@@ -1,9 +1,9 @@
 use anchor_lang::prelude::*;
 
-declare_id!("2mzvgXHKwkGTQpBWxDD7ebbHK4V1UpobmoCCFd9eQ4sa");
+declare_id!("EUE8AaF2X5Z7Pbi3j3DU3zquhe9QpuANqZWLvDQM1vJ");
 
 #[program]
-pub mod gmx_solana {
+pub mod role {
     use super::*;
 
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
