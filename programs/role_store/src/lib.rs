@@ -26,6 +26,11 @@ pub mod role_store {
             ctx.accounts.member.key(),
         )
     }
+
+    pub fn revoke_role(ctx: Context<RevokeRole>, _role_key: String) -> Result<()> {
+        ctx.accounts.membership.revoke_role();
+        Ok(())
+    }
 }
 
 #[derive(Accounts)]
@@ -61,6 +66,28 @@ pub struct GrantRole<'info> {
         space = 8 + Membership::INIT_SPACE,
         seeds = [Membership::SEED, role_key.as_bytes(), member.key().as_ref()],
         bump,
+    )]
+    pub membership: Account<'info, Membership>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(role_key: String)]
+pub struct RevokeRole<'info> {
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    #[account(
+        has_one = authority,
+        constraint = only_admin.is_admin() @ RoleStoreError::InvalidRole,
+    )]
+    pub only_admin: Account<'info, Membership>,
+    /// CHECK: We only use it as a pubkey.
+    pub member: UncheckedAccount<'info>,
+    #[account(
+        mut,
+        close = authority,
+        seeds = [Membership::SEED, role_key.as_bytes(), member.key().as_ref()],
+        bump = membership.bump(),
     )]
     pub membership: Account<'info, Membership>,
     pub system_program: Program<'info, System>,

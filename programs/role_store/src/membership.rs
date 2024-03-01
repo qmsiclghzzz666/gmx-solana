@@ -30,6 +30,10 @@ impl Membership {
         Ok(())
     }
 
+    pub(super) fn revoke_role(&mut self) {
+        self.valid = false;
+    }
+
     /// Check if it is a valid membership.
     pub fn is_valid(&self) -> bool {
         self.valid

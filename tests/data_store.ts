@@ -64,7 +64,6 @@ describe("data store", () => {
             member: user.publicKey,
             membership: userAdminPDA,
         });
-        console.log("signing with", user.publicKey);
         await expect(program.methods.initialize().accounts(
             {
                 authority: user.publicKey,
