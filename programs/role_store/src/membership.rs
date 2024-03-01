@@ -19,6 +19,9 @@ impl Membership {
     /// The ROLE_ADMIN role.
     pub const ROLE_ADMIN: &'static str = "ROLE_ADMIN";
 
+    /// The CONTROLLER role.
+    pub const CONTROLLER: &'static str = "CONTROLLER";
+
     pub(super) fn grant_role(&mut self, role: &str, bump: u8, authority: Pubkey) -> Result<()> {
         if role.len() > 32 {
             return Err(RoleStoreError::InvalidRoleName.into());
@@ -41,6 +44,11 @@ impl Membership {
 
     /// Check if it is a role admin.
     pub fn is_admin(&self) -> bool {
+        self.is_valid() && matches!(self.role.as_str(), Self::ROLE_ADMIN)
+    }
+
+    /// Check if it is a controller.
+    pub fn is_controller(&self) -> bool {
         self.is_valid() && matches!(self.role.as_str(), Self::ROLE_ADMIN)
     }
 

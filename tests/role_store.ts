@@ -33,7 +33,7 @@ describe("role store", () => {
     const user2 = anchor.web3.Keypair.generate();
     const [user2MembershipPDA,] = anchor.web3.PublicKey.findProgramAddressSync([
         membershipSeed,
-        anchor.utils.bytes.utf8.encode("HELLO"),
+        anchor.utils.bytes.utf8.encode("CONTROLLER"),
         user2.publicKey.toBytes(),
     ], program.programId);
 
@@ -72,14 +72,14 @@ describe("role store", () => {
     });
 
     it("Revoke role", async () => {
-        await program.methods.grantRole("HELLO").accounts({
+        await program.methods.grantRole("CONTROLLER").accounts({
             authority: provider.wallet.publicKey,
             onlyAdmin: adminMembershipPDA,
             member: user2.publicKey,
             membership: user2MembershipPDA
         }).rpc();
         expect(await program.account.membership.getAccountInfo(user2MembershipPDA)).to.be.not.null;
-        await program.methods.revokeRole("HELLO").accounts({
+        await program.methods.revokeRole("CONTROLLER").accounts({
             authority: provider.wallet.publicKey,
             onlyAdmin: adminMembershipPDA,
             member: user2.publicKey,
