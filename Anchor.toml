@@ -5,14 +5,16 @@ seeds = false
 skip-lint = false
 
 [programs.localnet]
-role = "EUE8AaF2X5Z7Pbi3j3DU3zquhe9QpuANqZWLvDQM1vJ"
+data_store = "HLkiY9JScepfVa8UJ9dfy3gnKfQhWvFZ4iK8hANxuTCy"
+oracle = "wtj96FFfr7r8hvuyDTt8mZ85RcYjGEFqmQGZozSA8S9"
+role_store = "KLAh3o2hMDJT26zBxv6RYrxcUxBjPCEeSt3Q1rS4JMU"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
 cluster = "Localnet"
-wallet = "/Users/orion/.config/solana/id.json"
+wallet = "~/.config/solana/id.json"
 
 [scripts]
 test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"

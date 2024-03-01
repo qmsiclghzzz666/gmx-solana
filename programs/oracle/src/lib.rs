@@ -1,9 +1,9 @@
 use anchor_lang::prelude::*;
 
-declare_id!("EUE8AaF2X5Z7Pbi3j3DU3zquhe9QpuANqZWLvDQM1vJ");
+declare_id!("wtj96FFfr7r8hvuyDTt8mZ85RcYjGEFqmQGZozSA8S9");
 
 #[program]
-pub mod role {
+pub mod oracle {
     use super::*;
 
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
