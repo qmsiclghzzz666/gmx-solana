@@ -49,7 +49,7 @@ impl Membership {
 
     /// Check if it is a controller.
     pub fn is_controller(&self) -> bool {
-        self.is_valid() && matches!(self.role.as_str(), Self::ROLE_ADMIN)
+        self.is_valid() && matches!(self.role.as_str(), Self::CONTROLLER)
     }
 
     /// Bump.
