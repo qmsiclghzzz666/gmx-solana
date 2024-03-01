@@ -695,6 +695,7 @@ name = "data_store"
 version = "0.1.0"
 dependencies = [
  "anchor-lang",
+ "role_store",
 ]
 
 [[package]]

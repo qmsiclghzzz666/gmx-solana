@@ -17,3 +17,4 @@ default = []
 
 [dependencies]
 anchor-lang = "0.29.0"
+role_store = { path = "../role_store", features = ["cpi"] }

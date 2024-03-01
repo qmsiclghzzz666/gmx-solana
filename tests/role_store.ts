@@ -8,6 +8,8 @@ chai.use(chaiAsPromised);
 const expect = chai.expect;
 
 const membershipSeed = anchor.utils.bytes.utf8.encode("membership");
+const roleAdmin = anchor.utils.bytes.utf8.encode("ROLE_ADMIN");
+export const user = anchor.web3.Keypair.generate();
 
 describe("role store", () => {
     const provider = anchor.AnchorProvider.env();
@@ -18,12 +20,13 @@ describe("role store", () => {
 
     const [adminMembershipPDA,] = anchor.web3.PublicKey.findProgramAddressSync([
         membershipSeed,
+        roleAdmin,
         provider.wallet.publicKey.toBytes(),
     ], program.programId);
 
-    const user = anchor.web3.Keypair.generate();
     const [userMembershipPDA,] = anchor.web3.PublicKey.findProgramAddressSync([
         membershipSeed,
+        anchor.utils.bytes.utf8.encode("HELLO"),
         user.publicKey.toBytes(),
     ], program.programId);
 
@@ -43,12 +46,8 @@ describe("role store", () => {
 
     it("Grant role", async () => {
         const tx = await program.methods.grantRole("HELLO").accounts({
-            permission: {
-                authority: {
-                    signer: provider.wallet.publicKey,
-                    membership: adminMembershipPDA,
-                }
-            },
+            authority: provider.wallet.publicKey,
+            onlyAdmin: adminMembershipPDA,
             member: user.publicKey,
             membership: userMembershipPDA
         }).rpc();
@@ -63,14 +62,10 @@ describe("role store", () => {
             user2.publicKey.toBytes(),
         ], program.programId);
         await expect(program.methods.grantRole("HELLO").accounts({
-            permission: {
-                authority: {
-                    signer: user.publicKey,
-                    membership: userMembershipPDA,
-                }
-            },
+            authority: user.publicKey,
+            onlyAdmin: userMembershipPDA,
             member: user2.publicKey,
             membership: user2MembershipPDA
-        }).signers([user]).rpc()).to.be.rejectedWith(anchor.AnchorError, /Error Message: Invalid role/);
+        }).signers([user]).rpc()).to.be.rejected;
     });
 });

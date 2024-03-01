@@ -5,22 +5,26 @@ pub mod membership;
 
 pub use self::membership::Membership;
 
-declare_id!("KLAh3o2hMDJT26zBxv6RYrxcUxBjPCEeSt3Q1rS4JMU");
+declare_id!("H7L3aYUzR3joc6Heyonjt1thpWdtwYcTVQvCrB2xDsdi");
 
 #[program]
 pub mod role_store {
     use super::*;
 
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
-        ctx.accounts
-            .admin_membership
-            .grant_role(Membership::ROLE_ADMIN, ctx.bumps.admin_membership)
+        ctx.accounts.admin_membership.grant_role(
+            Membership::ROLE_ADMIN,
+            ctx.bumps.admin_membership,
+            ctx.accounts.admin.key(),
+        )
     }
 
     pub fn grant_role(ctx: Context<GrantRole>, role_key: String) -> Result<()> {
-        ctx.accounts
-            .membership
-            .grant_role(&role_key, ctx.bumps.membership)
+        ctx.accounts.membership.grant_role(
+            &role_key,
+            ctx.bumps.membership,
+            ctx.accounts.member.key(),
+        )
     }
 }
 
@@ -31,8 +35,8 @@ pub struct Initialize<'info> {
     #[account(
         init,
         payer = admin,
-        space = 8 + Membership::MAX_SIZE,
-        seeds = [Membership::SEED, admin.key().as_ref()],
+        space = 8 + Membership::INIT_SPACE,
+        seeds = [Membership::SEED, Membership::ROLE_ADMIN.as_bytes(), admin.key().as_ref()],
         bump,
     )]
     pub admin_membership: Account<'info, Membership>,
@@ -40,36 +44,26 @@ pub struct Initialize<'info> {
 }
 
 #[derive(Accounts)]
+#[instruction(role_key: String)]
 pub struct GrantRole<'info> {
-    pub permission: OnlyRoleAdmin<'info>,
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    #[account(
+        has_one = authority,
+        constraint = only_admin.is_admin() @ RoleStoreError::InvalidRole,
+    )]
+    pub only_admin: Account<'info, Membership>,
     /// CHECK: We only use it as a pubkey.
     pub member: UncheckedAccount<'info>,
     #[account(
         init,
-        payer = permission.authority.signer,
-        space = 8 + Membership::MAX_SIZE,
-        seeds = [Membership::SEED, member.key().as_ref()],
+        payer = authority,
+        space = 8 + Membership::INIT_SPACE,
+        seeds = [Membership::SEED, role_key.as_bytes(), member.key().as_ref()],
         bump,
     )]
     pub membership: Account<'info, Membership>,
     pub system_program: Program<'info, System>,
-}
-
-#[derive(Accounts)]
-pub struct Member<'info> {
-    #[account(mut)]
-    pub signer: Signer<'info>,
-    #[account(
-        seeds = [Membership::SEED, signer.key().as_ref()],
-        bump = membership.bump(),
-    )]
-    pub membership: Account<'info, Membership>,
-}
-
-#[derive(Accounts)]
-pub struct OnlyRoleAdmin<'info> {
-    #[account(constraint = authority.membership.is_admin() @ RoleStoreError::InvalidRole)]
-    pub authority: Member<'info>,
 }
 
 #[error_code]
