@@ -1,90 +1,69 @@
 import * as anchor from "@coral-xyz/anchor";
-import { Program } from "@coral-xyz/anchor";
-import { RoleStore } from "../target/types/role_store";
-import chai from 'chai';
-import chaiAsPromised from 'chai-as-promised';
-
-chai.use(chaiAsPromised);
-const expect = chai.expect;
+import { getProvider, getPrograms, expect, getUsers } from "../utils/fixtures";
+import { createMembershipPDA, createRoleAdminPDA } from "../utils/role";
 
 const membershipSeed = anchor.utils.bytes.utf8.encode("membership");
 const roleAdmin = anchor.utils.bytes.utf8.encode("ROLE_ADMIN");
 export const user = anchor.web3.Keypair.generate();
 
 describe("role store", () => {
-    const provider = anchor.AnchorProvider.env();
-    // Configure the client to use the local cluster.
-    anchor.setProvider(provider);
+    const provider = getProvider();
+    const {
+        roleStore,
+    } = getPrograms();
+    const {
+        signer0,
+    } = getUsers();
 
-    const program = anchor.workspace.RoleStore as Program<RoleStore>;
+    const helloRole = "HELLO";
+    const [onlyAdmin] = createRoleAdminPDA(provider.wallet.publicKey);
+    const [helloMembership] = createMembershipPDA(helloRole, user.publicKey);
 
-    const [adminMembershipPDA,] = anchor.web3.PublicKey.findProgramAddressSync([
-        membershipSeed,
-        roleAdmin,
-        provider.wallet.publicKey.toBytes(),
-    ], program.programId);
-
-    const [userMembershipPDA,] = anchor.web3.PublicKey.findProgramAddressSync([
-        membershipSeed,
-        anchor.utils.bytes.utf8.encode("HELLO"),
-        user.publicKey.toBytes(),
-    ], program.programId);
-
-    const user2 = anchor.web3.Keypair.generate();
-    const [user2MembershipPDA,] = anchor.web3.PublicKey.findProgramAddressSync([
-        membershipSeed,
-        anchor.utils.bytes.utf8.encode("CONTROLLER"),
-        user2.publicKey.toBytes(),
-    ], program.programId);
-
-    it("Initialize role store", async () => {
-        // Add your test here.
-        const tx = await program.methods.initialize().accounts(
-            {
-                admin: provider.wallet.publicKey,
-                adminMembership: adminMembershipPDA,
-            }
-        ).rpc();
-        const adminRole = (await program.account.membership.fetch(adminMembershipPDA)).role;
-        expect(
-            adminRole
-        ).to.equal("ROLE_ADMIN");
-    });
-
-    it("Grant role", async () => {
-        const tx = await program.methods.grantRole("HELLO").accounts({
+    it(`grant a role to a user`, async () => {
+        await roleStore.methods.grantRole(helloRole).accounts({
             authority: provider.wallet.publicKey,
-            onlyAdmin: adminMembershipPDA,
+            onlyAdmin,
             member: user.publicKey,
-            membership: userMembershipPDA
+            membership: helloMembership,
         }).rpc();
-        const userMember = await program.account.membership.fetch(userMembershipPDA);
-        expect(userMember.role).to.equals("HELLO");
+        expect((await roleStore.account.membership.fetch(helloMembership)).role).to.equals(helloRole);
     });
 
-    it("Grant role should failed", async () => {
-        await expect(program.methods.grantRole("HELLO").accounts({
-            authority: user.publicKey,
-            onlyAdmin: userMembershipPDA,
-            member: user2.publicKey,
-            membership: user2MembershipPDA
-        }).signers([user]).rpc()).to.be.rejected;
+    it("should fail to grant a role without admin role", async () => {
+        await expect(roleStore.methods.grantRole("OTHER").accounts({
+            authority: signer0.publicKey,
+            onlyAdmin: createRoleAdminPDA(signer0.publicKey)[0],
+            member: user.publicKey,
+            membership: createMembershipPDA("OTHER", user.publicKey)[0],
+        }).signers([signer0]).rpc()).to.be.rejected;
     });
 
-    it("Revoke role", async () => {
-        await program.methods.grantRole("CONTROLLER").accounts({
+    it("should fail to revoke a role without admin role", async () => {
+        await expect(roleStore.methods.revokeRole(helloRole).accounts({
+            authority: signer0.publicKey,
+            onlyAdmin: createRoleAdminPDA(signer0.publicKey)[0],
+            member: user.publicKey,
+            membership: helloMembership,
+        }).signers([signer0]).rpc()).to.be.rejected;
+    });
+
+    it("grant a role and then revoke it", async () => {
+        const role = "OTHER";
+        const [membership] = createMembershipPDA(role, user.publicKey);
+        await roleStore.methods.grantRole(role).accounts({
             authority: provider.wallet.publicKey,
-            onlyAdmin: adminMembershipPDA,
-            member: user2.publicKey,
-            membership: user2MembershipPDA
+            onlyAdmin,
+            member: user.publicKey,
+            membership,
         }).rpc();
-        expect(await program.account.membership.getAccountInfo(user2MembershipPDA)).to.be.not.null;
-        await program.methods.revokeRole("CONTROLLER").accounts({
+        expect(await roleStore.account.membership.getAccountInfo(membership)).to.be.not.null;
+        expect((await roleStore.account.membership.fetch(membership)).role).to.equals(role);
+        await roleStore.methods.revokeRole(role).accounts({
             authority: provider.wallet.publicKey,
-            onlyAdmin: adminMembershipPDA,
-            member: user2.publicKey,
-            membership: user2MembershipPDA,
+            onlyAdmin,
+            member: user.publicKey,
+            membership,
         }).rpc();
-        expect(await program.account.membership.getAccountInfo(user2MembershipPDA)).to.be.null;
+        expect(await roleStore.account.membership.getAccountInfo(membership)).to.be.null;
     });
 });
