@@ -2,9 +2,7 @@ import * as anchor from "@coral-xyz/anchor";
 import { getProvider, getPrograms, expect, getUsers } from "../utils/fixtures";
 import { createMembershipPDA, createRoleAdminPDA } from "../utils/role";
 
-const membershipSeed = anchor.utils.bytes.utf8.encode("membership");
-const roleAdmin = anchor.utils.bytes.utf8.encode("ROLE_ADMIN");
-export const user = anchor.web3.Keypair.generate();
+const user = anchor.web3.Keypair.generate();
 
 describe("role store", () => {
     const provider = getProvider();
@@ -12,7 +10,7 @@ describe("role store", () => {
         roleStore,
     } = getPrograms();
     const {
-        signer0,
+        user0,
     } = getUsers();
 
     const helloRole = "HELLO";
@@ -31,20 +29,20 @@ describe("role store", () => {
 
     it("should fail to grant a role without admin role", async () => {
         await expect(roleStore.methods.grantRole("OTHER").accounts({
-            authority: signer0.publicKey,
-            onlyAdmin: createRoleAdminPDA(signer0.publicKey)[0],
+            authority: user0.publicKey,
+            onlyAdmin: createRoleAdminPDA(user0.publicKey)[0],
             member: user.publicKey,
             membership: createMembershipPDA("OTHER", user.publicKey)[0],
-        }).signers([signer0]).rpc()).to.be.rejected;
+        }).signers([user0]).rpc()).to.be.rejected;
     });
 
     it("should fail to revoke a role without admin role", async () => {
         await expect(roleStore.methods.revokeRole(helloRole).accounts({
-            authority: signer0.publicKey,
-            onlyAdmin: createRoleAdminPDA(signer0.publicKey)[0],
+            authority: user0.publicKey,
+            onlyAdmin: createRoleAdminPDA(user0.publicKey)[0],
             member: user.publicKey,
             membership: helloMembership,
-        }).signers([signer0]).rpc()).to.be.rejected;
+        }).signers([user0]).rpc()).to.be.rejected;
     });
 
     it("grant a role and then revoke it", async () => {

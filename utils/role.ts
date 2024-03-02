@@ -1,12 +1,12 @@
 import * as anchor from "@coral-xyz/anchor";
 import { RoleStore } from "../target/types/role_store";
 
+export const roleStore = anchor.workspace.RoleStore as anchor.Program<RoleStore>;
+
 export const MEMBERSHIP_SEED = anchor.utils.bytes.utf8.encode("membership");
 
 export const ROLE_ADMIN = "ROLE_ADMIN";
 export const CONTROLLER = "CONTROLLER";
-
-export const roleStore = anchor.workspace.RoleStore as anchor.Program<RoleStore>;
 
 export const createMembershipPDA = (roleKey: string, authority: anchor.web3.PublicKey) => anchor.web3.PublicKey.findProgramAddressSync([
     MEMBERSHIP_SEED,
