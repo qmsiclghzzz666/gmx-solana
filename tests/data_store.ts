@@ -5,9 +5,8 @@ import { createControllerPDA, createMembershipPDA, roleStore } from "../utils/ro
 import { createAddressPDA } from "../utils/data";
 
 describe("data store", () => {
-    const provider = getProvider();
     const { dataStore } = getPrograms();
-    const { user0 } = getUsers();
+    const { user0, signer0 } = getUsers();
 
     const key = Keypair.generate().publicKey;
     const fooAddressKey = `PRICE_FEED:${key}`;
@@ -15,12 +14,12 @@ describe("data store", () => {
     const [fooAddressPDA] = createAddressPDA(fooAddressKey);
 
     it("set and get address", async () => {
-        const [onlyController] = createControllerPDA(provider.wallet.publicKey);
+        const [onlyController] = createControllerPDA(signer0.publicKey);
         await dataStore.methods.setAddress(fooAddressKey, fooAddress).accounts({
-            authority: provider.wallet.publicKey,
+            authority: signer0.publicKey,
             onlyController,
             address: fooAddressPDA,
-        }).signers([]).rpc();
+        }).signers([signer0]).rpc();
         const saved = await dataStore.methods.getAddress(fooAddressKey).accounts({
             address: fooAddressPDA,
         }).view() as PublicKey;

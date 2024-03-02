@@ -31,11 +31,15 @@ export const initializeRoleStore = async (provider: anchor.AnchorProvider, contr
     }
 
     // Grant CONTROLLER role to the `controller`.
-    const tx = await roleStore.methods.grantRole(CONTROLLER).accounts({
-        authority: provider.wallet.publicKey,
-        onlyAdmin: onlyAdmin,
-        member: controller,
-        membership: createControllerPDA(controller)[0],
-    }).rpc();
-    console.log("Granted CONTROLLER to the given `controller` in tx:", tx);
+    try {
+        const tx = await roleStore.methods.grantRole(CONTROLLER).accounts({
+            authority: provider.wallet.publicKey,
+            onlyAdmin: onlyAdmin,
+            member: controller,
+            membership: createControllerPDA(controller)[0],
+        }).rpc();
+        console.log(`Granted CONTROLLER role to ${controller} in tx ${tx}`);
+    } catch (error) {
+        console.warn(`Failed to grant CONTROLLER role to ${controller}`, error);
+    }
 };
