@@ -37,7 +37,7 @@ pub struct SetAddress<'info> {
     )]
     only_controller: Account<'info, Membership>,
     #[account(
-        init,
+        init_if_needed,
         payer = authority,
         space = 8 + Address::INIT_SPACE,
         seeds = [Address::SEED, &to_seed(&key)],

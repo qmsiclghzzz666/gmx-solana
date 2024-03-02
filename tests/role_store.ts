@@ -45,7 +45,7 @@ describe("role store", () => {
         }).signers([user0]).rpc()).to.be.rejected;
     });
 
-    it("grant a role and then revoke it", async () => {
+    it("tests grant-revoke multiple times", async () => {
         const role = "OTHER";
         const [membership] = createMembershipPDA(role, user.publicKey);
         await roleStore.methods.grantRole(role).accounts({
@@ -56,6 +56,13 @@ describe("role store", () => {
         }).rpc();
         expect(await roleStore.account.membership.getAccountInfo(membership)).to.be.not.null;
         expect((await roleStore.account.membership.fetch(membership)).role).to.equals(role);
+        // Cannot grant again without revoking it first.
+        await expect(roleStore.methods.grantRole(role).accounts({
+            authority: provider.wallet.publicKey,
+            onlyAdmin,
+            member: user.publicKey,
+            membership,
+        }).rpc()).to.be.rejected;
         await roleStore.methods.revokeRole(role).accounts({
             authority: provider.wallet.publicKey,
             onlyAdmin,
@@ -63,5 +70,13 @@ describe("role store", () => {
             membership,
         }).rpc();
         expect(await roleStore.account.membership.getAccountInfo(membership)).to.be.null;
+        await roleStore.methods.grantRole(role).accounts({
+            authority: provider.wallet.publicKey,
+            onlyAdmin,
+            member: user.publicKey,
+            membership,
+        }).rpc();
+        expect(await roleStore.account.membership.getAccountInfo(membership)).to.be.not.null;
+        expect((await roleStore.account.membership.fetch(membership)).role).to.equals(role);
     });
 });
