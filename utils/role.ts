@@ -35,7 +35,7 @@ export const initializeRoleStore = async (provider: anchor.AnchorProvider, key: 
             store,
             roleAdmin: onlyRoleAdmin,
         }).rpc();
-        console.log(`Initialized a new role store ${store.toBase58()} program in tx: ${tx}`);
+        console.log(`Initialized a new role store account ${store.toBase58()} in tx: ${tx}`);
     } catch (error) {
         console.warn("Failed to initialize a role store, maybe it has been initialized", error);
     }

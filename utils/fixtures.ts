@@ -5,7 +5,7 @@ import chaiAsPromised from 'chai-as-promised';
 chai.use(chaiAsPromised);
 
 import { initializeRoleStore, roleStore } from "./role";
-import { dataStore } from "./data";
+import { dataStore, initializeDataStore } from "./data";
 
 export const expect = chai.expect;
 
@@ -15,7 +15,9 @@ const provider = anchor.AnchorProvider.env();
 const user0 = anchor.web3.Keypair.generate();
 const signer0 = anchor.web3.Keypair.generate();
 
-const roleStoreKey = anchor.web3.Keypair.generate().publicKey.toBase58();
+// Keys.
+const roleStoreKey = "role_store_0";
+const dataStoreKey = "data_store_0";
 
 export const getProvider = () => provider;
 
@@ -36,6 +38,7 @@ export const getUsers = () => {
 export const getKeys = () => {
     return {
         roleStoreKey,
+        dataStoreKey,
     }
 };
 
@@ -66,6 +69,7 @@ export const mochaGlobalSetup = async () => {
     anchor.setProvider(provider);
     await initializeUser(provider, signer0, 1);
     await initializeRoleStore(provider, roleStoreKey, signer0.publicKey);
+    await initializeDataStore(signer0, roleStoreKey, dataStoreKey);
     console.log("[Done.]");
 };
 
