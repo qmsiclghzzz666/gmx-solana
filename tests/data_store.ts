@@ -1,12 +1,14 @@
 import { PublicKey, Keypair } from '@solana/web3.js';
 
-import { expect, getPrograms, getProvider, getUsers } from "../utils/fixtures";
-import { createControllerPDA, createMembershipPDA, roleStore } from "../utils/role";
+import { expect, getKeys, getPrograms, getProvider, getUsers } from "../utils/fixtures";
+import { createControllerPDA, createRolePDA, createRoleStorePDA, roleStore } from "../utils/role";
 import { createAddressPDA } from "../utils/data";
 
 describe("data store", () => {
     const { dataStore } = getPrograms();
     const { user0, signer0 } = getUsers();
+    const { roleStoreKey } = getKeys();
+    const [store] = createRoleStorePDA(roleStoreKey);
 
     const key = Keypair.generate().publicKey;
     const fooAddressKey = `PRICE_FEED:${key}`;
@@ -14,7 +16,7 @@ describe("data store", () => {
 
     it("set and get address", async () => {
         const fooAddress = Keypair.generate().publicKey;
-        const [onlyController] = createControllerPDA(signer0.publicKey);
+        const [onlyController] = createControllerPDA(store, signer0.publicKey);
         await dataStore.methods.setAddress(fooAddressKey, fooAddress).accounts({
             authority: signer0.publicKey,
             onlyController,
@@ -28,7 +30,7 @@ describe("data store", () => {
 
     it("can only be set by controller", async () => {
         const fooAddress = Keypair.generate().publicKey;
-        const [otherMembership] = createMembershipPDA("OTHER", user0.publicKey);
+        const [otherMembership] = createRolePDA(store, "OTHER", user0.publicKey);
         await expect(dataStore.methods.setAddress(fooAddressKey, fooAddress).accounts({
             authority: user0.publicKey,
             onlyController: otherMembership,
@@ -38,7 +40,7 @@ describe("data store", () => {
 
     it("can be set again", async () => {
         const fooAddress = Keypair.generate().publicKey;
-        const [onlyController] = createControllerPDA(signer0.publicKey);
+        const [onlyController] = createControllerPDA(store, signer0.publicKey);
         await dataStore.methods.setAddress(fooAddressKey, fooAddress).accounts({
             authority: signer0.publicKey,
             onlyController,

@@ -15,6 +15,8 @@ const provider = anchor.AnchorProvider.env();
 const user0 = anchor.web3.Keypair.generate();
 const signer0 = anchor.web3.Keypair.generate();
 
+const roleStoreKey = anchor.web3.Keypair.generate().publicKey.toBase58();
+
 export const getProvider = () => provider;
 
 export const getPrograms = () => {
@@ -28,6 +30,12 @@ export const getUsers = () => {
     return {
         user0,
         signer0,
+    }
+};
+
+export const getKeys = () => {
+    return {
+        roleStoreKey,
     }
 };
 
@@ -57,7 +65,7 @@ export const mochaGlobalSetup = async () => {
     console.log("[Setting up everything...]");
     anchor.setProvider(provider);
     await initializeUser(provider, signer0, 1);
-    await initializeRoleStore(provider, signer0.publicKey);
+    await initializeRoleStore(provider, roleStoreKey, signer0.publicKey);
     console.log("[Done.]");
 };
 

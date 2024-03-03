@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
-use role_store::membership::Membership;
+use gmx_solana_utils::to_seed;
+use role_store::Role;
 
 declare_id!("8hJ2dGQ2Ccr5G6iEqQQEoBApRSXt7Jn8Qyf9Qf3eLBX2");
 
@@ -20,12 +21,6 @@ pub mod data_store {
     }
 }
 
-/// Convert a string to a seed.
-pub fn to_seed(key: &str) -> [u8; 32] {
-    use anchor_lang::solana_program::hash::hash;
-    hash(key.as_bytes()).to_bytes()
-}
-
 #[derive(Accounts)]
 #[instruction(key: String)]
 pub struct SetAddress<'info> {
@@ -35,7 +30,7 @@ pub struct SetAddress<'info> {
         has_one = authority,
         constraint = only_controller.is_controller(),
     )]
-    only_controller: Account<'info, Membership>,
+    only_controller: Account<'info, Role>,
     #[account(
         init_if_needed,
         payer = authority,

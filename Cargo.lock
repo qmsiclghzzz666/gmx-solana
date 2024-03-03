@@ -695,6 +695,7 @@ name = "data_store"
 version = "0.1.0"
 dependencies = [
  "anchor-lang",
+ "gmx-solana-utils",
  "role_store",
 ]
 
@@ -782,6 +783,13 @@ dependencies = [
  "libc",
  "wasi 0.11.0+wasi-snapshot-preview1",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "gmx-solana-utils"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
 ]
 
 [[package]]
@@ -1294,6 +1302,7 @@ name = "role_store"
 version = "0.1.0"
 dependencies = [
  "anchor-lang",
+ "gmx-solana-utils",
 ]
 
 [[package]]
