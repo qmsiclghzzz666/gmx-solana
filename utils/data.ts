@@ -24,7 +24,7 @@ export const initializeDataStore = async (signer: anchor.web3.Keypair, roleStore
     const [roleStorePDA] = createRoleStorePDA(roleStoreKey);
     const [dataStorePDA] = createDataStorePDA(roleStorePDA, dataStoreKey);
 
-    // Initialize the DataStore with the given key.
+    // Initialize a DataStore with the given key.
     try {
         const tx = await dataStore.methods.initialize(dataStoreKey).accounts({
             authority: signer.publicKey,

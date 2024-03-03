@@ -14,7 +14,7 @@ describe("data store", () => {
     const [dataStorePDA] = createDataStorePDA(roleStorePDA, dataStoreKey);
 
     const key = Keypair.generate().publicKey;
-    const fooAddressKey = `PRICE_FEED:${key}`;
+    const fooAddressKey = `FOO:${key}`;
     const [fooAddressPDA] = createAddressPDA(dataStorePDA, fooAddressKey);
 
     it("set and get address", async () => {
@@ -33,7 +33,7 @@ describe("data store", () => {
         expect(saved).to.eql(fooAddress);
     });
 
-    it("can only be set by controller", async () => {
+    it("can only be set by CONTROLLER", async () => {
         const fooAddress = Keypair.generate().publicKey;
         const [otherMembership] = createRoleAdminPDA(roleStorePDA, provider.wallet.publicKey);
         await expect(dataStore.methods.setAddress(fooAddressKey, fooAddress).accounts({
