@@ -26,14 +26,14 @@ export const createControllerPDA = (store: anchor.web3.PublicKey, authority: anc
 
 export const initializeRoleStore = async (provider: anchor.AnchorProvider, key: string, controller: anchor.web3.PublicKey) => {
     const [store] = createRoleStorePDA(key);
-    const [onlyAdmin] = createRoleAdminPDA(store, provider.wallet.publicKey);
+    const [onlyRoleAdmin] = createRoleAdminPDA(store, provider.wallet.publicKey);
 
     // Initialize the RoleStore with the first admin to be the wallet.
     try {
         const tx = await roleStore.methods.initialize(key).accounts({
             authority: provider.wallet.publicKey,
             store,
-            role: onlyAdmin,
+            roleAdmin: onlyRoleAdmin,
         }).rpc();
         console.log(`Initialized a new role store ${store.toBase58()} program in tx: ${tx}`);
     } catch (error) {
@@ -45,7 +45,7 @@ export const initializeRoleStore = async (provider: anchor.AnchorProvider, key: 
         const tx = await roleStore.methods.grantRole(CONTROLLER).accounts({
             authority: provider.wallet.publicKey,
             store,
-            onlyAdmin,
+            onlyRoleAdmin,
             roleAuthority: controller,
             role: onlyController0,
         }).rpc();

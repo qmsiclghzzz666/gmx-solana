@@ -9,10 +9,10 @@ pub mod role_store {
 
     pub fn initialize(ctx: Context<Initialize>, key: String) -> Result<()> {
         ctx.accounts.store.init(&key, ctx.bumps.store);
-        ctx.accounts.role.grant(
+        ctx.accounts.role_admin.grant(
             ctx.accounts.store.key(),
             Role::ROLE_ADMIN,
-            ctx.bumps.role,
+            ctx.bumps.role_admin,
             ctx.accounts.authority.key(),
         )
     }
@@ -36,7 +36,7 @@ pub mod role_store {
         //     1,
         //     RoleStoreError::AtLeastOneAdminPerStore
         // );
-        if ctx.accounts.role.is_admin() {
+        if ctx.accounts.role.is_role_admin() {
             ctx.accounts.store.num_admins -= 1;
         }
         Ok(())
@@ -63,7 +63,7 @@ pub struct Initialize<'info> {
         seeds = [Role::SEED, store.key().as_ref(), Role::ROLE_ADMIN.as_bytes(), authority.key().as_ref()],
         bump,
     )]
-    pub role: Account<'info, Role>,
+    pub role_admin: Account<'info, Role>,
     pub system_program: Program<'info, System>,
 }
 
@@ -77,9 +77,9 @@ pub struct GrantRole<'info> {
     #[account(
         has_one = authority @ RoleStoreError::PermissionDenied,
         has_one = store @ RoleStoreError::MismatchedStore,
-        constraint = only_admin.is_admin() @ RoleStoreError::PermissionDenied,
+        constraint = only_role_admin.is_role_admin() @ RoleStoreError::PermissionDenied,
     )]
-    pub only_admin: Account<'info, Role>,
+    pub only_role_admin: Account<'info, Role>,
     /// CHECK: We only use it as a pubkey.
     pub role_authority: UncheckedAccount<'info>,
     #[account(
@@ -102,13 +102,13 @@ pub struct RevokeRole<'info> {
     #[account(
         has_one = authority @ RoleStoreError::PermissionDenied,
         has_one = store @ RoleStoreError::MismatchedStore,
-        constraint = only_admin.is_admin() @ RoleStoreError::PermissionDenied,
+        constraint = only_role_admin.is_role_admin() @ RoleStoreError::PermissionDenied,
     )]
-    pub only_admin: Account<'info, Role>,
+    pub only_role_admin: Account<'info, Role>,
     #[account(
         mut,
         has_one = store @ RoleStoreError::MismatchedStore,
-        constraint = !role.is_admin() || store.num_admins > 1 @ RoleStoreError::AtLeastOneAdminPerStore,
+        constraint = !role.is_role_admin() || store.num_admins > 1 @ RoleStoreError::AtLeastOneAdminPerStore,
         close = authority,
     )]
     pub role: Account<'info, Role>,
@@ -165,7 +165,7 @@ impl Role {
     }
 
     /// Check if it is a role admin.
-    pub fn is_admin(&self) -> bool {
+    pub fn is_role_admin(&self) -> bool {
         matches!(self.role.as_str(), Self::ROLE_ADMIN)
     }
 
