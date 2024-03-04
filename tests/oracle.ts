@@ -8,7 +8,7 @@ describe("oracle", () => {
         const answer = await oracle.methods.initialize().accounts({
             feed: "Cv4T27XbjVoKUYwP72NQQanvZeA7W4YF9L4EnYT9kx5o",
             chainlink: "HEvSKofvBgfaexv23kMabbYqxasxU3mQ4ibBMEmJWHny",
-        }).rpc();
-        console.log(answer);
+        }).view() as anchor.BN;
+        console.log(`got answer: ${answer}`);
     });
 });
