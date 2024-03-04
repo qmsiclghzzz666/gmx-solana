@@ -1,5 +1,8 @@
 use anchor_lang::prelude::*;
 
+/// Decimal type for storing prices.
+pub mod decimal;
+
 declare_id!("8LmVjFpoR6hupp6WZZb6EbmupaXvivaCEk2iAHskr1en");
 
 #[program]
