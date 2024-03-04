@@ -14,15 +14,18 @@ url = "https://api.apr.dev"
 
 [provider]
 cluster = "Localnet"
-wallet = "/Users/orion/.config/solana/id.json"
+wallet = "~/.config/solana/id.json"
 
 [scripts]
 test = "yarn run ts-mocha -p ./tsconfig.json --require utils/fixtures.ts -t 1000000 tests/**/*.ts"
 
 [test.validator]
 url = "https://api.mainnet-beta.solana.com"
+bind_address = "127.0.0.1"
 
-[[test.validator.clone]]
+[[test.genesis]]
 address = "HEvSKofvBgfaexv23kMabbYqxasxU3mQ4ibBMEmJWHny"
+program = "external-programs/chainlink-store.so"
+
 [[test.validator.clone]]
 address = "Cv4T27XbjVoKUYwP72NQQanvZeA7W4YF9L4EnYT9kx5o"
