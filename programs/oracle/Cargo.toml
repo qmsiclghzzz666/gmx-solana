@@ -17,3 +17,4 @@ default = []
 
 [dependencies]
 anchor-lang = { workspace = true }
+chainlink_solana = "1.0.0"
