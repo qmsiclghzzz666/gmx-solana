@@ -1,7 +1,10 @@
-use anchor_lang::prelude::{borsh, AnchorDeserialize, AnchorSerialize};
+use anchor_lang::{
+    prelude::{borsh, AnchorDeserialize, AnchorSerialize},
+    InitSpace,
+};
 
 /// Decimal type for storing prices.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, AnchorSerialize, AnchorDeserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, AnchorSerialize, AnchorDeserialize, InitSpace)]
 pub struct Decimal {
     /// Value.
     pub value: u32,

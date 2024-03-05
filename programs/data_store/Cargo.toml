@@ -14,6 +14,7 @@ no-idl = []
 no-log-ix-name = []
 cpi = ["no-entrypoint"]
 default = []
+idl-build = ["anchor-lang/idl-build", "role_store/idl-build"]
 
 [dependencies]
 anchor-lang = { workspace = true, features = ["init-if-needed"] }
