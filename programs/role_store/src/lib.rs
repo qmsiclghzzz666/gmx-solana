@@ -1,5 +1,10 @@
-use anchor_lang::{prelude::*, Bumps};
+use anchor_lang::prelude::*;
 use gmx_solana_utils::to_seed;
+
+/// Traits.
+pub mod traits;
+
+pub use self::traits::{Authenticate, Authorization};
 
 declare_id!("H7L3aYUzR3joc6Heyonjt1thpWdtwYcTVQvCrB2xDsdi");
 
@@ -17,6 +22,7 @@ pub mod role_store {
         )
     }
 
+    #[access_control(GrantRole::only_role_admin(&ctx))]
     pub fn grant_role(ctx: Context<GrantRole>, role_name: String) -> Result<()> {
         ctx.accounts.role.grant(
             ctx.accounts.store.key(),
@@ -30,12 +36,8 @@ pub mod role_store {
         Ok(())
     }
 
+    #[access_control(RevokeRole::only_role_admin(&ctx))]
     pub fn revoke_role(ctx: Context<RevokeRole>) -> Result<()> {
-        // require_gt!(
-        //     ctx.accounts.store.num_admins,
-        //     1,
-        //     RoleStoreError::AtLeastOneAdminPerStore
-        // );
         if ctx.accounts.role.is_role_admin() {
             ctx.accounts.store.num_admins -= 1;
         }
@@ -74,11 +76,6 @@ pub struct GrantRole<'info> {
     pub authority: Signer<'info>,
     #[account(mut)]
     pub store: Account<'info, RoleStore>,
-    #[account(
-        has_one = authority @ RoleStoreError::PermissionDenied,
-        has_one = store @ RoleStoreError::MismatchedStore,
-        constraint = only_role_admin.is_role_admin() @ RoleStoreError::PermissionDenied,
-    )]
     pub only_role_admin: Account<'info, Role>,
     /// CHECK: We only use it as a pubkey.
     pub role_authority: UncheckedAccount<'info>,
@@ -93,17 +90,26 @@ pub struct GrantRole<'info> {
     pub system_program: Program<'info, System>,
 }
 
+impl<'info> Authorization<'info> for GrantRole<'info> {
+    fn store(&self) -> Pubkey {
+        self.store.key()
+    }
+
+    fn authority(&self) -> &Signer<'info> {
+        &self.authority
+    }
+
+    fn role(&self) -> &Account<'info, Role> {
+        &self.only_role_admin
+    }
+}
+
 #[derive(Accounts)]
 pub struct RevokeRole<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
     #[account(mut)]
     pub store: Account<'info, RoleStore>,
-    #[account(
-        has_one = authority @ RoleStoreError::PermissionDenied,
-        has_one = store @ RoleStoreError::MismatchedStore,
-        constraint = only_role_admin.is_role_admin() @ RoleStoreError::PermissionDenied,
-    )]
     pub only_role_admin: Account<'info, Role>,
     #[account(
         mut,
@@ -112,6 +118,20 @@ pub struct RevokeRole<'info> {
         close = authority,
     )]
     pub role: Account<'info, Role>,
+}
+
+impl<'info> Authorization<'info> for RevokeRole<'info> {
+    fn store(&self) -> Pubkey {
+        self.store.key()
+    }
+
+    fn authority(&self) -> &Signer<'info> {
+        &self.authority
+    }
+
+    fn role(&self) -> &Account<'info, Role> {
+        &self.only_role_admin
+    }
 }
 
 #[account]
@@ -182,60 +202,6 @@ impl Role {
         self.bump
     }
 }
-
-/// Authorization.
-pub trait Authorization<'info> {
-    /// Get the address of role store.
-    fn store(&self) -> &Pubkey;
-
-    /// Get the address of the authority.
-    fn authority(&self) -> &Signer<'info>;
-
-    /// Get the role to check.
-    fn role(&self) -> &Account<'info, Role>;
-}
-
-/// Provides access control methods for [`Authorization`].
-pub trait Authenticate<'info>: Authorization<'info> + Bumps + Sized {
-    /// Check if the authorization is valid.
-    fn valid(ctx: &Context<Self>) -> Result<()> {
-        require_eq!(
-            ctx.accounts.store().key(),
-            ctx.accounts.role().store,
-            RoleStoreError::MismatchedStore
-        );
-        require_eq!(
-            *ctx.accounts.authority().key,
-            ctx.accounts.role().authority,
-            RoleStoreError::Unauthorized
-        );
-        Ok(())
-    }
-
-    /// Check if the authorization is valid and the role matches the given.
-    fn only_role(ctx: &Context<Self>, role: &str) -> Result<()> {
-        Self::valid(ctx)?;
-        require!(role.len() <= MAX_ROLE_LEN, RoleStoreError::RoleNameTooLarge);
-        require_eq!(
-            role,
-            &ctx.accounts.role().role,
-            RoleStoreError::PermissionDenied
-        );
-        Ok(())
-    }
-
-    /// Check if the authorization is valid and the role is [`CONTROLLER`](Role::CONTROLLER).
-    fn only_controller(ctx: &Context<Self>) -> Result<()> {
-        Self::only_role(ctx, Role::CONTROLLER)
-    }
-
-    /// Check if the authorization is valid and the role is [`ROLE_ADMIN`](Role::ROLE_ADMIN).
-    fn only_role_admin(ctx: &Context<Self>) -> Result<()> {
-        Self::only_role(ctx, Role::ROLE_ADMIN)
-    }
-}
-
-impl<'info, T: Authorization<'info> + Bumps> Authenticate<'info> for T {}
 
 #[error_code]
 pub enum RoleStoreError {

@@ -83,8 +83,8 @@ pub struct SetAddress<'info> {
 }
 
 impl<'info> Authorization<'info> for SetAddress<'info> {
-    fn store(&self) -> &Pubkey {
-        &self.store.role_store
+    fn store(&self) -> Pubkey {
+        self.store.role_store
     }
 
     fn authority(&self) -> &Signer<'info> {
