@@ -26,6 +26,8 @@ export const createPriceFeedKey = key => createKey("PRICE_FEE", key);
 
 export const BTC_TOKEN = anchor.translateAddress("3NZ9JMVBmGAqocybic2c7LQCJScmgsAZ6vQqTDzcqmJh");
 export const BTC_FEED = anchor.translateAddress("Cv4T27XbjVoKUYwP72NQQanvZeA7W4YF9L4EnYT9kx5o");
+export const SOL_TOKEN = anchor.translateAddress("So11111111111111111111111111111111111111112");
+export const SOL_FEED = anchor.translateAddress("CH31Xns5z3M1cTAbKW34jcxPPciazARpijcHj9rxtemt");
 
 export const initializeDataStore = async (signer: anchor.web3.Keypair, roleStoreKey: string, dataStoreKey: string) => {
     const [roleStorePDA] = createRoleStorePDA(roleStoreKey);
@@ -54,6 +56,21 @@ export const initializeDataStore = async (signer: anchor.web3.Keypair, roleStore
             address: addressPDA,
         }).signers([signer]).rpc();
         console.log(`Set an address account ${addressPDA} for ${BTC_TOKEN} in tx: ${tx}`);
+    } catch (error) {
+        console.warn("Failed to set address account", error);
+    }
+
+    // Insert SOL feed.
+    try {
+        const key = createPriceFeedKey(SOL_TOKEN);
+        const [addressPDA] = createAddressPDA(dataStorePDA, key);
+        const tx = await dataStore.methods.setAddress(key, SOL_FEED).accounts({
+            authority: signer.publicKey,
+            store: dataStorePDA,
+            onlyController: createControllerPDA(roleStorePDA, signer.publicKey)[0],
+            address: addressPDA,
+        }).signers([signer]).rpc();
+        console.log(`Set an address account ${addressPDA} for ${SOL_TOKEN} in tx: ${tx}`);
     } catch (error) {
         console.warn("Failed to set address account", error);
     }

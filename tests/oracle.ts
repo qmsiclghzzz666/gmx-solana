@@ -2,7 +2,7 @@ import * as anchor from "@coral-xyz/anchor";
 import { Oracle } from "../target/types/oracle";
 import { IDL as chainlinkIDL } from "../external-programs/chainlink-store";
 import { getAddresses, getProvider, getUsers } from "../utils/fixtures";
-import { BTC_FEED, BTC_TOKEN, createAddressPDA, createPriceFeedKey } from "../utils/data";
+import { BTC_FEED, BTC_TOKEN, SOL_FEED, SOL_TOKEN, createAddressPDA, createPriceFeedKey } from "../utils/data";
 import { createControllerPDA } from "../utils/role";
 
 describe("oracle", () => {
@@ -50,6 +50,7 @@ describe("oracle", () => {
     it("set price from feed", async () => {
         await oracle.methods.setPricesFromPriceFeed([
             BTC_TOKEN,
+            SOL_TOKEN,
         ]).accounts({
             store: dataStoreAddress,
             authority: signer0.publicKey,
@@ -66,9 +67,20 @@ describe("oracle", () => {
                 pubkey: BTC_FEED,
                 isSigner: false,
                 isWritable: false,
-            }
+            },
+            {
+                pubkey: createAddressPDA(dataStoreAddress, createPriceFeedKey(SOL_TOKEN))[0],
+                isSigner: false,
+                isWritable: false,
+            },
+            {
+                pubkey: SOL_FEED,
+                isSigner: false,
+                isWritable: false,
+            },
         ]).signers([signer0]).rpc();
         const oracleData = await oracle.account.oracle.fetch(oracleAddress);
         console.log(oracleData.primary.prices);
+        console.log(oracleData.primary.tokens);
     });
 });
