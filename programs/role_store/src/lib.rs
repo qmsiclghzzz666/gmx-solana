@@ -22,7 +22,7 @@ pub mod role_store {
         )
     }
 
-    #[access_control(GrantRole::only_role_admin(&ctx))]
+    #[access_control(Authenticate::only_role_admin(&ctx))]
     pub fn grant_role(ctx: Context<GrantRole>, role_name: String) -> Result<()> {
         ctx.accounts.role.grant(
             ctx.accounts.store.key(),
@@ -36,7 +36,7 @@ pub mod role_store {
         Ok(())
     }
 
-    #[access_control(RevokeRole::only_role_admin(&ctx))]
+    #[access_control(Authenticate::only_role_admin(&ctx))]
     pub fn revoke_role(ctx: Context<RevokeRole>) -> Result<()> {
         if ctx.accounts.role.is_role_admin() {
             ctx.accounts.store.num_admins -= 1;

@@ -15,7 +15,7 @@ pub mod data_store {
         Ok(())
     }
 
-    #[access_control(SetAddress::only_controller(&ctx))]
+    #[access_control(Authenticate::only_controller(&ctx))]
     pub fn set_address(ctx: Context<SetAddress>, _key: String, value: Pubkey) -> Result<()> {
         ctx.accounts.address.value = value;
         ctx.accounts.address.bump = ctx.bumps.address;
