@@ -11,7 +11,7 @@ pub mod oracle {
 
     pub fn initialize(ctx: Context<Initialize>) -> Result<Round> {
         let round = chainlink_solana::latest_round_data(
-            ctx.accounts.chainlink.to_account_info(),
+            ctx.accounts.chainlink_program.to_account_info(),
             ctx.accounts.feed.to_account_info(),
         )?;
         msg!("answer: {}", round.answer);
@@ -51,6 +51,14 @@ impl Round {
 pub struct Initialize<'info> {
     /// CHECK: it will be checked by chainlink.
     feed: UncheckedAccount<'info>,
-    /// CHECK: it will be checked by chainlink.
-    chainlink: UncheckedAccount<'info>,
+    chainlink_program: Program<'info, Chainlink>,
+}
+
+/// The Chainlink Program.
+pub struct Chainlink;
+
+impl Id for Chainlink {
+    fn id() -> Pubkey {
+        chainlink_solana::ID
+    }
 }

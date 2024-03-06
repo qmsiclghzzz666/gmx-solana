@@ -16,7 +16,7 @@ describe("oracle", () => {
         try {
             const round = await oracle.methods.initialize().accounts({
                 feed: "Cv4T27XbjVoKUYwP72NQQanvZeA7W4YF9L4EnYT9kx5o",
-                chainlink: chainlinkID,
+                chainlinkProgram: chainlinkID,
             }).view();
             console.log(`got round of slot ${round.slot}, answer: ${round.answer}, feed ts: ${round.timestamp}, sys ts: ${round.sysTimestamp}`, round);
         } catch (error) {
