@@ -12,9 +12,9 @@ describe("oracle", () => {
 
     const mockFeedAccount = anchor.web3.Keypair.generate();
 
-    it("should work", async () => {
+    it("get price from the given feed", async () => {
         try {
-            const round = await oracle.methods.initialize().accounts({
+            const round = await oracle.methods.getPriceFromFeed().accounts({
                 feed: "Cv4T27XbjVoKUYwP72NQQanvZeA7W4YF9L4EnYT9kx5o",
                 chainlinkProgram: chainlinkID,
             }).view();
@@ -29,6 +29,7 @@ describe("oracle", () => {
                 feed: mockFeedAccount.publicKey,
                 authority: provider.wallet.publicKey,
             }).signers([mockFeedAccount]).preInstructions([
+                // @ts-ignore: ignore because the field name of `transmissions` account generated is wrong.
                 await chainlink.account.transmissions.createInstruction(
                     mockFeedAccount,
                     8 + 192 + (3 + 3) * 48

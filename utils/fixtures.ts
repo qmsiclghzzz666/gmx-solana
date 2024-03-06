@@ -4,9 +4,10 @@ import chai from 'chai';
 import chaiAsPromised from 'chai-as-promised';
 chai.use(chaiAsPromised);
 
-import { initializeRoleStore, roleStore } from "./role";
-import { dataStore, initializeDataStore } from "./data";
+import { createRoleStorePDA, initializeRoleStore, roleStore } from "./role";
+import { createAddressPDA, createDataStorePDA, dataStore, initializeDataStore } from "./data";
 import { keyToSeed } from "./seed";
+import { createOraclePDA, initializeOracle } from "./oracle";
 
 export const expect = chai.expect;
 
@@ -19,6 +20,12 @@ const signer0 = anchor.web3.Keypair.generate();
 // Keys.
 const roleStoreKey = anchor.web3.Keypair.generate().publicKey.toBase58();
 const dataStoreKey = anchor.web3.Keypair.generate().publicKey.toBase58();
+const oracleKey = anchor.web3.Keypair.generate().publicKey.toBase58();
+
+// Addresses.
+const [roleStoreAddress] = createRoleStorePDA(roleStoreKey);
+const [dataStoreAddress] = createDataStorePDA(roleStoreAddress, dataStoreKey);
+const [oracleAddress] = createOraclePDA(dataStoreAddress, oracleKey);
 
 export const getProvider = () => provider;
 
@@ -40,8 +47,17 @@ export const getKeys = () => {
     return {
         roleStoreKey,
         dataStoreKey,
+        oracleKey,
     }
 };
+
+export const getAddresses = () => {
+    return {
+        roleStoreAddress,
+        dataStoreAddress,
+        oracleAddress,
+    }
+}
 
 const initializeUser = async (provider: anchor.AnchorProvider, user: anchor.web3.Keypair, airdrop: number) => {
     // const tx = await provider.connection.requestAirdrop(user.publicKey, anchor.web3.LAMPORTS_PER_SOL * airdrop);
@@ -87,6 +103,7 @@ export const mochaGlobalSetup = async () => {
     await initializeUser(provider, signer0, 1.5);
     await initializeRoleStore(provider, roleStoreKey, signer0.publicKey);
     await initializeDataStore(signer0, roleStoreKey, dataStoreKey);
+    await initializeOracle(signer0, dataStoreAddress, oracleKey);
     console.log("[Done.]");
 };
 

@@ -14,9 +14,11 @@ no-idl = []
 no-log-ix-name = []
 cpi = ["no-entrypoint"]
 default = []
-idl-build = ["anchor-lang/idl-build"]
+idl-build = ["anchor-lang/idl-build", "data_store/idl-build"]
 
 [dependencies]
 anchor-lang = { workspace = true }
 chainlink_solana = "1.0.0"
 thiserror = "1.0.57"
+gmx-solana-utils = { path = "../../crates/gmx-solana-utils" }
+data_store = { path = "../data_store", features = ["cpi"] }

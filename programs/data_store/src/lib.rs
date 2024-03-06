@@ -62,6 +62,11 @@ impl DataStore {
         self.key = to_seed(key).into();
         self.bump = bump;
     }
+
+    /// Get the role store key.
+    pub fn role_store(&self) -> &Pubkey {
+        &self.role_store
+    }
 }
 
 #[derive(Accounts)]

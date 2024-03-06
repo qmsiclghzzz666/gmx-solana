@@ -1096,6 +1096,8 @@ version = "0.1.0"
 dependencies = [
  "anchor-lang",
  "chainlink_solana",
+ "data_store",
+ "gmx-solana-utils",
  "thiserror",
 ]
 
