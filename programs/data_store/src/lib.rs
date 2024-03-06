@@ -82,16 +82,16 @@ pub struct SetAddress<'info> {
     pub system_program: Program<'info, System>,
 }
 
-impl<'info> Authorization for SetAddress<'info> {
+impl<'info> Authorization<'info> for SetAddress<'info> {
     fn store(&self) -> &Pubkey {
         &self.store.role_store
     }
 
-    fn authority(&self) -> &Pubkey {
-        self.authority.key
+    fn authority(&self) -> &Signer<'info> {
+        &self.authority
     }
 
-    fn role(&self) -> &Role {
+    fn role(&self) -> &Account<'info, Role> {
         &self.only_controller
     }
 }

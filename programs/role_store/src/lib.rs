@@ -140,7 +140,7 @@ pub const MAX_ROLE_LEN: usize = 32;
 #[account]
 #[derive(InitSpace)]
 pub struct Role {
-    // Length <= 32 bytes.
+    // Length in bytes <= MAX_ROLE_LEN.
     #[max_len(MAX_ROLE_LEN)]
     role: String,
     bump: u8,
@@ -184,28 +184,28 @@ impl Role {
 }
 
 /// Authorization.
-pub trait Authorization {
+pub trait Authorization<'info> {
     /// Get the address of role store.
     fn store(&self) -> &Pubkey;
 
     /// Get the address of the authority.
-    fn authority(&self) -> &Pubkey;
+    fn authority(&self) -> &Signer<'info>;
 
     /// Get the role to check.
-    fn role(&self) -> &Role;
+    fn role(&self) -> &Account<'info, Role>;
 }
 
 /// Provides access control methods for [`Authorization`].
-pub trait Authenticate: Authorization + Bumps + Sized {
+pub trait Authenticate<'info>: Authorization<'info> + Bumps + Sized {
     /// Check if the authorization is valid.
     fn valid(ctx: &Context<Self>) -> Result<()> {
         require_eq!(
-            *ctx.accounts.store(),
+            ctx.accounts.store().key(),
             ctx.accounts.role().store,
             RoleStoreError::MismatchedStore
         );
         require_eq!(
-            *ctx.accounts.authority(),
+            *ctx.accounts.authority().key,
             ctx.accounts.role().authority,
             RoleStoreError::Unauthorized
         );
@@ -235,7 +235,7 @@ pub trait Authenticate: Authorization + Bumps + Sized {
     }
 }
 
-impl<T: Authorization + Bumps> Authenticate for T {}
+impl<'info, T: Authorization<'info> + Bumps> Authenticate<'info> for T {}
 
 #[error_code]
 pub enum RoleStoreError {
