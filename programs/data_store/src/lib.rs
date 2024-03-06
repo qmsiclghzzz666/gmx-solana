@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 use gmx_solana_utils::to_seed;
-use role_store::{Role, RoleStore, RoleStoreError};
+use role_store::{Authenticate, Authorization, Role, RoleStore};
 
 declare_id!("8hJ2dGQ2Ccr5G6iEqQQEoBApRSXt7Jn8Qyf9Qf3eLBX2");
 
@@ -15,6 +15,7 @@ pub mod data_store {
         Ok(())
     }
 
+    #[access_control(SetAddress::only_controller(&ctx))]
     pub fn set_address(ctx: Context<SetAddress>, _key: String, value: Pubkey) -> Result<()> {
         ctx.accounts.address.value = value;
         ctx.accounts.address.bump = ctx.bumps.address;
@@ -69,11 +70,6 @@ pub struct SetAddress<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
     pub store: Account<'info, DataStore>,
-    #[account(
-        has_one = authority,
-        constraint = only_controller.store == store.role_store @ DataStoreError::MismatchedRoleStore,
-        constraint = only_controller.is_controller() @ RoleStoreError::PermissionDenied,
-    )]
     pub only_controller: Account<'info, Role>,
     #[account(
         init_if_needed,
@@ -84,6 +80,20 @@ pub struct SetAddress<'info> {
     )]
     pub address: Account<'info, Address>,
     pub system_program: Program<'info, System>,
+}
+
+impl<'info> Authorization for SetAddress<'info> {
+    fn store(&self) -> &Pubkey {
+        &self.store.role_store
+    }
+
+    fn authority(&self) -> &Pubkey {
+        self.authority.key
+    }
+
+    fn role(&self) -> &Role {
+        &self.only_controller
+    }
 }
 
 #[derive(Accounts)]

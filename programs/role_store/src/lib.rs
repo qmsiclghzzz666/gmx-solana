@@ -1,4 +1,4 @@
-use anchor_lang::prelude::*;
+use anchor_lang::{prelude::*, Bumps};
 use gmx_solana_utils::to_seed;
 
 declare_id!("H7L3aYUzR3joc6Heyonjt1thpWdtwYcTVQvCrB2xDsdi");
@@ -134,11 +134,14 @@ impl RoleStore {
     }
 }
 
+/// Maximum length in bytes of the name of role.
+pub const MAX_ROLE_LEN: usize = 32;
+
 #[account]
 #[derive(InitSpace)]
 pub struct Role {
     // Length <= 32 bytes.
-    #[max_len(32)]
+    #[max_len(MAX_ROLE_LEN)]
     role: String,
     bump: u8,
     pub store: Pubkey,
@@ -156,7 +159,7 @@ impl Role {
     pub const CONTROLLER: &'static str = "CONTROLLER";
 
     fn grant(&mut self, store: Pubkey, role: &str, bump: u8, authority: Pubkey) -> Result<()> {
-        require!(role.len() <= 32, RoleStoreError::RoleNameTooLarge);
+        require!(role.len() <= MAX_ROLE_LEN, RoleStoreError::RoleNameTooLarge);
         self.role = role.to_string();
         self.bump = bump;
         self.store = store;
@@ -180,6 +183,60 @@ impl Role {
     }
 }
 
+/// Authorization.
+pub trait Authorization {
+    /// Get the address of role store.
+    fn store(&self) -> &Pubkey;
+
+    /// Get the address of the authority.
+    fn authority(&self) -> &Pubkey;
+
+    /// Get the role to check.
+    fn role(&self) -> &Role;
+}
+
+/// Provides access control methods for [`Authorization`].
+pub trait Authenticate: Authorization + Bumps + Sized {
+    /// Check if the authorization is valid.
+    fn valid(ctx: &Context<Self>) -> Result<()> {
+        require_eq!(
+            *ctx.accounts.store(),
+            ctx.accounts.role().store,
+            RoleStoreError::MismatchedStore
+        );
+        require_eq!(
+            *ctx.accounts.authority(),
+            ctx.accounts.role().authority,
+            RoleStoreError::Unauthorized
+        );
+        Ok(())
+    }
+
+    /// Check if the authorization is valid and the role matches the given.
+    fn only_role(ctx: &Context<Self>, role: &str) -> Result<()> {
+        Self::valid(ctx)?;
+        require!(role.len() <= MAX_ROLE_LEN, RoleStoreError::RoleNameTooLarge);
+        require_eq!(
+            role,
+            &ctx.accounts.role().role,
+            RoleStoreError::PermissionDenied
+        );
+        Ok(())
+    }
+
+    /// Check if the authorization is valid and the role is [`CONTROLLER`](Role::CONTROLLER).
+    fn only_controller(ctx: &Context<Self>) -> Result<()> {
+        Self::only_role(ctx, Role::CONTROLLER)
+    }
+
+    /// Check if the authorization is valid and the role is [`ROLE_ADMIN`](Role::ROLE_ADMIN).
+    fn only_role_admin(ctx: &Context<Self>) -> Result<()> {
+        Self::only_role(ctx, Role::ROLE_ADMIN)
+    }
+}
+
+impl<T: Authorization + Bumps> Authenticate for T {}
+
 #[error_code]
 pub enum RoleStoreError {
     #[msg("The length of the role name is too large")]
@@ -190,4 +247,6 @@ pub enum RoleStoreError {
     MismatchedStore,
     #[msg("At least one admin per store")]
     AtLeastOneAdminPerStore,
+    #[msg("Unauthorized")]
+    Unauthorized,
 }
