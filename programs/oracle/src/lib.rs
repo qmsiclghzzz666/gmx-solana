@@ -1,12 +1,16 @@
 use anchor_lang::prelude::*;
 use data_store::DataStore;
 use gmx_solana_utils::to_seed;
+use role_store::{Authenticate, Authorization, Role};
 
 /// Decimal type for storing prices.
 pub mod decimal;
 
 /// Price type.
 pub mod price;
+
+/// Utils.
+pub mod utils;
 
 pub use self::{
     decimal::{Decimal, DecimalError},
@@ -26,6 +30,43 @@ pub mod oracle {
         ctx.accounts.oracle.role_store = *ctx.accounts.store.role_store();
         ctx.accounts.oracle.data_store = ctx.accounts.store.key();
         msg!("new oracle initialized with key: {}", key);
+        Ok(())
+    }
+
+    #[access_control(Authenticate::only_controller(&ctx))]
+    pub fn set_prices_from_price_feed<'info>(
+        ctx: Context<'_, '_, 'info, 'info, SetPricesFromPriceFeed<'info>>,
+        tokens: Vec<Pubkey>,
+    ) -> Result<()> {
+        require!(
+            ctx.accounts.oracle.primary.is_empty(),
+            OracleError::PricesAlreadySet
+        );
+        require!(
+            tokens.len() <= PriceMap::MAX_TOKENS,
+            OracleError::ExceedMaxTokens
+        );
+        // We are going to parse the remaining accounts to address accounts and feed accounts in order.
+        // It won't overflow since we has checked the length before.
+        let remaining = ctx.remaining_accounts;
+        require!(
+            (tokens.len() << 1) <= remaining.len(),
+            OracleError::NotEnoughAccountInfos
+        );
+        // Assume the remaining accounts are arranged in the following way:
+        // [address, feed; tokens.len()] [..remaining]
+        for (idx, token) in tokens.iter().enumerate() {
+            let address_idx = idx << 1;
+            let feed_idx = address_idx + 1;
+            let price = utils::check_and_get_chainlink_price(
+                &ctx.accounts.chainlink_program,
+                &ctx.accounts.store,
+                &remaining[address_idx],
+                &remaining[feed_idx],
+                token,
+            )?;
+            ctx.accounts.oracle.primary.set(token, price)?;
+        }
         Ok(())
     }
 
@@ -49,11 +90,35 @@ pub struct Initialize<'info> {
         init,
         payer = authority,
         space = 8 + Oracle::INIT_SPACE,
-        seeds = [Oracle::SEED, &store.key().to_bytes(), &to_seed(&key)],
+        seeds = [Oracle::SEED, store.key().as_ref(), &to_seed(&key)],
         bump,
     )]
     pub oracle: Account<'info, Oracle>,
     pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct SetPricesFromPriceFeed<'info> {
+    pub authority: Signer<'info>,
+    pub role: Account<'info, Role>,
+    pub store: Account<'info, DataStore>,
+    #[account(mut)]
+    pub oracle: Account<'info, Oracle>,
+    pub chainlink_program: Program<'info, Chainlink>,
+}
+
+impl<'info> Authorization<'info> for SetPricesFromPriceFeed<'info> {
+    fn role_store(&self) -> Pubkey {
+        *self.store.role_store()
+    }
+
+    fn authority(&self) -> &Signer<'info> {
+        &self.authority
+    }
+
+    fn role(&self) -> &Account<'info, Role> {
+        &self.role
+    }
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
@@ -120,4 +185,16 @@ impl Id for Chainlink {
 pub enum OracleError {
     #[msg("Price of the given token already set")]
     PriceAlreadySet,
+    #[msg("Prices already set")]
+    PricesAlreadySet,
+    #[msg("Exceed the maximum number of tokens")]
+    ExceedMaxTokens,
+    #[msg("Not enough account infos")]
+    NotEnoughAccountInfos,
+    #[msg("Invalid price feed address account")]
+    InvalidPriceFeedAddressAccount,
+    #[msg("Invalid price feed account")]
+    InvalidPriceFeedAccount,
+    #[msg("Invalid price from data feed")]
+    InvalidDataFeedPrice,
 }

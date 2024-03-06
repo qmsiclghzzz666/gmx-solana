@@ -5,7 +5,7 @@ use crate::{Role, RoleStoreError, MAX_ROLE_LEN};
 /// Authorization.
 pub trait Authorization<'info> {
     /// Get the address of role store.
-    fn store(&self) -> Pubkey;
+    fn role_store(&self) -> Pubkey;
 
     /// Get the checked authority account.
     fn authority(&self) -> &Signer<'info>;
@@ -19,7 +19,7 @@ pub trait Authenticate<'info>: Authorization<'info> + Bumps + Sized {
     /// Check if the authorization is valid.
     fn valid(ctx: &Context<Self>) -> Result<()> {
         require_eq!(
-            ctx.accounts.store(),
+            ctx.accounts.role_store(),
             ctx.accounts.role().store,
             RoleStoreError::MismatchedStore
         );

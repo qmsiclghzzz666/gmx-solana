@@ -2,6 +2,9 @@ use anchor_lang::prelude::*;
 use gmx_solana_utils::to_seed;
 use role_store::{Authenticate, Authorization, Role, RoleStore};
 
+/// Defined keys used in data store.
+pub mod keys;
+
 declare_id!("8hJ2dGQ2Ccr5G6iEqQQEoBApRSXt7Jn8Qyf9Qf3eLBX2");
 
 #[program]
@@ -80,7 +83,7 @@ pub struct SetAddress<'info> {
         init_if_needed,
         payer = authority,
         space = 8 + Address::INIT_SPACE,
-        seeds = [Address::SEED, &store.key().to_bytes(), &to_seed(&key)],
+        seeds = [Address::SEED, store.key().as_ref(), &to_seed(&key)],
         bump,
     )]
     pub address: Account<'info, Address>,
@@ -88,7 +91,7 @@ pub struct SetAddress<'info> {
 }
 
 impl<'info> Authorization<'info> for SetAddress<'info> {
-    fn store(&self) -> Pubkey {
+    fn role_store(&self) -> Pubkey {
         self.store.role_store
     }
 
@@ -106,7 +109,7 @@ impl<'info> Authorization<'info> for SetAddress<'info> {
 pub struct GetAddress<'info> {
     pub store: Account<'info, DataStore>,
     #[account(
-        seeds = [Address::SEED, &store.key().to_bytes(), &to_seed(&key)],
+        seeds = [Address::SEED, store.key().as_ref(), &to_seed(&key)],
         bump = address.bump,
     )]
     pub address: Account<'info, Address>,
@@ -115,17 +118,29 @@ pub struct GetAddress<'info> {
 #[account]
 #[derive(InitSpace)]
 pub struct Address {
-    value: Pubkey,
-    bump: u8,
+    pub value: Pubkey,
+    pub bump: u8,
 }
 
 impl Address {
     /// Seed for [`Address`]
     pub const SEED: &'static [u8] = b"address";
+
+    /// Create PDA from the given [`Address`] account.
+    pub fn create_pda(&self, store: &Pubkey, key: &str) -> Result<Pubkey> {
+        let pda = Pubkey::create_program_address(
+            &[Address::SEED, store.as_ref(), &to_seed(key), &[self.bump]],
+            &ID,
+        )
+        .map_err(|_| DataStoreError::InvalidAddressPDA)?;
+        Ok(pda)
+    }
 }
 
 #[error_code]
 pub enum DataStoreError {
     #[msg("Mismatched role store")]
     MismatchedRoleStore,
+    #[msg("Invalid address pda")]
+    InvalidAddressPDA,
 }

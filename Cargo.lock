@@ -1098,6 +1098,7 @@ dependencies = [
  "chainlink_solana",
  "data_store",
  "gmx-solana-utils",
+ "role_store",
  "thiserror",
 ]
 

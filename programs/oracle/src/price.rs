@@ -64,4 +64,9 @@ impl PriceMap {
         self.tokens.clear();
         self.prices.clear();
     }
+
+    /// Is empty.
+    pub fn is_empty(&self) -> bool {
+        self.tokens.is_empty()
+    }
 }

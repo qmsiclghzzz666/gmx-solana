@@ -1,7 +1,9 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Oracle } from "../target/types/oracle";
 import { IDL as chainlinkIDL } from "../external-programs/chainlink-store";
-import { getProvider } from "../utils/fixtures";
+import { getAddresses, getProvider, getUsers } from "../utils/fixtures";
+import { BTC_FEED, BTC_TOKEN, createAddressPDA, createPriceFeedKey } from "../utils/data";
+import { createControllerPDA } from "../utils/role";
 
 describe("oracle", () => {
     const provider = getProvider();
@@ -10,12 +12,15 @@ describe("oracle", () => {
     const oracle = anchor.workspace.Oracle as anchor.Program<Oracle>;
     const chainlink = new anchor.Program(chainlinkIDL, chainlinkID);
 
+    const { dataStoreAddress, roleStoreAddress, oracleAddress } = getAddresses();
+    const { signer0 } = getUsers();
+
     const mockFeedAccount = anchor.web3.Keypair.generate();
 
     it("get price from the given feed", async () => {
         try {
             const round = await oracle.methods.getPriceFromFeed().accounts({
-                feed: "Cv4T27XbjVoKUYwP72NQQanvZeA7W4YF9L4EnYT9kx5o",
+                feed: BTC_FEED,
                 chainlinkProgram: chainlinkID,
             }).view();
             console.log(`got round of slot ${round.slot}, answer: ${round.answer}, feed ts: ${round.timestamp}, sys ts: ${round.sysTimestamp}`, round);
@@ -40,5 +45,30 @@ describe("oracle", () => {
             console.error(error);
             throw error;
         }
+    });
+
+    it("set price from feed", async () => {
+        await oracle.methods.setPricesFromPriceFeed([
+            BTC_TOKEN,
+        ]).accounts({
+            store: dataStoreAddress,
+            authority: signer0.publicKey,
+            chainlinkProgram: chainlinkID,
+            role: createControllerPDA(roleStoreAddress, signer0.publicKey)[0],
+            oracle: oracleAddress,
+        }).remainingAccounts([
+            {
+                pubkey: createAddressPDA(dataStoreAddress, createPriceFeedKey(BTC_TOKEN))[0],
+                isSigner: false,
+                isWritable: false,
+            },
+            {
+                pubkey: BTC_FEED,
+                isSigner: false,
+                isWritable: false,
+            }
+        ]).signers([signer0]).rpc();
+        const oracleData = await oracle.account.oracle.fetch(oracleAddress);
+        console.log(oracleData.primary.prices);
     });
 });

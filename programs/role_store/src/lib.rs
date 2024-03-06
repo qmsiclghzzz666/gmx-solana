@@ -91,7 +91,7 @@ pub struct GrantRole<'info> {
 }
 
 impl<'info> Authorization<'info> for GrantRole<'info> {
-    fn store(&self) -> Pubkey {
+    fn role_store(&self) -> Pubkey {
         self.store.key()
     }
 
@@ -121,7 +121,7 @@ pub struct RevokeRole<'info> {
 }
 
 impl<'info> Authorization<'info> for RevokeRole<'info> {
-    fn store(&self) -> Pubkey {
+    fn role_store(&self) -> Pubkey {
         self.store.key()
     }
 
