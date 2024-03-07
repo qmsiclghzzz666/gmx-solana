@@ -37,13 +37,9 @@ fn check_and_get_price_from_round(
 ) -> Result<crate::Price> {
     require_gt!(round.answer, 0, OracleError::InvalidDataFeedPrice);
     // TODO: check the timestamp.
-    // TODO: get expected precision.
-    let price = crate::Decimal::try_new(
-        round.answer as u128,
-        decimals,
-        crate::Decimal::decimal_multiplier_from_precision(decimals, 2),
-    )
-    .map_err(|_| OracleError::InvalidDataFeedPrice)?;
+    // TODO: get the token decimals and the expected precision.
+    let price = crate::Decimal::try_from_price(round.answer as u128, decimals, 18, 2)
+        .map_err(|_| OracleError::InvalidDataFeedPrice)?;
     Ok(crate::Price {
         min: price,
         max: price,
