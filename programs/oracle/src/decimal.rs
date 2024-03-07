@@ -65,13 +65,16 @@ impl Decimal {
             decimal_multiplier <= Self::MAX_DECIMAL_MULTIPLIER,
             "must not exceed `MAX_DECIMAL_MULTIPLIER`"
         );
-        // 2 * MAX_DECIMALS + MAX_DECIMAL_MULTIPLER <= u8::MAX
+        // CHECK: 2 * MAX_DECIMALS + MAX_DECIMAL_MULTIPLER <= u8::MAX
         let multiplier = (token_decimals << 1) + decimal_multiplier;
         let value = if Self::MAX_DECIMALS >= multiplier {
+            // CHECK: Since `MAX_DECIMALS == 30`, the pow will never overflow.
             price
                 .checked_mul(10u128.pow((Self::MAX_DECIMALS - multiplier) as u32))
                 .ok_or_else(|| DecimalError::Overflow)?
         } else {
+            // CHECK: Since `multiplier == 2 * token_decimals + decimal_multiplier <= token_decimals + MAX_DECIMALS <= 2 * MAX_DECIMALS`,
+            // `multiplier - MAX_DECIMALS <= MAX_DECIMALS == 30` will never make the pow overflow.
             price / 10u128.pow((multiplier - Self::MAX_DECIMALS) as u32)
         };
         Ok(Self {
