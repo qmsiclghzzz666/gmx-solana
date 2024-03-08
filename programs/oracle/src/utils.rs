@@ -1,5 +1,6 @@
 use crate::OracleError;
 use anchor_lang::prelude::*;
+use data_store::states::TokenConfig;
 
 /// Check and get latest chainlink price from data feed.
 pub fn check_and_get_chainlink_price<'info>(
@@ -9,37 +10,40 @@ pub fn check_and_get_chainlink_price<'info>(
     feed: &AccountInfo<'info>,
     token: &Pubkey,
 ) -> Result<crate::Price> {
-    use data_store::{keys, Address};
-
-    let address = Account::<'info, Address>::try_from(feed_address)?;
-    let key = keys::create_price_feed_key(token);
-    let expected_address_key = address.create_pda(&store.key(), &key)?;
+    let token_config = Account::<'info, TokenConfig>::try_from(feed_address)?;
+    let key = token.to_string();
+    let expected_pda = token_config.pda(&store.key(), &key)?;
     require_eq!(
-        expected_address_key,
-        address.key(),
-        OracleError::InvalidPriceFeedAddressAccount
+        expected_pda,
+        token_config.key(),
+        OracleError::InvalidTokenConfigAccount
     );
     require_eq!(
-        address.value,
+        token_config.price_feed,
         *feed.key,
         OracleError::InvalidPriceFeedAccount
     );
     let round =
         chainlink_solana::latest_round_data(chainlink_program.to_account_info(), feed.clone())?;
     let decimals = chainlink_solana::decimals(chainlink_program.to_account_info(), feed.clone())?;
-    check_and_get_price_from_round(&round, decimals)
+    check_and_get_price_from_round(&round, decimals, &token_config)
 }
 
 /// Check and get price from the round data.
 fn check_and_get_price_from_round(
     round: &chainlink_solana::Round,
     decimals: u8,
+    token_config: &TokenConfig,
 ) -> Result<crate::Price> {
     require_gt!(round.answer, 0, OracleError::InvalidDataFeedPrice);
     // TODO: check the timestamp.
-    // TODO: get the token decimals and the expected precision.
-    let price = crate::Decimal::try_from_price(round.answer as u128, decimals, 18, 2)
-        .map_err(|_| OracleError::InvalidDataFeedPrice)?;
+    let price = crate::Decimal::try_from_price(
+        round.answer as u128,
+        decimals,
+        token_config.token_decimals,
+        token_config.precision,
+    )
+    .map_err(|_| OracleError::InvalidDataFeedPrice)?;
     Ok(crate::Price {
         min: price,
         max: price,

@@ -2,7 +2,7 @@ import * as anchor from "@coral-xyz/anchor";
 import { Oracle } from "../target/types/oracle";
 import { IDL as chainlinkIDL } from "../external-programs/chainlink-store";
 import { getAddresses, getProvider, getUsers } from "../utils/fixtures";
-import { BTC_FEED, BTC_TOKEN, SOL_FEED, SOL_TOKEN, createAddressPDA, createPriceFeedKey } from "../utils/data";
+import { BTC_FEED, BTC_TOKEN, SOL_FEED, SOL_TOKEN, createAddressPDA, createPriceFeedKey, createTokenConfigPDA } from "../utils/data";
 import { createControllerPDA } from "../utils/role";
 
 describe("oracle", () => {
@@ -59,7 +59,7 @@ describe("oracle", () => {
             oracle: oracleAddress,
         }).remainingAccounts([
             {
-                pubkey: createAddressPDA(dataStoreAddress, createPriceFeedKey(BTC_TOKEN))[0],
+                pubkey: createTokenConfigPDA(dataStoreAddress, BTC_TOKEN.toBase58())[0],
                 isSigner: false,
                 isWritable: false,
             },
@@ -69,7 +69,7 @@ describe("oracle", () => {
                 isWritable: false,
             },
             {
-                pubkey: createAddressPDA(dataStoreAddress, createPriceFeedKey(SOL_TOKEN))[0],
+                pubkey: createTokenConfigPDA(dataStoreAddress, SOL_TOKEN.toBase58())[0],
                 isSigner: false,
                 isWritable: false,
             },

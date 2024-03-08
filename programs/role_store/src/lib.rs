@@ -99,6 +99,7 @@ impl<'info> Authorization<'info> for GrantRole<'info> {
         &self.authority
     }
 
+    #[allow(clippy::misnamed_getters)]
     fn role(&self) -> &Account<'info, Role> {
         &self.only_role_admin
     }
@@ -129,6 +130,7 @@ impl<'info> Authorization<'info> for RevokeRole<'info> {
         &self.authority
     }
 
+    #[allow(clippy::misnamed_getters)]
     fn role(&self) -> &Account<'info, Role> {
         &self.only_role_admin
     }

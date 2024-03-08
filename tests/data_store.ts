@@ -2,7 +2,7 @@ import { PublicKey, Keypair } from '@solana/web3.js';
 
 import { expect, getKeys, getPrograms, getProvider, getUsers } from "../utils/fixtures";
 import { createControllerPDA, createRoleAdminPDA, createRoleStorePDA } from "../utils/role";
-import { createAddressPDA, createDataStorePDA } from "../utils/data";
+import { createAddressPDA, createDataStorePDA, createTokenConfigPDA } from "../utils/data";
 import { AnchorError } from '@coral-xyz/anchor';
 
 describe("data store", () => {
@@ -14,49 +14,50 @@ describe("data store", () => {
     const [dataStorePDA] = createDataStorePDA(roleStorePDA, dataStoreKey);
 
     const key = Keypair.generate().publicKey;
-    const fooAddressKey = `FOO:${key}`;
-    const [fooAddressPDA] = createAddressPDA(dataStorePDA, fooAddressKey);
+    const fooTokenConfigKey = `FOO:${key}`;
+    const [fooTokenConfigPDA] = createTokenConfigPDA(dataStorePDA, fooTokenConfigKey);
+    const fooAddress = Keypair.generate().publicKey;
 
-    it("set and get address", async () => {
-        const fooAddress = Keypair.generate().publicKey;
+    before("init address", async () => {
         const [onlyController] = createControllerPDA(roleStorePDA, signer0.publicKey);
-        await dataStore.methods.setAddress(fooAddressKey, fooAddress).accounts({
+        await dataStore.methods.initializeTokenConfig(fooTokenConfigKey, fooAddress, 18, 2).accounts({
             authority: signer0.publicKey,
             store: dataStorePDA,
             onlyController,
-            address: fooAddressPDA,
+            tokenConfig: fooTokenConfigPDA,
         }).signers([signer0]).rpc();
-        const saved = await dataStore.methods.getAddress(fooAddressKey).accounts({
-            store: dataStorePDA,
-            address: fooAddressPDA,
-        }).view() as PublicKey;
-        expect(saved).to.eql(fooAddress);
     });
 
-    it("can only be set by CONTROLLER", async () => {
+    it("get address", async () => {
+        const saved = await dataStore.account.tokenConfig.fetch(fooTokenConfigPDA);
+        expect(saved.priceFeed).to.eql(fooAddress);
+        expect(saved.precision).to.equal(2);
+        expect(saved.tokenDecimals).to.equal(18);
+    });
+
+    it("can only be updated by CONTROLLER", async () => {
         const fooAddress = Keypair.generate().publicKey;
         const [otherMembership] = createRoleAdminPDA(roleStorePDA, provider.wallet.publicKey);
-        await expect(dataStore.methods.setAddress(fooAddressKey, fooAddress).accounts({
+        await expect(dataStore.methods.updateTokenConfig(fooTokenConfigKey, fooAddress, 8, 4).accounts({
             authority: provider.wallet.publicKey,
             store: dataStorePDA,
             onlyController: otherMembership,
-            address: fooAddressPDA,
+            tokenConfig: fooTokenConfigPDA,
         }).rpc()).to.be.rejectedWith(AnchorError, "Permission denied");
     });
 
-    it("can be set again", async () => {
+    it("can be updated by CONTROLLER", async () => {
         const fooAddress = Keypair.generate().publicKey;
         const [onlyController] = createControllerPDA(roleStorePDA, signer0.publicKey);
-        await dataStore.methods.setAddress(fooAddressKey, fooAddress).accounts({
+        await dataStore.methods.updateTokenConfig(fooTokenConfigKey, fooAddress, 8, 4).accounts({
             authority: signer0.publicKey,
             store: dataStorePDA,
             onlyController,
-            address: fooAddressPDA,
+            tokenConfig: fooTokenConfigPDA,
         }).signers([signer0]).rpc();
-        const saved = await dataStore.methods.getAddress(fooAddressKey).accounts({
-            store: dataStorePDA,
-            address: fooAddressPDA,
-        }).view() as PublicKey;
-        expect(saved).to.eql(fooAddress);
+        const saved = await dataStore.account.tokenConfig.fetch(fooTokenConfigPDA);
+        expect(saved.priceFeed).to.eql(fooAddress);
+        expect(saved.precision).to.equal(4);
+        expect(saved.tokenDecimals).to.equal(8);
     });
 });

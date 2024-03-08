@@ -9,7 +9,7 @@ pub fn create_key(prefix: &str, key: &str) -> String {
 }
 
 /// Prefix for price feed keys.
-pub const PRICE_FEED: &'static str = "PRICE_FEE";
+pub const PRICE_FEED: &str = "PRICE_FEE";
 
 /// Key for price feed.
 pub fn create_price_feed_key(token: &Pubkey) -> String {

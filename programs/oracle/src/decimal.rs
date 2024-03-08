@@ -50,13 +50,13 @@ impl Decimal {
                 let multiplier = 10u128.pow((token_decimals - decimals) as u32);
                 price = price
                     .checked_mul(multiplier)
-                    .ok_or_else(|| DecimalError::Overflow)?;
+                    .ok_or(DecimalError::Overflow)?;
             }
             Ordering::Greater => {
                 let divisor = 10u128
                     .checked_pow((decimals - token_decimals) as u32)
-                    .ok_or_else(|| DecimalError::Overflow)?;
-                price = price / divisor;
+                    .ok_or(DecimalError::Overflow)?;
+                price /= divisor;
             }
         }
 
@@ -71,7 +71,7 @@ impl Decimal {
             // CHECK: Since `MAX_DECIMALS == 30`, the pow will never overflow.
             price
                 .checked_mul(10u128.pow((Self::MAX_DECIMALS - multiplier) as u32))
-                .ok_or_else(|| DecimalError::Overflow)?
+                .ok_or(DecimalError::Overflow)?
         } else {
             // CHECK: Since `multiplier == 2 * token_decimals + decimal_multiplier <= token_decimals + MAX_DECIMALS <= 2 * MAX_DECIMALS`,
             // `multiplier - MAX_DECIMALS <= MAX_DECIMALS == 30` will never make the pow overflow.

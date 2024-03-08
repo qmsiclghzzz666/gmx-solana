@@ -5,8 +5,7 @@ import chaiAsPromised from 'chai-as-promised';
 chai.use(chaiAsPromised);
 
 import { createRoleStorePDA, initializeRoleStore, roleStore } from "./role";
-import { createAddressPDA, createDataStorePDA, dataStore, initializeDataStore } from "./data";
-import { keyToSeed } from "./seed";
+import { createDataStorePDA, dataStore, initializeDataStore } from "./data";
 import { createOraclePDA, initializeOracle } from "./oracle";
 
 export const expect = chai.expect;

@@ -5,6 +5,14 @@ use role_store::{Authenticate, Authorization, Role, RoleStore};
 /// Defined keys used in data store.
 pub mod keys;
 
+/// Instructions.
+pub mod instructions;
+
+/// States.
+pub mod states;
+
+use self::instructions::*;
+
 declare_id!("8hJ2dGQ2Ccr5G6iEqQQEoBApRSXt7Jn8Qyf9Qf3eLBX2");
 
 #[program]
@@ -27,6 +35,28 @@ pub mod data_store {
 
     pub fn get_address(ctx: Context<GetAddress>, _key: String) -> Result<Pubkey> {
         Ok(ctx.accounts.address.value)
+    }
+
+    #[access_control(Authenticate::only_controller(&ctx))]
+    pub fn initialize_token_config(
+        ctx: Context<InitializeTokenConfig>,
+        key: String,
+        price_feed: Pubkey,
+        token_decimals: u8,
+        precision: u8,
+    ) -> Result<()> {
+        instructions::initialize_token_config(ctx, key, price_feed, token_decimals, precision)
+    }
+
+    #[access_control(Authenticate::only_controller(&ctx))]
+    pub fn update_token_config(
+        ctx: Context<UpdateTokenConfig>,
+        key: String,
+        price_feed: Option<Pubkey>,
+        token_decimals: Option<u8>,
+        precision: Option<u8>,
+    ) -> Result<()> {
+        instructions::update_token_config(ctx, key, price_feed, token_decimals, precision)
     }
 }
 
@@ -132,7 +162,7 @@ impl Address {
             &[Address::SEED, store.as_ref(), &to_seed(key), &[self.bump]],
             &ID,
         )
-        .map_err(|_| DataStoreError::InvalidAddressPDA)?;
+        .map_err(|_| DataStoreError::InvalidPDA)?;
         Ok(pda)
     }
 }
@@ -141,6 +171,6 @@ impl Address {
 pub enum DataStoreError {
     #[msg("Mismatched role store")]
     MismatchedRoleStore,
-    #[msg("Invalid address pda")]
-    InvalidAddressPDA,
+    #[msg("Invalid pda")]
+    InvalidPDA,
 }

@@ -7,6 +7,13 @@ export const dataStore = anchor.workspace.DataStore as anchor.Program<DataStore>
 
 export const DATA_STORE_SEED = anchor.utils.bytes.utf8.encode("data_store");
 export const ADDRESS_SEED = anchor.utils.bytes.utf8.encode("address");
+export const TOKEN_CONFIG_SEED = anchor.utils.bytes.utf8.encode("token_config");
+
+export const createDataStorePDA = (role_store: anchor.web3.PublicKey, key: string) => anchor.web3.PublicKey.findProgramAddressSync([
+    DATA_STORE_SEED,
+    role_store.toBytes(),
+    keyToSeed(key),
+], dataStore.programId);
 
 export const createAddressPDA = (store: anchor.web3.PublicKey, key: string) => anchor.web3.PublicKey.findProgramAddressSync([
     ADDRESS_SEED,
@@ -14,9 +21,9 @@ export const createAddressPDA = (store: anchor.web3.PublicKey, key: string) => a
     keyToSeed(key),
 ], dataStore.programId);
 
-export const createDataStorePDA = (role_store: anchor.web3.PublicKey, key: string) => anchor.web3.PublicKey.findProgramAddressSync([
-    DATA_STORE_SEED,
-    role_store.toBytes(),
+export const createTokenConfigPDA = (store: anchor.web3.PublicKey, key: string) => anchor.web3.PublicKey.findProgramAddressSync([
+    TOKEN_CONFIG_SEED,
+    store.toBytes(),
     keyToSeed(key),
 ], dataStore.programId);
 
@@ -45,33 +52,33 @@ export const initializeDataStore = async (signer: anchor.web3.Keypair, roleStore
         console.warn("Failed to initialize a data store with the given key:", error);
     }
 
-    // Insert BTC feed.
+    // Insert BTC token config.
     try {
-        const key = createPriceFeedKey(BTC_TOKEN);
-        const [addressPDA] = createAddressPDA(dataStorePDA, key);
-        const tx = await dataStore.methods.setAddress(key, BTC_FEED).accounts({
+        const key = BTC_TOKEN.toBase58();
+        const [tokenConfigPDA] = createTokenConfigPDA(dataStorePDA, key);
+        const tx = await dataStore.methods.initializeTokenConfig(key, BTC_FEED, 8, 2).accounts({
             authority: signer.publicKey,
             store: dataStorePDA,
             onlyController: createControllerPDA(roleStorePDA, signer.publicKey)[0],
-            address: addressPDA,
+            tokenConfig: tokenConfigPDA,
         }).signers([signer]).rpc();
-        console.log(`Set an address account ${addressPDA} for ${BTC_TOKEN} in tx: ${tx}`);
+        console.log(`Init a token config account ${tokenConfigPDA} for ${BTC_TOKEN} in tx: ${tx}`);
     } catch (error) {
-        console.warn("Failed to set address account", error);
+        console.warn("Failed to init the token config account", error);
     }
 
-    // Insert SOL feed.
+    // Insert SOL token config.
     try {
-        const key = createPriceFeedKey(SOL_TOKEN);
-        const [addressPDA] = createAddressPDA(dataStorePDA, key);
-        const tx = await dataStore.methods.setAddress(key, SOL_FEED).accounts({
+        const key = SOL_TOKEN.toBase58();
+        const [tokenConfigPDA] = createTokenConfigPDA(dataStorePDA, key);
+        const tx = await dataStore.methods.initializeTokenConfig(key, SOL_FEED, 8, 4).accounts({
             authority: signer.publicKey,
             store: dataStorePDA,
             onlyController: createControllerPDA(roleStorePDA, signer.publicKey)[0],
-            address: addressPDA,
+            tokenConfig: tokenConfigPDA,
         }).signers([signer]).rpc();
-        console.log(`Set an address account ${addressPDA} for ${SOL_TOKEN} in tx: ${tx}`);
+        console.log(`Init a token config account ${tokenConfigPDA} for ${SOL_TOKEN} in tx: ${tx}`);
     } catch (error) {
-        console.warn("Failed to set address account", error);
+        console.warn("Failed to init the token config account", error);
     }
 };

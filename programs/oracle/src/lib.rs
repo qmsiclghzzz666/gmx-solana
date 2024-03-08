@@ -191,8 +191,8 @@ pub enum OracleError {
     ExceedMaxTokens,
     #[msg("Not enough account infos")]
     NotEnoughAccountInfos,
-    #[msg("Invalid price feed address account")]
-    InvalidPriceFeedAddressAccount,
+    #[msg("Invalid token config account")]
+    InvalidTokenConfigAccount,
     #[msg("Invalid price feed account")]
     InvalidPriceFeedAccount,
     #[msg("Invalid price from data feed")]
