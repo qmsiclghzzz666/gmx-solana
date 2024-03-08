@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 use gmx_solana_utils::to_seed;
-use role_store::{Authenticate, Authorization, Role, RoleStore};
+use role_store::{Authenticate, RoleStore};
 
 /// Defined keys used in data store.
 pub mod keys;
@@ -24,17 +24,6 @@ pub mod data_store {
             .data_store
             .init(ctx.accounts.role_store.key(), &key, ctx.bumps.data_store);
         Ok(())
-    }
-
-    #[access_control(Authenticate::only_controller(&ctx))]
-    pub fn set_address(ctx: Context<SetAddress>, _key: String, value: Pubkey) -> Result<()> {
-        ctx.accounts.address.value = value;
-        ctx.accounts.address.bump = ctx.bumps.address;
-        Ok(())
-    }
-
-    pub fn get_address(ctx: Context<GetAddress>, _key: String) -> Result<Pubkey> {
-        Ok(ctx.accounts.address.value)
     }
 
     #[access_control(Authenticate::only_controller(&ctx))]
@@ -99,71 +88,6 @@ impl DataStore {
     /// Get the role store key.
     pub fn role_store(&self) -> &Pubkey {
         &self.role_store
-    }
-}
-
-#[derive(Accounts)]
-#[instruction(key: String)]
-pub struct SetAddress<'info> {
-    #[account(mut)]
-    pub authority: Signer<'info>,
-    pub store: Account<'info, DataStore>,
-    pub only_controller: Account<'info, Role>,
-    #[account(
-        init_if_needed,
-        payer = authority,
-        space = 8 + Address::INIT_SPACE,
-        seeds = [Address::SEED, store.key().as_ref(), &to_seed(&key)],
-        bump,
-    )]
-    pub address: Account<'info, Address>,
-    pub system_program: Program<'info, System>,
-}
-
-impl<'info> Authorization<'info> for SetAddress<'info> {
-    fn role_store(&self) -> Pubkey {
-        self.store.role_store
-    }
-
-    fn authority(&self) -> &Signer<'info> {
-        &self.authority
-    }
-
-    fn role(&self) -> &Account<'info, Role> {
-        &self.only_controller
-    }
-}
-
-#[derive(Accounts)]
-#[instruction(key: String)]
-pub struct GetAddress<'info> {
-    pub store: Account<'info, DataStore>,
-    #[account(
-        seeds = [Address::SEED, store.key().as_ref(), &to_seed(&key)],
-        bump = address.bump,
-    )]
-    pub address: Account<'info, Address>,
-}
-
-#[account]
-#[derive(InitSpace)]
-pub struct Address {
-    pub value: Pubkey,
-    pub bump: u8,
-}
-
-impl Address {
-    /// Seed for [`Address`]
-    pub const SEED: &'static [u8] = b"address";
-
-    /// Create PDA from the given [`Address`] account.
-    pub fn create_pda(&self, store: &Pubkey, key: &str) -> Result<Pubkey> {
-        let pda = Pubkey::create_program_address(
-            &[Address::SEED, store.as_ref(), &to_seed(key), &[self.bump]],
-            &ID,
-        )
-        .map_err(|_| DataStoreError::InvalidPDA)?;
-        Ok(pda)
     }
 }
 
