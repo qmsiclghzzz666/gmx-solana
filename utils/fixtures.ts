@@ -17,9 +17,9 @@ const user0 = anchor.web3.Keypair.generate();
 const signer0 = anchor.web3.Keypair.generate();
 
 // Keys.
-const roleStoreKey = anchor.web3.Keypair.generate().publicKey.toBase58();
-const dataStoreKey = anchor.web3.Keypair.generate().publicKey.toBase58();
-const oracleKey = anchor.web3.Keypair.generate().publicKey.toBase58();
+const roleStoreKey = "role_store_0";
+const dataStoreKey = "data_store_0";
+const oracleKey = "oracle_0";
 
 // Addresses.
 const [roleStoreAddress] = createRoleStorePDA(roleStoreKey);
