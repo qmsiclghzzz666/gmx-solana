@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use data_store::DataStore;
+use data_store::states::DataStore;
 use gmx_solana_utils::to_seed;
 use role_store::{Authenticate, Authorization, Role};
 

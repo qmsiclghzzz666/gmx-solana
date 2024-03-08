@@ -5,7 +5,7 @@ use data_store::states::TokenConfig;
 /// Check and get latest chainlink price from data feed.
 pub fn check_and_get_chainlink_price<'info>(
     chainlink_program: &Program<'info, crate::Chainlink>,
-    store: &Account<'info, data_store::DataStore>,
+    store: &Account<'info, data_store::states::DataStore>,
     feed_address: &'info AccountInfo<'info>,
     feed: &AccountInfo<'info>,
     token: &Pubkey,

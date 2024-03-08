@@ -1,9 +1,5 @@
 use anchor_lang::prelude::*;
-use gmx_solana_utils::to_seed;
-use role_store::{Authenticate, RoleStore};
-
-/// Defined keys used in data store.
-pub mod keys;
+use role_store::Authenticate;
 
 /// Instructions.
 pub mod instructions;
@@ -20,10 +16,7 @@ pub mod data_store {
     use super::*;
 
     pub fn initialize(ctx: Context<Initialize>, key: String) -> Result<()> {
-        ctx.accounts
-            .data_store
-            .init(ctx.accounts.role_store.key(), &key, ctx.bumps.data_store);
-        Ok(())
+        instructions::initialize(ctx, key)
     }
 
     #[access_control(Authenticate::only_controller(&ctx))]
@@ -46,48 +39,6 @@ pub mod data_store {
         precision: Option<u8>,
     ) -> Result<()> {
         instructions::update_token_config(ctx, key, price_feed, token_decimals, precision)
-    }
-}
-
-#[derive(Accounts)]
-#[instruction(key: String)]
-pub struct Initialize<'info> {
-    #[account(mut)]
-    pub authority: Signer<'info>,
-    pub role_store: Account<'info, RoleStore>,
-    #[account(
-        init,
-        payer = authority,
-        space = 8 + DataStore::INIT_SPACE,
-        seeds = [DataStore::SEED, &role_store.key().to_bytes(), &to_seed(&key)],
-        bump,
-    )]
-    pub data_store: Account<'info, DataStore>,
-    pub system_program: Program<'info, System>,
-}
-
-#[account]
-#[derive(InitSpace)]
-pub struct DataStore {
-    role_store: Pubkey,
-    #[max_len(32)]
-    key: Vec<u8>,
-    bump: u8,
-}
-
-impl DataStore {
-    /// Seed.
-    pub const SEED: &'static [u8] = b"data_store";
-
-    fn init(&mut self, role_store: Pubkey, key: &str, bump: u8) {
-        self.role_store = role_store;
-        self.key = to_seed(key).into();
-        self.bump = bump;
-    }
-
-    /// Get the role store key.
-    pub fn role_store(&self) -> &Pubkey {
-        &self.role_store
     }
 }
 
