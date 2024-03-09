@@ -16,7 +16,7 @@ impl Id for Chainlink {
 #[derive(Accounts)]
 pub struct SetPricesFromPriceFeed<'info> {
     pub authority: Signer<'info>,
-    pub role: Account<'info, Role>,
+    pub only_controller: Account<'info, Role>,
     pub store: Account<'info, DataStore>,
     #[account(
         mut,
@@ -36,7 +36,7 @@ impl<'info> Authorization<'info> for SetPricesFromPriceFeed<'info> {
     }
 
     fn role(&self) -> &Account<'info, Role> {
-        &self.role
+        &self.only_controller
     }
 }
 

@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 use data_store::states::DataStore;
 use gmx_solana_utils::to_seed;
+use role_store::{Authorization, Role};
 
 use crate::states::Oracle;
 
@@ -28,5 +29,32 @@ pub fn initialize(ctx: Context<Initialize>, key: String) -> Result<()> {
     ctx.accounts.oracle.role_store = *ctx.accounts.store.role_store();
     ctx.accounts.oracle.data_store = ctx.accounts.store.key();
     msg!("new oracle initialized with key: {}", key);
+    Ok(())
+}
+
+#[derive(Accounts)]
+pub struct ClearAllPrices<'info> {
+    pub authority: Signer<'info>,
+    pub only_controller: Account<'info, Role>,
+    #[account(mut)]
+    pub oracle: Account<'info, Oracle>,
+}
+
+impl<'info> Authorization<'info> for ClearAllPrices<'info> {
+    fn role_store(&self) -> Pubkey {
+        self.oracle.role_store
+    }
+
+    fn authority(&self) -> &Signer<'info> {
+        &self.authority
+    }
+
+    fn role(&self) -> &Account<'info, Role> {
+        &self.only_controller
+    }
+}
+
+pub fn clear_all_prices(ctx: Context<ClearAllPrices>) -> Result<()> {
+    ctx.accounts.oracle.primary.clear();
     Ok(())
 }

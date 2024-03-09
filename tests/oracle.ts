@@ -4,6 +4,7 @@ import { IDL as chainlinkIDL } from "../external-programs/chainlink-store";
 import { getAddresses, getProvider, getUsers } from "../utils/fixtures";
 import { BTC_FEED, BTC_TOKEN, SOL_FEED, SOL_TOKEN, createAddressPDA, createPriceFeedKey, createTokenConfigPDA } from "../utils/data";
 import { createControllerPDA } from "../utils/role";
+import { expect } from "chai";
 
 describe("oracle", () => {
     const provider = getProvider();
@@ -36,7 +37,8 @@ describe("oracle", () => {
         }
     });
 
-    it("set price from feed", async () => {
+    it("set price from feed and then clear", async () => {
+        const [onlyController] = createControllerPDA(roleStoreAddress, signer0.publicKey);
         await oracle.methods.setPricesFromPriceFeed([
             BTC_TOKEN,
             SOL_TOKEN,
@@ -44,7 +46,7 @@ describe("oracle", () => {
             store: dataStoreAddress,
             authority: signer0.publicKey,
             chainlinkProgram: chainlinkID,
-            role: createControllerPDA(roleStoreAddress, signer0.publicKey)[0],
+            onlyController,
             oracle: oracleAddress,
         }).remainingAccounts([
             {
@@ -68,8 +70,22 @@ describe("oracle", () => {
                 isWritable: false,
             },
         ]).signers([signer0]).rpc();
-        const oracleData = await oracle.account.oracle.fetch(oracleAddress);
-        console.log(oracleData.primary.prices);
-        console.log(oracleData.primary.tokens);
+        const setData = await oracle.account.oracle.fetch(oracleAddress);
+        console.log(setData.primary.prices);
+        console.log(setData.primary.tokens);
+        expect(setData.primary.prices.length).to.equal(2);
+        expect(setData.primary.tokens).to.eql([
+            SOL_TOKEN,
+            BTC_TOKEN,
+        ]);
+
+        await oracle.methods.clearAllPrices().accounts({
+            authority: signer0.publicKey,
+            onlyController,
+            oracle: oracleAddress,
+        }).signers([signer0]).rpc();
+        const clearedData = await oracle.account.oracle.fetch(oracleAddress);
+        expect(clearedData.primary.prices.length).to.equal(0);
+        expect(clearedData.primary.tokens.length).to.equal(0);
     });
 });

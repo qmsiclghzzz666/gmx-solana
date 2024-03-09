@@ -38,6 +38,11 @@ pub mod oracle {
     ) -> Result<()> {
         instructions::set_prices_from_price_feed(ctx, tokens)
     }
+
+    #[access_control(Authenticate::only_controller(&ctx))]
+    pub fn clear_all_prices(ctx: Context<ClearAllPrices>) -> Result<()> {
+        instructions::clear_all_prices(ctx)
+    }
 }
 
 /// Oracle Errors.
