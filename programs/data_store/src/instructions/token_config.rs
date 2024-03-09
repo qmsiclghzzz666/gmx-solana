@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use gmx_solana_utils::to_seed;
 use role_store::{Authorization, Role};
 
-use crate::states::{DataStore, TokenConfig};
+use crate::states::{DataStore, TokenConfig, TokenConfigChangeEvent};
 
 #[derive(Accounts)]
 #[instruction(key: String)]
@@ -24,7 +24,7 @@ pub struct InitializeTokenConfig<'info> {
 
 pub fn initialize_token_config(
     ctx: Context<InitializeTokenConfig>,
-    _key: String,
+    key: String,
     price_feed: Pubkey,
     heartbeat_duration: u32,
     token_decimals: u8,
@@ -37,6 +37,12 @@ pub fn initialize_token_config(
         token_decimals,
         precision,
     );
+    emit!(TokenConfigChangeEvent {
+        key,
+        address: ctx.accounts.token_config.key(),
+        init: true,
+        config: (*ctx.accounts.token_config).clone(),
+    });
     Ok(())
 }
 
@@ -84,7 +90,7 @@ impl<'info> Authorization<'info> for UpdateTokenConfig<'info> {
 
 pub fn update_token_config(
     ctx: Context<UpdateTokenConfig>,
-    _key: String,
+    key: String,
     price_feed: Option<Pubkey>,
     token_decimals: Option<u8>,
     precision: Option<u8>,
@@ -92,5 +98,11 @@ pub fn update_token_config(
     ctx.accounts
         .token_config
         .update(price_feed, token_decimals, precision);
+    emit!(TokenConfigChangeEvent {
+        key,
+        address: ctx.accounts.token_config.key(),
+        init: false,
+        config: (*ctx.accounts.token_config).clone(),
+    });
     Ok(())
 }

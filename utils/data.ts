@@ -1,7 +1,8 @@
 import * as anchor from "@coral-xyz/anchor";
 import { DataStore } from "../target/types/data_store";
 import { keyToSeed } from "./seed";
-import { createControllerPDA, createRoleStorePDA } from "./role";
+import { createControllerPDA, createRoleStorePDA, roleStore } from "./role";
+import { EventManager } from "./event";
 
 export const dataStore = anchor.workspace.DataStore as anchor.Program<DataStore>;
 
@@ -36,9 +37,12 @@ export const BTC_FEED = anchor.translateAddress("Cv4T27XbjVoKUYwP72NQQanvZeA7W4Y
 export const SOL_TOKEN = anchor.translateAddress("So11111111111111111111111111111111111111112");
 export const SOL_FEED = anchor.translateAddress("CH31Xns5z3M1cTAbKW34jcxPPciazARpijcHj9rxtemt");
 
-export const initializeDataStore = async (signer: anchor.web3.Keypair, roleStoreKey: string, dataStoreKey: string) => {
+export const initializeDataStore = async (eventManager: EventManager, signer: anchor.web3.Keypair, roleStoreKey: string, dataStoreKey: string) => {
     const [roleStorePDA] = createRoleStorePDA(roleStoreKey);
     const [dataStorePDA] = createDataStorePDA(roleStorePDA, dataStoreKey);
+
+    eventManager.subscribe(dataStore, "DataStoreInitEvent");
+    eventManager.subscribe(dataStore, "TokenConfigChangeEvent");
 
     // Initialize a DataStore with the given key.
     try {

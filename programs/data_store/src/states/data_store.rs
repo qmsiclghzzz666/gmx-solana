@@ -30,3 +30,10 @@ impl DataStore {
         &self.role_store
     }
 }
+
+#[event]
+pub struct DataStoreInitEvent {
+    pub key: String,
+    pub address: Pubkey,
+    pub role_store: Pubkey,
+}

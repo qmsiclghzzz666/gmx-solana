@@ -66,3 +66,11 @@ impl TokenConfig {
         Ok(pda)
     }
 }
+
+#[event]
+pub struct TokenConfigChangeEvent {
+    pub key: String,
+    pub address: Pubkey,
+    pub init: bool,
+    pub config: TokenConfig,
+}

@@ -7,6 +7,7 @@ chai.use(chaiAsPromised);
 import { createRoleStorePDA, initializeRoleStore, roleStore } from "./role";
 import { createDataStorePDA, dataStore, initializeDataStore } from "./data";
 import { createOraclePDA, initializeOracle } from "./oracle";
+import { EventManager } from "./event";
 
 export const expect = chai.expect;
 
@@ -58,6 +59,8 @@ export const getAddresses = () => {
     }
 }
 
+const eventManager = new EventManager();
+
 const initializeUser = async (provider: anchor.AnchorProvider, user: anchor.web3.Keypair, airdrop: number) => {
     // const tx = await provider.connection.requestAirdrop(user.publicKey, anchor.web3.LAMPORTS_PER_SOL * airdrop);
     // console.log(`Airdropped ${airdrop} SOL to the user ${user.publicKey} in tx ${tx}`);
@@ -101,13 +104,14 @@ export const mochaGlobalSetup = async () => {
     anchor.setProvider(provider);
     await initializeUser(provider, signer0, 1.5);
     await initializeRoleStore(provider, roleStoreKey, signer0.publicKey);
-    await initializeDataStore(signer0, roleStoreKey, dataStoreKey);
+    await initializeDataStore(eventManager, signer0, roleStoreKey, dataStoreKey);
     await initializeOracle(signer0, dataStoreAddress, oracleKey);
     console.log("[Done.]");
 };
 
 export const mochaGlobalTeardown = async () => {
     console.log("[Cleanup...]");
+    eventManager.unsubscribeAll();
     await deinitializeUser(provider, signer0);
     console.log("[Done.]");
 };

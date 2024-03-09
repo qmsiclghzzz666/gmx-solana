@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use gmx_solana_utils::to_seed;
 use role_store::RoleStore;
 
-use crate::states::DataStore;
+use crate::states::{DataStore, DataStoreInitEvent};
 
 #[derive(Accounts)]
 #[instruction(key: String)]
@@ -25,5 +25,10 @@ pub fn initialize(ctx: Context<Initialize>, key: String) -> Result<()> {
     ctx.accounts
         .data_store
         .init(ctx.accounts.role_store.key(), &key, ctx.bumps.data_store);
+    emit!(DataStoreInitEvent {
+        key,
+        address: ctx.accounts.data_store.key(),
+        role_store: ctx.accounts.role_store.key(),
+    });
     Ok(())
 }
