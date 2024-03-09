@@ -59,4 +59,6 @@ pub enum OracleError {
     InvalidDataFeedPrice,
     #[msg("Price Feed not updated")]
     PriceFeedNotUpdated,
+    #[msg("Data store mismatched")]
+    DataStoreMismatched,
 }

@@ -18,14 +18,17 @@ pub struct SetPricesFromPriceFeed<'info> {
     pub authority: Signer<'info>,
     pub role: Account<'info, Role>,
     pub store: Account<'info, DataStore>,
-    #[account(mut)]
+    #[account(
+        mut,
+        constraint = oracle.data_store == store.key() @ OracleError::DataStoreMismatched,
+    )]
     pub oracle: Account<'info, Oracle>,
     pub chainlink_program: Program<'info, Chainlink>,
 }
 
 impl<'info> Authorization<'info> for SetPricesFromPriceFeed<'info> {
     fn role_store(&self) -> Pubkey {
-        *self.store.role_store()
+        self.oracle.role_store
     }
 
     fn authority(&self) -> &Signer<'info> {
