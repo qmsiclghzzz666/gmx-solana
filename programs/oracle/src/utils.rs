@@ -6,11 +6,11 @@ use data_store::states::TokenConfig;
 pub fn check_and_get_chainlink_price<'info>(
     chainlink_program: &Program<'info, crate::Chainlink>,
     store: &Account<'info, data_store::states::DataStore>,
-    feed_address: &'info AccountInfo<'info>,
+    token_config: &'info AccountInfo<'info>,
     feed: &AccountInfo<'info>,
     token: &Pubkey,
 ) -> Result<crate::Price> {
-    let token_config = Account::<'info, TokenConfig>::try_from(feed_address)?;
+    let token_config = Account::<'info, TokenConfig>::try_from(token_config)?;
     let key = token.to_string();
     let expected_pda = token_config.pda(&store.key(), &key)?;
     require_eq!(
@@ -35,10 +35,17 @@ fn check_and_get_price_from_round(
     decimals: u8,
     token_config: &TokenConfig,
 ) -> Result<crate::Price> {
-    require_gt!(round.answer, 0, OracleError::InvalidDataFeedPrice);
-    // TODO: check the timestamp.
+    let chainlink_solana::Round {
+        answer, timestamp, ..
+    } = round;
+    require_gt!(*answer, 0, OracleError::InvalidDataFeedPrice);
+    let timestamp = *timestamp as i64;
+    let current = Clock::get()?.unix_timestamp;
+    if current > timestamp && current - timestamp > token_config.heartbeat_duration.into() {
+        return Err(OracleError::PriceFeedNotUpdated.into());
+    }
     let price = crate::Decimal::try_from_price(
-        round.answer as u128,
+        *answer as u128,
         decimals,
         token_config.token_decimals,
         token_config.precision,

@@ -26,12 +26,14 @@ pub fn initialize_token_config(
     ctx: Context<InitializeTokenConfig>,
     _key: String,
     price_feed: Pubkey,
+    heartbeat_duration: u32,
     token_decimals: u8,
     precision: u8,
 ) -> Result<()> {
     ctx.accounts.token_config.init(
         ctx.bumps.token_config,
         price_feed,
+        heartbeat_duration,
         token_decimals,
         precision,
     );

@@ -18,9 +18,9 @@ describe("data store", () => {
     const [fooTokenConfigPDA] = createTokenConfigPDA(dataStorePDA, fooTokenConfigKey);
     const fooAddress = Keypair.generate().publicKey;
 
-    before("init address", async () => {
+    before("init token config", async () => {
         const [onlyController] = createControllerPDA(roleStorePDA, signer0.publicKey);
-        await dataStore.methods.initializeTokenConfig(fooTokenConfigKey, fooAddress, 18, 2).accounts({
+        await dataStore.methods.initializeTokenConfig(fooTokenConfigKey, fooAddress, 60, 18, 2).accounts({
             authority: signer0.publicKey,
             store: dataStorePDA,
             onlyController,
@@ -28,9 +28,10 @@ describe("data store", () => {
         }).signers([signer0]).rpc();
     });
 
-    it("get address", async () => {
+    it("get token config", async () => {
         const saved = await dataStore.account.tokenConfig.fetch(fooTokenConfigPDA);
         expect(saved.priceFeed).to.eql(fooAddress);
+        expect(saved.heartbeatDuration).to.equal(60);
         expect(saved.precision).to.equal(2);
         expect(saved.tokenDecimals).to.equal(18);
     });

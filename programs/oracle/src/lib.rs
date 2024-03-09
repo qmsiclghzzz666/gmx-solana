@@ -56,12 +56,12 @@ pub mod oracle {
         // Assume the remaining accounts are arranged in the following way:
         // [address, feed; tokens.len()] [..remaining]
         for (idx, token) in tokens.iter().enumerate() {
-            let address_idx = idx << 1;
-            let feed_idx = address_idx + 1;
+            let token_config_idx = idx << 1;
+            let feed_idx = token_config_idx + 1;
             let price = utils::check_and_get_chainlink_price(
                 &ctx.accounts.chainlink_program,
                 &ctx.accounts.store,
-                &remaining[address_idx],
+                &remaining[token_config_idx],
                 &remaining[feed_idx],
                 token,
             )?;
@@ -197,4 +197,6 @@ pub enum OracleError {
     InvalidPriceFeedAccount,
     #[msg("Invalid price from data feed")]
     InvalidDataFeedPrice,
+    #[msg("Price Feed not updated")]
+    PriceFeedNotUpdated,
 }

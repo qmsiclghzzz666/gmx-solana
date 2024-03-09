@@ -10,6 +10,8 @@ pub struct TokenConfig {
     pub bump: u8,
     /// The address of the price feed.
     pub price_feed: Pubkey,
+    /// Heartbeat duration.
+    pub heartbeat_duration: u32,
     /// Token decimals.
     pub token_decimals: u8,
     /// Precision.
@@ -21,9 +23,17 @@ impl TokenConfig {
     pub const SEED: &'static [u8] = b"token_config";
 
     /// Init.
-    pub fn init(&mut self, bump: u8, price_feed: Pubkey, token_decimals: u8, precision: u8) {
+    pub fn init(
+        &mut self,
+        bump: u8,
+        price_feed: Pubkey,
+        heartbeat_duration: u32,
+        token_decimals: u8,
+        precision: u8,
+    ) {
         self.bump = bump;
         self.price_feed = price_feed;
+        self.heartbeat_duration = heartbeat_duration;
         self.token_decimals = token_decimals;
         self.precision = precision;
     }

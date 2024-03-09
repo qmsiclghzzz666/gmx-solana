@@ -24,10 +24,18 @@ pub mod data_store {
         ctx: Context<InitializeTokenConfig>,
         key: String,
         price_feed: Pubkey,
+        heartbeat_duration: u32,
         token_decimals: u8,
         precision: u8,
     ) -> Result<()> {
-        instructions::initialize_token_config(ctx, key, price_feed, token_decimals, precision)
+        instructions::initialize_token_config(
+            ctx,
+            key,
+            price_feed,
+            heartbeat_duration,
+            token_decimals,
+            precision,
+        )
     }
 
     #[access_control(Authenticate::only_controller(&ctx))]

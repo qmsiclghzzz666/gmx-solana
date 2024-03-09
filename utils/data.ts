@@ -56,7 +56,7 @@ export const initializeDataStore = async (signer: anchor.web3.Keypair, roleStore
     try {
         const key = BTC_TOKEN.toBase58();
         const [tokenConfigPDA] = createTokenConfigPDA(dataStorePDA, key);
-        const tx = await dataStore.methods.initializeTokenConfig(key, BTC_FEED, 8, 2).accounts({
+        const tx = await dataStore.methods.initializeTokenConfig(key, BTC_FEED, 60, 8, 2).accounts({
             authority: signer.publicKey,
             store: dataStorePDA,
             onlyController: createControllerPDA(roleStorePDA, signer.publicKey)[0],
@@ -71,7 +71,7 @@ export const initializeDataStore = async (signer: anchor.web3.Keypair, roleStore
     try {
         const key = SOL_TOKEN.toBase58();
         const [tokenConfigPDA] = createTokenConfigPDA(dataStorePDA, key);
-        const tx = await dataStore.methods.initializeTokenConfig(key, SOL_FEED, 8, 4).accounts({
+        const tx = await dataStore.methods.initializeTokenConfig(key, SOL_FEED, 60, 8, 4).accounts({
             authority: signer.publicKey,
             store: dataStorePDA,
             onlyController: createControllerPDA(roleStorePDA, signer.publicKey)[0],
