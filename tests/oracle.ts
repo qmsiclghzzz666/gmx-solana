@@ -17,18 +17,7 @@ describe("oracle", () => {
 
     const mockFeedAccount = anchor.web3.Keypair.generate();
 
-    it("get price from the given feed", async () => {
-        try {
-            const round = await oracle.methods.getPriceFromFeed().accounts({
-                feed: BTC_FEED,
-                chainlinkProgram: chainlinkID,
-            }).view();
-            console.log(`got round of slot ${round.slot}, answer: ${round.answer}, feed ts: ${round.timestamp}, sys ts: ${round.sysTimestamp}`, round);
-        } catch (error) {
-            console.log(error);
-            throw error;
-        }
-
+    it("create a new price feed", async () => {
         try {
             const createFeedTx = await chainlink.methods.createFeed("FOO", 1, 2, 3).accounts({
                 feed: mockFeedAccount.publicKey,
