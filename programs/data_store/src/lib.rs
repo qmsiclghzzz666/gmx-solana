@@ -58,4 +58,6 @@ pub enum DataStoreError {
     MismatchedRoleStore,
     #[msg("Invalid pda")]
     InvalidPDA,
+    #[msg("Invalid key")]
+    InvalidKey,
 }
