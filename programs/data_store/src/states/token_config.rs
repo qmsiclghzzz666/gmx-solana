@@ -1,7 +1,6 @@
 use anchor_lang::prelude::*;
-use gmx_solana_utils::to_seed;
 
-use crate::DataStoreError;
+use super::Data;
 
 #[account]
 #[derive(InitSpace)]
@@ -19,9 +18,6 @@ pub struct TokenConfig {
 }
 
 impl TokenConfig {
-    /// Seed for [`TokenConfig`].
-    pub const SEED: &'static [u8] = b"token_config";
-
     /// Init.
     pub fn init(
         &mut self,
@@ -55,16 +51,16 @@ impl TokenConfig {
             self.precision = precision;
         }
     }
+}
 
-    /// Recreate the PDA.
-    pub fn pda(&self, store: &Pubkey, key: &str) -> Result<Pubkey> {
-        let pda = Pubkey::create_program_address(
-            &[Self::SEED, store.as_ref(), &to_seed(key), &[self.bump]],
-            &crate::ID,
-        )
-        .map_err(|_| DataStoreError::InvalidPDA)?;
-        Ok(pda)
+impl anchor_lang::Bump for TokenConfig {
+    fn seed(&self) -> u8 {
+        self.bump
     }
+}
+
+impl Data for TokenConfig {
+    const SEED: &'static [u8] = b"token_config";
 }
 
 #[event]

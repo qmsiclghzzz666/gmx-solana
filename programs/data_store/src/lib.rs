@@ -7,6 +7,8 @@ pub mod instructions;
 /// States.
 pub mod states;
 
+pub use self::states::Data;
+
 use self::instructions::*;
 
 declare_id!("8hJ2dGQ2Ccr5G6iEqQQEoBApRSXt7Jn8Qyf9Qf3eLBX2");

@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use data_store::states::{DataStore, TokenConfig};
+use data_store::states::{Data, DataStore, TokenConfig};
 use role_store::{Authorization, Role};
 
 use crate::{states::Oracle, OracleError, PriceMap};
