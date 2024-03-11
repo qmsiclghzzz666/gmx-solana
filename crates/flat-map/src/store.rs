@@ -214,3 +214,56 @@ where
         (**self).get_mut(index)
     }
 }
+
+impl<'b, S> Store for &'b S
+where
+    S: Store,
+{
+    type Value = S::Value;
+
+    fn len(&self) -> usize {
+        (**self).len()
+    }
+
+    fn get(&self, index: usize) -> Option<&Self::Value> {
+        (**self).get(index)
+    }
+
+    fn is_empty(&self) -> bool {
+        (**self).is_empty()
+    }
+
+    fn is_sorted(&self) -> bool
+    where
+        Self::Value: PartialOrd,
+    {
+        (**self).is_sorted()
+    }
+
+    fn is_sorted_by<'a, F>(&'a self, compare: F) -> bool
+    where
+        F: FnMut(&'a Self::Value, &'a Self::Value) -> Option<Ordering>,
+    {
+        (**self).is_sorted_by(compare)
+    }
+}
+
+impl<'b, S> SearchStore for &'b S
+where
+    S: SearchStore,
+{
+    fn binary_search<Q: ?Sized>(&self, key: &Q) -> Result<usize, usize>
+    where
+        Self::Value: Borrow<Q>,
+        Q: Ord,
+    {
+        (**self).binary_search(key)
+    }
+
+    fn binary_search_by<'a, F>(&'a self, f: F) -> Result<usize, usize>
+    where
+        F: FnMut(&'a Self::Value) -> Ordering,
+    {
+        (**self).binary_search_by(f)
+    }
+}

@@ -27,3 +27,4 @@ thiserror = "1.0.57"
 gmx-solana-utils = { path = "../../crates/gmx-solana-utils" }
 data_store = { path = "../data_store", features = ["cpi"] }
 role_store = { path = "../role_store", features = ["cpi"] }
+flat-map = { path = "../../crates/flat-map" }

@@ -25,6 +25,7 @@ impl<K, V> FlatMap<K, V> {
     /// One must make sure that:
     /// - `keys` is sorted and have no duplicate values.
     /// - `values` has the same length of `keys`.
+    #[inline]
     pub const fn from_sorted_stores_unchecked(keys: K, values: V) -> Self {
         Self { keys, values }
     }
@@ -137,13 +138,17 @@ where
     /// Attempts to insert a unique entry into the map.
     /// - If `key` is not in the map, inserts it with the corresponding `value` and returns `None`.
     /// - If `key` is already in the map, no change is made, and the `key` and `value` are returned.
-    pub fn try_insert(&mut self, key: K::Value, value: V::Value) -> Option<(K::Value, V::Value)> {
+    pub fn try_insert(
+        &mut self,
+        key: K::Value,
+        value: V::Value,
+    ) -> Result<(), (K::Value, V::Value)> {
         match self.keys.binary_search(&key) {
-            Ok(_) => Some((key, value)),
+            Ok(_) => Err((key, value)),
             Err(index) => {
                 self.keys.insert(index, key);
                 self.values.insert(index, value);
-                None
+                Ok(())
             }
         }
     }

@@ -1104,6 +1104,7 @@ dependencies = [
  "anchor-lang",
  "chainlink_solana",
  "data_store",
+ "flat-map",
  "gmx-solana-utils",
  "role_store",
  "thiserror",
