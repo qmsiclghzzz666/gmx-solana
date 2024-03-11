@@ -50,6 +50,22 @@ pub mod data_store {
     ) -> Result<()> {
         instructions::update_token_config(ctx, key, price_feed, token_decimals, precision)
     }
+
+    #[access_control(Authenticate::only_market_keeper(&ctx))]
+    pub fn initialize_market(
+        ctx: Context<InitializeMarket>,
+        index_token: Pubkey,
+        long_token: Pubkey,
+        short_token: Pubkey,
+        market_token: Pubkey,
+    ) -> Result<()> {
+        instructions::initialize_market(ctx, index_token, long_token, short_token, market_token)
+    }
+
+    #[access_control(Authenticate::only_market_keeper(&ctx))]
+    pub fn update_market(ctx: Context<UpdateMarket>, market_token: Pubkey) -> Result<()> {
+        instructions::update_market(ctx, market_token)
+    }
 }
 
 #[error_code]

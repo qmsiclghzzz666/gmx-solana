@@ -52,6 +52,11 @@ pub trait Authenticate<'info>: Authorization<'info> + Bumps + Sized {
     fn only_role_admin(ctx: &Context<Self>) -> Result<()> {
         Self::only_role(ctx, Role::ROLE_ADMIN)
     }
+
+    /// Check if the authorization is valid and the role is [`MARKET_KEEPR`](Role::MARKET_KEEPER).
+    fn only_market_keeper(ctx: &Context<Self>) -> Result<()> {
+        Self::only_role(ctx, Role::MARKET_KEEPER)
+    }
 }
 
 impl<'info, T: Authorization<'info> + Bumps> Authenticate<'info> for T {}

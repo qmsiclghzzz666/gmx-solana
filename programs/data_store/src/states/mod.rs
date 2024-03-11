@@ -8,6 +8,7 @@ pub mod token_config;
 pub mod market;
 
 pub use data_store::*;
+pub use market::*;
 pub use token_config::*;
 
 use anchor_lang::{

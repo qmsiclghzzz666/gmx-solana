@@ -180,6 +180,9 @@ impl Role {
     /// The CONTROLLER role.
     pub const CONTROLLER: &'static str = "CONTROLLER";
 
+    /// The MARKET_KEEPER role.
+    pub const MARKET_KEEPER: &'static str = "MARKET_KEEPER";
+
     fn grant(&mut self, store: Pubkey, role: &str, bump: u8, authority: Pubkey) -> Result<()> {
         require!(role.len() <= MAX_ROLE_LEN, RoleStoreError::RoleNameTooLarge);
         self.role = role.to_string();
