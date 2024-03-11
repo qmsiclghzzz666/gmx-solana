@@ -6,6 +6,7 @@ skip-lint = false
 
 [programs.localnet]
 data_store = "8hJ2dGQ2Ccr5G6iEqQQEoBApRSXt7Jn8Qyf9Qf3eLBX2"
+market = "AFxZM92h6tryw4hZx2puJRWjA4CQSkxmVkzJrDWJgJAL"
 oracle = "8LmVjFpoR6hupp6WZZb6EbmupaXvivaCEk2iAHskr1en"
 role_store = "H7L3aYUzR3joc6Heyonjt1thpWdtwYcTVQvCrB2xDsdi"
 
@@ -19,13 +20,20 @@ wallet = "~/.config/solana/id.json"
 [scripts]
 test = "yarn run ts-mocha -p ./tsconfig.json --require utils/fixtures.ts -t 1000000 tests/**/*.ts"
 
-[test.validator]
-url = "https://api.mainnet-beta.solana.com"
-bind_address = "127.0.0.1"
+[test]
+startup_wait = 5000
+shutdown_wait = 2000
+upgradeable = false
 
 [[test.genesis]]
 address = "HEvSKofvBgfaexv23kMabbYqxasxU3mQ4ibBMEmJWHny"
 program = "external-programs/chainlink-store.so"
+
+[test.validator]
+bind_address = "127.0.0.1"
+url = "https://api.mainnet-beta.solana.com"
+ledger = ".anchor/test-ledger"
+rpc_port = 8899
 
 [[test.validator.clone]]
 address = "Cv4T27XbjVoKUYwP72NQQanvZeA7W4YF9L4EnYT9kx5o"
