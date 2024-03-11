@@ -59,7 +59,12 @@ export const getAddresses = () => {
     }
 }
 
-const eventManager = new EventManager();
+const SHOW_EVENT = process.env.SHOW_EVENT;
+const callback = SHOW_EVENT ? (eventName, event) => {
+    console.debug(`<Event: ${eventName}>`, event);
+} : (eventName, event) => { };
+
+const eventManager = new EventManager(callback);
 
 const initializeUser = async (provider: anchor.AnchorProvider, user: anchor.web3.Keypair, airdrop: number) => {
     // const tx = await provider.connection.requestAirdrop(user.publicKey, anchor.web3.LAMPORTS_PER_SOL * airdrop);

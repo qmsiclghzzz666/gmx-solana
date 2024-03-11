@@ -51,6 +51,7 @@ export const initializeDataStore = async (eventManager: EventManager, signer: an
 
     eventManager.subscribe(dataStore, "DataStoreInitEvent");
     eventManager.subscribe(dataStore, "TokenConfigChangeEvent");
+    eventManager.subscribe(dataStore, "MarketChangeEvent");
 
     // Initialize a DataStore with the given key.
     try {
