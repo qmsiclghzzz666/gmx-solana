@@ -25,7 +25,7 @@ pub trait Store {
 
     /// Checks if the elements of this store are sorted using the given comparator function.
     ///
-    /// See the `is_sorted_by` method of [`std::slice`](std::slice) for more information.
+    /// See the `is_sorted_by` method of [`std::slice`] for more information.
     fn is_sorted_by<'a, F>(&'a self, mut compare: F) -> bool
     where
         F: FnMut(&'a Self::Value, &'a Self::Value) -> Option<Ordering>,
@@ -47,7 +47,7 @@ pub trait Store {
 
     /// Checks if the elements of this store are sorted.
     ///
-    /// See the `is_sorted` method of [`std::slice`](std::slice) for more information.
+    /// See the `is_sorted` method of [`std::slice`] for more information.
     fn is_sorted(&self) -> bool
     where
         Self::Value: PartialOrd,
@@ -60,14 +60,14 @@ pub trait Store {
 pub trait SearchStore: Store {
     /// Binary searches this store with a comparator function.
     ///
-    /// See the `binary_search_by` method of [`std::slice`](std::slice) for more details.
+    /// See the `binary_search_by` method of [`std::slice`] for more details.
     fn binary_search_by<'a, F>(&'a self, f: F) -> Result<usize, usize>
     where
         F: FnMut(&'a Self::Value) -> Ordering;
 
     /// Binary searches this store for the given key.
     ///
-    /// See the `binary_search` method of [`std::slice`](std::slice) for more details.
+    /// See the `binary_search` method of [`std::slice`] for more details.
     #[inline]
     fn binary_search<Q: ?Sized>(&self, key: &Q) -> Result<usize, usize>
     where

@@ -743,6 +743,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "dual-vec-map"
+version = "0.1.0"
+dependencies = [
+ "thiserror",
+]
+
+[[package]]
 name = "either"
 version = "1.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -759,13 +766,6 @@ name = "feature-probe"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "835a3dc7d1ec9e75e2b5fb4ba75396837112d2060b03f7d43bc1897c7f7211da"
-
-[[package]]
-name = "flat-map"
-version = "0.1.0"
-dependencies = [
- "thiserror",
-]
 
 [[package]]
 name = "generic-array"
@@ -1104,7 +1104,7 @@ dependencies = [
  "anchor-lang",
  "chainlink_solana",
  "data_store",
- "flat-map",
+ "dual-vec-map",
  "gmx-solana-utils",
  "role_store",
  "thiserror",

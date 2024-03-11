@@ -1,26 +1,27 @@
 //! Map-like data structure backed by sorted vectors.
 
-/// Traits that required by [`FlatMap`].
+/// Traits that required by [`DualVecMap`].
 pub mod store;
 
 use std::{borrow::Borrow, cmp::Ordering};
 
 pub use self::store::{SearchStore, Store, StoreMut};
 
-/// A "flat" map backed by sorted vectors.
-pub struct FlatMap<K, V> {
+/// A map-like structure backed by a pair of vector-like stores:
+/// one storing keys and the other storing associated values.
+pub struct DualVecMap<K, V> {
     keys: K,
     values: V,
 }
 
-impl<K, V> FlatMap<Vec<K>, Vec<V>> {
-    /// Create a new empty [`FlatMap`] from [`Vec`]s.
+impl<K, V> DualVecMap<Vec<K>, Vec<V>> {
+    /// Create a new empty [`DualVecMap`] from [`Vec`]s.
     pub fn new_vecs() -> Self {
         Self::from_sorted_stores_unchecked(Vec::default(), Vec::default())
     }
 }
 
-impl<K, V> FlatMap<K, V> {
+impl<K, V> DualVecMap<K, V> {
     /// Create from sorted `keys` and `values` stores unchecked.
     /// One must make sure that:
     /// - `keys` is sorted and have no duplicate values.
@@ -35,14 +36,14 @@ impl<K, V> FlatMap<K, V> {
     /// Returns error if:
     /// - `keys` is not sorted or have duplicate values.
     /// - the length of `keys` and `values` mismatched.
-    pub fn try_from_stores(keys: K, values: V) -> Result<Self, FlatMapError>
+    pub fn try_from_stores(keys: K, values: V) -> Result<Self, DualVecMapError>
     where
         K: Store,
         K::Value: PartialOrd,
         V: Store,
     {
         if keys.len() != values.len() {
-            return Err(FlatMapError::InvalidStores);
+            return Err(DualVecMapError::InvalidStores);
         }
 
         let is_strictly_sorted = keys.is_sorted_by(|a, b| {
@@ -53,7 +54,7 @@ impl<K, V> FlatMap<K, V> {
             }
         });
         if !is_strictly_sorted {
-            return Err(FlatMapError::InvalidStores);
+            return Err(DualVecMapError::InvalidStores);
         }
 
         Ok(Self::from_sorted_stores_unchecked(keys, values))
@@ -86,7 +87,7 @@ impl<K, V> FlatMap<K, V> {
     }
 }
 
-impl<K, V> FlatMap<K, V>
+impl<K, V> DualVecMap<K, V>
 where
     K: SearchStore,
     V: Store,
@@ -129,7 +130,7 @@ where
     }
 }
 
-impl<K, V> FlatMap<K, V>
+impl<K, V> DualVecMap<K, V>
 where
     K: SearchStore + StoreMut,
     K::Value: Ord,
@@ -188,9 +189,9 @@ where
     }
 }
 
-/// Errors for [`FlatMap`].
+/// Errors for [`DualVecMap`].
 #[derive(Debug, thiserror::Error)]
-pub enum FlatMapError {
+pub enum DualVecMapError {
     /// Invalid keys or values stores.
     #[error("invalid keys or values stores")]
     InvalidStores,
@@ -202,7 +203,7 @@ mod tests {
 
     #[test]
     fn basic_operations() {
-        let mut map = FlatMap::new_vecs();
+        let mut map = DualVecMap::new_vecs();
         assert!(map.is_empty());
         assert_eq!(map.len(), 0);
         map.insert("hello", 1);
@@ -232,7 +233,7 @@ mod tests {
     fn from_references() {
         let mut keys = Vec::from([1, 3, 5]);
         let mut values = Vec::from([2, 4, 6]);
-        let mut map = FlatMap::try_from_stores(&mut keys, &mut values).expect("must be ok");
+        let mut map = DualVecMap::try_from_stores(&mut keys, &mut values).expect("must be ok");
         assert!(!map.is_empty());
         assert_eq!(map.len(), 3);
         assert_eq!(map.get(&1), Some(&2));

@@ -1,5 +1,5 @@
 [package]
-name = "flat-map"
+name = "dual-vec-map"
 version = "0.1.0"
 edition = "2021"
 

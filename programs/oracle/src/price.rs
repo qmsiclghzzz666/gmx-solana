@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use flat_map::FlatMap;
+use dual_vec_map::DualVecMap;
 
 use crate::{decimal::Decimal, OracleError};
 
@@ -28,14 +28,14 @@ impl PriceMap {
     /// Maximum number of tokens for a single `Price Map` to store.
     pub const MAX_TOKENS: usize = MAX_TOKENS;
 
-    fn as_map(&self) -> FlatMap<&Vec<Pubkey>, &Vec<Price>> {
+    fn as_map(&self) -> DualVecMap<&Vec<Pubkey>, &Vec<Price>> {
         // CHECK: All the insert operations is done by `FlatMap`.
-        FlatMap::from_sorted_stores_unchecked(&self.tokens, &self.prices)
+        DualVecMap::from_sorted_stores_unchecked(&self.tokens, &self.prices)
     }
 
-    fn as_map_mut(&mut self) -> FlatMap<&mut Vec<Pubkey>, &mut Vec<Price>> {
+    fn as_map_mut(&mut self) -> DualVecMap<&mut Vec<Pubkey>, &mut Vec<Price>> {
         // CHECK: All the insert operations is done by `FlatMap`.
-        FlatMap::from_sorted_stores_unchecked(&mut self.tokens, &mut self.prices)
+        DualVecMap::from_sorted_stores_unchecked(&mut self.tokens, &mut self.prices)
     }
 
     /// Get price of the given token key.
