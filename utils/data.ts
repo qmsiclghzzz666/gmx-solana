@@ -3,12 +3,14 @@ import { DataStore } from "../target/types/data_store";
 import { keyToSeed } from "./seed";
 import { createControllerPDA, createRoleStorePDA, roleStore } from "./role";
 import { EventManager } from "./event";
+import { PublicKey } from "@solana/web3.js";
 
 export const dataStore = anchor.workspace.DataStore as anchor.Program<DataStore>;
 
 export const DATA_STORE_SEED = anchor.utils.bytes.utf8.encode("data_store");
 export const ADDRESS_SEED = anchor.utils.bytes.utf8.encode("address");
 export const TOKEN_CONFIG_SEED = anchor.utils.bytes.utf8.encode("token_config");
+export const MARKET_SEED = anchor.utils.bytes.utf8.encode("market");
 
 export const createDataStorePDA = (role_store: anchor.web3.PublicKey, key: string) => anchor.web3.PublicKey.findProgramAddressSync([
     DATA_STORE_SEED,
@@ -26,6 +28,12 @@ export const createTokenConfigPDA = (store: anchor.web3.PublicKey, key: string) 
     TOKEN_CONFIG_SEED,
     store.toBytes(),
     keyToSeed(key),
+], dataStore.programId);
+
+export const createMarketPDA = (store: PublicKey, indexToken: PublicKey, longToken: PublicKey, shortToken: PublicKey) => PublicKey.findProgramAddressSync([
+    MARKET_SEED,
+    store.toBytes(),
+    keyToSeed(`${indexToken}${longToken}${shortToken}`),
 ], dataStore.programId);
 
 export const createKey = (prefix: string, key: string) => `${prefix}:${key}`;

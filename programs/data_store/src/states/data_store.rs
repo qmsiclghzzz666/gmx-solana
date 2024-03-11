@@ -8,7 +8,7 @@ const MAX_LEN: usize = 32;
 pub struct DataStore {
     pub role_store: Pubkey,
     #[max_len(MAX_LEN)]
-    pub key: Vec<u8>,
+    pub key_seed: Vec<u8>,
     pub bump: u8,
 }
 
@@ -21,7 +21,7 @@ impl DataStore {
 
     pub fn init(&mut self, role_store: Pubkey, key: &str, bump: u8) {
         self.role_store = role_store;
-        self.key = to_seed(key).into();
+        self.key_seed = to_seed(key).into();
         self.bump = bump;
     }
 

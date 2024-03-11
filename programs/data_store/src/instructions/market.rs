@@ -38,7 +38,7 @@ pub struct InitializeMarket<'info> {
         space = 8 + Market::INIT_SPACE,
         seeds = [
             Market::SEED,
-            store.key.as_ref(),
+            store.key().as_ref(),
             &Market::create_key_seed(&index_token, &long_token, &short_token),
         ],
         bump,
@@ -80,7 +80,7 @@ pub struct UpdateMarket<'info> {
     store: Account<'info, DataStore>,
     #[account(
         mut,
-        seeds = [Market::SEED, store.key.as_ref(), &market.expected_key_seed()],
+        seeds = [Market::SEED, store.key().as_ref(), &market.expected_key_seed()],
         bump = market.bump,
     )]
     market: Account<'info, Market>,

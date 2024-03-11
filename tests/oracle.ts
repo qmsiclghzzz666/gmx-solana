@@ -30,7 +30,6 @@ describe("oracle", () => {
                     8 + 192 + (3 + 3) * 48
                 ),
             ]).rpc();
-            console.log("create feed:", createFeedTx);
         } catch (error) {
             console.error(error);
             throw error;
@@ -71,8 +70,6 @@ describe("oracle", () => {
             },
         ]).signers([signer0]).rpc();
         const setData = await oracle.account.oracle.fetch(oracleAddress);
-        console.log(setData.primary.prices);
-        console.log(setData.primary.tokens);
         expect(setData.primary.prices.length).to.equal(2);
         expect(setData.primary.tokens).to.eql([
             SOL_TOKEN,

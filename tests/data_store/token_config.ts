@@ -1,11 +1,11 @@
 import { PublicKey, Keypair } from '@solana/web3.js';
 
-import { expect, getKeys, getPrograms, getProvider, getUsers } from "../utils/fixtures";
-import { createControllerPDA, createRoleAdminPDA, createRoleStorePDA } from "../utils/role";
-import { createAddressPDA, createDataStorePDA, createTokenConfigPDA } from "../utils/data";
+import { expect, getKeys, getPrograms, getProvider, getUsers } from "../../utils/fixtures";
+import { createControllerPDA, createRoleAdminPDA, createRoleStorePDA } from "../../utils/role";
+import { createAddressPDA, createDataStorePDA, createTokenConfigPDA } from "../../utils/data";
 import { AnchorError } from '@coral-xyz/anchor';
 
-describe("data store", () => {
+describe("data store: TokenConfig", () => {
     const provider = getProvider();
     const { dataStore } = getPrograms();
     const { signer0 } = getUsers();

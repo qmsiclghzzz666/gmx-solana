@@ -43,7 +43,8 @@ impl Market {
         long_token: &Pubkey,
         short_token: &Pubkey,
     ) -> [u8; 32] {
-        to_seed(&Self::create_key(index_token, long_token, short_token))
+        let key = Self::create_key(index_token, long_token, short_token);
+        to_seed(&key)
     }
 }
 
