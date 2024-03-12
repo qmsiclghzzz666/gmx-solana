@@ -46,6 +46,7 @@ pub struct CreateMarket<'info> {
         space = Mint::LEN,
         seeds = [
             crate::MAREKT_TOKEN_SEED,
+            data_store.key().as_ref(),
             index_token.as_ref(),
             long_token.as_ref(),
             short_token.as_ref(),

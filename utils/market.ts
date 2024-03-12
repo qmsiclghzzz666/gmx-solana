@@ -6,8 +6,9 @@ export const market = anchor.workspace.Market as anchor.Program<Market>;
 
 export const MARKET_TOKEN_SEED = anchor.utils.bytes.utf8.encode("market_token");
 
-export const createMarketTokenPDA = (indexToken: PublicKey, longToken: PublicKey, shortToken: PublicKey) => PublicKey.findProgramAddressSync([
+export const createMarketTokenPDA = (dataStore: PublicKey, indexToken: PublicKey, longToken: PublicKey, shortToken: PublicKey) => PublicKey.findProgramAddressSync([
     MARKET_TOKEN_SEED,
+    dataStore.toBytes(),
     indexToken.toBytes(),
     longToken.toBytes(),
     shortToken.toBytes(),
