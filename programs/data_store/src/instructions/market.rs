@@ -1,15 +1,15 @@
 use anchor_lang::prelude::*;
 use role_store::{Authorization, Role};
 
-use crate::states::{Data, DataStore, Market, MarketChangeEvent};
+use crate::states::{Action, Data, DataStore, Market, MarketChangeEvent};
 
 /// Initialize the account for [`Market`].
 pub fn initialize_market(
     ctx: Context<InitializeMarket>,
+    market_token: Pubkey,
     index_token: Pubkey,
     long_token: Pubkey,
     short_token: Pubkey,
-    market_token: Pubkey,
 ) -> Result<()> {
     let market = &mut ctx.accounts.market;
     market.bump = ctx.bumps.market;
@@ -19,14 +19,14 @@ pub fn initialize_market(
     market.market_token = market_token;
     emit!(MarketChangeEvent {
         address: market.key(),
-        init: true,
+        action: Action::Init,
         market: (**market).clone(),
     });
     Ok(())
 }
 
 #[derive(Accounts)]
-#[instruction(index_token: Pubkey, long_token: Pubkey, short_token: Pubkey)]
+#[instruction(market_token: Pubkey)]
 pub struct InitializeMarket<'info> {
     #[account(mut)]
     authority: Signer<'info>,
@@ -39,7 +39,7 @@ pub struct InitializeMarket<'info> {
         seeds = [
             Market::SEED,
             store.key().as_ref(),
-            &Market::create_key_seed(&index_token, &long_token, &short_token),
+            &Market::create_key_seed(&market_token),
         ],
         bump,
     )]
@@ -61,20 +61,20 @@ impl<'info> Authorization<'info> for InitializeMarket<'info> {
     }
 }
 
-/// Update market.
-pub fn update_market(ctx: Context<UpdateMarket>, market_token: Pubkey) -> Result<()> {
+/// Remove market.
+pub fn remove_market(ctx: Context<RemoveMarket>) -> Result<()> {
     let market = &mut ctx.accounts.market;
-    market.market_token = market_token;
     emit!(MarketChangeEvent {
         address: market.key(),
-        init: false,
+        action: Action::Remove,
         market: (**market).clone(),
     });
     Ok(())
 }
 
 #[derive(Accounts)]
-pub struct UpdateMarket<'info> {
+pub struct RemoveMarket<'info> {
+    #[account(mut)]
     authority: Signer<'info>,
     only_market_keeper: Account<'info, Role>,
     store: Account<'info, DataStore>,
@@ -82,11 +82,12 @@ pub struct UpdateMarket<'info> {
         mut,
         seeds = [Market::SEED, store.key().as_ref(), &market.expected_key_seed()],
         bump = market.bump,
+        close = authority,
     )]
     market: Account<'info, Market>,
 }
 
-impl<'info> Authorization<'info> for UpdateMarket<'info> {
+impl<'info> Authorization<'info> for RemoveMarket<'info> {
     fn role_store(&self) -> Pubkey {
         self.store.role_store
     }

@@ -63,8 +63,8 @@ pub mod data_store {
     }
 
     #[access_control(Authenticate::only_market_keeper(&ctx))]
-    pub fn update_market(ctx: Context<UpdateMarket>, market_token: Pubkey) -> Result<()> {
-        instructions::update_market(ctx, market_token)
+    pub fn remove_market(ctx: Context<RemoveMarket>) -> Result<()> {
+        instructions::remove_market(ctx)
     }
 }
 

@@ -16,10 +16,10 @@ describe("data store: Market", () => {
     const longToken = Keypair.generate().publicKey;
     const shortToken = Keypair.generate().publicKey;
     const marketToken = Keypair.generate().publicKey;
-    const [marketPDA] = createMarketPDA(dataStoreAddress, indexToken, longToken, shortToken);
+    const [marketPDA] = createMarketPDA(dataStoreAddress, marketToken);
 
-    it("init and update a market", async () => {
-        await dataStore.methods.initializeMarket(indexToken, longToken, shortToken, marketToken).accounts({
+    it("init and remove a market", async () => {
+        await dataStore.methods.initializeMarket(marketToken, indexToken, longToken, shortToken).accounts({
             authority: signer0.publicKey,
             onlyMarketKeeper,
             store: dataStoreAddress,
@@ -32,16 +32,15 @@ describe("data store: Market", () => {
             expect(market.shortToken).eql(shortToken);
             expect(market.marketToken).eql(marketToken);
         }
-        const newMarketToken = Keypair.generate().publicKey;
-        await dataStore.methods.updateMarket(newMarketToken).accounts({
+        await dataStore.methods.removeMarket().accounts({
             authority: signer0.publicKey,
             onlyMarketKeeper,
             store: dataStoreAddress,
             market: marketPDA,
         }).signers([signer0]).rpc();
         {
-            const market = await dataStore.account.market.fetch(marketPDA);
-            expect(market.marketToken).eql(newMarketToken);
+            const market = await dataStore.account.market.getAccountInfo(marketPDA);
+            expect(market).to.be.null;
         }
     });
 });

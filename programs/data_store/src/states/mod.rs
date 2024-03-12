@@ -12,7 +12,7 @@ pub use market::*;
 pub use token_config::*;
 
 use anchor_lang::{
-    prelude::{Pubkey, Result},
+    prelude::{borsh, AnchorDeserialize, AnchorSerialize, Pubkey, Result},
     Bump,
 };
 use gmx_solana_utils::to_seed;
@@ -38,4 +38,15 @@ pub trait Data: Bump {
         .map_err(|_| crate::DataStoreError::InvalidPDA)?;
         Ok(pda)
     }
+}
+
+/// Action.
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq)]
+pub enum Action {
+    /// Initialize.
+    Init,
+    /// Change.
+    Change,
+    /// Remove.
+    Remove,
 }
