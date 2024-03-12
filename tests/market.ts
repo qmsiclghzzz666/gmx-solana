@@ -1,12 +1,12 @@
 import * as anchor from "@coral-xyz/anchor";
 import { expect, getAddresses, getPrograms, getUsers } from "../utils/fixtures";
-import { Market } from "../target/types/market";
-import { Keypair } from "@solana/web3.js";
+import { Keypair, PublicKey } from "@solana/web3.js";
 import { createMarketKeeperPDA } from "../utils/role";
 import { createMarketPDA } from "../utils/data";
+import { createMarketTokenPDA, getMarketTokenAuthority } from "../utils/market";
 
 describe("market", () => {
-    const market = anchor.workspace.Market as anchor.Program<Market>;
+    const { market } = getPrograms();
     const { signer0 } = getUsers();
     const { roleStoreAddress, dataStoreAddress } = getAddresses();
     const { dataStore } = getPrograms();
@@ -16,17 +16,21 @@ describe("market", () => {
     const shortToken = Keypair.generate().publicKey;
 
     it("create market", async () => {
+        const [marketToken] = createMarketTokenPDA(indexToken, longToken, shortToken);
+        const [marketTokenAuthority] = getMarketTokenAuthority();
         await market.methods.createMarket(
             indexToken,
             longToken,
             shortToken,
-            Keypair.generate().publicKey,
         ).accounts({
             authority: signer0.publicKey,
             onlyMarketKeeper: createMarketKeeperPDA(roleStoreAddress, signer0.publicKey)[0],
             dataStore: dataStoreAddress,
-            market: createMarketPDA(dataStoreAddress, indexToken, longToken, shortToken)[0],
+            market: createMarketPDA(dataStoreAddress, marketToken)[0],
+            marketToken,
+            marketTokenAuthority,
             dataStoreProgram: dataStore.programId,
+            tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID,
         }).signers([signer0]).rpc();
     });
 });

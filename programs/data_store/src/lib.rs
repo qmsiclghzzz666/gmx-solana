@@ -54,12 +54,12 @@ pub mod data_store {
     #[access_control(Authenticate::only_market_keeper(&ctx))]
     pub fn initialize_market(
         ctx: Context<InitializeMarket>,
+        market_token: Pubkey,
         index_token: Pubkey,
         long_token: Pubkey,
         short_token: Pubkey,
-        market_token: Pubkey,
     ) -> Result<()> {
-        instructions::initialize_market(ctx, index_token, long_token, short_token, market_token)
+        instructions::initialize_market(ctx, market_token, index_token, long_token, short_token)
     }
 
     #[access_control(Authenticate::only_market_keeper(&ctx))]

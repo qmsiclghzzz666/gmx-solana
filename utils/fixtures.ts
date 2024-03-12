@@ -4,10 +4,11 @@ import chai from 'chai';
 import chaiAsPromised from 'chai-as-promised';
 chai.use(chaiAsPromised);
 
+import { EventManager } from "./event";
 import { createRoleStorePDA, initializeRoleStore, roleStore } from "./role";
 import { createDataStorePDA, dataStore, initializeDataStore } from "./data";
 import { createOraclePDA, initializeOracle } from "./oracle";
-import { EventManager } from "./event";
+import { market } from "./market";
 
 export const expect = chai.expect;
 
@@ -33,6 +34,7 @@ export const getPrograms = () => {
     return {
         roleStore,
         dataStore,
+        market,
     }
 };
 

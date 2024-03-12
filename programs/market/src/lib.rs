@@ -18,8 +18,10 @@ pub mod market {
         index_token: Pubkey,
         long_token: Pubkey,
         short_token: Pubkey,
-        market_token: Pubkey,
     ) -> Result<()> {
-        instructions::create_market(ctx, index_token, long_token, short_token, market_token)
+        instructions::create_market(ctx, index_token, long_token, short_token)
     }
 }
+
+/// Market Token Address Seed.
+pub const MAREKT_TOKEN_SEED: &[u8] = b"market_token";
