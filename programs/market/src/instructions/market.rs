@@ -56,10 +56,7 @@ pub struct CreateMarket<'info> {
     )]
     pub market_token: UncheckedAccount<'info>,
     /// CHECK: only used as a signing PDA.
-    #[account(
-        seeds = [],
-        bump,
-    )]
+    #[account(seeds = [], bump)]
     pub market_token_authority: UncheckedAccount<'info>,
     pub data_store_program: Program<'info, data_store::program::DataStore>,
     pub system_program: Program<'info, System>,

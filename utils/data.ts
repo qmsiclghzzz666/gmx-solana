@@ -84,7 +84,7 @@ export const initializeDataStore = async (eventManager: EventManager, signer: an
     try {
         const key = SOL_TOKEN.toBase58();
         const [tokenConfigPDA] = createTokenConfigPDA(dataStorePDA, key);
-        const tx = await dataStore.methods.initializeTokenConfig(key, SOL_FEED, 60, 8, 4).accounts({
+        const tx = await dataStore.methods.initializeTokenConfig(key, SOL_FEED, 60, 9, 4).accounts({
             authority: signer.publicKey,
             store: dataStorePDA,
             onlyController: createControllerPDA(roleStorePDA, signer.publicKey)[0],
