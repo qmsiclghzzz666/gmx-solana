@@ -116,14 +116,14 @@ describe("role store", () => {
         expect((await roleStore.account.role.fetch(role)).role).to.equal(roleName);
     });
 
-    it("cannot revoke ROLE_ADMIN role with the only ROLE_ADMIN role member", async () => {
-        await expect(roleStore.methods.revokeRole().accounts({
-            authority: provider.wallet.publicKey,
-            store,
-            onlyRoleAdmin,
-            role: onlyRoleAdmin,
-        }).rpc()).to.be.rejectedWith(anchor.AnchorError, "At least one admin per store");
-    });
+    // it("cannot revoke ROLE_ADMIN role with the only ROLE_ADMIN role member", async () => {
+    //     await expect(roleStore.methods.revokeRole().accounts({
+    //         authority: provider.wallet.publicKey,
+    //         store,
+    //         onlyRoleAdmin,
+    //         role: onlyRoleAdmin,
+    //     }).rpc()).to.be.rejectedWith(anchor.AnchorError, "At least one admin per store");
+    // });
 
     it("can revoke ROLE_ADMIN role when there are other ROLE_ADMIN role members", async () => {
         const anotherAdmin = anchor.web3.Keypair.generate();

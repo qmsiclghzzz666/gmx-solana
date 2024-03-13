@@ -2,7 +2,7 @@ import * as anchor from "@coral-xyz/anchor";
 import { Oracle } from "../target/types/oracle";
 import { IDL as chainlinkIDL } from "../external-programs/chainlink-store";
 import { getAddresses, getProvider, getUsers } from "../utils/fixtures";
-import { BTC_FEED, BTC_TOKEN, SOL_FEED, SOL_TOKEN, createAddressPDA, createPriceFeedKey, createTokenConfigPDA } from "../utils/data";
+import { BTC_FEED, BTC_TOKEN_MINT, SOL_FEED, SOL_TOKEN_MINT, createAddressPDA, createPriceFeedKey, createTokenConfigPDA } from "../utils/data";
 import { createControllerPDA } from "../utils/role";
 import { expect } from "chai";
 
@@ -39,8 +39,8 @@ describe("oracle", () => {
     it("set price from feed and then clear", async () => {
         const [onlyController] = createControllerPDA(roleStoreAddress, signer0.publicKey);
         await oracle.methods.setPricesFromPriceFeed([
-            BTC_TOKEN,
-            SOL_TOKEN,
+            BTC_TOKEN_MINT,
+            SOL_TOKEN_MINT,
         ]).accounts({
             store: dataStoreAddress,
             authority: signer0.publicKey,
@@ -49,7 +49,7 @@ describe("oracle", () => {
             oracle: oracleAddress,
         }).remainingAccounts([
             {
-                pubkey: createTokenConfigPDA(dataStoreAddress, BTC_TOKEN.toBase58())[0],
+                pubkey: createTokenConfigPDA(dataStoreAddress, BTC_TOKEN_MINT.toBase58())[0],
                 isSigner: false,
                 isWritable: false,
             },
@@ -59,7 +59,7 @@ describe("oracle", () => {
                 isWritable: false,
             },
             {
-                pubkey: createTokenConfigPDA(dataStoreAddress, SOL_TOKEN.toBase58())[0],
+                pubkey: createTokenConfigPDA(dataStoreAddress, SOL_TOKEN_MINT.toBase58())[0],
                 isSigner: false,
                 isWritable: false,
             },
@@ -72,8 +72,8 @@ describe("oracle", () => {
         const setData = await oracle.account.oracle.fetch(oracleAddress);
         expect(setData.primary.prices.length).to.equal(2);
         expect(setData.primary.tokens).to.eql([
-            SOL_TOKEN,
-            BTC_TOKEN,
+            SOL_TOKEN_MINT,
+            BTC_TOKEN_MINT,
         ]);
 
         await oracle.methods.clearAllPrices().accounts({

@@ -1,4 +1,6 @@
 import * as anchor from "@coral-xyz/anchor";
+const provider = anchor.AnchorProvider.env();
+anchor.setProvider(provider);
 
 import chai from 'chai';
 import chaiAsPromised from 'chai-as-promised';
@@ -6,22 +8,20 @@ chai.use(chaiAsPromised);
 
 import { EventManager } from "./event";
 import { createRoleStorePDA, initializeRoleStore, roleStore } from "./role";
-import { createDataStorePDA, dataStore, initializeDataStore } from "./data";
+import { BTC_TOKEN_MINT, SOL_TOKEN_MINT, createDataStorePDA, dataStore, initializeDataStore } from "./data";
 import { createOraclePDA, initializeOracle } from "./oracle";
 import { market } from "./market";
 
 export const expect = chai.expect;
-
-const provider = anchor.AnchorProvider.env();
 
 // Users.
 const user0 = anchor.web3.Keypair.generate();
 const signer0 = anchor.web3.Keypair.generate();
 
 // Keys.
-const roleStoreKey = "role_store_0";
-const dataStoreKey = "data_store_0";
-const oracleKey = "oracle_0";
+const roleStoreKey = "role_store_2";
+const dataStoreKey = "data_store_2";
+const oracleKey = "oracle_2";
 
 // Addresses.
 const [roleStoreAddress] = createRoleStorePDA(roleStoreKey);
@@ -61,6 +61,13 @@ export const getAddresses = () => {
     }
 }
 
+export const getTokenMints = () => {
+    return {
+        BTC_TOKEN_MINT,
+        SOL_TOKEN_MINT,
+    }
+};
+
 const SHOW_EVENT = process.env.SHOW_EVENT;
 const callback = SHOW_EVENT ? (eventName, event) => {
     console.debug(`<Event: ${eventName}>`, event);
@@ -69,6 +76,7 @@ const callback = SHOW_EVENT ? (eventName, event) => {
 const eventManager = new EventManager(callback);
 
 const initializeUser = async (provider: anchor.AnchorProvider, user: anchor.web3.Keypair, airdrop: number) => {
+    console.log(provider);
     // const tx = await provider.connection.requestAirdrop(user.publicKey, anchor.web3.LAMPORTS_PER_SOL * airdrop);
     // console.log(`Airdropped ${airdrop} SOL to the user ${user.publicKey} in tx ${tx}`);
     const balance = await provider.connection.getBalance(provider.wallet.publicKey);
