@@ -15,7 +15,7 @@ pub fn create_market(
 ) -> Result<()> {
     data_store::cpi::initialize_market(
         ctx.accounts.initialize_market_ctx(),
-        ctx.accounts.market_token.key(),
+        ctx.accounts.market_token_mint.key(),
         index_token,
         long_token,
         short_token,
@@ -47,7 +47,7 @@ pub struct CreateMarket<'info> {
         mint::decimals = MARKET_TOKEN_DECIMALS,
         mint::authority = market_token_authority,
     )]
-    pub market_token: Account<'info, Mint>,
+    pub market_token_mint: Account<'info, Mint>,
     /// CHECK: only used as a signing PDA.
     #[account(seeds = [], bump)]
     pub market_token_authority: UncheckedAccount<'info>,

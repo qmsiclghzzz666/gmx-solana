@@ -16,7 +16,7 @@ describe("market", () => {
     const shortToken = Keypair.generate().publicKey;
 
     it("create market", async () => {
-        const [marketToken] = createMarketTokenPDA(dataStoreAddress, indexToken, longToken, shortToken);
+        const [marketTokenMint] = createMarketTokenPDA(dataStoreAddress, indexToken, longToken, shortToken);
         const [marketTokenAuthority] = getMarketTokenAuthority();
         await market.methods.createMarket(
             indexToken,
@@ -26,8 +26,8 @@ describe("market", () => {
             authority: signer0.publicKey,
             onlyMarketKeeper: createMarketKeeperPDA(roleStoreAddress, signer0.publicKey)[0],
             dataStore: dataStoreAddress,
-            market: createMarketPDA(dataStoreAddress, marketToken)[0],
-            marketToken,
+            market: createMarketPDA(dataStoreAddress, marketTokenMint)[0],
+            marketTokenMint,
             marketTokenAuthority,
             dataStoreProgram: dataStore.programId,
             tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID,
