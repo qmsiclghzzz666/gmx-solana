@@ -24,7 +24,9 @@ describe("role store", () => {
             authority: signer0.publicKey,
             store: anotherStore,
             roleAdmin: anotherAdmin,
-        }).signers([signer0]).rpc();
+        }).signers([signer0]).rpc({
+            commitment: "confirmed",
+        });
     });
 
     it(`grant a role to a user`, async () => {
