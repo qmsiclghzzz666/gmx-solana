@@ -1,7 +1,7 @@
-import * as anchor from "@coral-xyz/anchor";
-const provider = anchor.AnchorProvider.env();
-anchor.setProvider(provider);
+// Must be imported first to make sure the anchor is initialized with the given provider.
+import { isDevNet, provider } from "./endpoint";
 
+import * as anchor from "@coral-xyz/anchor";
 import chai from 'chai';
 import chaiAsPromised from 'chai-as-promised';
 chai.use(chaiAsPromised);
@@ -14,21 +14,23 @@ import { market } from "./market";
 
 export const expect = chai.expect;
 
+// Get anchor provider.
+export const getProvider = () => provider;
+
 // Users.
 const user0 = anchor.web3.Keypair.generate();
 const signer0 = anchor.web3.Keypair.generate();
 
 // Keys.
-const roleStoreKey = "role_store_2";
-const dataStoreKey = "data_store_2";
-const oracleKey = "oracle_2";
+const randomeKey = anchor.web3.Keypair.generate().publicKey.toBase58();
+const roleStoreKey = isDevNet ? randomeKey : "role_store_0";
+const dataStoreKey = isDevNet ? randomeKey : "data_store_0";
+const oracleKey = isDevNet ? randomeKey : "oracle_0";
 
 // Addresses.
 const [roleStoreAddress] = createRoleStorePDA(roleStoreKey);
 const [dataStoreAddress] = createDataStorePDA(roleStoreAddress, dataStoreKey);
 const [oracleAddress] = createOraclePDA(dataStoreAddress, oracleKey);
-
-export const getProvider = () => provider;
 
 export const getPrograms = () => {
     return {
@@ -76,7 +78,7 @@ const callback = SHOW_EVENT ? (eventName, event) => {
 const eventManager = new EventManager(callback);
 
 const initializeUser = async (provider: anchor.AnchorProvider, user: anchor.web3.Keypair, airdrop: number) => {
-    console.log(provider);
+    console.log("Using", provider.connection.rpcEndpoint);
     // const tx = await provider.connection.requestAirdrop(user.publicKey, anchor.web3.LAMPORTS_PER_SOL * airdrop);
     // console.log(`Airdropped ${airdrop} SOL to the user ${user.publicKey} in tx ${tx}`);
     const balance = await provider.connection.getBalance(provider.wallet.publicKey);

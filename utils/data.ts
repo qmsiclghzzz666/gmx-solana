@@ -4,6 +4,7 @@ import { keyToSeed } from "./seed";
 import { createControllerPDA, createRoleStorePDA, roleStore } from "./role";
 import { EventManager } from "./event";
 import { PublicKey } from "@solana/web3.js";
+import { isDevNet } from "./endpoint";
 
 export const dataStore = anchor.workspace.DataStore as anchor.Program<DataStore>;
 
@@ -41,7 +42,6 @@ export const createKey = (prefix: string, key: string) => `${prefix}:${key}`;
 export const createPriceFeedKey = key => createKey("PRICE_FEE", key);
 
 const provider = anchor.getProvider();
-const isDevNet = provider.connection.rpcEndpoint == "https://api.devnet.solana.com"
 
 export const BTC_TOKEN_MINT = anchor.translateAddress(isDevNet ? "Hb5pJ53KeUPCkUvaDZm7Y7WafEjuP1xjD4owaXksJ86R" : "3NZ9JMVBmGAqocybic2c7LQCJScmgsAZ6vQqTDzcqmJh");
 export const BTC_FEED = anchor.translateAddress(isDevNet ? "6PxBx93S8x3tno1TsFZwT5VqP8drrRCbCXygEXYNkFJe" : "Cv4T27XbjVoKUYwP72NQQanvZeA7W4YF9L4EnYT9kx5o");

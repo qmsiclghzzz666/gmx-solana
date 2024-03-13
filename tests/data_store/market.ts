@@ -1,9 +1,8 @@
-import { PublicKey, Keypair } from '@solana/web3.js';
+import { Keypair } from '@solana/web3.js';
 
-import { expect, getAddresses, getPrograms, getProvider, getUsers } from "../../utils/fixtures";
+import { expect, getAddresses, getPrograms, getUsers } from "../../utils/fixtures";
 import { createMarketKeeperPDA } from "../../utils/role";
 import { createMarketPDA } from "../../utils/data";
-import { AnchorError } from '@coral-xyz/anchor';
 
 describe("data store: Market", () => {
     const { dataStore } = getPrograms();
