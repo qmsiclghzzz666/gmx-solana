@@ -25,6 +25,7 @@ idl-build = [
 anchor-lang = "0.29.0"
 anchor-spl = { version = "0.29.0", default_features = false, features = [
     "token",
+    "token_2022",
 ] }
 data_store = { path = "../data_store", features = ["cpi"] }
 role_store = { path = "../role_store", features = ["cpi"] }

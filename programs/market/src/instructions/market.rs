@@ -1,7 +1,10 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{InitializeMint2, Mint, Token};
+use anchor_spl::token::{Mint, Token};
 use data_store::{cpi::accounts::InitializeMarket, states::DataStore};
 use role_store::{Authorization, Role};
+
+/// Decimals of market tokens.
+pub const MARKET_TOKEN_DECIMALS: u8 = 18;
 
 /// Create a new market.
 pub fn create_market(
@@ -10,15 +13,6 @@ pub fn create_market(
     long_token: Pubkey,
     short_token: Pubkey,
 ) -> Result<()> {
-    anchor_spl::token::initialize_mint2(
-        ctx.accounts
-            .initialize_market_token_mint_ctx()
-            .with_signer(&[&[&[ctx.bumps.market_token_authority]]]),
-        18,
-        ctx.accounts.market_token_authority.key,
-        Some(ctx.accounts.market_token_authority.key),
-    )?;
-
     data_store::cpi::initialize_market(
         ctx.accounts.initialize_market_ctx(),
         ctx.accounts.market_token.key(),
@@ -39,11 +33,9 @@ pub struct CreateMarket<'info> {
     /// CHECK: check by CPI.
     #[account(mut)]
     pub market: UncheckedAccount<'info>,
-    /// CHECK: check by CPI.
     #[account(
         init,
         payer = authority,
-        space = Mint::LEN,
         seeds = [
             crate::MAREKT_TOKEN_SEED,
             data_store.key().as_ref(),
@@ -52,9 +44,10 @@ pub struct CreateMarket<'info> {
             short_token.as_ref(),
         ],
         bump,
-        owner = token_program.key(),
+        mint::decimals = MARKET_TOKEN_DECIMALS,
+        mint::authority = market_token_authority,
     )]
-    pub market_token: UncheckedAccount<'info>,
+    pub market_token: Account<'info, Mint>,
     /// CHECK: only used as a signing PDA.
     #[account(seeds = [], bump)]
     pub market_token_authority: UncheckedAccount<'info>,
@@ -73,17 +66,6 @@ impl<'info> CreateMarket<'info> {
                 store: self.data_store.to_account_info(),
                 market: self.market.to_account_info(),
                 system_program: self.system_program.to_account_info(),
-            },
-        )
-    }
-
-    fn initialize_market_token_mint_ctx(
-        &self,
-    ) -> CpiContext<'_, '_, '_, 'info, InitializeMint2<'info>> {
-        CpiContext::new(
-            self.token_program.to_account_info(),
-            InitializeMint2 {
-                mint: self.market_token.to_account_info(),
             },
         )
     }
