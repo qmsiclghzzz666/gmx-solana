@@ -2,8 +2,7 @@ import * as anchor from "@coral-xyz/anchor";
 import { expect, getAddresses, getPrograms, getTokenMints, getUsers } from "../utils/fixtures";
 import { Keypair, PublicKey } from "@solana/web3.js";
 import { createMarketKeeperPDA } from "../utils/role";
-import { createMarketPDA } from "../utils/data";
-import { createLongTokenPDA, createMarketTokenMintPDA, createShortTokenPDA, getMarketTokenAuthority } from "../utils/market";
+import { createMarketPDA, createMarketTokenMintPDA, createMarketVaultPDA, getMarketSignPDA } from "../utils/data";
 
 describe("market", () => {
     const { market } = getPrograms();
@@ -18,9 +17,9 @@ describe("market", () => {
 
     it("create market", async () => {
         const [marketTokenMint] = createMarketTokenMintPDA(dataStoreAddress, indexTokenMint, longTokenMint, shortTokenMint);
-        const [longToken] = createLongTokenPDA(marketTokenMint);
-        const [shortToken] = createShortTokenPDA(marketTokenMint);
-        const [marketAuthority] = getMarketTokenAuthority();
+        const [longToken] = createMarketVaultPDA(dataStoreAddress, longTokenMint, marketTokenMint);
+        const [shortToken] = createMarketVaultPDA(dataStoreAddress, shortTokenMint, marketTokenMint);
+        const [marketSign] = getMarketSignPDA();
         await market.methods.createMarket(indexTokenMint).accounts({
             authority: signer0.publicKey,
             onlyMarketKeeper: createMarketKeeperPDA(roleStoreAddress, signer0.publicKey)[0],
@@ -31,7 +30,7 @@ describe("market", () => {
             shortTokenMint,
             longToken,
             shortToken,
-            marketAuthority,
+            marketSign,
             dataStoreProgram: dataStore.programId,
             tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID,
         }).signers([signer0]).rpc();

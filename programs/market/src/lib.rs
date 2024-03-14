@@ -17,12 +17,3 @@ pub mod market {
         instructions::create_market(ctx, index_token_mint)
     }
 }
-
-/// Market Token Mint Address Seed.
-pub const MAREKT_TOKEN_MINT_SEED: &[u8] = b"market_token_mint";
-
-/// Long Token Account Seed.
-pub const LONG_TOKEN_SEED: &[u8] = b"long_token";
-
-/// Short Token Account Seed.
-pub const SHORT_TOKEN_SEED: &[u8] = b"short_token";

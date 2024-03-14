@@ -60,15 +60,12 @@ describe("data store: Market", () => {
         }).signers([signer0]).rpc();
 
         const userTokenAccount = await getAssociatedTokenAddress(marketTokenMint, user0.publicKey);
-        {
-            const tx = await provider.sendAndConfirm(new Transaction().add(createAssociatedTokenAccountInstruction(
-                provider.publicKey,
-                userTokenAccount,
-                user0.publicKey,
-                marketTokenMint,
-            )));
-            console.log(tx);
-        }
+        await provider.sendAndConfirm(new Transaction().add(createAssociatedTokenAccountInstruction(
+            provider.publicKey,
+            userTokenAccount,
+            user0.publicKey,
+            marketTokenMint,
+        )));
 
         await dataStore.methods.mintMarketTokenTo(new BN("100000000").mul(new BN(100))).accounts({
             authority: signer0.publicKey,
@@ -89,17 +86,14 @@ describe("data store: Market", () => {
             marketSign,
         }).signers([signer0]).rpc();
 
-        {
-            const tx = await provider.sendAndConfirm(new Transaction().add(createTransferInstruction(
-                userTokenAccount,
-                marketVault,
-                user0.publicKey,
-                100000000 * 50,
-            )), [
-                user0,
-            ]);
-            console.log(tx);
-        }
+        await provider.sendAndConfirm(new Transaction().add(createTransferInstruction(
+            userTokenAccount,
+            marketVault,
+            user0.publicKey,
+            100000000 * 50,
+        )), [
+            user0,
+        ]);
 
         await dataStore.methods.marketVaultTransferOut(new BN("100000000").mul(new BN(11))).accounts({
             authority: signer0.publicKey,
