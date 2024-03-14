@@ -7,6 +7,9 @@ pub mod instructions;
 /// States.
 pub mod states;
 
+/// Constants.
+pub mod constants;
+
 pub use self::states::Data;
 
 use self::instructions::*;
@@ -65,6 +68,34 @@ pub mod data_store {
     #[access_control(Authenticate::only_market_keeper(&ctx))]
     pub fn remove_market(ctx: Context<RemoveMarket>) -> Result<()> {
         instructions::remove_market(ctx)
+    }
+
+    #[access_control(Authenticate::only_market_keeper(&ctx))]
+    pub fn initialize_market_token(
+        ctx: Context<InitializeMarketToken>,
+        index_token_mint: Pubkey,
+        long_token_mint: Pubkey,
+        short_token_mint: Pubkey,
+    ) -> Result<()> {
+        instructions::initialize_market_token(
+            ctx,
+            index_token_mint,
+            long_token_mint,
+            short_token_mint,
+        )
+    }
+
+    #[access_control(Authenticate::only_market_keeper(&ctx))]
+    pub fn mint_market_token_to(ctx: Context<MintMarketTokenTo>, amount: u64) -> Result<()> {
+        instructions::mint_market_token_to(ctx, amount)
+    }
+
+    #[access_control(Authenticate::only_market_keeper(&ctx))]
+    pub fn initialize_vault(
+        ctx: Context<InitializeVault>,
+        market_token_mint: Option<Pubkey>,
+    ) -> Result<()> {
+        instructions::initialize_vault(ctx, market_token_mint)
     }
 }
 
