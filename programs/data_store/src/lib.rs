@@ -103,6 +103,14 @@ pub mod data_store {
     ) -> Result<()> {
         instructions::initialize_market_vault(ctx, market_token_mint)
     }
+
+    #[access_control(Authenticate::only_market_keeper(&ctx))]
+    pub fn market_vault_transfer_out(
+        ctx: Context<MarketVaultTransferOut>,
+        amount: u64,
+    ) -> Result<()> {
+        instructions::market_vault_transfer_out(ctx, amount)
+    }
 }
 
 #[error_code]

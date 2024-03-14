@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{Mint, MintTo, Token, TokenAccount};
+use anchor_spl::token::{Mint, MintTo, Token, TokenAccount, Transfer};
 use role_store::{Authorization, Role};
 
 use crate::constants;
@@ -162,7 +162,7 @@ pub fn mint_market_token_to(ctx: Context<MintMarketTokenTo>, amount: u64) -> Res
     anchor_spl::token::mint_to(
         ctx.accounts
             .mint_to_ctx()
-            .with_signer(&[&[&[ctx.bumps.market_sign]]]),
+            .with_signer(&[&[constants::MARKET_SIGN_SEED, &[ctx.bumps.market_sign]]]),
         amount,
     )
 }
@@ -174,13 +174,13 @@ pub struct MintMarketTokenTo<'info> {
     pub only_market_keeper: Account<'info, Role>,
     pub data_store: Account<'info, DataStore>,
     // We don't have to check the mint is really a market token,
-    // since the owner must be derived from `MARKET_SIGN`.
+    // since the mint authority must be derived from `MARKET_SIGN`.
     pub market_token_mint: Account<'info, Mint>,
+    #[account(token::mint = market_token_mint)]
+    pub to: Account<'info, TokenAccount>,
     /// CHECK: only used as a signing PDA.
     #[account(seeds = [constants::MARKET_SIGN_SEED], bump)]
     pub market_sign: UncheckedAccount<'info>,
-    #[account(token::mint = market_token_mint)]
-    pub to: Account<'info, TokenAccount>,
     pub token_program: Program<'info, Token>,
 }
 
@@ -261,5 +261,59 @@ impl<'info> Authorization<'info> for InitializeMarketVault<'info> {
 
     fn role(&self) -> &Account<'info, Role> {
         &self.only_market_keeper
+    }
+}
+
+/// Transfer the given amount of tokens out to the destination account.
+pub fn market_vault_transfer_out(ctx: Context<MarketVaultTransferOut>, amount: u64) -> Result<()> {
+    anchor_spl::token::transfer(
+        ctx.accounts
+            .transfer_ctx()
+            .with_signer(&[&[constants::MARKET_SIGN_SEED, &[ctx.bumps.market_sign]]]),
+        amount,
+    )
+}
+
+#[derive(Accounts)]
+pub struct MarketVaultTransferOut<'info> {
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    pub only_market_keeper: Account<'info, Role>,
+    pub data_store: Account<'info, DataStore>,
+    // We don't have to check the vault is really a market token,
+    // since the owner must be derived from `MARKET_SIGN`.
+    pub market_vault: Account<'info, TokenAccount>,
+    #[account(token::mint = market_vault.mint)]
+    pub to: Account<'info, TokenAccount>,
+    /// CHECK: only used as a signing PDA.
+    #[account(seeds = [constants::MARKET_SIGN_SEED], bump)]
+    pub market_sign: UncheckedAccount<'info>,
+    pub token_program: Program<'info, Token>,
+}
+
+impl<'info> Authorization<'info> for MarketVaultTransferOut<'info> {
+    fn role_store(&self) -> Pubkey {
+        self.data_store.role_store
+    }
+
+    fn authority(&self) -> &Signer<'info> {
+        &self.authority
+    }
+
+    fn role(&self) -> &Account<'info, Role> {
+        &self.only_market_keeper
+    }
+}
+
+impl<'info> MarketVaultTransferOut<'info> {
+    fn transfer_ctx(&self) -> CpiContext<'_, '_, '_, 'info, Transfer<'info>> {
+        CpiContext::new(
+            self.token_program.to_account_info(),
+            Transfer {
+                from: self.market_vault.to_account_info(),
+                to: self.to.to_account_info(),
+                authority: self.market_sign.to_account_info(),
+            },
+        )
     }
 }
