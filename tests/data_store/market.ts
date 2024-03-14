@@ -2,7 +2,7 @@ import { Keypair, Transaction } from '@solana/web3.js';
 import { BN } from '@coral-xyz/anchor';
 
 import { expect, getAddresses, getPrograms, getProvider, getUsers } from "../../utils/fixtures";
-import { createMarketKeeperPDA } from "../../utils/role";
+import { createControllerPDA, createMarketKeeperPDA } from "../../utils/role";
 import { createMarketPDA, createMarketTokenMintPDA, createMarketVaultPDA, getMarketSignPDA } from "../../utils/data";
 import { createAssociatedTokenAccountInstruction, createTransferInstruction, getAssociatedTokenAddress } from "@solana/spl-token";
 
@@ -14,6 +14,7 @@ describe("data store: Market", () => {
     const provider = getProvider();
 
     const [onlyMarketKeeper] = createMarketKeeperPDA(roleStoreAddress, signer0.publicKey);
+    const [onlyController] = createControllerPDA(roleStoreAddress, signer0.publicKey);
 
     const indexToken = Keypair.generate().publicKey;
     const longToken = Keypair.generate().publicKey;
@@ -70,7 +71,7 @@ describe("data store: Market", () => {
         await dataStore.methods.mintMarketTokenTo(new BN("100000000").mul(new BN(100))).accounts({
             authority: signer0.publicKey,
             store: dataStoreAddress,
-            onlyMarketKeeper,
+            onlyController,
             marketTokenMint,
             marketSign,
             to: userTokenAccount,
@@ -97,7 +98,7 @@ describe("data store: Market", () => {
 
         await dataStore.methods.marketVaultTransferOut(new BN("100000000").mul(new BN(11))).accounts({
             authority: signer0.publicKey,
-            onlyMarketKeeper,
+            onlyController,
             store: dataStoreAddress,
             marketSign,
             marketVault,

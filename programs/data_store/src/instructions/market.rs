@@ -171,7 +171,7 @@ pub fn mint_market_token_to(ctx: Context<MintMarketTokenTo>, amount: u64) -> Res
 pub struct MintMarketTokenTo<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
-    pub only_market_keeper: Account<'info, Role>,
+    pub only_controller: Account<'info, Role>,
     pub store: Account<'info, DataStore>,
     // We don't have to check the mint is really a market token,
     // since the mint authority must be derived from `MARKET_SIGN`.
@@ -195,7 +195,7 @@ impl<'info> Authorization<'info> for MintMarketTokenTo<'info> {
     }
 
     fn role(&self) -> &Account<'info, Role> {
-        &self.only_market_keeper
+        &self.only_controller
     }
 }
 
@@ -279,7 +279,7 @@ pub fn market_vault_transfer_out(ctx: Context<MarketVaultTransferOut>, amount: u
 pub struct MarketVaultTransferOut<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
-    pub only_market_keeper: Account<'info, Role>,
+    pub only_controller: Account<'info, Role>,
     pub store: Account<'info, DataStore>,
     // We don't have to check the vault is really a market token,
     // since the owner must be derived from `MARKET_SIGN`.
@@ -303,7 +303,7 @@ impl<'info> Authorization<'info> for MarketVaultTransferOut<'info> {
     }
 
     fn role(&self) -> &Account<'info, Role> {
-        &self.only_market_keeper
+        &self.only_controller
     }
 }
 

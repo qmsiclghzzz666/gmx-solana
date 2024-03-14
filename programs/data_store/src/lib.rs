@@ -91,7 +91,7 @@ pub mod data_store {
         )
     }
 
-    #[access_control(Authenticate::only_market_keeper(&ctx))]
+    #[access_control(Authenticate::only_controller(&ctx))]
     pub fn mint_market_token_to(ctx: Context<MintMarketTokenTo>, amount: u64) -> Result<()> {
         instructions::mint_market_token_to(ctx, amount)
     }
@@ -104,7 +104,7 @@ pub mod data_store {
         instructions::initialize_market_vault(ctx, market_token_mint)
     }
 
-    #[access_control(Authenticate::only_market_keeper(&ctx))]
+    #[access_control(Authenticate::only_controller(&ctx))]
     pub fn market_vault_transfer_out(
         ctx: Context<MarketVaultTransferOut>,
         amount: u64,
