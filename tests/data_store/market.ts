@@ -1,14 +1,18 @@
-import { Keypair } from '@solana/web3.js';
+import { Keypair, Transaction } from '@solana/web3.js';
+import { BN } from '@coral-xyz/anchor';
 
-import { expect, getAddresses, getPrograms, getUsers } from "../../utils/fixtures";
+import { expect, getAddresses, getPrograms, getProvider, getUsers } from "../../utils/fixtures";
 import { createMarketKeeperPDA } from "../../utils/role";
-import { createMarketPDA } from "../../utils/data";
+import { createMarketPDA, createMarketTokenMintPDA, createMarketVaultPDA, getMarketSignPDA } from "../../utils/data";
+import { createAssociatedTokenAccountInstruction, createTransferInstruction, getAssociatedTokenAddress } from "@solana/spl-token";
 
 describe("data store: Market", () => {
     const { dataStore } = getPrograms();
-    const { signer0 } = getUsers();
+    const { signer0, user0 } = getUsers();
 
     const { roleStoreAddress, dataStoreAddress } = getAddresses();
+    const provider = getProvider();
+
     const [onlyMarketKeeper] = createMarketKeeperPDA(roleStoreAddress, signer0.publicKey);
 
     const indexToken = Keypair.generate().publicKey;
@@ -41,5 +45,70 @@ describe("data store: Market", () => {
             const market = await dataStore.account.market.getAccountInfo(marketPDA);
             expect(market).to.be.null;
         }
+    });
+
+    it("perform basic token operations", async () => {
+        const [marketTokenMint] = createMarketTokenMintPDA(dataStoreAddress, indexToken, longToken, shortToken);
+        const [marketSign] = getMarketSignPDA();
+
+        await dataStore.methods.initializeMarketToken(indexToken, longToken, shortToken).accounts({
+            store: dataStoreAddress,
+            authority: signer0.publicKey,
+            onlyMarketKeeper,
+            marketTokenMint,
+            marketSign,
+        }).signers([signer0]).rpc();
+
+        const userTokenAccount = await getAssociatedTokenAddress(marketTokenMint, user0.publicKey);
+        {
+            const tx = await provider.sendAndConfirm(new Transaction().add(createAssociatedTokenAccountInstruction(
+                provider.publicKey,
+                userTokenAccount,
+                user0.publicKey,
+                marketTokenMint,
+            )));
+            console.log(tx);
+        }
+
+        await dataStore.methods.mintMarketTokenTo(new BN("100000000").mul(new BN(100))).accounts({
+            authority: signer0.publicKey,
+            store: dataStoreAddress,
+            onlyMarketKeeper,
+            marketTokenMint,
+            marketSign,
+            to: userTokenAccount,
+        }).signers([signer0]).rpc();
+
+        const [marketVault] = createMarketVaultPDA(dataStoreAddress, marketTokenMint);
+        await dataStore.methods.initializeMarketVault(null).accounts({
+            authority: signer0.publicKey,
+            store: dataStoreAddress,
+            onlyMarketKeeper,
+            mint: marketTokenMint,
+            vault: marketVault,
+            marketSign,
+        }).signers([signer0]).rpc();
+
+        {
+            const tx = await provider.sendAndConfirm(new Transaction().add(createTransferInstruction(
+                userTokenAccount,
+                marketVault,
+                user0.publicKey,
+                100000000 * 50,
+            )), [
+                user0,
+            ]);
+            console.log(tx);
+        }
+
+        await dataStore.methods.marketVaultTransferOut(new BN("100000000").mul(new BN(11))).accounts({
+            authority: signer0.publicKey,
+            onlyMarketKeeper,
+            store: dataStoreAddress,
+            marketSign,
+            marketVault,
+            to: userTokenAccount,
+        }).signers([signer0]).rpc();
+
     });
 });

@@ -48,6 +48,7 @@ export const createMarketTokenMintPDA = (
     longTokenMint: PublicKey,
     shortTokenMint: PublicKey,
 ) => PublicKey.findProgramAddressSync([
+    MARKET_TOKEN_MINT_SEED,
     store.toBytes(),
     indexTokenMint.toBytes(),
     longTokenMint.toBytes(),

@@ -120,7 +120,7 @@ pub struct InitializeMarketToken<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
     pub only_market_keeper: Account<'info, Role>,
-    pub data_store: Account<'info, DataStore>,
+    pub store: Account<'info, DataStore>,
     #[account(
         init,
         payer = authority,
@@ -128,7 +128,7 @@ pub struct InitializeMarketToken<'info> {
         mint::authority = market_sign,
         seeds = [
             constants::MAREKT_TOKEN_MINT_SEED,
-            data_store.key().as_ref(),
+            store.key().as_ref(),
             index_token_mint.as_ref(),
             long_token_mint.key().as_ref(),
             short_token_mint.key().as_ref(),
@@ -145,7 +145,7 @@ pub struct InitializeMarketToken<'info> {
 
 impl<'info> Authorization<'info> for InitializeMarketToken<'info> {
     fn role_store(&self) -> Pubkey {
-        self.data_store.role_store
+        self.store.role_store
     }
 
     fn authority(&self) -> &Signer<'info> {
@@ -172,11 +172,12 @@ pub struct MintMarketTokenTo<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
     pub only_market_keeper: Account<'info, Role>,
-    pub data_store: Account<'info, DataStore>,
+    pub store: Account<'info, DataStore>,
     // We don't have to check the mint is really a market token,
     // since the mint authority must be derived from `MARKET_SIGN`.
+    #[account(mut)]
     pub market_token_mint: Account<'info, Mint>,
-    #[account(token::mint = market_token_mint)]
+    #[account(mut, token::mint = market_token_mint)]
     pub to: Account<'info, TokenAccount>,
     /// CHECK: only used as a signing PDA.
     #[account(seeds = [constants::MARKET_SIGN_SEED], bump)]
@@ -186,7 +187,7 @@ pub struct MintMarketTokenTo<'info> {
 
 impl<'info> Authorization<'info> for MintMarketTokenTo<'info> {
     fn role_store(&self) -> Pubkey {
-        self.data_store.role_store
+        self.store.role_store
     }
 
     fn authority(&self) -> &Signer<'info> {
@@ -227,7 +228,7 @@ pub struct InitializeMarketVault<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
     pub only_market_keeper: Account<'info, Role>,
-    pub data_store: Account<'info, DataStore>,
+    pub store: Account<'info, DataStore>,
     pub mint: Account<'info, Mint>,
     #[account(
         init,
@@ -236,7 +237,7 @@ pub struct InitializeMarketVault<'info> {
         token::authority = market_sign,
         seeds = [
             constants::MARKET_VAULT_SEED,
-            data_store.key().as_ref(),
+            store.key().as_ref(),
             mint.key().as_ref(),
             market_token_mint.as_ref().map(|key| key.as_ref()).unwrap_or_default(),
         ],
@@ -252,7 +253,7 @@ pub struct InitializeMarketVault<'info> {
 
 impl<'info> Authorization<'info> for InitializeMarketVault<'info> {
     fn role_store(&self) -> Pubkey {
-        self.data_store.role_store
+        self.store.role_store
     }
 
     fn authority(&self) -> &Signer<'info> {
@@ -279,11 +280,12 @@ pub struct MarketVaultTransferOut<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
     pub only_market_keeper: Account<'info, Role>,
-    pub data_store: Account<'info, DataStore>,
+    pub store: Account<'info, DataStore>,
     // We don't have to check the vault is really a market token,
     // since the owner must be derived from `MARKET_SIGN`.
+    #[account(mut)]
     pub market_vault: Account<'info, TokenAccount>,
-    #[account(token::mint = market_vault.mint)]
+    #[account(mut, token::mint = market_vault.mint)]
     pub to: Account<'info, TokenAccount>,
     /// CHECK: only used as a signing PDA.
     #[account(seeds = [constants::MARKET_SIGN_SEED], bump)]
@@ -293,7 +295,7 @@ pub struct MarketVaultTransferOut<'info> {
 
 impl<'info> Authorization<'info> for MarketVaultTransferOut<'info> {
     fn role_store(&self) -> Pubkey {
-        self.data_store.role_store
+        self.store.role_store
     }
 
     fn authority(&self) -> &Signer<'info> {
