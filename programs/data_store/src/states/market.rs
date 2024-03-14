@@ -9,19 +9,19 @@ pub struct Market {
     /// Bump Seed.
     pub bump: u8,
     /// Market token.
-    pub market_token: Pubkey,
+    pub market_token_mint: Pubkey,
     /// Index token.
-    pub index_token: Pubkey,
+    pub index_token_mint: Pubkey,
     /// Long token.
-    pub long_token: Pubkey,
+    pub long_token_mint: Pubkey,
     /// Short token.
-    pub short_token: Pubkey,
+    pub short_token_mint: Pubkey,
 }
 
 impl Market {
     /// Get the expected key.
     pub fn expected_key(&self) -> String {
-        Self::create_key(&self.market_token)
+        Self::create_key(&self.market_token_mint)
     }
 
     /// Get the expected key seed.

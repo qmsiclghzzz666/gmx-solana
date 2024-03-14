@@ -8,17 +8,17 @@ use crate::states::{Action, Data, DataStore, Market, MarketChangeEvent};
 /// Initialize the account for [`Market`].
 pub fn initialize_market(
     ctx: Context<InitializeMarket>,
-    market_token: Pubkey,
-    index_token: Pubkey,
-    long_token: Pubkey,
-    short_token: Pubkey,
+    market_token_mint: Pubkey,
+    index_token_mint: Pubkey,
+    long_token_mint: Pubkey,
+    short_token_mint: Pubkey,
 ) -> Result<()> {
     let market = &mut ctx.accounts.market;
     market.bump = ctx.bumps.market;
-    market.index_token = index_token;
-    market.long_token = long_token;
-    market.short_token = short_token;
-    market.market_token = market_token;
+    market.index_token_mint = index_token_mint;
+    market.long_token_mint = long_token_mint;
+    market.short_token_mint = short_token_mint;
+    market.market_token_mint = market_token_mint;
     emit!(MarketChangeEvent {
         address: market.key(),
         action: Action::Init,
@@ -214,8 +214,8 @@ impl<'info> MintMarketTokenTo<'info> {
 /// Initialize a vault of the given token for a market.
 /// The address is derived from token mint addresses (the `market_token_mint` seed is optional).
 #[allow(unused_variables)]
-pub fn initialize_vault(
-    ctx: Context<InitializeVault>,
+pub fn initialize_market_vault(
+    ctx: Context<InitializeMarketVault>,
     market_token_mint: Option<Pubkey>,
 ) -> Result<()> {
     Ok(())
@@ -223,7 +223,7 @@ pub fn initialize_vault(
 
 #[derive(Accounts)]
 #[instruction(market_token_mint: Option<Pubkey>)]
-pub struct InitializeVault<'info> {
+pub struct InitializeMarketVault<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
     pub only_market_keeper: Account<'info, Role>,
@@ -236,6 +236,7 @@ pub struct InitializeVault<'info> {
         token::authority = market_sign,
         seeds = [
             constants::MARKET_VAULT_SEED,
+            data_store.key().as_ref(),
             mint.key().as_ref(),
             market_token_mint.as_ref().map(|key| key.as_ref()).unwrap_or_default(),
         ],
@@ -249,7 +250,7 @@ pub struct InitializeVault<'info> {
     pub token_program: Program<'info, Token>,
 }
 
-impl<'info> Authorization<'info> for InitializeVault<'info> {
+impl<'info> Authorization<'info> for InitializeMarketVault<'info> {
     fn role_store(&self) -> Pubkey {
         self.data_store.role_store
     }

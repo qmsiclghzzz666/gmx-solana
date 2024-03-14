@@ -1,17 +1,22 @@
 import * as anchor from "@coral-xyz/anchor";
 import { DataStore } from "../target/types/data_store";
 import { keyToSeed } from "./seed";
-import { createControllerPDA, createRoleStorePDA, roleStore } from "./role";
+import { createControllerPDA, createRoleStorePDA } from "./role";
 import { EventManager } from "./event";
 import { PublicKey } from "@solana/web3.js";
 import { isDevNet } from "./endpoint";
 
 export const dataStore = anchor.workspace.DataStore as anchor.Program<DataStore>;
 
-export const DATA_STORE_SEED = anchor.utils.bytes.utf8.encode("data_store");
-export const ADDRESS_SEED = anchor.utils.bytes.utf8.encode("address");
-export const TOKEN_CONFIG_SEED = anchor.utils.bytes.utf8.encode("token_config");
-export const MARKET_SEED = anchor.utils.bytes.utf8.encode("market");
+const encodeUtf8 = anchor.utils.bytes.utf8.encode;
+
+export const DATA_STORE_SEED = encodeUtf8("data_store");
+export const ADDRESS_SEED = encodeUtf8("address");
+export const TOKEN_CONFIG_SEED = encodeUtf8("token_config");
+export const MARKET_SEED = encodeUtf8("market");
+export const MARKET_SIGN_SEED = encodeUtf8("market_sign");
+export const MARKET_TOKEN_MINT_SEED = encodeUtf8("market_token_mint");
+export const MARKET_VAULT_SEED = encodeUtf8("market_vault");
 
 export const createDataStorePDA = (role_store: anchor.web3.PublicKey, key: string) => anchor.web3.PublicKey.findProgramAddressSync([
     DATA_STORE_SEED,
@@ -37,11 +42,26 @@ export const createMarketPDA = (store: PublicKey, marketToken: PublicKey) => Pub
     keyToSeed(marketToken.toBase58()),
 ], dataStore.programId);
 
-export const createKey = (prefix: string, key: string) => `${prefix}:${key}`;
+export const createMarketTokenMintPDA = (
+    store: PublicKey,
+    indexTokenMint: PublicKey,
+    longTokenMint: PublicKey,
+    shortTokenMint: PublicKey,
+) => PublicKey.findProgramAddressSync([
+    store.toBytes(),
+    indexTokenMint.toBytes(),
+    longTokenMint.toBytes(),
+    shortTokenMint.toBytes(),
+], dataStore.programId);
 
-export const createPriceFeedKey = key => createKey("PRICE_FEE", key);
+export const createMarketVaultPDA = (store: PublicKey, tokenMint: PublicKey, marketTokenMint?: PublicKey) => PublicKey.findProgramAddressSync([
+    MARKET_VAULT_SEED,
+    store.toBytes(),
+    tokenMint.toBytes(),
+    marketTokenMint?.toBytes() ?? new Uint8Array(),
+], dataStore.programId);
 
-const provider = anchor.getProvider();
+export const getMarketSignPDA = () => PublicKey.findProgramAddressSync([MARKET_SIGN_SEED], dataStore.programId);
 
 export const BTC_TOKEN_MINT = anchor.translateAddress(isDevNet ? "Hb5pJ53KeUPCkUvaDZm7Y7WafEjuP1xjD4owaXksJ86R" : "3NZ9JMVBmGAqocybic2c7LQCJScmgsAZ6vQqTDzcqmJh");
 export const BTC_FEED = anchor.translateAddress(isDevNet ? "6PxBx93S8x3tno1TsFZwT5VqP8drrRCbCXygEXYNkFJe" : "Cv4T27XbjVoKUYwP72NQQanvZeA7W4YF9L4EnYT9kx5o");

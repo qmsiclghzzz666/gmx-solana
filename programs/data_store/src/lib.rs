@@ -57,12 +57,18 @@ pub mod data_store {
     #[access_control(Authenticate::only_market_keeper(&ctx))]
     pub fn initialize_market(
         ctx: Context<InitializeMarket>,
-        market_token: Pubkey,
-        index_token: Pubkey,
-        long_token: Pubkey,
-        short_token: Pubkey,
+        market_token_mint: Pubkey,
+        index_token_mint: Pubkey,
+        long_token_mint: Pubkey,
+        short_token_mint: Pubkey,
     ) -> Result<()> {
-        instructions::initialize_market(ctx, market_token, index_token, long_token, short_token)
+        instructions::initialize_market(
+            ctx,
+            market_token_mint,
+            index_token_mint,
+            long_token_mint,
+            short_token_mint,
+        )
     }
 
     #[access_control(Authenticate::only_market_keeper(&ctx))]
@@ -91,11 +97,11 @@ pub mod data_store {
     }
 
     #[access_control(Authenticate::only_market_keeper(&ctx))]
-    pub fn initialize_vault(
-        ctx: Context<InitializeVault>,
+    pub fn initialize_market_vault(
+        ctx: Context<InitializeMarketVault>,
         market_token_mint: Option<Pubkey>,
     ) -> Result<()> {
-        instructions::initialize_vault(ctx, market_token_mint)
+        instructions::initialize_market_vault(ctx, market_token_mint)
     }
 }
 
