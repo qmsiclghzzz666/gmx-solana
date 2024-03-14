@@ -4,6 +4,7 @@ members = ["programs/*", "crates/*"]
 
 [workspace.dependencies]
 anchor-lang = "0.29.0"
+anchor-spl = { version = "0.29.0", default_features = false }
 
 [profile.release]
 overflow-checks = true

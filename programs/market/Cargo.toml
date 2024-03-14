@@ -1,12 +1,12 @@
 [package]
-name = "data_store"
+name = "market"
 version = "0.1.0"
 description = "Created with Anchor"
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "data_store"
+name = "market"
 
 [features]
 no-entrypoint = []
@@ -16,15 +16,11 @@ cpi = ["no-entrypoint"]
 default = []
 idl-build = [
     "anchor-lang/idl-build",
+    "data_store/idl-build",
     "role_store/idl-build",
-    "anchor-spl/idl-build",
 ]
 
 [dependencies]
 anchor-lang = { workspace = true }
-gmx-solana-utils = { path = "../../crates/gmx-solana-utils" }
+data_store = { path = "../data_store", features = ["cpi"] }
 role_store = { path = "../role_store", features = ["cpi"] }
-anchor-spl = { workspace = true, default_features = false, features = [
-    "token",
-    "token_2022",
-] }

@@ -9,19 +9,19 @@ pub struct Market {
     /// Bump Seed.
     pub bump: u8,
     /// Market token.
-    pub market_token: Pubkey,
+    pub market_token_mint: Pubkey,
     /// Index token.
-    pub index_token: Pubkey,
+    pub index_token_mint: Pubkey,
     /// Long token.
-    pub long_token: Pubkey,
+    pub long_token_mint: Pubkey,
     /// Short token.
-    pub short_token: Pubkey,
+    pub short_token_mint: Pubkey,
 }
 
 impl Market {
     /// Get the expected key.
     pub fn expected_key(&self) -> String {
-        Self::create_key(&self.index_token, &self.long_token, &self.short_token)
+        Self::create_key(&self.market_token_mint)
     }
 
     /// Get the expected key seed.
@@ -30,20 +30,13 @@ impl Market {
     }
 
     /// Create key from tokens.
-    pub fn create_key(index_token: &Pubkey, long_token: &Pubkey, short_token: &Pubkey) -> String {
-        let mut key = index_token.to_string();
-        key.push_str(&long_token.to_string());
-        key.push_str(&short_token.to_string());
-        key
+    pub fn create_key(market_token: &Pubkey) -> String {
+        market_token.to_string()
     }
 
     /// Create key seed from tokens.
-    pub fn create_key_seed(
-        index_token: &Pubkey,
-        long_token: &Pubkey,
-        short_token: &Pubkey,
-    ) -> [u8; 32] {
-        let key = Self::create_key(index_token, long_token, short_token);
+    pub fn create_key_seed(market_token: &Pubkey) -> [u8; 32] {
+        let key = Self::create_key(market_token);
         to_seed(&key)
     }
 }
@@ -68,6 +61,6 @@ impl Data for Market {
 #[event]
 pub struct MarketChangeEvent {
     pub address: Pubkey,
-    pub init: bool,
+    pub action: super::Action,
     pub market: Market,
 }

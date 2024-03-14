@@ -25,7 +25,9 @@ describe("data store: TokenConfig", () => {
             store: dataStorePDA,
             onlyController,
             tokenConfig: fooTokenConfigPDA,
-        }).signers([signer0]).rpc();
+        }).signers([signer0]).rpc({
+            commitment: "confirmed",
+        });
     });
 
     it("get token config", async () => {
