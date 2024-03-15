@@ -110,3 +110,79 @@ impl<'info> internal::Authentication<'info> for DisableRole<'info> {
         &self.only_admin
     }
 }
+
+/// Grant a role to the user.
+pub fn grant_role(ctx: Context<GrantRole>, _user: Pubkey, role: String) -> Result<()> {
+    ctx.accounts
+        .store
+        .grant(&mut ctx.accounts.user_roles, &role)
+}
+
+#[derive(Accounts)]
+#[instruction(user: Pubkey)]
+pub struct GrantRole<'info> {
+    pub authority: Signer<'info>,
+    #[account(mut)]
+    pub store: Account<'info, DataStore>,
+    pub only_admin: Account<'info, Roles>,
+    #[account(
+        mut,
+        has_one = store,
+        constraint = user_roles.authority == user @ DataStoreError::InvalidRoles,
+        seeds = [Roles::SEED, store.key().as_ref(), user.key().as_ref()],
+        bump = user_roles.bump,
+    )]
+    pub user_roles: Account<'info, Roles>,
+}
+
+impl<'info> internal::Authentication<'info> for GrantRole<'info> {
+    fn authority(&self) -> Pubkey {
+        self.authority.key()
+    }
+
+    fn store(&self) -> &Account<'info, DataStore> {
+        &self.store
+    }
+
+    fn roles(&self) -> &Account<'info, Roles> {
+        &self.only_admin
+    }
+}
+
+/// Revoke a role to the user.
+pub fn revoke_role(ctx: Context<RevokeRole>, _user: Pubkey, role: String) -> Result<()> {
+    ctx.accounts
+        .store
+        .revoke(&mut ctx.accounts.user_roles, &role)
+}
+
+#[derive(Accounts)]
+#[instruction(user: Pubkey)]
+pub struct RevokeRole<'info> {
+    pub authority: Signer<'info>,
+    #[account(mut)]
+    pub store: Account<'info, DataStore>,
+    pub only_admin: Account<'info, Roles>,
+    #[account(
+        mut,
+        has_one = store,
+        constraint = user_roles.authority == user @ DataStoreError::InvalidRoles,
+        seeds = [Roles::SEED, store.key().as_ref(), user.key().as_ref()],
+        bump = user_roles.bump,
+    )]
+    pub user_roles: Account<'info, Roles>,
+}
+
+impl<'info> internal::Authentication<'info> for RevokeRole<'info> {
+    fn authority(&self) -> Pubkey {
+        self.authority.key()
+    }
+
+    fn store(&self) -> &Account<'info, DataStore> {
+        &self.store
+    }
+
+    fn roles(&self) -> &Account<'info, Roles> {
+        &self.only_admin
+    }
+}

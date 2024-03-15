@@ -83,6 +83,7 @@ export const initializeDataStore = async (provider: anchor.AnchorProvider, event
     const [roleStorePDA] = createRoleStorePDA(roleStoreKey);
     const [dataStorePDA] = createDataStorePDA(roleStorePDA, dataStoreKey);
     const [rolesPDA] = createRolesPDA(dataStorePDA, provider.publicKey);
+    const [signerRoles] = createRolesPDA(dataStorePDA, signer.publicKey);
 
     eventManager.subscribe(dataStore, "DataStoreInitEvent");
     eventManager.subscribe(dataStore, "TokenConfigChangeEvent");
@@ -103,7 +104,6 @@ export const initializeDataStore = async (provider: anchor.AnchorProvider, event
 
     // Initiliaze a roles account for `signer`.
     try {
-        const [signerRoles] = createRolesPDA(dataStorePDA, signer.publicKey);
         const tx = await dataStore.methods.initializeRoles().accounts({
             authority: signer.publicKey,
             store: dataStorePDA,
@@ -125,6 +125,15 @@ export const initializeDataStore = async (provider: anchor.AnchorProvider, event
                 onlyAdmin: rolesPDA,
             }).rpc();
             console.log(`Enabled ${role} in tx: ${tx}`);
+        }
+        {
+            const tx = await dataStore.methods.grantRole(signer.publicKey, role).accounts({
+                authority: provider.publicKey,
+                store: dataStorePDA,
+                onlyAdmin: rolesPDA,
+                userRoles: signerRoles,
+            }).rpc();
+            console.log(`Grant ${role} to signer in tx: ${tx}`);
         }
     }
 

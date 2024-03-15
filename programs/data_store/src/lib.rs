@@ -49,6 +49,16 @@ pub mod data_store {
         instructions::disable_role(ctx, role)
     }
 
+    #[access_control(internal::Authenticate::only_admin(&ctx))]
+    pub fn grant_role(ctx: Context<GrantRole>, user: Pubkey, role: String) -> Result<()> {
+        instructions::grant_role(ctx, user, role)
+    }
+
+    #[access_control(internal::Authenticate::only_admin(&ctx))]
+    pub fn revoke_role(ctx: Context<RevokeRole>, user: Pubkey, role: String) -> Result<()> {
+        instructions::revoke_role(ctx, user, role)
+    }
+
     #[access_control(Authenticate::only_controller(&ctx))]
     pub fn initialize_token_config(
         ctx: Context<InitializeTokenConfig>,
@@ -162,6 +172,8 @@ pub enum DataStoreError {
     NotAnAdmin,
     #[msg("Invalid role")]
     InvalidRole,
+    #[msg("Invalid roles account")]
+    InvalidRoles,
     #[msg("Permission denied")]
     PermissionDenied,
 }
