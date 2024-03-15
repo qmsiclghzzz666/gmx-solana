@@ -186,3 +186,77 @@ impl<'info> internal::Authentication<'info> for RevokeRole<'info> {
         &self.only_admin
     }
 }
+
+/// Add an admin.
+pub fn add_admin(ctx: Context<AddAdmin>, _user: Pubkey) -> Result<()> {
+    ctx.accounts.store.add_admin(&mut ctx.accounts.user_roles)
+}
+
+#[derive(Accounts)]
+#[instruction(user: Pubkey)]
+pub struct AddAdmin<'info> {
+    pub authority: Signer<'info>,
+    #[account(mut)]
+    pub store: Account<'info, DataStore>,
+    pub only_admin: Account<'info, Roles>,
+    #[account(
+        mut,
+        has_one = store,
+        constraint = user_roles.authority == user @ DataStoreError::InvalidRoles,
+        seeds = [Roles::SEED, store.key().as_ref(), user.key().as_ref()],
+        bump = user_roles.bump,
+    )]
+    pub user_roles: Account<'info, Roles>,
+}
+
+impl<'info> internal::Authentication<'info> for AddAdmin<'info> {
+    fn authority(&self) -> Pubkey {
+        self.authority.key()
+    }
+
+    fn store(&self) -> &Account<'info, DataStore> {
+        &self.store
+    }
+
+    fn roles(&self) -> &Account<'info, Roles> {
+        &self.only_admin
+    }
+}
+
+/// Remove an admin.
+pub fn remove_admin(ctx: Context<RemoveAdmin>, _user: Pubkey) -> Result<()> {
+    ctx.accounts
+        .store
+        .remove_admin(&mut ctx.accounts.user_roles)
+}
+
+#[derive(Accounts)]
+#[instruction(user: Pubkey)]
+pub struct RemoveAdmin<'info> {
+    pub authority: Signer<'info>,
+    #[account(mut)]
+    pub store: Account<'info, DataStore>,
+    pub only_admin: Account<'info, Roles>,
+    #[account(
+        mut,
+        has_one = store,
+        constraint = user_roles.authority == user @ DataStoreError::InvalidRoles,
+        seeds = [Roles::SEED, store.key().as_ref(), user.key().as_ref()],
+        bump = user_roles.bump,
+    )]
+    pub user_roles: Account<'info, Roles>,
+}
+
+impl<'info> internal::Authentication<'info> for RemoveAdmin<'info> {
+    fn authority(&self) -> Pubkey {
+        self.authority.key()
+    }
+
+    fn store(&self) -> &Account<'info, DataStore> {
+        &self.store
+    }
+
+    fn roles(&self) -> &Account<'info, Roles> {
+        &self.only_admin
+    }
+}
