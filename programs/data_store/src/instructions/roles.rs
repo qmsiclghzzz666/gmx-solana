@@ -52,19 +52,6 @@ pub struct CheckRole<'info> {
 
 /// Verify that the `user` is an admin of the given `store`.
 #[allow(unused_variables)]
-pub fn check_admin(ctx: Context<CheckAdmin>, user: Pubkey) -> Result<bool> {
+pub fn check_admin(ctx: Context<CheckRole>, user: Pubkey) -> Result<bool> {
     Ok(ctx.accounts.roles.is_admin())
-}
-
-#[derive(Accounts)]
-#[instruction(authority: Pubkey)]
-pub struct CheckAdmin<'info> {
-    pub store: Account<'info, DataStore>,
-    #[account(
-        has_one = store @ DataStoreError::PermissionDenied,
-        has_one = authority @ DataStoreError::PermissionDenied,
-        seeds = [Roles::SEED, store.key().as_ref(), authority.key().as_ref()],
-        bump = roles.bump,
-    )]
-    pub roles: Account<'info, Roles>,
 }
