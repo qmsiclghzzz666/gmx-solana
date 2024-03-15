@@ -1,9 +1,12 @@
 use anchor_lang::prelude::*;
-use data_store::states::DataStore;
+use data_store::{
+    cpi::accounts::CheckRole,
+    states::{DataStore, Roles},
+    utils::Authentication,
+};
 use gmx_solana_utils::to_seed;
-use role_store::{Authorization, Role};
 
-use crate::states::Oracle;
+use crate::{states::Oracle, OracleError};
 
 #[derive(Accounts)]
 #[instruction(key: String)]
@@ -26,7 +29,6 @@ pub fn initialize(ctx: Context<Initialize>, key: String) -> Result<()> {
     // FIXME: Is it still correct if we not clear here?
     ctx.accounts.oracle.primary.clear();
     ctx.accounts.oracle.bump = ctx.bumps.oracle;
-    ctx.accounts.oracle.role_store = *ctx.accounts.store.role_store();
     ctx.accounts.oracle.data_store = ctx.accounts.store.key();
     msg!("new oracle initialized with key: {}", key);
     Ok(())
@@ -35,22 +37,30 @@ pub fn initialize(ctx: Context<Initialize>, key: String) -> Result<()> {
 #[derive(Accounts)]
 pub struct ClearAllPrices<'info> {
     pub authority: Signer<'info>,
-    pub only_controller: Account<'info, Role>,
+    pub store: Account<'info, DataStore>,
+    pub only_controller: Account<'info, Roles>,
     #[account(mut)]
     pub oracle: Account<'info, Oracle>,
+    pub data_store_program: Program<'info, data_store::program::DataStore>,
 }
 
-impl<'info> Authorization<'info> for ClearAllPrices<'info> {
-    fn role_store(&self) -> Pubkey {
-        self.oracle.role_store
-    }
-
+impl<'info> Authentication<'info> for ClearAllPrices<'info> {
     fn authority(&self) -> &Signer<'info> {
         &self.authority
     }
 
-    fn role(&self) -> &Account<'info, Role> {
-        &self.only_controller
+    fn check_role_ctx(&self) -> CpiContext<'_, '_, '_, 'info, CheckRole<'info>> {
+        CpiContext::new(
+            self.data_store_program.to_account_info(),
+            CheckRole {
+                store: self.store.to_account_info(),
+                roles: self.only_controller.to_account_info(),
+            },
+        )
+    }
+
+    fn on_error(&self) -> Result<()> {
+        Err(OracleError::PermissionDenied.into())
     }
 }
 

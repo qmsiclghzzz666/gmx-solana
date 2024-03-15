@@ -71,8 +71,8 @@ pub struct EnableRole<'info> {
 }
 
 impl<'info> internal::Authentication<'info> for EnableRole<'info> {
-    fn authority(&self) -> Pubkey {
-        self.authority.key()
+    fn authority(&self) -> &Signer<'info> {
+        &self.authority
     }
 
     fn store(&self) -> &Account<'info, DataStore> {
@@ -98,8 +98,8 @@ pub struct DisableRole<'info> {
 }
 
 impl<'info> internal::Authentication<'info> for DisableRole<'info> {
-    fn authority(&self) -> Pubkey {
-        self.authority.key()
+    fn authority(&self) -> &Signer<'info> {
+        &self.authority
     }
 
     fn store(&self) -> &Account<'info, DataStore> {
@@ -136,8 +136,8 @@ pub struct GrantRole<'info> {
 }
 
 impl<'info> internal::Authentication<'info> for GrantRole<'info> {
-    fn authority(&self) -> Pubkey {
-        self.authority.key()
+    fn authority(&self) -> &Signer<'info> {
+        &self.authority
     }
 
     fn store(&self) -> &Account<'info, DataStore> {
@@ -174,8 +174,8 @@ pub struct RevokeRole<'info> {
 }
 
 impl<'info> internal::Authentication<'info> for RevokeRole<'info> {
-    fn authority(&self) -> Pubkey {
-        self.authority.key()
+    fn authority(&self) -> &Signer<'info> {
+        &self.authority
     }
 
     fn store(&self) -> &Account<'info, DataStore> {
@@ -210,8 +210,8 @@ pub struct AddAdmin<'info> {
 }
 
 impl<'info> internal::Authentication<'info> for AddAdmin<'info> {
-    fn authority(&self) -> Pubkey {
-        self.authority.key()
+    fn authority(&self) -> &Signer<'info> {
+        &self.authority
     }
 
     fn store(&self) -> &Account<'info, DataStore> {
@@ -248,8 +248,8 @@ pub struct RemoveAdmin<'info> {
 }
 
 impl<'info> internal::Authentication<'info> for RemoveAdmin<'info> {
-    fn authority(&self) -> Pubkey {
-        self.authority.key()
+    fn authority(&self) -> &Signer<'info> {
+        &self.authority
     }
 
     fn store(&self) -> &Account<'info, DataStore> {

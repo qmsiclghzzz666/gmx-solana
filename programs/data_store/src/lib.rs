@@ -1,5 +1,4 @@
 use anchor_lang::prelude::*;
-use role_store::Authenticate;
 
 /// Instructions.
 pub mod instructions;
@@ -69,7 +68,7 @@ pub mod data_store {
         instructions::remove_admin(ctx, user)
     }
 
-    #[access_control(Authenticate::only_controller(&ctx))]
+    #[access_control(internal::Authenticate::only_controller(&ctx))]
     pub fn initialize_token_config(
         ctx: Context<InitializeTokenConfig>,
         key: String,
@@ -88,7 +87,7 @@ pub mod data_store {
         )
     }
 
-    #[access_control(Authenticate::only_controller(&ctx))]
+    #[access_control(internal::Authenticate::only_controller(&ctx))]
     pub fn update_token_config(
         ctx: Context<UpdateTokenConfig>,
         key: String,
@@ -99,7 +98,7 @@ pub mod data_store {
         instructions::update_token_config(ctx, key, price_feed, token_decimals, precision)
     }
 
-    #[access_control(Authenticate::only_market_keeper(&ctx))]
+    #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn initialize_market(
         ctx: Context<InitializeMarket>,
         market_token_mint: Pubkey,
@@ -116,12 +115,12 @@ pub mod data_store {
         )
     }
 
-    #[access_control(Authenticate::only_market_keeper(&ctx))]
+    #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn remove_market(ctx: Context<RemoveMarket>) -> Result<()> {
         instructions::remove_market(ctx)
     }
 
-    #[access_control(Authenticate::only_market_keeper(&ctx))]
+    #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn initialize_market_token(
         ctx: Context<InitializeMarketToken>,
         index_token_mint: Pubkey,
@@ -136,12 +135,12 @@ pub mod data_store {
         )
     }
 
-    #[access_control(Authenticate::only_controller(&ctx))]
+    #[access_control(internal::Authenticate::only_controller(&ctx))]
     pub fn mint_market_token_to(ctx: Context<MintMarketTokenTo>, amount: u64) -> Result<()> {
         instructions::mint_market_token_to(ctx, amount)
     }
 
-    #[access_control(Authenticate::only_market_keeper(&ctx))]
+    #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn initialize_market_vault(
         ctx: Context<InitializeMarketVault>,
         market_token_mint: Option<Pubkey>,
@@ -149,7 +148,7 @@ pub mod data_store {
         instructions::initialize_market_vault(ctx, market_token_mint)
     }
 
-    #[access_control(Authenticate::only_controller(&ctx))]
+    #[access_control(internal::Authenticate::only_controller(&ctx))]
     pub fn market_vault_transfer_out(
         ctx: Context<MarketVaultTransferOut>,
         amount: u64,

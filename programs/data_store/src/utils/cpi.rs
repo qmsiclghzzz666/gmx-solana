@@ -1,11 +1,11 @@
 use anchor_lang::{prelude::*, Bumps};
 
-use crate::cpi::accounts::CheckRole;
+use crate::{cpi::accounts::CheckRole, states::RoleKey};
 
 /// Accounts that can be used for authentication.
 pub trait Authentication<'info> {
     /// Get the authority to check.
-    fn authority(&self) -> Pubkey;
+    fn authority(&self) -> &Signer<'info>;
 
     /// Get the cpi context for checking role or admin permission.
     fn check_role_ctx(&self) -> CpiContext<'_, '_, '_, 'info, CheckRole<'info>>;
@@ -20,7 +20,7 @@ pub trait Authenticate<'info>: Authentication<'info> + Bumps + Sized {
     fn only(ctx: &Context<Self>, role: &str) -> Result<()> {
         let has_role = crate::cpi::check_role(
             ctx.accounts.check_role_ctx(),
-            ctx.accounts.authority(),
+            ctx.accounts.authority().key(),
             role.to_string(),
         )?
         .get();
@@ -33,13 +33,26 @@ pub trait Authenticate<'info>: Authentication<'info> + Bumps + Sized {
 
     /// Check that the `authority` is an admin.
     fn only_admin(ctx: &Context<Self>) -> Result<()> {
-        let is_admin =
-            crate::cpi::check_admin(ctx.accounts.check_role_ctx(), ctx.accounts.authority())?.get();
+        let is_admin = crate::cpi::check_admin(
+            ctx.accounts.check_role_ctx(),
+            ctx.accounts.authority().key(),
+        )?
+        .get();
         if is_admin {
             Ok(())
         } else {
             ctx.accounts.on_error()
         }
+    }
+
+    /// Check that the `authority` has the [`CONTROLLER`](`RoleKey::CONTROLLER`) role.
+    fn only_controller(ctx: &Context<Self>) -> Result<()> {
+        Self::only(ctx, RoleKey::CONTROLLER)
+    }
+
+    /// Check that the `authority` has the [`MARKET_KEEPER`](`RoleKey::MARKET_KEEPER`) role.
+    fn only_market_keeper(ctx: &Context<Self>) -> Result<()> {
+        Self::only(ctx, RoleKey::MARKET_KEEPER)
     }
 }
 

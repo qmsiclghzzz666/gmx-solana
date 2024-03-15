@@ -1,5 +1,4 @@
 import { AnchorError } from "@coral-xyz/anchor";
-import { Keypair } from "@solana/web3.js";
 import { createRolesPDA } from "../../utils/data";
 import { expect, getAddresses, getPrograms, getProvider, getUsers } from "../../utils/fixtures";
 

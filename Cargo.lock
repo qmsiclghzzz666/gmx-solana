@@ -860,7 +860,6 @@ dependencies = [
  "bitmaps 3.2.1",
  "dual-vec-map",
  "gmx-solana-utils",
- "role_store",
 ]
 
 [[package]]
@@ -1269,7 +1268,6 @@ version = "0.1.0"
 dependencies = [
  "anchor-lang",
  "data_store",
- "role_store",
 ]
 
 [[package]]
@@ -1390,7 +1388,6 @@ dependencies = [
  "data_store",
  "dual-vec-map",
  "gmx-solana-utils",
- "role_store",
  "thiserror",
 ]
 
@@ -1681,14 +1678,6 @@ name = "regex-syntax"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c08c74e62047bb2de4ff487b251e4a92e24f48745648451635cec7d591162d9f"
-
-[[package]]
-name = "role_store"
-version = "0.1.0"
-dependencies = [
- "anchor-lang",
- "gmx-solana-utils",
-]
 
 [[package]]
 name = "rustc-hash"

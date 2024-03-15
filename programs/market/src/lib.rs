@@ -3,8 +3,8 @@ use anchor_lang::prelude::*;
 /// Instructions.
 pub mod instructions;
 
+use data_store::utils::Authenticate;
 use instructions::*;
-use role_store::Authenticate;
 
 declare_id!("AFxZM92h6tryw4hZx2puJRWjA4CQSkxmVkzJrDWJgJAL");
 
@@ -16,4 +16,11 @@ pub mod market {
     pub fn create_market(ctx: Context<CreateMarket>, index_token_mint: Pubkey) -> Result<()> {
         instructions::create_market(ctx, index_token_mint)
     }
+}
+
+/// Errors of market program.
+#[error_code]
+pub enum MarketError {
+    #[msg("Permission denied")]
+    PermissionDenied,
 }

@@ -21,7 +21,6 @@ pub struct DataStore {
     #[max_len(MAX_ROLES)]
     roles: Vec<RoleKey>,
     num_admins: u32,
-    pub role_store: Pubkey,
     #[max_len(MAX_LEN)]
     key_seed: Vec<u8>,
     pub bump: u8,
@@ -38,20 +37,13 @@ impl DataStore {
     /// Init.
     /// # Warning
     /// The `roles` is assumed to be initialized with `is_admin == false`.
-    pub fn init(
-        &mut self,
-        roles: &mut Roles,
-        role_store: Pubkey,
-        key: &str,
-        bump: u8,
-    ) -> Result<()> {
+    pub fn init(&mut self, roles: &mut Roles, key: &str, bump: u8) -> Result<()> {
         // Init roles map.
         self.roles.clear();
         self.roles_metadata.clear();
         self.num_admins = 0;
 
         // Init others.
-        self.role_store = role_store;
         self.key_seed = to_seed(key).into();
         self.bump = bump;
 
@@ -111,11 +103,6 @@ impl DataStore {
             .as_map()?
             .get(role)
             .and_then(|metadata| metadata.enabled.then_some(metadata.index)))
-    }
-
-    /// Get the role store key.
-    pub fn role_store(&self) -> &Pubkey {
-        &self.role_store
     }
 
     /// Add admin.
@@ -254,7 +241,6 @@ impl Seed for Roles {
 pub struct DataStoreInitEvent {
     pub key: String,
     pub address: Pubkey,
-    pub role_store: Pubkey,
 }
 
 #[cfg(test)]
@@ -266,7 +252,6 @@ mod tests {
             roles_metadata: vec![],
             roles: vec![],
             num_admins: 0,
-            role_store: Pubkey::default(),
             key_seed: vec![],
             bump: 0,
         }
@@ -284,9 +269,7 @@ mod tests {
 
     fn new_store(roles: &mut Roles) -> DataStore {
         let mut store = new_uninited_store();
-        store
-            .init(roles, Pubkey::new_unique(), "hello", 255)
-            .unwrap();
+        store.init(roles, "hello", 255).unwrap();
         store
     }
 

@@ -1,6 +1,9 @@
 use anchor_lang::prelude::*;
-use data_store::states::{Data, DataStore, TokenConfig};
-use role_store::{Authorization, Role};
+use data_store::{
+    cpi::accounts::CheckRole,
+    states::{Data, DataStore, Roles, TokenConfig},
+    utils::Authentication,
+};
 
 use crate::{states::Oracle, OracleError, PriceMap};
 
@@ -16,7 +19,7 @@ impl Id for Chainlink {
 #[derive(Accounts)]
 pub struct SetPricesFromPriceFeed<'info> {
     pub authority: Signer<'info>,
-    pub only_controller: Account<'info, Role>,
+    pub only_controller: Account<'info, Roles>,
     pub store: Account<'info, DataStore>,
     #[account(
         mut,
@@ -24,19 +27,26 @@ pub struct SetPricesFromPriceFeed<'info> {
     )]
     pub oracle: Account<'info, Oracle>,
     pub chainlink_program: Program<'info, Chainlink>,
+    pub data_store_program: Program<'info, data_store::program::DataStore>,
 }
 
-impl<'info> Authorization<'info> for SetPricesFromPriceFeed<'info> {
-    fn role_store(&self) -> Pubkey {
-        self.oracle.role_store
-    }
-
+impl<'info> Authentication<'info> for SetPricesFromPriceFeed<'info> {
     fn authority(&self) -> &Signer<'info> {
         &self.authority
     }
 
-    fn role(&self) -> &Account<'info, Role> {
-        &self.only_controller
+    fn check_role_ctx(&self) -> CpiContext<'_, '_, '_, 'info, CheckRole<'info>> {
+        CpiContext::new(
+            self.data_store_program.to_account_info(),
+            CheckRole {
+                store: self.store.to_account_info(),
+                roles: self.only_controller.to_account_info(),
+            },
+        )
+    }
+
+    fn on_error(&self) -> Result<()> {
+        Err(OracleError::PermissionDenied.into())
     }
 }
 

@@ -1,14 +1,14 @@
 use anchor_lang::{prelude::*, Bumps};
 
 use crate::{
-    states::{DataStore, Roles, Seed},
+    states::{DataStore, RoleKey, Roles, Seed},
     DataStoreError,
 };
 
 /// Accounts that can be used for authentication.
 pub(crate) trait Authentication<'info> {
     /// Get the authority to check.
-    fn authority(&self) -> Pubkey;
+    fn authority(&self) -> &Signer<'info>;
 
     /// Get the data store account.
     fn store(&self) -> &Account<'info, DataStore>;
@@ -21,9 +21,8 @@ pub(crate) trait Authentication<'info> {
 pub(crate) trait Authenticate<'info>: Authentication<'info> + Bumps + Sized {
     /// Verify that context matches.
     fn verify(ctx: &Context<Self>) -> Result<()> {
-        let authority = ctx.accounts.authority();
-        let store = ctx.accounts.store();
-        let store_key = store.key();
+        let authority = ctx.accounts.authority().key();
+        let store_key = ctx.accounts.store().key();
         let roles = ctx.accounts.roles();
         require_eq!(roles.authority, authority, DataStoreError::PermissionDenied);
         require_eq!(roles.store, store_key, DataStoreError::PermissionDenied);
@@ -56,6 +55,16 @@ pub(crate) trait Authenticate<'info>: Authentication<'info> + Bumps + Sized {
         Self::verify(ctx)?;
         require!(ctx.accounts.roles().is_admin(), DataStoreError::NotAnAdmin);
         Ok(())
+    }
+
+    /// Check that the `authority` has the [`CONTROLLER`](`RoleKey::CONTROLLER`) role.
+    fn only_controller(ctx: &Context<Self>) -> Result<()> {
+        Self::only(ctx, RoleKey::CONTROLLER)
+    }
+
+    /// Check that the `authority` has the [`MARKET_KEEPER`](`RoleKey::MARKET_KEEPER`) role.
+    fn only_market_keeper(ctx: &Context<Self>) -> Result<()> {
+        Self::only(ctx, RoleKey::MARKET_KEEPER)
     }
 }
 

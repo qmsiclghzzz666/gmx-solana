@@ -2,8 +2,7 @@ import * as anchor from "@coral-xyz/anchor";
 import { Oracle } from "../target/types/oracle";
 import { IDL as chainlinkIDL } from "../external-programs/chainlink-store";
 import { getAddresses, getProvider, getUsers } from "../utils/fixtures";
-import { BTC_FEED, BTC_TOKEN_MINT, SOL_FEED, SOL_TOKEN_MINT, createAddressPDA, createPriceFeedKey, createTokenConfigPDA } from "../utils/data";
-import { createControllerPDA } from "../utils/role";
+import { BTC_FEED, BTC_TOKEN_MINT, SOL_FEED, SOL_TOKEN_MINT, createRolesPDA, createTokenConfigPDA, dataStore } from "../utils/data";
 import { expect } from "chai";
 
 describe("oracle", () => {
@@ -13,14 +12,16 @@ describe("oracle", () => {
     const oracle = anchor.workspace.Oracle as anchor.Program<Oracle>;
     const chainlink = new anchor.Program(chainlinkIDL, chainlinkID);
 
-    const { dataStoreAddress, roleStoreAddress, oracleAddress } = getAddresses();
+    const { dataStoreAddress, oracleAddress } = getAddresses();
     const { signer0 } = getUsers();
+
+    const [roles] = createRolesPDA(dataStoreAddress, signer0.publicKey);
 
     const mockFeedAccount = anchor.web3.Keypair.generate();
 
     it("create a new price feed", async () => {
         try {
-            const createFeedTx = await chainlink.methods.createFeed("FOO", 1, 2, 3).accounts({
+            await chainlink.methods.createFeed("FOO", 1, 2, 3).accounts({
                 feed: mockFeedAccount.publicKey,
                 authority: provider.wallet.publicKey,
             }).signers([mockFeedAccount]).preInstructions([
@@ -37,7 +38,6 @@ describe("oracle", () => {
     });
 
     it("set price from feed and then clear", async () => {
-        const [onlyController] = createControllerPDA(roleStoreAddress, signer0.publicKey);
         await oracle.methods.setPricesFromPriceFeed([
             BTC_TOKEN_MINT,
             SOL_TOKEN_MINT,
@@ -45,8 +45,9 @@ describe("oracle", () => {
             store: dataStoreAddress,
             authority: signer0.publicKey,
             chainlinkProgram: chainlinkID,
-            onlyController,
+            onlyController: roles,
             oracle: oracleAddress,
+            dataStoreProgram: dataStore.programId,
         }).remainingAccounts([
             {
                 pubkey: createTokenConfigPDA(dataStoreAddress, BTC_TOKEN_MINT.toBase58())[0],
@@ -77,9 +78,11 @@ describe("oracle", () => {
         ]);
 
         await oracle.methods.clearAllPrices().accounts({
+            store: dataStoreAddress,
             authority: signer0.publicKey,
-            onlyController,
+            onlyController: roles,
             oracle: oracleAddress,
+            dataStoreProgram: dataStore.programId,
         }).signers([signer0]).rpc();
         const clearedData = await oracle.account.oracle.fetch(oracleAddress);
         expect(clearedData.primary.prices.length).to.equal(0);

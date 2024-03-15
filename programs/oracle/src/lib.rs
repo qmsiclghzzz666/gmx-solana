@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use role_store::Authenticate;
+use data_store::utils::Authenticate;
 
 /// Instructions.
 pub mod instructions;
@@ -66,4 +66,6 @@ pub enum OracleError {
     PriceFeedNotUpdated,
     #[msg("Data store mismatched")]
     DataStoreMismatched,
+    #[msg("Permission denied")]
+    PermissionDenied,
 }
