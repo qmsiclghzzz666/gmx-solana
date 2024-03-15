@@ -17,11 +17,14 @@ use anchor_lang::{
 };
 use gmx_solana_utils::to_seed;
 
-/// Data type stored in data store.
-pub trait Data: Bump {
+/// Data type that has [`SEED`].
+pub trait Seed {
     /// Prefix seed for program derived addresses.
     const SEED: &'static [u8];
+}
 
+/// Data type stored in data store.
+pub trait Data: Bump + Seed {
     /// Verify the key.
     #[allow(unused_variables)]
     fn verify(&self, key: &str) -> Result<()> {

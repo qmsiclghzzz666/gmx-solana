@@ -2,19 +2,17 @@ import { Keypair, Transaction } from '@solana/web3.js';
 import { BN } from '@coral-xyz/anchor';
 
 import { expect, getAddresses, getPrograms, getProvider, getUsers } from "../../utils/fixtures";
-import { createControllerPDA, createMarketKeeperPDA } from "../../utils/role";
-import { createMarketPDA, createMarketTokenMintPDA, createMarketVaultPDA, getMarketSignPDA } from "../../utils/data";
+import { createMarketPDA, createMarketTokenMintPDA, createMarketVaultPDA, createRolesPDA, getMarketSignPDA } from "../../utils/data";
 import { createAssociatedTokenAccountInstruction, createTransferInstruction, getAssociatedTokenAddress } from "@solana/spl-token";
 
 describe("data store: Market", () => {
     const { dataStore } = getPrograms();
     const { signer0, user0 } = getUsers();
 
-    const { roleStoreAddress, dataStoreAddress } = getAddresses();
+    const { dataStoreAddress } = getAddresses();
     const provider = getProvider();
 
-    const [onlyMarketKeeper] = createMarketKeeperPDA(roleStoreAddress, signer0.publicKey);
-    const [onlyController] = createControllerPDA(roleStoreAddress, signer0.publicKey);
+    const [roles] = createRolesPDA(dataStoreAddress, signer0.publicKey);
 
     const indexToken = Keypair.generate().publicKey;
     const longToken = Keypair.generate().publicKey;
@@ -25,7 +23,7 @@ describe("data store: Market", () => {
     it("init and remove a market", async () => {
         await dataStore.methods.initializeMarket(marketToken, indexToken, longToken, shortToken).accounts({
             authority: signer0.publicKey,
-            onlyMarketKeeper,
+            onlyMarketKeeper: roles,
             store: dataStoreAddress,
             market: marketPDA,
         }).signers([signer0]).rpc();
@@ -38,7 +36,7 @@ describe("data store: Market", () => {
         }
         await dataStore.methods.removeMarket().accounts({
             authority: signer0.publicKey,
-            onlyMarketKeeper,
+            onlyMarketKeeper: roles,
             store: dataStoreAddress,
             market: marketPDA,
         }).signers([signer0]).rpc();
@@ -55,7 +53,7 @@ describe("data store: Market", () => {
         await dataStore.methods.initializeMarketToken(indexToken, longToken, shortToken).accounts({
             store: dataStoreAddress,
             authority: signer0.publicKey,
-            onlyMarketKeeper,
+            onlyMarketKeeper: roles,
             marketTokenMint,
             marketSign,
         }).signers([signer0]).rpc();
@@ -71,7 +69,7 @@ describe("data store: Market", () => {
         await dataStore.methods.mintMarketTokenTo(new BN("100000000").mul(new BN(100))).accounts({
             authority: signer0.publicKey,
             store: dataStoreAddress,
-            onlyController,
+            onlyController: roles,
             marketTokenMint,
             marketSign,
             to: userTokenAccount,
@@ -81,7 +79,7 @@ describe("data store: Market", () => {
         await dataStore.methods.initializeMarketVault(null).accounts({
             authority: signer0.publicKey,
             store: dataStoreAddress,
-            onlyMarketKeeper,
+            onlyMarketKeeper: roles,
             mint: marketTokenMint,
             vault: marketVault,
             marketSign,
@@ -98,7 +96,7 @@ describe("data store: Market", () => {
 
         await dataStore.methods.marketVaultTransferOut(new BN("100000000").mul(new BN(11))).accounts({
             authority: signer0.publicKey,
-            onlyController,
+            onlyController: roles,
             store: dataStoreAddress,
             marketSign,
             marketVault,

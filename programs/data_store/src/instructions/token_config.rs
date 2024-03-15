@@ -1,8 +1,10 @@
 use anchor_lang::prelude::*;
 use gmx_solana_utils::to_seed;
-use role_store::{Authorization, Role};
 
-use crate::states::{Data, DataStore, TokenConfig, TokenConfigChangeEvent};
+use crate::{
+    states::{DataStore, Roles, Seed, TokenConfig, TokenConfigChangeEvent},
+    utils::internal,
+};
 
 #[derive(Accounts)]
 #[instruction(key: String)]
@@ -10,7 +12,7 @@ pub struct InitializeTokenConfig<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
     pub store: Account<'info, DataStore>,
-    pub only_controller: Account<'info, Role>,
+    pub only_controller: Account<'info, Roles>,
     #[account(
         init,
         payer = authority,
@@ -46,16 +48,16 @@ pub fn initialize_token_config(
     Ok(())
 }
 
-impl<'info> Authorization<'info> for InitializeTokenConfig<'info> {
-    fn role_store(&self) -> Pubkey {
-        self.store.role_store
-    }
-
+impl<'info> internal::Authentication<'info> for InitializeTokenConfig<'info> {
     fn authority(&self) -> &Signer<'info> {
         &self.authority
     }
 
-    fn role(&self) -> &Account<'info, Role> {
+    fn store(&self) -> &Account<'info, DataStore> {
+        &self.store
+    }
+
+    fn roles(&self) -> &Account<'info, Roles> {
         &self.only_controller
     }
 }
@@ -65,7 +67,7 @@ impl<'info> Authorization<'info> for InitializeTokenConfig<'info> {
 pub struct UpdateTokenConfig<'info> {
     pub authority: Signer<'info>,
     pub store: Account<'info, DataStore>,
-    pub only_controller: Account<'info, Role>,
+    pub only_controller: Account<'info, Roles>,
     #[account(
         mut,
         seeds = [TokenConfig::SEED, store.key().as_ref(), &to_seed(&key)],
@@ -74,16 +76,16 @@ pub struct UpdateTokenConfig<'info> {
     pub token_config: Account<'info, TokenConfig>,
 }
 
-impl<'info> Authorization<'info> for UpdateTokenConfig<'info> {
-    fn role_store(&self) -> Pubkey {
-        self.store.role_store
-    }
-
+impl<'info> internal::Authentication<'info> for UpdateTokenConfig<'info> {
     fn authority(&self) -> &Signer<'info> {
         &self.authority
     }
 
-    fn role(&self) -> &Account<'info, Role> {
+    fn store(&self) -> &Account<'info, DataStore> {
+        &self.store
+    }
+
+    fn roles(&self) -> &Account<'info, Roles> {
         &self.only_controller
     }
 }

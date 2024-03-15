@@ -441,6 +441,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "bitmaps"
+version = "3.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a1d084b0137aaa901caf9f1e8b21daa6aa24d41cd806e111335541eff9683bd6"
+
+[[package]]
 name = "blake3"
 version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -851,8 +857,9 @@ version = "0.1.0"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
+ "bitmaps 3.2.1",
+ "dual-vec-map",
  "gmx-solana-utils",
- "role_store",
 ]
 
 [[package]]
@@ -1105,7 +1112,7 @@ version = "15.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d0acd33ff0285af998aaf9b57342af478078f53492322fafc47450e09397e0e9"
 dependencies = [
- "bitmaps",
+ "bitmaps 2.1.0",
  "rand_core 0.6.4",
  "rand_xoshiro",
  "rayon",
@@ -1261,7 +1268,6 @@ version = "0.1.0"
 dependencies = [
  "anchor-lang",
  "data_store",
- "role_store",
 ]
 
 [[package]]
@@ -1382,7 +1388,6 @@ dependencies = [
  "data_store",
  "dual-vec-map",
  "gmx-solana-utils",
- "role_store",
  "thiserror",
 ]
 
@@ -1675,14 +1680,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c08c74e62047bb2de4ff487b251e4a92e24f48745648451635cec7d591162d9f"
 
 [[package]]
-name = "role_store"
-version = "0.1.0"
-dependencies = [
- "anchor-lang",
- "gmx-solana-utils",
-]
-
-[[package]]
 name = "rustc-hash"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1847,7 +1844,7 @@ version = "0.6.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "16d69225bde7a69b235da73377861095455d298f2b970996eec25ddbb42b3d1e"
 dependencies = [
- "bitmaps",
+ "bitmaps 2.1.0",
  "typenum",
 ]
 

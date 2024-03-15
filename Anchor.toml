@@ -8,7 +8,6 @@ skip-lint = false
 data_store = "8hJ2dGQ2Ccr5G6iEqQQEoBApRSXt7Jn8Qyf9Qf3eLBX2"
 market = "AFxZM92h6tryw4hZx2puJRWjA4CQSkxmVkzJrDWJgJAL"
 oracle = "8LmVjFpoR6hupp6WZZb6EbmupaXvivaCEk2iAHskr1en"
-role_store = "H7L3aYUzR3joc6Heyonjt1thpWdtwYcTVQvCrB2xDsdi"
 
 [registry]
 url = "https://api.apr.dev"

@@ -7,7 +7,6 @@ use crate::PriceMap;
 #[derive(InitSpace)]
 pub struct Oracle {
     pub bump: u8,
-    pub role_store: Pubkey,
     pub data_store: Pubkey,
     pub primary: PriceMap,
 }

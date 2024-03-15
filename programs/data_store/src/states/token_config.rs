@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use super::Data;
+use super::{Data, Seed};
 
 #[account]
 #[derive(InitSpace)]
@@ -59,9 +59,11 @@ impl anchor_lang::Bump for TokenConfig {
     }
 }
 
-impl Data for TokenConfig {
+impl Seed for TokenConfig {
     const SEED: &'static [u8] = b"token_config";
 }
+
+impl Data for TokenConfig {}
 
 #[event]
 pub struct TokenConfigChangeEvent {

@@ -1,9 +1,11 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, MintTo, Token, TokenAccount, Transfer};
-use role_store::{Authorization, Role};
 
-use crate::constants;
-use crate::states::{Action, Data, DataStore, Market, MarketChangeEvent};
+use crate::{
+    constants,
+    states::{Action, DataStore, Market, MarketChangeEvent, Roles, Seed},
+    utils::internal,
+};
 
 /// Initialize the account for [`Market`].
 pub fn initialize_market(
@@ -32,7 +34,7 @@ pub fn initialize_market(
 pub struct InitializeMarket<'info> {
     #[account(mut)]
     authority: Signer<'info>,
-    only_market_keeper: Account<'info, Role>,
+    only_market_keeper: Account<'info, Roles>,
     store: Account<'info, DataStore>,
     #[account(
         init,
@@ -49,16 +51,16 @@ pub struct InitializeMarket<'info> {
     system_program: Program<'info, System>,
 }
 
-impl<'info> Authorization<'info> for InitializeMarket<'info> {
-    fn role_store(&self) -> Pubkey {
-        self.store.role_store
-    }
-
+impl<'info> internal::Authentication<'info> for InitializeMarket<'info> {
     fn authority(&self) -> &Signer<'info> {
         &self.authority
     }
 
-    fn role(&self) -> &Account<'info, Role> {
+    fn store(&self) -> &Account<'info, DataStore> {
+        &self.store
+    }
+
+    fn roles(&self) -> &Account<'info, Roles> {
         &self.only_market_keeper
     }
 }
@@ -78,7 +80,7 @@ pub fn remove_market(ctx: Context<RemoveMarket>) -> Result<()> {
 pub struct RemoveMarket<'info> {
     #[account(mut)]
     authority: Signer<'info>,
-    only_market_keeper: Account<'info, Role>,
+    only_market_keeper: Account<'info, Roles>,
     store: Account<'info, DataStore>,
     #[account(
         mut,
@@ -89,16 +91,16 @@ pub struct RemoveMarket<'info> {
     market: Account<'info, Market>,
 }
 
-impl<'info> Authorization<'info> for RemoveMarket<'info> {
-    fn role_store(&self) -> Pubkey {
-        self.store.role_store
-    }
-
+impl<'info> internal::Authentication<'info> for RemoveMarket<'info> {
     fn authority(&self) -> &Signer<'info> {
         &self.authority
     }
 
-    fn role(&self) -> &Account<'info, Role> {
+    fn store(&self) -> &Account<'info, DataStore> {
+        &self.store
+    }
+
+    fn roles(&self) -> &Account<'info, Roles> {
         &self.only_market_keeper
     }
 }
@@ -119,7 +121,7 @@ pub fn initialize_market_token(
 pub struct InitializeMarketToken<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
-    pub only_market_keeper: Account<'info, Role>,
+    pub only_market_keeper: Account<'info, Roles>,
     pub store: Account<'info, DataStore>,
     #[account(
         init,
@@ -143,16 +145,16 @@ pub struct InitializeMarketToken<'info> {
     pub token_program: Program<'info, Token>,
 }
 
-impl<'info> Authorization<'info> for InitializeMarketToken<'info> {
-    fn role_store(&self) -> Pubkey {
-        self.store.role_store
-    }
-
+impl<'info> internal::Authentication<'info> for InitializeMarketToken<'info> {
     fn authority(&self) -> &Signer<'info> {
         &self.authority
     }
 
-    fn role(&self) -> &Account<'info, Role> {
+    fn store(&self) -> &Account<'info, DataStore> {
+        &self.store
+    }
+
+    fn roles(&self) -> &Account<'info, Roles> {
         &self.only_market_keeper
     }
 }
@@ -171,7 +173,7 @@ pub fn mint_market_token_to(ctx: Context<MintMarketTokenTo>, amount: u64) -> Res
 pub struct MintMarketTokenTo<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
-    pub only_controller: Account<'info, Role>,
+    pub only_controller: Account<'info, Roles>,
     pub store: Account<'info, DataStore>,
     // We don't have to check the mint is really a market token,
     // since the mint authority must be derived from `MARKET_SIGN`.
@@ -185,16 +187,16 @@ pub struct MintMarketTokenTo<'info> {
     pub token_program: Program<'info, Token>,
 }
 
-impl<'info> Authorization<'info> for MintMarketTokenTo<'info> {
-    fn role_store(&self) -> Pubkey {
-        self.store.role_store
-    }
-
+impl<'info> internal::Authentication<'info> for MintMarketTokenTo<'info> {
     fn authority(&self) -> &Signer<'info> {
         &self.authority
     }
 
-    fn role(&self) -> &Account<'info, Role> {
+    fn store(&self) -> &Account<'info, DataStore> {
+        &self.store
+    }
+
+    fn roles(&self) -> &Account<'info, Roles> {
         &self.only_controller
     }
 }
@@ -227,7 +229,7 @@ pub fn initialize_market_vault(
 pub struct InitializeMarketVault<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
-    pub only_market_keeper: Account<'info, Role>,
+    pub only_market_keeper: Account<'info, Roles>,
     pub store: Account<'info, DataStore>,
     pub mint: Account<'info, Mint>,
     #[account(
@@ -251,16 +253,16 @@ pub struct InitializeMarketVault<'info> {
     pub token_program: Program<'info, Token>,
 }
 
-impl<'info> Authorization<'info> for InitializeMarketVault<'info> {
-    fn role_store(&self) -> Pubkey {
-        self.store.role_store
-    }
-
+impl<'info> internal::Authentication<'info> for InitializeMarketVault<'info> {
     fn authority(&self) -> &Signer<'info> {
         &self.authority
     }
 
-    fn role(&self) -> &Account<'info, Role> {
+    fn store(&self) -> &Account<'info, DataStore> {
+        &self.store
+    }
+
+    fn roles(&self) -> &Account<'info, Roles> {
         &self.only_market_keeper
     }
 }
@@ -279,7 +281,7 @@ pub fn market_vault_transfer_out(ctx: Context<MarketVaultTransferOut>, amount: u
 pub struct MarketVaultTransferOut<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
-    pub only_controller: Account<'info, Role>,
+    pub only_controller: Account<'info, Roles>,
     pub store: Account<'info, DataStore>,
     // We don't have to check the vault is really a market token,
     // since the owner must be derived from `MARKET_SIGN`.
@@ -293,16 +295,16 @@ pub struct MarketVaultTransferOut<'info> {
     pub token_program: Program<'info, Token>,
 }
 
-impl<'info> Authorization<'info> for MarketVaultTransferOut<'info> {
-    fn role_store(&self) -> Pubkey {
-        self.store.role_store
-    }
-
+impl<'info> internal::Authentication<'info> for MarketVaultTransferOut<'info> {
     fn authority(&self) -> &Signer<'info> {
         &self.authority
     }
 
-    fn role(&self) -> &Account<'info, Role> {
+    fn store(&self) -> &Account<'info, DataStore> {
+        &self.store
+    }
+
+    fn roles(&self) -> &Account<'info, Roles> {
         &self.only_controller
     }
 }

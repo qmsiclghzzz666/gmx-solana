@@ -1,15 +1,16 @@
 import * as anchor from "@coral-xyz/anchor";
-import { expect, getAddresses, getPrograms, getTokenMints, getUsers } from "../utils/fixtures";
-import { Keypair, PublicKey } from "@solana/web3.js";
-import { createMarketKeeperPDA } from "../utils/role";
-import { createMarketPDA, createMarketTokenMintPDA, createMarketVaultPDA, getMarketSignPDA } from "../utils/data";
+import { getAddresses, getPrograms, getTokenMints, getUsers } from "../utils/fixtures";
+import { Keypair } from "@solana/web3.js";
+import { createMarketPDA, createMarketTokenMintPDA, createMarketVaultPDA, createRolesPDA, getMarketSignPDA } from "../utils/data";
 
 describe("market", () => {
     const { market } = getPrograms();
     const { signer0 } = getUsers();
-    const { roleStoreAddress, dataStoreAddress } = getAddresses();
+    const { dataStoreAddress } = getAddresses();
     const { dataStore } = getPrograms();
     const { BTC_TOKEN_MINT, SOL_TOKEN_MINT } = getTokenMints();
+
+    const [roles] = createRolesPDA(dataStoreAddress, signer0.publicKey);
 
     const indexTokenMint = Keypair.generate().publicKey;
     const longTokenMint = BTC_TOKEN_MINT;
@@ -22,7 +23,7 @@ describe("market", () => {
         const [marketSign] = getMarketSignPDA();
         await market.methods.createMarket(indexTokenMint).accounts({
             authority: signer0.publicKey,
-            onlyMarketKeeper: createMarketKeeperPDA(roleStoreAddress, signer0.publicKey)[0],
+            onlyMarketKeeper: roles,
             dataStore: dataStoreAddress,
             market: createMarketPDA(dataStoreAddress, marketTokenMint)[0],
             marketTokenMint,

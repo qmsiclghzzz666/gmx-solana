@@ -7,7 +7,6 @@ import chaiAsPromised from 'chai-as-promised';
 chai.use(chaiAsPromised);
 
 import { EventManager } from "./event";
-import { createRoleStorePDA, initializeRoleStore, roleStore } from "./role";
 import { BTC_TOKEN_MINT, SOL_TOKEN_MINT, createDataStorePDA, dataStore, initializeDataStore } from "./data";
 import { createOraclePDA, initializeOracle } from "./oracle";
 import { market } from "./market";
@@ -23,18 +22,15 @@ const signer0 = anchor.web3.Keypair.generate();
 
 // Keys.
 const randomeKey = anchor.web3.Keypair.generate().publicKey.toBase58();
-const roleStoreKey = isDevNet ? randomeKey : "role_store_0";
 const dataStoreKey = isDevNet ? randomeKey : "data_store_0";
 const oracleKey = isDevNet ? randomeKey : "oracle_0";
 
 // Addresses.
-const [roleStoreAddress] = createRoleStorePDA(roleStoreKey);
-const [dataStoreAddress] = createDataStorePDA(roleStoreAddress, dataStoreKey);
+const [dataStoreAddress] = createDataStorePDA(dataStoreKey);
 const [oracleAddress] = createOraclePDA(dataStoreAddress, oracleKey);
 
 export const getPrograms = () => {
     return {
-        roleStore,
         dataStore,
         market,
     }
@@ -49,7 +45,6 @@ export const getUsers = () => {
 
 export const getKeys = () => {
     return {
-        roleStoreKey,
         dataStoreKey,
         oracleKey,
     }
@@ -57,7 +52,6 @@ export const getKeys = () => {
 
 export const getAddresses = () => {
     return {
-        roleStoreAddress,
         dataStoreAddress,
         oracleAddress,
     }
@@ -120,8 +114,7 @@ export const mochaGlobalSetup = async () => {
     console.log("[Setting up everything...]");
     anchor.setProvider(provider);
     await initializeUser(provider, signer0, 1.5);
-    await initializeRoleStore(provider, roleStoreKey, signer0.publicKey);
-    await initializeDataStore(eventManager, signer0, roleStoreKey, dataStoreKey);
+    await initializeDataStore(provider, eventManager, signer0, dataStoreKey);
     await initializeOracle(signer0, dataStoreAddress, oracleKey);
     console.log("[Done.]");
 };

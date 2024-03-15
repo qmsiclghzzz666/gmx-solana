@@ -1,9 +1,11 @@
 use anchor_lang::prelude::*;
 use data_store::{
-    cpi::accounts::{InitializeMarket, InitializeMarketToken, InitializeMarketVault},
+    cpi::accounts::{CheckRole, InitializeMarket, InitializeMarketToken, InitializeMarketVault},
     states::DataStore,
 };
-use role_store::{Authorization, Role};
+use data_store::{states::Roles, utils::Authentication};
+
+use crate::MarketError;
 
 /// Decimals of market tokens.
 pub const MARKET_TOKEN_DECIMALS: u8 = 18;
@@ -39,7 +41,7 @@ pub fn create_market(ctx: Context<CreateMarket>, index_token_mint: Pubkey) -> Re
 pub struct CreateMarket<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
-    pub only_market_keeper: Account<'info, Role>,
+    pub only_market_keeper: Account<'info, Roles>,
     pub data_store: Account<'info, DataStore>,
     /// CHECK: check by CPI.
     #[account(mut)]
@@ -127,16 +129,22 @@ impl<'info> CreateMarket<'info> {
     }
 }
 
-impl<'info> Authorization<'info> for CreateMarket<'info> {
-    fn role_store(&self) -> Pubkey {
-        self.data_store.role_store
-    }
-
+impl<'info> Authentication<'info> for CreateMarket<'info> {
     fn authority(&self) -> &Signer<'info> {
         &self.authority
     }
 
-    fn role(&self) -> &Account<'info, Role> {
-        &self.only_market_keeper
+    fn check_role_ctx(&self) -> CpiContext<'_, '_, '_, 'info, CheckRole<'info>> {
+        CpiContext::new(
+            self.data_store_program.to_account_info(),
+            CheckRole {
+                store: self.data_store.to_account_info(),
+                roles: self.only_market_keeper.to_account_info(),
+            },
+        )
+    }
+
+    fn on_error(&self) -> Result<()> {
+        Err(MarketError::PermissionDenied.into())
     }
 }
