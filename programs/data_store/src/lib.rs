@@ -121,4 +121,20 @@ pub enum DataStoreError {
     InvalidPDA,
     #[msg("Invalid key")]
     InvalidKey,
+    #[msg("Exceed max length limit")]
+    ExceedMaxLengthLimit,
+    #[msg("Exceed max string length limit")]
+    ExceedMaxStringLengthLimit,
+    #[msg("Too many admins")]
+    TooManyAdmins,
+    #[msg("At least one admin")]
+    AtLeastOneAdmin,
+    #[msg("Invalid data store")]
+    InvalidDataStore,
+    #[msg("Already be an admin")]
+    AlreadyBeAnAdmin,
+    #[msg("Not an admin")]
+    NotAnAdmin,
+    #[msg("Invalid role")]
+    InvalidRole,
 }

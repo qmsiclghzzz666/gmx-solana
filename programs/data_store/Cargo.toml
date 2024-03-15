@@ -23,8 +23,10 @@ idl-build = [
 [dependencies]
 anchor-lang = { workspace = true }
 gmx-solana-utils = { path = "../../crates/gmx-solana-utils" }
+dual-vec-map = { path = "../../crates/dual-vec-map" }
 role_store = { path = "../role_store", features = ["cpi"] }
 anchor-spl = { workspace = true, default_features = false, features = [
     "token",
     "token_2022",
 ] }
+bitmaps = "3.2.1"
