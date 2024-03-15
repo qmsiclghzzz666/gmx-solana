@@ -7,6 +7,8 @@ use gmx_solana_utils::to_seed;
 
 use crate::DataStoreError;
 
+use super::Seed;
+
 const MAX_LEN: usize = 32;
 
 const MAX_ROLES: usize = 32;
@@ -22,27 +24,41 @@ pub struct DataStore {
     pub role_store: Pubkey,
     #[max_len(MAX_LEN)]
     key_seed: Vec<u8>,
-    bump: u8,
+    pub bump: u8,
+}
+
+impl Seed for DataStore {
+    const SEED: &'static [u8] = b"data_store";
 }
 
 impl DataStore {
-    /// Seed.
-    pub const SEED: &'static [u8] = b"data_store";
-
     /// Maximum length of key.
     pub const MAX_LEN: usize = MAX_LEN;
 
     /// Init.
-    pub fn init(&mut self, role_store: Pubkey, key: &str, bump: u8) {
+    /// # Warning
+    /// The `roles` will be initialized by the method.
+    pub fn init(
+        &mut self,
+        roles: &mut Roles,
+        roles_bump: u8,
+        role_store: Pubkey,
+        key: &str,
+        bump: u8,
+    ) -> Result<()> {
         // Init roles map.
         self.roles.clear();
         self.roles_metadata.clear();
-        self.num_admins = 1;
+        self.num_admins = 0;
 
         // Init others.
         self.role_store = role_store;
         self.key_seed = to_seed(key).into();
         self.bump = bump;
+
+        // Init the roles.
+        roles.init(roles_bump);
+        self.add_admin(roles)
     }
 
     fn as_map_mut(&mut self) -> Result<DualVecMap<&mut Vec<RoleKey>, &mut Vec<RoleMetadata>>> {
@@ -66,14 +82,19 @@ impl DataStore {
             map.len() < MAX_ROLES || map.get(role).is_none(),
             DataStoreError::ExceedMaxLengthLimit
         );
-        let metadata = RoleMetadata {
-            index: map
-                .len()
-                .try_into()
-                .map_err(|_| DataStoreError::ExceedMaxLengthLimit)?,
-            enabled: true,
-        };
-        map.insert(role.into(), metadata);
+        if let Some(metadata) = map.get_mut(role) {
+            metadata.enabled = true;
+        } else {
+            let metadata = RoleMetadata {
+                index: map
+                    .len()
+                    .try_into()
+                    .map_err(|_| DataStoreError::ExceedMaxLengthLimit)?,
+                enabled: true,
+            };
+            map.try_insert(role.into(), metadata)
+                .map_err(|_| DataStoreError::InvalidDataStore)?;
+        }
         Ok(())
     }
 
@@ -155,6 +176,14 @@ pub struct RoleKey {
     name: String,
 }
 
+impl RoleKey {
+    /// CONTROLLER.
+    pub const CONTROLLER: &'static str = "CONTROLLER";
+
+    /// MARKET KEEPER.
+    pub const MARKET_KEEPER: &'static str = "MARKET_KEEPER";
+}
+
 /// Metadata of a role.
 #[derive(Clone, AnchorSerialize, AnchorDeserialize, InitSpace)]
 pub struct RoleMetadata {
@@ -184,15 +213,17 @@ pub struct Roles {
     is_admin: bool,
     /// Roles value (a bitmap).
     value: u32,
+    pub bump: u8,
 }
 
 type RolesMap = Bitmap<MAX_ROLES>;
 
 impl Roles {
     /// Initialize the [`Roles`]
-    pub fn init(&mut self) {
+    pub fn init(&mut self, bump: u8) {
         self.is_admin = false;
         self.value = RolesMap::new().into_value();
+        self.bump = bump;
     }
 
     fn get(&self, index: u8) -> bool {
@@ -205,6 +236,15 @@ impl Roles {
         map.set(index as usize, enable);
         self.value = map.into_value();
     }
+
+    /// Returns whether it is an admin.
+    pub fn is_admin(&self) -> bool {
+        self.is_admin
+    }
+}
+
+impl Seed for Roles {
+    const SEED: &'static [u8] = b"roles";
 }
 
 #[event]
@@ -212,4 +252,124 @@ pub struct DataStoreInitEvent {
     pub key: String,
     pub address: Pubkey,
     pub role_store: Pubkey,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn new_uninited_store() -> DataStore {
+        DataStore {
+            roles_metadata: vec![],
+            roles: vec![],
+            num_admins: 0,
+            role_store: Pubkey::default(),
+            key_seed: vec![],
+            bump: 0,
+        }
+    }
+
+    fn new_uninited_roles() -> Roles {
+        Roles {
+            is_admin: false,
+            value: 0,
+            bump: 0,
+        }
+    }
+
+    fn new_store(roles: &mut Roles) -> DataStore {
+        let mut store = new_uninited_store();
+        store
+            .init(roles, 255, Pubkey::new_unique(), "hello", 255)
+            .unwrap();
+        store
+    }
+
+    fn new_roles() -> Roles {
+        let mut roles = new_uninited_roles();
+        roles.init(255);
+        roles
+    }
+
+    #[test]
+    fn test_admins() {
+        let mut roles = new_roles();
+        let mut store = new_store(&mut roles);
+        assert_eq!(store.num_admins, 1);
+
+        assert!(store.remove_admin(&mut roles).is_err());
+
+        let mut other_roles = new_roles();
+        store.add_admin(&mut other_roles).unwrap();
+        assert_eq!(store.num_admins, 2);
+        store.remove_admin(&mut other_roles).unwrap();
+
+        assert!(store.add_admin(&mut roles).is_err());
+        assert!(store.remove_admin(&mut other_roles).is_err());
+        assert_eq!(store.num_admins, 1);
+    }
+
+    #[test]
+    fn swap_admins() {
+        let mut roles_1 = new_roles();
+        let mut roles_2 = new_roles();
+        let mut store = new_store(&mut roles_1);
+
+        assert!(roles_1.is_admin);
+        assert!(!roles_2.is_admin);
+        assert_eq!(store.num_admins, 1);
+
+        store.add_admin(&mut roles_2).unwrap();
+        store.remove_admin(&mut roles_1).unwrap();
+        assert!(!roles_1.is_admin);
+        assert!(roles_2.is_admin);
+        assert_eq!(store.num_admins, 1);
+    }
+
+    #[test]
+    fn grant_and_revoke_roles() {
+        let mut roles_1 = new_roles();
+        let mut store = new_store(&mut roles_1);
+
+        assert!(store.grant(&mut roles_1, RoleKey::CONTROLLER).is_err());
+        assert_eq!(store.has_role(&roles_1, RoleKey::CONTROLLER), Ok(false));
+
+        store.enable_role(RoleKey::CONTROLLER).unwrap();
+        store.enable_role(RoleKey::MARKET_KEEPER).unwrap();
+
+        store.grant(&mut roles_1, RoleKey::CONTROLLER).unwrap();
+        assert_eq!(store.has_role(&roles_1, RoleKey::CONTROLLER), Ok(true));
+        store.grant(&mut roles_1, RoleKey::MARKET_KEEPER).unwrap();
+        assert_eq!(store.has_role(&roles_1, RoleKey::MARKET_KEEPER), Ok(true));
+        assert_eq!(store.has_role(&roles_1, RoleKey::CONTROLLER), Ok(true));
+
+        store.revoke(&mut roles_1, RoleKey::CONTROLLER).unwrap();
+        assert_eq!(store.has_role(&roles_1, RoleKey::MARKET_KEEPER), Ok(true));
+        assert_eq!(store.has_role(&roles_1, RoleKey::CONTROLLER), Ok(false));
+
+        store.revoke(&mut roles_1, RoleKey::MARKET_KEEPER).unwrap();
+        assert_eq!(store.has_role(&roles_1, RoleKey::MARKET_KEEPER), Ok(false));
+        assert_eq!(store.has_role(&roles_1, RoleKey::CONTROLLER), Ok(false));
+
+        store.disable_role(RoleKey::MARKET_KEEPER).unwrap();
+        assert!(store.grant(&mut roles_1, RoleKey::MARKET_KEEPER).is_err());
+        assert_eq!(store.has_role(&roles_1, RoleKey::MARKET_KEEPER), Ok(false));
+        store.enable_role(RoleKey::MARKET_KEEPER).unwrap();
+        store.grant(&mut roles_1, RoleKey::MARKET_KEEPER).unwrap();
+        assert_eq!(store.has_role(&roles_1, RoleKey::MARKET_KEEPER), Ok(true));
+    }
+
+    #[test]
+    fn enable_and_disable_role() {
+        let mut roles_1 = new_roles();
+        let mut store = new_store(&mut roles_1);
+
+        store.enable_role(RoleKey::CONTROLLER).unwrap();
+        store.grant(&mut roles_1, RoleKey::CONTROLLER).unwrap();
+        assert_eq!(store.has_role(&roles_1, RoleKey::CONTROLLER), Ok(true));
+        store.disable_role(RoleKey::CONTROLLER).unwrap();
+        assert_eq!(store.has_role(&roles_1, RoleKey::CONTROLLER), Ok(false));
+        store.enable_role(RoleKey::CONTROLLER).unwrap();
+        assert_eq!(store.has_role(&roles_1, RoleKey::CONTROLLER), Ok(true));
+    }
 }

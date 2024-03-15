@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use gmx_solana_utils::to_seed;
 use role_store::{Authorization, Role};
 
-use crate::states::{Data, DataStore, TokenConfig, TokenConfigChangeEvent};
+use crate::states::{DataStore, Seed, TokenConfig, TokenConfigChangeEvent};
 
 #[derive(Accounts)]
 #[instruction(key: String)]

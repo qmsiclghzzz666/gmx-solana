@@ -121,7 +121,7 @@ export const mochaGlobalSetup = async () => {
     anchor.setProvider(provider);
     await initializeUser(provider, signer0, 1.5);
     await initializeRoleStore(provider, roleStoreKey, signer0.publicKey);
-    await initializeDataStore(eventManager, signer0, roleStoreKey, dataStoreKey);
+    await initializeDataStore(provider, eventManager, signer0, roleStoreKey, dataStoreKey);
     await initializeOracle(signer0, dataStoreAddress, oracleKey);
     console.log("[Done.]");
 };

@@ -10,6 +10,7 @@ export const dataStore = anchor.workspace.DataStore as anchor.Program<DataStore>
 
 const encodeUtf8 = anchor.utils.bytes.utf8.encode;
 
+export const ROLES_SEED = encodeUtf8("roles");
 export const DATA_STORE_SEED = encodeUtf8("data_store");
 export const ADDRESS_SEED = encodeUtf8("address");
 export const TOKEN_CONFIG_SEED = encodeUtf8("token_config");
@@ -18,10 +19,16 @@ export const MARKET_SIGN_SEED = encodeUtf8("market_sign");
 export const MARKET_TOKEN_MINT_SEED = encodeUtf8("market_token_mint");
 export const MARKET_VAULT_SEED = encodeUtf8("market_vault");
 
-export const createDataStorePDA = (role_store: anchor.web3.PublicKey, key: string) => anchor.web3.PublicKey.findProgramAddressSync([
+export const createDataStorePDA = (roleStore: anchor.web3.PublicKey, key: string) => anchor.web3.PublicKey.findProgramAddressSync([
     DATA_STORE_SEED,
-    role_store.toBytes(),
+    roleStore.toBytes(),
     keyToSeed(key),
+], dataStore.programId);
+
+export const createRolesPDA = (store: PublicKey, authority: PublicKey) => PublicKey.findProgramAddressSync([
+    ROLES_SEED,
+    store.toBytes(),
+    authority.toBytes(),
 ], dataStore.programId);
 
 export const createAddressPDA = (store: anchor.web3.PublicKey, key: string) => anchor.web3.PublicKey.findProgramAddressSync([
@@ -69,9 +76,10 @@ export const BTC_FEED = anchor.translateAddress(isDevNet ? "6PxBx93S8x3tno1TsFZw
 export const SOL_TOKEN_MINT = anchor.translateAddress("So11111111111111111111111111111111111111112");
 export const SOL_FEED = anchor.translateAddress(isDevNet ? "99B2bTijsU6f1GCT73HmdR7HCFFjGMBcPZY6jZ96ynrR" : "CH31Xns5z3M1cTAbKW34jcxPPciazARpijcHj9rxtemt");
 
-export const initializeDataStore = async (eventManager: EventManager, signer: anchor.web3.Keypair, roleStoreKey: string, dataStoreKey: string) => {
+export const initializeDataStore = async (provider: anchor.AnchorProvider, eventManager: EventManager, signer: anchor.web3.Keypair, roleStoreKey: string, dataStoreKey: string) => {
     const [roleStorePDA] = createRoleStorePDA(roleStoreKey);
     const [dataStorePDA] = createDataStorePDA(roleStorePDA, dataStoreKey);
+    const [rolesPDA] = createRolesPDA(dataStorePDA, provider.publicKey);
 
     eventManager.subscribe(dataStore, "DataStoreInitEvent");
     eventManager.subscribe(dataStore, "TokenConfigChangeEvent");
@@ -80,10 +88,11 @@ export const initializeDataStore = async (eventManager: EventManager, signer: an
     // Initialize a DataStore with the given key.
     try {
         const tx = await dataStore.methods.initialize(dataStoreKey).accounts({
-            authority: signer.publicKey,
+            authority: provider.publicKey,
             roleStore: roleStorePDA,
             dataStore: dataStorePDA,
-        }).signers([signer]).rpc();
+            roles: rolesPDA,
+        }).rpc();
         console.log(`Initialized a new data store account ${dataStorePDA.toBase58()} in tx: ${tx}`);
     } catch (error) {
         console.warn("Failed to initialize a data store with the given key:", error);

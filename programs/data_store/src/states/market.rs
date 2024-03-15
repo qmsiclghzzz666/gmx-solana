@@ -1,7 +1,7 @@
 use anchor_lang::{prelude::*, Bump};
 use gmx_solana_utils::to_seed;
 
-use super::Data;
+use super::{Data, Seed};
 
 #[account]
 #[derive(InitSpace)]
@@ -47,9 +47,11 @@ impl Bump for Market {
     }
 }
 
-impl Data for Market {
+impl Seed for Market {
     const SEED: &'static [u8] = b"market";
+}
 
+impl Data for Market {
     fn verify(&self, key: &str) -> Result<()> {
         // FIXME: is there a better way to verify the key?
         let expected = self.expected_key();
