@@ -10,6 +10,9 @@ pub mod states;
 /// Constants.
 pub mod constants;
 
+/// Utils.
+pub mod utils;
+
 pub use self::states::Data;
 
 use self::instructions::*;
@@ -28,7 +31,7 @@ pub mod data_store {
         instructions::initialize_roles(ctx)
     }
 
-    pub fn check_admin(ctx: Context<CheckAdmin>, authority: Pubkey) -> Result<bool> {
+    pub fn check_admin(ctx: Context<CheckRole>, authority: Pubkey) -> Result<bool> {
         instructions::check_admin(ctx, authority)
     }
 
