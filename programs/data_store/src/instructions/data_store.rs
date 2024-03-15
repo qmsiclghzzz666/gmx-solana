@@ -30,10 +30,15 @@ pub struct Initialize<'info> {
 }
 
 pub fn initialize(ctx: Context<Initialize>, key: String) -> Result<()> {
+    let roles = &mut ctx.accounts.roles;
+    roles.init(
+        ctx.accounts.authority.key(),
+        ctx.accounts.data_store.key(),
+        ctx.bumps.roles,
+    );
     let data_store = &mut ctx.accounts.data_store;
     data_store.init(
-        &mut ctx.accounts.roles,
-        ctx.bumps.roles,
+        roles,
         ctx.accounts.role_store.key(),
         &key,
         ctx.bumps.data_store,

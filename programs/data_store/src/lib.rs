@@ -28,6 +28,14 @@ pub mod data_store {
         instructions::initialize_roles(ctx)
     }
 
+    pub fn check_admin(ctx: Context<CheckAdmin>, authority: Pubkey) -> Result<bool> {
+        instructions::check_admin(ctx, authority)
+    }
+
+    pub fn check_role(ctx: Context<CheckRole>, authority: Pubkey, role: String) -> Result<bool> {
+        instructions::check_role(ctx, authority, role)
+    }
+
     #[access_control(Authenticate::only_controller(&ctx))]
     pub fn initialize_token_config(
         ctx: Context<InitializeTokenConfig>,
@@ -141,4 +149,6 @@ pub enum DataStoreError {
     NotAnAdmin,
     #[msg("Invalid role")]
     InvalidRole,
+    #[msg("Permission denied")]
+    PermissionDenied,
 }

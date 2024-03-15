@@ -37,11 +37,10 @@ impl DataStore {
 
     /// Init.
     /// # Warning
-    /// The `roles` will be initialized by the method.
+    /// The `roles` is assumed to be initialized with `is_admin == false`.
     pub fn init(
         &mut self,
         roles: &mut Roles,
-        roles_bump: u8,
         role_store: Pubkey,
         key: &str,
         bump: u8,
@@ -56,8 +55,6 @@ impl DataStore {
         self.key_seed = to_seed(key).into();
         self.bump = bump;
 
-        // Init the roles.
-        roles.init(roles_bump);
         self.add_admin(roles)
     }
 
@@ -209,6 +206,10 @@ impl<'a> From<&'a str> for RoleKey {
 #[account]
 #[derive(InitSpace)]
 pub struct Roles {
+    /// Authority.
+    pub authority: Pubkey,
+    /// Store.
+    pub store: Pubkey,
     /// Is admin.
     is_admin: bool,
     /// Roles value (a bitmap).
@@ -220,9 +221,11 @@ type RolesMap = Bitmap<MAX_ROLES>;
 
 impl Roles {
     /// Initialize the [`Roles`]
-    pub fn init(&mut self, bump: u8) {
+    pub fn init(&mut self, authority: Pubkey, store: Pubkey, bump: u8) {
         self.is_admin = false;
         self.value = RolesMap::new().into_value();
+        self.authority = authority;
+        self.store = store;
         self.bump = bump;
     }
 
@@ -271,6 +274,8 @@ mod tests {
 
     fn new_uninited_roles() -> Roles {
         Roles {
+            authority: Pubkey::default(),
+            store: Pubkey::default(),
             is_admin: false,
             value: 0,
             bump: 0,
@@ -280,14 +285,14 @@ mod tests {
     fn new_store(roles: &mut Roles) -> DataStore {
         let mut store = new_uninited_store();
         store
-            .init(roles, 255, Pubkey::new_unique(), "hello", 255)
+            .init(roles, Pubkey::new_unique(), "hello", 255)
             .unwrap();
         store
     }
 
     fn new_roles() -> Roles {
         let mut roles = new_uninited_roles();
-        roles.init(255);
+        roles.init(Pubkey::default(), Pubkey::default(), 255);
         roles
     }
 

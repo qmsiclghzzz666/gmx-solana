@@ -98,7 +98,7 @@ export const initializeDataStore = async (provider: anchor.AnchorProvider, event
         console.warn("Failed to initialize a data store with the given key:", error);
     }
 
-    // Initiliaze roles account for `signer`.
+    // Initiliaze a roles account for `signer`.
     try {
         const [signerRoles] = createRolesPDA(dataStorePDA, signer.publicKey);
         const tx = await dataStore.methods.initializeRoles().accounts({
