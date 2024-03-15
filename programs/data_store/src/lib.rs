@@ -24,6 +24,10 @@ pub mod data_store {
         instructions::initialize(ctx, key)
     }
 
+    pub fn initialize_roles(ctx: Context<InitializeRoles>) -> Result<()> {
+        instructions::initialize_roles(ctx)
+    }
+
     #[access_control(Authenticate::only_controller(&ctx))]
     pub fn initialize_token_config(
         ctx: Context<InitializeTokenConfig>,

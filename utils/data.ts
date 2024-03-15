@@ -98,6 +98,19 @@ export const initializeDataStore = async (provider: anchor.AnchorProvider, event
         console.warn("Failed to initialize a data store with the given key:", error);
     }
 
+    // Initiliaze roles account for `signer`.
+    try {
+        const [signerRoles] = createRolesPDA(dataStorePDA, signer.publicKey);
+        const tx = await dataStore.methods.initializeRoles().accounts({
+            authority: signer.publicKey,
+            store: dataStorePDA,
+            roles: signerRoles,
+        }).signers([signer]).rpc();
+        console.log(`Initialized a roles account ${signerRoles} in tx: ${tx}`);
+    } catch (error) {
+        console.warn("Failed to initialize roles account:", error);
+    }
+
     // Insert BTC token config.
     try {
         const key = BTC_TOKEN_MINT.toBase58();
