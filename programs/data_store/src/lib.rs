@@ -15,7 +15,7 @@ pub mod utils;
 
 pub use self::states::Data;
 
-use self::instructions::*;
+use self::{instructions::*, utils::internal};
 
 declare_id!("8hJ2dGQ2Ccr5G6iEqQQEoBApRSXt7Jn8Qyf9Qf3eLBX2");
 
@@ -37,6 +37,16 @@ pub mod data_store {
 
     pub fn check_role(ctx: Context<CheckRole>, authority: Pubkey, role: String) -> Result<bool> {
         instructions::check_role(ctx, authority, role)
+    }
+
+    #[access_control(internal::Authenticate::only_admin(&ctx))]
+    pub fn enable_role(ctx: Context<EnableRole>, role: String) -> Result<()> {
+        instructions::enable_role(ctx, role)
+    }
+
+    #[access_control(internal::Authenticate::only_admin(&ctx))]
+    pub fn disable_role(ctx: Context<DisableRole>, role: String) -> Result<()> {
+        instructions::disable_role(ctx, role)
     }
 
     #[access_control(Authenticate::only_controller(&ctx))]

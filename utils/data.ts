@@ -19,6 +19,9 @@ export const MARKET_SIGN_SEED = encodeUtf8("market_sign");
 export const MARKET_TOKEN_MINT_SEED = encodeUtf8("market_token_mint");
 export const MARKET_VAULT_SEED = encodeUtf8("market_vault");
 
+export const CONTROLLER = "CONTROLLER";
+export const MARKET_KEEPER = "MARKET_KEEPER";
+
 export const createDataStorePDA = (roleStore: anchor.web3.PublicKey, key: string) => anchor.web3.PublicKey.findProgramAddressSync([
     DATA_STORE_SEED,
     roleStore.toBytes(),
@@ -109,6 +112,20 @@ export const initializeDataStore = async (provider: anchor.AnchorProvider, event
         console.log(`Initialized a roles account ${signerRoles} in tx: ${tx}`);
     } catch (error) {
         console.warn("Failed to initialize roles account:", error);
+    }
+
+    // Enable the required roles and grant to `signer`.
+    const enabled_roles = [CONTROLLER, MARKET_KEEPER];
+    for (let index = 0; index < enabled_roles.length; index++) {
+        const role = enabled_roles[index];
+        {
+            const tx = await dataStore.methods.enableRole(role).accounts({
+                authority: provider.publicKey,
+                store: dataStorePDA,
+                onlyAdmin: rolesPDA,
+            }).rpc();
+            console.log(`Enabled ${role} in tx: ${tx}`);
+        }
     }
 
     // Insert BTC token config.

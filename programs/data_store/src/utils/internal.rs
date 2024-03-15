@@ -28,7 +28,12 @@ pub(crate) trait Authenticate<'info>: Authentication<'info> + Bumps + Sized {
         require_eq!(roles.authority, authority, DataStoreError::PermissionDenied);
         require_eq!(roles.store, store_key, DataStoreError::PermissionDenied);
         let expected = Pubkey::create_program_address(
-            &[Roles::SEED, store_key.as_ref(), authority.as_ref()],
+            &[
+                Roles::SEED,
+                store_key.as_ref(),
+                authority.as_ref(),
+                &[roles.bump],
+            ],
             &crate::ID,
         )
         .map_err(|_| DataStoreError::InvalidPDA)?;
