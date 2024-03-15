@@ -159,8 +159,6 @@ pub mod data_store {
 
 #[error_code]
 pub enum DataStoreError {
-    #[msg("Mismatched role store")]
-    MismatchedRoleStore,
     #[msg("Invalid pda")]
     InvalidPDA,
     #[msg("Invalid key")]
