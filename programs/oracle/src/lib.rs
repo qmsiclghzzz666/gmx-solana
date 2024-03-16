@@ -8,16 +8,10 @@ pub mod instructions;
 /// States.
 pub mod states;
 
-/// Decimal type for storing prices.
-pub mod decimal;
-
 /// Price type.
 pub mod price;
 
-pub use self::{
-    decimal::{Decimal, DecimalError},
-    price::{Price, PriceMap},
-};
+pub use self::price::PriceMap;
 
 use self::instructions::*;
 

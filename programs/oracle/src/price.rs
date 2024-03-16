@@ -1,16 +1,8 @@
 use anchor_lang::prelude::*;
 use dual_vec_map::DualVecMap;
+use gmx_solana_utils::price::Price;
 
-use crate::{decimal::Decimal, OracleError};
-
-/// Price type.
-#[derive(Debug, AnchorSerialize, AnchorDeserialize, Clone, Copy, InitSpace)]
-pub struct Price {
-    /// Min Price.
-    pub min: Decimal,
-    /// Max Price.
-    pub max: Decimal,
-}
+use crate::OracleError;
 
 /// Maximum number of tokens for a single `Price Map` to store.
 const MAX_TOKENS: usize = 32;

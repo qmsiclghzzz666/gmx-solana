@@ -4,6 +4,7 @@ use data_store::{
     states::{Data, DataStore, Roles, TokenConfig},
     utils::Authentication,
 };
+use gmx_solana_utils::price::{Decimal, Price};
 
 use crate::{states::Oracle, OracleError, PriceMap};
 
@@ -93,7 +94,7 @@ fn check_and_get_chainlink_price<'info>(
     token_config: &'info AccountInfo<'info>,
     feed: &AccountInfo<'info>,
     token: &Pubkey,
-) -> Result<crate::Price> {
+) -> Result<Price> {
     let token_config = Account::<'info, TokenConfig>::try_from(token_config)?;
     let key = token.to_string();
     let expected_pda = token_config.pda(&store.key(), &key)?;
@@ -118,7 +119,7 @@ fn check_and_get_price_from_round(
     round: &chainlink_solana::Round,
     decimals: u8,
     token_config: &TokenConfig,
-) -> Result<crate::Price> {
+) -> Result<Price> {
     let chainlink_solana::Round {
         answer, timestamp, ..
     } = round;
@@ -128,14 +129,14 @@ fn check_and_get_price_from_round(
     if current > timestamp && current - timestamp > token_config.heartbeat_duration.into() {
         return Err(OracleError::PriceFeedNotUpdated.into());
     }
-    let price = crate::Decimal::try_from_price(
+    let price = Decimal::try_from_price(
         *answer as u128,
         decimals,
         token_config.token_decimals,
         token_config.precision,
     )
     .map_err(|_| OracleError::InvalidDataFeedPrice)?;
-    Ok(crate::Price {
+    Ok(Price {
         min: price,
         max: price,
     })
