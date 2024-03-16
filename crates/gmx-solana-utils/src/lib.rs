@@ -1,3 +1,6 @@
+/// Utils for price representation.
+pub mod price;
+
 /// Convert a string to a seed.
 pub fn to_seed(key: &str) -> [u8; 32] {
     use anchor_lang::solana_program::hash::hash;

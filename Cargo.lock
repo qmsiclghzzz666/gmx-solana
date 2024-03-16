@@ -1020,6 +1020,7 @@ name = "gmx-solana-utils"
 version = "0.1.0"
 dependencies = [
  "anchor-lang",
+ "thiserror",
 ]
 
 [[package]]
