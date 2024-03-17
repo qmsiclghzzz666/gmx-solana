@@ -1,47 +1,41 @@
 use anchor_lang::prelude::*;
 use data_store::{
     cpi::accounts::CheckRole,
-    states::{DataStore, Roles},
+    states::{DataStore, Oracle, Roles},
     utils::Authentication,
 };
-use gmx_solana_utils::to_seed;
 
-use crate::{states::Oracle, OracleError};
+use crate::OracleError;
 
-#[derive(Accounts)]
-#[instruction(key: String)]
-pub struct Initialize<'info> {
-    #[account(mut)]
-    pub authority: Signer<'info>,
-    pub store: Account<'info, DataStore>,
-    #[account(
-        init,
-        payer = authority,
-        space = 8 + Oracle::INIT_SPACE,
-        seeds = [Oracle::SEED, store.key().as_ref(), &to_seed(&key)],
-        bump,
-    )]
-    pub oracle: Account<'info, Oracle>,
-    pub system_program: Program<'info, System>,
-}
-
-pub fn initialize(ctx: Context<Initialize>, key: String) -> Result<()> {
-    // FIXME: Is it still correct if we not clear here?
-    ctx.accounts.oracle.primary.clear();
-    ctx.accounts.oracle.bump = ctx.bumps.oracle;
-    ctx.accounts.oracle.data_store = ctx.accounts.store.key();
-    msg!("new oracle initialized with key: {}", key);
-    Ok(())
+/// Clear all prices of the oracle account.
+pub fn clear_all_prices(ctx: Context<ClearAllPrices>) -> Result<()> {
+    data_store::cpi::clear_all_prices(ctx.accounts.clear_all_prices_ctx())
 }
 
 #[derive(Accounts)]
 pub struct ClearAllPrices<'info> {
     pub authority: Signer<'info>,
-    pub store: Account<'info, DataStore>,
     pub only_controller: Account<'info, Roles>,
+    pub store: Account<'info, DataStore>,
     #[account(mut)]
     pub oracle: Account<'info, Oracle>,
     pub data_store_program: Program<'info, data_store::program::DataStore>,
+}
+
+impl<'info> ClearAllPrices<'info> {
+    fn clear_all_prices_ctx(
+        &self,
+    ) -> CpiContext<'_, '_, '_, 'info, data_store::cpi::accounts::ClearAllPrices<'info>> {
+        CpiContext::new(
+            self.data_store_program.to_account_info(),
+            data_store::cpi::accounts::ClearAllPrices {
+                authority: self.authority.to_account_info(),
+                store: self.store.to_account_info(),
+                only_controller: self.only_controller.to_account_info(),
+                oracle: self.oracle.to_account_info(),
+            },
+        )
+    }
 }
 
 impl<'info> Authentication<'info> for ClearAllPrices<'info> {
@@ -62,9 +56,4 @@ impl<'info> Authentication<'info> for ClearAllPrices<'info> {
     fn on_error(&self) -> Result<()> {
         Err(OracleError::PermissionDenied.into())
     }
-}
-
-pub fn clear_all_prices(ctx: Context<ClearAllPrices>) -> Result<()> {
-    ctx.accounts.oracle.primary.clear();
-    Ok(())
 }

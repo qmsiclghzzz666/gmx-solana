@@ -1,16 +1,12 @@
 import * as anchor from "@coral-xyz/anchor";
-import { Oracle } from "../target/types/oracle";
-import { IDL as chainlinkIDL } from "../external-programs/chainlink-store";
-import { getAddresses, getProvider, getUsers } from "../utils/fixtures";
+import { getAddresses, getExternalPrograms, getPrograms, getProvider, getUsers, expect } from "../utils/fixtures";
 import { BTC_FEED, BTC_TOKEN_MINT, SOL_FEED, SOL_TOKEN_MINT, createRolesPDA, createTokenConfigPDA, dataStore } from "../utils/data";
-import { expect } from "chai";
 
 describe("oracle", () => {
     const provider = getProvider();
 
-    const chainlinkID = "HEvSKofvBgfaexv23kMabbYqxasxU3mQ4ibBMEmJWHny";
-    const oracle = anchor.workspace.Oracle as anchor.Program<Oracle>;
-    const chainlink = new anchor.Program(chainlinkIDL, chainlinkID);
+    const { chainlink } = getExternalPrograms();
+    const { oracle } = getPrograms();
 
     const { dataStoreAddress, oracleAddress } = getAddresses();
     const { signer0 } = getUsers();
@@ -44,7 +40,7 @@ describe("oracle", () => {
         ]).accounts({
             store: dataStoreAddress,
             authority: signer0.publicKey,
-            chainlinkProgram: chainlinkID,
+            chainlinkProgram: chainlink.programId,
             onlyController: roles,
             oracle: oracleAddress,
             dataStoreProgram: dataStore.programId,

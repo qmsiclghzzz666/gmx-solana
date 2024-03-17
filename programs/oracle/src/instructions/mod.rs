@@ -1,4 +1,4 @@
-/// Oracle managment instructions.
+/// Common instructions for oracle.
 pub mod oracle;
 
 /// Price feed instructions.

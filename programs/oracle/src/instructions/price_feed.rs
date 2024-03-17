@@ -1,56 +1,14 @@
 use anchor_lang::prelude::*;
 use data_store::{
-    cpi::accounts::CheckRole,
-    states::{Data, DataStore, Roles, TokenConfig},
+    cpi::accounts::{CheckRole, SetPrice},
+    states::{Data, DataStore, Oracle, PriceMap, Roles, TokenConfig},
     utils::Authentication,
 };
 use gmx_solana_utils::price::{Decimal, Price};
 
-use crate::{states::Oracle, OracleError, PriceMap};
+use crate::OracleError;
 
-/// The Chainlink Program.
-pub struct Chainlink;
-
-impl Id for Chainlink {
-    fn id() -> Pubkey {
-        chainlink_solana::ID
-    }
-}
-
-#[derive(Accounts)]
-pub struct SetPricesFromPriceFeed<'info> {
-    pub authority: Signer<'info>,
-    pub only_controller: Account<'info, Roles>,
-    pub store: Account<'info, DataStore>,
-    #[account(
-        mut,
-        constraint = oracle.data_store == store.key() @ OracleError::DataStoreMismatched,
-    )]
-    pub oracle: Account<'info, Oracle>,
-    pub chainlink_program: Program<'info, Chainlink>,
-    pub data_store_program: Program<'info, data_store::program::DataStore>,
-}
-
-impl<'info> Authentication<'info> for SetPricesFromPriceFeed<'info> {
-    fn authority(&self) -> &Signer<'info> {
-        &self.authority
-    }
-
-    fn check_role_ctx(&self) -> CpiContext<'_, '_, '_, 'info, CheckRole<'info>> {
-        CpiContext::new(
-            self.data_store_program.to_account_info(),
-            CheckRole {
-                store: self.store.to_account_info(),
-                roles: self.only_controller.to_account_info(),
-            },
-        )
-    }
-
-    fn on_error(&self) -> Result<()> {
-        Err(OracleError::PermissionDenied.into())
-    }
-}
-
+/// Set the oracle prices from price feed.
 pub fn set_prices_from_price_feed<'info>(
     ctx: Context<'_, '_, 'info, 'info, SetPricesFromPriceFeed<'info>>,
     tokens: Vec<Pubkey>,
@@ -82,9 +40,64 @@ pub fn set_prices_from_price_feed<'info>(
             &remaining[feed_idx],
             token,
         )?;
-        ctx.accounts.oracle.primary.set(token, price)?;
+        // ctx.accounts.oracle.primary.set(token, price)?;
+        data_store::cpi::set_price(ctx.accounts.set_price_ctx(), *token, price)?;
     }
     Ok(())
+}
+
+#[derive(Accounts)]
+pub struct SetPricesFromPriceFeed<'info> {
+    pub authority: Signer<'info>,
+    pub only_controller: Account<'info, Roles>,
+    pub store: Account<'info, DataStore>,
+    #[account(mut)]
+    pub oracle: Account<'info, Oracle>,
+    pub chainlink_program: Program<'info, Chainlink>,
+    pub data_store_program: Program<'info, data_store::program::DataStore>,
+}
+
+impl<'info> SetPricesFromPriceFeed<'info> {
+    fn set_price_ctx(&self) -> CpiContext<'_, '_, '_, 'info, SetPrice<'info>> {
+        CpiContext::new(
+            self.data_store_program.to_account_info(),
+            SetPrice {
+                authority: self.authority.to_account_info(),
+                only_controller: self.only_controller.to_account_info(),
+                store: self.store.to_account_info(),
+                oracle: self.oracle.to_account_info(),
+            },
+        )
+    }
+}
+
+impl<'info> Authentication<'info> for SetPricesFromPriceFeed<'info> {
+    fn authority(&self) -> &Signer<'info> {
+        &self.authority
+    }
+
+    fn check_role_ctx(&self) -> CpiContext<'_, '_, '_, 'info, CheckRole<'info>> {
+        CpiContext::new(
+            self.data_store_program.to_account_info(),
+            CheckRole {
+                store: self.store.to_account_info(),
+                roles: self.only_controller.to_account_info(),
+            },
+        )
+    }
+
+    fn on_error(&self) -> Result<()> {
+        Err(OracleError::PermissionDenied.into())
+    }
+}
+
+/// The Chainlink Program.
+pub struct Chainlink;
+
+impl Id for Chainlink {
+    fn id() -> Pubkey {
+        chainlink_solana::ID
+    }
 }
 
 /// Check and get latest chainlink price from data feed.

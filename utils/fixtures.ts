@@ -7,14 +7,19 @@ import chaiAsPromised from 'chai-as-promised';
 chai.use(chaiAsPromised);
 
 import { EventManager } from "./event";
-import { BTC_TOKEN_MINT, SOL_TOKEN_MINT, createDataStorePDA, dataStore, initializeDataStore } from "./data";
-import { createOraclePDA, initializeOracle } from "./oracle";
+import { BTC_TOKEN_MINT, SOL_TOKEN_MINT, createDataStorePDA, createOraclePDA, dataStore, initializeDataStore } from "./data";
 import { market } from "./market";
+import { oracle } from "./oracle";
+
+import { IDL as chainlinkIDL } from "../external-programs/chainlink-store";
 
 export const expect = chai.expect;
 
 // Get anchor provider.
 export const getProvider = () => provider;
+
+// External Program IDs.
+const chainlinkID = "HEvSKofvBgfaexv23kMabbYqxasxU3mQ4ibBMEmJWHny";
 
 // Users.
 const user0 = anchor.web3.Keypair.generate();
@@ -23,16 +28,23 @@ const signer0 = anchor.web3.Keypair.generate();
 // Keys.
 const randomeKey = anchor.web3.Keypair.generate().publicKey.toBase58();
 const dataStoreKey = isDevNet ? randomeKey : "data_store_0";
-const oracleKey = isDevNet ? randomeKey : "oracle_0";
+const oracleIndex = 255;
 
 // Addresses.
 const [dataStoreAddress] = createDataStorePDA(dataStoreKey);
-const [oracleAddress] = createOraclePDA(dataStoreAddress, oracleKey);
+const [oracleAddress] = createOraclePDA(dataStoreAddress, oracleIndex);
 
 export const getPrograms = () => {
     return {
         dataStore,
         market,
+        oracle,
+    }
+};
+
+export const getExternalPrograms = () => {
+    return {
+        chainlink: new anchor.Program(chainlinkIDL, chainlinkID),
     }
 };
 
@@ -46,7 +58,6 @@ export const getUsers = () => {
 export const getKeys = () => {
     return {
         dataStoreKey,
-        oracleKey,
     }
 };
 
@@ -114,8 +125,7 @@ export const mochaGlobalSetup = async () => {
     console.log("[Setting up everything...]");
     anchor.setProvider(provider);
     await initializeUser(provider, signer0, 1.5);
-    await initializeDataStore(provider, eventManager, signer0, dataStoreKey);
-    await initializeOracle(signer0, dataStoreAddress, oracleKey);
+    await initializeDataStore(provider, eventManager, signer0, dataStoreKey, oracleIndex);
     console.log("[Done.]");
 };
 

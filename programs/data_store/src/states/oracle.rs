@@ -40,7 +40,7 @@ impl PriceMap {
     /// Set the price of the given token.
     /// # Error
     /// Return error if it already set.
-    pub fn set(&mut self, token: &Pubkey, price: Price) -> Result<()> {
+    pub(crate) fn set(&mut self, token: &Pubkey, price: Price) -> Result<()> {
         self.as_map_mut()
             .try_insert(*token, price)
             .map_err(|_| DataStoreError::PriceAlreadySet)?;
@@ -48,7 +48,7 @@ impl PriceMap {
     }
 
     /// Clear all prices.
-    pub fn clear(&mut self) {
+    pub(crate) fn clear(&mut self) {
         self.tokens.clear();
         self.prices.clear();
     }
@@ -74,7 +74,7 @@ impl Seed for Oracle {
 
 impl Oracle {
     /// Initialize the [`Oracle`].
-    pub fn init(&mut self, bump: u8, index: u8) {
+    pub(crate) fn init(&mut self, bump: u8, index: u8) {
         self.primary.clear();
         self.bump = bump;
         self.index = index;
