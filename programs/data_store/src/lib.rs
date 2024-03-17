@@ -15,6 +15,7 @@ pub mod utils;
 pub use self::states::Data;
 
 use self::{instructions::*, utils::internal};
+use gmx_solana_utils::price::Price;
 
 declare_id!("8hJ2dGQ2Ccr5G6iEqQQEoBApRSXt7Jn8Qyf9Qf3eLBX2");
 
@@ -22,10 +23,12 @@ declare_id!("8hJ2dGQ2Ccr5G6iEqQQEoBApRSXt7Jn8Qyf9Qf3eLBX2");
 pub mod data_store {
     use super::*;
 
+    // Data Store.
     pub fn initialize(ctx: Context<Initialize>, key: String) -> Result<()> {
         instructions::initialize(ctx, key)
     }
 
+    // Roles.
     pub fn initialize_roles(ctx: Context<InitializeRoles>) -> Result<()> {
         instructions::initialize_roles(ctx)
     }
@@ -68,6 +71,7 @@ pub mod data_store {
         instructions::remove_admin(ctx, user)
     }
 
+    // Token Config.
     #[access_control(internal::Authenticate::only_controller(&ctx))]
     pub fn initialize_token_config(
         ctx: Context<InitializeTokenConfig>,
@@ -98,6 +102,7 @@ pub mod data_store {
         instructions::update_token_config(ctx, key, price_feed, token_decimals, precision)
     }
 
+    // Market.
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn initialize_market(
         ctx: Context<InitializeMarket>,
@@ -155,10 +160,27 @@ pub mod data_store {
     ) -> Result<()> {
         instructions::market_vault_transfer_out(ctx, amount)
     }
+
+    // Oracle.
+    #[access_control(internal::Authenticate::only_controller(&ctx))]
+    pub fn initialize_oracle(ctx: Context<InitializeOracle>, index: u8) -> Result<()> {
+        instructions::initialize_oracle(ctx, index)
+    }
+
+    #[access_control(internal::Authenticate::only_controller(&ctx))]
+    pub fn clear_all_prices(ctx: Context<ClearAllPrices>) -> Result<()> {
+        instructions::clear_all_prices(ctx)
+    }
+
+    #[access_control(internal::Authenticate::only_controller(&ctx))]
+    pub fn set_price(ctx: Context<SetPrice>, token: Pubkey, price: Price) -> Result<()> {
+        instructions::set_price(ctx, token, price)
+    }
 }
 
 #[error_code]
 pub enum DataStoreError {
+    // Common.
     #[msg("Invalid pda")]
     InvalidPDA,
     #[msg("Invalid key")]
@@ -167,6 +189,7 @@ pub enum DataStoreError {
     ExceedMaxLengthLimit,
     #[msg("Exceed max string length limit")]
     ExceedMaxStringLengthLimit,
+    // Roles.
     #[msg("Too many admins")]
     TooManyAdmins,
     #[msg("At least one admin")]
@@ -183,4 +206,7 @@ pub enum DataStoreError {
     InvalidRoles,
     #[msg("Permission denied")]
     PermissionDenied,
+    // Oracle.
+    #[msg("Price of the given token already set")]
+    PriceAlreadySet,
 }

@@ -7,8 +7,12 @@ pub mod token_config;
 /// Market.
 pub mod market;
 
+/// Oracle.
+pub mod oracle;
+
 pub use data_store::*;
 pub use market::*;
+pub use oracle::*;
 pub use token_config::*;
 
 use anchor_lang::{

@@ -10,7 +10,11 @@ pub mod token_config;
 /// Instructions for Market.
 pub mod market;
 
+/// Instructions for Oracle.
+pub mod oracle;
+
 pub use data_store::*;
 pub use market::*;
+pub use oracle::*;
 pub use roles::*;
 pub use token_config::*;

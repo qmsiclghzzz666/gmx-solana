@@ -9,14 +9,21 @@ export const dataStore = anchor.workspace.DataStore as anchor.Program<DataStore>
 
 const encodeUtf8 = anchor.utils.bytes.utf8.encode;
 
-export const ROLES_SEED = encodeUtf8("roles");
+// Data Store seed.
 export const DATA_STORE_SEED = encodeUtf8("data_store");
+// Roles seed.
+export const ROLES_SEED = encodeUtf8("roles");
+// Token Config seed.
 export const TOKEN_CONFIG_SEED = encodeUtf8("token_config");
+// Market seeds.
 export const MARKET_SEED = encodeUtf8("market");
 export const MARKET_SIGN_SEED = encodeUtf8("market_sign");
 export const MARKET_TOKEN_MINT_SEED = encodeUtf8("market_token_mint");
 export const MARKET_VAULT_SEED = encodeUtf8("market_vault");
+// Oracle seed.
+export const ORACLE_SEED = encodeUtf8("oracle");
 
+// Role keys.
 export const CONTROLLER = "CONTROLLER";
 export const MARKET_KEEPER = "MARKET_KEEPER";
 
@@ -65,12 +72,24 @@ export const createMarketVaultPDA = (store: PublicKey, tokenMint: PublicKey, mar
 
 export const getMarketSignPDA = () => PublicKey.findProgramAddressSync([MARKET_SIGN_SEED], dataStore.programId);
 
+export const createOraclePDA = (store: PublicKey, index: number) => PublicKey.findProgramAddressSync([
+    ORACLE_SEED,
+    store.toBytes(),
+    new Uint8Array([index]),
+], dataStore.programId);
+
 export const BTC_TOKEN_MINT = anchor.translateAddress(isDevNet ? "Hb5pJ53KeUPCkUvaDZm7Y7WafEjuP1xjD4owaXksJ86R" : "3NZ9JMVBmGAqocybic2c7LQCJScmgsAZ6vQqTDzcqmJh");
 export const BTC_FEED = anchor.translateAddress(isDevNet ? "6PxBx93S8x3tno1TsFZwT5VqP8drrRCbCXygEXYNkFJe" : "Cv4T27XbjVoKUYwP72NQQanvZeA7W4YF9L4EnYT9kx5o");
 export const SOL_TOKEN_MINT = anchor.translateAddress("So11111111111111111111111111111111111111112");
 export const SOL_FEED = anchor.translateAddress(isDevNet ? "99B2bTijsU6f1GCT73HmdR7HCFFjGMBcPZY6jZ96ynrR" : "CH31Xns5z3M1cTAbKW34jcxPPciazARpijcHj9rxtemt");
 
-export const initializeDataStore = async (provider: anchor.AnchorProvider, eventManager: EventManager, signer: anchor.web3.Keypair, dataStoreKey: string) => {
+export const initializeDataStore = async (
+    provider: anchor.AnchorProvider,
+    eventManager: EventManager,
+    signer: anchor.web3.Keypair,
+    dataStoreKey: string,
+    oracleIndex: number,
+) => {
     const [dataStorePDA] = createDataStorePDA(dataStoreKey);
     const [rolesPDA] = createRolesPDA(dataStorePDA, provider.publicKey);
     const [signerRoles] = createRolesPDA(dataStorePDA, signer.publicKey);
@@ -154,5 +173,19 @@ export const initializeDataStore = async (provider: anchor.AnchorProvider, event
         console.log(`Init a token config account ${tokenConfigPDA} for ${SOL_TOKEN_MINT} in tx: ${tx}`);
     } catch (error) {
         console.warn("Failed to init the token config account", error);
+    }
+
+    // Init an oracle.
+    try {
+        const [oraclePDA] = createOraclePDA(dataStorePDA, oracleIndex);
+        const tx = await dataStore.methods.initializeOracle(oracleIndex).accounts({
+            authority: signer.publicKey,
+            store: dataStorePDA,
+            onlyController: signerRoles,
+            oracle: oraclePDA,
+        }).signers([signer]).rpc();
+        console.log(`Inited an oracle account ${oraclePDA} in tx: ${tx}`);
+    } catch (error) {
+        console.warn(`Failed to init an oracle account with index ${oracleIndex}:`, error);
     }
 };
