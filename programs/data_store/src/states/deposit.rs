@@ -13,7 +13,7 @@ pub struct Deposit {
     /// The nonce bytes for this deposit.
     pub nonce: [u8; 32],
     /// The account depositing liquidity.
-    pub account: Pubkey,
+    pub user: Pubkey,
     // /// Callback Contract.
     // pub callback: Pubkey,
     /// The market to deposit to.
@@ -49,7 +49,7 @@ impl Deposit {
     ) -> Result<()> {
         self.bump = bump;
         self.nonce = nonce;
-        self.account = account;
+        self.user = account;
         self.receivers = receivers;
         self.market = market;
         self.tokens = tokens;

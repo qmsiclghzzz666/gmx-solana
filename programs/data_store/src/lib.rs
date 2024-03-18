@@ -203,6 +203,11 @@ pub mod data_store {
     ) -> Result<()> {
         instructions::initialize_deposit(ctx, nonce, market, receivers, tokens)
     }
+
+    #[access_control(internal::Authenticate::only_controller(&ctx))]
+    pub fn remove_deposit(ctx: Context<RemoveDeposit>) -> Result<()> {
+        instructions::remove_deposit(ctx)
+    }
 }
 
 #[error_code]

@@ -58,3 +58,46 @@ impl<'info> internal::Authentication<'info> for InitializeDeposit<'info> {
         &self.only_controller
     }
 }
+
+/// Remove deposit.
+pub fn remove_deposit(_ctx: Context<RemoveDeposit>) -> Result<()> {
+    Ok(())
+}
+
+#[derive(Accounts)]
+pub struct RemoveDeposit<'info> {
+    pub authority: Signer<'info>,
+    pub only_controller: Account<'info, Roles>,
+    pub store: Account<'info, DataStore>,
+    #[account(
+        mut,
+        close = user,
+        has_one = user,
+        seeds = [
+            Deposit::SEED,
+            store.key().as_ref(),
+            user.key().as_ref(),
+            &deposit.nonce,
+        ],
+        bump = deposit.bump,
+    )]
+    pub deposit: Account<'info, Deposit>,
+    /// CHECK: only used to receive lamports,
+    /// and has been checked in `deposit`'s constraint.
+    #[account(mut)]
+    pub user: UncheckedAccount<'info>,
+}
+
+impl<'info> internal::Authentication<'info> for RemoveDeposit<'info> {
+    fn authority(&self) -> &Signer<'info> {
+        &self.authority
+    }
+
+    fn store(&self) -> &Account<'info, DataStore> {
+        &self.store
+    }
+
+    fn roles(&self) -> &Account<'info, Roles> {
+        &self.only_controller
+    }
+}
