@@ -16,9 +16,13 @@ pub mod oracle;
 /// Instructions for Deposit.
 pub mod deposit;
 
+/// Instructions for incrementing nonce value.
+pub mod nonce;
+
 pub use data_store::*;
 pub use deposit::*;
 pub use market::*;
+pub use nonce::*;
 pub use oracle::*;
 pub use roles::*;
 pub use token_config::*;

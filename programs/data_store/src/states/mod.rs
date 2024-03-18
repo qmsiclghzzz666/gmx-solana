@@ -13,9 +13,13 @@ pub mod oracle;
 /// Deposit.
 pub mod deposit;
 
+/// Nonce.
+pub mod nonce;
+
 pub use data_store::*;
 pub use deposit::Deposit;
 pub use market::*;
+pub use nonce::*;
 pub use oracle::*;
 pub use token_config::*;
 
@@ -24,9 +28,6 @@ use anchor_lang::{
     Bump,
 };
 use gmx_solana_utils::to_seed;
-
-/// Nonce bytes type.
-pub type NonceBytes = [u8; 32];
 
 /// Data type that has [`SEED`].
 pub trait Seed {

@@ -181,6 +181,17 @@ pub mod data_store {
         instructions::set_price(ctx, token, price)
     }
 
+    // Nonce.
+    #[access_control(internal::Authenticate::only_controller(&ctx))]
+    pub fn initialize_nonce(ctx: Context<InitializeNonce>) -> Result<()> {
+        instructions::initialize_nonce(ctx)
+    }
+
+    #[access_control(internal::Authenticate::only_controller(&ctx))]
+    pub fn increment_nonce(ctx: Context<IncrementNonce>) -> Result<[u8; 32]> {
+        instructions::increment_nonce(ctx)
+    }
+
     // Deposit.
     #[access_control(internal::Authenticate::only_controller(&ctx))]
     pub fn initialize_deposit(
