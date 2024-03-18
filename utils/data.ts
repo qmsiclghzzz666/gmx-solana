@@ -22,6 +22,8 @@ export const MARKET_TOKEN_MINT_SEED = encodeUtf8("market_token_mint");
 export const MARKET_VAULT_SEED = encodeUtf8("market_vault");
 // Oracle seed.
 export const ORACLE_SEED = encodeUtf8("oracle");
+// Nonce seed.
+export const NONCE_SEED = encodeUtf8("nonce");
 
 // Role keys.
 export const CONTROLLER = "CONTROLLER";
@@ -76,6 +78,11 @@ export const createOraclePDA = (store: PublicKey, index: number) => PublicKey.fi
     ORACLE_SEED,
     store.toBytes(),
     new Uint8Array([index]),
+], dataStore.programId);
+
+export const createNoncePDA = (store: PublicKey) => PublicKey.findProgramAddressSync([
+    NONCE_SEED,
+    store.toBytes(),
 ], dataStore.programId);
 
 export const BTC_TOKEN_MINT = anchor.translateAddress(isDevNet ? "Hb5pJ53KeUPCkUvaDZm7Y7WafEjuP1xjD4owaXksJ86R" : "3NZ9JMVBmGAqocybic2c7LQCJScmgsAZ6vQqTDzcqmJh");
@@ -187,5 +194,19 @@ export const initializeDataStore = async (
         console.log(`Inited an oracle account ${oraclePDA} in tx: ${tx}`);
     } catch (error) {
         console.warn(`Failed to init an oracle account with index ${oracleIndex}:`, error);
+    }
+
+    // Init a nonce.
+    try {
+        const [noncePDA] = createNoncePDA(dataStorePDA);
+        const tx = await dataStore.methods.initializeNonce().accounts({
+            authority: signer.publicKey,
+            store: dataStorePDA,
+            onlyController: signerRoles,
+            nonce: noncePDA,
+        }).signers([signer]).rpc();
+        console.log(`Inited a nonce account ${noncePDA} in tx: ${tx}`);
+    } catch (error) {
+        console.warn("Failed to init a nonce account", error);
     }
 };
