@@ -13,7 +13,11 @@ pub mod market;
 /// Instructions for Oracle.
 pub mod oracle;
 
+/// Instructions for Deposit.
+pub mod deposit;
+
 pub use data_store::*;
+pub use deposit::*;
 pub use market::*;
 pub use oracle::*;
 pub use roles::*;

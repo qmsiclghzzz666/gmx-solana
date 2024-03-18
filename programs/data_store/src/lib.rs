@@ -14,7 +14,11 @@ pub mod utils;
 
 pub use self::states::Data;
 
-use self::{instructions::*, utils::internal};
+use self::{
+    instructions::*,
+    states::deposit::{Receivers, Tokens},
+    utils::internal,
+};
 use gmx_solana_utils::price::Price;
 
 declare_id!("8hJ2dGQ2Ccr5G6iEqQQEoBApRSXt7Jn8Qyf9Qf3eLBX2");
@@ -175,6 +179,18 @@ pub mod data_store {
     #[access_control(internal::Authenticate::only_controller(&ctx))]
     pub fn set_price(ctx: Context<SetPrice>, token: Pubkey, price: Price) -> Result<()> {
         instructions::set_price(ctx, token, price)
+    }
+
+    // Deposit.
+    #[access_control(internal::Authenticate::only_controller(&ctx))]
+    pub fn initialize_deposit(
+        ctx: Context<InitializeDeposit>,
+        nonce: [u8; 32],
+        market: Pubkey,
+        receivers: Receivers,
+        tokens: Tokens,
+    ) -> Result<()> {
+        instructions::initialize_deposit(ctx, nonce, market, receivers, tokens)
     }
 }
 
