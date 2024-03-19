@@ -19,9 +19,10 @@ describe("exchange: deposit", async () => {
     const { marketFakeFakeUsdG } = getMarkets();
 
     const [roles] = createRolesPDA(dataStoreAddress, signer0.publicKey);
+    const [nonce] = createNoncePDA(dataStoreAddress);
 
     it("create deposit", async () => {
-        const depositNonce = Keypair.generate().publicKey.toBytes();
+        const depositNonce = await dataStore.methods.getNonceBytes().accounts({ nonce }).view();
         const receiver = Keypair.generate().publicKey;
         const [deposit] = createDepositPDA(dataStoreAddress, user0.publicKey, depositNonce);
         const tx = await market.methods.createDeposit(
@@ -51,7 +52,14 @@ describe("exchange: deposit", async () => {
             longTokenDepositVault: fakeTokenVault,
             shortTokenDepositVault: usdGVault,
             tokenProgram: TOKEN_PROGRAM_ID,
-        }).signers([signer0, user0]).rpc();
+        }).postInstructions([
+            await dataStore.methods.incrementNonce().accounts({
+                authority: signer0.publicKey,
+                store: dataStoreAddress,
+                onlyController: roles,
+                nonce,
+            }).instruction(),
+        ]).signers([signer0, user0]).rpc();
         console.log(tx);
     });
 });
