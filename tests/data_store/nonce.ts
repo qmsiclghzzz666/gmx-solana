@@ -5,7 +5,6 @@ import { createNoncePDA, createRolesPDA, createTokenConfigPDA } from "../../util
 import { AnchorError } from '@coral-xyz/anchor';
 
 describe("data store: Nonce", () => {
-    const provider = getProvider();
     const { dataStore } = getPrograms();
     const { signer0 } = getUsers();
     const { dataStoreAddress } = getAddresses();
@@ -14,14 +13,18 @@ describe("data store: Nonce", () => {
     const [nonce] = createNoncePDA(dataStoreAddress);
 
     it("inc nonce", async () => {
+        const beforeNonce = await dataStore.methods.getNonceBytes().accounts({
+            nonce,
+        }).view();
         await dataStore.methods.incrementNonce().accounts({
             authority: signer0.publicKey,
             onlyController: roles,
-            payer: provider.publicKey,
             store: dataStoreAddress,
             nonce,
         }).signers([signer0]).rpc();
-        const currentNonce = await dataStore.account.nonce.fetch(nonce);
-        console.log(currentNonce);
+        const currentNonce = await dataStore.methods.getNonceBytes().accounts({
+            nonce,
+        }).view();
+        expect(beforeNonce != currentNonce).true;
     });
 });

@@ -16,8 +16,6 @@ pub struct Deposit {
     pub user: Pubkey,
     // /// Callback Contract.
     // pub callback: Pubkey,
-    /// The market to deposit to.
-    pub market: Pubkey,
     /// The receivers of the deposit.
     pub receivers: Receivers,
     /// The tokens and swap paths for the deposit.
@@ -43,7 +41,6 @@ impl Deposit {
         bump: u8,
         nonce: NonceBytes,
         account: Pubkey,
-        market: Pubkey,
         receivers: Receivers,
         tokens: Tokens,
     ) -> Result<()> {
@@ -51,7 +48,6 @@ impl Deposit {
         self.nonce = nonce;
         self.user = account;
         self.receivers = receivers;
-        self.market = market;
         self.tokens = tokens;
         self.updated_at_slot = Clock::get()?.slot;
         Ok(())
@@ -70,6 +66,8 @@ pub struct Receivers {
 /// The tokens and swap paths config for the deposit.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, InitSpace)]
 pub struct Tokens {
+    /// The market to deposit to.
+    pub market_token: Pubkey,
     /// Initial long token.
     pub initial_long_token: Pubkey,
     /// Initial short token.

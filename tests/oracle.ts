@@ -1,6 +1,7 @@
 import * as anchor from "@coral-xyz/anchor";
 import { getAddresses, getExternalPrograms, getPrograms, getProvider, getUsers, expect } from "../utils/fixtures";
-import { BTC_FEED, BTC_TOKEN_MINT, SOL_FEED, SOL_TOKEN_MINT, createRolesPDA, createTokenConfigPDA, dataStore } from "../utils/data";
+import { createRolesPDA, createTokenConfigPDA, dataStore } from "../utils/data";
+import { BTC_FEED, BTC_TOKEN_MINT, SOL_FEED, SOL_TOKEN_MINT } from "../utils/token";
 
 describe("oracle", () => {
     const provider = getProvider();

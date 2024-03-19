@@ -192,16 +192,19 @@ pub mod data_store {
         instructions::increment_nonce(ctx)
     }
 
+    pub fn get_nonce_bytes(ctx: Context<GetNonceBytes>) -> Result<[u8; 32]> {
+        instructions::get_nonce_bytes(ctx)
+    }
+
     // Deposit.
     #[access_control(internal::Authenticate::only_controller(&ctx))]
     pub fn initialize_deposit(
         ctx: Context<InitializeDeposit>,
         nonce: [u8; 32],
-        market: Pubkey,
         receivers: Receivers,
         tokens: Tokens,
     ) -> Result<()> {
-        instructions::initialize_deposit(ctx, nonce, market, receivers, tokens)
+        instructions::initialize_deposit(ctx, nonce, receivers, tokens)
     }
 
     #[access_control(internal::Authenticate::only_controller(&ctx))]

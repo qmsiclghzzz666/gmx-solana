@@ -2,8 +2,9 @@ import * as anchor from "@coral-xyz/anchor";
 import { DataStore } from "../target/types/data_store";
 import { keyToSeed } from "./seed";
 import { EventManager } from "./event";
-import { PublicKey } from "@solana/web3.js";
-import { isDevNet } from "./endpoint";
+import { Keypair, PublicKey } from "@solana/web3.js";
+import { BTC_FEED, BTC_TOKEN_MINT, SOL_FEED, SOL_TOKEN_MINT } from "./token";
+import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 
 export const dataStore = anchor.workspace.DataStore as anchor.Program<DataStore>;
 
@@ -24,6 +25,8 @@ export const MARKET_VAULT_SEED = encodeUtf8("market_vault");
 export const ORACLE_SEED = encodeUtf8("oracle");
 // Nonce seed.
 export const NONCE_SEED = encodeUtf8("nonce");
+// Deposit seed.
+export const DEPOSIT_SEED = encodeUtf8("deposit");
 
 // Role keys.
 export const CONTROLLER = "CONTROLLER";
@@ -85,10 +88,28 @@ export const createNoncePDA = (store: PublicKey) => PublicKey.findProgramAddress
     store.toBytes(),
 ], dataStore.programId);
 
-export const BTC_TOKEN_MINT = anchor.translateAddress(isDevNet ? "Hb5pJ53KeUPCkUvaDZm7Y7WafEjuP1xjD4owaXksJ86R" : "3NZ9JMVBmGAqocybic2c7LQCJScmgsAZ6vQqTDzcqmJh");
-export const BTC_FEED = anchor.translateAddress(isDevNet ? "6PxBx93S8x3tno1TsFZwT5VqP8drrRCbCXygEXYNkFJe" : "Cv4T27XbjVoKUYwP72NQQanvZeA7W4YF9L4EnYT9kx5o");
-export const SOL_TOKEN_MINT = anchor.translateAddress("So11111111111111111111111111111111111111112");
-export const SOL_FEED = anchor.translateAddress(isDevNet ? "99B2bTijsU6f1GCT73HmdR7HCFFjGMBcPZY6jZ96ynrR" : "CH31Xns5z3M1cTAbKW34jcxPPciazARpijcHj9rxtemt");
+export const createDepositPDA = (store: PublicKey, user: PublicKey, nonce: Uint8Array) => PublicKey.findProgramAddressSync([
+    DEPOSIT_SEED,
+    store.toBytes(),
+    user.toBytes(),
+    nonce,
+], dataStore.programId);
+
+export const createMarketVault = async (provider: anchor.AnchorProvider, signer: Keypair, dataStoreAddress: PublicKey, mint: PublicKey) => {
+    const [vault] = createMarketVaultPDA(dataStoreAddress, mint);
+    const [roles] = createRolesPDA(dataStoreAddress, signer.publicKey);
+
+    await dataStore.methods.initializeMarketVault(null).accounts({
+        authority: signer.publicKey,
+        onlyMarketKeeper: roles,
+        store: dataStoreAddress,
+        mint,
+        vault,
+        marketSign: getMarketSignPDA()[0],
+        tokenProgram: TOKEN_PROGRAM_ID,
+    }).signers([signer]).rpc();
+    return vault;
+};
 
 export const initializeDataStore = async (
     provider: anchor.AnchorProvider,

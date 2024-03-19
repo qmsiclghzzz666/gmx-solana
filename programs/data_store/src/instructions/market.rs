@@ -241,7 +241,7 @@ pub struct InitializeMarketVault<'info> {
             constants::MARKET_VAULT_SEED,
             store.key().as_ref(),
             mint.key().as_ref(),
-            market_token_mint.as_ref().map(|key| key.as_ref()).unwrap_or_default(),
+            market_token_mint.as_ref().map(|key| key.as_ref()).unwrap_or(&[]),
         ],
         bump,
     )]

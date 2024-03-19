@@ -52,8 +52,6 @@ pub fn increment_nonce(ctx: Context<IncrementNonce>) -> Result<NonceBytes> {
 #[derive(Accounts)]
 pub struct IncrementNonce<'info> {
     pub authority: Signer<'info>,
-    #[account(mut)]
-    pub payer: Signer<'info>,
     pub only_controller: Account<'info, Roles>,
     pub store: Account<'info, DataStore>,
     #[account(
@@ -76,4 +74,14 @@ impl<'info> internal::Authentication<'info> for IncrementNonce<'info> {
     fn roles(&self) -> &Account<'info, Roles> {
         &self.only_controller
     }
+}
+
+/// Get the nonce in bytes.
+pub fn get_nonce_bytes(ctx: Context<GetNonceBytes>) -> Result<NonceBytes> {
+    Ok(ctx.accounts.nonce.nonce())
+}
+
+#[derive(Accounts)]
+pub struct GetNonceBytes<'info> {
+    nonce: Account<'info, Nonce>,
 }

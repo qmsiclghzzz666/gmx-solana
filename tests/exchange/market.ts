@@ -1,9 +1,9 @@
-import * as anchor from "@coral-xyz/anchor";
-import { getAddresses, getPrograms, getTokenMints, getUsers } from "../utils/fixtures";
+import { getAddresses, getPrograms, getTokenMints, getUsers } from "../../utils/fixtures";
 import { Keypair } from "@solana/web3.js";
-import { createMarketPDA, createMarketTokenMintPDA, createMarketVaultPDA, createRolesPDA, getMarketSignPDA } from "../utils/data";
+import { createMarketPDA, createMarketTokenMintPDA, createMarketVaultPDA, createRolesPDA, getMarketSignPDA } from "../../utils/data";
+import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 
-describe("market", () => {
+describe("exchange: market", () => {
     const { market } = getPrograms();
     const { signer0 } = getUsers();
     const { dataStoreAddress } = getAddresses();
@@ -33,7 +33,7 @@ describe("market", () => {
             shortToken,
             marketSign,
             dataStoreProgram: dataStore.programId,
-            tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID,
+            tokenProgram: TOKEN_PROGRAM_ID,
         }).signers([signer0]).rpc();
     });
 });

@@ -12,9 +12,20 @@ declare_id!("AFxZM92h6tryw4hZx2puJRWjA4CQSkxmVkzJrDWJgJAL");
 pub mod market {
     use super::*;
 
+    // Market.
     #[access_control(Authenticate::only_market_keeper(&ctx))]
     pub fn create_market(ctx: Context<CreateMarket>, index_token_mint: Pubkey) -> Result<()> {
         instructions::create_market(ctx, index_token_mint)
+    }
+
+    // Deposit.
+    #[access_control(Authenticate::only_controller(&ctx))]
+    pub fn create_deposit(
+        ctx: Context<CreateDeposit>,
+        nonce: [u8; 32],
+        params: CreateDepositParams,
+    ) -> Result<()> {
+        instructions::create_deposit(ctx, nonce, params)
     }
 }
 

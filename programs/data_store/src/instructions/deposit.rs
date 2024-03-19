@@ -12,7 +12,6 @@ use crate::{
 pub fn initialize_deposit(
     ctx: Context<InitializeDeposit>,
     nonce: NonceBytes,
-    market: Pubkey,
     receivers: Receivers,
     tokens: Tokens,
 ) -> Result<()> {
@@ -20,7 +19,6 @@ pub fn initialize_deposit(
         ctx.bumps.deposit,
         nonce,
         ctx.accounts.payer.key(),
-        market,
         receivers,
         tokens,
     )

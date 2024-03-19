@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use anchor_spl::token::{Mint, Token};
 use data_store::{
     cpi::accounts::{CheckRole, InitializeMarket, InitializeMarketToken, InitializeMarketVault},
     states::DataStore,
@@ -43,28 +44,25 @@ pub struct CreateMarket<'info> {
     pub authority: Signer<'info>,
     pub only_market_keeper: Account<'info, Roles>,
     pub data_store: Account<'info, DataStore>,
-    /// CHECK: check by CPI.
+    /// CHECK: check and init by CPI.
     #[account(mut)]
     pub market: UncheckedAccount<'info>,
-    /// CHECK: check by CPI.
+    /// CHECK: check and init by CPI.
     #[account(mut)]
     pub market_token_mint: UncheckedAccount<'info>,
-    /// CHECK: check by CPI.
-    pub long_token_mint: UncheckedAccount<'info>,
-    /// CHECK: check by CPI.
-    pub short_token_mint: UncheckedAccount<'info>,
-    /// CHECK: check by CPI
+    pub long_token_mint: Account<'info, Mint>,
+    pub short_token_mint: Account<'info, Mint>,
+    /// CHECK: check and init by CPI.
     #[account(mut)]
     pub long_token: UncheckedAccount<'info>,
-    /// CHECK: check by CPI.
+    /// CHECK: check and init by CPI.
     #[account(mut)]
     pub short_token: UncheckedAccount<'info>,
     /// CHECK: check by CPI.
     pub market_sign: UncheckedAccount<'info>,
     pub data_store_program: Program<'info, data_store::program::DataStore>,
     pub system_program: Program<'info, System>,
-    /// CHECK: check by CPI.
-    pub token_program: UncheckedAccount<'info>,
+    pub token_program: Program<'info, Token>,
 }
 
 impl<'info> CreateMarket<'info> {

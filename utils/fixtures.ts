@@ -7,13 +7,26 @@ import chaiAsPromised from 'chai-as-promised';
 chai.use(chaiAsPromised);
 
 import { EventManager } from "./event";
-import { BTC_TOKEN_MINT, SOL_TOKEN_MINT, createDataStorePDA, createOraclePDA, dataStore, initializeDataStore } from "./data";
-import { market } from "./market";
+import { createDataStorePDA, createMarketPDA, createMarketTokenMintPDA, createMarketVault, createMarketVaultPDA, createOraclePDA, dataStore, initializeDataStore } from "./data";
+import { initializeMarkets, market } from "./market";
 import { oracle } from "./oracle";
 
 import { IDL as chainlinkIDL } from "../external-programs/chainlink-store";
+import { BTC_TOKEN_MINT, SOL_TOKEN_MINT, createSignedToken } from "./token";
+import { PublicKey } from "@solana/web3.js";
 
 export const expect = chai.expect;
+
+let isInitialized: Promise<boolean>;
+let resolveInitialized: (value: boolean | PromiseLike<boolean>) => void;
+
+isInitialized = new Promise<boolean>(resolve => {
+    resolveInitialized = resolve;
+});
+
+export async function waitForSetup() {
+    await isInitialized;
+}
 
 // Get anchor provider.
 export const getProvider = () => provider;
@@ -21,32 +34,15 @@ export const getProvider = () => provider;
 // External Program IDs.
 const chainlinkID = "HEvSKofvBgfaexv23kMabbYqxasxU3mQ4ibBMEmJWHny";
 
-// Users.
-const user0 = anchor.web3.Keypair.generate();
-const signer0 = anchor.web3.Keypair.generate();
-
-// Keys.
-const randomeKey = anchor.web3.Keypair.generate().publicKey.toBase58();
-const dataStoreKey = isDevNet ? randomeKey : "data_store_0";
-const oracleIndex = 255;
-
-// Addresses.
-const [dataStoreAddress] = createDataStorePDA(dataStoreKey);
-const [oracleAddress] = createOraclePDA(dataStoreAddress, oracleIndex);
-
-export const getPrograms = () => {
-    return {
-        dataStore,
-        market,
-        oracle,
-    }
-};
-
 export const getExternalPrograms = () => {
     return {
         chainlink: new anchor.Program(chainlinkIDL, chainlinkID),
     }
 };
+
+// Users.
+const user0 = anchor.web3.Keypair.generate();
+const signer0 = anchor.web3.Keypair.generate();
 
 export const getUsers = () => {
     return {
@@ -55,18 +51,49 @@ export const getUsers = () => {
     }
 };
 
+// Keys.
+const randomeKey = anchor.web3.Keypair.generate().publicKey.toBase58();
+const dataStoreKey = isDevNet ? randomeKey : "data_store_0";
+const oracleIndex = 255;
+
 export const getKeys = () => {
     return {
         dataStoreKey,
     }
 };
 
+// Addresses.
+const [dataStoreAddress] = createDataStorePDA(dataStoreKey);
+const [oracleAddress] = createOraclePDA(dataStoreAddress, oracleIndex);
+
+let user0FakeTokenAccount: PublicKey;
+let user0UsdGTokenAccount: PublicKey;
+let fakeTokenVault: PublicKey;
+let usdGVault: PublicKey;
+
 export const getAddresses = () => {
     return {
         dataStoreAddress,
         oracleAddress,
+        user0FakeTokenAccount,
+        user0UsdGTokenAccount,
+        fakeTokenVault,
+        usdGVault,
     }
 }
+
+let markets: Awaited<ReturnType<typeof initializeMarkets>>;
+export const getMarkets = () => {
+    return markets;
+}
+
+export const getPrograms = () => {
+    return {
+        dataStore,
+        market,
+        oracle,
+    }
+};
 
 export const getTokenMints = () => {
     return {
@@ -125,13 +152,28 @@ export const mochaGlobalSetup = async () => {
     console.log("[Setting up everything...]");
     anchor.setProvider(provider);
     await initializeUser(provider, signer0, 1.5);
+    await initializeUser(provider, user0, 1.5);
     await initializeDataStore(provider, eventManager, signer0, dataStoreKey, oracleIndex);
+
+    // Init fakeToken and usdG.
+    const fakeToken = await createSignedToken(signer0, 9);
+    const usdG = await createSignedToken(signer0, 8);
+    user0FakeTokenAccount = await fakeToken.createTokenAccount(user0.publicKey);
+    user0UsdGTokenAccount = await usdG.createTokenAccount(user0.publicKey);
+    fakeToken.mintTo(user0FakeTokenAccount, 1_000 * 1_000_000_000);
+    usdG.mintTo(user0UsdGTokenAccount, 1_000 * 100_000_000);
+    fakeTokenVault = await createMarketVault(provider, signer0, dataStoreAddress, fakeToken.mint);
+    usdGVault = await createMarketVault(provider, signer0, dataStoreAddress, usdG.mint);
+
+    markets = await initializeMarkets(signer0, dataStoreAddress, fakeToken.mint, usdG.mint);
     console.log("[Done.]");
+    resolveInitialized(true);
 };
 
 export const mochaGlobalTeardown = async () => {
     console.log("[Cleanup...]");
     eventManager.unsubscribeAll();
     await deinitializeUser(provider, signer0);
+    await deinitializeUser(provider, user0);
     console.log("[Done.]");
 };
