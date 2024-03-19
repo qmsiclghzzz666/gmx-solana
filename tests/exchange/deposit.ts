@@ -12,6 +12,7 @@ describe("exchange: deposit", async () => {
         dataStoreAddress,
         user0FakeTokenAccount,
         user0UsdGTokenAccount,
+        user0FakeFakeUsdGTokenAccount,
         fakeTokenVault,
         usdGVault,
     } = getAddresses();
@@ -23,15 +24,11 @@ describe("exchange: deposit", async () => {
 
     it("create deposit", async () => {
         const depositNonce = await dataStore.methods.getNonceBytes().accounts({ nonce }).view();
-        const receiver = Keypair.generate().publicKey;
         const [deposit] = createDepositPDA(dataStoreAddress, user0.publicKey, depositNonce);
         const tx = await exchange.methods.createDeposit(
             [...depositNonce],
             {
-                receivers: {
-                    receiver,
-                    uiFeeReceiver: receiver,
-                },
+                uiFeeReceiver: Keypair.generate().publicKey,
                 longTokenSwapPath: [],
                 shortTokenSwapPath: [],
                 initialLongTokenAmount: new BN(1),
@@ -47,6 +44,7 @@ describe("exchange: deposit", async () => {
             dataStoreProgram: dataStore.programId,
             deposit,
             payer: user0.publicKey,
+            receiver: user0FakeFakeUsdGTokenAccount,
             initialLongToken: user0FakeTokenAccount,
             initialShortToken: user0UsdGTokenAccount,
             longTokenDepositVault: fakeTokenVault,

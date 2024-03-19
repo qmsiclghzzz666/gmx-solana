@@ -7,13 +7,14 @@ import chaiAsPromised from 'chai-as-promised';
 chai.use(chaiAsPromised);
 
 import { EventManager } from "./event";
-import { createDataStorePDA, createMarketVault, createOraclePDA, dataStore, initializeDataStore } from "./data";
+import { createDataStorePDA, createMarketTokenMintPDA, createMarketVault, createOraclePDA, dataStore, initializeDataStore } from "./data";
 import { initializeMarkets, exchange } from "./exchange";
 import { oracle } from "./oracle";
 
 import { IDL as chainlinkIDL } from "../external-programs/chainlink-store";
 import { BTC_TOKEN_MINT, SOL_TOKEN_MINT, createSignedToken } from "./token";
 import { PublicKey } from "@solana/web3.js";
+import { createAssociatedTokenAccount } from "@solana/spl-token";
 
 export const expect = chai.expect;
 
@@ -68,6 +69,7 @@ const [oracleAddress] = createOraclePDA(dataStoreAddress, oracleIndex);
 
 let user0FakeTokenAccount: PublicKey;
 let user0UsdGTokenAccount: PublicKey;
+let user0FakeFakeUsdGTokenAccount: PublicKey;
 let fakeTokenVault: PublicKey;
 let usdGVault: PublicKey;
 
@@ -77,6 +79,7 @@ export const getAddresses = () => {
         oracleAddress,
         user0FakeTokenAccount,
         user0UsdGTokenAccount,
+        user0FakeFakeUsdGTokenAccount,
         fakeTokenVault,
         usdGVault,
     }
@@ -166,6 +169,9 @@ export const mochaGlobalSetup = async () => {
     usdGVault = await createMarketVault(provider, signer0, dataStoreAddress, usdG.mint);
 
     markets = await initializeMarkets(signer0, dataStoreAddress, fakeToken.mint, usdG.mint);
+    const [marketTokenMint] = createMarketTokenMintPDA(dataStoreAddress, fakeToken.mint, fakeToken.mint, usdG.mint);
+    user0FakeFakeUsdGTokenAccount = await createAssociatedTokenAccount(provider.connection, user0, marketTokenMint, user0.publicKey);
+
     console.log("[Done.]");
     resolveInitialized(true);
 };

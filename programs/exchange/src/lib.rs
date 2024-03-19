@@ -34,4 +34,7 @@ pub mod exchange {
 pub enum ExchangeError {
     #[msg("Permission denied")]
     PermissionDenied,
+    // Deposit.
+    #[msg("Empty deposit amounts")]
+    EmptyDepositAmounts,
 }

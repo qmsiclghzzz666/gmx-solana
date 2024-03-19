@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{Token, TokenAccount};
+use anchor_spl::token::{Token, TokenAccount, Transfer};
 use data_store::{
     constants,
     cpi::accounts::{CheckRole, InitializeDeposit},
@@ -16,7 +16,7 @@ use crate::ExchangeError;
 /// Create Deposit Params.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct CreateDepositParams {
-    pub receivers: Receivers,
+    pub ui_fee_receiver: Pubkey,
     pub long_token_swap_path: Vec<Pubkey>,
     pub short_token_swap_path: Vec<Pubkey>,
     pub initial_long_token_amount: u64,
@@ -32,10 +32,35 @@ pub fn create_deposit(
     params: CreateDepositParams,
 ) -> Result<()> {
     use data_store::cpi;
+
+    require!(
+        params.initial_long_token_amount != 0 || params.initial_short_token_amount != 0,
+        ExchangeError::EmptyDepositAmounts
+    );
+
+    if params.initial_long_token_amount != 0 {
+        anchor_spl::token::transfer(
+            ctx.accounts.transfer_ctx(true),
+            params.initial_long_token_amount,
+        )?;
+    }
+
+    if params.initial_short_token_amount != 0 {
+        anchor_spl::token::transfer(
+            ctx.accounts.transfer_ctx(false),
+            params.initial_long_token_amount,
+        )?;
+    }
+
+    // TODO: allow using WNT to pay for the execution fee.
+
     cpi::initialize_deposit(
         ctx.accounts.initialize_deposit_ctx(),
         nonce,
-        params.receivers,
+        Receivers {
+            receiver: ctx.accounts.receiver.key(),
+            ui_fee_receiver: params.ui_fee_receiver,
+        },
         Tokens {
             market_token: ctx.accounts.market.market_token_mint,
             initial_long_token: ctx.accounts.initial_long_token.mint,
@@ -48,6 +73,8 @@ pub fn create_deposit(
             should_unwrap_native_token: params.should_unwrap_native_token,
         },
     )?;
+    // TODO: check the execution fee.
+    // TODO: emit deposit created event.
     Ok(())
 }
 
@@ -66,6 +93,8 @@ pub struct CreateDeposit<'info> {
     pub deposit: UncheckedAccount<'info>,
     #[account(mut)]
     pub payer: Signer<'info>,
+    #[account(token::mint = market.market_token_mint)]
+    pub receiver: Account<'info, TokenAccount>,
     pub market: Account<'info, Market>,
     #[account(mut)]
     pub initial_long_token: Account<'info, TokenAccount>,
@@ -130,6 +159,28 @@ impl<'info> CreateDeposit<'info> {
                 store: self.store.to_account_info(),
                 deposit: self.deposit.to_account_info(),
                 system_program: self.system_program.to_account_info(),
+            },
+        )
+    }
+
+    fn transfer_ctx(&self, is_long_token: bool) -> CpiContext<'_, '_, '_, 'info, Transfer<'info>> {
+        let (from, to) = if is_long_token {
+            (
+                self.initial_long_token.to_account_info(),
+                self.long_token_deposit_vault.to_account_info(),
+            )
+        } else {
+            (
+                self.initial_short_token.to_account_info(),
+                self.short_token_deposit_vault.to_account_info(),
+            )
+        };
+        CpiContext::new(
+            self.token_program.to_account_info(),
+            Transfer {
+                from,
+                to,
+                authority: self.payer.to_account_info(),
             },
         )
     }
