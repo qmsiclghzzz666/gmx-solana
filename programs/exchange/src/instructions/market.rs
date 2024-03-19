@@ -6,7 +6,7 @@ use data_store::{
 };
 use data_store::{states::Roles, utils::Authentication};
 
-use crate::MarketError;
+use crate::ExchangeError;
 
 /// Decimals of market tokens.
 pub const MARKET_TOKEN_DECIMALS: u8 = 18;
@@ -143,6 +143,6 @@ impl<'info> Authentication<'info> for CreateMarket<'info> {
     }
 
     fn on_error(&self) -> Result<()> {
-        Err(MarketError::PermissionDenied.into())
+        Err(ExchangeError::PermissionDenied.into())
     }
 }

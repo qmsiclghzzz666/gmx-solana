@@ -9,7 +9,7 @@ use instructions::*;
 declare_id!("AFxZM92h6tryw4hZx2puJRWjA4CQSkxmVkzJrDWJgJAL");
 
 #[program]
-pub mod market {
+pub mod exchange {
     use super::*;
 
     // Market.
@@ -31,7 +31,7 @@ pub mod market {
 
 /// Errors of market program.
 #[error_code]
-pub enum MarketError {
+pub enum ExchangeError {
     #[msg("Permission denied")]
     PermissionDenied,
 }

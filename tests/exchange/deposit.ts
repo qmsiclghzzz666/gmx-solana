@@ -6,7 +6,7 @@ import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 
 describe("exchange: deposit", async () => {
     await waitForSetup();
-    const { market, dataStore } = getPrograms();
+    const { exchange, dataStore } = getPrograms();
     const { signer0, user0 } = getUsers();
     const {
         dataStoreAddress,
@@ -25,7 +25,7 @@ describe("exchange: deposit", async () => {
         const depositNonce = await dataStore.methods.getNonceBytes().accounts({ nonce }).view();
         const receiver = Keypair.generate().publicKey;
         const [deposit] = createDepositPDA(dataStoreAddress, user0.publicKey, depositNonce);
-        const tx = await market.methods.createDeposit(
+        const tx = await exchange.methods.createDeposit(
             [...depositNonce],
             {
                 receivers: {

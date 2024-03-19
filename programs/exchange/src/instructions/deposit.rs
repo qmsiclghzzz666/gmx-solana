@@ -11,7 +11,7 @@ use data_store::{
     utils::Authentication,
 };
 
-use crate::MarketError;
+use crate::ExchangeError;
 
 /// Create Deposit Params.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
@@ -115,7 +115,7 @@ impl<'info> Authentication<'info> for CreateDeposit<'info> {
     }
 
     fn on_error(&self) -> Result<()> {
-        Err(error!(MarketError::PermissionDenied))
+        Err(error!(ExchangeError::PermissionDenied))
     }
 }
 

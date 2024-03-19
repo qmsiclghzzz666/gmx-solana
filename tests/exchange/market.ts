@@ -4,7 +4,7 @@ import { createMarketPDA, createMarketTokenMintPDA, createMarketVaultPDA, create
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 
 describe("exchange: market", () => {
-    const { market } = getPrograms();
+    const { exchange } = getPrograms();
     const { signer0 } = getUsers();
     const { dataStoreAddress } = getAddresses();
     const { dataStore } = getPrograms();
@@ -21,7 +21,7 @@ describe("exchange: market", () => {
         const [longToken] = createMarketVaultPDA(dataStoreAddress, longTokenMint, marketTokenMint);
         const [shortToken] = createMarketVaultPDA(dataStoreAddress, shortTokenMint, marketTokenMint);
         const [marketSign] = getMarketSignPDA();
-        await market.methods.createMarket(indexTokenMint).accounts({
+        await exchange.methods.createMarket(indexTokenMint).accounts({
             authority: signer0.publicKey,
             onlyMarketKeeper: roles,
             dataStore: dataStoreAddress,

@@ -7,8 +7,8 @@ import chaiAsPromised from 'chai-as-promised';
 chai.use(chaiAsPromised);
 
 import { EventManager } from "./event";
-import { createDataStorePDA, createMarketPDA, createMarketTokenMintPDA, createMarketVault, createMarketVaultPDA, createOraclePDA, dataStore, initializeDataStore } from "./data";
-import { initializeMarkets, market } from "./market";
+import { createDataStorePDA, createMarketVault, createOraclePDA, dataStore, initializeDataStore } from "./data";
+import { initializeMarkets, exchange } from "./exchange";
 import { oracle } from "./oracle";
 
 import { IDL as chainlinkIDL } from "../external-programs/chainlink-store";
@@ -90,7 +90,7 @@ export const getMarkets = () => {
 export const getPrograms = () => {
     return {
         dataStore,
-        market,
+        exchange,
         oracle,
     }
 };
