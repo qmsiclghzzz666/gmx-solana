@@ -6,7 +6,7 @@ pub mod instructions;
 use data_store::utils::Authenticate;
 use instructions::*;
 
-declare_id!("AFxZM92h6tryw4hZx2puJRWjA4CQSkxmVkzJrDWJgJAL");
+declare_id!("HY9NoGiu68nqu3H44UySTX3rZ1db8Mx3b2CFcDNAmSQJ");
 
 #[program]
 pub mod exchange {

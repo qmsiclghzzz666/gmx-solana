@@ -5,9 +5,9 @@ seeds = false
 skip-lint = false
 
 [programs.localnet]
-data_store = "8hJ2dGQ2Ccr5G6iEqQQEoBApRSXt7Jn8Qyf9Qf3eLBX2"
-exchange = "AFxZM92h6tryw4hZx2puJRWjA4CQSkxmVkzJrDWJgJAL"
-oracle = "8LmVjFpoR6hupp6WZZb6EbmupaXvivaCEk2iAHskr1en"
+data_store = "EjfyBCoSMd6rjkUNz1SFfD7DBYbvAuaxhQs8phcu7Eb6"
+exchange = "HY9NoGiu68nqu3H44UySTX3rZ1db8Mx3b2CFcDNAmSQJ"
+oracle = "HBSdtMCkmjoP4MavNPRULTaEuYJ5fWudt4YzHvXWFdW8"
 
 [registry]
 url = "https://api.apr.dev"

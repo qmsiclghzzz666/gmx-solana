@@ -7,7 +7,7 @@ pub mod instructions;
 
 use self::instructions::*;
 
-declare_id!("8LmVjFpoR6hupp6WZZb6EbmupaXvivaCEk2iAHskr1en");
+declare_id!("HBSdtMCkmjoP4MavNPRULTaEuYJ5fWudt4YzHvXWFdW8");
 
 #[program]
 pub mod oracle {

@@ -21,7 +21,7 @@ use self::{
 };
 use gmx_solana_utils::price::Price;
 
-declare_id!("8hJ2dGQ2Ccr5G6iEqQQEoBApRSXt7Jn8Qyf9Qf3eLBX2");
+declare_id!("EjfyBCoSMd6rjkUNz1SFfD7DBYbvAuaxhQs8phcu7Eb6");
 
 #[program]
 pub mod data_store {
