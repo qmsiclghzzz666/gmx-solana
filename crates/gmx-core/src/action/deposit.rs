@@ -1,4 +1,4 @@
-use num_traits::{One, Zero};
+use num_traits::Zero;
 
 use crate::{
     market::{Market, MarketExt},
@@ -26,6 +26,7 @@ impl<M: Market> Deposit<M> {
         short_token_amount: M::Num,
         long_token_price: M::Num,
         short_token_price: M::Num,
+        float_to_wei_divisor: M::Num,
     ) -> Result<Self, crate::Error> {
         if long_token_amount.is_zero() && short_token_amount.is_zero() {
             return Err(crate::Error::EmptyDeposit);
@@ -36,8 +37,7 @@ impl<M: Market> Deposit<M> {
             short_token_amount,
             long_token_price,
             short_token_price,
-            // TODO: pass from args.
-            float_to_wei_divisor: One::one(),
+            float_to_wei_divisor,
         })
     }
 
@@ -94,7 +94,7 @@ impl<M: Market> Deposit<M> {
     }
 
     /// Execute.
-    pub fn execute(mut self) -> Result<M::Num, crate::Error> {
+    pub fn execute(mut self) -> Result<(), crate::Error> {
         debug_assert!(
             !self.long_token_amount.is_zero() || !self.short_token_amount.is_zero(),
             "shouldn't be empty deposit"
@@ -130,7 +130,8 @@ impl<M: Market> Deposit<M> {
             market_token_to_mint =
                 market_token_to_mint + self.deposit(false, pool_value, price_impact)?;
         }
-        Ok(market_token_to_mint)
+        self.market.mint(market_token_to_mint);
+        Ok(())
     }
 }
 
@@ -141,9 +142,15 @@ mod tests {
 
     #[test]
     fn basic() -> Result<(), crate::Error> {
+        const FLOAT_TOWEI_DIVISOR: u64 = 1;
         let mut market = TestMarket::default();
-        let amount = Deposit::try_new(&mut market, 1000, 0, 120, 1)?.execute()?;
-        println!("{amount}");
+        Deposit::try_new(&mut market, 1000, 0, 120, 1, FLOAT_TOWEI_DIVISOR)?.execute()?;
+        Deposit::try_new(&mut market, 0, 2000, 120, 1, FLOAT_TOWEI_DIVISOR)?.execute()?;
+        Deposit::try_new(&mut market, 100, 0, 100, 1, FLOAT_TOWEI_DIVISOR)?.execute()?;
+        println!("{market:?}, {}", market.pool_value(200, 1).unwrap());
+        Deposit::try_new(&mut market, 100, 0, 200, 1, FLOAT_TOWEI_DIVISOR)?.execute()?;
+        println!("{market:?}, {}", market.pool_value(200, 1).unwrap());
+        Deposit::try_new(&mut market, 100, 0, 200, 1, FLOAT_TOWEI_DIVISOR)?.execute()?;
         Ok(())
     }
 }

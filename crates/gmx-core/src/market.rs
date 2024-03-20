@@ -28,6 +28,9 @@ pub trait Market {
 
     /// Get total supply of the market token.
     fn total_supply(&self) -> &Self::Num;
+
+    /// Perform mint.
+    fn mint(&mut self, amount: Self::Num);
 }
 
 impl<'a, M: Market> Market for &'a mut M {
@@ -55,6 +58,10 @@ impl<'a, M: Market> Market for &'a mut M {
 
     fn total_supply(&self) -> &Self::Num {
         (**self).total_supply()
+    }
+
+    fn mint(&mut self, amount: Self::Num) {
+        (**self).mint(amount)
     }
 }
 

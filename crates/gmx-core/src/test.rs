@@ -38,7 +38,7 @@ impl Pool for TestPool {
 }
 
 /// Test Market.
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct TestMarket {
     primary: TestPool,
     price_impact: TestPool,
@@ -70,5 +70,10 @@ impl Market for TestMarket {
 
     fn total_supply(&self) -> &Self::Num {
         &self.total_supply
+    }
+
+    fn mint(&mut self, amount: Self::Num) {
+        self.total_supply += amount;
+        println!("minted: {amount}");
     }
 }
