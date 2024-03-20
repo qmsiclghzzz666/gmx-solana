@@ -1,0 +1,10 @@
+[package]
+name = "gmx-core"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+test = []
+
+[dependencies]
+thiserror = { workspace = true }

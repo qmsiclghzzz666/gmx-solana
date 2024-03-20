@@ -1025,6 +1025,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "gmx-core"
+version = "0.1.0"
+dependencies = [
+ "thiserror",
+]
+
+[[package]]
 name = "gmx-solana-utils"
 version = "0.1.0"
 dependencies = [
