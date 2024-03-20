@@ -6,6 +6,7 @@ import chai from 'chai';
 import chaiAsPromised from 'chai-as-promised';
 chai.use(chaiAsPromised);
 
+import { setInitialized, waitForSetup } from "./setup";
 import { EventManager } from "./event";
 import { createDataStorePDA, createMarketTokenMintPDA, createMarketVault, createOraclePDA, dataStore, initializeDataStore } from "./data";
 import { initializeMarkets, exchange } from "./exchange";
@@ -17,17 +18,6 @@ import { PublicKey } from "@solana/web3.js";
 import { createAssociatedTokenAccount } from "@solana/spl-token";
 
 export const expect = chai.expect;
-
-let isInitialized: Promise<boolean>;
-let resolveInitialized: (value: boolean | PromiseLike<boolean>) => void;
-
-isInitialized = new Promise<boolean>(resolve => {
-    resolveInitialized = resolve;
-});
-
-export async function waitForSetup() {
-    await isInitialized;
-}
 
 // Get anchor provider.
 export const getProvider = () => provider;
@@ -73,7 +63,8 @@ let user0FakeFakeUsdGTokenAccount: PublicKey;
 let fakeTokenVault: PublicKey;
 let usdGVault: PublicKey;
 
-export const getAddresses = () => {
+export const getAddresses = async () => {
+    await waitForSetup();
     return {
         dataStoreAddress,
         oracleAddress,
@@ -86,7 +77,8 @@ export const getAddresses = () => {
 }
 
 let markets: Awaited<ReturnType<typeof initializeMarkets>>;
-export const getMarkets = () => {
+export const getMarkets = async () => {
+    await waitForSetup();
     return markets;
 }
 
@@ -173,7 +165,7 @@ export const mochaGlobalSetup = async () => {
     user0FakeFakeUsdGTokenAccount = await createAssociatedTokenAccount(provider.connection, user0, marketTokenMint, user0.publicKey);
 
     console.log("[Done.]");
-    resolveInitialized(true);
+    setInitialized();
 };
 
 export const mochaGlobalTeardown = async () => {

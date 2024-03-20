@@ -1,26 +1,36 @@
 import { BN } from "@coral-xyz/anchor";
-import { Keypair } from "@solana/web3.js";
+import { Keypair, PublicKey } from "@solana/web3.js";
 import { createDepositPDA, createNoncePDA, createRolesPDA } from "../../utils/data";
-import { getAddresses, getMarkets, getPrograms, getProvider, getUsers, waitForSetup } from "../../utils/fixtures";
+import { getAddresses, getMarkets, getPrograms, getUsers } from "../../utils/fixtures";
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 
-describe("exchange: deposit", async () => {
-    await waitForSetup();
+describe("exchange: deposit", () => {
     const { exchange, dataStore } = getPrograms();
     const { signer0, user0 } = getUsers();
-    const {
-        dataStoreAddress,
-        user0FakeTokenAccount,
-        user0UsdGTokenAccount,
-        user0FakeFakeUsdGTokenAccount,
-        fakeTokenVault,
-        usdGVault,
-    } = getAddresses();
 
-    const { marketFakeFakeUsdG } = getMarkets();
+    let dataStoreAddress: PublicKey;
+    let user0FakeTokenAccount: PublicKey;
+    let user0UsdGTokenAccount: PublicKey;
+    let user0FakeFakeUsdGTokenAccount: PublicKey;
+    let fakeTokenVault: PublicKey;
+    let usdGVault: PublicKey;
+    let marketFakeFakeUsdG: PublicKey;
+    let roles: PublicKey;
+    let nonce: PublicKey;
 
-    const [roles] = createRolesPDA(dataStoreAddress, signer0.publicKey);
-    const [nonce] = createNoncePDA(dataStoreAddress);
+    before(async () => {
+        ({
+            dataStoreAddress,
+            user0FakeTokenAccount,
+            user0UsdGTokenAccount,
+            user0FakeFakeUsdGTokenAccount,
+            fakeTokenVault,
+            usdGVault,
+        } = await getAddresses());
+        ({ marketFakeFakeUsdG } = await getMarkets());
+        [roles] = createRolesPDA(dataStoreAddress, signer0.publicKey);
+        [nonce] = createNoncePDA(dataStoreAddress);
+    });
 
     it("create deposit", async () => {
         const depositNonce = await dataStore.methods.getNonceBytes().accounts({ nonce }).view();

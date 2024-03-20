@@ -1,4 +1,4 @@
-import { Keypair } from '@solana/web3.js';
+import { Keypair, PublicKey } from '@solana/web3.js';
 
 import { expect, getAddresses, getPrograms, getProvider, getUsers } from "../../utils/fixtures";
 import { createNoncePDA, createRolesPDA, createTokenConfigPDA } from "../../utils/data";
@@ -7,10 +7,16 @@ import { AnchorError } from '@coral-xyz/anchor';
 describe("data store: Nonce", () => {
     const { dataStore } = getPrograms();
     const { signer0 } = getUsers();
-    const { dataStoreAddress } = getAddresses();
 
-    const [roles] = createRolesPDA(dataStoreAddress, signer0.publicKey);
-    const [nonce] = createNoncePDA(dataStoreAddress);
+    let dataStoreAddress: PublicKey;
+    let roles: PublicKey;
+    let nonce: PublicKey;
+    before(async () => {
+        ({ dataStoreAddress } = await getAddresses());
+
+        [roles] = createRolesPDA(dataStoreAddress, signer0.publicKey);
+        [nonce] = createNoncePDA(dataStoreAddress);
+    });
 
     it("inc nonce", async () => {
         const beforeNonce = await dataStore.methods.getNonceBytes().accounts({

@@ -1,4 +1,4 @@
-import { Keypair } from '@solana/web3.js';
+import { Keypair, PublicKey } from '@solana/web3.js';
 
 import { expect, getAddresses, getPrograms, getProvider, getUsers } from "../../utils/fixtures";
 import { createRolesPDA, createTokenConfigPDA } from "../../utils/data";
@@ -8,16 +8,19 @@ describe("data store: TokenConfig", () => {
     const provider = getProvider();
     const { dataStore } = getPrograms();
     const { signer0 } = getUsers();
-    const { dataStoreAddress } = getAddresses();
-
-    const [roles] = createRolesPDA(dataStoreAddress, signer0.publicKey);
 
     const key = Keypair.generate().publicKey;
     const fooTokenConfigKey = `FOO:${key}`;
-    const [fooTokenConfigPDA] = createTokenConfigPDA(dataStoreAddress, fooTokenConfigKey);
     const fooAddress = Keypair.generate().publicKey;
 
+    let dataStoreAddress: PublicKey;
+    let roles: PublicKey;
+    let fooTokenConfigPDA: PublicKey;
     before("init token config", async () => {
+        ({ dataStoreAddress } = await getAddresses());
+        [roles] = createRolesPDA(dataStoreAddress, signer0.publicKey);
+        [fooTokenConfigPDA] = createTokenConfigPDA(dataStoreAddress, fooTokenConfigKey);
+
         await dataStore.methods.initializeTokenConfig(fooTokenConfigKey, fooAddress, 60, 18, 2).accounts({
             authority: signer0.publicKey,
             store: dataStoreAddress,

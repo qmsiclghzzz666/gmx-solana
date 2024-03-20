@@ -2,6 +2,7 @@ import * as anchor from "@coral-xyz/anchor";
 import { getAddresses, getExternalPrograms, getPrograms, getProvider, getUsers, expect } from "../utils/fixtures";
 import { createRolesPDA, createTokenConfigPDA, dataStore } from "../utils/data";
 import { BTC_FEED, BTC_TOKEN_MINT, SOL_FEED, SOL_TOKEN_MINT } from "../utils/token";
+import { PublicKey } from "@solana/web3.js";
 
 describe("oracle", () => {
     const provider = getProvider();
@@ -9,12 +10,17 @@ describe("oracle", () => {
     const { chainlink } = getExternalPrograms();
     const { oracle } = getPrograms();
 
-    const { dataStoreAddress, oracleAddress } = getAddresses();
     const { signer0 } = getUsers();
 
-    const [roles] = createRolesPDA(dataStoreAddress, signer0.publicKey);
-
     const mockFeedAccount = anchor.web3.Keypair.generate();
+
+    let dataStoreAddress: PublicKey;
+    let oracleAddress: PublicKey;
+    let roles: PublicKey;
+    before(async () => {
+        ({ dataStoreAddress, oracleAddress } = await getAddresses());
+        [roles] = createRolesPDA(dataStoreAddress, signer0.publicKey);
+    });
 
     it("create a new price feed", async () => {
         try {

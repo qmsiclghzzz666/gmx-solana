@@ -1,19 +1,23 @@
 import { AnchorError } from "@coral-xyz/anchor";
 import { createRolesPDA } from "../../utils/data";
 import { expect, getAddresses, getPrograms, getProvider, getUsers } from "../../utils/fixtures";
+import { PublicKey } from "@solana/web3.js";
 
 describe("data store: Roles", () => {
     const provider = getProvider();
     const { signer0 } = getUsers();
-    const { dataStoreAddress } = getAddresses();
     const { dataStore } = getPrograms();
-
-    const [signer0Roles] = createRolesPDA(dataStoreAddress, signer0.publicKey);
-    const [providerRoles] = createRolesPDA(dataStoreAddress, provider.publicKey);
 
     const otherRole = "OTHER";
 
+    let dataStoreAddress: PublicKey;
+    let signer0Roles: PublicKey;
+    let providerRoles: PublicKey;
     before(async () => {
+        ({ dataStoreAddress } = await getAddresses());
+        [signer0Roles] = createRolesPDA(dataStoreAddress, signer0.publicKey);
+        [providerRoles] = createRolesPDA(dataStoreAddress, provider.publicKey);
+
         await dataStore.methods.enableRole(otherRole).accounts({
             authority: provider.publicKey,
             store: dataStoreAddress,

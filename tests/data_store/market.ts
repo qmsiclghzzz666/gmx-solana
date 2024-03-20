@@ -1,4 +1,4 @@
-import { Keypair, Transaction } from '@solana/web3.js';
+import { Keypair, PublicKey, Transaction } from '@solana/web3.js';
 import { BN } from '@coral-xyz/anchor';
 
 import { expect, getAddresses, getPrograms, getProvider, getUsers } from "../../utils/fixtures";
@@ -9,16 +9,21 @@ describe("data store: Market", () => {
     const { dataStore } = getPrograms();
     const { signer0, user0 } = getUsers();
 
-    const { dataStoreAddress } = getAddresses();
     const provider = getProvider();
-
-    const [roles] = createRolesPDA(dataStoreAddress, signer0.publicKey);
 
     const indexToken = Keypair.generate().publicKey;
     const longToken = Keypair.generate().publicKey;
     const shortToken = Keypair.generate().publicKey;
     const marketToken = Keypair.generate().publicKey;
-    const [marketPDA] = createMarketPDA(dataStoreAddress, marketToken);
+
+    let dataStoreAddress: PublicKey;
+    let roles: PublicKey;
+    let marketPDA: PublicKey;
+    before(async () => {
+        ({ dataStoreAddress } = await getAddresses());
+        [roles] = createRolesPDA(dataStoreAddress, signer0.publicKey);
+        [marketPDA] = createMarketPDA(dataStoreAddress, marketToken);
+    });
 
     it("init and remove a market", async () => {
         await dataStore.methods.initializeMarket(marketToken, indexToken, longToken, shortToken).accounts({
