@@ -15,6 +15,12 @@ pub mod action;
 /// Error type.
 pub mod error;
 
+/// Number utils.
+pub mod num;
+
+/// Utils.
+pub mod utils;
+
 /// Utils for testing.
 #[cfg(any(test, feature = "test"))]
 pub mod test;

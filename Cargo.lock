@@ -1028,6 +1028,7 @@ dependencies = [
 name = "gmx-core"
 version = "0.1.0"
 dependencies = [
+ "num-traits",
  "thiserror",
 ]
 

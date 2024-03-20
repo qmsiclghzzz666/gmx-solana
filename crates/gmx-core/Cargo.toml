@@ -7,4 +7,5 @@ edition = "2021"
 test = []
 
 [dependencies]
+num-traits = "0.2.18"
 thiserror = { workspace = true }
