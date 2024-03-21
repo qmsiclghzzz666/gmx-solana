@@ -973,6 +973,7 @@ dependencies = [
  "anchor-lang",
  "anchor-spl",
  "data_store",
+ "gmx-core",
 ]
 
 [[package]]

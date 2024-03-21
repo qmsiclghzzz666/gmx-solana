@@ -27,6 +27,10 @@ pub mod exchange {
     ) -> Result<()> {
         instructions::create_deposit(ctx, nonce, params)
     }
+    #[access_control(Authenticate::only_order_keeper(&ctx))]
+    pub fn execute_deposit(ctx: Context<ExecuteDeposit>) -> Result<()> {
+        instructions::execute_deposit(ctx)
+    }
 }
 
 /// Errors of market program.
