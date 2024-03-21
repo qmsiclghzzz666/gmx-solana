@@ -11,7 +11,7 @@ pub trait Market {
     type Num: MulDiv<Signed = Self::Signed> + Num;
 
     /// Signed number type used in the market.
-    type Signed: UnsignedAbs<Self::Num> + TryFrom<Self::Num> + Num;
+    type Signed: UnsignedAbs<Unsigned = Self::Num> + TryFrom<Self::Num> + Num;
 
     /// Pool type.
     type Pool: Pool<Num = Self::Num, Signed = Self::Signed>;

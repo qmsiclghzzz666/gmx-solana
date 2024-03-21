@@ -10,6 +10,9 @@ pub enum Error {
     /// Overflow.
     #[error("overflow")]
     Overflow,
+    /// Underflow.
+    #[error("underflow")]
+    Underflow,
     /// Invalid pool value for deposit.
     #[error("invalid pool value for deposit")]
     InvalidPoolValueForDeposit,

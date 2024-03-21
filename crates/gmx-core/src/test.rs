@@ -1,33 +1,49 @@
-use crate::{market::Market, pool::Pool};
+use std::fmt;
+
+use crate::{
+    market::Market,
+    num::{MulDiv, Num, UnsignedAbs},
+    pool::Pool,
+};
+use num_traits::{CheckedSub, One, Signed};
 
 /// Test Pool.
 #[derive(Debug, Default)]
-pub struct TestPool {
-    long_token_amount: u64,
-    short_token_amount: u64,
+pub struct TestPool<T> {
+    long_token_amount: T,
+    short_token_amount: T,
 }
 
-impl Pool for TestPool {
-    type Num = u64;
+impl<T> Pool for TestPool<T>
+where
+    T: MulDiv + Num + CheckedSub,
+{
+    type Num = T;
 
-    type Signed = i64;
+    type Signed = T::Signed;
 
     fn long_token_amount(&self) -> Self::Num {
-        self.long_token_amount
+        self.long_token_amount.clone()
     }
 
     fn short_token_amount(&self) -> Self::Num {
-        self.short_token_amount
+        self.short_token_amount.clone()
     }
 
     fn apply_delta_to_long_token_amount(
         &mut self,
         delta: Self::Signed,
     ) -> Result<(), crate::Error> {
-        if delta > 0 {
-            self.long_token_amount += delta.unsigned_abs();
+        if delta.is_positive() {
+            self.long_token_amount = self
+                .long_token_amount
+                .checked_add(&delta.unsigned_abs())
+                .ok_or(crate::Error::Overflow)?;
         } else {
-            self.long_token_amount -= delta.unsigned_abs();
+            self.long_token_amount = self
+                .long_token_amount
+                .checked_sub(&delta.unsigned_abs())
+                .ok_or(crate::Error::Underflow)?;
         }
         Ok(())
     }
@@ -36,10 +52,16 @@ impl Pool for TestPool {
         &mut self,
         delta: Self::Signed,
     ) -> Result<(), crate::Error> {
-        if delta > 0 {
-            self.short_token_amount += delta.unsigned_abs();
+        if delta.is_positive() {
+            self.short_token_amount = self
+                .short_token_amount
+                .checked_add(&delta.unsigned_abs())
+                .ok_or(crate::Error::Overflow)?;
         } else {
-            self.short_token_amount -= delta.unsigned_abs();
+            self.short_token_amount = self
+                .short_token_amount
+                .checked_sub(&delta.unsigned_abs())
+                .ok_or(crate::Error::Underflow)?;
         }
         Ok(())
     }
@@ -47,18 +69,22 @@ impl Pool for TestPool {
 
 /// Test Market.
 #[derive(Debug, Default)]
-pub struct TestMarket {
-    primary: TestPool,
-    price_impact: TestPool,
-    total_supply: u64,
+pub struct TestMarket<T> {
+    primary: TestPool<T>,
+    price_impact: TestPool<T>,
+    total_supply: T,
 }
 
-impl Market for TestMarket {
-    type Num = u64;
+impl<T> Market for TestMarket<T>
+where
+    T: MulDiv + Num + CheckedSub + fmt::Display,
+    T::Signed: Num,
+{
+    type Num = T;
 
-    type Signed = i64;
+    type Signed = T::Signed;
 
-    type Pool = TestPool;
+    type Pool = TestPool<T>;
 
     fn pool(&self) -> &Self::Pool {
         &self.primary
@@ -83,13 +109,13 @@ impl Market for TestMarket {
     fn mint(&mut self, amount: &Self::Num) -> Result<(), crate::Error> {
         self.total_supply = self
             .total_supply
-            .checked_add(*amount)
+            .checked_add(amount)
             .ok_or(crate::Error::Overflow)?;
         println!("minted: {amount}");
         Ok(())
     }
 
     fn usd_to_amount_divisor(&self) -> Self::Num {
-        1
+        One::one()
     }
 }
