@@ -1,4 +1,4 @@
-use num_traits::Zero;
+use num_traits::{CheckedAdd, CheckedMul, Zero};
 
 use crate::{
     market::{Market, MarketExt},
@@ -41,12 +41,13 @@ impl<M: Market> Deposit<M> {
         })
     }
 
-    fn price_impact(&self) -> (M::Signed, M::Num, M::Num) {
-        let long_token_usd_value = self.long_token_amount.clone() * self.long_token_price.clone();
-        let short_token_usd_value =
-            self.short_token_amount.clone() * self.short_token_price.clone();
+    fn price_impact(&self) -> Option<(M::Signed, M::Num, M::Num)> {
+        let long_token_usd_value = self.long_token_amount.checked_mul(&self.long_token_price)?;
+        let short_token_usd_value = self
+            .short_token_amount
+            .checked_mul(&self.short_token_price)?;
         // TODO: calculate the price impart.
-        (Zero::zero(), long_token_usd_value, short_token_usd_value)
+        Some((Zero::zero(), long_token_usd_value, short_token_usd_value))
     }
 
     fn deposit(
@@ -55,40 +56,43 @@ impl<M: Market> Deposit<M> {
         pool_value: M::Num,
         _price_impact: M::Signed,
     ) -> Result<M::Num, crate::Error> {
-        let mut mint_amount = Zero::zero();
+        let mut mint_amount: M::Num = Zero::zero();
         let supply = self.market.total_supply();
         if pool_value.is_zero() && !supply.is_zero() {
             return Err(crate::Error::InvalidPoolValueForDeposit);
         }
         let (amount, price) = if is_long_token {
-            (
-                self.long_token_amount.clone(),
-                self.long_token_price.clone(),
-            )
+            (&self.long_token_amount, &self.long_token_price)
         } else {
-            (
-                self.short_token_amount.clone(),
-                self.short_token_price.clone(),
-            )
+            (&self.short_token_amount, &self.short_token_price)
         };
         // TODO: handle fees.
         // TODO: apply price impact.
         mint_amount = mint_amount
-            + utils::usd_to_market_token_amount(
-                amount.clone() * price,
-                pool_value,
-                supply.clone(),
-                self.float_to_wei_divisor.clone(),
+            .checked_add(
+                &utils::usd_to_market_token_amount(
+                    amount.checked_mul(price).ok_or(crate::Error::Computation)?,
+                    pool_value,
+                    supply.clone(),
+                    self.float_to_wei_divisor.clone(),
+                )
+                .ok_or(crate::Error::Computation)?,
             )
             .ok_or(crate::Error::Computation)?;
         if is_long_token {
             self.market.pool_mut().apply_delta_to_long_token_amount(
-                amount.try_into().map_err(|_| crate::Error::Convert)?,
-            );
+                amount
+                    .clone()
+                    .try_into()
+                    .map_err(|_| crate::Error::Convert)?,
+            )?;
         } else {
             self.market.pool_mut().apply_delta_to_short_token_amount(
-                amount.try_into().map_err(|_| crate::Error::Convert)?,
-            );
+                amount
+                    .clone()
+                    .try_into()
+                    .map_err(|_| crate::Error::Convert)?,
+            )?;
         }
         Ok(mint_amount)
     }
@@ -99,38 +103,42 @@ impl<M: Market> Deposit<M> {
             !self.long_token_amount.is_zero() || !self.short_token_amount.is_zero(),
             "shouldn't be empty deposit"
         );
-        let (price_impact, long_token_usd_value, short_token_usd_value) = self.price_impact();
-        let mut market_token_to_mint = Zero::zero();
+        let (price_impact, long_token_usd_value, short_token_usd_value) =
+            self.price_impact().ok_or(crate::Error::Computation)?;
+        let mut market_token_to_mint: M::Num = Zero::zero();
         let pool_value = self
             .market
-            .pool_value(
-                self.long_token_price.clone(),
-                self.short_token_price.clone(),
-            )
+            .pool_value(&self.long_token_price, &self.short_token_price)
             .ok_or(crate::Error::Computation)?;
         if !self.long_token_amount.is_zero() {
             let price_impact = long_token_usd_value
                 .clone()
                 .checked_mul_div_with_signed_numberator(
                     price_impact.clone(),
-                    long_token_usd_value.clone() + short_token_usd_value.clone(),
+                    long_token_usd_value
+                        .checked_add(&short_token_usd_value)
+                        .ok_or(crate::Error::Computation)?,
                 )
                 .ok_or(crate::Error::Computation)?;
-            market_token_to_mint =
-                market_token_to_mint + self.deposit(true, pool_value.clone(), price_impact)?;
+            market_token_to_mint = market_token_to_mint
+                .checked_add(&self.deposit(true, pool_value.clone(), price_impact)?)
+                .ok_or(crate::Error::Computation)?;
         }
         if !self.short_token_amount.is_zero() {
             let price_impact = short_token_usd_value
                 .clone()
                 .checked_mul_div_with_signed_numberator(
                     price_impact,
-                    long_token_usd_value + short_token_usd_value,
+                    long_token_usd_value
+                        .checked_add(&short_token_usd_value)
+                        .ok_or(crate::Error::Computation)?,
                 )
                 .ok_or(crate::Error::Computation)?;
-            market_token_to_mint =
-                market_token_to_mint + self.deposit(false, pool_value, price_impact)?;
+            market_token_to_mint = market_token_to_mint
+                .checked_add(&self.deposit(false, pool_value, price_impact)?)
+                .ok_or(crate::Error::Computation)?;
         }
-        self.market.mint(market_token_to_mint);
+        self.market.mint(&market_token_to_mint)?;
         Ok(())
     }
 }
@@ -142,15 +150,15 @@ mod tests {
 
     #[test]
     fn basic() -> Result<(), crate::Error> {
-        const FLOAT_TOWEI_DIVISOR: u64 = 1;
+        const FLOAT_TO_WEI_DIVISOR: u64 = 1;
         let mut market = TestMarket::default();
-        Deposit::try_new(&mut market, 1000, 0, 120, 1, FLOAT_TOWEI_DIVISOR)?.execute()?;
-        Deposit::try_new(&mut market, 0, 2000, 120, 1, FLOAT_TOWEI_DIVISOR)?.execute()?;
-        Deposit::try_new(&mut market, 100, 0, 100, 1, FLOAT_TOWEI_DIVISOR)?.execute()?;
-        println!("{market:?}, {}", market.pool_value(200, 1).unwrap());
-        Deposit::try_new(&mut market, 100, 0, 200, 1, FLOAT_TOWEI_DIVISOR)?.execute()?;
-        println!("{market:?}, {}", market.pool_value(200, 1).unwrap());
-        Deposit::try_new(&mut market, 100, 0, 200, 1, FLOAT_TOWEI_DIVISOR)?.execute()?;
+        Deposit::try_new(&mut market, 1000, 0, 120, 1, FLOAT_TO_WEI_DIVISOR)?.execute()?;
+        Deposit::try_new(&mut market, 0, 2000, 120, 1, FLOAT_TO_WEI_DIVISOR)?.execute()?;
+        Deposit::try_new(&mut market, 100, 0, 100, 1, FLOAT_TO_WEI_DIVISOR)?.execute()?;
+        println!("{market:?}, {}", market.pool_value(&200, &1).unwrap());
+        Deposit::try_new(&mut market, 100, 0, 200, 1, FLOAT_TO_WEI_DIVISOR)?.execute()?;
+        println!("{market:?}, {}", market.pool_value(&200, &1).unwrap());
+        Deposit::try_new(&mut market, 100, 0, 200, 1, FLOAT_TO_WEI_DIVISOR)?.execute()?;
         Ok(())
     }
 }

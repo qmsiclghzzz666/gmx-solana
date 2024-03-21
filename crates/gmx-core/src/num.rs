@@ -1,4 +1,9 @@
-use num_traits::Signed;
+use num_traits::{CheckedAdd, CheckedMul, Signed};
+
+/// Num trait used in GMX.
+pub trait Num: num_traits::Num + CheckedAdd + CheckedMul + Clone {}
+
+impl<T: num_traits::Num + CheckedAdd + CheckedMul + Clone> Num for T {}
 
 /// Convert signed value to unsigned.
 pub trait UnsignedAbs<Unsigned>: Signed {

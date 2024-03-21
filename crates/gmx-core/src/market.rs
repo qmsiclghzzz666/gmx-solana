@@ -1,15 +1,16 @@
 use crate::{
-    num::{MulDiv, UnsignedAbs},
+    num::{MulDiv, Num, UnsignedAbs},
     pool::{Pool, PoolExt},
 };
+use num_traits::CheckedAdd;
 
 /// A market.
 pub trait Market {
     /// Unsigned number type used in the market.
-    type Num: MulDiv<Signed = Self::Signed> + Clone;
+    type Num: MulDiv<Signed = Self::Signed> + Num;
 
     /// Signed number type used in the market.
-    type Signed: UnsignedAbs<Self::Num> + TryFrom<Self::Num> + Clone;
+    type Signed: UnsignedAbs<Self::Num> + TryFrom<Self::Num> + Num;
 
     /// Pool type.
     type Pool: Pool<Num = Self::Num, Signed = Self::Signed>;
@@ -30,7 +31,7 @@ pub trait Market {
     fn total_supply(&self) -> &Self::Num;
 
     /// Perform mint.
-    fn mint(&mut self, amount: Self::Num);
+    fn mint(&mut self, amount: &Self::Num) -> Result<(), crate::Error>;
 }
 
 impl<'a, M: Market> Market for &'a mut M {
@@ -60,7 +61,7 @@ impl<'a, M: Market> Market for &'a mut M {
         (**self).total_supply()
     }
 
-    fn mint(&mut self, amount: Self::Num) {
+    fn mint(&mut self, amount: &Self::Num) -> Result<(), crate::Error> {
         (**self).mint(amount)
     }
 }
@@ -70,12 +71,12 @@ pub trait MarketExt: Market {
     /// Get the usd value of primary pool.
     fn pool_value(
         &self,
-        long_token_price: Self::Num,
-        short_token_price: Self::Num,
+        long_token_price: &Self::Num,
+        short_token_price: &Self::Num,
     ) -> Option<Self::Num> {
-        let long_value = self.pool().long_token_usd_value(long_token_price);
-        let short_value = self.pool().short_token_usd_value(short_token_price);
-        Some(long_value + short_value)
+        let long_value = self.pool().long_token_usd_value(long_token_price)?;
+        let short_value = self.pool().short_token_usd_value(short_token_price)?;
+        long_value.checked_add(&short_value)
     }
 }
 

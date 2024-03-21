@@ -20,20 +20,28 @@ impl Pool for TestPool {
         self.short_token_amount
     }
 
-    fn apply_delta_to_long_token_amount(&mut self, delta: Self::Signed) {
+    fn apply_delta_to_long_token_amount(
+        &mut self,
+        delta: Self::Signed,
+    ) -> Result<(), crate::Error> {
         if delta > 0 {
             self.long_token_amount += delta.unsigned_abs();
         } else {
             self.long_token_amount -= delta.unsigned_abs();
         }
+        Ok(())
     }
 
-    fn apply_delta_to_short_token_amount(&mut self, delta: Self::Signed) {
+    fn apply_delta_to_short_token_amount(
+        &mut self,
+        delta: Self::Signed,
+    ) -> Result<(), crate::Error> {
         if delta > 0 {
             self.short_token_amount += delta.unsigned_abs();
         } else {
             self.short_token_amount -= delta.unsigned_abs();
         }
+        Ok(())
     }
 }
 
@@ -72,8 +80,12 @@ impl Market for TestMarket {
         &self.total_supply
     }
 
-    fn mint(&mut self, amount: Self::Num) {
-        self.total_supply += amount;
+    fn mint(&mut self, amount: &Self::Num) -> Result<(), crate::Error> {
+        self.total_supply = self
+            .total_supply
+            .checked_add(*amount)
+            .ok_or(crate::Error::Overflow)?;
         println!("minted: {amount}");
+        Ok(())
     }
 }

@@ -1,4 +1,5 @@
-use num_traits::Num;
+use crate::num::Num;
+use num_traits::CheckedMul;
 
 /// A pool for holding tokens.
 pub trait Pool {
@@ -18,22 +19,26 @@ pub trait Pool {
     fn short_token_amount(&self) -> Self::Num;
 
     /// Apply delta to long token pool amount.
-    fn apply_delta_to_long_token_amount(&mut self, delta: Self::Signed);
+    fn apply_delta_to_long_token_amount(&mut self, delta: Self::Signed)
+        -> Result<(), crate::Error>;
 
     /// Apply delta to short token pool amount.
-    fn apply_delta_to_short_token_amount(&mut self, delta: Self::Signed);
+    fn apply_delta_to_short_token_amount(
+        &mut self,
+        delta: Self::Signed,
+    ) -> Result<(), crate::Error>;
 }
 
 /// Extension trait for [`Pool`] with utils.
 pub trait PoolExt: Pool {
     /// Get the long token value in USD.
-    fn long_token_usd_value(&self, price: Self::Num) -> Self::Num {
-        self.long_token_amount() * price
+    fn long_token_usd_value(&self, price: &Self::Num) -> Option<Self::Num> {
+        self.long_token_amount().checked_mul(price)
     }
 
     /// Get the short token value in USD.
-    fn short_token_usd_value(&self, price: Self::Num) -> Self::Num {
-        self.short_token_amount() * price
+    fn short_token_usd_value(&self, price: &Self::Num) -> Option<Self::Num> {
+        self.short_token_amount().checked_mul(price)
     }
 }
 

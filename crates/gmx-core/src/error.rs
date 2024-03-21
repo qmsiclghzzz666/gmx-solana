@@ -4,9 +4,12 @@ pub enum Error {
     /// Empty deposit.
     #[error("empty deposit")]
     EmptyDeposit,
-    /// Computation error.
-    #[error("computation error")]
+    /// Unknown computation error.
+    #[error("unknown computation error")]
     Computation,
+    /// Overflow.
+    #[error("overflow")]
+    Overflow,
     /// Invalid pool value for deposit.
     #[error("invalid pool value for deposit")]
     InvalidPoolValueForDeposit,
