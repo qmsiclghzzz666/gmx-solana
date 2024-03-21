@@ -15,7 +15,6 @@ pub struct Deposit<M: Market> {
     short_token_amount: M::Num,
     long_token_price: M::Num,
     short_token_price: M::Num,
-    float_to_wei_divisor: M::Num,
 }
 
 impl<M: Market> Deposit<M> {
@@ -26,7 +25,6 @@ impl<M: Market> Deposit<M> {
         short_token_amount: M::Num,
         long_token_price: M::Num,
         short_token_price: M::Num,
-        float_to_wei_divisor: M::Num,
     ) -> Result<Self, crate::Error> {
         if long_token_amount.is_zero() && short_token_amount.is_zero() {
             return Err(crate::Error::EmptyDeposit);
@@ -37,7 +35,6 @@ impl<M: Market> Deposit<M> {
             short_token_amount,
             long_token_price,
             short_token_price,
-            float_to_wei_divisor,
         })
     }
 
@@ -74,7 +71,7 @@ impl<M: Market> Deposit<M> {
                     amount.checked_mul(price).ok_or(crate::Error::Computation)?,
                     pool_value,
                     supply.clone(),
-                    self.float_to_wei_divisor.clone(),
+                    self.market.usd_to_amount_divisor(),
                 )
                 .ok_or(crate::Error::Computation)?,
             )
@@ -145,20 +142,18 @@ impl<M: Market> Deposit<M> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::test::TestMarket;
+    use crate::{market::MarketExt, test::TestMarket};
 
     #[test]
     fn basic() -> Result<(), crate::Error> {
-        const FLOAT_TO_WEI_DIVISOR: u64 = 1;
         let mut market = TestMarket::default();
-        Deposit::try_new(&mut market, 1000, 0, 120, 1, FLOAT_TO_WEI_DIVISOR)?.execute()?;
-        Deposit::try_new(&mut market, 0, 2000, 120, 1, FLOAT_TO_WEI_DIVISOR)?.execute()?;
-        Deposit::try_new(&mut market, 100, 0, 100, 1, FLOAT_TO_WEI_DIVISOR)?.execute()?;
+        market.deposit(1000, 0, 120, 1)?.execute()?;
+        market.deposit(0, 2000, 120, 1)?.execute()?;
+        market.deposit(100, 0, 100, 1)?.execute()?;
         println!("{market:?}, {}", market.pool_value(&200, &1).unwrap());
-        Deposit::try_new(&mut market, 100, 0, 200, 1, FLOAT_TO_WEI_DIVISOR)?.execute()?;
+        market.deposit(100, 0, 200, 1)?.execute()?;
         println!("{market:?}, {}", market.pool_value(&200, &1).unwrap());
-        Deposit::try_new(&mut market, 100, 0, 200, 1, FLOAT_TO_WEI_DIVISOR)?.execute()?;
+        market.deposit(100, 0, 200, 1)?.execute()?;
         Ok(())
     }
 }

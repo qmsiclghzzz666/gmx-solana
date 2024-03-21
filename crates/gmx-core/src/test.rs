@@ -88,4 +88,8 @@ impl Market for TestMarket {
         println!("minted: {amount}");
         Ok(())
     }
+
+    fn usd_to_amount_divisor(&self) -> Self::Num {
+        1
+    }
 }
