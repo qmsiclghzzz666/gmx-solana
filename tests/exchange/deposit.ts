@@ -1,11 +1,12 @@
 import { BN } from "@coral-xyz/anchor";
-import { Keypair, PublicKey } from "@solana/web3.js";
-import { createDepositPDA, createNoncePDA, createOraclePDA, createRolesPDA, createTokenConfigPDA } from "../../utils/data";
-import { getAddresses, getExternalPrograms, getMarkets, getPrograms, getUsers } from "../../utils/fixtures";
+import { ComputeBudgetProgram, Keypair, PublicKey, Transaction } from "@solana/web3.js";
+import { createDepositPDA, createNoncePDA, createRolesPDA, createTokenConfigPDA } from "../../utils/data";
+import { getAddresses, getExternalPrograms, getMarkets, getPrograms, getProvider, getUsers, expect } from "../../utils/fixtures";
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { BTC_FEED, USDC_FEED } from "../../utils/token";
 
 describe("exchange: deposit", () => {
+    const provider = getProvider();
     const { exchange, dataStore, oracle } = getPrograms();
     const { chainlink } = getExternalPrograms();
     const { signer0, user0 } = getUsers();
@@ -79,8 +80,8 @@ describe("exchange: deposit", () => {
             ]).signers([signer0, user0]).rpc();
             console.log("created at", tx);
         }
-        {
-            const tx = await exchange.methods.executeDeposit().accounts({
+        try {
+            const ix = await exchange.methods.executeDeposit().accounts({
                 authority: signer0.publicKey,
                 store: dataStoreAddress,
                 dataStoreProgram: dataStore.programId,
@@ -110,8 +111,26 @@ describe("exchange: deposit", () => {
                     isSigner: false,
                     isWritable: false,
                 },
-            ]).signers([signer0]).rpc();
+            ]).instruction();
+            const modifyComputeUnits = ComputeBudgetProgram.setComputeUnitLimit({
+                units: 200_000
+            });
+            const addPriorityFee = ComputeBudgetProgram.setComputeUnitPrice({
+                microLamports: 1,
+            });
+            const tx = await provider.sendAndConfirm(
+                new Transaction()
+                    .add(modifyComputeUnits)
+                    .add(addPriorityFee)
+                    .add(ix),
+                [signer0],
+            );
             console.log("executed at", tx);
+        } catch (error) {
+            throw error;
+        } finally {
+            const afterExecution = await dataStore.account.oracle.fetch(oracleAddress);
+            expect(afterExecution.primary.prices.length).equals(0);
         }
     });
 });
