@@ -6,7 +6,7 @@ use data_store::{
 };
 use gmx_solana_utils::price::{Decimal, Price};
 
-use crate::OracleError;
+use crate::{utils::Chainlink, OracleError};
 
 /// Set the oracle prices from price feed.
 pub fn set_prices_from_price_feed<'info>(
@@ -29,7 +29,7 @@ pub fn set_prices_from_price_feed<'info>(
         OracleError::NotEnoughAccountInfos
     );
     // Assume the remaining accounts are arranged in the following way:
-    // [address, feed; tokens.len()] [..remaining]
+    // [token_config, feed; tokens.len()] [..remaining]
     for (idx, token) in tokens.iter().enumerate() {
         let token_config_idx = idx << 1;
         let feed_idx = token_config_idx + 1;
@@ -40,7 +40,6 @@ pub fn set_prices_from_price_feed<'info>(
             &remaining[feed_idx],
             token,
         )?;
-        // ctx.accounts.oracle.primary.set(token, price)?;
         data_store::cpi::set_price(ctx.accounts.set_price_ctx(), *token, price)?;
     }
     Ok(())
@@ -91,18 +90,9 @@ impl<'info> Authentication<'info> for SetPricesFromPriceFeed<'info> {
     }
 }
 
-/// The Chainlink Program.
-pub struct Chainlink;
-
-impl Id for Chainlink {
-    fn id() -> Pubkey {
-        chainlink_solana::ID
-    }
-}
-
 /// Check and get latest chainlink price from data feed.
 fn check_and_get_chainlink_price<'info>(
-    chainlink_program: &Program<'info, crate::Chainlink>,
+    chainlink_program: &Program<'info, Chainlink>,
     store: &Account<'info, data_store::states::DataStore>,
     token_config: &'info AccountInfo<'info>,
     feed: &AccountInfo<'info>,

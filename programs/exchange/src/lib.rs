@@ -28,7 +28,9 @@ pub mod exchange {
         instructions::create_deposit(ctx, nonce, params)
     }
     #[access_control(Authenticate::only_order_keeper(&ctx))]
-    pub fn execute_deposit(ctx: Context<ExecuteDeposit>) -> Result<()> {
+    pub fn execute_deposit<'info>(
+        ctx: Context<'_, '_, 'info, 'info, ExecuteDeposit<'info>>,
+    ) -> Result<()> {
         instructions::execute_deposit(ctx)
     }
 }

@@ -974,6 +974,7 @@ dependencies = [
  "anchor-spl",
  "data_store",
  "gmx-core",
+ "oracle",
 ]
 
 [[package]]

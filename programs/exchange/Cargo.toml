@@ -26,5 +26,6 @@ anchor-spl = { workspace = true, default_features = false, features = [
     "token",
     "token_2022",
 ] }
-data_store = { path = "../data_store", features = ["cpi"] }
 gmx-core = { path = "../../crates/gmx-core", features = ["u128"] }
+data_store = { path = "../data_store", features = ["cpi"] }
+oracle = { path = "../oracle", features = ["cpi"] }

@@ -5,6 +5,9 @@ use data_store::utils::Authenticate;
 /// Instructions.
 pub mod instructions;
 
+/// Utils.
+pub mod utils;
+
 use self::instructions::*;
 
 declare_id!("HBSdtMCkmjoP4MavNPRULTaEuYJ5fWudt4YzHvXWFdW8");

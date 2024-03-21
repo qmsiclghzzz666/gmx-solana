@@ -3,7 +3,7 @@ use anchor_lang::{prelude::*, Bumps};
 use crate::{cpi::accounts::CheckRole, states::RoleKey};
 
 /// Accounts that can be used for authentication.
-pub trait Authentication<'info> {
+pub trait Authentication<'info>: Bumps + Sized {
     /// Get the authority to check.
     fn authority(&self) -> &Signer<'info>;
 
@@ -15,7 +15,7 @@ pub trait Authentication<'info> {
 }
 
 /// Provides access control utils for [`Authentication`]s.
-pub trait Authenticate<'info>: Authentication<'info> + Bumps + Sized {
+pub trait Authenticate<'info>: Authentication<'info> {
     /// Check that the `authority` has the given `role`.
     fn only(ctx: &Context<Self>, role: &str) -> Result<()> {
         let has_role = crate::cpi::check_role(
@@ -61,4 +61,4 @@ pub trait Authenticate<'info>: Authentication<'info> + Bumps + Sized {
     }
 }
 
-impl<'info, T> Authenticate<'info> for T where T: Authentication<'info> + Bumps + Sized {}
+impl<'info, T> Authenticate<'info> for T where T: Authentication<'info> {}

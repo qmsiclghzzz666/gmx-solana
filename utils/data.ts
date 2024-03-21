@@ -3,7 +3,7 @@ import { DataStore } from "../target/types/data_store";
 import { keyToSeed } from "./seed";
 import { EventManager } from "./event";
 import { Keypair, PublicKey } from "@solana/web3.js";
-import { BTC_FEED, BTC_TOKEN_MINT, SOL_FEED, SOL_TOKEN_MINT } from "./token";
+import { BTC_FEED, BTC_TOKEN_MINT, SOL_FEED, SOL_TOKEN_MINT, USDC_FEED } from "./token";
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 
 export const dataStore = anchor.workspace.DataStore as anchor.Program<DataStore>;
@@ -31,6 +31,7 @@ export const DEPOSIT_SEED = encodeUtf8("deposit");
 // Role keys.
 export const CONTROLLER = "CONTROLLER";
 export const MARKET_KEEPER = "MARKET_KEEPER";
+export const ORDER_KEEPER = "ORDER_KEEPER";
 
 export const createDataStorePDA = (key: string) => anchor.web3.PublicKey.findProgramAddressSync([
     DATA_STORE_SEED,
@@ -117,6 +118,8 @@ export const initializeDataStore = async (
     signer: anchor.web3.Keypair,
     dataStoreKey: string,
     oracleIndex: number,
+    fakeToken: PublicKey,
+    usdG: PublicKey,
 ) => {
     const [dataStorePDA] = createDataStorePDA(dataStoreKey);
     const [rolesPDA] = createRolesPDA(dataStorePDA, provider.publicKey);
@@ -151,7 +154,7 @@ export const initializeDataStore = async (
     }
 
     // Enable the required roles and grant to `signer`.
-    const enabled_roles = [CONTROLLER, MARKET_KEEPER];
+    const enabled_roles = [CONTROLLER, MARKET_KEEPER, ORDER_KEEPER];
     for (let index = 0; index < enabled_roles.length; index++) {
         const role = enabled_roles[index];
         {
@@ -173,11 +176,13 @@ export const initializeDataStore = async (
         }
     }
 
+    const HEARTBEAT = 120;
+
     // Insert BTC token config.
     try {
         const key = BTC_TOKEN_MINT.toBase58();
         const [tokenConfigPDA] = createTokenConfigPDA(dataStorePDA, key);
-        const tx = await dataStore.methods.initializeTokenConfig(key, BTC_FEED, 60, 8, 2).accounts({
+        const tx = await dataStore.methods.initializeTokenConfig(key, BTC_FEED, HEARTBEAT, 8, 2).accounts({
             authority: signer.publicKey,
             store: dataStorePDA,
             onlyController: createRolesPDA(dataStorePDA, signer.publicKey)[0],
@@ -192,13 +197,43 @@ export const initializeDataStore = async (
     try {
         const key = SOL_TOKEN_MINT.toBase58();
         const [tokenConfigPDA] = createTokenConfigPDA(dataStorePDA, key);
-        const tx = await dataStore.methods.initializeTokenConfig(key, SOL_FEED, 60, 9, 4).accounts({
+        const tx = await dataStore.methods.initializeTokenConfig(key, SOL_FEED, HEARTBEAT, 8, 4).accounts({
             authority: signer.publicKey,
             store: dataStorePDA,
             onlyController: createRolesPDA(dataStorePDA, signer.publicKey)[0],
             tokenConfig: tokenConfigPDA,
         }).signers([signer]).rpc();
         console.log(`Init a token config account ${tokenConfigPDA} for ${SOL_TOKEN_MINT} in tx: ${tx}`);
+    } catch (error) {
+        console.warn("Failed to init the token config account", error);
+    }
+
+    // Insert FakeToken token config.
+    try {
+        const key = fakeToken.toBase58();
+        const [tokenConfigPDA] = createTokenConfigPDA(dataStorePDA, key);
+        const tx = await dataStore.methods.initializeTokenConfig(key, BTC_FEED, HEARTBEAT, 9, 2).accounts({
+            authority: signer.publicKey,
+            store: dataStorePDA,
+            onlyController: createRolesPDA(dataStorePDA, signer.publicKey)[0],
+            tokenConfig: tokenConfigPDA,
+        }).signers([signer]).rpc();
+        console.log(`Init a token config account ${tokenConfigPDA} for ${fakeToken} in tx: ${tx}`);
+    } catch (error) {
+        console.warn("Failed to init the token config account", error);
+    }
+
+    // Insert UsdG token config.
+    try {
+        const key = usdG.toBase58();
+        const [tokenConfigPDA] = createTokenConfigPDA(dataStorePDA, key);
+        const tx = await dataStore.methods.initializeTokenConfig(key, USDC_FEED, HEARTBEAT, 8, 4).accounts({
+            authority: signer.publicKey,
+            store: dataStorePDA,
+            onlyController: createRolesPDA(dataStorePDA, signer.publicKey)[0],
+            tokenConfig: tokenConfigPDA,
+        }).signers([signer]).rpc();
+        console.log(`Init a token config account ${tokenConfigPDA} for ${usdG} in tx: ${tx}`);
     } catch (error) {
         console.warn("Failed to init the token config account", error);
     }
