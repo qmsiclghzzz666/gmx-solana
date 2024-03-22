@@ -102,8 +102,8 @@ where
         &mut self.price_impact
     }
 
-    fn total_supply(&self) -> &Self::Num {
-        &self.total_supply
+    fn total_supply(&self) -> Self::Num {
+        self.total_supply.clone()
     }
 
     fn mint(&mut self, amount: &Self::Num) -> Result<(), crate::Error> {

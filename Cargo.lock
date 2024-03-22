@@ -859,6 +859,7 @@ dependencies = [
  "anchor-spl",
  "bitmaps 3.2.1",
  "dual-vec-map",
+ "gmx-core",
  "gmx-solana-utils",
 ]
 
@@ -1030,6 +1031,7 @@ dependencies = [
 name = "gmx-core"
 version = "0.1.0"
 dependencies = [
+ "anchor-lang",
  "num-traits",
  "ruint",
  "thiserror",

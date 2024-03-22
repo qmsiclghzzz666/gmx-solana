@@ -19,4 +19,8 @@ pub enum Error {
     /// Convert error.
     #[error("convert value error")]
     Convert,
+    /// Anchor error.
+    #[cfg(feature = "solana")]
+    #[error(transparent)]
+    Solana(#[from] anchor_lang::prelude::Error),
 }

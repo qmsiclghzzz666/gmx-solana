@@ -1,6 +1,6 @@
 import { BN } from "@coral-xyz/anchor";
 import { ComputeBudgetProgram, Keypair, PublicKey, Transaction } from "@solana/web3.js";
-import { createDepositPDA, createNoncePDA, createRolesPDA, createTokenConfigPDA } from "../../utils/data";
+import { createDepositPDA, createMarketTokenMintPDA, createNoncePDA, createRolesPDA, createTokenConfigPDA, getMarketSignPDA } from "../../utils/data";
 import { getAddresses, getExternalPrograms, getMarkets, getPrograms, getProvider, getUsers, expect } from "../../utils/fixtures";
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { BTC_FEED, USDC_FEED } from "../../utils/token";
@@ -85,11 +85,15 @@ describe("exchange: deposit", () => {
                 authority: signer0.publicKey,
                 store: dataStoreAddress,
                 dataStoreProgram: dataStore.programId,
-                deposit,
                 onlyOrderKeeper: roles,
                 oracleProgram: oracle.programId,
                 oracle: oracleAddress,
                 chainlinkProgram: chainlink.programId,
+                deposit,
+                receiver: user0FakeFakeUsdGTokenAccount,
+                market: marketFakeFakeUsdG,
+                marketTokenMint: createMarketTokenMintPDA(dataStoreAddress, fakeTokenMint, fakeTokenMint, usdGTokenMint)[0],
+                marketSign: getMarketSignPDA()[0],
             }).remainingAccounts([
                 {
                     pubkey: createTokenConfigPDA(dataStoreAddress, fakeTokenMint.toBase58())[0],
@@ -127,6 +131,7 @@ describe("exchange: deposit", () => {
             );
             console.log("executed at", tx);
         } catch (error) {
+            console.log(error);
             throw error;
         } finally {
             const afterExecution = await dataStore.account.oracle.fetch(oracleAddress);

@@ -3,6 +3,9 @@ use anchor_lang::prelude::*;
 /// Instructions.
 pub mod instructions;
 
+/// Utils.
+pub mod utils;
+
 use data_store::utils::Authenticate;
 use instructions::*;
 
@@ -43,4 +46,7 @@ pub enum ExchangeError {
     // Deposit.
     #[msg("Empty deposit amounts")]
     EmptyDepositAmounts,
+    // Failed to execute deposit.
+    #[msg("Failed to execute deposit")]
+    FailedToExecuteDeposit,
 }

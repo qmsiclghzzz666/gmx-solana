@@ -29,7 +29,7 @@ pub trait Market {
     fn price_impact_pool_mut(&mut self) -> &mut Self::Pool;
 
     /// Get total supply of the market token.
-    fn total_supply(&self) -> &Self::Num;
+    fn total_supply(&self) -> Self::Num;
 
     /// Usd value to market token amount divisor.
     ///
@@ -63,7 +63,7 @@ impl<'a, M: Market> Market for &'a mut M {
         (**self).price_impact_pool_mut()
     }
 
-    fn total_supply(&self) -> &Self::Num {
+    fn total_supply(&self) -> Self::Num {
         (**self).total_supply()
     }
 

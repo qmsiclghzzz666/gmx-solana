@@ -26,3 +26,8 @@ pub mod utils;
 pub mod test;
 
 pub use error::Error;
+pub use market::{Market, MarketExt};
+pub use pool::{Pool, PoolExt};
+
+/// Alias for result.
+pub type Result<T> = std::result::Result<T, Error>;
