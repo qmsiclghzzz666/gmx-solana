@@ -22,8 +22,10 @@ idl-build = [
 
 [dependencies]
 anchor-lang = { workspace = true }
-data_store = { path = "../data_store", features = ["cpi"] }
 anchor-spl = { workspace = true, default_features = false, features = [
     "token",
     "token_2022",
 ] }
+gmx-core = { path = "../../crates/gmx-core", features = ["u128", "solana"] }
+data_store = { path = "../data_store", features = ["cpi"] }
+oracle = { path = "../oracle", features = ["cpi"] }

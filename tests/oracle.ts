@@ -1,7 +1,7 @@
 import * as anchor from "@coral-xyz/anchor";
 import { getAddresses, getExternalPrograms, getPrograms, getProvider, getUsers, expect } from "../utils/fixtures";
 import { createRolesPDA, createTokenConfigPDA, dataStore } from "../utils/data";
-import { BTC_FEED, BTC_TOKEN_MINT, SOL_FEED, SOL_TOKEN_MINT } from "../utils/token";
+import { BTC_FEED, BTC_TOKEN_MINT, SOL_FEED, SOL_TOKEN_MINT, USDC_FEED } from "../utils/token";
 import { PublicKey } from "@solana/web3.js";
 
 describe("oracle", () => {
@@ -17,8 +17,10 @@ describe("oracle", () => {
     let dataStoreAddress: PublicKey;
     let oracleAddress: PublicKey;
     let roles: PublicKey;
+    let fakeTokenMint: PublicKey;
+    let usdGTokenMint: PublicKey;
     before(async () => {
-        ({ dataStoreAddress, oracleAddress } = await getAddresses());
+        ({ dataStoreAddress, oracleAddress, fakeTokenMint, usdGTokenMint } = await getAddresses());
         [roles] = createRolesPDA(dataStoreAddress, signer0.publicKey);
     });
 
@@ -44,6 +46,8 @@ describe("oracle", () => {
         await oracle.methods.setPricesFromPriceFeed([
             BTC_TOKEN_MINT,
             SOL_TOKEN_MINT,
+            fakeTokenMint,
+            usdGTokenMint,
         ]).accounts({
             store: dataStoreAddress,
             authority: signer0.publicKey,
@@ -72,13 +76,29 @@ describe("oracle", () => {
                 isSigner: false,
                 isWritable: false,
             },
+            {
+                pubkey: createTokenConfigPDA(dataStoreAddress, fakeTokenMint.toBase58())[0],
+                isSigner: false,
+                isWritable: false,
+            },
+            {
+                pubkey: BTC_FEED,
+                isSigner: false,
+                isWritable: false,
+            },
+            {
+                pubkey: createTokenConfigPDA(dataStoreAddress, usdGTokenMint.toBase58())[0],
+                isSigner: false,
+                isWritable: false,
+            },
+            {
+                pubkey: USDC_FEED,
+                isSigner: false,
+                isWritable: false,
+            },
         ]).signers([signer0]).rpc();
         const setData = await oracle.account.oracle.fetch(oracleAddress);
-        expect(setData.primary.prices.length).to.equal(2);
-        expect(setData.primary.tokens).to.eql([
-            SOL_TOKEN_MINT,
-            BTC_TOKEN_MINT,
-        ]);
+        expect(setData.primary.prices.length).to.equal(4);
 
         await oracle.methods.clearAllPrices().accounts({
             store: dataStoreAddress,

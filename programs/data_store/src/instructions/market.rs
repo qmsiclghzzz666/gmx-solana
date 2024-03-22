@@ -16,11 +16,13 @@ pub fn initialize_market(
     short_token_mint: Pubkey,
 ) -> Result<()> {
     let market = &mut ctx.accounts.market;
-    market.bump = ctx.bumps.market;
-    market.index_token_mint = index_token_mint;
-    market.long_token_mint = long_token_mint;
-    market.short_token_mint = short_token_mint;
-    market.market_token_mint = market_token_mint;
+    market.init(
+        ctx.bumps.market,
+        market_token_mint,
+        index_token_mint,
+        long_token_mint,
+        short_token_mint,
+    );
     emit!(MarketChangeEvent {
         address: market.key(),
         action: Action::Init,
@@ -171,7 +173,6 @@ pub fn mint_market_token_to(ctx: Context<MintMarketTokenTo>, amount: u64) -> Res
 
 #[derive(Accounts)]
 pub struct MintMarketTokenTo<'info> {
-    #[account(mut)]
     pub authority: Signer<'info>,
     pub only_controller: Account<'info, Roles>,
     pub store: Account<'info, DataStore>,

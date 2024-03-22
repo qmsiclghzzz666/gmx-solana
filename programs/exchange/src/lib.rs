@@ -3,6 +3,9 @@ use anchor_lang::prelude::*;
 /// Instructions.
 pub mod instructions;
 
+/// Utils.
+pub mod utils;
+
 use data_store::utils::Authenticate;
 use instructions::*;
 
@@ -27,6 +30,12 @@ pub mod exchange {
     ) -> Result<()> {
         instructions::create_deposit(ctx, nonce, params)
     }
+    #[access_control(Authenticate::only_order_keeper(&ctx))]
+    pub fn execute_deposit<'info>(
+        ctx: Context<'_, '_, 'info, 'info, ExecuteDeposit<'info>>,
+    ) -> Result<()> {
+        instructions::execute_deposit(ctx)
+    }
 }
 
 /// Errors of market program.
@@ -37,4 +46,7 @@ pub enum ExchangeError {
     // Deposit.
     #[msg("Empty deposit amounts")]
     EmptyDepositAmounts,
+    // Failed to execute deposit.
+    #[msg("Failed to execute deposit")]
+    FailedToExecuteDeposit,
 }

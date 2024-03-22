@@ -60,6 +60,8 @@ const [oracleAddress] = createOraclePDA(dataStoreAddress, oracleIndex);
 let user0FakeTokenAccount: PublicKey;
 let user0UsdGTokenAccount: PublicKey;
 let user0FakeFakeUsdGTokenAccount: PublicKey;
+let fakeTokenMint: PublicKey;
+let usdGTokenMint: PublicKey;
 let fakeTokenVault: PublicKey;
 let usdGVault: PublicKey;
 
@@ -71,6 +73,8 @@ export const getAddresses = async () => {
         user0FakeTokenAccount,
         user0UsdGTokenAccount,
         user0FakeFakeUsdGTokenAccount,
+        fakeTokenMint,
+        usdGTokenMint,
         fakeTokenVault,
         usdGVault,
     }
@@ -148,20 +152,24 @@ export const mochaGlobalSetup = async () => {
     anchor.setProvider(provider);
     await initializeUser(provider, signer0, 1.5);
     await initializeUser(provider, user0, 1.5);
-    await initializeDataStore(provider, eventManager, signer0, dataStoreKey, oracleIndex);
 
     // Init fakeToken and usdG.
     const fakeToken = await createSignedToken(signer0, 9);
+    fakeTokenMint = fakeToken.mint;
     const usdG = await createSignedToken(signer0, 8);
+    usdGTokenMint = usdG.mint;
     user0FakeTokenAccount = await fakeToken.createTokenAccount(user0.publicKey);
     user0UsdGTokenAccount = await usdG.createTokenAccount(user0.publicKey);
     fakeToken.mintTo(user0FakeTokenAccount, 1_000 * 1_000_000_000);
     usdG.mintTo(user0UsdGTokenAccount, 1_000 * 100_000_000);
-    fakeTokenVault = await createMarketVault(provider, signer0, dataStoreAddress, fakeToken.mint);
-    usdGVault = await createMarketVault(provider, signer0, dataStoreAddress, usdG.mint);
 
-    markets = await initializeMarkets(signer0, dataStoreAddress, fakeToken.mint, usdG.mint);
-    const [marketTokenMint] = createMarketTokenMintPDA(dataStoreAddress, fakeToken.mint, fakeToken.mint, usdG.mint);
+    await initializeDataStore(provider, eventManager, signer0, dataStoreKey, oracleIndex, fakeTokenMint, usdGTokenMint);
+
+    fakeTokenVault = await createMarketVault(provider, signer0, dataStoreAddress, fakeTokenMint);
+    usdGVault = await createMarketVault(provider, signer0, dataStoreAddress, usdGTokenMint);
+
+    markets = await initializeMarkets(signer0, dataStoreAddress, fakeTokenMint, usdGTokenMint);
+    const [marketTokenMint] = createMarketTokenMintPDA(dataStoreAddress, fakeTokenMint, fakeTokenMint, usdGTokenMint);
     user0FakeFakeUsdGTokenAccount = await createAssociatedTokenAccount(provider.connection, user0, marketTokenMint, user0.publicKey);
 
     console.log("[Done.]");

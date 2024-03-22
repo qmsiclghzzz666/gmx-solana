@@ -166,6 +166,9 @@ impl RoleKey {
 
     /// MARKET KEEPER.
     pub const MARKET_KEEPER: &'static str = "MARKET_KEEPER";
+
+    /// ORDER KEEPER.
+    pub const ORDER_KEEPER: &'static str = "ORDER_KEEPER";
 }
 
 /// Metadata of a role.

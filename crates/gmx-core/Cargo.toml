@@ -1,0 +1,15 @@
+[package]
+name = "gmx-core"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+test = []
+u128 = ["ruint"]
+solana = ["anchor-lang"]
+
+[dependencies]
+num-traits = "0.2.18"
+thiserror = { workspace = true }
+ruint = { version = "1.12.1", optional = true, default-features = false }
+anchor-lang = { workspace = true, optional = true }
