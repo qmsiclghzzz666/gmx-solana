@@ -48,7 +48,7 @@ pub fn create_deposit(
     if params.initial_short_token_amount != 0 {
         anchor_spl::token::transfer(
             ctx.accounts.transfer_ctx(false),
-            params.initial_long_token_amount,
+            params.initial_short_token_amount,
         )?;
     }
 
