@@ -90,6 +90,7 @@ describe("exchange: deposit", () => {
                 oracle: oracleAddress,
                 chainlinkProgram: chainlink.programId,
                 deposit,
+                user: user0.publicKey,
                 receiver: user0FakeFakeUsdGTokenAccount,
                 market: marketFakeFakeUsdG,
                 marketTokenMint: createMarketTokenMintPDA(dataStoreAddress, fakeTokenMint, fakeTokenMint, usdGTokenMint)[0],

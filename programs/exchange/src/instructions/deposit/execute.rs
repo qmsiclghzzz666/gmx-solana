@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token, TokenAccount};
 use data_store::{
-    cpi::accounts::CheckRole,
+    cpi::accounts::{CheckRole, RemoveDeposit},
     program::DataStore,
     states::{Deposit, Market},
     utils::Authentication,
@@ -21,6 +21,7 @@ use crate::{
 pub fn execute_deposit<'info>(
     ctx: Context<'_, '_, 'info, 'info, ExecuteDeposit<'info>>,
 ) -> Result<()> {
+    data_store::cpi::remove_deposit(ctx.accounts.remove_deposit_ctx())?;
     let deposit = &ctx.accounts.deposit;
     let long_token = deposit.tokens.initial_long_token;
     let short_token = deposit.tokens.initial_short_token;
@@ -79,6 +80,9 @@ pub struct ExecuteDeposit<'info> {
     /// CHECK: used and checked by CPI.
     #[account(mut)]
     pub deposit: Account<'info, Deposit>,
+    /// CHECK: only used to receive lamports.
+    #[account(mut)]
+    pub user: UncheckedAccount<'info>,
     #[account(mut, constraint = receiver.key() == deposit.receivers.receiver)]
     pub receiver: Account<'info, TokenAccount>,
     #[account(mut, constraint = market.market_token_mint == market_token_mint.key())]
@@ -87,6 +91,21 @@ pub struct ExecuteDeposit<'info> {
     pub market_token_mint: Account<'info, Mint>,
     /// CHECK: only used as signing PDA.
     pub market_sign: UncheckedAccount<'info>,
+}
+
+impl<'info> ExecuteDeposit<'info> {
+    fn remove_deposit_ctx(&self) -> CpiContext<'_, '_, '_, 'info, RemoveDeposit<'info>> {
+        CpiContext::new(
+            self.data_store_program.to_account_info(),
+            RemoveDeposit {
+                authority: self.authority.to_account_info(),
+                only_controller: self.only_order_keeper.to_account_info(),
+                store: self.store.to_account_info(),
+                deposit: self.deposit.to_account_info(),
+                user: self.user.to_account_info(),
+            },
+        )
+    }
 }
 
 impl<'info> Authentication<'info> for ExecuteDeposit<'info> {
