@@ -3,7 +3,7 @@ use anchor_spl::token::{Mint, MintTo, Token, TokenAccount, Transfer};
 
 use crate::{
     constants,
-    states::{Action, DataStore, Market, MarketChangeEvent, Roles, Seed},
+    states::{Action, DataStore, Market, MarketChangeEvent, PoolKind, Roles, Seed},
     utils::internal,
 };
 
@@ -104,6 +104,53 @@ impl<'info> internal::Authentication<'info> for RemoveMarket<'info> {
 
     fn roles(&self) -> &Account<'info, Roles> {
         &self.only_market_keeper
+    }
+}
+
+/// Apply delta to market pool.
+pub fn apply_delta_to_market_pool(
+    ctx: Context<ApplyDeltaToMarketPool>,
+    pool: PoolKind,
+    is_long_token: bool,
+    delta: i128,
+) -> Result<()> {
+    let market = &mut ctx.accounts.market;
+    let pool = match pool {
+        PoolKind::Primary => &mut market.primary,
+        PoolKind::PriceImpact => &mut market.price_impact,
+    };
+    if is_long_token {
+        pool.apply_delta_to_long_token_amount(delta)?;
+    } else {
+        pool.apply_delta_to_short_token_amount(delta)?;
+    }
+    Ok(())
+}
+
+#[derive(Accounts)]
+pub struct ApplyDeltaToMarketPool<'info> {
+    pub authority: Signer<'info>,
+    pub store: Account<'info, DataStore>,
+    pub only_controller: Account<'info, Roles>,
+    #[account(
+        mut,
+        seeds = [Market::SEED, store.key().as_ref(), &market.expected_key_seed()],
+        bump = market.bump,
+    )]
+    pub market: Account<'info, Market>,
+}
+
+impl<'info> internal::Authentication<'info> for ApplyDeltaToMarketPool<'info> {
+    fn authority(&self) -> &Signer<'info> {
+        &self.authority
+    }
+
+    fn store(&self) -> &Account<'info, DataStore> {
+        &self.store
+    }
+
+    fn roles(&self) -> &Account<'info, Roles> {
+        &self.only_controller
     }
 }
 

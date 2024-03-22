@@ -859,8 +859,8 @@ dependencies = [
  "anchor-spl",
  "bitmaps 3.2.1",
  "dual-vec-map",
- "gmx-core",
  "gmx-solana-utils",
+ "num_enum",
 ]
 
 [[package]]

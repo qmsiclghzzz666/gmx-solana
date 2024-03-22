@@ -1,8 +1,8 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, TokenAccount};
 use data_store::{
-    cpi::accounts::MintMarketTokenTo,
-    states::{Market, Pool},
+    cpi::accounts::{ApplyDeltaToMarketPool, MintMarketTokenTo},
+    states::{Market, Pool, PoolKind},
     utils::Authentication,
 };
 
@@ -12,9 +12,6 @@ use crate::ExchangeError;
 pub trait AsMarket<'info>: Authentication<'info> {
     /// Get market.
     fn market(&self) -> &Account<'info, Market>;
-
-    /// Get mutable market.
-    fn market_mut(&mut self) -> &mut Account<'info, Market>;
 
     /// Get market token mint.
     fn market_token(&self) -> &Account<'info, Mint>;
@@ -29,14 +26,99 @@ pub trait AsMarket<'info>: Authentication<'info> {
     fn token_program(&self) -> AccountInfo<'info>;
 
     /// Convert to a [`Market`](gmx_core::Market).
-    fn as_market(&mut self) -> AccountsMarket<Self> {
-        AccountsMarket { accounts: self }
+    fn as_market(&self) -> AccountsMarket<Self> {
+        AccountsMarket {
+            accounts: self,
+            primary: AccountsPool {
+                kind: PoolKind::Primary,
+                accounts: self,
+            },
+            price_impact: AccountsPool {
+                kind: PoolKind::PriceImpact,
+                accounts: self,
+            },
+        }
+    }
+}
+
+/// Use [`Accounts`] as pool.
+pub struct AccountsPool<'a, T> {
+    kind: PoolKind,
+    accounts: &'a T,
+}
+
+impl<'a, 'info, T> AccountsPool<'a, T>
+where
+    T: AsMarket<'info>,
+{
+    fn pool(&'a self) -> &'a Pool
+    where
+        'info: 'a,
+    {
+        match self.kind {
+            PoolKind::Primary => &self.accounts.market().primary,
+            PoolKind::PriceImpact => &self.accounts.market().price_impact,
+        }
+    }
+
+    fn apply_delta_to_market_pool_ctx(
+        &self,
+    ) -> CpiContext<'_, '_, '_, 'info, ApplyDeltaToMarketPool<'info>> {
+        let check_role = self.accounts.check_role_ctx();
+        CpiContext::new(
+            check_role.program,
+            ApplyDeltaToMarketPool {
+                authority: self.accounts.authority().to_account_info(),
+                store: check_role.accounts.store,
+                only_controller: check_role.accounts.roles,
+                market: self.accounts.market().to_account_info(),
+            },
+        )
+    }
+}
+
+impl<'a, 'info, T> gmx_core::Pool for AccountsPool<'a, T>
+where
+    T: AsMarket<'info>,
+{
+    type Num = u128;
+
+    type Signed = i128;
+
+    fn long_token_amount(&self) -> Self::Num {
+        self.pool().long_token_amount()
+    }
+
+    fn short_token_amount(&self) -> Self::Num {
+        self.pool().short_token_amount()
+    }
+
+    fn apply_delta_to_long_token_amount(&mut self, delta: Self::Signed) -> gmx_core::Result<()> {
+        data_store::cpi::apply_delta_to_market_pool(
+            self.apply_delta_to_market_pool_ctx(),
+            self.kind as u8,
+            true,
+            delta,
+        )?;
+        Ok(())
+    }
+
+    fn apply_delta_to_short_token_amount(&mut self, delta: Self::Signed) -> gmx_core::Result<()> {
+        data_store::cpi::apply_delta_to_market_pool(
+            self.apply_delta_to_market_pool_ctx(),
+            self.kind as u8,
+            false,
+            delta,
+        )?;
+        Ok(())
     }
 }
 
 /// Use [`Accounts`] as market.
 pub struct AccountsMarket<'a, T> {
-    accounts: &'a mut T,
+    accounts: &'a T,
+    primary: AccountsPool<'a, T>,
+    price_impact: AccountsPool<'a, T>,
 }
 
 impl<'a, 'info, T> AccountsMarket<'a, T>
@@ -69,22 +151,22 @@ where
 
     type Signed = i128;
 
-    type Pool = Pool;
+    type Pool = AccountsPool<'a, T>;
 
     fn pool(&self) -> &Self::Pool {
-        &self.accounts.market().primary
+        &self.primary
     }
 
     fn pool_mut(&mut self) -> &mut Self::Pool {
-        &mut self.accounts.market_mut().primary
+        &mut self.primary
     }
 
     fn price_impact_pool(&self) -> &Self::Pool {
-        &self.accounts.market().price_impact
+        &self.price_impact
     }
 
     fn price_impact_pool_mut(&mut self) -> &mut Self::Pool {
-        &mut self.accounts.market_mut().price_impact
+        &mut self.price_impact
     }
 
     fn total_supply(&self) -> Self::Num {

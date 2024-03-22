@@ -129,6 +129,22 @@ pub mod data_store {
         instructions::remove_market(ctx)
     }
 
+    #[access_control(internal::Authenticate::only_controller(&ctx))]
+    pub fn apply_delta_to_market_pool(
+        ctx: Context<ApplyDeltaToMarketPool>,
+        pool: u8,
+        is_long_token: bool,
+        delta: i128,
+    ) -> Result<()> {
+        instructions::apply_delta_to_market_pool(
+            ctx,
+            pool.try_into()
+                .map_err(|_| DataStoreError::InvalidArgument)?,
+            is_long_token,
+            delta,
+        )
+    }
+
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn initialize_market_token(
         ctx: Context<InitializeMarketToken>,
@@ -224,6 +240,8 @@ pub enum DataStoreError {
     ExceedMaxLengthLimit,
     #[msg("Exceed max string length limit")]
     ExceedMaxStringLengthLimit,
+    #[msg("Invalid argument")]
+    InvalidArgument,
     // Roles.
     #[msg("Too many admins")]
     TooManyAdmins,
@@ -244,4 +262,7 @@ pub enum DataStoreError {
     // Oracle.
     #[msg("Price of the given token already set")]
     PriceAlreadySet,
+    // Market.
+    #[msg("Computation error")]
+    Computation,
 }

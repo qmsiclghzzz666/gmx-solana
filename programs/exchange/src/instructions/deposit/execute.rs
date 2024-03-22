@@ -147,10 +147,6 @@ impl<'info> AsMarket<'info> for ExecuteDeposit<'info> {
         &self.market
     }
 
-    fn market_mut(&mut self) -> &mut Account<'info, Market> {
-        &mut self.market
-    }
-
     fn market_token(&self) -> &Account<'info, Mint> {
         &self.market_token_mint
     }

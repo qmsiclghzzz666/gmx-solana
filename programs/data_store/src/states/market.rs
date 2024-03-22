@@ -1,7 +1,7 @@
 use anchor_lang::{prelude::*, Bump};
 use gmx_solana_utils::{price::Decimal, to_seed};
 
-use crate::constants;
+use crate::{constants, DataStoreError};
 
 use super::{Data, Seed};
 
@@ -108,14 +108,9 @@ impl Pool {
         self.is_pure = is_pure;
         self
     }
-}
 
-impl gmx_core::Pool for Pool {
-    type Num = u128;
-
-    type Signed = i128;
-
-    fn long_token_amount(&self) -> Self::Num {
+    /// Get the long token amount.
+    pub fn long_token_amount(&self) -> u128 {
         if self.is_pure {
             debug_assert_eq!(
                 self.short_token_amount, 0,
@@ -127,7 +122,8 @@ impl gmx_core::Pool for Pool {
         }
     }
 
-    fn short_token_amount(&self) -> Self::Num {
+    /// Get the short token amount.
+    pub fn short_token_amount(&self) -> u128 {
         if self.is_pure {
             debug_assert_eq!(
                 self.short_token_amount, 0,
@@ -139,15 +135,15 @@ impl gmx_core::Pool for Pool {
         }
     }
 
-    fn apply_delta_to_long_token_amount(&mut self, delta: Self::Signed) -> gmx_core::Result<()> {
+    pub(crate) fn apply_delta_to_long_token_amount(&mut self, delta: i128) -> Result<()> {
         self.long_token_amount = self
             .long_token_amount
             .checked_add_signed(delta)
-            .ok_or(gmx_core::Error::Computation)?;
+            .ok_or(DataStoreError::Computation)?;
         Ok(())
     }
 
-    fn apply_delta_to_short_token_amount(&mut self, delta: Self::Signed) -> gmx_core::Result<()> {
+    pub(crate) fn apply_delta_to_short_token_amount(&mut self, delta: i128) -> Result<()> {
         let amount = if self.is_pure {
             &mut self.long_token_amount
         } else {
@@ -155,9 +151,20 @@ impl gmx_core::Pool for Pool {
         };
         *amount = amount
             .checked_add_signed(delta)
-            .ok_or(gmx_core::Error::Computation)?;
+            .ok_or(DataStoreError::Computation)?;
         Ok(())
     }
+}
+
+/// Pool kind.
+#[derive(Debug, Clone, Copy, Default, num_enum::TryFromPrimitive, PartialEq, Eq)]
+#[repr(u8)]
+pub enum PoolKind {
+    /// Primary.
+    #[default]
+    Primary,
+    /// Price impact.
+    PriceImpact,
 }
 
 #[event]

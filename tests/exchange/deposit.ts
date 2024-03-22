@@ -118,7 +118,7 @@ describe("exchange: deposit", () => {
                 },
             ]).instruction();
             const modifyComputeUnits = ComputeBudgetProgram.setComputeUnitLimit({
-                units: 200_000
+                units: 400_000
             });
             const addPriorityFee = ComputeBudgetProgram.setComputeUnitPrice({
                 microLamports: 1,
@@ -137,6 +137,9 @@ describe("exchange: deposit", () => {
         } finally {
             const afterExecution = await dataStore.account.oracle.fetch(oracleAddress);
             expect(afterExecution.primary.prices.length).equals(0);
+            const market = await dataStore.account.market.fetch(marketFakeFakeUsdG);
+            console.log(`long token amount: ${market.primary.longTokenAmount}`);
+            console.log(`short token amount: ${market.primary.shortTokenAmount}`);
         }
     });
 });
