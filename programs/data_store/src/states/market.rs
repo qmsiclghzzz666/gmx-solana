@@ -1,5 +1,7 @@
 use anchor_lang::{prelude::*, Bump};
-use gmx_solana_utils::to_seed;
+use gmx_solana_utils::{price::Decimal, to_seed};
+
+use crate::constants;
 
 use super::{Data, Seed};
 
@@ -24,8 +26,8 @@ pub struct Market {
 
 impl Market {
     /// USD value to amount divisor.
-    // TODO: set the real divisor.
-    pub const USD_TO_AMOUNT_DIVISOR: u128 = 10_000_000_000_000;
+    pub const USD_TO_AMOUNT_DIVISOR: u128 =
+        10u128.pow((Decimal::MAX_DECIMALS - constants::MARKET_TOKEN_DECIMALS) as u32);
 
     /// Initialize the market.
     pub fn init(

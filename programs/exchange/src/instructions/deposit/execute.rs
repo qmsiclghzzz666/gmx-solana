@@ -6,7 +6,7 @@ use data_store::{
     states::{Deposit, Market},
     utils::Authentication,
 };
-use gmx_core::{Market as GmxCoreMarket, MarketExt};
+use gmx_core::MarketExt;
 use oracle::{
     program::Oracle,
     utils::{Chainlink, WithOracle, WithOracleExt},
@@ -38,13 +38,19 @@ pub fn execute_deposit<'info>(
                 .unwrap()
                 .max
                 .to_unit_price();
-            msg!(&long_price.to_string());
-            msg!(&short_price.to_string());
-            let total_supply = accounts.as_market().total_supply();
-            msg!(&total_supply.to_string());
+            let (long_amount, short_amount) = (
+                accounts.deposit.tokens.initial_long_token_amount,
+                accounts.deposit.tokens.initial_short_token_amount,
+            );
+            msg!("long: {}, short: {}", long_price, short_price);
             accounts
                 .as_market()
-                .deposit(1, 0, long_price, short_price)
+                .deposit(
+                    long_amount.into(),
+                    short_amount.into(),
+                    long_price,
+                    short_price,
+                )
                 .map_err(GmxCoreError::from)?
                 .execute()
                 .map_err(|err| {
