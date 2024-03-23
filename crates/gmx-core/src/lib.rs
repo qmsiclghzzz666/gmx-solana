@@ -9,6 +9,9 @@ pub mod pool;
 /// Market.
 pub mod market;
 
+/// Market params.
+pub mod params;
+
 /// Actions.
 pub mod action;
 

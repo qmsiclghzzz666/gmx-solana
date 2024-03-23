@@ -2,9 +2,9 @@ use num_traits::{CheckedAdd, CheckedMul, Zero};
 
 use crate::{
     market::{Market, MarketExt},
-    num::MulDiv,
+    num::{MulDiv, Unsigned, UnsignedAbs},
     pool::Pool,
-    utils,
+    utils, PoolExt,
 };
 
 /// A deposit.
@@ -15,6 +15,62 @@ pub struct Deposit<M: Market> {
     short_token_amount: M::Num,
     long_token_price: M::Num,
     short_token_price: M::Num,
+}
+
+struct PoolParams<T> {
+    long_token_usd_value: T,
+    short_token_usd_value: T,
+    delta_long_token_usd_value: T,
+    delta_short_token_usd_value: T,
+    next_long_token_usd_value: T,
+    next_short_token_usd_value: T,
+}
+
+impl<T> PoolParams<T>
+where
+    T: MulDiv + Clone + Ord,
+{
+    #[inline]
+    fn initial_diff_usd(&self) -> T {
+        self.long_token_usd_value
+            .clone()
+            .diff(self.short_token_usd_value.clone())
+    }
+
+    #[inline]
+    fn next_diff_usd(&self) -> T {
+        self.next_long_token_usd_value
+            .clone()
+            .diff(self.next_short_token_usd_value.clone())
+    }
+
+    #[inline]
+    fn is_same_side_rebalance(&self) -> bool {
+        (self.long_token_usd_value <= self.short_token_usd_value)
+            == (self.next_long_token_usd_value <= self.next_short_token_usd_value)
+    }
+
+    fn price_impact(&self) -> T::Signed {
+        if self.is_same_side_rebalance() {
+            self.price_impact_for_same_side_rebalance()
+        } else {
+            self.price_impact_for_cross_over_rebalance()
+        }
+    }
+
+    #[inline]
+    fn price_impact_for_same_side_rebalance(&self) -> T::Signed {
+        let initial = self.initial_diff_usd();
+        let next = self.next_diff_usd();
+        todo!()
+    }
+
+    #[inline]
+    fn price_impact_for_cross_over_rebalance(&self) -> T::Signed {
+        let initial = self.initial_diff_usd();
+        let next = self.next_diff_usd();
+        todo!()
+    }
 }
 
 impl<M: Market> Deposit<M> {
@@ -38,13 +94,41 @@ impl<M: Market> Deposit<M> {
         })
     }
 
-    fn price_impact(&self) -> Option<(M::Signed, M::Num, M::Num)> {
-        let long_token_usd_value = self.long_token_amount.checked_mul(&self.long_token_price)?;
+    fn pool_params(&self) -> Option<PoolParams<M::Num>> {
+        let long_token_usd_value = self
+            .market
+            .pool()
+            .long_token_usd_value(&self.long_token_price)?;
         let short_token_usd_value = self
+            .market
+            .pool()
+            .short_token_usd_value(&self.short_token_price)?;
+        let delta_long_token_usd_value =
+            self.long_token_amount.checked_mul(&self.long_token_price)?;
+        let delta_short_token_usd_value = self
             .short_token_amount
             .checked_mul(&self.short_token_price)?;
-        // TODO: calculate the price impart.
-        Some((Zero::zero(), long_token_usd_value, short_token_usd_value))
+        Some(PoolParams {
+            next_long_token_usd_value: long_token_usd_value
+                .checked_add(&delta_long_token_usd_value)?,
+            next_short_token_usd_value: short_token_usd_value
+                .checked_add(&delta_short_token_usd_value)?,
+            long_token_usd_value,
+            short_token_usd_value,
+            delta_long_token_usd_value,
+            delta_short_token_usd_value,
+        })
+    }
+
+    /// Get the price impact USD value.
+    fn price_impact(&self) -> Option<(M::Signed, M::Num, M::Num)> {
+        let params = self.pool_params()?;
+        let price_impact = params.price_impact();
+        Some((
+            price_impact,
+            params.delta_long_token_usd_value,
+            params.delta_short_token_usd_value,
+        ))
     }
 
     fn deposit(

@@ -1,6 +1,7 @@
 use crate::{
     action::deposit::Deposit,
     num::{MulDiv, Num, UnsignedAbs},
+    params::SwapImpactParams,
     pool::{Pool, PoolExt},
 };
 use num_traits::CheckedAdd;
@@ -31,13 +32,16 @@ pub trait Market {
     /// Get total supply of the market token.
     fn total_supply(&self) -> Self::Num;
 
+    /// Perform mint.
+    fn mint(&mut self, amount: &Self::Num) -> Result<(), crate::Error>;
+
     /// Usd value to market token amount divisor.
     ///
     /// One should make sure it is non-zero.
     fn usd_to_amount_divisor(&self) -> Self::Num;
 
-    /// Perform mint.
-    fn mint(&mut self, amount: &Self::Num) -> Result<(), crate::Error>;
+    /// Get the swap impact params.
+    fn swap_impact_params(&self) -> SwapImpactParams<Self::Num>;
 }
 
 impl<'a, M: Market> Market for &'a mut M {
@@ -67,12 +71,16 @@ impl<'a, M: Market> Market for &'a mut M {
         (**self).total_supply()
     }
 
+    fn mint(&mut self, amount: &Self::Num) -> Result<(), crate::Error> {
+        (**self).mint(amount)
+    }
+
     fn usd_to_amount_divisor(&self) -> Self::Num {
         (**self).usd_to_amount_divisor()
     }
 
-    fn mint(&mut self, amount: &Self::Num) -> Result<(), crate::Error> {
-        (**self).mint(amount)
+    fn swap_impact_params(&self) -> SwapImpactParams<Self::Num> {
+        (**self).swap_impact_params()
     }
 }
 

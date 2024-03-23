@@ -1,21 +1,27 @@
 use num_traits::{CheckedAdd, CheckedMul, Signed};
 
 /// Num trait used in GMX.
-pub trait Num: num_traits::Num + CheckedAdd + CheckedMul + Clone {}
+pub trait Num: num_traits::Num + CheckedAdd + CheckedMul + Clone + Ord {}
 
-impl<T: num_traits::Num + CheckedAdd + CheckedMul + Clone> Num for T {}
+impl<T: num_traits::Num + CheckedAdd + CheckedMul + Clone + Ord> Num for T {}
+
+/// Unsigned value that cannot be negative.
+pub trait Unsigned: num_traits::Unsigned {
+    /// Compute the absolute difference of two values.
+    fn diff(self, other: Self) -> Self;
+}
 
 /// Convert signed value to unsigned.
 pub trait UnsignedAbs: Signed {
     /// Unsigned type.
-    type Unsigned;
+    type Unsigned: Unsigned;
 
     /// Computes the absolute value and returns as a unsigned value.
     fn unsigned_abs(&self) -> Self::Unsigned;
 }
 
 /// Perform Mul-Div calculation with bigger range num type.
-pub trait MulDiv: num_traits::Unsigned {
+pub trait MulDiv: Unsigned {
     /// The signed type used in mul-div.
     type Signed: TryFrom<Self> + UnsignedAbs<Unsigned = Self>;
 
@@ -45,6 +51,12 @@ pub trait MulDiv: num_traits::Unsigned {
     }
 }
 
+impl Unsigned for u64 {
+    fn diff(self, other: Self) -> Self {
+        self.abs_diff(other)
+    }
+}
+
 impl MulDiv for u64 {
     type Signed = i64;
 
@@ -71,8 +83,14 @@ impl UnsignedAbs for i64 {
 #[cfg(feature = "u128")]
 /// Add support to `u128`.
 mod u128 {
-    use super::{MulDiv, UnsignedAbs};
+    use super::{MulDiv, Unsigned, UnsignedAbs};
     use ruint::aliases::U256;
+
+    impl Unsigned for u128 {
+        fn diff(self, other: Self) -> Self {
+            self.abs_diff(other)
+        }
+    }
 
     impl UnsignedAbs for i128 {
         type Unsigned = u128;

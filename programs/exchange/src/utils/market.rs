@@ -5,6 +5,7 @@ use data_store::{
     states::{Market, Pool, PoolKind},
     utils::Authentication,
 };
+use gmx_core::params::SwapImpactParams;
 
 use crate::ExchangeError;
 
@@ -186,6 +187,10 @@ where
                 .map_err(|_| gmx_core::Error::Overflow)?,
         )?;
         Ok(())
+    }
+
+    fn swap_impact_params(&self) -> SwapImpactParams<Self::Num> {
+        todo!()
     }
 }
 

@@ -3,6 +3,7 @@ use std::fmt;
 use crate::{
     market::Market,
     num::{MulDiv, Num, UnsignedAbs},
+    params::SwapImpactParams,
     pool::Pool,
 };
 use num_traits::{CheckedSub, One, Signed};
@@ -117,5 +118,9 @@ where
 
     fn usd_to_amount_divisor(&self) -> Self::Num {
         One::one()
+    }
+
+    fn swap_impact_params(&self) -> SwapImpactParams<Self::Num> {
+        todo!()
     }
 }

@@ -23,4 +23,14 @@ pub enum Error {
     #[cfg(feature = "solana")]
     #[error(transparent)]
     Solana(#[from] anchor_lang::prelude::Error),
+    /// Build params error.
+    #[error("build params: {0}")]
+    BuildParams(String),
+}
+
+impl Error {
+    /// Build params.
+    pub fn build_params(msg: impl ToString) -> Self {
+        Self::BuildParams(msg.to_string())
+    }
 }
