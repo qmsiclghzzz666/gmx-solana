@@ -2,7 +2,8 @@ use num_traits::{CheckedAdd, CheckedMul, Zero};
 
 use crate::{
     market::{Market, MarketExt},
-    num::{MulDiv, Unsigned, UnsignedAbs},
+    num::{MulDiv, Num},
+    params::SwapImpactParams,
     pool::Pool,
     utils, PoolExt,
 };
@@ -18,6 +19,7 @@ pub struct Deposit<M: Market> {
 }
 
 struct PoolParams<T> {
+    unit: T,
     long_token_usd_value: T,
     short_token_usd_value: T,
     delta_long_token_usd_value: T,
@@ -28,7 +30,7 @@ struct PoolParams<T> {
 
 impl<T> PoolParams<T>
 where
-    T: MulDiv + Clone + Ord,
+    T: MulDiv + Num,
 {
     #[inline]
     fn initial_diff_usd(&self) -> T {
@@ -50,26 +52,71 @@ where
             == (self.next_long_token_usd_value <= self.next_short_token_usd_value)
     }
 
-    fn price_impact(&self) -> T::Signed {
+    fn price_impact(&self, params: &SwapImpactParams<T>) -> Option<T::Signed> {
         if self.is_same_side_rebalance() {
-            self.price_impact_for_same_side_rebalance()
+            self.price_impact_for_same_side_rebalance(params)
         } else {
-            self.price_impact_for_cross_over_rebalance()
+            self.price_impact_for_cross_over_rebalance(params)
         }
     }
 
     #[inline]
-    fn price_impact_for_same_side_rebalance(&self) -> T::Signed {
+    fn price_impact_for_same_side_rebalance(
+        &self,
+        params: &SwapImpactParams<T>,
+    ) -> Option<T::Signed> {
         let initial = self.initial_diff_usd();
         let next = self.next_diff_usd();
-        todo!()
+        let has_positive_impact = next < initial;
+        let (positive_factor, negative_factor) = params.adjusted_factors();
+
+        let factor = if has_positive_impact {
+            positive_factor
+        } else {
+            negative_factor
+        };
+        let exponent_factor = params.exponent();
+
+        let initial = utils::apply_factors(
+            initial,
+            factor.clone(),
+            exponent_factor.clone(),
+            self.unit.clone(),
+        )?;
+        let next = utils::apply_factors(
+            next,
+            factor.clone(),
+            exponent_factor.clone(),
+            self.unit.clone(),
+        )?;
+        let delta: T::Signed = initial.diff(next).try_into().ok()?;
+        Some(if has_positive_impact { delta } else { -delta })
     }
 
     #[inline]
-    fn price_impact_for_cross_over_rebalance(&self) -> T::Signed {
+    fn price_impact_for_cross_over_rebalance(
+        &self,
+        params: &SwapImpactParams<T>,
+    ) -> Option<T::Signed> {
         let initial = self.initial_diff_usd();
         let next = self.next_diff_usd();
-        todo!()
+        let (positive_factor, negative_factor) = params.adjusted_factors();
+        let exponent_factor = params.exponent();
+        let positive_impact = utils::apply_factors(
+            initial,
+            positive_factor.clone(),
+            exponent_factor.clone(),
+            self.unit.clone(),
+        )?;
+        let negative_impact = utils::apply_factors(
+            next,
+            negative_factor.clone(),
+            exponent_factor.clone(),
+            self.unit.clone(),
+        )?;
+        let has_positive_impact = positive_impact > negative_impact;
+        let delta: T::Signed = positive_impact.diff(negative_impact).try_into().ok()?;
+        Some(if has_positive_impact { delta } else { -delta })
     }
 }
 
@@ -109,6 +156,7 @@ impl<M: Market> Deposit<M> {
             .short_token_amount
             .checked_mul(&self.short_token_price)?;
         Some(PoolParams {
+            unit: self.market.unit(),
             next_long_token_usd_value: long_token_usd_value
                 .checked_add(&delta_long_token_usd_value)?,
             next_short_token_usd_value: short_token_usd_value
@@ -123,7 +171,7 @@ impl<M: Market> Deposit<M> {
     /// Get the price impact USD value.
     fn price_impact(&self) -> Option<(M::Signed, M::Num, M::Num)> {
         let params = self.pool_params()?;
-        let price_impact = params.price_impact();
+        let price_impact = params.price_impact(&self.market.swap_impact_params())?;
         Some((
             price_impact,
             params.delta_long_token_usd_value,

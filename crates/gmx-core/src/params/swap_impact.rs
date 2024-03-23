@@ -30,6 +30,18 @@ impl<T> SwapImpactParams<T> {
             negative_factor: None,
         }
     }
+
+    /// Get adjusted swap factors.
+    pub fn adjusted_factors(&self) -> (&T, &T)
+    where
+        T: Ord,
+    {
+        if self.positive_factor > self.negative_factor {
+            (&self.negative_factor, &self.negative_factor)
+        } else {
+            (&self.positive_factor, &self.negative_factor)
+        }
+    }
 }
 
 /// Builder for Swap impact parameters.
@@ -66,7 +78,7 @@ impl<T> Builder<T> {
                 .ok_or(crate::Error::build_params("missing `exponent`"))?,
             positive_factor: self
                 .positive_factor
-                .ok_or(crate::Error::build_params("missing `positive_factor"))?,
+                .ok_or(crate::Error::build_params("missing `positive_factor`"))?,
             negative_factor: self
                 .negative_factor
                 .ok_or(crate::Error::build_params("missing `negative_factor`"))?,

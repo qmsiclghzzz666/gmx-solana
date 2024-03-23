@@ -6,7 +6,7 @@ use crate::{
     params::SwapImpactParams,
     pool::Pool,
 };
-use num_traits::{CheckedSub, One, Signed};
+use num_traits::{CheckedSub, Signed};
 
 /// Test Pool.
 #[derive(Debug, Default)]
@@ -69,11 +69,38 @@ where
 }
 
 /// Test Market.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct TestMarket<T> {
     primary: TestPool<T>,
     price_impact: TestPool<T>,
     total_supply: T,
+    value_to_amount_divisor: T,
+    value_unit: T,
+}
+
+impl Default for TestMarket<u64> {
+    fn default() -> Self {
+        Self {
+            primary: Default::default(),
+            price_impact: Default::default(),
+            total_supply: Default::default(),
+            value_to_amount_divisor: 1,
+            value_unit: 10u64.pow(8),
+        }
+    }
+}
+
+#[cfg(feature = "u128")]
+impl Default for TestMarket<u128> {
+    fn default() -> Self {
+        Self {
+            primary: Default::default(),
+            price_impact: Default::default(),
+            total_supply: Default::default(),
+            value_to_amount_divisor: 10u128.pow(30 - 8),
+            value_unit: 10u128.pow(30),
+        }
+    }
 }
 
 impl<T> Market for TestMarket<T>
@@ -117,7 +144,11 @@ where
     }
 
     fn usd_to_amount_divisor(&self) -> Self::Num {
-        One::one()
+        self.value_to_amount_divisor.clone()
+    }
+
+    fn unit(&self) -> Self::Num {
+        self.value_unit.clone()
     }
 
     fn swap_impact_params(&self) -> SwapImpactParams<Self::Num> {

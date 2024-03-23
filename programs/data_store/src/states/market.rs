@@ -25,6 +25,9 @@ pub struct Market {
 }
 
 impl Market {
+    /// Unit USD value i.e. `one`.
+    pub const USD_UNIT: u128 = 10u128.pow(Decimal::MAX_DECIMALS as u32);
+
     /// USD value to amount divisor.
     pub const USD_TO_AMOUNT_DIVISOR: u128 =
         10u128.pow((Decimal::MAX_DECIMALS - constants::MARKET_TOKEN_DECIMALS) as u32);

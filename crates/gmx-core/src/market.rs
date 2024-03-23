@@ -40,6 +40,10 @@ pub trait Market {
     /// One should make sure it is non-zero.
     fn usd_to_amount_divisor(&self) -> Self::Num;
 
+    /// Unit value used in the market, i.e. the amount of `one`,
+    /// not the amount unit of market token.
+    fn unit(&self) -> Self::Num;
+
     /// Get the swap impact params.
     fn swap_impact_params(&self) -> SwapImpactParams<Self::Num>;
 }
@@ -77,6 +81,10 @@ impl<'a, M: Market> Market for &'a mut M {
 
     fn usd_to_amount_divisor(&self) -> Self::Num {
         (**self).usd_to_amount_divisor()
+    }
+
+    fn unit(&self) -> Self::Num {
+        (**self).unit()
     }
 
     fn swap_impact_params(&self) -> SwapImpactParams<Self::Num> {

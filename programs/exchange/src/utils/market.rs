@@ -178,6 +178,10 @@ where
         Market::USD_TO_AMOUNT_DIVISOR
     }
 
+    fn unit(&self) -> Self::Num {
+        Market::USD_UNIT
+    }
+
     fn mint(&mut self, amount: &Self::Num) -> gmx_core::Result<()> {
         msg!("minting {}", amount);
         data_store::cpi::mint_market_token_to(
