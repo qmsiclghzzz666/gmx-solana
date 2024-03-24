@@ -243,8 +243,8 @@ impl<M: Market> Deposit<M> {
             let price_impact = long_token_usd_value
                 .clone()
                 .checked_mul_div_with_signed_numberator(
-                    price_impact.clone(),
-                    long_token_usd_value
+                    &price_impact,
+                    &long_token_usd_value
                         .checked_add(&short_token_usd_value)
                         .ok_or(crate::Error::Computation)?,
                 )
@@ -257,8 +257,8 @@ impl<M: Market> Deposit<M> {
             let price_impact = short_token_usd_value
                 .clone()
                 .checked_mul_div_with_signed_numberator(
-                    price_impact,
-                    long_token_usd_value
+                    &price_impact,
+                    &long_token_usd_value
                         .checked_add(&short_token_usd_value)
                         .ok_or(crate::Error::Computation)?,
                 )

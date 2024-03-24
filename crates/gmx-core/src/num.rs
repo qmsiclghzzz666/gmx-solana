@@ -28,19 +28,19 @@ pub trait MulDiv: Unsigned {
     /// Calculates floor(self * numerator / denominator) with full precision.
     ///
     /// Returns `None` if the `denominator` is zero or overflow.
-    fn checked_mul_div(self, numerator: Self, denominator: Self) -> Option<Self>;
+    fn checked_mul_div(&self, numerator: &Self, denominator: &Self) -> Option<Self>;
 
     /// Calculates floor(self * numerator / denominator) with full precision,
     /// where `numerator` is signed.
     ///
     /// Returns `None` if the `denominator` is zero or overflow.
     fn checked_mul_div_with_signed_numberator(
-        self,
-        numerator: Self::Signed,
-        denominator: Self,
+        &self,
+        numerator: &Self::Signed,
+        denominator: &Self,
     ) -> Option<Self::Signed> {
         let ans = self
-            .checked_mul_div(numerator.unsigned_abs(), denominator)?
+            .checked_mul_div(&numerator.unsigned_abs(), denominator)?
             .try_into()
             .ok()?;
         if numerator.is_positive() {
@@ -60,14 +60,14 @@ impl Unsigned for u64 {
 impl MulDiv for u64 {
     type Signed = i64;
 
-    fn checked_mul_div(self, numerator: Self, denominator: Self) -> Option<Self> {
-        if denominator == 0 {
+    fn checked_mul_div(&self, numerator: &Self, denominator: &Self) -> Option<Self> {
+        if *denominator == 0 {
             return None;
         }
-        let x = self as u128;
-        let numerator = numerator as u128;
-        let denominator = denominator as u128;
-        let ans = x * numerator / denominator;
+        let x = *self as u128;
+        let numerator = *numerator as u128;
+        let denominator = *denominator as u128;
+        let ans = dbg!(x * numerator) / denominator;
         ans.try_into().ok()
     }
 }
@@ -103,13 +103,13 @@ mod u128 {
     impl MulDiv for u128 {
         type Signed = i128;
 
-        fn checked_mul_div(self, numerator: Self, denominator: Self) -> Option<Self> {
-            if denominator == 0 {
+        fn checked_mul_div(&self, numerator: &Self, denominator: &Self) -> Option<Self> {
+            if *denominator == 0 {
                 return None;
             }
-            let x = U256::from(self);
-            let numerator = U256::from(numerator);
-            let denominator = U256::from(denominator);
+            let x = U256::from(*self);
+            let numerator = U256::from(*numerator);
+            let denominator = U256::from(*denominator);
             let ans = x * numerator / denominator;
             ans.try_into().ok()
         }

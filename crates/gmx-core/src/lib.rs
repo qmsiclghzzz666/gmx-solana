@@ -21,6 +21,9 @@ pub mod error;
 /// Number utils.
 pub mod num;
 
+/// Decimal type with fixed deicmals.
+pub mod decimal;
+
 /// Utils.
 pub mod utils;
 

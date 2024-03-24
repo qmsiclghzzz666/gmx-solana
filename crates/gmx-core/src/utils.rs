@@ -22,7 +22,7 @@ where
     } else if supply.is_zero() && !pool_value.is_zero() {
         Some((pool_value.checked_add(&usd_value)?) / usd_to_amount_divisor)
     } else {
-        supply.checked_mul_div(usd_value, pool_value)
+        supply.checked_mul_div(&usd_value, &pool_value)
     }
 }
 
@@ -74,5 +74,5 @@ pub fn apply_factor<T>(value: T, factor: T, unit: T) -> Option<T>
 where
     T: MulDiv,
 {
-    value.checked_mul_div(factor, unit)
+    value.checked_mul_div(&factor, &unit)
 }
