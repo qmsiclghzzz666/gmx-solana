@@ -154,6 +154,8 @@ where
 
     type Pool = AccountsPool<'a, T>;
 
+    const DECIMALS: u8 = Market::DECIMALS;
+
     fn pool(&self) -> &Self::Pool {
         &self.primary
     }

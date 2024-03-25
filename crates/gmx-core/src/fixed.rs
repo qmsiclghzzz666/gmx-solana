@@ -3,12 +3,12 @@ use std::{
     ops::{Add, Mul},
 };
 
-use num_traits::{CheckedAdd, CheckedMul};
+use num_traits::{CheckedAdd, CheckedMul, One, Zero};
 
-use crate::num::MulDiv;
+use crate::num::{MulDiv, Num};
 
 /// Integer type used in [`Fixed`].
-pub trait Integer<const DECIMALS: u8>: Sized {
+pub trait Integer<const DECIMALS: u8>: MulDiv + Num {
     /// Ten.
     const TEN: Self;
     /// The unit with value pow(TEN, DECIMALS).
@@ -90,8 +90,15 @@ impl<T, const DECIMALS: u8> Fixed<T, DECIMALS> {
     }
 
     /// Create a new decimal from the inner representation.
+    #[inline]
     pub fn from_inner(inner: T) -> Self {
         Self(inner)
+    }
+
+    /// Get the inner value.
+    #[inline]
+    pub fn into_inner(self) -> T {
+        self.0
     }
 }
 
@@ -108,7 +115,7 @@ impl<T: Integer<DECIMALS>, const DECIMALS: u8> Fixed<T, DECIMALS> {
     }
 }
 
-impl<T: Add<Output = T>, const DECIMALS: u8> Add for Fixed<T, DECIMALS> {
+impl<T: Integer<DECIMALS>, const DECIMALS: u8> Add for Fixed<T, DECIMALS> {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
@@ -116,13 +123,13 @@ impl<T: Add<Output = T>, const DECIMALS: u8> Add for Fixed<T, DECIMALS> {
     }
 }
 
-impl<T: CheckedAdd, const DECIMALS: u8> CheckedAdd for Fixed<T, DECIMALS> {
+impl<T: Integer<DECIMALS>, const DECIMALS: u8> CheckedAdd for Fixed<T, DECIMALS> {
     fn checked_add(&self, v: &Self) -> Option<Self> {
         Some(Self(self.0.checked_add(&v.0)?))
     }
 }
 
-impl<T: MulDiv + Integer<DECIMALS>, const DECIMALS: u8> Mul for Fixed<T, DECIMALS> {
+impl<T: Integer<DECIMALS>, const DECIMALS: u8> Mul for Fixed<T, DECIMALS> {
     type Output = Self;
 
     fn mul(self, rhs: Self) -> Self::Output {
@@ -130,9 +137,32 @@ impl<T: MulDiv + Integer<DECIMALS>, const DECIMALS: u8> Mul for Fixed<T, DECIMAL
     }
 }
 
-impl<T: MulDiv + Integer<DECIMALS>, const DECIMALS: u8> CheckedMul for Fixed<T, DECIMALS> {
+impl<T: Integer<DECIMALS>, const DECIMALS: u8> CheckedMul for Fixed<T, DECIMALS> {
     fn checked_mul(&self, v: &Self) -> Option<Self> {
         Some(Self(self.0.checked_mul_div(&v.0, &Self::ONE.0)?))
+    }
+}
+
+impl<T: Integer<DECIMALS>, const DECIMALS: u8> Zero for Fixed<T, DECIMALS> {
+    fn zero() -> Self {
+        Self(T::zero())
+    }
+
+    fn is_zero(&self) -> bool {
+        self.0.is_zero()
+    }
+}
+
+impl<T: Integer<DECIMALS>, const DECIMALS: u8> One for Fixed<T, DECIMALS> {
+    fn one() -> Self {
+        Self::ONE
+    }
+
+    fn is_one(&self) -> bool
+    where
+        Self: PartialEq,
+    {
+        self.0 == Self::ONE.0
     }
 }
 

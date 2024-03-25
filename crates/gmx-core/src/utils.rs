@@ -1,6 +1,11 @@
 use std::cmp::Ordering;
 
-use crate::num::{MulDiv, Num};
+use crate::{
+    fixed::{Fixed, Integer},
+    num::{MulDiv, Num},
+};
+
+use num_traits::{CheckedMul, One, Zero};
 
 /// Usd value to market token amount.
 ///
@@ -29,50 +34,50 @@ where
 /// Apply factors using this formula: `A * x^E`.
 ///
 /// Assuming that all values are "float"s with the same decimals.
-pub fn apply_factors<T>(value: T, factor: T, exponent_factor: T, unit: T) -> Option<T>
+pub fn apply_factors<T, const DECIMALS: u8>(value: T, factor: T, exponent_factor: T) -> Option<T>
 where
-    T: MulDiv + Num,
+    T: Integer<DECIMALS>,
 {
-    apply_factor(
-        apply_exponent_factor(value, exponent_factor, unit.clone())?,
-        factor,
-        unit,
-    )
+    apply_factor(apply_exponent_factor(value, exponent_factor)?, factor)
 }
 
 /// Apply exponent factor using this formula: `x^E`.
 ///
 /// Assuming that all values are "float"s with the same decimals.
 #[inline]
-pub fn apply_exponent_factor<T>(value: T, exponent_factor: T, unit: T) -> Option<T>
+pub fn apply_exponent_factor<T, const DECIMALS: u8>(value: T, exponent_factor: T) -> Option<T>
 where
-    T: Num,
+    T: Integer<DECIMALS>,
 {
-    if unit.is_zero() {
-        return None;
-    }
-    match value.cmp(&unit) {
-        Ordering::Less => Some(T::zero()),
-        Ordering::Equal => Some(unit),
+    let unit = Fixed::ONE;
+    let value = Fixed::from_inner(value);
+    let exponent = Fixed::from_inner(exponent_factor);
+
+    let ans = match value.cmp(&unit) {
+        Ordering::Less => Fixed::zero(),
+        Ordering::Equal => unit,
         Ordering::Greater => {
-            if exponent_factor.is_zero() {
-                Some(unit)
-            } else if exponent_factor.is_one() {
-                Some(value)
+            if exponent.is_zero() {
+                unit
+            } else if exponent.is_one() {
+                value
             } else {
-                Some(T::zero())
+                value.checked_pow(&exponent)?
             }
         }
-    }
+    };
+    Some(ans.into_inner())
 }
 
 /// Apply factor using this formula: `A * x`.
 ///
 /// Assuming that values are "float"s with the same decimals.
 #[inline]
-pub fn apply_factor<T>(value: T, factor: T, unit: T) -> Option<T>
+pub fn apply_factor<T, const DECIMALS: u8>(value: T, factor: T) -> Option<T>
 where
-    T: MulDiv,
+    T: Integer<DECIMALS>,
 {
-    value.checked_mul_div(&factor, &unit)
+    Fixed::from_inner(value)
+        .checked_mul(&Fixed::from_inner(factor))
+        .map(Fixed::into_inner)
 }

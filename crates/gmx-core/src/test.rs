@@ -70,15 +70,16 @@ where
 
 /// Test Market.
 #[derive(Debug)]
-pub struct TestMarket<T> {
+pub struct TestMarket<T, const DECIMALS: u8> {
     primary: TestPool<T>,
     price_impact: TestPool<T>,
     total_supply: T,
     value_to_amount_divisor: T,
     value_unit: T,
+    swap_impact_params: SwapImpactParams<T>,
 }
 
-impl Default for TestMarket<u64> {
+impl Default for TestMarket<u64, 8> {
     fn default() -> Self {
         Self {
             primary: Default::default(),
@@ -86,12 +87,18 @@ impl Default for TestMarket<u64> {
             total_supply: Default::default(),
             value_to_amount_divisor: 1,
             value_unit: 10u64.pow(8),
+            swap_impact_params: SwapImpactParams::builder()
+                .with_exponent(200_000_000)
+                .with_positive_factor(2)
+                .with_negative_factor(4)
+                .build()
+                .unwrap(),
         }
     }
 }
 
 #[cfg(feature = "u128")]
-impl Default for TestMarket<u128> {
+impl Default for TestMarket<u128, 20> {
     fn default() -> Self {
         Self {
             primary: Default::default(),
@@ -99,20 +106,28 @@ impl Default for TestMarket<u128> {
             total_supply: Default::default(),
             value_to_amount_divisor: 10u128.pow(20 - 8),
             value_unit: 10u128.pow(20),
+            swap_impact_params: SwapImpactParams::builder()
+                .with_exponent(200_000_000_000_000_000_000)
+                .with_positive_factor(2_000_000_000_000)
+                .with_negative_factor(4_000_000_000_000)
+                .build()
+                .unwrap(),
         }
     }
 }
 
-impl<T> Market for TestMarket<T>
+impl<T, const DECIMALS: u8> Market for TestMarket<T, DECIMALS>
 where
     T: MulDiv + Num + CheckedSub + fmt::Display,
-    T::Signed: Num,
+    T::Signed: Num + std::fmt::Debug,
 {
     type Num = T;
 
     type Signed = T::Signed;
 
     type Pool = TestPool<T>;
+
+    const DECIMALS: u8 = DECIMALS;
 
     fn pool(&self) -> &Self::Pool {
         &self.primary
@@ -152,6 +167,6 @@ where
     }
 
     fn swap_impact_params(&self) -> SwapImpactParams<Self::Num> {
-        todo!()
+        self.swap_impact_params.clone()
     }
 }

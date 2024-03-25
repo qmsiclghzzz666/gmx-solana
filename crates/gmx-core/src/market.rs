@@ -12,10 +12,13 @@ pub trait Market {
     type Num: MulDiv<Signed = Self::Signed> + Num;
 
     /// Signed number type used in the market.
-    type Signed: UnsignedAbs<Unsigned = Self::Num> + TryFrom<Self::Num> + Num;
+    type Signed: UnsignedAbs<Unsigned = Self::Num> + TryFrom<Self::Num> + Num + std::fmt::Debug;
 
     /// Pool type.
     type Pool: Pool<Num = Self::Num, Signed = Self::Signed>;
+
+    /// Decimals.
+    const DECIMALS: u8;
 
     /// Get the reference to the primary pool.
     fn pool(&self) -> &Self::Pool;
@@ -54,6 +57,8 @@ impl<'a, M: Market> Market for &'a mut M {
     type Signed = M::Signed;
 
     type Pool = M::Pool;
+
+    const DECIMALS: u8 = M::DECIMALS;
 
     fn pool(&self) -> &Self::Pool {
         (**self).pool()

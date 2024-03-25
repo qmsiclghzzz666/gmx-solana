@@ -1,6 +1,7 @@
 use num_traits::{CheckedAdd, CheckedMul, Zero};
 
 use crate::{
+    fixed::Integer,
     market::{Market, MarketExt},
     num::{MulDiv, Num},
     params::SwapImpactParams,
@@ -19,7 +20,6 @@ pub struct Deposit<M: Market> {
 }
 
 struct PoolParams<T> {
-    unit: T,
     long_token_usd_value: T,
     short_token_usd_value: T,
     delta_long_token_usd_value: T,
@@ -52,7 +52,10 @@ where
             == (self.next_long_token_usd_value <= self.next_short_token_usd_value)
     }
 
-    fn price_impact(&self, params: &SwapImpactParams<T>) -> Option<T::Signed> {
+    fn price_impact<const DECIMALS: u8>(&self, params: &SwapImpactParams<T>) -> Option<T::Signed>
+    where
+        T: Integer<DECIMALS>,
+    {
         if self.is_same_side_rebalance() {
             self.price_impact_for_same_side_rebalance(params)
         } else {
@@ -61,10 +64,13 @@ where
     }
 
     #[inline]
-    fn price_impact_for_same_side_rebalance(
+    fn price_impact_for_same_side_rebalance<const DECIMALS: u8>(
         &self,
         params: &SwapImpactParams<T>,
-    ) -> Option<T::Signed> {
+    ) -> Option<T::Signed>
+    where
+        T: Integer<DECIMALS>,
+    {
         let initial = self.initial_diff_usd();
         let next = self.next_diff_usd();
         let has_positive_impact = next < initial;
@@ -77,43 +83,28 @@ where
         };
         let exponent_factor = params.exponent();
 
-        let initial = utils::apply_factors(
-            initial,
-            factor.clone(),
-            exponent_factor.clone(),
-            self.unit.clone(),
-        )?;
-        let next = utils::apply_factors(
-            next,
-            factor.clone(),
-            exponent_factor.clone(),
-            self.unit.clone(),
-        )?;
+        let initial = utils::apply_factors(initial, factor.clone(), exponent_factor.clone())?;
+        let next = utils::apply_factors(next, factor.clone(), exponent_factor.clone())?;
         let delta: T::Signed = initial.diff(next).try_into().ok()?;
         Some(if has_positive_impact { delta } else { -delta })
     }
 
     #[inline]
-    fn price_impact_for_cross_over_rebalance(
+    fn price_impact_for_cross_over_rebalance<const DECIMALS: u8>(
         &self,
         params: &SwapImpactParams<T>,
-    ) -> Option<T::Signed> {
+    ) -> Option<T::Signed>
+    where
+        T: Integer<DECIMALS>,
+    {
         let initial = self.initial_diff_usd();
         let next = self.next_diff_usd();
         let (positive_factor, negative_factor) = params.adjusted_factors();
         let exponent_factor = params.exponent();
-        let positive_impact = utils::apply_factors(
-            initial,
-            positive_factor.clone(),
-            exponent_factor.clone(),
-            self.unit.clone(),
-        )?;
-        let negative_impact = utils::apply_factors(
-            next,
-            negative_factor.clone(),
-            exponent_factor.clone(),
-            self.unit.clone(),
-        )?;
+        let positive_impact =
+            utils::apply_factors(initial, positive_factor.clone(), exponent_factor.clone())?;
+        let negative_impact =
+            utils::apply_factors(next, negative_factor.clone(), exponent_factor.clone())?;
         let has_positive_impact = positive_impact > negative_impact;
         let delta: T::Signed = positive_impact.diff(negative_impact).try_into().ok()?;
         Some(if has_positive_impact { delta } else { -delta })
@@ -156,7 +147,6 @@ impl<M: Market> Deposit<M> {
             .short_token_amount
             .checked_mul(&self.short_token_price)?;
         Some(PoolParams {
-            unit: self.market.unit(),
             next_long_token_usd_value: long_token_usd_value
                 .checked_add(&delta_long_token_usd_value)?,
             next_short_token_usd_value: short_token_usd_value
@@ -169,7 +159,10 @@ impl<M: Market> Deposit<M> {
     }
 
     /// Get the price impact USD value.
-    fn price_impact(&self) -> Option<(M::Signed, M::Num, M::Num)> {
+    fn price_impact<const DECIMALS: u8>(&self) -> Option<(M::Signed, M::Num, M::Num)>
+    where
+        M::Num: Integer<{ DECIMALS }>,
+    {
         let params = self.pool_params()?;
         let price_impact = params.price_impact(&self.market.swap_impact_params())?;
         Some((
@@ -183,7 +176,7 @@ impl<M: Market> Deposit<M> {
         &mut self,
         is_long_token: bool,
         pool_value: M::Num,
-        _price_impact: M::Signed,
+        price_impact: M::Signed,
     ) -> Result<M::Num, crate::Error> {
         let mut mint_amount: M::Num = Zero::zero();
         let supply = self.market.total_supply();
@@ -197,6 +190,7 @@ impl<M: Market> Deposit<M> {
         };
         // TODO: handle fees.
         // TODO: apply price impact.
+        dbg!(price_impact);
         mint_amount = mint_amount
             .checked_add(
                 &utils::usd_to_market_token_amount(
@@ -227,13 +221,17 @@ impl<M: Market> Deposit<M> {
     }
 
     /// Execute.
-    pub fn execute(mut self) -> Result<(), crate::Error> {
+    pub fn execute<const DECIMALS: u8>(mut self) -> Result<(), crate::Error>
+    where
+        M::Num: Integer<DECIMALS>,
+    {
         debug_assert!(
             !self.long_token_amount.is_zero() || !self.short_token_amount.is_zero(),
             "shouldn't be empty deposit"
         );
-        let (price_impact, long_token_usd_value, short_token_usd_value) =
-            self.price_impact().ok_or(crate::Error::Computation)?;
+        let (price_impact, long_token_usd_value, short_token_usd_value) = self
+            .price_impact::<DECIMALS>()
+            .ok_or(crate::Error::Computation)?;
         let mut market_token_to_mint: M::Num = Zero::zero();
         let pool_value = self
             .market
@@ -278,28 +276,24 @@ mod tests {
 
     #[test]
     fn basic() -> Result<(), crate::Error> {
-        let mut market = TestMarket::<u64>::default();
-        market.deposit(1000, 0, 120, 1)?.execute()?;
-        market.deposit(0, 2000, 120, 1)?.execute()?;
-        market.deposit(100, 0, 100, 1)?.execute()?;
-        println!("{market:?}, {}", market.pool_value(&200, &1).unwrap());
-        market.deposit(100, 0, 200, 1)?.execute()?;
-        println!("{market:?}, {}", market.pool_value(&200, &1).unwrap());
-        market.deposit(100, 0, 200, 1)?.execute()?;
+        let mut market = TestMarket::<u64, 8>::default();
+        market.deposit(100_000_000, 0, 120, 1)?.execute::<8>()?;
+        market.deposit(100_000_000, 0, 120, 1)?.execute::<8>()?;
+        market.deposit(0, 100_000_000, 120, 1)?.execute::<8>()?;
         Ok(())
     }
 
     #[cfg(feature = "u128")]
     #[test]
     fn basic_u128() -> Result<(), crate::Error> {
-        let mut market = TestMarket::<u128>::default();
-        market.deposit(1000, 0, 120, 1)?.execute()?;
-        market.deposit(0, 2000, 120, 1)?.execute()?;
-        market.deposit(100, 0, 100, 1)?.execute()?;
+        let mut market = TestMarket::<u128, 20>::default();
+        market.deposit(1000, 0, 120, 1)?.execute::<20>()?;
+        market.deposit(0, 2000, 120, 1)?.execute::<20>()?;
+        market.deposit(100, 0, 100, 1)?.execute::<20>()?;
         println!("{market:?}, {}", market.pool_value(&200, &1).unwrap());
-        market.deposit(100, 0, 200, 1)?.execute()?;
+        market.deposit(100, 0, 200, 1)?.execute::<20>()?;
         println!("{market:?}, {}", market.pool_value(&200, &1).unwrap());
-        market.deposit(100, 0, 200, 1)?.execute()?;
+        market.deposit(100, 0, 200, 1)?.execute::<20>()?;
         Ok(())
     }
 }

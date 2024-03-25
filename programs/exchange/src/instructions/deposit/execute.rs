@@ -53,7 +53,7 @@ pub fn execute_deposit<'info>(
                     short_price,
                 )
                 .map_err(GmxCoreError::from)?
-                .execute()
+                .execute::<{ data_store::states::Market::DECIMALS }>()
                 .map_err(|err| {
                     msg!(&err.to_string());
                     GmxCoreError::from(err)
