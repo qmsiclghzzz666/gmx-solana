@@ -21,8 +21,8 @@ pub mod error;
 /// Number utils.
 pub mod num;
 
-/// Decimal type with fixed deicmals.
-pub mod decimal;
+/// Fixed-point decimal type.
+pub mod fixed;
 
 /// Utils.
 pub mod utils;

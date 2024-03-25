@@ -4,7 +4,7 @@ use num_traits::{CheckedAdd, CheckedMul};
 
 use crate::num::MulDiv;
 
-/// Integer type used in [`Decimal`].
+/// Integer type used in [`Fixed`].
 pub trait Integer<const DECIMALS: u8> {
     /// Ten.
     const TEN: Self;
@@ -23,11 +23,11 @@ impl<const DECIMALS: u8> Integer<DECIMALS> for u128 {
     const UNIT: Self = 10u128.pow(DECIMALS as u32);
 }
 
-/// Decimal type with fixed decimals.
+/// Fixed-point decimal type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default)]
-pub struct Decimal<T, const DECIMALS: u8>(T);
+pub struct Fixed<T, const DECIMALS: u8>(T);
 
-impl<T, const DECIMALS: u8> Decimal<T, DECIMALS> {
+impl<T, const DECIMALS: u8> Fixed<T, DECIMALS> {
     /// Get the internal integer representation.
     pub fn get(&self) -> &T {
         &self.0
@@ -39,12 +39,12 @@ impl<T, const DECIMALS: u8> Decimal<T, DECIMALS> {
     }
 }
 
-impl<T: Integer<DECIMALS>, const DECIMALS: u8> Decimal<T, DECIMALS> {
+impl<T: Integer<DECIMALS>, const DECIMALS: u8> Fixed<T, DECIMALS> {
     /// The unit value.
-    pub const ONE: Decimal<T, DECIMALS> = Decimal(Integer::UNIT);
+    pub const ONE: Fixed<T, DECIMALS> = Fixed(Integer::UNIT);
 }
 
-impl<T: Add<Output = T>, const DECIMALS: u8> Add for Decimal<T, DECIMALS> {
+impl<T: Add<Output = T>, const DECIMALS: u8> Add for Fixed<T, DECIMALS> {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
@@ -52,13 +52,13 @@ impl<T: Add<Output = T>, const DECIMALS: u8> Add for Decimal<T, DECIMALS> {
     }
 }
 
-impl<T: CheckedAdd, const DECIMALS: u8> CheckedAdd for Decimal<T, DECIMALS> {
+impl<T: CheckedAdd, const DECIMALS: u8> CheckedAdd for Fixed<T, DECIMALS> {
     fn checked_add(&self, v: &Self) -> Option<Self> {
         Some(Self(self.0.checked_add(&v.0)?))
     }
 }
 
-impl<T: MulDiv + Integer<DECIMALS>, const DECIMALS: u8> Mul for Decimal<T, DECIMALS> {
+impl<T: MulDiv + Integer<DECIMALS>, const DECIMALS: u8> Mul for Fixed<T, DECIMALS> {
     type Output = Self;
 
     fn mul(self, rhs: Self) -> Self::Output {
@@ -66,18 +66,18 @@ impl<T: MulDiv + Integer<DECIMALS>, const DECIMALS: u8> Mul for Decimal<T, DECIM
     }
 }
 
-impl<T: MulDiv + Integer<DECIMALS>, const DECIMALS: u8> CheckedMul for Decimal<T, DECIMALS> {
+impl<T: MulDiv + Integer<DECIMALS>, const DECIMALS: u8> CheckedMul for Fixed<T, DECIMALS> {
     fn checked_mul(&self, v: &Self) -> Option<Self> {
         Some(Self(self.0.checked_mul_div(&v.0, &Self::ONE.0)?))
     }
 }
 
 /// Decimal type with `8` decimals and backed by [`u64`]
-pub type U64D8 = Decimal<u64, 8>;
+pub type U64D8 = Fixed<u64, 8>;
 
 #[cfg(feature = "u128")]
 /// Decimal type with `20` decimals and backed by [`u128`]
-pub type U128D20 = Decimal<u128, 20>;
+pub type U128D20 = Fixed<u128, 20>;
 
 #[cfg(test)]
 mod tests {
