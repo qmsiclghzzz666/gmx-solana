@@ -19,13 +19,15 @@ pub trait Pool {
     fn short_token_amount(&self) -> Self::Num;
 
     /// Apply delta to long token pool amount.
-    fn apply_delta_to_long_token_amount(&mut self, delta: Self::Signed)
-        -> Result<(), crate::Error>;
+    fn apply_delta_to_long_token_amount(
+        &mut self,
+        delta: &Self::Signed,
+    ) -> Result<(), crate::Error>;
 
     /// Apply delta to short token pool amount.
     fn apply_delta_to_short_token_amount(
         &mut self,
-        delta: Self::Signed,
+        delta: &Self::Signed,
     ) -> Result<(), crate::Error>;
 }
 

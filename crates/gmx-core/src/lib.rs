@@ -9,6 +9,9 @@ pub mod pool;
 /// Market.
 pub mod market;
 
+/// Market params.
+pub mod params;
+
 /// Actions.
 pub mod action;
 
@@ -17,6 +20,9 @@ pub mod error;
 
 /// Number utils.
 pub mod num;
+
+/// Fixed-point decimal type.
+pub mod fixed;
 
 /// Utils.
 pub mod utils;

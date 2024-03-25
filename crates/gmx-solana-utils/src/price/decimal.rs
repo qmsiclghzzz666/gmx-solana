@@ -16,11 +16,12 @@ pub struct Decimal {
 
 impl Decimal {
     /// The Maximum Decimals.
-    pub const MAX_DECIMALS: u8 = 30;
+    /// Should satisfy `MAX_DECIMALS <= 30`.
+    pub const MAX_DECIMALS: u8 = 20;
 
     /// The Maximum Decimal Multiplier,
-    /// which satisfy `u32::MAX * 10^{MAX_DECIMAL_MULTIPLIER} <= u128::MAX`.
-    pub const MAX_DECIMAL_MULTIPLIER: u8 = 28;
+    /// which should satisfy `u32::MAX * 10^{MAX_DECIMAL_MULTIPLIER} <= u128::MAX`.
+    pub const MAX_DECIMAL_MULTIPLIER: u8 = 20;
 
     /// Returns the price of one unit (with decimals to be [`MAX_DECIMALS`](Self::MAX_DECIMALS)).
     pub fn to_unit_price(&self) -> u128 {
@@ -68,13 +69,13 @@ impl Decimal {
         // CHECK: 2 * MAX_DECIMALS + MAX_DECIMAL_MULTIPLER <= u8::MAX
         let multiplier = (token_decimals << 1) + decimal_multiplier;
         let value = if Self::MAX_DECIMALS >= multiplier {
-            // CHECK: Since `MAX_DECIMALS == 30`, the pow will never overflow.
+            // CHECK: Since `MAX_DECIMALS <= 30`, the pow will never overflow.
             price
                 .checked_mul(10u128.pow((Self::MAX_DECIMALS - multiplier) as u32))
                 .ok_or(DecimalError::Overflow)?
         } else {
             // CHECK: Since `multiplier == 2 * token_decimals + decimal_multiplier <= token_decimals + MAX_DECIMALS <= 2 * MAX_DECIMALS`,
-            // `multiplier - MAX_DECIMALS <= MAX_DECIMALS == 30` will never make the pow overflow.
+            // `multiplier - MAX_DECIMALS <= MAX_DECIMALS <= 30` will never make the pow overflow.
             price / 10u128.pow((multiplier - Self::MAX_DECIMALS) as u32)
         };
         Ok(Self {
@@ -121,31 +122,31 @@ mod tests {
     #[test]
     fn test_price_1() {
         // The price of ETH is 5,000 with 18 decimals and the decimal multipler is set to 8 (so that we have decimals of precision 4).
-        let price = Decimal::try_from_price(5_000_000_000_000_000_000_000, 18, 18, 4).unwrap();
+        let price = Decimal::try_from_price(5_000_000_000_000_000_000_000, 18, 8, 4).unwrap();
         assert_eq!(price.to_unit_price(), 5_000_000_000_000_000);
         assert_eq!(price.decimal_multiplier, 8);
     }
 
     #[test]
     fn test_price_2() {
-        // The price of BTC is 60,000 with 8 decimals and the decimal multipler is set to 20 (so that we have decimals of precision 2).
+        // The price of BTC is 60,000 with 8 decimals and the decimal multipler is set to 10 (so that we have decimals of precision 2).
         let price = Decimal::try_from_price(6_000_000_000_000, 8, 8, 2).unwrap();
-        assert_eq!(price.to_unit_price(), 600_000_000_000_000_000_000_000_000);
-        assert_eq!(price.decimal_multiplier, 20);
+        assert_eq!(price.to_unit_price(), 60_000_000_000_000_000);
+        assert_eq!(price.decimal_multiplier, 10);
     }
 
     #[test]
     fn test_price_3() {
-        // The price of USDC is 1 with 6 decimals and the decimal multipler is set to 18 (so that we have decimals of precision 6).
+        // The price of USDC is 1 with 6 decimals and the decimal multipler is set to 8 (so that we have decimals of precision 6).
         let price = Decimal::try_from_price(1_000_000, 6, 6, 6).unwrap();
-        assert_eq!(price.to_unit_price(), 1_000_000_000_000_000_000_000_000);
-        assert_eq!(price.decimal_multiplier, 18);
+        assert_eq!(price.to_unit_price(), 100_000_000_000_000);
+        assert_eq!(price.decimal_multiplier, 8);
     }
 
     #[test]
     fn test_price_4() {
         // The price of DG is 0.00000001 with 18 decimals and the decimal multipler is set to 1 (so that we have decimals of precision 11).
-        let price = Decimal::try_from_price(10_000_000_000, 18, 18, 11).unwrap();
+        let price = Decimal::try_from_price(10_000_000_000, 18, 8, 11).unwrap();
         assert_eq!(price.to_unit_price(), 10_000);
         assert_eq!(price.decimal_multiplier, 1);
     }
@@ -153,13 +154,13 @@ mod tests {
     #[test]
     fn test_price_5() {
         // The price of one WNT is 5,000
-        // price decimals: 8
-        // token decimals: 18
+        // price decimals: 5
+        // token decimals: 8
         // expected precision: 4
-        let price = Decimal::try_from_price(500_000_000_000, 8, 18, 4).unwrap();
-        // 5,000 / 10^18 * 10^30
+        let price = Decimal::try_from_price(500_000_000, 5, 8, 4).unwrap();
+        // 5,000 / 10^18 * 10^20
         assert_eq!(price.to_unit_price(), 5_000_000_000_000_000);
-        assert_eq!(price.decimal_multiplier, 30 - 18 - 4);
+        assert_eq!(price.decimal_multiplier, 20 - 8 - 4);
     }
 
     #[test]
@@ -169,9 +170,9 @@ mod tests {
         // token decimals: 8
         // expected precision: 2
         let price = Decimal::try_from_price(5_000_000_000_000, 8, 8, 2).unwrap();
-        // 50,000 / 10^8 * 10^30
-        assert_eq!(price.to_unit_price(), 500_000_000_000_000_000_000_000_000);
-        assert_eq!(price.decimal_multiplier, 30 - 8 - 2);
+        // 50,000 / 10^8 * 10^20
+        assert_eq!(price.to_unit_price(), 50_000_000_000_000_000);
+        assert_eq!(price.decimal_multiplier, 20 - 8 - 2);
     }
 
     #[test]
@@ -181,8 +182,8 @@ mod tests {
         // token decimals: 8
         // expected precision: 2
         let price = Decimal::try_from_price(5_000_000_000_000, 12, 8, 2).unwrap();
-        // 5 / 10^8 * 10^30
-        assert_eq!(price.to_unit_price(), 50_000_000_000_000_000_000_000);
-        assert_eq!(price.decimal_multiplier, 30 - 8 - 2);
+        // 5 / 10^8 * 10^20
+        assert_eq!(price.to_unit_price(), 5_000_000_000_000);
+        assert_eq!(price.decimal_multiplier, 20 - 8 - 2);
     }
 }

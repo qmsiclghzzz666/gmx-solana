@@ -140,6 +140,8 @@ describe("exchange: deposit", () => {
             const market = await dataStore.account.market.fetch(marketFakeFakeUsdG);
             console.log(`long token amount: ${market.primary.longTokenAmount}`);
             console.log(`short token amount: ${market.primary.shortTokenAmount}`);
+            console.log(`long impact amount: ${market.priceImpact.longTokenAmount}`);
+            console.log(`short impact amount: ${market.priceImpact.shortTokenAmount}`);
         }
     });
 });

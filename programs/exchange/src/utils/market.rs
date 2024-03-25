@@ -5,6 +5,7 @@ use data_store::{
     states::{Market, Pool, PoolKind},
     utils::Authentication,
 };
+use gmx_core::params::SwapImpactParams;
 
 use crate::ExchangeError;
 
@@ -93,22 +94,22 @@ where
         self.pool().short_token_amount()
     }
 
-    fn apply_delta_to_long_token_amount(&mut self, delta: Self::Signed) -> gmx_core::Result<()> {
+    fn apply_delta_to_long_token_amount(&mut self, delta: &Self::Signed) -> gmx_core::Result<()> {
         data_store::cpi::apply_delta_to_market_pool(
             self.apply_delta_to_market_pool_ctx(),
             self.kind as u8,
             true,
-            delta,
+            *delta,
         )?;
         Ok(())
     }
 
-    fn apply_delta_to_short_token_amount(&mut self, delta: Self::Signed) -> gmx_core::Result<()> {
+    fn apply_delta_to_short_token_amount(&mut self, delta: &Self::Signed) -> gmx_core::Result<()> {
         data_store::cpi::apply_delta_to_market_pool(
             self.apply_delta_to_market_pool_ctx(),
             self.kind as u8,
             false,
-            delta,
+            *delta,
         )?;
         Ok(())
     }
@@ -142,7 +143,7 @@ where
     }
 }
 
-impl<'a, 'info, T> gmx_core::Market for AccountsMarket<'a, T>
+impl<'a, 'info, T> gmx_core::Market<{ Market::DECIMALS }> for AccountsMarket<'a, T>
 where
     T: AsMarket<'info>,
     'info: 'a,
@@ -186,6 +187,15 @@ where
                 .map_err(|_| gmx_core::Error::Overflow)?,
         )?;
         Ok(())
+    }
+
+    fn swap_impact_params(&self) -> SwapImpactParams<Self::Num> {
+        SwapImpactParams::builder()
+            .with_exponent(2 * Market::USD_UNIT)
+            .with_positive_factor(2_000_000_000_000)
+            .with_negative_factor(4_000_000_000_000)
+            .build()
+            .unwrap()
     }
 }
 
