@@ -150,7 +150,6 @@ where
             .total_supply
             .checked_add(amount)
             .ok_or(crate::Error::Overflow)?;
-        println!("minted: {amount}");
         Ok(())
     }
 

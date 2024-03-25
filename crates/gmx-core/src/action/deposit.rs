@@ -18,6 +18,38 @@ pub struct Deposit<M: Market<DECIMALS>, const DECIMALS: u8> {
     short_token_price: M::Num,
 }
 
+/// Report the execution of deposit.
+#[derive(Debug, Clone, Copy)]
+pub struct DepositReport<T>
+where
+    T: MulDiv,
+{
+    minted: T,
+    price_impact: T::Signed,
+}
+
+impl<T> DepositReport<T>
+where
+    T: MulDiv,
+{
+    fn new(minted: T, price_impact: T::Signed) -> Self {
+        Self {
+            minted,
+            price_impact,
+        }
+    }
+
+    /// Get minted.
+    pub fn minted(&self) -> &T {
+        &self.minted
+    }
+
+    /// Get price impact.
+    pub fn price_impact(&self) -> &T::Signed {
+        &self.price_impact
+    }
+}
+
 struct PoolParams<T> {
     long_token_usd_value: T,
     short_token_usd_value: T,
@@ -256,7 +288,7 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Deposit<M, DECIMALS> {
     }
 
     /// Execute.
-    pub fn execute(mut self) -> Result<(), crate::Error> {
+    pub fn execute(mut self) -> Result<DepositReport<M::Num>, crate::Error> {
         debug_assert!(
             !self.long_token_amount.is_zero() || !self.short_token_amount.is_zero(),
             "shouldn't be empty deposit"
@@ -297,7 +329,7 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Deposit<M, DECIMALS> {
                 .ok_or(crate::Error::Computation)?;
         }
         self.market.mint(&market_token_to_mint)?;
-        Ok(())
+        Ok(DepositReport::new(market_token_to_mint, price_impact))
     }
 }
 
@@ -308,9 +340,10 @@ mod tests {
     #[test]
     fn basic() -> Result<(), crate::Error> {
         let mut market = TestMarket::<u64, 8>::default();
-        market.deposit(100_000_000, 0, 120, 1)?.execute()?;
-        market.deposit(100_000_000, 0, 120, 1)?.execute()?;
-        market.deposit(0, 100_000_000, 120, 1)?.execute()?;
+        println!("{:?}", market.deposit(100_000_000, 0, 120, 1)?.execute()?);
+        println!("{:?}", market.deposit(100_000_000, 0, 120, 1)?.execute()?);
+        println!("{:?}", market.deposit(0, 100_000_000, 120, 1)?.execute()?);
+        println!("{market:#?}");
         Ok(())
     }
 
@@ -318,15 +351,25 @@ mod tests {
     #[test]
     fn basic_u128() -> Result<(), crate::Error> {
         let mut market = TestMarket::<u128, 20>::default();
-        market
-            .deposit(100_000_000, 0, 120_000_000_000_000, 1)?
-            .execute()?;
-        market
-            .deposit(100_000_000, 0, 120_000_000_000_000, 1)?
-            .execute()?;
-        market
-            .deposit(0, 100_000_000, 120_000_000_000_000, 1_000_000_000_000)?
-            .execute()?;
+        println!(
+            "{:?}",
+            market
+                .deposit(100_000_000, 0, 120_000_000_000_000, 1)?
+                .execute()?
+        );
+        println!(
+            "{:?}",
+            market
+                .deposit(100_000_000, 0, 120_000_000_000_000, 1)?
+                .execute()?
+        );
+        println!(
+            "{:?}",
+            market
+                .deposit(0, 100_000_000, 120_000_000_000_000, 1_000_000_000_000)?
+                .execute()?
+        );
+        println!("{market:#?}");
         Ok(())
     }
 }
