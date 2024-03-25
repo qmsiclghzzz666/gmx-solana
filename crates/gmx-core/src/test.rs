@@ -34,7 +34,7 @@ where
 
     fn apply_delta_to_long_token_amount(
         &mut self,
-        delta: Self::Signed,
+        delta: &Self::Signed,
     ) -> Result<(), crate::Error> {
         if delta.is_positive() {
             self.long_token_amount = self
@@ -52,7 +52,7 @@ where
 
     fn apply_delta_to_short_token_amount(
         &mut self,
-        delta: Self::Signed,
+        delta: &Self::Signed,
     ) -> Result<(), crate::Error> {
         if delta.is_positive() {
             self.short_token_amount = self

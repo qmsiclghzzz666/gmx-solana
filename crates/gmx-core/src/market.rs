@@ -5,7 +5,7 @@ use crate::{
     params::SwapImpactParams,
     pool::{Pool, PoolExt},
 };
-use num_traits::CheckedAdd;
+use num_traits::{CheckedAdd, CheckedSub, One, Signed, Zero};
 
 /// A GMX Market.
 ///
@@ -124,6 +124,80 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
             long_token_price,
             short_token_price,
         )
+    }
+
+    /// Get the swap impact amount with cap.
+    fn swap_impact_amount_with_cap(
+        &self,
+        is_long_token: bool,
+        price: &Self::Num,
+        usd_impact: &Self::Signed,
+    ) -> crate::Result<Self::Signed> {
+        if price.is_zero() {
+            return Err(crate::Error::DividedByZero);
+        }
+        if usd_impact.is_positive() {
+            let mut amount = usd_impact.clone()
+                / price
+                    .clone()
+                    .try_into()
+                    .map_err(|_| crate::Error::Convert)?;
+            let max_amount = if is_long_token {
+                self.price_impact_pool().long_token_amount()
+            } else {
+                self.price_impact_pool().short_token_amount()
+            };
+            if amount.unsigned_abs() > max_amount {
+                amount = max_amount.try_into().map_err(|_| crate::Error::Convert)?;
+            }
+            Ok(amount)
+        } else if usd_impact.is_negative() {
+            let price: Self::Signed = price
+                .clone()
+                .try_into()
+                .map_err(|_| crate::Error::Convert)?;
+            // Round up div.
+            let amount = (usd_impact
+                .checked_sub(&price)
+                .ok_or(crate::Error::Computation)?
+                + One::one())
+                / price;
+            Ok(amount)
+        } else {
+            Ok(Zero::zero())
+        }
+    }
+
+    /// Apply a swap impact value to the price impact pool.
+    ///
+    /// - If it is a positive impact amount, cap the impact amount to the amount available in the price impact pool,
+    /// and the price impact pool will be decreased by this amount and return.
+    /// - If it is a negative impact amount, the price impact pool will be increased by this amount and return.
+    fn apply_swap_impact_value_with_cap(
+        &mut self,
+        is_long_token: bool,
+        price: &Self::Num,
+        usd_impact: &Self::Signed,
+    ) -> crate::Result<Self::Num> {
+        let delta = self.swap_impact_amount_with_cap(is_long_token, price, usd_impact)?;
+        if is_long_token {
+            self.price_impact_pool_mut()
+                .apply_delta_to_long_token_amount(&-delta.clone())?;
+        } else {
+            self.price_impact_pool_mut()
+                .apply_delta_to_short_token_amount(&-delta.clone())?;
+        }
+        Ok(delta.unsigned_abs())
+    }
+
+    /// Apply delta to the pool.
+    fn apply_delta(&mut self, is_long_token: bool, delta: &Self::Signed) -> crate::Result<()> {
+        if is_long_token {
+            self.pool_mut().apply_delta_to_long_token_amount(delta)?;
+        } else {
+            self.pool_mut().apply_delta_to_short_token_amount(delta)?;
+        }
+        Ok(())
     }
 }
 

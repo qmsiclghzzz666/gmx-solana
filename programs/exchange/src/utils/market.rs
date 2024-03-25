@@ -94,22 +94,22 @@ where
         self.pool().short_token_amount()
     }
 
-    fn apply_delta_to_long_token_amount(&mut self, delta: Self::Signed) -> gmx_core::Result<()> {
+    fn apply_delta_to_long_token_amount(&mut self, delta: &Self::Signed) -> gmx_core::Result<()> {
         data_store::cpi::apply_delta_to_market_pool(
             self.apply_delta_to_market_pool_ctx(),
             self.kind as u8,
             true,
-            delta,
+            *delta,
         )?;
         Ok(())
     }
 
-    fn apply_delta_to_short_token_amount(&mut self, delta: Self::Signed) -> gmx_core::Result<()> {
+    fn apply_delta_to_short_token_amount(&mut self, delta: &Self::Signed) -> gmx_core::Result<()> {
         data_store::cpi::apply_delta_to_market_pool(
             self.apply_delta_to_market_pool_ctx(),
             self.kind as u8,
             false,
-            delta,
+            *delta,
         )?;
         Ok(())
     }

@@ -1,11 +1,10 @@
-use num_traits::{CheckedAdd, CheckedMul, Zero};
+use num_traits::{CheckedAdd, CheckedMul, CheckedSub, Signed, Zero};
 
 use crate::{
     fixed::FixedPointOps,
     market::{Market, MarketExt},
     num::{MulDiv, Num},
     params::SwapImpactParams,
-    pool::Pool,
     utils, PoolExt,
 };
 
@@ -173,21 +172,67 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Deposit<M, DECIMALS> {
         &mut self,
         is_long_token: bool,
         pool_value: M::Num,
-        price_impact: M::Signed,
+        mut price_impact: M::Signed,
     ) -> Result<M::Num, crate::Error> {
         let mut mint_amount: M::Num = Zero::zero();
         let supply = self.market.total_supply();
         if pool_value.is_zero() && !supply.is_zero() {
             return Err(crate::Error::InvalidPoolValueForDeposit);
         }
-        let (amount, price) = if is_long_token {
-            (&self.long_token_amount, &self.long_token_price)
+        let (mut amount, price, opposite_price) = if is_long_token {
+            (
+                self.long_token_amount.clone(),
+                &self.long_token_price,
+                &self.short_token_price,
+            )
         } else {
-            (&self.short_token_amount, &self.short_token_price)
+            (
+                self.short_token_amount.clone(),
+                &self.short_token_price,
+                &self.long_token_price,
+            )
         };
         // TODO: handle fees.
-        // TODO: apply price impact.
-        dbg!(price_impact);
+        // FIXME: will this case happend in our implementation?
+        if price_impact.is_positive() && supply.is_zero() {
+            price_impact = Zero::zero();
+        }
+        if price_impact.is_positive() {
+            let positive_impact_amount = self.market.apply_swap_impact_value_with_cap(
+                !is_long_token,
+                opposite_price,
+                &price_impact,
+            )?;
+            mint_amount = mint_amount
+                .checked_add(
+                    &utils::usd_to_market_token_amount(
+                        positive_impact_amount
+                            .checked_mul(opposite_price)
+                            .ok_or(crate::Error::Computation)?,
+                        pool_value.clone(),
+                        supply.clone(),
+                        self.market.usd_to_amount_divisor(),
+                    )
+                    .ok_or(crate::Error::Computation)?,
+                )
+                .ok_or(crate::Error::Computation)?;
+            self.market.apply_delta(
+                !is_long_token,
+                &positive_impact_amount
+                    .try_into()
+                    .map_err(|_| crate::Error::Convert)?,
+            )?;
+            // TODO: validate the amounts.
+        } else if price_impact.is_negative() {
+            let negative_impact_amount = self.market.apply_swap_impact_value_with_cap(
+                is_long_token,
+                price,
+                &price_impact,
+            )?;
+            amount = amount
+                .checked_sub(&negative_impact_amount)
+                .ok_or(crate::Error::Underflow)?;
+        }
         mint_amount = mint_amount
             .checked_add(
                 &utils::usd_to_market_token_amount(
@@ -199,21 +244,14 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Deposit<M, DECIMALS> {
                 .ok_or(crate::Error::Computation)?,
             )
             .ok_or(crate::Error::Computation)?;
-        if is_long_token {
-            self.market.pool_mut().apply_delta_to_long_token_amount(
-                amount
-                    .clone()
-                    .try_into()
-                    .map_err(|_| crate::Error::Convert)?,
-            )?;
-        } else {
-            self.market.pool_mut().apply_delta_to_short_token_amount(
-                amount
-                    .clone()
-                    .try_into()
-                    .map_err(|_| crate::Error::Convert)?,
-            )?;
-        }
+        self.market.apply_delta(
+            is_long_token,
+            &amount
+                .clone()
+                .try_into()
+                .map_err(|_| crate::Error::Convert)?,
+        )?;
+        // TODO: validate the amounts.
         Ok(mint_amount)
     }
 

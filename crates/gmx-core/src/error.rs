@@ -13,6 +13,9 @@ pub enum Error {
     /// Underflow.
     #[error("underflow")]
     Underflow,
+    /// Divided by zero.
+    #[error("divided by zero")]
+    DividedByZero,
     /// Invalid pool value for deposit.
     #[error("invalid pool value for deposit")]
     InvalidPoolValueForDeposit,
