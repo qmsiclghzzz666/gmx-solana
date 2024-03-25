@@ -1,26 +1,82 @@
-use std::ops::{Add, Mul};
+use std::{
+    cmp::Ordering,
+    ops::{Add, Mul},
+};
 
 use num_traits::{CheckedAdd, CheckedMul};
 
 use crate::num::MulDiv;
 
 /// Integer type used in [`Fixed`].
-pub trait Integer<const DECIMALS: u8> {
+pub trait Integer<const DECIMALS: u8>: Sized {
     /// Ten.
     const TEN: Self;
     /// The unit with value pow(TEN, DECIMALS).
     const UNIT: Self;
+
+    /// Fixed point power.
+    fn checked_pow_fixed(&self, exponent: &Self) -> Option<Self>;
 }
 
 impl<const DECIMALS: u8> Integer<DECIMALS> for u64 {
     const TEN: Self = 10u64;
     const UNIT: Self = 10u64.pow(DECIMALS as u32);
+
+    fn checked_pow_fixed(&self, exponent: &Self) -> Option<Self> {
+        use rust_decimal::{Decimal, MathematicalOps};
+
+        // `scale > 28` is not supported by `rust_decimal`.
+        if DECIMALS > 28 {
+            return None;
+        }
+        let value = Decimal::new((*self).try_into().ok()?, DECIMALS as u32);
+        let exponent = Decimal::new((*exponent).try_into().ok()?, DECIMALS as u32);
+        let mut ans = value.checked_powd(exponent)?;
+        ans.rescale(DECIMALS as u32);
+        ans.mantissa().try_into().ok()
+    }
 }
 
 #[cfg(feature = "u128")]
 impl<const DECIMALS: u8> Integer<DECIMALS> for u128 {
     const TEN: Self = 10u128;
     const UNIT: Self = 10u128.pow(DECIMALS as u32);
+
+    fn checked_pow_fixed(&self, exponent: &Self) -> Option<Self> {
+        type Convert = U64D8;
+
+        let (divisor, multiplier) = match DECIMALS.cmp(&U64D8::DECIMALS) {
+            Ordering::Greater => {
+                let divisor = 10u128.pow((DECIMALS - Convert::DECIMALS) as u32);
+                (Some(divisor), None)
+            }
+            Ordering::Less => {
+                let multiplier = 10u128.pow((Convert::DECIMALS - DECIMALS) as u32);
+                (None, Some(multiplier))
+            }
+            Ordering::Equal => (None, None),
+        };
+        let convert_to = |value: Self| -> Option<u64> {
+            match (&divisor, &multiplier) {
+                (Some(divisor), _) => (value / *divisor).try_into().ok(),
+                (_, Some(multiplier)) => value.checked_mul(*multiplier)?.try_into().ok(),
+                _ => value.try_into().ok(),
+            }
+        };
+        let convert_from = |value: u64| -> Option<Self> {
+            let value: Self = value.into();
+            match (&divisor, &multiplier) {
+                (Some(divisor), _) => value.checked_mul(*divisor),
+                (_, Some(multiplier)) => Some(value / *multiplier),
+                _ => Some(value),
+            }
+        };
+        let ans = Integer::<{ Convert::DECIMALS }>::checked_pow_fixed(
+            &convert_to(*self)?,
+            &convert_to(*exponent)?,
+        )?;
+        convert_from(ans)
+    }
 }
 
 /// Fixed-point decimal type.
@@ -42,6 +98,14 @@ impl<T, const DECIMALS: u8> Fixed<T, DECIMALS> {
 impl<T: Integer<DECIMALS>, const DECIMALS: u8> Fixed<T, DECIMALS> {
     /// The unit value.
     pub const ONE: Fixed<T, DECIMALS> = Fixed(Integer::UNIT);
+    /// The decimals.
+    pub const DECIMALS: u8 = DECIMALS;
+
+    /// Checked pow.
+    pub fn checked_pow(&self, exponent: &Self) -> Option<Self> {
+        let inner = self.0.checked_pow_fixed(&exponent.0)?;
+        Some(Self(inner))
+    }
 }
 
 impl<T: Add<Output = T>, const DECIMALS: u8> Add for Fixed<T, DECIMALS> {
@@ -90,6 +154,14 @@ mod tests {
         assert_eq!(x * y, U64D8::from_inner(32_768_000_012));
     }
 
+    #[test]
+    fn pow() {
+        let x = U64D8::from_inner(123_456 * 10_000_000);
+        let exp = U64D8::from_inner(11 * 10_000_000);
+        let ans = x.checked_pow(&exp).unwrap();
+        assert_eq!(ans, U64D8::from_inner(3167098273314));
+    }
+
     #[cfg(feature = "u128")]
     #[test]
     fn basic_u128() {
@@ -99,5 +171,14 @@ mod tests {
             x * y,
             U128D20::from_inner(3_276_800_000_000_000_000_000_128)
         );
+    }
+
+    #[cfg(feature = "u128")]
+    #[test]
+    fn pow_u128() {
+        let x = U128D20::from_inner(123_456 * U128D20::ONE.0 / 10);
+        let exp = U128D20::from_inner(11 * U128D20::ONE.0 / 10);
+        let ans = x.checked_pow(&exp).unwrap();
+        assert_eq!(ans, U128D20::from_inner(3167098273314000000000000));
     }
 }

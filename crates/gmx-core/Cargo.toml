@@ -12,4 +12,7 @@ solana = ["anchor-lang"]
 num-traits = "0.2.18"
 thiserror = { workspace = true }
 ruint = { version = "1.12.1", optional = true, default-features = false }
+rust_decimal = { version = "1.34", default-features = false, features = [
+    "maths",
+] }
 anchor-lang = { workspace = true, optional = true }
