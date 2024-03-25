@@ -280,13 +280,15 @@ mod tests {
     #[test]
     fn basic_u128() -> Result<(), crate::Error> {
         let mut market = TestMarket::<u128, 20>::default();
-        market.deposit(1000, 0, 120, 1)?.execute()?;
-        market.deposit(0, 2000, 120, 1)?.execute()?;
-        market.deposit(100, 0, 100, 1)?.execute()?;
-        println!("{market:?}, {}", market.pool_value(&200, &1).unwrap());
-        market.deposit(100, 0, 200, 1)?.execute()?;
-        println!("{market:?}, {}", market.pool_value(&200, &1).unwrap());
-        market.deposit(100, 0, 200, 1)?.execute()?;
+        market
+            .deposit(100_000_000, 0, 120_000_000_000_000, 1)?
+            .execute()?;
+        market
+            .deposit(100_000_000, 0, 120_000_000_000_000, 1)?
+            .execute()?;
+        market
+            .deposit(0, 100_000_000, 120_000_000_000_000, 1_000_000_000_000)?
+            .execute()?;
         Ok(())
     }
 }
