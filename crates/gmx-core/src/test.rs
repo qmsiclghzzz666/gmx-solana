@@ -97,8 +97,8 @@ impl Default for TestMarket<u128> {
             primary: Default::default(),
             price_impact: Default::default(),
             total_supply: Default::default(),
-            value_to_amount_divisor: 10u128.pow(30 - 8),
-            value_unit: 10u128.pow(30),
+            value_to_amount_divisor: 10u128.pow(20 - 8),
+            value_unit: 10u128.pow(20),
         }
     }
 }

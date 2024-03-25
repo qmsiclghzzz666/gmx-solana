@@ -194,7 +194,12 @@ where
     }
 
     fn swap_impact_params(&self) -> SwapImpactParams<Self::Num> {
-        todo!()
+        SwapImpactParams::builder()
+            .with_exponent(2 * Market::USD_UNIT)
+            .with_positive_factor(2_000_000_000_000)
+            .with_negative_factor(4_000_000_000_000)
+            .build()
+            .unwrap()
     }
 }
 

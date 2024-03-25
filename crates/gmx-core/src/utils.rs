@@ -60,7 +60,7 @@ where
             } else if exponent_factor.is_one() {
                 Some(value)
             } else {
-                todo!()
+                Some(T::zero())
             }
         }
     }
