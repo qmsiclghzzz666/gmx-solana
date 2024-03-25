@@ -1,9 +1,11 @@
+use std::fmt;
+
 use num_traits::{CheckedAdd, CheckedMul, Signed};
 
 /// Num trait used in GMX.
-pub trait Num: num_traits::Num + CheckedAdd + CheckedMul + Clone + Ord {}
+pub trait Num: num_traits::Num + CheckedAdd + CheckedMul + Clone + Ord + fmt::Debug {}
 
-impl<T: num_traits::Num + CheckedAdd + CheckedMul + Clone + Ord> Num for T {}
+impl<T: num_traits::Num + CheckedAdd + CheckedMul + Clone + Ord + fmt::Debug> Num for T {}
 
 /// Unsigned value that cannot be negative.
 pub trait Unsigned: num_traits::Unsigned {

@@ -1,6 +1,7 @@
 use std::fmt;
 
 use crate::{
+    fixed::Integer,
     market::Market,
     num::{MulDiv, Num, UnsignedAbs},
     params::SwapImpactParams,
@@ -75,7 +76,6 @@ pub struct TestMarket<T, const DECIMALS: u8> {
     price_impact: TestPool<T>,
     total_supply: T,
     value_to_amount_divisor: T,
-    value_unit: T,
     swap_impact_params: SwapImpactParams<T>,
 }
 
@@ -86,7 +86,6 @@ impl Default for TestMarket<u64, 8> {
             price_impact: Default::default(),
             total_supply: Default::default(),
             value_to_amount_divisor: 1,
-            value_unit: 10u64.pow(8),
             swap_impact_params: SwapImpactParams::builder()
                 .with_exponent(200_000_000)
                 .with_positive_factor(2)
@@ -105,7 +104,6 @@ impl Default for TestMarket<u128, 20> {
             price_impact: Default::default(),
             total_supply: Default::default(),
             value_to_amount_divisor: 10u128.pow(20 - 8),
-            value_unit: 10u128.pow(20),
             swap_impact_params: SwapImpactParams::builder()
                 .with_exponent(200_000_000_000_000_000_000)
                 .with_positive_factor(2_000_000_000_000)
@@ -116,9 +114,9 @@ impl Default for TestMarket<u128, 20> {
     }
 }
 
-impl<T, const DECIMALS: u8> Market for TestMarket<T, DECIMALS>
+impl<T, const DECIMALS: u8> Market<DECIMALS> for TestMarket<T, DECIMALS>
 where
-    T: MulDiv + Num + CheckedSub + fmt::Display,
+    T: CheckedSub + fmt::Display + Integer<DECIMALS>,
     T::Signed: Num + std::fmt::Debug,
 {
     type Num = T;
@@ -126,8 +124,6 @@ where
     type Signed = T::Signed;
 
     type Pool = TestPool<T>;
-
-    const DECIMALS: u8 = DECIMALS;
 
     fn pool(&self) -> &Self::Pool {
         &self.primary
@@ -160,10 +156,6 @@ where
 
     fn usd_to_amount_divisor(&self) -> Self::Num {
         self.value_to_amount_divisor.clone()
-    }
-
-    fn unit(&self) -> Self::Num {
-        self.value_unit.clone()
     }
 
     fn swap_impact_params(&self) -> SwapImpactParams<Self::Num> {

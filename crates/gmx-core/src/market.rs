@@ -1,24 +1,24 @@
 use crate::{
     action::deposit::Deposit,
+    fixed::Integer,
     num::{MulDiv, Num, UnsignedAbs},
     params::SwapImpactParams,
     pool::{Pool, PoolExt},
 };
 use num_traits::CheckedAdd;
 
-/// A market.
-pub trait Market {
+/// A GMX Market.
+///
+/// - The constant generic `DECIMALS` is the number of decimals of USD values.
+pub trait Market<const DECIMALS: u8> {
     /// Unsigned number type used in the market.
-    type Num: MulDiv<Signed = Self::Signed> + Num;
+    type Num: MulDiv<Signed = Self::Signed> + Integer<DECIMALS>;
 
     /// Signed number type used in the market.
-    type Signed: UnsignedAbs<Unsigned = Self::Num> + TryFrom<Self::Num> + Num + std::fmt::Debug;
+    type Signed: UnsignedAbs<Unsigned = Self::Num> + TryFrom<Self::Num> + Num;
 
     /// Pool type.
     type Pool: Pool<Num = Self::Num, Signed = Self::Signed>;
-
-    /// Decimals.
-    const DECIMALS: u8;
 
     /// Get the reference to the primary pool.
     fn pool(&self) -> &Self::Pool;
@@ -38,27 +38,21 @@ pub trait Market {
     /// Perform mint.
     fn mint(&mut self, amount: &Self::Num) -> Result<(), crate::Error>;
 
-    /// Usd value to market token amount divisor.
+    /// USD value to market token amount divisor.
     ///
     /// One should make sure it is non-zero.
     fn usd_to_amount_divisor(&self) -> Self::Num;
-
-    /// Unit value used in the market, i.e. the amount of `one`,
-    /// not the amount unit of market token.
-    fn unit(&self) -> Self::Num;
 
     /// Get the swap impact params.
     fn swap_impact_params(&self) -> SwapImpactParams<Self::Num>;
 }
 
-impl<'a, M: Market> Market for &'a mut M {
+impl<'a, const DECIMALS: u8, M: Market<DECIMALS>> Market<DECIMALS> for &'a mut M {
     type Num = M::Num;
 
     type Signed = M::Signed;
 
     type Pool = M::Pool;
-
-    const DECIMALS: u8 = M::DECIMALS;
 
     fn pool(&self) -> &Self::Pool {
         (**self).pool()
@@ -88,17 +82,19 @@ impl<'a, M: Market> Market for &'a mut M {
         (**self).usd_to_amount_divisor()
     }
 
-    fn unit(&self) -> Self::Num {
-        (**self).unit()
-    }
-
     fn swap_impact_params(&self) -> SwapImpactParams<Self::Num> {
         (**self).swap_impact_params()
     }
 }
 
 /// Extension trait for [`Market`] with utils.
-pub trait MarketExt: Market {
+pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
+    /// Unit USD value used in the market, i.e. the fixed-point deciamls amount of `one` USD,
+    /// not the amount unit of market token.
+    fn unit(&self) -> Self::Num {
+        Self::Num::UNIT
+    }
+
     /// Get the usd value of primary pool.
     fn pool_value(
         &self,
@@ -117,7 +113,7 @@ pub trait MarketExt: Market {
         short_token_amount: Self::Num,
         long_token_price: Self::Num,
         short_token_price: Self::Num,
-    ) -> Result<Deposit<&mut Self>, crate::Error>
+    ) -> Result<Deposit<&mut Self, DECIMALS>, crate::Error>
     where
         Self: Sized,
     {
@@ -131,4 +127,4 @@ pub trait MarketExt: Market {
     }
 }
 
-impl<M: Market> MarketExt for M {}
+impl<const DECIMALS: u8, M: Market<DECIMALS>> MarketExt<DECIMALS> for M {}

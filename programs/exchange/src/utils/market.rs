@@ -143,7 +143,7 @@ where
     }
 }
 
-impl<'a, 'info, T> gmx_core::Market for AccountsMarket<'a, T>
+impl<'a, 'info, T> gmx_core::Market<{ Market::DECIMALS }> for AccountsMarket<'a, T>
 where
     T: AsMarket<'info>,
     'info: 'a,
@@ -153,8 +153,6 @@ where
     type Signed = i128;
 
     type Pool = AccountsPool<'a, T>;
-
-    const DECIMALS: u8 = Market::DECIMALS;
 
     fn pool(&self) -> &Self::Pool {
         &self.primary
@@ -178,10 +176,6 @@ where
 
     fn usd_to_amount_divisor(&self) -> Self::Num {
         Market::USD_TO_AMOUNT_DIVISOR
-    }
-
-    fn unit(&self) -> Self::Num {
-        Market::USD_UNIT
     }
 
     fn mint(&mut self, amount: &Self::Num) -> gmx_core::Result<()> {
