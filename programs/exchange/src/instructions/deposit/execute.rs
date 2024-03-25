@@ -43,8 +43,7 @@ pub fn execute_deposit<'info>(
                 accounts.deposit.tokens.initial_long_token_amount,
                 accounts.deposit.tokens.initial_short_token_amount,
             );
-            msg!("long: {}, short: {}", long_price, short_price);
-            accounts
+            let report = accounts
                 .as_market()
                 .deposit(
                     long_amount.into(),
@@ -58,6 +57,7 @@ pub fn execute_deposit<'info>(
                     msg!(&err.to_string());
                     GmxCoreError::from(err)
                 })?;
+            msg!("{:?}", report);
             Ok(())
         },
     )?;
