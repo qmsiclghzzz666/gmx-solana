@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 
 use crate::{
-    fixed::{Fixed, Integer},
+    fixed::{Fixed, FixedPointOps},
     num::{MulDiv, Num},
 };
 
@@ -36,7 +36,7 @@ where
 /// Assuming that all values are "float"s with the same decimals.
 pub fn apply_factors<T, const DECIMALS: u8>(value: T, factor: T, exponent_factor: T) -> Option<T>
 where
-    T: Integer<DECIMALS>,
+    T: FixedPointOps<DECIMALS>,
 {
     apply_factor(apply_exponent_factor(value, exponent_factor)?, factor)
 }
@@ -47,7 +47,7 @@ where
 #[inline]
 pub fn apply_exponent_factor<T, const DECIMALS: u8>(value: T, exponent_factor: T) -> Option<T>
 where
-    T: Integer<DECIMALS>,
+    T: FixedPointOps<DECIMALS>,
 {
     let unit = Fixed::ONE;
     let value = Fixed::from_inner(value);
@@ -75,7 +75,7 @@ where
 #[inline]
 pub fn apply_factor<T, const DECIMALS: u8>(value: T, factor: T) -> Option<T>
 where
-    T: Integer<DECIMALS>,
+    T: FixedPointOps<DECIMALS>,
 {
     Fixed::from_inner(value)
         .checked_mul(&Fixed::from_inner(factor))

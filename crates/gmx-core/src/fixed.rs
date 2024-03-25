@@ -7,19 +7,16 @@ use num_traits::{CheckedAdd, CheckedMul, One, Zero};
 
 use crate::num::{MulDiv, Num};
 
-/// Integer type used in [`Fixed`].
-pub trait Integer<const DECIMALS: u8>: MulDiv + Num {
-    /// Ten.
-    const TEN: Self;
-    /// The unit with value pow(TEN, DECIMALS).
+/// Number type with the required properties for implementing [`Fixed`].
+pub trait FixedPointOps<const DECIMALS: u8>: MulDiv + Num {
+    /// The unit value (i.e. the value "one") which is expected to be `pow(10, DECIMALS)`.
     const UNIT: Self;
 
     /// Fixed point power.
     fn checked_pow_fixed(&self, exponent: &Self) -> Option<Self>;
 }
 
-impl<const DECIMALS: u8> Integer<DECIMALS> for u64 {
-    const TEN: Self = 10u64;
+impl<const DECIMALS: u8> FixedPointOps<DECIMALS> for u64 {
     const UNIT: Self = 10u64.pow(DECIMALS as u32);
 
     fn checked_pow_fixed(&self, exponent: &Self) -> Option<Self> {
@@ -38,8 +35,7 @@ impl<const DECIMALS: u8> Integer<DECIMALS> for u64 {
 }
 
 #[cfg(feature = "u128")]
-impl<const DECIMALS: u8> Integer<DECIMALS> for u128 {
-    const TEN: Self = 10u128;
+impl<const DECIMALS: u8> FixedPointOps<DECIMALS> for u128 {
     const UNIT: Self = 10u128.pow(DECIMALS as u32);
 
     fn checked_pow_fixed(&self, exponent: &Self) -> Option<Self> {
@@ -71,7 +67,7 @@ impl<const DECIMALS: u8> Integer<DECIMALS> for u128 {
                 _ => Some(value),
             }
         };
-        let ans = Integer::<{ Convert::DECIMALS }>::checked_pow_fixed(
+        let ans = FixedPointOps::<{ Convert::DECIMALS }>::checked_pow_fixed(
             &convert_to(*self)?,
             &convert_to(*exponent)?,
         )?;
@@ -102,9 +98,9 @@ impl<T, const DECIMALS: u8> Fixed<T, DECIMALS> {
     }
 }
 
-impl<T: Integer<DECIMALS>, const DECIMALS: u8> Fixed<T, DECIMALS> {
+impl<T: FixedPointOps<DECIMALS>, const DECIMALS: u8> Fixed<T, DECIMALS> {
     /// The unit value.
-    pub const ONE: Fixed<T, DECIMALS> = Fixed(Integer::UNIT);
+    pub const ONE: Fixed<T, DECIMALS> = Fixed(FixedPointOps::UNIT);
     /// The decimals.
     pub const DECIMALS: u8 = DECIMALS;
 
@@ -115,7 +111,7 @@ impl<T: Integer<DECIMALS>, const DECIMALS: u8> Fixed<T, DECIMALS> {
     }
 }
 
-impl<T: Integer<DECIMALS>, const DECIMALS: u8> Add for Fixed<T, DECIMALS> {
+impl<T: FixedPointOps<DECIMALS>, const DECIMALS: u8> Add for Fixed<T, DECIMALS> {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
@@ -123,13 +119,13 @@ impl<T: Integer<DECIMALS>, const DECIMALS: u8> Add for Fixed<T, DECIMALS> {
     }
 }
 
-impl<T: Integer<DECIMALS>, const DECIMALS: u8> CheckedAdd for Fixed<T, DECIMALS> {
+impl<T: FixedPointOps<DECIMALS>, const DECIMALS: u8> CheckedAdd for Fixed<T, DECIMALS> {
     fn checked_add(&self, v: &Self) -> Option<Self> {
         Some(Self(self.0.checked_add(&v.0)?))
     }
 }
 
-impl<T: Integer<DECIMALS>, const DECIMALS: u8> Mul for Fixed<T, DECIMALS> {
+impl<T: FixedPointOps<DECIMALS>, const DECIMALS: u8> Mul for Fixed<T, DECIMALS> {
     type Output = Self;
 
     fn mul(self, rhs: Self) -> Self::Output {
@@ -137,13 +133,13 @@ impl<T: Integer<DECIMALS>, const DECIMALS: u8> Mul for Fixed<T, DECIMALS> {
     }
 }
 
-impl<T: Integer<DECIMALS>, const DECIMALS: u8> CheckedMul for Fixed<T, DECIMALS> {
+impl<T: FixedPointOps<DECIMALS>, const DECIMALS: u8> CheckedMul for Fixed<T, DECIMALS> {
     fn checked_mul(&self, v: &Self) -> Option<Self> {
         Some(Self(self.0.checked_mul_div(&v.0, &Self::ONE.0)?))
     }
 }
 
-impl<T: Integer<DECIMALS>, const DECIMALS: u8> Zero for Fixed<T, DECIMALS> {
+impl<T: FixedPointOps<DECIMALS>, const DECIMALS: u8> Zero for Fixed<T, DECIMALS> {
     fn zero() -> Self {
         Self(T::zero())
     }
@@ -153,7 +149,7 @@ impl<T: Integer<DECIMALS>, const DECIMALS: u8> Zero for Fixed<T, DECIMALS> {
     }
 }
 
-impl<T: Integer<DECIMALS>, const DECIMALS: u8> One for Fixed<T, DECIMALS> {
+impl<T: FixedPointOps<DECIMALS>, const DECIMALS: u8> One for Fixed<T, DECIMALS> {
     fn one() -> Self {
         Self::ONE
     }

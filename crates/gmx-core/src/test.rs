@@ -1,7 +1,7 @@
 use std::fmt;
 
 use crate::{
-    fixed::Integer,
+    fixed::FixedPointOps,
     market::Market,
     num::{MulDiv, Num, UnsignedAbs},
     params::SwapImpactParams,
@@ -116,7 +116,7 @@ impl Default for TestMarket<u128, 20> {
 
 impl<T, const DECIMALS: u8> Market<DECIMALS> for TestMarket<T, DECIMALS>
 where
-    T: CheckedSub + fmt::Display + Integer<DECIMALS>,
+    T: CheckedSub + fmt::Display + FixedPointOps<DECIMALS>,
     T::Signed: Num + std::fmt::Debug,
 {
     type Num = T;

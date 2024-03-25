@@ -1,6 +1,6 @@
 use crate::{
     action::deposit::Deposit,
-    fixed::Integer,
+    fixed::FixedPointOps,
     num::{MulDiv, Num, UnsignedAbs},
     params::SwapImpactParams,
     pool::{Pool, PoolExt},
@@ -12,7 +12,7 @@ use num_traits::CheckedAdd;
 /// - The constant generic `DECIMALS` is the number of decimals of USD values.
 pub trait Market<const DECIMALS: u8> {
     /// Unsigned number type used in the market.
-    type Num: MulDiv<Signed = Self::Signed> + Integer<DECIMALS>;
+    type Num: MulDiv<Signed = Self::Signed> + FixedPointOps<DECIMALS>;
 
     /// Signed number type used in the market.
     type Signed: UnsignedAbs<Unsigned = Self::Num> + TryFrom<Self::Num> + Num;

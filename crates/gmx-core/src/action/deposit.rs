@@ -1,7 +1,7 @@
 use num_traits::{CheckedAdd, CheckedMul, Zero};
 
 use crate::{
-    fixed::Integer,
+    fixed::FixedPointOps,
     market::{Market, MarketExt},
     num::{MulDiv, Num},
     params::SwapImpactParams,
@@ -54,7 +54,7 @@ where
 
     fn price_impact<const DECIMALS: u8>(&self, params: &SwapImpactParams<T>) -> Option<T::Signed>
     where
-        T: Integer<DECIMALS>,
+        T: FixedPointOps<DECIMALS>,
     {
         if self.is_same_side_rebalance() {
             self.price_impact_for_same_side_rebalance(params)
@@ -69,7 +69,7 @@ where
         params: &SwapImpactParams<T>,
     ) -> Option<T::Signed>
     where
-        T: Integer<DECIMALS>,
+        T: FixedPointOps<DECIMALS>,
     {
         let initial = self.initial_diff_usd();
         let next = self.next_diff_usd();
@@ -95,7 +95,7 @@ where
         params: &SwapImpactParams<T>,
     ) -> Option<T::Signed>
     where
-        T: Integer<DECIMALS>,
+        T: FixedPointOps<DECIMALS>,
     {
         let initial = self.initial_diff_usd();
         let next = self.next_diff_usd();
