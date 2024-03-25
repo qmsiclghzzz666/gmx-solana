@@ -394,6 +394,25 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn sequence() -> crate::Result<()> {
+        let mut market_1 = TestMarket::<u64, 8>::default();
+        println!(
+            "{:#?}",
+            market_1.deposit(1_000_000_000, 0, 120, 1)?.execute()?
+        );
+        println!(
+            "{:#?}",
+            market_1.deposit(1_000_000_000, 0, 120, 1)?.execute()?
+        );
+        let mut market_2 = TestMarket::<u64, 8>::default();
+        println!(
+            "{:#?}",
+            market_2.deposit(2_000_000_000, 0, 120, 1)?.execute()?
+        );
+        Ok(())
+    }
+
     #[cfg(feature = "u128")]
     #[test]
     fn basic_u128() -> Result<(), crate::Error> {
