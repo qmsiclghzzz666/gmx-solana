@@ -10,7 +10,7 @@ use crate::{
 };
 
 /// A deposit.
-#[must_use = "Action do nothing if not execute"]
+#[must_use]
 pub struct Deposit<M: Market<DECIMALS>, const DECIMALS: u8> {
     market: M,
     long_token_amount: M::Num,
