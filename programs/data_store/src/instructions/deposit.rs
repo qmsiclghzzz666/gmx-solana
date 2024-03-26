@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use anchor_spl::token::TokenAccount;
 
 use crate::{
     states::{
@@ -12,7 +13,7 @@ use crate::{
 pub fn initialize_deposit(
     ctx: Context<InitializeDeposit>,
     nonce: NonceBytes,
-    receivers: Receivers,
+    ui_fee_receiver: Pubkey,
     tokens: TokenParams,
 ) -> Result<()> {
     ctx.accounts.deposit.init(
@@ -20,7 +21,10 @@ pub fn initialize_deposit(
         &ctx.accounts.market,
         nonce,
         ctx.accounts.payer.key(),
-        receivers,
+        Receivers {
+            ui_fee_receiver,
+            receiver: ctx.accounts.receiver.key(),
+        },
         tokens,
     )
 }
@@ -42,6 +46,8 @@ pub struct InitializeDeposit<'info> {
     )]
     pub deposit: Account<'info, Deposit>,
     pub market: Account<'info, Market>,
+    #[account(token::mint = market.meta.market_token_mint)]
+    pub receiver: Account<'info, TokenAccount>,
     pub system_program: Program<'info, System>,
 }
 
