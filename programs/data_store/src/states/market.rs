@@ -1,14 +1,14 @@
 use anchor_lang::{prelude::*, Bump};
 use dual_vec_map::DualVecMap;
 use gmx_core::PoolKind;
-use gmx_solana_utils::{price::Decimal, to_seed};
+use gmx_solana_utils::to_seed;
 
-use crate::{constants, DataStoreError};
+use crate::DataStoreError;
 
 use super::{Data, Seed};
 
 #[account]
-pub struct Market {
+pub(crate) struct Market {
     pub(crate) meta: MarketMeta,
     pools: Pools,
 }
@@ -71,16 +71,6 @@ impl Pools {
 }
 
 impl Market {
-    /// Unit USD value i.e. `one`.
-    pub const USD_UNIT: u128 = 10u128.pow(Decimal::MAX_DECIMALS as u32);
-
-    /// USD value to amount divisor.
-    pub const USD_TO_AMOUNT_DIVISOR: u128 =
-        10u128.pow((Decimal::MAX_DECIMALS - constants::MARKET_TOKEN_DECIMALS) as u32);
-
-    /// Deicmals.
-    pub const DECIMALS: u8 = Decimal::MAX_DECIMALS;
-
     /// Initialize the market.
     pub fn init(
         &mut self,
@@ -228,5 +218,5 @@ impl Pool {
 pub struct MarketChangeEvent {
     pub address: Pubkey,
     pub action: super::Action,
-    pub market: Market,
+    pub(crate) market: Market,
 }

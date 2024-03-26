@@ -45,7 +45,7 @@ pub struct InitializeDeposit<'info> {
         bump,
     )]
     pub deposit: Account<'info, Deposit>,
-    pub market: Account<'info, Market>,
+    pub(crate) market: Account<'info, Market>,
     #[account(token::mint = market.meta.market_token_mint)]
     pub receiver: Account<'info, TokenAccount>,
     pub system_program: Program<'info, System>,

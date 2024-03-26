@@ -3,7 +3,7 @@ use anchor_spl::token::{Mint, Token, TokenAccount};
 use data_store::{
     cpi::accounts::{CheckRole, RemoveDeposit},
     program::DataStore,
-    states::{Deposit, Market},
+    states::Deposit,
     utils::Authentication,
 };
 use gmx_core::MarketExt;
@@ -86,7 +86,8 @@ pub struct ExecuteDeposit<'info> {
     #[account(mut, constraint = receiver.key() == deposit.receivers.receiver)]
     pub receiver: Account<'info, TokenAccount>,
     #[account(mut, constraint = market.key() == deposit.market)]
-    pub market: Account<'info, Market>,
+    /// CHECK: only used to invoke CPI and should be checked by it.
+    pub market: UncheckedAccount<'info>,
     #[account(mut, constraint = market_token_mint.key() == deposit.tokens.market_token)]
     pub market_token_mint: Account<'info, Mint>,
     /// CHECK: only used as signing PDA.
@@ -143,8 +144,8 @@ impl<'info> WithOracle<'info> for ExecuteDeposit<'info> {
 }
 
 impl<'info> AsMarket<'info> for ExecuteDeposit<'info> {
-    fn market(&self) -> &Account<'info, Market> {
-        &self.market
+    fn market(&self) -> AccountInfo<'info> {
+        self.market.to_account_info()
     }
 
     fn market_token(&self) -> &Account<'info, Mint> {

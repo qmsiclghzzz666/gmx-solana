@@ -4,7 +4,7 @@ use data_store::{
     constants,
     cpi::accounts::{CheckRole, InitializeDeposit},
     program::DataStore,
-    states::{deposit::TokenParams, Market, NonceBytes},
+    states::{deposit::TokenParams, NonceBytes},
     utils::Authentication,
 };
 
@@ -87,7 +87,8 @@ pub struct CreateDeposit<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
     pub receiver: Account<'info, TokenAccount>,
-    pub market: Account<'info, Market>,
+    /// CHECK: only used to invoke CPI and should be checked by it.
+    pub market: UncheckedAccount<'info>,
     #[account(mut)]
     pub initial_long_token: Account<'info, TokenAccount>,
     #[account(mut)]

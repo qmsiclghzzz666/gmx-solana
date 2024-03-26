@@ -4,7 +4,7 @@ use gmx_core::PoolKind;
 
 use crate::{
     constants,
-    states::{Action, DataStore, Market, MarketChangeEvent, MarketMeta, Pools, Roles, Seed},
+    states::{Action, DataStore, Market, MarketChangeEvent, MarketMeta, Pool, Pools, Roles, Seed},
     utils::internal,
     DataStoreError,
 };
@@ -144,7 +144,7 @@ pub struct ApplyDeltaToMarketPool<'info> {
         seeds = [Market::SEED, store.key().as_ref(), &market.expected_key_seed()],
         bump = market.meta.bump,
     )]
-    pub market: Account<'info, Market>,
+    pub(crate) market: Account<'info, Market>,
 }
 
 impl<'info> internal::Authentication<'info> for ApplyDeltaToMarketPool<'info> {
@@ -159,6 +159,16 @@ impl<'info> internal::Authentication<'info> for ApplyDeltaToMarketPool<'info> {
     fn roles(&self) -> &Account<'info, Roles> {
         &self.only_controller
     }
+}
+
+/// Get the given pool info of the market.
+pub fn get_pool(ctx: Context<GetPool>, pool: PoolKind) -> Result<Option<Pool>> {
+    Ok(ctx.accounts.market.pool(pool))
+}
+
+#[derive(Accounts)]
+pub struct GetPool<'info> {
+    pub(crate) market: Account<'info, Market>,
 }
 
 /// Initialize a new market token.

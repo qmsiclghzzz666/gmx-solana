@@ -14,7 +14,11 @@ pub mod utils;
 
 pub use self::states::Data;
 
-use self::{instructions::*, states::deposit::TokenParams, utils::internal};
+use self::{
+    instructions::*,
+    states::{deposit::TokenParams, market::Pool},
+    utils::internal,
+};
 use gmx_solana_utils::price::Price;
 
 declare_id!("EjfyBCoSMd6rjkUNz1SFfD7DBYbvAuaxhQs8phcu7Eb6");
@@ -138,6 +142,14 @@ pub mod data_store {
                 .map_err(|_| DataStoreError::InvalidArgument)?,
             is_long_token,
             delta,
+        )
+    }
+
+    pub fn get_pool(ctx: Context<GetPool>, pool: u8) -> Result<Option<Pool>> {
+        instructions::get_pool(
+            ctx,
+            pool.try_into()
+                .map_err(|_| DataStoreError::InvalidArgument)?,
         )
     }
 

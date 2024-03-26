@@ -3,8 +3,9 @@ use std::collections::BTreeMap;
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, TokenAccount};
 use data_store::{
-    cpi::accounts::{ApplyDeltaToMarketPool, MintMarketTokenTo},
-    states::{Market, Pool},
+    constants,
+    cpi::accounts::{ApplyDeltaToMarketPool, GetPool, MintMarketTokenTo},
+    states::Pool,
     utils::Authentication,
 };
 use gmx_core::{params::SwapImpactParams, PoolKind};
@@ -16,7 +17,7 @@ const SUPPORTED_POOLS: [PoolKind; 2] = [PoolKind::Primary, PoolKind::PriceImpact
 /// Accounts that can be used as [`Market`](gmx_core::Market).
 pub trait AsMarket<'info>: Authentication<'info> {
     /// Get market.
-    fn market(&self) -> &Account<'info, Market>;
+    fn market(&self) -> AccountInfo<'info>;
 
     /// Get market token mint.
     fn market_token(&self) -> &Account<'info, Mint>;
@@ -79,8 +80,18 @@ impl<'a, 'info, T> AccountsPool<'a, T>
 where
     T: AsMarket<'info>,
 {
-    fn pool(&self) -> Option<Pool> {
-        self.accounts.market().pool(self.kind)
+    fn get_pool_ctx(&self) -> CpiContext<'_, '_, '_, 'info, GetPool<'info>> {
+        let check_role = self.accounts.check_role_ctx();
+        CpiContext::new(
+            check_role.program,
+            GetPool {
+                market: self.accounts.market(),
+            },
+        )
+    }
+
+    fn pool(&self) -> Result<Option<Pool>> {
+        Ok(data_store::cpi::get_pool(self.get_pool_ctx(), self.kind as u8)?.get())
     }
 
     fn apply_delta_to_market_pool_ctx(
@@ -107,18 +118,18 @@ where
 
     type Signed = i128;
 
-    fn long_token_amount(&self) -> Self::Num {
-        let Some(pool) = self.pool() else {
-            return 0;
+    fn long_token_amount(&self) -> gmx_core::Result<Self::Num> {
+        let Some(pool) = self.pool()? else {
+            return Ok(0);
         };
-        pool.long_token_amount()
+        Ok(pool.long_token_amount())
     }
 
-    fn short_token_amount(&self) -> Self::Num {
-        let Some(pool) = self.pool() else {
-            return 0;
+    fn short_token_amount(&self) -> gmx_core::Result<Self::Num> {
+        let Some(pool) = self.pool()? else {
+            return Ok(0);
         };
-        pool.short_token_amount()
+        Ok(pool.short_token_amount())
     }
 
     fn apply_delta_to_long_token_amount(&mut self, delta: &Self::Signed) -> gmx_core::Result<()> {
@@ -169,7 +180,7 @@ where
     }
 }
 
-impl<'a, 'info, T> gmx_core::Market<{ Market::DECIMALS }> for AccountsMarket<'a, T>
+impl<'a, 'info, T> gmx_core::Market<{ constants::MARKET_DECIMALS }> for AccountsMarket<'a, T>
 where
     T: AsMarket<'info>,
     'info: 'a,
@@ -199,7 +210,7 @@ where
     }
 
     fn usd_to_amount_divisor(&self) -> Self::Num {
-        Market::USD_TO_AMOUNT_DIVISOR
+        constants::MARKET_USD_TO_AMOUNT_DIVISOR
     }
 
     fn mint(&mut self, amount: &Self::Num) -> gmx_core::Result<()> {
@@ -215,7 +226,7 @@ where
 
     fn swap_impact_params(&self) -> SwapImpactParams<Self::Num> {
         SwapImpactParams::builder()
-            .with_exponent(2 * Market::USD_UNIT)
+            .with_exponent(2 * constants::MARKET_USD_UNIT)
             .with_positive_factor(2_000_000_000_000)
             .with_negative_factor(4_000_000_000_000)
             .build()

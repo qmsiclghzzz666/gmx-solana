@@ -24,12 +24,12 @@ where
 
     type Signed = T::Signed;
 
-    fn long_token_amount(&self) -> Self::Num {
-        self.long_token_amount.clone()
+    fn long_token_amount(&self) -> crate::Result<Self::Num> {
+        Ok(self.long_token_amount.clone())
     }
 
-    fn short_token_amount(&self) -> Self::Num {
-        self.short_token_amount.clone()
+    fn short_token_amount(&self) -> crate::Result<Self::Num> {
+        Ok(self.short_token_amount.clone())
     }
 
     fn apply_delta_to_long_token_amount(

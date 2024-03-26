@@ -86,16 +86,14 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
         &self,
         long_token_price: &Self::Num,
         short_token_price: &Self::Num,
-    ) -> Option<Self::Num> {
+    ) -> crate::Result<Option<Self::Num>> {
         let long_value = self
-            .pool(PoolKind::Primary)
-            .ok()?
+            .pool(PoolKind::Primary)?
             .long_token_usd_value(long_token_price)?;
         let short_value = self
-            .pool(PoolKind::Primary)
-            .ok()?
+            .pool(PoolKind::Primary)?
             .short_token_usd_value(short_token_price)?;
-        long_value.checked_add(&short_value)
+        Ok(long_value.and_then(|v| v.checked_add(&short_value?)))
     }
 
     /// Create a [`Deposit`] action.
@@ -135,9 +133,9 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
                     .try_into()
                     .map_err(|_| crate::Error::Convert)?;
             let max_amount = if is_long_token {
-                self.pool(PoolKind::PriceImpact)?.long_token_amount()
+                self.pool(PoolKind::PriceImpact)?.long_token_amount()?
             } else {
-                self.pool(PoolKind::PriceImpact)?.short_token_amount()
+                self.pool(PoolKind::PriceImpact)?.short_token_amount()?
             };
             if amount.unsigned_abs() > max_amount {
                 amount = max_amount.try_into().map_err(|_| crate::Error::Convert)?;

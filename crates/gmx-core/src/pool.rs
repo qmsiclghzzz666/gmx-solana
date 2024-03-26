@@ -15,10 +15,10 @@ pub trait Pool {
     // type Signed: Signed;
 
     /// Get the long token amount.
-    fn long_token_amount(&self) -> Self::Num;
+    fn long_token_amount(&self) -> crate::Result<Self::Num>;
 
     /// Get the short token amount.
-    fn short_token_amount(&self) -> Self::Num;
+    fn short_token_amount(&self) -> crate::Result<Self::Num>;
 
     /// Apply delta to long token pool amount.
     fn apply_delta_to_long_token_amount(
@@ -36,13 +36,13 @@ pub trait Pool {
 /// Extension trait for [`Pool`] with utils.
 pub trait PoolExt: Pool {
     /// Get the long token value in USD.
-    fn long_token_usd_value(&self, price: &Self::Num) -> Option<Self::Num> {
-        self.long_token_amount().checked_mul(price)
+    fn long_token_usd_value(&self, price: &Self::Num) -> crate::Result<Option<Self::Num>> {
+        Ok(self.long_token_amount()?.checked_mul(price))
     }
 
     /// Get the short token value in USD.
-    fn short_token_usd_value(&self, price: &Self::Num) -> Option<Self::Num> {
-        self.short_token_amount().checked_mul(price)
+    fn short_token_usd_value(&self, price: &Self::Num) -> crate::Result<Option<Self::Num>> {
+        Ok(self.short_token_amount()?.checked_mul(price))
     }
 }
 
