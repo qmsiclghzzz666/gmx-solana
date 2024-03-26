@@ -1,4 +1,5 @@
 use anchor_lang::{prelude::*, Bump};
+use gmx_core::PoolKind;
 use gmx_solana_utils::{price::Decimal, to_seed};
 
 use crate::{constants, DataStoreError};
@@ -52,6 +53,15 @@ impl Market {
         let is_pure = self.long_token_mint == self.short_token_mint;
         self.primary = Pool::default().with_is_pure(is_pure);
         self.price_impact = Pool::default().with_is_pure(is_pure);
+    }
+
+    /// Get pool of the given kind.
+    pub fn pool(&self, kind: PoolKind) -> Option<&Pool> {
+        match kind {
+            PoolKind::Primary => Some(&self.price_impact),
+            PoolKind::PriceImpact => Some(&self.price_impact),
+            _ => None,
+        }
     }
 
     /// Get the expected key.
@@ -160,17 +170,6 @@ impl Pool {
             .ok_or(DataStoreError::Computation)?;
         Ok(())
     }
-}
-
-/// Pool kind.
-#[derive(Debug, Clone, Copy, Default, num_enum::TryFromPrimitive, PartialEq, Eq)]
-#[repr(u8)]
-pub enum PoolKind {
-    /// Primary.
-    #[default]
-    Primary,
-    /// Price impact.
-    PriceImpact,
 }
 
 #[event]

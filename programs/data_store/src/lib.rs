@@ -265,4 +265,6 @@ pub enum DataStoreError {
     // Market.
     #[msg("Computation error")]
     Computation,
+    #[msg("Unsupported pool kind")]
+    UnsupportedPoolKind,
 }

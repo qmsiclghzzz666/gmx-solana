@@ -1,13 +1,17 @@
+use std::collections::BTreeMap;
+
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, TokenAccount};
 use data_store::{
     cpi::accounts::{ApplyDeltaToMarketPool, MintMarketTokenTo},
-    states::{Market, Pool, PoolKind},
+    states::{Market, Pool},
     utils::Authentication,
 };
-use gmx_core::params::SwapImpactParams;
+use gmx_core::{params::SwapImpactParams, PoolKind};
 
 use crate::ExchangeError;
+
+const SUPPORTED_POOLS: [PoolKind; 2] = [PoolKind::Primary, PoolKind::PriceImpact];
 
 /// Accounts that can be used as [`Market`](gmx_core::Market).
 pub trait AsMarket<'info>: Authentication<'info> {
@@ -28,17 +32,40 @@ pub trait AsMarket<'info>: Authentication<'info> {
 
     /// Convert to a [`Market`](gmx_core::Market).
     fn as_market(&self) -> AccountsMarket<Self> {
+        let mut pools = AccountsPools::new(self);
+        for kind in SUPPORTED_POOLS {
+            pools.add(kind);
+        }
         AccountsMarket {
             accounts: self,
-            primary: AccountsPool {
-                kind: PoolKind::Primary,
-                accounts: self,
-            },
-            price_impact: AccountsPool {
-                kind: PoolKind::PriceImpact,
-                accounts: self,
-            },
+            pools,
         }
+    }
+}
+
+/// Accounts pools.
+struct AccountsPools<'a, T> {
+    accounts: &'a T,
+    pools: BTreeMap<PoolKind, AccountsPool<'a, T>>,
+}
+
+impl<'a, T> AccountsPools<'a, T> {
+    fn new(accounts: &'a T) -> Self {
+        Self {
+            accounts,
+            pools: BTreeMap::default(),
+        }
+    }
+
+    fn add(&mut self, kind: PoolKind) -> &mut Self {
+        self.pools.insert(
+            kind,
+            AccountsPool {
+                kind,
+                accounts: self.accounts,
+            },
+        );
+        self
     }
 }
 
@@ -52,14 +79,11 @@ impl<'a, 'info, T> AccountsPool<'a, T>
 where
     T: AsMarket<'info>,
 {
-    fn pool(&'a self) -> &'a Pool
+    fn pool(&'a self) -> Option<&'a Pool>
     where
         'info: 'a,
     {
-        match self.kind {
-            PoolKind::Primary => &self.accounts.market().primary,
-            PoolKind::PriceImpact => &self.accounts.market().price_impact,
-        }
+        self.accounts.market().pool(self.kind)
     }
 
     fn apply_delta_to_market_pool_ctx(
@@ -87,11 +111,17 @@ where
     type Signed = i128;
 
     fn long_token_amount(&self) -> Self::Num {
-        self.pool().long_token_amount()
+        let Some(pool) = self.pool() else {
+            return 0;
+        };
+        pool.long_token_amount()
     }
 
     fn short_token_amount(&self) -> Self::Num {
-        self.pool().short_token_amount()
+        let Some(pool) = self.pool() else {
+            return 0;
+        };
+        pool.short_token_amount()
     }
 
     fn apply_delta_to_long_token_amount(&mut self, delta: &Self::Signed) -> gmx_core::Result<()> {
@@ -118,8 +148,7 @@ where
 /// Use [`Accounts`] as market.
 pub struct AccountsMarket<'a, T> {
     accounts: &'a T,
-    primary: AccountsPool<'a, T>,
-    price_impact: AccountsPool<'a, T>,
+    pools: AccountsPools<'a, T>,
 }
 
 impl<'a, 'info, T> AccountsMarket<'a, T>
@@ -154,20 +183,18 @@ where
 
     type Pool = AccountsPool<'a, T>;
 
-    fn pool(&self) -> &Self::Pool {
-        &self.primary
+    fn pool(&self, kind: PoolKind) -> gmx_core::Result<&Self::Pool> {
+        self.pools
+            .pools
+            .get(&kind)
+            .ok_or(gmx_core::Error::MissingPoolKind(kind))
     }
 
-    fn pool_mut(&mut self) -> &mut Self::Pool {
-        &mut self.primary
-    }
-
-    fn price_impact_pool(&self) -> &Self::Pool {
-        &self.price_impact
-    }
-
-    fn price_impact_pool_mut(&mut self) -> &mut Self::Pool {
-        &mut self.price_impact
+    fn pool_mut(&mut self, kind: PoolKind) -> gmx_core::Result<&mut Self::Pool> {
+        self.pools
+            .pools
+            .get_mut(&kind)
+            .ok_or(gmx_core::Error::MissingPoolKind(kind))
     }
 
     fn total_supply(&self) -> Self::Num {

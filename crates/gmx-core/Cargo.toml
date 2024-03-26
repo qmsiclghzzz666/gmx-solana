@@ -16,3 +16,4 @@ rust_decimal = { version = "1.34", default-features = false, features = [
     "maths",
 ] }
 anchor-lang = { workspace = true, optional = true }
+num_enum = "0.7.2"

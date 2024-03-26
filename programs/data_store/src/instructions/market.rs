@@ -1,10 +1,12 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, MintTo, Token, TokenAccount, Transfer};
+use gmx_core::PoolKind;
 
 use crate::{
     constants,
-    states::{Action, DataStore, Market, MarketChangeEvent, PoolKind, Roles, Seed},
+    states::{Action, DataStore, Market, MarketChangeEvent, Roles, Seed},
     utils::internal,
+    DataStoreError,
 };
 
 /// Initialize the account for [`Market`].
@@ -118,6 +120,7 @@ pub fn apply_delta_to_market_pool(
     let pool = match pool {
         PoolKind::Primary => &mut market.primary,
         PoolKind::PriceImpact => &mut market.price_impact,
+        _ => return Err(DataStoreError::UnsupportedPoolKind.into()),
     };
     if is_long_token {
         pool.apply_delta_to_long_token_amount(delta)?;

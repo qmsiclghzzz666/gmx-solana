@@ -18,6 +18,7 @@ idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
 
 [dependencies]
 anchor-lang = { workspace = true }
+gmx-core = { path = "../../crates/gmx-core" }
 gmx-solana-utils = { path = "../../crates/gmx-solana-utils" }
 dual-vec-map = { path = "../../crates/dual-vec-map" }
 anchor-spl = { workspace = true, default_features = false, features = [
@@ -25,4 +26,3 @@ anchor-spl = { workspace = true, default_features = false, features = [
     "token_2022",
 ] }
 bitmaps = "3.2.1"
-num_enum = "0.7.2"

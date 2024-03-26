@@ -5,7 +5,7 @@ use crate::{
     market::Market,
     num::{MulDiv, Num, UnsignedAbs},
     params::SwapImpactParams,
-    pool::Pool,
+    pool::{Pool, PoolKind},
 };
 use num_traits::{CheckedSub, Signed};
 
@@ -125,20 +125,18 @@ where
 
     type Pool = TestPool<T>;
 
-    fn pool(&self) -> &Self::Pool {
-        &self.primary
+    fn pool(&self, kind: PoolKind) -> crate::Result<&Self::Pool> {
+        match kind {
+            PoolKind::Primary => Ok(&self.primary),
+            PoolKind::PriceImpact => Ok(&self.price_impact),
+        }
     }
 
-    fn pool_mut(&mut self) -> &mut Self::Pool {
-        &mut self.primary
-    }
-
-    fn price_impact_pool(&self) -> &Self::Pool {
-        &self.price_impact
-    }
-
-    fn price_impact_pool_mut(&mut self) -> &mut Self::Pool {
-        &mut self.price_impact
+    fn pool_mut(&mut self, kind: PoolKind) -> crate::Result<&mut Self::Pool> {
+        match kind {
+            PoolKind::Primary => Ok(&mut self.primary),
+            PoolKind::PriceImpact => Ok(&mut self.price_impact),
+        }
     }
 
     fn total_supply(&self) -> Self::Num {

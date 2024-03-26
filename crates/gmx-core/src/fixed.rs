@@ -1,7 +1,4 @@
-use std::{
-    cmp::Ordering,
-    ops::{Add, Mul},
-};
+use std::ops::{Add, Mul};
 
 use num_traits::{CheckedAdd, CheckedMul, One, Zero};
 
@@ -39,6 +36,8 @@ impl<const DECIMALS: u8> FixedPointOps<DECIMALS> for u128 {
     const UNIT: Self = 10u128.pow(DECIMALS as u32);
 
     fn checked_pow_fixed(&self, exponent: &Self) -> Option<Self> {
+        use std::cmp::Ordering;
+
         type Convert = U64D8;
 
         let (divisor, multiplier) = match DECIMALS.cmp(&U64D8::DECIMALS) {

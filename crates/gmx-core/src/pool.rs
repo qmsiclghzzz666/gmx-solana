@@ -1,3 +1,5 @@
+use std::fmt;
+
 use crate::num::Num;
 use num_traits::CheckedMul;
 
@@ -45,3 +47,27 @@ pub trait PoolExt: Pool {
 }
 
 impl<P: Pool> PoolExt for P {}
+
+/// Pool kind.
+#[derive(
+    Debug, Clone, Copy, Default, num_enum::TryFromPrimitive, PartialEq, Eq, PartialOrd, Ord,
+)]
+#[repr(u8)]
+#[non_exhaustive]
+pub enum PoolKind {
+    /// Primary.
+    #[default]
+    Primary,
+    /// Price impact.
+    PriceImpact,
+}
+
+impl fmt::Display for PoolKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let name = match self {
+            Self::Primary => "Primary",
+            Self::PriceImpact => "PriceImpact",
+        };
+        write!(f, "{name}")
+    }
+}

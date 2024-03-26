@@ -1,3 +1,5 @@
+use crate::PoolKind;
+
 /// Error type.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -29,6 +31,9 @@ pub enum Error {
     /// Build params error.
     #[error("build params: {0}")]
     BuildParams(String),
+    /// Missing pool kind.
+    #[error("missing pool of kind: {0}")]
+    MissingPoolKind(PoolKind),
 }
 
 impl Error {

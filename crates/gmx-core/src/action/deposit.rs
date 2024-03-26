@@ -5,6 +5,7 @@ use crate::{
     market::{Market, MarketExt},
     num::{MulDiv, Num},
     params::SwapImpactParams,
+    pool::PoolKind,
     utils, PoolExt,
 };
 
@@ -203,11 +204,13 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Deposit<M, DECIMALS> {
     fn pool_params(&self) -> Option<PoolParams<M::Num>> {
         let long_token_usd_value = self
             .market
-            .pool()
+            .pool(PoolKind::Primary)
+            .ok()?
             .long_token_usd_value(&self.params.long_token_price)?;
         let short_token_usd_value = self
             .market
-            .pool()
+            .pool(PoolKind::Primary)
+            .ok()?
             .short_token_usd_value(&self.params.short_token_price)?;
         let delta_long_token_usd_value = self
             .params
