@@ -5,7 +5,7 @@ use data_store::{
     cpi::accounts::{CheckRole, InitializeDeposit},
     program::DataStore,
     states::{
-        deposit::{Receivers, Tokens},
+        deposit::{Receivers, TokenParams},
         Market, NonceBytes,
     },
     utils::Authentication,
@@ -61,8 +61,7 @@ pub fn create_deposit(
             receiver: ctx.accounts.receiver.key(),
             ui_fee_receiver: params.ui_fee_receiver,
         },
-        Tokens {
-            market_token: ctx.accounts.market.market_token_mint,
+        TokenParams {
             initial_long_token: ctx.accounts.initial_long_token.mint,
             initial_short_token: ctx.accounts.initial_short_token.mint,
             long_token_swap_path: params.long_token_swap_path,
@@ -93,7 +92,7 @@ pub struct CreateDeposit<'info> {
     pub deposit: UncheckedAccount<'info>,
     #[account(mut)]
     pub payer: Signer<'info>,
-    #[account(token::mint = market.market_token_mint)]
+    // #[account(token::mint = market.market_token_mint)]
     pub receiver: Account<'info, TokenAccount>,
     pub market: Account<'info, Market>,
     #[account(mut)]
@@ -158,6 +157,7 @@ impl<'info> CreateDeposit<'info> {
                 only_controller: self.only_controller.to_account_info(),
                 store: self.store.to_account_info(),
                 deposit: self.deposit.to_account_info(),
+                market: self.market.to_account_info(),
                 system_program: self.system_program.to_account_info(),
             },
         )

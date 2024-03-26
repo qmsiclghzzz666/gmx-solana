@@ -16,7 +16,7 @@ pub use self::states::Data;
 
 use self::{
     instructions::*,
-    states::deposit::{Receivers, Tokens},
+    states::deposit::{Receivers, TokenParams},
     utils::internal,
 };
 use gmx_solana_utils::price::Price;
@@ -218,7 +218,7 @@ pub mod data_store {
         ctx: Context<InitializeDeposit>,
         nonce: [u8; 32],
         receivers: Receivers,
-        tokens: Tokens,
+        tokens: TokenParams,
     ) -> Result<()> {
         instructions::initialize_deposit(ctx, nonce, receivers, tokens)
     }

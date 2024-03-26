@@ -22,6 +22,11 @@ impl<K, V> DualVecMap<Vec<K>, Vec<V>> {
 }
 
 impl<K, V> DualVecMap<K, V> {
+    /// Into inner stores.
+    pub fn into_inner(self) -> (K, V) {
+        (self.keys, self.values)
+    }
+
     /// Create from sorted `keys` and `values` stores unchecked.
     /// One must make sure that:
     /// - `keys` is sorted and have no duplicate values.

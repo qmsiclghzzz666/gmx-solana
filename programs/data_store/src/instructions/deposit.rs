@@ -2,8 +2,8 @@ use anchor_lang::prelude::*;
 
 use crate::{
     states::{
-        deposit::{Receivers, Tokens},
-        DataStore, Deposit, NonceBytes, Roles, Seed,
+        deposit::{Receivers, TokenParams},
+        DataStore, Deposit, Market, NonceBytes, Roles, Seed,
     },
     utils::internal,
 };
@@ -13,10 +13,11 @@ pub fn initialize_deposit(
     ctx: Context<InitializeDeposit>,
     nonce: NonceBytes,
     receivers: Receivers,
-    tokens: Tokens,
+    tokens: TokenParams,
 ) -> Result<()> {
     ctx.accounts.deposit.init(
         ctx.bumps.deposit,
+        &ctx.accounts.market,
         nonce,
         ctx.accounts.payer.key(),
         receivers,
@@ -40,6 +41,7 @@ pub struct InitializeDeposit<'info> {
         bump,
     )]
     pub deposit: Account<'info, Deposit>,
+    pub market: Account<'info, Market>,
     pub system_program: Program<'info, System>,
 }
 

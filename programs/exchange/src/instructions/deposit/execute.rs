@@ -23,8 +23,8 @@ pub fn execute_deposit<'info>(
 ) -> Result<()> {
     data_store::cpi::remove_deposit(ctx.accounts.remove_deposit_ctx())?;
     let deposit = &ctx.accounts.deposit;
-    let long_token = deposit.tokens.initial_long_token;
-    let short_token = deposit.tokens.initial_short_token;
+    let long_token = deposit.tokens.params.initial_long_token;
+    let short_token = deposit.tokens.params.initial_short_token;
     let remaining_accounts = ctx.remaining_accounts.to_vec();
     ctx.accounts.with_oracle_prices(
         vec![long_token, short_token],
@@ -40,8 +40,8 @@ pub fn execute_deposit<'info>(
                 .max
                 .to_unit_price();
             let (long_amount, short_amount) = (
-                accounts.deposit.tokens.initial_long_token_amount,
-                accounts.deposit.tokens.initial_short_token_amount,
+                accounts.deposit.tokens.params.initial_long_token_amount,
+                accounts.deposit.tokens.params.initial_short_token_amount,
             );
             let report = accounts
                 .as_market()
@@ -85,7 +85,7 @@ pub struct ExecuteDeposit<'info> {
     pub user: UncheckedAccount<'info>,
     #[account(mut, constraint = receiver.key() == deposit.receivers.receiver)]
     pub receiver: Account<'info, TokenAccount>,
-    #[account(mut, constraint = market.market_token_mint == market_token_mint.key())]
+    #[account(mut, constraint = market.key() == deposit.market)]
     pub market: Account<'info, Market>,
     #[account(mut, constraint = market_token_mint.key() == deposit.tokens.market_token)]
     pub market_token_mint: Account<'info, Mint>,

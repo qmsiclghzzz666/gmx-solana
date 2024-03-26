@@ -1,4 +1,5 @@
 use anchor_lang::{prelude::*, Bump};
+use dual_vec_map::DualVecMap;
 use gmx_core::PoolKind;
 use gmx_solana_utils::{price::Decimal, to_seed};
 
@@ -7,8 +8,13 @@ use crate::{constants, DataStoreError};
 use super::{Data, Seed};
 
 #[account]
-#[derive(InitSpace)]
 pub struct Market {
+    pub(crate) meta: MarketMeta,
+    pools: Pools,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, InitSpace)]
+pub struct MarketMeta {
     /// Bump Seed.
     pub bump: u8,
     /// Market token.
@@ -19,10 +25,49 @@ pub struct Market {
     pub long_token_mint: Pubkey,
     /// Short token.
     pub short_token_mint: Pubkey,
-    /// Primary Pool.
-    pub primary: Pool,
-    /// Price impact pool.
-    pub price_impact: Pool,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+pub struct Pools {
+    pools: Vec<Pool>,
+    keys: Vec<u8>,
+}
+
+impl Pools {
+    pub(crate) fn init_space(num_pools: u8) -> usize {
+        let len = num_pools as usize;
+        (4 + Pool::INIT_SPACE * len) + (4 + len)
+    }
+
+    fn init(&mut self, is_pure: bool, num_pools: u8) {
+        let mut map: DualVecMap<Vec<u8>, Vec<Pool>> = DualVecMap::new_vecs();
+        for kind in 0..num_pools {
+            map.insert(kind, Pool::default().with_is_pure(is_pure));
+        }
+        let (keys, pools) = map.into_inner();
+        self.keys = keys;
+        self.pools = pools;
+    }
+
+    fn as_map(&self) -> DualVecMap<&Vec<u8>, &Vec<Pool>> {
+        DualVecMap::from_sorted_stores_unchecked(&self.keys, &self.pools)
+    }
+
+    fn as_map_mut(&mut self) -> DualVecMap<&mut Vec<u8>, &mut Vec<Pool>> {
+        DualVecMap::from_sorted_stores_unchecked(&mut self.keys, &mut self.pools)
+    }
+
+    fn pool(&self, kind: PoolKind) -> Option<Pool> {
+        self.as_map().get(&(kind as u8)).cloned()
+    }
+
+    fn with_pool_mut<T>(&mut self, kind: PoolKind, f: impl FnOnce(&mut Pool) -> T) -> Option<T> {
+        let mut map = self.as_map_mut();
+        let Some(pool) = map.get_mut(&(kind as u8)) else {
+            return None;
+        };
+        Some(f(pool))
+    }
 }
 
 impl Market {
@@ -44,29 +89,36 @@ impl Market {
         index_token_mint: Pubkey,
         long_token_mint: Pubkey,
         short_token_mint: Pubkey,
+        num_pools: u8,
     ) {
-        self.bump = bump;
-        self.market_token_mint = market_token_mint;
-        self.index_token_mint = index_token_mint;
-        self.long_token_mint = long_token_mint;
-        self.short_token_mint = short_token_mint;
-        let is_pure = self.long_token_mint == self.short_token_mint;
-        self.primary = Pool::default().with_is_pure(is_pure);
-        self.price_impact = Pool::default().with_is_pure(is_pure);
+        self.meta.bump = bump;
+        self.meta.market_token_mint = market_token_mint;
+        self.meta.index_token_mint = index_token_mint;
+        self.meta.long_token_mint = long_token_mint;
+        self.meta.short_token_mint = short_token_mint;
+        let is_pure = self.meta.long_token_mint == self.meta.short_token_mint;
+        self.pools.init(is_pure, num_pools);
     }
 
     /// Get pool of the given kind.
-    pub fn pool(&self, kind: PoolKind) -> Option<&Pool> {
-        match kind {
-            PoolKind::Primary => Some(&self.price_impact),
-            PoolKind::PriceImpact => Some(&self.price_impact),
-            _ => None,
-        }
+    #[inline]
+    pub fn pool(&self, kind: PoolKind) -> Option<Pool> {
+        self.pools.pool(kind)
+    }
+
+    /// Get mutable reference to the pool of the given kind.
+    #[inline]
+    pub(crate) fn with_pool_mut<T>(
+        &mut self,
+        kind: PoolKind,
+        f: impl FnOnce(&mut Pool) -> T,
+    ) -> Option<T> {
+        self.pools.with_pool_mut(kind, f)
     }
 
     /// Get the expected key.
     pub fn expected_key(&self) -> String {
-        Self::create_key(&self.market_token_mint)
+        Self::create_key(&self.meta.market_token_mint)
     }
 
     /// Get the expected key seed.
@@ -88,7 +140,7 @@ impl Market {
 
 impl Bump for Market {
     fn seed(&self) -> u8 {
-        self.bump
+        self.meta.bump
     }
 }
 

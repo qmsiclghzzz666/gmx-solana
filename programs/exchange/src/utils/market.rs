@@ -79,10 +79,7 @@ impl<'a, 'info, T> AccountsPool<'a, T>
 where
     T: AsMarket<'info>,
 {
-    fn pool(&'a self) -> Option<&'a Pool>
-    where
-        'info: 'a,
-    {
+    fn pool(&self) -> Option<Pool> {
         self.accounts.market().pool(self.kind)
     }
 

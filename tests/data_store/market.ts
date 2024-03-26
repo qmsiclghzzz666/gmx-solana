@@ -34,10 +34,10 @@ describe("data store: Market", () => {
         }).signers([signer0]).rpc();
         {
             const market = await dataStore.account.market.fetch(marketPDA);
-            expect(market.indexTokenMint).eql(indexToken);
-            expect(market.longTokenMint).eql(longToken);
-            expect(market.shortTokenMint).eql(shortToken);
-            expect(market.marketTokenMint).eql(marketToken);
+            expect(market.meta.indexTokenMint).eql(indexToken);
+            expect(market.meta.longTokenMint).eql(longToken);
+            expect(market.meta.shortTokenMint).eql(shortToken);
+            expect(market.meta.marketTokenMint).eql(marketToken);
         }
         await dataStore.methods.removeMarket().accounts({
             authority: signer0.publicKey,

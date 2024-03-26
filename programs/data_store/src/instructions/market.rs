@@ -4,10 +4,13 @@ use gmx_core::PoolKind;
 
 use crate::{
     constants,
-    states::{Action, DataStore, Market, MarketChangeEvent, Roles, Seed},
+    states::{Action, DataStore, Market, MarketChangeEvent, MarketMeta, Pools, Roles, Seed},
     utils::internal,
     DataStoreError,
 };
+
+/// Number of pools.
+pub const NUM_POOLS: u8 = 2;
 
 /// Initialize the account for [`Market`].
 pub fn initialize_market(
@@ -24,6 +27,7 @@ pub fn initialize_market(
         index_token_mint,
         long_token_mint,
         short_token_mint,
+        NUM_POOLS,
     );
     emit!(MarketChangeEvent {
         address: market.key(),
@@ -43,7 +47,7 @@ pub struct InitializeMarket<'info> {
     #[account(
         init,
         payer = authority,
-        space = 8 + Market::INIT_SPACE,
+        space = 8 + MarketMeta::INIT_SPACE + Pools::init_space(NUM_POOLS),
         seeds = [
             Market::SEED,
             store.key().as_ref(),
@@ -89,7 +93,7 @@ pub struct RemoveMarket<'info> {
     #[account(
         mut,
         seeds = [Market::SEED, store.key().as_ref(), &market.expected_key_seed()],
-        bump = market.bump,
+        bump = market.meta.bump,
         close = authority,
     )]
     market: Account<'info, Market>,
@@ -117,16 +121,16 @@ pub fn apply_delta_to_market_pool(
     delta: i128,
 ) -> Result<()> {
     let market = &mut ctx.accounts.market;
-    let pool = match pool {
-        PoolKind::Primary => &mut market.primary,
-        PoolKind::PriceImpact => &mut market.price_impact,
-        _ => return Err(DataStoreError::UnsupportedPoolKind.into()),
-    };
-    if is_long_token {
-        pool.apply_delta_to_long_token_amount(delta)?;
-    } else {
-        pool.apply_delta_to_short_token_amount(delta)?;
-    }
+    market
+        .with_pool_mut(pool, |pool| {
+            if is_long_token {
+                pool.apply_delta_to_long_token_amount(delta)?;
+            } else {
+                pool.apply_delta_to_short_token_amount(delta)?;
+            }
+            Result::Ok(())
+        })
+        .ok_or(DataStoreError::UnsupportedPoolKind)??;
     Ok(())
 }
 
@@ -138,7 +142,7 @@ pub struct ApplyDeltaToMarketPool<'info> {
     #[account(
         mut,
         seeds = [Market::SEED, store.key().as_ref(), &market.expected_key_seed()],
-        bump = market.bump,
+        bump = market.meta.bump,
     )]
     pub market: Account<'info, Market>,
 }
