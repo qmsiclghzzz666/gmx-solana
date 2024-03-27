@@ -118,7 +118,7 @@ describe("exchange: deposit", () => {
                 },
             ]).instruction();
             const modifyComputeUnits = ComputeBudgetProgram.setComputeUnitLimit({
-                units: 400_000
+                units: 800_000
             });
             const addPriorityFee = ComputeBudgetProgram.setComputeUnitPrice({
                 microLamports: 1,

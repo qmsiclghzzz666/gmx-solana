@@ -15,7 +15,11 @@ use gmx_core::{
 
 use crate::ExchangeError;
 
-const SUPPORTED_POOLS: [PoolKind; 2] = [PoolKind::Primary, PoolKind::PriceImpact];
+const SUPPORTED_POOLS: [PoolKind; 3] = [
+    PoolKind::Primary,
+    PoolKind::PriceImpact,
+    PoolKind::ClaimableFee,
+];
 
 /// Accounts that can be used as [`Market`](gmx_core::Market).
 pub trait AsMarket<'info>: Authentication<'info> {

@@ -44,6 +44,19 @@ pub trait PoolExt: Pool {
     fn short_token_usd_value(&self, price: &Self::Num) -> crate::Result<Option<Self::Num>> {
         Ok(self.short_token_amount()?.checked_mul(price))
     }
+
+    /// Apply delta.
+    fn apply_delta_amount(
+        &mut self,
+        is_long_token: bool,
+        delta: &Self::Signed,
+    ) -> Result<(), crate::Error> {
+        if is_long_token {
+            self.apply_delta_to_long_token_amount(delta)
+        } else {
+            self.apply_delta_to_short_token_amount(delta)
+        }
+    }
 }
 
 impl<P: Pool> PoolExt for P {}
