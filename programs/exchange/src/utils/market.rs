@@ -191,18 +191,12 @@ where
 
     type Pool = AccountsPool<'a, T>;
 
-    fn pool(&self, kind: PoolKind) -> gmx_core::Result<&Self::Pool> {
-        self.pools
-            .pools
-            .get(&kind)
-            .ok_or(gmx_core::Error::MissingPoolKind(kind))
+    fn pool(&self, kind: PoolKind) -> gmx_core::Result<Option<&Self::Pool>> {
+        Ok(self.pools.pools.get(&kind))
     }
 
-    fn pool_mut(&mut self, kind: PoolKind) -> gmx_core::Result<&mut Self::Pool> {
-        self.pools
-            .pools
-            .get_mut(&kind)
-            .ok_or(gmx_core::Error::MissingPoolKind(kind))
+    fn pool_mut(&mut self, kind: PoolKind) -> gmx_core::Result<Option<&mut Self::Pool>> {
+        Ok(self.pools.pools.get_mut(&kind))
     }
 
     fn total_supply(&self) -> Self::Num {

@@ -60,6 +60,8 @@ pub enum PoolKind {
     Primary,
     /// Price impact.
     PriceImpact,
+    /// Fee.
+    Fee,
 }
 
 impl fmt::Display for PoolKind {
@@ -67,6 +69,7 @@ impl fmt::Display for PoolKind {
         let name = match self {
             Self::Primary => "Primary",
             Self::PriceImpact => "PriceImpact",
+            Self::Fee => "Fee",
         };
         write!(f, "{name}")
     }

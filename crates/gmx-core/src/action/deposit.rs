@@ -205,13 +205,13 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Deposit<M, DECIMALS> {
         let long_token_usd_value = self
             .market
             .pool(PoolKind::Primary)
-            .ok()?
+            .ok()??
             .long_token_usd_value(&self.params.long_token_price)
             .ok()??;
         let short_token_usd_value = self
             .market
             .pool(PoolKind::Primary)
-            .ok()?
+            .ok()??
             .short_token_usd_value(&self.params.short_token_price)
             .ok()??;
         let delta_long_token_usd_value = self

@@ -72,18 +72,17 @@ where
 /// Test Market.
 #[derive(Debug)]
 pub struct TestMarket<T, const DECIMALS: u8> {
-    primary: TestPool<T>,
-    price_impact: TestPool<T>,
     total_supply: T,
     value_to_amount_divisor: T,
     swap_impact_params: SwapImpactParams<T>,
+    primary: TestPool<T>,
+    price_impact: TestPool<T>,
+    fee: TestPool<T>,
 }
 
 impl Default for TestMarket<u64, 8> {
     fn default() -> Self {
         Self {
-            primary: Default::default(),
-            price_impact: Default::default(),
             total_supply: Default::default(),
             value_to_amount_divisor: 1,
             swap_impact_params: SwapImpactParams::builder()
@@ -92,6 +91,9 @@ impl Default for TestMarket<u64, 8> {
                 .with_negative_factor(4)
                 .build()
                 .unwrap(),
+            primary: Default::default(),
+            price_impact: Default::default(),
+            fee: Default::default(),
         }
     }
 }
@@ -100,8 +102,6 @@ impl Default for TestMarket<u64, 8> {
 impl Default for TestMarket<u128, 20> {
     fn default() -> Self {
         Self {
-            primary: Default::default(),
-            price_impact: Default::default(),
             total_supply: Default::default(),
             value_to_amount_divisor: 10u128.pow(20 - 8),
             swap_impact_params: SwapImpactParams::builder()
@@ -110,6 +110,9 @@ impl Default for TestMarket<u128, 20> {
                 .with_negative_factor(4_000_000_000_000)
                 .build()
                 .unwrap(),
+            primary: Default::default(),
+            price_impact: Default::default(),
+            fee: Default::default(),
         }
     }
 }
@@ -125,18 +128,22 @@ where
 
     type Pool = TestPool<T>;
 
-    fn pool(&self, kind: PoolKind) -> crate::Result<&Self::Pool> {
-        match kind {
-            PoolKind::Primary => Ok(&self.primary),
-            PoolKind::PriceImpact => Ok(&self.price_impact),
-        }
+    fn pool(&self, kind: PoolKind) -> crate::Result<Option<&Self::Pool>> {
+        let pool = match kind {
+            PoolKind::Primary => &self.primary,
+            PoolKind::PriceImpact => &self.price_impact,
+            PoolKind::Fee => &self.fee,
+        };
+        Ok(Some(pool))
     }
 
-    fn pool_mut(&mut self, kind: PoolKind) -> crate::Result<&mut Self::Pool> {
-        match kind {
-            PoolKind::Primary => Ok(&mut self.primary),
-            PoolKind::PriceImpact => Ok(&mut self.price_impact),
-        }
+    fn pool_mut(&mut self, kind: PoolKind) -> crate::Result<Option<&mut Self::Pool>> {
+        let pool = match kind {
+            PoolKind::Primary => &mut self.primary,
+            PoolKind::PriceImpact => &mut self.price_impact,
+            PoolKind::Fee => &mut self.fee,
+        };
+        Ok(Some(pool))
     }
 
     fn total_supply(&self) -> Self::Num {

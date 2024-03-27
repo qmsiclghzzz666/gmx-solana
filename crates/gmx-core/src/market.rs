@@ -21,10 +21,10 @@ pub trait Market<const DECIMALS: u8> {
     type Pool: Pool<Num = Self::Num, Signed = Self::Signed>;
 
     /// Get the reference to the pool of the given kind.
-    fn pool(&self, kind: PoolKind) -> crate::Result<&Self::Pool>;
+    fn pool(&self, kind: PoolKind) -> crate::Result<Option<&Self::Pool>>;
 
     /// Get the mutable reference to the pool of the given kind.
-    fn pool_mut(&mut self, kind: PoolKind) -> crate::Result<&mut Self::Pool>;
+    fn pool_mut(&mut self, kind: PoolKind) -> crate::Result<Option<&mut Self::Pool>>;
 
     /// Get total supply of the market token.
     fn total_supply(&self) -> Self::Num;
@@ -48,11 +48,11 @@ impl<'a, const DECIMALS: u8, M: Market<DECIMALS>> Market<DECIMALS> for &'a mut M
 
     type Pool = M::Pool;
 
-    fn pool(&self, kind: PoolKind) -> crate::Result<&Self::Pool> {
+    fn pool(&self, kind: PoolKind) -> crate::Result<Option<&Self::Pool>> {
         (**self).pool(kind)
     }
 
-    fn pool_mut(&mut self, kind: PoolKind) -> crate::Result<&mut Self::Pool> {
+    fn pool_mut(&mut self, kind: PoolKind) -> crate::Result<Option<&mut Self::Pool>> {
         (**self).pool_mut(kind)
     }
 
@@ -89,9 +89,11 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
     ) -> crate::Result<Option<Self::Num>> {
         let long_value = self
             .pool(PoolKind::Primary)?
+            .ok_or(crate::Error::MissingPoolKind(PoolKind::Primary))?
             .long_token_usd_value(long_token_price)?;
         let short_value = self
             .pool(PoolKind::Primary)?
+            .ok_or(crate::Error::MissingPoolKind(PoolKind::Primary))?
             .short_token_usd_value(short_token_price)?;
         Ok(long_value.and_then(|v| v.checked_add(&short_value?)))
     }
@@ -133,9 +135,13 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
                     .try_into()
                     .map_err(|_| crate::Error::Convert)?;
             let max_amount = if is_long_token {
-                self.pool(PoolKind::PriceImpact)?.long_token_amount()?
+                self.pool(PoolKind::PriceImpact)?
+                    .ok_or(crate::Error::MissingPoolKind(PoolKind::PriceImpact))?
+                    .long_token_amount()?
             } else {
-                self.pool(PoolKind::PriceImpact)?.short_token_amount()?
+                self.pool(PoolKind::PriceImpact)?
+                    .ok_or(crate::Error::MissingPoolKind(PoolKind::PriceImpact))?
+                    .short_token_amount()?
             };
             if amount.unsigned_abs() > max_amount {
                 amount = max_amount.try_into().map_err(|_| crate::Error::Convert)?;
@@ -172,9 +178,11 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
         let delta = self.swap_impact_amount_with_cap(is_long_token, price, usd_impact)?;
         if is_long_token {
             self.pool_mut(PoolKind::PriceImpact)?
+                .ok_or(crate::Error::MissingPoolKind(PoolKind::PriceImpact))?
                 .apply_delta_to_long_token_amount(&-delta.clone())?;
         } else {
             self.pool_mut(PoolKind::PriceImpact)?
+                .ok_or(crate::Error::MissingPoolKind(PoolKind::PriceImpact))?
                 .apply_delta_to_short_token_amount(&-delta.clone())?;
         }
         Ok(delta.unsigned_abs())
@@ -184,9 +192,11 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
     fn apply_delta(&mut self, is_long_token: bool, delta: &Self::Signed) -> crate::Result<()> {
         if is_long_token {
             self.pool_mut(PoolKind::Primary)?
+                .ok_or(crate::Error::MissingPoolKind(PoolKind::Primary))?
                 .apply_delta_to_long_token_amount(delta)?;
         } else {
             self.pool_mut(PoolKind::Primary)?
+                .ok_or(crate::Error::MissingPoolKind(PoolKind::Primary))?
                 .apply_delta_to_short_token_amount(delta)?;
         }
         Ok(())
