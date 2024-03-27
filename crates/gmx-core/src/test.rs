@@ -4,7 +4,7 @@ use crate::{
     fixed::FixedPointOps,
     market::Market,
     num::{MulDiv, Num, UnsignedAbs},
-    params::SwapImpactParams,
+    params::{FeeParams, SwapImpactParams},
     pool::{Pool, PoolKind},
 };
 use num_traits::{CheckedSub, Signed};
@@ -75,6 +75,7 @@ pub struct TestMarket<T, const DECIMALS: u8> {
     total_supply: T,
     value_to_amount_divisor: T,
     swap_impact_params: SwapImpactParams<T>,
+    swap_fee_params: FeeParams<T>,
     primary: TestPool<T>,
     price_impact: TestPool<T>,
     fee: TestPool<T>,
@@ -91,6 +92,11 @@ impl Default for TestMarket<u64, 8> {
                 .with_negative_factor(4)
                 .build()
                 .unwrap(),
+            swap_fee_params: FeeParams::builder()
+                .with_fee_receiver_factor(37_000_000)
+                .with_positive_impact_factor(50_000)
+                .with_negative_impact_factor(70_000)
+                .build(),
             primary: Default::default(),
             price_impact: Default::default(),
             fee: Default::default(),
@@ -110,6 +116,11 @@ impl Default for TestMarket<u128, 20> {
                 .with_negative_factor(4_000_000_000_000)
                 .build()
                 .unwrap(),
+            swap_fee_params: FeeParams::builder()
+                .with_fee_receiver_factor(37_000_000_000_000_000_000)
+                .with_positive_impact_factor(50_000_000_000_000_000)
+                .with_negative_impact_factor(70_000_000_000_000_000)
+                .build(),
             primary: Default::default(),
             price_impact: Default::default(),
             fee: Default::default(),
@@ -132,7 +143,7 @@ where
         let pool = match kind {
             PoolKind::Primary => &self.primary,
             PoolKind::PriceImpact => &self.price_impact,
-            PoolKind::Fee => &self.fee,
+            PoolKind::ClaimableFee => &self.fee,
         };
         Ok(Some(pool))
     }
@@ -141,7 +152,7 @@ where
         let pool = match kind {
             PoolKind::Primary => &mut self.primary,
             PoolKind::PriceImpact => &mut self.price_impact,
-            PoolKind::Fee => &mut self.fee,
+            PoolKind::ClaimableFee => &mut self.fee,
         };
         Ok(Some(pool))
     }
@@ -164,5 +175,9 @@ where
 
     fn swap_impact_params(&self) -> SwapImpactParams<Self::Num> {
         self.swap_impact_params.clone()
+    }
+
+    fn swap_fee_params(&self) -> crate::params::FeeParams<Self::Num> {
+        self.swap_fee_params.clone()
     }
 }

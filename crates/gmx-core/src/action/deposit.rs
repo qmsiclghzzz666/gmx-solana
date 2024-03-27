@@ -4,7 +4,7 @@ use crate::{
     fixed::FixedPointOps,
     market::{Market, MarketExt},
     num::{MulDiv, Num},
-    params::SwapImpactParams,
+    params::{Fees, SwapImpactParams},
     pool::PoolKind,
     utils, PoolExt,
 };
@@ -56,17 +56,24 @@ where
     params: DepositParams<T>,
     minted: T,
     price_impact: T::Signed,
+    fees: [Fees<T>; 2],
 }
 
 impl<T> DepositReport<T>
 where
     T: MulDiv,
 {
-    fn new(params: DepositParams<T>, minted: T, price_impact: T::Signed) -> Self {
+    fn new(
+        params: DepositParams<T>,
+        price_impact: T::Signed,
+        minted: T,
+        fees: [Fees<T>; 2],
+    ) -> Self {
         Self {
             params,
             minted,
             price_impact,
+            fees,
         }
     }
 
@@ -83,6 +90,16 @@ where
     /// Get the deposit params.
     pub fn params(&self) -> &DepositParams<T> {
         &self.params
+    }
+
+    /// Get long token fees.
+    pub fn long_token_fees(&self) -> &Fees<T> {
+        &self.fees[0]
+    }
+
+    /// Get short token fees.
+    pub fn short_token_fees(&self) -> &Fees<T> {
+        &self.fees[1]
     }
 }
 
@@ -245,12 +262,29 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Deposit<M, DECIMALS> {
         ))
     }
 
-    fn deposit(
+    /// Charge swap fees.
+    ///
+    /// The `amount` will become the amount after fees.
+    fn charge_fees(
+        &self,
+        is_positive_impact: bool,
+        amount: &mut M::Num,
+    ) -> crate::Result<Fees<M::Num>> {
+        let (amount_after_fees, fees) = self
+            .market
+            .swap_fee_params()
+            .apply_fees(is_positive_impact, amount)
+            .ok_or(crate::Error::Computation)?;
+        *amount = amount_after_fees;
+        Ok(fees)
+    }
+
+    fn execute_deposit(
         &mut self,
         is_long_token: bool,
         pool_value: M::Num,
         mut price_impact: M::Signed,
-    ) -> Result<M::Num, crate::Error> {
+    ) -> Result<(M::Num, Fees<M::Num>), crate::Error> {
         let mut mint_amount: M::Num = Zero::zero();
         let supply = self.market.total_supply();
         if pool_value.is_zero() && !supply.is_zero() {
@@ -269,7 +303,8 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Deposit<M, DECIMALS> {
                 &self.params.long_token_price,
             )
         };
-        // TODO: handle fees.
+        let fees = self.charge_fees(price_impact.is_positive(), &mut amount)?;
+        // TODO: update claimable fee pool.
         // FIXME: will this case happend in our implementation?
         if price_impact.is_positive() && supply.is_zero() {
             price_impact = Zero::zero();
@@ -323,13 +358,15 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Deposit<M, DECIMALS> {
             .ok_or(crate::Error::Computation)?;
         self.market.apply_delta(
             is_long_token,
-            &amount
-                .clone()
-                .try_into()
-                .map_err(|_| crate::Error::Convert)?,
+            &(amount
+                .checked_add(fees.fee_amount_for_pool())
+                .ok_or(crate::Error::Overflow)?)
+            .clone()
+            .try_into()
+            .map_err(|_| crate::Error::Convert)?,
         )?;
         // TODO: validate the amounts.
-        Ok(mint_amount)
+        Ok((mint_amount, fees))
     }
 
     /// Execute.
@@ -338,6 +375,7 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Deposit<M, DECIMALS> {
             !self.params.long_token_amount.is_zero() || !self.params.short_token_amount.is_zero(),
             "shouldn't be empty deposit"
         );
+        // TODO: validate first deposit.
         let (price_impact, long_token_usd_value, short_token_usd_value) =
             self.price_impact().ok_or(crate::Error::Computation)?;
         let mut market_token_to_mint: M::Num = Zero::zero();
@@ -348,6 +386,7 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Deposit<M, DECIMALS> {
                 &self.params.short_token_price,
             )?
             .ok_or(crate::Error::Computation)?;
+        let mut all_fees = [Default::default(), Default::default()];
         if !self.params.long_token_amount.is_zero() {
             let price_impact = long_token_usd_value
                 .clone()
@@ -358,9 +397,12 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Deposit<M, DECIMALS> {
                         .ok_or(crate::Error::Computation)?,
                 )
                 .ok_or(crate::Error::Computation)?;
+            let (mint_amount, fees) =
+                self.execute_deposit(true, pool_value.clone(), price_impact)?;
             market_token_to_mint = market_token_to_mint
-                .checked_add(&self.deposit(true, pool_value.clone(), price_impact)?)
+                .checked_add(&mint_amount)
                 .ok_or(crate::Error::Computation)?;
+            all_fees[0] = fees;
         }
         if !self.params.short_token_amount.is_zero() {
             let price_impact = short_token_usd_value
@@ -372,15 +414,18 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Deposit<M, DECIMALS> {
                         .ok_or(crate::Error::Computation)?,
                 )
                 .ok_or(crate::Error::Computation)?;
+            let (mint_amount, fees) = self.execute_deposit(false, pool_value, price_impact)?;
             market_token_to_mint = market_token_to_mint
-                .checked_add(&self.deposit(false, pool_value, price_impact)?)
+                .checked_add(&mint_amount)
                 .ok_or(crate::Error::Computation)?;
+            all_fees[1] = fees;
         }
         self.market.mint(&market_token_to_mint)?;
         Ok(DepositReport::new(
             self.params,
-            market_token_to_mint,
             price_impact,
+            market_token_to_mint,
+            all_fees,
         ))
     }
 }

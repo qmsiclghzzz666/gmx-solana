@@ -38,14 +38,17 @@ pub fn apply_factors<T, const DECIMALS: u8>(value: T, factor: T, exponent_factor
 where
     T: FixedPointOps<DECIMALS>,
 {
-    apply_factor(apply_exponent_factor(value, exponent_factor)?, factor)
+    Some(
+        apply_exponent_factor_wrapped(value, exponent_factor)?
+            .checked_mul(&Fixed::from_inner(factor))?
+            .into_inner(),
+    )
 }
 
-/// Apply exponent factor using this formula: `x^E`.
-///
-/// Assuming that all values are "float"s with the same decimals.
-#[inline]
-pub fn apply_exponent_factor<T, const DECIMALS: u8>(value: T, exponent_factor: T) -> Option<T>
+fn apply_exponent_factor_wrapped<T, const DECIMALS: u8>(
+    value: T,
+    exponent_factor: T,
+) -> Option<Fixed<T, DECIMALS>>
 where
     T: FixedPointOps<DECIMALS>,
 {
@@ -66,18 +69,29 @@ where
             }
         }
     };
-    Some(ans.into_inner())
+    Some(ans)
+}
+
+/// Apply exponent factor using this formula: `x^E`.
+///
+/// Assuming that all values are "float"s with the same decimals.
+#[inline]
+pub fn apply_exponent_factor<T, const DECIMALS: u8>(value: T, exponent_factor: T) -> Option<T>
+where
+    T: FixedPointOps<DECIMALS>,
+{
+    Some(apply_exponent_factor_wrapped(value, exponent_factor)?.into_inner())
 }
 
 /// Apply factor using this formula: `A * x`.
 ///
-/// Assuming that values are "float"s with the same decimals.
+/// Assuming that `value` and `factor` are a fixed-point decimals,
+/// but they do not need to be of the same decimals.
+/// The const type `DECIMALS` is the decimals of `factor`.
 #[inline]
-pub fn apply_factor<T, const DECIMALS: u8>(value: T, factor: T) -> Option<T>
+pub fn apply_factor<T, const DECIMALS: u8>(value: &T, factor: &T) -> Option<T>
 where
     T: FixedPointOps<DECIMALS>,
 {
-    Fixed::from_inner(value)
-        .checked_mul(&Fixed::from_inner(factor))
-        .map(Fixed::into_inner)
+    value.checked_mul_div(factor, &FixedPointOps::UNIT)
 }
