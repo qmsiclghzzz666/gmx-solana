@@ -15,8 +15,6 @@ export const createMarket = async (
     shortTokenMint: PublicKey,
 ) => {
     const [marketTokenMint] = createMarketTokenMintPDA(dataStoreAddress, indexTokenMint, longTokenMint, shortTokenMint);
-    const [longToken] = createMarketVaultPDA(dataStoreAddress, longTokenMint, marketTokenMint);
-    const [shortToken] = createMarketVaultPDA(dataStoreAddress, shortTokenMint, marketTokenMint);
     const [marketSign] = getMarketSignPDA();
     const [roles] = createRolesPDA(dataStoreAddress, signer.publicKey);
     const [marketAddress] = createMarketPDA(dataStoreAddress, marketTokenMint);
@@ -29,8 +27,6 @@ export const createMarket = async (
         marketTokenMint,
         longTokenMint,
         shortTokenMint,
-        longToken,
-        shortToken,
         marketSign,
         dataStoreProgram: dataStore.programId,
         tokenProgram: TOKEN_PROGRAM_ID,

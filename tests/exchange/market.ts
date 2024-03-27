@@ -22,8 +22,6 @@ describe("exchange: market", () => {
 
     it("create market", async () => {
         const [marketTokenMint] = createMarketTokenMintPDA(dataStoreAddress, indexTokenMint, longTokenMint, shortTokenMint);
-        const [longToken] = createMarketVaultPDA(dataStoreAddress, longTokenMint, marketTokenMint);
-        const [shortToken] = createMarketVaultPDA(dataStoreAddress, shortTokenMint, marketTokenMint);
         const [marketSign] = getMarketSignPDA();
         await exchange.methods.createMarket(indexTokenMint).accounts({
             authority: signer0.publicKey,
@@ -33,8 +31,6 @@ describe("exchange: market", () => {
             marketTokenMint,
             longTokenMint,
             shortTokenMint,
-            longToken,
-            shortToken,
             marketSign,
             dataStoreProgram: dataStore.programId,
             tokenProgram: TOKEN_PROGRAM_ID,
