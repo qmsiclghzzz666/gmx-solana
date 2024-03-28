@@ -215,7 +215,6 @@ where
     }
 
     fn mint(&mut self, amount: &Self::Num) -> gmx_core::Result<()> {
-        msg!("minting {}", amount);
         data_store::cpi::mint_market_token_to(
             self.mint_to_ctx(),
             (*amount)
@@ -228,8 +227,8 @@ where
     fn swap_impact_params(&self) -> SwapImpactParams<Self::Num> {
         SwapImpactParams::builder()
             .with_exponent(2 * constants::MARKET_USD_UNIT)
-            .with_positive_factor(2_000_000_000_000)
-            .with_negative_factor(4_000_000_000_000)
+            .with_positive_factor(400_000_000_000)
+            .with_negative_factor(800_000_000_000)
             .build()
             .unwrap()
     }
