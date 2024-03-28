@@ -237,8 +237,8 @@ where
     fn swap_fee_params(&self) -> FeeParams<Self::Num> {
         FeeParams::builder()
             .with_fee_receiver_factor(37_000_000_000_000_000_000)
-            .with_positive_impact_factor(50_000_000_000_000_000)
-            .with_negative_impact_factor(70_000_000_000_000_000)
+            .with_positive_impact_fee_factor(50_000_000_000_000_000)
+            .with_negative_impact_fee_factor(70_000_000_000_000_000)
             .build()
     }
 }

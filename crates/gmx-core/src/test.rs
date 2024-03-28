@@ -81,21 +81,21 @@ pub struct TestMarket<T, const DECIMALS: u8> {
     fee: TestPool<T>,
 }
 
-impl Default for TestMarket<u64, 8> {
+impl Default for TestMarket<u64, 9> {
     fn default() -> Self {
         Self {
             total_supply: Default::default(),
             value_to_amount_divisor: 1,
             swap_impact_params: SwapImpactParams::builder()
-                .with_exponent(200_000_000)
-                .with_positive_factor(2)
-                .with_negative_factor(4)
+                .with_exponent(2_000_000_000)
+                .with_positive_factor(4)
+                .with_negative_factor(8)
                 .build()
                 .unwrap(),
             swap_fee_params: FeeParams::builder()
-                .with_fee_receiver_factor(37_000_000)
-                .with_positive_impact_factor(50_000)
-                .with_negative_impact_factor(70_000)
+                .with_fee_receiver_factor(370_000_000)
+                .with_positive_impact_fee_factor(500_000)
+                .with_negative_impact_fee_factor(700_000)
                 .build(),
             primary: Default::default(),
             price_impact: Default::default(),
@@ -109,17 +109,17 @@ impl Default for TestMarket<u128, 20> {
     fn default() -> Self {
         Self {
             total_supply: Default::default(),
-            value_to_amount_divisor: 10u128.pow(20 - 8),
+            value_to_amount_divisor: 10u128.pow(20 - 9),
             swap_impact_params: SwapImpactParams::builder()
                 .with_exponent(200_000_000_000_000_000_000)
-                .with_positive_factor(2_000_000_000_000)
-                .with_negative_factor(4_000_000_000_000)
+                .with_positive_factor(400_000_000_000)
+                .with_negative_factor(800_000_000_000)
                 .build()
                 .unwrap(),
             swap_fee_params: FeeParams::builder()
                 .with_fee_receiver_factor(37_000_000_000_000_000_000)
-                .with_positive_impact_factor(50_000_000_000_000_000)
-                .with_negative_impact_factor(70_000_000_000_000_000)
+                .with_positive_impact_fee_factor(50_000_000_000_000_000)
+                .with_negative_impact_fee_factor(70_000_000_000_000_000)
                 .build(),
             primary: Default::default(),
             price_impact: Default::default(),

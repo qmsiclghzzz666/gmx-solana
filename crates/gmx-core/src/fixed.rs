@@ -38,9 +38,9 @@ impl<const DECIMALS: u8> FixedPointOps<DECIMALS> for u128 {
     fn checked_pow_fixed(&self, exponent: &Self) -> Option<Self> {
         use std::cmp::Ordering;
 
-        type Convert = U64D8;
+        type Convert = U64D9;
 
-        let (divisor, multiplier) = match DECIMALS.cmp(&U64D8::DECIMALS) {
+        let (divisor, multiplier) = match DECIMALS.cmp(&U64D9::DECIMALS) {
             Ordering::Greater => {
                 let divisor = 10u128.pow((DECIMALS - Convert::DECIMALS) as u32);
                 (Some(divisor), None)
@@ -161,8 +161,8 @@ impl<T: FixedPointOps<DECIMALS>, const DECIMALS: u8> One for Fixed<T, DECIMALS> 
     }
 }
 
-/// Decimal type with `8` decimals and backed by [`u64`]
-pub type U64D8 = Fixed<u64, 8>;
+/// Decimal type with `9` decimals and backed by [`u64`]
+pub type U64D9 = Fixed<u64, 9>;
 
 #[cfg(feature = "u128")]
 /// Decimal type with `20` decimals and backed by [`u128`]
@@ -174,17 +174,17 @@ mod tests {
 
     #[test]
     fn basic() {
-        let x = U64D8::from_inner(1_280_000_000);
-        let y = U64D8::from_inner(2_560_000_001);
-        assert_eq!(x * y, U64D8::from_inner(32_768_000_012));
+        let x = U64D9::from_inner(12_800_000_000);
+        let y = U64D9::from_inner(25_600_000_001);
+        assert_eq!(x * y, U64D9::from_inner(327_680_000_012));
     }
 
     #[test]
     fn pow() {
-        let x = U64D8::from_inner(123_456 * 10_000_000);
-        let exp = U64D8::from_inner(11 * 10_000_000);
+        let x = U64D9::from_inner(123_456 * 100_000_000);
+        let exp = U64D9::from_inner(11 * 100_000_000);
         let ans = x.checked_pow(&exp).unwrap();
-        assert_eq!(ans, U64D8::from_inner(3167098273314));
+        assert_eq!(ans, U64D9::from_inner(31670982733137));
     }
 
     #[cfg(feature = "u128")]

@@ -446,17 +446,26 @@ mod tests {
 
     #[test]
     fn basic() -> Result<(), crate::Error> {
-        let mut market = TestMarket::<u64, 8>::default();
-        println!("{:#?}", market.deposit(100_000_000, 0, 120, 1)?.execute()?);
-        println!("{:#?}", market.deposit(100_000_000, 0, 120, 1)?.execute()?);
-        println!("{:#?}", market.deposit(0, 100_000_000, 120, 1)?.execute()?);
+        let mut market = TestMarket::<u64, 9>::default();
+        println!(
+            "{:#?}",
+            market.deposit(1_000_000_000, 0, 120, 1)?.execute()?
+        );
+        println!(
+            "{:#?}",
+            market.deposit(1_000_000_000, 0, 120, 1)?.execute()?
+        );
+        println!(
+            "{:#?}",
+            market.deposit(0, 1_000_000_000, 120, 1)?.execute()?
+        );
         println!("{market:#?}");
         Ok(())
     }
 
     #[test]
     fn sequence() -> crate::Result<()> {
-        let mut market_1 = TestMarket::<u64, 8>::default();
+        let mut market_1 = TestMarket::<u64, 9>::default();
         println!(
             "{:#?}",
             market_1.deposit(1_000_000_000, 0, 120, 1)?.execute()?
@@ -465,7 +474,7 @@ mod tests {
             "{:#?}",
             market_1.deposit(1_000_000_000, 0, 120, 1)?.execute()?
         );
-        let mut market_2 = TestMarket::<u64, 8>::default();
+        let mut market_2 = TestMarket::<u64, 9>::default();
         println!(
             "{:#?}",
             market_2.deposit(2_000_000_000, 0, 120, 1)?.execute()?
@@ -480,19 +489,19 @@ mod tests {
         println!(
             "{:#?}",
             market
-                .deposit(100_000_000, 0, 120_000_000_000_000, 1)?
+                .deposit(1_000_000_000, 0, 12_000_000_000_000, 100_000_000_000)?
                 .execute()?
         );
         println!(
             "{:#?}",
             market
-                .deposit(100_000_000, 0, 120_000_000_000_000, 1)?
+                .deposit(1_000_000_000, 0, 12_000_000_000_000, 100_000_000_000)?
                 .execute()?
         );
         println!(
             "{:#?}",
             market
-                .deposit(0, 100_000_000, 120_000_000_000_000, 1_000_000_000_000)?
+                .deposit(0, 1_000_000_000, 12_000_000_000_000, 100_000_000_000)?
                 .execute()?
         );
         println!("{market:#?}");

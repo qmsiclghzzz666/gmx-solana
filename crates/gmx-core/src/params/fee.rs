@@ -5,8 +5,8 @@ use crate::{fixed::FixedPointOps, utils};
 /// Fee Parameters.
 #[derive(Debug, Clone, Copy)]
 pub struct FeeParams<T> {
-    positive_impact_factor: T,
-    negative_impact_factor: T,
+    positive_impact_fee_factor: T,
+    negative_impact_fee_factor: T,
     fee_receiver_factor: T,
 }
 
@@ -56,9 +56,9 @@ impl<T> FeeParams<T> {
     #[inline]
     fn factor(&self, is_positive_impact: bool) -> &T {
         if is_positive_impact {
-            &self.positive_impact_factor
+            &self.positive_impact_fee_factor
         } else {
-            &self.negative_impact_factor
+            &self.negative_impact_fee_factor
         }
     }
 
@@ -93,14 +93,14 @@ pub struct Builder<T> {
 }
 
 impl<T> Builder<T> {
-    /// Set the positive impact factor.
-    pub fn with_positive_impact_factor(mut self, factor: T) -> Self {
+    /// Set the fee factor for positive impact.
+    pub fn with_positive_impact_fee_factor(mut self, factor: T) -> Self {
         self.positive_impact_factor = factor;
         self
     }
 
-    /// Set the negative impact factor.
-    pub fn with_negative_impact_factor(mut self, factor: T) -> Self {
+    /// Set the fee factor for negative impact.
+    pub fn with_negative_impact_fee_factor(mut self, factor: T) -> Self {
         self.negative_impact_factor = factor;
         self
     }
@@ -114,8 +114,8 @@ impl<T> Builder<T> {
     /// Build [`FeeParams`].
     pub fn build(self) -> FeeParams<T> {
         FeeParams {
-            positive_impact_factor: self.positive_impact_factor,
-            negative_impact_factor: self.negative_impact_factor,
+            positive_impact_fee_factor: self.positive_impact_factor,
+            negative_impact_fee_factor: self.negative_impact_factor,
             fee_receiver_factor: self.fee_receiver_factor,
         }
     }
