@@ -41,7 +41,7 @@ describe("exchange: deposit", () => {
         [nonce] = createNoncePDA(dataStoreAddress);
     });
 
-    it("create deposit", async () => {
+    it("create and execute deposit", async () => {
         const depositNonce = await dataStore.methods.getNonceBytes().accounts({ nonce }).view();
         const [deposit] = createDepositPDA(dataStoreAddress, user0.publicKey, depositNonce);
         {
@@ -131,6 +131,69 @@ describe("exchange: deposit", () => {
                 .add(ix);
             const txId = await sendAndConfirmTransaction(provider.connection, tx, [signer0]);
             console.log(`executed at`, txId);
+        } catch (error) {
+            console.log(error);
+            throw error;
+        } finally {
+            const afterExecution = await dataStore.account.oracle.fetch(oracleAddress);
+            expect(afterExecution.primary.prices.length).equals(0);
+            const market = await dataStore.account.market.fetch(marketFakeFakeUsdG);
+            console.log("pools", market.pools);
+        }
+    });
+
+    it("create and cancel deposit", async () => {
+        const depositNonce = Keypair.generate().publicKey.toBuffer();
+        const [deposit] = createDepositPDA(dataStoreAddress, user0.publicKey, depositNonce);
+        {
+            const ix = await exchange.methods.createDeposit(
+                [...depositNonce],
+                {
+                    uiFeeReceiver: Keypair.generate().publicKey,
+                    executionFee: new BN(0),
+                    longTokenSwapPath: [],
+                    shortTokenSwapPath: [],
+                    initialLongTokenAmount: new BN(2_000_000_000),
+                    initialShortTokenAmount: new BN(200_000_000),
+                    minMarketToken: new BN(0),
+                    shouldUnwrapNativeToken: false,
+                },
+            ).accounts({
+                market: marketFakeFakeUsdG,
+                authority: signer0.publicKey,
+                store: dataStoreAddress,
+                onlyController: roles,
+                dataStoreProgram: dataStore.programId,
+                deposit,
+                payer: user0.publicKey,
+                receiver: user0FakeFakeUsdGTokenAccount,
+                initialLongToken: user0FakeTokenAccount,
+                initialShortToken: user0UsdGTokenAccount,
+                longTokenDepositVault: fakeTokenVault,
+                shortTokenDepositVault: usdGVault,
+                tokenProgram: TOKEN_PROGRAM_ID,
+            }).signers([signer0, user0]).instruction();
+            const txId = await sendAndConfirmTransaction(provider.connection, new Transaction().add(ix), [user0, signer0]);
+            console.log("created at", txId);
+        }
+        try {
+            const ix = await exchange.methods.cancelDeposit(new BN(5000)).accounts({
+                authority: signer0.publicKey,
+                store: dataStoreAddress,
+                dataStoreProgram: dataStore.programId,
+                onlyController: roles,
+                deposit,
+                user: user0.publicKey,
+                initialLongToken: user0FakeTokenAccount,
+                initialShortToken: user0UsdGTokenAccount,
+                longTokenDepositVault: fakeTokenVault,
+                shortTokenDepositVault: usdGVault,
+                tokenProgram: TOKEN_PROGRAM_ID,
+                marketSign: getMarketSignPDA()[0],
+            }).instruction();
+            const tx = new Transaction().add(ix);
+            const txId = await sendAndConfirmTransaction(provider.connection, tx, [signer0]);
+            console.log(`cancelled at`, txId);
         } catch (error) {
             console.log(error);
             throw error;

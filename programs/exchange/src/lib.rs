@@ -30,12 +30,18 @@ pub mod exchange {
     ) -> Result<()> {
         instructions::create_deposit(ctx, nonce, params)
     }
+
     #[access_control(Authenticate::only_order_keeper(&ctx))]
     pub fn execute_deposit<'info>(
         ctx: Context<'_, '_, 'info, 'info, ExecuteDeposit<'info>>,
         execution_fee: u64,
     ) -> Result<()> {
         instructions::execute_deposit(ctx, execution_fee)
+    }
+
+    #[access_control(Authenticate::only_controller(&ctx))]
+    pub fn cancel_deposit(ctx: Context<CancelDeposit>, execution_fee: u64) -> Result<()> {
+        instructions::cancel_deposit(ctx, execution_fee)
     }
 }
 
@@ -51,4 +57,6 @@ pub enum ExchangeError {
     NotEnoughExecutionFee,
     #[msg("Failed to execute deposit")]
     FailedToExecuteDeposit,
+    #[msg("Invalid deposit to cancel")]
+    InvalidDepositToCancel,
 }
