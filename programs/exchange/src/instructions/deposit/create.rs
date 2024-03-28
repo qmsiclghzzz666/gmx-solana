@@ -1,5 +1,5 @@
-use anchor_lang::prelude::*;
-use anchor_spl::token::{Token, TokenAccount, Transfer};
+use anchor_lang::{prelude::*, system_program};
+use anchor_spl::token::{self, Token, TokenAccount};
 use data_store::{
     constants,
     cpi::accounts::{CheckRole, InitializeDeposit},
@@ -14,6 +14,7 @@ use crate::ExchangeError;
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct CreateDepositParams {
     pub ui_fee_receiver: Pubkey,
+    pub execution_fee: u64,
     pub long_token_swap_path: Vec<Pubkey>,
     pub short_token_swap_path: Vec<Pubkey>,
     pub initial_long_token_amount: u64,
@@ -37,19 +38,17 @@ pub fn create_deposit(
 
     if params.initial_long_token_amount != 0 {
         anchor_spl::token::transfer(
-            ctx.accounts.transfer_ctx(true),
+            ctx.accounts.token_transfer_ctx(true),
             params.initial_long_token_amount,
         )?;
     }
 
     if params.initial_short_token_amount != 0 {
         anchor_spl::token::transfer(
-            ctx.accounts.transfer_ctx(false),
+            ctx.accounts.token_transfer_ctx(false),
             params.initial_short_token_amount,
         )?;
     }
-
-    // TODO: allow using WNT to pay for the execution fee.
 
     cpi::initialize_deposit(
         ctx.accounts.initialize_deposit_ctx(),
@@ -66,7 +65,13 @@ pub fn create_deposit(
             should_unwrap_native_token: params.should_unwrap_native_token,
         },
     )?;
-    // TODO: check the execution fee.
+    // FIXME: should we allow using WNT to pay for the execution fee?
+    require_gte!(
+        ctx.accounts.deposit.lamports() + params.execution_fee,
+        super::MAX_EXECUTION_FEE,
+        ExchangeError::NotEnoughExecutionFee
+    );
+    system_program::transfer(ctx.accounts.transfer_ctx(), params.execution_fee)?;
     // TODO: emit deposit created event.
     Ok(())
 }
@@ -158,7 +163,10 @@ impl<'info> CreateDeposit<'info> {
         )
     }
 
-    fn transfer_ctx(&self, is_long_token: bool) -> CpiContext<'_, '_, '_, 'info, Transfer<'info>> {
+    fn token_transfer_ctx(
+        &self,
+        is_long_token: bool,
+    ) -> CpiContext<'_, '_, '_, 'info, token::Transfer<'info>> {
         let (from, to) = if is_long_token {
             (
                 self.initial_long_token.to_account_info(),
@@ -172,10 +180,20 @@ impl<'info> CreateDeposit<'info> {
         };
         CpiContext::new(
             self.token_program.to_account_info(),
-            Transfer {
+            token::Transfer {
                 from,
                 to,
                 authority: self.payer.to_account_info(),
+            },
+        )
+    }
+
+    fn transfer_ctx(&self) -> CpiContext<'_, '_, '_, 'info, system_program::Transfer<'info>> {
+        CpiContext::new(
+            self.system_program.to_account_info(),
+            system_program::Transfer {
+                from: self.payer.to_account_info(),
+                to: self.deposit.to_account_info(),
             },
         )
     }

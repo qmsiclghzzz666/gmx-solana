@@ -232,8 +232,8 @@ pub mod data_store {
     }
 
     #[access_control(internal::Authenticate::only_controller(&ctx))]
-    pub fn remove_deposit(ctx: Context<RemoveDeposit>) -> Result<()> {
-        instructions::remove_deposit(ctx)
+    pub fn remove_deposit(ctx: Context<RemoveDeposit>, refund: u64) -> Result<()> {
+        instructions::remove_deposit(ctx, refund)
     }
 }
 
@@ -250,6 +250,8 @@ pub enum DataStoreError {
     ExceedMaxStringLengthLimit,
     #[msg("Invalid argument")]
     InvalidArgument,
+    #[msg("Lamports not enough")]
+    LamportsNotEnough,
     // Roles.
     #[msg("Too many admins")]
     TooManyAdmins,

@@ -1,4 +1,4 @@
-use anchor_lang::prelude::*;
+use anchor_lang::{prelude::*, system_program};
 use anchor_spl::token::TokenAccount;
 
 use crate::{
@@ -7,6 +7,7 @@ use crate::{
         DataStore, Deposit, Market, NonceBytes, Roles, Seed,
     },
     utils::internal,
+    DataStoreError,
 };
 
 /// Initialize a new [`Deposit`] account.
@@ -65,19 +66,22 @@ impl<'info> internal::Authentication<'info> for InitializeDeposit<'info> {
     }
 }
 
-/// Remove deposit.
-pub fn remove_deposit(_ctx: Context<RemoveDeposit>) -> Result<()> {
-    Ok(())
+/// Remove a deposit.
+pub fn remove_deposit(ctx: Context<RemoveDeposit>, refund: u64) -> Result<()> {
+    system_program::transfer(ctx.accounts.transfer_ctx(), refund)
 }
 
 #[derive(Accounts)]
+#[instruction(refund: u64)]
 pub struct RemoveDeposit<'info> {
+    #[account(mut)]
     pub authority: Signer<'info>,
     pub only_controller: Account<'info, Roles>,
     pub store: Account<'info, DataStore>,
     #[account(
         mut,
-        close = user,
+        constraint = deposit.to_account_info().lamports() >= refund @ DataStoreError::LamportsNotEnough,
+        close = authority,
         has_one = user,
         seeds = [
             Deposit::SEED,
@@ -92,6 +96,7 @@ pub struct RemoveDeposit<'info> {
     /// and has been checked in `deposit`'s constraint.
     #[account(mut)]
     pub user: UncheckedAccount<'info>,
+    pub system_program: Program<'info, System>,
 }
 
 impl<'info> internal::Authentication<'info> for RemoveDeposit<'info> {
@@ -105,5 +110,17 @@ impl<'info> internal::Authentication<'info> for RemoveDeposit<'info> {
 
     fn roles(&self) -> &Account<'info, Roles> {
         &self.only_controller
+    }
+}
+
+impl<'info> RemoveDeposit<'info> {
+    fn transfer_ctx(&self) -> CpiContext<'_, '_, '_, 'info, system_program::Transfer<'info>> {
+        CpiContext::new(
+            self.system_program.to_account_info(),
+            system_program::Transfer {
+                from: self.authority.to_account_info(),
+                to: self.user.to_account_info(),
+            },
+        )
     }
 }

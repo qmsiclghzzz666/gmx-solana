@@ -1,5 +1,5 @@
 import { BN } from "@coral-xyz/anchor";
-import { ComputeBudgetProgram, Keypair, PublicKey, Transaction } from "@solana/web3.js";
+import { ComputeBudgetProgram, Keypair, PublicKey, Transaction, sendAndConfirmTransaction } from "@solana/web3.js";
 import { createDepositPDA, createMarketTokenMintPDA, createNoncePDA, createRolesPDA, createTokenConfigPDA, getMarketSignPDA } from "../../utils/data";
 import { getAddresses, getExternalPrograms, getMarkets, getPrograms, getProvider, getUsers, expect } from "../../utils/fixtures";
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
@@ -45,10 +45,11 @@ describe("exchange: deposit", () => {
         const depositNonce = await dataStore.methods.getNonceBytes().accounts({ nonce }).view();
         const [deposit] = createDepositPDA(dataStoreAddress, user0.publicKey, depositNonce);
         {
-            const tx = await exchange.methods.createDeposit(
+            const ix = await exchange.methods.createDeposit(
                 [...depositNonce],
                 {
                     uiFeeReceiver: Keypair.generate().publicKey,
+                    executionFee: new BN(0),
                     longTokenSwapPath: [],
                     shortTokenSwapPath: [],
                     initialLongTokenAmount: new BN(1_000_000_000),
@@ -77,11 +78,12 @@ describe("exchange: deposit", () => {
                     onlyController: roles,
                     nonce,
                 }).instruction(),
-            ]).signers([signer0, user0]).rpc();
-            console.log("created at", tx);
+            ]).signers([signer0, user0]).instruction();
+            const txId = await sendAndConfirmTransaction(provider.connection, new Transaction().add(ix), [user0, signer0]);
+            console.log("created at", txId);
         }
         try {
-            const ix = await exchange.methods.executeDeposit().accounts({
+            const ix = await exchange.methods.executeDeposit(new BN(5001)).accounts({
                 authority: signer0.publicKey,
                 store: dataStoreAddress,
                 dataStoreProgram: dataStore.programId,
@@ -123,14 +125,12 @@ describe("exchange: deposit", () => {
             const addPriorityFee = ComputeBudgetProgram.setComputeUnitPrice({
                 microLamports: 1,
             });
-            const tx = await provider.sendAndConfirm(
-                new Transaction()
-                    .add(modifyComputeUnits)
-                    .add(addPriorityFee)
-                    .add(ix),
-                [signer0],
-            );
-            console.log("executed at", tx);
+            const tx = new Transaction()
+                .add(modifyComputeUnits)
+                .add(addPriorityFee)
+                .add(ix);
+            const txId = await sendAndConfirmTransaction(provider.connection, tx, [signer0]);
+            console.log(`executed at`, txId);
         } catch (error) {
             console.log(error);
             throw error;

@@ -14,7 +14,7 @@ import { oracle } from "./oracle";
 
 import { IDL as chainlinkIDL } from "../external-programs/chainlink-store";
 import { BTC_TOKEN_MINT, SOL_TOKEN_MINT, createSignedToken } from "./token";
-import { PublicKey } from "@solana/web3.js";
+import { PublicKey, Transaction } from "@solana/web3.js";
 import { createAssociatedTokenAccount } from "@solana/spl-token";
 
 export const expect = chai.expect;
@@ -108,40 +108,52 @@ const callback = SHOW_EVENT ? (eventName, event) => {
 
 const eventManager = new EventManager(callback);
 
-const initializeUser = async (provider: anchor.AnchorProvider, user: anchor.web3.Keypair, airdrop: number) => {
+const initializeUsers = async (provider: anchor.AnchorProvider, users: anchor.web3.Keypair[], airdrop: number) => {
     console.log("Using", provider.connection.rpcEndpoint);
     // const tx = await provider.connection.requestAirdrop(user.publicKey, anchor.web3.LAMPORTS_PER_SOL * airdrop);
     // console.log(`Airdropped ${airdrop} SOL to the user ${user.publicKey} in tx ${tx}`);
     const balance = await provider.connection.getBalance(provider.wallet.publicKey);
     console.log(`The balance of ${provider.wallet.publicKey} is ${balance / anchor.web3.LAMPORTS_PER_SOL}`);
-    const tx = new anchor.web3.Transaction().add(anchor.web3.SystemProgram.transfer({
-        toPubkey: user.publicKey,
-        fromPubkey: provider.wallet.publicKey,
-        lamports: anchor.web3.LAMPORTS_PER_SOL * airdrop,
-    }));
+    const tx = new Transaction();
+    for (let index = 0; index < users.length; index++) {
+        const user = users[index];
+        tx.add(anchor.web3.SystemProgram.transfer({
+            toPubkey: user.publicKey,
+            fromPubkey: provider.wallet.publicKey,
+            lamports: anchor.web3.LAMPORTS_PER_SOL * airdrop,
+        }));
+    }
     tx.feePayer = provider.wallet.publicKey;
     try {
         const hash = await provider.sendAndConfirm(tx, [], { commitment: "confirmed" });
-        console.log(`Transferred ${airdrop} SOL to ${user.publicKey} from the wallet in tx ${hash}`);
-        const balance = await provider.connection.getBalance(user.publicKey);
-        console.log(`Now it has ${balance} lamports`);
+        for (let index = 0; index < users.length; index++) {
+            const user = users[index];
+            console.log(`Transferred ${airdrop} SOL to ${user.publicKey} from the wallet in tx ${hash}`);
+            const balance = await provider.connection.getBalance(user.publicKey);
+            console.log(`Now it has ${balance} lamports`);
+        }
     } catch (error) {
         console.error("Failed to transfer:", error);
     }
 };
 
-const deinitializeUser = async (provider: anchor.AnchorProvider, user: anchor.web3.Keypair) => {
-    const balance = await provider.connection.getBalance(user.publicKey);
-    console.log(`The balance of ${user.publicKey} is ${balance / anchor.web3.LAMPORTS_PER_SOL}`);
-    const tx = new anchor.web3.Transaction().add(anchor.web3.SystemProgram.transfer({
-        fromPubkey: user.publicKey,
-        toPubkey: provider.wallet.publicKey,
-        lamports: balance,
-    }));
+const deinitializeUsers = async (provider: anchor.AnchorProvider, users: anchor.web3.Keypair[]) => {
+    const tx = new Transaction();
+    for (let index = 0; index < users.length; index++) {
+        const user = users[index];
+        const balance = await provider.connection.getBalance(user.publicKey);
+        console.log(`The balance of ${user.publicKey} is ${balance / anchor.web3.LAMPORTS_PER_SOL}`);
+        tx.add(anchor.web3.SystemProgram.transfer({
+            fromPubkey: user.publicKey,
+            toPubkey: provider.wallet.publicKey,
+            lamports: balance,
+        }));
+    }
+
     tx.feePayer = provider.wallet.publicKey;
     try {
-        const hash = await provider.sendAndConfirm(tx, [user]);
-        console.log(`Transferred back all balance of ${user.publicKey} to the wallet in tx ${hash}`);
+        const hash = await provider.sendAndConfirm(tx, users);
+        console.log(`Transferred back all balance of the users to the wallet in tx ${hash}`);
     } catch (error) {
         console.error("Failed to transfer back all balance:", error);
     }
@@ -150,8 +162,7 @@ const deinitializeUser = async (provider: anchor.AnchorProvider, user: anchor.we
 export const mochaGlobalSetup = async () => {
     console.log("[Setting up everything...]");
     anchor.setProvider(provider);
-    await initializeUser(provider, signer0, 1.5);
-    await initializeUser(provider, user0, 1.5);
+    await initializeUsers(provider, [signer0, user0], 0.5);
 
     // Init fakeToken and usdG.
     const fakeToken = await createSignedToken(signer0, 9);
@@ -179,7 +190,6 @@ export const mochaGlobalSetup = async () => {
 export const mochaGlobalTeardown = async () => {
     console.log("[Cleanup...]");
     eventManager.unsubscribeAll();
-    await deinitializeUser(provider, signer0);
-    await deinitializeUser(provider, user0);
+    await deinitializeUsers(provider, [signer0, user0]);
     console.log("[Done.]");
 };

@@ -20,9 +20,13 @@ use crate::{
 /// Execute a deposit.
 pub fn execute_deposit<'info>(
     ctx: Context<'_, '_, 'info, 'info, ExecuteDeposit<'info>>,
+    execution_fee: u64,
 ) -> Result<()> {
-    data_store::cpi::remove_deposit(ctx.accounts.remove_deposit_ctx())?;
     let deposit = &ctx.accounts.deposit;
+    let refund = deposit
+        .get_lamports()
+        .checked_sub(super::MAX_EXECUTION_FEE.min(execution_fee))
+        .ok_or(ExchangeError::NotEnoughExecutionFee)?;
     let long_token = deposit.tokens.params.initial_long_token;
     let short_token = deposit.tokens.params.initial_short_token;
     let remaining_accounts = ctx.remaining_accounts.to_vec();
@@ -61,11 +65,12 @@ pub fn execute_deposit<'info>(
             Ok(())
         },
     )?;
-    Ok(())
+    data_store::cpi::remove_deposit(ctx.accounts.remove_deposit_ctx(), refund)
 }
 
 #[derive(Accounts)]
 pub struct ExecuteDeposit<'info> {
+    #[account(mut)]
     pub authority: Signer<'info>,
     /// CHECK: used and checked by CPI.
     pub only_order_keeper: UncheckedAccount<'info>,
@@ -92,6 +97,7 @@ pub struct ExecuteDeposit<'info> {
     pub market_token_mint: Account<'info, Mint>,
     /// CHECK: only used as signing PDA.
     pub market_sign: UncheckedAccount<'info>,
+    pub system_program: Program<'info, System>,
 }
 
 impl<'info> ExecuteDeposit<'info> {
@@ -104,6 +110,7 @@ impl<'info> ExecuteDeposit<'info> {
                 store: self.store.to_account_info(),
                 deposit: self.deposit.to_account_info(),
                 user: self.user.to_account_info(),
+                system_program: self.system_program.to_account_info(),
             },
         )
     }

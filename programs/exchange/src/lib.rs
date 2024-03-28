@@ -33,8 +33,9 @@ pub mod exchange {
     #[access_control(Authenticate::only_order_keeper(&ctx))]
     pub fn execute_deposit<'info>(
         ctx: Context<'_, '_, 'info, 'info, ExecuteDeposit<'info>>,
+        execution_fee: u64,
     ) -> Result<()> {
-        instructions::execute_deposit(ctx)
+        instructions::execute_deposit(ctx, execution_fee)
     }
 }
 
@@ -46,7 +47,8 @@ pub enum ExchangeError {
     // Deposit.
     #[msg("Empty deposit amounts")]
     EmptyDepositAmounts,
-    // Failed to execute deposit.
+    #[msg("Not enough execution fee")]
+    NotEnoughExecutionFee,
     #[msg("Failed to execute deposit")]
     FailedToExecuteDeposit,
 }

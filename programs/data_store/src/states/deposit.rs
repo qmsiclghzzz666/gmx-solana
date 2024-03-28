@@ -24,8 +24,6 @@ pub struct Deposit {
     pub tokens: Tokens,
     /// The slot that the deposit was last updated at.
     pub updated_at_slot: u64,
-    // /// The execution fee for keepers.
-    // pub execution_fee: u64,
     // /// The fee limit for the callback contract.
     // pub callback_fee_limit: u64,
 }
