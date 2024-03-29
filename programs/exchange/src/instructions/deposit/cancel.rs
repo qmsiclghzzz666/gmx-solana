@@ -28,7 +28,7 @@ pub fn cancel_deposit(ctx: Context<CancelDeposit>, execution_fee: u64) -> Result
         .accounts
         .deposit
         .get_lamports()
-        .checked_sub(execution_fee.min(crate::MAX_EXECUTION_FEE))
+        .checked_sub(execution_fee.min(crate::MAX_DEPOSIT_EXECUTION_FEE))
         .ok_or(ExchangeError::NotEnoughExecutionFee)?;
     data_store::cpi::remove_deposit(ctx.accounts.remove_deposit_ctx(), refund)?;
 

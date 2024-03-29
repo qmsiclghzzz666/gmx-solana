@@ -68,7 +68,7 @@ pub fn create_deposit(
     // FIXME: should we allow using WNT to pay for the execution fee?
     require_gte!(
         ctx.accounts.deposit.lamports() + params.execution_fee,
-        super::MAX_EXECUTION_FEE,
+        super::MAX_DEPOSIT_EXECUTION_FEE,
         ExchangeError::NotEnoughExecutionFee
     );
     system_program::transfer(ctx.accounts.transfer_ctx(), params.execution_fee)?;
