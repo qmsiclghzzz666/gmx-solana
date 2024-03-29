@@ -89,4 +89,10 @@ pub enum ExchangeError {
     EmptyWithdrawalAmount,
     #[msg("Invalid withdrawal to cancel")]
     InvalidWithdrawalToCancel,
+    #[msg("Invalid output amount")]
+    InvalidOutputAmount,
+    #[msg("Output amount too small")]
+    OutputAmountTooSmall,
+    #[msg("Invalid withdrawal to execute")]
+    InvalidWIthdrawalToExecute,
 }

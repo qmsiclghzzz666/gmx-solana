@@ -34,6 +34,7 @@ impl<T> WithdrawParams<T> {
 }
 
 /// Report of the execution of withdrawal.
+#[must_use = "`long_token_output` and `short_token_output` must use"]
 #[derive(Debug, Clone, Copy)]
 pub struct WithdrawReport<T> {
     params: WithdrawParams<T>,
@@ -80,6 +81,9 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Withdrawal<M, DECIMALS> {
     ) -> crate::Result<Self> {
         if market_token_amount.is_zero() {
             return Err(crate::Error::EmptyWithdrawal);
+        }
+        if long_token_price.is_zero() || short_token_price.is_zero() {
+            return Err(crate::Error::InvalidPrices);
         }
         Ok(Self {
             market,
@@ -170,10 +174,12 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Withdrawal<M, DECIMALS> {
         .ok_or(crate::Error::Computation)?;
         let long_token_amount = market_token_value
             .checked_mul_div(&long_token_value, &pool_value)
-            .ok_or(crate::Error::Computation)?;
+            .ok_or(crate::Error::Computation)?
+            / self.params.long_token_price.clone();
         let short_token_amount = market_token_value
             .checked_mul_div(&short_token_value, &pool_value)
-            .ok_or(crate::Error::Computation)?;
+            .ok_or(crate::Error::Computation)?
+            / self.params.short_token_price.clone();
         Ok((long_token_amount, short_token_amount))
     }
 

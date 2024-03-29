@@ -141,9 +141,13 @@ export interface ExecuteWithdrawalOptions {
     executionFee?: number | bigint,
     callback?: (string) => void,
     hints?: {
-        market?: {
-            address: PublicKey,
-            mint: PublicKey,
+        params?: {
+            market: PublicKey,
+            marketTokenMint: PublicKey,
+            finalLongTokenReceiver: PublicKey,
+            finalShortTokenReceiver: PublicKey,
+            finalLongTokenMint: PublicKey,
+            finalShortTokenMint: PublicKey,
         }
     }
 };
@@ -156,11 +160,22 @@ export const executeWithdrawal = async (
     withdrawal: PublicKey,
     options: ExecuteWithdrawalOptions = {},
 ) => {
-    const { address: market, mint: marketTokenMint } = options.hints?.market ?? (
+    const {
+        market,
+        marketTokenMint,
+        finalLongTokenReceiver,
+        finalShortTokenReceiver,
+        finalLongTokenMint,
+        finalShortTokenMint,
+    } = options.hints?.params ?? (
         await dataStore.account.withdrawal.fetch(withdrawal).then(withdrawal => {
             return {
-                address: withdrawal.market,
-                mint: withdrawal.tokens.marketToken,
+                market: withdrawal.market,
+                marketTokenMint: withdrawal.tokens.marketToken,
+                finalLongTokenMint: withdrawal.tokens.finalLongToken,
+                finalShortTokenMint: withdrawal.tokens.finalShortToken,
+                finalLongTokenReceiver: withdrawal.receivers.finalLongTokenReceiver,
+                finalShortTokenReceiver: withdrawal.receivers.finalShortTokenReceiver,
             }
         }));
     const marketMeta = await dataStore.methods.getMarketMeta().accounts({ market }).view();
@@ -181,6 +196,11 @@ export const executeWithdrawal = async (
         user,
         market,
         marketTokenMint,
+        marketTokenWithdrawalVault: createMarketVaultPDA(store, marketTokenMint)[0],
+        finalLongTokenReceiver,
+        finalShortTokenReceiver,
+        finalLongTokenVault: createMarketVaultPDA(store, finalLongTokenMint)[0],
+        finalShortTokenVault: createMarketVaultPDA(store, finalShortTokenMint)[0],
     }).remainingAccounts([
         {
             pubkey: longTokenConfig,

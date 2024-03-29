@@ -9,6 +9,9 @@ pub enum Error {
     /// Empty withdrawal.
     #[error("empty withdrawal")]
     EmptyWithdrawal,
+    /// Invalid prices.
+    #[error("invalid prices")]
+    InvalidPrices,
     /// Unknown computation error.
     #[error("unknown computation error")]
     Computation,
@@ -40,6 +43,9 @@ pub enum Error {
     /// Mint receiver not set.
     #[error("mint receiver not set")]
     MintReceiverNotSet,
+    /// Withdrawal vault not set.
+    #[error("withdrawal vault not set")]
+    WithdrawalVaultNotSet,
 }
 
 impl Error {

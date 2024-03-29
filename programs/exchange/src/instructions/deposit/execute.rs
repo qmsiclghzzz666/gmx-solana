@@ -162,6 +162,10 @@ impl<'info> AsMarket<'info> for ExecuteDeposit<'info> {
         Some(&self.receiver)
     }
 
+    fn withdrawal_vault(&self) -> Option<&Account<'info, TokenAccount>> {
+        None
+    }
+
     fn token_program(&self) -> AccountInfo<'info> {
         self.token_program.to_account_info()
     }

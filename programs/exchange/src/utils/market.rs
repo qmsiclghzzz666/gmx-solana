@@ -4,7 +4,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, TokenAccount};
 use data_store::{
     constants,
-    cpi::accounts::{ApplyDeltaToMarketPool, GetPool, MintMarketTokenTo},
+    cpi::accounts::{ApplyDeltaToMarketPool, BurnMarketTokenFrom, GetPool, MintMarketTokenTo},
     states::Pool,
     utils::Authentication,
 };
@@ -31,6 +31,9 @@ pub trait AsMarket<'info>: Authentication<'info> {
 
     /// Get receiver.
     fn receiver(&self) -> Option<&Account<'info, TokenAccount>>;
+
+    /// Get withdrawal vault.
+    fn withdrawal_vault(&self) -> Option<&Account<'info, TokenAccount>>;
 
     /// Get token program.
     fn token_program(&self) -> AccountInfo<'info>;
@@ -182,6 +185,22 @@ where
         );
         Some(ctx)
     }
+
+    fn burn_from_ctx(&self) -> Option<CpiContext<'_, '_, '_, 'info, BurnMarketTokenFrom<'info>>> {
+        let check_role = self.accounts.check_role_ctx();
+        let ctx = CpiContext::new(
+            check_role.program,
+            BurnMarketTokenFrom {
+                authority: self.accounts.authority().to_account_info(),
+                only_controller: check_role.accounts.roles,
+                store: check_role.accounts.store,
+                market_token_mint: self.accounts.market_token().to_account_info(),
+                from: self.accounts.withdrawal_vault()?.to_account_info(),
+                token_program: self.accounts.token_program(),
+            },
+        );
+        Some(ctx)
+    }
 }
 
 impl<'a, 'info, T> gmx_core::Market<{ constants::MARKET_DECIMALS }> for AccountsMarket<'a, T>
@@ -223,7 +242,14 @@ where
     }
 
     fn burn(&mut self, amount: &Self::Num) -> gmx_core::Result<()> {
-        todo!()
+        data_store::cpi::burn_market_token_from(
+            self.burn_from_ctx()
+                .ok_or(gmx_core::Error::WithdrawalVaultNotSet)?,
+            (*amount)
+                .try_into()
+                .map_err(|_| gmx_core::Error::Overflow)?,
+        )?;
+        Ok(())
     }
 
     fn swap_impact_params(&self) -> SwapImpactParams<Self::Num> {

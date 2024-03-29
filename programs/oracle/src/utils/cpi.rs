@@ -56,19 +56,19 @@ pub trait WithOracleExt<'info>: WithOracle<'info> {
     }
 
     /// Run the given function inside the scope with oracle prices.
-    fn with_oracle_prices(
+    fn with_oracle_prices<T>(
         &mut self,
         tokens: Vec<Pubkey>,
         remaining_accounts: Vec<AccountInfo<'info>>,
-        f: impl FnOnce(&mut Self) -> Result<()>,
-    ) -> Result<()> {
+        f: impl FnOnce(&mut Self) -> Result<T>,
+    ) -> Result<T> {
         cpi::set_prices_from_price_feed(
             self.set_prices_from_price_feed_ctx(remaining_accounts),
             tokens,
         )?;
-        f(self)?;
+        let output = f(self)?;
         cpi::clear_all_prices(self.clear_all_prices_ctx())?;
-        Ok(())
+        Ok(output)
     }
 }
 
