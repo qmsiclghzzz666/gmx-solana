@@ -26,6 +26,8 @@ export const ORACLE_SEED = encodeUtf8("oracle");
 export const NONCE_SEED = encodeUtf8("nonce");
 // Deposit seed.
 export const DEPOSIT_SEED = encodeUtf8("deposit");
+// Withdrawal seed.
+export const WITHDRAWAL_SEED = encodeUtf8("withdrawal");
 
 // Role keys.
 export const CONTROLLER = "CONTROLLER";
@@ -88,6 +90,13 @@ export const createNoncePDA = (store: PublicKey) => PublicKey.findProgramAddress
 
 export const createDepositPDA = (store: PublicKey, user: PublicKey, nonce: Uint8Array) => PublicKey.findProgramAddressSync([
     DEPOSIT_SEED,
+    store.toBytes(),
+    user.toBytes(),
+    nonce,
+], dataStore.programId);
+
+export const createWithdrawalPDA = (store: PublicKey, user: PublicKey, nonce: Uint8Array) => PublicKey.findProgramAddressSync([
+    WITHDRAWAL_SEED,
     store.toBytes(),
     user.toBytes(),
     nonce,

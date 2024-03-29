@@ -1,7 +1,6 @@
 use anchor_lang::{prelude::*, system_program};
 use anchor_spl::token::{self, Token, TokenAccount};
 use data_store::{
-    constants,
     cpi::accounts::{CheckRole, GetMarketTokenMint, InitializeWithdrawal},
     program::DataStore,
     states::{withdrawal::TokenParams, NonceBytes},
@@ -47,13 +46,6 @@ pub struct CreateWithdrawal<'info> {
     #[account(
         mut,
         token::mint = market_token.mint,
-        seeds = [
-            constants::MARKET_VAULT_SEED,
-            store.key().as_ref(),
-            market_token_withdrawal_vault.mint.as_ref(),
-            &[],
-        ],
-        bump,
     )]
     pub market_token_withdrawal_vault: Account<'info, TokenAccount>,
     pub final_long_token_receiver: Account<'info, TokenAccount>,
@@ -91,8 +83,8 @@ pub fn create_withdrawal(
     cpi::initialize_withdrawal(
         ctx.accounts.initialize_withdrawal_ctx(),
         nonce,
-        params.market_token_amount,
         params.tokens,
+        params.market_token_amount,
         params.ui_fee_receiver,
     )?;
 

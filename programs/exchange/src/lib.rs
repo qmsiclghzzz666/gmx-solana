@@ -53,6 +53,11 @@ pub mod exchange {
     ) -> Result<()> {
         instructions::create_withdrawal(ctx, nonce, params)
     }
+
+    #[access_control(Authenticate::only_controller(&ctx))]
+    pub fn cancel_withdrawal(ctx: Context<CancelWithdrawal>, execution_fee: u64) -> Result<()> {
+        instructions::cancel_withdrawal(ctx, execution_fee)
+    }
 }
 
 /// Errors of market program.

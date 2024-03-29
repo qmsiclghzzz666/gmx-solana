@@ -2,10 +2,7 @@ use anchor_lang::{prelude::*, system_program};
 use anchor_spl::token::TokenAccount;
 
 use crate::{
-    states::{
-        withdrawal::{Receivers, TokenParams},
-        DataStore, Market, NonceBytes, Roles, Seed, Withdrawal,
-    },
+    states::{withdrawal::TokenParams, DataStore, Market, NonceBytes, Roles, Seed, Withdrawal},
     utils::internal,
     DataStoreError,
 };
@@ -14,8 +11,8 @@ use crate::{
 pub fn initialize_withdrawal(
     ctx: Context<InitializeWithdrawal>,
     nonce: NonceBytes,
-    market_token_amount: u64,
     tokens: TokenParams,
+    market_token_amount: u64,
     ui_fee_receiver: Pubkey,
 ) -> Result<()> {
     ctx.accounts.withdrawal.init(
@@ -25,16 +22,14 @@ pub fn initialize_withdrawal(
         &ctx.accounts.market,
         market_token_amount,
         tokens,
-        Receivers {
-            ui_fee_receiver,
-            final_long_token_receiver: ctx.accounts.final_long_token_receiver.key(),
-            final_short_token_receiver: ctx.accounts.final_short_token_receiver.key(),
-        },
+        &ctx.accounts.final_long_token_receiver,
+        &ctx.accounts.final_short_token_receiver,
+        ui_fee_receiver,
     )
 }
 
 #[derive(Accounts)]
-#[instruction(nonce: [u8; 32], tokens: TokenParams)]
+#[instruction(nonce: [u8; 32])]
 pub struct InitializeWithdrawal<'info> {
     pub authority: Signer<'info>,
     pub store: Account<'info, DataStore>,
@@ -50,9 +45,9 @@ pub struct InitializeWithdrawal<'info> {
     )]
     pub withdrawal: Account<'info, Withdrawal>,
     pub(crate) market: Account<'info, Market>,
-    #[account(token::mint = tokens.final_long_token)]
+    #[account(token::authority = payer)]
     pub final_long_token_receiver: Account<'info, TokenAccount>,
-    #[account(token::mint = tokens.final_short_token)]
+    #[account(token::authority = payer)]
     pub final_short_token_receiver: Account<'info, TokenAccount>,
     pub system_program: Program<'info, System>,
 }

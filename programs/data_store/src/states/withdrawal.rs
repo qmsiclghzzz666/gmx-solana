@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use anchor_spl::token::TokenAccount;
 
 use super::{Market, NonceBytes, Seed};
 
@@ -42,6 +43,10 @@ pub struct Tokens {
     pub params: TokenParams,
     /// The market token to burn.
     pub market_token: Pubkey,
+    /// The final long token to receive.
+    pub final_long_token: Pubkey,
+    /// The final short token to receive.
+    pub final_short_token: Pubkey,
     /// The amount of market tokens taht will be withdrawn.
     pub market_token_amount: u64,
 }
@@ -49,10 +54,6 @@ pub struct Tokens {
 /// Tokens params.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, InitSpace)]
 pub struct TokenParams {
-    /// Final long token.
-    pub final_long_token: Pubkey,
-    /// Final short token.
-    pub final_short_token: Pubkey,
     /// The minimum amount of final long tokens that must be withdrawn.
     pub min_long_token_amount: u64,
     /// The minimum amount of final short tokens that must be withdrawn.
@@ -84,7 +85,9 @@ impl Withdrawal {
         market: &Account<Market>,
         market_token_amount: u64,
         tokens: TokenParams,
-        receivers: Receivers,
+        final_long_token_receiver: &Account<TokenAccount>,
+        final_short_token_receiver: &Account<TokenAccount>,
+        ui_fee_receiver: Pubkey,
     ) -> Result<()> {
         *self = Self {
             bump,
@@ -92,18 +95,36 @@ impl Withdrawal {
             updated_at_slot: Clock::get()?.slot,
             user,
             market: market.key(),
-            receivers,
-            tokens: Tokens::new(market, market_token_amount, tokens),
+            receivers: Receivers {
+                ui_fee_receiver,
+                final_long_token_receiver: final_long_token_receiver.key(),
+                final_short_token_receiver: final_short_token_receiver.key(),
+            },
+            tokens: Tokens::new(
+                market,
+                market_token_amount,
+                final_long_token_receiver.mint,
+                final_short_token_receiver.mint,
+                tokens,
+            ),
         };
         Ok(())
     }
 }
 
 impl Tokens {
-    fn new(market: &Market, market_token_amount: u64, params: TokenParams) -> Self {
+    fn new(
+        market: &Market,
+        market_token_amount: u64,
+        final_long_token: Pubkey,
+        final_short_token: Pubkey,
+        params: TokenParams,
+    ) -> Self {
         Self {
             params,
             market_token: market.meta.market_token_mint,
+            final_long_token,
+            final_short_token,
             market_token_amount,
         }
     }

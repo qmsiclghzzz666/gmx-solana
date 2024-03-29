@@ -248,15 +248,15 @@ pub mod data_store {
     pub fn initialize_withdrawal(
         ctx: Context<InitializeWithdrawal>,
         nonce: [u8; 32],
-        market_token_amount: u64,
         tokens: WithdrawalTokenParams,
+        market_token_amount: u64,
         ui_fee_receiver: Pubkey,
     ) -> Result<()> {
         instructions::initialize_withdrawal(
             ctx,
             nonce,
-            market_token_amount,
             tokens,
+            market_token_amount,
             ui_fee_receiver,
         )
     }
