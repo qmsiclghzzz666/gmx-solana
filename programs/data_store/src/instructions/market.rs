@@ -358,8 +358,7 @@ pub struct MarketVaultTransferOut<'info> {
     pub authority: Signer<'info>,
     pub only_controller: Account<'info, Roles>,
     pub store: Account<'info, DataStore>,
-    // We don't have to check the vault is really a market token,
-    // since the owner must be derived from `MARKET_SIGN`.
+    // FIXME: this is a bug to not checking the store.
     #[account(mut)]
     pub market_vault: Account<'info, TokenAccount>,
     #[account(mut, token::mint = market_vault.mint)]

@@ -58,9 +58,14 @@ pub struct CancelDeposit<'info> {
     /// CHECK: only used to invoke CPI.
     pub only_controller: UncheckedAccount<'info>,
     pub data_store_program: Program<'info, DataStore>,
+    /// The deposit to cancel.
+    ///
+    /// ## Notes
+    /// - Only the user who created the deposit can receive the funds,
+    /// which is checked by [`remove_deposit`](data_store::instructions::remove_deposit)
+    /// through CPI.
     #[account(
         mut,
-        constraint = deposit.user == user.key() @ ExchangeError::InvalidDepositToCancel,
         constraint = deposit.tokens.params.initial_long_token == initial_long_token.mint @ ExchangeError::InvalidDepositToCancel,
         constraint = deposit.tokens.params.initial_short_token == initial_short_token.mint @ ExchangeError::InvalidDepositToCancel,
     )]
@@ -69,10 +74,10 @@ pub struct CancelDeposit<'info> {
     #[account(mut)]
     pub user: UncheckedAccount<'info>,
     /// The token account for receiving the initial long tokens.
-    #[account(mut)]
+    #[account(mut, token::authority = user)]
     pub initial_long_token: Account<'info, TokenAccount>,
     /// The token account for receiving the initial short tokens.
-    #[account(mut)]
+    #[account(mut, token::authority = user)]
     pub initial_short_token: Account<'info, TokenAccount>,
     #[account(
         mut,

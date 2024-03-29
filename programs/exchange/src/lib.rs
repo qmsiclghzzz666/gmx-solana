@@ -74,4 +74,6 @@ pub enum ExchangeError {
     MismatchedMarketTokenMint,
     #[msg("Empty withdrawal amount")]
     EmptyWithdrawalAmount,
+    #[msg("Invalid withdrawal to cancel")]
+    InvalidWithdrawalToCancel,
 }
