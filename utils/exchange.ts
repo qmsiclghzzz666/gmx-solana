@@ -18,6 +18,7 @@ export const createMarket = async (
     const [marketSign] = getMarketSignPDA();
     const [roles] = createRolesPDA(dataStoreAddress, signer.publicKey);
     const [marketAddress] = createMarketPDA(dataStoreAddress, marketTokenMint);
+    const [marketTokenVault] = createMarketVaultPDA(dataStoreAddress, marketTokenMint);
 
     await exchange.methods.createMarket(indexTokenMint).accounts({
         authority: signer.publicKey,
@@ -27,6 +28,7 @@ export const createMarket = async (
         marketTokenMint,
         longTokenMint,
         shortTokenMint,
+        marketTokenVault,
         marketSign,
         dataStoreProgram: dataStore.programId,
         tokenProgram: TOKEN_PROGRAM_ID,

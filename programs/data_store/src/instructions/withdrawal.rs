@@ -14,6 +14,7 @@ use crate::{
 pub fn initialize_withdrawal(
     ctx: Context<InitializeWithdrawal>,
     nonce: NonceBytes,
+    market_token_amount: u64,
     tokens: TokenParams,
     ui_fee_receiver: Pubkey,
 ) -> Result<()> {
@@ -22,6 +23,7 @@ pub fn initialize_withdrawal(
         nonce,
         ctx.accounts.payer.key(),
         &ctx.accounts.market,
+        market_token_amount,
         tokens,
         Receivers {
             ui_fee_receiver,

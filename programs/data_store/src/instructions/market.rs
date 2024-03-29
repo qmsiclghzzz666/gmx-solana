@@ -171,6 +171,16 @@ pub struct GetPool<'info> {
     pub(crate) market: Account<'info, Market>,
 }
 
+/// Get the market token mint of the market.
+pub fn get_market_token_mint(ctx: Context<GetMarketTokenMint>) -> Result<Pubkey> {
+    Ok(ctx.accounts.market.meta.market_token_mint)
+}
+
+#[derive(Accounts)]
+pub struct GetMarketTokenMint<'info> {
+    pub(crate) market: Account<'info, Market>,
+}
+
 /// Initialize a new market token.
 #[allow(unused_variables)]
 pub fn initialize_market_token(

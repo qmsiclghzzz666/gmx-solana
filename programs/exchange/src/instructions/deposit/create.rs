@@ -71,7 +71,9 @@ pub fn create_deposit(
         super::MAX_DEPOSIT_EXECUTION_FEE,
         ExchangeError::NotEnoughExecutionFee
     );
-    system_program::transfer(ctx.accounts.transfer_ctx(), params.execution_fee)?;
+    if params.execution_fee != 0 {
+        system_program::transfer(ctx.accounts.transfer_ctx(), params.execution_fee)?;
+    }
     // TODO: emit deposit created event.
     Ok(())
 }

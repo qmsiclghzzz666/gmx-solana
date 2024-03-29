@@ -42,6 +42,8 @@ pub struct Tokens {
     pub params: TokenParams,
     /// The market token to burn.
     pub market_token: Pubkey,
+    /// The amount of market tokens taht will be withdrawn.
+    pub market_token_amount: u64,
 }
 
 /// Tokens params.
@@ -51,8 +53,6 @@ pub struct TokenParams {
     pub final_long_token: Pubkey,
     /// Final short token.
     pub final_short_token: Pubkey,
-    /// The amount of market tokens taht will be withdrawn.
-    pub market_token_amount: u64,
     /// The minimum amount of final long tokens that must be withdrawn.
     pub min_long_token_amount: u64,
     /// The minimum amount of final short tokens that must be withdrawn.
@@ -75,12 +75,14 @@ impl Withdrawal {
     /// The max length of swap path.
     pub const MAX_SWAP_PATH_LEN: usize = MAX_SWAP_PATH_LEN;
 
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn init(
         &mut self,
         bump: u8,
         nonce: NonceBytes,
         user: Pubkey,
         market: &Account<Market>,
+        market_token_amount: u64,
         tokens: TokenParams,
         receivers: Receivers,
     ) -> Result<()> {
@@ -91,17 +93,18 @@ impl Withdrawal {
             user,
             market: market.key(),
             receivers,
-            tokens: Tokens::new(market, tokens),
+            tokens: Tokens::new(market, market_token_amount, tokens),
         };
         Ok(())
     }
 }
 
 impl Tokens {
-    fn new(market: &Market, params: TokenParams) -> Self {
+    fn new(market: &Market, market_token_amount: u64, params: TokenParams) -> Self {
         Self {
             params,
             market_token: market.meta.market_token_mint,
+            market_token_amount,
         }
     }
 }

@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token};
 use data_store::{
-    cpi::accounts::{CheckRole, InitializeMarket, InitializeMarketToken},
+    cpi::accounts::{CheckRole, InitializeMarket, InitializeMarketToken, InitializeMarketVault},
     states::DataStore,
 };
 use data_store::{states::Roles, utils::Authentication};
@@ -26,6 +26,7 @@ pub fn create_market(ctx: Context<CreateMarket>, index_token_mint: Pubkey) -> Re
         ctx.accounts.long_token_mint.key(),
         ctx.accounts.short_token_mint.key(),
     )?;
+    data_store::cpi::initialize_market_vault(ctx.accounts.initialize_market_vault_ctx(), None)?;
     Ok(())
 }
 
@@ -46,6 +47,9 @@ pub struct CreateMarket<'info> {
     pub short_token_mint: Account<'info, Mint>,
     /// CHECK: check by CPI.
     pub market_sign: UncheckedAccount<'info>,
+    /// CHECK: check and init by CPI.
+    #[account(mut)]
+    pub market_token_vault: UncheckedAccount<'info>,
     pub data_store_program: Program<'info, data_store::program::DataStore>,
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,
@@ -75,6 +79,24 @@ impl<'info> CreateMarket<'info> {
                 only_market_keeper: self.only_market_keeper.to_account_info(),
                 store: self.data_store.to_account_info(),
                 market_token_mint: self.market_token_mint.to_account_info(),
+                market_sign: self.market_sign.to_account_info(),
+                system_program: self.system_program.to_account_info(),
+                token_program: self.token_program.to_account_info(),
+            },
+        )
+    }
+
+    fn initialize_market_vault_ctx(
+        &self,
+    ) -> CpiContext<'_, '_, '_, 'info, InitializeMarketVault<'info>> {
+        CpiContext::new(
+            self.data_store_program.to_account_info(),
+            InitializeMarketVault {
+                authority: self.authority.to_account_info(),
+                only_market_keeper: self.only_market_keeper.to_account_info(),
+                store: self.data_store.to_account_info(),
+                mint: self.market_token_mint.to_account_info(),
+                vault: self.market_token_vault.to_account_info(),
                 market_sign: self.market_sign.to_account_info(),
                 system_program: self.system_program.to_account_info(),
                 token_program: self.token_program.to_account_info(),

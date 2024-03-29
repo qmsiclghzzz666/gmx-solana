@@ -156,6 +156,10 @@ pub mod data_store {
         )
     }
 
+    pub fn get_market_token_mint(ctx: Context<GetMarketTokenMint>) -> Result<Pubkey> {
+        instructions::get_market_token_mint(ctx)
+    }
+
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn initialize_market_token(
         ctx: Context<InitializeMarketToken>,
@@ -244,10 +248,17 @@ pub mod data_store {
     pub fn initialize_withdrawal(
         ctx: Context<InitializeWithdrawal>,
         nonce: [u8; 32],
+        market_token_amount: u64,
         tokens: WithdrawalTokenParams,
         ui_fee_receiver: Pubkey,
     ) -> Result<()> {
-        instructions::initialize_withdrawal(ctx, nonce, tokens, ui_fee_receiver)
+        instructions::initialize_withdrawal(
+            ctx,
+            nonce,
+            market_token_amount,
+            tokens,
+            ui_fee_receiver,
+        )
     }
 
     #[access_control(internal::Authenticate::only_controller(&ctx))]

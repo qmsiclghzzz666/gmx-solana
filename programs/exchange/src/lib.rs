@@ -43,6 +43,16 @@ pub mod exchange {
     pub fn cancel_deposit(ctx: Context<CancelDeposit>, execution_fee: u64) -> Result<()> {
         instructions::cancel_deposit(ctx, execution_fee)
     }
+
+    // Withdrawal.
+    #[access_control(Authenticate::only_controller(&ctx))]
+    pub fn create_withdrawal(
+        ctx: Context<CreateWithdrawal>,
+        nonce: [u8; 32],
+        params: CreateWithdrawalParams,
+    ) -> Result<()> {
+        instructions::create_withdrawal(ctx, nonce, params)
+    }
 }
 
 /// Errors of market program.
@@ -50,13 +60,18 @@ pub mod exchange {
 pub enum ExchangeError {
     #[msg("Permission denied")]
     PermissionDenied,
+    #[msg("Not enough execution fee")]
+    NotEnoughExecutionFee,
     // Deposit.
     #[msg("Empty deposit amounts")]
     EmptyDepositAmounts,
-    #[msg("Not enough execution fee")]
-    NotEnoughExecutionFee,
     #[msg("Failed to execute deposit")]
     FailedToExecuteDeposit,
     #[msg("Invalid deposit to cancel")]
     InvalidDepositToCancel,
+    // Withdrawal.
+    #[msg("Market token mint mismached")]
+    MismatchedMarketTokenMint,
+    #[msg("Empty withdrawal amount")]
+    EmptyWithdrawalAmount,
 }
