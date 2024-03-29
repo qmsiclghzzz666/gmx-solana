@@ -52,6 +52,7 @@ pub fn cancel_deposit(ctx: Context<CancelDeposit>, execution_fee: u64) -> Result
 
 #[derive(Accounts)]
 pub struct CancelDeposit<'info> {
+    #[account(mut)]
     pub authority: Signer<'info>,
     /// CHECK: only used to invoke CPI.
     pub store: UncheckedAccount<'info>,

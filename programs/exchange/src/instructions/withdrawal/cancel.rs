@@ -12,6 +12,7 @@ use crate::ExchangeError;
 
 #[derive(Accounts)]
 pub struct CancelWithdrawal<'info> {
+    #[account(mut)]
     pub authority: Signer<'info>,
     /// CHECK: used and checked by CPI.
     pub store: UncheckedAccount<'info>,
@@ -41,13 +42,13 @@ pub struct CancelWithdrawal<'info> {
         seeds = [
             constants::MARKET_VAULT_SEED,
             store.key().as_ref(),
-            market_token_vault.mint.as_ref(),
+            market_token_withdrawal_vault.mint.as_ref(),
             &[],
         ],
         bump,
         seeds::program = data_store_program.key(),
     )]
-    pub market_token_vault: Account<'info, TokenAccount>,
+    pub market_token_withdrawal_vault: Account<'info, TokenAccount>,
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
 }
@@ -121,7 +122,7 @@ impl<'info> CancelWithdrawal<'info> {
                 authority: self.authority.to_account_info(),
                 only_controller: self.only_controller.to_account_info(),
                 store: self.store.to_account_info(),
-                market_vault: self.market_token_vault.to_account_info(),
+                market_vault: self.market_token_withdrawal_vault.to_account_info(),
                 to: self.market_token.to_account_info(),
                 token_program: self.token_program.to_account_info(),
             },

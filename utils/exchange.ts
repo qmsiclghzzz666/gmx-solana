@@ -105,6 +105,36 @@ export const createWithdrawal = async (
     return withdrawalAddress;
 };
 
+export interface CancelWithdrawalOptions {
+    executionFee?: number | bigint,
+    callback?: (string) => void,
+    hints?: {
+        marketToken?: PublicKey,
+    }
+};
+
+export const cancelWithdrawal = async (
+    authority: Keypair,
+    store: PublicKey,
+    user: PublicKey,
+    withdrawal: PublicKey,
+    toMarketTokenAccount: PublicKey,
+    options: CancelWithdrawalOptions = {},
+) => {
+    const marketToken = options.hints?.marketToken ?? (await dataStore.account.withdrawal.fetch(withdrawal)).tokens.marketToken;
+    await exchange.methods.cancelWithdrawal(toBN(options.executionFee ?? 0)).accounts({
+        authority: authority.publicKey,
+        store,
+        onlyController: createRolesPDA(store, authority.publicKey)[0],
+        dataStoreProgram: dataStore.programId,
+        withdrawal,
+        user,
+        marketToken: toMarketTokenAccount,
+        marketTokenWithdrawalVault: createMarketVaultPDA(store, marketToken)[0],
+        tokenProgram: TOKEN_PROGRAM_ID,
+    }).signers([authority]).rpc().then(options.callback);
+};
+
 export const initializeMarkets = async (signer: Keypair, dataStoreAddress: PublicKey, fakeTokenMint: PublicKey, usdGMint: PublicKey) => {
     let marketSolSolBtc: PublicKey;
     try {

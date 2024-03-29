@@ -4,7 +4,7 @@ import { createDepositPDA, createMarketTokenMintPDA, createNoncePDA, createRoles
 import { getAddresses, getExternalPrograms, getMarkets, getPrograms, getProvider, getUsers, expect } from "../../utils/fixtures";
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { BTC_FEED, USDC_FEED } from "../../utils/token";
-import { createWithdrawal } from "../../utils/exchange";
+import { cancelWithdrawal, createWithdrawal } from "../../utils/exchange";
 
 describe("exchange: deposit", () => {
     const provider = getProvider();
@@ -141,18 +141,41 @@ describe("exchange: deposit", () => {
             console.log("pools", market.pools);
         }
 
+        let withdrawal: PublicKey;
         try {
-            const withdrawal = await createWithdrawal(
+            withdrawal = await createWithdrawal(
                 signer0,
                 dataStoreAddress,
                 user0,
                 marketFakeFakeUsdG,
-                1_000,
+                1_000_000_000_000,
                 user0FakeFakeUsdGTokenAccount,
                 user0FakeTokenAccount,
                 user0UsdGTokenAccount,
                 {
                     callback: tx => console.log("withdrawal created at", tx),
+                }
+            );
+        } catch (error) {
+            console.log(error);
+            throw error;
+        } finally {
+            const afterExecution = await dataStore.account.oracle.fetch(oracleAddress);
+            expect(afterExecution.primary.prices.length).equals(0);
+            const market = await dataStore.account.market.fetch(marketFakeFakeUsdG);
+            console.log("pools", market.pools);
+        }
+        // Cancel the withdrawal.
+        try {
+            await cancelWithdrawal(
+                signer0,
+                dataStoreAddress,
+                user0.publicKey,
+                withdrawal,
+                user0FakeFakeUsdGTokenAccount,
+                {
+                    executionFee: 5001,
+                    callback: tx => console.log("withdrawal cancelled at", tx),
                 }
             );
         } catch (error) {
