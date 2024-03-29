@@ -87,10 +87,10 @@ pub struct TokenParams {
     pub should_unwrap_native_token: bool,
 }
 
-/// The tokens and swap paths config for the deposit.
+/// The tokens and swap paths config for [`Deposit`].
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, InitSpace)]
 pub struct Tokens {
-    /// The market to deposit to.
+    /// The market token to mint.
     pub market_token: Pubkey,
     /// Params.
     pub params: TokenParams,

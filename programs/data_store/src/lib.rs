@@ -16,7 +16,10 @@ pub use self::states::Data;
 
 use self::{
     instructions::*,
-    states::{deposit::TokenParams, market::Pool},
+    states::{
+        deposit::TokenParams as DepositTokenParams, market::Pool,
+        withdrawal::TokenParams as WithdrawalTokenParams,
+    },
     utils::internal,
 };
 use gmx_solana_utils::price::Price;
@@ -226,7 +229,7 @@ pub mod data_store {
         ctx: Context<InitializeDeposit>,
         nonce: [u8; 32],
         ui_fee_receiver: Pubkey,
-        tokens: TokenParams,
+        tokens: DepositTokenParams,
     ) -> Result<()> {
         instructions::initialize_deposit(ctx, nonce, ui_fee_receiver, tokens)
     }
@@ -234,6 +237,22 @@ pub mod data_store {
     #[access_control(internal::Authenticate::only_controller(&ctx))]
     pub fn remove_deposit(ctx: Context<RemoveDeposit>, refund: u64) -> Result<()> {
         instructions::remove_deposit(ctx, refund)
+    }
+
+    // Withdrawal.
+    #[access_control(internal::Authenticate::only_controller(&ctx))]
+    pub fn initialize_withdrawal(
+        ctx: Context<InitializeWithdrawal>,
+        nonce: [u8; 32],
+        tokens: WithdrawalTokenParams,
+        ui_fee_receiver: Pubkey,
+    ) -> Result<()> {
+        instructions::initialize_withdrawal(ctx, nonce, tokens, ui_fee_receiver)
+    }
+
+    #[access_control(internal::Authenticate::only_controller(&ctx))]
+    pub fn remove_withdrawal(ctx: Context<RemoveWithdrawal>, refund: u64) -> Result<()> {
+        instructions::remove_withdrawal(ctx, refund)
     }
 }
 

@@ -4,6 +4,9 @@ pub mod data_store;
 /// Instructions for roles management.
 pub mod roles;
 
+/// Instructions for incrementing nonce value.
+pub mod nonce;
+
 /// Instructions for Token Config.
 pub mod token_config;
 
@@ -16,8 +19,8 @@ pub mod oracle;
 /// Instructions for Deposit.
 pub mod deposit;
 
-/// Instructions for incrementing nonce value.
-pub mod nonce;
+/// Instructions for Withdrawal.
+pub mod withdrawal;
 
 pub use data_store::*;
 pub use deposit::*;
@@ -26,3 +29,4 @@ pub use nonce::*;
 pub use oracle::*;
 pub use roles::*;
 pub use token_config::*;
+pub use withdrawal::*;

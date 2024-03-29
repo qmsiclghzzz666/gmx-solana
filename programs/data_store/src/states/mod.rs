@@ -1,6 +1,9 @@
 /// Data Store.
 pub mod data_store;
 
+/// Nonce.
+pub mod nonce;
+
 /// Token Config.
 pub mod token_config;
 
@@ -13,8 +16,8 @@ pub mod oracle;
 /// Deposit.
 pub mod deposit;
 
-/// Nonce.
-pub mod nonce;
+/// Withdrawal.
+pub mod withdrawal;
 
 pub use data_store::*;
 pub use deposit::Deposit;
@@ -22,6 +25,7 @@ pub use market::*;
 pub use nonce::*;
 pub use oracle::*;
 pub use token_config::*;
+pub use withdrawal::Withdrawal;
 
 use anchor_lang::{
     prelude::{borsh, AnchorDeserialize, AnchorSerialize, Pubkey, Result},
