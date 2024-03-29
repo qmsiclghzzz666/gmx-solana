@@ -170,7 +170,7 @@ export const mochaGlobalSetup = async () => {
     user0FakeTokenAccount = await fakeToken.createTokenAccount(user0.publicKey);
     user0UsdGTokenAccount = await usdG.createTokenAccount(user0.publicKey);
     fakeToken.mintTo(user0FakeTokenAccount, 1_000 * 1_000_000_000);
-    usdG.mintTo(user0UsdGTokenAccount, 1_000 * 100_000_000);
+    usdG.mintTo(user0UsdGTokenAccount, 1_000_000 * 100_000_000);
 
     await initializeDataStore(provider, eventManager, signer0, dataStoreKey, oracleIndex, fakeTokenMint, usdGTokenMint);
 

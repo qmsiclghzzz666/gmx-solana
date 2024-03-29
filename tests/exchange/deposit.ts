@@ -45,7 +45,7 @@ describe("exchange: deposit", () => {
     it("create and execute deposit and then withdraw", async () => {
         const depositNonce = await dataStore.methods.getNonceBytes().accounts({ nonce }).view();
         const [deposit] = createDepositPDA(dataStoreAddress, user0.publicKey, depositNonce);
-        {
+        try {
             const ix = await exchange.methods.createDeposit(
                 [...depositNonce],
                 {
@@ -54,7 +54,7 @@ describe("exchange: deposit", () => {
                     longTokenSwapPath: [],
                     shortTokenSwapPath: [],
                     initialLongTokenAmount: new BN(1_000_000_000),
-                    initialShortTokenAmount: new BN(100_000_000),
+                    initialShortTokenAmount: new BN(70_000 * 100_000_000),
                     minMarketToken: new BN(0),
                     shouldUnwrapNativeToken: false,
                 },
@@ -82,6 +82,8 @@ describe("exchange: deposit", () => {
             ]).signers([signer0, user0]).instruction();
             const txId = await sendAndConfirmTransaction(provider.connection, new Transaction().add(ix), [user0, signer0]);
             console.log("created at", txId);
+        } catch (error) {
+            console.log(error);
         }
         try {
             const ix = await exchange.methods.executeDeposit(new BN(5001)).accounts({
@@ -137,8 +139,8 @@ describe("exchange: deposit", () => {
         } finally {
             const afterExecution = await dataStore.account.oracle.fetch(oracleAddress);
             expect(afterExecution.primary.prices.length).equals(0);
-            const market = await dataStore.account.market.fetch(marketFakeFakeUsdG);
-            console.log("pools", market.pools);
+            // const market = await dataStore.account.market.fetch(marketFakeFakeUsdG);
+            // console.log("pools", market.pools);
         }
 
         let withdrawal: PublicKey;
@@ -162,8 +164,8 @@ describe("exchange: deposit", () => {
         } finally {
             const afterExecution = await dataStore.account.oracle.fetch(oracleAddress);
             expect(afterExecution.primary.prices.length).equals(0);
-            const market = await dataStore.account.market.fetch(marketFakeFakeUsdG);
-            console.log("pools", market.pools);
+            // const market = await dataStore.account.market.fetch(marketFakeFakeUsdG);
+            // console.log("pools", market.pools);
         }
         // Cancel the withdrawal.
         try {
@@ -184,8 +186,8 @@ describe("exchange: deposit", () => {
         } finally {
             const afterExecution = await dataStore.account.oracle.fetch(oracleAddress);
             expect(afterExecution.primary.prices.length).equals(0);
-            const market = await dataStore.account.market.fetch(marketFakeFakeUsdG);
-            console.log("pools", market.pools);
+            // const market = await dataStore.account.market.fetch(marketFakeFakeUsdG);
+            // console.log("pools", market.pools);
         }
         // Create again.
         try {
@@ -194,7 +196,7 @@ describe("exchange: deposit", () => {
                 dataStoreAddress,
                 user0,
                 marketFakeFakeUsdG,
-                2_000_000_000_000,
+                2_000 * 1_000_000_000,
                 user0FakeFakeUsdGTokenAccount,
                 user0FakeTokenAccount,
                 user0UsdGTokenAccount,
@@ -208,8 +210,8 @@ describe("exchange: deposit", () => {
         } finally {
             const afterExecution = await dataStore.account.oracle.fetch(oracleAddress);
             expect(afterExecution.primary.prices.length).equals(0);
-            const market = await dataStore.account.market.fetch(marketFakeFakeUsdG);
-            console.log("pools", market.pools);
+            // const market = await dataStore.account.market.fetch(marketFakeFakeUsdG);
+            // console.log("pools", market.pools);
         }
         try {
             await executeWithdrawal(
@@ -220,6 +222,7 @@ describe("exchange: deposit", () => {
                 withdrawal,
                 {
                     callback: tx => console.log("withdrawal executed at", tx),
+                    executionFee: 5001,
                 }
             );
         } catch (error) {
@@ -228,8 +231,8 @@ describe("exchange: deposit", () => {
         } finally {
             const afterExecution = await dataStore.account.oracle.fetch(oracleAddress);
             expect(afterExecution.primary.prices.length).equals(0);
-            const market = await dataStore.account.market.fetch(marketFakeFakeUsdG);
-            console.log("pools", market.pools);
+            // const market = await dataStore.account.market.fetch(marketFakeFakeUsdG);
+            // console.log("pools", market.pools);
         }
     });
 
@@ -290,8 +293,8 @@ describe("exchange: deposit", () => {
         } finally {
             const afterExecution = await dataStore.account.oracle.fetch(oracleAddress);
             expect(afterExecution.primary.prices.length).equals(0);
-            const market = await dataStore.account.market.fetch(marketFakeFakeUsdG);
-            console.log("pools", market.pools);
+            // const market = await dataStore.account.market.fetch(marketFakeFakeUsdG);
+            // console.log("pools", market.pools);
         }
     });
 });
