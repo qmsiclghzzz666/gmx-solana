@@ -45,8 +45,6 @@ pub struct CreateMarket<'info> {
     pub market_token_mint: UncheckedAccount<'info>,
     pub long_token_mint: Account<'info, Mint>,
     pub short_token_mint: Account<'info, Mint>,
-    /// CHECK: check by CPI.
-    pub market_sign: UncheckedAccount<'info>,
     /// CHECK: check and init by CPI.
     #[account(mut)]
     pub market_token_vault: UncheckedAccount<'info>,
@@ -79,7 +77,6 @@ impl<'info> CreateMarket<'info> {
                 only_market_keeper: self.only_market_keeper.to_account_info(),
                 store: self.data_store.to_account_info(),
                 market_token_mint: self.market_token_mint.to_account_info(),
-                market_sign: self.market_sign.to_account_info(),
                 system_program: self.system_program.to_account_info(),
                 token_program: self.token_program.to_account_info(),
             },
@@ -97,7 +94,6 @@ impl<'info> CreateMarket<'info> {
                 store: self.data_store.to_account_info(),
                 mint: self.market_token_mint.to_account_info(),
                 vault: self.market_token_vault.to_account_info(),
-                market_sign: self.market_sign.to_account_info(),
                 system_program: self.system_program.to_account_info(),
                 token_program: self.token_program.to_account_info(),
             },

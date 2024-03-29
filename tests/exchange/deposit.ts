@@ -1,6 +1,6 @@
 import { BN } from "@coral-xyz/anchor";
 import { ComputeBudgetProgram, Keypair, PublicKey, Transaction, sendAndConfirmTransaction } from "@solana/web3.js";
-import { createDepositPDA, createMarketTokenMintPDA, createNoncePDA, createRolesPDA, createTokenConfigPDA, getMarketSignPDA } from "../../utils/data";
+import { createDepositPDA, createMarketTokenMintPDA, createNoncePDA, createRolesPDA, createTokenConfigPDA } from "../../utils/data";
 import { getAddresses, getExternalPrograms, getMarkets, getPrograms, getProvider, getUsers, expect } from "../../utils/fixtures";
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { BTC_FEED, USDC_FEED } from "../../utils/token";
@@ -96,7 +96,6 @@ describe("exchange: deposit", () => {
                 receiver: user0FakeFakeUsdGTokenAccount,
                 market: marketFakeFakeUsdG,
                 marketTokenMint: createMarketTokenMintPDA(dataStoreAddress, fakeTokenMint, fakeTokenMint, usdGTokenMint)[0],
-                marketSign: getMarketSignPDA()[0],
             }).remainingAccounts([
                 {
                     pubkey: createTokenConfigPDA(dataStoreAddress, fakeTokenMint.toBase58())[0],
@@ -189,7 +188,6 @@ describe("exchange: deposit", () => {
                 longTokenDepositVault: fakeTokenVault,
                 shortTokenDepositVault: usdGVault,
                 tokenProgram: TOKEN_PROGRAM_ID,
-                marketSign: getMarketSignPDA()[0],
             }).instruction();
             const tx = new Transaction().add(ix);
             const txId = await sendAndConfirmTransaction(provider.connection, tx, [signer0]);

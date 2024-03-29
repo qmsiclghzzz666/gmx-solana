@@ -29,9 +29,6 @@ pub trait AsMarket<'info>: Authentication<'info> {
     /// Get market token mint.
     fn market_token(&self) -> &Account<'info, Mint>;
 
-    /// Get market sign of data store.
-    fn market_sign(&self) -> AccountInfo<'info>;
-
     /// Get receiver.
     fn receiver(&self) -> &Account<'info, TokenAccount>;
 
@@ -180,7 +177,6 @@ where
                 store: check_role.accounts.store,
                 market_token_mint: self.accounts.market_token().to_account_info(),
                 to: self.accounts.receiver().to_account_info(),
-                market_sign: self.accounts.market_sign(),
                 token_program: self.accounts.token_program(),
             },
         )

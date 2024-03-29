@@ -23,7 +23,7 @@ pub struct DataStore {
     num_admins: u32,
     #[max_len(MAX_LEN)]
     key_seed: Vec<u8>,
-    pub bump: u8,
+    pub bump: [u8; 1],
 }
 
 impl Seed for DataStore {
@@ -45,9 +45,13 @@ impl DataStore {
 
         // Init others.
         self.key_seed = to_seed(key).into();
-        self.bump = bump;
+        self.bump = [bump];
 
         self.add_admin(roles)
+    }
+
+    pub(crate) fn pda_seeds(&self) -> [&[u8]; 3] {
+        [Self::SEED, &self.key_seed, &self.bump]
     }
 
     fn as_map_mut(&mut self) -> Result<DualVecMap<&mut Vec<RoleKey>, &mut Vec<RoleMetadata>>> {
@@ -256,7 +260,7 @@ mod tests {
             roles: vec![],
             num_admins: 0,
             key_seed: vec![],
-            bump: 0,
+            bump: [0],
         }
     }
 

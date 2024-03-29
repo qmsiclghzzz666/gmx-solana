@@ -1,8 +1,5 @@
 use gmx_solana_utils::price::Decimal;
 
-/// Market Sign Seed.
-pub const MARKET_SIGN_SEED: &[u8] = b"market_sign";
-
 /// Market Token Mint Address Seed.
 pub const MAREKT_TOKEN_MINT_SEED: &[u8] = b"market_token_mint";
 

@@ -13,6 +13,9 @@ pub mod token_config;
 /// Instructions for Market.
 pub mod market;
 
+/// Instructions for Tokens and Token accounts.
+pub mod token;
+
 /// Instructions for Oracle.
 pub mod oracle;
 
@@ -28,5 +31,6 @@ pub use market::*;
 pub use nonce::*;
 pub use oracle::*;
 pub use roles::*;
+pub use token::*;
 pub use token_config::*;
 pub use withdrawal::*;

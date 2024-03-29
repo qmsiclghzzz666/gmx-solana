@@ -18,7 +18,6 @@ export const ROLES_SEED = encodeUtf8("roles");
 export const TOKEN_CONFIG_SEED = encodeUtf8("token_config");
 // Market seeds.
 export const MARKET_SEED = encodeUtf8("market");
-export const MARKET_SIGN_SEED = encodeUtf8("market_sign");
 export const MARKET_TOKEN_MINT_SEED = encodeUtf8("market_token_mint");
 export const MARKET_VAULT_SEED = encodeUtf8("market_vault");
 // Oracle seed.
@@ -76,8 +75,6 @@ export const createMarketVaultPDA = (store: PublicKey, tokenMint: PublicKey, mar
     marketTokenMint?.toBytes() ?? new Uint8Array(),
 ], dataStore.programId);
 
-export const getMarketSignPDA = () => PublicKey.findProgramAddressSync([MARKET_SIGN_SEED], dataStore.programId);
-
 export const createOraclePDA = (store: PublicKey, index: number) => PublicKey.findProgramAddressSync([
     ORACLE_SEED,
     store.toBytes(),
@@ -106,7 +103,6 @@ export const createMarketVault = async (provider: anchor.AnchorProvider, signer:
         store: dataStoreAddress,
         mint,
         vault,
-        marketSign: getMarketSignPDA()[0],
         tokenProgram: TOKEN_PROGRAM_ID,
     }).signers([signer]).rpc();
     return vault;

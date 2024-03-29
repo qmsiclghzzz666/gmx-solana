@@ -105,8 +105,6 @@ pub struct CancelDeposit<'info> {
         seeds::program = data_store_program.key(),
     )]
     pub short_token_deposit_vault: Account<'info, TokenAccount>,
-    /// CHECK: only used as signing pda.
-    pub market_sign: UncheckedAccount<'info>,
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
 }
@@ -166,7 +164,6 @@ impl<'info> CancelDeposit<'info> {
                 } else {
                     self.initial_short_token.to_account_info()
                 },
-                market_sign: self.market_sign.to_account_info(),
                 token_program: self.token_program.to_account_info(),
             },
         )

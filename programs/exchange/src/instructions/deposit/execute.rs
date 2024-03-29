@@ -95,8 +95,6 @@ pub struct ExecuteDeposit<'info> {
     pub market: UncheckedAccount<'info>,
     #[account(mut, constraint = market_token_mint.key() == deposit.tokens.market_token)]
     pub market_token_mint: Account<'info, Mint>,
-    /// CHECK: only used as signing PDA.
-    pub market_sign: UncheckedAccount<'info>,
     pub system_program: Program<'info, System>,
 }
 
@@ -157,10 +155,6 @@ impl<'info> AsMarket<'info> for ExecuteDeposit<'info> {
 
     fn market_token(&self) -> &Account<'info, Mint> {
         &self.market_token_mint
-    }
-
-    fn market_sign(&self) -> AccountInfo<'info> {
-        self.market_sign.to_account_info()
     }
 
     fn receiver(&self) -> &Account<'info, TokenAccount> {

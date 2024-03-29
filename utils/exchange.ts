@@ -1,7 +1,7 @@
 import { workspace, Program } from "@coral-xyz/anchor";
 import { Exchange } from "../target/types/exchange";
 import { Keypair, PublicKey } from "@solana/web3.js";
-import { createMarketPDA, createMarketTokenMintPDA, createMarketVaultPDA, createRolesPDA, dataStore, getMarketSignPDA } from "./data";
+import { createMarketPDA, createMarketTokenMintPDA, createMarketVaultPDA, createRolesPDA, dataStore } from "./data";
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { BTC_TOKEN_MINT, SOL_TOKEN_MINT, SignedToken } from "./token";
 
@@ -15,7 +15,6 @@ export const createMarket = async (
     shortTokenMint: PublicKey,
 ) => {
     const [marketTokenMint] = createMarketTokenMintPDA(dataStoreAddress, indexTokenMint, longTokenMint, shortTokenMint);
-    const [marketSign] = getMarketSignPDA();
     const [roles] = createRolesPDA(dataStoreAddress, signer.publicKey);
     const [marketAddress] = createMarketPDA(dataStoreAddress, marketTokenMint);
     const [marketTokenVault] = createMarketVaultPDA(dataStoreAddress, marketTokenMint);
@@ -29,7 +28,6 @@ export const createMarket = async (
         longTokenMint,
         shortTokenMint,
         marketTokenVault,
-        marketSign,
         dataStoreProgram: dataStore.programId,
         tokenProgram: TOKEN_PROGRAM_ID,
     }).signers([signer]).rpc();

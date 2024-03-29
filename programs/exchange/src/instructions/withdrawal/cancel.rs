@@ -48,8 +48,6 @@ pub struct CancelWithdrawal<'info> {
         seeds::program = data_store_program.key(),
     )]
     pub market_token_vault: Account<'info, TokenAccount>,
-    /// CHECK: only used as signing pda.
-    pub market_sign: UncheckedAccount<'info>,
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
 }
@@ -125,7 +123,6 @@ impl<'info> CancelWithdrawal<'info> {
                 store: self.store.to_account_info(),
                 market_vault: self.market_token_vault.to_account_info(),
                 to: self.market_token.to_account_info(),
-                market_sign: self.market_sign.to_account_info(),
                 token_program: self.token_program.to_account_info(),
             },
         )

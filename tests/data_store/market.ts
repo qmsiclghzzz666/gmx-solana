@@ -2,7 +2,7 @@ import { Keypair, PublicKey, Transaction } from '@solana/web3.js';
 import { BN } from '@coral-xyz/anchor';
 
 import { expect, getAddresses, getPrograms, getProvider, getUsers } from "../../utils/fixtures";
-import { createMarketPDA, createMarketTokenMintPDA, createMarketVaultPDA, createRolesPDA, getMarketSignPDA } from "../../utils/data";
+import { createMarketPDA, createMarketTokenMintPDA, createMarketVaultPDA, createRolesPDA } from "../../utils/data";
 import { createAssociatedTokenAccountInstruction, createTransferInstruction, getAssociatedTokenAddress } from "@solana/spl-token";
 
 describe("data store: Market", () => {
@@ -53,14 +53,11 @@ describe("data store: Market", () => {
 
     it("perform basic token operations", async () => {
         const [marketTokenMint] = createMarketTokenMintPDA(dataStoreAddress, indexToken, longToken, shortToken);
-        const [marketSign] = getMarketSignPDA();
-
         await dataStore.methods.initializeMarketToken(indexToken, longToken, shortToken).accounts({
             store: dataStoreAddress,
             authority: signer0.publicKey,
             onlyMarketKeeper: roles,
             marketTokenMint,
-            marketSign,
         }).signers([signer0]).rpc();
 
         const userTokenAccount = await getAssociatedTokenAddress(marketTokenMint, user0.publicKey);
@@ -76,7 +73,6 @@ describe("data store: Market", () => {
             store: dataStoreAddress,
             onlyController: roles,
             marketTokenMint,
-            marketSign,
             to: userTokenAccount,
         }).signers([signer0]).rpc();
 
@@ -87,7 +83,6 @@ describe("data store: Market", () => {
             onlyMarketKeeper: roles,
             mint: marketTokenMint,
             vault: marketVault,
-            marketSign,
         }).signers([signer0]).rpc();
 
         await provider.sendAndConfirm(new Transaction().add(createTransferInstruction(
@@ -103,7 +98,6 @@ describe("data store: Market", () => {
             authority: signer0.publicKey,
             onlyController: roles,
             store: dataStoreAddress,
-            marketSign,
             marketVault,
             to: userTokenAccount,
         }).signers([signer0]).rpc();
