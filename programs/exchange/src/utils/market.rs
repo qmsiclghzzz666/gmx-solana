@@ -222,6 +222,10 @@ where
         Ok(())
     }
 
+    fn burn(&mut self, amount: &Self::Num) -> gmx_core::Result<()> {
+        todo!()
+    }
+
     fn swap_impact_params(&self) -> SwapImpactParams<Self::Num> {
         SwapImpactParams::builder()
             .with_exponent(2 * constants::MARKET_USD_UNIT)

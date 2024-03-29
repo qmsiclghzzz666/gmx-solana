@@ -31,6 +31,16 @@ where
     }
 }
 
+/// Market token amount to usd value.
+///
+/// Returns `None` if the computation cannot be done or `supply` is zero.
+pub fn market_token_amount_to_usd<T>(amount: &T, pool_value: &T, supply: &T) -> Option<T>
+where
+    T: MulDiv,
+{
+    pool_value.checked_mul_div(amount, supply)
+}
+
 /// Apply factors using this formula: `A * x^E`.
 ///
 /// Assuming that all values are "float"s with the same decimals.

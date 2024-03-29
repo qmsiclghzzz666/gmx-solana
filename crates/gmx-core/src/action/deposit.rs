@@ -47,7 +47,7 @@ impl<T> DepositParams<T> {
     }
 }
 
-/// Report the execution of deposit.
+/// Report of the execution of deposit.
 #[derive(Debug, Clone, Copy)]
 pub struct DepositReport<T>
 where
@@ -224,13 +224,13 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Deposit<M, DECIMALS> {
             .pool(PoolKind::Primary)
             .ok()??
             .long_token_usd_value(&self.params.long_token_price)
-            .ok()??;
+            .ok()?;
         let short_token_usd_value = self
             .market
             .pool(PoolKind::Primary)
             .ok()??
             .short_token_usd_value(&self.params.short_token_price)
-            .ok()??;
+            .ok()?;
         let delta_long_token_usd_value = self
             .params
             .long_token_amount
@@ -288,7 +288,7 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Deposit<M, DECIMALS> {
         let mut mint_amount: M::Num = Zero::zero();
         let supply = self.market.total_supply();
         if pool_value.is_zero() && !supply.is_zero() {
-            return Err(crate::Error::InvalidPoolValueForDeposit);
+            return Err(crate::Error::invalid_pool_value("deposit"));
         }
         let (mut amount, price, opposite_price) = if is_long_token {
             (
@@ -389,13 +389,10 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Deposit<M, DECIMALS> {
         let (price_impact, long_token_usd_value, short_token_usd_value) =
             self.price_impact().ok_or(crate::Error::Computation)?;
         let mut market_token_to_mint: M::Num = Zero::zero();
-        let pool_value = self
-            .market
-            .pool_value(
-                &self.params.long_token_price,
-                &self.params.short_token_price,
-            )?
-            .ok_or(crate::Error::Computation)?;
+        let pool_value = self.market.pool_value(
+            &self.params.long_token_price,
+            &self.params.short_token_price,
+        )?;
         let mut all_fees = [Default::default(), Default::default()];
         if !self.params.long_token_amount.is_zero() {
             let price_impact = long_token_usd_value

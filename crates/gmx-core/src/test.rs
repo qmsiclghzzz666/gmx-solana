@@ -169,6 +169,14 @@ where
         Ok(())
     }
 
+    fn burn(&mut self, amount: &Self::Num) -> crate::Result<()> {
+        self.total_supply = self
+            .total_supply
+            .checked_sub(amount)
+            .ok_or(crate::Error::Underflow)?;
+        Ok(())
+    }
+
     fn usd_to_amount_divisor(&self) -> Self::Num {
         self.value_to_amount_divisor.clone()
     }

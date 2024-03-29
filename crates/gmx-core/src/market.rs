@@ -1,5 +1,5 @@
 use crate::{
-    action::deposit::Deposit,
+    action::{deposit::Deposit, withdraw::Withdrawal},
     fixed::FixedPointOps,
     num::{MulDiv, Num, UnsignedAbs},
     params::{FeeParams, SwapImpactParams},
@@ -31,6 +31,9 @@ pub trait Market<const DECIMALS: u8> {
 
     /// Perform mint.
     fn mint(&mut self, amount: &Self::Num) -> Result<(), crate::Error>;
+
+    /// Perform burn.
+    fn burn(&mut self, amount: &Self::Num) -> crate::Result<()>;
 
     /// USD value to market token amount divisor.
     ///
@@ -67,6 +70,10 @@ impl<'a, const DECIMALS: u8, M: Market<DECIMALS>> Market<DECIMALS> for &'a mut M
         (**self).mint(amount)
     }
 
+    fn burn(&mut self, amount: &Self::Num) -> crate::Result<()> {
+        (**self).burn(amount)
+    }
+
     fn usd_to_amount_divisor(&self) -> Self::Num {
         (**self).usd_to_amount_divisor()
     }
@@ -88,21 +95,28 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
         Self::Num::UNIT
     }
 
+    /// Get primary pool.
+    #[inline]
+    fn primary_pool(&self) -> crate::Result<&Self::Pool> {
+        self.pool(PoolKind::Primary)?
+            .ok_or(crate::Error::MissingPoolKind(PoolKind::Primary))
+    }
+
     /// Get the usd value of primary pool.
     fn pool_value(
         &self,
         long_token_price: &Self::Num,
         short_token_price: &Self::Num,
-    ) -> crate::Result<Option<Self::Num>> {
+    ) -> crate::Result<Self::Num> {
         let long_value = self
-            .pool(PoolKind::Primary)?
-            .ok_or(crate::Error::MissingPoolKind(PoolKind::Primary))?
+            .primary_pool()?
             .long_token_usd_value(long_token_price)?;
         let short_value = self
-            .pool(PoolKind::Primary)?
-            .ok_or(crate::Error::MissingPoolKind(PoolKind::Primary))?
+            .primary_pool()?
             .short_token_usd_value(short_token_price)?;
-        Ok(long_value.and_then(|v| v.checked_add(&short_value?)))
+        long_value
+            .checked_add(&short_value)
+            .ok_or(crate::Error::Computation)
     }
 
     /// Create a [`Deposit`] action.
@@ -120,6 +134,24 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
             self,
             long_token_amount,
             short_token_amount,
+            long_token_price,
+            short_token_price,
+        )
+    }
+
+    /// Create a [`Withdrawal`].
+    fn withdraw(
+        &mut self,
+        market_token_amount: Self::Num,
+        long_token_price: Self::Num,
+        short_token_price: Self::Num,
+    ) -> crate::Result<Withdrawal<&mut Self, DECIMALS>>
+    where
+        Self: Sized,
+    {
+        Withdrawal::try_new(
+            self,
+            market_token_amount,
             long_token_price,
             short_token_price,
         )

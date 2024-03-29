@@ -36,13 +36,17 @@ pub trait Pool {
 /// Extension trait for [`Pool`] with utils.
 pub trait PoolExt: Pool {
     /// Get the long token value in USD.
-    fn long_token_usd_value(&self, price: &Self::Num) -> crate::Result<Option<Self::Num>> {
-        Ok(self.long_token_amount()?.checked_mul(price))
+    fn long_token_usd_value(&self, price: &Self::Num) -> crate::Result<Self::Num> {
+        self.long_token_amount()?
+            .checked_mul(price)
+            .ok_or(crate::Error::Computation)
     }
 
     /// Get the short token value in USD.
-    fn short_token_usd_value(&self, price: &Self::Num) -> crate::Result<Option<Self::Num>> {
-        Ok(self.short_token_amount()?.checked_mul(price))
+    fn short_token_usd_value(&self, price: &Self::Num) -> crate::Result<Self::Num> {
+        self.short_token_amount()?
+            .checked_mul(price)
+            .ok_or(crate::Error::Computation)
     }
 
     /// Apply delta.

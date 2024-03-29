@@ -6,6 +6,9 @@ pub enum Error {
     /// Empty deposit.
     #[error("empty deposit")]
     EmptyDeposit,
+    /// Empty withdrawal.
+    #[error("empty withdrawal")]
+    EmptyWithdrawal,
     /// Unknown computation error.
     #[error("unknown computation error")]
     Computation,
@@ -18,9 +21,9 @@ pub enum Error {
     /// Divided by zero.
     #[error("divided by zero")]
     DividedByZero,
-    /// Invalid pool value for deposit.
-    #[error("invalid pool value for deposit")]
-    InvalidPoolValueForDeposit,
+    /// Invalid pool value.
+    #[error("invalid pool value {0}")]
+    InvalidPoolValue(String),
     /// Convert error.
     #[error("convert value error")]
     Convert,
@@ -43,5 +46,10 @@ impl Error {
     /// Build params.
     pub fn build_params(msg: impl ToString) -> Self {
         Self::BuildParams(msg.to_string())
+    }
+
+    /// Invalid pool value.
+    pub fn invalid_pool_value(msg: impl ToString) -> Self {
+        Self::InvalidPoolValue(msg.to_string())
     }
 }
