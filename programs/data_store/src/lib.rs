@@ -17,7 +17,8 @@ pub use self::states::Data;
 use self::{
     instructions::*,
     states::{
-        deposit::TokenParams as DepositTokenParams, market::Pool,
+        deposit::TokenParams as DepositTokenParams,
+        market::{MarketMeta, Pool},
         withdrawal::TokenParams as WithdrawalTokenParams,
     },
     utils::internal,
@@ -160,6 +161,11 @@ pub mod data_store {
         instructions::get_market_token_mint(ctx)
     }
 
+    pub fn get_market_meta(ctx: Context<GetMarketMeta>) -> Result<MarketMeta> {
+        instructions::get_market_meta(ctx)
+    }
+
+    // Token.
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn initialize_market_token(
         ctx: Context<InitializeMarketToken>,

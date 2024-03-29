@@ -27,6 +27,7 @@ pub fn execute_deposit<'info>(
         .get_lamports()
         .checked_sub(super::MAX_DEPOSIT_EXECUTION_FEE.min(execution_fee))
         .ok_or(ExchangeError::NotEnoughExecutionFee)?;
+    // TODO: perform the swaps.
     let long_token = deposit.tokens.params.initial_long_token;
     let short_token = deposit.tokens.params.initial_short_token;
     let remaining_accounts = ctx.remaining_accounts.to_vec();
@@ -157,8 +158,8 @@ impl<'info> AsMarket<'info> for ExecuteDeposit<'info> {
         &self.market_token_mint
     }
 
-    fn receiver(&self) -> &Account<'info, TokenAccount> {
-        &self.receiver
+    fn receiver(&self) -> Option<&Account<'info, TokenAccount>> {
+        Some(&self.receiver)
     }
 
     fn token_program(&self) -> AccountInfo<'info> {

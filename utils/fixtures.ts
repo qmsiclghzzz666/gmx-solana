@@ -16,18 +16,16 @@ import { IDL as chainlinkIDL } from "../external-programs/chainlink-store";
 import { BTC_TOKEN_MINT, SOL_TOKEN_MINT, createSignedToken } from "./token";
 import { PublicKey, Transaction } from "@solana/web3.js";
 import { createAssociatedTokenAccount } from "@solana/spl-token";
+import { CHAINLINK_ID } from "./external";
 
 export const expect = chai.expect;
 
 // Get anchor provider.
 export const getProvider = () => provider;
 
-// External Program IDs.
-const chainlinkID = "HEvSKofvBgfaexv23kMabbYqxasxU3mQ4ibBMEmJWHny";
-
 export const getExternalPrograms = () => {
     return {
-        chainlink: new anchor.Program(chainlinkIDL, chainlinkID),
+        chainlink: new anchor.Program(chainlinkIDL, CHAINLINK_ID),
     }
 };
 

@@ -30,7 +30,7 @@ pub trait AsMarket<'info>: Authentication<'info> {
     fn market_token(&self) -> &Account<'info, Mint>;
 
     /// Get receiver.
-    fn receiver(&self) -> &Account<'info, TokenAccount>;
+    fn receiver(&self) -> Option<&Account<'info, TokenAccount>>;
 
     /// Get token program.
     fn token_program(&self) -> AccountInfo<'info>;
@@ -167,19 +167,20 @@ impl<'a, 'info, T> AccountsMarket<'a, T>
 where
     T: AsMarket<'info>,
 {
-    fn mint_to_ctx(&self) -> CpiContext<'_, '_, '_, 'info, MintMarketTokenTo<'info>> {
+    fn mint_to_ctx(&self) -> Option<CpiContext<'_, '_, '_, 'info, MintMarketTokenTo<'info>>> {
         let check_role = self.accounts.check_role_ctx();
-        CpiContext::new(
+        let ctx = CpiContext::new(
             check_role.program,
             MintMarketTokenTo {
                 authority: self.accounts.authority().to_account_info(),
                 only_controller: check_role.accounts.roles,
                 store: check_role.accounts.store,
                 market_token_mint: self.accounts.market_token().to_account_info(),
-                to: self.accounts.receiver().to_account_info(),
+                to: self.accounts.receiver()?.to_account_info(),
                 token_program: self.accounts.token_program(),
             },
-        )
+        );
+        Some(ctx)
     }
 }
 
@@ -212,7 +213,8 @@ where
 
     fn mint(&mut self, amount: &Self::Num) -> gmx_core::Result<()> {
         data_store::cpi::mint_market_token_to(
-            self.mint_to_ctx(),
+            self.mint_to_ctx()
+                .ok_or(gmx_core::Error::MintReceiverNotSet)?,
             (*amount)
                 .try_into()
                 .map_err(|_| gmx_core::Error::Overflow)?,

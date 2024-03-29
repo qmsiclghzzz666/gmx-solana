@@ -9,14 +9,20 @@ use super::{Data, Seed};
 
 #[account]
 pub(crate) struct Market {
+    /// Bump Seed.
+    pub bump: u8,
     pub(crate) meta: MarketMeta,
     pools: Pools,
 }
 
+impl Market {
+    pub(crate) fn init_space(num_pools: u8) -> usize {
+        1 + MarketMeta::INIT_SPACE + Pools::init_space(num_pools)
+    }
+}
+
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, InitSpace)]
 pub struct MarketMeta {
-    /// Bump Seed.
-    pub bump: u8,
     /// Market token.
     pub market_token_mint: Pubkey,
     /// Index token.
@@ -81,7 +87,7 @@ impl Market {
         short_token_mint: Pubkey,
         num_pools: u8,
     ) {
-        self.meta.bump = bump;
+        self.bump = bump;
         self.meta.market_token_mint = market_token_mint;
         self.meta.index_token_mint = index_token_mint;
         self.meta.long_token_mint = long_token_mint;
@@ -130,7 +136,7 @@ impl Market {
 
 impl Bump for Market {
     fn seed(&self) -> u8 {
-        self.meta.bump
+        self.bump
     }
 }
 

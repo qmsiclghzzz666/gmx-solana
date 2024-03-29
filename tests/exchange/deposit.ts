@@ -4,7 +4,7 @@ import { createDepositPDA, createMarketTokenMintPDA, createNoncePDA, createRoles
 import { getAddresses, getExternalPrograms, getMarkets, getPrograms, getProvider, getUsers, expect } from "../../utils/fixtures";
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { BTC_FEED, USDC_FEED } from "../../utils/token";
-import { cancelWithdrawal, createWithdrawal } from "../../utils/exchange";
+import { cancelWithdrawal, createWithdrawal, executeWithdrawal } from "../../utils/exchange";
 
 describe("exchange: deposit", () => {
     const provider = getProvider();
@@ -176,6 +176,50 @@ describe("exchange: deposit", () => {
                 {
                     executionFee: 5001,
                     callback: tx => console.log("withdrawal cancelled at", tx),
+                }
+            );
+        } catch (error) {
+            console.log(error);
+            throw error;
+        } finally {
+            const afterExecution = await dataStore.account.oracle.fetch(oracleAddress);
+            expect(afterExecution.primary.prices.length).equals(0);
+            const market = await dataStore.account.market.fetch(marketFakeFakeUsdG);
+            console.log("pools", market.pools);
+        }
+        // Create again.
+        try {
+            withdrawal = await createWithdrawal(
+                signer0,
+                dataStoreAddress,
+                user0,
+                marketFakeFakeUsdG,
+                2_000_000_000_000,
+                user0FakeFakeUsdGTokenAccount,
+                user0FakeTokenAccount,
+                user0UsdGTokenAccount,
+                {
+                    callback: tx => console.log("withdrawal created at", tx),
+                }
+            );
+        } catch (error) {
+            console.log(error);
+            throw error;
+        } finally {
+            const afterExecution = await dataStore.account.oracle.fetch(oracleAddress);
+            expect(afterExecution.primary.prices.length).equals(0);
+            const market = await dataStore.account.market.fetch(marketFakeFakeUsdG);
+            console.log("pools", market.pools);
+        }
+        try {
+            await executeWithdrawal(
+                signer0,
+                dataStoreAddress,
+                oracleAddress,
+                user0.publicKey,
+                withdrawal,
+                {
+                    callback: tx => console.log("withdrawal executed at", tx),
                 }
             );
         } catch (error) {

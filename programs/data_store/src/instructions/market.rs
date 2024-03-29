@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use gmx_core::PoolKind;
 
 use crate::{
-    states::{Action, DataStore, Market, MarketChangeEvent, MarketMeta, Pool, Pools, Roles, Seed},
+    states::{Action, DataStore, Market, MarketChangeEvent, MarketMeta, Pool, Roles, Seed},
     utils::internal,
     DataStoreError,
 };
@@ -45,7 +45,7 @@ pub struct InitializeMarket<'info> {
     #[account(
         init,
         payer = authority,
-        space = 8 + MarketMeta::INIT_SPACE + Pools::init_space(NUM_POOLS),
+        space = 8 + Market::init_space(NUM_POOLS),
         seeds = [
             Market::SEED,
             store.key().as_ref(),
@@ -91,7 +91,7 @@ pub struct RemoveMarket<'info> {
     #[account(
         mut,
         seeds = [Market::SEED, store.key().as_ref(), &market.expected_key_seed()],
-        bump = market.meta.bump,
+        bump = market.bump,
         close = authority,
     )]
     market: Account<'info, Market>,
@@ -140,7 +140,7 @@ pub struct ApplyDeltaToMarketPool<'info> {
     #[account(
         mut,
         seeds = [Market::SEED, store.key().as_ref(), &market.expected_key_seed()],
-        bump = market.meta.bump,
+        bump = market.bump,
     )]
     pub(crate) market: Account<'info, Market>,
 }
@@ -176,5 +176,15 @@ pub fn get_market_token_mint(ctx: Context<GetMarketTokenMint>) -> Result<Pubkey>
 
 #[derive(Accounts)]
 pub struct GetMarketTokenMint<'info> {
+    pub(crate) market: Account<'info, Market>,
+}
+
+/// Get the meta of the market.
+pub fn get_market_meta(ctx: Context<GetMarketMeta>) -> Result<MarketMeta> {
+    Ok(ctx.accounts.market.meta.clone())
+}
+
+#[derive(Accounts)]
+pub struct GetMarketMeta<'info> {
     pub(crate) market: Account<'info, Market>,
 }

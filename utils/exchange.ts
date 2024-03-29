@@ -1,10 +1,12 @@
 import { workspace, Program, BN } from "@coral-xyz/anchor";
 import { Exchange } from "../target/types/exchange";
-import { Keypair, PublicKey } from "@solana/web3.js";
-import { createMarketPDA, createMarketTokenMintPDA, createMarketVaultPDA, createRolesPDA, createWithdrawalPDA, dataStore } from "./data";
+import { ComputeBudgetProgram, Keypair, PublicKey, Transaction } from "@solana/web3.js";
+import { createMarketPDA, createMarketTokenMintPDA, createMarketVaultPDA, createRolesPDA, createTokenConfigPDA, createWithdrawalPDA, dataStore } from "./data";
 import { TOKEN_PROGRAM_ID, getAccount } from "@solana/spl-token";
 import { BTC_TOKEN_MINT, SOL_TOKEN_MINT } from "./token";
 import { toBN } from "./number";
+import { oracle as oracleProgram } from "./oracle";
+import { CHAINLINK_ID } from "./external";
 
 export const exchange = workspace.Exchange as Program<Exchange>;
 
@@ -133,6 +135,82 @@ export const cancelWithdrawal = async (
         marketTokenWithdrawalVault: createMarketVaultPDA(store, marketToken)[0],
         tokenProgram: TOKEN_PROGRAM_ID,
     }).signers([authority]).rpc().then(options.callback);
+};
+
+export interface ExecuteWithdrawalOptions {
+    executionFee?: number | bigint,
+    callback?: (string) => void,
+    hints?: {
+        market?: {
+            address: PublicKey,
+            mint: PublicKey,
+        }
+    }
+};
+
+export const executeWithdrawal = async (
+    authority: Keypair,
+    store: PublicKey,
+    oracle: PublicKey,
+    user: PublicKey,
+    withdrawal: PublicKey,
+    options: ExecuteWithdrawalOptions = {},
+) => {
+    const { address: market, mint: marketTokenMint } = options.hints?.market ?? (
+        await dataStore.account.withdrawal.fetch(withdrawal).then(withdrawal => {
+            return {
+                address: withdrawal.market,
+                mint: withdrawal.tokens.marketToken,
+            }
+        }));
+    const marketMeta = await dataStore.methods.getMarketMeta().accounts({ market }).view();
+    const longTokenConfig = createTokenConfigPDA(store, marketMeta.longTokenMint.toBase58())[0];
+    const shortTokenConfig = createTokenConfigPDA(store, marketMeta.shortTokenMint.toBase58())[0];
+    const longTokenFeed = (await dataStore.account.tokenConfig.fetch(longTokenConfig)).priceFeed;
+    const shortTokenFeed = (await dataStore.account.tokenConfig.fetch(shortTokenConfig)).priceFeed;
+    let ix = await exchange.methods.executeWithdrawal(toBN(options.executionFee ?? 0)).accounts({
+        authority: authority.publicKey,
+        store,
+        onlyOrderKeeper: createRolesPDA(store, authority.publicKey)[0],
+        dataStoreProgram: dataStore.programId,
+        oracleProgram: oracleProgram.programId,
+        chainlinkProgram: CHAINLINK_ID,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        oracle,
+        withdrawal,
+        user,
+        market,
+        marketTokenMint,
+    }).remainingAccounts([
+        {
+            pubkey: longTokenConfig,
+            isSigner: false,
+            isWritable: false,
+        },
+        {
+            pubkey: longTokenFeed,
+            isSigner: false,
+            isWritable: false,
+        },
+        {
+            pubkey: shortTokenConfig,
+            isSigner: false,
+            isWritable: false,
+        },
+        {
+            pubkey: shortTokenFeed,
+            isSigner: false,
+            isWritable: false,
+        }
+    ]).instruction();
+    const modifyComputeUnits = ComputeBudgetProgram.setComputeUnitLimit({
+        units: 400_000
+    });
+    const addPriorityFee = ComputeBudgetProgram.setComputeUnitPrice({
+        microLamports: 1,
+    });
+    const tx = new Transaction().add(modifyComputeUnits).add(addPriorityFee).add(ix);
+    await exchange.provider.sendAndConfirm(tx, [authority]).then(options.callback);
 };
 
 export const initializeMarkets = async (signer: Keypair, dataStoreAddress: PublicKey, fakeTokenMint: PublicKey, usdGMint: PublicKey) => {

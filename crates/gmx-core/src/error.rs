@@ -34,6 +34,9 @@ pub enum Error {
     /// Missing pool kind.
     #[error("missing pool of kind: {0}")]
     MissingPoolKind(PoolKind),
+    /// Mint receiver not set.
+    #[error("mint receiver not set")]
+    MintReceiverNotSet,
 }
 
 impl Error {
