@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{Mint, MintTo, Token, TokenAccount, Transfer};
+use anchor_spl::token::{Burn, Mint, MintTo, Token, TokenAccount, Transfer};
 
 use crate::{
     constants,
@@ -102,6 +102,58 @@ impl<'info> MintMarketTokenTo<'info> {
             MintTo {
                 mint: self.market_token_mint.to_account_info(),
                 to: self.to.to_account_info(),
+                authority: self.store.to_account_info(),
+            },
+        )
+    }
+}
+
+/// Burn the given amount of market tokens from the given account.
+///
+/// ## Notes
+/// - The `from` account is expected to be owned by `store`.
+pub fn burn_market_token_from(ctx: Context<BurnMarketTokenFrom>, amount: u64) -> Result<()> {
+    anchor_spl::token::burn(
+        ctx.accounts
+            .burn_ctx()
+            .with_signer(&[&ctx.accounts.store.pda_seeds()]),
+        amount,
+    )
+}
+
+#[derive(Accounts)]
+pub struct BurnMarketTokenFrom<'info> {
+    pub authority: Signer<'info>,
+    pub only_controller: Account<'info, Roles>,
+    pub store: Account<'info, DataStore>,
+    #[account(mut)]
+    pub market_token_mint: Account<'info, Mint>,
+    #[account(mut, token::mint = market_token_mint)]
+    pub from: Account<'info, TokenAccount>,
+    pub token_program: Program<'info, Token>,
+}
+
+impl<'info> internal::Authentication<'info> for BurnMarketTokenFrom<'info> {
+    fn authority(&self) -> &Signer<'info> {
+        &self.authority
+    }
+
+    fn store(&self) -> &Account<'info, DataStore> {
+        &self.store
+    }
+
+    fn roles(&self) -> &Account<'info, Roles> {
+        &self.only_controller
+    }
+}
+
+impl<'info> BurnMarketTokenFrom<'info> {
+    fn burn_ctx(&self) -> CpiContext<'_, '_, '_, 'info, Burn<'info>> {
+        CpiContext::new(
+            self.token_program.to_account_info(),
+            Burn {
+                mint: self.market_token_mint.to_account_info(),
+                from: self.from.to_account_info(),
                 authority: self.store.to_account_info(),
             },
         )

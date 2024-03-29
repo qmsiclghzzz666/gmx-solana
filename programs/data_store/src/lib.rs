@@ -186,6 +186,11 @@ pub mod data_store {
         instructions::mint_market_token_to(ctx, amount)
     }
 
+    #[access_control(internal::Authenticate::only_controller(&ctx))]
+    pub fn burn_market_token_from(ctx: Context<BurnMarketTokenFrom>, amount: u64) -> Result<()> {
+        instructions::burn_market_token_from(ctx, amount)
+    }
+
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn initialize_market_vault(
         ctx: Context<InitializeMarketVault>,
