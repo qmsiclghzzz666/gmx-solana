@@ -9,6 +9,9 @@ pub enum Error {
     /// Empty withdrawal.
     #[error("empty withdrawal")]
     EmptyWithdrawal,
+    /// Empty swap.
+    #[error("empty swap")]
+    EmptySwap,
     /// Invalid prices.
     #[error("invalid prices")]
     InvalidPrices,
