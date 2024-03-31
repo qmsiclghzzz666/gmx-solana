@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use data_store::{
     cpi::accounts::{CheckRole, GetTokenConfig, SetPrice},
-    states::{DataStore, Oracle, PriceMap, Roles, TokenConfig2},
+    states::{DataStore, Oracle, PriceMap, Roles, TokenConfig},
     utils::Authentication,
 };
 use gmx_solana_utils::price::{Decimal, Price};
@@ -105,7 +105,7 @@ impl<'info> Authentication<'info> for SetPricesFromPriceFeed<'info> {
 /// Check and get latest chainlink price from data feed.
 fn check_and_get_chainlink_price<'info>(
     chainlink_program: &Program<'info, Chainlink>,
-    token_config: &TokenConfig2,
+    token_config: &TokenConfig,
     feed: &AccountInfo<'info>,
 ) -> Result<Price> {
     require_eq!(
@@ -123,7 +123,7 @@ fn check_and_get_chainlink_price<'info>(
 fn check_and_get_price_from_round(
     round: &chainlink_solana::Round,
     decimals: u8,
-    token_config: &TokenConfig2,
+    token_config: &TokenConfig,
 ) -> Result<Price> {
     let chainlink_solana::Round {
         answer, timestamp, ..

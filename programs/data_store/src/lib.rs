@@ -19,7 +19,7 @@ use self::{
     states::{
         deposit::TokenParams as DepositTokenParams,
         market::{MarketMeta, Pool},
-        token_config::TokenConfig2,
+        token_config::TokenConfig,
         withdrawal::TokenParams as WithdrawalTokenParams,
     },
     utils::internal,
@@ -112,7 +112,7 @@ pub mod data_store {
         ctx: Context<GetTokenConfig>,
         store: Pubkey,
         token: Pubkey,
-    ) -> Result<Option<TokenConfig2>> {
+    ) -> Result<Option<TokenConfig>> {
         instructions::get_token_config(ctx, store, token)
     }
 

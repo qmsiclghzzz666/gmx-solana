@@ -4,7 +4,7 @@ use dual_vec_map::DualVecMap;
 use super::Seed;
 
 #[derive(AnchorSerialize, AnchorDeserialize, InitSpace, Clone)]
-pub struct TokenConfig2 {
+pub struct TokenConfig {
     /// Enabled.
     pub enabled: bool,
     /// The address of the price feed.
@@ -21,20 +21,20 @@ pub struct TokenConfig2 {
 pub struct TokenConfigMap {
     pub(crate) bump: u8,
     tokens: Vec<Pubkey>,
-    configs: Vec<TokenConfig2>,
+    configs: Vec<TokenConfig>,
 }
 
 impl TokenConfigMap {
     /// Get init space.
     pub const fn init_space(len: usize) -> usize {
-        1 + (4 + TokenConfig2::INIT_SPACE * len) + (4 + 32 * len)
+        1 + (4 + TokenConfig::INIT_SPACE * len) + (4 + 32 * len)
     }
 
-    pub(crate) fn as_map(&self) -> DualVecMap<&Vec<Pubkey>, &Vec<TokenConfig2>> {
+    pub(crate) fn as_map(&self) -> DualVecMap<&Vec<Pubkey>, &Vec<TokenConfig>> {
         DualVecMap::from_sorted_stores_unchecked(&self.tokens, &self.configs)
     }
 
-    pub(crate) fn as_map_mut(&mut self) -> DualVecMap<&mut Vec<Pubkey>, &mut Vec<TokenConfig2>> {
+    pub(crate) fn as_map_mut(&mut self) -> DualVecMap<&mut Vec<Pubkey>, &mut Vec<TokenConfig>> {
         DualVecMap::from_sorted_stores_unchecked(&mut self.tokens, &mut self.configs)
     }
 

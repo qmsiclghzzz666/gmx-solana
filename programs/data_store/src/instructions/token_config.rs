@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::Mint;
 
 use crate::{
-    states::{DataStore, Roles, Seed, TokenConfig2, TokenConfigMap},
+    states::{DataStore, Roles, Seed, TokenConfig, TokenConfigMap},
     utils::internal,
     DataStoreError,
 };
@@ -72,7 +72,7 @@ pub fn insert_token_config(
     let token = &ctx.accounts.token;
     ctx.accounts.map.as_map_mut().insert(
         token.key(),
-        TokenConfig2 {
+        TokenConfig {
             enabled: true,
             price_feed,
             heartbeat_duration,
@@ -154,7 +154,7 @@ pub fn get_token_config(
     ctx: Context<GetTokenConfig>,
     _store: Pubkey,
     token: Pubkey,
-) -> Result<Option<TokenConfig2>> {
+) -> Result<Option<TokenConfig>> {
     Ok(ctx.accounts.map.as_map().get(&token).cloned())
 }
 
