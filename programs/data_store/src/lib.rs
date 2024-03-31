@@ -82,36 +82,6 @@ pub mod data_store {
 
     // Token Config.
     #[access_control(internal::Authenticate::only_controller(&ctx))]
-    pub fn initialize_token_config(
-        ctx: Context<InitializeTokenConfig>,
-        key: String,
-        price_feed: Pubkey,
-        heartbeat_duration: u32,
-        token_decimals: u8,
-        precision: u8,
-    ) -> Result<()> {
-        instructions::initialize_token_config(
-            ctx,
-            key,
-            price_feed,
-            heartbeat_duration,
-            token_decimals,
-            precision,
-        )
-    }
-
-    #[access_control(internal::Authenticate::only_controller(&ctx))]
-    pub fn update_token_config(
-        ctx: Context<UpdateTokenConfig>,
-        key: String,
-        price_feed: Option<Pubkey>,
-        token_decimals: Option<u8>,
-        precision: Option<u8>,
-    ) -> Result<()> {
-        instructions::update_token_config(ctx, key, price_feed, token_decimals, precision)
-    }
-
-    #[access_control(internal::Authenticate::only_controller(&ctx))]
     pub fn initialize_token_config_map(
         ctx: Context<InitializeTokenConfigMap>,
         len: u16,

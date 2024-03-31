@@ -1,19 +1,10 @@
 import { PublicKey, Signer } from "@solana/web3.js";
 import { dataStore } from "./program";
 import { createRolesPDA } from ".";
-import { keyToSeed } from "../seed";
 import { utils } from "@coral-xyz/anchor";
 
-// Token Config seed.
-export const TOKEN_CONFIG_SEED = utils.bytes.utf8.encode("token_config");
 // Token Config map seed.
 export const TOKEN_CONFIG_MAP_SEED = utils.bytes.utf8.encode("token_config_map");
-
-export const createTokenConfigPDA = (store: PublicKey, key: string) => PublicKey.findProgramAddressSync([
-    TOKEN_CONFIG_SEED,
-    store.toBytes(),
-    keyToSeed(key),
-], dataStore.programId);
 
 export const createTokenConfigMapPDA = (store: PublicKey) => PublicKey.findProgramAddressSync([
     TOKEN_CONFIG_MAP_SEED,

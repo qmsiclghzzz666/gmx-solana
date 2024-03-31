@@ -1,8 +1,8 @@
 import { workspace, Program, BN } from "@coral-xyz/anchor";
 import { Exchange } from "../target/types/exchange";
 import { ComputeBudgetProgram, Keypair, PublicKey, Transaction } from "@solana/web3.js";
-import { createMarketPDA, createMarketTokenMintPDA, createMarketVaultPDA, createRolesPDA, createTokenConfigMapPDA, createTokenConfigPDA, createWithdrawalPDA, dataStore } from "./data";
-import { TOKEN_PROGRAM_ID, getAccount } from "@solana/spl-token";
+import { createMarketPDA, createMarketTokenMintPDA, createMarketVaultPDA, createRolesPDA, createTokenConfigMapPDA, createWithdrawalPDA, dataStore, getTokenConfig } from "./data";
+import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { BTC_TOKEN_MINT, SOL_TOKEN_MINT } from "./token";
 import { toBN } from "./number";
 import { oracle as oracleProgram } from "./oracle";
@@ -179,10 +179,8 @@ export const executeWithdrawal = async (
             }
         }));
     const marketMeta = await dataStore.methods.getMarketMeta().accounts({ market }).view();
-    const longTokenConfig = createTokenConfigPDA(store, marketMeta.longTokenMint.toBase58())[0];
-    const shortTokenConfig = createTokenConfigPDA(store, marketMeta.shortTokenMint.toBase58())[0];
-    const longTokenFeed = (await dataStore.account.tokenConfig.fetch(longTokenConfig)).priceFeed;
-    const shortTokenFeed = (await dataStore.account.tokenConfig.fetch(shortTokenConfig)).priceFeed;
+    const longTokenFeed = (await getTokenConfig(store, marketMeta.longTokenMint)).priceFeed;
+    const shortTokenFeed = (await getTokenConfig(store, marketMeta.shortTokenMint)).priceFeed;
     let ix = await exchange.methods.executeWithdrawal(toBN(options.executionFee ?? 0)).accounts({
         authority: authority.publicKey,
         store,
