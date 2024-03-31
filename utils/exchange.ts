@@ -1,7 +1,7 @@
 import { workspace, Program, BN } from "@coral-xyz/anchor";
 import { Exchange } from "../target/types/exchange";
 import { ComputeBudgetProgram, Keypair, PublicKey, Transaction } from "@solana/web3.js";
-import { createMarketPDA, createMarketTokenMintPDA, createMarketVaultPDA, createRolesPDA, createTokenConfigPDA, createWithdrawalPDA, dataStore } from "./data";
+import { createMarketPDA, createMarketTokenMintPDA, createMarketVaultPDA, createRolesPDA, createTokenConfigMapPDA, createTokenConfigPDA, createWithdrawalPDA, dataStore } from "./data";
 import { TOKEN_PROGRAM_ID, getAccount } from "@solana/spl-token";
 import { BTC_TOKEN_MINT, SOL_TOKEN_MINT } from "./token";
 import { toBN } from "./number";
@@ -192,6 +192,7 @@ export const executeWithdrawal = async (
         chainlinkProgram: CHAINLINK_ID,
         tokenProgram: TOKEN_PROGRAM_ID,
         oracle,
+        tokenConfigMap: createTokenConfigMapPDA(store)[0],
         withdrawal,
         user,
         market,
@@ -203,17 +204,7 @@ export const executeWithdrawal = async (
         finalShortTokenVault: createMarketVaultPDA(store, finalShortTokenMint)[0],
     }).remainingAccounts([
         {
-            pubkey: longTokenConfig,
-            isSigner: false,
-            isWritable: false,
-        },
-        {
             pubkey: longTokenFeed,
-            isSigner: false,
-            isWritable: false,
-        },
-        {
-            pubkey: shortTokenConfig,
             isSigner: false,
             isWritable: false,
         },

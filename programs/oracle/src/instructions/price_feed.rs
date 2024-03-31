@@ -1,12 +1,25 @@
 use anchor_lang::prelude::*;
 use data_store::{
-    cpi::accounts::{CheckRole, SetPrice},
-    states::{Data, DataStore, Oracle, PriceMap, Roles, TokenConfig},
+    cpi::accounts::{CheckRole, GetTokenConfig, SetPrice},
+    states::{DataStore, Oracle, PriceMap, Roles, TokenConfig2},
     utils::Authentication,
 };
 use gmx_solana_utils::price::{Decimal, Price};
 
 use crate::{utils::Chainlink, OracleError};
+
+#[derive(Accounts)]
+pub struct SetPricesFromPriceFeed<'info> {
+    pub authority: Signer<'info>,
+    pub only_controller: Account<'info, Roles>,
+    pub store: Account<'info, DataStore>,
+    #[account(mut)]
+    pub oracle: Account<'info, Oracle>,
+    /// CHECK: check by CPI.
+    pub token_config_map: UncheckedAccount<'info>,
+    pub chainlink_program: Program<'info, Chainlink>,
+    pub data_store_program: Program<'info, data_store::program::DataStore>,
+}
 
 /// Set the oracle prices from price feed.
 pub fn set_prices_from_price_feed<'info>(
@@ -25,35 +38,25 @@ pub fn set_prices_from_price_feed<'info>(
     // It won't overflow since we has checked the length before.
     let remaining = ctx.remaining_accounts;
     require!(
-        (tokens.len() << 1) <= remaining.len(),
+        tokens.len() <= remaining.len(),
         OracleError::NotEnoughAccountInfos
     );
     // Assume the remaining accounts are arranged in the following way:
     // [token_config, feed; tokens.len()] [..remaining]
     for (idx, token) in tokens.iter().enumerate() {
-        let token_config_idx = idx << 1;
-        let feed_idx = token_config_idx + 1;
-        let price = check_and_get_chainlink_price(
-            &ctx.accounts.chainlink_program,
-            &ctx.accounts.store,
-            &remaining[token_config_idx],
-            &remaining[feed_idx],
-            token,
-        )?;
+        let feed = &remaining[idx];
+        let token_config = data_store::cpi::get_token_config(
+            ctx.accounts.get_token_config_ctx(),
+            ctx.accounts.store.key(),
+            *token,
+        )?
+        .get()
+        .ok_or(OracleError::MissingTokenConfig)?;
+        let price =
+            check_and_get_chainlink_price(&ctx.accounts.chainlink_program, &token_config, feed)?;
         data_store::cpi::set_price(ctx.accounts.set_price_ctx(), *token, price)?;
     }
     Ok(())
-}
-
-#[derive(Accounts)]
-pub struct SetPricesFromPriceFeed<'info> {
-    pub authority: Signer<'info>,
-    pub only_controller: Account<'info, Roles>,
-    pub store: Account<'info, DataStore>,
-    #[account(mut)]
-    pub oracle: Account<'info, Oracle>,
-    pub chainlink_program: Program<'info, Chainlink>,
-    pub data_store_program: Program<'info, data_store::program::DataStore>,
 }
 
 impl<'info> SetPricesFromPriceFeed<'info> {
@@ -65,6 +68,15 @@ impl<'info> SetPricesFromPriceFeed<'info> {
                 only_controller: self.only_controller.to_account_info(),
                 store: self.store.to_account_info(),
                 oracle: self.oracle.to_account_info(),
+            },
+        )
+    }
+
+    fn get_token_config_ctx(&self) -> CpiContext<'_, '_, '_, 'info, GetTokenConfig<'info>> {
+        CpiContext::new(
+            self.data_store_program.to_account_info(),
+            GetTokenConfig {
+                map: self.token_config_map.to_account_info(),
             },
         )
     }
@@ -93,19 +105,9 @@ impl<'info> Authentication<'info> for SetPricesFromPriceFeed<'info> {
 /// Check and get latest chainlink price from data feed.
 fn check_and_get_chainlink_price<'info>(
     chainlink_program: &Program<'info, Chainlink>,
-    store: &Account<'info, data_store::states::DataStore>,
-    token_config: &'info AccountInfo<'info>,
+    token_config: &TokenConfig2,
     feed: &AccountInfo<'info>,
-    token: &Pubkey,
 ) -> Result<Price> {
-    let token_config = Account::<'info, TokenConfig>::try_from(token_config)?;
-    let key = token.to_string();
-    let expected_pda = token_config.pda(&store.key(), &key)?;
-    require_eq!(
-        expected_pda,
-        token_config.key(),
-        OracleError::InvalidTokenConfigAccount
-    );
     require_eq!(
         token_config.price_feed,
         *feed.key,
@@ -114,14 +116,14 @@ fn check_and_get_chainlink_price<'info>(
     let round =
         chainlink_solana::latest_round_data(chainlink_program.to_account_info(), feed.clone())?;
     let decimals = chainlink_solana::decimals(chainlink_program.to_account_info(), feed.clone())?;
-    check_and_get_price_from_round(&round, decimals, &token_config)
+    check_and_get_price_from_round(&round, decimals, token_config)
 }
 
 /// Check and get price from the round data.
 fn check_and_get_price_from_round(
     round: &chainlink_solana::Round,
     decimals: u8,
-    token_config: &TokenConfig,
+    token_config: &TokenConfig2,
 ) -> Result<Price> {
     let chainlink_solana::Round {
         answer, timestamp, ..

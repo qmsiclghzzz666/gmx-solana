@@ -32,6 +32,8 @@ pub struct ExecuteWithdrawal<'info> {
     pub system_program: Program<'info, System>,
     #[account(mut)]
     pub oracle: Account<'info, data_store::states::Oracle>,
+    /// CHECK: check by CPI.
+    pub token_config_map: UncheckedAccount<'info>,
     /// CHECK: used and checked by CPI.
     ///
     /// ## Notes
@@ -171,6 +173,10 @@ impl<'info> WithOracle<'info> for ExecuteWithdrawal<'info> {
 
     fn oracle(&self) -> AccountInfo<'info> {
         self.oracle.to_account_info()
+    }
+
+    fn token_config_map(&self) -> AccountInfo<'info> {
+        self.token_config_map.to_account_info()
     }
 }
 
