@@ -271,6 +271,7 @@ pub mod data_store {
         ctx: Context<InitializeWithdrawal>,
         nonce: [u8; 32],
         tokens: WithdrawalTokenParams,
+        tokens_with_feed: Vec<(Pubkey, Pubkey)>,
         market_token_amount: u64,
         ui_fee_receiver: Pubkey,
     ) -> Result<()> {
@@ -278,6 +279,7 @@ pub mod data_store {
             ctx,
             nonce,
             tokens,
+            tokens_with_feed,
             market_token_amount,
             ui_fee_receiver,
         )

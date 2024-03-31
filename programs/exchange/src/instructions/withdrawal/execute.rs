@@ -83,16 +83,21 @@ pub fn execute_withdrawal<'info>(
     let short_token = meta.short_token_mint;
     let remaing_accounts = ctx.remaining_accounts.to_vec();
     let report = ctx.accounts.with_oracle_prices(
-        vec![long_token, short_token],
+        withdrawal.tokens.tokens.clone(),
         remaing_accounts,
         |accounts| {
             let oracle = &mut accounts.oracle;
             oracle.reload()?;
-            let long_token_price = oracle.primary.get(&long_token).unwrap().max.to_unit_price();
+            let long_token_price = oracle
+                .primary
+                .get(&long_token)
+                .ok_or(ExchangeError::ResourceNotFound)?
+                .max
+                .to_unit_price();
             let short_token_price = oracle
                 .primary
                 .get(&short_token)
-                .unwrap()
+                .ok_or(ExchangeError::ResourceNotFound)?
                 .max
                 .to_unit_price();
             let report = accounts

@@ -12,6 +12,7 @@ pub fn initialize_withdrawal(
     ctx: Context<InitializeWithdrawal>,
     nonce: NonceBytes,
     tokens: TokenParams,
+    tokens_with_feed: Vec<(Pubkey, Pubkey)>,
     market_token_amount: u64,
     ui_fee_receiver: Pubkey,
 ) -> Result<()> {
@@ -22,6 +23,7 @@ pub fn initialize_withdrawal(
         &ctx.accounts.market,
         market_token_amount,
         tokens,
+        tokens_with_feed,
         &ctx.accounts.final_long_token_receiver,
         &ctx.accounts.final_short_token_receiver,
         ui_fee_receiver,

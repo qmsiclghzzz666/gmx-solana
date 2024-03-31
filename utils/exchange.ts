@@ -95,6 +95,7 @@ export const createWithdrawal = async (
         onlyController: createRolesPDA(store, authority.publicKey)[0],
         dataStoreProgram: dataStore.programId,
         tokenProgram: TOKEN_PROGRAM_ID,
+        tokenConfigMap: createTokenConfigMapPDA(store)[0],
         market,
         withdrawal: withdrawalAddress,
         payer: payer.publicKey,
@@ -148,6 +149,7 @@ export interface ExecuteWithdrawalOptions {
             finalShortTokenReceiver: PublicKey,
             finalLongTokenMint: PublicKey,
             finalShortTokenMint: PublicKey,
+            feeds: PublicKey[],
         }
     }
 };
@@ -167,6 +169,7 @@ export const executeWithdrawal = async (
         finalShortTokenReceiver,
         finalLongTokenMint,
         finalShortTokenMint,
+        feeds,
     } = options.hints?.params ?? (
         await dataStore.account.withdrawal.fetch(withdrawal).then(withdrawal => {
             return {
@@ -176,11 +179,9 @@ export const executeWithdrawal = async (
                 finalShortTokenMint: withdrawal.tokens.finalShortToken,
                 finalLongTokenReceiver: withdrawal.receivers.finalLongTokenReceiver,
                 finalShortTokenReceiver: withdrawal.receivers.finalShortTokenReceiver,
+                feeds: withdrawal.tokens.feeds,
             }
         }));
-    const marketMeta = await dataStore.methods.getMarketMeta().accounts({ market }).view();
-    const longTokenFeed = (await getTokenConfig(store, marketMeta.longTokenMint)).priceFeed;
-    const shortTokenFeed = (await getTokenConfig(store, marketMeta.shortTokenMint)).priceFeed;
     let ix = await exchange.methods.executeWithdrawal(toBN(options.executionFee ?? 0)).accounts({
         authority: authority.publicKey,
         store,
@@ -200,18 +201,13 @@ export const executeWithdrawal = async (
         finalShortTokenReceiver,
         finalLongTokenVault: createMarketVaultPDA(store, finalLongTokenMint)[0],
         finalShortTokenVault: createMarketVaultPDA(store, finalShortTokenMint)[0],
-    }).remainingAccounts([
-        {
-            pubkey: longTokenFeed,
-            isSigner: false,
-            isWritable: false,
-        },
-        {
-            pubkey: shortTokenFeed,
+    }).remainingAccounts(feeds.map(feed => {
+        return {
+            pubkey: feed,
             isSigner: false,
             isWritable: false,
         }
-    ]).instruction();
+    })).instruction();
     const modifyComputeUnits = ComputeBudgetProgram.setComputeUnitLimit({
         units: 400_000
     });
