@@ -19,6 +19,7 @@ use self::{
     states::{
         deposit::TokenParams as DepositTokenParams,
         market::{MarketMeta, Pool},
+        token_config::TokenConfig2,
         withdrawal::TokenParams as WithdrawalTokenParams,
     },
     utils::internal,
@@ -108,6 +109,37 @@ pub mod data_store {
         precision: Option<u8>,
     ) -> Result<()> {
         instructions::update_token_config(ctx, key, price_feed, token_decimals, precision)
+    }
+
+    #[access_control(internal::Authenticate::only_controller(&ctx))]
+    pub fn initialize_token_config_map(
+        ctx: Context<InitializeTokenConfigMap>,
+        len: u16,
+    ) -> Result<()> {
+        instructions::initialize_token_config_map(ctx, len)
+    }
+
+    #[access_control(internal::Authenticate::only_controller(&ctx))]
+    pub fn insert_token_config(
+        ctx: Context<InsertTokenConfig>,
+        price_feed: Pubkey,
+        heartbeat_duration: u32,
+        precision: u8,
+    ) -> Result<()> {
+        instructions::insert_token_config(ctx, price_feed, heartbeat_duration, precision)
+    }
+
+    pub fn get_token_config(
+        ctx: Context<GetTokenConfig>,
+        store: Pubkey,
+        token: Pubkey,
+    ) -> Result<Option<TokenConfig2>> {
+        instructions::get_token_config(ctx, store, token)
+    }
+
+    #[access_control(internal::Authenticate::only_controller(&ctx))]
+    pub fn extend_token_config_map(ctx: Context<ExtendTokenConfigMap>, len: u16) -> Result<()> {
+        instructions::extend_token_config_map(ctx, len)
     }
 
     // Market.

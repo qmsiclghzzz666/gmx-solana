@@ -1,7 +1,7 @@
 import { Keypair, PublicKey } from '@solana/web3.js';
 
 import { expect, getAddresses, getPrograms, getProvider, getUsers } from "../../utils/fixtures";
-import { createRolesPDA, createTokenConfigPDA } from "../../utils/data";
+import { createRolesPDA, createTokenConfigPDA, getTokenConfig } from "../../utils/data";
 import { AnchorError } from '@coral-xyz/anchor';
 
 describe("data store: TokenConfig", () => {
@@ -16,8 +16,9 @@ describe("data store: TokenConfig", () => {
     let dataStoreAddress: PublicKey;
     let roles: PublicKey;
     let fooTokenConfigPDA: PublicKey;
+    let fakeTokenMint: PublicKey;
     before("init token config", async () => {
-        ({ dataStoreAddress } = await getAddresses());
+        ({ dataStoreAddress, fakeTokenMint } = await getAddresses());
         [roles] = createRolesPDA(dataStoreAddress, signer0.publicKey);
         [fooTokenConfigPDA] = createTokenConfigPDA(dataStoreAddress, fooTokenConfigKey);
 
@@ -62,5 +63,11 @@ describe("data store: TokenConfig", () => {
         expect(saved.priceFeed).to.eql(fooAddress);
         expect(saved.precision).to.equal(4);
         expect(saved.tokenDecimals).to.equal(8);
+    });
+
+    it("test token config map", async () => {
+        const config = await getTokenConfig(dataStoreAddress, fakeTokenMint);
+        expect(config.tokenDecimals).equal(9);
+        expect(config.precision).equal(2);
     });
 });
