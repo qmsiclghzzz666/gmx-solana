@@ -68,6 +68,8 @@ impl Data for TokenConfig {}
 
 #[derive(AnchorSerialize, AnchorDeserialize, InitSpace, Clone)]
 pub struct TokenConfig2 {
+    /// Enabled.
+    pub enabled: bool,
     /// The address of the price feed.
     pub price_feed: Pubkey,
     /// Heartbeat duration.

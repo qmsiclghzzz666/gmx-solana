@@ -129,6 +129,15 @@ pub mod data_store {
         instructions::insert_token_config(ctx, price_feed, heartbeat_duration, precision)
     }
 
+    #[access_control(internal::Authenticate::only_controller(&ctx))]
+    pub fn toggle_token_config(
+        ctx: Context<ToggleTokenConfig>,
+        token: Pubkey,
+        enable: bool,
+    ) -> Result<()> {
+        instructions::toggle_token_config(ctx, token, enable)
+    }
+
     pub fn get_token_config(
         ctx: Context<GetTokenConfig>,
         store: Pubkey,
@@ -325,6 +334,8 @@ pub enum DataStoreError {
     InvalidArgument,
     #[msg("Lamports not enough")]
     LamportsNotEnough,
+    #[msg("Required resource not found")]
+    RequiredResourceNotFound,
     // Roles.
     #[msg("Too many admins")]
     TooManyAdmins,

@@ -7,6 +7,7 @@ use crate::{
         DataStore, Roles, Seed, TokenConfig, TokenConfig2, TokenConfigChangeEvent, TokenConfigMap,
     },
     utils::internal,
+    DataStoreError,
 };
 
 #[derive(Accounts)]
@@ -178,6 +179,7 @@ pub fn insert_token_config(
     ctx.accounts.map.as_map_mut().insert(
         token.key(),
         TokenConfig2 {
+            enabled: true,
             price_feed,
             heartbeat_duration,
             precision,
@@ -188,6 +190,48 @@ pub fn insert_token_config(
 }
 
 impl<'info> internal::Authentication<'info> for InsertTokenConfig<'info> {
+    fn authority(&self) -> &Signer<'info> {
+        &self.authority
+    }
+
+    fn store(&self) -> &Account<'info, DataStore> {
+        &self.store
+    }
+
+    fn roles(&self) -> &Account<'info, Roles> {
+        &self.only_controller
+    }
+}
+
+#[derive(Accounts)]
+pub struct ToggleTokenConfig<'info> {
+    pub authority: Signer<'info>,
+    pub store: Account<'info, DataStore>,
+    pub only_controller: Account<'info, Roles>,
+    #[account(
+        mut,
+        seeds = [TokenConfigMap::SEED, store.key().as_ref()],
+        bump = map.bump,
+    )]
+    pub map: Account<'info, TokenConfigMap>,
+}
+
+/// Toggle the config for the given token.
+pub fn toggle_token_config(
+    ctx: Context<ToggleTokenConfig>,
+    token: Pubkey,
+    enable: bool,
+) -> Result<()> {
+    ctx.accounts
+        .map
+        .as_map_mut()
+        .get_mut(&token)
+        .ok_or(DataStoreError::RequiredResourceNotFound)?
+        .enabled = enable;
+    Ok(())
+}
+
+impl<'info> internal::Authentication<'info> for ToggleTokenConfig<'info> {
     fn authority(&self) -> &Signer<'info> {
         &self.authority
     }

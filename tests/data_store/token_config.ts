@@ -1,7 +1,7 @@
 import { Keypair, PublicKey } from '@solana/web3.js';
 
 import { expect, getAddresses, getPrograms, getProvider, getUsers } from "../../utils/fixtures";
-import { createRolesPDA, createTokenConfigPDA, extendTokenConfigMap, getTokenConfig, insertTokenConfig } from "../../utils/data";
+import { createRolesPDA, createTokenConfigPDA, extendTokenConfigMap, getTokenConfig, insertTokenConfig, toggleTokenConfig } from "../../utils/data";
 import { AnchorError } from '@coral-xyz/anchor';
 import { createMint } from '@solana/spl-token';
 import { BTC_FEED, SOL_FEED } from '../../utils/token';
@@ -86,6 +86,7 @@ describe("data store: TokenConfig", () => {
         {
             await insertTokenConfig(signer0, dataStoreAddress, newToken, BTC_FEED, 60, 3);
             const config = await getTokenConfig(dataStoreAddress, newToken);
+            expect(config.enabled).true;
             expect(config.priceFeed).eqls(BTC_FEED);
             expect(config.heartbeatDuration).equals(60);
             expect(config.precision).equals(3);
@@ -95,9 +96,24 @@ describe("data store: TokenConfig", () => {
         {
             await insertTokenConfig(signer0, dataStoreAddress, newToken, SOL_FEED, 42, 5);
             const config = await getTokenConfig(dataStoreAddress, newToken);
+            expect(config.enabled).true;
             expect(config.priceFeed).eqls(SOL_FEED);
             expect(config.heartbeatDuration).equals(42);
             expect(config.precision).equals(5);
+        }
+
+        // We can disable the config temporarily.
+        {
+            await toggleTokenConfig(signer0, dataStoreAddress, newToken, false);
+            const config = await getTokenConfig(dataStoreAddress, newToken);
+            expect(config.enabled).false;
+        }
+
+        // And we can enable the config again.
+        {
+            await toggleTokenConfig(signer0, dataStoreAddress, newToken, true);
+            const config = await getTokenConfig(dataStoreAddress, newToken);
+            expect(config.enabled).true;
         }
     });
 });

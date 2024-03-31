@@ -48,7 +48,22 @@ export const insertTokenConfig = async (
     }).signers([authority]).rpc();
 };
 
+export const toggleTokenConfig = async (
+    authority: Signer,
+    store: PublicKey,
+    token: PublicKey,
+    enable: boolean,
+) => {
+    await dataStore.methods.toggleTokenConfig(token, enable).accounts({
+        authority: authority.publicKey,
+        store,
+        onlyController: createRolesPDA(store, authority.publicKey)[0],
+        map: createTokenConfigMapPDA(store)[0],
+    }).signers([authority]).rpc();
+};
+
 export interface TokenConfig {
+    enabled: boolean,
     priceFeed: PublicKey,
     heartbeatDuration: number,
     tokenDecimals: number,
