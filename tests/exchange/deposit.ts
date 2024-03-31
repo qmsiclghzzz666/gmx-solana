@@ -59,6 +59,7 @@ describe("exchange: deposit", () => {
                     shouldUnwrapNativeToken: false,
                 },
             ).accounts({
+                tokenConfigMap: createTokenConfigMapPDA(dataStoreAddress)[0],
                 market: marketFakeFakeUsdG,
                 authority: signer0.publicKey,
                 store: dataStoreAddress,
@@ -86,6 +87,7 @@ describe("exchange: deposit", () => {
             console.log(error);
         }
         try {
+            const depositAccount = await exchange.account.deposit.fetch(deposit);
             const ix = await exchange.methods.executeDeposit(new BN(5001)).accounts({
                 authority: signer0.publicKey,
                 store: dataStoreAddress,
@@ -100,18 +102,13 @@ describe("exchange: deposit", () => {
                 receiver: user0FakeFakeUsdGTokenAccount,
                 market: marketFakeFakeUsdG,
                 marketTokenMint: createMarketTokenMintPDA(dataStoreAddress, fakeTokenMint, fakeTokenMint, usdGTokenMint)[0],
-            }).remainingAccounts([
-                {
-                    pubkey: BTC_FEED,
+            }).remainingAccounts(depositAccount.tokens.feeds.map(feed => {
+                return {
+                    pubkey: feed,
                     isSigner: false,
                     isWritable: false,
-                },
-                {
-                    pubkey: USDC_FEED,
-                    isSigner: false,
-                    isWritable: false,
-                },
-            ]).instruction();
+                };
+            })).instruction();
             const modifyComputeUnits = ComputeBudgetProgram.setComputeUnitLimit({
                 units: 800_000
             });
@@ -244,6 +241,7 @@ describe("exchange: deposit", () => {
                     shouldUnwrapNativeToken: false,
                 },
             ).accounts({
+                tokenConfigMap: createTokenConfigMapPDA(dataStoreAddress)[0],
                 market: marketFakeFakeUsdG,
                 authority: signer0.publicKey,
                 store: dataStoreAddress,

@@ -1,8 +1,10 @@
+use std::collections::BTreeSet;
+
 use anchor_lang::{prelude::*, system_program};
 use anchor_spl::token::{self, Token, TokenAccount};
 use data_store::{
     constants,
-    cpi::accounts::{CheckRole, InitializeDeposit},
+    cpi::accounts::{CheckRole, GetMarketMeta, GetTokenConfig, InitializeDeposit},
     program::DataStore,
     states::{deposit::TokenParams, NonceBytes},
     utils::Authentication,
@@ -50,6 +52,29 @@ pub fn create_deposit(
         )?;
     }
 
+    let mut tokens = BTreeSet::default();
+    tokens.insert(ctx.accounts.initial_long_token.mint);
+    tokens.insert(ctx.accounts.initial_short_token.mint);
+
+    let market_meta = cpi::get_market_meta(ctx.accounts.get_market_meta_ctx())?.get();
+    tokens.insert(market_meta.long_token_mint);
+    tokens.insert(market_meta.short_token_mint);
+
+    // TODO: verify swap paths.
+    let tokens_with_feed = tokens
+        .into_iter()
+        .map(|token| {
+            let config = cpi::get_token_config(
+                ctx.accounts.get_token_config_ctx(),
+                ctx.accounts.store.key(),
+                token,
+            )?
+            .get()
+            .ok_or(ExchangeError::ResourceNotFound)?;
+            Result::Ok((token, config.price_feed))
+        })
+        .collect::<Result<Vec<_>>>()?;
+
     cpi::initialize_deposit(
         ctx.accounts.initialize_deposit_ctx(),
         nonce,
@@ -64,6 +89,7 @@ pub fn create_deposit(
             min_market_tokens: params.min_market_token,
             should_unwrap_native_token: params.should_unwrap_native_token,
         },
+        tokens_with_feed,
     )?;
     // FIXME: should we allow using WNT to pay for the execution fee?
     require_gte!(
@@ -94,6 +120,8 @@ pub struct CreateDeposit<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
     pub receiver: Account<'info, TokenAccount>,
+    /// CHECK: check by CPI.
+    pub token_config_map: UncheckedAccount<'info>,
     /// CHECK: only used to invoke CPI and should be checked by it.
     pub market: UncheckedAccount<'info>,
     #[account(mut)]
@@ -149,6 +177,24 @@ impl<'info> Authentication<'info> for CreateDeposit<'info> {
 }
 
 impl<'info> CreateDeposit<'info> {
+    fn get_market_meta_ctx(&self) -> CpiContext<'_, '_, '_, 'info, GetMarketMeta<'info>> {
+        CpiContext::new(
+            self.data_store_program.to_account_info(),
+            GetMarketMeta {
+                market: self.market.to_account_info(),
+            },
+        )
+    }
+
+    fn get_token_config_ctx(&self) -> CpiContext<'_, '_, '_, 'info, GetTokenConfig<'info>> {
+        CpiContext::new(
+            self.data_store_program.to_account_info(),
+            GetTokenConfig {
+                map: self.token_config_map.to_account_info(),
+            },
+        )
+    }
+
     fn initialize_deposit_ctx(&self) -> CpiContext<'_, '_, '_, 'info, InitializeDeposit<'info>> {
         CpiContext::new(
             self.data_store_program.to_account_info(),

@@ -256,8 +256,9 @@ pub mod data_store {
         nonce: [u8; 32],
         ui_fee_receiver: Pubkey,
         tokens: DepositTokenParams,
+        tokens_with_feed: Vec<(Pubkey, Pubkey)>,
     ) -> Result<()> {
-        instructions::initialize_deposit(ctx, nonce, ui_fee_receiver, tokens)
+        instructions::initialize_deposit(ctx, nonce, ui_fee_receiver, tokens, tokens_with_feed)
     }
 
     #[access_control(internal::Authenticate::only_controller(&ctx))]

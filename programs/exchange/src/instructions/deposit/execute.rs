@@ -32,7 +32,7 @@ pub fn execute_deposit<'info>(
     let short_token = deposit.tokens.params.initial_short_token;
     let remaining_accounts = ctx.remaining_accounts.to_vec();
     ctx.accounts.with_oracle_prices(
-        vec![long_token, short_token],
+        deposit.tokens.tokens.clone(),
         remaining_accounts,
         |accounts| {
             let oracle = &mut accounts.oracle;
