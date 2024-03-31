@@ -32,6 +32,8 @@ pub struct ExecuteWithdrawal<'info> {
     pub system_program: Program<'info, System>,
     #[account(mut)]
     pub oracle: Account<'info, data_store::states::Oracle>,
+    /// CHECK: check by CPI.
+    pub token_config_map: UncheckedAccount<'info>,
     /// CHECK: used and checked by CPI.
     ///
     /// ## Notes
@@ -81,16 +83,21 @@ pub fn execute_withdrawal<'info>(
     let short_token = meta.short_token_mint;
     let remaing_accounts = ctx.remaining_accounts.to_vec();
     let report = ctx.accounts.with_oracle_prices(
-        vec![long_token, short_token],
+        withdrawal.tokens.tokens.clone(),
         remaing_accounts,
         |accounts| {
             let oracle = &mut accounts.oracle;
             oracle.reload()?;
-            let long_token_price = oracle.primary.get(&long_token).unwrap().max.to_unit_price();
+            let long_token_price = oracle
+                .primary
+                .get(&long_token)
+                .ok_or(ExchangeError::ResourceNotFound)?
+                .max
+                .to_unit_price();
             let short_token_price = oracle
                 .primary
                 .get(&short_token)
-                .unwrap()
+                .ok_or(ExchangeError::ResourceNotFound)?
                 .max
                 .to_unit_price();
             let report = accounts
@@ -171,6 +178,10 @@ impl<'info> WithOracle<'info> for ExecuteWithdrawal<'info> {
 
     fn oracle(&self) -> AccountInfo<'info> {
         self.oracle.to_account_info()
+    }
+
+    fn token_config_map(&self) -> AccountInfo<'info> {
+        self.token_config_map.to_account_info()
     }
 }
 

@@ -1,6 +1,6 @@
 import { BN } from "@coral-xyz/anchor";
 import { ComputeBudgetProgram, Keypair, PublicKey, Transaction, sendAndConfirmTransaction } from "@solana/web3.js";
-import { createDepositPDA, createMarketTokenMintPDA, createNoncePDA, createRolesPDA, createTokenConfigPDA } from "../../utils/data";
+import { createDepositPDA, createMarketTokenMintPDA, createNoncePDA, createRolesPDA, createTokenConfigMapPDA } from "../../utils/data";
 import { getAddresses, getExternalPrograms, getMarkets, getPrograms, getProvider, getUsers, expect } from "../../utils/fixtures";
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { BTC_FEED, USDC_FEED } from "../../utils/token";
@@ -59,6 +59,7 @@ describe("exchange: deposit", () => {
                     shouldUnwrapNativeToken: false,
                 },
             ).accounts({
+                tokenConfigMap: createTokenConfigMapPDA(dataStoreAddress)[0],
                 market: marketFakeFakeUsdG,
                 authority: signer0.publicKey,
                 store: dataStoreAddress,
@@ -86,6 +87,7 @@ describe("exchange: deposit", () => {
             console.log(error);
         }
         try {
+            const depositAccount = await exchange.account.deposit.fetch(deposit);
             const ix = await exchange.methods.executeDeposit(new BN(5001)).accounts({
                 authority: signer0.publicKey,
                 store: dataStoreAddress,
@@ -93,34 +95,20 @@ describe("exchange: deposit", () => {
                 onlyOrderKeeper: roles,
                 oracleProgram: oracle.programId,
                 oracle: oracleAddress,
+                tokenConfigMap: createTokenConfigMapPDA(dataStoreAddress)[0],
                 chainlinkProgram: chainlink.programId,
                 deposit,
                 user: user0.publicKey,
                 receiver: user0FakeFakeUsdGTokenAccount,
                 market: marketFakeFakeUsdG,
                 marketTokenMint: createMarketTokenMintPDA(dataStoreAddress, fakeTokenMint, fakeTokenMint, usdGTokenMint)[0],
-            }).remainingAccounts([
-                {
-                    pubkey: createTokenConfigPDA(dataStoreAddress, fakeTokenMint.toBase58())[0],
+            }).remainingAccounts(depositAccount.tokens.feeds.map(feed => {
+                return {
+                    pubkey: feed,
                     isSigner: false,
                     isWritable: false,
-                },
-                {
-                    pubkey: BTC_FEED,
-                    isSigner: false,
-                    isWritable: false,
-                },
-                {
-                    pubkey: createTokenConfigPDA(dataStoreAddress, usdGTokenMint.toBase58())[0],
-                    isSigner: false,
-                    isWritable: false,
-                },
-                {
-                    pubkey: USDC_FEED,
-                    isSigner: false,
-                    isWritable: false,
-                },
-            ]).instruction();
+                };
+            })).instruction();
             const modifyComputeUnits = ComputeBudgetProgram.setComputeUnitLimit({
                 units: 800_000
             });
@@ -253,6 +241,7 @@ describe("exchange: deposit", () => {
                     shouldUnwrapNativeToken: false,
                 },
             ).accounts({
+                tokenConfigMap: createTokenConfigMapPDA(dataStoreAddress)[0],
                 market: marketFakeFakeUsdG,
                 authority: signer0.publicKey,
                 store: dataStoreAddress,

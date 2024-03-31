@@ -3,6 +3,7 @@ use anchor_lang::prelude::*;
 use super::{Market, NonceBytes, Seed};
 
 const MAX_SWAP_PATH_LEN: usize = 16;
+const MAX_TOKENS: usize = 2 * (1 + MAX_SWAP_PATH_LEN);
 
 /// Deposit.
 #[account]
@@ -36,6 +37,7 @@ impl Deposit {
     /// The max length of swap path.
     pub const MAX_SWAP_PATH_LEN: usize = MAX_SWAP_PATH_LEN;
 
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn init(
         &mut self,
         bump: u8,
@@ -44,13 +46,14 @@ impl Deposit {
         account: Pubkey,
         receivers: Receivers,
         tokens: TokenParams,
+        tokens_with_feed: Vec<(Pubkey, Pubkey)>,
     ) -> Result<()> {
         self.bump = bump;
         self.market = market.key();
         self.nonce = nonce;
         self.user = account;
         self.receivers = receivers;
-        self.tokens.init(market, tokens);
+        self.tokens.init(market, tokens, tokens_with_feed);
         self.updated_at_slot = Clock::get()?.slot;
         Ok(())
     }
@@ -94,11 +97,25 @@ pub struct Tokens {
     pub market_token: Pubkey,
     /// Params.
     pub params: TokenParams,
+    /// Tokens that require prices.
+    #[max_len(MAX_TOKENS)]
+    pub tokens: Vec<Pubkey>,
+    /// Token feeds for the tokens.
+    #[max_len(MAX_TOKENS)]
+    pub feeds: Vec<Pubkey>,
 }
 
 impl Tokens {
-    fn init(&mut self, market: &Market, params: TokenParams) {
+    fn init(
+        &mut self,
+        market: &Market,
+        params: TokenParams,
+        tokens_with_feed: Vec<(Pubkey, Pubkey)>,
+    ) {
         self.market_token = market.meta.market_token_mint;
         self.params = params;
+        let (tokens, feeds) = tokens_with_feed.into_iter().unzip();
+        self.tokens = tokens;
+        self.feeds = feeds;
     }
 }

@@ -75,6 +75,8 @@ pub enum ExchangeError {
     PermissionDenied,
     #[msg("Not enough execution fee")]
     NotEnoughExecutionFee,
+    #[msg("Resource not found")]
+    ResourceNotFound,
     // Deposit.
     #[msg("Empty deposit amounts")]
     EmptyDepositAmounts,

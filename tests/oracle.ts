@@ -1,6 +1,6 @@
 import * as anchor from "@coral-xyz/anchor";
 import { getAddresses, getExternalPrograms, getPrograms, getProvider, getUsers, expect } from "../utils/fixtures";
-import { createRolesPDA, createTokenConfigPDA, dataStore } from "../utils/data";
+import { createRolesPDA, createTokenConfigMapPDA, createTokenConfigPDA, dataStore } from "../utils/data";
 import { BTC_FEED, BTC_TOKEN_MINT, SOL_FEED, SOL_TOKEN_MINT, USDC_FEED } from "../utils/token";
 import { PublicKey } from "@solana/web3.js";
 
@@ -54,20 +54,11 @@ describe("oracle", () => {
             chainlinkProgram: chainlink.programId,
             onlyController: roles,
             oracle: oracleAddress,
+            tokenConfigMap: createTokenConfigMapPDA(dataStoreAddress)[0],
             dataStoreProgram: dataStore.programId,
         }).remainingAccounts([
             {
-                pubkey: createTokenConfigPDA(dataStoreAddress, BTC_TOKEN_MINT.toBase58())[0],
-                isSigner: false,
-                isWritable: false,
-            },
-            {
                 pubkey: BTC_FEED,
-                isSigner: false,
-                isWritable: false,
-            },
-            {
-                pubkey: createTokenConfigPDA(dataStoreAddress, SOL_TOKEN_MINT.toBase58())[0],
                 isSigner: false,
                 isWritable: false,
             },
@@ -77,17 +68,7 @@ describe("oracle", () => {
                 isWritable: false,
             },
             {
-                pubkey: createTokenConfigPDA(dataStoreAddress, fakeTokenMint.toBase58())[0],
-                isSigner: false,
-                isWritable: false,
-            },
-            {
                 pubkey: BTC_FEED,
-                isSigner: false,
-                isWritable: false,
-            },
-            {
-                pubkey: createTokenConfigPDA(dataStoreAddress, usdGTokenMint.toBase58())[0],
                 isSigner: false,
                 isWritable: false,
             },

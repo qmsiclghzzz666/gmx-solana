@@ -16,6 +16,7 @@ pub fn initialize_deposit(
     nonce: NonceBytes,
     ui_fee_receiver: Pubkey,
     tokens: TokenParams,
+    tokens_with_feed: Vec<(Pubkey, Pubkey)>,
 ) -> Result<()> {
     ctx.accounts.deposit.init(
         ctx.bumps.deposit,
@@ -27,6 +28,7 @@ pub fn initialize_deposit(
             receiver: ctx.accounts.receiver.key(),
         },
         tokens,
+        tokens_with_feed,
     )
 }
 

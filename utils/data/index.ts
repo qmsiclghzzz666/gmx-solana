@@ -1,21 +1,19 @@
-import * as anchor from "@coral-xyz/anchor";
-import { DataStore } from "../target/types/data_store";
-import { keyToSeed } from "./seed";
-import { EventManager } from "./event";
+import { anchor } from "../endpoint";
+import { keyToSeed } from ".././seed";
+import { EventManager } from ".././event";
 import { Keypair, PublicKey } from "@solana/web3.js";
-import { BTC_FEED, BTC_TOKEN_MINT, SOL_FEED, SOL_TOKEN_MINT, USDC_FEED } from "./token";
+import { BTC_FEED, BTC_TOKEN_MINT, SOL_FEED, SOL_TOKEN_MINT, USDC_FEED } from ".././token";
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 
-export const dataStore = anchor.workspace.DataStore as anchor.Program<DataStore>;
+import { dataStore } from "./program";
+import { initializeTokenConfigMap, insertTokenConfig } from "./token_config";
+import { createRolesPDA, initializeRoles } from "./roles";
 
-const encodeUtf8 = anchor.utils.bytes.utf8.encode;
+export const encodeUtf8 = anchor.utils.bytes.utf8.encode;
 
 // Data Store seed.
 export const DATA_STORE_SEED = encodeUtf8("data_store");
-// Roles seed.
-export const ROLES_SEED = encodeUtf8("roles");
-// Token Config seed.
-export const TOKEN_CONFIG_SEED = encodeUtf8("token_config");
+
 // Market seeds.
 export const MARKET_SEED = encodeUtf8("market");
 export const MARKET_TOKEN_MINT_SEED = encodeUtf8("market_token_mint");
@@ -36,18 +34,6 @@ export const ORDER_KEEPER = "ORDER_KEEPER";
 
 export const createDataStorePDA = (key: string) => anchor.web3.PublicKey.findProgramAddressSync([
     DATA_STORE_SEED,
-    keyToSeed(key),
-], dataStore.programId);
-
-export const createRolesPDA = (store: PublicKey, authority: PublicKey) => PublicKey.findProgramAddressSync([
-    ROLES_SEED,
-    store.toBytes(),
-    authority.toBytes(),
-], dataStore.programId);
-
-export const createTokenConfigPDA = (store: anchor.web3.PublicKey, key: string) => anchor.web3.PublicKey.findProgramAddressSync([
-    TOKEN_CONFIG_SEED,
-    store.toBytes(),
     keyToSeed(key),
 ], dataStore.programId);
 
@@ -121,6 +107,7 @@ export const initializeDataStore = async (
     provider: anchor.AnchorProvider,
     eventManager: EventManager,
     signer: anchor.web3.Keypair,
+    user: Keypair,
     dataStoreKey: string,
     oracleIndex: number,
     fakeToken: PublicKey,
@@ -131,7 +118,6 @@ export const initializeDataStore = async (
     const [signerRoles] = createRolesPDA(dataStorePDA, signer.publicKey);
 
     eventManager.subscribe(dataStore, "DataStoreInitEvent");
-    eventManager.subscribe(dataStore, "TokenConfigChangeEvent");
     eventManager.subscribe(dataStore, "MarketChangeEvent");
 
     // Initialize a DataStore with the given key.
@@ -148,12 +134,16 @@ export const initializeDataStore = async (
 
     // Initiliaze a roles account for `signer`.
     try {
-        const tx = await dataStore.methods.initializeRoles().accounts({
-            authority: signer.publicKey,
-            store: dataStorePDA,
-            roles: signerRoles,
-        }).signers([signer]).rpc();
-        console.log(`Initialized a roles account ${signerRoles} in tx: ${tx}`);
+        const roles = await initializeRoles(signer, dataStorePDA);
+        console.log(`Initialized a roles account ${roles} for ${signer.publicKey}`);
+    } catch (error) {
+        console.warn("Failed to initialize roles account:", error);
+    }
+
+    // Initiliaze a roles account for `user`.
+    try {
+        const roles = await initializeRoles(user, dataStorePDA);
+        console.log(`Initialized a roles account ${roles} for ${user.publicKey}`);
     } catch (error) {
         console.warn("Failed to initialize roles account:", error);
     }
@@ -181,64 +171,44 @@ export const initializeDataStore = async (
         }
     }
 
+    // Initialize token config map.
+    try {
+        const tokenConfigMapAddress = await initializeTokenConfigMap(signer, dataStorePDA, 4);
+        console.log(`Intialized token config map: ${tokenConfigMapAddress}`);
+    } catch (error) {
+        console.log("Failed to initialize token config map", error);
+    }
+
     const HEARTBEAT = 120;
 
     // Insert BTC token config.
     try {
-        const key = BTC_TOKEN_MINT.toBase58();
-        const [tokenConfigPDA] = createTokenConfigPDA(dataStorePDA, key);
-        const tx = await dataStore.methods.initializeTokenConfig(key, BTC_FEED, HEARTBEAT, 8, 2).accounts({
-            authority: signer.publicKey,
-            store: dataStorePDA,
-            onlyController: createRolesPDA(dataStorePDA, signer.publicKey)[0],
-            tokenConfig: tokenConfigPDA,
-        }).signers([signer]).rpc();
-        console.log(`Init a token config account ${tokenConfigPDA} for ${BTC_TOKEN_MINT} in tx: ${tx}`);
+        await insertTokenConfig(signer, dataStorePDA, BTC_TOKEN_MINT, BTC_FEED, HEARTBEAT, 2);
+        console.log(`Init a token config for ${BTC_TOKEN_MINT}`);
     } catch (error) {
         console.warn("Failed to init the token config account", error);
     }
 
     // Insert SOL token config.
     try {
-        const key = SOL_TOKEN_MINT.toBase58();
-        const [tokenConfigPDA] = createTokenConfigPDA(dataStorePDA, key);
-        const tx = await dataStore.methods.initializeTokenConfig(key, SOL_FEED, HEARTBEAT, 8, 4).accounts({
-            authority: signer.publicKey,
-            store: dataStorePDA,
-            onlyController: createRolesPDA(dataStorePDA, signer.publicKey)[0],
-            tokenConfig: tokenConfigPDA,
-        }).signers([signer]).rpc();
-        console.log(`Init a token config account ${tokenConfigPDA} for ${SOL_TOKEN_MINT} in tx: ${tx}`);
+        await insertTokenConfig(signer, dataStorePDA, SOL_TOKEN_MINT, SOL_FEED, HEARTBEAT, 4);
+        console.log(`Init a token config for ${SOL_TOKEN_MINT}`);
     } catch (error) {
         console.warn("Failed to init the token config account", error);
     }
 
     // Insert FakeToken token config.
     try {
-        const key = fakeToken.toBase58();
-        const [tokenConfigPDA] = createTokenConfigPDA(dataStorePDA, key);
-        const tx = await dataStore.methods.initializeTokenConfig(key, BTC_FEED, HEARTBEAT, 9, 2).accounts({
-            authority: signer.publicKey,
-            store: dataStorePDA,
-            onlyController: createRolesPDA(dataStorePDA, signer.publicKey)[0],
-            tokenConfig: tokenConfigPDA,
-        }).signers([signer]).rpc();
-        console.log(`Init a token config account ${tokenConfigPDA} for ${fakeToken} in tx: ${tx}`);
+        await insertTokenConfig(signer, dataStorePDA, fakeToken, BTC_FEED, HEARTBEAT, 2);
+        console.log(`Init a token configfor ${fakeToken}`);
     } catch (error) {
         console.warn("Failed to init the token config account", error);
     }
 
     // Insert UsdG token config.
     try {
-        const key = usdG.toBase58();
-        const [tokenConfigPDA] = createTokenConfigPDA(dataStorePDA, key);
-        const tx = await dataStore.methods.initializeTokenConfig(key, USDC_FEED, HEARTBEAT, 8, 4).accounts({
-            authority: signer.publicKey,
-            store: dataStorePDA,
-            onlyController: createRolesPDA(dataStorePDA, signer.publicKey)[0],
-            tokenConfig: tokenConfigPDA,
-        }).signers([signer]).rpc();
-        console.log(`Init a token config account ${tokenConfigPDA} for ${usdG} in tx: ${tx}`);
+        await insertTokenConfig(signer, dataStorePDA, usdG, USDC_FEED, HEARTBEAT, 4);
+        console.log(`Init a token config for ${usdG}`);
     } catch (error) {
         console.warn("Failed to init the token config account", error);
     }
@@ -271,3 +241,7 @@ export const initializeDataStore = async (
         console.warn("Failed to init a nonce account", error);
     }
 };
+
+export * from "./program";
+export * from "./token_config";
+export * from "./roles";

@@ -4,6 +4,7 @@ use anchor_spl::token::TokenAccount;
 use super::{Market, NonceBytes, Seed};
 
 const MAX_SWAP_PATH_LEN: usize = 16;
+const MAX_TOKENS: usize = 2 * (1 + MAX_SWAP_PATH_LEN);
 
 /// Withdrawal.
 #[account]
@@ -49,6 +50,12 @@ pub struct Tokens {
     pub final_short_token: Pubkey,
     /// The amount of market tokens taht will be withdrawn.
     pub market_token_amount: u64,
+    /// Tokens that require prices.
+    #[max_len(MAX_TOKENS)]
+    pub tokens: Vec<Pubkey>,
+    /// Token feeds for the tokens.
+    #[max_len(MAX_TOKENS)]
+    pub feeds: Vec<Pubkey>,
 }
 
 /// Tokens params.
@@ -85,6 +92,7 @@ impl Withdrawal {
         market: &Account<Market>,
         market_token_amount: u64,
         tokens: TokenParams,
+        tokens_with_feed: Vec<(Pubkey, Pubkey)>,
         final_long_token_receiver: &Account<TokenAccount>,
         final_short_token_receiver: &Account<TokenAccount>,
         ui_fee_receiver: Pubkey,
@@ -106,6 +114,7 @@ impl Withdrawal {
                 final_long_token_receiver.mint,
                 final_short_token_receiver.mint,
                 tokens,
+                tokens_with_feed,
             ),
         };
         Ok(())
@@ -119,13 +128,17 @@ impl Tokens {
         final_long_token: Pubkey,
         final_short_token: Pubkey,
         params: TokenParams,
+        tokens_with_feed: Vec<(Pubkey, Pubkey)>,
     ) -> Self {
+        let (tokens, feeds) = tokens_with_feed.into_iter().unzip();
         Self {
             params,
             market_token: market.meta.market_token_mint,
             final_long_token,
             final_short_token,
             market_token_amount,
+            tokens,
+            feeds,
         }
     }
 }

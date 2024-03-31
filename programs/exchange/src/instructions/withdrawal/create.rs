@@ -1,7 +1,9 @@
+use std::collections::BTreeSet;
+
 use anchor_lang::{prelude::*, system_program};
 use anchor_spl::token::{self, Token, TokenAccount};
 use data_store::{
-    cpi::accounts::{CheckRole, GetMarketTokenMint, InitializeWithdrawal},
+    cpi::accounts::{CheckRole, GetMarketMeta, GetTokenConfig, InitializeWithdrawal},
     program::DataStore,
     states::{withdrawal::TokenParams, NonceBytes},
     utils::Authentication,
@@ -28,6 +30,8 @@ pub struct CreateWithdrawal<'info> {
     pub data_store_program: Program<'info, DataStore>,
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
+    /// CHECK: check by CPI.
+    pub token_config_map: UncheckedAccount<'info>,
     /// CHECK: only used to invoke CPI and should be checked by it.
     pub market: UncheckedAccount<'info>,
     /// CHECK: only used to invoke CPI which will then initalize the account.
@@ -65,14 +69,34 @@ pub fn create_withdrawal(
         ExchangeError::EmptyWithdrawalAmount
     );
 
+    let mut tokens = BTreeSet::default();
+    tokens.insert(ctx.accounts.final_long_token_receiver.mint);
+    tokens.insert(ctx.accounts.final_short_token_receiver.mint);
+
     // The market token mint used to withdraw must match the `market`'s.
-    let market_token_mint =
-        cpi::get_market_token_mint(ctx.accounts.get_market_token_mint_ctx())?.get();
+    let market_meta = cpi::get_market_meta(ctx.accounts.get_market_meta_ctx())?.get();
     require_eq!(
         ctx.accounts.market_token.mint,
-        market_token_mint,
+        market_meta.market_token_mint,
         ExchangeError::MismatchedMarketTokenMint
     );
+    tokens.insert(market_meta.long_token_mint);
+    tokens.insert(market_meta.short_token_mint);
+
+    // TODO: verify swap paths.
+    let tokens_with_feed = tokens
+        .into_iter()
+        .map(|token| {
+            let config = cpi::get_token_config(
+                ctx.accounts.get_token_config_ctx(),
+                ctx.accounts.store.key(),
+                token,
+            )?
+            .get()
+            .ok_or(ExchangeError::ResourceNotFound)?;
+            Result::Ok((token, config.price_feed))
+        })
+        .collect::<Result<Vec<_>>>()?;
 
     // Transfer the market tokens to the vault.
     token::transfer(
@@ -84,6 +108,7 @@ pub fn create_withdrawal(
         ctx.accounts.initialize_withdrawal_ctx(),
         nonce,
         params.tokens,
+        tokens_with_feed,
         params.market_token_amount,
         params.ui_fee_receiver,
     )?;
@@ -120,12 +145,19 @@ impl<'info> Authentication<'info> for CreateWithdrawal<'info> {
 }
 
 impl<'info> CreateWithdrawal<'info> {
-    fn get_market_token_mint_ctx(
-        &self,
-    ) -> CpiContext<'_, '_, '_, 'info, GetMarketTokenMint<'info>> {
+    fn get_token_config_ctx(&self) -> CpiContext<'_, '_, '_, 'info, GetTokenConfig<'info>> {
         CpiContext::new(
             self.data_store_program.to_account_info(),
-            GetMarketTokenMint {
+            GetTokenConfig {
+                map: self.token_config_map.to_account_info(),
+            },
+        )
+    }
+
+    fn get_market_meta_ctx(&self) -> CpiContext<'_, '_, '_, 'info, GetMarketMeta<'info>> {
+        CpiContext::new(
+            self.data_store_program.to_account_info(),
+            GetMarketMeta {
                 market: self.market.to_account_info(),
             },
         )

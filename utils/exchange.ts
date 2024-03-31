@@ -1,8 +1,8 @@
 import { workspace, Program, BN } from "@coral-xyz/anchor";
 import { Exchange } from "../target/types/exchange";
 import { ComputeBudgetProgram, Keypair, PublicKey, Transaction } from "@solana/web3.js";
-import { createMarketPDA, createMarketTokenMintPDA, createMarketVaultPDA, createRolesPDA, createTokenConfigPDA, createWithdrawalPDA, dataStore } from "./data";
-import { TOKEN_PROGRAM_ID, getAccount } from "@solana/spl-token";
+import { createMarketPDA, createMarketTokenMintPDA, createMarketVaultPDA, createRolesPDA, createTokenConfigMapPDA, createWithdrawalPDA, dataStore, getTokenConfig } from "./data";
+import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { BTC_TOKEN_MINT, SOL_TOKEN_MINT } from "./token";
 import { toBN } from "./number";
 import { oracle as oracleProgram } from "./oracle";
@@ -95,6 +95,7 @@ export const createWithdrawal = async (
         onlyController: createRolesPDA(store, authority.publicKey)[0],
         dataStoreProgram: dataStore.programId,
         tokenProgram: TOKEN_PROGRAM_ID,
+        tokenConfigMap: createTokenConfigMapPDA(store)[0],
         market,
         withdrawal: withdrawalAddress,
         payer: payer.publicKey,
@@ -148,6 +149,7 @@ export interface ExecuteWithdrawalOptions {
             finalShortTokenReceiver: PublicKey,
             finalLongTokenMint: PublicKey,
             finalShortTokenMint: PublicKey,
+            feeds: PublicKey[],
         }
     }
 };
@@ -167,6 +169,7 @@ export const executeWithdrawal = async (
         finalShortTokenReceiver,
         finalLongTokenMint,
         finalShortTokenMint,
+        feeds,
     } = options.hints?.params ?? (
         await dataStore.account.withdrawal.fetch(withdrawal).then(withdrawal => {
             return {
@@ -176,13 +179,9 @@ export const executeWithdrawal = async (
                 finalShortTokenMint: withdrawal.tokens.finalShortToken,
                 finalLongTokenReceiver: withdrawal.receivers.finalLongTokenReceiver,
                 finalShortTokenReceiver: withdrawal.receivers.finalShortTokenReceiver,
+                feeds: withdrawal.tokens.feeds,
             }
         }));
-    const marketMeta = await dataStore.methods.getMarketMeta().accounts({ market }).view();
-    const longTokenConfig = createTokenConfigPDA(store, marketMeta.longTokenMint.toBase58())[0];
-    const shortTokenConfig = createTokenConfigPDA(store, marketMeta.shortTokenMint.toBase58())[0];
-    const longTokenFeed = (await dataStore.account.tokenConfig.fetch(longTokenConfig)).priceFeed;
-    const shortTokenFeed = (await dataStore.account.tokenConfig.fetch(shortTokenConfig)).priceFeed;
     let ix = await exchange.methods.executeWithdrawal(toBN(options.executionFee ?? 0)).accounts({
         authority: authority.publicKey,
         store,
@@ -192,6 +191,7 @@ export const executeWithdrawal = async (
         chainlinkProgram: CHAINLINK_ID,
         tokenProgram: TOKEN_PROGRAM_ID,
         oracle,
+        tokenConfigMap: createTokenConfigMapPDA(store)[0],
         withdrawal,
         user,
         market,
@@ -201,28 +201,13 @@ export const executeWithdrawal = async (
         finalShortTokenReceiver,
         finalLongTokenVault: createMarketVaultPDA(store, finalLongTokenMint)[0],
         finalShortTokenVault: createMarketVaultPDA(store, finalShortTokenMint)[0],
-    }).remainingAccounts([
-        {
-            pubkey: longTokenConfig,
-            isSigner: false,
-            isWritable: false,
-        },
-        {
-            pubkey: longTokenFeed,
-            isSigner: false,
-            isWritable: false,
-        },
-        {
-            pubkey: shortTokenConfig,
-            isSigner: false,
-            isWritable: false,
-        },
-        {
-            pubkey: shortTokenFeed,
+    }).remainingAccounts(feeds.map(feed => {
+        return {
+            pubkey: feed,
             isSigner: false,
             isWritable: false,
         }
-    ]).instruction();
+    })).instruction();
     const modifyComputeUnits = ComputeBudgetProgram.setComputeUnitLimit({
         units: 400_000
     });

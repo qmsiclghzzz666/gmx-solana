@@ -41,14 +41,14 @@ pub enum OracleError {
     NotEnoughAccountInfos,
     #[msg("Invalid token config account")]
     InvalidTokenConfigAccount,
+    #[msg("Missing token config")]
+    MissingTokenConfig,
     #[msg("Invalid price feed account")]
     InvalidPriceFeedAccount,
     #[msg("Invalid price from data feed")]
     InvalidDataFeedPrice,
     #[msg("Price Feed not updated")]
     PriceFeedNotUpdated,
-    // #[msg("Data store mismatched")]
-    // DataStoreMismatched,
     #[msg("Permission denied")]
     PermissionDenied,
 }

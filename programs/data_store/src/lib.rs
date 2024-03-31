@@ -19,6 +19,7 @@ use self::{
     states::{
         deposit::TokenParams as DepositTokenParams,
         market::{MarketMeta, Pool},
+        token_config::TokenConfig,
         withdrawal::TokenParams as WithdrawalTokenParams,
     },
     utils::internal,
@@ -81,33 +82,43 @@ pub mod data_store {
 
     // Token Config.
     #[access_control(internal::Authenticate::only_controller(&ctx))]
-    pub fn initialize_token_config(
-        ctx: Context<InitializeTokenConfig>,
-        key: String,
-        price_feed: Pubkey,
-        heartbeat_duration: u32,
-        token_decimals: u8,
-        precision: u8,
+    pub fn initialize_token_config_map(
+        ctx: Context<InitializeTokenConfigMap>,
+        len: u16,
     ) -> Result<()> {
-        instructions::initialize_token_config(
-            ctx,
-            key,
-            price_feed,
-            heartbeat_duration,
-            token_decimals,
-            precision,
-        )
+        instructions::initialize_token_config_map(ctx, len)
     }
 
     #[access_control(internal::Authenticate::only_controller(&ctx))]
-    pub fn update_token_config(
-        ctx: Context<UpdateTokenConfig>,
-        key: String,
-        price_feed: Option<Pubkey>,
-        token_decimals: Option<u8>,
-        precision: Option<u8>,
+    pub fn insert_token_config(
+        ctx: Context<InsertTokenConfig>,
+        price_feed: Pubkey,
+        heartbeat_duration: u32,
+        precision: u8,
     ) -> Result<()> {
-        instructions::update_token_config(ctx, key, price_feed, token_decimals, precision)
+        instructions::insert_token_config(ctx, price_feed, heartbeat_duration, precision)
+    }
+
+    #[access_control(internal::Authenticate::only_controller(&ctx))]
+    pub fn toggle_token_config(
+        ctx: Context<ToggleTokenConfig>,
+        token: Pubkey,
+        enable: bool,
+    ) -> Result<()> {
+        instructions::toggle_token_config(ctx, token, enable)
+    }
+
+    pub fn get_token_config(
+        ctx: Context<GetTokenConfig>,
+        store: Pubkey,
+        token: Pubkey,
+    ) -> Result<Option<TokenConfig>> {
+        instructions::get_token_config(ctx, store, token)
+    }
+
+    #[access_control(internal::Authenticate::only_controller(&ctx))]
+    pub fn extend_token_config_map(ctx: Context<ExtendTokenConfigMap>, len: u16) -> Result<()> {
+        instructions::extend_token_config_map(ctx, len)
     }
 
     // Market.
@@ -245,8 +256,9 @@ pub mod data_store {
         nonce: [u8; 32],
         ui_fee_receiver: Pubkey,
         tokens: DepositTokenParams,
+        tokens_with_feed: Vec<(Pubkey, Pubkey)>,
     ) -> Result<()> {
-        instructions::initialize_deposit(ctx, nonce, ui_fee_receiver, tokens)
+        instructions::initialize_deposit(ctx, nonce, ui_fee_receiver, tokens, tokens_with_feed)
     }
 
     #[access_control(internal::Authenticate::only_controller(&ctx))]
@@ -260,6 +272,7 @@ pub mod data_store {
         ctx: Context<InitializeWithdrawal>,
         nonce: [u8; 32],
         tokens: WithdrawalTokenParams,
+        tokens_with_feed: Vec<(Pubkey, Pubkey)>,
         market_token_amount: u64,
         ui_fee_receiver: Pubkey,
     ) -> Result<()> {
@@ -267,6 +280,7 @@ pub mod data_store {
             ctx,
             nonce,
             tokens,
+            tokens_with_feed,
             market_token_amount,
             ui_fee_receiver,
         )
@@ -293,6 +307,8 @@ pub enum DataStoreError {
     InvalidArgument,
     #[msg("Lamports not enough")]
     LamportsNotEnough,
+    #[msg("Required resource not found")]
+    RequiredResourceNotFound,
     // Roles.
     #[msg("Too many admins")]
     TooManyAdmins,
