@@ -1,12 +1,13 @@
 import { workspace, Program, BN } from "@coral-xyz/anchor";
 import { Exchange } from "../target/types/exchange";
-import { ComputeBudgetProgram, Keypair, PublicKey, Transaction } from "@solana/web3.js";
-import { createMarketPDA, createMarketTokenMintPDA, createMarketVaultPDA, createRolesPDA, createTokenConfigMapPDA, createWithdrawalPDA, dataStore, getTokenConfig } from "./data";
-import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import { ComputeBudgetProgram, Keypair, PublicKey, Signer, Transaction } from "@solana/web3.js";
+import { createDepositPDA, createMarketPDA, createMarketTokenMintPDA, createMarketVaultPDA, createRolesPDA, createTokenConfigMapPDA, createWithdrawalPDA, dataStore, getTokenConfig } from "./data";
+import { TOKEN_PROGRAM_ID, getAccount } from "@solana/spl-token";
 import { BTC_TOKEN_MINT, SOL_TOKEN_MINT } from "./token";
 import { toBN } from "./number";
-import { oracle as oracleProgram } from "./oracle";
+import { oracle, oracle as oracleProgram } from "./oracle";
 import { CHAINLINK_ID } from "./external";
+import { makeInvoke } from "./invoke";
 
 export const exchange = workspace.Exchange as Program<Exchange>;
 
@@ -38,7 +39,163 @@ export const createMarket = async (
     return marketAddress;
 };
 
-export interface WithdrawalOptions {
+export interface CreateDepositOptions {
+    nonce?: Buffer,
+    executionFee?: number | bigint,
+    longTokenSwapPath?: PublicKey[],
+    shortTokenSwapPath?: PublicKey[],
+    minMarketToken?: number | bigint,
+    shouldUnwrapNativeToken?: boolean,
+    hints?: {
+        initialLongToken?: PublicKey,
+        initialShortToken?: PublicKey,
+    },
+    callback?: (string) => void,
+}
+
+export const createDeposit = async (
+    authority: Signer,
+    store: PublicKey,
+    payer: Signer,
+    market: PublicKey,
+    toMarketTokenAccount: PublicKey,
+    fromInitialLongTokenAccount: PublicKey,
+    fromInitialShortTokenAccount: PublicKey,
+    initialLongTokenAmount: number | bigint,
+    initialShortTokenAmount: number | bigint,
+    options: CreateDepositOptions = {},
+) => {
+    const depositNonce = options.nonce ?? Keypair.generate().publicKey.toBuffer();
+    const [deposit] = createDepositPDA(store, payer.publicKey, depositNonce);
+    const initialLongToken = options.hints?.initialLongToken ?? (await getAccount(exchange.provider.connection, fromInitialLongTokenAccount)).mint;
+    const initialShortToken = options.hints?.initialShortToken ?? (await getAccount(exchange.provider.connection, fromInitialShortTokenAccount)).mint;
+    await exchange.methods.createDeposit(
+        [...depositNonce],
+        {
+            uiFeeReceiver: Keypair.generate().publicKey,
+            executionFee: toBN(options.executionFee ?? 0),
+            longTokenSwapPath: options.longTokenSwapPath ?? [],
+            shortTokenSwapPath: options.shortTokenSwapPath ?? [],
+            initialLongTokenAmount: toBN(initialLongTokenAmount),
+            initialShortTokenAmount: toBN(initialShortTokenAmount),
+            minMarketToken: toBN(options.minMarketToken ?? 0),
+            shouldUnwrapNativeToken: options.shouldUnwrapNativeToken ?? false,
+        }
+    ).accounts({
+        authority: authority.publicKey,
+        store,
+        onlyController: createRolesPDA(store, authority.publicKey)[0],
+        dataStoreProgram: dataStore.programId,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        market,
+        tokenConfigMap: createTokenConfigMapPDA(store)[0],
+        deposit,
+        payer: payer.publicKey,
+        receiver: toMarketTokenAccount,
+        initialLongToken: fromInitialLongTokenAccount,
+        initialShortToken: fromInitialShortTokenAccount,
+        longTokenDepositVault: createMarketVaultPDA(store, initialLongToken)[0],
+        shortTokenDepositVault: createMarketVaultPDA(store, initialShortToken)[0],
+    }).signers([authority, payer]).rpc().then(options.callback);
+
+    return deposit;
+}
+
+export const cancelDeposit = async (
+    authority: Signer,
+    store: PublicKey,
+    user: PublicKey,
+    deposit: PublicKey,
+    fromInitialLongTokenAccount: PublicKey,
+    fromInitialShortTokenAccount: PublicKey,
+    options: {
+        executionFee?: number | bigint,
+        hints?: {
+            initialLongToken?: PublicKey,
+            initialShortToken?: PublicKey,
+        }
+        callback?: (string) => void,
+    } = {},
+) => {
+    const initialLongToken = options.hints?.initialLongToken ?? (await getAccount(exchange.provider.connection, fromInitialLongTokenAccount)).mint;
+    const initialShortToken = options.hints?.initialShortToken ?? (await getAccount(exchange.provider.connection, fromInitialShortTokenAccount)).mint;
+    await exchange.methods.cancelDeposit(toBN(options.executionFee ?? 0)).accounts({
+        authority: authority.publicKey,
+        store,
+        onlyController: createRolesPDA(store, authority.publicKey)[0],
+        dataStoreProgram: dataStore.programId,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        user,
+        deposit,
+        initialLongToken: fromInitialLongTokenAccount,
+        initialShortToken: fromInitialShortTokenAccount,
+        longTokenDepositVault: createMarketVaultPDA(store, initialLongToken)[0],
+        shortTokenDepositVault: createMarketVaultPDA(store, initialShortToken)[0],
+    }).signers([authority]).rpc().then(options.callback);
+};
+
+export type MakeExecuteDepositInstructionParams = {
+    authority: PublicKey,
+    store: PublicKey,
+    oracle: PublicKey,
+    deposit: PublicKey,
+    options?: {
+        executionFee?: number | bigint,
+        hints?: {
+            deposit?: {
+                user: PublicKey,
+                market: PublicKey,
+                marketToken: PublicKey,
+                toMarketTokenAccount: PublicKey,
+                feeds: PublicKey[],
+            },
+        }
+    }
+};
+
+export const makeExecuteDepositInstruction = async ({
+    authority,
+    store,
+    oracle,
+    deposit,
+    options
+}: MakeExecuteDepositInstructionParams,
+) => {
+    const { user, market, marketToken, toMarketTokenAccount, feeds } = options?.hints?.deposit ?? await exchange.account.deposit.fetch(deposit).then(deposit => {
+        return {
+            user: deposit.user,
+            market: deposit.market,
+            marketToken: deposit.tokens.marketToken,
+            toMarketTokenAccount: deposit.receivers.receiver,
+            feeds: deposit.tokens.feeds,
+        }
+    });
+    return await exchange.methods.executeDeposit(toBN(options?.executionFee ?? 0)).accounts({
+        authority,
+        store,
+        onlyOrderKeeper: createRolesPDA(store, authority)[0],
+        dataStoreProgram: dataStore.programId,
+        oracleProgram: oracleProgram.programId,
+        oracle,
+        chainlinkProgram: CHAINLINK_ID,
+        tokenConfigMap: createTokenConfigMapPDA(store)[0],
+        market,
+        marketTokenMint: marketToken,
+        user,
+        deposit,
+        receiver: toMarketTokenAccount,
+    }).remainingAccounts(feeds.map(feed => {
+        return {
+            pubkey: feed,
+            isSigner: false,
+            isWritable: false,
+        }
+    })).instruction();
+};
+
+export const invokeExecuteDeposit = makeInvoke(makeExecuteDepositInstruction, ["authority"]);
+
+export interface CreateWithdrawalOptions {
     nonce?: Buffer,
     executionFee?: number | bigint,
     minLongTokenAmount?: number | bigint,
@@ -46,24 +203,24 @@ export interface WithdrawalOptions {
     longTokenSwapPath?: PublicKey[],
     shortTokenSwapPath?: PublicKey[],
     shouldUnwrapNativeToken?: boolean,
-    hints?: WithdrawalHints,
+    hints?: CreateWithdrawalHints,
     callback?: (string) => void,
 }
 
-export interface WithdrawalHints {
+export interface CreateWithdrawalHints {
     marketToken?: PublicKey,
 }
 
 export const createWithdrawal = async (
-    authority: Keypair,
+    authority: Signer,
     store: PublicKey,
-    payer: Keypair,
+    payer: Signer,
     market: PublicKey,
     amount: number | bigint,
     fromMarketTokenAccount: PublicKey,
     toLongTokenAccount: PublicKey,
     toShortTokenAccount: PublicKey,
-    options: WithdrawalOptions = {
+    options: CreateWithdrawalOptions = {
         executionFee: 0,
         minLongTokenAmount: 0,
         minShortTokenAmount: 0,
