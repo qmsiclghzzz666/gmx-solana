@@ -3,8 +3,8 @@ use anchor_spl::token::TokenAccount;
 
 use crate::{
     states::{
-        withdrawal::{SwapParams, TokenParams},
-        DataStore, Market, NonceBytes, Roles, Seed, Withdrawal,
+        common::SwapParams, withdrawal::TokenParams, DataStore, Market, NonceBytes, Roles, Seed,
+        Withdrawal,
     },
     utils::internal,
     DataStoreError,

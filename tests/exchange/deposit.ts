@@ -183,10 +183,7 @@ describe("exchange: deposit", () => {
             await cancelDeposit(
                 signer0,
                 dataStoreAddress,
-                user0.publicKey,
                 deposit,
-                user0FakeTokenAccount,
-                user0UsdGTokenAccount,
                 {
                     executionFee: 5000,
                     callback: signature => console.log(`deposit cancelled at ${signature}`),

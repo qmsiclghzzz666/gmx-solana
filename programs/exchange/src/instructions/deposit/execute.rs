@@ -28,11 +28,11 @@ pub fn execute_deposit<'info>(
         .checked_sub(super::MAX_DEPOSIT_EXECUTION_FEE.min(execution_fee))
         .ok_or(ExchangeError::NotEnoughExecutionFee)?;
     // TODO: perform the swaps.
-    let long_token = deposit.tokens.params.initial_long_token;
-    let short_token = deposit.tokens.params.initial_short_token;
+    let long_token = deposit.fixed.tokens.initial_long_token;
+    let short_token = deposit.fixed.tokens.initial_short_token;
     let remaining_accounts = ctx.remaining_accounts.to_vec();
     ctx.accounts.with_oracle_prices(
-        deposit.tokens.tokens.clone(),
+        deposit.dynamic.tokens_with_feed.tokens.clone(),
         remaining_accounts,
         |accounts| {
             let oracle = &mut accounts.oracle;
@@ -45,8 +45,18 @@ pub fn execute_deposit<'info>(
                 .max
                 .to_unit_price();
             let (long_amount, short_amount) = (
-                accounts.deposit.tokens.params.initial_long_token_amount,
-                accounts.deposit.tokens.params.initial_short_token_amount,
+                accounts
+                    .deposit
+                    .fixed
+                    .tokens
+                    .params
+                    .initial_long_token_amount,
+                accounts
+                    .deposit
+                    .fixed
+                    .tokens
+                    .params
+                    .initial_short_token_amount,
             );
             let report = accounts
                 .as_market()
@@ -91,12 +101,12 @@ pub struct ExecuteDeposit<'info> {
     /// CHECK: only used to receive lamports.
     #[account(mut)]
     pub user: UncheckedAccount<'info>,
-    #[account(mut, constraint = receiver.key() == deposit.receivers.receiver)]
+    #[account(mut, constraint = receiver.key() == deposit.fixed.receivers.receiver)]
     pub receiver: Account<'info, TokenAccount>,
-    #[account(mut, constraint = market.key() == deposit.market)]
+    #[account(mut, constraint = market.key() == deposit.fixed.market)]
     /// CHECK: only used to invoke CPI and should be checked by it.
     pub market: UncheckedAccount<'info>,
-    #[account(mut, constraint = market_token_mint.key() == deposit.tokens.market_token)]
+    #[account(mut, constraint = market_token_mint.key() == deposit.fixed.tokens.market_token)]
     pub market_token_mint: Account<'info, Mint>,
     pub system_program: Program<'info, System>,
 }

@@ -1,32 +1,89 @@
 use anchor_lang::prelude::*;
+use anchor_spl::token::TokenAccount;
 
-use super::{Market, NonceBytes, Seed};
-
-const MAX_SWAP_PATH_LEN: usize = 16;
-const MAX_TOKENS: usize = 2 * (1 + MAX_SWAP_PATH_LEN);
+use super::{
+    common::{SwapParams, TokensWithFeed},
+    Market, NonceBytes, Seed,
+};
 
 /// Deposit.
 #[account]
-#[derive(InitSpace)]
 pub struct Deposit {
+    /// Fixed part.
+    pub fixed: Fixed,
+    /// Dynamic part.
+    pub dynamic: Dynamic,
+}
+
+impl Deposit {
+    pub(crate) fn init_space(
+        tokens_with_feed: &[(Pubkey, Pubkey)],
+        swap_params: &SwapParams,
+    ) -> usize {
+        Fixed::INIT_SPACE + Dynamic::init_space(tokens_with_feed, swap_params)
+    }
+}
+
+/// Fixed part of [`Deposit`].
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, InitSpace)]
+pub struct Fixed {
     /// The bump seed.
     pub bump: u8,
     /// The nonce bytes for this deposit.
     pub nonce: [u8; 32],
-    /// The account depositing liquidity.
-    pub user: Pubkey,
-    /// Market.
-    pub market: Pubkey,
-    // /// Callback Contract.
-    // pub callback: Pubkey,
-    /// The receivers of the deposit.
-    pub receivers: Receivers,
-    /// The tokens and swap paths for the deposit.
-    pub tokens: Tokens,
     /// The slot that the deposit was last updated at.
     pub updated_at_slot: u64,
-    // /// The fee limit for the callback contract.
-    // pub callback_fee_limit: u64,
+    /// Market.
+    pub market: Pubkey,
+    /// Senders.
+    pub senders: Senders,
+    /// The receivers of the deposit.
+    pub receivers: Receivers,
+    /// Tokens config.
+    pub tokens: Tokens,
+}
+
+/// Senders of [`Deposit`].
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, InitSpace)]
+pub struct Senders {
+    /// The user depositing liquidity.
+    pub user: Pubkey,
+    /// Initial long token account.
+    pub initial_long_token_account: Pubkey,
+    /// Initial short token account.
+    pub initial_short_token_account: Pubkey,
+}
+
+/// Tokens config of [`Deposit`].
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, InitSpace)]
+pub struct Tokens {
+    /// The market token of the market.
+    pub market_token: Pubkey,
+    /// Initial long token.
+    pub initial_long_token: Pubkey,
+    /// Initial short token.
+    pub initial_short_token: Pubkey,
+    /// Params.
+    pub params: TokenParams,
+}
+
+/// Dynamic part of [`Deposit`].
+#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+pub struct Dynamic {
+    /// Tokens with feed.
+    pub tokens_with_feed: TokensWithFeed,
+    /// Swap params.
+    pub swap_params: SwapParams,
+}
+
+impl Dynamic {
+    fn init_space(tokens_with_feed: &[(Pubkey, Pubkey)], swap_params: &SwapParams) -> usize {
+        TokensWithFeed::init_space(tokens_with_feed)
+            + SwapParams::init_space(
+                swap_params.long_token_swap_path.len(),
+                swap_params.short_token_swap_path.len(),
+            )
+    }
 }
 
 impl Seed for Deposit {
@@ -34,27 +91,44 @@ impl Seed for Deposit {
 }
 
 impl Deposit {
-    /// The max length of swap path.
-    pub const MAX_SWAP_PATH_LEN: usize = MAX_SWAP_PATH_LEN;
-
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn init(
         &mut self,
         bump: u8,
         market: &Account<Market>,
         nonce: NonceBytes,
-        account: Pubkey,
-        receivers: Receivers,
-        tokens: TokenParams,
         tokens_with_feed: Vec<(Pubkey, Pubkey)>,
+        user: Pubkey,
+        initial_long_token_account: &Account<TokenAccount>,
+        initial_short_token_account: &Account<TokenAccount>,
+        receivers: Receivers,
+        token_params: TokenParams,
+        swap_params: SwapParams,
     ) -> Result<()> {
-        self.bump = bump;
-        self.market = market.key();
-        self.nonce = nonce;
-        self.user = account;
-        self.receivers = receivers;
-        self.tokens.init(market, tokens, tokens_with_feed);
-        self.updated_at_slot = Clock::get()?.slot;
+        *self = Self {
+            fixed: Fixed {
+                bump,
+                nonce,
+                updated_at_slot: Clock::get()?.slot,
+                market: market.key(),
+                senders: Senders {
+                    user,
+                    initial_long_token_account: initial_long_token_account.key(),
+                    initial_short_token_account: initial_short_token_account.key(),
+                },
+                receivers,
+                tokens: Tokens {
+                    market_token: market.meta.market_token_mint,
+                    initial_long_token: initial_long_token_account.mint,
+                    initial_short_token: initial_short_token_account.mint,
+                    params: token_params,
+                },
+            },
+            dynamic: Dynamic {
+                tokens_with_feed: TokensWithFeed::from_vec(tokens_with_feed),
+                swap_params,
+            },
+        };
         Ok(())
     }
 }
@@ -70,16 +144,6 @@ pub struct Receivers {
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, InitSpace)]
 pub struct TokenParams {
-    /// Initial long token.
-    pub initial_long_token: Pubkey,
-    /// Initial short token.
-    pub initial_short_token: Pubkey,
-    /// Swap path for long token.
-    #[max_len(MAX_SWAP_PATH_LEN)]
-    pub long_token_swap_path: Vec<Pubkey>,
-    /// Swap path for short token.
-    #[max_len(MAX_SWAP_PATH_LEN)]
-    pub short_token_swap_path: Vec<Pubkey>,
     /// The amount of long tokens to deposit.
     pub initial_long_token_amount: u64,
     /// The amount of short tokens to deposit.
@@ -88,34 +152,4 @@ pub struct TokenParams {
     pub min_market_tokens: u64,
     /// Whether to unwrap the native token.
     pub should_unwrap_native_token: bool,
-}
-
-/// The tokens and swap paths config for [`Deposit`].
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, InitSpace)]
-pub struct Tokens {
-    /// The market token to mint.
-    pub market_token: Pubkey,
-    /// Params.
-    pub params: TokenParams,
-    /// Tokens that require prices.
-    #[max_len(MAX_TOKENS)]
-    pub tokens: Vec<Pubkey>,
-    /// Token feeds for the tokens.
-    #[max_len(MAX_TOKENS)]
-    pub feeds: Vec<Pubkey>,
-}
-
-impl Tokens {
-    fn init(
-        &mut self,
-        market: &Market,
-        params: TokenParams,
-        tokens_with_feed: Vec<(Pubkey, Pubkey)>,
-    ) {
-        self.market_token = market.meta.market_token_mint;
-        self.params = params;
-        let (tokens, feeds) = tokens_with_feed.into_iter().unzip();
-        self.tokens = tokens;
-        self.feeds = feeds;
-    }
 }

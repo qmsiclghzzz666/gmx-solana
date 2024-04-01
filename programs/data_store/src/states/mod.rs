@@ -19,6 +19,9 @@ pub mod deposit;
 /// Withdrawal.
 pub mod withdrawal;
 
+/// Common types.
+pub mod common;
+
 pub use data_store::*;
 pub use deposit::Deposit;
 pub use market::*;

@@ -92,8 +92,8 @@ export const createDeposit = async (
         deposit,
         payer: payer.publicKey,
         receiver: toMarketTokenAccount,
-        initialLongToken: fromInitialLongTokenAccount,
-        initialShortToken: fromInitialShortTokenAccount,
+        initialLongTokenAccount: fromInitialLongTokenAccount,
+        initialShortTokenAccount: fromInitialShortTokenAccount,
         longTokenDepositVault: createMarketVaultPDA(store, initialLongToken)[0],
         shortTokenDepositVault: createMarketVaultPDA(store, initialShortToken)[0],
     }).signers([authority, payer]).rpc().then(options.callback);
@@ -104,21 +104,36 @@ export const createDeposit = async (
 export const cancelDeposit = async (
     authority: Signer,
     store: PublicKey,
-    user: PublicKey,
     deposit: PublicKey,
-    fromInitialLongTokenAccount: PublicKey,
-    fromInitialShortTokenAccount: PublicKey,
     options: {
         executionFee?: number | bigint,
         hints?: {
-            initialLongToken?: PublicKey,
-            initialShortToken?: PublicKey,
+            deposit?: {
+                user: PublicKey,
+                fromInitialLongTokenAccount: PublicKey,
+                fromInitialShortTokenAccount: PublicKey,
+                initialLongToken: PublicKey,
+                initialShortToken: PublicKey,
+            }
         }
         callback?: (string) => void,
     } = {},
 ) => {
-    const initialLongToken = options.hints?.initialLongToken ?? (await getAccount(exchange.provider.connection, fromInitialLongTokenAccount)).mint;
-    const initialShortToken = options.hints?.initialShortToken ?? (await getAccount(exchange.provider.connection, fromInitialShortTokenAccount)).mint;
+    const {
+        user,
+        fromInitialLongTokenAccount,
+        fromInitialShortTokenAccount,
+        initialLongToken,
+        initialShortToken,
+    } = options.hints?.deposit ?? await dataStore.account.deposit.fetch(deposit).then(deposit => {
+        return {
+            user: deposit.fixed.senders.user,
+            fromInitialLongTokenAccount: deposit.fixed.senders.initialLongTokenAccount,
+            fromInitialShortTokenAccount: deposit.fixed.senders.initialShortTokenAccount,
+            initialLongToken: deposit.fixed.tokens.initialLongToken,
+            initialShortToken: deposit.fixed.tokens.initialShortToken,
+        }
+    });
     await exchange.methods.cancelDeposit(toBN(options.executionFee ?? 0)).accounts({
         authority: authority.publicKey,
         store,
@@ -163,11 +178,11 @@ export const makeExecuteDepositInstruction = async ({
 ) => {
     const { user, market, marketToken, toMarketTokenAccount, feeds } = options?.hints?.deposit ?? await exchange.account.deposit.fetch(deposit).then(deposit => {
         return {
-            user: deposit.user,
-            market: deposit.market,
-            marketToken: deposit.tokens.marketToken,
-            toMarketTokenAccount: deposit.receivers.receiver,
-            feeds: deposit.tokens.feeds,
+            user: deposit.fixed.senders.user,
+            market: deposit.fixed.market,
+            marketToken: deposit.fixed.tokens.marketToken,
+            toMarketTokenAccount: deposit.fixed.receivers.receiver,
+            feeds: deposit.dynamic.tokensWithFeed.feeds,
         }
     });
     return await exchange.methods.executeDeposit(toBN(options?.executionFee ?? 0)).accounts({
@@ -338,7 +353,7 @@ export const executeWithdrawal = async (
                 finalShortTokenMint: withdrawal.fixed.tokens.finalShortToken,
                 finalLongTokenReceiver: withdrawal.fixed.receivers.finalLongTokenReceiver,
                 finalShortTokenReceiver: withdrawal.fixed.receivers.finalShortTokenReceiver,
-                feeds: withdrawal.dynamic.feeds,
+                feeds: withdrawal.dynamic.tokensWithFeed.feeds,
             }
         }));
     let ix = await exchange.methods.executeWithdrawal(toBN(options.executionFee ?? 0)).accounts({

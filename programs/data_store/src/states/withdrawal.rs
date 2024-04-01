@@ -1,7 +1,10 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::TokenAccount;
 
-use super::{Market, NonceBytes, Seed};
+use super::{
+    common::{SwapParams, TokensWithFeed},
+    Market, NonceBytes, Seed,
+};
 
 /// Withdrawal.
 #[account]
@@ -40,18 +43,15 @@ pub struct Fixed {
 /// Dynamic part of [`Withdrawal`].
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct Dynamic {
-    /// Tokens that require prices of the same length with `feeds`.
-    pub tokens: Vec<Pubkey>,
-    /// Token feeds for the tokens of the same length with `tokens`.
-    pub feeds: Vec<Pubkey>,
+    /// Tokens with feed.
+    pub tokens_with_feed: TokensWithFeed,
     /// Swap params.
     pub swap: SwapParams,
 }
 
 impl Dynamic {
     fn init_space(tokens_with_feed: &[(Pubkey, Pubkey)], swap: &SwapParams) -> usize {
-        (4 + 32 * tokens_with_feed.len())
-            + (4 + 32 * tokens_with_feed.len())
+        TokensWithFeed::init_space(tokens_with_feed)
             + SwapParams::init_space(
                 swap.long_token_swap_path.len(),
                 swap.short_token_swap_path.len(),
@@ -96,21 +96,6 @@ pub struct TokenParams {
     pub should_unwrap_native_token: bool,
 }
 
-/// Swap params.
-#[derive(AnchorDeserialize, AnchorSerialize, Clone)]
-pub struct SwapParams {
-    /// Swap path for long token.
-    pub long_token_swap_path: Vec<Pubkey>,
-    /// Swap path for short token.
-    pub short_token_swap_path: Vec<Pubkey>,
-}
-
-impl SwapParams {
-    fn init_space(long_path_len: usize, short_path_len: usize) -> usize {
-        (4 + 32 * long_path_len) + (4 + 32 * short_path_len)
-    }
-}
-
 impl Seed for Withdrawal {
     const SEED: &'static [u8] = b"withdrawal";
 }
@@ -131,7 +116,6 @@ impl Withdrawal {
         final_short_token_receiver: &Account<TokenAccount>,
         ui_fee_receiver: Pubkey,
     ) -> Result<()> {
-        let (tokens, feeds) = tokens_with_feed.into_iter().unzip();
         *self = Self {
             fixed: Fixed {
                 bump,
@@ -153,8 +137,7 @@ impl Withdrawal {
                 },
             },
             dynamic: Dynamic {
-                tokens,
-                feeds,
+                tokens_with_feed: TokensWithFeed::from_vec(tokens_with_feed),
                 swap: swap_params,
             },
         };

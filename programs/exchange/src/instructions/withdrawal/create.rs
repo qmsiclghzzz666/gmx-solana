@@ -5,10 +5,7 @@ use anchor_spl::token::{self, Token, TokenAccount};
 use data_store::{
     cpi::accounts::{CheckRole, GetMarketMeta, GetTokenConfig, InitializeWithdrawal},
     program::DataStore,
-    states::{
-        withdrawal::{SwapParams, TokenParams},
-        NonceBytes,
-    },
+    states::{common::SwapParams, withdrawal::TokenParams, NonceBytes},
     utils::Authentication,
 };
 

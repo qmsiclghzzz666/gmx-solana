@@ -12,10 +12,17 @@ use crate::ExchangeError;
 
 /// Cancel a deposit.
 pub fn cancel_deposit(ctx: Context<CancelDeposit>, execution_fee: u64) -> Result<()> {
-    let initial_long_amount = ctx.accounts.deposit.tokens.params.initial_long_token_amount;
+    let initial_long_amount = ctx
+        .accounts
+        .deposit
+        .fixed
+        .tokens
+        .params
+        .initial_long_token_amount;
     let initial_short_amount = ctx
         .accounts
         .deposit
+        .fixed
         .tokens
         .params
         .initial_short_token_amount;
@@ -67,8 +74,8 @@ pub struct CancelDeposit<'info> {
     /// through CPI.
     #[account(
         mut,
-        constraint = deposit.tokens.params.initial_long_token == initial_long_token.mint @ ExchangeError::InvalidDepositToCancel,
-        constraint = deposit.tokens.params.initial_short_token == initial_short_token.mint @ ExchangeError::InvalidDepositToCancel,
+        constraint = deposit.fixed.tokens.initial_long_token == initial_long_token.mint @ ExchangeError::InvalidDepositToCancel,
+        constraint = deposit.fixed.tokens.initial_short_token == initial_short_token.mint @ ExchangeError::InvalidDepositToCancel,
     )]
     pub deposit: Account<'info, Deposit>,
     /// CHECK: only used to receive lamports.

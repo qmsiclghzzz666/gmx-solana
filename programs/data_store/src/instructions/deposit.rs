@@ -3,6 +3,7 @@ use anchor_spl::token::TokenAccount;
 
 use crate::{
     states::{
+        common::SwapParams,
         deposit::{Receivers, TokenParams},
         DataStore, Deposit, Market, NonceBytes, Roles, Seed,
     },
@@ -14,26 +15,30 @@ use crate::{
 pub fn initialize_deposit(
     ctx: Context<InitializeDeposit>,
     nonce: NonceBytes,
-    ui_fee_receiver: Pubkey,
-    tokens: TokenParams,
     tokens_with_feed: Vec<(Pubkey, Pubkey)>,
+    swap_params: SwapParams,
+    token_params: TokenParams,
+    ui_fee_receiver: Pubkey,
 ) -> Result<()> {
     ctx.accounts.deposit.init(
         ctx.bumps.deposit,
         &ctx.accounts.market,
         nonce,
-        ctx.accounts.payer.key(),
-        Receivers {
-            ui_fee_receiver,
-            receiver: ctx.accounts.receiver.key(),
-        },
-        tokens,
         tokens_with_feed,
+        ctx.accounts.payer.key(),
+        &ctx.accounts.initial_long_token_account,
+        &ctx.accounts.initial_short_token_account,
+        Receivers {
+            receiver: ctx.accounts.receiver.key(),
+            ui_fee_receiver,
+        },
+        token_params,
+        swap_params,
     )
 }
 
 #[derive(Accounts)]
-#[instruction(nonce: [u8; 32])]
+#[instruction(nonce: [u8; 32], tokens_with_feed: Vec<(Pubkey, Pubkey)>, swap_params: SwapParams)]
 pub struct InitializeDeposit<'info> {
     pub authority: Signer<'info>,
     #[account(mut)]
@@ -42,12 +47,16 @@ pub struct InitializeDeposit<'info> {
     pub store: Account<'info, DataStore>,
     #[account(
         init,
-        space = 8 + Deposit::INIT_SPACE,
+        space = 8 + Deposit::init_space(&tokens_with_feed, &swap_params),
         payer = payer,
         seeds = [Deposit::SEED, store.key().as_ref(), payer.key().as_ref(), &nonce],
         bump,
     )]
     pub deposit: Account<'info, Deposit>,
+    #[account(token::authority = payer)]
+    pub initial_long_token_account: Account<'info, TokenAccount>,
+    #[account(token::authority = payer)]
+    pub initial_short_token_account: Account<'info, TokenAccount>,
     pub(crate) market: Account<'info, Market>,
     #[account(token::mint = market.meta.market_token_mint)]
     pub receiver: Account<'info, TokenAccount>,
@@ -84,14 +93,14 @@ pub struct RemoveDeposit<'info> {
         mut,
         constraint = deposit.to_account_info().lamports() >= refund @ DataStoreError::LamportsNotEnough,
         close = authority,
-        has_one = user,
+        constraint = deposit.fixed.senders.user == user.key() @ DataStoreError::UserMismatch,
         seeds = [
             Deposit::SEED,
             store.key().as_ref(),
             user.key().as_ref(),
-            &deposit.nonce,
+            &deposit.fixed.nonce,
         ],
-        bump = deposit.bump,
+        bump = deposit.fixed.bump,
     )]
     pub deposit: Account<'info, Deposit>,
     /// CHECK: only used to receive lamports,

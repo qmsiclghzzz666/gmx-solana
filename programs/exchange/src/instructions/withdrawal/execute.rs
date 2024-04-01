@@ -83,7 +83,7 @@ pub fn execute_withdrawal<'info>(
     let short_token = meta.short_token_mint;
     let remaing_accounts = ctx.remaining_accounts.to_vec();
     let report = ctx.accounts.with_oracle_prices(
-        withdrawal.dynamic.tokens.clone(),
+        withdrawal.dynamic.tokens_with_feed.tokens.clone(),
         remaing_accounts,
         |accounts| {
             let oracle = &mut accounts.oracle;

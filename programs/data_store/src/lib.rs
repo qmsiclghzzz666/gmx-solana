@@ -17,10 +17,11 @@ pub use self::states::Data;
 use self::{
     instructions::*,
     states::{
+        common::SwapParams,
         deposit::TokenParams as DepositTokenParams,
         market::{MarketMeta, Pool},
         token_config::TokenConfig,
-        withdrawal::{SwapParams as WithdrawalSwapParams, TokenParams as WithdrawalTokenParams},
+        withdrawal::TokenParams as WithdrawalTokenParams,
     },
     utils::internal,
 };
@@ -254,11 +255,19 @@ pub mod data_store {
     pub fn initialize_deposit(
         ctx: Context<InitializeDeposit>,
         nonce: [u8; 32],
-        ui_fee_receiver: Pubkey,
-        tokens: DepositTokenParams,
         tokens_with_feed: Vec<(Pubkey, Pubkey)>,
+        swap_params: SwapParams,
+        token_params: DepositTokenParams,
+        ui_fee_receiver: Pubkey,
     ) -> Result<()> {
-        instructions::initialize_deposit(ctx, nonce, ui_fee_receiver, tokens, tokens_with_feed)
+        instructions::initialize_deposit(
+            ctx,
+            nonce,
+            tokens_with_feed,
+            swap_params,
+            token_params,
+            ui_fee_receiver,
+        )
     }
 
     #[access_control(internal::Authenticate::only_controller(&ctx))]
@@ -271,7 +280,7 @@ pub mod data_store {
     pub fn initialize_withdrawal(
         ctx: Context<InitializeWithdrawal>,
         nonce: [u8; 32],
-        swap_params: WithdrawalSwapParams,
+        swap_params: SwapParams,
         tokens_with_feed: Vec<(Pubkey, Pubkey)>,
         token_params: WithdrawalTokenParams,
         market_token_amount: u64,
