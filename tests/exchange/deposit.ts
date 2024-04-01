@@ -1,7 +1,7 @@
 import { PublicKey } from "@solana/web3.js";
 import { createNoncePDA, createRolesPDA } from "../../utils/data";
 import { getAddresses, getMarkets, getPrograms, getProvider, getUsers, expect } from "../../utils/fixtures";
-import { cancelDeposit, cancelWithdrawal, createDeposit, createWithdrawal, executeWithdrawal, invokeExecuteDeposit } from "../../utils/exchange";
+import { invokeCancelDeposit, invokeCancelWithdrawal, invokeExecuteWithdrawal, invokeCreateDeposit, invokeExecuteDeposit, invokeCreateWithdrawal } from "../../utils/exchange";
 
 describe("exchange: deposit", () => {
     const provider = getProvider();
@@ -33,25 +33,24 @@ describe("exchange: deposit", () => {
     it("create and execute deposit and then withdraw", async () => {
         let deposit: PublicKey;
         try {
-            deposit = await createDeposit(
-                signer0,
-                dataStoreAddress,
-                user0,
-                marketFakeFakeUsdG,
-                user0FakeFakeUsdGTokenAccount,
-                user0FakeTokenAccount,
-                user0UsdGTokenAccount,
-                1_000_000_000,
-                70_000 * 100_000_000,
-                {
-                    callback: signature => console.log(`deposit created at ${signature}`),
-                }
-            );
+            const [signature, address] = await invokeCreateDeposit(provider.connection, {
+                authority: signer0,
+                store: dataStoreAddress,
+                payer: user0,
+                market: marketFakeFakeUsdG,
+                toMarketTokenAccount: user0FakeFakeUsdGTokenAccount,
+                fromInitialLongTokenAccount: user0FakeTokenAccount,
+                fromInitialShortTokenAccount: user0UsdGTokenAccount,
+                initialLongTokenAmount: 1_000_000_000,
+                initialShortTokenAmount: 70_000 * 100_000_000,
+            });
+            console.log(`deposit created at ${signature}`);
+            deposit = address;
         } catch (error) {
             console.log(error);
         }
         try {
-            const signature = await invokeExecuteDeposit(provider.connection, {
+            const [signature] = await invokeExecuteDeposit(provider.connection, {
                 authority: signer0,
                 store: dataStoreAddress,
                 oracle: oracleAddress,
@@ -73,19 +72,21 @@ describe("exchange: deposit", () => {
 
         let withdrawal: PublicKey;
         try {
-            withdrawal = await createWithdrawal(
-                signer0,
-                dataStoreAddress,
-                user0,
-                marketFakeFakeUsdG,
-                1_000_000_000_000,
-                user0FakeFakeUsdGTokenAccount,
-                user0FakeTokenAccount,
-                user0UsdGTokenAccount,
+            const [signature, withdrawalAddress] = await invokeCreateWithdrawal(
+                provider.connection,
                 {
-                    callback: tx => console.log("withdrawal created at", tx),
+                    authority: signer0,
+                    store: dataStoreAddress,
+                    payer: user0,
+                    market: marketFakeFakeUsdG,
+                    amount: 1_000_000_000_000,
+                    fromMarketTokenAccount: user0FakeFakeUsdGTokenAccount,
+                    toLongTokenAccount: user0FakeTokenAccount,
+                    toShortTokenAccount: user0UsdGTokenAccount
                 }
             );
+            console.log(`withdrawal created at ${signature}`);
+            withdrawal = withdrawalAddress;
         } catch (error) {
             console.log(error);
             throw error;
@@ -97,15 +98,18 @@ describe("exchange: deposit", () => {
         }
         // Cancel the withdrawal.
         try {
-            await cancelWithdrawal(
-                signer0,
-                dataStoreAddress,
-                withdrawal,
+            const [signature] = await invokeCancelWithdrawal(
+                provider.connection,
                 {
-                    executionFee: 5001,
-                    callback: tx => console.log("withdrawal cancelled at", tx),
+                    authority: signer0,
+                    store: dataStoreAddress,
+                    withdrawal,
+                    options: {
+                        executionFee: 5000,
+                    }
                 }
             );
+            console.log(`withdrawal cancelled at ${signature}`);
         } catch (error) {
             console.log(error);
             throw error;
@@ -117,19 +121,21 @@ describe("exchange: deposit", () => {
         }
         // Create again.
         try {
-            withdrawal = await createWithdrawal(
-                signer0,
-                dataStoreAddress,
-                user0,
-                marketFakeFakeUsdG,
-                2_000 * 1_000_000_000,
-                user0FakeFakeUsdGTokenAccount,
-                user0FakeTokenAccount,
-                user0UsdGTokenAccount,
+            const [signature, address] = await invokeCreateWithdrawal(
+                provider.connection,
                 {
-                    callback: tx => console.log("withdrawal created at", tx),
+                    authority: signer0,
+                    store: dataStoreAddress,
+                    payer: user0,
+                    market: marketFakeFakeUsdG,
+                    amount: 2_000 * 1_000_000_000,
+                    fromMarketTokenAccount: user0FakeFakeUsdGTokenAccount,
+                    toLongTokenAccount: user0FakeTokenAccount,
+                    toShortTokenAccount: user0UsdGTokenAccount,
                 }
             );
+            console.log(`withdrawal created at ${signature}`);
+            withdrawal = address;
         } catch (error) {
             console.log(error);
             throw error;
@@ -140,16 +146,20 @@ describe("exchange: deposit", () => {
             // console.log("pools", market.pools);
         }
         try {
-            await executeWithdrawal(
-                signer0,
-                dataStoreAddress,
-                oracleAddress,
-                withdrawal,
+            const signature = await invokeExecuteWithdrawal(
+                provider.connection,
                 {
-                    callback: tx => console.log("withdrawal executed at", tx),
-                    executionFee: 5001,
-                }
+                    authority: signer0,
+                    store: dataStoreAddress,
+                    oracle: oracleAddress,
+                    withdrawal,
+                    options: {
+                        executionFee: 5001,
+                    }
+                },
+                400_000,
             );
+            console.log(`withdrawal executed at ${signature}`);
         } catch (error) {
             console.log(error);
             throw error;
@@ -162,30 +172,34 @@ describe("exchange: deposit", () => {
     });
 
     it("create and cancel deposit", async () => {
-        const deposit = await createDeposit(
-            signer0,
-            dataStoreAddress,
-            user0,
-            marketFakeFakeUsdG,
-            user0FakeFakeUsdGTokenAccount,
-            user0FakeTokenAccount,
-            user0UsdGTokenAccount,
-            2_000_000_000,
-            200_000_000,
+        const [signature, deposit] = await invokeCreateDeposit(
+            provider.connection,
             {
-                callback: sigature => console.log(`deposit created at ${sigature}`),
+                authority: signer0,
+                store: dataStoreAddress,
+                payer: user0,
+                market: marketFakeFakeUsdG,
+                toMarketTokenAccount: user0FakeFakeUsdGTokenAccount,
+                fromInitialLongTokenAccount: user0FakeTokenAccount,
+                fromInitialShortTokenAccount: user0UsdGTokenAccount,
+                initialLongTokenAmount: 2_000_000_000,
+                initialShortTokenAmount: 200_000_000,
             }
         );
+        console.log(`deposit created at ${signature}`);
         try {
-            await cancelDeposit(
-                signer0,
-                dataStoreAddress,
-                deposit,
+            const signature = await invokeCancelDeposit(
+                provider.connection,
                 {
-                    executionFee: 5000,
-                    callback: signature => console.log(`deposit cancelled at ${signature}`),
+                    authority: signer0,
+                    store: dataStoreAddress,
+                    deposit,
+                    options: {
+                        executionFee: 5000,
+                    }
                 }
-            )
+            );
+            console.log(`deposit cancelled at ${signature}`);
         } catch (error) {
             console.log(error);
             throw error;
