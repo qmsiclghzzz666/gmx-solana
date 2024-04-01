@@ -15,6 +15,7 @@ const MAX_ROLES: usize = 32;
 
 #[account]
 #[derive(InitSpace)]
+#[cfg_attr(feature = "debug", derive(Debug))]
 pub struct DataStore {
     #[max_len(MAX_ROLES)]
     roles_metadata: Vec<RoleMetadata>,
@@ -159,6 +160,7 @@ impl DataStore {
 
 /// The key of a Role.
 #[derive(Clone, AnchorSerialize, AnchorDeserialize, InitSpace, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "debug", derive(Debug))]
 pub struct RoleKey {
     #[max_len(MAX_LEN)]
     name: String,
@@ -177,6 +179,7 @@ impl RoleKey {
 
 /// Metadata of a role.
 #[derive(Clone, AnchorSerialize, AnchorDeserialize, InitSpace)]
+#[cfg_attr(feature = "debug", derive(Debug))]
 pub struct RoleMetadata {
     enabled: bool,
     index: u8,
@@ -199,6 +202,7 @@ impl<'a> From<&'a str> for RoleKey {
 /// Account that stores the roles of an address.
 #[account]
 #[derive(InitSpace)]
+#[cfg_attr(feature = "debug", derive(Debug))]
 pub struct Roles {
     /// Authority.
     pub authority: Pubkey,

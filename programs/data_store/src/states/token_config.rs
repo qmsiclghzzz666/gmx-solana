@@ -4,6 +4,7 @@ use dual_vec_map::DualVecMap;
 use super::Seed;
 
 #[derive(AnchorSerialize, AnchorDeserialize, InitSpace, Clone)]
+#[cfg_attr(feature = "debug", derive(Debug))]
 pub struct TokenConfig {
     /// Enabled.
     pub enabled: bool,
@@ -18,6 +19,7 @@ pub struct TokenConfig {
 }
 
 #[account]
+#[cfg_attr(feature = "debug", derive(Debug))]
 pub struct TokenConfigMap {
     pub(crate) bump: u8,
     tokens: Vec<Pubkey>,

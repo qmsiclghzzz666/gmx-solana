@@ -8,6 +8,7 @@ use super::{
 
 /// Deposit.
 #[account]
+#[cfg_attr(feature = "debug", derive(Debug))]
 pub struct Deposit {
     /// Fixed part.
     pub fixed: Fixed,
@@ -26,6 +27,7 @@ impl Deposit {
 
 /// Fixed part of [`Deposit`].
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, InitSpace)]
+#[cfg_attr(feature = "debug", derive(Debug))]
 pub struct Fixed {
     /// The bump seed.
     pub bump: u8,
@@ -45,6 +47,7 @@ pub struct Fixed {
 
 /// Senders of [`Deposit`].
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, InitSpace)]
+#[cfg_attr(feature = "debug", derive(Debug))]
 pub struct Senders {
     /// The user depositing liquidity.
     pub user: Pubkey,
@@ -56,6 +59,7 @@ pub struct Senders {
 
 /// Tokens config of [`Deposit`].
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, InitSpace)]
+#[cfg_attr(feature = "debug", derive(Debug))]
 pub struct Tokens {
     /// The market token of the market.
     pub market_token: Pubkey,
@@ -69,6 +73,7 @@ pub struct Tokens {
 
 /// Dynamic part of [`Deposit`].
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+#[cfg_attr(feature = "debug", derive(Debug))]
 pub struct Dynamic {
     /// Tokens with feed.
     pub tokens_with_feed: TokensWithFeed,
@@ -135,6 +140,7 @@ impl Deposit {
 
 /// The receivers of the deposit.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, InitSpace)]
+#[cfg_attr(feature = "debug", derive(Debug))]
 pub struct Receivers {
     /// The address to send the liquidity tokens to.
     pub receiver: Pubkey,
@@ -143,6 +149,7 @@ pub struct Receivers {
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, InitSpace)]
+#[cfg_attr(feature = "debug", derive(Debug))]
 pub struct TokenParams {
     /// The amount of long tokens to deposit.
     pub initial_long_token_amount: u64,

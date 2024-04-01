@@ -2,6 +2,7 @@ use anchor_lang::prelude::*;
 
 /// Tokens with feed.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+#[cfg_attr(feature = "debug", derive(Debug))]
 pub struct TokensWithFeed {
     /// Tokens that require prices,
     /// which must be of the same length with `feeds`.
@@ -25,6 +26,7 @@ impl TokensWithFeed {
 
 /// Swap params.
 #[derive(AnchorDeserialize, AnchorSerialize, Clone)]
+#[cfg_attr(feature = "debug", derive(Debug))]
 pub struct SwapParams {
     /// Swap path for long token.
     pub long_token_swap_path: Vec<Pubkey>,

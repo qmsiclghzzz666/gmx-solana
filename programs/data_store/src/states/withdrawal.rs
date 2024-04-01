@@ -8,6 +8,7 @@ use super::{
 
 /// Withdrawal.
 #[account]
+#[cfg_attr(feature = "debug", derive(Debug))]
 pub struct Withdrawal {
     /// Fixed part.
     pub fixed: Fixed,
@@ -23,6 +24,7 @@ impl Withdrawal {
 
 /// Fixed part of [`Withdrawal`].
 #[derive(AnchorSerialize, AnchorDeserialize, InitSpace, Clone)]
+#[cfg_attr(feature = "debug", derive(Debug))]
 pub struct Fixed {
     /// The bump seed.
     pub bump: u8,
@@ -44,6 +46,7 @@ pub struct Fixed {
 
 /// Dynamic part of [`Withdrawal`].
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+#[cfg_attr(feature = "debug", derive(Debug))]
 pub struct Dynamic {
     /// Tokens with feed.
     pub tokens_with_feed: TokensWithFeed,
@@ -63,6 +66,7 @@ impl Dynamic {
 
 /// Fees and tokens receivers for [`Withdrawal`]
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, InitSpace)]
+#[cfg_attr(feature = "debug", derive(Debug))]
 pub struct Receivers {
     /// The ui fee receiver.
     pub ui_fee_receiver: Pubkey,
@@ -74,6 +78,7 @@ pub struct Receivers {
 
 /// Tokens config for [`Withdrawal`].
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, InitSpace)]
+#[cfg_attr(feature = "debug", derive(Debug))]
 pub struct Tokens {
     /// Params.
     pub params: TokenParams,
@@ -89,6 +94,7 @@ pub struct Tokens {
 
 /// Tokens params.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, InitSpace)]
+#[cfg_attr(feature = "debug", derive(Debug))]
 pub struct TokenParams {
     /// The minimum amount of final long tokens that must be withdrawn.
     pub min_long_token_amount: u64,

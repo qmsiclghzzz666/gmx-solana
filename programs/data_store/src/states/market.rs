@@ -7,10 +7,12 @@ use crate::DataStoreError;
 
 use super::{Data, Seed};
 
+/// Market.
 #[account]
-pub(crate) struct Market {
+#[cfg_attr(feature = "debug", derive(Debug))]
+pub struct Market {
     /// Bump Seed.
-    pub bump: u8,
+    pub(crate) bump: u8,
     pub(crate) meta: MarketMeta,
     pools: Pools,
 }
@@ -22,6 +24,7 @@ impl Market {
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, InitSpace)]
+#[cfg_attr(feature = "debug", derive(Debug))]
 pub struct MarketMeta {
     /// Market token.
     pub market_token_mint: Pubkey,
@@ -34,6 +37,7 @@ pub struct MarketMeta {
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+#[cfg_attr(feature = "debug", derive(Debug))]
 pub struct Pools {
     pools: Vec<Pool>,
     keys: Vec<u8>,
@@ -155,6 +159,7 @@ impl Data for Market {
 
 /// A pool for market.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, InitSpace, Default)]
+#[cfg_attr(feature = "debug", derive(Debug))]
 pub struct Pool {
     /// Whether the pool only contains one kind of token,
     /// i.e. a pure pool.
