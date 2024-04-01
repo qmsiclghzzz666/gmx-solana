@@ -20,7 +20,7 @@ use self::{
         deposit::TokenParams as DepositTokenParams,
         market::{MarketMeta, Pool},
         token_config::TokenConfig,
-        withdrawal::TokenParams as WithdrawalTokenParams,
+        withdrawal::{SwapParams as WithdrawalSwapParams, TokenParams as WithdrawalTokenParams},
     },
     utils::internal,
 };
@@ -271,16 +271,18 @@ pub mod data_store {
     pub fn initialize_withdrawal(
         ctx: Context<InitializeWithdrawal>,
         nonce: [u8; 32],
-        tokens: WithdrawalTokenParams,
+        swap_params: WithdrawalSwapParams,
         tokens_with_feed: Vec<(Pubkey, Pubkey)>,
+        token_params: WithdrawalTokenParams,
         market_token_amount: u64,
         ui_fee_receiver: Pubkey,
     ) -> Result<()> {
         instructions::initialize_withdrawal(
             ctx,
             nonce,
-            tokens,
+            swap_params,
             tokens_with_feed,
+            token_params,
             market_token_amount,
             ui_fee_receiver,
         )
@@ -334,4 +336,7 @@ pub enum DataStoreError {
     Computation,
     #[msg("Unsupported pool kind")]
     UnsupportedPoolKind,
+    // Withdrawal.
+    #[msg("User mismach")]
+    UserMismatch,
 }

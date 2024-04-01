@@ -2,7 +2,10 @@ use anchor_lang::{prelude::*, system_program};
 use anchor_spl::token::TokenAccount;
 
 use crate::{
-    states::{withdrawal::TokenParams, DataStore, Market, NonceBytes, Roles, Seed, Withdrawal},
+    states::{
+        withdrawal::{SwapParams, TokenParams},
+        DataStore, Market, NonceBytes, Roles, Seed, Withdrawal,
+    },
     utils::internal,
     DataStoreError,
 };
@@ -11,8 +14,9 @@ use crate::{
 pub fn initialize_withdrawal(
     ctx: Context<InitializeWithdrawal>,
     nonce: NonceBytes,
-    tokens: TokenParams,
+    swap_params: SwapParams,
     tokens_with_feed: Vec<(Pubkey, Pubkey)>,
+    tokens_params: TokenParams,
     market_token_amount: u64,
     ui_fee_receiver: Pubkey,
 ) -> Result<()> {
@@ -22,7 +26,8 @@ pub fn initialize_withdrawal(
         ctx.accounts.payer.key(),
         &ctx.accounts.market,
         market_token_amount,
-        tokens,
+        tokens_params,
+        swap_params,
         tokens_with_feed,
         &ctx.accounts.final_long_token_receiver,
         &ctx.accounts.final_short_token_receiver,
@@ -31,7 +36,7 @@ pub fn initialize_withdrawal(
 }
 
 #[derive(Accounts)]
-#[instruction(nonce: [u8; 32])]
+#[instruction(nonce: [u8; 32], swap_params: SwapParams, tokens_with_feed: Vec<(Pubkey, Pubkey)>)]
 pub struct InitializeWithdrawal<'info> {
     pub authority: Signer<'info>,
     pub store: Account<'info, DataStore>,
@@ -40,7 +45,7 @@ pub struct InitializeWithdrawal<'info> {
     pub payer: Signer<'info>,
     #[account(
         init,
-        space = 8 + Withdrawal::INIT_SPACE,
+        space = 8 + Withdrawal::init_space(&tokens_with_feed, &swap_params),
         payer = payer,
         seeds = [Withdrawal::SEED, store.key().as_ref(), payer.key().as_ref(), &nonce],
         bump,
@@ -84,14 +89,14 @@ pub struct RemoveWithdrawal<'info> {
         mut,
         constraint = withdrawal.to_account_info().lamports() >= refund @ DataStoreError::LamportsNotEnough,
         close = authority,
-        has_one = user,
+        constraint = withdrawal.fixed.user == user.key() @ DataStoreError::UserMismatch,
         seeds = [
             Withdrawal::SEED,
             store.key().as_ref(),
             user.key().as_ref(),
-            &withdrawal.nonce,
+            &withdrawal.fixed.nonce,
         ],
-        bump = withdrawal.bump,
+        bump = withdrawal.fixed.bump,
     )]
     pub withdrawal: Account<'info, Withdrawal>,
     /// CHECK: only used to receive the refund, and has been checked

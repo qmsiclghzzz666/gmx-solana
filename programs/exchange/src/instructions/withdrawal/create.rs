@@ -5,7 +5,10 @@ use anchor_spl::token::{self, Token, TokenAccount};
 use data_store::{
     cpi::accounts::{CheckRole, GetMarketMeta, GetTokenConfig, InitializeWithdrawal},
     program::DataStore,
-    states::{withdrawal::TokenParams, NonceBytes},
+    states::{
+        withdrawal::{SwapParams, TokenParams},
+        NonceBytes,
+    },
     utils::Authentication,
 };
 
@@ -18,6 +21,7 @@ pub struct CreateWithdrawalParams {
     pub execution_fee: u64,
     pub ui_fee_receiver: Pubkey,
     pub tokens: TokenParams,
+    pub swaps: SwapParams,
 }
 
 #[derive(Accounts)]
@@ -107,8 +111,9 @@ pub fn create_withdrawal(
     cpi::initialize_withdrawal(
         ctx.accounts.initialize_withdrawal_ctx(),
         nonce,
-        params.tokens,
+        params.swaps,
         tokens_with_feed,
+        params.tokens,
         params.market_token_amount,
         params.ui_fee_receiver,
     )?;

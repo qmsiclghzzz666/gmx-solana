@@ -27,7 +27,7 @@ pub struct CancelWithdrawal<'info> {
     /// through CPI.
     #[account(
         mut,
-        constraint = withdrawal.tokens.market_token == market_token.mint @ ExchangeError::InvalidWithdrawalToCancel,
+        constraint = withdrawal.fixed.tokens.market_token == market_token.mint @ ExchangeError::InvalidWithdrawalToCancel,
     )]
     pub withdrawal: Account<'info, Withdrawal>,
     /// CHECK: only used to receive lamports.
@@ -55,7 +55,7 @@ pub struct CancelWithdrawal<'info> {
 
 /// Cancel Withdrawal.
 pub fn cancel_withdrawal(ctx: Context<CancelWithdrawal>, execution_fee: u64) -> Result<()> {
-    let market_token_amount = ctx.accounts.withdrawal.tokens.market_token_amount;
+    let market_token_amount = ctx.accounts.withdrawal.fixed.tokens.market_token_amount;
     // FIXME: it seems that we don't have to check this?
     // require!(
     //     market_token_amount != 0,

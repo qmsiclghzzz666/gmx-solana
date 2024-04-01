@@ -85,9 +85,11 @@ export const createWithdrawal = async (
         tokens: {
             minLongTokenAmount: toBN(options.minLongTokenAmount ?? 0),
             minShortTokenAmount: toBN(options.minShortTokenAmount ?? 0),
+            shouldUnwrapNativeToken: options.shouldUnwrapNativeToken ?? false
+        },
+        swaps: {
             longTokenSwapPath: options.longTokenSwapPath ?? [],
             shortTokenSwapPath: options.shortTokenSwapPath ?? [],
-            shouldUnwrapNativeToken: options.shouldUnwrapNativeToken ?? false
         }
     }).accounts({
         authority: authority.publicKey,
@@ -124,7 +126,7 @@ export const cancelWithdrawal = async (
     toMarketTokenAccount: PublicKey,
     options: CancelWithdrawalOptions = {},
 ) => {
-    const marketToken = options.hints?.marketToken ?? (await dataStore.account.withdrawal.fetch(withdrawal)).tokens.marketToken;
+    const marketToken = options.hints?.marketToken ?? (await dataStore.account.withdrawal.fetch(withdrawal)).fixed.tokens.marketToken;
     await exchange.methods.cancelWithdrawal(toBN(options.executionFee ?? 0)).accounts({
         authority: authority.publicKey,
         store,
@@ -173,13 +175,13 @@ export const executeWithdrawal = async (
     } = options.hints?.params ?? (
         await dataStore.account.withdrawal.fetch(withdrawal).then(withdrawal => {
             return {
-                market: withdrawal.market,
-                marketTokenMint: withdrawal.tokens.marketToken,
-                finalLongTokenMint: withdrawal.tokens.finalLongToken,
-                finalShortTokenMint: withdrawal.tokens.finalShortToken,
-                finalLongTokenReceiver: withdrawal.receivers.finalLongTokenReceiver,
-                finalShortTokenReceiver: withdrawal.receivers.finalShortTokenReceiver,
-                feeds: withdrawal.tokens.feeds,
+                market: withdrawal.fixed.market,
+                marketTokenMint: withdrawal.fixed.tokens.marketToken,
+                finalLongTokenMint: withdrawal.fixed.tokens.finalLongToken,
+                finalShortTokenMint: withdrawal.fixed.tokens.finalShortToken,
+                finalLongTokenReceiver: withdrawal.fixed.receivers.finalLongTokenReceiver,
+                finalShortTokenReceiver: withdrawal.fixed.receivers.finalShortTokenReceiver,
+                feeds: withdrawal.dynamic.feeds,
             }
         }));
     let ix = await exchange.methods.executeWithdrawal(toBN(options.executionFee ?? 0)).accounts({

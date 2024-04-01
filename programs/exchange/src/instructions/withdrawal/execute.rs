@@ -40,9 +40,9 @@ pub struct ExecuteWithdrawal<'info> {
     /// - `user` is checked on the removal CPI of the withdrawal.
     #[account(
         mut,
-        constraint = withdrawal.tokens.market_token == market_token_mint.key() @ ExchangeError::InvalidWIthdrawalToExecute,
-        constraint = withdrawal.receivers.final_long_token_receiver == final_long_token_receiver.key() @ ExchangeError::InvalidWIthdrawalToExecute,
-        constraint = withdrawal.receivers.final_short_token_receiver == final_short_token_receiver.key() @ ExchangeError::InvalidWIthdrawalToExecute,
+        constraint = withdrawal.fixed.tokens.market_token == market_token_mint.key() @ ExchangeError::InvalidWIthdrawalToExecute,
+        constraint = withdrawal.fixed.receivers.final_long_token_receiver == final_long_token_receiver.key() @ ExchangeError::InvalidWIthdrawalToExecute,
+        constraint = withdrawal.fixed.receivers.final_short_token_receiver == final_short_token_receiver.key() @ ExchangeError::InvalidWIthdrawalToExecute,
     )]
     pub withdrawal: Account<'info, Withdrawal>,
     /// CHECK: only used to invoke CPI and should be checked by it.
@@ -51,7 +51,7 @@ pub struct ExecuteWithdrawal<'info> {
     /// CHECK: only used to receive lamports.
     #[account(mut)]
     pub user: UncheckedAccount<'info>,
-    #[account(mut, constraint = market_token_mint.key() == withdrawal.tokens.market_token)]
+    #[account(mut, constraint = market_token_mint.key() == withdrawal.fixed.tokens.market_token)]
     pub market_token_mint: Account<'info, Mint>,
     #[account(mut, token::mint = market_token_mint)]
     pub market_token_withdrawal_vault: Account<'info, TokenAccount>,
@@ -75,15 +75,15 @@ pub fn execute_withdrawal<'info>(
         .get_lamports()
         .checked_sub(execution_fee.min(super::MAX_WITHDRAWAL_EXECUTION_FEE))
         .ok_or(ExchangeError::NotEnoughExecutionFee)?;
-    let market_token_amount = withdrawal.tokens.market_token_amount;
-    let min_long_token_amount = withdrawal.tokens.params.min_long_token_amount;
-    let min_short_token_amount = withdrawal.tokens.params.min_short_token_amount;
+    let market_token_amount = withdrawal.fixed.tokens.market_token_amount;
+    let min_long_token_amount = withdrawal.fixed.tokens.params.min_long_token_amount;
+    let min_short_token_amount = withdrawal.fixed.tokens.params.min_short_token_amount;
     let meta = data_store::cpi::get_market_meta(ctx.accounts.get_market_meta_ctx())?.get();
     let long_token = meta.long_token_mint;
     let short_token = meta.short_token_mint;
     let remaing_accounts = ctx.remaining_accounts.to_vec();
     let report = ctx.accounts.with_oracle_prices(
-        withdrawal.tokens.tokens.clone(),
+        withdrawal.dynamic.tokens.clone(),
         remaing_accounts,
         |accounts| {
             let oracle = &mut accounts.oracle;

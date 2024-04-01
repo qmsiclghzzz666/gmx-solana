@@ -3,13 +3,24 @@ use anchor_spl::token::TokenAccount;
 
 use super::{Market, NonceBytes, Seed};
 
-const MAX_SWAP_PATH_LEN: usize = 16;
-const MAX_TOKENS: usize = 2 * (1 + MAX_SWAP_PATH_LEN);
-
 /// Withdrawal.
 #[account]
-#[derive(InitSpace)]
 pub struct Withdrawal {
+    /// Fixed part.
+    pub fixed: Fixed,
+    /// Dynamic part.
+    pub dynamic: Dynamic,
+}
+
+impl Withdrawal {
+    pub(crate) fn init_space(tokens_with_feed: &[(Pubkey, Pubkey)], swap: &SwapParams) -> usize {
+        Fixed::INIT_SPACE + Dynamic::init_space(tokens_with_feed, swap)
+    }
+}
+
+/// Fixed part of [`Withdrawal`].
+#[derive(AnchorSerialize, AnchorDeserialize, InitSpace, Clone)]
+pub struct Fixed {
     /// The bump seed.
     pub bump: u8,
     /// The nonce bytes for this withdrawal.
@@ -20,10 +31,32 @@ pub struct Withdrawal {
     pub user: Pubkey,
     /// The market on which the withdrawal will be executed.
     pub market: Pubkey,
-    /// Tokens config and accounts.
-    pub tokens: Tokens,
     /// Receivers.
     pub receivers: Receivers,
+    /// Tokens config.
+    pub tokens: Tokens,
+}
+
+/// Dynamic part of [`Withdrawal`].
+#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+pub struct Dynamic {
+    /// Tokens that require prices of the same length with `feeds`.
+    pub tokens: Vec<Pubkey>,
+    /// Token feeds for the tokens of the same length with `tokens`.
+    pub feeds: Vec<Pubkey>,
+    /// Swap params.
+    pub swap: SwapParams,
+}
+
+impl Dynamic {
+    fn init_space(tokens_with_feed: &[(Pubkey, Pubkey)], swap: &SwapParams) -> usize {
+        (4 + 32 * tokens_with_feed.len())
+            + (4 + 32 * tokens_with_feed.len())
+            + SwapParams::init_space(
+                swap.long_token_swap_path.len(),
+                swap.short_token_swap_path.len(),
+            )
+    }
 }
 
 /// Fees and tokens receivers for [`Withdrawal`]
@@ -50,12 +83,6 @@ pub struct Tokens {
     pub final_short_token: Pubkey,
     /// The amount of market tokens taht will be withdrawn.
     pub market_token_amount: u64,
-    /// Tokens that require prices.
-    #[max_len(MAX_TOKENS)]
-    pub tokens: Vec<Pubkey>,
-    /// Token feeds for the tokens.
-    #[max_len(MAX_TOKENS)]
-    pub feeds: Vec<Pubkey>,
 }
 
 /// Tokens params.
@@ -65,14 +92,23 @@ pub struct TokenParams {
     pub min_long_token_amount: u64,
     /// The minimum amount of final short tokens that must be withdrawn.
     pub min_short_token_amount: u64,
-    /// Swap path for long token.
-    #[max_len(MAX_SWAP_PATH_LEN)]
-    pub long_token_swap_path: Vec<Pubkey>,
-    /// Swap path for short token.
-    #[max_len(MAX_SWAP_PATH_LEN)]
-    pub short_token_swap_path: Vec<Pubkey>,
     /// Whether to unwrap the native token.
     pub should_unwrap_native_token: bool,
+}
+
+/// Swap params.
+#[derive(AnchorDeserialize, AnchorSerialize, Clone)]
+pub struct SwapParams {
+    /// Swap path for long token.
+    pub long_token_swap_path: Vec<Pubkey>,
+    /// Swap path for short token.
+    pub short_token_swap_path: Vec<Pubkey>,
+}
+
+impl SwapParams {
+    fn init_space(long_path_len: usize, short_path_len: usize) -> usize {
+        (4 + 32 * long_path_len) + (4 + 32 * short_path_len)
+    }
 }
 
 impl Seed for Withdrawal {
@@ -80,9 +116,6 @@ impl Seed for Withdrawal {
 }
 
 impl Withdrawal {
-    /// The max length of swap path.
-    pub const MAX_SWAP_PATH_LEN: usize = MAX_SWAP_PATH_LEN;
-
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn init(
         &mut self,
@@ -91,54 +124,40 @@ impl Withdrawal {
         user: Pubkey,
         market: &Account<Market>,
         market_token_amount: u64,
-        tokens: TokenParams,
+        token_params: TokenParams,
+        swap_params: SwapParams,
         tokens_with_feed: Vec<(Pubkey, Pubkey)>,
         final_long_token_receiver: &Account<TokenAccount>,
         final_short_token_receiver: &Account<TokenAccount>,
         ui_fee_receiver: Pubkey,
     ) -> Result<()> {
+        let (tokens, feeds) = tokens_with_feed.into_iter().unzip();
         *self = Self {
-            bump,
-            nonce,
-            updated_at_slot: Clock::get()?.slot,
-            user,
-            market: market.key(),
-            receivers: Receivers {
-                ui_fee_receiver,
-                final_long_token_receiver: final_long_token_receiver.key(),
-                final_short_token_receiver: final_short_token_receiver.key(),
+            fixed: Fixed {
+                bump,
+                nonce,
+                updated_at_slot: Clock::get()?.slot,
+                user,
+                market: market.key(),
+                receivers: Receivers {
+                    ui_fee_receiver,
+                    final_long_token_receiver: final_long_token_receiver.key(),
+                    final_short_token_receiver: final_short_token_receiver.key(),
+                },
+                tokens: Tokens {
+                    params: token_params,
+                    market_token: market.meta.market_token_mint,
+                    final_long_token: final_long_token_receiver.mint,
+                    final_short_token: final_short_token_receiver.mint,
+                    market_token_amount,
+                },
             },
-            tokens: Tokens::new(
-                market,
-                market_token_amount,
-                final_long_token_receiver.mint,
-                final_short_token_receiver.mint,
+            dynamic: Dynamic {
                 tokens,
-                tokens_with_feed,
-            ),
+                feeds,
+                swap: swap_params,
+            },
         };
         Ok(())
-    }
-}
-
-impl Tokens {
-    fn new(
-        market: &Market,
-        market_token_amount: u64,
-        final_long_token: Pubkey,
-        final_short_token: Pubkey,
-        params: TokenParams,
-        tokens_with_feed: Vec<(Pubkey, Pubkey)>,
-    ) -> Self {
-        let (tokens, feeds) = tokens_with_feed.into_iter().unzip();
-        Self {
-            params,
-            market_token: market.meta.market_token_mint,
-            final_long_token,
-            final_short_token,
-            market_token_amount,
-            tokens,
-            feeds,
-        }
     }
 }
