@@ -25,6 +25,7 @@ pub fn initialize_withdrawal(
         nonce,
         ctx.accounts.payer.key(),
         &ctx.accounts.market,
+        ctx.accounts.market_token_account.key(),
         market_token_amount,
         tokens_params,
         swap_params,
@@ -52,6 +53,8 @@ pub struct InitializeWithdrawal<'info> {
     )]
     pub withdrawal: Account<'info, Withdrawal>,
     pub(crate) market: Account<'info, Market>,
+    #[account(token::authority = payer, token::mint = market.meta.market_token_mint)]
+    pub market_token_account: Account<'info, TokenAccount>,
     #[account(token::authority = payer)]
     pub final_long_token_receiver: Account<'info, TokenAccount>,
     #[account(token::authority = payer)]

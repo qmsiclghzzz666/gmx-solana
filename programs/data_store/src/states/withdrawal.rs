@@ -32,6 +32,8 @@ pub struct Fixed {
     pub updated_at_slot: u64,
     /// The user to withdraw for.
     pub user: Pubkey,
+    /// The market token account.
+    pub market_token_account: Pubkey,
     /// The market on which the withdrawal will be executed.
     pub market: Pubkey,
     /// Receivers.
@@ -108,6 +110,7 @@ impl Withdrawal {
         nonce: NonceBytes,
         user: Pubkey,
         market: &Account<Market>,
+        market_token_account: Pubkey,
         market_token_amount: u64,
         token_params: TokenParams,
         swap_params: SwapParams,
@@ -122,6 +125,7 @@ impl Withdrawal {
                 nonce,
                 updated_at_slot: Clock::get()?.slot,
                 user,
+                market_token_account,
                 market: market.key(),
                 receivers: Receivers {
                     ui_fee_receiver,

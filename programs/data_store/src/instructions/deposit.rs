@@ -58,7 +58,7 @@ pub struct InitializeDeposit<'info> {
     #[account(token::authority = payer)]
     pub initial_short_token_account: Account<'info, TokenAccount>,
     pub(crate) market: Account<'info, Market>,
-    #[account(token::mint = market.meta.market_token_mint)]
+    #[account(token::authority = payer, token::mint = market.meta.market_token_mint)]
     pub receiver: Account<'info, TokenAccount>,
     pub system_program: Program<'info, System>,
 }

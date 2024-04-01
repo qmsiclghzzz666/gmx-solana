@@ -100,9 +100,7 @@ describe("exchange: deposit", () => {
             await cancelWithdrawal(
                 signer0,
                 dataStoreAddress,
-                user0.publicKey,
                 withdrawal,
-                user0FakeFakeUsdGTokenAccount,
                 {
                     executionFee: 5001,
                     callback: tx => console.log("withdrawal cancelled at", tx),
@@ -146,7 +144,6 @@ describe("exchange: deposit", () => {
                 signer0,
                 dataStoreAddress,
                 oracleAddress,
-                user0.publicKey,
                 withdrawal,
                 {
                     callback: tx => console.log("withdrawal executed at", tx),

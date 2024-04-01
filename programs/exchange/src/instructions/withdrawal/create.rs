@@ -47,10 +47,10 @@ pub struct CreateWithdrawal<'info> {
     /// but whether to be matched the market token mint of the `market` should be checked by
     /// [`get_market_token_mint`](data_store::instructions::get_market_token_mint) through CPI.
     #[account(mut)]
-    pub market_token: Account<'info, TokenAccount>,
+    pub market_token_account: Account<'info, TokenAccount>,
     #[account(
         mut,
-        token::mint = market_token.mint,
+        token::mint = market_token_account.mint,
     )]
     pub market_token_withdrawal_vault: Account<'info, TokenAccount>,
     pub final_long_token_receiver: Account<'info, TokenAccount>,
@@ -77,7 +77,7 @@ pub fn create_withdrawal(
     // The market token mint used to withdraw must match the `market`'s.
     let market_meta = cpi::get_market_meta(ctx.accounts.get_market_meta_ctx())?.get();
     require_eq!(
-        ctx.accounts.market_token.mint,
+        ctx.accounts.market_token_account.mint,
         market_meta.market_token_mint,
         ExchangeError::MismatchedMarketTokenMint
     );
@@ -176,6 +176,7 @@ impl<'info> CreateWithdrawal<'info> {
                 only_controller: self.only_controller.to_account_info(),
                 payer: self.payer.to_account_info(),
                 withdrawal: self.withdrawal.to_account_info(),
+                market_token_account: self.market_token_account.to_account_info(),
                 market: self.market.to_account_info(),
                 final_long_token_receiver: self.final_long_token_receiver.to_account_info(),
                 final_short_token_receiver: self.final_short_token_receiver.to_account_info(),
@@ -188,7 +189,7 @@ impl<'info> CreateWithdrawal<'info> {
         CpiContext::new(
             self.token_program.to_account_info(),
             token::Transfer {
-                from: self.market_token.to_account_info(),
+                from: self.market_token_account.to_account_info(),
                 to: self.market_token_withdrawal_vault.to_account_info(),
                 authority: self.payer.to_account_info(),
             },

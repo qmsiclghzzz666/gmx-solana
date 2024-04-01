@@ -273,7 +273,7 @@ export const createWithdrawal = async (
         market,
         withdrawal: withdrawalAddress,
         payer: payer.publicKey,
-        marketToken: fromMarketTokenAccount,
+        marketTokenAccount: fromMarketTokenAccount,
         marketTokenWithdrawalVault: createMarketVaultPDA(store, marketToken)[0],
         finalLongTokenReceiver: toLongTokenAccount,
         finalShortTokenReceiver: toShortTokenAccount,
@@ -286,19 +286,27 @@ export interface CancelWithdrawalOptions {
     executionFee?: number | bigint,
     callback?: (string) => void,
     hints?: {
-        marketToken?: PublicKey,
+        withdrawal?: {
+            user: PublicKey,
+            marketToken: PublicKey,
+            toMarketTokenAccount: PublicKey,
+        }
     }
 };
 
 export const cancelWithdrawal = async (
     authority: Keypair,
     store: PublicKey,
-    user: PublicKey,
     withdrawal: PublicKey,
-    toMarketTokenAccount: PublicKey,
     options: CancelWithdrawalOptions = {},
 ) => {
-    const marketToken = options.hints?.marketToken ?? (await dataStore.account.withdrawal.fetch(withdrawal)).fixed.tokens.marketToken;
+    const { marketToken, user, toMarketTokenAccount } = options.hints?.withdrawal ?? await dataStore.account.withdrawal.fetch(withdrawal).then(withdrawal => {
+        return {
+            user: withdrawal.fixed.user,
+            marketToken: withdrawal.fixed.tokens.marketToken,
+            toMarketTokenAccount: withdrawal.fixed.marketTokenAccount,
+        }
+    });
     await exchange.methods.cancelWithdrawal(toBN(options.executionFee ?? 0)).accounts({
         authority: authority.publicKey,
         store,
@@ -316,7 +324,8 @@ export interface ExecuteWithdrawalOptions {
     executionFee?: number | bigint,
     callback?: (string) => void,
     hints?: {
-        params?: {
+        withdrawal?: {
+            user: PublicKey,
             market: PublicKey,
             marketTokenMint: PublicKey,
             finalLongTokenReceiver: PublicKey,
@@ -332,11 +341,11 @@ export const executeWithdrawal = async (
     authority: Keypair,
     store: PublicKey,
     oracle: PublicKey,
-    user: PublicKey,
     withdrawal: PublicKey,
     options: ExecuteWithdrawalOptions = {},
 ) => {
     const {
+        user,
         market,
         marketTokenMint,
         finalLongTokenReceiver,
@@ -344,9 +353,10 @@ export const executeWithdrawal = async (
         finalLongTokenMint,
         finalShortTokenMint,
         feeds,
-    } = options.hints?.params ?? (
+    } = options.hints?.withdrawal ?? (
         await dataStore.account.withdrawal.fetch(withdrawal).then(withdrawal => {
             return {
+                user: withdrawal.fixed.user,
                 market: withdrawal.fixed.market,
                 marketTokenMint: withdrawal.fixed.tokens.marketToken,
                 finalLongTokenMint: withdrawal.fixed.tokens.finalLongToken,
