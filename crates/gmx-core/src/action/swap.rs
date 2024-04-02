@@ -273,13 +273,14 @@ mod tests {
     fn basic() -> crate::Result<()> {
         let mut market = TestMarket::<u64, 9>::default();
         market.deposit(1_000_000_000, 0, 120, 1)?.execute()?;
-        market.deposit(1_000_000_000, 0, 120, 1)?.execute()?;
-        market.deposit(0, 1_000_000_000, 120, 1)?.execute()?;
+        market.deposit(1_000_000_000, 0, 121, 1)?.execute()?;
+        market.deposit(0, 1_000_000_000, 122, 1)?.execute()?;
         println!("{market:#?}");
 
+        // Test for positive impact.
         let before_market = market.clone();
         let token_in_amount = 100_000_000;
-        let report = market.swap(false, token_in_amount, 120, 1)?.execute()?;
+        let report = market.swap(false, token_in_amount, 123, 1)?.execute()?;
         println!("{report:#?}");
         println!("{market:#?}");
 
@@ -312,6 +313,45 @@ mod tests {
         assert_eq!(
             before_market.claimable_fee_pool()?.short_token_amount()?
                 + report.token_in_fees.fee_receiver_amount(),
+            market.claimable_fee_pool()?.short_token_amount()?,
+        );
+
+        // Test for negative impact.
+        let before_market = market.clone();
+        let token_in_amount = 100_000;
+        let report = market.swap(true, token_in_amount, 119, 1)?.execute()?;
+        println!("{report:#?}");
+        println!("{market:#?}");
+
+        assert_eq!(before_market.total_supply(), market.total_supply());
+
+        assert_eq!(
+            before_market.primary_pool()?.long_token_amount()? + token_in_amount
+                - report.price_impact_amount
+                - report.token_in_fees.fee_receiver_amount(),
+            market.primary_pool()?.long_token_amount()?,
+        );
+        assert_eq!(
+            before_market.primary_pool()?.short_token_amount()? - report.token_out_amount,
+            market.primary_pool()?.short_token_amount()?,
+        );
+
+        assert_eq!(
+            before_market.swap_impact_pool()?.long_token_amount()? + report.price_impact_amount,
+            market.swap_impact_pool()?.long_token_amount()?,
+        );
+        assert_eq!(
+            before_market.swap_impact_pool()?.short_token_amount()?,
+            market.swap_impact_pool()?.short_token_amount()?
+        );
+
+        assert_eq!(
+            before_market.claimable_fee_pool()?.long_token_amount()?
+                + report.token_in_fees.fee_receiver_amount(),
+            market.claimable_fee_pool()?.long_token_amount()?,
+        );
+        assert_eq!(
+            before_market.claimable_fee_pool()?.short_token_amount()?,
             market.claimable_fee_pool()?.short_token_amount()?,
         );
         Ok(())
