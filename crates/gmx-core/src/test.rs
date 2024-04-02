@@ -10,7 +10,7 @@ use crate::{
 use num_traits::{CheckedSub, Signed};
 
 /// Test Pool.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct TestPool<T> {
     long_token_amount: T,
     short_token_amount: T,
@@ -94,7 +94,7 @@ where
 }
 
 /// Test Market.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TestMarket<T, const DECIMALS: u8> {
     total_supply: T,
     value_to_amount_divisor: T,

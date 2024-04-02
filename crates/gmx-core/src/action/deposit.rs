@@ -4,7 +4,6 @@ use crate::{
     market::{Market, MarketExt},
     num::{MulDiv, UnsignedAbs},
     params::Fees,
-    pool::PoolKind,
     utils, PoolExt,
 };
 
@@ -198,17 +197,14 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Deposit<M, DECIMALS> {
             )
         };
         let fees = self.charge_fees(price_impact.is_positive(), &mut amount)?;
-        self.market
-            .pool_mut(PoolKind::ClaimableFee)?
-            .ok_or(crate::Error::MissingPoolKind(PoolKind::ClaimableFee))?
-            .apply_delta_amount(
-                is_long_token,
-                &fees
-                    .fee_receiver_amount()
-                    .clone()
-                    .try_into()
-                    .map_err(|_| crate::Error::Convert)?,
-            )?;
+        self.market.claimable_fee_pool_mut()?.apply_delta_amount(
+            is_long_token,
+            &fees
+                .fee_receiver_amount()
+                .clone()
+                .try_into()
+                .map_err(|_| crate::Error::Convert)?,
+        )?;
         // FIXME: will this case happend in our implementation?
         if price_impact.is_positive() && supply.is_zero() {
             price_impact = Zero::zero();

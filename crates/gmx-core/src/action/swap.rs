@@ -1,6 +1,10 @@
-use crate::{params::Fees, Market};
+use crate::{
+    num::{MulDiv, Unsigned},
+    params::Fees,
+    Market, MarketExt, PoolExt,
+};
 
-use num_traits::Zero;
+use num_traits::{CheckedAdd, CheckedSub, Signed, Zero};
 
 /// A swap.
 #[must_use]
@@ -43,13 +47,15 @@ impl<T> SwapParams<T> {
 /// Report of the execution of swap.
 #[must_use = "`token_out_amount` must use"]
 #[derive(Debug, Clone, Copy)]
-pub struct SwapReport<T> {
+pub struct SwapReport<T: Unsigned> {
     params: SwapParams<T>,
     token_in_fees: Fees<T>,
     token_out_amount: T,
+    price_impact_value: T::Signed,
+    price_impact_amount: T,
 }
 
-impl<T> SwapReport<T> {
+impl<T: Unsigned> SwapReport<T> {
     /// Get swap params.
     pub fn params(&self) -> &SwapParams<T> {
         &self.params
@@ -63,6 +69,39 @@ impl<T> SwapReport<T> {
     /// Get the amount of out token.
     pub fn token_out_amount(&self) -> &T {
         &self.token_out_amount
+    }
+
+    /// Get the price impact for the swap.
+    pub fn price_impact(&self) -> &T::Signed {
+        &self.price_impact_value
+    }
+
+    /// Get the price impact amount.
+    pub fn price_impact_amount(&self) -> &T {
+        &self.price_impact_amount
+    }
+}
+
+struct ReassignedValues<T: Unsigned> {
+    long_token_delta_amount: T::Signed,
+    short_token_delta_amount: T::Signed,
+    token_in_price: T,
+    token_out_price: T,
+}
+
+impl<T: Unsigned> ReassignedValues<T> {
+    fn new(
+        long_token_delta_amount: T::Signed,
+        short_token_delta_amount: T::Signed,
+        token_in_price: T,
+        token_out_price: T,
+    ) -> Self {
+        Self {
+            long_token_delta_amount,
+            short_token_delta_amount,
+            token_in_price,
+            token_out_price,
+        }
     }
 }
 
@@ -92,20 +131,143 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Swap<M, DECIMALS> {
         })
     }
 
+    /// Assign the amounts of `token_in` and `token_out` to `long_token` and `short_token`, respectively,
+    /// and assgin the prices of `long_token` and `short_token` to `token_in` and `token_out`.
+    fn reassign_values(&self) -> crate::Result<ReassignedValues<M::Num>> {
+        if self.params.is_token_in_long {
+            let long_delta_amount: M::Signed = self
+                .params
+                .token_in_amount
+                .clone()
+                .try_into()
+                .map_err(|_| crate::Error::Convert)?;
+            Ok(ReassignedValues::new(
+                long_delta_amount.clone(),
+                -long_delta_amount,
+                self.params.long_token_price.clone(),
+                self.params.short_token_price.clone(),
+            ))
+        } else {
+            let short_delta_amount: M::Signed = self
+                .params
+                .token_in_amount
+                .clone()
+                .try_into()
+                .map_err(|_| crate::Error::Convert)?;
+            Ok(ReassignedValues::new(
+                -short_delta_amount.clone(),
+                short_delta_amount,
+                self.params.short_token_price.clone(),
+                self.params.long_token_price.clone(),
+            ))
+        }
+    }
+
+    fn charge_fees(&mut self, is_positive_impact: bool) -> crate::Result<(M::Num, Fees<M::Num>)> {
+        let (amount_after_fees, fees) = self
+            .market
+            .swap_fee_params()
+            .apply_fees(is_positive_impact, &self.params.token_in_amount)
+            .ok_or(crate::Error::Computation)?;
+        self.market.claimable_fee_pool_mut()?.apply_delta_amount(
+            self.params.is_token_in_long,
+            &fees
+                .fee_receiver_amount()
+                .clone()
+                .try_into()
+                .map_err(|_| crate::Error::Convert)?,
+        )?;
+        Ok((amount_after_fees, fees))
+    }
+
     /// Execute the swap.
-    pub fn execute(self) -> crate::Result<SwapReport<M::Num>> {
-        self.market.swap_impact_params();
+    pub fn execute(mut self) -> crate::Result<SwapReport<M::Num>> {
+        let ReassignedValues {
+            long_token_delta_amount,
+            short_token_delta_amount,
+            token_in_price,
+            token_out_price,
+        } = self.reassign_values()?;
+
+        // Calculate price impact.
+        let price_impact = self
+            .market
+            .primary_pool()?
+            .pool_delta(
+                &long_token_delta_amount,
+                &short_token_delta_amount,
+                &self.params.long_token_price,
+                &self.params.short_token_price,
+            )?
+            .swap_impact(&self.market.swap_impact_params())
+            .ok_or(crate::Error::Computation)?;
+
+        let (amount_after_fees, fees) = self.charge_fees(price_impact.is_positive())?;
+
+        // Calculate final amounts && apply delta to price impact pool.
+        let token_in_amount;
+        let token_out_amount;
+        let pool_amount_out;
+        let price_impact_amount;
+        if price_impact.is_positive() {
+            price_impact_amount = self.market.apply_swap_impact_value_with_cap(
+                !self.params.is_token_in_long,
+                &token_out_price,
+                &price_impact,
+            )?;
+            token_in_amount = amount_after_fees;
+            pool_amount_out = token_in_amount
+                .checked_mul_div(&token_in_price, &token_out_price)
+                .ok_or(crate::Error::Computation)?;
+            // Extra amount is deducted from the swap impact pool.
+            token_out_amount = pool_amount_out
+                .checked_add(&price_impact_amount)
+                .ok_or(crate::Error::Computation)?;
+        } else {
+            price_impact_amount = self.market.apply_swap_impact_value_with_cap(
+                self.params.is_token_in_long,
+                &token_in_price,
+                &price_impact,
+            )?;
+            token_in_amount = amount_after_fees
+                .checked_sub(&price_impact_amount)
+                .ok_or(crate::Error::Computation)?;
+            token_out_amount = token_in_amount
+                .checked_mul_div(&token_in_price, &token_out_price)
+                .ok_or(crate::Error::Computation)?;
+            pool_amount_out = token_out_amount.clone();
+        }
+
+        // Apply delta to primary pools.
+        // `token_in_amount` is assumed to have been transferred in.
+        self.market.apply_delta(
+            self.params.is_token_in_long,
+            &token_in_amount
+                .checked_add(fees.fee_amount_for_pool())
+                .ok_or(crate::Error::Computation)?
+                .try_into()
+                .map_err(|_| crate::Error::Convert)?,
+        )?;
+        self.market.apply_delta(
+            !self.params.is_token_in_long,
+            &-pool_amount_out
+                .try_into()
+                .map_err(|_| crate::Error::Convert)?,
+        )?;
+
         Ok(SwapReport {
             params: self.params,
-            token_in_fees: Fees::default(),
-            token_out_amount: Zero::zero(),
+            price_impact_value: price_impact,
+            token_in_fees: fees,
+            token_out_amount,
+            price_impact_amount,
         })
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{test::TestMarket, MarketExt};
+    use crate::{test::TestMarket, Market, MarketExt, Pool};
 
     #[test]
     fn basic() -> crate::Result<()> {
@@ -114,9 +276,44 @@ mod tests {
         market.deposit(1_000_000_000, 0, 120, 1)?.execute()?;
         market.deposit(0, 1_000_000_000, 120, 1)?.execute()?;
         println!("{market:#?}");
-        let report = market.swap(true, 100_000_000, 120, 1)?.execute()?;
+
+        let before_market = market.clone();
+        let token_in_amount = 100_000_000;
+        let report = market.swap(false, token_in_amount, 120, 1)?.execute()?;
         println!("{report:#?}");
         println!("{market:#?}");
+
+        assert_eq!(before_market.total_supply(), market.total_supply());
+
+        assert_eq!(
+            before_market.primary_pool()?.long_token_amount()?,
+            market.primary_pool()?.long_token_amount()? + report.token_out_amount
+                - report.price_impact_amount,
+        );
+        assert_eq!(
+            before_market.primary_pool()?.short_token_amount()? + token_in_amount
+                - report.token_in_fees.fee_receiver_amount(),
+            market.primary_pool()?.short_token_amount()?,
+        );
+
+        assert_eq!(
+            before_market.swap_impact_pool()?.long_token_amount()?,
+            market.swap_impact_pool()?.long_token_amount()? + report.price_impact_amount,
+        );
+        assert_eq!(
+            before_market.swap_impact_pool()?.short_token_amount()?,
+            market.swap_impact_pool()?.short_token_amount()?
+        );
+
+        assert_eq!(
+            before_market.claimable_fee_pool()?.long_token_amount()?,
+            market.claimable_fee_pool()?.long_token_amount()?,
+        );
+        assert_eq!(
+            before_market.claimable_fee_pool()?.short_token_amount()?
+                + report.token_in_fees.fee_receiver_amount(),
+            market.claimable_fee_pool()?.short_token_amount()?,
+        );
         Ok(())
     }
 }

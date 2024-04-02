@@ -95,11 +95,32 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
         Self::Num::UNIT
     }
 
-    /// Get primary pool.
+    /// Get the primary pool.
     #[inline]
     fn primary_pool(&self) -> crate::Result<&Self::Pool> {
         self.pool(PoolKind::Primary)?
             .ok_or(crate::Error::MissingPoolKind(PoolKind::Primary))
+    }
+
+    /// Get the swap impact pool.
+    #[inline]
+    fn swap_impact_pool(&self) -> crate::Result<&Self::Pool> {
+        self.pool(PoolKind::PriceImpact)?
+            .ok_or(crate::Error::MissingPoolKind(PoolKind::PriceImpact))
+    }
+
+    /// Get the claimable fee pool.
+    #[inline]
+    fn claimable_fee_pool(&self) -> crate::Result<&Self::Pool> {
+        self.pool(PoolKind::ClaimableFee)?
+            .ok_or(crate::Error::MissingPoolKind(PoolKind::ClaimableFee))
+    }
+
+    /// Get the mutable reference of the claimable fee pool.
+    #[inline]
+    fn claimable_fee_pool_mut(&mut self) -> crate::Result<&mut Self::Pool> {
+        self.pool_mut(PoolKind::ClaimableFee)?
+            .ok_or(crate::Error::MissingPoolKind(PoolKind::ClaimableFee))
     }
 
     /// Get the usd value of primary pool.
