@@ -5,15 +5,14 @@ use crate::SharedClient;
 
 #[derive(clap::Args)]
 pub(super) struct StoreArgs {
+    #[command(subcommand)]
     action: Action,
-    kind: Kind,
-    address: Pubkey,
 }
 
-#[derive(clap::ValueEnum, Clone, Copy)]
+#[derive(clap::Subcommand)]
 enum Action {
     /// Get.
-    Get,
+    Get { kind: Kind, address: Pubkey },
 }
 
 #[derive(clap::ValueEnum, Clone, Copy)]
@@ -36,31 +35,30 @@ impl StoreArgs {
     pub(super) fn run(&self, client: &SharedClient) -> eyre::Result<()> {
         let program = client.program(data_store::id())?;
 
-        match (&self.kind, &self.action) {
-            (Kind::DataStore, Action::Get) => {
-                println!("{:#?}", program.account::<states::DataStore>(self.address)?);
-            }
-            (Kind::Roles, Action::Get) => {
-                println!("{:#?}", program.account::<states::Roles>(self.address)?);
-            }
-            (Kind::TokenConfigMap, Action::Get) => {
-                println!(
-                    "{:#?}",
-                    program.account::<states::TokenConfigMap>(self.address)?
-                );
-            }
-            (Kind::Market, Action::Get) => {
-                println!("{:#?}", program.account::<states::Market>(self.address)?);
-            }
-            (Kind::Deposit, Action::Get) => {
-                println!("{:#?}", program.account::<states::Deposit>(self.address)?);
-            }
-            (Kind::Withdrawal, Action::Get) => {
-                println!(
-                    "{:#?}",
-                    program.account::<states::Withdrawal>(self.address)?
-                );
-            }
+        match &self.action {
+            Action::Get { kind, address } => match kind {
+                Kind::DataStore => {
+                    println!("{:#?}", program.account::<states::DataStore>(*address)?);
+                }
+                Kind::Roles => {
+                    println!("{:#?}", program.account::<states::Roles>(*address)?);
+                }
+                Kind::TokenConfigMap => {
+                    println!(
+                        "{:#?}",
+                        program.account::<states::TokenConfigMap>(*address)?
+                    );
+                }
+                Kind::Market => {
+                    println!("{:#?}", program.account::<states::Market>(*address)?);
+                }
+                Kind::Deposit => {
+                    println!("{:#?}", program.account::<states::Deposit>(*address)?);
+                }
+                Kind::Withdrawal => {
+                    println!("{:#?}", program.account::<states::Withdrawal>(*address)?);
+                }
+            },
         }
         Ok(())
     }
