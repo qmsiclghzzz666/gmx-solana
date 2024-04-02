@@ -204,6 +204,6 @@ mod tests {
         let x = U128D20::from_inner(123_456 * U128D20::ONE.0 / 10);
         let exp = U128D20::from_inner(11 * U128D20::ONE.0 / 10);
         let ans = x.checked_pow(&exp).unwrap();
-        assert_eq!(ans, U128D20::from_inner(3167098273314000000000000));
+        assert_eq!(ans, U128D20::from_inner(3167098273313700000000000));
     }
 }

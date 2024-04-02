@@ -67,6 +67,30 @@ where
         }
         Ok(())
     }
+
+    // fn long_token_amount_after_delta(&self, delta: &Self::Signed) -> crate::Result<Self::Num> {
+    //     if delta.is_positive() {
+    //         self.long_token_amount
+    //             .checked_add(&delta.unsigned_abs())
+    //             .ok_or(crate::Error::Overflow)
+    //     } else {
+    //         self.long_token_amount
+    //             .checked_sub(&delta.unsigned_abs())
+    //             .ok_or(crate::Error::Underflow)
+    //     }
+    // }
+
+    // fn short_token_amount_after_delta(&self, delta: &Self::Signed) -> crate::Result<Self::Num> {
+    //     if delta.is_positive() {
+    //         self.short_token_amount
+    //             .checked_add(&delta.unsigned_abs())
+    //             .ok_or(crate::Error::Overflow)
+    //     } else {
+    //         self.short_token_amount
+    //             .checked_sub(&delta.unsigned_abs())
+    //             .ok_or(crate::Error::Underflow)
+    //     }
+    // }
 }
 
 /// Test Market.

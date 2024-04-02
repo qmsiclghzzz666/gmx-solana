@@ -7,14 +7,43 @@ impl<T: num_traits::Num + CheckedAdd + CheckedMul + CheckedSub + Clone + Ord> Nu
 
 /// Unsigned value that cannot be negative.
 pub trait Unsigned: num_traits::Unsigned {
+    /// The signed type.
+    type Signed: TryFrom<Self> + UnsignedAbs<Unsigned = Self>;
+
     /// Compute the absolute difference of two values.
     fn diff(self, other: Self) -> Self;
+
+    /// Checked signed add.
+    fn checked_add_with_signed(&self, other: &Self::Signed) -> Option<Self>
+    where
+        Self: CheckedAdd + CheckedSub,
+    {
+        let value = other.unsigned_abs();
+        if other.is_positive() {
+            self.checked_add(&value)
+        } else {
+            self.checked_sub(&value)
+        }
+    }
+
+    /// Checked signed mul.
+    fn checked_mul_with_signed(&self, other: &Self::Signed) -> Option<Self::Signed>
+    where
+        Self: CheckedMul,
+    {
+        let value = other.unsigned_abs();
+        if other.is_negative() {
+            Some(-self.checked_mul(&value)?.try_into().ok()?)
+        } else {
+            self.checked_mul(&value)?.try_into().ok()
+        }
+    }
 }
 
 /// Convert signed value to unsigned.
 pub trait UnsignedAbs: Signed {
     /// Unsigned type.
-    type Unsigned: Unsigned;
+    type Unsigned;
 
     /// Computes the absolute value and returns as a unsigned value.
     fn unsigned_abs(&self) -> Self::Unsigned;
@@ -22,9 +51,6 @@ pub trait UnsignedAbs: Signed {
 
 /// Perform Mul-Div calculation with bigger range num type.
 pub trait MulDiv: Unsigned {
-    /// The signed type used in mul-div.
-    type Signed: TryFrom<Self> + UnsignedAbs<Unsigned = Self>;
-
     /// Calculates floor(self * numerator / denominator) with full precision.
     ///
     /// Returns `None` if the `denominator` is zero or overflow.
@@ -52,14 +78,14 @@ pub trait MulDiv: Unsigned {
 }
 
 impl Unsigned for u64 {
+    type Signed = i64;
+
     fn diff(self, other: Self) -> Self {
         self.abs_diff(other)
     }
 }
 
 impl MulDiv for u64 {
-    type Signed = i64;
-
     fn checked_mul_div(&self, numerator: &Self, denominator: &Self) -> Option<Self> {
         if *denominator == 0 {
             return None;
@@ -87,6 +113,8 @@ mod u128 {
     use ruint::aliases::U256;
 
     impl Unsigned for u128 {
+        type Signed = i128;
+
         fn diff(self, other: Self) -> Self {
             self.abs_diff(other)
         }
@@ -101,8 +129,6 @@ mod u128 {
     }
 
     impl MulDiv for u128 {
-        type Signed = i128;
-
         fn checked_mul_div(&self, numerator: &Self, denominator: &Self) -> Option<Self> {
             if *denominator == 0 {
                 return None;

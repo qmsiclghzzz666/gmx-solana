@@ -94,6 +94,7 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Swap<M, DECIMALS> {
 
     /// Execute the swap.
     pub fn execute(self) -> crate::Result<SwapReport<M::Num>> {
+        self.market.swap_impact_params();
         Ok(SwapReport {
             params: self.params,
             token_in_fees: Fees::default(),
