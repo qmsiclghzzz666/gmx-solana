@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use anchor_client::{
     solana_sdk::{
+        commitment_config::CommitmentConfig,
         signature::{read_keypair_file, Keypair},
         signer::Signer,
     },
@@ -22,6 +23,9 @@ struct Cli {
     /// Cluster to connect to.
     #[arg(long, short, env, default_value = "devnet")]
     cluster: String,
+    /// Commitment level.
+    #[arg(long, env, default_value = "confirmed")]
+    commitment: CommitmentConfig,
     /// Commands.
     #[command(subcommand)]
     command: Command,
@@ -33,7 +37,8 @@ enum Command {
     Store(store::StoreArgs),
 }
 
-fn main() -> eyre::Result<()> {
+#[tokio::main]
+async fn main() -> eyre::Result<()> {
     tracing_subscriber::fmt::fmt()
         .with_env_filter(
             EnvFilter::builder()
@@ -41,7 +46,7 @@ fn main() -> eyre::Result<()> {
                 .from_env_lossy(),
         )
         .init();
-    Cli::try_parse()?.run()?;
+    Cli::try_parse()?.run().await?;
     Ok(())
 }
 
@@ -65,14 +70,16 @@ impl Cli {
         tracing::info!("using cluster: {cluster}");
         let wallet = self.wallet()?;
         tracing::info!("using wallet: {}", wallet.pubkey());
-        let client = Client::new(cluster, wallet);
+        let commitment = self.commitment;
+        tracing::info!("using commitment config: {}", commitment.commitment);
+        let client = Client::new_with_options(cluster, wallet, self.commitment);
         Ok(Arc::new(client))
     }
 
-    fn run(&self) -> eyre::Result<()> {
+    async fn run(&self) -> eyre::Result<()> {
         let client = self.client()?;
         match &self.command {
-            Command::Store(args) => args.run(&client)?,
+            Command::Store(args) => args.run(&client).await?,
         }
         Ok(())
     }

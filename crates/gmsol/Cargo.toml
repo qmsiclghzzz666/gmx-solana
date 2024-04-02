@@ -9,12 +9,13 @@ path = "src/cli/main.rs"
 required-features = ["cli"]
 
 [features]
-cli = ["eyre", "clap", "tracing-subscriber", "shellexpand"]
+cli = ["tokio/full", "eyre", "clap", "tracing-subscriber", "shellexpand"]
 
 [dependencies]
+tokio = "1.37.0"
 thiserror = "1.0.58"
 tracing = "0.1.40"
-anchor-client = { version = "0.29.0" }
+anchor-client = { version = "0.29.0", features = ["async"] }
 data_store = { path = "../../programs/data_store", features = [
     "no-entrypoint",
     "debug",
