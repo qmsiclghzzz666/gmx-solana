@@ -44,15 +44,19 @@ where
 /// Apply factors using this formula: `A * x^E`.
 ///
 /// Assuming that all values are "float"s with the same decimals.
-pub fn apply_factors<T, const DECIMALS: u8>(value: T, factor: T, exponent_factor: T) -> Option<T>
+pub fn apply_factors<T, const DECIMALS: u8>(
+    value: T,
+    factor: T,
+    exponent_factor: T,
+) -> crate::Result<T>
 where
     T: FixedPointOps<DECIMALS>,
 {
-    Some(
-        apply_exponent_factor_wrapped(value, exponent_factor)?
-            .checked_mul(&Fixed::from_inner(factor))?
-            .into_inner(),
-    )
+    Ok(apply_exponent_factor_wrapped(value, exponent_factor)
+        .ok_or(crate::Error::PowComputation)?
+        .checked_mul(&Fixed::from_inner(factor))
+        .ok_or(crate::Error::Overflow)?
+        .into_inner())
 }
 
 fn apply_exponent_factor_wrapped<T, const DECIMALS: u8>(

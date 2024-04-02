@@ -124,7 +124,10 @@ impl<T: Unsigned + Clone + Ord> PoolDelta<T> {
     }
 
     /// Calculate swap impact.
-    pub fn swap_impact<const DECIMALS: u8>(&self, params: &SwapImpactParams<T>) -> Option<T::Signed>
+    pub fn swap_impact<const DECIMALS: u8>(
+        &self,
+        params: &SwapImpactParams<T>,
+    ) -> crate::Result<T::Signed>
     where
         T: FixedPointOps<DECIMALS>,
     {
@@ -139,7 +142,7 @@ impl<T: Unsigned + Clone + Ord> PoolDelta<T> {
     fn swap_impact_for_same_side_rebalance<const DECIMALS: u8>(
         &self,
         params: &SwapImpactParams<T>,
-    ) -> Option<T::Signed>
+    ) -> crate::Result<T::Signed>
     where
         T: FixedPointOps<DECIMALS>,
     {
@@ -157,15 +160,18 @@ impl<T: Unsigned + Clone + Ord> PoolDelta<T> {
 
         let initial = utils::apply_factors(initial, factor.clone(), exponent_factor.clone())?;
         let next = utils::apply_factors(next, factor.clone(), exponent_factor.clone())?;
-        let delta: T::Signed = initial.diff(next).try_into().ok()?;
-        Some(if has_positive_impact { delta } else { -delta })
+        let delta: T::Signed = initial
+            .diff(next)
+            .try_into()
+            .map_err(|_| crate::Error::Convert)?;
+        Ok(if has_positive_impact { delta } else { -delta })
     }
 
     #[inline]
     fn swap_impact_for_cross_over_rebalance<const DECIMALS: u8>(
         &self,
         params: &SwapImpactParams<T>,
-    ) -> Option<T::Signed>
+    ) -> crate::Result<T::Signed>
     where
         T: FixedPointOps<DECIMALS>,
     {
@@ -178,7 +184,10 @@ impl<T: Unsigned + Clone + Ord> PoolDelta<T> {
         let negative_impact =
             utils::apply_factors(next, negative_factor.clone(), exponent_factor.clone())?;
         let has_positive_impact = positive_impact > negative_impact;
-        let delta: T::Signed = positive_impact.diff(negative_impact).try_into().ok()?;
-        Some(if has_positive_impact { delta } else { -delta })
+        let delta: T::Signed = positive_impact
+            .diff(negative_impact)
+            .try_into()
+            .map_err(|_| crate::Error::Convert)?;
+        Ok(if has_positive_impact { delta } else { -delta })
     }
 }

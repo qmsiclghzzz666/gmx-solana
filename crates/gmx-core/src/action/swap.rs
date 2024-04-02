@@ -199,8 +199,7 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Swap<M, DECIMALS> {
                 &self.params.long_token_price,
                 &self.params.short_token_price,
             )?
-            .swap_impact(&self.market.swap_impact_params())
-            .ok_or(crate::Error::Computation)?;
+            .swap_impact(&self.market.swap_impact_params())?;
 
         let (amount_after_fees, fees) = self.charge_fees(price_impact.is_positive())?;
 

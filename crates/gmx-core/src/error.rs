@@ -18,6 +18,9 @@ pub enum Error {
     /// Unknown computation error.
     #[error("unknown computation error")]
     Computation,
+    /// Power computation error.
+    #[error("pow computation error")]
+    PowComputation,
     /// Overflow.
     #[error("overflow")]
     Overflow,
