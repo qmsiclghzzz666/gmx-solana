@@ -17,7 +17,7 @@ pub(super) struct StoreArgs {
 #[derive(clap::Subcommand)]
 enum Action {
     /// Inspect.
-    Inspect { kind: Kind, address: Pubkey },
+    Inspect { kind: Kind, address: Option<Pubkey> },
     /// Roles account actions.
     Roles {
         #[command(subcommand)]
@@ -65,30 +65,54 @@ impl StoreArgs {
         match &self.action {
             Action::Inspect { kind, address } => match kind {
                 Kind::DataStore => {
+                    let address = address.unwrap_or(*self.store()?);
                     println!(
                         "{:#?}",
-                        program.account::<states::DataStore>(*address).await?
+                        program.account::<states::DataStore>(address).await?
                     );
                 }
                 Kind::Roles => {
-                    println!("{:#?}", program.account::<states::Roles>(*address).await?);
+                    println!(
+                        "{:#?}",
+                        program
+                            .account::<states::Roles>(address.wrap_err("address not provided")?)
+                            .await?
+                    );
                 }
                 Kind::TokenConfigMap => {
                     println!(
                         "{:#?}",
-                        program.account::<states::TokenConfigMap>(*address).await?
+                        program
+                            .account::<states::TokenConfigMap>(
+                                address.wrap_err("address not provided")?
+                            )
+                            .await?
                     );
                 }
                 Kind::Market => {
-                    println!("{:#?}", program.account::<states::Market>(*address).await?);
+                    println!(
+                        "{:#?}",
+                        program
+                            .account::<states::Market>(address.wrap_err("address not provided")?)
+                            .await?
+                    );
                 }
                 Kind::Deposit => {
-                    println!("{:#?}", program.account::<states::Deposit>(*address).await?);
+                    println!(
+                        "{:#?}",
+                        program
+                            .account::<states::Deposit>(address.wrap_err("address not provided")?)
+                            .await?
+                    );
                 }
                 Kind::Withdrawal => {
                     println!(
                         "{:#?}",
-                        program.account::<states::Withdrawal>(*address).await?
+                        program
+                            .account::<states::Withdrawal>(
+                                address.wrap_err("address not provided")?
+                            )
+                            .await?
                     );
                 }
             },
