@@ -17,7 +17,7 @@ use crate::ExchangeError;
 
 const SUPPORTED_POOLS: [PoolKind; 3] = [
     PoolKind::Primary,
-    PoolKind::PriceImpact,
+    PoolKind::SwapImpact,
     PoolKind::ClaimableFee,
 ];
 

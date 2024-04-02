@@ -105,8 +105,8 @@ pub enum PoolKind {
     /// Primary.
     #[default]
     Primary,
-    /// Price impact.
-    PriceImpact,
+    /// Swap impact.
+    SwapImpact,
     /// Claimable fee.
     ClaimableFee,
 }
@@ -115,7 +115,7 @@ impl fmt::Display for PoolKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let name = match self {
             Self::Primary => "Primary",
-            Self::PriceImpact => "PriceImpact",
+            Self::SwapImpact => "SwapImpact",
             Self::ClaimableFee => "ClaimableFee",
         };
         write!(f, "{name}")

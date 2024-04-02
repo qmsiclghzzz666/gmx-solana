@@ -105,8 +105,8 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
     /// Get the swap impact pool.
     #[inline]
     fn swap_impact_pool(&self) -> crate::Result<&Self::Pool> {
-        self.pool(PoolKind::PriceImpact)?
-            .ok_or(crate::Error::MissingPoolKind(PoolKind::PriceImpact))
+        self.pool(PoolKind::SwapImpact)?
+            .ok_or(crate::Error::MissingPoolKind(PoolKind::SwapImpact))
     }
 
     /// Get the claimable fee pool.
@@ -215,12 +215,12 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
                     .try_into()
                     .map_err(|_| crate::Error::Convert)?;
             let max_amount = if is_long_token {
-                self.pool(PoolKind::PriceImpact)?
-                    .ok_or(crate::Error::MissingPoolKind(PoolKind::PriceImpact))?
+                self.pool(PoolKind::SwapImpact)?
+                    .ok_or(crate::Error::MissingPoolKind(PoolKind::SwapImpact))?
                     .long_token_amount()?
             } else {
-                self.pool(PoolKind::PriceImpact)?
-                    .ok_or(crate::Error::MissingPoolKind(PoolKind::PriceImpact))?
+                self.pool(PoolKind::SwapImpact)?
+                    .ok_or(crate::Error::MissingPoolKind(PoolKind::SwapImpact))?
                     .short_token_amount()?
             };
             if amount.unsigned_abs() > max_amount {
@@ -257,12 +257,12 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
     ) -> crate::Result<Self::Num> {
         let delta = self.swap_impact_amount_with_cap(is_long_token, price, usd_impact)?;
         if is_long_token {
-            self.pool_mut(PoolKind::PriceImpact)?
-                .ok_or(crate::Error::MissingPoolKind(PoolKind::PriceImpact))?
+            self.pool_mut(PoolKind::SwapImpact)?
+                .ok_or(crate::Error::MissingPoolKind(PoolKind::SwapImpact))?
                 .apply_delta_to_long_token_amount(&-delta.clone())?;
         } else {
-            self.pool_mut(PoolKind::PriceImpact)?
-                .ok_or(crate::Error::MissingPoolKind(PoolKind::PriceImpact))?
+            self.pool_mut(PoolKind::SwapImpact)?
+                .ok_or(crate::Error::MissingPoolKind(PoolKind::SwapImpact))?
                 .apply_delta_to_short_token_amount(&-delta.clone())?;
         }
         Ok(delta.unsigned_abs())

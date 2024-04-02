@@ -166,7 +166,7 @@ where
     fn pool(&self, kind: PoolKind) -> crate::Result<Option<&Self::Pool>> {
         let pool = match kind {
             PoolKind::Primary => &self.primary,
-            PoolKind::PriceImpact => &self.price_impact,
+            PoolKind::SwapImpact => &self.price_impact,
             PoolKind::ClaimableFee => &self.fee,
         };
         Ok(Some(pool))
@@ -175,7 +175,7 @@ where
     fn pool_mut(&mut self, kind: PoolKind) -> crate::Result<Option<&mut Self::Pool>> {
         let pool = match kind {
             PoolKind::Primary => &mut self.primary,
-            PoolKind::PriceImpact => &mut self.price_impact,
+            PoolKind::SwapImpact => &mut self.price_impact,
             PoolKind::ClaimableFee => &mut self.fee,
         };
         Ok(Some(pool))
