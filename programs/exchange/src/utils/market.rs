@@ -23,12 +23,6 @@ const SUPPORTED_POOLS: [PoolKind; 3] = [
 
 /// Accounts that can be used as [`Market`](gmx_core::Market).
 pub trait AsMarket<'info>: Authentication<'info> {
-    /// Get market.
-    fn market(&self) -> AccountInfo<'info>;
-
-    /// Get market token mint.
-    fn market_token(&self) -> &Account<'info, Mint>;
-
     /// Get receiver.
     fn receiver(&self) -> Option<&Account<'info, TokenAccount>>;
 
@@ -39,12 +33,17 @@ pub trait AsMarket<'info>: Authentication<'info> {
     fn token_program(&self) -> AccountInfo<'info>;
 
     /// Convert to a [`Market`](gmx_core::Market).
-    fn as_market(&self) -> AccountsMarket<Self> {
-        let mut pools = AccountsPools::new(self);
+    fn as_market<'a>(
+        &'a self,
+        market: AccountInfo<'info>,
+        market_token_mint: &'a Account<'info, Mint>,
+    ) -> AccountsMarket<'a, 'info, Self> {
+        let mut pools = AccountsPools::new(self, market);
         for kind in SUPPORTED_POOLS {
             pools.add(kind);
         }
         AccountsMarket {
+            mint: market_token_mint,
             accounts: self,
             pools,
         }
@@ -52,15 +51,17 @@ pub trait AsMarket<'info>: Authentication<'info> {
 }
 
 /// Accounts pools.
-struct AccountsPools<'a, T> {
+struct AccountsPools<'a, 'info, T> {
     accounts: &'a T,
-    pools: BTreeMap<PoolKind, AccountsPool<'a, T>>,
+    market: AccountInfo<'info>,
+    pools: BTreeMap<PoolKind, AccountsPool<'a, 'info, T>>,
 }
 
-impl<'a, T> AccountsPools<'a, T> {
-    fn new(accounts: &'a T) -> Self {
+impl<'a, 'info, T> AccountsPools<'a, 'info, T> {
+    fn new(accounts: &'a T, market: AccountInfo<'info>) -> Self {
         Self {
             accounts,
+            market,
             pools: BTreeMap::default(),
         }
     }
@@ -71,6 +72,7 @@ impl<'a, T> AccountsPools<'a, T> {
             AccountsPool {
                 kind,
                 accounts: self.accounts,
+                market: self.market.clone(),
             },
         );
         self
@@ -78,12 +80,13 @@ impl<'a, T> AccountsPools<'a, T> {
 }
 
 /// Use [`Accounts`] as pool.
-pub struct AccountsPool<'a, T> {
+pub struct AccountsPool<'a, 'info, T> {
+    market: AccountInfo<'info>,
     kind: PoolKind,
     accounts: &'a T,
 }
 
-impl<'a, 'info, T> AccountsPool<'a, T>
+impl<'a, 'info, T> AccountsPool<'a, 'info, T>
 where
     T: AsMarket<'info>,
 {
@@ -92,7 +95,7 @@ where
         CpiContext::new(
             check_role.program,
             GetPool {
-                market: self.accounts.market(),
+                market: self.market.clone(),
             },
         )
     }
@@ -111,13 +114,13 @@ where
                 authority: self.accounts.authority().to_account_info(),
                 store: check_role.accounts.store,
                 only_controller: check_role.accounts.roles,
-                market: self.accounts.market().to_account_info(),
+                market: self.market.clone(),
             },
         )
     }
 }
 
-impl<'a, 'info, T> gmx_core::Pool for AccountsPool<'a, T>
+impl<'a, 'info, T> gmx_core::Pool for AccountsPool<'a, 'info, T>
 where
     T: AsMarket<'info>,
 {
@@ -161,12 +164,13 @@ where
 }
 
 /// Use [`Accounts`] as market.
-pub struct AccountsMarket<'a, T> {
+pub struct AccountsMarket<'a, 'info, T> {
     accounts: &'a T,
-    pools: AccountsPools<'a, T>,
+    pools: AccountsPools<'a, 'info, T>,
+    mint: &'a Account<'info, Mint>,
 }
 
-impl<'a, 'info, T> AccountsMarket<'a, T>
+impl<'a, 'info, T> AccountsMarket<'a, 'info, T>
 where
     T: AsMarket<'info>,
 {
@@ -178,7 +182,7 @@ where
                 authority: self.accounts.authority().to_account_info(),
                 only_controller: check_role.accounts.roles,
                 store: check_role.accounts.store,
-                market_token_mint: self.accounts.market_token().to_account_info(),
+                market_token_mint: self.mint.to_account_info(),
                 to: self.accounts.receiver()?.to_account_info(),
                 token_program: self.accounts.token_program(),
             },
@@ -194,7 +198,7 @@ where
                 authority: self.accounts.authority().to_account_info(),
                 only_controller: check_role.accounts.roles,
                 store: check_role.accounts.store,
-                market_token_mint: self.accounts.market_token().to_account_info(),
+                market_token_mint: self.mint.to_account_info(),
                 from: self.accounts.withdrawal_vault()?.to_account_info(),
                 token_program: self.accounts.token_program(),
             },
@@ -203,7 +207,7 @@ where
     }
 }
 
-impl<'a, 'info, T> gmx_core::Market<{ constants::MARKET_DECIMALS }> for AccountsMarket<'a, T>
+impl<'a, 'info, T> gmx_core::Market<{ constants::MARKET_DECIMALS }> for AccountsMarket<'a, 'info, T>
 where
     T: AsMarket<'info>,
     'info: 'a,
@@ -212,7 +216,7 @@ where
 
     type Signed = i128;
 
-    type Pool = AccountsPool<'a, T>;
+    type Pool = AccountsPool<'a, 'info, T>;
 
     fn pool(&self, kind: PoolKind) -> gmx_core::Result<Option<&Self::Pool>> {
         Ok(self.pools.pools.get(&kind))
@@ -223,7 +227,7 @@ where
     }
 
     fn total_supply(&self) -> Self::Num {
-        self.accounts.market_token().supply.into()
+        self.mint.supply.into()
     }
 
     fn usd_to_amount_divisor(&self) -> Self::Num {

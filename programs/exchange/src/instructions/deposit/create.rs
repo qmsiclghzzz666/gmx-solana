@@ -89,7 +89,7 @@ pub fn create_deposit<'info>(
             .as_ref()
             .unwrap_or(&market_meta.long_token_mint),
         &market_meta.long_token_mint,
-        Some(&mut tokens),
+        &mut tokens,
     )?;
     let short_token_swap_path = get_and_validate_swap_path(
         &ctx.accounts.data_store_program,
@@ -98,7 +98,7 @@ pub fn create_deposit<'info>(
             .as_ref()
             .unwrap_or(&market_meta.short_token_mint),
         &market_meta.short_token_mint,
-        Some(&mut tokens),
+        &mut tokens,
     )?;
 
     let tokens_with_feed = tokens
@@ -312,15 +312,14 @@ fn get_and_validate_swap_path<'info>(
     accounts: &[AccountInfo<'info>],
     initial_token: &Pubkey,
     final_token: &Pubkey,
-    mut tokens: Option<&mut BTreeSet<Pubkey>>,
+    tokens: &mut BTreeSet<Pubkey>,
 ) -> Result<Vec<Pubkey>> {
     let mut current = *initial_token;
     let mut flags = BTreeSet::default();
     let markets = accounts
         .iter()
         .map(|account| {
-            let key = account.key();
-            if !flags.insert(key) {
+            if !flags.insert(account.key) {
                 return Err(ExchangeError::InvalidSwapPath.into());
             }
             let meta = data_store::cpi::get_market_meta(CpiContext::new(
@@ -340,11 +339,9 @@ fn get_and_validate_swap_path<'info>(
             } else {
                 return Err(ExchangeError::InvalidSwapPath.into());
             }
-            if let Some(tokens) = tokens.as_mut() {
-                tokens.insert(meta.long_token_mint);
-                tokens.insert(meta.short_token_mint);
-            }
-            Ok(key)
+            tokens.insert(meta.long_token_mint);
+            tokens.insert(meta.short_token_mint);
+            Ok(meta.market_token_mint)
         })
         .collect::<Result<Vec<_>>>()?;
     require_eq!(current, *final_token, ExchangeError::InvalidSwapPath);

@@ -81,6 +81,10 @@ pub enum ExchangeError {
     NotEnoughRemainingAccounts,
     #[msg("Invalid swap path")]
     InvalidSwapPath,
+    #[msg("Missing oracle price")]
+    MissingOraclePrice,
+    #[msg("Amount overflow")]
+    AmountOverflow,
     // Deposit.
     #[msg("Empty deposit amounts")]
     EmptyDepositAmounts,

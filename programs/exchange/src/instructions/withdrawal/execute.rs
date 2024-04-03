@@ -81,11 +81,10 @@ pub fn execute_withdrawal<'info>(
     let meta = data_store::cpi::get_market_meta(ctx.accounts.get_market_meta_ctx())?.get();
     let long_token = meta.long_token_mint;
     let short_token = meta.short_token_mint;
-    let remaing_accounts = ctx.remaining_accounts.to_vec();
     let report = ctx.accounts.with_oracle_prices(
         withdrawal.dynamic.tokens_with_feed.tokens.clone(),
-        remaing_accounts,
-        |accounts| {
+        ctx.remaining_accounts,
+        |accounts, _| {
             let oracle = &mut accounts.oracle;
             oracle.reload()?;
             let long_token_price = oracle
@@ -101,7 +100,10 @@ pub fn execute_withdrawal<'info>(
                 .max
                 .to_unit_price();
             let report = accounts
-                .as_market()
+                .as_market(
+                    accounts.market.to_account_info(),
+                    &accounts.market_token_mint,
+                )
                 .withdraw(
                     market_token_amount.into(),
                     long_token_price,
@@ -239,14 +241,6 @@ impl<'info> ExecuteWithdrawal<'info> {
 }
 
 impl<'info> AsMarket<'info> for ExecuteWithdrawal<'info> {
-    fn market(&self) -> AccountInfo<'info> {
-        self.market.to_account_info()
-    }
-
-    fn market_token(&self) -> &Account<'info, Mint> {
-        &self.market_token_mint
-    }
-
     fn receiver(&self) -> Option<&Account<'info, TokenAccount>> {
         None
     }

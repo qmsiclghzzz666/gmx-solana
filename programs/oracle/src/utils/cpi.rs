@@ -1,9 +1,12 @@
 use anchor_lang::prelude::*;
 use data_store::utils::Authentication;
 
-use crate::cpi::{
-    self,
-    accounts::{ClearAllPrices, SetPricesFromPriceFeed},
+use crate::{
+    cpi::{
+        self,
+        accounts::{ClearAllPrices, SetPricesFromPriceFeed},
+    },
+    OracleError,
 };
 
 /// Accounts that with oracle context.
@@ -26,7 +29,7 @@ pub trait WithOracleExt<'info>: WithOracle<'info> {
     /// Get the CPI context for set prices.
     fn set_prices_from_price_feed_ctx(
         &self,
-        remaining_accounts: Vec<AccountInfo<'info>>,
+        feeds: Vec<AccountInfo<'info>>,
     ) -> CpiContext<'_, '_, '_, 'info, SetPricesFromPriceFeed<'info>> {
         let check_role = self.check_role_ctx();
         CpiContext::new(
@@ -41,7 +44,7 @@ pub trait WithOracleExt<'info>: WithOracle<'info> {
                 data_store_program: check_role.program,
             },
         )
-        .with_remaining_accounts(remaining_accounts)
+        .with_remaining_accounts(feeds)
     }
 
     /// Get the CPI context for clear all prices.
@@ -63,14 +66,18 @@ pub trait WithOracleExt<'info>: WithOracle<'info> {
     fn with_oracle_prices<T>(
         &mut self,
         tokens: Vec<Pubkey>,
-        remaining_accounts: Vec<AccountInfo<'info>>,
-        f: impl FnOnce(&mut Self) -> Result<T>,
+        remaining_accounts: &'info [AccountInfo<'info>],
+        f: impl FnOnce(&mut Self, &'info [AccountInfo<'info>]) -> Result<T>,
     ) -> Result<T> {
-        cpi::set_prices_from_price_feed(
-            self.set_prices_from_price_feed_ctx(remaining_accounts),
-            tokens,
-        )?;
-        let output = f(self)?;
+        require_gte!(
+            remaining_accounts.len(),
+            tokens.len(),
+            OracleError::NotEnoughAccountInfos
+        );
+        let feeds = remaining_accounts[..tokens.len()].to_vec();
+        let remaining_accounts = &remaining_accounts[tokens.len()..];
+        cpi::set_prices_from_price_feed(self.set_prices_from_price_feed_ctx(feeds), tokens)?;
+        let output = f(self, remaining_accounts)?;
         cpi::clear_all_prices(self.clear_all_prices_ctx())?;
         Ok(output)
     }

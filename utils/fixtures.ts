@@ -176,6 +176,7 @@ export const mochaGlobalSetup = async () => {
         usdGTokenMint = usdG.mint;
         user0FakeTokenAccount = await fakeToken.createTokenAccount(user0.publicKey);
         user0UsdGTokenAccount = await usdG.createTokenAccount(user0.publicKey);
+        user0WsolTokenAccount = await createWrappedNativeAccount(provider.connection, user0, user0.publicKey, 10_000_000);
         fakeToken.mintTo(user0FakeTokenAccount, 1_000 * 1_000_000_000);
         usdG.mintTo(user0UsdGTokenAccount, 1_000_000 * 100_000_000);
 
@@ -186,13 +187,8 @@ export const mochaGlobalSetup = async () => {
         wsolVault = await createMarketVault(provider, signer0, dataStoreAddress, SOL_TOKEN_MINT);
 
         markets = await initializeMarkets(signer0, dataStoreAddress, fakeTokenMint, usdGTokenMint);
-        const [GMFakeMint] = createMarketTokenMintPDA(dataStoreAddress, fakeTokenMint, fakeTokenMint, usdGTokenMint);
-        user0FakeFakeUsdGTokenAccount = await createAssociatedTokenAccount(provider.connection, user0, GMFakeMint, user0.publicKey);
-
-        user0WsolTokenAccount = await createWrappedNativeAccount(provider.connection, user0, user0.publicKey, 10_000_000);
-
-        const [GMWsolMint] = createMarketTokenMintPDA(dataStoreAddress, SOL_TOKEN_MINT, SOL_TOKEN_MINT, usdGTokenMint);
-        user0WsolWsolUsdGTokenAccount = await createAssociatedTokenAccount(provider.connection, user0, GMWsolMint, user0.publicKey);
+        user0FakeFakeUsdGTokenAccount = await createAssociatedTokenAccount(provider.connection, user0, markets.GMFakeFakeUsdG, user0.publicKey);
+        user0WsolWsolUsdGTokenAccount = await createAssociatedTokenAccount(provider.connection, user0, markets.GMWsolWsolUsdG, user0.publicKey);
 
         console.log("[Done.]");
     } catch (error) {

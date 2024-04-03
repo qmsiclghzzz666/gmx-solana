@@ -36,14 +36,14 @@ export const createMarket = async (
         tokenProgram: TOKEN_PROGRAM_ID,
     }).signers([signer]).rpc();
 
-    return marketAddress;
+    return marketTokenMint;
 };
 
 export type MakeCreateDepositParams = {
     authority: PublicKey,
     store: PublicKey,
     payer: PublicKey,
-    market: PublicKey,
+    marketToken: PublicKey,
     toMarketTokenAccount: PublicKey,
     fromInitialLongTokenAccount?: PublicKey,
     fromInitialShortTokenAccount?: PublicKey,
@@ -74,7 +74,7 @@ export const makeCreateDepositInstruction = async ({
     authority,
     store,
     payer,
-    market,
+    marketToken,
     toMarketTokenAccount,
     fromInitialLongTokenAccount,
     fromInitialShortTokenAccount,
@@ -106,7 +106,7 @@ export const makeCreateDepositInstruction = async ({
         onlyController: createRolesPDA(store, authority)[0],
         dataStoreProgram: dataStore.programId,
         tokenProgram: TOKEN_PROGRAM_ID,
-        market,
+        market: createMarketPDA(store, marketToken)[0],
         tokenConfigMap: createTokenConfigMapPDA(store)[0],
         deposit,
         payer,
@@ -115,9 +115,9 @@ export const makeCreateDepositInstruction = async ({
         initialShortTokenAccount: fromInitialShortTokenAccount ?? null,
         longTokenDepositVault: longTokenDepositVault ?? null,
         shortTokenDepositVault: shortTokenDepositVault ?? null,
-    }).remainingAccounts([...longSwapPath, ...shortSwapPath].map(pubkey => {
+    }).remainingAccounts([...longSwapPath, ...shortSwapPath].map(mint => {
         return {
-            pubkey,
+            pubkey: createMarketPDA(store, mint)[0],
             isSigner: false,
             isWritable: false,
         }
@@ -195,10 +195,11 @@ export type MakeExecuteDepositParams = {
         hints?: {
             deposit?: {
                 user: PublicKey,
-                market: PublicKey,
                 marketToken: PublicKey,
                 toMarketTokenAccount: PublicKey,
                 feeds: PublicKey[],
+                longSwapPath: PublicKey[],
+                shortSwapPath: PublicKey[],
             },
         }
     }
@@ -212,14 +213,37 @@ export const makeExecuteDepositInstruction = async ({
     options
 }: MakeExecuteDepositParams,
 ) => {
-    const { user, market, marketToken, toMarketTokenAccount, feeds } = options?.hints?.deposit ?? await exchange.account.deposit.fetch(deposit).then(deposit => {
+    const { user, marketToken, toMarketTokenAccount, feeds, longSwapPath, shortSwapPath } = options?.hints?.deposit ?? await exchange.account.deposit.fetch(deposit).then(deposit => {
         return {
             user: deposit.fixed.senders.user,
             market: deposit.fixed.market,
             marketToken: deposit.fixed.tokens.marketToken,
             toMarketTokenAccount: deposit.fixed.receivers.receiver,
             feeds: deposit.dynamic.tokensWithFeed.feeds,
+            longSwapPath: deposit.dynamic.swapParams.longTokenSwapPath,
+            shortSwapPath: deposit.dynamic.swapParams.shortTokenSwapPath,
         }
+    });
+    const feedAccounts = feeds.map(feed => {
+        return {
+            pubkey: feed,
+            isSigner: false,
+            isWritable: false,
+        }
+    });
+    const swapPathMints = [...longSwapPath, ...shortSwapPath].map(mint => {
+        return {
+            pubkey: mint,
+            isSigner: false,
+            isWritable: false,
+        }
+    });
+    const swapPathMarkets = [...longSwapPath, ...shortSwapPath].map(mint => {
+        return {
+            pubkey: createMarketPDA(store, mint)[0],
+            isSigner: false,
+            isWritable: true,
+        };
     });
     return await exchange.methods.executeDeposit(toBN(options?.executionFee ?? 0)).accounts({
         authority,
@@ -230,18 +254,12 @@ export const makeExecuteDepositInstruction = async ({
         oracle,
         chainlinkProgram: CHAINLINK_ID,
         tokenConfigMap: createTokenConfigMapPDA(store)[0],
-        market,
+        market: createMarketPDA(store, marketToken)[0],
         marketTokenMint: marketToken,
         user,
         deposit,
         receiver: toMarketTokenAccount,
-    }).remainingAccounts(feeds.map(feed => {
-        return {
-            pubkey: feed,
-            isSigner: false,
-            isWritable: false,
-        }
-    })).instruction();
+    }).remainingAccounts([...feedAccounts, ...swapPathMarkets, ...swapPathMints]).instruction();
 };
 
 export const invokeExecuteDeposit = makeInvoke(makeExecuteDepositInstruction, ["authority"]);
@@ -250,7 +268,7 @@ export type MakeCreateWithdrawalParams = {
     authority: PublicKey,
     store: PublicKey,
     payer: PublicKey,
-    market: PublicKey,
+    marketToken: PublicKey,
     amount: number | bigint,
     fromMarketTokenAccount: PublicKey,
     toLongTokenAccount: PublicKey,
@@ -263,9 +281,6 @@ export type MakeCreateWithdrawalParams = {
         longTokenSwapPath?: PublicKey[],
         shortTokenSwapPath?: PublicKey[],
         shouldUnwrapNativeToken?: boolean,
-        hints?: {
-            marketToken?: PublicKey,
-        },
     }
 };
 
@@ -273,16 +288,13 @@ export const makeCreateWithdrawalInstruction = async ({
     authority,
     store,
     payer,
-    market,
+    marketToken,
     amount,
     fromMarketTokenAccount,
     toLongTokenAccount,
     toShortTokenAccount,
     options,
 }: MakeCreateWithdrawalParams) => {
-    const marketToken: PublicKey = options?.hints?.marketToken ?? await dataStore.methods.getMarketTokenMint().accounts({
-        market,
-    }).view();
     const withdrawalNonce = options?.nonce ?? Keypair.generate().publicKey.toBuffer();
     const [withdrawalAddress] = createWithdrawalPDA(store, payer, withdrawalNonce);
     const instruction = await exchange.methods.createWithdrawal([...withdrawalNonce], {
@@ -305,7 +317,7 @@ export const makeCreateWithdrawalInstruction = async ({
         dataStoreProgram: dataStore.programId,
         tokenProgram: TOKEN_PROGRAM_ID,
         tokenConfigMap: createTokenConfigMapPDA(store)[0],
-        market,
+        market: createMarketPDA(store, marketToken)[0],
         withdrawal: withdrawalAddress,
         payer,
         marketTokenAccount: fromMarketTokenAccount,
@@ -373,7 +385,6 @@ export type MakeExecuteWithdrawalParams = {
         hints?: {
             withdrawal?: {
                 user: PublicKey,
-                market: PublicKey,
                 marketTokenMint: PublicKey,
                 finalLongTokenReceiver: PublicKey,
                 finalShortTokenReceiver: PublicKey,
@@ -394,7 +405,6 @@ export const makeExecuteWithdrawalInstruction = async ({
 }: MakeExecuteWithdrawalParams) => {
     const {
         user,
-        market,
         marketTokenMint,
         finalLongTokenReceiver,
         finalShortTokenReceiver,
@@ -426,7 +436,7 @@ export const makeExecuteWithdrawalInstruction = async ({
         tokenConfigMap: createTokenConfigMapPDA(store)[0],
         withdrawal,
         user,
-        market,
+        market: createMarketPDA(store, marketTokenMint)[0],
         marketTokenMint,
         marketTokenWithdrawalVault: createMarketVaultPDA(store, marketTokenMint)[0],
         finalLongTokenReceiver,
@@ -445,33 +455,33 @@ export const makeExecuteWithdrawalInstruction = async ({
 export const invokeExecuteWithdrawal = makeInvoke(makeExecuteWithdrawalInstruction, ["authority"]);
 
 export const initializeMarkets = async (signer: Keypair, dataStoreAddress: PublicKey, fakeTokenMint: PublicKey, usdGMint: PublicKey) => {
-    let marketWsolWsolBtc: PublicKey;
+    let GMWsolWsolBtc: PublicKey;
     try {
-        marketWsolWsolBtc = await createMarket(signer, dataStoreAddress, SOL_TOKEN_MINT, SOL_TOKEN_MINT, BTC_TOKEN_MINT);
-        console.log(`New market has been created: ${marketWsolWsolBtc}`);
+        GMWsolWsolBtc = await createMarket(signer, dataStoreAddress, SOL_TOKEN_MINT, SOL_TOKEN_MINT, BTC_TOKEN_MINT);
+        console.log(`New market has been created, mint: ${GMWsolWsolBtc}`);
     } catch (error) {
         console.warn("Failed to initialize market", error);
     }
 
-    let marketWsolWsolUsdG: PublicKey;
+    let GMWsolWsolUsdG: PublicKey;
     try {
-        marketWsolWsolUsdG = await createMarket(signer, dataStoreAddress, SOL_TOKEN_MINT, SOL_TOKEN_MINT, usdGMint);
-        console.log(`New market has been created: ${marketWsolWsolUsdG}`);
+        GMWsolWsolUsdG = await createMarket(signer, dataStoreAddress, SOL_TOKEN_MINT, SOL_TOKEN_MINT, usdGMint);
+        console.log(`New market has been created, mint: ${GMWsolWsolUsdG}`);
     } catch (error) {
         console.warn("Failed to initialize market", error);
     }
 
-    let marketFakeFakeUsdG: PublicKey;
+    let GMFakeFakeUsdG: PublicKey;
     try {
-        marketFakeFakeUsdG = await createMarket(signer, dataStoreAddress, fakeTokenMint, fakeTokenMint, usdGMint);
-        console.log(`New market has been created: ${marketFakeFakeUsdG}`);
+        GMFakeFakeUsdG = await createMarket(signer, dataStoreAddress, fakeTokenMint, fakeTokenMint, usdGMint);
+        console.log(`New market has been created, mint: ${GMFakeFakeUsdG}`);
     } catch (error) {
         console.warn("Failed to initialize market", error);
     }
 
     return {
-        marketWsolWsolBtc,
-        marketWsolWsolUsdG,
-        marketFakeFakeUsdG,
+        GMWsolWsolBtc,
+        GMWsolWsolUsdG,
+        GMFakeFakeUsdG,
     }
 };

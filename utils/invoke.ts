@@ -18,8 +18,11 @@ export const makeInvoke = <
     return async (
         connection: Connection,
         params: ParamsWithSigners<T, S>,
-        computeUnits?: number,
-        computeUnitPrice?: number | bigint,
+        options?: {
+            computeUnits?: number,
+            computeUnitPrice?: number | bigint,
+            skipPreflight?: boolean,
+        }
     ) => {
         const originalParams: Partial<T> = { ...params } as any;
         const signerList = [];
@@ -36,18 +39,20 @@ export const makeInvoke = <
         } else {
             ([ix, output] = result as IxWithOutput<U>);
         }
-        const tx = computeUnits ?
+        const tx = options?.computeUnits ?
             new Transaction()
                 .add(ComputeBudgetProgram.setComputeUnitLimit({
-                    units: computeUnits,
+                    units: options.computeUnits,
                 }))
                 .add(ComputeBudgetProgram.setComputeUnitPrice({
-                    microLamports: computeUnitPrice ?? 1,
+                    microLamports: options.computeUnitPrice ?? 1,
                 }))
                 .add(ix) :
             new Transaction().add(ix);
         try {
-            return [await sendAndConfirmTransaction(connection, tx, signerList), output] as [string, U];
+            return [await sendAndConfirmTransaction(connection, tx, signerList, {
+                skipPreflight: options?.skipPreflight ?? false,
+            }), output] as [string, U];
         } catch (error) {
             if ((error as SendTransactionError).logs) {
                 const anchorError = AnchorError.parse(error.logs);

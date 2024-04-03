@@ -274,53 +274,52 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Deposit<M, DECIMALS> {
             "shouldn't be empty deposit"
         );
         // TODO: validate first deposit.
-        let (price_impact, long_token_usd_value, short_token_usd_value) = self.price_impact()?;
-        let mut market_token_to_mint: M::Num = Zero::zero();
-        let pool_value = self.market.pool_value(
-            &self.params.long_token_price,
-            &self.params.short_token_price,
-        )?;
-        let mut all_fees = [Default::default(), Default::default()];
-        if !self.params.long_token_amount.is_zero() {
-            let price_impact = long_token_usd_value
-                .clone()
-                .checked_mul_div_with_signed_numberator(
-                    &price_impact,
-                    &long_token_usd_value
-                        .checked_add(&short_token_usd_value)
-                        .ok_or(crate::Error::Computation)?,
-                )
-                .ok_or(crate::Error::Computation)?;
-            let (mint_amount, fees) =
-                self.execute_deposit(true, pool_value.clone(), price_impact)?;
-            market_token_to_mint = market_token_to_mint
-                .checked_add(&mint_amount)
-                .ok_or(crate::Error::Computation)?;
-            all_fees[0] = fees;
-        }
-        if !self.params.short_token_amount.is_zero() {
-            let price_impact = short_token_usd_value
-                .clone()
-                .checked_mul_div_with_signed_numberator(
-                    &price_impact,
-                    &long_token_usd_value
-                        .checked_add(&short_token_usd_value)
-                        .ok_or(crate::Error::Computation)?,
-                )
-                .ok_or(crate::Error::Computation)?;
-            let (mint_amount, fees) = self.execute_deposit(false, pool_value, price_impact)?;
-            market_token_to_mint = market_token_to_mint
-                .checked_add(&mint_amount)
-                .ok_or(crate::Error::Computation)?;
-            all_fees[1] = fees;
-        }
-        self.market.mint(&market_token_to_mint)?;
-        Ok(DepositReport::new(
-            self.params,
-            price_impact,
-            market_token_to_mint,
-            all_fees,
-        ))
+        let report = {
+            let (price_impact, long_token_usd_value, short_token_usd_value) =
+                self.price_impact()?;
+            let mut market_token_to_mint: M::Num = Zero::zero();
+            let pool_value = self.market.pool_value(
+                &self.params.long_token_price,
+                &self.params.short_token_price,
+            )?;
+            let mut all_fees = [Default::default(), Default::default()];
+            if !self.params.long_token_amount.is_zero() {
+                let price_impact = long_token_usd_value
+                    .clone()
+                    .checked_mul_div_with_signed_numberator(
+                        &price_impact,
+                        &long_token_usd_value
+                            .checked_add(&short_token_usd_value)
+                            .ok_or(crate::Error::Computation)?,
+                    )
+                    .ok_or(crate::Error::Computation)?;
+                let (mint_amount, fees) =
+                    self.execute_deposit(true, pool_value.clone(), price_impact)?;
+                market_token_to_mint = market_token_to_mint
+                    .checked_add(&mint_amount)
+                    .ok_or(crate::Error::Computation)?;
+                all_fees[0] = fees;
+            }
+            if !self.params.short_token_amount.is_zero() {
+                let price_impact = short_token_usd_value
+                    .clone()
+                    .checked_mul_div_with_signed_numberator(
+                        &price_impact,
+                        &long_token_usd_value
+                            .checked_add(&short_token_usd_value)
+                            .ok_or(crate::Error::Computation)?,
+                    )
+                    .ok_or(crate::Error::Computation)?;
+                let (mint_amount, fees) = self.execute_deposit(false, pool_value, price_impact)?;
+                market_token_to_mint = market_token_to_mint
+                    .checked_add(&mint_amount)
+                    .ok_or(crate::Error::Computation)?;
+                all_fees[1] = fees;
+            }
+            DepositReport::new(self.params, price_impact, market_token_to_mint, all_fees)
+        };
+        self.market.mint(&report.minted)?;
+        Ok(report)
     }
 }
 

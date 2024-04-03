@@ -15,8 +15,8 @@ describe("exchange: deposit", () => {
     let user0WsolTokenAccount: PublicKey;
     let user0WsolWsolUsdGTokenAccount: PublicKey;
     let user0FakeFakeUsdGTokenAccount: PublicKey;
-    let marketFakeFakeUsdG: PublicKey;
-    let marketWsolWsolUsdG: PublicKey;
+    let GMFakeFakeUsdG: PublicKey;
+    let GMWsolWsolUsdG: PublicKey;
     let oracleAddress: PublicKey;
 
     before(async () => {
@@ -29,7 +29,7 @@ describe("exchange: deposit", () => {
             user0WsolTokenAccount,
             user0WsolWsolUsdGTokenAccount,
         } = await getAddresses());
-        ({ marketFakeFakeUsdG, marketWsolWsolUsdG } = await getMarkets());
+        ({ GMFakeFakeUsdG, GMWsolWsolUsdG } = await getMarkets());
     });
 
     it("create and execute deposit and then withdraw", async () => {
@@ -39,7 +39,7 @@ describe("exchange: deposit", () => {
                 authority: signer0,
                 store: dataStoreAddress,
                 payer: user0,
-                market: marketFakeFakeUsdG,
+                marketToken: GMFakeFakeUsdG,
                 toMarketTokenAccount: user0FakeFakeUsdGTokenAccount,
                 fromInitialLongTokenAccount: user0FakeTokenAccount,
                 fromInitialShortTokenAccount: user0UsdGTokenAccount,
@@ -60,7 +60,9 @@ describe("exchange: deposit", () => {
                 options: {
                     executionFee: 5_001,
                 }
-            }, 800_000);
+            }, {
+                computeUnits: 800_000,
+            });
             console.log(`deposit executed at ${signature}`);
         } catch (error) {
             console.log(error);
@@ -80,7 +82,7 @@ describe("exchange: deposit", () => {
                     authority: signer0,
                     store: dataStoreAddress,
                     payer: user0,
-                    market: marketFakeFakeUsdG,
+                    marketToken: GMFakeFakeUsdG,
                     amount: 1_000_000_000_000,
                     fromMarketTokenAccount: user0FakeFakeUsdGTokenAccount,
                     toLongTokenAccount: user0FakeTokenAccount,
@@ -129,7 +131,7 @@ describe("exchange: deposit", () => {
                     authority: signer0,
                     store: dataStoreAddress,
                     payer: user0,
-                    market: marketFakeFakeUsdG,
+                    marketToken: GMFakeFakeUsdG,
                     amount: 2_000 * 1_000_000_000,
                     fromMarketTokenAccount: user0FakeFakeUsdGTokenAccount,
                     toLongTokenAccount: user0FakeTokenAccount,
@@ -159,7 +161,9 @@ describe("exchange: deposit", () => {
                         executionFee: 5001,
                     }
                 },
-                400_000,
+                {
+                    computeUnits: 400_000,
+                },
             );
             console.log(`withdrawal executed at ${signature}`);
         } catch (error) {
@@ -180,7 +184,7 @@ describe("exchange: deposit", () => {
                 authority: signer0,
                 store: dataStoreAddress,
                 payer: user0,
-                market: marketFakeFakeUsdG,
+                marketToken: GMFakeFakeUsdG,
                 toMarketTokenAccount: user0FakeFakeUsdGTokenAccount,
                 fromInitialLongTokenAccount: user0FakeTokenAccount,
                 fromInitialShortTokenAccount: user0UsdGTokenAccount,
@@ -220,14 +224,14 @@ describe("exchange: deposit", () => {
                 authority: signer0,
                 store: dataStoreAddress,
                 payer: user0,
-                market: marketFakeFakeUsdG,
+                marketToken: GMFakeFakeUsdG,
                 toMarketTokenAccount: user0FakeFakeUsdGTokenAccount,
                 fromInitialLongTokenAccount: user0FakeTokenAccount,
                 fromInitialShortTokenAccount: user0UsdGTokenAccount,
                 initialLongTokenAmount: 2_000_000_000,
                 initialShortTokenAmount: 200_000_000,
                 options: {
-                    longTokenSwapPath: [marketFakeFakeUsdG],
+                    longTokenSwapPath: [GMFakeFakeUsdG],
                 }
             }
         )).rejectedWith(AnchorError, "Invalid swap path");
@@ -242,12 +246,12 @@ describe("exchange: deposit", () => {
                     authority: signer0,
                     store: dataStoreAddress,
                     payer: user0,
-                    market: marketWsolWsolUsdG,
+                    marketToken: GMWsolWsolUsdG,
                     toMarketTokenAccount: user0WsolWsolUsdGTokenAccount,
                     fromInitialShortTokenAccount: user0FakeTokenAccount,
                     initialShortTokenAmount: 1_000_000,
                     options: {
-                        shortTokenSwapPath: [marketFakeFakeUsdG],
+                        shortTokenSwapPath: [GMFakeFakeUsdG],
                     }
                 }
             );
@@ -265,6 +269,55 @@ describe("exchange: deposit", () => {
                 }
             );
             console.log(`deposit cancelled at ${signature}`);
+        }
+    });
+
+    it("create deposit with valid swap path and execute", async () => {
+        let deposit: PublicKey;
+        try {
+            const [signature, depositAddress] = await invokeCreateDeposit(
+                provider.connection,
+                {
+                    authority: signer0,
+                    store: dataStoreAddress,
+                    payer: user0,
+                    marketToken: GMWsolWsolUsdG,
+                    toMarketTokenAccount: user0WsolWsolUsdGTokenAccount,
+                    fromInitialShortTokenAccount: user0FakeTokenAccount,
+                    initialShortTokenAmount: 20_000_000,
+                    options: {
+                        shortTokenSwapPath: [GMFakeFakeUsdG],
+                    }
+                }
+            );
+            deposit = depositAddress;
+            console.log(`deposit created at ${signature}`);
+        } catch (error) {
+            console.log(error);
+            throw error;
+        }
+
+        try {
+            const [signature] = await invokeExecuteDeposit(
+                provider.connection,
+                {
+                    authority: signer0,
+                    store: dataStoreAddress,
+                    oracle: oracleAddress,
+                    deposit,
+                    options: {
+                        executionFee: 5001,
+                    }
+                },
+                {
+                    computeUnits: 4_000_000,
+                    skipPreflight: true,
+                },
+            );
+            console.log(`deposit executed at ${signature}`);
+        } catch (error) {
+            console.log(error);
+            throw error;
         }
     });
 });
