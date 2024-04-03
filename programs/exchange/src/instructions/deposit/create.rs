@@ -40,21 +40,35 @@ pub fn create_deposit<'info>(
 
     if params.initial_long_token_amount != 0 {
         anchor_spl::token::transfer(
-            ctx.accounts.token_transfer_ctx(true),
+            ctx.accounts.token_transfer_ctx(true)?,
             params.initial_long_token_amount,
         )?;
     }
 
     if params.initial_short_token_amount != 0 {
         anchor_spl::token::transfer(
-            ctx.accounts.token_transfer_ctx(false),
+            ctx.accounts.token_transfer_ctx(false)?,
             params.initial_short_token_amount,
         )?;
     }
 
     let mut tokens = BTreeSet::default();
-    tokens.insert(ctx.accounts.initial_long_token_account.mint);
-    tokens.insert(ctx.accounts.initial_short_token_account.mint);
+    let initial_long_token_mint = ctx
+        .accounts
+        .initial_long_token_account
+        .as_ref()
+        .map(|a| a.mint);
+    let initial_short_token_mint = ctx
+        .accounts
+        .initial_short_token_account
+        .as_ref()
+        .map(|a| a.mint);
+    if let Some(mint) = initial_long_token_mint {
+        tokens.insert(mint);
+    }
+    if let Some(mint) = initial_short_token_mint {
+        tokens.insert(mint);
+    }
 
     let market_meta = cpi::get_market_meta(ctx.accounts.get_market_meta_ctx())?.get();
     tokens.insert(market_meta.long_token_mint);
@@ -71,14 +85,18 @@ pub fn create_deposit<'info>(
     let long_token_swap_path = get_and_validate_swap_path(
         &ctx.accounts.data_store_program,
         &ctx.remaining_accounts[..long_swap_length],
-        &ctx.accounts.initial_long_token_account.mint,
+        initial_long_token_mint
+            .as_ref()
+            .unwrap_or(&market_meta.long_token_mint),
         &market_meta.long_token_mint,
         Some(&mut tokens),
     )?;
     let short_token_swap_path = get_and_validate_swap_path(
         &ctx.accounts.data_store_program,
         &ctx.remaining_accounts[long_swap_length..(long_swap_length + short_swap_length)],
-        &ctx.accounts.initial_short_token_account.mint,
+        initial_short_token_mint
+            .as_ref()
+            .unwrap_or(&market_meta.short_token_mint),
         &market_meta.short_token_mint,
         Some(&mut tokens),
     )?;
@@ -147,12 +165,12 @@ pub struct CreateDeposit<'info> {
     /// CHECK: only used to invoke CPI and should be checked by it.
     pub market: UncheckedAccount<'info>,
     #[account(mut)]
-    pub initial_long_token_account: Account<'info, TokenAccount>,
+    pub initial_long_token_account: Option<Account<'info, TokenAccount>>,
     #[account(mut)]
-    pub initial_short_token_account: Account<'info, TokenAccount>,
+    pub initial_short_token_account: Option<Account<'info, TokenAccount>>,
     #[account(
         mut,
-        token::mint = initial_long_token_account.mint,
+        token::mint = initial_long_token_account.as_ref().expect("token account not provided").mint,
         seeds = [
             constants::MARKET_VAULT_SEED,
             store.key().as_ref(),
@@ -162,10 +180,10 @@ pub struct CreateDeposit<'info> {
         bump,
         seeds::program = data_store_program.key(),
     )]
-    pub long_token_deposit_vault: Account<'info, TokenAccount>,
+    pub long_token_deposit_vault: Option<Account<'info, TokenAccount>>,
     #[account(
         mut,
-        token::mint = initial_short_token_account.mint,
+        token::mint = initial_short_token_account.as_ref().expect("token account not provided").mint,
         seeds = [
             constants::MARKET_VAULT_SEED,
             store.key().as_ref(),
@@ -175,7 +193,7 @@ pub struct CreateDeposit<'info> {
         bump,
         seeds::program = data_store_program.key(),
     )]
-    pub short_token_deposit_vault: Account<'info, TokenAccount>,
+    pub short_token_deposit_vault: Option<Account<'info, TokenAccount>>,
 }
 
 impl<'info> Authentication<'info> for CreateDeposit<'info> {
@@ -226,8 +244,14 @@ impl<'info> CreateDeposit<'info> {
                 only_controller: self.only_controller.to_account_info(),
                 store: self.store.to_account_info(),
                 deposit: self.deposit.to_account_info(),
-                initial_long_token_account: self.initial_long_token_account.to_account_info(),
-                initial_short_token_account: self.initial_short_token_account.to_account_info(),
+                initial_long_token_account: self
+                    .initial_long_token_account
+                    .as_ref()
+                    .map(|a| a.to_account_info()),
+                initial_short_token_account: self
+                    .initial_short_token_account
+                    .as_ref()
+                    .map(|a| a.to_account_info()),
                 market: self.market.to_account_info(),
                 receiver: self.receiver.to_account_info(),
                 system_program: self.system_program.to_account_info(),
@@ -238,26 +262,38 @@ impl<'info> CreateDeposit<'info> {
     fn token_transfer_ctx(
         &self,
         is_long_token: bool,
-    ) -> CpiContext<'_, '_, '_, 'info, token::Transfer<'info>> {
+    ) -> Result<CpiContext<'_, '_, '_, 'info, token::Transfer<'info>>> {
         let (from, to) = if is_long_token {
             (
-                self.initial_long_token_account.to_account_info(),
-                self.long_token_deposit_vault.to_account_info(),
+                self.initial_long_token_account
+                    .as_ref()
+                    .ok_or(ExchangeError::MissingDepositTokenAccount)?
+                    .to_account_info(),
+                self.long_token_deposit_vault
+                    .as_ref()
+                    .ok_or(ExchangeError::MissingDepositTokenAccount)?
+                    .to_account_info(),
             )
         } else {
             (
-                self.initial_short_token_account.to_account_info(),
-                self.short_token_deposit_vault.to_account_info(),
+                self.initial_short_token_account
+                    .as_ref()
+                    .ok_or(ExchangeError::MissingDepositTokenAccount)?
+                    .to_account_info(),
+                self.short_token_deposit_vault
+                    .as_ref()
+                    .ok_or(ExchangeError::MissingDepositTokenAccount)?
+                    .to_account_info(),
             )
         };
-        CpiContext::new(
+        Ok(CpiContext::new(
             self.token_program.to_account_info(),
             token::Transfer {
                 from,
                 to,
                 authority: self.payer.to_account_info(),
             },
-        )
+        ))
     }
 
     fn transfer_ctx(&self) -> CpiContext<'_, '_, '_, 'info, system_program::Transfer<'info>> {

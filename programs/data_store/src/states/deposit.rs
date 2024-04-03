@@ -52,9 +52,9 @@ pub struct Senders {
     /// The user depositing liquidity.
     pub user: Pubkey,
     /// Initial long token account.
-    pub initial_long_token_account: Pubkey,
+    pub initial_long_token_account: Option<Pubkey>,
     /// Initial short token account.
-    pub initial_short_token_account: Pubkey,
+    pub initial_short_token_account: Option<Pubkey>,
 }
 
 /// Tokens config of [`Deposit`].
@@ -64,9 +64,9 @@ pub struct Tokens {
     /// The market token of the market.
     pub market_token: Pubkey,
     /// Initial long token.
-    pub initial_long_token: Pubkey,
+    pub initial_long_token: Option<Pubkey>,
     /// Initial short token.
-    pub initial_short_token: Pubkey,
+    pub initial_short_token: Option<Pubkey>,
     /// Params.
     pub params: TokenParams,
 }
@@ -104,8 +104,8 @@ impl Deposit {
         nonce: NonceBytes,
         tokens_with_feed: Vec<(Pubkey, Pubkey)>,
         user: Pubkey,
-        initial_long_token_account: &Account<TokenAccount>,
-        initial_short_token_account: &Account<TokenAccount>,
+        initial_long_token_account: Option<&Account<TokenAccount>>,
+        initial_short_token_account: Option<&Account<TokenAccount>>,
         receivers: Receivers,
         token_params: TokenParams,
         swap_params: SwapParams,
@@ -118,14 +118,18 @@ impl Deposit {
                 market: market.key(),
                 senders: Senders {
                     user,
-                    initial_long_token_account: initial_long_token_account.key(),
-                    initial_short_token_account: initial_short_token_account.key(),
+                    initial_long_token_account: initial_long_token_account
+                        .as_ref()
+                        .map(|a| a.key()),
+                    initial_short_token_account: initial_short_token_account
+                        .as_ref()
+                        .map(|a| a.key()),
                 },
                 receivers,
                 tokens: Tokens {
                     market_token: market.meta.market_token_mint,
-                    initial_long_token: initial_long_token_account.mint,
-                    initial_short_token: initial_short_token_account.mint,
+                    initial_long_token: initial_long_token_account.as_ref().map(|a| a.mint),
+                    initial_short_token: initial_short_token_account.as_ref().map(|a| a.mint),
                     params: token_params,
                 },
             },

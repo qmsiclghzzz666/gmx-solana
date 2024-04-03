@@ -41,14 +41,14 @@ pub fn cancel_deposit(ctx: Context<CancelDeposit>, execution_fee: u64) -> Result
 
     if initial_long_amount != 0 {
         data_store::cpi::market_vault_transfer_out(
-            ctx.accounts.market_vault_transfer_out_ctx(true),
+            ctx.accounts.market_vault_transfer_out_ctx(true)?,
             initial_long_amount,
         )?;
     }
 
     if initial_short_amount != 0 {
         data_store::cpi::market_vault_transfer_out(
-            ctx.accounts.market_vault_transfer_out_ctx(false),
+            ctx.accounts.market_vault_transfer_out_ctx(false)?,
             initial_short_amount,
         )?;
     }
@@ -74,8 +74,8 @@ pub struct CancelDeposit<'info> {
     /// through CPI.
     #[account(
         mut,
-        constraint = deposit.fixed.tokens.initial_long_token == initial_long_token.mint @ ExchangeError::InvalidDepositToCancel,
-        constraint = deposit.fixed.tokens.initial_short_token == initial_short_token.mint @ ExchangeError::InvalidDepositToCancel,
+        constraint = deposit.fixed.tokens.initial_long_token == initial_long_token.as_ref().map(|a| a.mint) @ ExchangeError::InvalidDepositToCancel,
+        constraint = deposit.fixed.tokens.initial_short_token == initial_short_token.as_ref().map(|a| a.mint) @ ExchangeError::InvalidDepositToCancel,
     )]
     pub deposit: Account<'info, Deposit>,
     /// CHECK: only used to receive lamports.
@@ -83,13 +83,13 @@ pub struct CancelDeposit<'info> {
     pub user: UncheckedAccount<'info>,
     /// The token account for receiving the initial long tokens.
     #[account(mut, token::authority = user)]
-    pub initial_long_token: Account<'info, TokenAccount>,
+    pub initial_long_token: Option<Account<'info, TokenAccount>>,
     /// The token account for receiving the initial short tokens.
     #[account(mut, token::authority = user)]
-    pub initial_short_token: Account<'info, TokenAccount>,
+    pub initial_short_token: Option<Account<'info, TokenAccount>>,
     #[account(
         mut,
-        token::mint = initial_long_token.mint,
+        token::mint = initial_long_token.as_ref().expect("missing token account").mint,
         seeds = [
             constants::MARKET_VAULT_SEED,
             store.key().as_ref(),
@@ -99,10 +99,10 @@ pub struct CancelDeposit<'info> {
         bump,
         seeds::program = data_store_program.key(),
     )]
-    pub long_token_deposit_vault: Account<'info, TokenAccount>,
+    pub long_token_deposit_vault: Option<Account<'info, TokenAccount>>,
     #[account(
         mut,
-        token::mint = initial_short_token.mint,
+        token::mint = initial_short_token.as_ref().expect("missing token account").mint,
         seeds = [
             constants::MARKET_VAULT_SEED,
             store.key().as_ref(),
@@ -112,7 +112,7 @@ pub struct CancelDeposit<'info> {
         bump,
         seeds::program = data_store_program.key(),
     )]
-    pub short_token_deposit_vault: Account<'info, TokenAccount>,
+    pub short_token_deposit_vault: Option<Account<'info, TokenAccount>>,
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
 }
@@ -155,25 +155,34 @@ impl<'info> CancelDeposit<'info> {
     fn market_vault_transfer_out_ctx(
         &self,
         is_long_token: bool,
-    ) -> CpiContext<'_, '_, '_, 'info, MarketVaultTransferOut<'info>> {
-        CpiContext::new(
+    ) -> Result<CpiContext<'_, '_, '_, 'info, MarketVaultTransferOut<'info>>> {
+        let (market_vault, to) = if is_long_token {
+            let (Some(market_vault), Some(to)) = (
+                self.long_token_deposit_vault.as_ref(),
+                self.initial_long_token.as_ref(),
+            ) else {
+                return Err(ExchangeError::MissingDepositTokenAccount.into());
+            };
+            (market_vault, to)
+        } else {
+            let (Some(market_vault), Some(to)) = (
+                self.short_token_deposit_vault.as_ref(),
+                self.initial_short_token.as_ref(),
+            ) else {
+                return Err(ExchangeError::MissingDepositTokenAccount.into());
+            };
+            (market_vault, to)
+        };
+        Ok(CpiContext::new(
             self.data_store_program.to_account_info(),
             MarketVaultTransferOut {
                 authority: self.authority.to_account_info(),
                 only_controller: self.only_controller.to_account_info(),
                 store: self.store.to_account_info(),
-                market_vault: if is_long_token {
-                    self.long_token_deposit_vault.to_account_info()
-                } else {
-                    self.short_token_deposit_vault.to_account_info()
-                },
-                to: if is_long_token {
-                    self.initial_long_token.to_account_info()
-                } else {
-                    self.initial_short_token.to_account_info()
-                },
+                market_vault: market_vault.to_account_info(),
+                to: to.to_account_info(),
                 token_program: self.token_program.to_account_info(),
             },
-        )
+        ))
     }
 }

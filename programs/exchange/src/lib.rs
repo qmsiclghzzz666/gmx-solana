@@ -88,6 +88,8 @@ pub enum ExchangeError {
     FailedToExecuteDeposit,
     #[msg("Invalid deposit to cancel")]
     InvalidDepositToCancel,
+    #[msg("Missing deposit token account")]
+    MissingDepositTokenAccount,
     // Withdrawal.
     #[msg("Market token mint mismached")]
     MismatchedMarketTokenMint,

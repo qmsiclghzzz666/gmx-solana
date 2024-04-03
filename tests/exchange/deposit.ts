@@ -244,9 +244,7 @@ describe("exchange: deposit", () => {
                     payer: user0,
                     market: marketWsolWsolUsdG,
                     toMarketTokenAccount: user0WsolWsolUsdGTokenAccount,
-                    fromInitialLongTokenAccount: user0WsolTokenAccount,
                     fromInitialShortTokenAccount: user0FakeTokenAccount,
-                    initialLongTokenAmount: 0,
                     initialShortTokenAmount: 1_000_000,
                     options: {
                         shortTokenSwapPath: [marketFakeFakeUsdG],

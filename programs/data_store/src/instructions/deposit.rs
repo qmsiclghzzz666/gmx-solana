@@ -26,8 +26,8 @@ pub fn initialize_deposit(
         nonce,
         tokens_with_feed,
         ctx.accounts.payer.key(),
-        &ctx.accounts.initial_long_token_account,
-        &ctx.accounts.initial_short_token_account,
+        ctx.accounts.initial_long_token_account.as_ref(),
+        ctx.accounts.initial_short_token_account.as_ref(),
         Receivers {
             receiver: ctx.accounts.receiver.key(),
             ui_fee_receiver,
@@ -54,9 +54,9 @@ pub struct InitializeDeposit<'info> {
     )]
     pub deposit: Account<'info, Deposit>,
     #[account(token::authority = payer)]
-    pub initial_long_token_account: Account<'info, TokenAccount>,
+    pub initial_long_token_account: Option<Account<'info, TokenAccount>>,
     #[account(token::authority = payer)]
-    pub initial_short_token_account: Account<'info, TokenAccount>,
+    pub initial_short_token_account: Option<Account<'info, TokenAccount>>,
     pub(crate) market: Account<'info, Market>,
     #[account(token::authority = payer, token::mint = market.meta.market_token_mint)]
     pub receiver: Account<'info, TokenAccount>,

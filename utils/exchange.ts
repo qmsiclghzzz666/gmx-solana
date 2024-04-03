@@ -1,6 +1,6 @@
 import { workspace, Program, BN } from "@coral-xyz/anchor";
 import { Exchange } from "../target/types/exchange";
-import { ComputeBudgetProgram, Keypair, PublicKey, Signer, Transaction } from "@solana/web3.js";
+import { ComputeBudgetProgram, Connection, Keypair, PublicKey, Signer, Transaction } from "@solana/web3.js";
 import { createDepositPDA, createMarketPDA, createMarketTokenMintPDA, createMarketVaultPDA, createRolesPDA, createTokenConfigMapPDA, createWithdrawalPDA, dataStore, getTokenConfig } from "./data";
 import { TOKEN_PROGRAM_ID, getAccount } from "@solana/spl-token";
 import { BTC_TOKEN_MINT, SOL_TOKEN_MINT } from "./token";
@@ -45,10 +45,10 @@ export type MakeCreateDepositParams = {
     payer: PublicKey,
     market: PublicKey,
     toMarketTokenAccount: PublicKey,
-    fromInitialLongTokenAccount: PublicKey,
-    fromInitialShortTokenAccount: PublicKey,
-    initialLongTokenAmount: number | bigint,
-    initialShortTokenAmount: number | bigint,
+    fromInitialLongTokenAccount?: PublicKey,
+    fromInitialShortTokenAccount?: PublicKey,
+    initialLongTokenAmount?: number | bigint,
+    initialShortTokenAmount?: number | bigint,
     options?: {
         nonce?: Buffer,
         executionFee?: number | bigint,
@@ -62,6 +62,13 @@ export type MakeCreateDepositParams = {
         },
     },
 }
+
+const getDepositVault = async (connection: Connection, store: PublicKey, fromTokenAccount?: PublicKey, hint?: PublicKey) => {
+    if (fromTokenAccount) {
+        const token = hint ?? (await getAccount(connection, fromTokenAccount)).mint;
+        return createMarketVaultPDA(store, token)[0];
+    }
+};
 
 export const makeCreateDepositInstruction = async ({
     authority,
@@ -77,8 +84,8 @@ export const makeCreateDepositInstruction = async ({
 }: MakeCreateDepositParams) => {
     const depositNonce = options?.nonce ?? Keypair.generate().publicKey.toBuffer();
     const [deposit] = createDepositPDA(store, payer, depositNonce);
-    const initialLongToken = options?.hints?.initialLongToken ?? (await getAccount(exchange.provider.connection, fromInitialLongTokenAccount)).mint;
-    const initialShortToken = options?.hints?.initialShortToken ?? (await getAccount(exchange.provider.connection, fromInitialShortTokenAccount)).mint;
+    const longTokenDepositVault = await getDepositVault(exchange.provider.connection, store, fromInitialLongTokenAccount, options?.hints?.initialLongToken);
+    const shortTokenDepositVault = await getDepositVault(exchange.provider.connection, store, fromInitialShortTokenAccount, options?.hints?.initialShortToken);
     const longSwapPath = options?.longTokenSwapPath ?? [];
     const shortSwapPath = options?.shortTokenSwapPath ?? [];
     let instruction = await exchange.methods.createDeposit(
@@ -88,8 +95,8 @@ export const makeCreateDepositInstruction = async ({
             executionFee: toBN(options?.executionFee ?? 0),
             longTokenSwapLength: longSwapPath.length,
             shortTokenSwapLength: shortSwapPath.length,
-            initialLongTokenAmount: toBN(initialLongTokenAmount),
-            initialShortTokenAmount: toBN(initialShortTokenAmount),
+            initialLongTokenAmount: toBN(initialLongTokenAmount ?? 0),
+            initialShortTokenAmount: toBN(initialShortTokenAmount ?? 0),
             minMarketToken: toBN(options?.minMarketToken ?? 0),
             shouldUnwrapNativeToken: options?.shouldUnwrapNativeToken ?? false,
         }
@@ -104,10 +111,10 @@ export const makeCreateDepositInstruction = async ({
         deposit,
         payer,
         receiver: toMarketTokenAccount,
-        initialLongTokenAccount: fromInitialLongTokenAccount,
-        initialShortTokenAccount: fromInitialShortTokenAccount,
-        longTokenDepositVault: createMarketVaultPDA(store, initialLongToken)[0],
-        shortTokenDepositVault: createMarketVaultPDA(store, initialShortToken)[0],
+        initialLongTokenAccount: fromInitialLongTokenAccount ?? null,
+        initialShortTokenAccount: fromInitialShortTokenAccount ?? null,
+        longTokenDepositVault: longTokenDepositVault ?? null,
+        shortTokenDepositVault: shortTokenDepositVault ?? null,
     }).remainingAccounts([...longSwapPath, ...shortSwapPath].map(pubkey => {
         return {
             pubkey,
@@ -130,10 +137,10 @@ export type MakeCancelDepositParams = {
         hints?: {
             deposit?: {
                 user: PublicKey,
-                fromInitialLongTokenAccount: PublicKey,
-                fromInitialShortTokenAccount: PublicKey,
-                initialLongToken: PublicKey,
-                initialShortToken: PublicKey,
+                fromInitialLongTokenAccount: PublicKey | null,
+                fromInitialShortTokenAccount: PublicKey | null,
+                initialLongToken: PublicKey | null,
+                initialShortToken: PublicKey | null,
             }
         }
     }
@@ -154,10 +161,10 @@ export const makeCancelDepositInstruction = async ({
     } = options?.hints?.deposit ?? await dataStore.account.deposit.fetch(deposit).then(deposit => {
         return {
             user: deposit.fixed.senders.user,
-            fromInitialLongTokenAccount: deposit.fixed.senders.initialLongTokenAccount,
-            fromInitialShortTokenAccount: deposit.fixed.senders.initialShortTokenAccount,
-            initialLongToken: deposit.fixed.tokens.initialLongToken,
-            initialShortToken: deposit.fixed.tokens.initialShortToken,
+            fromInitialLongTokenAccount: deposit.fixed.senders.initialLongTokenAccount ?? null,
+            fromInitialShortTokenAccount: deposit.fixed.senders.initialShortTokenAccount ?? null,
+            initialLongToken: deposit.fixed.tokens.initialLongToken ?? null,
+            initialShortToken: deposit.fixed.tokens.initialShortToken ?? null,
         }
     });
 
@@ -171,8 +178,8 @@ export const makeCancelDepositInstruction = async ({
         deposit,
         initialLongToken: fromInitialLongTokenAccount,
         initialShortToken: fromInitialShortTokenAccount,
-        longTokenDepositVault: createMarketVaultPDA(store, initialLongToken)[0],
-        shortTokenDepositVault: createMarketVaultPDA(store, initialShortToken)[0],
+        longTokenDepositVault: initialLongToken ? createMarketVaultPDA(store, initialLongToken)[0] : null,
+        shortTokenDepositVault: initialShortToken ? createMarketVaultPDA(store, initialShortToken)[0] : null,
     }).instruction();
 };
 

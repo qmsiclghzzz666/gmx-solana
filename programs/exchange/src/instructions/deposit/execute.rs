@@ -1,9 +1,9 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token, TokenAccount};
 use data_store::{
-    cpi::accounts::{CheckRole, RemoveDeposit},
+    cpi::accounts::{CheckRole, GetMarketMeta, RemoveDeposit},
     program::DataStore,
-    states::Deposit,
+    states::{Deposit, MarketMeta},
     utils::Authentication,
 };
 use gmx_core::MarketExt;
@@ -28,8 +28,12 @@ pub fn execute_deposit<'info>(
         .checked_sub(super::MAX_DEPOSIT_EXECUTION_FEE.min(execution_fee))
         .ok_or(ExchangeError::NotEnoughExecutionFee)?;
     // TODO: perform the swaps.
-    let long_token = deposit.fixed.tokens.initial_long_token;
-    let short_token = deposit.fixed.tokens.initial_short_token;
+    let meta = get_market_meta(
+        &ctx.accounts.data_store_program,
+        ctx.accounts.market.to_account_info(),
+    )?;
+    let long_token = meta.long_token_mint;
+    let short_token = meta.short_token_mint;
     let remaining_accounts = ctx.remaining_accounts.to_vec();
     ctx.accounts.with_oracle_prices(
         deposit.dynamic.tokens_with_feed.tokens.clone(),
@@ -109,6 +113,14 @@ pub struct ExecuteDeposit<'info> {
     #[account(mut, constraint = market_token_mint.key() == deposit.fixed.tokens.market_token)]
     pub market_token_mint: Account<'info, Mint>,
     pub system_program: Program<'info, System>,
+}
+
+fn get_market_meta<'info>(
+    program: &Program<'info, DataStore>,
+    market: AccountInfo<'info>,
+) -> Result<MarketMeta> {
+    let ctx = CpiContext::new(program.to_account_info(), GetMarketMeta { market });
+    Ok(data_store::cpi::get_market_meta(ctx)?.get())
 }
 
 impl<'info> ExecuteDeposit<'info> {
