@@ -17,8 +17,8 @@ use crate::ExchangeError;
 pub struct CreateDepositParams {
     pub ui_fee_receiver: Pubkey,
     pub execution_fee: u64,
-    pub long_token_swap_path: Vec<Pubkey>,
-    pub short_token_swap_path: Vec<Pubkey>,
+    pub long_token_swap_length: u8,
+    pub short_token_swap_length: u8,
     pub initial_long_token_amount: u64,
     pub initial_short_token_amount: u64,
     pub min_market_token: u64,
@@ -26,8 +26,8 @@ pub struct CreateDepositParams {
 }
 
 /// Create Deposit.
-pub fn create_deposit(
-    ctx: Context<CreateDeposit>,
+pub fn create_deposit<'info>(
+    ctx: Context<'_, '_, 'info, 'info, CreateDeposit<'info>>,
     nonce: NonceBytes,
     params: CreateDepositParams,
 ) -> Result<()> {
@@ -60,7 +60,29 @@ pub fn create_deposit(
     tokens.insert(market_meta.long_token_mint);
     tokens.insert(market_meta.short_token_mint);
 
-    // TODO: verify swap paths.
+    // Handle the swap paths.
+    let long_swap_length = params.long_token_swap_length as usize;
+    let short_swap_length = params.short_token_swap_length as usize;
+    require_gte!(
+        ctx.remaining_accounts.len(),
+        long_swap_length + short_swap_length,
+        ExchangeError::NotEnoughRemainingAccounts,
+    );
+    let long_token_swap_path = get_and_validate_swap_path(
+        &ctx.accounts.data_store_program,
+        &ctx.remaining_accounts[..long_swap_length],
+        &ctx.accounts.initial_long_token_account.mint,
+        &market_meta.long_token_mint,
+        Some(&mut tokens),
+    )?;
+    let short_token_swap_path = get_and_validate_swap_path(
+        &ctx.accounts.data_store_program,
+        &ctx.remaining_accounts[long_swap_length..(long_swap_length + short_swap_length)],
+        &ctx.accounts.initial_short_token_account.mint,
+        &market_meta.short_token_mint,
+        Some(&mut tokens),
+    )?;
+
     let tokens_with_feed = tokens
         .into_iter()
         .map(|token| {
@@ -80,8 +102,8 @@ pub fn create_deposit(
         nonce,
         tokens_with_feed,
         SwapParams {
-            long_token_swap_path: params.long_token_swap_path,
-            short_token_swap_path: params.short_token_swap_path,
+            long_token_swap_path,
+            short_token_swap_path,
         },
         TokenParams {
             initial_long_token_amount: params.initial_long_token_amount,
@@ -247,4 +269,48 @@ impl<'info> CreateDeposit<'info> {
             },
         )
     }
+}
+
+fn get_and_validate_swap_path<'info>(
+    program: &Program<'info, DataStore>,
+    accounts: &[AccountInfo<'info>],
+    initial_token: &Pubkey,
+    final_token: &Pubkey,
+    mut tokens: Option<&mut BTreeSet<Pubkey>>,
+) -> Result<Vec<Pubkey>> {
+    let mut current = *initial_token;
+    let mut flags = BTreeSet::default();
+    let markets = accounts
+        .iter()
+        .map(|account| {
+            let key = account.key();
+            if !flags.insert(key) {
+                return Err(ExchangeError::InvalidSwapPath.into());
+            }
+            let meta = data_store::cpi::get_market_meta(CpiContext::new(
+                program.to_account_info(),
+                GetMarketMeta {
+                    market: account.clone(),
+                },
+            ))?
+            .get();
+            if meta.long_token_mint == meta.short_token_mint {
+                return Err(ExchangeError::InvalidSwapPath.into());
+            }
+            if current == meta.long_token_mint {
+                current = meta.short_token_mint;
+            } else if current == meta.short_token_mint {
+                current = meta.long_token_mint;
+            } else {
+                return Err(ExchangeError::InvalidSwapPath.into());
+            }
+            if let Some(tokens) = tokens.as_mut() {
+                tokens.insert(meta.long_token_mint);
+                tokens.insert(meta.short_token_mint);
+            }
+            Ok(key)
+        })
+        .collect::<Result<Vec<_>>>()?;
+    require_eq!(current, *final_token, ExchangeError::InvalidSwapPath);
+    Ok(markets)
 }

@@ -23,8 +23,8 @@ pub mod exchange {
 
     // Deposit.
     #[access_control(Authenticate::only_controller(&ctx))]
-    pub fn create_deposit(
-        ctx: Context<CreateDeposit>,
+    pub fn create_deposit<'info>(
+        ctx: Context<'_, '_, 'info, 'info, CreateDeposit<'info>>,
         nonce: [u8; 32],
         params: CreateDepositParams,
     ) -> Result<()> {
@@ -77,6 +77,10 @@ pub enum ExchangeError {
     NotEnoughExecutionFee,
     #[msg("Resource not found")]
     ResourceNotFound,
+    #[msg("Not enough remaining accounts")]
+    NotEnoughRemainingAccounts,
+    #[msg("Invalid swap path")]
+    InvalidSwapPath,
     // Deposit.
     #[msg("Empty deposit amounts")]
     EmptyDepositAmounts,

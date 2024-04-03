@@ -1,4 +1,5 @@
-import { ComputeBudgetProgram, Connection, Signer, Transaction, TransactionInstruction, sendAndConfirmTransaction } from "@solana/web3.js";
+import { AnchorError } from "@coral-xyz/anchor";
+import { ComputeBudgetProgram, Connection, SendTransactionError, Signer, Transaction, TransactionInstruction, sendAndConfirmTransaction } from "@solana/web3.js";
 
 type ParamsWithSigners<T, S extends PropertyKey[]> = {
     [P in keyof T]: P extends S[number] ? Signer : T[P];
@@ -45,6 +46,16 @@ export const makeInvoke = <
                 }))
                 .add(ix) :
             new Transaction().add(ix);
-        return [await sendAndConfirmTransaction(connection, tx, signerList), output] as [string, U];
+        try {
+            return [await sendAndConfirmTransaction(connection, tx, signerList), output] as [string, U];
+        } catch (error) {
+            if ((error as SendTransactionError).logs) {
+                const anchorError = AnchorError.parse(error.logs);
+                if (anchorError) {
+                    throw anchorError;
+                }
+            }
+            throw error;
+        }
     }
 };

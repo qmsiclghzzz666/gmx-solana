@@ -79,13 +79,15 @@ export const makeCreateDepositInstruction = async ({
     const [deposit] = createDepositPDA(store, payer, depositNonce);
     const initialLongToken = options?.hints?.initialLongToken ?? (await getAccount(exchange.provider.connection, fromInitialLongTokenAccount)).mint;
     const initialShortToken = options?.hints?.initialShortToken ?? (await getAccount(exchange.provider.connection, fromInitialShortTokenAccount)).mint;
+    const longSwapPath = options?.longTokenSwapPath ?? [];
+    const shortSwapPath = options?.shortTokenSwapPath ?? [];
     let instruction = await exchange.methods.createDeposit(
         [...depositNonce],
         {
             uiFeeReceiver: Keypair.generate().publicKey,
             executionFee: toBN(options?.executionFee ?? 0),
-            longTokenSwapPath: options?.longTokenSwapPath ?? [],
-            shortTokenSwapPath: options?.shortTokenSwapPath ?? [],
+            longTokenSwapLength: longSwapPath.length,
+            shortTokenSwapLength: shortSwapPath.length,
             initialLongTokenAmount: toBN(initialLongTokenAmount),
             initialShortTokenAmount: toBN(initialShortTokenAmount),
             minMarketToken: toBN(options?.minMarketToken ?? 0),
@@ -106,7 +108,13 @@ export const makeCreateDepositInstruction = async ({
         initialShortTokenAccount: fromInitialShortTokenAccount,
         longTokenDepositVault: createMarketVaultPDA(store, initialLongToken)[0],
         shortTokenDepositVault: createMarketVaultPDA(store, initialShortToken)[0],
-    }).instruction();
+    }).remainingAccounts([...longSwapPath, ...shortSwapPath].map(pubkey => {
+        return {
+            pubkey,
+            isSigner: false,
+            isWritable: false,
+        }
+    })).instruction();
 
     return [instruction, deposit] as IxWithOutput<PublicKey>;
 }

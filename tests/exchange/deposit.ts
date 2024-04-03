@@ -2,6 +2,7 @@ import { PublicKey } from "@solana/web3.js";
 import { createNoncePDA, createRolesPDA } from "../../utils/data";
 import { getAddresses, getMarkets, getPrograms, getProvider, getUsers, expect } from "../../utils/fixtures";
 import { invokeCancelDeposit, invokeCancelWithdrawal, invokeExecuteWithdrawal, invokeCreateDeposit, invokeExecuteDeposit, invokeCreateWithdrawal } from "../../utils/exchange";
+import { AnchorError } from "@coral-xyz/anchor";
 
 describe("exchange: deposit", () => {
     const provider = getProvider();
@@ -209,5 +210,25 @@ describe("exchange: deposit", () => {
             // const market = await dataStore.account.market.fetch(marketFakeFakeUsdG);
             // console.log("pools", market.pools);
         }
+    });
+
+    it("create deposit with invalid swap path", async () => {
+        await expect(invokeCreateDeposit(
+            provider.connection,
+            {
+                authority: signer0,
+                store: dataStoreAddress,
+                payer: user0,
+                market: marketFakeFakeUsdG,
+                toMarketTokenAccount: user0FakeFakeUsdGTokenAccount,
+                fromInitialLongTokenAccount: user0FakeTokenAccount,
+                fromInitialShortTokenAccount: user0UsdGTokenAccount,
+                initialLongTokenAmount: 2_000_000_000,
+                initialShortTokenAmount: 200_000_000,
+                options: {
+                    longTokenSwapPath: [marketFakeFakeUsdG],
+                }
+            }
+        )).rejectedWith(AnchorError, "Invalid swap path");
     });
 });
