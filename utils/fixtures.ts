@@ -15,7 +15,7 @@ import { oracle } from "./oracle";
 import { IDL as chainlinkIDL } from "../external-programs/chainlink-store";
 import { BTC_TOKEN_MINT, SOL_TOKEN_MINT, createSignedToken } from "./token";
 import { PublicKey, Transaction } from "@solana/web3.js";
-import { createAssociatedTokenAccount } from "@solana/spl-token";
+import { createAssociatedTokenAccount, createWrappedNativeAccount } from "@solana/spl-token";
 import { CHAINLINK_ID } from "./external";
 
 export const expect = chai.expect;
@@ -57,11 +57,14 @@ const [oracleAddress] = createOraclePDA(dataStoreAddress, oracleIndex);
 
 let user0FakeTokenAccount: PublicKey;
 let user0UsdGTokenAccount: PublicKey;
+let user0WsolTokenAccount: PublicKey;
 let user0FakeFakeUsdGTokenAccount: PublicKey;
+let user0WsolWsolUsdGTokenAccount: PublicKey;
 let fakeTokenMint: PublicKey;
 let usdGTokenMint: PublicKey;
 let fakeTokenVault: PublicKey;
 let usdGVault: PublicKey;
+let wsolVault: PublicKey;
 
 export const getAddresses = async () => {
     await waitForSetup();
@@ -71,10 +74,13 @@ export const getAddresses = async () => {
         user0FakeTokenAccount,
         user0UsdGTokenAccount,
         user0FakeFakeUsdGTokenAccount,
+        user0WsolTokenAccount,
+        user0WsolWsolUsdGTokenAccount,
         fakeTokenMint,
         usdGTokenMint,
         fakeTokenVault,
         usdGVault,
+        wsolVault,
     }
 }
 
@@ -158,31 +164,42 @@ const deinitializeUsers = async (provider: anchor.AnchorProvider, users: anchor.
 };
 
 export const mochaGlobalSetup = async () => {
-    console.log("[Setting up everything...]");
-    anchor.setProvider(provider);
-    await initializeUsers(provider, [signer0, user0], 0.5);
+    try {
+        console.log("[Setting up everything...]");
+        anchor.setProvider(provider);
+        await initializeUsers(provider, [signer0, user0], 0.5);
 
-    // Init fakeToken and usdG.
-    const fakeToken = await createSignedToken(signer0, 9);
-    fakeTokenMint = fakeToken.mint;
-    const usdG = await createSignedToken(signer0, 8);
-    usdGTokenMint = usdG.mint;
-    user0FakeTokenAccount = await fakeToken.createTokenAccount(user0.publicKey);
-    user0UsdGTokenAccount = await usdG.createTokenAccount(user0.publicKey);
-    fakeToken.mintTo(user0FakeTokenAccount, 1_000 * 1_000_000_000);
-    usdG.mintTo(user0UsdGTokenAccount, 1_000_000 * 100_000_000);
+        // Init fakeToken and usdG.
+        const fakeToken = await createSignedToken(signer0, 9);
+        fakeTokenMint = fakeToken.mint;
+        const usdG = await createSignedToken(signer0, 8);
+        usdGTokenMint = usdG.mint;
+        user0FakeTokenAccount = await fakeToken.createTokenAccount(user0.publicKey);
+        user0UsdGTokenAccount = await usdG.createTokenAccount(user0.publicKey);
+        fakeToken.mintTo(user0FakeTokenAccount, 1_000 * 1_000_000_000);
+        usdG.mintTo(user0UsdGTokenAccount, 1_000_000 * 100_000_000);
 
-    await initializeDataStore(provider, eventManager, signer0, user0, dataStoreKey, oracleIndex, fakeTokenMint, usdGTokenMint);
+        await initializeDataStore(provider, eventManager, signer0, user0, dataStoreKey, oracleIndex, fakeTokenMint, usdGTokenMint);
 
-    fakeTokenVault = await createMarketVault(provider, signer0, dataStoreAddress, fakeTokenMint);
-    usdGVault = await createMarketVault(provider, signer0, dataStoreAddress, usdGTokenMint);
+        fakeTokenVault = await createMarketVault(provider, signer0, dataStoreAddress, fakeTokenMint);
+        usdGVault = await createMarketVault(provider, signer0, dataStoreAddress, usdGTokenMint);
+        wsolVault = await createMarketVault(provider, signer0, dataStoreAddress, SOL_TOKEN_MINT);
 
-    markets = await initializeMarkets(signer0, dataStoreAddress, fakeTokenMint, usdGTokenMint);
-    const [marketTokenMint] = createMarketTokenMintPDA(dataStoreAddress, fakeTokenMint, fakeTokenMint, usdGTokenMint);
-    user0FakeFakeUsdGTokenAccount = await createAssociatedTokenAccount(provider.connection, user0, marketTokenMint, user0.publicKey);
+        markets = await initializeMarkets(signer0, dataStoreAddress, fakeTokenMint, usdGTokenMint);
+        const [GMFakeMint] = createMarketTokenMintPDA(dataStoreAddress, fakeTokenMint, fakeTokenMint, usdGTokenMint);
+        user0FakeFakeUsdGTokenAccount = await createAssociatedTokenAccount(provider.connection, user0, GMFakeMint, user0.publicKey);
 
-    console.log("[Done.]");
-    setInitialized();
+        user0WsolTokenAccount = await createWrappedNativeAccount(provider.connection, user0, user0.publicKey, 10_000_000);
+
+        const [GMWsolMint] = createMarketTokenMintPDA(dataStoreAddress, SOL_TOKEN_MINT, SOL_TOKEN_MINT, usdGTokenMint);
+        user0WsolWsolUsdGTokenAccount = await createAssociatedTokenAccount(provider.connection, user0, GMWsolMint, user0.publicKey);
+
+        console.log("[Done.]");
+    } catch (error) {
+        console.log("[Failed.]", error);
+    } finally {
+        setInitialized();
+    }
 };
 
 export const mochaGlobalTeardown = async () => {

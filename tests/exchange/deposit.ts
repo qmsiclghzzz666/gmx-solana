@@ -12,10 +12,11 @@ describe("exchange: deposit", () => {
     let dataStoreAddress: PublicKey;
     let user0FakeTokenAccount: PublicKey;
     let user0UsdGTokenAccount: PublicKey;
+    let user0WsolTokenAccount: PublicKey;
+    let user0WsolWsolUsdGTokenAccount: PublicKey;
     let user0FakeFakeUsdGTokenAccount: PublicKey;
     let marketFakeFakeUsdG: PublicKey;
-    let roles: PublicKey;
-    let nonce: PublicKey;
+    let marketWsolWsolUsdG: PublicKey;
     let oracleAddress: PublicKey;
 
     before(async () => {
@@ -25,10 +26,10 @@ describe("exchange: deposit", () => {
             user0UsdGTokenAccount,
             user0FakeFakeUsdGTokenAccount,
             oracleAddress,
+            user0WsolTokenAccount,
+            user0WsolWsolUsdGTokenAccount,
         } = await getAddresses());
-        ({ marketFakeFakeUsdG } = await getMarkets());
-        [roles] = createRolesPDA(dataStoreAddress, signer0.publicKey);
-        [nonce] = createNoncePDA(dataStoreAddress);
+        ({ marketFakeFakeUsdG, marketWsolWsolUsdG } = await getMarkets());
     });
 
     it("create and execute deposit and then withdraw", async () => {
@@ -230,5 +231,42 @@ describe("exchange: deposit", () => {
                 }
             }
         )).rejectedWith(AnchorError, "Invalid swap path");
+    });
+
+    it("create deposit with valid swap path and cancel", async () => {
+        let deposit: PublicKey;
+        {
+            const [signature, depositAddress] = await invokeCreateDeposit(
+                provider.connection,
+                {
+                    authority: signer0,
+                    store: dataStoreAddress,
+                    payer: user0,
+                    market: marketWsolWsolUsdG,
+                    toMarketTokenAccount: user0WsolWsolUsdGTokenAccount,
+                    fromInitialLongTokenAccount: user0WsolTokenAccount,
+                    fromInitialShortTokenAccount: user0FakeTokenAccount,
+                    initialLongTokenAmount: 0,
+                    initialShortTokenAmount: 1_000_000,
+                    options: {
+                        shortTokenSwapPath: [marketFakeFakeUsdG],
+                    }
+                }
+            );
+            deposit = depositAddress;
+            console.log(`deposit created at ${signature}`);
+        }
+
+        {
+            const [signature] = await invokeCancelDeposit(
+                provider.connection,
+                {
+                    authority: signer0,
+                    store: dataStoreAddress,
+                    deposit,
+                }
+            );
+            console.log(`deposit cancelled at ${signature}`);
+        }
     });
 });

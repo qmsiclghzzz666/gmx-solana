@@ -438,10 +438,18 @@ export const makeExecuteWithdrawalInstruction = async ({
 export const invokeExecuteWithdrawal = makeInvoke(makeExecuteWithdrawalInstruction, ["authority"]);
 
 export const initializeMarkets = async (signer: Keypair, dataStoreAddress: PublicKey, fakeTokenMint: PublicKey, usdGMint: PublicKey) => {
-    let marketSolSolBtc: PublicKey;
+    let marketWsolWsolBtc: PublicKey;
     try {
-        marketSolSolBtc = await createMarket(signer, dataStoreAddress, SOL_TOKEN_MINT, SOL_TOKEN_MINT, BTC_TOKEN_MINT);
-        console.log(`New market has been created: ${marketSolSolBtc}`);
+        marketWsolWsolBtc = await createMarket(signer, dataStoreAddress, SOL_TOKEN_MINT, SOL_TOKEN_MINT, BTC_TOKEN_MINT);
+        console.log(`New market has been created: ${marketWsolWsolBtc}`);
+    } catch (error) {
+        console.warn("Failed to initialize market", error);
+    }
+
+    let marketWsolWsolUsdG: PublicKey;
+    try {
+        marketWsolWsolUsdG = await createMarket(signer, dataStoreAddress, SOL_TOKEN_MINT, SOL_TOKEN_MINT, usdGMint);
+        console.log(`New market has been created: ${marketWsolWsolUsdG}`);
     } catch (error) {
         console.warn("Failed to initialize market", error);
     }
@@ -455,7 +463,8 @@ export const initializeMarkets = async (signer: Keypair, dataStoreAddress: Publi
     }
 
     return {
-        marketSolSolBtc,
+        marketWsolWsolBtc,
+        marketWsolWsolUsdG,
         marketFakeFakeUsdG,
     }
 };
