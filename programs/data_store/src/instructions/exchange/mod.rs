@@ -1,7 +1,7 @@
-/// Deposit.
-pub mod deposit;
+/// Execute Deposit.
+pub mod execute_deposit;
 
-pub use deposit::*;
+pub use execute_deposit::*;
 
 use crate::DataStoreError;
 

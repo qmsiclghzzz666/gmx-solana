@@ -5,24 +5,28 @@ use anchor_spl::token::{Mint, Token, TokenAccount};
 use gmx_core::MarketExt;
 
 use crate::{
-    states::{DataStore, Deposit, Market, MarketMeta, Oracle, Roles},
+    states::{DataStore, Deposit, Market, MarketMeta, Oracle, Roles, Seed},
     utils::internal,
     DataStoreError, GmxCoreError, ID,
 };
 
 #[derive(Accounts)]
 pub struct ExecuteDeposit<'info> {
-    #[account(mut)]
     pub authority: Signer<'info>,
     pub only_order_keeper: Account<'info, Roles>,
     pub store: Account<'info, DataStore>,
-    #[account(mut)]
     pub oracle: Account<'info, Oracle>,
     #[account(
-        mut,
         constraint = deposit.fixed.receivers.receiver == receiver.key(),
         constraint = deposit.fixed.tokens.market_token == market_token_mint.key(),
         constraint = deposit.fixed.market == market.key(),
+        seeds = [
+            Deposit::SEED,
+            store.key().as_ref(),
+            deposit.fixed.senders.user.key().as_ref(),
+            &deposit.fixed.nonce,
+        ],
+        bump = deposit.fixed.bump,
     )]
     pub deposit: Account<'info, Deposit>,
     #[account(mut)]
@@ -206,7 +210,8 @@ impl<'info> ExecuteDeposit<'info> {
             .ok_or(DataStoreError::InvalidArgument)?
             .max
             .to_unit_price();
-        self.market
+        let report = self
+            .market
             .as_market(&self.market_token_mint)
             .enable_transfer(self.token_program.to_account_info(), &self.store)
             .with_receiver(self.receiver.to_account_info())
@@ -222,6 +227,7 @@ impl<'info> ExecuteDeposit<'info> {
                 msg!(&err.to_string());
                 GmxCoreError::from(err)
             })?;
+        msg!("{:?}", report);
         Ok(())
     }
 }

@@ -117,7 +117,7 @@ impl Oracle {
     }
 
     /// Run a function inside the scope with oracle prices set.
-    pub(crate) fn with_oracle_prices<'info, T>(
+    pub fn with_oracle_prices<'info, T>(
         &mut self,
         price_feed_program: &Program<'info, Chainlink>,
         map: &TokenConfigMap,
