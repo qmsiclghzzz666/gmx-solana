@@ -141,7 +141,7 @@ impl<'info> WithOracle<'info> for ExecuteDeposit<'info> {
 
 impl<'info> ExecuteDeposit<'info> {
     fn execute(&mut self, remaining_accounts: &'info [AccountInfo<'info>]) -> Result<()> {
-        self.oracle.reload()?;
+        // self.oracle.reload()?;
         cpi::execute_deposit(
             self.execute_deposit_ctx()
                 .with_remaining_accounts(remaining_accounts.to_vec()),
