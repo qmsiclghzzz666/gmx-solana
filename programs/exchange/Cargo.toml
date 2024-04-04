@@ -28,4 +28,3 @@ anchor-spl = { workspace = true, default_features = false, features = [
 ] }
 gmx-core = { path = "../../crates/gmx-core", features = ["u128", "solana"] }
 data_store = { path = "../data_store", features = ["cpi"] }
-oracle = { path = "../oracle", features = ["cpi"] }
