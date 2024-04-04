@@ -179,7 +179,7 @@ impl<'info> ExecuteDeposit<'info> {
                     .map_err(|_| DataStoreError::AmountOverflow)?;
                 msg!("{:?}", report);
             }
-            // FIXME: Is this needed?
+            // `exit` must be called to ensure data is written to the storage.
             market.exit(&ID)?;
         }
         require_eq!(token_in, final_token, DataStoreError::InvalidSwapPath);
