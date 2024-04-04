@@ -267,7 +267,7 @@ impl<'a, 'info> AsMarket<'a, 'info> {
         self.transfer = Some(TransferUtils::new(
             token_program,
             store,
-            self.mint.to_account_info(),
+            Some(self.mint.to_account_info()),
         ));
         self
     }

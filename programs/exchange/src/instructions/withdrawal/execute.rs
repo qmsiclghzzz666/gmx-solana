@@ -1,17 +1,13 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token, TokenAccount};
 use data_store::{
-    cpi::accounts::{CheckRole, GetMarketMeta, MarketVaultTransferOut, RemoveWithdrawal},
+    cpi::accounts::{CheckRole, RemoveWithdrawal},
     program::DataStore,
     states::{Chainlink, Withdrawal},
     utils::{Authentication, WithOracle, WithOracleExt},
 };
-use gmx_core::MarketExt;
 
-use crate::{
-    utils::market::{AsMarket, GmxCoreError},
-    ExchangeError,
-};
+use crate::ExchangeError;
 
 #[derive(Accounts)]
 pub struct ExecuteWithdrawal<'info> {
@@ -29,7 +25,7 @@ pub struct ExecuteWithdrawal<'info> {
     pub oracle: Account<'info, data_store::states::Oracle>,
     /// CHECK: check by CPI.
     pub token_config_map: UncheckedAccount<'info>,
-    /// CHECK: used and checked by CPI.
+    /// Withdrawal to execute.
     ///
     /// ## Notes
     /// - `user` is checked on the removal CPI of the withdrawal.
@@ -70,75 +66,16 @@ pub fn execute_withdrawal<'info>(
         .get_lamports()
         .checked_sub(execution_fee.min(super::MAX_WITHDRAWAL_EXECUTION_FEE))
         .ok_or(ExchangeError::NotEnoughExecutionFee)?;
-    let market_token_amount = withdrawal.fixed.tokens.market_token_amount;
-    let min_long_token_amount = withdrawal.fixed.tokens.params.min_long_token_amount;
-    let min_short_token_amount = withdrawal.fixed.tokens.params.min_short_token_amount;
-    let meta = data_store::cpi::get_market_meta(ctx.accounts.get_market_meta_ctx())?.get();
-    let long_token = meta.long_token_mint;
-    let short_token = meta.short_token_mint;
-    let report = ctx.accounts.with_oracle_prices(
+    ctx.accounts.with_oracle_prices(
         withdrawal.dynamic.tokens_with_feed.tokens.clone(),
         ctx.remaining_accounts,
-        |accounts, _| {
-            let oracle = &mut accounts.oracle;
-            oracle.reload()?;
-            let long_token_price = oracle
-                .primary
-                .get(&long_token)
-                .ok_or(ExchangeError::ResourceNotFound)?
-                .max
-                .to_unit_price();
-            let short_token_price = oracle
-                .primary
-                .get(&short_token)
-                .ok_or(ExchangeError::ResourceNotFound)?
-                .max
-                .to_unit_price();
-            let report = accounts
-                .as_market(
-                    accounts.market.to_account_info(),
-                    &accounts.market_token_mint,
-                )
-                .withdraw(
-                    market_token_amount.into(),
-                    long_token_price,
-                    short_token_price,
-                )
-                .map_err(GmxCoreError::from)?
-                .execute()
-                .map_err(|err| {
-                    msg!(&err.to_string());
-                    GmxCoreError::from(err)
-                })?;
-            Ok(report)
+        |accounts, remaining_accounts| {
+            data_store::cpi::execute_withdrawal(
+                accounts
+                    .execute_withdrawal_ctx()
+                    .with_remaining_accounts(remaining_accounts.to_vec()),
+            )
         },
-    )?;
-    msg!("{:?}", report);
-    // TODO: perform the swaps.
-    // For now we are assuming that final tokens are the same as pool tokens.
-    let final_long_token_amount: u64 = (*report.long_token_output())
-        .try_into()
-        .map_err(|_| ExchangeError::InvalidOutputAmount)?;
-    let final_short_token_amount: u64 = (*report.short_token_output())
-        .try_into()
-        .map_err(|_| ExchangeError::InvalidOutputAmount)?;
-    require_gte!(
-        final_long_token_amount,
-        min_long_token_amount,
-        ExchangeError::OutputAmountTooSmall
-    );
-    require_gte!(
-        final_short_token_amount,
-        min_short_token_amount,
-        ExchangeError::OutputAmountTooSmall
-    );
-    data_store::cpi::market_vault_transfer_out(
-        ctx.accounts.market_vault_transfer_out_ctx(true),
-        final_long_token_amount,
-    )?;
-    data_store::cpi::market_vault_transfer_out(
-        ctx.accounts.market_vault_transfer_out_ctx(false),
-        final_short_token_amount,
     )?;
     data_store::cpi::remove_withdrawal(ctx.accounts.remove_withdrawal_ctx(), refund)?;
     Ok(())
@@ -193,54 +130,26 @@ impl<'info> ExecuteWithdrawal<'info> {
         )
     }
 
-    fn get_market_meta_ctx(&self) -> CpiContext<'_, '_, '_, 'info, GetMarketMeta<'info>> {
-        CpiContext::new(
-            self.data_store_program.to_account_info(),
-            GetMarketMeta {
-                market: self.market.to_account_info(),
-            },
-        )
-    }
-
-    fn market_vault_transfer_out_ctx(
+    fn execute_withdrawal_ctx(
         &self,
-        is_long_token: bool,
-    ) -> CpiContext<'_, '_, '_, 'info, MarketVaultTransferOut<'info>> {
-        let (market_vault, to) = if is_long_token {
-            (
-                self.final_long_token_vault.to_account_info(),
-                self.final_long_token_receiver.to_account_info(),
-            )
-        } else {
-            (
-                self.final_short_token_vault.to_account_info(),
-                self.final_short_token_receiver.to_account_info(),
-            )
-        };
+    ) -> CpiContext<'_, '_, '_, 'info, data_store::cpi::accounts::ExecuteWithdrawal<'info>> {
         CpiContext::new(
             self.data_store_program.to_account_info(),
-            MarketVaultTransferOut {
+            data_store::cpi::accounts::ExecuteWithdrawal {
                 authority: self.authority.to_account_info(),
-                only_controller: self.only_order_keeper.to_account_info(),
                 store: self.store.to_account_info(),
-                market_vault,
-                to,
+                only_order_keeper: self.only_order_keeper.to_account_info(),
+                oracle: self.oracle.to_account_info(),
+                withdrawal: self.withdrawal.to_account_info(),
+                market: self.market.to_account_info(),
+                market_token_mint: self.market_token_mint.to_account_info(),
+                market_token_withdrawal_vault: self.market_token_withdrawal_vault.to_account_info(),
+                final_long_token_vault: self.final_long_token_vault.to_account_info(),
+                final_short_token_vault: self.final_short_token_vault.to_account_info(),
+                final_long_token_receiver: self.final_long_token_receiver.to_account_info(),
+                final_short_token_receiver: self.final_short_token_receiver.to_account_info(),
                 token_program: self.token_program.to_account_info(),
             },
         )
-    }
-}
-
-impl<'info> AsMarket<'info> for ExecuteWithdrawal<'info> {
-    fn receiver(&self) -> Option<&Account<'info, TokenAccount>> {
-        None
-    }
-
-    fn withdrawal_vault(&self) -> Option<&Account<'info, TokenAccount>> {
-        Some(&self.market_token_withdrawal_vault)
-    }
-
-    fn token_program(&self) -> AccountInfo<'info> {
-        self.token_program.to_account_info()
     }
 }

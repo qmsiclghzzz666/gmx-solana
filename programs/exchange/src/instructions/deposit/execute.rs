@@ -45,7 +45,6 @@ pub struct ExecuteDeposit<'info> {
     pub oracle: Account<'info, data_store::states::Oracle>,
     /// CHECK: check by CPI.
     pub token_config_map: UncheckedAccount<'info>,
-    /// CHECK: used and checked by CPI.
     #[account(mut)]
     pub deposit: Account<'info, Deposit>,
     /// CHECK: only used to receive lamports.

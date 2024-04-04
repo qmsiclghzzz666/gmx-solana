@@ -317,6 +317,13 @@ pub mod data_store {
     ) -> Result<()> {
         instructions::execute_deposit(ctx)
     }
+
+    #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
+    pub fn execute_withdrawal<'info>(
+        ctx: Context<'_, '_, 'info, 'info, ExecuteWithdrawal<'info>>,
+    ) -> Result<()> {
+        instructions::execute_withdrawal(ctx)
+    }
 }
 
 #[error_code]
@@ -374,6 +381,12 @@ pub enum DataStoreError {
     // Exchange Common.
     #[msg("Invalid swap path")]
     InvalidSwapPath,
+    #[msg("Output amount too small")]
+    OutputAmountTooSmall,
+    #[msg("Amount is not zero but swap in token not provided")]
+    AmountNonZeroMissingToken,
+    #[msg("Missing token mint")]
+    MissingTokenMint,
     // Withdrawal.
     #[msg("User mismach")]
     UserMismatch,

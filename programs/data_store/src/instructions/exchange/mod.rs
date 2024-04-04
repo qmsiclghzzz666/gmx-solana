@@ -1,7 +1,13 @@
 /// Execute Deposit.
 pub mod execute_deposit;
 
+/// Execute Withdrawal.
+pub mod execute_withdrawal;
+
+pub(crate) mod utils;
+
 pub use execute_deposit::*;
+pub use execute_withdrawal::*;
 
 use crate::DataStoreError;
 
