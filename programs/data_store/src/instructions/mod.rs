@@ -25,8 +25,12 @@ pub mod deposit;
 /// Instructions for Withdrawal.
 pub mod withdrawal;
 
+/// Instructions for Exchange.
+pub mod exchange;
+
 pub use data_store::*;
 pub use deposit::*;
+pub use exchange::*;
 pub use market::*;
 pub use nonce::*;
 pub use oracle::*;

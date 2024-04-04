@@ -3,6 +3,9 @@ use crate::PoolKind;
 /// Error type.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    /// Invalid Argument.
+    #[error("invalid argument: {0}")]
+    InvalidArgument(&'static str),
     /// Empty deposit.
     #[error("empty deposit")]
     EmptyDeposit,
@@ -63,5 +66,10 @@ impl Error {
     /// Invalid pool value.
     pub fn invalid_pool_value(msg: impl ToString) -> Self {
         Self::InvalidPoolValue(msg.to_string())
+    }
+
+    /// Invalid argument.
+    pub fn invalid_argument(msg: &'static str) -> Self {
+        Self::InvalidArgument(msg)
     }
 }

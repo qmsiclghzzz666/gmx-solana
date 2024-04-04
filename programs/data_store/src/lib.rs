@@ -301,6 +301,14 @@ pub mod data_store {
     pub fn remove_withdrawal(ctx: Context<RemoveWithdrawal>, refund: u64) -> Result<()> {
         instructions::remove_withdrawal(ctx, refund)
     }
+
+    // Exchange.
+    #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
+    pub fn execute_deposit<'info>(
+        ctx: Context<'_, '_, 'info, 'info, ExecuteDeposit<'info>>,
+    ) -> Result<()> {
+        instructions::execute_deposit(ctx)
+    }
 }
 
 #[error_code]
@@ -320,6 +328,8 @@ pub enum DataStoreError {
     LamportsNotEnough,
     #[msg("Required resource not found")]
     RequiredResourceNotFound,
+    #[msg("amount overflow")]
+    AmountOverflow,
     // Roles.
     #[msg("Too many admins")]
     TooManyAdmins,
@@ -345,6 +355,9 @@ pub enum DataStoreError {
     Computation,
     #[msg("Unsupported pool kind")]
     UnsupportedPoolKind,
+    // Exchange Common.
+    #[msg("Invalid swap path")]
+    InvalidSwapPath,
     // Withdrawal.
     #[msg("User mismach")]
     UserMismatch,

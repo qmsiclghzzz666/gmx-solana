@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use gmx_core::PoolKind;
+use gmx_core::{Pool as GmxCorePool, PoolKind};
 
 use crate::{
     states::{Action, DataStore, Market, MarketChangeEvent, MarketMeta, Pool, Roles, Seed},
@@ -122,9 +122,11 @@ pub fn apply_delta_to_market_pool(
     market
         .with_pool_mut(pool, |pool| {
             if is_long_token {
-                pool.apply_delta_to_long_token_amount(delta)?;
+                pool.apply_delta_to_long_token_amount(&delta)
+                    .map_err(|_| DataStoreError::Computation)?;
             } else {
-                pool.apply_delta_to_short_token_amount(delta)?;
+                pool.apply_delta_to_short_token_amount(&delta)
+                    .map_err(|_| DataStoreError::Computation)?;
             }
             Result::Ok(())
         })

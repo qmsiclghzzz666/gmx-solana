@@ -132,14 +132,16 @@ where
         let Some(pool) = self.pool()? else {
             return Ok(0);
         };
-        Ok(pool.long_token_amount())
+        pool.long_token_amount()
+            .map_err(|_| gmx_core::Error::Computation)
     }
 
     fn short_token_amount(&self) -> gmx_core::Result<Self::Num> {
         let Some(pool) = self.pool()? else {
             return Ok(0);
         };
-        Ok(pool.short_token_amount())
+        pool.short_token_amount()
+            .map_err(|_| gmx_core::Error::Computation)
     }
 
     fn apply_delta_to_long_token_amount(&mut self, delta: &Self::Signed) -> gmx_core::Result<()> {

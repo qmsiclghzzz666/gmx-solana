@@ -1,5 +1,5 @@
 import { PublicKey } from "@solana/web3.js";
-import { createNoncePDA, createRolesPDA } from "../../utils/data";
+import { createMarketPDA, createNoncePDA, createRolesPDA } from "../../utils/data";
 import { getAddresses, getMarkets, getPrograms, getProvider, getUsers, expect } from "../../utils/fixtures";
 import { invokeCancelDeposit, invokeCancelWithdrawal, invokeExecuteWithdrawal, invokeCreateDeposit, invokeExecuteDeposit, invokeCreateWithdrawal } from "../../utils/exchange";
 import { AnchorError } from "@coral-xyz/anchor";
@@ -273,8 +273,12 @@ describe("exchange: deposit", () => {
     });
 
     it("create deposit with valid swap path and execute", async () => {
+        const market1 = createMarketPDA(dataStoreAddress, GMWsolWsolUsdG)[0];
+        const market2 = createMarketPDA(dataStoreAddress, GMFakeFakeUsdG)[0];
         let deposit: PublicKey;
         try {
+            const pool2 = (await dataStore.account.market.fetch(market2)).pools.pools[0];
+            console.log(`${pool2.longTokenAmount}:${pool2.shortTokenAmount}`);
             const [signature, depositAddress] = await invokeCreateDeposit(
                 provider.connection,
                 {
@@ -283,7 +287,9 @@ describe("exchange: deposit", () => {
                     payer: user0,
                     marketToken: GMWsolWsolUsdG,
                     toMarketTokenAccount: user0WsolWsolUsdGTokenAccount,
+                    fromInitialLongTokenAccount: user0WsolTokenAccount,
                     fromInitialShortTokenAccount: user0FakeTokenAccount,
+                    initialLongTokenAmount: 3_000_000,
                     initialShortTokenAmount: 20_000_000,
                     options: {
                         shortTokenSwapPath: [GMFakeFakeUsdG],
@@ -310,7 +316,7 @@ describe("exchange: deposit", () => {
                     }
                 },
                 {
-                    computeUnits: 4_000_000,
+                    computeUnits: 400_000,
                     skipPreflight: true,
                 },
             );
@@ -318,6 +324,11 @@ describe("exchange: deposit", () => {
         } catch (error) {
             console.log(error);
             throw error;
+        } finally {
+            const pool1 = (await dataStore.account.market.fetch(market1)).pools.pools[0];
+            console.log(`${pool1.longTokenAmount}:${pool1.shortTokenAmount}`);
+            const pool2 = (await dataStore.account.market.fetch(market2)).pools.pools[0];
+            console.log(`${pool2.longTokenAmount}:${pool2.shortTokenAmount}`);
         }
     });
 });

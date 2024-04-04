@@ -1,11 +1,15 @@
 use anchor_lang::{prelude::*, Bump};
+use anchor_spl::token::Mint;
 use dual_vec_map::DualVecMap;
-use gmx_core::PoolKind;
+use gmx_core::{
+    params::{FeeParams, SwapImpactParams},
+    PoolKind,
+};
 use gmx_solana_utils::to_seed;
 
-use crate::DataStoreError;
+use crate::{constants, utils::transfer::TransferUtils};
 
-use super::{Data, Seed};
+use super::{Data, DataStore, Seed};
 
 /// Market.
 #[account]
@@ -42,6 +46,8 @@ pub struct Pools {
     pools: Vec<Pool>,
     keys: Vec<u8>,
 }
+
+type PoolsMap<'a> = DualVecMap<&'a mut Vec<u8>, &'a mut Vec<Pool>>;
 
 impl Pools {
     pub(crate) fn init_space(num_pools: u8) -> usize {
@@ -136,6 +142,19 @@ impl Market {
         let key = Self::create_key(market_token);
         to_seed(&key)
     }
+
+    pub(crate) fn as_market<'a, 'info>(
+        &'a mut self,
+        mint: &'a Account<'info, Mint>,
+    ) -> AsMarket<'a, 'info> {
+        AsMarket {
+            pools: self.pools.as_map_mut(),
+            mint,
+            transfer: None,
+            receiver: None,
+            vault: None,
+        }
+    }
 }
 
 impl Bump for Market {
@@ -177,51 +196,163 @@ impl Pool {
         self.is_pure = is_pure;
         self
     }
+}
+
+impl gmx_core::Pool for Pool {
+    type Num = u128;
+
+    type Signed = i128;
 
     /// Get the long token amount.
-    pub fn long_token_amount(&self) -> u128 {
+    fn long_token_amount(&self) -> gmx_core::Result<Self::Num> {
         if self.is_pure {
             debug_assert_eq!(
                 self.short_token_amount, 0,
                 "short token amount must be zero"
             );
-            self.long_token_amount / 2
+            Ok(self.long_token_amount / 2)
         } else {
-            self.long_token_amount
+            Ok(self.long_token_amount)
         }
     }
 
     /// Get the short token amount.
-    pub fn short_token_amount(&self) -> u128 {
+    fn short_token_amount(&self) -> gmx_core::Result<Self::Num> {
         if self.is_pure {
             debug_assert_eq!(
                 self.short_token_amount, 0,
                 "short token amount must be zero"
             );
-            self.long_token_amount / 2
+            Ok(self.long_token_amount / 2)
         } else {
-            self.short_token_amount
+            Ok(self.short_token_amount)
         }
     }
 
-    pub(crate) fn apply_delta_to_long_token_amount(&mut self, delta: i128) -> Result<()> {
+    fn apply_delta_to_long_token_amount(&mut self, delta: &Self::Signed) -> gmx_core::Result<()> {
         self.long_token_amount = self
             .long_token_amount
-            .checked_add_signed(delta)
-            .ok_or(DataStoreError::Computation)?;
+            .checked_add_signed(*delta)
+            .ok_or(gmx_core::Error::Computation)?;
         Ok(())
     }
 
-    pub(crate) fn apply_delta_to_short_token_amount(&mut self, delta: i128) -> Result<()> {
+    fn apply_delta_to_short_token_amount(&mut self, delta: &Self::Signed) -> gmx_core::Result<()> {
         let amount = if self.is_pure {
             &mut self.long_token_amount
         } else {
             &mut self.short_token_amount
         };
         *amount = amount
-            .checked_add_signed(delta)
-            .ok_or(DataStoreError::Computation)?;
+            .checked_add_signed(*delta)
+            .ok_or(gmx_core::Error::Computation)?;
         Ok(())
+    }
+}
+
+pub(crate) struct AsMarket<'a, 'info> {
+    pools: PoolsMap<'a>,
+    mint: &'a Account<'info, Mint>,
+    transfer: Option<TransferUtils<'a, 'info>>,
+    receiver: Option<AccountInfo<'info>>,
+    vault: Option<AccountInfo<'info>>,
+}
+
+impl<'a, 'info> AsMarket<'a, 'info> {
+    pub(crate) fn enable_transfer(
+        &mut self,
+        token_program: AccountInfo<'info>,
+        store: &'a Account<'info, DataStore>,
+    ) -> &mut Self {
+        self.transfer = Some(TransferUtils::new(
+            token_program,
+            store,
+            self.mint.to_account_info(),
+        ));
+        self
+    }
+
+    pub(crate) fn with_receiver(&mut self, receiver: AccountInfo<'info>) -> &mut Self {
+        self.receiver = Some(receiver);
+        self
+    }
+
+    pub(crate) fn with_vault(&mut self, vault: AccountInfo<'info>) -> &mut Self {
+        self.vault = Some(vault);
+        self
+    }
+}
+
+impl<'a, 'info> gmx_core::Market<{ constants::MARKET_DECIMALS }> for AsMarket<'a, 'info> {
+    type Num = u128;
+
+    type Signed = i128;
+
+    type Pool = Pool;
+
+    fn pool(&self, kind: PoolKind) -> gmx_core::Result<Option<&Self::Pool>> {
+        Ok(self.pools.get(&(kind as u8)))
+    }
+
+    fn pool_mut(&mut self, kind: PoolKind) -> gmx_core::Result<Option<&mut Self::Pool>> {
+        Ok(self.pools.get_mut(&(kind as u8)))
+    }
+
+    fn total_supply(&self) -> Self::Num {
+        self.mint.supply.into()
+    }
+
+    fn mint(&mut self, amount: &Self::Num) -> gmx_core::Result<()> {
+        let Some(transfer) = self.transfer.as_ref() else {
+            return Err(gmx_core::Error::invalid_argument("transfer not enabled"));
+        };
+        let Some(receiver) = self.receiver.as_ref() else {
+            return Err(gmx_core::Error::MintReceiverNotSet);
+        };
+        transfer.mint_to(
+            receiver,
+            (*amount)
+                .try_into()
+                .map_err(|_| gmx_core::Error::Overflow)?,
+        )?;
+        Ok(())
+    }
+
+    fn burn(&mut self, amount: &Self::Num) -> gmx_core::Result<()> {
+        let Some(transfer) = self.transfer.as_ref() else {
+            return Err(gmx_core::Error::invalid_argument("transfer not enabled"));
+        };
+        let Some(vault) = self.vault.as_ref() else {
+            return Err(gmx_core::Error::WithdrawalVaultNotSet);
+        };
+        transfer.burn_from(
+            vault,
+            (*amount)
+                .try_into()
+                .map_err(|_| gmx_core::Error::Overflow)?,
+        )?;
+        Ok(())
+    }
+
+    fn usd_to_amount_divisor(&self) -> Self::Num {
+        constants::MARKET_USD_TO_AMOUNT_DIVISOR
+    }
+
+    fn swap_impact_params(&self) -> gmx_core::params::SwapImpactParams<Self::Num> {
+        SwapImpactParams::builder()
+            .with_exponent(2 * constants::MARKET_USD_UNIT)
+            .with_positive_factor(400_000_000_000)
+            .with_negative_factor(800_000_000_000)
+            .build()
+            .unwrap()
+    }
+
+    fn swap_fee_params(&self) -> gmx_core::params::FeeParams<Self::Num> {
+        FeeParams::builder()
+            .with_fee_receiver_factor(37_000_000_000_000_000_000)
+            .with_positive_impact_fee_factor(50_000_000_000_000_000)
+            .with_negative_impact_fee_factor(70_000_000_000_000_000)
+            .build()
     }
 }
 
