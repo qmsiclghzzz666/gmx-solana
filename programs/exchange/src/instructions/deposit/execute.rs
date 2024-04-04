@@ -6,12 +6,8 @@ use data_store::{
         accounts::{CheckRole, RemoveDeposit},
     },
     program::DataStore,
-    states::Deposit,
-    utils::Authentication,
-};
-use oracle::{
-    program::Oracle,
-    utils::{Chainlink, WithOracle, WithOracleExt},
+    states::{Chainlink, Deposit},
+    utils::{Authentication, WithOracle, WithOracleExt},
 };
 
 use crate::ExchangeError;
@@ -43,7 +39,6 @@ pub struct ExecuteDeposit<'info> {
     /// CHECK: used and checked by CPI.
     pub store: UncheckedAccount<'info>,
     pub data_store_program: Program<'info, DataStore>,
-    pub oracle_program: Program<'info, Oracle>,
     pub chainlink_program: Program<'info, Chainlink>,
     pub token_program: Program<'info, Token>,
     #[account(mut)]
@@ -122,10 +117,6 @@ impl<'info> Authentication<'info> for ExecuteDeposit<'info> {
 }
 
 impl<'info> WithOracle<'info> for ExecuteDeposit<'info> {
-    fn oracle_program(&self) -> AccountInfo<'info> {
-        self.oracle_program.to_account_info()
-    }
-
     fn chainlink_program(&self) -> AccountInfo<'info> {
         self.chainlink_program.to_account_info()
     }

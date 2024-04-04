@@ -235,6 +235,14 @@ pub mod data_store {
         instructions::set_price(ctx, token, price)
     }
 
+    #[access_control(internal::Authenticate::only_controller(&ctx))]
+    pub fn set_prices_from_price_feed<'info>(
+        ctx: Context<'_, '_, 'info, 'info, SetPricesFromPriceFeed<'info>>,
+        tokens: Vec<Pubkey>,
+    ) -> Result<()> {
+        instructions::set_prices_from_price_feed(ctx, tokens)
+    }
+
     // Nonce.
     #[access_control(internal::Authenticate::only_controller(&ctx))]
     pub fn initialize_nonce(ctx: Context<InitializeNonce>) -> Result<()> {
@@ -348,8 +356,16 @@ pub enum DataStoreError {
     #[msg("Permission denied")]
     PermissionDenied,
     // Oracle.
+    #[msg("Oracle is not empty")]
+    PricesAlreadySet,
     #[msg("Price of the given token already set")]
     PriceAlreadySet,
+    #[msg("Invalid price feed account")]
+    InvalidPriceFeedAccount,
+    #[msg("Invalid price feed price")]
+    InvalidPriceFeedPrice,
+    #[msg("Price feed not updated")]
+    PriceFeedNotUpdated,
     // Market.
     #[msg("Computation error")]
     Computation,

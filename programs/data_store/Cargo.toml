@@ -27,3 +27,4 @@ anchor-spl = { workspace = true, default_features = false, features = [
     "token_2022",
 ] }
 bitmaps = "3.2.1"
+chainlink_solana = "1.0.0"

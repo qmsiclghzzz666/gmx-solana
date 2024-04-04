@@ -1,6 +1,6 @@
 import * as anchor from "@coral-xyz/anchor";
 import { getAddresses, getExternalPrograms, getPrograms, getProvider, getUsers, expect } from "../utils/fixtures";
-import { createRolesPDA, createTokenConfigMapPDA, createTokenConfigPDA, dataStore } from "../utils/data";
+import { createRolesPDA, createTokenConfigMapPDA, dataStore } from "../utils/data";
 import { BTC_FEED, BTC_TOKEN_MINT, SOL_FEED, SOL_TOKEN_MINT, USDC_FEED } from "../utils/token";
 import { PublicKey } from "@solana/web3.js";
 
@@ -43,7 +43,7 @@ describe("oracle", () => {
     });
 
     it("set price from feed and then clear", async () => {
-        await oracle.methods.setPricesFromPriceFeed([
+        await dataStore.methods.setPricesFromPriceFeed([
             BTC_TOKEN_MINT,
             SOL_TOKEN_MINT,
             fakeTokenMint,
@@ -55,7 +55,6 @@ describe("oracle", () => {
             onlyController: roles,
             oracle: oracleAddress,
             tokenConfigMap: createTokenConfigMapPDA(dataStoreAddress)[0],
-            dataStoreProgram: dataStore.programId,
         }).remainingAccounts([
             {
                 pubkey: BTC_FEED,
@@ -78,17 +77,16 @@ describe("oracle", () => {
                 isWritable: false,
             },
         ]).signers([signer0]).rpc();
-        const setData = await oracle.account.oracle.fetch(oracleAddress);
+        const setData = await dataStore.account.oracle.fetch(oracleAddress);
         expect(setData.primary.prices.length).to.equal(4);
 
-        await oracle.methods.clearAllPrices().accounts({
+        await dataStore.methods.clearAllPrices().accounts({
             store: dataStoreAddress,
             authority: signer0.publicKey,
             onlyController: roles,
             oracle: oracleAddress,
-            dataStoreProgram: dataStore.programId,
         }).signers([signer0]).rpc();
-        const clearedData = await oracle.account.oracle.fetch(oracleAddress);
+        const clearedData = await dataStore.account.oracle.fetch(oracleAddress);
         expect(clearedData.primary.prices.length).to.equal(0);
         expect(clearedData.primary.tokens.length).to.equal(0);
     });

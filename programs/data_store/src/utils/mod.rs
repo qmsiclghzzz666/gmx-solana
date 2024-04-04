@@ -5,5 +5,3 @@ mod cpi;
 pub use self::cpi::*;
 
 pub(crate) mod internal;
-
-pub(crate) mod transfer;

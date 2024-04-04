@@ -1,19 +1,11 @@
 use anchor_lang::prelude::*;
-use data_store::utils::Authentication;
-
-use crate::{
-    cpi::{
-        self,
-        accounts::{ClearAllPrices, SetPricesFromPriceFeed},
-    },
-    OracleError,
+use data_store::{
+    cpi::accounts::{ClearAllPrices, SetPricesFromPriceFeed},
+    utils::Authentication,
 };
 
 /// Accounts that with oracle context.
 pub trait WithOracle<'info>: Authentication<'info> {
-    /// Get the oracle program.
-    fn oracle_program(&self) -> AccountInfo<'info>;
-
     /// Get the chainlink program.
     fn chainlink_program(&self) -> AccountInfo<'info>;
 
@@ -33,7 +25,7 @@ pub trait WithOracleExt<'info>: WithOracle<'info> {
     ) -> CpiContext<'_, '_, '_, 'info, SetPricesFromPriceFeed<'info>> {
         let check_role = self.check_role_ctx();
         CpiContext::new(
-            self.oracle_program(),
+            check_role.program,
             SetPricesFromPriceFeed {
                 authority: self.authority().to_account_info(),
                 only_controller: check_role.accounts.roles,
@@ -41,7 +33,6 @@ pub trait WithOracleExt<'info>: WithOracle<'info> {
                 token_config_map: self.token_config_map(),
                 oracle: self.oracle(),
                 chainlink_program: self.chainlink_program(),
-                data_store_program: check_role.program,
             },
         )
         .with_remaining_accounts(feeds)
@@ -51,13 +42,12 @@ pub trait WithOracleExt<'info>: WithOracle<'info> {
     fn clear_all_prices_ctx(&self) -> CpiContext<'_, '_, '_, 'info, ClearAllPrices<'info>> {
         let check_role = self.check_role_ctx();
         CpiContext::new(
-            self.oracle_program(),
+            check_role.program,
             ClearAllPrices {
                 authority: self.authority().to_account_info(),
                 only_controller: check_role.accounts.roles,
                 store: check_role.accounts.store,
                 oracle: self.oracle(),
-                data_store_program: check_role.program,
             },
         )
     }
@@ -72,13 +62,16 @@ pub trait WithOracleExt<'info>: WithOracle<'info> {
         require_gte!(
             remaining_accounts.len(),
             tokens.len(),
-            OracleError::NotEnoughAccountInfos
+            ErrorCode::AccountNotEnoughKeys
         );
         let feeds = remaining_accounts[..tokens.len()].to_vec();
         let remaining_accounts = &remaining_accounts[tokens.len()..];
-        cpi::set_prices_from_price_feed(self.set_prices_from_price_feed_ctx(feeds), tokens)?;
+        data_store::cpi::set_prices_from_price_feed(
+            self.set_prices_from_price_feed_ctx(feeds),
+            tokens,
+        )?;
         let output = f(self, remaining_accounts)?;
-        cpi::clear_all_prices(self.clear_all_prices_ctx())?;
+        data_store::cpi::clear_all_prices(self.clear_all_prices_ctx())?;
         Ok(output)
     }
 }

@@ -1,11 +1,10 @@
 import { workspace, Program, BN } from "@coral-xyz/anchor";
 import { Exchange } from "../target/types/exchange";
-import { ComputeBudgetProgram, Connection, Keypair, PublicKey, Signer, Transaction } from "@solana/web3.js";
+import { Connection, Keypair, PublicKey } from "@solana/web3.js";
 import { createDepositPDA, createMarketPDA, createMarketTokenMintPDA, createMarketVaultPDA, createRolesPDA, createTokenConfigMapPDA, createWithdrawalPDA, dataStore, getTokenConfig } from "./data";
 import { TOKEN_PROGRAM_ID, getAccount } from "@solana/spl-token";
 import { BTC_TOKEN_MINT, SOL_TOKEN_MINT } from "./token";
 import { toBN } from "./number";
-import { oracle, oracle as oracleProgram } from "./oracle";
 import { CHAINLINK_ID } from "./external";
 import { IxWithOutput, makeInvoke } from "./invoke";
 
@@ -250,7 +249,6 @@ export const makeExecuteDepositInstruction = async ({
         store,
         onlyOrderKeeper: createRolesPDA(store, authority)[0],
         dataStoreProgram: dataStore.programId,
-        oracleProgram: oracleProgram.programId,
         oracle,
         chainlinkProgram: CHAINLINK_ID,
         tokenConfigMap: createTokenConfigMapPDA(store)[0],
@@ -429,7 +427,6 @@ export const makeExecuteWithdrawalInstruction = async ({
         store,
         onlyOrderKeeper: createRolesPDA(store, authority)[0],
         dataStoreProgram: dataStore.programId,
-        oracleProgram: oracleProgram.programId,
         chainlinkProgram: CHAINLINK_ID,
         tokenProgram: TOKEN_PROGRAM_ID,
         oracle,

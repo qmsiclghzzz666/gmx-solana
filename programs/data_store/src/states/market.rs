@@ -7,7 +7,7 @@ use gmx_core::{
 };
 use gmx_solana_utils::to_seed;
 
-use crate::{constants, utils::transfer::TransferUtils};
+use crate::{constants, utils::internal::TransferUtils};
 
 use super::{Data, DataStore, Seed};
 

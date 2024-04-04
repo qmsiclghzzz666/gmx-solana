@@ -1,0 +1,52 @@
+use anchor_lang::prelude::*;
+
+use crate::{
+    states::{Chainlink, DataStore, Oracle, Roles, Seed, TokenConfigMap},
+    utils::internal,
+};
+
+#[derive(Accounts)]
+pub struct SetPricesFromPriceFeed<'info> {
+    pub authority: Signer<'info>,
+    pub only_controller: Account<'info, Roles>,
+    pub store: Account<'info, DataStore>,
+    #[account(
+        mut,
+        seeds = [Oracle::SEED, store.key().as_ref(), &[oracle.index]],
+        bump = oracle.bump,
+    )]
+    pub oracle: Account<'info, Oracle>,
+    #[account(
+        seeds = [TokenConfigMap::SEED, store.key().as_ref()],
+        bump = token_config_map.bump,
+    )]
+    pub token_config_map: Account<'info, TokenConfigMap>,
+    pub chainlink_program: Program<'info, Chainlink>,
+}
+
+/// Set the oracle prices from price feeds.
+pub fn set_prices_from_price_feed<'info>(
+    ctx: Context<'_, '_, 'info, 'info, SetPricesFromPriceFeed<'info>>,
+    tokens: Vec<Pubkey>,
+) -> Result<()> {
+    ctx.accounts.oracle.set_prices_from_remaining_accounts(
+        &ctx.accounts.chainlink_program,
+        &ctx.accounts.token_config_map,
+        &tokens,
+        ctx.remaining_accounts,
+    )
+}
+
+impl<'info> internal::Authentication<'info> for SetPricesFromPriceFeed<'info> {
+    fn authority(&self) -> &Signer<'info> {
+        &self.authority
+    }
+
+    fn store(&self) -> &Account<'info, DataStore> {
+        &self.store
+    }
+
+    fn roles(&self) -> &Account<'info, Roles> {
+        &self.only_controller
+    }
+}

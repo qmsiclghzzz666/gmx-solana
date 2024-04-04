@@ -1324,6 +1324,7 @@ dependencies = [
  "anchor-lang",
  "anchor-spl",
  "bitmaps 3.2.1",
+ "chainlink_solana",
  "dual-vec-map",
  "gmx-core",
  "gmx-solana-utils",

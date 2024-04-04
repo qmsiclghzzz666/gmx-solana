@@ -3,14 +3,10 @@ use anchor_spl::token::{Mint, Token, TokenAccount};
 use data_store::{
     cpi::accounts::{CheckRole, GetMarketMeta, MarketVaultTransferOut, RemoveWithdrawal},
     program::DataStore,
-    states::Withdrawal,
-    utils::Authentication,
+    states::{Chainlink, Withdrawal},
+    utils::{Authentication, WithOracle, WithOracleExt},
 };
 use gmx_core::MarketExt;
-use oracle::{
-    program::Oracle,
-    utils::{Chainlink, WithOracle, WithOracleExt},
-};
 
 use crate::{
     utils::market::{AsMarket, GmxCoreError},
@@ -26,7 +22,6 @@ pub struct ExecuteWithdrawal<'info> {
     /// CHECK: only used to invoke CPI.
     pub only_order_keeper: UncheckedAccount<'info>,
     pub data_store_program: Program<'info, DataStore>,
-    pub oracle_program: Program<'info, Oracle>,
     pub chainlink_program: Program<'info, Chainlink>,
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
@@ -170,10 +165,6 @@ impl<'info> Authentication<'info> for ExecuteWithdrawal<'info> {
 }
 
 impl<'info> WithOracle<'info> for ExecuteWithdrawal<'info> {
-    fn oracle_program(&self) -> AccountInfo<'info> {
-        self.oracle_program.to_account_info()
-    }
-
     fn chainlink_program(&self) -> AccountInfo<'info> {
         self.chainlink_program.to_account_info()
     }
