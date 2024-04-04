@@ -345,6 +345,8 @@ pub enum DataStoreError {
     RequiredResourceNotFound,
     #[msg("amount overflow")]
     AmountOverflow,
+    #[msg("Unknown error")]
+    Unknown,
     // Roles.
     #[msg("Too many admins")]
     TooManyAdmins,
@@ -387,7 +389,12 @@ pub enum DataStoreError {
     AmountNonZeroMissingToken,
     #[msg("Missing token mint")]
     MissingTokenMint,
+    #[msg("Missing oracle price")]
+    MissingOracelPrice,
     // Withdrawal.
     #[msg("User mismach")]
     UserMismatch,
+    // Deposit.
+    #[msg("Empty deposit")]
+    EmptyDeposit,
 }

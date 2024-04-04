@@ -168,7 +168,7 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Swap<M, DECIMALS> {
             .market
             .swap_fee_params()
             .apply_fees(is_positive_impact, &self.params.token_in_amount)
-            .ok_or(crate::Error::Computation)?;
+            .ok_or(crate::Error::Computation("apply fees"))?;
         self.market.claimable_fee_pool_mut()?.apply_delta_amount(
             self.params.is_token_in_long,
             &fees
@@ -217,11 +217,13 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Swap<M, DECIMALS> {
             token_in_amount = amount_after_fees;
             pool_amount_out = token_in_amount
                 .checked_mul_div(&token_in_price, &token_out_price)
-                .ok_or(crate::Error::Computation)?;
+                .ok_or(crate::Error::Computation(
+                    "pool amount out for positive impact",
+                ))?;
             // Extra amount is deducted from the swap impact pool.
-            token_out_amount = pool_amount_out
-                .checked_add(&price_impact_amount)
-                .ok_or(crate::Error::Computation)?;
+            token_out_amount = pool_amount_out.checked_add(&price_impact_amount).ok_or(
+                crate::Error::Computation("token out amount for positive impact"),
+            )?;
         } else {
             price_impact_amount = self.market.apply_swap_impact_value_with_cap(
                 self.params.is_token_in_long,
@@ -230,10 +232,12 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Swap<M, DECIMALS> {
             )?;
             token_in_amount = amount_after_fees
                 .checked_sub(&price_impact_amount)
-                .ok_or(crate::Error::Computation)?;
+                .ok_or(crate::Error::Underflow)?;
             token_out_amount = token_in_amount
                 .checked_mul_div(&token_in_price, &token_out_price)
-                .ok_or(crate::Error::Computation)?;
+                .ok_or(crate::Error::Computation(
+                    "token out amount for negative impact",
+                ))?;
             pool_amount_out = token_out_amount.clone();
         }
 
@@ -243,7 +247,7 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Swap<M, DECIMALS> {
             self.params.is_token_in_long,
             &token_in_amount
                 .checked_add(fees.fee_amount_for_pool())
-                .ok_or(crate::Error::Computation)?
+                .ok_or(crate::Error::Overflow)?
                 .try_into()
                 .map_err(|_| crate::Error::Convert)?,
         )?;

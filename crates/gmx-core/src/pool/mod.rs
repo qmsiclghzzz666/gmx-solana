@@ -51,7 +51,7 @@ pub trait PoolExt: Pool {
         // FIXME: should we use MulDiv?
         self.long_token_amount()?
             .checked_mul(price)
-            .ok_or(crate::Error::Computation)
+            .ok_or(crate::Error::Overflow)
     }
 
     /// Get the short token value in USD.
@@ -59,7 +59,7 @@ pub trait PoolExt: Pool {
         // FIXME: should we use MulDiv?
         self.short_token_amount()?
             .checked_mul(price)
-            .ok_or(crate::Error::Computation)
+            .ok_or(crate::Error::Overflow)
     }
 
     /// Apply delta.

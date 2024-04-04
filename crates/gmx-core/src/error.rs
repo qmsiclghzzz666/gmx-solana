@@ -19,8 +19,8 @@ pub enum Error {
     #[error("invalid prices")]
     InvalidPrices,
     /// Unknown computation error.
-    #[error("unknown computation error")]
-    Computation,
+    #[error("unknown computation error: {0}")]
+    Computation(&'static str),
     /// Power computation error.
     #[error("pow computation error")]
     PowComputation,

@@ -69,20 +69,20 @@ impl<T: Unsigned> PoolDelta<T> {
 
         let delta_long_token_usd_value = long_token_price
             .checked_mul_with_signed(long_token_delta_amount)
-            .ok_or(crate::Error::Computation)?;
+            .ok_or(crate::Error::Computation("delta long token usd value"))?;
         let delta_short_token_usd_value = short_token_price
             .checked_mul_with_signed(short_token_delta_amount)
-            .ok_or(crate::Error::Computation)?;
+            .ok_or(crate::Error::Computation("delta short token usd value"))?;
 
         let next = PoolValue {
             long_token_usd_value: current
                 .long_token_usd_value
                 .checked_add_with_signed(&delta_long_token_usd_value)
-                .ok_or(crate::Error::Computation)?,
+                .ok_or(crate::Error::Computation("next delta long usd value"))?,
             short_token_usd_value: current
                 .short_token_usd_value
                 .checked_add_with_signed(&delta_short_token_usd_value)
-                .ok_or(crate::Error::Computation)?,
+                .ok_or(crate::Error::Computation("next delta short usd value"))?,
         };
 
         let delta = PoolValue {

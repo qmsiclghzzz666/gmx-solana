@@ -137,7 +137,7 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
             .short_token_usd_value(short_token_price)?;
         long_value
             .checked_add(&short_value)
-            .ok_or(crate::Error::Computation)
+            .ok_or(crate::Error::Overflow)
     }
 
     /// Create a [`Deposit`] action.
@@ -235,7 +235,7 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
             // Round up div.
             let amount = (usd_impact
                 .checked_sub(&price)
-                .ok_or(crate::Error::Computation)?
+                .ok_or(crate::Error::Underflow)?
                 + One::one())
                 / price;
             Ok(amount)

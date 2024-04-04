@@ -9,7 +9,7 @@ use data_store::{
     utils::Authentication,
 };
 
-use crate::ExchangeError;
+use crate::{utils::market::get_and_validate_swap_path, ExchangeError};
 
 /// Create Withdrawal Params.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
@@ -18,7 +18,8 @@ pub struct CreateWithdrawalParams {
     pub execution_fee: u64,
     pub ui_fee_receiver: Pubkey,
     pub tokens: TokenParams,
-    pub swaps: SwapParams,
+    pub long_token_swap_length: u8,
+    pub short_token_swap_length: u8,
 }
 
 #[derive(Accounts)]
@@ -58,8 +59,8 @@ pub struct CreateWithdrawal<'info> {
 }
 
 /// Create withdrawal.
-pub fn create_withdrawal(
-    ctx: Context<CreateWithdrawal>,
+pub fn create_withdrawal<'info>(
+    ctx: Context<'_, '_, 'info, 'info, CreateWithdrawal<'info>>,
     nonce: NonceBytes,
     params: CreateWithdrawalParams,
 ) -> Result<()> {
@@ -84,7 +85,29 @@ pub fn create_withdrawal(
     tokens.insert(market_meta.long_token_mint);
     tokens.insert(market_meta.short_token_mint);
 
-    // TODO: verify swap paths.
+    // Handle the swap paths.
+    let long_swap_length = params.long_token_swap_length as usize;
+    let short_swap_length = params.short_token_swap_length as usize;
+    require_gte!(
+        ctx.remaining_accounts.len(),
+        long_swap_length + short_swap_length,
+        ExchangeError::NotEnoughRemainingAccounts,
+    );
+    let long_token_swap_path = get_and_validate_swap_path(
+        &ctx.accounts.data_store_program,
+        &ctx.remaining_accounts[..long_swap_length],
+        &market_meta.long_token_mint,
+        &ctx.accounts.final_long_token_receiver.mint,
+        &mut tokens,
+    )?;
+    let short_token_swap_path = get_and_validate_swap_path(
+        &ctx.accounts.data_store_program,
+        &ctx.remaining_accounts[long_swap_length..(long_swap_length + short_swap_length)],
+        &market_meta.short_token_mint,
+        &ctx.accounts.final_short_token_receiver.mint,
+        &mut tokens,
+    )?;
+
     let tokens_with_feed = tokens
         .into_iter()
         .map(|token| {
@@ -108,7 +131,10 @@ pub fn create_withdrawal(
     cpi::initialize_withdrawal(
         ctx.accounts.initialize_withdrawal_ctx(),
         nonce,
-        params.swaps,
+        SwapParams {
+            long_token_swap_path,
+            short_token_swap_path,
+        },
         tokens_with_feed,
         params.tokens,
         params.market_token_amount,

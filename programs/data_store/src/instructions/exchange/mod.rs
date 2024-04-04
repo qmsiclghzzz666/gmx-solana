@@ -22,9 +22,12 @@ impl From<gmx_core::Error> for GmxCoreError {
 impl From<GmxCoreError> for anchor_lang::prelude::Error {
     fn from(err: GmxCoreError) -> Self {
         match err.0 {
-            gmx_core::Error::EmptyDeposit => DataStoreError::InvalidArgument.into(),
+            gmx_core::Error::EmptyDeposit => DataStoreError::EmptyDeposit.into(),
             gmx_core::Error::Solana(err) => err,
-            _ => DataStoreError::InvalidArgument.into(),
+            err => {
+                crate::msg!("GmxCoreError occurred. Error Message: {}", err);
+                DataStoreError::Unknown.into()
+            }
         }
     }
 }

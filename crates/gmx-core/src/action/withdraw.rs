@@ -131,13 +131,13 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Withdrawal<M, DECIMALS> {
         let delta = long_token_fees
             .fee_receiver_amount()
             .checked_add(&long_token_amount)
-            .ok_or(crate::Error::Computation)?;
+            .ok_or(crate::Error::Overflow)?;
         pool.apply_delta_amount(true, &-delta.try_into().map_err(|_| crate::Error::Convert)?)?;
 
         let delta = short_token_fees
             .fee_receiver_amount()
             .checked_add(&short_token_amount)
-            .ok_or(crate::Error::Computation)?;
+            .ok_or(crate::Error::Overflow)?;
         pool.apply_delta_amount(
             false,
             &-delta.try_into().map_err(|_| crate::Error::Convert)?,
@@ -171,14 +171,14 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Withdrawal<M, DECIMALS> {
             &pool_value,
             &total_supply,
         )
-        .ok_or(crate::Error::Computation)?;
+        .ok_or(crate::Error::Computation("amount to usd"))?;
         let long_token_amount = market_token_value
             .checked_mul_div(&long_token_value, &pool_value)
-            .ok_or(crate::Error::Computation)?
+            .ok_or(crate::Error::Computation("long token amount"))?
             / self.params.long_token_price.clone();
         let short_token_amount = market_token_value
             .checked_mul_div(&short_token_value, &pool_value)
-            .ok_or(crate::Error::Computation)?
+            .ok_or(crate::Error::Computation("short token amount"))?
             / self.params.short_token_price.clone();
         Ok((long_token_amount, short_token_amount))
     }
@@ -188,7 +188,7 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Withdrawal<M, DECIMALS> {
             .market
             .swap_fee_params()
             .apply_fees(false, amount)
-            .ok_or(crate::Error::Computation)?;
+            .ok_or(crate::Error::Computation("apply fees"))?;
         *amount = amount_after_fees;
         Ok(fees)
     }

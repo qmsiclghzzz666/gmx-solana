@@ -212,7 +212,14 @@ export const makeExecuteDepositInstruction = async ({
     options
 }: MakeExecuteDepositParams,
 ) => {
-    const { user, marketToken, toMarketTokenAccount, feeds, longSwapPath, shortSwapPath } = options?.hints?.deposit ?? await exchange.account.deposit.fetch(deposit).then(deposit => {
+    const {
+        user,
+        marketToken,
+        toMarketTokenAccount,
+        feeds,
+        longSwapPath,
+        shortSwapPath,
+    } = options?.hints?.deposit ?? await exchange.account.deposit.fetch(deposit).then(deposit => {
         return {
             user: deposit.fixed.senders.user,
             market: deposit.fixed.market,
@@ -295,6 +302,8 @@ export const makeCreateWithdrawalInstruction = async ({
 }: MakeCreateWithdrawalParams) => {
     const withdrawalNonce = options?.nonce ?? Keypair.generate().publicKey.toBuffer();
     const [withdrawalAddress] = createWithdrawalPDA(store, payer, withdrawalNonce);
+    const longSwapPath = options?.longTokenSwapPath ?? [];
+    const shortSwapPath = options?.shortTokenSwapPath ?? [];
     const instruction = await exchange.methods.createWithdrawal([...withdrawalNonce], {
         marketTokenAmount: toBN(amount),
         executionFee: toBN(options?.executionFee ?? 0),
@@ -304,10 +313,8 @@ export const makeCreateWithdrawalInstruction = async ({
             minShortTokenAmount: toBN(options?.minShortTokenAmount ?? 0),
             shouldUnwrapNativeToken: options?.shouldUnwrapNativeToken ?? false
         },
-        swaps: {
-            longTokenSwapPath: options?.longTokenSwapPath ?? [],
-            shortTokenSwapPath: options?.shortTokenSwapPath ?? [],
-        }
+        longTokenSwapLength: longSwapPath.length,
+        shortTokenSwapLength: shortSwapPath.length,
     }).accounts({
         authority,
         store,
@@ -322,7 +329,13 @@ export const makeCreateWithdrawalInstruction = async ({
         marketTokenWithdrawalVault: createMarketVaultPDA(store, marketToken)[0],
         finalLongTokenReceiver: toLongTokenAccount,
         finalShortTokenReceiver: toShortTokenAccount,
-    }).instruction();
+    }).remainingAccounts([...longSwapPath, ...shortSwapPath].map(token => {
+        return {
+            pubkey: createMarketPDA(store, token)[0],
+            isSigner: false,
+            isWritable: false,
+        };
+    })).instruction();
 
     return [instruction, withdrawalAddress] as IxWithOutput<PublicKey>;
 };
@@ -389,6 +402,8 @@ export type MakeExecuteWithdrawalParams = {
                 finalLongTokenMint: PublicKey,
                 finalShortTokenMint: PublicKey,
                 feeds: PublicKey[],
+                longSwapPath: PublicKey[],
+                shortSwapPath: PublicKey[],
             }
         }
     },
@@ -409,6 +424,8 @@ export const makeExecuteWithdrawalInstruction = async ({
         finalLongTokenMint,
         finalShortTokenMint,
         feeds,
+        longSwapPath,
+        shortSwapPath,
     } = options?.hints?.withdrawal ?? (
         await dataStore.account.withdrawal.fetch(withdrawal).then(withdrawal => {
             return {
@@ -420,8 +437,31 @@ export const makeExecuteWithdrawalInstruction = async ({
                 finalLongTokenReceiver: withdrawal.fixed.receivers.finalLongTokenReceiver,
                 finalShortTokenReceiver: withdrawal.fixed.receivers.finalShortTokenReceiver,
                 feeds: withdrawal.dynamic.tokensWithFeed.feeds,
+                longSwapPath: withdrawal.dynamic.swap.longTokenSwapPath,
+                shortSwapPath: withdrawal.dynamic.swap.shortTokenSwapPath,
             }
         }));
+    const feedAccounts = feeds.map(feed => {
+        return {
+            pubkey: feed,
+            isSigner: false,
+            isWritable: false,
+        }
+    });
+    const swapPathMints = [...longSwapPath, ...shortSwapPath].map(mint => {
+        return {
+            pubkey: mint,
+            isSigner: false,
+            isWritable: false,
+        }
+    });
+    const swapPathMarkets = [...longSwapPath, ...shortSwapPath].map(mint => {
+        return {
+            pubkey: createMarketPDA(store, mint)[0],
+            isSigner: false,
+            isWritable: true,
+        };
+    });
     return await exchange.methods.executeWithdrawal(toBN(options?.executionFee ?? 0)).accounts({
         authority,
         store,
@@ -440,13 +480,7 @@ export const makeExecuteWithdrawalInstruction = async ({
         finalShortTokenReceiver,
         finalLongTokenVault: createMarketVaultPDA(store, finalLongTokenMint)[0],
         finalShortTokenVault: createMarketVaultPDA(store, finalShortTokenMint)[0],
-    }).remainingAccounts(feeds.map(feed => {
-        return {
-            pubkey: feed,
-            isSigner: false,
-            isWritable: false,
-        }
-    })).instruction();
+    }).remainingAccounts([...feedAccounts, ...swapPathMarkets, ...swapPathMints]).instruction();
 };
 
 export const invokeExecuteWithdrawal = makeInvoke(makeExecuteWithdrawalInstruction, ["authority"]);

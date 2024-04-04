@@ -233,7 +233,7 @@ impl gmx_core::Pool for Pool {
         self.long_token_amount = self
             .long_token_amount
             .checked_add_signed(*delta)
-            .ok_or(gmx_core::Error::Computation)?;
+            .ok_or(gmx_core::Error::Computation("apply delta to long amount"))?;
         Ok(())
     }
 
@@ -245,7 +245,7 @@ impl gmx_core::Pool for Pool {
         };
         *amount = amount
             .checked_add_signed(*delta)
-            .ok_or(gmx_core::Error::Computation)?;
+            .ok_or(gmx_core::Error::Computation("apply delta to short amount"))?;
         Ok(())
     }
 }

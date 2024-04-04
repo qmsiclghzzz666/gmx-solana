@@ -165,7 +165,7 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Deposit<M, DECIMALS> {
             .market
             .swap_fee_params()
             .apply_fees(is_positive_impact, amount)
-            .ok_or(crate::Error::Computation)?;
+            .ok_or(crate::Error::Computation("apply fees"))?;
         *amount = amount_after_fees;
         Ok(fees)
     }
@@ -218,14 +218,14 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Deposit<M, DECIMALS> {
                     &utils::usd_to_market_token_amount(
                         positive_impact_amount
                             .checked_mul(opposite_price)
-                            .ok_or(crate::Error::Computation)?,
+                            .ok_or(crate::Error::Overflow)?,
                         pool_value.clone(),
                         supply.clone(),
                         self.market.usd_to_amount_divisor(),
                     )
-                    .ok_or(crate::Error::Computation)?,
+                    .ok_or(crate::Error::Computation("convert positive usd to amount"))?,
                 )
-                .ok_or(crate::Error::Computation)?;
+                .ok_or(crate::Error::Overflow)?;
             self.market.apply_delta(
                 !is_long_token,
                 &positive_impact_amount
@@ -246,14 +246,14 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Deposit<M, DECIMALS> {
         mint_amount = mint_amount
             .checked_add(
                 &utils::usd_to_market_token_amount(
-                    amount.checked_mul(price).ok_or(crate::Error::Computation)?,
+                    amount.checked_mul(price).ok_or(crate::Error::Overflow)?,
                     pool_value,
                     supply.clone(),
                     self.market.usd_to_amount_divisor(),
                 )
-                .ok_or(crate::Error::Computation)?,
+                .ok_or(crate::Error::Computation("convert negative usd to amount"))?,
             )
-            .ok_or(crate::Error::Computation)?;
+            .ok_or(crate::Error::Overflow)?;
         self.market.apply_delta(
             is_long_token,
             &(amount
@@ -290,14 +290,14 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Deposit<M, DECIMALS> {
                         &price_impact,
                         &long_token_usd_value
                             .checked_add(&short_token_usd_value)
-                            .ok_or(crate::Error::Computation)?,
+                            .ok_or(crate::Error::Overflow)?,
                     )
-                    .ok_or(crate::Error::Computation)?;
+                    .ok_or(crate::Error::Computation("price impact for long"))?;
                 let (mint_amount, fees) =
                     self.execute_deposit(true, pool_value.clone(), price_impact)?;
                 market_token_to_mint = market_token_to_mint
                     .checked_add(&mint_amount)
-                    .ok_or(crate::Error::Computation)?;
+                    .ok_or(crate::Error::Overflow)?;
                 all_fees[0] = fees;
             }
             if !self.params.short_token_amount.is_zero() {
@@ -307,13 +307,13 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Deposit<M, DECIMALS> {
                         &price_impact,
                         &long_token_usd_value
                             .checked_add(&short_token_usd_value)
-                            .ok_or(crate::Error::Computation)?,
+                            .ok_or(crate::Error::Overflow)?,
                     )
-                    .ok_or(crate::Error::Computation)?;
+                    .ok_or(crate::Error::Computation("price impact for short"))?;
                 let (mint_amount, fees) = self.execute_deposit(false, pool_value, price_impact)?;
                 market_token_to_mint = market_token_to_mint
                     .checked_add(&mint_amount)
-                    .ok_or(crate::Error::Computation)?;
+                    .ok_or(crate::Error::Overflow)?;
                 all_fees[1] = fees;
             }
             DepositReport::new(self.params, price_impact, market_token_to_mint, all_fees)

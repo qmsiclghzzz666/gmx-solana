@@ -74,12 +74,12 @@ impl<'a, 'info> SwapUtils<'a, 'info> {
                     .oracle
                     .primary
                     .get(&meta.long_token_mint)
-                    .ok_or(DataStoreError::InvalidArgument)?;
+                    .ok_or(DataStoreError::MissingOracelPrice)?;
                 let short_token_price = self
                     .oracle
                     .primary
                     .get(&meta.short_token_mint)
-                    .ok_or(DataStoreError::InvalidArgument)?;
+                    .ok_or(DataStoreError::MissingOracelPrice)?;
                 let report = market
                     .as_market(&mint)
                     .swap(

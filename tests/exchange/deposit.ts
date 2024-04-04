@@ -237,6 +237,58 @@ describe("exchange: deposit", () => {
         )).rejectedWith(AnchorError, "Invalid swap path");
     });
 
+    it("create withdrawal with invalid swap path", async () => {
+        await expect(invokeCreateWithdrawal(
+            provider.connection,
+            {
+                authority: signer0,
+                store: dataStoreAddress,
+                payer: user0,
+                marketToken: GMFakeFakeUsdG,
+                amount: 1_000,
+                fromMarketTokenAccount: user0FakeFakeUsdGTokenAccount,
+                toLongTokenAccount: user0FakeTokenAccount,
+                toShortTokenAccount: user0UsdGTokenAccount,
+                options: {
+                    longTokenSwapPath: [GMFakeFakeUsdG],
+                }
+            }
+        )).rejectedWith(AnchorError, "Invalid swap path");
+    });
+
+    it("create withdrawal with valid swap path and cancel", async () => {
+        let withdrawal: PublicKey;
+        {
+            const [signature, withdrawAddress] = await invokeCreateWithdrawal(
+                provider.connection,
+                {
+                    authority: signer0,
+                    store: dataStoreAddress,
+                    payer: user0,
+                    marketToken: GMFakeFakeUsdG,
+                    amount: 1_000_000,
+                    fromMarketTokenAccount: user0FakeFakeUsdGTokenAccount,
+                    toLongTokenAccount: user0UsdGTokenAccount,
+                    toShortTokenAccount: user0UsdGTokenAccount,
+                    options: {
+                        longTokenSwapPath: [GMFakeFakeUsdG],
+                    }
+                }
+            );
+            withdrawal = withdrawAddress;
+            console.log(`withdrawal created at ${signature}`);
+        }
+
+        {
+            const [signature] = await invokeCancelWithdrawal(provider.connection, {
+                authority: signer0,
+                store: dataStoreAddress,
+                withdrawal,
+            });
+            console.log(`withdrawal cancelled at ${signature}`);
+        }
+    });
+
     it("create deposit with valid swap path and cancel", async () => {
         let deposit: PublicKey;
         {
@@ -329,6 +381,47 @@ describe("exchange: deposit", () => {
             console.log(`${pool1.longTokenAmount}:${pool1.shortTokenAmount}`);
             const pool2 = (await dataStore.account.market.fetch(market2)).pools.pools[0];
             console.log(`${pool2.longTokenAmount}:${pool2.shortTokenAmount}`);
+        }
+    });
+
+    it("create withdrawal with valid swap path and execute", async () => {
+        let withdrawal: PublicKey;
+        {
+            const [signature, withdrawAddress] = await invokeCreateWithdrawal(
+                provider.connection,
+                {
+                    authority: signer0,
+                    store: dataStoreAddress,
+                    payer: user0,
+                    marketToken: GMFakeFakeUsdG,
+                    amount: 1_000_000,
+                    fromMarketTokenAccount: user0FakeFakeUsdGTokenAccount,
+                    toLongTokenAccount: user0WsolTokenAccount,
+                    toShortTokenAccount: user0WsolTokenAccount,
+                    options: {
+                        longTokenSwapPath: [GMFakeFakeUsdG, GMWsolWsolUsdG],
+                        shortTokenSwapPath: [GMWsolWsolUsdG],
+                    }
+                }
+            );
+            withdrawal = withdrawAddress;
+            console.log(`withdrawal created at ${signature}`);
+        }
+
+        {
+            const [signature] = await invokeExecuteWithdrawal(provider.connection, {
+                authority: signer0,
+                store: dataStoreAddress,
+                oracle: oracleAddress,
+                withdrawal,
+                options: {
+                    executionFee: 5_001,
+                }
+            }, {
+                computeUnits: 400_000,
+                skipPreflight: true,
+            });
+            console.log(`withdrawal executed at ${signature}`);
         }
     });
 });
