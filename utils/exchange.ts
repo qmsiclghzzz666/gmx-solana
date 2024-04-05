@@ -1,4 +1,4 @@
-import { workspace, Program, BN } from "@coral-xyz/anchor";
+import { workspace, Program, BN, utils } from "@coral-xyz/anchor";
 import { Exchange } from "../target/types/exchange";
 import { Connection, Keypair, PublicKey } from "@solana/web3.js";
 import { createDepositPDA, createMarketPDA, createMarketTokenMintPDA, createMarketVaultPDA, createRolesPDA, createTokenConfigMapPDA, createWithdrawalPDA, dataStore, getTokenConfig } from "./data";
@@ -9,6 +9,11 @@ import { CHAINLINK_ID } from "./external";
 import { IxWithOutput, makeInvoke } from "./invoke";
 
 export const exchange = workspace.Exchange as Program<Exchange>;
+
+export const createControllerPDA = (store: PublicKey) => PublicKey.findProgramAddressSync([
+    utils.bytes.utf8.encode("controller"),
+    store.toBuffer(),
+], exchange.programId);
 
 export const createMarket = async (
     signer: Keypair,
@@ -39,7 +44,6 @@ export const createMarket = async (
 };
 
 export type MakeCreateDepositParams = {
-    authority: PublicKey,
     store: PublicKey,
     payer: PublicKey,
     marketToken: PublicKey,
@@ -70,7 +74,6 @@ const getDepositVault = async (connection: Connection, store: PublicKey, fromTok
 };
 
 export const makeCreateDepositInstruction = async ({
-    authority,
     store,
     payer,
     marketToken,
@@ -81,6 +84,7 @@ export const makeCreateDepositInstruction = async ({
     initialShortTokenAmount,
     options,
 }: MakeCreateDepositParams) => {
+    const [authority] = createControllerPDA(store);
     const depositNonce = options?.nonce ?? Keypair.generate().publicKey.toBuffer();
     const [deposit] = createDepositPDA(store, payer, depositNonce);
     const longTokenDepositVault = await getDepositVault(exchange.provider.connection, store, fromInitialLongTokenAccount, options?.hints?.initialLongToken);
@@ -125,7 +129,7 @@ export const makeCreateDepositInstruction = async ({
     return [instruction, deposit] as IxWithOutput<PublicKey>;
 }
 
-export const invokeCreateDeposit = makeInvoke(makeCreateDepositInstruction, ["payer", "authority"]);
+export const invokeCreateDeposit = makeInvoke(makeCreateDepositInstruction, ["payer"]);
 
 export type MakeCancelDepositParams = {
     authority: PublicKey,

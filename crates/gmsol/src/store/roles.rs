@@ -17,11 +17,7 @@ pub trait RolesOps<C> {
     fn find_roles_address(&self, store: &Pubkey, authority: &Pubkey) -> (Pubkey, u8);
 
     /// Create a request to initialize a new [`Roles`] account.
-    fn initialize_roles<'a>(
-        &'a self,
-        store: &Pubkey,
-        authority: Option<&'a dyn Signer>,
-    ) -> RequestBuilder<'a, C>;
+    fn initialize_roles<'a>(&'a self, store: &Pubkey, authority: &Pubkey) -> RequestBuilder<'a, C>;
 
     /// Grant a role to user.
     fn grant_role(&self, store: &Pubkey, user: &Pubkey, role: &str) -> RequestBuilder<C>;
@@ -39,26 +35,20 @@ where
         )
     }
 
-    fn initialize_roles<'a>(
-        &'a self,
-        store: &Pubkey,
-        authority: Option<&'a dyn Signer>,
-    ) -> RequestBuilder<'a, C> {
-        let authority_pubkey = authority.map(|s| s.pubkey()).unwrap_or(self.payer());
-        let roles = self.find_roles_address(store, &authority_pubkey).0;
+    fn initialize_roles<'a>(&'a self, store: &Pubkey, authority: &Pubkey) -> RequestBuilder<'a, C> {
+        let roles = self.find_roles_address(store, authority).0;
         let builder = self
             .request()
             .accounts(accounts::InitializeRoles {
-                authority: authority_pubkey,
+                payer: self.payer(),
                 store: *store,
                 roles,
                 system_program: system_program::ID,
             })
-            .args(instruction::InitializeRoles {});
-        match authority {
-            Some(signer) => builder.signer(signer),
-            None => builder,
-        }
+            .args(instruction::InitializeRoles {
+                authority: *authority,
+            });
+        builder
     }
 
     fn grant_role(&self, store: &Pubkey, user: &Pubkey, role: &str) -> RequestBuilder<C> {

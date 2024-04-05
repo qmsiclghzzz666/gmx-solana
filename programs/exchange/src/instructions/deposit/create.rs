@@ -3,14 +3,15 @@ use std::collections::BTreeSet;
 use anchor_lang::{prelude::*, system_program};
 use anchor_spl::token::{self, Token, TokenAccount};
 use data_store::{
-    constants,
-    cpi::accounts::{CheckRole, GetMarketMeta, GetTokenConfig, InitializeDeposit},
+    cpi::accounts::{GetMarketMeta, GetTokenConfig, InitializeDeposit},
     program::DataStore,
     states::{common::SwapParams, deposit::TokenParams, NonceBytes},
-    utils::Authentication,
 };
 
-use crate::{utils::market::get_and_validate_swap_path, ExchangeError};
+use crate::{
+    utils::{market::get_and_validate_swap_path, ControllerSeeds},
+    ExchangeError,
+};
 
 /// Create Deposit Params.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
@@ -23,6 +24,66 @@ pub struct CreateDepositParams {
     pub initial_short_token_amount: u64,
     pub min_market_token: u64,
     pub should_unwrap_native_token: bool,
+}
+
+#[derive(Accounts)]
+pub struct CreateDeposit<'info> {
+    /// CHECK: only used as signing PDA.
+    #[account(
+        seeds = [
+            crate::constants::CONTROLLER_SEED,
+            store.key().as_ref(),
+        ],
+        bump,
+    )]
+    pub authority: UncheckedAccount<'info>,
+    /// CHECK: only used to invoke CPI.
+    pub store: UncheckedAccount<'info>,
+    /// CHECK: only used to invoke CPI.
+    pub only_controller: UncheckedAccount<'info>,
+    pub data_store_program: Program<'info, DataStore>,
+    pub system_program: Program<'info, System>,
+    pub token_program: Program<'info, Token>,
+    /// CHECK: only used to invoke CPI which will then initialize the account.
+    #[account(mut)]
+    pub deposit: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    pub receiver: Account<'info, TokenAccount>,
+    /// CHECK: check by CPI.
+    pub token_config_map: UncheckedAccount<'info>,
+    /// CHECK: only used to invoke CPI and should be checked by it.
+    pub market: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub initial_long_token_account: Option<Account<'info, TokenAccount>>,
+    #[account(mut)]
+    pub initial_short_token_account: Option<Account<'info, TokenAccount>>,
+    #[account(
+        mut,
+        token::mint = initial_long_token_account.as_ref().expect("token account not provided").mint,
+        seeds = [
+            data_store::constants::MARKET_VAULT_SEED,
+            store.key().as_ref(),
+            long_token_deposit_vault.mint.as_ref(),
+            &[],
+        ],
+        bump,
+        seeds::program = data_store_program.key(),
+    )]
+    pub long_token_deposit_vault: Option<Account<'info, TokenAccount>>,
+    #[account(
+        mut,
+        token::mint = initial_short_token_account.as_ref().expect("token account not provided").mint,
+        seeds = [
+            data_store::constants::MARKET_VAULT_SEED,
+            store.key().as_ref(),
+            short_token_deposit_vault.mint.as_ref(),
+            &[],
+        ],
+        bump,
+        seeds::program = data_store_program.key(),
+    )]
+    pub short_token_deposit_vault: Option<Account<'info, TokenAccount>>,
 }
 
 /// Create Deposit.
@@ -114,9 +175,11 @@ pub fn create_deposit<'info>(
             Result::Ok((token, config.price_feed))
         })
         .collect::<Result<Vec<_>>>()?;
-
+    let controller = ControllerSeeds::new(ctx.accounts.store.key, ctx.bumps.authority);
     cpi::initialize_deposit(
-        ctx.accounts.initialize_deposit_ctx(),
+        ctx.accounts
+            .initialize_deposit_ctx()
+            .with_signer(&[&controller.as_seeds()]),
         nonce,
         tokens_with_feed,
         SwapParams {
@@ -144,77 +207,25 @@ pub fn create_deposit<'info>(
     Ok(())
 }
 
-#[derive(Accounts)]
-pub struct CreateDeposit<'info> {
-    pub authority: Signer<'info>,
-    /// CHECK: only used to invoke CPI.
-    pub store: UncheckedAccount<'info>,
-    /// CHECK: only used to invoke CPI.
-    pub only_controller: UncheckedAccount<'info>,
-    pub data_store_program: Program<'info, DataStore>,
-    pub system_program: Program<'info, System>,
-    pub token_program: Program<'info, Token>,
-    /// CHECK: only used to invoke CPI which will then initialize the account.
-    #[account(mut)]
-    pub deposit: UncheckedAccount<'info>,
-    #[account(mut)]
-    pub payer: Signer<'info>,
-    pub receiver: Account<'info, TokenAccount>,
-    /// CHECK: check by CPI.
-    pub token_config_map: UncheckedAccount<'info>,
-    /// CHECK: only used to invoke CPI and should be checked by it.
-    pub market: UncheckedAccount<'info>,
-    #[account(mut)]
-    pub initial_long_token_account: Option<Account<'info, TokenAccount>>,
-    #[account(mut)]
-    pub initial_short_token_account: Option<Account<'info, TokenAccount>>,
-    #[account(
-        mut,
-        token::mint = initial_long_token_account.as_ref().expect("token account not provided").mint,
-        seeds = [
-            constants::MARKET_VAULT_SEED,
-            store.key().as_ref(),
-            long_token_deposit_vault.mint.as_ref(),
-            &[],
-        ],
-        bump,
-        seeds::program = data_store_program.key(),
-    )]
-    pub long_token_deposit_vault: Option<Account<'info, TokenAccount>>,
-    #[account(
-        mut,
-        token::mint = initial_short_token_account.as_ref().expect("token account not provided").mint,
-        seeds = [
-            constants::MARKET_VAULT_SEED,
-            store.key().as_ref(),
-            short_token_deposit_vault.mint.as_ref(),
-            &[],
-        ],
-        bump,
-        seeds::program = data_store_program.key(),
-    )]
-    pub short_token_deposit_vault: Option<Account<'info, TokenAccount>>,
-}
+// impl<'info> Authentication<'info> for CreateDeposit<'info> {
+//     fn authority(&self) -> &Signer<'info> {
+//         &self.authority
+//     }
 
-impl<'info> Authentication<'info> for CreateDeposit<'info> {
-    fn authority(&self) -> &Signer<'info> {
-        &self.authority
-    }
+//     fn check_role_ctx(&self) -> CpiContext<'_, '_, '_, 'info, CheckRole<'info>> {
+//         CpiContext::new(
+//             self.data_store_program.to_account_info(),
+//             CheckRole {
+//                 store: self.store.to_account_info(),
+//                 roles: self.only_controller.to_account_info(),
+//             },
+//         )
+//     }
 
-    fn check_role_ctx(&self) -> CpiContext<'_, '_, '_, 'info, CheckRole<'info>> {
-        CpiContext::new(
-            self.data_store_program.to_account_info(),
-            CheckRole {
-                store: self.store.to_account_info(),
-                roles: self.only_controller.to_account_info(),
-            },
-        )
-    }
-
-    fn on_error(&self) -> Result<()> {
-        Err(error!(ExchangeError::PermissionDenied))
-    }
-}
+//     fn on_error(&self) -> Result<()> {
+//         Err(error!(ExchangeError::PermissionDenied))
+//     }
+// }
 
 impl<'info> CreateDeposit<'info> {
     fn get_market_meta_ctx(&self) -> CpiContext<'_, '_, '_, 'info, GetMarketMeta<'info>> {

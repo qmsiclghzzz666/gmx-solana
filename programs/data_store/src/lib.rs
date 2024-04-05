@@ -39,8 +39,8 @@ pub mod data_store {
     }
 
     // Roles.
-    pub fn initialize_roles(ctx: Context<InitializeRoles>) -> Result<()> {
-        instructions::initialize_roles(ctx)
+    pub fn initialize_roles(ctx: Context<InitializeRoles>, authority: Pubkey) -> Result<()> {
+        instructions::initialize_roles(ctx, authority)
     }
 
     pub fn check_admin(ctx: Context<CheckRole>, authority: Pubkey) -> Result<bool> {

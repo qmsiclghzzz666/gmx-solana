@@ -46,7 +46,11 @@ enum RolesAction {
     /// Get.
     Get,
     /// Init.
-    Init,
+    Init {
+        /// Authority.
+        #[arg(long)]
+        authority: Option<Pubkey>,
+    },
     /// Grant,
     Grant {
         /// User.
@@ -123,8 +127,12 @@ impl StoreArgs {
                         .0;
                     println!("{address}");
                 }
-                Some(RolesAction::Init) => {
-                    let signature = program.initialize_roles(self.store()?, None).send().await?;
+                Some(RolesAction::Init { authority }) => {
+                    let authority = authority.unwrap_or(program.payer());
+                    let signature = program
+                        .initialize_roles(self.store()?, &authority)
+                        .send()
+                        .await?;
                     tracing::info!("initialized a new roles account at {signature}");
                 }
                 Some(RolesAction::Grant { role, user }) => {

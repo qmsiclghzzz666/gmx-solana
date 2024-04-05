@@ -7,25 +7,24 @@ use crate::{
 };
 
 /// Initialize a new roles account.
-pub fn initialize_roles(ctx: Context<InitializeRoles>) -> Result<()> {
-    ctx.accounts.roles.init(
-        ctx.accounts.authority.key(),
-        ctx.accounts.store.key(),
-        ctx.bumps.roles,
-    );
+pub fn initialize_roles(ctx: Context<InitializeRoles>, authority: Pubkey) -> Result<()> {
+    ctx.accounts
+        .roles
+        .init(authority, ctx.accounts.store.key(), ctx.bumps.roles);
     Ok(())
 }
 
 #[derive(Accounts)]
+#[instruction(authority: Pubkey)]
 pub struct InitializeRoles<'info> {
     #[account(mut)]
-    pub authority: Signer<'info>,
+    pub payer: Signer<'info>,
     pub store: Account<'info, DataStore>,
     #[account(
         init,
-        payer = authority,
+        payer = payer,
         space = 8 + Roles::INIT_SPACE,
-        seeds = [Roles::SEED, store.key().as_ref(), authority.key().as_ref()],
+        seeds = [Roles::SEED, store.key().as_ref(), authority.as_ref()],
         bump,
     )]
     pub roles: Account<'info, Roles>,
