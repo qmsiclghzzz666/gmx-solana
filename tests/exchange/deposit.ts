@@ -36,7 +36,6 @@ describe("exchange: deposit", () => {
         let deposit: PublicKey;
         try {
             const [signature, address] = await invokeCreateDeposit(provider.connection, {
-                authority: signer0,
                 store: dataStoreAddress,
                 payer: user0,
                 marketToken: GMFakeFakeUsdG,
@@ -181,7 +180,6 @@ describe("exchange: deposit", () => {
         const [signature, deposit] = await invokeCreateDeposit(
             provider.connection,
             {
-                authority: signer0,
                 store: dataStoreAddress,
                 payer: user0,
                 marketToken: GMFakeFakeUsdG,
@@ -221,7 +219,6 @@ describe("exchange: deposit", () => {
         await expect(invokeCreateDeposit(
             provider.connection,
             {
-                authority: signer0,
                 store: dataStoreAddress,
                 payer: user0,
                 marketToken: GMFakeFakeUsdG,
@@ -295,7 +292,6 @@ describe("exchange: deposit", () => {
             const [signature, depositAddress] = await invokeCreateDeposit(
                 provider.connection,
                 {
-                    authority: signer0,
                     store: dataStoreAddress,
                     payer: user0,
                     marketToken: GMWsolWsolUsdG,
@@ -334,7 +330,6 @@ describe("exchange: deposit", () => {
             const [signature, depositAddress] = await invokeCreateDeposit(
                 provider.connection,
                 {
-                    authority: signer0,
                     store: dataStoreAddress,
                     payer: user0,
                     marketToken: GMWsolWsolUsdG,
