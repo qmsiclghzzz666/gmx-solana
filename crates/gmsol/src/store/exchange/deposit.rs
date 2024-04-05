@@ -128,7 +128,7 @@ where
         amount: u64,
         token: Option<&Pubkey>,
     ) -> crate::Result<&mut Self> {
-        self.initial_long_token = Some(*token_account);
+        self.initial_long_token_account = Some(*token_account);
         self.initial_long_token_amount = amount;
         self.initial_long_token = Some(
             self.get_token_mint_if_not_provided(token_account, token)
@@ -146,7 +146,7 @@ where
         amount: u64,
         token: Option<&Pubkey>,
     ) -> crate::Result<&mut Self> {
-        self.initial_short_token = Some(*token_account);
+        self.initial_short_token_account = Some(*token_account);
         self.initial_short_token_amount = amount;
         self.initial_short_token = Some(
             self.get_token_mint_if_not_provided(token_account, token)
