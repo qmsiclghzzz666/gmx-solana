@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use anchor_lang::{prelude::*, system_program};
 use anchor_spl::token::{self, Token, TokenAccount};
 use data_store::{
-    cpi::accounts::{CheckRole, GetMarketMeta, GetTokenConfig, InitializeWithdrawal},
+    cpi::accounts::{GetMarketMeta, GetTokenConfig, InitializeWithdrawal},
     program::DataStore,
     states::{common::SwapParams, withdrawal::TokenParams, NonceBytes},
     utils::Authentication,
@@ -153,22 +153,24 @@ pub fn create_withdrawal<'info>(
 }
 
 impl<'info> Authentication<'info> for CreateWithdrawal<'info> {
-    fn authority(&self) -> &Signer<'info> {
-        &self.authority
-    }
-
-    fn check_role_ctx(&self) -> CpiContext<'_, '_, '_, 'info, CheckRole<'info>> {
-        CpiContext::new(
-            self.data_store_program.to_account_info(),
-            CheckRole {
-                store: self.store.to_account_info(),
-                roles: self.only_controller.to_account_info(),
-            },
-        )
+    fn authority(&self) -> AccountInfo<'info> {
+        self.authority.to_account_info()
     }
 
     fn on_error(&self) -> Result<()> {
         Err(error!(ExchangeError::PermissionDenied))
+    }
+
+    fn data_store_program(&self) -> AccountInfo<'info> {
+        self.data_store_program.to_account_info()
+    }
+
+    fn store(&self) -> AccountInfo<'info> {
+        self.store.to_account_info()
+    }
+
+    fn roles(&self) -> AccountInfo<'info> {
+        self.only_controller.to_account_info()
     }
 }
 

@@ -42,7 +42,7 @@ pub mod exchange {
         instructions::execute_deposit(ctx, execution_fee)
     }
 
-    #[access_control(Authenticate::only_controller(&ctx))]
+    #[access_control(instructions::only_controller_or_deposit_creator(&ctx))]
     pub fn cancel_deposit(ctx: Context<CancelDeposit>, execution_fee: u64) -> Result<()> {
         instructions::cancel_deposit(ctx, execution_fee)
     }

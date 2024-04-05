@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token};
 use data_store::{
-    cpi::accounts::{CheckRole, InitializeMarket, InitializeMarketToken, InitializeMarketVault},
+    cpi::accounts::{InitializeMarket, InitializeMarketToken, InitializeMarketVault},
     states::DataStore,
 };
 use data_store::{states::Roles, utils::Authentication};
@@ -102,21 +102,23 @@ impl<'info> CreateMarket<'info> {
 }
 
 impl<'info> Authentication<'info> for CreateMarket<'info> {
-    fn authority(&self) -> &Signer<'info> {
-        &self.authority
-    }
-
-    fn check_role_ctx(&self) -> CpiContext<'_, '_, '_, 'info, CheckRole<'info>> {
-        CpiContext::new(
-            self.data_store_program.to_account_info(),
-            CheckRole {
-                store: self.data_store.to_account_info(),
-                roles: self.only_market_keeper.to_account_info(),
-            },
-        )
+    fn authority(&self) -> AccountInfo<'info> {
+        self.authority.to_account_info()
     }
 
     fn on_error(&self) -> Result<()> {
-        Err(ExchangeError::PermissionDenied.into())
+        Err(error!(ExchangeError::PermissionDenied))
+    }
+
+    fn data_store_program(&self) -> AccountInfo<'info> {
+        self.data_store_program.to_account_info()
+    }
+
+    fn store(&self) -> AccountInfo<'info> {
+        self.data_store.to_account_info()
+    }
+
+    fn roles(&self) -> AccountInfo<'info> {
+        self.only_market_keeper.to_account_info()
     }
 }

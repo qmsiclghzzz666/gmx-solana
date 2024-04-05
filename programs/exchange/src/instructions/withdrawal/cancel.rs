@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::{Token, TokenAccount};
 use data_store::{
     constants,
-    cpi::accounts::{CheckRole, MarketVaultTransferOut, RemoveWithdrawal},
+    cpi::accounts::{MarketVaultTransferOut, RemoveWithdrawal},
     program::DataStore,
     states::Withdrawal,
     utils::Authentication,
@@ -79,22 +79,24 @@ pub fn cancel_withdrawal(ctx: Context<CancelWithdrawal>, execution_fee: u64) -> 
 }
 
 impl<'info> Authentication<'info> for CancelWithdrawal<'info> {
-    fn authority(&self) -> &Signer<'info> {
-        &self.authority
-    }
-
-    fn check_role_ctx(&self) -> CpiContext<'_, '_, '_, 'info, CheckRole<'info>> {
-        CpiContext::new(
-            self.data_store_program.to_account_info(),
-            CheckRole {
-                store: self.store.to_account_info(),
-                roles: self.only_controller.to_account_info(),
-            },
-        )
+    fn authority(&self) -> AccountInfo<'info> {
+        self.authority.to_account_info()
     }
 
     fn on_error(&self) -> Result<()> {
         Err(error!(ExchangeError::PermissionDenied))
+    }
+
+    fn data_store_program(&self) -> AccountInfo<'info> {
+        self.data_store_program.to_account_info()
+    }
+
+    fn store(&self) -> AccountInfo<'info> {
+        self.store.to_account_info()
+    }
+
+    fn roles(&self) -> AccountInfo<'info> {
+        self.only_controller.to_account_info()
     }
 }
 

@@ -8,10 +8,31 @@ use crate::{
 /// Accounts that can be used for authentication.
 pub trait Authentication<'info>: Bumps + Sized {
     /// Get the authority to check.
-    fn authority(&self) -> &Signer<'info>;
+    ///
+    /// ## Notes
+    /// - `authority` should be a signer.
+    fn authority(&self) -> AccountInfo<'info>;
+
+    /// Get data store program.
+    fn data_store_program(&self) -> AccountInfo<'info>;
+
+    /// Get data store.
+    fn store(&self) -> AccountInfo<'info>;
+
+    /// Get roles for `authority`.
+    fn roles(&self) -> AccountInfo<'info>;
 
     /// Get the cpi context for checking role or admin permission.
-    fn check_role_ctx(&self) -> CpiContext<'_, '_, '_, 'info, CheckRole<'info>>;
+    fn check_role_ctx(&self) -> CpiContext<'_, '_, '_, 'info, CheckRole<'info>> {
+        CpiContext::new(
+            self.data_store_program(),
+            CheckRole {
+                authority: self.authority(),
+                store: self.store(),
+                roles: self.roles(),
+            },
+        )
+    }
 
     /// Callback on authentication error.
     fn on_error(&self) -> Result<()>;
@@ -21,12 +42,8 @@ pub trait Authentication<'info>: Bumps + Sized {
 pub trait Authenticate<'info>: Authentication<'info> {
     /// Check that the `authority` has the given `role`.
     fn only(ctx: &Context<Self>, role: &str) -> Result<()> {
-        let has_role = crate::cpi::check_role(
-            ctx.accounts.check_role_ctx(),
-            ctx.accounts.authority().key(),
-            role.to_string(),
-        )?
-        .get();
+        let has_role =
+            crate::cpi::check_role(ctx.accounts.check_role_ctx(), role.to_string())?.get();
         if has_role {
             Ok(())
         } else {
@@ -36,11 +53,7 @@ pub trait Authenticate<'info>: Authentication<'info> {
 
     /// Check that the `authority` is an admin.
     fn only_admin(ctx: &Context<Self>) -> Result<()> {
-        let is_admin = crate::cpi::check_admin(
-            ctx.accounts.check_role_ctx(),
-            ctx.accounts.authority().key(),
-        )?
-        .get();
+        let is_admin = crate::cpi::check_admin(ctx.accounts.check_role_ctx())?.get();
         if is_admin {
             Ok(())
         } else {
