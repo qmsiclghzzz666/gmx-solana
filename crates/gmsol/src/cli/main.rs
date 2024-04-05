@@ -1,8 +1,10 @@
 use std::sync::Arc;
 
+use admin::AdminArgs;
 use anchor_client::{
     solana_sdk::{
         commitment_config::CommitmentConfig,
+        pubkey::Pubkey,
         signature::{read_keypair_file, Keypair},
         signer::Signer,
     },
@@ -13,7 +15,10 @@ use eyre::eyre;
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::EnvFilter;
 
-mod store;
+mod admin;
+mod exchange;
+mod inspect;
+mod roles;
 
 #[derive(Parser)]
 struct Cli {
@@ -26,6 +31,9 @@ struct Cli {
     /// Commitment level.
     #[arg(long, env, default_value = "confirmed")]
     commitment: CommitmentConfig,
+    /// The address of the `DataStore` account.
+    #[arg(long, env)]
+    store: Option<Pubkey>,
     /// Commands.
     #[command(subcommand)]
     command: Command,
@@ -33,8 +41,16 @@ struct Cli {
 
 #[derive(clap::Subcommand)]
 enum Command {
-    /// Commands for `DataStore` program.
-    Store(store::StoreArgs),
+    /// Show current wallet pubkey.
+    Whoami,
+    /// Commands for admin.
+    Admin(AdminArgs),
+    /// Inspect the accounts defined by `DataStore` program.
+    Inspect(inspect::InspectArgs),
+    /// Commands for roles management.
+    Roles(roles::RolesArgs),
+    /// Commands for `Exchange` program.
+    Exchange(exchange::ExchangeArgs),
 }
 
 #[tokio::main]
@@ -65,21 +81,34 @@ impl Cli {
             .map_err(|err| eyre!("Invalid cluster: {err}"))
     }
 
-    fn client(&self) -> eyre::Result<SharedClient> {
+    fn client(&self) -> eyre::Result<(SharedClient, Pubkey)> {
         let cluster = self.cluster()?;
-        tracing::info!("using cluster: {cluster}");
+        tracing::debug!("using cluster: {cluster}");
         let wallet = self.wallet()?;
-        tracing::info!("using wallet: {}", wallet.pubkey());
+        let payer = wallet.pubkey();
+        tracing::debug!("using wallet: {}", payer);
         let commitment = self.commitment;
-        tracing::info!("using commitment config: {}", commitment.commitment);
+        tracing::debug!("using commitment config: {}", commitment.commitment);
         let client = Client::new_with_options(cluster, wallet, self.commitment);
-        Ok(Arc::new(client))
+        Ok((Arc::new(client), payer))
     }
 
     async fn run(&self) -> eyre::Result<()> {
-        let client = self.client()?;
+        let (client, payer) = self.client()?;
         match &self.command {
-            Command::Store(args) => args.run(&client).await?,
+            Command::Whoami => {
+                println!("{payer}");
+            }
+            Command::Admin(args) => args.run(&client, self.store.as_ref()).await?,
+            Command::Inspect(args) => args.run(&client, self.store.as_ref()).await?,
+            Command::Roles(args) => {
+                let store = self.store.ok_or(eyre::eyre!("missing store address"))?;
+                args.run(&client, &store).await?
+            }
+            Command::Exchange(args) => {
+                let store = self.store.ok_or(eyre::eyre!("missing store address"))?;
+                args.run(&client, &store).await?
+            }
         }
         Ok(())
     }
