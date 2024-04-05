@@ -49,15 +49,15 @@ pub struct CreateDeposit<'info> {
     pub deposit: UncheckedAccount<'info>,
     #[account(mut)]
     pub payer: Signer<'info>,
-    pub receiver: Account<'info, TokenAccount>,
+    pub receiver: Box<Account<'info, TokenAccount>>,
     /// CHECK: check by CPI.
     pub token_config_map: UncheckedAccount<'info>,
     /// CHECK: only used to invoke CPI and should be checked by it.
     pub market: UncheckedAccount<'info>,
     #[account(mut)]
-    pub initial_long_token_account: Option<Account<'info, TokenAccount>>,
+    pub initial_long_token_account: Option<Box<Account<'info, TokenAccount>>>,
     #[account(mut)]
-    pub initial_short_token_account: Option<Account<'info, TokenAccount>>,
+    pub initial_short_token_account: Option<Box<Account<'info, TokenAccount>>>,
     #[account(
         mut,
         token::mint = initial_long_token_account.as_ref().expect("token account not provided").mint,
@@ -70,7 +70,7 @@ pub struct CreateDeposit<'info> {
         bump,
         seeds::program = data_store_program.key(),
     )]
-    pub long_token_deposit_vault: Option<Account<'info, TokenAccount>>,
+    pub long_token_deposit_vault: Option<Box<Account<'info, TokenAccount>>>,
     #[account(
         mut,
         token::mint = initial_short_token_account.as_ref().expect("token account not provided").mint,
@@ -83,7 +83,7 @@ pub struct CreateDeposit<'info> {
         bump,
         seeds::program = data_store_program.key(),
     )]
-    pub short_token_deposit_vault: Option<Account<'info, TokenAccount>>,
+    pub short_token_deposit_vault: Option<Box<Account<'info, TokenAccount>>>,
 }
 
 /// Create Deposit.
