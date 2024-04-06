@@ -39,16 +39,24 @@ pub mod data_store {
     }
 
     // Roles.
-    pub fn initialize_roles(ctx: Context<InitializeRoles>) -> Result<()> {
-        instructions::initialize_roles(ctx)
+    pub fn initialize_roles(ctx: Context<InitializeRoles>, authority: Pubkey) -> Result<()> {
+        instructions::initialize_roles(ctx, authority)
     }
 
-    pub fn check_admin(ctx: Context<CheckRole>, authority: Pubkey) -> Result<bool> {
-        instructions::check_admin(ctx, authority)
+    pub fn check_admin(ctx: Context<CheckRole>) -> Result<bool> {
+        instructions::check_admin(ctx)
     }
 
-    pub fn check_role(ctx: Context<CheckRole>, authority: Pubkey, role: String) -> Result<bool> {
-        instructions::check_role(ctx, authority, role)
+    pub fn check_role(ctx: Context<CheckRole>, role: String) -> Result<bool> {
+        instructions::check_role(ctx, role)
+    }
+
+    pub fn has_admin(ctx: Context<HasRole>, authority: Pubkey) -> Result<bool> {
+        instructions::has_admin(ctx, authority)
+    }
+
+    pub fn has_role(ctx: Context<HasRole>, authority: Pubkey, role: String) -> Result<bool> {
+        instructions::has_role(ctx, authority, role)
     }
 
     #[access_control(internal::Authenticate::only_admin(&ctx))]

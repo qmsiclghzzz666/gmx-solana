@@ -1,7 +1,7 @@
 import { Keypair, PublicKey } from '@solana/web3.js';
 
 import { expect, getAddresses, getPrograms, getProvider, getUsers } from "../../utils/fixtures";
-import { createNoncePDA, createRolesPDA, createTokenConfigPDA } from "../../utils/data";
+import { createNoncePDA, createRolesPDA } from "../../utils/data";
 import { AnchorError } from '@coral-xyz/anchor';
 
 describe("data store: Nonce", () => {

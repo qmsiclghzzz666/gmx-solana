@@ -6,6 +6,9 @@ pub mod instructions;
 /// Utils.
 pub mod utils;
 
+/// Constants.
+pub mod constants;
+
 use data_store::utils::Authenticate;
 use instructions::*;
 
@@ -22,7 +25,7 @@ pub mod exchange {
     }
 
     // Deposit.
-    #[access_control(Authenticate::only_controller(&ctx))]
+    // #[access_control(Authenticate::only_controller(&ctx))]
     pub fn create_deposit<'info>(
         ctx: Context<'_, '_, 'info, 'info, CreateDeposit<'info>>,
         nonce: [u8; 32],
@@ -39,7 +42,7 @@ pub mod exchange {
         instructions::execute_deposit(ctx, execution_fee)
     }
 
-    #[access_control(Authenticate::only_controller(&ctx))]
+    #[access_control(instructions::only_controller_or_deposit_creator(&ctx))]
     pub fn cancel_deposit(ctx: Context<CancelDeposit>, execution_fee: u64) -> Result<()> {
         instructions::cancel_deposit(ctx, execution_fee)
     }

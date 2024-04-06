@@ -7,40 +7,33 @@ use crate::{
 };
 
 /// Initialize a new roles account.
-pub fn initialize_roles(ctx: Context<InitializeRoles>) -> Result<()> {
-    ctx.accounts.roles.init(
-        ctx.accounts.authority.key(),
-        ctx.accounts.store.key(),
-        ctx.bumps.roles,
-    );
+pub fn initialize_roles(ctx: Context<InitializeRoles>, authority: Pubkey) -> Result<()> {
+    ctx.accounts
+        .roles
+        .init(authority, ctx.accounts.store.key(), ctx.bumps.roles);
     Ok(())
 }
 
 #[derive(Accounts)]
+#[instruction(authority: Pubkey)]
 pub struct InitializeRoles<'info> {
     #[account(mut)]
-    pub authority: Signer<'info>,
+    pub payer: Signer<'info>,
     pub store: Account<'info, DataStore>,
     #[account(
         init,
-        payer = authority,
+        payer = payer,
         space = 8 + Roles::INIT_SPACE,
-        seeds = [Roles::SEED, store.key().as_ref(), authority.key().as_ref()],
+        seeds = [Roles::SEED, store.key().as_ref(), authority.as_ref()],
         bump,
     )]
     pub roles: Account<'info, Roles>,
     pub system_program: Program<'info, System>,
 }
 
-/// Verify that the `authority` has the given role in the given `store`.
-#[allow(unused_variables)]
-pub fn check_role(ctx: Context<CheckRole>, user: Pubkey, role: String) -> Result<bool> {
-    ctx.accounts.store.has_role(&ctx.accounts.roles, &role)
-}
-
 #[derive(Accounts)]
-#[instruction(authority: Pubkey)]
 pub struct CheckRole<'info> {
+    pub authority: Signer<'info>,
     pub store: Account<'info, DataStore>,
     #[account(
         has_one = store @ DataStoreError::PermissionDenied,
@@ -51,9 +44,36 @@ pub struct CheckRole<'info> {
     pub roles: Account<'info, Roles>,
 }
 
+/// Verify that the `authority` has the given role in the given `store`.
+pub fn check_role(ctx: Context<CheckRole>, role: String) -> Result<bool> {
+    ctx.accounts.store.has_role(&ctx.accounts.roles, &role)
+}
+
 /// Verify that the `user` is an admin of the given `store`.
-#[allow(unused_variables)]
-pub fn check_admin(ctx: Context<CheckRole>, user: Pubkey) -> Result<bool> {
+pub fn check_admin(ctx: Context<CheckRole>) -> Result<bool> {
+    Ok(ctx.accounts.roles.is_admin())
+}
+
+#[derive(Accounts)]
+#[instruction(authority: Pubkey)]
+pub struct HasRole<'info> {
+    pub store: Account<'info, DataStore>,
+    #[account(
+        has_one = store @ DataStoreError::PermissionDenied,
+        has_one = authority @ DataStoreError::PermissionDenied,
+        seeds = [Roles::SEED, store.key().as_ref(), authority.key().as_ref()],
+        bump = roles.bump,
+    )]
+    pub roles: Account<'info, Roles>,
+}
+
+/// Verify that the `authority` has the given role in the given `store` without signing.
+pub fn has_role(ctx: Context<HasRole>, _authority: Pubkey, role: String) -> Result<bool> {
+    ctx.accounts.store.has_role(&ctx.accounts.roles, &role)
+}
+
+/// Verify that the `user` is an admin of the given `store` without signing.
+pub fn has_admin(ctx: Context<HasRole>, _authority: Pubkey) -> Result<bool> {
     Ok(ctx.accounts.roles.is_admin())
 }
 

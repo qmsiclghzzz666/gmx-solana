@@ -8,6 +8,7 @@ import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { dataStore } from "./program";
 import { initializeTokenConfigMap, insertTokenConfig } from "./token_config";
 import { createRolesPDA, initializeRoles } from "./roles";
+import { createControllerPDA } from "../exchange";
 
 export const encodeUtf8 = anchor.utils.bytes.utf8.encode;
 
@@ -134,7 +135,7 @@ export const initializeDataStore = async (
 
     // Initiliaze a roles account for `signer`.
     try {
-        const roles = await initializeRoles(signer, dataStorePDA);
+        const roles = await initializeRoles(signer, signer.publicKey, dataStorePDA);
         console.log(`Initialized a roles account ${roles} for ${signer.publicKey}`);
     } catch (error) {
         console.warn("Failed to initialize roles account:", error);
@@ -142,13 +143,23 @@ export const initializeDataStore = async (
 
     // Initiliaze a roles account for `user`.
     try {
-        const roles = await initializeRoles(user, dataStorePDA);
+        const roles = await initializeRoles(signer, user.publicKey, dataStorePDA);
         console.log(`Initialized a roles account ${roles} for ${user.publicKey}`);
     } catch (error) {
         console.warn("Failed to initialize roles account:", error);
     }
 
-    // Enable the required roles and grant to `signer`.
+    // Initiliaze a roles account for Exchange Program.
+    const [controller] = createControllerPDA(dataStorePDA);
+    let controllerRoles: PublicKey;
+    try {
+        controllerRoles = await initializeRoles(signer, controller, dataStorePDA);
+        console.log(`Initialized a roles account ${controllerRoles} for ${controller}`);
+    } catch (error) {
+        console.warn("Failed to initialize roles account:", error);
+    }
+
+    // Enable the required roles and grant to `signer` and `controller`
     const enabled_roles = [CONTROLLER, MARKET_KEEPER, ORDER_KEEPER];
     for (let index = 0; index < enabled_roles.length; index++) {
         const role = enabled_roles[index];
@@ -168,6 +179,15 @@ export const initializeDataStore = async (
                 userRoles: signerRoles,
             }).rpc();
             console.log(`Grant ${role} to signer in tx: ${tx}`);
+        }
+        {
+            const tx = await dataStore.methods.grantRole(controller, role).accounts({
+                authority: provider.publicKey,
+                store: dataStorePDA,
+                onlyAdmin: rolesPDA,
+                userRoles: controllerRoles,
+            }).rpc();
+            console.log(`Grant ${role} to exchange program in tx: ${tx}`);
         }
     }
 

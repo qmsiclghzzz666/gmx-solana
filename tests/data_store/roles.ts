@@ -35,7 +35,7 @@ describe("data store: Roles", () => {
 
 
     it("check admin success", async () => {
-        const isAdmin: boolean = await dataStore.methods.checkAdmin(provider.publicKey).accounts({
+        const isAdmin: boolean = await dataStore.methods.hasAdmin(provider.publicKey).accounts({
             store: dataStoreAddress,
             roles: providerRoles,
         }).view();
@@ -43,7 +43,7 @@ describe("data store: Roles", () => {
     });
 
     it("check admin failure", async () => {
-        const isAdmin = await dataStore.methods.checkAdmin(signer0.publicKey).accounts({
+        const isAdmin = await dataStore.methods.hasAdmin(signer0.publicKey).accounts({
             store: dataStoreAddress,
             roles: signer0Roles,
         }).view();
@@ -102,7 +102,7 @@ describe("data store: Roles", () => {
         }).rpc();
 
         {
-            const hasRole = await dataStore.methods.checkRole(signer0.publicKey, otherRole).accounts({
+            const hasRole = await dataStore.methods.hasRole(signer0.publicKey, otherRole).accounts({
                 store: dataStoreAddress,
                 roles: signer0Roles,
             }).view();
@@ -117,7 +117,7 @@ describe("data store: Roles", () => {
         }).rpc();
 
         {
-            const hasRole = await dataStore.methods.checkRole(signer0.publicKey, otherRole).accounts({
+            const hasRole = await dataStore.methods.hasRole(signer0.publicKey, otherRole).accounts({
                 store: dataStoreAddress,
                 roles: signer0Roles,
             }).view();

@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token, TokenAccount};
 use data_store::{
-    cpi::accounts::{CheckRole, RemoveWithdrawal},
+    cpi::accounts::RemoveWithdrawal,
     program::DataStore,
     states::{Chainlink, Withdrawal},
     utils::{Authentication, WithOracle, WithOracleExt},
@@ -82,22 +82,24 @@ pub fn execute_withdrawal<'info>(
 }
 
 impl<'info> Authentication<'info> for ExecuteWithdrawal<'info> {
-    fn authority(&self) -> &Signer<'info> {
-        &self.authority
-    }
-
-    fn check_role_ctx(&self) -> CpiContext<'_, '_, '_, 'info, CheckRole<'info>> {
-        CpiContext::new(
-            self.data_store_program.to_account_info(),
-            CheckRole {
-                store: self.store.to_account_info(),
-                roles: self.only_order_keeper.to_account_info(),
-            },
-        )
+    fn authority(&self) -> AccountInfo<'info> {
+        self.authority.to_account_info()
     }
 
     fn on_error(&self) -> Result<()> {
         Err(error!(ExchangeError::PermissionDenied))
+    }
+
+    fn data_store_program(&self) -> AccountInfo<'info> {
+        self.data_store_program.to_account_info()
+    }
+
+    fn store(&self) -> AccountInfo<'info> {
+        self.store.to_account_info()
+    }
+
+    fn roles(&self) -> AccountInfo<'info> {
+        self.only_order_keeper.to_account_info()
     }
 }
 

@@ -269,6 +269,7 @@ checksum = "6c4fd6e43b2ca6220d2ef1641539e678bfc31b6cc393cf892b373b5997b6a39a"
 dependencies = [
  "anchor-lang",
  "solana-program",
+ "spl-associated-token-account",
  "spl-token",
  "spl-token-2022 0.9.0",
 ]
@@ -1794,9 +1795,13 @@ name = "gmsol"
 version = "0.1.0"
 dependencies = [
  "anchor-client",
+ "anchor-spl",
  "clap 4.5.4",
  "data_store",
+ "exchange",
  "eyre",
+ "gmx-solana-utils",
+ "rand 0.8.5",
  "shellexpand",
  "thiserror",
  "tokio",

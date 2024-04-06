@@ -26,8 +26,8 @@ pub fn initialize_deposit(
         nonce,
         tokens_with_feed,
         ctx.accounts.payer.key(),
-        ctx.accounts.initial_long_token_account.as_ref(),
-        ctx.accounts.initial_short_token_account.as_ref(),
+        ctx.accounts.initial_long_token_account.as_deref(),
+        ctx.accounts.initial_short_token_account.as_deref(),
         Receivers {
             receiver: ctx.accounts.receiver.key(),
             ui_fee_receiver,
@@ -52,14 +52,14 @@ pub struct InitializeDeposit<'info> {
         seeds = [Deposit::SEED, store.key().as_ref(), payer.key().as_ref(), &nonce],
         bump,
     )]
-    pub deposit: Account<'info, Deposit>,
+    pub deposit: Box<Account<'info, Deposit>>,
     #[account(token::authority = payer)]
-    pub initial_long_token_account: Option<Account<'info, TokenAccount>>,
+    pub initial_long_token_account: Option<Box<Account<'info, TokenAccount>>>,
     #[account(token::authority = payer)]
-    pub initial_short_token_account: Option<Account<'info, TokenAccount>>,
-    pub(crate) market: Account<'info, Market>,
+    pub initial_short_token_account: Option<Box<Account<'info, TokenAccount>>>,
+    pub(crate) market: Box<Account<'info, Market>>,
     #[account(token::authority = payer, token::mint = market.meta.market_token_mint)]
-    pub receiver: Account<'info, TokenAccount>,
+    pub receiver: Box<Account<'info, TokenAccount>>,
     pub system_program: Program<'info, System>,
 }
 
