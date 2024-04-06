@@ -2,6 +2,7 @@ use anchor_client::solana_sdk::pubkey::Pubkey;
 use data_store::states;
 use exchange::utils::ControllerSeeds;
 use eyre::ContextCompat;
+use gmsol::store::data_store::find_market_address;
 
 use crate::SharedClient;
 
@@ -9,6 +10,9 @@ use crate::SharedClient;
 pub(super) struct InspectArgs {
     kind: Kind,
     address: Option<Pubkey>,
+    /// Consider the address as market address rather than the address of its market token.
+    #[arg(long)]
+    as_market_address: bool,
 }
 
 #[derive(clap::ValueEnum, Clone, Copy)]
@@ -87,12 +91,12 @@ impl InspectArgs {
                 );
             }
             Kind::Market => {
-                println!(
-                    "{:#?}",
-                    program
-                        .account::<states::Market>(address.wrap_err("address not provided")?)
-                        .await?
-                );
+                let mut address = address.wrap_err("address not provided")?;
+                if !self.as_market_address {
+                    address =
+                        find_market_address(store.wrap_err("`store` not provided")?, &address).0;
+                }
+                println!("{:#?}", program.account::<states::Market>(address).await?);
             }
             Kind::Deposit => {
                 println!(
