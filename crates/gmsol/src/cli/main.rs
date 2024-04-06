@@ -22,6 +22,7 @@ mod keeper;
 mod roles;
 
 #[derive(Parser)]
+#[command(version, about, long_about = None)]
 struct Cli {
     /// Path to the wallet.
     #[arg(long, short, env, default_value = "~/.config/solana/id.json")]
@@ -66,7 +67,7 @@ async fn main() -> eyre::Result<()> {
                 .from_env_lossy(),
         )
         .init();
-    Cli::try_parse()?.run().await?;
+    Cli::parse().run().await?;
     Ok(())
 }
 
