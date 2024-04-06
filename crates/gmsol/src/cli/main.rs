@@ -40,6 +40,7 @@ struct Cli {
 }
 
 #[derive(clap::Subcommand)]
+#[allow(clippy::large_enum_variant)]
 enum Command {
     /// Show current wallet pubkey.
     Whoami,

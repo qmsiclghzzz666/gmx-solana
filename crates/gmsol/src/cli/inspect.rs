@@ -1,5 +1,6 @@
 use anchor_client::solana_sdk::pubkey::Pubkey;
 use data_store::states;
+use exchange::utils::ControllerSeeds;
 use eyre::{eyre, ContextCompat};
 
 use crate::SharedClient;
@@ -24,6 +25,8 @@ enum Kind {
     Deposit,
     /// `Withdrawal` account.
     Withdrawal,
+    /// Get the CONTROLLER address.
+    Controller,
 }
 
 #[derive(clap::Subcommand)]
@@ -106,6 +109,12 @@ impl InspectArgs {
                         .account::<states::Withdrawal>(address.wrap_err("address not provided")?)
                         .await?
                 );
+            }
+            Kind::Controller => {
+                let controller =
+                    ControllerSeeds::find_with_address(store.wrap_err("missing `store` address")?)
+                        .1;
+                println!("{controller}");
             }
         }
         Ok(())

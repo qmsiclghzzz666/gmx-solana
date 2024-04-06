@@ -5,6 +5,7 @@ use anchor_client::{
     solana_sdk::{instruction::AccountMeta, pubkey::Pubkey, signer::Signer},
     Program, RequestBuilder,
 };
+use anchor_spl::associated_token::get_associated_token_address;
 use data_store::states::{Deposit, NonceBytes, Seed};
 use exchange::{accounts, instruction, instructions::CreateDepositParams, utils::ControllerSeeds};
 use rand::{distributions::Standard, Rng};
@@ -102,57 +103,48 @@ where
         self
     }
 
-    async fn get_token_mint_if_not_provided(
+    fn get_associated_token_account_if_not_provided(
         &self,
-        token_account: &Pubkey,
-        token: Option<&Pubkey>,
-    ) -> crate::Result<Pubkey> {
-        let token = if let Some(token) = token {
-            *token
+        token: &Pubkey,
+        token_account: Option<&Pubkey>,
+    ) -> Pubkey {
+        if let Some(account) = token_account {
+            *account
         } else {
-            let account = self
-                .program
-                .account::<anchor_spl::token::TokenAccount>(*token_account)
-                .await?;
-            account.mint
-        };
-        Ok(token)
+            get_associated_token_address(&self.program.payer(), token)
+        }
     }
 
     /// Set the initial long token params for deposit.
     ///
     /// - It will fetch the token of the given account if `token` not provided.
-    pub async fn long_token(
+    pub fn long_token(
         &mut self,
-        token_account: &Pubkey,
+        token: &Pubkey,
         amount: u64,
-        token: Option<&Pubkey>,
-    ) -> crate::Result<&mut Self> {
-        self.initial_long_token_account = Some(*token_account);
+        token_account: Option<&Pubkey>,
+    ) -> &mut Self {
+        self.initial_long_token = Some(*token);
         self.initial_long_token_amount = amount;
-        self.initial_long_token = Some(
-            self.get_token_mint_if_not_provided(token_account, token)
-                .await?,
-        );
-        Ok(self)
+        self.initial_long_token_account =
+            Some(self.get_associated_token_account_if_not_provided(token, token_account));
+        self
     }
 
     /// Set the initial short token params for deposit.
     ///
     /// - It will fetch the token of the given account if `token` not provided.
-    pub async fn short_token(
+    pub fn short_token(
         &mut self,
-        token_account: &Pubkey,
+        token: &Pubkey,
         amount: u64,
-        token: Option<&Pubkey>,
-    ) -> crate::Result<&mut Self> {
-        self.initial_short_token_account = Some(*token_account);
+        token_account: Option<&Pubkey>,
+    ) -> &mut Self {
+        self.initial_short_token = Some(*token);
         self.initial_short_token_amount = amount;
-        self.initial_short_token = Some(
-            self.get_token_mint_if_not_provided(token_account, token)
-                .await?,
-        );
-        Ok(self)
+        self.initial_short_token_account =
+            Some(self.get_associated_token_account_if_not_provided(token, token_account));
+        self
     }
 
     fn get_receiver(&self) -> Pubkey {
@@ -165,7 +157,7 @@ where
         }
     }
 
-    /// Build a [`RequesitBuilder`] and return deposit address.
+    /// Build a [`RequestBuilder`] and return deposit address.
     pub fn build_with_address(&self) -> crate::Result<(RequestBuilder<'a, C>, Pubkey)> {
         let receiver = self.get_receiver();
         let Self {
@@ -251,5 +243,114 @@ where
                     .collect::<Vec<_>>(),
             );
         Ok((builder, deposit))
+    }
+}
+
+#[derive(Clone)]
+struct DepositHint {
+    initial_long_token: Option<Pubkey>,
+    initial_short_token: Option<Pubkey>,
+    initial_long_token_account: Option<Pubkey>,
+    initial_short_token_account: Option<Pubkey>,
+}
+
+impl From<Deposit> for DepositHint {
+    fn from(deposit: Deposit) -> Self {
+        Self {
+            initial_long_token: deposit.fixed.tokens.initial_long_token,
+            initial_short_token: deposit.fixed.tokens.initial_short_token,
+            initial_long_token_account: deposit.fixed.senders.initial_long_token_account,
+            initial_short_token_account: deposit.fixed.senders.initial_short_token_account,
+        }
+    }
+}
+
+/// Cancel Deposit Builder.
+pub struct CancelDepositBuilder<'a, C> {
+    program: &'a Program<C>,
+    store: Pubkey,
+    deposit: Pubkey,
+    cancel_for_user: Option<Pubkey>,
+    execution_fee: u64,
+    hint: Option<DepositHint>,
+}
+
+impl<'a, S, C> CancelDepositBuilder<'a, C>
+where
+    C: Deref<Target = S> + Clone,
+    S: Signer,
+{
+    pub(super) fn new(program: &'a Program<C>, store: &Pubkey, deposit: &Pubkey) -> Self {
+        Self {
+            program,
+            store: *store,
+            deposit: *deposit,
+            cancel_for_user: None,
+            execution_fee: 0,
+            hint: None,
+        }
+    }
+
+    /// Cancel for the given user.
+    pub fn cancel_for_user(&mut self, user: &Pubkey) -> &mut Self {
+        self.cancel_for_user = Some(*user);
+        self
+    }
+
+    fn get_user_and_authority(&self) -> (Pubkey, Pubkey) {
+        match self.cancel_for_user {
+            Some(user) => (user, self.program.payer()),
+            None => (
+                self.program.payer(),
+                ControllerSeeds::find_with_address(&self.store).1,
+            ),
+        }
+    }
+
+    async fn get_or_fetch_deposit_info(&self) -> crate::Result<DepositHint> {
+        match &self.hint {
+            Some(hint) => Ok(hint.clone()),
+            None => {
+                let deposit: Deposit = self.program.account(self.deposit).await?;
+                Ok(deposit.into())
+            }
+        }
+    }
+
+    /// Build a [`RequestBuilder`] for `cancel_deposit` instruction.
+    pub async fn build(&self) -> crate::Result<RequestBuilder<'a, C>> {
+        let (user, authority) = self.get_user_and_authority();
+        let hint = self.get_or_fetch_deposit_info().await?;
+        let Self {
+            program,
+            store,
+            deposit,
+            execution_fee,
+            ..
+        } = self;
+        let only_controller = find_roles_address(store, &authority).0;
+        Ok(program
+            .request()
+            .accounts(accounts::CancelDeposit {
+                authority,
+                store: *store,
+                only_controller,
+                data_store_program: data_store::id(),
+                deposit: *deposit,
+                user,
+                initial_long_token: hint.initial_long_token_account,
+                initial_short_token: hint.initial_short_token_account,
+                long_token_deposit_vault: hint
+                    .initial_long_token
+                    .map(|token| find_market_vault_address(store, &token).0),
+                short_token_deposit_vault: hint
+                    .initial_short_token
+                    .map(|token| find_market_vault_address(store, &token).0),
+                token_program: anchor_spl::token::ID,
+                system_program: system_program::ID,
+            })
+            .args(instruction::CancelDeposit {
+                execution_fee: *execution_fee,
+            }))
     }
 }

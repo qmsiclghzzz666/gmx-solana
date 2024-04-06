@@ -10,7 +10,7 @@ use anchor_client::{
 use data_store::states::{DataStore, Seed};
 use gmx_solana_utils::to_seed;
 
-use self::deposit::CreateDepositBuilder;
+use self::deposit::{CancelDepositBuilder, CreateDepositBuilder};
 
 /// Find PDA for `DataStore` account.
 pub fn find_store_address(key: &str) -> (Pubkey, u8) {
@@ -19,8 +19,11 @@ pub fn find_store_address(key: &str) -> (Pubkey, u8) {
 
 /// Exchange instructions for GMSOL.
 pub trait ExchangeOps<C> {
-    /// Create deposit.
+    /// Create a deposit.
     fn create_deposit(&self, store: &Pubkey, market_token: &Pubkey) -> CreateDepositBuilder<C>;
+
+    /// Cancel a deposit.
+    fn cancel_deposit(&self, store: &Pubkey, deposit: &Pubkey) -> CancelDepositBuilder<C>;
 }
 
 impl<S, C> ExchangeOps<C> for Program<C>
@@ -30,5 +33,9 @@ where
 {
     fn create_deposit(&self, store: &Pubkey, market_token: &Pubkey) -> CreateDepositBuilder<C> {
         CreateDepositBuilder::new(self, *store, *market_token)
+    }
+
+    fn cancel_deposit(&self, store: &Pubkey, deposit: &Pubkey) -> CancelDepositBuilder<C> {
+        CancelDepositBuilder::new(self, store, deposit)
     }
 }
