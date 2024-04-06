@@ -1,12 +1,12 @@
 use std::ops::Deref;
 
 use anchor_client::{
-    anchor_lang::system_program,
+    anchor_lang::{system_program, Id},
     solana_sdk::{instruction::AccountMeta, pubkey::Pubkey, signer::Signer},
     Program, RequestBuilder,
 };
 use anchor_spl::associated_token::get_associated_token_address;
-use data_store::states::{Deposit, NonceBytes, Seed};
+use data_store::states::{Chainlink, Deposit, NonceBytes, Seed};
 use exchange::{accounts, instruction, instructions::CreateDepositParams, utils::ControllerSeeds};
 use rand::{distributions::Standard, Rng};
 
@@ -246,16 +246,16 @@ where
     }
 }
 
-#[derive(Clone)]
-struct DepositHint {
+#[derive(Clone, Copy)]
+struct CancelDepositHint {
     initial_long_token: Option<Pubkey>,
     initial_short_token: Option<Pubkey>,
     initial_long_token_account: Option<Pubkey>,
     initial_short_token_account: Option<Pubkey>,
 }
 
-impl From<Deposit> for DepositHint {
-    fn from(deposit: Deposit) -> Self {
+impl<'a> From<&'a Deposit> for CancelDepositHint {
+    fn from(deposit: &'a Deposit) -> Self {
         Self {
             initial_long_token: deposit.fixed.tokens.initial_long_token,
             initial_short_token: deposit.fixed.tokens.initial_short_token,
@@ -272,7 +272,7 @@ pub struct CancelDepositBuilder<'a, C> {
     deposit: Pubkey,
     cancel_for_user: Option<Pubkey>,
     execution_fee: u64,
-    hint: Option<DepositHint>,
+    hint: Option<CancelDepositHint>,
 }
 
 impl<'a, S, C> CancelDepositBuilder<'a, C>
@@ -297,6 +297,18 @@ where
         self
     }
 
+    /// Set execution fee.
+    pub fn execution_fee(&mut self, fee: u64) -> &mut Self {
+        self.execution_fee = fee;
+        self
+    }
+
+    /// Set hint with the given deposit.
+    pub fn hint(&mut self, deposit: &Deposit) -> &mut Self {
+        self.hint = Some(deposit.into());
+        self
+    }
+
     fn get_user_and_authority(&self) -> (Pubkey, Pubkey) {
         match self.cancel_for_user {
             Some(user) => (user, self.program.payer()),
@@ -307,12 +319,12 @@ where
         }
     }
 
-    async fn get_or_fetch_deposit_info(&self) -> crate::Result<DepositHint> {
+    async fn get_or_fetch_deposit_info(&self) -> crate::Result<CancelDepositHint> {
         match &self.hint {
-            Some(hint) => Ok(hint.clone()),
+            Some(hint) => Ok(*hint),
             None => {
                 let deposit: Deposit = self.program.account(self.deposit).await?;
-                Ok(deposit.into())
+                Ok((&deposit).into())
             }
         }
     }
@@ -352,5 +364,147 @@ where
             .args(instruction::CancelDeposit {
                 execution_fee: *execution_fee,
             }))
+    }
+}
+
+/// Execute Deposit Builder.
+pub struct ExecuteDepositBuilder<'a, C> {
+    program: &'a Program<C>,
+    store: Pubkey,
+    oracle: Pubkey,
+    deposit: Pubkey,
+    execution_fee: u64,
+    hint: Option<ExecuteDepositHint>,
+}
+
+#[derive(Clone)]
+struct ExecuteDepositHint {
+    user: Pubkey,
+    receiver: Pubkey,
+    market_token_mint: Pubkey,
+    feeds: Vec<Pubkey>,
+    long_swap_tokens: Vec<Pubkey>,
+    short_swap_tokens: Vec<Pubkey>,
+}
+
+impl<'a> From<&'a Deposit> for ExecuteDepositHint {
+    fn from(deposit: &'a Deposit) -> Self {
+        Self {
+            user: deposit.fixed.senders.user,
+            receiver: deposit.fixed.receivers.receiver,
+            market_token_mint: deposit.fixed.tokens.market_token,
+            feeds: deposit.dynamic.tokens_with_feed.feeds.clone(),
+            long_swap_tokens: deposit.dynamic.swap_params.long_token_swap_path.clone(),
+            short_swap_tokens: deposit.dynamic.swap_params.short_token_swap_path.clone(),
+        }
+    }
+}
+
+impl<'a, S, C> ExecuteDepositBuilder<'a, C>
+where
+    C: Deref<Target = S> + Clone,
+    S: Signer,
+{
+    pub(super) fn new(
+        program: &'a Program<C>,
+        store: &Pubkey,
+        oracle: &Pubkey,
+        deposit: &Pubkey,
+    ) -> Self {
+        Self {
+            program,
+            store: *store,
+            oracle: *oracle,
+            deposit: *deposit,
+            execution_fee: 0,
+            hint: None,
+        }
+    }
+
+    /// Set execution fee.
+    pub fn execution_fee(&mut self, fee: u64) -> &mut Self {
+        self.execution_fee = fee;
+        self
+    }
+
+    /// Set hint with the given deposit.
+    pub fn hint(&mut self, deposit: &Deposit) -> &mut Self {
+        self.hint = Some(deposit.into());
+        self
+    }
+
+    async fn get_or_fetch_hint(&self) -> crate::Result<ExecuteDepositHint> {
+        match &self.hint {
+            Some(hint) => Ok(hint.clone()),
+            None => {
+                let deposit: Deposit = self.program.account(self.deposit).await?;
+                Ok((&deposit).into())
+            }
+        }
+    }
+
+    /// Build [`RequestBuilder`] for executing the deposit.
+    pub async fn build(&self) -> crate::Result<RequestBuilder<'a, C>> {
+        let hint = self.get_or_fetch_hint().await?;
+        let Self {
+            program,
+            store,
+            oracle,
+            deposit,
+            execution_fee,
+            ..
+        } = self;
+        let authority = program.payer();
+        let only_order_keeper = find_roles_address(store, &authority).0;
+        let feeds = hint.feeds.iter().map(|pubkey| AccountMeta {
+            pubkey: *pubkey,
+            is_signer: false,
+            is_writable: false,
+        });
+        let markets = hint
+            .long_swap_tokens
+            .iter()
+            .chain(hint.short_swap_tokens.iter())
+            .map(|mint| AccountMeta {
+                pubkey: find_market_address(store, mint).0,
+                is_signer: false,
+                is_writable: true,
+            });
+        let market_tokens = hint
+            .long_swap_tokens
+            .iter()
+            .chain(hint.short_swap_tokens.iter())
+            .map(|mint| AccountMeta {
+                pubkey: *mint,
+                is_signer: false,
+                is_writable: false,
+            });
+        Ok(program
+            .request()
+            .accounts(accounts::ExecuteDeposit {
+                authority,
+                only_order_keeper,
+                store: *store,
+                data_store_program: data_store::id(),
+                chainlink_program: Chainlink::id(),
+                token_program: anchor_spl::token::ID,
+                oracle: *oracle,
+                token_config_map: find_token_config_map(store).0,
+                deposit: *deposit,
+                user: hint.user,
+                receiver: hint.receiver,
+                market: find_market_address(store, &hint.market_token_mint).0,
+                market_token_mint: hint.market_token_mint,
+                system_program: system_program::ID,
+            })
+            .args(instruction::ExecuteDeposit {
+                execution_fee: *execution_fee,
+            })
+            .accounts(
+                feeds
+                    .chain(markets)
+                    .chain(market_tokens)
+                    .collect::<Vec<_>>(),
+            ))
     }
 }

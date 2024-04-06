@@ -15,22 +15,14 @@ pub(super) struct AdminArgs {
 #[derive(clap::Subcommand)]
 enum Command {
     /// Initialize a new data store.
-    InitializeStore {
-        #[arg(long)]
-        key: Option<String>,
-    },
+    InitializeStore { key: Option<String> },
     /// Enable a role.
-    EnableRole {
-        #[arg(long)]
-        role: String,
-    },
+    EnableRole { role: String },
     /// Grant a role to a user.
     GrantRole {
         /// User.
-        #[arg(long)]
         authority: Pubkey,
         /// Role.
-        #[arg(long)]
         role: String,
     },
 }
@@ -40,7 +32,7 @@ impl AdminArgs {
         &self,
         client: &SharedClient,
         store: Option<&Pubkey>,
-    ) -> eyre::Result<()> {
+    ) -> gmsol::Result<()> {
         let program = client.program(data_store::id())?;
         match (&self.command, store) {
             (Command::InitializeStore { key }, _) => {
@@ -57,9 +49,7 @@ impl AdminArgs {
                 let signature = program.grant_role(store, authority, role).send().await?;
                 tracing::info!("grant a role for user {authority} at tx {signature}");
             }
-            (_, None) => {
-                eyre::bail!("missing `store` address");
-            }
+            (_, None) => return Err(gmsol::Error::unknown("missing `store` address")),
         }
         Ok(())
     }

@@ -22,7 +22,7 @@ enum RolesAction {
 }
 
 impl RolesArgs {
-    pub(super) async fn run(&self, client: &SharedClient, store: &Pubkey) -> eyre::Result<()> {
+    pub(super) async fn run(&self, client: &SharedClient, store: &Pubkey) -> gmsol::Result<()> {
         let program = client.program(data_store::id())?;
         match &self.action {
             Some(RolesAction::Get) | None => {

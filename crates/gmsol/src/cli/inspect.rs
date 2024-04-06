@@ -1,7 +1,7 @@
 use anchor_client::solana_sdk::pubkey::Pubkey;
 use data_store::states;
 use exchange::utils::ControllerSeeds;
-use eyre::{eyre, ContextCompat};
+use eyre::ContextCompat;
 
 use crate::SharedClient;
 
@@ -55,14 +55,14 @@ impl InspectArgs {
         &self,
         client: &SharedClient,
         store: Option<&Pubkey>,
-    ) -> eyre::Result<()> {
+    ) -> gmsol::Result<()> {
         let program = client.program(data_store::id())?;
         let address = self.address;
         match self.kind {
             Kind::DataStore => {
-                let address = address
-                    .or(store.copied())
-                    .ok_or(eyre!("missing address for DataStore account"))?;
+                let address = address.or(store.copied()).ok_or(gmsol::Error::unknown(
+                    "missing address for DataStore account",
+                ))?;
                 println!(
                     "{:#?}",
                     program.account::<states::DataStore>(address).await?

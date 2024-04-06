@@ -10,7 +10,7 @@ use anchor_client::{
 use data_store::states::{DataStore, Seed};
 use gmx_solana_utils::to_seed;
 
-use self::deposit::{CancelDepositBuilder, CreateDepositBuilder};
+use self::deposit::{CancelDepositBuilder, CreateDepositBuilder, ExecuteDepositBuilder};
 
 /// Find PDA for `DataStore` account.
 pub fn find_store_address(key: &str) -> (Pubkey, u8) {
@@ -24,6 +24,14 @@ pub trait ExchangeOps<C> {
 
     /// Cancel a deposit.
     fn cancel_deposit(&self, store: &Pubkey, deposit: &Pubkey) -> CancelDepositBuilder<C>;
+
+    /// Execute a deposit.
+    fn execute_deposit(
+        &self,
+        store: &Pubkey,
+        oracle: &Pubkey,
+        deposit: &Pubkey,
+    ) -> ExecuteDepositBuilder<C>;
 }
 
 impl<S, C> ExchangeOps<C> for Program<C>
@@ -37,5 +45,14 @@ where
 
     fn cancel_deposit(&self, store: &Pubkey, deposit: &Pubkey) -> CancelDepositBuilder<C> {
         CancelDepositBuilder::new(self, store, deposit)
+    }
+
+    fn execute_deposit(
+        &self,
+        store: &Pubkey,
+        oracle: &Pubkey,
+        deposit: &Pubkey,
+    ) -> ExecuteDepositBuilder<C> {
+        ExecuteDepositBuilder::new(self, store, oracle, deposit)
     }
 }

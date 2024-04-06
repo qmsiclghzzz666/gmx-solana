@@ -18,6 +18,7 @@ use tracing_subscriber::EnvFilter;
 mod admin;
 mod exchange;
 mod inspect;
+mod keeper;
 mod roles;
 
 #[derive(Parser)]
@@ -52,6 +53,8 @@ enum Command {
     Roles(roles::RolesArgs),
     /// Commands for `Exchange` program.
     Exchange(exchange::ExchangeArgs),
+    /// Coomands for keepers.
+    Keeper(keeper::KeeperArgs),
 }
 
 #[tokio::main]
@@ -107,6 +110,10 @@ impl Cli {
                 args.run(&client, &store).await?
             }
             Command::Exchange(args) => {
+                let store = self.store.ok_or(eyre::eyre!("missing store address"))?;
+                args.run(&client, &store).await?
+            }
+            Command::Keeper(args) => {
                 let store = self.store.ok_or(eyre::eyre!("missing store address"))?;
                 args.run(&client, &store).await?
             }
