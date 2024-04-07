@@ -124,7 +124,7 @@ where
         token: &Pubkey,
         token_account: Option<&Pubkey>,
     ) -> &mut Self {
-        self.final_long_token = Some(*token);
+        self.final_short_token = Some(*token);
         self.final_short_token_receiver = token_account.copied();
         self
     }
