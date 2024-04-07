@@ -56,8 +56,8 @@ impl<T: Unsigned> PoolDelta<T> {
     /// Create a new [`PoolDelta`].
     pub fn try_new<P>(
         pool: &P,
-        long_token_delta_amount: &T::Signed,
-        short_token_delta_amount: &T::Signed,
+        delta_long_token_usd_value: T::Signed,
+        delta_short_token_usd_value: T::Signed,
         long_token_price: &T,
         short_token_price: &T,
     ) -> crate::Result<Self>
@@ -66,13 +66,6 @@ impl<T: Unsigned> PoolDelta<T> {
         P: Pool<Num = T, Signed = T::Signed> + ?Sized,
     {
         let current = PoolValue::try_new(pool, long_token_price, short_token_price)?;
-
-        let delta_long_token_usd_value = long_token_price
-            .checked_mul_with_signed(long_token_delta_amount)
-            .ok_or(crate::Error::Computation("delta long token usd value"))?;
-        let delta_short_token_usd_value = short_token_price
-            .checked_mul_with_signed(short_token_delta_amount)
-            .ok_or(crate::Error::Computation("delta short token usd value"))?;
 
         let next = PoolValue {
             long_token_usd_value: current
@@ -95,6 +88,33 @@ impl<T: Unsigned> PoolDelta<T> {
             next,
             delta,
         })
+    }
+
+    /// Create a new [`PoolDelta`].
+    pub fn try_from_delta_amounts<P>(
+        pool: &P,
+        long_token_delta_amount: &T::Signed,
+        short_token_delta_amount: &T::Signed,
+        long_token_price: &T,
+        short_token_price: &T,
+    ) -> crate::Result<Self>
+    where
+        T: CheckedAdd + CheckedSub + CheckedMul,
+        P: Pool<Num = T, Signed = T::Signed> + ?Sized,
+    {
+        let delta_long_token_usd_value = long_token_price
+            .checked_mul_with_signed(long_token_delta_amount)
+            .ok_or(crate::Error::Computation("delta long token usd value"))?;
+        let delta_short_token_usd_value = short_token_price
+            .checked_mul_with_signed(short_token_delta_amount)
+            .ok_or(crate::Error::Computation("delta short token usd value"))?;
+        Self::try_new(
+            pool,
+            delta_long_token_usd_value,
+            delta_short_token_usd_value,
+            long_token_price,
+            short_token_price,
+        )
     }
 
     /// Get delta values.

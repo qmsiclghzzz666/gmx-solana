@@ -4,7 +4,7 @@ use crate::{
     Market, MarketExt, PoolExt,
 };
 
-use num_traits::{CheckedAdd, CheckedSub, Signed, Zero};
+use num_traits::{CheckedAdd, CheckedMul, CheckedSub, Signed, Zero};
 
 /// A swap.
 #[must_use]
@@ -83,22 +83,22 @@ impl<T: Unsigned> SwapReport<T> {
 }
 
 struct ReassignedValues<T: Unsigned> {
-    long_token_delta_amount: T::Signed,
-    short_token_delta_amount: T::Signed,
+    long_token_delta_value: T::Signed,
+    short_token_delta_value: T::Signed,
     token_in_price: T,
     token_out_price: T,
 }
 
 impl<T: Unsigned> ReassignedValues<T> {
     fn new(
-        long_token_delta_amount: T::Signed,
-        short_token_delta_amount: T::Signed,
+        long_token_delta_value: T::Signed,
+        short_token_delta_value: T::Signed,
         token_in_price: T,
         token_out_price: T,
     ) -> Self {
         Self {
-            long_token_delta_amount,
-            short_token_delta_amount,
+            long_token_delta_value,
+            short_token_delta_value,
             token_in_price,
             token_out_price,
         }
@@ -135,28 +135,30 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Swap<M, DECIMALS> {
     /// and assgin the prices of `long_token` and `short_token` to `token_in` and `token_out`.
     fn reassign_values(&self) -> crate::Result<ReassignedValues<M::Num>> {
         if self.params.is_token_in_long {
-            let long_delta_amount: M::Signed = self
+            let long_delta_value: M::Signed = self
                 .params
                 .token_in_amount
-                .clone()
+                .checked_mul(&self.params.long_token_price)
+                .ok_or(crate::Error::Computation("long delta value"))?
                 .try_into()
                 .map_err(|_| crate::Error::Convert)?;
             Ok(ReassignedValues::new(
-                long_delta_amount.clone(),
-                -long_delta_amount,
+                long_delta_value.clone(),
+                -long_delta_value,
                 self.params.long_token_price.clone(),
                 self.params.short_token_price.clone(),
             ))
         } else {
-            let short_delta_amount: M::Signed = self
+            let short_delta_value: M::Signed = self
                 .params
                 .token_in_amount
-                .clone()
+                .checked_mul(&self.params.short_token_price)
+                .ok_or(crate::Error::Computation("short delta value"))?
                 .try_into()
                 .map_err(|_| crate::Error::Convert)?;
             Ok(ReassignedValues::new(
-                -short_delta_amount.clone(),
-                short_delta_amount,
+                -short_delta_value.clone(),
+                short_delta_value,
                 self.params.short_token_price.clone(),
                 self.params.long_token_price.clone(),
             ))
@@ -183,8 +185,8 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Swap<M, DECIMALS> {
     /// Execute the swap.
     pub fn execute(mut self) -> crate::Result<SwapReport<M::Num>> {
         let ReassignedValues {
-            long_token_delta_amount,
-            short_token_delta_amount,
+            long_token_delta_value,
+            short_token_delta_value,
             token_in_price,
             token_out_price,
         } = self.reassign_values()?;
@@ -193,9 +195,9 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Swap<M, DECIMALS> {
         let price_impact = self
             .market
             .primary_pool()?
-            .pool_delta(
-                &long_token_delta_amount,
-                &short_token_delta_amount,
+            .pool_delta_with_values(
+                long_token_delta_value,
+                short_token_delta_value,
                 &self.params.long_token_price,
                 &self.params.short_token_price,
             )?

@@ -76,17 +76,34 @@ pub trait PoolExt: Pool {
     }
 
     /// Get pool value information after applying delta.
-    fn pool_delta(
+    fn pool_delta_with_amounts(
         &self,
         long_token_delta_amount: &Self::Signed,
         short_token_delta_amount: &Self::Signed,
         long_token_price: &Self::Num,
         short_token_price: &Self::Num,
     ) -> crate::Result<PoolDelta<Self::Num>> {
-        PoolDelta::try_new(
+        PoolDelta::try_from_delta_amounts(
             self,
             long_token_delta_amount,
             short_token_delta_amount,
+            long_token_price,
+            short_token_price,
+        )
+    }
+
+    /// Get pool value information after applying delta.
+    fn pool_delta_with_values(
+        &self,
+        delta_long_token_usd_value: Self::Signed,
+        delta_short_token_usd_value: Self::Signed,
+        long_token_price: &Self::Num,
+        short_token_price: &Self::Num,
+    ) -> crate::Result<PoolDelta<Self::Num>> {
+        PoolDelta::try_new(
+            self,
+            delta_long_token_usd_value,
+            delta_short_token_usd_value,
             long_token_price,
             short_token_price,
         )

@@ -126,7 +126,7 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Deposit<M, DECIMALS> {
 
     /// Get the price impact USD value.
     fn price_impact(&self) -> crate::Result<(M::Signed, M::Num, M::Num)> {
-        let delta = self.market.primary_pool()?.pool_delta(
+        let delta = self.market.primary_pool()?.pool_delta_with_amounts(
             &self
                 .params
                 .long_token_amount
