@@ -5,15 +5,26 @@ use data_store::{
     cpi::accounts::{MarketVaultTransferOut, RemoveWithdrawal},
     program::DataStore,
     states::Withdrawal,
-    utils::Authentication,
+    utils::{Authenticate, Authentication},
 };
 
 use crate::ExchangeError;
 
+pub(crate) fn only_controller_or_withdrawal_creator(ctx: &Context<CancelWithdrawal>) -> Result<()> {
+    if ctx.accounts.user.is_signer {
+        // The creator is signed for the cancellation.
+        Ok(())
+    } else {
+        // `check_role` CPI will only pass when `authority` is a signer.
+        Authenticate::only_controller(ctx)
+    }
+}
+
 #[derive(Accounts)]
 pub struct CancelWithdrawal<'info> {
+    /// CHECK: check by access control.
     #[account(mut)]
-    pub authority: Signer<'info>,
+    pub authority: UncheckedAccount<'info>,
     /// CHECK: used and checked by CPI.
     pub store: UncheckedAccount<'info>,
     /// CHECK: used and checked by CPI.
@@ -27,10 +38,13 @@ pub struct CancelWithdrawal<'info> {
     /// through CPI.
     #[account(
         mut,
+        // We must check that the user is the creator of the withdrawal.
+        constraint = withdrawal.fixed.user == user.key() @ ExchangeError::InvalidWithdrawalToCancel,
+        constraint = withdrawal.fixed.market_token_account == market_token.key() @ ExchangeError::InvalidDepositToCancel,
         constraint = withdrawal.fixed.tokens.market_token == market_token.mint @ ExchangeError::InvalidWithdrawalToCancel,
     )]
     pub withdrawal: Account<'info, Withdrawal>,
-    /// CHECK: only used to receive lamports.
+    /// CHECK: check by access control.
     #[account(mut)]
     pub user: UncheckedAccount<'info>,
     /// Token account for receiving the market tokens.
