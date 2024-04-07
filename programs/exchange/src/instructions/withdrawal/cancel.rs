@@ -8,7 +8,7 @@ use data_store::{
     utils::{Authenticate, Authentication},
 };
 
-use crate::ExchangeError;
+use crate::{utils::ControllerSeeds, ExchangeError};
 
 pub(crate) fn only_controller_or_withdrawal_creator(ctx: &Context<CancelWithdrawal>) -> Result<()> {
     if ctx.accounts.user.is_signer {
@@ -40,7 +40,7 @@ pub struct CancelWithdrawal<'info> {
         mut,
         // We must check that the user is the creator of the withdrawal.
         constraint = withdrawal.fixed.user == user.key() @ ExchangeError::InvalidWithdrawalToCancel,
-        constraint = withdrawal.fixed.market_token_account == market_token.key() @ ExchangeError::InvalidDepositToCancel,
+        constraint = withdrawal.fixed.market_token_account == market_token.key() @ ExchangeError::InvalidWithdrawalToCancel,
         constraint = withdrawal.fixed.tokens.market_token == market_token.mint @ ExchangeError::InvalidWithdrawalToCancel,
     )]
     pub withdrawal: Account<'info, Withdrawal>,
@@ -69,6 +69,7 @@ pub struct CancelWithdrawal<'info> {
 
 /// Cancel Withdrawal.
 pub fn cancel_withdrawal(ctx: Context<CancelWithdrawal>, execution_fee: u64) -> Result<()> {
+    let controller = ControllerSeeds::find(ctx.accounts.store.key);
     let market_token_amount = ctx.accounts.withdrawal.fixed.tokens.market_token_amount;
     // FIXME: it seems that we don't have to check this?
     // require!(
@@ -81,11 +82,18 @@ pub fn cancel_withdrawal(ctx: Context<CancelWithdrawal>, execution_fee: u64) -> 
         .get_lamports()
         .checked_sub(execution_fee.min(super::MAX_WITHDRAWAL_EXECUTION_FEE))
         .ok_or(ExchangeError::NotEnoughExecutionFee)?;
-    data_store::cpi::remove_withdrawal(ctx.accounts.remove_withdrawal_ctx(), refund)?;
+    data_store::cpi::remove_withdrawal(
+        ctx.accounts
+            .remove_withdrawal_ctx()
+            .with_signer(&[&controller.as_seeds()]),
+        refund,
+    )?;
 
     if market_token_amount != 0 {
         data_store::cpi::market_vault_transfer_out(
-            ctx.accounts.market_vault_transfer_out_ctx(),
+            ctx.accounts
+                .market_vault_transfer_out_ctx()
+                .with_signer(&[&controller.as_seeds()]),
             market_token_amount,
         )?;
     }

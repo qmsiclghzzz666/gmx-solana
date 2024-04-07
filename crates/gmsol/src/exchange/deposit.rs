@@ -282,6 +282,16 @@ where
     }
 }
 
+/// Cancel Deposit Builder.
+pub struct CancelDepositBuilder<'a, C> {
+    program: &'a Program<C>,
+    store: Pubkey,
+    deposit: Pubkey,
+    cancel_for_user: Option<Pubkey>,
+    execution_fee: u64,
+    hint: Option<CancelDepositHint>,
+}
+
 #[derive(Clone, Copy)]
 struct CancelDepositHint {
     initial_long_token: Option<Pubkey>,
@@ -299,16 +309,6 @@ impl<'a> From<&'a Deposit> for CancelDepositHint {
             initial_short_token_account: deposit.fixed.senders.initial_short_token_account,
         }
     }
-}
-
-/// Cancel Deposit Builder.
-pub struct CancelDepositBuilder<'a, C> {
-    program: &'a Program<C>,
-    store: Pubkey,
-    deposit: Pubkey,
-    cancel_for_user: Option<Pubkey>,
-    execution_fee: u64,
-    hint: Option<CancelDepositHint>,
 }
 
 impl<'a, S, C> CancelDepositBuilder<'a, C>
@@ -333,7 +333,7 @@ where
         self
     }
 
-    /// Set execution fee.
+    /// Set execution fee to used
     pub fn execution_fee(&mut self, fee: u64) -> &mut Self {
         self.execution_fee = fee;
         self

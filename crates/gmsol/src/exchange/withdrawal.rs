@@ -244,3 +244,111 @@ where
         Ok((builder, withdrawal))
     }
 }
+
+/// Cancel Withdrawal Builder.
+pub struct CancelWithdrawalBuilder<'a, C> {
+    program: &'a Program<C>,
+    store: Pubkey,
+    withdrawal: Pubkey,
+    cancel_for_user: Option<Pubkey>,
+    execution_fee: u64,
+    hint: Option<CancelWithdrawalHint>,
+}
+
+#[derive(Clone, Copy)]
+struct CancelWithdrawalHint {
+    market_token: Pubkey,
+    market_token_account: Pubkey,
+}
+
+impl<'a> From<&'a Withdrawal> for CancelWithdrawalHint {
+    fn from(withdrawal: &'a Withdrawal) -> Self {
+        Self {
+            market_token: withdrawal.fixed.tokens.market_token,
+            market_token_account: withdrawal.fixed.market_token_account,
+        }
+    }
+}
+
+impl<'a, S, C> CancelWithdrawalBuilder<'a, C>
+where
+    C: Deref<Target = S> + Clone,
+    S: Signer,
+{
+    pub(super) fn new(program: &'a Program<C>, store: &Pubkey, withdrawal: &Pubkey) -> Self {
+        Self {
+            program,
+            store: *store,
+            withdrawal: *withdrawal,
+            cancel_for_user: None,
+            execution_fee: 0,
+            hint: None,
+        }
+    }
+
+    /// Cancel for the given user.
+    pub fn cancel_for_user(&mut self, user: &Pubkey) -> &mut Self {
+        self.cancel_for_user = Some(*user);
+        self
+    }
+
+    /// Set execution fee to used
+    pub fn execution_fee(&mut self, fee: u64) -> &mut Self {
+        self.execution_fee = fee;
+        self
+    }
+
+    /// Set hint with the given withdrawal.
+    pub fn hint(&mut self, withdrawal: &Withdrawal) -> &mut Self {
+        self.hint = Some(withdrawal.into());
+        self
+    }
+
+    fn get_user_and_authority(&self) -> (Pubkey, Pubkey) {
+        match self.cancel_for_user {
+            Some(user) => (user, self.program.payer()),
+            None => (
+                self.program.payer(),
+                ControllerSeeds::find_with_address(&self.store).1,
+            ),
+        }
+    }
+
+    async fn get_or_fetch_withdrawal_hint(&self) -> crate::Result<CancelWithdrawalHint> {
+        match &self.hint {
+            Some(hint) => Ok(*hint),
+            None => {
+                let withdrawal: Withdrawal = self.program.account(self.withdrawal).await?;
+                Ok((&withdrawal).into())
+            }
+        }
+    }
+
+    /// Build a [`RequestBuilder`] for `cancel_withdrawal` instruction.
+    pub async fn build(&self) -> crate::Result<RequestBuilder<'a, C>> {
+        let (user, authority) = self.get_user_and_authority();
+        let hint = self.get_or_fetch_withdrawal_hint().await?;
+        Ok(self
+            .program
+            .request()
+            .accounts(accounts::CancelWithdrawal {
+                authority,
+                store: self.store,
+                only_controller: find_roles_address(&self.store, &authority).0,
+                data_store_program: data_store::id(),
+                withdrawal: self.withdrawal,
+                user,
+                market_token: hint.market_token_account,
+                market_token_withdrawal_vault: find_market_vault_address(
+                    &self.store,
+                    &hint.market_token,
+                )
+                .0,
+                token_program: anchor_spl::token::ID,
+                system_program: system_program::ID,
+            })
+            .args(instruction::CancelWithdrawal {
+                execution_fee: self.execution_fee,
+            }))
+    }
+}

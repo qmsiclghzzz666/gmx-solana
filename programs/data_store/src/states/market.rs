@@ -84,9 +84,7 @@ impl Pools {
 
     fn with_pool_mut<T>(&mut self, kind: PoolKind, f: impl FnOnce(&mut Pool) -> T) -> Option<T> {
         let mut map = self.as_map_mut();
-        let Some(pool) = map.get_mut(&(kind as u8)) else {
-            return None;
-        };
+        let pool = map.get_mut(&(kind as u8))?;
         Some(f(pool))
     }
 }

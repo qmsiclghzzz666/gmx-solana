@@ -95,6 +95,11 @@ enum Command {
         #[arg(long, short, action = clap::ArgAction::Append)]
         short_swap: Vec<Pubkey>,
     },
+    /// Cancel a withdrawal.
+    CancelWithdrawal {
+        /// The address of the withdrawal to cancel.
+        withdrawal: Pubkey,
+    },
 }
 
 impl ExchangeArgs {
@@ -187,6 +192,16 @@ impl ExchangeArgs {
                     .await?;
                 let signature = builder.send().await?;
                 println!("created withdrawal {withdrawal} at {signature}");
+            }
+            Command::CancelWithdrawal { withdrawal } => {
+                let signature = program
+                    .cancel_withdrawal(store, withdrawal)
+                    .build()
+                    .await?
+                    .send()
+                    .await?;
+                tracing::info!(%withdrawal, "cancelled withdrawal at tx {signature}");
+                println!("{signature}");
             }
         }
         Ok(())
