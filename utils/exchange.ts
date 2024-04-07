@@ -274,7 +274,6 @@ export const makeExecuteDepositInstruction = async ({
 export const invokeExecuteDeposit = makeInvoke(makeExecuteDepositInstruction, ["authority"]);
 
 export type MakeCreateWithdrawalParams = {
-    authority: PublicKey,
     store: PublicKey,
     payer: PublicKey,
     marketToken: PublicKey,
@@ -294,7 +293,6 @@ export type MakeCreateWithdrawalParams = {
 };
 
 export const makeCreateWithdrawalInstruction = async ({
-    authority,
     store,
     payer,
     marketToken,
@@ -304,6 +302,7 @@ export const makeCreateWithdrawalInstruction = async ({
     toShortTokenAccount,
     options,
 }: MakeCreateWithdrawalParams) => {
+    const [authority] = createControllerPDA(store);
     const withdrawalNonce = options?.nonce ?? Keypair.generate().publicKey.toBuffer();
     const [withdrawalAddress] = createWithdrawalPDA(store, payer, withdrawalNonce);
     const longSwapPath = options?.longTokenSwapPath ?? [];
@@ -344,7 +343,7 @@ export const makeCreateWithdrawalInstruction = async ({
     return [instruction, withdrawalAddress] as IxWithOutput<PublicKey>;
 };
 
-export const invokeCreateWithdrawal = makeInvoke(makeCreateWithdrawalInstruction, ["payer", "authority"]);
+export const invokeCreateWithdrawal = makeInvoke(makeCreateWithdrawalInstruction, ["payer"]);
 
 export type MakeCancelWithdrawalParams = {
     authority: PublicKey,

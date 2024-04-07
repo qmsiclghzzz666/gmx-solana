@@ -48,7 +48,6 @@ pub mod exchange {
     }
 
     // Withdrawal.
-    #[access_control(Authenticate::only_controller(&ctx))]
     pub fn create_withdrawal<'info>(
         ctx: Context<'_, '_, 'info, 'info, CreateWithdrawal<'info>>,
         nonce: [u8; 32],

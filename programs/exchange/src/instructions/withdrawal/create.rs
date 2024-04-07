@@ -6,10 +6,12 @@ use data_store::{
     cpi::accounts::{GetMarketMeta, GetTokenConfig, InitializeWithdrawal},
     program::DataStore,
     states::{common::SwapParams, withdrawal::TokenParams, NonceBytes},
-    utils::Authentication,
 };
 
-use crate::{utils::market::get_and_validate_swap_path, ExchangeError};
+use crate::{
+    utils::{market::get_and_validate_swap_path, ControllerSeeds},
+    ExchangeError,
+};
 
 /// Create Withdrawal Params.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
@@ -24,7 +26,15 @@ pub struct CreateWithdrawalParams {
 
 #[derive(Accounts)]
 pub struct CreateWithdrawal<'info> {
-    pub authority: Signer<'info>,
+    /// CHECK: only used as signing PDA.
+    #[account(
+        seeds = [
+            crate::constants::CONTROLLER_SEED,
+            store.key().as_ref(),
+        ],
+        bump,
+    )]
+    pub authority: UncheckedAccount<'info>,
     /// CHECK: only used to invoke CPI.
     pub store: UncheckedAccount<'info>,
     /// CHECK: only used to invoke CPI.
@@ -128,8 +138,11 @@ pub fn create_withdrawal<'info>(
         params.market_token_amount,
     )?;
 
+    let controller = ControllerSeeds::new(ctx.accounts.store.key, ctx.bumps.authority);
     cpi::initialize_withdrawal(
-        ctx.accounts.initialize_withdrawal_ctx(),
+        ctx.accounts
+            .initialize_withdrawal_ctx()
+            .with_signer(&[&controller.as_seeds()]),
         nonce,
         SwapParams {
             long_token_swap_path,
@@ -150,28 +163,6 @@ pub fn create_withdrawal<'info>(
         system_program::transfer(ctx.accounts.transfer_ctx(), params.execution_fee)?;
     }
     Ok(())
-}
-
-impl<'info> Authentication<'info> for CreateWithdrawal<'info> {
-    fn authority(&self) -> AccountInfo<'info> {
-        self.authority.to_account_info()
-    }
-
-    fn on_error(&self) -> Result<()> {
-        Err(error!(ExchangeError::PermissionDenied))
-    }
-
-    fn data_store_program(&self) -> AccountInfo<'info> {
-        self.data_store_program.to_account_info()
-    }
-
-    fn store(&self) -> AccountInfo<'info> {
-        self.store.to_account_info()
-    }
-
-    fn roles(&self) -> AccountInfo<'info> {
-        self.only_controller.to_account_info()
-    }
 }
 
 impl<'info> CreateWithdrawal<'info> {

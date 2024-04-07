@@ -78,7 +78,6 @@ describe("exchange: deposit", () => {
             const [signature, withdrawalAddress] = await invokeCreateWithdrawal(
                 provider.connection,
                 {
-                    authority: signer0,
                     store: dataStoreAddress,
                     payer: user0,
                     marketToken: GMFakeFakeUsdG,
@@ -127,7 +126,6 @@ describe("exchange: deposit", () => {
             const [signature, address] = await invokeCreateWithdrawal(
                 provider.connection,
                 {
-                    authority: signer0,
                     store: dataStoreAddress,
                     payer: user0,
                     marketToken: GMFakeFakeUsdG,
@@ -238,7 +236,6 @@ describe("exchange: deposit", () => {
         await expect(invokeCreateWithdrawal(
             provider.connection,
             {
-                authority: signer0,
                 store: dataStoreAddress,
                 payer: user0,
                 marketToken: GMFakeFakeUsdG,
@@ -259,7 +256,6 @@ describe("exchange: deposit", () => {
             const [signature, withdrawAddress] = await invokeCreateWithdrawal(
                 provider.connection,
                 {
-                    authority: signer0,
                     store: dataStoreAddress,
                     payer: user0,
                     marketToken: GMFakeFakeUsdG,
@@ -385,7 +381,6 @@ describe("exchange: deposit", () => {
             const [signature, withdrawAddress] = await invokeCreateWithdrawal(
                 provider.connection,
                 {
-                    authority: signer0,
                     store: dataStoreAddress,
                     payer: user0,
                     marketToken: GMFakeFakeUsdG,
