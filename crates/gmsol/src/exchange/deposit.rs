@@ -6,14 +6,15 @@ use anchor_client::{
     Program, RequestBuilder,
 };
 use anchor_spl::associated_token::get_associated_token_address;
-use data_store::states::{Chainlink, Deposit, NonceBytes, Seed};
+use data_store::states::{Chainlink, Deposit, Market, NonceBytes, Seed};
 use exchange::{accounts, instruction, instructions::CreateDepositParams, utils::ControllerSeeds};
-use rand::{distributions::Standard, Rng};
 
 use crate::store::{
     data_store::{find_market_address, find_market_vault_address, find_token_config_map},
     roles::find_roles_address,
 };
+
+use super::generate_nonce;
 
 /// Create PDA for deposit.
 pub fn find_deposit_address(store: &Pubkey, user: &Pubkey, nonce: &NonceBytes) -> (Pubkey, u8) {
@@ -85,7 +86,9 @@ where
         self
     }
 
-    /// Set allowed execution fee.
+    /// Set extra exectuion fee allowed to use.
+    ///
+    ///  /// Defaults to `0` means only allowed to use at most `rent-exempt` amount of fee.
     pub fn execution_fee(&mut self, fee: u64) -> &mut Self {
         self.execution_fee = fee;
         self
@@ -103,47 +106,85 @@ where
         self
     }
 
-    fn get_associated_token_account_if_not_provided(
+    fn get_or_find_associated_initial_long_token_account(
         &self,
-        token: &Pubkey,
-        token_account: Option<&Pubkey>,
-    ) -> Pubkey {
-        if let Some(account) = token_account {
-            *account
-        } else {
-            get_associated_token_address(&self.program.payer(), token)
+        token: Option<&Pubkey>,
+    ) -> Option<Pubkey> {
+        let token = token?;
+        match self.initial_long_token_account {
+            Some(account) => Some(account),
+            None => Some(get_associated_token_address(&self.program.payer(), token)),
         }
     }
 
+    fn get_or_find_associated_initial_short_token_account(
+        &self,
+        token: Option<&Pubkey>,
+    ) -> Option<Pubkey> {
+        let token = token?;
+        match self.initial_short_token_account {
+            Some(account) => Some(account),
+            None => Some(get_associated_token_address(&self.program.payer(), token)),
+        }
+    }
+
+    async fn get_or_fetch_initial_tokens(
+        &self,
+        market: &Pubkey,
+    ) -> crate::Result<(Option<Pubkey>, Option<Pubkey>)> {
+        let res = match (
+            self.initial_long_token,
+            self.initial_long_token_amount,
+            self.initial_short_token,
+            self.initial_short_token_amount,
+        ) {
+            (Some(long_token), _, Some(short_token), _) => (Some(long_token), Some(short_token)),
+            (_, 0, _, 0) => {
+                return Err(crate::Error::EmptyDeposit);
+            }
+            (None, 0, Some(short_token), _) => (None, Some(short_token)),
+            (Some(long_token), _, None, 0) => (Some(long_token), None),
+            (mut long_token, long_amount, mut short_token, short_amount) => {
+                debug_assert!(
+                    (long_token.is_none() && long_amount != 0)
+                        || (short_token.is_none() && short_amount != 0)
+                );
+                let market: Market = self.program.account(*market).await?;
+                if long_amount != 0 {
+                    long_token = Some(market.meta().long_token_mint);
+                }
+                if short_amount != 0 {
+                    short_token = Some(market.meta().short_token_mint);
+                }
+                (long_token, short_token)
+            }
+        };
+        Ok(res)
+    }
+
     /// Set the initial long token params for deposit.
-    ///
-    /// - It will fetch the token of the given account if `token` not provided.
     pub fn long_token(
         &mut self,
-        token: &Pubkey,
         amount: u64,
+        token: Option<&Pubkey>,
         token_account: Option<&Pubkey>,
     ) -> &mut Self {
-        self.initial_long_token = Some(*token);
+        self.initial_long_token = token.copied();
         self.initial_long_token_amount = amount;
-        self.initial_long_token_account =
-            Some(self.get_associated_token_account_if_not_provided(token, token_account));
+        self.initial_long_token_account = token_account.copied();
         self
     }
 
     /// Set the initial short token params for deposit.
-    ///
-    /// - It will fetch the token of the given account if `token` not provided.
     pub fn short_token(
         &mut self,
-        token: &Pubkey,
         amount: u64,
+        token: Option<&Pubkey>,
         token_account: Option<&Pubkey>,
     ) -> &mut Self {
-        self.initial_short_token = Some(*token);
+        self.initial_short_token = token.cloned();
         self.initial_short_token_amount = amount;
-        self.initial_short_token_account =
-            Some(self.get_associated_token_account_if_not_provided(token, token_account));
+        self.initial_short_token_account = token_account.copied();
         self
     }
 
@@ -158,7 +199,7 @@ where
     }
 
     /// Build a [`RequestBuilder`] and return deposit address.
-    pub fn build_with_address(&self) -> crate::Result<(RequestBuilder<'a, C>, Pubkey)> {
+    pub async fn build_with_address(&self) -> crate::Result<(RequestBuilder<'a, C>, Pubkey)> {
         let receiver = self.get_receiver();
         let Self {
             program,
@@ -169,28 +210,23 @@ where
             execution_fee,
             long_token_swap_path,
             short_token_swap_path,
-            initial_long_token,
-            initial_short_token,
-            initial_long_token_account,
-            initial_short_token_account,
             initial_long_token_amount,
             initial_short_token_amount,
             min_market_token,
             should_unwrap_native_token,
             ..
         } = self;
-        let nonce = nonce.unwrap_or_else(|| {
-            rand::thread_rng()
-                .sample_iter(Standard)
-                .take(32)
-                .collect::<Vec<u8>>()
-                .try_into()
-                .unwrap()
-        });
+        let nonce = nonce.unwrap_or_else(generate_nonce);
         let payer = program.payer();
         let deposit = find_deposit_address(store, &payer, &nonce).0;
         let (_, authority) = ControllerSeeds::find_with_address(store);
         let only_controller = find_roles_address(store, &authority).0;
+        let market = find_market_address(store, market_token).0;
+        let (long_token, short_token) = self.get_or_fetch_initial_tokens(&market).await?;
+        let initial_long_token_account =
+            self.get_or_find_associated_initial_long_token_account(long_token.as_ref());
+        let initial_short_token_account =
+            self.get_or_find_associated_initial_short_token_account(short_token.as_ref());
         let builder = program
             .request()
             .accounts(accounts::CreateDeposit {
@@ -204,12 +240,12 @@ where
                 payer,
                 receiver,
                 token_config_map: find_token_config_map(store).0,
-                market: find_market_address(store, market_token).0,
-                initial_long_token_account: *initial_long_token_account,
-                initial_short_token_account: *initial_short_token_account,
-                long_token_deposit_vault: initial_long_token
+                market,
+                initial_long_token_account,
+                initial_short_token_account,
+                long_token_deposit_vault: long_token
                     .map(|token| find_market_vault_address(store, &token).0),
-                short_token_deposit_vault: initial_short_token
+                short_token_deposit_vault: short_token
                     .map(|token| find_market_vault_address(store, &token).0),
             })
             .args(instruction::CreateDeposit {

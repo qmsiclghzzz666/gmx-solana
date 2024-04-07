@@ -1,16 +1,23 @@
 /// Deposit.
 pub mod deposit;
 
+/// Withdrawal.
+pub mod withdrawal;
+
 use std::ops::Deref;
 
 use anchor_client::{
     solana_sdk::{pubkey::Pubkey, signer::Signer},
     Program,
 };
-use data_store::states::{DataStore, Seed};
+use data_store::states::{DataStore, NonceBytes, Seed};
 use gmx_solana_utils::to_seed;
+use rand::{distributions::Standard, Rng};
 
-use self::deposit::{CancelDepositBuilder, CreateDepositBuilder, ExecuteDepositBuilder};
+use self::{
+    deposit::{CancelDepositBuilder, CreateDepositBuilder, ExecuteDepositBuilder},
+    withdrawal::CreateWithdrawalBuilder,
+};
 
 /// Find PDA for `DataStore` account.
 pub fn find_store_address(key: &str) -> (Pubkey, u8) {
@@ -32,6 +39,14 @@ pub trait ExchangeOps<C> {
         oracle: &Pubkey,
         deposit: &Pubkey,
     ) -> ExecuteDepositBuilder<C>;
+
+    /// Create a withdrawal.
+    fn create_withdrawal(
+        &self,
+        store: &Pubkey,
+        market_token: &Pubkey,
+        amount: u64,
+    ) -> CreateWithdrawalBuilder<C>;
 }
 
 impl<S, C> ExchangeOps<C> for Program<C>
@@ -55,4 +70,22 @@ where
     ) -> ExecuteDepositBuilder<C> {
         ExecuteDepositBuilder::new(self, store, oracle, deposit)
     }
+
+    fn create_withdrawal(
+        &self,
+        store: &Pubkey,
+        market_token: &Pubkey,
+        amount: u64,
+    ) -> CreateWithdrawalBuilder<C> {
+        CreateWithdrawalBuilder::new(self, *store, *market_token, amount)
+    }
+}
+
+fn generate_nonce() -> NonceBytes {
+    rand::thread_rng()
+        .sample_iter(Standard)
+        .take(32)
+        .collect::<Vec<u8>>()
+        .try_into()
+        .unwrap()
 }

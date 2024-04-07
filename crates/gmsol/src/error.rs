@@ -1,6 +1,9 @@
 /// Error type for `gmsol`.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    /// Empty deposit.
+    #[error("empty deposit")]
+    EmptyDeposit,
     /// Client Error.
     #[error("{0:?}")]
     Client(#[from] anchor_client::ClientError),

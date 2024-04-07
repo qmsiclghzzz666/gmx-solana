@@ -16,11 +16,17 @@ enum Command {
     CreateDeposit {
         /// The address of the market token of the Market to deposit into.
         market_token: Pubkey,
+        /// Extra execution fee allowed to use.
+        #[arg(long, short, default_value_t = 0)]
+        extra_execution_fee: u64,
         /// The token account to receive the minted market tokens.
         ///
         /// Defaults to use assciated token account.
         #[arg(long, short)]
         receiver: Option<Pubkey>,
+        /// Minimum amount of market tokens to mint.
+        #[arg(long, default_value_t = 0)]
+        min_amount: u64,
         /// The initial long token.
         #[arg(long, requires = "long_token_amount")]
         long_token: Option<Pubkey>,
@@ -34,10 +40,10 @@ enum Command {
         #[arg(long)]
         short_token_account: Option<Pubkey>,
         /// The initial long token amount.
-        #[arg(long, default_value_t = 0, requires = "long_token")]
+        #[arg(long, default_value_t = 0)]
         long_token_amount: u64,
         /// The initial short token amount.
-        #[arg(long, default_value_t = 0, requires = "short_token")]
+        #[arg(long, default_value_t = 0)]
         short_token_amount: u64,
         /// Swap paths for long token.
         #[arg(long, short, action = clap::ArgAction::Append)]
@@ -51,6 +57,44 @@ enum Command {
         /// The address of the deposit to cancel.
         deposit: Pubkey,
     },
+    /// Create a withdrawal.
+    CreateWithdrawal {
+        /// The address of the market token of the Market to withdraw from.
+        market_token: Pubkey,
+        /// Extra execution fee allowed to use.
+        #[arg(long, short, default_value_t = 0)]
+        extra_execution_fee: u64,
+        /// The amount of market tokens to burn.
+        #[arg(long)]
+        amount: u64,
+        /// Final long token.
+        #[arg(long)]
+        long_token: Option<Pubkey>,
+        /// Final short token.
+        #[arg(long)]
+        short_token: Option<Pubkey>,
+        /// The market token account to use.
+        #[arg(long)]
+        market_token_account: Option<Pubkey>,
+        /// The final long token account.
+        #[arg(long)]
+        long_token_account: Option<Pubkey>,
+        /// The final short token account.
+        #[arg(long)]
+        short_token_account: Option<Pubkey>,
+        /// Minimal amount of final long tokens to withdraw.
+        #[arg(long, default_value_t = 0)]
+        min_long_token_amount: u64,
+        /// Minimal amount of final short tokens to withdraw.
+        #[arg(long, default_value_t = 0)]
+        min_short_token_amount: u64,
+        /// Swap paths for long token.
+        #[arg(long, short, action = clap::ArgAction::Append)]
+        long_swap: Vec<Pubkey>,
+        /// Swap paths for short token.
+        #[arg(long, short, action = clap::ArgAction::Append)]
+        short_swap: Vec<Pubkey>,
+    },
 }
 
 impl ExchangeArgs {
@@ -58,8 +102,10 @@ impl ExchangeArgs {
         let program = client.program(exchange::id())?;
         match &self.command {
             Command::CreateDeposit {
+                extra_execution_fee,
                 market_token,
                 receiver,
+                min_amount,
                 long_token,
                 short_token,
                 long_token_account,
@@ -73,19 +119,29 @@ impl ExchangeArgs {
                 if let Some(receiver) = receiver {
                     builder.receiver(receiver);
                 }
-                if let Some(token) = long_token {
-                    builder.long_token(token, *long_token_amount, long_token_account.as_ref());
+                if *long_token_amount != 0 {
+                    builder.long_token(
+                        *long_token_amount,
+                        long_token.as_ref(),
+                        long_token_account.as_ref(),
+                    );
                 }
-                if let Some(token) = short_token {
-                    builder.short_token(token, *short_token_amount, short_token_account.as_ref());
+                if *short_token_amount != 0 {
+                    builder.short_token(
+                        *short_token_amount,
+                        short_token.as_ref(),
+                        short_token_account.as_ref(),
+                    );
                 }
                 let (builder, deposit) = builder
+                    .execution_fee(*extra_execution_fee)
+                    .min_market_token(*min_amount)
                     .long_token_swap_path(long_swap.clone())
                     .short_token_swap_path(short_swap.clone())
-                    .build_with_address()?;
+                    .build_with_address()
+                    .await?;
                 let signature = builder.send().await?;
-                tracing::info!(%deposit, "created deposit at tx {signature}");
-                println!("{deposit}");
+                println!("created deposit {deposit} at {signature}");
             }
             Command::CancelDeposit { deposit } => {
                 let signature = program
@@ -95,7 +151,42 @@ impl ExchangeArgs {
                     .send()
                     .await?;
                 tracing::info!(%deposit, "cancelled deposit at tx {signature}");
-                println!("{deposit}");
+                println!("{signature}");
+            }
+            Command::CreateWithdrawal {
+                market_token,
+                extra_execution_fee,
+                amount,
+                long_token,
+                short_token,
+                market_token_account,
+                long_token_account,
+                short_token_account,
+                min_long_token_amount,
+                min_short_token_amount,
+                long_swap,
+                short_swap,
+            } => {
+                let mut builder = program.create_withdrawal(store, market_token, *amount);
+                if let Some(account) = market_token_account {
+                    builder.market_token_account(account);
+                }
+                if let Some(token) = long_token {
+                    builder.final_long_token(token, long_token_account.as_ref());
+                }
+                if let Some(token) = short_token {
+                    builder.final_short_token(token, short_token_account.as_ref());
+                }
+                let (builder, withdrawal) = builder
+                    .execution_fee(*extra_execution_fee)
+                    .min_final_long_token_amount(*min_long_token_amount)
+                    .min_final_short_token_amount(*min_short_token_amount)
+                    .long_token_swap_path(long_swap.clone())
+                    .short_token_swap_path(short_swap.clone())
+                    .build_with_address()
+                    .await?;
+                let signature = builder.send().await?;
+                println!("created withdrawal {withdrawal} at {signature}");
             }
         }
         Ok(())

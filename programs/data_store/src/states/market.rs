@@ -25,6 +25,11 @@ impl Market {
     pub(crate) fn init_space(num_pools: u8) -> usize {
         1 + MarketMeta::INIT_SPACE + Pools::init_space(num_pools)
     }
+
+    /// Get meta.
+    pub fn meta(&self) -> &MarketMeta {
+        &self.meta
+    }
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, InitSpace)]
