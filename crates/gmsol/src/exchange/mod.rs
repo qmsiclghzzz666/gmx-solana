@@ -16,7 +16,7 @@ use rand::{distributions::Standard, Rng};
 
 use self::{
     deposit::{CancelDepositBuilder, CreateDepositBuilder, ExecuteDepositBuilder},
-    withdrawal::{CancelWithdrawalBuilder, CreateWithdrawalBuilder},
+    withdrawal::{CancelWithdrawalBuilder, CreateWithdrawalBuilder, ExecuteWithdrawalBuilder},
 };
 
 /// Find PDA for `DataStore` account.
@@ -50,6 +50,14 @@ pub trait ExchangeOps<C> {
 
     /// Cancel a withdrawal.
     fn cancel_withdrawal(&self, store: &Pubkey, withdrawal: &Pubkey) -> CancelWithdrawalBuilder<C>;
+
+    /// Execute a withdrawal.
+    fn execute_withdrawal(
+        &self,
+        store: &Pubkey,
+        oracle: &Pubkey,
+        withdrawal: &Pubkey,
+    ) -> ExecuteWithdrawalBuilder<C>;
 }
 
 impl<S, C> ExchangeOps<C> for Program<C>
@@ -85,6 +93,15 @@ where
 
     fn cancel_withdrawal(&self, store: &Pubkey, withdrawal: &Pubkey) -> CancelWithdrawalBuilder<C> {
         CancelWithdrawalBuilder::new(self, store, withdrawal)
+    }
+
+    fn execute_withdrawal(
+        &self,
+        store: &Pubkey,
+        oracle: &Pubkey,
+        withdrawal: &Pubkey,
+    ) -> ExecuteWithdrawalBuilder<C> {
+        ExecuteWithdrawalBuilder::new(self, store, oracle, withdrawal)
     }
 }
 

@@ -33,6 +33,12 @@ enum Command {
         #[arg(long)]
         oracle: Pubkey,
     },
+    /// Execute Withdrawal.
+    ExecuteWithdrawal {
+        withdrawal: Pubkey,
+        #[arg(long)]
+        oracle: Pubkey,
+    },
 }
 
 impl KeeperArgs {
@@ -98,6 +104,21 @@ impl KeeperArgs {
                     .send()
                     .await?;
                 tracing::info!(%deposit, "executed deposit at tx {signature}");
+                println!("{signature}");
+            }
+            Command::ExecuteWithdrawal { withdrawal, oracle } => {
+                let program = client.program(exchange::id())?;
+                let mut builder = program.execute_withdrawal(store, oracle, withdrawal);
+                let execution_fee = self
+                    .get_or_estimate_execution_fee(&program, builder.build().await?)
+                    .await?;
+                let signature = self
+                    .insert_compute_budget_instructions(
+                        builder.execution_fee(execution_fee).build().await?,
+                    )
+                    .send()
+                    .await?;
+                tracing::info!(%withdrawal, "executed withdrawal at tx {signature}");
                 println!("{signature}");
             }
         }

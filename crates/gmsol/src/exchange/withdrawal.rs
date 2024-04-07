@@ -1,12 +1,14 @@
 use std::ops::Deref;
 
 use anchor_client::{
-    anchor_lang::system_program,
+    anchor_lang::{system_program, Id},
     solana_sdk::{instruction::AccountMeta, pubkey::Pubkey, signer::Signer},
     Program, RequestBuilder,
 };
 use anchor_spl::associated_token::get_associated_token_address;
-use data_store::states::{withdrawal::TokenParams, Market, NonceBytes, Seed, Withdrawal};
+use data_store::states::{
+    withdrawal::TokenParams, Chainlink, Market, NonceBytes, Seed, Withdrawal,
+};
 use exchange::{
     accounts, instruction, instructions::CreateWithdrawalParams, utils::ControllerSeeds,
 };
@@ -350,5 +352,161 @@ where
             .args(instruction::CancelWithdrawal {
                 execution_fee: self.execution_fee,
             }))
+    }
+}
+
+/// Execute Withdrawal Builder.
+pub struct ExecuteWithdrawalBuilder<'a, C> {
+    program: &'a Program<C>,
+    store: Pubkey,
+    oracle: Pubkey,
+    withdrawal: Pubkey,
+    execution_fee: u64,
+    hint: Option<ExecuteWithdrawalHint>,
+}
+
+#[derive(Clone)]
+struct ExecuteWithdrawalHint {
+    market_token: Pubkey,
+    user: Pubkey,
+    final_long_token_receiver: Pubkey,
+    final_short_token_receiver: Pubkey,
+    final_long_token: Pubkey,
+    final_short_token: Pubkey,
+    feeds: Vec<Pubkey>,
+    long_swap_tokens: Vec<Pubkey>,
+    short_swap_tokens: Vec<Pubkey>,
+}
+
+impl<'a> From<&'a Withdrawal> for ExecuteWithdrawalHint {
+    fn from(withdrawal: &'a Withdrawal) -> Self {
+        Self {
+            market_token: withdrawal.fixed.tokens.market_token,
+            user: withdrawal.fixed.user,
+            final_long_token: withdrawal.fixed.tokens.final_long_token,
+            final_short_token: withdrawal.fixed.tokens.final_short_token,
+            final_long_token_receiver: withdrawal.fixed.receivers.final_long_token_receiver,
+            final_short_token_receiver: withdrawal.fixed.receivers.final_short_token_receiver,
+            long_swap_tokens: withdrawal.dynamic.swap.long_token_swap_path.clone(),
+            short_swap_tokens: withdrawal.dynamic.swap.short_token_swap_path.clone(),
+            feeds: withdrawal.dynamic.tokens_with_feed.feeds.clone(),
+        }
+    }
+}
+
+impl<'a, S, C> ExecuteWithdrawalBuilder<'a, C>
+where
+    C: Deref<Target = S> + Clone,
+    S: Signer,
+{
+    pub(super) fn new(
+        program: &'a Program<C>,
+        store: &Pubkey,
+        oracle: &Pubkey,
+        withdrawal: &Pubkey,
+    ) -> Self {
+        Self {
+            program,
+            store: *store,
+            oracle: *oracle,
+            withdrawal: *withdrawal,
+            execution_fee: 0,
+            hint: None,
+        }
+    }
+
+    /// Set execution fee.
+    pub fn execution_fee(&mut self, fee: u64) -> &mut Self {
+        self.execution_fee = fee;
+        self
+    }
+
+    /// Set hint with the given withdrawal.
+    pub fn hint(&mut self, withdrawal: &Withdrawal) -> &mut Self {
+        self.hint = Some(withdrawal.into());
+        self
+    }
+
+    async fn get_or_fetch_hint(&self) -> crate::Result<ExecuteWithdrawalHint> {
+        match &self.hint {
+            Some(hint) => Ok(hint.clone()),
+            None => {
+                let withdrawal: Withdrawal = self.program.account(self.withdrawal).await?;
+                Ok((&withdrawal).into())
+            }
+        }
+    }
+
+    /// Build [`RequestBuilder`] for `execute_deposit` instruction.
+    pub async fn build(&self) -> crate::Result<RequestBuilder<'a, C>> {
+        let authority = self.program.payer();
+        let hint = self.get_or_fetch_hint().await?;
+        let feeds = hint.feeds.iter().map(|pubkey| AccountMeta {
+            pubkey: *pubkey,
+            is_signer: false,
+            is_writable: false,
+        });
+        let swap_path_markets = hint
+            .long_swap_tokens
+            .iter()
+            .chain(hint.short_swap_tokens.iter())
+            .map(|mint| AccountMeta {
+                pubkey: find_market_address(&self.store, mint).0,
+                is_signer: false,
+                is_writable: true,
+            });
+        let swap_path_mints = hint
+            .long_swap_tokens
+            .iter()
+            .chain(hint.short_swap_tokens.iter())
+            .map(|pubkey| AccountMeta {
+                pubkey: *pubkey,
+                is_signer: false,
+                is_writable: false,
+            });
+        Ok(self
+            .program
+            .request()
+            .accounts(accounts::ExecuteWithdrawal {
+                authority,
+                store: self.store,
+                only_order_keeper: find_roles_address(&self.store, &authority).0,
+                data_store_program: data_store::id(),
+                chainlink_program: Chainlink::id(),
+                token_program: anchor_spl::token::ID,
+                system_program: system_program::ID,
+                oracle: self.oracle,
+                token_config_map: find_token_config_map(&self.store).0,
+                withdrawal: self.withdrawal,
+                market: find_market_address(&self.store, &hint.market_token).0,
+                user: hint.user,
+                market_token_mint: hint.market_token,
+                market_token_withdrawal_vault: find_market_vault_address(
+                    &self.store,
+                    &hint.market_token,
+                )
+                .0,
+                final_long_token_receiver: hint.final_long_token_receiver,
+                final_short_token_receiver: hint.final_short_token_receiver,
+                final_long_token_vault: find_market_vault_address(
+                    &self.store,
+                    &hint.final_long_token,
+                )
+                .0,
+                final_short_token_vault: find_market_vault_address(
+                    &self.store,
+                    &hint.final_short_token,
+                )
+                .0,
+            })
+            .args(instruction::ExecuteWithdrawal {
+                execution_fee: self.execution_fee,
+            })
+            .accounts(
+                feeds
+                    .chain(swap_path_markets)
+                    .chain(swap_path_mints)
+                    .collect::<Vec<_>>(),
+            ))
     }
 }
