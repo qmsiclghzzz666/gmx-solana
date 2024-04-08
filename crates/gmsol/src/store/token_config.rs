@@ -56,8 +56,16 @@ pub trait TokenConfigOps<C> {
         precision: u8,
     ) -> RequestBuilder<C>;
 
-    /// get token config of the given token.
+    /// Get token config of the given token.
     fn get_token_config(&self, store: &Pubkey, token: &Pubkey) -> RequestBuilder<C>;
+
+    /// Toggle token config.
+    fn toggle_token_config(
+        &self,
+        store: &Pubkey,
+        token: &Pubkey,
+        enable: bool,
+    ) -> RequestBuilder<C>;
 }
 
 impl<C, S> TokenConfigOps<C> for Program<C>
@@ -115,6 +123,28 @@ where
             .args(instruction::GetTokenConfig {
                 store: *store,
                 token: *token,
+            })
+    }
+
+    fn toggle_token_config(
+        &self,
+        store: &Pubkey,
+        token: &Pubkey,
+        enable: bool,
+    ) -> RequestBuilder<C> {
+        let authority = self.payer();
+        let only_controller = find_roles_address(store, &authority).0;
+        let map = find_token_config_map(store).0;
+        self.request()
+            .accounts(accounts::ToggleTokenConfig {
+                authority,
+                store: *store,
+                only_controller,
+                map,
+            })
+            .args(instruction::ToggleTokenConfig {
+                token: *token,
+                enable,
             })
     }
 }

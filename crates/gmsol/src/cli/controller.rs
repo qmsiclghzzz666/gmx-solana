@@ -25,6 +25,28 @@ enum Command {
         #[arg(long, default_value_t = 4)]
         precision: u8,
     },
+    /// Toggle token config of token.
+    ToggleTokenConfig {
+        token: Pubkey,
+        #[command(flatten)]
+        toggle: Toggle,
+    },
+}
+
+#[derive(clap::Args)]
+#[group(required = true, multiple = false)]
+struct Toggle {
+    #[arg(long)]
+    enable: bool,
+    #[arg(long)]
+    disable: bool,
+}
+
+impl Toggle {
+    fn is_enable(&self) -> bool {
+        debug_assert!(self.enable != self.disable);
+        self.enable
+    }
 }
 
 impl ControllerArgs {
@@ -49,6 +71,13 @@ impl ControllerArgs {
             } => {
                 let signature = program
                     .insert_token_config(store, token, price_feed, *heartbeat_duration, *precision)
+                    .send()
+                    .await?;
+                println!("{signature}");
+            }
+            Command::ToggleTokenConfig { token, toggle } => {
+                let signature = program
+                    .toggle_token_config(store, token, toggle.is_enable())
                     .send()
                     .await?;
                 println!("{signature}");
