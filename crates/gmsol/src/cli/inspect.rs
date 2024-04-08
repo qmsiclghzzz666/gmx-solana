@@ -8,50 +8,33 @@ use crate::SharedClient;
 
 #[derive(clap::Args)]
 pub(super) struct InspectArgs {
-    kind: Kind,
-    address: Option<Pubkey>,
-    /// Consider the address as market address rather than the address of its market token.
-    #[arg(long)]
-    as_market_address: bool,
-}
-
-#[derive(clap::ValueEnum, Clone, Copy)]
-enum Kind {
-    /// `DataStore` account.
-    DataStore,
-    /// `Roles` account.
-    Roles,
-    /// `TokenConfigMap` account.
-    TokenConfigMap,
-    /// `Market` account.
-    Market,
-    /// `Deposit` account.
-    Deposit,
-    /// `Withdrawal` account.
-    Withdrawal,
-    /// Get the CONTROLLER address.
-    Controller,
+    #[command(subcommand)]
+    command: Command,
 }
 
 #[derive(clap::Subcommand)]
-enum RolesAction {
-    /// Get.
-    Get,
-    /// Init.
-    Init {
-        /// Authority.
+enum Command {
+    /// `DataStore` account.
+    DataStore { address: Option<Pubkey> },
+    /// `Roles` account.
+    Roles { address: Pubkey },
+    /// `TokenConfigMap` account.
+    TokenConfigMap { address: Pubkey },
+    /// `Market` account.
+    Market {
+        address: Pubkey,
+        /// Consider the address as market address rather than the address of its market token.
         #[arg(long)]
-        authority: Option<Pubkey>,
+        as_market_address: bool,
     },
-    /// Grant,
-    Grant {
-        /// User.
-        #[arg(long)]
-        user: Pubkey,
-        /// Role.
-        #[arg(long)]
-        role: String,
-    },
+    /// `Deposit` account.
+    Deposit { address: Pubkey },
+    /// `Withdrawal` account.
+    Withdrawal { address: Pubkey },
+    /// `Oracle` account.
+    Oracle { address: Pubkey },
+    /// Get the CONTROLLER address.
+    Controller,
 }
 
 impl InspectArgs {
@@ -61,9 +44,8 @@ impl InspectArgs {
         store: Option<&Pubkey>,
     ) -> gmsol::Result<()> {
         let program = client.program(data_store::id())?;
-        let address = self.address;
-        match self.kind {
-            Kind::DataStore => {
+        match self.command {
+            Command::DataStore { address } => {
                 let address = address.or(store.copied()).ok_or(gmsol::Error::unknown(
                     "missing address for DataStore account",
                 ))?;
@@ -72,53 +54,42 @@ impl InspectArgs {
                     program.account::<states::DataStore>(address).await?
                 );
             }
-            Kind::Roles => {
+            Command::Roles { address } => {
+                println!("{:#?}", program.account::<states::Roles>(address).await?);
+            }
+            Command::TokenConfigMap { address } => {
                 println!(
                     "{:#?}",
-                    program
-                        .account::<states::Roles>(address.wrap_err("address not provided")?)
-                        .await?
+                    program.account::<states::TokenConfigMap>(address).await?
                 );
             }
-            Kind::TokenConfigMap => {
-                println!(
-                    "{:#?}",
-                    program
-                        .account::<states::TokenConfigMap>(
-                            address.wrap_err("address not provided")?
-                        )
-                        .await?
-                );
-            }
-            Kind::Market => {
-                let mut address = address.wrap_err("address not provided")?;
-                if !self.as_market_address {
+            Command::Market {
+                mut address,
+                as_market_address,
+            } => {
+                if !as_market_address {
                     address =
                         find_market_address(store.wrap_err("`store` not provided")?, &address).0;
                 }
                 println!("{:#?}", program.account::<states::Market>(address).await?);
             }
-            Kind::Deposit => {
+            Command::Deposit { address } => {
+                println!("{:#?}", program.account::<states::Deposit>(address).await?);
+            }
+            Command::Withdrawal { address } => {
                 println!(
                     "{:#?}",
-                    program
-                        .account::<states::Deposit>(address.wrap_err("address not provided")?)
-                        .await?
+                    program.account::<states::Withdrawal>(address).await?
                 );
             }
-            Kind::Withdrawal => {
-                println!(
-                    "{:#?}",
-                    program
-                        .account::<states::Withdrawal>(address.wrap_err("address not provided")?)
-                        .await?
-                );
-            }
-            Kind::Controller => {
+            Command::Controller => {
                 let controller =
                     ControllerSeeds::find_with_address(store.wrap_err("missing `store` address")?)
                         .1;
                 println!("{controller}");
+            }
+            Command::Oracle { address } => {
+                println!("{:#?}", program.account::<states::Oracle>(address).await?);
             }
         }
         Ok(())

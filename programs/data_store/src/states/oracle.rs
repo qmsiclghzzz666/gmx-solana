@@ -62,6 +62,7 @@ impl PriceMap {
 /// Oracle Account.
 #[account]
 #[derive(InitSpace, Default)]
+#[cfg_attr(feature = "debug", derive(Debug))]
 pub struct Oracle {
     pub bump: u8,
     pub index: u8,
