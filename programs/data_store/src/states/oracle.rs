@@ -155,6 +155,7 @@ pub(crate) fn check_and_get_chainlink_price<'info>(
     token_config: &TokenConfig,
     feed: &AccountInfo<'info>,
 ) -> Result<Price> {
+    require!(token_config.enabled, DataStoreError::TokenConfigDisabled);
     require_eq!(
         token_config.price_feed,
         *feed.key,

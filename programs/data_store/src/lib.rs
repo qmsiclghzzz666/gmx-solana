@@ -383,6 +383,8 @@ pub enum DataStoreError {
     InvalidPriceFeedPrice,
     #[msg("Price feed not updated")]
     PriceFeedNotUpdated,
+    #[msg("Token config disabled")]
+    TokenConfigDisabled,
     // Market.
     #[msg("Computation error")]
     Computation,
