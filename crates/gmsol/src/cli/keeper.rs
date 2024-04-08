@@ -6,7 +6,10 @@ use anchor_client::{
     },
     Program, RequestBuilder,
 };
-use gmsol::{exchange::ExchangeOps, store::oracle::find_oracle_address};
+use gmsol::{
+    exchange::ExchangeOps,
+    store::{oracle::find_oracle_address, vault::VaultOps},
+};
 
 use crate::SharedClient;
 
@@ -39,6 +42,8 @@ enum Command {
         #[command(flatten)]
         oracle: Oracle,
     },
+    /// Initialize Market Vault.
+    InitializeVault { token: Pubkey },
 }
 
 #[derive(clap::Args)]
@@ -139,6 +144,12 @@ impl KeeperArgs {
                     .await?;
                 tracing::info!(%withdrawal, "executed withdrawal at tx {signature}");
                 println!("{signature}");
+            }
+            Command::InitializeVault { token } => {
+                let program = client.program(data_store::id())?;
+                let (request, vault) = program.initialize_market_vault(store, token);
+                let signature = request.send().await?;
+                println!("created a new vault {vault} at tx {signature}");
             }
         }
         Ok(())

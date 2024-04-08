@@ -9,3 +9,6 @@ pub mod oracle;
 
 /// Token Config.
 pub mod token_config;
+
+/// Vault.
+pub mod vault;
