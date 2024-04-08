@@ -16,6 +16,18 @@ pub enum Error {
     /// Eyre errors.
     #[error("eyre: {0}")]
     Eyre(#[from] eyre::Error),
+    /// Missing return data.
+    #[error("missing return data")]
+    MissingReturnData,
+    /// Base64 Decode Error.
+    #[error("base64: {0}")]
+    Base64(#[from] base64::DecodeError),
+    /// Borsh Error.
+    #[error("borsh: {0}")]
+    Borsh(#[from] anchor_client::anchor_lang::prelude::borsh::maybestd::io::Error),
+    /// Not found.
+    #[error("not found")]
+    NotFound,
 }
 
 impl Error {

@@ -16,6 +16,7 @@ eyre = { version = "0.6.12" }
 tokio = "1.37.0"
 thiserror = "1.0.58"
 tracing = "0.1.40"
+base64 = "0.21.7"
 anchor-client = { version = "0.29.0", features = ["async"] }
 anchor-spl = { workspace = true, default_features = false, features = [
     "token",

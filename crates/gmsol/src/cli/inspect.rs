@@ -2,7 +2,10 @@ use anchor_client::solana_sdk::pubkey::Pubkey;
 use data_store::states;
 use exchange::utils::ControllerSeeds;
 use eyre::ContextCompat;
-use gmsol::store::data_store::find_market_address;
+use gmsol::store::{
+    data_store::find_market_address,
+    token_config::{find_token_config_map, get_token_config},
+};
 
 use crate::SharedClient;
 
@@ -19,7 +22,7 @@ enum Command {
     /// `Roles` account.
     Roles { address: Pubkey },
     /// `TokenConfigMap` account.
-    TokenConfigMap { address: Pubkey },
+    TokenConfigMap { address: Option<Pubkey> },
     /// `Market` account.
     Market {
         address: Pubkey,
@@ -35,6 +38,8 @@ enum Command {
     Oracle { address: Pubkey },
     /// Get the CONTROLLER address.
     Controller,
+    /// Get token config.
+    TokenConfig { token: Pubkey },
 }
 
 impl InspectArgs {
@@ -46,9 +51,9 @@ impl InspectArgs {
         let program = client.program(data_store::id())?;
         match self.command {
             Command::DataStore { address } => {
-                let address = address.or(store.copied()).ok_or(gmsol::Error::unknown(
-                    "missing address for DataStore account",
-                ))?;
+                let address = address
+                    .or(store.copied())
+                    .wrap_err("missing store address")?;
                 println!(
                     "{:#?}",
                     program.account::<states::DataStore>(address).await?
@@ -58,6 +63,9 @@ impl InspectArgs {
                 println!("{:#?}", program.account::<states::Roles>(address).await?);
             }
             Command::TokenConfigMap { address } => {
+                let address = address
+                    .or_else(|| store.as_ref().map(|store| find_token_config_map(store).0))
+                    .wrap_err("missing store address")?;
                 println!(
                     "{:#?}",
                     program.account::<states::TokenConfigMap>(address).await?
@@ -90,6 +98,13 @@ impl InspectArgs {
             }
             Command::Oracle { address } => {
                 println!("{:#?}", program.account::<states::Oracle>(address).await?);
+            }
+            Command::TokenConfig { token } => {
+                let store = store.wrap_err("missing store address")?;
+                let config = get_token_config(&program, store, &token)
+                    .await?
+                    .ok_or(gmsol::Error::NotFound)?;
+                println!("{config:#?}");
             }
         }
         Ok(())
