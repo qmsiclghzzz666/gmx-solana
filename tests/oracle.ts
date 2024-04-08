@@ -8,7 +8,6 @@ describe("oracle", () => {
     const provider = getProvider();
 
     const { chainlink } = getExternalPrograms();
-    const { oracle } = getPrograms();
 
     const { signer0 } = getUsers();
 

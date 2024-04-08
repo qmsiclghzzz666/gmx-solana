@@ -6,7 +6,7 @@ use anchor_client::{
     },
     Program, RequestBuilder,
 };
-use gmsol::exchange::ExchangeOps;
+use gmsol::{exchange::ExchangeOps, store::oracle::find_oracle_address};
 
 use crate::SharedClient;
 
@@ -30,15 +30,33 @@ enum Command {
     /// Execute Deposit.
     ExecuteDeposit {
         deposit: Pubkey,
-        #[arg(long)]
-        oracle: Pubkey,
+        #[command(flatten)]
+        oracle: Oracle,
     },
     /// Execute Withdrawal.
     ExecuteWithdrawal {
         withdrawal: Pubkey,
-        #[arg(long)]
-        oracle: Pubkey,
+        #[command(flatten)]
+        oracle: Oracle,
     },
+}
+
+#[derive(clap::Args)]
+#[group(required = false, multiple = false)]
+struct Oracle {
+    #[arg(long, env)]
+    oracle: Option<Pubkey>,
+    #[arg(long, default_value_t = 0)]
+    oracle_index: u8,
+}
+
+impl Oracle {
+    fn address(&self, store: &Pubkey) -> Pubkey {
+        match self.oracle {
+            Some(address) => address,
+            None => find_oracle_address(store, self.oracle_index).0,
+        }
+    }
 }
 
 impl KeeperArgs {
@@ -93,7 +111,7 @@ impl KeeperArgs {
         match &self.command {
             Command::ExecuteDeposit { deposit, oracle } => {
                 let program = client.program(exchange::id())?;
-                let mut builder = program.execute_deposit(store, oracle, deposit);
+                let mut builder = program.execute_deposit(store, &oracle.address(store), deposit);
                 let execution_fee = self
                     .get_or_estimate_execution_fee(&program, builder.build().await?)
                     .await?;
@@ -108,7 +126,8 @@ impl KeeperArgs {
             }
             Command::ExecuteWithdrawal { withdrawal, oracle } => {
                 let program = client.program(exchange::id())?;
-                let mut builder = program.execute_withdrawal(store, oracle, withdrawal);
+                let mut builder =
+                    program.execute_withdrawal(store, &oracle.address(store), withdrawal);
                 let execution_fee = self
                     .get_or_estimate_execution_fee(&program, builder.build().await?)
                     .await?;
