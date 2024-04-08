@@ -50,6 +50,7 @@ impl<'info> internal::Authentication<'info> for InitializeTokenConfigMap<'info> 
 
 #[derive(Accounts)]
 pub struct InsertTokenConfig<'info> {
+    #[account(mut)]
     pub authority: Signer<'info>,
     pub only_controller: Account<'info, Roles>,
     pub store: Account<'info, DataStore>,
@@ -57,9 +58,13 @@ pub struct InsertTokenConfig<'info> {
         mut,
         seeds = [TokenConfigMap::SEED, store.key().as_ref()],
         bump = map.bump,
+        realloc = 8 + TokenConfigMap::init_space(map.length_after_insert(&token.key())),
+        realloc::zero = false,
+        realloc::payer = authority,
     )]
     pub map: Account<'info, TokenConfigMap>,
     pub token: Account<'info, Mint>,
+    pub system_program: Program<'info, System>,
 }
 
 /// Insert or update the config of the given token.

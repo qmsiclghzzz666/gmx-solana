@@ -32,13 +32,7 @@ describe("data store: TokenConfig", () => {
             expect(config).null;
         }
 
-        // Shouldn't have enough space for inserting a new token config.
-        await expect(insertTokenConfig(signer0, dataStoreAddress, newToken, BTC_FEED, 60, 3)).to.be.rejectedWith(AnchorError, "AccountDidNotSerialize");
-
-        // Extend the map.
-        await extendTokenConfigMap(signer0, dataStoreAddress, 1);
-
-        // We should be able to insert now.
+        // We should be able to insert.
         {
             await insertTokenConfig(signer0, dataStoreAddress, newToken, BTC_FEED, 60, 3);
             const config = await getTokenConfig(dataStoreAddress, newToken);

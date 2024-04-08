@@ -220,7 +220,7 @@ export const initializeDataStore = async (
     // Insert FakeToken token config.
     try {
         await insertTokenConfig(signer, dataStorePDA, fakeToken, BTC_FEED, HEARTBEAT, 2);
-        console.log(`Init a token configfor ${fakeToken}`);
+        console.log(`Init a token config for ${fakeToken}`);
     } catch (error) {
         console.warn("Failed to init the token config account", error);
     }

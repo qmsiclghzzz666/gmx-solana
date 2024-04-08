@@ -36,6 +36,14 @@ impl TokenConfigMap {
         DualVecMap::from_sorted_stores_unchecked(&self.tokens, &self.configs)
     }
 
+    pub(crate) fn length_after_insert(&self, token: &Pubkey) -> usize {
+        let map = self.as_map();
+        match map.get(token) {
+            None => map.len() + 1,
+            Some(_) => map.len(),
+        }
+    }
+
     pub(crate) fn as_map_mut(&mut self) -> DualVecMap<&mut Vec<Pubkey>, &mut Vec<TokenConfig>> {
         DualVecMap::from_sorted_stores_unchecked(&mut self.tokens, &mut self.configs)
     }
