@@ -7,7 +7,7 @@ use anchor_client::{
 };
 use data_store::{
     accounts, instruction,
-    states::{DataStore, Market, Seed, TokenConfigMap},
+    states::{DataStore, Market, Seed},
 };
 use gmx_solana_utils::to_seed;
 
@@ -37,11 +37,6 @@ pub fn find_market_vault_address(store: &Pubkey, token: &Pubkey) -> (Pubkey, u8)
         ],
         &data_store::id(),
     )
-}
-
-/// Find PDA for [`TokenConfigMap`] account.
-pub fn find_token_config_map(store: &Pubkey) -> (Pubkey, u8) {
-    Pubkey::find_program_address(&[TokenConfigMap::SEED, store.as_ref()], &data_store::id())
 }
 
 /// Data Store management for GMSOL.
