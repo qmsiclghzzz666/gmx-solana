@@ -11,11 +11,12 @@ use anchor_client::{
     Client, Cluster,
 };
 use clap::Parser;
-use eyre::eyre;
+use eyre::{eyre, ContextCompat};
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::EnvFilter;
 
 mod admin;
+mod controller;
 mod exchange;
 mod inspect;
 mod keeper;
@@ -54,8 +55,10 @@ enum Command {
     Roles(roles::RolesArgs),
     /// Commands for `Exchange` program.
     Exchange(exchange::ExchangeArgs),
-    /// Coomands for keepers.
+    /// Commands for keepers.
     Keeper(keeper::KeeperArgs),
+    /// Commands for controllers.
+    Controller(controller::ControllerArgs),
 }
 
 #[tokio::main]
@@ -98,6 +101,10 @@ impl Cli {
         Ok((Arc::new(client), payer))
     }
 
+    fn store(&self) -> eyre::Result<&Pubkey> {
+        self.store.as_ref().wrap_err("missing store address")
+    }
+
     async fn run(&self) -> eyre::Result<()> {
         let (client, payer) = self.client()?;
         match &self.command {
@@ -106,18 +113,10 @@ impl Cli {
             }
             Command::Admin(args) => args.run(&client, self.store.as_ref()).await?,
             Command::Inspect(args) => args.run(&client, self.store.as_ref()).await?,
-            Command::Roles(args) => {
-                let store = self.store.ok_or(eyre::eyre!("missing store address"))?;
-                args.run(&client, &store).await?
-            }
-            Command::Exchange(args) => {
-                let store = self.store.ok_or(eyre::eyre!("missing store address"))?;
-                args.run(&client, &store).await?
-            }
-            Command::Keeper(args) => {
-                let store = self.store.ok_or(eyre::eyre!("missing store address"))?;
-                args.run(&client, &store).await?
-            }
+            Command::Roles(args) => args.run(&client, self.store()?).await?,
+            Command::Exchange(args) => args.run(&client, self.store()?).await?,
+            Command::Keeper(args) => args.run(&client, self.store()?).await?,
+            Command::Controller(args) => args.run(&client, self.store()?).await?,
         }
         Ok(())
     }
