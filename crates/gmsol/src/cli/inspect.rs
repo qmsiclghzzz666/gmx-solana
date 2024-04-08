@@ -29,6 +29,9 @@ enum Command {
         /// Consider the address as market address rather than the address of its market token.
         #[arg(long)]
         as_market_address: bool,
+        /// Whether to display the market address.
+        #[arg(long)]
+        show_market_address: bool,
     },
     /// `Deposit` account.
     Deposit { address: Pubkey },
@@ -74,12 +77,16 @@ impl InspectArgs {
             Command::Market {
                 mut address,
                 as_market_address,
+                show_market_address,
             } => {
                 if !as_market_address {
                     address =
                         find_market_address(store.wrap_err("`store` not provided")?, &address).0;
                 }
                 println!("{:#?}", program.account::<states::Market>(address).await?);
+                if show_market_address {
+                    println!("Market address: {address}");
+                }
             }
             Command::Deposit { address } => {
                 println!("{:#?}", program.account::<states::Deposit>(address).await?);
