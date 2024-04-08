@@ -14,7 +14,7 @@ use exchange::{
 };
 
 use crate::store::{
-    data_store::{find_market_address, find_market_vault_address},
+    market::{find_market_address, find_market_vault_address},
     roles::find_roles_address,
     token_config::find_token_config_map,
 };

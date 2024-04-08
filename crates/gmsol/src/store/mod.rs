@@ -10,5 +10,5 @@ pub mod oracle;
 /// Token Config.
 pub mod token_config;
 
-/// Vault.
-pub mod vault;
+/// Market and vault management.
+pub mod market;

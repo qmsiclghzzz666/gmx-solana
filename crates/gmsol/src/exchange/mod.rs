@@ -7,12 +7,19 @@ pub mod withdrawal;
 use std::ops::Deref;
 
 use anchor_client::{
+    anchor_lang::system_program,
     solana_sdk::{pubkey::Pubkey, signer::Signer},
-    Program,
+    Program, RequestBuilder,
 };
 use data_store::states::{DataStore, NonceBytes, Seed};
+use exchange::{accounts, instruction};
 use gmx_solana_utils::to_seed;
 use rand::{distributions::Standard, Rng};
+
+use crate::store::{
+    market::{find_market_address, find_market_token_address, find_market_vault_address},
+    roles::find_roles_address,
+};
 
 use self::{
     deposit::{CancelDepositBuilder, CreateDepositBuilder, ExecuteDepositBuilder},
@@ -58,6 +65,15 @@ pub trait ExchangeOps<C> {
         oracle: &Pubkey,
         withdrawal: &Pubkey,
     ) -> ExecuteWithdrawalBuilder<C>;
+
+    /// Create a new market and return its token mint address.
+    fn create_market(
+        &self,
+        store: &Pubkey,
+        index_token: &Pubkey,
+        long_token: &Pubkey,
+        short_token: &Pubkey,
+    ) -> (RequestBuilder<C>, Pubkey);
 }
 
 impl<S, C> ExchangeOps<C> for Program<C>
@@ -102,6 +118,36 @@ where
         withdrawal: &Pubkey,
     ) -> ExecuteWithdrawalBuilder<C> {
         ExecuteWithdrawalBuilder::new(self, store, oracle, withdrawal)
+    }
+
+    fn create_market(
+        &self,
+        store: &Pubkey,
+        index_token: &Pubkey,
+        long_token: &Pubkey,
+        short_token: &Pubkey,
+    ) -> (RequestBuilder<C>, Pubkey) {
+        let authority = self.payer();
+        let market_token = find_market_token_address(store, index_token, long_token, short_token).0;
+        let builder = self
+            .request()
+            .accounts(accounts::CreateMarket {
+                authority,
+                only_market_keeper: find_roles_address(store, &authority).0,
+                data_store: *store,
+                market: find_market_address(store, &market_token).0,
+                market_token_mint: market_token,
+                long_token_mint: *long_token,
+                short_token_mint: *short_token,
+                market_token_vault: find_market_vault_address(store, &market_token).0,
+                data_store_program: data_store::id(),
+                system_program: system_program::ID,
+                token_program: anchor_spl::token::ID,
+            })
+            .args(instruction::CreateMarket {
+                index_token_mint: *index_token,
+            });
+        (builder, market_token)
     }
 }
 

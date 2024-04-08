@@ -8,7 +8,7 @@ use anchor_client::{
 };
 use gmsol::{
     exchange::ExchangeOps,
-    store::{oracle::find_oracle_address, vault::VaultOps},
+    store::{market::VaultOps, oracle::find_oracle_address},
 };
 
 use crate::SharedClient;
@@ -44,6 +44,15 @@ enum Command {
     },
     /// Initialize Market Vault.
     InitializeVault { token: Pubkey },
+    /// Create Market.
+    CreateMarket {
+        #[arg(long)]
+        index_token: Pubkey,
+        #[arg(long)]
+        long_token: Pubkey,
+        #[arg(long)]
+        short_token: Pubkey,
+    },
 }
 
 #[derive(clap::Args)]
@@ -150,6 +159,19 @@ impl KeeperArgs {
                 let (request, vault) = program.initialize_market_vault(store, token);
                 let signature = request.send().await?;
                 println!("created a new vault {vault} at tx {signature}");
+            }
+            Command::CreateMarket {
+                index_token,
+                long_token,
+                short_token,
+            } => {
+                let program = client.program(exchange::id())?;
+                let (request, market_token) =
+                    program.create_market(store, index_token, long_token, short_token);
+                let signature = request.send().await?;
+                println!(
+                    "created a new market with {market_token} as its token address at tx {signature}"
+                );
             }
         }
         Ok(())

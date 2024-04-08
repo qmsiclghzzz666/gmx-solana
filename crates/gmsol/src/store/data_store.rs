@@ -7,7 +7,7 @@ use anchor_client::{
 };
 use data_store::{
     accounts, instruction,
-    states::{DataStore, Market, Seed},
+    states::{DataStore, Seed},
 };
 use gmx_solana_utils::to_seed;
 
@@ -16,27 +16,6 @@ use super::roles::find_roles_address;
 /// Find PDA for [`DataStore`] account.
 pub fn find_store_address(key: &str) -> (Pubkey, u8) {
     Pubkey::find_program_address(&[DataStore::SEED, &to_seed(key)], &data_store::id())
-}
-
-/// Find PDA for [`Market`] account.
-pub fn find_market_address(store: &Pubkey, token: &Pubkey) -> (Pubkey, u8) {
-    Pubkey::find_program_address(
-        &[Market::SEED, store.as_ref(), &to_seed(&token.to_string())],
-        &data_store::id(),
-    )
-}
-
-/// Find PDA for market vault account.
-pub fn find_market_vault_address(store: &Pubkey, token: &Pubkey) -> (Pubkey, u8) {
-    Pubkey::find_program_address(
-        &[
-            data_store::constants::MARKET_VAULT_SEED,
-            store.as_ref(),
-            token.as_ref(),
-            &[],
-        ],
-        &data_store::id(),
-    )
 }
 
 /// Data Store management for GMSOL.

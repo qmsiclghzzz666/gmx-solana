@@ -3,7 +3,7 @@ use data_store::states;
 use exchange::utils::ControllerSeeds;
 use eyre::ContextCompat;
 use gmsol::store::{
-    data_store::find_market_address,
+    market::find_market_address,
     token_config::{find_token_config_map, get_token_config},
 };
 

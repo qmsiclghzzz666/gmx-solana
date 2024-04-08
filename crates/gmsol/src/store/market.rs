@@ -5,7 +5,11 @@ use anchor_client::{
     solana_sdk::{pubkey::Pubkey, signer::Signer},
     Program, RequestBuilder,
 };
-use data_store::{accounts, constants, instruction};
+use data_store::{
+    accounts, constants, instruction,
+    states::{Market, Seed},
+};
+use gmx_solana_utils::to_seed;
 
 use super::roles::find_roles_address;
 
@@ -18,6 +22,33 @@ pub fn find_market_vault_address(store: &Pubkey, token: &Pubkey) -> (Pubkey, u8)
             token.as_ref(),
             &[],
         ],
+        &data_store::id(),
+    )
+}
+
+/// Find PDA for Market token mint account.
+pub fn find_market_token_address(
+    store: &Pubkey,
+    index_token: &Pubkey,
+    long_token: &Pubkey,
+    short_token: &Pubkey,
+) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[
+            constants::MAREKT_TOKEN_MINT_SEED,
+            store.as_ref(),
+            index_token.as_ref(),
+            long_token.as_ref(),
+            short_token.as_ref(),
+        ],
+        &data_store::id(),
+    )
+}
+
+/// Find PDA for [`Market`] account.
+pub fn find_market_address(store: &Pubkey, token: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[Market::SEED, store.as_ref(), &to_seed(&token.to_string())],
         &data_store::id(),
     )
 }
