@@ -37,6 +37,8 @@ where
         f.debug_struct("IncreasePositionReport")
             .field("params", &self.params)
             .field("execution", &self.execution)
+            .field("collateral_delta_amount", &self.collateral_delta_amount)
+            .field("fees", &self.fees)
             .finish()
     }
 }
@@ -77,7 +79,7 @@ impl<T: Unsigned> IncreasePositionReport<T> {
     }
 }
 
-/// Exeuction Params for increating position.
+/// Exeuction Params for increasing position.
 #[derive(Debug, Clone, Copy)]
 pub struct ExecutionParams<T: Unsigned> {
     price_impact_value: T::Signed,

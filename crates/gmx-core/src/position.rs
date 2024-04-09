@@ -1,5 +1,5 @@
 use crate::{
-    action::{increase_position::IncreasePosition, Prices},
+    action::{decrease_position::DecreasePosition, increase_position::IncreasePosition, Prices},
     num::{Num, Unsigned, UnsignedAbs},
     Market,
 };
@@ -86,6 +86,18 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
             size_delta_usd,
             acceptable_price,
         )
+    }
+
+    /// Create an action to decrease the position.
+    fn decrease(
+        &mut self,
+        prices: Prices<Self::Num>,
+        acceptable_price: Option<Self::Num>,
+    ) -> crate::Result<DecreasePosition<&mut Self, DECIMALS>>
+    where
+        Self: Sized,
+    {
+        DecreasePosition::try_new(self, prices, acceptable_price)
     }
 }
 

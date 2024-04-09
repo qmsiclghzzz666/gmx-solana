@@ -7,8 +7,11 @@ pub mod withdraw;
 /// Swap.
 pub mod swap;
 
-/// Increate Position.
+/// Increase Position.
 pub mod increase_position;
+
+/// Decrease Position.
+pub mod decrease_position;
 
 /// Prices of a market.
 #[derive(Debug, Clone, Copy)]
