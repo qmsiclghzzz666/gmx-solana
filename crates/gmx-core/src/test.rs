@@ -6,6 +6,7 @@ use crate::{
     num::{MulDiv, Num, UnsignedAbs},
     params::{FeeParams, SwapImpactParams},
     pool::{Pool, PoolKind},
+    position::Position,
 };
 use num_traits::{CheckedSub, Signed};
 
@@ -187,5 +188,69 @@ where
 
     fn swap_fee_params(&self) -> crate::params::FeeParams<Self::Num> {
         self.swap_fee_params.clone()
+    }
+}
+
+/// Test Position
+#[derive(Debug, Clone, Copy, Default)]
+pub struct TestPosition<T, const DECIMALS: u8> {
+    is_long: bool,
+    is_collateral_token_long: bool,
+    collateral_token_amount: T,
+    size_in_usd: T,
+    size_in_tokens: T,
+}
+
+impl<T, const DECIMALS: u8> TestPosition<T, DECIMALS> {
+    /// Create a [`TestPositionOps`] for ops.
+    pub fn ops<'a>(
+        &'a mut self,
+        market: &'a mut TestMarket<T, DECIMALS>,
+    ) -> TestPositionOps<T, DECIMALS> {
+        TestPositionOps {
+            market,
+            position: self,
+        }
+    }
+}
+
+/// Test Position.
+#[derive(Debug)]
+pub struct TestPositionOps<'a, T, const DECIMALS: u8> {
+    market: &'a mut TestMarket<T, DECIMALS>,
+    position: &'a mut TestPosition<T, DECIMALS>,
+}
+
+impl<'a, T, const DECIMALS: u8> Position<DECIMALS> for TestPositionOps<'a, T, DECIMALS>
+where
+    T: CheckedSub + fmt::Display + FixedPointOps<DECIMALS>,
+    T::Signed: Num + std::fmt::Debug,
+{
+    type Num = T;
+
+    type Market = TestMarket<T, DECIMALS>;
+
+    fn market_mut(&mut self) -> &mut Self::Market {
+        self.market
+    }
+
+    fn is_collateral_token_long(&self) -> bool {
+        self.position.is_collateral_token_long
+    }
+
+    fn collateral_amount_mut(&mut self) -> &mut Self::Num {
+        &mut self.position.collateral_token_amount
+    }
+
+    fn size_in_usd_mut(&mut self) -> &mut Self::Num {
+        &mut self.position.size_in_usd
+    }
+
+    fn size_in_tokens_mut(&mut self) -> &mut Self::Num {
+        &mut self.position.size_in_tokens
+    }
+
+    fn is_long(&self) -> bool {
+        self.position.is_long
     }
 }
