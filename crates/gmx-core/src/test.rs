@@ -212,6 +212,28 @@ impl<T, const DECIMALS: u8> TestPosition<T, DECIMALS> {
             position: self,
         }
     }
+
+    /// Create an empty long position.
+    pub fn long() -> Self
+    where
+        T: Default,
+    {
+        Self {
+            is_long: true,
+            ..Default::default()
+        }
+    }
+
+    /// Create an empty short position.
+    pub fn short() -> Self
+    where
+        T: Default,
+    {
+        Self {
+            is_long: false,
+            ..Default::default()
+        }
+    }
 }
 
 /// Test Position.
@@ -227,6 +249,8 @@ where
     T::Signed: Num + std::fmt::Debug,
 {
     type Num = T;
+
+    type Signed = T::Signed;
 
     type Market = TestMarket<T, DECIMALS>;
 

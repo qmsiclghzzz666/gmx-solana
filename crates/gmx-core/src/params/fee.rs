@@ -85,6 +85,27 @@ impl<T> FeeParams<T> {
     }
 }
 
+/// Position Fees.
+#[derive(Debug, Clone, Copy)]
+pub struct PositionFees<T> {
+    base: Fees<T>,
+}
+
+impl<T> PositionFees<T> {
+    /// Get base fees.
+    pub fn base(&self) -> &Fees<T> {
+        &self.base
+    }
+}
+
+impl<T: Zero> Default for PositionFees<T> {
+    fn default() -> Self {
+        Self {
+            base: Default::default(),
+        }
+    }
+}
+
 /// Builder for [`FeeParams`].
 pub struct Builder<T> {
     positive_impact_factor: T,

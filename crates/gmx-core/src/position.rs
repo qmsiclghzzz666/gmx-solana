@@ -1,12 +1,16 @@
 use crate::{
     action::{increase_position::IncreasePosition, Prices},
+    num::{Num, Unsigned, UnsignedAbs},
     Market,
 };
 
 /// A position.
 pub trait Position<const DECIMALS: u8> {
     /// Unsigned number type.
-    type Num;
+    type Num: Unsigned<Signed = Self::Signed> + Num;
+
+    /// Signed number type.
+    type Signed: UnsignedAbs<Unsigned = Self::Num> + TryFrom<Self::Num> + Num;
 
     /// Market type.
     type Market: Market<DECIMALS, Num = Self::Num>;
@@ -32,6 +36,8 @@ pub trait Position<const DECIMALS: u8> {
 
 impl<'a, const DECIMALS: u8, P: Position<DECIMALS>> Position<DECIMALS> for &'a mut P {
     type Num = P::Num;
+
+    type Signed = P::Signed;
 
     type Market = P::Market;
 

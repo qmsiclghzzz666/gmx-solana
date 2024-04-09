@@ -20,3 +20,15 @@ pub struct Prices<T> {
     /// Short token price.
     pub short_token_price: T,
 }
+
+impl<T> Prices<T>
+where
+    T: num_traits::Zero,
+{
+    /// Check if the prices is valid.
+    pub fn is_valid(&self) -> bool {
+        !self.index_token_price.is_zero()
+            && !self.long_token_price.is_zero()
+            && !self.short_token_price.is_zero()
+    }
+}
