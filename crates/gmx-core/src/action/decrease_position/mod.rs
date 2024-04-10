@@ -19,18 +19,27 @@ mod debt;
 pub struct DecreasePosition<P: Position<DECIMALS>, const DECIMALS: u8> {
     position: P,
     params: DecreasePositionParams<P::Num>,
+    withdrawable_collateral_amount: P::Num,
 }
 
 /// Decrease Position Params.
 #[derive(Debug, Clone, Copy)]
 pub struct DecreasePositionParams<T> {
+    collateral_withdrawal_amount: T,
     size_delta_usd: T,
     acceptable_price: Option<T>,
     prices: Prices<T>,
 }
 
+impl<T> DecreasePositionParams<T> {
+    /// Get collateral withdrawal amount.
+    pub fn collateral_withdrawal_amount(&self) -> &T {
+        &self.collateral_withdrawal_amount
+    }
+}
+
 /// Report of the execution of posiiton decreasing.
-#[must_use = "`should_remove` and `output_amount` must use"]
+#[must_use = "`should_remove`, `output_amount`, `secondary_output_amount` must use"]
 pub struct DecreasePositionReport<T: Unsigned> {
     should_remove: bool,
     params: DecreasePositionParams<T>,
@@ -38,6 +47,7 @@ pub struct DecreasePositionReport<T: Unsigned> {
     execution_price: T,
     size_delta_in_tokens: T,
     fees: PositionFees<T>,
+    withdrawable_collateral_amount: T,
 
     // Output.
     is_output_token_long: bool,
@@ -57,6 +67,10 @@ where
             .field("execution_price", &self.execution_price)
             .field("size_delta_in_tokens", &self.size_delta_in_tokens)
             .field("fees", &self.fees)
+            .field(
+                "withdrawable_collateral_amount",
+                &self.withdrawable_collateral_amount,
+            )
             .field("is_output_token_long", &self.is_output_token_long)
             .field("output_amount", &self.output_amount)
             .field("secondary_output_amount", &self.secondary_output_amount)
@@ -69,6 +83,7 @@ impl<T: Unsigned> DecreasePositionReport<T> {
         should_remove: bool,
         params: DecreasePositionParams<T>,
         execution: ProcessCollateralResult<T>,
+        withdrawable_collateral_amount: T,
     ) -> Self {
         Self {
             should_remove,
@@ -80,6 +95,7 @@ impl<T: Unsigned> DecreasePositionReport<T> {
             is_output_token_long: execution.is_output_token_long,
             output_amount: execution.collateral.output_amount,
             secondary_output_amount: execution.collateral.secondary_output_amount,
+            withdrawable_collateral_amount,
         }
     }
 
@@ -88,14 +104,29 @@ impl<T: Unsigned> DecreasePositionReport<T> {
         &self.params
     }
 
-    /// Returns whether the output token is long token.
-    pub fn is_output_token_long(&self) -> bool {
-        self.is_output_token_long
-    }
-
     /// Get size delta in tokens.
     pub fn size_delta_in_tokens(&self) -> &T {
         &self.size_delta_in_tokens
+    }
+
+    /// Get execution price.
+    pub fn execution_price(&self) -> &T {
+        &self.execution_price
+    }
+
+    /// Get price impact value.
+    pub fn price_impact_value(&self) -> &T::Signed {
+        &self.price_impact_value
+    }
+
+    /// Get execution fees.
+    pub fn fees(&self) -> &PositionFees<T> {
+        &self.fees
+    }
+
+    /// Returns whether the output token is long token.
+    pub fn is_output_token_long(&self) -> bool {
+        self.is_output_token_long
     }
 
     /// Get output amount.
@@ -113,19 +144,9 @@ impl<T: Unsigned> DecreasePositionReport<T> {
         self.should_remove
     }
 
-    /// Get execution price.
-    pub fn execution_price(&self) -> &T {
-        &self.execution_price
-    }
-
-    /// Get price impact value.
-    pub fn price_impact_value(&self) -> &T::Signed {
-        &self.price_impact_value
-    }
-
-    /// Get execution fees.
-    pub fn fees(&self) -> &PositionFees<T> {
-        &self.fees
+    /// Get withdrawable collateral amount.
+    pub fn withdrawable_collateral_amount(&self) -> &T {
+        &self.withdrawable_collateral_amount
     }
 }
 
@@ -145,6 +166,7 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
         prices: Prices<P::Num>,
         size_delta_usd: P::Num,
         acceptable_price: Option<P::Num>,
+        collateral_withdrawal_amount: P::Num,
     ) -> crate::Result<Self> {
         if !prices.is_valid() {
             return Err(crate::Error::invalid_argument("invalid prices"));
@@ -155,12 +177,15 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
             ));
         }
         Ok(Self {
-            position,
             params: DecreasePositionParams {
                 size_delta_usd,
                 acceptable_price,
                 prices,
+                collateral_withdrawal_amount: collateral_withdrawal_amount.clone(),
             },
+            withdrawable_collateral_amount: collateral_withdrawal_amount
+                .min(position.collateral_amount_mut().clone()),
+            position,
         })
     }
 
@@ -170,8 +195,13 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
             self.params.size_delta_usd <= *self.position.size_in_usd_mut(),
             "must have been checked or capped by the position size"
         );
-        self.check_partial()?;
-        self.prepare_close()?;
+        debug_assert!(
+            self.withdrawable_collateral_amount <= *self.position.collateral_amount_mut(),
+            "must have been capped by the position collateral amount"
+        );
+
+        self.check_partial_close()?;
+        self.check_close()?;
 
         let is_pnl_token_long = self.position.is_long();
 
@@ -236,18 +266,23 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
             should_remove,
             self.params,
             execution,
+            self.withdrawable_collateral_amount,
         ))
     }
 
     /// Do a check when the position will be partially decreased.
-    fn check_partial(&mut self) -> crate::Result<()> {
-        // TODO: do the check.
+    fn check_partial_close(&mut self) -> crate::Result<()> {
+        // TODO: make sure the collateral amount after withdraw will be sufficient.
         Ok(())
     }
 
-    /// FIXME: not sure what to do here.
-    fn prepare_close(&mut self) -> crate::Result<()> {
-        // TODO: set initial collateral delta amount to zero?
+    fn check_close(&mut self) -> crate::Result<()> {
+        if self.params.size_delta_usd == *self.position.size_in_usd()
+            && !self.withdrawable_collateral_amount.is_zero()
+        {
+            // Help ensure that the order can be executed.
+            self.withdrawable_collateral_amount = Zero::zero();
+        }
         Ok(())
     }
 
@@ -285,9 +320,27 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
         // TODO: pay for other fees.
         // TODO: pay ofr negative price impact.
         // TODO: pay for price impact diff.
-        // TODO: handle initial collateral delta amount.
+        let mut report = processor.process()?;
 
-        let report = processor.process()?;
+        // TODO: handle initial collateral delta amount with price impact diff.
+
+        // Cap the withdrawal amount to the remaining collateral amount.
+        if self.withdrawable_collateral_amount > report.remaining_collateral_amount {
+            self.withdrawable_collateral_amount = report.remaining_collateral_amount.clone();
+        }
+
+        if !self.withdrawable_collateral_amount.is_zero() {
+            report.remaining_collateral_amount = report
+                .remaining_collateral_amount
+                .checked_sub(&self.withdrawable_collateral_amount)
+                .expect("must be success");
+            report.output_amount = report
+                .output_amount
+                .checked_add(&self.withdrawable_collateral_amount)
+                .ok_or(crate::Error::Computation(
+                    "overflow adding withdrawable amount",
+                ))?;
+        }
 
         Ok(ProcessCollateralResult {
             price_impact_value,
@@ -491,6 +544,7 @@ mod tests {
                 },
                 40_000_000,
                 None,
+                100,
             )?
             .execute()?;
         println!("{report:#?}");
@@ -507,6 +561,7 @@ mod tests {
                 },
                 40_000_000,
                 None,
+                0,
             )?
             .execute()?;
         println!("{report:#?}");

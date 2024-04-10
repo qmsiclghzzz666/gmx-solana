@@ -115,11 +115,18 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
         prices: Prices<Self::Num>,
         size_delta_usd: Self::Num,
         acceptable_price: Option<Self::Num>,
+        collateral_withdrawal_amount: Self::Num,
     ) -> crate::Result<DecreasePosition<&mut Self, DECIMALS>>
     where
         Self: Sized,
     {
-        DecreasePosition::try_new(self, prices, size_delta_usd, acceptable_price)
+        DecreasePosition::try_new(
+            self,
+            prices,
+            size_delta_usd,
+            acceptable_price,
+            collateral_withdrawal_amount,
+        )
     }
 }
 
