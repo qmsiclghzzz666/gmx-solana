@@ -55,6 +55,9 @@ pub enum Error {
     /// Withdrawal vault not set.
     #[error("withdrawal vault not set")]
     WithdrawalVaultNotSet,
+    /// Insufficient funds to pay for cost.
+    #[error("insufficient funds to pay for costs")]
+    InsufficientFundsToPayForCosts,
 }
 
 impl Error {

@@ -4,12 +4,15 @@ use std::fmt;
 use crate::{
     num::{MulDiv, Unsigned, UnsignedAbs},
     params::fee::PositionFees,
-    pool::PoolExt,
     position::Position,
-    MarketExt,
 };
 
+use self::collateral_processor::{CollateralProcessor, ProcessReport};
+
 use super::Prices;
+
+mod collateral_processor;
+mod debt;
 
 /// Decrease the position.
 #[must_use]
@@ -31,7 +34,15 @@ pub struct DecreasePositionParams<T> {
 pub struct DecreasePositionReport<T: Unsigned> {
     should_remove: bool,
     params: DecreasePositionParams<T>,
-    execution: ExecutionResult<T>,
+    price_impact_value: T::Signed,
+    execution_price: T,
+    size_delta_in_tokens: T,
+    fees: PositionFees<T>,
+
+    // Output.
+    is_output_token_long: bool,
+    output_amount: T,
+    secondary_output_amount: T,
 }
 
 impl<T: Unsigned + fmt::Debug> fmt::Debug for DecreasePositionReport<T>
@@ -42,7 +53,13 @@ where
         f.debug_struct("DecreasePositionReport")
             .field("should_remove", &self.should_remove)
             .field("params", &self.params)
-            .field("execution", &self.execution)
+            .field("price_impact_value", &self.price_impact_value)
+            .field("execution_price", &self.execution_price)
+            .field("size_delta_in_tokens", &self.size_delta_in_tokens)
+            .field("fees", &self.fees)
+            .field("is_output_token_long", &self.is_output_token_long)
+            .field("output_amount", &self.output_amount)
+            .field("secondary_output_amount", &self.secondary_output_amount)
             .finish()
     }
 }
@@ -51,12 +68,18 @@ impl<T: Unsigned> DecreasePositionReport<T> {
     fn new(
         should_remove: bool,
         params: DecreasePositionParams<T>,
-        execution: ExecutionResult<T>,
+        execution: ProcessCollateralResult<T>,
     ) -> Self {
         Self {
             should_remove,
             params,
-            execution,
+            price_impact_value: execution.price_impact_value,
+            execution_price: execution.execution_price,
+            size_delta_in_tokens: execution.size_delta_in_tokens,
+            fees: execution.fees,
+            is_output_token_long: execution.is_output_token_long,
+            output_amount: execution.collateral.output_amount,
+            secondary_output_amount: execution.collateral.secondary_output_amount,
         }
     }
 
@@ -65,40 +88,54 @@ impl<T: Unsigned> DecreasePositionReport<T> {
         &self.params
     }
 
-    /// Get execution result.
-    pub fn execution(&self) -> &ExecutionResult<T> {
-        &self.execution
+    /// Returns whether the output token is long token.
+    pub fn is_output_token_long(&self) -> bool {
+        self.is_output_token_long
+    }
+
+    /// Get size delta in tokens.
+    pub fn size_delta_in_tokens(&self) -> &T {
+        &self.size_delta_in_tokens
     }
 
     /// Get output amount.
     pub fn output_amount(&self) -> &T {
-        &self.execution.output_amount
+        &self.output_amount
+    }
+
+    /// Get secondary output amount.
+    pub fn secondary_output_amount(&self) -> &T {
+        &self.secondary_output_amount
     }
 
     /// Get should remove.
     pub fn should_remove(&self) -> bool {
         self.should_remove
     }
-}
 
-/// Exeuction Result for decreasing position.
-#[derive(Debug, Clone, Copy)]
-pub struct ExecutionResult<T: Unsigned> {
-    price_impact_value: T::Signed,
-    execution_price: T,
-    size_delta_in_tokens: T,
-    remaining_collateral_amount: T,
-    is_output_token_long: bool,
-    output_amount: T,
-    is_secondary_output_token_long: bool,
-    secondary_output_amount: T,
-}
-
-impl<T: Unsigned> ExecutionResult<T> {
     /// Get execution price.
     pub fn execution_price(&self) -> &T {
         &self.execution_price
     }
+
+    /// Get price impact value.
+    pub fn price_impact_value(&self) -> &T::Signed {
+        &self.price_impact_value
+    }
+
+    /// Get execution fees.
+    pub fn fees(&self) -> &PositionFees<T> {
+        &self.fees
+    }
+}
+
+struct ProcessCollateralResult<T: Unsigned> {
+    price_impact_value: T::Signed,
+    execution_price: T,
+    size_delta_in_tokens: T,
+    is_output_token_long: bool,
+    collateral: ProcessReport<T>,
+    fees: PositionFees<T>,
 }
 
 impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
@@ -137,11 +174,6 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
         self.prepare_close()?;
 
         let is_pnl_token_long = self.position.is_long();
-        let pnl_token_price = if is_pnl_token_long {
-            &self.params.prices.long_token_price
-        } else {
-            &self.params.prices.short_token_price
-        };
 
         // TODO: handle NoSwap.
 
@@ -151,9 +183,9 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
 
         // TODO: handle liquidation order.
 
-        let initial_collateral_amount = self.position.collateral_amount_mut().clone();
+        // let initial_collateral_amount = self.position.collateral_amount_mut().clone();
 
-        let (mut execution, fees) = self.process_collateral(is_pnl_token_long)?;
+        let mut execution = self.process_collateral(is_pnl_token_long)?;
 
         let next_position_size_in_usd = self
             .position
@@ -171,7 +203,8 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
             .size_in_tokens_mut()
             .checked_sub(&execution.size_delta_in_tokens)
             .ok_or(crate::Error::Computation("calculating next size in tokens"))?;
-        let next_position_collateral_amount = execution.remaining_collateral_amount.clone();
+        let next_position_collateral_amount =
+            execution.collateral.remaining_collateral_amount.clone();
 
         // TODO: update claimable funding amount.
 
@@ -180,7 +213,8 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
                 *self.position.size_in_usd_mut() = Zero::zero();
                 *self.position.size_in_tokens_mut() = Zero::zero();
                 *self.position.collateral_amount_mut() = Zero::zero();
-                execution.output_amount = execution
+                execution.collateral.output_amount = execution
+                    .collateral
                     .output_amount
                     .checked_add(&next_position_collateral_amount)
                     .ok_or(crate::Error::Computation("calculating output amount"))?;
@@ -221,82 +255,48 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
     fn process_collateral(
         &mut self,
         is_pnl_token_long: bool,
-    ) -> crate::Result<(ExecutionResult<P::Num>, PositionFees<P::Num>)> {
-        let pnl_token_price = if is_pnl_token_long {
-            &self.params.prices.long_token_price
-        } else {
-            &self.params.prices.short_token_price
-        };
+    ) -> crate::Result<ProcessCollateralResult<P::Num>> {
         // TODO: handle insolvent close.
 
-        let (price_impact_value, price_impact_diff_usd, execution_price) =
+        let (price_impact_value, _price_impact_diff_usd, execution_price) =
             self.get_execution_params()?;
 
         // TODO: calculate position pnl usd.
-        let (base_pnl_usd, unpacced_base_pnl_usd, size_delta_in_tokens) = self.get_pnl_usd()?;
+        let (base_pnl_usd, _uncapped_base_pnl_usd, size_delta_in_tokens) = self.get_pnl_usd()?;
 
         // TODO: calcualte fees.
         let fees = PositionFees::default();
 
         let is_output_token_long = self.position.is_collateral_token_long();
-        let mut output_amount: P::Num = Zero::zero();
-        let mut secondary_output_amount: P::Num = Zero::zero();
 
-        // Pay positive pnl.
-        if base_pnl_usd.is_positive() {
-            // TODO: pick max pnl token price.
-            let deduction_amount_for_pool = base_pnl_usd.unsigned_abs() / pnl_token_price.clone();
+        let remaining_collateral_amount = self.position.collateral_amount_mut().clone();
+        let mut processor = CollateralProcessor::new(
+            self.position.market_mut(),
+            remaining_collateral_amount,
+            is_output_token_long,
+            is_pnl_token_long,
+            &self.params.prices.long_token_price,
+            &self.params.prices.short_token_price,
+        );
 
-            self.position.market_mut().apply_delta(
-                is_pnl_token_long,
-                &deduction_amount_for_pool.to_opposite_signed()?,
-            )?;
-
-            if is_output_token_long == is_pnl_token_long {
-                output_amount = output_amount
-                    .checked_add(&deduction_amount_for_pool)
-                    .ok_or(crate::Error::Computation(
-                        "overflow adding deduction amount to output_amount",
-                    ))?;
-            } else {
-                secondary_output_amount = secondary_output_amount
-                    .checked_add(&deduction_amount_for_pool)
-                    .ok_or(crate::Error::Computation(
-                        "overflow adding deduction amount to secondary_output_amount",
-                    ))?;
-            }
-        }
-
+        processor.apply_pnl(&base_pnl_usd)?;
         // TODO: pay positive price impact.
-
-        // FIXME: We might not have to do the swapping of profit to collateral token here.
-
-        let mut remaining_collateral_amount = self.position.collateral_amount_mut().clone();
-
         // TODO: pay for funding fees.
-
-        // Pay negative pnl.
-        if base_pnl_usd.is_negative() {
-            self.pay_for_cost(&base_pnl_usd.unsigned_abs())?;
-        }
-
         // TODO: pay for other fees.
         // TODO: pay ofr negative price impact.
         // TODO: pay for price impact diff.
         // TODO: handle initial collateral delta amount.
-        Ok((
-            ExecutionResult {
-                price_impact_value,
-                execution_price,
-                size_delta_in_tokens,
-                remaining_collateral_amount,
-                is_output_token_long,
-                output_amount,
-                is_secondary_output_token_long: is_pnl_token_long,
-                secondary_output_amount,
-            },
+
+        let report = processor.process()?;
+
+        Ok(ProcessCollateralResult {
+            price_impact_value,
+            execution_price,
+            size_delta_in_tokens,
+            is_output_token_long,
+            collateral: report,
             fees,
-        ))
+        })
     }
 
     fn get_execution_params(&self) -> crate::Result<(P::Signed, P::Signed, P::Num)> {
@@ -389,10 +389,6 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
 
         Ok((pnl_usd, uncapped_pnl_usd, size_delta_in_tokens))
     }
-
-    fn pay_for_cost(&self, cost: &P::Num) -> crate::Result<()> {
-        todo!()
-    }
 }
 
 fn get_execution_price_for_decrease<T: Unsigned>(
@@ -484,12 +480,29 @@ mod tests {
             .execute()?;
         println!("{report:#?}");
         println!("{position:#?}");
+
         let report = position
             .ops(&mut market)
             .decrease(
                 Prices {
                     index_token_price: 125,
                     long_token_price: 125,
+                    short_token_price: 1,
+                },
+                40_000_000,
+                None,
+            )?
+            .execute()?;
+        println!("{report:#?}");
+        println!("{position:#?}");
+        println!("{market:#?}");
+
+        let report = position
+            .ops(&mut market)
+            .decrease(
+                Prices {
+                    index_token_price: 118,
+                    long_token_price: 118,
                     short_token_price: 1,
                 },
                 40_000_000,
