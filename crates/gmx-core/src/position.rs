@@ -1,19 +1,22 @@
 use crate::{
     action::{decrease_position::DecreasePosition, increase_position::IncreasePosition, Prices},
-    num::{Num, Unsigned, UnsignedAbs},
+    num::{MulDiv, Num, UnsignedAbs},
     Market,
 };
 
 /// A position.
 pub trait Position<const DECIMALS: u8> {
     /// Unsigned number type.
-    type Num: Unsigned<Signed = Self::Signed> + Num;
+    type Num: MulDiv<Signed = Self::Signed> + Num;
 
     /// Signed number type.
     type Signed: UnsignedAbs<Unsigned = Self::Num> + TryFrom<Self::Num> + Num;
 
     /// Market type.
-    type Market: Market<DECIMALS, Num = Self::Num>;
+    type Market: Market<DECIMALS, Num = Self::Num, Signed = Self::Signed>;
+
+    /// Get a reference to the market.
+    fn market(&self) -> &Self::Market;
 
     /// Get a mutable reference to the market.
     fn market_mut(&mut self) -> &mut Self::Market;
@@ -23,6 +26,12 @@ pub trait Position<const DECIMALS: u8> {
 
     /// Get a mutable reference to the collateral amount.
     fn collateral_amount_mut(&mut self) -> &mut Self::Num;
+
+    /// Get a reference to the size (in USD) of the position.
+    fn size_in_usd(&self) -> &Self::Num;
+
+    /// Get a reference to the size (in tokens) of the position.
+    fn size_in_tokens(&self) -> &Self::Num;
 
     /// Get a mutable reference to the size (in USD) of the position.
     fn size_in_usd_mut(&mut self) -> &mut Self::Num;
@@ -41,6 +50,10 @@ impl<'a, const DECIMALS: u8, P: Position<DECIMALS>> Position<DECIMALS> for &'a m
 
     type Market = P::Market;
 
+    fn market(&self) -> &Self::Market {
+        (**self).market()
+    }
+
     fn market_mut(&mut self) -> &mut Self::Market {
         (**self).market_mut()
     }
@@ -51,6 +64,14 @@ impl<'a, const DECIMALS: u8, P: Position<DECIMALS>> Position<DECIMALS> for &'a m
 
     fn collateral_amount_mut(&mut self) -> &mut Self::Num {
         (**self).collateral_amount_mut()
+    }
+
+    fn size_in_usd(&self) -> &Self::Num {
+        (**self).size_in_usd()
+    }
+
+    fn size_in_tokens(&self) -> &Self::Num {
+        (**self).size_in_tokens()
     }
 
     fn size_in_usd_mut(&mut self) -> &mut Self::Num {
@@ -92,12 +113,13 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
     fn decrease(
         &mut self,
         prices: Prices<Self::Num>,
+        size_delta_usd: Self::Num,
         acceptable_price: Option<Self::Num>,
     ) -> crate::Result<DecreasePosition<&mut Self, DECIMALS>>
     where
         Self: Sized,
     {
-        DecreasePosition::try_new(self, prices, acceptable_price)
+        DecreasePosition::try_new(self, prices, size_delta_usd, acceptable_price)
     }
 }
 

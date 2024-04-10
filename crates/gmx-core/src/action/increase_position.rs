@@ -307,7 +307,7 @@ mod tests {
         market.deposit(1_000_000_000, 0, 120, 1)?.execute()?;
         market.deposit(0, 1_000_000_000, 120, 1)?.execute()?;
         println!("{market:#?}");
-        let mut position = TestPosition::long();
+        let mut position = TestPosition::long(true);
         let report = position
             .ops(&mut market)
             .increase(

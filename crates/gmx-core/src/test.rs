@@ -214,23 +214,25 @@ impl<T, const DECIMALS: u8> TestPosition<T, DECIMALS> {
     }
 
     /// Create an empty long position.
-    pub fn long() -> Self
+    pub fn long(long_token_as_collateral: bool) -> Self
     where
         T: Default,
     {
         Self {
             is_long: true,
+            is_collateral_token_long: long_token_as_collateral,
             ..Default::default()
         }
     }
 
     /// Create an empty short position.
-    pub fn short() -> Self
+    pub fn short(long_token_as_collateral: bool) -> Self
     where
         T: Default,
     {
         Self {
             is_long: false,
+            is_collateral_token_long: long_token_as_collateral,
             ..Default::default()
         }
     }
@@ -254,6 +256,10 @@ where
 
     type Market = TestMarket<T, DECIMALS>;
 
+    fn market(&self) -> &Self::Market {
+        self.market
+    }
+
     fn market_mut(&mut self) -> &mut Self::Market {
         self.market
     }
@@ -264,6 +270,14 @@ where
 
     fn collateral_amount_mut(&mut self) -> &mut Self::Num {
         &mut self.position.collateral_token_amount
+    }
+
+    fn size_in_usd(&self) -> &Self::Num {
+        &self.position.size_in_usd
+    }
+
+    fn size_in_tokens(&self) -> &Self::Num {
+        &self.position.size_in_tokens
     }
 
     fn size_in_usd_mut(&mut self) -> &mut Self::Num {

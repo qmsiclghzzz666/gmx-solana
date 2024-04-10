@@ -1,4 +1,4 @@
-use num_traits::{CheckedAdd, CheckedMul, CheckedSub, One, Signed};
+use num_traits::{CheckedAdd, CheckedMul, CheckedSub, One, Signed, Zero};
 
 /// Num trait used in GMX.
 pub trait Num: num_traits::Num + CheckedAdd + CheckedMul + CheckedSub + Clone + Ord {}
@@ -9,6 +9,26 @@ impl<T: num_traits::Num + CheckedAdd + CheckedMul + CheckedSub + Clone + Ord> Nu
 pub trait Unsigned: num_traits::Unsigned {
     /// The signed type.
     type Signed: TryFrom<Self> + UnsignedAbs<Unsigned = Self>;
+
+    /// Convert to signed.
+    fn to_signed(&self) -> crate::Result<Self::Signed>
+    where
+        Self: Clone,
+    {
+        self.clone().try_into().map_err(|_| crate::Error::Convert)
+    }
+
+    /// Convert to opposite signed.
+    fn to_opposite_signed(&self) -> crate::Result<Self::Signed>
+    where
+        Self: Clone,
+        Self::Signed: CheckedSub,
+    {
+        let value = self.to_signed()?;
+        Self::Signed::zero()
+            .checked_sub(&value)
+            .ok_or(crate::Error::Underflow)
+    }
 
     /// Compute the absolute difference of two values.
     fn diff(self, other: Self) -> Self;
