@@ -59,7 +59,7 @@ impl<T> State<T> {
 
     #[inline]
     fn secondary_output_token_price(&self) -> &T {
-        if !self.is_output_token_long {
+        if self.is_pnl_token_long {
             &self.long_token_price
         } else {
             &self.short_token_price
@@ -293,7 +293,7 @@ where
                 }
                 if !paid_in_secondary_output_token.is_zero() {
                     self.market.apply_delta(
-                        !self.state.is_output_token_long,
+                        self.state.is_pnl_token_long,
                         &paid_in_secondary_output_token.to_signed()?,
                     )?;
                 }
