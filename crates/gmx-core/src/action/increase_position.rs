@@ -1,7 +1,11 @@
 use num_traits::{CheckedAdd, Signed, Zero};
 use std::fmt;
 
-use crate::{num::Unsigned, params::fee::PositionFees, position::Position};
+use crate::{
+    num::Unsigned,
+    params::fee::PositionFees,
+    position::{CollateralDelta, Position, PositionExt},
+};
 
 use super::Prices;
 
@@ -158,7 +162,28 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> IncreasePosition<P, DECIMALS> {
         // TODO: update other position state
 
         // TODO: update open interest
-        // TODO: validate global states when `size_delta_usd > 0`
+
+        if !self.params.size_delta_usd.is_zero() {
+            // TODO: validate reserve.
+            // TODO: validate open interset reserve.
+
+            let delta = CollateralDelta::new(
+                self.position.size_in_usd().clone(),
+                self.position.collateral_amount().clone(),
+                Zero::zero(),
+                Zero::zero(),
+            );
+            let will_collateral_be_sufficient = self
+                .position
+                .will_collateral_be_sufficient(&self.params.prices, &delta)?;
+
+            if !will_collateral_be_sufficient.is_sufficient() {
+                return Err(crate::Error::invalid_argument(
+                    "insufficient collateral usd",
+                ));
+            }
+        }
+
         // TODO: handle referral
         // TODO: validate position state
         Ok(IncreasePositionReport::new(

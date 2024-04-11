@@ -292,6 +292,13 @@ pub enum WillCollateralBeSufficient<T> {
     Insufficient(T),
 }
 
+impl<T> WillCollateralBeSufficient<T> {
+    /// Returns whether it is sufficient.
+    pub fn is_sufficient(&self) -> bool {
+        matches!(self, Self::Sufficient(_))
+    }
+}
+
 impl<T> Deref for WillCollateralBeSufficient<T> {
     type Target = T;
 
