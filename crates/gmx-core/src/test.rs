@@ -4,7 +4,7 @@ use crate::{
     fixed::FixedPointOps,
     market::Market,
     num::{MulDiv, Num, UnsignedAbs},
-    params::{FeeParams, SwapImpactParams},
+    params::{FeeParams, PositionParams, SwapImpactParams},
     pool::{Pool, PoolKind},
     position::Position,
 };
@@ -77,6 +77,7 @@ pub struct TestMarket<T, const DECIMALS: u8> {
     value_to_amount_divisor: T,
     swap_impact_params: SwapImpactParams<T>,
     swap_fee_params: FeeParams<T>,
+    position_params: PositionParams<T>,
     primary: TestPool<T>,
     price_impact: TestPool<T>,
     fee: TestPool<T>,
@@ -98,6 +99,7 @@ impl Default for TestMarket<u64, 9> {
                 .with_positive_impact_fee_factor(500_000)
                 .with_negative_impact_fee_factor(700_000)
                 .build(),
+            position_params: PositionParams::new(1_000_000_000, 1_000_000_000),
             primary: Default::default(),
             price_impact: Default::default(),
             fee: Default::default(),
@@ -122,6 +124,10 @@ impl Default for TestMarket<u128, 20> {
                 .with_positive_impact_fee_factor(50_000_000_000_000_000)
                 .with_negative_impact_fee_factor(70_000_000_000_000_000)
                 .build(),
+            position_params: PositionParams::new(
+                100_000_000_000_000_000_000,
+                100_000_000_000_000_000_000,
+            ),
             primary: Default::default(),
             price_impact: Default::default(),
             fee: Default::default(),
@@ -188,6 +194,10 @@ where
 
     fn swap_fee_params(&self) -> crate::params::FeeParams<Self::Num> {
         self.swap_fee_params.clone()
+    }
+
+    fn position_params(&self) -> crate::params::PositionParams<Self::Num> {
+        self.position_params.clone()
     }
 }
 

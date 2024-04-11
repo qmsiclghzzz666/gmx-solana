@@ -4,6 +4,7 @@ use crate::{
     num::{MulDiv, Unsigned},
     params::fee::PositionFees,
     position::{CollateralDelta, Position, PositionExt, WillCollateralBeSufficient},
+    Market,
 };
 
 use self::{
@@ -167,7 +168,6 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
 
     /// Do a check when the position will be partially decreased.
     fn check_partial_close(&mut self) -> crate::Result<()> {
-        use crate::fixed::FixedPointOps;
         use num_traits::CheckedMul;
 
         if self.size_delta_usd < *self.position.size_in_usd() {
@@ -227,13 +227,12 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
 
             // Close all if collateral or position size too small.
 
-            // TODO: use the real min values.
-            let unit = <P::Num as FixedPointOps<DECIMALS>>::UNIT;
+            let params = self.position.market().position_params();
 
             let remaining_value = will_be_sufficient
                 .checked_add(&estimated_remaining_pnl)
                 .ok_or(crate::Error::Computation("calculating remaining value"))?;
-            if remaining_value < unit.to_signed()? {
+            if remaining_value < params.min_collateral_size().to_signed()? {
                 self.size_delta_usd = self.position.size_in_usd().clone();
             }
 
@@ -243,7 +242,7 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
                     .size_in_usd()
                     .checked_sub(&self.size_delta_usd)
                     .expect("must success")
-                    < unit
+                    < *params.min_position_size_usd()
             {
                 self.size_delta_usd = self.position.size_in_usd().clone();
             }
