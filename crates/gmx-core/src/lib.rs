@@ -1,5 +1,7 @@
 #![deny(missing_docs)]
 #![deny(unreachable_pub)]
+// FIXME: enable this when we are ready.
+// #![warn(clippy::arithmetic_side_effects)]
 
 //! The core concepts of GMX.
 
@@ -8,6 +10,9 @@ pub mod pool;
 
 /// Market.
 pub mod market;
+
+/// Position.
+pub mod position;
 
 /// Market params.
 pub mod params;

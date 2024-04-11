@@ -1,4 +1,4 @@
-use crate::PoolKind;
+use crate::{position::LiquidatableReason, PoolKind};
 
 /// Error type.
 #[derive(Debug, thiserror::Error)]
@@ -55,6 +55,15 @@ pub enum Error {
     /// Withdrawal vault not set.
     #[error("withdrawal vault not set")]
     WithdrawalVaultNotSet,
+    /// Insufficient funds to pay for cost.
+    #[error("insufficient funds to pay for costs")]
+    InsufficientFundsToPayForCosts,
+    /// Invalid position state.
+    #[error("invalid position state: {0}")]
+    InvalidPosition(&'static str),
+    /// Liquidatable Position.
+    #[error("liquidatable position: {0}")]
+    Liquidatable(LiquidatableReason),
 }
 
 impl Error {

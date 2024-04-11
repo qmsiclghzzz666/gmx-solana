@@ -2,7 +2,7 @@ use crate::{
     action::{deposit::Deposit, swap::Swap, withdraw::Withdrawal},
     fixed::FixedPointOps,
     num::{MulDiv, Num, UnsignedAbs},
-    params::{FeeParams, SwapImpactParams},
+    params::{position::PositionParams, FeeParams, SwapImpactParams},
     pool::{Pool, PoolExt, PoolKind},
 };
 use num_traits::{CheckedAdd, CheckedSub, One, Signed, Zero};
@@ -45,6 +45,9 @@ pub trait Market<const DECIMALS: u8> {
 
     /// Get the swap fee params.
     fn swap_fee_params(&self) -> FeeParams<Self::Num>;
+
+    /// Get basic position params.
+    fn position_params(&self) -> PositionParams<Self::Num>;
 }
 
 impl<'a, const DECIMALS: u8, M: Market<DECIMALS>> Market<DECIMALS> for &'a mut M {
@@ -84,6 +87,10 @@ impl<'a, const DECIMALS: u8, M: Market<DECIMALS>> Market<DECIMALS> for &'a mut M
 
     fn swap_fee_params(&self) -> FeeParams<Self::Num> {
         (**self).swap_fee_params()
+    }
+
+    fn position_params(&self) -> PositionParams<Self::Num> {
+        (**self).position_params()
     }
 }
 

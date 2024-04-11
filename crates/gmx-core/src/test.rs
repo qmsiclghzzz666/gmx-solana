@@ -4,8 +4,9 @@ use crate::{
     fixed::FixedPointOps,
     market::Market,
     num::{MulDiv, Num, UnsignedAbs},
-    params::{FeeParams, SwapImpactParams},
+    params::{FeeParams, PositionParams, SwapImpactParams},
     pool::{Pool, PoolKind},
+    position::Position,
 };
 use num_traits::{CheckedSub, Signed};
 
@@ -76,6 +77,7 @@ pub struct TestMarket<T, const DECIMALS: u8> {
     value_to_amount_divisor: T,
     swap_impact_params: SwapImpactParams<T>,
     swap_fee_params: FeeParams<T>,
+    position_params: PositionParams<T>,
     primary: TestPool<T>,
     price_impact: TestPool<T>,
     fee: TestPool<T>,
@@ -97,6 +99,7 @@ impl Default for TestMarket<u64, 9> {
                 .with_positive_impact_fee_factor(500_000)
                 .with_negative_impact_fee_factor(700_000)
                 .build(),
+            position_params: PositionParams::new(1_000_000_000, 1_000_000_000, 10_000_000),
             primary: Default::default(),
             price_impact: Default::default(),
             fee: Default::default(),
@@ -121,6 +124,11 @@ impl Default for TestMarket<u128, 20> {
                 .with_positive_impact_fee_factor(50_000_000_000_000_000)
                 .with_negative_impact_fee_factor(70_000_000_000_000_000)
                 .build(),
+            position_params: PositionParams::new(
+                100_000_000_000_000_000_000,
+                100_000_000_000_000_000_000,
+                1_000_000_000_000_000_000,
+            ),
             primary: Default::default(),
             price_impact: Default::default(),
             fee: Default::default(),
@@ -187,5 +195,115 @@ where
 
     fn swap_fee_params(&self) -> crate::params::FeeParams<Self::Num> {
         self.swap_fee_params.clone()
+    }
+
+    fn position_params(&self) -> crate::params::PositionParams<Self::Num> {
+        self.position_params.clone()
+    }
+}
+
+/// Test Position
+#[derive(Debug, Clone, Copy, Default)]
+pub struct TestPosition<T, const DECIMALS: u8> {
+    is_long: bool,
+    is_collateral_token_long: bool,
+    collateral_token_amount: T,
+    size_in_usd: T,
+    size_in_tokens: T,
+}
+
+impl<T, const DECIMALS: u8> TestPosition<T, DECIMALS> {
+    /// Create a [`TestPositionOps`] for ops.
+    pub fn ops<'a>(
+        &'a mut self,
+        market: &'a mut TestMarket<T, DECIMALS>,
+    ) -> TestPositionOps<T, DECIMALS> {
+        TestPositionOps {
+            market,
+            position: self,
+        }
+    }
+
+    /// Create an empty long position.
+    pub fn long(long_token_as_collateral: bool) -> Self
+    where
+        T: Default,
+    {
+        Self {
+            is_long: true,
+            is_collateral_token_long: long_token_as_collateral,
+            ..Default::default()
+        }
+    }
+
+    /// Create an empty short position.
+    pub fn short(long_token_as_collateral: bool) -> Self
+    where
+        T: Default,
+    {
+        Self {
+            is_long: false,
+            is_collateral_token_long: long_token_as_collateral,
+            ..Default::default()
+        }
+    }
+}
+
+/// Test Position.
+#[derive(Debug)]
+pub struct TestPositionOps<'a, T, const DECIMALS: u8> {
+    market: &'a mut TestMarket<T, DECIMALS>,
+    position: &'a mut TestPosition<T, DECIMALS>,
+}
+
+impl<'a, T, const DECIMALS: u8> Position<DECIMALS> for TestPositionOps<'a, T, DECIMALS>
+where
+    T: CheckedSub + fmt::Display + FixedPointOps<DECIMALS>,
+    T::Signed: Num + std::fmt::Debug,
+{
+    type Num = T;
+
+    type Signed = T::Signed;
+
+    type Market = TestMarket<T, DECIMALS>;
+
+    fn market(&self) -> &Self::Market {
+        self.market
+    }
+
+    fn market_mut(&mut self) -> &mut Self::Market {
+        self.market
+    }
+
+    fn is_collateral_token_long(&self) -> bool {
+        self.position.is_collateral_token_long
+    }
+
+    fn collateral_amount(&self) -> &Self::Num {
+        &self.position.collateral_token_amount
+    }
+
+    fn collateral_amount_mut(&mut self) -> &mut Self::Num {
+        &mut self.position.collateral_token_amount
+    }
+
+    fn size_in_usd(&self) -> &Self::Num {
+        &self.position.size_in_usd
+    }
+
+    fn size_in_tokens(&self) -> &Self::Num {
+        &self.position.size_in_tokens
+    }
+
+    fn size_in_usd_mut(&mut self) -> &mut Self::Num {
+        &mut self.position.size_in_usd
+    }
+
+    fn size_in_tokens_mut(&mut self) -> &mut Self::Num {
+        &mut self.position.size_in_tokens
+    }
+
+    fn is_long(&self) -> bool {
+        self.position.is_long
     }
 }
