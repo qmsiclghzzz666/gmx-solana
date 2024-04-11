@@ -117,6 +117,11 @@ pub trait MulDiv: Unsigned {
     /// Returns `None` if the `denominator` is zero or overflow.
     fn checked_mul_div(&self, numerator: &Self, denominator: &Self) -> Option<Self>;
 
+    /// Calculates ceil(self * numerator / denominator) with full precision.
+    ///
+    /// Returns `None` if the `denominator` is zero or overflow.
+    fn checked_mul_div_ceil(&self, numerator: &Self, denominator: &Self) -> Option<Self>;
+
     /// Calculates floor(self * numerator / denominator) with full precision,
     /// where `numerator` is signed.
     ///
@@ -155,6 +160,17 @@ impl MulDiv for u64 {
         let numerator = *numerator as u128;
         let denominator = *denominator as u128;
         let ans = x * numerator / denominator;
+        ans.try_into().ok()
+    }
+
+    fn checked_mul_div_ceil(&self, numerator: &Self, denominator: &Self) -> Option<Self> {
+        if *denominator == 0 {
+            return None;
+        }
+        let x = *self as u128;
+        let numerator = *numerator as u128;
+        let denominator = *denominator as u128;
+        let ans = (x * numerator + denominator - 1) / denominator;
         ans.try_into().ok()
     }
 }
@@ -200,6 +216,17 @@ mod u128 {
             let ans = x * numerator / denominator;
             ans.try_into().ok()
         }
+
+        fn checked_mul_div_ceil(&self, numerator: &Self, denominator: &Self) -> Option<Self> {
+            if *denominator == 0 {
+                return None;
+            }
+            let x = U256::from(*self);
+            let numerator = U256::from(*numerator);
+            let denominator = U256::from(*denominator);
+            let ans = (x * numerator).div_ceil(denominator);
+            ans.try_into().ok()
+        }
     }
 }
 
@@ -222,5 +249,26 @@ mod tests {
         let b = 3u64;
         let a = 1u64;
         assert_eq!(a.checked_round_up_div(&b), Some(1));
+    }
+
+    #[test]
+    fn mul_div_ceil() {
+        let a = 650_406_504u64;
+        let a2 = 650_406_505u64;
+        let b = 40_000_000_000u64;
+        let c = 80_000_000_000u64;
+        assert_eq!(a.checked_mul_div_ceil(&b, &c).unwrap(), 325_203_252);
+        assert_eq!(a2.checked_mul_div_ceil(&b, &c).unwrap(), 325_203_253);
+    }
+
+    #[cfg(feature = "u128")]
+    #[test]
+    fn mul_div_ceil_u128() {
+        let a = 650_406_504u128;
+        let a2 = 650_406_505u128;
+        let b = 40_000_000_000u128;
+        let c = 80_000_000_000u128;
+        assert_eq!(a.checked_mul_div_ceil(&b, &c).unwrap(), 325_203_252);
+        assert_eq!(a2.checked_mul_div_ceil(&b, &c).unwrap(), 325_203_253);
     }
 }

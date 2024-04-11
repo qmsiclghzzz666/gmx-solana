@@ -268,6 +268,10 @@ where
         self.position.is_collateral_token_long
     }
 
+    fn collateral_amount(&self) -> &Self::Num {
+        &self.position.collateral_token_amount
+    }
+
     fn collateral_amount_mut(&mut self) -> &mut Self::Num {
         &mut self.position.collateral_token_amount
     }

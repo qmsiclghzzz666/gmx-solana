@@ -1,18 +1,22 @@
-use num_traits::{CheckedAdd, CheckedMul, CheckedSub, Signed, Zero};
-use std::fmt;
+use num_traits::{CheckedAdd, CheckedSub, Zero};
 
 use crate::{
-    num::{MulDiv, Unsigned, UnsignedAbs},
+    num::{MulDiv, Unsigned},
     params::fee::PositionFees,
-    position::Position,
+    position::{CollateralDelta, Position, PositionExt, WillCollateralBeSufficient},
 };
 
-use self::collateral_processor::{CollateralProcessor, ProcessReport};
+use self::{
+    collateral_processor::{CollateralProcessor, ProcessReport},
+    report::DecreasePositionReport,
+};
 
 use super::Prices;
 
 mod collateral_processor;
 mod debt;
+mod report;
+mod utils;
 
 /// Decrease the position.
 #[must_use]
@@ -20,133 +24,27 @@ pub struct DecreasePosition<P: Position<DECIMALS>, const DECIMALS: u8> {
     position: P,
     params: DecreasePositionParams<P::Num>,
     withdrawable_collateral_amount: P::Num,
+    size_delta_usd: P::Num,
 }
 
 /// Decrease Position Params.
 #[derive(Debug, Clone, Copy)]
 pub struct DecreasePositionParams<T> {
-    collateral_withdrawal_amount: T,
-    size_delta_usd: T,
+    initial_collateral_withdrawal_amount: T,
+    initial_size_delta_usd: T,
     acceptable_price: Option<T>,
     prices: Prices<T>,
 }
 
 impl<T> DecreasePositionParams<T> {
-    /// Get collateral withdrawal amount.
-    pub fn collateral_withdrawal_amount(&self) -> &T {
-        &self.collateral_withdrawal_amount
-    }
-}
-
-/// Report of the execution of posiiton decreasing.
-#[must_use = "`should_remove`, `output_amount`, `secondary_output_amount` must use"]
-pub struct DecreasePositionReport<T: Unsigned> {
-    should_remove: bool,
-    params: DecreasePositionParams<T>,
-    price_impact_value: T::Signed,
-    execution_price: T,
-    size_delta_in_tokens: T,
-    fees: PositionFees<T>,
-    withdrawable_collateral_amount: T,
-
-    // Output.
-    is_output_token_long: bool,
-    output_amount: T,
-    secondary_output_amount: T,
-}
-
-impl<T: Unsigned + fmt::Debug> fmt::Debug for DecreasePositionReport<T>
-where
-    T::Signed: fmt::Debug,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("DecreasePositionReport")
-            .field("should_remove", &self.should_remove)
-            .field("params", &self.params)
-            .field("price_impact_value", &self.price_impact_value)
-            .field("execution_price", &self.execution_price)
-            .field("size_delta_in_tokens", &self.size_delta_in_tokens)
-            .field("fees", &self.fees)
-            .field(
-                "withdrawable_collateral_amount",
-                &self.withdrawable_collateral_amount,
-            )
-            .field("is_output_token_long", &self.is_output_token_long)
-            .field("output_amount", &self.output_amount)
-            .field("secondary_output_amount", &self.secondary_output_amount)
-            .finish()
-    }
-}
-
-impl<T: Unsigned> DecreasePositionReport<T> {
-    fn new(
-        should_remove: bool,
-        params: DecreasePositionParams<T>,
-        execution: ProcessCollateralResult<T>,
-        withdrawable_collateral_amount: T,
-    ) -> Self {
-        Self {
-            should_remove,
-            params,
-            price_impact_value: execution.price_impact_value,
-            execution_price: execution.execution_price,
-            size_delta_in_tokens: execution.size_delta_in_tokens,
-            fees: execution.fees,
-            is_output_token_long: execution.is_output_token_long,
-            output_amount: execution.collateral.output_amount,
-            secondary_output_amount: execution.collateral.secondary_output_amount,
-            withdrawable_collateral_amount,
-        }
+    /// Get initial collateral withdrawal amount.
+    pub fn initial_collateral_withdrawal_amount(&self) -> &T {
+        &self.initial_collateral_withdrawal_amount
     }
 
-    /// Get params.
-    pub fn params(&self) -> &DecreasePositionParams<T> {
-        &self.params
-    }
-
-    /// Get size delta in tokens.
-    pub fn size_delta_in_tokens(&self) -> &T {
-        &self.size_delta_in_tokens
-    }
-
-    /// Get execution price.
-    pub fn execution_price(&self) -> &T {
-        &self.execution_price
-    }
-
-    /// Get price impact value.
-    pub fn price_impact_value(&self) -> &T::Signed {
-        &self.price_impact_value
-    }
-
-    /// Get execution fees.
-    pub fn fees(&self) -> &PositionFees<T> {
-        &self.fees
-    }
-
-    /// Returns whether the output token is long token.
-    pub fn is_output_token_long(&self) -> bool {
-        self.is_output_token_long
-    }
-
-    /// Get output amount.
-    pub fn output_amount(&self) -> &T {
-        &self.output_amount
-    }
-
-    /// Get secondary output amount.
-    pub fn secondary_output_amount(&self) -> &T {
-        &self.secondary_output_amount
-    }
-
-    /// Get should remove.
-    pub fn should_remove(&self) -> bool {
-        self.should_remove
-    }
-
-    /// Get withdrawable collateral amount.
-    pub fn withdrawable_collateral_amount(&self) -> &T {
-        &self.withdrawable_collateral_amount
+    /// Get inital size delta usd.
+    pub fn initial_size_delta_usd(&self) -> &T {
+        &self.initial_size_delta_usd
     }
 }
 
@@ -162,7 +60,7 @@ struct ProcessCollateralResult<T: Unsigned> {
 impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
     /// Create a new action to decrease the given position.
     pub fn try_new(
-        mut position: P,
+        position: P,
         prices: Prices<P::Num>,
         size_delta_usd: P::Num,
         acceptable_price: Option<P::Num>,
@@ -171,20 +69,16 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
         if !prices.is_valid() {
             return Err(crate::Error::invalid_argument("invalid prices"));
         }
-        if size_delta_usd > *position.size_in_usd_mut() {
-            return Err(crate::Error::invalid_argument(
-                "invalid decrease position size",
-            ));
-        }
         Ok(Self {
             params: DecreasePositionParams {
-                size_delta_usd,
+                initial_size_delta_usd: size_delta_usd.clone(),
                 acceptable_price,
                 prices,
-                collateral_withdrawal_amount: collateral_withdrawal_amount.clone(),
+                initial_collateral_withdrawal_amount: collateral_withdrawal_amount.clone(),
             },
             withdrawable_collateral_amount: collateral_withdrawal_amount
-                .min(position.collateral_amount_mut().clone()),
+                .min(position.collateral_amount().clone()),
+            size_delta_usd: size_delta_usd.min(position.size_in_usd().clone()),
             position,
         })
     }
@@ -192,7 +86,7 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
     /// Execute.
     pub fn execute(mut self) -> crate::Result<DecreasePositionReport<P::Num>> {
         debug_assert!(
-            self.params.size_delta_usd <= *self.position.size_in_usd_mut(),
+            self.size_delta_usd <= *self.position.size_in_usd_mut(),
             "must have been checked or capped by the position size"
         );
         debug_assert!(
@@ -220,7 +114,7 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
         let next_position_size_in_usd = self
             .position
             .size_in_usd_mut()
-            .checked_sub(&self.params.size_delta_usd)
+            .checked_sub(&self.size_delta_usd)
             .ok_or(crate::Error::Computation(
                 "calculating next position size in usd",
             ))?;
@@ -267,17 +161,98 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
             self.params,
             execution,
             self.withdrawable_collateral_amount,
+            self.size_delta_usd,
         ))
     }
 
     /// Do a check when the position will be partially decreased.
     fn check_partial_close(&mut self) -> crate::Result<()> {
-        // TODO: make sure the collateral amount after withdraw will be sufficient.
+        use crate::fixed::FixedPointOps;
+        use num_traits::CheckedMul;
+
+        if self.size_delta_usd < *self.position.size_in_usd() {
+            let (estimated_pnl, _, _) = self
+                .position
+                .pnl_value(&self.params.prices, self.position.size_in_usd())?;
+            let estimated_realized_pnl = self
+                .size_delta_usd
+                .checked_mul_div_with_signed_numberator(&estimated_pnl, self.position.size_in_usd())
+                .ok_or(crate::Error::Computation("estiamting realized pnl"))?;
+            let estimated_remaining_pnl = estimated_pnl
+                .checked_sub(&estimated_realized_pnl)
+                .ok_or(crate::Error::Underflow)?;
+
+            let delta = CollateralDelta::new(
+                self.position
+                    .size_in_usd()
+                    .checked_sub(&self.size_delta_usd)
+                    .expect("should have been capped"),
+                self.position
+                    .collateral_amount()
+                    .checked_sub(&self.withdrawable_collateral_amount)
+                    .expect("should have been capped"),
+                estimated_realized_pnl,
+                self.size_delta_usd.to_opposite_signed()?,
+            );
+
+            let mut will_be_sufficient = self
+                .position
+                .will_collateral_be_sufficient(&self.params.prices, &delta)?;
+
+            if let WillCollateralBeSufficient::Insufficient(remaining_collateral_value) =
+                &mut will_be_sufficient
+            {
+                if self.size_delta_usd.is_zero() {
+                    return Err(crate::Error::invalid_argument(
+                        "unable to withdraw collateral: insufficient collateral",
+                    ));
+                }
+
+                let collateral_token_price = if self.position.is_collateral_token_long() {
+                    &self.params.prices.long_token_price
+                } else {
+                    &self.params.prices.short_token_price
+                };
+                // Add back to the estimated remaining collateral value && set withdrawable collateral amount to zero.
+                let add_back = self
+                    .withdrawable_collateral_amount
+                    .checked_mul(collateral_token_price)
+                    .ok_or(crate::Error::Computation("overflow calculating add back"))?
+                    .to_signed()?;
+                *remaining_collateral_value = remaining_collateral_value
+                    .checked_add(&add_back)
+                    .ok_or(crate::Error::Computation("adding back"))?;
+                self.withdrawable_collateral_amount = Zero::zero();
+            }
+
+            // Close all if collateral or position size too small.
+
+            // TODO: use the real min values.
+            let unit = <P::Num as FixedPointOps<DECIMALS>>::UNIT;
+
+            let remaining_value = will_be_sufficient
+                .checked_add(&estimated_remaining_pnl)
+                .ok_or(crate::Error::Computation("calculating remaining value"))?;
+            if remaining_value < unit.to_signed()? {
+                self.size_delta_usd = self.position.size_in_usd().clone();
+            }
+
+            if *self.position.size_in_usd() > self.size_delta_usd
+                && self
+                    .position
+                    .size_in_usd()
+                    .checked_sub(&self.size_delta_usd)
+                    .expect("must success")
+                    < unit
+            {
+                self.size_delta_usd = self.position.size_in_usd().clone();
+            }
+        }
         Ok(())
     }
 
     fn check_close(&mut self) -> crate::Result<()> {
-        if self.params.size_delta_usd == *self.position.size_in_usd()
+        if self.size_delta_usd == *self.position.size_in_usd()
             && !self.withdrawable_collateral_amount.is_zero()
         {
             // Help ensure that the order can be executed.
@@ -297,7 +272,9 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
             self.get_execution_params()?;
 
         // TODO: calculate position pnl usd.
-        let (base_pnl_usd, _uncapped_base_pnl_usd, size_delta_in_tokens) = self.get_pnl_usd()?;
+        let (base_pnl_usd, _uncapped_base_pnl_usd, size_delta_in_tokens) = self
+            .position
+            .pnl_value(&self.params.prices, &self.size_delta_usd)?;
 
         // TODO: calcualte fees.
         let fees = PositionFees::default();
@@ -354,7 +331,7 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
 
     fn get_execution_params(&self) -> crate::Result<(P::Signed, P::Signed, P::Num)> {
         let index_token_price = &self.params.prices.index_token_price;
-        let size_delta_usd = &self.params.size_delta_usd;
+        let size_delta_usd = &self.size_delta_usd;
 
         if size_delta_usd.is_zero() {
             // TODO: pick price by position side.
@@ -366,7 +343,7 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
 
         // TODO: bound negative price impact value.
 
-        let execution_price = get_execution_price_for_decrease(
+        let execution_price = utils::get_execution_price_for_decrease(
             index_token_price,
             self.position.size_in_usd(),
             self.position.size_in_tokens(),
@@ -377,127 +354,6 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
         )?;
 
         Ok((price_impact_value, Zero::zero(), execution_price))
-    }
-
-    fn get_pnl_usd(&self) -> crate::Result<(P::Signed, P::Signed, P::Num)> {
-        // TODO: pick by position side.
-        let execution_price = &self.params.prices.index_token_price;
-
-        let position_value: P::Signed = self
-            .position
-            .size_in_tokens()
-            .checked_mul(execution_price)
-            .ok_or(crate::Error::Computation(
-                "overflow calculating position value",
-            ))?
-            .try_into()
-            .map_err(|_| crate::Error::Convert)?;
-        let size_in_usd: P::Signed = self
-            .position
-            .size_in_usd()
-            .clone()
-            .try_into()
-            .map_err(|_| crate::Error::Convert)?;
-        let total_pnl = if self.position.is_long() {
-            position_value.checked_sub(&size_in_usd)
-        } else {
-            size_in_usd.checked_sub(&position_value)
-        }
-        .ok_or(crate::Error::Computation("calculating total pnl"))?;
-        let uncapped_total_pnl = total_pnl.clone();
-
-        if total_pnl.is_positive() {
-            // TODO: cap `total_pnl`.
-        }
-
-        let size_delta_in_tokens = if *self.position.size_in_usd() == self.params.size_delta_usd {
-            self.position.size_in_tokens().clone()
-        } else if self.position.is_long() {
-            self.position
-                .size_in_tokens()
-                .checked_mul(&self.params.size_delta_usd)
-                .and_then(|v| v.checked_round_up_div(self.position.size_in_usd()))
-                .ok_or(crate::Error::Computation(
-                    "calculating size delta in tokens for long",
-                ))?
-        } else {
-            self.position
-                .size_in_tokens()
-                .checked_mul_div(&self.params.size_delta_usd, self.position.size_in_usd())
-                .ok_or(crate::Error::Computation(
-                    "calculating size delta in tokens for short",
-                ))?
-        };
-
-        let pnl_usd = size_delta_in_tokens
-            .checked_mul_div_with_signed_numberator(&total_pnl, self.position.size_in_tokens())
-            .ok_or(crate::Error::Computation("calculating pnl_usd"))?;
-
-        let uncapped_pnl_usd = size_delta_in_tokens
-            .checked_mul_div_with_signed_numberator(
-                &uncapped_total_pnl,
-                self.position.size_in_tokens(),
-            )
-            .ok_or(crate::Error::Computation("calculating uncapped_pnl_usd"))?;
-
-        Ok((pnl_usd, uncapped_pnl_usd, size_delta_in_tokens))
-    }
-}
-
-fn get_execution_price_for_decrease<T: Unsigned>(
-    index_price: &T,
-    size_in_usd: &T,
-    size_in_tokens: &T,
-    size_delta_usd: &T,
-    price_impact_value: &T::Signed,
-    acceptable_price: Option<&T>,
-    is_long: bool,
-) -> crate::Result<T>
-where
-    T: Clone + MulDiv + Ord + CheckedAdd + CheckedSub,
-    T::Signed: CheckedSub + Clone + Ord + UnsignedAbs,
-{
-    // TODO: pick index price by position side.
-    let mut execution_price = index_price.clone();
-    if !size_delta_usd.is_zero() && !size_in_tokens.is_zero() {
-        let adjusted_price_impact_value = if is_long {
-            price_impact_value.clone()
-        } else {
-            T::Signed::zero()
-                .checked_sub(price_impact_value)
-                .ok_or(crate::Error::Computation("price impact too large"))?
-        };
-        if adjusted_price_impact_value.is_negative()
-            && adjusted_price_impact_value.unsigned_abs() > *size_delta_usd
-        {
-            return Err(crate::Error::Computation(
-                "price impact larger than order size",
-            ));
-        }
-
-        let adjustment = size_in_usd
-            .checked_mul_div_with_signed_numberator(&adjusted_price_impact_value, size_in_tokens)
-            .ok_or(crate::Error::Computation(
-                "calculating execution price adjustment",
-            ))?
-            / (size_delta_usd.clone())
-                .try_into()
-                .map_err(|_| crate::Error::Convert)?;
-        execution_price = execution_price
-            .checked_add_with_signed(&adjustment)
-            .ok_or(crate::Error::Computation("adjusting execution price"))?;
-    }
-    let Some(acceptable_prcie) = acceptable_price else {
-        return Ok(execution_price);
-    };
-    if (is_long && execution_price >= *acceptable_prcie)
-        || (!is_long && execution_price <= *acceptable_prcie)
-    {
-        Ok(execution_price)
-    } else {
-        Err(crate::Error::InvalidArgument(
-            "order not fulfillable at acceptable price",
-        ))
     }
 }
 
@@ -526,8 +382,8 @@ mod tests {
                     long_token_price: 123,
                     short_token_price: 1,
                 },
-                1_000_000,
-                80_000_000,
+                100_000_000,
+                80_000_000_000,
                 None,
             )?
             .execute()?;
@@ -542,9 +398,9 @@ mod tests {
                     long_token_price: 125,
                     short_token_price: 1,
                 },
-                40_000_000,
+                40_000_000_000,
                 None,
-                100,
+                10_000,
             )?
             .execute()?;
         println!("{report:#?}");
@@ -559,7 +415,7 @@ mod tests {
                     long_token_price: 118,
                     short_token_price: 1,
                 },
-                40_000_000,
+                40_000_000_000,
                 None,
                 0,
             )?
