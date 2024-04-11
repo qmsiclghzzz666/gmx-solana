@@ -243,10 +243,15 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
         }
 
         // TODO: check leverage.
-
-        Ok(WillCollateralBeSufficient::Sufficient(
-            remaining_collateral_value,
-        ))
+        if remaining_collateral_value.is_positive() {
+            Ok(WillCollateralBeSufficient::Sufficient(
+                remaining_collateral_value,
+            ))
+        } else {
+            Ok(WillCollateralBeSufficient::Insufficient(
+                remaining_collateral_value,
+            ))
+        }
     }
 }
 
