@@ -253,6 +253,7 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
 impl<const DECIMALS: u8, P: Position<DECIMALS>> PositionExt<DECIMALS> for P {}
 
 /// Collateral Delta Values.
+#[allow(unused)]
 pub struct CollateralDelta<T: Unsigned> {
     next_size_in_usd: T,
     next_collateral_amount: T,
