@@ -99,7 +99,7 @@ impl Default for TestMarket<u64, 9> {
                 .with_positive_impact_fee_factor(500_000)
                 .with_negative_impact_fee_factor(700_000)
                 .build(),
-            position_params: PositionParams::new(1_000_000_000, 1_000_000_000),
+            position_params: PositionParams::new(1_000_000_000, 1_000_000_000, 10_000_000),
             primary: Default::default(),
             price_impact: Default::default(),
             fee: Default::default(),
@@ -127,6 +127,7 @@ impl Default for TestMarket<u128, 20> {
             position_params: PositionParams::new(
                 100_000_000_000_000_000_000,
                 100_000_000_000_000_000_000,
+                1_000_000_000_000_000_000,
             ),
             primary: Default::default(),
             price_impact: Default::default(),

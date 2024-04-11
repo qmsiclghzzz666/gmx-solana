@@ -1,9 +1,12 @@
-use std::ops::Deref;
+use std::{fmt, ops::Deref};
+
+use num_traits::Zero;
 
 use crate::{
     action::{decrease_position::DecreasePosition, increase_position::IncreasePosition, Prices},
     fixed::FixedPointOps,
     num::{MulDiv, Num, Unsigned, UnsignedAbs},
+    params::fee::PositionFees,
     Market,
 };
 
@@ -253,6 +256,126 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
             ))
         }
     }
+
+    /// Validate the position state.
+    fn validate_position(
+        &self,
+        prices: &Prices<Self::Num>,
+        should_validate_min_position_size: bool,
+        should_validate_min_collateral_usd: bool,
+    ) -> crate::Result<()> {
+        if self.size_in_usd().is_zero() || self.size_in_tokens().is_zero() {
+            return Err(crate::Error::InvalidPosition(
+                "size_in_usd or size_in_tokens is zero",
+            ));
+        }
+
+        // TODO: validate market is enabled.
+
+        if should_validate_min_position_size
+            && self.size_in_usd() < self.market().position_params().min_position_size_usd()
+        {
+            return Err(crate::Error::InvalidPosition("size in usd too small"));
+        }
+
+        if let Some(reason) = self.check_liquidatable(prices, should_validate_min_collateral_usd)? {
+            return Err(crate::Error::Liquidatable(reason));
+        }
+
+        Ok(())
+    }
+
+    /// Get collateral price.
+    fn collateral_price<'a>(&self, prices: &'a Prices<Self::Num>) -> &'a Self::Num {
+        if self.is_collateral_token_long() {
+            &prices.long_token_price
+        } else {
+            &prices.short_token_price
+        }
+    }
+
+    /// Get collateral value.
+    fn collateral_value(&self, prices: &Prices<Self::Num>) -> crate::Result<Self::Num> {
+        use num_traits::CheckedMul;
+
+        let collateral_token_price = self.collateral_price(prices);
+
+        let collateral_value = self
+            .collateral_amount()
+            .checked_mul(collateral_token_price)
+            .ok_or(crate::Error::Computation(
+                "overflow calculating collateral value",
+            ))?;
+
+        Ok(collateral_value)
+    }
+
+    /// Check if the position is liquidatable.
+    ///
+    /// Return [`LiquidatableReason`] if it is liquidatable, `None` otherwise.
+    fn check_liquidatable(
+        &self,
+        prices: &Prices<Self::Num>,
+        should_validate_min_collateral_usd: bool,
+    ) -> crate::Result<Option<LiquidatableReason>> {
+        use num_traits::{CheckedAdd, CheckedMul, CheckedSub, Signed};
+
+        let (pnl, _, _) = self.pnl_value(prices, self.size_in_usd())?;
+
+        let collateral_value = self.collateral_value(prices)?;
+
+        // TODO: calculate price impact.
+        let price_impact_value: Self::Signed = Zero::zero();
+
+        let _has_positive_impact = price_impact_value.is_positive();
+        // TODO: cap negative price impact.
+
+        // TODO: get position fees.
+        let fees = PositionFees::<Self::Num>::default();
+
+        let collateral_cost_value = fees
+            .total_cost_amount()
+            .checked_mul(self.collateral_price(prices))
+            .ok_or(crate::Error::Computation(
+                "overflow calculating collateral cost value",
+            ))?;
+
+        let remaining_collateral_value = collateral_value
+            .to_signed()?
+            .checked_add(&pnl)
+            .and_then(|v| {
+                v.checked_add(&price_impact_value)?
+                    .checked_sub(&collateral_cost_value.to_signed().ok()?)
+            })
+            .ok_or(crate::Error::Computation(
+                "calculating remaining collateral value",
+            ))?;
+
+        let params = self.market().position_params();
+
+        let min_collateral_usd_for_leverage =
+            crate::utils::apply_factor(self.size_in_usd(), params.min_collateral_factor()).ok_or(
+                crate::Error::Computation("calculating min collateral usd for leverage"),
+            )?;
+
+        if !remaining_collateral_value.is_positive() {
+            return Ok(Some(LiquidatableReason::NotPositive));
+        }
+
+        let remaining_collateral_value = remaining_collateral_value.unsigned_abs();
+
+        if should_validate_min_collateral_usd
+            && remaining_collateral_value < *params.min_collateral_value()
+        {
+            return Ok(Some(LiquidatableReason::MinCollateral));
+        }
+
+        if remaining_collateral_value < min_collateral_usd_for_leverage {
+            return Ok(Some(LiquidatableReason::MinCollateralForLeverage));
+        }
+
+        Ok(None)
+    }
 }
 
 impl<const DECIMALS: u8, P: Position<DECIMALS>> PositionExt<DECIMALS> for P {}
@@ -306,6 +429,27 @@ impl<T> Deref for WillCollateralBeSufficient<T> {
         match self {
             Self::Sufficient(v) => v,
             Self::Insufficient(v) => v,
+        }
+    }
+}
+
+/// Liquidatable reason.
+#[derive(Debug, Clone, Copy)]
+pub enum LiquidatableReason {
+    /// Min collateral.
+    MinCollateral,
+    /// Remaining collateral not positive.
+    NotPositive,
+    /// Min collateral for leverage.
+    MinCollateralForLeverage,
+}
+
+impl fmt::Display for LiquidatableReason {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::MinCollateral => write!(f, "min colltateral"),
+            Self::NotPositive => write!(f, "<= 0"),
+            Self::MinCollateralForLeverage => write!(f, "min collateral for leverage"),
         }
     }
 }

@@ -89,6 +89,7 @@ impl<T> FeeParams<T> {
 #[derive(Debug, Clone, Copy)]
 pub struct PositionFees<T> {
     base: Fees<T>,
+    total_cost_amount: T,
 }
 
 impl<T> PositionFees<T> {
@@ -96,12 +97,18 @@ impl<T> PositionFees<T> {
     pub fn base(&self) -> &Fees<T> {
         &self.base
     }
+
+    /// Get total cost amount in collateral tokens.
+    pub fn total_cost_amount(&self) -> &T {
+        &self.total_cost_amount
+    }
 }
 
 impl<T: Zero> Default for PositionFees<T> {
     fn default() -> Self {
         Self {
             base: Default::default(),
+            total_cost_amount: Zero::zero(),
         }
     }
 }

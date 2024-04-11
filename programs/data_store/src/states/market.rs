@@ -359,7 +359,11 @@ impl<'a, 'info> gmx_core::Market<{ constants::MARKET_DECIMALS }> for AsMarket<'a
     }
 
     fn position_params(&self) -> gmx_core::params::PositionParams<Self::Num> {
-        PositionParams::new(constants::MARKET_USD_UNIT, constants::MARKET_USD_UNIT)
+        PositionParams::new(
+            constants::MARKET_USD_UNIT,
+            constants::MARKET_USD_UNIT,
+            constants::MARKET_USD_UNIT / 100,
+        )
     }
 }
 

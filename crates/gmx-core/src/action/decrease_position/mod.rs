@@ -122,7 +122,6 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
 
         // TODO: update borrowing state.
 
-        // *self.position.size_in_usd_mut() = next_position_size_in_usd;
         let next_position_size_in_tokens = self
             .position
             .size_in_tokens_mut()
@@ -155,7 +154,10 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
         // TODO: update global states.
         // TODO: handle referral.
 
-        // TODO: validate position if not `should_remove`.
+        if !should_remove {
+            self.position
+                .validate_position(&self.params.prices, false, false)?;
+        }
 
         Ok(DecreasePositionReport::new(
             should_remove,
@@ -232,7 +234,7 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
             let remaining_value = will_be_sufficient
                 .checked_add(&estimated_remaining_pnl)
                 .ok_or(crate::Error::Computation("calculating remaining value"))?;
-            if remaining_value < params.min_collateral_size().to_signed()? {
+            if remaining_value < params.min_collateral_value().to_signed()? {
                 self.size_delta_usd = self.position.size_in_usd().clone();
             }
 
