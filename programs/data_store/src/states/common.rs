@@ -28,12 +28,12 @@ impl TokensWithFeed {
 #[derive(AnchorDeserialize, AnchorSerialize, Clone)]
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub struct SwapParams {
-    /// The addresses of token mints for markets along the swap path for long token.
+    /// The addresses of token mints for markets along the swap path for long token or primary token.
     ///
     /// Market addresses are not cached as they can be derived
     /// by seeding with the corresponding mint addresses.
     pub long_token_swap_path: Vec<Pubkey>,
-    /// The addresses of token mints for markets along the swap path for short token.
+    /// The addresses of token mints for markets along the swap path for short token or secondary token.
     ///
     /// Market addresses are not cached as they can be derived
     /// by seeding with the corresponding mint addresses.

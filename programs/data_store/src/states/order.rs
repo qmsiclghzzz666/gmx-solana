@@ -1,11 +1,29 @@
 use anchor_lang::prelude::*;
 
+use super::common::{SwapParams, TokensWithFeed};
+
 /// Order.
 #[account]
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub struct Order {
     /// The fixed-size part of the order.
     pub fixed: Fixed,
+    /// The config for prices.
+    pub prices: TokensWithFeed,
+    /// The swap config.
+    pub swap: SwapParams,
+}
+
+impl Order {
+    /// Init space.
+    pub fn init_space(tokens_with_feed: &[(Pubkey, Pubkey)], swap: &SwapParams) -> usize {
+        Fixed::INIT_SPACE
+            + TokensWithFeed::init_space(tokens_with_feed)
+            + SwapParams::init_space(
+                swap.long_token_swap_path.len(),
+                swap.short_token_swap_path.len(),
+            )
+    }
 }
 
 /// Fixed part of [`Order`]
