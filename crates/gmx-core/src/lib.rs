@@ -39,6 +39,7 @@ pub mod test;
 pub use error::Error;
 pub use market::{Market, MarketExt};
 pub use pool::{Pool, PoolExt, PoolKind};
+pub use position::{Position, PositionExt};
 
 /// Alias for result.
 pub type Result<T> = std::result::Result<T, Error>;

@@ -413,6 +413,10 @@ pub enum DataStoreError {
     // Exchange.
     #[msg("Invalid position kind")]
     InvalidPositionKind,
+    #[msg("Invalid position collateral token")]
+    InvalidPositionCollateralToken,
+    #[msg("Invalid position market")]
+    InvalidPositionMarket,
 }
 
 impl DataStoreError {

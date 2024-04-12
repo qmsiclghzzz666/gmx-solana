@@ -9,7 +9,10 @@ use gmx_solana_utils::to_seed;
 
 use crate::{constants, utils::internal::TransferUtils};
 
-use super::{Data, DataStore, Seed};
+use super::{
+    position::{Position, PositionOps},
+    Data, DataStore, Seed,
+};
 
 /// Market.
 #[account]
@@ -151,6 +154,7 @@ impl Market {
         mint: &'a Account<'info, Mint>,
     ) -> AsMarket<'a, 'info> {
         AsMarket {
+            meta: &self.meta,
             pools: self.pools.as_map_mut(),
             mint,
             transfer: None,
@@ -253,7 +257,9 @@ impl gmx_core::Pool for Pool {
     }
 }
 
-pub(crate) struct AsMarket<'a, 'info> {
+/// Convert to a [`Market`](gmx_core::Market).
+pub struct AsMarket<'a, 'info> {
+    meta: &'a MarketMeta,
     pools: PoolsMap<'a>,
     mint: &'a Account<'info, Mint>,
     transfer: Option<TransferUtils<'a, 'info>>,
@@ -263,10 +269,10 @@ pub(crate) struct AsMarket<'a, 'info> {
 
 impl<'a, 'info> AsMarket<'a, 'info> {
     pub(crate) fn enable_transfer(
-        &mut self,
+        mut self,
         token_program: AccountInfo<'info>,
         store: &'a Account<'info, DataStore>,
-    ) -> &mut Self {
+    ) -> Self {
         self.transfer = Some(TransferUtils::new(
             token_program,
             store,
@@ -275,14 +281,25 @@ impl<'a, 'info> AsMarket<'a, 'info> {
         self
     }
 
-    pub(crate) fn with_receiver(&mut self, receiver: AccountInfo<'info>) -> &mut Self {
+    pub(crate) fn with_receiver(mut self, receiver: AccountInfo<'info>) -> Self {
         self.receiver = Some(receiver);
         self
     }
 
-    pub(crate) fn with_vault(&mut self, vault: AccountInfo<'info>) -> &mut Self {
+    pub(crate) fn with_vault(mut self, vault: AccountInfo<'info>) -> Self {
         self.vault = Some(vault);
         self
+    }
+
+    pub(crate) fn meta(&self) -> &MarketMeta {
+        self.meta
+    }
+
+    pub(crate) fn into_position_ops(
+        self,
+        position: &'a mut AccountLoader<'info, Position>,
+    ) -> Result<PositionOps<'a, 'info>> {
+        PositionOps::try_new(self, position)
     }
 }
 
