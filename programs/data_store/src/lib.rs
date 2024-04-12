@@ -335,6 +335,13 @@ pub mod data_store {
     ) -> Result<()> {
         instructions::execute_withdrawal(ctx)
     }
+
+    #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
+    pub fn execute_order<'info>(
+        ctx: Context<'_, '_, 'info, 'info, ExecuteOrder<'info>>,
+    ) -> Result<()> {
+        instructions::execute_order(ctx)
+    }
 }
 
 #[error_code]
@@ -417,6 +424,8 @@ pub enum DataStoreError {
     InvalidPositionCollateralToken,
     #[msg("Invalid position market")]
     InvalidPositionMarket,
+    #[msg("Position account not provided")]
+    PositionNotProvided,
 }
 
 impl DataStoreError {
