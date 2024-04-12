@@ -344,8 +344,8 @@ mod tests {
                     long_token_price: 123,
                     short_token_price: 1,
                 },
-                1_000_000,
-                80_000_000,
+                100_000_000,
+                8_000_000_000,
                 None,
             )?
             .execute()?;

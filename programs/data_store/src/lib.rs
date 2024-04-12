@@ -27,6 +27,9 @@ use self::{
 };
 use gmx_solana_utils::price::Price;
 
+#[cfg_attr(test, macro_use)]
+extern crate static_assertions;
+
 declare_id!("EjfyBCoSMd6rjkUNz1SFfD7DBYbvAuaxhQs8phcu7Eb6");
 
 #[program]
@@ -407,4 +410,14 @@ pub enum DataStoreError {
     // Deposit.
     #[msg("Empty deposit")]
     EmptyDeposit,
+    // Exchange.
+    #[msg("Invalid position kind")]
+    InvalidPositionKind,
+}
+
+impl DataStoreError {
+    #[inline]
+    pub(crate) const fn invalid_position_kind(_kind: u8) -> Self {
+        Self::InvalidPositionKind
+    }
 }

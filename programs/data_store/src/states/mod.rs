@@ -25,6 +25,9 @@ pub mod withdrawal;
 /// Order.
 pub mod order;
 
+/// Position.
+pub mod position;
+
 pub use data_store::*;
 pub use deposit::Deposit;
 pub use market::*;

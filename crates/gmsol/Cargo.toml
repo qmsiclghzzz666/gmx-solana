@@ -9,7 +9,7 @@ path = "src/cli/main.rs"
 required-features = ["cli"]
 
 [features]
-cli = ["tokio/full", "clap", "tracing-subscriber", "shellexpand", "rand"]
+cli = ["tokio/full", "clap", "tracing-subscriber", "shellexpand"]
 
 [dependencies]
 eyre = { version = "0.6.12" }
@@ -29,6 +29,7 @@ data_store = { path = "../../programs/data_store", features = [
     "debug",
 ] }
 exchange = { path = "../../programs/exchange", features = ["no-entrypoint"] }
+rand = { version = "0.8.5" }
 
 # Dependencies for cli
 clap = { version = "4.5.0", optional = true, features = ["derive", "env"] }
@@ -36,4 +37,3 @@ tracing-subscriber = { version = "0.3.18", optional = true, features = [
     "env-filter",
 ] }
 shellexpand = { version = "3.1.0", optional = true }
-rand = { version = "0.8.5", optional = true }
