@@ -426,6 +426,10 @@ pub enum DataStoreError {
     InvalidPositionMarket,
     #[msg("Position account not provided")]
     PositionNotProvided,
+    #[msg("Same secondary tokens not merged")]
+    SameSecondaryTokensNotMerged,
+    #[msg("Missing receivers")]
+    MissingReceivers,
 }
 
 impl DataStoreError {

@@ -36,6 +36,8 @@ pub struct Fixed {
     pub nonce: [u8; 32],
     /// The slot that the order was last updated at.
     pub updated_at_slot: u64,
+    /// The order market.
+    pub market: Pubkey,
     /// The creator of the order.
     pub user: Pubkey,
     /// The params of order.
@@ -63,7 +65,7 @@ pub struct Receivers {
     /// The ui fee receiver.
     pub ui_fee: Pubkey,
     /// The token account for receiving the output tokens.
-    pub output_token_account: Pubkey,
+    pub output_token_account: Option<Pubkey>,
     /// The token account for receiving the secondary output tokens.
     pub secondary_output_token_account: Option<Pubkey>,
 }
@@ -81,7 +83,7 @@ pub struct Tokens {
     /// The output token.
     pub output_token: Pubkey,
     /// The secondary output token.
-    pub secondary_output_token: Option<Pubkey>,
+    pub secondary_output_token: Pubkey,
 }
 
 /// The parameters for [`Order`].

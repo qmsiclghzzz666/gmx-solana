@@ -314,6 +314,16 @@ where
 
     pub(super) fn process(mut self) -> crate::Result<ProcessReport<M::Num>> {
         self.pay_for_debt()?;
+        if self.state.is_output_token_long == self.state.is_pnl_token_long {
+            self.state.output_amount = self
+                .state
+                .output_amount
+                .checked_add(&self.state.secondary_output_amount)
+                .ok_or(crate::Error::Computation(
+                    "merge amounts when tokens are the same",
+                ))?;
+            self.state.secondary_output_amount = Zero::zero();
+        }
         Ok(ProcessReport {
             output_amount: self.state.output_amount,
             remaining_collateral_amount: self.state.remaining_collateral_amount,

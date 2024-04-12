@@ -98,8 +98,6 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
         self.check_partial_close()?;
         self.check_close()?;
 
-        let is_pnl_token_long = self.position.is_long();
-
         // TODO: handle NoSwap.
 
         // TODO: distribute position impact pool.
@@ -110,7 +108,7 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
 
         // let initial_collateral_amount = self.position.collateral_amount_mut().clone();
 
-        let mut execution = self.process_collateral(is_pnl_token_long)?;
+        let mut execution = self.process_collateral()?;
 
         let next_position_size_in_usd = self
             .position
@@ -263,10 +261,7 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
     }
 
     #[allow(clippy::type_complexity)]
-    fn process_collateral(
-        &mut self,
-        is_pnl_token_long: bool,
-    ) -> crate::Result<ProcessCollateralResult<P::Num>> {
+    fn process_collateral(&mut self) -> crate::Result<ProcessCollateralResult<P::Num>> {
         // TODO: handle insolvent close.
 
         let (price_impact_value, _price_impact_diff_usd, execution_price) =
@@ -281,6 +276,7 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
         let fees = PositionFees::default();
 
         let is_output_token_long = self.position.is_collateral_token_long();
+        let is_pnl_token_long = self.position.is_long();
 
         let remaining_collateral_amount = self.position.collateral_amount_mut().clone();
         let mut processor = CollateralProcessor::new(
