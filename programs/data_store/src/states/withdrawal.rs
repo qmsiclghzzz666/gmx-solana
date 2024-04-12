@@ -88,7 +88,7 @@ pub struct Tokens {
     pub final_long_token: Pubkey,
     /// The final short token to receive.
     pub final_short_token: Pubkey,
-    /// The amount of market tokens taht will be withdrawn.
+    /// The amount of market tokens that will be withdrawn.
     pub market_token_amount: u64,
 }
 

@@ -1,6 +1,9 @@
 /// Data Store.
 pub mod data_store;
 
+/// Common types.
+pub mod common;
+
 /// Nonce.
 pub mod nonce;
 
@@ -19,8 +22,8 @@ pub mod deposit;
 /// Withdrawal.
 pub mod withdrawal;
 
-/// Common types.
-pub mod common;
+/// Order.
+pub mod order;
 
 pub use data_store::*;
 pub use deposit::Deposit;
