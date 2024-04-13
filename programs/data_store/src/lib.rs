@@ -430,6 +430,9 @@ pub enum DataStoreError {
     SameSecondaryTokensNotMerged,
     #[msg("Missing receivers")]
     MissingReceivers,
+    // Position.
+    #[msg("position is not initialized")]
+    PositionNotInitalized,
 }
 
 impl DataStoreError {

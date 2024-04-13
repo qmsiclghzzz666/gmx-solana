@@ -52,10 +52,20 @@ const_assert_eq!(std::mem::size_of::<Position>(), Position::INIT_SPACE);
 
 impl Position {
     /// Get position kind.
+    ///
+    /// Note that `Uninitialized` kind will also be returned without error.
     #[inline]
-    pub fn kind(&self) -> Result<PositionKind> {
+    pub fn kind_unchecked(&self) -> Result<PositionKind> {
         let kind = PositionKind::try_from_primitive(self.kind)?;
         Ok(kind)
+    }
+
+    /// Get **initialized** position kind.
+    pub fn kind(&self) -> Result<PositionKind> {
+        match self.kind_unchecked()? {
+            PositionKind::Uninitialized => Err(DataStoreError::PositionNotInitalized.into()),
+            kind => Ok(kind),
+        }
     }
 
     /// Returns whether the position side is long.
@@ -71,6 +81,8 @@ impl Position {
 #[num_enum(error_type(name = DataStoreError, constructor = DataStoreError::invalid_position_kind))]
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub enum PositionKind {
+    /// Uninitialized.
+    Uninitialized,
     /// Long position.
     Long,
     /// Short position.
