@@ -400,6 +400,8 @@ pub enum DataStoreError {
     Computation,
     #[msg("Unsupported pool kind")]
     UnsupportedPoolKind,
+    #[msg("Invalid collateral token")]
+    InvalidCollateralToken,
     // Exchange Common.
     #[msg("Invalid swap path")]
     InvalidSwapPath,
@@ -433,6 +435,19 @@ pub enum DataStoreError {
     // Position.
     #[msg("position is not initialized")]
     PositionNotInitalized,
+    #[msg("position has been initialized")]
+    PositionHasBeenInitialized,
+    #[msg("position is not required")]
+    PositionIsNotRequried,
+    #[msg("position is not provided")]
+    PositionIsNotProvided,
+    #[msg("invalid position initialization params")]
+    InvalidPositionInitailziationParams,
+    #[msg("invalid position")]
+    InvalidPosition,
+    // Order.
+    #[msg("missing sender")]
+    MissingSender,
 }
 
 impl DataStoreError {

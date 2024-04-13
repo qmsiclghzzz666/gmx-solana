@@ -1,6 +1,12 @@
 use anchor_lang::prelude::*;
 
-use super::common::{SwapParams, TokensWithFeed};
+use crate::DataStoreError;
+
+use super::{
+    common::{SwapParams, TokensWithFeed},
+    position::PositionKind,
+    NonceBytes, Seed,
+};
 
 /// Order.
 #[account]
@@ -24,6 +30,33 @@ impl Order {
                 swap.short_token_swap_path.len(),
             )
     }
+
+    /// Initialize the order.
+    #[allow(clippy::too_many_arguments)]
+    pub fn init(
+        &mut self,
+        bump: u8,
+        nonce: &NonceBytes,
+        market: &Pubkey,
+        user: &Pubkey,
+        params: &OrderParams,
+        tokens: &Tokens,
+        senders: &Senders,
+        receivers: &Receivers,
+        tokens_with_feed: Vec<(Pubkey, Pubkey)>,
+        swap: SwapParams,
+    ) -> Result<()> {
+        self.fixed.init(
+            bump, nonce, market, user, params, tokens, senders, receivers,
+        )?;
+        self.prices = TokensWithFeed::from_vec(tokens_with_feed);
+        self.swap = swap;
+        Ok(())
+    }
+}
+
+impl Seed for Order {
+    const SEED: &'static [u8] = b"order";
 }
 
 /// Fixed part of [`Order`]
@@ -50,12 +83,38 @@ pub struct Fixed {
     pub receivers: Receivers,
 }
 
+impl Fixed {
+    #[allow(clippy::too_many_arguments)]
+    fn init(
+        &mut self,
+        bump: u8,
+        nonce: &NonceBytes,
+        market: &Pubkey,
+        user: &Pubkey,
+        params: &OrderParams,
+        tokens: &Tokens,
+        senders: &Senders,
+        receivers: &Receivers,
+    ) -> Result<()> {
+        self.bump = bump;
+        self.nonce = *nonce;
+        self.updated_at_slot = Clock::get()?.slot;
+        self.market = *market;
+        self.user = *user;
+        self.params = params.clone();
+        self.tokens = tokens.clone();
+        self.senders = senders.clone();
+        self.receivers = receivers.clone();
+        Ok(())
+    }
+}
+
 /// Senders.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, InitSpace)]
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub struct Senders {
     /// The token account for sending inital collateral tokens.
-    pub initial_collateral_token_account: Pubkey,
+    pub initial_collateral_token_account: Option<Pubkey>,
 }
 
 /// Fees and tokens receivers for [`Order`]
@@ -64,8 +123,8 @@ pub struct Senders {
 pub struct Receivers {
     /// The ui fee receiver.
     pub ui_fee: Pubkey,
-    /// The token account for receiving the output tokens.
-    pub output_token_account: Option<Pubkey>,
+    /// The token account for receiving the final output tokens.
+    pub final_output_token_account: Option<Pubkey>,
     /// The token account for receiving the secondary output tokens.
     pub secondary_output_token_account: Option<Pubkey>,
 }
@@ -78,12 +137,14 @@ pub struct Tokens {
     ///
     /// Used to identify the market.
     pub market_token: Pubkey,
-    /// The initial collateral token.
+    /// The initial collateral token or swap in token.
     pub initial_collateral_token: Pubkey,
-    /// The output token.
+    /// The expected collateral token or swap out token.
     pub output_token: Pubkey,
-    /// The secondary output token.
+    /// The expected pnl token.
     pub secondary_output_token: Pubkey,
+    /// Final output token.
+    pub final_output_token: Option<Pubkey>,
 }
 
 /// The parameters for [`Order`].
@@ -104,6 +165,22 @@ pub struct OrderParams {
     pub is_long: bool,
 }
 
+impl OrderParams {
+    pub(crate) fn to_position_kind(&self) -> Result<PositionKind> {
+        match &self.kind {
+            OrderKind::MarketSwap => Err(DataStoreError::PositionIsNotRequried.into()),
+            OrderKind::Liquidation | OrderKind::MarketDecrease | OrderKind::MarketIncrease => {
+                if self.is_long {
+                    Ok(PositionKind::Long)
+                } else {
+                    Ok(PositionKind::Short)
+                }
+            }
+        }
+    }
+}
+
+/// Order Kind.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, InitSpace)]
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[non_exhaustive]

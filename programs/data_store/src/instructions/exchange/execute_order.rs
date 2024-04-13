@@ -23,8 +23,8 @@ pub struct ExecuteOrder<'info> {
     #[account(
         constraint = order.fixed.market == market.key(),
         constraint = order.fixed.tokens.market_token == market_token_mint.key(),
-        constraint = order.fixed.receivers.output_token_account == output_token_receiver.as_ref().map(|a| a.key()),
-        constraint = order.fixed.receivers.secondary_output_token_account == secondary_output_token_receiver.as_ref().map(|a| a.key()),
+        constraint = order.fixed.receivers.final_output_token_account == final_output_token_account.as_ref().map(|a| a.key()),
+        constraint = order.fixed.receivers.secondary_output_token_account == secondary_output_token_account.as_ref().map(|a| a.key()),
     )]
     pub order: Account<'info, Order>,
     #[account(mut)]
@@ -34,18 +34,18 @@ pub struct ExecuteOrder<'info> {
     pub position: Option<AccountLoader<'info, Position>>,
     #[account(
         mut,
-        token::mint = output_token_receiver.as_ref().expect("must provided").mint
+        token::mint = final_output_token_account.as_ref().expect("must provided").mint
     )]
     pub output_token_vault: Option<Account<'info, TokenAccount>>,
     #[account(
         mut,
-        token::mint = secondary_output_token_receiver.as_ref().expect("must provided").mint
+        token::mint = secondary_output_token_account.as_ref().expect("must provided").mint
     )]
     pub secondary_output_token_vault: Option<Account<'info, TokenAccount>>,
     #[account(mut)]
-    pub output_token_receiver: Option<Account<'info, TokenAccount>>,
+    pub final_output_token_account: Option<Account<'info, TokenAccount>>,
     #[account(mut)]
-    pub secondary_output_token_receiver: Option<Account<'info, TokenAccount>>,
+    pub secondary_output_token_account: Option<Account<'info, TokenAccount>>,
     pub token_program: Program<'info, Token>,
 }
 
@@ -218,7 +218,11 @@ impl<'info> ExecuteOrder<'info> {
                     &self.order.swap,
                     remaining_accounts,
                     (
-                        self.order.fixed.tokens.output_token,
+                        self.order
+                            .fixed
+                            .tokens
+                            .final_output_token
+                            .ok_or(DataStoreError::MissingTokenMint)?,
                         self.order.fixed.tokens.secondary_output_token,
                     ),
                     token_ins,
@@ -238,10 +242,10 @@ impl<'info> ExecuteOrder<'info> {
         let (from, to) = if is_secondary {
             (
                 &self.secondary_output_token_vault,
-                &self.secondary_output_token_receiver,
+                &self.secondary_output_token_account,
             )
         } else {
-            (&self.output_token_vault, &self.output_token_receiver)
+            (&self.output_token_vault, &self.final_output_token_account)
         };
         let (Some(from), Some(to)) = (from, to) else {
             return err!(DataStoreError::MissingReceivers);

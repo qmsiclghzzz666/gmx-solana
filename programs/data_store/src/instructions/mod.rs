@@ -25,6 +25,9 @@ pub mod deposit;
 /// Instructions for Withdrawal.
 pub mod withdrawal;
 
+/// Instructions for Order.
+pub mod order;
+
 /// Instructions for Exchange.
 pub mod exchange;
 

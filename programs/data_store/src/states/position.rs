@@ -4,7 +4,7 @@ use crate::{constants, DataStoreError};
 use anchor_lang::prelude::*;
 use num_enum::TryFromPrimitive;
 
-use super::AsMarket;
+use super::{AsMarket, Seed};
 
 /// Position.
 #[account(zero_copy)]
@@ -47,6 +47,10 @@ impl Space for Position {
     const INIT_SPACE: usize = (1 * 2) + (1 * 14) + (32 * 3) + (8 * 2) + (16 * 7);
 }
 
+impl Seed for Position {
+    const SEED: &'static [u8] = b"position";
+}
+
 #[cfg(test)]
 const_assert_eq!(std::mem::size_of::<Position>(), Position::INIT_SPACE);
 
@@ -72,12 +76,47 @@ impl Position {
     pub fn is_long(&self) -> Result<bool> {
         Ok(matches!(self.kind()?, PositionKind::Long))
     }
+
+    /// Initialize the position state.
+    ///
+    /// Returns error if `kind` is not `Unitialized`.
+    pub fn try_init(
+        &mut self,
+        kind: PositionKind,
+        bump: u8,
+        owner: &Pubkey,
+        market_token: &Pubkey,
+        collateral_token: &Pubkey,
+    ) -> Result<()> {
+        let PositionKind::Uninitialized = self.kind_unchecked()? else {
+            return err!(DataStoreError::PositionHasBeenInitialized);
+        };
+        if matches!(kind, PositionKind::Uninitialized) {
+            return err!(DataStoreError::InvalidPositionInitailziationParams);
+        }
+        self.kind = kind as u8;
+        self.bump = bump;
+        self.padding_0 = [0; 14];
+        self.owner = *owner;
+        self.market_token = *market_token;
+        self.collateral_token = *collateral_token;
+        self.increasted_at_slot = 0;
+        self.decreased_at_slot = 0;
+        self.size_in_tokens = 0;
+        self.collateral_amount = 0;
+        self.size_in_usd = 0;
+        self.borrowing_factor = 0;
+        self.funding_fee_amount_per_size = 0;
+        self.long_token_claimable_funding_amount_per_size = 0;
+        self.short_token_claimable_funding_amount_per_size = 0;
+        Ok(())
+    }
 }
 
 /// Position Kind.
 #[non_exhaustive]
 #[repr(u8)]
-#[derive(Clone, Copy, num_enum::IntoPrimitive, num_enum::TryFromPrimitive)]
+#[derive(Clone, Copy, num_enum::IntoPrimitive, num_enum::TryFromPrimitive, PartialEq, Eq)]
 #[num_enum(error_type(name = DataStoreError, constructor = DataStoreError::invalid_position_kind))]
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub enum PositionKind {

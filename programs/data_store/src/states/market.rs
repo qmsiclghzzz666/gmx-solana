@@ -7,7 +7,7 @@ use gmx_core::{
 };
 use gmx_solana_utils::to_seed;
 
-use crate::{constants, utils::internal::TransferUtils};
+use crate::{constants, utils::internal::TransferUtils, DataStoreError};
 
 use super::{
     position::{Position, PositionOps},
@@ -46,6 +46,33 @@ pub struct MarketMeta {
     pub long_token_mint: Pubkey,
     /// Short token.
     pub short_token_mint: Pubkey,
+}
+
+impl MarketMeta {
+    /// Check if the given token is a valid collateral token.
+    #[inline]
+    pub fn is_collateral_token(&self, token: &Pubkey) -> bool {
+        *token == self.long_token_mint || *token == self.short_token_mint
+    }
+
+    /// Get pnl token.
+    pub fn pnl_token(&self, is_long: bool) -> Pubkey {
+        if is_long {
+            self.long_token_mint
+        } else {
+            self.short_token_mint
+        }
+    }
+
+    /// Check if the given token is a valid collateral token,
+    /// return error if it is not.
+    pub fn validate_collateral_token(&self, token: &Pubkey) -> Result<()> {
+        if self.is_collateral_token(token) {
+            Ok(())
+        } else {
+            Err(DataStoreError::InvalidCollateralToken.into())
+        }
+    }
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
