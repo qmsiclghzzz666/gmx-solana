@@ -22,8 +22,9 @@ describe("exchange: order", () => {
         ({ GMFakeFakeUsdG } = await getMarkets());
     });
 
-    it("create an increase order", async () => {
-        let order: PublicKey;
+    it("increase and decrease position", async () => {
+        // Increase position.
+        let increaseOrder: PublicKey;
         try {
             const [signature, address] = await invokeCreateOrder(provider.connection, {
                 store: dataStoreAddress,
@@ -41,8 +42,8 @@ describe("exchange: order", () => {
                     ],
                 }
             });
-            order = address;
-            console.log(`order ${order} created at ${signature}`);
+            increaseOrder = address;
+            console.log(`order ${increaseOrder} created at ${signature}`);
         } catch (error) {
             console.log(error);
             throw error;
@@ -52,11 +53,52 @@ describe("exchange: order", () => {
                 authority: signer0,
                 store: dataStoreAddress,
                 oracle: oracleAddress,
-                order,
+                order: increaseOrder,
             }, {
                 computeUnits: 400_000,
             });
-            console.log(`order ${order} executed at ${signature}`);
+            console.log(`order ${increaseOrder} executed at ${signature}`);
+        } catch (error) {
+            console.log(error);
+            throw error;
+        }
+
+        // Decrease position.
+        let decreaseOrder: PublicKey;
+        try {
+            const [signature, address] = await invokeCreateOrder(provider.connection, {
+                store: dataStoreAddress,
+                payer: user0,
+                orderType: "marketDecrease",
+                marketToken: GMFakeFakeUsdG,
+                isCollateralTokenLong: false,
+                initialCollateralDeltaAmount: 0,
+                isLong: true,
+                sizeDeltaUsd: 100_000_000_000_000_000_000n,
+                toTokenAccount: user0FakeTokenAccount,
+                secondaryTokenAccount: user0FakeTokenAccount,
+                options: {
+                    swapPath: [
+                        GMFakeFakeUsdG
+                    ],
+                }
+            });
+            decreaseOrder = address;
+            console.log(`order ${decreaseOrder} created at ${signature}`);
+        } catch (error) {
+            console.log(error);
+            throw error;
+        }
+        try {
+            const signature = await invokeExecuteOrder(provider.connection, {
+                authority: signer0,
+                store: dataStoreAddress,
+                oracle: oracleAddress,
+                order: decreaseOrder,
+            }, {
+                computeUnits: 400_000,
+            });
+            console.log(`order ${decreaseOrder} executed at ${signature}`);
         } catch (error) {
             console.log(error);
             throw error;

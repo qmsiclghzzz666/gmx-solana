@@ -98,10 +98,10 @@ pub fn initialize_order(
                 .validate_position(ctx.bumps.position, &output_token)?;
             Tokens {
                 market_token: meta.market_token_mint,
-                initial_collateral_token: ctx.accounts.initial_collateral_token_account()?.mint,
+                initial_collateral_token: output_token,
                 output_token,
                 secondary_output_token: meta.pnl_token(params.is_long),
-                final_output_token: None,
+                final_output_token: Some(ctx.accounts.final_output_token_account()?.mint),
             }
         }
     };
@@ -187,7 +187,7 @@ impl<'info> InitializeOrder<'info> {
         let account = self
             .final_output_token_account
             .as_ref()
-            .ok_or(DataStoreError::MissingSender)?;
+            .ok_or(DataStoreError::MissingReceivers)?;
         Ok(account)
     }
 
@@ -195,7 +195,7 @@ impl<'info> InitializeOrder<'info> {
         let account = self
             .secondary_output_token_account
             .as_ref()
-            .ok_or(DataStoreError::MissingSender)?;
+            .ok_or(DataStoreError::MissingReceivers)?;
         Ok(account)
     }
 
