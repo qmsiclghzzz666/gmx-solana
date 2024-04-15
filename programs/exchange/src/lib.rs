@@ -61,7 +61,7 @@ pub mod exchange {
         instructions::cancel_withdrawal(ctx, execution_fee)
     }
 
-    #[access_control(Authenticate::only_controller(&ctx))]
+    #[access_control(Authenticate::only_order_keeper(&ctx))]
     pub fn execute_withdrawal<'info>(
         ctx: Context<'_, '_, 'info, 'info, ExecuteWithdrawal<'info>>,
         execution_fee: u64,
@@ -76,6 +76,14 @@ pub mod exchange {
         params: CreateOrderParams,
     ) -> Result<()> {
         instructions::create_order(ctx, nonce, params)
+    }
+
+    #[access_control(Authenticate::only_order_keeper(&ctx))]
+    pub fn execute_order<'info>(
+        ctx: Context<'_, '_, 'info, 'info, ExecuteOrder<'info>>,
+        execution_fee: u64,
+    ) -> Result<()> {
+        instructions::execute_order(ctx, execution_fee)
     }
 }
 

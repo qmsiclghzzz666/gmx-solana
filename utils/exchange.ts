@@ -578,7 +578,7 @@ export const makeCreateOrderInstruction = async ({
     const [authority] = createControllerPDA(store);
     const [onlyController] = createRolesPDA(store, authority);
     const [order] = createOrderPDA(store, payer, nonce);
-
+    const acceptablePrice = options?.acceptablePrice;
     const instruction = await exchange.methods.createOrder(
         [...nonce],
         {
@@ -587,7 +587,7 @@ export const makeCreateOrderInstruction = async ({
                 minOutputAmount: toBN(options?.minOutputAmount ?? 0),
                 sizeDeltaUsd: toBN(sizeDeltaUsd ?? 0),
                 initialCollateralDeltaAmount: toBN(initialCollateralDeltaAmount),
-                acceptablePrice: toBN(options?.acceptablePrice ?? 0),
+                acceptablePrice: acceptablePrice ? toBN(acceptablePrice) : null,
                 isLong,
             },
             outputToken: collateralToken,
@@ -621,6 +621,103 @@ export const makeCreateOrderInstruction = async ({
 };
 
 export const invokeCreateOrder = makeInvoke(makeCreateOrderInstruction, ["payer"]);
+
+export type MakeExecuteOrderParams = {
+    authority: PublicKey,
+    store: PublicKey,
+    oracle: PublicKey,
+    order: PublicKey,
+    options?: {
+        executionFee?: number | bigint,
+        hints?: {
+            order?: {
+                user: PublicKey,
+                marketTokenMint: PublicKey,
+                position: PublicKey | null,
+                feeds: PublicKey[],
+                swapPath: PublicKey[],
+                finalOutputToken: PublicKey | null,
+                secondaryOutputToken: PublicKey | null,
+                finalOutputTokenAccount: PublicKey | null,
+                secondaryOutputTokenAccount: PublicKey | null,
+            }
+        }
+    },
+};
+
+export const makeExecuteOrderInstruction = async ({
+    authority,
+    store,
+    oracle,
+    order,
+    options,
+}: MakeExecuteOrderParams) => {
+    const {
+        user,
+        marketTokenMint,
+        position,
+        finalOutputToken,
+        finalOutputTokenAccount,
+        secondaryOutputToken,
+        secondaryOutputTokenAccount,
+        feeds,
+        swapPath,
+    } = options?.hints?.order ?? await dataStore.account.order.fetch(order).then(order => {
+        return {
+            user: order.fixed.user,
+            marketTokenMint: order.fixed.tokens.marketToken,
+            position: order.fixed.position ?? null,
+            finalOutputToken: order.fixed.tokens.finalOutputToken ?? null,
+            secondaryOutputToken: order.fixed.tokens.secondaryOutputToken ?? null,
+            finalOutputTokenAccount: order.fixed.receivers.finalOutputTokenAccount ?? null,
+            secondaryOutputTokenAccount: order.fixed.receivers.secondaryOutputTokenAccount ?? null,
+            feeds: order.prices.feeds,
+            swapPath: order.swap.longTokenSwapPath,
+        };
+    });
+    const [onlyOrderKeeper] = createRolesPDA(store, authority);
+    const feedAccounts = feeds.map(pubkey => {
+        return {
+            pubkey,
+            isSigner: false,
+            isWritable: false,
+        }
+    });
+    const swapMarkets = swapPath.map(mint => {
+        return {
+            pubkey: createMarketPDA(store, mint)[0],
+            isSigner: false,
+            isWritable: true,
+        }
+    });
+    const swapMarketMints = swapPath.map(pubkey => {
+        return {
+            pubkey,
+            isSigner: false,
+            isWritable: false,
+        }
+    });
+    return await exchange.methods.executeOrder(toBN(options?.executionFee ?? 0)).accounts({
+        authority,
+        onlyOrderKeeper,
+        store,
+        oracle,
+        tokenConfigMap: createTokenConfigMapPDA(store)[0],
+        market: createMarketPDA(store, marketTokenMint)[0],
+        marketTokenMint,
+        order,
+        position,
+        user,
+        finalOutputTokenAccount,
+        secondaryOutputTokenAccount,
+        finalOutputTokenVault: finalOutputTokenAccount ? createMarketVaultPDA(store, finalOutputToken)[0] : null,
+        secondaryOutputTokenVault: secondaryOutputTokenAccount ? createMarketVaultPDA(store, secondaryOutputToken)[0] : null,
+        dataStoreProgram: dataStore.programId,
+        chainlinkProgram: CHAINLINK_ID,
+    }).remainingAccounts([...feedAccounts, ...swapMarkets, ...swapMarketMints]).instruction();
+};
+
+export const invokeExecuteOrder = makeInvoke(makeExecuteOrderInstruction, ["authority"]);
 
 export const initializeMarkets = async (signer: Keypair, dataStoreAddress: PublicKey, fakeTokenMint: PublicKey, usdGMint: PublicKey) => {
     let GMWsolWsolBtc: PublicKey;

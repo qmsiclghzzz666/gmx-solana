@@ -3,10 +3,11 @@ use anchor_spl::token::{Mint, Token, TokenAccount};
 use gmx_core::{action::Prices, MarketExt, Position as _, PositionExt};
 
 use crate::{
+    constants,
     states::{
         order::{Order, OrderKind},
         position::Position,
-        DataStore, Market, Oracle, Roles,
+        DataStore, Market, Oracle, Roles, Seed,
     },
     utils::internal::{self, TransferUtils},
     DataStoreError, GmxCoreError,
@@ -30,16 +31,42 @@ pub struct ExecuteOrder<'info> {
     #[account(mut)]
     pub market: Account<'info, Market>,
     pub market_token_mint: Account<'info, Mint>,
-    #[account(mut)]
+    #[account(
+        mut,
+        constraint = position.load()?.owner == order.fixed.user,
+        seeds = [
+            Position::SEED,
+            store.key().as_ref(),
+            order.fixed.user.as_ref(),
+            position.load()?.market_token.as_ref(),
+            position.load()?.collateral_token.as_ref(),
+            &[position.load()?.kind],
+        ],
+        bump = position.load()?.bump,
+    )]
     pub position: Option<AccountLoader<'info, Position>>,
     #[account(
         mut,
-        token::mint = final_output_token_account.as_ref().expect("must provided").mint
+        token::mint = final_output_token_account.as_ref().expect("must provided").mint,
+        seeds = [
+            constants::MARKET_VAULT_SEED,
+            store.key().as_ref(),
+            final_output_token_vault.mint.as_ref(),
+            &[],
+        ],
+        bump,
     )]
-    pub output_token_vault: Option<Account<'info, TokenAccount>>,
+    pub final_output_token_vault: Option<Account<'info, TokenAccount>>,
     #[account(
         mut,
-        token::mint = secondary_output_token_account.as_ref().expect("must provided").mint
+        token::mint = secondary_output_token_account.as_ref().expect("must provided").mint,
+        seeds = [
+            constants::MARKET_VAULT_SEED,
+            store.key().as_ref(),
+            secondary_output_token_vault.mint.as_ref(),
+            &[],
+        ],
+        bump,
     )]
     pub secondary_output_token_vault: Option<Account<'info, TokenAccount>>,
     #[account(mut)]
@@ -50,13 +77,15 @@ pub struct ExecuteOrder<'info> {
 }
 
 /// Execute an order.
-pub fn execute_order<'info>(ctx: Context<'_, '_, 'info, 'info, ExecuteOrder<'info>>) -> Result<()> {
+pub fn execute_order<'info>(
+    ctx: Context<'_, '_, 'info, 'info, ExecuteOrder<'info>>,
+) -> Result<bool> {
     // TODO: validate non-empty order.
     // TODO: validate order trigger price.
-    ctx.accounts.execute(ctx.remaining_accounts)?;
+    let should_remove = ctx.accounts.execute(ctx.remaining_accounts)?;
     // TODO: validate market state.
     // TODO: emit order executed event.
-    Ok(())
+    Ok(should_remove)
 }
 
 impl<'info> internal::Authentication<'info> for ExecuteOrder<'info> {
@@ -96,8 +125,9 @@ impl<'info> ExecuteOrder<'info> {
         })
     }
 
-    fn execute(&mut self, remaining_accounts: &'info [AccountInfo<'info>]) -> Result<()> {
+    fn execute(&mut self, remaining_accounts: &'info [AccountInfo<'info>]) -> Result<bool> {
         let prices = self.prices()?;
+        let mut should_remove = false;
         match self.order.fixed.params.kind {
             OrderKind::MarketSwap => {
                 unimplemented!();
@@ -134,7 +164,7 @@ impl<'info> ExecuteOrder<'info> {
                         prices,
                         collateral_increment_amount as u128,
                         size_delta_usd,
-                        Some(acceptable_price),
+                        acceptable_price,
                     )
                     .map_err(GmxCoreError::from)?
                     .execute()
@@ -160,7 +190,7 @@ impl<'info> ExecuteOrder<'info> {
                         .decrease(
                             prices,
                             size_delta_usd,
-                            Some(acceptable_price),
+                            acceptable_price,
                             collateral_withdrawal_amount,
                         )
                         .map_err(GmxCoreError::from)?
@@ -192,7 +222,7 @@ impl<'info> ExecuteOrder<'info> {
                             .ok_or(DataStoreError::AmountOverflow)?;
                         secondary_output_amount = 0;
                     }
-
+                    should_remove = report.should_remove();
                     (
                         report.is_output_token_long(),
                         output_amount
@@ -235,7 +265,7 @@ impl<'info> ExecuteOrder<'info> {
                 unimplemented!();
             }
         }
-        Ok(())
+        Ok(should_remove)
     }
 
     fn transfer_out(&self, is_secondary: bool, amount: u64) -> Result<()> {
@@ -245,7 +275,10 @@ impl<'info> ExecuteOrder<'info> {
                 &self.secondary_output_token_account,
             )
         } else {
-            (&self.output_token_vault, &self.final_output_token_account)
+            (
+                &self.final_output_token_vault,
+                &self.final_output_token_account,
+            )
         };
         let (Some(from), Some(to)) = (from, to) else {
             return err!(DataStoreError::MissingReceivers);

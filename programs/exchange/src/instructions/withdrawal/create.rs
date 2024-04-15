@@ -3,6 +3,7 @@ use std::collections::BTreeSet;
 use anchor_lang::{prelude::*, system_program};
 use anchor_spl::token::{self, Token, TokenAccount};
 use data_store::{
+    constants,
     cpi::accounts::{GetMarketMeta, GetTokenConfig, InitializeWithdrawal},
     program::DataStore,
     states::{common::SwapParams, withdrawal::TokenParams, NonceBytes},
@@ -62,6 +63,14 @@ pub struct CreateWithdrawal<'info> {
     #[account(
         mut,
         token::mint = market_token_account.mint,
+        seeds = [
+            constants::MARKET_VAULT_SEED,
+            store.key().as_ref(),
+            market_token_withdrawal_vault.mint.as_ref(),
+            &[],
+        ],
+        seeds::program = data_store_program.key(),
+        bump,
     )]
     pub market_token_withdrawal_vault: Account<'info, TokenAccount>,
     pub final_long_token_receiver: Account<'info, TokenAccount>,

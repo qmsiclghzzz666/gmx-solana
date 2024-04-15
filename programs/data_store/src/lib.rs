@@ -340,7 +340,7 @@ pub mod data_store {
     #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
     pub fn execute_order<'info>(
         ctx: Context<'_, '_, 'info, 'info, ExecuteOrder<'info>>,
-    ) -> Result<()> {
+    ) -> Result<bool> {
         instructions::execute_order(ctx)
     }
 

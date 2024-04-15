@@ -3,6 +3,7 @@ use anchor_spl::token::{Mint, Token, TokenAccount};
 use gmx_core::MarketExt;
 
 use crate::{
+    constants,
     states::{DataStore, Market, Oracle, Roles, Seed, Withdrawal},
     utils::internal::{self, TransferUtils},
     DataStoreError, GmxCoreError,
@@ -34,11 +35,41 @@ pub struct ExecuteWithdrawal<'info> {
     pub market: Account<'info, Market>,
     #[account(mut)]
     pub market_token_mint: Account<'info, Mint>,
-    #[account(mut, token::mint = market_token_mint)]
+    #[account(
+        mut,
+        token::mint = market_token_mint,
+        seeds = [
+            constants::MARKET_VAULT_SEED,
+            store.key().as_ref(),
+            market_token_withdrawal_vault.mint.as_ref(),
+            &[],
+        ],
+        bump,
+    )]
     pub market_token_withdrawal_vault: Account<'info, TokenAccount>,
-    #[account(mut, token::mint = final_long_token_receiver.mint)]
+    #[account(
+        mut,
+        token::mint = final_long_token_receiver.mint,
+        seeds = [
+            constants::MARKET_VAULT_SEED,
+            store.key().as_ref(),
+            final_long_token_vault.mint.as_ref(),
+            &[],
+        ],
+        bump,
+    )]
     pub final_long_token_vault: Account<'info, TokenAccount>,
-    #[account(mut, token::mint = final_short_token_receiver.mint)]
+    #[account(
+        mut,
+        token::mint = final_short_token_receiver.mint,
+        seeds = [
+            constants::MARKET_VAULT_SEED,
+            store.key().as_ref(),
+            final_short_token_vault.mint.as_ref(),
+            &[],
+        ],
+        bump,
+    )]
     pub final_short_token_vault: Account<'info, TokenAccount>,
     #[account(mut)]
     pub final_long_token_receiver: Account<'info, TokenAccount>,

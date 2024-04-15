@@ -39,6 +39,7 @@ impl Order {
         nonce: &NonceBytes,
         market: &Pubkey,
         user: &Pubkey,
+        position: Option<&Pubkey>,
         params: &OrderParams,
         tokens: &Tokens,
         senders: &Senders,
@@ -47,7 +48,7 @@ impl Order {
         swap: SwapParams,
     ) -> Result<()> {
         self.fixed.init(
-            bump, nonce, market, user, params, tokens, senders, receivers,
+            bump, nonce, market, user, position, params, tokens, senders, receivers,
         )?;
         self.prices = TokensWithFeed::from_vec(tokens_with_feed);
         self.swap = swap;
@@ -73,6 +74,8 @@ pub struct Fixed {
     pub market: Pubkey,
     /// The creator of the order.
     pub user: Pubkey,
+    /// Position.
+    pub position: Option<Pubkey>,
     /// The params of order.
     pub params: OrderParams,
     /// The token config.
@@ -91,6 +94,7 @@ impl Fixed {
         nonce: &NonceBytes,
         market: &Pubkey,
         user: &Pubkey,
+        position: Option<&Pubkey>,
         params: &OrderParams,
         tokens: &Tokens,
         senders: &Senders,
@@ -101,6 +105,7 @@ impl Fixed {
         self.updated_at_slot = Clock::get()?.slot;
         self.market = *market;
         self.user = *user;
+        self.position = position.copied();
         self.params = params.clone();
         self.tokens = tokens.clone();
         self.senders = senders.clone();
@@ -160,7 +165,7 @@ pub struct OrderParams {
     /// Initial collateral delta amount.
     pub initial_collateral_delta_amount: u64,
     /// Acceptable price (unit price).
-    pub acceptable_price: u128,
+    pub acceptable_price: Option<u128>,
     /// Whether the order is for a long or short position.
     pub is_long: bool,
 }

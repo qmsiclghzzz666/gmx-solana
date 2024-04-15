@@ -149,6 +149,7 @@ pub fn initialize_order(
         &nonce,
         &ctx.accounts.market.key(),
         ctx.accounts.payer.key,
+        ctx.accounts.position.as_ref().map(|a| a.key()).as_ref(),
         &params,
         &tokens,
         &senders,
