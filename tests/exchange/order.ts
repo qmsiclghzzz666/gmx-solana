@@ -28,10 +28,15 @@ describe("exchange: order", () => {
                 orderType: "marketIncrease",
                 marketToken: GMFakeFakeUsdG,
                 isCollateralTokenLong: false,
-                initialCollateralDeltaAmount: 200_000_000,
+                initialCollateralDeltaAmount: 2_000_000,
                 isLong: true,
                 sizeDeltaUsd: 200_000_000_000_000_000_000n,
-                fromTokenAccount: user0UsdGTokenAccount,
+                fromTokenAccount: user0FakeTokenAccount,
+                options: {
+                    swapPath: [
+                        GMFakeFakeUsdG
+                    ],
+                }
             });
             console.log(`order ${order} created at ${signature}`);
         } catch (error) {

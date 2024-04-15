@@ -609,7 +609,13 @@ export const makeCreateOrderInstruction = async ({
         secondaryOutputTokenAccount: secondaryTokenAccount ?? null,
         initialCollateralTokenVault: (await getDepositVault(exchange.provider.connection, store, fromTokenAccount, options?.hints?.initialToken)) ?? null,
         dataStoreProgram: dataStore.programId,
-    }).instruction();
+    }).remainingAccounts(swapPath.map(mint => {
+        return {
+            pubkey: createMarketPDA(store, mint)[0],
+            isSigner: false,
+            isWritable: false,
+        };
+    })).instruction();
 
     return [instruction, order] as IxWithOutput<PublicKey>;
 };
