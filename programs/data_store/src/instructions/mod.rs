@@ -37,6 +37,7 @@ pub use exchange::*;
 pub use market::*;
 pub use nonce::*;
 pub use oracle::*;
+pub use order::*;
 pub use roles::*;
 pub use token::*;
 pub use token_config::*;

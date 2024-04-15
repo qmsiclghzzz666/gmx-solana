@@ -20,6 +20,7 @@ use self::{
         common::SwapParams,
         deposit::TokenParams as DepositTokenParams,
         market::{MarketMeta, Pool},
+        order::OrderParams,
         token_config::TokenConfig,
         withdrawal::TokenParams as WithdrawalTokenParams,
     },
@@ -341,6 +342,27 @@ pub mod data_store {
         ctx: Context<'_, '_, 'info, 'info, ExecuteOrder<'info>>,
     ) -> Result<()> {
         instructions::execute_order(ctx)
+    }
+
+    #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
+    pub fn initialize_order(
+        ctx: Context<InitializeOrder>,
+        nonce: [u8; 32],
+        tokens_with_feed: Vec<(Pubkey, Pubkey)>,
+        swap: SwapParams,
+        params: OrderParams,
+        output_token: Pubkey,
+        ui_fee_receiver: Pubkey,
+    ) -> Result<()> {
+        instructions::initialize_order(
+            ctx,
+            nonce,
+            tokens_with_feed,
+            swap,
+            params,
+            output_token,
+            ui_fee_receiver,
+        )
     }
 }
 

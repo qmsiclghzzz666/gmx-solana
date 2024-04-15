@@ -8,6 +8,7 @@ use crate::{
         position::Position,
         DataStore, Market, NonceBytes, Roles, Seed,
     },
+    utils::internal,
     DataStoreError,
 };
 
@@ -156,6 +157,20 @@ pub fn initialize_order(
         swap,
     )?;
     Ok(())
+}
+
+impl<'info> internal::Authentication<'info> for InitializeOrder<'info> {
+    fn authority(&self) -> &Signer<'info> {
+        &self.authority
+    }
+
+    fn store(&self) -> &Account<'info, DataStore> {
+        &self.store
+    }
+
+    fn roles(&self) -> &Account<'info, Roles> {
+        &self.only_controller
+    }
 }
 
 impl<'info> InitializeOrder<'info> {

@@ -27,6 +27,10 @@ export const NONCE_SEED = encodeUtf8("nonce");
 export const DEPOSIT_SEED = encodeUtf8("deposit");
 // Withdrawal seed.
 export const WITHDRAWAL_SEED = encodeUtf8("withdrawal");
+// Order seed.
+export const ORDER_SEED = encodeUtf8("order");
+// Position seed.
+export const POSITION_SEED = encodeUtf8("position");
 
 // Role keys.
 export const CONTROLLER = "CONTROLLER";
@@ -87,6 +91,22 @@ export const createWithdrawalPDA = (store: PublicKey, user: PublicKey, nonce: Ui
     store.toBytes(),
     user.toBytes(),
     nonce,
+], dataStore.programId);
+
+export const createOrderPDA = (store: PublicKey, user: PublicKey, nonce: Uint8Array) => PublicKey.findProgramAddressSync([
+    ORDER_SEED,
+    store.toBytes(),
+    user.toBytes(),
+    nonce,
+], dataStore.programId);
+
+export const createPositionPDA = (store: PublicKey, user: PublicKey, marketToken: PublicKey, collateralToken: PublicKey, isLong: boolean) => PublicKey.findProgramAddressSync([
+    POSITION_SEED,
+    store.toBytes(),
+    user.toBytes(),
+    marketToken.toBytes(),
+    collateralToken.toBytes(),
+    new Uint8Array([isLong ? 1 : 2]),
 ], dataStore.programId);
 
 export const createMarketVault = async (provider: anchor.AnchorProvider, signer: Keypair, dataStoreAddress: PublicKey, mint: PublicKey) => {

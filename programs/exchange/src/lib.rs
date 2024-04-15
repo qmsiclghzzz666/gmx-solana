@@ -68,6 +68,15 @@ pub mod exchange {
     ) -> Result<()> {
         instructions::execute_withdrawal(ctx, execution_fee)
     }
+
+    // Order.
+    pub fn create_order<'info>(
+        ctx: Context<'_, '_, 'info, 'info, CreateOrder<'info>>,
+        nonce: [u8; 32],
+        params: CreateOrderParams,
+    ) -> Result<()> {
+        instructions::create_order(ctx, nonce, params)
+    }
 }
 
 /// Errors of market program.
@@ -109,4 +118,11 @@ pub enum ExchangeError {
     OutputAmountTooSmall,
     #[msg("Invalid withdrawal to execute")]
     InvalidWIthdrawalToExecute,
+    // Order.
+    #[msg("Unsupported order kind")]
+    UnsupportedOrderKind,
+    #[msg("Invalid secondary output token")]
+    InvalidSecondaryOutputToken,
+    #[msg("Invalid output token")]
+    InvalidOutputToken,
 }

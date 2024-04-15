@@ -1,7 +1,7 @@
 import { workspace, Program, BN, utils } from "@coral-xyz/anchor";
 import { Exchange } from "../target/types/exchange";
 import { Connection, Keypair, PublicKey } from "@solana/web3.js";
-import { createDepositPDA, createMarketPDA, createMarketTokenMintPDA, createMarketVaultPDA, createRolesPDA, createTokenConfigMapPDA, createWithdrawalPDA, dataStore, getTokenConfig } from "./data";
+import { createDepositPDA, createMarketPDA, createMarketTokenMintPDA, createMarketVaultPDA, createOrderPDA, createPositionPDA, createRolesPDA, createTokenConfigMapPDA, createWithdrawalPDA, dataStore } from "./data";
 import { TOKEN_PROGRAM_ID, getAccount } from "@solana/spl-token";
 import { BTC_TOKEN_MINT, SOL_TOKEN_MINT } from "./token";
 import { toBN } from "./number";
@@ -487,6 +487,134 @@ export const makeExecuteWithdrawalInstruction = async ({
 };
 
 export const invokeExecuteWithdrawal = makeInvoke(makeExecuteWithdrawalInstruction, ["authority"]);
+
+export type MakeCreateOrderParams = {
+    store: PublicKey,
+    payer: PublicKey,
+    orderType: "marketSwap" | "marketIncrease" | "marketDecrease" | "liquidation",
+    marketToken: PublicKey,
+    isCollateralTokenLong: boolean,
+    initialCollateralDeltaAmount: number | bigint,
+    isLong?: boolean,
+    sizeDeltaUsd?: number | bigint,
+    fromTokenAccount?: PublicKey,
+    toTokenAccount?: PublicKey,
+    secondaryTokenAccount?: PublicKey,
+    options?: {
+        nonce?: Buffer,
+        executionFee?: number | bigint,
+        swapPath?: PublicKey[],
+        minOutputAmount?: number | bigint,
+        acceptablePrice?: number | bigint,
+        hints?: {
+            initialToken?: PublicKey,
+            collateralToken?: PublicKey,
+        }
+    },
+};
+
+export const makeCreateOrderInstruction = async ({
+    store,
+    payer,
+    orderType,
+    marketToken,
+    isCollateralTokenLong,
+    initialCollateralDeltaAmount,
+    isLong,
+    sizeDeltaUsd,
+    fromTokenAccount,
+    toTokenAccount,
+    secondaryTokenAccount,
+    options,
+}: MakeCreateOrderParams) => {
+    const [market] = createMarketPDA(store, marketToken);
+
+    const getCollateralToken = async (isCollateralTokenLong: boolean) => {
+        const meta = (await dataStore.account.market.fetch(market)).meta;
+        return isCollateralTokenLong ? meta.longTokenMint : meta.shortTokenMint;
+    };
+    const collateralToken = options?.hints?.collateralToken ?? await getCollateralToken(isCollateralTokenLong);
+
+    let kind;
+    let position: PublicKey | null = null;
+
+    switch (orderType) {
+        case "marketSwap":
+            kind = {
+                marketSwap: {},
+            };
+            break;
+        case "marketIncrease":
+            kind = {
+                marketIncrease: {},
+            };
+            if (isLong === undefined) {
+                throw "position side must be provided";
+            }
+            position = createPositionPDA(store, payer, marketToken, collateralToken, isLong)[0]
+            break;
+        case "marketDecrease":
+            kind = {
+                marketDecrease: {},
+            };
+            if (isLong === undefined) {
+                throw "position side must be provided";
+            }
+            position = createPositionPDA(store, payer, marketToken, collateralToken, isLong)[0]
+            break;
+        case "liquidation":
+            kind = {
+                liquidation: {},
+            };
+            if (isLong === undefined) {
+                throw "position side must be provided";
+            }
+            position = createPositionPDA(store, payer, marketToken, collateralToken, isLong)[0]
+            break;
+    }
+
+    const nonce = options?.nonce ?? Keypair.generate().publicKey.toBuffer();
+    const swapPath = options?.swapPath ?? [];
+    const [authority] = createControllerPDA(store);
+    const [onlyController] = createRolesPDA(store, authority);
+    const [order] = createOrderPDA(store, payer, nonce);
+
+    const instruction = await exchange.methods.createOrder(
+        [...nonce],
+        {
+            order: {
+                kind,
+                minOutputAmount: toBN(options?.minOutputAmount ?? 0),
+                sizeDeltaUsd: toBN(sizeDeltaUsd ?? 0),
+                initialCollateralDeltaAmount: toBN(initialCollateralDeltaAmount),
+                acceptablePrice: toBN(options?.acceptablePrice ?? 0),
+                isLong,
+            },
+            outputToken: collateralToken,
+            uiFeeReceiver: Keypair.generate().publicKey,
+            executionFee: toBN(options?.executionFee ?? 0),
+            swapLength: swapPath.length,
+        },
+    ).accounts({
+        authority,
+        store,
+        onlyController,
+        payer,
+        order,
+        position,
+        tokenConfigMap: createTokenConfigMapPDA(store)[0],
+        market,
+        initialCollateralTokenAccount: fromTokenAccount ?? null,
+        finalOutputTokenAccount: toTokenAccount ?? null,
+        secondaryOutputTokenAccount: secondaryTokenAccount ?? null,
+        initialCollateralTokenVault: (await getDepositVault(exchange.provider.connection, store, fromTokenAccount, options?.hints?.initialToken)) ?? null,
+        dataStoreProgram: dataStore.programId,
+    }).instruction();
+
+    return [instruction, order] as IxWithOutput<PublicKey>;
+};
+
+export const invokeCreateOrder = makeInvoke(makeCreateOrderInstruction, ["payer"]);
 
 export const initializeMarkets = async (signer: Keypair, dataStoreAddress: PublicKey, fakeTokenMint: PublicKey, usdGMint: PublicKey) => {
     let GMWsolWsolBtc: PublicKey;
