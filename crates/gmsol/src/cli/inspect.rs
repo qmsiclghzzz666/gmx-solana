@@ -1,10 +1,13 @@
 use anchor_client::solana_sdk::pubkey::Pubkey;
-use data_store::states;
+use data_store::states::{self};
 use exchange::utils::ControllerSeeds;
 use eyre::ContextCompat;
-use gmsol::store::{
-    market::find_market_address,
-    token_config::{find_token_config_map, get_token_config},
+use gmsol::{
+    store::{
+        market::find_market_address,
+        token_config::{find_token_config_map, get_token_config},
+    },
+    utils,
 };
 
 use crate::SharedClient;
@@ -43,6 +46,10 @@ enum Command {
     Controller,
     /// Get token config.
     TokenConfig { token: Pubkey },
+    /// `Order` account.
+    Order { address: Pubkey },
+    /// `Position` account.
+    Position { address: Pubkey },
 }
 
 impl InspectArgs {
@@ -112,6 +119,19 @@ impl InspectArgs {
                     .await?
                     .ok_or(gmsol::Error::NotFound)?;
                 println!("{config:#?}");
+            }
+            Command::Order { address } => {
+                println!("{:#?}", program.account::<states::Order>(address).await?);
+            }
+            Command::Position { address } => {
+                println!(
+                    "{:#?}",
+                    utils::try_deserailize_account::<states::Position>(
+                        &program.async_rpc(),
+                        &address
+                    )
+                    .await?
+                );
             }
         }
         Ok(())

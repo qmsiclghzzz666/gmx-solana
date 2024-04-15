@@ -28,6 +28,9 @@ pub enum Error {
     /// Not found.
     #[error("not found")]
     NotFound,
+    /// Bytemuck error.
+    #[error("bytemuck: {0}")]
+    Bytemuck(bytemuck::PodCastError),
 }
 
 impl Error {

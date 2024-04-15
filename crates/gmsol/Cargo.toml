@@ -23,6 +23,7 @@ anchor-spl = { workspace = true, default_features = false, features = [
     "token_2022",
     "associated_token",
 ] }
+bytemuck = { workspace = true }
 gmx-solana-utils = { path = "../gmx-solana-utils" }
 data_store = { path = "../../programs/data_store", features = [
     "no-entrypoint",

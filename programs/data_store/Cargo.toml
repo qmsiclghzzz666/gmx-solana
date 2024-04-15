@@ -18,7 +18,7 @@ idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
 debug = []
 
 [dependencies]
-bytemuck = "1.15.0"
+bytemuck = { workspace = true }
 anchor-lang = { workspace = true, features = ["init-if-needed"] }
 gmx-core = { path = "../../crates/gmx-core", features = ["u128", "solana"] }
 gmx-solana-utils = { path = "../../crates/gmx-solana-utils" }

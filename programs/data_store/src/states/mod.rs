@@ -33,6 +33,8 @@ pub use deposit::Deposit;
 pub use market::*;
 pub use nonce::*;
 pub use oracle::*;
+pub use order::Order;
+pub use position::Position;
 pub use token_config::*;
 pub use withdrawal::Withdrawal;
 
