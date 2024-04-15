@@ -133,4 +133,6 @@ pub enum ExchangeError {
     InvalidSecondaryOutputToken,
     #[msg("Invalid output token")]
     InvalidOutputToken,
+    #[msg("Position is not provided")]
+    PositionNotProvided,
 }

@@ -54,6 +54,9 @@ describe("exchange: order", () => {
                 store: dataStoreAddress,
                 oracle: oracleAddress,
                 order: increaseOrder,
+                options: {
+                    executionFee: 5001,
+                }
             }, {
                 computeUnits: 400_000,
             });
@@ -74,7 +77,7 @@ describe("exchange: order", () => {
                 isCollateralTokenLong: false,
                 initialCollateralDeltaAmount: 0,
                 isLong: true,
-                sizeDeltaUsd: 100_000_000_000_000_000_000n,
+                sizeDeltaUsd: 200_000_000_000_000_000_000n,
                 toTokenAccount: user0FakeTokenAccount,
                 secondaryTokenAccount: user0FakeTokenAccount,
                 options: {
@@ -95,6 +98,9 @@ describe("exchange: order", () => {
                 store: dataStoreAddress,
                 oracle: oracleAddress,
                 order: decreaseOrder,
+                options: {
+                    executionFee: 5001,
+                }
             }, {
                 computeUnits: 400_000,
             });

@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token};
 use data_store::{
+    cpi::accounts::{RemoveOrder, RemovePosition},
     program::DataStore,
     states::{Chainlink, Oracle, Order},
     utils::{Authentication, WithOracle, WithOracleExt},
@@ -56,11 +57,11 @@ pub fn execute_order<'info>(
     execution_fee: u64,
 ) -> Result<()> {
     let order = &ctx.accounts.order;
-    let _refund = order
+    let refund = order
         .get_lamports()
         .checked_sub(super::MAX_ORDER_EXECUTION_FEE.min(execution_fee))
         .ok_or(ExchangeError::NotEnoughExecutionFee)?;
-    let _should_remove_position = ctx.accounts.with_oracle_prices(
+    let should_remove_position = ctx.accounts.with_oracle_prices(
         order.prices.tokens.clone(),
         ctx.remaining_accounts,
         |accounts, remaining_accounts| {
@@ -73,7 +74,12 @@ pub fn execute_order<'info>(
             Ok(should_remove_position)
         },
     )?;
-    // TODO: remove order.
+    data_store::cpi::remove_order(ctx.accounts.remove_order_ctx(), refund)?;
+    if should_remove_position {
+        // Refund all lamports.
+        let refund = ctx.accounts.position()?.get_lamports();
+        data_store::cpi::remove_position(ctx.accounts.remove_position_ctx()?, refund)?;
+    }
     Ok(())
 }
 
@@ -147,5 +153,40 @@ impl<'info> ExecuteOrder<'info> {
                 token_program: self.token_program.to_account_info(),
             },
         )
+    }
+
+    fn remove_order_ctx(&self) -> CpiContext<'_, '_, '_, 'info, RemoveOrder<'info>> {
+        CpiContext::new(
+            self.data_store_program.to_account_info(),
+            RemoveOrder {
+                authority: self.authority.to_account_info(),
+                only_controller: self.only_order_keeper.to_account_info(),
+                store: self.store.to_account_info(),
+                order: self.order.to_account_info(),
+                user: self.user.to_account_info(),
+                system_program: self.system_program.to_account_info(),
+            },
+        )
+    }
+
+    fn position(&self) -> Result<&UncheckedAccount<'info>> {
+        let Some(position) = self.position.as_ref() else {
+            return err!(ExchangeError::PositionNotProvided);
+        };
+        Ok(position)
+    }
+
+    fn remove_position_ctx(&self) -> Result<CpiContext<'_, '_, '_, 'info, RemovePosition<'info>>> {
+        Ok(CpiContext::new(
+            self.data_store_program.to_account_info(),
+            RemovePosition {
+                authority: self.authority.to_account_info(),
+                only_controller: self.only_order_keeper.to_account_info(),
+                store: self.store.to_account_info(),
+                position: self.position()?.to_account_info(),
+                user: self.user.to_account_info(),
+                system_program: self.system_program.to_account_info(),
+            },
+        ))
     }
 }

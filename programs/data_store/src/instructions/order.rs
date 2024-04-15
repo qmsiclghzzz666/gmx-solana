@@ -1,4 +1,4 @@
-use anchor_lang::prelude::*;
+use anchor_lang::{prelude::*, system_program};
 use anchor_spl::token::TokenAccount;
 
 use crate::{
@@ -247,5 +247,64 @@ impl<'info> InitializeOrder<'info> {
         let position = position.load()?;
         require_eq!(position.bump, bump, DataStoreError::InvalidPosition);
         Ok(())
+    }
+}
+
+#[derive(Accounts)]
+#[instruction(refund: u64)]
+pub struct RemoveOrder<'info> {
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    pub only_controller: Account<'info, Roles>,
+    pub store: Account<'info, DataStore>,
+    #[account(
+        mut,
+        constraint = order.to_account_info().lamports() >= refund @ DataStoreError::LamportsNotEnough,
+        close = authority,
+        constraint = order.fixed.user == user.key() @ DataStoreError::UserMismatch,
+        seeds = [
+            Order::SEED,
+            store.key().as_ref(),
+            user.key().as_ref(),
+            &order.fixed.nonce,
+        ],
+        bump = order.fixed.bump,
+    )]
+    pub order: Account<'info, Order>,
+    /// CHECK: only used to receive lamports,
+    /// and has been checked in `order`'s constraint.
+    #[account(mut)]
+    pub user: UncheckedAccount<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+/// Remove an order.
+pub fn remove_order(ctx: Context<RemoveOrder>, refund: u64) -> Result<()> {
+    system_program::transfer(ctx.accounts.transfer_ctx(), refund)
+}
+
+impl<'info> internal::Authentication<'info> for RemoveOrder<'info> {
+    fn authority(&self) -> &Signer<'info> {
+        &self.authority
+    }
+
+    fn store(&self) -> &Account<'info, DataStore> {
+        &self.store
+    }
+
+    fn roles(&self) -> &Account<'info, Roles> {
+        &self.only_controller
+    }
+}
+
+impl<'info> RemoveOrder<'info> {
+    fn transfer_ctx(&self) -> CpiContext<'_, '_, '_, 'info, system_program::Transfer<'info>> {
+        CpiContext::new(
+            self.system_program.to_account_info(),
+            system_program::Transfer {
+                from: self.authority.to_account_info(),
+                to: self.user.to_account_info(),
+            },
+        )
     }
 }

@@ -364,6 +364,17 @@ pub mod data_store {
             ui_fee_receiver,
         )
     }
+
+    #[access_control(internal::Authenticate::only_controller(&ctx))]
+    pub fn remove_order(ctx: Context<RemoveOrder>, refund: u64) -> Result<()> {
+        instructions::remove_order(ctx, refund)
+    }
+
+    // Position.
+    #[access_control(internal::Authenticate::only_controller(&ctx))]
+    pub fn remove_position(ctx: Context<RemovePosition>, refund: u64) -> Result<()> {
+        instructions::remove_position(ctx, refund)
+    }
 }
 
 #[error_code]

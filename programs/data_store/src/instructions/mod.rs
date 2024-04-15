@@ -28,6 +28,9 @@ pub mod withdrawal;
 /// Instructions for Order.
 pub mod order;
 
+/// Instructions for Position.
+pub mod position;
+
 /// Instructions for Exchange.
 pub mod exchange;
 
@@ -38,6 +41,7 @@ pub use market::*;
 pub use nonce::*;
 pub use oracle::*;
 pub use order::*;
+pub use position::*;
 pub use roles::*;
 pub use token::*;
 pub use token_config::*;
