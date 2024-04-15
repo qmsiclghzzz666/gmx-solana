@@ -189,6 +189,8 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> IncreasePosition<P, DECIMALS> {
         self.position
             .validate_position(&self.params.prices, true, true)?;
 
+        self.position.increased()?;
+
         Ok(IncreasePositionReport::new(
             self.params,
             execution,

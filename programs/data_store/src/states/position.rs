@@ -23,7 +23,7 @@ pub struct Position {
     /// Collateral token.
     pub collateral_token: Pubkey,
     /// Increased at slot.
-    pub increasted_at_slot: u64,
+    pub increased_at_slot: u64,
     /// Decreased at slot.
     pub decreased_at_slot: u64,
     /// Size in tokens.
@@ -100,7 +100,7 @@ impl Position {
         self.owner = *owner;
         self.market_token = *market_token;
         self.collateral_token = *collateral_token;
-        self.increasted_at_slot = 0;
+        self.increased_at_slot = 0;
         self.decreased_at_slot = 0;
         self.size_in_tokens = 0;
         self.collateral_amount = 0;
@@ -109,6 +109,18 @@ impl Position {
         self.funding_fee_amount_per_size = 0;
         self.long_token_claimable_funding_amount_per_size = 0;
         self.short_token_claimable_funding_amount_per_size = 0;
+        Ok(())
+    }
+
+    /// Update state after increased.
+    pub fn increased(&mut self) -> Result<()> {
+        self.increased_at_slot = Clock::get()?.slot;
+        Ok(())
+    }
+
+    /// Update state after decreased.
+    pub fn decreased(&mut self) -> Result<()> {
+        self.decreased_at_slot = Clock::get()?.slot;
         Ok(())
     }
 }
@@ -218,5 +230,15 @@ impl<'a, 'info> gmx_core::Position<{ constants::MARKET_DECIMALS }> for PositionO
 
     fn is_long(&self) -> bool {
         self.is_long
+    }
+
+    fn increased(&mut self) -> gmx_core::Result<()> {
+        self.position.increased()?;
+        Ok(())
+    }
+
+    fn decreased(&mut self) -> gmx_core::Result<()> {
+        self.position.decreased()?;
+        Ok(())
     }
 }

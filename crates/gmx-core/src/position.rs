@@ -50,6 +50,12 @@ pub trait Position<const DECIMALS: u8> {
 
     /// Returns whether the position is a long position.
     fn is_long(&self) -> bool;
+
+    /// Increased callback.
+    fn increased(&mut self) -> crate::Result<()>;
+
+    /// Decreased callback.
+    fn decreased(&mut self) -> crate::Result<()>;
 }
 
 impl<'a, const DECIMALS: u8, P: Position<DECIMALS>> Position<DECIMALS> for &'a mut P {
@@ -97,6 +103,14 @@ impl<'a, const DECIMALS: u8, P: Position<DECIMALS>> Position<DECIMALS> for &'a m
 
     fn is_long(&self) -> bool {
         (**self).is_long()
+    }
+
+    fn increased(&mut self) -> crate::Result<()> {
+        (**self).increased()
+    }
+
+    fn decreased(&mut self) -> crate::Result<()> {
+        (**self).decreased()
     }
 }
 

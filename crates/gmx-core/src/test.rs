@@ -306,4 +306,12 @@ where
     fn is_long(&self) -> bool {
         self.position.is_long
     }
+
+    fn increased(&mut self) -> crate::Result<()> {
+        Ok(())
+    }
+
+    fn decreased(&mut self) -> crate::Result<()> {
+        Ok(())
+    }
 }

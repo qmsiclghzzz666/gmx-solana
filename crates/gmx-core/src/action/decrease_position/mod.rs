@@ -157,6 +157,8 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
                 .validate_position(&self.params.prices, false, false)?;
         }
 
+        self.position.decreased()?;
+
         Ok(DecreasePositionReport::new(
             should_remove,
             self.params,
