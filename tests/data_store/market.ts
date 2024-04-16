@@ -39,7 +39,7 @@ describe("data store: Market", () => {
             expect(market.meta.shortTokenMint).eql(shortToken);
             expect(market.meta.marketTokenMint).eql(marketToken);
         }
-        await dataStore.methods.removeMarket().accounts({
+        await dataStore.methods.removeMarket().accountsPartial({
             authority: signer0.publicKey,
             onlyMarketKeeper: roles,
             store: dataStoreAddress,
@@ -53,7 +53,7 @@ describe("data store: Market", () => {
 
     it("perform basic token operations", async () => {
         const [marketTokenMint] = createMarketTokenMintPDA(dataStoreAddress, indexToken, longToken, shortToken);
-        await dataStore.methods.initializeMarketToken(indexToken, longToken, shortToken).accounts({
+        await dataStore.methods.initializeMarketToken(indexToken, longToken, shortToken).accountsPartial({
             store: dataStoreAddress,
             authority: signer0.publicKey,
             onlyMarketKeeper: roles,
@@ -77,7 +77,7 @@ describe("data store: Market", () => {
         }).signers([signer0]).rpc();
 
         const [marketVault] = createMarketVaultPDA(dataStoreAddress, marketTokenMint);
-        await dataStore.methods.initializeMarketVault(null).accounts({
+        await dataStore.methods.initializeMarketVault(null).accountsPartial({
             authority: signer0.publicKey,
             store: dataStoreAddress,
             onlyMarketKeeper: roles,

@@ -94,7 +94,7 @@ describe("data store: Roles", () => {
     });
 
     it("grant, check and revoke a role to user", async () => {
-        await dataStore.methods.grantRole(signer0.publicKey, otherRole).accounts({
+        await dataStore.methods.grantRole(signer0.publicKey, otherRole).accountsPartial({
             authority: provider.publicKey,
             store: dataStoreAddress,
             onlyAdmin: providerRoles,
@@ -109,7 +109,7 @@ describe("data store: Roles", () => {
             expect(hasRole).true;
         }
 
-        await dataStore.methods.revokeRole(signer0.publicKey, otherRole).accounts({
+        await dataStore.methods.revokeRole(signer0.publicKey, otherRole).accountsPartial({
             authority: provider.publicKey,
             store: dataStoreAddress,
             onlyAdmin: providerRoles,
@@ -124,14 +124,14 @@ describe("data store: Roles", () => {
             expect(hasRole).false;
         }
 
-        await expect(dataStore.methods.grantRole(signer0.publicKey, otherRole).accounts({
+        await expect(dataStore.methods.grantRole(signer0.publicKey, otherRole).accountsPartial({
             authority: signer0.publicKey,
             store: dataStoreAddress,
             onlyAdmin: signer0Roles,
             userRoles: signer0Roles,
         }).signers([signer0]).rpc()).to.rejectedWith(AnchorError, "Not an admin");
 
-        await expect(dataStore.methods.revokeRole(signer0.publicKey, otherRole).accounts({
+        await expect(dataStore.methods.revokeRole(signer0.publicKey, otherRole).accountsPartial({
             authority: signer0.publicKey,
             store: dataStoreAddress,
             onlyAdmin: signer0Roles,

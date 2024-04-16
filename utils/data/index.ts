@@ -113,7 +113,7 @@ export const createMarketVault = async (provider: anchor.AnchorProvider, signer:
     const [vault] = createMarketVaultPDA(dataStoreAddress, mint);
     const [roles] = createRolesPDA(dataStoreAddress, signer.publicKey);
 
-    await dataStore.methods.initializeMarketVault(null).accounts({
+    await dataStore.methods.initializeMarketVault(null).accountsPartial({
         authority: signer.publicKey,
         onlyMarketKeeper: roles,
         store: dataStoreAddress,
@@ -143,7 +143,7 @@ export const initializeDataStore = async (
 
     // Initialize a DataStore with the given key.
     try {
-        const tx = await dataStore.methods.initialize(dataStoreKey).accounts({
+        const tx = await dataStore.methods.initialize(dataStoreKey).accountsPartial({
             authority: provider.publicKey,
             dataStore: dataStorePDA,
             roles: rolesPDA,
@@ -192,7 +192,7 @@ export const initializeDataStore = async (
             console.log(`Enabled ${role} in tx: ${tx}`);
         }
         {
-            const tx = await dataStore.methods.grantRole(signer.publicKey, role).accounts({
+            const tx = await dataStore.methods.grantRole(signer.publicKey, role).accountsPartial({
                 authority: provider.publicKey,
                 store: dataStorePDA,
                 onlyAdmin: rolesPDA,
@@ -201,7 +201,7 @@ export const initializeDataStore = async (
             console.log(`Grant ${role} to signer in tx: ${tx}`);
         }
         {
-            const tx = await dataStore.methods.grantRole(controller, role).accounts({
+            const tx = await dataStore.methods.grantRole(controller, role).accountsPartial({
                 authority: provider.publicKey,
                 store: dataStorePDA,
                 onlyAdmin: rolesPDA,
@@ -270,7 +270,7 @@ export const initializeDataStore = async (
     // Init a nonce.
     try {
         const [noncePDA] = createNoncePDA(dataStorePDA);
-        const tx = await dataStore.methods.initializeNonce().accounts({
+        const tx = await dataStore.methods.initializeNonce().accountsPartial({
             authority: signer.publicKey,
             store: dataStorePDA,
             onlyController: signerRoles,
