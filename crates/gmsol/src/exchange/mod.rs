@@ -4,6 +4,9 @@ pub mod deposit;
 /// Withdrawal.
 pub mod withdrawal;
 
+/// Order.
+pub mod order;
+
 use std::ops::Deref;
 
 use anchor_client::{
@@ -11,7 +14,10 @@ use anchor_client::{
     solana_sdk::{pubkey::Pubkey, signer::Signer},
     Program, RequestBuilder,
 };
-use data_store::states::{DataStore, NonceBytes, Seed};
+use data_store::states::{
+    order::{OrderKind, OrderParams},
+    DataStore, NonceBytes, Seed,
+};
 use exchange::{accounts, instruction};
 use gmx_solana_utils::to_seed;
 use rand::{distributions::Standard, Rng};
@@ -23,6 +29,7 @@ use crate::store::{
 
 use self::{
     deposit::{CancelDepositBuilder, CreateDepositBuilder, ExecuteDepositBuilder},
+    order::CreateOrderBuilder,
     withdrawal::{CancelWithdrawalBuilder, CreateWithdrawalBuilder, ExecuteWithdrawalBuilder},
 };
 
@@ -33,6 +40,15 @@ pub fn find_store_address(key: &str) -> (Pubkey, u8) {
 
 /// Exchange instructions for GMSOL.
 pub trait ExchangeOps<C> {
+    /// Create a new market and return its token mint address.
+    fn create_market(
+        &self,
+        store: &Pubkey,
+        index_token: &Pubkey,
+        long_token: &Pubkey,
+        short_token: &Pubkey,
+    ) -> (RequestBuilder<C>, Pubkey);
+
     /// Create a deposit.
     fn create_deposit(&self, store: &Pubkey, market_token: &Pubkey) -> CreateDepositBuilder<C>;
 
@@ -66,14 +82,56 @@ pub trait ExchangeOps<C> {
         withdrawal: &Pubkey,
     ) -> ExecuteWithdrawalBuilder<C>;
 
-    /// Create a new market and return its token mint address.
-    fn create_market(
+    /// Create an order.
+    fn create_order(
         &self,
         store: &Pubkey,
-        index_token: &Pubkey,
-        long_token: &Pubkey,
-        short_token: &Pubkey,
-    ) -> (RequestBuilder<C>, Pubkey);
+        market_token: &Pubkey,
+        is_output_token_long: bool,
+        params: OrderParams,
+    ) -> CreateOrderBuilder<C>;
+
+    /// Create a market increase position order.
+    fn market_increase(
+        &self,
+        store: &Pubkey,
+        market_token: &Pubkey,
+        is_collateral_token_long: bool,
+        initial_collateral_amount: u64,
+        is_long: bool,
+        increment_size_in_usd: u128,
+    ) -> CreateOrderBuilder<C> {
+        let params = OrderParams {
+            kind: OrderKind::MarketIncrease,
+            min_output_amount: 0,
+            size_delta_usd: increment_size_in_usd,
+            initial_collateral_delta_amount: initial_collateral_amount,
+            acceptable_price: None,
+            is_long,
+        };
+        self.create_order(store, market_token, is_collateral_token_long, params)
+    }
+
+    /// Create a market decrease position order.
+    fn market_decrease(
+        &self,
+        store: &Pubkey,
+        market_token: &Pubkey,
+        is_collateral_token_long: bool,
+        collateral_withdrawal_amount: u64,
+        is_long: bool,
+        decrement_size_in_usd: u128,
+    ) -> CreateOrderBuilder<C> {
+        let params = OrderParams {
+            kind: OrderKind::MarketDecrease,
+            min_output_amount: 0,
+            size_delta_usd: decrement_size_in_usd,
+            initial_collateral_delta_amount: collateral_withdrawal_amount,
+            acceptable_price: None,
+            is_long,
+        };
+        self.create_order(store, market_token, is_collateral_token_long, params)
+    }
 }
 
 impl<S, C> ExchangeOps<C> for Program<C>
@@ -148,6 +206,16 @@ where
                 index_token_mint: *index_token,
             });
         (builder, market_token)
+    }
+
+    fn create_order(
+        &self,
+        store: &Pubkey,
+        market_token: &Pubkey,
+        is_output_token_long: bool,
+        params: OrderParams,
+    ) -> CreateOrderBuilder<C> {
+        CreateOrderBuilder::new(self, store, market_token, params, is_output_token_long)
     }
 }
 

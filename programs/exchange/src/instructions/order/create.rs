@@ -45,11 +45,11 @@ pub struct CreateOrder<'info> {
     /// CHECK: check by CPI.
     pub market: UncheckedAccount<'info>,
     #[account(mut)]
-    pub initial_collateral_token_account: Option<Account<'info, TokenAccount>>,
+    pub initial_collateral_token_account: Option<Box<Account<'info, TokenAccount>>>,
     /// CHECK: check by CPI.
-    pub final_output_token_account: Option<Account<'info, TokenAccount>>,
+    pub final_output_token_account: Option<Box<Account<'info, TokenAccount>>>,
     /// CHECK: check by CPI.
-    pub secondary_output_token_account: Option<Account<'info, TokenAccount>>,
+    pub secondary_output_token_account: Option<Box<Account<'info, TokenAccount>>>,
     #[account(
         mut,
         token::mint = initial_collateral_token_account.as_ref().expect("sender must be provided").mint,
@@ -62,7 +62,7 @@ pub struct CreateOrder<'info> {
         bump,
         seeds::program = data_store_program.key(),
     )]
-    pub initial_collateral_token_vault: Option<Account<'info, TokenAccount>>,
+    pub initial_collateral_token_vault: Option<Box<Account<'info, TokenAccount>>>,
     pub data_store_program: Program<'info, DataStore>,
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,
@@ -127,11 +127,16 @@ pub fn create_order<'info>(
 /// Create Order Params.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct CreateOrderParams {
-    order: OrderParams,
-    output_token: Pubkey,
-    ui_fee_receiver: Pubkey,
-    execution_fee: u64,
-    swap_length: u8,
+    /// Order Params.
+    pub order: OrderParams,
+    /// Swap out token or collateral token.
+    pub output_token: Pubkey,
+    /// Ui fee receiver.
+    pub ui_fee_receiver: Pubkey,
+    /// Execution fee.
+    pub execution_fee: u64,
+    /// Swap path length.
+    pub swap_length: u8,
 }
 
 impl<'info> CreateOrder<'info> {

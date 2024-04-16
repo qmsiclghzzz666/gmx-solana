@@ -5,7 +5,7 @@ pub enum Error {
     #[error("empty deposit")]
     EmptyDeposit,
     /// Client Error.
-    #[error("{0:?}")]
+    #[error("{0:#?}")]
     Client(#[from] anchor_client::ClientError),
     /// Number out of range.
     #[error("numer out of range")]
@@ -31,11 +31,19 @@ pub enum Error {
     /// Bytemuck error.
     #[error("bytemuck: {0}")]
     Bytemuck(bytemuck::PodCastError),
+    /// Invalid Arguments.
+    #[error("invalid argument: {0}")]
+    InvalidArgument(String),
 }
 
 impl Error {
     /// Create unknown error.
     pub fn unknown(msg: impl ToString) -> Self {
         Self::Unknown(msg.to_string())
+    }
+
+    /// Create "invalid argument" error.
+    pub fn invalid_argument(msg: impl ToString) -> Self {
+        Self::InvalidArgument(msg.to_string())
     }
 }

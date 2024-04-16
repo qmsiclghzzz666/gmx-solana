@@ -100,6 +100,44 @@ enum Command {
         /// The address of the withdrawal to cancel.
         withdrawal: Pubkey,
     },
+    /// Create a market increase order.
+    MarketIncrease {
+        /// The address of the market token of the position's market.
+        market_token: Pubkey,
+        /// Whether the collateral is long token.
+        #[arg(long)]
+        collateral_side: Side,
+        /// Initial collateral token.
+        #[arg(long, short = 'c')]
+        initial_collateral_token: Option<Pubkey>,
+        /// Initial collateral token account.
+        #[arg(long, requires = "initial_collateral_token")]
+        initial_collateral_token_account: Option<Pubkey>,
+        /// Collateral amount.
+        #[arg(long, short = 'a')]
+        initial_collateral_token_amount: u64,
+        /// Position side.
+        #[arg(long)]
+        side: Side,
+        /// Position increment size in usd.
+        #[arg(long)]
+        size: u128,
+        /// Swap paths for collateral token.
+        #[arg(long, short, action = clap::ArgAction::Append)]
+        swap: Vec<Pubkey>,
+    },
+}
+
+#[derive(clap::ValueEnum, Clone)]
+enum Side {
+    Long,
+    Short,
+}
+
+impl Side {
+    fn is_long(&self) -> bool {
+        matches!(self, Self::Long)
+    }
 }
 
 impl ExchangeArgs {
@@ -202,6 +240,33 @@ impl ExchangeArgs {
                     .await?;
                 tracing::info!(%withdrawal, "cancelled withdrawal at tx {signature}");
                 println!("{signature}");
+            }
+            Command::MarketIncrease {
+                market_token,
+                collateral_side,
+                initial_collateral_token,
+                initial_collateral_token_account,
+                initial_collateral_token_amount,
+                side,
+                size,
+                swap,
+            } => {
+                let mut builder = program.market_increase(
+                    store,
+                    market_token,
+                    collateral_side.is_long(),
+                    *initial_collateral_token_amount,
+                    side.is_long(),
+                    *size,
+                );
+                if let Some(token) = initial_collateral_token {
+                    builder
+                        .initial_collateral_token(token, initial_collateral_token_account.as_ref());
+                }
+
+                let (request, order) = builder.swap_path(swap.clone()).build_with_address().await?;
+                let signature = request.send().await?;
+                println!("created market increase order {order} at tx {signature}");
             }
         }
         Ok(())

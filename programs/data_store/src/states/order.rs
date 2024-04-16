@@ -171,7 +171,8 @@ pub struct OrderParams {
 }
 
 impl OrderParams {
-    pub(crate) fn to_position_kind(&self) -> Result<PositionKind> {
+    /// Get position kind.
+    pub fn to_position_kind(&self) -> Result<PositionKind> {
         match &self.kind {
             OrderKind::MarketSwap => Err(DataStoreError::PositionIsNotRequried.into()),
             OrderKind::Liquidation | OrderKind::MarketDecrease | OrderKind::MarketIncrease => {

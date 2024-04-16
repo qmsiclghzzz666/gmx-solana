@@ -1,9 +1,13 @@
+use std::ops::Deref;
+
 use anchor_client::{
     anchor_lang::prelude::borsh::BorshDeserialize,
     solana_client::{nonblocking::rpc_client::RpcClient, rpc_client::SerializableTransaction},
-    solana_sdk::pubkey::Pubkey,
+    solana_sdk::{pubkey::Pubkey, signer::Signer},
+    Program,
 };
 
+use anchor_spl::associated_token::get_associated_token_address;
 use base64::{prelude::BASE64_STANDARD, Engine};
 
 /// View the return data by simulating the transaction.
@@ -55,4 +59,73 @@ where
     }
     let data_without_discriminator = data[8..end].to_vec();
     Ok(*bytemuck::try_from_bytes(&data_without_discriminator).map_err(crate::Error::Bytemuck)?)
+}
+
+/// Token Account Params.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct TokenAccountParams {
+    token: Option<Pubkey>,
+    token_account: Option<Pubkey>,
+}
+
+impl TokenAccountParams {
+    /// Set token account.
+    pub fn token_account(&mut self, account: Pubkey) -> &mut Self {
+        self.token_account = Some(account);
+        self
+    }
+
+    /// Set token.
+    pub fn token(&mut self, mint: Pubkey) -> &mut Self {
+        self.token = Some(mint);
+        self
+    }
+
+    /// Get or find associated token account.
+    pub fn get_or_find_associated_token_account(&self, owner: Option<&Pubkey>) -> Option<Pubkey> {
+        match self.token_account {
+            Some(account) => Some(account),
+            None => {
+                let token = self.token.as_ref()?;
+                let owner = owner?;
+                Some(get_associated_token_address(owner, token))
+            }
+        }
+    }
+
+    /// Get of fetch token and token account.
+    ///
+    /// Returns `(token, token_account)` if success.
+    pub async fn get_or_fetch_token_and_token_account<S, C>(
+        &self,
+        program: &Program<C>,
+        owner: Option<&Pubkey>,
+    ) -> crate::Result<Option<(Pubkey, Pubkey)>>
+    where
+        C: Deref<Target = S> + Clone,
+        S: Signer,
+    {
+        use anchor_spl::token::TokenAccount;
+        match (self.token, self.token_account) {
+            (Some(token), Some(account)) => Ok(Some((token, account))),
+            (None, Some(account)) => {
+                let mint = program.account::<TokenAccount>(account).await?.mint;
+                Ok(Some((mint, account)))
+            }
+            (Some(token), None) => {
+                let Some(account) = self.get_or_find_associated_token_account(owner) else {
+                    return Err(crate::Error::invalid_argument(
+                        "cannot find associated token account: `owner` is not provided",
+                    ));
+                };
+                Ok(Some((token, account)))
+            }
+            (None, None) => Ok(None),
+        }
+    }
+
+    /// Returns whether the params is empty.
+    pub fn is_empty(&self) -> bool {
+        self.token.is_none() && self.token.is_none()
+    }
 }
