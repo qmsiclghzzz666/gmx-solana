@@ -137,7 +137,7 @@ impl<'info> ExecuteWithdrawal<'info> {
             .to_unit_price();
         let report = self
             .market
-            .as_market(&self.market_token_mint)
+            .as_market(&mut self.market_token_mint)
             .enable_transfer(self.token_program.to_account_info(), &self.store)
             .with_vault(self.market_token_withdrawal_vault.to_account_info())
             .withdraw(

@@ -178,7 +178,7 @@ impl Market {
 
     pub(crate) fn as_market<'a, 'info>(
         &'a mut self,
-        mint: &'a Account<'info, Mint>,
+        mint: &'a mut Account<'info, Mint>,
     ) -> AsMarket<'a, 'info> {
         AsMarket {
             meta: &self.meta,
@@ -288,7 +288,7 @@ impl gmx_core::Pool for Pool {
 pub struct AsMarket<'a, 'info> {
     meta: &'a MarketMeta,
     pools: PoolsMap<'a>,
-    mint: &'a Account<'info, Mint>,
+    mint: &'a mut Account<'info, Mint>,
     transfer: Option<TransferUtils<'a, 'info>>,
     receiver: Option<AccountInfo<'info>>,
     vault: Option<AccountInfo<'info>>,
@@ -362,6 +362,7 @@ impl<'a, 'info> gmx_core::Market<{ constants::MARKET_DECIMALS }> for AsMarket<'a
                 .try_into()
                 .map_err(|_| gmx_core::Error::Overflow)?,
         )?;
+        self.mint.reload()?;
         Ok(())
     }
 
@@ -378,6 +379,7 @@ impl<'a, 'info> gmx_core::Market<{ constants::MARKET_DECIMALS }> for AsMarket<'a
                 .try_into()
                 .map_err(|_| gmx_core::Error::Overflow)?,
         )?;
+        self.mint.reload()?;
         Ok(())
     }
 

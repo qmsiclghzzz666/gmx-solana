@@ -48,7 +48,7 @@ impl<'a, 'info> SwapUtils<'a, 'info> {
             let mut market = Account::<'info, Market>::try_from(market)?;
             {
                 let meta = &market.meta;
-                let mint = Account::<Mint>::try_from(&self.mints[idx])?;
+                let mut mint = Account::<Mint>::try_from(&self.mints[idx])?;
                 require_eq!(
                     meta.market_token_mint,
                     mint.key(),
@@ -81,7 +81,7 @@ impl<'a, 'info> SwapUtils<'a, 'info> {
                     .get(&meta.short_token_mint)
                     .ok_or(DataStoreError::MissingOracelPrice)?;
                 let report = market
-                    .as_market(&mint)
+                    .as_market(&mut mint)
                     .swap(
                         is_token_in_long,
                         amount.into(),

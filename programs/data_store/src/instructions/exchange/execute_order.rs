@@ -162,7 +162,7 @@ impl<'info> ExecuteOrder<'info> {
 
                 let report = self
                     .market
-                    .as_market(&self.market_token_mint)
+                    .as_market(&mut self.market_token_mint)
                     .into_position_ops(position)?
                     .increase(
                         prices,
@@ -187,7 +187,7 @@ impl<'info> ExecuteOrder<'info> {
                 let (is_output_token_long, output_amount, secondary_output_amount) = {
                     let mut position = self
                         .market
-                        .as_market(&self.market_token_mint)
+                        .as_market(&mut self.market_token_mint)
                         .into_position_ops(position)?;
 
                     let report = position

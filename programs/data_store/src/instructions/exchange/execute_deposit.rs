@@ -115,7 +115,7 @@ impl<'info> ExecuteDeposit<'info> {
             .to_unit_price();
         let report = self
             .market
-            .as_market(&self.market_token_mint)
+            .as_market(&mut self.market_token_mint)
             .enable_transfer(self.token_program.to_account_info(), &self.store)
             .with_receiver(self.receiver.to_account_info())
             .deposit(
