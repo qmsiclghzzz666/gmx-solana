@@ -1,14 +1,14 @@
 use std::ops::Deref;
 
 use anchor_client::{
-    anchor_lang::system_program,
+    anchor_lang::{system_program, Id},
     solana_sdk::{instruction::AccountMeta, pubkey::Pubkey, signer::Signer},
     Program, RequestBuilder,
 };
 use data_store::states::{
     order::{OrderKind, OrderParams},
     position::PositionKind,
-    Market, MarketMeta, NonceBytes, Order, Position, Seed,
+    Chainlink, Market, MarketMeta, NonceBytes, Order, Position, Seed,
 };
 use exchange::{accounts, instruction, instructions::CreateOrderParams, utils::ControllerSeeds};
 
@@ -356,5 +356,143 @@ where
             );
 
         Ok((builder, order))
+    }
+}
+
+/// Execute Order Builder.
+pub struct ExecuteOrderBuilder<'a, C> {
+    program: &'a Program<C>,
+    store: Pubkey,
+    oracle: Pubkey,
+    order: Pubkey,
+    execution_fee: u64,
+    hint: Option<ExecuteOrderHint>,
+}
+
+#[derive(Clone)]
+struct ExecuteOrderHint {
+    market_token: Pubkey,
+    position: Option<Pubkey>,
+    user: Pubkey,
+    final_output_token: Option<Pubkey>,
+    secondary_output_token: Pubkey,
+    final_output_token_account: Option<Pubkey>,
+    secondary_output_token_account: Option<Pubkey>,
+    feeds: Vec<Pubkey>,
+    swap_path: Vec<Pubkey>,
+}
+
+impl<'a, S, C> ExecuteOrderBuilder<'a, C>
+where
+    C: Deref<Target = S> + Clone,
+    S: Signer,
+{
+    pub(super) fn new(
+        program: &'a Program<C>,
+        store: &Pubkey,
+        oracle: &Pubkey,
+        order: &Pubkey,
+    ) -> Self {
+        Self {
+            program,
+            store: *store,
+            oracle: *oracle,
+            order: *order,
+            execution_fee: 0,
+            hint: None,
+        }
+    }
+
+    /// Set execution fee.
+    pub fn execution_fee(&mut self, fee: u64) -> &mut Self {
+        self.execution_fee = fee;
+        self
+    }
+
+    /// Set hint with the given order.
+    pub fn hint(&mut self, order: &Order) -> &mut Self {
+        self.hint = Some(ExecuteOrderHint {
+            market_token: order.fixed.tokens.market_token,
+            position: order.fixed.position,
+            user: order.fixed.user,
+            final_output_token: order.fixed.tokens.final_output_token,
+            secondary_output_token: order.fixed.tokens.secondary_output_token,
+            final_output_token_account: order.fixed.receivers.final_output_token_account,
+            secondary_output_token_account: order.fixed.receivers.secondary_output_token_account,
+            feeds: order.prices.feeds.clone(),
+            swap_path: order.swap.long_token_swap_path.clone(),
+        });
+        self
+    }
+
+    async fn prepare_hint(&mut self) -> crate::Result<ExecuteOrderHint> {
+        loop {
+            match &self.hint {
+                Some(hint) => return Ok(hint.clone()),
+                None => {
+                    let order: Order = self.program.account(self.order).await?;
+                    self.hint(&order);
+                }
+            }
+        }
+    }
+
+    /// Build [`RequestBuilder`] for `execute_order` instruction.
+    pub async fn build(&mut self) -> crate::Result<RequestBuilder<'a, C>> {
+        let hint = self.prepare_hint().await?;
+        let authority = self.program.payer();
+        let feeds = hint.feeds.iter().map(|pubkey| AccountMeta {
+            pubkey: *pubkey,
+            is_signer: false,
+            is_writable: false,
+        });
+        let swap_markets = hint.swap_path.iter().map(|mint| AccountMeta {
+            pubkey: find_market_address(&self.store, mint).0,
+            is_signer: false,
+            is_writable: true,
+        });
+        let swap_market_mints = hint.swap_path.iter().map(|pubkey| AccountMeta {
+            pubkey: *pubkey,
+            is_signer: false,
+            is_writable: false,
+        });
+        Ok(self
+            .program
+            .request()
+            .accounts(accounts::ExecuteOrder {
+                authority,
+                only_order_keeper: find_roles_address(&self.store, &authority).0,
+                store: self.store,
+                oracle: self.oracle,
+                token_config_map: find_token_config_map(&self.store).0,
+                market: find_market_address(&self.store, &hint.market_token).0,
+                market_token_mint: hint.market_token,
+                order: self.order,
+                position: hint.position,
+                user: hint.user,
+                final_output_token_vault: hint
+                    .final_output_token_account
+                    .as_ref()
+                    .and(hint.final_output_token.as_ref())
+                    .map(|token| find_market_vault_address(&self.store, token).0),
+                secondary_output_token_vault: hint.secondary_output_token_account.as_ref().map(
+                    |_| find_market_vault_address(&self.store, &hint.secondary_output_token).0,
+                ),
+                final_output_token_account: hint.final_output_token_account,
+                secondary_output_token_account: hint.secondary_output_token_account,
+                data_store_program: data_store::id(),
+                token_program: anchor_spl::token::ID,
+                chainlink_program: Chainlink::id(),
+                system_program: system_program::ID,
+            })
+            .args(instruction::ExecuteOrder {
+                execution_fee: self.execution_fee,
+            })
+            .accounts(
+                feeds
+                    .chain(swap_markets)
+                    .chain(swap_market_mints)
+                    .collect::<Vec<_>>(),
+            ))
     }
 }

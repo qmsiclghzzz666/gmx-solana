@@ -22,6 +22,7 @@ pub struct ExecuteOrder<'info> {
     /// CHECK: check by CPI.
     pub token_config_map: UncheckedAccount<'info>,
     /// CHECK: only used to invoke CPI and should be checked by it.
+    #[account(mut)]
     pub market: UncheckedAccount<'info>,
     #[account(mut, constraint = market_token_mint.key() == order.fixed.tokens.market_token)]
     pub market_token_mint: Account<'info, Mint>,

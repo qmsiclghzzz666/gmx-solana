@@ -438,7 +438,7 @@ where
         }
     }
 
-    /// Build [`RequestBuilder`] for `execute_deposit` instruction.
+    /// Build [`RequestBuilder`] for `execute_withdrawal` instruction.
     pub async fn build(&self) -> crate::Result<RequestBuilder<'a, C>> {
         let authority = self.program.payer();
         let hint = self.get_or_fetch_hint().await?;

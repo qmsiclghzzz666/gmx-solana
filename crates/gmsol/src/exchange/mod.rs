@@ -29,7 +29,7 @@ use crate::store::{
 
 use self::{
     deposit::{CancelDepositBuilder, CreateDepositBuilder, ExecuteDepositBuilder},
-    order::CreateOrderBuilder,
+    order::{CreateOrderBuilder, ExecuteOrderBuilder},
     withdrawal::{CancelWithdrawalBuilder, CreateWithdrawalBuilder, ExecuteWithdrawalBuilder},
 };
 
@@ -90,6 +90,14 @@ pub trait ExchangeOps<C> {
         is_output_token_long: bool,
         params: OrderParams,
     ) -> CreateOrderBuilder<C>;
+
+    /// Execute an order.
+    fn execute_order(
+        &self,
+        store: &Pubkey,
+        oracle: &Pubkey,
+        order: &Pubkey,
+    ) -> ExecuteOrderBuilder<C>;
 
     /// Create a market increase position order.
     fn market_increase(
@@ -216,6 +224,15 @@ where
         params: OrderParams,
     ) -> CreateOrderBuilder<C> {
         CreateOrderBuilder::new(self, store, market_token, params, is_output_token_long)
+    }
+
+    fn execute_order(
+        &self,
+        store: &Pubkey,
+        oracle: &Pubkey,
+        order: &Pubkey,
+    ) -> ExecuteOrderBuilder<C> {
+        ExecuteOrderBuilder::new(self, store, oracle, order)
     }
 }
 
