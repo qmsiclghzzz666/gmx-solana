@@ -22,12 +22,6 @@ export const expect = chai.expect;
 // Get anchor provider.
 export const getProvider = () => provider;
 
-export const getExternalPrograms = () => {
-    return {
-        chainlink: new anchor.Program(chainlinkIDL, CHAINLINK_ID),
-    }
-};
-
 // Users.
 const user0 = anchor.web3.Keypair.generate();
 const signer0 = anchor.web3.Keypair.generate();

@@ -26,6 +26,7 @@ dual-vec-map = { path = "../../crates/dual-vec-map" }
 anchor-spl = { workspace = true, default_features = false, features = [
     "token",
     "token_2022",
+    "token_2022_extensions",
 ] }
 bitmaps = "3.2.1"
 chainlink_solana = "1.0.0"

@@ -17,7 +17,6 @@ export const initializeTokenConfigMap = async (authority: Signer, store: PublicK
         authority: authority.publicKey,
         store,
         onlyController: createRolesPDA(store, authority.publicKey)[0],
-        map,
     }).signers([authority]).rpc();
     return map;
 };
@@ -34,7 +33,6 @@ export const insertTokenConfig = async (
         authority: authority.publicKey,
         store,
         onlyController: createRolesPDA(store, authority.publicKey)[0],
-        map: createTokenConfigMapPDA(store)[0],
         token,
     }).signers([authority]).rpc();
 };
@@ -49,7 +47,6 @@ export const toggleTokenConfig = async (
         authority: authority.publicKey,
         store,
         onlyController: createRolesPDA(store, authority.publicKey)[0],
-        map: createTokenConfigMapPDA(store)[0],
     }).signers([authority]).rpc();
 };
 
@@ -73,6 +70,5 @@ export const extendTokenConfigMap = async (authority: Signer, store: PublicKey, 
         authority: authority.publicKey,
         store,
         onlyController: createRolesPDA(store, authority.publicKey)[0],
-        map: createTokenConfigMapPDA(store)[0],
     }).signers([authority]).rpc();
 };

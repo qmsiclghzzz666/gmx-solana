@@ -1,9 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token};
-use data_store::{
-    cpi::accounts::{InitializeMarket, InitializeMarketToken, InitializeMarketVault},
-    states::DataStore,
-};
+use data_store::cpi::accounts::{InitializeMarket, InitializeMarketToken, InitializeMarketVault};
+use data_store::program::DataStore;
 use data_store::{states::Roles, utils::Authentication};
 
 use crate::ExchangeError;
@@ -36,7 +34,8 @@ pub struct CreateMarket<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
     pub only_market_keeper: Account<'info, Roles>,
-    pub data_store: Account<'info, DataStore>,
+    /// CHECK: check by CPI.
+    pub data_store: UncheckedAccount<'info>,
     /// CHECK: check and init by CPI.
     #[account(mut)]
     pub market: UncheckedAccount<'info>,
@@ -48,7 +47,7 @@ pub struct CreateMarket<'info> {
     /// CHECK: check and init by CPI.
     #[account(mut)]
     pub market_token_vault: UncheckedAccount<'info>,
-    pub data_store_program: Program<'info, data_store::program::DataStore>,
+    pub data_store_program: Program<'info, DataStore>,
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,
 }

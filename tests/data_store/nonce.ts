@@ -26,7 +26,6 @@ describe("data store: Nonce", () => {
             authority: signer0.publicKey,
             onlyController: roles,
             store: dataStoreAddress,
-            nonce,
         }).signers([signer0]).rpc();
         const currentNonce = await dataStore.methods.getNonceBytes().accounts({
             nonce,

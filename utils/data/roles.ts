@@ -16,7 +16,6 @@ export const initializeRoles = async (payer: Signer, authority: PublicKey, store
     await dataStore.methods.initializeRoles(authority).accounts({
         payer: payer.publicKey,
         store,
-        roles,
     }).signers([payer]).rpc();
     return roles;
 };

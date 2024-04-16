@@ -3,8 +3,8 @@ resolver = "2"
 members = ["programs/*", "crates/*"]
 
 [workspace.dependencies]
-anchor-lang = "0.29.0"
-anchor-spl = { version = "0.29.0", default_features = false }
+anchor-lang = "0.30.0"
+anchor-spl = { version = "0.30.0", default_features = false }
 thiserror = "1.0.58"
 bytemuck = "1.15.0"
 

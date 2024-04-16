@@ -202,11 +202,11 @@ impl<'info> InitializeOrder<'info> {
     fn initialize_position_if_needed(
         &self,
         params: &OrderParams,
-        bump: u8,
+        bump: Option<u8>,
         output_token: &Pubkey,
     ) -> Result<()> {
         self.market.meta().validate_collateral_token(output_token)?;
-        let Some(position) = self.position.as_ref() else {
+        let (Some(position), Some(bump)) = (self.position.as_ref(), bump) else {
             return err!(DataStoreError::PositionIsNotProvided);
         };
         let maybe_initialized = match position.load_init() {
@@ -233,15 +233,15 @@ impl<'info> InitializeOrder<'info> {
         };
         if maybe_initialized {
             // We need to validate the position if it has been initialized.
-            self.validate_position(bump, output_token)?;
+            self.validate_position(Some(bump), output_token)?;
         }
         Ok(())
     }
 
     /// Validate the position to make sure it is initialized and valid.
-    fn validate_position(&self, bump: u8, output_token: &Pubkey) -> Result<()> {
+    fn validate_position(&self, bump: Option<u8>, output_token: &Pubkey) -> Result<()> {
         self.market.meta().validate_collateral_token(output_token)?;
-        let Some(position) = self.position.as_ref() else {
+        let (Some(position), Some(bump)) = (self.position.as_ref(), bump) else {
             return err!(DataStoreError::PositionIsNotProvided);
         };
         let position = position.load()?;

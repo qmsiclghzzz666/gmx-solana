@@ -36,8 +36,6 @@ export const createMarket = async (
         longTokenMint,
         shortTokenMint,
         marketTokenVault,
-        dataStoreProgram: dataStore.programId,
-        tokenProgram: TOKEN_PROGRAM_ID,
     }).signers([signer]).rpc();
 
     return marketTokenMint;
@@ -104,11 +102,8 @@ export const makeCreateDepositInstruction = async ({
             shouldUnwrapNativeToken: options?.shouldUnwrapNativeToken ?? false,
         }
     ).accounts({
-        authority,
         store,
         onlyController: createRolesPDA(store, authority)[0],
-        dataStoreProgram: dataStore.programId,
-        tokenProgram: TOKEN_PROGRAM_ID,
         market: createMarketPDA(store, marketToken)[0],
         tokenConfigMap: createTokenConfigMapPDA(store)[0],
         deposit,
@@ -175,8 +170,6 @@ export const makeCancelDepositInstruction = async ({
         authority,
         store,
         onlyController: createRolesPDA(store, authority)[0],
-        dataStoreProgram: dataStore.programId,
-        tokenProgram: TOKEN_PROGRAM_ID,
         user,
         deposit,
         initialLongToken: fromInitialLongTokenAccount,
@@ -259,9 +252,7 @@ export const makeExecuteDepositInstruction = async ({
         authority,
         store,
         onlyOrderKeeper: createRolesPDA(store, authority)[0],
-        dataStoreProgram: dataStore.programId,
         oracle,
-        chainlinkProgram: CHAINLINK_ID,
         tokenConfigMap: createTokenConfigMapPDA(store)[0],
         market: createMarketPDA(store, marketToken)[0],
         marketTokenMint: marketToken,
@@ -319,11 +310,8 @@ export const makeCreateWithdrawalInstruction = async ({
         longTokenSwapLength: longSwapPath.length,
         shortTokenSwapLength: shortSwapPath.length,
     }).accounts({
-        authority,
         store,
         onlyController: createRolesPDA(store, authority)[0],
-        dataStoreProgram: dataStore.programId,
-        tokenProgram: TOKEN_PROGRAM_ID,
         tokenConfigMap: createTokenConfigMapPDA(store)[0],
         market: createMarketPDA(store, marketToken)[0],
         withdrawal: withdrawalAddress,
@@ -378,12 +366,10 @@ export const makeCancelWithdrawalInstruction = async ({
         authority,
         store,
         onlyController: createRolesPDA(store, authority)[0],
-        dataStoreProgram: dataStore.programId,
         withdrawal,
         user,
         marketToken: toMarketTokenAccount,
         marketTokenWithdrawalVault: createMarketVaultPDA(store, marketToken)[0],
-        tokenProgram: TOKEN_PROGRAM_ID,
     }).instruction();
 };
 
@@ -469,9 +455,6 @@ export const makeExecuteWithdrawalInstruction = async ({
         authority,
         store,
         onlyOrderKeeper: createRolesPDA(store, authority)[0],
-        dataStoreProgram: dataStore.programId,
-        chainlinkProgram: CHAINLINK_ID,
-        tokenProgram: TOKEN_PROGRAM_ID,
         oracle,
         tokenConfigMap: createTokenConfigMapPDA(store)[0],
         withdrawal,
@@ -596,7 +579,6 @@ export const makeCreateOrderInstruction = async ({
             swapLength: swapPath.length,
         },
     ).accounts({
-        authority,
         store,
         onlyController,
         payer,
@@ -608,7 +590,6 @@ export const makeCreateOrderInstruction = async ({
         finalOutputTokenAccount: toTokenAccount ?? null,
         secondaryOutputTokenAccount: secondaryTokenAccount ?? null,
         initialCollateralTokenVault: (await getDepositVault(exchange.provider.connection, store, fromTokenAccount, options?.hints?.initialToken)) ?? null,
-        dataStoreProgram: dataStore.programId,
     }).remainingAccounts(swapPath.map(mint => {
         return {
             pubkey: createMarketPDA(store, mint)[0],
@@ -712,8 +693,6 @@ export const makeExecuteOrderInstruction = async ({
         secondaryOutputTokenAccount,
         finalOutputTokenVault: finalOutputTokenAccount ? createMarketVaultPDA(store, finalOutputToken)[0] : null,
         secondaryOutputTokenVault: secondaryOutputTokenAccount ? createMarketVaultPDA(store, secondaryOutputToken)[0] : null,
-        dataStoreProgram: dataStore.programId,
-        chainlinkProgram: CHAINLINK_ID,
     }).remainingAccounts([...feedAccounts, ...swapMarkets, ...swapMarketMints]).instruction();
 };
 
