@@ -344,7 +344,7 @@ pub mod data_store {
         instructions::execute_order(ctx)
     }
 
-    #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
+    #[access_control(internal::Authenticate::only_controller(&ctx))]
     pub fn initialize_order(
         ctx: Context<InitializeOrder>,
         nonce: [u8; 32],

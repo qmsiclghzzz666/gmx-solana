@@ -13,7 +13,7 @@ use super::{
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub struct Order {
     /// The fixed-size part of the order.
-    pub fixed: Fixed,
+    pub fixed: Box<Fixed>,
     /// The config for prices.
     pub prices: TokensWithFeed,
     /// The swap config.
