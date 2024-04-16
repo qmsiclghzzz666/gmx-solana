@@ -8,7 +8,7 @@ use crate::{
     DataStoreError, GmxCoreError,
 };
 
-use super::utils::swap::swap_with_params;
+use super::utils::swap::unchecked_swap_with_params;
 
 #[derive(Accounts)]
 pub struct ExecuteDeposit<'info> {
@@ -73,7 +73,8 @@ impl<'info> ExecuteDeposit<'info> {
         meta: &MarketMeta,
         remaining_accounts: &'info [AccountInfo<'info>],
     ) -> Result<(u64, u64)> {
-        swap_with_params(
+        // CHECK: no modification has been made here, and `reload` has been called after.
+        let res = unchecked_swap_with_params(
             &self.oracle,
             &self.deposit.dynamic.swap_params,
             remaining_accounts,
@@ -86,7 +87,10 @@ impl<'info> ExecuteDeposit<'info> {
                 self.deposit.fixed.tokens.params.initial_long_token_amount,
                 self.deposit.fixed.tokens.params.initial_short_token_amount,
             ),
-        )
+        )?;
+        // Call `reload` to make sure the state is up-to-date.
+        self.market.reload()?;
+        Ok(res)
     }
 
     fn perform_deposit(

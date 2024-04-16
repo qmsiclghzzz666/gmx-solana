@@ -13,7 +13,7 @@ use crate::{
     DataStoreError, GmxCoreError,
 };
 
-use super::utils::swap::swap_with_params;
+use super::utils::swap::unchecked_swap_with_params;
 
 #[derive(Accounts)]
 pub struct ExecuteOrder<'info> {
@@ -145,7 +145,8 @@ impl<'info> ExecuteOrder<'info> {
                 );
                 let collateral_token = position.load()?.collateral_token;
 
-                let (collateral_increment_amount, _) = swap_with_params(
+                // CHECK: no modification before, and `reload` has been called later.
+                let (collateral_increment_amount, _) = unchecked_swap_with_params(
                     &self.oracle,
                     swap,
                     remaining_accounts,
@@ -153,6 +154,9 @@ impl<'info> ExecuteOrder<'info> {
                     (Some(self.order.fixed.tokens.initial_collateral_token), None),
                     (params.initial_collateral_delta_amount, 0),
                 )?;
+                // Call `reload` to make sure the state is up-to-date.
+                self.market.reload()?;
+
                 let size_delta_usd = params.size_delta_usd;
                 let acceptable_price = params.acceptable_price;
 
@@ -241,9 +245,15 @@ impl<'info> ExecuteOrder<'info> {
                 } else {
                     (Some(meta.short_token_mint), Some(meta.long_token_mint))
                 };
+
                 // Since we have checked that secondary_amount must be zero if output_token == secondary_output_token,
                 // the swap should still be correct.
-                let (output_amount, secondary_amount) = swap_with_params(
+
+                // Call exit to make sure the data are written to the storage.
+                // In case that there are markets also appear in the swap paths.
+                self.market.exit(&crate::ID)?;
+                // CHECK: `exit` and `reload` have been called on the modified market account before and after the swap.
+                let (output_amount, secondary_amount) = unchecked_swap_with_params(
                     &self.oracle,
                     &self.order.swap,
                     remaining_accounts,
@@ -258,6 +268,9 @@ impl<'info> ExecuteOrder<'info> {
                     token_ins,
                     (output_amount, secondary_output_amount),
                 )?;
+                // Call `reload` to make sure the state is up-to-date.
+                self.market.reload()?;
+
                 self.transfer_out(false, output_amount)?;
                 self.transfer_out(true, secondary_amount)?;
             }

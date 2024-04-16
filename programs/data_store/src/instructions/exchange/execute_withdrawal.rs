@@ -9,7 +9,7 @@ use crate::{
     DataStoreError, GmxCoreError,
 };
 
-use super::utils::swap::swap_with_params;
+use super::utils::swap::unchecked_swap_with_params;
 
 #[derive(Accounts)]
 pub struct ExecuteWithdrawal<'info> {
@@ -166,7 +166,11 @@ impl<'info> ExecuteWithdrawal<'info> {
         short_amount: u64,
     ) -> Result<(u64, u64)> {
         let meta = &self.market.meta;
-        swap_with_params(
+        // Call exit and reload to make sure the data are written to the storage.
+        // In case that there are markets also appear in the swap paths.
+        self.market.exit(&crate::ID)?;
+        // CHECK: `exit` and `reload` have been called on the modified market account before and after the swap.
+        let res = unchecked_swap_with_params(
             &self.oracle,
             &self.withdrawal.dynamic.swap,
             remaining_accounts,
@@ -176,7 +180,10 @@ impl<'info> ExecuteWithdrawal<'info> {
             ),
             (Some(meta.long_token_mint), Some(meta.short_token_mint)),
             (long_amount, short_amount),
-        )
+        )?;
+        // Call `reload` to make sure the state is up-to-date.
+        self.market.reload()?;
+        Ok(res)
     }
 
     fn transfer_out(&self, is_long_token: bool, amount: u64) -> Result<()> {

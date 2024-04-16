@@ -10,7 +10,7 @@ use crate::{
 };
 
 #[must_use]
-pub(crate) struct SwapUtils<'a, 'info> {
+struct SwapUtils<'a, 'info> {
     oracle: &'a Oracle,
     markets: &'info [AccountInfo<'info>],
     mints: &'info [AccountInfo<'info>],
@@ -18,7 +18,7 @@ pub(crate) struct SwapUtils<'a, 'info> {
 }
 
 impl<'a, 'info> SwapUtils<'a, 'info> {
-    pub(crate) fn new(
+    fn new(
         oracle: &'a Oracle,
         markets: &'info [AccountInfo<'info>],
         mints: &'info [AccountInfo<'info>],
@@ -32,7 +32,7 @@ impl<'a, 'info> SwapUtils<'a, 'info> {
         }
     }
 
-    pub(crate) fn execute(
+    fn execute(
         self,
         expected_token_out: Pubkey,
         mut token_in: Pubkey,
@@ -114,7 +114,11 @@ impl<'a, 'info> SwapUtils<'a, 'info> {
 /// Expecting the `remaining_accounts` are of the of the following form:
 ///
 /// `[...long_path_markets, ...short_path_markets, ...long_path_mints, ...short_path_mints]`
-pub(crate) fn swap_with_params<'info>(
+///
+/// ## Check
+/// - All remaining_accounts must contain the most recent state.
+///  The `exit` and `reload` functions can be called to synchronize any accounts that might have an unsynchronized state.
+pub(crate) fn unchecked_swap_with_params<'info>(
     oracle: &Oracle,
     params: &SwapParams,
     remaining_accounts: &'info [AccountInfo<'info>],
