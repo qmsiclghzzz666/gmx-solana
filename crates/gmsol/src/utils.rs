@@ -70,15 +70,20 @@ pub struct TokenAccountParams {
 
 impl TokenAccountParams {
     /// Set token account.
-    pub fn token_account(&mut self, account: Pubkey) -> &mut Self {
+    pub fn set_token_account(&mut self, account: Pubkey) -> &mut Self {
         self.token_account = Some(account);
         self
     }
 
     /// Set token.
-    pub fn token(&mut self, mint: Pubkey) -> &mut Self {
+    pub fn set_token(&mut self, mint: Pubkey) -> &mut Self {
         self.token = Some(mint);
         self
+    }
+
+    /// Get token.
+    pub fn token(&self) -> Option<&Pubkey> {
+        self.token.as_ref()
     }
 
     /// Get or find associated token account.

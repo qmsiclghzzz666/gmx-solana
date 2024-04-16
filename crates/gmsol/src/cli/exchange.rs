@@ -126,6 +126,35 @@ enum Command {
         #[arg(long, short, action = clap::ArgAction::Append)]
         swap: Vec<Pubkey>,
     },
+    /// Create a market decrese order.
+    MarketDecrease {
+        /// The address of the market token of the position's market.
+        market_token: Pubkey,
+        /// Whether the collateral is long token.
+        #[arg(long)]
+        collateral_side: Side,
+        /// Collateral withdrawal amount.
+        #[arg(long, short = 'a', default_value_t = 0)]
+        collateral_withdrawal_amount: u64,
+        /// Position side.
+        #[arg(long)]
+        side: Side,
+        /// Position decrement size in usd.
+        #[arg(long, default_value_t = 0)]
+        size: u128,
+        /// Final output token.
+        #[arg(long, short = 'o')]
+        final_output_token: Option<Pubkey>,
+        /// Initial collateral token account.
+        #[arg(long, requires = "final_output_token")]
+        final_output_token_account: Option<Pubkey>,
+        /// Secondary output token account.
+        #[arg(long)]
+        secondary_output_token_account: Option<Pubkey>,
+        /// Swap paths for output token (collateral token).
+        #[arg(long, short, action = clap::ArgAction::Append)]
+        swap: Vec<Pubkey>,
+    },
 }
 
 #[derive(clap::ValueEnum, Clone)]
@@ -267,6 +296,35 @@ impl ExchangeArgs {
                 let (request, order) = builder.swap_path(swap.clone()).build_with_address().await?;
                 let signature = request.send().await?;
                 println!("created market increase order {order} at tx {signature}");
+            }
+            Command::MarketDecrease {
+                market_token,
+                collateral_side,
+                collateral_withdrawal_amount,
+                side,
+                size,
+                final_output_token,
+                final_output_token_account,
+                secondary_output_token_account,
+                swap,
+            } => {
+                let mut builder = program.market_decrease(
+                    store,
+                    market_token,
+                    collateral_side.is_long(),
+                    *collateral_withdrawal_amount,
+                    side.is_long(),
+                    *size,
+                );
+                if let Some(token) = final_output_token {
+                    builder.final_output_token(token, final_output_token_account.as_ref());
+                }
+                if let Some(account) = secondary_output_token_account {
+                    builder.secondary_output_token_account(account);
+                }
+                let (request, order) = builder.swap_path(swap.clone()).build_with_address().await?;
+                let signature = request.send().await?;
+                println!("created market decrease order {order} at tx {signature}");
             }
         }
         Ok(())

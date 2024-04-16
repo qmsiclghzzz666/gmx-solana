@@ -138,9 +138,9 @@ where
         token: &Pubkey,
         token_account: Option<&Pubkey>,
     ) -> &mut Self {
-        self.initial_token.token(*token);
+        self.initial_token.set_token(*token);
         if let Some(account) = token_account {
-            self.initial_token.token_account(*account);
+            self.initial_token.set_token_account(*account);
         }
         self
     }
@@ -151,9 +151,9 @@ where
         token: &Pubkey,
         token_account: Option<&Pubkey>,
     ) -> &mut Self {
-        self.final_token.token(*token);
+        self.final_token.set_token(*token);
         if let Some(account) = token_account {
-            self.final_token.token_account(*account);
+            self.final_token.set_token_account(*account);
         }
         self
     }
@@ -231,7 +231,7 @@ where
             OrderKind::MarketIncrease | OrderKind::MarketSwap => {
                 if self.initial_token.is_empty() {
                     let output_token = self.output_token().await?;
-                    self.initial_token.token(output_token);
+                    self.initial_token.set_token(output_token);
                 }
                 let Some((token, account)) = self
                     .initial_token
@@ -254,9 +254,13 @@ where
         }
     }
 
-    fn final_output_token_account(&self) -> crate::Result<Option<Pubkey>> {
+    async fn final_output_token_account(&mut self) -> crate::Result<Option<Pubkey>> {
         match &self.params.kind {
             OrderKind::MarketSwap | OrderKind::MarketDecrease | OrderKind::Liquidation => {
+                if self.final_token.is_empty() {
+                    let output_token = self.output_token().await?;
+                    self.final_token.set_token(output_token);
+                }
                 let Some(account) = self
                     .final_token
                     .get_or_find_associated_token_account(Some(&self.program.payer()))
@@ -292,7 +296,7 @@ where
                 }
                 let secondary_output_token = self.secondary_output_token().await?;
                 Ok(TokenAccountParams::default()
-                    .token(secondary_output_token)
+                    .set_token(secondary_output_token)
                     .get_or_find_associated_token_account(Some(&self.program.payer())))
             }
             kind => Err(crate::Error::invalid_argument(format!(
@@ -323,7 +327,7 @@ where
                 token_config_map: find_token_config_map(&self.store).0,
                 market: self.market(),
                 initial_collateral_token_account,
-                final_output_token_account: self.final_output_token_account()?,
+                final_output_token_account: self.final_output_token_account().await?,
                 secondary_output_token_account: self.get_secondary_output_token_account().await?,
                 initial_collateral_token_vault,
                 data_store_program: data_store::id(),
