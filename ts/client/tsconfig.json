@@ -1,11 +1,19 @@
 {
-    "extends": "../../tsconfig.json",
     "compilerOptions": {
         "outDir": "../../dist/gmsol",
         "rootDir": "src",
         "baseUrl": ".",
         "declaration": true,
         "declarationMap": true,
+        "typeRoots": [
+            "./node_modules/@types"
+        ],
+        "lib": [
+            "es2015"
+        ],
+        "module": "commonjs",
+        "target": "ES2020",
+        "esModuleInterop": true
     },
     "include": [
         "src/**/*.ts"
