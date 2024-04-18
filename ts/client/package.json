@@ -1,0 +1,23 @@
+{
+  "name": "gmsol",
+  "version": "0.1.0",
+  "description": "",
+  "main": "../../dist/gmsol/index.js",
+  "types": "../../dist/gmsol/index.d.ts",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@coral-xyz/anchor": "^0.30.0",
+    "@solana/web3.js": "^1.91.1",
+    "@solana/spl-token": "^0.4.3",
+    "js-sha256": "^0.11.0"
+  },
+  "devDependencies": {
+    "typescript": "^4.3.5"
+  }
+}

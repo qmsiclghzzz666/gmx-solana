@@ -1,0 +1,22 @@
+{
+    "extends": "../../tsconfig.json",
+    "compilerOptions": {
+        "outDir": "../../dist/gmsol",
+        "rootDir": "src",
+        "baseUrl": ".",
+        "declaration": true,
+        "declarationMap": true,
+        "paths": {
+            "*": [
+                "../../target/*",
+                "*"
+            ]
+        },
+    },
+    "include": [
+        "**/*.ts"
+    ],
+    "exclude": [
+        "node_modules"
+    ]
+}

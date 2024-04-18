@@ -3,13 +3,15 @@
     "scripts": {
         "lint:fix": "prettier */*.js \"*/**/*{.js,.ts}\" -w",
         "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check",
-        "test": "ts-mocha -p ./tsconfig.json --require ts/utils/fixtures.ts -t 1000000 ts/tests/**/*.ts"
+        "build-client": "pnpm -C ts/client build",
+        "test": "pnpm build-client && ts-mocha -p ./tsconfig.json --require ts/utils/fixtures.ts -t 1000000 ts/tests/**/*.ts"
     },
     "dependencies": {
         "@coral-xyz/anchor": "^0.30.0",
         "@solana/web3.js": "^1.91.1",
         "@solana/spl-token": "^0.4.3",
-        "js-sha256": "^0.11.0"
+        "js-sha256": "^0.11.0",
+        "gmsol": "workspace:*"
     },
     "devDependencies": {
         "@types/bn.js": "^5.1.0",

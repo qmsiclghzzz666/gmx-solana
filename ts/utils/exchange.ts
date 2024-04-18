@@ -2,11 +2,10 @@ import { workspace, Program, BN, utils } from "@coral-xyz/anchor";
 import { Exchange } from "../../target/types/exchange";
 import { Connection, Keypair, PublicKey } from "@solana/web3.js";
 import { createDepositPDA, createMarketPDA, createMarketTokenMintPDA, createMarketVaultPDA, createOrderPDA, createPositionPDA, createRolesPDA, createTokenConfigMapPDA, createWithdrawalPDA, dataStore } from "./data";
-import { TOKEN_PROGRAM_ID, getAccount } from "@solana/spl-token";
+import { getAccount } from "@solana/spl-token";
 import { BTC_TOKEN_MINT, SOL_TOKEN_MINT } from "./token";
-import { toBN } from "./number";
-import { CHAINLINK_ID } from "./external";
 import { IxWithOutput, makeInvoke } from "./invoke";
+import { toBN } from "gmsol";
 
 export const exchange = workspace.Exchange as Program<Exchange>;
 
