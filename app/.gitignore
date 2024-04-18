@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# lingui
+src/locales/**/*.ts
+src/locales/en/messages.po
+src/locales/_build/

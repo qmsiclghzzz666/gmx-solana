@@ -20,10 +20,16 @@
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+    "paths": {
+      "components/*": [
+        "./src/components/*"
+      ]
+    }
   },
   "include": [
-    "src"
+    "src",
+    "lingui.config.ts"
   ],
   "references": [
     {
