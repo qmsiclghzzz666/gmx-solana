@@ -2,7 +2,8 @@
     "license": "UNLICENSED",
     "scripts": {
         "lint:fix": "prettier */*.js \"*/**/*{.js,.ts}\" -w",
-        "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check"
+        "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check",
+        "test": "ts-mocha -p ./tsconfig.json --require ts/utils/fixtures.ts -t 1000000 ts/tests/**/*.ts"
     },
     "dependencies": {
         "@coral-xyz/anchor": "^0.30.0",

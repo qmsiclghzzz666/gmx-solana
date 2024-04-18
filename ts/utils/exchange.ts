@@ -1,5 +1,5 @@
 import { workspace, Program, BN, utils } from "@coral-xyz/anchor";
-import { Exchange } from "../target/types/exchange";
+import { Exchange } from "../../target/types/exchange";
 import { Connection, Keypair, PublicKey } from "@solana/web3.js";
 import { createDepositPDA, createMarketPDA, createMarketTokenMintPDA, createMarketVaultPDA, createOrderPDA, createPositionPDA, createRolesPDA, createTokenConfigMapPDA, createWithdrawalPDA, dataStore } from "./data";
 import { TOKEN_PROGRAM_ID, getAccount } from "@solana/spl-token";

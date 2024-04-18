@@ -1,8 +1,8 @@
 import { anchor } from "../endpoint";
-import { keyToSeed } from ".././seed";
-import { EventManager } from ".././event";
+import { keyToSeed } from "../seed";
+import { EventManager } from "../event";
 import { Keypair, PublicKey } from "@solana/web3.js";
-import { BTC_FEED, BTC_TOKEN_MINT, SOL_FEED, SOL_TOKEN_MINT, USDC_FEED } from ".././token";
+import { BTC_FEED, BTC_TOKEN_MINT, SOL_FEED, SOL_TOKEN_MINT, USDC_FEED } from "../token";
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 
 import { dataStore } from "./program";

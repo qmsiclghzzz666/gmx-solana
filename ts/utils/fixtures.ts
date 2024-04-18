@@ -11,7 +11,7 @@ import { EventManager } from "./event";
 import { createDataStorePDA, createMarketTokenMintPDA, createMarketVault, createOraclePDA, dataStore, initializeDataStore } from "./data";
 import { initializeMarkets, exchange } from "./exchange";
 
-import { IDL as chainlinkIDL } from "../external-programs/chainlink-store";
+import { IDL as chainlinkIDL } from "../../external-programs/chainlink-store";
 import { BTC_TOKEN_MINT, SOL_TOKEN_MINT, createSignedToken } from "./token";
 import { PublicKey, Transaction } from "@solana/web3.js";
 import { createAssociatedTokenAccount, createWrappedNativeAccount } from "@solana/spl-token";
