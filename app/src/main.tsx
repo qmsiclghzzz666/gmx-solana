@@ -9,6 +9,7 @@ import { I18nProvider } from "@lingui/react";
 import { i18n } from "@lingui/core";
 import Stake from './routes/Stake';
 import Dashboard from './routes/Dashboard';
+import Exchange from './routes/Exchange';
 
 const router = createBrowserRouter([
   {
@@ -26,6 +27,10 @@ const router = createBrowserRouter([
       {
         path: "earn",
         element: <Stake />,
+      },
+      {
+        path: "trade",
+        element: <Exchange />,
       }
     ]
   }

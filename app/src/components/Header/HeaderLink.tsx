@@ -31,8 +31,8 @@ export function HeaderLink({
 
   return (
     <NavLink
-      className={({ isActive, isPending }) =>
-        isPending ? "pending" : isActive ? "active" : ""
+      className={({ isActive }) =>
+        `${className} ${isActive ? "active" : ""}`
       }
       to={to}
       onClick={onClick}
