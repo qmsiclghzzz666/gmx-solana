@@ -1,0 +1,27 @@
+{
+  "name": "gmsol",
+  "version": "0.1.0",
+  "description": "",
+  "main": "../../dist/gmsol/index.js",
+  "types": "../../dist/gmsol/index.d.ts",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build-data-store-idl": "anchor idl build -p data_store -t src/idl/data_store.ts -o src/idl/data_store.json",
+    "build-exchange-idl": "anchor idl build -p exchange -t src/idl/exchange.ts -o src/idl/exchange.json",
+    "build-idls": "pnpm build-data-store-idl && pnpm build-exchange-idl",
+    "build": "tsc",
+    "build-all": "pnpm build-idls && pnpm build"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@coral-xyz/anchor": "^0.30.0",
+    "@solana/web3.js": "^1.91.1",
+    "@solana/spl-token": "^0.4.3",
+    "js-sha256": "^0.11.0"
+  },
+  "devDependencies": {
+    "typescript": "^4.3.5"
+  }
+}

@@ -16,8 +16,7 @@ cluster = "Localnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]
-test = "yarn run ts-mocha -p ./tsconfig.json --require utils/fixtures.ts -t 1000000 tests/**/*.ts"
-test-exchange = "yarn run ts-mocha -p ./tsconfig.json --require utils/fixtures.ts -t 1000000 tests/exchange/*.ts"
+test = "cargo test --features u128 && pnpm test"
 
 [test]
 startup_wait = 5000
