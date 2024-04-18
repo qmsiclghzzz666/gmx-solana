@@ -6,15 +6,9 @@
         "baseUrl": ".",
         "declaration": true,
         "declarationMap": true,
-        "paths": {
-            "*": [
-                "../../target/*",
-                "*"
-            ]
-        },
     },
     "include": [
-        "**/*.ts"
+        "src/**/*.ts"
     ],
     "exclude": [
         "node_modules"

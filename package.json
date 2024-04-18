@@ -3,8 +3,9 @@
     "scripts": {
         "lint:fix": "prettier */*.js \"*/**/*{.js,.ts}\" -w",
         "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check",
-        "build-client": "pnpm -C ts/client build",
-        "test": "pnpm build-client && ts-mocha -p ./tsconfig.json --require ts/utils/fixtures.ts -t 1000000 ts/tests/**/*.ts"
+        "build-client": "pnpm -C ts/client build-all",
+        "test-no-build": "ts-mocha -p ./tsconfig.json --require ts/utils/fixtures.ts -t 1000000 ts/tests/**/*.ts",
+        "test": "pnpm build-client && pnpm test-no-build"
     },
     "dependencies": {
         "@coral-xyz/anchor": "^0.30.0",

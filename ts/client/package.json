@@ -6,7 +6,11 @@
   "types": "../../dist/gmsol/index.d.ts",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "tsc"
+    "build-data-store-idl": "anchor idl build -p data_store -t src/idl/data_store.ts -o /dev/null",
+    "build-exchange-idl": "anchor idl build -p exchange -t src/idl/exchange.ts -o /dev/null",
+    "build-idls": "pnpm build-data-store-idl && pnpm build-exchange-idl",
+    "build": "tsc",
+    "build-all": "pnpm build-idls && pnpm build"
   },
   "keywords": [],
   "author": "",

@@ -1,0 +1,3 @@
+src/idl/*
+
+!src/idl/README.md
