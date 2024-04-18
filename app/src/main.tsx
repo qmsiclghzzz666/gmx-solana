@@ -1,17 +1,33 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
 import Root from './routes/Root';
 import { AnchorContextProvider } from './components/AnchorContextProvider';
 
 import { messages } from "./locales/en/messages";
 import { I18nProvider } from "@lingui/react";
 import { i18n } from "@lingui/core";
+import Stake from './routes/Stake';
+import Dashboard from './routes/Dashboard';
 
 const router = createBrowserRouter([
   {
     path: "/",
     element: <Root />,
+    children: [
+      {
+        index: true,
+        element: <Navigate to="/dashboard" />,
+      },
+      {
+        path: "dashboard",
+        element: <Dashboard />,
+      },
+      {
+        path: "earn",
+        element: <Stake />,
+      }
+    ]
   }
 ]);
 
