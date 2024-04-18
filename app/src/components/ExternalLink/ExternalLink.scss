@@ -1,10 +1,10 @@
 .link-underline {
-    text-decoration: underline;
-    cursor: pointer;
-    display: inline-flex;
-    color: rgba(255, 255, 255, 0.7);
+  text-decoration: underline;
+  cursor: pointer;
+  display: inline-flex;
+  color: rgba(255, 255, 255, 0.7);
 
-    &:hover {
-        color: rgba(255, 255, 255);
-    }
+  &:hover {
+    color: rgba(255, 255, 255);
+  }
 }

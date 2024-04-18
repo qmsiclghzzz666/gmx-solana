@@ -3,25 +3,25 @@ import cx from "classnames";
 import "./ExternalLink.scss";
 
 interface Props {
-    href: string;
-    children: React.ReactNode;
-    className?: string;
-    newTab?: boolean;
+  href: string;
+  children: React.ReactNode;
+  className?: string;
+  newTab?: boolean;
 }
 
 function ExternalLink({ href, children, className, newTab = true }: Props) {
-    const classNames = cx("link-underline", className);
-    const props = {
-        href,
-        className: classNames,
-        ...(newTab
-            ? {
-                target: "_blank",
-                rel: "noopener noreferrer",
-            }
-            : {}),
-    };
-    return <a {...props}>{children}</a>;
+  const classNames = cx("link-underline", className);
+  const props = {
+    href,
+    className: classNames,
+    ...(newTab
+      ? {
+        target: "_blank",
+        rel: "noopener noreferrer",
+      }
+      : {}),
+  };
+  return <a {...props}>{children}</a>;
 }
 
 export default ExternalLink;

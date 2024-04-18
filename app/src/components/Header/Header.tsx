@@ -9,6 +9,7 @@ import logoImg from "img/logo_GMSOL.png";
 
 import "./Header.scss";
 import { AppHeaderLinks } from "./AppHeaderLinks";
+import { AppHeaderUser } from "./AppHeaderUser";
 
 const FADE_VARIANTS = {
   hidden: { opacity: 0 },
@@ -82,13 +83,9 @@ export function Header() {
               </Link>
               <AppHeaderLinks />
             </div>
-            {/* <div className="App-header-container-right">
-              <AppHeaderUser
-                disconnectAccountAndCloseSettings={disconnectAccountAndCloseSettings}
-                openSettings={openSettings}
-                showRedirectModal={showRedirectModal}
-              />
-            </div> */}
+            <div className="App-header-container-right">
+              <AppHeaderUser />
+            </div>
           </div>
         )}
         {isMobile && (
@@ -108,14 +105,9 @@ export function Header() {
                   <img src={logoImg} className="small" alt="GMSOL Logo" />
                 </div>
               </div>
-              {/* <div className="App-header-container-right">
-                <AppHeaderUser
-                  disconnectAccountAndCloseSettings={disconnectAccountAndCloseSettings}
-                  openSettings={openSettings}
-                  small
-                  showRedirectModal={showRedirectModal}
-                />
-              </div> */}
+              <div className="App-header-container-right">
+                <AppHeaderUser small />
+              </div>
             </div>
           </div>
         )}
