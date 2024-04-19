@@ -9,6 +9,7 @@ export default defineConfig(async ({ mode }) => {
     plugins: [react({
       babel: {
         plugins: ['macros'],
+        compact: mode == "development" ? false : undefined,
       }
     })],
     resolve: {
@@ -16,6 +17,7 @@ export default defineConfig(async ({ mode }) => {
         "styles": path.resolve(__dirname, "./src/styles"),
         "img": path.resolve(__dirname, "./src/img"),
         "components": path.resolve(__dirname, "./src/components"),
+        "fonts": path.resolve(__dirname, "./src/fonts"),
       }
     },
     define: {
