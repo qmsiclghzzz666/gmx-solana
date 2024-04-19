@@ -18,6 +18,8 @@ export default defineConfig(async ({ mode }) => {
         "img": path.resolve(__dirname, "./src/img"),
         "components": path.resolve(__dirname, "./src/components"),
         "fonts": path.resolve(__dirname, "./src/fonts"),
+        "config": path.resolve(__dirname, "./src/config"),
+        "contexts": path.resolve(__dirname, "./src/contexts"),
       }
     },
     define: {

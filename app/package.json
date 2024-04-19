@@ -12,8 +12,8 @@
     "compile": "lingui compile --typescript"
   },
   "dependencies": {
-    "gmsol": "workspace:*",
     "@coral-xyz/anchor": "^0.30.0",
+    "@floating-ui/dom": "^1.6.3",
     "@lingui/react": "^4.10.0",
     "@solana/wallet-adapter-react": "^0.15.35",
     "@solana/wallet-adapter-react-ui": "^0.9.35",
@@ -21,6 +21,7 @@
     "@solana/web3.js": "^1.91.6",
     "classnames": "^2.5.1",
     "framer-motion": "^11.1.3",
+    "gmsol": "workspace:*",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-icons": "^5.1.0",

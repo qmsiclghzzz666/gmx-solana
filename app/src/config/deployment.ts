@@ -1,5 +1,7 @@
 import { PublicKey } from "@solana/web3.js";
 
+import { Market as ParsedMarket } from "contexts/market";
+
 export interface GMSOLDeployment {
   store: string,
   oracle: string,
@@ -20,14 +22,6 @@ export interface ParsedGMSOLDeployment {
   markets: ParsedMarket[],
 }
 
-export interface ParsedMarket {
-  name: string,
-  market_token: PublicKey,
-  index_token: PublicKey,
-  long_token: PublicKey,
-  short_token: PublicKey,
-}
-
 export const getGMSOLDeployment = () => {
   const deployment = window.__GMSOL_DEPLOYMENT__;
 
@@ -44,9 +38,9 @@ export const getGMSOLDeployment = () => {
 
 const parseMarket = (market: Market) => {
   return {
-    market_token: new PublicKey(market.market_token),
-    index_token: new PublicKey(market.index_token),
-    long_token: new PublicKey(market.long_token),
-    short_token: new PublicKey(market.short_token),
+    marketTokenAddress: new PublicKey(market.market_token),
+    indexTokenAddress: new PublicKey(market.index_token),
+    longTokenAddress: new PublicKey(market.long_token),
+    shortTokenAddress: new PublicKey(market.short_token),
   } as ParsedMarket;
 }

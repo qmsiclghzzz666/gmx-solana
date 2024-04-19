@@ -24,7 +24,7 @@ export const useDataStore = () => {
     return ctx.provider ? makeDataStoreProgram(ctx.provider) : ctx.connection ? makeDataStoreProgram({
       connection: ctx.connection
     }) : null;
-  }, [ctx]);
+  }, [ctx.provider, ctx.connection]);
 
   return program;
 }
