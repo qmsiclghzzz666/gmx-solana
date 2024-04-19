@@ -2,7 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
 import Root from './routes/Root';
-import { AnchorContextProvider } from './components/AnchorContextProvider';
+import { AnchorContextProvider } from './contexts/anchor';
 
 import { messages } from "./locales/en/messages";
 import { I18nProvider } from "@lingui/react";
@@ -47,4 +47,4 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       </I18nProvider>
     </AnchorContextProvider>
   </React.StrictMode>,
-)
+);

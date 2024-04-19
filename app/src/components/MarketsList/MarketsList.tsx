@@ -33,7 +33,6 @@ export function MarketsList() {
     marketsStats: [
       {
         marketInfo: {
-          name: "GM:SOL/USD",
           marketTokenAddress: PublicKey.unique(),
           indexTokenAddress: PublicKey.unique(),
           longTokenAddress: PublicKey.unique(),
