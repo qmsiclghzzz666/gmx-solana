@@ -4,10 +4,12 @@ import "./Dashboard.css";
 
 import { findMarketPDA } from "gmsol";
 import { getGMSOLDeployment } from "../config/deployment";
+import { PublicKey } from "@solana/web3.js";
 
 interface Market {
   long?: string,
   short?: string,
+  pubkey?: PublicKey,
 }
 
 export default function Dashboard() {
@@ -24,6 +26,7 @@ export default function Dashboard() {
         setMarket({
           long: data?.pools.pools[0].longTokenAmount.toString(),
           short: data?.pools.pools[0].shortTokenAmount.toString(),
+          pubkey: dataStore?.provider.publicKey,
         });
       }
     };
@@ -35,6 +38,7 @@ export default function Dashboard() {
     <div className="default-container page-layout">
       <div>long: {market?.long}</div>
       <div>short: {market?.short}</div>
+      <div>connected: {market?.pubkey?.toBase58() ?? ""} </div>
     </div>
   )
 }

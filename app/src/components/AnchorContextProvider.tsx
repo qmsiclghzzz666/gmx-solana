@@ -12,6 +12,7 @@ function Inner({ children }: { children: ReactNode }) {
   const provider = wallet ? new AnchorProvider(connection, wallet) : null;
   return (
     <AnchorContext.Provider value={{
+      connection,
       provider,
     }}>
       {children}
