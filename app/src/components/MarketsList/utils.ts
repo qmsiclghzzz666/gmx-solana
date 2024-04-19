@@ -1,5 +1,6 @@
 import { BN } from "@coral-xyz/anchor";
-import { Token } from "contexts/token";
+import { TRIGGER_PREFIX_ABOVE, TRIGGER_PREFIX_BELOW } from "config/ui";
+import { Token } from "states/token";
 
 export function getMarketIndexName({ indexToken }: { indexToken: Token }) {
   return `${indexToken.symbol}/USD`
@@ -13,9 +14,65 @@ export function getMarketPoolName({ longToken, shortToken }: { longToken: Token,
   }
 }
 
-export const formatUsd = (usd: BN) => {
-  return `$${usd.toString()}`
+const MAX_EXCEEDING_THRESHOLD = "1000000000";
+const MIN_EXCEEDING_THRESHOLD_SCALE = 2;
+export const USD_DECIMALS = 20;
+
+export function formatUsd(
+  usd?: BN,
+  opts: {
+    fallbackToZero?: boolean;
+    displayDecimals?: number;
+    maxThreshold?: string;
+    minThreshold?: string;
+    displayPlus?: boolean;
+  } = {}
+) {
+  const { fallbackToZero = false, displayDecimals = 2 } = opts;
+
+  if (!usd) {
+    if (fallbackToZero) {
+      usd = new BN(0);
+    } else {
+      return undefined;
+    }
+  }
+
+  const exceedingInfo = getLimitedDisplay(usd, USD_DECIMALS, opts);
+
+  const maybePlus = opts.displayPlus ? "+" : "";
+  const sign = usd.lt(new BN(0)) ? "-" : maybePlus;
+  const symbol = exceedingInfo.symbol ? `${exceedingInfo.symbol} ` : "";
+  const displayUsd = formatAmount(exceedingInfo.value, USD_DECIMALS, displayDecimals, true);
+  return `${symbol}${sign}$${displayUsd}`;
 }
+
+function getLimitedDisplay(
+  amount: BN,
+  tokenDecimals: number,
+  opts: { maxThreshold?: string; minThresholdScale?: number } = {}
+) {
+  const { maxThreshold = MAX_EXCEEDING_THRESHOLD, minThresholdScale = MIN_EXCEEDING_THRESHOLD_SCALE } = opts;
+  const max = expandDecimals(new BN(maxThreshold), tokenDecimals);
+  const min = new BN(10).pow(new BN(tokenDecimals - minThresholdScale));
+  const absAmount = amount.abs();
+
+  if (absAmount.isZero()) {
+    return {
+      symbol: "",
+      value: absAmount,
+    };
+  }
+
+  const symbol = absAmount.gt(max) ? TRIGGER_PREFIX_ABOVE : absAmount.lt(min) ? TRIGGER_PREFIX_BELOW : "";
+  const value = absAmount.gt(max) ? max : absAmount.lt(min) ? min : absAmount;
+
+  return {
+    symbol,
+    value,
+  };
+}
+
 
 export function formatRatePercentage(rate?: BN, displayDecimals?: number) {
   if (!rate) {
@@ -23,6 +80,10 @@ export function formatRatePercentage(rate?: BN, displayDecimals?: number) {
   }
 
   return `${getPlusOrMinusSymbol(rate)}${formatAmount(rate.mul(new BN(100)).abs(), 30, displayDecimals ?? 4)}%`;
+}
+
+export function expandDecimals(n: BN, decimals: number) {
+  return n.mul((new BN(10)).pow(new BN(decimals)));
 }
 
 export const formatAmount = (

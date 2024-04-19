@@ -5,27 +5,24 @@ import * as walletAdapterWallets from "@solana/wallet-adapter-wallets";
 import { WalletModalProvider } from "@solana/wallet-adapter-react-ui";
 import { AnchorProvider } from "@coral-xyz/anchor";
 
-export interface AnchorContextType {
-  connection: Connection | null,
-  provider: AnchorProvider | null,
+export interface AnchorContext {
+  connection: Connection,
+  provider?: AnchorProvider,
 }
 
-export const AnchorContext = createContext<AnchorContextType>({
-  connection: null,
-  provider: null,
-});
+export const AnchorContextCtx = createContext<AnchorContext | null>(null);
 
 function Inner({ children }: { children: ReactNode }) {
   const { connection } = useConnection();
   const wallet = useAnchorWallet();
-  const provider = wallet ? new AnchorProvider(connection, wallet) : null;
+  const provider = wallet ? new AnchorProvider(connection, wallet) : undefined;
   return (
-    <AnchorContext.Provider value={{
+    <AnchorContextCtx.Provider value={{
       connection,
       provider,
     }}>
       {children}
-    </AnchorContext.Provider>
+    </AnchorContextCtx.Provider>
   )
 }
 

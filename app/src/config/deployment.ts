@@ -1,6 +1,6 @@
 import { PublicKey } from "@solana/web3.js";
 
-import { Market as ParsedMarket } from "contexts/market";
+import { Market as ParsedMarket } from "states/market";
 
 export interface GMSOLDeployment {
   store: string,
@@ -31,7 +31,6 @@ export const getGMSOLDeployment = () => {
       oracle: new PublicKey(deployment.oracle),
       markets: deployment.markets.map(parseMarket),
     };
-
     return parsed;
   }
 }

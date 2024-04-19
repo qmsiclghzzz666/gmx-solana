@@ -6,37 +6,43 @@ import { Trans } from "@lingui/macro";
 import Tooltip from "components/Tooltip/Tooltip";
 import { renderNetFeeHeaderTooltipContent } from "./NetFeeHeaderTooltipContent";
 import TooltipWithPortal from "components/Tooltip/TooltipWithPortal";
-import { IndexTokenStat } from "contexts/stats";
-import { formatAmount, formatRatePercentage, formatUsd, getMarketIndexName, getMarketPoolName } from "./utils";
+import { IndexTokenStat } from "contexts/state";
+import { USD_DECIMALS, expandDecimals, formatAmount, formatRatePercentage, formatUsd, getMarketIndexName, getMarketPoolName } from "./utils";
 import StatsTooltipRow from "components/StatsTooltipRow/StatsTooltipRow";
 import { NetFeeTooltip } from "./NetFeeTooltip";
 import { BN } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
+import { useMarkets } from "states/market/use-markets";
+import { MarketInfo } from "states/market";
+
+const TOKEN_DECIMALS: number = 9;
+const NORMAL_PRICE = new BN(135);
+const PRICE = expandDecimals(NORMAL_PRICE, USD_DECIMALS);
+const UNIT_PRICE = expandDecimals(NORMAL_PRICE, USD_DECIMALS - TOKEN_DECIMALS);
 
 export function MarketsList() {
-  const indexTokensStats: IndexTokenStat[] = [{
+  const markets = useMarkets();
+  const marketKeys = Object.keys(markets);
+  const indexTokensStats: IndexTokenStat[] = marketKeys.length ? [{
     token: {
       symbol: "SOL",
       address: PublicKey.unique(),
       prices: {
-        maxPrice: new BN(123000),
-        minPrice: new BN(123000),
+        maxPrice: PRICE,
+        minPrice: PRICE,
       },
     },
     price: new BN(1),
-    totalPoolValue: new BN(10000),
-    totalUtilization: new BN(1),
-    totalUsedLiquidity: new BN(1),
-    totalMaxLiquidity: new BN(1),
-    bestNetFeeLong: new BN(1),
-    bestNetFeeShort: new BN(1),
-    marketsStats: [
-      {
+    totalPoolValue: new BN("1768607000000000000000000"),
+    totalUtilization: new BN(7000),
+    totalUsedLiquidity: new BN("1768607000000000000000000"),
+    totalMaxLiquidity: new BN("1768607000000000000000000"),
+    bestNetFeeLong: new BN("1000000000000000000000000"),
+    bestNetFeeShort: new BN("-1000000000000000000000000"),
+    marketsStats: Object.keys(markets).map(key => {
+      const market = markets[key];
+      return {
         marketInfo: {
-          marketTokenAddress: PublicKey.unique(),
-          indexTokenAddress: PublicKey.unique(),
-          longTokenAddress: PublicKey.unique(),
-          shortTokenAddress: PublicKey.unique(),
           longToken: {
             symbol: "SOL",
             address: PublicKey.unique(),
@@ -60,17 +66,18 @@ export function MarketsList() {
               maxPrice: new BN(1),
               minPrice: new BN(1),
             },
-          }
-        },
-        poolValueUsd: new BN(1),
+          },
+          ...market,
+        } as MarketInfo,
+        poolValueUsd: market.longPoolAmount.mul(UNIT_PRICE).add(market.shortPoolAmount.mul(UNIT_PRICE)),
         usedLiquidity: new BN(1),
         maxLiquidity: new BN(1),
         netFeeLong: new BN(1),
         netFeeShort: new BN(1),
         utilization: new BN(1),
       }
-    ]
-  }];
+    }),
+  }] : [];
 
   const isMobile = useMedia("(max-width: 1100px)");
 
@@ -83,7 +90,6 @@ export function MarketsList() {
 }
 
 function MarketsListDesktop({ indexTokensStats }: { indexTokensStats: IndexTokenStat[] }) {
-  console.log(indexTokensStats);
   return (
     <div className="token-table-wrapper App-card">
       <div className="App-card-title">
@@ -118,7 +124,7 @@ function MarketsListDesktop({ indexTokensStats }: { indexTokensStats: IndexToken
             indexTokensStats.map((stats) => <MarketsListDesktopItem key={stats.token.address.toBase58()} stats={stats} />)
           ) : (
             // <MarketListSkeleton />
-            <div>Loading</div>
+            <tr></tr>
           )}
         </tbody>
       </table>

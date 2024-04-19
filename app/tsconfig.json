@@ -30,6 +30,9 @@
       ],
       "contexts/*": [
         "./src/contexts/*"
+      ],
+      "states/*": [
+        "./src/states/*"
       ]
     },
   },

@@ -20,6 +20,7 @@ export default defineConfig(async ({ mode }) => {
         "fonts": path.resolve(__dirname, "./src/fonts"),
         "config": path.resolve(__dirname, "./src/config"),
         "contexts": path.resolve(__dirname, "./src/contexts"),
+        "states": path.resolve(__dirname, "./src/states"),
       }
     },
     define: {
