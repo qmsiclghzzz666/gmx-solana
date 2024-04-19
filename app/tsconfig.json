@@ -28,8 +28,7 @@
     }
   },
   "include": [
-    "src",
-    "lingui.config.ts"
+    "src"
   ],
   "references": [
     {
