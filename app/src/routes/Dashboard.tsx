@@ -5,6 +5,9 @@ import "./Dashboard.css";
 import { findMarketPDA } from "gmsol";
 import { getGMSOLDeployment } from "../config/deployment";
 import { PublicKey } from "@solana/web3.js";
+import PageTitle from "components/PageTitle/PageTitle";
+import { Trans, t } from "@lingui/macro";
+import Footer from "components/Footer/Footer";
 
 interface Market {
   long?: string,
@@ -35,10 +38,27 @@ export default function Dashboard() {
   }, [dataStore]);
 
   return (
-    <div className="default-container page-layout">
-      <div>long: {market?.long}</div>
-      <div>short: {market?.short}</div>
-      <div>connected: {market?.pubkey?.toBase58() ?? ""} </div>
+    <div className="default-container page-layout DashboardV2">
+      <PageTitle
+        title={t`Stats`}
+        isTop
+        subtitle={
+          <div>
+            <Trans>
+              Total Stats of GMSOL.
+            </Trans>
+          </div>
+        }
+      />
+      <div className="DashboardV2-content">
+        <div className="DashboardV2-token-cards">
+          <div>long: {market?.long}</div>
+          <div>short: {market?.short}</div>
+          <div>connected: {market?.pubkey?.toBase58() ?? ""} </div>
+          {/* <MarketsList /> */}
+        </div>
+      </div>
+      <Footer />
     </div>
   )
 }
