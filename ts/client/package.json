@@ -1,27 +1,29 @@
 {
   "name": "gmsol",
   "version": "0.1.0",
-  "description": "",
-  "main": "../../dist/gmsol/index.js",
-  "types": "../../dist/gmsol/index.d.ts",
+  "type": "module",
+  "main": "../../dist/gmsol/gmsol.cjs",
+  "module": "../../dist/gmsol/gmsol.js",
+  "types": "../../dist/gmsol/main.d.ts",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
     "build-data-store-idl": "anchor idl build -p data_store -t src/idl/data_store.ts -o src/idl/data_store.json",
     "build-exchange-idl": "anchor idl build -p exchange -t src/idl/exchange.ts -o src/idl/exchange.json",
     "build-idls": "pnpm build-data-store-idl && pnpm build-exchange-idl",
-    "build": "tsc",
     "build-all": "pnpm build-idls && pnpm build"
   },
-  "keywords": [],
-  "author": "",
   "license": "UNLICENSED",
   "dependencies": {
     "@coral-xyz/anchor": "^0.30.0",
-    "@solana/web3.js": "^1.91.1",
+    "@noble/hashes": "^1.4.0",
     "@solana/spl-token": "^0.4.3",
-    "js-sha256": "^0.11.0"
+    "@solana/web3.js": "^1.91.1"
   },
   "devDependencies": {
-    "typescript": "^4.3.5"
+    "typescript": "^5.2.2",
+    "vite": "^5.2.0",
+    "vite-plugin-dts": "^3.8.3"
   }
 }

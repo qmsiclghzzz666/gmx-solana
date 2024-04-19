@@ -12,6 +12,7 @@
     "compile": "lingui compile --typescript"
   },
   "dependencies": {
+    "gmsol": "workspace:*",
     "@coral-xyz/anchor": "^0.30.0",
     "@lingui/react": "^4.10.0",
     "@solana/wallet-adapter-react": "^0.15.35",

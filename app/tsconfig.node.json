@@ -10,7 +10,6 @@
   "include": [
     "vite.config.ts",
     "lingui.config.ts",
-    "utils",
-    "src/config/deployment.ts"
+    "utils"
   ]
 }

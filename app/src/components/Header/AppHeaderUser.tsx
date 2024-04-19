@@ -12,7 +12,7 @@ interface Props {
 }
 
 export function AppHeaderUser({ small }: Props) {
-  console.log(small);
+  void small;
   return (
     <div className="App-header-user">
       <div className={cx("App-header-trade-link")}>

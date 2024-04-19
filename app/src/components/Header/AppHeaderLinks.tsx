@@ -61,7 +61,6 @@ export function AppHeaderLinks({ small, openSettings, clickCloseIcon }: Props) {
       </div>
       {small && (
         <div className="App-header-link-container">
-          {/* eslint-disable-next-line */}
           <a href="#" onClick={openSettings}>
             <Trans>Settings</Trans>
           </a>

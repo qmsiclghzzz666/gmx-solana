@@ -1,5 +1,18 @@
 import * as fs from "fs/promises";
-import { GMSOLDeployment } from "../src/config/deployment";
+
+interface GMSOLDeployment {
+  store: string,
+  oracle: string,
+  markets: Market[],
+}
+
+interface Market {
+  name: string,
+  market_token: string,
+  index_token: string,
+  long_token: string,
+  short_token: string,
+}
 
 export const loadGMSOLDeployment = async (path?: string) => {
   if (path) {

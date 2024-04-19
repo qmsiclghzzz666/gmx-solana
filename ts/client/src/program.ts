@@ -5,6 +5,7 @@ import { Exchange } from "./idl/exchange";
 
 import DataStoreIDL from "./idl/data_store.json";
 import ExchangeIDL from "./idl/exchange.json";
+import { PublicKey } from "@solana/web3.js";
 
 /**
  * Creates an instance of the Program with the provided IDL schema for the DataStore program.
@@ -23,3 +24,6 @@ export const makeDataStoreProgram = (provider?: Provider) => new Program(DataSto
  * @returns An instance of the Program configured with the Exchange's IDL.
  */
 export const makeExchangeProgram = (provider?: Provider) => new Program(ExchangeIDL as Exchange, provider);
+
+export const DATA_STORE_ID: PublicKey = new PublicKey(DataStoreIDL.address);
+export const EXCHANGE_ID: PublicKey = new PublicKey(ExchangeIDL.address);

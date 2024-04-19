@@ -1,5 +1,6 @@
-import { createContext, useContext } from "react";
+import { createContext, useContext, useMemo } from "react";
 import { AnchorProvider } from "@coral-xyz/anchor";
+import { makeDataStoreProgram } from "gmsol";
 
 export interface AnchorContextType {
   provider: AnchorProvider | null,
@@ -14,3 +15,12 @@ export const useAnchorProvider = () => {
 
   return ctx.provider
 };
+
+export const useDataStore = () => {
+  const provider = useAnchorProvider();
+  const program = useMemo(() => {
+    return provider ? makeDataStoreProgram(provider) : null;
+  }, [provider]);
+
+  return program;
+}
