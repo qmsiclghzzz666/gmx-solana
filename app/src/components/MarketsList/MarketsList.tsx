@@ -5,85 +5,77 @@ import { Trans, t } from "@lingui/macro";
 import Tooltip from "@/components/Tooltip/Tooltip";
 import { renderNetFeeHeaderTooltipContent } from "./NetFeeHeaderTooltipContent";
 import TooltipWithPortal from "@/components/Tooltip/TooltipWithPortal";
-import { IndexTokenStat } from "@/contexts/state";
-import { USD_DECIMALS, expandDecimals, formatAmount, formatRatePercentage, formatUsd, getMarketIndexName, getMarketPoolName, getUnit } from "./utils";
+import { IndexTokenStat, MarketStat } from "@/contexts/state";
+import { USD_DECIMALS, formatAmount, formatRatePercentage, formatUsd, getMarketIndexName, getMarketPoolName, getUnit } from "./utils";
 import StatsTooltipRow from "@/components/StatsTooltipRow/StatsTooltipRow";
 import { NetFeeTooltip } from "./NetFeeTooltip";
 import { BN } from "@coral-xyz/anchor";
-import { PublicKey } from "@solana/web3.js";
 import { MarketInfo } from "@/onchain/market";
 import PageTitle from "../PageTitle/PageTitle";
 
 import "./MarketsList.scss";
-import { useDeployedMarkets } from "@/hooks";
-import { usePriceFromFeeds } from "@/onchain/token";
+import { useDeployedMarketInfos } from "@/onchain";
+import { useMemo } from "react";
 
-const TOKEN_DECIMALS: number = 9;
-const TOKEN_UNIT = getUnit(TOKEN_DECIMALS);
-const FEED = new PublicKey("J83w4HKfqxwcq3BEMMkPFSppX3gqekLyLJBexebFVkix");
+const info2Stat = (info: MarketInfo) => {
+  const longUnit = getUnit(info.longToken.decimals);
+  const shortUnit = getUnit(info.shortToken.decimals);
+  const longUnitPrice = info.longToken.prices.minPrice.div(longUnit);
+  const shortUnitPrice = info.shortToken.prices.minPrice.div(shortUnit);
+  const poolValueUsd = info.longPoolAmount.mul(longUnitPrice).add(info.shortPoolAmount.mul(shortUnitPrice));
+  const usedLiquidity = new BN(0);
+  const maxLiquidity = poolValueUsd;
+  const stat: MarketStat = {
+    marketInfo: info,
+    poolValueUsd,
+    usedLiquidity,
+    maxLiquidity,
+    netFeeLong: getUnit(USD_DECIMALS - 2),
+    netFeeShort: getUnit(USD_DECIMALS - 2).neg(),
+    utilization: usedLiquidity.div(maxLiquidity),
+  };
+  return stat;
+};
 
 export function MarketsList() {
-  const markets = useDeployedMarkets();
-  const prices = usePriceFromFeeds("pyth", [FEED]);
+  const infos = useDeployedMarketInfos();
+  const indexTokensStats = useMemo(() => {
+    const stats: { [indexAddress: string]: IndexTokenStat } = {};
 
-  const price = prices["SOL"];
-  const unitPrice = price ? price.minPrice.div(TOKEN_UNIT) : undefined;
-  const marketKeys = Object.keys(markets);
-  const indexTokensStats: IndexTokenStat[] = unitPrice && marketKeys.length ? [{
-    token: {
-      symbol: "SOL",
-      address: PublicKey.unique(),
-      prices: price,
-    },
-    price: new BN(1),
-    totalPoolValue: new BN("1768607000000000000000000"),
-    totalUtilization: new BN(7000),
-    totalUsedLiquidity: new BN("1768607000000000000000000"),
-    totalMaxLiquidity: new BN("1768607000000000000000000"),
-    bestNetFeeLong: new BN("1000000000000000000000000"),
-    bestNetFeeShort: new BN("-1000000000000000000000000"),
-    marketsStats: Object.keys(markets).map(key => {
-      const market = markets[key];
-      return {
-        marketInfo: {
-          longToken: {
-            symbol: "SOL",
-            address: PublicKey.unique(),
-            prices: {
-              maxPrice: new BN(1),
-              minPrice: new BN(1),
-            },
-          },
-          shortToken: {
-            symbol: "USDC",
-            address: PublicKey.unique(),
-            prices: {
-              maxPrice: new BN(1),
-              minPrice: new BN(1),
-            },
-          },
-          indexToken: {
-            symbol: "SOL",
-            address: PublicKey.unique(),
-            prices: {
-              maxPrice: new BN(1),
-              minPrice: new BN(1),
-            },
-          },
-          ...market,
-        } as MarketInfo,
-        poolValueUsd: market.longPoolAmount.mul(unitPrice).add(market.shortPoolAmount.mul(expandDecimals(new BN(1), USD_DECIMALS - TOKEN_DECIMALS))),
-        usedLiquidity: new BN(1),
-        maxLiquidity: new BN(1),
-        netFeeLong: new BN(1),
-        netFeeShort: new BN(1),
-        utilization: new BN(1),
+    for (const key in infos) {
+      const info = infos[key];
+      const stat = info2Stat(info);
+      const indexKey = info.indexTokenAddress.toBase58();
+      const indexStat = stats[indexKey] ?? {
+        token: info.indexToken,
+        price: info.indexToken.prices.minPrice,
+        totalPoolValue: new BN(0),
+        totalUtilization: new BN(0),
+        totalUsedLiquidity: new BN(0),
+        totalMaxLiquidity: new BN(0),
+        bestNetFeeLong: getUnit(USD_DECIMALS).neg(),
+        bestNetFeeShort: getUnit(USD_DECIMALS).neg(),
+        marketsStats: [],
+      };
+      indexStat.totalPoolValue = indexStat.totalPoolValue.add(stat.poolValueUsd);
+      indexStat.totalUsedLiquidity = indexStat.totalUsedLiquidity.add(stat.usedLiquidity);
+      indexStat.totalMaxLiquidity = indexStat.totalMaxLiquidity.add(stat.maxLiquidity);
+      indexStat.totalUtilization = indexStat.totalUsedLiquidity.div(indexStat.totalMaxLiquidity);
+      if (stat.netFeeLong.gt(indexStat.bestNetFeeLong)) {
+        indexStat.bestNetFeeLong = stat.netFeeLong;
       }
-    }),
-  }] : [];
+      if (stat.netFeeShort.gt(indexStat.bestNetFeeShort)) {
+        indexStat.bestNetFeeShort = stat.netFeeShort;
+      }
+      indexStat.marketsStats.push(stat);
+      indexStat.marketsStats.sort((a, b) => b.poolValueUsd.cmp(a.poolValueUsd));
+      stats[indexKey] = indexStat;
+    }
+
+    return Object.values(stats);
+  }, [infos]);
 
   const isMobile = useMedia("(max-width: 1100px)");
-
   return (
     <>
       {!isMobile && <MarketsListDesktop indexTokensStats={indexTokensStats} />}

@@ -11,17 +11,17 @@ import { toBN } from "gmsol";
 export type PriceProvider = "pyth";
 
 interface Request {
-  key: "tokens",
+  key: "token-prices",
   provider: PriceProvider,
   feeds: PublicKey[],
 }
 
-export const usePriceFromFeeds = (provider: PriceProvider = "pyth", feeds: PublicKey[]) => {
+export const usePriceFromFeeds = ({ provider = "pyth", feeds }: { provider?: PriceProvider, feeds: PublicKey[] }) => {
   const connection = useConnection();
 
   const request = useMemo<Request | null>(() => {
     return feeds.length > 0 ? {
-      key: "tokens",
+      key: "token-prices",
       provider,
       feeds,
     } : null;
@@ -31,18 +31,18 @@ export const usePriceFromFeeds = (provider: PriceProvider = "pyth", feeds: Publi
     const pubkey = getPythProgramKeyForCluster(DEFAULT_CLUSTER);
     const conn = new PythConnection(connection.connection, pubkey, undefined, feeds);
     conn.onPriceChange((product, price) => {
+      const feedAddress = product.price_account;
       const priceValue = price.aggregate.priceComponent;
       const confidence = price.aggregate.confidenceComponent;
       const decimals = price.exponent;
-      if (-decimals <= USD_DECIMALS) {
+      if (feedAddress && -decimals <= USD_DECIMALS) {
         const minPrice = expandDecimals(toBN(priceValue - confidence), USD_DECIMALS + decimals);
         const maxPrice = expandDecimals(toBN(priceValue + confidence), USD_DECIMALS + decimals);
         next(null, prices => {
           prices = prices ?? {};
-          const base = product.base;
           return {
             ...prices,
-            [base]: {
+            [feedAddress]: {
               minPrice,
               maxPrice,
             } as TokenPrices,

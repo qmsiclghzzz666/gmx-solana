@@ -4,6 +4,8 @@ import { PublicKey } from "@solana/web3.js";
 export interface Token {
   symbol: string,
   address: PublicKey,
+  decimals: number,
+  feedAddress?: PublicKey,
 }
 
 export interface TokenPrices {
@@ -18,5 +20,9 @@ export type TokenData = Token & {
 };
 
 export interface Prices {
-  [base: string]: TokenPrices,
+  [feedAddress: string]: TokenPrices,
+}
+
+export interface Tokens {
+  [address: string]: TokenData,
 }

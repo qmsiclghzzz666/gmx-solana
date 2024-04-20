@@ -10,9 +10,9 @@ export interface Market {
 }
 
 export interface MarketTokens {
+  indexToken: TokenData,
   longToken: TokenData,
   shortToken: TokenData,
-  indexToken: TokenData,
 }
 
 export interface MarketState {
@@ -26,4 +26,8 @@ export type MarketInfo = MarketData & MarketTokens;
 
 export interface Markets {
   [marketTokenAddress: string]: MarketData;
+}
+
+export interface MarketInfos {
+  [marketTokenAddress: string]: MarketInfo;
 }
