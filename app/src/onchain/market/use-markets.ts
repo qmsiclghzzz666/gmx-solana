@@ -1,22 +1,21 @@
-import { GMSOL_DEPLOYMENT } from "@/config/deployment";
 import { useDataStore } from "@/contexts/anchor";
 import { MarketData, Markets } from "./types";
 import useSWR from "swr";
 import { findMarketPDA } from "gmsol";
 import { useMemo } from "react";
+import { PublicKey } from "@solana/web3.js";
 
-export const useMarkets = () => {
+export const useMarkets = (params?: { store: PublicKey, marketTokens: PublicKey[] }) => {
   const dataStore = useDataStore();
 
-  const marketAddresses = useMemo(() => {
-    const deployment = GMSOL_DEPLOYMENT;
-    return deployment ? {
+  const request = useMemo(() => {
+    return params ? {
       key: "data_store/markets",
-      marketAddresses: deployment.marketTokens.map(token => findMarketPDA(deployment.store, token)[0]),
+      marketAddresses: params.marketTokens.map(token => findMarketPDA(params.store, token)[0]),
     } : null;
-  }, []);
+  }, [params]);
 
-  const { data } = useSWR(marketAddresses, async ({ marketAddresses }) => {
+  const { data } = useSWR(request, async ({ marketAddresses }) => {
     const data = await dataStore.account.market.fetchMultiple(marketAddresses);
     const markets = (data ?? []).map(market => {
       return market ? {

@@ -1,7 +1,6 @@
 import { useMedia } from "react-use";
 import icon_solana from "@/img/ic_solana_24.svg";
 
-import "./MarketsList.scss";
 import { Trans, t } from "@lingui/macro";
 import Tooltip from "@/components/Tooltip/Tooltip";
 import { renderNetFeeHeaderTooltipContent } from "./NetFeeHeaderTooltipContent";
@@ -12,9 +11,11 @@ import StatsTooltipRow from "@/components/StatsTooltipRow/StatsTooltipRow";
 import { NetFeeTooltip } from "./NetFeeTooltip";
 import { BN } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
-import { useMarkets } from "@/states/market/use-markets";
-import { MarketInfo } from "@/states/market";
+import { MarketInfo } from "@/onchain/market";
 import PageTitle from "../PageTitle/PageTitle";
+
+import "./MarketsList.scss";
+import { useDeployedMarkets } from "@/hooks";
 
 const TOKEN_DECIMALS: number = 9;
 const NORMAL_PRICE = new BN(135);
@@ -22,7 +23,7 @@ const PRICE = expandDecimals(NORMAL_PRICE, USD_DECIMALS);
 const UNIT_PRICE = expandDecimals(NORMAL_PRICE, USD_DECIMALS - TOKEN_DECIMALS);
 
 export function MarketsList() {
-  const markets = useMarkets();
+  const markets = useDeployedMarkets();
   const marketKeys = Object.keys(markets);
   const indexTokensStats: IndexTokenStat[] = marketKeys.length ? [{
     token: {

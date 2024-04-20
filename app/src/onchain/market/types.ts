@@ -1,6 +1,6 @@
 import { BN } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
-import { TokenData } from "@/states/token";
+import { TokenData } from "@/onchain/token";
 
 export interface Market {
   marketTokenAddress: PublicKey,
