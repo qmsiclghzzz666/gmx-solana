@@ -1,6 +1,6 @@
 import cx from "classnames";
 import "./Footer.css";
-import logoImg from "img/logo_GMSOL.png";
+import logoImg from "@/img/logo_GMSOL.png";
 
 export default function Footer() {
   return (

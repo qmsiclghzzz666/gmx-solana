@@ -11,10 +11,10 @@ import React, {
 import cx from "classnames";
 
 import "./Tooltip.scss";
-import { IS_TOUCH } from "config/env";
+import { IS_TOUCH } from "@/config/env";
 import Portal from "../Common/Portal";
 import { TooltipPosition } from "./Tooltip";
-import { DEFAULT_TOOLTIP_POSITION, TOOLTIP_CLOSE_DELAY, TOOLTIP_OPEN_DELAY } from "config/ui";
+import { DEFAULT_TOOLTIP_POSITION, TOOLTIP_CLOSE_DELAY, TOOLTIP_OPEN_DELAY } from "@/config/ui";
 import { computePosition, flip, size } from "@floating-ui/dom";
 
 type Props = PropsWithChildren<{

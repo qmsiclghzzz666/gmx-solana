@@ -14,13 +14,7 @@ export default defineConfig(async ({ mode }) => {
     })],
     resolve: {
       alias: {
-        "styles": path.resolve(__dirname, "./src/styles"),
-        "img": path.resolve(__dirname, "./src/img"),
-        "components": path.resolve(__dirname, "./src/components"),
-        "fonts": path.resolve(__dirname, "./src/fonts"),
-        "config": path.resolve(__dirname, "./src/config"),
-        "contexts": path.resolve(__dirname, "./src/contexts"),
-        "states": path.resolve(__dirname, "./src/states"),
+        "@": path.resolve(__dirname, "./src"),
       }
     },
     define: {

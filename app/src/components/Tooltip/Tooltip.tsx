@@ -1,8 +1,8 @@
 import cx from "classnames";
 import { useCallback, useState, useRef, MouseEvent, ReactNode, useEffect } from "react";
 import "./Tooltip.scss";
-import { IS_TOUCH } from "config/env";
-import { TOOLTIP_CLOSE_DELAY, TOOLTIP_OPEN_DELAY, DEFAULT_TOOLTIP_POSITION } from "config/ui";
+import { IS_TOUCH } from "@/config/env";
+import { TOOLTIP_CLOSE_DELAY, TOOLTIP_OPEN_DELAY, DEFAULT_TOOLTIP_POSITION } from "@/config/ui";
 import { computePosition, flip, size } from "@floating-ui/dom";
 
 export type TooltipPosition =

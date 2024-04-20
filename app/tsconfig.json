@@ -22,17 +22,8 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "paths": {
-      "components/*": [
-        "./src/components/*"
-      ],
-      "config/*": [
-        "./src/config/*"
-      ],
-      "contexts/*": [
-        "./src/contexts/*"
-      ],
-      "states/*": [
-        "./src/states/*"
+      "@/*": [
+        "./src/*"
       ]
     },
   },

@@ -1,6 +1,6 @@
 import { BN } from "@coral-xyz/anchor";
-import { TRIGGER_PREFIX_ABOVE, TRIGGER_PREFIX_BELOW } from "config/ui";
-import { Token } from "states/token";
+import { TRIGGER_PREFIX_ABOVE, TRIGGER_PREFIX_BELOW } from "@/config/ui";
+import { Token } from "@/states/token";
 
 export function getMarketIndexName({ indexToken }: { indexToken: Token }) {
   return `${indexToken.symbol}/USD`

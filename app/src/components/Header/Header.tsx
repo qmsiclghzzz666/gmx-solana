@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { RiMenuLine } from "react-icons/ri";
 import { FaTimes } from "react-icons/fa";
-import logoImg from "img/logo_GMSOL.png";
+import logoImg from "@/img/logo_GMSOL.png";
 
 import "./Header.scss";
 import { AppHeaderLinks } from "./AppHeaderLinks";

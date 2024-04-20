@@ -1,7 +1,7 @@
 import { ReactNode } from "react";
 import "./PageTitle.scss";
 import cx from "classnames";
-import icon_solana from "img/ic_solana_24.svg";
+import icon_solana from "@/img/ic_solana_24.svg";
 
 type Props = {
   title: string;

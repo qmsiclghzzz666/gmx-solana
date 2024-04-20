@@ -1,19 +1,19 @@
 import { useMedia } from "react-use";
-import icon_solana from "img/ic_solana_24.svg";
+import icon_solana from "@/img/ic_solana_24.svg";
 
 import "./MarketsList.scss";
 import { Trans } from "@lingui/macro";
-import Tooltip from "components/Tooltip/Tooltip";
+import Tooltip from "@/components/Tooltip/Tooltip";
 import { renderNetFeeHeaderTooltipContent } from "./NetFeeHeaderTooltipContent";
-import TooltipWithPortal from "components/Tooltip/TooltipWithPortal";
-import { IndexTokenStat } from "contexts/state";
+import TooltipWithPortal from "@/components/Tooltip/TooltipWithPortal";
+import { IndexTokenStat } from "@/contexts/state";
 import { USD_DECIMALS, expandDecimals, formatAmount, formatRatePercentage, formatUsd, getMarketIndexName, getMarketPoolName } from "./utils";
-import StatsTooltipRow from "components/StatsTooltipRow/StatsTooltipRow";
+import StatsTooltipRow from "@/components/StatsTooltipRow/StatsTooltipRow";
 import { NetFeeTooltip } from "./NetFeeTooltip";
 import { BN } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
-import { useMarkets } from "states/market/use-markets";
-import { MarketInfo } from "states/market";
+import { useMarkets } from "@/states/market/use-markets";
+import { MarketInfo } from "@/states/market";
 
 const TOKEN_DECIMALS: number = 9;
 const NORMAL_PRICE = new BN(135);

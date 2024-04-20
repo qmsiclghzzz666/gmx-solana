@@ -1,8 +1,8 @@
-import Footer from "components/Footer/Footer";
+import Footer from "@/components/Footer/Footer";
 import "./Stake.css";
-import PageTitle from "components/PageTitle/PageTitle";
+import PageTitle from "@/components/PageTitle/PageTitle";
 import { Trans, t } from "@lingui/macro";
-import ExternalLink from "components/ExternalLink/ExternalLink";
+import ExternalLink from "@/components/ExternalLink/ExternalLink";
 
 export default function Stake() {
   return (

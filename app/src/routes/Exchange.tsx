@@ -1,4 +1,4 @@
-import Footer from "components/Footer/Footer";
+import Footer from "@/components/Footer/Footer";
 import "./Exchange.css";
 
 export default function Exchange() {

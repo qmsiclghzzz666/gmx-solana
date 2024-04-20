@@ -2,7 +2,7 @@ import { Trans } from "@lingui/macro";
 import cx from "classnames";
 
 import "./NetFeeTooltip.scss";
-import { MarketStat } from "contexts/state";
+import { MarketStat } from "@/contexts/state";
 import { formatRatePercentage, getMarketIndexName, getMarketPoolName } from "./utils";
 import { BN } from "@coral-xyz/anchor";
 

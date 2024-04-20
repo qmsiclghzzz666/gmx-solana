@@ -1,6 +1,6 @@
 import { BN } from "@coral-xyz/anchor";
-import { MarketInfo } from "states/market";
-import { TokenData } from "states/token";
+import { MarketInfo } from "@/states/market";
+import { TokenData } from "@/states/token";
 
 export interface MarketStat {
   marketInfo: MarketInfo;

@@ -1,7 +1,7 @@
-import PageTitle from "components/PageTitle/PageTitle";
+import PageTitle from "@/components/PageTitle/PageTitle";
 import { Trans, t } from "@lingui/macro";
-import Footer from "components/Footer/Footer";
-import { MarketsList } from "components/MarketsList/MarketsList";
+import Footer from "@/components/Footer/Footer";
+import { MarketsList } from "@/components/MarketsList/MarketsList";
 
 import "./Dashboard.css";
 

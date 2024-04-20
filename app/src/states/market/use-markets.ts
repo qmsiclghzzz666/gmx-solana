@@ -1,5 +1,5 @@
-import { getGMSOLDeployment } from "config/deployment";
-import { useDataStore } from "contexts/anchor";
+import { getGMSOLDeployment } from "@/config/deployment";
+import { useDataStore } from "@/contexts/anchor";
 import { MarketData, Markets } from "./types";
 import useSWR from "swr";
 import { findMarketPDA } from "gmsol";
