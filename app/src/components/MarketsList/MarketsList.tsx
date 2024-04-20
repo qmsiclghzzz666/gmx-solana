@@ -2,7 +2,7 @@ import { useMedia } from "react-use";
 import icon_solana from "@/img/ic_solana_24.svg";
 
 import "./MarketsList.scss";
-import { Trans } from "@lingui/macro";
+import { Trans, t } from "@lingui/macro";
 import Tooltip from "@/components/Tooltip/Tooltip";
 import { renderNetFeeHeaderTooltipContent } from "./NetFeeHeaderTooltipContent";
 import TooltipWithPortal from "@/components/Tooltip/TooltipWithPortal";
@@ -14,6 +14,7 @@ import { BN } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
 import { useMarkets } from "@/states/market/use-markets";
 import { MarketInfo } from "@/states/market";
+import PageTitle from "../PageTitle/PageTitle";
 
 const TOKEN_DECIMALS: number = 9;
 const NORMAL_PRICE = new BN(135);
@@ -84,7 +85,7 @@ export function MarketsList() {
   return (
     <>
       {!isMobile && <MarketsListDesktop indexTokensStats={indexTokensStats} />}
-      {/* {isMobile && <MarketsListMobile indexTokensStats={indexTokensStats} />} */}
+      {isMobile && <MarketsListMobile indexTokensStats={indexTokensStats} />}
     </>
   );
 }
@@ -129,6 +130,126 @@ function MarketsListDesktop({ indexTokensStats }: { indexTokensStats: IndexToken
         </tbody>
       </table>
     </div>
+  );
+}
+
+function MarketsListMobile({ indexTokensStats }: { indexTokensStats: IndexTokenStat[] }) {
+  return (
+    <>
+      <PageTitle title={t`GM Pools`} />
+      <div className="token-grid">
+        {indexTokensStats.map((stats, index) => {
+          const tooltipPositionNetFee = index < indexTokensStats.length / 2 ? "bottom-end" : "top-end";
+          const netFeePerHourLong = stats.bestNetFeeLong;
+          const netFeePerHourShort = stats.bestNetFeeShort;
+
+          return (
+            <div className="App-card" key={stats.token.symbol}>
+              <div className="App-card-title">
+                <div className="mobile-token-card">
+                  <img
+                    src={`src/img/ic_${stats.token.symbol.toLocaleLowerCase()}_40.svg`}
+                    alt={stats.token.symbol}
+                    width="20"
+                  />
+                  <div className="token-symbol-text">{stats.token.symbol}</div>
+                  {/* <div>
+                    <AssetDropdown assetSymbol={stats.token.symbol} />
+                  </div> */}
+                </div>
+              </div>
+              <div className="App-card-divider"></div>
+              <div className="App-card-content">
+                <div className="App-card-row">
+                  <div className="label">
+                    <Trans>Price</Trans>
+                  </div>
+                  <div>{formatUsd(stats.token.prices?.minPrice)}</div>
+                </div>
+                <div className="App-card-row">
+                  <div className="label">
+                    <Trans>TVL</Trans>
+                  </div>
+                  <div>
+                    <Tooltip
+                      handle={formatUsd(stats.totalPoolValue)}
+                      position="bottom-end"
+                      className="MarketList-mobile-tvl-tooltip"
+                      renderContent={() => (
+                        <>
+                          {stats.marketsStats.map(({ marketInfo, poolValueUsd }) => (
+                            <StatsTooltipRow
+                              key={marketInfo.marketTokenAddress.toBase58()}
+                              showDollar={false}
+                              label={
+                                <div className="items-top">
+                                  <span className="text-white">{getMarketIndexName(marketInfo)}</span>
+                                  <span className="subtext lh-1">[{getMarketPoolName(marketInfo)}]</span>
+                                </div>
+                              }
+                              value={formatUsd(poolValueUsd)}
+                            />
+                          ))}
+                        </>
+                      )}
+                    />
+                  </div>
+                </div>
+                <div className="App-card-row">
+                  <div className="label">
+                    <Trans>Liquidity</Trans>
+                  </div>
+                  <div>
+                    <Tooltip
+                      handle={formatUsd(stats.totalMaxLiquidity)}
+                      className="MarketList-mobile-tvl-tooltip"
+                      renderContent={() => (
+                        <>
+                          {stats.marketsStats.map(({ marketInfo, maxLiquidity }) => (
+                            <StatsTooltipRow
+                              key={marketInfo.marketTokenAddress.toBase58()}
+                              showDollar={false}
+                              label={
+                                <div className="items-top">
+                                  <span className="text-white">{getMarketIndexName(marketInfo)}</span>
+                                  <span className="subtext lh-1">[{getMarketPoolName(marketInfo)}]</span>
+                                </div>
+                              }
+                              value={formatUsd(maxLiquidity)}
+                            />
+                          ))}
+                        </>
+                      )}
+                    />
+                  </div>
+                </div>
+                <div className="App-card-row">
+                  <div className="label">
+                    <Tooltip handle={<Trans>Net Fee / 1h</Trans>} renderContent={renderNetFeeHeaderTooltipContent} />
+                  </div>
+                  <div>
+                    <TooltipWithPortal
+                      portalClassName="MarketList-netfee-tooltip"
+                      handle={`${formatRatePercentage(netFeePerHourLong)} / ${formatRatePercentage(
+                        netFeePerHourShort
+                      )}`}
+                      position={tooltipPositionNetFee}
+                      renderContent={() => <NetFeeTooltip marketStats={stats.marketsStats} />}
+                    />
+                  </div>
+                </div>
+                <div className="App-card-row">
+                  <div className="label">
+                    <Trans>Utilization</Trans>
+                  </div>
+                  <div>{formatAmount(stats.totalUtilization, 2, 2, false)}%</div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </>
   );
 }
 
