@@ -69,7 +69,7 @@ export function MarketsList() {
           },
           ...market,
         } as MarketInfo,
-        poolValueUsd: market.longPoolAmount.mul(UNIT_PRICE).add(market.shortPoolAmount.mul(UNIT_PRICE)),
+        poolValueUsd: market.longPoolAmount.mul(UNIT_PRICE).add(market.shortPoolAmount.mul(expandDecimals(new BN(1), USD_DECIMALS - TOKEN_DECIMALS))),
         usedLiquidity: new BN(1),
         maxLiquidity: new BN(1),
         netFeeLong: new BN(1),

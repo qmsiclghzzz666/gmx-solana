@@ -2,7 +2,6 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
 import Root from './routes/Root';
-import { AnchorContextProvider } from './contexts/anchor';
 
 import { messages } from "./locales/en/messages";
 import { I18nProvider } from "@lingui/react";
@@ -10,6 +9,7 @@ import { i18n } from "@lingui/core";
 import Stake from './routes/Stake';
 import Dashboard from './routes/Dashboard';
 import Exchange from './routes/Exchange';
+import { OnChainProvider } from './onchain';
 
 const router = createBrowserRouter([
   {
@@ -41,10 +41,10 @@ i18n.activate("en");
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <AnchorContextProvider>
-      <I18nProvider i18n={i18n}>
+    <I18nProvider i18n={i18n}>
+      <OnChainProvider>
         <RouterProvider router={router} />
-      </I18nProvider>
-    </AnchorContextProvider>
+      </OnChainProvider>
+    </I18nProvider>
   </React.StrictMode>,
 );

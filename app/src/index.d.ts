@@ -1,4 +1,4 @@
-import { GMSOLDeployment } from "./config/deployment";
+import { GMSOLDeployment } from "gmsol";
 
 declare global {
   interface Window {
