@@ -1,2 +1,2 @@
 export * from "./types";
-export * from "./use-tokens";
+export * from "./use-price-from-feeds";

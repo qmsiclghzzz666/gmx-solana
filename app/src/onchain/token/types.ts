@@ -16,3 +16,7 @@ export type TokenData = Token & {
   balance?: BN,
   totalSupply?: BN,
 };
+
+export interface Prices {
+  [base: string]: TokenPrices,
+}

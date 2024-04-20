@@ -4,6 +4,7 @@ import { Connection, clusterApiUrl } from "@solana/web3.js";
 import * as walletAdapterWallets from "@solana/wallet-adapter-wallets";
 import { WalletModalProvider } from "@solana/wallet-adapter-react-ui";
 import { AnchorProvider } from "@coral-xyz/anchor";
+import { DEFAULT_CLUSTER } from "@/config/env";
 
 export interface AnchorContext {
   connection: Connection,
@@ -27,7 +28,7 @@ function Inner({ children }: { children: ReactNode }) {
 }
 
 export function AnchorContextProvider({ children }: { children: ReactNode }) {
-  const endpoint = clusterApiUrl("devnet");
+  const endpoint = clusterApiUrl(DEFAULT_CLUSTER);
   const wallets = useMemo(() => {
     return [
       new walletAdapterWallets.PhantomWalletAdapter(),

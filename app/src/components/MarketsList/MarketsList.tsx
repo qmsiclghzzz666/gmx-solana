@@ -6,7 +6,7 @@ import Tooltip from "@/components/Tooltip/Tooltip";
 import { renderNetFeeHeaderTooltipContent } from "./NetFeeHeaderTooltipContent";
 import TooltipWithPortal from "@/components/Tooltip/TooltipWithPortal";
 import { IndexTokenStat } from "@/contexts/state";
-import { USD_DECIMALS, expandDecimals, formatAmount, formatRatePercentage, formatUsd, getMarketIndexName, getMarketPoolName } from "./utils";
+import { USD_DECIMALS, expandDecimals, formatAmount, formatRatePercentage, formatUsd, getMarketIndexName, getMarketPoolName, getUnit } from "./utils";
 import StatsTooltipRow from "@/components/StatsTooltipRow/StatsTooltipRow";
 import { NetFeeTooltip } from "./NetFeeTooltip";
 import { BN } from "@coral-xyz/anchor";
@@ -16,23 +16,24 @@ import PageTitle from "../PageTitle/PageTitle";
 
 import "./MarketsList.scss";
 import { useDeployedMarkets } from "@/hooks";
+import { usePriceFromFeeds } from "@/onchain/token";
 
 const TOKEN_DECIMALS: number = 9;
-const NORMAL_PRICE = new BN(135);
-const PRICE = expandDecimals(NORMAL_PRICE, USD_DECIMALS);
-const UNIT_PRICE = expandDecimals(NORMAL_PRICE, USD_DECIMALS - TOKEN_DECIMALS);
+const TOKEN_UNIT = getUnit(TOKEN_DECIMALS);
+const FEED = new PublicKey("J83w4HKfqxwcq3BEMMkPFSppX3gqekLyLJBexebFVkix");
 
 export function MarketsList() {
   const markets = useDeployedMarkets();
+  const prices = usePriceFromFeeds("pyth", [FEED]);
+
+  const price = prices["SOL"];
+  const unitPrice = price ? price.minPrice.div(TOKEN_UNIT) : undefined;
   const marketKeys = Object.keys(markets);
-  const indexTokensStats: IndexTokenStat[] = marketKeys.length ? [{
+  const indexTokensStats: IndexTokenStat[] = unitPrice && marketKeys.length ? [{
     token: {
       symbol: "SOL",
       address: PublicKey.unique(),
-      prices: {
-        maxPrice: PRICE,
-        minPrice: PRICE,
-      },
+      prices: price,
     },
     price: new BN(1),
     totalPoolValue: new BN("1768607000000000000000000"),
@@ -71,7 +72,7 @@ export function MarketsList() {
           },
           ...market,
         } as MarketInfo,
-        poolValueUsd: market.longPoolAmount.mul(UNIT_PRICE).add(market.shortPoolAmount.mul(expandDecimals(new BN(1), USD_DECIMALS - TOKEN_DECIMALS))),
+        poolValueUsd: market.longPoolAmount.mul(unitPrice).add(market.shortPoolAmount.mul(expandDecimals(new BN(1), USD_DECIMALS - TOKEN_DECIMALS))),
         usedLiquidity: new BN(1),
         maxLiquidity: new BN(1),
         netFeeLong: new BN(1),

@@ -15,6 +15,7 @@
     "@coral-xyz/anchor": "^0.30.0",
     "@floating-ui/dom": "^1.6.3",
     "@lingui/react": "^4.10.0",
+    "@pythnetwork/client": "^2.21.0",
     "@solana/wallet-adapter-react": "^0.15.35",
     "@solana/wallet-adapter-react-ui": "^0.9.35",
     "@solana/wallet-adapter-wallets": "^0.19.32",

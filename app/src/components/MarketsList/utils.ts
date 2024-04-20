@@ -82,8 +82,12 @@ export function formatRatePercentage(rate?: BN, displayDecimals?: number) {
   return `${getPlusOrMinusSymbol(rate)}${formatAmount(rate.mul(new BN(100)).abs(), 30, displayDecimals ?? 4)}%`;
 }
 
+export function getUnit(decimals: number) {
+  return (new BN(10)).pow(new BN(decimals));
+}
+
 export function expandDecimals(n: BN, decimals: number) {
-  return n.mul((new BN(10)).pow(new BN(decimals)));
+  return n.mul(getUnit(decimals));
 }
 
 export const formatAmount = (
