@@ -3,7 +3,7 @@ import { useStateSelector } from "./utils";
 import { getUnit } from "@/utils/number";
 import { BN } from "@coral-xyz/anchor";
 import { IndexTokenStat, MarketStat } from "../types";
-import { USD_DECIMALS } from "@/config/constants";
+import { BN_ZERO, MIN_SIGNED_USD, USD_DECIMALS } from "@/config/constants";
 
 const info2Stat = (info: MarketInfo) => {
   const longUnit = getUnit(info.longToken.decimals);
@@ -35,12 +35,12 @@ export const useIndexTokenStats = () => useStateSelector(state => {
     const indexStat = stats[indexKey] ?? {
       token: info.indexToken,
       price: info.indexToken.prices.minPrice,
-      totalPoolValue: new BN(0),
-      totalUtilization: new BN(0),
-      totalUsedLiquidity: new BN(0),
-      totalMaxLiquidity: new BN(0),
-      bestNetFeeLong: getUnit(USD_DECIMALS).neg(),
-      bestNetFeeShort: getUnit(USD_DECIMALS).neg(),
+      totalPoolValue: BN_ZERO,
+      totalUtilization: BN_ZERO,
+      totalUsedLiquidity: BN_ZERO,
+      totalMaxLiquidity: BN_ZERO,
+      bestNetFeeLong: MIN_SIGNED_USD,
+      bestNetFeeShort: MIN_SIGNED_USD,
       marketsStats: [],
     };
     indexStat.totalPoolValue = indexStat.totalPoolValue.add(stat.poolValueUsd);
