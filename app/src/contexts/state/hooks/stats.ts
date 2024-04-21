@@ -4,12 +4,13 @@ import { getUnit } from "@/utils/number";
 import { BN } from "@coral-xyz/anchor";
 import { IndexTokenStat, MarketStat } from "../types";
 import { BN_ZERO, MIN_SIGNED_USD, USD_DECIMALS } from "@/config/constants";
+import { getMidPrice } from "@/onchain/token/utils";
 
 export const info2Stat = (info: MarketInfo) => {
   const longUnit = getUnit(info.longToken.decimals);
   const shortUnit = getUnit(info.shortToken.decimals);
-  const longUnitPrice = info.longToken.prices.minPrice.div(longUnit);
-  const shortUnitPrice = info.shortToken.prices.minPrice.div(shortUnit);
+  const longUnitPrice = getMidPrice(info.longToken.prices).div(longUnit);
+  const shortUnitPrice = getMidPrice(info.shortToken.prices).div(shortUnit);
   const poolValueUsd = info.longPoolAmount.mul(longUnitPrice).add(info.shortPoolAmount.mul(shortUnitPrice));
   const usedLiquidity = new BN(0);
   const maxLiquidity = poolValueUsd;

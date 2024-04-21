@@ -9,7 +9,7 @@ import { CardRow } from "../CardRow/CardRow";
 import StatsTooltipRow from "../StatsTooltipRow/StatsTooltipRow";
 import { BN_ZERO } from "@/config/constants";
 import { getPoolUsdWithoutPnl, getSellableMarketToken } from "@/onchain/market/utils";
-import { convertToTokenAmount } from "@/onchain/token/utils";
+import { convertToTokenAmount, getMidPrice } from "@/onchain/token/utils";
 
 type Props = {
   marketsInfoData?: MarketInfos;
@@ -29,7 +29,7 @@ export function MarketStats(p: Props) {
     // marketTokensData,
     // marketsTokensIncentiveAprData,
   } = p;
-  const marketPrice = marketToken?.prices?.maxPrice;
+  const marketPrice = marketToken ? getMidPrice(marketToken.prices) : undefined;
   // const marketBalance = marketToken?.balance;
   // const marketBalanceUsd = convertToUsd(marketBalance, marketToken?.decimals, marketPrice);
 

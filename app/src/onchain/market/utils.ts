@@ -30,8 +30,8 @@ export function usdToMarketTokenAmount(poolValue: BN, marketToken: TokenData, us
 
 export function getSellableMarketToken(marketInfo: MarketInfo, marketToken: TokenData) {
   const { longToken, shortToken, longPoolAmount, shortPoolAmount } = marketInfo;
-  const longPoolUsd = convertToUsd(longPoolAmount, longToken.decimals, longToken.prices.maxPrice)!;
-  const shortPoolUsd = convertToUsd(shortPoolAmount, shortToken.decimals, shortToken.prices.maxPrice)!;
+  const longPoolUsd = convertToUsd(longPoolAmount, longToken.decimals, getMidPrice(longToken.prices))!;
+  const shortPoolUsd = convertToUsd(shortPoolAmount, shortToken.decimals, getMidPrice(shortToken.prices))!;
   // const longCollateralLiquidityUsd = getAvailableUsdLiquidityForCollateral(marketInfo, true);
   // const shortCollateralLiquidityUsd = getAvailableUsdLiquidityForCollateral(marketInfo, false);
   const longCollateralLiquidityUsd = longPoolUsd;

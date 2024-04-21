@@ -12,6 +12,7 @@ import { NetFeeTooltip } from "./NetFeeTooltip";
 import PageTitle from "../PageTitle/PageTitle";
 
 import "./MarketsList.scss";
+import { getMidPrice } from "@/onchain/token/utils";
 
 export function MarketsList() {
   const indexTokensStats = useIndexTokenStats();
@@ -76,6 +77,7 @@ function MarketsListMobile({ indexTokensStats }: { indexTokensStats: IndexTokenS
           const tooltipPositionNetFee = index < indexTokensStats.length / 2 ? "bottom-end" : "top-end";
           const netFeePerHourLong = stats.bestNetFeeLong;
           const netFeePerHourShort = stats.bestNetFeeShort;
+          const price = stats.token.prices ? getMidPrice(stats.token.prices) : undefined;
 
           return (
             <div className="App-card" key={stats.token.symbol}>
@@ -98,7 +100,7 @@ function MarketsListMobile({ indexTokensStats }: { indexTokensStats: IndexTokenS
                   <div className="label">
                     <Trans>Price</Trans>
                   </div>
-                  <div>{formatUsd(stats.token.prices?.minPrice)}</div>
+                  <div>{formatUsd(price)}</div>
                 </div>
                 <div className="App-card-row">
                   <div className="label">
@@ -193,6 +195,7 @@ function MarketsListDesktopItem({ stats }: { stats: IndexTokenStat }) {
   const netFeePerHourLong = stats.bestNetFeeLong;
   const netFeePerHourShort = stats.bestNetFeeShort;
   const marketIndexName = getMarketIndexName(anyPool.marketInfo);
+  const price = stats.token.prices ? getMidPrice(stats.token.prices) : undefined;
 
   return (
     <tr key={stats.token.symbol}>
@@ -215,7 +218,7 @@ function MarketsListDesktopItem({ stats }: { stats: IndexTokenStat }) {
           </div>
         </div>
       </td>
-      <td>{formatUsd(stats.token.prices?.minPrice)}</td>
+      <td>{formatUsd(price)}</td>
       <td>
         <Tooltip
           className="nowrap"

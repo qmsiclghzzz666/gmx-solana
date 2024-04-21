@@ -7,7 +7,7 @@ import Tooltip from "../Tooltip/Tooltip";
 import PageTitle from "../PageTitle/PageTitle";
 import { useSortedPoolsWithIndexToken } from "@/hooks";
 import { getByKey } from "@/utils/objects";
-import { getTokenData } from "@/onchain/token/utils";
+import { getMidPrice, getTokenData } from "@/onchain/token/utils";
 import { convertToUsd, formatTokenAmount } from "@/utils/number";
 import { getNormalizedTokenSymbol } from "@/utils/tokens";
 import { formatUsd, getMarketIndexName, getMarketPoolName } from "../MarketsList/utils";
@@ -176,7 +176,8 @@ function DesktopList({
               }
 
               const totalSupply = token?.totalSupply;
-              const totalSupplyUsd = convertToUsd(totalSupply, token?.decimals, token?.prices?.minPrice);
+              const price = token?.prices ? getMidPrice(token.prices) : undefined;
+              const totalSupplyUsd = convertToUsd(totalSupply, token?.decimals, price);
               const tokenIconName = market.isSpotOnly
                 ? getNormalizedTokenSymbol(longToken.symbol) + getNormalizedTokenSymbol(shortToken.symbol)
                 : getNormalizedTokenSymbol(indexToken.symbol);
@@ -207,7 +208,7 @@ function DesktopList({
                     </div>
                   </td>
                   <td>
-                    {formatUsd(token.prices?.minPrice, {
+                    {formatUsd(price, {
                       displayDecimals: 3,
                     })}
                   </td>
@@ -297,7 +298,8 @@ function MobileList(
           // const marketEarnings = getByKey(userEarnings?.byMarketAddress, token?.address);
 
           const totalSupply = token?.totalSupply;
-          const totalSupplyUsd = convertToUsd(totalSupply, token?.decimals, token?.prices?.minPrice);
+          const price = token?.prices ? getMidPrice(token.prices) : undefined;
+          const totalSupplyUsd = convertToUsd(totalSupply, token?.decimals, price);
           const market = getByKey(marketsInfoData, token?.address.toBase58());
           const indexToken = getTokenData(tokensData, market?.indexTokenAddress, "native");
           const longToken = getTokenData(tokensData, market?.longTokenAddress);
@@ -341,7 +343,7 @@ function MobileList(
                     <Trans>Price</Trans>
                   </div>
                   <div>
-                    {formatUsd(token.prices?.minPrice, {
+                    {formatUsd(price, {
                       displayDecimals: 3,
                     })}
                   </div>
