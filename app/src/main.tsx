@@ -6,7 +6,7 @@ import Root from './routes/Root';
 import { messages } from "./locales/en/messages";
 import { I18nProvider } from "@lingui/react";
 import { i18n } from "@lingui/core";
-import Stake from './routes/Stake';
+import Earn from './routes/Earn';
 import Dashboard from './routes/Dashboard';
 import Exchange from './routes/Exchange';
 import { OnChainProvider } from './onchain';
@@ -27,7 +27,7 @@ const router = createBrowserRouter([
       },
       {
         path: "earn",
-        element: <Stake />,
+        element: <Earn />,
       },
       {
         path: "trade",
