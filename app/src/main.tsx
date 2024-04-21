@@ -10,6 +10,7 @@ import Stake from './routes/Stake';
 import Dashboard from './routes/Dashboard';
 import Exchange from './routes/Exchange';
 import { OnChainProvider } from './onchain';
+import { StateProvider } from './contexts/state';
 
 const router = createBrowserRouter([
   {
@@ -43,7 +44,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <I18nProvider i18n={i18n}>
       <OnChainProvider>
-        <RouterProvider router={router} />
+        <StateProvider>
+          <RouterProvider router={router} />
+        </StateProvider>
       </OnChainProvider>
     </I18nProvider>
   </React.StrictMode>,

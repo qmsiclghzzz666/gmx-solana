@@ -5,8 +5,9 @@ import { PublicKey } from "@solana/web3.js";
 import { useMemo } from "react";
 import useSWRSubscription, { SWRSubscriptionOptions } from "swr/subscription";
 import { Prices, TokenPrices } from "./types";
-import { USD_DECIMALS, expandDecimals } from "@/components/MarketsList/utils";
 import { toBN } from "gmsol";
+import { expandDecimals } from "@/utils/number";
+import { USD_DECIMALS } from "@/config/constants";
 
 export type PriceProvider = "pyth";
 

@@ -1,6 +1,8 @@
 import { BN } from "@coral-xyz/anchor";
 import { TRIGGER_PREFIX_ABOVE, TRIGGER_PREFIX_BELOW } from "@/config/ui";
 import { Token } from "@/onchain/token";
+import { expandDecimals } from "@/utils/number";
+import { USD_DECIMALS } from "@/config/constants";
 
 export function getMarketIndexName({ indexToken }: { indexToken: Token }) {
   return `${indexToken.symbol}/USD`
@@ -16,7 +18,6 @@ export function getMarketPoolName({ longToken, shortToken }: { longToken: Token,
 
 const MAX_EXCEEDING_THRESHOLD = "1000000000";
 const MIN_EXCEEDING_THRESHOLD_SCALE = 2;
-export const USD_DECIMALS = 20;
 
 export function formatUsd(
   usd?: BN,
@@ -80,14 +81,6 @@ export function formatRatePercentage(rate?: BN, displayDecimals?: number) {
   }
 
   return `${getPlusOrMinusSymbol(rate)}${formatAmount(rate.mul(new BN(100)).abs(), USD_DECIMALS, displayDecimals ?? 4)}%`;
-}
-
-export function getUnit(decimals: number) {
-  return (new BN(10)).pow(new BN(decimals));
-}
-
-export function expandDecimals(n: BN, decimals: number) {
-  return n.mul(getUnit(decimals));
 }
 
 export const formatAmount = (
