@@ -6,6 +6,9 @@ export interface Token {
   address: PublicKey,
   decimals: number,
   feedAddress?: PublicKey,
+  isNative?: boolean,
+  wrappedAddress?: PublicKey,
+  isWrapped?: boolean,
 }
 
 export interface TokenPrices {
@@ -13,11 +16,19 @@ export interface TokenPrices {
   maxPrice: BN,
 }
 
-export type TokenData = Token & {
+export type TokenData = Token & TokenMetadata & {
   prices: TokenPrices,
   balance?: BN,
-  totalSupply?: BN,
 };
+
+export interface TokenMetadata {
+  decimals: number,
+  totalSupply?: BN,
+}
+
+export interface TokenMetadatas {
+  [address: string]: TokenMetadata,
+}
 
 export interface Prices {
   [feedAddress: string]: TokenPrices,

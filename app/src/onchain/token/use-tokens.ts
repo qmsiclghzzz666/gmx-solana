@@ -1,13 +1,17 @@
-import { useMemo } from "react";
-import { Token, Tokens } from "./types";
+import { useMemo, useRef } from "react";
+import { Token, TokenMetadatas, Tokens } from "./types";
 import { PriceProvider, usePriceFromFeeds } from "./use-price-from-feeds";
 import { PublicKey } from "@solana/web3.js";
+import useSWR from "swr";
+import { useConnection } from "@solana/wallet-adapter-react";
+import { getMint } from "@solana/spl-token";
+import { toBN } from "gmsol";
 
 export interface TokenMap {
   [address: string]: Token,
 }
 
-export const useTokens = ({
+export const useTokensWithPrices = ({
   provider = "pyth",
   tokens,
 }: {
@@ -41,4 +45,37 @@ export const useTokens = ({
     }
     return tokenDatas;
   }, [tokens, prices]);
+};
+
+export const useTokenMetadatas = (tokens: PublicKey[]) => {
+  const connection = useConnection();
+  const cache = useRef<TokenMetadatas>({});
+
+  const request = useMemo(() => {
+    return {
+      key: "token-metadatas",
+      tokens,
+    };
+  }, [tokens]);
+
+  const { data, isLoading } = useSWR(request, async ({ tokens }) => {
+    const tokenDatas: TokenMetadatas = {};
+
+    for (const address of tokens) {
+      const mint = await getMint(connection.connection, address);
+      tokenDatas[address.toBase58()] = {
+        decimals: mint.decimals,
+        totalSupply: toBN(mint.supply),
+      };
+    }
+
+    return tokenDatas;
+  });
+
+  return useMemo(() => {
+    if (!isLoading && data) {
+      cache.current = data;
+    }
+    return cache.current;
+  }, [data, isLoading]);
 };

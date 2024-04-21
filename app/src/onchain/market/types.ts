@@ -7,6 +7,8 @@ export interface Market {
   indexTokenAddress: PublicKey,
   longTokenAddress: PublicKey,
   shortTokenAddress: PublicKey,
+  isSpotOnly?: boolean,
+  isDisabled?: boolean,
 }
 
 export interface MarketTokens {
@@ -30,4 +32,8 @@ export interface Markets {
 
 export interface MarketInfos {
   [marketTokenAddress: string]: MarketInfo;
+}
+
+export interface MarketTokenAPRs {
+  [marketTokenAddress: string]: BN;
 }

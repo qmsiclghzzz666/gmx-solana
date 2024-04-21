@@ -5,7 +5,7 @@ import { BN } from "@coral-xyz/anchor";
 import { IndexTokenStat, MarketStat } from "../types";
 import { BN_ZERO, MIN_SIGNED_USD, USD_DECIMALS } from "@/config/constants";
 
-const info2Stat = (info: MarketInfo) => {
+export const info2Stat = (info: MarketInfo) => {
   const longUnit = getUnit(info.longToken.decimals);
   const shortUnit = getUnit(info.shortToken.decimals);
   const longUnitPrice = info.longToken.prices.minPrice.div(longUnit);

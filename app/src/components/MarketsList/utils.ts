@@ -1,10 +1,13 @@
 import { BN } from "@coral-xyz/anchor";
-import { TRIGGER_PREFIX_ABOVE, TRIGGER_PREFIX_BELOW } from "@/config/ui";
 import { Token } from "@/onchain/token";
-import { expandDecimals } from "@/utils/number";
 import { USD_DECIMALS } from "@/config/constants";
+import { getLimitedDisplay } from "@/utils/number";
 
-export function getMarketIndexName({ indexToken }: { indexToken: Token }) {
+export function getMarketIndexName({ indexToken, isSpotOnly }: { indexToken: Token, isSpotOnly?: boolean }) {
+  if (isSpotOnly) {
+    return `SWAP-ONLY`;
+  }
+
   return `${indexToken.symbol}/USD`
 }
 
@@ -16,16 +19,14 @@ export function getMarketPoolName({ longToken, shortToken }: { longToken: Token,
   }
 }
 
-const MAX_EXCEEDING_THRESHOLD = "1000000000";
-const MIN_EXCEEDING_THRESHOLD_SCALE = 2;
-
 export function formatUsd(
   usd?: BN,
   opts: {
     fallbackToZero?: boolean;
     displayDecimals?: number;
     maxThreshold?: string;
-    minThreshold?: string;
+    minThreshold?: number;
+    minThresholdScale?: number;
     displayPlus?: boolean;
   } = {}
 ) {
@@ -47,33 +48,6 @@ export function formatUsd(
   const displayUsd = formatAmount(exceedingInfo.value, USD_DECIMALS, displayDecimals, true);
   return `${symbol}${sign}$${displayUsd}`;
 }
-
-function getLimitedDisplay(
-  amount: BN,
-  tokenDecimals: number,
-  opts: { maxThreshold?: string; minThresholdScale?: number } = {}
-) {
-  const { maxThreshold = MAX_EXCEEDING_THRESHOLD, minThresholdScale = MIN_EXCEEDING_THRESHOLD_SCALE } = opts;
-  const max = expandDecimals(new BN(maxThreshold), tokenDecimals);
-  const min = new BN(10).pow(new BN(tokenDecimals - minThresholdScale));
-  const absAmount = amount.abs();
-
-  if (absAmount.isZero()) {
-    return {
-      symbol: "",
-      value: absAmount,
-    };
-  }
-
-  const symbol = absAmount.gt(max) ? TRIGGER_PREFIX_ABOVE : absAmount.lt(min) ? TRIGGER_PREFIX_BELOW : "";
-  const value = absAmount.gt(max) ? max : absAmount.lt(min) ? min : absAmount;
-
-  return {
-    symbol,
-    value,
-  };
-}
-
 
 export function formatRatePercentage(rate?: BN, displayDecimals?: number) {
   if (!rate) {
