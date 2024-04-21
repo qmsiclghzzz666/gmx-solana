@@ -4,6 +4,11 @@ import { Trans, t } from "@lingui/macro";
 import ExternalLink from "@/components/ExternalLink/ExternalLink";
 import { GmList } from "@/components/GmList/GmList";
 import { useStateSelector } from "@/contexts/state";
+import { MarketStats } from "@/components/MarketStats/MarketStats";
+import { getByKey } from "@/utils/objects";
+import { getTokenData } from "@/onchain/token/utils";
+import { useLoaderData } from "react-router-dom";
+import { PublicKey } from "@solana/web3.js";
 
 export default function Earn() {
   const { marketInfos, tokens, marketTokens } = useStateSelector(state => {
@@ -13,6 +18,17 @@ export default function Earn() {
       marketTokens: state.marketTokens,
     };
   });
+
+  const { market } = useLoaderData() as { market: string | null };
+
+  const selectedMarketKey = market ?? Object.keys(marketInfos)[0];
+
+  const marketInfo = getByKey(marketInfos, selectedMarketKey);
+
+  const marketToken = getTokenData(
+    marketTokens,
+    selectedMarketKey ? new PublicKey(selectedMarketKey) : undefined,
+  );
 
   return (
     <div className="default-container page-layout">
@@ -28,17 +44,17 @@ export default function Earn() {
         }
       />
 
-      {/* <div className="MarketPoolsPage-content">
+      <div className="MarketPoolsPage-content">
         <MarketStats
-          marketsTokensAPRData={marketsTokensAPRData}
-          marketsTokensIncentiveAprData={marketsTokensIncentiveAprData}
-          marketTokensData={depositMarketTokensData}
-          marketsInfoData={marketsInfoData}
+          // marketsTokensAPRData={marketsTokensAPRData}
+          // marketsTokensIncentiveAprData={marketsTokensIncentiveAprData}
+          marketTokensData={marketTokens}
+          marketsInfoData={marketInfos}
           marketInfo={marketInfo}
           marketToken={marketToken}
         />
 
-        <div className="MarketPoolsPage-swap-box" ref={gmSwapBoxRef}>
+        {/* <div className="MarketPoolsPage-swap-box" ref={gmSwapBoxRef}>
           <GmSwapBox
             selectedMarketAddress={selectedMarketKey}
             markets={markets}
@@ -50,8 +66,8 @@ export default function Earn() {
             setMode={setMode}
             setOperation={setOperation}
           />
-        </div>
-      </div> */}
+        </div> */}
+      </div>
 
       <div className="Tab-title-section">
         <div className="Page-title">

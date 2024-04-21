@@ -82,7 +82,7 @@ function MarketsListMobile({ indexTokensStats }: { indexTokensStats: IndexTokenS
               <div className="App-card-title">
                 <div className="mobile-token-card">
                   <img
-                    src={`src/img/ic_${stats.token.symbol.toLocaleLowerCase()}_40.svg`}
+                    src={`/src/img/ic_${stats.token.symbol.toLocaleLowerCase()}_40.svg`}
                     alt={stats.token.symbol}
                     width="20"
                   />
@@ -201,7 +201,7 @@ function MarketsListDesktopItem({ stats }: { stats: IndexTokenStat }) {
           <div className="items-center">
             <div className="App-card-title-info-icon">
               <img
-                src={`src/img/ic_${stats.token.symbol.toLocaleLowerCase()}_40.svg`}
+                src={`/src/img/ic_${stats.token.symbol.toLocaleLowerCase()}_40.svg`}
                 alt={stats.token.symbol}
                 width="40"
               />

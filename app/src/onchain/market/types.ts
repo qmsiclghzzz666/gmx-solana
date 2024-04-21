@@ -9,6 +9,7 @@ export interface Market {
   shortTokenAddress: PublicKey,
   isSpotOnly?: boolean,
   isDisabled?: boolean,
+  isSingle: boolean,
 }
 
 export interface MarketTokens {

@@ -1,4 +1,4 @@
-import { formatAmount, limitDecimals, toFixedDecimal } from "@/components/MarketsList/utils";
+import { formatAmount, formatUsd, limitDecimals, toFixedDecimal } from "@/components/MarketsList/utils";
 import { BN_ZERO } from "@/config/constants";
 import { TRIGGER_PREFIX_ABOVE, TRIGGER_PREFIX_BELOW } from "@/config/ui";
 import { BN } from "@coral-xyz/anchor";
@@ -93,7 +93,7 @@ export function formatTokenAmount(
     maxThreshold,
   } = opts;
 
-  const symbolStr = symbol ? `${symbol}` : "";
+  const symbolStr = symbol ? ` ${symbol}` : "";
 
   if (!amount || !tokenDecimals) {
     if (fallbackToZero) {
@@ -118,4 +118,35 @@ export function formatTokenAmount(
   }
 
   return `${amountStr}${symbolStr}`;
+}
+
+export function formatTokenAmountWithUsd(
+  tokenAmount?: BN,
+  usdAmount?: BN,
+  tokenSymbol?: string,
+  tokenDecimals?: number,
+  opts: {
+    fallbackToZero?: boolean;
+    displayDecimals?: number;
+    displayPlus?: boolean;
+  } = {}
+) {
+  if (!tokenAmount || !usdAmount || !tokenSymbol || !tokenDecimals) {
+    if (!opts.fallbackToZero) {
+      return undefined;
+    }
+  }
+
+  const tokenStr = formatTokenAmount(tokenAmount, tokenDecimals, tokenSymbol, {
+    ...opts,
+    useCommas: true,
+    displayPlus: opts.displayPlus,
+  });
+
+  const usdStr = formatUsd(usdAmount, {
+    fallbackToZero: opts.fallbackToZero,
+    displayPlus: opts.displayPlus,
+  });
+
+  return `${tokenStr} (${usdStr})`;
 }

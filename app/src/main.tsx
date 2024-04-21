@@ -28,6 +28,12 @@ const router = createBrowserRouter([
       {
         path: "earn",
         element: <Earn />,
+        loader: ({ request }) => {
+          const url = new URL(request.url);
+          return {
+            market: url.searchParams.get("market"),
+          };
+        },
       },
       {
         path: "trade",
