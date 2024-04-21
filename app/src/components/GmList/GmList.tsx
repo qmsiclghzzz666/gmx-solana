@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import { Trans, t } from "@lingui/macro";
 import { MarketInfos, MarketTokenAPRs } from "@/onchain/market";
 import { TokenData, Tokens } from "@/onchain/token";
@@ -13,6 +12,9 @@ import { convertToUsd, formatTokenAmount } from "@/utils/number";
 import { getNormalizedTokenSymbol } from "@/utils/tokens";
 import { formatUsd, getMarketIndexName, getMarketPoolName } from "../MarketsList/utils";
 import Button from "../Button/Button";
+import TokenIcon from "../TokenIcon/TokenIcon";
+
+import "./GmList.scss";
 
 type Props = {
   hideTitle?: boolean;
@@ -66,19 +68,25 @@ export function GmList({
         shouldScrollToTop={shouldScrollToTop}
         buySellActionHandler={buySellActionHandler}
       />}
-      {isMobile && <MobileList hideTitle={hideTitle} sortedMarketsByIndexToken={markets} />}
+      {isMobile && <MobileList
+        hideTitle={hideTitle}
+        sortedMarketsByIndexToken={markets}
+        marketsInfoData={marketsInfoData}
+        tokensData={tokensData}
+        marketsTokensAPRData={marketsTokensAPRData}
+        marketsTokensIncentiveAprData={marketsTokensIncentiveAprData}
+        shouldScrollToTop={shouldScrollToTop}
+        buySellActionHandler={buySellActionHandler}
+      />}
     </div>
   );
 }
 
 function DesktopList({
   hideTitle,
-  daysConsidered,
   sortedMarketsByIndexToken,
   marketsInfoData,
   tokensData,
-  marketsTokensAPRData,
-  marketsTokensIncentiveAprData,
   shouldScrollToTop,
 }: {
   daysConsidered: number,
@@ -120,15 +128,15 @@ function DesktopList({
                 )}
               />
             </th>
-            <th>
-              {/* <GmTokensTotalBalanceInfo
-                    balance={userTotalGmInfo?.balance}
-                    balanceUsd={userTotalGmInfo?.balanceUsd}
-                    userEarnings={userEarnings}
-                    label={t`WALLET`}
-                  /> */}
-            </th>
-            <th>
+            {/* <th>
+              <GmTokensTotalBalanceInfo
+                balance={userTotalGmInfo?.balance}
+                balanceUsd={userTotalGmInfo?.balanceUsd}
+                userEarnings={userEarnings}
+                label={t`WALLET`}
+              />
+            </th> */}
+            {/* <th>
               <Tooltip
                 handle={t`APR`}
                 className="text-none"
@@ -144,7 +152,7 @@ function DesktopList({
                   </p>
                 )}
               />
-            </th>
+            </th> */}
 
             <th></th>
           </tr>
@@ -158,10 +166,9 @@ function DesktopList({
               const longToken = getTokenData(tokensData, market?.longTokenAddress);
               const shortToken = getTokenData(tokensData, market?.shortTokenAddress);
               // const mintableInfo = market && token ? getMintableMarketTokens(market, token) : undefined;
-              const mintableInfo = undefined;
 
-              const apr = getByKey(marketsTokensAPRData, token?.address.toBase58());
-              const incentiveApr = getByKey(marketsTokensIncentiveAprData, token?.address.toBase58());
+              // const apr = getByKey(marketsTokensAPRData, token?.address.toBase58());
+              // const incentiveApr = getByKey(marketsTokensIncentiveAprData, token?.address.toBase58());
               // const marketEarnings = getByKey(userEarnings?.byMarketAddress, token?.address);
 
               if (!token || !indexToken || !longToken || !shortToken) {
@@ -179,7 +186,7 @@ function DesktopList({
                   <td>
                     <div className="App-card-title-info">
                       <div className="App-card-title-info-icon">
-                        {/* <TokenIcon symbol={tokenIconName} displaySize={40} importSize={40} /> */}
+                        <TokenIcon symbol={tokenIconName} displaySize={40} importSize={40} />
                       </div>
 
                       <div className="App-card-title-info-text">
@@ -213,6 +220,7 @@ function DesktopList({
                     <br />({formatUsd(totalSupplyUsd)})
                   </td>
                   <td className="GmList-last-column">
+                    Unlimited (dev only)
                     {/* <MintableAmount
                       mintableInfo={mintableInfo}
                       market={market}
@@ -222,19 +230,19 @@ function DesktopList({
                     /> */}
                   </td>
 
-                  <td>
-                    {/* <GmTokensBalanceInfo
+                  {/* <td>
+                    <GmTokensBalanceInfo
                       token={token}
                       daysConsidered={daysConsidered}
                       oneLine={false}
                       earnedRecently={marketEarnings?.recent}
                       earnedTotal={marketEarnings?.total}
-                    /> */}
-                  </td>
+                    />
+                  </td> */}
 
-                  <td>
-                    {/* <AprInfo apr={apr} incentiveApr={incentiveApr} isIncentiveActive={isLpIncentiveActive} /> */}
-                  </td>
+                  {/* <td>
+                    <AprInfo apr={apr} incentiveApr={incentiveApr} isIncentiveActive={isLpIncentiveActive} />
+                  </td> */}
 
                   <td className="GmList-actions">
                     <Button
@@ -266,24 +274,35 @@ function DesktopList({
   );
 }
 
-function MobileList({ hideTitle, sortedMarketsByIndexToken }: { hideTitle?: boolean, sortedMarketsByIndexToken: TokenData[] }) {
+function MobileList(
+  {
+    hideTitle,
+    sortedMarketsByIndexToken,
+    marketsInfoData,
+    tokensData,
+    buySellActionHandler,
+  }: {
+    hideTitle?: boolean,
+    sortedMarketsByIndexToken: TokenData[]
+  } & Props
+) {
   return (
     <>
       {!hideTitle && <PageTitle title={t`GM Pools`} />}
 
       <div className="token-grid">
-        {/* {sortedMarketsByIndexToken.map((token, index) => {
-          const apr = marketsTokensAPRData?.[token.address];
-          const incentiveApr = marketsTokensIncentiveAprData?.[token.address];
-          const marketEarnings = getByKey(userEarnings?.byMarketAddress, token?.address);
+        {sortedMarketsByIndexToken.map((token) => {
+          // const apr = marketsTokensAPRData?.[token.address];
+          // const incentiveApr = marketsTokensIncentiveAprData?.[token.address];
+          // const marketEarnings = getByKey(userEarnings?.byMarketAddress, token?.address);
 
           const totalSupply = token?.totalSupply;
           const totalSupplyUsd = convertToUsd(totalSupply, token?.decimals, token?.prices?.minPrice);
-          const market = getByKey(marketsInfoData, token?.address);
+          const market = getByKey(marketsInfoData, token?.address.toBase58());
           const indexToken = getTokenData(tokensData, market?.indexTokenAddress, "native");
           const longToken = getTokenData(tokensData, market?.longTokenAddress);
           const shortToken = getTokenData(tokensData, market?.shortTokenAddress);
-          const mintableInfo = market && token ? getMintableMarketTokens(market, token) : undefined;
+          // const mintableInfo = market && token ? getMintableMarketTokens(market, token) : undefined;
 
           if (!indexToken || !longToken || !shortToken || !market) {
             return null;
@@ -295,7 +314,7 @@ function MobileList({ hideTitle, sortedMarketsByIndexToken }: { hideTitle?: bool
             : getNormalizedTokenSymbol(indexToken.symbol);
 
           return (
-            <div className="App-card" key={token.address}>
+            <div className="App-card" key={token.address.toBase58()}>
               <div className="App-card-title">
                 <div className="mobile-token-card">
                   <TokenIcon symbol={tokenIconName} displaySize={20} importSize={40} />
@@ -306,12 +325,12 @@ function MobileList({ hideTitle, sortedMarketsByIndexToken }: { hideTitle?: bool
                     </div>
                   </div>
                   <div>
-                    <GmAssetDropdown
+                    {/* <GmAssetDropdown
                       token={token}
                       tokensData={tokensData}
                       marketsInfoData={marketsInfoData}
                       position={index % 2 !== 0 ? "left" : "right"}
-                    />
+                    /> */}
                   </div>
                 </div>
               </div>
@@ -354,16 +373,17 @@ function MobileList({ hideTitle, sortedMarketsByIndexToken }: { hideTitle?: bool
                     />
                   </div>
                   <div>
-                    <MintableAmount
+                    Unlimited (dev only)
+                    {/* <MintableAmount
                       mintableInfo={mintableInfo}
                       market={market}
                       token={token}
                       longToken={longToken}
                       shortToken={shortToken}
-                    />
+                    /> */}
                   </div>
                 </div>
-                <div className="App-card-row">
+                {/* <div className="App-card-row">
                   <div className="label">
                     <GmTokensTotalBalanceInfo
                       balance={userTotalGmInfo?.balance}
@@ -382,27 +402,27 @@ function MobileList({ hideTitle, sortedMarketsByIndexToken }: { hideTitle?: bool
                       earnedTotal={marketEarnings?.total}
                     />
                   </div>
-                </div>
-                <div className="App-card-row">
+                </div> */}
+                {/* <div className="App-card-row">
                   <div className="label">
                     <Trans>APR</Trans>
                   </div>
                   <div>
                     <AprInfo apr={apr} incentiveApr={incentiveApr} isIncentiveActive={isLpIncentiveActive} />
                   </div>
-                </div>
+                </div> */}
 
                 <div className="App-card-divider"></div>
                 <div className="App-card-buttons m-0" onClick={buySellActionHandler}>
                   <Button
                     variant="secondary"
-                    to={`/pools/?market=${market.marketTokenAddress}&operation=buy&scroll=0`}
+                    to={`/pools/?market=${market.marketTokenAddress.toBase58()}&operation=buy&scroll=0`}
                   >
                     <Trans>Buy</Trans>
                   </Button>
                   <Button
                     variant="secondary"
-                    to={`/pools/?market=${market.marketTokenAddress}&operation=sell&scroll=0`}
+                    to={`/pools/?market=${market.marketTokenAddress.toBase58()}&operation=sell&scroll=0`}
                   >
                     <Trans>Sell</Trans>
                   </Button>
@@ -410,7 +430,7 @@ function MobileList({ hideTitle, sortedMarketsByIndexToken }: { hideTitle?: bool
               </div>
             </div>
           );
-        })} */}
+        })}
       </div>
     </>
   );
