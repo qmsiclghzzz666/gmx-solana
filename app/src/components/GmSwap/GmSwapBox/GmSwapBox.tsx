@@ -1,16 +1,8 @@
-import { t, Trans } from "@lingui/macro";
-import { useLingui } from "@lingui/react";
-import cx from "classnames";
-import mapValues from "lodash/mapValues";
-import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useState } from "react";
-
 import "./GmSwapBox.scss";
 import { Market, MarketInfo, MarketInfos } from "@/onchain/market";
 import { Tokens } from "@/onchain/token";
 import { Mode, Operation } from "./utils";
-import { useSearchParams } from "react-router-dom";
 import { getByKey } from "@/utils/objects";
-import { NATIVE_TOKEN_ADDRESS } from "@/config/tokens";
 import Inner from "./Inner";
 
 type Props = {
@@ -25,6 +17,24 @@ type Props = {
   setOperation: (operation: Operation) => void;
 };
 
+const getTokenOptions = (marketInfo?: MarketInfo) => {
+  if (!marketInfo) {
+    return [];
+  }
+
+  const { longToken, shortToken } = marketInfo;
+
+  if (!longToken || !shortToken) return [];
+
+  const options = [longToken];
+
+  if (!marketInfo.isSingle) {
+    options.push(shortToken);
+  }
+
+  return options;
+};
+
 export function GmSwapBox({
   operation,
   mode,
@@ -35,14 +45,17 @@ export function GmSwapBox({
   tokensData,
   selectedMarketAddress: marketAddress,
 }: Props) {
+  const marketInfo = getByKey(marketsInfoData, marketAddress);
+  const tokenOptions = getTokenOptions(marketInfo);
   return (
     <Inner
       operation={operation}
-      setOperation={setOperation}
       mode={mode}
+      setOperation={setOperation}
       setMode={setMode}
-      marketsInfoData={marketsInfoData}
-      marketAddress={marketAddress}
+      marketInfo={marketInfo}
+      tokensData={tokensData}
+      tokenOptions={tokenOptions}
     />
   );
 }

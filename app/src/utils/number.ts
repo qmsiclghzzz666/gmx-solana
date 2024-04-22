@@ -150,3 +150,44 @@ export function formatTokenAmountWithUsd(
 
   return `${tokenStr} (${usdStr})`;
 }
+
+/**
+ * Converts a numeric string to a BigNumber representation based on the specified unit.
+ * @param {string} value - The numeric string to convert.
+ * @param {number} decimals - The number of decimal places to account for the unit (e.g., 18 for ether to wei conversion).
+ * @returns {BN} The BigNumber object representing the value.
+ */
+export function parseUnits(value: string, decimals = 18) {
+  // Ensure the input is a string
+  if (typeof value !== 'string') {
+    throw new TypeError('Value must be a string');
+  }
+
+  const parts = value.split('.');
+  const integerPart = parts[0];
+  const decimalPart = parts[1] || '';
+  if (decimalPart.length > decimals) {
+    throw new Error('Decimal places exceed decimals limit');
+  }
+
+  // Extend the decimal part to the specified number of decimals
+  const fullDecimalPart = (decimalPart + '0'.repeat(decimals)).substring(0, decimals);
+
+  // Combine the integer part with the extended decimal part
+  const fullNumber = integerPart + fullDecimalPart;
+
+  // Remove leading zeros
+  const cleanNumber = fullNumber.replace(/^0+/, '') || '0';
+
+  return new BN(cleanNumber);
+}
+
+export const parseValue = (value: string, tokenDecimals: number) => {
+  const pValue = parseFloat(value);
+
+  if (isNaN(pValue)) {
+    return undefined;
+  }
+  value = limitDecimals(value, tokenDecimals);
+  return parseUnits(value, tokenDecimals);
+};

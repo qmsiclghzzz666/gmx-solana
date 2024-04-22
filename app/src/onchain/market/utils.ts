@@ -3,8 +3,9 @@ import { TokenData } from "../token";
 import { MarketInfo } from "./types";
 import { toBN } from "gmsol";
 import { BN_ZERO, ONE_USD } from "@/config/constants";
-import { BN } from "@coral-xyz/anchor";
+import { Address, BN, translateAddress } from "@coral-xyz/anchor";
 import { convertToTokenAmount, getMidPrice } from "../token/utils";
+import { NATIVE_TOKEN_ADDRESS } from "@/config/tokens";
 
 export function usdToMarketTokenAmount(poolValue: BN, marketToken: TokenData, usdValue: BN) {
   const supply = marketToken.totalSupply!;
@@ -97,4 +98,27 @@ export function getPoolUsdWithoutPnl(
   }
 
   return convertToUsd(poolAmount, token.decimals, price)!;
+}
+
+/**
+ * Apart from usual cases, returns `long` for single token backed markets.
+ */
+export function getTokenPoolType(marketInfo: MarketInfo, tokenAddress: Address): "long" | "short" | undefined {
+  const translated = translateAddress(tokenAddress);
+
+  const { longToken, shortToken } = marketInfo;
+
+  if (longToken.address.equals(shortToken.address) && translated.equals(longToken.address)) {
+    return "long";
+  }
+
+  if (translated.equals(longToken.address) || (translated.equals(NATIVE_TOKEN_ADDRESS) && longToken.isWrapped)) {
+    return "long";
+  }
+
+  if (translated.equals(shortToken.address) || (translated.equals(NATIVE_TOKEN_ADDRESS) && shortToken.isWrapped)) {
+    return "short";
+  }
+
+  return undefined;
 }

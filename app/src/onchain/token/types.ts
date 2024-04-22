@@ -37,3 +37,12 @@ export interface Prices {
 export interface Tokens {
   [address: string]: TokenData,
 }
+
+export type TokenInfo = Token & {
+  maxPrice?: BN;
+  minPrice?: BN;
+};
+
+export interface InfoTokens {
+  [address: string]: TokenInfo,
+}

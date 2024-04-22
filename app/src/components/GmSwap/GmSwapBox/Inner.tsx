@@ -1,20 +1,31 @@
 import Tab from "@/components/Tab/Tab";
 import { Mode, Operation, getGmSwapBoxAvailableModes } from "./utils";
-import { Dispatch, SetStateAction, useCallback, useEffect, useMemo } from "react";
+import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useState } from "react";
 import { useLingui } from "@lingui/react";
 import { mapValues } from "lodash";
 import { useSafeState } from "@/utils/state";
 import { getByKey } from "@/utils/objects";
-import { MarketInfos } from "@/onchain/market";
+import { MarketInfo, MarketInfos } from "@/onchain/market";
 import { PublicKey } from "@solana/web3.js";
 import cx from "classnames";
 import { t, Trans } from "@lingui/macro";
 
 import "./GmSwapBox.scss";
 import { formatUsd } from "@/components/MarketsList/utils";
-import { formatTokenAmount } from "@/utils/number";
+import { convertToUsd, formatTokenAmount, parseValue } from "@/utils/number";
 import Button from "@/components/Button/Button";
 import { Form } from "react-router-dom";
+import BuyInputSection from "@/components/BuyInputSection/BuyInputSection";
+import { Token, TokenData, Tokens } from "@/onchain/token";
+import { getTokenPoolType } from "@/onchain/market/utils";
+import TokenWithIcon from "@/components/TokenIcon/TokenWithIcon";
+import TokenSelector from "@/components/TokenSelector/TokenSelector";
+import { Address } from "@coral-xyz/anchor";
+import { useLocalStorageSerializeKey } from "@/utils/localStorage";
+import { useEndpointName } from "@/onchain";
+import { SYNTHETICS_MARKET_DEPOSIT_TOKEN_KEY } from "@/config/localStorage";
+import { getTokenData } from "@/onchain/token/utils";
+import { BN_ZERO } from "@/config/constants";
 
 const OPERATION_LABELS = {
   [Operation.Deposit]: /*i18n*/ "Buy GM",
@@ -27,20 +38,23 @@ const MODE_LABELS = {
 };
 
 export default function Inner({
+  marketInfo,
   operation,
-  setOperation,
   mode,
+  tokenOptions,
+  tokensData,
+  setOperation,
   setMode,
-  marketsInfoData,
-  marketAddress,
 }: {
-  operation: Operation
-  setOperation: Dispatch<SetStateAction<Operation>>,
+  marketInfo?: MarketInfo,
+  operation: Operation,
   mode: Mode,
-  setMode: Dispatch<SetStateAction<Mode>>,
-  marketsInfoData?: MarketInfos,
-  marketAddress?: string,
+  tokenOptions: Token[],
+  tokensData?: Tokens,
+  setOperation: (operation: Operation) => void,
+  setMode: (mode: Mode) => void,
 }) {
+  const endpoint = useEndpointName();
   const { i18n } = useLingui();
 
   const { localizedOperationLabels, localizedModeLabels } = useMemo(() => {
@@ -53,6 +67,7 @@ export default function Inner({
   const [firstTokenInputValue, setFirstTokenInputValue] = useSafeState<string>("");
   const [secondTokenInputValue, setSecondTokenInputValue] = useSafeState<string>("");
   const [marketTokenInputValue, setMarketTokenInputValue] = useSafeState<string>("");
+  const [focusedInput, setFocusedInput] = useState<"longCollateral" | "shortCollateral" | "market">("market");
 
   const resetInputs = useCallback(() => {
     setFirstTokenInputValue("");
@@ -68,11 +83,108 @@ export default function Inner({
     [resetInputs, setOperation]
   );
 
-  const marketInfo = getByKey(marketsInfoData, marketAddress);
-  const availableModes = useMemo(() => getGmSwapBoxAvailableModes(operation, marketInfo), [operation, marketInfo]);
+  function onFocusedCollateralInputChange(tokenAddress: string) {
+    if (!marketInfo) {
+      return;
+    }
 
+    if (marketInfo.isSingle) {
+      setFocusedInput("longCollateral");
+      return;
+    }
+
+    if (getTokenPoolType(marketInfo, tokenAddress) === "long") {
+      setFocusedInput("longCollateral");
+    } else {
+      setFocusedInput("shortCollateral");
+    }
+  }
+
+  const availableModes = useMemo(() => getGmSwapBoxAvailableModes(operation, marketInfo), [operation, marketInfo]);
   const isDeposit = operation === Operation.Deposit;
   const isWithdrawal = operation === Operation.Withdrawal;
+  const isSingle = mode === Mode.Single;
+  const isPair = mode === Mode.Pair;
+
+  const [firstTokenAddress, setFirstTokenAddress] = useLocalStorageSerializeKey<string | undefined>(
+    [endpoint, SYNTHETICS_MARKET_DEPOSIT_TOKEN_KEY, isDeposit, marketInfo?.marketTokenAddress.toBase58(), "first"],
+    undefined
+  );
+  const firstToken = getTokenData(tokensData, firstTokenAddress ? new PublicKey(firstTokenAddress) : undefined);
+  const firstTokenAmount = parseValue(firstTokenInputValue, firstToken?.decimals || 0);
+  const firstTokenUsd = convertToUsd(
+    firstTokenAmount,
+    firstToken?.decimals,
+    isDeposit ? firstToken?.prices?.minPrice : firstToken?.prices?.maxPrice
+  );
+
+  const [secondTokenAddress, setSecondTokenAddress] = useLocalStorageSerializeKey<string | undefined>(
+    [endpoint, SYNTHETICS_MARKET_DEPOSIT_TOKEN_KEY, isDeposit, marketInfo?.marketTokenAddress.toBase58(), "second"],
+    undefined
+  );
+
+  const secondToken = getTokenData(tokensData, secondTokenAddress ? new PublicKey(secondTokenAddress) : undefined);
+
+  const secondTokenAmount = parseValue(secondTokenInputValue, secondToken?.decimals || 0);
+  const secondTokenUsd = convertToUsd(
+    secondTokenAmount,
+    secondToken?.decimals,
+    isDeposit ? secondToken?.prices?.minPrice : secondToken?.prices?.maxPrice
+  );
+
+  // Update tokens.
+  useEffect(() => {
+    if (!tokenOptions.length) return;
+
+    if (!tokenOptions.find((token) => token.address.toBase58() === firstTokenAddress)) {
+      setFirstTokenAddress(tokenOptions[0].address.toBase58());
+    }
+
+    if (isSingle && secondTokenAddress && marketInfo && secondTokenAmount?.gt(BN_ZERO)) {
+      const secondTokenPoolType = getTokenPoolType(marketInfo, secondTokenAddress);
+      setFocusedInput(secondTokenPoolType === "long" ? "longCollateral" : "shortCollateral");
+      setSecondTokenAddress("");
+      setSecondTokenInputValue("");
+      return;
+    }
+
+    if (isPair && firstTokenAddress) {
+      if (marketInfo?.isSingle) {
+        if (!secondTokenAddress || firstTokenAddress !== secondTokenAddress) {
+          setSecondTokenAddress(firstTokenAddress);
+        }
+        return;
+      } else if (firstTokenAddress === secondTokenAddress) {
+        setSecondTokenAddress("");
+        setSecondTokenInputValue("");
+        return;
+      }
+
+      if (
+        !secondTokenAddress ||
+        !tokenOptions.find((token) => token.address.toBase58() === secondTokenAddress) ||
+        firstTokenAddress === secondTokenAddress
+      ) {
+        const secondToken = tokenOptions.find((token) => {
+          return (
+            token.address.toBase58() !== firstTokenAddress
+          );
+        });
+        setSecondTokenAddress(secondToken?.address.toBase58());
+      }
+    }
+  }, [
+    tokenOptions,
+    firstTokenAddress,
+    setFirstTokenAddress,
+    isSingle,
+    isPair,
+    marketInfo,
+    secondTokenAddress,
+    setSecondTokenAddress,
+    secondTokenAmount,
+    setSecondTokenInputValue,
+  ]);
 
   return (
     <div className={`App-box GmSwapBox`}>
@@ -97,40 +209,39 @@ export default function Inner({
         method="post"
       >
         <div className={cx("GmSwapBox-form-layout", { reverse: isWithdrawal })}>
-          {/* <BuyInputSection
+          <BuyInputSection
             topLeftLabel={isDeposit ? t`Pay` : t`Receive`}
             topLeftValue={formatUsd(firstTokenUsd)}
-            topRightLabel={t`Balance`}
-            topRightValue={formatTokenAmount(firstToken?.balance, firstToken?.decimals, "", {
-              useCommas: true,
-            })}
+            // topRightLabel={t`Balance`}
+            // topRightValue={formatTokenAmount(firstToken?.balance, firstToken?.decimals, "", {
+            //   useCommas: true,
+            // })}
             preventFocusOnLabelClick="right"
-            {...(isDeposit && {
-              onClickTopRightLabel: onMaxClickFirstToken,
-            })}
-            showMaxButton={
-              isDeposit &&
-              firstToken?.balance?.gt(0) &&
-              !firstTokenAmount?.eq(firstToken.balance) &&
-              (firstToken?.isNative ? minResidualAmount && firstToken?.balance?.gt(minResidualAmount) : true)
-            }
+            // {...(isDeposit && {
+            //   onClickTopRightLabel: onMaxClickFirstToken,
+            // })}
+            // showMaxButton={
+            //   isDeposit &&
+            //   firstToken?.balance?.gt(0) &&
+            //   !firstTokenAmount?.eq(firstToken.balance) &&
+            //   (firstToken?.isNative ? minResidualAmount && firstToken?.balance?.gt(minResidualAmount) : true)
+            // }
             inputValue={firstTokenInputValue}
             onInputValueChange={(e) => {
               if (firstToken) {
                 setFirstTokenInputValue(e.target.value);
-                onFocusedCollateralInputChange(firstToken.address);
+                onFocusedCollateralInputChange(firstToken.address.toBase58());
               }
             }}
-            onClickMax={onMaxClickFirstToken}
+          // onClickMax={onMaxClickFirstToken}
           >
-            {firstTokenAddress && isSingle ? (
+            {firstToken && isSingle ? (
               <TokenSelector
                 label={isDeposit ? t`Pay` : t`Receive`}
-                chainId={chainId}
-                tokenAddress={firstTokenAddress}
-                onSelectToken={(token) => setFirstTokenAddress(token.address)}
+                token={firstToken}
+                onSelectToken={(token) => setFirstTokenAddress(token.address.toBase58())}
                 tokens={tokenOptions}
-                infoTokens={infoTokens}
+                // infoTokens={infoTokens}
                 className="GlpSwap-from-token"
                 showSymbolImage={true}
                 showTokenImgInDropdown={true}
@@ -140,40 +251,40 @@ export default function Inner({
                 <TokenWithIcon symbol={firstToken?.symbol} displaySize={20} />
               </div>
             )}
-          </BuyInputSection> */}
+          </BuyInputSection>
 
-          {/* {isPair && secondTokenAddress && (
+          {isPair && secondToken && (
             <BuyInputSection
               topLeftLabel={isDeposit ? t`Pay` : t`Receive`}
               topLeftValue={formatUsd(secondTokenUsd)}
-              topRightLabel={t`Balance`}
-              topRightValue={formatTokenAmount(secondToken?.balance, secondToken?.decimals, "", {
-                useCommas: true,
-              })}
+              // topRightLabel={t`Balance`}
+              // topRightValue={formatTokenAmount(secondToken?.balance, secondToken?.decimals, "", {
+              //   useCommas: true,
+              // })}
               preventFocusOnLabelClick="right"
               inputValue={secondTokenInputValue}
-              showMaxButton={
-                isDeposit &&
-                secondToken?.balance?.gt(0) &&
-                !secondTokenAmount?.eq(secondToken.balance) &&
-                (secondToken?.isNative ? minResidualAmount && secondToken?.balance?.gt(minResidualAmount) : true)
-              }
+              // showMaxButton={
+              //   isDeposit &&
+              //   secondToken?.balance?.gt(0) &&
+              //   !secondTokenAmount?.eq(secondToken.balance) &&
+              //   (secondToken?.isNative ? minResidualAmount && secondToken?.balance?.gt(minResidualAmount) : true)
+              // }
               onInputValueChange={(e) => {
                 if (secondToken) {
                   setSecondTokenInputValue(e.target.value);
-                  onFocusedCollateralInputChange(secondToken.address);
+                  onFocusedCollateralInputChange(secondToken.address.toBase58());
                 }
               }}
-              {...(isDeposit && {
-                onClickTopRightLabel: onMaxClickSecondToken,
-              })}
-              onClickMax={onMaxClickSecondToken}
+            // {...(isDeposit && {
+            //   onClickTopRightLabel: onMaxClickSecondToken,
+            // })}
+            // onClickMax={onMaxClickSecondToken}
             >
               <div className="selected-token">
                 <TokenWithIcon symbol={secondToken?.symbol} displaySize={20} />
               </div>
             </BuyInputSection>
-          )} */}
+          )}
 
           {/* <div className="AppOrder-ball-container" onClick={onSwitchSide}>
             <div className="AppOrder-ball">
