@@ -13,6 +13,8 @@ import { t, Trans } from "@lingui/macro";
 import "./GmSwapBox.scss";
 import { formatUsd } from "@/components/MarketsList/utils";
 import { formatTokenAmount } from "@/utils/number";
+import Button from "@/components/Button/Button";
+import { Form } from "react-router-dom";
 
 const OPERATION_LABELS = {
   [Operation.Deposit]: /*i18n*/ "Buy GM",
@@ -91,14 +93,11 @@ export default function Inner({
         onChange={setMode}
       />
 
-      {/* <form
-      // onSubmit={(e) => {
-      //   e.preventDefault();
-      //   submitState.onSubmit();
-      // }}
+      <Form
+        method="post"
       >
         <div className={cx("GmSwapBox-form-layout", { reverse: isWithdrawal })}>
-          <BuyInputSection
+          {/* <BuyInputSection
             topLeftLabel={isDeposit ? t`Pay` : t`Receive`}
             topLeftValue={formatUsd(firstTokenUsd)}
             topRightLabel={t`Balance`}
@@ -141,9 +140,9 @@ export default function Inner({
                 <TokenWithIcon symbol={firstToken?.symbol} displaySize={20} />
               </div>
             )}
-          </BuyInputSection>
+          </BuyInputSection> */}
 
-          {isPair && secondTokenAddress && (
+          {/* {isPair && secondTokenAddress && (
             <BuyInputSection
               topLeftLabel={isDeposit ? t`Pay` : t`Receive`}
               topLeftValue={formatUsd(secondTokenUsd)}
@@ -174,15 +173,15 @@ export default function Inner({
                 <TokenWithIcon symbol={secondToken?.symbol} displaySize={20} />
               </div>
             </BuyInputSection>
-          )}
+          )} */}
 
-          <div className="AppOrder-ball-container" onClick={onSwitchSide}>
+          {/* <div className="AppOrder-ball-container" onClick={onSwitchSide}>
             <div className="AppOrder-ball">
               <IoMdSwap className="Exchange-swap-ball-icon" />
             </div>
-          </div>
+          </div> */}
 
-          <BuyInputSection
+          {/* <BuyInputSection
             topLeftLabel={isWithdrawal ? t`Pay` : t`Receive`}
             topLeftValue={marketTokenUsd?.gt(0) ? formatUsd(marketTokenUsd) : ""}
             topRightLabel={t`Balance`}
@@ -232,10 +231,10 @@ export default function Inner({
                 showMarketToast(marketInfo);
               }}
             />
-          </BuyInputSection>
+          </BuyInputSection> */}
         </div>
 
-        <ExchangeInfo className="GmSwapBox-info-section" dividerClassName="App-card-divider">
+        {/* <ExchangeInfo className="GmSwapBox-info-section" dividerClassName="App-card-divider">
           <ExchangeInfo.Group>
             <ExchangeInfoRow
               className="SwapBox-info-row"
@@ -297,43 +296,43 @@ export default function Inner({
               </Checkbox>
             </ExchangeInfo.Group>
           )}
-        </ExchangeInfo>
+        </ExchangeInfo> */}
 
         <div className="Exchange-swap-button-container">
           <Button
+            type="submit"
             className="w-full"
             variant="primary-action"
-            onClick={submitState.onSubmit}
-            disabled={submitState.isDisabled}
+          // onClick={submitState.onSubmit}
+          // disabled={submitState.isDisabled}
           >
-            {submitState.text}
+            {isDeposit ? t`Buy GM` : t`Sell GM`}
           </Button>
         </div>
-      </form> */}
-      {/* 
-      <GmConfirmationBox
-        isVisible={stage === "confirmation"}
-        marketToken={marketToken!}
-        longToken={longTokenInputState?.token}
-        shortToken={shortTokenInputState?.token}
-        marketTokenAmount={amounts?.marketTokenAmount ?? BigNumber.from(0)}
-        marketTokenUsd={amounts?.marketTokenUsd ?? BigNumber.from(0)}
-        longTokenAmount={amounts?.longTokenAmount}
-        longTokenUsd={amounts?.longTokenUsd}
-        shortTokenAmount={amounts?.shortTokenAmount}
-        shortTokenUsd={amounts?.shortTokenUsd}
-        fees={fees!}
-        error={submitState.error}
-        isDeposit={isDeposit}
-        executionFee={executionFee}
-        onSubmitted={() => {
-          setStage("swap");
-        }}
-        onClose={() => {
-          setStage("swap");
-        }}
-        shouldDisableValidation={shouldDisableValidationForTesting}
-      /> */}
+        {/* <GmConfirmationBox
+          isVisible={stage === "confirmation"}
+          marketToken={marketToken!}
+          longToken={longTokenInputState?.token}
+          shortToken={shortTokenInputState?.token}
+          marketTokenAmount={amounts?.marketTokenAmount ?? BigNumber.from(0)}
+          marketTokenUsd={amounts?.marketTokenUsd ?? BigNumber.from(0)}
+          longTokenAmount={amounts?.longTokenAmount}
+          longTokenUsd={amounts?.longTokenUsd}
+          shortTokenAmount={amounts?.shortTokenAmount}
+          shortTokenUsd={amounts?.shortTokenUsd}
+          fees={fees!}
+          error={submitState.error}
+          isDeposit={isDeposit}
+          executionFee={executionFee}
+          onSubmitted={() => {
+            setStage("swap");
+          }}
+          onClose={() => {
+            setStage("swap");
+          }}
+          shouldDisableValidation={shouldDisableValidationForTesting}
+        /> */}
+      </Form>
     </div>
   );
 }

@@ -12,6 +12,7 @@ import Exchange from './routes/Exchange';
 import { OnChainProvider } from './onchain';
 import { StateProvider } from './contexts/state';
 import { earnLoader } from './routes/loaders';
+import { action as gmAction } from "@/components/GmSwap/GmSwapBox/action";
 
 const router = createBrowserRouter([
   {
@@ -30,6 +31,7 @@ const router = createBrowserRouter([
         path: "earn",
         element: <Earn />,
         loader: earnLoader,
+        action: gmAction,
       },
       {
         path: "trade",
