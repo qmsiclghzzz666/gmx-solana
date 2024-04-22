@@ -44,8 +44,16 @@ export const useDeployedMarketInfos = () => {
       const shortToken = tokens[market.shortTokenAddress.toBase58()];
 
       if (indexToken && longToken && shortToken) {
+        const indexName = getMarketIndexName({
+          indexToken,
+          isSpotOnly: market.isSpotOnly,
+        });
+        const poolName = getMarketPoolName({
+          longToken, shortToken
+        });
         infos[key] = {
           ...market,
+          name: `${indexName}[${poolName}]`,
           indexToken,
           longToken,
           shortToken,
@@ -54,13 +62,11 @@ export const useDeployedMarketInfos = () => {
         const marketToken = marketTokenMetadatas[key];
 
         if (marketToken) {
-          const indexName = getMarketIndexName(infos[key]);
-          const poolName = getMarketPoolName(infos[key]);
           const stat = info2Stat(infos[key]);
           const unit = getUnit(marketToken.decimals);
           const price = marketToken.totalSupply && !marketToken.totalSupply.isZero() ? stat.poolValueUsd.mul(unit).div(marketToken.totalSupply) : ONE_USD;
           marketTokens[key] = {
-            symbol: `GM:${indexName}(${poolName})`,
+            symbol: `GM`,
             address: market.marketTokenAddress,
             ...marketToken,
             prices: {

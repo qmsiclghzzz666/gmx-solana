@@ -25,7 +25,9 @@ export interface MarketState {
 
 export type MarketData = Market & MarketState;
 
-export type MarketInfo = MarketData & MarketTokens;
+export type MarketInfo = MarketData & MarketTokens & {
+  name: string,
+};
 
 export interface Markets {
   [marketTokenAddress: string]: MarketData;

@@ -84,6 +84,7 @@ export function GmList({
 
 function DesktopList({
   hideTitle,
+  daysConsidered,
   sortedMarketsByIndexToken,
   marketsInfoData,
   tokensData,
@@ -136,7 +137,7 @@ function DesktopList({
                 label={t`WALLET`}
               />
             </th> */}
-            {/* <th>
+            <th>
               <Tooltip
                 handle={t`APR`}
                 className="text-none"
@@ -152,7 +153,7 @@ function DesktopList({
                   </p>
                 )}
               />
-            </th> */}
+            </th>
 
             <th></th>
           </tr>
@@ -241,9 +242,10 @@ function DesktopList({
                     />
                   </td> */}
 
-                  {/* <td>
-                    <AprInfo apr={apr} incentiveApr={incentiveApr} isIncentiveActive={isLpIncentiveActive} />
-                  </td> */}
+                  <td>
+                    {/* <AprInfo apr={apr} incentiveApr={incentiveApr} isIncentiveActive={isLpIncentiveActive} /> */}
+                    Unavailable
+                  </td>
 
                   <td className="GmList-actions">
                     <Button
@@ -405,14 +407,15 @@ function MobileList(
                     />
                   </div>
                 </div> */}
-                {/* <div className="App-card-row">
+                <div className="App-card-row">
                   <div className="label">
                     <Trans>APR</Trans>
                   </div>
                   <div>
-                    <AprInfo apr={apr} incentiveApr={incentiveApr} isIncentiveActive={isLpIncentiveActive} />
+                    {/* <AprInfo apr={apr} incentiveApr={incentiveApr} isIncentiveActive={isLpIncentiveActive} /> */}
+                    Unavailable
                   </div>
-                </div> */}
+                </div>
 
                 <div className="App-card-divider"></div>
                 <div className="App-card-buttons m-0" onClick={buySellActionHandler}>

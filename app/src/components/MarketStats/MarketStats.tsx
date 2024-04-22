@@ -10,6 +10,7 @@ import StatsTooltipRow from "../StatsTooltipRow/StatsTooltipRow";
 import { BN_ZERO } from "@/config/constants";
 import { getPoolUsdWithoutPnl, getSellableMarketToken } from "@/onchain/market/utils";
 import { convertToTokenAmount, getMidPrice } from "@/onchain/token/utils";
+import MarketTokenSelector from "../MarketTokenSelector/MarketTokenSelector";
 
 type Props = {
   marketsInfoData?: MarketInfos;
@@ -24,10 +25,10 @@ export function MarketStats(p: Props) {
   const {
     marketInfo,
     marketToken,
-    // marketsTokensAPRData,
-    // marketsInfoData,
-    // marketTokensData,
-    // marketsTokensIncentiveAprData,
+    marketsTokensAPRData,
+    marketsInfoData,
+    marketTokensData,
+    marketsTokensIncentiveAprData,
   } = p;
   const marketPrice = marketToken ? getMidPrice(marketToken.prices) : undefined;
   // const marketBalance = marketToken?.balance;
@@ -126,13 +127,13 @@ export function MarketStats(p: Props) {
 
   return (
     <div className="App-card MarketStats-card">
-      {/* <MarketTokenSelector
+      <MarketTokenSelector
         marketTokensData={marketTokensData}
         marketsInfoData={marketsInfoData}
         marketsTokensAPRData={marketsTokensAPRData}
         marketsTokensIncentiveAprData={marketsTokensIncentiveAprData}
         currentMarketInfo={marketInfo}
-      /> */}
+      />
       <div className="App-card-divider" />
       <div className="App-card-content">
         <CardRow
@@ -179,10 +180,11 @@ export function MarketStats(p: Props) {
           )}
         /> */}
 
-        {/* <CardRow
+        <CardRow
           label={t`APR`}
-          value={<AprInfo apr={apr} incentiveApr={incentiveApr} isIncentiveActive={isLpIncentiveActive} />}
-        /> */}
+          // value={<AprInfo apr={apr} incentiveApr={incentiveApr} isIncentiveActive={isLpIncentiveActive} />}
+          value="Unavailable"
+        />
 
         <CardRow
           label={t`Total Supply`}
@@ -195,64 +197,65 @@ export function MarketStats(p: Props) {
           }
         />
 
-        {/* <CardRow
+        <CardRow
           label={t`Buyable`}
           value={
-            mintableInfo && marketTotalSupplyUsd && marketToken ? (
-              <Tooltip
-                maxAllowedWidth={350}
-                handle={formatTokenAmountWithUsd(
-                  mintableInfo.mintableAmount,
-                  mintableInfo.mintableUsd,
-                  "GM",
-                  marketToken?.decimals,
-                  {
-                    displayDecimals: 0,
-                  }
-                )}
-                position="bottom-end"
-                renderContent={() => {
-                  return (
-                    <div>
-                      {marketInfo?.isSameCollaterals ? (
-                        <Trans>
-                          {marketInfo?.longToken.symbol} can be used to buy GM for this market up to the specified
-                          buying caps.
-                        </Trans>
-                      ) : (
-                        <Trans>
-                          {marketInfo?.longToken.symbol} and {marketInfo?.shortToken.symbol} can be used to buy GM for
-                          this market up to the specified buying caps.
-                        </Trans>
-                      )}
+            // mintableInfo && marketTotalSupplyUsd && marketToken ? (
+            //   <Tooltip
+            //     maxAllowedWidth={350}
+            //     handle={formatTokenAmountWithUsd(
+            //       mintableInfo.mintableAmount,
+            //       mintableInfo.mintableUsd,
+            //       "GM",
+            //       marketToken?.decimals,
+            //       {
+            //         displayDecimals: 0,
+            //       }
+            //     )}
+            //     position="bottom-end"
+            //     renderContent={() => {
+            //       return (
+            //         <div>
+            //           {marketInfo?.isSameCollaterals ? (
+            //             <Trans>
+            //               {marketInfo?.longToken.symbol} can be used to buy GM for this market up to the specified
+            //               buying caps.
+            //             </Trans>
+            //           ) : (
+            //             <Trans>
+            //               {marketInfo?.longToken.symbol} and {marketInfo?.shortToken.symbol} can be used to buy GM for
+            //               this market up to the specified buying caps.
+            //             </Trans>
+            //           )}
 
-                      <br />
-                      <br />
+            //           <br />
+            //           <br />
 
-                      <StatsTooltipRow
-                        label={t`Max ${marketInfo?.longToken.symbol}`}
-                        value={maxLongTokenValue}
-                        showDollar={false}
-                      />
+            //           <StatsTooltipRow
+            //             label={t`Max ${marketInfo?.longToken.symbol}`}
+            //             value={maxLongTokenValue}
+            //             showDollar={false}
+            //           />
 
-                      <br />
+            //           <br />
 
-                      {!marketInfo?.isSameCollaterals && (
-                        <StatsTooltipRow
-                          label={t`Max ${marketInfo?.shortToken.symbol}`}
-                          value={maxShortTokenValue}
-                          showDollar={false}
-                        />
-                      )}
-                    </div>
-                  );
-                }}
-              />
-            ) : (
-              "..."
-            )
+            //           {!marketInfo?.isSameCollaterals && (
+            //             <StatsTooltipRow
+            //               label={t`Max ${marketInfo?.shortToken.symbol}`}
+            //               value={maxShortTokenValue}
+            //               showDollar={false}
+            //             />
+            //           )}
+            //         </div>
+            //       );
+            //     }}
+            //   />
+            // ) : (
+            //   "..."
+            // )
+            "Unlimited (dev only)"
           }
-        /> */}
+        />
 
         <CardRow
           label={t`Sellable`}
