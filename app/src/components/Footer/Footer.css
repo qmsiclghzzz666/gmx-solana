@@ -1,8 +1,7 @@
 .Footer-wrapper {
   text-align: center;
   padding-top: 4rem;
-  /* background: #16182e; */
-  background: #000000;
+  background: #16182e;
   width: 100vw;
   position: absolute;
   transform: translateX(-50%);
@@ -20,8 +19,7 @@
 }
 
 .Footer-logo img {
-  /* height: 2.65rem; */
-  height: 12rem;
+  height: 3.65rem;
 }
 
 .Footer-social-link-block {

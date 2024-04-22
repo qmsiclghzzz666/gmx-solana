@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 import { HeaderLink } from "./HeaderLink";
 import "./Header.scss";
 import ExternalLink from "@/components/ExternalLink/ExternalLink";
-import logoImg from "@/img/logo_GMSOL.png";
+import logoImg from "@/img/logo_GMSOL.svg";
 
 interface Props {
   small?: boolean;
