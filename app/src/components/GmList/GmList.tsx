@@ -251,7 +251,7 @@ function DesktopList({
                     <Button
                       className="GmList-action"
                       variant="secondary"
-                      to={`/earn/?market=${market.marketTokenAddress.toBase58()}&operation=buy&scroll=${shouldScrollToTop ? "1" : "0"
+                      to={`/earn/?market=${market.marketTokenAddress.toBase58()}&operation=deposit&scroll=${shouldScrollToTop ? "1" : "0"
                         }`}
                     >
                       <Trans>Buy</Trans>
@@ -259,7 +259,7 @@ function DesktopList({
                     <Button
                       className="GmList-action GmList-last-action"
                       variant="secondary"
-                      to={`/earn/?market=${market.marketTokenAddress.toBase58()}&operation=sell&scroll=${shouldScrollToTop ? "1" : "0"
+                      to={`/earn/?market=${market.marketTokenAddress.toBase58()}&operation=withdrawal&scroll=${shouldScrollToTop ? "1" : "0"
                         }`}
                     >
                       <Trans>Sell</Trans>
@@ -421,13 +421,13 @@ function MobileList(
                 <div className="App-card-buttons m-0" onClick={buySellActionHandler}>
                   <Button
                     variant="secondary"
-                    to={`/earn/?market=${market.marketTokenAddress.toBase58()}&operation=buy&scroll=0`}
+                    to={`/earn/?market=${market.marketTokenAddress.toBase58()}&operation=deposit&scroll=0`}
                   >
                     <Trans>Buy</Trans>
                   </Button>
                   <Button
                     variant="secondary"
-                    to={`/earn/?market=${market.marketTokenAddress.toBase58()}&operation=sell&scroll=0`}
+                    to={`/earn/?market=${market.marketTokenAddress.toBase58()}&operation=withdrawal&scroll=0`}
                   >
                     <Trans>Sell</Trans>
                   </Button>

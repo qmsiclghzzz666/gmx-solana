@@ -1,3 +1,3 @@
-import { PublicKey } from "@solana/web3.js";
+import { NATIVE_MINT } from "@solana/spl-token";
 
-export const NATIVE_TOKEN_ADDRESS = PublicKey.default;
+export const NATIVE_TOKEN_ADDRESS = NATIVE_MINT;

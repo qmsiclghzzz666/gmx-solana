@@ -11,6 +11,7 @@ import Dashboard from './routes/Dashboard';
 import Exchange from './routes/Exchange';
 import { OnChainProvider } from './onchain';
 import { StateProvider } from './contexts/state';
+import { earnLoader } from './routes/loaders';
 
 const router = createBrowserRouter([
   {
@@ -28,12 +29,7 @@ const router = createBrowserRouter([
       {
         path: "earn",
         element: <Earn />,
-        loader: ({ request }) => {
-          const url = new URL(request.url);
-          return {
-            market: url.searchParams.get("market"),
-          };
-        },
+        loader: earnLoader,
       },
       {
         path: "trade",

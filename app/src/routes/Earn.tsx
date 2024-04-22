@@ -7,10 +7,20 @@ import { useStateSelector } from "@/contexts/state";
 import { MarketStats } from "@/components/MarketStats/MarketStats";
 import { getByKey } from "@/utils/objects";
 import { getTokenData } from "@/onchain/token/utils";
-import { useLoaderData } from "react-router-dom";
+import { useLoaderData, useSearchParams } from "react-router-dom";
 import { PublicKey } from "@solana/web3.js";
+import { useCallback, useEffect, useRef } from "react";
+import { GmSwapBox } from "@/components/GmSwap/GmSwapBox/GmSwapBox";
+import { Mode, Operation, getGmSwapBoxAvailableModes } from "@/components/GmSwap/GmSwapBox/utils";
 
 export default function Earn() {
+  const gmSwapBoxRef = useRef<HTMLDivElement>(null);
+
+  function buySellActionHandler() {
+    gmSwapBoxRef?.current?.scrollIntoView();
+    window.scrollBy(0, -25); // add some offset
+  }
+
   const { marketInfos, tokens, marketTokens } = useStateSelector(state => {
     return {
       marketInfos: state.marketInfos,
@@ -19,7 +29,11 @@ export default function Earn() {
     };
   });
 
-  const { market } = useLoaderData() as { market: string | null };
+  const { market, operation, mode } = useLoaderData() as {
+    market: string | null,
+    operation: Operation,
+    mode: Mode,
+  };
 
   const selectedMarketKey = market ?? Object.keys(marketInfos)[0];
 
@@ -29,6 +43,38 @@ export default function Earn() {
     marketTokens,
     selectedMarketKey ? new PublicKey(selectedMarketKey) : undefined,
   );
+
+  const setSearchParams = useSearchParams()[1];
+
+  const setSelectedMarketKey = useCallback((address: string) => {
+    setSearchParams((params) => {
+      params.set("market", address);
+      return params;
+    });
+  }, [setSearchParams]);
+
+  const setMode = useCallback((mode: Mode) => {
+    setSearchParams((params) => {
+      params.set("mode", mode.toLowerCase());
+      return params;
+    });
+  }, [setSearchParams]);
+
+  const setOperation = useCallback((operation: Operation) => {
+    setSearchParams((params) => {
+      params.set("operation", operation.toLowerCase());
+      return params;
+    });
+  }, [setSearchParams]);
+
+  // Repair mode if it is incorrect.
+  useEffect(() => {
+    const newAvailableModes = getGmSwapBoxAvailableModes(operation, getByKey(marketInfos, selectedMarketKey));
+
+    if (!newAvailableModes.includes(mode)) {
+      setMode(newAvailableModes[0]);
+    }
+  }, [marketInfos, mode, setMode, operation, selectedMarketKey]);
 
   return (
     <div className="default-container page-layout">
@@ -54,19 +100,19 @@ export default function Earn() {
           marketToken={marketToken}
         />
 
-        {/* <div className="MarketPoolsPage-swap-box" ref={gmSwapBoxRef}>
+        <div className="MarketPoolsPage-swap-box" ref={gmSwapBoxRef}>
           <GmSwapBox
             selectedMarketAddress={selectedMarketKey}
-            markets={markets}
-            marketsInfoData={marketsInfoData}
-            tokensData={tokensData}
+            markets={[]}
+            marketsInfoData={marketInfos}
+            tokensData={tokens}
             onSelectMarket={setSelectedMarketKey}
             operation={operation}
             mode={mode}
             setMode={setMode}
             setOperation={setOperation}
           />
-        </div> */}
+        </div>
       </div>
 
       <div className="Tab-title-section">
@@ -80,7 +126,7 @@ export default function Earn() {
         marketTokensData={marketTokens}
         marketsInfoData={marketInfos}
         tokensData={tokens}
-        // buySellActionHandler={buySellActionHandler}
+        buySellActionHandler={buySellActionHandler}
         shouldScrollToTop={true}
       />
 
