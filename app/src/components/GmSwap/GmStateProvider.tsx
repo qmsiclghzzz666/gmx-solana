@@ -1,54 +1,114 @@
 import { MarketInfo } from "@/onchain/market";
-import { TokenData } from "@/onchain/token";
-import { Dispatch, ReactNode, createContext } from "react";
+import { TokenData, Tokens } from "@/onchain/token";
+import React, { Dispatch, ReactNode, useMemo } from "react";
 import { useImmerReducer } from "use-immer";
+import { createContext } from "use-context-selector";
+import { Operation } from "./utils";
+import { useStateSelector } from "@/contexts/state";
+import { getTokenData } from "@/onchain/token/utils";
+import { useSortedPoolsWithIndexToken } from "@/hooks";
 
 export const GmStateContext = createContext<GmState | null>(null);
-export const GmStateUpdaterContext = createContext<Dispatch<Action> | null>(null);
-
-interface Ctx {
-  isDeposit: boolean,
-}
+export const GmStateDispatchContext = React.createContext<Dispatch<Action> | null>(null);
 
 export default function GmStateProvider({
   children,
   market,
+  operation,
   firstToken,
   secondToken,
-}: Ctx & {
+}: {
   children: ReactNode,
   market: MarketInfo,
+  operation: Operation,
   firstToken?: TokenData,
   secondToken?: TokenData,
 }) {
-  const [state, dispath] = useImmerReducer(stateReducer, {
-    market,
-    firstToken,
-    secondToken,
+  const [input, dispath] = useImmerReducer(stateReducer, {
+    firstTokenInputValue: "",
+    secondTokenInputValue: "",
+    marketTokenInputValue: "",
   });
+
+  const { marketTokens, marketInfos } = useStateSelector(({ marketTokens, marketInfos }) => {
+    return {
+      marketTokens,
+      marketInfos,
+    }
+  });
+
+  const marketToken = getTokenData(marketTokens, market.marketTokenAddress);
+  const { marketsInfo: sortedMarketsInfoByIndexToken } = useSortedPoolsWithIndexToken(
+    marketInfos,
+    marketTokens
+  );
+
+  const state = useMemo(() => {
+    return {
+      input,
+      market,
+      operation,
+      firstToken,
+      secondToken,
+      marketToken,
+      marketTokens,
+      sortedMarketsInfoByIndexToken,
+    };
+  }, [firstToken, input, market, marketToken, marketTokens, operation, secondToken, sortedMarketsInfoByIndexToken]);
 
   return (
     <GmStateContext.Provider value={state}>
-      <GmStateUpdaterContext.Provider value={dispath}>
+      <GmStateDispatchContext.Provider value={dispath}>
         {children}
-      </GmStateUpdaterContext.Provider>
+      </GmStateDispatchContext.Provider>
     </GmStateContext.Provider>
   );
 }
 
-interface GmState {
+export interface GmState {
   market: MarketInfo,
+  operation: Operation,
   firstToken?: TokenData,
   secondToken?: TokenData,
+  marketToken?: TokenData,
+  marketTokens?: Tokens,
+  sortedMarketsInfoByIndexToken: MarketInfo[],
+  input: InputState,
 }
 
-interface Action {
-  type: "update-first-token-amount",
+interface InputState {
+  firstTokenInputValue: string,
+  secondTokenInputValue: string,
+  marketTokenInputValue: string,
 }
 
-const stateReducer = (state: GmState, action: Action) => {
+export interface Action {
+  type:
+  "reset"
+  | "set-first-token-input-value"
+  | "set-second-token-input-value"
+  | "set-market-token-input-value",
+  value?: string,
+}
+
+const stateReducer = (state: InputState, action: Action) => {
   switch (action.type) {
-    case 'update-first-token-amount': {
+    case 'reset': {
+      state.firstTokenInputValue = "";
+      state.secondTokenInputValue = "";
+      state.marketTokenInputValue = "";
+      break;
+    }
+    case "set-first-token-input-value": {
+      state.firstTokenInputValue = action.value ?? "";
+      break;
+    }
+    case "set-second-token-input-value": {
+      state.secondTokenInputValue = action.value ?? "";
+      break;
+    }
+    case "set-market-token-input-value": {
+      state.marketTokenInputValue = action.value ?? "";
       break;
     }
   }

@@ -1,17 +1,14 @@
 import Tab from "@/components/Tab/Tab";
-import { Mode, Operation, getGmSwapBoxAvailableModes, useTokenOptions } from "../utils";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Mode, Operation, TokenOptions, getGmSwapBoxAvailableModes } from "../utils";
+import { useCallback, useMemo, useState } from "react";
 import { useLingui } from "@lingui/react";
 import { mapValues } from "lodash";
-import { useSafeState } from "@/utils/state";
 import { MarketInfo } from "@/onchain/market";
-import { PublicKey } from "@solana/web3.js";
 import cx from "classnames";
 import { t } from "@lingui/macro";
 
 import "./GmSwapBox.scss";
 import { formatUsd, getMarketIndexName } from "@/components/MarketsList/utils";
-import { convertToUsd, parseValue } from "@/utils/number";
 import Button from "@/components/Button/Button";
 import BuyInputSection from "@/components/BuyInputSection/BuyInputSection";
 import { Token, Tokens } from "@/onchain/token";
@@ -19,13 +16,12 @@ import { getTokenPoolType } from "@/onchain/market/utils";
 import TokenWithIcon from "@/components/TokenIcon/TokenWithIcon";
 import TokenSelector from "@/components/TokenSelector/TokenSelector";
 import { useLocalStorageSerializeKey } from "@/utils/localStorage";
-import { SYNTHETICS_MARKET_DEPOSIT_TOKEN_KEY, getSyntheticsDepositIndexTokenKey } from "@/config/localStorage";
-import { getTokenData } from "@/onchain/token/utils";
+import { getSyntheticsDepositIndexTokenKey } from "@/config/localStorage";
 import { BN_ZERO } from "@/config/constants";
 import { IoMdSwap } from "react-icons/io";
 import { PoolSelector } from "@/components/MarketSelector/PoolSelector";
-import { useStateSelector } from "@/contexts/state";
-import { useSortedPoolsWithIndexToken } from "@/hooks";
+import { useGmInputDisplay, useGmStateDispath, useGmStateSelector, useTokenOptionsFromStorage } from "../hooks";
+import GmStateProvider from "../GmStateProvider";
 
 const OPERATION_LABELS = {
   [Operation.Deposit]: /*i18n*/ "Buy GM",
@@ -56,6 +52,56 @@ export default function Inner({
   setMode: (mode: Mode) => void,
   onSelectMarket: (marketAddress: string) => void,
 }) {
+  const [tokenOptions, setTokenAddress] = useTokenOptionsFromStorage({
+    genesisHash,
+    marketInfo,
+    operation,
+    mode,
+    tokensData,
+  });
+
+  return (
+    <GmStateProvider
+      market={marketInfo}
+      operation={operation}
+      firstToken={tokenOptions.firstToken}
+      secondToken={tokenOptions.secondToken}
+    >
+      <GmForm
+        genesisHash={genesisHash}
+        operation={operation}
+        mode={mode}
+        tokenOptions={tokenOptions}
+        setOperation={setOperation}
+        setMode={setMode}
+        onSelectMarket={onSelectMarket}
+        onSelectFirstToken={(token) => {
+          setTokenAddress(token.address, "first");
+        }}
+      />
+    </GmStateProvider>
+  );
+}
+
+function GmForm({
+  genesisHash,
+  operation,
+  mode,
+  tokenOptions: { tokenOptions, firstToken, secondToken },
+  setOperation,
+  setMode,
+  onSelectMarket,
+  onSelectFirstToken,
+}: {
+  genesisHash: string,
+  operation: Operation,
+  mode: Mode,
+  tokenOptions: TokenOptions,
+  setOperation: (operation: Operation) => void,
+  setMode: (mode: Mode) => void,
+  onSelectMarket: (marketAddress: string) => void,
+  onSelectFirstToken: (token: Token) => void,
+}) {
   const { i18n } = useLingui();
 
   const { localizedOperationLabels, localizedModeLabels } = useMemo(() => {
@@ -65,24 +111,28 @@ export default function Inner({
     };
   }, [i18n]);
 
-  const [{ tokenOptions, firstToken, secondToken }, setTokenAddress] = useTokenOptions({
-    genesisHash,
-    marketInfo,
-    operation,
-    mode,
-    tokensData,
-  });
+  const dispatch = useGmStateDispath();
 
-  const [firstTokenInputValue, setFirstTokenInputValue] = useSafeState<string>("");
-  const [secondTokenInputValue, setSecondTokenInputValue] = useSafeState<string>("");
-  const [marketTokenInputValue, setMarketTokenInputValue] = useSafeState<string>("");
+  const {
+    inputState,
+    marketInfo,
+    marketTokens,
+    sortedMarketsInfoByIndexToken
+  } = useGmStateSelector(s => {
+    return {
+      inputState: s.input,
+      marketInfo: s.market,
+      marketTokens: s.marketTokens,
+      sortedMarketsInfoByIndexToken: s.sortedMarketsInfoByIndexToken,
+    }
+  });
+  const { firstTokenUsd, secondTokenUsd, marketTokenUsd } = useGmInputDisplay();
+
   const [focusedInput, setFocusedInput] = useState<"longCollateral" | "shortCollateral" | "market">("market");
 
   const resetInputs = useCallback(() => {
-    setFirstTokenInputValue("");
-    setSecondTokenInputValue("");
-    setMarketTokenInputValue("");
-  }, [setFirstTokenInputValue, setMarketTokenInputValue, setSecondTokenInputValue]);
+    dispatch({ "type": "reset" });
+  }, [dispatch]);
 
   const onOperationChange = useCallback(
     (operation: Operation) => {
@@ -129,39 +179,9 @@ export default function Inner({
   const isSingle = mode === Mode.Single;
   const isPair = mode === Mode.Pair;
 
-  const firstTokenAmount = parseValue(firstTokenInputValue, firstToken?.decimals || 0);
-  const firstTokenUsd = convertToUsd(
-    firstTokenAmount,
-    firstToken?.decimals,
-    isDeposit ? firstToken?.prices?.minPrice : firstToken?.prices?.maxPrice
-  );
-
-  const secondTokenAmount = parseValue(secondTokenInputValue, secondToken?.decimals || 0);
-  const secondTokenUsd = convertToUsd(
-    secondTokenAmount,
-    secondToken?.decimals,
-    isDeposit ? secondToken?.prices?.minPrice : secondToken?.prices?.maxPrice
-  );
-
   const [indexName, setIndexName] = useLocalStorageSerializeKey<string>(
     getSyntheticsDepositIndexTokenKey(genesisHash),
     ""
-  );
-
-  const { marketTokens, marketInfos } = useStateSelector((s) => {
-    return s;
-  });
-  const marketToken = getTokenData(marketTokens, marketInfo.marketTokenAddress);
-  const marketTokenAmount = parseValue(marketTokenInputValue || "0", marketToken?.decimals || 0)!;
-  const marketTokenUsd = convertToUsd(
-    marketTokenAmount,
-    marketToken?.decimals,
-    isDeposit ? marketToken?.prices?.maxPrice : marketToken?.prices?.minPrice
-  )!;
-
-  const { marketsInfo: sortedMarketsInfoByIndexToken } = useSortedPoolsWithIndexToken(
-    marketInfos,
-    marketTokens
   );
 
   return (
@@ -206,10 +226,11 @@ export default function Inner({
             //   !firstTokenAmount?.eq(firstToken.balance) &&
             //   (firstToken?.isNative ? minResidualAmount && firstToken?.balance?.gt(minResidualAmount) : true)
             // }
-            inputValue={firstTokenInputValue}
+            inputValue={inputState.firstTokenInputValue}
             onInputValueChange={(e) => {
               if (firstToken) {
-                setFirstTokenInputValue(e.target.value);
+                // setFirstTokenInputValue(e.target.value);
+                dispatch({ type: "set-first-token-input-value", value: e.target.value });
                 onFocusedCollateralInputChange(firstToken.address.toBase58());
               }
             }}
@@ -219,7 +240,7 @@ export default function Inner({
               <TokenSelector
                 label={isDeposit ? t`Pay` : t`Receive`}
                 token={firstToken}
-                onSelectToken={(token) => setTokenAddress(token.address, "first")}
+                onSelectToken={onSelectFirstToken}
                 tokens={tokenOptions}
                 // infoTokens={infoTokens}
                 className="GlpSwap-from-token"
@@ -242,7 +263,7 @@ export default function Inner({
               //   useCommas: true,
               // })}
               preventFocusOnLabelClick="right"
-              inputValue={secondTokenInputValue}
+              inputValue={inputState.secondTokenInputValue}
               // showMaxButton={
               //   isDeposit &&
               //   secondToken?.balance?.gt(0) &&
@@ -251,7 +272,7 @@ export default function Inner({
               // }
               onInputValueChange={(e) => {
                 if (secondToken) {
-                  setSecondTokenInputValue(e.target.value);
+                  dispatch({ type: "set-second-token-input-value", value: e.target.value });
                   onFocusedCollateralInputChange(secondToken.address.toBase58());
                 }
               }}
@@ -281,9 +302,9 @@ export default function Inner({
             // })}
             preventFocusOnLabelClick="right"
             // showMaxButton={isWithdrawal && marketToken?.balance?.gt(0) && !marketTokenAmount?.eq(marketToken.balance)}
-            inputValue={marketTokenInputValue}
+            inputValue={inputState.marketTokenInputValue}
             onInputValueChange={(e) => {
-              setMarketTokenInputValue(e.target.value);
+              dispatch({ type: "set-market-token-input-value", value: e.target.value });
               setFocusedInput("market");
             }}
           // {...(isWithdrawal && {
