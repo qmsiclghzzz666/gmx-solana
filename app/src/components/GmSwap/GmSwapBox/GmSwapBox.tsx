@@ -4,6 +4,7 @@ import { Tokens } from "@/onchain/token";
 import { Mode, Operation } from "./utils";
 import { getByKey } from "@/utils/objects";
 import Inner from "./Inner";
+import { getTokenData } from "@/onchain/token/utils";
 
 type Props = {
   selectedMarketAddress?: string;
@@ -56,6 +57,7 @@ export function GmSwapBox({
       marketInfo={marketInfo}
       tokensData={tokensData}
       tokenOptions={tokenOptions}
+      onSelectMarket={onSelectMarket}
     />
   );
 }

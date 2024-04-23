@@ -11,7 +11,7 @@ import cx from "classnames";
 import { t, Trans } from "@lingui/macro";
 
 import "./GmSwapBox.scss";
-import { formatUsd } from "@/components/MarketsList/utils";
+import { formatUsd, getMarketIndexName } from "@/components/MarketsList/utils";
 import { convertToUsd, formatTokenAmount, parseValue } from "@/utils/number";
 import Button from "@/components/Button/Button";
 import { Form } from "react-router-dom";
@@ -23,9 +23,13 @@ import TokenSelector from "@/components/TokenSelector/TokenSelector";
 import { Address } from "@coral-xyz/anchor";
 import { useLocalStorageSerializeKey } from "@/utils/localStorage";
 import { useEndpointName } from "@/onchain";
-import { SYNTHETICS_MARKET_DEPOSIT_TOKEN_KEY } from "@/config/localStorage";
+import { SYNTHETICS_MARKET_DEPOSIT_TOKEN_KEY, getSyntheticsDepositIndexTokenKey } from "@/config/localStorage";
 import { getTokenData } from "@/onchain/token/utils";
 import { BN_ZERO } from "@/config/constants";
+import { IoMdSwap } from "react-icons/io";
+import { PoolSelector } from "@/components/MarketSelector/PoolSelector";
+import { useStateSelector } from "@/contexts/state";
+import { useSortedPoolsWithIndexToken } from "@/hooks";
 
 const OPERATION_LABELS = {
   [Operation.Deposit]: /*i18n*/ "Buy GM",
@@ -45,6 +49,7 @@ export default function Inner({
   tokensData,
   setOperation,
   setMode,
+  onSelectMarket,
 }: {
   marketInfo?: MarketInfo,
   operation: Operation,
@@ -53,6 +58,7 @@ export default function Inner({
   tokensData?: Tokens,
   setOperation: (operation: Operation) => void,
   setMode: (mode: Mode) => void,
+  onSelectMarket: (marketAddress: string) => void,
 }) {
   const endpoint = useEndpointName();
   const { i18n } = useLingui();
@@ -81,6 +87,20 @@ export default function Inner({
       setOperation(operation);
     },
     [resetInputs, setOperation]
+  );
+
+  const onSwitchSide = useCallback(() => {
+    setFocusedInput("market");
+    resetInputs();
+    setOperation(operation === Operation.Deposit ? Operation.Withdrawal : Operation.Deposit);
+  }, [operation, resetInputs, setOperation]);
+
+  const onMarketChange = useCallback(
+    (marketAddress: string) => {
+      resetInputs();
+      onSelectMarket(marketAddress);
+    },
+    [onSelectMarket, resetInputs]
   );
 
   function onFocusedCollateralInputChange(tokenAddress: string) {
@@ -122,14 +142,33 @@ export default function Inner({
     [endpoint, SYNTHETICS_MARKET_DEPOSIT_TOKEN_KEY, isDeposit, marketInfo?.marketTokenAddress.toBase58(), "second"],
     undefined
   );
-
   const secondToken = getTokenData(tokensData, secondTokenAddress ? new PublicKey(secondTokenAddress) : undefined);
-
   const secondTokenAmount = parseValue(secondTokenInputValue, secondToken?.decimals || 0);
   const secondTokenUsd = convertToUsd(
     secondTokenAmount,
     secondToken?.decimals,
     isDeposit ? secondToken?.prices?.minPrice : secondToken?.prices?.maxPrice
+  );
+
+  const [indexName, setIndexName] = useLocalStorageSerializeKey<string | undefined>(
+    getSyntheticsDepositIndexTokenKey(endpoint),
+    undefined
+  );
+
+  const { marketTokens, marketInfos } = useStateSelector((s) => {
+    return s;
+  });
+  const marketToken = getTokenData(marketTokens, marketInfo?.marketTokenAddress);
+  const marketTokenAmount = parseValue(marketTokenInputValue || "0", marketToken?.decimals || 0)!;
+  const marketTokenUsd = convertToUsd(
+    marketTokenAmount,
+    marketToken?.decimals,
+    isDeposit ? marketToken?.prices?.maxPrice : marketToken?.prices?.minPrice
+  )!;
+
+  const { marketsInfo: sortedMarketsInfoByIndexToken } = useSortedPoolsWithIndexToken(
+    marketInfos,
+    marketTokens
   );
 
   // Update tokens.
@@ -286,63 +325,63 @@ export default function Inner({
             </BuyInputSection>
           )}
 
-          {/* <div className="AppOrder-ball-container" onClick={onSwitchSide}>
+          <div className="AppOrder-ball-container" onClick={onSwitchSide}>
             <div className="AppOrder-ball">
               <IoMdSwap className="Exchange-swap-ball-icon" />
             </div>
-          </div> */}
+          </div>
 
-          {/* <BuyInputSection
+          <BuyInputSection
             topLeftLabel={isWithdrawal ? t`Pay` : t`Receive`}
-            topLeftValue={marketTokenUsd?.gt(0) ? formatUsd(marketTokenUsd) : ""}
-            topRightLabel={t`Balance`}
-            topRightValue={formatTokenAmount(marketToken?.balance, marketToken?.decimals, "", {
-              useCommas: true,
-            })}
+            topLeftValue={marketTokenUsd?.gt(BN_ZERO) ? formatUsd(marketTokenUsd) : ""}
+            // topRightLabel={t`Balance`}
+            // topRightValue={formatTokenAmount(marketToken?.balance, marketToken?.decimals, "", {
+            //   useCommas: true,
+            // })}
             preventFocusOnLabelClick="right"
-            showMaxButton={isWithdrawal && marketToken?.balance?.gt(0) && !marketTokenAmount?.eq(marketToken.balance)}
+            // showMaxButton={isWithdrawal && marketToken?.balance?.gt(0) && !marketTokenAmount?.eq(marketToken.balance)}
             inputValue={marketTokenInputValue}
             onInputValueChange={(e) => {
               setMarketTokenInputValue(e.target.value);
               setFocusedInput("market");
             }}
-            {...(isWithdrawal && {
-              onClickTopRightLabel: () => {
-                if (marketToken?.balance) {
-                  setMarketTokenInputValue(formatAmountFree(marketToken.balance, marketToken.decimals));
-                  setFocusedInput("market");
-                }
-              },
-            })}
-            onClickMax={() => {
-              if (marketToken?.balance) {
-                const formattedGMBalance = formatAmountFree(marketToken.balance, marketToken.decimals);
-                const finalGMBalance = isMetamaskMobile
-                  ? limitDecimals(formattedGMBalance, MAX_METAMASK_MOBILE_DECIMALS)
-                  : formattedGMBalance;
-                setMarketTokenInputValue(finalGMBalance);
-                setFocusedInput("market");
-              }
-            }}
+          // {...(isWithdrawal && {
+          //   onClickTopRightLabel: () => {
+          //     if (marketToken?.balance) {
+          //       setMarketTokenInputValue(formatAmountFree(marketToken.balance, marketToken.decimals));
+          //       setFocusedInput("market");
+          //     }
+          //   },
+          // })}
+          // onClickMax={() => {
+          //   if (marketToken?.balance) {
+          //     const formattedGMBalance = formatAmountFree(marketToken.balance, marketToken.decimals);
+          //     const finalGMBalance = isMetamaskMobile
+          //       ? limitDecimals(formattedGMBalance, MAX_METAMASK_MOBILE_DECIMALS)
+          //       : formattedGMBalance;
+          //     setMarketTokenInputValue(finalGMBalance);
+          //     setFocusedInput("market");
+          //   }
+          // }}
           >
             <PoolSelector
               label={t`Pool`}
               className="SwapBox-info-dropdown"
               selectedIndexName={indexName}
-              selectedMarketAddress={marketAddress}
+              selectedMarketAddress={marketInfo?.marketTokenAddress.toBase58()}
               markets={sortedMarketsInfoByIndexToken}
-              marketTokensData={marketTokensData}
+              marketTokensData={marketTokens}
               isSideMenu
               showBalances
               showAllPools
               showIndexIcon
               onSelectMarket={(marketInfo) => {
                 setIndexName(getMarketIndexName(marketInfo));
-                onMarketChange(marketInfo.marketTokenAddress);
-                showMarketToast(marketInfo);
+                onMarketChange(marketInfo.marketTokenAddress.toBase58());
+                // showMarketToast(marketInfo);
               }}
             />
-          </BuyInputSection> */}
+          </BuyInputSection>
         </div>
 
         {/* <ExchangeInfo className="GmSwapBox-info-section" dividerClassName="App-card-divider">
