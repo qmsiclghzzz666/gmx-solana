@@ -1,7 +1,7 @@
 import "./GmSwapBox.scss";
-import { Market, MarketInfo, MarketInfos } from "@/onchain/market";
+import { Market, MarketInfos } from "@/onchain/market";
 import { Tokens } from "@/onchain/token";
-import { Mode, Operation } from "./utils";
+import { Mode, Operation } from "../utils";
 import { getByKey } from "@/utils/objects";
 import Inner from "./Inner";
 import { useGenesisHash } from "@/onchain";
@@ -18,24 +18,6 @@ type Props = {
   setOperation: (operation: Operation) => void;
 };
 
-const getTokenOptions = (marketInfo?: MarketInfo) => {
-  if (!marketInfo) {
-    return [];
-  }
-
-  const { longToken, shortToken } = marketInfo;
-
-  if (!longToken || !shortToken) return [];
-
-  const options = [longToken];
-
-  if (!marketInfo.isSingle) {
-    options.push(shortToken);
-  }
-
-  return options;
-};
-
 export function GmSwapBox({
   operation,
   mode,
@@ -48,7 +30,6 @@ export function GmSwapBox({
 }: Props) {
   const genesisHash = useGenesisHash();
   const marketInfo = getByKey(marketsInfoData, marketAddress);
-  const tokenOptions = getTokenOptions(marketInfo);
   return (
     genesisHash && marketInfo ?
       <Inner
@@ -59,7 +40,6 @@ export function GmSwapBox({
         setMode={setMode}
         marketInfo={marketInfo}
         tokensData={tokensData}
-        tokenOptions={tokenOptions}
         onSelectMarket={onSelectMarket}
       />
       : <div>loading</div>

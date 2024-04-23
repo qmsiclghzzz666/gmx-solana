@@ -11,7 +11,7 @@ import { useLoaderData, useSearchParams } from "react-router-dom";
 import { PublicKey } from "@solana/web3.js";
 import { useCallback, useEffect, useRef } from "react";
 import { GmSwapBox } from "@/components/GmSwap/GmSwapBox/GmSwapBox";
-import { Mode, Operation, getGmSwapBoxAvailableModes } from "@/components/GmSwap/GmSwapBox/utils";
+import { Mode, Operation, getGmSwapBoxAvailableModes } from "@/components/GmSwap/utils";
 
 export default function Earn() {
   const gmSwapBoxRef = useRef<HTMLDivElement>(null);

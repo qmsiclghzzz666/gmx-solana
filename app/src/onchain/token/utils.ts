@@ -1,16 +1,16 @@
 import { NATIVE_TOKEN_ADDRESS } from "@/config/tokens";
 import { TokenPrices, Tokens } from "./types";
-import { PublicKey } from "@solana/web3.js";
-import { BN } from "@coral-xyz/anchor";
+import { Address, BN } from "@coral-xyz/anchor";
 import { expandDecimals } from "@/utils/number";
 import { BN_ZERO } from "@/config/constants";
 
-export function getTokenData(tokensData?: Tokens, address?: PublicKey, convertTo?: "wrapped" | "native") {
-  if (!address || !tokensData?.[address.toBase58()]) {
+export function getTokenData(tokensData?: Tokens, address?: Address, convertTo?: "wrapped" | "native") {
+  const addressStr = address?.toString();
+  if (!addressStr || !tokensData?.[addressStr]) {
     return undefined;
   }
 
-  const token = tokensData[address.toBase58()];
+  const token = tokensData[addressStr];
 
   if (convertTo === "wrapped" && token.isNative && token.wrappedAddress) {
     return tokensData[token.wrappedAddress.toBase58()];

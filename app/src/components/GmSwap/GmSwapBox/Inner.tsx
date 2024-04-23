@@ -1,5 +1,5 @@
 import Tab from "@/components/Tab/Tab";
-import { Mode, Operation, getGmSwapBoxAvailableModes } from "./utils";
+import { Mode, Operation, getGmSwapBoxAvailableModes, useTokenOptions } from "../utils";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLingui } from "@lingui/react";
 import { mapValues } from "lodash";
@@ -13,7 +13,6 @@ import "./GmSwapBox.scss";
 import { formatUsd, getMarketIndexName } from "@/components/MarketsList/utils";
 import { convertToUsd, parseValue } from "@/utils/number";
 import Button from "@/components/Button/Button";
-import { Form } from "react-router-dom";
 import BuyInputSection from "@/components/BuyInputSection/BuyInputSection";
 import { Token, Tokens } from "@/onchain/token";
 import { getTokenPoolType } from "@/onchain/market/utils";
@@ -43,7 +42,6 @@ export default function Inner({
   marketInfo,
   operation,
   mode,
-  tokenOptions,
   tokensData,
   setOperation,
   setMode,
@@ -53,7 +51,6 @@ export default function Inner({
   marketInfo: MarketInfo,
   operation: Operation,
   mode: Mode,
-  tokenOptions: Token[],
   tokensData?: Tokens,
   setOperation: (operation: Operation) => void,
   setMode: (mode: Mode) => void,
@@ -67,6 +64,14 @@ export default function Inner({
       localizedModeLabels: mapValues(MODE_LABELS, (label) => i18n._(label)),
     };
   }, [i18n]);
+
+  const [{ tokenOptions, firstToken, secondToken }, setTokenAddress] = useTokenOptions({
+    genesisHash,
+    marketInfo,
+    operation,
+    mode,
+    tokensData,
+  });
 
   const [firstTokenInputValue, setFirstTokenInputValue] = useSafeState<string>("");
   const [secondTokenInputValue, setSecondTokenInputValue] = useSafeState<string>("");
@@ -124,12 +129,6 @@ export default function Inner({
   const isSingle = mode === Mode.Single;
   const isPair = mode === Mode.Pair;
 
-  const [firstTokenAddress, setFirstTokenAddress] = useLocalStorageSerializeKey<string>(
-    [genesisHash, SYNTHETICS_MARKET_DEPOSIT_TOKEN_KEY, isDeposit, marketInfo.marketTokenAddress.toBase58(), "first"],
-    ""
-  );
-
-  const firstToken = getTokenData(tokensData, firstTokenAddress ? new PublicKey(firstTokenAddress) : undefined);
   const firstTokenAmount = parseValue(firstTokenInputValue, firstToken?.decimals || 0);
   const firstTokenUsd = convertToUsd(
     firstTokenAmount,
@@ -137,11 +136,6 @@ export default function Inner({
     isDeposit ? firstToken?.prices?.minPrice : firstToken?.prices?.maxPrice
   );
 
-  const [secondTokenAddress, setSecondTokenAddress] = useLocalStorageSerializeKey<string>(
-    [genesisHash, SYNTHETICS_MARKET_DEPOSIT_TOKEN_KEY, isDeposit, marketInfo.marketTokenAddress.toBase58(), "second"],
-    ""
-  );
-  const secondToken = getTokenData(tokensData, secondTokenAddress ? new PublicKey(secondTokenAddress) : undefined);
   const secondTokenAmount = parseValue(secondTokenInputValue, secondToken?.decimals || 0);
   const secondTokenUsd = convertToUsd(
     secondTokenAmount,
@@ -170,60 +164,6 @@ export default function Inner({
     marketTokens
   );
 
-  // Update tokens.
-  useEffect(() => {
-    if (!tokenOptions.length) return;
-
-    if (!tokenOptions.find((token) => token.address.toBase58() === firstTokenAddress)) {
-      setFirstTokenAddress(tokenOptions[0].address.toBase58());
-    }
-
-    if (isSingle && secondTokenAddress && marketInfo && secondTokenAmount?.gt(BN_ZERO)) {
-      const secondTokenPoolType = getTokenPoolType(marketInfo, secondTokenAddress);
-      setFocusedInput(secondTokenPoolType === "long" ? "longCollateral" : "shortCollateral");
-      setSecondTokenAddress("");
-      setSecondTokenInputValue("");
-      return;
-    }
-
-    if (isPair && firstTokenAddress) {
-      if (marketInfo.isSingle) {
-        if (!secondTokenAddress || firstTokenAddress !== secondTokenAddress) {
-          setSecondTokenAddress(firstTokenAddress);
-        }
-        return;
-      } else if (firstTokenAddress === secondTokenAddress) {
-        setSecondTokenAddress("");
-        setSecondTokenInputValue("");
-        return;
-      }
-
-      if (
-        !secondTokenAddress ||
-        !tokenOptions.find((token) => token.address.toBase58() === secondTokenAddress) ||
-        firstTokenAddress === secondTokenAddress
-      ) {
-        const secondToken = tokenOptions.find((token) => {
-          return (
-            token.address.toBase58() !== firstTokenAddress
-          );
-        });
-        setSecondTokenAddress(secondToken?.address.toBase58());
-      }
-    }
-  }, [
-    tokenOptions,
-    firstTokenAddress,
-    setFirstTokenAddress,
-    isSingle,
-    isPair,
-    marketInfo,
-    secondTokenAddress,
-    setSecondTokenAddress,
-    secondTokenAmount,
-    setSecondTokenInputValue,
-  ]);
-
   return (
     <div className={`App-box GmSwapBox`}>
       <Tab
@@ -243,8 +183,10 @@ export default function Inner({
         onChange={setMode}
       />
 
-      <Form
-        method="post"
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+        }}
       >
         <div className={cx("GmSwapBox-form-layout", { reverse: isWithdrawal })}>
           <BuyInputSection
@@ -277,7 +219,7 @@ export default function Inner({
               <TokenSelector
                 label={isDeposit ? t`Pay` : t`Receive`}
                 token={firstToken}
-                onSelectToken={(token) => setFirstTokenAddress(token.address.toBase58())}
+                onSelectToken={(token) => setTokenAddress(token.address, "first")}
                 tokens={tokenOptions}
                 // infoTokens={infoTokens}
                 className="GlpSwap-from-token"
@@ -449,9 +391,9 @@ export default function Inner({
 
         <div className="Exchange-swap-button-container">
           <Button
-            type="submit"
             className="w-full"
             variant="primary-action"
+            type="submit"
           // onClick={submitState.onSubmit}
           // disabled={submitState.isDisabled}
           >
@@ -481,7 +423,7 @@ export default function Inner({
           }}
           shouldDisableValidation={shouldDisableValidationForTesting}
         /> */}
-      </Form>
+      </form>
     </div>
   );
 }

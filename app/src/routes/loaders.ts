@@ -1,4 +1,4 @@
-import { parseMode, parseOperation } from "@/components/GmSwap/GmSwapBox/utils";
+import { parseMode, parseOperation } from "@/components/GmSwap/utils";
 
 export const earnLoader = ({ request }: { request: Request }) => {
   const url = new URL(request.url);
