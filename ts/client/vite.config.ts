@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import { resolve } from 'path';
 import dts from 'vite-plugin-dts';
+import { nodePolyfills } from 'vite-plugin-node-polyfills';
 
 export default defineConfig({
     build: {
@@ -9,5 +10,10 @@ export default defineConfig({
         emptyOutDir: true,
     },
     resolve: { alias: { src: resolve('src/') } },
-    plugins: [dts()],
+    plugins: [
+        nodePolyfills({
+            include: ['buffer', 'crypto', 'stream', 'vm'],
+        }),
+        dts()
+    ],
 });

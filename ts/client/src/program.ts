@@ -7,6 +7,9 @@ import DataStoreIDL from "./idl/data_store.json";
 import ExchangeIDL from "./idl/exchange.json";
 import { PublicKey } from "@solana/web3.js";
 
+export type DataStoreProgram = Program<DataStore>;
+export type ExchangeProgram = Program<Exchange>;
+
 /**
  * Creates an instance of the Program with the provided IDL schema for the DataStore program.
  * 

@@ -1,5 +1,5 @@
 import Tab from "@/components/Tab/Tab";
-import { Mode, Operation, TokenOptions, getGmSwapBoxAvailableModes } from "../utils";
+import { CreateDepositParams, Mode, Operation, TokenOptions, getGmSwapBoxAvailableModes } from "../utils";
 import { useCallback, useMemo, useState } from "react";
 import { useLingui } from "@lingui/react";
 import { mapValues } from "lodash";
@@ -19,7 +19,7 @@ import { getSyntheticsDepositIndexTokenKey } from "@/config/localStorage";
 import { BN_ZERO } from "@/config/constants";
 import { IoMdSwap } from "react-icons/io";
 import { PoolSelector } from "@/components/MarketSelector/PoolSelector";
-import { useGmInputDisplay, useGmStateDispath, useGmStateSelector } from "../hooks";
+import { useGmInputDisplay, useGmStateDispath, useGmStateSelector, useHandleSumit } from "../hooks";
 
 const OPERATION_LABELS = {
   [Operation.Deposit]: /*i18n*/ "Buy GM",
@@ -33,22 +33,20 @@ const MODE_LABELS = {
 
 export function GmForm({
   genesisHash,
-  operation,
-  mode,
   tokenOptions: { tokenOptions, firstToken, secondToken },
   setOperation,
   setMode,
   onSelectMarket,
   onSelectFirstToken,
+  onCreateDeposit,
 }: {
   genesisHash: string,
-  operation: Operation,
-  mode: Mode,
   tokenOptions: TokenOptions,
   setOperation: (operation: Operation) => void,
   setMode: (mode: Mode) => void,
   onSelectMarket: (marketAddress: string) => void,
   onSelectFirstToken: (token: Token) => void,
+  onCreateDeposit: (params: CreateDepositParams) => void,
 }) {
   const { i18n } = useLingui();
 
@@ -75,6 +73,14 @@ export function GmForm({
     }
   });
   const { firstTokenUsd, secondTokenUsd, marketTokenUsd } = useGmInputDisplay();
+  const { operation, mode } = useGmStateSelector(s => {
+    return {
+      operation: s.operation,
+      mode: s.mode,
+    };
+  });
+
+  const handleSubmit = useHandleSumit({ onCreateDeposit });
 
   const [focusedInput, setFocusedInput] = useState<"longCollateral" | "shortCollateral" | "market">("market");
 
@@ -154,6 +160,7 @@ export function GmForm({
       <form
         onSubmit={(e) => {
           e.preventDefault();
+          handleSubmit();
         }}
       >
         <div className={cx("GmSwapBox-form-layout", { reverse: isWithdrawal })}>

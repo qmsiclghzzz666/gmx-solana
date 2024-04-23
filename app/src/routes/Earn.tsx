@@ -11,11 +11,17 @@ import { useLoaderData, useSearchParams } from "react-router-dom";
 import { PublicKey } from "@solana/web3.js";
 import { useCallback, useEffect, useRef } from "react";
 import { GmSwapBox } from "@/components/GmSwap/GmSwapBox/GmSwapBox";
-import { Mode, Operation, getGmSwapBoxAvailableModes } from "@/components/GmSwap/utils";
+import { CreateDepositParams, Mode, Operation, getGmSwapBoxAvailableModes } from "@/components/GmSwap/utils";
 import { useGenesisHash } from "@/onchain";
+import { useExchange } from "@/contexts/anchor";
+import { MakeCreateDepositParams, invokeCreateDeposit } from "gmsol";
+import { GMSOL_DEPLOYMENT } from "@/config/deployment";
+import useSWRMutation from "swr/mutation";
 
 export default function Earn() {
   const chainId = useGenesisHash();
+  const exchange = useExchange();
+  const payer = exchange.provider.publicKey;
 
   const gmSwapBoxRef = useRef<HTMLDivElement>(null);
 
@@ -79,6 +85,34 @@ export default function Earn() {
     }
   }, [marketInfos, mode, setMode, operation, selectedMarketKey]);
 
+  const { trigger: triggerCreateDeposit } = useSWRMutation('exchange/create-deposit', async (_key, { arg }: { arg: MakeCreateDepositParams }) => {
+    try {
+      const [signature, deposit] = await invokeCreateDeposit(exchange, arg, { signByProvider: true });
+      console.log(`created a deposit ${deposit.toBase58()} at tx ${signature}`);
+    } catch (error) {
+      console.log(error);
+      throw error;
+    }
+  });
+
+  const handleCreateDeposit = useCallback((params: CreateDepositParams) => {
+    if (payer && GMSOL_DEPLOYMENT) {
+      const store = GMSOL_DEPLOYMENT.store;
+      const fullParams: MakeCreateDepositParams = {
+        store,
+        payer,
+        marketToken: params.marketToken,
+        initialLongToken: params.initialLongToken,
+        initialShortToken: params.initialShortToken,
+        initialLongTokenAmount: params.initialLongTokenAmount,
+        initialShortTokenAmount: params.initialShortTokenAmount,
+      };
+      void triggerCreateDeposit(fullParams);
+    } else {
+      console.log("not connected");
+    }
+  }, [payer, triggerCreateDeposit]);
+
   return (
     <div className="default-container page-layout">
       <PageTitle
@@ -115,6 +149,7 @@ export default function Earn() {
             mode={mode}
             setMode={setMode}
             setOperation={setOperation}
+            onCreateDeposit={handleCreateDeposit}
           />) : "loading"}
         </div>
       </div>

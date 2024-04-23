@@ -1,5 +1,7 @@
 import { Market, MarketInfo } from "@/onchain/market";
 import { Token, TokenData } from "@/onchain/token";
+import { BN } from "@coral-xyz/anchor";
+import { PublicKey } from "@solana/web3.js";
 
 export enum Operation {
   Deposit = "Deposit",
@@ -17,6 +19,14 @@ export enum Mode {
 
 export const parseMode = (value: string | null) => {
   return value?.toLocaleLowerCase() === "pair" ? Mode.Pair : Mode.Single;
+}
+
+export interface CreateDepositParams {
+  marketToken: PublicKey,
+  initialLongToken: PublicKey,
+  initialShortToken: PublicKey,
+  initialLongTokenAmount: BN,
+  initialShortTokenAmount: BN,
 }
 
 export const getGmSwapBoxAvailableModes = (

@@ -1,14 +1,16 @@
 import { SYNTHETICS_MARKET_DEPOSIT_TOKEN_KEY } from "@/config/localStorage";
-import { MarketInfo } from "@/onchain/market";
+import { Market, MarketInfo } from "@/onchain/market";
 import { Tokens } from "@/onchain/token";
 import { getTokenData } from "@/onchain/token/utils";
 import { useLocalStorageSerializeKey } from "@/utils/localStorage";
-import { Address } from "@coral-xyz/anchor";
+import { Address, BN } from "@coral-xyz/anchor";
 import React, { useCallback, useEffect } from "react";
-import { Mode, Operation, TokenOptions, getTokenOptions } from "./utils";
+import { CreateDepositParams, Mode, Operation, TokenOptions, getTokenOptions } from "./utils";
 import { Context, useContext, useContextSelector } from "use-context-selector";
 import { GmState, GmStateContext, GmStateDispatchContext } from "./GmStateProvider";
 import { convertToUsd, parseValue } from "@/utils/number";
+import { BN_ZERO } from "@/config/constants";
+import { PublicKey } from "@solana/web3.js";
 
 export const useTokenOptionsFromStorage = ({
   chainId,
@@ -120,8 +122,28 @@ export const useGmStateDispath = () => {
   return dispatch;
 };
 
-export const useGmInputDisplay = () => {
+export const useGmInputAmounts = () => {
   const input = useGmStateSelector(s => s.input);
+  const firstToken = useGmStateSelector(s => s.firstToken);
+  const secondToken = useGmStateSelector(s => s.secondToken);
+  const marketToken = useGmStateSelector(s => s.marketToken);
+
+  const firstTokenAmount = parseValue(input.firstTokenInputValue, firstToken?.decimals || 0);
+
+  const secondTokenAmount = parseValue(input.secondTokenInputValue, secondToken?.decimals || 0);
+
+  const marketTokenAmount = parseValue(input.marketTokenInputValue || "0", marketToken?.decimals || 0)!;
+
+  return {
+    firstTokenAmount,
+    secondTokenAmount,
+    marketTokenAmount,
+  };
+};
+
+export const useGmInputDisplay = () => {
+  const { firstTokenAmount, secondTokenAmount, marketTokenAmount } = useGmInputAmounts();
+
   const operation = useGmStateSelector(s => s.operation);
   const firstToken = useGmStateSelector(s => s.firstToken);
   const secondToken = useGmStateSelector(s => s.secondToken);
@@ -129,21 +151,18 @@ export const useGmInputDisplay = () => {
 
   const isDeposit = operation === Operation.Deposit;
 
-  const firstTokenAmount = parseValue(input.firstTokenInputValue, firstToken?.decimals || 0);
   const firstTokenUsd = convertToUsd(
     firstTokenAmount,
     firstToken?.decimals,
     isDeposit ? firstToken?.prices?.minPrice : firstToken?.prices?.maxPrice
   );
 
-  const secondTokenAmount = parseValue(input.secondTokenInputValue, secondToken?.decimals || 0);
   const secondTokenUsd = convertToUsd(
     secondTokenAmount,
     secondToken?.decimals,
     isDeposit ? secondToken?.prices?.minPrice : secondToken?.prices?.maxPrice
   );
 
-  const marketTokenAmount = parseValue(input.marketTokenInputValue || "0", marketToken?.decimals || 0)!;
   const marketTokenUsd = convertToUsd(
     marketTokenAmount,
     marketToken?.decimals,
@@ -155,4 +174,88 @@ export const useGmInputDisplay = () => {
     secondTokenUsd,
     marketTokenUsd,
   };
+};
+
+const fixUnnecessarySwap = ({
+  market,
+  initialLongToken,
+  initialShortToken,
+  initialLongTokenAmount,
+  initialShortTokenAmount,
+}: {
+  market: Market,
+  initialLongToken: PublicKey,
+  initialShortToken: PublicKey,
+  initialLongTokenAmount: BN,
+  initialShortTokenAmount: BN
+}) => {
+  if (initialLongToken.equals(market.shortTokenAddress) && initialShortToken.equals(market.longTokenAddress)) {
+    return {
+      fixedInitialLongToken: initialShortToken,
+      fixedInitialShortToken: initialLongToken,
+      fixedInitialLongTokenAmount: initialShortTokenAmount,
+      fixedInitialShortTokenAmount: initialLongTokenAmount,
+    }
+  } else {
+    return {
+      fixedInitialLongToken: initialLongToken,
+      fixedInitialShortToken: initialShortToken,
+      fixedInitialLongTokenAmount: initialLongTokenAmount,
+      fixedInitialShortTokenAmount: initialShortTokenAmount,
+    }
+  }
+}
+
+export const useHandleSumit = ({
+  onCreateDeposit,
+}: {
+  onCreateDeposit: (params: CreateDepositParams) => void,
+}) => {
+  const operation = useGmStateSelector(s => s.operation);
+  const mode = useGmStateSelector(s => s.mode);
+  const market = useGmStateSelector(s => s.market);
+  const initialLongToken = useGmStateSelector(s => s.firstToken?.address) ?? market.longTokenAddress;
+  const initialShortToken = useGmStateSelector(s => s.secondToken?.address) ?? market.shortTokenAddress;
+  const { firstTokenAmount, secondTokenAmount } = useGmInputAmounts();
+
+  return useCallback(() => {
+    if (operation === Operation.Deposit) {
+      const initialLongTokenAmount = firstTokenAmount ?? BN_ZERO;
+      const initialShortTokenAmount = secondTokenAmount ?? BN_ZERO;
+
+      if (mode === Mode.Single && !initialLongTokenAmount.isZero()) {
+        const params = {
+          marketToken: market.marketTokenAddress,
+          initialLongToken,
+          initialShortToken,
+          initialLongTokenAmount,
+          initialShortTokenAmount: BN_ZERO,
+        };
+        onCreateDeposit(params);
+      } else if (mode === Mode.Pair && !(initialLongTokenAmount.isZero() && initialShortTokenAmount.isZero())) {
+        const {
+          fixedInitialLongToken,
+          fixedInitialShortToken,
+          fixedInitialLongTokenAmount,
+          fixedInitialShortTokenAmount
+        } = fixUnnecessarySwap({
+          market,
+          initialLongToken,
+          initialShortToken,
+          initialLongTokenAmount,
+          initialShortTokenAmount
+        });
+        const params = {
+          marketToken: market.marketTokenAddress,
+          initialLongToken: fixedInitialLongToken,
+          initialShortToken: fixedInitialShortToken,
+          initialLongTokenAmount: fixedInitialLongTokenAmount,
+          initialShortTokenAmount: fixedInitialShortTokenAmount,
+        };
+        onCreateDeposit(params);
+      } else {
+        console.log("not enough amounts", mode, initialLongTokenAmount.toString(), initialShortTokenAmount.toString());
+      }
+    }
+  }, [firstTokenAmount, initialLongToken, initialShortToken, market, mode, onCreateDeposit, operation, secondTokenAmount]);
 };

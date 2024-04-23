@@ -3,7 +3,7 @@ import { TokenData, Tokens } from "@/onchain/token";
 import React, { Dispatch, ReactNode, useMemo } from "react";
 import { useImmerReducer } from "use-immer";
 import { createContext } from "use-context-selector";
-import { Operation } from "./utils";
+import { Mode, Operation } from "./utils";
 import { getTokenData } from "@/onchain/token/utils";
 import { useSortedPoolsWithIndexToken } from "@/hooks";
 
@@ -14,6 +14,7 @@ export default function GmStateProvider({
   children,
   market,
   operation,
+  mode,
   firstToken,
   secondToken,
   marketTokens,
@@ -22,6 +23,7 @@ export default function GmStateProvider({
   children: ReactNode,
   market: MarketInfo,
   operation: Operation,
+  mode: Mode,
   firstToken?: TokenData,
   secondToken?: TokenData,
   marketTokens: Tokens,
@@ -44,13 +46,14 @@ export default function GmStateProvider({
       input,
       market,
       operation,
+      mode,
       firstToken,
       secondToken,
       marketToken,
       marketTokens,
       sortedMarketsInfoByIndexToken,
     };
-  }, [firstToken, input, market, marketToken, marketTokens, operation, secondToken, sortedMarketsInfoByIndexToken]);
+  }, [firstToken, input, market, marketToken, marketTokens, operation, mode, secondToken, sortedMarketsInfoByIndexToken]);
 
   return (
     <GmStateContext.Provider value={state}>
@@ -64,6 +67,7 @@ export default function GmStateProvider({
 export interface GmState {
   market: MarketInfo,
   operation: Operation,
+  mode: Mode,
   firstToken?: TokenData,
   secondToken?: TokenData,
   marketToken?: TokenData,
