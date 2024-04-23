@@ -1,28 +1,25 @@
 import Tab from "@/components/Tab/Tab";
 import { Mode, Operation, getGmSwapBoxAvailableModes } from "./utils";
-import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLingui } from "@lingui/react";
 import { mapValues } from "lodash";
 import { useSafeState } from "@/utils/state";
-import { getByKey } from "@/utils/objects";
-import { MarketInfo, MarketInfos } from "@/onchain/market";
+import { MarketInfo } from "@/onchain/market";
 import { PublicKey } from "@solana/web3.js";
 import cx from "classnames";
-import { t, Trans } from "@lingui/macro";
+import { t } from "@lingui/macro";
 
 import "./GmSwapBox.scss";
 import { formatUsd, getMarketIndexName } from "@/components/MarketsList/utils";
-import { convertToUsd, formatTokenAmount, parseValue } from "@/utils/number";
+import { convertToUsd, parseValue } from "@/utils/number";
 import Button from "@/components/Button/Button";
 import { Form } from "react-router-dom";
 import BuyInputSection from "@/components/BuyInputSection/BuyInputSection";
-import { Token, TokenData, Tokens } from "@/onchain/token";
+import { Token, Tokens } from "@/onchain/token";
 import { getTokenPoolType } from "@/onchain/market/utils";
 import TokenWithIcon from "@/components/TokenIcon/TokenWithIcon";
 import TokenSelector from "@/components/TokenSelector/TokenSelector";
-import { Address } from "@coral-xyz/anchor";
 import { useLocalStorageSerializeKey } from "@/utils/localStorage";
-import { useEndpointName } from "@/onchain";
 import { SYNTHETICS_MARKET_DEPOSIT_TOKEN_KEY, getSyntheticsDepositIndexTokenKey } from "@/config/localStorage";
 import { getTokenData } from "@/onchain/token/utils";
 import { BN_ZERO } from "@/config/constants";
@@ -42,6 +39,7 @@ const MODE_LABELS = {
 };
 
 export default function Inner({
+  genesisHash,
   marketInfo,
   operation,
   mode,
@@ -51,7 +49,8 @@ export default function Inner({
   setMode,
   onSelectMarket,
 }: {
-  marketInfo?: MarketInfo,
+  genesisHash: string,
+  marketInfo: MarketInfo,
   operation: Operation,
   mode: Mode,
   tokenOptions: Token[],
@@ -60,7 +59,6 @@ export default function Inner({
   setMode: (mode: Mode) => void,
   onSelectMarket: (marketAddress: string) => void,
 }) {
-  const endpoint = useEndpointName();
   const { i18n } = useLingui();
 
   const { localizedOperationLabels, localizedModeLabels } = useMemo(() => {
@@ -126,10 +124,11 @@ export default function Inner({
   const isSingle = mode === Mode.Single;
   const isPair = mode === Mode.Pair;
 
-  const [firstTokenAddress, setFirstTokenAddress] = useLocalStorageSerializeKey<string | undefined>(
-    [endpoint, SYNTHETICS_MARKET_DEPOSIT_TOKEN_KEY, isDeposit, marketInfo?.marketTokenAddress.toBase58(), "first"],
-    undefined
+  const [firstTokenAddress, setFirstTokenAddress] = useLocalStorageSerializeKey<string>(
+    [genesisHash, SYNTHETICS_MARKET_DEPOSIT_TOKEN_KEY, isDeposit, marketInfo.marketTokenAddress.toBase58(), "first"],
+    ""
   );
+
   const firstToken = getTokenData(tokensData, firstTokenAddress ? new PublicKey(firstTokenAddress) : undefined);
   const firstTokenAmount = parseValue(firstTokenInputValue, firstToken?.decimals || 0);
   const firstTokenUsd = convertToUsd(
@@ -138,9 +137,9 @@ export default function Inner({
     isDeposit ? firstToken?.prices?.minPrice : firstToken?.prices?.maxPrice
   );
 
-  const [secondTokenAddress, setSecondTokenAddress] = useLocalStorageSerializeKey<string | undefined>(
-    [endpoint, SYNTHETICS_MARKET_DEPOSIT_TOKEN_KEY, isDeposit, marketInfo?.marketTokenAddress.toBase58(), "second"],
-    undefined
+  const [secondTokenAddress, setSecondTokenAddress] = useLocalStorageSerializeKey<string>(
+    [genesisHash, SYNTHETICS_MARKET_DEPOSIT_TOKEN_KEY, isDeposit, marketInfo.marketTokenAddress.toBase58(), "second"],
+    ""
   );
   const secondToken = getTokenData(tokensData, secondTokenAddress ? new PublicKey(secondTokenAddress) : undefined);
   const secondTokenAmount = parseValue(secondTokenInputValue, secondToken?.decimals || 0);
@@ -150,15 +149,15 @@ export default function Inner({
     isDeposit ? secondToken?.prices?.minPrice : secondToken?.prices?.maxPrice
   );
 
-  const [indexName, setIndexName] = useLocalStorageSerializeKey<string | undefined>(
-    getSyntheticsDepositIndexTokenKey(endpoint),
-    undefined
+  const [indexName, setIndexName] = useLocalStorageSerializeKey<string>(
+    getSyntheticsDepositIndexTokenKey(genesisHash),
+    ""
   );
 
   const { marketTokens, marketInfos } = useStateSelector((s) => {
     return s;
   });
-  const marketToken = getTokenData(marketTokens, marketInfo?.marketTokenAddress);
+  const marketToken = getTokenData(marketTokens, marketInfo.marketTokenAddress);
   const marketTokenAmount = parseValue(marketTokenInputValue || "0", marketToken?.decimals || 0)!;
   const marketTokenUsd = convertToUsd(
     marketTokenAmount,
@@ -188,7 +187,7 @@ export default function Inner({
     }
 
     if (isPair && firstTokenAddress) {
-      if (marketInfo?.isSingle) {
+      if (marketInfo.isSingle) {
         if (!secondTokenAddress || firstTokenAddress !== secondTokenAddress) {
           setSecondTokenAddress(firstTokenAddress);
         }
@@ -368,7 +367,7 @@ export default function Inner({
               label={t`Pool`}
               className="SwapBox-info-dropdown"
               selectedIndexName={indexName}
-              selectedMarketAddress={marketInfo?.marketTokenAddress.toBase58()}
+              selectedMarketAddress={marketInfo.marketTokenAddress.toBase58()}
               markets={sortedMarketsInfoByIndexToken}
               marketTokensData={marketTokens}
               isSideMenu
