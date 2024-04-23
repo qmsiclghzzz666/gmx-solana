@@ -11,13 +11,13 @@ import { GmState, GmStateContext, GmStateDispatchContext } from "./GmStateProvid
 import { convertToUsd, parseValue } from "@/utils/number";
 
 export const useTokenOptionsFromStorage = ({
-  genesisHash,
+  chainId,
   marketInfo,
   operation,
   mode,
   tokensData,
 }: {
-  genesisHash: string,
+  chainId: string,
   marketInfo: MarketInfo,
   operation: Operation,
   mode: Mode,
@@ -29,11 +29,11 @@ export const useTokenOptionsFromStorage = ({
   const tokenOptions = getTokenOptions(marketInfo);
 
   const [firstTokenAddress, setFirstTokenAddress] = useLocalStorageSerializeKey<string>(
-    [genesisHash, SYNTHETICS_MARKET_DEPOSIT_TOKEN_KEY, isDeposit, marketInfo.marketTokenAddress.toBase58(), "first"],
+    [chainId, SYNTHETICS_MARKET_DEPOSIT_TOKEN_KEY, isDeposit, marketInfo.marketTokenAddress.toBase58(), "first"],
     ""
   );
   const [secondTokenAddress, setSecondTokenAddress] = useLocalStorageSerializeKey<string>(
-    [genesisHash, SYNTHETICS_MARKET_DEPOSIT_TOKEN_KEY, isDeposit, marketInfo.marketTokenAddress.toBase58(), "second"],
+    [chainId, SYNTHETICS_MARKET_DEPOSIT_TOKEN_KEY, isDeposit, marketInfo.marketTokenAddress.toBase58(), "second"],
     ""
   );
 

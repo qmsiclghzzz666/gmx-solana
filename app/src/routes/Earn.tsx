@@ -12,8 +12,11 @@ import { PublicKey } from "@solana/web3.js";
 import { useCallback, useEffect, useRef } from "react";
 import { GmSwapBox } from "@/components/GmSwap/GmSwapBox/GmSwapBox";
 import { Mode, Operation, getGmSwapBoxAvailableModes } from "@/components/GmSwap/utils";
+import { useGenesisHash } from "@/onchain";
 
 export default function Earn() {
+  const chainId = useGenesisHash();
+
   const gmSwapBoxRef = useRef<HTMLDivElement>(null);
 
   function buySellActionHandler() {
@@ -101,17 +104,18 @@ export default function Earn() {
         />
 
         <div className="MarketPoolsPage-swap-box" ref={gmSwapBoxRef}>
-          <GmSwapBox
-            selectedMarketAddress={selectedMarketKey}
-            markets={[]}
-            marketsInfoData={marketInfos}
+          {chainId && marketInfo ? (<GmSwapBox
+            chainId={chainId}
+            marketInfo={marketInfo}
             tokensData={tokens}
+            marketTokens={marketTokens}
+            marketInfos={marketInfos}
             onSelectMarket={setSelectedMarketKey}
             operation={operation}
             mode={mode}
             setMode={setMode}
             setOperation={setOperation}
-          />
+          />) : "loading"}
         </div>
       </div>
 

@@ -3,7 +3,6 @@ import { Mode, Operation, TokenOptions, getGmSwapBoxAvailableModes } from "../ut
 import { useCallback, useMemo, useState } from "react";
 import { useLingui } from "@lingui/react";
 import { mapValues } from "lodash";
-import { MarketInfo } from "@/onchain/market";
 import cx from "classnames";
 import { t } from "@lingui/macro";
 
@@ -11,7 +10,7 @@ import "./GmSwapBox.scss";
 import { formatUsd, getMarketIndexName } from "@/components/MarketsList/utils";
 import Button from "@/components/Button/Button";
 import BuyInputSection from "@/components/BuyInputSection/BuyInputSection";
-import { Token, Tokens } from "@/onchain/token";
+import { Token } from "@/onchain/token";
 import { getTokenPoolType } from "@/onchain/market/utils";
 import TokenWithIcon from "@/components/TokenIcon/TokenWithIcon";
 import TokenSelector from "@/components/TokenSelector/TokenSelector";
@@ -20,8 +19,7 @@ import { getSyntheticsDepositIndexTokenKey } from "@/config/localStorage";
 import { BN_ZERO } from "@/config/constants";
 import { IoMdSwap } from "react-icons/io";
 import { PoolSelector } from "@/components/MarketSelector/PoolSelector";
-import { useGmInputDisplay, useGmStateDispath, useGmStateSelector, useTokenOptionsFromStorage } from "../hooks";
-import GmStateProvider from "../GmStateProvider";
+import { useGmInputDisplay, useGmStateDispath, useGmStateSelector } from "../hooks";
 
 const OPERATION_LABELS = {
   [Operation.Deposit]: /*i18n*/ "Buy GM",
@@ -33,57 +31,7 @@ const MODE_LABELS = {
   [Mode.Pair]: /*i18n*/ "Pair",
 };
 
-export default function Inner({
-  genesisHash,
-  marketInfo,
-  operation,
-  mode,
-  tokensData,
-  setOperation,
-  setMode,
-  onSelectMarket,
-}: {
-  genesisHash: string,
-  marketInfo: MarketInfo,
-  operation: Operation,
-  mode: Mode,
-  tokensData?: Tokens,
-  setOperation: (operation: Operation) => void,
-  setMode: (mode: Mode) => void,
-  onSelectMarket: (marketAddress: string) => void,
-}) {
-  const [tokenOptions, setTokenAddress] = useTokenOptionsFromStorage({
-    genesisHash,
-    marketInfo,
-    operation,
-    mode,
-    tokensData,
-  });
-
-  return (
-    <GmStateProvider
-      market={marketInfo}
-      operation={operation}
-      firstToken={tokenOptions.firstToken}
-      secondToken={tokenOptions.secondToken}
-    >
-      <GmForm
-        genesisHash={genesisHash}
-        operation={operation}
-        mode={mode}
-        tokenOptions={tokenOptions}
-        setOperation={setOperation}
-        setMode={setMode}
-        onSelectMarket={onSelectMarket}
-        onSelectFirstToken={(token) => {
-          setTokenAddress(token.address, "first");
-        }}
-      />
-    </GmStateProvider>
-  );
-}
-
-function GmForm({
+export function GmForm({
   genesisHash,
   operation,
   mode,

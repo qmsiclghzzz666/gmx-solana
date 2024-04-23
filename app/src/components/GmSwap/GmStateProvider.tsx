@@ -1,10 +1,9 @@
-import { MarketInfo } from "@/onchain/market";
+import { MarketInfo, MarketInfos } from "@/onchain/market";
 import { TokenData, Tokens } from "@/onchain/token";
 import React, { Dispatch, ReactNode, useMemo } from "react";
 import { useImmerReducer } from "use-immer";
 import { createContext } from "use-context-selector";
 import { Operation } from "./utils";
-import { useStateSelector } from "@/contexts/state";
 import { getTokenData } from "@/onchain/token/utils";
 import { useSortedPoolsWithIndexToken } from "@/hooks";
 
@@ -17,24 +16,21 @@ export default function GmStateProvider({
   operation,
   firstToken,
   secondToken,
+  marketTokens,
+  marketInfos,
 }: {
   children: ReactNode,
   market: MarketInfo,
   operation: Operation,
   firstToken?: TokenData,
   secondToken?: TokenData,
+  marketTokens: Tokens,
+  marketInfos: MarketInfos,
 }) {
   const [input, dispath] = useImmerReducer(stateReducer, {
     firstTokenInputValue: "",
     secondTokenInputValue: "",
     marketTokenInputValue: "",
-  });
-
-  const { marketTokens, marketInfos } = useStateSelector(({ marketTokens, marketInfos }) => {
-    return {
-      marketTokens,
-      marketInfos,
-    }
   });
 
   const marketToken = getTokenData(marketTokens, market.marketTokenAddress);

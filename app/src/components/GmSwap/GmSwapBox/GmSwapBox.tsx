@@ -1,48 +1,66 @@
 import "./GmSwapBox.scss";
-import { Market, MarketInfos } from "@/onchain/market";
+import { MarketInfo, MarketInfos } from "@/onchain/market";
 import { Tokens } from "@/onchain/token";
 import { Mode, Operation } from "../utils";
-import { getByKey } from "@/utils/objects";
-import Inner from "./Inner";
-import { useGenesisHash } from "@/onchain";
+import { GmForm } from "./GmForm";
+import { useTokenOptionsFromStorage } from "../hooks";
+import GmStateProvider from "../GmStateProvider";
 
 type Props = {
-  selectedMarketAddress?: string;
-  markets: Market[];
-  marketsInfoData?: MarketInfos;
-  tokensData?: Tokens;
-  onSelectMarket: (marketAddress: string) => void;
+  chainId: string,
+  marketInfo: MarketInfo,
   operation: Operation;
   mode: Mode;
+  tokensData?: Tokens;
+  marketTokens: Tokens,
+  marketInfos: MarketInfos,
   setMode: (mode: Mode) => void;
   setOperation: (operation: Operation) => void;
+  onSelectMarket: (marketAddress: string) => void;
 };
 
 export function GmSwapBox({
+  chainId,
+  marketInfo,
   operation,
   mode,
+  tokensData,
+  marketTokens,
+  marketInfos,
   setMode,
   setOperation,
   onSelectMarket,
-  marketsInfoData,
-  tokensData,
-  selectedMarketAddress: marketAddress,
 }: Props) {
-  const genesisHash = useGenesisHash();
-  const marketInfo = getByKey(marketsInfoData, marketAddress);
+  const [tokenOptions, setTokenAddress] = useTokenOptionsFromStorage({
+    chainId,
+    marketInfo,
+    operation,
+    mode,
+    tokensData,
+  });
+
   return (
-    genesisHash && marketInfo ?
-      <Inner
-        genesisHash={genesisHash}
+    <GmStateProvider
+      market={marketInfo}
+      operation={operation}
+      firstToken={tokenOptions.firstToken}
+      secondToken={tokenOptions.secondToken}
+      marketTokens={marketTokens}
+      marketInfos={marketInfos}
+    >
+      <GmForm
+        genesisHash={chainId}
         operation={operation}
         mode={mode}
+        tokenOptions={tokenOptions}
         setOperation={setOperation}
         setMode={setMode}
-        marketInfo={marketInfo}
-        tokensData={tokensData}
         onSelectMarket={onSelectMarket}
+        onSelectFirstToken={(token) => {
+          setTokenAddress(token.address, "first");
+        }}
       />
-      : <div>loading</div>
+    </GmStateProvider>
   );
 }
 
