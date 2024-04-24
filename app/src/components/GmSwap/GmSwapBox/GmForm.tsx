@@ -1,5 +1,6 @@
 import Tab from "@/components/Tab/Tab";
-import { CreateDepositParams, Mode, Operation, TokenOptions, getGmSwapBoxAvailableModes } from "../utils";
+import { TokenOptions, getGmSwapBoxAvailableModes } from "../utils";
+import { CreateDepositParams, CreateWithdrawalParams, Mode, Operation } from "../types";
 import { useCallback, useMemo, useState } from "react";
 import { useLingui } from "@lingui/react";
 import { mapValues } from "lodash";
@@ -39,6 +40,7 @@ export function GmForm({
   onSelectMarket,
   onSelectFirstToken,
   onCreateDeposit,
+  onCreateWithdrawal,
 }: {
   genesisHash: string,
   tokenOptions: TokenOptions,
@@ -47,6 +49,7 @@ export function GmForm({
   onSelectMarket: (marketAddress: string) => void,
   onSelectFirstToken: (token: Token) => void,
   onCreateDeposit: (params: CreateDepositParams) => void,
+  onCreateWithdrawal: (params: CreateWithdrawalParams) => void,
 }) {
   const { i18n } = useLingui();
 
@@ -80,7 +83,7 @@ export function GmForm({
     };
   });
 
-  const handleSubmit = useHandleSumit({ onCreateDeposit });
+  const handleSubmit = useHandleSumit({ onCreateDeposit, onCreateWithdrawal });
 
   const [focusedInput, setFocusedInput] = useState<"longCollateral" | "shortCollateral" | "market">("market");
 

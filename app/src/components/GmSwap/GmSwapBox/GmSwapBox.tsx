@@ -1,7 +1,7 @@
 import "./GmSwapBox.scss";
 import { MarketInfo, MarketInfos } from "@/onchain/market";
 import { Tokens } from "@/onchain/token";
-import { CreateDepositParams, Mode, Operation } from "../utils";
+import { CreateDepositParams, CreateWithdrawalParams, Mode, Operation } from "../types";
 import { GmForm } from "./GmForm";
 import { useTokenOptionsFromStorage } from "../hooks";
 import GmStateProvider from "../GmStateProvider";
@@ -18,6 +18,7 @@ type Props = {
   setOperation: (operation: Operation) => void;
   onSelectMarket: (marketAddress: string) => void;
   onCreateDeposit: (params: CreateDepositParams) => void;
+  onCreateWithdrawal: (params: CreateWithdrawalParams) => void;
 };
 
 export function GmSwapBox({
@@ -32,6 +33,7 @@ export function GmSwapBox({
   setOperation,
   onSelectMarket,
   onCreateDeposit,
+  onCreateWithdrawal,
 }: Props) {
   const [tokenOptions, setTokenAddress] = useTokenOptionsFromStorage({
     chainId,
@@ -61,6 +63,7 @@ export function GmSwapBox({
           setTokenAddress(token.address, "first");
         }}
         onCreateDeposit={onCreateDeposit}
+        onCreateWithdrawal={onCreateWithdrawal}
       />
     </GmStateProvider>
   );

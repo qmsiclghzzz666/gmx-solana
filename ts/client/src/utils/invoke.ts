@@ -15,6 +15,7 @@ export const makeInvoke = <
 >(
     makeInstruction: (program: Program<IDL>, params: T) => Promise<TransactionInstruction | IxWithOutput<U>>,
     signers: S,
+    defaultSignByProvider?: boolean,
 ) => {
     return async (
         program: Program<IDL>,
@@ -52,7 +53,8 @@ export const makeInvoke = <
                 .add(ix) :
             new Transaction().add(ix);
         try {
-            if (options?.signByProvider && program.provider.sendAndConfirm) {
+            const signByProvider = options?.signByProvider ?? defaultSignByProvider;
+            if (signByProvider && program.provider.sendAndConfirm) {
                 const hash = await program.provider.connection.getLatestBlockhash();
                 tx.recentBlockhash = hash.blockhash;
                 return [await program.provider.sendAndConfirm(tx, signerList, {

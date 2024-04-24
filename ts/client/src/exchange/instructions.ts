@@ -2,7 +2,7 @@ import { Keypair, PublicKey } from "@solana/web3.js";
 import { findControllerPDA } from ".";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { toBN } from "../utils/number";
-import { findDepositPDA, findMarketPDA, findMarketVaultPDA, findRolesPDA, findTokenConfigMapPDA } from "../store";
+import { findDepositPDA, findMarketPDA, findMarketVaultPDA, findRolesPDA, findTokenConfigMapPDA, findWithdrawalPDA } from "../store";
 import { IxWithOutput, makeInvoke } from "../utils/invoke";
 import { ExchangeProgram } from "../program";
 import { BN } from "@coral-xyz/anchor";
@@ -91,4 +91,80 @@ export const makeCreateDepositInstruction = async (
 }
 
 export const invokeCreateDepositWithPayerAsSigner = makeInvoke(makeCreateDepositInstruction, ["payer"]);
-export const invokeCreateDeposit = makeInvoke(makeCreateDepositInstruction, []);
+export const invokeCreateDeposit = makeInvoke(makeCreateDepositInstruction, [], true);
+
+export type MakeCreateWithdrawalParams = {
+    store: PublicKey,
+    payer: PublicKey,
+    marketToken: PublicKey,
+    amount: number | bigint | BN,
+    finalLongToken: PublicKey,
+    finalShortToken: PublicKey,
+    options?: {
+        nonce?: Buffer,
+        executionFee?: number | bigint,
+        minLongTokenAmount?: number | bigint,
+        minShortTokenAmount?: number | bigint,
+        fromMarketTokenAccount?: PublicKey,
+        toLongTokenAccount?: PublicKey,
+        toShortTokenAccount?: PublicKey,
+        longTokenSwapPath?: PublicKey[],
+        shortTokenSwapPath?: PublicKey[],
+        shouldUnwrapNativeToken?: boolean,
+    }
+};
+
+export const makeCreateWithdrawalInstruction = async (
+    exchange: ExchangeProgram,
+    {
+        store,
+        payer,
+        marketToken,
+        amount,
+        finalLongToken,
+        finalShortToken,
+        options,
+    }: MakeCreateWithdrawalParams) => {
+    const [authority] = findControllerPDA(store);
+    const fromMarketTokenAccount = getTokenAccount(payer, marketToken, options?.fromMarketTokenAccount);
+    const toLongTokenAccount = getTokenAccount(payer, finalLongToken, options?.toLongTokenAccount);
+    const toShortTokenAccount = getTokenAccount(payer, finalShortToken, options?.toShortTokenAccount);
+    const withdrawalNonce = options?.nonce ?? Keypair.generate().publicKey.toBuffer();
+    const [withdrawalAddress] = findWithdrawalPDA(store, payer, withdrawalNonce);
+    const longSwapPath = options?.longTokenSwapPath ?? [];
+    const shortSwapPath = options?.shortTokenSwapPath ?? [];
+    const instruction = await exchange.methods.createWithdrawal([...withdrawalNonce], {
+        marketTokenAmount: toBN(amount),
+        executionFee: toBN(options?.executionFee ?? 0),
+        uiFeeReceiver: PublicKey.default,
+        tokens: {
+            minLongTokenAmount: toBN(options?.minLongTokenAmount ?? 0),
+            minShortTokenAmount: toBN(options?.minShortTokenAmount ?? 0),
+            shouldUnwrapNativeToken: options?.shouldUnwrapNativeToken ?? false
+        },
+        longTokenSwapLength: longSwapPath.length,
+        shortTokenSwapLength: shortSwapPath.length,
+    }).accounts({
+        store,
+        onlyController: findRolesPDA(store, authority)[0],
+        tokenConfigMap: findTokenConfigMapPDA(store)[0],
+        market: findMarketPDA(store, marketToken)[0],
+        withdrawal: withdrawalAddress,
+        payer,
+        marketTokenAccount: fromMarketTokenAccount,
+        marketTokenWithdrawalVault: findMarketVaultPDA(store, marketToken)[0],
+        finalLongTokenReceiver: toLongTokenAccount,
+        finalShortTokenReceiver: toShortTokenAccount,
+    }).remainingAccounts([...longSwapPath, ...shortSwapPath].map(token => {
+        return {
+            pubkey: findMarketPDA(store, token)[0],
+            isSigner: false,
+            isWritable: false,
+        };
+    })).instruction();
+
+    return [instruction, withdrawalAddress] as IxWithOutput<PublicKey>;
+};
+
+export const invokeCreateWithdrawalWithPayerAsSigner = makeInvoke(makeCreateWithdrawalInstruction, ["payer"]);
+export const invokeCreateWithdrawal = makeInvoke(makeCreateWithdrawalInstruction, [], true);

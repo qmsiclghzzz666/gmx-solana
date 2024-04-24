@@ -35,3 +35,10 @@ export const findDepositPDA = (store: PublicKey, user: PublicKey, nonce: Uint8Ar
     user.toBytes(),
     nonce,
 ], DATA_STORE_ID);
+
+export const findWithdrawalPDA = (store: PublicKey, user: PublicKey, nonce: Uint8Array) => PublicKey.findProgramAddressSync([
+    encodeUtf8("withdrawal"),
+    store.toBytes(),
+    user.toBytes(),
+    nonce,
+], DATA_STORE_ID);

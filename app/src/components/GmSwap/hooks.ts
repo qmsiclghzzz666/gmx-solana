@@ -5,7 +5,8 @@ import { getTokenData } from "@/onchain/token/utils";
 import { useLocalStorageSerializeKey } from "@/utils/localStorage";
 import { Address, BN } from "@coral-xyz/anchor";
 import React, { useCallback, useEffect } from "react";
-import { CreateDepositParams, Mode, Operation, TokenOptions, getTokenOptions } from "./utils";
+import { TokenOptions, getTokenOptions } from "./utils";
+import { CreateDepositParams, CreateWithdrawalParams, Mode, Operation } from "./types";
 import { Context, useContext, useContextSelector } from "use-context-selector";
 import { GmState, GmStateContext, GmStateDispatchContext } from "./GmStateProvider";
 import { convertToUsd, parseValue } from "@/utils/number";
@@ -186,8 +187,8 @@ const fixUnnecessarySwap = ({
   market: Market,
   initialLongToken: PublicKey,
   initialShortToken: PublicKey,
-  initialLongTokenAmount: BN,
-  initialShortTokenAmount: BN
+  initialLongTokenAmount?: BN,
+  initialShortTokenAmount?: BN
 }) => {
   if (initialLongToken.equals(market.shortTokenAddress) && initialShortToken.equals(market.longTokenAddress)) {
     return {
@@ -208,15 +209,17 @@ const fixUnnecessarySwap = ({
 
 export const useHandleSumit = ({
   onCreateDeposit,
+  onCreateWithdrawal,
 }: {
   onCreateDeposit: (params: CreateDepositParams) => void,
+  onCreateWithdrawal: (params: CreateWithdrawalParams) => void,
 }) => {
   const operation = useGmStateSelector(s => s.operation);
   const mode = useGmStateSelector(s => s.mode);
   const market = useGmStateSelector(s => s.market);
   const initialLongToken = useGmStateSelector(s => s.firstToken?.address) ?? market.longTokenAddress;
   const initialShortToken = useGmStateSelector(s => s.secondToken?.address) ?? market.shortTokenAddress;
-  const { firstTokenAmount, secondTokenAmount } = useGmInputAmounts();
+  const { firstTokenAmount, secondTokenAmount, marketTokenAmount } = useGmInputAmounts();
 
   return useCallback(() => {
     if (operation === Operation.Deposit) {
@@ -224,14 +227,13 @@ export const useHandleSumit = ({
       const initialShortTokenAmount = secondTokenAmount ?? BN_ZERO;
 
       if (mode === Mode.Single && !initialLongTokenAmount.isZero()) {
-        const params = {
+        onCreateDeposit({
           marketToken: market.marketTokenAddress,
           initialLongToken,
           initialShortToken,
           initialLongTokenAmount,
           initialShortTokenAmount: BN_ZERO,
-        };
-        onCreateDeposit(params);
+        });
       } else if (mode === Mode.Pair && !(initialLongTokenAmount.isZero() && initialShortTokenAmount.isZero())) {
         const {
           fixedInitialLongToken,
@@ -245,17 +247,40 @@ export const useHandleSumit = ({
           initialLongTokenAmount,
           initialShortTokenAmount
         });
-        const params = {
+        onCreateDeposit({
           marketToken: market.marketTokenAddress,
           initialLongToken: fixedInitialLongToken,
           initialShortToken: fixedInitialShortToken,
-          initialLongTokenAmount: fixedInitialLongTokenAmount,
-          initialShortTokenAmount: fixedInitialShortTokenAmount,
-        };
-        onCreateDeposit(params);
+          initialLongTokenAmount: fixedInitialLongTokenAmount!,
+          initialShortTokenAmount: fixedInitialShortTokenAmount!,
+        });
       } else {
         console.log("not enough amounts", mode, initialLongTokenAmount.toString(), initialShortTokenAmount.toString());
       }
+    } else if (operation === Operation.Withdrawal && !marketTokenAmount?.isZero()) {
+      if (market.isSingle) {
+        onCreateWithdrawal({
+          marketToken: market.marketTokenAddress,
+          amount: marketTokenAmount,
+          finalLongToken: initialLongToken,
+          finalShortToken: initialLongToken,
+        });
+      } else {
+        const {
+          fixedInitialLongToken,
+          fixedInitialShortToken,
+        } = fixUnnecessarySwap({
+          market,
+          initialLongToken,
+          initialShortToken,
+        });
+        onCreateWithdrawal({
+          marketToken: market.marketTokenAddress,
+          amount: marketTokenAmount,
+          finalLongToken: fixedInitialLongToken,
+          finalShortToken: fixedInitialShortToken,
+        });
+      }
     }
-  }, [firstTokenAmount, initialLongToken, initialShortToken, market, mode, onCreateDeposit, operation, secondTokenAmount]);
+  }, [operation, marketTokenAmount, firstTokenAmount, secondTokenAmount, mode, onCreateDeposit, market, initialLongToken, initialShortToken, onCreateWithdrawal]);
 };

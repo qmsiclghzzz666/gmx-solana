@@ -162,7 +162,7 @@ export function MarketStats(p: Props) {
               renderContent={() => {
                 return (
                   <div>
-                    <Trans>GM Token pricing includes positions&apos Pending PnL, Impact Pool Amount and Borrow Fees.</Trans>
+                    <Trans>GM Token pricing includes positions&apos; Pending PnL, Impact Pool Amount and Borrow Fees.</Trans>
                   </div>
                 );
               }}

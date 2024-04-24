@@ -3,7 +3,7 @@ import { TokenData, Tokens } from "@/onchain/token";
 import React, { Dispatch, ReactNode, useMemo } from "react";
 import { useImmerReducer } from "use-immer";
 import { createContext } from "use-context-selector";
-import { Mode, Operation } from "./utils";
+import { Mode, Operation } from "./types";
 import { getTokenData } from "@/onchain/token/utils";
 import { useSortedPoolsWithIndexToken } from "@/hooks";
 

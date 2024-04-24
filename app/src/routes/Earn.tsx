@@ -11,10 +11,11 @@ import { useLoaderData, useSearchParams } from "react-router-dom";
 import { PublicKey } from "@solana/web3.js";
 import { useCallback, useEffect, useRef } from "react";
 import { GmSwapBox } from "@/components/GmSwap/GmSwapBox/GmSwapBox";
-import { CreateDepositParams, Mode, Operation, getGmSwapBoxAvailableModes } from "@/components/GmSwap/utils";
+import { getGmSwapBoxAvailableModes } from "@/components/GmSwap/utils";
+import { CreateDepositParams, CreateWithdrawalParams, Mode, Operation } from "@/components/GmSwap/types";
 import { useGenesisHash } from "@/onchain";
 import { useExchange } from "@/contexts/anchor";
-import { MakeCreateDepositParams, invokeCreateDeposit } from "gmsol";
+import { MakeCreateDepositParams, MakeCreateWithdrawalParams, invokeCreateDeposit, invokeCreateWithdrawal } from "gmsol";
 import { GMSOL_DEPLOYMENT } from "@/config/deployment";
 import useSWRMutation from "swr/mutation";
 
@@ -87,7 +88,7 @@ export default function Earn() {
 
   const { trigger: triggerCreateDeposit } = useSWRMutation('exchange/create-deposit', async (_key, { arg }: { arg: MakeCreateDepositParams }) => {
     try {
-      const [signature, deposit] = await invokeCreateDeposit(exchange, arg, { signByProvider: true });
+      const [signature, deposit] = await invokeCreateDeposit(exchange, arg);
       console.log(`created a deposit ${deposit.toBase58()} at tx ${signature}`);
     } catch (error) {
       console.log(error);
@@ -98,20 +99,38 @@ export default function Earn() {
   const handleCreateDeposit = useCallback((params: CreateDepositParams) => {
     if (payer && GMSOL_DEPLOYMENT) {
       const store = GMSOL_DEPLOYMENT.store;
-      const fullParams: MakeCreateDepositParams = {
+      void triggerCreateDeposit({
         store,
         payer,
-        marketToken: params.marketToken,
-        initialLongToken: params.initialLongToken,
-        initialShortToken: params.initialShortToken,
-        initialLongTokenAmount: params.initialLongTokenAmount,
-        initialShortTokenAmount: params.initialShortTokenAmount,
-      };
-      void triggerCreateDeposit(fullParams);
+        ...params,
+      });
     } else {
       console.log("not connected");
     }
   }, [payer, triggerCreateDeposit]);
+
+  const { trigger: triggerCreateWithdrawal } = useSWRMutation('exchange/create-withdrawal', async (_key, { arg }: { arg: MakeCreateWithdrawalParams }) => {
+    try {
+      const [signature, deposit] = await invokeCreateWithdrawal(exchange, arg);
+      console.log(`created a withdrawal ${deposit.toBase58()} at tx ${signature}`);
+    } catch (error) {
+      console.log(error);
+      throw error;
+    }
+  });
+
+  const handleCreateWithdrawal = useCallback((params: CreateWithdrawalParams) => {
+    if (payer && GMSOL_DEPLOYMENT) {
+      const store = GMSOL_DEPLOYMENT.store;
+      void triggerCreateWithdrawal({
+        store,
+        payer,
+        ...params,
+      });
+    } else {
+      console.log("not connected");
+    }
+  }, [payer, triggerCreateWithdrawal]);
 
   return (
     <div className="default-container page-layout">
@@ -150,6 +169,7 @@ export default function Earn() {
             setMode={setMode}
             setOperation={setOperation}
             onCreateDeposit={handleCreateDeposit}
+            onCreateWithdrawal={handleCreateWithdrawal}
           />) : "loading"}
         </div>
       </div>
