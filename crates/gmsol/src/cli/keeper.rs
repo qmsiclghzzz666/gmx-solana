@@ -212,13 +212,13 @@ impl KeeperArgs {
         let unsubscriber = program
             .on::<DepositCreatedEvent>(move |ctx, event| {
                 if event.store == store {
-                    tracing::info!(slot=%ctx.slot, "{event:?}");
+                    tracing::info!(slot=%ctx.slot, ?event, "received a new deposit event");
                     tx.send(Command::ExecuteDeposit {
                         deposit: event.deposit,
                     })
                     .unwrap();
                 } else {
-                    tracing::debug!(slot=%ctx.slot, ?event, "received events from other store");
+                    tracing::debug!(slot=%ctx.slot, ?event, "received deposit event from other store");
                 }
             })
             .await?;
@@ -226,7 +226,7 @@ impl KeeperArgs {
             while let Some(command) = rx.recv().await {
                 match self.with_command(command).run(client, &store).await {
                     Ok(()) => {
-                        tracing::info!("executed");
+                        tracing::info!("command executed");
                     }
                     Err(err) => {
                         tracing::error!(%err, "failed to execute, ignore");
