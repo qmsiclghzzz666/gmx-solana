@@ -56,6 +56,17 @@ pub trait TokenConfigOps<C> {
         precision: u8,
     ) -> RequestBuilder<C>;
 
+    /// Insert or update config the given fake token.
+    fn insert_fake_token_config(
+        &self,
+        store: &Pubkey,
+        token: &Pubkey,
+        decimals: u8,
+        price_feed: &Pubkey,
+        heartbeat_duration: u32,
+        precision: u8,
+    ) -> RequestBuilder<C>;
+
     /// Get token config of the given token.
     fn get_token_config(&self, store: &Pubkey, token: &Pubkey) -> RequestBuilder<C>;
 
@@ -110,6 +121,35 @@ where
                 system_program: system_program::ID,
             })
             .args(instruction::InsertTokenConfig {
+                price_feed: *price_feed,
+                heartbeat_duration,
+                precision,
+            })
+    }
+
+    fn insert_fake_token_config(
+        &self,
+        store: &Pubkey,
+        token: &Pubkey,
+        decimals: u8,
+        price_feed: &Pubkey,
+        heartbeat_duration: u32,
+        precision: u8,
+    ) -> RequestBuilder<C> {
+        let authority = self.payer();
+        let only_controller = find_roles_address(store, &authority).0;
+        let map = find_token_config_map(store).0;
+        self.request()
+            .accounts(accounts::InsertFakeTokenConfig {
+                authority,
+                only_controller,
+                store: *store,
+                map,
+                system_program: system_program::ID,
+            })
+            .args(instruction::InsertFakeTokenConfig {
+                token: *token,
+                decimals,
                 price_feed: *price_feed,
                 heartbeat_duration,
                 precision,

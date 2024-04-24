@@ -24,6 +24,9 @@ enum Command {
         heartbeat_duration: u32,
         #[arg(long, default_value_t = 4)]
         precision: u8,
+        /// Provide to create a fake token with the given decimals.
+        #[arg(long)]
+        fake_decimals: Option<u8>,
     },
     /// Toggle token config of token.
     ToggleTokenConfig {
@@ -68,11 +71,32 @@ impl ControllerArgs {
                 price_feed,
                 heartbeat_duration,
                 precision,
+                fake_decimals,
             } => {
-                let signature = program
-                    .insert_token_config(store, token, price_feed, *heartbeat_duration, *precision)
-                    .send()
-                    .await?;
+                let signature = if let Some(decimals) = fake_decimals {
+                    program
+                        .insert_fake_token_config(
+                            store,
+                            token,
+                            *decimals,
+                            price_feed,
+                            *heartbeat_duration,
+                            *precision,
+                        )
+                        .send()
+                        .await?
+                } else {
+                    program
+                        .insert_token_config(
+                            store,
+                            token,
+                            price_feed,
+                            *heartbeat_duration,
+                            *precision,
+                        )
+                        .send()
+                        .await?
+                };
                 println!("{signature}");
             }
             Command::ToggleTokenConfig { token, toggle } => {
