@@ -4,7 +4,7 @@ import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { toBN } from "../utils/number";
 import { findDepositPDA, findMarketPDA, findMarketVaultPDA, findRolesPDA, findTokenConfigMapPDA, findWithdrawalPDA } from "../store";
 import { IxWithOutput, makeInvoke } from "../utils/invoke";
-import { ExchangeProgram } from "../program";
+import { EXCHANGE_ID, ExchangeProgram } from "../program";
 import { BN } from "@coral-xyz/anchor";
 
 export type MakeCreateDepositParams = {
@@ -79,6 +79,7 @@ export const makeCreateDepositInstruction = async (
         initialShortTokenAccount: fromInitialShortTokenAccount ?? null,
         longTokenDepositVault: longTokenDepositVault ?? null,
         shortTokenDepositVault: shortTokenDepositVault ?? null,
+        program: EXCHANGE_ID,
     }).remainingAccounts([...longSwapPath, ...shortSwapPath].map(mint => {
         return {
             pubkey: findMarketPDA(store, mint)[0],

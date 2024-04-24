@@ -9,6 +9,9 @@ pub mod utils;
 /// Constants.
 pub mod constants;
 
+/// Events.
+pub mod events;
+
 use data_store::utils::Authenticate;
 use instructions::*;
 

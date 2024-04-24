@@ -134,3 +134,6 @@ impl TokenAccountParams {
         self.token.is_none() && self.token.is_none()
     }
 }
+
+/// Event authority SEED.
+pub const EVENT_AUTHORITY_SEED: &[u8] = b"__event_authority";

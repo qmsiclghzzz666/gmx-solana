@@ -9,6 +9,7 @@ use data_store::{
 };
 
 use crate::{
+    events::DepositCreatedEvent,
     utils::{market::get_and_validate_swap_path, ControllerSeeds},
     ExchangeError,
 };
@@ -26,6 +27,7 @@ pub struct CreateDepositParams {
     pub should_unwrap_native_token: bool,
 }
 
+#[event_cpi]
 #[derive(Accounts)]
 pub struct CreateDeposit<'info> {
     /// CHECK: only used as signing PDA.
@@ -203,29 +205,12 @@ pub fn create_deposit<'info>(
     if params.execution_fee != 0 {
         system_program::transfer(ctx.accounts.transfer_ctx(), params.execution_fee)?;
     }
-    // TODO: emit deposit created event.
+    emit_cpi!(DepositCreatedEvent {
+        store: ctx.accounts.store.key(),
+        deposit: ctx.accounts.deposit.key(),
+    });
     Ok(())
 }
-
-// impl<'info> Authentication<'info> for CreateDeposit<'info> {
-//     fn authority(&self) -> &Signer<'info> {
-//         &self.authority
-//     }
-
-//     fn check_role_ctx(&self) -> CpiContext<'_, '_, '_, 'info, CheckRole<'info>> {
-//         CpiContext::new(
-//             self.data_store_program.to_account_info(),
-//             CheckRole {
-//                 store: self.store.to_account_info(),
-//                 roles: self.only_controller.to_account_info(),
-//             },
-//         )
-//     }
-
-//     fn on_error(&self) -> Result<()> {
-//         Err(error!(ExchangeError::PermissionDenied))
-//     }
-// }
 
 impl<'info> CreateDeposit<'info> {
     fn get_market_meta_ctx(&self) -> CpiContext<'_, '_, '_, 'info, GetMarketMeta<'info>> {

@@ -29,7 +29,10 @@ data_store = { path = "../../programs/data_store", features = [
     "no-entrypoint",
     "debug",
 ] }
-exchange = { path = "../../programs/exchange", features = ["no-entrypoint"] }
+exchange = { path = "../../programs/exchange", features = [
+    "no-entrypoint",
+    "debug",
+] }
 rand = { version = "0.8.5" }
 
 # Dependencies for cli

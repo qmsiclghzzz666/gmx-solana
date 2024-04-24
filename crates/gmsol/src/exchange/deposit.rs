@@ -248,6 +248,8 @@ where
                     .map(|token| find_market_vault_address(store, &token).0),
                 short_token_deposit_vault: short_token
                     .map(|token| find_market_vault_address(store, &token).0),
+                event_authority: super::find_event_authority_address().0,
+                program: program.id(),
             })
             .args(instruction::CreateDeposit {
                 nonce,

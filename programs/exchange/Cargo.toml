@@ -19,9 +19,10 @@ idl-build = [
     "data_store/idl-build",
     "anchor-spl/idl-build",
 ]
+debug = ["data_store/debug"]
 
 [dependencies]
-anchor-lang = { workspace = true }
+anchor-lang = { workspace = true, features = ["event-cpi"] }
 anchor-spl = { workspace = true, default_features = false, features = [
     "token",
     "token_2022",

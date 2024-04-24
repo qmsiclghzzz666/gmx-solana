@@ -6,6 +6,7 @@ use anchor_client::{
     },
     Program, RequestBuilder,
 };
+use exchange::events::DepositCreatedEvent;
 use gmsol::{
     exchange::ExchangeOps,
     store::{market::VaultOps, oracle::find_oracle_address},
@@ -30,6 +31,8 @@ pub(super) struct KeeperArgs {
 
 #[derive(clap::Subcommand)]
 enum Command {
+    /// Watch for items creation and execute them.
+    Watch,
     /// Execute Deposit.
     ExecuteDeposit {
         deposit: Pubkey,
@@ -129,6 +132,9 @@ impl KeeperArgs {
 
     pub(super) async fn run(&self, client: &SharedClient, store: &Pubkey) -> gmsol::Result<()> {
         match &self.command {
+            Command::Watch => {
+                start_watching(client).await?;
+            }
             Command::ExecuteDeposit { deposit, oracle } => {
                 let program = client.program(exchange::id())?;
                 let mut builder = program.execute_deposit(store, &oracle.address(store), deposit);
@@ -197,4 +203,17 @@ impl KeeperArgs {
         }
         Ok(())
     }
+}
+
+async fn start_watching(client: &SharedClient) -> gmsol::Result<()> {
+    let program = client.program(exchange::id())?;
+    let unsubscriber = program
+        .on::<DepositCreatedEvent>(|ctx, event| {
+            tracing::info!(slot=%ctx.slot, "{event:?}");
+        })
+        .await?;
+    tokio::signal::ctrl_c().await?;
+    tracing::info!("Received `ctrl + c`, stopping...");
+    unsubscriber.unsubscribe().await;
+    Ok(())
 }

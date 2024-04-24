@@ -182,6 +182,8 @@ export const mochaGlobalSetup = async () => {
         user0FakeFakeUsdGTokenAccount = await createAssociatedTokenAccount(provider.connection, user0, markets.GMFakeFakeUsdG, user0.publicKey);
         user0WsolWsolUsdGTokenAccount = await createAssociatedTokenAccount(provider.connection, user0, markets.GMWsolWsolUsdG, user0.publicKey);
 
+        eventManager.subscribe(exchange, "DepositCreatedEvent");
+
         console.log("[Done.]");
     } catch (error) {
         console.log("[Failed.]", error);

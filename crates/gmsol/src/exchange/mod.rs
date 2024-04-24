@@ -16,15 +16,17 @@ use anchor_client::{
 };
 use data_store::states::{
     order::{OrderKind, OrderParams},
-    DataStore, NonceBytes, Seed,
+    NonceBytes,
 };
 use exchange::{accounts, instruction};
-use gmx_solana_utils::to_seed;
 use rand::{distributions::Standard, Rng};
 
-use crate::store::{
-    market::{find_market_address, find_market_token_address, find_market_vault_address},
-    roles::find_roles_address,
+use crate::{
+    store::{
+        market::{find_market_address, find_market_token_address, find_market_vault_address},
+        roles::find_roles_address,
+    },
+    utils::EVENT_AUTHORITY_SEED,
 };
 
 use self::{
@@ -33,9 +35,9 @@ use self::{
     withdrawal::{CancelWithdrawalBuilder, CreateWithdrawalBuilder, ExecuteWithdrawalBuilder},
 };
 
-/// Find PDA for `DataStore` account.
-pub fn find_store_address(key: &str) -> (Pubkey, u8) {
-    Pubkey::find_program_address(&[DataStore::SEED, &to_seed(key)], &data_store::id())
+/// Find PDA for `event_authority` account.
+pub fn find_event_authority_address() -> (Pubkey, u8) {
+    Pubkey::find_program_address(&[EVENT_AUTHORITY_SEED], &exchange::id())
 }
 
 /// Exchange instructions for GMSOL.
