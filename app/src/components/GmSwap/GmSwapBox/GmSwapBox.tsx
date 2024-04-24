@@ -5,6 +5,8 @@ import { CreateDepositParams, CreateWithdrawalParams, Mode, Operation } from "..
 import { GmForm } from "./GmForm";
 import { useTokenOptionsFromStorage } from "../hooks";
 import GmStateProvider from "../GmStateProvider";
+import { getTokenData } from "@/onchain/token/utils";
+import { NATIVE_TOKEN_ADDRESS } from "@/config/tokens";
 
 type Props = {
   chainId: string,
@@ -43,6 +45,8 @@ export function GmSwapBox({
     tokensData,
   });
 
+  const nativeToken = getTokenData(tokensData, NATIVE_TOKEN_ADDRESS);
+
   return (
     <GmStateProvider
       market={marketInfo}
@@ -50,6 +54,7 @@ export function GmSwapBox({
       mode={mode}
       firstToken={tokenOptions.firstToken}
       secondToken={tokenOptions.secondToken}
+      nativeToken={nativeToken}
       marketTokens={marketTokens}
       marketInfos={marketInfos}
     >

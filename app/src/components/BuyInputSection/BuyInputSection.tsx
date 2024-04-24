@@ -10,6 +10,7 @@ type Props = {
   topLeftValue?: string;
   topRightLabel?: string;
   topRightValue?: string;
+  onClientTopLeftLabel?: () => void;
   onClickTopRightLabel?: () => void;
   inputValue?: number | string;
   onInputValueChange?: (e: ChangeEvent<HTMLInputElement>) => void;
@@ -30,6 +31,7 @@ export default function BuyInputSection(props: Props) {
     topLeftValue,
     topRightLabel,
     topRightValue,
+    onClientTopLeftLabel,
     onClickTopRightLabel,
     inputValue,
     onInputValueChange,
@@ -83,7 +85,11 @@ export default function BuyInputSection(props: Props) {
     <div>
       <div className="Exchange-swap-section buy-input" onClick={handleBoxClick}>
         <div className="buy-input-top-row">
-          <div data-label="left" className="text-gray">
+          <div
+            data-label="left"
+            className={cx("text-gray", { clickable: onClientTopLeftLabel })}
+            onClick={onClientTopLeftLabel}
+          >
             {topLeftLabel}
             {topLeftValue && `${INPUT_LABEL_SEPARATOR} ${topLeftValue}`}
           </div>

@@ -17,6 +17,7 @@ export default function GmStateProvider({
   mode,
   firstToken,
   secondToken,
+  nativeToken,
   marketTokens,
   marketInfos,
 }: {
@@ -26,6 +27,7 @@ export default function GmStateProvider({
   mode: Mode,
   firstToken?: TokenData,
   secondToken?: TokenData,
+  nativeToken?: TokenData,
   marketTokens: Tokens,
   marketInfos: MarketInfos,
 }) {
@@ -49,11 +51,12 @@ export default function GmStateProvider({
       mode,
       firstToken,
       secondToken,
+      nativeToken,
       marketToken,
       marketTokens,
       sortedMarketsInfoByIndexToken,
     };
-  }, [firstToken, input, market, marketToken, marketTokens, operation, mode, secondToken, sortedMarketsInfoByIndexToken]);
+  }, [input, market, operation, mode, firstToken, secondToken, nativeToken, marketToken, marketTokens, sortedMarketsInfoByIndexToken]);
 
   return (
     <GmStateContext.Provider value={state}>
@@ -71,6 +74,7 @@ export interface GmState {
   firstToken?: TokenData,
   secondToken?: TokenData,
   marketToken?: TokenData,
+  nativeToken?: TokenData,
   marketTokens?: Tokens,
   sortedMarketsInfoByIndexToken: MarketInfo[],
   input: InputState,

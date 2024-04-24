@@ -9,6 +9,7 @@ export interface Token {
   isNative?: boolean,
   wrappedAddress?: PublicKey,
   isWrapped?: boolean,
+  isWrappedNative?: boolean,
 }
 
 export interface TokenPrices {

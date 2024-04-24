@@ -1,7 +1,7 @@
 import Tab from "@/components/Tab/Tab";
 import { TokenOptions, getGmSwapBoxAvailableModes } from "../utils";
 import { CreateDepositParams, CreateWithdrawalParams, Mode, Operation } from "../types";
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useLingui } from "@lingui/react";
 import { mapValues } from "lodash";
 import cx from "classnames";
@@ -11,7 +11,7 @@ import "./GmSwapBox.scss";
 import { formatUsd, getMarketIndexName } from "@/components/MarketsList/utils";
 import Button from "@/components/Button/Button";
 import BuyInputSection from "@/components/BuyInputSection/BuyInputSection";
-import { Token } from "@/onchain/token";
+import { Token, TokenData } from "@/onchain/token";
 import TokenWithIcon from "@/components/TokenIcon/TokenWithIcon";
 import TokenSelector from "@/components/TokenSelector/TokenSelector";
 import { useLocalStorageSerializeKey } from "@/utils/localStorage";
@@ -20,8 +20,9 @@ import { BN_ZERO } from "@/config/constants";
 import { IoMdSwap } from "react-icons/io";
 import { PoolSelector } from "@/components/MarketSelector/PoolSelector";
 import { useGmInputAmounts, useGmInputDisplay, useGmStateDispath, useGmStateSelector, useHandleSumit } from "../hooks";
-import { formatAmountFree, formatTokenAmount } from "@/utils/number";
-import { useInitializeTokenAccount } from "@/onchain";
+import { convertToUsd, formatAmountFree, formatTokenAmount, parseValue } from "@/utils/number";
+import { useInitializeTokenAccount, useWrapNativeToken } from "@/onchain";
+import Modal from "@/components/Modal/Modal";
 
 const OPERATION_LABELS = {
   [Operation.Deposit]: /*i18n*/ "Buy GM",
@@ -69,6 +70,7 @@ export function GmForm({
     marketToken,
     marketTokens,
     sortedMarketsInfoByIndexToken,
+    nativeToken,
   } = useGmStateSelector(s => {
     return {
       inputState: s.input,
@@ -76,6 +78,7 @@ export function GmForm({
       marketTokens: s.marketTokens,
       marketToken: s.marketToken,
       sortedMarketsInfoByIndexToken: s.sortedMarketsInfoByIndexToken,
+      nativeToken: s.nativeToken,
     }
   });
   const { marketTokenAmount, firstTokenAmount, secondTokenAmount } = useGmInputAmounts();
@@ -145,6 +148,8 @@ export function GmForm({
   const isMarketTokenAccountInited = marketToken?.balance !== null;
   const isFirstTokenAccountInited = firstToken?.balance !== null;
   const isSecondTokenAccountInited = secondToken?.balance !== null;
+  const allowWrapFirstToken = nativeToken && isDeposit && isMarketTokenAccountInited && firstToken?.isWrappedNative;
+  const allowWrapSecondToken = nativeToken && isDeposit && isMarketTokenAccountInited && secondToken?.isWrappedNative;
 
   const [indexName, setIndexName] = useLocalStorageSerializeKey<string>(
     getSyntheticsDepositIndexTokenKey(genesisHash),
@@ -185,6 +190,11 @@ export function GmForm({
 
   const initializeTokenAccount = useInitializeTokenAccount();
 
+  const [isWrapping, setIsWrapping] = useState(false);
+  const wrapNativeToken = useCallback(() => {
+    setIsWrapping(true);
+  }, [setIsWrapping]);
+
   return (
     <div className={`App-box GmSwapBox`}>
       <Tab
@@ -212,7 +222,10 @@ export function GmForm({
       >
         <div className={cx("GmSwapBox-form-layout", { reverse: isWithdrawal })}>
           <BuyInputSection
-            topLeftLabel={isDeposit ? t`Pay` : t`Receive`}
+            topLeftLabel={isDeposit ? (allowWrapFirstToken ? t`Pay (wrap)` : t`Pay`) : t`Receive`}
+            {...(allowWrapFirstToken && {
+              onClientTopLeftLabel: wrapNativeToken,
+            })}
             topLeftValue={formatUsd(firstTokenUsd)}
             topRightLabel={isFirstTokenAccountInited ? t`Balance` : t`Uninitialized`}
             topRightValue={isFirstTokenAccountInited ? formatTokenAmount(firstToken?.balance || BN_ZERO, firstToken?.decimals, "", {
@@ -260,7 +273,10 @@ export function GmForm({
 
           {isPair && secondToken && (
             <BuyInputSection
-              topLeftLabel={isDeposit ? t`Pay` : t`Receive`}
+              topLeftLabel={isDeposit ? allowWrapSecondToken ? t`Pay (wrap)` : t`Pay` : t`Receive`}
+              {...(allowWrapSecondToken && {
+                onClientTopLeftLabel: wrapNativeToken,
+              })}
               topLeftValue={formatUsd(secondTokenUsd)}
               topRightLabel={isSecondTokenAccountInited ? t`Balance` : t`Uninitialized`}
               topRightValue={isSecondTokenAccountInited ? formatTokenAmount(secondToken?.balance ?? BN_ZERO, secondToken?.decimals, "", {
@@ -457,6 +473,76 @@ export function GmForm({
           shouldDisableValidation={shouldDisableValidationForTesting}
         /> */}
       </form >
+      {nativeToken && <WrapNativeTokenBox
+        nativeToken={nativeToken}
+        isVisible={isWrapping}
+        onClose={() => setIsWrapping(false)}
+        onSubmitted={() => setIsWrapping(false)}
+      />}
     </div >
+  );
+}
+
+function WrapNativeTokenBox({
+  isVisible,
+  nativeToken,
+  onSubmitted,
+  onClose
+}: {
+  isVisible: boolean,
+  nativeToken: TokenData,
+  onSubmitted: () => void,
+  onClose: () => void,
+}) {
+  const [inputValue, setInputValue] = useState("");
+
+  const handleSubmitted = useCallback(() => {
+    setInputValue("");
+    onSubmitted();
+  }, [onSubmitted, setInputValue]);
+
+  const wrapNativeToken = useWrapNativeToken(handleSubmitted);
+
+  const { nativeTokenAmount, nativeTokenUsd } = useMemo(() => {
+    const nativeTokenAmount = parseValue(inputValue, nativeToken.decimals) ?? BN_ZERO;
+    const nativeTokenUsd = convertToUsd(nativeTokenAmount, nativeToken.decimals, nativeToken.prices.minPrice);
+    return {
+      nativeTokenAmount,
+      nativeTokenUsd,
+    }
+  }, [inputValue, nativeToken]);
+
+  const handleSubmit = useCallback(() => {
+    wrapNativeToken(nativeTokenAmount);
+  }, [nativeTokenAmount, wrapNativeToken]);
+
+  return (
+    <Modal isVisible={isVisible} setIsVisible={() => {
+      setInputValue("");
+      onClose();
+    }} label={t`Wrap Native Token`}>
+      <form onSubmit={(e) => {
+        e.preventDefault();
+        handleSubmit();
+      }}>
+        <BuyInputSection
+          topLeftLabel={t`Pay`}
+          topLeftValue={nativeTokenUsd?.gt(BN_ZERO) ? formatUsd(nativeTokenUsd) : ""}
+          inputValue={inputValue}
+          onInputValueChange={(e) => setInputValue(e.target.value)}
+        >
+          <div className="selected-token">
+            <TokenWithIcon symbol="SOL" displaySize={20} />
+          </div>
+        </BuyInputSection>
+        <Button
+          className="w-full"
+          variant="primary-action"
+          type="submit"
+        >
+          {t`Wrap`}
+        </Button>
+      </form>
+    </Modal>
   );
 }
