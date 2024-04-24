@@ -6,7 +6,7 @@ use anchor_client::{
     },
     Program, RequestBuilder,
 };
-use exchange::events::DepositCreatedEvent;
+use exchange::events::{DepositCreatedEvent, OrderCreatedEvent, WithdrawalCreatedEvent};
 use gmsol::{
     exchange::ExchangeOps,
     store::{market::VaultOps, oracle::find_oracle_address},
@@ -206,24 +206,77 @@ impl KeeperArgs {
     async fn start_watching(&self, client: &SharedClient, store: &Pubkey) -> gmsol::Result<()> {
         use tokio::sync::mpsc;
 
-        let program = client.program(exchange::id())?;
         let store = *store;
         let (tx, mut rx) = mpsc::unbounded_channel();
-        let unsubscriber = program
-            .on::<DepositCreatedEvent>(move |ctx, event| {
+        let mut unsubscribers = vec![];
+
+        // Subscribe deposit creation event.
+        let deposit_program = client.program(exchange::id())?;
+        let unsubscriber = 
+            deposit_program
+            .on::<DepositCreatedEvent>({
+                let tx = tx.clone();
+                move |ctx, event| {
                 if event.store == store {
-                    tracing::info!(slot=%ctx.slot, ?event, "received a new deposit event");
+                    tracing::info!(slot=%ctx.slot, ?event, "received a new deposit creation event");
                     tx.send(Command::ExecuteDeposit {
                         deposit: event.deposit,
                     })
                     .unwrap();
                 } else {
-                    tracing::debug!(slot=%ctx.slot, ?event, "received deposit event from other store");
+                    tracing::debug!(slot=%ctx.slot, ?event, "received deposit creation event from other store");
                 }
-            })
+            }})
             .await?;
+        unsubscribers.push(unsubscriber);
+
+        tracing::info!("deposit creation subscribed");
+
+        // Subscribe withdrawal creation event.
+        let withdrawal_program = client.program(exchange::id())?;
+        let unsubscriber = withdrawal_program
+            .on::<WithdrawalCreatedEvent>({
+                let tx = tx.clone();
+                move |ctx, event| {
+                if event.store == store {
+                    tracing::info!(slot=%ctx.slot, ?event, "received a new withdrawal creation event");
+                    tx.send(Command::ExecuteWithdrawal {
+                        withdrawal: event.withdrawal,
+                    })
+                    .unwrap();
+                } else {
+                    tracing::debug!(slot=%ctx.slot, ?event, "received withdrawal creation event from other store");
+                }
+            }})
+            .await?;
+        unsubscribers.push(unsubscriber);
+
+        tracing::info!("withdrawal creation subscribed");
+
+        // Subscribe order creation event.
+        let order_program = client.program(exchange::id())?;
+        let unsubscriber = order_program
+            .on::<OrderCreatedEvent>({
+                let tx = tx.clone();
+                move |ctx, event| {
+                if event.store == store {
+                    tracing::info!(slot=%ctx.slot, ?event, "received a new order creation event");
+                    tx.send(Command::ExecuteOrder { 
+                        order: event.order,
+                    })
+                    .unwrap();
+                } else {
+                    tracing::debug!(slot=%ctx.slot, ?event, "received order creation event from other store");
+                }
+            }})
+            .await?;
+        unsubscribers.push(unsubscriber);
+
+        tracing::info!("order creation subscribed");
+
         let worker = async move {
             while let Some(command) = rx.recv().await {
+                tracing::info!(?command, "received new command");
                 match self.with_command(command).run(client, &store).await {
                     Ok(()) => {
                         tracing::info!("command executed");
@@ -251,7 +304,9 @@ impl KeeperArgs {
                 res?;
             }
         }
-        unsubscriber.unsubscribe().await;
+        for unsubscriber in unsubscribers {
+            unsubscriber.unsubscribe().await;
+        }
         Ok(())
     }
 }
