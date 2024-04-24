@@ -14,7 +14,7 @@ use gmsol::{
 
 use crate::SharedClient;
 
-#[derive(clap::Args)]
+#[derive(clap::Args, Clone)]
 pub(super) struct KeeperArgs {
     /// Set the compute unit limit.
     #[arg(long, short = 'u')]
@@ -22,6 +22,9 @@ pub(super) struct KeeperArgs {
     /// Set the compute unit price in micro lamports.
     #[arg(long, short = 'p', default_value_t = 1)]
     compute_unit_price: u64,
+    /// The oracle to use.
+    #[command(flatten)]
+    oracle: Oracle,
     /// Set the execution fee to the given instead of estimating one.
     #[arg(long)]
     execution_fee: Option<u64>,
@@ -29,28 +32,16 @@ pub(super) struct KeeperArgs {
     command: Command,
 }
 
-#[derive(clap::Subcommand)]
+#[derive(clap::Subcommand, Clone, Debug)]
 enum Command {
     /// Watch for items creation and execute them.
     Watch,
     /// Execute Deposit.
-    ExecuteDeposit {
-        deposit: Pubkey,
-        #[command(flatten)]
-        oracle: Oracle,
-    },
+    ExecuteDeposit { deposit: Pubkey },
     /// Execute Withdrawal.
-    ExecuteWithdrawal {
-        withdrawal: Pubkey,
-        #[command(flatten)]
-        oracle: Oracle,
-    },
+    ExecuteWithdrawal { withdrawal: Pubkey },
     /// Execute Order.
-    ExecuteOrder {
-        order: Pubkey,
-        #[command(flatten)]
-        oracle: Oracle,
-    },
+    ExecuteOrder { order: Pubkey },
     /// Initialize Market Vault.
     InitializeVault { token: Pubkey },
     /// Create Market.
@@ -64,7 +55,7 @@ enum Command {
     },
 }
 
-#[derive(clap::Args)]
+#[derive(clap::Args, Clone)]
 #[group(required = false, multiple = false)]
 struct Oracle {
     #[arg(long, env)]
@@ -133,11 +124,13 @@ impl KeeperArgs {
     pub(super) async fn run(&self, client: &SharedClient, store: &Pubkey) -> gmsol::Result<()> {
         match &self.command {
             Command::Watch => {
-                start_watching(client).await?;
+                let task = Box::pin(self.start_watching(client, store));
+                task.await?;
             }
-            Command::ExecuteDeposit { deposit, oracle } => {
+            Command::ExecuteDeposit { deposit } => {
                 let program = client.program(exchange::id())?;
-                let mut builder = program.execute_deposit(store, &oracle.address(store), deposit);
+                let mut builder =
+                    program.execute_deposit(store, &self.oracle.address(store), deposit);
                 let execution_fee = self
                     .get_or_estimate_execution_fee(&program, builder.build().await?)
                     .await?;
@@ -150,10 +143,10 @@ impl KeeperArgs {
                 tracing::info!(%deposit, "executed deposit at tx {signature}");
                 println!("{signature}");
             }
-            Command::ExecuteWithdrawal { withdrawal, oracle } => {
+            Command::ExecuteWithdrawal { withdrawal } => {
                 let program = client.program(exchange::id())?;
                 let mut builder =
-                    program.execute_withdrawal(store, &oracle.address(store), withdrawal);
+                    program.execute_withdrawal(store, &self.oracle.address(store), withdrawal);
                 let execution_fee = self
                     .get_or_estimate_execution_fee(&program, builder.build().await?)
                     .await?;
@@ -166,9 +159,9 @@ impl KeeperArgs {
                 tracing::info!(%withdrawal, "executed withdrawal at tx {signature}");
                 println!("{signature}");
             }
-            Command::ExecuteOrder { order, oracle } => {
+            Command::ExecuteOrder { order } => {
                 let program = client.program(exchange::id())?;
-                let mut builder = program.execute_order(store, &oracle.address(store), order);
+                let mut builder = program.execute_order(store, &self.oracle.address(store), order);
                 let execution_fee = self
                     .get_or_estimate_execution_fee(&program, builder.build().await?)
                     .await?;
@@ -203,17 +196,62 @@ impl KeeperArgs {
         }
         Ok(())
     }
-}
 
-async fn start_watching(client: &SharedClient) -> gmsol::Result<()> {
-    let program = client.program(exchange::id())?;
-    let unsubscriber = program
-        .on::<DepositCreatedEvent>(|ctx, event| {
-            tracing::info!(slot=%ctx.slot, "{event:?}");
-        })
-        .await?;
-    tokio::signal::ctrl_c().await?;
-    tracing::info!("Received `ctrl + c`, stopping...");
-    unsubscriber.unsubscribe().await;
-    Ok(())
+    fn with_command(&self, command: Command) -> Self {
+        let mut args = self.clone();
+        args.command = command;
+        args
+    }
+
+    async fn start_watching(&self, client: &SharedClient, store: &Pubkey) -> gmsol::Result<()> {
+        use tokio::sync::mpsc;
+
+        let program = client.program(exchange::id())?;
+        let store = *store;
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let unsubscriber = program
+            .on::<DepositCreatedEvent>(move |ctx, event| {
+                if event.store == store {
+                    tracing::info!(slot=%ctx.slot, "{event:?}");
+                    tx.send(Command::ExecuteDeposit {
+                        deposit: event.deposit,
+                    })
+                    .unwrap();
+                } else {
+                    tracing::debug!(slot=%ctx.slot, ?event, "received events from other store");
+                }
+            })
+            .await?;
+        let worker = async move {
+            while let Some(command) = rx.recv().await {
+                match self.with_command(command).run(client, &store).await {
+                    Ok(()) => {
+                        tracing::info!("executed");
+                    }
+                    Err(err) => {
+                        tracing::error!(%err, "failed to execute, ignore");
+                    }
+                }
+            }
+            gmsol::Result::Ok(())
+        };
+        tokio::select! {
+            res = tokio::signal::ctrl_c() => {
+                match res {
+                    Ok(()) => {
+                        tracing::info!("Received `ctrl + c`, stopping...");
+                    },
+                    Err(err) => {
+                        tracing::error!(%err, "Failed to setup signal handler");
+                    }
+                }
+
+            },
+            res = worker => {
+                res?;
+            }
+        }
+        unsubscriber.unsubscribe().await;
+        Ok(())
+    }
 }
