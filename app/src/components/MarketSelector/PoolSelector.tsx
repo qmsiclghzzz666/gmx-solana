@@ -71,7 +71,7 @@ export function PoolSelector({
         const poolName = getMarketPoolName(marketInfo);
         const marketToken = getByKey(marketTokensData, marketInfo.marketTokenAddress.toBase58());
         const gmBalance = marketToken?.balance;
-        const gmBalanceUsd = convertToUsd(marketToken?.balance, marketToken?.decimals, marketToken?.prices.minPrice);
+        const gmBalanceUsd = convertToUsd(marketToken?.balance ?? BN_ZERO, marketToken?.decimals, marketToken?.prices.minPrice);
         const state = getMarketState?.(marketInfo);
 
         return {
