@@ -19,7 +19,7 @@ import { getSyntheticsDepositIndexTokenKey } from "@/config/localStorage";
 import { BN_ZERO, MIN_RESIDUAL_AMOUNT } from "@/config/constants";
 import { IoMdSwap } from "react-icons/io";
 import { PoolSelector } from "@/components/MarketSelector/PoolSelector";
-import { useGmInputAmounts, useGmInputDisplay, useGmStateDispath, useGmStateSelector, useHandleSumit } from "../hooks";
+import { useGmInputAmounts, useGmInputDisplay, useGmStateDispath, useGmStateSelector, useHandleSubmit } from "../hooks";
 import { convertToUsd, formatAmountFree, formatTokenAmount, parseValue } from "@/utils/number";
 import { useInitializeTokenAccount, useWrapNativeToken } from "@/onchain";
 import Modal from "@/components/Modal/Modal";
@@ -90,13 +90,18 @@ export function GmForm({
     };
   });
 
-  const handleSubmit = useHandleSumit({ onCreateDeposit, onCreateWithdrawal });
-
   // const [focusedInput, setFocusedInput] = useState<"longCollateral" | "shortCollateral" | "market">("market");
 
   const resetInputs = useCallback(() => {
     dispatch({ "type": "reset" });
   }, [dispatch]);
+
+  const performAction = useHandleSubmit({ onCreateDeposit, onCreateWithdrawal });
+
+  const handleSubmit = useCallback(() => {
+    performAction();
+    resetInputs();
+  }, [performAction, resetInputs]);
 
   const onOperationChange = useCallback(
     (operation: Operation) => {

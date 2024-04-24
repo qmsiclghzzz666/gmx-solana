@@ -207,7 +207,7 @@ const fixUnnecessarySwap = ({
   }
 }
 
-export const useHandleSumit = ({
+export const useHandleSubmit = ({
   onCreateDeposit,
   onCreateWithdrawal,
 }: {

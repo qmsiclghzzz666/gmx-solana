@@ -5,6 +5,9 @@ import { findMarketPDA } from "gmsol";
 import { useMemo } from "react";
 import { PublicKey } from "@solana/web3.js";
 import { BN } from "@coral-xyz/anchor";
+import { isObject } from "lodash";
+
+const MARKETS_KEY = "data_store/markets";
 
 const BN_TWO = new BN(2);
 
@@ -13,7 +16,7 @@ export const useMarkets = (params?: { store: PublicKey, marketTokens: PublicKey[
 
   const request = useMemo(() => {
     return params ? {
-      key: "data_store/markets",
+      key: MARKETS_KEY,
       marketAddresses: params.marketTokens.map(token => findMarketPDA(params.store, token)[0]),
     } : null;
   }, [params]);
@@ -50,4 +53,15 @@ export const useMarkets = (params?: { store: PublicKey, marketTokens: PublicKey[
   }, [data]);
 
   return markets;
+};
+
+export const fitlerMarkets = (value: unknown) => {
+  if (isObject(value)) {
+    const { key } = value as { key?: string };
+    if (key === MARKETS_KEY) {
+      console.debug("filtered markets");
+      return true;
+    }
+  }
+  return false;
 };

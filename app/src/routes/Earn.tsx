@@ -19,7 +19,8 @@ import { MakeCreateDepositParams, MakeCreateWithdrawalParams, invokeCreateDeposi
 import { GMSOL_DEPLOYMENT } from "@/config/deployment";
 import useSWRMutation from "swr/mutation";
 import { useSWRConfig } from "swr";
-import { filterBalances } from "@/onchain/token";
+import { filterBalances, filterMetadatas } from "@/onchain/token";
+import { fitlerMarkets } from "@/onchain/market";
 
 export default function Earn() {
   const chainId = useGenesisHash();
@@ -109,7 +110,9 @@ export default function Earn() {
         ...params,
       }, {
         onSuccess: () => {
+          void mutate(filterMetadatas);
           void mutate(filterBalances);
+          void mutate(fitlerMarkets);
         }
       });
     } else {
@@ -136,7 +139,9 @@ export default function Earn() {
         ...params,
       }, {
         onSuccess: () => {
+          void mutate(filterMetadatas);
           void mutate(filterBalances);
+          void mutate(fitlerMarkets);
         }
       });
     } else {

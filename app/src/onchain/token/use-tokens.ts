@@ -12,6 +12,7 @@ import { isObject } from "lodash";
 import { NATIVE_TOKEN_ADDRESS } from "@/config/tokens";
 
 export const BALANCE_KEY = "token-balanses";
+export const METADATA_KEY = "token-metadatas";
 
 export interface TokenMap {
   [address: string]: Token,
@@ -59,7 +60,7 @@ export const useTokenMetadatas = (tokens: PublicKey[]) => {
 
   const request = useMemo(() => {
     return {
-      key: "token-metadatas",
+      key: METADATA_KEY,
       tokens,
     };
   }, [tokens]);
@@ -143,6 +144,17 @@ export const filterBalances = (value: unknown) => {
     const { key } = value as { key?: string };
     if (key === BALANCE_KEY) {
       console.debug("filtered token balances");
+      return true;
+    }
+  }
+  return false;
+};
+
+export const filterMetadatas = (value: unknown) => {
+  if (isObject(value)) {
+    const { key } = value as { key?: string };
+    if (key === METADATA_KEY) {
+      console.debug("filtered token metadatas");
       return true;
     }
   }
