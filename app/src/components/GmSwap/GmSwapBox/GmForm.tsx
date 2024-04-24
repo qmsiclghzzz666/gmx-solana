@@ -19,7 +19,8 @@ import { getSyntheticsDepositIndexTokenKey } from "@/config/localStorage";
 import { BN_ZERO } from "@/config/constants";
 import { IoMdSwap } from "react-icons/io";
 import { PoolSelector } from "@/components/MarketSelector/PoolSelector";
-import { useGmInputDisplay, useGmStateDispath, useGmStateSelector, useHandleSumit } from "../hooks";
+import { useGmInputAmounts, useGmInputDisplay, useGmStateDispath, useGmStateSelector, useHandleSumit } from "../hooks";
+import { formatAmountFree, formatTokenAmount } from "@/utils/number";
 
 const OPERATION_LABELS = {
   [Operation.Deposit]: /*i18n*/ "Buy GM",
@@ -64,16 +65,19 @@ export function GmForm({
   const {
     inputState,
     marketInfo,
+    marketToken,
     marketTokens,
-    sortedMarketsInfoByIndexToken
+    sortedMarketsInfoByIndexToken,
   } = useGmStateSelector(s => {
     return {
       inputState: s.input,
       marketInfo: s.market,
       marketTokens: s.marketTokens,
+      marketToken: s.marketToken,
       sortedMarketsInfoByIndexToken: s.sortedMarketsInfoByIndexToken,
     }
   });
+  const { marketTokenAmount } = useGmInputAmounts();
   const { firstTokenUsd, secondTokenUsd, marketTokenUsd } = useGmInputDisplay();
   const { operation, mode } = useGmStateSelector(s => {
     return {
@@ -256,35 +260,38 @@ export function GmForm({
           <BuyInputSection
             topLeftLabel={isWithdrawal ? t`Pay` : t`Receive`}
             topLeftValue={marketTokenUsd?.gt(BN_ZERO) ? formatUsd(marketTokenUsd) : ""}
-            // topRightLabel={t`Balance`}
-            // topRightValue={formatTokenAmount(marketToken?.balance, marketToken?.decimals, "", {
-            //   useCommas: true,
-            // })}
+            topRightLabel={t`Balance`}
+            topRightValue={formatTokenAmount(marketToken?.balance ?? BN_ZERO, marketToken?.decimals, "", {
+              useCommas: true,
+            })}
             preventFocusOnLabelClick="right"
-            // showMaxButton={isWithdrawal && marketToken?.balance?.gt(0) && !marketTokenAmount?.eq(marketToken.balance)}
+            showMaxButton={isWithdrawal && marketToken?.balance?.gt(BN_ZERO) && !marketTokenAmount?.eq(marketToken.balance)}
             inputValue={inputState.marketTokenInputValue}
             onInputValueChange={(e) => {
               dispatch({ type: "set-market-token-input-value", value: e.target.value });
               // setFocusedInput("market");
             }}
-          // {...(isWithdrawal && {
-          //   onClickTopRightLabel: () => {
-          //     if (marketToken?.balance) {
-          //       setMarketTokenInputValue(formatAmountFree(marketToken.balance, marketToken.decimals));
-          //       setFocusedInput("market");
-          //     }
-          //   },
-          // })}
-          // onClickMax={() => {
-          //   if (marketToken?.balance) {
-          //     const formattedGMBalance = formatAmountFree(marketToken.balance, marketToken.decimals);
-          //     const finalGMBalance = isMetamaskMobile
-          //       ? limitDecimals(formattedGMBalance, MAX_METAMASK_MOBILE_DECIMALS)
-          //       : formattedGMBalance;
-          //     setMarketTokenInputValue(finalGMBalance);
-          //     setFocusedInput("market");
-          //   }
-          // }}
+            {...(isWithdrawal && {
+              onClickTopRightLabel: () => {
+                if (marketToken?.balance) {
+                  dispatch({
+                    type: "set-market-token-input-value",
+                    value: formatAmountFree(marketToken.balance, marketToken.decimals)
+                  });
+                  // setFocusedInput("market");
+                }
+              },
+            })}
+            onClickMax={() => {
+              if (marketToken?.balance) {
+                const formattedGMBalance = formatAmountFree(marketToken.balance, marketToken.decimals);
+                dispatch({
+                  type: "set-market-token-input-value",
+                  value: formattedGMBalance
+                });
+                // setFocusedInput("market");
+              }
+            }}
           >
             <PoolSelector
               label={t`Pool`}
