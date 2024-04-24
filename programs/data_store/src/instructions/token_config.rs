@@ -103,6 +103,61 @@ impl<'info> internal::Authentication<'info> for InsertTokenConfig<'info> {
 }
 
 #[derive(Accounts)]
+#[instruction(token: Pubkey)]
+pub struct InsertFakeTokenConfig<'info> {
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    pub only_controller: Account<'info, Roles>,
+    pub store: Account<'info, DataStore>,
+    #[account(
+        mut,
+        seeds = [TokenConfigMap::SEED, store.key().as_ref()],
+        bump = map.bump,
+        realloc = 8 + TokenConfigMap::init_space(map.length_after_insert(&token)),
+        realloc::zero = false,
+        realloc::payer = authority,
+    )]
+    pub map: Account<'info, TokenConfigMap>,
+    pub system_program: Program<'info, System>,
+}
+
+/// Insert or update the config of the given fake token.
+pub fn insert_fake_token_config(
+    ctx: Context<InsertFakeTokenConfig>,
+    token: Pubkey,
+    decimals: u8,
+    price_feed: Pubkey,
+    heartbeat_duration: u32,
+    precision: u8,
+) -> Result<()> {
+    ctx.accounts.map.as_map_mut().insert(
+        token.key(),
+        TokenConfig {
+            enabled: true,
+            price_feed,
+            heartbeat_duration,
+            precision,
+            token_decimals: decimals,
+        },
+    );
+    Ok(())
+}
+
+impl<'info> internal::Authentication<'info> for InsertFakeTokenConfig<'info> {
+    fn authority(&self) -> &Signer<'info> {
+        &self.authority
+    }
+
+    fn store(&self) -> &Account<'info, DataStore> {
+        &self.store
+    }
+
+    fn roles(&self) -> &Account<'info, Roles> {
+        &self.only_controller
+    }
+}
+
+#[derive(Accounts)]
 pub struct ToggleTokenConfig<'info> {
     pub authority: Signer<'info>,
     pub store: Account<'info, DataStore>,

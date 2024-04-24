@@ -113,6 +113,25 @@ pub mod data_store {
     }
 
     #[access_control(internal::Authenticate::only_controller(&ctx))]
+    pub fn insert_fake_token_config(
+        ctx: Context<InsertFakeTokenConfig>,
+        token: Pubkey,
+        decimals: u8,
+        price_feed: Pubkey,
+        heartbeat_duration: u32,
+        precision: u8,
+    ) -> Result<()> {
+        instructions::insert_fake_token_config(
+            ctx,
+            token,
+            decimals,
+            price_feed,
+            heartbeat_duration,
+            precision,
+        )
+    }
+
+    #[access_control(internal::Authenticate::only_controller(&ctx))]
     pub fn toggle_token_config(
         ctx: Context<ToggleTokenConfig>,
         token: Pubkey,

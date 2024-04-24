@@ -1,7 +1,7 @@
 import { Keypair, PublicKey } from '@solana/web3.js';
 
 import { expect, getAddresses, getProvider, getUsers } from "../../utils/fixtures";
-import { createRolesPDA, extendTokenConfigMap, getTokenConfig, insertTokenConfig, toggleTokenConfig } from "../../utils/data";
+import { createRolesPDA, extendTokenConfigMap, getTokenConfig, insertFakeTokenConfig, insertTokenConfig, toggleTokenConfig } from "../../utils/data";
 import { AnchorError } from '@coral-xyz/anchor';
 import { createMint } from '@solana/spl-token';
 import { BTC_FEED, SOL_FEED } from '../../utils/token';
@@ -64,6 +64,20 @@ describe("data store: TokenConfig", () => {
             await toggleTokenConfig(signer0, dataStoreAddress, newToken, true);
             const config = await getTokenConfig(dataStoreAddress, newToken);
             expect(config.enabled).true;
+        }
+    });
+
+    it("insert fake token", async () => {
+        const newFakeToken = PublicKey.unique();
+        // We should be able to insert.
+        {
+            await insertFakeTokenConfig(signer0, dataStoreAddress, newFakeToken, 6, BTC_FEED, 60, 3);
+            const config = await getTokenConfig(dataStoreAddress, newFakeToken);
+            expect(config.enabled).true;
+            expect(config.priceFeed).eqls(BTC_FEED);
+            expect(config.heartbeatDuration).equals(60);
+            expect(config.precision).equals(3);
+            expect(config.tokenDecimals).equals(6);
         }
     });
 });

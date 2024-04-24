@@ -37,6 +37,22 @@ export const insertTokenConfig = async (
     }).signers([authority]).rpc();
 };
 
+export const insertFakeTokenConfig = async (
+    authority: Signer,
+    store: PublicKey,
+    token: PublicKey,
+    decimals: number,
+    price_feed: PublicKey,
+    heartbeat_duration: number,
+    precision: number,
+) => {
+    await dataStore.methods.insertFakeTokenConfig(token, decimals, price_feed, heartbeat_duration, precision).accounts({
+        authority: authority.publicKey,
+        store,
+        onlyController: createRolesPDA(store, authority.publicKey)[0],
+    }).signers([authority]).rpc();
+};
+
 export const toggleTokenConfig = async (
     authority: Signer,
     store: PublicKey,
