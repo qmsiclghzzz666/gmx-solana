@@ -9,6 +9,7 @@ import { toBN } from "gmsol";
 import { useAnchorProvider } from "@/contexts/anchor";
 import { Address, translateAddress } from "@coral-xyz/anchor";
 import { isObject } from "lodash";
+import { NATIVE_TOKEN_ADDRESS } from "@/config/tokens";
 
 export const BALANCE_KEY = "token-balanses";
 
@@ -103,15 +104,25 @@ export const useTokenBalances = (tokens: Address[]) => {
 
     if (owner && provider) {
       for (const address of tokens) {
-        const accountAddress = getAssociatedTokenAddressSync(translateAddress(address), owner);
-        try {
-          const account = await getAccount(provider.connection, accountAddress);
-          tokenBalances[address.toString()] = toBN(account.amount);
-        } catch (error) {
-          if ((error as TokenAccountNotFoundError).name === "TokenAccountNotFoundError") {
-            tokenBalances[address.toString()] = null;
-          } else {
-            console.error("fetch account balance error", error);
+        const tokenAddress = translateAddress(address);
+        if (tokenAddress.equals(NATIVE_TOKEN_ADDRESS)) {
+          try {
+            const balance = await provider.connection.getBalance(owner);
+            tokenBalances[tokenAddress.toBase58()] = toBN(balance);
+          } catch (error) {
+            console.error("fetch balance error", error);
+          }
+        } else {
+          const accountAddress = getAssociatedTokenAddressSync(tokenAddress, owner);
+          try {
+            const account = await getAccount(provider.connection, accountAddress);
+            tokenBalances[address.toString()] = toBN(account.amount);
+          } catch (error) {
+            if ((error as TokenAccountNotFoundError).name === "TokenAccountNotFoundError") {
+              tokenBalances[address.toString()] = null;
+            } else {
+              console.error(`fetch account balance for ${tokenAddress.toBase58()} error`, error);
+            }
           }
         }
       }

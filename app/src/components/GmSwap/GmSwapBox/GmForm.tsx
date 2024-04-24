@@ -16,7 +16,7 @@ import TokenWithIcon from "@/components/TokenIcon/TokenWithIcon";
 import TokenSelector from "@/components/TokenSelector/TokenSelector";
 import { useLocalStorageSerializeKey } from "@/utils/localStorage";
 import { getSyntheticsDepositIndexTokenKey } from "@/config/localStorage";
-import { BN_ZERO } from "@/config/constants";
+import { BN_ZERO, MIN_RESIDUAL_AMOUNT } from "@/config/constants";
 import { IoMdSwap } from "react-icons/io";
 import { PoolSelector } from "@/components/MarketSelector/PoolSelector";
 import { useGmInputAmounts, useGmInputDisplay, useGmStateDispath, useGmStateSelector, useHandleSumit } from "../hooks";
@@ -516,6 +516,15 @@ function WrapNativeTokenBox({
     wrapNativeToken(nativeTokenAmount);
   }, [nativeTokenAmount, wrapNativeToken]);
 
+  const showMaxButton = !nativeTokenAmount.eq(nativeToken.balance ?? BN_ZERO) && nativeToken.balance?.gt(MIN_RESIDUAL_AMOUNT);
+  const onMaxClick = useCallback(() => {
+    if (nativeToken.balance) {
+      const maxAvailableAmount = nativeToken.balance.gt(MIN_RESIDUAL_AMOUNT) ? nativeToken.balance.sub(MIN_RESIDUAL_AMOUNT) : BN_ZERO;
+      const finalAmount = formatAmountFree(maxAvailableAmount, nativeToken.decimals);
+      setInputValue(finalAmount);
+    }
+  }, [nativeToken]);
+
   return (
     <Modal isVisible={isVisible} setIsVisible={() => {
       setInputValue("");
@@ -528,11 +537,18 @@ function WrapNativeTokenBox({
         <BuyInputSection
           topLeftLabel={t`Pay`}
           topLeftValue={nativeTokenUsd?.gt(BN_ZERO) ? formatUsd(nativeTokenUsd) : ""}
+          topRightLabel={t`Balance`}
+          topRightValue={formatTokenAmount(nativeToken?.balance ?? BN_ZERO, nativeToken?.decimals, "", {
+            useCommas: true,
+          })}
+          onClickTopRightLabel={onMaxClick}
+          onClickMax={onMaxClick}
+          showMaxButton={showMaxButton}
           inputValue={inputValue}
           onInputValueChange={(e) => setInputValue(e.target.value)}
         >
           <div className="selected-token">
-            <TokenWithIcon symbol="SOL" displaySize={20} />
+            <TokenWithIcon symbol={nativeToken.symbol} displaySize={20} />
           </div>
         </BuyInputSection>
         <Button

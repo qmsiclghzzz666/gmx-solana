@@ -7,6 +7,7 @@ import { getMarketIndexName, getMarketPoolName } from "@/components/MarketsList/
 import { info2Stat } from "@/contexts/state";
 import { ONE_USD } from "@/config/constants";
 import { getUnit } from "@/utils/number";
+import { NATIVE_TOKEN_ADDRESS } from "@/config/tokens";
 
 export const useDeployedMarketInfos = () => {
   const markets = useDeployedMarkets();
@@ -22,6 +23,13 @@ export const useDeployedMarketInfos = () => {
           tokenMap[key] = config;
         }
       });
+    }
+    const nativeKey = NATIVE_TOKEN_ADDRESS.toBase58();
+    if (!(nativeKey in tokenMap)) {
+      const config = GMSOL_DEPLOYMENT?.tokens[nativeKey];
+      if (config) {
+        tokenMap[nativeKey] = config;
+      }
     }
     return tokenMap;
   }, [markets]);
