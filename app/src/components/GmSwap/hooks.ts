@@ -227,13 +227,23 @@ export const useHandleSumit = ({
       const initialShortTokenAmount = secondTokenAmount ?? BN_ZERO;
 
       if (mode === Mode.Single && !initialLongTokenAmount.isZero()) {
-        onCreateDeposit({
-          marketToken: market.marketTokenAddress,
-          initialLongToken,
-          initialShortToken,
-          initialLongTokenAmount,
-          initialShortTokenAmount: BN_ZERO,
-        });
+        if (initialLongToken.equals(market.shortTokenAddress)) {
+          onCreateDeposit({
+            marketToken: market.marketTokenAddress,
+            initialLongToken: market.longTokenAddress,
+            initialShortToken: initialLongToken,
+            initialLongTokenAmount: BN_ZERO,
+            initialShortTokenAmount: initialLongTokenAmount,
+          });
+        } else {
+          onCreateDeposit({
+            marketToken: market.marketTokenAddress,
+            initialLongToken,
+            initialShortToken: market.shortTokenAddress,
+            initialLongTokenAmount,
+            initialShortTokenAmount: BN_ZERO,
+          });
+        }
       } else if (mode === Mode.Pair && !(initialLongTokenAmount.isZero() && initialShortTokenAmount.isZero())) {
         const {
           fixedInitialLongToken,
