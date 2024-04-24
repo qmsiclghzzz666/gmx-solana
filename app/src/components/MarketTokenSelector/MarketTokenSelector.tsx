@@ -14,6 +14,7 @@ import { getNormalizedTokenSymbol } from "@/utils/tokens";
 import TokenIcon from "../TokenIcon/TokenIcon";
 import { formatTokenAmount } from "@/utils/number";
 import SearchInput from "../SearchInput/SearchInput";
+import { BN_ZERO } from "@/config/constants";
 
 type Props = {
   marketsInfoData?: MarketInfos;
@@ -185,7 +186,7 @@ export default function MarketTokenSelector(props: Props) {
                                 Unlimited (dev only)
                               </td>
                               <td>
-                                {formatTokenAmount(sellableInfo?.totalAmount, market?.decimals, market?.symbol, {
+                                {formatTokenAmount(sellableInfo?.totalAmount ?? BN_ZERO, market?.decimals, market?.symbol, {
                                   displayDecimals: 0,
                                   useCommas: true,
                                 })}

@@ -19,7 +19,7 @@ export const useDataStore = () => {
 export const useExchange = () => {
   const ctx = useContext(AnchorContextCtx);
   if (!ctx) {
-    throw new Error("Used `useDataStore` outside of `AnchorContextProvider`");
+    throw new Error("Used `useExchange` outside of `AnchorContextProvider`");
   }
   const program = useMemo(() => {
     return ctx.provider ? makeExchangeProgram(ctx.provider) : makeExchangeProgram({
@@ -28,4 +28,13 @@ export const useExchange = () => {
   }, [ctx.provider, ctx.connection]);
 
   return program;
+}
+
+export const useAnchorProvider = () => {
+  const ctx = useContext(AnchorContextCtx);
+  if (!ctx) {
+    throw new Error("Used `useAnchorProvdier` outside of `AnchorContextProvider`");
+  }
+
+  return ctx.provider;
 }

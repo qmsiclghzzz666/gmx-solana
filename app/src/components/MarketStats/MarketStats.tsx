@@ -7,7 +7,7 @@ import { formatUsd, getMarketIndexName, getMarketPoolName } from "../MarketsList
 import Tooltip from "../Tooltip/Tooltip";
 import { CardRow } from "../CardRow/CardRow";
 import StatsTooltipRow from "../StatsTooltipRow/StatsTooltipRow";
-import { BN_ZERO } from "@/config/constants";
+import { BN_ZERO, GM_DECIMALS } from "@/config/constants";
 import { getPoolUsdWithoutPnl, getSellableMarketToken } from "@/onchain/market/utils";
 import { convertToTokenAmount, getMidPrice } from "@/onchain/token/utils";
 import MarketTokenSelector from "../MarketTokenSelector/MarketTokenSelector";
@@ -31,8 +31,8 @@ export function MarketStats(p: Props) {
     marketsTokensIncentiveAprData,
   } = p;
   const marketPrice = marketToken ? getMidPrice(marketToken.prices) : undefined;
-  // const marketBalance = marketToken?.balance;
-  // const marketBalanceUsd = convertToUsd(marketBalance, marketToken?.decimals, marketPrice);
+  const marketBalance = marketToken?.balance ?? BN_ZERO;
+  const marketBalanceUsd = convertToUsd(marketBalance, marketToken?.decimals, marketPrice);
 
   const marketTotalSupply = marketToken?.totalSupply;
   const marketTotalSupplyUsd = convertToUsd(marketTotalSupply, marketToken?.decimals, marketPrice);
@@ -170,15 +170,15 @@ export function MarketStats(p: Props) {
           }
         />
 
-        {/* <CardRow
+        <CardRow
           label={t`Wallet`}
           value={formatTokenAmountWithUsd(
             marketBalance || BN_ZERO,
             marketBalanceUsd || BN_ZERO,
             "GM",
-            marketToken?.decimals ?? 18
+            marketToken?.decimals ?? GM_DECIMALS
           )}
-        /> */}
+        />
 
         <CardRow
           label={t`APR`}

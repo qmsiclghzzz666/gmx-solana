@@ -1,7 +1,7 @@
 import { GMSOL_DEPLOYMENT } from "@/config/deployment";
 import { useDeployedMarkets } from "./use-deployed-markets";
 import { useMemo } from "react";
-import { TokenMap, Tokens, useTokenMetadatas, useTokensWithPrices } from "../token";
+import { TokenMap, Tokens, useTokenBalances, useTokenMetadatas, useTokensWithPrices } from "../token";
 import { MarketInfos } from "../market";
 import { getMarketIndexName, getMarketPoolName } from "@/components/MarketsList/utils";
 import { info2Stat } from "@/contexts/state";
@@ -33,6 +33,7 @@ export const useDeployedMarketInfos = () => {
   }, [markets]);
 
   const marketTokenMetadatas = useTokenMetadatas(marketTokenAddresses);
+  const marketTokenBalances = useTokenBalances(marketTokenAddresses);
 
   return useMemo(() => {
     const infos: MarketInfos = {};
@@ -72,7 +73,8 @@ export const useDeployedMarketInfos = () => {
             prices: {
               minPrice: price,
               maxPrice: price,
-            }
+            },
+            balance: marketTokenBalances[key],
           }
         }
       }
@@ -82,5 +84,5 @@ export const useDeployedMarketInfos = () => {
       tokens: tokens,
       marketTokens,
     };
-  }, [markets, tokens, marketTokenMetadatas]);
+  }, [markets, tokens, marketTokenMetadatas, marketTokenBalances]);
 };

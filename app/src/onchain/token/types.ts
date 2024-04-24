@@ -18,7 +18,7 @@ export interface TokenPrices {
 
 export type TokenData = Token & TokenMetadata & {
   prices: TokenPrices,
-  balance?: BN,
+  balance?: BN | null,
 };
 
 export interface TokenMetadata {
@@ -45,4 +45,8 @@ export type TokenInfo = Token & {
 
 export interface InfoTokens {
   [address: string]: TokenInfo,
+}
+
+export interface TokenBalances {
+  [address: string]: BN | null,
 }
