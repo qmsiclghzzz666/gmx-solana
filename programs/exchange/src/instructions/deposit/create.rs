@@ -27,7 +27,6 @@ pub struct CreateDepositParams {
     pub should_unwrap_native_token: bool,
 }
 
-#[event_cpi]
 #[derive(Accounts)]
 pub struct CreateDeposit<'info> {
     /// CHECK: only used as signing PDA.
@@ -205,7 +204,7 @@ pub fn create_deposit<'info>(
     if params.execution_fee != 0 {
         system_program::transfer(ctx.accounts.transfer_ctx(), params.execution_fee)?;
     }
-    emit_cpi!(DepositCreatedEvent {
+    emit!(DepositCreatedEvent {
         store: ctx.accounts.store.key(),
         deposit: ctx.accounts.deposit.key(),
     });
