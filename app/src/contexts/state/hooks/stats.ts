@@ -21,7 +21,7 @@ export const info2Stat = (info: MarketInfo) => {
     maxLiquidity,
     netFeeLong: getUnit(USD_DECIMALS - 2),
     netFeeShort: getUnit(USD_DECIMALS - 2).neg(),
-    utilization: usedLiquidity.div(maxLiquidity),
+    utilization: !maxLiquidity.isZero() ? usedLiquidity.div(maxLiquidity) : BN_ZERO,
   };
   return stat;
 };
@@ -47,7 +47,7 @@ export const useIndexTokenStats = () => useStateSelector(state => {
     indexStat.totalPoolValue = indexStat.totalPoolValue.add(stat.poolValueUsd);
     indexStat.totalUsedLiquidity = indexStat.totalUsedLiquidity.add(stat.usedLiquidity);
     indexStat.totalMaxLiquidity = indexStat.totalMaxLiquidity.add(stat.maxLiquidity);
-    indexStat.totalUtilization = indexStat.totalUsedLiquidity.div(indexStat.totalMaxLiquidity);
+    indexStat.totalUtilization = !indexStat.totalMaxLiquidity.isZero() ? indexStat.totalUsedLiquidity.div(indexStat.totalMaxLiquidity) : BN_ZERO;
     if (stat.netFeeLong.gt(indexStat.bestNetFeeLong)) {
       indexStat.bestNetFeeLong = stat.netFeeLong;
     }
