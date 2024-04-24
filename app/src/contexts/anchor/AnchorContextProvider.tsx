@@ -31,13 +31,14 @@ export function AnchorContextProvider({ children }: { children: ReactNode }) {
   const endpoint = clusterApiUrl(DEFAULT_CLUSTER);
   const wallets = useMemo(() => {
     return [
+      new walletAdapterWallets.SolflareWalletAdapter(),
       new walletAdapterWallets.PhantomWalletAdapter(),
     ];
   }, []);
 
   return (
     <ConnectionProvider endpoint={endpoint}>
-      <WalletProvider wallets={wallets} autoConnect={true}>
+      <WalletProvider wallets={wallets} autoConnect={true} onError={(e) => console.error("wallet error:", e)}>
         <WalletModalProvider>
           <Inner>
             {children}
