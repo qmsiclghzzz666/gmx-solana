@@ -77,7 +77,7 @@ export function GmForm({
       sortedMarketsInfoByIndexToken: s.sortedMarketsInfoByIndexToken,
     }
   });
-  const { marketTokenAmount } = useGmInputAmounts();
+  const { marketTokenAmount, firstTokenAmount, secondTokenAmount } = useGmInputAmounts();
   const { firstTokenUsd, secondTokenUsd, marketTokenUsd } = useGmInputDisplay();
   const { operation, mode } = useGmStateSelector(s => {
     return {
@@ -147,6 +147,38 @@ export function GmForm({
     ""
   );
 
+  function onMaxClickFirstToken() {
+    if (firstToken?.balance) {
+      let maxAvailableAmount = firstToken.balance;
+
+      if (maxAvailableAmount.isNeg()) {
+        maxAvailableAmount = BN_ZERO;
+      }
+
+      const formattedMaxAvailableAmount = formatAmountFree(maxAvailableAmount, firstToken.decimals);
+      const finalAmount = formattedMaxAvailableAmount;
+
+      dispatch({ type: "set-first-token-input-value", value: finalAmount });
+      // onFocusedCollateralInputChange(firstToken.address);
+    }
+  }
+
+  function onMaxClickSecondToken() {
+    if (secondToken?.balance) {
+      let maxAvailableAmount = secondToken.balance;
+
+      if (maxAvailableAmount.isNeg()) {
+        maxAvailableAmount = BN_ZERO
+      }
+
+      const formattedMaxAvailableAmount = formatAmountFree(maxAvailableAmount, secondToken.decimals);
+      const finalAmount = formattedMaxAvailableAmount;
+
+      dispatch({ type: "set-second-token-input-value", value: finalAmount });
+      // onFocusedCollateralInputChange(secondToken.address);
+    }
+  }
+
   return (
     <div className={`App-box GmSwapBox`}>
       <Tab
@@ -176,20 +208,20 @@ export function GmForm({
           <BuyInputSection
             topLeftLabel={isDeposit ? t`Pay` : t`Receive`}
             topLeftValue={formatUsd(firstTokenUsd)}
-            // topRightLabel={t`Balance`}
-            // topRightValue={formatTokenAmount(firstToken?.balance, firstToken?.decimals, "", {
-            //   useCommas: true,
-            // })}
+            topRightLabel={t`Balance`}
+            topRightValue={formatTokenAmount(firstToken?.balance || BN_ZERO, firstToken?.decimals, "", {
+              useCommas: true,
+            })}
             preventFocusOnLabelClick="right"
-            // {...(isDeposit && {
-            //   onClickTopRightLabel: onMaxClickFirstToken,
-            // })}
-            // showMaxButton={
-            //   isDeposit &&
-            //   firstToken?.balance?.gt(0) &&
-            //   !firstTokenAmount?.eq(firstToken.balance) &&
-            //   (firstToken?.isNative ? minResidualAmount && firstToken?.balance?.gt(minResidualAmount) : true)
-            // }
+            {...(isDeposit && {
+              onClickTopRightLabel: onMaxClickFirstToken,
+            })}
+            onClickMax={onMaxClickFirstToken}
+            showMaxButton={
+              isDeposit &&
+              firstToken?.balance?.gt(BN_ZERO) &&
+              !firstTokenAmount?.eq(firstToken.balance)
+            }
             inputValue={inputState.firstTokenInputValue}
             onInputValueChange={(e) => {
               if (firstToken) {
@@ -198,7 +230,6 @@ export function GmForm({
                 onFocusedCollateralInputChange(firstToken.address.toBase58());
               }
             }}
-          // onClickMax={onMaxClickFirstToken}
           >
             {firstToken && isSingle ? (
               <TokenSelector
@@ -222,28 +253,27 @@ export function GmForm({
             <BuyInputSection
               topLeftLabel={isDeposit ? t`Pay` : t`Receive`}
               topLeftValue={formatUsd(secondTokenUsd)}
-              // topRightLabel={t`Balance`}
-              // topRightValue={formatTokenAmount(secondToken?.balance, secondToken?.decimals, "", {
-              //   useCommas: true,
-              // })}
+              topRightLabel={t`Balance`}
+              topRightValue={formatTokenAmount(secondToken?.balance ?? BN_ZERO, secondToken?.decimals, "", {
+                useCommas: true,
+              })}
               preventFocusOnLabelClick="right"
               inputValue={inputState.secondTokenInputValue}
-              // showMaxButton={
-              //   isDeposit &&
-              //   secondToken?.balance?.gt(0) &&
-              //   !secondTokenAmount?.eq(secondToken.balance) &&
-              //   (secondToken?.isNative ? minResidualAmount && secondToken?.balance?.gt(minResidualAmount) : true)
-              // }
+              showMaxButton={
+                isDeposit &&
+                secondToken?.balance?.gt(BN_ZERO) &&
+                !secondTokenAmount?.eq(secondToken.balance)
+              }
               onInputValueChange={(e) => {
                 if (secondToken) {
                   dispatch({ type: "set-second-token-input-value", value: e.target.value });
                   onFocusedCollateralInputChange(secondToken.address.toBase58());
                 }
               }}
-            // {...(isDeposit && {
-            //   onClickTopRightLabel: onMaxClickSecondToken,
-            // })}
-            // onClickMax={onMaxClickSecondToken}
+              {...(isDeposit && {
+                onClickTopRightLabel: onMaxClickSecondToken,
+              })}
+              onClickMax={onMaxClickSecondToken}
             >
               <div className="selected-token">
                 <TokenWithIcon symbol={secondToken?.symbol} displaySize={20} />

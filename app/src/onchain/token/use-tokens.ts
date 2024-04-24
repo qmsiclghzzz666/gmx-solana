@@ -7,6 +7,7 @@ import { useConnection } from "@solana/wallet-adapter-react";
 import { TokenAccountNotFoundError, getAccount, getAssociatedTokenAddressSync, getMint } from "@solana/spl-token";
 import { toBN } from "gmsol";
 import { useAnchorProvider } from "@/contexts/anchor";
+import { Address, translateAddress } from "@coral-xyz/anchor";
 
 export interface TokenMap {
   [address: string]: Token,
@@ -81,7 +82,7 @@ export const useTokenMetadatas = (tokens: PublicKey[]) => {
   }, [data, isLoading]);
 };
 
-export const useTokenBalances = (tokens: PublicKey[]) => {
+export const useTokenBalances = (tokens: Address[]) => {
   const provider = useAnchorProvider();
   const cache = useRef<TokenBalances>({});
 
@@ -99,13 +100,13 @@ export const useTokenBalances = (tokens: PublicKey[]) => {
 
     if (owner && provider) {
       for (const address of tokens) {
-        const accountAddress = getAssociatedTokenAddressSync(address, owner);
+        const accountAddress = getAssociatedTokenAddressSync(translateAddress(address), owner);
         try {
           const account = await getAccount(provider.connection, accountAddress);
-          tokenBalances[address.toBase58()] = toBN(account.amount);
+          tokenBalances[address.toString()] = toBN(account.amount);
         } catch (error) {
           if ((error as TokenAccountNotFoundError).name === "TokenAccountNotFoundError") {
-            tokenBalances[address.toBase58()] = null;
+            tokenBalances[address.toString()] = null;
           } else {
             console.error("fetch account balance error", error);
           }
