@@ -18,6 +18,8 @@ import { useExchange } from "@/contexts/anchor";
 import { MakeCreateDepositParams, MakeCreateWithdrawalParams, invokeCreateDeposit, invokeCreateWithdrawal } from "gmsol";
 import { GMSOL_DEPLOYMENT } from "@/config/deployment";
 import useSWRMutation from "swr/mutation";
+import { useSWRConfig } from "swr";
+import { filterBalances } from "@/onchain/token";
 
 export default function Earn() {
   const chainId = useGenesisHash();
@@ -86,6 +88,8 @@ export default function Earn() {
     }
   }, [marketInfos, mode, setMode, operation, selectedMarketKey]);
 
+  const { mutate } = useSWRConfig();
+
   const { trigger: triggerCreateDeposit } = useSWRMutation('exchange/create-deposit', async (_key, { arg }: { arg: MakeCreateDepositParams }) => {
     try {
       const [signature, deposit] = await invokeCreateDeposit(exchange, arg);
@@ -103,11 +107,15 @@ export default function Earn() {
         store,
         payer,
         ...params,
+      }, {
+        onSuccess: () => {
+          void mutate(filterBalances);
+        }
       });
     } else {
       console.log("not connected");
     }
-  }, [payer, triggerCreateDeposit]);
+  }, [payer, triggerCreateDeposit, mutate]);
 
   const { trigger: triggerCreateWithdrawal } = useSWRMutation('exchange/create-withdrawal', async (_key, { arg }: { arg: MakeCreateWithdrawalParams }) => {
     try {
@@ -126,11 +134,15 @@ export default function Earn() {
         store,
         payer,
         ...params,
+      }, {
+        onSuccess: () => {
+          void mutate(filterBalances);
+        }
       });
     } else {
       console.log("not connected");
     }
-  }, [payer, triggerCreateWithdrawal]);
+  }, [payer, triggerCreateWithdrawal, mutate]);
 
   return (
     <div className="default-container page-layout">

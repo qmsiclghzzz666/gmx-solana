@@ -3,8 +3,9 @@ import { createAssociatedTokenAccountInstruction, getAssociatedTokenAddressSync 
 import { useConnection } from "@solana/wallet-adapter-react";
 import { PublicKey, Transaction } from "@solana/web3.js";
 import { useCallback } from "react";
-import useSWR from "swr";
+import useSWR, { useSWRConfig } from "swr";
 import useSWRMutation from "swr/mutation";
+import { filterBalances } from "../token";
 
 export const useGenesisHash = () => {
   const connection = useConnection();
@@ -21,6 +22,7 @@ export const useGenesisHash = () => {
 
 export const useInitializeTokenAccount = () => {
   const provider = useAnchorProvider();
+  const { mutate } = useSWRConfig();
 
   const { trigger } = useSWRMutation("init-token-account", async (_key, { arg }: { arg: PublicKey }) => {
     if (provider && provider.publicKey) {
@@ -36,9 +38,13 @@ export const useInitializeTokenAccount = () => {
 
   return useCallback((token: PublicKey) => {
     void trigger(token, {
+      onSuccess: () => {
+        console.log(`token account for ${token.toBase58()} is initialized`);
+        void mutate(filterBalances);
+      },
       onError: (error) => {
         console.error(error)
       }
     });
-  }, [trigger]);
+  }, [trigger, mutate]);
 };

@@ -8,6 +8,9 @@ import { TokenAccountNotFoundError, getAccount, getAssociatedTokenAddressSync, g
 import { toBN } from "gmsol";
 import { useAnchorProvider } from "@/contexts/anchor";
 import { Address, translateAddress } from "@coral-xyz/anchor";
+import { isObject } from "lodash";
+
+export const BALANCE_KEY = "token-balanses";
 
 export interface TokenMap {
   [address: string]: Token,
@@ -89,7 +92,7 @@ export const useTokenBalances = (tokens: Address[]) => {
   const owner = provider?.publicKey;
   const request = useMemo(() => {
     return {
-      key: "token-balances",
+      key: BALANCE_KEY,
       tokens,
       owner,
     }
@@ -122,4 +125,15 @@ export const useTokenBalances = (tokens: Address[]) => {
     }
     return cache.current;
   }, [data, isLoading]);
+};
+
+export const filterBalances = (value: unknown) => {
+  if (isObject(value)) {
+    const { key } = value as { key?: string };
+    if (key === BALANCE_KEY) {
+      console.debug("filtered token balances");
+      return true;
+    }
+  }
+  return false;
 };
