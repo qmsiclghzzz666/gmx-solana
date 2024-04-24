@@ -10,6 +10,7 @@ use data_store::{
 };
 
 use crate::{
+    events::WithdrawalCreatedEvent,
     utils::{market::get_and_validate_swap_path, ControllerSeeds},
     ExchangeError,
 };
@@ -171,6 +172,11 @@ pub fn create_withdrawal<'info>(
     if params.execution_fee != 0 {
         system_program::transfer(ctx.accounts.transfer_ctx(), params.execution_fee)?;
     }
+    emit!(WithdrawalCreatedEvent {
+        ts: Clock::get()?.unix_timestamp,
+        store: ctx.accounts.store.key(),
+        withdrawal: ctx.accounts.withdrawal.key(),
+    });
     Ok(())
 }
 

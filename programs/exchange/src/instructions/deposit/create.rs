@@ -205,6 +205,7 @@ pub fn create_deposit<'info>(
         system_program::transfer(ctx.accounts.transfer_ctx(), params.execution_fee)?;
     }
     emit!(DepositCreatedEvent {
+        ts: Clock::get()?.unix_timestamp,
         store: ctx.accounts.store.key(),
         deposit: ctx.accounts.deposit.key(),
     });

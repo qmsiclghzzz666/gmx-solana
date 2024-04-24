@@ -13,6 +13,7 @@ use data_store::{
 };
 
 use crate::{
+    events::OrderCreatedEvent,
     utils::{market::get_and_validate_swap_path, ControllerSeeds},
     ExchangeError,
 };
@@ -121,6 +122,13 @@ pub fn create_order<'info>(
     if params.execution_fee != 0 {
         system_program::transfer(ctx.accounts.transfer_ctx(), params.execution_fee)?;
     }
+
+    emit!(OrderCreatedEvent {
+        ts: Clock::get()?.unix_timestamp,
+        store: ctx.accounts.store.key(),
+        order: ctx.accounts.order.key(),
+        position: ctx.accounts.position.as_ref().map(|a| a.key()),
+    });
     Ok(())
 }
 
