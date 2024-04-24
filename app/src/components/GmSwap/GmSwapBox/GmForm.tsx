@@ -148,8 +148,8 @@ export function GmForm({
   const isMarketTokenAccountInited = marketToken?.balance !== null;
   const isFirstTokenAccountInited = firstToken?.balance !== null;
   const isSecondTokenAccountInited = secondToken?.balance !== null;
-  const allowWrapFirstToken = nativeToken && isDeposit && isMarketTokenAccountInited && firstToken?.isWrappedNative;
-  const allowWrapSecondToken = nativeToken && isDeposit && isMarketTokenAccountInited && secondToken?.isWrappedNative;
+  const allowWrapFirstToken = nativeToken && isDeposit && isFirstTokenAccountInited && firstToken?.isWrappedNative;
+  const allowWrapSecondToken = nativeToken && isDeposit && isSecondTokenAccountInited && secondToken?.isWrappedNative;
 
   const [indexName, setIndexName] = useLocalStorageSerializeKey<string>(
     getSyntheticsDepositIndexTokenKey(genesisHash),
