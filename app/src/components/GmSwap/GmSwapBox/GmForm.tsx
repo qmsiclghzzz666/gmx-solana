@@ -1,7 +1,7 @@
 import Tab from "@/components/Tab/Tab";
 import { TokenOptions, getGmSwapBoxAvailableModes } from "../utils";
 import { CreateDepositParams, CreateWithdrawalParams, Mode, Operation } from "../types";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 import { useLingui } from "@lingui/react";
 import { mapValues } from "lodash";
 import cx from "classnames";
@@ -12,7 +12,6 @@ import { formatUsd, getMarketIndexName } from "@/components/MarketsList/utils";
 import Button from "@/components/Button/Button";
 import BuyInputSection from "@/components/BuyInputSection/BuyInputSection";
 import { Token } from "@/onchain/token";
-import { getTokenPoolType } from "@/onchain/market/utils";
 import TokenWithIcon from "@/components/TokenIcon/TokenWithIcon";
 import TokenSelector from "@/components/TokenSelector/TokenSelector";
 import { useLocalStorageSerializeKey } from "@/utils/localStorage";
@@ -85,7 +84,7 @@ export function GmForm({
 
   const handleSubmit = useHandleSumit({ onCreateDeposit, onCreateWithdrawal });
 
-  const [focusedInput, setFocusedInput] = useState<"longCollateral" | "shortCollateral" | "market">("market");
+  // const [focusedInput, setFocusedInput] = useState<"longCollateral" | "shortCollateral" | "market">("market");
 
   const resetInputs = useCallback(() => {
     dispatch({ "type": "reset" });
@@ -100,7 +99,7 @@ export function GmForm({
   );
 
   const onSwitchSide = useCallback(() => {
-    setFocusedInput("market");
+    // setFocusedInput("market");
     resetInputs();
     setOperation(operation === Operation.Deposit ? Operation.Withdrawal : Operation.Deposit);
   }, [operation, resetInputs, setOperation]);
@@ -113,21 +112,24 @@ export function GmForm({
     [onSelectMarket, resetInputs]
   );
 
-  function onFocusedCollateralInputChange(tokenAddress: string) {
-    if (!marketInfo) {
-      return;
-    }
+  function onFocusedCollateralInputChange(
+    tokenAddress: string
+  ) {
+    void tokenAddress;
+    // if (!marketInfo) {
+    //   return;
+    // }
 
-    if (marketInfo.isSingle) {
-      setFocusedInput("longCollateral");
-      return;
-    }
+    // if (marketInfo.isSingle) {
+    //   setFocusedInput("longCollateral");
+    //   return;
+    // }
 
-    if (getTokenPoolType(marketInfo, tokenAddress) === "long") {
-      setFocusedInput("longCollateral");
-    } else {
-      setFocusedInput("shortCollateral");
-    }
+    // if (getTokenPoolType(marketInfo, tokenAddress) === "long") {
+    //   setFocusedInput("longCollateral");
+    // } else {
+    //   setFocusedInput("shortCollateral");
+    // }
   }
 
   const availableModes = useMemo(() => getGmSwapBoxAvailableModes(operation, marketInfo), [operation, marketInfo]);
@@ -263,7 +265,7 @@ export function GmForm({
             inputValue={inputState.marketTokenInputValue}
             onInputValueChange={(e) => {
               dispatch({ type: "set-market-token-input-value", value: e.target.value });
-              setFocusedInput("market");
+              // setFocusedInput("market");
             }}
           // {...(isWithdrawal && {
           //   onClickTopRightLabel: () => {
