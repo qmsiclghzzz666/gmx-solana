@@ -14,7 +14,7 @@ import { GmSwapBox } from "@/components/GmSwap/GmSwapBox/GmSwapBox";
 import { getGmSwapBoxAvailableModes } from "@/components/GmSwap/utils";
 import { CreateDepositParams, CreateWithdrawalParams, Mode, Operation } from "@/components/GmSwap/types";
 import { useGenesisHash } from "@/onchain";
-import { useExchange } from "@/contexts/anchor";
+import { useAnchor, useExchange } from "@/contexts/anchor";
 import { MakeCreateDepositParams, MakeCreateWithdrawalParams, invokeCreateDeposit, invokeCreateWithdrawal } from "gmsol";
 import { GMSOL_DEPLOYMENT } from "@/config/deployment";
 import useSWRMutation from "swr/mutation";
@@ -25,6 +25,7 @@ import { fitlerMarkets } from "@/onchain/market";
 export default function Earn() {
   const chainId = useGenesisHash();
   const exchange = useExchange();
+  const { owner } = useAnchor();
   const payer = exchange.provider.publicKey;
 
   const gmSwapBoxRef = useRef<HTMLDivElement>(null);
@@ -175,6 +176,7 @@ export default function Earn() {
 
         <div className="MarketPoolsPage-swap-box" ref={gmSwapBoxRef}>
           {chainId && marketInfo ? (<GmSwapBox
+            owner={owner}
             chainId={chainId}
             marketInfo={marketInfo}
             tokensData={tokens}

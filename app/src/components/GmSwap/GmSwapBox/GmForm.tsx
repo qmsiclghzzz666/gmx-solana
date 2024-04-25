@@ -23,6 +23,8 @@ import { useGmInputAmounts, useGmInputDisplay, useGmStateDispath, useGmStateSele
 import { convertToUsd, formatAmountFree, formatTokenAmount, parseValue } from "@/utils/number";
 import { useInitializeTokenAccount, useWrapNativeToken } from "@/onchain";
 import Modal from "@/components/Modal/Modal";
+import { PublicKey } from "@solana/web3.js";
+import { useOpenConnectModal } from "@/contexts/anchor";
 
 const OPERATION_LABELS = {
   [Operation.Deposit]: /*i18n*/ "Buy GM",
@@ -35,6 +37,7 @@ const MODE_LABELS = {
 };
 
 export function GmForm({
+  owner,
   genesisHash,
   tokenOptions: { tokenOptions, firstToken, secondToken },
   setOperation,
@@ -44,6 +47,7 @@ export function GmForm({
   onCreateDeposit,
   onCreateWithdrawal,
 }: {
+  owner: PublicKey | undefined,
   genesisHash: string,
   tokenOptions: TokenOptions,
   setOperation: (operation: Operation) => void,
@@ -97,11 +101,16 @@ export function GmForm({
   }, [dispatch]);
 
   const performAction = useHandleSubmit({ onCreateDeposit, onCreateWithdrawal });
+  const openConnectModal = useOpenConnectModal();
 
   const handleSubmit = useCallback(() => {
-    performAction();
+    if (owner) {
+      performAction();
+    } else {
+      openConnectModal();
+    }
     resetInputs();
-  }, [performAction, resetInputs]);
+  }, [owner, performAction, resetInputs, openConnectModal]);
 
   const onOperationChange = useCallback(
     (operation: Operation) => {
@@ -153,8 +162,8 @@ export function GmForm({
   const isMarketTokenAccountInited = marketToken?.balance !== null;
   const isFirstTokenAccountInited = firstToken?.balance !== null;
   const isSecondTokenAccountInited = secondToken?.balance !== null;
-  const allowWrapFirstToken = nativeToken && isDeposit && isFirstTokenAccountInited && firstToken?.isWrappedNative;
-  const allowWrapSecondToken = nativeToken && isDeposit && isSecondTokenAccountInited && secondToken?.isWrappedNative;
+  const allowWrapFirstToken = owner && nativeToken && isDeposit && isFirstTokenAccountInited && firstToken?.isWrappedNative;
+  const allowWrapSecondToken = owner && nativeToken && isDeposit && isSecondTokenAccountInited && secondToken?.isWrappedNative;
 
   const [indexName, setIndexName] = useLocalStorageSerializeKey<string>(
     getSyntheticsDepositIndexTokenKey(genesisHash),
@@ -236,7 +245,7 @@ export function GmForm({
             topRightValue={isFirstTokenAccountInited ? formatTokenAmount(firstToken?.balance || BN_ZERO, firstToken?.decimals, "", {
               useCommas: true,
             }) : ""}
-            preventFocusOnLabelClick="right"
+            preventFocusOnLabelClick={allowWrapFirstToken ? "both" : "right"}
             {...(isDeposit && isFirstTokenAccountInited && {
               onClickTopRightLabel: onMaxClickFirstToken,
             })}
@@ -287,7 +296,7 @@ export function GmForm({
               topRightValue={isSecondTokenAccountInited ? formatTokenAmount(secondToken?.balance ?? BN_ZERO, secondToken?.decimals, "", {
                 useCommas: true,
               }) : ""}
-              preventFocusOnLabelClick="right"
+              preventFocusOnLabelClick={allowWrapSecondToken ? "both" : "right"}
               inputValue={inputState.secondTokenInputValue}
               showMaxButton={
                 isDeposit &&
@@ -451,7 +460,7 @@ export function GmForm({
           // onClick={submitState.onSubmit}
           // disabled={submitState.isDisabled}
           >
-            {isDeposit ? t`Buy GM` : t`Sell GM`}
+            {owner ? isDeposit ? t`Buy GM` : t`Sell GM` : t`Connect Wallet`}
           </Button>
         </div>
         {/* <GmConfirmationBox

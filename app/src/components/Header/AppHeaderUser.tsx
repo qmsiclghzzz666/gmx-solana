@@ -3,7 +3,6 @@ import cx from "classnames";
 
 import "./Header.scss";
 import { HeaderLink } from "./HeaderLink";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import connectWalletImg from "@/img/ic_wallet_24.svg";
 
 import "@solana/wallet-adapter-react-ui/styles.css";
@@ -11,6 +10,7 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import ConnectWalletButton from "../Common/ConnectWalletButton/ConnectWalletButton";
 import AddressDropdown from "../AddressDropdown/AddressDropdown";
 import { useCallback } from "react";
+import { useOpenConnectModal } from "@/contexts/anchor";
 
 interface Props {
   small?: boolean;
@@ -18,7 +18,7 @@ interface Props {
 
 export function AppHeaderUser({ small }: Props) {
   const wallet = useWallet();
-  const { setVisible } = useWalletModal();
+  const openConnectModal = useOpenConnectModal();
   const disconnectAccountAndCloseSettings = useCallback(() => {
     void wallet.disconnect();
   }, [wallet]);
@@ -38,7 +38,7 @@ export function AppHeaderUser({ small }: Props) {
             />
           </div>
         ) : (
-          <ConnectWalletButton onClick={() => setVisible(true)} imgSrc={connectWalletImg}>
+          <ConnectWalletButton onClick={openConnectModal} imgSrc={connectWalletImg}>
             {small ? <Trans>Connect</Trans> : <Trans>Connect Wallet</Trans>}
           </ConnectWalletButton>
         )

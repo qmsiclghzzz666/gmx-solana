@@ -7,8 +7,10 @@ import { useTokenOptionsFromStorage } from "../hooks";
 import GmStateProvider from "../GmStateProvider";
 import { getTokenData } from "@/onchain/token/utils";
 import { NATIVE_TOKEN_ADDRESS } from "@/config/tokens";
+import { PublicKey } from "@solana/web3.js";
 
 type Props = {
+  owner: PublicKey | undefined,
   chainId: string,
   marketInfo: MarketInfo,
   operation: Operation;
@@ -24,6 +26,7 @@ type Props = {
 };
 
 export function GmSwapBox({
+  owner,
   chainId,
   marketInfo,
   operation,
@@ -59,6 +62,7 @@ export function GmSwapBox({
       marketInfos={marketInfos}
     >
       <GmForm
+        owner={owner}
         genesisHash={chainId}
         tokenOptions={tokenOptions}
         setOperation={setOperation}

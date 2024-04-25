@@ -1,6 +1,7 @@
-import { useContext, useMemo } from "react";
+import { useCallback, useContext, useMemo } from "react";
 import { makeDataStoreProgram, makeExchangeProgram } from "gmsol";
 import { AnchorStateContext } from "./AnchorStateProvider";
+import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 
 export const useDataStore = () => {
   const { provider, connection } = useAnchor();
@@ -36,4 +37,12 @@ export const useAnchor = () => {
     throw new Error("Used `useAnchor` outside of `AnchorStateProvider`");
   }
   return ctx;
+};
+
+export const useOpenConnectModal = () => {
+  const { setVisible } = useWalletModal();
+
+  return useCallback(() => {
+    setVisible(true);
+  }, [setVisible]);
 };
