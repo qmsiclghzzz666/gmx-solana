@@ -15,21 +15,41 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    padding-top: 1px;
+    padding-bottom: 1px;
   }
 
   .btn-label {
     font-weight: 400;
     font-size: var(--font-sm);
-    margin-left: 0.8rem;
     letter-spacing: 0;
+    margin-left: 0.8rem;
   }
 
-  &:hover {
+  &:not([disabled]):hover {
     background: var(--dark-blue-hover);
   }
 
-  &:active {
+  &:not([disabled]):active {
     background: var(--dark-blue-active);
+  }
+
+  &:disabled {
+    box-shadow: none;
+    cursor: not-allowed;
+    opacity: 0.8;
+  }
+}
+
+.connect-wallet-btn-connecting {
+  &:not([disabled]):hover {
+    background: rgba(129, 57, 57, 0.6) !important;
+    opacity: 0.8;
+  }
+
+  &:not([disabled]):active {
+    background: rgba(129, 57, 57, 0.6) !important;
+    opacity: 0.8;
   }
 }
 
