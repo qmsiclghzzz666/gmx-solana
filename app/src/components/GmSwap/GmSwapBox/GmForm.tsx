@@ -245,7 +245,7 @@ export function GmForm({
             topRightValue={isFirstTokenAccountInited ? formatTokenAmount(firstToken?.balance || BN_ZERO, firstToken?.decimals, "", {
               useCommas: true,
             }) : ""}
-            preventFocusOnLabelClick={allowWrapFirstToken ? "both" : "right"}
+            preventFocusOnLabelClick="right"
             {...(isDeposit && isFirstTokenAccountInited && {
               onClickTopRightLabel: onMaxClickFirstToken,
             })}
@@ -296,7 +296,7 @@ export function GmForm({
               topRightValue={isSecondTokenAccountInited ? formatTokenAmount(secondToken?.balance ?? BN_ZERO, secondToken?.decimals, "", {
                 useCommas: true,
               }) : ""}
-              preventFocusOnLabelClick={allowWrapSecondToken ? "both" : "right"}
+              preventFocusOnLabelClick="right"
               inputValue={inputState.secondTokenInputValue}
               showMaxButton={
                 isDeposit &&
@@ -565,6 +565,7 @@ function WrapNativeTokenBox({
             <TokenWithIcon symbol={nativeToken.symbol} displaySize={20} />
           </div>
         </BuyInputSection>
+
         <Button
           className="w-full"
           variant="primary-action"

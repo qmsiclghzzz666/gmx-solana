@@ -5,6 +5,7 @@ import { RemoveScroll } from "react-remove-scroll";
 import { MdClose } from "react-icons/md";
 
 import "./Modal.css";
+import { FocusOn } from "react-focus-on";
 
 const FADE_VARIANTS = {
   hidden: { opacity: 0 },
@@ -61,38 +62,40 @@ export default function Modal(props: ModalProps) {
   return (
     <AnimatePresence>
       {isVisible && (
-        <motion.div
-          className={cx("Modal", className)}
-          style={style}
-          initial="hidden"
-          animate="visible"
-          exit="hidden"
-          variants={FADE_VARIANTS}
-          transition={TRANSITION}
-        >
-          <div
-            className="Modal-backdrop"
-            style={isVisible ? VISIBLE_STYLES : HIDDEN_STYLES}
-            onClick={() => setIsVisible(false)}
-          ></div>
-          <div className="Modal-content" onClick={stopPropagation}>
-            <div className="Modal-header-wrapper">
-              <div className="Modal-title-bar">
-                <div className="Modal-title">{props.label}</div>
-                <div className="Modal-close-button" onClick={() => setIsVisible(false)}>
-                  <MdClose fontSize={20} className="Modal-close-icon" />
+        <FocusOn>
+          <motion.div
+            className={cx("Modal", className)}
+            style={style}
+            initial="hidden"
+            animate="visible"
+            exit="hidden"
+            variants={FADE_VARIANTS}
+            transition={TRANSITION}
+          >
+            <div
+              className="Modal-backdrop"
+              style={isVisible ? VISIBLE_STYLES : HIDDEN_STYLES}
+              onClick={() => setIsVisible(false)}
+            ></div>
+            <div className="Modal-content" onClick={stopPropagation}>
+              <div className="Modal-header-wrapper">
+                <div className="Modal-title-bar">
+                  <div className="Modal-title">{props.label}</div>
+                  <div className="Modal-close-button" onClick={() => setIsVisible(false)}>
+                    <MdClose fontSize={20} className="Modal-close-icon" />
+                  </div>
                 </div>
+                {props.headerContent && props.headerContent()}
               </div>
-              {props.headerContent && props.headerContent()}
+              <div className="divider" />
+              <RemoveScroll>
+                <div className={cx("Modal-body")} ref={modalRef}>
+                  {props.children}
+                </div>
+              </RemoveScroll>
             </div>
-            <div className="divider" />
-            <RemoveScroll>
-              <div className={cx("Modal-body")} ref={modalRef}>
-                {props.children}
-              </div>
-            </RemoveScroll>
-          </div>
-        </motion.div>
+          </motion.div>
+        </FocusOn>
       )}
     </AnimatePresence>
   );

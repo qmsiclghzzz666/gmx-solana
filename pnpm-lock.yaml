@@ -114,6 +114,9 @@ importers:
       react-dom:
         specifier: ^18.2.0
         version: 18.2.0(react@18.2.0)
+      react-focus-on:
+        specifier: ^3.9.3
+        version: 3.9.3(@types/react@18.2.79)(react@18.2.0)
       react-icons:
         specifier: ^5.1.0
         version: 5.1.0(react@18.2.0)
@@ -3167,6 +3170,10 @@ packages:
   argparse@2.0.1:
     resolution: {integrity: sha512-8+9WqebbFzpX9OR+Wa6O29asIogeRMzcGtAINdpMHHyAg10f05aSFVBbcEqGf/PXw1EjAZ+q2/bEBg3DvurK3Q==}
 
+  aria-hidden@1.2.4:
+    resolution: {integrity: sha512-y+CcFFwelSXpLZk/7fMB2mUbGtX9lKycf1MWJ7CaTIERyitVlyQx6C+sxcROU2BAJ24OiZyK+8wj2i8AlBoS3A==}
+    engines: {node: '>=10'}
+
   array-buffer-byte-length@1.0.1:
     resolution: {integrity: sha512-ahC5W1xgou+KTXix4sAO8Ki12Q+jf4i0+tmk3sC+zgcynshkHxzpXdImBehiUYKKKDwvfFiJl1tZt6ewscS1Mg==}
     engines: {node: '>= 0.4'}
@@ -4428,6 +4435,10 @@ packages:
   flow-parser@0.206.0:
     resolution: {integrity: sha512-HVzoK3r6Vsg+lKvlIZzaWNBVai+FXTX1wdYhz/wVlH13tb/gOdLXmlTqy6odmTBhT5UoWUbq0k8263Qhr9d88w==}
     engines: {node: '>=0.4.0'}
+
+  focus-lock@1.3.5:
+    resolution: {integrity: sha512-QFaHbhv9WPUeLYBDe/PAuLKJ4Dd9OPvKs9xZBr3yLXnUrDNaVXKu2baDBXe3naPY30hgHYSsf2JW4jzas2mDEQ==}
+    engines: {node: '>=10'}
 
   fontfaceobserver@2.3.0:
     resolution: {integrity: sha512-6FPvD/IVyT4ZlNe7Wcn5Fb/4ChigpucKYSvD6a+0iMoLn2inpo711eyIcKjmDtE5XNcgAkSH9uN/nfAeZzHEfg==}
@@ -6174,6 +6185,11 @@ packages:
     resolution: {integrity: sha512-y3bGgqKj3QBdxLbLkomlohkvsA8gdAiUQlSBJnBhfn+BPxg4bc62d8TcBW15wavDfgexCgccckhcZvywyQYPOw==}
     hasBin: true
 
+  react-clientside-effect@1.2.6:
+    resolution: {integrity: sha512-XGGGRQAKY+q25Lz9a/4EPqom7WRjz3z9R2k4jhVKA/puQFH/5Nt27vFZYql4m4NVNdUvX8PS3O7r/Zzm7cjUlg==}
+    peerDependencies:
+      react: ^15.3.0 || ^16.0.0 || ^17.0.0 || ^18.0.0
+
   react-devtools-core@4.28.5:
     resolution: {integrity: sha512-cq/o30z9W2Wb4rzBefjv5fBalHU0rJGZCHAkf/RHSBWSSYwh8PlQTqqOJmgIIbBtpj27T6FIPXeomIjZtCNVqA==}
 
@@ -6186,6 +6202,25 @@ packages:
     resolution: {integrity: sha512-6IMTriUmvsjHUjNtEDudZfuDQUoWXVxKHhlEGSk81n4YFS+r/Kl99wXiwlVXtPBtJenozv2P+hxDsw9eA7Xo6g==}
     peerDependencies:
       react: ^18.2.0
+
+  react-focus-lock@2.12.1:
+    resolution: {integrity: sha512-lfp8Dve4yJagkHiFrC1bGtib3mF2ktqwPJw4/WGcgPW+pJ/AVQA5X2vI7xgp13FcxFEpYBBHpXai/N2DBNC0Jw==}
+    peerDependencies:
+      '@types/react': ^16.8.0 || ^17.0.0 || ^18.0.0
+      react: ^16.8.0 || ^17.0.0 || ^18.0.0
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
+
+  react-focus-on@3.9.3:
+    resolution: {integrity: sha512-GSLz54TvP6OUlsvnlgHJu80nHOAO2ikRTtDt/aP8GZu3DPPAbwHFdliveBwUfPnyKLUKutFMCJUkH55vuo4uKQ==}
+    engines: {node: '>=8.5.0'}
+    peerDependencies:
+      '@types/react': ^16.8.0 || ^17.0.0 || ^18.0.0
+      react: ^16.8.0 || ^17.0.0 || ^18.0.0
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
 
   react-icons@5.1.0:
     resolution: {integrity: sha512-D3zug1270S4hbSlIRJ0CUS97QE1yNNKDjzQe3HqY0aefp2CBn9VgzgES27sRR2gOvFK+0CNx/BW0ggOESp6fqQ==}
@@ -11852,6 +11887,10 @@ snapshots:
 
   argparse@2.0.1: {}
 
+  aria-hidden@1.2.4:
+    dependencies:
+      tslib: 2.6.2
+
   array-buffer-byte-length@1.0.1:
     dependencies:
       call-bind: 1.0.7
@@ -13476,6 +13515,10 @@ snapshots:
   flow-enums-runtime@0.0.6: {}
 
   flow-parser@0.206.0: {}
+
+  focus-lock@1.3.5:
+    dependencies:
+      tslib: 2.6.2
 
   fontfaceobserver@2.3.0: {}
 
@@ -15392,6 +15435,11 @@ snapshots:
       minimist: 1.2.8
       strip-json-comments: 2.0.1
 
+  react-clientside-effect@1.2.6(react@18.2.0):
+    dependencies:
+      '@babel/runtime': 7.24.4
+      react: 18.2.0
+
   react-devtools-core@4.28.5(bufferutil@4.0.8)(utf-8-validate@5.0.10):
     dependencies:
       shell-quote: 1.8.1
@@ -15413,6 +15461,30 @@ snapshots:
       loose-envify: 1.4.0
       react: 18.2.0
       scheduler: 0.23.0
+
+  react-focus-lock@2.12.1(@types/react@18.2.79)(react@18.2.0):
+    dependencies:
+      '@babel/runtime': 7.24.4
+      focus-lock: 1.3.5
+      prop-types: 15.8.1
+      react: 18.2.0
+      react-clientside-effect: 1.2.6(react@18.2.0)
+      use-callback-ref: 1.3.2(@types/react@18.2.79)(react@18.2.0)
+      use-sidecar: 1.1.2(@types/react@18.2.79)(react@18.2.0)
+    optionalDependencies:
+      '@types/react': 18.2.79
+
+  react-focus-on@3.9.3(@types/react@18.2.79)(react@18.2.0):
+    dependencies:
+      aria-hidden: 1.2.4
+      react: 18.2.0
+      react-focus-lock: 2.12.1(@types/react@18.2.79)(react@18.2.0)
+      react-remove-scroll: 2.5.9(@types/react@18.2.79)(react@18.2.0)
+      react-style-singleton: 2.2.1(@types/react@18.2.79)(react@18.2.0)
+      tslib: 2.6.2
+      use-sidecar: 1.1.2(@types/react@18.2.79)(react@18.2.0)
+    optionalDependencies:
+      '@types/react': 18.2.79
 
   react-icons@5.1.0(react@18.2.0):
     dependencies:
