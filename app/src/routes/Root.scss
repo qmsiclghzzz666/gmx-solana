@@ -62,6 +62,8 @@ $app-card-padding: 1.5rem;
   box-shadow: 0.8rem 0.3rem 0.6rem #00000029;
   opacity: 1;
   backdrop-filter: blur(2.7rem);
+  /* Safari 9+ */
+  -webkit-backdrop-filter: blur(2.7rem);
   position: fixed;
   z-index: 801;
   left: 0;

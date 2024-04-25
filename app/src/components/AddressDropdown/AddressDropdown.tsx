@@ -6,6 +6,7 @@ import { FaChevronDown } from "react-icons/fa";
 import { createBreakpoint, useCopyToClipboard } from "react-use";
 import "./AddressDropdown.scss";
 import { PublicKey } from "@solana/web3.js";
+import { useWallet } from "@solana/wallet-adapter-react";
 
 type Props = {
   account: PublicKey;
@@ -42,13 +43,15 @@ function AddressDropdown({ account, disconnectAccountAndCloseSettings }: Props) 
   //   setOneClickModalOpen(true);
   // }, [setOneClickModalOpen]);
 
+  const { wallet } = useWallet();
+
   return (
     <Menu>
       <Menu.Button as="div">
         <button className="App-cta small transparent address-btn">
-          {/* <div className="user-avatar">
-            {ethereumProvider && <Davatar size={20} address={account} provider={ethereumProvider} />}
-          </div> */}
+          <div className="user-avatar">
+            {wallet && <img width={20} src={wallet.adapter.icon} />}
+          </div>
           <span className="user-address">{shortenAddress(account.toBase58(), displayAddressLength)}</span>
           <FaChevronDown />
         </button>
