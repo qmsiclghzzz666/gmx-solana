@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { Trans, t } from "@lingui/macro";
 import { MarketInfos, MarketTokenAPRs } from "@/onchain/market";
 import { TokenData, Tokens } from "@/onchain/token";
@@ -15,6 +16,10 @@ import Button from "../Button/Button";
 import TokenIcon from "../TokenIcon/TokenIcon";
 
 import "./GmList.scss";
+import { useAnchor } from "@/contexts/anchor";
+import { getTotalGmInfo } from "@/onchain/market/utils";
+import { GmTokensBalanceInfo, GmTokensTotalBalanceInfo } from "../GmTokensBalanceInfo/GmTokensBalanceInfo";
+import { BN } from "@coral-xyz/anchor";
 
 type Props = {
   hideTitle?: boolean;
@@ -26,6 +31,11 @@ type Props = {
   shouldScrollToTop?: boolean;
   buySellActionHandler?: () => void;
 };
+
+interface TotalBalance {
+  balance: BN;
+  balanceUsd: BN;
+}
 
 export function GmList({
   hideTitle,
@@ -40,7 +50,7 @@ export function GmList({
   const isMobile = useMedia("(max-width: 1100px)");
 
   // const { chainId } = useChainId();
-  // const { active } = useWallet();
+  const { active } = useAnchor();
   // const currentIcons = getIcons(chainId);
   // const userEarnings = useUserEarnings(chainId);
 
@@ -50,10 +60,11 @@ export function GmList({
   const { markets } = useSortedPoolsWithIndexToken(marketsInfoData, marketTokensData);
   // const isLpIncentiveActive = useIncentiveStats()?.lp?.isActive ?? false;
 
-  // const userTotalGmInfo = useMemo(() => {
-  //   if (!active) return;
-  //   return getTotalGmInfo(marketTokensData);
-  // }, [marketTokensData, active]);
+  const userTotalGmInfo = useMemo(() => {
+    if (active) {
+      return getTotalGmInfo(marketTokensData);
+    }
+  }, [marketTokensData, active]);
 
   return (
     <div className="GMList">
@@ -67,6 +78,7 @@ export function GmList({
         marketsTokensIncentiveAprData={marketsTokensIncentiveAprData}
         shouldScrollToTop={shouldScrollToTop}
         buySellActionHandler={buySellActionHandler}
+        userTotalGmInfo={userTotalGmInfo}
       />}
       {isMobile && <MobileList
         hideTitle={hideTitle}
@@ -77,6 +89,8 @@ export function GmList({
         marketsTokensIncentiveAprData={marketsTokensIncentiveAprData}
         shouldScrollToTop={shouldScrollToTop}
         buySellActionHandler={buySellActionHandler}
+        daysConsidered={daysConsidered}
+        userTotalGmInfo={userTotalGmInfo}
       />}
     </div>
   );
@@ -89,9 +103,11 @@ function DesktopList({
   marketsInfoData,
   tokensData,
   shouldScrollToTop,
+  userTotalGmInfo,
 }: {
-  daysConsidered: number,
   sortedMarketsByIndexToken: TokenData[],
+  daysConsidered: number,
+  userTotalGmInfo?: TotalBalance,
 } & Props) {
   return (
     <div className="token-table-wrapper App-card">
@@ -129,14 +145,14 @@ function DesktopList({
                 )}
               />
             </th>
-            {/* <th>
+            <th>
               <GmTokensTotalBalanceInfo
                 balance={userTotalGmInfo?.balance}
                 balanceUsd={userTotalGmInfo?.balanceUsd}
-                userEarnings={userEarnings}
+                // userEarnings={userEarnings}
                 label={t`WALLET`}
               />
-            </th> */}
+            </th>
             <th>
               <Tooltip
                 handle={t`APR`}
@@ -232,15 +248,15 @@ function DesktopList({
                     /> */}
                   </td>
 
-                  {/* <td>
+                  <td>
                     <GmTokensBalanceInfo
                       token={token}
                       daysConsidered={daysConsidered}
                       oneLine={false}
-                      earnedRecently={marketEarnings?.recent}
-                      earnedTotal={marketEarnings?.total}
+                    // earnedRecently={marketEarnings?.recent}
+                    // earnedTotal={marketEarnings?.total}
                     />
-                  </td> */}
+                  </td>
 
                   <td>
                     {/* <AprInfo apr={apr} incentiveApr={incentiveApr} isIncentiveActive={isLpIncentiveActive} /> */}
@@ -284,9 +300,13 @@ function MobileList(
     marketsInfoData,
     tokensData,
     buySellActionHandler,
+    daysConsidered,
+    userTotalGmInfo,
   }: {
     hideTitle?: boolean,
-    sortedMarketsByIndexToken: TokenData[]
+    sortedMarketsByIndexToken: TokenData[],
+    daysConsidered: number,
+    userTotalGmInfo?: TotalBalance,
   } & Props
 ) {
   return (
@@ -387,12 +407,12 @@ function MobileList(
                     /> */}
                   </div>
                 </div>
-                {/* <div className="App-card-row">
+                <div className="App-card-row">
                   <div className="label">
                     <GmTokensTotalBalanceInfo
                       balance={userTotalGmInfo?.balance}
                       balanceUsd={userTotalGmInfo?.balanceUsd}
-                      userEarnings={userEarnings}
+                      // userEarnings={userEarnings}
                       tooltipPosition="bottom-start"
                       label={t`Wallet`}
                     />
@@ -402,11 +422,11 @@ function MobileList(
                       token={token}
                       daysConsidered={daysConsidered}
                       oneLine
-                      earnedRecently={marketEarnings?.recent}
-                      earnedTotal={marketEarnings?.total}
+                    // earnedRecently={marketEarnings?.recent}
+                    // earnedTotal={marketEarnings?.total}
                     />
                   </div>
-                </div> */}
+                </div>
                 <div className="App-card-row">
                   <div className="label">
                     <Trans>APR</Trans>

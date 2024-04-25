@@ -1,5 +1,5 @@
 import { convertToUsd, expandDecimals } from "@/utils/number";
-import { TokenData } from "../token";
+import { TokenData, Tokens } from "../token";
 import { MarketInfo } from "./types";
 import { toBN } from "gmsol";
 import { BN_ZERO, ONE_USD } from "@/config/constants";
@@ -121,4 +121,24 @@ export function getTokenPoolType(marketInfo: MarketInfo, tokenAddress: Address):
   }
 
   return undefined;
+}
+
+export function getTotalGmInfo(tokensData?: Tokens) {
+  const defaultResult = {
+    balance: BN_ZERO,
+    balanceUsd: BN_ZERO,
+  };
+
+  if (!tokensData) {
+    return defaultResult;
+  }
+
+  const tokens = Object.values(tokensData).filter((token) => token.symbol === "GM");
+
+  return tokens.reduce((acc, token) => {
+    const balanceUsd = convertToUsd(token.balance ?? BN_ZERO, token.decimals, token.prices.minPrice);
+    acc.balance = acc.balance.add(token.balance || BN_ZERO);
+    acc.balanceUsd = acc.balanceUsd.add(balanceUsd || BN_ZERO);
+    return acc;
+  }, defaultResult);
 }

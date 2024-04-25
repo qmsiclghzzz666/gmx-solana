@@ -1,33 +1,40 @@
 import { ReactNode, createContext, useMemo } from "react";
 import { ConnectionProvider, WalletProvider, useAnchorWallet, useConnection } from "@solana/wallet-adapter-react";
-import { Connection, clusterApiUrl } from "@solana/web3.js";
+import { Connection, PublicKey, clusterApiUrl } from "@solana/web3.js";
 import * as walletAdapterWallets from "@solana/wallet-adapter-wallets";
 import { WalletModalProvider } from "@solana/wallet-adapter-react-ui";
 import { AnchorProvider } from "@coral-xyz/anchor";
 import { DEFAULT_CLUSTER } from "@/config/env";
 
-export interface AnchorContext {
+export interface AnchorState {
   connection: Connection,
+  active: boolean,
+  owner?: PublicKey,
   provider?: AnchorProvider,
 }
 
-export const AnchorContextCtx = createContext<AnchorContext | null>(null);
+export const AnchorStateContext = createContext<AnchorState | null>(null);
 
 function Inner({ children }: { children: ReactNode }) {
   const { connection } = useConnection();
   const wallet = useAnchorWallet();
-  const provider = wallet ? new AnchorProvider(connection, wallet) : undefined;
-  return (
-    <AnchorContextCtx.Provider value={{
+  const value = useMemo(() => {
+    const provider = wallet ? new AnchorProvider(connection, wallet) : undefined;
+    return {
       connection,
       provider,
-    }}>
+      active: Boolean(provider && provider.publicKey),
+      owner: provider?.publicKey,
+    }
+  }, [connection, wallet]);
+  return (
+    <AnchorStateContext.Provider value={value}>
       {children}
-    </AnchorContextCtx.Provider>
+    </AnchorStateContext.Provider>
   )
 }
 
-export function AnchorContextProvider({ children }: { children: ReactNode }) {
+export function AnchorStateProvider({ children }: { children: ReactNode }) {
   const endpoint = clusterApiUrl(DEFAULT_CLUSTER);
   const wallets = useMemo(() => {
     return [

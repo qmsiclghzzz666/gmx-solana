@@ -1,13 +1,13 @@
 import { ReactNode } from "react";
 import { SWRConfig, SWRConfiguration } from "swr";
-import { AnchorContextProvider } from "@/contexts/anchor";
+import { AnchorStateProvider } from "@/contexts/anchor";
 
 export function OnChainProvider({ children, refreshInterval = 5000 }: { children: ReactNode, refreshInterval?: number }) {
   return (
     <SWRConfig value={createOnChainSWRConfig(refreshInterval)}>
-      <AnchorContextProvider>
+      <AnchorStateProvider>
         {children}
-      </AnchorContextProvider>
+      </AnchorStateProvider>
     </SWRConfig>
   );
 }
