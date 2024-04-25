@@ -1,7 +1,7 @@
 import { ReactNode, createContext, useMemo } from "react";
 import { ConnectionProvider, WalletProvider, useAnchorWallet, useConnection } from "@solana/wallet-adapter-react";
 import { Connection, PublicKey, clusterApiUrl } from "@solana/web3.js";
-import * as walletAdapterWallets from "@solana/wallet-adapter-wallets";
+// import * as walletAdapterWallets from "@solana/wallet-adapter-wallets";
 import { WalletModalProvider } from "@solana/wallet-adapter-react-ui";
 import { AnchorProvider } from "@coral-xyz/anchor";
 import { DEFAULT_CLUSTER } from "@/config/env";
@@ -38,8 +38,8 @@ export function AnchorStateProvider({ children }: { children: ReactNode }) {
   const endpoint = clusterApiUrl(DEFAULT_CLUSTER);
   const wallets = useMemo(() => {
     return [
-      new walletAdapterWallets.SolflareWalletAdapter(),
-      new walletAdapterWallets.PhantomWalletAdapter(),
+      // new walletAdapterWallets.SolflareWalletAdapter(),
+      // new walletAdapterWallets.PhantomWalletAdapter(),
     ];
   }, []);
 
