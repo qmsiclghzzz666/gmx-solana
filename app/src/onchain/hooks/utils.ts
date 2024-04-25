@@ -1,5 +1,5 @@
 import { useAnchorProvider } from "@/contexts/anchor";
-import { createAssociatedTokenAccountInstruction, createSyncNativeInstruction, getAssociatedTokenAddressSync } from "@solana/spl-token";
+import { createAssociatedTokenAccountInstruction, createCloseAccountInstruction, createSyncNativeInstruction, getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { useConnection } from "@solana/wallet-adapter-react";
 import { PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
 import { useCallback } from "react";
@@ -77,6 +77,38 @@ export const useWrapNativeToken = (callback: () => void) => {
     void trigger(lamports, {
       onSuccess: (signature) => {
         console.log(`wrapped SOL at tx ${signature}`);
+        callback();
+        void mutate(filterBalances);
+      },
+      onError: (error) => {
+        console.error(error);
+        callback();
+      }
+    });
+  }, [trigger, mutate, callback]);
+};
+
+export const useUnwrapNativeToken = (callback: () => void) => {
+  const provider = useAnchorProvider();
+  const { mutate } = useSWRConfig();
+
+  const { trigger } = useSWRMutation("unwrap-native-token", async () => {
+    if (provider && provider.publicKey) {
+      const address = getAssociatedTokenAddressSync(WRAPPED_NATIVE_TOKEN_ADDRESS, provider.publicKey);
+      const tx = new Transaction().add(
+        createCloseAccountInstruction(address, provider.publicKey, provider.publicKey),
+      );
+      tx.recentBlockhash = (await provider.connection.getLatestBlockhash()).blockhash;
+      return await provider.sendAndConfirm(tx);
+    } else {
+      throw Error("Wallet not connected");
+    }
+  });
+
+  return useCallback(() => {
+    void trigger(undefined, {
+      onSuccess: (signature) => {
+        console.log(`unwrapped SOL at tx ${signature}`);
         callback();
         void mutate(filterBalances);
       },

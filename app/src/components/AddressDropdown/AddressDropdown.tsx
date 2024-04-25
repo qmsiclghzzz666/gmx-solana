@@ -7,6 +7,8 @@ import { createBreakpoint, useCopyToClipboard } from "react-use";
 import "./AddressDropdown.scss";
 import { PublicKey } from "@solana/web3.js";
 import { useWallet } from "@solana/wallet-adapter-react";
+import { useNativeTokenUtils } from "../NativeTokenUtils";
+import { MdOutlineWallet } from "react-icons/md";
 
 type Props = {
   account: PublicKey;
@@ -45,6 +47,8 @@ function AddressDropdown({ account, disconnectAccountAndCloseSettings }: Props) 
 
   const { wallet } = useWallet();
 
+  const { isNativeTokenReady, openUnwrapNativeTokenModal } = useNativeTokenUtils();
+
   return (
     <Menu>
       <Menu.Button as="div">
@@ -72,6 +76,17 @@ function AddressDropdown({ account, disconnectAccountAndCloseSettings }: Props) 
               </p>
             </div>
           </Menu.Item>
+          {isNativeTokenReady && <Menu.Item>
+            <div
+              className="menu-item"
+              onClick={openUnwrapNativeTokenModal}
+            >
+              <MdOutlineWallet size={20} />
+              <p>
+                <Trans>Unwrap WSOL</Trans>
+              </p>
+            </div>
+          </Menu.Item>}
           {/* <Menu.Item>
             <ExternalLink href={accountUrl} className="menu-item">
               <img width={20} src={externalLink} alt="Open address in explorer" />

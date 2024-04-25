@@ -23,7 +23,6 @@ type Props = {
   showPercentSelector?: boolean;
   onPercentChange?: (percentage: number) => void;
   preventFocusOnLabelClick?: "left" | "right" | "both";
-  focus?: boolean;
 };
 
 export default function BuyInputSection(props: Props) {

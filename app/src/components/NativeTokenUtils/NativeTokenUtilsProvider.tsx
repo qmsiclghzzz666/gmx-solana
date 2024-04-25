@@ -3,14 +3,18 @@ import { NativeTokenUtilsContext } from "./context";
 import { WrapNativeTokenModal } from "./WrapNativeTokenModal";
 import { useDeployedMarketInfos } from "@/onchain";
 import { getTokenData } from "@/onchain/token/utils";
-import { NATIVE_TOKEN_ADDRESS } from "@/config/tokens";
+import { NATIVE_TOKEN_ADDRESS, WRAPPED_NATIVE_TOKEN_ADDRESS } from "@/config/tokens";
+import { UnwrapNativeTokenModal } from "./UnwrapNativeTokenModal";
 
 export const NativeTokenUtilsProvider = ({ children }: { children: ReactNode }) => {
   const [isWrapping, setIsWrapping] = useState(false);
+  const [isUnwrapping, setIsUnwrapping] = useState(false);
+
   const { tokens } = useDeployedMarketInfos();
   const nativeToken = getTokenData(tokens, NATIVE_TOKEN_ADDRESS);
+  const wrappedNativeToken = getTokenData(tokens, WRAPPED_NATIVE_TOKEN_ADDRESS);
 
-  const isNativeTokenReady = nativeToken ? true : false;
+  const isNativeTokenReady = nativeToken && wrappedNativeToken ? true : false;
 
   const handleOpenWrapNativeTokenModal = useCallback(() => {
     if (!isNativeTokenReady) {
@@ -19,11 +23,20 @@ export const NativeTokenUtilsProvider = ({ children }: { children: ReactNode }) 
     setIsWrapping(true);
   }, [isNativeTokenReady]);
 
+  const handleOpenUnwrapNativeTokenModal = useCallback(() => {
+    if (!isNativeTokenReady) {
+      throw Error("Native token data not ready");
+    }
+    setIsUnwrapping(true);
+  }, [isNativeTokenReady]);
+
   return (
     <NativeTokenUtilsContext.Provider value={{
       isNativeTokenReady,
       isWrapping,
+      isUnwrapping,
       openWrapNativeTokenModal: handleOpenWrapNativeTokenModal,
+      openUnwrapNativeTokenModal: handleOpenUnwrapNativeTokenModal,
     }}>
       {children}
       {nativeToken && <WrapNativeTokenModal
@@ -32,6 +45,12 @@ export const NativeTokenUtilsProvider = ({ children }: { children: ReactNode }) 
         onSubmitted={() => setIsWrapping(false)}
         onClose={() => setIsWrapping(false)}
       />}
+      {wrappedNativeToken && <UnwrapNativeTokenModal
+        isVisible={isUnwrapping}
+        wrappedNativeToken={wrappedNativeToken}
+        onSubmitted={() => setIsUnwrapping(false)}
+        onClose={() => setIsUnwrapping(false)} />
+      }
     </NativeTokenUtilsContext.Provider>
   );
 };

@@ -56,7 +56,7 @@ export function WrapNativeTokenModal({
     <Modal isVisible={isVisible} setIsVisible={() => {
       setInputValue("");
       onClose();
-    }} label={t`Wrap Native Token`}>
+    }} label={t`Wrap SOL`}>
       <form onSubmit={(e) => {
         e.preventDefault();
         handleSubmit();
