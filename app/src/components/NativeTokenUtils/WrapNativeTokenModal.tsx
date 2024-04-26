@@ -1,5 +1,5 @@
-import { BN_ZERO, MIN_RESIDUAL_AMOUNT } from "@/config/constants";
-import { useWrapNativeToken } from "@/onchain";
+import { BN_ZERO, DEFAULT_RENT_EXEMPT_FEE_FOR_ZERO, ESTIMATED_EXECUTION_FEE } from "@/config/constants";
+import { useRentExemptionAmount, useWrapNativeToken } from "@/onchain";
 import { TokenData } from "@/onchain/token";
 import { convertToUsd, formatAmountFree, formatTokenAmount, parseValue } from "@/utils/number";
 import { useCallback, useMemo, useState } from "react";
@@ -31,6 +31,12 @@ export function WrapNativeTokenModal({
 
   const { trigger: wrapNativeToken, isSending } = useWrapNativeToken(handleSubmitted);
 
+  const rentExemptionFeeAmount = useRentExemptionAmount(0);
+
+  const minResidualAmount = useMemo(() => {
+    return ESTIMATED_EXECUTION_FEE.muln(2).add(rentExemptionFeeAmount ?? DEFAULT_RENT_EXEMPT_FEE_FOR_ZERO);
+  }, [rentExemptionFeeAmount]);
+
   const { nativeTokenAmount, nativeTokenUsd } = useMemo(() => {
     const nativeTokenAmount = parseValue(inputValue, nativeToken.decimals) ?? BN_ZERO;
     const nativeTokenUsd = convertToUsd(nativeTokenAmount, nativeToken.decimals, nativeToken.prices.minPrice);
@@ -44,14 +50,14 @@ export function WrapNativeTokenModal({
     void wrapNativeToken(nativeTokenAmount);
   }, [nativeTokenAmount, wrapNativeToken]);
 
-  const showMaxButton = !nativeTokenAmount.eq(nativeToken.balance ?? BN_ZERO) && nativeToken.balance?.gt(MIN_RESIDUAL_AMOUNT);
+  const showMaxButton = !nativeTokenAmount.eq(nativeToken.balance ?? BN_ZERO) && nativeToken.balance?.gt(minResidualAmount);
   const onMaxClick = useCallback(() => {
     if (nativeToken.balance) {
-      const maxAvailableAmount = nativeToken.balance.gt(MIN_RESIDUAL_AMOUNT) ? nativeToken.balance.sub(MIN_RESIDUAL_AMOUNT) : BN_ZERO;
+      const maxAvailableAmount = nativeToken.balance.gt(minResidualAmount) ? nativeToken.balance.sub(minResidualAmount) : BN_ZERO;
       const finalAmount = formatAmountFree(maxAvailableAmount, nativeToken.decimals);
       setInputValue(finalAmount);
     }
-  }, [nativeToken]);
+  }, [minResidualAmount, nativeToken.balance, nativeToken.decimals]);
 
   return (
     <Modal isVisible={isVisible} setIsVisible={() => {

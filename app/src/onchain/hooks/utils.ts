@@ -2,7 +2,7 @@ import { useAnchorProvider } from "@/contexts/anchor";
 import { createAssociatedTokenAccountInstruction, createCloseAccountInstruction, createSyncNativeInstruction, getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { useConnection } from "@solana/wallet-adapter-react";
 import { ConfirmOptions, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import useSWR, { useSWRConfig } from "swr";
 import useSWRMutation, { MutationFetcher } from "swr/mutation";
 import { filterBalances } from "../token";
@@ -14,6 +14,7 @@ import { helperToast } from "@/utils/helperToast";
 import { makeSendErrorContent } from "./makeSendErrorContent";
 import { makeSendingContent } from "./makeSendingContent";
 import { t } from "@lingui/macro";
+import { toBN } from "gmsol";
 
 export const useGenesisHash = () => {
   const connection = useConnection();
@@ -26,6 +27,23 @@ export const useGenesisHash = () => {
   });
 
   return data;
+};
+
+export const useRentExemptionAmount = (dataLength: number) => {
+  const connection = useConnection();
+  const { data } = useSWR(['rent-exemption-amount', dataLength], async (key) => {
+    return await connection.connection.getMinimumBalanceForRentExemption(key[1]);
+  }, { refreshInterval: 3600 });
+
+  const dataRef = useRef<BN | null>(null);
+
+  useEffect(() => {
+    if (data) {
+      dataRef.current = toBN(data);
+    }
+  }, [data]);
+
+  return dataRef.current;
 };
 
 export interface TriggerOptions {
