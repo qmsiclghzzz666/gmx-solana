@@ -1,7 +1,6 @@
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
 import Root from './routes/Root';
 
-import { messages } from "./locales/en/messages";
 import { I18nProvider } from "@lingui/react";
 import { i18n } from "@lingui/core";
 import Earn from './routes/Earn';
@@ -40,7 +39,7 @@ const router = createBrowserRouter([
   }
 ]);
 
-i18n.load("en", messages);
+i18n.load({ "en": {} });
 i18n.activate("en");
 
 export function App() {
