@@ -54,7 +54,9 @@ export const useTriggerInvocation = <T>(
     return signature;
   }, [info, invoke, setPendingTxs]);
 
-  const { trigger, isMutating } = useSWRMutation<string, Error, string, { arg: T }>(key, fetcher);
+  const { trigger, isMutating } = useSWRMutation<string, Error, string, { arg: T }, string>(key, fetcher, {
+    throwOnError: false,
+  });
 
   return useMemo(() => {
     return {
