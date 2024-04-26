@@ -4,3 +4,5 @@ export const SYNTHETICS_DEPOSIT_INDEX_TOKEN_KEY = "synthetics-deposit-index-toke
 export function getSyntheticsDepositIndexTokenKey(endpoint: string) {
   return [endpoint, SYNTHETICS_DEPOSIT_INDEX_TOKEN_KEY];
 }
+
+export const LANGUAGE_LOCALSTORAGE_KEY = "LANGUAGE_KEY";

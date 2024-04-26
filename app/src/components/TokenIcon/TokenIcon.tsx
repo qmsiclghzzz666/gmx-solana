@@ -1,10 +1,6 @@
 import cx from "classnames";
 import "./TokenIcon.scss";
-
-function getIconUrlPath(symbol: string, size: 24 | 40) {
-  if (!symbol || !size) return;
-  return `/src/img/ic_${symbol.toLowerCase()}_${size}.svg`;
-}
+import { getIconUrlPath } from "@/utils/icon";
 
 type Props = {
   symbol: string;

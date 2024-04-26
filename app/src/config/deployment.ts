@@ -31,7 +31,7 @@ const parseTokens = (tokens: Tokens) => {
   return ans;
 };
 
-const parseDeployment = (deployment?: GMSOLDeployment) => {
+const parseDeployment = (deployment: GMSOLDeployment | null) => {
   if (deployment) {
     const parsed: ParsedGMSOLDeployment = {
       store: new PublicKey(deployment.store),
@@ -43,4 +43,4 @@ const parseDeployment = (deployment?: GMSOLDeployment) => {
   }
 }
 
-export const GMSOL_DEPLOYMENT = parseDeployment(window.__GMSOL_DEPLOYMENT__);
+export const GMSOL_DEPLOYMENT = parseDeployment(__GMSOL_DEPLOYMENT__);

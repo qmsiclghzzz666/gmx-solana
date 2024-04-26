@@ -11,6 +11,9 @@ import { StateProvider } from './contexts/state';
 import { earnLoader } from './routes/loaders';
 import { action as gmAction } from "@/components/GmSwap/GmSwapBox/action";
 import { NativeTokenUtilsProvider } from './components/NativeTokenUtils';
+import { useEffect } from 'react';
+import { defaultLocale, dynamicActivate } from './utils/i18n';
+import { LANGUAGE_LOCALSTORAGE_KEY } from './config/localStorage';
 
 const router = createBrowserRouter([
   {
@@ -39,10 +42,12 @@ const router = createBrowserRouter([
   }
 ]);
 
-i18n.load({ "en": {} });
-i18n.activate("en");
-
 export function App() {
+  useEffect(() => {
+    const defaultLangugage = localStorage.getItem(LANGUAGE_LOCALSTORAGE_KEY) ?? defaultLocale;
+    void dynamicActivate(defaultLangugage);
+  }, []);
+
   return (
     <I18nProvider i18n={i18n}>
       <OnChainProvider>

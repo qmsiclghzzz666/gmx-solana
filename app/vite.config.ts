@@ -4,13 +4,14 @@ import { nodePolyfills } from 'vite-plugin-node-polyfills'
 import path from "path";
 import { loadGMSOLDeployment } from "./utils/load-deployment";
 import { loadHttpsOptions } from './utils/load-https-options';
+import { lingui } from "@lingui/vite-plugin";
 
 export default defineConfig(async ({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   return {
     plugins: [
       nodePolyfills({
-        include: ['buffer', 'crypto', 'stream', 'vm'],
+        include: ['buffer', 'crypto', 'stream', 'vm', 'util'],
         globals: {
           global: false,
         }
@@ -21,6 +22,7 @@ export default defineConfig(async ({ mode }) => {
           compact: mode == "development" ? false : undefined,
         }
       }),
+      lingui(),
     ],
     resolve: {
       alias: {
@@ -28,7 +30,7 @@ export default defineConfig(async ({ mode }) => {
       }
     },
     define: {
-      __GMSOL_DEPLOYMENT__: await loadGMSOLDeployment(env.GMSOL_DEPLOYMENT ? path.resolve(__dirname, env.GMSOL_DEPLOYMENT) : undefined),
+      __GMSOL_DEPLOYMENT__: JSON.stringify(await loadGMSOLDeployment(env.GMSOL_DEPLOYMENT ? path.resolve(__dirname, env.GMSOL_DEPLOYMENT) : undefined) ?? null),
     },
     server: {
       https: await loadHttpsOptions(env.GMSOL_SSL_DIR ? path.resolve(__dirname, env.GMSOL_SSL_DIR) : undefined),
