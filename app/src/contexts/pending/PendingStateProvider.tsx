@@ -6,20 +6,21 @@ import { helperToast } from "@/utils/helperToast";
 import { Trans } from "@lingui/macro";
 import ExternalLink from "@/components/ExternalLink/ExternalLink";
 import { getTransactionUrl } from "@/utils/transaction";
+import { PendingTranscation } from "@/onchain";
 
 interface Props {
   children: ReactNode,
 }
 
-export function PendingTransactionsStateProvider({
+export function PendingStateProvider({
   children,
 }: Props) {
-  const [pendingTxs, setPendingTxs] = useState<string[]>([]);
+  const [pendingTxs, setPendingTxs] = useState<PendingTranscation[]>([]);
 
   const request = useMemo(() => {
     return {
       key: "check_txs",
-      pendingTxs: [...pendingTxs],
+      pendingTxs: pendingTxs.map(tx => tx.signature),
     }
   }, [pendingTxs]);
 
@@ -47,13 +48,13 @@ export function PendingTransactionsStateProvider({
 
   useEffect(() => {
     if (data) {
-      const updatedPendingTxs: string[] = [];
+      const updatedPendingTxs: PendingTranscation[] = [];
       for (let i = 0; i < pendingTxs.length; i++) {
         const pendingTx = pendingTxs[i];
         const status = data[i];
         if (status) {
           if (status.confirmationStatus === "confirmed" || status.confirmationStatus === "finalized") {
-            const url = getTransactionUrl(pendingTx);
+            const url = getTransactionUrl(pendingTx.signature);
             if (status.err) {
               helperToast.error(
                 <div>
@@ -65,9 +66,9 @@ export function PendingTransactionsStateProvider({
             } else {
               helperToast.success(
                 <div>
-                  {pendingTx}{" "}
+                  {pendingTx.message}{" "}
                   <ExternalLink href={url}>
-                    <Trans>View</Trans>
+                    <Trans>View Tx</Trans>
                   </ExternalLink>
                 </div>
               );
@@ -78,7 +79,7 @@ export function PendingTransactionsStateProvider({
           helperToast.info(
             <div>
               <Trans>
-                {`Status for tx ${pendingTx} not found`}
+                {`Status for tx ${pendingTx.signature} not found`}
               </Trans>
             </div>
           );

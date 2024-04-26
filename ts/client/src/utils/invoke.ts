@@ -1,5 +1,5 @@
 import { AnchorError, Idl, Program } from "@coral-xyz/anchor";
-import { ComputeBudgetProgram, SendTransactionError, Signer, Transaction, TransactionInstruction, sendAndConfirmTransaction } from "@solana/web3.js";
+import { ComputeBudgetProgram, ConfirmOptions, SendTransactionError, Signer, Transaction, TransactionInstruction, sendAndConfirmTransaction } from "@solana/web3.js";
 
 type ParamsWithSigners<T, S extends PropertyKey[]> = {
     [P in keyof T]: P extends S[number] ? Signer : T[P];
@@ -20,11 +20,10 @@ export const makeInvoke = <
     return async (
         program: Program<IDL>,
         params: ParamsWithSigners<T, S>,
-        options?: {
+        options?: ConfirmOptions & {
             signByProvider?: boolean,
             computeUnits?: number,
             computeUnitPrice?: number | bigint,
-            skipPreflight?: boolean,
         }
     ) => {
         const originalParams: Partial<T> = { ...params } as any;
@@ -61,9 +60,7 @@ export const makeInvoke = <
                     skipPreflight: options?.skipPreflight ?? false,
                 }), output] as [string, U];
             } else {
-                return [await sendAndConfirmTransaction(program.provider.connection, tx, signerList, {
-                    skipPreflight: options?.skipPreflight ?? false,
-                }), output] as [string, U];
+                return [await sendAndConfirmTransaction(program.provider.connection, tx, signerList, options), output] as [string, U];
             }
         } catch (error) {
             if ((error as SendTransactionError).logs) {

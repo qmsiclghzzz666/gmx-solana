@@ -29,7 +29,7 @@ export function WrapNativeTokenModal({
     onSubmitted();
   }, [onSubmitted, setInputValue]);
 
-  const { wrapNativeToken, isMutating } = useWrapNativeToken(handleSubmitted);
+  const { trigger: wrapNativeToken, isSending } = useWrapNativeToken(handleSubmitted);
 
   const { nativeTokenAmount, nativeTokenUsd } = useMemo(() => {
     const nativeTokenAmount = parseValue(inputValue, nativeToken.decimals) ?? BN_ZERO;
@@ -41,7 +41,7 @@ export function WrapNativeTokenModal({
   }, [inputValue, nativeToken]);
 
   const handleSubmit = useCallback(() => {
-    wrapNativeToken(nativeTokenAmount);
+    void wrapNativeToken(nativeTokenAmount);
   }, [nativeTokenAmount, wrapNativeToken]);
 
   const showMaxButton = !nativeTokenAmount.eq(nativeToken.balance ?? BN_ZERO) && nativeToken.balance?.gt(MIN_RESIDUAL_AMOUNT);
@@ -84,9 +84,9 @@ export function WrapNativeTokenModal({
           className="w-full"
           variant="primary-action"
           type="submit"
-          disabled={isMutating}
+          disabled={isSending}
         >
-          {isMutating ? <LoadingDots size={14} /> : t`Wrap`}
+          {isSending ? <LoadingDots size={14} /> : t`Wrap`}
         </Button>
       </form>
     </Modal>

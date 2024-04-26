@@ -204,7 +204,7 @@ export function GmForm({
     }
   }
 
-  const initializeTokenAccount = useInitializeTokenAccount();
+  const { isSending: isInitializing, trigger: initializeTokenAccount } = useInitializeTokenAccount();
 
   const wrapNativeToken = useCallback(() => {
     openWrapNativeTokenModal();
@@ -242,7 +242,7 @@ export function GmForm({
               onClientTopLeftLabel: wrapNativeToken,
             })}
             topLeftValue={formatUsd(firstTokenUsd)}
-            topRightLabel={isFirstTokenAccountInited ? t`Balance` : t`Uninitialized`}
+            topRightLabel={isFirstTokenAccountInited ? t`Balance` : isInitializing ? t`Initializing` : t`Uninitialized`}
             topRightValue={isFirstTokenAccountInited ? formatTokenAmount(firstToken?.balance || BN_ZERO, firstToken?.decimals, "", {
               useCommas: true,
             }) : ""}
@@ -250,8 +250,8 @@ export function GmForm({
             {...(isDeposit && isFirstTokenAccountInited && {
               onClickTopRightLabel: onMaxClickFirstToken,
             })}
-            {...(!isFirstTokenAccountInited && {
-              onClickTopRightLabel: () => initializeTokenAccount(firstToken.address),
+            {...(!isFirstTokenAccountInited && !isInitializing && {
+              onClickTopRightLabel: () => void initializeTokenAccount(firstToken.address),
             })}
             onClickMax={onMaxClickFirstToken}
             showMaxButton={
@@ -293,7 +293,7 @@ export function GmForm({
                 onClientTopLeftLabel: wrapNativeToken,
               })}
               topLeftValue={formatUsd(secondTokenUsd)}
-              topRightLabel={isSecondTokenAccountInited ? t`Balance` : t`Uninitialized`}
+              topRightLabel={isSecondTokenAccountInited ? t`Balance` : isInitializing ? t`Initializing...` : t`Uninitialized`}
               topRightValue={isSecondTokenAccountInited ? formatTokenAmount(secondToken?.balance ?? BN_ZERO, secondToken?.decimals, "", {
                 useCommas: true,
               }) : ""}
@@ -313,8 +313,8 @@ export function GmForm({
               {...(isDeposit && isSecondTokenAccountInited && {
                 onClickTopRightLabel: onMaxClickSecondToken,
               })}
-              {...(!isSecondTokenAccountInited && {
-                onClickTopRightLabel: () => initializeTokenAccount(secondToken.address),
+              {...(!isSecondTokenAccountInited && !isInitializing && {
+                onClickTopRightLabel: () => void initializeTokenAccount(secondToken.address),
               })}
               onClickMax={onMaxClickSecondToken}
             >
@@ -333,7 +333,7 @@ export function GmForm({
           <BuyInputSection
             topLeftLabel={isWithdrawal ? t`Pay` : t`Receive`}
             topLeftValue={marketTokenUsd?.gt(BN_ZERO) ? formatUsd(marketTokenUsd) : ""}
-            topRightLabel={isMarketTokenAccountInited ? t`Balance` : t`Uninitialized`}
+            topRightLabel={isMarketTokenAccountInited ? t`Balance` : isInitializing ? t`Initializing` : t`Uninitialized`}
             topRightValue={isMarketTokenAccountInited ? formatTokenAmount(marketToken?.balance ?? BN_ZERO, marketToken?.decimals, "", {
               useCommas: true,
             }) : ""}
@@ -355,8 +355,8 @@ export function GmForm({
                 }
               },
             })}
-            {...(!isMarketTokenAccountInited && {
-              onClickTopRightLabel: () => initializeTokenAccount(marketToken.address),
+            {...(!isMarketTokenAccountInited && !isInitializing && {
+              onClickTopRightLabel: () => void initializeTokenAccount(marketToken.address),
             })}
             onClickMax={() => {
               if (marketToken?.balance) {

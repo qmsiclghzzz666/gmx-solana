@@ -12,6 +12,7 @@ import Button from "../Button/Button";
 
 import "./UnwrapNativeTokenModal.scss";
 import { useAnchor } from "@/contexts/anchor";
+import LoadingDots from "../Common/LoadingDots/LoadingDots";
 
 export function UnwrapNativeTokenModal({
   isVisible,
@@ -29,10 +30,10 @@ export function UnwrapNativeTokenModal({
     onSubmitted();
   }, [onSubmitted]);
 
-  const unwrapNativeToken = useUnwrapNativeToken(handleSubmitted);
+  const { trigger: unwrapNativeToken, isSending } = useUnwrapNativeToken(handleSubmitted);
 
   const handleSubmit = useCallback(() => {
-    unwrapNativeToken();
+    void unwrapNativeToken(undefined);
   }, [unwrapNativeToken]);
 
   const isInitilized = wrappedNativeToken.balance !== null;
@@ -69,12 +70,12 @@ export function UnwrapNativeTokenModal({
         </BuyInputSection>
 
         <Button
-          disabled={!allowToUnwrap}
+          disabled={!allowToUnwrap || isSending}
           className="w-full"
           variant="primary-action"
           type="submit"
         >
-          {t`Unwrap`}
+          {isSending ? <LoadingDots size={14} /> : t`Unwrap`}
         </Button>
       </form>
     </Modal>

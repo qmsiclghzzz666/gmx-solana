@@ -4,4 +4,4 @@ import { PendingTransactionsState } from "./types";
 export const PendingTransactionsStateContext = createContext<PendingTransactionsState | null>(null);
 
 export * from "./hooks";
-export * from "./PendingTransactionsStateProvider";
+export * from "./PendingStateProvider";
