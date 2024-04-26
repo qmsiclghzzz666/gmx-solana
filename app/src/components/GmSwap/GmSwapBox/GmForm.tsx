@@ -5,10 +5,10 @@ import { useCallback, useMemo } from "react";
 import { useLingui } from "@lingui/react";
 import { mapValues } from "lodash";
 import cx from "classnames";
-import { t } from "@lingui/macro";
+import { Trans, t } from "@lingui/macro";
 
 import "./GmSwapBox.scss";
-import { formatUsd, getMarketIndexName } from "@/components/MarketsList/utils";
+import { formatUsd, getMarketIndexName, getMarketPoolName } from "@/components/MarketsList/utils";
 import Button from "@/components/Button/Button";
 import BuyInputSection from "@/components/BuyInputSection/BuyInputSection";
 import { Token } from "@/onchain/token";
@@ -25,6 +25,8 @@ import { useInitializeTokenAccount } from "@/onchain";
 import { PublicKey } from "@solana/web3.js";
 import { useOpenConnectModal } from "@/contexts/anchor";
 import { useNativeTokenUtils } from "@/components/NativeTokenUtils";
+import { MarketInfo } from "@/onchain/market";
+import { helperToast } from "@/utils/helperToast";
 
 const OPERATION_LABELS = {
   [Operation.Deposit]: /*i18n*/ "Buy GM",
@@ -381,7 +383,7 @@ export function GmForm({
               onSelectMarket={(marketInfo) => {
                 setIndexName(getMarketIndexName(marketInfo));
                 onMarketChange(marketInfo.marketTokenAddress.toBase58());
-                // showMarketToast(marketInfo);
+                showMarketToast(marketInfo);
               }}
             />
           </BuyInputSection>
@@ -487,5 +489,20 @@ export function GmForm({
         /> */}
       </form >
     </div >
+  );
+}
+
+function showMarketToast(market: MarketInfo) {
+  if (!market) return;
+  const indexName = getMarketIndexName(market);
+  const poolName = getMarketPoolName(market);
+  helperToast.success(
+    <Trans>
+      <div className="inline-flex">
+        GM:&nbsp;<span>{indexName}</span>
+        <span className="subtext gm-toast">[{poolName}]</span>
+      </div>{" "}
+      <span>selected in order form</span>
+    </Trans>
   );
 }

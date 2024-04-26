@@ -697,38 +697,6 @@ button.App-connect-wallet:hover {
   color: white;
 }
 
-.Toastify {
-  font-size: var(--font-sm);
-}
-
-.Toastify__toast {
-  min-height: 4.65rem;
-  cursor: default;
-}
-
-.Toastify__toast-body {
-  padding: 0 0.465rem;
-}
-
-.Toastify-debug {
-  margin-top: 0.465rem;
-  font-size: 1.24rem;
-  opacity: 0.7;
-}
-
-.Toastify-debug-button {
-  display: inline-block;
-  border-bottom: 1px dashed;
-  cursor: pointer;
-}
-
-.Toastify-debug-content {
-  margin-top: 4px;
-  padding-bottom: 8px;
-  max-width: 300px;
-  overflow-x: auto;
-}
-
 .App-icon {
   vertical-align: middle;
   margin-bottom: 0.465rem;
@@ -1028,56 +996,6 @@ button.App-button {
   max-width: 46.5rem;
 }
 
-.Toastify__toast--error {
-  background: #333957;
-  color: white;
-  border-radius: 0.6rem;
-}
-
-.Toastify__toast--success {
-  background: transparent linear-gradient(90deg, #19836c 0%, #177c66 100%) 0% 0% no-repeat padding-box;
-  color: white;
-  box-shadow: 0px 0.3rem 0.6rem #0000005c;
-  border-radius: 0.4rem;
-}
-
-.Toastify__toast--default {
-  background: linear-gradient(90deg, #0b0b0f 0%, rgba(10, 13, 28, 1) 100%);
-  color: white;
-  border-radius: 0.6rem;
-}
-
-.Toastify__toast--default .Toastify__close-button {
-  color: white;
-}
-
-.Toastify__toast--default .Toastify__close-button:hover {
-  color: white;
-  background: transparent;
-}
-
-.Toastify__close-button {
-  align-self: flex-start;
-  border-radius: 0.4rem;
-  width: 2.1rem;
-  min-width: 2.1rem;
-  height: 2rem;
-  display: inline-flex;
-  justify-content: center;
-  align-items: center;
-  transition: none;
-  z-index: 2;
-}
-
-.Toastify__close-button:hover {
-  background: #ffffff47 0% 0% no-repeat padding-box;
-}
-
-.Toastify__toast-body {
-  font: normal normal normal 1.4rem/1.6rem Relative;
-  line-height: 2rem;
-}
-
 .dropdown-backdrop {
   position: fixed;
   z-index: 10;
@@ -1099,10 +1017,6 @@ button.App-button {
   }
 }
 
-.zoomIn {
-  animation-name: zoomIn;
-}
-
 @keyframes zoomOut {
   from {
     opacity: 1;
@@ -1118,8 +1032,14 @@ button.App-button {
   }
 }
 
+.zoomIn {
+  animation: zoomIn 0.2s ease-in-out;
+  animation-fill-mode: forwards;
+}
+
 .zoomOut {
-  animation-name: zoomOut;
+  animation: zoomOut 0.2s ease-in-out;
+  animation-fill-mode: forwards;
 }
 
 .positive {
@@ -1511,5 +1431,89 @@ button.App-button {
 
   to {
     transform: rotate(360deg);
+  }
+}
+
+.App {
+  .Toastify {
+    font-size: var(--font-sm);
+  }
+
+  .Toastify__toast {
+    min-height: 4.65rem;
+    cursor: default;
+  }
+
+  .Toastify__toast-body {
+    padding: 0 0.465rem;
+  }
+
+  .Toastify-debug {
+    margin-top: 0.465rem;
+    font-size: 1.24rem;
+    opacity: 0.7;
+  }
+
+  .Toastify-debug-button {
+    display: inline-block;
+    border-bottom: 1px dashed;
+    cursor: pointer;
+  }
+
+  .Toastify-debug-content {
+    margin-top: 4px;
+    padding-bottom: 8px;
+    max-width: 300px;
+    overflow-x: auto;
+  }
+
+  .Toastify__toast--error {
+    background: #333957;
+    color: white;
+    border-radius: 0.6rem;
+  }
+
+  .Toastify__toast--success {
+    background: transparent linear-gradient(90deg, #19836c 0%, #177c66 100%) 0% 0% no-repeat padding-box;
+    color: white;
+    box-shadow: 0px 0.3rem 0.6rem #0000005c;
+    border-radius: 0.4rem;
+  }
+
+  .Toastify__toast--default {
+    background: linear-gradient(90deg, #0b0b0f 0%, rgba(10, 13, 28, 1) 100%);
+    color: white;
+    border-radius: 0.6rem;
+  }
+
+  .Toastify__toast--default .Toastify__close-button {
+    color: white;
+  }
+
+  .Toastify__toast--default .Toastify__close-button:hover {
+    color: white;
+    background: transparent;
+  }
+
+  .Toastify__close-button {
+    align-self: flex-start;
+    border-radius: 0.4rem;
+    width: 2.1rem;
+    min-width: 2.1rem;
+    height: 2rem;
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    transition: none;
+    z-index: 2;
+  }
+
+  .Toastify__close-button:hover {
+    background: #ffffff47 0% 0% no-repeat padding-box;
+  }
+
+  .Toastify__toast-body {
+    font: normal normal normal 1.4rem/1.6rem Relative;
+    line-height: 2rem;
   }
 }

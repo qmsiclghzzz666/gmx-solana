@@ -77,18 +77,3 @@ export function GmSwapBox({
     </GmStateProvider>
   );
 }
-
-// function showMarketToast(market: MarketInfo) {
-//   if (!market) return;
-//   const indexName = getMarketIndexName(market);
-//   const poolName = getMarketPoolName(market);
-//   helperToast.success(
-//     <Trans>
-//       <div className="inline-flex">
-//         GM:&nbsp;<span>{indexName}</span>
-//         <span className="subtext gm-toast">[{poolName}]</span>
-//       </div>{" "}
-//       <span>selected in order form</span>
-//     </Trans>
-//   );
-// }
