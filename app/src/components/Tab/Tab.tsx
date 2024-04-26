@@ -1,6 +1,6 @@
 import cx from "classnames";
 import "./Tab.css";
-import { useCallback, useEffect } from "react";
+import { useCallback } from "react";
 
 interface Props<T> {
   options: T[],

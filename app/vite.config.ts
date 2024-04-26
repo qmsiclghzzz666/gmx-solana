@@ -10,7 +10,10 @@ export default defineConfig(async ({ mode }) => {
   return {
     plugins: [
       nodePolyfills({
-        include: ['buffer'],
+        include: ['buffer', 'crypto', 'stream', 'vm'],
+        globals: {
+          global: false,
+        }
       }),
       react({
         babel: {
@@ -29,6 +32,6 @@ export default defineConfig(async ({ mode }) => {
     },
     server: {
       https: await loadHttpsOptions(env.GMSOL_SSL_DIR ? path.resolve(__dirname, env.GMSOL_SSL_DIR) : undefined),
-    }
+    },
   }
 })
