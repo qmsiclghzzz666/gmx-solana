@@ -1,14 +1,11 @@
 import { MarketInfo, MarketInfos } from "@/onchain/market";
 import { TokenData, Tokens } from "@/onchain/token";
-import React, { Dispatch, ReactNode, useMemo } from "react";
+import { ReactNode, useMemo } from "react";
 import { useImmerReducer } from "use-immer";
-import { createContext } from "use-context-selector";
-import { Mode, Operation } from "./types";
+import { Action, InputState, Mode, Operation } from "./types";
 import { getTokenData } from "@/onchain/token/utils";
 import { useSortedPoolsWithIndexToken } from "@/hooks";
-
-export const GmStateContext = createContext<GmState | null>(null);
-export const GmStateDispatchContext = React.createContext<Dispatch<Action> | null>(null);
+import { GmStateContext, GmStateDispatchContext } from "./context";
 
 export default function GmStateProvider({
   children,
@@ -63,33 +60,6 @@ export default function GmStateProvider({
       </GmStateDispatchContext.Provider>
     </GmStateContext.Provider>
   );
-}
-
-export interface GmState {
-  market: MarketInfo,
-  operation: Operation,
-  mode: Mode,
-  firstToken?: TokenData,
-  secondToken?: TokenData,
-  marketToken?: TokenData,
-  marketTokens?: Tokens,
-  sortedMarketsInfoByIndexToken: MarketInfo[],
-  input: InputState,
-}
-
-interface InputState {
-  firstTokenInputValue: string,
-  secondTokenInputValue: string,
-  marketTokenInputValue: string,
-}
-
-export interface Action {
-  type:
-  "reset"
-  | "set-first-token-input-value"
-  | "set-second-token-input-value"
-  | "set-market-token-input-value",
-  value?: string,
 }
 
 const stateReducer = (state: InputState, action: Action) => {

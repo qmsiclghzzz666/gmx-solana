@@ -1,4 +1,4 @@
-import { State, StateCtx } from "../StateProvider"
+import { State, StateCtx } from ".."
 import { useContextSelector, useContext, Context } from "use-context-selector";
 
 export const useStateSelector = <T>(selector: (s: State) => T) => {

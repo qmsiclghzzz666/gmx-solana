@@ -1,3 +1,5 @@
+import { MarketInfo } from "@/onchain/market";
+import { TokenData, Tokens } from "@/onchain/token";
 import { BN } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
 
@@ -24,4 +26,31 @@ export interface CreateWithdrawalParams {
   amount: BN,
   finalLongToken: PublicKey,
   finalShortToken: PublicKey,
+}
+
+export interface GmState {
+  market: MarketInfo,
+  operation: Operation,
+  mode: Mode,
+  firstToken?: TokenData,
+  secondToken?: TokenData,
+  marketToken?: TokenData,
+  marketTokens?: Tokens,
+  sortedMarketsInfoByIndexToken: MarketInfo[],
+  input: InputState,
+}
+
+export interface InputState {
+  firstTokenInputValue: string,
+  secondTokenInputValue: string,
+  marketTokenInputValue: string,
+}
+
+export interface Action {
+  type:
+  "reset"
+  | "set-first-token-input-value"
+  | "set-second-token-input-value"
+  | "set-market-token-input-value",
+  value?: string,
 }

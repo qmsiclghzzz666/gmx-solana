@@ -1,6 +1,6 @@
 import { useCallback, useContext, useMemo } from "react";
 import { makeDataStoreProgram, makeExchangeProgram } from "gmsol";
-import { AnchorStateContext } from "./AnchorStateProvider";
+import { AnchorStateContext } from ".";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 
 export const useDataStore = () => {

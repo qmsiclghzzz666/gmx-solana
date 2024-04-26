@@ -1,19 +1,10 @@
-import { ReactNode, createContext, useMemo } from "react";
+import { ReactNode, useMemo } from "react";
 import { ConnectionProvider, WalletProvider, useAnchorWallet, useConnection } from "@solana/wallet-adapter-react";
-import { Connection, PublicKey, clusterApiUrl } from "@solana/web3.js";
-// import * as walletAdapterWallets from "@solana/wallet-adapter-wallets";
+import { clusterApiUrl } from "@solana/web3.js";
 import { WalletModalProvider } from "@solana/wallet-adapter-react-ui";
 import { AnchorProvider } from "@coral-xyz/anchor";
 import { DEFAULT_CLUSTER } from "@/config/env";
-
-export interface AnchorState {
-  connection: Connection,
-  active: boolean,
-  owner?: PublicKey,
-  provider?: AnchorProvider,
-}
-
-export const AnchorStateContext = createContext<AnchorState | null>(null);
+import { AnchorStateContext } from ".";
 
 function Inner({ children }: { children: ReactNode }) {
   const { connection } = useConnection();
@@ -36,16 +27,9 @@ function Inner({ children }: { children: ReactNode }) {
 
 export function AnchorStateProvider({ children }: { children: ReactNode }) {
   const endpoint = clusterApiUrl(DEFAULT_CLUSTER);
-  const wallets = useMemo(() => {
-    return [
-      // new walletAdapterWallets.SolflareWalletAdapter(),
-      // new walletAdapterWallets.PhantomWalletAdapter(),
-    ];
-  }, []);
-
   return (
     <ConnectionProvider endpoint={endpoint}>
-      <WalletProvider wallets={wallets} autoConnect={true} onError={(e) => console.error("wallet error:", e)}>
+      <WalletProvider wallets={[]} autoConnect={true} onError={(e) => console.error("wallet error:", e)}>
         <WalletModalProvider>
           <Inner>
             {children}
