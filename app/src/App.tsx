@@ -13,6 +13,7 @@ import { NativeTokenUtilsProvider } from './components/NativeTokenUtils';
 import { useEffect } from 'react';
 import { defaultLocale, dynamicActivate } from './utils/i18n';
 import { LANGUAGE_LOCALSTORAGE_KEY } from './config/localStorage';
+import { PendingTransactionsStateProvider } from './contexts/pendingTransactions';
 
 const router = createBrowserRouter([
   {
@@ -49,11 +50,13 @@ export function App() {
   return (
     <I18nProvider i18n={i18n}>
       <OnChainProvider>
-        <StateProvider>
-          <NativeTokenUtilsProvider>
-            <RouterProvider router={router} />
-          </NativeTokenUtilsProvider>
-        </StateProvider>
+        <PendingTransactionsStateProvider>
+          <StateProvider>
+            <NativeTokenUtilsProvider>
+              <RouterProvider router={router} />
+            </NativeTokenUtilsProvider>
+          </StateProvider>
+        </PendingTransactionsStateProvider>
       </OnChainProvider>
     </I18nProvider>
   );

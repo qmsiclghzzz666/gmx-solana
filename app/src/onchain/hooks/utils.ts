@@ -8,6 +8,7 @@ import useSWRMutation from "swr/mutation";
 import { filterBalances } from "../token";
 import { BN } from "@coral-xyz/anchor";
 import { WRAPPED_NATIVE_TOKEN_ADDRESS } from "@/config/tokens";
+import { usePendingTransactions } from "@/contexts/pendingTransactions";
 
 export const useGenesisHash = () => {
   const connection = useConnection();
@@ -25,6 +26,7 @@ export const useGenesisHash = () => {
 export const useInitializeTokenAccount = () => {
   const provider = useAnchorProvider();
   const { mutate } = useSWRConfig();
+  const { setPendingTxs } = usePendingTransactions();
 
   const { trigger } = useSWRMutation("init-token-account", async (_key, { arg }: { arg: PublicKey }) => {
     if (provider && provider.publicKey) {
@@ -32,7 +34,13 @@ export const useInitializeTokenAccount = () => {
       const ix = createAssociatedTokenAccountInstruction(provider.publicKey, address, provider.publicKey, arg);
       const tx = new Transaction().add(ix);
       tx.recentBlockhash = (await provider.connection.getLatestBlockhash()).blockhash;
-      await provider.sendAndConfirm(tx);
+      const signature = await provider.sendAndConfirm(tx, undefined, {
+        commitment: "processed",
+      });
+      setPendingTxs((txs) => {
+        return [...txs, signature];
+      });
+      return signature;
     } else {
       throw Error("Wallet not connected");
     }
@@ -54,6 +62,7 @@ export const useInitializeTokenAccount = () => {
 export const useWrapNativeToken = (callback: () => void) => {
   const provider = useAnchorProvider();
   const { mutate } = useSWRConfig();
+  const { setPendingTxs } = usePendingTransactions();
 
   const { trigger } = useSWRMutation("wrap-native-token", async (_key, { arg }: { arg: BN }) => {
     if (provider && provider.publicKey) {
@@ -67,7 +76,13 @@ export const useWrapNativeToken = (callback: () => void) => {
         createSyncNativeInstruction(address),
       );
       tx.recentBlockhash = (await provider.connection.getLatestBlockhash()).blockhash;
-      return await provider.sendAndConfirm(tx);
+      const signature = await provider.sendAndConfirm(tx, undefined, {
+        commitment: "processed",
+      });
+      setPendingTxs((txs) => {
+        return [...txs, signature];
+      });
+      return signature;
     } else {
       throw Error("Wallet not connected");
     }
@@ -91,6 +106,7 @@ export const useWrapNativeToken = (callback: () => void) => {
 export const useUnwrapNativeToken = (callback: () => void) => {
   const provider = useAnchorProvider();
   const { mutate } = useSWRConfig();
+  const { setPendingTxs } = usePendingTransactions();
 
   const { trigger } = useSWRMutation("unwrap-native-token", async () => {
     if (provider && provider.publicKey) {
@@ -99,7 +115,13 @@ export const useUnwrapNativeToken = (callback: () => void) => {
         createCloseAccountInstruction(address, provider.publicKey, provider.publicKey),
       );
       tx.recentBlockhash = (await provider.connection.getLatestBlockhash()).blockhash;
-      return await provider.sendAndConfirm(tx);
+      const signature = await provider.sendAndConfirm(tx, undefined, {
+        commitment: "processed",
+      });
+      setPendingTxs((txs) => {
+        return [...txs, signature];
+      });
+      return signature;
     } else {
       throw Error("Wallet not connected");
     }
