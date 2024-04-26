@@ -44,9 +44,11 @@ export const makeCreateDepositInstruction = async (
         initialShortTokenAmount,
         options,
     }: MakeCreateDepositParams) => {
+    const initialLongTokenAmountBN = toBN(initialLongTokenAmount ?? 0);
+    const initialShortTokenAmountBN = toBN(initialShortTokenAmount ?? 0);
     const market = findMarketPDA(store, marketToken)[0];
-    const fromInitialLongTokenAccount = getTokenAccount(payer, initialLongToken, options?.fromInitialLongTokenAccount);
-    const fromInitialShortTokenAccount = getTokenAccount(payer, initialShortToken, options?.fromInitialShortTokenAccount);
+    const fromInitialLongTokenAccount = initialLongTokenAmountBN.isZero() ? null : getTokenAccount(payer, initialLongToken, options?.fromInitialLongTokenAccount);
+    const fromInitialShortTokenAccount = initialShortTokenAmountBN.isZero() ? null : getTokenAccount(payer, initialShortToken, options?.fromInitialShortTokenAccount);
     const toMarketTokenAccount = getTokenAccount(payer, marketToken, options?.toMarketTokenAccount);
     const [authority] = findControllerPDA(store);
     const depositNonce = options?.nonce ?? Keypair.generate().publicKey.toBuffer();
@@ -62,8 +64,8 @@ export const makeCreateDepositInstruction = async (
             executionFee: toBN(options?.executionFee ?? 0),
             longTokenSwapLength: longSwapPath.length,
             shortTokenSwapLength: shortSwapPath.length,
-            initialLongTokenAmount: toBN(initialLongTokenAmount ?? 0),
-            initialShortTokenAmount: toBN(initialShortTokenAmount ?? 0),
+            initialLongTokenAmount: initialLongTokenAmountBN,
+            initialShortTokenAmount: initialShortTokenAmountBN,
             minMarketToken: toBN(options?.minMarketToken ?? 0),
             shouldUnwrapNativeToken: options?.shouldUnwrapNativeToken ?? false,
         }
@@ -75,10 +77,10 @@ export const makeCreateDepositInstruction = async (
         deposit,
         payer,
         receiver: toMarketTokenAccount,
-        initialLongTokenAccount: fromInitialLongTokenAccount ?? null,
-        initialShortTokenAccount: fromInitialShortTokenAccount ?? null,
-        longTokenDepositVault: longTokenDepositVault ?? null,
-        shortTokenDepositVault: shortTokenDepositVault ?? null
+        initialLongTokenAccount: fromInitialLongTokenAccount,
+        initialShortTokenAccount: fromInitialShortTokenAccount,
+        longTokenDepositVault: fromInitialLongTokenAccount ? longTokenDepositVault : null,
+        shortTokenDepositVault: fromInitialShortTokenAccount ? shortTokenDepositVault : null,
     }).remainingAccounts([...longSwapPath, ...shortSwapPath].map(mint => {
         return {
             pubkey: findMarketPDA(store, mint)[0],
