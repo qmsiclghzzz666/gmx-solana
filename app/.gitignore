@@ -25,5 +25,5 @@ dist-ssr
 
 # lingui
 src/locales/**/*.ts
-src/locales/en/messages.po
+# src/locales/en/messages.po
 src/locales/_build/
