@@ -17,7 +17,7 @@ export const useMarkets = (params?: { store: PublicKey, marketTokens: PublicKey[
   const request = useMemo(() => {
     return params ? {
       key: MARKETS_KEY,
-      marketAddresses: params.marketTokens.map(token => findMarketPDA(params.store, token)[0]),
+      marketAddresses: params.marketTokens.map(token => findMarketPDA(params.store, token)[0].toBase58()),
     } : null;
   }, [params]);
 

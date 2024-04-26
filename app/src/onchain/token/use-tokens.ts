@@ -61,15 +61,16 @@ export const useTokenMetadatas = (tokens: PublicKey[]) => {
   const request = useMemo(() => {
     return {
       key: METADATA_KEY,
-      tokens,
+      tokens: tokens.map(key => key.toBase58()),
     };
   }, [tokens]);
 
   const { data, isLoading } = useSWR(request, async ({ tokens }) => {
     const tokenDatas: TokenMetadatas = {};
 
-    for (const address of tokens) {
-      const mint = await getMint(connection.connection, address);
+    for (const addressStr of tokens) {
+      const address = translateAddress(addressStr);
+      const mint = await getMint(connection.connection, translateAddress(address));
       tokenDatas[address.toBase58()] = {
         decimals: mint.decimals,
         totalSupply: toBN(mint.supply),
@@ -95,8 +96,8 @@ export const useTokenBalances = (tokens: Address[]) => {
   const request = useMemo(() => {
     return {
       key: BALANCE_KEY,
-      tokens,
-      owner,
+      tokens: tokens.map(token => token.toString()),
+      owner: owner?.toBase58(),
     }
   }, [tokens, owner]);
 
@@ -104,17 +105,18 @@ export const useTokenBalances = (tokens: Address[]) => {
     const tokenBalances: TokenBalances = {};
 
     if (owner && provider) {
+      const ownerAddress = translateAddress(owner);
       for (const address of tokens) {
         const tokenAddress = translateAddress(address);
         if (tokenAddress.equals(NATIVE_TOKEN_ADDRESS)) {
           try {
-            const balance = await provider.connection.getBalance(owner);
+            const balance = await provider.connection.getBalance(ownerAddress);
             tokenBalances[tokenAddress.toBase58()] = toBN(balance);
           } catch (error) {
             console.error("fetch balance error", error);
           }
         } else {
-          const accountAddress = getAssociatedTokenAddressSync(tokenAddress, owner);
+          const accountAddress = getAssociatedTokenAddressSync(tokenAddress, ownerAddress);
           try {
             const account = await getAccount(provider.connection, accountAddress);
             tokenBalances[address.toString()] = toBN(account.amount);
