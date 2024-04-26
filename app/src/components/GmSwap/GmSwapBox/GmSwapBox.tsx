@@ -18,6 +18,7 @@ type Props = {
   tokensData?: Tokens;
   marketTokens: Tokens,
   marketInfos: MarketInfos,
+  isPending: boolean,
   setMode: (mode: Mode) => void;
   setOperation: (operation: Operation) => void;
   onSelectMarket: (marketAddress: string) => void;
@@ -34,6 +35,7 @@ export function GmSwapBox({
   tokensData,
   marketTokens,
   marketInfos,
+  isPending,
   setMode,
   setOperation,
   onSelectMarket,
@@ -65,6 +67,7 @@ export function GmSwapBox({
         owner={owner}
         genesisHash={chainId}
         tokenOptions={tokenOptions}
+        isPending={isPending}
         setOperation={setOperation}
         setMode={setMode}
         onSelectMarket={onSelectMarket}

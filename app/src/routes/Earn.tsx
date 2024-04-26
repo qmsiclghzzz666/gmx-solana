@@ -13,11 +13,10 @@ import { useCallback, useEffect, useRef } from "react";
 import { GmSwapBox } from "@/components/GmSwap/GmSwapBox/GmSwapBox";
 import { getGmSwapBoxAvailableModes } from "@/components/GmSwap/utils";
 import { CreateDepositParams, CreateWithdrawalParams, Mode, Operation } from "@/components/GmSwap/types";
-import { useGenesisHash } from "@/onchain";
+import { useGenesisHash, useTriggerInvocation } from "@/onchain";
 import { useAnchor, useExchange } from "@/contexts/anchor";
-import { MakeCreateDepositParams, MakeCreateWithdrawalParams, invokeCreateDeposit, invokeCreateWithdrawal } from "gmsol";
+import { invokeCreateDeposit, invokeCreateWithdrawal } from "gmsol";
 import { GMSOL_DEPLOYMENT } from "@/config/deployment";
-import useSWRMutation from "swr/mutation";
 import { useSWRConfig } from "swr";
 import { filterBalances, filterMetadatas } from "@/onchain/token";
 import { fitlerMarkets } from "@/onchain/market";
@@ -26,7 +25,6 @@ export default function Earn() {
   const chainId = useGenesisHash();
   const exchange = useExchange();
   const { owner } = useAnchor();
-  const payer = exchange.provider.publicKey;
 
   const gmSwapBoxRef = useRef<HTMLDivElement>(null);
 
@@ -92,63 +90,55 @@ export default function Earn() {
 
   const { mutate } = useSWRConfig();
 
-  const { trigger: triggerCreateDeposit } = useSWRMutation('exchange/create-deposit', async (_key, { arg }: { arg: MakeCreateDepositParams }) => {
-    try {
-      const [signature, deposit] = await invokeCreateDeposit(exchange, arg);
+  const mutateStates = useCallback(() => {
+    void mutate(filterMetadatas);
+    void mutate(filterBalances);
+    void mutate(fitlerMarkets);
+  }, [mutate]);
+
+  const createDepositInvoker = useCallback(async (params: CreateDepositParams) => {
+    const payer = exchange.provider.publicKey;
+    if (payer && GMSOL_DEPLOYMENT) {
+      const [signature, deposit] = await invokeCreateDeposit(exchange, {
+        store: GMSOL_DEPLOYMENT?.store,
+        payer,
+        ...params,
+      });
       console.log(`created a deposit ${deposit.toBase58()} at tx ${signature}`);
-    } catch (error) {
-      console.log(error);
-      throw error;
+      return signature;
+    } else {
+      throw Error("Wallet is not connected");
     }
+  }, [exchange]);
+
+  const { trigger: triggerCreateDeposit, isSending: isCreatingDeposit } = useTriggerInvocation({
+    key: "exchange-create-deposit",
+    onSentMessage: t`Creating deposit...`,
+    message: t`Deposit created.`,
+  }, createDepositInvoker, {
+    onSuccess: mutateStates
   });
 
-  const handleCreateDeposit = useCallback((params: CreateDepositParams) => {
+  const createWithdrawalInvoker = useCallback(async (params: CreateWithdrawalParams) => {
+    const payer = exchange.provider.publicKey;
     if (payer && GMSOL_DEPLOYMENT) {
-      const store = GMSOL_DEPLOYMENT.store;
-      void triggerCreateDeposit({
-        store,
+      const [signature, deposit] = await invokeCreateWithdrawal(exchange, {
+        store: GMSOL_DEPLOYMENT.store,
         payer,
         ...params,
-      }, {
-        onSuccess: () => {
-          void mutate(filterMetadatas);
-          void mutate(filterBalances);
-          void mutate(fitlerMarkets);
-        }
       });
-    } else {
-      console.log("not connected");
-    }
-  }, [payer, triggerCreateDeposit, mutate]);
-
-  const { trigger: triggerCreateWithdrawal } = useSWRMutation('exchange/create-withdrawal', async (_key, { arg }: { arg: MakeCreateWithdrawalParams }) => {
-    try {
-      const [signature, deposit] = await invokeCreateWithdrawal(exchange, arg);
       console.log(`created a withdrawal ${deposit.toBase58()} at tx ${signature}`);
-    } catch (error) {
-      console.log(error);
-      throw error;
-    }
-  });
-
-  const handleCreateWithdrawal = useCallback((params: CreateWithdrawalParams) => {
-    if (payer && GMSOL_DEPLOYMENT) {
-      const store = GMSOL_DEPLOYMENT.store;
-      void triggerCreateWithdrawal({
-        store,
-        payer,
-        ...params,
-      }, {
-        onSuccess: () => {
-          void mutate(filterMetadatas);
-          void mutate(filterBalances);
-          void mutate(fitlerMarkets);
-        }
-      });
+      return signature;
     } else {
-      console.log("not connected");
+      throw Error("Wallet is not connected");
     }
-  }, [payer, triggerCreateWithdrawal, mutate]);
+  }, [exchange]);
+
+  const { trigger: triggerCreateWithdrawal, isSending: isCreatingWithdrawal } = useTriggerInvocation({
+    key: "exchange-create-deposit",
+    onSentMessage: t`Creating withdrawal...`,
+    message: t`Withdrawal created.`,
+  }, createWithdrawalInvoker, { onSuccess: mutateStates });
 
   return (
     <div className="default-container page-layout">
@@ -184,11 +174,15 @@ export default function Earn() {
             marketInfos={marketInfos}
             onSelectMarket={setSelectedMarketKey}
             operation={operation}
+            isPending={
+              (operation === Operation.Deposit && isCreatingDeposit)
+              || (operation === Operation.Withdrawal && isCreatingWithdrawal)
+            }
             mode={mode}
             setMode={setMode}
             setOperation={setOperation}
-            onCreateDeposit={handleCreateDeposit}
-            onCreateWithdrawal={handleCreateWithdrawal}
+            onCreateDeposit={(params) => void triggerCreateDeposit(params)}
+            onCreateWithdrawal={(params) => void triggerCreateWithdrawal(params)}
           />) : "loading"}
         </div>
       </div>

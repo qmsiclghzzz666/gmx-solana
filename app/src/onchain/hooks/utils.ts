@@ -116,7 +116,7 @@ export const useInitializeTokenAccount = (opts: ConfirmOptions = {
   return useSendTransaction({
     key: "init-token-account",
     onSentMessage: t`Initializing token account...`,
-    message: t`Initialized token account`,
+    message: t`Initialized token account.`,
   }, (token: PublicKey, owner) => {
     const address = getAssociatedTokenAddressSync(token, owner);
     const ix = createAssociatedTokenAccountInstruction(owner, address, owner, token);
@@ -134,7 +134,7 @@ export const useWrapNativeToken = (callback: () => void) => {
   return useSendTransaction({
     key: "wrap-native-token",
     onSentMessage: t`Wrapping SOL...`,
-    message: t`Wrapped SOL`,
+    message: t`Wrapped SOL.`,
   }, (amount: BN, owner) => {
     const address = getAssociatedTokenAddressSync(WRAPPED_NATIVE_TOKEN_ADDRESS, owner);
     const tx = new Transaction().add(
@@ -162,7 +162,7 @@ export const useUnwrapNativeToken = (callback: () => void) => {
   return useSendTransaction({
     key: "unwrap-native-token",
     onSentMessage: t`Unwrapping WSOL...`,
-    message: t`Unwrapped WSOL`,
+    message: t`Unwrapped WSOL.`,
   }, (_arg: undefined, owner) => {
     const address = getAssociatedTokenAddressSync(WRAPPED_NATIVE_TOKEN_ADDRESS, owner);
     return new Transaction().add(

@@ -27,6 +27,7 @@ import { useOpenConnectModal } from "@/contexts/anchor";
 import { useNativeTokenUtils } from "@/components/NativeTokenUtils";
 import { MarketInfo } from "@/onchain/market";
 import { helperToast } from "@/utils/helperToast";
+import LoadingDots from "@/components/Common/LoadingDots/LoadingDots";
 
 const OPERATION_LABELS = {
   [Operation.Deposit]: /*i18n*/ "Buy GM",
@@ -42,6 +43,7 @@ export function GmForm({
   owner,
   genesisHash,
   tokenOptions: { tokenOptions, firstToken, secondToken },
+  isPending,
   setOperation,
   setMode,
   onSelectMarket,
@@ -52,6 +54,7 @@ export function GmForm({
   owner: PublicKey | undefined,
   genesisHash: string,
   tokenOptions: TokenOptions,
+  isPending: boolean,
   setOperation: (operation: Operation) => void,
   setMode: (mode: Mode) => void,
   onSelectMarket: (marketAddress: string) => void,
@@ -458,10 +461,12 @@ export function GmForm({
             className="w-full"
             variant="primary-action"
             type="submit"
+            disabled={isPending}
           // onClick={submitState.onSubmit}
           // disabled={submitState.isDisabled}
           >
-            {owner ? isDeposit ? t`Buy GM` : t`Sell GM` : t`Connect Wallet`}
+            {isPending && <LoadingDots size={14} />}
+            {!isPending && (owner ? isDeposit ? t`Buy GM` : t`Sell GM` : t`Connect Wallet`)}
           </Button>
         </div>
         {/* <GmConfirmationBox
