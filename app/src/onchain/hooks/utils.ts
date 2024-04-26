@@ -64,7 +64,7 @@ export const useWrapNativeToken = (callback: () => void) => {
   const { mutate } = useSWRConfig();
   const { setPendingTxs } = usePendingTransactions();
 
-  const { trigger } = useSWRMutation("wrap-native-token", async (_key, { arg }: { arg: BN }) => {
+  const { trigger, isMutating } = useSWRMutation("wrap-native-token", async (_key, { arg }: { arg: BN }) => {
     if (provider && provider.publicKey) {
       const address = getAssociatedTokenAddressSync(WRAPPED_NATIVE_TOKEN_ADDRESS, provider.publicKey);
       const tx = new Transaction().add(
@@ -88,19 +88,22 @@ export const useWrapNativeToken = (callback: () => void) => {
     }
   });
 
-  return useCallback((lamports: BN) => {
-    void trigger(lamports, {
-      onSuccess: (signature) => {
-        console.log(`wrapped SOL at tx ${signature}`);
-        callback();
-        void mutate(filterBalances);
-      },
-      onError: (error) => {
-        console.error(error);
-        callback();
-      }
-    });
-  }, [trigger, mutate, callback]);
+  return {
+    isMutating,
+    wrapNativeToken: useCallback((lamports: BN) => {
+      void trigger(lamports, {
+        onSuccess: (signature) => {
+          console.log(`wrapped SOL at tx ${signature}`);
+          callback();
+          void mutate(filterBalances);
+        },
+        onError: (error) => {
+          console.error(error);
+          callback();
+        }
+      });
+    }, [trigger, mutate, callback])
+  };
 };
 
 export const useUnwrapNativeToken = (callback: () => void) => {

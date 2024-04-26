@@ -9,6 +9,7 @@ import BuyInputSection from "../BuyInputSection/BuyInputSection";
 import { formatUsd } from "../MarketsList/utils";
 import TokenWithIcon from "../TokenIcon/TokenWithIcon";
 import Button from "../Button/Button";
+import LoadingDots from "../Common/LoadingDots/LoadingDots";
 
 export function WrapNativeTokenModal({
   isVisible,
@@ -28,7 +29,7 @@ export function WrapNativeTokenModal({
     onSubmitted();
   }, [onSubmitted, setInputValue]);
 
-  const wrapNativeToken = useWrapNativeToken(handleSubmitted);
+  const { wrapNativeToken, isMutating } = useWrapNativeToken(handleSubmitted);
 
   const { nativeTokenAmount, nativeTokenUsd } = useMemo(() => {
     const nativeTokenAmount = parseValue(inputValue, nativeToken.decimals) ?? BN_ZERO;
@@ -83,8 +84,9 @@ export function WrapNativeTokenModal({
           className="w-full"
           variant="primary-action"
           type="submit"
+          disabled={isMutating}
         >
-          {t`Wrap`}
+          {isMutating ? <LoadingDots size={14} /> : t`Wrap`}
         </Button>
       </form>
     </Modal>
