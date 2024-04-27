@@ -41,3 +41,19 @@ export interface AvailableTokenOptions {
   sortedLongAndShortTokens: string[],
   sortedAllMarkets: MarketInfo[],
 }
+
+export interface TradeFlags {
+  isLong: boolean;
+  isShort: boolean;
+  isSwap: boolean;
+  /**
+   * ```ts
+   * isLong || isShort
+   * ```
+   */
+  isPosition: boolean;
+  isIncrease: boolean;
+  isTrigger: boolean;
+  isMarket: boolean;
+  isLimit: boolean;
+}

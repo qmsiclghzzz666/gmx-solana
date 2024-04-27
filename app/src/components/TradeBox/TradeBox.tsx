@@ -9,6 +9,7 @@ import { TradeForm } from "./TradeForm";
 import Tab from "../Tab/Tab";
 import { TradeMode, TradeType } from "@/onchain/trade";
 import { t } from "@lingui/macro";
+import { useTradeBoxStateSelector } from "@/contexts/shared/hooks/use-trade-box-state-selector";
 
 interface Prop {
   setPendingTxs: PendingTxsSetter,
@@ -35,15 +36,23 @@ const tradeModeLabels = {
 export function TradeBox({
   setPendingTxs,
 }: Prop) {
+  const {
+    tradeType,
+    tradeMode,
+    availalbleTradeModes,
+    setTradeMode: onSelectTradeMode,
+    setTradeType: onSelectTradeType,
+  } = useTradeBoxStateSelector(s => s);
+
   return (
     <>
       <div className="App-box SwapBox">
-        {/* <Tab
+        <Tab
           icons={tradeTypeIcons}
           options={Object.values(TradeType)}
           optionLabels={tradeTypeLabels}
           option={tradeType}
-          onChange={onTradeTypeChange}
+          onChange={onSelectTradeType}
           className="SwapBox-option-tabs"
         />
         <Tab
@@ -53,7 +62,7 @@ export function TradeBox({
           type="inline"
           option={tradeMode}
           onChange={onSelectTradeMode}
-        /> */}
+        />
         <TradeForm />
       </div>
 

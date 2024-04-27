@@ -1,7 +1,7 @@
 import { TradeBox } from "@/components/TradeBox/TradeBox";
 import "./Exchange.css";
 
-import Helmet from "react-helmet";
+import { Helmet } from "react-helmet-async";
 import { usePending } from "@/contexts/pending";
 
 export default function Exchange() {
