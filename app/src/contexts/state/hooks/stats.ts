@@ -1,5 +1,5 @@
 import { MarketInfo } from "@/onchain/market";
-import { useStateSelector } from "./utils";
+import { useMarketStateSelector } from "./utils";
 import { getUnit } from "@/utils/number";
 import { BN } from "@coral-xyz/anchor";
 import { IndexTokenStat, MarketStat } from "../types";
@@ -26,7 +26,7 @@ export const info2Stat = (info: MarketInfo) => {
   return stat;
 };
 
-export const useIndexTokenStats = () => useStateSelector(state => {
+export const useIndexTokenStats = () => useMarketStateSelector(state => {
   const infos = state.marketInfos;
   const stats: { [indexAddress: string]: IndexTokenStat } = {};
   for (const key in infos) {

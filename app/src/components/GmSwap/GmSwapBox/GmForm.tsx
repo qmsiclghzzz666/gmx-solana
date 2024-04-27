@@ -21,7 +21,7 @@ import { IoMdSwap } from "react-icons/io";
 import { PoolSelector } from "@/components/MarketSelector/PoolSelector";
 import { useGmInputAmounts, useGmInputDisplay, useGmStateDispath, useGmStateSelector, useHandleSubmit } from "../hooks";
 import { formatAmountFree, formatTokenAmount } from "@/utils/number";
-import { useInitializeTokenAccount } from "@/onchain";
+import { useInitializeTokenAccount } from "@/onchain/token";
 import { PublicKey } from "@solana/web3.js";
 import { useOpenConnectModal } from "@/contexts/anchor";
 import { useNativeTokenUtils } from "@/components/NativeTokenUtils";

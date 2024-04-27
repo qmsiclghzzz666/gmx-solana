@@ -1,4 +1,4 @@
-import { useDeployedMarketInfos } from "@/onchain";
+import { useDeployedMarketInfos } from "@/onchain/market";
 import { ReactNode, useMemo } from "react";
 import { State } from "./types";
 import { StateCtx } from ".";
@@ -8,9 +8,12 @@ export function StateProvider({ children }: { children: ReactNode }) {
 
   const state = useMemo(() => {
     const state: State = {
-      marketInfos: marketInfos,
-      tokens,
-      marketTokens,
+      market: {
+        marketInfos: marketInfos,
+        tokens,
+        marketTokens,
+      },
+      tradeBox: {}
     };
     return state;
   }, [marketInfos, tokens, marketTokens]);

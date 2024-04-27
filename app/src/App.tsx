@@ -6,7 +6,7 @@ import { i18n } from "@lingui/core";
 import Earn from './routes/Earn';
 import Dashboard from './routes/Dashboard';
 import Exchange from './routes/Exchange';
-import { OnChainProvider } from './onchain';
+import { OnChainProvider } from './onchain/OnChainProvider';
 import { StateProvider } from './contexts/state';
 import { earnLoader } from './routes/loaders';
 import { NativeTokenUtilsProvider } from './components/NativeTokenUtils';

@@ -1,2 +1,2 @@
 export * from "./stats";
-export { useStateSelector } from "./utils";
+export { useMarketStateSelector as useStateSelector } from "./utils";

@@ -1,6 +1,6 @@
-import { TranscationInfo } from "../types";
+import { TransactionInfo } from "./types";
 
-export const makeSendingContent = (info: TranscationInfo) => function SendSuccessContent() {
+export const makeSendingContent = (info: TransactionInfo) => function SendSuccessContent() {
   return (
     <div>
       {info.onSentMessage ? info.onSentMessage : info.message}

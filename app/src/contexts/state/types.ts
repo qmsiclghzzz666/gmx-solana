@@ -1,8 +1,14 @@
 import { BN } from "@coral-xyz/anchor";
 import { MarketInfo, MarketInfos } from "@/onchain/market";
 import { TokenData, Tokens } from "@/onchain/token";
+import { TradeBoxState } from "@/onchain/trade";
 
 export interface State {
+  market: MarketState,
+  tradeBox: TradeBoxState,
+}
+
+export interface MarketState {
   marketInfos: MarketInfos,
   tokens: Tokens,
   marketTokens: Tokens,

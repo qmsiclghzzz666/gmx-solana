@@ -2,7 +2,7 @@ import { GMSOL_DEPLOYMENT } from "@/config/deployment";
 import { useDeployedMarkets } from "./use-deployed-markets";
 import { useMemo } from "react";
 import { TokenMap, Tokens, useTokenBalances, useTokenMetadatas, useTokensWithPrices } from "../token";
-import { MarketInfos } from "../market";
+import { MarketInfos } from ".";
 import { getMarketIndexName, getMarketPoolName } from "@/components/MarketsList/utils";
 import { info2Stat } from "@/contexts/state";
 import { ONE_USD } from "@/config/constants";
