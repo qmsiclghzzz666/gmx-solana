@@ -1,4 +1,4 @@
-import { useMemo, useRef } from "react";
+import { useMemo } from "react";
 import { Token, TokenBalances, TokenMetadatas, Tokens } from "./types";
 import { PriceProvider, usePriceFromFeeds } from "./use-price-from-feeds";
 import { PublicKey } from "@solana/web3.js";
@@ -56,7 +56,6 @@ export const useTokensWithPrices = ({
 
 export const useTokenMetadatas = (tokens: PublicKey[]) => {
   const connection = useConnection();
-  const cache = useRef<TokenMetadatas>({});
 
   const request = useMemo(() => {
     return {
@@ -65,7 +64,7 @@ export const useTokenMetadatas = (tokens: PublicKey[]) => {
     };
   }, [tokens]);
 
-  const { data, isLoading } = useSWR(request, async ({ tokens }) => {
+  const { data } = useSWR(request, async ({ tokens }) => {
     const tokenDatas: TokenMetadatas = {};
 
     for (const addressStr of tokens) {
@@ -80,17 +79,11 @@ export const useTokenMetadatas = (tokens: PublicKey[]) => {
     return tokenDatas;
   });
 
-  return useMemo(() => {
-    if (!isLoading && data) {
-      cache.current = data;
-    }
-    return cache.current;
-  }, [data, isLoading]);
+  return data;
 };
 
 export const useTokenBalances = (tokens: Address[]) => {
   const provider = useAnchorProvider();
-  const cache = useRef<TokenBalances>({});
 
   const owner = provider?.publicKey;
   const request = useMemo(() => {
@@ -101,7 +94,7 @@ export const useTokenBalances = (tokens: Address[]) => {
     }
   }, [tokens, owner]);
 
-  const { data, isLoading } = useSWR(request, async ({ tokens, owner }) => {
+  const { data } = useSWR(request, async ({ tokens, owner }) => {
     const tokenBalances: TokenBalances = {};
 
     if (owner && provider) {
@@ -133,12 +126,7 @@ export const useTokenBalances = (tokens: Address[]) => {
     return tokenBalances;
   });
 
-  return useMemo(() => {
-    if (!isLoading && data) {
-      cache.current = data;
-    }
-    return cache.current;
-  }, [data, isLoading]);
+  return data ?? {};
 };
 
 export const filterBalances = (value: unknown) => {

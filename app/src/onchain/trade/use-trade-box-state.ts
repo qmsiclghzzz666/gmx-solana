@@ -26,10 +26,11 @@ const useTradeOptions = (chainId: string | undefined, avaiableTokensOptions: Ava
     if (syncedChainId === chainId) {
       return;
     }
+    console.log("available token options", avaiableTokensOptions);
     console.log(`stored trade options for ${chainId}`, storedOptions);
 
     setSyncedChainId(chainId);
-  }, [chainId, storedOptions, syncedChainId]);
+  }, [avaiableTokensOptions, chainId, storedOptions, syncedChainId]);
 
   return [storedOptions!, setStoredOptions] as [TradeOptions, Dispatch<React.SetStateAction<TradeOptions>>];
 };
