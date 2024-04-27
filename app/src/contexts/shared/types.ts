@@ -4,6 +4,7 @@ import { TokenData, Tokens } from "@/onchain/token";
 import { TradeBoxState } from "@/onchain/trade";
 
 export interface SharedStates {
+  chainId?: string,
   market: MarketState,
   tradeBox: TradeBoxState,
 }

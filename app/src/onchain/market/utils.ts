@@ -1,6 +1,6 @@
 import { convertToUsd, expandDecimals } from "@/utils/number";
 import { TokenData, Tokens } from "../token";
-import { MarketInfo } from "./types";
+import { MarketInfo, MarketState, MarketTokens } from "./types";
 import { toBN } from "gmsol";
 import { BN_ZERO, ONE_USD } from "@/config/constants";
 import { Address, BN, translateAddress } from "@coral-xyz/anchor";
@@ -80,7 +80,7 @@ export function getSellableMarketToken(marketInfo: MarketInfo, marketToken: Toke
 }
 
 export function getPoolUsdWithoutPnl(
-  marketInfo: MarketInfo,
+  marketInfo: MarketTokens & MarketState,
   isLong: boolean,
   priceType: "minPrice" | "maxPrice" | "midPrice"
 ) {

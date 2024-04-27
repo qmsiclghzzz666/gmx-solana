@@ -1,3 +1,7 @@
+import { MarketInfo } from "../market";
+import { TokenData, Tokens } from "../token";
+import { useTradeBoxState } from "./use-trade-box-state"
+
 export enum TradeType {
   Long = "Long",
   Short = "Short",
@@ -10,6 +14,30 @@ export enum TradeMode {
   Trigger = "Trigger",
 }
 
-export interface TradeBoxState {
+export interface TradeOptions {
+  tradeType: TradeType,
+  tradeMode: TradeMode,
+  tokens: {
+    indexTokenAddress?: string,
+    fromTokenAddress?: string,
+    toTokenAddress?: string,
+  }
+  markets: {
+    [marketTokenAddress: string]: {
+      longTokenAddress: string,
+      shortTokenAddress: string,
+    }
+  },
+  collateralAddress?: string,
+}
 
+export type TradeBoxState = ReturnType<typeof useTradeBoxState>;
+
+export interface AvailableTokenOptions {
+  tokens: Tokens,
+  swapTokens: TokenData[],
+  indexTokens: TokenData[],
+  sortedIndexTokensWithPoolValue: string[],
+  sortedLongAndShortTokens: string[],
+  sortedAllMarkets: MarketInfo[],
 }

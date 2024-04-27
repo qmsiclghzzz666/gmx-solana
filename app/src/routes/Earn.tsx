@@ -13,7 +13,6 @@ import { useCallback, useEffect, useRef } from "react";
 import { GmSwapBox } from "@/components/GmSwap/GmSwapBox/GmSwapBox";
 import { getGmSwapBoxAvailableModes } from "@/components/GmSwap/utils";
 import { CreateDepositParams, CreateWithdrawalParams, Mode, Operation } from "@/components/GmSwap/types";
-import { useGenesisHash } from "@/onchain/utils";
 import { useAnchor, useExchange } from "@/contexts/anchor";
 import { invokeCreateDeposit, invokeCreateWithdrawal } from "gmsol";
 import { GMSOL_DEPLOYMENT } from "@/config/deployment";
@@ -21,9 +20,10 @@ import { useSWRConfig } from "swr";
 import { filterBalances, filterMetadatas } from "@/onchain/token";
 import { fitlerMarkets } from "@/onchain/market";
 import { useTriggerInvocation } from "@/onchain/transaction";
+import { useChainId } from "@/contexts/shared/hooks/use-chain-id";
 
 export default function Earn() {
-  const chainId = useGenesisHash();
+  const chainId = useChainId();
   const exchange = useExchange();
   const { owner } = useAnchor();
 

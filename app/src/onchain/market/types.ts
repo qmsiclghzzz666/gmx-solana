@@ -27,6 +27,7 @@ export type MarketData = Market & MarketState;
 
 export type MarketInfo = MarketData & MarketTokens & {
   name: string,
+  poolValueMax: BN,
 };
 
 export interface Markets {

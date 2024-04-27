@@ -2,7 +2,7 @@ import { GMSOL_DEPLOYMENT } from "@/config/deployment";
 import { useDeployedMarkets } from "./use-deployed-markets";
 import { useMemo } from "react";
 import { TokenMap, Tokens, useTokenBalances, useTokenMetadatas, useTokensWithPrices } from "../token";
-import { MarketInfos } from ".";
+import { MarketInfos, getPoolUsdWithoutPnl } from ".";
 import { getMarketIndexName, getMarketPoolName } from "@/components/MarketsList/utils";
 import { info2Stat } from "@/contexts/shared";
 import { ONE_USD } from "@/config/constants";
@@ -61,12 +61,17 @@ export const useDeployedMarketInfos = () => {
         const poolName = getMarketPoolName({
           longToken, shortToken
         });
-        infos[key] = {
+        const info = {
           ...market,
           name: `${indexName}[${poolName}]`,
           indexToken,
           longToken,
           shortToken,
+        };
+
+        infos[key] = {
+          ...info,
+          poolValueMax: getPoolUsdWithoutPnl(info, true, "maxPrice").add(getPoolUsdWithoutPnl(info, false, "maxPrice")),
         };
 
         const marketToken = marketTokenMetadatas[key];
