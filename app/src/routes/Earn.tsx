@@ -3,7 +3,7 @@ import PageTitle from "@/components/PageTitle/PageTitle";
 import { Trans, t } from "@lingui/macro";
 import ExternalLink from "@/components/ExternalLink/ExternalLink";
 import { GmList } from "@/components/GmList/GmList";
-import { useStateSelector } from "@/contexts/shared";
+import { useMarketStateSelector } from "@/contexts/shared";
 import { MarketStats } from "@/components/MarketStats/MarketStats";
 import { getByKey } from "@/utils/objects";
 import { getTokenData } from "@/onchain/token/utils";
@@ -34,7 +34,7 @@ export default function Earn() {
     window.scrollBy(0, -25); // add some offset
   }
 
-  const { marketInfos, tokens, marketTokens } = useStateSelector(state => {
+  const { marketInfos, tokens, marketTokens } = useMarketStateSelector(state => {
     return {
       marketInfos: state.marketInfos,
       tokens: state.tokens,

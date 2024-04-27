@@ -1,5 +1,5 @@
 import { MarketInfo } from "@/onchain/market";
-import { useMarketStateSelector } from "./utils";
+import { useMarketStateSelector } from "./use-market-state-selector";
 import { getUnit } from "@/utils/number";
 import { BN } from "@coral-xyz/anchor";
 import { IndexTokenStat, MarketStat } from "../types";
