@@ -1,5 +1,5 @@
 import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useState } from "react";
-import { AvailableTokenOptions, TradeMode, TradeOptions, TradeType } from "./types";
+import { AvailableTokenOptions, TradeMode, TradeOptions, TradeParams, TradeType } from "./types";
 import { useLocalStorageSerializeKey } from "@/utils/localStorage";
 import { getSyntheticsTradeOptionsKey } from "@/config/localStorage";
 import { MarketInfos } from "../market";
@@ -157,7 +157,7 @@ const useTradeOptions = (chainId: string | undefined, availableTokensOptions: Av
     }
   }, [availableIndexTokenAddresses, availableSwapTokenAddresses, setStoredOptions, strippedMarketInfos]);
 
-  return [storedOptions!, setTradeOptions] as [TradeOptions, Dispatch<SetStateAction<TradeOptions>>];
+  return [storedOptions, setTradeOptions] as [TradeOptions, Dispatch<SetStateAction<TradeOptions>>];
 };
 
 export function useTradeBoxState(
@@ -209,6 +209,30 @@ export function useTradeBoxState(
     });
   }, [setTradeOptions]);
 
+  const setTradeParams = useCallback((params: TradeParams) => {
+    setTradeOptions((state) => {
+      const { tradeType, tradeMode } = params;
+      const newState = { ...state };
+
+      if (tradeType) {
+        newState.tradeType = tradeType;
+      }
+
+      if (tradeMode) {
+        newState.tradeMode = tradeMode;
+      }
+
+      return newState;
+    });
+  }, [setTradeOptions]);
+
+  // Update Trade Mode.
+  useEffect(() => {
+    if (!availalbleTradeModes.includes(tradeMode)) {
+      setTradeMode(availalbleTradeModes[0]);
+    }
+  }, [availalbleTradeModes, setTradeMode, tradeMode]);
+
   return {
     tradeType,
     tradeMode,
@@ -216,6 +240,7 @@ export function useTradeBoxState(
     availalbleTradeModes,
     setTradeType,
     setTradeMode,
+    setTradeParams,
   };
 }
 

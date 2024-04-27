@@ -10,6 +10,8 @@ import Tab from "../Tab/Tab";
 import { TradeMode, TradeType } from "@/onchain/trade";
 import { t } from "@lingui/macro";
 import { useTradeBoxStateSelector } from "@/contexts/shared/hooks/use-trade-box-state-selector";
+import { useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 
 interface Prop {
   setPendingTxs: PendingTxsSetter,
@@ -41,8 +43,12 @@ export function TradeBox({
     tradeMode,
     availalbleTradeModes,
     setTradeMode: onSelectTradeMode,
-    setTradeType: onSelectTradeType,
   } = useTradeBoxStateSelector(s => s);
+
+  const navigate = useNavigate();
+  const handleChangeTradeType = useCallback((tradeType: TradeType) => {
+    navigate(`/trade/${tradeType.toLocaleLowerCase()}`);
+  }, [navigate]);
 
   return (
     <>
@@ -52,7 +58,7 @@ export function TradeBox({
           options={Object.values(TradeType)}
           optionLabels={tradeTypeLabels}
           option={tradeType}
-          onChange={onSelectTradeType}
+          onChange={handleChangeTradeType}
           className="SwapBox-option-tabs"
         />
         <Tab

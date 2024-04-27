@@ -31,6 +31,11 @@ export interface TradeOptions {
   collateralAddress?: string,
 }
 
+export interface TradeParams {
+  tradeType?: TradeType,
+  tradeMode?: TradeMode,
+}
+
 export type TradeBoxState = ReturnType<typeof useTradeBoxState>;
 
 export interface AvailableTokenOptions {
