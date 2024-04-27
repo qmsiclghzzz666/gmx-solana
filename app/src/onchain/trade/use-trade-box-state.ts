@@ -96,9 +96,6 @@ const useTradeOptions = (chainId: string | undefined, availableTokensOptions: Av
       if (newState && (newState.tradeType === TradeType.Long || newState.tradeType === TradeType.Short)) {
         newState = fallbackPositionTokens(newState);
       }
-
-      console.log(newState);
-
       return newState;
     });
 

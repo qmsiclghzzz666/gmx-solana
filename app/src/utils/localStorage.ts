@@ -1,4 +1,4 @@
-import { useLocalStorage } from "react-use";
+import { useLocalStorage } from "usehooks-ts";
 
 export type LocalStorageKey = string | number | boolean | null | undefined;
 
