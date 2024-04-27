@@ -3,7 +3,7 @@ import PageTitle from "@/components/PageTitle/PageTitle";
 import { Trans, t } from "@lingui/macro";
 import ExternalLink from "@/components/ExternalLink/ExternalLink";
 import { GmList } from "@/components/GmList/GmList";
-import { useStateSelector } from "@/contexts/state";
+import { useStateSelector } from "@/contexts/shared";
 import { MarketStats } from "@/components/MarketStats/MarketStats";
 import { getByKey } from "@/utils/objects";
 import { getTokenData } from "@/onchain/token/utils";

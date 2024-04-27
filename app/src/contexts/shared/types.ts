@@ -3,7 +3,7 @@ import { MarketInfo, MarketInfos } from "@/onchain/market";
 import { TokenData, Tokens } from "@/onchain/token";
 import { TradeBoxState } from "@/onchain/trade";
 
-export interface State {
+export interface SharedStates {
   market: MarketState,
   tradeBox: TradeBoxState,
 }

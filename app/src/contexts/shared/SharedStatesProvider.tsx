@@ -1,13 +1,13 @@
 import { useDeployedMarketInfos } from "@/onchain/market";
 import { ReactNode, useMemo } from "react";
-import { State } from "./types";
-import { StateCtx } from ".";
+import { SharedStates } from "./types";
+import { SharedStatesCtx } from ".";
 
-export function StateProvider({ children }: { children: ReactNode }) {
+export function SharedStatesProvider({ children }: { children: ReactNode }) {
   const { marketInfos, tokens, marketTokens } = useDeployedMarketInfos();
 
   const state = useMemo(() => {
-    const state: State = {
+    const state: SharedStates = {
       market: {
         marketInfos: marketInfos,
         tokens,
@@ -18,8 +18,8 @@ export function StateProvider({ children }: { children: ReactNode }) {
     return state;
   }, [marketInfos, tokens, marketTokens]);
   return (
-    <StateCtx.Provider value={state}>
+    <SharedStatesCtx.Provider value={state}>
       {children}
-    </StateCtx.Provider>
+    </SharedStatesCtx.Provider>
   );
 }

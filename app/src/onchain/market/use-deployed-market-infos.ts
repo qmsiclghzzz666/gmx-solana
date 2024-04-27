@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { TokenMap, Tokens, useTokenBalances, useTokenMetadatas, useTokensWithPrices } from "../token";
 import { MarketInfos } from ".";
 import { getMarketIndexName, getMarketPoolName } from "@/components/MarketsList/utils";
-import { info2Stat } from "@/contexts/state";
+import { info2Stat } from "@/contexts/shared";
 import { ONE_USD } from "@/config/constants";
 import { getUnit } from "@/utils/number";
 import { NATIVE_TOKEN_ADDRESS } from "@/config/tokens";

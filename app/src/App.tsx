@@ -6,7 +6,7 @@ import { i18n } from "@lingui/core";
 import Earn from './routes/Earn';
 import Dashboard from './routes/Dashboard';
 import Exchange from './routes/Exchange';
-import { StateProvider } from './contexts/state';
+import { SharedStatesProvider } from './contexts/shared';
 import { earnLoader } from './routes/loaders';
 import { NativeTokenUtilsProvider } from './components/NativeTokenUtils';
 import { useEffect } from 'react';
@@ -57,11 +57,11 @@ export function App() {
       <SWRConfig value={swrConfig}>
         <AnchorStateProvider>
           <PendingStateProvider>
-            <StateProvider>
+            <SharedStatesProvider>
               <NativeTokenUtilsProvider>
                 <RouterProvider router={router} />
               </NativeTokenUtilsProvider>
-            </StateProvider>
+            </SharedStatesProvider>
           </PendingStateProvider>
         </AnchorStateProvider>
       </SWRConfig>

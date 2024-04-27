@@ -5,7 +5,7 @@ import { Trans, t } from "@lingui/macro";
 import Tooltip from "@/components/Tooltip/Tooltip";
 import { renderNetFeeHeaderTooltipContent } from "./NetFeeHeaderTooltipContent";
 import TooltipWithPortal from "@/components/Tooltip/TooltipWithPortal";
-import { IndexTokenStat, useIndexTokenStats } from "@/contexts/state";
+import { IndexTokenStat, useIndexTokenStats } from "@/contexts/shared";
 import { formatAmount, formatRatePercentage, formatUsd, getMarketIndexName, getMarketPoolName } from "./utils";
 import StatsTooltipRow from "@/components/StatsTooltipRow/StatsTooltipRow";
 import { NetFeeTooltip } from "./NetFeeTooltip";
