@@ -1,13 +1,13 @@
 import { getTokenData } from "@/onchain/token";
 import { createSharedStatesSelector } from "../../utils";
-import { selectTokens } from "../market-selectors";
+import { selectMarketStateTokens } from "../market-selectors";
 import { selectTradeBoxFromTokenAddress, selectTradeBoxToTokenAddress, selectTradeBoxTradeFlags } from "../trade-box-selectors";
 
 export const selectChartToken = createSharedStatesSelector([
   selectTradeBoxFromTokenAddress,
   selectTradeBoxToTokenAddress,
   selectTradeBoxTradeFlags,
-  selectTokens,
+  selectMarketStateTokens,
 ], (fromTokenAddress, toTokenAddress, flags, tokens) => {
   if (!fromTokenAddress || !toTokenAddress) {
     return;

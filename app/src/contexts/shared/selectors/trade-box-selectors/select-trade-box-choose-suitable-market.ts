@@ -1,6 +1,6 @@
 import { getByKey } from "@/utils/objects";
 import { createSharedStatesSelector } from "../../utils";
-import { selectTokens } from "../market-selectors";
+import { selectMarketStateTokens } from "../market-selectors";
 import { selectTradeBoxGetMaxLongShortLiquidityPool } from "./select-trade-box-get-max-long-short-liquidity-pool";
 import { selectTradeBoxSetTradeParams } from "./select-trade-box-set-trade-params";
 import { selectTradeBoxTradeType } from "./select-trade-box-trade-type";
@@ -9,7 +9,7 @@ import { TradeType } from "@/onchain/trade";
 
 export const selectTradeBoxChooseSuitableMarket = createSharedStatesSelector([
   selectTradeBoxTradeType,
-  selectTokens,
+  selectMarketStateTokens,
   selectTradeBoxGetMaxLongShortLiquidityPool,
   selectTradeBoxSetTradeParams,
 ], (tradeType, tokens, getMaxLongShortLiquidityPool, setTradeParams) => {
