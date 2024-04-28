@@ -6,6 +6,7 @@ import { createSyncNativeInstruction, getAssociatedTokenAddressSync } from "@sol
 import { SystemProgram, Transaction } from "@solana/web3.js";
 import { WRAPPED_NATIVE_TOKEN_ADDRESS } from "@/config/tokens";
 import { filterBalances } from "./use-tokens";
+import { toBigInt } from "@/utils/number";
 
 export const useWrapNativeToken = (callback: () => void) => {
   const { mutate } = useSWRConfig();
@@ -19,7 +20,7 @@ export const useWrapNativeToken = (callback: () => void) => {
       SystemProgram.transfer({
         fromPubkey: owner,
         toPubkey: address,
-        lamports: BigInt(amount.toString()),
+        lamports: toBigInt(amount),
       }),
       createSyncNativeInstruction(address),
     );

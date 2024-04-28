@@ -3,17 +3,19 @@ import "./TVChart.scss";
 import { ChartTokenSelector } from "../ChartTokenSelector/ChartTokenSelector";
 import { formatUsd } from "../MarketsList/utils";
 import { useSharedStatesSelector } from "@/contexts/shared";
-import { selectChartToken } from "@/contexts/shared/selectors/chart-selectors";
+import { selectAvailableChartTokens, selectChartToken } from "@/contexts/shared/selectors/chart-selectors";
 
 export function TVChart() {
   const chartToken = useSharedStatesSelector(selectChartToken);
+  const availableTokens = useSharedStatesSelector(selectAvailableChartTokens);
+  const tokenOptions = availableTokens;
 
   return (
     <div className="ExchangeChart tv">
       <div className="ExchangeChart-header">
         <div className="ExchangeChart-info">
           <div className="ExchangeChart-top-inner">
-            {/* <ChartTokenSelector selectedToken={selectedTokenOption} options={tokenOptions} /> */}
+            <ChartTokenSelector selectedToken={chartToken} options={tokenOptions} />
             <div className="Chart-min-max-price">
               <div className="ExchangeChart-main-price">
                 {formatUsd(chartToken?.prices?.maxPrice, {

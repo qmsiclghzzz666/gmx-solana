@@ -34,6 +34,10 @@ export interface TradeOptions {
 export interface TradeParams {
   tradeType?: TradeType,
   tradeMode?: TradeMode,
+  fromTokenAddress?: string;
+  toTokenAddress?: string;
+  marketAddress?: string;
+  collateralAddress?: string;
 }
 
 export type TradeBoxState = ReturnType<typeof useTradeBoxState>;

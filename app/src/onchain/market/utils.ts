@@ -1,11 +1,12 @@
 import { convertToUsd, expandDecimals } from "@/utils/number";
-import { TokenData, Tokens } from "../token";
+import { TokenData, TokenOption, Tokens } from "../token";
 import { MarketInfo, MarketState, MarketTokens } from "./types";
 import { toBN } from "gmsol";
 import { BN_ZERO, ONE_USD } from "@/config/constants";
 import { Address, BN, translateAddress } from "@coral-xyz/anchor";
 import { convertToTokenAmount, getMidPrice } from "../token/utils";
 import { NATIVE_TOKEN_ADDRESS } from "@/config/tokens";
+import { TradeType } from "../trade";
 
 export function usdToMarketTokenAmount(poolValue: BN, marketToken: TokenData, usdValue: BN) {
   const supply = marketToken.totalSupply!;
@@ -141,4 +142,142 @@ export function getTotalGmInfo(tokensData?: Tokens) {
     acc.balanceUsd = acc.balanceUsd.add(balanceUsd || BN_ZERO);
     return acc;
   }, defaultResult);
+}
+
+export function getAvailableUsdLiquidityForPosition(marketInfo: MarketInfo, isLong: boolean) {
+  if (marketInfo.isSpotOnly) {
+    return BN_ZERO;
+  }
+
+  // const maxReservedUsd = getMaxReservedUsd(marketInfo, isLong);
+  // const reservedUsd = getReservedUsd(marketInfo, isLong);
+
+  // const maxOpenInterest = getMaxOpenInterestUsd(marketInfo, isLong);
+  // const currentOpenInterest = getOpenInterestUsd(marketInfo, isLong);
+
+  // const availableLiquidityBasedOnMaxReserve = maxReservedUsd.sub(reservedUsd);
+  // const availableLiquidityBasedOnMaxOpenInterest = maxOpenInterest.sub(currentOpenInterest);
+
+  // const result = availableLiquidityBasedOnMaxReserve.lt(availableLiquidityBasedOnMaxOpenInterest)
+  //   ? availableLiquidityBasedOnMaxReserve
+  //   : availableLiquidityBasedOnMaxOpenInterest;
+
+  // return result.lt(0) ? BigNumber.from(0) : result;
+  return getPoolUsdWithoutPnl(marketInfo, isLong, "midPrice");
+}
+
+export type PreferredTradeTypePickStrategy = TradeType | "largestPosition";
+
+export function chooseSuitableMarket({
+  indexTokenAddress,
+  maxLongLiquidityPool,
+  maxShortLiquidityPool,
+  isSwap,
+  // positionsInfo,
+  preferredTradeType,
+}: {
+  indexTokenAddress: string;
+  maxLongLiquidityPool: TokenOption;
+  maxShortLiquidityPool: TokenOption;
+  isSwap?: boolean;
+  // positionsInfo?: PositionsInfoData;
+  preferredTradeType: PreferredTradeTypePickStrategy;
+}):
+  | { indexTokenAddress: string; marketTokenAddress?: string; tradeType: TradeType; collateralTokenAddress?: string }
+  | undefined {
+  if (isSwap) {
+    return {
+      indexTokenAddress,
+      tradeType: TradeType.Swap,
+    };
+  }
+
+  if (preferredTradeType === "largestPosition") {
+    // if (positionsInfo) {
+    //   let largestLongPosition: PositionInfo | undefined = getLargestRelatedExistingPosition({
+    //     positionsInfo,
+    //     isLong: true,
+    //     indexTokenAddress,
+    //   });
+
+    //   let largestShortPosition: PositionInfo | undefined = getLargestRelatedExistingPosition({
+    //     positionsInfo,
+    //     isLong: false,
+    //     indexTokenAddress,
+    //   });
+
+    //   if (!largestLongPosition && !largestShortPosition) {
+    //     return {
+    //       indexTokenAddress,
+    //       marketTokenAddress: maxLongLiquidityPool.marketTokenAddress,
+    //       tradeType: TradeType.Long,
+    //     };
+    //   }
+
+    //   let largestPosition: PositionInfo;
+    //   if (largestLongPosition && largestShortPosition) {
+    //     largestPosition = largestLongPosition.sizeInUsd.gt(largestShortPosition.sizeInUsd)
+    //       ? largestLongPosition
+    //       : largestShortPosition;
+    //   } else {
+    //     largestPosition = largestLongPosition! || largestShortPosition!;
+    //   }
+    //   const largestPositionTradeType = largestPosition?.isLong ? TradeType.Long : TradeType.Short;
+
+    //   return {
+    //     indexTokenAddress,
+    //     marketTokenAddress: largestPosition.marketInfo.marketTokenAddress,
+    //     tradeType: largestPositionTradeType,
+    //     collateralTokenAddress: largestPosition.collateralTokenAddress,
+    //   };
+    // }
+
+    return {
+      indexTokenAddress,
+      marketTokenAddress: maxLongLiquidityPool.marketTokenAddress,
+      tradeType: TradeType.Long,
+    };
+  }
+
+  if (preferredTradeType === TradeType.Long) {
+    // const largestLongPosition =
+    //   positionsInfo &&
+    //   getLargestRelatedExistingPosition({
+    //     positionsInfo,
+    //     isLong: true,
+    //     indexTokenAddress,
+    //   });
+
+    // const marketTokenAddress =
+    //   largestLongPosition?.marketInfo.marketTokenAddress ?? maxLongLiquidityPool.marketTokenAddress;
+
+    const marketTokenAddress = maxLongLiquidityPool.marketTokenAddress;
+
+    return {
+      indexTokenAddress,
+      marketTokenAddress: marketTokenAddress,
+      tradeType: TradeType.Long,
+      collateralTokenAddress: undefined,
+    };
+  } else {
+    // const largestShortPosition =
+    //   positionsInfo &&
+    //   getLargestRelatedExistingPosition({
+    //     positionsInfo,
+    //     isLong: false,
+    //     indexTokenAddress,
+    //   });
+
+    // const marketTokenAddress =
+    //   largestShortPosition?.marketInfo.marketTokenAddress ?? maxShortLiquidityPool.marketTokenAddress;
+
+    const marketTokenAddress = maxShortLiquidityPool.marketTokenAddress;
+
+    return {
+      indexTokenAddress,
+      marketTokenAddress,
+      tradeType: TradeType.Short,
+      collateralTokenAddress: undefined,
+    };
+  }
 }

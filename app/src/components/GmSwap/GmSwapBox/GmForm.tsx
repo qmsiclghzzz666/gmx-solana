@@ -501,7 +501,7 @@ function showMarketToast(market: MarketInfo) {
   if (!market) return;
   const indexName = getMarketIndexName(market);
   const poolName = getMarketPoolName(market);
-  helperToast.success(
+  helperToast.info(
     <Trans>
       <div className="inline-flex">
         GM:&nbsp;<span>{indexName}</span>

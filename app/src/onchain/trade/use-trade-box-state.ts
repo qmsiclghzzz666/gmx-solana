@@ -219,7 +219,7 @@ export function useTradeBoxState(
 
   const setTradeParams = useCallback((params: TradeParams) => {
     setTradeOptions((state) => {
-      const { tradeType, tradeMode } = params;
+      const { tradeType, tradeMode, fromTokenAddress, toTokenAddress, marketAddress, collateralAddress } = params;
       const newState = { ...state };
 
       if (tradeType) {
@@ -228,6 +228,30 @@ export function useTradeBoxState(
 
       if (tradeMode) {
         newState.tradeMode = tradeMode;
+      }
+
+      if (fromTokenAddress) {
+        newState.tokens.fromTokenAddress = fromTokenAddress;
+      }
+
+      if (toTokenAddress) {
+        if (tradeType === TradeType.Swap) {
+          newState.tokens.swapTokenAddress = toTokenAddress;
+        } else {
+          newState.tokens.indexTokenAddress = toTokenAddress;
+          if (toTokenAddress && marketAddress) {
+            newState.markets[toTokenAddress] = newState.markets[toTokenAddress] || {};
+            if (tradeType === TradeType.Long) {
+              newState.markets[toTokenAddress].longTokenAddress = marketAddress;
+            } else if (tradeType === TradeType.Short) {
+              newState.markets[toTokenAddress].shortTokenAddress = marketAddress;
+            }
+          }
+        }
+      }
+
+      if (collateralAddress) {
+        newState.collateralAddress = collateralAddress;
       }
 
       return newState;

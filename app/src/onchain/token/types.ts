@@ -53,3 +53,10 @@ export interface InfoTokens {
 export interface TokenBalances {
   [address: string]: BN | null,
 }
+
+export type TokenOption = {
+  maxLongLiquidity: BN;
+  maxShortLiquidity: BN;
+  marketTokenAddress: string;
+  indexTokenAddress: string;
+};

@@ -6,15 +6,64 @@ import TokenIcon from "../TokenIcon/TokenIcon";
 import { FaChevronDown } from "react-icons/fa";
 import SearchInput from "../SearchInput/SearchInput";
 import cx from "classnames";
-import { Trans } from "@lingui/macro";
-import { formatUsd } from "../MarketsList/utils";
+import { Trans, t } from "@lingui/macro";
+import { formatUsd, getMarketIndexName, getMarketPoolName } from "../MarketsList/utils";
+import { useCallback, useState } from "react";
+import { useMarketInfos, useSharedStatesSelector } from "@/contexts/shared";
+import { selectTradeBoxChooseSuitableMarket, selectTradeBoxGetMaxLongShortLiquidityPool, selectTradeBoxTradeFlags } from "@/contexts/shared/selectors/trade-box-selectors";
+import { PreferredTradeTypePickStrategy } from "@/onchain/market";
+import { TradeType } from "@/onchain/trade";
+import { getByKey } from "@/utils/objects";
+import { helperToast } from "@/utils/helperToast";
 
 type Props = {
   selectedToken: Token | undefined;
   options: Token[] | undefined;
 };
 
-export function ChartTokenSelector(props: Props) {
+export function ChartTokenSelector({ options, selectedToken }: Props) {
+  const [searchKeyword, setSearchKeyword] = useState("");
+  const { isSwap } = useSharedStatesSelector(selectTradeBoxTradeFlags);
+
+  const filteredTokens: Token[] | undefined = options?.filter((item) => {
+    return (
+      // item.name.toLowerCase().indexOf(searchKeyword.toLowerCase()) > -1 ||
+      item.symbol.toLowerCase().indexOf(searchKeyword.toLowerCase()) > -1
+    );
+  });
+
+  const chooseSuitableMarket = useSharedStatesSelector(selectTradeBoxChooseSuitableMarket);
+  const marketsInfoData = useMarketInfos();
+
+  const handleMarketSelect = useCallback(
+    (tokenAddress: string, preferredTradeType?: PreferredTradeTypePickStrategy) => {
+      setSearchKeyword("");
+      const chosenMarket = chooseSuitableMarket(tokenAddress, preferredTradeType);
+
+      if (chosenMarket?.marketTokenAddress && chosenMarket.tradeType !== TradeType.Swap) {
+        const marketInfo = getByKey(marketsInfoData, chosenMarket.marketTokenAddress);
+        const nextTradeType = chosenMarket.tradeType;
+        if (marketInfo) {
+          const indexName = getMarketIndexName(marketInfo);
+          const poolName = getMarketPoolName(marketInfo);
+          helperToast.info(
+            <Trans>
+              <span>{nextTradeType === TradeType.Long ? t`Long` : t`Short`}</span>{" "}
+              <div className="inline-flex">
+                <span>{indexName}</span>
+                <span className="subtext gm-toast lh-1">[{poolName}]</span>
+              </div>{" "}
+              <span>market selected</span>
+            </Trans>
+          );
+        }
+      }
+    },
+    [chooseSuitableMarket, marketsInfoData]
+  );
+
+  const getMaxLongShortLiquidityPool = useSharedStatesSelector(selectTradeBoxGetMaxLongShortLiquidityPool);
+
   return (
     <Popover className="Synths-ChartTokenSelector">
       {({ open, close }) => {
@@ -46,7 +95,7 @@ export function ChartTokenSelector(props: Props) {
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && filteredTokens && filteredTokens.length > 0) {
                       const token = filteredTokens[0];
-                      handleMarketSelect(token.address);
+                      handleMarketSelect(token.address.toBase58());
                       close();
                     }
                   }}
@@ -76,7 +125,7 @@ export function ChartTokenSelector(props: Props) {
                           >
                             <td
                               className="token-item"
-                              onClick={() => handleMarketSelect(token.address, "largestPosition")}
+                              onClick={() => handleMarketSelect(token.address.toBase58(), "largestPosition")}
                             >
                               <span className="inline-items-center">
                                 <TokenIcon
@@ -91,14 +140,14 @@ export function ChartTokenSelector(props: Props) {
 
                             <td
                               onClick={() => {
-                                handleMarketSelect(token.address, TradeType.Long);
+                                handleMarketSelect(token.address.toBase58(), TradeType.Long);
                               }}
                             >
                               {!isSwap && maxLongLiquidityPool ? formatUsd(maxLongLiquidityPool?.maxLongLiquidity) : ""}
                             </td>
                             <td
                               onClick={() => {
-                                handleMarketSelect(token.address, TradeType.Short);
+                                handleMarketSelect(token.address.toBase58(), TradeType.Short);
                               }}
                             >
                               {!isSwap && maxShortLiquidityPool

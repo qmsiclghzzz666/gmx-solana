@@ -191,3 +191,11 @@ export const parseValue = (value: string, tokenDecimals: number) => {
   value = limitDecimals(value, tokenDecimals);
   return parseUnits(value, tokenDecimals);
 };
+
+export function bnClampMin(value: BN, min: BN) {
+  return value.lt(min) ? min : value;
+}
+
+export function toBigInt(amount: BN) {
+  return BigInt(amount.toString());
+}
