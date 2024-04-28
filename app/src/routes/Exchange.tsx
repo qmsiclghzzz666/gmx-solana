@@ -3,12 +3,12 @@ import "./Exchange.css";
 
 import { Helmet } from "react-helmet-async";
 import { usePending } from "@/contexts/pending";
-import { useTradeParamsEffect } from "@/onchain/trade/use-trade-params-effect";
+import { useTradeParamsProcessor } from "@/onchain/trade/use-trade-params-processor";
 
 export default function Exchange() {
   const { setPendingTxs } = usePending();
 
-  useTradeParamsEffect();
+  useTradeParamsProcessor();
 
   return (
     <div className="default-container Exchange page-layout">

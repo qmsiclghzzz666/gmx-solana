@@ -5,7 +5,7 @@ import { useEffect, useRef } from "react";
 import { useTradeBoxStateSelector } from "@/contexts/shared/hooks/use-trade-box-state-selector";
 import { isMatch } from "lodash";
 
-export const useTradeParamsEffect = () => {
+export const useTradeParamsProcessor = () => {
   const savedTradeMode = useTradeBoxStateSelector(s => s.tradeMode);
   const savedTradeType = useTradeBoxStateSelector(s => s.tradeType);
   const setTradeParams = useTradeBoxStateSelector(s => s.setTradeParams);

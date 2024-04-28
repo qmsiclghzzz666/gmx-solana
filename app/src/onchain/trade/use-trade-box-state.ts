@@ -132,7 +132,7 @@ const useTradeOptions = (chainId: string | undefined, availableTokensOptions: Av
 
       const toTokenAddress =
         newState.tradeType === TradeType.Swap
-          ? newState.tokens.toTokenAddress
+          ? newState.tokens.swapTokenAddress
           : newState.tokens.indexTokenAddress;
       const marketAddress = toTokenAddress
         ? newState.markets[toTokenAddress]?.[newState.tradeType === TradeType.Long ? "longTokenAddress" : "shortTokenAddress"]
@@ -174,6 +174,8 @@ export function useTradeBoxState(
   const avaiableTokensOptions = useAvailableTokenOptions({ marketInfos, tokens });
   const [tradeOptions, setTradeOptions] = useTradeOptions(chainId, avaiableTokensOptions);
 
+  const { swapTokens } = avaiableTokensOptions;
+
   const tradeType = tradeOptions.tradeType;
   const tradeMode = tradeOptions.tradeMode;
 
@@ -190,6 +192,12 @@ export function useTradeBoxState(
 
   const tradeFlags = useMemo(() => createTradeFlags(tradeType, tradeMode), [tradeType, tradeMode]);
   const { isSwap } = tradeFlags;
+
+  const fromTokenAddress = tradeOptions.tokens.fromTokenAddress;
+
+  const toTokenAddress = isSwap
+    ? tradeOptions.tokens.swapTokenAddress
+    : tradeOptions.tokens.indexTokenAddress;
 
   const setTradeType = useCallback((tradeType: TradeType) => {
     setTradeOptions((state) => {
@@ -226,12 +234,56 @@ export function useTradeBoxState(
     });
   }, [setTradeOptions]);
 
+  const setFromTokenAddress = useCallback(
+    (tokenAddress?: string) => {
+      setTradeOptions((oldState) => {
+        return {
+          ...oldState,
+          tokens: {
+            ...oldState.tokens,
+            fromTokenAddress: tokenAddress,
+          },
+        };
+      });
+    },
+    [setTradeOptions]
+  );
+
+  const setToTokenAddress = useCallback(
+    function setToTokenAddressCallback(tokenAddress: string, marketTokenAddress?: string, tradeType?: TradeType) {
+      setTradeOptions(setToTokenAddressUpdaterBuilder(tradeType, tokenAddress, marketTokenAddress));
+    },
+    [setTradeOptions]
+  );
+
   // Update Trade Mode.
   useEffect(() => {
     if (!availalbleTradeModes.includes(tradeMode)) {
       setTradeMode(availalbleTradeModes[0]);
     }
   }, [availalbleTradeModes, setTradeMode, tradeMode]);
+
+  // Update Swap Tokens.
+  useEffect(
+    () => {
+      if (!isSwap || !swapTokens.length) {
+        return;
+      }
+
+      const needFromUpdate = !swapTokens.find((t) => t.address.toBase58() === fromTokenAddress);
+
+      if (needFromUpdate) {
+        setFromTokenAddress(swapTokens[0].address.toBase58());
+      }
+
+      const needToUpdate = !swapTokens.find((t) => t.address.toBase58() === toTokenAddress);
+
+      if (needToUpdate) {
+        setToTokenAddress(swapTokens[0].address.toBase58());
+      }
+    },
+    [fromTokenAddress, isSwap, setFromTokenAddress, setToTokenAddress, swapTokens, toTokenAddress]
+  );
 
   return {
     tradeType,
@@ -261,7 +313,7 @@ function setToTokenAddressUpdaterBuilder(
     }
 
     if (isSwap) {
-      newState.tokens.toTokenAddress = tokenAddress;
+      newState.tokens.swapTokenAddress = tokenAddress;
     } else {
       newState.tokens.indexTokenAddress = tokenAddress;
       if (tokenAddress && marketTokenAddress) {
