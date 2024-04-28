@@ -1,4 +1,4 @@
-import { useState, useEffect, ReactNode, KeyboardEventHandler, ChangeEventHandler } from "react";
+import { useState, useEffect, ReactNode, KeyboardEventHandler, ChangeEventHandler, useMemo } from "react";
 import cx from "classnames";
 
 import { BiChevronDown } from "react-icons/bi";
@@ -6,11 +6,14 @@ import { BiChevronDown } from "react-icons/bi";
 import dropDownIcon from "@/img/DROP_DOWN.svg";
 import "./TokenSelector.scss";
 import TooltipWithPortal from "../Tooltip/TooltipWithPortal";
-import { InfoTokens, Token, TokenInfo } from "@/onchain/token";
+import { Token, TokenData, TokenInfo, Tokens } from "@/onchain/token";
 import { BN } from "@coral-xyz/anchor";
 import TokenIcon from "../TokenIcon/TokenIcon";
 import Modal from "../Modal/Modal";
 import SearchInput from "../SearchInput/SearchInput";
+import { BN_ZERO, USD_DECIMALS } from "@/config/constants";
+import { convertToUsd, expandDecimals } from "@/utils/number";
+import { formatAmount } from "../MarketsList/utils";
 
 type TokenState = {
   disabled?: boolean;
@@ -23,7 +26,7 @@ type Props = {
   className?: string;
   token: Token;
   tokens: Token[];
-  infoTokens?: InfoTokens;
+  infoTokens?: Tokens;
   showMintingCap?: boolean;
   mintingCap?: BN;
   disabled?: boolean;
@@ -51,11 +54,15 @@ export default function TokenSelector(props: Props) {
   const {
     token,
     tokens,
+    infoTokens,
     disabled,
     selectedTokenLabel,
     showTokenImgInDropdown = false,
     showSymbolImage = false,
     showNewCaret = false,
+    showBalances = true,
+    extendedSortSequence,
+    showMintingCap,
     getTokenState = () => ({ disabled: false, message: null }),
   } = props;
 
@@ -83,64 +90,64 @@ export default function TokenSelector(props: Props) {
     );
   });
 
-  // const sortedFilteredTokens = useMemo(() => {
-  //   const tokensWithBalance: Token[] = [];
-  //   const tokensWithoutBalance: Token[] = showBalances ? [] : filteredTokens;
+  const sortedFilteredTokens = useMemo(() => {
+    const tokensWithBalance: Token[] = [];
+    const tokensWithoutBalance: Token[] = showBalances ? [] : filteredTokens;
 
-  //   for (const token of filteredTokens) {
-  //     const info = infoTokens?.[token.address];
-  //     if (showBalances) {
-  //       if (info?.balance?.gt(0)) {
-  //         tokensWithBalance.push(token);
-  //       } else {
-  //         tokensWithoutBalance.push(token);
-  //       }
-  //     }
-  //   }
+    for (const token of filteredTokens) {
+      const info = infoTokens?.[token.address.toBase58()];
+      if (showBalances) {
+        if (info?.balance?.gt(BN_ZERO)) {
+          tokensWithBalance.push(token);
+        } else {
+          tokensWithoutBalance.push(token);
+        }
+      }
+    }
 
-  //   const sortedTokensWithBalance = tokensWithBalance.sort((a, b) => {
-  //     const aInfo = infoTokens?.[a.address];
-  //     const bInfo = infoTokens?.[b.address];
+    const sortedTokensWithBalance = tokensWithBalance.sort((a, b) => {
+      const aInfo = infoTokens?.[a.address.toBase58()];
+      const bInfo = infoTokens?.[b.address.toBase58()];
 
-  //     if (!aInfo || !bInfo) return 0;
+      if (!aInfo || !bInfo) return 0;
 
-  //     if (aInfo?.balance && bInfo?.balance && aInfo?.maxPrice && bInfo?.maxPrice) {
-  //       const aBalanceUsd = convertToUsd(aInfo.balance, a.decimals, aInfo.minPrice);
-  //       const bBalanceUsd = convertToUsd(bInfo.balance, b.decimals, bInfo.minPrice);
+      if (aInfo?.balance && bInfo?.balance && aInfo?.prices.maxPrice && bInfo?.prices.maxPrice) {
+        const aBalanceUsd = convertToUsd(aInfo.balance, a.decimals, aInfo.prices.minPrice);
+        const bBalanceUsd = convertToUsd(bInfo.balance, b.decimals, bInfo.prices.minPrice);
 
-  //       return bBalanceUsd?.sub(aBalanceUsd || 0).gt(0) ? 1 : -1;
-  //     }
-  //     return 0;
-  //   });
+        return bBalanceUsd?.sub(aBalanceUsd || BN_ZERO).gt(BN_ZERO) ? 1 : -1;
+      }
+      return 0;
+    });
 
-  //   const sortedTokensWithoutBalance = tokensWithoutBalance.sort((a, b) => {
-  //     const aInfo = infoTokens?.[a.address];
-  //     const bInfo = infoTokens?.[b.address];
+    const sortedTokensWithoutBalance = tokensWithoutBalance.sort((a, b) => {
+      const aInfo = infoTokens?.[a.address.toBase58()];
+      const bInfo = infoTokens?.[b.address.toBase58()];
 
-  //     if (!aInfo || !bInfo) return 0;
+      if (!aInfo || !bInfo) return 0;
 
-  //     if (extendedSortSequence) {
-  //       // making sure to use the wrapped address if it exists in the extended sort sequence
-  //       const aAddress =
-  //         aInfo.wrappedAddress && extendedSortSequence.includes(aInfo.wrappedAddress)
-  //           ? aInfo.wrappedAddress
-  //           : aInfo.address;
+      if (extendedSortSequence) {
+        // making sure to use the wrapped address if it exists in the extended sort sequence
+        const aAddress =
+          aInfo.wrappedAddress && extendedSortSequence.includes(aInfo.wrappedAddress.toBase58())
+            ? aInfo.wrappedAddress
+            : aInfo.address;
 
-  //       const bAddress =
-  //         bInfo.wrappedAddress && extendedSortSequence.includes(bInfo.wrappedAddress)
-  //           ? bInfo.wrappedAddress
-  //           : bInfo.address;
+        const bAddress =
+          bInfo.wrappedAddress && extendedSortSequence.includes(bInfo.wrappedAddress.toBase58())
+            ? bInfo.wrappedAddress
+            : bInfo.address;
 
-  //       return extendedSortSequence.indexOf(aAddress) - extendedSortSequence.indexOf(bAddress);
-  //     }
+        return extendedSortSequence.indexOf(aAddress.toBase58()) - extendedSortSequence.indexOf(bAddress.toBase58());
+      }
 
-  //     return 0;
-  //   });
+      return 0;
+    });
 
-  //   return [...sortedTokensWithBalance, ...sortedTokensWithoutBalance];
-  // }, [filteredTokens, infoTokens, extendedSortSequence, showBalances]);
+    return [...sortedTokensWithBalance, ...sortedTokensWithoutBalance];
+  }, [filteredTokens, infoTokens, extendedSortSequence, showBalances]);
 
-  const sortedFilteredTokens = filteredTokens;
+  // const sortedFilteredTokens = filteredTokens;
 
   const _handleKeyDown: KeyboardEventHandler<HTMLInputElement> = (e) => {
     if (e.key === "Enter") {
@@ -173,21 +180,20 @@ export default function TokenSelector(props: Props) {
       >
         <div className="TokenSelector-tokens">
           {sortedFilteredTokens.map((token, tokenIndex) => {
-            // let info = infoTokens?.[token.address] || ({} as TokenInfo);
-            const info = token;
+            const info = infoTokens?.[token.address.toBase58()] || ({} as TokenData);
 
             // let mintAmount;
-            // let balance = info.balance;
+            const balance = info.balance;
             // if (showMintingCap && mintingCap && info.usdgAmount) {
             //   mintAmount = mintingCap.sub(info.usdgAmount);
             // }
             // if (mintAmount && mintAmount.lt(0)) {
             //   mintAmount = bigNumberify(0);
             // }
-            // let balanceUsd;
-            // if (balance && info.maxPrice) {
-            //   balanceUsd = balance.mul(info.maxPrice).div(expandDecimals(1, token.decimals));
-            // }
+            let balanceUsd;
+            if (balance && info.prices.maxPrice) {
+              balanceUsd = balance.mul(info.prices.maxPrice).div(expandDecimals(new BN(1), token.decimals));
+            }
 
             const tokenState = getTokenState(info) || {};
 
@@ -217,21 +223,21 @@ export default function TokenSelector(props: Props) {
                     <span className="text-accent">{token.symbol}</span>
                   </div>
                 </div>
-                {/* <div className="Token-balance">
+                <div className="Token-balance">
                   {showBalances && balance && (
                     <div className="Token-text">
-                      {balance.gt(0) && formatAmount(balance, token.decimals, 4, true)}
-                      {balance.eq(0) && "-"}
+                      {balance.gt(BN_ZERO) && formatAmount(balance, token.decimals, 4, true)}
+                      {balance.eq(BN_ZERO) && "-"}
                     </div>
                   )}
                   <span className="text-accent">
-                    {mintAmount && <div>Mintable: {formatAmount(mintAmount, token.decimals, 2, true)} USDG</div>}
-                    {showMintingCap && !mintAmount && <div>-</div>}
-                    {!showMintingCap && showBalances && balanceUsd && balanceUsd.gt(0) && (
-                      <div>${formatAmount(balanceUsd, 30, 2, true)}</div>
+                    {/* {mintAmount && <div>Mintable: {formatAmount(mintAmount, token.decimals, 2, true)} USDG</div>}
+                    {showMintingCap && !mintAmount && <div>-</div>} */}
+                    {!showMintingCap && showBalances && balanceUsd && balanceUsd.gt(BN_ZERO) && (
+                      <div>${formatAmount(balanceUsd, USD_DECIMALS, 2, true)}</div>
                     )}
                   </span>
-                </div> */}
+                </div>
               </div>
             );
           })}

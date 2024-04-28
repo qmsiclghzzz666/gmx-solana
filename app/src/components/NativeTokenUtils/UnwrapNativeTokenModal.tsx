@@ -1,5 +1,5 @@
 import { BN_ZERO } from "@/config/constants";
-import { useUnwrapNativeToken } from "@/onchain";
+import { useUnwrapNativeToken } from "@/onchain/token";
 import { TokenData } from "@/onchain/token";
 import { convertToUsd, formatTokenAmount } from "@/utils/number";
 import { useCallback } from "react";

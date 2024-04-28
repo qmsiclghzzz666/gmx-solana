@@ -1,8 +1,8 @@
 import { ReactNode, useCallback, useState } from "react";
 import { NativeTokenUtilsContext } from "./context";
 import { WrapNativeTokenModal } from "./WrapNativeTokenModal";
-import { useDeployedMarketInfos } from "@/onchain";
-import { getTokenData } from "@/onchain/token/utils";
+import { useDeployedMarketInfos } from "@/onchain/market";
+import { getTokenData } from "@/onchain/token";
 import { NATIVE_TOKEN_ADDRESS, WRAPPED_NATIVE_TOKEN_ADDRESS } from "@/config/tokens";
 import { UnwrapNativeTokenModal } from "./UnwrapNativeTokenModal";
 

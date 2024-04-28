@@ -31,14 +31,17 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-focus-on": "^3.9.3",
+    "react-helmet-async": "^2.0.4",
     "react-icons": "^5.1.0",
     "react-remove-scroll": "^2.5.9",
     "react-router-dom": "^6.23.0",
     "react-toastify": "^10.0.5",
     "react-use": "^17.5.0",
+    "reselect": "^5.1.0",
     "swr": "^2.2.5",
     "use-context-selector": "^1.4.4",
-    "use-immer": "^0.9.0"
+    "use-immer": "^0.9.0",
+    "usehooks-ts": "^3.1.0"
   },
   "devDependencies": {
     "@lingui/cli": "^4.10.0",

@@ -5,7 +5,7 @@ import { Trans, t } from "@lingui/macro";
 import Tooltip from "@/components/Tooltip/Tooltip";
 import { renderNetFeeHeaderTooltipContent } from "./NetFeeHeaderTooltipContent";
 import TooltipWithPortal from "@/components/Tooltip/TooltipWithPortal";
-import { IndexTokenStat, useIndexTokenStats } from "@/contexts/state";
+import { IndexTokenStat, useIndexTokenStats } from "@/contexts/shared";
 import { formatAmount, formatRatePercentage, formatUsd, getMarketIndexName, getMarketPoolName } from "./utils";
 import StatsTooltipRow from "@/components/StatsTooltipRow/StatsTooltipRow";
 import { NetFeeTooltip } from "./NetFeeTooltip";
@@ -13,6 +13,7 @@ import PageTitle from "../PageTitle/PageTitle";
 
 import "./MarketsList.scss";
 import { getMidPrice } from "@/onchain/token/utils";
+import { getIconUrlPath } from "@/utils/icon";
 
 export function MarketsList() {
   const indexTokensStats = useIndexTokenStats();
@@ -78,13 +79,14 @@ function MarketsListMobile({ indexTokensStats }: { indexTokensStats: IndexTokenS
           const netFeePerHourLong = stats.bestNetFeeLong;
           const netFeePerHourShort = stats.bestNetFeeShort;
           const price = stats.token.prices ? getMidPrice(stats.token.prices) : undefined;
+          const priceDecimals = stats.token.priceDecimals;
 
           return (
             <div className="App-card" key={stats.token.symbol}>
               <div className="App-card-title">
                 <div className="mobile-token-card">
                   <img
-                    src={`/src/img/ic_${stats.token.symbol.toLocaleLowerCase()}_40.svg`}
+                    src={getIconUrlPath(stats.token.symbol, 40)}
                     alt={stats.token.symbol}
                     width="20"
                   />
@@ -100,7 +102,7 @@ function MarketsListMobile({ indexTokensStats }: { indexTokensStats: IndexTokenS
                   <div className="label">
                     <Trans>Price</Trans>
                   </div>
-                  <div>{formatUsd(price)}</div>
+                  <div>{formatUsd(price, { displayDecimals: priceDecimals })}</div>
                 </div>
                 <div className="App-card-row">
                   <div className="label">
@@ -204,7 +206,7 @@ function MarketsListDesktopItem({ stats }: { stats: IndexTokenStat }) {
           <div className="items-center">
             <div className="App-card-title-info-icon">
               <img
-                src={`/src/img/ic_${stats.token.symbol.toLocaleLowerCase()}_40.svg`}
+                src={getIconUrlPath(stats.token.symbol, 40)}
                 alt={stats.token.symbol}
                 width="40"
               />

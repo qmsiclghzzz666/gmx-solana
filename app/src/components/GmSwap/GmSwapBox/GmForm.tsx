@@ -11,7 +11,7 @@ import "./GmSwapBox.scss";
 import { formatUsd, getMarketIndexName, getMarketPoolName } from "@/components/MarketsList/utils";
 import Button from "@/components/Button/Button";
 import BuyInputSection from "@/components/BuyInputSection/BuyInputSection";
-import { Token } from "@/onchain/token";
+import { Token, Tokens } from "@/onchain/token";
 import TokenWithIcon from "@/components/TokenIcon/TokenWithIcon";
 import TokenSelector from "@/components/TokenSelector/TokenSelector";
 import { useLocalStorageSerializeKey } from "@/utils/localStorage";
@@ -21,7 +21,7 @@ import { IoMdSwap } from "react-icons/io";
 import { PoolSelector } from "@/components/MarketSelector/PoolSelector";
 import { useGmInputAmounts, useGmInputDisplay, useGmStateDispath, useGmStateSelector, useHandleSubmit } from "../hooks";
 import { formatAmountFree, formatTokenAmount } from "@/utils/number";
-import { useInitializeTokenAccount } from "@/onchain";
+import { useInitializeTokenAccount } from "@/onchain/token";
 import { PublicKey } from "@solana/web3.js";
 import { useOpenConnectModal } from "@/contexts/anchor";
 import { useNativeTokenUtils } from "@/components/NativeTokenUtils";
@@ -43,6 +43,7 @@ export function GmForm({
   owner,
   genesisHash,
   tokenOptions: { tokenOptions, firstToken, secondToken },
+  tokensData,
   isPending,
   setOperation,
   setMode,
@@ -53,6 +54,7 @@ export function GmForm({
 }: {
   owner: PublicKey | undefined,
   genesisHash: string,
+  tokensData?: Tokens,
   tokenOptions: TokenOptions,
   isPending: boolean,
   setOperation: (operation: Operation) => void,
@@ -277,7 +279,7 @@ export function GmForm({
                 token={firstToken}
                 onSelectToken={onSelectFirstToken}
                 tokens={tokenOptions}
-                // infoTokens={infoTokens}
+                infoTokens={tokensData}
                 className="GlpSwap-from-token"
                 showSymbolImage={true}
                 showTokenImgInDropdown={true}
@@ -501,7 +503,7 @@ function showMarketToast(market: MarketInfo) {
   if (!market) return;
   const indexName = getMarketIndexName(market);
   const poolName = getMarketPoolName(market);
-  helperToast.success(
+  helperToast.info(
     <Trans>
       <div className="inline-flex">
         GM:&nbsp;<span>{indexName}</span>

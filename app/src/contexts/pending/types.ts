@@ -1,7 +1,9 @@
-import { PendingTranscation } from "@/onchain";
+import { PendingTransaction } from "@/onchain/transaction";
 import { Dispatch, SetStateAction } from "react";
 
+export type PendingTxsSetter = Dispatch<SetStateAction<PendingTransaction[]>>;
+
 export interface PendingTransactionsState {
-  pendingTxs: PendingTranscation[],
-  setPendingTxs: Dispatch<SetStateAction<PendingTranscation[]>>,
+  pendingTxs: PendingTransaction[],
+  setPendingTxs: PendingTxsSetter,
 }

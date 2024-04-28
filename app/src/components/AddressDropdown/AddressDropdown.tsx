@@ -1,5 +1,5 @@
 import { Menu } from "@headlessui/react";
-import { Trans } from "@lingui/macro";
+import { Trans, t } from "@lingui/macro";
 import copy from "@/img/ic_copy_20.svg";
 import disconnect from "@/img/ic_sign_out_20.svg";
 import { FaChevronDown } from "react-icons/fa";
@@ -9,6 +9,7 @@ import { PublicKey } from "@solana/web3.js";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useNativeTokenUtils } from "../NativeTokenUtils";
 import { MdOutlineWallet } from "react-icons/md";
+import { helperToast } from "@/utils/helperToast";
 
 type Props = {
   account: PublicKey;
@@ -67,7 +68,7 @@ function AddressDropdown({ account, disconnectAccountAndCloseSettings }: Props) 
               className="menu-item"
               onClick={() => {
                 copyToClipboard(account.toBase58());
-                // helperToast.success(t`Address copied to your clipboard`);
+                helperToast.success(t`Address copied to your clipboard`);
               }}
             >
               <img width={20} src={copy} alt="Copy user address" />

@@ -6,7 +6,7 @@ import { helperToast } from "@/utils/helperToast";
 import { Trans } from "@lingui/macro";
 import ExternalLink from "@/components/ExternalLink/ExternalLink";
 import { getTransactionUrl } from "@/utils/transaction";
-import { PendingTranscation } from "@/onchain";
+import { PendingTransaction } from "@/onchain/transaction";
 
 interface Props {
   children: ReactNode,
@@ -15,7 +15,7 @@ interface Props {
 export function PendingStateProvider({
   children,
 }: Props) {
-  const [pendingTxs, setPendingTxs] = useState<PendingTranscation[]>([]);
+  const [pendingTxs, setPendingTxs] = useState<PendingTransaction[]>([]);
 
   const request = useMemo(() => {
     return {
@@ -48,7 +48,7 @@ export function PendingStateProvider({
 
   useEffect(() => {
     if (data) {
-      const updatedPendingTxs: PendingTranscation[] = [];
+      const updatedPendingTxs: PendingTransaction[] = [];
       for (let i = 0; i < pendingTxs.length; i++) {
         const pendingTx = pendingTxs[i];
         const status = data[i];

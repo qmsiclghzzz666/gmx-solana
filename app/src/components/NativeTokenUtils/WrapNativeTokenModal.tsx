@@ -1,6 +1,6 @@
 import { BN_ZERO, DEFAULT_RENT_EXEMPT_FEE_FOR_ZERO, ESTIMATED_EXECUTION_FEE } from "@/config/constants";
-import { useRentExemptionAmount, useWrapNativeToken } from "@/onchain";
-import { TokenData } from "@/onchain/token";
+import { useRentExemptionAmount } from "@/onchain/utils";
+import { TokenData, useWrapNativeToken } from "@/onchain/token";
 import { convertToUsd, formatAmountFree, formatTokenAmount, parseValue } from "@/utils/number";
 import { useCallback, useMemo, useState } from "react";
 import Modal from "../Modal/Modal";

@@ -5,7 +5,9 @@ export interface Token {
   symbol: string,
   address: PublicKey,
   decimals: number,
+  priceDecimals?: number,
   feedAddress?: PublicKey,
+  isStable?: boolean,
   isNative?: boolean,
   wrappedAddress?: PublicKey,
   isWrapped?: boolean,
@@ -44,10 +46,13 @@ export type TokenInfo = Token & {
   minPrice?: BN;
 };
 
-export interface InfoTokens {
-  [address: string]: TokenInfo,
-}
-
 export interface TokenBalances {
   [address: string]: BN | null,
 }
+
+export type TokenOption = {
+  maxLongLiquidity: BN;
+  maxShortLiquidity: BN;
+  marketTokenAddress: string;
+  indexTokenAddress: string;
+};

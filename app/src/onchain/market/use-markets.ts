@@ -48,11 +48,7 @@ export const useMarkets = (params?: { store: PublicKey, marketTokens: PublicKey[
     }, {} as Markets);
   });
 
-  const markets = useMemo(() => {
-    return data ?? {};
-  }, [data]);
-
-  return markets;
+  return data ?? {};
 };
 
 export const fitlerMarkets = (value: unknown) => {
