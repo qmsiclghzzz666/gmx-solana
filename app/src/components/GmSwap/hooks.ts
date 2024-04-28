@@ -74,7 +74,7 @@ export const useTokenOptionsFromStorage = ({
             token.address.toBase58() !== firstTokenAddress
           );
         });
-        setSecondTokenAddress(secondToken?.address.toBase58());
+        setSecondTokenAddress(secondToken?.address.toBase58() ?? "");
       }
     }
   }, [
@@ -92,9 +92,9 @@ export const useTokenOptionsFromStorage = ({
   const secondToken = getTokenData(tokensData, secondTokenAddress);
   const updateToken = useCallback((address: Address | null, kind: "first" | "second") => {
     if (kind === "first") {
-      setFirstTokenAddress(address?.toString());
+      setFirstTokenAddress(address?.toString() ?? "");
     } else if (kind === "second") {
-      setSecondTokenAddress(address?.toString());
+      setSecondTokenAddress(address?.toString() ?? "");
     }
   }, [setFirstTokenAddress, setSecondTokenAddress]);
 

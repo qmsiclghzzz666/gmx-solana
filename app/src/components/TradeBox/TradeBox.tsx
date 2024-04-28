@@ -38,6 +38,8 @@ const tradeModeLabels = {
 export function TradeBox({
   setPendingTxs,
 }: Prop) {
+  void setPendingTxs;
+
   const {
     tradeType,
     tradeMode,

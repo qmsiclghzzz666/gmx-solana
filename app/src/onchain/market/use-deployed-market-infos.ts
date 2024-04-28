@@ -74,7 +74,7 @@ export const useDeployedMarketInfos = () => {
           poolValueMax: getPoolUsdWithoutPnl(info, true, "maxPrice").add(getPoolUsdWithoutPnl(info, false, "maxPrice")),
         };
 
-        const marketToken = marketTokenMetadatas[key];
+        const marketToken = marketTokenMetadatas ? marketTokenMetadatas[key] : undefined;
 
         if (marketToken) {
           const stat = info2Stat(infos[key]);
