@@ -286,10 +286,13 @@ export function useTradeBoxState(
   );
 
   return {
+    fromTokenAddress,
+    toTokenAddress,
     tradeType,
     tradeMode,
     avaiableTokensOptions,
     availalbleTradeModes,
+    tradeFlags,
     setTradeType,
     setTradeMode,
     setTradeParams,

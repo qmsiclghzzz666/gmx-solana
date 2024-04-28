@@ -20,6 +20,8 @@ const parseToken = (address: string, token: TokenConfig) => {
     decimals: token.decimals,
     feedAddress: new PublicKey(token.feedAddress),
     isWrappedNative: tokenAddress.equals(WRAPPED_NATIVE_TOKEN_ADDRESS),
+    isStable: token.isStable,
+    priceDecimals: token.priceDecimals,
   } as Token;
 };
 
@@ -39,6 +41,7 @@ const parseDeployment = (deployment: GMSOLDeployment | null) => {
       marketTokens: deployment.market_tokens.map(token => new PublicKey(token)),
       tokens: parseTokens(deployment.tokens),
     };
+    console.debug("parsed deployment:", parsed);
     return parsed;
   }
 }

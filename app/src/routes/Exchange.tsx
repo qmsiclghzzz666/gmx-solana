@@ -4,6 +4,7 @@ import "./Exchange.css";
 import { Helmet } from "react-helmet-async";
 import { usePending } from "@/contexts/pending";
 import { useTradeParamsProcessor } from "@/onchain/trade/use-trade-params-processor";
+import { TVChart } from "@/components/TVChart/TVChart";
 
 export default function Exchange() {
   const { setPendingTxs } = usePending();
@@ -23,7 +24,40 @@ export default function Exchange() {
       </Helmet>
       <div className="Exchange-content">
         <div className="Exchange-left">
-
+          <TVChart />
+          <div className="Exchange-list large">
+            <div className="Exchange-list-tab-container">
+              {/* <Tab
+                options={tabOptions}
+                optionLabels={tabLabels}
+                option={listSection}
+                onChange={handleTabChange}
+                type="inline"
+                className="Exchange-list-tabs"
+              /> */}
+              {/* <div className="align-right Exchange-should-show-position-lines">
+                {listSection === ListSection.Orders && selectedOrdersKeysArr.length > 0 && (
+                  <button
+                    className="muted font-base cancel-order-btn"
+                    disabled={isCancelOrdersProcessig}
+                    type="button"
+                    onClick={onCancelOrdersClick}
+                  >
+                    <Plural value={selectedOrdersKeysArr.length} one="Cancel order" other="Cancel # orders" />
+                  </button>
+                )}
+                <Checkbox
+                  isChecked={shouldShowPositionLines}
+                  setIsChecked={setShouldShowPositionLines}
+                  className={cx("muted chart-positions", { active: shouldShowPositionLines })}
+                >
+                  <span>
+                    <Trans>Chart positions</Trans>
+                  </span>
+                </Checkbox>
+              </div> */}
+            </div>
+          </div>
         </div>
 
         <div className="Exchange-right">

@@ -1032,7 +1032,8 @@ table.Exchange-list-small td {
 
 .ExchangeChart-header {
   display: grid;
-  grid-template-columns: auto 116.32px;
+  /* For version switch */
+  /* grid-template-columns: auto 116.32px; */
   grid-column-gap: 1rem;
 }
 

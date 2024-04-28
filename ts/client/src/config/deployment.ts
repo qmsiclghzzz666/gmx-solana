@@ -13,4 +13,6 @@ export interface TokenConfig {
     symbol: string,
     decimals: number,
     feedAddress: string,
+    isStable?: boolean,
+    priceDecimals?: number,
 }

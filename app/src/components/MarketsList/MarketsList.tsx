@@ -78,6 +78,7 @@ function MarketsListMobile({ indexTokensStats }: { indexTokensStats: IndexTokenS
           const netFeePerHourLong = stats.bestNetFeeLong;
           const netFeePerHourShort = stats.bestNetFeeShort;
           const price = stats.token.prices ? getMidPrice(stats.token.prices) : undefined;
+          const priceDecimals = stats.token.priceDecimals;
 
           return (
             <div className="App-card" key={stats.token.symbol}>
@@ -100,7 +101,7 @@ function MarketsListMobile({ indexTokensStats }: { indexTokensStats: IndexTokenS
                   <div className="label">
                     <Trans>Price</Trans>
                   </div>
-                  <div>{formatUsd(price)}</div>
+                  <div>{formatUsd(price, { displayDecimals: priceDecimals })}</div>
                 </div>
                 <div className="App-card-row">
                   <div className="label">
