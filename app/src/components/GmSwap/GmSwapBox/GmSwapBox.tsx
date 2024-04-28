@@ -65,6 +65,7 @@ export function GmSwapBox({
     >
       <GmForm
         owner={owner}
+        tokensData={tokensData}
         genesisHash={chainId}
         tokenOptions={tokenOptions}
         isPending={isPending}

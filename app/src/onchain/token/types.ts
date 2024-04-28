@@ -46,10 +46,6 @@ export type TokenInfo = Token & {
   minPrice?: BN;
 };
 
-export interface InfoTokens {
-  [address: string]: TokenInfo,
-}
-
 export interface TokenBalances {
   [address: string]: BN | null,
 }

@@ -8,6 +8,7 @@ import { useAvailableTokenOptions } from "./use-available-token-options";
 import { mapValues, pick } from "lodash";
 import { getByKey } from "@/utils/objects";
 import { createTradeFlags } from "./utils";
+import { useSafeState } from "@/utils/state";
 
 const INITIAL_TRADE_OPTIONS: TradeOptions = {
   tradeType: TradeType.Long,
@@ -170,15 +171,14 @@ export function useTradeBoxState(
     tokens?: Tokens,
   },
 ) {
-
   const avaiableTokensOptions = useAvailableTokenOptions({ marketInfos, tokens });
   const [tradeOptions, setTradeOptions] = useTradeOptions(chainId, avaiableTokensOptions);
+  const [fromTokenInputValue, setFromTokenInputValue] = useSafeState("");
+  const [toTokenInputValue, setToTokenInputValue] = useSafeState("");
 
   const { swapTokens } = avaiableTokensOptions;
-
   const tradeType = tradeOptions.tradeType;
   const tradeMode = tradeOptions.tradeMode;
-
   const availalbleTradeModes = useMemo(() => {
     if (!tradeType) {
       return [];
@@ -189,12 +189,9 @@ export function useTradeBoxState(
       [TradeType.Swap]: [TradeMode.Market, TradeMode.Limit],
     }[tradeType];
   }, [tradeType]);
-
   const tradeFlags = useMemo(() => createTradeFlags(tradeType, tradeMode), [tradeType, tradeMode]);
   const { isSwap } = tradeFlags;
-
   const fromTokenAddress = tradeOptions.tokens.fromTokenAddress;
-
   const toTokenAddress = isSwap
     ? tradeOptions.tokens.swapTokenAddress
     : tradeOptions.tokens.indexTokenAddress;
@@ -311,14 +308,20 @@ export function useTradeBoxState(
 
   return {
     fromTokenAddress,
+    setFromTokenAddress,
     toTokenAddress,
-    tradeType,
-    tradeMode,
+    setToTokenAddress,
     avaiableTokensOptions,
     availalbleTradeModes,
     tradeFlags,
+    tradeType,
     setTradeType,
+    tradeMode,
     setTradeMode,
+    fromTokenInputValue,
+    setFromTokenInputValue,
+    toTokenInputValue,
+    setToTokenInputValue,
     setTradeParams,
   };
 }
