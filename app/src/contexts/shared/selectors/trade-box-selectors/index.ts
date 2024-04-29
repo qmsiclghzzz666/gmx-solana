@@ -9,3 +9,4 @@ export * from "./select-trade-box-choose-suitable-market";
 export * from "./select-trade-box-get-max-long-short-liquidity-pool";
 export * from "./select-trade-box-set-trade-params";
 export * from "./select-trade-box-set-to-token-address";
+export * from "./select-trade-box-trade-mode";

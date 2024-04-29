@@ -175,6 +175,8 @@ export function useTradeBoxState(
   const [tradeOptions, setTradeOptions] = useTradeOptions(chainId, avaiableTokensOptions);
   const [fromTokenInputValue, setFromTokenInputValue] = useSafeState("");
   const [toTokenInputValue, setToTokenInputValue] = useSafeState("");
+  const [triggerRatioInputValue, setTriggerRatioInputValue] = useSafeState("");
+  const [focusedInput, setFocusedInput] = useState<"from" | "to">();
 
   const { swapTokens } = avaiableTokensOptions;
   const tradeType = tradeOptions.tradeType;
@@ -195,6 +197,7 @@ export function useTradeBoxState(
   const toTokenAddress = isSwap
     ? tradeOptions.tokens.swapTokenAddress
     : tradeOptions.tokens.indexTokenAddress;
+  const collateralAddress = tradeOptions.collateralAddress;
 
   const setTradeType = useCallback((tradeType: TradeType) => {
     setTradeOptions((state) => {
@@ -339,6 +342,7 @@ export function useTradeBoxState(
     setFromTokenAddress,
     toTokenAddress,
     setToTokenAddress,
+    collateralAddress,
     avaiableTokensOptions,
     availalbleTradeModes,
     tradeFlags,
@@ -350,6 +354,10 @@ export function useTradeBoxState(
     setFromTokenInputValue,
     toTokenInputValue,
     setToTokenInputValue,
+    triggerRatioInputValue,
+    setTriggerRatioInputValue,
+    focusedInput,
+    setFocusedInput,
     setTradeParams,
     switchTokenAddresses,
   };

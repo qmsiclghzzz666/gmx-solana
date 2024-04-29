@@ -1,5 +1,6 @@
+import { BN } from "@coral-xyz/anchor";
 import { MarketInfo } from "../market";
-import { TokenData, Tokens } from "../token";
+import { Token, TokenData, Tokens } from "../token";
 import { useTradeBoxState } from "./use-trade-box-state"
 
 export enum TradeType {
@@ -66,3 +67,51 @@ export interface TradeFlags {
   isMarket: boolean;
   isLimit: boolean;
 }
+
+export type TokensRatio = {
+  ratio: BN;
+  largestToken: Token;
+  smallestToken: Token;
+};
+
+export type SwapStats = {
+  marketAddress: string;
+  tokenInAddress: string;
+  tokenOutAddress: string;
+  isWrap: boolean;
+  isUnwrap: boolean;
+  isOutLiquidity?: boolean;
+  swapFeeAmount: BN;
+  swapFeeUsd: BN;
+  priceImpactDeltaUsd: BN;
+  amountIn: BN;
+  amountInAfterFees: BN;
+  usdIn: BN;
+  amountOut: BN;
+  usdOut: BN;
+};
+
+export type SwapPathStats = {
+  swapPath: string[];
+  swapSteps: SwapStats[];
+  targetMarketAddress?: string;
+  totalSwapPriceImpactDeltaUsd: BN;
+  totalSwapFeeUsd: BN;
+  totalFeesDeltaUsd: BN;
+  tokenInAddress: string;
+  tokenOutAddress: string;
+  usdOut: BN;
+  amountOut: BN;
+};
+
+export type SwapAmounts = {
+  amountIn: BN;
+  usdIn: BN;
+  amountOut: BN;
+  usdOut: BN;
+  priceIn: BN;
+  priceOut: BN;
+  swapPathStats: SwapPathStats | undefined;
+  minOutputAmount: BN;
+  uiFeeUsd?: BN;
+};
