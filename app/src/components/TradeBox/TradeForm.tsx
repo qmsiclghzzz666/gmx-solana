@@ -15,6 +15,8 @@ import { selectFromToken, selectFromTokenInputValue, selectFromTokenUsd, selectS
 import TokenIcon from "../TokenIcon/TokenIcon";
 import { TradeType } from "@/onchain/trade";
 import { MarketSelector } from "../MarketSelector/MarketSelector";
+import Button from "../Button/Button";
+import { helperToast } from "@/utils/helperToast";
 
 const tradeTypeLabels = {
   [TradeType.Long]: t`Long`,
@@ -27,6 +29,7 @@ export function TradeForm() {
 
   const handleSubmit: FormEventHandler<HTMLFormElement> = useCallback((e) => {
     e.preventDefault();
+    helperToast.info("trading");
   }, []);
 
   return (
@@ -36,6 +39,17 @@ export function TradeForm() {
       {isSwap && isLimit && <TriggerRatioInput />}
       {isPosition && (isLimit || isTrigger) && <TriggerPriceInput />}
       <TradeInfo />
+      <div className="Exchange-swap-button-container">
+        <Button
+          variant="primary-action"
+          className="w-full"
+          // onClick={onSubmit}
+          type="submit"
+        // disabled={isSubmitButtonDisabled && !shouldDisableValidationForTesting}
+        >
+          {t`Trade`}
+        </Button>
+      </div>
     </form>
   );
 }
