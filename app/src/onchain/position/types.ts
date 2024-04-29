@@ -13,6 +13,10 @@ export interface Position {
   isOpening?: boolean,
 }
 
+export interface Positions {
+  [address: string]: Position,
+}
+
 export type PositionInfo = Position & {
   marketInfo: MarketInfo,
 };

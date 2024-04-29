@@ -1,4 +1,4 @@
-import { useDeployedMarketInfos } from "@/onchain/market";
+import { useDeployedInfos } from "@/onchain/utils";
 import { ReactNode, useMemo } from "react";
 import { SharedStates } from "./types";
 import { SharedStatesCtx } from ".";
@@ -7,7 +7,7 @@ import { useGenesisHash } from "@/onchain/utils";
 
 export function SharedStatesProvider({ children }: { children: ReactNode }) {
   const chainId = useGenesisHash();
-  const { marketInfos, tokens, marketTokens } = useDeployedMarketInfos();
+  const { marketInfos, tokens, marketTokens, positionInfos, isPositionsLoading } = useDeployedInfos();
   const tradeBox = useTradeBoxState(chainId, { marketInfos, tokens });
 
   const state = useMemo(() => {
@@ -19,9 +19,13 @@ export function SharedStatesProvider({ children }: { children: ReactNode }) {
         marketTokens,
       },
       tradeBox,
+      position: {
+        isLoading: isPositionsLoading,
+        positionInfos,
+      }
     };
     return state;
-  }, [chainId, marketInfos, tokens, marketTokens, tradeBox]);
+  }, [chainId, marketInfos, tokens, marketTokens, tradeBox, isPositionsLoading, positionInfos]);
   return (
     <SharedStatesCtx.Provider value={state}>
       {children}

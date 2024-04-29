@@ -1,15 +1,16 @@
 import { GMSOL_DEPLOYMENT } from "@/config/deployment";
-import { useDeployedMarkets } from "./use-deployed-markets";
+import { useDeployedMarkets } from "../market/use-deployed-markets";
 import { useMemo } from "react";
 import { TokenMap, Tokens, useTokenBalances, useTokenMetadatas, useTokensWithPrices } from "../token";
-import { MarketInfos, getPoolUsdWithoutPnl } from ".";
+import { MarketInfos, getPoolUsdWithoutPnl } from "../market";
 import { getMarketIndexName, getMarketPoolName } from "@/components/MarketsList/utils";
 import { info2Stat } from "@/contexts/shared";
 import { ONE_USD } from "@/config/constants";
 import { getUnit } from "@/utils/number";
 import { NATIVE_TOKEN_ADDRESS } from "@/config/tokens";
+import { PositionInfos, usePositions } from "../position";
 
-export const useDeployedMarketInfos = () => {
+export const useDeployedInfos = () => {
   const markets = useDeployedMarkets();
 
   const tokenMap = useMemo(() => {
@@ -43,6 +44,8 @@ export const useDeployedMarketInfos = () => {
 
   const marketTokenMetadatas = useTokenMetadatas(marketTokenAddresses);
   const marketTokenBalances = useTokenBalances(marketTokenAddresses);
+
+  const { positions, isLoading: isPositionsLoading } = usePositions(GMSOL_DEPLOYMENT ? { store: GMSOL_DEPLOYMENT.store, markets: Object.values(markets) } : undefined);
 
   return useMemo(() => {
     const infos: MarketInfos = {};
@@ -97,10 +100,22 @@ export const useDeployedMarketInfos = () => {
     for (const key in tokens) {
       tokens[key].balance = tokenBalances[key];
     }
+
+    const positionInfos: PositionInfos = {};
+    for (const key in positions) {
+      const position = positions[key];
+      positionInfos[key] = {
+        ...position,
+        marketInfo: infos[position.marketTokenAddress.toBase58()],
+      };
+    }
+
     return {
       marketInfos: infos,
       tokens: tokens,
       marketTokens,
+      positionInfos,
+      isPositionsLoading,
     };
-  }, [markets, tokens, marketTokenMetadatas, marketTokenBalances, tokenBalances]);
+  }, [tokens, isPositionsLoading, markets, marketTokenMetadatas, marketTokenBalances, tokenBalances, positions]);
 };

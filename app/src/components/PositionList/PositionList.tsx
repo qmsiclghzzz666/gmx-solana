@@ -2,6 +2,8 @@ import { PositionInfo } from "@/onchain/position";
 import { TradeMode } from "@/onchain/trade";
 import { Trans, t } from "@lingui/macro";
 import { PositionItem } from "./PositionItem";
+import { useSharedStatesSelector } from "@/contexts/shared";
+import { selectIsPositionLoading, selectPositionList } from "@/contexts/shared/selectors/position_selectors";
 
 type Props = {
   onSelectPositionClick: (key: string, tradeMode?: TradeMode) => void;
@@ -13,11 +15,11 @@ type Props = {
 };
 
 function usePositions(): PositionInfo[] {
-  return [];
+  return useSharedStatesSelector(selectPositionList);
 }
 
 function useIsPositionLoading(): boolean {
-  return true;
+  return useSharedStatesSelector(selectIsPositionLoading);
 }
 
 export function PositionList({

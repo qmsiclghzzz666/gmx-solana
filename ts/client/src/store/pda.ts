@@ -5,6 +5,8 @@ import { keyToSeed } from "../utils/seed";
 
 const encodeUtf8 = utils.bytes.utf8.encode;
 
+export const POSITION_SEED = encodeUtf8("position");
+
 export const findRolesPDA = (store: PublicKey, authority: PublicKey) => PublicKey.findProgramAddressSync([
     encodeUtf8("roles"),
     store.toBytes(),
@@ -41,4 +43,13 @@ export const findWithdrawalPDA = (store: PublicKey, user: PublicKey, nonce: Uint
     store.toBytes(),
     user.toBytes(),
     nonce,
+], DATA_STORE_ID);
+
+export const findPositionPDA = (store: PublicKey, user: PublicKey, marketToken: PublicKey, collateralToken: PublicKey, isLong: boolean) => PublicKey.findProgramAddressSync([
+    POSITION_SEED,
+    store.toBytes(),
+    user.toBytes(),
+    marketToken.toBytes(),
+    collateralToken.toBytes(),
+    new Uint8Array([isLong ? 1 : 2]),
 ], DATA_STORE_ID);

@@ -2,11 +2,16 @@ import { BN } from "@coral-xyz/anchor";
 import { MarketInfo, MarketInfos } from "@/onchain/market";
 import { TokenData, Tokens } from "@/onchain/token";
 import { TradeBoxState } from "@/onchain/trade";
+import { PositionInfos } from "@/onchain/position";
 
 export interface SharedStates {
   chainId?: string,
   market: MarketState,
   tradeBox: TradeBoxState,
+  position: {
+    isLoading: boolean,
+    positionInfos: PositionInfos,
+  }
 }
 
 export interface MarketState {
