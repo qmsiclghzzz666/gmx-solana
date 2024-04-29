@@ -21,7 +21,7 @@ export interface TradeOptions {
   tokens: {
     indexTokenAddress?: string,
     fromTokenAddress?: string,
-    swapTokenAddress?: string,
+    swapToTokenAddress?: string,
   }
   markets: {
     [marketTokenAddress: string]: {

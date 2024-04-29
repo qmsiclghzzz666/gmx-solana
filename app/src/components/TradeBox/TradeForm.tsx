@@ -1,5 +1,5 @@
 import { useSharedStatesSelector } from "@/contexts/shared";
-import { selectTradeBoxSetFromTokenAddress, selectTradeBoxSetToTokenAddress, selectTradeBoxTradeFlags } from "@/contexts/shared/selectors/trade-box-selectors";
+import { selectTradeBoxChooseSuitableMarket, selectTradeBoxSetFromTokenAddress, selectTradeBoxTradeFlags } from "@/contexts/shared/selectors/trade-box-selectors";
 import { ChangeEvent, FormEventHandler, useCallback } from "react";
 import BuyInputSection from "../BuyInputSection/BuyInputSection";
 import { t } from "@lingui/macro";
@@ -43,8 +43,8 @@ function TokenInputs({ isSwap, isIncrease }: { isSwap: boolean, isIncrease: bool
   const setFromTokenInputValueRaw = useSharedStatesSelector(selectSetFromTokenInputValue);
   const setToTokenInputValueRaw = useSharedStatesSelector(selectSetToTokenInputValue);
   const setFromTokenAddress = useSharedStatesSelector(selectTradeBoxSetFromTokenAddress);
-  const setToTokenAddress = useSharedStatesSelector(selectTradeBoxSetToTokenAddress);
   const switchTokenAddresses = useSharedStatesSelector(selectSwitchTokenAddresses);
+  const chooseSuitableMarket = useSharedStatesSelector(selectTradeBoxChooseSuitableMarket);
 
   const setFromTokenInputValue = useCallback((value: string, shouldResetPriceImpactWarning: boolean) => {
     setFromTokenInputValueRaw(value);
@@ -75,8 +75,8 @@ function TokenInputs({ isSwap, isIncrease }: { isSwap: boolean, isIncrease: bool
   }, [setFromTokenAddress]);
 
   const handleSelectToToken = useCallback((token: Token) => {
-    setToTokenAddress(token.address.toBase58());
-  }, [setToTokenAddress]);
+    chooseSuitableMarket(token.address.toBase58());
+  }, [chooseSuitableMarket]);
 
   const hanldeSwitchTokens = useCallback(() => {
     switchTokenAddresses();
