@@ -11,6 +11,7 @@ import { t } from "@lingui/macro";
 import { useLocalStorageSerializeKey } from "@/utils/localStorage";
 import { getSyntheticsListSectionKey } from "@/config/localStorage";
 import { useChainId } from "@/contexts/shared";
+import { PositionList } from "@/components/PositionList/PositionList";
 
 enum ListSection {
   Positions = "Positions",
@@ -42,6 +43,11 @@ export default function Exchange() {
   const tabOptions = useMemo(() => Object.keys(ListSection).map(section => section as ListSection), []);
 
   const handleTabChange = useCallback((section: ListSection) => setListSection(section), [setListSection]);
+  const handlePositionListOrdersClick = useCallback(() => { }, []);
+  const handleSettlePositionFeesClick = useCallback(() => { }, []);
+  const handleSelectPositionClick = useCallback(() => { }, []);
+  const hanldeClosePositionClick = useCallback(() => { }, []);
+  const openSettings = useCallback(() => { }, []);
 
   useTradeParamsProcessor();
 
@@ -91,6 +97,15 @@ export default function Exchange() {
                 </Checkbox>
               </div> */}
             </div>
+            {listSection === ListSection.Positions && (
+              <PositionList
+                onOrdersClick={handlePositionListOrdersClick}
+                onSettlePositionFeesClick={handleSettlePositionFeesClick}
+                onSelectPositionClick={handleSelectPositionClick}
+                onClosePositionClick={hanldeClosePositionClick}
+                openSettings={openSettings}
+              />
+            )}
           </div>
         </div>
 

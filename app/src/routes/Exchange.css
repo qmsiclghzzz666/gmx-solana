@@ -31,7 +31,7 @@
 }
 
 .Exchange-empty-positions-list-note.small {
-  display: none;
+  display: none !important;
 }
 
 .position-loading-icon {
