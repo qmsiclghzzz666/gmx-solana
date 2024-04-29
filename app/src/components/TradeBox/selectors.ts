@@ -30,6 +30,7 @@ export const selectSwapTokens = createSharedStatesSelector([selectTradeBoxAvaila
 export const selectSortedLongAndShortTokens = createSharedStatesSelector([selectTradeBoxAvailableTokensOptions], options => options.sortedLongAndShortTokens);
 export const selectSwitchTokenAddresses = createSharedStatesSelector([selectTradeBoxState], state => state.switchTokenAddresses);
 export const selectTriggerRatioValue = createSharedStatesSelector([selectTriggerRatioInputValue], value => parseValue(value, USD_DECIMALS));
+export const selectSortedAllMarkets = createSharedStatesSelector([selectTradeBoxAvailableTokensOptions], options => options.sortedAllMarkets);
 
 export const selectMarkPrice = createSharedStatesSelector([
   selectTradeBoxTradeFlags,

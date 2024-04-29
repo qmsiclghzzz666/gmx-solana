@@ -1,5 +1,5 @@
 import { useSharedStatesSelector } from "@/contexts/shared";
-import { selectTradeBoxChooseSuitableMarket, selectTradeBoxSetFromTokenAddress, selectTradeBoxTradeFlags } from "@/contexts/shared/selectors/trade-box-selectors";
+import { selectTradeBoxChooseSuitableMarket, selectTradeBoxSetFromTokenAddress, selectTradeBoxTradeFlags, selectTradeBoxTradeType } from "@/contexts/shared/selectors/trade-box-selectors";
 import { ChangeEvent, FormEventHandler, useCallback } from "react";
 import BuyInputSection from "../BuyInputSection/BuyInputSection";
 import { t } from "@lingui/macro";
@@ -8,10 +8,19 @@ import { Token } from "@/onchain/token";
 import { formatTokenAmount } from "@/utils/number";
 import { selectMarketStateTokens } from "@/contexts/shared/selectors/market-selectors";
 import { BN_ZERO } from "@/config/constants";
-import { formatUsd } from "../MarketsList/utils";
+import { formatUsd, getMarketIndexName } from "../MarketsList/utils";
 import { IoMdSwap } from "react-icons/io";
 
-import { selectFromToken, selectFromTokenInputValue, selectFromTokenUsd, selectSetFromTokenInputValue, selectSetToTokenInputValue, selectSortedLongAndShortTokens, selectSwapTokens, selectSwitchTokenAddresses, selectToToken, selectToTokenInputValue } from "./selectors";
+import { selectFromToken, selectFromTokenInputValue, selectFromTokenUsd, selectSetFromTokenInputValue, selectSetToTokenInputValue, selectSortedAllMarkets, selectSortedLongAndShortTokens, selectSwapTokens, selectSwitchTokenAddresses, selectToToken, selectToTokenInputValue } from "./selectors";
+import TokenIcon from "../TokenIcon/TokenIcon";
+import { TradeType } from "@/onchain/trade";
+import { MarketSelector } from "../MarketSelector/MarketSelector";
+
+const tradeTypeLabels = {
+  [TradeType.Long]: t`Long`,
+  [TradeType.Short]: t`Short`,
+  [TradeType.Swap]: t`Swap`,
+};
 
 export function TradeForm() {
   const { isSwap, isIncrease, isPosition, isLimit, isTrigger } = useSharedStatesSelector(selectTradeBoxTradeFlags);
@@ -32,6 +41,7 @@ export function TradeForm() {
 }
 
 function TokenInputs({ isSwap, isIncrease }: { isSwap: boolean, isIncrease: boolean }) {
+  const tradeType = useSharedStatesSelector(selectTradeBoxTradeType);
   const fromToken = useSharedStatesSelector(selectFromToken);
   const toToken = useSharedStatesSelector(selectToToken);
   const fromUsd = useSharedStatesSelector(selectFromTokenUsd);
@@ -40,6 +50,7 @@ function TokenInputs({ isSwap, isIncrease }: { isSwap: boolean, isIncrease: bool
   const swapTokens = useSharedStatesSelector(selectSwapTokens);
   const tokens = useSharedStatesSelector(selectMarketStateTokens);
   const sortedLongAndShortTokens = useSharedStatesSelector(selectSortedLongAndShortTokens);
+  const sortedAllMarkets = useSharedStatesSelector(selectSortedAllMarkets);
   const setFromTokenInputValueRaw = useSharedStatesSelector(selectSetFromTokenInputValue);
   const setToTokenInputValueRaw = useSharedStatesSelector(selectSetToTokenInputValue);
   const setFromTokenAddress = useSharedStatesSelector(selectTradeBoxSetFromTokenAddress);
@@ -156,23 +167,23 @@ function TokenInputs({ isSwap, isIncrease }: { isSwap: boolean, isIncrease: bool
         </BuyInputSection>
       )}
 
-      {/* {isIncrease && (
+      {isIncrease && (
         <BuyInputSection
-          topLeftLabel={tradeTypeLabels[tradeType!]}
-          topLeftValue={
-            increaseAmounts?.sizeDeltaUsd.gt(0)
-              ? formatUsd(increaseAmounts?.sizeDeltaUsd, { fallbackToZero: true })
-              : ""
-          }
+          topLeftLabel={tradeTypeLabels[tradeType]}
+          // topLeftValue={
+          //   increaseAmounts?.sizeDeltaUsd.gt(0)
+          //     ? formatUsd(increaseAmounts?.sizeDeltaUsd, { fallbackToZero: true })
+          //     : ""
+          // }
           topRightLabel={t`Leverage`}
-          topRightValue={formatLeverage(isLeverageEnabled ? leverage : increaseAmounts?.estimatedLeverage) || "-"}
+          // topRightValue={formatLeverage(isLeverageEnabled ? leverage : increaseAmounts?.estimatedLeverage) || "-"}
           inputValue={toTokenInputValue}
           onInputValueChange={handleToInputTokenChange}
           showMaxButton={false}
         >
-          {toTokenAddress && (
+          {toToken && (
             <MarketSelector
-              label={tradeTypeLabels[tradeType!]}
+              label={tradeTypeLabels[tradeType]}
               selectedIndexName={toToken ? getMarketIndexName({ indexToken: toToken, isSpotOnly: false }) : undefined}
               selectedMarketLabel={
                 toToken && (
@@ -184,13 +195,13 @@ function TokenInputs({ isSwap, isIncrease }: { isSwap: boolean, isIncrease: bool
                   </>
                 )
               }
-              markets={sortedAllMarkets ?? EMPTY_ARRAY}
+              markets={sortedAllMarkets ?? []}
               isSideMenu
-              onSelectMarket={(_indexName, marketInfo) => onSelectToTokenAddress(marketInfo.indexToken.address)}
+              onSelectMarket={(_indexName, marketInfo) => handleSelectToToken(marketInfo.indexToken)}
             />
           )}
         </BuyInputSection>
-      )} */}
+      )}
     </>
   );
 }
