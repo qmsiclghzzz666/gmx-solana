@@ -1,6 +1,6 @@
 
 import { selectTradeBoxAvailableTokensOptions, selectTradeBoxFromTokenAddress, selectTradeBoxState, selectTradeBoxToTokenAddress, selectTradeBoxTradeFlags } from "@/contexts/shared/selectors/trade-box-selectors";
-import { Token, TokenData, TokenPrices, getTokenData } from "@/onchain/token";
+import { Token, TokenData, getTokenData } from "@/onchain/token";
 import { convertToUsd, parseValue } from "@/utils/number";
 import { createSharedStatesSelector } from "@/contexts/shared/utils";
 import { selectMarketStateMarketInfos, selectMarketStateTokens } from "@/contexts/shared/selectors/market-selectors";
@@ -8,6 +8,7 @@ import { BN_ZERO, ONE_USD, USD_DECIMALS } from "@/config/constants";
 import { BN } from "@coral-xyz/anchor";
 import { selectTradeBoxCollateralTokenAddress } from "@/contexts/shared/selectors/trade-box-selectors/select-trade-box-collateral-token-address";
 import { TokensRatio } from "@/onchain/trade";
+import { getMarkPrice } from "@/utils/price";
 
 const parseAmount = (value: string, token?: Token) => (token ? parseValue(value || "0", token.decimals) : BN_ZERO) ?? BN_ZERO;
 const calcUsd = (amount: BN, token?: TokenData) => convertToUsd(amount, token?.decimals, token?.prices.minPrice);
@@ -138,23 +139,6 @@ export const selectSwapRoutes = createSharedStatesSelector([
 //     });
 //   }
 // });
-
-function getShouldUseMaxPrice(isIncrease: boolean, isLong: boolean) {
-  return isIncrease ? isLong : !isLong;
-}
-
-function getMarkPrice({
-  prices,
-  isIncrease,
-  isLong,
-}: {
-  prices: TokenPrices,
-  isIncrease: boolean,
-  isLong: boolean,
-}) {
-  const shouldUseMaxPrice = getShouldUseMaxPrice(isIncrease, isLong);
-  return shouldUseMaxPrice ? prices.maxPrice : prices.minPrice;
-}
 
 function getTokensRatioByPrice(p: {
   fromToken: TokenData;

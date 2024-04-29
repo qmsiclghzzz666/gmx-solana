@@ -1,5 +1,5 @@
 import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useState } from "react";
-import { AvailableTokenOptions, TradeMode, TradeOptions, TradeParams, TradeType } from "./types";
+import { AvailableTokenOptions, TradeFlags, TradeMode, TradeOptions, TradeParams, TradeType } from "./types";
 import { useLocalStorageSerializeKey } from "@/utils/localStorage";
 import { getSyntheticsTradeOptionsKey } from "@/config/localStorage";
 import { MarketInfos } from "../market";
@@ -193,11 +193,7 @@ export function useTradeBoxState(
   }, [tradeType]);
   const tradeFlags = useMemo(() => createTradeFlags(tradeType, tradeMode), [tradeType, tradeMode]);
   const { isSwap } = tradeFlags;
-  const fromTokenAddress = tradeOptions.tokens.fromTokenAddress;
-  const toTokenAddress = isSwap
-    ? tradeOptions.tokens.swapToTokenAddress
-    : tradeOptions.tokens.indexTokenAddress;
-  const collateralAddress = tradeOptions.collateralAddress;
+  const { fromTokenAddress, toTokenAddress, collateralAddress, marketAddress } = getAddresses(tradeFlags, tradeOptions);
 
   const setTradeType = useCallback((tradeType: TradeType) => {
     setTradeOptions((state) => {
@@ -338,6 +334,7 @@ export function useTradeBoxState(
   );
 
   return {
+    marketAddress,
     fromTokenAddress,
     setFromTokenAddress,
     toTokenAddress,
@@ -395,4 +392,22 @@ function setToTokenAddressUpdaterBuilder(
 
     return newState;
   };
+}
+
+function getAddresses({ isSwap, isLong }: { isSwap: boolean, isLong: boolean }, tradeOptions: TradeOptions) {
+  const fromTokenAddress = tradeOptions.tokens.fromTokenAddress;
+  const toTokenAddress = isSwap
+    ? tradeOptions.tokens.swapToTokenAddress
+    : tradeOptions.tokens.indexTokenAddress;
+  const collateralAddress = tradeOptions.collateralAddress;
+  const marketAddress = toTokenAddress
+    ? tradeOptions?.markets[toTokenAddress]?.[isLong ? "longTokenAddress" : "shortTokenAddress"]
+    : undefined;
+
+  return {
+    fromTokenAddress,
+    toTokenAddress,
+    collateralAddress,
+    marketAddress,
+  }
 }

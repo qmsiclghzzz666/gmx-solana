@@ -1,6 +1,7 @@
 import { BN } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
 import { MarketInfo } from "../market";
+import { TokenData } from "../token";
 
 export interface Position {
   address: PublicKey,
@@ -10,6 +11,7 @@ export interface Position {
   isLong: boolean,
   sizeInUsd: BN,
   sizeInTokens: BN,
+  collateralAmount: BN,
   isOpening?: boolean,
 }
 
@@ -19,6 +21,15 @@ export interface Positions {
 
 export type PositionInfo = Position & {
   marketInfo: MarketInfo,
+  collateralToken?: TokenData,
+  entryPrice?: BN,
+  markPrice?: BN,
+  remainingCollateralUsd?: BN,
+  remainingCollateralAmount?: BN,
+  netValue?: BN,
+  leverage?: BN,
+  pnl?: BN,
+  pnlPercentage?: BN,
 };
 
 export interface PositionInfos {

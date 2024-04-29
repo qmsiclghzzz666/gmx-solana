@@ -7,7 +7,15 @@ import { useGenesisHash } from "@/onchain/utils";
 
 export function SharedStatesProvider({ children }: { children: ReactNode }) {
   const chainId = useGenesisHash();
-  const { marketInfos, tokens, marketTokens, positionInfos, isPositionsLoading } = useDeployedInfos();
+  const {
+    marketInfos,
+    tokens,
+    marketTokens,
+    positionInfos,
+    isPositionsLoading,
+    isMarketLoading,
+    isMarketTokenLoading,
+  } = useDeployedInfos();
   const tradeBox = useTradeBoxState(chainId, { marketInfos, tokens });
 
   const state = useMemo(() => {
@@ -20,12 +28,12 @@ export function SharedStatesProvider({ children }: { children: ReactNode }) {
       },
       tradeBox,
       position: {
-        isLoading: isPositionsLoading,
+        isLoading: isPositionsLoading || isMarketLoading || isMarketTokenLoading,
         positionInfos,
       }
     };
     return state;
-  }, [chainId, marketInfos, tokens, marketTokens, tradeBox, isPositionsLoading, positionInfos]);
+  }, [chainId, marketInfos, tokens, marketTokens, tradeBox, isPositionsLoading, isMarketLoading, isMarketTokenLoading, positionInfos]);
   return (
     <SharedStatesCtx.Provider value={state}>
       {children}

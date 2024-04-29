@@ -1,17 +1,19 @@
 import { GMSOL_DEPLOYMENT } from "@/config/deployment";
 import { useDeployedMarkets } from "../market/use-deployed-markets";
 import { useMemo } from "react";
-import { TokenMap, Tokens, useTokenBalances, useTokenMetadatas, useTokensWithPrices } from "../token";
+import { TokenMap, Tokens, convertToTokenAmount, useTokenBalances, useTokenMetadatas, useTokensWithPrices } from "../token";
 import { MarketInfos, getPoolUsdWithoutPnl } from "../market";
 import { getMarketIndexName, getMarketPoolName } from "@/components/MarketsList/utils";
 import { info2Stat } from "@/contexts/shared";
-import { ONE_USD } from "@/config/constants";
-import { getUnit } from "@/utils/number";
+import { BN_ZERO, ONE_USD } from "@/config/constants";
+import { convertToUsd, getBasisPoints, getUnit } from "@/utils/number";
 import { NATIVE_TOKEN_ADDRESS } from "@/config/tokens";
-import { PositionInfos, usePositions } from "../position";
+import { PositionInfos, getEntryPrice, getLeverage, getPositionNetValue, getPositionPnlUsd, usePositions } from "../position";
+import { getMarkPrice } from "@/utils/price";
+import { getByKey } from "@/utils/objects";
 
 export const useDeployedInfos = () => {
-  const markets = useDeployedMarkets();
+  const { markets, isLoading: isMarketLoading } = useDeployedMarkets();
 
   const tokenMap = useMemo(() => {
     const tokenMap: TokenMap = {};
@@ -42,7 +44,7 @@ export const useDeployedInfos = () => {
     return Object.values(markets).map(market => market.marketTokenAddress);
   }, [markets]);
 
-  const marketTokenMetadatas = useTokenMetadatas(marketTokenAddresses);
+  const { tokenMetadatas: marketTokenMetadatas, isLoading: isMarketTokenLoading } = useTokenMetadatas(marketTokenAddresses);
   const marketTokenBalances = useTokenBalances(marketTokenAddresses);
 
   const { positions, isLoading: isPositionsLoading } = usePositions(GMSOL_DEPLOYMENT ? { store: GMSOL_DEPLOYMENT.store, markets: Object.values(markets) } : undefined);
@@ -102,12 +104,61 @@ export const useDeployedInfos = () => {
     }
 
     const positionInfos: PositionInfos = {};
+    let isPositionInfosLoading = false;
     for (const key in positions) {
       const position = positions[key];
-      positionInfos[key] = {
-        ...position,
-        marketInfo: infos[position.marketTokenAddress.toBase58()],
-      };
+      const info = infos[position.marketTokenAddress.toBase58()];
+      const collateralToken = getByKey(tokens, position.collateralTokenAddress.toBase58());
+      const collateralMinPrice = collateralToken?.prices.minPrice;
+      if (info && collateralToken) {
+        const collateralUsd = convertToUsd(position.collateralAmount, collateralToken?.decimals, collateralMinPrice);
+        const remainingCollateralUsd = collateralUsd;
+        const remainingCollateralAmount = convertToTokenAmount(
+          remainingCollateralUsd,
+          collateralToken.decimals,
+          collateralMinPrice
+        )!;
+        const markPrice = getMarkPrice({ prices: info.indexToken.prices, isLong: position.isLong, isIncrease: false });
+        const pnl = getPositionPnlUsd({
+          marketInfo: info,
+          sizeInUsd: position.sizeInUsd,
+          sizeInTokens: position.sizeInTokens,
+          markPrice,
+          isLong: position.isLong,
+        });
+        const pnlPercentage =
+          collateralUsd && !collateralUsd.eq(BN_ZERO) ? getBasisPoints(pnl, collateralUsd) : BN_ZERO;
+        const leverage = getLeverage({
+          sizeInUsd: position.sizeInUsd,
+          collateralUsd: collateralUsd ?? BN_ZERO,
+          // pnl: showPnlInLeverage ? pnl : undefined,
+          pnl,
+          pendingBorrowingFeesUsd: BN_ZERO,
+          pendingFundingFeesUsd: BN_ZERO,
+        });
+        positionInfos[key] = {
+          ...position,
+          marketInfo: info,
+          collateralToken,
+          markPrice,
+          entryPrice: getEntryPrice({ sizeInTokens: position.sizeInTokens, sizeInUsd: position.sizeInUsd, indexToken: info.indexToken }),
+          remainingCollateralUsd,
+          remainingCollateralAmount,
+          netValue: getPositionNetValue({
+            collateralUsd: collateralUsd ?? BN_ZERO,
+            pnl,
+            pendingBorrowingFeesUsd: BN_ZERO,
+            pendingFundingFeesUsd: BN_ZERO,
+            closingFeeUsd: BN_ZERO,
+            uiFeeUsd: BN_ZERO,
+          }),
+          leverage,
+          pnl,
+          pnlPercentage,
+        };
+      } else {
+        isPositionInfosLoading = true;
+      }
     }
 
     return {
@@ -115,7 +166,9 @@ export const useDeployedInfos = () => {
       tokens: tokens,
       marketTokens,
       positionInfos,
-      isPositionsLoading,
+      isPositionsLoading: isPositionsLoading || isPositionInfosLoading,
+      isMarketLoading,
+      isMarketTokenLoading,
     };
-  }, [tokens, isPositionsLoading, markets, marketTokenMetadatas, marketTokenBalances, tokenBalances, positions]);
+  }, [tokens, isPositionsLoading, isMarketLoading, isMarketTokenLoading, markets, marketTokenMetadatas, marketTokenBalances, tokenBalances, positions]);
 };

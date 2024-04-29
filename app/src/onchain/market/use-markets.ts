@@ -21,7 +21,7 @@ export const useMarkets = (params?: { store: PublicKey, marketTokens: PublicKey[
     } : null;
   }, [params]);
 
-  const { data } = useSWR(request, async ({ marketAddresses }) => {
+  const { data, isLoading } = useSWR(request, async ({ marketAddresses }) => {
     const data = await dataStore.account.market.fetchMultiple(marketAddresses);
     const markets = (data ?? []).map(market => {
       if (market) {
@@ -48,7 +48,10 @@ export const useMarkets = (params?: { store: PublicKey, marketTokens: PublicKey[
     }, {} as Markets);
   });
 
-  return data ?? {};
+  return {
+    markets: data ?? {},
+    isLoading,
+  };
 };
 
 export const fitlerMarkets = (value: unknown) => {

@@ -1,5 +1,6 @@
-import { formatAmount, formatUsd, limitDecimals, toFixedDecimal } from "@/components/MarketsList/utils";
-import { BN_ZERO } from "@/config/constants";
+import { formatAmount, formatUsd, getPlusOrMinusSymbol, limitDecimals, toFixedDecimal } from "@/components/MarketsList/utils";
+import { BN_ZERO, USD_DECIMALS } from "@/config/constants";
+import { BASIS_POINTS_DIVISOR } from "@/config/factors";
 import { TRIGGER_PREFIX_ABOVE, TRIGGER_PREFIX_BELOW } from "@/config/ui";
 import { BN } from "@coral-xyz/anchor";
 
@@ -198,4 +199,56 @@ export function bnClampMin(value: BN, min: BN) {
 
 export function toBigInt(amount: BN) {
   return BigInt(amount.toString());
+}
+
+export function getBasisPoints(numerator: BN, denominator: BN, shouldRoundUp = false) {
+  const result = numerator.muln(BASIS_POINTS_DIVISOR).div(denominator);
+
+  if (shouldRoundUp) {
+    const remainder = numerator.muln(BASIS_POINTS_DIVISOR).mod(denominator);
+    if (!remainder.isZero()) {
+      return result.isNeg() ? result.subn(1) : result.addn(1);
+    }
+  }
+
+  return result;
+}
+
+export function formatDeltaUsd(
+  deltaUsd?: BN,
+  percentage?: BN,
+  opts: { fallbackToZero?: boolean; showPlusForZero?: boolean } = {}
+) {
+  if (!deltaUsd) {
+    if (opts.fallbackToZero) {
+      return `${formatUsd(BN_ZERO)} (${formatAmount(BN_ZERO, 2, 2)}%)`;
+    }
+
+    return undefined;
+  }
+
+  const sign = getPlusOrMinusSymbol(deltaUsd, { showPlusForZero: opts.showPlusForZero });
+
+  const exceedingInfo = getLimitedDisplay(deltaUsd, USD_DECIMALS);
+  const percentageStr = percentage ? ` (${sign}${formatPercentage(percentage.abs())})` : "";
+  const deltaUsdStr = formatAmount(exceedingInfo.value, USD_DECIMALS, 2, true);
+  const symbol = exceedingInfo.symbol ? `${exceedingInfo.symbol} ` : "";
+
+  return `${symbol}${sign}$${deltaUsdStr}${percentageStr}`;
+}
+
+export function formatPercentage(percentage?: BN, opts: { fallbackToZero?: boolean; signed?: boolean } = {}) {
+  const { fallbackToZero = false, signed = false } = opts;
+
+  if (!percentage) {
+    if (fallbackToZero) {
+      return `${formatAmount(BN_ZERO, 2, 2)}%`;
+    }
+
+    return undefined;
+  }
+
+  const sign = signed ? getPlusOrMinusSymbol(percentage) : "";
+
+  return `${sign}${formatAmount(percentage.abs(), 2, 2)}%`;
 }

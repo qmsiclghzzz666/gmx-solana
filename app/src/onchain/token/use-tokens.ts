@@ -64,7 +64,7 @@ export const useTokenMetadatas = (tokens: PublicKey[]) => {
     };
   }, [tokens]);
 
-  const { data } = useSWR(request, async ({ tokens }) => {
+  const { data, isLoading } = useSWR(request, async ({ tokens }) => {
     const tokenDatas: TokenMetadatas = {};
 
     for (const addressStr of tokens) {
@@ -79,7 +79,10 @@ export const useTokenMetadatas = (tokens: PublicKey[]) => {
     return tokenDatas;
   });
 
-  return data;
+  return {
+    tokenMetadatas: data ?? {},
+    isLoading,
+  };
 };
 
 export const useTokenBalances = (tokens: Address[]) => {
