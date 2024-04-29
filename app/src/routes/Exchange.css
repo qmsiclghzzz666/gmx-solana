@@ -256,7 +256,8 @@
 
 .ExchangeChart {
   position: relative;
-  height: 49.6rem;
+  /* FIXME: re-enable this when chart is ready */
+  /* height: 49.6rem; */
 }
 
 .ExchangeChart-main-price {
@@ -1085,9 +1086,10 @@ table.Exchange-list-small td {
     display: block;
   }
 
-  .ExchangeChart-header {
+  /* For version switch */
+  /* .ExchangeChart-header {
     grid-template-columns: auto 103px;
-  }
+  } */
 
   .VersionSwitch-wrapper {
     padding: 1rem;
@@ -1133,9 +1135,10 @@ table.Exchange-list-small td {
     display: none;
   }
 
-  .ExchangeChart {
+  /* FIXME: re-enable this when chart is ready */
+  /* .ExchangeChart {
     height: 38.75rem;
-  }
+  } */
 
   .Exchange-content {
     grid-template-columns: 1fr;
