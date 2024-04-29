@@ -277,6 +277,34 @@ export function useTradeBoxState(
     [setTradeOptions]
   );
 
+  const switchTokenAddresses = useCallback(() => {
+    setTradeOptions((oldState) => {
+      const isSwap = oldState?.tradeType === TradeType.Swap;
+      const fromTokenAddress = oldState?.tokens.fromTokenAddress;
+      const toTokenAddress = oldState?.tokens.indexTokenAddress;
+
+      if (isSwap) {
+        return {
+          ...oldState,
+          tokens: {
+            ...oldState.tokens,
+            fromTokenAddress: toTokenAddress,
+            swapToTokenAddress: fromTokenAddress,
+          },
+        };
+      }
+
+      return {
+        ...oldState,
+        tokens: {
+          ...oldState.tokens,
+          fromTokenAddress: toTokenAddress,
+          indexTokenAddress: fromTokenAddress,
+        },
+      };
+    });
+  }, [setTradeOptions]);
+
   // Update Trade Mode.
   useEffect(() => {
     if (!availalbleTradeModes.includes(tradeMode)) {
@@ -323,6 +351,7 @@ export function useTradeBoxState(
     toTokenInputValue,
     setToTokenInputValue,
     setTradeParams,
+    switchTokenAddresses,
   };
 }
 
