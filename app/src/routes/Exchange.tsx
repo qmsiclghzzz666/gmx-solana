@@ -10,7 +10,7 @@ import { useCallback, useMemo } from "react";
 import { t } from "@lingui/macro";
 import { useLocalStorageSerializeKey } from "@/utils/localStorage";
 import { getSyntheticsListSectionKey } from "@/config/localStorage";
-import { useChainId } from "@/contexts/shared";
+import { useChainId, useClosePosition } from "@/contexts/shared";
 import { PositionList } from "@/components/PositionList/PositionList";
 import { PositionSeller } from "@/components/PositionSeller/PositionSeller";
 
@@ -24,6 +24,7 @@ enum ListSection {
 export default function Exchange() {
   const { setPendingTxs } = usePending();
   const chainId = useChainId();
+  const closePosition = useClosePosition();
 
   const [listSection, setListSection] = useLocalStorageSerializeKey(
     getSyntheticsListSectionKey(chainId ?? ""),
@@ -47,7 +48,7 @@ export default function Exchange() {
   const handlePositionListOrdersClick = useCallback(() => { }, []);
   const handleSettlePositionFeesClick = useCallback(() => { }, []);
   const handleSelectPositionClick = useCallback(() => { }, []);
-  const hanldeClosePositionClick = useCallback((key: string) => { requestAnimationFrame(() => console.log(key)) }, []);
+  const hanldeClosePositionClick = useCallback((key: string) => { requestAnimationFrame(() => closePosition(key)) }, [closePosition]);
   const openSettings = useCallback(() => { }, []);
 
   useTradeParamsProcessor();

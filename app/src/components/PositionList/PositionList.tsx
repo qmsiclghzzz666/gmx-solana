@@ -3,7 +3,7 @@ import { TradeMode } from "@/onchain/trade";
 import { Trans, t } from "@lingui/macro";
 import { PositionItem } from "./PositionItem";
 import { useSharedStatesSelector } from "@/contexts/shared";
-import { selectIsPositionLoading, selectPositionList } from "@/contexts/shared/selectors/position_selectors";
+import { selectIsPositionLoading, selectPositionList } from "@/contexts/shared/selectors/position-selectors";
 
 type Props = {
   onSelectPositionClick: (key: string, tradeMode?: TradeMode) => void;

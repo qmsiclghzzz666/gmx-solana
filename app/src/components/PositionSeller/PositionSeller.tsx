@@ -1,22 +1,16 @@
 import { useCallback } from "react";
 import Modal from "../Modal/Modal";
 import "./PositionSeller.scss";
-import { PositionInfo } from "@/onchain/position";
 import { Trans, t } from "@lingui/macro";
 import BuyInputSection from "../BuyInputSection/BuyInputSection";
 import Button from "../Button/Button";
-
-function usePosition(): PositionInfo | undefined {
-  return;
-}
+import { useClearClosingPosition, useClosingPosition } from "@/contexts/shared";
 
 export function PositionSeller() {
-  const position: PositionInfo | undefined = usePosition();
+  const position = useClosingPosition();
   const isVisible = Boolean(position);
 
-  const handleClose = useCallback(() => {
-
-  }, []);
+  const handleClose = useClearClosingPosition();
 
   const handleSubmit = useCallback(() => {
 
