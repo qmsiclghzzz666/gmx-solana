@@ -1,20 +1,34 @@
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import Modal from "../Modal/Modal";
 import "./PositionSeller.scss";
 import { Trans, t } from "@lingui/macro";
 import BuyInputSection from "../BuyInputSection/BuyInputSection";
 import Button from "../Button/Button";
 import { useClearClosingPosition, useClosingPosition } from "@/contexts/shared";
+import { BN_ZERO, USD_DECIMALS } from "@/config/constants";
+import { formatUsd } from "../MarketsList/utils";
+import { formatAmountFree, parseValue } from "@/utils/number";
+import { useDebounceValue } from "usehooks-ts";
+import { DEBOUNCE_MS } from "@/config/ui";
 
 export function PositionSeller() {
   const position = useClosingPosition();
-  const isVisible = Boolean(position);
-
-  const handleClose = useClearClosingPosition();
-
+  const [closeUsdInputValue, setCloseUsdInputValue] = useDebounceValue("", DEBOUNCE_MS);
+  const resetInputs = useCallback(() => {
+    setCloseUsdInputValue("");
+  }, [setCloseUsdInputValue]);
+  const clearClosingPosition = useClearClosingPosition();
+  const handleClose = useCallback(() => {
+    clearClosingPosition();
+    resetInputs();
+  }, [clearClosingPosition, resetInputs]);
   const handleSubmit = useCallback(() => {
 
   }, []);
+
+  const isVisible = Boolean(position);
+  const maxCloseSize = position?.sizeInUsd ?? BN_ZERO;
+  const closeSizeUsd = useMemo(() => parseValue(closeUsdInputValue || "0", USD_DECIMALS)!, [closeUsdInputValue]);
 
   return (
     <div className="PositionEditor PositionSeller">
@@ -34,16 +48,16 @@ export function PositionSeller() {
               <BuyInputSection
                 topLeftLabel={t`Close`}
                 topRightLabel={t`Max`}
-              // topRightValue={formatUsd(maxCloseSize)}
-              // inputValue={closeUsdInputValue}
-              // onInputValueChange={(e) => setCloseUsdInputValue(e.target.value)}
-              // showMaxButton={maxCloseSize?.gt(0) && !closeSizeUsd?.eq(maxCloseSize)}
-              // onClickMax={() => setCloseUsdInputValueRaw(formatAmountFree(maxCloseSize, USD_DECIMALS))}
-              // showPercentSelector={true}
-              // onPercentChange={(percentage) => {
-              //   const formattedAmount = formatAmountFree(maxCloseSize.mul(percentage).div(100), USD_DECIMALS, 2);
-              //   setCloseUsdInputValueRaw(formattedAmount);
-              // }}
+                topRightValue={formatUsd(maxCloseSize)}
+                inputValue={closeUsdInputValue}
+                onInputValueChange={(e) => setCloseUsdInputValue(e.target.value)}
+                showMaxButton={maxCloseSize?.gt(BN_ZERO) && !closeSizeUsd?.eq(maxCloseSize)}
+                onClickMax={() => setCloseUsdInputValue(formatAmountFree(maxCloseSize, USD_DECIMALS))}
+                showPercentSelector
+                onPercentChange={(percentage) => {
+                  const formattedAmount = formatAmountFree(maxCloseSize.muln(percentage).divn(100), USD_DECIMALS, 2);
+                  setCloseUsdInputValue(formattedAmount);
+                }}
               >
                 USD
               </BuyInputSection>

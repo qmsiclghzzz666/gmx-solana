@@ -17,3 +17,5 @@ export const V2_LEVERAGE_SLIDER_MARKS = [0.1, 1, 2, 5, 10, 15, 20, 25, 30, 40, 5
 
 export const TOOLTIP_OPEN_DELAY = 100; // ms
 export const TOOLTIP_CLOSE_DELAY = 100; // ms
+
+export const DEBOUNCE_MS = 50;
