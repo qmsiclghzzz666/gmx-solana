@@ -13,6 +13,7 @@ pub(super) struct CollateralProcessor<'a, M: Market<DECIMALS>, const DECIMALS: u
     market: &'a mut M,
     state: State<M::Num>,
     debt: Debt<M::Num>,
+    is_insolvent_close_allowed: bool,
 }
 
 /// Collateral Process Report.
@@ -226,6 +227,7 @@ where
         is_pnl_token_long: bool,
         long_token_price: &M::Num,
         short_token_price: &M::Num,
+        is_insolvent_close_allowed: bool,
     ) -> Self {
         Self {
             market,
@@ -239,6 +241,7 @@ where
                 secondary_output_amount: Zero::zero(),
             },
             debt: Debt::default(),
+            is_insolvent_close_allowed,
         }
     }
 
@@ -277,34 +280,28 @@ where
     }
 
     fn pay_for_debt_for_pool(&mut self) -> crate::Result<()> {
-        let res = self.debt.pay_for_pool_debt(|cost| {
-            let (_, paid_in_collateral_token, paid_in_secondary_output_token) =
-                self.state.pay_for_cost(cost)?;
-            Ok((paid_in_collateral_token, paid_in_secondary_output_token))
-        });
-
-        match res {
-            Ok((paid_in_collateral_token, paid_in_secondary_output_token)) => {
-                if !paid_in_collateral_token.is_zero() {
-                    self.market.apply_delta(
-                        self.state.is_output_token_long,
-                        &paid_in_collateral_token.to_signed()?,
-                    )?;
-                }
-                if !paid_in_secondary_output_token.is_zero() {
-                    self.market.apply_delta(
-                        self.state.is_pnl_token_long,
-                        &paid_in_secondary_output_token.to_signed()?,
-                    )?;
-                }
-                Ok(())
-            }
-            Err(crate::Error::InsufficientFundsToPayForCosts) => {
-                // TODO: handle insolvent close.
-                Err(crate::Error::InsufficientFundsToPayForCosts)
-            }
-            Err(err) => Err(err),
+        let (paid_in_collateral_token, paid_in_secondary_output_token) =
+            self.debt.pay_for_pool_debt(
+                |cost| {
+                    let (_, paid_in_collateral_token, paid_in_secondary_output_token) =
+                        self.state.pay_for_cost(cost)?;
+                    Ok((paid_in_collateral_token, paid_in_secondary_output_token))
+                },
+                self.is_insolvent_close_allowed,
+            )?;
+        if !paid_in_collateral_token.is_zero() {
+            self.market.apply_delta(
+                self.state.is_output_token_long,
+                &paid_in_collateral_token.to_signed()?,
+            )?;
         }
+        if !paid_in_secondary_output_token.is_zero() {
+            self.market.apply_delta(
+                self.state.is_pnl_token_long,
+                &paid_in_secondary_output_token.to_signed()?,
+            )?;
+        }
+        Ok(())
     }
 
     fn pay_for_debt(&mut self) -> crate::Result<&mut Self> {

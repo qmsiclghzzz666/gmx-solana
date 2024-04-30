@@ -25,9 +25,10 @@ where
     pub(super) fn pay_for_pool_debt<U>(
         &mut self,
         f: impl FnOnce(&mut T) -> crate::Result<U>,
+        is_insolvent_close_allowed: bool,
     ) -> crate::Result<U> {
         let output = f(&mut self.pool)?;
-        if self.pool.is_zero() {
+        if self.pool.is_zero() || is_insolvent_close_allowed {
             Ok(output)
         } else {
             Err(crate::Error::InsufficientFundsToPayForCosts)
