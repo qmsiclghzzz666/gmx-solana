@@ -21,7 +21,7 @@ export interface Positions {
 
 export type PositionInfo = Position & {
   marketInfo: MarketInfo,
-  collateralToken?: TokenData,
+  collateralToken: TokenData,
   entryPrice?: BN,
   markPrice?: BN,
   remainingCollateralUsd?: BN,

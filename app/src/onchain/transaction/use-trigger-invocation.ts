@@ -47,6 +47,7 @@ export const useTriggerInvocation = <T>(
             }
           },
           onError: (error: Error) => {
+            console.error(error);
             if (!opts?.disableErrorToast) {
               helperToast.error(makeSendErrorContent(error));
             }

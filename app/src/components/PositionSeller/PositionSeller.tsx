@@ -7,9 +7,18 @@ import Button from "../Button/Button";
 import { useClearClosingPosition, useClosingPosition } from "@/contexts/shared";
 import { BN_ZERO, USD_DECIMALS } from "@/config/constants";
 import { formatUsd } from "../MarketsList/utils";
-import { formatAmountFree, parseValue } from "@/utils/number";
+import { formatAmountFree, parseValue, toBigInt } from "@/utils/number";
 import { useDebounceValue } from "usehooks-ts";
 import { DEBOUNCE_MS } from "@/config/ui";
+import { useTriggerInvocation } from "@/onchain/transaction";
+import LoadingDots from "../Common/LoadingDots/LoadingDots";
+import { useSWRConfig } from "swr";
+import { filterBalances } from "@/onchain/token";
+import { fitlerMarkets } from "@/onchain/market";
+import { fitlerPositions } from "@/onchain/position";
+import { MakeCreateDecreaseOrderParams, invokeCreateDecreaseOrder } from "gmsol";
+import { useExchange, useOpenConnectModal } from "@/contexts/anchor";
+import { GMSOL_DEPLOYMENT } from "@/config/deployment";
 
 export function PositionSeller() {
   const position = useClosingPosition();
@@ -22,13 +31,63 @@ export function PositionSeller() {
     clearClosingPosition();
     resetInputs();
   }, [clearClosingPosition, resetInputs]);
-  const handleSubmit = useCallback(() => {
 
-  }, []);
+  const { mutate } = useSWRConfig();
+
+  const mutateStates = useCallback(() => {
+    void mutate(filterBalances);
+    void mutate(fitlerMarkets);
+    void mutate(fitlerPositions);
+  }, [mutate]);
+
+  const exchange = useExchange();
+  const payer = exchange.provider.publicKey;
+  const openConnectModal = useOpenConnectModal();
+
+  const createDecreaseOrder = useCallback(async (params: MakeCreateDecreaseOrderParams) => {
+    if (payer) {
+      const [signature, order] = await invokeCreateDecreaseOrder(exchange, params, { skipPreflight: false });
+      console.log(`created a decrease order ${order.toBase58()} at tx ${signature}`);
+      return signature;
+    } else {
+      throw Error("Wallet is not connected");
+    }
+  }, [exchange, payer]);
+
+  const { trigger, isSending } = useTriggerInvocation({
+    key: "exchange-create-decrease-order",
+    onSentMessage: t`Creating decrease order...`,
+    message: t`Decrease order created.`,
+  }, createDecreaseOrder, { onSuccess: mutateStates });
 
   const isVisible = Boolean(position);
   const maxCloseSize = position?.sizeInUsd ?? BN_ZERO;
   const closeSizeUsd = useMemo(() => parseValue(closeUsdInputValue || "0", USD_DECIMALS)!, [closeUsdInputValue]);
+
+  const handleSubmit = useCallback(() => {
+    if (!payer) {
+      openConnectModal();
+      return;
+    }
+    if (!position) return handleClose();
+    void trigger({
+      store: GMSOL_DEPLOYMENT!.store,
+      payer,
+      position: position.address,
+      sizeDeltaUsd: toBigInt(closeSizeUsd),
+      options: {
+        hint: {
+          market: {
+            marketToken: position.marketInfo.marketTokenAddress,
+            longToken: position.marketInfo.longToken.address,
+            shortToken: position.marketInfo.shortToken.address,
+          },
+          collateralToken: position.collateralToken.address,
+          isLong: position.isLong,
+        }
+      }
+    }).then(handleClose);
+  }, [closeSizeUsd, handleClose, openConnectModal, payer, position, trigger]);
 
   return (
     <div className="PositionEditor PositionSeller">
@@ -66,7 +125,7 @@ export function PositionSeller() {
               <Button
                 className="w-full"
                 variant="primary-action"
-                // disabled={Boolean(error) && !shouldDisableValidationForTesting}
+                disabled={isSending}
                 onClick={handleSubmit}
               // buttonRef={submitButtonRef}
               >
@@ -74,7 +133,7 @@ export function PositionSeller() {
                   (isTrigger
                     ? t`Create ${getTriggerNameByOrderType(decreaseAmounts?.triggerOrderType)} Order`
                     : t`Close`)} */}
-                {t`Close`}
+                {isSending ? <LoadingDots /> : t`Close`}
               </Button>
             </div>
           </>

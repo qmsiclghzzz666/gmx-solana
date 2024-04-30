@@ -2,10 +2,11 @@ import { Keypair, PublicKey } from "@solana/web3.js";
 import { findControllerPDA } from ".";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { toBN } from "../utils/number";
-import { findDepositPDA, findMarketPDA, findMarketVaultPDA, findRolesPDA, findTokenConfigMapPDA, findWithdrawalPDA } from "../store";
+import { findDepositPDA, findMarketPDA, findMarketVaultPDA, findOrderPDA, findRolesPDA, findTokenConfigMapPDA, findWithdrawalPDA } from "../store";
 import { IxWithOutput, makeInvoke } from "../utils/invoke";
-import { ExchangeProgram } from "../program";
+import { DataStoreProgram, ExchangeProgram } from "../program";
 import { BN } from "@coral-xyz/anchor";
+import { getPositionSide } from "./utils";
 
 export type MakeCreateDepositParams = {
     store: PublicKey,
@@ -170,3 +171,114 @@ export const makeCreateWithdrawalInstruction = async (
 
 export const invokeCreateWithdrawalWithPayerAsSigner = makeInvoke(makeCreateWithdrawalInstruction, ["payer"]);
 export const invokeCreateWithdrawal = makeInvoke(makeCreateWithdrawalInstruction, [], true);
+
+export type MakeCreateDecreaseOrderParams = {
+    store: PublicKey,
+    payer: PublicKey,
+    position: PublicKey,
+    initialCollateralDeltaAmount?: number | bigint,
+    sizeDeltaUsd?: number | bigint,
+    options: {
+        nonce?: Buffer,
+        executionFee?: number | bigint,
+        swapPath?: PublicKey[],
+        minOutputAmount?: number | bigint,
+        acceptablePrice?: number | bigint,
+        finalOutputToken?: PublicKey,
+        finalOutputTokenAccount?: PublicKey,
+        secondaryOutputTokenAccount?: PublicKey,
+        hint?: {
+            market: {
+                marketToken: PublicKey,
+                longToken: PublicKey,
+                shortToken: PublicKey,
+            },
+            collateralToken: PublicKey,
+            isLong: boolean,
+        },
+        dataStore?: DataStoreProgram,
+    }
+};
+
+export const makeCreateDecreaseOrderInstruction = async (
+    exchange: ExchangeProgram,
+    {
+        store,
+        payer,
+        position,
+        initialCollateralDeltaAmount,
+        sizeDeltaUsd,
+        options,
+    }: MakeCreateDecreaseOrderParams
+) => {
+    let pnlToken: PublicKey;
+    let collateralToken: PublicKey;
+    let market: PublicKey;
+    let isLong: boolean;
+    if (options.hint) {
+        const { marketToken, longToken, shortToken } = options.hint.market;
+        isLong = options.hint.isLong;
+        collateralToken = options.hint.collateralToken;
+        [market] = findMarketPDA(store, marketToken);
+        pnlToken = isLong ? longToken : shortToken;
+    } else if (options.dataStore) {
+        const program = options.dataStore;
+        const { kind, collateralToken: fetchedCollateralToken, marketToken } = await program.account.position.fetch(position);
+        isLong = getPositionSide(kind)! === "long";
+        collateralToken = fetchedCollateralToken;
+        [market] = findMarketPDA(store, marketToken);
+        const { meta: { longTokenMint, shortTokenMint } } = await program.account.market.fetch(market);
+        pnlToken = isLong ? longTokenMint : shortTokenMint;
+    } else {
+        throw Error("Must provide either `hints` or `dataStore` program");
+    }
+
+    const swapPath = options?.swapPath ?? [];
+    const [authority] = findControllerPDA(store);
+    const [onlyController] = findRolesPDA(store, authority);
+    const nonce = options?.nonce ?? PublicKey.unique().toBuffer();
+    const [order] = findOrderPDA(store, payer, nonce);
+    const acceptablePrice = options?.acceptablePrice;
+    const finalOutputToken = options?.finalOutputToken ?? collateralToken;
+    const finalOutputTokenAccount = getTokenAccount(payer, finalOutputToken, options?.finalOutputTokenAccount);
+    const secondaryOutputTokenAccount = getTokenAccount(payer, pnlToken, options?.secondaryOutputTokenAccount);
+
+    const instruction = await exchange.methods.createOrder(
+        [...nonce],
+        {
+            order: {
+                kind: { "marketDecrease": {} },
+                minOutputAmount: toBN(options?.minOutputAmount ?? 0),
+                sizeDeltaUsd: toBN(sizeDeltaUsd ?? 0),
+                initialCollateralDeltaAmount: toBN(initialCollateralDeltaAmount ?? 0),
+                acceptablePrice: acceptablePrice ? toBN(acceptablePrice) : null,
+                isLong,
+            },
+            outputToken: collateralToken,
+            uiFeeReceiver: PublicKey.unique(),
+            executionFee: toBN(options?.executionFee ?? 0),
+            swapLength: swapPath.length,
+        }).accounts({
+            store,
+            onlyController,
+            payer,
+            order,
+            position,
+            tokenConfigMap: findTokenConfigMapPDA(store)[0],
+            market,
+            initialCollateralTokenAccount: null,
+            finalOutputTokenAccount,
+            secondaryOutputTokenAccount,
+            initialCollateralTokenVault: null,
+        }).remainingAccounts(swapPath.map(mint => {
+            return {
+                pubkey: findMarketPDA(store, mint)[0],
+                isSigner: false,
+                isWritable: false,
+            }
+        })).instruction();
+    return [instruction, order] as IxWithOutput<PublicKey>;
+};
+
+export const invokeCreateDecreaseOrderWithPayerAsSigner = makeInvoke(makeCreateDecreaseOrderInstruction, ["payer"]);
+export const invokeCreateDecreaseOrder = makeInvoke(makeCreateDecreaseOrderInstruction, [], true);
