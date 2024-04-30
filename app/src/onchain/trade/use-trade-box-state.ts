@@ -85,7 +85,8 @@ const useTradeOptions = (chainId: string | undefined, availableTokensOptions: Av
       tokens: {
         indexTokenAddress: market.indexTokenAddress.toBase58(),
         fromTokenAddress: market.shortTokenAddress.toBase58(),
-      }
+      },
+      collateralAddress: market.longTokenAddress.toBase58(),
     });
     setSyncedChainId(chainId);
   }, [availableIndexTokenAddresses, availableTokensOptions.sortedAllMarkets, chainId, setStoredOptions, storedOptions, syncedChainId]);
@@ -329,6 +330,20 @@ export function useTradeBoxState(
     [setTradeOptions]
   );
 
+  const setCollateralAddress = useCallback(
+    function setCollateralAddressCallback(tokenAddress?: string) {
+      setTradeOptions(function setCollateralAddressUpdater(
+        oldState: TradeOptions | undefined
+      ): TradeOptions {
+        return {
+          ...oldState!,
+          collateralAddress: tokenAddress,
+        };
+      });
+    },
+    [setTradeOptions]
+  );
+
   // Update Trade Mode.
   useEffect(() => {
     if (!availalbleTradeModes.includes(tradeMode)) {
@@ -385,6 +400,7 @@ export function useTradeBoxState(
     setTradeParams,
     switchTokenAddresses,
     setMarketAddress,
+    setCollateralAddress,
   };
 }
 

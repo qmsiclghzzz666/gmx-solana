@@ -16,6 +16,7 @@ const calcUsd = (amount: BN, token?: TokenData) => convertToUsd(amount, token?.d
 export const selectFromToken = createSharedStatesSelector([selectMarketStateTokens, selectTradeBoxFromTokenAddress], getTokenData);
 export const selectToToken = createSharedStatesSelector([selectMarketStateTokens, selectTradeBoxToTokenAddress], getTokenData);
 export const selectCollateralToken = createSharedStatesSelector([selectMarketStateTokens, selectTradeBoxCollateralTokenAddress], getTokenData)
+export const selectSetCollateralAddress = createSharedStatesSelector([selectTradeBoxState], state => state.setCollateralAddress);
 export const selectFromTokenInputValue = createSharedStatesSelector([selectTradeBoxState], state => state.fromTokenInputValue);
 export const selectSetFromTokenInputValue = createSharedStatesSelector([selectTradeBoxState], state => state.setFromTokenInputValue);
 export const selectToTokenInputValue = createSharedStatesSelector([selectTradeBoxState], state => state.toTokenInputValue);
@@ -192,3 +193,4 @@ export * from "./select-trade-box-get-max-long-short-liquidity-pool";
 export * from "./select-trade-box-set-trade-params";
 export * from "./select-trade-box-set-to-token-address";
 export * from "./select-trade-box-trade-mode";
+export * from "./select-trade-box-collateral-token-address";

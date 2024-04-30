@@ -11,7 +11,7 @@ import { BN_ZERO } from "@/config/constants";
 import { formatUsd, getMarketIndexName } from "../MarketsList/utils";
 import { IoMdSwap } from "react-icons/io";
 
-import { selectFromToken, selectFromTokenInputValue, selectFromTokenUsd, selectSetFromTokenInputValue, selectSetToTokenInputValue, selectSortedAllMarkets, selectSortedLongAndShortTokens, selectSwapTokens, selectSwitchTokenAddresses, selectToToken, selectToTokenInputValue } from "./selectors";
+import { selectFromToken, selectFromTokenInputValue, selectFromTokenUsd, selectSetFromTokenInputValue, selectSetToTokenInputValue, selectSortedAllMarkets, selectSortedLongAndShortTokens, selectSwapTokens, selectSwitchTokenAddresses, selectToToken, selectToTokenInputValue } from "@/contexts/shared/selectors/trade-box-selectors";
 import TokenIcon from "../TokenIcon/TokenIcon";
 import { TradeType } from "@/onchain/trade";
 import { MarketSelector } from "../MarketSelector/MarketSelector";
@@ -19,6 +19,7 @@ import Button from "../Button/Button";
 import { useSetTradeStage } from "@/contexts/shared/hooks/use-set-trade-stage";
 import { ExchangeInfo } from "../Exchange/ExchangeInfo";
 import { MarketPoolSelectorRow } from "./MarketPoolSelectorRow";
+import { CollateralSelectorRow } from "./CollateralSelectorRow";
 
 const tradeTypeLabels = {
   [TradeType.Long]: t`Long`,
@@ -266,12 +267,7 @@ function TradeInfo() {
           onSelectMarketAddress={setMarketAddress}
         />
 
-        {/* <CollateralSelectorRow
-          selectedMarketAddress={marketInfo?.marketTokenAddress}
-          selectedCollateralAddress={collateralAddress}
-          onSelectCollateralAddress={onSelectCollateralAddress}
-          isMarket={isMarket}
-        /> */}
+        <CollateralSelectorRow />
       </>
     );
   }
