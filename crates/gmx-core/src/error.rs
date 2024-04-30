@@ -64,6 +64,9 @@ pub enum Error {
     /// Liquidatable Position.
     #[error("liquidatable position: {0}")]
     Liquidatable(LiquidatableReason),
+    /// Not liquidatable.
+    #[error("not liquidatable")]
+    NotLiquidatable,
 }
 
 impl Error {

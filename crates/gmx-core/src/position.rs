@@ -143,6 +143,8 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
         size_delta_usd: Self::Num,
         acceptable_price: Option<Self::Num>,
         collateral_withdrawal_amount: Self::Num,
+        is_insolvent_close_allowed: bool,
+        is_liquidation_order: bool,
     ) -> crate::Result<DecreasePosition<&mut Self, DECIMALS>>
     where
         Self: Sized,
@@ -153,6 +155,8 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
             size_delta_usd,
             acceptable_price,
             collateral_withdrawal_amount,
+            is_insolvent_close_allowed,
+            is_liquidation_order,
         )
     }
 

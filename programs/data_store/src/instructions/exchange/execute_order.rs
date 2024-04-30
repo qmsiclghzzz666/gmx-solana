@@ -128,7 +128,8 @@ impl<'info> ExecuteOrder<'info> {
     fn execute(&mut self, remaining_accounts: &'info [AccountInfo<'info>]) -> Result<bool> {
         let prices = self.prices()?;
         let mut should_remove = false;
-        match self.order.fixed.params.kind {
+        let kind = &self.order.fixed.params.kind;
+        match kind {
             OrderKind::MarketSwap => {
                 unimplemented!();
             }
@@ -175,7 +176,7 @@ impl<'info> ExecuteOrder<'info> {
                     .map_err(GmxCoreError::from)?;
                 msg!("{:?}", report);
             }
-            OrderKind::MarketDecrease => {
+            OrderKind::MarketDecrease | OrderKind::Liquidation => {
                 let Some(position) = self.position.as_mut() else {
                     return err!(DataStoreError::PositionNotProvided);
                 };
@@ -196,6 +197,8 @@ impl<'info> ExecuteOrder<'info> {
                             size_delta_usd,
                             acceptable_price,
                             collateral_withdrawal_amount,
+                            matches!(kind, OrderKind::Liquidation),
+                            matches!(kind, OrderKind::Liquidation),
                         )
                         .map_err(GmxCoreError::from)?
                         .execute()
@@ -273,9 +276,6 @@ impl<'info> ExecuteOrder<'info> {
 
                 self.transfer_out(false, output_amount)?;
                 self.transfer_out(true, secondary_amount)?;
-            }
-            OrderKind::Liquidation => {
-                unimplemented!();
             }
         }
         Ok(should_remove)

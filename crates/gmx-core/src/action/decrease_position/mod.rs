@@ -26,6 +26,8 @@ pub struct DecreasePosition<P: Position<DECIMALS>, const DECIMALS: u8> {
     params: DecreasePositionParams<P::Num>,
     withdrawable_collateral_amount: P::Num,
     size_delta_usd: P::Num,
+    is_insolvent_close_allowed: bool,
+    is_liquidation_order: bool,
 }
 
 /// Decrease Position Params.
@@ -66,10 +68,13 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
         size_delta_usd: P::Num,
         acceptable_price: Option<P::Num>,
         collateral_withdrawal_amount: P::Num,
+        is_insolvent_close_allowed: bool,
+        is_liquidation_order: bool,
     ) -> crate::Result<Self> {
         if !prices.is_valid() {
             return Err(crate::Error::invalid_argument("invalid prices"));
         }
+        let size_delta_usd = size_delta_usd.min(position.size_in_usd().clone());
         Ok(Self {
             params: DecreasePositionParams {
                 initial_size_delta_usd: size_delta_usd.clone(),
@@ -79,8 +84,12 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
             },
             withdrawable_collateral_amount: collateral_withdrawal_amount
                 .min(position.collateral_amount().clone()),
-            size_delta_usd: size_delta_usd.min(position.size_in_usd().clone()),
+            is_insolvent_close_allowed: is_insolvent_close_allowed
+                && (size_delta_usd == *position.size_in_usd())
+                && is_liquidation_order,
+            size_delta_usd,
             position,
+            is_liquidation_order,
         })
     }
 
@@ -104,7 +113,7 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
 
         // TODO: update funding and borrowing state.
 
-        // TODO: handle liquidation order.
+        self.check_liquiation()?;
 
         // let initial_collateral_amount = self.position.collateral_amount_mut().clone();
 
@@ -262,6 +271,21 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
         Ok(())
     }
 
+    fn check_liquiation(&self) -> crate::Result<()> {
+        if self.is_liquidation_order {
+            // FIXME: should we check that whether this is a close all order?
+            let Some(_reason) = self
+                .position
+                .check_liquidatable(&self.params.prices, true)?
+            else {
+                return Err(crate::Error::NotLiquidatable);
+            };
+            Ok(())
+        } else {
+            Ok(())
+        }
+    }
+
     #[allow(clippy::type_complexity)]
     fn process_collateral(&mut self) -> crate::Result<ProcessCollateralResult<P::Num>> {
         // TODO: handle insolvent close.
@@ -288,6 +312,7 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
             is_pnl_token_long,
             &self.params.prices.long_token_price,
             &self.params.prices.short_token_price,
+            self.is_insolvent_close_allowed,
         );
 
         processor.apply_pnl(&base_pnl_usd)?;
@@ -400,6 +425,8 @@ mod tests {
                 40_000_000_000,
                 None,
                 100_000_000,
+                false,
+                false,
             )?
             .execute()?;
         println!("{report:#?}");
@@ -417,6 +444,8 @@ mod tests {
                 40_000_000_000,
                 None,
                 0,
+                false,
+                false,
             )?
             .execute()?;
         println!("{report:#?}");
