@@ -12,6 +12,7 @@ import { useLocalStorageSerializeKey } from "@/utils/localStorage";
 import { getSyntheticsListSectionKey } from "@/config/localStorage";
 import { useChainId } from "@/contexts/shared";
 import { PositionList } from "@/components/PositionList/PositionList";
+import { PositionSeller } from "@/components/PositionSeller/PositionSeller";
 
 enum ListSection {
   Positions = "Positions",
@@ -124,6 +125,7 @@ export default function Exchange() {
 
         </div>
       </div>
+      <PositionSeller />
     </div>
   )
 }
