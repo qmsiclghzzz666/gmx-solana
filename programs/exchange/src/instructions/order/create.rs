@@ -92,11 +92,13 @@ pub fn create_order<'info>(
                 params.swap_length as usize,
             )?
         }
-        OrderKind::MarketDecrease => ctx.accounts.handle_tokens_for_decrease_order(
-            &params.output_token,
-            ctx.remaining_accounts,
-            params.swap_length as usize,
-        )?,
+        OrderKind::MarketDecrease | OrderKind::Liquidation => {
+            ctx.accounts.handle_tokens_for_decrease_order(
+                &params.output_token,
+                ctx.remaining_accounts,
+                params.swap_length as usize,
+            )?
+        }
         _ => {
             return err!(ExchangeError::UnsupportedOrderKind);
         }

@@ -142,6 +142,26 @@ pub trait ExchangeOps<C> {
         };
         self.create_order(store, market_token, is_collateral_token_long, params)
     }
+
+    /// Create a liquidation order.
+    fn liquidate(
+        &self,
+        store: &Pubkey,
+        market_token: &Pubkey,
+        is_collateral_token_long: bool,
+        is_long: bool,
+        size_in_usd: Option<u128>,
+    ) -> CreateOrderBuilder<C> {
+        let params = OrderParams {
+            kind: OrderKind::Liquidation,
+            min_output_amount: 0,
+            size_delta_usd: size_in_usd.unwrap_or(u128::MAX),
+            initial_collateral_delta_amount: 0,
+            acceptable_price: None,
+            is_long,
+        };
+        self.create_order(store, market_token, is_collateral_token_long, params)
+    }
 }
 
 impl<S, C> ExchangeOps<C> for Program<C>
