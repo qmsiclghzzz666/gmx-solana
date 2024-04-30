@@ -13,9 +13,21 @@ import { Trans, t } from "@lingui/macro";
 import { formatUsd, getMarketIndexName, getMarketPoolName } from "../MarketsList/utils";
 import { BN_ZERO } from "@/config/constants";
 import { formatDeltaUsd, formatTokenAmount } from "@/utils/number";
+import { useCallback } from "react";
 
-export function PositionItem({ position, isLarge }: { position: PositionInfo, isLarge: boolean }) {
-  return isLarge ? <Large position={position} /> : <></>;
+export function PositionItem({
+  position,
+  isLarge,
+  onClosePositionClick,
+  ...ops
+}: {
+  position: PositionInfo,
+  isLarge: boolean,
+  onClosePositionClick?: (address: string) => void,
+}) {
+  const address = position.address;
+  const handleClosePositionClick = useCallback(() => onClosePositionClick && onClosePositionClick(address.toBase58()), [address, onClosePositionClick]);
+  return isLarge ? <Large position={position} onClosePositionClick={handleClosePositionClick} {...ops} /> : <></>;
 }
 
 const selectIsCurrentMarket = createStructuredSelector({
@@ -24,7 +36,15 @@ const selectIsCurrentMarket = createStructuredSelector({
   isCurrentTradeTypeLong: createSharedStatesSelector([selectTradeBoxTradeFlags], flags => flags.isLong),
 }, createSharedStatesSelector);
 
-function Large({ position, hideActions }: { position: PositionInfo, hideActions?: boolean }) {
+function Large({
+  position,
+  hideActions,
+  onClosePositionClick,
+}: {
+  position: PositionInfo,
+  hideActions?: boolean,
+  onClosePositionClick?: () => void,
+}) {
   const {
     currentCollateralTokenAddress,
     currentMarketTokenAddress,
@@ -210,7 +230,7 @@ function Large({ position, hideActions }: { position: PositionInfo, hideActions?
         {!position.isOpening && !hideActions && (
           <button
             className="Exchange-list-action"
-          // onClick={p.onClosePositionClick}
+            onClick={onClosePositionClick}
           // disabled={p.position.sizeInUsd.eq(0)}
           >
             <Trans>Close</Trans>

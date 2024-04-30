@@ -46,7 +46,7 @@ export default function Exchange() {
   const handlePositionListOrdersClick = useCallback(() => { }, []);
   const handleSettlePositionFeesClick = useCallback(() => { }, []);
   const handleSelectPositionClick = useCallback(() => { }, []);
-  const hanldeClosePositionClick = useCallback(() => { }, []);
+  const hanldeClosePositionClick = useCallback((key: string) => { requestAnimationFrame(() => console.log(key)) }, []);
   const openSettings = useCallback(() => { }, []);
 
   useTradeParamsProcessor();

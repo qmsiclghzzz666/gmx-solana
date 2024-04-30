@@ -56,7 +56,12 @@ export function PositionList({
             //   openSettings={openSettings}
             //   hideActions={hideActions}
             // />
-            <PositionItem key={position.address.toBase58()} position={position} isLarge={false} />
+            <PositionItem
+              key={position.address.toBase58()}
+              position={position}
+              isLarge={false}
+              onClosePositionClick={onClosePositionClick}
+            />
           ))}
       </div>
 
@@ -96,7 +101,12 @@ export function PositionList({
           )}
           {!isLoading &&
             positions.map((position) => (
-              <PositionItem key={position.address.toBase58()} position={position} isLarge />
+              <PositionItem
+                key={position.address.toBase58()}
+                position={position}
+                isLarge
+                onClosePositionClick={onClosePositionClick}
+              />
             ))}
         </tbody>
       </table>
