@@ -1,0 +1,70 @@
+.Position-buttons-container {
+  margin-top: 1.2rem;
+}
+
+.Position-collateral-amount {
+  margin-left: 0;
+}
+
+.Position-item-action {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 1.5rem;
+
+  .Position-item-buttons {
+    display: grid;
+    grid-template-columns: auto auto auto;
+    grid-gap: 1rem;
+  }
+}
+
+.PositionItem-collateral-tooltip {
+  .Tooltip-popup {
+    min-width: 32rem;
+  }
+}
+
+.Position-list-order {
+  .order-error-text {
+    margin-top: 0.5rem;
+    white-space: normal;
+
+    &.level-error {
+      color: var(--error-red);
+    }
+
+    &.level-warning {
+      color: rgb(243, 181, 12);
+    }
+  }
+}
+
+.order-error-text-msg.level-error .Tooltip-handle,
+.position-order-error.level-error {
+  text-decoration-color: var(--error-red);
+  color: var(--error-red);
+}
+
+.order-error-text-msg.level-warning .Tooltip-handle,
+.position-order-error.level-warning {
+  text-decoration-color: var(--warning-yellow);
+  color: var(--warning-yellow);
+}
+
+.position-list-collateral {
+  display: flex;
+  align-items: flex-end;
+}
+
+.position-list-collateral.isSmall {
+  justify-content: flex-end;
+}
+
+@media (max-width: 800px) {
+  .PositionItem-collateral-tooltip {
+    .Tooltip-popup {
+      min-width: 22rem;
+    }
+  }
+}

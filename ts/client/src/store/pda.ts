@@ -5,6 +5,9 @@ import { keyToSeed } from "../utils/seed";
 
 const encodeUtf8 = utils.bytes.utf8.encode;
 
+export const POSITION_SEED = encodeUtf8("position");
+export const ORDER_SEED = encodeUtf8("order");
+
 export const findRolesPDA = (store: PublicKey, authority: PublicKey) => PublicKey.findProgramAddressSync([
     encodeUtf8("roles"),
     store.toBytes(),
@@ -38,6 +41,30 @@ export const findDepositPDA = (store: PublicKey, user: PublicKey, nonce: Uint8Ar
 
 export const findWithdrawalPDA = (store: PublicKey, user: PublicKey, nonce: Uint8Array) => PublicKey.findProgramAddressSync([
     encodeUtf8("withdrawal"),
+    store.toBytes(),
+    user.toBytes(),
+    nonce,
+], DATA_STORE_ID);
+
+export const findPositionPDAWithKind = (store: PublicKey, user: PublicKey, marketToken: PublicKey, collateralToken: PublicKey, kind: number) => PublicKey.findProgramAddressSync([
+    POSITION_SEED,
+    store.toBytes(),
+    user.toBytes(),
+    marketToken.toBytes(),
+    collateralToken.toBytes(),
+    new Uint8Array([kind]),
+], DATA_STORE_ID);
+
+export const findPositionPDA = (store: PublicKey, user: PublicKey, marketToken: PublicKey, collateralToken: PublicKey, isLong: boolean) => findPositionPDAWithKind(
+    store,
+    user,
+    marketToken,
+    collateralToken,
+    isLong ? 1 : 2
+);
+
+export const findOrderPDA = (store: PublicKey, user: PublicKey, nonce: Uint8Array) => PublicKey.findProgramAddressSync([
+    ORDER_SEED,
     store.toBytes(),
     user.toBytes(),
     nonce,

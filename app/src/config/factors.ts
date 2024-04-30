@@ -1,0 +1,1 @@
+export const BASIS_POINTS_DIVISOR = 10000;

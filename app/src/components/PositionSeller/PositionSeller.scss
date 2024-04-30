@@ -1,0 +1,39 @@
+.PositionSeller {
+  overflow-x: hidden;
+
+  .Modal-body {
+    overflow-x: hidden;
+  }
+}
+
+.PositionSeller-modal {
+  overflow-x: hidden;
+}
+
+.PositionSeller-info-box {
+  overflow-x: hidden;
+}
+
+.PositionSeller-price-impact-warning {
+  margin-bottom: 0.5rem;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+@media (max-width: 350px) {
+  .PositionSeller-receive-row.Exchange-info-row {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .Exchange-info-row.PositionSeller-receive-row .TokenSelector-box {
+    margin-top: 8px;
+    text-align: left;
+  }
+
+  .PositionSelector-selected-receive-token.align-right {
+    margin-top: 8px;
+    text-align: left;
+  }
+}

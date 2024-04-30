@@ -133,7 +133,7 @@ const useTradeOptions = (chainId: string | undefined, availableTokensOptions: Av
 
       const toTokenAddress =
         newState.tradeType === TradeType.Swap
-          ? newState.tokens.swapTokenAddress
+          ? newState.tokens.swapToTokenAddress
           : newState.tokens.indexTokenAddress;
       const marketAddress = toTokenAddress
         ? newState.markets[toTokenAddress]?.[newState.tradeType === TradeType.Long ? "longTokenAddress" : "shortTokenAddress"]
@@ -175,6 +175,9 @@ export function useTradeBoxState(
   const [tradeOptions, setTradeOptions] = useTradeOptions(chainId, avaiableTokensOptions);
   const [fromTokenInputValue, setFromTokenInputValue] = useSafeState("");
   const [toTokenInputValue, setToTokenInputValue] = useSafeState("");
+  const [triggerRatioInputValue, setTriggerRatioInputValue] = useSafeState("");
+  const [focusedInput, setFocusedInput] = useState<"from" | "to">();
+  const [stage, setStage] = useState<"trade" | "confirmation">("trade");
 
   const { swapTokens } = avaiableTokensOptions;
   const tradeType = tradeOptions.tradeType;
@@ -191,10 +194,7 @@ export function useTradeBoxState(
   }, [tradeType]);
   const tradeFlags = useMemo(() => createTradeFlags(tradeType, tradeMode), [tradeType, tradeMode]);
   const { isSwap } = tradeFlags;
-  const fromTokenAddress = tradeOptions.tokens.fromTokenAddress;
-  const toTokenAddress = isSwap
-    ? tradeOptions.tokens.swapTokenAddress
-    : tradeOptions.tokens.indexTokenAddress;
+  const { fromTokenAddress, toTokenAddress, collateralAddress, marketAddress } = getAddresses(tradeFlags, tradeOptions);
 
   const setTradeType = useCallback((tradeType: TradeType) => {
     setTradeOptions((state) => {
@@ -233,7 +233,7 @@ export function useTradeBoxState(
 
       if (toTokenAddress) {
         if (tradeType === TradeType.Swap) {
-          newState.tokens.swapTokenAddress = toTokenAddress;
+          newState.tokens.swapToTokenAddress = toTokenAddress;
         } else {
           newState.tokens.indexTokenAddress = toTokenAddress;
           if (toTokenAddress && marketAddress) {
@@ -277,6 +277,34 @@ export function useTradeBoxState(
     [setTradeOptions]
   );
 
+  const switchTokenAddresses = useCallback(() => {
+    setTradeOptions((oldState) => {
+      const isSwap = oldState?.tradeType === TradeType.Swap;
+      const fromTokenAddress = oldState?.tokens.fromTokenAddress;
+      const toTokenAddress = isSwap ? oldState?.tokens.swapToTokenAddress : oldState?.tokens.indexTokenAddress;
+
+      if (isSwap) {
+        return {
+          ...oldState,
+          tokens: {
+            ...oldState.tokens,
+            fromTokenAddress: toTokenAddress,
+            swapToTokenAddress: fromTokenAddress,
+          },
+        };
+      }
+
+      return {
+        ...oldState,
+        tokens: {
+          ...oldState.tokens,
+          fromTokenAddress: toTokenAddress,
+          indexTokenAddress: fromTokenAddress,
+        },
+      };
+    });
+  }, [setTradeOptions]);
+
   // Update Trade Mode.
   useEffect(() => {
     if (!availalbleTradeModes.includes(tradeMode)) {
@@ -307,10 +335,14 @@ export function useTradeBoxState(
   );
 
   return {
+    marketAddress,
+    stage,
+    setStage,
     fromTokenAddress,
     setFromTokenAddress,
     toTokenAddress,
     setToTokenAddress,
+    collateralAddress,
     avaiableTokensOptions,
     availalbleTradeModes,
     tradeFlags,
@@ -322,7 +354,12 @@ export function useTradeBoxState(
     setFromTokenInputValue,
     toTokenInputValue,
     setToTokenInputValue,
+    triggerRatioInputValue,
+    setTriggerRatioInputValue,
+    focusedInput,
+    setFocusedInput,
     setTradeParams,
+    switchTokenAddresses,
   };
 }
 
@@ -343,7 +380,7 @@ function setToTokenAddressUpdaterBuilder(
     }
 
     if (isSwap) {
-      newState.tokens.swapTokenAddress = tokenAddress;
+      newState.tokens.swapToTokenAddress = tokenAddress;
     } else {
       newState.tokens.indexTokenAddress = tokenAddress;
       if (tokenAddress && marketTokenAddress) {
@@ -358,4 +395,22 @@ function setToTokenAddressUpdaterBuilder(
 
     return newState;
   };
+}
+
+function getAddresses({ isSwap, isLong }: { isSwap: boolean, isLong: boolean }, tradeOptions: TradeOptions) {
+  const fromTokenAddress = tradeOptions.tokens.fromTokenAddress;
+  const toTokenAddress = isSwap
+    ? tradeOptions.tokens.swapToTokenAddress
+    : tradeOptions.tokens.indexTokenAddress;
+  const collateralAddress = tradeOptions.collateralAddress;
+  const marketAddress = toTokenAddress
+    ? tradeOptions?.markets[toTokenAddress]?.[isLong ? "longTokenAddress" : "shortTokenAddress"]
+    : undefined;
+
+  return {
+    fromTokenAddress,
+    toTokenAddress,
+    collateralAddress,
+    marketAddress,
+  }
 }

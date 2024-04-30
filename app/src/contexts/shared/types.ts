@@ -1,12 +1,22 @@
-import { BN } from "@coral-xyz/anchor";
+import { Address, BN } from "@coral-xyz/anchor";
 import { MarketInfo, MarketInfos } from "@/onchain/market";
 import { TokenData, Tokens } from "@/onchain/token";
 import { TradeBoxState } from "@/onchain/trade";
+import { PositionInfos } from "@/onchain/position";
+import { PublicKey } from "@solana/web3.js";
 
 export interface SharedStates {
   chainId?: string,
   market: MarketState,
   tradeBox: TradeBoxState,
+  position: {
+    isLoading: boolean,
+    positionInfos: PositionInfos,
+  },
+  positionSeller: {
+    address?: PublicKey,
+    setAddress: (address: Address | null) => void,
+  }
 }
 
 export interface MarketState {
