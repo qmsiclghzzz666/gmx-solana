@@ -12,6 +12,7 @@ import { t } from "@lingui/macro";
 import { useTradeBoxStateSelector } from "@/contexts/shared/hooks/use-trade-box-state-selector";
 import { useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { ConfirmationBox } from "./ConfirmationBox";
 
 interface Prop {
   setPendingTxs: PendingTxsSetter,
@@ -77,15 +78,9 @@ export function TradeBox({
       {/* {isSwap && <SwapCard maxLiquidityUsd={swapOutLiquidity} fromToken={fromToken} toToken={toToken} />}
       <div className="Exchange-swap-info-group">
         {isPosition && <MarketCard isLong={isLong} marketInfo={marketInfo} allowedSlippage={allowedSlippage} />}
-      </div>
+      </div> */}
 
-      <ConfirmationBox
-        isVisible={stage === "confirmation"}
-        error={buttonErrorText}
-        onClose={onConfirmationClose}
-        onSubmitted={onConfirmed}
-        setPendingTxns={setPendingTxns}
-      /> */}
+      <ConfirmationBox />
     </>
   );
 }

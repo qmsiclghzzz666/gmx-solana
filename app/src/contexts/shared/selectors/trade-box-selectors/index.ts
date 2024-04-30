@@ -15,3 +15,5 @@ export * from "./select-trade-box-set-to-token-address";
 export * from "./select-trade-box-trade-mode";
 
 export const selectMarketAddress = createSharedStatesSelector([selectTradeBoxState], state => state.marketAddress);
+export const selectStage = createSharedStatesSelector([selectTradeBoxState], state => state.stage);
+export const selectSetStage = createSharedStatesSelector([selectTradeBoxState], state => state.setStage);

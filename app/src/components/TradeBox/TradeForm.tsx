@@ -1,6 +1,6 @@
 import { useSharedStatesSelector } from "@/contexts/shared";
 import { selectTradeBoxChooseSuitableMarket, selectTradeBoxSetFromTokenAddress, selectTradeBoxTradeFlags, selectTradeBoxTradeType } from "@/contexts/shared/selectors/trade-box-selectors";
-import { ChangeEvent, FormEventHandler, useCallback } from "react";
+import { ChangeEvent, FormEventHandler, useCallback, useMemo } from "react";
 import BuyInputSection from "../BuyInputSection/BuyInputSection";
 import { t } from "@lingui/macro";
 import TokenSelector from "../TokenSelector/TokenSelector";
@@ -16,7 +16,7 @@ import TokenIcon from "../TokenIcon/TokenIcon";
 import { TradeType } from "@/onchain/trade";
 import { MarketSelector } from "../MarketSelector/MarketSelector";
 import Button from "../Button/Button";
-import { helperToast } from "@/utils/helperToast";
+import { useSetTradeStage } from "@/contexts/shared/hooks/use-set-trade-stage";
 
 const tradeTypeLabels = {
   [TradeType.Long]: t`Long`,
@@ -25,12 +25,22 @@ const tradeTypeLabels = {
 };
 
 export function TradeForm() {
-  const { isSwap, isIncrease, isPosition, isLimit, isTrigger } = useSharedStatesSelector(selectTradeBoxTradeFlags);
-
+  const { isSwap, isIncrease, isPosition, isLimit, isTrigger, isLong } = useSharedStatesSelector(selectTradeBoxTradeFlags);
+  const setTradeStage = useSetTradeStage();
   const handleSubmit: FormEventHandler<HTMLFormElement> = useCallback((e) => {
     e.preventDefault();
-    helperToast.info("trading");
-  }, []);
+    setTradeStage("confirmation");
+  }, [setTradeStage]);
+
+  const buttonText = useMemo(() => {
+    if (isSwap) {
+      return t`Swap`
+    } else if (isLong) {
+      return t`Open Long`
+    } else {
+      return t`Open Short`
+    }
+  }, [isLong, isSwap]);
 
   return (
     <form onSubmit={handleSubmit}>
@@ -47,7 +57,7 @@ export function TradeForm() {
           type="submit"
         // disabled={isSubmitButtonDisabled && !shouldDisableValidationForTesting}
         >
-          {t`Trade`}
+          {buttonText}
         </Button>
       </div>
     </form>

@@ -6,3 +6,4 @@ export * from "./use-market-infos";
 export * from "./use-closing-position";
 export * from "./use-close-position";
 export * from "./use-clear-closing-position";
+export * from "./use-trade-stage";

@@ -1,5 +1,5 @@
 import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useState } from "react";
-import { AvailableTokenOptions, TradeFlags, TradeMode, TradeOptions, TradeParams, TradeType } from "./types";
+import { AvailableTokenOptions, TradeMode, TradeOptions, TradeParams, TradeType } from "./types";
 import { useLocalStorageSerializeKey } from "@/utils/localStorage";
 import { getSyntheticsTradeOptionsKey } from "@/config/localStorage";
 import { MarketInfos } from "../market";
@@ -177,6 +177,7 @@ export function useTradeBoxState(
   const [toTokenInputValue, setToTokenInputValue] = useSafeState("");
   const [triggerRatioInputValue, setTriggerRatioInputValue] = useSafeState("");
   const [focusedInput, setFocusedInput] = useState<"from" | "to">();
+  const [stage, setStage] = useState<"trade" | "confirmation">("trade");
 
   const { swapTokens } = avaiableTokensOptions;
   const tradeType = tradeOptions.tradeType;
@@ -335,6 +336,8 @@ export function useTradeBoxState(
 
   return {
     marketAddress,
+    stage,
+    setStage,
     fromTokenAddress,
     setFromTokenAddress,
     toTokenAddress,
