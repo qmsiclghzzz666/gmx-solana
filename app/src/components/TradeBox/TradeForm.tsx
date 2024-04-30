@@ -1,5 +1,5 @@
 import { useSharedStatesSelector } from "@/contexts/shared";
-import { selectTradeBoxChooseSuitableMarket, selectTradeBoxSetFromTokenAddress, selectTradeBoxTradeFlags, selectTradeBoxTradeType } from "@/contexts/shared/selectors/trade-box-selectors";
+import { selectMarketInfo, selectSetMarketAddress, selectTradeBoxChooseSuitableMarket, selectTradeBoxSetFromTokenAddress, selectTradeBoxTradeFlags, selectTradeBoxTradeType } from "@/contexts/shared/selectors/trade-box-selectors";
 import { ChangeEvent, FormEventHandler, useCallback, useMemo } from "react";
 import BuyInputSection from "../BuyInputSection/BuyInputSection";
 import { t } from "@lingui/macro";
@@ -17,6 +17,8 @@ import { TradeType } from "@/onchain/trade";
 import { MarketSelector } from "../MarketSelector/MarketSelector";
 import Button from "../Button/Button";
 import { useSetTradeStage } from "@/contexts/shared/hooks/use-set-trade-stage";
+import { ExchangeInfo } from "../Exchange/ExchangeInfo";
+import { MarketPoolSelectorRow } from "./MarketPoolSelectorRow";
 
 const tradeTypeLabels = {
   [TradeType.Long]: t`Long`,
@@ -249,7 +251,33 @@ function TriggerPriceInput() {
 }
 
 function TradeInfo() {
+  const { isPosition } = useSharedStatesSelector(selectTradeBoxTradeFlags);
+  const marketInfo = useSharedStatesSelector(selectMarketInfo);
+  const toToken = useSharedStatesSelector(selectToToken);
+  const setMarketAddress = useSharedStatesSelector(selectSetMarketAddress);
+  function renderPositionControls() {
+    return (
+      <>
+        <MarketPoolSelectorRow
+          selectedMarket={marketInfo}
+          indexToken={toToken}
+          // isOutPositionLiquidity={isOutPositionLiquidity}
+          // currentPriceImpactBps={increaseAmounts?.acceptablePriceDeltaBps}
+          onSelectMarketAddress={setMarketAddress}
+        />
+
+        {/* <CollateralSelectorRow
+          selectedMarketAddress={marketInfo?.marketTokenAddress}
+          selectedCollateralAddress={collateralAddress}
+          onSelectCollateralAddress={onSelectCollateralAddress}
+          isMarket={isMarket}
+        /> */}
+      </>
+    );
+  }
   return (
-    <></>
+    <ExchangeInfo className="SwapBox-info-section" dividerClassName="App-card-divider">
+      <ExchangeInfo.Group>{isPosition && renderPositionControls()}</ExchangeInfo.Group>
+    </ExchangeInfo>
   );
 }

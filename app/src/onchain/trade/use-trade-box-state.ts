@@ -77,9 +77,9 @@ const useTradeOptions = (chainId: string | undefined, availableTokensOptions: Av
     setStoredOptions({
       ...INITIAL_TRADE_OPTIONS,
       markets: {
-        [market.marketTokenAddress.toBase58()]: {
-          longTokenAddress: market.longTokenAddress.toBase58(),
-          shortTokenAddress: market.shortTokenAddress.toBase58(),
+        [market.indexTokenAddress.toBase58()]: {
+          longTokenAddress: market.marketTokenAddress.toBase58(),
+          shortTokenAddress: market.marketTokenAddress.toBase58(),
         }
       },
       tokens: {
@@ -305,6 +305,30 @@ export function useTradeBoxState(
     });
   }, [setTradeOptions]);
 
+  const setMarketAddress = useCallback(
+    (marketAddress?: string) => {
+      setTradeOptions((oldState) => {
+        const toTokenAddress = oldState?.tokens.indexTokenAddress;
+        const isLong = oldState?.tradeType === TradeType.Long;
+        if (!toTokenAddress) {
+          return oldState;
+        }
+
+        return {
+          ...oldState,
+          markets: {
+            ...oldState.markets,
+            [toTokenAddress]: {
+              ...oldState.markets[toTokenAddress],
+              [isLong ? "longTokenAddress" : "shortTokenAddress"]: marketAddress,
+            },
+          },
+        };
+      });
+    },
+    [setTradeOptions]
+  );
+
   // Update Trade Mode.
   useEffect(() => {
     if (!availalbleTradeModes.includes(tradeMode)) {
@@ -360,6 +384,7 @@ export function useTradeBoxState(
     setFocusedInput,
     setTradeParams,
     switchTokenAddresses,
+    setMarketAddress,
   };
 }
 

@@ -8,6 +8,17 @@ import { useTradeStage } from "@/contexts/shared/hooks";
 import { useSetTradeStage } from "@/contexts/shared/hooks/use-set-trade-stage";
 import Button from "../Button/Button";
 import LoadingDots from "../Common/LoadingDots/LoadingDots";
+import { useExchange } from "@/contexts/anchor";
+import { useTriggerInvocation } from "@/onchain/transaction";
+import { invokeCreateIncreaseOrder } from "gmsol";
+import { GMSOL_DEPLOYMENT } from "@/config/deployment";
+import { PublicKey } from "@solana/web3.js";
+import { useSWRConfig } from "swr";
+import { filterBalances } from "@/onchain/token";
+import { fitlerMarkets } from "@/onchain/market";
+import { fitlerPositions } from "@/onchain/position";
+import { BN_ZERO } from "@/config/constants";
+import { toBigInt } from "@/utils/number";
 
 interface Props {
   onClose?: () => void,
@@ -90,7 +101,48 @@ export function ConfirmationBox({
 }
 
 function useTriggerCreateOrder() {
-  const { isMarket, isLimit, isSwap, isLong } = useSharedStatesSelector(selectTradeBoxTradeFlags);
+  const { isMarket, isLimit, isSwap, isLong, isPosition } = useSharedStatesSelector(selectTradeBoxTradeFlags);
+  const exchange = useExchange();
+
+  const { mutate } = useSWRConfig();
+  const mutateStates = useCallback(() => {
+    void mutate(filterBalances);
+    void mutate(fitlerMarkets);
+    void mutate(fitlerPositions);
+  }, [mutate]);
+
+  const invoker = useCallback(async () => {
+    const payer = exchange.provider.publicKey;
+    if (!payer) throw Error("Wallet is not connteced");
+    if (isMarket && isPosition) {
+      const [signatrue, order] = await invokeCreateIncreaseOrder(exchange, {
+        store: GMSOL_DEPLOYMENT!.store,
+        payer,
+        marketToken: PublicKey.unique(),
+        collateralToken: PublicKey.unique(),
+        isLong,
+        initialCollateralDeltaAmount: toBigInt(BN_ZERO),
+        sizeDeltaUsd: toBigInt(BN_ZERO),
+        options: {
+          swapPath: undefined,
+          initialCollateralToken: undefined,
+        }
+      });
+      console.log(`created increase order ${order.toBase58()} at tx ${signatrue}`);
+      return signatrue;
+    } else {
+      throw Error("Unsupprted order type");
+    }
+  }, [exchange, isLong, isMarket, isPosition]);
+
+  const { trigger, isSending } = useTriggerInvocation<void>({
+    key: "create-increase-order",
+    onSentMessage: t`Creating market increase order...`,
+    message: t`Market increase order created.`
+  }, invoker, {
+    onSuccess: mutateStates,
+  });
+
   if (isMarket) {
     if (isSwap) {
       return {
@@ -100,8 +152,8 @@ function useTriggerCreateOrder() {
       }
     } else {
       return {
-        trigger: async () => { },
-        isSending: true,
+        trigger,
+        isSending,
         error: null,
       }
     }

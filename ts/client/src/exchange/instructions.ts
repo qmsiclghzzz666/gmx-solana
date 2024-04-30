@@ -2,7 +2,7 @@ import { Keypair, PublicKey } from "@solana/web3.js";
 import { findControllerPDA } from ".";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { toBN } from "../utils/number";
-import { findDepositPDA, findMarketPDA, findMarketVaultPDA, findOrderPDA, findRolesPDA, findTokenConfigMapPDA, findWithdrawalPDA } from "../store";
+import { findDepositPDA, findMarketPDA, findMarketVaultPDA, findOrderPDA, findPositionPDA, findRolesPDA, findTokenConfigMapPDA, findWithdrawalPDA } from "../store";
 import { IxWithOutput, makeInvoke } from "../utils/invoke";
 import { DataStoreProgram, ExchangeProgram } from "../program";
 import { BN } from "@coral-xyz/anchor";
@@ -282,3 +282,84 @@ export const makeCreateDecreaseOrderInstruction = async (
 
 export const invokeCreateDecreaseOrderWithPayerAsSigner = makeInvoke(makeCreateDecreaseOrderInstruction, ["payer"]);
 export const invokeCreateDecreaseOrder = makeInvoke(makeCreateDecreaseOrderInstruction, [], true);
+
+export type MakeCreateIncreaseOrderParams = {
+    store: PublicKey,
+    payer: PublicKey,
+    marketToken: PublicKey,
+    collateralToken: PublicKey,
+    isLong: boolean,
+    initialCollateralDeltaAmount?: number | bigint,
+    sizeDeltaUsd?: number | bigint,
+    options: {
+        nonce?: Buffer,
+        executionFee?: number | bigint,
+        swapPath?: PublicKey[],
+        minOutputAmount?: number | bigint,
+        acceptablePrice?: number | bigint,
+        initialCollateralToken?: PublicKey,
+        initialCollateralTokenAccount?: PublicKey,
+    }
+};
+
+export const makeCreateIncreaseOrderInstruction = async (
+    exchange: ExchangeProgram,
+    {
+        store,
+        payer,
+        marketToken,
+        collateralToken,
+        isLong,
+        initialCollateralDeltaAmount,
+        sizeDeltaUsd,
+        options,
+    }: MakeCreateIncreaseOrderParams
+) => {
+    const swapPath = options?.swapPath ?? [];
+    const [authority] = findControllerPDA(store);
+    const [onlyController] = findRolesPDA(store, authority);
+    const nonce = options?.nonce ?? PublicKey.unique().toBuffer();
+    const [order] = findOrderPDA(store, payer, nonce);
+    const acceptablePrice = options?.acceptablePrice;
+    const initialCollateralToken = options?.initialCollateralToken ?? collateralToken;
+    const initialCollateralTokenAccount = getTokenAccount(payer, initialCollateralToken, options?.initialCollateralTokenAccount);
+
+    const instruction = await exchange.methods.createOrder(
+        [...nonce],
+        {
+            order: {
+                kind: { "marketIncrease": {} },
+                minOutputAmount: toBN(options?.minOutputAmount ?? 0),
+                sizeDeltaUsd: toBN(sizeDeltaUsd ?? 0),
+                initialCollateralDeltaAmount: toBN(initialCollateralDeltaAmount ?? 0),
+                acceptablePrice: acceptablePrice ? toBN(acceptablePrice) : null,
+                isLong,
+            },
+            outputToken: collateralToken,
+            uiFeeReceiver: PublicKey.unique(),
+            executionFee: toBN(options?.executionFee ?? 0),
+            swapLength: swapPath.length,
+        }).accounts({
+            store,
+            onlyController,
+            payer,
+            order,
+            position: findPositionPDA(store, payer, marketToken, collateralToken, isLong)[0],
+            tokenConfigMap: findTokenConfigMapPDA(store)[0],
+            market: findMarketPDA(store, marketToken)[0],
+            initialCollateralTokenAccount: initialCollateralTokenAccount,
+            initialCollateralTokenVault: findMarketVaultPDA(store, initialCollateralToken)[0],
+            finalOutputTokenAccount: null,
+            secondaryOutputTokenAccount: null
+        }).remainingAccounts(swapPath.map(mint => {
+            return {
+                pubkey: findMarketPDA(store, mint)[0],
+                isSigner: false,
+                isWritable: false,
+            }
+        })).instruction();
+    return [instruction, order] as IxWithOutput<PublicKey>;
+};
+
+export const invokeCreateIncreaseOrderWithPayerAsSigner = makeInvoke(makeCreateIncreaseOrderInstruction, ["payer"]);
+export const invokeCreateIncreaseOrder = makeInvoke(makeCreateIncreaseOrderInstruction, [], true);
