@@ -2,8 +2,8 @@ import { useSharedStatesSelector } from "@/contexts/shared";
 import Modal from "../Modal/Modal";
 import "./ConfirmationBox.scss";
 import { selectMarketAddress, selectTradeBoxCollateralTokenAddress, selectTradeBoxTradeFlags, selectIncreaseAmounts, selectIncreaseSwapParams } from "@/contexts/shared/selectors/trade-box-selectors";
-import { useCallback, useMemo } from "react";
-import { t } from "@lingui/macro";
+import { useCallback, useMemo, useState } from "react";
+import { Trans, t } from "@lingui/macro";
 import { useTradeStage, useSetTradeStage } from "@/contexts/shared/hooks";
 import Button from "../Button/Button";
 import LoadingDots from "../Common/LoadingDots/LoadingDots";
@@ -17,6 +17,7 @@ import { fitlerMarkets } from "@/onchain/market";
 import { fitlerPositions } from "@/onchain/position";
 import { toBigInt } from "@/utils/number";
 import { translateAddress } from "@coral-xyz/anchor";
+import CheckBox from "../Common/CheckBox/CheckBox";
 
 interface Props {
   onClose?: () => void,
@@ -26,6 +27,7 @@ export function ConfirmationBox({
   onClose
 }: Props) {
   const { isMarket, isLimit, isSwap, isLong } = useSharedStatesSelector(selectTradeBoxTradeFlags);
+  const [skipPreflight, setSkipPreflight] = useState(false);
 
   const title = useMemo(() => {
     if (isMarket) {
@@ -71,9 +73,9 @@ export function ConfirmationBox({
 
   const handleSubmit = useCallback(() => {
     if (trigger) {
-      void trigger().then(handleClose);
+      void trigger({ skipPreflight }).then(handleClose);
     }
-  }, [handleClose, trigger]);
+  }, [handleClose, skipPreflight, trigger]);
 
   return (
     <div className="Confirmation-box">
@@ -82,6 +84,11 @@ export function ConfirmationBox({
         setIsVisible={handleClose}
         label={title}
       >
+        <CheckBox isChecked={skipPreflight} setIsChecked={setSkipPreflight}>
+          <span className="muted font-sm">
+            <Trans>Skip transaction preflight test.</Trans>
+          </span>
+        </CheckBox>
         <div className="Confirmation-box-row">
           <Button
             variant="primary-action"
@@ -113,7 +120,7 @@ function useTriggerCreateOrder() {
     void mutate(fitlerPositions);
   }, [mutate]);
 
-  const invoker = useCallback(async () => {
+  const invoker = useCallback(async ({ skipPreflight }: { skipPreflight: boolean }) => {
     const payer = exchange.provider.publicKey;
     if (!payer) throw Error("Wallet is not connteced");
     if (!marketTokenAddress) throw Error("Missing market token address");
@@ -133,7 +140,7 @@ function useTriggerCreateOrder() {
           swapPath,
           initialCollateralToken: initialCollateralToken.address,
         }
-      }, { skipPreflight: false });
+      }, { skipPreflight });
       console.log(`created increase order ${order.toBase58()} at tx ${signatrue}`);
       return signatrue;
     } else {
@@ -141,7 +148,7 @@ function useTriggerCreateOrder() {
     }
   }, [exchange, marketTokenAddress, collateralTokenAddress, isMarket, isIncrease, increaseAmounts, increaseSwapParams, isLong]);
 
-  const { trigger, isSending } = useTriggerInvocation<void>({
+  const { trigger, isSending } = useTriggerInvocation({
     key: "create-increase-order",
     onSentMessage: t`Creating market increase order...`,
     message: t`Market increase order created.`
