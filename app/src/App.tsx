@@ -35,7 +35,7 @@ const router = createBrowserRouter([
         loader: earnLoader,
       },
       {
-        path: "trade/:tradeType?",
+        path: "trade",
         element: <Exchange />,
       }
     ]

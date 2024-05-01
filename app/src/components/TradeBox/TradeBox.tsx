@@ -11,7 +11,6 @@ import { TradeMode, TradeType } from "@/onchain/trade";
 import { t } from "@lingui/macro";
 import { useTradeBoxStateSelector } from "@/contexts/shared/hooks/use-trade-box-state-selector";
 import { useCallback } from "react";
-import { useNavigate } from "react-router-dom";
 import { ConfirmationBox } from "./ConfirmationBox";
 import { useSharedStatesSelector } from "@/contexts/shared";
 import { selectSetFromTokenInputValue, selectSetToTokenInputValue, selectTradeBoxTradeFlags } from "@/contexts/shared/selectors/trade-box-selectors";
@@ -50,6 +49,7 @@ export function TradeBox({
     tradeMode,
     availalbleTradeModes,
     setTradeMode,
+    setTradeType,
   } = useTradeBoxStateSelector(s => s);
 
   const setFromTokenInputValue = useSharedStatesSelector(selectSetFromTokenInputValue);
@@ -60,13 +60,12 @@ export function TradeBox({
     setToTokenInputValue("");
   }, [setFromTokenInputValue, setToTokenInputValue]);
 
-  const navigate = useNavigate();
   const handleChangeTradeType = useCallback((tradeType: TradeType) => {
     if ((tradeType === TradeType.Swap) !== isSwap) {
       resetInputs();
     }
-    navigate(`/trade/${tradeType.toLocaleLowerCase()}`);
-  }, [isSwap, navigate, resetInputs]);
+    setTradeType(tradeType);
+  }, [isSwap, resetInputs, setTradeType]);
 
   const handleSelectTradeMode = useCallback((tradeMode: TradeMode) => {
     setTradeMode(tradeMode);
