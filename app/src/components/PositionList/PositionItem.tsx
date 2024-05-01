@@ -14,20 +14,31 @@ import { formatUsd, getMarketIndexName, getMarketPoolName } from "../MarketsList
 import { BN_ZERO } from "@/config/constants";
 import { formatDeltaUsd, formatTokenAmount } from "@/utils/number";
 import { useCallback } from "react";
+import { TradeMode, TradeParams } from "@/onchain/trade";
+import { getTradeParamsFromPosition } from "@/onchain/trade/utils";
 
 export function PositionItem({
   position,
   isLarge,
   onClosePositionClick,
+  onPositionClick,
   ...ops
 }: {
   position: PositionInfo,
   isLarge: boolean,
+  onPositionClick: (params: TradeParams) => void,
   onClosePositionClick?: (address: string) => void,
 }) {
   const address = position.address;
   const handleClosePositionClick = useCallback(() => onClosePositionClick && onClosePositionClick(address.toBase58()), [address, onClosePositionClick]);
-  return isLarge ? <Large position={position} onClosePositionClick={handleClosePositionClick} {...ops} /> : <></>;
+  const handlePositionClick = useCallback((tradeMode?: TradeMode) => {
+    const params = getTradeParamsFromPosition(position) as TradeParams;
+    if (tradeMode) {
+      params.tradeMode = tradeMode;
+    }
+    onPositionClick(params);
+  }, [onPositionClick, position]);
+  return isLarge ? <Large position={position} onPositionClick={handlePositionClick} onClosePositionClick={handleClosePositionClick} {...ops} /> : <></>;
 }
 
 const selectIsCurrentMarket = createStructuredSelector({
@@ -40,10 +51,12 @@ function Large({
   position,
   hideActions,
   onClosePositionClick,
+  onPositionClick,
 }: {
   position: PositionInfo,
   hideActions?: boolean,
   onClosePositionClick?: () => void,
+  onPositionClick: (tradeMode?: TradeMode) => void,
 }) {
   const {
     currentCollateralTokenAddress,
@@ -111,6 +124,7 @@ function Large({
       className={cx("Exchange-list-item", {
         "Exchange-list-item-active": isCurrentMarket,
       })}
+      onClick={() => onPositionClick()}
     >
       <td className="clickable">
         {/* title */}

@@ -1,4 +1,5 @@
-import { TradeFlags, TradeMode, TradeType } from "./types";
+import { PositionInfo } from "../position";
+import { TradeFlags, TradeMode, TradeParams, TradeType } from "./types";
 
 export const createTradeFlags = (tradeType: TradeType, tradeMode: TradeMode): TradeFlags => {
   const isLong = tradeType === TradeType.Long;
@@ -22,4 +23,13 @@ export const createTradeFlags = (tradeType: TradeType, tradeMode: TradeMode): Tr
   };
 
   return tradeFlags;
+};
+
+export const getTradeParamsFromPosition = (position: PositionInfo) => {
+  return {
+    tradeType: position.isLong ? TradeType.Long : TradeType.Short,
+    marketAddress: position.marketTokenAddress.toBase58(),
+    collateralAddress: position.collateralTokenAddress.toBase58(),
+    toTokenAddress: position.marketInfo.indexTokenAddress.toBase58(),
+  } satisfies TradeParams;
 };

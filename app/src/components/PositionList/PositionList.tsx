@@ -1,12 +1,12 @@
 import { PositionInfo } from "@/onchain/position";
-import { TradeMode } from "@/onchain/trade";
+import { TradeParams } from "@/onchain/trade";
 import { Trans, t } from "@lingui/macro";
 import { PositionItem } from "./PositionItem";
 import { useSharedStatesSelector } from "@/contexts/shared";
 import { selectIsPositionLoading, selectPositionList } from "@/contexts/shared/selectors/position-selectors";
 
 type Props = {
-  onSelectPositionClick: (key: string, tradeMode?: TradeMode) => void;
+  onSelectPositionClick: (params: TradeParams) => void;
   onClosePositionClick: (key: string) => void;
   onSettlePositionFeesClick: (key: string) => void;
   onOrdersClick: (key?: string) => void;
@@ -24,11 +24,7 @@ function useIsPositionLoading(): boolean {
 
 export function PositionList({
   onClosePositionClick,
-  onOrdersClick,
   onSelectPositionClick,
-  onSettlePositionFeesClick,
-  openSettings,
-  hideActions,
 }: Props) {
   const positions = usePositions();
   const isLoading = useIsPositionLoading();
@@ -61,6 +57,7 @@ export function PositionList({
               position={position}
               isLarge={false}
               onClosePositionClick={onClosePositionClick}
+              onPositionClick={onSelectPositionClick}
             />
           ))}
       </div>
@@ -106,6 +103,7 @@ export function PositionList({
                 position={position}
                 isLarge
                 onClosePositionClick={onClosePositionClick}
+                onPositionClick={onSelectPositionClick}
               />
             ))}
         </tbody>

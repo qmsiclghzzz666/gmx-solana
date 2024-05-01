@@ -10,9 +10,10 @@ import { useCallback, useMemo } from "react";
 import { t } from "@lingui/macro";
 import { useLocalStorageSerializeKey } from "@/utils/localStorage";
 import { getSyntheticsListSectionKey } from "@/config/localStorage";
-import { useChainId, useClosePosition } from "@/contexts/shared";
+import { useChainId, useClosePosition, useSharedStatesSelector } from "@/contexts/shared";
 import { PositionList } from "@/components/PositionList/PositionList";
 import { PositionSeller } from "@/components/PositionSeller/PositionSeller";
+import { selectTradeBoxSetTradeParams } from "@/contexts/shared/selectors/trade-box-selectors";
 
 enum ListSection {
   Positions = "Positions",
@@ -44,10 +45,11 @@ export default function Exchange() {
   );
   const tabOptions = useMemo(() => Object.keys(ListSection).map(section => section as ListSection), []);
 
+  const handleSelectPositionClick = useSharedStatesSelector(selectTradeBoxSetTradeParams);
+
   const handleTabChange = useCallback((section: ListSection) => setListSection(section), [setListSection]);
   const handlePositionListOrdersClick = useCallback(() => { }, []);
   const handleSettlePositionFeesClick = useCallback(() => { }, []);
-  const handleSelectPositionClick = useCallback(() => { }, []);
   const hanldeClosePositionClick = useCallback((key: string) => { requestAnimationFrame(() => closePosition(key)) }, [closePosition]);
   const openSettings = useCallback(() => { }, []);
 
