@@ -13,6 +13,8 @@ import { useTradeBoxStateSelector } from "@/contexts/shared/hooks/use-trade-box-
 import { useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { ConfirmationBox } from "./ConfirmationBox";
+import { useSharedStatesSelector } from "@/contexts/shared";
+import { selectSetFromTokenInputValue, selectSetToTokenInputValue, selectTradeBoxTradeFlags } from "@/contexts/shared/selectors/trade-box-selectors";
 
 interface Prop {
   setPendingTxs: PendingTxsSetter,
@@ -41,17 +43,36 @@ export function TradeBox({
 }: Prop) {
   void setPendingTxs;
 
+  const { isSwap } = useSharedStatesSelector(selectTradeBoxTradeFlags);
+
   const {
     tradeType,
     tradeMode,
     availalbleTradeModes,
-    setTradeMode: onSelectTradeMode,
+    setTradeMode,
+    setTradeType,
   } = useTradeBoxStateSelector(s => s);
+
+  const setFromTokenInputValue = useSharedStatesSelector(selectSetFromTokenInputValue);
+  const setToTokenInputValue = useSharedStatesSelector(selectSetToTokenInputValue);
+
+  const resetInputs = useCallback(() => {
+    setFromTokenInputValue("");
+    setToTokenInputValue("");
+  }, [setFromTokenInputValue, setToTokenInputValue]);
 
   const navigate = useNavigate();
   const handleChangeTradeType = useCallback((tradeType: TradeType) => {
+    if ((tradeType === TradeType.Swap) !== isSwap) {
+      resetInputs();
+    }
+    setTradeType(tradeType);
     navigate(`/trade/${tradeType.toLocaleLowerCase()}`);
-  }, [navigate]);
+  }, [isSwap, navigate, resetInputs, setTradeType]);
+
+  const handleSelectTradeMode = useCallback((tradeMode: TradeMode) => {
+    setTradeMode(tradeMode);
+  }, [setTradeMode]);
 
   return (
     <>
@@ -70,7 +91,7 @@ export function TradeBox({
           className="SwapBox-asset-options-tabs"
           type="inline"
           option={tradeMode}
-          onChange={onSelectTradeMode}
+          onChange={handleSelectTradeMode}
         />
         <TradeForm />
       </div>
@@ -80,7 +101,7 @@ export function TradeBox({
         {isPosition && <MarketCard isLong={isLong} marketInfo={marketInfo} allowedSlippage={allowedSlippage} />}
       </div> */}
 
-      <ConfirmationBox />
+      <ConfirmationBox onClose={resetInputs} />
     </>
   );
 }
