@@ -107,6 +107,7 @@ export const useDeployedInfos = () => {
     let isPositionInfosLoading = false;
     for (const key in positions) {
       const position = positions[key];
+      if (position.sizeInUsd.isZero()) continue;
       const info = infos[position.marketTokenAddress.toBase58()];
       const collateralToken = getByKey(tokens, position.collateralTokenAddress.toBase58());
       const collateralMinPrice = collateralToken?.prices.minPrice;
