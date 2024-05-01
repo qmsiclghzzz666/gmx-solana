@@ -5,20 +5,22 @@ import { t } from "@lingui/macro";
 import { createAssociatedTokenAccountInstruction, getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { filterBalances } from "./use-tokens";
 
-export const useInitializeTokenAccount = (opts: ConfirmOptions = {
+export const useInitializeTokenAccounts = (opts: ConfirmOptions = {
   commitment: "confirmed",
   preflightCommitment: "processed",
 }) => {
   const { mutate } = useSWRConfig();
 
   return useSendTransaction({
-    key: "init-token-account",
-    onSentMessage: t`Initializing token account...`,
-    message: t`Initialized token account.`,
-  }, (token: PublicKey, owner) => {
-    const address = getAssociatedTokenAddressSync(token, owner);
-    const ix = createAssociatedTokenAccountInstruction(owner, address, owner, token);
-    return new Transaction().add(ix);
+    key: "init-token-accounts",
+    onSentMessage: t`Initializing token accounts...`,
+    message: t`Initialized token accounts.`,
+  }, (tokens: PublicKey[], owner) => {
+    const ixs = tokens.map(token => {
+      const address = getAssociatedTokenAddressSync(token, owner);
+      return createAssociatedTokenAccountInstruction(owner, address, owner, token);
+    });
+    return new Transaction().add(...ixs);
   }, {
     onSuccess: () => {
       void mutate(filterBalances);
