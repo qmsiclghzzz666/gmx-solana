@@ -5,7 +5,7 @@ import { useConnection } from "@solana/wallet-adapter-react";
 import { helperToast } from "@/utils/helperToast";
 import { Trans } from "@lingui/macro";
 import ExternalLink from "@/components/ExternalLink/ExternalLink";
-import { getTransactionUrl } from "@/utils/transaction";
+import { getTransactionUrl } from "@/utils/explorer";
 import { PendingTransaction } from "@/onchain/transaction";
 
 interface Props {

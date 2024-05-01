@@ -1,5 +1,5 @@
 import ExternalLink from "@/components/ExternalLink/ExternalLink";
-import { getTransactionUrl } from "@/utils/transaction";
+import { getTransactionUrl } from "@/utils/explorer";
 import { Trans, t } from "@lingui/macro";
 
 export const makeSendErrorContent = (errorMessage: string | undefined) => function SendErrorContent() {

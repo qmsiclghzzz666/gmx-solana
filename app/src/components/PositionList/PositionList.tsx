@@ -12,6 +12,7 @@ type Props = {
   onOrdersClick: (key?: string) => void;
   openSettings: () => void;
   hideActions?: boolean;
+  showDebugValues?: boolean;
 };
 
 function usePositions(): PositionInfo[] {
@@ -25,6 +26,7 @@ function useIsPositionLoading(): boolean {
 export function PositionList({
   onClosePositionClick,
   onSelectPositionClick,
+  showDebugValues
 }: Props) {
   const positions = usePositions();
   const isLoading = useIsPositionLoading();
@@ -58,6 +60,7 @@ export function PositionList({
               isLarge={false}
               onClosePositionClick={onClosePositionClick}
               onPositionClick={onSelectPositionClick}
+              showDebugValues={showDebugValues}
             />
           ))}
       </div>
@@ -104,6 +107,7 @@ export function PositionList({
                 isLarge
                 onClosePositionClick={onClosePositionClick}
                 onPositionClick={onSelectPositionClick}
+                showDebugValues={showDebugValues}
               />
             ))}
         </tbody>

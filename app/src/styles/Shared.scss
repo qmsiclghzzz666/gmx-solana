@@ -169,6 +169,10 @@ td {
   cursor: pointer;
 }
 
+.default-cursor {
+  cursor: default !important;
+}
+
 .underline {
   text-decoration: underline;
 }

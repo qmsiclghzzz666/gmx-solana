@@ -16,6 +16,8 @@ import { formatDeltaUsd, formatTokenAmount } from "@/utils/number";
 import { useCallback } from "react";
 import { TradeMode, TradeParams } from "@/onchain/trade";
 import { getTradeParamsFromPosition } from "@/onchain/trade/utils";
+import ExternalLink from "../ExternalLink/ExternalLink";
+import { getAddressUrl } from "@/utils/explorer";
 
 export function PositionItem({
   position,
@@ -28,6 +30,7 @@ export function PositionItem({
   isLarge: boolean,
   onPositionClick: (params: TradeParams) => void,
   onClosePositionClick?: (address: string) => void,
+  showDebugValues?: boolean,
 }) {
   const address = position.address;
   const handleClosePositionClick = useCallback(() => onClosePositionClick && onClosePositionClick(address.toBase58()), [address, onClosePositionClick]);
@@ -52,11 +55,13 @@ function Large({
   hideActions,
   onClosePositionClick,
   onPositionClick,
+  showDebugValues,
 }: {
   position: PositionInfo,
   hideActions?: boolean,
   onClosePositionClick?: () => void,
   onPositionClick: (tradeMode?: TradeMode) => void,
+  showDebugValues?: boolean,
 }) {
   const {
     currentCollateralTokenAddress,
@@ -126,7 +131,7 @@ function Large({
       })}
       onClick={() => onPositionClick()}
     >
-      <td className="clickable">
+      <td>
         {/* title */}
         <div className="Exchange-list-title">
           <Tooltip
@@ -144,7 +149,7 @@ function Large({
             position="bottom-start"
             handleClassName="plain"
             renderContent={() => (
-              <div>
+              <div className="default-cursor">
                 <StatsTooltipRow
                   label={t`Market`}
                   value={
@@ -168,16 +173,22 @@ function Large({
                   <Trans>Use the &quot;Close&quot; button to reduce your Position Size.</Trans>
                 </div>
 
-                {/* {showDebugValues && (
-                <>
-                  <br />
-                  <StatsTooltipRow
-                    label={"Key"}
-                    value={<div className="debug-key muted">{p.position.contractKey}</div>}
-                    showDollar={false}
-                  />
-                </>
-              )} */}
+                {showDebugValues && (
+                  <>
+                    <br />
+                    <StatsTooltipRow
+                      label={t`Address`}
+                      value={
+                        <ExternalLink href={getAddressUrl(position.address)}>
+                          <div className="debug-key muted">
+                            {position.address.toBase58()}
+                          </div>
+                        </ExternalLink>
+                      }
+                      showDollar={false}
+                    />
+                  </>
+                )}
               </div>
             )}
           />

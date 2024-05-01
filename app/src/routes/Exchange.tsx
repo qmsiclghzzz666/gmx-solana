@@ -108,6 +108,7 @@ export default function Exchange() {
                 onSelectPositionClick={handleSelectPositionClick}
                 onClosePositionClick={hanldeClosePositionClick}
                 openSettings={openSettings}
+                showDebugValues
               />
             )}
           </div>
