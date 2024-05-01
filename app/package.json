@@ -26,6 +26,8 @@
     "classnames": "^2.5.1",
     "framer-motion": "^11.1.7",
     "gmsol": "workspace:*",
+    "graphology": "^0.25.4",
+    "graphology-shortest-path": "^2.1.0",
     "immer": "^10.0.4",
     "lodash": "^4.17.21",
     "react": "^18.2.0",

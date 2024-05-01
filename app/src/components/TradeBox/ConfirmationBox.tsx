@@ -137,7 +137,7 @@ function useTriggerCreateOrder() {
         initialCollateralDeltaAmount: toBigInt(initialCollateralDeltaAmount),
         sizeDeltaUsd: toBigInt(sizeDeltaUsd),
         options: {
-          swapPath,
+          swapPath: swapPath.map(translateAddress),
           initialCollateralToken: initialCollateralToken.address,
         }
       }, { skipPreflight });

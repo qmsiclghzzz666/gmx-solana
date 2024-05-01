@@ -1,12 +1,13 @@
 import { convertToUsd, expandDecimals } from "@/utils/number";
 import { TokenData, TokenOption, Tokens } from "../token";
-import { MarketInfo, MarketState, MarketTokens } from "./types";
+import { MarketInfo, MarketInfos, MarketState, MarketTokens } from "./types";
 import { toBN } from "gmsol";
 import { BN_ZERO, ONE_USD } from "@/config/constants";
 import { Address, BN, translateAddress } from "@coral-xyz/anchor";
 import { convertToTokenAmount, getMidPrice } from "../token/utils";
 import { NATIVE_TOKEN_ADDRESS } from "@/config/tokens";
 import { TradeType } from "../trade";
+import Graph from "graphology";
 
 export function usdToMarketTokenAmount(poolValue: BN, marketToken: TokenData, usdValue: BN) {
   const supply = marketToken.totalSupply!;
@@ -279,5 +280,38 @@ export function chooseSuitableMarket({
       tradeType: TradeType.Short,
       collateralTokenAddress: undefined,
     };
+  }
+}
+
+export function makeMarketGraph(marketInfos: MarketInfos) {
+  const graph = new Graph({
+    multi: true,
+    type: "directed",
+  });
+  for (const address in marketInfos) {
+    const market = marketInfos[address];
+    const longAddress = market.longTokenAddress.toBase58();
+    const shortAddress = market.shortTokenAddress.toBase58();
+    const longCapacity = getPoolUsdWithoutPnl(market, true, "minPrice");
+    const shortCapacity = getPoolUsdWithoutPnl(market, false, "minPrice");
+    graph.mergeNode(longAddress);
+    graph.mergeNode(shortAddress);
+    graph.addEdgeWithKey([address, "long"], longAddress, shortAddress, {
+      capacity: shortCapacity,
+      fee: longCapacity.gt(shortCapacity) ? 0 : 1,
+    });
+    graph.addEdgeWithKey([address, "short"], shortAddress, longAddress, {
+      capacity: longCapacity,
+      fee: shortCapacity.gt(longCapacity) ? 0 : 1,
+    });
+  }
+  return graph;
+}
+
+export function edgeNameToMarketTokenAddress(edgeName: string) {
+  try {
+    return edgeName.split(',')[0];
+  } catch (error) {
+    throw Error("Not a valid edge name");
   }
 }

@@ -1,15 +1,27 @@
 import { IncreaseSwapParams } from "@/onchain/trade";
 import { selectCollateralToken, selectFromToken, selectTradeBoxTradeFlags } from ".";
 import { createSharedStatesSelector } from "../../utils";
+import { selectMarketGraph } from "../market-selectors";
+import dijkstra from 'graphology-shortest-path/dijkstra';
+import { edgePathFromNodePath } from 'graphology-shortest-path/utils';
+import { edgeNameToMarketTokenAddress } from "@/onchain/market";
 
 export const selectIncreaseSwapParams = createSharedStatesSelector([
   selectTradeBoxTradeFlags,
   selectFromToken,
   selectCollateralToken,
-], ({ isIncrease }, fromToken) => {
-  if (!isIncrease || !fromToken) return;
+  selectMarketGraph,
+], ({ isIncrease }, fromToken, toToken, marketGraph) => {
+  if (!isIncrease || !fromToken || !toToken) return;
+  let path: string[] = [];
+  try {
+    const nodes = dijkstra.bidirectional(marketGraph, fromToken.address.toBase58(), toToken.address.toBase58(), "fee");
+    path = edgePathFromNodePath(marketGraph, nodes).map(edgeNameToMarketTokenAddress);
+  } catch (error) {
+    console.error("find swap path error:", error);
+  }
   return {
     initialCollateralToken: fromToken,
-    swapPath: [],
+    swapPath: path,
   } satisfies IncreaseSwapParams;
 });
