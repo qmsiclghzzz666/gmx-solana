@@ -1,7 +1,7 @@
 import { useSharedStatesSelector } from "@/contexts/shared";
 import Modal from "../Modal/Modal";
 import "./ConfirmationBox.scss";
-import { selectMarketAddress, selectTradeBoxCollateralTokenAddress, selectTradeBoxTradeFlags, selectIncreaseAmounts, selectIncreaseSwapParams } from "@/contexts/shared/selectors/trade-box-selectors";
+import { selectMarketAddress, selectTradeBoxCollateralTokenAddress, selectTradeBoxTradeFlags, selectIncreaseAmounts, selectIncreaseSwapParams, selectFromTokenInputAmount, selectFromToken, selectFromTokenUsd, selectToToken, selectToTokenInputAmount, selectToTokenUsd } from "@/contexts/shared/selectors/trade-box-selectors";
 import { useCallback, useMemo, useState } from "react";
 import { Trans, t } from "@lingui/macro";
 import { useTradeStage, useSetTradeStage } from "@/contexts/shared/hooks";
@@ -12,22 +12,43 @@ import { useTriggerInvocation } from "@/onchain/transaction";
 import { invokeCreateIncreaseOrder } from "gmsol";
 import { GMSOL_DEPLOYMENT } from "@/config/deployment";
 import { useSWRConfig } from "swr";
-import { filterBalances } from "@/onchain/token";
+import { TokenData, filterBalances } from "@/onchain/token";
 import { fitlerMarkets } from "@/onchain/market";
 import { fitlerPositions } from "@/onchain/position";
 import { toBigInt } from "@/utils/number";
-import { translateAddress } from "@coral-xyz/anchor";
+import { BN, translateAddress } from "@coral-xyz/anchor";
 import CheckBox from "../Common/CheckBox/CheckBox";
+import TokenWithIcon from "../TokenIcon/TokenWithIcon";
+import { formatAmount } from "../MarketsList/utils";
+import { BN_ZERO, USD_DECIMALS } from "@/config/constants";
+import { createStructuredSelector } from "reselect";
 
 interface Props {
   onClose?: () => void,
 }
 
+const selectDisplayInfo = createStructuredSelector({
+  fromToken: selectFromToken,
+  fromTokenAmount: selectFromTokenInputAmount,
+  fromTokenUsd: selectFromTokenUsd,
+  toToken: selectToToken,
+  toTokenAmount: selectToTokenInputAmount,
+  toTokenUsd: selectToTokenUsd,
+});
+
 export function ConfirmationBox({
   onClose
 }: Props) {
-  const { isMarket, isLimit, isSwap, isLong } = useSharedStatesSelector(selectTradeBoxTradeFlags);
   const [skipPreflight, setSkipPreflight] = useState(false);
+  const { isMarket, isLimit, isSwap, isLong } = useSharedStatesSelector(selectTradeBoxTradeFlags);
+  const {
+    fromToken,
+    fromTokenAmount,
+    fromTokenUsd,
+    toToken,
+    toTokenAmount,
+    toTokenUsd,
+  } = useSharedStatesSelector(selectDisplayInfo);
 
   const title = useMemo(() => {
     if (isMarket) {
@@ -84,11 +105,22 @@ export function ConfirmationBox({
         setIsVisible={handleClose}
         label={title}
       >
-        <CheckBox isChecked={skipPreflight} setIsChecked={setSkipPreflight}>
-          <span className="muted font-sm">
-            <Trans>Skip transaction preflight test.</Trans>
-          </span>
-        </CheckBox>
+        <div>
+          {fromToken && toToken && <MainInfo
+            isLong={isLong}
+            fromToken={fromToken}
+            fromAmount={fromTokenAmount}
+            fromUsdMin={fromTokenUsd ?? BN_ZERO}
+            toToken={toToken}
+            toAmount={toTokenAmount}
+            toUsdMax={toTokenUsd ?? BN_ZERO}
+          />}
+          <CheckBox isChecked={skipPreflight} setIsChecked={setSkipPreflight}>
+            <span className="muted font-sm">
+              <Trans>Skip transaction preflight test.</Trans>
+            </span>
+          </CheckBox>
+        </div>
         <div className="Confirmation-box-row">
           <Button
             variant="primary-action"
@@ -101,6 +133,40 @@ export function ConfirmationBox({
           </Button>
         </div>
       </Modal>
+    </div>
+  );
+}
+
+function MainInfo({
+  isLong,
+  fromAmount,
+  fromUsdMin,
+  fromToken,
+  toAmount,
+  toUsdMax,
+  toToken,
+}: {
+  isLong: boolean,
+  fromAmount: BN,
+  fromUsdMin: BN,
+  fromToken: TokenData,
+  toAmount: BN,
+  toUsdMax: BN,
+  toToken: TokenData,
+}) {
+  return (
+    <div className="Confirmation-box-main">
+      <span>
+        <Trans>Pay</Trans>&nbsp;{formatAmount(fromAmount, fromToken.decimals, 4, true)}{" "}
+        <TokenWithIcon symbol={fromToken.symbol} displaySize={20} />
+        (${formatAmount(fromUsdMin, USD_DECIMALS, 2, true)})
+      </span>
+      <div className="Confirmation-box-main-icon"></div>
+      <div>
+        {isLong ? t`Long` : t`Short`}&nbsp;
+        {formatAmount(toAmount, toToken.decimals, 4, true)} <TokenWithIcon symbol={toToken.symbol} displaySize={20} />{" "}
+        (${formatAmount(toUsdMax, USD_DECIMALS, 2, true)})
+      </div>
     </div>
   );
 }

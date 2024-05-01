@@ -1,4 +1,4 @@
-import { useSharedStatesSelector } from "@/contexts/shared";
+import { useSharedStatesSelector, useTradeStage } from "@/contexts/shared";
 import { selectIncreaseAmounts, selectMarketInfo, selectSetMarketAddress, selectTradeBoxChooseSuitableMarket, selectTradeBoxSetFromTokenAddress, selectTradeBoxTradeFlags, selectTradeBoxTradeType } from "@/contexts/shared/selectors/trade-box-selectors";
 import { ChangeEvent, FormEventHandler, useCallback, useMemo } from "react";
 import BuyInputSection from "../BuyInputSection/BuyInputSection";
@@ -20,6 +20,7 @@ import { useSetTradeStage } from "@/contexts/shared/hooks/use-set-trade-stage";
 import { ExchangeInfo } from "../Exchange/ExchangeInfo";
 import { MarketPoolSelectorRow } from "./MarketPoolSelectorRow";
 import { CollateralSelectorRow } from "./CollateralSelectorRow";
+import LoadingDots from "../Common/LoadingDots/LoadingDots";
 
 const tradeTypeLabels = {
   [TradeType.Long]: t`Long`,
@@ -29,6 +30,7 @@ const tradeTypeLabels = {
 
 export function TradeForm() {
   const { isSwap, isIncrease, isPosition, isLimit, isTrigger, isLong } = useSharedStatesSelector(selectTradeBoxTradeFlags);
+  const stage = useTradeStage();
   const setTradeStage = useSetTradeStage();
   const handleSubmit: FormEventHandler<HTMLFormElement> = useCallback((e) => {
     e.preventDefault();
@@ -58,9 +60,10 @@ export function TradeForm() {
           className="w-full"
           // onClick={onSubmit}
           type="submit"
+          disabled={stage !== "trade"}
         // disabled={isSubmitButtonDisabled && !shouldDisableValidationForTesting}
         >
-          {buttonText}
+          {stage === "trade" ? buttonText : <LoadingDots />}
         </Button>
       </div>
     </form>

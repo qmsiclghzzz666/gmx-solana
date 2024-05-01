@@ -32,6 +32,7 @@ export const selectSetFocusedInput = createSharedStatesSelector([selectTradeBoxS
 export const selectFromTokenInputAmount = createSharedStatesSelector([selectFromTokenInputValue, selectFromToken], parseAmount);
 export const selectFromTokenUsd = createSharedStatesSelector([selectFromTokenInputAmount, selectFromToken], calcUsd);
 export const selectToTokenInputAmount = createSharedStatesSelector([selectToTokenInputValue, selectToToken], parseAmount);
+export const selectToTokenUsd = createSharedStatesSelector([selectToTokenInputAmount, selectToToken], calcUsd);
 export const selectSwapTokens = createSharedStatesSelector([selectTradeBoxAvailableTokensOptions], options => options.swapTokens);
 export const selectSortedLongAndShortTokens = createSharedStatesSelector([selectTradeBoxAvailableTokensOptions], options => options.sortedLongAndShortTokens);
 export const selectSwitchTokenAddresses = createSharedStatesSelector([selectTradeBoxState], state => state.switchTokenAddresses);
