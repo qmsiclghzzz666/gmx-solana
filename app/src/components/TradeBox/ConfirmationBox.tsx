@@ -1,24 +1,22 @@
 import { useSharedStatesSelector } from "@/contexts/shared";
 import Modal from "../Modal/Modal";
 import "./ConfirmationBox.scss";
-import { selectTradeBoxTradeFlags } from "@/contexts/shared/selectors/trade-box-selectors";
+import { selectMarketAddress, selectTradeBoxCollateralTokenAddress, selectTradeBoxTradeFlags, selectIncreaseAmounts, selectIncreaseSwapParams } from "@/contexts/shared/selectors/trade-box-selectors";
 import { useCallback, useMemo } from "react";
 import { t } from "@lingui/macro";
-import { useTradeStage } from "@/contexts/shared/hooks";
-import { useSetTradeStage } from "@/contexts/shared/hooks/use-set-trade-stage";
+import { useTradeStage, useSetTradeStage } from "@/contexts/shared/hooks";
 import Button from "../Button/Button";
 import LoadingDots from "../Common/LoadingDots/LoadingDots";
 import { useExchange } from "@/contexts/anchor";
 import { useTriggerInvocation } from "@/onchain/transaction";
 import { invokeCreateIncreaseOrder } from "gmsol";
 import { GMSOL_DEPLOYMENT } from "@/config/deployment";
-import { PublicKey } from "@solana/web3.js";
 import { useSWRConfig } from "swr";
 import { filterBalances } from "@/onchain/token";
 import { fitlerMarkets } from "@/onchain/market";
 import { fitlerPositions } from "@/onchain/position";
-import { BN_ZERO } from "@/config/constants";
 import { toBigInt } from "@/utils/number";
+import { translateAddress } from "@coral-xyz/anchor";
 
 interface Props {
   onClose?: () => void,
@@ -101,7 +99,11 @@ export function ConfirmationBox({
 }
 
 function useTriggerCreateOrder() {
-  const { isMarket, isLimit, isSwap, isLong, isPosition } = useSharedStatesSelector(selectTradeBoxTradeFlags);
+  const { isMarket, isLimit, isSwap, isLong, isIncrease } = useSharedStatesSelector(selectTradeBoxTradeFlags);
+  const increaseAmounts = useSharedStatesSelector(selectIncreaseAmounts);
+  const marketTokenAddress = useSharedStatesSelector(selectMarketAddress);
+  const collateralTokenAddress = useSharedStatesSelector(selectTradeBoxCollateralTokenAddress);
+  const increaseSwapParams = useSharedStatesSelector(selectIncreaseSwapParams);
   const exchange = useExchange();
 
   const { mutate } = useSWRConfig();
@@ -114,26 +116,30 @@ function useTriggerCreateOrder() {
   const invoker = useCallback(async () => {
     const payer = exchange.provider.publicKey;
     if (!payer) throw Error("Wallet is not connteced");
-    if (isMarket && isPosition) {
+    if (!marketTokenAddress) throw Error("Missing market token address");
+    if (!collateralTokenAddress) throw Error("Missing collateral token address");
+    if (isMarket && isIncrease && increaseAmounts && increaseSwapParams) {
+      const { initialCollateralDeltaAmount, sizeDeltaUsd } = increaseAmounts;
+      const { initialCollateralToken, swapPath } = increaseSwapParams;
       const [signatrue, order] = await invokeCreateIncreaseOrder(exchange, {
         store: GMSOL_DEPLOYMENT!.store,
         payer,
-        marketToken: PublicKey.unique(),
-        collateralToken: PublicKey.unique(),
+        marketToken: translateAddress(marketTokenAddress),
+        collateralToken: translateAddress(collateralTokenAddress),
         isLong,
-        initialCollateralDeltaAmount: toBigInt(BN_ZERO),
-        sizeDeltaUsd: toBigInt(BN_ZERO),
+        initialCollateralDeltaAmount: toBigInt(initialCollateralDeltaAmount),
+        sizeDeltaUsd: toBigInt(sizeDeltaUsd),
         options: {
-          swapPath: undefined,
-          initialCollateralToken: undefined,
+          swapPath,
+          initialCollateralToken: initialCollateralToken.address,
         }
-      });
+      }, { skipPreflight: false });
       console.log(`created increase order ${order.toBase58()} at tx ${signatrue}`);
       return signatrue;
     } else {
       throw Error("Unsupprted order type");
     }
-  }, [exchange, isLong, isMarket, isPosition]);
+  }, [exchange, marketTokenAddress, collateralTokenAddress, isMarket, isIncrease, increaseAmounts, increaseSwapParams, isLong]);
 
   const { trigger, isSending } = useTriggerInvocation<void>({
     key: "create-increase-order",
@@ -150,7 +156,7 @@ function useTriggerCreateOrder() {
         isSending: false,
         error: t`Swap orders are not supported for now.`
       }
-    } else {
+    } else if (isIncrease) {
       return {
         trigger,
         isSending,
@@ -163,11 +169,10 @@ function useTriggerCreateOrder() {
       isSending: false,
       error: t`Limit orders are not supported for now.`
     }
-  } else {
-    return {
-      trigger: undefined,
-      isSending: false,
-      error: t`Unsupported order type.`,
-    }
+  }
+  return {
+    trigger: undefined,
+    isSending: false,
+    error: t`Unsupported order type.`,
   }
 }

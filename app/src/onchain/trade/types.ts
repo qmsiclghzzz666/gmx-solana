@@ -1,4 +1,4 @@
-import { BN } from "@coral-xyz/anchor";
+import { Address, BN } from "@coral-xyz/anchor";
 import { MarketInfo } from "../market";
 import { Token, TokenData, Tokens } from "../token";
 import { useTradeBoxState } from "./use-trade-box-state"
@@ -115,3 +115,13 @@ export type SwapAmounts = {
   minOutputAmount: BN;
   uiFeeUsd?: BN;
 };
+
+export interface IncreaseAmounts {
+  initialCollateralDeltaAmount: BN,
+  sizeDeltaUsd: BN,
+}
+
+export interface IncreaseSwapParams {
+  initialCollateralToken: TokenData,
+  swapPath: Address[],
+}

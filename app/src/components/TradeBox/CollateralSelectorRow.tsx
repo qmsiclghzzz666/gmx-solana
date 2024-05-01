@@ -1,14 +1,15 @@
 import { t } from "@lingui/macro";
 import ExchangeInfoRow from "../Exchange/ExchangeInfoRow";
 import TokenSelector from "../TokenSelector/TokenSelector";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useSharedStatesSelector } from "@/contexts/shared";
 import { Tokens } from "@/onchain/token";
 import { getPoolUsdWithoutPnl } from "@/onchain/market";
-import { selectMarketInfo, selectCollateralToken, selectSetCollateralAddress } from "@/contexts/shared/selectors/trade-box-selectors";
+import { selectMarketInfo, selectCollateralToken, selectSetCollateralAddress, selectTradeBoxCollateralTokenAddress } from "@/contexts/shared/selectors/trade-box-selectors";
 
 export function CollateralSelectorRow() {
   const marketInfo = useSharedStatesSelector(selectMarketInfo);
+  const selectCollateralTokenAddress = useSharedStatesSelector(selectTradeBoxCollateralTokenAddress);
   const selectedCollateralToken = useSharedStatesSelector(selectCollateralToken);
   const setCollateralAddress = useSharedStatesSelector(selectSetCollateralAddress);
 
@@ -35,6 +36,12 @@ export function CollateralSelectorRow() {
       allRelatedTokensMap,
     }
   }, [marketInfo]);
+
+  useEffect(() => {
+    if (!selectCollateralTokenAddress || !(selectCollateralTokenAddress in allRelatedTokensMap)) {
+      setCollateralAddress(allRelatedTokensArr[0]?.address.toBase58());
+    }
+  }, [allRelatedTokensArr, allRelatedTokensMap, selectCollateralTokenAddress, setCollateralAddress]);
 
   return (
     <>

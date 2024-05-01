@@ -1,5 +1,5 @@
 import { useSharedStatesSelector } from "@/contexts/shared";
-import { selectMarketInfo, selectSetMarketAddress, selectTradeBoxChooseSuitableMarket, selectTradeBoxSetFromTokenAddress, selectTradeBoxTradeFlags, selectTradeBoxTradeType } from "@/contexts/shared/selectors/trade-box-selectors";
+import { selectIncreaseAmounts, selectMarketInfo, selectSetMarketAddress, selectTradeBoxChooseSuitableMarket, selectTradeBoxSetFromTokenAddress, selectTradeBoxTradeFlags, selectTradeBoxTradeType } from "@/contexts/shared/selectors/trade-box-selectors";
 import { ChangeEvent, FormEventHandler, useCallback, useMemo } from "react";
 import BuyInputSection from "../BuyInputSection/BuyInputSection";
 import { t } from "@lingui/macro";
@@ -83,6 +83,7 @@ function TokenInputs({ isSwap, isIncrease }: { isSwap: boolean, isIncrease: bool
   const setFromTokenAddress = useSharedStatesSelector(selectTradeBoxSetFromTokenAddress);
   const switchTokenAddresses = useSharedStatesSelector(selectSwitchTokenAddresses);
   const chooseSuitableMarket = useSharedStatesSelector(selectTradeBoxChooseSuitableMarket);
+  const increaseAmounts = useSharedStatesSelector(selectIncreaseAmounts);
 
   const setFromTokenInputValue = useCallback((value: string, shouldResetPriceImpactWarning: boolean) => {
     setFromTokenInputValueRaw(value);
@@ -197,11 +198,11 @@ function TokenInputs({ isSwap, isIncrease }: { isSwap: boolean, isIncrease: bool
       {isIncrease && (
         <BuyInputSection
           topLeftLabel={tradeTypeLabels[tradeType]}
-          // topLeftValue={
-          //   increaseAmounts?.sizeDeltaUsd.gt(0)
-          //     ? formatUsd(increaseAmounts?.sizeDeltaUsd, { fallbackToZero: true })
-          //     : ""
-          // }
+          topLeftValue={
+            increaseAmounts?.sizeDeltaUsd.gt(BN_ZERO)
+              ? formatUsd(increaseAmounts?.sizeDeltaUsd, { fallbackToZero: true })
+              : ""
+          }
           topRightLabel={t`Leverage`}
           // topRightValue={formatLeverage(isLeverageEnabled ? leverage : increaseAmounts?.estimatedLeverage) || "-"}
           inputValue={toTokenInputValue}

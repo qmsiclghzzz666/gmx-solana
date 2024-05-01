@@ -236,7 +236,7 @@ export const makeCreateDecreaseOrderInstruction = async (
     const swapPath = options?.swapPath ?? [];
     const [authority] = findControllerPDA(store);
     const [onlyController] = findRolesPDA(store, authority);
-    const nonce = options?.nonce ?? PublicKey.unique().toBuffer();
+    const nonce = options?.nonce ?? Keypair.generate().publicKey.toBuffer();
     const [order] = findOrderPDA(store, payer, nonce);
     const acceptablePrice = options?.acceptablePrice;
     const finalOutputToken = options?.finalOutputToken ?? collateralToken;
@@ -255,7 +255,7 @@ export const makeCreateDecreaseOrderInstruction = async (
                 isLong,
             },
             outputToken: collateralToken,
-            uiFeeReceiver: PublicKey.unique(),
+            uiFeeReceiver: PublicKey.default,
             executionFee: toBN(options?.executionFee ?? 0),
             swapLength: swapPath.length,
         }).accounts({
@@ -318,7 +318,7 @@ export const makeCreateIncreaseOrderInstruction = async (
     const swapPath = options?.swapPath ?? [];
     const [authority] = findControllerPDA(store);
     const [onlyController] = findRolesPDA(store, authority);
-    const nonce = options?.nonce ?? PublicKey.unique().toBuffer();
+    const nonce = options?.nonce ?? Keypair.generate().publicKey.toBuffer();
     const [order] = findOrderPDA(store, payer, nonce);
     const acceptablePrice = options?.acceptablePrice;
     const initialCollateralToken = options?.initialCollateralToken ?? collateralToken;
@@ -336,7 +336,7 @@ export const makeCreateIncreaseOrderInstruction = async (
                 isLong,
             },
             outputToken: collateralToken,
-            uiFeeReceiver: PublicKey.unique(),
+            uiFeeReceiver: PublicKey.default,
             executionFee: toBN(options?.executionFee ?? 0),
             swapLength: swapPath.length,
         }).accounts({
