@@ -1,36 +1,15 @@
-import { useNavigate, useParams } from "react-router-dom";
-import { TradeParams, TradeType } from "./types";
-import { getMatchingValueFromObject } from "@/utils/objects";
-import { useEffect, useRef } from "react";
-import { useTradeBoxStateSelector } from "@/contexts/shared/hooks/use-trade-box-state-selector";
-import { isMatch } from "lodash";
+import { useSharedStatesSelector } from "@/contexts/shared";
+import { selectAvailableMarkets, selectMarketAddress, selectSetMarketAddress } from "@/contexts/shared/selectors/trade-box-selectors";
+import { useEffect } from "react";
 
 export const useTradeParamsProcessor = () => {
-  const setTradeParams = useTradeBoxStateSelector(s => s.setTradeParams);
-
-  const prevParams = useRef<TradeParams>({
-    tradeType: undefined,
-    tradeMode: undefined,
-  });
-
-  const { tradeType } = useParams();
-  const navigate = useNavigate();
+  const marketAddress = useSharedStatesSelector(selectMarketAddress);
+  const setMarketAddress = useSharedStatesSelector(selectSetMarketAddress);
+  const availablePools = useSharedStatesSelector(selectAvailableMarkets);
 
   useEffect(() => {
-    const params: TradeParams = {};
-
-    if (tradeType) {
-      const validTradeType = getMatchingValueFromObject(TradeType, tradeType);
-      if (validTradeType) {
-        params.tradeType = validTradeType as TradeType;
-      } else {
-        navigate("/trade");
-      }
+    if (!marketAddress && availablePools.length > 0) {
+      setMarketAddress(availablePools[0].marketTokenAddress.toBase58());
     }
-
-    if (!isMatch(prevParams.current, params)) {
-      prevParams.current = params;
-      setTradeParams(params);
-    }
-  }, [navigate, setTradeParams, tradeType]);
+  }, [availablePools, marketAddress, setMarketAddress]);
 };
