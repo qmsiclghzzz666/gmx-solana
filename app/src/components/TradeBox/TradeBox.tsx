@@ -50,7 +50,6 @@ export function TradeBox({
     tradeMode,
     availalbleTradeModes,
     setTradeMode,
-    setTradeType,
   } = useTradeBoxStateSelector(s => s);
 
   const setFromTokenInputValue = useSharedStatesSelector(selectSetFromTokenInputValue);
@@ -66,9 +65,8 @@ export function TradeBox({
     if ((tradeType === TradeType.Swap) !== isSwap) {
       resetInputs();
     }
-    setTradeType(tradeType);
     navigate(`/trade/${tradeType.toLocaleLowerCase()}`);
-  }, [isSwap, navigate, resetInputs, setTradeType]);
+  }, [isSwap, navigate, resetInputs]);
 
   const handleSelectTradeMode = useCallback((tradeMode: TradeMode) => {
     setTradeMode(tradeMode);

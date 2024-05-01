@@ -6,13 +6,11 @@ import { useTradeBoxStateSelector } from "@/contexts/shared/hooks/use-trade-box-
 import { isMatch } from "lodash";
 
 export const useTradeParamsProcessor = () => {
-  const savedTradeMode = useTradeBoxStateSelector(s => s.tradeMode);
-  const savedTradeType = useTradeBoxStateSelector(s => s.tradeType);
   const setTradeParams = useTradeBoxStateSelector(s => s.setTradeParams);
 
   const prevParams = useRef<TradeParams>({
-    tradeType: savedTradeType,
-    tradeMode: savedTradeMode,
+    tradeType: undefined,
+    tradeMode: undefined,
   });
 
   const { tradeType } = useParams();
