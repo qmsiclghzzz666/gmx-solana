@@ -2,8 +2,9 @@ import { Address, translateAddress } from "@coral-xyz/anchor";
 import { useTokensData } from "./use-tokens-data";
 import { useCallback, useMemo } from "react";
 import { useInitializeTokenAccounts } from "@/onchain/token";
+import { ConfirmOptions } from "@solana/web3.js";
 
-export function useNeedToInitializeTokenAccounts(filter?: Address[]) {
+export function useNeedToInitializeTokenAccounts(filter?: Address[], opts?: ConfirmOptions) {
   const translatedFilter = useMemo(() => new Set(filter?.map(address => address.toString())), [filter]);
   const tokens = useTokensData();
   const { needToInitializeTokenAddresses, needToInitializeTokens } = useMemo(() => {
@@ -14,7 +15,7 @@ export function useNeedToInitializeTokenAccounts(filter?: Address[]) {
     const needToInitializeTokens = needToInitializeTokenAddresses.map(address => tokens[address]);
     return { needToInitializeTokenAddresses, needToInitializeTokens }
   }, [tokens, translatedFilter]);
-  const { trigger, isSending } = useInitializeTokenAccounts();
+  const { trigger, isSending } = useInitializeTokenAccounts(opts);
   const initialize = useCallback(async () => {
     return await trigger(needToInitializeTokenAddresses.map(address => translateAddress(address)));
   }, [needToInitializeTokenAddresses, trigger]);
