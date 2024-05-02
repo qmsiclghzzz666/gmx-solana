@@ -19,21 +19,52 @@ import { fitlerPositions } from "@/onchain/position";
 import { MakeCreateDecreaseOrderParams, invokeCreateDecreaseOrder } from "gmsol";
 import { useExchange, useOpenConnectModal } from "@/contexts/anchor";
 import { GMSOL_DEPLOYMENT } from "@/config/deployment";
+import { withInitializeTokenAccountGuard } from "../InitializeTokenAccountGuard";
 
 export function PositionSeller() {
   const position = useClosingPosition();
+  const clearClosingPosition = useClearClosingPosition();
+
+  const handleClose = useCallback(() => {
+    clearClosingPosition();
+  }, [clearClosingPosition]);
+
+  const isVisible = Boolean(position);
+
+  const relatedTokens = useMemo(() => {
+    const tokens = [];
+    if (position) {
+      tokens.push(position.collateralTokenAddress);
+      if (position.isLong) {
+        tokens.push(position.marketInfo.longTokenAddress);
+      } else {
+        tokens.push(position.marketInfo.shortTokenAddress);
+      }
+    }
+    return tokens;
+  }, [position]);
+
+  return (
+    <ConfirmationModal isVisible={isVisible} onClose={handleClose} tokens={relatedTokens} />
+  );
+}
+
+const ConfirmationModal = withInitializeTokenAccountGuard(ConfirmationModalInner);
+
+function ConfirmationModalInner({ isVisible, onClose }: { isVisible: boolean, onClose: () => void }) {
+  const position = useClosingPosition();
   const [closeUsdInputValue, setCloseUsdInputValue] = useDebounceValue("", DEBOUNCE_MS);
+
   const resetInputs = useCallback(() => {
     setCloseUsdInputValue("");
   }, [setCloseUsdInputValue]);
-  const clearClosingPosition = useClearClosingPosition();
+
   const handleClose = useCallback(() => {
-    clearClosingPosition();
+    onClose();
     resetInputs();
-  }, [clearClosingPosition, resetInputs]);
+  }, [onClose, resetInputs]);
 
   const { mutate } = useSWRConfig();
-
   const mutateStates = useCallback(() => {
     void mutate(filterBalances);
     void mutate(fitlerMarkets);
@@ -60,7 +91,6 @@ export function PositionSeller() {
     message: t`Decrease order created.`,
   }, createDecreaseOrder, { onSuccess: mutateStates });
 
-  const isVisible = Boolean(position);
   const maxCloseSize = position?.sizeInUsd ?? BN_ZERO;
   const closeSizeUsd = useMemo(() => parseValue(closeUsdInputValue || "0", USD_DECIMALS)!, [closeUsdInputValue]);
 
