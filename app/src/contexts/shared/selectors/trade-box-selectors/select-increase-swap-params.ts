@@ -2,9 +2,9 @@ import { IncreaseSwapParams } from "@/onchain/trade";
 import { selectCollateralToken, selectFromToken, selectTradeBoxTradeFlags } from ".";
 import { createSharedStatesSelector } from "../../utils";
 import { selectMarketGraph } from "../market-selectors";
-import dijkstra from 'graphology-shortest-path/dijkstra';
-import { edgePathFromNodePath } from 'graphology-shortest-path/utils';
-import { edgeNameToMarketTokenAddress } from "@/onchain/market";
+import { dijkstraWithLimit, edgeNameToMarketTokenAddress } from "@/onchain/market";
+
+export const MAX_LENGTH = 5;
 
 export const selectIncreaseSwapParams = createSharedStatesSelector([
   selectTradeBoxTradeFlags,
@@ -13,17 +13,25 @@ export const selectIncreaseSwapParams = createSharedStatesSelector([
   selectMarketGraph,
 ], ({ isIncrease }, fromToken, toToken, marketGraph) => {
   if (!isIncrease || !fromToken || !toToken) return;
-  let path: string[] = [];
+  let swapPath: string[] = [];
   let swapTokens: string[] = [];
   try {
-    swapTokens = dijkstra.bidirectional(marketGraph, fromToken.address.toBase58(), toToken.address.toBase58(), "fee");
-    path = edgePathFromNodePath(marketGraph, swapTokens).map(edgeNameToMarketTokenAddress);
+    const { nodePath, edgePath } = dijkstraWithLimit(
+      marketGraph,
+      fromToken.address.toBase58(),
+      toToken.address.toBase58(),
+      attrs => attrs['fee'] as number,
+      MAX_LENGTH,
+    );
+    swapPath = edgePath.map(edgeNameToMarketTokenAddress);
+    swapTokens = nodePath;
   } catch (error) {
     console.error("find swap path error:", error);
   }
   return {
+    isSwapfulfilled: fromToken.address === toToken.address || swapPath.length > 0,
     initialCollateralToken: fromToken,
-    swapPath: path,
+    swapPath,
     swapTokens,
-  } as IncreaseSwapParams;
+  } satisfies IncreaseSwapParams as IncreaseSwapParams;
 });

@@ -24,6 +24,7 @@ import { BN_ZERO, USD_DECIMALS } from "@/config/constants";
 import { createStructuredSelector } from "reselect";
 import { selectMarketStateTokens } from "@/contexts/shared/selectors/market-selectors";
 import { createSharedStatesSelector } from "@/contexts/shared/utils";
+import { getByKey } from "@/utils/objects";
 
 interface Props {
   onClose?: () => void,
@@ -119,7 +120,7 @@ export function ConfirmationBox({
           />}
           <CheckBox isChecked={skipPreflight} setIsChecked={setSkipPreflight}>
             <span className="muted font-sm">
-              <Trans>Skip transaction preflight test.</Trans>
+              <Trans>Skip transaction preflight.</Trans>
             </span>
           </CheckBox>
         </div>
@@ -145,9 +146,22 @@ const selectIntermediateSwapTokens = createSharedStatesSelector([
 ], (fullSwapTokens, tokens) => {
   if (fullSwapTokens && fullSwapTokens.length >= 1) {
     const addresses = fullSwapTokens.slice(1);
-    return addresses.map(address => tokens[address.toString()]);
+    let allReady = true;
+    return {
+      allReady,
+      swapTokens: addresses.map(address => {
+        const token = getByKey(tokens, address.toString());
+        if (!token) {
+          allReady = false;
+        }
+        return token;
+      }).filter(token => token) as TokenData[],
+    };
   } else {
-    return [];
+    return {
+      allReady: false,
+      swapTokens: [],
+    };
   }
 });
 
@@ -170,7 +184,7 @@ function MainInfo({
   toToken: TokenData,
   showSwapPath?: boolean,
 }) {
-  const swapTokens = useSharedStatesSelector(selectIntermediateSwapTokens);
+  const { allReady, swapTokens } = useSharedStatesSelector(selectIntermediateSwapTokens);
   return (
     <div className="Confirmation-box-main">
       <span>
@@ -178,7 +192,7 @@ function MainInfo({
         <TokenWithIcon symbol={fromToken.symbol} displaySize={20} />
         (${formatAmount(fromUsdMin, USD_DECIMALS, 2, true)})
       </span>
-      {showSwapPath && swapTokens.map(token => (<div key={token.address.toBase58()}>
+      {showSwapPath && allReady && swapTokens.map(token => (<div key={token?.address.toBase58()}>
         <div className="Confirmation-box-main-icon"></div>
         <span>
           {"("}
@@ -203,6 +217,7 @@ function useTriggerCreateOrder() {
   const marketTokenAddress = useSharedStatesSelector(selectMarketAddress);
   const collateralTokenAddress = useSharedStatesSelector(selectTradeBoxCollateralTokenAddress);
   const increaseSwapParams = useSharedStatesSelector(selectIncreaseSwapParams);
+  const isSwapfulfilled = increaseSwapParams?.isSwapfulfilled;
   const exchange = useExchange();
 
   const { mutate } = useSWRConfig();
@@ -255,12 +270,6 @@ function useTriggerCreateOrder() {
         isSending: false,
         error: t`Swap orders are not supported for now.`
       }
-    } else if (isIncrease) {
-      return {
-        trigger,
-        isSending,
-        error: null,
-      }
     }
   } else if (isLimit) {
     return {
@@ -269,9 +278,24 @@ function useTriggerCreateOrder() {
       error: t`Limit orders are not supported for now.`
     }
   }
-  return {
-    trigger: undefined,
-    isSending: false,
-    error: t`Unsupported order type.`,
+
+  if (isSwapfulfilled === undefined) {
+    return {
+      trigger: undefined,
+      isSending: false,
+      error: t`Unsupported order type.`,
+    }
+  } else if (isSwapfulfilled) {
+    return {
+      trigger,
+      isSending,
+      error: null,
+    }
+  } else {
+    return {
+      trigger: undefined,
+      isSending: false,
+      error: t`Swap path cannot be fulfilled.`,
+    }
   }
 }
