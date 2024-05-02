@@ -1,11 +1,11 @@
 import { useSharedStatesSelector, useTradeStage } from "@/contexts/shared";
-import { selectIncreaseAmounts, selectMarketInfo, selectSetMarketAddress, selectTradeBoxChooseSuitableMarket, selectTradeBoxSetFromTokenAddress, selectTradeBoxTradeFlags, selectTradeBoxTradeType } from "@/contexts/shared/selectors/trade-box-selectors";
+import { selectFromTokenInputAmount, selectIncreaseAmounts, selectMarketInfo, selectSetMarketAddress, selectTradeBoxChooseSuitableMarket, selectTradeBoxSetFromTokenAddress, selectTradeBoxTradeFlags, selectTradeBoxTradeType } from "@/contexts/shared/selectors/trade-box-selectors";
 import { ChangeEvent, FormEventHandler, useCallback, useMemo } from "react";
 import BuyInputSection from "../BuyInputSection/BuyInputSection";
 import { t } from "@lingui/macro";
 import TokenSelector from "../TokenSelector/TokenSelector";
 import { Token } from "@/onchain/token";
-import { formatTokenAmount } from "@/utils/number";
+import { formatAmountFree, formatTokenAmount } from "@/utils/number";
 import { selectMarketStateTokens } from "@/contexts/shared/selectors/market-selectors";
 import { BN_ZERO } from "@/config/constants";
 import { formatUsd, getMarketIndexName } from "../MarketsList/utils";
@@ -21,6 +21,8 @@ import { ExchangeInfo } from "../Exchange/ExchangeInfo";
 import { MarketPoolSelectorRow } from "./MarketPoolSelectorRow";
 import { CollateralSelectorRow } from "./CollateralSelectorRow";
 import LoadingDots from "../Common/LoadingDots/LoadingDots";
+import { useAnchor } from "@/contexts/anchor";
+import { useNativeTokenUtils } from "../NativeTokenUtils";
 
 const tradeTypeLabels = {
   [TradeType.Long]: t`Long`,
@@ -126,25 +128,39 @@ function TokenInputs({ isSwap, isIncrease }: { isSwap: boolean, isIncrease: bool
     setToTokenInputValue(fromTokenInputValue, true);
   }, [fromTokenInputValue, setFromTokenInputValue, setToTokenInputValue, switchTokenAddresses, toTokenInputValue]);
 
-  const isFromTokenInitialized = fromToken?.balance !== null;
-  const isToTokenInitialized = toToken?.balance !== null;
+  const { owner } = useAnchor();
+  const { isNativeTokenReady, openWrapNativeTokenModal } = useNativeTokenUtils();
+  const allowWrapFromToken = owner && isNativeTokenReady && fromToken?.isWrappedNative;
+
+  const onMaxClick = useCallback(() => {
+    if (fromToken?.balance) {
+      const finalAmount = formatAmountFree(fromToken.balance, fromToken.decimals);
+      setFromTokenInputValue(finalAmount, true);
+    }
+  }, [fromToken, setFromTokenInputValue]);
+
+  const fromTokenAmount = useSharedStatesSelector(selectFromTokenInputAmount);
+  const isNotMatchAvailableBalance =
+    fromToken?.balance?.gt(BN_ZERO) &&
+    !fromToken.balance.eq(fromTokenAmount);
 
   return (
     <>
       <BuyInputSection
-        topLeftLabel={t`Pay`}
-        // FIXME: the comparison seems to be trivial.
-        // Original version is `topLeftValue={fromUsd?.gt(BN_ZERO) ? formatUsd(isIncrease ? increaseAmounts?.initialCollateralUsd : fromUsd) : ""}`
+        topLeftLabel={allowWrapFromToken ? t`Pay (wrap)` : t`Pay`}
         topLeftValue={fromUsd?.gt(BN_ZERO) ? formatUsd(fromUsd) : ""}
-        topRightLabel={isFromTokenInitialized ? t`Balance` : t`Unintialized`}
-        topRightValue={isFromTokenInitialized ? formatTokenAmount(fromToken?.balance ?? BN_ZERO, fromToken?.decimals, "", {
+        {...(allowWrapFromToken && {
+          onClickTopLeftLabel: openWrapNativeTokenModal,
+        })}
+        topRightLabel={t`Balance`}
+        topRightValue={formatTokenAmount(fromToken?.balance ?? BN_ZERO, fromToken?.decimals, "", {
           useCommas: true,
-        }) : ""}
-        // onClickTopRightLabel={onMaxClick}
+        })}
+        onClickTopRightLabel={onMaxClick}
         inputValue={fromTokenInputValue}
         onInputValueChange={handleFromInputTokenChange}
-      // showMaxButton={isNotMatchAvailableBalance}
-      // onClickMax={onMaxClick}
+        showMaxButton={isNotMatchAvailableBalance}
+        onClickMax={onMaxClick}
       >
         {fromToken && (
           <TokenSelector
@@ -172,10 +188,10 @@ function TokenInputs({ isSwap, isIncrease }: { isSwap: boolean, isIncrease: bool
         <BuyInputSection
           topLeftLabel={t`Receive`}
           // topLeftValue={swapAmounts?.usdOut.gt(0) ? formatUsd(swapAmounts?.usdOut) : ""}
-          topRightLabel={isToTokenInitialized ? t`Balance` : t`Uninitialized`}
-          topRightValue={isToTokenInitialized ? formatTokenAmount(toToken?.balance ?? BN_ZERO, toToken?.decimals, "", {
+          topRightLabel={t`Balance`}
+          topRightValue={formatTokenAmount(toToken?.balance ?? BN_ZERO, toToken?.decimals, "", {
             useCommas: true,
-          }) : ""}
+          })}
           inputValue={toTokenInputValue}
           onInputValueChange={handleToInputTokenChange}
           showMaxButton={false}
