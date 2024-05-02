@@ -26,7 +26,7 @@ const TRANSITION = { duration: 0.2 };
 
 export type ModalProps = PropsWithChildren<{
   isVisible?: boolean;
-  setIsVisible: (isVisible: boolean) => void;
+  onClose: (isVisible: boolean) => void;
   className?: string;
   zIndex?: number;
   onAfterOpen?: () => void;
@@ -35,7 +35,7 @@ export type ModalProps = PropsWithChildren<{
 }>;
 
 export default function Modal(props: ModalProps) {
-  const { isVisible, setIsVisible, className, zIndex, onAfterOpen } = props;
+  const { isVisible, onClose: setIsVisible, className, zIndex, onAfterOpen } = props;
 
   const modalRef = useRef(null);
 

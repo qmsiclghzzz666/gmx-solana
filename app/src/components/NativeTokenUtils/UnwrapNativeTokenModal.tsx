@@ -47,7 +47,7 @@ export function UnwrapNativeTokenModal({
     <Modal
       className="unwrap-native-token-modal"
       isVisible={isVisible}
-      setIsVisible={() => {
+      onClose={() => {
         onClose();
       }} label={t`Unwrap WSOL`}>
       <form onSubmit={(e) => {

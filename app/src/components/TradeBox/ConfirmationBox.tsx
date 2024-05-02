@@ -105,7 +105,7 @@ export function ConfirmationBox({
     <div className="Confirmation-box">
       <Modal
         isVisible={isVisible}
-        setIsVisible={handleClose}
+        onClose={handleClose}
         label={title}
       >
         <div>

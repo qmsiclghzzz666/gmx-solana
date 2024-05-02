@@ -42,6 +42,7 @@ export const NativeTokenUtilsProvider = ({ children }: { children: ReactNode }) 
       {children}
       {nativeToken && <WrapNativeTokenModal
         isVisible={isWrapping}
+        tokens={[WRAPPED_NATIVE_TOKEN_ADDRESS]}
         nativeToken={nativeToken}
         onSubmitted={() => setIsWrapping(false)}
         onClose={() => setIsWrapping(false)}

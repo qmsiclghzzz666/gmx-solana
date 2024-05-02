@@ -169,8 +169,8 @@ export function GmForm({
   const isMarketTokenAccountInited = marketToken?.balance !== null;
   const isFirstTokenAccountInited = firstToken?.balance !== null;
   const isSecondTokenAccountInited = secondToken?.balance !== null;
-  const allowWrapFirstToken = owner && isNativeTokenReady && isDeposit && isFirstTokenAccountInited && firstToken?.isWrappedNative;
-  const allowWrapSecondToken = owner && isNativeTokenReady && isDeposit && isSecondTokenAccountInited && secondToken?.isWrappedNative;
+  const allowWrapFirstToken = owner && isNativeTokenReady && isDeposit && firstToken?.isWrappedNative;
+  const allowWrapSecondToken = owner && isNativeTokenReady && isDeposit && secondToken?.isWrappedNative;
 
   const [indexName, setIndexName] = useLocalStorageSerializeKey<string>(
     getSyntheticsDepositIndexTokenKey(genesisHash),
@@ -244,7 +244,7 @@ export function GmForm({
           <BuyInputSection
             topLeftLabel={isDeposit ? (allowWrapFirstToken ? t`Pay (wrap)` : t`Pay`) : t`Receive`}
             {...(allowWrapFirstToken && {
-              onClientTopLeftLabel: wrapNativeToken,
+              onClickTopLeftLabel: wrapNativeToken,
             })}
             topLeftValue={formatUsd(firstTokenUsd)}
             topRightLabel={isFirstTokenAccountInited ? t`Balance` : isInitializing ? t`Initializing` : t`Uninitialized`}
@@ -295,7 +295,7 @@ export function GmForm({
             <BuyInputSection
               topLeftLabel={isDeposit ? allowWrapSecondToken ? t`Pay (wrap)` : t`Pay` : t`Receive`}
               {...(allowWrapSecondToken && {
-                onClientTopLeftLabel: wrapNativeToken,
+                onClickTopLeftLabel: wrapNativeToken,
               })}
               topLeftValue={formatUsd(secondTokenUsd)}
               topRightLabel={isSecondTokenAccountInited ? t`Balance` : isInitializing ? t`Initializing...` : t`Uninitialized`}

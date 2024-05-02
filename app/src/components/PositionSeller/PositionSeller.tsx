@@ -94,7 +94,7 @@ export function PositionSeller() {
       <Modal
         className="PositionSeller-modal"
         isVisible={isVisible}
-        setIsVisible={handleClose}
+        onClose={handleClose}
         label={
           <Trans>
             Close {position?.isLong ? t`Long` : t`Short`} {position?.marketInfo.indexToken?.symbol}
