@@ -31,7 +31,7 @@ export function InitializeTokenAccountBox({
   return (
     <div className="Confirmation-box">
       <Modal isVisible={isVisible} onClose={onClose} label={t`Need to initialize Token Accounts`}>
-        <span className="muted font-sm"><Trans>Initialize the accounts for the following tokens:</Trans></span>
+        <span className="muted font-sm"><Trans>The following tokens accounts are required:</Trans></span>
         <div className="Confirmation-box-main">
           {tokens.map(token => {
             return (
@@ -59,7 +59,7 @@ export function InitializeTokenAccountBox({
             onClick={handleClick}
             disabled={isSending}
           >
-            {isSending ? <LoadingDots size={14} /> : t`Initialize`}
+            {isSending ? <LoadingDots size={14} /> : t`Initialize All`}
           </Button>
         </div>
       </Modal>

@@ -1,7 +1,7 @@
 import { useSharedStatesSelector } from "@/contexts/shared";
 import Modal from "../Modal/Modal";
 import "./ConfirmationBox.scss";
-import { selectMarketAddress, selectTradeBoxCollateralTokenAddress, selectTradeBoxTradeFlags, selectIncreaseAmounts, selectIncreaseSwapParams, selectFromTokenInputAmount, selectFromToken, selectFromTokenUsd, selectToToken, selectToTokenInputAmount, selectToTokenUsd } from "@/contexts/shared/selectors/trade-box-selectors";
+import { selectMarketAddress, selectTradeBoxCollateralTokenAddress, selectTradeBoxTradeFlags, selectIncreaseAmounts, selectIncreaseSwapParams, selectFromTokenInputAmount, selectFromToken, selectFromTokenUsd, selectToToken, selectToTokenInputAmount, selectToTokenUsd, selectTradeBoxFromTokenAddress, selectTradeBoxToTokenAddress } from "@/contexts/shared/selectors/trade-box-selectors";
 import { useCallback, useMemo, useState } from "react";
 import { Trans, t } from "@lingui/macro";
 import { useTradeStage, useSetTradeStage } from "@/contexts/shared/hooks";
@@ -25,6 +25,7 @@ import { createStructuredSelector } from "reselect";
 import { selectMarketStateTokens } from "@/contexts/shared/selectors/market-selectors";
 import { createSharedStatesSelector } from "@/contexts/shared/utils";
 import { getByKey } from "@/utils/objects";
+import { withInitializeTokenAccountGuard } from "../InitializeTokenAccountGuard";
 
 interface Props {
   onClose?: () => void,
@@ -42,6 +43,50 @@ const selectDisplayInfo = createStructuredSelector({
 export function ConfirmationBox({
   onClose
 }: Props) {
+  const stage = useTradeStage();
+  const isVisible = useMemo(() => stage === "confirmation", [stage]);
+  const setStage = useSetTradeStage();
+
+  const handleClose = useCallback(() => {
+    if (onClose) {
+      onClose();
+    }
+    setStage("trade");
+  }, [onClose, setStage]);
+
+  const { isSwap } = useSharedStatesSelector(selectTradeBoxTradeFlags);
+  const fromTokenAddress = useSharedStatesSelector(selectTradeBoxFromTokenAddress);
+  const toTokenAddress = useSharedStatesSelector(selectTradeBoxToTokenAddress);
+
+  const relatedTokens = useMemo(() => {
+    const relatedTokens: string[] = [];
+    if (fromTokenAddress) {
+      relatedTokens.push(fromTokenAddress);
+    }
+    if (isSwap && toTokenAddress) {
+      relatedTokens.push(toTokenAddress);
+    }
+    return relatedTokens;
+  }, [fromTokenAddress, isSwap, toTokenAddress]);
+
+  return (
+    <ConfirmationModal
+      tokens={relatedTokens}
+      isVisible={isVisible}
+      onClose={handleClose}
+    />
+  );
+}
+
+const ConfirmationModal = withInitializeTokenAccountGuard(ConfirmationModalInner);
+
+function ConfirmationModalInner({
+  isVisible,
+  onClose,
+}: {
+  isVisible: boolean,
+  onClose: () => void,
+}) {
   const [skipPreflight, setSkipPreflight] = useState(false);
   const { isMarket, isLimit, isSwap, isLong } = useSharedStatesSelector(selectTradeBoxTradeFlags);
   const {
@@ -82,30 +127,19 @@ export function ConfirmationBox({
     return text;
   }, [isLimit, isLong, isMarket, isSwap]);
 
-  const stage = useTradeStage();
-  const isVisible = useMemo(() => stage === "confirmation", [stage]);
-
-  const setStage = useSetTradeStage();
-  const handleClose = useCallback(() => {
-    if (onClose) {
-      onClose();
-    }
-    setStage("trade");
-  }, [onClose, setStage]);
-
   const { trigger, isSending, error } = useTriggerCreateOrder();
 
   const handleSubmit = useCallback(() => {
     if (trigger) {
-      void trigger({ skipPreflight }).then(handleClose);
+      void trigger({ skipPreflight }).then(onClose);
     }
-  }, [handleClose, skipPreflight, trigger]);
+  }, [onClose, skipPreflight, trigger]);
 
   return (
     <div className="Confirmation-box">
       <Modal
         isVisible={isVisible}
-        onClose={handleClose}
+        onClose={onClose}
         label={title}
       >
         <div>
@@ -128,7 +162,6 @@ export function ConfirmationBox({
           <Button
             variant="primary-action"
             className="w-full"
-            type="submit"
             onClick={handleSubmit}
             disabled={isSending || Boolean(error)}
           >
