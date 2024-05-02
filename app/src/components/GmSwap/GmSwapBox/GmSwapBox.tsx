@@ -8,6 +8,7 @@ import GmStateProvider from "../GmStateProvider";
 import { getTokenData } from "@/onchain/token/utils";
 import { NATIVE_TOKEN_ADDRESS } from "@/config/tokens";
 import { PublicKey } from "@solana/web3.js";
+import { useWallet } from "@solana/wallet-adapter-react";
 
 type Props = {
   owner: PublicKey | undefined,
@@ -52,6 +53,8 @@ export function GmSwapBox({
 
   const nativeToken = getTokenData(tokensData, NATIVE_TOKEN_ADDRESS);
 
+  const { connecting } = useWallet();
+
   return (
     <GmStateProvider
       market={marketInfo}
@@ -68,7 +71,7 @@ export function GmSwapBox({
         tokensData={tokensData}
         genesisHash={chainId}
         tokenOptions={tokenOptions}
-        isPending={isPending}
+        isPending={isPending || connecting}
         setOperation={setOperation}
         setMode={setMode}
         onSelectMarket={onSelectMarket}

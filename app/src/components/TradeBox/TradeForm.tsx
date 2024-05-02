@@ -21,8 +21,9 @@ import { ExchangeInfo } from "../Exchange/ExchangeInfo";
 import { MarketPoolSelectorRow } from "./MarketPoolSelectorRow";
 import { CollateralSelectorRow } from "./CollateralSelectorRow";
 import LoadingDots from "../Common/LoadingDots/LoadingDots";
-import { useAnchor } from "@/contexts/anchor";
+import { useAnchor, useOpenConnectModal } from "@/contexts/anchor";
 import { useNativeTokenUtils } from "../NativeTokenUtils";
+import { useWallet } from "@solana/wallet-adapter-react";
 
 const tradeTypeLabels = {
   [TradeType.Long]: t`Long`,
@@ -34,12 +35,17 @@ export function TradeForm() {
   const { isSwap, isIncrease, isPosition, isLimit, isTrigger, isLong } = useSharedStatesSelector(selectTradeBoxTradeFlags);
   const stage = useTradeStage();
   const setTradeStage = useSetTradeStage();
+  const { owner } = useAnchor();
+  const openConnectWalletModal = useOpenConnectModal();
+  const { connecting } = useWallet();
   const handleSubmit: FormEventHandler<HTMLFormElement> = useCallback((e) => {
     e.preventDefault();
+    if (!owner) return openConnectWalletModal();
     setTradeStage("confirmation");
-  }, [setTradeStage]);
+  }, [openConnectWalletModal, owner, setTradeStage]);
 
   const buttonText = useMemo(() => {
+    if (!owner) return t`Connect Wallet`;
     if (isSwap) {
       return t`Swap`
     } else if (isLong) {
@@ -47,7 +53,7 @@ export function TradeForm() {
     } else {
       return t`Open Short`
     }
-  }, [isLong, isSwap]);
+  }, [isLong, isSwap, owner]);
 
   return (
     <form onSubmit={handleSubmit}>
@@ -62,10 +68,10 @@ export function TradeForm() {
           className="w-full"
           // onClick={onSubmit}
           type="submit"
-          disabled={stage !== "trade"}
+          disabled={stage !== "trade" || connecting}
         // disabled={isSubmitButtonDisabled && !shouldDisableValidationForTesting}
         >
-          {stage === "trade" ? buttonText : <LoadingDots />}
+          {(stage !== "trade" || connecting) ? <LoadingDots /> : buttonText}
         </Button>
       </div>
     </form>
