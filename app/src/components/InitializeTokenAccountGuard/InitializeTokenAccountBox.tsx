@@ -5,11 +5,14 @@ import Button from "../Button/Button";
 import LoadingDots from "../Common/LoadingDots/LoadingDots";
 import { TokenData } from "@/onchain/token";
 import TokenWithIcon from "../TokenIcon/TokenWithIcon";
+import { MarketInfo } from "@/onchain/market";
+import { getMarketIndexName } from "../MarketsList/utils";
 
 interface Props {
   isSending: boolean,
   isVisible: boolean,
   tokens: TokenData[],
+  marketTokens: MarketInfo[],
   initialize: () => Promise<string | undefined>,
   onClose: () => void,
 }
@@ -18,6 +21,7 @@ export function InitializeTokenAccountBox({
   isVisible,
   isSending,
   tokens,
+  marketTokens,
   onClose,
   initialize,
 }: Props) {
@@ -31,9 +35,18 @@ export function InitializeTokenAccountBox({
         <div className="Confirmation-box-main">
           {tokens.map(token => {
             return (
-              <div key={token.address.toBase58()}>
+              <div key={token.address.toBase58()} className="Confirmation-box-row">
                 <span>
                   <TokenWithIcon symbol={token.symbol} displaySize={20} />
+                </span>
+              </div>
+            );
+          })}
+          {marketTokens.map(market => {
+            return (
+              <div key={market.marketTokenAddress.toBase58()} className="Confirmation-box-row">
+                <span>
+                  <TokenWithIcon symbol={market.indexToken.symbol} displaySize={20} name={`GM:${getMarketIndexName(market)}`} />
                 </span>
               </div>
             );

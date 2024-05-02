@@ -15,8 +15,14 @@ type GuardedProps<P extends Props> = P & {
 export function withInitializeTokenAccountGuard<P extends Props>(Component: ComponentType<P>) {
   const Guarded = (props: GuardedProps<P>) => {
     const { tokens, onClose, isVisible } = props;
-    const { isSending, needToInitialize, initialize } = useNeedToInitializeTokenAccounts(tokens);
-    const isPassed = needToInitialize.length === 0;
+    const {
+      isSending,
+      needToInitialize,
+      initialize,
+      needToInitializeTokens,
+      needToInitializeMarketTokens,
+    } = useNeedToInitializeTokenAccounts(tokens);
+    const isPassed = !needToInitialize;
     const handleInitializeBoxClose = useCallback(() => {
       if (!isPassed) {
         onClose();
@@ -30,7 +36,8 @@ export function withInitializeTokenAccountGuard<P extends Props>(Component: Comp
           onClose={handleInitializeBoxClose}
           isSending={isSending}
           initialize={initialize}
-          tokens={needToInitialize}
+          tokens={needToInitializeTokens}
+          marketTokens={needToInitializeMarketTokens}
         />
         <Component {...componentProps} />
       </>

@@ -1,5 +1,6 @@
 import Button from "@/components/Button/Button";
 import LoadingDots from "@/components/Common/LoadingDots/LoadingDots";
+import { withInitializeTokenAccountGuard } from "@/components/InitializeTokenAccountGuard";
 import Modal from "@/components/Modal/Modal";
 import { t } from "@lingui/macro";
 
@@ -10,7 +11,9 @@ interface Props {
   onClose: () => void,
 }
 
-export function GmConfirmationBox({
+export const GmConfirmationBox = withInitializeTokenAccountGuard(GmConfirmationBoxInner);
+
+function GmConfirmationBoxInner({
   isPending,
   isVisible,
   operationText,

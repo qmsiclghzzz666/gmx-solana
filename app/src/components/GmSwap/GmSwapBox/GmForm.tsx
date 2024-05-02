@@ -177,6 +177,20 @@ export function GmForm({
   const allowWrapFirstToken = owner && isNativeTokenReady && isDeposit && firstToken?.isWrappedNative;
   const allowWrapSecondToken = owner && isNativeTokenReady && isDeposit && secondToken?.isWrappedNative;
 
+  const relatedTokens = useMemo(() => {
+    const tokens = [];
+    if (firstToken) {
+      tokens.push(firstToken.address);
+    }
+    if (secondToken && ((isDeposit && isPair) || isWithdrawal)) {
+      tokens.push(secondToken.address);
+    }
+    if (marketToken) {
+      tokens.push(marketToken.address);
+    }
+    return tokens;
+  }, [firstToken, isDeposit, isPair, isWithdrawal, marketToken, secondToken]);
+
   const [indexName, setIndexName] = useLocalStorageSerializeKey<string>(
     getSyntheticsDepositIndexTokenKey(genesisHash),
     ""
@@ -475,6 +489,7 @@ export function GmForm({
           </Button>
         </div>
         <GmConfirmationBox
+          tokens={relatedTokens}
           isVisible={stage === "confirmation"}
           onClose={handleConfirmationClose}
           operationText={isDeposit ? t`Buy GM` : t`Sell GM`}
