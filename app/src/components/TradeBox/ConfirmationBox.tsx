@@ -232,7 +232,7 @@ function MainInfo({
     <div className="Confirmation-box-main">
       <span>
         <Trans>Pay</Trans>&nbsp;{formatAmount(fromAmount, fromToken.decimals, 4, true)}{" "}
-        <TokenWithIcon symbol={fromToken.symbol} displaySize={20} />
+        <TokenWithIcon symbol={fromToken.symbol} displaySize={20} />{" "}
         (${formatAmount(fromUsdMin, USD_DECIMALS, 2, true)})
       </span>
       {showSwapPath && allReady && swapTokens.map(token => (<div key={token?.address.toBase58()}>

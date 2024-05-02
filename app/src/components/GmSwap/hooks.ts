@@ -9,9 +9,9 @@ import { TokenOptions, getTokenOptions } from "./utils";
 import { CreateDepositParams, CreateWithdrawalParams, GmState, Mode, Operation } from "./types";
 import { Context, useContext, useContextSelector } from "use-context-selector";
 import { GmStateContext, GmStateDispatchContext } from "./context";
-import { convertToUsd, parseValue } from "@/utils/number";
 import { BN_ZERO } from "@/config/constants";
 import { PublicKey } from "@solana/web3.js";
+import { selectInputAmounts, selectInputDisplay } from "./selectors";
 
 export const useTokenOptionsFromStorage = ({
   chainId,
@@ -123,59 +123,9 @@ export const useGmStateDispath = () => {
   return dispatch;
 };
 
-export const useGmInputAmounts = () => {
-  const input = useGmStateSelector(s => s.input);
-  const firstToken = useGmStateSelector(s => s.firstToken);
-  const secondToken = useGmStateSelector(s => s.secondToken);
-  const marketToken = useGmStateSelector(s => s.marketToken);
+export const useGmInputAmounts = () => useGmStateSelector(selectInputAmounts);
 
-  const firstTokenAmount = parseValue(input.firstTokenInputValue, firstToken?.decimals || 0);
-
-  const secondTokenAmount = parseValue(input.secondTokenInputValue, secondToken?.decimals || 0);
-
-  const marketTokenAmount = parseValue(input.marketTokenInputValue || "0", marketToken?.decimals || 0)!;
-
-  return {
-    firstTokenAmount,
-    secondTokenAmount,
-    marketTokenAmount,
-  };
-};
-
-export const useGmInputDisplay = () => {
-  const { firstTokenAmount, secondTokenAmount, marketTokenAmount } = useGmInputAmounts();
-
-  const operation = useGmStateSelector(s => s.operation);
-  const firstToken = useGmStateSelector(s => s.firstToken);
-  const secondToken = useGmStateSelector(s => s.secondToken);
-  const marketToken = useGmStateSelector(s => s.marketToken);
-
-  const isDeposit = operation === Operation.Deposit;
-
-  const firstTokenUsd = convertToUsd(
-    firstTokenAmount,
-    firstToken?.decimals,
-    isDeposit ? firstToken?.prices?.minPrice : firstToken?.prices?.maxPrice
-  );
-
-  const secondTokenUsd = convertToUsd(
-    secondTokenAmount,
-    secondToken?.decimals,
-    isDeposit ? secondToken?.prices?.minPrice : secondToken?.prices?.maxPrice
-  );
-
-  const marketTokenUsd = convertToUsd(
-    marketTokenAmount,
-    marketToken?.decimals,
-    isDeposit ? marketToken?.prices?.maxPrice : marketToken?.prices?.minPrice
-  )!;
-
-  return {
-    firstTokenUsd,
-    secondTokenUsd,
-    marketTokenUsd,
-  };
-};
+export const useGmInputDisplay = () => useGmStateSelector(selectInputDisplay);
 
 const fixUnnecessarySwap = ({
   market,
