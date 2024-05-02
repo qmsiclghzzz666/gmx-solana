@@ -14,14 +14,16 @@ export const selectIncreaseSwapParams = createSharedStatesSelector([
 ], ({ isIncrease }, fromToken, toToken, marketGraph) => {
   if (!isIncrease || !fromToken || !toToken) return;
   let path: string[] = [];
+  let swapTokens: string[] = [];
   try {
-    const nodes = dijkstra.bidirectional(marketGraph, fromToken.address.toBase58(), toToken.address.toBase58(), "fee");
-    path = edgePathFromNodePath(marketGraph, nodes).map(edgeNameToMarketTokenAddress);
+    swapTokens = dijkstra.bidirectional(marketGraph, fromToken.address.toBase58(), toToken.address.toBase58(), "fee");
+    path = edgePathFromNodePath(marketGraph, swapTokens).map(edgeNameToMarketTokenAddress);
   } catch (error) {
     console.error("find swap path error:", error);
   }
   return {
     initialCollateralToken: fromToken,
     swapPath: path,
-  } satisfies IncreaseSwapParams;
+    swapTokens,
+  } as IncreaseSwapParams;
 });

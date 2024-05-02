@@ -124,4 +124,5 @@ export interface IncreaseAmounts {
 export interface IncreaseSwapParams {
   initialCollateralToken: TokenData,
   swapPath: Address[],
+  swapTokens: Address[],
 }

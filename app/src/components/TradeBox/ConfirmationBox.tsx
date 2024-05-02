@@ -22,6 +22,8 @@ import TokenWithIcon from "../TokenIcon/TokenWithIcon";
 import { formatAmount } from "../MarketsList/utils";
 import { BN_ZERO, USD_DECIMALS } from "@/config/constants";
 import { createStructuredSelector } from "reselect";
+import { selectMarketStateTokens } from "@/contexts/shared/selectors/market-selectors";
+import { createSharedStatesSelector } from "@/contexts/shared/utils";
 
 interface Props {
   onClose?: () => void,
@@ -137,6 +139,18 @@ export function ConfirmationBox({
   );
 }
 
+const selectIntermediateSwapTokens = createSharedStatesSelector([
+  state => selectIncreaseSwapParams(state)?.swapTokens,
+  selectMarketStateTokens,
+], (fullSwapTokens, tokens) => {
+  if (fullSwapTokens && fullSwapTokens.length >= 1) {
+    const addresses = fullSwapTokens.slice(1);
+    return addresses.map(address => tokens[address.toString()]);
+  } else {
+    return [];
+  }
+});
+
 function MainInfo({
   isLong,
   fromAmount,
@@ -145,6 +159,7 @@ function MainInfo({
   toAmount,
   toUsdMax,
   toToken,
+  showSwapPath = true,
 }: {
   isLong: boolean,
   fromAmount: BN,
@@ -153,7 +168,9 @@ function MainInfo({
   toAmount: BN,
   toUsdMax: BN,
   toToken: TokenData,
+  showSwapPath?: boolean,
 }) {
+  const swapTokens = useSharedStatesSelector(selectIntermediateSwapTokens);
   return (
     <div className="Confirmation-box-main">
       <span>
@@ -161,6 +178,15 @@ function MainInfo({
         <TokenWithIcon symbol={fromToken.symbol} displaySize={20} />
         (${formatAmount(fromUsdMin, USD_DECIMALS, 2, true)})
       </span>
+      {showSwapPath && swapTokens.map(token => (<div key={token.address.toBase58()}>
+        <div className="Confirmation-box-main-icon"></div>
+        <span>
+          {"("}
+          <Trans>Swap to</Trans>{" "}
+          <TokenWithIcon symbol={token.symbol} displaySize={20} />
+          {")"}
+        </span>
+      </div>))}
       <div className="Confirmation-box-main-icon"></div>
       <div>
         {isLong ? t`Long` : t`Short`}&nbsp;
