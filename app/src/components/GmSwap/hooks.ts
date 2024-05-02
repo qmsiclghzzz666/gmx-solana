@@ -211,8 +211,8 @@ export const useHandleSubmit = ({
   onCreateDeposit,
   onCreateWithdrawal,
 }: {
-  onCreateDeposit: (params: CreateDepositParams) => void,
-  onCreateWithdrawal: (params: CreateWithdrawalParams) => void,
+  onCreateDeposit: (params: CreateDepositParams) => Promise<void>,
+  onCreateWithdrawal: (params: CreateWithdrawalParams) => Promise<void>,
 }) => {
   const operation = useGmStateSelector(s => s.operation);
   const mode = useGmStateSelector(s => s.mode);
@@ -221,14 +221,14 @@ export const useHandleSubmit = ({
   const initialShortToken = useGmStateSelector(s => s.secondToken?.address) ?? market.shortTokenAddress;
   const { firstTokenAmount, secondTokenAmount, marketTokenAmount } = useGmInputAmounts();
 
-  return useCallback(() => {
+  return useCallback(async () => {
     if (operation === Operation.Deposit) {
       const initialLongTokenAmount = firstTokenAmount ?? BN_ZERO;
       const initialShortTokenAmount = secondTokenAmount ?? BN_ZERO;
 
       if (mode === Mode.Single && !initialLongTokenAmount.isZero()) {
         if (initialLongToken.equals(market.shortTokenAddress)) {
-          onCreateDeposit({
+          await onCreateDeposit({
             marketToken: market.marketTokenAddress,
             initialLongToken: market.longTokenAddress,
             initialShortToken: initialLongToken,
@@ -236,7 +236,7 @@ export const useHandleSubmit = ({
             initialShortTokenAmount: initialLongTokenAmount,
           });
         } else {
-          onCreateDeposit({
+          await onCreateDeposit({
             marketToken: market.marketTokenAddress,
             initialLongToken,
             initialShortToken: market.shortTokenAddress,
@@ -257,7 +257,7 @@ export const useHandleSubmit = ({
           initialLongTokenAmount,
           initialShortTokenAmount
         });
-        onCreateDeposit({
+        await onCreateDeposit({
           marketToken: market.marketTokenAddress,
           initialLongToken: fixedInitialLongToken,
           initialShortToken: fixedInitialShortToken,
@@ -269,7 +269,7 @@ export const useHandleSubmit = ({
       }
     } else if (operation === Operation.Withdrawal && !marketTokenAmount?.isZero()) {
       if (market.isSingle) {
-        onCreateWithdrawal({
+        await onCreateWithdrawal({
           marketToken: market.marketTokenAddress,
           amount: marketTokenAmount,
           finalLongToken: initialLongToken,
@@ -284,7 +284,7 @@ export const useHandleSubmit = ({
           initialLongToken,
           initialShortToken,
         });
-        onCreateWithdrawal({
+        await onCreateWithdrawal({
           marketToken: market.marketTokenAddress,
           amount: marketTokenAmount,
           finalLongToken: fixedInitialLongToken,

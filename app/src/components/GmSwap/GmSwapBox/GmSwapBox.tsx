@@ -23,8 +23,8 @@ type Props = {
   setMode: (mode: Mode) => void;
   setOperation: (operation: Operation) => void;
   onSelectMarket: (marketAddress: string) => void;
-  onCreateDeposit: (params: CreateDepositParams) => void;
-  onCreateWithdrawal: (params: CreateWithdrawalParams) => void;
+  onCreateDeposit: (params: CreateDepositParams) => Promise<void>;
+  onCreateWithdrawal: (params: CreateWithdrawalParams) => Promise<void>;
 };
 
 export function GmSwapBox({

@@ -61,8 +61,8 @@ export function GmForm({
   setMode: (mode: Mode) => void,
   onSelectMarket: (marketAddress: string) => void,
   onSelectFirstToken: (token: Token) => void,
-  onCreateDeposit: (params: CreateDepositParams) => void,
-  onCreateWithdrawal: (params: CreateWithdrawalParams) => void,
+  onCreateDeposit: (params: CreateDepositParams) => Promise<void>,
+  onCreateWithdrawal: (params: CreateWithdrawalParams) => Promise<void>,
 }) {
   const { i18n } = useLingui();
 
@@ -112,10 +112,10 @@ export function GmForm({
   const performAction = useHandleSubmit({ onCreateDeposit, onCreateWithdrawal });
   const openConnectModal = useOpenConnectModal();
 
-  const handleSubmit = useCallback(() => {
+  const handleSubmit = useCallback(async () => {
     if (!owner && stage === "swap") return openConnectModal();
     if (stage === "confirmation") {
-      performAction();
+      await performAction();
       setStage("swap");
       resetInputs();
     } else if (stage === "swap") {
@@ -254,7 +254,7 @@ export function GmForm({
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          handleSubmit();
+          void handleSubmit();
         }}
       >
         <div className={cx("GmSwapBox-form-layout", { reverse: isWithdrawal })}>
@@ -492,6 +492,7 @@ export function GmForm({
           tokens={relatedTokens}
           isVisible={stage === "confirmation"}
           onClose={handleConfirmationClose}
+          onSubmit={handleSubmit}
           operationText={isDeposit ? t`Buy GM` : t`Sell GM`}
           isPending={isPending}
         />

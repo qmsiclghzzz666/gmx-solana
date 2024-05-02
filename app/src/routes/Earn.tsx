@@ -182,8 +182,8 @@ export default function Earn() {
             mode={mode}
             setMode={setMode}
             setOperation={setOperation}
-            onCreateDeposit={(params) => void triggerCreateDeposit(params)}
-            onCreateWithdrawal={(params) => void triggerCreateWithdrawal(params)}
+            onCreateDeposit={async (params) => { await triggerCreateDeposit(params) }}
+            onCreateWithdrawal={async (params) => { await triggerCreateWithdrawal(params) }}
           />) : "loading"}
         </div>
       </div>
