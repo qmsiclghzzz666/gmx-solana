@@ -15,4 +15,5 @@ export interface TokenConfig {
     feedAddress: string,
     isStable?: boolean,
     priceDecimals?: number,
+    wrappedAddress?: string,
 }

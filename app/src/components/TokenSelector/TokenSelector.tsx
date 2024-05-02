@@ -167,7 +167,7 @@ export default function TokenSelector(props: Props) {
     <div className={cx("TokenSelector", { disabled }, props.className)} onClick={(event) => event.stopPropagation()}>
       <Modal
         isVisible={isModalVisible}
-        setIsVisible={setIsModalVisible}
+        onClose={setIsModalVisible}
         label={props.label}
         headerContent={() => (
           <SearchInput

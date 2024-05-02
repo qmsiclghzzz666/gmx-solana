@@ -10,7 +10,7 @@ type Props = {
   topLeftValue?: string;
   topRightLabel?: string;
   topRightValue?: string;
-  onClientTopLeftLabel?: () => void;
+  onClickTopLeftLabel?: () => void;
   onClickTopRightLabel?: () => void;
   inputValue?: number | string;
   onInputValueChange?: (e: ChangeEvent<HTMLInputElement>) => void;
@@ -31,7 +31,7 @@ export default function BuyInputSection(props: Props) {
     topLeftValue,
     topRightLabel,
     topRightValue,
-    onClientTopLeftLabel,
+    onClickTopLeftLabel,
     onClickTopRightLabel,
     inputValue,
     onInputValueChange,
@@ -87,8 +87,8 @@ export default function BuyInputSection(props: Props) {
         <div className="buy-input-top-row">
           <div
             data-label="left"
-            className={cx("text-gray", { clickable: onClientTopLeftLabel })}
-            onClick={onClientTopLeftLabel}
+            className={cx("text-gray", { clickable: onClickTopLeftLabel })}
+            onClick={onClickTopLeftLabel}
           >
             {topLeftLabel}
             {topLeftValue && `${INPUT_LABEL_SEPARATOR} ${topLeftValue}`}

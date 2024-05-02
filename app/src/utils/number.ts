@@ -1,5 +1,5 @@
 import { formatAmount, formatUsd, getPlusOrMinusSymbol, limitDecimals, toFixedDecimal } from "@/components/MarketsList/utils";
-import { BN_ZERO, USD_DECIMALS } from "@/config/constants";
+import { BN_ZERO, ONE_USD, USD_DECIMALS } from "@/config/constants";
 import { BASIS_POINTS_DIVISOR } from "@/config/factors";
 import { TRIGGER_PREFIX_ABOVE, TRIGGER_PREFIX_BELOW } from "@/config/ui";
 import { BN } from "@coral-xyz/anchor";
@@ -251,4 +251,8 @@ export function formatPercentage(percentage?: BN, opts: { fallbackToZero?: boole
   const sign = signed ? getPlusOrMinusSymbol(percentage) : "";
 
   return `${sign}${formatAmount(percentage.abs(), 2, 2)}%`;
+}
+
+export function applyFactor(value: BN, factor: BN) {
+  return value.mul(factor).div(ONE_USD);
 }

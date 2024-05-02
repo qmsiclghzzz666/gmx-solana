@@ -117,7 +117,7 @@ export function MarketSelector({
     <div className={cx("TokenSelector", "MarketSelector", { "side-menu": isSideMenu }, className)}>
       <Modal
         isVisible={isModalVisible}
-        setIsVisible={setIsModalVisible}
+        onClose={setIsModalVisible}
         label={label}
         headerContent={() => (
           <SearchInput

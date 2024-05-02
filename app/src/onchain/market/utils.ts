@@ -8,6 +8,7 @@ import { convertToTokenAmount, getMidPrice } from "../token/utils";
 import { NATIVE_TOKEN_ADDRESS } from "@/config/tokens";
 import { TradeType } from "../trade";
 import Graph from "graphology";
+import Heap from "heap";
 
 export function usdToMarketTokenAmount(poolValue: BN, marketToken: TokenData, usdValue: BN) {
   const supply = marketToken.totalSupply!;
@@ -314,4 +315,77 @@ export function edgeNameToMarketTokenAddress(edgeName: string) {
   } catch (error) {
     throw Error("Not a valid edge name");
   }
+}
+
+type Attributes<T> = { [name: string]: T };
+
+/**
+ * Executes Dijkstra's algorithm on a graph to find the shortest path from a source node to a target node,
+ * considering an optional limit on the number of steps (edges) in the path.
+ * This function allows for specifying a custom function to determine the weight of the edges.
+ *
+ * @param {Graph} graph - The graph on which to perform the algorithm. The graph should implement
+ *        a method `forEachOutEdge` to iterate over the outgoing edges of a given node.
+ * @param {string} source - The starting node identifier.
+ * @param {string} target - The ending node identifier, where the pathfinding should stop.
+ * @param {Function} getEdgeWeight - An optional function to determine the weight of an edge based on
+ *        its attributes. If not provided, all edges are considered to have a weight of 1.
+ * @param {number} limit - An optional maximum number of steps (edges) that the path can take.
+ *        If not specified, the path length is not constrained.
+ * @returns An object containing the shortest node path, the corresponding edges path from source to target,
+ *          and the computed scores from source to each node. Returns an empty path and edge path if no path exists.
+ */
+export function dijkstraWithLimit(
+  graph: Graph,
+  source: string,
+  target: string,
+  getEdgeWeight?: (attrs: Attributes<unknown>) => number,
+  limit?: number,
+) {
+  if (!graph.hasNode(source)) throw new Error("`source` node does not in the graph");
+  if (!graph.hasNode(target)) throw new Error("`target` node does not int the graph");
+  const visited = new Set<string>();
+  const scores = {
+    [source]: 0,
+  };
+  const lengths = {
+    [source]: 0,
+  };
+  const paths = {
+    [source]: [source],
+  };
+  const edgePaths: Record<string, string[]> = {
+    [source]: [],
+  };
+  const visit_next = new Heap<{ node: string, score: number }>((a, b) => a.score - b.score);
+  visit_next.push({ node: source, score: 0 });
+
+  while (visit_next.size()) {
+    const { node } = visit_next.pop()!;
+    if (node in visited) continue;
+    if (node === target) break;
+    const length = lengths[node];
+    if (!limit || length < limit) {
+      const score = scores[node];
+      graph.forEachOutEdge(node, (edge, attrs, current, next) => {
+        if (next in visited) return;
+        const next_score = score + (getEdgeWeight ? getEdgeWeight(attrs) : 1);
+        if (!(next in scores) || next_score < scores[next]) {
+          scores[next] = next_score;
+          lengths[next] = length + 1;
+          paths[next] = paths[current].concat([next]);
+          edgePaths[next] = edgePaths[current].concat([edge]);
+          visit_next.push({ node: next, score: next_score });
+        }
+      });
+    }
+    visited.add(node);
+  }
+  const targetPath = paths[target] ?? [];
+  const targetEdgePath = edgePaths[target] ?? [];
+  return {
+    nodePath: targetPath,
+    edgePath: targetEdgePath,
+    scores,
+  };
 }

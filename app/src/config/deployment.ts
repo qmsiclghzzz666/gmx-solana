@@ -22,7 +22,8 @@ const parseToken = (address: string, token: TokenConfig) => {
     isWrappedNative: tokenAddress.equals(WRAPPED_NATIVE_TOKEN_ADDRESS),
     isStable: token.isStable,
     priceDecimals: token.priceDecimals,
-  } as Token;
+    wrappedAddress: token.wrappedAddress ? new PublicKey(token.wrappedAddress) : undefined,
+  } satisfies Token as Token;
 };
 
 const parseTokens = (tokens: Tokens) => {

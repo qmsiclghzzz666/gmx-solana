@@ -8,7 +8,7 @@ import { info2Stat } from "@/contexts/shared";
 import { BN_ZERO, ONE_USD } from "@/config/constants";
 import { convertToUsd, getBasisPoints, getUnit } from "@/utils/number";
 import { NATIVE_TOKEN_ADDRESS } from "@/config/tokens";
-import { PositionInfos, getEntryPrice, getLeverage, getPositionNetValue, getPositionPnlUsd, usePositions } from "../position";
+import { PositionInfos, getEntryPrice, getLeverage, getLiquidationPrice, getPositionNetValue, getPositionPnlUsd, usePositions } from "../position";
 import { getMarkPrice } from "@/utils/price";
 import { getByKey } from "@/utils/objects";
 
@@ -77,6 +77,7 @@ export const useDeployedInfos = () => {
         infos[key] = {
           ...info,
           poolValueMax: getPoolUsdWithoutPnl(info, true, "maxPrice").add(getPoolUsdWithoutPnl(info, false, "maxPrice")),
+          minCollateralFactor: ONE_USD.divn(100),
         };
 
         const marketToken = marketTokenMetadatas ? marketTokenMetadatas[key] : undefined;
@@ -137,6 +138,18 @@ export const useDeployedInfos = () => {
           pendingBorrowingFeesUsd: BN_ZERO,
           pendingFundingFeesUsd: BN_ZERO,
         });
+        const liquidationPrice = getLiquidationPrice({
+          sizeInUsd: position.sizeInUsd,
+          sizeInTokens: position.sizeInTokens,
+          collateralAmount: position.collateralAmount,
+          collateralUsd: collateralUsd ?? BN_ZERO,
+          collateralToken,
+          marketInfo: info,
+          pendingFundingFeesUsd: BN_ZERO,
+          pendingBorrowingFeesUsd: BN_ZERO,
+          minCollateralUsd: ONE_USD,
+          isLong: position.isLong,
+        });
         positionInfos[key] = {
           ...position,
           marketInfo: info,
@@ -156,6 +169,7 @@ export const useDeployedInfos = () => {
           leverage,
           pnl,
           pnlPercentage,
+          liquidationPrice,
         };
       } else {
         isPositionInfosLoading = true;

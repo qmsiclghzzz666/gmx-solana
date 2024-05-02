@@ -8,7 +8,7 @@ import "./AddressDropdown.scss";
 import { PublicKey } from "@solana/web3.js";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useNativeTokenUtils } from "../NativeTokenUtils";
-import { MdOutlineWallet } from "react-icons/md";
+import { MdSwapHorizontalCircle, MdOutlineSwapHorizontalCircle } from "react-icons/md";
 import { helperToast } from "@/utils/helperToast";
 
 type Props = {
@@ -48,7 +48,7 @@ function AddressDropdown({ account, disconnectAccountAndCloseSettings }: Props) 
 
   const { wallet } = useWallet();
 
-  const { isNativeTokenReady, openUnwrapNativeTokenModal } = useNativeTokenUtils();
+  const { isNativeTokenReady, openUnwrapNativeTokenModal, openWrapNativeTokenModal } = useNativeTokenUtils();
 
   return (
     <Menu>
@@ -80,9 +80,20 @@ function AddressDropdown({ account, disconnectAccountAndCloseSettings }: Props) 
           {isNativeTokenReady && <Menu.Item>
             <div
               className="menu-item"
+              onClick={openWrapNativeTokenModal}
+            >
+              <MdSwapHorizontalCircle size={20} />
+              <p>
+                <Trans>Wrap SOL</Trans>
+              </p>
+            </div>
+          </Menu.Item>}
+          {isNativeTokenReady && <Menu.Item>
+            <div
+              className="menu-item"
               onClick={openUnwrapNativeTokenModal}
             >
-              <MdOutlineWallet size={20} />
+              <MdOutlineSwapHorizontalCircle size={20} />
               <p>
                 <Trans>Unwrap WSOL</Trans>
               </p>

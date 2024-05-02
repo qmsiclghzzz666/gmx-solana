@@ -10,8 +10,11 @@ import { formatUsd } from "../MarketsList/utils";
 import TokenWithIcon from "../TokenIcon/TokenWithIcon";
 import Button from "../Button/Button";
 import LoadingDots from "../Common/LoadingDots/LoadingDots";
+import { withInitializeTokenAccountGuard } from "../InitializeTokenAccountGuard";
 
-export function WrapNativeTokenModal({
+export const WrapNativeTokenModal = withInitializeTokenAccountGuard(WrapNativeTokenModalInner);
+
+function WrapNativeTokenModalInner({
   isVisible,
   nativeToken,
   onSubmitted,
@@ -60,7 +63,7 @@ export function WrapNativeTokenModal({
   }, [minResidualAmount, nativeToken.balance, nativeToken.decimals]);
 
   return (
-    <Modal isVisible={isVisible} setIsVisible={() => {
+    <Modal isVisible={isVisible} onClose={() => {
       setInputValue("");
       onClose();
     }} label={t`Wrap SOL`}>

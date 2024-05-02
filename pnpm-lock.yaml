@@ -105,6 +105,9 @@ importers:
       graphology-shortest-path:
         specifier: ^2.1.0
         version: 2.1.0(graphology-types@0.24.7)
+      heap:
+        specifier: ^0.2.7
+        version: 0.2.7
       immer:
         specifier: ^10.0.4
         version: 10.0.4
@@ -172,6 +175,9 @@ importers:
       '@lingui/vite-plugin':
         specifier: ^4.10.0
         version: 4.10.0(typescript@5.4.5)(vite@5.2.10(@types/node@20.12.7)(lightningcss@1.19.0)(sass@1.75.0)(terser@5.30.3))
+      '@types/heap':
+        specifier: ^0.2.34
+        version: 0.2.34
       '@types/lodash':
         specifier: ^4.17.0
         version: 4.17.0
@@ -1916,6 +1922,9 @@ packages:
   '@types/estree@1.0.5':
     resolution: {integrity: sha512-/kYRxGDLWzHOB7q+wtSUQlFrtcdUccpfy+X+9iMBpHK8QLLhx2wIPYuS5DYtR9Wa/YlZAbIovy7qVdB1Aq6Lyw==}
 
+  '@types/heap@0.2.34':
+    resolution: {integrity: sha512-x9gp0NZnQeFrgrb6O3Tq5KtvsuEhWbc2vlHfs4cDOKcHsanzI39lIGcPdND/MRyaKUbxNgKXfKGCQGnjjOWweQ==}
+
   '@types/istanbul-lib-coverage@2.0.6':
     resolution: {integrity: sha512-2QF/t/auWm0lsy8XtKVPG19v3sSOQlJe/YHZgfjb/KBBHOGSV+J2q/S671rcq9uTBrLAXmZpqJiaQbMT+zNU1w==}
 
@@ -3337,6 +3346,9 @@ packages:
   he@1.2.0:
     resolution: {integrity: sha512-F/1DnUGPopORZi0ni+CvrCgHQ5FyEAHRLSApuYWMmrbSwoN2Mn/7k+Gl38gJnR7yyDZk6WLXwiGod1JOWNDKGw==}
     hasBin: true
+
+  heap@0.2.7:
+    resolution: {integrity: sha512-2bsegYkkHO+h/9MGbn6KWcE45cHZgPANo5LXF7EvWdT0yT2EguSVO1nDgU5c8+ZOPwp2vMNa7YFsJhVcDR9Sdg==}
 
   hermes-estree@0.15.0:
     resolution: {integrity: sha512-lLYvAd+6BnOqWdnNbP/Q8xfl8LOGw4wVjfrNd9Gt8eoFzhNBRVD95n4l2ksfMVOoxuVyegs85g83KS9QOsxbVQ==}
@@ -7668,6 +7680,8 @@ snapshots:
 
   '@types/estree@1.0.5': {}
 
+  '@types/heap@0.2.34': {}
+
   '@types/istanbul-lib-coverage@2.0.6': {}
 
   '@types/istanbul-lib-report@3.0.3':
@@ -9422,6 +9436,8 @@ snapshots:
       function-bind: 1.1.2
 
   he@1.2.0: {}
+
+  heap@0.2.7: {}
 
   hermes-estree@0.15.0: {}
 

@@ -98,7 +98,7 @@ export function TradeBox({
         {isPosition && <MarketCard isLong={isLong} marketInfo={marketInfo} allowedSlippage={allowedSlippage} />}
       </div> */}
 
-      <ConfirmationBox onClose={resetInputs} />
+      <ConfirmationBox onSubmitted={resetInputs} />
     </>
   );
 }

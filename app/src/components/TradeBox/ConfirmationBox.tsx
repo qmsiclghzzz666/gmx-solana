@@ -1,7 +1,7 @@
 import { useSharedStatesSelector } from "@/contexts/shared";
 import Modal from "../Modal/Modal";
 import "./ConfirmationBox.scss";
-import { selectMarketAddress, selectTradeBoxCollateralTokenAddress, selectTradeBoxTradeFlags, selectIncreaseAmounts, selectIncreaseSwapParams, selectFromTokenInputAmount, selectFromToken, selectFromTokenUsd, selectToToken, selectToTokenInputAmount, selectToTokenUsd } from "@/contexts/shared/selectors/trade-box-selectors";
+import { selectMarketAddress, selectTradeBoxCollateralTokenAddress, selectTradeBoxTradeFlags, selectIncreaseAmounts, selectIncreaseSwapParams, selectFromTokenInputAmount, selectFromToken, selectFromTokenUsd, selectToToken, selectToTokenInputAmount, selectToTokenUsd, selectTradeBoxFromTokenAddress, selectTradeBoxToTokenAddress } from "@/contexts/shared/selectors/trade-box-selectors";
 import { useCallback, useMemo, useState } from "react";
 import { Trans, t } from "@lingui/macro";
 import { useTradeStage, useSetTradeStage } from "@/contexts/shared/hooks";
@@ -22,10 +22,10 @@ import TokenWithIcon from "../TokenIcon/TokenWithIcon";
 import { formatAmount } from "../MarketsList/utils";
 import { BN_ZERO, USD_DECIMALS } from "@/config/constants";
 import { createStructuredSelector } from "reselect";
-
-interface Props {
-  onClose?: () => void,
-}
+import { selectMarketStateTokens } from "@/contexts/shared/selectors/market-selectors";
+import { createSharedStatesSelector } from "@/contexts/shared/utils";
+import { getByKey } from "@/utils/objects";
+import { withInitializeTokenAccountGuard } from "../InitializeTokenAccountGuard";
 
 const selectDisplayInfo = createStructuredSelector({
   fromToken: selectFromToken,
@@ -37,8 +37,66 @@ const selectDisplayInfo = createStructuredSelector({
 });
 
 export function ConfirmationBox({
-  onClose
-}: Props) {
+  onClose,
+  onSubmitted,
+}: {
+  onClose?: () => void,
+  onSubmitted?: () => void,
+}) {
+  const stage = useTradeStage();
+  const isVisible = useMemo(() => stage === "confirmation", [stage]);
+  const setStage = useSetTradeStage();
+
+  const handleClose = useCallback(() => {
+    if (onClose) {
+      onClose();
+    }
+    setStage("trade");
+  }, [onClose, setStage]);
+
+  const handleSubmitted = useCallback(() => {
+    if (onSubmitted) {
+      onSubmitted();
+    }
+    setStage("trade");
+  }, [onSubmitted, setStage]);
+
+  const { isSwap } = useSharedStatesSelector(selectTradeBoxTradeFlags);
+  const fromTokenAddress = useSharedStatesSelector(selectTradeBoxFromTokenAddress);
+  const toTokenAddress = useSharedStatesSelector(selectTradeBoxToTokenAddress);
+
+  const relatedTokens = useMemo(() => {
+    const relatedTokens: string[] = [];
+    if (fromTokenAddress) {
+      relatedTokens.push(fromTokenAddress);
+    }
+    if (isSwap && toTokenAddress) {
+      relatedTokens.push(toTokenAddress);
+    }
+    return relatedTokens;
+  }, [fromTokenAddress, isSwap, toTokenAddress]);
+
+  return (
+    <ConfirmationModal
+      tokens={relatedTokens}
+      isVisible={isVisible}
+      onClose={handleClose}
+      onSubmitted={handleSubmitted}
+    />
+  );
+}
+
+const ConfirmationModal = withInitializeTokenAccountGuard(ConfirmationModalInner);
+
+function ConfirmationModalInner({
+  isVisible,
+  onClose,
+  onSubmitted,
+}: {
+  isVisible: boolean,
+  onClose: () => void,
+  onSubmitted?: () => void,
+}) {
   const [skipPreflight, setSkipPreflight] = useState(false);
   const { isMarket, isLimit, isSwap, isLong } = useSharedStatesSelector(selectTradeBoxTradeFlags);
   const {
@@ -79,30 +137,19 @@ export function ConfirmationBox({
     return text;
   }, [isLimit, isLong, isMarket, isSwap]);
 
-  const stage = useTradeStage();
-  const isVisible = useMemo(() => stage === "confirmation", [stage]);
-
-  const setStage = useSetTradeStage();
-  const handleClose = useCallback(() => {
-    if (onClose) {
-      onClose();
-    }
-    setStage("trade");
-  }, [onClose, setStage]);
-
   const { trigger, isSending, error } = useTriggerCreateOrder();
 
   const handleSubmit = useCallback(() => {
     if (trigger) {
-      void trigger({ skipPreflight }).then(handleClose);
+      void trigger({ skipPreflight }).then(onSubmitted);
     }
-  }, [handleClose, skipPreflight, trigger]);
+  }, [onSubmitted, skipPreflight, trigger]);
 
   return (
     <div className="Confirmation-box">
       <Modal
         isVisible={isVisible}
-        setIsVisible={handleClose}
+        onClose={onClose}
         label={title}
       >
         <div>
@@ -117,7 +164,7 @@ export function ConfirmationBox({
           />}
           <CheckBox isChecked={skipPreflight} setIsChecked={setSkipPreflight}>
             <span className="muted font-sm">
-              <Trans>Skip transaction preflight test.</Trans>
+              <Trans>Skip transaction preflight.</Trans>
             </span>
           </CheckBox>
         </div>
@@ -125,7 +172,6 @@ export function ConfirmationBox({
           <Button
             variant="primary-action"
             className="w-full"
-            type="submit"
             onClick={handleSubmit}
             disabled={isSending || Boolean(error)}
           >
@@ -137,6 +183,31 @@ export function ConfirmationBox({
   );
 }
 
+const selectIntermediateSwapTokens = createSharedStatesSelector([
+  state => selectIncreaseSwapParams(state)?.swapTokens,
+  selectMarketStateTokens,
+], (fullSwapTokens, tokens) => {
+  if (fullSwapTokens && fullSwapTokens.length >= 1) {
+    const addresses = fullSwapTokens.slice(1);
+    let allReady = true;
+    return {
+      allReady,
+      swapTokens: addresses.map(address => {
+        const token = getByKey(tokens, address.toString());
+        if (!token) {
+          allReady = false;
+        }
+        return token;
+      }).filter(token => token) as TokenData[],
+    };
+  } else {
+    return {
+      allReady: false,
+      swapTokens: [],
+    };
+  }
+});
+
 function MainInfo({
   isLong,
   fromAmount,
@@ -145,6 +216,7 @@ function MainInfo({
   toAmount,
   toUsdMax,
   toToken,
+  showSwapPath = true,
 }: {
   isLong: boolean,
   fromAmount: BN,
@@ -153,7 +225,9 @@ function MainInfo({
   toAmount: BN,
   toUsdMax: BN,
   toToken: TokenData,
+  showSwapPath?: boolean,
 }) {
+  const { allReady, swapTokens } = useSharedStatesSelector(selectIntermediateSwapTokens);
   return (
     <div className="Confirmation-box-main">
       <span>
@@ -161,6 +235,15 @@ function MainInfo({
         <TokenWithIcon symbol={fromToken.symbol} displaySize={20} />
         (${formatAmount(fromUsdMin, USD_DECIMALS, 2, true)})
       </span>
+      {showSwapPath && allReady && swapTokens.map(token => (<div key={token?.address.toBase58()}>
+        <div className="Confirmation-box-main-icon"></div>
+        <span>
+          {"("}
+          <Trans>Swap to</Trans>{" "}
+          <TokenWithIcon symbol={token.symbol} displaySize={20} />
+          {")"}
+        </span>
+      </div>))}
       <div className="Confirmation-box-main-icon"></div>
       <div>
         {isLong ? t`Long` : t`Short`}&nbsp;
@@ -177,6 +260,7 @@ function useTriggerCreateOrder() {
   const marketTokenAddress = useSharedStatesSelector(selectMarketAddress);
   const collateralTokenAddress = useSharedStatesSelector(selectTradeBoxCollateralTokenAddress);
   const increaseSwapParams = useSharedStatesSelector(selectIncreaseSwapParams);
+  const isSwapfulfilled = increaseSwapParams?.isSwapfulfilled;
   const exchange = useExchange();
 
   const { mutate } = useSWRConfig();
@@ -229,12 +313,6 @@ function useTriggerCreateOrder() {
         isSending: false,
         error: t`Swap orders are not supported for now.`
       }
-    } else if (isIncrease) {
-      return {
-        trigger,
-        isSending,
-        error: null,
-      }
     }
   } else if (isLimit) {
     return {
@@ -243,9 +321,24 @@ function useTriggerCreateOrder() {
       error: t`Limit orders are not supported for now.`
     }
   }
-  return {
-    trigger: undefined,
-    isSending: false,
-    error: t`Unsupported order type.`,
+
+  if (isSwapfulfilled === undefined) {
+    return {
+      trigger: undefined,
+      isSending: false,
+      error: t`Unsupported order type.`,
+    }
+  } else if (isSwapfulfilled) {
+    return {
+      trigger,
+      isSending,
+      error: null,
+    }
+  } else {
+    return {
+      trigger: undefined,
+      isSending: false,
+      error: t`Swap path cannot be fulfilled.`,
+    }
   }
 }
