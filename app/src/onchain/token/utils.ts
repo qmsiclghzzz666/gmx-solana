@@ -1,5 +1,5 @@
 import { NATIVE_TOKEN_ADDRESS } from "@/config/tokens";
-import { TokenPrices, Tokens } from "./types";
+import { Token, TokenPrices, Tokens } from "./types";
 import { Address, BN } from "@coral-xyz/anchor";
 import { expandDecimals } from "@/utils/number";
 import { BN_ZERO } from "@/config/constants";
@@ -37,4 +37,21 @@ export function convertToTokenAmount(
 
 export function getMidPrice(prices: TokenPrices) {
   return prices.minPrice.add(prices.maxPrice).div(new BN(2));
+}
+
+export function getIsEquivalentTokens(token1: Token, token2: Token) {
+  // console.log(token1, token2);
+  if (token1.address.equals(token2.address)) {
+    return true;
+  }
+
+  if (token1.wrappedAddress?.equals(token2.address) || token2.wrappedAddress?.equals(token1.address)) {
+    return true;
+  }
+
+  // if ((token1.isSynthetic || token2.isSynthetic) && token1.symbol === token2.symbol) {
+  //   return true;
+  // }
+
+  return false;
 }

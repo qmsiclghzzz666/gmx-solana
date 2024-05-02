@@ -30,6 +30,8 @@ export type PositionInfo = Position & {
   leverage?: BN,
   pnl?: BN,
   pnlPercentage?: BN,
+  uiFeeUsd?: BN,
+  liquidationPrice?: BN,
 };
 
 export interface PositionInfos {
