@@ -1,7 +1,7 @@
 import { GoDotFill } from 'react-icons/go';
 import './LoadingDots.scss';
 
-const LoadingDots = ({ size }: { size?: number }) => {
+const LoadingDots = ({ size = 14 }: { size?: number }) => {
   return (
     <div className="loading-dots">
       <GoDotFill fontSize={size} />

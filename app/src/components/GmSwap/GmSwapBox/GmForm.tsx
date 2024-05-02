@@ -1,7 +1,7 @@
 import Tab from "@/components/Tab/Tab";
 import { TokenOptions, getGmSwapBoxAvailableModes } from "../utils";
 import { CreateDepositParams, CreateWithdrawalParams, Mode, Operation } from "../types";
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useLingui } from "@lingui/react";
 import { mapValues } from "lodash";
 import cx from "classnames";
@@ -21,13 +21,13 @@ import { IoMdSwap } from "react-icons/io";
 import { PoolSelector } from "@/components/MarketSelector/PoolSelector";
 import { useGmInputAmounts, useGmInputDisplay, useGmStateDispath, useGmStateSelector, useHandleSubmit } from "../hooks";
 import { formatAmountFree, formatTokenAmount } from "@/utils/number";
-import { useInitializeTokenAccounts } from "@/onchain/token";
 import { PublicKey } from "@solana/web3.js";
 import { useOpenConnectModal } from "@/contexts/anchor";
 import { useNativeTokenUtils } from "@/components/NativeTokenUtils";
 import { MarketInfo } from "@/onchain/market";
 import { helperToast } from "@/utils/helperToast";
 import LoadingDots from "@/components/Common/LoadingDots/LoadingDots";
+import { GmConfirmationBox } from "../GmConfirmationBox/GmConfirmationBox";
 
 const OPERATION_LABELS = {
   [Operation.Deposit]: /*i18n*/ "Buy GM",
@@ -65,6 +65,8 @@ export function GmForm({
   onCreateWithdrawal: (params: CreateWithdrawalParams) => void,
 }) {
   const { i18n } = useLingui();
+
+  const [stage, setStage] = useState<"swap" | "confirmation">("swap");
 
   const { localizedOperationLabels, localizedModeLabels } = useMemo(() => {
     return {
@@ -111,13 +113,19 @@ export function GmForm({
   const openConnectModal = useOpenConnectModal();
 
   const handleSubmit = useCallback(() => {
-    if (owner) {
+    if (!owner && stage === "swap") return openConnectModal();
+    if (stage === "confirmation") {
       performAction();
-    } else {
-      openConnectModal();
+      setStage("swap");
+      resetInputs();
+    } else if (stage === "swap") {
+      setStage("confirmation");
     }
-    resetInputs();
-  }, [owner, performAction, resetInputs, openConnectModal]);
+  }, [owner, resetInputs, stage, performAction, openConnectModal]);
+
+  const handleConfirmationClose = useCallback(() => {
+    setStage("swap");
+  }, []);
 
   const onOperationChange = useCallback(
     (operation: Operation) => {
@@ -166,9 +174,6 @@ export function GmForm({
   const isWithdrawal = operation === Operation.Withdrawal;
   const isSingle = mode === Mode.Single;
   const isPair = mode === Mode.Pair;
-  const isMarketTokenAccountInited = marketToken?.balance !== null;
-  const isFirstTokenAccountInited = firstToken?.balance !== null;
-  const isSecondTokenAccountInited = secondToken?.balance !== null;
   const allowWrapFirstToken = owner && isNativeTokenReady && isDeposit && firstToken?.isWrappedNative;
   const allowWrapSecondToken = owner && isNativeTokenReady && isDeposit && secondToken?.isWrappedNative;
 
@@ -209,8 +214,6 @@ export function GmForm({
     }
   }
 
-  const { isSending: isInitializing, trigger: initializeTokenAccount } = useInitializeTokenAccounts();
-
   const wrapNativeToken = useCallback(() => {
     openWrapNativeTokenModal();
   }, [openWrapNativeTokenModal]);
@@ -247,17 +250,17 @@ export function GmForm({
               onClickTopLeftLabel: wrapNativeToken,
             })}
             topLeftValue={formatUsd(firstTokenUsd)}
-            topRightLabel={isFirstTokenAccountInited ? t`Balance` : isInitializing ? t`Initializing` : t`Uninitialized`}
-            topRightValue={isFirstTokenAccountInited ? formatTokenAmount(firstToken?.balance || BN_ZERO, firstToken?.decimals, "", {
+            topRightLabel={t`Balance`}
+            topRightValue={formatTokenAmount(firstToken?.balance || BN_ZERO, firstToken?.decimals, "", {
               useCommas: true,
-            }) : ""}
+            })}
             preventFocusOnLabelClick="right"
-            {...(isDeposit && isFirstTokenAccountInited && {
+            {...(isDeposit && {
               onClickTopRightLabel: onMaxClickFirstToken,
             })}
-            {...(!isFirstTokenAccountInited && !isInitializing && {
-              onClickTopRightLabel: () => void initializeTokenAccount([firstToken.address]),
-            })}
+            // {...(!isFirstTokenAccountInited && !isInitializing && {
+            //   onClickTopRightLabel: () => void initializeTokenAccount([firstToken.address]),
+            // })}
             onClickMax={onMaxClickFirstToken}
             showMaxButton={
               isDeposit &&
@@ -298,10 +301,10 @@ export function GmForm({
                 onClickTopLeftLabel: wrapNativeToken,
               })}
               topLeftValue={formatUsd(secondTokenUsd)}
-              topRightLabel={isSecondTokenAccountInited ? t`Balance` : isInitializing ? t`Initializing...` : t`Uninitialized`}
-              topRightValue={isSecondTokenAccountInited ? formatTokenAmount(secondToken?.balance ?? BN_ZERO, secondToken?.decimals, "", {
+              topRightLabel={t`Balance`}
+              topRightValue={formatTokenAmount(secondToken?.balance ?? BN_ZERO, secondToken?.decimals, "", {
                 useCommas: true,
-              }) : ""}
+              })}
               preventFocusOnLabelClick="right"
               inputValue={inputState.secondTokenInputValue}
               showMaxButton={
@@ -315,12 +318,12 @@ export function GmForm({
                   onFocusedCollateralInputChange(secondToken.address.toBase58());
                 }
               }}
-              {...(isDeposit && isSecondTokenAccountInited && {
+              {...(isDeposit && {
                 onClickTopRightLabel: onMaxClickSecondToken,
               })}
-              {...(!isSecondTokenAccountInited && !isInitializing && {
-                onClickTopRightLabel: () => void initializeTokenAccount([secondToken.address]),
-              })}
+              // {...(!isSecondTokenAccountInited && !isInitializing && {
+              //   onClickTopRightLabel: () => void initializeTokenAccount([secondToken.address]),
+              // })}
               onClickMax={onMaxClickSecondToken}
             >
               <div className="selected-token">
@@ -338,10 +341,10 @@ export function GmForm({
           <BuyInputSection
             topLeftLabel={isWithdrawal ? t`Pay` : t`Receive`}
             topLeftValue={marketTokenUsd?.gt(BN_ZERO) ? formatUsd(marketTokenUsd) : ""}
-            topRightLabel={isMarketTokenAccountInited ? t`Balance` : isInitializing ? t`Initializing` : t`Uninitialized`}
-            topRightValue={isMarketTokenAccountInited ? formatTokenAmount(marketToken?.balance ?? BN_ZERO, marketToken?.decimals, "", {
+            topRightLabel={t`Balance`}
+            topRightValue={formatTokenAmount(marketToken?.balance ?? BN_ZERO, marketToken?.decimals, "", {
               useCommas: true,
-            }) : ""}
+            })}
             preventFocusOnLabelClick="right"
             showMaxButton={isWithdrawal && marketToken?.balance?.gt(BN_ZERO) && !marketTokenAmount?.eq(marketToken.balance)}
             inputValue={inputState.marketTokenInputValue}
@@ -349,7 +352,7 @@ export function GmForm({
               dispatch({ type: "set-market-token-input-value", value: e.target.value });
               // setFocusedInput("market");
             }}
-            {...(isMarketTokenAccountInited && isWithdrawal && {
+            {...(isWithdrawal && {
               onClickTopRightLabel: () => {
                 if (marketToken?.balance) {
                   dispatch({
@@ -360,9 +363,9 @@ export function GmForm({
                 }
               },
             })}
-            {...(!isMarketTokenAccountInited && !isInitializing && {
-              onClickTopRightLabel: () => void initializeTokenAccount([marketToken.address]),
-            })}
+            // {...(!isMarketTokenAccountInited && !isInitializing && {
+            //   onClickTopRightLabel: () => void initializeTokenAccount([marketToken.address]),
+            // })}
             onClickMax={() => {
               if (marketToken?.balance) {
                 const formattedGMBalance = formatAmountFree(marketToken.balance, marketToken.decimals);
@@ -463,7 +466,7 @@ export function GmForm({
             className="w-full"
             variant="primary-action"
             type="submit"
-            disabled={isPending}
+            disabled={isPending || stage !== "swap"}
           // onClick={submitState.onSubmit}
           // disabled={submitState.isDisabled}
           >
@@ -471,6 +474,12 @@ export function GmForm({
             {!isPending && (owner ? isDeposit ? t`Buy GM` : t`Sell GM` : t`Connect Wallet`)}
           </Button>
         </div>
+        <GmConfirmationBox
+          isVisible={stage === "confirmation"}
+          onClose={handleConfirmationClose}
+          operationText={isDeposit ? t`Buy GM` : t`Sell GM`}
+          isPending={isPending}
+        />
         {/* <GmConfirmationBox
           isVisible={stage === "confirmation"}
           marketToken={marketToken!}
