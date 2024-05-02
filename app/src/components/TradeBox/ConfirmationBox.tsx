@@ -27,10 +27,6 @@ import { createSharedStatesSelector } from "@/contexts/shared/utils";
 import { getByKey } from "@/utils/objects";
 import { withInitializeTokenAccountGuard } from "../InitializeTokenAccountGuard";
 
-interface Props {
-  onClose?: () => void,
-}
-
 const selectDisplayInfo = createStructuredSelector({
   fromToken: selectFromToken,
   fromTokenAmount: selectFromTokenInputAmount,
@@ -41,8 +37,12 @@ const selectDisplayInfo = createStructuredSelector({
 });
 
 export function ConfirmationBox({
-  onClose
-}: Props) {
+  onClose,
+  onSubmitted,
+}: {
+  onClose?: () => void,
+  onSubmitted?: () => void,
+}) {
   const stage = useTradeStage();
   const isVisible = useMemo(() => stage === "confirmation", [stage]);
   const setStage = useSetTradeStage();
@@ -53,6 +53,13 @@ export function ConfirmationBox({
     }
     setStage("trade");
   }, [onClose, setStage]);
+
+  const handleSubmitted = useCallback(() => {
+    if (onSubmitted) {
+      onSubmitted();
+    }
+    setStage("trade");
+  }, [onSubmitted, setStage]);
 
   const { isSwap } = useSharedStatesSelector(selectTradeBoxTradeFlags);
   const fromTokenAddress = useSharedStatesSelector(selectTradeBoxFromTokenAddress);
@@ -74,6 +81,7 @@ export function ConfirmationBox({
       tokens={relatedTokens}
       isVisible={isVisible}
       onClose={handleClose}
+      onSubmitted={handleSubmitted}
     />
   );
 }
@@ -83,9 +91,11 @@ const ConfirmationModal = withInitializeTokenAccountGuard(ConfirmationModalInner
 function ConfirmationModalInner({
   isVisible,
   onClose,
+  onSubmitted,
 }: {
   isVisible: boolean,
   onClose: () => void,
+  onSubmitted?: () => void,
 }) {
   const [skipPreflight, setSkipPreflight] = useState(false);
   const { isMarket, isLimit, isSwap, isLong } = useSharedStatesSelector(selectTradeBoxTradeFlags);
@@ -131,9 +141,9 @@ function ConfirmationModalInner({
 
   const handleSubmit = useCallback(() => {
     if (trigger) {
-      void trigger({ skipPreflight }).then(onClose);
+      void trigger({ skipPreflight }).then(onSubmitted);
     }
-  }, [onClose, skipPreflight, trigger]);
+  }, [onSubmitted, skipPreflight, trigger]);
 
   return (
     <div className="Confirmation-box">
