@@ -6,6 +6,7 @@ import { getAccount } from "@solana/spl-token";
 import { BTC_TOKEN_MINT, SOL_TOKEN_MINT } from "./token";
 import { IxWithOutput, makeInvoke } from "./invoke";
 import { toBN } from "gmsol";
+import { PYTH_ID } from "./external";
 
 export const exchange = workspace.Exchange as Program<Exchange>;
 
@@ -187,6 +188,7 @@ export type MakeExecuteDepositParams = {
     deposit: PublicKey,
     options?: {
         executionFee?: number | bigint,
+        priceProvider?: PublicKey,
         hints?: {
             deposit?: {
                 user: PublicKey,
@@ -258,6 +260,7 @@ export const makeExecuteDepositInstruction = async ({
         user,
         deposit,
         receiver: toMarketTokenAccount,
+        priceProvider: options.priceProvider ?? PYTH_ID,
     }).remainingAccounts([...feedAccounts, ...swapPathMarkets, ...swapPathMints]).instruction();
 };
 
@@ -381,6 +384,7 @@ export type MakeExecuteWithdrawalParams = {
     withdrawal: PublicKey,
     options?: {
         executionFee?: number | bigint,
+        priceProvider?: PublicKey,
         hints?: {
             withdrawal?: {
                 user: PublicKey,
@@ -465,6 +469,7 @@ export const makeExecuteWithdrawalInstruction = async ({
         finalShortTokenReceiver,
         finalLongTokenVault: createMarketVaultPDA(store, finalLongTokenMint)[0],
         finalShortTokenVault: createMarketVaultPDA(store, finalShortTokenMint)[0],
+        priceProvider: options.priceProvider ?? PYTH_ID,
     }).remainingAccounts([...feedAccounts, ...swapPathMarkets, ...swapPathMints]).instruction();
 };
 
@@ -609,6 +614,7 @@ export type MakeExecuteOrderParams = {
     order: PublicKey,
     options?: {
         executionFee?: number | bigint,
+        priceProvider?: PublicKey,
         hints?: {
             order?: {
                 user: PublicKey,
@@ -692,6 +698,7 @@ export const makeExecuteOrderInstruction = async ({
         secondaryOutputTokenAccount,
         finalOutputTokenVault: finalOutputTokenAccount ? createMarketVaultPDA(store, finalOutputToken)[0] : null,
         secondaryOutputTokenVault: secondaryOutputTokenAccount ? createMarketVaultPDA(store, secondaryOutputToken)[0] : null,
+        priceProvider: options.priceProvider ?? PYTH_ID,
     }).remainingAccounts([...feedAccounts, ...swapMarkets, ...swapMarketMints]).instruction();
 };
 

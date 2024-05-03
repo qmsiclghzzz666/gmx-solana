@@ -1,11 +1,11 @@
 import * as anchor from "@coral-xyz/anchor";
 import { getAddresses, getPrograms, getProvider, getUsers, expect } from "../../utils/fixtures";
 import { createRolesPDA, createTokenConfigMapPDA, dataStore } from "../../utils/data";
-import { BTC_FEED, BTC_TOKEN_MINT, SOL_FEED, SOL_TOKEN_MINT, USDC_FEED } from "../../utils/token";
+import { BTC_FEED, BTC_FEED_PYTH, BTC_TOKEN_MINT, SOL_FEED, SOL_FEED_PYTH, SOL_TOKEN_MINT, USDC_FEED, USDC_FEED_PYTH } from "../../utils/token";
 import { PublicKey } from "@solana/web3.js";
-import { CHAINLINK_ID } from "../../utils/external";
+import { PYTH_ID } from "../../utils/external";
 
-describe("data_store: oracle", () => {
+describe("data store: oracle", () => {
     const provider = getProvider();
 
     const { signer0 } = getUsers();
@@ -51,30 +51,31 @@ describe("data_store: oracle", () => {
             authority: signer0.publicKey,
             onlyController: roles,
             oracle: oracleAddress,
-            priceProvider: CHAINLINK_ID,
+            priceProvider: PYTH_ID,
         }).remainingAccounts([
             {
-                pubkey: BTC_FEED,
+                pubkey: BTC_FEED_PYTH,
                 isSigner: false,
                 isWritable: false,
             },
             {
-                pubkey: SOL_FEED,
+                pubkey: SOL_FEED_PYTH,
                 isSigner: false,
                 isWritable: false,
             },
             {
-                pubkey: BTC_FEED,
+                pubkey: BTC_FEED_PYTH,
                 isSigner: false,
                 isWritable: false,
             },
             {
-                pubkey: USDC_FEED,
+                pubkey: USDC_FEED_PYTH,
                 isSigner: false,
                 isWritable: false,
             },
         ]).signers([signer0]).rpc();
         const setData = await dataStore.account.oracle.fetch(oracleAddress);
+        // console.log(setData.primary.prices);
         expect(setData.primary.prices.length).to.equal(4);
 
         await dataStore.methods.clearAllPrices().accounts({

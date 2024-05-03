@@ -2,7 +2,7 @@ import { anchor } from "../endpoint";
 import { keyToSeed } from "../seed";
 import { EventManager } from "../event";
 import { Keypair, PublicKey } from "@solana/web3.js";
-import { BTC_FEED, BTC_TOKEN_MINT, SOL_FEED, SOL_TOKEN_MINT, USDC_FEED } from "../token";
+import { BTC_FEED, BTC_FEED_PYTH, BTC_TOKEN_MINT, SOL_FEED, SOL_FEED_PYTH, SOL_TOKEN_MINT, USDC_FEED, USDC_FEED_PYTH } from "../token";
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 
 import { dataStore } from "./program";
@@ -219,11 +219,11 @@ export const initializeDataStore = async (
         console.log("Failed to initialize token config map", error);
     }
 
-    const HEARTBEAT = 120;
+    const HEARTBEAT = 240;
 
     // Insert BTC token config.
     try {
-        await insertTokenConfig(signer, dataStorePDA, BTC_TOKEN_MINT, BTC_FEED, HEARTBEAT, 2);
+        await insertTokenConfig(signer, dataStorePDA, BTC_TOKEN_MINT, BTC_FEED_PYTH, HEARTBEAT, 2);
         console.log(`Init a token config for ${BTC_TOKEN_MINT}`);
     } catch (error) {
         console.warn("Failed to init the token config account", error);
@@ -231,7 +231,7 @@ export const initializeDataStore = async (
 
     // Insert SOL token config.
     try {
-        await insertTokenConfig(signer, dataStorePDA, SOL_TOKEN_MINT, SOL_FEED, HEARTBEAT, 4);
+        await insertTokenConfig(signer, dataStorePDA, SOL_TOKEN_MINT, SOL_FEED_PYTH, HEARTBEAT, 4);
         console.log(`Init a token config for ${SOL_TOKEN_MINT}`);
     } catch (error) {
         console.warn("Failed to init the token config account", error);
@@ -239,7 +239,7 @@ export const initializeDataStore = async (
 
     // Insert FakeToken token config.
     try {
-        await insertTokenConfig(signer, dataStorePDA, fakeToken, BTC_FEED, HEARTBEAT, 2);
+        await insertTokenConfig(signer, dataStorePDA, fakeToken, BTC_FEED_PYTH, HEARTBEAT, 2);
         console.log(`Init a token config for ${fakeToken}`);
     } catch (error) {
         console.warn("Failed to init the token config account", error);
@@ -247,7 +247,7 @@ export const initializeDataStore = async (
 
     // Insert UsdG token config.
     try {
-        await insertTokenConfig(signer, dataStorePDA, usdG, USDC_FEED, HEARTBEAT, 4);
+        await insertTokenConfig(signer, dataStorePDA, usdG, USDC_FEED_PYTH, HEARTBEAT, 4);
         console.log(`Init a token config for ${usdG}`);
     } catch (error) {
         console.warn("Failed to init the token config account", error);

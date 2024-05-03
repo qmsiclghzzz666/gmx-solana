@@ -8,7 +8,7 @@ use anchor_client::{
 use data_store::states::{
     order::{OrderKind, OrderParams},
     position::PositionKind,
-    Chainlink, Market, MarketMeta, NonceBytes, Order, Position, Seed,
+    Market, MarketMeta, NonceBytes, Order, Position, Pyth, Seed,
 };
 use exchange::{accounts, instruction, instructions::CreateOrderParams, utils::ControllerSeeds};
 
@@ -370,6 +370,7 @@ pub struct ExecuteOrderBuilder<'a, C> {
     oracle: Pubkey,
     order: Pubkey,
     execution_fee: u64,
+    price_provider: Pubkey,
     hint: Option<ExecuteOrderHint>,
 }
 
@@ -403,6 +404,7 @@ where
             oracle: *oracle,
             order: *order,
             execution_fee: 0,
+            price_provider: Pyth::id(),
             hint: None,
         }
     }
@@ -410,6 +412,12 @@ where
     /// Set execution fee.
     pub fn execution_fee(&mut self, fee: u64) -> &mut Self {
         self.execution_fee = fee;
+        self
+    }
+
+    /// Set price provider to the given.
+    pub fn price_provider(&mut self, program: Pubkey) -> &mut Self {
+        self.price_provider = program;
         self
     }
 
@@ -486,7 +494,7 @@ where
                 secondary_output_token_account: hint.secondary_output_token_account,
                 data_store_program: data_store::id(),
                 token_program: anchor_spl::token::ID,
-                chainlink_program: Chainlink::id(),
+                price_provider: self.price_provider,
                 system_program: system_program::ID,
             })
             .args(instruction::ExecuteOrder {

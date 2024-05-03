@@ -6,7 +6,7 @@ use anchor_client::{
     Program, RequestBuilder,
 };
 use anchor_spl::associated_token::get_associated_token_address;
-use data_store::states::{Chainlink, Deposit, Market, NonceBytes, Seed};
+use data_store::states::{Deposit, Market, NonceBytes, Pyth, Seed};
 use exchange::{accounts, instruction, instructions::CreateDepositParams, utils::ControllerSeeds};
 
 use crate::store::{
@@ -411,6 +411,7 @@ pub struct ExecuteDepositBuilder<'a, C> {
     oracle: Pubkey,
     deposit: Pubkey,
     execution_fee: u64,
+    price_provider: Pubkey,
     hint: Option<ExecuteDepositHint>,
 }
 
@@ -454,6 +455,7 @@ where
             oracle: *oracle,
             deposit: *deposit,
             execution_fee: 0,
+            price_provider: Pyth::id(),
             hint: None,
         }
     }
@@ -461,6 +463,12 @@ where
     /// Set execution fee.
     pub fn execution_fee(&mut self, fee: u64) -> &mut Self {
         self.execution_fee = fee;
+        self
+    }
+
+    /// Set price provider to the given.
+    pub fn price_provider(&mut self, program: Pubkey) -> &mut Self {
+        self.price_provider = program;
         self
     }
 
@@ -489,6 +497,7 @@ where
             oracle,
             deposit,
             execution_fee,
+            price_provider,
             ..
         } = self;
         let authority = program.payer();
@@ -523,7 +532,7 @@ where
                 only_order_keeper,
                 store: *store,
                 data_store_program: data_store::id(),
-                chainlink_program: Chainlink::id(),
+                price_provider: *price_provider,
                 token_program: anchor_spl::token::ID,
                 oracle: *oracle,
                 token_config_map: find_token_config_map(store).0,

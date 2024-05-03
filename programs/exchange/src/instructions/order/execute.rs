@@ -3,7 +3,7 @@ use anchor_spl::token::{Mint, Token};
 use data_store::{
     cpi::accounts::{RemoveOrder, RemovePosition},
     program::DataStore,
-    states::{Chainlink, Oracle, Order},
+    states::{Oracle, Order, PriceProvider},
     utils::{Authentication, WithOracle, WithOracleExt},
 };
 
@@ -48,7 +48,7 @@ pub struct ExecuteOrder<'info> {
     pub secondary_output_token_account: Option<UncheckedAccount<'info>>,
     pub data_store_program: Program<'info, DataStore>,
     pub token_program: Program<'info, Token>,
-    pub chainlink_program: Program<'info, Chainlink>,
+    pub price_provider: Interface<'info, PriceProvider>,
     pub system_program: Program<'info, System>,
 }
 
@@ -108,7 +108,7 @@ impl<'info> Authentication<'info> for ExecuteOrder<'info> {
 
 impl<'info> WithOracle<'info> for ExecuteOrder<'info> {
     fn price_provider(&self) -> AccountInfo<'info> {
-        self.chainlink_program.to_account_info()
+        self.price_provider.to_account_info()
     }
 
     fn oracle(&self) -> AccountInfo<'info> {

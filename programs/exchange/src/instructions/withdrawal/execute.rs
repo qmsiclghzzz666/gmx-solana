@@ -3,7 +3,7 @@ use anchor_spl::token::{Mint, Token, TokenAccount};
 use data_store::{
     cpi::accounts::RemoveWithdrawal,
     program::DataStore,
-    states::{Chainlink, Withdrawal},
+    states::{PriceProvider, Withdrawal},
     utils::{Authentication, WithOracle, WithOracleExt},
 };
 
@@ -18,7 +18,7 @@ pub struct ExecuteWithdrawal<'info> {
     /// CHECK: only used to invoke CPI.
     pub only_order_keeper: UncheckedAccount<'info>,
     pub data_store_program: Program<'info, DataStore>,
-    pub chainlink_program: Program<'info, Chainlink>,
+    pub price_provider: Interface<'info, PriceProvider>,
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
     #[account(mut)]
@@ -105,7 +105,7 @@ impl<'info> Authentication<'info> for ExecuteWithdrawal<'info> {
 
 impl<'info> WithOracle<'info> for ExecuteWithdrawal<'info> {
     fn price_provider(&self) -> AccountInfo<'info> {
-        self.chainlink_program.to_account_info()
+        self.price_provider.to_account_info()
     }
 
     fn oracle(&self) -> AccountInfo<'info> {

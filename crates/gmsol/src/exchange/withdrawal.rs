@@ -6,9 +6,7 @@ use anchor_client::{
     Program, RequestBuilder,
 };
 use anchor_spl::associated_token::get_associated_token_address;
-use data_store::states::{
-    withdrawal::TokenParams, Chainlink, Market, NonceBytes, Seed, Withdrawal,
-};
+use data_store::states::{withdrawal::TokenParams, Market, NonceBytes, Pyth, Seed, Withdrawal};
 use exchange::{
     accounts, instruction, instructions::CreateWithdrawalParams, utils::ControllerSeeds,
 };
@@ -363,6 +361,7 @@ pub struct ExecuteWithdrawalBuilder<'a, C> {
     oracle: Pubkey,
     withdrawal: Pubkey,
     execution_fee: u64,
+    price_provider: Pubkey,
     hint: Option<ExecuteWithdrawalHint>,
 }
 
@@ -412,6 +411,7 @@ where
             oracle: *oracle,
             withdrawal: *withdrawal,
             execution_fee: 0,
+            price_provider: Pyth::id(),
             hint: None,
         }
     }
@@ -419,6 +419,12 @@ where
     /// Set execution fee.
     pub fn execution_fee(&mut self, fee: u64) -> &mut Self {
         self.execution_fee = fee;
+        self
+    }
+
+    /// Set price provider to the given.
+    pub fn price_provider(&mut self, program: Pubkey) -> &mut Self {
+        self.price_provider = program;
         self
     }
 
@@ -473,7 +479,7 @@ where
                 store: self.store,
                 only_order_keeper: find_roles_address(&self.store, &authority).0,
                 data_store_program: data_store::id(),
-                chainlink_program: Chainlink::id(),
+                price_provider: self.price_provider,
                 token_program: anchor_spl::token::ID,
                 system_program: system_program::ID,
                 oracle: self.oracle,

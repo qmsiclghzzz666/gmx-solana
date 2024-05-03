@@ -3,7 +3,7 @@ use anchor_spl::token::{Mint, Token, TokenAccount};
 use data_store::{
     cpi::{self, accounts::RemoveDeposit},
     program::DataStore,
-    states::{Chainlink, Deposit},
+    states::{Deposit, PriceProvider},
     utils::{Authentication, WithOracle, WithOracleExt},
 };
 
@@ -36,7 +36,7 @@ pub struct ExecuteDeposit<'info> {
     /// CHECK: used and checked by CPI.
     pub store: UncheckedAccount<'info>,
     pub data_store_program: Program<'info, DataStore>,
-    pub chainlink_program: Program<'info, Chainlink>,
+    pub price_provider: Interface<'info, PriceProvider>,
     pub token_program: Program<'info, Token>,
     #[account(mut)]
     pub oracle: Account<'info, data_store::states::Oracle>,
@@ -116,7 +116,7 @@ impl<'info> Authentication<'info> for ExecuteDeposit<'info> {
 
 impl<'info> WithOracle<'info> for ExecuteDeposit<'info> {
     fn price_provider(&self) -> AccountInfo<'info> {
-        self.chainlink_program.to_account_info()
+        self.price_provider.to_account_info()
     }
 
     fn oracle(&self) -> AccountInfo<'info> {

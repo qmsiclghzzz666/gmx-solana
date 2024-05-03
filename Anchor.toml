@@ -27,6 +27,10 @@ upgradeable = false
 address = "HEvSKofvBgfaexv23kMabbYqxasxU3mQ4ibBMEmJWHny"
 program = "external-programs/chainlink-store.so"
 
+[[test.genesis]]
+address = "rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ"
+program = "external-programs/pyth-receiver.so"
+
 [test.validator]
 bind_address = "127.0.0.1"
 url = "https://api.mainnet-beta.solana.com"
@@ -48,6 +52,10 @@ address = "GzGuoKXE8Unn7Vcg1DtomwD27tL4bVUpSK2M1yk6Xfz5"
 # WBTC Token Mint
 [[test.validator.clone]]
 address = "3NZ9JMVBmGAqocybic2c7LQCJScmgsAZ6vQqTDzcqmJh"
+
+# Pyth receiver program
+[[test.validator.clone]]
+address = "rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ"
 
 # BTC Data Feed (Pyth)
 [[test.validator.clone]]
