@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    states::{Chainlink, DataStore, Oracle, Roles, Seed, TokenConfigMap},
+    states::{DataStore, Oracle, PriceProvider, Roles, Seed, TokenConfigMap},
     utils::internal,
 };
 
@@ -21,7 +21,7 @@ pub struct SetPricesFromPriceFeed<'info> {
         bump = token_config_map.bump,
     )]
     pub token_config_map: Account<'info, TokenConfigMap>,
-    pub chainlink_program: Program<'info, Chainlink>,
+    pub price_provider: Interface<'info, PriceProvider>,
 }
 
 /// Set the oracle prices from price feeds.
@@ -30,7 +30,7 @@ pub fn set_prices_from_price_feed<'info>(
     tokens: Vec<Pubkey>,
 ) -> Result<()> {
     ctx.accounts.oracle.set_prices_from_remaining_accounts(
-        &ctx.accounts.chainlink_program,
+        &ctx.accounts.price_provider,
         &ctx.accounts.token_config_map,
         &tokens,
         ctx.remaining_accounts,

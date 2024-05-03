@@ -1,6 +1,7 @@
-use anchor_lang::prelude::*;
+use anchor_lang::{prelude::*, Ids};
 use dual_vec_map::DualVecMap;
 use gmx_solana_utils::price::{Decimal, Price};
+use pyth_solana_receiver_sdk::price_update::PriceUpdateV2;
 
 use crate::DataStoreError;
 
@@ -84,10 +85,10 @@ impl Oracle {
     /// Set prices from remaining accounts.
     pub(crate) fn set_prices_from_remaining_accounts<'info>(
         &mut self,
-        price_feed_program: &Program<'info, Chainlink>,
+        provider: &Interface<'info, PriceProvider>,
         map: &TokenConfigMap,
         tokens: &[Pubkey],
-        remaining_accounts: &[AccountInfo<'info>],
+        remaining_accounts: &'info [AccountInfo<'info>],
     ) -> Result<()> {
         require!(self.primary.is_empty(), DataStoreError::PricesAlreadySet);
         require!(
@@ -98,6 +99,8 @@ impl Oracle {
             tokens.len() <= remaining_accounts.len(),
             ErrorCode::AccountNotEnoughKeys
         );
+        let program = PriceProviderProgram::from_interface(provider);
+        let clock = Clock::get()?;
         // Assume the remaining accounts are arranged in the following way:
         // [token_config, feed; tokens.len()] [..remaining]
         for (idx, token) in tokens.iter().enumerate() {
@@ -106,7 +109,20 @@ impl Oracle {
             let token_config = map
                 .get(token)
                 .ok_or(DataStoreError::RequiredResourceNotFound)?;
-            let price = check_and_get_chainlink_price(price_feed_program, token_config, feed)?;
+            require!(token_config.enabled, DataStoreError::TokenConfigDisabled);
+            require_eq!(
+                token_config.price_feed,
+                *feed.key,
+                DataStoreError::InvalidPriceFeedAccount
+            );
+            let price = match &program {
+                PriceProviderProgram::Chainlink(program) => {
+                    Chainlink::check_and_get_chainlink_price(&clock, program, token_config, feed)?
+                }
+                PriceProviderProgram::Pyth(_program) => {
+                    Pyth::check_and_get_price(&clock, token_config, feed)?
+                }
+            };
             self.primary.set(token, price)?;
         }
         Ok(())
@@ -120,7 +136,7 @@ impl Oracle {
     /// Run a function inside the scope with oracle prices set.
     pub fn with_oracle_prices<'info, T>(
         &mut self,
-        price_feed_program: &Program<'info, Chainlink>,
+        provider: &'info Interface<'info, PriceProvider>,
         map: &TokenConfigMap,
         tokens: &[Pubkey],
         remaining_accounts: &'info [AccountInfo<'info>],
@@ -133,7 +149,7 @@ impl Oracle {
         );
         let feeds = &remaining_accounts[..tokens.len()];
         let remaining_accounts = &remaining_accounts[tokens.len()..];
-        self.set_prices_from_remaining_accounts(price_feed_program, map, tokens, feeds)?;
+        self.set_prices_from_remaining_accounts(provider, map, tokens, feeds)?;
         let output = f(self, remaining_accounts)?;
         self.clear_all_prices();
         Ok(output)
@@ -149,48 +165,143 @@ impl Id for Chainlink {
     }
 }
 
-/// Check and get latest chainlink price from data feed.
-pub(crate) fn check_and_get_chainlink_price<'info>(
-    chainlink_program: &Program<'info, Chainlink>,
-    token_config: &TokenConfig,
-    feed: &AccountInfo<'info>,
-) -> Result<Price> {
-    require!(token_config.enabled, DataStoreError::TokenConfigDisabled);
-    require_eq!(
-        token_config.price_feed,
-        *feed.key,
-        DataStoreError::InvalidPriceFeedAccount
-    );
-    let round =
-        chainlink_solana::latest_round_data(chainlink_program.to_account_info(), feed.clone())?;
-    let decimals = chainlink_solana::decimals(chainlink_program.to_account_info(), feed.clone())?;
-    check_and_get_price_from_round(&round, decimals, token_config)
+impl Chainlink {
+    /// Check and get latest chainlink price from data feed.
+    pub(crate) fn check_and_get_chainlink_price<'info>(
+        clock: &Clock,
+        chainlink_program: &AccountInfo<'info>,
+        token_config: &TokenConfig,
+        feed: &AccountInfo<'info>,
+    ) -> Result<Price> {
+        let round = chainlink_solana::latest_round_data(chainlink_program.clone(), feed.clone())?;
+        let decimals =
+            chainlink_solana::decimals(chainlink_program.to_account_info(), feed.clone())?;
+        Self::check_and_get_price_from_round(clock, &round, decimals, token_config)
+    }
+
+    /// Check and get price from the round data.
+    fn check_and_get_price_from_round(
+        clock: &Clock,
+        round: &chainlink_solana::Round,
+        decimals: u8,
+        token_config: &TokenConfig,
+    ) -> Result<Price> {
+        let chainlink_solana::Round {
+            answer, timestamp, ..
+        } = round;
+        require_gt!(*answer, 0, DataStoreError::InvalidPriceFeedPrice);
+        let timestamp = *timestamp as i64;
+        let current = clock.unix_timestamp;
+        if current > timestamp && current - timestamp > token_config.heartbeat_duration.into() {
+            return Err(DataStoreError::PriceFeedNotUpdated.into());
+        }
+        let price = Decimal::try_from_price(
+            *answer as u128,
+            decimals,
+            token_config.token_decimals,
+            token_config.precision,
+        )
+        .map_err(|_| DataStoreError::InvalidPriceFeedPrice)?;
+        Ok(Price {
+            min: price,
+            max: price,
+        })
+    }
 }
 
-/// Check and get price from the round data.
-fn check_and_get_price_from_round(
-    round: &chainlink_solana::Round,
-    decimals: u8,
-    token_config: &TokenConfig,
-) -> Result<Price> {
-    let chainlink_solana::Round {
-        answer, timestamp, ..
-    } = round;
-    require_gt!(*answer, 0, DataStoreError::InvalidPriceFeedPrice);
-    let timestamp = *timestamp as i64;
-    let current = Clock::get()?.unix_timestamp;
-    if current > timestamp && current - timestamp > token_config.heartbeat_duration.into() {
-        return Err(DataStoreError::PriceFeedNotUpdated.into());
+/// The Pyth receiver program.
+pub struct Pyth;
+
+impl Id for Pyth {
+    fn id() -> Pubkey {
+        pyth_solana_receiver_sdk::ID
     }
-    let price = Decimal::try_from_price(
-        *answer as u128,
-        decimals,
-        token_config.token_decimals,
-        token_config.precision,
-    )
-    .map_err(|_| DataStoreError::InvalidPriceFeedPrice)?;
-    Ok(Price {
-        min: price,
-        max: price,
-    })
+}
+
+impl Pyth {
+    fn check_and_get_price<'info>(
+        clock: &Clock,
+        token_config: &TokenConfig,
+        feed: &'info AccountInfo<'info>,
+    ) -> Result<Price> {
+        let feed = Account::<PriceUpdateV2>::try_from(feed)?;
+        // TODO: read feed id from the token config if available.
+        let feed_id = &feed.price_message.feed_id;
+        let price =
+            feed.get_price_no_older_than(clock, token_config.heartbeat_duration.into(), feed_id)?;
+        let mid_price: u64 = price
+            .price
+            .try_into()
+            .map_err(|_| DataStoreError::NegativePrice)?;
+        // FIXME: use min and max price when ready.
+        let _min_price = mid_price
+            .checked_sub(price.conf)
+            .ok_or(DataStoreError::NegativePrice)?;
+        let _max_price = mid_price
+            .checked_add(price.conf)
+            .ok_or(DataStoreError::PriceOverflow)?;
+        Ok(Price {
+            min: Self::price_value_to_decimal(mid_price, price.exponent, token_config)?,
+            max: Self::price_value_to_decimal(mid_price, price.exponent, token_config)?,
+        })
+    }
+
+    fn price_value_to_decimal(
+        mut value: u64,
+        exponent: i32,
+        token_config: &TokenConfig,
+    ) -> Result<Decimal> {
+        // actual price == value * 10^exponent
+        // - If `exponent` is not positive, then the `decimals` is set to `-exponent`.
+        // - Otherwise, we should use `value * 10^exponent` as `price` argument, and let `decimals` be `0`.
+        let decimals: u8 = if exponent <= 0 {
+            (-exponent)
+                .try_into()
+                .map_err(|_| DataStoreError::InvalidPriceFeedPrice)?
+        } else {
+            let factor = 10u64
+                .checked_pow(exponent as u32)
+                .ok_or(DataStoreError::InvalidPriceFeedPrice)?;
+            value = value
+                .checked_mul(factor)
+                .ok_or(DataStoreError::PriceOverflow)?;
+            0
+        };
+        let price = Decimal::try_from_price(
+            value as u128,
+            decimals,
+            token_config.token_decimals,
+            token_config.precision,
+        )
+        .map_err(|_| DataStoreError::InvalidPriceFeedPrice)?;
+        Ok(price)
+    }
+}
+
+/// Price Provider.
+pub struct PriceProvider;
+
+static PRICE_PROVIDER_IDS: [Pubkey; 2] = [chainlink_solana::ID, pyth_solana_receiver_sdk::ID];
+
+impl Ids for PriceProvider {
+    fn ids() -> &'static [Pubkey] {
+        &PRICE_PROVIDER_IDS
+    }
+}
+
+enum PriceProviderProgram<'info> {
+    Chainlink(AccountInfo<'info>),
+    Pyth(AccountInfo<'info>),
+}
+
+impl<'info> PriceProviderProgram<'info> {
+    fn from_interface(interface: &Interface<'info, PriceProvider>) -> Self {
+        if *interface.key == Chainlink::id() {
+            Self::Chainlink(interface.to_account_info())
+        } else if *interface.key == Pyth::id() {
+            Self::Pyth(interface.to_account_info())
+        } else {
+            unreachable!();
+        }
+    }
 }

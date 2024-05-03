@@ -33,15 +33,15 @@ url = "https://api.mainnet-beta.solana.com"
 ledger = ".anchor/test-ledger"
 rpc_port = 8899
 
-# BTC Data Feed
+# BTC Data Feed (Chainlink)
 [[test.validator.clone]]
 address = "Cv4T27XbjVoKUYwP72NQQanvZeA7W4YF9L4EnYT9kx5o"
 
-# SOL Data Feed
+# SOL Data Feed (Chainlink)
 [[test.validator.clone]]
 address = "CH31Xns5z3M1cTAbKW34jcxPPciazARpijcHj9rxtemt"
 
-# USDC Data Feed
+# USDC Data Feed (Chainlink)
 [[test.validator.clone]]
 address = "GzGuoKXE8Unn7Vcg1DtomwD27tL4bVUpSK2M1yk6Xfz5"
 
@@ -49,7 +49,14 @@ address = "GzGuoKXE8Unn7Vcg1DtomwD27tL4bVUpSK2M1yk6Xfz5"
 [[test.validator.clone]]
 address = "3NZ9JMVBmGAqocybic2c7LQCJScmgsAZ6vQqTDzcqmJh"
 
-# We don't need to clone the WSOL Mint account.
-# # WSOL Token Mint
-# [[test.validator.clone]]
-# address = "So11111111111111111111111111111111111111112"
+# BTC Data Feed (Pyth)
+[[test.validator.clone]]
+address = "4cSM2e6rvbGQUFiJbqytoVMi5GgghSMr8LwVrT9VPSPo"
+
+# SOL Data Feed (Pyth)
+[[test.validator.clone]]
+address = "7UVimffxr9ow1uXYxsr4LHAcV58mLzhmwaeKvJ1pjLiE"
+
+# USDC Data Feed (Pyth)
+[[test.validator.clone]]
+address = "Dpw1EAVrSB1ibxiDQyTAW6Zip3J4Btk2x4SgApQCeFbX"

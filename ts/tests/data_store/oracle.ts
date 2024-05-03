@@ -1,11 +1,11 @@
 import * as anchor from "@coral-xyz/anchor";
-import { getAddresses, getPrograms, getProvider, getUsers, expect } from "../utils/fixtures";
-import { createRolesPDA, createTokenConfigMapPDA, dataStore } from "../utils/data";
-import { BTC_FEED, BTC_TOKEN_MINT, SOL_FEED, SOL_TOKEN_MINT, USDC_FEED } from "../utils/token";
+import { getAddresses, getPrograms, getProvider, getUsers, expect } from "../../utils/fixtures";
+import { createRolesPDA, createTokenConfigMapPDA, dataStore } from "../../utils/data";
+import { BTC_FEED, BTC_TOKEN_MINT, SOL_FEED, SOL_TOKEN_MINT, USDC_FEED } from "../../utils/token";
 import { PublicKey } from "@solana/web3.js";
-import { CHAINLINK_ID } from "../utils/external";
+import { CHAINLINK_ID } from "../../utils/external";
 
-describe("oracle", () => {
+describe("data_store: oracle", () => {
     const provider = getProvider();
 
     const { signer0 } = getUsers();
@@ -51,6 +51,7 @@ describe("oracle", () => {
             authority: signer0.publicKey,
             onlyController: roles,
             oracle: oracleAddress,
+            priceProvider: CHAINLINK_ID,
         }).remainingAccounts([
             {
                 pubkey: BTC_FEED,

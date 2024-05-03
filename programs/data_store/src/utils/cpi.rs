@@ -81,8 +81,8 @@ impl<'info, T> Authenticate<'info> for T where T: Authentication<'info> {}
 
 /// Accounts that with oracle context.
 pub trait WithOracle<'info>: Authentication<'info> {
-    /// Get the chainlink program.
-    fn chainlink_program(&self) -> AccountInfo<'info>;
+    /// Get the price provider.
+    fn price_provider(&self) -> AccountInfo<'info>;
 
     /// Get the oracle account.
     fn oracle(&self) -> AccountInfo<'info>;
@@ -107,7 +107,7 @@ pub trait WithOracleExt<'info>: WithOracle<'info> {
                 store: check_role.accounts.store,
                 token_config_map: self.token_config_map(),
                 oracle: self.oracle(),
-                chainlink_program: self.chainlink_program(),
+                price_provider: self.price_provider(),
             },
         )
         .with_remaining_accounts(feeds)

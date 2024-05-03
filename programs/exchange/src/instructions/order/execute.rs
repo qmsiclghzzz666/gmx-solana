@@ -107,7 +107,7 @@ impl<'info> Authentication<'info> for ExecuteOrder<'info> {
 }
 
 impl<'info> WithOracle<'info> for ExecuteOrder<'info> {
-    fn chainlink_program(&self) -> AccountInfo<'info> {
+    fn price_provider(&self) -> AccountInfo<'info> {
         self.chainlink_program.to_account_info()
     }
 

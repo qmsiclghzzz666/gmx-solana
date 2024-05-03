@@ -447,6 +447,10 @@ pub enum DataStoreError {
     PriceFeedNotUpdated,
     #[msg("Token config disabled")]
     TokenConfigDisabled,
+    #[msg("Negative price is not allowed")]
+    NegativePrice,
+    #[msg("Price overflow")]
+    PriceOverflow,
     // Market.
     #[msg("Computation error")]
     Computation,
