@@ -100,11 +100,12 @@ export default function Earn() {
   const createDepositInvoker = useCallback(async (params: CreateDepositParams) => {
     const payer = exchange.provider.publicKey;
     if (payer && GMSOL_DEPLOYMENT) {
+      const { skipPreflight, ...ixParams } = params;
       const [signature, deposit] = await invokeCreateDeposit(exchange, {
         store: GMSOL_DEPLOYMENT?.store,
         payer,
-        ...params,
-      });
+        ...ixParams,
+      }, { skipPreflight });
       console.log(`created a deposit ${deposit.toBase58()} at tx ${signature}`);
       return signature;
     } else {
@@ -123,11 +124,12 @@ export default function Earn() {
   const createWithdrawalInvoker = useCallback(async (params: CreateWithdrawalParams) => {
     const payer = exchange.provider.publicKey;
     if (payer && GMSOL_DEPLOYMENT) {
+      const { skipPreflight, ...ixParams } = params;
       const [signature, deposit] = await invokeCreateWithdrawal(exchange, {
         store: GMSOL_DEPLOYMENT.store,
         payer,
-        ...params,
-      });
+        ...ixParams,
+      }, { skipPreflight });
       console.log(`created a withdrawal ${deposit.toBase58()} at tx ${signature}`);
       return signature;
     } else {

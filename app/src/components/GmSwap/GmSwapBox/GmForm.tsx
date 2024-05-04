@@ -99,10 +99,10 @@ export function GmForm({
   const performAction = useHandleSubmit({ onCreateDeposit, onCreateWithdrawal });
   const openConnectModal = useOpenConnectModal();
 
-  const handleSubmit = useCallback(async () => {
+  const handleSubmit = useCallback(async (skipPreflight?: boolean) => {
     if (!owner && stage === "swap") return openConnectModal();
     if (stage === "confirmation") {
-      await performAction();
+      await performAction(skipPreflight || false);
       setStage("swap");
       resetInputs();
     } else if (stage === "swap") {

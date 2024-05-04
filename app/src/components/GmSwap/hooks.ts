@@ -171,7 +171,7 @@ export const useHandleSubmit = ({
   const initialShortToken = useGmStateSelector(s => s.secondToken?.address) ?? market.shortTokenAddress;
   const { firstTokenAmount, secondTokenAmount, marketTokenAmount } = useGmInputAmounts();
 
-  return useCallback(async () => {
+  return useCallback(async (skipPreflight: boolean) => {
     if (operation === Operation.Deposit) {
       const initialLongTokenAmount = firstTokenAmount ?? BN_ZERO;
       const initialShortTokenAmount = secondTokenAmount ?? BN_ZERO;
@@ -184,6 +184,7 @@ export const useHandleSubmit = ({
             initialShortToken: initialLongToken,
             initialLongTokenAmount: BN_ZERO,
             initialShortTokenAmount: initialLongTokenAmount,
+            skipPreflight,
           });
         } else {
           await onCreateDeposit({
@@ -192,6 +193,7 @@ export const useHandleSubmit = ({
             initialShortToken: market.shortTokenAddress,
             initialLongTokenAmount,
             initialShortTokenAmount: BN_ZERO,
+            skipPreflight,
           });
         }
       } else if (mode === Mode.Pair && !(initialLongTokenAmount.isZero() && initialShortTokenAmount.isZero())) {
@@ -213,6 +215,7 @@ export const useHandleSubmit = ({
           initialShortToken: fixedInitialShortToken,
           initialLongTokenAmount: fixedInitialLongTokenAmount!,
           initialShortTokenAmount: fixedInitialShortTokenAmount!,
+          skipPreflight,
         });
       } else {
         console.log("not enough amounts", mode, initialLongTokenAmount.toString(), initialShortTokenAmount.toString());
@@ -224,6 +227,7 @@ export const useHandleSubmit = ({
           amount: marketTokenAmount,
           finalLongToken: initialLongToken,
           finalShortToken: initialLongToken,
+          skipPreflight,
         });
       } else {
         const {
@@ -239,6 +243,7 @@ export const useHandleSubmit = ({
           amount: marketTokenAmount,
           finalLongToken: fixedInitialLongToken,
           finalShortToken: fixedInitialShortToken,
+          skipPreflight,
         });
       }
     }

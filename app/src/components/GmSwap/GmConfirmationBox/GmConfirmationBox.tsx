@@ -4,7 +4,7 @@ import LoadingDots from "@/components/Common/LoadingDots/LoadingDots";
 import { withInitializeTokenAccountGuard } from "@/components/InitializeTokenAccountGuard";
 import Modal from "@/components/Modal/Modal";
 import { Trans, t } from "@lingui/macro";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { useGmStateSelector } from "../hooks";
 import { selectIsDeposit, selectMarket, selectParams } from "../selectors";
 // import { FaArrowRight } from "react-icons/fa";
@@ -14,13 +14,14 @@ import { BN } from "@coral-xyz/anchor";
 import { BN_ZERO } from "@/config/constants";
 import TokenWithIcon from "@/components/TokenIcon/TokenWithIcon";
 import { MarketInfo } from "@/onchain/market";
+import CheckBox from "@/components/Common/CheckBox/CheckBox";
 
 interface Props {
   isPending: boolean,
   isVisible: boolean,
   operationText: string,
   onClose: () => void,
-  onSubmit: () => Promise<void>,
+  onSubmit: (skipPreflight: boolean) => Promise<void>,
   onSubmitted?: () => void,
 }
 
@@ -42,9 +43,11 @@ function GmConfirmationBoxInner({
     display
   } = useGmStateSelector(selectParams);
 
+  const [skipPreflight, setSkipPreflight] = useState(false);
+
   const handleSubmit = useCallback(() => {
-    void onSubmit().then(onSubmitted);
-  }, [onSubmit, onSubmitted]);
+    void onSubmit(skipPreflight).then(onSubmitted);
+  }, [onSubmit, onSubmitted, skipPreflight]);
   return (
     <div className="Confirmation-box GmConfirmationBox">
       <Modal isVisible={isVisible} onClose={onClose} label={t`Confirm ${operationText}`}>
@@ -128,6 +131,11 @@ function GmConfirmationBoxInner({
                 </div> */}
               </div>
             )}
+            <CheckBox isChecked={skipPreflight} setIsChecked={setSkipPreflight}>
+              <span className="muted font-sm">
+                <Trans>Skip transaction preflight.</Trans>
+              </span>
+            </CheckBox>
             <div className="Confirmation-box-row">
               <Button
                 className="w-full"

@@ -19,6 +19,7 @@ export interface CreateDepositParams {
   initialShortToken: PublicKey,
   initialLongTokenAmount: BN,
   initialShortTokenAmount: BN,
+  skipPreflight: boolean,
 }
 
 export interface CreateWithdrawalParams {
@@ -26,6 +27,7 @@ export interface CreateWithdrawalParams {
   amount: BN,
   finalLongToken: PublicKey,
   finalShortToken: PublicKey,
+  skipPreflight: boolean,
 }
 
 export interface GmState {

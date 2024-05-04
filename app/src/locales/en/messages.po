@@ -673,6 +673,7 @@ msgstr "Value"
 msgid "Mark Price"
 msgstr "Mark Price"
 
+#: src/components/GmSwap/GmConfirmationBox/GmConfirmationBox.tsx
 #: src/components/TradeBox/ConfirmationBox.tsx
 msgid "Skip transaction preflight."
 msgstr "Skip transaction preflight."
