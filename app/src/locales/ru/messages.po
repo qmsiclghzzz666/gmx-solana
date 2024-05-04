@@ -26,13 +26,50 @@ msgstr ""
 msgid "<0>APR is based on the Fees collected for the past {daysConsidered} days. It is an estimate as actual Fees are auto-compounded into the pool in real-time.</0>"
 msgstr ""
 
+#: src/components/TradeBox/ConfirmationBox.tsx
+msgid "Swap orders are not supported for now."
+msgstr ""
+
+#: src/components/TradeBox/TradeForm.tsx
+msgid "Open Short"
+msgstr ""
+
+#: src/contexts/pending/PendingStateProvider.tsx
+msgid "Failed to get signature statuses."
+msgstr ""
+
+#: src/components/InitializeTokenAccountGuard/InitializeTokenAccountBox.tsx
+msgid "Initialize All"
+msgstr ""
+
 #: src/components/GmList/GmList.tsx
 #: src/components/MarketStats/MarketStats.tsx
 msgid "Buyable"
 msgstr ""
 
+#: src/components/PositionList/PositionItem.tsx
+msgid "Net Value: Initial Collateral + PnL - Borrow Fee - Negative Funding Fee - Close Fee - UI Fee"
+msgstr ""
+
+#: src/components/TradeBox/TradeBox.tsx
+#~ msgid "LongLong"
+#~ msgstr ""
+
+#: src/components/TradeBox/TradeBox.tsx
+#~ msgid "ShortShort"
+#~ msgstr ""
+
 #: src/components/MarketsList/NetFeeHeaderTooltipContent.tsx
 msgid "Net fee combines funding and borrowing fees but excludes open, swap or impact fees.<0/><1/>Funding fees help to balance longs and shorts and are exchanged between both sides. <2>Read more</2>.<3/><4/>Borrowing fees help ensure available liquidity. <5>Read more</5>."
+msgstr ""
+
+#: src/components/TradeBox/ConfirmationBox.tsx
+msgid "Unsupported order type."
+msgstr ""
+
+#: src/components/TradeBox/ConfirmationBox.tsx
+#: src/components/TradeBox/ConfirmationBox.tsx
+msgid "Confirm Limit Order"
 msgstr ""
 
 #: src/routes/Dashboard.tsx
@@ -47,6 +84,7 @@ msgstr ""
 msgid "MARKET"
 msgstr ""
 
+#: src/components/AddressDropdown/AddressDropdown.tsx
 #: src/components/NativeTokenUtils/WrapNativeTokenModal.tsx
 msgid "Wrap SOL"
 msgstr ""
@@ -59,16 +97,26 @@ msgstr ""
 msgid "MAX"
 msgstr ""
 
+#: src/components/GmSwap/GmConfirmationBox/GmConfirmationBox.tsx
+#: src/components/GmSwap/GmConfirmationBox/GmConfirmationBox.tsx
 #: src/components/GmSwap/GmSwapBox/GmForm.tsx
 #: src/components/GmSwap/GmSwapBox/GmForm.tsx
 #: src/components/GmSwap/GmSwapBox/GmForm.tsx
 #: src/components/GmSwap/GmSwapBox/GmForm.tsx
 #: src/components/NativeTokenUtils/WrapNativeTokenModal.tsx
+#: src/components/TradeBox/ConfirmationBox.tsx
+#: src/components/TradeBox/TradeForm.tsx
+#: src/components/TradeBox/TradeForm.tsx
 msgid "Pay"
 msgstr ""
 
 #: src/components/MarketStats/MarketStats.tsx
+#: src/components/PositionList/PositionList.tsx
 msgid "Collateral"
+msgstr ""
+
+#: src/components/PositionList/PositionItem.tsx
+msgid "Click on the Position to select its market, then use the trade box to increase your Position Size, or to set Take-Profit / Stop-Loss Orders."
 msgstr ""
 
 #: src/components/MarketsList/MarketsList.tsx
@@ -81,24 +129,55 @@ msgstr ""
 msgid "APR"
 msgstr ""
 
+#: src/components/PositionList/PositionItem.tsx
+msgid "Negative Funding Fees are settled against the collateral automatically and will influence the liquidation price. Positive Funding Fees can be claimed under Claimable Funding after realizing any action on the position."
+msgstr ""
+
+#: src/components/GmSwap/GmConfirmationBox/GmConfirmationBox.tsx
+#: src/components/TradeBox/ConfirmationBox.tsx
+#: src/components/TradeBox/ConfirmationBox.tsx
+msgid "Confirm"
+msgstr ""
+
 #: src/components/Header/AppHeaderLinks.tsx
 msgid "Dashboard"
 msgstr ""
 
-#: src/components/GmSwap/GmSwapBox/GmForm.tsx
-#: src/components/GmSwap/GmSwapBox/GmForm.tsx
-#: src/components/GmSwap/GmSwapBox/GmForm.tsx
+#: src/contexts/shared/SharedStatesProvider.tsx
+msgid "Invalid closing position address"
+msgstr ""
+
+#: src/components/TradeBox/TradeBox.tsx
+#~ msgid "MarketMarket"
+#~ msgstr ""
+
+#: src/components/PositionSeller/PositionSeller.tsx
+msgid "Decrease order created."
+msgstr ""
+
 #: src/components/NativeTokenUtils/UnwrapNativeTokenModal.tsx
 msgid "Uninitialized"
+msgstr ""
+
+#: src/onchain/token/use-wrap-native-token.ts
+msgid "Wrapped SOL."
 msgstr ""
 
 #: src/routes/Dashboard.tsx
 msgid "Total Stats of GMSOL."
 msgstr ""
 
+#: src/components/PositionList/PositionList.tsx
+msgid "Net Value"
+msgstr ""
+
 #: src/components/AddressDropdown/AddressDropdown.tsx
 #: src/components/NativeTokenUtils/UnwrapNativeTokenModal.tsx
 msgid "Unwrap WSOL"
+msgstr ""
+
+#: src/components/MarketSelector/MarketSelector.tsx
+msgid "Search Market"
 msgstr ""
 
 #: src/components/MarketsList/MarketsList.tsx
@@ -110,10 +189,15 @@ msgstr ""
 msgid "Max {0}"
 msgstr ""
 
+#: src/onchain/token/use-initialize-token-accounts.ts
+msgid "Initializing token accounts..."
+msgstr ""
+
 #: src/components/MarketsList/MarketsList.tsx
 msgid "Utilization"
 msgstr ""
 
+#: src/components/GmSwap/GmSwapBox/GmForm.tsx
 #: src/components/GmSwap/GmSwapBox/GmForm.tsx
 msgid "Buy GM"
 msgstr ""
@@ -123,6 +207,10 @@ msgstr ""
 msgid "Buy GM"
 msgstr ""
 
+#: src/components/PositionSeller/PositionSeller.tsx
+msgid "Max"
+msgstr ""
+
 #: src/components/GmList/GmList.tsx
 #: src/components/GmList/GmList.tsx
 #: src/components/MarketsList/MarketsList.tsx
@@ -130,19 +218,48 @@ msgstr ""
 msgid "GM Pools"
 msgstr ""
 
+#: src/components/PositionList/PositionList.tsx
+msgid "Size"
+msgstr ""
+
 #: src/components/Common/ConnectWalletButton/ConnectWalletButton.tsx
 #: src/components/GmSwap/GmSwapBox/GmForm.tsx
+#: src/components/TradeBox/TradeForm.tsx
 msgid "Connect Wallet"
+msgstr ""
+
+#: src/components/PositionList/PositionItem.tsx
+msgid "Address"
+msgstr ""
+
+#: src/components/TradeBox/ConfirmationBox.tsx
+msgid "Creating market increase order..."
 msgstr ""
 
 #: src/components/MarketsList/MarketsList.tsx
 msgid "LIQUIDITY"
 msgstr ""
 
+#: src/components/PositionList/PositionItem.tsx
+msgid "Estimated Liquidation Price."
+msgstr ""
+
 #. Total Value Locked
 #: src/components/MarketsList/MarketsList.tsx
 #: src/components/MarketsList/MarketsList.tsx
 msgid "TVL"
+msgstr ""
+
+#: src/onchain/transaction/makeSendErrorContent.tsx
+msgid "Send Transaction Error."
+msgstr ""
+
+#: src/components/TradeBox/ConfirmationBox.tsx
+msgid "Confirm Long"
+msgstr ""
+
+#: src/components/PositionList/PositionItem.tsx
+msgid "Use the \"Close\" button to reduce your Position Size."
 msgstr ""
 
 #: src/components/Common/ConnectWalletButton/ConnectWalletButton.tsx
@@ -153,12 +270,44 @@ msgstr ""
 msgid "Trade"
 msgstr ""
 
+#: src/onchain/token/use-initialize-token-accounts.ts
+msgid "Initialized token accounts."
+msgstr ""
+
+#: src/components/TradeBox/TradeForm.tsx
+msgid "Leverage"
+msgstr ""
+
+#: src/components/ChartTokenSelector/ChartTokenSelector.tsx
 #: src/components/MarketStats/MarketStats.tsx
+#: src/components/PositionList/PositionItem.tsx
+#: src/components/TradeBox/TradeBox.tsx
 msgid "Market"
+msgstr ""
+
+#: src/routes/Exchange.tsx
+msgid "Positions{0}"
+msgstr ""
+
+#: src/components/TradeBox/ConfirmationBox.tsx
+msgid "Swap to"
+msgstr ""
+
+#: src/routes/Earn.tsx
+msgid "Creating withdrawal..."
+msgstr ""
+
+#: src/components/PositionList/PositionItem.tsx
+msgid "PnL"
 msgstr ""
 
 #: src/components/Common/ConnectWalletButton/ConnectWalletButton.tsx
 msgid "Disconnecting..."
+msgstr ""
+
+#: src/components/PositionList/PositionItem.tsx
+#: src/components/PositionList/PositionItem.tsx
+msgid "Opening..."
 msgstr ""
 
 #: src/components/GmList/GmList.tsx
@@ -175,12 +324,39 @@ msgstr ""
 msgid "Earn"
 msgstr ""
 
+#: src/components/TradeBox/CollateralSelectorRow.tsx
+#: src/components/TradeBox/CollateralSelectorRow.tsx
+msgid "Collateral In"
+msgstr ""
+
 #: src/components/NativeTokenUtils/UnwrapNativeTokenModal.tsx
 msgid "Unwrap"
 msgstr ""
 
+#: src/components/ChartTokenSelector/ChartTokenSelector.tsx
+#: src/components/PositionList/PositionItem.tsx
+#: src/components/PositionSeller/PositionSeller.tsx
+#: src/components/TradeBox/ConfirmationBox.tsx
+#: src/components/TradeBox/ConfirmationBox.tsx
+#: src/components/TradeBox/TradeBox.tsx
+#: src/components/TradeBox/TradeForm.tsx
+msgid "Short"
+msgstr ""
+
+#: src/components/PositionList/PositionList.tsx
+msgid "Liq. Price"
+msgstr ""
+
+#: src/components/ChartTokenSelector/ChartTokenSelector.tsx
+msgid "<0>{0}</0> <1><2>{indexName}</2><3>[{poolName}]</3></1> <4>market selected</4>"
+msgstr ""
+
 #: src/components/MarketStats/MarketStats.tsx
 msgid "GM Token pricing includes positions' Pending PnL, Impact Pool Amount and Borrow Fees."
+msgstr ""
+
+#: src/onchain/transaction/makeSendErrorContent.tsx
+msgid "Error message: {errorMessage}"
 msgstr ""
 
 #: src/components/MarketStats/MarketStats.tsx
@@ -197,8 +373,16 @@ msgstr ""
 msgid "Single"
 msgstr ""
 
+#: src/components/PositionList/PositionItem.tsx
+msgid "UI Fee"
+msgstr ""
+
 #: src/components/Header/AppHeaderLinks.tsx
 msgid "Docs"
+msgstr ""
+
+#: src/components/AddressDropdown/AddressDropdown.tsx
+msgid "Address copied to your clipboard"
 msgstr ""
 
 #: src/components/Header/AppHeaderLinks.tsx
@@ -207,6 +391,10 @@ msgstr ""
 
 #: src/components/MarketStats/MarketStats.tsx
 msgid "Long Collateral"
+msgstr ""
+
+#: src/onchain/transaction/makeSendErrorContent.tsx
+msgid "View the failed Tx"
 msgstr ""
 
 #: src/components/Footer/utils.ts
@@ -226,14 +414,60 @@ msgstr ""
 msgid "Short Collateral"
 msgstr ""
 
+#: src/components/TradeBox/TradeBox.tsx
+#~ msgid "LimitLimit"
+#~ msgstr ""
+
+#: src/routes/Earn.tsx
+msgid "Deposit created."
+msgstr ""
+
+#: src/components/TradeBox/ConfirmationBox.tsx
+msgid "Swap path cannot be fulfilled."
+msgstr ""
+
 #: src/components/MarketsList/MarketsList.tsx
 msgid "UTILIZATION"
+msgstr ""
+
+#: src/components/TradeBox/ConfirmationBox.tsx
+msgid "Confirm Short"
+msgstr ""
+
+#: src/components/PositionList/PositionList.tsx
+#: src/components/PositionList/PositionList.tsx
+msgid "Loading..."
+msgstr ""
+
+#: src/contexts/pending/PendingStateProvider.tsx
+msgid "Status for tx {0} not found"
 msgstr ""
 
 #: src/components/GmList/GmList.tsx
 #: src/components/MarketsList/MarketsList.tsx
 #: src/components/MarketStats/MarketStats.tsx
 msgid "Price"
+msgstr ""
+
+#: src/components/TradeBox/TradeBox.tsx
+msgid "TP/SL"
+msgstr ""
+
+#: src/components/TradeBox/TradeBox.tsx
+#~ msgid "SwapSwap"
+#~ msgstr ""
+
+#: src/components/ChartTokenSelector/ChartTokenSelector.tsx
+msgid "LONG LIQ."
+msgstr ""
+
+#: src/onchain/token/use-unwrap-native-token.ts
+msgid "Unwrapping WSOL..."
+msgstr ""
+
+#: src/components/PositionList/PositionList.tsx
+#: src/components/PositionList/PositionList.tsx
+msgid "No open positions"
 msgstr ""
 
 #: src/routes/Earn.tsx
@@ -244,9 +478,18 @@ msgstr ""
 msgid "Search Pool"
 msgstr ""
 
+#: src/components/TradeBox/TradeForm.tsx
+msgid "Open Long"
+msgstr ""
+
 #: src/components/GmSwap/GmSwapBox/GmForm.tsx
 #: src/components/GmSwap/GmSwapBox/GmForm.tsx
+#: src/components/TradeBox/TradeForm.tsx
 msgid "Pay (wrap)"
+msgstr ""
+
+#: src/onchain/token/use-wrap-native-token.ts
+msgid "Wrapping SOL..."
 msgstr ""
 
 #: src/components/GmSwap/GmSwapBox/GmForm.tsx
@@ -254,8 +497,18 @@ msgstr ""
 #: src/components/GmSwap/GmSwapBox/GmForm.tsx
 #: src/components/NativeTokenUtils/UnwrapNativeTokenModal.tsx
 #: src/components/NativeTokenUtils/WrapNativeTokenModal.tsx
+#: src/components/TradeBox/TradeForm.tsx
+#: src/components/TradeBox/TradeForm.tsx
 msgid "Balance"
 msgstr ""
+
+#: src/components/ChartTokenSelector/ChartTokenSelector.tsx
+msgid "SHORT LIQ."
+msgstr ""
+
+#: src/components/TradeBox/TradeBox.tsx
+#~ msgid "TP/SLTP/SL"
+#~ msgstr ""
 
 #: src/components/MarketStats/MarketStats.tsx
 #: src/components/MarketStats/MarketStats.tsx
@@ -271,18 +524,32 @@ msgstr ""
 msgid "Wrap"
 msgstr ""
 
+#: src/components/TradeBox/ConfirmationBox.tsx
+msgid "Market increase order created."
+msgstr ""
+
 #: src/components/Common/ConnectWalletButton/ConnectWalletButton.tsx
 msgid "Connect"
+msgstr ""
+
+#: src/onchain/token/use-unwrap-native-token.ts
+msgid "Unwrapped WSOL."
 msgstr ""
 
 #: src/components/GmList/GmList.tsx
 msgid "TOTAL SUPPLY"
 msgstr ""
 
+#: src/components/InitializeTokenAccountGuard/InitializeTokenAccountBox.tsx
+msgid "Need to initialize Token Accounts"
+msgstr ""
+
 #: src/components/GmSwap/GmSwapBox/GmForm.tsx
 #: src/components/GmSwap/GmSwapBox/GmForm.tsx
 #: src/components/GmSwap/GmSwapBox/GmForm.tsx
 #: src/components/GmSwap/GmSwapBox/GmForm.tsx
+#: src/components/TradeBox/TradeForm.tsx
+#: src/components/TradeBox/TradeForm.tsx
 msgid "Receive"
 msgstr ""
 
@@ -294,6 +561,14 @@ msgstr ""
 msgid "Sellable"
 msgstr ""
 
+#: src/components/PositionList/PositionItem.tsx
+msgid "Use the Edit Collateral icon to deposit or withdraw collateral."
+msgstr ""
+
+#: src/components/InitializeTokenAccountGuard/InitializeTokenAccountBox.tsx
+msgid "The following tokens accounts are required:"
+msgstr ""
+
 #: src/components/MarketsList/NetFeeTooltip.tsx
 msgid "Longs Net Fee / 1h"
 msgstr ""
@@ -303,12 +578,41 @@ msgid "<0>GM: <1>{indexName}</1><2>[{poolName}]</2></0> <3>selected in order fo
 msgstr ""
 
 #: src/components/GmSwap/GmSwapBox/GmForm.tsx
+#: src/components/GmSwap/GmSwapBox/GmForm.tsx
 msgid "Sell GM"
+msgstr ""
+
+#: src/components/ChartTokenSelector/ChartTokenSelector.tsx
+#: src/components/PositionList/PositionItem.tsx
+#: src/components/PositionSeller/PositionSeller.tsx
+#: src/components/TradeBox/ConfirmationBox.tsx
+#: src/components/TradeBox/ConfirmationBox.tsx
+#: src/components/TradeBox/TradeBox.tsx
+#: src/components/TradeBox/TradeForm.tsx
+msgid "Long"
 msgstr ""
 
 #: src/components/GmSwap/GmSwapBox/GmForm.tsx
 #: src/components/MarketsList/NetFeeTooltip.tsx
+#: src/components/TradeBox/MarketPoolSelectorRow.tsx
+#: src/components/TradeBox/MarketPoolSelectorRow.tsx
 msgid "Pool"
+msgstr ""
+
+#: src/components/PositionList/PositionList.tsx
+msgid "Position"
+msgstr ""
+
+#: src/routes/Earn.tsx
+msgid "Withdrawal created."
+msgstr ""
+
+#: src/routes/Earn.tsx
+msgid "Creating deposit..."
+msgstr ""
+
+#: src/components/TradeBox/ConfirmationBox.tsx
+msgid "Limit orders are not supported for now."
 msgstr ""
 
 #: src/components/GmList/GmList.tsx
@@ -316,9 +620,17 @@ msgstr ""
 msgid "Total Supply"
 msgstr ""
 
+#: src/components/PositionSeller/PositionSeller.tsx
+msgid "Creating decrease order..."
+msgstr ""
+
 #: src/components/GmList/GmList.tsx
 #: src/components/GmList/GmList.tsx
 msgid "Buy"
+msgstr ""
+
+#: src/components/GmSwap/GmConfirmationBox/GmConfirmationBox.tsx
+msgid "Confirm {operationText}"
 msgstr ""
 
 #: src/components/GmList/GmList.tsx
@@ -326,17 +638,66 @@ msgstr ""
 msgid "Wallet"
 msgstr ""
 
+#: src/components/PositionList/PositionList.tsx
+msgid "Entry Price"
+msgstr ""
+
+#: src/components/TradeBox/ConfirmationBox.tsx
+msgid "Confirm Swap"
+msgstr ""
+
 #: src/components/MarketsList/MarketsList.tsx
 msgid "NET FEE / 1 H"
+msgstr ""
+
+#: src/components/TradeBox/ConfirmationBox.tsx
+#: src/components/TradeBox/TradeBox.tsx
+#: src/components/TradeBox/TradeForm.tsx
+#: src/components/TradeBox/TradeForm.tsx
+msgid "Swap"
+msgstr ""
+
+#: src/components/PositionList/PositionItem.tsx
+msgid "Net Value: Initial Collateral + PnL - Borrow Fee - Negative Funding Fee - Close Fee"
+msgstr ""
+
+#: src/components/PositionSeller/PositionSeller.tsx
+msgid "Close {0} {1}"
 msgstr ""
 
 #: src/components/NativeTokenUtils/UnwrapNativeTokenModal.tsx
 msgid "Value"
 msgstr ""
 
+#: src/components/PositionList/PositionList.tsx
+msgid "Mark Price"
+msgstr ""
+
+#: src/components/TradeBox/ConfirmationBox.tsx
+msgid "Skip transaction preflight."
+msgstr ""
+
+#: src/contexts/pending/PendingStateProvider.tsx
+msgid "View Tx"
+msgstr ""
+
 #: src/components/GmList/GmList.tsx
 #: src/components/GmList/GmList.tsx
 msgid "Sell"
+msgstr ""
+
+#: src/contexts/pending/PendingStateProvider.tsx
+msgid "Tx failed. <0>View</0>"
+msgstr ""
+
+#: src/components/TradeBox/TradeBox.tsx
+msgid "Limit"
+msgstr ""
+
+#: src/components/PositionList/PositionItem.tsx
+#: src/components/PositionSeller/PositionSeller.tsx
+#: src/components/PositionSeller/PositionSeller.tsx
+msgid "Close"
 msgstr ""
 
 #: src/components/MarketsList/MarketsList.tsx

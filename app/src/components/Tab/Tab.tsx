@@ -1,6 +1,8 @@
 import cx from "classnames";
 import "./Tab.css";
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
+import { mapValues } from "lodash";
+import { useLingui } from "@lingui/react";
 
 interface Props<T> {
   options: T[],
@@ -36,10 +38,16 @@ export default function Tab<T extends string>({
     }
   }, [onChange, setOption]);
 
+  const { i18n } = useLingui();
+
+  const localizedLabels = useMemo(() => {
+    return mapValues(optionLabels, label => i18n._(label));
+  }, [i18n, optionLabels]);
+
   return (
     <div className={cx("Tab", type, className)}>
       {options.map((opt) => {
-        const label = optionLabels && optionLabels[opt] ? optionLabels[opt] : opt;
+        const label = localizedLabels && localizedLabels[opt] ? localizedLabels[opt] : opt;
         return (
           <div className={cx("Tab-option", "muted", { active: opt === option })} onClick={() => onClick(opt)} key={opt}>
             {icons && icons[opt] && <img className="Tab-option-icon" src={icons[opt]} alt={option} />}

@@ -2,8 +2,6 @@ import Tab from "@/components/Tab/Tab";
 import { TokenOptions, getGmSwapBoxAvailableModes } from "../utils";
 import { CreateDepositParams, CreateWithdrawalParams, Mode, Operation } from "../types";
 import { useCallback, useMemo, useState } from "react";
-import { useLingui } from "@lingui/react";
-import { mapValues } from "lodash";
 import cx from "classnames";
 import { Trans, t } from "@lingui/macro";
 
@@ -64,19 +62,8 @@ export function GmForm({
   onCreateDeposit: (params: CreateDepositParams) => Promise<void>,
   onCreateWithdrawal: (params: CreateWithdrawalParams) => Promise<void>,
 }) {
-  const { i18n } = useLingui();
-
   const [stage, setStage] = useState<"swap" | "confirmation">("swap");
-
-  const { localizedOperationLabels, localizedModeLabels } = useMemo(() => {
-    return {
-      localizedOperationLabels: mapValues(OPERATION_LABELS, (label) => i18n._(label)),
-      localizedModeLabels: mapValues(MODE_LABELS, (label) => i18n._(label)),
-    };
-  }, [i18n]);
-
   const dispatch = useGmStateDispath();
-
   const {
     inputState,
     marketInfo,
@@ -236,7 +223,7 @@ export function GmForm({
     <div className={`App-box GmSwapBox`}>
       <Tab
         options={Object.values(Operation)}
-        optionLabels={localizedOperationLabels}
+        optionLabels={OPERATION_LABELS}
         option={operation}
         onChange={onOperationChange}
         className="Exchange-swap-option-tabs"
@@ -244,7 +231,7 @@ export function GmForm({
 
       <Tab
         options={availableModes}
-        optionLabels={localizedModeLabels}
+        optionLabels={MODE_LABELS}
         className="GmSwapBox-asset-options-tabs"
         type="inline"
         option={mode}
