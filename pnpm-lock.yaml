@@ -138,6 +138,9 @@ importers:
       react-toastify:
         specifier: ^10.0.5
         version: 10.0.5(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+      react-ts-tradingview-widgets:
+        specifier: ^1.2.4
+        version: 1.2.4(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       react-use:
         specifier: ^17.5.0
         version: 17.5.0(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
@@ -4574,6 +4577,12 @@ packages:
     peerDependencies:
       react: '>=18'
       react-dom: '>=18'
+
+  react-ts-tradingview-widgets@1.2.4:
+    resolution: {integrity: sha512-Ygx9mxPi5JyOex64HpHFLn3hfJj/AeKau1S9Bok9AAggKH6j8dcYjNuECpRQ9olb612SFIZNzyv4+L4dyNVdGg==}
+    peerDependencies:
+      react: ^17.0.2 || ^18.1.0
+      react-dom: ^17.0.2 || ^18.1.0
 
   react-universal-interface@0.6.2:
     resolution: {integrity: sha512-dg8yXdcQmvgR13RIlZbTRQOoUrDciFVoSBZILwjE2LFISxZZ8loVJKAkuzswl5js8BHda79bIb2b84ehU8IjXw==}
@@ -10842,6 +10851,11 @@ snapshots:
   react-toastify@10.0.5(react-dom@18.2.0(react@18.2.0))(react@18.2.0):
     dependencies:
       clsx: 2.1.1
+      react: 18.2.0
+      react-dom: 18.2.0(react@18.2.0)
+
+  react-ts-tradingview-widgets@1.2.4(react-dom@18.2.0(react@18.2.0))(react@18.2.0):
+    dependencies:
       react: 18.2.0
       react-dom: 18.2.0(react@18.2.0)
 

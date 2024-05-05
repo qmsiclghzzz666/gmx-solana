@@ -39,6 +39,7 @@
     "react-remove-scroll": "^2.5.9",
     "react-router-dom": "^6.23.0",
     "react-toastify": "^10.0.5",
+    "react-ts-tradingview-widgets": "^1.2.4",
     "react-use": "^17.5.0",
     "reselect": "^5.1.0",
     "swr": "^2.2.5",

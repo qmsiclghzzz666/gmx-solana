@@ -4,6 +4,7 @@ import { ChartTokenSelector } from "../ChartTokenSelector/ChartTokenSelector";
 import { formatUsd } from "../MarketsList/utils";
 import { useSharedStatesSelector } from "@/contexts/shared";
 import { selectAvailableChartTokens, selectChartToken } from "@/contexts/shared/selectors/chart-selectors";
+import { TVChartContainer } from "./TVChartContainer";
 
 export function TVChart() {
   const chartToken = useSharedStatesSelector(selectChartToken);
@@ -62,21 +63,22 @@ export function TVChart() {
           <VersionSwitch />
         </div> */}
       </div>
-      {/* <div className="ExchangeChart-bottom App-box App-box-border">
+      <div className="ExchangeChart-bottom App-box App-box-border">
         {chartToken && (
           <TVChartContainer
-            chartLines={chartLines}
             symbol={chartToken.symbol}
-            chainId={chainId}
-            onSelectToken={onSelectChartToken}
-            dataProvider={dataProvider}
-            period={period}
-            setPeriod={setPeriod}
-            chartToken={chartTokenProp}
-            supportedResolutions={SUPPORTED_RESOLUTIONS_V2}
+          // chartLines={chartLines}
+          // symbol={chartToken.symbol}
+          // chainId={chainId}
+          // onSelectToken={onSelectChartToken}
+          // dataProvider={dataProvider}
+          // period={period}
+          // setPeriod={setPeriod}
+          // chartToken={chartTokenProp}
+          // supportedResolutions={SUPPORTED_RESOLUTIONS_V2}
           />
         )}
-      </div> */}
+      </div>
     </div>
   );
 }

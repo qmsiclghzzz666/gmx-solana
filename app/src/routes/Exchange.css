@@ -256,8 +256,7 @@
 
 .ExchangeChart {
   position: relative;
-  /* FIXME: re-enable this when chart is ready */
-  /* height: 49.6rem; */
+  height: 49.6rem;
 }
 
 .ExchangeChart-main-price {
@@ -433,6 +432,11 @@ body.dragging .ExchangeChart iframe {
   right: 0;
   top: 0;
   bottom: 0;
+  background-color: var(--main-bg-color);
+}
+
+.ExchangeChart-container>div:first-child {
+  display: block !important;
 }
 
 .Exchange-list-modal .Modal-content {
@@ -1135,10 +1139,9 @@ table.Exchange-list-small td {
     display: none;
   }
 
-  /* FIXME: re-enable this when chart is ready */
-  /* .ExchangeChart {
+  .ExchangeChart {
     height: 38.75rem;
-  } */
+  }
 
   .Exchange-content {
     grid-template-columns: 1fr;
