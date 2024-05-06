@@ -1,5 +1,5 @@
 import { Keypair, PublicKey } from "@solana/web3.js";
-import { findControllerPDA } from ".";
+import { PriceProvider, findControllerPDA } from ".";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { toBN } from "../utils/number";
 import { findDepositPDA, findMarketPDA, findMarketVaultPDA, findOrderPDA, findPositionPDA, findRolesPDA, findTokenConfigMapPDA, findWithdrawalPDA } from "../store";
@@ -17,6 +17,7 @@ export type MakeCreateDepositParams = {
     initialLongTokenAmount?: number | bigint | BN,
     initialShortTokenAmount?: number | bigint | BN,
     options?: {
+        priceProvider?: PriceProvider,
         nonce?: Buffer,
         executionFee?: number | bigint,
         longTokenSwapPath?: PublicKey[],
@@ -69,7 +70,8 @@ export const makeCreateDepositInstruction = async (
             initialShortTokenAmount: initialShortTokenAmountBN,
             minMarketToken: toBN(options?.minMarketToken ?? 0),
             shouldUnwrapNativeToken: options?.shouldUnwrapNativeToken ?? false,
-        }
+        },
+        options?.priceProvider ?? null,
     ).accounts({
         store,
         onlyController: findRolesPDA(store, authority)[0],
@@ -104,6 +106,7 @@ export type MakeCreateWithdrawalParams = {
     finalLongToken: PublicKey,
     finalShortToken: PublicKey,
     options?: {
+        priceProvider?: PriceProvider,
         nonce?: Buffer,
         executionFee?: number | bigint,
         minLongTokenAmount?: number | bigint,
@@ -147,7 +150,7 @@ export const makeCreateWithdrawalInstruction = async (
         },
         longTokenSwapLength: longSwapPath.length,
         shortTokenSwapLength: shortSwapPath.length,
-    }).accounts({
+    }, options?.priceProvider ?? null).accounts({
         store,
         onlyController: findRolesPDA(store, authority)[0],
         tokenConfigMap: findTokenConfigMapPDA(store)[0],
@@ -179,6 +182,7 @@ export type MakeCreateDecreaseOrderParams = {
     initialCollateralDeltaAmount?: number | bigint,
     sizeDeltaUsd?: number | bigint,
     options: {
+        priceProvider?: PriceProvider,
         nonce?: Buffer,
         executionFee?: number | bigint,
         swapPath?: PublicKey[],
@@ -258,7 +262,7 @@ export const makeCreateDecreaseOrderInstruction = async (
             uiFeeReceiver: PublicKey.default,
             executionFee: toBN(options?.executionFee ?? 0),
             swapLength: swapPath.length,
-        }).accounts({
+        }, options?.priceProvider ?? null).accounts({
             store,
             onlyController,
             payer,
@@ -292,6 +296,7 @@ export type MakeCreateIncreaseOrderParams = {
     initialCollateralDeltaAmount?: number | bigint,
     sizeDeltaUsd?: number | bigint,
     options: {
+        priceProvider?: PriceProvider,
         nonce?: Buffer,
         executionFee?: number | bigint,
         swapPath?: PublicKey[],
@@ -339,7 +344,7 @@ export const makeCreateIncreaseOrderInstruction = async (
             uiFeeReceiver: PublicKey.default,
             executionFee: toBN(options?.executionFee ?? 0),
             swapLength: swapPath.length,
-        }).accounts({
+        }, options?.priceProvider ?? null).accounts({
             store,
             onlyController,
             payer,

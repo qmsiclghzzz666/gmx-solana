@@ -1,6 +1,7 @@
 use anchor_lang::{prelude::*, Ids};
 use dual_vec_map::DualVecMap;
 use gmx_solana_utils::price::{Decimal, Price};
+use num_enum::TryFromPrimitive;
 use pyth_solana_receiver_sdk::price_update::PriceUpdateV2;
 
 use crate::DataStoreError;
@@ -110,17 +111,18 @@ impl Oracle {
                 .get(token)
                 .ok_or(DataStoreError::RequiredResourceNotFound)?;
             require!(token_config.enabled, DataStoreError::TokenConfigDisabled);
-            require_eq!(
-                token_config.price_feed,
-                *feed.key,
-                DataStoreError::InvalidPriceFeedAccount
-            );
             let price = match &program {
-                PriceProviderProgram::Chainlink(program) => {
+                PriceProviderProgram::Chainlink(program, kind) => {
+                    require_eq!(
+                        token_config.get_feed(kind)?,
+                        feed.key(),
+                        DataStoreError::InvalidPriceFeedAccount
+                    );
                     Chainlink::check_and_get_chainlink_price(&clock, program, token_config, feed)?
                 }
-                PriceProviderProgram::Pyth(_program) => {
-                    Pyth::check_and_get_price(&clock, token_config, feed)?
+                PriceProviderProgram::Pyth(_program, kind) => {
+                    let feed_id = token_config.get_feed(kind)?;
+                    Pyth::check_and_get_price(&clock, token_config, feed, &feed_id)?
                 }
             };
             self.primary.set(token, price)?;
@@ -223,12 +225,14 @@ impl Pyth {
         clock: &Clock,
         token_config: &TokenConfig,
         feed: &'info AccountInfo<'info>,
+        feed_id: &Pubkey,
     ) -> Result<Price> {
         let feed = Account::<PriceUpdateV2>::try_from(feed)?;
-        // TODO: read feed id from the token config if available.
-        let feed_id = &feed.price_message.feed_id;
-        let price =
-            feed.get_price_no_older_than(clock, token_config.heartbeat_duration.into(), feed_id)?;
+        let price = feed.get_price_no_older_than(
+            clock,
+            token_config.heartbeat_duration.into(),
+            &feed_id.to_bytes(),
+        )?;
         let mid_price: u64 = price
             .price
             .try_into()
@@ -281,7 +285,8 @@ impl Pyth {
 /// Price Provider.
 pub struct PriceProvider;
 
-static PRICE_PROVIDER_IDS: [Pubkey; 2] = [chainlink_solana::ID, pyth_solana_receiver_sdk::ID];
+pub(crate) static PRICE_PROVIDER_IDS: [Pubkey; 2] =
+    [chainlink_solana::ID, pyth_solana_receiver_sdk::ID];
 
 impl Ids for PriceProvider {
     fn ids() -> &'static [Pubkey] {
@@ -289,17 +294,33 @@ impl Ids for PriceProvider {
     }
 }
 
+/// Supported Price Provider Kind.
+#[repr(u8)]
+#[derive(Clone, Copy, Default, TryFromPrimitive)]
+pub enum PriceProviderKind {
+    /// Pyth Oracle V2.
+    #[default]
+    Pyth = 0,
+    /// Chainlink Data Feed.
+    Chainlink = 1,
+    /// Legacy Pyth Push Oracle for Devnet.
+    PythDev = 2,
+}
+
+/// Supported Price Provider Programs.
+/// The [`PriceProviderKind`] field is used as index
+/// to query the correspoding feed from the token config.
 enum PriceProviderProgram<'info> {
-    Chainlink(AccountInfo<'info>),
-    Pyth(AccountInfo<'info>),
+    Chainlink(AccountInfo<'info>, PriceProviderKind),
+    Pyth(AccountInfo<'info>, PriceProviderKind),
 }
 
 impl<'info> PriceProviderProgram<'info> {
     fn from_interface(interface: &Interface<'info, PriceProvider>) -> Self {
         if *interface.key == Chainlink::id() {
-            Self::Chainlink(interface.to_account_info())
+            Self::Chainlink(interface.to_account_info(), PriceProviderKind::Chainlink)
         } else if *interface.key == Pyth::id() {
-            Self::Pyth(interface.to_account_info())
+            Self::Pyth(interface.to_account_info(), PriceProviderKind::Pyth)
         } else {
             unreachable!();
         }

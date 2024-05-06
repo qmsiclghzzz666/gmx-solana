@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::Mint;
 
 use crate::{
-    states::{DataStore, Roles, Seed, TokenConfig, TokenConfigMap},
+    states::{DataStore, Roles, Seed, TokenConfig, TokenConfigBuilder, TokenConfigMap},
     utils::internal,
 };
 
@@ -69,22 +69,13 @@ pub struct InsertTokenConfig<'info> {
 /// Insert or update the config of the given token.
 pub fn insert_token_config(
     ctx: Context<InsertTokenConfig>,
-    price_feed: Pubkey,
-    heartbeat_duration: u32,
-    precision: u8,
+    builder: TokenConfigBuilder,
     enable: bool,
 ) -> Result<()> {
     let token = &ctx.accounts.token;
     ctx.accounts.map.checked_insert(
         token.key(),
-        TokenConfig {
-            enabled: enable,
-            synthetic: false,
-            price_feed,
-            heartbeat_duration,
-            precision,
-            token_decimals: token.decimals,
-        },
+        TokenConfig::new(false, token.decimals, builder, enable),
     )
 }
 
@@ -126,21 +117,12 @@ pub fn insert_synthetic_token_config(
     ctx: Context<InsertSyntheticTokenConfig>,
     token: Pubkey,
     decimals: u8,
-    price_feed: Pubkey,
-    heartbeat_duration: u32,
-    precision: u8,
+    builder: TokenConfigBuilder,
     enable: bool,
 ) -> Result<()> {
     ctx.accounts.map.checked_insert(
         token.key(),
-        TokenConfig {
-            enabled: enable,
-            synthetic: true,
-            price_feed,
-            heartbeat_duration,
-            precision,
-            token_decimals: decimals,
-        },
+        TokenConfig::new(true, decimals, builder, enable),
     )
 }
 

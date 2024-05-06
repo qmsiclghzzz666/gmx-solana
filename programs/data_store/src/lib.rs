@@ -21,7 +21,7 @@ use self::{
         deposit::TokenParams as DepositTokenParams,
         market::{MarketMeta, Pool},
         order::OrderParams,
-        token_config::TokenConfig,
+        token_config::{TokenConfig, TokenConfigBuilder},
         withdrawal::TokenParams as WithdrawalTokenParams,
     },
     utils::internal,
@@ -105,12 +105,10 @@ pub mod data_store {
     #[access_control(internal::Authenticate::only_controller(&ctx))]
     pub fn insert_token_config(
         ctx: Context<InsertTokenConfig>,
-        price_feed: Pubkey,
-        heartbeat_duration: u32,
-        precision: u8,
+        builder: TokenConfigBuilder,
         enable: bool,
     ) -> Result<()> {
-        instructions::insert_token_config(ctx, price_feed, heartbeat_duration, precision, enable)
+        instructions::insert_token_config(ctx, builder, enable)
     }
 
     #[access_control(internal::Authenticate::only_controller(&ctx))]
@@ -118,20 +116,10 @@ pub mod data_store {
         ctx: Context<InsertSyntheticTokenConfig>,
         token: Pubkey,
         decimals: u8,
-        price_feed: Pubkey,
-        heartbeat_duration: u32,
-        precision: u8,
+        builder: TokenConfigBuilder,
         enable: bool,
     ) -> Result<()> {
-        instructions::insert_synthetic_token_config(
-            ctx,
-            token,
-            decimals,
-            price_feed,
-            heartbeat_duration,
-            precision,
-            enable,
-        )
+        instructions::insert_synthetic_token_config(ctx, token, decimals, builder, enable)
     }
 
     #[access_control(internal::Authenticate::only_controller(&ctx))]
@@ -454,6 +442,8 @@ pub enum DataStoreError {
     NegativePrice,
     #[msg("Price overflow")]
     PriceOverflow,
+    #[msg("Price feed is not set for the given provider")]
+    PriceFeedNotSet,
     // Market.
     #[msg("Computation error")]
     Computation,

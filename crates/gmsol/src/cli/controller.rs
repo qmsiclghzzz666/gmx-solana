@@ -1,4 +1,5 @@
 use anchor_client::solana_sdk::pubkey::Pubkey;
+use data_store::states::{PriceProviderKind, TokenConfigBuilder};
 use gmsol::store::{oracle::OracleOps, token_config::TokenConfigOps};
 
 use crate::SharedClient;
@@ -18,15 +19,15 @@ enum Command {
     /// Insert or update the config of token.
     InsertTokenConfig {
         token: Pubkey,
-        #[arg(long)]
-        price_feed: Pubkey,
+        #[command(flatten)]
+        feeds: Feeds,
         #[arg(long, default_value_t = 60)]
         heartbeat_duration: u32,
         #[arg(long, default_value_t = 4)]
         precision: u8,
-        /// Provide to create a fake token with the given decimals.
+        /// Provide to create a synthetic token with the given decimals.
         #[arg(long)]
-        fake_decimals: Option<u8>,
+        synthetic: Option<u8>,
     },
     /// Toggle token config of token.
     ToggleTokenConfig {
@@ -34,6 +35,20 @@ enum Command {
         #[command(flatten)]
         toggle: Toggle,
     },
+}
+
+#[derive(clap::Args)]
+#[group(required = true, multiple = true)]
+struct Feeds {
+    /// Pyth feed id.
+    #[arg(long)]
+    pyth_feed_id: Option<String>,
+    /// Pyth feed account (Devnet)
+    #[arg(long)]
+    pyth_feed_devnet: Option<Pubkey>,
+    /// Chainlink feed.
+    #[arg(long)]
+    chainlink_feed: Option<Pubkey>,
 }
 
 #[derive(clap::Args)]
@@ -68,32 +83,40 @@ impl ControllerArgs {
             }
             Command::InsertTokenConfig {
                 token,
-                price_feed,
+                feeds,
                 heartbeat_duration,
                 precision,
-                fake_decimals,
+                synthetic: fake_decimals,
             } => {
+                let mut builder = TokenConfigBuilder::default()
+                    .with_heartbeat_duration(*heartbeat_duration)
+                    .with_precision(*precision);
+                if let Some(feed_id) = feeds.pyth_feed_id.as_ref() {
+                    let feed_id =
+                        pyth_sdk::Identifier::from_hex(feed_id).map_err(gmsol::Error::unknown)?;
+                    let feed_id_as_key = Pubkey::new_from_array(feed_id.to_bytes());
+                    builder = builder
+                        .update_price_feed(&PriceProviderKind::Pyth, feed_id_as_key)
+                        .map_err(anchor_client::ClientError::from)?;
+                }
+                if let Some(feed) = feeds.pyth_feed_devnet {
+                    builder = builder
+                        .update_price_feed(&PriceProviderKind::PythDev, feed)
+                        .map_err(anchor_client::ClientError::from)?;
+                }
+                if let Some(feed) = feeds.chainlink_feed {
+                    builder = builder
+                        .update_price_feed(&PriceProviderKind::Chainlink, feed)
+                        .map_err(anchor_client::ClientError::from)?;
+                }
                 let signature = if let Some(decimals) = fake_decimals {
                     program
-                        .insert_synthetic_token_config(
-                            store,
-                            token,
-                            *decimals,
-                            price_feed,
-                            *heartbeat_duration,
-                            *precision,
-                        )
+                        .insert_synthetic_token_config(store, token, *decimals, builder, true)
                         .send()
                         .await?
                 } else {
                     program
-                        .insert_token_config(
-                            store,
-                            token,
-                            price_feed,
-                            *heartbeat_duration,
-                            *precision,
-                        )
+                        .insert_token_config(store, token, builder, true)
                         .send()
                         .await?
                 };

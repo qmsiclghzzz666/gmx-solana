@@ -64,67 +64,67 @@ export type MakeCreateDepositParams = {
     },
 }
 
-const getDepositVault = async (connection: Connection, store: PublicKey, fromTokenAccount?: PublicKey, hint?: PublicKey) => {
-    if (fromTokenAccount) {
-        const token = hint ?? (await getAccount(connection, fromTokenAccount)).mint;
-        return createMarketVaultPDA(store, token)[0];
-    }
-};
+// const getDepositVault = async (connection: Connection, store: PublicKey, fromTokenAccount?: PublicKey, hint?: PublicKey) => {
+//     if (fromTokenAccount) {
+//         const token = hint ?? (await getAccount(connection, fromTokenAccount)).mint;
+//         return createMarketVaultPDA(store, token)[0];
+//     }
+// };
 
-export const makeCreateDepositInstruction = async ({
-    store,
-    payer,
-    marketToken,
-    toMarketTokenAccount,
-    fromInitialLongTokenAccount,
-    fromInitialShortTokenAccount,
-    initialLongTokenAmount,
-    initialShortTokenAmount,
-    options,
-}: MakeCreateDepositParams) => {
-    const [authority] = createControllerPDA(store);
-    const depositNonce = options?.nonce ?? Keypair.generate().publicKey.toBuffer();
-    const [deposit] = createDepositPDA(store, payer, depositNonce);
-    const longTokenDepositVault = await getDepositVault(exchange.provider.connection, store, fromInitialLongTokenAccount, options?.hints?.initialLongToken);
-    const shortTokenDepositVault = await getDepositVault(exchange.provider.connection, store, fromInitialShortTokenAccount, options?.hints?.initialShortToken);
-    const longSwapPath = options?.longTokenSwapPath ?? [];
-    const shortSwapPath = options?.shortTokenSwapPath ?? [];
-    let instruction = await exchange.methods.createDeposit(
-        [...depositNonce],
-        {
-            uiFeeReceiver: Keypair.generate().publicKey,
-            executionFee: toBN(options?.executionFee ?? 0),
-            longTokenSwapLength: longSwapPath.length,
-            shortTokenSwapLength: shortSwapPath.length,
-            initialLongTokenAmount: toBN(initialLongTokenAmount ?? 0),
-            initialShortTokenAmount: toBN(initialShortTokenAmount ?? 0),
-            minMarketToken: toBN(options?.minMarketToken ?? 0),
-            shouldUnwrapNativeToken: options?.shouldUnwrapNativeToken ?? false,
-        }
-    ).accounts({
-        store,
-        onlyController: createRolesPDA(store, authority)[0],
-        market: createMarketPDA(store, marketToken)[0],
-        tokenConfigMap: createTokenConfigMapPDA(store)[0],
-        deposit,
-        payer,
-        receiver: toMarketTokenAccount,
-        initialLongTokenAccount: fromInitialLongTokenAccount ?? null,
-        initialShortTokenAccount: fromInitialShortTokenAccount ?? null,
-        longTokenDepositVault: longTokenDepositVault ?? null,
-        shortTokenDepositVault: shortTokenDepositVault ?? null,
-    }).remainingAccounts([...longSwapPath, ...shortSwapPath].map(mint => {
-        return {
-            pubkey: createMarketPDA(store, mint)[0],
-            isSigner: false,
-            isWritable: false,
-        }
-    })).instruction();
+// export const makeCreateDepositInstruction = async ({
+//     store,
+//     payer,
+//     marketToken,
+//     toMarketTokenAccount,
+//     fromInitialLongTokenAccount,
+//     fromInitialShortTokenAccount,
+//     initialLongTokenAmount,
+//     initialShortTokenAmount,
+//     options,
+// }: MakeCreateDepositParams) => {
+//     const [authority] = createControllerPDA(store);
+//     const depositNonce = options?.nonce ?? Keypair.generate().publicKey.toBuffer();
+//     const [deposit] = createDepositPDA(store, payer, depositNonce);
+//     const longTokenDepositVault = await getDepositVault(exchange.provider.connection, store, fromInitialLongTokenAccount, options?.hints?.initialLongToken);
+//     const shortTokenDepositVault = await getDepositVault(exchange.provider.connection, store, fromInitialShortTokenAccount, options?.hints?.initialShortToken);
+//     const longSwapPath = options?.longTokenSwapPath ?? [];
+//     const shortSwapPath = options?.shortTokenSwapPath ?? [];
+//     let instruction = await exchange.methods.createDeposit(
+//         [...depositNonce],
+//         {
+//             uiFeeReceiver: Keypair.generate().publicKey,
+//             executionFee: toBN(options?.executionFee ?? 0),
+//             longTokenSwapLength: longSwapPath.length,
+//             shortTokenSwapLength: shortSwapPath.length,
+//             initialLongTokenAmount: toBN(initialLongTokenAmount ?? 0),
+//             initialShortTokenAmount: toBN(initialShortTokenAmount ?? 0),
+//             minMarketToken: toBN(options?.minMarketToken ?? 0),
+//             shouldUnwrapNativeToken: options?.shouldUnwrapNativeToken ?? false,
+//         }
+//     ).accounts({
+//         store,
+//         onlyController: createRolesPDA(store, authority)[0],
+//         market: createMarketPDA(store, marketToken)[0],
+//         tokenConfigMap: createTokenConfigMapPDA(store)[0],
+//         deposit,
+//         payer,
+//         receiver: toMarketTokenAccount,
+//         initialLongTokenAccount: fromInitialLongTokenAccount ?? null,
+//         initialShortTokenAccount: fromInitialShortTokenAccount ?? null,
+//         longTokenDepositVault: longTokenDepositVault ?? null,
+//         shortTokenDepositVault: shortTokenDepositVault ?? null,
+//     }).remainingAccounts([...longSwapPath, ...shortSwapPath].map(mint => {
+//         return {
+//             pubkey: createMarketPDA(store, mint)[0],
+//             isSigner: false,
+//             isWritable: false,
+//         }
+//     })).instruction();
 
-    return [instruction, deposit] as IxWithOutput<PublicKey>;
-}
+//     return [instruction, deposit] as IxWithOutput<PublicKey>;
+// }
 
-export const invokeCreateDeposit = makeInvoke(makeCreateDepositInstruction, ["payer"]);
+// export const invokeCreateDeposit = makeInvoke(makeCreateDepositInstruction, ["payer"]);
 
 export type MakeCancelDepositParams = {
     authority: PublicKey,
@@ -266,74 +266,74 @@ export const makeExecuteDepositInstruction = async ({
 
 export const invokeExecuteDeposit = makeInvoke(makeExecuteDepositInstruction, ["authority"]);
 
-export type MakeCreateWithdrawalParams = {
-    store: PublicKey,
-    payer: PublicKey,
-    marketToken: PublicKey,
-    amount: number | bigint,
-    fromMarketTokenAccount: PublicKey,
-    toLongTokenAccount: PublicKey,
-    toShortTokenAccount: PublicKey,
-    options?: {
-        nonce?: Buffer,
-        executionFee?: number | bigint,
-        minLongTokenAmount?: number | bigint,
-        minShortTokenAmount?: number | bigint,
-        longTokenSwapPath?: PublicKey[],
-        shortTokenSwapPath?: PublicKey[],
-        shouldUnwrapNativeToken?: boolean,
-    }
-};
+// export type MakeCreateWithdrawalParams = {
+//     store: PublicKey,
+//     payer: PublicKey,
+//     marketToken: PublicKey,
+//     amount: number | bigint,
+//     fromMarketTokenAccount: PublicKey,
+//     toLongTokenAccount: PublicKey,
+//     toShortTokenAccount: PublicKey,
+//     options?: {
+//         nonce?: Buffer,
+//         executionFee?: number | bigint,
+//         minLongTokenAmount?: number | bigint,
+//         minShortTokenAmount?: number | bigint,
+//         longTokenSwapPath?: PublicKey[],
+//         shortTokenSwapPath?: PublicKey[],
+//         shouldUnwrapNativeToken?: boolean,
+//     }
+// };
 
-export const makeCreateWithdrawalInstruction = async ({
-    store,
-    payer,
-    marketToken,
-    amount,
-    fromMarketTokenAccount,
-    toLongTokenAccount,
-    toShortTokenAccount,
-    options,
-}: MakeCreateWithdrawalParams) => {
-    const [authority] = createControllerPDA(store);
-    const withdrawalNonce = options?.nonce ?? Keypair.generate().publicKey.toBuffer();
-    const [withdrawalAddress] = createWithdrawalPDA(store, payer, withdrawalNonce);
-    const longSwapPath = options?.longTokenSwapPath ?? [];
-    const shortSwapPath = options?.shortTokenSwapPath ?? [];
-    const instruction = await exchange.methods.createWithdrawal([...withdrawalNonce], {
-        marketTokenAmount: toBN(amount),
-        executionFee: toBN(options?.executionFee ?? 0),
-        uiFeeReceiver: PublicKey.default,
-        tokens: {
-            minLongTokenAmount: toBN(options?.minLongTokenAmount ?? 0),
-            minShortTokenAmount: toBN(options?.minShortTokenAmount ?? 0),
-            shouldUnwrapNativeToken: options?.shouldUnwrapNativeToken ?? false
-        },
-        longTokenSwapLength: longSwapPath.length,
-        shortTokenSwapLength: shortSwapPath.length,
-    }).accounts({
-        store,
-        onlyController: createRolesPDA(store, authority)[0],
-        tokenConfigMap: createTokenConfigMapPDA(store)[0],
-        market: createMarketPDA(store, marketToken)[0],
-        withdrawal: withdrawalAddress,
-        payer,
-        marketTokenAccount: fromMarketTokenAccount,
-        marketTokenWithdrawalVault: createMarketVaultPDA(store, marketToken)[0],
-        finalLongTokenReceiver: toLongTokenAccount,
-        finalShortTokenReceiver: toShortTokenAccount,
-    }).remainingAccounts([...longSwapPath, ...shortSwapPath].map(token => {
-        return {
-            pubkey: createMarketPDA(store, token)[0],
-            isSigner: false,
-            isWritable: false,
-        };
-    })).instruction();
+// export const makeCreateWithdrawalInstruction = async ({
+//     store,
+//     payer,
+//     marketToken,
+//     amount,
+//     fromMarketTokenAccount,
+//     toLongTokenAccount,
+//     toShortTokenAccount,
+//     options,
+// }: MakeCreateWithdrawalParams) => {
+//     const [authority] = createControllerPDA(store);
+//     const withdrawalNonce = options?.nonce ?? Keypair.generate().publicKey.toBuffer();
+//     const [withdrawalAddress] = createWithdrawalPDA(store, payer, withdrawalNonce);
+//     const longSwapPath = options?.longTokenSwapPath ?? [];
+//     const shortSwapPath = options?.shortTokenSwapPath ?? [];
+//     const instruction = await exchange.methods.createWithdrawal([...withdrawalNonce], {
+//         marketTokenAmount: toBN(amount),
+//         executionFee: toBN(options?.executionFee ?? 0),
+//         uiFeeReceiver: PublicKey.default,
+//         tokens: {
+//             minLongTokenAmount: toBN(options?.minLongTokenAmount ?? 0),
+//             minShortTokenAmount: toBN(options?.minShortTokenAmount ?? 0),
+//             shouldUnwrapNativeToken: options?.shouldUnwrapNativeToken ?? false
+//         },
+//         longTokenSwapLength: longSwapPath.length,
+//         shortTokenSwapLength: shortSwapPath.length,
+//     }).accounts({
+//         store,
+//         onlyController: createRolesPDA(store, authority)[0],
+//         tokenConfigMap: createTokenConfigMapPDA(store)[0],
+//         market: createMarketPDA(store, marketToken)[0],
+//         withdrawal: withdrawalAddress,
+//         payer,
+//         marketTokenAccount: fromMarketTokenAccount,
+//         marketTokenWithdrawalVault: createMarketVaultPDA(store, marketToken)[0],
+//         finalLongTokenReceiver: toLongTokenAccount,
+//         finalShortTokenReceiver: toShortTokenAccount,
+//     }).remainingAccounts([...longSwapPath, ...shortSwapPath].map(token => {
+//         return {
+//             pubkey: createMarketPDA(store, token)[0],
+//             isSigner: false,
+//             isWritable: false,
+//         };
+//     })).instruction();
 
-    return [instruction, withdrawalAddress] as IxWithOutput<PublicKey>;
-};
+//     return [instruction, withdrawalAddress] as IxWithOutput<PublicKey>;
+// };
 
-export const invokeCreateWithdrawal = makeInvoke(makeCreateWithdrawalInstruction, ["payer"]);
+// export const invokeCreateWithdrawal = makeInvoke(makeCreateWithdrawalInstruction, ["payer"]);
 
 export type MakeCancelWithdrawalParams = {
     authority: PublicKey,
@@ -475,137 +475,137 @@ export const makeExecuteWithdrawalInstruction = async ({
 
 export const invokeExecuteWithdrawal = makeInvoke(makeExecuteWithdrawalInstruction, ["authority"]);
 
-export type MakeCreateOrderParams = {
-    store: PublicKey,
-    payer: PublicKey,
-    orderType: "marketSwap" | "marketIncrease" | "marketDecrease" | "liquidation",
-    marketToken: PublicKey,
-    isCollateralTokenLong: boolean,
-    initialCollateralDeltaAmount: number | bigint,
-    isLong?: boolean,
-    sizeDeltaUsd?: number | bigint,
-    fromTokenAccount?: PublicKey,
-    toTokenAccount?: PublicKey,
-    secondaryTokenAccount?: PublicKey,
-    options?: {
-        nonce?: Buffer,
-        executionFee?: number | bigint,
-        swapPath?: PublicKey[],
-        minOutputAmount?: number | bigint,
-        acceptablePrice?: number | bigint,
-        hints?: {
-            initialToken?: PublicKey,
-            collateralToken?: PublicKey,
-        }
-    },
-};
+// export type MakeCreateOrderParams = {
+//     store: PublicKey,
+//     payer: PublicKey,
+//     orderType: "marketSwap" | "marketIncrease" | "marketDecrease" | "liquidation",
+//     marketToken: PublicKey,
+//     isCollateralTokenLong: boolean,
+//     initialCollateralDeltaAmount: number | bigint,
+//     isLong?: boolean,
+//     sizeDeltaUsd?: number | bigint,
+//     fromTokenAccount?: PublicKey,
+//     toTokenAccount?: PublicKey,
+//     secondaryTokenAccount?: PublicKey,
+//     options?: {
+//         nonce?: Buffer,
+//         executionFee?: number | bigint,
+//         swapPath?: PublicKey[],
+//         minOutputAmount?: number | bigint,
+//         acceptablePrice?: number | bigint,
+//         hints?: {
+//             initialToken?: PublicKey,
+//             collateralToken?: PublicKey,
+//         }
+//     },
+// };
 
-export const makeCreateOrderInstruction = async ({
-    store,
-    payer,
-    orderType,
-    marketToken,
-    isCollateralTokenLong,
-    initialCollateralDeltaAmount,
-    isLong,
-    sizeDeltaUsd,
-    fromTokenAccount,
-    toTokenAccount,
-    secondaryTokenAccount,
-    options,
-}: MakeCreateOrderParams) => {
-    const [market] = createMarketPDA(store, marketToken);
+// export const makeCreateOrderInstruction = async ({
+//     store,
+//     payer,
+//     orderType,
+//     marketToken,
+//     isCollateralTokenLong,
+//     initialCollateralDeltaAmount,
+//     isLong,
+//     sizeDeltaUsd,
+//     fromTokenAccount,
+//     toTokenAccount,
+//     secondaryTokenAccount,
+//     options,
+// }: MakeCreateOrderParams) => {
+//     const [market] = createMarketPDA(store, marketToken);
 
-    const getCollateralToken = async (isCollateralTokenLong: boolean) => {
-        const meta = (await dataStore.account.market.fetch(market)).meta;
-        return isCollateralTokenLong ? meta.longTokenMint : meta.shortTokenMint;
-    };
-    const collateralToken = options?.hints?.collateralToken ?? await getCollateralToken(isCollateralTokenLong);
+//     const getCollateralToken = async (isCollateralTokenLong: boolean) => {
+//         const meta = (await dataStore.account.market.fetch(market)).meta;
+//         return isCollateralTokenLong ? meta.longTokenMint : meta.shortTokenMint;
+//     };
+//     const collateralToken = options?.hints?.collateralToken ?? await getCollateralToken(isCollateralTokenLong);
 
-    let kind;
-    let position: PublicKey | null = null;
+//     let kind;
+//     let position: PublicKey | null = null;
 
-    switch (orderType) {
-        case "marketSwap":
-            kind = {
-                marketSwap: {},
-            };
-            break;
-        case "marketIncrease":
-            kind = {
-                marketIncrease: {},
-            };
-            if (isLong === undefined) {
-                throw "position side must be provided";
-            }
-            position = createPositionPDA(store, payer, marketToken, collateralToken, isLong)[0]
-            break;
-        case "marketDecrease":
-            kind = {
-                marketDecrease: {},
-            };
-            if (isLong === undefined) {
-                throw "position side must be provided";
-            }
-            position = createPositionPDA(store, payer, marketToken, collateralToken, isLong)[0]
-            break;
-        case "liquidation":
-            kind = {
-                liquidation: {},
-            };
-            if (isLong === undefined) {
-                throw "position side must be provided";
-            }
-            position = createPositionPDA(store, payer, marketToken, collateralToken, isLong)[0]
-            break;
-    }
+//     switch (orderType) {
+//         case "marketSwap":
+//             kind = {
+//                 marketSwap: {},
+//             };
+//             break;
+//         case "marketIncrease":
+//             kind = {
+//                 marketIncrease: {},
+//             };
+//             if (isLong === undefined) {
+//                 throw "position side must be provided";
+//             }
+//             position = createPositionPDA(store, payer, marketToken, collateralToken, isLong)[0]
+//             break;
+//         case "marketDecrease":
+//             kind = {
+//                 marketDecrease: {},
+//             };
+//             if (isLong === undefined) {
+//                 throw "position side must be provided";
+//             }
+//             position = createPositionPDA(store, payer, marketToken, collateralToken, isLong)[0]
+//             break;
+//         case "liquidation":
+//             kind = {
+//                 liquidation: {},
+//             };
+//             if (isLong === undefined) {
+//                 throw "position side must be provided";
+//             }
+//             position = createPositionPDA(store, payer, marketToken, collateralToken, isLong)[0]
+//             break;
+//     }
 
-    const nonce = options?.nonce ?? Keypair.generate().publicKey.toBuffer();
-    const swapPath = options?.swapPath ?? [];
-    const [authority] = createControllerPDA(store);
-    const [onlyController] = createRolesPDA(store, authority);
-    const [order] = createOrderPDA(store, payer, nonce);
-    const acceptablePrice = options?.acceptablePrice;
-    const instruction = await exchange.methods.createOrder(
-        [...nonce],
-        {
-            order: {
-                kind,
-                minOutputAmount: toBN(options?.minOutputAmount ?? 0),
-                sizeDeltaUsd: toBN(sizeDeltaUsd ?? 0),
-                initialCollateralDeltaAmount: toBN(initialCollateralDeltaAmount),
-                acceptablePrice: acceptablePrice ? toBN(acceptablePrice) : null,
-                isLong,
-            },
-            outputToken: collateralToken,
-            uiFeeReceiver: Keypair.generate().publicKey,
-            executionFee: toBN(options?.executionFee ?? 0),
-            swapLength: swapPath.length,
-        },
-    ).accounts({
-        store,
-        onlyController,
-        payer,
-        order,
-        position,
-        tokenConfigMap: createTokenConfigMapPDA(store)[0],
-        market,
-        initialCollateralTokenAccount: fromTokenAccount ?? null,
-        finalOutputTokenAccount: toTokenAccount ?? null,
-        secondaryOutputTokenAccount: secondaryTokenAccount ?? null,
-        initialCollateralTokenVault: (await getDepositVault(exchange.provider.connection, store, fromTokenAccount, options?.hints?.initialToken)) ?? null,
-    }).remainingAccounts(swapPath.map(mint => {
-        return {
-            pubkey: createMarketPDA(store, mint)[0],
-            isSigner: false,
-            isWritable: false,
-        };
-    })).instruction();
+//     const nonce = options?.nonce ?? Keypair.generate().publicKey.toBuffer();
+//     const swapPath = options?.swapPath ?? [];
+//     const [authority] = createControllerPDA(store);
+//     const [onlyController] = createRolesPDA(store, authority);
+//     const [order] = createOrderPDA(store, payer, nonce);
+//     const acceptablePrice = options?.acceptablePrice;
+//     const instruction = await exchange.methods.createOrder(
+//         [...nonce],
+//         {
+//             order: {
+//                 kind,
+//                 minOutputAmount: toBN(options?.minOutputAmount ?? 0),
+//                 sizeDeltaUsd: toBN(sizeDeltaUsd ?? 0),
+//                 initialCollateralDeltaAmount: toBN(initialCollateralDeltaAmount),
+//                 acceptablePrice: acceptablePrice ? toBN(acceptablePrice) : null,
+//                 isLong,
+//             },
+//             outputToken: collateralToken,
+//             uiFeeReceiver: Keypair.generate().publicKey,
+//             executionFee: toBN(options?.executionFee ?? 0),
+//             swapLength: swapPath.length,
+//         },
+//     ).accounts({
+//         store,
+//         onlyController,
+//         payer,
+//         order,
+//         position,
+//         tokenConfigMap: createTokenConfigMapPDA(store)[0],
+//         market,
+//         initialCollateralTokenAccount: fromTokenAccount ?? null,
+//         finalOutputTokenAccount: toTokenAccount ?? null,
+//         secondaryOutputTokenAccount: secondaryTokenAccount ?? null,
+//         initialCollateralTokenVault: (await getDepositVault(exchange.provider.connection, store, fromTokenAccount, options?.hints?.initialToken)) ?? null,
+//     }).remainingAccounts(swapPath.map(mint => {
+//         return {
+//             pubkey: createMarketPDA(store, mint)[0],
+//             isSigner: false,
+//             isWritable: false,
+//         };
+//     })).instruction();
 
-    return [instruction, order] as IxWithOutput<PublicKey>;
-};
+//     return [instruction, order] as IxWithOutput<PublicKey>;
+// };
 
-export const invokeCreateOrder = makeInvoke(makeCreateOrderInstruction, ["payer"]);
+// export const invokeCreateOrder = makeInvoke(makeCreateOrderInstruction, ["payer"]);
 
 export type MakeExecuteOrderParams = {
     authority: PublicKey,

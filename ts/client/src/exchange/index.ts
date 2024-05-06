@@ -8,3 +8,9 @@ export const findControllerPDA = (store: PublicKey) => PublicKey.findProgramAddr
     utils.bytes.utf8.encode("controller"),
     store.toBuffer(),
 ], EXCHANGE_ID);
+
+export enum PriceProvider {
+    Pyth = 0,
+    Chainlink = 1,
+    PythDevnet = 2,
+}

@@ -20,7 +20,7 @@ describe("data store: TokenConfig", () => {
 
     it("can only be updated by CONTROLLER", async () => {
         const fooAddress = Keypair.generate().publicKey;
-        await expect(insertTokenConfig(user0, dataStoreAddress, fakeTokenMint, fooAddress, 123, 10)).to.be.rejectedWith(AnchorError, "Permission denied");
+        await expect(insertTokenConfig(user0, dataStoreAddress, fakeTokenMint, 123, 10, {})).to.be.rejectedWith(AnchorError, "Permission denied");
     });
 
     it("test token config map", async () => {
@@ -34,20 +34,24 @@ describe("data store: TokenConfig", () => {
 
         // We should be able to insert.
         {
-            await insertTokenConfig(signer0, dataStoreAddress, newToken, BTC_FEED, 60, 3);
+            await insertTokenConfig(signer0, dataStoreAddress, newToken, 60, 3, {
+                chainlinkFeed: BTC_FEED,
+            });
             const config = await getTokenConfig(dataStoreAddress, newToken);
             expect(config.enabled).true;
-            expect(config.priceFeed).eqls(BTC_FEED);
+            expect(config.feeds[1]).eqls(BTC_FEED);
             expect(config.heartbeatDuration).equals(60);
             expect(config.precision).equals(3);
         }
 
         // Update the config by inserting again.
         {
-            await insertTokenConfig(signer0, dataStoreAddress, newToken, SOL_FEED, 42, 5);
+            await insertTokenConfig(signer0, dataStoreAddress, newToken, 42, 5, {
+                chainlinkFeed: SOL_FEED,
+            });
             const config = await getTokenConfig(dataStoreAddress, newToken);
             expect(config.enabled).true;
-            expect(config.priceFeed).eqls(SOL_FEED);
+            expect(config.feeds[1]).eqls(SOL_FEED);
             expect(config.heartbeatDuration).equals(42);
             expect(config.precision).equals(5);
         }
@@ -67,14 +71,16 @@ describe("data store: TokenConfig", () => {
         }
     });
 
-    it("insert fake token", async () => {
+    it("insert synthetic token", async () => {
         const newFakeToken = PublicKey.unique();
         // We should be able to insert.
         {
-            await insertSyntheticTokenConfig(signer0, dataStoreAddress, newFakeToken, 6, BTC_FEED, 60, 3);
+            await insertSyntheticTokenConfig(signer0, dataStoreAddress, newFakeToken, 6, 60, 3, {
+                chainlinkFeed: BTC_FEED,
+            });
             const config = await getTokenConfig(dataStoreAddress, newFakeToken);
             expect(config.enabled).true;
-            expect(config.priceFeed).eqls(BTC_FEED);
+            expect(config.feeds[1]).eqls(BTC_FEED);
             expect(config.heartbeatDuration).equals(60);
             expect(config.precision).equals(3);
             expect(config.tokenDecimals).equals(6);

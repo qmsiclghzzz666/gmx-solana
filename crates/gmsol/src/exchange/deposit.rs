@@ -6,7 +6,7 @@ use anchor_client::{
     Program, RequestBuilder,
 };
 use anchor_spl::associated_token::get_associated_token_address;
-use data_store::states::{Deposit, Market, NonceBytes, Pyth, Seed};
+use data_store::states::{Deposit, Market, NonceBytes, PriceProviderKind, Pyth, Seed};
 use exchange::{accounts, instruction, instructions::CreateDepositParams, utils::ControllerSeeds};
 
 use crate::store::{
@@ -44,6 +44,7 @@ pub struct CreateDepositBuilder<'a, C> {
     min_market_token: u64,
     should_unwrap_native_token: bool,
     nonce: Option<NonceBytes>,
+    price_provider: PriceProviderKind,
 }
 
 impl<'a, C, S> CreateDepositBuilder<'a, C>
@@ -70,6 +71,7 @@ where
             initial_short_token_amount: 0,
             min_market_token: 0,
             should_unwrap_native_token: false,
+            price_provider: PriceProviderKind::default(),
         }
     }
 
@@ -189,6 +191,12 @@ where
         self
     }
 
+    /// Set price provider to use.
+    pub fn price_provider(&mut self, kind: PriceProviderKind) -> &mut Self {
+        self.price_provider = kind;
+        self
+    }
+
     fn get_receiver(&self) -> Pubkey {
         match self.receiver {
             Some(token_account) => token_account,
@@ -267,6 +275,7 @@ where
                     min_market_token: *min_market_token,
                     should_unwrap_native_token: *should_unwrap_native_token,
                 },
+                provider: Some(self.price_provider as u8),
             })
             .accounts(
                 long_token_swap_path

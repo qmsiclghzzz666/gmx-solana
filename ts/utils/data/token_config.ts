@@ -21,15 +21,32 @@ export const initializeTokenConfigMap = async (authority: Signer, store: PublicK
     return map;
 };
 
+const hexStringToPublicKey = (hex: string) => {
+    const decoded = utils.bytes.hex.decode(hex);
+    return new PublicKey(decoded);
+};
+
 export const insertTokenConfig = async (
     authority: Signer,
     store: PublicKey,
     token: PublicKey,
-    price_feed: PublicKey,
-    heartbeat_duration: number,
+    heartbeatDuration: number,
     precision: number,
+    feeds: {
+        pythFeedId?: string,
+        chainlinkFeed?: PublicKey,
+        pythDevFeed?: PublicKey,
+    }
 ) => {
-    await dataStore.methods.insertTokenConfig(price_feed, heartbeat_duration, precision, true).accounts({
+    await dataStore.methods.insertTokenConfig({
+        heartbeatDuration,
+        precision,
+        feeds: [
+            feeds.pythFeedId ? hexStringToPublicKey(feeds.pythFeedId) : PublicKey.default,
+            feeds.chainlinkFeed ?? PublicKey.default,
+            feeds.pythDevFeed ?? PublicKey.default,
+        ]
+    }, true).accounts({
         authority: authority.publicKey,
         store,
         onlyController: createRolesPDA(store, authority.publicKey)[0],
@@ -42,11 +59,23 @@ export const insertSyntheticTokenConfig = async (
     store: PublicKey,
     token: PublicKey,
     decimals: number,
-    price_feed: PublicKey,
-    heartbeat_duration: number,
+    heartbeatDuration: number,
     precision: number,
+    feeds: {
+        pythFeedId?: string,
+        chainlinkFeed?: PublicKey,
+        pythDevFeed?: PublicKey,
+    }
 ) => {
-    await dataStore.methods.insertSyntheticTokenConfig(token, decimals, price_feed, heartbeat_duration, precision, true).accounts({
+    await dataStore.methods.insertSyntheticTokenConfig(token, decimals, {
+        heartbeatDuration,
+        precision,
+        feeds: [
+            feeds.pythFeedId ? hexStringToPublicKey(feeds.pythFeedId) : PublicKey.default,
+            feeds.chainlinkFeed ?? PublicKey.default,
+            feeds.pythDevFeed ?? PublicKey.default,
+        ]
+    }, true).accounts({
         authority: authority.publicKey,
         store,
         onlyController: createRolesPDA(store, authority.publicKey)[0],
@@ -68,10 +97,10 @@ export const toggleTokenConfig = async (
 
 export interface TokenConfig {
     enabled: boolean,
-    priceFeed: PublicKey,
     heartbeatDuration: number,
     tokenDecimals: number,
     precision: number,
+    feeds: PublicKey[],
 }
 
 export const getTokenConfig = async (store: PublicKey, token: PublicKey) => {

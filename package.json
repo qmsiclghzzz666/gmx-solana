@@ -4,8 +4,9 @@
         "lint:fix": "prettier */*.js \"*/**/*{.js,.ts}\" -w",
         "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check",
         "build-client": "pnpm -C ts/client build-all",
+        "build-client:node": "pnpm -C ts/client build-all:node",
         "test-no-build": "ts-mocha -p ./tsconfig.json --require ts/utils/fixtures.ts -t 1000000 ts/tests/**/*.ts",
-        "test": "pnpm build-client && pnpm test-no-build",
+        "test": "pnpm build-client:node && pnpm test-no-build",
         "start": "pnpm -C app start"
     },
     "dependencies": {

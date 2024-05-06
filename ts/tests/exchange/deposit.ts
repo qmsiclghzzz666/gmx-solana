@@ -1,8 +1,10 @@
 import { PublicKey } from "@solana/web3.js";
-import { createMarketPDA, createNoncePDA, createRolesPDA } from "../../utils/data";
+import { createMarketPDA } from "../../utils/data";
 import { getAddresses, getMarkets, getPrograms, getProvider, getUsers, expect } from "../../utils/fixtures";
-import { invokeCancelDeposit, invokeCancelWithdrawal, invokeExecuteWithdrawal, invokeCreateDeposit, invokeExecuteDeposit, invokeCreateWithdrawal } from "../../utils/exchange";
+import { invokeCancelDeposit, invokeCancelWithdrawal, invokeExecuteWithdrawal, invokeExecuteDeposit, exchange } from "../../utils/exchange";
 import { AnchorError } from "@coral-xyz/anchor";
+import { invokeCreateDepositWithPayerAsSigner, invokeCreateWithdrawalWithPayerAsSigner } from "gmsol";
+import { SOL_TOKEN_MINT } from "../../utils/token";
 
 describe("exchange: deposit", () => {
     const provider = getProvider();
@@ -18,6 +20,8 @@ describe("exchange: deposit", () => {
     let GMFakeFakeUsdG: PublicKey;
     let GMWsolWsolUsdG: PublicKey;
     let oracleAddress: PublicKey;
+    let fakeTokenMint: PublicKey;
+    let usdGTokenMint: PublicKey;
 
     before(async () => {
         ({
@@ -28,6 +32,8 @@ describe("exchange: deposit", () => {
             oracleAddress,
             user0WsolTokenAccount,
             user0WsolWsolUsdGTokenAccount,
+            fakeTokenMint,
+            usdGTokenMint,
         } = await getAddresses());
         ({ GMFakeFakeUsdG, GMWsolWsolUsdG } = await getMarkets());
     });
@@ -35,13 +41,12 @@ describe("exchange: deposit", () => {
     it("create and execute deposit and then withdraw", async () => {
         let deposit: PublicKey;
         try {
-            const [signature, address] = await invokeCreateDeposit(provider.connection, {
+            const [signature, address] = await invokeCreateDepositWithPayerAsSigner(exchange, {
                 store: dataStoreAddress,
                 payer: user0,
                 marketToken: GMFakeFakeUsdG,
-                toMarketTokenAccount: user0FakeFakeUsdGTokenAccount,
-                fromInitialLongTokenAccount: user0FakeTokenAccount,
-                fromInitialShortTokenAccount: user0UsdGTokenAccount,
+                initialLongToken: fakeTokenMint,
+                initialShortToken: usdGTokenMint,
                 initialLongTokenAmount: 1_000_000_000,
                 initialShortTokenAmount: 70_000 * 100_000_000,
             });
@@ -75,16 +80,15 @@ describe("exchange: deposit", () => {
 
         let withdrawal: PublicKey;
         try {
-            const [signature, withdrawalAddress] = await invokeCreateWithdrawal(
-                provider.connection,
+            const [signature, withdrawalAddress] = await invokeCreateWithdrawalWithPayerAsSigner(
+                exchange,
                 {
                     store: dataStoreAddress,
                     payer: user0,
                     marketToken: GMFakeFakeUsdG,
                     amount: 1_000_000_000_000,
-                    fromMarketTokenAccount: user0FakeFakeUsdGTokenAccount,
-                    toLongTokenAccount: user0FakeTokenAccount,
-                    toShortTokenAccount: user0UsdGTokenAccount
+                    finalLongToken: fakeTokenMint,
+                    finalShortToken: usdGTokenMint,
                 }
             );
             console.log(`withdrawal created at ${signature}`);
@@ -123,16 +127,15 @@ describe("exchange: deposit", () => {
         }
         // Create again.
         try {
-            const [signature, address] = await invokeCreateWithdrawal(
-                provider.connection,
+            const [signature, address] = await invokeCreateWithdrawalWithPayerAsSigner(
+                exchange,
                 {
                     store: dataStoreAddress,
                     payer: user0,
                     marketToken: GMFakeFakeUsdG,
                     amount: 2_000 * 1_000_000_000,
-                    fromMarketTokenAccount: user0FakeFakeUsdGTokenAccount,
-                    toLongTokenAccount: user0FakeTokenAccount,
-                    toShortTokenAccount: user0UsdGTokenAccount,
+                    finalLongToken: fakeTokenMint,
+                    finalShortToken: usdGTokenMint,
                 }
             );
             console.log(`withdrawal created at ${signature}`);
@@ -175,15 +178,14 @@ describe("exchange: deposit", () => {
     });
 
     it("create and cancel deposit", async () => {
-        const [signature, deposit] = await invokeCreateDeposit(
-            provider.connection,
+        const [signature, deposit] = await invokeCreateDepositWithPayerAsSigner(
+            exchange,
             {
                 store: dataStoreAddress,
                 payer: user0,
                 marketToken: GMFakeFakeUsdG,
-                toMarketTokenAccount: user0FakeFakeUsdGTokenAccount,
-                fromInitialLongTokenAccount: user0FakeTokenAccount,
-                fromInitialShortTokenAccount: user0UsdGTokenAccount,
+                initialLongToken: fakeTokenMint,
+                initialShortToken: usdGTokenMint,
                 initialLongTokenAmount: 2_000_000_000,
                 initialShortTokenAmount: 200_000_000,
             }
@@ -214,15 +216,14 @@ describe("exchange: deposit", () => {
     });
 
     it("create deposit with invalid swap path", async () => {
-        await expect(invokeCreateDeposit(
-            provider.connection,
+        await expect(invokeCreateDepositWithPayerAsSigner(
+            exchange,
             {
                 store: dataStoreAddress,
                 payer: user0,
                 marketToken: GMFakeFakeUsdG,
-                toMarketTokenAccount: user0FakeFakeUsdGTokenAccount,
-                fromInitialLongTokenAccount: user0FakeTokenAccount,
-                fromInitialShortTokenAccount: user0UsdGTokenAccount,
+                initialLongToken: fakeTokenMint,
+                initialShortToken: usdGTokenMint,
                 initialLongTokenAmount: 2_000_000_000,
                 initialShortTokenAmount: 200_000_000,
                 options: {
@@ -233,16 +234,15 @@ describe("exchange: deposit", () => {
     });
 
     it("create withdrawal with invalid swap path", async () => {
-        await expect(invokeCreateWithdrawal(
-            provider.connection,
+        await expect(invokeCreateWithdrawalWithPayerAsSigner(
+            exchange,
             {
                 store: dataStoreAddress,
                 payer: user0,
                 marketToken: GMFakeFakeUsdG,
                 amount: 1_000,
-                fromMarketTokenAccount: user0FakeFakeUsdGTokenAccount,
-                toLongTokenAccount: user0FakeTokenAccount,
-                toShortTokenAccount: user0UsdGTokenAccount,
+                finalLongToken: fakeTokenMint,
+                finalShortToken: usdGTokenMint,
                 options: {
                     longTokenSwapPath: [GMFakeFakeUsdG],
                 }
@@ -253,16 +253,15 @@ describe("exchange: deposit", () => {
     it("create withdrawal with valid swap path and cancel", async () => {
         let withdrawal: PublicKey;
         {
-            const [signature, withdrawAddress] = await invokeCreateWithdrawal(
-                provider.connection,
+            const [signature, withdrawAddress] = await invokeCreateWithdrawalWithPayerAsSigner(
+                exchange,
                 {
                     store: dataStoreAddress,
                     payer: user0,
                     marketToken: GMFakeFakeUsdG,
                     amount: 1_000_000,
-                    fromMarketTokenAccount: user0FakeFakeUsdGTokenAccount,
-                    toLongTokenAccount: user0UsdGTokenAccount,
-                    toShortTokenAccount: user0UsdGTokenAccount,
+                    finalLongToken: usdGTokenMint,
+                    finalShortToken: usdGTokenMint,
                     options: {
                         longTokenSwapPath: [GMFakeFakeUsdG],
                     }
@@ -285,14 +284,14 @@ describe("exchange: deposit", () => {
     it("create deposit with valid swap path and cancel", async () => {
         let deposit: PublicKey;
         {
-            const [signature, depositAddress] = await invokeCreateDeposit(
-                provider.connection,
+            const [signature, depositAddress] = await invokeCreateDepositWithPayerAsSigner(
+                exchange,
                 {
                     store: dataStoreAddress,
                     payer: user0,
                     marketToken: GMWsolWsolUsdG,
-                    toMarketTokenAccount: user0WsolWsolUsdGTokenAccount,
-                    fromInitialShortTokenAccount: user0FakeTokenAccount,
+                    initialLongToken: fakeTokenMint,
+                    initialShortToken: fakeTokenMint,
                     initialShortTokenAmount: 1_000_000,
                     options: {
                         shortTokenSwapPath: [GMFakeFakeUsdG],
@@ -323,15 +322,14 @@ describe("exchange: deposit", () => {
         try {
             const pool2 = (await dataStore.account.market.fetch(market2)).pools.pools[0];
             console.log(`${pool2.longTokenAmount}:${pool2.shortTokenAmount}`);
-            const [signature, depositAddress] = await invokeCreateDeposit(
-                provider.connection,
+            const [signature, depositAddress] = await invokeCreateDepositWithPayerAsSigner(
+                exchange,
                 {
                     store: dataStoreAddress,
                     payer: user0,
                     marketToken: GMWsolWsolUsdG,
-                    toMarketTokenAccount: user0WsolWsolUsdGTokenAccount,
-                    fromInitialLongTokenAccount: user0WsolTokenAccount,
-                    fromInitialShortTokenAccount: user0FakeTokenAccount,
+                    initialLongToken: SOL_TOKEN_MINT,
+                    initialShortToken: fakeTokenMint,
                     initialLongTokenAmount: 3_000_000,
                     initialShortTokenAmount: 20_000_000,
                     options: {
@@ -378,16 +376,15 @@ describe("exchange: deposit", () => {
     it("create withdrawal with valid swap path and execute", async () => {
         let withdrawal: PublicKey;
         {
-            const [signature, withdrawAddress] = await invokeCreateWithdrawal(
-                provider.connection,
+            const [signature, withdrawAddress] = await invokeCreateWithdrawalWithPayerAsSigner(
+                exchange,
                 {
                     store: dataStoreAddress,
                     payer: user0,
                     marketToken: GMFakeFakeUsdG,
                     amount: 1_000_000,
-                    fromMarketTokenAccount: user0FakeFakeUsdGTokenAccount,
-                    toLongTokenAccount: user0WsolTokenAccount,
-                    toShortTokenAccount: user0WsolTokenAccount,
+                    finalLongToken: SOL_TOKEN_MINT,
+                    finalShortToken: SOL_TOKEN_MINT,
                     options: {
                         longTokenSwapPath: [GMFakeFakeUsdG, GMWsolWsolUsdG],
                         shortTokenSwapPath: [GMWsolWsolUsdG],
