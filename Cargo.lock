@@ -1365,6 +1365,7 @@ dependencies = [
  "bitmaps 3.2.1",
  "bytemuck",
  "chainlink_solana",
+ "clap 4.5.4",
  "dual-vec-map",
  "gmx-core",
  "gmx-solana-utils",

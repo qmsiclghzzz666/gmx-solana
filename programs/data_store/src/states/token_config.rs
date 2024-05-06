@@ -23,6 +23,8 @@ pub struct TokenConfig {
     /// Price Feeds.
     #[max_len(FEEDS_LEN)]
     pub feeds: Vec<Pubkey>,
+    /// Expected provider.
+    pub expected_provider: u8,
 }
 
 impl TokenConfig {
@@ -40,6 +42,18 @@ impl TokenConfig {
         }
     }
 
+    /// Get expected price provider kind.
+    pub fn expected_provider(&self) -> Result<PriceProviderKind> {
+        let kind = PriceProviderKind::try_from(self.expected_provider)
+            .map_err(|_| DataStoreError::InvalidProviderKindIndex)?;
+        Ok(kind)
+    }
+
+    /// Get price feed address for the expected provider.
+    pub fn get_expected_feed(&self) -> Result<Pubkey> {
+        self.get_feed(&self.expected_provider()?)
+    }
+
     /// Create a new token config from builder.
     pub fn new(
         synthetic: bool,
@@ -54,6 +68,9 @@ impl TokenConfig {
             heartbeat_duration: builder.heartbeat_duration,
             precision: builder.precision,
             feeds: builder.feeds,
+            expected_provider: builder
+                .expected_provider
+                .unwrap_or(PriceProviderKind::default() as u8),
         }
     }
 }
@@ -70,6 +87,7 @@ pub struct TokenConfigBuilder {
     heartbeat_duration: u32,
     precision: u8,
     feeds: Vec<Pubkey>,
+    expected_provider: Option<u8>,
 }
 
 impl Default for TokenConfigBuilder {
@@ -78,6 +96,7 @@ impl Default for TokenConfigBuilder {
             heartbeat_duration: DEFAULT_HEARTBEAT_DURATION,
             precision: DEFAULT_PRECISION,
             feeds: vec![Pubkey::default(); FEEDS_LEN],
+            expected_provider: None,
         }
     }
 }
@@ -104,6 +123,12 @@ impl TokenConfigBuilder {
     /// Set precision.
     pub fn with_precision(mut self, precision: u8) -> Self {
         self.precision = precision;
+        self
+    }
+
+    /// Set expected provider.
+    pub fn with_expected_provider(mut self, provider: PriceProviderKind) -> Self {
+        self.expected_provider = Some(provider as u8);
         self
     }
 }

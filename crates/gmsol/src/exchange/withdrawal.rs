@@ -6,9 +6,7 @@ use anchor_client::{
     Program, RequestBuilder,
 };
 use anchor_spl::associated_token::get_associated_token_address;
-use data_store::states::{
-    withdrawal::TokenParams, Market, NonceBytes, PriceProviderKind, Pyth, Seed, Withdrawal,
-};
+use data_store::states::{withdrawal::TokenParams, Market, NonceBytes, Pyth, Seed, Withdrawal};
 use exchange::{
     accounts, instruction, instructions::CreateWithdrawalParams, utils::ControllerSeeds,
 };
@@ -48,7 +46,6 @@ pub struct CreateWithdrawalBuilder<'a, C> {
     final_short_token_receiver: Option<Pubkey>,
     long_token_swap_path: Vec<Pubkey>,
     short_token_swap_path: Vec<Pubkey>,
-    price_provider: PriceProviderKind,
 }
 
 impl<'a, C, S> CreateWithdrawalBuilder<'a, C>
@@ -80,7 +77,6 @@ where
             final_short_token_receiver: None,
             long_token_swap_path: vec![],
             short_token_swap_path: vec![],
-            price_provider: PriceProviderKind::default(),
         }
     }
 
@@ -180,12 +176,6 @@ where
         ))
     }
 
-    /// Set price provider to use.
-    pub fn price_provider(&mut self, kind: PriceProviderKind) -> &mut Self {
-        self.price_provider = kind;
-        self
-    }
-
     /// Create the [`RequestBuilder`] and return withdrawal address.
     pub async fn build_with_address(&self) -> crate::Result<(RequestBuilder<'a, C>, Pubkey)> {
         let payer = self.program.payer();
@@ -239,7 +229,6 @@ where
                         .try_into()
                         .map_err(|_| crate::Error::NumberOutOfRange)?,
                 },
-                provider: Some(self.price_provider as u8),
             })
             .accounts(
                 self.long_token_swap_path

@@ -6,7 +6,7 @@ use data_store::{
     constants,
     cpi::accounts::{GetMarketMeta, GetTokenConfig, InitializeWithdrawal},
     program::DataStore,
-    states::{common::SwapParams, withdrawal::TokenParams, NonceBytes, PriceProviderKind},
+    states::{common::SwapParams, withdrawal::TokenParams, NonceBytes},
 };
 
 use crate::{
@@ -83,7 +83,6 @@ pub fn create_withdrawal<'info>(
     ctx: Context<'_, '_, 'info, 'info, CreateWithdrawal<'info>>,
     nonce: NonceBytes,
     params: CreateWithdrawalParams,
-    provider: Option<PriceProviderKind>,
 ) -> Result<()> {
     use data_store::cpi;
 
@@ -129,7 +128,6 @@ pub fn create_withdrawal<'info>(
         &mut tokens,
     )?;
 
-    let provider = provider.unwrap_or_default();
     let tokens_with_feed = tokens
         .into_iter()
         .map(|token| {
@@ -140,7 +138,7 @@ pub fn create_withdrawal<'info>(
             )?
             .get()
             .ok_or(ExchangeError::ResourceNotFound)?;
-            Result::Ok((token, config.get_feed(&provider)?))
+            Result::Ok((token, config.get_expected_feed()?))
         })
         .collect::<Result<Vec<_>>>()?;
 

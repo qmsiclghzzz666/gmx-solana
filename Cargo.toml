@@ -7,6 +7,7 @@ anchor-lang = "0.30.0"
 anchor-spl = { version = "0.30.0", default_features = false }
 thiserror = "1.0.58"
 bytemuck = "1.15.0"
+clap = "4.5.0"
 
 [profile.release]
 overflow-checks = true

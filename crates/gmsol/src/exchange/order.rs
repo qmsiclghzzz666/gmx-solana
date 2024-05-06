@@ -8,7 +8,7 @@ use anchor_client::{
 use data_store::states::{
     order::{OrderKind, OrderParams},
     position::PositionKind,
-    Market, MarketMeta, NonceBytes, Order, Position, PriceProviderKind, Pyth, Seed,
+    Market, MarketMeta, NonceBytes, Order, Position, Pyth, Seed,
 };
 use exchange::{accounts, instruction, instructions::CreateOrderParams, utils::ControllerSeeds};
 
@@ -72,7 +72,6 @@ pub struct CreateOrderBuilder<'a, C> {
     initial_token: TokenAccountParams,
     final_token: TokenAccountParams,
     secondary_token_account: Option<Pubkey>,
-    price_provider: PriceProviderKind,
 }
 
 #[derive(Clone, Copy)]
@@ -107,7 +106,6 @@ where
             initial_token: Default::default(),
             final_token: Default::default(),
             secondary_token_account: None,
-            price_provider: PriceProviderKind::default(),
         }
     }
 
@@ -256,12 +254,6 @@ where
         }
     }
 
-    /// Set price provider to use.
-    pub fn price_provider(&mut self, kind: PriceProviderKind) -> &mut Self {
-        self.price_provider = kind;
-        self
-    }
-
     async fn final_output_token_account(&mut self) -> crate::Result<Option<Pubkey>> {
         match &self.params.kind {
             OrderKind::MarketSwap | OrderKind::MarketDecrease | OrderKind::Liquidation => {
@@ -355,7 +347,6 @@ where
                         .try_into()
                         .map_err(|_| crate::Error::NumberOutOfRange)?,
                 },
-                provider: Some(self.price_provider as u8),
             })
             .accounts(
                 self.swap_path

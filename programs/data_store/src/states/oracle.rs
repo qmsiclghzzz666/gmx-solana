@@ -297,6 +297,7 @@ impl Ids for PriceProvider {
 /// Supported Price Provider Kind.
 #[repr(u8)]
 #[derive(Clone, Copy, Default, TryFromPrimitive)]
+#[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
 pub enum PriceProviderKind {
     /// Pyth Oracle V2.
     #[default]

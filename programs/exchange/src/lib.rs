@@ -19,8 +19,6 @@ declare_id!("HY9NoGiu68nqu3H44UySTX3rZ1db8Mx3b2CFcDNAmSQJ");
 
 #[program]
 pub mod exchange {
-    use data_store::states::PriceProviderKind;
-
     use super::*;
 
     // Market.
@@ -35,14 +33,8 @@ pub mod exchange {
         ctx: Context<'_, '_, 'info, 'info, CreateDeposit<'info>>,
         nonce: [u8; 32],
         params: CreateDepositParams,
-        provider: Option<u8>,
     ) -> Result<()> {
-        instructions::create_deposit(
-            ctx,
-            nonce,
-            params,
-            provider.and_then(|kind| PriceProviderKind::try_from(kind).ok()),
-        )
+        instructions::create_deposit(ctx, nonce, params)
     }
 
     #[access_control(Authenticate::only_order_keeper(&ctx))]
@@ -63,14 +55,8 @@ pub mod exchange {
         ctx: Context<'_, '_, 'info, 'info, CreateWithdrawal<'info>>,
         nonce: [u8; 32],
         params: CreateWithdrawalParams,
-        provider: Option<u8>,
     ) -> Result<()> {
-        instructions::create_withdrawal(
-            ctx,
-            nonce,
-            params,
-            provider.and_then(|kind| PriceProviderKind::try_from(kind).ok()),
-        )
+        instructions::create_withdrawal(ctx, nonce, params)
     }
 
     #[access_control(instructions::only_controller_or_withdrawal_creator(&ctx))]
@@ -91,14 +77,8 @@ pub mod exchange {
         ctx: Context<'_, '_, 'info, 'info, CreateOrder<'info>>,
         nonce: [u8; 32],
         params: CreateOrderParams,
-        provider: Option<u8>,
     ) -> Result<()> {
-        instructions::create_order(
-            ctx,
-            nonce,
-            params,
-            provider.and_then(|kind| PriceProviderKind::try_from(kind).ok()),
-        )
+        instructions::create_order(ctx, nonce, params)
     }
 
     #[access_control(Authenticate::only_order_keeper(&ctx))]

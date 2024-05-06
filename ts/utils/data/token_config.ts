@@ -2,6 +2,7 @@ import { PublicKey, Signer } from "@solana/web3.js";
 import { dataStore } from "./program";
 import { createRolesPDA } from ".";
 import { utils } from "@coral-xyz/anchor";
+import { PriceProvider } from "gmsol";
 
 // Token Config map seed.
 export const TOKEN_CONFIG_MAP_SEED = utils.bytes.utf8.encode("token_config_map");
@@ -26,26 +27,35 @@ const hexStringToPublicKey = (hex: string) => {
     return new PublicKey(decoded);
 };
 
+export interface FeedsOptions {
+    pythFeedId?: string,
+    chainlinkFeed?: PublicKey,
+    pythDevFeed?: PublicKey,
+    expectedProvider?: PriceProvider,
+}
+
 export const insertTokenConfig = async (
     authority: Signer,
     store: PublicKey,
     token: PublicKey,
     heartbeatDuration: number,
     precision: number,
-    feeds: {
-        pythFeedId?: string,
-        chainlinkFeed?: PublicKey,
-        pythDevFeed?: PublicKey,
-    }
+    {
+        pythFeedId,
+        chainlinkFeed,
+        pythDevFeed,
+        expectedProvider,
+    }: FeedsOptions,
 ) => {
     await dataStore.methods.insertTokenConfig({
         heartbeatDuration,
         precision,
         feeds: [
-            feeds.pythFeedId ? hexStringToPublicKey(feeds.pythFeedId) : PublicKey.default,
-            feeds.chainlinkFeed ?? PublicKey.default,
-            feeds.pythDevFeed ?? PublicKey.default,
-        ]
+            pythFeedId ? hexStringToPublicKey(pythFeedId) : PublicKey.default,
+            chainlinkFeed ?? PublicKey.default,
+            pythDevFeed ?? PublicKey.default,
+        ],
+        expectedProvider,
     }, true).accounts({
         authority: authority.publicKey,
         store,
@@ -61,20 +71,22 @@ export const insertSyntheticTokenConfig = async (
     decimals: number,
     heartbeatDuration: number,
     precision: number,
-    feeds: {
-        pythFeedId?: string,
-        chainlinkFeed?: PublicKey,
-        pythDevFeed?: PublicKey,
-    }
+    {
+        pythFeedId,
+        chainlinkFeed,
+        pythDevFeed,
+        expectedProvider,
+    }: FeedsOptions,
 ) => {
     await dataStore.methods.insertSyntheticTokenConfig(token, decimals, {
         heartbeatDuration,
         precision,
         feeds: [
-            feeds.pythFeedId ? hexStringToPublicKey(feeds.pythFeedId) : PublicKey.default,
-            feeds.chainlinkFeed ?? PublicKey.default,
-            feeds.pythDevFeed ?? PublicKey.default,
-        ]
+            pythFeedId ? hexStringToPublicKey(pythFeedId) : PublicKey.default,
+            chainlinkFeed ?? PublicKey.default,
+            pythDevFeed ?? PublicKey.default,
+        ],
+        expectedProvider,
     }, true).accounts({
         authority: authority.publicKey,
         store,

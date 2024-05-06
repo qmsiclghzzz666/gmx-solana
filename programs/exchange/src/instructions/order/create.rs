@@ -8,7 +8,7 @@ use data_store::{
     states::{
         common::SwapParams,
         order::{OrderKind, OrderParams},
-        NonceBytes, PriceProviderKind,
+        NonceBytes,
     },
 };
 
@@ -74,7 +74,6 @@ pub fn create_order<'info>(
     ctx: Context<'_, '_, 'info, 'info, CreateOrder<'info>>,
     nonce: NonceBytes,
     params: CreateOrderParams,
-    provider: Option<PriceProviderKind>,
 ) -> Result<()> {
     let order = &params.order;
     let controller = ControllerSeeds::new(ctx.accounts.store.key, ctx.bumps.authority);
@@ -110,7 +109,7 @@ pub fn create_order<'info>(
             .initialize_order_ctx()
             .with_signer(&[&controller.as_seeds()]),
         nonce,
-        ctx.accounts.to_tokens_with_feed(tokens, provider)?,
+        ctx.accounts.to_tokens_with_feed(tokens)?,
         swap,
         order.clone(),
         params.output_token,
@@ -312,9 +311,7 @@ impl<'info> CreateOrder<'info> {
     fn to_tokens_with_feed(
         &self,
         tokens: impl IntoIterator<Item = Pubkey>,
-        provider: Option<PriceProviderKind>,
     ) -> Result<Vec<(Pubkey, Pubkey)>> {
-        let provider = provider.unwrap_or_default();
         tokens
             .into_iter()
             .map(|token| {
@@ -327,7 +324,7 @@ impl<'info> CreateOrder<'info> {
                 let config = data_store::cpi::get_token_config(ctx, self.store.key(), token)?
                     .get()
                     .ok_or(ExchangeError::ResourceNotFound)?;
-                Result::Ok((token, config.get_feed(&provider)?))
+                Result::Ok((token, config.get_expected_feed()?))
             })
             .collect::<Result<Vec<_>>>()
     }

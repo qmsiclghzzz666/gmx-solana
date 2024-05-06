@@ -500,6 +500,9 @@ pub enum DataStoreError {
     // Token Config.
     #[msg("synthetic flag does not match")]
     InvalidSynthetic,
+    // Invalid Provider Kind.
+    #[msg("invalid provider kind index")]
+    InvalidProviderKindIndex,
 }
 
 impl DataStoreError {

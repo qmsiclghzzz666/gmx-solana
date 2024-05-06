@@ -5,6 +5,7 @@ import { createRolesPDA, extendTokenConfigMap, getTokenConfig, insertSyntheticTo
 import { AnchorError } from '@coral-xyz/anchor';
 import { createMint } from '@solana/spl-token';
 import { BTC_FEED, SOL_FEED } from '../../utils/token';
+import { PriceProvider } from 'gmsol';
 
 describe("data store: TokenConfig", () => {
     const provider = getProvider();
@@ -36,6 +37,7 @@ describe("data store: TokenConfig", () => {
         {
             await insertTokenConfig(signer0, dataStoreAddress, newToken, 60, 3, {
                 chainlinkFeed: BTC_FEED,
+                expectedProvider: PriceProvider.Chainlink,
             });
             const config = await getTokenConfig(dataStoreAddress, newToken);
             expect(config.enabled).true;
@@ -77,6 +79,7 @@ describe("data store: TokenConfig", () => {
         {
             await insertSyntheticTokenConfig(signer0, dataStoreAddress, newFakeToken, 6, 60, 3, {
                 chainlinkFeed: BTC_FEED,
+                expectedProvider: PriceProvider.Chainlink,
             });
             const config = await getTokenConfig(dataStoreAddress, newFakeToken);
             expect(config.enabled).true;

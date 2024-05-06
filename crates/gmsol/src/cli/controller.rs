@@ -21,6 +21,8 @@ enum Command {
         token: Pubkey,
         #[command(flatten)]
         feeds: Feeds,
+        #[arg(long)]
+        expected_provider: PriceProviderKind,
         #[arg(long, default_value_t = 60)]
         heartbeat_duration: u32,
         #[arg(long, default_value_t = 4)]
@@ -84,13 +86,15 @@ impl ControllerArgs {
             Command::InsertTokenConfig {
                 token,
                 feeds,
+                expected_provider,
                 heartbeat_duration,
                 precision,
                 synthetic: fake_decimals,
             } => {
                 let mut builder = TokenConfigBuilder::default()
                     .with_heartbeat_duration(*heartbeat_duration)
-                    .with_precision(*precision);
+                    .with_precision(*precision)
+                    .with_expected_provider(*expected_provider);
                 if let Some(feed_id) = feeds.pyth_feed_id.as_ref() {
                     let feed_id =
                         pyth_sdk::Identifier::from_hex(feed_id).map_err(gmsol::Error::unknown)?;
