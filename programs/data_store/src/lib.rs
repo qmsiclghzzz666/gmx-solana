@@ -108,26 +108,29 @@ pub mod data_store {
         price_feed: Pubkey,
         heartbeat_duration: u32,
         precision: u8,
+        enable: bool,
     ) -> Result<()> {
-        instructions::insert_token_config(ctx, price_feed, heartbeat_duration, precision)
+        instructions::insert_token_config(ctx, price_feed, heartbeat_duration, precision, enable)
     }
 
     #[access_control(internal::Authenticate::only_controller(&ctx))]
-    pub fn insert_fake_token_config(
-        ctx: Context<InsertFakeTokenConfig>,
+    pub fn insert_synthetic_token_config(
+        ctx: Context<InsertSyntheticTokenConfig>,
         token: Pubkey,
         decimals: u8,
         price_feed: Pubkey,
         heartbeat_duration: u32,
         precision: u8,
+        enable: bool,
     ) -> Result<()> {
-        instructions::insert_fake_token_config(
+        instructions::insert_synthetic_token_config(
             ctx,
             token,
             decimals,
             price_feed,
             heartbeat_duration,
             precision,
+            enable,
         )
     }
 
@@ -504,6 +507,9 @@ pub enum DataStoreError {
     // Order.
     #[msg("missing sender")]
     MissingSender,
+    // Token Config.
+    #[msg("synthetic flag does not match")]
+    InvalidSynthetic,
 }
 
 impl DataStoreError {

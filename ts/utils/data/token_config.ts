@@ -29,7 +29,7 @@ export const insertTokenConfig = async (
     heartbeat_duration: number,
     precision: number,
 ) => {
-    await dataStore.methods.insertTokenConfig(price_feed, heartbeat_duration, precision).accounts({
+    await dataStore.methods.insertTokenConfig(price_feed, heartbeat_duration, precision, true).accounts({
         authority: authority.publicKey,
         store,
         onlyController: createRolesPDA(store, authority.publicKey)[0],
@@ -37,7 +37,7 @@ export const insertTokenConfig = async (
     }).signers([authority]).rpc();
 };
 
-export const insertFakeTokenConfig = async (
+export const insertSyntheticTokenConfig = async (
     authority: Signer,
     store: PublicKey,
     token: PublicKey,
@@ -46,7 +46,7 @@ export const insertFakeTokenConfig = async (
     heartbeat_duration: number,
     precision: number,
 ) => {
-    await dataStore.methods.insertFakeTokenConfig(token, decimals, price_feed, heartbeat_duration, precision).accounts({
+    await dataStore.methods.insertSyntheticTokenConfig(token, decimals, price_feed, heartbeat_duration, precision, true).accounts({
         authority: authority.publicKey,
         store,
         onlyController: createRolesPDA(store, authority.publicKey)[0],

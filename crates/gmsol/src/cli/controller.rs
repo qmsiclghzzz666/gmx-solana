@@ -75,7 +75,7 @@ impl ControllerArgs {
             } => {
                 let signature = if let Some(decimals) = fake_decimals {
                     program
-                        .insert_fake_token_config(
+                        .insert_synthetic_token_config(
                             store,
                             token,
                             *decimals,

@@ -54,10 +54,12 @@ pub trait TokenConfigOps<C> {
         price_feed: &Pubkey,
         heartbeat_duration: u32,
         precision: u8,
+        enable: bool,
     ) -> RequestBuilder<C>;
 
-    /// Insert or update config the given fake token.
-    fn insert_fake_token_config(
+    /// Insert or update config the given synthetic token.
+    #[allow(clippy::too_many_arguments)]
+    fn insert_synthetic_token_config(
         &self,
         store: &Pubkey,
         token: &Pubkey,
@@ -65,6 +67,7 @@ pub trait TokenConfigOps<C> {
         price_feed: &Pubkey,
         heartbeat_duration: u32,
         precision: u8,
+        enable: bool,
     ) -> RequestBuilder<C>;
 
     /// Get token config of the given token.
@@ -107,6 +110,7 @@ where
         price_feed: &Pubkey,
         heartbeat_duration: u32,
         precision: u8,
+        enable: bool,
     ) -> RequestBuilder<C> {
         let authority = self.payer();
         let only_controller = find_roles_address(store, &authority).0;
@@ -124,10 +128,11 @@ where
                 price_feed: *price_feed,
                 heartbeat_duration,
                 precision,
+                enable,
             })
     }
 
-    fn insert_fake_token_config(
+    fn insert_synthetic_token_config(
         &self,
         store: &Pubkey,
         token: &Pubkey,
@@ -135,24 +140,26 @@ where
         price_feed: &Pubkey,
         heartbeat_duration: u32,
         precision: u8,
+        enable: bool,
     ) -> RequestBuilder<C> {
         let authority = self.payer();
         let only_controller = find_roles_address(store, &authority).0;
         let map = find_token_config_map(store).0;
         self.request()
-            .accounts(accounts::InsertFakeTokenConfig {
+            .accounts(accounts::InsertSyntheticTokenConfig {
                 authority,
                 only_controller,
                 store: *store,
                 map,
                 system_program: system_program::ID,
             })
-            .args(instruction::InsertFakeTokenConfig {
+            .args(instruction::InsertSyntheticTokenConfig {
                 token: *token,
                 decimals,
                 price_feed: *price_feed,
                 heartbeat_duration,
                 precision,
+                enable,
             })
     }
 

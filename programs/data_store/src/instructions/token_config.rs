@@ -4,7 +4,6 @@ use anchor_spl::token::Mint;
 use crate::{
     states::{DataStore, Roles, Seed, TokenConfig, TokenConfigMap},
     utils::internal,
-    DataStoreError,
 };
 
 #[derive(Accounts)]
@@ -73,19 +72,20 @@ pub fn insert_token_config(
     price_feed: Pubkey,
     heartbeat_duration: u32,
     precision: u8,
+    enable: bool,
 ) -> Result<()> {
     let token = &ctx.accounts.token;
-    ctx.accounts.map.as_map_mut().insert(
+    ctx.accounts.map.checked_insert(
         token.key(),
         TokenConfig {
-            enabled: true,
+            enabled: enable,
+            synthetic: false,
             price_feed,
             heartbeat_duration,
             precision,
             token_decimals: token.decimals,
         },
-    );
-    Ok(())
+    )
 }
 
 impl<'info> internal::Authentication<'info> for InsertTokenConfig<'info> {
@@ -104,7 +104,7 @@ impl<'info> internal::Authentication<'info> for InsertTokenConfig<'info> {
 
 #[derive(Accounts)]
 #[instruction(token: Pubkey)]
-pub struct InsertFakeTokenConfig<'info> {
+pub struct InsertSyntheticTokenConfig<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
     pub only_controller: Account<'info, Roles>,
@@ -121,29 +121,30 @@ pub struct InsertFakeTokenConfig<'info> {
     pub system_program: Program<'info, System>,
 }
 
-/// Insert or update the config of the given fake token.
-pub fn insert_fake_token_config(
-    ctx: Context<InsertFakeTokenConfig>,
+/// Insert or update the config of the given synthetic token.
+pub fn insert_synthetic_token_config(
+    ctx: Context<InsertSyntheticTokenConfig>,
     token: Pubkey,
     decimals: u8,
     price_feed: Pubkey,
     heartbeat_duration: u32,
     precision: u8,
+    enable: bool,
 ) -> Result<()> {
-    ctx.accounts.map.as_map_mut().insert(
+    ctx.accounts.map.checked_insert(
         token.key(),
         TokenConfig {
-            enabled: true,
+            enabled: enable,
+            synthetic: true,
             price_feed,
             heartbeat_duration,
             precision,
             token_decimals: decimals,
         },
-    );
-    Ok(())
+    )
 }
 
-impl<'info> internal::Authentication<'info> for InsertFakeTokenConfig<'info> {
+impl<'info> internal::Authentication<'info> for InsertSyntheticTokenConfig<'info> {
     fn authority(&self) -> &Signer<'info> {
         &self.authority
     }
@@ -176,13 +177,7 @@ pub fn toggle_token_config(
     token: Pubkey,
     enable: bool,
 ) -> Result<()> {
-    ctx.accounts
-        .map
-        .as_map_mut()
-        .get_mut(&token)
-        .ok_or(DataStoreError::RequiredResourceNotFound)?
-        .enabled = enable;
-    Ok(())
+    ctx.accounts.map.toggle_token_config(&token, enable)
 }
 
 impl<'info> internal::Authentication<'info> for ToggleTokenConfig<'info> {
