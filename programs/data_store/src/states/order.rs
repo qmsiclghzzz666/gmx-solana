@@ -50,7 +50,7 @@ impl Order {
         self.fixed.init(
             bump, nonce, market, user, position, params, tokens, senders, receivers,
         )?;
-        self.prices = TokensWithFeed::from_vec(tokens_with_feed);
+        self.prices = TokensWithFeed::try_from_vec(tokens_with_feed)?;
         self.swap = swap;
         Ok(())
     }
