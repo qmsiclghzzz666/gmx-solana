@@ -1,12 +1,14 @@
 import { workspace, Program, BN, utils } from "@coral-xyz/anchor";
 import { Exchange } from "../../target/types/exchange";
-import { Connection, Keypair, PublicKey } from "@solana/web3.js";
+import { AccountMeta, Connection, Keypair, PublicKey } from "@solana/web3.js";
 import { createDepositPDA, createMarketPDA, createMarketTokenMintPDA, createMarketVaultPDA, createOrderPDA, createPositionPDA, createRolesPDA, createTokenConfigMapPDA, createWithdrawalPDA, dataStore } from "./data";
 import { getAccount } from "@solana/spl-token";
 import { BTC_TOKEN_MINT, SOL_TOKEN_MINT } from "./token";
 import { IxWithOutput, makeInvoke } from "./invoke";
-import { toBN } from "gmsol";
+import { PriceProvider, toBN } from "gmsol";
 import { PYTH_ID } from "./external";
+import { findKey } from "lodash";
+import { findPythPriceFeedPDA } from "gmsol";
 
 export const exchange = workspace.Exchange as Program<Exchange>;
 
@@ -197,8 +199,36 @@ export type MakeExecuteDepositParams = {
                 feeds: PublicKey[],
                 longSwapPath: PublicKey[],
                 shortSwapPath: PublicKey[],
+                providerMapper: (number) => number | undefined,
             },
         }
+    }
+};
+
+const getFeedAccountMeta = (provider: number, feed: PublicKey) => {
+    const selectedProvider = PriceProvider[findKey(PriceProvider, p => p === provider) as keyof typeof PriceProvider];
+    let pubkey: PublicKey = feed;
+    if (selectedProvider === PriceProvider.Pyth) {
+        pubkey = findPythPriceFeedPDA(0, feed.toBuffer())[0];
+    }
+    return {
+        pubkey,
+        isSigner: false,
+        isWritable: false,
+    } satisfies AccountMeta as AccountMeta;
+};
+
+const makeProviderMapper = (providers: number[], lenghts: number[]) => {
+    const ranges: Array<{ start: number, end: number, provider: number }> = [];
+    let startIndex = 0;
+    for (let i = 0; i < lenghts.length; i++) {
+        let endIndex = startIndex + lenghts[i];
+        ranges.push({ start: startIndex, end: endIndex, provider: providers[i] });
+        startIndex = endIndex;
+    }
+    return (index: number) => {
+        const range = ranges.find(range => index >= range.start && index < range.end);
+        return range ? range.provider : undefined;
     }
 };
 
@@ -217,6 +247,7 @@ export const makeExecuteDepositInstruction = async ({
         feeds,
         longSwapPath,
         shortSwapPath,
+        providerMapper,
     } = options?.hints?.deposit ?? await exchange.account.deposit.fetch(deposit).then(deposit => {
         return {
             user: deposit.fixed.senders.user,
@@ -226,14 +257,15 @@ export const makeExecuteDepositInstruction = async ({
             feeds: deposit.dynamic.tokensWithFeed.feeds,
             longSwapPath: deposit.dynamic.swapParams.longTokenSwapPath,
             shortSwapPath: deposit.dynamic.swapParams.shortTokenSwapPath,
+            providerMapper: makeProviderMapper(
+                [...deposit.dynamic.tokensWithFeed.providers],
+                deposit.dynamic.tokensWithFeed.nums,
+            )
         }
     });
-    const feedAccounts = feeds.map(feed => {
-        return {
-            pubkey: feed,
-            isSigner: false,
-            isWritable: false,
-        }
+    const feedAccounts = feeds.map((feed, idx) => {
+        const provider = providerMapper(idx);
+        return getFeedAccountMeta(provider, feed);
     });
     const swapPathMints = [...longSwapPath, ...shortSwapPath].map(mint => {
         return {
@@ -396,6 +428,7 @@ export type MakeExecuteWithdrawalParams = {
                 feeds: PublicKey[],
                 longSwapPath: PublicKey[],
                 shortSwapPath: PublicKey[],
+                providerMapper: (number) => number | undefined,
             }
         }
     },
@@ -418,6 +451,7 @@ export const makeExecuteWithdrawalInstruction = async ({
         feeds,
         longSwapPath,
         shortSwapPath,
+        providerMapper,
     } = options?.hints?.withdrawal ?? (
         await dataStore.account.withdrawal.fetch(withdrawal).then(withdrawal => {
             return {
@@ -431,14 +465,14 @@ export const makeExecuteWithdrawalInstruction = async ({
                 feeds: withdrawal.dynamic.tokensWithFeed.feeds,
                 longSwapPath: withdrawal.dynamic.swap.longTokenSwapPath,
                 shortSwapPath: withdrawal.dynamic.swap.shortTokenSwapPath,
+                providerMapper: makeProviderMapper(
+                    [...withdrawal.dynamic.tokensWithFeed.providers],
+                    withdrawal.dynamic.tokensWithFeed.nums,
+                ),
             }
         }));
-    const feedAccounts = feeds.map(feed => {
-        return {
-            pubkey: feed,
-            isSigner: false,
-            isWritable: false,
-        }
+    const feedAccounts = feeds.map((feed, idx) => {
+        return getFeedAccountMeta(providerMapper(idx), feed);
     });
     const swapPathMints = [...longSwapPath, ...shortSwapPath].map(mint => {
         return {
@@ -626,6 +660,7 @@ export type MakeExecuteOrderParams = {
                 secondaryOutputToken: PublicKey | null,
                 finalOutputTokenAccount: PublicKey | null,
                 secondaryOutputTokenAccount: PublicKey | null,
+                providerMapper: (number) => number | undefined,
             }
         }
     },
@@ -648,6 +683,7 @@ export const makeExecuteOrderInstruction = async ({
         secondaryOutputTokenAccount,
         feeds,
         swapPath,
+        providerMapper,
     } = options?.hints?.order ?? await dataStore.account.order.fetch(order).then(order => {
         return {
             user: order.fixed.user,
@@ -659,15 +695,12 @@ export const makeExecuteOrderInstruction = async ({
             secondaryOutputTokenAccount: order.fixed.receivers.secondaryOutputTokenAccount ?? null,
             feeds: order.prices.feeds,
             swapPath: order.swap.longTokenSwapPath,
+            providerMapper: makeProviderMapper([...order.prices.providers], order.prices.nums),
         };
     });
     const [onlyOrderKeeper] = createRolesPDA(store, authority);
-    const feedAccounts = feeds.map(pubkey => {
-        return {
-            pubkey,
-            isSigner: false,
-            isWritable: false,
-        }
+    const feedAccounts = feeds.map((pubkey, idx) => {
+        return getFeedAccountMeta(providerMapper(idx), pubkey);
     });
     const swapMarkets = swapPath.map(mint => {
         return {

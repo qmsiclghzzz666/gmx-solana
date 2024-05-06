@@ -85,6 +85,15 @@ describe("exchange: order", () => {
                     swapPath: [
                         GMFakeFakeUsdG
                     ],
+                    hint: {
+                        market: {
+                            marketToken: GMFakeFakeUsdG,
+                            longToken: fakeTokenMint,
+                            shortToken: usdGTokenMint,
+                        },
+                        collateralToken: usdGTokenMint,
+                        isLong: true,
+                    }
                 }
             });
             decreaseOrder = address;

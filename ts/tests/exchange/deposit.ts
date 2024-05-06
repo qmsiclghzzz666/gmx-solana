@@ -230,7 +230,7 @@ describe("exchange: deposit", () => {
                     longTokenSwapPath: [GMFakeFakeUsdG],
                 }
             }
-        )).rejectedWith(AnchorError, "Invalid swap path");
+        )).rejectedWith(Error, "Invalid swap path");
     });
 
     it("create withdrawal with invalid swap path", async () => {
@@ -247,7 +247,7 @@ describe("exchange: deposit", () => {
                     longTokenSwapPath: [GMFakeFakeUsdG],
                 }
             }
-        )).rejectedWith(AnchorError, "Invalid swap path");
+        )).rejectedWith(Error, "Invalid swap path");
     });
 
     it("create withdrawal with valid swap path and cancel", async () => {

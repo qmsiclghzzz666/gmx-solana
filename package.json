@@ -13,12 +13,14 @@
         "@coral-xyz/anchor": "^0.30.0",
         "@solana/spl-token": "^0.4.6",
         "@solana/web3.js": "^1.91.7",
-        "js-sha256": "^0.11.0"
+        "js-sha256": "^0.11.0",
+        "lodash": "^4.17.21"
     },
     "devDependencies": {
         "@types/bn.js": "^5.1.5",
         "@types/chai": "^4.3.14",
         "@types/chai-as-promised": "^7.1.8",
+        "@types/lodash": "^4.17.0",
         "@types/mocha": "^9.1.1",
         "chai": "^4.4.1",
         "chai-as-promised": "^7.1.1",
