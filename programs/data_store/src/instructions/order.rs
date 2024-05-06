@@ -3,7 +3,7 @@ use anchor_spl::token::TokenAccount;
 
 use crate::{
     states::{
-        common::SwapParams,
+        common::{SwapParams, TokenRecord},
         order::{Order, OrderKind, OrderParams, Receivers, Senders, Tokens},
         position::Position,
         DataStore, Market, NonceBytes, Roles, Seed,
@@ -15,7 +15,7 @@ use crate::{
 #[derive(Accounts)]
 #[instruction(
     nonce: [u8; 32],
-    tokens_with_feed: Vec<(Pubkey, Pubkey)>,
+    tokens_with_feed: Vec<TokenRecord>,
     swap: SwapParams,
     params: OrderParams,
     output_token: Pubkey,
@@ -63,7 +63,7 @@ pub struct InitializeOrder<'info> {
 pub fn initialize_order(
     ctx: Context<InitializeOrder>,
     nonce: NonceBytes,
-    tokens_with_feed: Vec<(Pubkey, Pubkey)>,
+    tokens_with_feed: Vec<TokenRecord>,
     swap: SwapParams,
     params: OrderParams,
     output_token: Pubkey,

@@ -3,8 +3,9 @@ use anchor_spl::token::TokenAccount;
 
 use crate::{
     states::{
-        common::SwapParams, withdrawal::TokenParams, DataStore, Market, NonceBytes, Roles, Seed,
-        Withdrawal,
+        common::{SwapParams, TokenRecord},
+        withdrawal::TokenParams,
+        DataStore, Market, NonceBytes, Roles, Seed, Withdrawal,
     },
     utils::internal,
     DataStoreError,
@@ -15,7 +16,7 @@ pub fn initialize_withdrawal(
     ctx: Context<InitializeWithdrawal>,
     nonce: NonceBytes,
     swap_params: SwapParams,
-    tokens_with_feed: Vec<(Pubkey, Pubkey)>,
+    tokens_with_feed: Vec<TokenRecord>,
     tokens_params: TokenParams,
     market_token_amount: u64,
     ui_fee_receiver: Pubkey,
@@ -37,7 +38,7 @@ pub fn initialize_withdrawal(
 }
 
 #[derive(Accounts)]
-#[instruction(nonce: [u8; 32], swap_params: SwapParams, tokens_with_feed: Vec<(Pubkey, Pubkey)>)]
+#[instruction(nonce: [u8; 32], swap_params: SwapParams, tokens_with_feed: Vec<TokenRecord>)]
 pub struct InitializeWithdrawal<'info> {
     pub authority: Signer<'info>,
     pub store: Account<'info, DataStore>,

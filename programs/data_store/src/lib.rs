@@ -17,7 +17,7 @@ pub use self::states::Data;
 use self::{
     instructions::*,
     states::{
-        common::SwapParams,
+        common::{SwapParams, TokenRecord},
         deposit::TokenParams as DepositTokenParams,
         market::{MarketMeta, Pool},
         order::OrderParams,
@@ -285,7 +285,7 @@ pub mod data_store {
     pub fn initialize_deposit(
         ctx: Context<InitializeDeposit>,
         nonce: [u8; 32],
-        tokens_with_feed: Vec<(Pubkey, Pubkey)>,
+        tokens_with_feed: Vec<TokenRecord>,
         swap_params: SwapParams,
         token_params: DepositTokenParams,
         ui_fee_receiver: Pubkey,
@@ -311,7 +311,7 @@ pub mod data_store {
         ctx: Context<InitializeWithdrawal>,
         nonce: [u8; 32],
         swap_params: SwapParams,
-        tokens_with_feed: Vec<(Pubkey, Pubkey)>,
+        tokens_with_feed: Vec<TokenRecord>,
         token_params: WithdrawalTokenParams,
         market_token_amount: u64,
         ui_fee_receiver: Pubkey,
@@ -358,7 +358,7 @@ pub mod data_store {
     pub fn initialize_order(
         ctx: Context<InitializeOrder>,
         nonce: [u8; 32],
-        tokens_with_feed: Vec<(Pubkey, Pubkey)>,
+        tokens_with_feed: Vec<TokenRecord>,
         swap: SwapParams,
         params: OrderParams,
         output_token: Pubkey,

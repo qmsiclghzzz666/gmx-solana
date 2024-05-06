@@ -1,5 +1,7 @@
 use anchor_lang::prelude::*;
 
+use super::{PriceProviderKind, TokenConfig};
+
 /// Tokens with feed.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 #[cfg_attr(feature = "debug", derive(Debug))]
@@ -8,19 +10,56 @@ pub struct TokensWithFeed {
     /// which must be of the same length with `feeds`.
     pub tokens: Vec<Pubkey>,
     /// Token feeds for the tokens,
-    /// which must be of  the same length with `tokens`.
+    /// which must be of the same length with `tokens`.
     pub feeds: Vec<Pubkey>,
+    /// Corresponding providers,
+    /// which must be of the same length with `feeds`.
+    pub providers: Vec<u8>,
+}
+
+/// A record of token config.
+#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+#[cfg_attr(feature = "debug", derive(Debug))]
+pub struct TokenRecord {
+    token: Pubkey,
+    feed: Pubkey,
+    provider: u8,
+}
+
+impl TokenRecord {
+    /// Create a new [`TokenRecord`]
+    pub fn new(token: Pubkey, feed: Pubkey, provider: PriceProviderKind) -> Self {
+        Self {
+            token,
+            feed,
+            provider: provider as u8,
+        }
+    }
+
+    /// Create a new [`TokenRecord`] from token config,
+    /// using the expected provider and feed.
+    pub fn from_config(token: Pubkey, config: &TokenConfig) -> Result<Self> {
+        Ok(Self::new(
+            token,
+            config.get_expected_feed()?,
+            config.expected_provider()?,
+        ))
+    }
 }
 
 impl TokensWithFeed {
-    /// Create from vec.
-    pub fn from_vec(tokens_with_feed: Vec<(Pubkey, Pubkey)>) -> Self {
-        let (tokens, feeds) = tokens_with_feed.into_iter().unzip();
-        Self { tokens, feeds }
+    /// Create from token records.
+    pub fn from_vec(records: Vec<TokenRecord>) -> Self {
+        Self {
+            tokens: records.iter().map(|r| r.token).collect(),
+            feeds: records.iter().map(|r| r.feed).collect(),
+            providers: records.iter().map(|r| r.provider).collect(),
+        }
     }
 
-    pub(crate) fn init_space(tokens_with_feed: &[(Pubkey, Pubkey)]) -> usize {
-        (4 + 32 * tokens_with_feed.len()) + (4 + 32 * tokens_with_feed.len())
+    pub(crate) fn init_space(tokens_with_feed: &[TokenRecord]) -> usize {
+        let len = tokens_with_feed.len();
+        (4 + 32 * len) + (4 + 32 * len) + (4 + len)
     }
 }
 

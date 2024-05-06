@@ -6,7 +6,7 @@ use data_store::{
     cpi::accounts::{GetMarketMeta, GetTokenConfig, InitializeOrder},
     program::DataStore,
     states::{
-        common::SwapParams,
+        common::{SwapParams, TokenRecord},
         order::{OrderKind, OrderParams},
         NonceBytes,
     },
@@ -311,7 +311,7 @@ impl<'info> CreateOrder<'info> {
     fn to_tokens_with_feed(
         &self,
         tokens: impl IntoIterator<Item = Pubkey>,
-    ) -> Result<Vec<(Pubkey, Pubkey)>> {
+    ) -> Result<Vec<TokenRecord>> {
         tokens
             .into_iter()
             .map(|token| {
@@ -324,7 +324,7 @@ impl<'info> CreateOrder<'info> {
                 let config = data_store::cpi::get_token_config(ctx, self.store.key(), token)?
                     .get()
                     .ok_or(ExchangeError::ResourceNotFound)?;
-                Result::Ok((token, config.get_expected_feed()?))
+                TokenRecord::from_config(token, &config)
             })
             .collect::<Result<Vec<_>>>()
     }
