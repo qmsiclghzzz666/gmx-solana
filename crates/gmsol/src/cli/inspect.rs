@@ -10,7 +10,7 @@ use gmsol::{
     utils,
 };
 
-use crate::SharedClient;
+use crate::{utils::Oracle, SharedClient};
 
 #[derive(clap::Args)]
 pub(super) struct InspectArgs {
@@ -41,7 +41,10 @@ enum Command {
     /// `Withdrawal` account.
     Withdrawal { address: Pubkey },
     /// `Oracle` account.
-    Oracle { address: Pubkey },
+    Oracle {
+        #[command(flatten)]
+        oracle: Oracle,
+    },
     /// Get the CONTROLLER address.
     Controller,
     /// Get token config.
@@ -59,7 +62,7 @@ impl InspectArgs {
         store: Option<&Pubkey>,
     ) -> gmsol::Result<()> {
         let program = client.program(data_store::id())?;
-        match self.command {
+        match &self.command {
             Command::DataStore { address } => {
                 let address = address
                     .or(store.copied())
@@ -70,7 +73,7 @@ impl InspectArgs {
                 );
             }
             Command::Roles { address } => {
-                println!("{:#?}", program.account::<states::Roles>(address).await?);
+                println!("{:#?}", program.account::<states::Roles>(*address).await?);
             }
             Command::TokenConfigMap { address } => {
                 let address = address
@@ -91,17 +94,17 @@ impl InspectArgs {
                         find_market_address(store.wrap_err("`store` not provided")?, &address).0;
                 }
                 println!("{:#?}", program.account::<states::Market>(address).await?);
-                if show_market_address {
+                if *show_market_address {
                     println!("Market address: {address}");
                 }
             }
             Command::Deposit { address } => {
-                println!("{:#?}", program.account::<states::Deposit>(address).await?);
+                println!("{:#?}", program.account::<states::Deposit>(*address).await?);
             }
             Command::Withdrawal { address } => {
                 println!(
                     "{:#?}",
-                    program.account::<states::Withdrawal>(address).await?
+                    program.account::<states::Withdrawal>(*address).await?
                 );
             }
             Command::Controller => {
@@ -110,25 +113,27 @@ impl InspectArgs {
                         .1;
                 println!("{controller}");
             }
-            Command::Oracle { address } => {
+            Command::Oracle { oracle } => {
+                let address = oracle.address(store)?;
+                println!("{address}");
                 println!("{:#?}", program.account::<states::Oracle>(address).await?);
             }
             Command::TokenConfig { token } => {
                 let store = store.wrap_err("missing store address")?;
-                let config = get_token_config(&program, store, &token)
+                let config = get_token_config(&program, store, token)
                     .await?
                     .ok_or(gmsol::Error::NotFound)?;
                 println!("{config:#?}");
             }
             Command::Order { address } => {
-                println!("{:#?}", program.account::<states::Order>(address).await?);
+                println!("{:#?}", program.account::<states::Order>(*address).await?);
             }
             Command::Position { address } => {
                 println!(
                     "{:#?}",
                     utils::try_deserailize_account::<states::Position>(
                         &program.async_rpc(),
-                        &address
+                        address
                     )
                     .await?
                 );

@@ -9,10 +9,10 @@ use anchor_client::{
 use exchange::events::{DepositCreatedEvent, OrderCreatedEvent, WithdrawalCreatedEvent};
 use gmsol::{
     exchange::ExchangeOps,
-    store::{market::VaultOps, oracle::find_oracle_address},
+    store::market::VaultOps,
 };
 
-use crate::SharedClient;
+use crate::{utils::Oracle, SharedClient};
 
 #[derive(clap::Args, Clone)]
 pub(super) struct KeeperArgs {
@@ -53,24 +53,6 @@ enum Command {
         #[arg(long)]
         short_token: Pubkey,
     },
-}
-
-#[derive(clap::Args, Clone)]
-#[group(required = false, multiple = false)]
-struct Oracle {
-    #[arg(long, env)]
-    oracle: Option<Pubkey>,
-    #[arg(long, default_value_t = 0)]
-    oracle_index: u8,
-}
-
-impl Oracle {
-    fn address(&self, store: &Pubkey) -> Pubkey {
-        match self.oracle {
-            Some(address) => address,
-            None => find_oracle_address(store, self.oracle_index).0,
-        }
-    }
 }
 
 impl KeeperArgs {
@@ -130,7 +112,7 @@ impl KeeperArgs {
             Command::ExecuteDeposit { deposit } => {
                 let program = client.program(exchange::id())?;
                 let mut builder =
-                    program.execute_deposit(store, &self.oracle.address(store), deposit);
+                    program.execute_deposit(store, &self.oracle.address(Some(store))?, deposit);
                 let execution_fee = self
                     .get_or_estimate_execution_fee(&program, builder.build().await?)
                     .await?;
@@ -146,7 +128,7 @@ impl KeeperArgs {
             Command::ExecuteWithdrawal { withdrawal } => {
                 let program = client.program(exchange::id())?;
                 let mut builder =
-                    program.execute_withdrawal(store, &self.oracle.address(store), withdrawal);
+                    program.execute_withdrawal(store, &self.oracle.address(Some(store))?, withdrawal);
                 let execution_fee = self
                     .get_or_estimate_execution_fee(&program, builder.build().await?)
                     .await?;
@@ -161,7 +143,7 @@ impl KeeperArgs {
             }
             Command::ExecuteOrder { order } => {
                 let program = client.program(exchange::id())?;
-                let mut builder = program.execute_order(store, &self.oracle.address(store), order);
+                let mut builder = program.execute_order(store, &self.oracle.address(Some(store))?, order);
                 let execution_fee = self
                     .get_or_estimate_execution_fee(&program, builder.build().await?)
                     .await?;
