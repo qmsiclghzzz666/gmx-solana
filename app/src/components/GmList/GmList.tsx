@@ -238,7 +238,7 @@ function DesktopList({
                     <br />({formatUsd(totalSupplyUsd)})
                   </td>
                   <td className="GmList-last-column">
-                    Unlimited (dev only)
+                    Unlimited
                     {/* <MintableAmount
                       mintableInfo={mintableInfo}
                       market={market}
@@ -397,7 +397,7 @@ function MobileList(
                     />
                   </div>
                   <div>
-                    Unlimited (dev only)
+                    Unlimited
                     {/* <MintableAmount
                       mintableInfo={mintableInfo}
                       market={market}

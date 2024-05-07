@@ -253,7 +253,7 @@ export function MarketStats(p: Props) {
             // ) : (
             //   "..."
             // )
-            "Unlimited (dev only)"
+            "Unlimited"
           }
         />
 

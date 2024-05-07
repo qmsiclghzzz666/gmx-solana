@@ -183,7 +183,7 @@ export default function MarketTokenSelector(props: Props) {
                                   displayDecimals: 0,
                                   fallbackToZero: true,
                                 })} */}
-                                Unlimited (dev only)
+                                Unlimited
                               </td>
                               <td>
                                 {formatTokenAmount(sellableInfo?.totalAmount ?? BN_ZERO, market?.decimals, market?.symbol, {
