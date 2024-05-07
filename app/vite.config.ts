@@ -5,6 +5,7 @@ import path from "path";
 import { loadGMSOLDeployment } from "./utils/load-deployment";
 import { loadHttpsOptions } from './utils/load-https-options';
 import { lingui } from "@lingui/vite-plugin";
+import { viteStaticCopy } from 'vite-plugin-static-copy';
 
 export default defineConfig(async ({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
@@ -23,6 +24,14 @@ export default defineConfig(async ({ mode }) => {
         }
       }),
       lingui(),
+      viteStaticCopy({
+        targets: [
+          {
+            src: 'node_modules/cryptocurrency-icons/svg/icon/*',
+            dest: 'icons',
+          }
+        ]
+      })
     ],
     resolve: {
       alias: {

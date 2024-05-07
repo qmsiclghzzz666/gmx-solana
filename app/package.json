@@ -24,6 +24,7 @@
     "@solana/wallet-adapter-react-ui": "^0.9.35",
     "@solana/web3.js": "^1.91.7",
     "classnames": "^2.5.1",
+    "cryptocurrency-icons": "^0.18.1",
     "framer-motion": "^11.1.7",
     "gmsol": "workspace:*",
     "graphology": "^0.25.4",
@@ -68,6 +69,7 @@
     "sass": "^1.75.0",
     "typescript": "^5.4.5",
     "vite": "^5.2.10",
-    "vite-plugin-node-polyfills": "^0.21.0"
+    "vite-plugin-node-polyfills": "^0.21.0",
+    "vite-plugin-static-copy": "^1.0.4"
   }
 }
