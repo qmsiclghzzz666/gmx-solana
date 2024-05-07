@@ -11,6 +11,7 @@ import { BN_ZERO, GM_DECIMALS } from "@/config/constants";
 import { getPoolUsdWithoutPnl, getSellableMarketToken } from "@/onchain/market/utils";
 import { convertToTokenAmount, getMidPrice } from "@/onchain/token/utils";
 import MarketTokenSelector from "../MarketTokenSelector/MarketTokenSelector";
+import { AprInfo } from "../AprInfo/AprInfo";
 
 type Props = {
   marketsInfoData?: MarketInfos;
@@ -182,8 +183,7 @@ export function MarketStats(p: Props) {
 
         <CardRow
           label={t`APR`}
-          // value={<AprInfo apr={apr} incentiveApr={incentiveApr} isIncentiveActive={isLpIncentiveActive} />}
-          value="Unavailable"
+          value={<AprInfo apr={BN_ZERO} />}
         />
 
         <CardRow

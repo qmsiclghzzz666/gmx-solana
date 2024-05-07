@@ -20,6 +20,8 @@ import { useAnchor } from "@/contexts/anchor";
 import { getTotalGmInfo } from "@/onchain/market/utils";
 import { GmTokensBalanceInfo, GmTokensTotalBalanceInfo } from "../GmTokensBalanceInfo/GmTokensBalanceInfo";
 import { BN } from "@coral-xyz/anchor";
+import { AprInfo } from "../AprInfo/AprInfo";
+import { BN_ZERO } from "@/config/constants";
 
 type Props = {
   hideTitle?: boolean;
@@ -259,8 +261,7 @@ function DesktopList({
                   </td>
 
                   <td>
-                    {/* <AprInfo apr={apr} incentiveApr={incentiveApr} isIncentiveActive={isLpIncentiveActive} /> */}
-                    Unavailable
+                    <AprInfo apr={BN_ZERO} />
                   </td>
 
                   <td className="GmList-actions">
@@ -432,8 +433,7 @@ function MobileList(
                     <Trans>APR</Trans>
                   </div>
                   <div>
-                    {/* <AprInfo apr={apr} incentiveApr={incentiveApr} isIncentiveActive={isLpIncentiveActive} /> */}
-                    Unavailable
+                    <AprInfo apr={BN_ZERO} />
                   </div>
                 </div>
 

@@ -15,6 +15,7 @@ import TokenIcon from "../TokenIcon/TokenIcon";
 import { formatTokenAmount } from "@/utils/number";
 import SearchInput from "../SearchInput/SearchInput";
 import { BN_ZERO } from "@/config/constants";
+import { AprInfo } from "../AprInfo/AprInfo";
 
 type Props = {
   marketsInfoData?: MarketInfos;
@@ -192,8 +193,7 @@ export default function MarketTokenSelector(props: Props) {
                                 })}
                               </td>
                               <td>
-                                {/* <AprInfo apr={apr} incentiveApr={incentiveApr} showTooltip={false} /> */}
-                                Unavailable
+                                <AprInfo apr={BN_ZERO} />
                               </td>
                             </Popover.Button>
                           );
