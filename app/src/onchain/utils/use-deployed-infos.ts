@@ -38,7 +38,7 @@ export const useDeployedInfos = () => {
   }, [markets]);
 
   const tokens = useTokensWithPrices({ tokens: tokenMap });
-  const tokenBalances = useTokenBalances(Object.keys(tokenMap));
+  const tokenBalances = useTokenBalances(Object.keys(tokenMap).filter(key => tokenMap[key].isNative || !tokenMap[key].isSynthetic));
 
   const marketTokenAddresses = useMemo(() => {
     return Object.values(markets).map(market => market.marketTokenAddress);

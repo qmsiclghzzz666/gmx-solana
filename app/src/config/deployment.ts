@@ -1,7 +1,7 @@
 import { Token } from "@/onchain/token";
 import { PublicKey } from "@solana/web3.js";
 import { GMSOLDeployment, TokenConfig, Tokens } from "gmsol";
-import { WRAPPED_NATIVE_TOKEN_ADDRESS } from "./tokens";
+import { NATIVE_TOKEN_ADDRESS, WRAPPED_NATIVE_TOKEN_ADDRESS } from "./tokens";
 
 export interface ParsedGMSOLDeployment {
   store: PublicKey,
@@ -20,9 +20,11 @@ const parseToken = (address: string, token: TokenConfig) => {
     decimals: token.decimals,
     feedAddress: new PublicKey(token.feedAddress),
     isWrappedNative: tokenAddress.equals(WRAPPED_NATIVE_TOKEN_ADDRESS),
+    isNative: tokenAddress.equals(NATIVE_TOKEN_ADDRESS),
     isStable: token.isStable,
     priceDecimals: token.priceDecimals,
     wrappedAddress: token.wrappedAddress ? new PublicKey(token.wrappedAddress) : undefined,
+    isSynthetic: token.isSynthetic,
   } satisfies Token as Token;
 };
 

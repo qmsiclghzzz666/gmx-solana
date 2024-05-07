@@ -16,4 +16,5 @@ export interface TokenConfig {
     isStable?: boolean,
     priceDecimals?: number,
     wrappedAddress?: string,
+    isSynthetic?: boolean,
 }

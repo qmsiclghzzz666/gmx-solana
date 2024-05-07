@@ -12,6 +12,7 @@ export interface Token {
   wrappedAddress?: PublicKey,
   isWrapped?: boolean,
   isWrappedNative?: boolean,
+  isSynthetic?: boolean,
 }
 
 export interface TokenPrices {

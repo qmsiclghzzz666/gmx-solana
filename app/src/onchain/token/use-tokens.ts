@@ -90,9 +90,11 @@ export const useTokenBalances = (tokens: Address[]) => {
 
   const owner = provider?.publicKey;
   const request = useMemo(() => {
+    const tokensList = tokens.map(token => token.toString());
+    console.log(tokensList);
     return {
       key: BALANCE_KEY,
-      tokens: tokens.map(token => token.toString()),
+      tokens: tokensList,
       owner: owner?.toBase58(),
     }
   }, [tokens, owner]);
