@@ -308,6 +308,18 @@ pub enum PriceProviderKind {
     PythDev = 2,
 }
 
+#[cfg(feature = "utils")]
+impl PriceProviderKind {
+    pub(crate) fn parse_feed_account(&self, feed: &Pubkey) -> Pubkey {
+        use crate::utils::pyth::find_pyth_feed_account;
+
+        match self {
+            Self::Pyth => find_pyth_feed_account(0, feed.to_bytes()).0,
+            Self::Chainlink | Self::PythDev => *feed,
+        }
+    }
+}
+
 /// Supported Price Provider Programs.
 /// The [`PriceProviderKind`] field is used as index
 /// to query the correspoding feed from the token config.

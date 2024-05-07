@@ -47,3 +47,9 @@ impl Error {
         Self::InvalidArgument(msg.to_string())
     }
 }
+
+impl From<anchor_client::anchor_lang::prelude::Error> for Error {
+    fn from(value: anchor_client::anchor_lang::prelude::Error) -> Self {
+        Self::from(anchor_client::ClientError::from(value))
+    }
+}

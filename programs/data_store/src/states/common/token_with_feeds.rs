@@ -80,26 +80,75 @@ impl TokensWithFeed {
         let len = tokens_with_feed.len();
         (4 + 32 * len) * 2 + (4 + len) + (4 + 2 * len)
     }
+
+    /// Create an iterator of feed account metas.
+    #[cfg(feature = "utils")]
+    pub fn feed_account_metas(&self) -> utils::FeedAccountMetas {
+        utils::FeedAccountMetas::new(self)
+    }
 }
 
-/// Swap params.
-#[derive(AnchorDeserialize, AnchorSerialize, Clone)]
-#[cfg_attr(feature = "debug", derive(Debug))]
-pub struct SwapParams {
-    /// The addresses of token mints for markets along the swap path for long token or primary token.
-    ///
-    /// Market addresses are not cached as they can be derived
-    /// by seeding with the corresponding mint addresses.
-    pub long_token_swap_path: Vec<Pubkey>,
-    /// The addresses of token mints for markets along the swap path for short token or secondary token.
-    ///
-    /// Market addresses are not cached as they can be derived
-    /// by seeding with the corresponding mint addresses.
-    pub short_token_swap_path: Vec<Pubkey>,
-}
+#[cfg(feature = "utils")]
+mod utils {
+    use std::{
+        iter::{Peekable, Zip},
+        slice::Iter,
+    };
 
-impl SwapParams {
-    pub(crate) fn init_space(long_path_len: usize, short_path_len: usize) -> usize {
-        (4 + 32 * long_path_len) + (4 + 32 * short_path_len)
+    use super::*;
+
+    /// Feed account metas.
+    pub struct FeedAccountMetas<'a> {
+        provider_with_lengths: Peekable<Zip<Iter<'a, u8>, Iter<'a, u16>>>,
+        feeds: Iter<'a, Pubkey>,
+        current: usize,
+        failed: bool,
+    }
+
+    impl<'a> FeedAccountMetas<'a> {
+        pub(super) fn new(token_with_feeds: &'a TokensWithFeed) -> Self {
+            let providers = token_with_feeds.providers.iter();
+            let nums = token_with_feeds.nums.iter();
+            let provider_with_lengths = providers.zip(nums).peekable();
+            let feeds = token_with_feeds.feeds.iter();
+            Self {
+                feeds,
+                provider_with_lengths,
+                current: 0,
+                failed: false,
+            }
+        }
+    }
+
+    impl<'a> Iterator for FeedAccountMetas<'a> {
+        type Item = Result<AccountMeta>;
+
+        fn next(&mut self) -> Option<Self::Item> {
+            if self.failed {
+                return None;
+            }
+            loop {
+                let (provider, length) = self.provider_with_lengths.peek()?;
+                if self.current == (**length as usize) {
+                    self.provider_with_lengths.next();
+                    self.current = 0;
+                    continue;
+                }
+                let Ok(provider) = PriceProviderKind::try_from(**provider) else {
+                    self.failed = true;
+                    return Some(Err(DataStoreError::InvalidProviderKindIndex.into()));
+                };
+                let Some(feed) = self.feeds.next() else {
+                    return Some(Err(DataStoreError::NotEnoughFeeds.into()));
+                };
+                let pubkey = provider.parse_feed_account(feed);
+                self.current += 1;
+                return Some(Ok(AccountMeta {
+                    pubkey,
+                    is_signer: false,
+                    is_writable: false,
+                }));
+            }
+        }
     }
 }

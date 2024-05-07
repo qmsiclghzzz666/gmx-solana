@@ -29,6 +29,7 @@ gmx-solana-utils = { path = "../gmx-solana-utils" }
 data_store = { path = "../../programs/data_store", features = [
     "no-entrypoint",
     "debug",
+    "utils",
 ] }
 exchange = { path = "../../programs/exchange", features = [
     "no-entrypoint",

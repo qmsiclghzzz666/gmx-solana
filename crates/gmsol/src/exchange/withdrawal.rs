@@ -6,7 +6,9 @@ use anchor_client::{
     Program, RequestBuilder,
 };
 use anchor_spl::associated_token::get_associated_token_address;
-use data_store::states::{withdrawal::TokenParams, Market, NonceBytes, Pyth, Seed, Withdrawal};
+use data_store::states::{
+    common::TokensWithFeed, withdrawal::TokenParams, Market, NonceBytes, Pyth, Seed, Withdrawal,
+};
 use exchange::{
     accounts, instruction, instructions::CreateWithdrawalParams, utils::ControllerSeeds,
 };
@@ -373,7 +375,7 @@ struct ExecuteWithdrawalHint {
     final_short_token_receiver: Pubkey,
     final_long_token: Pubkey,
     final_short_token: Pubkey,
-    feeds: Vec<Pubkey>,
+    feeds: TokensWithFeed,
     long_swap_tokens: Vec<Pubkey>,
     short_swap_tokens: Vec<Pubkey>,
 }
@@ -389,7 +391,7 @@ impl<'a> From<&'a Withdrawal> for ExecuteWithdrawalHint {
             final_short_token_receiver: withdrawal.fixed.receivers.final_short_token_receiver,
             long_swap_tokens: withdrawal.dynamic.swap.long_token_swap_path.clone(),
             short_swap_tokens: withdrawal.dynamic.swap.short_token_swap_path.clone(),
-            feeds: withdrawal.dynamic.tokens_with_feed.feeds.clone(),
+            feeds: withdrawal.dynamic.tokens_with_feed.clone(),
         }
     }
 }
@@ -448,11 +450,10 @@ where
     pub async fn build(&self) -> crate::Result<RequestBuilder<'a, C>> {
         let authority = self.program.payer();
         let hint = self.get_or_fetch_hint().await?;
-        let feeds = hint.feeds.iter().map(|pubkey| AccountMeta {
-            pubkey: *pubkey,
-            is_signer: false,
-            is_writable: false,
-        });
+        let feeds = hint
+            .feeds
+            .feed_account_metas()
+            .collect::<Result<Vec<_>, _>>()?;
         let swap_path_markets = hint
             .long_swap_tokens
             .iter()
@@ -511,6 +512,7 @@ where
             })
             .accounts(
                 feeds
+                    .into_iter()
                     .chain(swap_path_markets)
                     .chain(swap_path_mints)
                     .collect::<Vec<_>>(),

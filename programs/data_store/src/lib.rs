@@ -444,6 +444,8 @@ pub enum DataStoreError {
     PriceOverflow,
     #[msg("Price feed is not set for the given provider")]
     PriceFeedNotSet,
+    #[msg("Not enough feeds")]
+    NotEnoughFeeds,
     // Market.
     #[msg("Computation error")]
     Computation,
