@@ -3,7 +3,7 @@ use anchor_spl::token::TokenAccount;
 
 use crate::{
     states::{
-        common::SwapParams,
+        common::{SwapParams, TokenRecord},
         deposit::{Receivers, TokenParams},
         DataStore, Deposit, Market, NonceBytes, Roles, Seed,
     },
@@ -15,7 +15,7 @@ use crate::{
 pub fn initialize_deposit(
     ctx: Context<InitializeDeposit>,
     nonce: NonceBytes,
-    tokens_with_feed: Vec<(Pubkey, Pubkey)>,
+    tokens_with_feed: Vec<TokenRecord>,
     swap_params: SwapParams,
     token_params: TokenParams,
     ui_fee_receiver: Pubkey,
@@ -38,7 +38,7 @@ pub fn initialize_deposit(
 }
 
 #[derive(Accounts)]
-#[instruction(nonce: [u8; 32], tokens_with_feed: Vec<(Pubkey, Pubkey)>, swap_params: SwapParams)]
+#[instruction(nonce: [u8; 32], tokens_with_feed: Vec<TokenRecord>, swap_params: SwapParams)]
 pub struct InitializeDeposit<'info> {
     pub authority: Signer<'info>,
     #[account(mut)]

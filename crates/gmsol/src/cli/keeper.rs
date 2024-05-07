@@ -6,13 +6,14 @@ use anchor_client::{
     },
     Program, RequestBuilder,
 };
+use data_store::states::PriceProviderKind;
 use exchange::events::{DepositCreatedEvent, OrderCreatedEvent, WithdrawalCreatedEvent};
 use gmsol::{
     exchange::ExchangeOps,
-    store::{market::VaultOps, oracle::find_oracle_address},
+    store::market::VaultOps,
 };
 
-use crate::SharedClient;
+use crate::{utils::Oracle, SharedClient};
 
 #[derive(clap::Args, Clone)]
 pub(super) struct KeeperArgs {
@@ -28,6 +29,9 @@ pub(super) struct KeeperArgs {
     /// Set the execution fee to the given instead of estimating one.
     #[arg(long)]
     execution_fee: Option<u64>,
+    /// Set the price provider to use.
+    #[arg(long, default_value = "pyth")]
+    provider: PriceProviderKind,
     #[command(subcommand)]
     command: Command,
 }
@@ -53,24 +57,6 @@ enum Command {
         #[arg(long)]
         short_token: Pubkey,
     },
-}
-
-#[derive(clap::Args, Clone)]
-#[group(required = false, multiple = false)]
-struct Oracle {
-    #[arg(long, env)]
-    oracle: Option<Pubkey>,
-    #[arg(long, default_value_t = 0)]
-    oracle_index: u8,
-}
-
-impl Oracle {
-    fn address(&self, store: &Pubkey) -> Pubkey {
-        match self.oracle {
-            Some(address) => address,
-            None => find_oracle_address(store, self.oracle_index).0,
-        }
-    }
 }
 
 impl KeeperArgs {
@@ -130,13 +116,13 @@ impl KeeperArgs {
             Command::ExecuteDeposit { deposit } => {
                 let program = client.program(exchange::id())?;
                 let mut builder =
-                    program.execute_deposit(store, &self.oracle.address(store), deposit);
+                    program.execute_deposit(store, &self.oracle.address(Some(store))?, deposit);
                 let execution_fee = self
                     .get_or_estimate_execution_fee(&program, builder.build().await?)
                     .await?;
                 let signature = self
                     .insert_compute_budget_instructions(
-                        builder.execution_fee(execution_fee).build().await?,
+                        builder.execution_fee(execution_fee).price_provider(self.provider.program()).build().await?,
                     )
                     .send()
                     .await?;
@@ -146,13 +132,13 @@ impl KeeperArgs {
             Command::ExecuteWithdrawal { withdrawal } => {
                 let program = client.program(exchange::id())?;
                 let mut builder =
-                    program.execute_withdrawal(store, &self.oracle.address(store), withdrawal);
+                    program.execute_withdrawal(store, &self.oracle.address(Some(store))?, withdrawal);
                 let execution_fee = self
                     .get_or_estimate_execution_fee(&program, builder.build().await?)
                     .await?;
                 let signature = self
                     .insert_compute_budget_instructions(
-                        builder.execution_fee(execution_fee).build().await?,
+                        builder.execution_fee(execution_fee).price_provider(self.provider.program()).build().await?,
                     )
                     .send()
                     .await?;
@@ -161,13 +147,13 @@ impl KeeperArgs {
             }
             Command::ExecuteOrder { order } => {
                 let program = client.program(exchange::id())?;
-                let mut builder = program.execute_order(store, &self.oracle.address(store), order);
+                let mut builder = program.execute_order(store, &self.oracle.address(Some(store))?, order);
                 let execution_fee = self
                     .get_or_estimate_execution_fee(&program, builder.build().await?)
                     .await?;
                 let signature = self
                     .insert_compute_budget_instructions(
-                        builder.execution_fee(execution_fee).build().await?,
+                        builder.execution_fee(execution_fee).price_provider(self.provider.program()).build().await?,
                     )
                     .send()
                     .await?;

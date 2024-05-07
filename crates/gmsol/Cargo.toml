@@ -10,6 +10,8 @@ required-features = ["cli"]
 
 [features]
 cli = ["tokio/full", "clap", "tracing-subscriber", "shellexpand"]
+clap = ["dep:clap", "data_store/clap"]
+devnet = ["data_store/devnet", "exchange/devnet"]
 
 [dependencies]
 eyre = { version = "0.6.12" }
@@ -28,6 +30,7 @@ gmx-solana-utils = { path = "../gmx-solana-utils" }
 data_store = { path = "../../programs/data_store", features = [
     "no-entrypoint",
     "debug",
+    "utils",
 ] }
 exchange = { path = "../../programs/exchange", features = [
     "no-entrypoint",
@@ -36,8 +39,9 @@ exchange = { path = "../../programs/exchange", features = [
 rand = { version = "0.8.5" }
 
 # Dependencies for cli
-clap = { version = "4.5.0", optional = true, features = ["derive", "env"] }
+clap = { workspace = true, optional = true, features = ["derive", "env"] }
 tracing-subscriber = { version = "0.3.18", optional = true, features = [
     "env-filter",
 ] }
 shellexpand = { version = "3.1.0", optional = true }
+pyth-sdk = "0.8.0"

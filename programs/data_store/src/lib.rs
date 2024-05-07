@@ -17,12 +17,13 @@ pub use self::states::Data;
 use self::{
     instructions::*,
     states::{
-        common::SwapParams,
+        common::{SwapParams, TokenRecord},
         deposit::TokenParams as DepositTokenParams,
         market::{MarketMeta, Pool},
         order::OrderParams,
-        token_config::TokenConfig,
+        token_config::{TokenConfig, TokenConfigBuilder},
         withdrawal::TokenParams as WithdrawalTokenParams,
+        PriceProviderKind,
     },
     utils::internal,
 };
@@ -105,30 +106,21 @@ pub mod data_store {
     #[access_control(internal::Authenticate::only_controller(&ctx))]
     pub fn insert_token_config(
         ctx: Context<InsertTokenConfig>,
-        price_feed: Pubkey,
-        heartbeat_duration: u32,
-        precision: u8,
+        builder: TokenConfigBuilder,
+        enable: bool,
     ) -> Result<()> {
-        instructions::insert_token_config(ctx, price_feed, heartbeat_duration, precision)
+        instructions::insert_token_config(ctx, builder, enable)
     }
 
     #[access_control(internal::Authenticate::only_controller(&ctx))]
-    pub fn insert_fake_token_config(
-        ctx: Context<InsertFakeTokenConfig>,
+    pub fn insert_synthetic_token_config(
+        ctx: Context<InsertSyntheticTokenConfig>,
         token: Pubkey,
         decimals: u8,
-        price_feed: Pubkey,
-        heartbeat_duration: u32,
-        precision: u8,
+        builder: TokenConfigBuilder,
+        enable: bool,
     ) -> Result<()> {
-        instructions::insert_fake_token_config(
-            ctx,
-            token,
-            decimals,
-            price_feed,
-            heartbeat_duration,
-            precision,
-        )
+        instructions::insert_synthetic_token_config(ctx, token, decimals, builder, enable)
     }
 
     #[access_control(internal::Authenticate::only_controller(&ctx))]
@@ -138,6 +130,20 @@ pub mod data_store {
         enable: bool,
     ) -> Result<()> {
         instructions::toggle_token_config(ctx, token, enable)
+    }
+
+    #[access_control(internal::Authenticate::only_controller(&ctx))]
+    pub fn set_expected_provider(
+        ctx: Context<SetExpectedProvider>,
+        token: Pubkey,
+        provider: u8,
+    ) -> Result<()> {
+        instructions::set_expected_provider(
+            ctx,
+            token,
+            PriceProviderKind::try_from(provider)
+                .map_err(|_| DataStoreError::InvalidProviderKindIndex)?,
+        )
     }
 
     pub fn get_token_config(
@@ -294,7 +300,7 @@ pub mod data_store {
     pub fn initialize_deposit(
         ctx: Context<InitializeDeposit>,
         nonce: [u8; 32],
-        tokens_with_feed: Vec<(Pubkey, Pubkey)>,
+        tokens_with_feed: Vec<TokenRecord>,
         swap_params: SwapParams,
         token_params: DepositTokenParams,
         ui_fee_receiver: Pubkey,
@@ -320,7 +326,7 @@ pub mod data_store {
         ctx: Context<InitializeWithdrawal>,
         nonce: [u8; 32],
         swap_params: SwapParams,
-        tokens_with_feed: Vec<(Pubkey, Pubkey)>,
+        tokens_with_feed: Vec<TokenRecord>,
         token_params: WithdrawalTokenParams,
         market_token_amount: u64,
         ui_fee_receiver: Pubkey,
@@ -367,7 +373,7 @@ pub mod data_store {
     pub fn initialize_order(
         ctx: Context<InitializeOrder>,
         nonce: [u8; 32],
-        tokens_with_feed: Vec<(Pubkey, Pubkey)>,
+        tokens_with_feed: Vec<TokenRecord>,
         swap: SwapParams,
         params: OrderParams,
         output_token: Pubkey,
@@ -451,6 +457,10 @@ pub enum DataStoreError {
     NegativePrice,
     #[msg("Price overflow")]
     PriceOverflow,
+    #[msg("Price feed is not set for the given provider")]
+    PriceFeedNotSet,
+    #[msg("Not enough feeds")]
+    NotEnoughFeeds,
     // Market.
     #[msg("Computation error")]
     Computation,
@@ -504,6 +514,12 @@ pub enum DataStoreError {
     // Order.
     #[msg("missing sender")]
     MissingSender,
+    // Token Config.
+    #[msg("synthetic flag does not match")]
+    InvalidSynthetic,
+    // Invalid Provider Kind.
+    #[msg("invalid provider kind index")]
+    InvalidProviderKindIndex,
 }
 
 impl DataStoreError {

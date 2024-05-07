@@ -6,7 +6,11 @@ use data_store::{
     constants,
     cpi::accounts::{GetMarketMeta, GetTokenConfig, InitializeWithdrawal},
     program::DataStore,
-    states::{common::SwapParams, withdrawal::TokenParams, NonceBytes},
+    states::{
+        common::{SwapParams, TokenRecord},
+        withdrawal::TokenParams,
+        NonceBytes,
+    },
 };
 
 use crate::{
@@ -138,7 +142,7 @@ pub fn create_withdrawal<'info>(
             )?
             .get()
             .ok_or(ExchangeError::ResourceNotFound)?;
-            Result::Ok((token, config.price_feed))
+            TokenRecord::from_config(token, &config)
         })
         .collect::<Result<Vec<_>>>()?;
 

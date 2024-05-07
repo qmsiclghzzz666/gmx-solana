@@ -6,6 +6,7 @@ use anchor_client::{
     Program, RequestBuilder,
 };
 use data_store::states::{
+    common::TokensWithFeed,
     order::{OrderKind, OrderParams},
     position::PositionKind,
     Market, MarketMeta, NonceBytes, Order, Position, Pyth, Seed,
@@ -383,7 +384,7 @@ struct ExecuteOrderHint {
     secondary_output_token: Pubkey,
     final_output_token_account: Option<Pubkey>,
     secondary_output_token_account: Option<Pubkey>,
-    feeds: Vec<Pubkey>,
+    feeds: TokensWithFeed,
     swap_path: Vec<Pubkey>,
 }
 
@@ -431,7 +432,7 @@ where
             secondary_output_token: order.fixed.tokens.secondary_output_token,
             final_output_token_account: order.fixed.receivers.final_output_token_account,
             secondary_output_token_account: order.fixed.receivers.secondary_output_token_account,
-            feeds: order.prices.feeds.clone(),
+            feeds: order.prices.clone(),
             swap_path: order.swap.long_token_swap_path.clone(),
         });
         self
@@ -453,11 +454,10 @@ where
     pub async fn build(&mut self) -> crate::Result<RequestBuilder<'a, C>> {
         let hint = self.prepare_hint().await?;
         let authority = self.program.payer();
-        let feeds = hint.feeds.iter().map(|pubkey| AccountMeta {
-            pubkey: *pubkey,
-            is_signer: false,
-            is_writable: false,
-        });
+        let feeds = hint
+            .feeds
+            .feed_account_metas()
+            .collect::<Result<Vec<_>, _>>()?;
         let swap_markets = hint.swap_path.iter().map(|mint| AccountMeta {
             pubkey: find_market_address(&self.store, mint).0,
             is_signer: false,
@@ -502,6 +502,7 @@ where
             })
             .accounts(
                 feeds
+                    .into_iter()
                     .chain(swap_markets)
                     .chain(swap_market_mints)
                     .collect::<Vec<_>>(),

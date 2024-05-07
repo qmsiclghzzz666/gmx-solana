@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::TokenAccount;
 
 use super::{
-    common::{SwapParams, TokensWithFeed},
+    common::{SwapParams, TokenRecord, TokensWithFeed},
     Market, NonceBytes, Seed,
 };
 
@@ -17,7 +17,7 @@ pub struct Withdrawal {
 }
 
 impl Withdrawal {
-    pub(crate) fn init_space(tokens_with_feed: &[(Pubkey, Pubkey)], swap: &SwapParams) -> usize {
+    pub(crate) fn init_space(tokens_with_feed: &[TokenRecord], swap: &SwapParams) -> usize {
         Fixed::INIT_SPACE + Dynamic::init_space(tokens_with_feed, swap)
     }
 }
@@ -55,7 +55,7 @@ pub struct Dynamic {
 }
 
 impl Dynamic {
-    fn init_space(tokens_with_feed: &[(Pubkey, Pubkey)], swap: &SwapParams) -> usize {
+    fn init_space(tokens_with_feed: &[TokenRecord], swap: &SwapParams) -> usize {
         TokensWithFeed::init_space(tokens_with_feed)
             + SwapParams::init_space(
                 swap.long_token_swap_path.len(),
@@ -120,7 +120,7 @@ impl Withdrawal {
         market_token_amount: u64,
         token_params: TokenParams,
         swap_params: SwapParams,
-        tokens_with_feed: Vec<(Pubkey, Pubkey)>,
+        tokens_with_feed: Vec<TokenRecord>,
         final_long_token_receiver: &Account<TokenAccount>,
         final_short_token_receiver: &Account<TokenAccount>,
         ui_fee_receiver: Pubkey,
@@ -147,7 +147,7 @@ impl Withdrawal {
                 },
             },
             dynamic: Dynamic {
-                tokens_with_feed: TokensWithFeed::from_vec(tokens_with_feed),
+                tokens_with_feed: TokensWithFeed::try_from_vec(tokens_with_feed)?,
                 swap: swap_params,
             },
         };

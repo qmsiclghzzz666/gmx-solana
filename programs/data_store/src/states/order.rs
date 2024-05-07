@@ -3,7 +3,7 @@ use anchor_lang::prelude::*;
 use crate::DataStoreError;
 
 use super::{
-    common::{SwapParams, TokensWithFeed},
+    common::{SwapParams, TokenRecord, TokensWithFeed},
     position::PositionKind,
     NonceBytes, Seed,
 };
@@ -22,7 +22,7 @@ pub struct Order {
 
 impl Order {
     /// Init space.
-    pub fn init_space(tokens_with_feed: &[(Pubkey, Pubkey)], swap: &SwapParams) -> usize {
+    pub fn init_space(tokens_with_feed: &[TokenRecord], swap: &SwapParams) -> usize {
         Fixed::INIT_SPACE
             + TokensWithFeed::init_space(tokens_with_feed)
             + SwapParams::init_space(
@@ -44,13 +44,13 @@ impl Order {
         tokens: &Tokens,
         senders: &Senders,
         receivers: &Receivers,
-        tokens_with_feed: Vec<(Pubkey, Pubkey)>,
+        tokens_with_feed: Vec<TokenRecord>,
         swap: SwapParams,
     ) -> Result<()> {
         self.fixed.init(
             bump, nonce, market, user, position, params, tokens, senders, receivers,
         )?;
-        self.prices = TokensWithFeed::from_vec(tokens_with_feed);
+        self.prices = TokensWithFeed::try_from_vec(tokens_with_feed)?;
         self.swap = swap;
         Ok(())
     }

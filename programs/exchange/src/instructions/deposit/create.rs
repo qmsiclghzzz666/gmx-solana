@@ -5,7 +5,11 @@ use anchor_spl::token::{self, Token, TokenAccount};
 use data_store::{
     cpi::accounts::{GetMarketMeta, GetTokenConfig, InitializeDeposit},
     program::DataStore,
-    states::{common::SwapParams, deposit::TokenParams, NonceBytes},
+    states::{
+        common::{SwapParams, TokenRecord},
+        deposit::TokenParams,
+        NonceBytes,
+    },
 };
 
 use crate::{
@@ -173,7 +177,7 @@ pub fn create_deposit<'info>(
             )?
             .get()
             .ok_or(ExchangeError::ResourceNotFound)?;
-            Result::Ok((token, config.price_feed))
+            TokenRecord::from_config(token, &config)
         })
         .collect::<Result<Vec<_>>>()?;
     let controller = ControllerSeeds::new(ctx.accounts.store.key, ctx.bumps.authority);

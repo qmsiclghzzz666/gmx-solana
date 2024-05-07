@@ -6,7 +6,7 @@ use anchor_client::{
     Program, RequestBuilder,
 };
 use anchor_spl::associated_token::get_associated_token_address;
-use data_store::states::{Deposit, Market, NonceBytes, Pyth, Seed};
+use data_store::states::{common::TokensWithFeed, Deposit, Market, NonceBytes, Pyth, Seed};
 use exchange::{accounts, instruction, instructions::CreateDepositParams, utils::ControllerSeeds};
 
 use crate::store::{
@@ -420,7 +420,7 @@ struct ExecuteDepositHint {
     user: Pubkey,
     receiver: Pubkey,
     market_token_mint: Pubkey,
-    feeds: Vec<Pubkey>,
+    feeds: TokensWithFeed,
     long_swap_tokens: Vec<Pubkey>,
     short_swap_tokens: Vec<Pubkey>,
 }
@@ -431,7 +431,7 @@ impl<'a> From<&'a Deposit> for ExecuteDepositHint {
             user: deposit.fixed.senders.user,
             receiver: deposit.fixed.receivers.receiver,
             market_token_mint: deposit.fixed.tokens.market_token,
-            feeds: deposit.dynamic.tokens_with_feed.feeds.clone(),
+            feeds: deposit.dynamic.tokens_with_feed.clone(),
             long_swap_tokens: deposit.dynamic.swap_params.long_token_swap_path.clone(),
             short_swap_tokens: deposit.dynamic.swap_params.short_token_swap_path.clone(),
         }
@@ -502,11 +502,10 @@ where
         } = self;
         let authority = program.payer();
         let only_order_keeper = find_roles_address(store, &authority).0;
-        let feeds = hint.feeds.iter().map(|pubkey| AccountMeta {
-            pubkey: *pubkey,
-            is_signer: false,
-            is_writable: false,
-        });
+        let feeds = hint
+            .feeds
+            .feed_account_metas()
+            .collect::<Result<Vec<_>, _>>()?;
         let markets = hint
             .long_swap_tokens
             .iter()
@@ -548,6 +547,7 @@ where
             })
             .accounts(
                 feeds
+                    .into_iter()
                     .chain(markets)
                     .chain(market_tokens)
                     .collect::<Vec<_>>(),

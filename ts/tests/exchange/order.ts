@@ -1,6 +1,7 @@
 import { PublicKey } from "@solana/web3.js";
 import { getAddresses, getMarkets, getProvider, getUsers } from "../../utils/fixtures";
-import { invokeCreateOrder, invokeExecuteOrder } from "../../utils/exchange";
+import { exchange, invokeExecuteOrder } from "../../utils/exchange";
+import { findPositionPDA, invokeCreateDecreaseOrderWithPayerAsSigner, invokeCreateIncreaseOrderWithPayerAsSigner } from "gmsol";
 
 describe("exchange: order", () => {
     const provider = getProvider();
@@ -11,6 +12,8 @@ describe("exchange: order", () => {
     let user0FakeTokenAccount: PublicKey;
     let user0UsdGTokenAccount: PublicKey;
     let GMFakeFakeUsdG: PublicKey;
+    let usdGTokenMint: PublicKey;
+    let fakeTokenMint: PublicKey;
 
     before(async () => {
         ({
@@ -18,6 +21,8 @@ describe("exchange: order", () => {
             oracleAddress,
             user0FakeTokenAccount,
             user0UsdGTokenAccount,
+            usdGTokenMint,
+            fakeTokenMint,
         } = await getAddresses());
         ({ GMFakeFakeUsdG } = await getMarkets());
     });
@@ -26,17 +31,16 @@ describe("exchange: order", () => {
         // Increase position.
         let increaseOrder: PublicKey;
         try {
-            const [signature, address] = await invokeCreateOrder(provider.connection, {
+            const [signature, address] = await invokeCreateIncreaseOrderWithPayerAsSigner(exchange, {
                 store: dataStoreAddress,
                 payer: user0,
-                orderType: "marketIncrease",
                 marketToken: GMFakeFakeUsdG,
-                isCollateralTokenLong: false,
+                collateralToken: usdGTokenMint,
                 initialCollateralDeltaAmount: 2_000_000,
                 isLong: true,
                 sizeDeltaUsd: 200_000_000_000_000_000_000n,
-                fromTokenAccount: user0FakeTokenAccount,
                 options: {
+                    initialCollateralToken: fakeTokenMint,
                     swapPath: [
                         GMFakeFakeUsdG
                     ],
@@ -69,21 +73,27 @@ describe("exchange: order", () => {
         // Decrease position.
         let decreaseOrder: PublicKey;
         try {
-            const [signature, address] = await invokeCreateOrder(provider.connection, {
+            const [position] = findPositionPDA(dataStoreAddress, user0.publicKey, GMFakeFakeUsdG, usdGTokenMint, true);
+            const [signature, address] = await invokeCreateDecreaseOrderWithPayerAsSigner(exchange, {
                 store: dataStoreAddress,
                 payer: user0,
-                orderType: "marketDecrease",
-                marketToken: GMFakeFakeUsdG,
-                isCollateralTokenLong: false,
+                position,
                 initialCollateralDeltaAmount: 0,
-                isLong: true,
                 sizeDeltaUsd: 200_000_000_000_000_000_000n,
-                toTokenAccount: user0FakeTokenAccount,
-                secondaryTokenAccount: user0FakeTokenAccount,
                 options: {
+                    finalOutputToken: fakeTokenMint,
                     swapPath: [
                         GMFakeFakeUsdG
                     ],
+                    hint: {
+                        market: {
+                            marketToken: GMFakeFakeUsdG,
+                            longToken: fakeTokenMint,
+                            shortToken: usdGTokenMint,
+                        },
+                        collateralToken: usdGTokenMint,
+                        isLong: true,
+                    }
                 }
             });
             decreaseOrder = address;

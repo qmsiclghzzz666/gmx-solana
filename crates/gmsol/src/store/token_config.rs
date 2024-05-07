@@ -7,7 +7,7 @@ use anchor_client::{
 };
 use data_store::{
     accounts, instruction,
-    states::{Seed, TokenConfig, TokenConfigMap},
+    states::{PriceProviderKind, Seed, TokenConfig, TokenConfigBuilder, TokenConfigMap},
 };
 
 use crate::utils::view;
@@ -51,20 +51,18 @@ pub trait TokenConfigOps<C> {
         &self,
         store: &Pubkey,
         token: &Pubkey,
-        price_feed: &Pubkey,
-        heartbeat_duration: u32,
-        precision: u8,
+        builder: TokenConfigBuilder,
+        enable: bool,
     ) -> RequestBuilder<C>;
 
-    /// Insert or update config the given fake token.
-    fn insert_fake_token_config(
+    /// Insert or update config the given synthetic token.
+    fn insert_synthetic_token_config(
         &self,
         store: &Pubkey,
         token: &Pubkey,
         decimals: u8,
-        price_feed: &Pubkey,
-        heartbeat_duration: u32,
-        precision: u8,
+        builder: TokenConfigBuilder,
+        enable: bool,
     ) -> RequestBuilder<C>;
 
     /// Get token config of the given token.
@@ -76,6 +74,14 @@ pub trait TokenConfigOps<C> {
         store: &Pubkey,
         token: &Pubkey,
         enable: bool,
+    ) -> RequestBuilder<C>;
+
+    /// Set expected provider.
+    fn set_expected_provider(
+        &self,
+        store: &Pubkey,
+        token: &Pubkey,
+        provider: PriceProviderKind,
     ) -> RequestBuilder<C>;
 }
 
@@ -104,9 +110,8 @@ where
         &self,
         store: &Pubkey,
         token: &Pubkey,
-        price_feed: &Pubkey,
-        heartbeat_duration: u32,
-        precision: u8,
+        builder: TokenConfigBuilder,
+        enable: bool,
     ) -> RequestBuilder<C> {
         let authority = self.payer();
         let only_controller = find_roles_address(store, &authority).0;
@@ -120,39 +125,33 @@ where
                 token: *token,
                 system_program: system_program::ID,
             })
-            .args(instruction::InsertTokenConfig {
-                price_feed: *price_feed,
-                heartbeat_duration,
-                precision,
-            })
+            .args(instruction::InsertTokenConfig { builder, enable })
     }
 
-    fn insert_fake_token_config(
+    fn insert_synthetic_token_config(
         &self,
         store: &Pubkey,
         token: &Pubkey,
         decimals: u8,
-        price_feed: &Pubkey,
-        heartbeat_duration: u32,
-        precision: u8,
+        builder: TokenConfigBuilder,
+        enable: bool,
     ) -> RequestBuilder<C> {
         let authority = self.payer();
         let only_controller = find_roles_address(store, &authority).0;
         let map = find_token_config_map(store).0;
         self.request()
-            .accounts(accounts::InsertFakeTokenConfig {
+            .accounts(accounts::InsertSyntheticTokenConfig {
                 authority,
                 only_controller,
                 store: *store,
                 map,
                 system_program: system_program::ID,
             })
-            .args(instruction::InsertFakeTokenConfig {
+            .args(instruction::InsertSyntheticTokenConfig {
                 token: *token,
                 decimals,
-                price_feed: *price_feed,
-                heartbeat_duration,
-                precision,
+                builder,
+                enable,
             })
     }
 
@@ -185,6 +184,28 @@ where
             .args(instruction::ToggleTokenConfig {
                 token: *token,
                 enable,
+            })
+    }
+
+    fn set_expected_provider(
+        &self,
+        store: &Pubkey,
+        token: &Pubkey,
+        provider: PriceProviderKind,
+    ) -> RequestBuilder<C> {
+        let authority = self.payer();
+        let only_controller = find_roles_address(store, &authority).0;
+        let map = find_token_config_map(store).0;
+        self.request()
+            .accounts(accounts::SetExpectedProvider {
+                authority,
+                store: *store,
+                only_controller,
+                map,
+            })
+            .args(instruction::SetExpectedProvider {
+                token: *token,
+                provider: provider as u8,
             })
     }
 }

@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::TokenAccount;
 
 use super::{
-    common::{SwapParams, TokensWithFeed},
+    common::{SwapParams, TokenRecord, TokensWithFeed},
     Market, NonceBytes, Seed,
 };
 
@@ -17,10 +17,7 @@ pub struct Deposit {
 }
 
 impl Deposit {
-    pub(crate) fn init_space(
-        tokens_with_feed: &[(Pubkey, Pubkey)],
-        swap_params: &SwapParams,
-    ) -> usize {
+    pub(crate) fn init_space(tokens_with_feed: &[TokenRecord], swap_params: &SwapParams) -> usize {
         Fixed::INIT_SPACE + Dynamic::init_space(tokens_with_feed, swap_params)
     }
 }
@@ -82,7 +79,7 @@ pub struct Dynamic {
 }
 
 impl Dynamic {
-    fn init_space(tokens_with_feed: &[(Pubkey, Pubkey)], swap_params: &SwapParams) -> usize {
+    fn init_space(tokens_with_feed: &[TokenRecord], swap_params: &SwapParams) -> usize {
         TokensWithFeed::init_space(tokens_with_feed)
             + SwapParams::init_space(
                 swap_params.long_token_swap_path.len(),
@@ -102,7 +99,7 @@ impl Deposit {
         bump: u8,
         market: &Account<Market>,
         nonce: NonceBytes,
-        tokens_with_feed: Vec<(Pubkey, Pubkey)>,
+        tokens_with_feed: Vec<TokenRecord>,
         user: Pubkey,
         initial_long_token_account: Option<&Account<TokenAccount>>,
         initial_short_token_account: Option<&Account<TokenAccount>>,
@@ -134,7 +131,7 @@ impl Deposit {
                 },
             },
             dynamic: Dynamic {
-                tokens_with_feed: TokensWithFeed::from_vec(tokens_with_feed),
+                tokens_with_feed: TokensWithFeed::try_from_vec(tokens_with_feed)?,
                 swap_params,
             },
         };

@@ -1,3 +1,9 @@
 [alias]
-gmsol = ["run", "--bin", "gmsol", "--features", "cli", "--"]
-install-gmsol = ["install", "--path", "crates/gmsol", "--features", "cli"]
+gmsol = ["run", "--bin", "gmsol", "--features", "cli,devnet", "--"]
+install-gmsol = [
+    "install",
+    "--path",
+    "crates/gmsol",
+    "--features",
+    "cli,devnet",
+]

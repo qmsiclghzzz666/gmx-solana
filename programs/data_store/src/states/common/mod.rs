@@ -1,28 +1,11 @@
 use anchor_lang::prelude::*;
 
-/// Tokens with feed.
-#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
-#[cfg_attr(feature = "debug", derive(Debug))]
-pub struct TokensWithFeed {
-    /// Tokens that require prices,
-    /// which must be of the same length with `feeds`.
-    pub tokens: Vec<Pubkey>,
-    /// Token feeds for the tokens,
-    /// which must be of  the same length with `tokens`.
-    pub feeds: Vec<Pubkey>,
-}
+use super::{PriceProviderKind, TokenConfig};
 
-impl TokensWithFeed {
-    /// Create from vec.
-    pub fn from_vec(tokens_with_feed: Vec<(Pubkey, Pubkey)>) -> Self {
-        let (tokens, feeds) = tokens_with_feed.into_iter().unzip();
-        Self { tokens, feeds }
-    }
+/// Token with feeds.
+pub mod token_with_feeds;
 
-    pub(crate) fn init_space(tokens_with_feed: &[(Pubkey, Pubkey)]) -> usize {
-        (4 + 32 * tokens_with_feed.len()) + (4 + 32 * tokens_with_feed.len())
-    }
-}
+pub use token_with_feeds::{TokenRecord, TokensWithFeed};
 
 /// Swap params.
 #[derive(AnchorDeserialize, AnchorSerialize, Clone)]

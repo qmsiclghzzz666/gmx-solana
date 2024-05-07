@@ -16,6 +16,8 @@ cpi = ["no-entrypoint"]
 default = []
 idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
 debug = []
+utils = []
+devnet = []
 
 [dependencies]
 bytemuck = { workspace = true }
@@ -32,6 +34,8 @@ bitmaps = "3.2.1"
 chainlink_solana = "1.0.0"
 num_enum = "0.7.2"
 static_assertions = "1.1.0"
+clap = { workspace = true, optional = true }
+pyth-sdk-solana = "0.10.1"
 
 # FIXME: use the crates.io version when it can compile with anchor v0.30
 [dependencies.pyth-solana-receiver-sdk]

@@ -2,6 +2,7 @@ import { PublicKey, Signer } from "@solana/web3.js";
 import { dataStore } from "./program";
 import { createRolesPDA } from ".";
 import { utils } from "@coral-xyz/anchor";
+import { PriceProvider } from "gmsol";
 
 // Token Config map seed.
 export const TOKEN_CONFIG_MAP_SEED = utils.bytes.utf8.encode("token_config_map");
@@ -21,15 +22,41 @@ export const initializeTokenConfigMap = async (authority: Signer, store: PublicK
     return map;
 };
 
+const hexStringToPublicKey = (hex: string) => {
+    const decoded = utils.bytes.hex.decode(hex);
+    return new PublicKey(decoded);
+};
+
+export interface FeedsOptions {
+    pythFeedId?: string,
+    chainlinkFeed?: PublicKey,
+    pythDevFeed?: PublicKey,
+    expectedProvider?: PriceProvider,
+}
+
 export const insertTokenConfig = async (
     authority: Signer,
     store: PublicKey,
     token: PublicKey,
-    price_feed: PublicKey,
-    heartbeat_duration: number,
+    heartbeatDuration: number,
     precision: number,
+    {
+        pythFeedId,
+        chainlinkFeed,
+        pythDevFeed,
+        expectedProvider,
+    }: FeedsOptions,
 ) => {
-    await dataStore.methods.insertTokenConfig(price_feed, heartbeat_duration, precision).accounts({
+    await dataStore.methods.insertTokenConfig({
+        heartbeatDuration,
+        precision,
+        feeds: [
+            pythFeedId ? hexStringToPublicKey(pythFeedId) : PublicKey.default,
+            chainlinkFeed ?? PublicKey.default,
+            pythDevFeed ?? PublicKey.default,
+        ],
+        expectedProvider,
+    }, true).accounts({
         authority: authority.publicKey,
         store,
         onlyController: createRolesPDA(store, authority.publicKey)[0],
@@ -37,16 +64,30 @@ export const insertTokenConfig = async (
     }).signers([authority]).rpc();
 };
 
-export const insertFakeTokenConfig = async (
+export const insertSyntheticTokenConfig = async (
     authority: Signer,
     store: PublicKey,
     token: PublicKey,
     decimals: number,
-    price_feed: PublicKey,
-    heartbeat_duration: number,
+    heartbeatDuration: number,
     precision: number,
+    {
+        pythFeedId,
+        chainlinkFeed,
+        pythDevFeed,
+        expectedProvider,
+    }: FeedsOptions,
 ) => {
-    await dataStore.methods.insertFakeTokenConfig(token, decimals, price_feed, heartbeat_duration, precision).accounts({
+    await dataStore.methods.insertSyntheticTokenConfig(token, decimals, {
+        heartbeatDuration,
+        precision,
+        feeds: [
+            pythFeedId ? hexStringToPublicKey(pythFeedId) : PublicKey.default,
+            chainlinkFeed ?? PublicKey.default,
+            pythDevFeed ?? PublicKey.default,
+        ],
+        expectedProvider,
+    }, true).accounts({
         authority: authority.publicKey,
         store,
         onlyController: createRolesPDA(store, authority.publicKey)[0],
@@ -66,12 +107,26 @@ export const toggleTokenConfig = async (
     }).signers([authority]).rpc();
 };
 
+export const setExpectedProvider = async (
+    authority: Signer,
+    store: PublicKey,
+    token: PublicKey,
+    provider: PriceProvider,
+) => {
+    await dataStore.methods.setExpectedProvider(token, provider).accounts({
+        authority: authority.publicKey,
+        store,
+        onlyController: createRolesPDA(store, authority.publicKey)[0],
+    }).signers([authority]).rpc();
+};
+
 export interface TokenConfig {
     enabled: boolean,
-    priceFeed: PublicKey,
     heartbeatDuration: number,
     tokenDecimals: number,
     precision: number,
+    feeds: PublicKey[],
+    expectedProvider: number,
 }
 
 export const getTokenConfig = async (store: PublicKey, token: PublicKey) => {
