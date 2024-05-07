@@ -24,11 +24,13 @@ import LoadingDots from "../Common/LoadingDots/LoadingDots";
 import { useAnchor, useOpenConnectModal } from "@/contexts/anchor";
 import { useNativeTokenUtils } from "../NativeTokenUtils";
 import { useWallet } from "@solana/wallet-adapter-react";
+import { mapValues } from "lodash";
+import { useLingui } from "@lingui/react";
 
 const tradeTypeLabels = {
-  [TradeType.Long]: t`Long`,
-  [TradeType.Short]: t`Short`,
-  [TradeType.Swap]: t`Swap`,
+  [TradeType.Long]: `Long`,
+  [TradeType.Short]: `Short`,
+  [TradeType.Swap]: `Swap`,
 };
 
 export function TradeForm() {
@@ -150,6 +152,11 @@ function TokenInputs({ isSwap, isIncrease }: { isSwap: boolean, isIncrease: bool
     fromToken?.balance?.gt(BN_ZERO) &&
     !fromToken.balance.eq(fromTokenAmount);
 
+  const { i18n } = useLingui();
+  const localizedTradeTypeLabels = useMemo(() => {
+    return mapValues(tradeTypeLabels, label => i18n._(label));
+  }, [i18n]);
+
   return (
     <>
       <BuyInputSection
@@ -222,7 +229,7 @@ function TokenInputs({ isSwap, isIncrease }: { isSwap: boolean, isIncrease: bool
 
       {isIncrease && (
         <BuyInputSection
-          topLeftLabel={tradeTypeLabels[tradeType]}
+          topLeftLabel={localizedTradeTypeLabels[tradeType]}
           topLeftValue={
             increaseAmounts?.sizeDeltaUsd.gt(BN_ZERO)
               ? formatUsd(increaseAmounts?.sizeDeltaUsd, { fallbackToZero: true })
@@ -236,7 +243,7 @@ function TokenInputs({ isSwap, isIncrease }: { isSwap: boolean, isIncrease: bool
         >
           {toToken && (
             <MarketSelector
-              label={tradeTypeLabels[tradeType]}
+              label={localizedTradeTypeLabels[tradeType]}
               selectedIndexName={toToken ? getMarketIndexName({ indexToken: toToken, isSpotOnly: false }) : undefined}
               selectedMarketLabel={
                 toToken && (

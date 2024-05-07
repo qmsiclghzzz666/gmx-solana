@@ -34,6 +34,10 @@ msgstr ""
 msgid "Open Short"
 msgstr ""
 
+#: src/components/MarketStats/MarketStats.tsx
+msgid "{0} can be used to buy GM for this market up to the specified buying caps."
+msgstr ""
+
 #: src/contexts/pending/PendingStateProvider.tsx
 msgid "Failed to get signature statuses."
 msgstr ""
@@ -58,6 +62,10 @@ msgstr ""
 #: src/components/TradeBox/TradeBox.tsx
 #~ msgid "ShortShort"
 #~ msgstr ""
+
+#: src/components/Header/AppHeaderLinks.tsx
+msgid "Treasury"
+msgstr ""
 
 #: src/components/MarketsList/NetFeeHeaderTooltipContent.tsx
 msgid "Net fee combines funding and borrowing fees but excludes open, swap or impact fees.<0/><1/>Funding fees help to balance longs and shorts and are exchanged between both sides. <2>Read more</2>.<3/><4/>Borrowing fees help ensure available liquidity. <5>Read more</5>."
@@ -147,6 +155,10 @@ msgstr ""
 msgid "Invalid closing position address"
 msgstr ""
 
+#: src/components/Header/AppHeaderLinks.tsx
+msgid "OTC"
+msgstr ""
+
 #: src/components/TradeBox/TradeBox.tsx
 #~ msgid "MarketMarket"
 #~ msgstr ""
@@ -218,6 +230,10 @@ msgstr ""
 msgid "GM Pools"
 msgstr ""
 
+#: src/components/Header/AppHeaderLinks.tsx
+msgid "Points"
+msgstr ""
+
 #: src/components/PositionList/PositionList.tsx
 msgid "Size"
 msgstr ""
@@ -250,6 +266,10 @@ msgstr ""
 msgid "TVL"
 msgstr ""
 
+#: src/components/Header/AppHeaderLinks.tsx
+msgid "Strategy"
+msgstr ""
+
 #: src/onchain/transaction/makeSendErrorContent.tsx
 msgid "Send Transaction Error."
 msgstr ""
@@ -266,7 +286,7 @@ msgstr ""
 msgid "Connecting..."
 msgstr ""
 
-#: src/components/Header/AppHeaderUser.tsx
+#: src/components/Header/AppHeaderLinks.tsx
 msgid "Trade"
 msgstr ""
 
@@ -339,7 +359,6 @@ msgstr ""
 #: src/components/TradeBox/ConfirmationBox.tsx
 #: src/components/TradeBox/ConfirmationBox.tsx
 #: src/components/TradeBox/TradeBox.tsx
-#: src/components/TradeBox/TradeForm.tsx
 msgid "Short"
 msgstr ""
 
@@ -422,12 +441,20 @@ msgstr ""
 msgid "Deposit created."
 msgstr ""
 
+#: src/components/GmList/GmList.tsx
+msgid "{0} and {1} can be used to buy GM tokens for this market up to the specified buying caps."
+msgstr ""
+
 #: src/components/TradeBox/ConfirmationBox.tsx
 msgid "Swap path cannot be fulfilled."
 msgstr ""
 
 #: src/components/MarketsList/MarketsList.tsx
 msgid "UTILIZATION"
+msgstr ""
+
+#: src/components/Header/AppHeaderLinks.tsx
+msgid "Referrals"
 msgstr ""
 
 #: src/components/TradeBox/ConfirmationBox.tsx
@@ -532,6 +559,15 @@ msgstr ""
 msgid "Connect"
 msgstr ""
 
+#: src/components/AssetDropdown/AssetDropdown.tsx
+#: src/components/AssetDropdown/GmAssetDropdown.tsx
+msgid "Open {0} in Explorer"
+msgstr ""
+
+#: src/components/MarketStats/MarketStats.tsx
+msgid "{0} and {1} can be used to buy GM for this market up to the specified buying caps."
+msgstr ""
+
 #: src/onchain/token/use-unwrap-native-token.ts
 msgid "Unwrapped WSOL."
 msgstr ""
@@ -551,6 +587,10 @@ msgstr ""
 #: src/components/TradeBox/TradeForm.tsx
 #: src/components/TradeBox/TradeForm.tsx
 msgid "Receive"
+msgstr ""
+
+#: src/components/AprInfo/AprInfo.tsx
+msgid "Base APR"
 msgstr ""
 
 #: src/components/MarketsList/NetFeeTooltip.tsx
@@ -588,7 +628,6 @@ msgstr ""
 #: src/components/TradeBox/ConfirmationBox.tsx
 #: src/components/TradeBox/ConfirmationBox.tsx
 #: src/components/TradeBox/TradeBox.tsx
-#: src/components/TradeBox/TradeForm.tsx
 msgid "Long"
 msgstr ""
 
@@ -652,7 +691,6 @@ msgstr ""
 
 #: src/components/TradeBox/ConfirmationBox.tsx
 #: src/components/TradeBox/TradeBox.tsx
-#: src/components/TradeBox/TradeForm.tsx
 #: src/components/TradeBox/TradeForm.tsx
 msgid "Swap"
 msgstr ""
