@@ -39,21 +39,31 @@ export function AppHeaderLinks({ small, openSettings, clickCloseIcon }: Props) {
           <Trans>Earn</Trans>
         </HeaderLink>
       </div>
-      {/* <div className="App-header-link-container">
-        <HeaderLink to="/buy">
-          <Trans>Buy</Trans>
+      <div className="App-header-link-container">
+        <HeaderLink to="/trade">
+          <Trans>Trade</Trans>
         </HeaderLink>
-      </div> */}
-      {/* <div className="App-header-link-container">
+      </div>
+      <div className="App-header-link-container">
+        <HeaderLink to="/strategy">
+          <Trans>Strategy</Trans>
+        </HeaderLink>
+      </div>
+      <div className="App-header-link-container">
+        <HeaderLink to="/points">
+          <Trans>Points</Trans>
+        </HeaderLink>
+      </div>
+      <div className="App-header-link-container">
+        <HeaderLink to="/treasury">
+          <Trans>Treasury</Trans>
+        </HeaderLink>
+      </div>
+      <div className="App-header-link-container">
         <HeaderLink to="/referrals">
           <Trans>Referrals</Trans>
         </HeaderLink>
       </div>
-      <div className="App-header-link-container">
-        <HeaderLink to="/ecosystem">
-          <Trans>Ecosystem</Trans>
-        </HeaderLink>
-      </div> */}
       <div className="App-header-link-container">
         <ExternalLink href="#">
           <Trans>Docs</Trans>
