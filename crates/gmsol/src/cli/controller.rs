@@ -28,7 +28,7 @@ enum Command {
         #[arg(long, default_value_t = 4)]
         precision: u8,
         /// Provide to create a synthetic token with the given decimals.
-        #[arg(long)]
+        #[arg(long, value_name = "DECIMALS")]
         synthetic: Option<u8>,
     },
     /// Toggle token config of token.
@@ -36,6 +36,11 @@ enum Command {
         token: Pubkey,
         #[command(flatten)]
         toggle: Toggle,
+    },
+    /// Set expected provider of token.
+    SetExpectedProvider {
+        token: Pubkey,
+        provider: PriceProviderKind,
     },
 }
 
@@ -96,6 +101,7 @@ impl ControllerArgs {
                     .with_precision(*precision)
                     .with_expected_provider(*expected_provider);
                 if let Some(feed_id) = feeds.pyth_feed_id.as_ref() {
+                    let feed_id = feed_id.strip_prefix("0x").unwrap_or(feed_id);
                     let feed_id =
                         pyth_sdk::Identifier::from_hex(feed_id).map_err(gmsol::Error::unknown)?;
                     let feed_id_as_key = Pubkey::new_from_array(feed_id.to_bytes());
@@ -129,6 +135,13 @@ impl ControllerArgs {
             Command::ToggleTokenConfig { token, toggle } => {
                 let signature = program
                     .toggle_token_config(store, token, toggle.is_enable())
+                    .send()
+                    .await?;
+                println!("{signature}");
+            }
+            Command::SetExpectedProvider { token, provider } => {
+                let signature = program
+                    .set_expected_provider(store, token, *provider)
                     .send()
                     .await?;
                 println!("{signature}");

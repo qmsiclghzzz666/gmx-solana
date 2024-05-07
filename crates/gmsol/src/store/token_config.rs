@@ -7,7 +7,7 @@ use anchor_client::{
 };
 use data_store::{
     accounts, instruction,
-    states::{Seed, TokenConfig, TokenConfigBuilder, TokenConfigMap},
+    states::{PriceProviderKind, Seed, TokenConfig, TokenConfigBuilder, TokenConfigMap},
 };
 
 use crate::utils::view;
@@ -74,6 +74,14 @@ pub trait TokenConfigOps<C> {
         store: &Pubkey,
         token: &Pubkey,
         enable: bool,
+    ) -> RequestBuilder<C>;
+
+    /// Set expected provider.
+    fn set_expected_provider(
+        &self,
+        store: &Pubkey,
+        token: &Pubkey,
+        provider: PriceProviderKind,
     ) -> RequestBuilder<C>;
 }
 
@@ -176,6 +184,28 @@ where
             .args(instruction::ToggleTokenConfig {
                 token: *token,
                 enable,
+            })
+    }
+
+    fn set_expected_provider(
+        &self,
+        store: &Pubkey,
+        token: &Pubkey,
+        provider: PriceProviderKind,
+    ) -> RequestBuilder<C> {
+        let authority = self.payer();
+        let only_controller = find_roles_address(store, &authority).0;
+        let map = find_token_config_map(store).0;
+        self.request()
+            .accounts(accounts::SetExpectedProvider {
+                authority,
+                store: *store,
+                only_controller,
+                map,
+            })
+            .args(instruction::SetExpectedProvider {
+                token: *token,
+                provider: provider as u8,
             })
     }
 }
