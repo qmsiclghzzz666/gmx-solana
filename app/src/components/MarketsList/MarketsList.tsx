@@ -14,6 +14,7 @@ import PageTitle from "../PageTitle/PageTitle";
 import "./MarketsList.scss";
 import { getMidPrice } from "@/onchain/token/utils";
 import { getIconUrlPath } from "@/utils/icon";
+import { AssetDropdown } from "../AssetDropdown/AssetDropdown";
 
 export function MarketsList() {
   const indexTokensStats = useIndexTokenStats();
@@ -91,9 +92,9 @@ function MarketsListMobile({ indexTokensStats }: { indexTokensStats: IndexTokenS
                     width="20"
                   />
                   <div className="token-symbol-text">{stats.token.symbol}</div>
-                  {/* <div>
-                    <AssetDropdown assetSymbol={stats.token.symbol} />
-                  </div> */}
+                  <div>
+                    <AssetDropdown token={stats.token} />
+                  </div>
                 </div>
               </div>
               <div className="App-card-divider"></div>
@@ -214,9 +215,9 @@ function MarketsListDesktopItem({ stats }: { stats: IndexTokenStat }) {
             <div className="App-card-title-info-text">
               <div className="App-card-info-title">{marketIndexName}</div>
             </div>
-            {/* <div>
+            <div>
               <AssetDropdown token={stats.token} />
-            </div> */}
+            </div>
           </div>
         </div>
       </td>

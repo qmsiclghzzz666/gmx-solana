@@ -22,6 +22,7 @@ import { GmTokensBalanceInfo, GmTokensTotalBalanceInfo } from "../GmTokensBalanc
 import { BN } from "@coral-xyz/anchor";
 import { AprInfo } from "../AprInfo/AprInfo";
 import { BN_ZERO } from "@/config/constants";
+import { GmAssetDropdown } from "../AssetDropdown/GmAssetDropdown";
 
 type Props = {
   hideTitle?: boolean;
@@ -213,11 +214,9 @@ function DesktopList({
                         <div className="App-card-info-title">
                           {getMarketIndexName({ indexToken, isSpotOnly: market?.isSpotOnly })}
                           <div className="Asset-dropdown-container">
-                            {/* <GmAssetDropdown
-                              token={token}
-                              marketsInfoData={marketsInfoData}
-                              tokensData={tokensData}
-                            /> */}
+                            <GmAssetDropdown
+                              market={market}
+                            />
                           </div>
                         </div>
                         <div className="App-card-info-subtitle">
@@ -313,7 +312,7 @@ function MobileList(
       {!hideTitle && <PageTitle title={t`GM Pools`} />}
 
       <div className="token-grid">
-        {sortedMarketsByIndexToken.map((token) => {
+        {sortedMarketsByIndexToken.map((token, index) => {
           // const apr = marketsTokensAPRData?.[token.address];
           // const incentiveApr = marketsTokensIncentiveAprData?.[token.address];
           // const marketEarnings = getByKey(userEarnings?.byMarketAddress, token?.address);
@@ -348,12 +347,10 @@ function MobileList(
                     </div>
                   </div>
                   <div>
-                    {/* <GmAssetDropdown
-                      token={token}
-                      tokensData={tokensData}
-                      marketsInfoData={marketsInfoData}
+                    <GmAssetDropdown
+                      market={market}
                       position={index % 2 !== 0 ? "left" : "right"}
-                    /> */}
+                    />
                   </div>
                 </div>
               </div>
