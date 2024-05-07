@@ -20,6 +20,7 @@ idl-build = [
     "anchor-spl/idl-build",
 ]
 debug = ["data_store/debug"]
+devnet = ["data_store/devnet"]
 
 [dependencies]
 anchor-lang = { workspace = true }

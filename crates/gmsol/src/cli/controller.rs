@@ -45,9 +45,9 @@ struct Feeds {
     /// Pyth feed id.
     #[arg(long)]
     pyth_feed_id: Option<String>,
-    /// Pyth feed account (Devnet)
+    /// Pyth feed account (Legacy)
     #[arg(long)]
-    pyth_feed_devnet: Option<Pubkey>,
+    pyth_feed_legacy: Option<Pubkey>,
     /// Chainlink feed.
     #[arg(long)]
     chainlink_feed: Option<Pubkey>,
@@ -103,9 +103,9 @@ impl ControllerArgs {
                         .update_price_feed(&PriceProviderKind::Pyth, feed_id_as_key)
                         .map_err(anchor_client::ClientError::from)?;
                 }
-                if let Some(feed) = feeds.pyth_feed_devnet {
+                if let Some(feed) = feeds.pyth_feed_legacy {
                     builder = builder
-                        .update_price_feed(&PriceProviderKind::PythDev, feed)
+                        .update_price_feed(&PriceProviderKind::PythLegacy, feed)
                         .map_err(anchor_client::ClientError::from)?;
                 }
                 if let Some(feed) = feeds.chainlink_feed {
