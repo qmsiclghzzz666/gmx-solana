@@ -394,6 +394,15 @@ impl PriceProviderKind {
             Self::Chainlink | Self::PythLegacy => *feed,
         }
     }
+
+    /// Get correspoding program address.
+    pub fn program(&self) -> Pubkey {
+        match self {
+            Self::Pyth => Pyth::id(),
+            Self::Chainlink => Chainlink::id(),
+            Self::PythLegacy => PythLegacy::id(),
+        }
+    }
 }
 
 /// Supported Price Provider Programs.

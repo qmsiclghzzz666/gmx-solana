@@ -11,6 +11,7 @@ required-features = ["cli"]
 [features]
 cli = ["tokio/full", "clap", "tracing-subscriber", "shellexpand"]
 clap = ["dep:clap", "data_store/clap"]
+devnet = ["data_store/devnet", "exchange/devnet"]
 
 [dependencies]
 eyre = { version = "0.6.12" }

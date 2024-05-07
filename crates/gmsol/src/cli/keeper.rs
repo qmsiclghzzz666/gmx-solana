@@ -6,6 +6,7 @@ use anchor_client::{
     },
     Program, RequestBuilder,
 };
+use data_store::states::PriceProviderKind;
 use exchange::events::{DepositCreatedEvent, OrderCreatedEvent, WithdrawalCreatedEvent};
 use gmsol::{
     exchange::ExchangeOps,
@@ -28,6 +29,9 @@ pub(super) struct KeeperArgs {
     /// Set the execution fee to the given instead of estimating one.
     #[arg(long)]
     execution_fee: Option<u64>,
+    /// Set the price provider to use.
+    #[arg(long)]
+    provider: PriceProviderKind,
     #[command(subcommand)]
     command: Command,
 }
@@ -118,7 +122,7 @@ impl KeeperArgs {
                     .await?;
                 let signature = self
                     .insert_compute_budget_instructions(
-                        builder.execution_fee(execution_fee).build().await?,
+                        builder.execution_fee(execution_fee).price_provider(self.provider.program()).build().await?,
                     )
                     .send()
                     .await?;
@@ -134,7 +138,7 @@ impl KeeperArgs {
                     .await?;
                 let signature = self
                     .insert_compute_budget_instructions(
-                        builder.execution_fee(execution_fee).build().await?,
+                        builder.execution_fee(execution_fee).price_provider(self.provider.program()).build().await?,
                     )
                     .send()
                     .await?;
@@ -149,7 +153,7 @@ impl KeeperArgs {
                     .await?;
                 let signature = self
                     .insert_compute_budget_instructions(
-                        builder.execution_fee(execution_fee).build().await?,
+                        builder.execution_fee(execution_fee).price_provider(self.provider.program()).build().await?,
                     )
                     .send()
                     .await?;
