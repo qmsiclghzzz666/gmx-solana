@@ -1,6 +1,6 @@
 use core::fmt;
 
-use anchor_lang::{prelude::*, Ids, Owners};
+use anchor_lang::{prelude::*, Ids};
 use dual_vec_map::DualVecMap;
 use gmx_solana_utils::price::{Decimal, Price};
 use num_enum::TryFromPrimitive;
@@ -125,9 +125,7 @@ impl Oracle {
                 }
                 PriceProviderProgram::Pyth(_program, kind) => {
                     let feed_id = token_config.get_feed(kind)?;
-                    // We have to check the `feed_id` because the `feed` account is provided by user,
-                    // and one can provide a feed account for other assets that still be valid.
-                    Pyth::check_and_get_price(&clock, token_config, feed, Some(&feed_id))?
+                    Pyth::check_and_get_price(&clock, token_config, feed, &feed_id)?
                 }
                 PriceProviderProgram::PythLegacy(_program, kind) => {
                     require_eq!(
@@ -136,7 +134,7 @@ impl Oracle {
                         DataStoreError::InvalidPriceFeedAccount
                     );
                     // We don't have to check the `feed_id` because the `feed` account is set by keeper.
-                    Pyth::check_and_get_price(&clock, token_config, feed, None)?
+                    PythLegacy::check_and_get_price(&clock, token_config, feed)?
                 }
             };
             self.primary.set(token, price)?;
@@ -239,40 +237,12 @@ impl Pyth {
         clock: &Clock,
         token_config: &TokenConfig,
         feed: &'info AccountInfo<'info>,
-        feed_id: Option<&Pubkey>,
+        feed_id: &Pubkey,
     ) -> Result<Price> {
-        #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
-        struct PythPriceUpdate(PriceUpdateV2);
-
-        static PYTH_IDS: [Pubkey; 2] = [pyth_solana_receiver_sdk::ID, PYTH_LEGACY_ID];
-
-        impl Owners for PythPriceUpdate {
-            fn owners() -> &'static [Pubkey] {
-                &PYTH_IDS
-            }
-        }
-
-        impl AccountSerialize for PythPriceUpdate {}
-
-        impl AccountDeserialize for PythPriceUpdate {
-            fn try_deserialize_unchecked(buf: &mut &[u8]) -> Result<Self> {
-                Ok(Self(PriceUpdateV2::try_deserialize_unchecked(buf)?))
-            }
-
-            fn try_deserialize(buf: &mut &[u8]) -> Result<Self> {
-                Ok(Self(PriceUpdateV2::try_deserialize(buf)?))
-            }
-        }
-
-        let feed = InterfaceAccount::<PythPriceUpdate>::try_from(feed)?;
-        let feed_id = feed_id
-            .map(|id| id.to_bytes())
-            .unwrap_or_else(|| feed.0.price_message.feed_id);
-        let price = feed.0.get_price_no_older_than(
-            clock,
-            token_config.heartbeat_duration.into(),
-            &feed_id,
-        )?;
+        let feed = Account::<PriceUpdateV2>::try_from(feed)?;
+        let feed_id = feed_id.to_bytes();
+        let price =
+            feed.get_price_no_older_than(clock, token_config.heartbeat_duration.into(), &feed_id)?;
         let mid_price: u64 = price
             .price
             .try_into()
@@ -324,6 +294,33 @@ impl Pyth {
 
 /// The legacy Pyth program.
 pub struct PythLegacy;
+
+impl PythLegacy {
+    fn check_and_get_price<'info>(
+        clock: &Clock,
+        token_config: &TokenConfig,
+        feed: &'info AccountInfo<'info>,
+    ) -> Result<Price> {
+        use pyth_sdk_solana::state::SolanaPriceAccount;
+        let feed = SolanaPriceAccount::account_info_to_feed(feed).map_err(|err| {
+            msg!("Pyth Error: {}", err);
+            DataStoreError::Unknown
+        })?;
+        let Some(price) = feed
+            .get_price_no_older_than(clock.unix_timestamp, token_config.heartbeat_duration.into())
+        else {
+            return err!(DataStoreError::PriceFeedNotUpdated);
+        };
+        let mid_price: u64 = price
+            .price
+            .try_into()
+            .map_err(|_| DataStoreError::NegativePrice)?;
+        Ok(Price {
+            min: Pyth::price_value_to_decimal(mid_price, price.expo, token_config)?,
+            max: Pyth::price_value_to_decimal(mid_price, price.expo, token_config)?,
+        })
+    }
+}
 
 /// The address of legacy Pyth program.
 #[cfg(not(feature = "devnet"))]

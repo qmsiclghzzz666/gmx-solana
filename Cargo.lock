@@ -1370,6 +1370,7 @@ dependencies = [
  "gmx-core",
  "gmx-solana-utils",
  "num_enum 0.7.2",
+ "pyth-sdk-solana",
  "pyth-solana-receiver-sdk",
  "static_assertions",
 ]
@@ -2942,6 +2943,23 @@ dependencies = [
  "hex",
  "schemars",
  "serde",
+]
+
+[[package]]
+name = "pyth-sdk-solana"
+version = "0.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7f913de6eb29d8def199af3beaee645e84c5281327d58777eff3fdd9f1d37105"
+dependencies = [
+ "borsh 0.10.3",
+ "borsh-derive 0.10.3",
+ "bytemuck",
+ "num-derive 0.3.3",
+ "num-traits",
+ "pyth-sdk",
+ "serde",
+ "solana-program",
+ "thiserror",
 ]
 
 [[package]]
