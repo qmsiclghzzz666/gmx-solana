@@ -30,7 +30,7 @@ pub(super) struct KeeperArgs {
     #[arg(long)]
     execution_fee: Option<u64>,
     /// Set the price provider to use.
-    #[arg(long)]
+    #[arg(long, default_value = "pyth")]
     provider: PriceProviderKind,
     #[command(subcommand)]
     command: Command,
