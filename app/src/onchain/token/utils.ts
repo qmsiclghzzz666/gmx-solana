@@ -1,7 +1,7 @@
 import { NATIVE_TOKEN_ADDRESS } from "@/config/tokens";
-import { Token, TokenPrices, Tokens } from "./types";
+import { Token, TokenData, TokenPrices, Tokens } from "./types";
 import { Address, BN } from "@coral-xyz/anchor";
-import { expandDecimals } from "@/utils/number";
+import { convertToUsd, expandDecimals } from "@/utils/number";
 import { BN_ZERO } from "@/config/constants";
 
 export function getTokenData(tokensData?: Tokens, address?: Address, convertTo?: "wrapped" | "native") {
@@ -54,4 +54,8 @@ export function getIsEquivalentTokens(token1: Token, token2: Token) {
   // }
 
   return false;
+}
+
+export function getMaxMintableUsd(token: TokenData) {
+  return convertToUsd(token.maxMintable, token.decimals, token.prices.minPrice);
 }

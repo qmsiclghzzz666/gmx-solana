@@ -1,14 +1,14 @@
 import { useMemo } from "react";
 import { Trans, t } from "@lingui/macro";
 import { MarketInfos, MarketTokenAPRs } from "@/onchain/market";
-import { TokenData, Tokens } from "@/onchain/token";
+import { Token, TokenData, Tokens } from "@/onchain/token";
 import { useMedia } from "react-use";
 import icon_solana from "@/img/ic_solana_24.svg";
 import Tooltip from "../Tooltip/Tooltip";
 import PageTitle from "../PageTitle/PageTitle";
 import { useSortedPoolsWithIndexToken } from "@/hooks";
 import { getByKey } from "@/utils/objects";
-import { getMidPrice, getTokenData } from "@/onchain/token/utils";
+import { getMaxMintableUsd, getMidPrice, getTokenData } from "@/onchain/token/utils";
 import { convertToUsd, formatTokenAmount } from "@/utils/number";
 import { getNormalizedTokenSymbol } from "@/utils/tokens";
 import { formatUsd, getMarketIndexName, getMarketPoolName } from "../MarketsList/utils";
@@ -239,15 +239,13 @@ function DesktopList({
                     })}
                     <br />({formatUsd(totalSupplyUsd)})
                   </td>
+
                   <td className="GmList-last-column">
-                    Unlimited
-                    {/* <MintableAmount
-                      mintableInfo={mintableInfo}
-                      market={market}
+                    <MintableAmount
                       token={token}
-                      longToken={longToken}
-                      shortToken={shortToken}
-                    /> */}
+                      longToken={market.longToken}
+                      shortToken={market.shortToken}
+                    />
                   </td>
 
                   <td>
@@ -398,14 +396,11 @@ function MobileList(
                     />
                   </div>
                   <div>
-                    Unlimited
-                    {/* <MintableAmount
-                      mintableInfo={mintableInfo}
-                      market={market}
+                    <MintableAmount
                       token={token}
-                      longToken={longToken}
-                      shortToken={shortToken}
-                    /> */}
+                      longToken={market.longToken}
+                      shortToken={market.shortToken}
+                    />
                   </div>
                 </div>
                 <div className="App-card-row">
@@ -461,68 +456,68 @@ function MobileList(
   );
 }
 
-// function MintableAmount({ mintableInfo, market, token, longToken, shortToken }) {
-//   const longTokenMaxValue = useMemo(
-//     () => [
-//       formatTokenAmount(mintableInfo?.longDepositCapacityAmount, longToken.decimals, longToken.symbol, {
-//         useCommas: true,
-//       }),
-//       `(${formatTokenAmount(market.longPoolAmount, longToken.decimals, "", {
-//         useCommas: true,
-//         displayDecimals: 0,
-//       })} / ${formatTokenAmount(getMaxPoolAmountForDeposit(market, true), longToken.decimals, longToken.symbol, {
-//         useCommas: true,
-//         displayDecimals: 0,
-//       })})`,
-//     ],
-//     [longToken.decimals, longToken.symbol, market, mintableInfo?.longDepositCapacityAmount]
-//   );
-//   const shortTokenMaxValue = useMemo(
-//     () => [
-//       formatTokenAmount(mintableInfo?.shortDepositCapacityAmount, shortToken.decimals, shortToken.symbol, {
-//         useCommas: true,
-//       }),
-//       `(${formatTokenAmount(market.shortPoolAmount, shortToken.decimals, "", {
-//         useCommas: true,
-//         displayDecimals: 0,
-//       })} / ${formatTokenAmount(getMaxPoolAmountForDeposit(market, false), shortToken.decimals, shortToken.symbol, {
-//         useCommas: true,
-//         displayDecimals: 0,
-//       })})`,
-//     ],
-//     [market, mintableInfo?.shortDepositCapacityAmount, shortToken.decimals, shortToken.symbol]
-//   );
-//   return (
-//     <Tooltip
-//       maxAllowedWidth={350}
-//       handle={
-//         <>
-//           {formatTokenAmount(mintableInfo?.mintableAmount, token.decimals, "GM", {
-//             useCommas: true,
-//             displayDecimals: 0,
-//           })}
-//           <br />(
-//           {formatUsd(mintableInfo?.mintableUsd, {
-//             displayDecimals: 0,
-//           })}
-//           )
-//         </>
-//       }
-//       className="text-none"
-//       position="bottom-end"
-//       renderContent={() => (
-//         <>
-//           <p className="text-white">
-//             <Trans>
-//               {longToken.symbol} and {shortToken.symbol} can be used to buy GM tokens for this market up to the
-//               specified buying caps.
-//             </Trans>
-//           </p>
-//           <br />
-//           <StatsTooltipRow label={`Max ${longToken.symbol}`} value={longTokenMaxValue} />
-//           <StatsTooltipRow label={`Max ${shortToken.symbol}`} value={shortTokenMaxValue} />
-//         </>
-//       )}
-//     />
-//   );
-// }
+function MintableAmount({ token, longToken, shortToken }: { token: TokenData, longToken: Token, shortToken: Token }) {
+  // const longTokenMaxValue = useMemo(
+  //   () => [
+  //     formatTokenAmount(mintableInfo?.longDepositCapacityAmount, longToken.decimals, longToken.symbol, {
+  //       useCommas: true,
+  //     }),
+  //     `(${formatTokenAmount(market.longPoolAmount, longToken.decimals, "", {
+  //       useCommas: true,
+  //       displayDecimals: 0,
+  //     })} / ${formatTokenAmount(getMaxPoolAmountForDeposit(market, true), longToken.decimals, longToken.symbol, {
+  //       useCommas: true,
+  //       displayDecimals: 0,
+  //     })})`,
+  //   ],
+  //   [longToken.decimals, longToken.symbol, market, mintableInfo?.longDepositCapacityAmount]
+  // );
+  // const shortTokenMaxValue = useMemo(
+  //   () => [
+  //     formatTokenAmount(mintableInfo?.shortDepositCapacityAmount, shortToken.decimals, shortToken.symbol, {
+  //       useCommas: true,
+  //     }),
+  //     `(${formatTokenAmount(market.shortPoolAmount, shortToken.decimals, "", {
+  //       useCommas: true,
+  //       displayDecimals: 0,
+  //     })} / ${formatTokenAmount(getMaxPoolAmountForDeposit(market, false), shortToken.decimals, shortToken.symbol, {
+  //       useCommas: true,
+  //       displayDecimals: 0,
+  //     })})`,
+  //   ],
+  //   [market, mintableInfo?.shortDepositCapacityAmount, shortToken.decimals, shortToken.symbol]
+  // );
+  return (
+    <Tooltip
+      maxAllowedWidth={350}
+      handle={
+        <>
+          {formatTokenAmount(token.maxMintable, token.decimals, "GM", {
+            useCommas: true,
+            displayDecimals: 0,
+          })}
+          <br />(
+          {formatUsd(getMaxMintableUsd(token), {
+            displayDecimals: 0,
+          })}
+          )
+        </>
+      }
+      className="text-none"
+      position="bottom-end"
+      renderContent={() => (
+        <>
+          <p className="text-white">
+            <Trans>
+              {longToken.symbol} and {shortToken.symbol} can be used to buy GM tokens for this market up to the
+              specified buying caps.
+            </Trans>
+          </p>
+          {/* <br />
+          <StatsTooltipRow label={`Max ${longToken.symbol}`} value={longTokenMaxValue} />
+          <StatsTooltipRow label={`Max ${shortToken.symbol}`} value={shortTokenMaxValue} /> */}
+        </>
+      )}
+    />
+  );
+}

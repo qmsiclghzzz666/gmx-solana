@@ -28,6 +28,7 @@ export type TokenData = Token & TokenMetadata & {
 export interface TokenMetadata {
   decimals: number,
   totalSupply?: BN,
+  maxMintable?: BN,
 }
 
 export interface TokenMetadatas {

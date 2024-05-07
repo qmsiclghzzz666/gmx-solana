@@ -10,6 +10,7 @@ import { useAnchorProvider } from "@/contexts/anchor";
 import { Address, translateAddress } from "@coral-xyz/anchor";
 import { isObject } from "lodash";
 import { NATIVE_TOKEN_ADDRESS } from "@/config/tokens";
+import { MAX_SUPPLY } from "@/config/constants";
 
 export const BALANCE_KEY = "token-balanses";
 export const METADATA_KEY = "token-metadatas";
@@ -70,9 +71,11 @@ export const useTokenMetadatas = (tokens: PublicKey[]) => {
     for (const addressStr of tokens) {
       const address = translateAddress(addressStr);
       const mint = await getMint(connection.connection, translateAddress(address));
+      const totalSupply = toBN(mint.supply);
       tokenDatas[address.toBase58()] = {
         decimals: mint.decimals,
-        totalSupply: toBN(mint.supply),
+        totalSupply,
+        maxMintable: MAX_SUPPLY.sub(totalSupply),
       };
     }
 
@@ -91,7 +94,6 @@ export const useTokenBalances = (tokens: Address[]) => {
   const owner = provider?.publicKey;
   const request = useMemo(() => {
     const tokensList = tokens.map(token => token.toString());
-    console.log(tokensList);
     return {
       key: BALANCE_KEY,
       tokens: tokensList,

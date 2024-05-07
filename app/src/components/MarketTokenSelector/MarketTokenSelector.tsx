@@ -4,9 +4,9 @@ import { Popover } from "@headlessui/react";
 import cx from "classnames";
 import { FaChevronDown } from "react-icons/fa";
 import { MarketInfo, MarketInfos, MarketTokenAPRs } from "@/onchain/market";
-import { Tokens } from "@/onchain/token";
+import { Tokens, getMaxMintableUsd } from "@/onchain/token";
 import { useSortedPoolsWithIndexToken } from "@/hooks";
-import { getMarketIndexName, getMarketPoolName } from "../MarketsList/utils";
+import { formatUsd, getMarketIndexName, getMarketPoolName } from "../MarketsList/utils";
 import { getByKey } from "@/utils/objects";
 import { getSellableMarketToken } from "@/onchain/market/utils";
 import { useNavigate } from "react-router-dom";
@@ -180,11 +180,10 @@ export default function MarketTokenSelector(props: Props) {
                                 </span>
                               </td>
                               <td>
-                                {/* {formatUsd(mintableInfo?.mintableUsd, {
+                                {formatUsd(getMaxMintableUsd(market), {
                                   displayDecimals: 0,
                                   fallbackToZero: true,
-                                })} */}
-                                Unlimited
+                                })}
                               </td>
                               <td>
                                 {formatTokenAmount(sellableInfo?.totalAmount ?? BN_ZERO, market?.decimals, market?.symbol, {

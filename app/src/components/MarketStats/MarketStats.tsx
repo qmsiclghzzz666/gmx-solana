@@ -9,7 +9,7 @@ import { CardRow } from "../CardRow/CardRow";
 import StatsTooltipRow from "../StatsTooltipRow/StatsTooltipRow";
 import { BN_ZERO, GM_DECIMALS } from "@/config/constants";
 import { getPoolUsdWithoutPnl, getSellableMarketToken } from "@/onchain/market/utils";
-import { convertToTokenAmount, getMidPrice } from "@/onchain/token/utils";
+import { convertToTokenAmount, getMaxMintableUsd, getMidPrice } from "@/onchain/token/utils";
 import MarketTokenSelector from "../MarketTokenSelector/MarketTokenSelector";
 import { AprInfo } from "../AprInfo/AprInfo";
 
@@ -200,60 +200,59 @@ export function MarketStats(p: Props) {
         <CardRow
           label={t`Buyable`}
           value={
-            // mintableInfo && marketTotalSupplyUsd && marketToken ? (
-            //   <Tooltip
-            //     maxAllowedWidth={350}
-            //     handle={formatTokenAmountWithUsd(
-            //       mintableInfo.mintableAmount,
-            //       mintableInfo.mintableUsd,
-            //       "GM",
-            //       marketToken?.decimals,
-            //       {
-            //         displayDecimals: 0,
-            //       }
-            //     )}
-            //     position="bottom-end"
-            //     renderContent={() => {
-            //       return (
-            //         <div>
-            //           {marketInfo?.isSameCollaterals ? (
-            //             <Trans>
-            //               {marketInfo?.longToken.symbol} can be used to buy GM for this market up to the specified
-            //               buying caps.
-            //             </Trans>
-            //           ) : (
-            //             <Trans>
-            //               {marketInfo?.longToken.symbol} and {marketInfo?.shortToken.symbol} can be used to buy GM for
-            //               this market up to the specified buying caps.
-            //             </Trans>
-            //           )}
+            marketTotalSupplyUsd && marketToken ? (
+              <Tooltip
+                maxAllowedWidth={350}
+                handle={formatTokenAmountWithUsd(
+                  marketToken.maxMintable,
+                  getMaxMintableUsd(marketToken),
+                  "GM",
+                  marketToken?.decimals,
+                  {
+                    displayDecimals: 0,
+                  }
+                )}
+                position="bottom-end"
+                renderContent={() => {
+                  return (
+                    <div>
+                      {marketInfo?.isSingle ? (
+                        <Trans>
+                          {marketInfo?.longToken.symbol} can be used to buy GM for this market up to the specified
+                          buying caps.
+                        </Trans>
+                      ) : (
+                        <Trans>
+                          {marketInfo?.longToken.symbol} and {marketInfo?.shortToken.symbol} can be used to buy GM for
+                          this market up to the specified buying caps.
+                        </Trans>
+                      )}
+                      {/* 
+                      <br />
+                      <br />
 
-            //           <br />
-            //           <br />
+                      <StatsTooltipRow
+                        label={t`Max ${marketInfo?.longToken.symbol}`}
+                        value={maxLongTokenValue}
+                        showDollar={false}
+                      />
 
-            //           <StatsTooltipRow
-            //             label={t`Max ${marketInfo?.longToken.symbol}`}
-            //             value={maxLongTokenValue}
-            //             showDollar={false}
-            //           />
+                      <br />
 
-            //           <br />
-
-            //           {!marketInfo?.isSameCollaterals && (
-            //             <StatsTooltipRow
-            //               label={t`Max ${marketInfo?.shortToken.symbol}`}
-            //               value={maxShortTokenValue}
-            //               showDollar={false}
-            //             />
-            //           )}
-            //         </div>
-            //       );
-            //     }}
-            //   />
-            // ) : (
-            //   "..."
-            // )
-            "Unlimited"
+                      {!marketInfo?.isSameCollaterals && (
+                        <StatsTooltipRow
+                          label={t`Max ${marketInfo?.shortToken.symbol}`}
+                          value={maxShortTokenValue}
+                          showDollar={false}
+                        />
+                      )} */}
+                    </div>
+                  );
+                }}
+              />
+            ) : (
+              "..."
+            )
           }
         />
 
