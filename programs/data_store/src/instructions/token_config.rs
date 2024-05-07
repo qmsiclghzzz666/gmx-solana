@@ -2,7 +2,9 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::Mint;
 
 use crate::{
-    states::{DataStore, Roles, Seed, TokenConfig, TokenConfigBuilder, TokenConfigMap},
+    states::{
+        DataStore, PriceProviderKind, Roles, Seed, TokenConfig, TokenConfigBuilder, TokenConfigMap,
+    },
     utils::internal,
 };
 
@@ -163,6 +165,42 @@ pub fn toggle_token_config(
 }
 
 impl<'info> internal::Authentication<'info> for ToggleTokenConfig<'info> {
+    fn authority(&self) -> &Signer<'info> {
+        &self.authority
+    }
+
+    fn store(&self) -> &Account<'info, DataStore> {
+        &self.store
+    }
+
+    fn roles(&self) -> &Account<'info, Roles> {
+        &self.only_controller
+    }
+}
+
+#[derive(Accounts)]
+pub struct SetExpectedProvider<'info> {
+    pub authority: Signer<'info>,
+    pub store: Account<'info, DataStore>,
+    pub only_controller: Account<'info, Roles>,
+    #[account(
+        mut,
+        seeds = [TokenConfigMap::SEED, store.key().as_ref()],
+        bump = map.bump,
+    )]
+    pub map: Account<'info, TokenConfigMap>,
+}
+
+/// Set the expected provider for the given token.
+pub fn set_expected_provider(
+    ctx: Context<SetExpectedProvider>,
+    token: Pubkey,
+    provider: PriceProviderKind,
+) -> Result<()> {
+    ctx.accounts.map.set_expected_provider(&token, provider)
+}
+
+impl<'info> internal::Authentication<'info> for SetExpectedProvider<'info> {
     fn authority(&self) -> &Signer<'info> {
         &self.authority
     }

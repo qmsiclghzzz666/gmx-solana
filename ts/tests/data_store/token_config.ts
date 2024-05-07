@@ -1,7 +1,7 @@
 import { Keypair, PublicKey } from '@solana/web3.js';
 
 import { expect, getAddresses, getProvider, getUsers } from "../../utils/fixtures";
-import { createRolesPDA, extendTokenConfigMap, getTokenConfig, insertSyntheticTokenConfig, insertTokenConfig, toggleTokenConfig } from "../../utils/data";
+import { createRolesPDA, extendTokenConfigMap, getTokenConfig, insertSyntheticTokenConfig, insertTokenConfig, setExpectedProvider, toggleTokenConfig } from "../../utils/data";
 import { AnchorError } from '@coral-xyz/anchor';
 import { createMint } from '@solana/spl-token';
 import { BTC_FEED, SOL_FEED } from '../../utils/token';
@@ -70,6 +70,13 @@ describe("data store: TokenConfig", () => {
             await toggleTokenConfig(signer0, dataStoreAddress, newToken, true);
             const config = await getTokenConfig(dataStoreAddress, newToken);
             expect(config.enabled).true;
+        }
+
+        // Select a different expected provider.
+        {
+            await setExpectedProvider(signer0, dataStoreAddress, newToken, PriceProvider.PythLegacy);
+            const config = await getTokenConfig(dataStoreAddress, newToken);
+            expect(config.expectedProvider).eqls(PriceProvider.PythLegacy);
         }
     });
 

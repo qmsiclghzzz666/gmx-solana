@@ -107,12 +107,26 @@ export const toggleTokenConfig = async (
     }).signers([authority]).rpc();
 };
 
+export const setExpectedProvider = async (
+    authority: Signer,
+    store: PublicKey,
+    token: PublicKey,
+    provider: PriceProvider,
+) => {
+    await dataStore.methods.setExpectedProvider(token, provider).accounts({
+        authority: authority.publicKey,
+        store,
+        onlyController: createRolesPDA(store, authority.publicKey)[0],
+    }).signers([authority]).rpc();
+};
+
 export interface TokenConfig {
     enabled: boolean,
     heartbeatDuration: number,
     tokenDecimals: number,
     precision: number,
     feeds: PublicKey[],
+    expectedProvider: number,
 }
 
 export const getTokenConfig = async (store: PublicKey, token: PublicKey) => {

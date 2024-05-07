@@ -12,5 +12,5 @@ export const findControllerPDA = (store: PublicKey) => PublicKey.findProgramAddr
 export enum PriceProvider {
     Pyth = 0,
     Chainlink = 1,
-    PythDevnet = 2,
+    PythLegacy = 2,
 }

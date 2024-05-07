@@ -189,6 +189,18 @@ impl TokenConfigMap {
         DualVecMap::from_sorted_stores_unchecked(&mut self.tokens, &mut self.configs)
     }
 
+    pub(crate) fn set_expected_provider(
+        &mut self,
+        key: &Pubkey,
+        kind: PriceProviderKind,
+    ) -> Result<()> {
+        self.as_map_mut()
+            .get_mut(key)
+            .ok_or(DataStoreError::RequiredResourceNotFound)?
+            .expected_provider = kind as u8;
+        Ok(())
+    }
+
     pub(crate) fn init(&mut self, bump: u8) {
         self.bump = bump;
         self.configs.clear();

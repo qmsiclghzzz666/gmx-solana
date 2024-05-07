@@ -23,6 +23,7 @@ use self::{
         order::OrderParams,
         token_config::{TokenConfig, TokenConfigBuilder},
         withdrawal::TokenParams as WithdrawalTokenParams,
+        PriceProviderKind,
     },
     utils::internal,
 };
@@ -129,6 +130,20 @@ pub mod data_store {
         enable: bool,
     ) -> Result<()> {
         instructions::toggle_token_config(ctx, token, enable)
+    }
+
+    #[access_control(internal::Authenticate::only_controller(&ctx))]
+    pub fn set_expected_provider(
+        ctx: Context<SetExpectedProvider>,
+        token: Pubkey,
+        provider: u8,
+    ) -> Result<()> {
+        instructions::set_expected_provider(
+            ctx,
+            token,
+            PriceProviderKind::try_from(provider)
+                .map_err(|_| DataStoreError::InvalidProviderKindIndex)?,
+        )
     }
 
     pub fn get_token_config(
