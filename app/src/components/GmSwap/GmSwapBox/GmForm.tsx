@@ -250,7 +250,7 @@ export function GmForm({
             {...(allowWrapFirstToken && {
               onClickTopLeftLabel: wrapNativeToken,
             })}
-            topLeftValue={formatUsd(firstTokenUsd)}
+            topLeftValue={firstTokenUsd?.gt(BN_ZERO) ? formatUsd(firstTokenUsd) : ""}
             topRightLabel={t`Balance`}
             topRightValue={formatTokenAmount(firstToken?.balance || BN_ZERO, firstToken?.decimals, "", {
               useCommas: true,
@@ -301,7 +301,7 @@ export function GmForm({
               {...(allowWrapSecondToken && {
                 onClickTopLeftLabel: wrapNativeToken,
               })}
-              topLeftValue={formatUsd(secondTokenUsd)}
+              topLeftValue={secondTokenUsd?.gt(BN_ZERO) ? formatUsd(secondTokenUsd) : ""}
               topRightLabel={t`Balance`}
               topRightValue={formatTokenAmount(secondToken?.balance ?? BN_ZERO, secondToken?.decimals, "", {
                 useCommas: true,
