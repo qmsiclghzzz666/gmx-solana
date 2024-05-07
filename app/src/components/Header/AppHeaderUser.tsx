@@ -1,8 +1,4 @@
-import { Trans } from "@lingui/macro";
-import cx from "classnames";
-
 import "./Header.scss";
-import { HeaderLink } from "./HeaderLink";
 
 import "@solana/wallet-adapter-react-ui/styles.css";
 import { useWallet } from "@solana/wallet-adapter-react";
@@ -24,11 +20,11 @@ export function AppHeaderUser({ small }: Props) {
   }, [wallet]);
   return (
     <div className="App-header-user">
-      <div className={cx("App-header-trade-link")}>
+      {/* <div className={cx("App-header-trade-link")}>
         <HeaderLink className="default-btn" to="/trade">
           <Trans>Trade</Trans>
         </HeaderLink>
-      </div>
+      </div> */}
       <>
         {(connected && publicKey) ? (
           <div className="App-header-user-address">

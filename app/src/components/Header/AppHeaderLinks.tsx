@@ -30,18 +30,13 @@ export function AppHeaderLinks({ small, openSettings, clickCloseIcon }: Props) {
         </div>
       )}
       <div className="App-header-link-container">
-        <HeaderLink to="/dashboard">
-          <Trans>Dashboard</Trans>
+        <HeaderLink to="/trade">
+          <Trans>Trade</Trans>
         </HeaderLink>
       </div>
       <div className="App-header-link-container">
         <HeaderLink to="/earn">
           <Trans>Earn</Trans>
-        </HeaderLink>
-      </div>
-      <div className="App-header-link-container">
-        <HeaderLink to="/trade">
-          <Trans>Trade</Trans>
         </HeaderLink>
       </div>
       <div className="App-header-link-container">
@@ -55,13 +50,23 @@ export function AppHeaderLinks({ small, openSettings, clickCloseIcon }: Props) {
         </HeaderLink>
       </div>
       <div className="App-header-link-container">
+        <HeaderLink to="/referrals">
+          <Trans>Referrals</Trans>
+        </HeaderLink>
+      </div>
+      <div className="App-header-link-container">
+        <HeaderLink to="/otc">
+          <Trans>OTC</Trans>
+        </HeaderLink>
+      </div>
+      <div className="App-header-link-container">
         <HeaderLink to="/treasury">
           <Trans>Treasury</Trans>
         </HeaderLink>
       </div>
       <div className="App-header-link-container">
-        <HeaderLink to="/referrals">
-          <Trans>Referrals</Trans>
+        <HeaderLink to="/dashboard">
+          <Trans>Dashboard</Trans>
         </HeaderLink>
       </div>
       <div className="App-header-link-container">
