@@ -8,7 +8,6 @@ import { useAvailableTokenOptions } from "./use-available-token-options";
 import { mapValues, pick } from "lodash";
 import { getByKey } from "@/utils/objects";
 import { createTradeFlags } from "./utils";
-import { useSafeState } from "@/utils/state";
 
 const INITIAL_TRADE_OPTIONS: TradeOptions = {
   tradeType: TradeType.Long,
@@ -174,9 +173,9 @@ export function useTradeBoxState(
 ) {
   const avaiableTokensOptions = useAvailableTokenOptions({ marketInfos, tokens });
   const [tradeOptions, setTradeOptions] = useTradeOptions(chainId, avaiableTokensOptions);
-  const [fromTokenInputValue, setFromTokenInputValue] = useSafeState("");
-  const [toTokenInputValue, setToTokenInputValue] = useSafeState("");
-  const [triggerRatioInputValue, setTriggerRatioInputValue] = useSafeState("");
+  const [fromTokenInputValue, setFromTokenInputValue] = useState("");
+  const [toTokenInputValue, setToTokenInputValue] = useState("");
+  const [triggerRatioInputValue, setTriggerRatioInputValue] = useState("");
   const [focusedInput, setFocusedInput] = useState<"from" | "to">();
   const [stage, setStage] = useState<"trade" | "confirmation">("trade");
 
