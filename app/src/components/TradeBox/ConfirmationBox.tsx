@@ -290,7 +290,7 @@ function useTriggerCreateOrder() {
           swapPath: swapPath.map(translateAddress),
           initialCollateralToken: initialCollateralToken.address,
         }
-      }, { skipPreflight });
+      }, { skipPreflight, computeUnits: 400000 });
       console.log(`created increase order ${order.toBase58()} at tx ${signatrue}`);
       return signatrue;
     } else {

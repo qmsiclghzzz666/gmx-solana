@@ -77,7 +77,7 @@ function ConfirmationModalInner({ isVisible, onClose }: { isVisible: boolean, on
 
   const createDecreaseOrder = useCallback(async (params: MakeCreateDecreaseOrderParams) => {
     if (payer) {
-      const [signature, order] = await invokeCreateDecreaseOrder(exchange, params, { skipPreflight: false });
+      const [signature, order] = await invokeCreateDecreaseOrder(exchange, params, { skipPreflight: false, computeUnits: 400000 });
       console.log(`created a decrease order ${order.toBase58()} at tx ${signature}`);
       return signature;
     } else {
