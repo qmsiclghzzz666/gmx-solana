@@ -11,7 +11,6 @@ const selectSortedAllMarkets = createSharedStatesSelector([selectTradeBoxState],
 export const selectTradeBoxGetMaxLongShortLiquidityPool = createSharedStatesSelector([
   selectSortedAllMarkets,
 ], (sortedAllMarkets) => {
-
   const marketsWithMaxReservedUsd = sortedAllMarkets.map((marketInfo) => {
     const maxLongLiquidity = getAvailableUsdLiquidityForPosition(marketInfo, true);
     const maxShortLiquidity = getAvailableUsdLiquidityForPosition(marketInfo, false);
@@ -30,8 +29,8 @@ export const selectTradeBoxGetMaxLongShortLiquidityPool = createSharedStatesSele
   );
 
   return (token: Token) => {
-    const indexTokenAddress = token.isNative ? token.wrappedAddress : token.address;
-    const currentMarkets = groupedIndexMarkets[indexTokenAddress!.toBase58()];
+    const indexTokenAddress = token.address;
+    const currentMarkets = groupedIndexMarkets[indexTokenAddress.toBase58()];
     const maxLongLiquidityPool = maxBy(currentMarkets, (market) => toBigInt(market.maxLongLiquidity))!;
     const maxShortLiquidityPool = maxBy(currentMarkets, (market) => toBigInt(market.maxShortLiquidity))!;
 
