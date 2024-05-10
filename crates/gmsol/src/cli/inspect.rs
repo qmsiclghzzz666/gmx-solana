@@ -53,6 +53,11 @@ enum Command {
     Order { address: Pubkey },
     /// `Position` account.
     Position { address: Pubkey },
+    /// Watch Pyth Price Updates.
+    WatchPyth {
+        #[arg(required = true)]
+        feed_ids: Vec<String>,
+    },
 }
 
 impl InspectArgs {
@@ -137,6 +142,27 @@ impl InspectArgs {
                     )
                     .await?
                 );
+            }
+            Command::WatchPyth { feed_ids } => {
+                use futures_util::TryStreamExt;
+                use gmsol::pyth::Hermes;
+                use pyth_sdk::Identifier;
+
+                let hermes = Hermes::default();
+
+                let feed_ids = feed_ids
+                    .iter()
+                    .map(|id| {
+                        let hex = id.strip_prefix("0x").unwrap_or(id);
+                        Identifier::from_hex(hex).map_err(gmsol::Error::unknown)
+                    })
+                    .collect::<gmsol::Result<Vec<_>>>()?;
+
+                let stream = hermes.price_updates(feed_ids).await?;
+                futures_util::pin_mut!(stream);
+                while let Some(update) = stream.try_next().await? {
+                    tracing::info!("{update:#?}");
+                }
             }
         }
         Ok(())

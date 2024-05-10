@@ -7,6 +7,10 @@ pub mod store;
 /// Actions for `Exchange` program.`
 pub mod exchange;
 
+/// Pyth integration.
+#[cfg(feature = "pyth")]
+pub mod pyth;
+
 /// Utils.
 pub mod utils;
 

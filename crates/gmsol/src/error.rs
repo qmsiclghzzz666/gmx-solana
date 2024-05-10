@@ -34,6 +34,18 @@ pub enum Error {
     /// Invalid Arguments.
     #[error("invalid argument: {0}")]
     InvalidArgument(String),
+    #[cfg(feature = "reqwest")]
+    #[error(transparent)]
+    Reqwest(#[from] reqwest::Error),
+    #[cfg(feature = "url")]
+    #[error("parse url: {0}")]
+    ParseUrl(#[from] url::ParseError),
+    #[cfg(feature = "pyth")]
+    #[error("sse: {0}")]
+    Sse(#[from] eventsource_stream::EventStreamError<reqwest::Error>),
+    #[cfg(feature = "serde_json")]
+    #[error("json: {0}")]
+    Json(#[from] serde_json::Error),
 }
 
 impl Error {

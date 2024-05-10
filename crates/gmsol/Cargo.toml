@@ -9,9 +9,17 @@ path = "src/cli/main.rs"
 required-features = ["cli"]
 
 [features]
-cli = ["tokio/full", "clap", "tracing-subscriber", "shellexpand"]
+cli = ["pyth", "tokio/full", "clap", "tracing-subscriber", "shellexpand"]
 clap = ["dep:clap", "data_store/clap"]
 devnet = ["data_store/devnet", "exchange/devnet"]
+pyth = [
+    "reqwest/stream",
+    "futures-util",
+    "url",
+    "serde",
+    "serde_json",
+    "eventsource-stream",
+]
 
 [dependencies]
 eyre = { version = "0.6.12" }
@@ -45,3 +53,11 @@ tracing-subscriber = { version = "0.3.18", optional = true, features = [
 ] }
 shellexpand = { version = "3.1.0", optional = true }
 pyth-sdk = "0.8.0"
+
+# Dependencies for pyth support
+reqwest = { version = "0.12.4", optional = true }
+futures-util = { version = "0.3.30", optional = true }
+url = { version = "2.5.0", optional = true }
+serde_json = { version = "1.0.117", optional = true }
+serde = { version = "1.0.201", optional = true, features = ["derive"] }
+eventsource-stream = { version = "0.2.3", optional = true }
