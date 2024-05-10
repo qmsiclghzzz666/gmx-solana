@@ -8,6 +8,7 @@ const IC_ICONS = [
   "usdc",
   "usdg",
   "wsol",
+  "pepe",
 ];
 
 function symbolExists(symbol: string): boolean {
