@@ -105,7 +105,7 @@ export default function Earn() {
         store: GMSOL_DEPLOYMENT?.store,
         payer,
         ...ixParams,
-      }, { skipPreflight });
+      }, { skipPreflight, computeUnits: 400000 });
       console.log(`created a deposit ${deposit.toBase58()} at tx ${signature}`);
       return signature;
     } else {
@@ -129,7 +129,7 @@ export default function Earn() {
         store: GMSOL_DEPLOYMENT.store,
         payer,
         ...ixParams,
-      }, { skipPreflight });
+      }, { skipPreflight, computeUnits: 400000 });
       console.log(`created a withdrawal ${deposit.toBase58()} at tx ${signature}`);
       return signature;
     } else {
