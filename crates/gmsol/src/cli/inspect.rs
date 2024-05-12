@@ -145,7 +145,7 @@ impl InspectArgs {
             }
             Command::WatchPyth { feed_ids } => {
                 use futures_util::TryStreamExt;
-                use gmsol::pyth::Hermes;
+                use gmsol::pyth::{EncodingType, Hermes};
                 use pyth_sdk::Identifier;
 
                 let hermes = Hermes::default();
@@ -158,7 +158,9 @@ impl InspectArgs {
                     })
                     .collect::<gmsol::Result<Vec<_>>>()?;
 
-                let stream = hermes.price_updates(feed_ids).await?;
+                let stream = hermes
+                    .price_updates(feed_ids, Some(EncodingType::Base64))
+                    .await?;
                 futures_util::pin_mut!(stream);
                 while let Some(update) = stream.try_next().await? {
                     tracing::info!("{update:#?}");

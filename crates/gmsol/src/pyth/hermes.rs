@@ -1,3 +1,5 @@
+use std::fmt;
+
 use eventsource_stream::Eventsource;
 use futures_util::{Stream, TryStreamExt};
 use pyth_sdk::Identifier;
@@ -29,10 +31,12 @@ impl Hermes {
     pub async fn price_updates(
         &self,
         feed_ids: impl IntoIterator<Item = Identifier>,
+        encoding: Option<EncodingType>,
     ) -> crate::Result<impl Stream<Item = crate::Result<PriceUpdate>>> {
         let params: Vec<_> = feed_ids
             .into_iter()
             .map(|id| ("ids[]", id.to_hex()))
+            .chain(encoding.map(|encoding| ("encoding", encoding.to_string())))
             .collect();
         let stream = self
             .client
@@ -91,6 +95,15 @@ pub enum EncodingType {
     /// Base64.
     #[serde(rename = "base64")]
     Base64,
+}
+
+impl fmt::Display for EncodingType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Hex => write!(f, "hex"),
+            Self::Base64 => write!(f, "base64"),
+        }
+    }
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
