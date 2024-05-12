@@ -1,4 +1,4 @@
-use pythnet_sdk::wire::v1::AccumulatorUpdateData;
+use pythnet_sdk::wire::v1::{AccumulatorUpdateData, Proof};
 
 use super::{hermes::PriceUpdate, EncodingType};
 
@@ -32,4 +32,18 @@ pub fn parse_accumulator_update_datas(
 #[inline]
 fn parse_accumulator_update_data(data: &[u8]) -> crate::Result<AccumulatorUpdateData> {
     AccumulatorUpdateData::try_from_slice(data).map_err(crate::Error::unknown)
+}
+
+/// Get guardian set index from [`Proof`].
+pub fn get_guardian_set_index(proof: &Proof) -> crate::Result<i32> {
+    match proof {
+        Proof::WormholeMerkle { vaa, .. } => {
+            let vaa = vaa.as_ref();
+            if vaa.len() < 5 {
+                return Err(crate::Error::unknown("invalid vaa"));
+            }
+            let index: &[u8; 4] = (&vaa[1..5]).try_into().map_err(crate::Error::unknown)?;
+            Ok(i32::from_be_bytes(*index))
+        }
+    }
 }

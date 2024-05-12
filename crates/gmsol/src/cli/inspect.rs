@@ -165,7 +165,11 @@ impl InspectArgs {
                 while let Some(update) = stream.try_next().await? {
                     tracing::info!("{:#?}", update.parsed());
                     let datas = utils::parse_accumulator_update_datas(&update)?;
-                    tracing::info!("{datas:?}");
+                    for data in datas {
+                        let proof = &data.proof;
+                        let guardian_set_index = utils::get_guardian_set_index(proof)?;
+                        tracing::info!("{guardian_set_index}:{proof:?}");
+                    }
                 }
             }
         }
