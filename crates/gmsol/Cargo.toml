@@ -19,6 +19,7 @@ pyth = [
     "serde",
     "serde_json",
     "eventsource-stream",
+    "pythnet-sdk",
 ]
 
 [dependencies]
@@ -61,3 +62,4 @@ url = { version = "2.5.0", optional = true }
 serde_json = { version = "1.0.117", optional = true }
 serde = { version = "1.0.201", optional = true, features = ["derive"] }
 eventsource-stream = { version = "0.2.3", optional = true }
+pythnet-sdk = { version = "2.1.0", optional = true }

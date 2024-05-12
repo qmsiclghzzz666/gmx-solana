@@ -75,15 +75,22 @@ fn deserialize_price_update_event(event: &eventsource_stream::Event) -> crate::R
 /// Price Update.
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct PriceUpdate {
-    binary: BinaryPriceUpdate,
+    pub(crate) binary: BinaryPriceUpdate,
     #[serde(default)]
     parsed: Vec<ParsedPriceUpdate>,
 }
 
+impl PriceUpdate {
+    /// Get the parsed price udpate.
+    pub fn parsed(&self) -> &[ParsedPriceUpdate] {
+        &self.parsed
+    }
+}
+
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct BinaryPriceUpdate {
-    encoding: EncodingType,
-    data: Vec<String>,
+    pub(crate) encoding: EncodingType,
+    pub(crate) data: Vec<String>,
 }
 
 #[derive(Clone, Copy, Debug, Default, serde::Deserialize, serde::Serialize)]

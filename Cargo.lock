@@ -1891,6 +1891,7 @@ dependencies = [
  "futures-util",
  "gmx-solana-utils",
  "pyth-sdk",
+ "pythnet-sdk 2.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.8.5",
  "reqwest 0.12.4",
  "serde",
@@ -3186,8 +3187,27 @@ source = "git+https://github.com/pyth-network/pyth-crosschain?rev=308599714ff07a
 dependencies = [
  "anchor-lang",
  "hex",
- "pythnet-sdk",
+ "pythnet-sdk 2.1.0 (git+https://github.com/pyth-network/pyth-crosschain?rev=308599714ff07aa6bbb31c36d79e8095bfc98c74)",
  "solana-program",
+]
+
+[[package]]
+name = "pythnet-sdk"
+version = "2.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3bbbc0456f9f27c9ad16b6c3bf1b2a7fea61eebf900f4d024a0468b9a84fe0c1"
+dependencies = [
+ "bincode",
+ "borsh 0.10.3",
+ "bytemuck",
+ "byteorder",
+ "fast-math",
+ "hex",
+ "rustc_version",
+ "serde",
+ "sha3 0.10.8",
+ "slow_primes",
+ "thiserror",
 ]
 
 [[package]]
