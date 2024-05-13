@@ -12,8 +12,7 @@ use anchor_client::{
     Program,
 };
 
-/// A wrapper of [`RequestBuilder`](anchor_client::RequestBuilder)
-/// better instruction insertion methods.
+/// A wrapper of [`RequestBuilder`](anchor_client::RequestBuilder).
 #[must_use]
 pub struct RpcBuilder<'a, C, T = ()> {
     output: T,
@@ -22,7 +21,6 @@ pub struct RpcBuilder<'a, C, T = ()> {
     pre_instructions: Vec<Instruction>,
     accounts: Vec<AccountMeta>,
     instruction_data: Option<Vec<u8>>,
-    post_instructions: Vec<Instruction>,
     compute_budget: Option<ComputeBudget>,
 }
 
@@ -54,6 +52,14 @@ impl ComputeBudget {
         self.price_micro_lamports = micro_lamports;
         self
     }
+
+    /// Build compute budget instructions.
+    pub fn compute_budget_instructions(&self) -> Vec<Instruction> {
+        vec![
+            ComputeBudgetInstruction::set_compute_unit_limit(self.limit_units),
+            ComputeBudgetInstruction::set_compute_unit_price(self.price_micro_lamports),
+        ]
+    }
 }
 
 impl<'a, C: Deref<Target = impl Signer> + Clone> RpcBuilder<'a, C> {
@@ -66,7 +72,6 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> RpcBuilder<'a, C> {
             pre_instructions: Default::default(),
             accounts: Default::default(),
             instruction_data: None,
-            post_instructions: Default::default(),
             compute_budget: Some(ComputeBudget::default()),
         }
     }
@@ -123,13 +128,9 @@ impl<'a, C: Deref<Target = impl Signer> + Clone, T> RpcBuilder<'a, C, T> {
     }
 
     fn get_compute_budget_instructions(&self) -> Vec<Instruction> {
-        let Some(budget) = self.compute_budget.as_ref() else {
-            return vec![];
-        };
-        vec![
-            ComputeBudgetInstruction::set_compute_unit_limit(budget.limit_units),
-            ComputeBudgetInstruction::set_compute_unit_price(budget.price_micro_lamports),
-        ]
+        self.compute_budget
+            .map(|budget| budget.compute_budget_instructions())
+            .unwrap_or_default()
     }
 
     /// Get all instructions.
@@ -143,7 +144,6 @@ impl<'a, C: Deref<Target = impl Signer> + Clone, T> RpcBuilder<'a, C, T> {
                 accounts: self.accounts.clone(),
             });
         }
-        instructions.append(&mut self.post_instructions.clone());
         instructions
     }
 
@@ -160,7 +160,6 @@ impl<'a, C: Deref<Target = impl Signer> + Clone, T> RpcBuilder<'a, C, T> {
             pre_instructions,
             accounts,
             instruction_data,
-            post_instructions,
             compute_budget,
             ..
         } = self;
@@ -172,7 +171,6 @@ impl<'a, C: Deref<Target = impl Signer> + Clone, T> RpcBuilder<'a, C, T> {
             pre_instructions,
             accounts,
             instruction_data,
-            post_instructions,
             compute_budget,
         }
     }
@@ -186,18 +184,6 @@ impl<'a, C: Deref<Target = impl Signer> + Clone, T> RpcBuilder<'a, C, T> {
     /// Insert instructions before the rpc method.
     pub fn pre_instructions(mut self, mut ixs: Vec<Instruction>) -> Self {
         self.pre_instructions.append(&mut ixs);
-        self
-    }
-
-    /// Insert an instruction after the rpc method.
-    pub fn post_instruction(mut self, ix: Instruction) -> Self {
-        self.post_instructions.push(ix);
-        self
-    }
-
-    /// Insert instructions after the rpc method.
-    pub fn post_instructions(mut self, mut ixs: Vec<Instruction>) -> Self {
-        self.post_instructions.append(&mut ixs);
         self
     }
 
