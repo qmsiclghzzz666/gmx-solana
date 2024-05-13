@@ -3,6 +3,7 @@ use data_store::states::{self};
 use exchange::utils::ControllerSeeds;
 use eyre::ContextCompat;
 use gmsol::{
+    pyth::{pull_oracle::receiver::PythReceiverOps, utils::get_merkle_price_updates},
     store::{
         market::find_market_address,
         token_config::{find_token_config_map, get_token_config},
@@ -153,7 +154,7 @@ impl InspectArgs {
             Command::WatchPyth { feed_ids, post } => {
                 use futures_util::TryStreamExt;
                 use gmsol::pyth::{
-                    pull_oracle::WormholeOps, utils, EncodingType, Hermes, PythPullOracle,
+                    pull_oracle::WormholeOps, utils, EncodingType, Hermes, PythPullOracleOps,
                 };
                 use pyth_sdk::Identifier;
 
@@ -183,6 +184,7 @@ impl InspectArgs {
                             let draft_vaa = encoded_vaa.pubkey();
                             let vaa = utils::get_vaa_buffer(proof);
                             let wormhole = client.wormhole()?;
+                            let pyth = client.pyth()?;
 
                             tracing::info!("sending txs...");
                             let signature = wormhole
@@ -207,6 +209,18 @@ impl InspectArgs {
                                 .send()
                                 .await?;
                             tracing::info!(%draft_vaa, "verified the encoded vaa account at tx {signature}");
+
+                            let updates = get_merkle_price_updates(proof);
+                            for update in updates {
+                                let price_update = Keypair::new();
+                                let price_update_pubkey = price_update.pubkey();
+                                let signature = pyth
+                                    .post_price_update(&price_update, update, &draft_vaa)
+                                    .build()
+                                    .send()
+                                    .await?;
+                                tracing::info!(price_update=%price_update_pubkey, "posted a price update at tx {signature}");
+                            }
 
                             let signature = wormhole
                                 .close_encoded_vaa(&draft_vaa)

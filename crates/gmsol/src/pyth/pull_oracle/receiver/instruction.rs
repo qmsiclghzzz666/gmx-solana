@@ -1,0 +1,17 @@
+use anchor_client::anchor_lang::{
+    prelude::{borsh, AnchorSerialize},
+    Discriminator, InstructionData,
+};
+use pythnet_sdk::wire::v1::MerklePriceUpdate;
+
+#[derive(AnchorSerialize)]
+pub(super) struct PostUpdate {
+    pub(super) merkle_price_update: MerklePriceUpdate,
+    pub(super) treasury_id: u8,
+}
+
+impl Discriminator for PostUpdate {
+    const DISCRIMINATOR: [u8; 8] = [133, 95, 207, 175, 11, 79, 118, 44];
+}
+
+impl InstructionData for PostUpdate {}

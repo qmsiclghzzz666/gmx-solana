@@ -1,4 +1,4 @@
-use pythnet_sdk::wire::v1::{AccumulatorUpdateData, Proof};
+use pythnet_sdk::wire::v1::{AccumulatorUpdateData, MerklePriceUpdate, Proof};
 
 use super::{hermes::PriceUpdate, EncodingType};
 
@@ -48,5 +48,12 @@ pub fn get_guardian_set_index(proof: &Proof) -> crate::Result<i32> {
 pub fn get_vaa_buffer(proof: &Proof) -> &[u8] {
     match proof {
         Proof::WormholeMerkle { vaa, .. } => vaa.as_ref(),
+    }
+}
+
+/// Get merkle price updates.
+pub fn get_merkle_price_updates(proof: &Proof) -> &[MerklePriceUpdate] {
+    match proof {
+        Proof::WormholeMerkle { updates, .. } => updates,
     }
 }

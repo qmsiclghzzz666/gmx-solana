@@ -9,8 +9,11 @@ pub use self::wormhole::WormholeOps;
 /// Wormhole Ops.
 pub mod wormhole;
 
-/// Pyth Pull Oracle.
-pub trait PythPullOracle<C> {
+/// Pyth Reciever Ops.
+pub mod receiver;
+
+/// Pyth Pull Oracle Ops.
+pub trait PythPullOracleOps<C> {
     /// Get Pyth Program.
     fn pyth(&self) -> crate::Result<Program<C>>;
 
@@ -18,7 +21,7 @@ pub trait PythPullOracle<C> {
     fn wormhole(&self) -> crate::Result<Program<C>>;
 }
 
-impl<S, C> PythPullOracle<C> for Client<C>
+impl<S, C> PythPullOracleOps<C> for Client<C>
 where
     C: Deref<Target = S> + Clone,
     S: Signer,
