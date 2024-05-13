@@ -32,12 +32,12 @@ pub fn find_guardian_set_pda(guardian_set_index: i32) -> (Pubkey, u8) {
 
 /// Wormhole Ops.
 pub trait WormholeOps<C> {
-    /// Create and initialize encoded vaa account.
+    /// Create and initialize an encoded vaa account.
     fn create_encoded_vaa<'a>(
         &'a self,
         encoded_vaa: &'a Keypair,
         vaa_buffer_len: u64,
-    ) -> impl Future<Output = crate::Result<RpcBuilder<'a, C>>>;
+    ) -> impl Future<Output = crate::Result<RpcBuilder<'a, C, Pubkey>>>;
 
     /// Write to encoded vaa account.
     fn write_encoded_vaa(&self, draft_vaa: &Pubkey, index: u32, data: &[u8]) -> RpcBuilder<C>;
@@ -58,7 +58,7 @@ where
         &'a self,
         encoded_vaa: &'a Keypair,
         vaa_buffer_len: u64,
-    ) -> crate::Result<RpcBuilder<'a, C>> {
+    ) -> crate::Result<RpcBuilder<'a, C, Pubkey>> {
         let space = vaa_buffer_len + VAA_START;
         let lamports = self
             .async_rpc()
@@ -78,7 +78,8 @@ where
                 write_authority: self.payer(),
                 encoded_vaa: encoded_vaa.pubkey(),
             })
-            .signer(encoded_vaa);
+            .signer(encoded_vaa)
+            .with_output(encoded_vaa.pubkey());
         Ok(request)
     }
 

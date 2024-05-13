@@ -147,7 +147,8 @@ pub const EVENT_AUTHORITY_SEED: &[u8] = b"__event_authority";
 /// A wrapper of [`RequestBuilder`](anchor_client::RequestBuilder)
 /// better instruction insertion methods.
 #[must_use]
-pub struct RpcBuilder<'a, C> {
+pub struct RpcBuilder<'a, C, T = ()> {
+    output: T,
     program_id: Pubkey,
     builder: anchor_client::RequestBuilder<'a, C>,
     pre_instructions: Vec<Instruction>,
@@ -191,6 +192,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> RpcBuilder<'a, C> {
     /// Create a new [`RpcBuilder`] from [`Program`].
     pub fn new(program: &'a Program<C>) -> Self {
         Self {
+            output: (),
             program_id: program.id(),
             builder: program.request(),
             pre_instructions: Default::default(),
@@ -200,7 +202,9 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> RpcBuilder<'a, C> {
             compute_budget: None,
         }
     }
+}
 
+impl<'a, C: Deref<Target = impl Signer> + Clone, T> RpcBuilder<'a, C, T> {
     /// Set payer.
     pub fn payer(mut self, payer: C) -> Self {
         self.builder = self.builder.payer(payer);
@@ -275,17 +279,54 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> RpcBuilder<'a, C> {
         instructions
     }
 
-    /// Build [`RequestBuilder`].
-    pub fn build(self) -> anchor_client::RequestBuilder<'a, C> {
+    /// Get the output.
+    pub fn output(&self) -> &T {
+        &self.output
+    }
+
+    /// Set the output.
+    pub fn with_output<U>(self, output: U) -> RpcBuilder<'a, C, U> {
+        let Self {
+            program_id,
+            builder,
+            pre_instructions,
+            accounts,
+            instruction_data,
+            post_instructions,
+            compute_budget,
+            ..
+        } = self;
+
+        RpcBuilder {
+            output,
+            program_id,
+            builder,
+            pre_instructions,
+            accounts,
+            instruction_data,
+            post_instructions,
+            compute_budget,
+        }
+    }
+
+    /// Build and output.
+    pub fn build_and_output(self) -> (anchor_client::RequestBuilder<'a, C>, T) {
         debug_assert!(
             self.builder.instructions().unwrap().is_empty(),
             "non-empty builder"
         );
-        self.instructions()
+        let request = self
+            .instructions()
             .into_iter()
             .fold(self.builder.program(self.program_id), |acc, ix| {
                 acc.instruction(ix)
-            })
+            });
+        (request, self.output)
+    }
+
+    /// Build [`RequestBuilder`](anchor_client::RequestBuilder).
+    pub fn build(self) -> anchor_client::RequestBuilder<'a, C> {
+        self.build_and_output().0
     }
 
     /// Insert an instruction before the rpc method.
