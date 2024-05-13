@@ -180,14 +180,23 @@ impl InspectArgs {
                         tracing::info!("{guardian_set_index}:{proof:?}");
                         if *post {
                             let encoded_vaa = Keypair::new();
+                            let draft_vaa = encoded_vaa.pubkey();
                             let vaa = utils::get_vaa_buffer(proof);
-                            let signature = client
-                                .wormhole()?
-                                .initialize_encoded_vaa(&encoded_vaa, vaa.len() as u64)
+                            let wormhole = client.wormhole()?;
+
+                            tracing::info!("sending txs...");
+                            let signature = wormhole
+                                .create_encoded_vaa(&encoded_vaa, vaa.len() as u64)
                                 .await?
                                 .send()
                                 .await?;
-                            tracing::info!(encoded_vaa=%encoded_vaa.pubkey(), "initilize encoded vaa account at tx {signature}");
+                            tracing::info!(%draft_vaa, "initialized an encoded vaa account at tx {signature}");
+
+                            let signature = wormhole
+                                .write_encoded_vaa(&draft_vaa, 0, vaa)
+                                .send()
+                                .await?;
+                            tracing::info!(%draft_vaa, "written to the encoded vaa account at tx {signature}");
                             return Ok(());
                         }
                     }

@@ -19,12 +19,15 @@ pub const VAA_START: u64 = 46;
 
 /// Wormhole Ops.
 pub trait WormholeOps<C> {
-    /// Initialize encoded vaa account.
-    fn initialize_encoded_vaa<'a>(
+    /// Create and initialize encoded vaa account.
+    fn create_encoded_vaa<'a>(
         &'a self,
         encoded_vaa: &'a Keypair,
         vaa_buffer_len: u64,
     ) -> impl Future<Output = crate::Result<RequestBuilder<'a, C>>>;
+
+    /// Write to encoded vaa account.
+    fn write_encoded_vaa(&self, draft_vaa: &Pubkey, index: u32, data: &[u8]) -> RequestBuilder<C>;
 }
 
 impl<S, C> WormholeOps<C> for Program<C>
@@ -32,7 +35,7 @@ where
     C: Deref<Target = S> + Clone,
     S: Signer,
 {
-    async fn initialize_encoded_vaa<'a>(
+    async fn create_encoded_vaa<'a>(
         &'a self,
         encoded_vaa: &'a Keypair,
         vaa_buffer_len: u64,
@@ -59,5 +62,17 @@ where
             })
             .signer(encoded_vaa);
         Ok(request)
+    }
+
+    fn write_encoded_vaa(&self, draft_vaa: &Pubkey, index: u32, data: &[u8]) -> RequestBuilder<C> {
+        self.request()
+            .args(instruction::WriteEncodedVaa {
+                index,
+                data: data.to_owned(),
+            })
+            .accounts(accounts::WriteEncodedVaa {
+                write_authority: self.payer(),
+                draft_vaa: *draft_vaa,
+            })
     }
 }
