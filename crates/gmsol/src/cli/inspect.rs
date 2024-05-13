@@ -1,4 +1,4 @@
-use anchor_client::solana_sdk::pubkey::Pubkey;
+use anchor_client::solana_sdk::{pubkey::Pubkey, signature::Keypair, signer::Signer};
 use data_store::states::{self};
 use exchange::utils::ControllerSeeds;
 use eyre::ContextCompat;
@@ -57,7 +57,11 @@ enum Command {
     WatchPyth {
         #[arg(required = true)]
         feed_ids: Vec<String>,
+        #[arg(long)]
+        post: bool,
     },
+    /// Generate Anchor Discriminator with the given name.
+    Discriminator { name: String },
 }
 
 impl InspectArgs {
@@ -68,6 +72,9 @@ impl InspectArgs {
     ) -> gmsol::Result<()> {
         let program = client.program(data_store::id())?;
         match &self.command {
+            Command::Discriminator { name } => {
+                println!("{:?}", crate::utils::generate_discriminator(name));
+            }
             Command::DataStore { address } => {
                 let address = address
                     .or(store.copied())
@@ -143,9 +150,11 @@ impl InspectArgs {
                     .await?
                 );
             }
-            Command::WatchPyth { feed_ids } => {
+            Command::WatchPyth { feed_ids, post } => {
                 use futures_util::TryStreamExt;
-                use gmsol::pyth::{utils, EncodingType, Hermes};
+                use gmsol::pyth::{
+                    pull_oracle::WormholeOps, utils, EncodingType, Hermes, PythPullOracle,
+                };
                 use pyth_sdk::Identifier;
 
                 let hermes = Hermes::default();
@@ -169,6 +178,18 @@ impl InspectArgs {
                         let proof = &data.proof;
                         let guardian_set_index = utils::get_guardian_set_index(proof)?;
                         tracing::info!("{guardian_set_index}:{proof:?}");
+                        if *post {
+                            let encoded_vaa = Keypair::new();
+                            let vaa = utils::get_vaa_buffer(proof);
+                            let signature = client
+                                .wormhole()?
+                                .initialize_encoded_vaa(&encoded_vaa, vaa.len() as u64)
+                                .await?
+                                .send()
+                                .await?;
+                            tracing::info!(encoded_vaa=%encoded_vaa.pubkey(), "initilize encoded vaa account at tx {signature}");
+                            return Ok(());
+                        }
                     }
                 }
             }

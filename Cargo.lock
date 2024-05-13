@@ -1881,6 +1881,7 @@ version = "0.1.0"
 dependencies = [
  "anchor-client",
  "anchor-spl",
+ "anchor-syn",
  "base64 0.22.0",
  "bytemuck",
  "clap 4.5.4",

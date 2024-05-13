@@ -36,14 +36,17 @@ fn parse_accumulator_update_data(data: &[u8]) -> crate::Result<AccumulatorUpdate
 
 /// Get guardian set index from [`Proof`].
 pub fn get_guardian_set_index(proof: &Proof) -> crate::Result<i32> {
+    let vaa = get_vaa_buffer(proof);
+    if vaa.len() < 5 {
+        return Err(crate::Error::unknown("invalid vaa"));
+    }
+    let index: &[u8; 4] = (&vaa[1..5]).try_into().map_err(crate::Error::unknown)?;
+    Ok(i32::from_be_bytes(*index))
+}
+
+/// Get vaa buffer.
+pub fn get_vaa_buffer(proof: &Proof) -> &[u8] {
     match proof {
-        Proof::WormholeMerkle { vaa, .. } => {
-            let vaa = vaa.as_ref();
-            if vaa.len() < 5 {
-                return Err(crate::Error::unknown("invalid vaa"));
-            }
-            let index: &[u8; 4] = (&vaa[1..5]).try_into().map_err(crate::Error::unknown)?;
-            Ok(i32::from_be_bytes(*index))
-        }
+        Proof::WormholeMerkle { vaa, .. } => vaa.as_ref(),
     }
 }
