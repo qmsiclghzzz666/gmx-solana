@@ -44,6 +44,9 @@ pub trait WormholeOps<C> {
 
     /// Verify encoded vaa account.
     fn verify_encoded_vaa_v1(&self, draft_vaa: &Pubkey, guardian_set_index: i32) -> RpcBuilder<C>;
+
+    /// Close encoded vaa account.
+    fn close_encoded_vaa(&self, encoded_vaa: &Pubkey) -> RpcBuilder<C>;
 }
 
 impl<S, C> WormholeOps<C> for Program<C>
@@ -99,6 +102,15 @@ where
                 write_authority: self.payer(),
                 draft_vaa: *draft_vaa,
                 guardian_set: find_guardian_set_pda(guardian_set_index).0,
+            })
+    }
+
+    fn close_encoded_vaa(&self, encoded_vaa: &Pubkey) -> RpcBuilder<C> {
+        RpcBuilder::new(self)
+            .args(instruction::CloseEncodedVaa {})
+            .accounts(accounts::CloseEncodedVaa {
+                write_authority: self.payer(),
+                encoded_vaa: *encoded_vaa,
             })
     }
 }

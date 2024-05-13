@@ -291,8 +291,14 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> RpcBuilder<'a, C> {
     }
 
     /// Insert an instruction after the rpc method.
-    pub fn post_isntruction(mut self, ix: Instruction) -> Self {
+    pub fn post_instruction(mut self, ix: Instruction) -> Self {
         self.post_instructions.push(ix);
+        self
+    }
+
+    /// Insert instructions after the rpc method.
+    pub fn post_instructions(mut self, mut ixs: Vec<Instruction>) -> Self {
+        self.post_instructions.append(&mut ixs);
         self
     }
 }

@@ -46,3 +46,17 @@ impl ToAccountMetas for VerifyEncodedVaaV1 {
         ]
     }
 }
+
+pub(super) struct CloseEncodedVaa {
+    pub(super) write_authority: Pubkey,
+    pub(super) encoded_vaa: Pubkey,
+}
+
+impl ToAccountMetas for CloseEncodedVaa {
+    fn to_account_metas(&self, _is_signer: Option<bool>) -> Vec<AccountMeta> {
+        vec![
+            AccountMeta::new(self.write_authority, true),
+            AccountMeta::new(self.encoded_vaa, false),
+        ]
+    }
+}

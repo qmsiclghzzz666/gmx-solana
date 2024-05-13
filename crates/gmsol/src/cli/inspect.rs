@@ -205,6 +205,14 @@ impl InspectArgs {
                                 .send()
                                 .await?;
                             tracing::info!(%draft_vaa, "verified the encoded vaa account at tx {signature}");
+
+                            let signature = wormhole
+                                .close_encoded_vaa(&draft_vaa)
+                                .build()?
+                                .send()
+                                .await?;
+
+                            tracing::info!(encoded_vaa=%draft_vaa, "closed the encoded vaa account at tx {signature}");
                             return Ok(());
                         }
                     }
