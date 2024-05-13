@@ -39,6 +39,9 @@ pub trait PythReceiverOps<C> {
         update: &MerklePriceUpdate,
         encoded_vaa: &Pubkey,
     ) -> RpcBuilder<'a, C, Pubkey>;
+
+    /// Reclaim rent.
+    fn reclaim_rent(&self, price_update: &Pubkey) -> RpcBuilder<C>;
 }
 
 impl<S, C> PythReceiverOps<C> for Program<C>
@@ -69,5 +72,14 @@ where
                 write_authority: self.payer(),
             })
             .signer(price_update)
+    }
+
+    fn reclaim_rent(&self, price_update: &Pubkey) -> RpcBuilder<C> {
+        RpcBuilder::new(self)
+            .args(instruction::ReclaimRent {})
+            .accounts(accounts::ReclaimRent {
+                payer: self.payer(),
+                price_update_account: *price_update,
+            })
     }
 }

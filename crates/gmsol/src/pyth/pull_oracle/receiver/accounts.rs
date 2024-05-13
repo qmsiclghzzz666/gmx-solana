@@ -26,3 +26,17 @@ impl ToAccountMetas for PostUpdate {
         ]
     }
 }
+
+pub(super) struct ReclaimRent {
+    pub(super) payer: Pubkey,
+    pub(super) price_update_account: Pubkey,
+}
+
+impl ToAccountMetas for ReclaimRent {
+    fn to_account_metas(&self, _is_signer: Option<bool>) -> Vec<AccountMeta> {
+        vec![
+            AccountMeta::new(self.payer, true),
+            AccountMeta::new(self.price_update_account, false),
+        ]
+    }
+}

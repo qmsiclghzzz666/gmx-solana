@@ -220,6 +220,13 @@ impl InspectArgs {
                                     .send()
                                     .await?;
                                 tracing::info!(price_update=%price_update_pubkey, "posted a price update at tx {signature}");
+
+                                let signature = pyth
+                                    .reclaim_rent(&price_update_pubkey)
+                                    .build()
+                                    .send()
+                                    .await?;
+                                tracing::info!(price_update=%price_update_pubkey, "reclaimed rent at tx {signature}");
                             }
 
                             let signature = wormhole

@@ -15,3 +15,12 @@ impl Discriminator for PostUpdate {
 }
 
 impl InstructionData for PostUpdate {}
+
+#[derive(AnchorSerialize)]
+pub(super) struct ReclaimRent {}
+
+impl Discriminator for ReclaimRent {
+    const DISCRIMINATOR: [u8; 8] = [218, 200, 19, 197, 227, 89, 192, 22];
+}
+
+impl InstructionData for ReclaimRent {}
