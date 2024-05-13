@@ -16,6 +16,7 @@ cli = [
     "tracing-subscriber",
     "shellexpand",
     "anchor-syn",
+    "heck",
 ]
 clap = ["dep:clap", "data_store/clap"]
 devnet = ["data_store/devnet", "exchange/devnet"]
@@ -73,3 +74,4 @@ eventsource-stream = { version = "0.2.3", optional = true }
 pythnet-sdk = { version = "2.1.0", optional = true }
 pyth-solana-receiver-sdk = { workspace = true, optional = true }
 anchor-syn = { version = "0.30.0", optional = true }
+heck = { version = "0.5.0", optional = true }

@@ -26,5 +26,7 @@ impl Oracle {
 
 pub(crate) fn generate_discriminator(name: &str) -> [u8; 8] {
     use anchor_syn::codegen::program::common::{sighash, SIGHASH_GLOBAL_NAMESPACE};
-    sighash(SIGHASH_GLOBAL_NAMESPACE, name)
+    use heck::AsSnakeCase;
+
+    sighash(SIGHASH_GLOBAL_NAMESPACE, &AsSnakeCase(name).to_string())
 }
