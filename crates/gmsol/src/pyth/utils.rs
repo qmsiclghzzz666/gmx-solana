@@ -1,4 +1,10 @@
-use pythnet_sdk::wire::v1::{AccumulatorUpdateData, MerklePriceUpdate, Proof};
+use pythnet_sdk::{
+    messages::PriceFeedMessage,
+    wire::{
+        from_slice,
+        v1::{AccumulatorUpdateData, MerklePriceUpdate, Proof},
+    },
+};
 
 use super::{hermes::PriceUpdate, EncodingType};
 
@@ -56,4 +62,24 @@ pub fn get_merkle_price_updates(proof: &Proof) -> &[MerklePriceUpdate] {
     match proof {
         Proof::WormholeMerkle { updates, .. } => updates,
     }
+}
+
+/// Price feed message variant.
+pub const PRICE_FEED_MESSAGE_VARIANT: u8 = 0;
+
+/// Parse price feed message.
+pub fn parse_price_feed_message(update: &MerklePriceUpdate) -> crate::Result<PriceFeedMessage> {
+    const PRICE_FEED_MESSAGE_VARIANT: u8 = 0;
+    let data = update.message.as_ref().as_slice();
+    if data.is_empty() {
+        return Err(crate::Error::invalid_argument("empty message"));
+    }
+    if data[0] != PRICE_FEED_MESSAGE_VARIANT {
+        return Err(crate::Error::invalid_argument(
+            "it is not a price feed message",
+        ));
+    }
+    from_slice::<byteorder::BE, _>(&data[1..]).map_err(|err| {
+        crate::Error::invalid_argument(format!("deserialize price feed message error: {err}"))
+    })
 }

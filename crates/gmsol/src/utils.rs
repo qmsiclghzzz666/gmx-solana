@@ -310,7 +310,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone, T> RpcBuilder<'a, C, T> {
     }
 
     /// Build and output.
-    pub fn build_and_output(self) -> (anchor_client::RequestBuilder<'a, C>, T) {
+    pub fn build_with_output(self) -> (anchor_client::RequestBuilder<'a, C>, T) {
         debug_assert!(
             self.builder.instructions().unwrap().is_empty(),
             "non-empty builder"
@@ -326,7 +326,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone, T> RpcBuilder<'a, C, T> {
 
     /// Build [`RequestBuilder`](anchor_client::RequestBuilder).
     pub fn build(self) -> anchor_client::RequestBuilder<'a, C> {
-        self.build_and_output().0
+        self.build_with_output().0
     }
 
     /// Insert an instruction before the rpc method.

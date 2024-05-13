@@ -214,19 +214,18 @@ impl InspectArgs {
                             for update in updates {
                                 let price_update = Keypair::new();
                                 let price_update_pubkey = price_update.pubkey();
-                                let signature = pyth
-                                    .post_price_update(&price_update, update, &draft_vaa)
-                                    .build()
-                                    .send()
-                                    .await?;
-                                tracing::info!(price_update=%price_update_pubkey, "posted a price update at tx {signature}");
+                                let (request, (feed_id, _)) = pyth
+                                    .post_price_update(&price_update, update, &draft_vaa)?
+                                    .build_with_output();
+                                let signature = request.send().await?;
+                                tracing::info!(%feed_id, price_update=%price_update_pubkey, "posted a price update at tx {signature}");
 
                                 let signature = pyth
                                     .reclaim_rent(&price_update_pubkey)
                                     .build()
                                     .send()
                                     .await?;
-                                tracing::info!(price_update=%price_update_pubkey, "reclaimed rent at tx {signature}");
+                                tracing::info!(%feed_id, price_update=%price_update_pubkey, "reclaimed rent at tx {signature}");
                             }
 
                             let signature = wormhole
