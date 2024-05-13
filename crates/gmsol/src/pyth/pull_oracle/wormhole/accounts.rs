@@ -30,3 +30,19 @@ impl ToAccountMetas for WriteEncodedVaa {
         ]
     }
 }
+
+pub(super) struct VerifyEncodedVaaV1 {
+    pub(super) write_authority: Pubkey,
+    pub(super) draft_vaa: Pubkey,
+    pub(super) guardian_set: Pubkey,
+}
+
+impl ToAccountMetas for VerifyEncodedVaaV1 {
+    fn to_account_metas(&self, _is_signer: Option<bool>) -> Vec<AccountMeta> {
+        vec![
+            AccountMeta::new_readonly(self.write_authority, true),
+            AccountMeta::new(self.draft_vaa, false),
+            AccountMeta::new_readonly(self.guardian_set, false),
+        ]
+    }
+}

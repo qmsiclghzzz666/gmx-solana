@@ -7,7 +7,7 @@ use gmsol::{
         market::find_market_address,
         token_config::{find_token_config_map, get_token_config},
     },
-    utils,
+    utils::{self, ComputeBudget},
 };
 
 use crate::{utils::Oracle, SharedClient};
@@ -197,6 +197,14 @@ impl InspectArgs {
                                 .send()
                                 .await?;
                             tracing::info!(%draft_vaa, "written to the encoded vaa account at tx {signature}");
+
+                            let signature = wormhole
+                                .verify_encoded_vaa_v1(&draft_vaa, guardian_set_index)
+                                .compute_budget(Some(ComputeBudget::default().with_limit(400_000)))
+                                .build()?
+                                .send()
+                                .await?;
+                            tracing::info!(%draft_vaa, "verified the encoded vaa account at tx {signature}");
                             return Ok(());
                         }
                     }

@@ -5,6 +5,8 @@ use anchor_client::{
     ClientError, Program, RequestBuilder,
 };
 
+use crate::utils::RpcBuilder;
+
 mod accounts;
 mod instruction;
 
@@ -17,6 +19,17 @@ pub const WORMHOLE_PROGRAM_ID: Pubkey = Pubkey::new_from_array([
 /// The start offset of the VAA bytes.
 pub const VAA_START: u64 = 46;
 
+/// Seed for guardian set account.
+pub const GUARDIAN_SET_SEED: &[u8] = b"GuardianSet";
+
+/// Find PDA for guardian set.
+pub fn find_guardian_set_pda(guardian_set_index: i32) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[GUARDIAN_SET_SEED, &guardian_set_index.to_be_bytes()],
+        &WORMHOLE_PROGRAM_ID,
+    )
+}
+
 /// Wormhole Ops.
 pub trait WormholeOps<C> {
     /// Create and initialize encoded vaa account.
@@ -28,6 +41,9 @@ pub trait WormholeOps<C> {
 
     /// Write to encoded vaa account.
     fn write_encoded_vaa(&self, draft_vaa: &Pubkey, index: u32, data: &[u8]) -> RequestBuilder<C>;
+
+    /// Verify encoded vaa account.
+    fn verify_encoded_vaa_v1(&self, draft_vaa: &Pubkey, guardian_set_index: i32) -> RpcBuilder<C>;
 }
 
 impl<S, C> WormholeOps<C> for Program<C>
@@ -73,6 +89,16 @@ where
             .accounts(accounts::WriteEncodedVaa {
                 write_authority: self.payer(),
                 draft_vaa: *draft_vaa,
+            })
+    }
+
+    fn verify_encoded_vaa_v1(&self, draft_vaa: &Pubkey, guardian_set_index: i32) -> RpcBuilder<C> {
+        RpcBuilder::new(self)
+            .args(instruction::VerifyEncodedVaaV1 {})
+            .accounts(accounts::VerifyEncodedVaaV1 {
+                write_authority: self.payer(),
+                draft_vaa: *draft_vaa,
+                guardian_set: find_guardian_set_pda(guardian_set_index).0,
             })
     }
 }

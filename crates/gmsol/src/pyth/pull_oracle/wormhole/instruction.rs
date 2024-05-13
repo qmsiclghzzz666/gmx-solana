@@ -23,3 +23,12 @@ impl Discriminator for WriteEncodedVaa {
 }
 
 impl InstructionData for WriteEncodedVaa {}
+
+#[derive(AnchorSerialize)]
+pub(super) struct VerifyEncodedVaaV1 {}
+
+impl Discriminator for VerifyEncodedVaaV1 {
+    const DISCRIMINATOR: [u8; 8] = [103, 56, 177, 229, 240, 103, 68, 73];
+}
+
+impl InstructionData for VerifyEncodedVaaV1 {}
