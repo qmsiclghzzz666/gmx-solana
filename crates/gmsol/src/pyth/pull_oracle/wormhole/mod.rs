@@ -2,7 +2,7 @@ use std::{future::Future, ops::Deref};
 
 use anchor_client::{
     solana_sdk::{pubkey::Pubkey, signature::Keypair, signer::Signer, system_instruction},
-    ClientError, Program, RequestBuilder,
+    ClientError, Program,
 };
 
 use crate::utils::RpcBuilder;
@@ -37,10 +37,10 @@ pub trait WormholeOps<C> {
         &'a self,
         encoded_vaa: &'a Keypair,
         vaa_buffer_len: u64,
-    ) -> impl Future<Output = crate::Result<RequestBuilder<'a, C>>>;
+    ) -> impl Future<Output = crate::Result<RpcBuilder<'a, C>>>;
 
     /// Write to encoded vaa account.
-    fn write_encoded_vaa(&self, draft_vaa: &Pubkey, index: u32, data: &[u8]) -> RequestBuilder<C>;
+    fn write_encoded_vaa(&self, draft_vaa: &Pubkey, index: u32, data: &[u8]) -> RpcBuilder<C>;
 
     /// Verify encoded vaa account.
     fn verify_encoded_vaa_v1(&self, draft_vaa: &Pubkey, guardian_set_index: i32) -> RpcBuilder<C>;
@@ -58,16 +58,15 @@ where
         &'a self,
         encoded_vaa: &'a Keypair,
         vaa_buffer_len: u64,
-    ) -> crate::Result<RequestBuilder<'a, C>> {
+    ) -> crate::Result<RpcBuilder<'a, C>> {
         let space = vaa_buffer_len + VAA_START;
         let lamports = self
             .async_rpc()
             .get_minimum_balance_for_rent_exemption(space as usize)
             .await
             .map_err(ClientError::from)?;
-        let request = self
-            .request()
-            .instruction(system_instruction::create_account(
+        let request = RpcBuilder::new(self)
+            .pre_instruction(system_instruction::create_account(
                 &self.payer(),
                 &encoded_vaa.pubkey(),
                 lamports,
@@ -83,8 +82,8 @@ where
         Ok(request)
     }
 
-    fn write_encoded_vaa(&self, draft_vaa: &Pubkey, index: u32, data: &[u8]) -> RequestBuilder<C> {
-        self.request()
+    fn write_encoded_vaa(&self, draft_vaa: &Pubkey, index: u32, data: &[u8]) -> RpcBuilder<C> {
+        RpcBuilder::new(self)
             .args(instruction::WriteEncodedVaa {
                 index,
                 data: data.to_owned(),

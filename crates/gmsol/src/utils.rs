@@ -149,7 +149,8 @@ pub const EVENT_AUTHORITY_SEED: &[u8] = b"__event_authority";
 #[must_use]
 pub struct RpcBuilder<'a, C> {
     program_id: Pubkey,
-    builder_with_pre_instructions: anchor_client::RequestBuilder<'a, C>,
+    builder: anchor_client::RequestBuilder<'a, C>,
+    pre_instructions: Vec<Instruction>,
     accounts: Vec<AccountMeta>,
     instruction_data: Option<Vec<u8>>,
     post_instructions: Vec<Instruction>,
@@ -191,7 +192,8 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> RpcBuilder<'a, C> {
     pub fn new(program: &'a Program<C>) -> Self {
         Self {
             program_id: program.id(),
-            builder_with_pre_instructions: program.request(),
+            builder: program.request(),
+            pre_instructions: Default::default(),
             accounts: Default::default(),
             instruction_data: None,
             post_instructions: Default::default(),
@@ -201,32 +203,31 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> RpcBuilder<'a, C> {
 
     /// Set payer.
     pub fn payer(mut self, payer: C) -> Self {
-        self.builder_with_pre_instructions = self.builder_with_pre_instructions.payer(payer);
+        self.builder = self.builder.payer(payer);
         self
     }
 
     /// Set cluster.
     pub fn cluster(mut self, url: &str) -> Self {
-        self.builder_with_pre_instructions = self.builder_with_pre_instructions.cluster(url);
+        self.builder = self.builder.cluster(url);
         self
     }
 
     /// Set commiment options.
     pub fn options(mut self, options: CommitmentConfig) -> Self {
-        self.builder_with_pre_instructions = self.builder_with_pre_instructions.options(options);
+        self.builder = self.builder.options(options);
         self
     }
 
     /// Add a signer to the signer list.
     pub fn signer(mut self, signer: &'a dyn Signer) -> Self {
-        self.builder_with_pre_instructions = self.builder_with_pre_instructions.signer(signer);
+        self.builder = self.builder.signer(signer);
         self
     }
 
     /// Set program id.
     pub fn program(mut self, program_id: Pubkey) -> Self {
         self.program_id = program_id;
-        self.builder_with_pre_instructions = self.builder_with_pre_instructions.program(program_id);
         self
     }
 
@@ -260,9 +261,9 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> RpcBuilder<'a, C> {
     }
 
     /// Get all instructions.
-    pub fn instructions(&self) -> Result<Vec<Instruction>, anchor_client::ClientError> {
+    pub fn instructions(&self) -> Vec<Instruction> {
         let mut instructions = self.get_compute_budget_instructions();
-        instructions.append(&mut self.builder_with_pre_instructions.instructions()?);
+        instructions.append(&mut self.pre_instructions.clone());
         if let Some(ix_data) = &self.instruction_data {
             instructions.push(Instruction {
                 program_id: self.program_id,
@@ -271,22 +272,31 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> RpcBuilder<'a, C> {
             });
         }
         instructions.append(&mut self.post_instructions.clone());
-        Ok(instructions)
+        instructions
     }
 
     /// Build [`RequestBuilder`].
-    pub fn build(self) -> Result<anchor_client::RequestBuilder<'a, C>, anchor_client::ClientError> {
-        Ok(self
-            .instructions()?
+    pub fn build(self) -> anchor_client::RequestBuilder<'a, C> {
+        debug_assert!(
+            self.builder.instructions().unwrap().is_empty(),
+            "non-empty builder"
+        );
+        self.instructions()
             .into_iter()
-            .fold(self.builder_with_pre_instructions, |acc, ix| {
+            .fold(self.builder.program(self.program_id), |acc, ix| {
                 acc.instruction(ix)
-            }))
+            })
     }
 
     /// Insert an instruction before the rpc method.
     pub fn pre_instruction(mut self, ix: Instruction) -> Self {
-        self.builder_with_pre_instructions = self.builder_with_pre_instructions.instruction(ix);
+        self.pre_instructions.push(ix);
+        self
+    }
+
+    /// Insert instructions before the rpc method.
+    pub fn pre_instructions(mut self, mut ixs: Vec<Instruction>) -> Self {
+        self.pre_instructions.append(&mut ixs);
         self
     }
 

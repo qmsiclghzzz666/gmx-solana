@@ -188,12 +188,14 @@ impl InspectArgs {
                             let signature = wormhole
                                 .create_encoded_vaa(&encoded_vaa, vaa.len() as u64)
                                 .await?
+                                .build()
                                 .send()
                                 .await?;
                             tracing::info!(%draft_vaa, "initialized an encoded vaa account at tx {signature}");
 
                             let signature = wormhole
                                 .write_encoded_vaa(&draft_vaa, 0, vaa)
+                                .build()
                                 .send()
                                 .await?;
                             tracing::info!(%draft_vaa, "written to the encoded vaa account at tx {signature}");
@@ -201,14 +203,14 @@ impl InspectArgs {
                             let signature = wormhole
                                 .verify_encoded_vaa_v1(&draft_vaa, guardian_set_index)
                                 .compute_budget(Some(ComputeBudget::default().with_limit(400_000)))
-                                .build()?
+                                .build()
                                 .send()
                                 .await?;
                             tracing::info!(%draft_vaa, "verified the encoded vaa account at tx {signature}");
 
                             let signature = wormhole
                                 .close_encoded_vaa(&draft_vaa)
-                                .build()?
+                                .build()
                                 .send()
                                 .await?;
 
