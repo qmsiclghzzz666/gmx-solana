@@ -152,27 +152,35 @@ impl<'a, C: Deref<Target = impl Signer> + Clone, T> RpcBuilder<'a, C, T> {
         &self.output
     }
 
-    /// Set the output.
-    pub fn with_output<U>(self, output: U) -> RpcBuilder<'a, C, U> {
+    /// Set the output and return the previous.
+    pub fn swap_output<U>(self, output: U) -> (RpcBuilder<'a, C, U>, T) {
         let Self {
+            output: previous,
             program_id,
             builder,
             pre_instructions,
             accounts,
             instruction_data,
             compute_budget,
-            ..
         } = self;
 
-        RpcBuilder {
-            output,
-            program_id,
-            builder,
-            pre_instructions,
-            accounts,
-            instruction_data,
-            compute_budget,
-        }
+        (
+            RpcBuilder {
+                output,
+                program_id,
+                builder,
+                pre_instructions,
+                accounts,
+                instruction_data,
+                compute_budget,
+            },
+            previous,
+        )
+    }
+
+    /// Set the output.
+    pub fn with_output<U>(self, output: U) -> RpcBuilder<'a, C, U> {
+        self.swap_output(output).0
     }
 
     /// Insert an instruction before the rpc method.
