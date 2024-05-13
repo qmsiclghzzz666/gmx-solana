@@ -36,9 +36,4 @@ num_enum = "0.7.2"
 static_assertions = "1.1.0"
 clap = { workspace = true, optional = true }
 pyth-sdk-solana = "0.10.1"
-
-# FIXME: use the crates.io version when it can compile with anchor v0.30
-[dependencies.pyth-solana-receiver-sdk]
-version = "0.2.0"
-git = "https://github.com/pyth-network/pyth-crosschain"
-rev = "308599714ff07aa6bbb31c36d79e8095bfc98c74"
+pyth-solana-receiver-sdk = { workspace = true }

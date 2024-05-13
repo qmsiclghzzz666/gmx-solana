@@ -1891,6 +1891,7 @@ dependencies = [
  "futures-util",
  "gmx-solana-utils",
  "pyth-sdk",
+ "pyth-solana-receiver-sdk",
  "pythnet-sdk 2.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.8.5",
  "reqwest 0.12.4",

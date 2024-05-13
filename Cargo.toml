@@ -9,6 +9,13 @@ thiserror = "1.0.58"
 bytemuck = "1.15.0"
 clap = "4.5.0"
 
+# FIXME: use the crates.io version when it can compile with anchor v0.30
+[workspace.dependencies.pyth-solana-receiver-sdk]
+version = "0.2.0"
+git = "https://github.com/pyth-network/pyth-crosschain"
+rev = "308599714ff07aa6bbb31c36d79e8095bfc98c74"
+
+
 [profile.release]
 overflow-checks = true
 lto = "fat"
