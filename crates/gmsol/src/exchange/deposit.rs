@@ -9,13 +9,19 @@ use anchor_spl::associated_token::get_associated_token_address;
 use data_store::states::{common::TokensWithFeed, Deposit, Market, NonceBytes, Pyth, Seed};
 use exchange::{accounts, instruction, instructions::CreateDepositParams, utils::ControllerSeeds};
 
-use crate::store::{
-    market::{find_market_address, find_market_vault_address},
-    roles::find_roles_address,
-    token_config::find_token_config_map,
+use crate::{
+    store::{
+        market::{find_market_address, find_market_vault_address},
+        roles::find_roles_address,
+        token_config::find_token_config_map,
+    },
+    utils::{ComputeBudget, RpcBuilder},
 };
 
 use super::generate_nonce;
+
+/// `execute_deposit` compute budget.
+pub const EXECUTE_DEPOSIT_COMPUTE_BUDGET: u32 = 400_000;
 
 /// Create PDA for deposit.
 pub fn find_deposit_address(store: &Pubkey, user: &Pubkey, nonce: &NonceBytes) -> (Pubkey, u8) {
@@ -488,8 +494,8 @@ where
         }
     }
 
-    /// Build [`RequestBuilder`] for executing the deposit.
-    pub async fn build(&self) -> crate::Result<RequestBuilder<'a, C>> {
+    /// Build [`RpcBuilder`] for executing the deposit.
+    pub async fn build(&self) -> crate::Result<RpcBuilder<'a, C>> {
         let hint = self.get_or_fetch_hint().await?;
         let Self {
             program,
@@ -524,8 +530,7 @@ where
                 is_signer: false,
                 is_writable: false,
             });
-        Ok(program
-            .request()
+        Ok(RpcBuilder::new(program)
             .accounts(accounts::ExecuteDeposit {
                 authority,
                 only_order_keeper,
@@ -551,6 +556,7 @@ where
                     .chain(markets)
                     .chain(market_tokens)
                     .collect::<Vec<_>>(),
-            ))
+            )
+            .compute_budget(ComputeBudget::default().with_limit(EXECUTE_DEPOSIT_COMPUTE_BUDGET)))
     }
 }

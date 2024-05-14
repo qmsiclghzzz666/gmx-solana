@@ -2,6 +2,7 @@ use std::ops::{AddAssign, Deref};
 
 use anchor_client::{
     anchor_lang::{InstructionData, ToAccountMetas},
+    solana_client::nonblocking::rpc_client::RpcClient,
     solana_sdk::{
         commitment_config::CommitmentConfig,
         compute_budget::ComputeBudgetInstruction,
@@ -264,6 +265,23 @@ impl<'a, C: Deref<Target = impl Signer> + Clone, T> RpcBuilder<'a, C, T> {
     /// See [`transaction_size`] for more information.
     pub fn transaction_size(&self, is_versioned_transaction: bool) -> usize {
         transaction_size(&self.instructions(false), is_versioned_transaction)
+    }
+
+    /// Estimated the execution fee of the result transaction.
+    pub async fn estimate_execution_fee(&self, client: &RpcClient) -> crate::Result<u64> {
+        use anchor_client::solana_sdk::message::Message;
+
+        let ixs = self.instructions(false);
+        let blockhash = client
+            .get_latest_blockhash()
+            .await
+            .map_err(anchor_client::ClientError::from)?;
+        let message = Message::new_with_blockhash(&ixs, Some(&self.payer), &blockhash);
+        let fee = client
+            .get_fee_for_message(&message)
+            .await
+            .map_err(anchor_client::ClientError::from)?;
+        Ok(fee)
     }
 }
 

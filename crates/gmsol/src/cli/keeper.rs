@@ -1,16 +1,15 @@
 use std::ops::Deref;
 
 use anchor_client::{
-    solana_sdk::{
-        compute_budget::ComputeBudgetInstruction, message::Message, pubkey::Pubkey, signer::Signer,
-    },
-    Program, RequestBuilder,
+    solana_sdk::{pubkey::Pubkey, signer::Signer},
+    Program,
 };
 use data_store::states::PriceProviderKind;
 use exchange::events::{DepositCreatedEvent, OrderCreatedEvent, WithdrawalCreatedEvent};
 use gmsol::{
     exchange::ExchangeOps,
     store::market::VaultOps,
+    utils::{ComputeBudget, RpcBuilder},
 };
 
 use crate::{utils::Oracle, SharedClient};
@@ -60,29 +59,19 @@ enum Command {
 }
 
 impl KeeperArgs {
-    fn insert_compute_budget_instructions<'a, S, C>(
-        &self,
-        builder: RequestBuilder<'a, C>,
-    ) -> RequestBuilder<'a, C>
-    where
-        C: Deref<Target = S> + Clone,
-        S: Signer,
-    {
-        if let Some(units) = self.compute_unit_limit {
-            builder
-                .instruction(ComputeBudgetInstruction::set_compute_unit_limit(units))
-                .instruction(ComputeBudgetInstruction::set_compute_unit_price(
-                    self.compute_unit_price,
-                ))
-        } else {
-            builder
-        }
+    fn get_compute_budget(&self) -> Option<ComputeBudget> {
+        let units = self.compute_unit_limit?;
+        Some(
+            ComputeBudget::default()
+                .with_limit(units)
+                .with_price(self.compute_unit_price),
+        )
     }
 
     async fn get_or_estimate_execution_fee<S, C>(
         &self,
         program: &Program<C>,
-        builder: RequestBuilder<'_, C>,
+        rpc: &RpcBuilder<'_, C>,
     ) -> gmsol::Result<u64>
     where
         C: Deref<Target = S> + Clone,
@@ -91,20 +80,7 @@ impl KeeperArgs {
         if let Some(fee) = self.execution_fee {
             return Ok(fee);
         }
-        let client = program.async_rpc();
-        let ixs = self
-            .insert_compute_budget_instructions(builder)
-            .instructions()?;
-        let blockhash = client
-            .get_latest_blockhash()
-            .await
-            .map_err(anchor_client::ClientError::from)?;
-        let message = Message::new_with_blockhash(&ixs, None, &blockhash);
-        let fee = client
-            .get_fee_for_message(&message)
-            .await
-            .map_err(anchor_client::ClientError::from)?;
-        Ok(fee)
+        rpc.estimate_execution_fee(&program.async_rpc()).await
     }
 
     pub(super) async fn run(&self, client: &SharedClient, store: &Pubkey) -> gmsol::Result<()> {
@@ -118,45 +94,58 @@ impl KeeperArgs {
                 let mut builder =
                     program.execute_deposit(store, &self.oracle.address(Some(store))?, deposit);
                 let execution_fee = self
-                    .get_or_estimate_execution_fee(&program, builder.build().await?)
+                    .get_or_estimate_execution_fee(&program, &builder.build().await?)
                     .await?;
-                let signature = self
-                    .insert_compute_budget_instructions(
-                        builder.execution_fee(execution_fee).price_provider(self.provider.program()).build().await?,
-                    )
-                    .send()
+                let mut rpc = builder
+                    .execution_fee(execution_fee)
+                    .price_provider(self.provider.program())
+                    .build()
                     .await?;
+                if let Some(budget) = self.get_compute_budget() {
+                    rpc = rpc.compute_budget(budget)
+                }
+                let signature = rpc.build().send().await?;
                 tracing::info!(%deposit, "executed deposit at tx {signature}");
                 println!("{signature}");
             }
             Command::ExecuteWithdrawal { withdrawal } => {
                 let program = client.program(exchange::id())?;
-                let mut builder =
-                    program.execute_withdrawal(store, &self.oracle.address(Some(store))?, withdrawal);
+                let mut builder = program.execute_withdrawal(
+                    store,
+                    &self.oracle.address(Some(store))?,
+                    withdrawal,
+                );
                 let execution_fee = self
-                    .get_or_estimate_execution_fee(&program, builder.build().await?)
+                    .get_or_estimate_execution_fee(&program, &builder.build().await?)
                     .await?;
-                let signature = self
-                    .insert_compute_budget_instructions(
-                        builder.execution_fee(execution_fee).price_provider(self.provider.program()).build().await?,
-                    )
-                    .send()
+                let mut rpc = builder
+                    .execution_fee(execution_fee)
+                    .price_provider(self.provider.program())
+                    .build()
                     .await?;
+                if let Some(budget) = self.get_compute_budget() {
+                    rpc = rpc.compute_budget(budget)
+                }
+                let signature = rpc.build().send().await?;
                 tracing::info!(%withdrawal, "executed withdrawal at tx {signature}");
                 println!("{signature}");
             }
             Command::ExecuteOrder { order } => {
                 let program = client.program(exchange::id())?;
-                let mut builder = program.execute_order(store, &self.oracle.address(Some(store))?, order);
+                let mut builder =
+                    program.execute_order(store, &self.oracle.address(Some(store))?, order);
                 let execution_fee = self
-                    .get_or_estimate_execution_fee(&program, builder.build().await?)
+                    .get_or_estimate_execution_fee(&program, &builder.build().await?)
                     .await?;
-                let signature = self
-                    .insert_compute_budget_instructions(
-                        builder.execution_fee(execution_fee).price_provider(self.provider.program()).build().await?,
-                    )
-                    .send()
+                let mut rpc = builder
+                    .execution_fee(execution_fee)
+                    .price_provider(self.provider.program())
+                    .build()
                     .await?;
+                if let Some(budget) = self.get_compute_budget() {
+                    rpc = rpc.compute_budget(budget)
+                }
+                let signature = rpc.build().send().await?;
                 tracing::info!(%order, "executed order at tx {signature}");
                 println!("{signature}");
             }
@@ -198,7 +187,7 @@ impl KeeperArgs {
 
         // Subscribe deposit creation event.
         let deposit_program = client.program(exchange::id())?;
-        let unsubscriber = 
+        let unsubscriber =
             deposit_program
             .on::<DepositCreatedEvent>({
                 let tx = tx.clone();
@@ -247,7 +236,7 @@ impl KeeperArgs {
                 move |ctx, event| {
                 if event.store == store {
                     tracing::info!(slot=%ctx.slot, ?event, "received a new order creation event");
-                    tx.send(Command::ExecuteOrder { 
+                    tx.send(Command::ExecuteOrder {
                         order: event.order,
                     })
                     .unwrap();

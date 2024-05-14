@@ -19,10 +19,13 @@ use crate::{
         roles::find_roles_address,
         token_config::find_token_config_map,
     },
-    utils::TokenAccountParams,
+    utils::{ComputeBudget, RpcBuilder, TokenAccountParams},
 };
 
 use super::generate_nonce;
+
+/// `execute_order` compute budget.
+pub const EXECUTE_ORDER_COMPUTE_BUDGET: u32 = 400_000;
 
 /// Create PDA for order.
 pub fn find_order_address(store: &Pubkey, user: &Pubkey, nonce: &NonceBytes) -> (Pubkey, u8) {
@@ -450,8 +453,8 @@ where
         }
     }
 
-    /// Build [`RequestBuilder`] for `execute_order` instruction.
-    pub async fn build(&mut self) -> crate::Result<RequestBuilder<'a, C>> {
+    /// Build [`RpcBuilder`] for `execute_order` instruction.
+    pub async fn build(&mut self) -> crate::Result<RpcBuilder<'a, C>> {
         let hint = self.prepare_hint().await?;
         let authority = self.program.payer();
         let feeds = hint
@@ -468,9 +471,7 @@ where
             is_signer: false,
             is_writable: false,
         });
-        Ok(self
-            .program
-            .request()
+        Ok(RpcBuilder::new(self.program)
             .accounts(accounts::ExecuteOrder {
                 authority,
                 only_order_keeper: find_roles_address(&self.store, &authority).0,
@@ -506,6 +507,7 @@ where
                     .chain(swap_markets)
                     .chain(swap_market_mints)
                     .collect::<Vec<_>>(),
-            ))
+            )
+            .compute_budget(ComputeBudget::default().with_limit(EXECUTE_ORDER_COMPUTE_BUDGET)))
     }
 }

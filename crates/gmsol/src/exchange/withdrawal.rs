@@ -13,13 +13,19 @@ use exchange::{
     accounts, instruction, instructions::CreateWithdrawalParams, utils::ControllerSeeds,
 };
 
-use crate::store::{
-    market::{find_market_address, find_market_vault_address},
-    roles::find_roles_address,
-    token_config::find_token_config_map,
+use crate::{
+    store::{
+        market::{find_market_address, find_market_vault_address},
+        roles::find_roles_address,
+        token_config::find_token_config_map,
+    },
+    utils::{ComputeBudget, RpcBuilder},
 };
 
 use super::generate_nonce;
+
+/// `execute_withdrawal` compute budget.
+pub const EXECUTE_WITHDRAWAL_COMPUTE_BUDGET: u32 = 400_000;
 
 /// Create PDA for withdrawal.
 pub fn find_withdrawal_address(store: &Pubkey, user: &Pubkey, nonce: &NonceBytes) -> (Pubkey, u8) {
@@ -446,8 +452,8 @@ where
         }
     }
 
-    /// Build [`RequestBuilder`] for `execute_withdrawal` instruction.
-    pub async fn build(&self) -> crate::Result<RequestBuilder<'a, C>> {
+    /// Build [`RpcBuilder`] for `execute_withdrawal` instruction.
+    pub async fn build(&self) -> crate::Result<RpcBuilder<'a, C>> {
         let authority = self.program.payer();
         let hint = self.get_or_fetch_hint().await?;
         let feeds = hint
@@ -472,9 +478,7 @@ where
                 is_signer: false,
                 is_writable: false,
             });
-        Ok(self
-            .program
-            .request()
+        Ok(RpcBuilder::new(self.program)
             .accounts(accounts::ExecuteWithdrawal {
                 authority,
                 store: self.store,
@@ -516,6 +520,7 @@ where
                     .chain(swap_path_markets)
                     .chain(swap_path_mints)
                     .collect::<Vec<_>>(),
-            ))
+            )
+            .compute_budget(ComputeBudget::default().with_limit(EXECUTE_WITHDRAWAL_COMPUTE_BUDGET)))
     }
 }
