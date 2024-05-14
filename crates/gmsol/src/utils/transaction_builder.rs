@@ -1,8 +1,8 @@
 use std::ops::Deref;
 
-use anchor_client::solana_sdk::{signature::Signature, signer::Signer};
+use anchor_client::solana_sdk::{packet::PACKET_DATA_SIZE, signature::Signature, signer::Signer};
 
-use super::RpcBuilder;
+use super::{transaction_size, RpcBuilder};
 
 /// Build transactions from [`RpcBuilder`].
 pub struct TransactionBuilder<'a, C> {
@@ -18,23 +18,41 @@ impl<'a, C> Default for TransactionBuilder<'a, C> {
 }
 
 impl<'a, C: Deref<Target = impl Signer> + Clone> TransactionBuilder<'a, C> {
-    /// Push a [`RpcBuilder`].
-    pub fn try_push(
+    /// Push a [`RpcBuilder`] with options.
+    pub fn try_push_with_opts(
         &mut self,
         mut rpc: RpcBuilder<'a, C>,
         new_transaction: bool,
     ) -> Result<&mut Self, (RpcBuilder<'a, C>, crate::Error)> {
         if self.builders.is_empty() || new_transaction {
+            tracing::debug!("adding to a new tx");
             self.builders.push(rpc);
         } else {
-            // TODO: calculate if reaches the transaction size limit.
-            self.builders
-                .last_mut()
-                .unwrap()
-                .try_merge(&mut rpc)
-                .map_err(|err| (rpc, err))?;
+            let last = self.builders.last_mut().unwrap();
+            let mut ixs_after_merge = last.instructions(false);
+            ixs_after_merge.append(&mut rpc.instructions(true));
+            let size_after_merge = transaction_size(&ixs_after_merge, true);
+            if size_after_merge <= PACKET_DATA_SIZE {
+                tracing::debug!(size_after_merge, "adding to the last tx");
+                last.try_merge(&mut rpc).map_err(|err| (rpc, err))?;
+            } else {
+                tracing::debug!(
+                    size_after_merge,
+                    "exceed packet data size limit, adding to a new tx"
+                );
+                self.builders.push(rpc);
+            }
         }
         Ok(self)
+    }
+
+    /// Push a [`RpcBuilder`].
+    #[inline]
+    pub fn try_push(
+        &mut self,
+        rpc: RpcBuilder<'a, C>,
+    ) -> Result<&mut Self, (RpcBuilder<'a, C>, crate::Error)> {
+        self.try_push_with_opts(rpc, false)
     }
 
     /// Get back all collected [`RpcBuilder`]s.
@@ -46,7 +64,11 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> TransactionBuilder<'a, C> {
     pub async fn send_all(self) -> Result<Vec<Signature>, (Vec<Signature>, crate::Error)> {
         let mut signatures = Vec::with_capacity(self.builders.len());
         let mut error = None;
-        for builder in self.builders {
+        for (idx, builder) in self.builders.into_iter().enumerate() {
+            tracing::info!(
+                size = builder.transaction_size(false),
+                "sending transaction {idx}"
+            );
             match builder.build().send().await {
                 Ok(signature) => {
                     signatures.push(signature);

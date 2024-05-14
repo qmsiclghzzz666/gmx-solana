@@ -16,9 +16,13 @@ pub mod rpc_builder;
 /// Transaction Builder.
 pub mod transaction_builder;
 
+/// Transaction size.
+pub mod transaction_size;
+
 pub use self::{
     rpc_builder::{ComputeBudget, RpcBuilder},
     transaction_builder::TransactionBuilder,
+    transaction_size::transaction_size,
 };
 
 /// View the return data by simulating the transaction.

@@ -12,6 +12,8 @@ use anchor_client::{
     Program,
 };
 
+use super::transaction_size;
+
 /// A wrapper of [`RequestBuilder`](anchor_client::RequestBuilder).
 #[must_use]
 pub struct RpcBuilder<'a, C, T = ()> {
@@ -153,16 +155,25 @@ impl<'a, C: Deref<Target = impl Signer> + Clone, T> RpcBuilder<'a, C, T> {
         self.compute_budget.compute_budget_instructions()
     }
 
+    fn get_rpc_instruction(&self) -> Option<Instruction> {
+        let ix_data = self.instruction_data.as_ref()?;
+        Some(Instruction {
+            program_id: self.program_id,
+            data: ix_data.clone(),
+            accounts: self.accounts.clone(),
+        })
+    }
+
     /// Get all instructions.
-    pub fn instructions(&self) -> Vec<Instruction> {
-        let mut instructions = self.get_compute_budget_instructions();
+    pub fn instructions(&self, without_compute_budget: bool) -> Vec<Instruction> {
+        let mut instructions = if without_compute_budget {
+            Vec::default()
+        } else {
+            self.get_compute_budget_instructions()
+        };
         instructions.append(&mut self.pre_instructions.clone());
-        if let Some(ix_data) = &self.instruction_data {
-            instructions.push(Instruction {
-                program_id: self.program_id,
-                data: ix_data.clone(),
-                accounts: self.accounts.clone(),
-            });
+        if let Some(ix) = self.get_rpc_instruction() {
+            instructions.push(ix);
         }
         instructions
     }
@@ -236,7 +247,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone, T> RpcBuilder<'a, C, T> {
             "non-empty builder"
         );
         let request = self
-            .instructions()
+            .instructions(false)
             .into_iter()
             .fold(self.builder.program(self.program_id), |acc, ix| {
                 acc.instruction(ix)
@@ -246,6 +257,13 @@ impl<'a, C: Deref<Target = impl Signer> + Clone, T> RpcBuilder<'a, C, T> {
             .into_iter()
             .fold(request, |acc, signer| acc.signer(signer));
         (request, self.output)
+    }
+
+    /// Estimated the size of the result transaction.
+    ///
+    /// See [`transaction_size`] for more information.
+    pub fn transaction_size(&self, is_versioned_transaction: bool) -> usize {
+        transaction_size(&self.instructions(false), is_versioned_transaction)
     }
 }
 

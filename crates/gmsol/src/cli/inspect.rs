@@ -202,33 +202,33 @@ impl InspectArgs {
                                 wormhole.verify_encoded_vaa_v1(&draft_vaa, guardian_set_index);
 
                             builder
-                                .try_push(create.clear_output(), false)?
-                                .try_push(write_1, false)?
-                                .try_push(write_2, true)?
-                                .try_push(verify, false)?;
+                                .try_push(create.clear_output())?
+                                .try_push(write_1)?
+                                .try_push(write_2)?
+                                .try_push(verify)?;
 
                             let updates = get_merkle_price_updates(proof)
                                 .iter()
                                 .map(|update| (Keypair::new(), update))
                                 .collect::<Vec<_>>();
                             let mut closes = Vec::with_capacity(updates.len());
-                            for (idx, (price_update, update)) in updates.iter().enumerate() {
+                            for (price_update, update) in updates.iter() {
                                 let price_update_pubkey = price_update.pubkey();
                                 let (post, (feed_id, _)) = pyth
                                     .post_price_update(price_update, update, &draft_vaa)?
                                     .swap_output(());
-                                builder.try_push(post, idx == 0)?;
+                                builder.try_push(post)?;
                                 tracing::info!(%feed_id, price_update=%price_update_pubkey, "post price update");
 
                                 let close = pyth.reclaim_rent(&price_update_pubkey);
                                 closes.push(close);
                             }
 
-                            for (idx, close) in closes.into_iter().enumerate() {
-                                builder.try_push(close, idx == 0)?;
+                            for close in closes.into_iter() {
+                                builder.try_push(close)?;
                             }
                             let close = wormhole.close_encoded_vaa(&draft_vaa);
-                            builder.try_push(close, false)?;
+                            builder.try_push(close)?;
 
                             tracing::info!("sending txs...");
                             match builder.send_all().await {
