@@ -231,8 +231,15 @@ impl InspectArgs {
                             builder.try_push(close, false)?;
 
                             tracing::info!("sending txs...");
-                            let signatures = builder.send_all().await?;
-                            tracing::info!("sent all txs: {signatures:#?}");
+                            match builder.send_all().await {
+                                Ok(signatures) => {
+                                    tracing::info!("sent all txs successfully: {signatures:#?}");
+                                }
+                                Err((signatures, err)) => {
+                                    tracing::error!(%err, "sent txs error, successful list: {signatures:#?}");
+                                }
+                            }
+
                             return Ok(());
                         }
                     }

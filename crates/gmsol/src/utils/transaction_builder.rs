@@ -42,19 +42,30 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> TransactionBuilder<'a, C> {
         self.builders
     }
 
-    /// Send all.
-    pub async fn send_all(self) -> crate::Result<Vec<Signature>> {
+    /// Send all in order and returns the signatures of the success transactions.
+    pub async fn send_all(self) -> Result<Vec<Signature>, (Vec<Signature>, crate::Error)> {
         let mut signatures = Vec::with_capacity(self.builders.len());
+        let mut error = None;
         for builder in self.builders {
-            let signature = builder.build().send().await?;
-            signatures.push(signature);
+            match builder.build().send().await {
+                Ok(signature) => {
+                    signatures.push(signature);
+                }
+                Err(err) => {
+                    error = Some(err.into());
+                    break;
+                }
+            }
         }
-        Ok(signatures)
+        match error {
+            None => Ok(signatures),
+            Some(err) => Err((signatures, err)),
+        }
     }
 }
 
-impl<'a, C> From<(RpcBuilder<'a, C>, crate::Error)> for crate::Error {
-    fn from(value: (RpcBuilder<'a, C>, crate::Error)) -> Self {
+impl<T> From<(T, crate::Error)> for crate::Error {
+    fn from(value: (T, crate::Error)) -> Self {
         value.1
     }
 }
