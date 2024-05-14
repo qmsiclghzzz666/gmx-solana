@@ -7,7 +7,10 @@ use anchor_client::{
 use pyth_sdk::Identifier;
 use pythnet_sdk::wire::v1::MerklePriceUpdate;
 
-use crate::{pyth::utils::parse_price_feed_message, utils::RpcBuilder};
+use crate::{
+    pyth::utils::parse_price_feed_message,
+    utils::{ComputeBudget, RpcBuilder},
+};
 
 mod accounts;
 mod instruction;
@@ -17,6 +20,12 @@ pub const TREASURY_SEED: &[u8] = b"treasury";
 
 /// Config account seed.
 pub const CONFIG_SEED: &[u8] = b"config";
+
+/// `post_price_update` compute budget.
+pub const POST_PRICE_UPDATE_COMPUTE_BUDGET: u32 = 35_000;
+
+/// `reclaim_rent` compute budget.
+pub const RECLAIM_RENT_COMPUTE_BUDGET: u32 = 3_000;
 
 /// Find PDA for treasury account.
 pub fn find_treasury_pda(treasury_id: u8) -> (Pubkey, u8) {
@@ -73,7 +82,8 @@ where
                 system_program: system_program::ID,
                 write_authority: self.payer(),
             })
-            .signer(price_update))
+            .signer(price_update)
+            .compute_budget(ComputeBudget::default().with_limit(POST_PRICE_UPDATE_COMPUTE_BUDGET)))
     }
 
     fn reclaim_rent(&self, price_update: &Pubkey) -> RpcBuilder<C> {
@@ -83,6 +93,7 @@ where
                 payer: self.payer(),
                 price_update_account: *price_update,
             })
+            .compute_budget(ComputeBudget::default().with_limit(RECLAIM_RENT_COMPUTE_BUDGET))
     }
 }
 

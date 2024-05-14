@@ -22,6 +22,18 @@ pub const VAA_START: u64 = 46;
 /// Seed for guardian set account.
 pub const GUARDIAN_SET_SEED: &[u8] = b"GuardianSet";
 
+/// `init_encoded_vaa` compute budget.
+pub const INIT_ENCODED_VAA_COMPUTE_BUDGET: u32 = 3_000;
+
+/// `write_encoded_vaa` compute budget.
+pub const WRITE_ENCODED_VAA_COMPUTE_BUDGET: u32 = 3_000;
+
+/// `verify_encoded_vaa_v1` compute budget.
+pub const VERIFY_ENCODED_VAA_V1_COMPUTE_BUDGET: u32 = 350_000;
+
+/// `close_encoded_vaa` compute budget.
+pub const CLOSE_ENCODED_VAA_COMPUTE_BUDGET: u32 = 3_000;
+
 /// Find PDA for guardian set.
 pub fn find_guardian_set_pda(guardian_set_index: i32) -> (Pubkey, u8) {
     Pubkey::find_program_address(
@@ -79,7 +91,8 @@ where
                 encoded_vaa: encoded_vaa.pubkey(),
             })
             .signer(encoded_vaa)
-            .with_output(encoded_vaa.pubkey());
+            .with_output(encoded_vaa.pubkey())
+            .compute_budget(ComputeBudget::default().with_limit(INIT_ENCODED_VAA_COMPUTE_BUDGET));
         Ok(request)
     }
 
@@ -93,7 +106,7 @@ where
                 write_authority: self.payer(),
                 draft_vaa: *draft_vaa,
             })
-            .compute_budget(ComputeBudget::default().with_limit(3_000))
+            .compute_budget(ComputeBudget::default().with_limit(WRITE_ENCODED_VAA_COMPUTE_BUDGET))
     }
 
     fn verify_encoded_vaa_v1(&self, draft_vaa: &Pubkey, guardian_set_index: i32) -> RpcBuilder<C> {
@@ -104,7 +117,9 @@ where
                 draft_vaa: *draft_vaa,
                 guardian_set: find_guardian_set_pda(guardian_set_index).0,
             })
-            .compute_budget(ComputeBudget::default().with_limit(400_000))
+            .compute_budget(
+                ComputeBudget::default().with_limit(VERIFY_ENCODED_VAA_V1_COMPUTE_BUDGET),
+            )
     }
 
     fn close_encoded_vaa(&self, encoded_vaa: &Pubkey) -> RpcBuilder<C> {
@@ -114,5 +129,6 @@ where
                 write_authority: self.payer(),
                 encoded_vaa: *encoded_vaa,
             })
+            .compute_budget(ComputeBudget::default().with_limit(CLOSE_ENCODED_VAA_COMPUTE_BUDGET))
     }
 }
