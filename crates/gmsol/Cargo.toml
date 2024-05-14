@@ -9,9 +9,28 @@ path = "src/cli/main.rs"
 required-features = ["cli"]
 
 [features]
-cli = ["tokio/full", "clap", "tracing-subscriber", "shellexpand"]
+cli = [
+    "pyth",
+    "tokio/full",
+    "clap",
+    "tracing-subscriber",
+    "shellexpand",
+    "anchor-syn",
+    "heck",
+]
 clap = ["dep:clap", "data_store/clap"]
 devnet = ["data_store/devnet", "exchange/devnet"]
+pyth = [
+    "reqwest/stream",
+    "futures-util",
+    "url",
+    "serde",
+    "serde_json",
+    "eventsource-stream",
+    "pythnet-sdk",
+    "pyth-solana-receiver-sdk",
+    "byteorder",
+]
 
 [dependencies]
 eyre = { version = "0.6.12" }
@@ -45,3 +64,16 @@ tracing-subscriber = { version = "0.3.18", optional = true, features = [
 ] }
 shellexpand = { version = "3.1.0", optional = true }
 pyth-sdk = "0.8.0"
+
+# Dependencies for pyth support
+reqwest = { version = "0.12.4", optional = true }
+futures-util = { version = "0.3.30", optional = true }
+url = { version = "2.5.0", optional = true }
+serde_json = { version = "1.0.117", optional = true }
+serde = { version = "1.0.201", optional = true, features = ["derive"] }
+eventsource-stream = { version = "0.2.3", optional = true }
+pythnet-sdk = { version = "2.1.0", optional = true }
+pyth-solana-receiver-sdk = { workspace = true, optional = true }
+anchor-syn = { version = "0.30.0", optional = true }
+heck = { version = "0.5.0", optional = true }
+byteorder = { version = "1.5.0", optional = true }

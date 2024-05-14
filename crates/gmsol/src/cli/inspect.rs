@@ -7,7 +7,7 @@ use gmsol::{
         market::find_market_address,
         token_config::{find_token_config_map, get_token_config},
     },
-    utils,
+    utils::{self},
 };
 
 use crate::{utils::Oracle, SharedClient};
@@ -53,6 +53,15 @@ enum Command {
     Order { address: Pubkey },
     /// `Position` account.
     Position { address: Pubkey },
+    /// Watch Pyth Price Updates.
+    WatchPyth {
+        #[arg(required = true)]
+        feed_ids: Vec<String>,
+        #[arg(long)]
+        post: bool,
+    },
+    /// Generate Anchor Discriminator with the given name.
+    Discriminator { name: String },
 }
 
 impl InspectArgs {
@@ -63,6 +72,9 @@ impl InspectArgs {
     ) -> gmsol::Result<()> {
         let program = client.program(data_store::id())?;
         match &self.command {
+            Command::Discriminator { name } => {
+                println!("{:?}", crate::utils::generate_discriminator(name));
+            }
             Command::DataStore { address } => {
                 let address = address
                     .or(store.copied())
@@ -137,6 +149,52 @@ impl InspectArgs {
                     )
                     .await?
                 );
+            }
+            Command::WatchPyth { feed_ids, post } => {
+                use futures_util::TryStreamExt;
+                use gmsol::pyth::{
+                    EncodingType, Hermes, PythPullOracle, PythPullOracleContext, PythPullOracleOps,
+                };
+                use pyth_sdk::Identifier;
+
+                let hermes = Hermes::default();
+
+                let feed_ids = feed_ids
+                    .iter()
+                    .map(|id| {
+                        let hex = id.strip_prefix("0x").unwrap_or(id);
+                        Identifier::from_hex(hex).map_err(gmsol::Error::unknown)
+                    })
+                    .collect::<gmsol::Result<Vec<_>>>()?;
+
+                let stream = hermes
+                    .price_updates(feed_ids.clone(), Some(EncodingType::Base64))
+                    .await?;
+                futures_util::pin_mut!(stream);
+                while let Some(update) = stream.try_next().await? {
+                    tracing::info!("{:#?}", update.parsed());
+                    if *post {
+                        let oracle = PythPullOracle::try_new(client)?;
+                        let ctx = PythPullOracleContext::new(feed_ids);
+                        let prices = oracle
+                            .with_pyth_prices(&ctx, &update, |prices| {
+                                for (feed_id, price_update) in prices {
+                                    tracing::info!(%feed_id, %price_update, "posting price update");
+                                }
+                                None
+                            })
+                            .await?;
+                        match prices.send_all().await {
+                            Ok(signatures) => {
+                                tracing::info!("successfully sent all txs: {signatures:#?}");
+                            }
+                            Err((signatures, err)) => {
+                                tracing::error!(%err, "sent txs error, successful list: {signatures:#?}");
+                            }
+                        }
+                        break;
+                    }
+                }
             }
         }
         Ok(())
