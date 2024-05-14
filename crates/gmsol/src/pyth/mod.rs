@@ -8,4 +8,4 @@ pub mod pull_oracle;
 pub mod utils;
 
 pub use hermes::{EncodingType, Hermes};
-pub use pull_oracle::PythPullOracleOps;
+pub use pull_oracle::{PythPullOracle, PythPullOracleContext, PythPullOracleOps};

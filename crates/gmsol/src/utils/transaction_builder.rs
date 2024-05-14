@@ -55,6 +55,17 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> TransactionBuilder<'a, C> {
         self.try_push_with_opts(rpc, false)
     }
 
+    /// Push [`RpcBuilder`]s.
+    pub fn try_push_many(
+        &mut self,
+        rpcs: impl IntoIterator<Item = RpcBuilder<'a, C>>,
+    ) -> crate::Result<&mut Self> {
+        for rpc in rpcs {
+            self.try_push(rpc)?;
+        }
+        Ok(self)
+    }
+
     /// Get back all collected [`RpcBuilder`]s.
     pub fn into_builders(self) -> Vec<RpcBuilder<'a, C>> {
         self.builders
@@ -65,7 +76,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> TransactionBuilder<'a, C> {
         let mut signatures = Vec::with_capacity(self.builders.len());
         let mut error = None;
         for (idx, builder) in self.builders.into_iter().enumerate() {
-            tracing::info!(
+            tracing::debug!(
                 size = builder.transaction_size(false),
                 "sending transaction {idx}"
             );

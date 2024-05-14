@@ -1,3 +1,4 @@
+use pyth_sdk::Identifier;
 use pythnet_sdk::{
     messages::PriceFeedMessage,
     wire::{
@@ -82,4 +83,10 @@ pub fn parse_price_feed_message(update: &MerklePriceUpdate) -> crate::Result<Pri
     from_slice::<byteorder::BE, _>(&data[1..]).map_err(|err| {
         crate::Error::invalid_argument(format!("deserialize price feed message error: {err}"))
     })
+}
+
+/// Parse feed id from [`MerklePriceUpdate`].
+pub fn parse_feed_id(update: &MerklePriceUpdate) -> crate::Result<Identifier> {
+    let feed_id = parse_price_feed_message(update)?.feed_id;
+    Ok(Identifier::new(feed_id))
 }

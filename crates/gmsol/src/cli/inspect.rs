@@ -1,14 +1,13 @@
-use anchor_client::solana_sdk::{pubkey::Pubkey, signature::Keypair, signer::Signer};
+use anchor_client::solana_sdk::pubkey::Pubkey;
 use data_store::states::{self};
 use exchange::utils::ControllerSeeds;
 use eyre::ContextCompat;
 use gmsol::{
-    pyth::{pull_oracle::receiver::PythReceiverOps, utils::get_merkle_price_updates},
     store::{
         market::find_market_address,
         token_config::{find_token_config_map, get_token_config},
     },
-    utils::{self, TransactionBuilder},
+    utils::{self},
 };
 
 use crate::{utils::Oracle, SharedClient};
@@ -154,7 +153,7 @@ impl InspectArgs {
             Command::WatchPyth { feed_ids, post } => {
                 use futures_util::TryStreamExt;
                 use gmsol::pyth::{
-                    pull_oracle::WormholeOps, utils, EncodingType, Hermes, PythPullOracleOps,
+                    EncodingType, Hermes, PythPullOracle, PythPullOracleContext, PythPullOracleOps,
                 };
                 use pyth_sdk::Identifier;
 
@@ -169,79 +168,31 @@ impl InspectArgs {
                     .collect::<gmsol::Result<Vec<_>>>()?;
 
                 let stream = hermes
-                    .price_updates(feed_ids, Some(EncodingType::Base64))
+                    .price_updates(feed_ids.clone(), Some(EncodingType::Base64))
                     .await?;
                 futures_util::pin_mut!(stream);
                 while let Some(update) = stream.try_next().await? {
                     tracing::info!("{:#?}", update.parsed());
-                    let datas = utils::parse_accumulator_update_datas(&update)?;
-                    for data in datas {
-                        const VAA_SPLIT_INDEX: usize = 755;
-                        let proof = &data.proof;
-                        let guardian_set_index = utils::get_guardian_set_index(proof)?;
-                        tracing::info!("{guardian_set_index}:{proof:?}");
-                        if *post {
-                            let encoded_vaa = Keypair::new();
-                            let draft_vaa = encoded_vaa.pubkey();
-                            let vaa = utils::get_vaa_buffer(proof);
-                            let wormhole = client.wormhole()?;
-                            let pyth = client.pyth()?;
-
-                            let mut builder = TransactionBuilder::default();
-                            let create = wormhole
-                                .create_encoded_vaa(&encoded_vaa, vaa.len() as u64)
-                                .await?;
-                            let write_1 =
-                                wormhole.write_encoded_vaa(&draft_vaa, 0, &vaa[0..VAA_SPLIT_INDEX]);
-                            let write_2 = wormhole.write_encoded_vaa(
-                                &draft_vaa,
-                                VAA_SPLIT_INDEX as u32,
-                                &vaa[VAA_SPLIT_INDEX..],
-                            );
-                            let verify =
-                                wormhole.verify_encoded_vaa_v1(&draft_vaa, guardian_set_index);
-
-                            builder
-                                .try_push(create.clear_output())?
-                                .try_push(write_1)?
-                                .try_push(write_2)?
-                                .try_push(verify)?;
-
-                            let updates = get_merkle_price_updates(proof)
-                                .iter()
-                                .map(|update| (Keypair::new(), update))
-                                .collect::<Vec<_>>();
-                            let mut closes = Vec::with_capacity(updates.len());
-                            for (price_update, update) in updates.iter() {
-                                let price_update_pubkey = price_update.pubkey();
-                                let (post, (feed_id, _)) = pyth
-                                    .post_price_update(price_update, update, &draft_vaa)?
-                                    .swap_output(());
-                                builder.try_push(post)?;
-                                tracing::info!(%feed_id, price_update=%price_update_pubkey, "post price update");
-
-                                let close = pyth.reclaim_rent(&price_update_pubkey);
-                                closes.push(close);
-                            }
-
-                            for close in closes.into_iter() {
-                                builder.try_push(close)?;
-                            }
-                            let close = wormhole.close_encoded_vaa(&draft_vaa);
-                            builder.try_push(close)?;
-
-                            tracing::info!("sending txs...");
-                            match builder.send_all().await {
-                                Ok(signatures) => {
-                                    tracing::info!("sent all txs successfully: {signatures:#?}");
+                    if *post {
+                        let oracle = PythPullOracle::try_new(client)?;
+                        let ctx = PythPullOracleContext::new(feed_ids);
+                        let prices = oracle
+                            .with_pyth_prices(&ctx, &update, |prices| {
+                                for (feed_id, price_update) in prices {
+                                    tracing::info!(%feed_id, %price_update, "posting price update");
                                 }
-                                Err((signatures, err)) => {
-                                    tracing::error!(%err, "sent txs error, successful list: {signatures:#?}");
-                                }
+                                None
+                            })
+                            .await?;
+                        match prices.send_all().await {
+                            Ok(signatures) => {
+                                tracing::info!("successfully sent all txs: {signatures:#?}");
                             }
-
-                            return Ok(());
+                            Err((signatures, err)) => {
+                                tracing::error!(%err, "sent txs error, successful list: {signatures:#?}");
+                            }
                         }
+                        break;
                     }
                 }
             }

@@ -4,13 +4,9 @@ use anchor_client::{
     solana_sdk::{pubkey::Pubkey, signature::Keypair, signer::Signer, system_program},
     Program,
 };
-use pyth_sdk::Identifier;
 use pythnet_sdk::wire::v1::MerklePriceUpdate;
 
-use crate::{
-    pyth::utils::parse_price_feed_message,
-    utils::{ComputeBudget, RpcBuilder},
-};
+use crate::utils::{ComputeBudget, RpcBuilder};
 
 mod accounts;
 mod instruction;
@@ -48,7 +44,7 @@ pub trait PythReceiverOps<C> {
         price_update: &'a Keypair,
         update: &MerklePriceUpdate,
         encoded_vaa: &Pubkey,
-    ) -> crate::Result<RpcBuilder<'a, C, (Identifier, Pubkey)>>;
+    ) -> crate::Result<RpcBuilder<'a, C, Pubkey>>;
 
     /// Reclaim rent.
     fn reclaim_rent(&self, price_update: &Pubkey) -> RpcBuilder<C>;
@@ -64,11 +60,10 @@ where
         price_update: &'a Keypair,
         update: &MerklePriceUpdate,
         encoded_vaa: &Pubkey,
-    ) -> crate::Result<RpcBuilder<'a, C, (Identifier, Pubkey)>> {
-        let feed_id = parse_feed_id(update)?;
+    ) -> crate::Result<RpcBuilder<'a, C, Pubkey>> {
         let treasury_id = rand::random();
         Ok(RpcBuilder::new(self)
-            .with_output((feed_id, price_update.pubkey()))
+            .with_output(price_update.pubkey())
             .args(instruction::PostUpdate {
                 merkle_price_update: update.clone(),
                 treasury_id,
@@ -95,9 +90,4 @@ where
             })
             .compute_budget(ComputeBudget::default().with_limit(RECLAIM_RENT_COMPUTE_BUDGET))
     }
-}
-
-fn parse_feed_id(update: &MerklePriceUpdate) -> crate::Result<Identifier> {
-    let feed_id = parse_price_feed_message(update)?.feed_id;
-    Ok(Identifier::new(feed_id))
 }
