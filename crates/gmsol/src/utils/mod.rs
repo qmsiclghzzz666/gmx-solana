@@ -10,10 +10,16 @@ use anchor_client::{
 use anchor_spl::associated_token::get_associated_token_address;
 use base64::{prelude::BASE64_STANDARD, Engine};
 
-/// Anchor RPC Builder.
+/// RPC Builder.
 pub mod rpc_builder;
 
-pub use self::rpc_builder::{ComputeBudget, RpcBuilder};
+/// Transaction Builder.
+pub mod transaction_builder;
+
+pub use self::{
+    rpc_builder::{ComputeBudget, RpcBuilder},
+    transaction_builder::TransactionBuilder,
+};
 
 /// View the return data by simulating the transaction.
 pub async fn view<T: BorshDeserialize>(

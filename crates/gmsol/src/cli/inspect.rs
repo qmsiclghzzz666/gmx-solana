@@ -8,7 +8,7 @@ use gmsol::{
         market::find_market_address,
         token_config::{find_token_config_map, get_token_config},
     },
-    utils::{self, ComputeBudget},
+    utils::{self, TransactionBuilder},
 };
 
 use crate::{utils::Oracle, SharedClient};
@@ -176,6 +176,7 @@ impl InspectArgs {
                     tracing::info!("{:#?}", update.parsed());
                     let datas = utils::parse_accumulator_update_datas(&update)?;
                     for data in datas {
+                        const VAA_SPLIT_INDEX: usize = 755;
                         let proof = &data.proof;
                         let guardian_set_index = utils::get_guardian_set_index(proof)?;
                         tracing::info!("{guardian_set_index}:{proof:?}");
@@ -186,55 +187,52 @@ impl InspectArgs {
                             let wormhole = client.wormhole()?;
                             let pyth = client.pyth()?;
 
-                            tracing::info!("sending txs...");
-                            let signature = wormhole
+                            let mut builder = TransactionBuilder::default();
+                            let create = wormhole
                                 .create_encoded_vaa(&encoded_vaa, vaa.len() as u64)
-                                .await?
-                                .build()
-                                .send()
                                 .await?;
-                            tracing::info!(%draft_vaa, "initialized an encoded vaa account at tx {signature}");
+                            let write_1 =
+                                wormhole.write_encoded_vaa(&draft_vaa, 0, &vaa[0..VAA_SPLIT_INDEX]);
+                            let write_2 = wormhole.write_encoded_vaa(
+                                &draft_vaa,
+                                VAA_SPLIT_INDEX as u32,
+                                &vaa[VAA_SPLIT_INDEX..],
+                            );
+                            let verify =
+                                wormhole.verify_encoded_vaa_v1(&draft_vaa, guardian_set_index);
 
-                            let signature = wormhole
-                                .write_encoded_vaa(&draft_vaa, 0, vaa)
-                                .build()
-                                .send()
-                                .await?;
-                            tracing::info!(%draft_vaa, "written to the encoded vaa account at tx {signature}");
+                            builder
+                                .try_push(create.clear_output(), false)?
+                                .try_push(write_1, false)?
+                                .try_push(write_2, true)?
+                                .try_push(verify, false)?;
 
-                            let signature = wormhole
-                                .verify_encoded_vaa_v1(&draft_vaa, guardian_set_index)
-                                .compute_budget(Some(ComputeBudget::default().with_limit(400_000)))
-                                .build()
-                                .send()
-                                .await?;
-                            tracing::info!(%draft_vaa, "verified the encoded vaa account at tx {signature}");
-
-                            let updates = get_merkle_price_updates(proof);
-                            for update in updates {
-                                let price_update = Keypair::new();
+                            let updates = get_merkle_price_updates(proof)
+                                .iter()
+                                .map(|update| (Keypair::new(), update))
+                                .collect::<Vec<_>>();
+                            let mut closes = Vec::with_capacity(updates.len());
+                            for (idx, (price_update, update)) in updates.iter().enumerate() {
                                 let price_update_pubkey = price_update.pubkey();
-                                let (request, (feed_id, _)) = pyth
-                                    .post_price_update(&price_update, update, &draft_vaa)?
-                                    .build_with_output();
-                                let signature = request.send().await?;
-                                tracing::info!(%feed_id, price_update=%price_update_pubkey, "posted a price update at tx {signature}");
+                                let (post, (feed_id, _)) = pyth
+                                    .post_price_update(price_update, update, &draft_vaa)?
+                                    .swap_output(());
+                                builder.try_push(post, idx == 0)?;
+                                tracing::info!(%feed_id, price_update=%price_update_pubkey, "post price update");
 
-                                let signature = pyth
-                                    .reclaim_rent(&price_update_pubkey)
-                                    .build()
-                                    .send()
-                                    .await?;
-                                tracing::info!(%feed_id, price_update=%price_update_pubkey, "reclaimed rent at tx {signature}");
+                                let close = pyth.reclaim_rent(&price_update_pubkey);
+                                closes.push(close);
                             }
 
-                            let signature = wormhole
-                                .close_encoded_vaa(&draft_vaa)
-                                .build()
-                                .send()
-                                .await?;
+                            for (idx, close) in closes.into_iter().enumerate() {
+                                builder.try_push(close, idx == 0)?;
+                            }
+                            let close = wormhole.close_encoded_vaa(&draft_vaa);
+                            builder.try_push(close, false)?;
 
-                            tracing::info!(encoded_vaa=%draft_vaa, "closed the encoded vaa account at tx {signature}");
+                            tracing::info!("sending txs...");
+                            let signatures = builder.send_all().await?;
+                            tracing::info!("sent all txs: {signatures:#?}");
                             return Ok(());
                         }
                     }
