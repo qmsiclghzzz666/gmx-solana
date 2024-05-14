@@ -7,9 +7,9 @@ const isNode = process.env.BUILD_TARGET === "node";
 
 export default defineConfig({
     build: {
-        lib: { entry: resolve(__dirname, 'src/main.ts'), formats: ['es', 'cjs'] },
+        lib: { entry: resolve(__dirname, 'src/main.ts'), formats: isNode ? ['cjs'] : ['es'] },
         outDir: "../../dist/gmsol",
-        emptyOutDir: true,
+        emptyOutDir: false,
         rollupOptions: {
             external: isNode ? ['crypto', 'buffer'] : [],
         },
