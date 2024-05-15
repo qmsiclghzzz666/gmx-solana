@@ -1,3 +1,4 @@
+use data_store::states::{common::TokensWithFeed, PriceProviderKind};
 use pyth_sdk::Identifier;
 use pythnet_sdk::{
     messages::PriceFeedMessage,
@@ -6,6 +7,8 @@ use pythnet_sdk::{
         v1::{AccumulatorUpdateData, MerklePriceUpdate, Proof},
     },
 };
+
+use crate::store::utils::Feeds;
 
 use super::hermes::{EncodingType, PriceUpdate};
 
@@ -89,4 +92,20 @@ pub fn parse_price_feed_message(update: &MerklePriceUpdate) -> crate::Result<Pri
 pub fn parse_feed_id(update: &MerklePriceUpdate) -> crate::Result<Identifier> {
     let feed_id = parse_price_feed_message(update)?.feed_id;
     Ok(Identifier::new(feed_id))
+}
+
+/// Extract pyth feed ids from [`TokensWithFeed`].
+pub fn extract_pyth_feed_ids(feeds: &TokensWithFeed) -> crate::Result<Vec<Identifier>> {
+    Feeds::new(feeds)
+        .filter_map(|res| {
+            res.map(|(provider, feed)| {
+                if matches!(provider, PriceProviderKind::Pyth) {
+                    Some(Identifier::new(feed.to_bytes()))
+                } else {
+                    None
+                }
+            })
+            .transpose()
+        })
+        .collect()
 }

@@ -190,7 +190,7 @@ impl InspectArgs {
                             for (feed_id, price_update) in prices {
                                 tracing::info!(%feed_id, %price_update, "posting price update");
                             }
-                            None
+                            async { Ok(None) }
                         })
                         .await?;
                     match prices.send_all().await {

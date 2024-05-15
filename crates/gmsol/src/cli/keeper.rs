@@ -8,6 +8,7 @@ use data_store::states::PriceProviderKind;
 use exchange::events::{DepositCreatedEvent, OrderCreatedEvent, WithdrawalCreatedEvent};
 use gmsol::{
     exchange::ExchangeOps,
+    pyth::{EncodingType, Hermes, PythPullOracle, PythPullOracleContext, PythPullOracleOps},
     store::market::VaultOps,
     utils::{ComputeBudget, RpcBuilder},
 };
@@ -31,6 +32,9 @@ pub(super) struct KeeperArgs {
     /// Set the price provider to use.
     #[arg(long, default_value = "pyth")]
     provider: PriceProviderKind,
+    /// Whether to use pull oracle when available.
+    #[arg(long)]
+    pull_oracle: bool,
     #[command(subcommand)]
     command: Command,
 }
@@ -83,6 +87,10 @@ impl KeeperArgs {
         rpc.estimate_execution_fee(&program.async_rpc()).await
     }
 
+    fn use_pyth_pull_oracle(&self) -> bool {
+        self.pull_oracle && matches!(self.provider, PriceProviderKind::Pyth)
+    }
+
     pub(super) async fn run(&self, client: &SharedClient, store: &Pubkey) -> gmsol::Result<()> {
         match &self.command {
             Command::Watch => {
@@ -96,17 +104,47 @@ impl KeeperArgs {
                 let execution_fee = self
                     .get_or_estimate_execution_fee(&program, &builder.build().await?)
                     .await?;
-                let mut rpc = builder
+                builder
                     .execution_fee(execution_fee)
-                    .price_provider(self.provider.program())
-                    .build()
-                    .await?;
-                if let Some(budget) = self.get_compute_budget() {
-                    rpc = rpc.compute_budget(budget)
+                    .price_provider(self.provider.program());
+                if self.use_pyth_pull_oracle() {
+                    let hint = builder.prepare_hint().await?;
+                    let ctx = PythPullOracleContext::try_from_feeds(&hint.feeds)?;
+                    let feed_ids = ctx.feed_ids();
+                    if feed_ids.is_empty() {
+                        tracing::error!(%deposit, "empty feed ids");
+                    }
+                    let oracle = PythPullOracle::try_new(client)?;
+                    let hermes = Hermes::default();
+                    let update = hermes
+                        .latest_price_updates(feed_ids, Some(EncodingType::Base64))
+                        .await?;
+                    let with_prices = oracle
+                        .with_pyth_prices(&ctx, &update, |prices| async {
+                            let rpc = builder
+                                .parse_with_pyth_price_updates(prices)
+                                .build()
+                                .await?;
+                            Ok(Some(rpc))
+                        })
+                        .await?;
+                    match with_prices.send_all().await {
+                        Ok(signatures) => {
+                            tracing::info!(%deposit, "executed deposit with txs {signatures:#?}");
+                        }
+                        Err((signatures, err)) => {
+                            tracing::error!(%err, %deposit, "failed to execute deposit, successful txs: {signatures:#?}");
+                        }
+                    }
+                } else {
+                    let mut rpc = builder.build().await?;
+                    if let Some(budget) = self.get_compute_budget() {
+                        rpc = rpc.compute_budget(budget)
+                    }
+                    let signature = rpc.build().send().await?;
+                    tracing::info!(%deposit, "executed deposit at tx {signature}");
+                    println!("{signature}");
                 }
-                let signature = rpc.build().send().await?;
-                tracing::info!(%deposit, "executed deposit at tx {signature}");
-                println!("{signature}");
             }
             Command::ExecuteWithdrawal { withdrawal } => {
                 let program = client.program(exchange::id())?;

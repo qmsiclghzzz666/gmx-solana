@@ -450,7 +450,7 @@ where
 
     /// Parse feeds with the given price udpates map.
     #[cfg(feature = "pyth-pull-oracle")]
-    pub fn parse_with_pyth_price_updates(&mut self, price_updates: &Prices) -> &mut Self {
+    pub fn parse_with_pyth_price_updates(&mut self, price_updates: Prices) -> &mut Self {
         self.feeds_parser.with_pyth_price_updates(price_updates);
         self
     }

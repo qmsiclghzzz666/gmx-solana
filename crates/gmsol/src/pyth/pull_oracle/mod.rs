@@ -20,6 +20,7 @@ use anchor_client::{
     },
     Client, Program,
 };
+use data_store::states::common::TokensWithFeed;
 use pyth_sdk::Identifier;
 
 use crate::utils::{RpcBuilder, TransactionBuilder};
@@ -86,19 +87,29 @@ pub type Prices = HashMap<Identifier, Pubkey>;
 pub struct PythPullOracleContext {
     encoded_vaa: Keypair,
     feeds: HashMap<Identifier, Keypair>,
+    feed_ids: Vec<Identifier>,
 }
 
 impl PythPullOracleContext {
-    /// Create a new oracle [`Context`].
-    pub fn new(feed_ids: impl IntoIterator<Item = Identifier>) -> Self {
-        let feeds = feed_ids
-            .into_iter()
-            .map(|id| (id, Keypair::new()))
-            .collect();
+    /// Create a new [`PythPullOracleContext`].
+    pub fn new(feed_ids: Vec<Identifier>) -> Self {
+        let feeds = feed_ids.iter().map(|id| (*id, Keypair::new())).collect();
         Self {
             encoded_vaa: Keypair::new(),
             feeds,
+            feed_ids,
         }
+    }
+
+    /// Create a new [`PythPullOracleContext`] from [`TokensWithFeed`].
+    pub fn try_from_feeds(feeds: &TokensWithFeed) -> crate::Result<Self> {
+        let feed_ids = utils::extract_pyth_feed_ids(feeds)?;
+        Ok(Self::new(feed_ids))
+    }
+
+    /// Get feed ids.
+    pub fn feed_ids(&self) -> &[Identifier] {
+        &self.feed_ids
     }
 }
 
@@ -111,16 +122,17 @@ pub trait PythPullOracleOps<C> {
     fn wormhole(&self) -> &Program<C>;
 
     /// Create transactions to post price updates and consume the prices.
-    fn with_pyth_prices<'a, S, It>(
+    fn with_pyth_prices<'a, S, It, Fut>(
         &'a self,
         ctx: &'a PythPullOracleContext,
         update: &PriceUpdate,
-        consume: impl FnOnce(&Prices) -> It,
+        consume: impl FnOnce(Prices) -> Fut,
     ) -> impl Future<Output = crate::Result<WithPythPrices<'a, C>>>
     where
         C: Deref<Target = S> + Clone + 'a,
         S: Signer,
         It: IntoIterator<Item = RpcBuilder<'a, C>>,
+        Fut: Future<Output = crate::Result<It>>,
     {
         async {
             let wormhole = self.wormhole();
@@ -166,7 +178,7 @@ pub trait PythPullOracleOps<C> {
                     close.try_push(pyth.reclaim_rent(&price_update))?;
                 }
             }
-            let consume = (consume)(&prices);
+            let consume = (consume)(prices).await?;
             post.try_push_many(consume)?;
             Ok(WithPythPrices { post, close })
         }

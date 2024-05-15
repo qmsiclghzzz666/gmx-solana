@@ -40,7 +40,7 @@ impl FeedsParser {
         &'a self,
         tokens_with_feed: &'a TokensWithFeed,
     ) -> impl Iterator<Item = crate::Result<AccountMeta>> + 'a {
-        FeedAccountMetas::new(tokens_with_feed)
+        Feeds::new(tokens_with_feed)
             .map(|res| res.and_then(|(provider, feed)| self.dispatch(&provider, &feed)))
     }
 
@@ -65,8 +65,7 @@ mod pyth_pull_oracle {
 
     impl FeedsParser {
         /// Parse Pyth feeds with price updates map.
-        pub fn with_pyth_price_updates(&mut self, price_updates: &Prices) -> &mut Self {
-            let price_updates = price_updates.clone();
+        pub fn with_pyth_price_updates(&mut self, price_updates: Prices) -> &mut Self {
             self.parsers.insert(
                 PriceProviderKind::Pyth,
                 Box::new(move |feed| {
@@ -90,14 +89,14 @@ mod pyth_pull_oracle {
 }
 
 /// Feed account metas.
-pub struct FeedAccountMetas<'a> {
+pub struct Feeds<'a> {
     provider_with_lengths: Peekable<Zip<Iter<'a, u8>, Iter<'a, u16>>>,
     feeds: Iter<'a, Pubkey>,
     current: usize,
     failed: bool,
 }
 
-impl<'a> FeedAccountMetas<'a> {
+impl<'a> Feeds<'a> {
     /// Create from [`TokensWithFeed`].
     pub fn new(token_with_feeds: &'a TokensWithFeed) -> Self {
         let providers = token_with_feeds.providers.iter();
@@ -113,7 +112,7 @@ impl<'a> FeedAccountMetas<'a> {
     }
 }
 
-impl<'a> Iterator for FeedAccountMetas<'a> {
+impl<'a> Iterator for Feeds<'a> {
     type Item = crate::Result<(PriceProviderKind, Pubkey)>;
 
     fn next(&mut self) -> Option<Self::Item> {

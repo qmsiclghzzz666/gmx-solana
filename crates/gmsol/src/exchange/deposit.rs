@@ -426,12 +426,14 @@ pub struct ExecuteDepositBuilder<'a, C> {
     hint: Option<ExecuteDepositHint>,
 }
 
+/// Hint for executing deposit.
 #[derive(Clone)]
-struct ExecuteDepositHint {
+pub struct ExecuteDepositHint {
     user: Pubkey,
     receiver: Pubkey,
     market_token_mint: Pubkey,
-    feeds: TokensWithFeed,
+    /// Feeds.
+    pub feeds: TokensWithFeed,
     long_swap_tokens: Vec<Pubkey>,
     short_swap_tokens: Vec<Pubkey>,
 }
@@ -492,24 +494,27 @@ where
 
     /// Parse feeds with the given price udpates map.
     #[cfg(feature = "pyth-pull-oracle")]
-    pub fn parse_with_pyth_price_updates(&mut self, price_updates: &Prices) -> &mut Self {
+    pub fn parse_with_pyth_price_updates(&mut self, price_updates: Prices) -> &mut Self {
         self.feeds_parser.with_pyth_price_updates(price_updates);
         self
     }
 
-    async fn get_or_fetch_hint(&self) -> crate::Result<ExecuteDepositHint> {
+    /// Prepare [`ExecuteDepositHint`].
+    pub async fn prepare_hint(&mut self) -> crate::Result<ExecuteDepositHint> {
         match &self.hint {
             Some(hint) => Ok(hint.clone()),
             None => {
                 let deposit: Deposit = self.program.account(self.deposit).await?;
-                Ok((&deposit).into())
+                let hint: ExecuteDepositHint = (&deposit).into();
+                self.hint = Some(hint.clone());
+                Ok(hint)
             }
         }
     }
 
     /// Build [`RpcBuilder`] for executing the deposit.
-    pub async fn build(&self) -> crate::Result<RpcBuilder<'a, C>> {
-        let hint = self.get_or_fetch_hint().await?;
+    pub async fn build(&mut self) -> crate::Result<RpcBuilder<'a, C>> {
+        let hint = self.prepare_hint().await?;
         let Self {
             program,
             store,
@@ -543,6 +548,7 @@ where
                 is_signer: false,
                 is_writable: false,
             });
+        tracing::debug!(%price_provider, "constructing `execute_deposit` ix...");
         Ok(RpcBuilder::new(program)
             .accounts(accounts::ExecuteDeposit {
                 authority,
