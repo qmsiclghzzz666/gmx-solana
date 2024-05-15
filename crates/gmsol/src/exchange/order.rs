@@ -18,12 +18,15 @@ use crate::{
         market::{find_market_address, find_market_vault_address},
         roles::find_roles_address,
         token_config::find_token_config_map,
-        utils::BoxFeedsParser,
+        utils::FeedsParser,
     },
     utils::{ComputeBudget, RpcBuilder, TokenAccountParams},
 };
 
 use super::generate_nonce;
+
+#[cfg(feature = "pyth-pull-oracle")]
+use crate::pyth::pull_oracle::Prices;
 
 /// `execute_order` compute budget.
 pub const EXECUTE_ORDER_COMPUTE_BUDGET: u32 = 400_000;
@@ -376,7 +379,7 @@ pub struct ExecuteOrderBuilder<'a, C> {
     order: Pubkey,
     execution_fee: u64,
     price_provider: Pubkey,
-    feeds_parser: BoxFeedsParser,
+    feeds_parser: FeedsParser,
     hint: Option<ExecuteOrderHint>,
 }
 
@@ -441,6 +444,13 @@ where
             feeds: order.prices.clone(),
             swap_path: order.swap.long_token_swap_path.clone(),
         });
+        self
+    }
+
+    /// Parse feeds with the given price udpates map.
+    #[cfg(feature = "pyth-pull-oracle")]
+    pub fn parse_with_pyth_price_updates(&mut self, price_updates: &Prices) -> &mut Self {
+        self.feeds_parser.with_pyth_price_updates(price_updates);
         self
     }
 

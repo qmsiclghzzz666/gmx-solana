@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     iter::{Peekable, Zip},
     slice::Iter,
 };
@@ -8,52 +9,83 @@ use data_store::states::{common::TokensWithFeed, PriceProviderKind};
 
 use crate::pyth::find_pyth_feed_account;
 
+type Parser = Box<dyn Fn(Pubkey) -> crate::Result<AccountMeta>>;
+
 /// Feeds parser.
-pub struct FeedsParser<F> {
-    parse: F,
+pub struct FeedsParser {
+    parsers: HashMap<PriceProviderKind, Parser>,
 }
 
-impl<F> FeedsParser<F> {
-    /// Create a new feeds parser.
-    pub fn new(parse: F) -> Self {
-        Self { parse }
+impl Default for FeedsParser {
+    fn default() -> Self {
+        Self {
+            parsers: HashMap::from([(
+                PriceProviderKind::Pyth,
+                Box::new(|feed: Pubkey| {
+                    let pubkey = find_pyth_feed_account(0, feed.to_bytes()).0;
+                    Ok(AccountMeta {
+                        pubkey,
+                        is_signer: false,
+                        is_writable: false,
+                    })
+                }) as Parser,
+            )]),
+        }
     }
+}
 
+impl FeedsParser {
     /// Parse a [`TokensWithFeed`]
     pub fn parse<'a>(
         &'a self,
         tokens_with_feed: &'a TokensWithFeed,
-    ) -> impl Iterator<Item = crate::Result<AccountMeta>> + 'a
-    where
-        F: Fn(&PriceProviderKind, &Pubkey) -> crate::Result<AccountMeta>,
-    {
+    ) -> impl Iterator<Item = crate::Result<AccountMeta>> + 'a {
         FeedAccountMetas::new(tokens_with_feed)
-            .map(|res| res.and_then(|(provider, feed)| (self.parse)(&provider, &feed)))
+            .map(|res| res.and_then(|(provider, feed)| self.dispatch(&provider, &feed)))
+    }
+
+    fn dispatch(&self, provider: &PriceProviderKind, feed: &Pubkey) -> crate::Result<AccountMeta> {
+        let Some(parser) = self.parsers.get(provider) else {
+            return Ok(AccountMeta {
+                pubkey: *feed,
+                is_signer: false,
+                is_writable: false,
+            });
+        };
+        (parser)(*feed)
     }
 }
 
-/// Boxed [`FeedsParser`].
-pub type BoxFeedsParser =
-    FeedsParser<Box<dyn Fn(&PriceProviderKind, &Pubkey) -> crate::Result<AccountMeta>>>;
+#[cfg(feature = "pyth-pull-oracle")]
+mod pyth_pull_oracle {
+    use pyth_sdk::Identifier;
 
-impl Default for BoxFeedsParser {
-    fn default() -> Self {
-        Self::new(Box::new(|provider, feed| {
-            let pubkey = match provider {
-                PriceProviderKind::Pyth => find_pyth_feed_account(0, feed.to_bytes()).0,
-                PriceProviderKind::Chainlink | PriceProviderKind::PythLegacy => *feed,
-                kind => {
-                    return Err(crate::Error::invalid_argument(format!(
-                        "unknown provider: {kind}"
-                    )))
-                }
-            };
-            Ok(AccountMeta {
-                pubkey,
-                is_signer: false,
-                is_writable: false,
-            })
-        }))
+    use super::*;
+    use crate::pyth::pull_oracle::Prices;
+
+    impl FeedsParser {
+        /// Parse Pyth feeds with price updates map.
+        pub fn with_pyth_price_updates(&mut self, price_updates: &Prices) -> &mut Self {
+            let price_updates = price_updates.clone();
+            self.parsers.insert(
+                PriceProviderKind::Pyth,
+                Box::new(move |feed| {
+                    let feed_id = Identifier::new(feed.to_bytes());
+                    let price_update = price_updates.get(&feed_id).ok_or_else(|| {
+                        crate::Error::invalid_argument(format!(
+                            "price update account for {feed_id}"
+                        ))
+                    })?;
+
+                    Ok(AccountMeta {
+                        pubkey: *price_update,
+                        is_signer: false,
+                        is_writable: false,
+                    })
+                }),
+            );
+            self
+        }
     }
 }
 

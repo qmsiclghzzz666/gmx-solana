@@ -361,7 +361,7 @@ impl Ids for PriceProvider {
 
 /// Supported Price Provider Kind.
 #[repr(u8)]
-#[derive(Clone, Copy, Default, TryFromPrimitive, PartialEq, Eq)]
+#[derive(Clone, Copy, Default, TryFromPrimitive, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
 #[non_exhaustive]
 pub enum PriceProviderKind {
