@@ -11,6 +11,9 @@ pub const DEFAULT_HERMES_BASE: &str = "https://hermes.pyth.network";
 /// The SSE endpoint of price updates stream.
 pub const PRICE_STREAM: &str = "/v2/updates/price/stream";
 
+/// The endpoint of latest price update.
+pub const PRICE_LATEST: &str = "/v2/updates/price/latest";
+
 /// Hermes Client.
 #[derive(Debug, Clone)]
 pub struct Hermes {
@@ -30,14 +33,10 @@ impl Hermes {
     /// Get a stream of price updates.
     pub async fn price_updates(
         &self,
-        feed_ids: impl IntoIterator<Item = Identifier>,
+        feed_ids: impl IntoIterator<Item = &Identifier>,
         encoding: Option<EncodingType>,
     ) -> crate::Result<impl Stream<Item = crate::Result<PriceUpdate>>> {
-        let params: Vec<_> = feed_ids
-            .into_iter()
-            .map(|id| ("ids[]", id.to_hex()))
-            .chain(encoding.map(|encoding| ("encoding", encoding.to_string())))
-            .collect();
+        let params = get_query(feed_ids, encoding);
         let stream = self
             .client
             .get(self.base.join(PRICE_STREAM)?)
@@ -56,6 +55,24 @@ impl Hermes {
                 async { Ok(update) }
             });
         Ok(stream)
+    }
+
+    /// Get latest price updates.
+    pub async fn latest_price_updates(
+        &self,
+        feed_ids: impl IntoIterator<Item = &Identifier>,
+        encoding: Option<EncodingType>,
+    ) -> crate::Result<PriceUpdate> {
+        let params = get_query(feed_ids, encoding);
+        let update = self
+            .client
+            .get(self.base.join(PRICE_LATEST)?)
+            .query(&params)
+            .send()
+            .await?
+            .json()
+            .await?;
+        Ok(update)
     }
 }
 
@@ -136,4 +153,15 @@ pub struct Metadata {
     slot: Option<u64>,
     proof_available_time: Option<i64>,
     prev_publish_time: Option<i64>,
+}
+
+fn get_query<'a>(
+    feed_ids: impl IntoIterator<Item = &'a Identifier>,
+    encoding: Option<EncodingType>,
+) -> Vec<(&'static str, String)> {
+    feed_ids
+        .into_iter()
+        .map(|id| ("ids[]", id.to_hex()))
+        .chain(encoding.map(|encoding| ("encoding", encoding.to_string())))
+        .collect()
 }

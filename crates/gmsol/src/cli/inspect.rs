@@ -9,6 +9,7 @@ use gmsol::{
     },
     utils::{self},
 };
+use pyth_sdk::Identifier;
 
 use crate::{utils::Oracle, SharedClient};
 
@@ -55,6 +56,11 @@ enum Command {
     Position { address: Pubkey },
     /// Watch Pyth Price Updates.
     WatchPyth {
+        #[arg(required = true)]
+        feed_ids: Vec<String>,
+    },
+    /// Get Pyth Price Updates.
+    GetPyth {
         #[arg(required = true)]
         feed_ids: Vec<String>,
         #[arg(long)]
@@ -150,53 +156,65 @@ impl InspectArgs {
                     .await?
                 );
             }
-            Command::WatchPyth { feed_ids, post } => {
+            Command::WatchPyth { feed_ids } => {
                 use futures_util::TryStreamExt;
-                use gmsol::pyth::{
-                    EncodingType, Hermes, PythPullOracle, PythPullOracleContext, PythPullOracleOps,
-                };
-                use pyth_sdk::Identifier;
+                use gmsol::pyth::{EncodingType, Hermes};
 
                 let hermes = Hermes::default();
-
-                let feed_ids = feed_ids
-                    .iter()
-                    .map(|id| {
-                        let hex = id.strip_prefix("0x").unwrap_or(id);
-                        Identifier::from_hex(hex).map_err(gmsol::Error::unknown)
-                    })
-                    .collect::<gmsol::Result<Vec<_>>>()?;
-
+                let feed_ids = parse_feed_ids(feed_ids)?;
                 let stream = hermes
-                    .price_updates(feed_ids.clone(), Some(EncodingType::Base64))
+                    .price_updates(&feed_ids, Some(EncodingType::Base64))
                     .await?;
                 futures_util::pin_mut!(stream);
                 while let Some(update) = stream.try_next().await? {
                     tracing::info!("{:#?}", update.parsed());
-                    if *post {
-                        let oracle = PythPullOracle::try_new(client)?;
-                        let ctx = PythPullOracleContext::new(feed_ids);
-                        let prices = oracle
-                            .with_pyth_prices(&ctx, &update, |prices| {
-                                for (feed_id, price_update) in prices {
-                                    tracing::info!(%feed_id, %price_update, "posting price update");
-                                }
-                                None
-                            })
-                            .await?;
-                        match prices.send_all().await {
-                            Ok(signatures) => {
-                                tracing::info!("successfully sent all txs: {signatures:#?}");
+                }
+            }
+            Command::GetPyth { feed_ids, post } => {
+                use gmsol::pyth::{
+                    EncodingType, Hermes, PythPullOracle, PythPullOracleContext, PythPullOracleOps,
+                };
+
+                let hermes = Hermes::default();
+                let feed_ids = parse_feed_ids(feed_ids)?;
+                let update = hermes
+                    .latest_price_updates(&feed_ids, Some(EncodingType::Base64))
+                    .await?;
+                tracing::info!("{:#?}", update.parsed());
+
+                if *post {
+                    let oracle = PythPullOracle::try_new(client)?;
+                    let ctx = PythPullOracleContext::new(feed_ids);
+                    let prices = oracle
+                        .with_pyth_prices(&ctx, &update, |prices| {
+                            for (feed_id, price_update) in prices {
+                                tracing::info!(%feed_id, %price_update, "posting price update");
                             }
-                            Err((signatures, err)) => {
-                                tracing::error!(%err, "sent txs error, successful list: {signatures:#?}");
-                            }
+                            None
+                        })
+                        .await?;
+                    match prices.send_all().await {
+                        Ok(signatures) => {
+                            tracing::info!("successfully sent all txs: {signatures:#?}");
                         }
-                        break;
+                        Err((signatures, err)) => {
+                            tracing::error!(%err, "sent txs error, successful list: {signatures:#?}");
+                        }
                     }
                 }
             }
         }
         Ok(())
     }
+}
+
+fn parse_feed_ids(feed_ids: &[String]) -> gmsol::Result<Vec<Identifier>> {
+    let feed_ids = feed_ids
+        .iter()
+        .map(|id| {
+            let hex = id.strip_prefix("0x").unwrap_or(id);
+            Identifier::from_hex(hex).map_err(gmsol::Error::unknown)
+        })
+        .collect::<gmsol::Result<Vec<_>>>()?;
+    Ok(feed_ids)
 }
