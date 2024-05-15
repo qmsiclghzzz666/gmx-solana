@@ -18,6 +18,7 @@ use crate::{
         market::{find_market_address, find_market_vault_address},
         roles::find_roles_address,
         token_config::find_token_config_map,
+        utils::BoxFeedsParser,
     },
     utils::{ComputeBudget, RpcBuilder, TokenAccountParams},
 };
@@ -375,6 +376,7 @@ pub struct ExecuteOrderBuilder<'a, C> {
     order: Pubkey,
     execution_fee: u64,
     price_provider: Pubkey,
+    feeds_parser: BoxFeedsParser,
     hint: Option<ExecuteOrderHint>,
 }
 
@@ -409,6 +411,7 @@ where
             order: *order,
             execution_fee: 0,
             price_provider: Pyth::id(),
+            feeds_parser: Default::default(),
             hint: None,
         }
     }
@@ -457,9 +460,9 @@ where
     pub async fn build(&mut self) -> crate::Result<RpcBuilder<'a, C>> {
         let hint = self.prepare_hint().await?;
         let authority = self.program.payer();
-        let feeds = hint
-            .feeds
-            .feed_account_metas()
+        let feeds = self
+            .feeds_parser
+            .parse(&hint.feeds)
             .collect::<Result<Vec<_>, _>>()?;
         let swap_markets = hint.swap_path.iter().map(|mint| AccountMeta {
             pubkey: find_market_address(&self.store, mint).0,

@@ -18,6 +18,7 @@ use crate::{
         market::{find_market_address, find_market_vault_address},
         roles::find_roles_address,
         token_config::find_token_config_map,
+        utils::BoxFeedsParser,
     },
     utils::{ComputeBudget, RpcBuilder},
 };
@@ -371,6 +372,7 @@ pub struct ExecuteWithdrawalBuilder<'a, C> {
     execution_fee: u64,
     price_provider: Pubkey,
     hint: Option<ExecuteWithdrawalHint>,
+    feeds_parser: BoxFeedsParser,
 }
 
 #[derive(Clone)]
@@ -421,6 +423,7 @@ where
             execution_fee: 0,
             price_provider: Pyth::id(),
             hint: None,
+            feeds_parser: Default::default(),
         }
     }
 
@@ -456,9 +459,9 @@ where
     pub async fn build(&self) -> crate::Result<RpcBuilder<'a, C>> {
         let authority = self.program.payer();
         let hint = self.get_or_fetch_hint().await?;
-        let feeds = hint
-            .feeds
-            .feed_account_metas()
+        let feeds = self
+            .feeds_parser
+            .parse(&hint.feeds)
             .collect::<Result<Vec<_>, _>>()?;
         let swap_path_markets = hint
             .long_swap_tokens

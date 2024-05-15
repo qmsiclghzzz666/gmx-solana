@@ -1,11 +1,11 @@
-use anchor_lang::solana_program::pubkey::Pubkey;
-use pyth_solana_receiver_sdk::PYTH_PUSH_ORACLE_ID;
+use anchor_client::anchor_lang::solana_program::pubkey::Pubkey;
+use data_store::states::Pyth;
 
 /// Find Pyth Feed Account PDA.
 pub fn find_pyth_feed_account(shard_id: u16, feed_id: [u8; 32]) -> (Pubkey, u8) {
     Pubkey::find_program_address(
         &[shard_id.to_le_bytes().as_slice(), feed_id.as_slice()],
-        &PYTH_PUSH_ORACLE_ID,
+        &Pyth::PUSH_ORACLE_ID,
     )
 }
 

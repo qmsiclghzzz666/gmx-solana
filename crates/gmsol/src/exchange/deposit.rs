@@ -14,6 +14,7 @@ use crate::{
         market::{find_market_address, find_market_vault_address},
         roles::find_roles_address,
         token_config::find_token_config_map,
+        utils::BoxFeedsParser,
     },
     utils::{ComputeBudget, RpcBuilder},
 };
@@ -418,6 +419,7 @@ pub struct ExecuteDepositBuilder<'a, C> {
     deposit: Pubkey,
     execution_fee: u64,
     price_provider: Pubkey,
+    feeds_parser: BoxFeedsParser,
     hint: Option<ExecuteDepositHint>,
 }
 
@@ -463,6 +465,7 @@ where
             execution_fee: 0,
             price_provider: Pyth::id(),
             hint: None,
+            feeds_parser: Default::default(),
         }
     }
 
@@ -508,9 +511,9 @@ where
         } = self;
         let authority = program.payer();
         let only_order_keeper = find_roles_address(store, &authority).0;
-        let feeds = hint
-            .feeds
-            .feed_account_metas()
+        let feeds = self
+            .feeds_parser
+            .parse(&hint.feeds)
             .collect::<Result<Vec<_>, _>>()?;
         let markets = hint
             .long_swap_tokens

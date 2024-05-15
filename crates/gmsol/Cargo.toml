@@ -10,7 +10,7 @@ required-features = ["cli"]
 
 [features]
 cli = [
-    "pyth",
+    "pyth-pull-oracle",
     "tokio/full",
     "clap",
     "tracing-subscriber",
@@ -20,7 +20,7 @@ cli = [
 ]
 clap = ["dep:clap", "data_store/clap"]
 devnet = ["data_store/devnet", "exchange/devnet"]
-pyth = [
+pyth-pull-oracle = [
     "reqwest/stream",
     "futures-util",
     "url",

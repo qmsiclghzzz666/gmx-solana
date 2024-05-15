@@ -1,11 +1,14 @@
-/// Hermes client.
-pub mod hermes;
-
 /// Pyth Pull Oracle.
+#[cfg(feature = "pyth-pull-oracle")]
 pub mod pull_oracle;
 
-/// Utils.
-pub mod utils;
+/// Push Oracle.
+pub mod push_oracle;
 
-pub use hermes::{EncodingType, Hermes};
-pub use pull_oracle::{PythPullOracle, PythPullOracleContext, PythPullOracleOps};
+#[cfg(feature = "pyth-pull-oracle")]
+pub use pull_oracle::{
+    hermes::{EncodingType, Hermes},
+    PythPullOracle, PythPullOracleContext, PythPullOracleOps,
+};
+
+pub use push_oracle::find_pyth_feed_account;

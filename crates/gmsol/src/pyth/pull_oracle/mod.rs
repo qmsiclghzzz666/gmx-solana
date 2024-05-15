@@ -1,3 +1,15 @@
+/// Wormhole Ops.
+pub mod wormhole;
+
+/// Pyth Reciever Ops.
+pub mod receiver;
+
+/// Hermes.
+pub mod hermes;
+
+/// Utils.
+pub mod utils;
+
 use std::{collections::HashMap, future::Future, ops::Deref};
 
 use anchor_client::{
@@ -10,22 +22,13 @@ use anchor_client::{
 };
 use pyth_sdk::Identifier;
 
-use crate::{
-    pyth::utils,
-    utils::{RpcBuilder, TransactionBuilder},
-};
+use crate::utils::{RpcBuilder, TransactionBuilder};
 
 use self::wormhole::WORMHOLE_PROGRAM_ID;
 
 pub use self::{receiver::PythReceiverOps, wormhole::WormholeOps};
 
-use super::hermes::PriceUpdate;
-
-/// Wormhole Ops.
-pub mod wormhole;
-
-/// Pyth Reciever Ops.
-pub mod receiver;
+use self::hermes::PriceUpdate;
 
 const VAA_SPLIT_INDEX: usize = 755;
 

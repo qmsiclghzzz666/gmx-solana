@@ -233,6 +233,9 @@ impl Id for Pyth {
 }
 
 impl Pyth {
+    /// Push Oracle ID.
+    pub const PUSH_ORACLE_ID: Pubkey = pyth_solana_receiver_sdk::PYTH_PUSH_ORACLE_ID;
+
     fn check_and_get_price<'info>(
         clock: &Clock,
         token_config: &TokenConfig,
@@ -383,15 +386,6 @@ impl fmt::Display for PriceProviderKind {
 
 #[cfg(feature = "utils")]
 impl PriceProviderKind {
-    pub(crate) fn parse_feed_account(&self, feed: &Pubkey) -> Pubkey {
-        use crate::utils::pyth::find_pyth_feed_account;
-
-        match self {
-            Self::Pyth => find_pyth_feed_account(0, feed.to_bytes()).0,
-            Self::Chainlink | Self::PythLegacy => *feed,
-        }
-    }
-
     /// Get correspoding program address.
     pub fn program(&self) -> Pubkey {
         match self {

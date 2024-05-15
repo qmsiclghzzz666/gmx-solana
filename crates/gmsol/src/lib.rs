@@ -8,7 +8,6 @@ pub mod store;
 pub mod exchange;
 
 /// Pyth integration.
-#[cfg(feature = "pyth")]
 pub mod pyth;
 
 /// Utils.

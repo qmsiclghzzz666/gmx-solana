@@ -40,7 +40,7 @@ pub enum Error {
     #[cfg(feature = "url")]
     #[error("parse url: {0}")]
     ParseUrl(#[from] url::ParseError),
-    #[cfg(feature = "pyth")]
+    #[cfg(all(feature = "eventsource-stream", feature = "reqwest"))]
     #[error("sse: {0}")]
     Sse(#[from] eventsource_stream::EventStreamError<reqwest::Error>),
     #[cfg(feature = "serde_json")]

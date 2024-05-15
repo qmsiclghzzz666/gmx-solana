@@ -7,7 +7,7 @@ use pythnet_sdk::{
     },
 };
 
-use super::{hermes::PriceUpdate, EncodingType};
+use super::hermes::{EncodingType, PriceUpdate};
 
 /// Parse [`AccumulatorUpdateData`] from price update.
 pub fn parse_accumulator_update_datas(
