@@ -13,6 +13,7 @@ pub mod utils;
 use std::{collections::HashMap, future::Future, ops::Deref};
 
 use anchor_client::{
+    solana_client::rpc_config::RpcSendTransactionConfig,
     solana_sdk::{
         pubkey::Pubkey,
         signature::{Keypair, Signature},
@@ -53,7 +54,13 @@ where
 
         let mut signatures = match self
             .post
-            .send_all_with_opts(compute_unit_price_micro_lamports)
+            .send_all_with_opts(
+                compute_unit_price_micro_lamports,
+                RpcSendTransactionConfig {
+                    skip_preflight: true,
+                    ..Default::default()
+                },
+            )
             .await
         {
             Ok(signatures) => signatures,
@@ -65,7 +72,13 @@ where
 
         let mut close_signatures = match self
             .close
-            .send_all_with_opts(compute_unit_price_micro_lamports)
+            .send_all_with_opts(
+                compute_unit_price_micro_lamports,
+                RpcSendTransactionConfig {
+                    skip_preflight: true,
+                    ..Default::default()
+                },
+            )
             .await
         {
             Ok(signatures) => signatures,
@@ -149,8 +162,8 @@ pub trait PythPullOracleOps<C> {
             let wormhole = self.wormhole();
             let pyth = self.pyth();
             let mut prices = HashMap::with_capacity(ctx.feeds.len());
-            let mut post = TransactionBuilder::default();
-            let mut close = TransactionBuilder::default();
+            let mut post = TransactionBuilder::new(pyth.async_rpc());
+            let mut close = TransactionBuilder::new(pyth.async_rpc());
 
             for data in utils::parse_accumulator_update_datas(update)? {
                 let proof = &data.proof;

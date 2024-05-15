@@ -161,17 +161,47 @@ impl KeeperArgs {
                 let execution_fee = self
                     .get_or_estimate_execution_fee(&program, builder.build().await?)
                     .await?;
-                let mut rpc = builder
+                builder
                     .execution_fee(execution_fee)
-                    .price_provider(self.provider.program())
-                    .build()
-                    .await?;
-                if let Some(budget) = self.get_compute_budget() {
-                    rpc = rpc.compute_budget(budget)
+                    .price_provider(self.provider.program());
+                if self.use_pyth_pull_oracle() {
+                    let hint = builder.prepare_hint().await?;
+                    let ctx = PythPullOracleContext::try_from_feeds(&hint.feeds)?;
+                    let feed_ids = ctx.feed_ids();
+                    if feed_ids.is_empty() {
+                        tracing::error!(%withdrawal, "empty feed ids");
+                    }
+                    let oracle = PythPullOracle::try_new(client)?;
+                    let hermes = Hermes::default();
+                    let update = hermes
+                        .latest_price_updates(feed_ids, Some(EncodingType::Base64))
+                        .await?;
+                    let with_prices = oracle
+                        .with_pyth_prices(&ctx, &update, |prices| async {
+                            let rpc = builder
+                                .parse_with_pyth_price_updates(prices)
+                                .build()
+                                .await?;
+                            Ok(Some(rpc))
+                        })
+                        .await?;
+                    match with_prices.send_all(Some(self.compute_unit_price)).await {
+                        Ok(signatures) => {
+                            tracing::info!(%withdrawal, "executed withdrawal with txs {signatures:#?}");
+                        }
+                        Err((signatures, err)) => {
+                            tracing::error!(%err, %withdrawal, "failed to execute withdrawal, successful txs: {signatures:#?}");
+                        }
+                    }
+                } else {
+                    let mut rpc = builder.build().await?;
+                    if let Some(budget) = self.get_compute_budget() {
+                        rpc = rpc.compute_budget(budget)
+                    }
+                    let signature = rpc.build().send().await?;
+                    tracing::info!(%withdrawal, "executed withdrawal at tx {signature}");
+                    println!("{signature}");
                 }
-                let signature = rpc.build().send().await?;
-                tracing::info!(%withdrawal, "executed withdrawal at tx {signature}");
-                println!("{signature}");
             }
             Command::ExecuteOrder { order } => {
                 let program = client.program(exchange::id())?;
@@ -180,17 +210,47 @@ impl KeeperArgs {
                 let execution_fee = self
                     .get_or_estimate_execution_fee(&program, builder.build().await?)
                     .await?;
-                let mut rpc = builder
+                builder
                     .execution_fee(execution_fee)
-                    .price_provider(self.provider.program())
-                    .build()
-                    .await?;
-                if let Some(budget) = self.get_compute_budget() {
-                    rpc = rpc.compute_budget(budget)
+                    .price_provider(self.provider.program());
+                if self.use_pyth_pull_oracle() {
+                    let hint = builder.prepare_hint().await?;
+                    let ctx = PythPullOracleContext::try_from_feeds(&hint.feeds)?;
+                    let feed_ids = ctx.feed_ids();
+                    if feed_ids.is_empty() {
+                        tracing::error!(%order, "empty feed ids");
+                    }
+                    let oracle = PythPullOracle::try_new(client)?;
+                    let hermes = Hermes::default();
+                    let update = hermes
+                        .latest_price_updates(feed_ids, Some(EncodingType::Base64))
+                        .await?;
+                    let with_prices = oracle
+                        .with_pyth_prices(&ctx, &update, |prices| async {
+                            let rpc = builder
+                                .parse_with_pyth_price_updates(prices)
+                                .build()
+                                .await?;
+                            Ok(Some(rpc))
+                        })
+                        .await?;
+                    match with_prices.send_all(Some(self.compute_unit_price)).await {
+                        Ok(signatures) => {
+                            tracing::info!(%order, "executed order with txs {signatures:#?}");
+                        }
+                        Err((signatures, err)) => {
+                            tracing::error!(%err, %order, "failed to execute order, successful txs: {signatures:#?}");
+                        }
+                    }
+                } else {
+                    let mut rpc = builder.build().await?;
+                    if let Some(budget) = self.get_compute_budget() {
+                        rpc = rpc.compute_budget(budget)
+                    }
+                    let signature = rpc.build().send().await?;
+                    tracing::info!(%order, "executed order at tx {signature}");
+                    println!("{signature}");
                 }
-                let signature = rpc.build().send().await?;
-                tracing::info!(%order, "executed order at tx {signature}");
-                println!("{signature}");
             }
             Command::InitializeVault { token } => {
                 let program = client.program(data_store::id())?;

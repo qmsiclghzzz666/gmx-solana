@@ -383,8 +383,9 @@ pub struct ExecuteOrderBuilder<'a, C> {
     hint: Option<ExecuteOrderHint>,
 }
 
+/// Hint for executing order.
 #[derive(Clone)]
-struct ExecuteOrderHint {
+pub struct ExecuteOrderHint {
     market_token: Pubkey,
     position: Option<Pubkey>,
     user: Pubkey,
@@ -392,7 +393,8 @@ struct ExecuteOrderHint {
     secondary_output_token: Pubkey,
     final_output_token_account: Option<Pubkey>,
     secondary_output_token_account: Option<Pubkey>,
-    feeds: TokensWithFeed,
+    /// Feeds.
+    pub feeds: TokensWithFeed,
     swap_path: Vec<Pubkey>,
 }
 
@@ -454,7 +456,8 @@ where
         self
     }
 
-    async fn prepare_hint(&mut self) -> crate::Result<ExecuteOrderHint> {
+    /// Prepare [`ExecuteOrderHint`].
+    pub async fn prepare_hint(&mut self) -> crate::Result<ExecuteOrderHint> {
         loop {
             match &self.hint {
                 Some(hint) => return Ok(hint.clone()),

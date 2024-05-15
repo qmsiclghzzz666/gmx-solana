@@ -378,15 +378,17 @@ pub struct ExecuteWithdrawalBuilder<'a, C> {
     feeds_parser: FeedsParser,
 }
 
+/// Hint for withdrawal execution.
 #[derive(Clone)]
-struct ExecuteWithdrawalHint {
+pub struct ExecuteWithdrawalHint {
     market_token: Pubkey,
     user: Pubkey,
     final_long_token_receiver: Pubkey,
     final_short_token_receiver: Pubkey,
     final_long_token: Pubkey,
     final_short_token: Pubkey,
-    feeds: TokensWithFeed,
+    /// Feeds.
+    pub feeds: TokensWithFeed,
     long_swap_tokens: Vec<Pubkey>,
     short_swap_tokens: Vec<Pubkey>,
 }
@@ -455,20 +457,23 @@ where
         self
     }
 
-    async fn get_or_fetch_hint(&self) -> crate::Result<ExecuteWithdrawalHint> {
+    /// Prepare [`ExecuteWithdrawalHint`].
+    pub async fn prepare_hint(&mut self) -> crate::Result<ExecuteWithdrawalHint> {
         match &self.hint {
             Some(hint) => Ok(hint.clone()),
             None => {
                 let withdrawal: Withdrawal = self.program.account(self.withdrawal).await?;
-                Ok((&withdrawal).into())
+                let hint: ExecuteWithdrawalHint = (&withdrawal).into();
+                self.hint = Some(hint.clone());
+                Ok(hint)
             }
         }
     }
 
     /// Build [`RpcBuilder`] for `execute_withdrawal` instruction.
-    pub async fn build(&self) -> crate::Result<RpcBuilder<'a, C>> {
+    pub async fn build(&mut self) -> crate::Result<RpcBuilder<'a, C>> {
         let authority = self.program.payer();
-        let hint = self.get_or_fetch_hint().await?;
+        let hint = self.prepare_hint().await?;
         let feeds = self
             .feeds_parser
             .parse(&hint.feeds)
