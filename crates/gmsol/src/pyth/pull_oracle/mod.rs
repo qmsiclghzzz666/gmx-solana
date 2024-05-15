@@ -45,10 +45,17 @@ where
     S: Signer,
 {
     /// Send all transactions.
-    pub async fn send_all(self) -> Result<Vec<Signature>, (Vec<Signature>, crate::Error)> {
+    pub async fn send_all(
+        self,
+        compute_unit_price_micro_lamports: Option<u64>,
+    ) -> Result<Vec<Signature>, (Vec<Signature>, crate::Error)> {
         let mut error = None;
 
-        let mut signatures = match self.post.send_all().await {
+        let mut signatures = match self
+            .post
+            .send_all_with_opts(compute_unit_price_micro_lamports)
+            .await
+        {
             Ok(signatures) => signatures,
             Err((signatures, err)) => {
                 error = Some(err);
@@ -56,7 +63,11 @@ where
             }
         };
 
-        let mut close_signatures = match self.close.send_all().await {
+        let mut close_signatures = match self
+            .close
+            .send_all_with_opts(compute_unit_price_micro_lamports)
+            .await
+        {
             Ok(signatures) => signatures,
             Err((signatures, err)) => {
                 match &error {

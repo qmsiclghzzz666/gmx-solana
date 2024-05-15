@@ -73,13 +73,24 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> TransactionBuilder<'a, C> {
 
     /// Send all in order and returns the signatures of the success transactions.
     pub async fn send_all(self) -> Result<Vec<Signature>, (Vec<Signature>, crate::Error)> {
+        self.send_all_with_opts(None).await
+    }
+
+    /// Send all in order with the given options and returns the signatures of the success transactions.
+    pub async fn send_all_with_opts(
+        self,
+        compute_unit_price_micro_lamports: Option<u64>,
+    ) -> Result<Vec<Signature>, (Vec<Signature>, crate::Error)> {
         let mut signatures = Vec::with_capacity(self.builders.len());
         let mut error = None;
-        for (idx, builder) in self.builders.into_iter().enumerate() {
+        for (idx, mut builder) in self.builders.into_iter().enumerate() {
             tracing::debug!(
                 size = builder.transaction_size(false),
                 "sending transaction {idx}"
             );
+            if let Some(price) = compute_unit_price_micro_lamports {
+                builder.compute_budget_mut().set_price(price);
+            }
             match builder.build().send().await {
                 Ok(signature) => {
                     signatures.push(signature);

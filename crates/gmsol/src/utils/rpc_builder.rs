@@ -1,11 +1,10 @@
-use std::ops::{AddAssign, Deref};
+use std::ops::Deref;
 
 use anchor_client::{
     anchor_lang::{InstructionData, ToAccountMetas},
     solana_client::nonblocking::rpc_client::RpcClient,
     solana_sdk::{
         commitment_config::CommitmentConfig,
-        compute_budget::ComputeBudgetInstruction,
         instruction::{AccountMeta, Instruction},
         pubkey::Pubkey,
         signer::Signer,
@@ -13,7 +12,7 @@ use anchor_client::{
     Program,
 };
 
-use super::transaction_size;
+use super::{compute_budget::ComputeBudget, transaction_size};
 
 /// A wrapper of [`RequestBuilder`](anchor_client::RequestBuilder).
 #[must_use]
@@ -152,6 +151,11 @@ impl<'a, C: Deref<Target = impl Signer> + Clone, T> RpcBuilder<'a, C, T> {
         self
     }
 
+    /// Get mutable reference to the compute budget.
+    pub fn compute_budget_mut(&mut self) -> &mut ComputeBudget {
+        &mut self.compute_budget
+    }
+
     fn get_compute_budget_instructions(&self) -> Vec<Instruction> {
         self.compute_budget.compute_budget_instructions()
     }
@@ -282,50 +286,5 @@ impl<'a, C: Deref<Target = impl Signer> + Clone, T> RpcBuilder<'a, C, T> {
             .await
             .map_err(anchor_client::ClientError::from)?;
         Ok(fee)
-    }
-}
-
-/// Compute Budget.
-#[derive(Debug, Clone, Copy)]
-pub struct ComputeBudget {
-    limit_units: u32,
-    price_micro_lamports: u64,
-}
-
-impl Default for ComputeBudget {
-    fn default() -> Self {
-        Self {
-            limit_units: 50_000,
-            price_micro_lamports: 100_000,
-        }
-    }
-}
-
-impl ComputeBudget {
-    /// Set compute units limit.
-    pub fn with_limit(mut self, units: u32) -> Self {
-        self.limit_units = units;
-        self
-    }
-
-    /// Set compute unit price.
-    pub fn with_price(mut self, micro_lamports: u64) -> Self {
-        self.price_micro_lamports = micro_lamports;
-        self
-    }
-
-    /// Build compute budget instructions.
-    pub fn compute_budget_instructions(&self) -> Vec<Instruction> {
-        vec![
-            ComputeBudgetInstruction::set_compute_unit_limit(self.limit_units),
-            ComputeBudgetInstruction::set_compute_unit_price(self.price_micro_lamports),
-        ]
-    }
-}
-
-impl AddAssign for ComputeBudget {
-    fn add_assign(&mut self, rhs: Self) {
-        self.limit_units += rhs.limit_units;
-        self.price_micro_lamports = self.price_micro_lamports.max(rhs.price_micro_lamports);
     }
 }

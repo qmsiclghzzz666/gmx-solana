@@ -21,7 +21,7 @@ pub(super) struct KeeperArgs {
     #[arg(long, short = 'u')]
     compute_unit_limit: Option<u32>,
     /// Set the compute unit price in micro lamports.
-    #[arg(long, short = 'p', default_value_t = 1)]
+    #[arg(long, short = 'p', default_value_t = 50_000)]
     compute_unit_price: u64,
     /// The oracle to use.
     #[command(flatten)]
@@ -75,7 +75,7 @@ impl KeeperArgs {
     async fn get_or_estimate_execution_fee<S, C>(
         &self,
         program: &Program<C>,
-        rpc: &RpcBuilder<'_, C>,
+        mut rpc: RpcBuilder<'_, C>,
     ) -> gmsol::Result<u64>
     where
         C: Deref<Target = S> + Clone,
@@ -83,6 +83,11 @@ impl KeeperArgs {
     {
         if let Some(fee) = self.execution_fee {
             return Ok(fee);
+        }
+        if let Some(budget) = self.get_compute_budget() {
+            rpc = rpc.compute_budget(budget);
+        } else {
+            rpc.compute_budget_mut().set_price(self.compute_unit_price);
         }
         rpc.estimate_execution_fee(&program.async_rpc()).await
     }
@@ -102,7 +107,7 @@ impl KeeperArgs {
                 let mut builder =
                     program.execute_deposit(store, &self.oracle.address(Some(store))?, deposit);
                 let execution_fee = self
-                    .get_or_estimate_execution_fee(&program, &builder.build().await?)
+                    .get_or_estimate_execution_fee(&program, builder.build().await?)
                     .await?;
                 builder
                     .execution_fee(execution_fee)
@@ -128,7 +133,7 @@ impl KeeperArgs {
                             Ok(Some(rpc))
                         })
                         .await?;
-                    match with_prices.send_all().await {
+                    match with_prices.send_all(Some(self.compute_unit_price)).await {
                         Ok(signatures) => {
                             tracing::info!(%deposit, "executed deposit with txs {signatures:#?}");
                         }
@@ -154,7 +159,7 @@ impl KeeperArgs {
                     withdrawal,
                 );
                 let execution_fee = self
-                    .get_or_estimate_execution_fee(&program, &builder.build().await?)
+                    .get_or_estimate_execution_fee(&program, builder.build().await?)
                     .await?;
                 let mut rpc = builder
                     .execution_fee(execution_fee)
@@ -173,7 +178,7 @@ impl KeeperArgs {
                 let mut builder =
                     program.execute_order(store, &self.oracle.address(Some(store))?, order);
                 let execution_fee = self
-                    .get_or_estimate_execution_fee(&program, &builder.build().await?)
+                    .get_or_estimate_execution_fee(&program, builder.build().await?)
                     .await?;
                 let mut rpc = builder
                     .execution_fee(execution_fee)
