@@ -1,6 +1,9 @@
 /// Instructions for Data Store.
 pub mod data_store;
 
+/// Config.
+pub mod config;
+
 /// Instructions for roles management.
 pub mod roles;
 
@@ -34,6 +37,7 @@ pub mod position;
 /// Instructions for Exchange.
 pub mod exchange;
 
+pub use config::*;
 pub use data_store::*;
 pub use deposit::*;
 pub use exchange::*;

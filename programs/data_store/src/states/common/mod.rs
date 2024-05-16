@@ -5,6 +5,10 @@ use super::{PriceProviderKind, TokenConfig};
 /// Token with feeds.
 pub mod token_with_feeds;
 
+/// Dual Vec Map.
+pub mod map;
+
+pub use map::MapStore;
 pub use token_with_feeds::{TokenRecord, TokensWithFeed};
 
 /// Swap params.

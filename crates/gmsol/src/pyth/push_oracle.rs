@@ -11,14 +11,13 @@ pub fn find_pyth_feed_account(shard_id: u16, feed_id: [u8; 32]) -> (Pubkey, u8) 
 
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
-
-    use pyth_solana_receiver_sdk::price_update::get_feed_id_from_hex;
-
-    use super::*;
-
+    #[cfg(feature = "pyth-solana-receiver-sdk")]
     #[test]
     fn test_sol_feed_account() {
+        use super::{find_pyth_feed_account, Pubkey};
+        use pyth_solana_receiver_sdk::price_update::get_feed_id_from_hex;
+        use std::str::FromStr;
+
         let feed_id = get_feed_id_from_hex(
             "0xef0d8b6fda2ceba41da15d4095d1da392a0d2f8ed0c6c7bc0f4cfac8c280b56d",
         )

@@ -23,7 +23,7 @@ use self::{
         order::OrderParams,
         token_config::{TokenConfig, TokenConfigBuilder},
         withdrawal::TokenParams as WithdrawalTokenParams,
-        PriceProviderKind,
+        AmountKey, PriceProviderKind,
     },
     utils::internal,
 };
@@ -92,6 +92,21 @@ pub mod data_store {
     #[access_control(internal::Authenticate::only_admin(&ctx))]
     pub fn remove_admin(ctx: Context<RemoveAdmin>, user: Pubkey) -> Result<()> {
         instructions::remove_admin(ctx, user)
+    }
+
+    // Config.
+    #[access_control(internal::Authenticate::only_controller(&ctx))]
+    pub fn initialize_config(ctx: Context<InitializeConfig>) -> Result<()> {
+        instructions::initialize_config(ctx)
+    }
+
+    #[access_control(internal::Authenticate::only_controller(&ctx))]
+    pub fn insert_amount(ctx: Context<InsertAmount>, key: u8, amount: u64) -> Result<()> {
+        instructions::insert_amount(
+            ctx,
+            AmountKey::try_from(key).map_err(|_| DataStoreError::InvalidKey)?,
+            amount,
+        )
     }
 
     // Token Config.

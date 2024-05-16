@@ -1,6 +1,9 @@
 /// Data Store.
 pub mod data_store;
 
+/// Config.
+pub mod config;
+
 /// Common types.
 pub mod common;
 
@@ -28,6 +31,7 @@ pub mod order;
 /// Position.
 pub mod position;
 
+pub use config::{AmountKey, Config, FactorKey};
 pub use data_store::*;
 pub use deposit::Deposit;
 pub use market::*;
@@ -79,4 +83,28 @@ pub enum Action {
     Change,
     /// Remove.
     Remove,
+}
+
+/// Factor.
+pub type Factor = u128;
+
+/// Amount.
+pub type Amount = u64;
+
+/// Alias of [`Space`](anchor_lang::Space).
+pub trait InitSpace {
+    /// Init Space.
+    const INIT_SPACE: usize;
+}
+
+impl InitSpace for u8 {
+    const INIT_SPACE: usize = 1;
+}
+
+impl InitSpace for u128 {
+    const INIT_SPACE: usize = 16;
+}
+
+impl InitSpace for u64 {
+    const INIT_SPACE: usize = 8;
 }

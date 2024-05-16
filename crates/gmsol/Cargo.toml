@@ -22,7 +22,6 @@ clap = ["dep:clap", "data_store/clap"]
 devnet = ["data_store/devnet", "exchange/devnet"]
 pyth-pull-oracle = [
     "reqwest/stream",
-    "futures-util",
     "url",
     "serde",
     "serde_json",
@@ -56,6 +55,7 @@ exchange = { path = "../../programs/exchange", features = [
     "debug",
 ] }
 rand = { version = "0.8.5" }
+futures-util = { version = "0.3.30" }
 
 # Dependencies for cli
 clap = { workspace = true, optional = true, features = ["derive", "env"] }
@@ -67,7 +67,6 @@ pyth-sdk = "0.8.0"
 
 # Dependencies for pyth support
 reqwest = { version = "0.12.4", optional = true, features = ["json"] }
-futures-util = { version = "0.3.30", optional = true }
 url = { version = "2.5.0", optional = true }
 serde_json = { version = "1.0.117", optional = true }
 serde = { version = "1.0.201", optional = true, features = ["derive"] }
