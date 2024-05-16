@@ -9,6 +9,7 @@ import { dataStore } from "./program";
 import { initializeTokenConfigMap, insertTokenConfig } from "./token_config";
 import { createRolesPDA, initializeRoles } from "./roles";
 import { createControllerPDA } from "../exchange";
+import { invokeInitializeConfig } from "./config";
 
 export const encodeUtf8 = anchor.utils.bytes.utf8.encode;
 
@@ -287,6 +288,14 @@ export const initializeDataStore = async (
         console.log(`Inited a nonce account ${noncePDA} in tx: ${tx}`);
     } catch (error) {
         console.warn("Failed to init a nonce account", error);
+    }
+
+    // Init the config.
+    try {
+        const tx = await invokeInitializeConfig(dataStore, { authority: signer, store: dataStorePDA });
+        console.log(`Inited the config account at tx: ${tx}`);
+    } catch (error) {
+        console.warn("Failed to init config account", error);
     }
 };
 

@@ -51,6 +51,10 @@ impl<'info> internal::Authentication<'info> for InitializeConfig<'info> {
 pub struct InsertAmount<'info> {
     #[account(mut)]
     authority: Signer<'info>,
+    #[account(
+        seeds = [Roles::SEED, store.key().as_ref(), authority.key().as_ref()],
+        bump = only_controller.bump,
+    )]
     only_controller: Account<'info, Roles>,
     store: Account<'info, DataStore>,
     #[account(
