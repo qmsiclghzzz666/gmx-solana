@@ -23,7 +23,7 @@ use self::{
         order::OrderParams,
         token_config::{TokenConfig, TokenConfigBuilder},
         withdrawal::TokenParams as WithdrawalTokenParams,
-        AmountKey, PriceProviderKind,
+        AmountKey, FactorKey, PriceProviderKind,
     },
     utils::internal,
 };
@@ -105,6 +105,15 @@ pub mod data_store {
         instructions::insert_amount(
             ctx,
             AmountKey::try_from(key).map_err(|_| DataStoreError::InvalidKey)?,
+            amount,
+        )
+    }
+
+    #[access_control(internal::Authenticate::only_controller(&ctx))]
+    pub fn insert_factor(ctx: Context<InsertFactor>, key: u8, amount: u128) -> Result<()> {
+        instructions::insert_factor(
+            ctx,
+            FactorKey::try_from(key).map_err(|_| DataStoreError::InvalidKey)?,
             amount,
         )
     }

@@ -44,3 +44,20 @@ export const makeInsertAmountInstruction = async (
 }
 
 export const invokeInsertAmount = makeInvoke(makeInsertAmountInstruction, ["authority"]);
+
+export const makeInsertFactorInstruction = async (
+    program: DataStoreProgram,
+    { authority, store, key, factor }: {
+        authority: PublicKey,
+        store: PublicKey,
+        key: number,
+        factor: number | bigint,
+    }
+) => {
+    return await program.methods.insertFactor(key, toBN(factor)).accounts({
+        authority,
+        store,
+    }).instruction();
+}
+
+export const invokeInsertFactor = makeInvoke(makeInsertFactorInstruction, ["authority"]);

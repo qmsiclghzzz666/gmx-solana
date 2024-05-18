@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    states::{Amount, AmountKey, Config, DataStore, Roles, Seed},
+    states::{Amount, AmountKey, Config, DataStore, Factor, FactorKey, Roles, Seed},
     utils::internal,
 };
 
@@ -72,6 +72,44 @@ pub fn insert_amount(ctx: Context<InsertAmount>, key: AmountKey, amount: Amount)
 }
 
 impl<'info> internal::Authentication<'info> for InsertAmount<'info> {
+    fn authority(&self) -> &Signer<'info> {
+        &self.authority
+    }
+
+    fn store(&self) -> &Account<'info, DataStore> {
+        &self.store
+    }
+
+    fn roles(&self) -> &Account<'info, Roles> {
+        &self.only_controller
+    }
+}
+
+#[derive(Accounts)]
+pub struct InsertFactor<'info> {
+    #[account(mut)]
+    authority: Signer<'info>,
+    #[account(
+        seeds = [Roles::SEED, store.key().as_ref(), authority.key().as_ref()],
+        bump = only_controller.bump,
+    )]
+    only_controller: Account<'info, Roles>,
+    store: Account<'info, DataStore>,
+    #[account(
+        mut,
+        seeds = [Config::SEED, store.key().as_ref()],
+        bump = config.bump,
+    )]
+    config: Account<'info, Config>,
+}
+
+/// Insert factor.
+pub fn insert_factor(ctx: Context<InsertFactor>, key: FactorKey, factor: Factor) -> Result<()> {
+    ctx.accounts.config.insert_factor(key, factor);
+    Ok(())
+}
+
+impl<'info> internal::Authentication<'info> for InsertFactor<'info> {
     fn authority(&self) -> &Signer<'info> {
         &self.authority
     }
