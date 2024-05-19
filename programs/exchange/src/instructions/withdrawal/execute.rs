@@ -147,6 +147,7 @@ impl<'info> ExecuteWithdrawal<'info> {
                 authority: self.authority.to_account_info(),
                 store: self.store.to_account_info(),
                 only_order_keeper: self.only_order_keeper.to_account_info(),
+                config: self.config.to_account_info(),
                 oracle: self.oracle.to_account_info(),
                 withdrawal: self.withdrawal.to_account_info(),
                 market: self.market.to_account_info(),

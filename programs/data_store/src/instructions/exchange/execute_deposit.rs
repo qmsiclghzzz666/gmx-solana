@@ -3,7 +3,9 @@ use anchor_spl::token::{Mint, Token, TokenAccount};
 use gmx_core::MarketExt;
 
 use crate::{
-    states::{DataStore, Deposit, Market, MarketMeta, Oracle, Roles, Seed},
+    states::{
+        Config, DataStore, Deposit, Market, MarketMeta, Oracle, Roles, Seed, ValidateOracleTime,
+    },
     utils::internal,
     DataStoreError, GmxCoreError,
 };
@@ -15,6 +17,11 @@ pub struct ExecuteDeposit<'info> {
     pub authority: Signer<'info>,
     pub only_order_keeper: Account<'info, Roles>,
     pub store: Account<'info, DataStore>,
+    #[account(
+        seeds = [Config::SEED, store.key().as_ref()],
+        bump = config.bump,
+    )]
+    config: Account<'info, Config>,
     pub oracle: Account<'info, Oracle>,
     #[account(
         constraint = deposit.fixed.receivers.receiver == receiver.key(),
@@ -42,6 +49,7 @@ pub struct ExecuteDeposit<'info> {
 pub fn execute_deposit<'info>(
     ctx: Context<'_, '_, 'info, 'info, ExecuteDeposit<'info>>,
 ) -> Result<()> {
+    ctx.accounts.validate()?;
     ctx.accounts.execute(ctx.remaining_accounts)
 }
 
@@ -59,7 +67,25 @@ impl<'info> internal::Authentication<'info> for ExecuteDeposit<'info> {
     }
 }
 
+impl<'info> ValidateOracleTime for ExecuteDeposit<'info> {
+    fn oracle_updated_after(&self) -> Result<Option<i64>> {
+        Ok(Some(self.deposit.fixed.updated_at))
+    }
+
+    fn oracle_updated_before(&self) -> Result<Option<i64>> {
+        let ts = self
+            .config
+            .request_expiration_at(self.deposit.fixed.updated_at)?;
+        Ok(Some(ts))
+    }
+}
+
 impl<'info> ExecuteDeposit<'info> {
+    fn validate(&self) -> Result<()> {
+        self.oracle.validate_time(self)?;
+        Ok(())
+    }
+
     fn execute(&mut self, remaining_accounts: &'info [AccountInfo<'info>]) -> Result<()> {
         let meta = self.market.meta.clone();
         let (long_amount, short_amount) = self.perform_swaps(&meta, remaining_accounts)?;

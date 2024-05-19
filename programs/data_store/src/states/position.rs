@@ -24,8 +24,12 @@ pub struct Position {
     pub collateral_token: Pubkey,
     /// Increased at slot.
     pub increased_at_slot: u64,
+    /// The time that the position last increased at.
+    pub increased_at: i64,
     /// Decreased at slot.
     pub decreased_at_slot: u64,
+    /// The time that the position last decreased at.
+    pub decreased_at: i64,
     /// Size in tokens.
     pub size_in_tokens: u128,
     /// Collateral amount.
@@ -44,7 +48,7 @@ pub struct Position {
 
 impl Space for Position {
     #[allow(clippy::identity_op)]
-    const INIT_SPACE: usize = (1 * 2) + (1 * 14) + (32 * 3) + (8 * 2) + (16 * 7);
+    const INIT_SPACE: usize = (1 * 2) + (1 * 14) + (32 * 3) + (8 * 4) + (16 * 7);
 }
 
 impl Seed for Position {
@@ -101,7 +105,9 @@ impl Position {
         self.market_token = *market_token;
         self.collateral_token = *collateral_token;
         self.increased_at_slot = 0;
+        self.increased_at = 0;
         self.decreased_at_slot = 0;
+        self.decreased_at = 0;
         self.size_in_tokens = 0;
         self.collateral_amount = 0;
         self.size_in_usd = 0;
@@ -114,13 +120,17 @@ impl Position {
 
     /// Update state after increased.
     pub fn increased(&mut self) -> Result<()> {
-        self.increased_at_slot = Clock::get()?.slot;
+        let clock = Clock::get()?;
+        self.increased_at_slot = clock.slot;
+        self.increased_at = clock.unix_timestamp;
         Ok(())
     }
 
     /// Update state after decreased.
     pub fn decreased(&mut self) -> Result<()> {
-        self.decreased_at_slot = Clock::get()?.slot;
+        let clock = Clock::get()?;
+        self.decreased_at_slot = clock.slot;
+        self.decreased_at = clock.unix_timestamp;
         Ok(())
     }
 }

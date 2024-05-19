@@ -70,6 +70,8 @@ pub struct Fixed {
     pub nonce: [u8; 32],
     /// The slot that the order was last updated at.
     pub updated_at_slot: u64,
+    /// The time that the order was last updated at.
+    pub updated_at: i64,
     /// The order market.
     pub market: Pubkey,
     /// The creator of the order.
@@ -100,9 +102,11 @@ impl Fixed {
         senders: &Senders,
         receivers: &Receivers,
     ) -> Result<()> {
+        let clock = Clock::get()?;
         self.bump = bump;
         self.nonce = *nonce;
-        self.updated_at_slot = Clock::get()?.slot;
+        self.updated_at_slot = clock.slot;
+        self.updated_at = clock.unix_timestamp;
         self.market = *market;
         self.user = *user;
         self.position = position.copied();

@@ -7,7 +7,7 @@ use crate::{
     states::{
         order::{Order, OrderKind},
         position::Position,
-        DataStore, Market, Oracle, Roles, Seed,
+        Config, DataStore, Market, Oracle, Roles, Seed, ValidateOracleTime,
     },
     utils::internal::{self, TransferUtils},
     DataStoreError, GmxCoreError,
@@ -20,6 +20,11 @@ pub struct ExecuteOrder<'info> {
     pub authority: Signer<'info>,
     pub store: Account<'info, DataStore>,
     pub only_order_keeper: Account<'info, Roles>,
+    #[account(
+        seeds = [Config::SEED, store.key().as_ref()],
+        bump = config.bump,
+    )]
+    config: Account<'info, Config>,
     pub oracle: Account<'info, Oracle>,
     #[account(
         constraint = order.fixed.market == market.key(),
@@ -80,6 +85,7 @@ pub struct ExecuteOrder<'info> {
 pub fn execute_order<'info>(
     ctx: Context<'_, '_, 'info, 'info, ExecuteOrder<'info>>,
 ) -> Result<bool> {
+    ctx.accounts.validate_time()?;
     // TODO: validate non-empty order.
     // TODO: validate order trigger price.
     let should_remove = ctx.accounts.execute(ctx.remaining_accounts)?;
@@ -102,7 +108,41 @@ impl<'info> internal::Authentication<'info> for ExecuteOrder<'info> {
     }
 }
 
+impl<'info> ValidateOracleTime for ExecuteOrder<'info> {
+    fn oracle_updated_after(&self) -> Result<Option<i64>> {
+        let ts = match self.order.fixed.params.kind {
+            OrderKind::MarketSwap | OrderKind::MarketIncrease | OrderKind::MarketDecrease => {
+                self.order.fixed.updated_at
+            }
+            OrderKind::Liquidation => {
+                let position = self
+                    .position
+                    .as_ref()
+                    .ok_or(error!(DataStoreError::PositionNotProvided))?
+                    .load()?;
+                position.increased_at.max(position.decreased_at)
+            }
+        };
+        Ok(Some(ts))
+    }
+
+    fn oracle_updated_before(&self) -> Result<Option<i64>> {
+        let ts = match self.order.fixed.params.kind {
+            OrderKind::MarketIncrease | OrderKind::MarketDecrease => {
+                Some(self.order.fixed.updated_at)
+            }
+            _ => None,
+        };
+        ts.map(|ts| self.config.request_expiration_at(ts))
+            .transpose()
+    }
+}
+
 impl<'info> ExecuteOrder<'info> {
+    fn validate_time(&self) -> Result<()> {
+        self.oracle.validate_time(self)
+    }
+
     fn prices(&self) -> Result<Prices<u128>> {
         let meta = self.market.meta();
         let oracle = &self.oracle.primary;

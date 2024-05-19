@@ -4,7 +4,7 @@ use gmx_core::MarketExt;
 
 use crate::{
     constants,
-    states::{DataStore, Market, Oracle, Roles, Seed, Withdrawal},
+    states::{Config, DataStore, Market, Oracle, Roles, Seed, ValidateOracleTime, Withdrawal},
     utils::internal::{self, TransferUtils},
     DataStoreError, GmxCoreError,
 };
@@ -16,6 +16,11 @@ pub struct ExecuteWithdrawal<'info> {
     pub authority: Signer<'info>,
     pub store: Account<'info, DataStore>,
     pub only_order_keeper: Account<'info, Roles>,
+    #[account(
+        seeds = [Config::SEED, store.key().as_ref()],
+        bump = config.bump,
+    )]
+    config: Account<'info, Config>,
     pub oracle: Account<'info, Oracle>,
     #[account(
         constraint = withdrawal.fixed.market == market.key(),
@@ -82,6 +87,7 @@ pub struct ExecuteWithdrawal<'info> {
 pub fn execute_withdrawal<'info>(
     ctx: Context<'_, '_, 'info, 'info, ExecuteWithdrawal<'info>>,
 ) -> Result<()> {
+    ctx.accounts.validate()?;
     ctx.accounts.execute(ctx.remaining_accounts)
 }
 
@@ -99,7 +105,25 @@ impl<'info> internal::Authentication<'info> for ExecuteWithdrawal<'info> {
     }
 }
 
+impl<'info> ValidateOracleTime for ExecuteWithdrawal<'info> {
+    fn oracle_updated_after(&self) -> Result<Option<i64>> {
+        Ok(Some(self.withdrawal.fixed.updated_at))
+    }
+
+    fn oracle_updated_before(&self) -> Result<Option<i64>> {
+        let ts = self
+            .config
+            .request_expiration_at(self.withdrawal.fixed.updated_at)?;
+        Ok(Some(ts))
+    }
+}
+
 impl<'info> ExecuteWithdrawal<'info> {
+    fn validate(&self) -> Result<()> {
+        self.oracle.validate_time(self)?;
+        Ok(())
+    }
+
     fn execute(&mut self, remaining_accounts: &'info [AccountInfo<'info>]) -> Result<()> {
         let (long_amount, short_amount) = self.perform_withdrawal()?;
         let (final_long_amount, final_short_amount) =

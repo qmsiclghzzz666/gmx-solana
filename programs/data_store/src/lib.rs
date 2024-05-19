@@ -507,6 +507,10 @@ pub enum DataStoreError {
     InvalidOracleTsTrange,
     #[msg("Max oracle timestamp range exceeded")]
     MaxOracleTimeStampRangeExceeded,
+    #[msg("Oracle timestamps are smaller than required")]
+    OracleTimestampsAreSmallerThanRequired,
+    #[msg("Oracle timestamps are larger than requried")]
+    OracleTimestampsAreLargerThanRequired,
     // Market.
     #[msg("Computation error")]
     Computation,

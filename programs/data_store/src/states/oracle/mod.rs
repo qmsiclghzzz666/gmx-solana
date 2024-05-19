@@ -10,6 +10,9 @@ pub mod pyth;
 /// Price Validator.
 pub mod validator;
 
+/// Oracle time validation.
+pub mod time;
+
 use core::fmt;
 
 use crate::DataStoreError;
@@ -22,6 +25,7 @@ pub use self::{
     chainlink::Chainlink,
     price_map::PriceMap,
     pyth::{Pyth, PythLegacy, PYTH_LEGACY_ID},
+    time::ValidateOracleTime,
     validator::PriceValidator,
 };
 
@@ -124,6 +128,13 @@ impl Oracle {
         self.primary.clear();
         self.min_oracle_ts = i64::MAX;
         self.max_oracle_ts = i64::MIN;
+    }
+
+    /// Validate oracle time.
+    pub(crate) fn validate_time(&self, target: &impl ValidateOracleTime) -> Result<()> {
+        target.validate_min_oracle_ts(self)?;
+        target.validate_max_oracle_ts(self)?;
+        Ok(())
     }
 }
 

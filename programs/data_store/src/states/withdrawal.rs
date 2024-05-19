@@ -11,7 +11,7 @@ use super::{
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub struct Withdrawal {
     /// Fixed part.
-    pub fixed: Fixed,
+    pub fixed: Box<Fixed>,
     /// Dynamic part.
     pub dynamic: Dynamic,
 }
@@ -32,6 +32,8 @@ pub struct Fixed {
     pub nonce: [u8; 32],
     /// The slot that the withdrawal was last updated at.
     pub updated_at_slot: u64,
+    /// The time that the withdrawal was last updated at.
+    pub updated_at: i64,
     /// The user to withdraw for.
     pub user: Pubkey,
     /// The market token account.
@@ -125,11 +127,13 @@ impl Withdrawal {
         final_short_token_receiver: &Account<TokenAccount>,
         ui_fee_receiver: Pubkey,
     ) -> Result<()> {
+        let clock = Clock::get()?;
         *self = Self {
-            fixed: Fixed {
+            fixed: Box::new(Fixed {
                 bump,
                 nonce,
-                updated_at_slot: Clock::get()?.slot,
+                updated_at_slot: clock.slot,
+                updated_at: clock.unix_timestamp,
                 user,
                 market_token_account,
                 market: market.key(),
@@ -145,7 +149,7 @@ impl Withdrawal {
                     final_short_token: final_short_token_receiver.mint,
                     market_token_amount,
                 },
-            },
+            }),
             dynamic: Dynamic {
                 tokens_with_feed: TokensWithFeed::try_from_vec(tokens_with_feed)?,
                 swap: swap_params,

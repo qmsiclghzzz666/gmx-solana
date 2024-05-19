@@ -32,6 +32,8 @@ pub struct Fixed {
     pub nonce: [u8; 32],
     /// The slot that the deposit was last updated at.
     pub updated_at_slot: u64,
+    /// The time that the deposit was last updated at.
+    pub updated_at: i64,
     /// Market.
     pub market: Pubkey,
     /// Senders.
@@ -107,11 +109,13 @@ impl Deposit {
         token_params: TokenParams,
         swap_params: SwapParams,
     ) -> Result<()> {
+        let clock = Clock::get()?;
         *self = Self {
             fixed: Fixed {
                 bump,
                 nonce,
-                updated_at_slot: Clock::get()?.slot,
+                updated_at_slot: clock.slot,
+                updated_at: clock.unix_timestamp,
                 market: market.key(),
                 senders: Senders {
                     user,
