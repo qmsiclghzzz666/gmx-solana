@@ -238,7 +238,7 @@ impl gmx_core::Pool for Pool {
     type Signed = i128;
 
     /// Get the long token amount.
-    fn long_token_amount(&self) -> gmx_core::Result<Self::Num> {
+    fn long_amount(&self) -> gmx_core::Result<Self::Num> {
         if self.is_pure {
             debug_assert_eq!(
                 self.short_token_amount, 0,
@@ -251,7 +251,7 @@ impl gmx_core::Pool for Pool {
     }
 
     /// Get the short token amount.
-    fn short_token_amount(&self) -> gmx_core::Result<Self::Num> {
+    fn short_amount(&self) -> gmx_core::Result<Self::Num> {
         if self.is_pure {
             debug_assert_eq!(
                 self.short_token_amount, 0,
@@ -263,7 +263,7 @@ impl gmx_core::Pool for Pool {
         }
     }
 
-    fn apply_delta_to_long_token_amount(&mut self, delta: &Self::Signed) -> gmx_core::Result<()> {
+    fn apply_delta_to_long_amount(&mut self, delta: &Self::Signed) -> gmx_core::Result<()> {
         self.long_token_amount = self
             .long_token_amount
             .checked_add_signed(*delta)
@@ -271,7 +271,7 @@ impl gmx_core::Pool for Pool {
         Ok(())
     }
 
-    fn apply_delta_to_short_token_amount(&mut self, delta: &Self::Signed) -> gmx_core::Result<()> {
+    fn apply_delta_to_short_amount(&mut self, delta: &Self::Signed) -> gmx_core::Result<()> {
         let amount = if self.is_pure {
             &mut self.long_token_amount
         } else {

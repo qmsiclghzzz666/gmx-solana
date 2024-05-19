@@ -16,14 +16,11 @@ pub trait Pool {
     /// Signed number type of the pool.
     type Signed;
 
-    // /// Signed number type of the pool.
-    // type Signed: Signed;
+    /// Get the long token amount (when this is a token pool), or long usd value (when this is a usd value pool).
+    fn long_amount(&self) -> crate::Result<Self::Num>;
 
-    /// Get the long token amount.
-    fn long_token_amount(&self) -> crate::Result<Self::Num>;
-
-    /// Get the short token amount.
-    fn short_token_amount(&self) -> crate::Result<Self::Num>;
+    /// Get the short token amount (when this is a token pool), or short usd value (when this is a usd value pool).
+    fn short_amount(&self) -> crate::Result<Self::Num>;
 
     // /// Get long token amount after applying delta.
     // fn long_token_amount_after_delta(&self, delta: &Self::Signed) -> crate::Result<Self::Num>;
@@ -31,33 +28,27 @@ pub trait Pool {
     // /// Get short token amount after applying delta.
     // fn short_token_amount_after_delta(&self, delta: &Self::Signed) -> crate::Result<Self::Num>;
 
-    /// Apply delta to long token pool amount.
-    fn apply_delta_to_long_token_amount(
-        &mut self,
-        delta: &Self::Signed,
-    ) -> Result<(), crate::Error>;
+    /// Apply delta to long amount.
+    fn apply_delta_to_long_amount(&mut self, delta: &Self::Signed) -> Result<(), crate::Error>;
 
-    /// Apply delta to short token pool amount.
-    fn apply_delta_to_short_token_amount(
-        &mut self,
-        delta: &Self::Signed,
-    ) -> Result<(), crate::Error>;
+    /// Apply delta to short amount.
+    fn apply_delta_to_short_amount(&mut self, delta: &Self::Signed) -> Result<(), crate::Error>;
 }
 
 /// Extension trait for [`Pool`] with utils.
 pub trait PoolExt: Pool {
-    /// Get the long token value in USD.
-    fn long_token_usd_value(&self, price: &Self::Num) -> crate::Result<Self::Num> {
+    /// Get the long amount value in USD.
+    fn long_usd_value(&self, price: &Self::Num) -> crate::Result<Self::Num> {
         // FIXME: should we use MulDiv?
-        self.long_token_amount()?
+        self.long_amount()?
             .checked_mul(price)
             .ok_or(crate::Error::Overflow)
     }
 
-    /// Get the short token value in USD.
-    fn short_token_usd_value(&self, price: &Self::Num) -> crate::Result<Self::Num> {
+    /// Get the short amount value in USD.
+    fn short_usd_value(&self, price: &Self::Num) -> crate::Result<Self::Num> {
         // FIXME: should we use MulDiv?
-        self.short_token_amount()?
+        self.short_amount()?
             .checked_mul(price)
             .ok_or(crate::Error::Overflow)
     }
@@ -65,13 +56,13 @@ pub trait PoolExt: Pool {
     /// Apply delta.
     fn apply_delta_amount(
         &mut self,
-        is_long_token: bool,
+        is_long: bool,
         delta: &Self::Signed,
     ) -> Result<(), crate::Error> {
-        if is_long_token {
-            self.apply_delta_to_long_token_amount(delta)
+        if is_long {
+            self.apply_delta_to_long_amount(delta)
         } else {
-            self.apply_delta_to_short_token_amount(delta)
+            self.apply_delta_to_short_amount(delta)
         }
     }
 
@@ -126,6 +117,14 @@ pub enum PoolKind {
     SwapImpact,
     /// Claimable fee.
     ClaimableFee,
+    /// Open Interest for long collateral.
+    OpenInterestForLongCollateral,
+    /// Open Interest for short collateral.
+    OpenInterestForShortCollateral,
+    /// Open Interest in tokens for long collateral.
+    OpenInterestInTokensForLongCollateral,
+    /// Open Interest in tokens for short collateral.
+    OpenInterestInTokensForShortCollateral,
 }
 
 impl fmt::Display for PoolKind {
@@ -134,6 +133,12 @@ impl fmt::Display for PoolKind {
             Self::Primary => "Primary",
             Self::SwapImpact => "SwapImpact",
             Self::ClaimableFee => "ClaimableFee",
+            Self::OpenInterestForLongCollateral => "OpenInterestForLongCollateral",
+            Self::OpenInterestForShortCollateral => "OpenInterestForShortCollateral",
+            Self::OpenInterestInTokensForLongCollateral => "OpenInterestInTokensForLongCollateral",
+            Self::OpenInterestInTokensForShortCollateral => {
+                "OpenInterestInTokensForShortCollateral"
+            }
         };
         write!(f, "{name}")
     }

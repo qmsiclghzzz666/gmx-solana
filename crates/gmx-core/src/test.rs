@@ -13,8 +13,8 @@ use num_traits::{CheckedSub, Signed};
 /// Test Pool.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct TestPool<T> {
-    long_token_amount: T,
-    short_token_amount: T,
+    long_amount: T,
+    short_amount: T,
 }
 
 impl<T> Pool for TestPool<T>
@@ -25,44 +25,38 @@ where
 
     type Signed = T::Signed;
 
-    fn long_token_amount(&self) -> crate::Result<Self::Num> {
-        Ok(self.long_token_amount.clone())
+    fn long_amount(&self) -> crate::Result<Self::Num> {
+        Ok(self.long_amount.clone())
     }
 
-    fn short_token_amount(&self) -> crate::Result<Self::Num> {
-        Ok(self.short_token_amount.clone())
+    fn short_amount(&self) -> crate::Result<Self::Num> {
+        Ok(self.short_amount.clone())
     }
 
-    fn apply_delta_to_long_token_amount(
-        &mut self,
-        delta: &Self::Signed,
-    ) -> Result<(), crate::Error> {
+    fn apply_delta_to_long_amount(&mut self, delta: &Self::Signed) -> Result<(), crate::Error> {
         if delta.is_positive() {
-            self.long_token_amount = self
-                .long_token_amount
+            self.long_amount = self
+                .long_amount
                 .checked_add(&delta.unsigned_abs())
                 .ok_or(crate::Error::Overflow)?;
         } else {
-            self.long_token_amount = self
-                .long_token_amount
+            self.long_amount = self
+                .long_amount
                 .checked_sub(&delta.unsigned_abs())
                 .ok_or(crate::Error::Underflow)?;
         }
         Ok(())
     }
 
-    fn apply_delta_to_short_token_amount(
-        &mut self,
-        delta: &Self::Signed,
-    ) -> Result<(), crate::Error> {
+    fn apply_delta_to_short_amount(&mut self, delta: &Self::Signed) -> Result<(), crate::Error> {
         if delta.is_positive() {
-            self.short_token_amount = self
-                .short_token_amount
+            self.short_amount = self
+                .short_amount
                 .checked_add(&delta.unsigned_abs())
                 .ok_or(crate::Error::Overflow)?;
         } else {
-            self.short_token_amount = self
-                .short_token_amount
+            self.short_amount = self
+                .short_amount
                 .checked_sub(&delta.unsigned_abs())
                 .ok_or(crate::Error::Underflow)?;
         }
@@ -81,6 +75,8 @@ pub struct TestMarket<T, const DECIMALS: u8> {
     primary: TestPool<T>,
     price_impact: TestPool<T>,
     fee: TestPool<T>,
+    open_interest: (TestPool<T>, TestPool<T>),
+    open_interest_in_tokens: (TestPool<T>, TestPool<T>),
 }
 
 impl Default for TestMarket<u64, 9> {
@@ -103,6 +99,8 @@ impl Default for TestMarket<u64, 9> {
             primary: Default::default(),
             price_impact: Default::default(),
             fee: Default::default(),
+            open_interest: Default::default(),
+            open_interest_in_tokens: Default::default(),
         }
     }
 }
@@ -132,6 +130,8 @@ impl Default for TestMarket<u128, 20> {
             primary: Default::default(),
             price_impact: Default::default(),
             fee: Default::default(),
+            open_interest: Default::default(),
+            open_interest_in_tokens: Default::default(),
         }
     }
 }
@@ -152,6 +152,10 @@ where
             PoolKind::Primary => &self.primary,
             PoolKind::SwapImpact => &self.price_impact,
             PoolKind::ClaimableFee => &self.fee,
+            PoolKind::OpenInterestForLongCollateral => &self.open_interest.0,
+            PoolKind::OpenInterestForShortCollateral => &self.open_interest.1,
+            PoolKind::OpenInterestInTokensForLongCollateral => &self.open_interest_in_tokens.0,
+            PoolKind::OpenInterestInTokensForShortCollateral => &self.open_interest_in_tokens.1,
         };
         Ok(Some(pool))
     }
@@ -161,6 +165,10 @@ where
             PoolKind::Primary => &mut self.primary,
             PoolKind::SwapImpact => &mut self.price_impact,
             PoolKind::ClaimableFee => &mut self.fee,
+            PoolKind::OpenInterestForLongCollateral => &mut self.open_interest.0,
+            PoolKind::OpenInterestForShortCollateral => &mut self.open_interest.1,
+            PoolKind::OpenInterestInTokensForLongCollateral => &mut self.open_interest.0,
+            PoolKind::OpenInterestInTokensForShortCollateral => &mut self.open_interest.1,
         };
         Ok(Some(pool))
     }

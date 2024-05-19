@@ -292,33 +292,33 @@ mod tests {
         assert_eq!(before_market.total_supply(), market.total_supply());
 
         assert_eq!(
-            before_market.primary_pool()?.long_token_amount()?,
-            market.primary_pool()?.long_token_amount()? + report.token_out_amount
+            before_market.primary_pool()?.long_amount()?,
+            market.primary_pool()?.long_amount()? + report.token_out_amount
                 - report.price_impact_amount,
         );
         assert_eq!(
-            before_market.primary_pool()?.short_token_amount()? + token_in_amount
+            before_market.primary_pool()?.short_amount()? + token_in_amount
                 - report.token_in_fees.fee_receiver_amount(),
-            market.primary_pool()?.short_token_amount()?,
+            market.primary_pool()?.short_amount()?,
         );
 
         assert_eq!(
-            before_market.swap_impact_pool()?.long_token_amount()?,
-            market.swap_impact_pool()?.long_token_amount()? + report.price_impact_amount,
+            before_market.swap_impact_pool()?.long_amount()?,
+            market.swap_impact_pool()?.long_amount()? + report.price_impact_amount,
         );
         assert_eq!(
-            before_market.swap_impact_pool()?.short_token_amount()?,
-            market.swap_impact_pool()?.short_token_amount()?
+            before_market.swap_impact_pool()?.short_amount()?,
+            market.swap_impact_pool()?.short_amount()?
         );
 
         assert_eq!(
-            before_market.claimable_fee_pool()?.long_token_amount()?,
-            market.claimable_fee_pool()?.long_token_amount()?,
+            before_market.claimable_fee_pool()?.long_amount()?,
+            market.claimable_fee_pool()?.long_amount()?,
         );
         assert_eq!(
-            before_market.claimable_fee_pool()?.short_token_amount()?
+            before_market.claimable_fee_pool()?.short_amount()?
                 + report.token_in_fees.fee_receiver_amount(),
-            market.claimable_fee_pool()?.short_token_amount()?,
+            market.claimable_fee_pool()?.short_amount()?,
         );
 
         // Test for negative impact.
@@ -331,33 +331,33 @@ mod tests {
         assert_eq!(before_market.total_supply(), market.total_supply());
 
         assert_eq!(
-            before_market.primary_pool()?.long_token_amount()? + token_in_amount
+            before_market.primary_pool()?.long_amount()? + token_in_amount
                 - report.price_impact_amount
                 - report.token_in_fees.fee_receiver_amount(),
-            market.primary_pool()?.long_token_amount()?,
+            market.primary_pool()?.long_amount()?,
         );
         assert_eq!(
-            before_market.primary_pool()?.short_token_amount()? - report.token_out_amount,
-            market.primary_pool()?.short_token_amount()?,
-        );
-
-        assert_eq!(
-            before_market.swap_impact_pool()?.long_token_amount()? + report.price_impact_amount,
-            market.swap_impact_pool()?.long_token_amount()?,
-        );
-        assert_eq!(
-            before_market.swap_impact_pool()?.short_token_amount()?,
-            market.swap_impact_pool()?.short_token_amount()?
+            before_market.primary_pool()?.short_amount()? - report.token_out_amount,
+            market.primary_pool()?.short_amount()?,
         );
 
         assert_eq!(
-            before_market.claimable_fee_pool()?.long_token_amount()?
+            before_market.swap_impact_pool()?.long_amount()? + report.price_impact_amount,
+            market.swap_impact_pool()?.long_amount()?,
+        );
+        assert_eq!(
+            before_market.swap_impact_pool()?.short_amount()?,
+            market.swap_impact_pool()?.short_amount()?
+        );
+
+        assert_eq!(
+            before_market.claimable_fee_pool()?.long_amount()?
                 + report.token_in_fees.fee_receiver_amount(),
-            market.claimable_fee_pool()?.long_token_amount()?,
+            market.claimable_fee_pool()?.long_amount()?,
         );
         assert_eq!(
-            before_market.claimable_fee_pool()?.short_token_amount()?,
-            market.claimable_fee_pool()?.short_token_amount()?,
+            before_market.claimable_fee_pool()?.short_amount()?,
+            market.claimable_fee_pool()?.short_amount()?,
         );
         Ok(())
     }

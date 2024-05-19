@@ -36,8 +36,8 @@ impl<T: Unsigned> PoolValue<T> {
     where
         P: Pool<Num = T, Signed = T::Signed> + ?Sized,
     {
-        let long_token_usd_value = pool.long_token_usd_value(long_token_price)?;
-        let short_token_usd_value = pool.short_token_usd_value(short_token_price)?;
+        let long_token_usd_value = pool.long_usd_value(long_token_price)?;
+        let short_token_usd_value = pool.short_usd_value(short_token_price)?;
         Ok(Self {
             long_token_usd_value,
             short_token_usd_value,
@@ -93,8 +93,8 @@ impl<T: Unsigned> PoolDelta<T> {
     /// Create a new [`PoolDelta`].
     pub fn try_from_delta_amounts<P>(
         pool: &P,
-        long_token_delta_amount: &T::Signed,
-        short_token_delta_amount: &T::Signed,
+        long_delta_amount: &T::Signed,
+        short_delta_amount: &T::Signed,
         long_token_price: &T,
         short_token_price: &T,
     ) -> crate::Result<Self>
@@ -103,10 +103,10 @@ impl<T: Unsigned> PoolDelta<T> {
         P: Pool<Num = T, Signed = T::Signed> + ?Sized,
     {
         let delta_long_token_usd_value = long_token_price
-            .checked_mul_with_signed(long_token_delta_amount)
+            .checked_mul_with_signed(long_delta_amount)
             .ok_or(crate::Error::Computation("delta long token usd value"))?;
         let delta_short_token_usd_value = short_token_price
-            .checked_mul_with_signed(short_token_delta_amount)
+            .checked_mul_with_signed(short_delta_amount)
             .ok_or(crate::Error::Computation("delta short token usd value"))?;
         Self::try_new(
             pool,

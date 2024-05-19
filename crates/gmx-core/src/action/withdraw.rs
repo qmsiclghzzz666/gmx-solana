@@ -164,8 +164,8 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Withdrawal<M, DECIMALS> {
         }
         let total_supply = self.market.total_supply();
         let pool = self.market.primary_pool()?;
-        let long_token_value = pool.long_token_usd_value(&self.params.long_token_price)?;
-        let short_token_value = pool.short_token_usd_value(&self.params.short_token_price)?;
+        let long_token_value = pool.long_usd_value(&self.params.long_token_price)?;
+        let short_token_value = pool.short_usd_value(&self.params.short_token_price)?;
         let market_token_value = utils::market_token_amount_to_usd(
             &self.params.market_token_amount,
             &pool_value,
@@ -206,8 +206,8 @@ mod tests {
         market.deposit(0, 1_000_000_000, 120, 1)?.execute()?;
         println!("{market:#?}");
         let before_supply = market.total_supply();
-        let before_long_amount = market.primary_pool()?.long_token_amount()?;
-        let before_short_amount = market.primary_pool()?.short_token_amount()?;
+        let before_long_amount = market.primary_pool()?.long_amount()?;
+        let before_short_amount = market.primary_pool()?.short_amount()?;
         let report = market.withdraw(1_000_000_000, 120, 1)?.execute()?;
         println!("{report:#?}");
         println!("{market:#?}");
@@ -216,13 +216,13 @@ mod tests {
             before_supply
         );
         assert_eq!(
-            market.primary_pool()?.long_token_amount()?
+            market.primary_pool()?.long_amount()?
                 + report.long_token_fees.fee_receiver_amount()
                 + report.long_token_output,
             before_long_amount
         );
         assert_eq!(
-            market.primary_pool()?.short_token_amount()?
+            market.primary_pool()?.short_amount()?
                 + report.short_token_fees.fee_receiver_amount()
                 + report.short_token_output,
             before_short_amount

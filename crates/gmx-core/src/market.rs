@@ -136,12 +136,8 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
         long_token_price: &Self::Num,
         short_token_price: &Self::Num,
     ) -> crate::Result<Self::Num> {
-        let long_value = self
-            .primary_pool()?
-            .long_token_usd_value(long_token_price)?;
-        let short_value = self
-            .primary_pool()?
-            .short_token_usd_value(short_token_price)?;
+        let long_value = self.primary_pool()?.long_usd_value(long_token_price)?;
+        let short_value = self.primary_pool()?.short_usd_value(short_token_price)?;
         long_value
             .checked_add(&short_value)
             .ok_or(crate::Error::Overflow)
@@ -224,11 +220,11 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
             let max_amount = if is_long_token {
                 self.pool(PoolKind::SwapImpact)?
                     .ok_or(crate::Error::MissingPoolKind(PoolKind::SwapImpact))?
-                    .long_token_amount()?
+                    .long_amount()?
             } else {
                 self.pool(PoolKind::SwapImpact)?
                     .ok_or(crate::Error::MissingPoolKind(PoolKind::SwapImpact))?
-                    .short_token_amount()?
+                    .short_amount()?
             };
             if amount.unsigned_abs() > max_amount {
                 amount = max_amount.try_into().map_err(|_| crate::Error::Convert)?;
@@ -266,11 +262,11 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
         if is_long_token {
             self.pool_mut(PoolKind::SwapImpact)?
                 .ok_or(crate::Error::MissingPoolKind(PoolKind::SwapImpact))?
-                .apply_delta_to_long_token_amount(&-delta.clone())?;
+                .apply_delta_to_long_amount(&-delta.clone())?;
         } else {
             self.pool_mut(PoolKind::SwapImpact)?
                 .ok_or(crate::Error::MissingPoolKind(PoolKind::SwapImpact))?
-                .apply_delta_to_short_token_amount(&-delta.clone())?;
+                .apply_delta_to_short_amount(&-delta.clone())?;
         }
         Ok(delta.unsigned_abs())
     }
@@ -280,11 +276,11 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
         if is_long_token {
             self.pool_mut(PoolKind::Primary)?
                 .ok_or(crate::Error::MissingPoolKind(PoolKind::Primary))?
-                .apply_delta_to_long_token_amount(delta)?;
+                .apply_delta_to_long_amount(delta)?;
         } else {
             self.pool_mut(PoolKind::Primary)?
                 .ok_or(crate::Error::MissingPoolKind(PoolKind::Primary))?
-                .apply_delta_to_short_token_amount(delta)?;
+                .apply_delta_to_short_amount(delta)?;
         }
         Ok(())
     }
