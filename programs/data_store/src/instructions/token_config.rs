@@ -270,3 +270,44 @@ impl<'info> internal::Authentication<'info> for ExtendTokenConfigMap<'info> {
         &self.only_controller
     }
 }
+
+#[derive(Accounts)]
+pub struct InsertTokenConfigAmount<'info> {
+    pub authority: Signer<'info>,
+    pub store: Account<'info, DataStore>,
+    #[account(
+        seeds = [Roles::SEED, store.key().as_ref(), authority.key().as_ref()],
+        bump = only_controller.bump,
+    )]
+    pub only_controller: Account<'info, Roles>,
+    #[account(
+        mut,
+        seeds = [TokenConfigMap::SEED, store.key().as_ref()],
+        bump = map.bump,
+    )]
+    pub map: Account<'info, TokenConfigMap>,
+}
+
+/// Insert amount of the given key for the token.
+pub fn insert_token_config_amount(
+    ctx: Context<InsertTokenConfigAmount>,
+    token: &Pubkey,
+    key: &str,
+    amount: u64,
+) -> Result<()> {
+    ctx.accounts.map.insert_amount(token, key, amount)
+}
+
+impl<'info> internal::Authentication<'info> for InsertTokenConfigAmount<'info> {
+    fn authority(&self) -> &Signer<'info> {
+        &self.authority
+    }
+
+    fn store(&self) -> &Account<'info, DataStore> {
+        &self.store
+    }
+
+    fn roles(&self) -> &Account<'info, Roles> {
+        &self.only_controller
+    }
+}

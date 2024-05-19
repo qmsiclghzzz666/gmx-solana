@@ -1,7 +1,7 @@
 import { Keypair, PublicKey } from '@solana/web3.js';
 
 import { expect, getAddresses, getProvider, getUsers } from "../../utils/fixtures";
-import { createRolesPDA, extendTokenConfigMap, getTokenConfig, insertSyntheticTokenConfig, insertTokenConfig, setExpectedProvider, toggleTokenConfig } from "../../utils/data";
+import { createRolesPDA, dataStore, extendTokenConfigMap, getTokenConfig, insertSyntheticTokenConfig, insertTokenConfig, invokeInsertTokenConfigAmount, setExpectedProvider, toggleTokenConfig } from "../../utils/data";
 import { AnchorError } from '@coral-xyz/anchor';
 import { createMint } from '@solana/spl-token';
 import { BTC_FEED, SOL_FEED } from '../../utils/token';
@@ -77,6 +77,18 @@ describe("data store: TokenConfig", () => {
             await setExpectedProvider(signer0, dataStoreAddress, newToken, PriceProvider.PythLegacy);
             const config = await getTokenConfig(dataStoreAddress, newToken);
             expect(config.expectedProvider).eqls(PriceProvider.PythLegacy);
+        }
+
+        // Insert timestamp adjustment.
+        {
+            await invokeInsertTokenConfigAmount(dataStore, {
+                authority: signer0,
+                store: dataStoreAddress,
+                token: newToken,
+                key: 'timestamp_adjustment',
+                amount: 3
+            });
+            console.log(`insert an amount for ${newToken.toBase58()}`);
         }
     });
 

@@ -1,5 +1,5 @@
 /// Keys.
-pub mod key;
+pub mod keys;
 
 use gmx_solana_utils::price::Decimal;
 

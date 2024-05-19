@@ -1,9 +1,12 @@
 use anchor_lang::prelude::*;
 use dual_vec_map::DualVecMap;
 
-use crate::DataStoreError;
+use crate::{
+    constants::keys::token::{TIMESTAMP_ADJUSTMENT, TOKEN},
+    DataStoreError,
+};
 
-use super::{PriceProviderKind, Seed};
+use super::{common::MapStore, PriceProviderKind, Seed};
 
 const FEEDS_LEN: usize = 4;
 
@@ -25,6 +28,8 @@ pub struct TokenConfig {
     pub feeds: Vec<Pubkey>,
     /// Expected provider.
     pub expected_provider: u8,
+    /// Amounts config.
+    pub amounts: MapStore<[u8; 32], u64, 1>,
 }
 
 impl TokenConfig {
@@ -71,7 +76,14 @@ impl TokenConfig {
             expected_provider: builder
                 .expected_provider
                 .unwrap_or(PriceProviderKind::default() as u8),
+            amounts: Default::default(),
         }
+    }
+
+    /// Get timestamp adjustment.
+    pub fn timestamp_adjustment(&self) -> Option<u64> {
+        self.amounts
+            .get_with(TOKEN, TIMESTAMP_ADJUSTMENT, |amount| amount.copied())
     }
 }
 
@@ -205,6 +217,15 @@ impl TokenConfigMap {
         self.bump = bump;
         self.configs.clear();
         self.tokens.clear();
+    }
+
+    pub(crate) fn insert_amount(&mut self, token: &Pubkey, key: &str, amount: u64) -> Result<()> {
+        self.as_map_mut()
+            .get_mut(token)
+            .ok_or(DataStoreError::RequiredResourceNotFound)?
+            .amounts
+            .insert(TOKEN, key, amount);
+        Ok(())
     }
 }
 

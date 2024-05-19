@@ -1,3 +1,6 @@
+/// Token config keys.
+pub mod token;
+
 /// Global Namespace.
 pub const GLOBAL: &str = "global";
 

@@ -185,6 +185,16 @@ pub mod data_store {
         instructions::extend_token_config_map(ctx, len)
     }
 
+    #[access_control(internal::Authenticate::only_controller(&ctx))]
+    pub fn insert_token_config_amount(
+        ctx: Context<InsertTokenConfigAmount>,
+        token: Pubkey,
+        key: String,
+        amount: u64,
+    ) -> Result<()> {
+        instructions::insert_token_config_amount(ctx, &token, &key, amount)
+    }
+
     // Market.
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn initialize_market(

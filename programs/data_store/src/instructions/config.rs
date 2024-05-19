@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    constants::key::GLOBAL,
+    constants::keys::GLOBAL,
     states::{Amount, Config, DataStore, Factor, Roles, Seed},
     utils::internal,
 };

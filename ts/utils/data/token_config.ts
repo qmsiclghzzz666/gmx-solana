@@ -2,7 +2,7 @@ import { PublicKey, Signer } from "@solana/web3.js";
 import { dataStore } from "./program";
 import { createRolesPDA } from ".";
 import { utils } from "@coral-xyz/anchor";
-import { PriceProvider } from "gmsol";
+import { DataStoreProgram, PriceProvider, makeInvoke, toBN } from "gmsol";
 
 // Token Config map seed.
 export const TOKEN_CONFIG_MAP_SEED = utils.bytes.utf8.encode("token_config_map");
@@ -143,3 +143,21 @@ export const extendTokenConfigMap = async (authority: Signer, store: PublicKey, 
         onlyController: createRolesPDA(store, authority.publicKey)[0],
     }).signers([authority]).rpc();
 };
+
+export const makeInsertTokenConfigAmountInstruction = async (
+    program: DataStoreProgram,
+    { authority, store, token, key, amount }: {
+        authority: PublicKey,
+        store: PublicKey,
+        token: PublicKey,
+        key: string,
+        amount: number | bigint,
+    }
+) => {
+    return await program.methods.insertTokenConfigAmount(token, key, toBN(amount)).accounts({
+        authority,
+        store,
+    }).instruction();
+};
+
+export const invokeInsertTokenConfigAmount = makeInvoke(makeInsertTokenConfigAmountInstruction, ["authority"]);
