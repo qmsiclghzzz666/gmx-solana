@@ -31,7 +31,7 @@ pub mod order;
 /// Position.
 pub mod position;
 
-pub use config::{AmountKey, Config, FactorKey};
+pub use config::Config;
 pub use data_store::*;
 pub use deposit::Deposit;
 pub use market::*;
@@ -107,4 +107,11 @@ impl InitSpace for u128 {
 
 impl InitSpace for u64 {
     const INIT_SPACE: usize = 8;
+}
+
+impl<T, const LEN: usize> InitSpace for [T; LEN]
+where
+    T: InitSpace,
+{
+    const INIT_SPACE: usize = T::INIT_SPACE * LEN;
 }

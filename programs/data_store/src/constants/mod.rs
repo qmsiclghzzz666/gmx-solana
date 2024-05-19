@@ -1,3 +1,6 @@
+/// Keys.
+pub mod key;
+
 use gmx_solana_utils::price::Decimal;
 
 /// Market Token Mint Address Seed.

@@ -1,4 +1,4 @@
-use anchor_lang::prelude::*;
+use anchor_lang::{prelude::*, solana_program::hash::hashv};
 use dual_vec_map::DualVecMap;
 
 use crate::states::InitSpace;
@@ -37,5 +37,49 @@ impl<K, V, const MAX_LEN: usize> MapStore<K, V, MAX_LEN> {
     /// As a mutable map.
     pub fn as_map_mut(&mut self) -> DualVecMap<&mut Vec<K>, &mut Vec<V>> {
         DualVecMap::from_sorted_stores_unchecked(&mut self.keys, &mut self.values)
+    }
+}
+
+// TODO: Define type alias (e.g., `ConfigStore`) when it won't cause the compiler to panic.
+impl<V, const MAX_LEN: usize> MapStore<[u8; 32], V, MAX_LEN> {
+    /// Get the internal hash key with the given namespace and key.
+    #[inline]
+    pub fn hash(namespace: &str, key: &str) -> [u8; 32] {
+        hashv(&[namespace.as_bytes(), key.as_bytes()]).to_bytes()
+    }
+
+    /// Get the value corressponding to the given namespace and key,
+    /// with the given function.
+    pub fn get_with<T>(&self, namespace: &str, key: &str, f: impl FnOnce(Option<&V>) -> T) -> T {
+        let hash = Self::hash(namespace, key);
+        let map = self.as_map();
+        let value = map.get(&hash);
+        (f)(value)
+    }
+
+    /// Get the value corresponding to the given namespace and key,
+    /// with the given function.
+    pub fn get_mut_with<T>(
+        &mut self,
+        namespace: &str,
+        key: &str,
+        f: impl FnOnce(Option<&mut V>) -> T,
+    ) -> T {
+        let hash = Self::hash(namespace, key);
+        let mut map = self.as_map_mut();
+        let value = map.get_mut(&hash);
+        (f)(value)
+    }
+
+    /// Insert value with the given namespace and key.
+    pub fn insert(&mut self, namespace: &str, key: &str, value: V) -> Option<V> {
+        let hash = Self::hash(namespace, key);
+        self.as_map_mut().insert(hash, value).map(|(_, v)| v)
+    }
+
+    /// Remove the value corresponding to the given namespace and key.
+    pub fn remove(&mut self, namespace: &str, key: &str) -> Option<V> {
+        let hash = Self::hash(namespace, key);
+        self.as_map_mut().remove(&hash).map(|(_, v)| v)
     }
 }

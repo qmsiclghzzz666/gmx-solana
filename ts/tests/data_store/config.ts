@@ -13,14 +13,14 @@ describe("data store: Config", () => {
 
     it("insert amount to the config", async () => {
         const [config] = findConfigPDA(dataStoreAddress);
-        await invokeInsertAmount(dataStore, { authority: signer0, store: dataStoreAddress, key: 0, amount: 3600 });
+        await invokeInsertAmount(dataStore, { authority: signer0, store: dataStoreAddress, key: "max_age", amount: 3600 });
         const account = await dataStore.account.config.fetch(config);
         console.log(account);
     });
 
     it("insert factor to the config", async () => {
         const [config] = findConfigPDA(dataStoreAddress);
-        await invokeInsertFactor(dataStore, { authority: signer0, store: dataStoreAddress, key: 0, factor: 1_000_000_000_000_000 });
+        await invokeInsertFactor(dataStore, { authority: signer0, store: dataStoreAddress, key: "ref_price_deviation", factor: 1_000_000_000_000_000 });
         const account = await dataStore.account.config.fetch(config);
         console.log(account);
     });

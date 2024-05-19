@@ -1,7 +1,8 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    states::{Amount, AmountKey, Config, DataStore, Factor, FactorKey, Roles, Seed},
+    constants::key::GLOBAL,
+    states::{Amount, Config, DataStore, Factor, Roles, Seed},
     utils::internal,
 };
 
@@ -66,8 +67,8 @@ pub struct InsertAmount<'info> {
 }
 
 /// Insert amount.
-pub fn insert_amount(ctx: Context<InsertAmount>, key: AmountKey, amount: Amount) -> Result<()> {
-    ctx.accounts.config.insert_amount(key, amount);
+pub fn insert_amount(ctx: Context<InsertAmount>, key: &str, amount: Amount) -> Result<()> {
+    ctx.accounts.config.insert_amount(GLOBAL, key, amount);
     Ok(())
 }
 
@@ -104,8 +105,8 @@ pub struct InsertFactor<'info> {
 }
 
 /// Insert factor.
-pub fn insert_factor(ctx: Context<InsertFactor>, key: FactorKey, factor: Factor) -> Result<()> {
-    ctx.accounts.config.insert_factor(key, factor);
+pub fn insert_factor(ctx: Context<InsertFactor>, key: &str, factor: Factor) -> Result<()> {
+    ctx.accounts.config.insert_factor(GLOBAL, key, factor);
     Ok(())
 }
 

@@ -33,7 +33,7 @@ export const makeInsertAmountInstruction = async (
     { authority, store, key, amount }: {
         authority: PublicKey,
         store: PublicKey,
-        key: number,
+        key: string,
         amount: number | bigint,
     }
 ) => {
@@ -50,7 +50,7 @@ export const makeInsertFactorInstruction = async (
     { authority, store, key, factor }: {
         authority: PublicKey,
         store: PublicKey,
-        key: number,
+        key: string,
         factor: number | bigint,
     }
 ) => {

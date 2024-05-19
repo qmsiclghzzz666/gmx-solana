@@ -1,28 +1,6 @@
 use anchor_lang::prelude::*;
 
-use super::{common::map::MapStore, Amount, Factor, Seed};
-
-/// Factor Keys.
-#[derive(num_enum::TryFromPrimitive, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "debug", derive(Debug))]
-#[repr(u8)]
-pub enum FactorKey {
-    /// Ref Price Deviation Factor.
-    RefPriceDeviation,
-}
-
-/// Amount Keys.
-#[derive(num_enum::TryFromPrimitive, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "debug", derive(Debug))]
-#[repr(u8)]
-pub enum AmountKey {
-    /// Max Age.
-    MaxAge,
-    /// Request Expiration Time.
-    RequestExpirationTime,
-    /// Max Oracle Timestamp Range.
-    MaxOracleTimestampRange,
-}
+use super::{common::MapStore, Amount, Factor, Seed};
 
 /// Config.
 #[account]
@@ -32,9 +10,9 @@ pub struct Config {
     /// Bump.
     pub bump: u8,
     /// Factors.
-    factors: MapStore<u8, u128, 32>,
+    factors: MapStore<[u8; 32], u128, 32>,
     /// Amounts or seconds.
-    amounts: MapStore<u8, u64, 32>,
+    amounts: MapStore<[u8; 32], u64, 32>,
 }
 
 impl Seed for Config {
@@ -43,18 +21,12 @@ impl Seed for Config {
 
 impl Config {
     /// Insert a new factor.
-    pub fn insert_factor(&mut self, key: FactorKey, factor: u128) -> Option<Factor> {
-        self.factors
-            .as_map_mut()
-            .insert(key as u8, factor)
-            .map(|(_, v)| v)
+    pub fn insert_factor(&mut self, namespace: &str, key: &str, factor: u128) -> Option<Factor> {
+        self.factors.insert(namespace, key, factor)
     }
 
     /// Insert a new amount.
-    pub fn insert_amount(&mut self, key: AmountKey, amount: u64) -> Option<Amount> {
-        self.amounts
-            .as_map_mut()
-            .insert(key as u8, amount)
-            .map(|(_, v)| v)
+    pub fn insert_amount(&mut self, namespace: &str, key: &str, amount: u64) -> Option<Amount> {
+        self.amounts.insert(namespace, key, amount)
     }
 }
