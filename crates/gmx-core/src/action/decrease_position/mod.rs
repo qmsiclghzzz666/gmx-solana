@@ -159,6 +159,13 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
             };
 
         // TODO: update global states.
+
+        // Update open interest.
+        self.position.apply_delta_to_open_interest(
+            &self.size_delta_usd.to_opposite_signed()?,
+            &execution.size_delta_in_tokens.to_opposite_signed()?,
+        )?;
+
         // TODO: handle referral.
 
         if !should_remove {

@@ -130,6 +130,36 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
             .ok_or(crate::Error::MissingPoolKind(PoolKind::ClaimableFee))
     }
 
+    /// Get mutable reference of open interest pool.
+    #[inline]
+    fn open_interest_pool_mut(
+        &mut self,
+        is_long_collateral: bool,
+    ) -> crate::Result<&mut Self::Pool> {
+        let kind = if is_long_collateral {
+            PoolKind::OpenInterestForLongCollateral
+        } else {
+            PoolKind::OpenInterestForShortCollateral
+        };
+        self.pool_mut(kind)?
+            .ok_or(crate::Error::MissingPoolKind(kind))
+    }
+
+    /// Get mutable reference of open interest pool.
+    #[inline]
+    fn open_interest_in_tokens_pool_mut(
+        &mut self,
+        is_long_collateral: bool,
+    ) -> crate::Result<&mut Self::Pool> {
+        let kind = if is_long_collateral {
+            PoolKind::OpenInterestInTokensForLongCollateral
+        } else {
+            PoolKind::OpenInterestInTokensForShortCollateral
+        };
+        self.pool_mut(kind)?
+            .ok_or(crate::Error::MissingPoolKind(kind))
+    }
+
     /// Get the usd value of primary pool.
     fn pool_value(
         &self,

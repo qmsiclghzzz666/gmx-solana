@@ -167,8 +167,8 @@ where
             PoolKind::ClaimableFee => &mut self.fee,
             PoolKind::OpenInterestForLongCollateral => &mut self.open_interest.0,
             PoolKind::OpenInterestForShortCollateral => &mut self.open_interest.1,
-            PoolKind::OpenInterestInTokensForLongCollateral => &mut self.open_interest.0,
-            PoolKind::OpenInterestInTokensForShortCollateral => &mut self.open_interest.1,
+            PoolKind::OpenInterestInTokensForLongCollateral => &mut self.open_interest_in_tokens.0,
+            PoolKind::OpenInterestInTokensForShortCollateral => &mut self.open_interest_in_tokens.1,
         };
         Ok(Some(pool))
     }

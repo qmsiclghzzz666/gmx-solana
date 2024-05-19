@@ -161,7 +161,10 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> IncreasePosition<P, DECIMALS> {
             .ok_or(crate::Error::Computation("size in tokens overflow"))?;
         // TODO: update other position state
 
-        // TODO: update open interest
+        self.position.apply_delta_to_open_interest(
+            &self.params.size_delta_usd.to_signed()?,
+            &execution.size_delta_in_tokens.to_signed()?,
+        )?;
 
         if !self.params.size_delta_usd.is_zero() {
             // TODO: validate reserve.

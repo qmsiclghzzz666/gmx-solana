@@ -7,7 +7,7 @@ use crate::{
     fixed::FixedPointOps,
     num::{MulDiv, Num, Unsigned, UnsignedAbs},
     params::fee::PositionFees,
-    Market,
+    Market, MarketExt, Pool,
 };
 
 /// A position.
@@ -393,6 +393,38 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
         }
 
         Ok(None)
+    }
+
+    /// Apply delta to open interest.
+    fn apply_delta_to_open_interest(
+        &mut self,
+        size_delta_usd: &Self::Signed,
+        size_delta_in_tokens: &Self::Signed,
+    ) -> crate::Result<()> {
+        if size_delta_usd.is_zero() {
+            return Ok(());
+        }
+        let is_long_collateral = self.is_collateral_token_long();
+        let is_long = self.is_long();
+        let open_interest = self
+            .market_mut()
+            .open_interest_pool_mut(is_long_collateral)?;
+        if is_long {
+            open_interest.apply_delta_to_long_amount(size_delta_usd)?;
+        } else {
+            open_interest.apply_delta_to_short_amount(size_delta_usd)?;
+        }
+
+        let open_interest_in_tokens = self
+            .market_mut()
+            .open_interest_in_tokens_pool_mut(is_long_collateral)?;
+        if is_long {
+            open_interest_in_tokens.apply_delta_to_long_amount(size_delta_in_tokens)?;
+        } else {
+            open_interest_in_tokens.apply_delta_to_short_amount(size_delta_in_tokens)?;
+        }
+
+        Ok(())
     }
 }
 
