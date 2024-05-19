@@ -1,15 +1,7 @@
-import { utils } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
-import { dataStore } from "./program";
 import { DataStoreProgram, makeInvoke, toBN } from "gmsol";
 
-// Config seed.
-export const CONFIG_SEED = utils.bytes.utf8.encode("config");
-
-export const findConfigPDA = (store: PublicKey) => PublicKey.findProgramAddressSync([
-    CONFIG_SEED,
-    store.toBytes(),
-], dataStore.programId);
+export { findConfigPDA } from "gmsol";
 
 export type MakeInitializeConfigParams = {
     authority: PublicKey,

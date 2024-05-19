@@ -101,11 +101,11 @@ impl InitSpace for u8 {
     const INIT_SPACE: usize = 1;
 }
 
-impl InitSpace for u128 {
+impl InitSpace for Factor {
     const INIT_SPACE: usize = 16;
 }
 
-impl InitSpace for u64 {
+impl InitSpace for Amount {
     const INIT_SPACE: usize = 8;
 }
 

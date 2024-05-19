@@ -1,7 +1,9 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    states::{DataStore, Oracle, PriceProvider, Roles, Seed, TokenConfigMap},
+    states::{
+        Config, DataStore, Oracle, PriceProvider, PriceValidator, Roles, Seed, TokenConfigMap,
+    },
     utils::internal,
 };
 
@@ -10,6 +12,11 @@ pub struct SetPricesFromPriceFeed<'info> {
     pub authority: Signer<'info>,
     pub only_controller: Account<'info, Roles>,
     pub store: Account<'info, DataStore>,
+    #[account(
+        seeds = [Config::SEED, store.key().as_ref()],
+        bump = config.bump,
+    )]
+    config: Account<'info, Config>,
     #[account(
         mut,
         seeds = [Oracle::SEED, store.key().as_ref(), &[oracle.index]],
@@ -29,7 +36,9 @@ pub fn set_prices_from_price_feed<'info>(
     ctx: Context<'_, '_, 'info, 'info, SetPricesFromPriceFeed<'info>>,
     tokens: Vec<Pubkey>,
 ) -> Result<()> {
+    let validator = PriceValidator::try_from(ctx.accounts.config.as_ref())?;
     ctx.accounts.oracle.set_prices_from_remaining_accounts(
+        validator,
         &ctx.accounts.price_provider,
         &ctx.accounts.token_config_map,
         &tokens,

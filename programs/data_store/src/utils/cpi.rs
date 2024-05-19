@@ -89,6 +89,9 @@ pub trait WithOracle<'info>: Authentication<'info> {
 
     /// Get the token config map account.
     fn token_config_map(&self) -> AccountInfo<'info>;
+
+    /// Get config account.
+    fn config(&self) -> AccountInfo<'info>;
 }
 
 /// Extension trait for [`WithOracle`].
@@ -105,6 +108,7 @@ pub trait WithOracleExt<'info>: WithOracle<'info> {
                 authority: self.authority().to_account_info(),
                 only_controller: check_role.accounts.roles,
                 store: check_role.accounts.store,
+                config: self.config(),
                 token_config_map: self.token_config_map(),
                 oracle: self.oracle(),
                 price_provider: self.price_provider(),

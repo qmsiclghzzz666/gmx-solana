@@ -459,6 +459,10 @@ pub enum DataStoreError {
     AmountOverflow,
     #[msg("Unknown error")]
     Unknown,
+    #[msg("Missing amount")]
+    MissingAmount,
+    #[msg("Missing factor")]
+    MissingFactor,
     // Roles.
     #[msg("Too many admins")]
     TooManyAdmins,
@@ -497,6 +501,12 @@ pub enum DataStoreError {
     PriceFeedNotSet,
     #[msg("Not enough feeds")]
     NotEnoughFeeds,
+    #[msg("Max price age exceeded")]
+    MaxPriceAgeExceeded,
+    #[msg("Invalid oracle timestamp range")]
+    InvalidOracleTsTrange,
+    #[msg("Max oracle timestamp range exceeded")]
+    MaxOracleTimeStampRangeExceeded,
     // Market.
     #[msg("Computation error")]
     Computation,

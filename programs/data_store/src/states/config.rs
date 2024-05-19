@@ -51,4 +51,16 @@ impl Config {
             Ok(self.amounts.insert(namespace, key, amount))
         }
     }
+
+    /// Get amount.
+    pub fn amount(&self, namespace: &str, key: &str) -> Option<Amount> {
+        self.amounts
+            .get_with(namespace, key, |amount| amount.copied())
+    }
+
+    /// Get Factor.
+    pub fn factor(&self, namespace: &str, key: &str) -> Option<Factor> {
+        self.factors
+            .get_with(namespace, key, |factor| factor.copied())
+    }
 }

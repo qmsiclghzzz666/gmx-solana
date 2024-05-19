@@ -11,6 +11,7 @@ use exchange::{accounts, instruction, instructions::CreateDepositParams, utils::
 
 use crate::{
     store::{
+        config::find_config_pda,
         market::{find_market_address, find_market_vault_address},
         roles::find_roles_address,
         token_config::find_token_config_map,
@@ -557,6 +558,7 @@ where
                 data_store_program: data_store::id(),
                 price_provider: *price_provider,
                 token_program: anchor_spl::token::ID,
+                config: find_config_pda(store).0,
                 oracle: *oracle,
                 token_config_map: find_token_config_map(store).0,
                 deposit: *deposit,

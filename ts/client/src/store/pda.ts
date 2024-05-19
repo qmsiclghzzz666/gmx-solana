@@ -7,6 +7,7 @@ const encodeUtf8 = utils.bytes.utf8.encode;
 
 export const POSITION_SEED = encodeUtf8("position");
 export const ORDER_SEED = encodeUtf8("order");
+export const CONFIG_SEED = utils.bytes.utf8.encode("config");
 
 export const findRolesPDA = (store: PublicKey, authority: PublicKey) => PublicKey.findProgramAddressSync([
     encodeUtf8("roles"),
@@ -68,4 +69,10 @@ export const findOrderPDA = (store: PublicKey, user: PublicKey, nonce: Uint8Arra
     store.toBytes(),
     user.toBytes(),
     nonce,
+], DATA_STORE_ID);
+
+
+export const findConfigPDA = (store: PublicKey) => PublicKey.findProgramAddressSync([
+    CONFIG_SEED,
+    store.toBytes(),
 ], DATA_STORE_ID);

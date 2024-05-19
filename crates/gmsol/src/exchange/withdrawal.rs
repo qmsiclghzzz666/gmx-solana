@@ -15,6 +15,7 @@ use exchange::{
 
 use crate::{
     store::{
+        config::find_config_pda,
         market::{find_market_address, find_market_vault_address},
         roles::find_roles_address,
         token_config::find_token_config_map,
@@ -506,6 +507,7 @@ where
                 token_program: anchor_spl::token::ID,
                 system_program: system_program::ID,
                 oracle: self.oracle,
+                config: find_config_pda(&self.store).0,
                 token_config_map: find_token_config_map(&self.store).0,
                 withdrawal: self.withdrawal,
                 market: find_market_address(&self.store, &hint.market_token).0,

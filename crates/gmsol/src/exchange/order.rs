@@ -15,6 +15,7 @@ use exchange::{accounts, instruction, instructions::CreateOrderParams, utils::Co
 
 use crate::{
     store::{
+        config::find_config_pda,
         market::{find_market_address, find_market_vault_address},
         roles::find_roles_address,
         token_config::find_token_config_map,
@@ -493,6 +494,7 @@ where
                 only_order_keeper: find_roles_address(&self.store, &authority).0,
                 store: self.store,
                 oracle: self.oracle,
+                config: find_config_pda(&self.store).0,
                 token_config_map: find_token_config_map(&self.store).0,
                 market: find_market_address(&self.store, &hint.market_token).0,
                 market_token_mint: hint.market_token,

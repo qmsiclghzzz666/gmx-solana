@@ -17,6 +17,8 @@ pub struct ExecuteOrder<'info> {
     pub only_order_keeper: UncheckedAccount<'info>,
     /// CHECK: used and checked by CPI.
     pub store: UncheckedAccount<'info>,
+    /// CHECK: only use and check by CPI.
+    pub config: UncheckedAccount<'info>,
     #[account(mut)]
     pub oracle: Account<'info, Oracle>,
     /// CHECK: check by CPI.
@@ -117,6 +119,10 @@ impl<'info> WithOracle<'info> for ExecuteOrder<'info> {
 
     fn token_config_map(&self) -> AccountInfo<'info> {
         self.token_config_map.to_account_info()
+    }
+
+    fn config(&self) -> AccountInfo<'info> {
+        self.config.to_account_info()
     }
 }
 
