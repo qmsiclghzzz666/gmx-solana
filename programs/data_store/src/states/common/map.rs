@@ -1,7 +1,7 @@
 use anchor_lang::{prelude::*, solana_program::hash::hashv};
 use dual_vec_map::DualVecMap;
 
-use crate::states::InitSpace;
+use crate::{states::InitSpace, DataStoreError};
 
 /// Store for a dual vec map.
 #[derive(AnchorDeserialize, AnchorSerialize, Clone)]
@@ -75,6 +75,16 @@ impl<V, const MAX_LEN: usize> MapStore<[u8; 32], V, MAX_LEN> {
     pub fn insert(&mut self, namespace: &str, key: &str, value: V) -> Option<V> {
         let hash = Self::hash(namespace, key);
         self.as_map_mut().insert(hash, value).map(|(_, v)| v)
+    }
+
+    /// Insert value with the given namespace and key,
+    /// return an error if the given key in the namespace already exists.
+    pub fn insert_new(&mut self, namespace: &str, key: &str, value: V) -> Result<()> {
+        let hash = Self::hash(namespace, key);
+        self.as_map_mut()
+            .try_insert(hash, value)
+            .map_err(|_| DataStoreError::InvalidArgument)?;
+        Ok(())
     }
 
     /// Remove the value corresponding to the given namespace and key.

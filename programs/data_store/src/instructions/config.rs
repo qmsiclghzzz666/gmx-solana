@@ -67,8 +67,15 @@ pub struct InsertAmount<'info> {
 }
 
 /// Insert amount.
-pub fn insert_amount(ctx: Context<InsertAmount>, key: &str, amount: Amount) -> Result<()> {
-    ctx.accounts.config.insert_amount(GLOBAL, key, amount);
+pub fn insert_amount(
+    ctx: Context<InsertAmount>,
+    key: &str,
+    amount: Amount,
+    new: bool,
+) -> Result<()> {
+    ctx.accounts
+        .config
+        .insert_amount(GLOBAL, key, amount, new)?;
     Ok(())
 }
 
@@ -105,8 +112,15 @@ pub struct InsertFactor<'info> {
 }
 
 /// Insert factor.
-pub fn insert_factor(ctx: Context<InsertFactor>, key: &str, factor: Factor) -> Result<()> {
-    ctx.accounts.config.insert_factor(GLOBAL, key, factor);
+pub fn insert_factor(
+    ctx: Context<InsertFactor>,
+    key: &str,
+    factor: Factor,
+    new: bool,
+) -> Result<()> {
+    ctx.accounts
+        .config
+        .insert_factor(GLOBAL, key, factor, new)?;
     Ok(())
 }
 

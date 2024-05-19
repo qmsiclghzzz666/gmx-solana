@@ -30,14 +30,15 @@ export const invokeInitializeConfig = makeInvoke(makeInitializeConfigInstruction
 
 export const makeInsertAmountInstruction = async (
     program: DataStoreProgram,
-    { authority, store, key, amount }: {
+    { authority, store, key, amount, insertNew }: {
         authority: PublicKey,
         store: PublicKey,
         key: string,
         amount: number | bigint,
+        insertNew?: boolean,
     }
 ) => {
-    return await program.methods.insertAmount(key, toBN(amount)).accounts({
+    return await program.methods.insertAmount(key, toBN(amount), insertNew).accounts({
         authority,
         store,
     }).instruction();
@@ -47,14 +48,15 @@ export const invokeInsertAmount = makeInvoke(makeInsertAmountInstruction, ["auth
 
 export const makeInsertFactorInstruction = async (
     program: DataStoreProgram,
-    { authority, store, key, factor }: {
+    { authority, store, key, factor, insertNew }: {
         authority: PublicKey,
         store: PublicKey,
         key: string,
         factor: number | bigint,
+        insertNew?: boolean,
     }
 ) => {
-    return await program.methods.insertFactor(key, toBN(factor)).accounts({
+    return await program.methods.insertFactor(key, toBN(factor), insertNew).accounts({
         authority,
         store,
     }).instruction();

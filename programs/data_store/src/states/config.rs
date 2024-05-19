@@ -21,12 +21,34 @@ impl Seed for Config {
 
 impl Config {
     /// Insert a new factor.
-    pub fn insert_factor(&mut self, namespace: &str, key: &str, factor: u128) -> Option<Factor> {
-        self.factors.insert(namespace, key, factor)
+    pub fn insert_factor(
+        &mut self,
+        namespace: &str,
+        key: &str,
+        factor: u128,
+        new: bool,
+    ) -> Result<Option<Factor>> {
+        if new {
+            self.factors.insert_new(namespace, key, factor)?;
+            Ok(None)
+        } else {
+            Ok(self.factors.insert(namespace, key, factor))
+        }
     }
 
     /// Insert a new amount.
-    pub fn insert_amount(&mut self, namespace: &str, key: &str, amount: u64) -> Option<Amount> {
-        self.amounts.insert(namespace, key, amount)
+    pub fn insert_amount(
+        &mut self,
+        namespace: &str,
+        key: &str,
+        amount: u64,
+        new: bool,
+    ) -> Result<Option<Amount>> {
+        if new {
+            self.amounts.insert_new(namespace, key, amount)?;
+            Ok(None)
+        } else {
+            Ok(self.amounts.insert(namespace, key, amount))
+        }
     }
 }

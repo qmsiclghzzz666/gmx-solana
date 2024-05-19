@@ -101,13 +101,23 @@ pub mod data_store {
     }
 
     #[access_control(internal::Authenticate::only_controller(&ctx))]
-    pub fn insert_amount(ctx: Context<InsertAmount>, key: String, amount: u64) -> Result<()> {
-        instructions::insert_amount(ctx, &key, amount)
+    pub fn insert_amount(
+        ctx: Context<InsertAmount>,
+        key: String,
+        amount: u64,
+        new: bool,
+    ) -> Result<()> {
+        instructions::insert_amount(ctx, &key, amount, new)
     }
 
     #[access_control(internal::Authenticate::only_controller(&ctx))]
-    pub fn insert_factor(ctx: Context<InsertFactor>, key: String, amount: u128) -> Result<()> {
-        instructions::insert_factor(ctx, &key, amount)
+    pub fn insert_factor(
+        ctx: Context<InsertFactor>,
+        key: String,
+        amount: u128,
+        new: bool,
+    ) -> Result<()> {
+        instructions::insert_factor(ctx, &key, amount, new)
     }
 
     // Token Config.
