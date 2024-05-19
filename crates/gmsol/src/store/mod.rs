@@ -7,6 +7,9 @@ pub mod data_store;
 /// Oracle.
 pub mod oracle;
 
+/// Config.
+pub mod config;
+
 /// Token Config.
 pub mod token_config;
 

@@ -4,10 +4,11 @@ use exchange::utils::ControllerSeeds;
 use eyre::ContextCompat;
 use gmsol::{
     store::{
+        config::find_config_pda,
         market::find_market_address,
         token_config::{find_token_config_map, get_token_config},
     },
-    utils::{self},
+    utils,
 };
 use pyth_sdk::Identifier;
 
@@ -25,6 +26,8 @@ enum Command {
     DataStore { address: Option<Pubkey> },
     /// `Roles` account.
     Roles { address: Pubkey },
+    /// `Config` account.
+    Config { address: Option<Pubkey> },
     /// `TokenConfigMap` account.
     TokenConfigMap { address: Option<Pubkey> },
     /// `Market` account.
@@ -92,6 +95,14 @@ impl InspectArgs {
             }
             Command::Roles { address } => {
                 println!("{:#?}", program.account::<states::Roles>(*address).await?);
+            }
+            Command::Config { address } => {
+                let address = address
+                    .or_else(|| store.map(|store| find_config_pda(store).0))
+                    .wrap_err(
+                        "neither the address of config account nor the address of store provided",
+                    )?;
+                println!("{:#?}", program.account::<states::Config>(address).await?);
             }
             Command::TokenConfigMap { address } => {
                 let address = address
