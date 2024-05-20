@@ -31,6 +31,14 @@ program = "external-programs/chainlink-store.so"
 address = "rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ"
 program = "external-programs/pyth-receiver.so"
 
+[[test.genesis]]
+address = "pythWSnswVUd12oZpeFP8e9CVaEqJg25g1Vtc2biRsT"
+program = "external-programs/pyth-push-oracle.so"
+
+[[test.genesis]]
+address = "HDwcJBJXjL9FpJ7UBsYBtaDjsBUhuLCUYoz3zr8SWWaQ"
+program = "external-programs/wormhole.so"
+
 [test.validator]
 bind_address = "127.0.0.1"
 url = "https://api.mainnet-beta.solana.com"
