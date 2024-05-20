@@ -1,6 +1,6 @@
 import { PublicKey } from "@solana/web3.js";
 import { getAddresses, getMarkets, getProvider, getUsers } from "../../utils/fixtures";
-import { exchange, invokeExecuteOrder } from "../../utils/exchange";
+import { exchange, executeOrder } from "../../utils/exchange";
 import { findPositionPDA, invokeCreateDecreaseOrderWithPayerAsSigner, invokeCreateIncreaseOrderWithPayerAsSigner } from "gmsol";
 
 describe("exchange: order", () => {
@@ -53,7 +53,7 @@ describe("exchange: order", () => {
             throw error;
         }
         try {
-            const signature = await invokeExecuteOrder(provider.connection, {
+            const signature = await executeOrder(false, provider.connection, {
                 authority: signer0,
                 store: dataStoreAddress,
                 oracle: oracleAddress,
@@ -103,7 +103,7 @@ describe("exchange: order", () => {
             throw error;
         }
         try {
-            const signature = await invokeExecuteOrder(provider.connection, {
+            const signature = await executeOrder(false, provider.connection, {
                 authority: signer0,
                 store: dataStoreAddress,
                 oracle: oracleAddress,

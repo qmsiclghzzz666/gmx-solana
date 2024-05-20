@@ -1,7 +1,7 @@
 import { PublicKey } from "@solana/web3.js";
 import { createMarketPDA } from "../../utils/data";
 import { getAddresses, getMarkets, getPrograms, getProvider, getUsers, expect } from "../../utils/fixtures";
-import { invokeCancelDeposit, invokeCancelWithdrawal, invokeExecuteWithdrawal, invokeExecuteDeposit, exchange } from "../../utils/exchange";
+import { invokeCancelDeposit, invokeCancelWithdrawal, executeWithdrawal, exchange, executeDeposit } from "../../utils/exchange";
 import { AnchorError } from "@coral-xyz/anchor";
 import { invokeCreateDepositWithPayerAsSigner, invokeCreateWithdrawalWithPayerAsSigner } from "gmsol";
 import { SOL_TOKEN_MINT } from "../../utils/token";
@@ -56,7 +56,7 @@ describe("exchange: deposit", () => {
             console.log(error);
         }
         try {
-            const [signature] = await invokeExecuteDeposit(provider.connection, {
+            const [signature] = await executeDeposit(false, provider.connection, {
                 authority: signer0,
                 store: dataStoreAddress,
                 oracle: oracleAddress,
@@ -150,7 +150,8 @@ describe("exchange: deposit", () => {
             // console.log("pools", market.pools);
         }
         try {
-            const signature = await invokeExecuteWithdrawal(
+            const signature = await executeWithdrawal(
+                false,
                 provider.connection,
                 {
                     authority: signer0,
@@ -345,7 +346,8 @@ describe("exchange: deposit", () => {
         }
 
         try {
-            const [signature] = await invokeExecuteDeposit(
+            const [signature] = await executeDeposit(
+                false,
                 provider.connection,
                 {
                     authority: signer0,
@@ -396,7 +398,7 @@ describe("exchange: deposit", () => {
         }
 
         {
-            const [signature] = await invokeExecuteWithdrawal(provider.connection, {
+            const [signature] = await executeWithdrawal(false, provider.connection, {
                 authority: signer0,
                 store: dataStoreAddress,
                 oracle: oracleAddress,
