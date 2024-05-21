@@ -77,6 +77,7 @@ pub struct TestMarket<T, const DECIMALS: u8> {
     swap_impact_params: PriceImpactParams<T>,
     swap_fee_params: FeeParams<T>,
     position_params: PositionParams<T>,
+    position_impact_params: PriceImpactParams<T>,
     primary: TestPool<T>,
     price_impact: TestPool<T>,
     fee: TestPool<T>,
@@ -101,6 +102,12 @@ impl Default for TestMarket<u64, 9> {
                 .with_negative_impact_fee_factor(700_000)
                 .build(),
             position_params: PositionParams::new(1_000_000_000, 1_000_000_000, 10_000_000),
+            position_impact_params: PriceImpactParams::builder()
+                .with_exponent(2_000_000_000)
+                .with_positive_factor(1)
+                .with_negative_factor(2)
+                .build()
+                .unwrap(),
             primary: Default::default(),
             price_impact: Default::default(),
             fee: Default::default(),
@@ -132,6 +139,12 @@ impl Default for TestMarket<u128, 20> {
                 100_000_000_000_000_000_000,
                 1_000_000_000_000_000_000,
             ),
+            position_impact_params: PriceImpactParams::builder()
+                .with_exponent(200_000_000_000_000_000_000)
+                .with_positive_factor(100_000_000_000)
+                .with_negative_factor(200_000_000_000)
+                .build()
+                .unwrap(),
             primary: Default::default(),
             price_impact: Default::default(),
             fee: Default::default(),
@@ -212,6 +225,10 @@ where
 
     fn position_params(&self) -> crate::params::PositionParams<Self::Num> {
         self.position_params.clone()
+    }
+
+    fn position_impact_params(&self) -> PriceImpactParams<Self::Num> {
+        self.position_impact_params.clone()
     }
 }
 

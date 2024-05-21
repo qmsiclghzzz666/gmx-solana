@@ -413,6 +413,15 @@ impl<'a, 'info> gmx_core::Market<{ constants::MARKET_DECIMALS }> for AsMarket<'a
             constants::MARKET_USD_UNIT / 100,
         )
     }
+
+    fn position_impact_params(&self) -> PriceImpactParams<Self::Num> {
+        PriceImpactParams::builder()
+            .with_exponent(2 * constants::MARKET_USD_UNIT)
+            .with_positive_factor(9_000_000_000)
+            .with_negative_factor(15_000_000_000)
+            .build()
+            .unwrap()
+    }
 }
 
 #[event]

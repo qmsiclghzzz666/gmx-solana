@@ -48,6 +48,9 @@ pub trait Market<const DECIMALS: u8> {
 
     /// Get basic position params.
     fn position_params(&self) -> PositionParams<Self::Num>;
+
+    /// Get the position impact params.
+    fn position_impact_params(&self) -> PriceImpactParams<Self::Num>;
 }
 
 impl<'a, const DECIMALS: u8, M: Market<DECIMALS>> Market<DECIMALS> for &'a mut M {
@@ -91,6 +94,10 @@ impl<'a, const DECIMALS: u8, M: Market<DECIMALS>> Market<DECIMALS> for &'a mut M
 
     fn position_params(&self) -> PositionParams<Self::Num> {
         (**self).position_params()
+    }
+
+    fn position_impact_params(&self) -> PriceImpactParams<Self::Num> {
+        (**self).position_impact_params()
     }
 }
 
