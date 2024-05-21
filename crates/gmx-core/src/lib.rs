@@ -38,7 +38,7 @@ pub mod test;
 
 pub use error::Error;
 pub use market::{Market, MarketExt};
-pub use pool::{Pool, PoolExt, PoolKind};
+pub use pool::{Balance, BalanceExt, Pool, PoolExt, PoolKind};
 pub use position::{Position, PositionExt};
 
 /// Alias for result.

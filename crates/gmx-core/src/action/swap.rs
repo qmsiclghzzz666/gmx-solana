@@ -1,7 +1,7 @@
 use crate::{
     num::{MulDiv, Unsigned},
     params::Fees,
-    Market, MarketExt, PoolExt,
+    BalanceExt, Market, MarketExt, PoolExt,
 };
 
 use num_traits::{CheckedAdd, CheckedMul, CheckedSub, Signed, Zero};
@@ -201,7 +201,7 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Swap<M, DECIMALS> {
                 &self.params.long_token_price,
                 &self.params.short_token_price,
             )?
-            .swap_impact(&self.market.swap_impact_params())?;
+            .price_impact(&self.market.swap_impact_params())?;
 
         let (amount_after_fees, fees) = self.charge_fees(price_impact.is_positive())?;
 
@@ -272,7 +272,7 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Swap<M, DECIMALS> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{test::TestMarket, Market, MarketExt, Pool};
+    use crate::{pool::Balance, test::TestMarket, Market, MarketExt};
 
     #[test]
     fn basic() -> crate::Result<()> {

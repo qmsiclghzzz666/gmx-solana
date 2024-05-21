@@ -1,4 +1,4 @@
-use crate::{num::MulDiv, params::Fees, utils, Market, MarketExt, PoolExt, PoolKind};
+use crate::{num::MulDiv, params::Fees, utils, BalanceExt, Market, MarketExt, PoolExt, PoolKind};
 use num_traits::{CheckedAdd, Zero};
 
 /// A withdrawal.
@@ -196,7 +196,7 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Withdrawal<M, DECIMALS> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{test::TestMarket, Market, MarketExt, Pool};
+    use crate::{pool::Balance, test::TestMarket, Market, MarketExt};
 
     #[test]
     fn basic() -> crate::Result<()> {

@@ -1,6 +1,8 @@
 use num_traits::{CheckedAdd, CheckedMul, CheckedSub};
 
-use crate::{fixed::FixedPointOps, num::Unsigned, params::SwapImpactParams, utils, Pool, PoolExt};
+use crate::{
+    fixed::FixedPointOps, num::Unsigned, params::PriceImpactParams, utils, Balance, BalanceExt,
+};
 
 /// Usd values of pool.
 pub struct PoolValue<T> {
@@ -34,7 +36,7 @@ impl<T: Unsigned> PoolValue<T> {
     /// Create a new [`PoolValue`] from the given pool and prices.
     pub fn try_new<P>(pool: &P, long_token_price: &T, short_token_price: &T) -> crate::Result<Self>
     where
-        P: Pool<Num = T, Signed = T::Signed> + ?Sized,
+        P: Balance<Num = T, Signed = T::Signed> + ?Sized,
     {
         let long_token_usd_value = pool.long_usd_value(long_token_price)?;
         let short_token_usd_value = pool.short_usd_value(short_token_price)?;
@@ -63,7 +65,7 @@ impl<T: Unsigned> PoolDelta<T> {
     ) -> crate::Result<Self>
     where
         T: CheckedAdd + CheckedSub + CheckedMul,
-        P: Pool<Num = T, Signed = T::Signed> + ?Sized,
+        P: Balance<Num = T, Signed = T::Signed> + ?Sized,
     {
         let current = PoolValue::try_new(pool, long_token_price, short_token_price)?;
 
@@ -100,7 +102,7 @@ impl<T: Unsigned> PoolDelta<T> {
     ) -> crate::Result<Self>
     where
         T: CheckedAdd + CheckedSub + CheckedMul,
-        P: Pool<Num = T, Signed = T::Signed> + ?Sized,
+        P: Balance<Num = T, Signed = T::Signed> + ?Sized,
     {
         let delta_long_token_usd_value = long_token_price
             .checked_mul_with_signed(long_delta_amount)
@@ -143,25 +145,25 @@ impl<T: Unsigned + Clone + Ord> PoolDelta<T> {
             == (self.next.long_token_usd_value <= self.next.short_token_usd_value)
     }
 
-    /// Calculate swap impact.
-    pub fn swap_impact<const DECIMALS: u8>(
+    /// Calculate price impact.
+    pub fn price_impact<const DECIMALS: u8>(
         &self,
-        params: &SwapImpactParams<T>,
+        params: &PriceImpactParams<T>,
     ) -> crate::Result<T::Signed>
     where
         T: FixedPointOps<DECIMALS>,
     {
         if self.is_same_side_rebalance() {
-            self.swap_impact_for_same_side_rebalance(params)
+            self.price_impact_for_same_side_rebalance(params)
         } else {
-            self.swap_impact_for_cross_over_rebalance(params)
+            self.price_impact_for_cross_over_rebalance(params)
         }
     }
 
     #[inline]
-    fn swap_impact_for_same_side_rebalance<const DECIMALS: u8>(
+    fn price_impact_for_same_side_rebalance<const DECIMALS: u8>(
         &self,
-        params: &SwapImpactParams<T>,
+        params: &PriceImpactParams<T>,
     ) -> crate::Result<T::Signed>
     where
         T: FixedPointOps<DECIMALS>,
@@ -188,9 +190,9 @@ impl<T: Unsigned + Clone + Ord> PoolDelta<T> {
     }
 
     #[inline]
-    fn swap_impact_for_cross_over_rebalance<const DECIMALS: u8>(
+    fn price_impact_for_cross_over_rebalance<const DECIMALS: u8>(
         &self,
-        params: &SwapImpactParams<T>,
+        params: &PriceImpactParams<T>,
     ) -> crate::Result<T::Signed>
     where
         T: FixedPointOps<DECIMALS>,

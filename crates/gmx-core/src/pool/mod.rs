@@ -8,8 +8,8 @@ use self::delta::PoolDelta;
 /// Delta.
 pub mod delta;
 
-/// A pool for holding tokens.
-pub trait Pool {
+/// Balanced amounts.
+pub trait Balance {
     /// Unsigned number type of the pool.
     type Num: Num + Unsigned<Signed = Self::Signed>;
 
@@ -21,13 +21,10 @@ pub trait Pool {
 
     /// Get the short token amount (when this is a token pool), or short usd value (when this is a usd value pool).
     fn short_amount(&self) -> crate::Result<Self::Num>;
+}
 
-    // /// Get long token amount after applying delta.
-    // fn long_token_amount_after_delta(&self, delta: &Self::Signed) -> crate::Result<Self::Num>;
-
-    // /// Get short token amount after applying delta.
-    // fn short_token_amount_after_delta(&self, delta: &Self::Signed) -> crate::Result<Self::Num>;
-
+/// A pool for holding tokens.
+pub trait Pool: Balance {
     /// Apply delta to long amount.
     fn apply_delta_to_long_amount(&mut self, delta: &Self::Signed) -> Result<(), crate::Error>;
 
@@ -35,8 +32,8 @@ pub trait Pool {
     fn apply_delta_to_short_amount(&mut self, delta: &Self::Signed) -> Result<(), crate::Error>;
 }
 
-/// Extension trait for [`Pool`] with utils.
-pub trait PoolExt: Pool {
+/// Extension trait for [`Balance`] with utils.
+pub trait BalanceExt: Balance {
     /// Get the long amount value in USD.
     fn long_usd_value(&self, price: &Self::Num) -> crate::Result<Self::Num> {
         // FIXME: should we use MulDiv?
@@ -51,19 +48,6 @@ pub trait PoolExt: Pool {
         self.short_amount()?
             .checked_mul(price)
             .ok_or(crate::Error::Overflow)
-    }
-
-    /// Apply delta.
-    fn apply_delta_amount(
-        &mut self,
-        is_long: bool,
-        delta: &Self::Signed,
-    ) -> Result<(), crate::Error> {
-        if is_long {
-            self.apply_delta_to_long_amount(delta)
-        } else {
-            self.apply_delta_to_short_amount(delta)
-        }
     }
 
     /// Get pool value information after applying delta.
@@ -98,6 +82,24 @@ pub trait PoolExt: Pool {
             long_token_price,
             short_token_price,
         )
+    }
+}
+
+impl<P: Balance + ?Sized> BalanceExt for P {}
+
+/// Extension trait for [`Pool`] with utils.
+pub trait PoolExt: Pool {
+    /// Apply delta.
+    fn apply_delta_amount(
+        &mut self,
+        is_long: bool,
+        delta: &Self::Signed,
+    ) -> Result<(), crate::Error> {
+        if is_long {
+            self.apply_delta_to_long_amount(delta)
+        } else {
+            self.apply_delta_to_short_amount(delta)
+        }
     }
 }
 

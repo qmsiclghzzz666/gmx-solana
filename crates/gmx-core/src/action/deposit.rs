@@ -4,7 +4,7 @@ use crate::{
     market::{Market, MarketExt},
     num::{MulDiv, UnsignedAbs},
     params::Fees,
-    utils, PoolExt,
+    utils, BalanceExt, PoolExt,
 };
 
 /// A deposit.
@@ -142,7 +142,7 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Deposit<M, DECIMALS> {
             &self.params.long_token_price,
             &self.params.short_token_price,
         )?;
-        let price_impact = delta.swap_impact(&self.market.swap_impact_params())?;
+        let price_impact = delta.price_impact(&self.market.swap_impact_params())?;
         let delta = delta.delta();
         debug_assert!(!delta.long_value().is_negative(), "must be non-negative");
         debug_assert!(!delta.short_value().is_negative(), "must be non-negative");

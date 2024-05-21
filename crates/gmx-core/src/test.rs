@@ -4,8 +4,8 @@ use crate::{
     fixed::FixedPointOps,
     market::Market,
     num::{MulDiv, Num, UnsignedAbs},
-    params::{FeeParams, PositionParams, SwapImpactParams},
-    pool::{Pool, PoolKind},
+    params::{FeeParams, PositionParams, PriceImpactParams},
+    pool::{Balance, Pool, PoolKind},
     position::Position,
 };
 use num_traits::{CheckedSub, Signed};
@@ -17,7 +17,7 @@ pub struct TestPool<T> {
     short_amount: T,
 }
 
-impl<T> Pool for TestPool<T>
+impl<T> Balance for TestPool<T>
 where
     T: MulDiv + Num + CheckedSub,
 {
@@ -32,7 +32,12 @@ where
     fn short_amount(&self) -> crate::Result<Self::Num> {
         Ok(self.short_amount.clone())
     }
+}
 
+impl<T> Pool for TestPool<T>
+where
+    T: MulDiv + Num + CheckedSub,
+{
     fn apply_delta_to_long_amount(&mut self, delta: &Self::Signed) -> Result<(), crate::Error> {
         if delta.is_positive() {
             self.long_amount = self
@@ -69,7 +74,7 @@ where
 pub struct TestMarket<T, const DECIMALS: u8> {
     total_supply: T,
     value_to_amount_divisor: T,
-    swap_impact_params: SwapImpactParams<T>,
+    swap_impact_params: PriceImpactParams<T>,
     swap_fee_params: FeeParams<T>,
     position_params: PositionParams<T>,
     primary: TestPool<T>,
@@ -84,7 +89,7 @@ impl Default for TestMarket<u64, 9> {
         Self {
             total_supply: Default::default(),
             value_to_amount_divisor: 1,
-            swap_impact_params: SwapImpactParams::builder()
+            swap_impact_params: PriceImpactParams::builder()
                 .with_exponent(2_000_000_000)
                 .with_positive_factor(4)
                 .with_negative_factor(8)
@@ -111,7 +116,7 @@ impl Default for TestMarket<u128, 20> {
         Self {
             total_supply: Default::default(),
             value_to_amount_divisor: 10u128.pow(20 - 9),
-            swap_impact_params: SwapImpactParams::builder()
+            swap_impact_params: PriceImpactParams::builder()
                 .with_exponent(200_000_000_000_000_000_000)
                 .with_positive_factor(400_000_000_000)
                 .with_negative_factor(800_000_000_000)
@@ -197,7 +202,7 @@ where
         self.value_to_amount_divisor.clone()
     }
 
-    fn swap_impact_params(&self) -> SwapImpactParams<Self::Num> {
+    fn swap_impact_params(&self) -> PriceImpactParams<Self::Num> {
         self.swap_impact_params.clone()
     }
 

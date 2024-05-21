@@ -2,8 +2,8 @@ use crate::{
     action::{deposit::Deposit, swap::Swap, withdraw::Withdrawal},
     fixed::FixedPointOps,
     num::{MulDiv, Num, UnsignedAbs},
-    params::{position::PositionParams, FeeParams, SwapImpactParams},
-    pool::{Pool, PoolExt, PoolKind},
+    params::{position::PositionParams, FeeParams, PriceImpactParams},
+    pool::{Balance, BalanceExt, Pool, PoolKind},
 };
 use num_traits::{CheckedAdd, CheckedSub, One, Signed, Zero};
 
@@ -41,7 +41,7 @@ pub trait Market<const DECIMALS: u8> {
     fn usd_to_amount_divisor(&self) -> Self::Num;
 
     /// Get the swap impact params.
-    fn swap_impact_params(&self) -> SwapImpactParams<Self::Num>;
+    fn swap_impact_params(&self) -> PriceImpactParams<Self::Num>;
 
     /// Get the swap fee params.
     fn swap_fee_params(&self) -> FeeParams<Self::Num>;
@@ -81,7 +81,7 @@ impl<'a, const DECIMALS: u8, M: Market<DECIMALS>> Market<DECIMALS> for &'a mut M
         (**self).usd_to_amount_divisor()
     }
 
-    fn swap_impact_params(&self) -> SwapImpactParams<Self::Num> {
+    fn swap_impact_params(&self) -> PriceImpactParams<Self::Num> {
         (**self).swap_impact_params()
     }
 
