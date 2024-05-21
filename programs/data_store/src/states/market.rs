@@ -411,6 +411,8 @@ impl<'a, 'info> gmx_core::Market<{ constants::MARKET_DECIMALS }> for AsMarket<'a
             constants::MARKET_USD_UNIT,
             constants::MARKET_USD_UNIT,
             constants::MARKET_USD_UNIT / 100,
+            500_000_000_000_000_000,
+            500_000_000_000_000_000,
         )
     }
 

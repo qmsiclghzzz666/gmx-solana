@@ -1,4 +1,5 @@
 use crate::{
+    action::Prices,
     num::{MulDiv, Num, Unsigned, UnsignedAbs},
     Market, MarketExt,
 };
@@ -13,6 +14,7 @@ pub(super) struct CollateralProcessor<'a, M: Market<DECIMALS>, const DECIMALS: u
     market: &'a mut M,
     state: State<M::Num>,
     debt: Debt<M::Num>,
+    price_impact_debt: Debt<M::Num>,
     is_insolvent_close_allowed: bool,
 }
 
@@ -27,6 +29,7 @@ pub(super) struct ProcessReport<T> {
 struct State<T> {
     long_token_price: T,
     short_token_price: T,
+    index_token_price: T,
     is_pnl_token_long: bool,
     is_output_token_long: bool,
     output_amount: T,
@@ -225,24 +228,46 @@ where
         remaining_collateral_amount: M::Num,
         is_output_token_long: bool,
         is_pnl_token_long: bool,
-        long_token_price: &M::Num,
-        short_token_price: &M::Num,
+        prices: &Prices<M::Num>,
         is_insolvent_close_allowed: bool,
     ) -> Self {
         Self {
             market,
             state: State {
                 remaining_collateral_amount,
-                long_token_price: long_token_price.clone(),
-                short_token_price: short_token_price.clone(),
+                long_token_price: prices.long_token_price.clone(),
+                short_token_price: prices.short_token_price.clone(),
+                index_token_price: prices.index_token_price.clone(),
                 is_pnl_token_long,
                 is_output_token_long,
                 output_amount: Zero::zero(),
                 secondary_output_amount: Zero::zero(),
             },
-            debt: Debt::default(),
+            debt: Default::default(),
+            price_impact_debt: Default::default(),
             is_insolvent_close_allowed,
         }
+    }
+
+    fn add_pnl_token_amount(&mut self, deduction_amount_for_pool: M::Num) -> crate::Result<()> {
+        if self.state.output_token_is_pnl_token() {
+            self.state.output_amount = self
+                .state
+                .output_amount
+                .checked_add(&deduction_amount_for_pool)
+                .ok_or(crate::Error::Computation(
+                    "overflow adding deduction amount to output_amount",
+                ))?;
+        } else {
+            self.state.secondary_output_amount = self
+                .state
+                .secondary_output_amount
+                .checked_add(&deduction_amount_for_pool)
+                .ok_or(crate::Error::Computation(
+                    "overflow adding deduction amount to secondary_output_amount",
+                ))?;
+        }
+        Ok(())
     }
 
     pub(super) fn apply_pnl(&mut self, pnl: &M::Signed) -> crate::Result<&mut Self> {
@@ -256,25 +281,50 @@ where
                 &deduction_amount_for_pool.to_opposite_signed()?,
             )?;
 
-            if self.state.output_token_is_pnl_token() {
-                self.state.output_amount = self
-                    .state
-                    .output_amount
-                    .checked_add(&deduction_amount_for_pool)
-                    .ok_or(crate::Error::Computation(
-                        "overflow adding deduction amount to output_amount",
-                    ))?;
-            } else {
-                self.state.secondary_output_amount = self
-                    .state
-                    .secondary_output_amount
-                    .checked_add(&deduction_amount_for_pool)
-                    .ok_or(crate::Error::Computation(
-                        "overflow adding deduction amount to secondary_output_amount",
-                    ))?;
-            }
+            self.add_pnl_token_amount(deduction_amount_for_pool)?;
         } else {
             self.debt.add_pool_debt(&pnl.unsigned_abs())?;
+        }
+        Ok(self)
+    }
+
+    pub(super) fn apply_price_impact(
+        &mut self,
+        price_impact: &M::Signed,
+    ) -> crate::Result<&mut Self> {
+        if price_impact.is_positive() {
+            // TODO: use min price to maximize the amount to reduce.
+            let min_amount = price_impact
+                .unsigned_abs()
+                .checked_round_up_div(&self.state.index_token_price)
+                .ok_or(crate::Error::Computation(
+                    "calculating positive price impact amount",
+                ))?;
+            self.market
+                .apply_delta_to_position_impact_pool(&min_amount.to_opposite_signed()?)?;
+
+            // TODO: use max price to minimize the amount to pay.
+            // The price has been validated to be non-zero.
+            let deduction_amount_for_pool =
+                price_impact.unsigned_abs() / self.state.pnl_token_price().clone();
+            self.market.apply_delta(
+                self.state.is_pnl_token_long,
+                &deduction_amount_for_pool.to_opposite_signed()?,
+            )?;
+            self.add_pnl_token_amount(deduction_amount_for_pool)?;
+        } else if price_impact.is_negative() {
+            self.price_impact_debt
+                .add_pool_debt(&price_impact.unsigned_abs())?;
+        }
+        Ok(self)
+    }
+
+    pub(super) fn apply_price_impact_diff(
+        &mut self,
+        price_impact_diff: &M::Num,
+    ) -> crate::Result<&mut Self> {
+        if !price_impact_diff.is_zero() {
+            self.debt.add_claimable_collateral_debt(price_impact_diff)?;
         }
         Ok(self)
     }
@@ -304,8 +354,82 @@ where
         Ok(())
     }
 
+    fn pay_for_debt_for_claimable_collateral(&mut self) -> crate::Result<()> {
+        let (paid_in_collateral_token, paid_in_secondary_output_token) =
+            self.debt.pay_for_claimable_collateral_debt(
+                |cost| {
+                    let (_, paid_in_collateral_token, paid_in_secondary_output_token) =
+                        self.state.pay_for_cost(cost)?;
+                    Ok((paid_in_collateral_token, paid_in_secondary_output_token))
+                },
+                self.is_insolvent_close_allowed,
+            )?;
+        if !paid_in_collateral_token.is_zero() {
+            // TODO: pay to claimable collateral pool.
+            self.market.apply_delta(
+                self.state.is_output_token_long,
+                &paid_in_collateral_token.to_signed()?,
+            )?;
+        }
+        if !paid_in_secondary_output_token.is_zero() {
+            // TODO: pay to claimable collateral pool.
+            self.market.apply_delta(
+                self.state.is_pnl_token_long,
+                &paid_in_secondary_output_token.to_signed()?,
+            )?;
+        }
+        Ok(())
+    }
+
+    fn pay_for_price_impact_debt_for_pool(&mut self) -> crate::Result<()> {
+        let (paid_in_collateral_token, paid_in_secondary_output_token) =
+            self.price_impact_debt.pay_for_pool_debt(
+                |cost| {
+                    let (_, paid_in_collateral_token, paid_in_secondary_output_token) =
+                        self.state.pay_for_cost(cost)?;
+                    Ok((paid_in_collateral_token, paid_in_secondary_output_token))
+                },
+                self.is_insolvent_close_allowed,
+            )?;
+        if !paid_in_collateral_token.is_zero() {
+            self.market.apply_delta(
+                self.state.is_output_token_long,
+                &paid_in_collateral_token.to_signed()?,
+            )?;
+            let delta = paid_in_collateral_token
+                .checked_mul_div(
+                    self.state.output_token_price(),
+                    &self.state.index_token_price,
+                )
+                .ok_or(crate::Error::Computation(
+                    "calculating price impact paied in collateral (output) token",
+                ))?
+                .to_signed()?;
+            self.market.apply_delta_to_position_impact_pool(&delta)?;
+        }
+        if !paid_in_secondary_output_token.is_zero() {
+            self.market.apply_delta(
+                self.state.is_pnl_token_long,
+                &paid_in_secondary_output_token.to_signed()?,
+            )?;
+            let delta = paid_in_collateral_token
+                .checked_mul_div(
+                    self.state.secondary_output_token_price(),
+                    &self.state.index_token_price,
+                )
+                .ok_or(crate::Error::Computation(
+                    "calculating price impact paied in secondary output token",
+                ))?
+                .to_signed()?;
+            self.market.apply_delta_to_position_impact_pool(&delta)?;
+        }
+        Ok(())
+    }
+
     fn pay_for_debt(&mut self) -> crate::Result<&mut Self> {
         self.pay_for_debt_for_pool()?;
+        self.pay_for_debt_for_claimable_collateral()?;
+        self.pay_for_price_impact_debt_for_pool()?;
         Ok(self)
     }
 

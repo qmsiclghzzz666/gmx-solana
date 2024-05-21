@@ -1,9 +1,15 @@
-use num_traits::{CheckedAdd, CheckedMul, CheckedSub, One, Signed, Zero};
+use num_traits::{CheckedAdd, CheckedMul, CheckedNeg, CheckedSub, One, Signed, Zero};
 
 /// Num trait used in GMX.
-pub trait Num: num_traits::Num + CheckedAdd + CheckedMul + CheckedSub + Clone + Ord {}
+pub trait Num:
+    num_traits::Num + CheckedAdd + CheckedMul + CheckedSub + CheckedNeg + Clone + Ord
+{
+}
 
-impl<T: num_traits::Num + CheckedAdd + CheckedMul + CheckedSub + Clone + Ord> Num for T {}
+impl<T: num_traits::Num + CheckedAdd + CheckedMul + CheckedSub + CheckedNeg + Clone + Ord> Num
+    for T
+{
+}
 
 /// Unsigned value that cannot be negative.
 pub trait Unsigned: num_traits::Unsigned {

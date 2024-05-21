@@ -8,7 +8,7 @@ use crate::{
 };
 
 /// Number of pools.
-pub const NUM_POOLS: u8 = 7;
+pub const NUM_POOLS: u8 = 8;
 
 /// Initialize the account for [`Market`].
 pub fn initialize_market(

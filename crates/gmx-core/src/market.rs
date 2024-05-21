@@ -3,7 +3,7 @@ use crate::{
     fixed::FixedPointOps,
     num::{MulDiv, Num, UnsignedAbs},
     params::{position::PositionParams, FeeParams, PriceImpactParams},
-    pool::{Balance, BalanceExt, Pool, PoolKind},
+    pool::{balance::Merged, Balance, BalanceExt, Pool, PoolKind},
 };
 use num_traits::{CheckedAdd, CheckedSub, One, Signed, Zero};
 
@@ -137,6 +137,28 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
             .ok_or(crate::Error::MissingPoolKind(PoolKind::ClaimableFee))
     }
 
+    /// Get the reference of open interest pool.
+    #[inline]
+    fn open_interest_pool(&self, is_long_collateral: bool) -> crate::Result<&Self::Pool> {
+        let kind = if is_long_collateral {
+            PoolKind::OpenInterestForLongCollateral
+        } else {
+            PoolKind::OpenInterestForShortCollateral
+        };
+        self.pool(kind)?.ok_or(crate::Error::MissingPoolKind(kind))
+    }
+
+    /// Get the reference of open interest pool.
+    #[inline]
+    fn open_interest_in_tokens_pool(&self, is_long_collateral: bool) -> crate::Result<&Self::Pool> {
+        let kind = if is_long_collateral {
+            PoolKind::OpenInterestInTokensForLongCollateral
+        } else {
+            PoolKind::OpenInterestInTokensForShortCollateral
+        };
+        self.pool(kind)?.ok_or(crate::Error::MissingPoolKind(kind))
+    }
+
     /// Get mutable reference of open interest pool.
     #[inline]
     fn open_interest_pool_mut(
@@ -167,6 +189,26 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
             .ok_or(crate::Error::MissingPoolKind(kind))
     }
 
+    /// Get position impact pool.
+    #[inline]
+    fn position_impact_pool(&self) -> crate::Result<&Self::Pool> {
+        self.pool(PoolKind::PositionImpact)?
+            .ok_or(crate::Error::MissingPoolKind(PoolKind::PositionImpact))
+    }
+
+    /// Get the mutable reference to position impact pool.
+    #[inline]
+    fn position_impact_pool_mut(&mut self) -> crate::Result<&mut Self::Pool> {
+        self.pool_mut(PoolKind::PositionImpact)?
+            .ok_or(crate::Error::MissingPoolKind(PoolKind::PositionImpact))
+    }
+
+    /// Get position impact pool amount.
+    #[inline]
+    fn position_impact_pool_amount(&self) -> crate::Result<Self::Num> {
+        self.position_impact_pool()?.long_amount()
+    }
+
     /// Get the usd value of primary pool.
     fn pool_value(
         &self,
@@ -178,6 +220,13 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
         long_value
             .checked_add(&short_value)
             .ok_or(crate::Error::Overflow)
+    }
+
+    /// Get total open interest as a [`Balance`].
+    fn open_interest(&self) -> crate::Result<Merged<&Self::Pool, &Self::Pool>> {
+        Ok(self
+            .open_interest_pool(true)?
+            .merge(self.open_interest_pool(false)?))
     }
 
     /// Create a [`Deposit`] action.
@@ -308,7 +357,7 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
         Ok(delta.unsigned_abs())
     }
 
-    /// Apply delta to the pool.
+    /// Apply delta to the primary pool.
     fn apply_delta(&mut self, is_long_token: bool, delta: &Self::Signed) -> crate::Result<()> {
         if is_long_token {
             self.pool_mut(PoolKind::Primary)?
@@ -320,6 +369,12 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
                 .apply_delta_to_short_amount(delta)?;
         }
         Ok(())
+    }
+
+    /// Apply delta to the position impact pool.
+    fn apply_delta_to_position_impact_pool(&mut self, delta: &Self::Signed) -> crate::Result<()> {
+        self.position_impact_pool_mut()?
+            .apply_delta_to_long_amount(delta)
     }
 }
 

@@ -59,6 +59,8 @@ pub enum PoolKind {
     OpenInterestInTokensForLongCollateral,
     /// Open Interest in tokens for short collateral.
     OpenInterestInTokensForShortCollateral,
+    /// Position impact.
+    PositionImpact,
 }
 
 impl fmt::Display for PoolKind {
@@ -73,6 +75,7 @@ impl fmt::Display for PoolKind {
             Self::OpenInterestInTokensForShortCollateral => {
                 "OpenInterestInTokensForShortCollateral"
             }
+            Self::PositionImpact => "PositionImpact",
         };
         write!(f, "{name}")
     }

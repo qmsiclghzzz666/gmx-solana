@@ -1,13 +1,13 @@
 use std::{fmt, ops::Deref};
 
-use num_traits::Zero;
+use num_traits::{One, Zero};
 
 use crate::{
     action::{decrease_position::DecreasePosition, increase_position::IncreasePosition, Prices},
     fixed::FixedPointOps,
     num::{MulDiv, Num, Unsigned, UnsignedAbs},
     params::fee::PositionFees,
-    Market, MarketExt, Pool,
+    BalanceExt, Market, MarketExt, Pool,
 };
 
 /// A position.
@@ -425,6 +425,104 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
         }
 
         Ok(())
+    }
+
+    /// Get position price impact.
+    fn position_price_impact(&self, size_delta_usd: Self::Signed) -> crate::Result<Self::Signed> {
+        // Since the amounts of open interest are already usd amounts,
+        // the price should be `one`.
+        let usd_price = One::one();
+        let (delta_long_usd_value, delta_short_usd_value) = if self.is_long() {
+            (size_delta_usd, Zero::zero())
+        } else {
+            (Zero::zero(), size_delta_usd)
+        };
+        let price_impact_value = self
+            .market()
+            .open_interest()?
+            .pool_delta_with_values(
+                delta_long_usd_value,
+                delta_short_usd_value,
+                &usd_price,
+                &usd_price,
+            )?
+            .price_impact(&self.market().position_impact_params())?;
+        Ok(price_impact_value)
+    }
+
+    /// Get position price impact usd and cap the value if it is positive.
+    fn capped_positive_position_price_impact(
+        &self,
+        index_token_price: &Self::Num,
+        size_delta_usd: &Self::Signed,
+    ) -> crate::Result<Self::Signed> {
+        use crate::utils;
+        use num_traits::{CheckedMul, Signed};
+
+        let mut impact = self.position_price_impact(size_delta_usd.clone())?;
+        if impact.is_positive() {
+            let impact_pool_amount = self.market().position_impact_pool_amount()?;
+            // Cap price impact based on pool amount.
+            // TODO: use min price.
+            let max_impact = impact_pool_amount
+                .checked_mul(index_token_price)
+                .ok_or(crate::Error::Computation(
+                    "overflow calculating max positive position impact based on pool amount",
+                ))?
+                .to_signed()?;
+            if impact > max_impact {
+                impact = max_impact;
+            }
+
+            // Cap price impact based on max factor.
+            let params = self.market().position_params();
+            let max_impact_factor = params.max_positive_position_impact_factor();
+            let max_impact = utils::apply_factor(&size_delta_usd.unsigned_abs(), max_impact_factor)
+                .ok_or(crate::Error::Computation(
+                    "calculating max positive position impact based on max factor",
+                ))?
+                .to_signed()?;
+            if impact > max_impact {
+                impact = max_impact;
+            }
+        }
+        Ok(impact)
+    }
+
+    /// Get capped position price impact usd.
+    ///
+    /// Compare to [`PositionExt::capped_positive_position_price_impact`],
+    /// this method will also cap the negative impact and return the difference before capping.
+    fn capped_position_price_impact(
+        &self,
+        index_token_price: &Self::Num,
+        size_delta_usd: &Self::Signed,
+    ) -> crate::Result<(Self::Signed, Self::Num)> {
+        use crate::utils;
+        use num_traits::{CheckedSub, Signed};
+
+        let mut impact =
+            self.capped_positive_position_price_impact(index_token_price, size_delta_usd)?;
+        let mut impact_diff = Zero::zero();
+        if impact.is_negative() {
+            let params = self.market().position_params();
+            let max_impact_factor = params.max_negative_position_impact_factor();
+            let min_impact = utils::apply_factor(&size_delta_usd.unsigned_abs(), max_impact_factor)
+                .ok_or(crate::Error::Computation(
+                    "calculating max negative position impact based on max factor",
+                ))?
+                .to_opposite_signed()?;
+            if impact < min_impact {
+                impact_diff = min_impact
+                    .checked_sub(&impact)
+                    .ok_or(crate::Error::Computation(
+                        "overflow calculating impact diff",
+                    ))?
+                    .unsigned_abs();
+                impact = min_impact;
+            }
+        }
+        Ok((impact, impact_diff))
     }
 }
 

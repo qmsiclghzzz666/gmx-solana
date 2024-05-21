@@ -53,6 +53,7 @@ impl<T> DecreasePositionParams<T> {
 
 struct ProcessCollateralResult<T: Unsigned> {
     price_impact_value: T::Signed,
+    price_impact_diff: T,
     execution_price: T,
     size_delta_in_tokens: T,
     is_output_token_long: bool,
@@ -297,7 +298,7 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
     fn process_collateral(&mut self) -> crate::Result<ProcessCollateralResult<P::Num>> {
         // TODO: handle insolvent close.
 
-        let (price_impact_value, _price_impact_diff_usd, execution_price) =
+        let (price_impact_value, price_impact_diff, execution_price) =
             self.get_execution_params()?;
 
         // TODO: calculate position pnl usd.
@@ -317,17 +318,16 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
             remaining_collateral_amount,
             is_output_token_long,
             is_pnl_token_long,
-            &self.params.prices.long_token_price,
-            &self.params.prices.short_token_price,
+            &self.params.prices,
             self.is_insolvent_close_allowed,
         );
 
-        processor.apply_pnl(&base_pnl_usd)?;
-        // TODO: pay positive price impact.
-        // TODO: pay for funding fees.
-        // TODO: pay for other fees.
-        // TODO: pay ofr negative price impact.
-        // TODO: pay for price impact diff.
+        processor
+            .apply_pnl(&base_pnl_usd)?
+            .apply_price_impact(&price_impact_value)?
+            // TODO: pay for funding fees.
+            // TODO: pay for other fees.
+            .apply_price_impact_diff(&price_impact_diff)?;
         let mut report = processor.process()?;
 
         // TODO: handle initial collateral delta amount with price impact diff.
@@ -352,6 +352,7 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
 
         Ok(ProcessCollateralResult {
             price_impact_value,
+            price_impact_diff,
             execution_price,
             size_delta_in_tokens,
             is_output_token_long,
@@ -360,7 +361,7 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
         })
     }
 
-    fn get_execution_params(&self) -> crate::Result<(P::Signed, P::Signed, P::Num)> {
+    fn get_execution_params(&self) -> crate::Result<(P::Signed, P::Num, P::Num)> {
         let index_token_price = &self.params.prices.index_token_price;
         let size_delta_usd = &self.size_delta_usd;
 
@@ -369,10 +370,11 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
             return Ok((Zero::zero(), Zero::zero(), index_token_price.clone()));
         }
 
-        // TODO: calculate capped price impact value.
-        let price_impact_value = Zero::zero();
-
-        // TODO: bound negative price impact value.
+        let (price_impact_value, price_impact_diff_usd) =
+            self.position.capped_position_price_impact(
+                index_token_price,
+                &self.size_delta_usd.to_opposite_signed()?,
+            )?;
 
         let execution_price = utils::get_execution_price_for_decrease(
             index_token_price,
@@ -384,7 +386,7 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
             self.position.is_long(),
         )?;
 
-        Ok((price_impact_value, Zero::zero(), execution_price))
+        Ok((price_impact_value, price_impact_diff_usd, execution_price))
     }
 }
 

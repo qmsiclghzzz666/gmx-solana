@@ -79,10 +79,11 @@ pub struct TestMarket<T, const DECIMALS: u8> {
     position_params: PositionParams<T>,
     position_impact_params: PriceImpactParams<T>,
     primary: TestPool<T>,
-    price_impact: TestPool<T>,
+    swap_impact: TestPool<T>,
     fee: TestPool<T>,
     open_interest: (TestPool<T>, TestPool<T>),
     open_interest_in_tokens: (TestPool<T>, TestPool<T>),
+    position_impact: TestPool<T>,
 }
 
 impl Default for TestMarket<u64, 9> {
@@ -101,7 +102,13 @@ impl Default for TestMarket<u64, 9> {
                 .with_positive_impact_fee_factor(500_000)
                 .with_negative_impact_fee_factor(700_000)
                 .build(),
-            position_params: PositionParams::new(1_000_000_000, 1_000_000_000, 10_000_000),
+            position_params: PositionParams::new(
+                1_000_000_000,
+                1_000_000_000,
+                10_000_000,
+                5_000_000,
+                5_000_000,
+            ),
             position_impact_params: PriceImpactParams::builder()
                 .with_exponent(2_000_000_000)
                 .with_positive_factor(1)
@@ -109,10 +116,11 @@ impl Default for TestMarket<u64, 9> {
                 .build()
                 .unwrap(),
             primary: Default::default(),
-            price_impact: Default::default(),
+            swap_impact: Default::default(),
             fee: Default::default(),
             open_interest: Default::default(),
             open_interest_in_tokens: Default::default(),
+            position_impact: Default::default(),
         }
     }
 }
@@ -138,6 +146,8 @@ impl Default for TestMarket<u128, 20> {
                 100_000_000_000_000_000_000,
                 100_000_000_000_000_000_000,
                 1_000_000_000_000_000_000,
+                500_000_000_000_000_000,
+                500_000_000_000_000_000,
             ),
             position_impact_params: PriceImpactParams::builder()
                 .with_exponent(200_000_000_000_000_000_000)
@@ -146,10 +156,11 @@ impl Default for TestMarket<u128, 20> {
                 .build()
                 .unwrap(),
             primary: Default::default(),
-            price_impact: Default::default(),
+            swap_impact: Default::default(),
             fee: Default::default(),
             open_interest: Default::default(),
             open_interest_in_tokens: Default::default(),
+            position_impact: Default::default(),
         }
     }
 }
@@ -168,12 +179,13 @@ where
     fn pool(&self, kind: PoolKind) -> crate::Result<Option<&Self::Pool>> {
         let pool = match kind {
             PoolKind::Primary => &self.primary,
-            PoolKind::SwapImpact => &self.price_impact,
+            PoolKind::SwapImpact => &self.swap_impact,
             PoolKind::ClaimableFee => &self.fee,
             PoolKind::OpenInterestForLongCollateral => &self.open_interest.0,
             PoolKind::OpenInterestForShortCollateral => &self.open_interest.1,
             PoolKind::OpenInterestInTokensForLongCollateral => &self.open_interest_in_tokens.0,
             PoolKind::OpenInterestInTokensForShortCollateral => &self.open_interest_in_tokens.1,
+            PoolKind::PositionImpact => &self.position_impact,
         };
         Ok(Some(pool))
     }
@@ -181,12 +193,13 @@ where
     fn pool_mut(&mut self, kind: PoolKind) -> crate::Result<Option<&mut Self::Pool>> {
         let pool = match kind {
             PoolKind::Primary => &mut self.primary,
-            PoolKind::SwapImpact => &mut self.price_impact,
+            PoolKind::SwapImpact => &mut self.swap_impact,
             PoolKind::ClaimableFee => &mut self.fee,
             PoolKind::OpenInterestForLongCollateral => &mut self.open_interest.0,
             PoolKind::OpenInterestForShortCollateral => &mut self.open_interest.1,
             PoolKind::OpenInterestInTokensForLongCollateral => &mut self.open_interest_in_tokens.0,
             PoolKind::OpenInterestInTokensForShortCollateral => &mut self.open_interest_in_tokens.1,
+            PoolKind::PositionImpact => &mut self.position_impact,
         };
         Ok(Some(pool))
     }
