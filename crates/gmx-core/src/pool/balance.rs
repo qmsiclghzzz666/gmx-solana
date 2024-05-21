@@ -1,0 +1,148 @@
+use crate::num::{Num, Unsigned};
+use num_traits::CheckedMul;
+
+use super::PoolDelta;
+
+/// Balanced amounts.
+pub trait Balance {
+    /// Unsigned number type of the pool.
+    type Num: Num + Unsigned<Signed = Self::Signed>;
+
+    /// Signed number type of the pool.
+    type Signed;
+
+    /// Get the long token amount (when this is a token pool), or long usd value (when this is a usd value pool).
+    fn long_amount(&self) -> crate::Result<Self::Num>;
+
+    /// Get the short token amount (when this is a token pool), or short usd value (when this is a usd value pool).
+    fn short_amount(&self) -> crate::Result<Self::Num>;
+}
+
+/// Extension trait for [`Balance`] with utils.
+pub trait BalanceExt: Balance {
+    /// Get the long amount value in USD.
+    fn long_usd_value(&self, price: &Self::Num) -> crate::Result<Self::Num> {
+        // FIXME: should we use MulDiv?
+        self.long_amount()?
+            .checked_mul(price)
+            .ok_or(crate::Error::Overflow)
+    }
+
+    /// Get the short amount value in USD.
+    fn short_usd_value(&self, price: &Self::Num) -> crate::Result<Self::Num> {
+        // FIXME: should we use MulDiv?
+        self.short_amount()?
+            .checked_mul(price)
+            .ok_or(crate::Error::Overflow)
+    }
+
+    /// Get pool value information after applying delta.
+    fn pool_delta_with_amounts(
+        &self,
+        long_token_delta_amount: &Self::Signed,
+        short_token_delta_amount: &Self::Signed,
+        long_token_price: &Self::Num,
+        short_token_price: &Self::Num,
+    ) -> crate::Result<PoolDelta<Self::Num>> {
+        PoolDelta::try_from_delta_amounts(
+            self,
+            long_token_delta_amount,
+            short_token_delta_amount,
+            long_token_price,
+            short_token_price,
+        )
+    }
+
+    /// Get pool value information after applying delta.
+    fn pool_delta_with_values(
+        &self,
+        delta_long_token_usd_value: Self::Signed,
+        delta_short_token_usd_value: Self::Signed,
+        long_token_price: &Self::Num,
+        short_token_price: &Self::Num,
+    ) -> crate::Result<PoolDelta<Self::Num>> {
+        PoolDelta::try_new(
+            self,
+            delta_long_token_usd_value,
+            delta_short_token_usd_value,
+            long_token_price,
+            short_token_price,
+        )
+    }
+
+    /// Merge the amounts with other [`Balance`].
+    fn merge<B: Balance>(&self, other: B) -> Merged<&Self, B> {
+        Merged(self, other)
+    }
+}
+
+impl<P: Balance + ?Sized> BalanceExt for P {}
+
+impl<'a, P: Balance> Balance for &'a P {
+    type Num = P::Num;
+
+    type Signed = P::Signed;
+
+    fn long_amount(&self) -> crate::Result<Self::Num> {
+        (**self).long_amount()
+    }
+
+    fn short_amount(&self) -> crate::Result<Self::Num> {
+        (**self).short_amount()
+    }
+}
+
+/// Merged balanced pool.
+/// A [`Balance`] returned by [`BalanceExt::merge`].
+#[derive(Debug, Clone, Copy)]
+pub struct Merged<A, B>(A, B);
+
+impl<A, B, Num, Signed> Balance for Merged<A, B>
+where
+    Num: crate::num::Num + Unsigned<Signed = Signed>,
+    A: Balance<Num = Num, Signed = Signed>,
+    B: Balance<Num = Num, Signed = Signed>,
+{
+    type Num = Num;
+
+    type Signed = Signed;
+
+    fn long_amount(&self) -> crate::Result<Self::Num> {
+        self.0
+            .long_amount()?
+            .checked_add(&self.1.long_amount()?)
+            .ok_or(crate::Error::Overflow)
+    }
+
+    fn short_amount(&self) -> crate::Result<Self::Num> {
+        self.0
+            .short_amount()?
+            .checked_add(&self.1.short_amount()?)
+            .ok_or(crate::Error::Overflow)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{test::TestPool, Pool};
+
+    #[test]
+    fn test_merge_balances() -> crate::Result<()> {
+        let mut open_interest_for_long_collateral = TestPool::<u64>::default();
+        let mut open_interest_for_short_collateral = TestPool::<u64>::default();
+
+        open_interest_for_long_collateral.apply_delta_to_long_amount(&1000)?;
+        open_interest_for_long_collateral.apply_delta_to_short_amount(&2000)?;
+        open_interest_for_short_collateral.apply_delta_to_long_amount(&3000)?;
+        open_interest_for_short_collateral.apply_delta_to_short_amount(&4000)?;
+
+        let open_interest =
+            open_interest_for_long_collateral.merge(&open_interest_for_short_collateral);
+
+        assert_eq!(open_interest.long_amount()?, 4000);
+        assert_eq!(open_interest.short_amount()?, 6000);
+
+        Ok(())
+    }
+}
