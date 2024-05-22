@@ -6,6 +6,7 @@ pub struct PositionParams<T> {
     min_collateral_factor: T,
     max_positive_position_impact_factor: T,
     max_negative_position_impact_factor: T,
+    max_position_impact_factor_for_liquidations: T,
 }
 
 impl<T> PositionParams<T> {
@@ -16,6 +17,7 @@ impl<T> PositionParams<T> {
         min_collateral_factor: T,
         max_positive_position_impact_factor: T,
         max_negative_position_impact_factor: T,
+        max_position_impact_factor_for_liquidations: T,
     ) -> Self {
         Self {
             min_collateral_value,
@@ -23,6 +25,7 @@ impl<T> PositionParams<T> {
             min_collateral_factor,
             max_positive_position_impact_factor,
             max_negative_position_impact_factor,
+            max_position_impact_factor_for_liquidations,
         }
     }
 
@@ -49,5 +52,10 @@ impl<T> PositionParams<T> {
     /// Get max negative position impact factor.
     pub fn max_negative_position_impact_factor(&self) -> &T {
         &self.max_negative_position_impact_factor
+    }
+
+    /// Get max position impact factor for liquidations.
+    pub fn max_position_impact_factor_for_liquidations(&self) -> &T {
+        &self.max_position_impact_factor_for_liquidations
     }
 }

@@ -108,6 +108,7 @@ impl Default for TestMarket<u64, 9> {
                 10_000_000,
                 5_000_000,
                 5_000_000,
+                2_500_000,
             ),
             position_impact_params: PriceImpactParams::builder()
                 .with_exponent(2_000_000_000)
@@ -148,6 +149,7 @@ impl Default for TestMarket<u128, 20> {
                 1_000_000_000_000_000_000,
                 500_000_000_000_000_000,
                 500_000_000_000_000_000,
+                250_000_000_000_000_000,
             ),
             position_impact_params: PriceImpactParams::builder()
                 .with_exponent(200_000_000_000_000_000_000)
