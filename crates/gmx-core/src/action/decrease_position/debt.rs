@@ -39,6 +39,8 @@ where
         }
     }
 
+    // FIXME: use it.
+    #[allow(unused)]
     pub(super) fn add_claimable_collateral_debt(&mut self, debt: &T) -> crate::Result<()> {
         self.claimable_collateral = self
             .claimable_collateral

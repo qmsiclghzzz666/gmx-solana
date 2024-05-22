@@ -324,7 +324,8 @@ where
         price_impact_diff: &M::Num,
     ) -> crate::Result<&mut Self> {
         if !price_impact_diff.is_zero() {
-            self.debt.add_claimable_collateral_debt(price_impact_diff)?;
+            // TODO: apply to the debt.
+            // self.debt.add_claimable_collateral_debt(price_impact_diff)?;
         }
         Ok(self)
     }
@@ -366,17 +367,17 @@ where
             )?;
         if !paid_in_collateral_token.is_zero() {
             // TODO: pay to claimable collateral pool.
-            self.market.apply_delta(
-                self.state.is_output_token_long,
-                &paid_in_collateral_token.to_signed()?,
-            )?;
+            // self.market.apply_delta(
+            //     self.state.is_output_token_long,
+            //     &paid_in_collateral_token.to_signed()?,
+            // )?;
         }
         if !paid_in_secondary_output_token.is_zero() {
             // TODO: pay to claimable collateral pool.
-            self.market.apply_delta(
-                self.state.is_pnl_token_long,
-                &paid_in_secondary_output_token.to_signed()?,
-            )?;
+            // self.market.apply_delta(
+            //     self.state.is_pnl_token_long,
+            //     &paid_in_secondary_output_token.to_signed()?,
+            // )?;
         }
         Ok(())
     }
