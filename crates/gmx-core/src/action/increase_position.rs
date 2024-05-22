@@ -1,10 +1,11 @@
-use num_traits::{CheckedAdd, Signed, Zero};
+use num_traits::{CheckedAdd, CheckedNeg, Signed, Zero};
 use std::fmt;
 
 use crate::{
     num::Unsigned,
     params::fee::PositionFees,
     position::{CollateralDelta, Position, PositionExt},
+    MarketExt,
 };
 
 use super::Prices;
@@ -141,7 +142,16 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> IncreasePosition<P, DECIMALS> {
             .checked_add(&collateral_delta_amount)
             .ok_or(crate::Error::Computation("collateral amount overflow"))?;
 
-        // TODO: update position impact pool
+        self.position
+            .market_mut()
+            .apply_delta_to_position_impact_pool(
+                &execution
+                    .price_impact_amount()
+                    .checked_neg()
+                    .ok_or(crate::Error::Computation(
+                        "calculating position impact pool delta amount",
+                    ))?,
+            )?;
 
         let next_position_size_in_usd = self
             .position
@@ -161,7 +171,10 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> IncreasePosition<P, DECIMALS> {
             .ok_or(crate::Error::Computation("size in tokens overflow"))?;
         // TODO: update other position state
 
-        // TODO: update open interest
+        self.position.apply_delta_to_open_interest(
+            &self.params.size_delta_usd.to_signed()?,
+            &execution.size_delta_in_tokens.to_signed()?,
+        )?;
 
         if !self.params.size_delta_usd.is_zero() {
             // TODO: validate reserve.
@@ -200,17 +213,21 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> IncreasePosition<P, DECIMALS> {
     }
 
     fn get_execution_params(&self) -> crate::Result<ExecutionParams<P::Num>> {
+        let index_token_price = &self.params.prices.index_token_price;
         if self.params.size_delta_usd.is_zero() {
             return Ok(ExecutionParams {
                 price_impact_value: Zero::zero(),
                 price_impact_amount: Zero::zero(),
                 size_delta_in_tokens: Zero::zero(),
                 // TODO: pick price by position side
-                execution_price: self.params.prices.index_token_price.clone(),
+                execution_price: index_token_price.clone(),
             });
         }
-        // TODO: calculate price impact.
-        let price_impact_value: P::Signed = Zero::zero();
+
+        let price_impact_value = self.position.capped_positive_position_price_impact(
+            index_token_price,
+            &self.params.size_delta_usd.to_signed()?,
+        )?;
 
         let price_impact_amount = if price_impact_value.is_positive() {
             let price: P::Signed = self

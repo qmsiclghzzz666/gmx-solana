@@ -2,7 +2,7 @@ use anchor_lang::{prelude::*, Bump};
 use anchor_spl::token::Mint;
 use dual_vec_map::DualVecMap;
 use gmx_core::{
-    params::{FeeParams, PositionParams, SwapImpactParams},
+    params::{FeeParams, PositionParams, PriceImpactParams},
     PoolKind,
 };
 use gmx_solana_utils::to_seed;
@@ -232,13 +232,13 @@ impl Pool {
     }
 }
 
-impl gmx_core::Pool for Pool {
+impl gmx_core::Balance for Pool {
     type Num = u128;
 
     type Signed = i128;
 
     /// Get the long token amount.
-    fn long_token_amount(&self) -> gmx_core::Result<Self::Num> {
+    fn long_amount(&self) -> gmx_core::Result<Self::Num> {
         if self.is_pure {
             debug_assert_eq!(
                 self.short_token_amount, 0,
@@ -251,7 +251,7 @@ impl gmx_core::Pool for Pool {
     }
 
     /// Get the short token amount.
-    fn short_token_amount(&self) -> gmx_core::Result<Self::Num> {
+    fn short_amount(&self) -> gmx_core::Result<Self::Num> {
         if self.is_pure {
             debug_assert_eq!(
                 self.short_token_amount, 0,
@@ -262,8 +262,10 @@ impl gmx_core::Pool for Pool {
             Ok(self.short_token_amount)
         }
     }
+}
 
-    fn apply_delta_to_long_token_amount(&mut self, delta: &Self::Signed) -> gmx_core::Result<()> {
+impl gmx_core::Pool for Pool {
+    fn apply_delta_to_long_amount(&mut self, delta: &Self::Signed) -> gmx_core::Result<()> {
         self.long_token_amount = self
             .long_token_amount
             .checked_add_signed(*delta)
@@ -271,7 +273,7 @@ impl gmx_core::Pool for Pool {
         Ok(())
     }
 
-    fn apply_delta_to_short_token_amount(&mut self, delta: &Self::Signed) -> gmx_core::Result<()> {
+    fn apply_delta_to_short_amount(&mut self, delta: &Self::Signed) -> gmx_core::Result<()> {
         let amount = if self.is_pure {
             &mut self.long_token_amount
         } else {
@@ -387,8 +389,8 @@ impl<'a, 'info> gmx_core::Market<{ constants::MARKET_DECIMALS }> for AsMarket<'a
         constants::MARKET_USD_TO_AMOUNT_DIVISOR
     }
 
-    fn swap_impact_params(&self) -> gmx_core::params::SwapImpactParams<Self::Num> {
-        SwapImpactParams::builder()
+    fn swap_impact_params(&self) -> gmx_core::params::PriceImpactParams<Self::Num> {
+        PriceImpactParams::builder()
             .with_exponent(2 * constants::MARKET_USD_UNIT)
             .with_positive_factor(400_000_000_000)
             .with_negative_factor(800_000_000_000)
@@ -409,7 +411,19 @@ impl<'a, 'info> gmx_core::Market<{ constants::MARKET_DECIMALS }> for AsMarket<'a
             constants::MARKET_USD_UNIT,
             constants::MARKET_USD_UNIT,
             constants::MARKET_USD_UNIT / 100,
+            500_000_000_000_000_000,
+            500_000_000_000_000_000,
+            250_000_000_000_000_000,
         )
+    }
+
+    fn position_impact_params(&self) -> PriceImpactParams<Self::Num> {
+        PriceImpactParams::builder()
+            .with_exponent(2 * constants::MARKET_USD_UNIT)
+            .with_positive_factor(9_000_000_000)
+            .with_negative_factor(15_000_000_000)
+            .build()
+            .unwrap()
     }
 }
 

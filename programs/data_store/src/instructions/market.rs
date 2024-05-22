@@ -8,7 +8,7 @@ use crate::{
 };
 
 /// Number of pools.
-pub const NUM_POOLS: u8 = 3;
+pub const NUM_POOLS: u8 = 8;
 
 /// Initialize the account for [`Market`].
 pub fn initialize_market(
@@ -122,10 +122,10 @@ pub fn apply_delta_to_market_pool(
     market
         .with_pool_mut(pool, |pool| {
             if is_long_token {
-                pool.apply_delta_to_long_token_amount(&delta)
+                pool.apply_delta_to_long_amount(&delta)
                     .map_err(|_| DataStoreError::Computation)?;
             } else {
-                pool.apply_delta_to_short_token_amount(&delta)
+                pool.apply_delta_to_short_amount(&delta)
                     .map_err(|_| DataStoreError::Computation)?;
             }
             Result::Ok(())

@@ -10,6 +10,7 @@ pub struct DecreasePositionReport<T: Unsigned> {
     should_remove: bool,
     params: DecreasePositionParams<T>,
     price_impact_value: T::Signed,
+    price_impact_diff: T,
     execution_price: T,
     size_delta_in_tokens: T,
     fees: PositionFees<T>,
@@ -31,6 +32,7 @@ where
             .field("should_remove", &self.should_remove)
             .field("params", &self.params)
             .field("price_impact_value", &self.price_impact_value)
+            .field("price_impact_diff", &self.price_impact_diff)
             .field("execution_price", &self.execution_price)
             .field("size_delta_in_tokens", &self.size_delta_in_tokens)
             .field("fees", &self.fees)
@@ -66,6 +68,7 @@ impl<T: Unsigned> DecreasePositionReport<T> {
             secondary_output_amount: execution.collateral.secondary_output_amount,
             withdrawable_collateral_amount,
             size_delta_usd,
+            price_impact_diff: execution.price_impact_diff,
         }
     }
 

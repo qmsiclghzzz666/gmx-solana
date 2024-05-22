@@ -109,3 +109,19 @@ where
 {
     value.checked_mul_div(factor, &FixedPointOps::UNIT)
 }
+
+/// Apply factor using this formula: `A * x`.
+///
+/// Assuming that `value` and `factor` are a fixed-point decimals,
+/// but they do not need to be of the same decimals.
+/// The const type `DECIMALS` is the decimals of `factor`.
+#[inline]
+pub fn apply_factor_to_signed<T, const DECIMALS: u8>(
+    value: &T::Signed,
+    factor: &T,
+) -> Option<T::Signed>
+where
+    T: FixedPointOps<DECIMALS>,
+{
+    factor.checked_mul_div_with_signed_numberator(value, &FixedPointOps::UNIT)
+}

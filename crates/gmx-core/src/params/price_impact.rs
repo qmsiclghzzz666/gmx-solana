@@ -1,12 +1,12 @@
-/// Swap impact parameters.
+/// Price impact parameters.
 #[derive(Debug, Clone, Copy)]
-pub struct SwapImpactParams<T> {
+pub struct PriceImpactParams<T> {
     exponent: T,
     positive_factor: T,
     negative_factor: T,
 }
 
-impl<T> SwapImpactParams<T> {
+impl<T> PriceImpactParams<T> {
     /// Exponent.
     pub fn exponent(&self) -> &T {
         &self.exponent
@@ -44,7 +44,7 @@ impl<T> SwapImpactParams<T> {
     }
 }
 
-/// Builder for Swap impact parameters.
+/// Builder for Price impact parameters.
 pub struct Builder<T> {
     exponent: Option<T>,
     positive_factor: Option<T>,
@@ -70,9 +70,9 @@ impl<T> Builder<T> {
         self
     }
 
-    /// Build [`SwapImpactParams`].
-    pub fn build(self) -> crate::Result<SwapImpactParams<T>> {
-        Ok(SwapImpactParams {
+    /// Build [`PriceImpactParams`].
+    pub fn build(self) -> crate::Result<PriceImpactParams<T>> {
+        Ok(PriceImpactParams {
             exponent: self
                 .exponent
                 .ok_or(crate::Error::build_params("missing `exponent`"))?,
