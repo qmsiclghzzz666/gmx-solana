@@ -19,7 +19,7 @@ impl Chainlink {
         chainlink_program: &AccountInfo<'info>,
         token_config: &TokenConfig,
         feed: &AccountInfo<'info>,
-    ) -> Result<(i64, Price)> {
+    ) -> Result<(u64, i64, Price)> {
         let round = chainlink_solana::latest_round_data(chainlink_program.clone(), feed.clone())?;
         let decimals =
             chainlink_solana::decimals(chainlink_program.to_account_info(), feed.clone())?;
@@ -32,7 +32,7 @@ impl Chainlink {
         round: &chainlink_solana::Round,
         decimals: u8,
         token_config: &TokenConfig,
-    ) -> Result<(i64, Price)> {
+    ) -> Result<(u64, i64, Price)> {
         let chainlink_solana::Round {
             answer, timestamp, ..
         } = round;
@@ -50,6 +50,7 @@ impl Chainlink {
         )
         .map_err(|_| DataStoreError::InvalidPriceFeedPrice)?;
         Ok((
+            round.slot,
             timestamp,
             Price {
                 min: price,

@@ -136,6 +136,10 @@ impl<'info> ValidateOracleTime for ExecuteOrder<'info> {
         ts.map(|ts| self.config.request_expiration_at(ts))
             .transpose()
     }
+
+    fn oracle_updated_after_slot(&self) -> Result<Option<u64>> {
+        Ok(Some(self.order.fixed.updated_at_slot))
+    }
 }
 
 impl<'info> ExecuteOrder<'info> {

@@ -116,6 +116,10 @@ impl<'info> ValidateOracleTime for ExecuteWithdrawal<'info> {
             .request_expiration_at(self.withdrawal.fixed.updated_at)?;
         Ok(Some(ts))
     }
+
+    fn oracle_updated_after_slot(&self) -> Result<Option<u64>> {
+        Ok(Some(self.withdrawal.fixed.updated_at_slot))
+    }
 }
 
 impl<'info> ExecuteWithdrawal<'info> {

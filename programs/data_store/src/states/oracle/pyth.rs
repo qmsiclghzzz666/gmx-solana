@@ -22,7 +22,7 @@ impl Pyth {
         token_config: &TokenConfig,
         feed: &'info AccountInfo<'info>,
         feed_id: &Pubkey,
-    ) -> Result<(i64, Price)> {
+    ) -> Result<(u64, i64, Price)> {
         let feed = Account::<PriceUpdateV2>::try_from(feed)?;
         let feed_id = feed_id.to_bytes();
         let price =
@@ -42,7 +42,7 @@ impl Pyth {
             min: Self::price_value_to_decimal(mid_price, price.exponent, token_config)?,
             max: Self::price_value_to_decimal(mid_price, price.exponent, token_config)?,
         };
-        Ok((price.publish_time, parsed_price))
+        Ok((feed.posted_slot, price.publish_time, parsed_price))
     }
 
     fn price_value_to_decimal(
@@ -85,7 +85,7 @@ impl PythLegacy {
         clock: &Clock,
         token_config: &TokenConfig,
         feed: &'info AccountInfo<'info>,
-    ) -> Result<(i64, Price)> {
+    ) -> Result<(u64, i64, Price)> {
         use pyth_sdk_solana::state::SolanaPriceAccount;
         let feed = SolanaPriceAccount::account_info_to_feed(feed).map_err(|err| {
             msg!("Pyth Error: {}", err);
@@ -104,7 +104,9 @@ impl PythLegacy {
             min: Pyth::price_value_to_decimal(mid_price, price.expo, token_config)?,
             max: Pyth::price_value_to_decimal(mid_price, price.expo, token_config)?,
         };
-        Ok((price.publish_time, parsed_price))
+        // Pyth legacy price feed does not provide `posted_slot`,
+        // so we use current slot to ignore the slot check.
+        Ok((clock.slot, price.publish_time, parsed_price))
     }
 }
 

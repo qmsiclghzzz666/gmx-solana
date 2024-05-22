@@ -18,6 +18,7 @@ pub struct PriceValidator {
     max_oracle_timestamp_range: Amount,
     min_oracle_ts: i64,
     max_oracle_ts: i64,
+    min_oracle_slot: Option<u64>,
 }
 
 impl PriceValidator {
@@ -29,6 +30,7 @@ impl PriceValidator {
         &mut self,
         token_config: &TokenConfig,
         oracle_ts: i64,
+        oracle_slot: u64,
         _price: &Price,
     ) -> Result<()> {
         let timestamp_adjustment = token_config
@@ -47,30 +49,41 @@ impl PriceValidator {
 
         // TODO: validate price with ref price.
 
-        self.min_oracle_ts = self.min_oracle_ts.min(ts);
-        self.max_oracle_ts = self.max_oracle_ts.max(ts);
+        self.merge_range(Some(oracle_slot), ts, ts);
 
         Ok(())
     }
 
-    pub(super) fn merge_range(&mut self, min_oracle_ts: i64, max_oracle_ts: i64) {
+    pub(super) fn merge_range(
+        &mut self,
+        min_oracle_slot: Option<u64>,
+        min_oracle_ts: i64,
+        max_oracle_ts: i64,
+    ) {
+        self.min_oracle_slot = match (self.min_oracle_slot, min_oracle_slot) {
+            (Some(current), Some(other)) => Some(current.min(other)),
+            (None, Some(slot)) | (Some(slot), None) => Some(slot),
+            (None, None) => None,
+        };
         self.min_oracle_ts = self.min_oracle_ts.min(min_oracle_ts);
         self.max_oracle_ts = self.max_oracle_ts.max(max_oracle_ts);
     }
 
-    pub(super) fn finish(self) -> Result<(i64, i64)> {
+    pub(super) fn finish(self) -> Result<Option<(u64, i64, i64)>> {
         let range: u64 = self
             .max_oracle_ts
             .checked_sub(self.min_oracle_ts)
-            .ok_or(DataStoreError::AmountOverflow)?
+            .ok_or(error!(DataStoreError::AmountOverflow))?
             .try_into()
-            .map_err(|_| DataStoreError::InvalidOracleTsTrange)?;
+            .map_err(|_| error!(DataStoreError::InvalidOracleTsTrange))?;
         require_gte!(
             self.max_oracle_timestamp_range,
             range,
             DataStoreError::MaxOracleTimeStampRangeExceeded
         );
-        Ok((self.min_oracle_ts, self.max_oracle_ts))
+        Ok(self
+            .min_oracle_slot
+            .map(|slot| (slot, self.min_oracle_ts, self.max_oracle_ts)))
     }
 }
 
@@ -95,6 +108,7 @@ impl<'a> TryFrom<&'a Config> for PriceValidator {
             max_oracle_timestamp_range,
             min_oracle_ts: i64::MAX,
             max_oracle_ts: i64::MIN,
+            min_oracle_slot: None,
         })
     }
 }

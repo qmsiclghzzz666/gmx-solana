@@ -78,6 +78,10 @@ impl<'info> ValidateOracleTime for ExecuteDeposit<'info> {
             .request_expiration_at(self.deposit.fixed.updated_at)?;
         Ok(Some(ts))
     }
+
+    fn oracle_updated_after_slot(&self) -> Result<Option<u64>> {
+        Ok(Some(self.deposit.fixed.updated_at_slot))
+    }
 }
 
 impl<'info> ExecuteDeposit<'info> {

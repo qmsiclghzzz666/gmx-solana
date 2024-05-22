@@ -25,7 +25,7 @@ pub use self::{
     chainlink::Chainlink,
     price_map::PriceMap,
     pyth::{Pyth, PythLegacy, PYTH_LEGACY_ID},
-    time::ValidateOracleTime,
+    time::{ValidateOracleTime, ValidateOracleTimeExt},
     validator::PriceValidator,
 };
 
@@ -39,6 +39,7 @@ pub struct Oracle {
     pub primary: PriceMap,
     pub min_oracle_ts: i64,
     pub max_oracle_ts: i64,
+    pub min_oracle_slot: Option<u64>,
 }
 
 impl Seed for Oracle {
@@ -82,7 +83,7 @@ impl Oracle {
                 .ok_or(DataStoreError::RequiredResourceNotFound)?;
             require!(token_config.enabled, DataStoreError::TokenConfigDisabled);
             require_eq!(token_config.expected_provider()?, *program.kind());
-            let (oracle_ts, price) = match &program {
+            let (oracle_slot, oracle_ts, price) = match &program {
                 PriceProviderProgram::Chainlink(program, kind) => {
                     require_eq!(
                         token_config.get_feed(kind)?,
@@ -110,16 +111,20 @@ impl Oracle {
                     PythLegacy::check_and_get_price(validator.clock(), token_config, feed)?
                 }
             };
-            validator.validate_one(token_config, oracle_ts, &price)?;
+            validator.validate_one(token_config, oracle_ts, oracle_slot, &price)?;
             self.primary.set(token, price)?;
         }
-        self.update_oracle_ts_range(validator)?;
+        self.update_oracle_ts_and_slot(validator)?;
         Ok(())
     }
 
-    fn update_oracle_ts_range(&mut self, mut validator: PriceValidator) -> Result<()> {
-        validator.merge_range(self.min_oracle_ts, self.max_oracle_ts);
-        (self.min_oracle_ts, self.max_oracle_ts) = validator.finish()?;
+    fn update_oracle_ts_and_slot(&mut self, mut validator: PriceValidator) -> Result<()> {
+        validator.merge_range(self.min_oracle_slot, self.min_oracle_ts, self.max_oracle_ts);
+        if let Some((min_slot, min_ts, max_ts)) = validator.finish()? {
+            self.min_oracle_slot = Some(min_slot);
+            self.min_oracle_ts = min_ts;
+            self.max_oracle_ts = max_ts;
+        }
         Ok(())
     }
 
@@ -128,10 +133,17 @@ impl Oracle {
         self.primary.clear();
         self.min_oracle_ts = i64::MAX;
         self.max_oracle_ts = i64::MIN;
+        self.min_oracle_slot = None;
     }
 
     /// Validate oracle time.
     pub(crate) fn validate_time(&self, target: &impl ValidateOracleTime) -> Result<()> {
+        require_gte!(
+            self.max_oracle_ts,
+            self.min_oracle_ts,
+            DataStoreError::InvalidOracleTsTrange
+        );
+        target.validate_min_oracle_slot(self)?;
         target.validate_min_oracle_ts(self)?;
         target.validate_max_oracle_ts(self)?;
         Ok(())

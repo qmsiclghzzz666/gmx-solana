@@ -511,6 +511,10 @@ pub enum DataStoreError {
     OracleTimestampsAreSmallerThanRequired,
     #[msg("Oracle timestamps are larger than requried")]
     OracleTimestampsAreLargerThanRequired,
+    #[msg("Oracle not updated")]
+    OracleNotUpdated,
+    #[msg("Invalid oracle slot")]
+    InvalidOracleSlot,
     // Market.
     #[msg("Computation error")]
     Computation,

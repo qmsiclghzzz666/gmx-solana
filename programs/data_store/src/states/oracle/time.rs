@@ -9,6 +9,15 @@ pub trait ValidateOracleTime {
     /// Oracle must be updated after this time.
     fn oracle_updated_after(&self) -> Result<Option<i64>>;
 
+    /// Oracle must be updated before this time.
+    fn oracle_updated_before(&self) -> Result<Option<i64>>;
+
+    /// Oracle must be updated after this slot.
+    fn oracle_updated_after_slot(&self) -> Result<Option<u64>>;
+}
+
+/// Extension trait for [`ValidateOracleTime`].
+pub trait ValidateOracleTimeExt: ValidateOracleTime {
     /// Validate min oracle ts.
     fn validate_min_oracle_ts(&self, oracle: &Oracle) -> Result<()> {
         let Some(after) = self.oracle_updated_after()? else {
@@ -22,9 +31,6 @@ pub trait ValidateOracleTime {
         Ok(())
     }
 
-    /// Oracle must be updated before this time.
-    fn oracle_updated_before(&self) -> Result<Option<i64>>;
-
     /// Validate max oracle ts.
     fn validate_max_oracle_ts(&self, oracle: &Oracle) -> Result<()> {
         let Some(before) = self.oracle_updated_before()? else {
@@ -37,4 +43,18 @@ pub trait ValidateOracleTime {
         );
         Ok(())
     }
+
+    /// Validate min oracle updated slot.
+    fn validate_min_oracle_slot(&self, oracle: &Oracle) -> Result<()> {
+        let Some(min_slot) = oracle.min_oracle_slot else {
+            return err!(DataStoreError::OracleNotUpdated);
+        };
+        let Some(after) = self.oracle_updated_after_slot()? else {
+            return Ok(());
+        };
+        require_gte!(min_slot, after, DataStoreError::InvalidOracleSlot);
+        Ok(())
+    }
 }
+
+impl<T: ValidateOracleTime> ValidateOracleTimeExt for T {}

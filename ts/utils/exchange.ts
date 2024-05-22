@@ -247,9 +247,15 @@ export const makeExecuteDepositInstruction = async ({
 
 export const invokeExecuteDeposit = makeInvoke(makeExecuteDepositInstruction, ["authority"]);
 
-const postPriceFeeds = async (connection: Connection, signer: Keypair, feeds: PublicKey[], providerMapper: (index: number) => number) => {
+const postPriceFeeds = async (
+    connection: Connection,
+    signer: Keypair,
+    feeds: PublicKey[],
+    providerMapper: (index: number) => number,
+    wait: number = 2000,
+) => {
     // Wait for 2s.
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    await new Promise(resolve => setTimeout(resolve, wait));
     const hermes = new PriceServiceConnection(
         "https://hermes.pyth.network/",
         { priceFeedRequestConfig: { binary: true } }
