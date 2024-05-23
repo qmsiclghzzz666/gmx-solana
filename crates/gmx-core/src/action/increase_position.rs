@@ -318,10 +318,6 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> IncreasePosition<P, DECIMALS> {
             price_impact_value.is_positive(),
         )?;
 
-        // TODO: apply claimable fee amount.
-
-        // TODO: apply claimable ui fee amount.
-
         collateral_delta_amount = collateral_delta_amount
             .checked_sub(&fees.total_cost_amount()?)
             .ok_or(crate::Error::Computation(
@@ -330,19 +326,21 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> IncreasePosition<P, DECIMALS> {
 
         let is_collateral_token_long = self.position.is_collateral_token_long();
 
-        // TODO: apply delta to collateral pool.
-
         self.position
             .market_mut()
             .apply_delta_to_claimable_fee_pool(
                 is_collateral_token_long,
-                &fees.base().fee_receiver_amount().to_opposite_signed()?,
+                &fees.base().fee_receiver_amount().to_signed()?,
             )?;
 
         self.position.market_mut().apply_delta(
             is_collateral_token_long,
             &fees.base().fee_amount_for_pool().to_signed()?,
         )?;
+
+        // TODO: apply claimable ui fee amount.
+
+        // TODO: apply delta to collateral sum.
 
         Ok((collateral_delta_amount, fees))
     }

@@ -311,7 +311,7 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
         let is_pnl_token_long = self.position.is_long();
 
         // TODO: calcualte fees.
-        let fees = self.position.position_fees(
+        let mut fees = self.position.position_fees(
             self.params
                 .prices
                 .collateral_token_price(is_output_token_long),
@@ -333,7 +333,7 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
                 .add_price_impact_if_positive(&price_impact_value)?
                 .pay_for_pnl_if_negative(&base_pnl_usd)?
                 // TODO: pay for funding fees.
-                .pay_for_fees_excluding_funding(&fees)?
+                .pay_for_fees_excluding_funding(&mut fees)?
                 .pay_for_price_impact_if_negative(&price_impact_value)?
                 .pay_for_price_impact_diff(&price_impact_diff)?;
             Ok(())

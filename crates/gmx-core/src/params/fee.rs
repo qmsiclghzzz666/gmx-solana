@@ -196,6 +196,14 @@ impl<T> PositionFees<T> {
             .checked_add(&self.base.fee_receiver_amount)
             .ok_or(crate::Error::Overflow)
     }
+
+    /// Clear fees excluding funding fee.
+    pub fn clear_fees_excluding_funding(&mut self)
+    where
+        T: Zero,
+    {
+        self.base = Fees::default();
+    }
 }
 
 impl<T: Zero> Default for PositionFees<T> {

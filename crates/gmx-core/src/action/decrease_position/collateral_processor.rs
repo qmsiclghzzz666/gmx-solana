@@ -297,11 +297,16 @@ where
     fn pay_for_cost(
         &mut self,
         mut cost: M::Num,
-        receive: impl FnOnce(&mut Self, &M::Num, &M::Num) -> crate::Result<()>,
+        receive: impl FnOnce(&mut Self, &M::Num, &M::Num, &M::Num) -> crate::Result<()>,
     ) -> crate::Result<()> {
         let (_paid_in_output_amount, paid_in_collateral_amount, paid_in_secondary_amount) =
             self.state.do_pay_for_cost(&mut cost)?;
-        (receive)(self, &paid_in_collateral_amount, &paid_in_secondary_amount)?;
+        (receive)(
+            self,
+            &paid_in_collateral_amount,
+            &paid_in_secondary_amount,
+            &cost,
+        )?;
         if !cost.is_zero() {
             return Err(crate::Error::InsufficientFundsToPayForCosts);
         }
@@ -377,7 +382,7 @@ where
         if pnl.is_negative() {
             self.pay_for_cost(
                 pnl.unsigned_abs(),
-                |processor, paid_in_collateral_amount, paid_in_secondary_output_amount| {
+                |processor, paid_in_collateral_amount, paid_in_secondary_output_amount, _| {
                     processor.pay_with_primary_pool(
                         &paid_in_collateral_amount.to_signed()?,
                         &paid_in_secondary_output_amount.to_signed()?,
@@ -424,7 +429,7 @@ where
         if price_impact.is_negative() {
             self.pay_for_cost(
                 price_impact.unsigned_abs(),
-                |processor, paid_in_collateral_amount, paid_in_secondary_output_amount| {
+                |processor, paid_in_collateral_amount, paid_in_secondary_output_amount, _| {
                     processor.pay_with_primary_pool(
                         &paid_in_collateral_amount.to_signed()?,
                         &paid_in_secondary_output_amount.to_signed()?,
@@ -466,7 +471,7 @@ where
 
     pub(super) fn pay_for_fees_excluding_funding(
         &mut self,
-        fees: &PositionFees<M::Num>,
+        fees: &mut PositionFees<M::Num>,
     ) -> crate::Result<&mut Self> {
         use num_traits::CheckedMul;
 
@@ -479,11 +484,29 @@ where
                 .ok_or(crate::Error::Computation("calculating total fee cost"))?;
             self.pay_for_cost(
                 cost,
-                |processor, paid_in_collateral_amount, paid_in_secondary_output_amount| {
-                    processor.pay_with_primary_pool(
-                        &paid_in_collateral_amount.to_signed()?,
-                        &paid_in_secondary_output_amount.to_signed()?,
-                    )
+                |processor,
+                 paid_in_collateral_amount,
+                 paid_in_secondary_output_amount,
+                 remaining_cost| {
+                    if remaining_cost.is_zero() && paid_in_secondary_output_amount.is_zero() {
+                        let is_collateral_token_long = processor.state.is_output_token_long;
+                        processor.market.apply_delta(
+                            is_collateral_token_long,
+                            &fees.base().fee_amount_for_pool().to_signed()?,
+                        )?;
+                        processor.market.apply_delta_to_claimable_fee_pool(
+                            is_collateral_token_long,
+                            &fees.base().fee_receiver_amount().to_signed()?,
+                        )?;
+                        // TODO: apply ui fee.
+                    } else {
+                        processor.pay_with_primary_pool(
+                            &paid_in_collateral_amount.to_signed()?,
+                            &paid_in_secondary_output_amount.to_signed()?,
+                        )?;
+                        fees.clear_fees_excluding_funding();
+                    }
+                    Ok(())
                 },
             )?;
         }
