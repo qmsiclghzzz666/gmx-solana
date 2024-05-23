@@ -1,4 +1,4 @@
-use num_traits::Zero;
+use num_traits::{CheckedAdd, Zero};
 
 use crate::{fixed::FixedPointOps, utils};
 
@@ -41,6 +41,14 @@ impl<T: Zero> Default for Fees<T> {
 }
 
 impl<T> Fees<T> {
+    /// Create a new [`Fees`].
+    pub fn new(pool: T, receiver: T) -> Self {
+        Self {
+            fee_amount_for_pool: pool,
+            fee_receiver_amount: receiver,
+        }
+    }
+
     /// Get fee receiver amount.
     pub fn fee_receiver_amount(&self) -> &T {
         &self.fee_receiver_amount
@@ -62,6 +70,25 @@ impl<T> FeeParams<T> {
         }
     }
 
+    /// Get basic fee.
+    #[inline]
+    pub fn fee<const DECIMALS: u8>(&self, is_positive_impact: bool, amount: &T) -> Option<T>
+    where
+        T: FixedPointOps<DECIMALS>,
+    {
+        let factor = self.factor(is_positive_impact);
+        utils::apply_factor(amount, factor)
+    }
+
+    /// Get receiver fee.
+    #[inline]
+    pub fn receiver_fee<const DECIMALS: u8>(&self, fee_amount: &T) -> Option<T>
+    where
+        T: FixedPointOps<DECIMALS>,
+    {
+        utils::apply_factor(fee_amount, &self.fee_receiver_factor)
+    }
+
     /// Apply fees to `amount`.
     /// - `DECIMALS` is the decimals of the parameters.
     ///
@@ -74,22 +101,75 @@ impl<T> FeeParams<T> {
     where
         T: FixedPointOps<DECIMALS>,
     {
-        let factor = self.factor(is_positive_impact);
-        let fee_amount = utils::apply_factor(amount, factor)?;
-        let fee_receiver_amount = utils::apply_factor(&fee_amount, &self.fee_receiver_factor)?;
+        let fee_amount = self.fee(is_positive_impact, amount)?;
+        let fee_receiver_amount = self.receiver_fee(&fee_amount)?;
         let fees = Fees {
             fee_amount_for_pool: fee_amount.checked_sub(&fee_receiver_amount)?,
             fee_receiver_amount,
         };
         Some((amount.checked_sub(&fee_amount)?, fees))
     }
+
+    /// Get order fees.
+    fn order_fees<const DECIMALS: u8>(
+        &self,
+        collateral_token_price: &T,
+        size_delta_usd: &T,
+        is_positive_impact: bool,
+    ) -> crate::Result<OrderFees<T>>
+    where
+        T: FixedPointOps<DECIMALS>,
+    {
+        if collateral_token_price.is_zero() {
+            return Err(crate::Error::InvalidPrices);
+        }
+
+        // TODO: use min price.
+        let fee_amount = self
+            .fee(is_positive_impact, size_delta_usd)
+            .ok_or(crate::Error::Computation("calculating order fee usd"))?
+            / collateral_token_price.clone();
+
+        // TODO: apply rebase.
+
+        let receiver_fee_amount = self
+            .receiver_fee(&fee_amount)
+            .ok_or(crate::Error::Computation("calculating order receiver fee"))?;
+        Ok(OrderFees {
+            base: Fees::new(
+                fee_amount
+                    .checked_sub(&receiver_fee_amount)
+                    .ok_or(crate::Error::Computation("calculating order fee for pool"))?,
+                receiver_fee_amount,
+            ),
+        })
+    }
+
+    /// Get position fees.
+    pub fn position_fees<const DECIMALS: u8>(
+        &self,
+        collateral_token_price: &T,
+        size_delta_usd: &T,
+        is_positive_impact: bool,
+    ) -> crate::Result<PositionFees<T>>
+    where
+        T: FixedPointOps<DECIMALS>,
+    {
+        let OrderFees { base } =
+            self.order_fees(collateral_token_price, size_delta_usd, is_positive_impact)?;
+        Ok(PositionFees { base })
+    }
+}
+
+/// Order Fees.
+pub struct OrderFees<T> {
+    base: Fees<T>,
 }
 
 /// Position Fees.
 #[derive(Debug, Clone, Copy)]
 pub struct PositionFees<T> {
     base: Fees<T>,
-    total_cost_amount: T,
 }
 
 impl<T> PositionFees<T> {
@@ -99,8 +179,22 @@ impl<T> PositionFees<T> {
     }
 
     /// Get total cost amount in collateral tokens.
-    pub fn total_cost_amount(&self) -> &T {
-        &self.total_cost_amount
+    pub fn total_cost_amount(&self) -> crate::Result<T>
+    where
+        T: CheckedAdd,
+    {
+        self.total_cost_excluding_funding()
+    }
+
+    /// Get total cost excluding funding fee.
+    pub fn total_cost_excluding_funding(&self) -> crate::Result<T>
+    where
+        T: CheckedAdd,
+    {
+        self.base
+            .fee_amount_for_pool
+            .checked_add(&self.base.fee_receiver_amount)
+            .ok_or(crate::Error::Overflow)
     }
 }
 
@@ -108,7 +202,6 @@ impl<T: Zero> Default for PositionFees<T> {
     fn default() -> Self {
         Self {
             base: Default::default(),
-            total_cost_amount: Zero::zero(),
         }
     }
 }

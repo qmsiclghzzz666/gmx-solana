@@ -295,15 +295,55 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> IncreasePosition<P, DECIMALS> {
         })
     }
 
+    #[inline]
+    fn collateral_price(&self) -> &P::Num {
+        if self.position.is_collateral_token_long() {
+            &self.params.prices.long_token_price
+        } else {
+            &self.params.prices.short_token_price
+        }
+    }
+
     fn process_collateral(
-        &self,
-        _price_impact_value: &P::Signed,
+        &mut self,
+        price_impact_value: &P::Signed,
     ) -> crate::Result<(P::Num, PositionFees<P::Num>)> {
-        let collateral_delta_amount = self.params.collateral_increment_amount.clone();
-        // TODO: get position fees params and use to get position fees.
-        let fees = PositionFees::default();
-        // TODO: apply the fees.
+        use num_traits::CheckedSub;
+
+        let mut collateral_delta_amount = self.params.collateral_increment_amount.clone();
+
+        let fees = self.position.position_fees(
+            self.collateral_price(),
+            &self.params.size_delta_usd,
+            price_impact_value.is_positive(),
+        )?;
+
+        // TODO: apply claimable fee amount.
+
+        // TODO: apply claimable ui fee amount.
+
+        collateral_delta_amount = collateral_delta_amount
+            .checked_sub(&fees.total_cost_amount()?)
+            .ok_or(crate::Error::Computation(
+                "applying fees to collateral amount",
+            ))?;
+
+        let is_collateral_token_long = self.position.is_collateral_token_long();
+
         // TODO: apply delta to collateral pool.
+
+        self.position
+            .market_mut()
+            .apply_delta_to_claimable_fee_pool(
+                is_collateral_token_long,
+                &fees.base().fee_receiver_amount().to_opposite_signed()?,
+            )?;
+
+        self.position.market_mut().apply_delta(
+            is_collateral_token_long,
+            &fees.base().fee_amount_for_pool().to_signed()?,
+        )?;
+
         Ok((collateral_delta_amount, fees))
     }
 }

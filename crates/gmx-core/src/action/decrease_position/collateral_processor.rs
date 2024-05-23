@@ -1,6 +1,7 @@
 use crate::{
     action::Prices,
     num::{MulDiv, Num, Unsigned, UnsignedAbs},
+    params::fee::PositionFees,
     Market, MarketExt,
 };
 
@@ -327,6 +328,22 @@ where
             // TODO: apply to the debt.
             // self.debt.add_claimable_collateral_debt(price_impact_diff)?;
         }
+        Ok(self)
+    }
+
+    pub(super) fn apply_fees(&mut self, fees: &PositionFees<M::Num>) -> crate::Result<&mut Self> {
+        use num_traits::CheckedMul;
+
+        let cost_amount = fees.total_cost_excluding_funding()?;
+        if !cost_amount.is_zero() {
+            // TODO: use min price.
+            let min_price = self.state.output_token_price();
+            let cost = cost_amount
+                .checked_mul(min_price)
+                .ok_or(crate::Error::Computation("calculating total fee cost"))?;
+            self.debt.add_pool_debt(&cost)?;
+        }
+        // TODO: apply funding fees.
         Ok(self)
     }
 

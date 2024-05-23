@@ -361,7 +361,7 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
         let fees = PositionFees::<Self::Num>::default();
 
         let collateral_cost_value = fees
-            .total_cost_amount()
+            .total_cost_amount()?
             .checked_mul(self.collateral_price(prices))
             .ok_or(crate::Error::Computation(
                 "overflow calculating collateral cost value",
@@ -560,6 +560,21 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
         let impact_diff =
             self.cap_negative_position_price_impact(size_delta_usd, &mut impact, false)?;
         Ok((impact, impact_diff))
+    }
+
+    /// Get position fees.
+    fn position_fees(
+        &self,
+        collateral_token_price: &Self::Num,
+        size_delta_usd: &Self::Num,
+        is_positive_impact: bool,
+    ) -> crate::Result<PositionFees<Self::Num>> {
+        // TODO: apply funding and borrowing fees.
+        self.market().order_fee_params().position_fees(
+            collateral_token_price,
+            size_delta_usd,
+            is_positive_impact,
+        )
     }
 }
 

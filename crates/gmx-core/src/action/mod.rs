@@ -24,6 +24,17 @@ pub struct Prices<T> {
     pub short_token_price: T,
 }
 
+impl<T> Prices<T> {
+    /// Get collateral token price.
+    pub fn collateral_token_price(&self, is_long: bool) -> &T {
+        if is_long {
+            &self.long_token_price
+        } else {
+            &self.short_token_price
+        }
+    }
+}
+
 impl<T> Prices<T>
 where
     T: num_traits::Zero,

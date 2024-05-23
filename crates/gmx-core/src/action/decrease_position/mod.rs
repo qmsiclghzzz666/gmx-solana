@@ -296,6 +296,8 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
 
     #[allow(clippy::type_complexity)]
     fn process_collateral(&mut self) -> crate::Result<ProcessCollateralResult<P::Num>> {
+        use num_traits::Signed;
+
         // TODO: handle insolvent close.
 
         let (price_impact_value, price_impact_diff, execution_price) =
@@ -306,13 +308,19 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
             .position
             .pnl_value(&self.params.prices, &self.size_delta_usd)?;
 
-        // TODO: calcualte fees.
-        let fees = PositionFees::default();
-
         let is_output_token_long = self.position.is_collateral_token_long();
         let is_pnl_token_long = self.position.is_long();
 
-        let remaining_collateral_amount = self.position.collateral_amount_mut().clone();
+        // TODO: calcualte fees.
+        let fees = self.position.position_fees(
+            self.params
+                .prices
+                .collateral_token_price(is_output_token_long),
+            &self.size_delta_usd,
+            price_impact_value.is_positive(),
+        )?;
+
+        let remaining_collateral_amount = self.position.collateral_amount().clone();
         let mut processor = CollateralProcessor::new(
             self.position.market_mut(),
             remaining_collateral_amount,
@@ -325,8 +333,7 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
         processor
             .apply_pnl(&base_pnl_usd)?
             .apply_price_impact(&price_impact_value)?
-            // TODO: pay for funding fees.
-            // TODO: pay for other fees.
+            .apply_fees(&fees)?
             .apply_price_impact_diff(&price_impact_diff)?;
         let mut report = processor.process()?;
 
