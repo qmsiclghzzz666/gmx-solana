@@ -15,7 +15,6 @@ use self::{
 use super::Prices;
 
 mod collateral_processor;
-mod debt;
 mod report;
 mod utils;
 
@@ -296,6 +295,8 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
 
     #[allow(clippy::type_complexity)]
     fn process_collateral(&mut self) -> crate::Result<ProcessCollateralResult<P::Num>> {
+        use num_traits::Signed;
+
         // TODO: handle insolvent close.
 
         let (price_impact_value, price_impact_diff, execution_price) =
@@ -306,14 +307,20 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
             .position
             .pnl_value(&self.params.prices, &self.size_delta_usd)?;
 
-        // TODO: calcualte fees.
-        let fees = PositionFees::default();
-
         let is_output_token_long = self.position.is_collateral_token_long();
         let is_pnl_token_long = self.position.is_long();
 
-        let remaining_collateral_amount = self.position.collateral_amount_mut().clone();
-        let mut processor = CollateralProcessor::new(
+        // TODO: calcualte fees.
+        let mut fees = self.position.position_fees(
+            self.params
+                .prices
+                .collateral_token_price(is_output_token_long),
+            &self.size_delta_usd,
+            price_impact_value.is_positive(),
+        )?;
+
+        let remaining_collateral_amount = self.position.collateral_amount().clone();
+        let processor = CollateralProcessor::new(
             self.position.market_mut(),
             remaining_collateral_amount,
             is_output_token_long,
@@ -321,14 +328,16 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
             &self.params.prices,
             self.is_insolvent_close_allowed,
         );
-
-        processor
-            .apply_pnl(&base_pnl_usd)?
-            .apply_price_impact(&price_impact_value)?
-            // TODO: pay for funding fees.
-            // TODO: pay for other fees.
-            .apply_price_impact_diff(&price_impact_diff)?;
-        let mut report = processor.process()?;
+        let mut report = processor.process(|mut ctx| {
+            ctx.add_pnl_if_positive(&base_pnl_usd)?
+                .add_price_impact_if_positive(&price_impact_value)?
+                .pay_for_pnl_if_negative(&base_pnl_usd)?
+                // TODO: pay for funding fees.
+                .pay_for_fees_excluding_funding(&mut fees)?
+                .pay_for_price_impact_if_negative(&price_impact_value)?
+                .pay_for_price_impact_diff(&price_impact_diff)?;
+            Ok(())
+        })?;
 
         // TODO: handle initial collateral delta amount with price impact diff.
 

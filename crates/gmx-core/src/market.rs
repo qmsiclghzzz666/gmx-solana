@@ -4,6 +4,7 @@ use crate::{
     num::{MulDiv, Num, UnsignedAbs},
     params::{position::PositionParams, FeeParams, PriceImpactParams},
     pool::{balance::Merged, Balance, BalanceExt, Pool, PoolKind},
+    PoolExt,
 };
 use num_traits::{CheckedAdd, CheckedSub, One, Signed, Zero};
 
@@ -51,6 +52,9 @@ pub trait Market<const DECIMALS: u8> {
 
     /// Get the position impact params.
     fn position_impact_params(&self) -> PriceImpactParams<Self::Num>;
+
+    /// Get the order fee params.
+    fn order_fee_params(&self) -> FeeParams<Self::Num>;
 }
 
 impl<'a, const DECIMALS: u8, M: Market<DECIMALS>> Market<DECIMALS> for &'a mut M {
@@ -98,6 +102,10 @@ impl<'a, const DECIMALS: u8, M: Market<DECIMALS>> Market<DECIMALS> for &'a mut M
 
     fn position_impact_params(&self) -> PriceImpactParams<Self::Num> {
         (**self).position_impact_params()
+    }
+
+    fn order_fee_params(&self) -> FeeParams<Self::Num> {
+        (**self).order_fee_params()
     }
 }
 
@@ -368,6 +376,17 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
                 .ok_or(crate::Error::MissingPoolKind(PoolKind::Primary))?
                 .apply_delta_to_short_amount(delta)?;
         }
+        Ok(())
+    }
+
+    /// Apply delta to claimable fee pool.
+    fn apply_delta_to_claimable_fee_pool(
+        &mut self,
+        is_long_token: bool,
+        delta: &Self::Signed,
+    ) -> crate::Result<()> {
+        self.claimable_fee_pool_mut()?
+            .apply_delta_amount(is_long_token, delta)?;
         Ok(())
     }
 

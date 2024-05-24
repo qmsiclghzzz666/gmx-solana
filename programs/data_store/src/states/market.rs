@@ -425,6 +425,14 @@ impl<'a, 'info> gmx_core::Market<{ constants::MARKET_DECIMALS }> for AsMarket<'a
             .build()
             .unwrap()
     }
+
+    fn order_fee_params(&self) -> gmx_core::params::FeeParams<Self::Num> {
+        FeeParams::builder()
+            .with_fee_receiver_factor(37_000_000_000_000_000_000)
+            .with_positive_impact_fee_factor(50_000_000_000_000_000)
+            .with_negative_impact_fee_factor(70_000_000_000_000_000)
+            .build()
+    }
 }
 
 #[event]
