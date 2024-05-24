@@ -112,6 +112,11 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
         // TODO: distribute position impact pool.
 
         // TODO: update funding state.
+        let borrowing = self
+            .position
+            .market_mut()
+            .update_borrowing(&self.params.prices)?
+            .execute()?;
 
         self.check_liquiation()?;
 
@@ -184,6 +189,7 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
             execution,
             self.withdrawable_collateral_amount,
             self.size_delta_usd,
+            borrowing,
         ))
     }
 

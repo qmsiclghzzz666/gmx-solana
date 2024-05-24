@@ -186,20 +186,6 @@ impl<'info> ExecuteOrder<'info> {
         let prices = self.prices()?;
         let mut should_remove = false;
         let kind = &self.order.fixed.params.kind;
-        if matches!(
-            kind,
-            OrderKind::MarketIncrease | OrderKind::MarketDecrease | OrderKind::Liquidation
-        ) {
-            // Update borrowing state.
-            let report = self
-                .market
-                .as_market(&mut self.market_token_mint)
-                .update_borrowing_state(&prices)
-                .map_err(GmxCoreError::from)?
-                .execute()
-                .map_err(GmxCoreError::from)?;
-            msg!("{:?}", report);
-        }
         match kind {
             OrderKind::MarketSwap => {
                 unimplemented!();

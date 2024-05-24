@@ -8,7 +8,7 @@ use crate::{
     MarketExt,
 };
 
-use super::Prices;
+use super::{update_borrowing_state::UpdateBorrowingReport, Prices};
 
 /// Increase the position.
 #[must_use]
@@ -32,6 +32,7 @@ pub struct IncreasePositionReport<T: Unsigned> {
     execution: ExecutionParams<T>,
     collateral_delta_amount: T,
     fees: PositionFees<T>,
+    borrowing: UpdateBorrowingReport<T>,
 }
 
 impl<T: Unsigned + fmt::Debug> fmt::Debug for IncreasePositionReport<T>
@@ -44,6 +45,7 @@ where
             .field("execution", &self.execution)
             .field("collateral_delta_amount", &self.collateral_delta_amount)
             .field("fees", &self.fees)
+            .field("borrowing", &self.borrowing)
             .finish()
     }
 }
@@ -54,12 +56,14 @@ impl<T: Unsigned> IncreasePositionReport<T> {
         execution: ExecutionParams<T>,
         collateral_delta_amount: T,
         fees: PositionFees<T>,
+        borrowing: UpdateBorrowingReport<T>,
     ) -> Self {
         Self {
             params,
             execution,
             collateral_delta_amount,
             fees,
+            borrowing,
         }
     }
 
@@ -130,7 +134,12 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> IncreasePosition<P, DECIMALS> {
 
     /// Execute.
     pub fn execute(mut self) -> crate::Result<IncreasePositionReport<P::Num>> {
-        // TODO: update funding and borrowing state
+        // TODO: update funding state
+        let borrowing = self
+            .position
+            .market_mut()
+            .update_borrowing(&self.params.prices)?
+            .execute()?;
 
         let execution = self.get_execution_params()?;
 
@@ -211,6 +220,7 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> IncreasePosition<P, DECIMALS> {
             execution,
             collateral_delta_amount,
             fees,
+            borrowing,
         ))
     }
 

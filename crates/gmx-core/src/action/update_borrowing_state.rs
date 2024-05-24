@@ -96,15 +96,13 @@ mod tests {
             long_token_price: 123,
             short_token_price: 1,
         };
-        market.update_borrowing_state(&prices)?.execute()?;
-        position
+        let report = position
             .ops(&mut market)
             .increase(prices, 1_000_000_000_000, 50_000_000_000_000, None)?
             .execute()?;
+        println!("{report:#?}");
         println!("{market:#?}");
         sleep(Duration::from_secs(2));
-        let report = market.update_borrowing_state(&prices)?.execute()?;
-        println!("{report:#?}");
         let report = position
             .ops(&mut market)
             .decrease(prices, 50_000_000_000_000, None, 0, false, false)?

@@ -356,7 +356,7 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
     }
 
     /// Create a [`UpdateBorrowingState`] action.
-    fn update_borrowing_state(
+    fn update_borrowing(
         &mut self,
         prices: &Prices<Self::Num>,
     ) -> crate::Result<UpdateBorrowingState<&mut Self, DECIMALS>>
