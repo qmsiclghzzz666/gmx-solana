@@ -203,7 +203,9 @@ impl<'info> ExecuteOrder<'info> {
                 );
                 let collateral_token = position.load()?.collateral_token;
 
-                // CHECK: no modification before, and `reload` has been called later.
+                // Exit must be called to update the external state.
+                self.market.exit(&crate::ID)?;
+                // CHECK: `exit` has been called above, and `reload` will be called later.
                 let (collateral_increment_amount, _) = unchecked_swap_with_params(
                     &self.oracle,
                     swap,

@@ -125,3 +125,27 @@ where
 {
     factor.checked_mul_div_with_signed_numberator(value, &FixedPointOps::UNIT)
 }
+
+/// Convert the `value` to a factor after dividing by the `divisor`.
+///
+/// ## Notes
+/// - Return `zero` if the `divisor` is zero.
+#[inline]
+pub fn div_to_factor<T, const DECIMALS: u8>(
+    value: &T,
+    divisor: &T,
+    round_up_magnitude: bool,
+) -> Option<T>
+where
+    T: FixedPointOps<DECIMALS>,
+{
+    if divisor.is_zero() {
+        return Some(T::zero());
+    }
+
+    if round_up_magnitude {
+        value.checked_mul_div_ceil(&T::UNIT, divisor)
+    } else {
+        value.checked_mul_div(&T::UNIT, divisor)
+    }
+}

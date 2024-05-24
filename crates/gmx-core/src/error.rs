@@ -70,6 +70,9 @@ pub enum Error {
     /// Not liquidatable.
     #[error("not liquidatable")]
     NotLiquidatable,
+    /// Unable to get borrowing factor for empty pool value.
+    #[error("unable to get borrowing factor for empty pool value")]
+    UnableToGetBorrowingFactorEmptyPoolValue,
 }
 
 impl Error {

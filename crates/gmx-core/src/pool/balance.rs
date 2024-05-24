@@ -74,6 +74,16 @@ pub trait BalanceExt: Balance {
     fn merge<B: Balance>(&self, other: B) -> Merged<&Self, B> {
         Merged(self, other)
     }
+
+    /// Get amount by side.
+    #[inline]
+    fn amount(&self, is_long: bool) -> crate::Result<Self::Num> {
+        if is_long {
+            self.long_amount()
+        } else {
+            self.short_amount()
+        }
+    }
 }
 
 impl<P: Balance + ?Sized> BalanceExt for P {}

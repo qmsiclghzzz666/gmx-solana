@@ -8,10 +8,10 @@ use crate::{
 };
 
 /// Number of pools.
-pub const NUM_POOLS: u8 = 8;
+pub const NUM_POOLS: u8 = 9;
 
 /// Number of clocks.
-pub const NUM_CLOCKS: u8 = 1;
+pub const NUM_CLOCKS: u8 = 2;
 
 /// Initialize the account for [`Market`].
 pub fn initialize_market(
@@ -30,7 +30,7 @@ pub fn initialize_market(
         short_token_mint,
         NUM_POOLS,
         NUM_CLOCKS,
-    );
+    )?;
     emit!(MarketChangeEvent {
         address: market.key(),
         action: Action::Init,

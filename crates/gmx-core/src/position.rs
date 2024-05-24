@@ -51,6 +51,12 @@ pub trait Position<const DECIMALS: u8> {
     /// Returns whether the position is a long position.
     fn is_long(&self) -> bool;
 
+    /// Get a reference to last borrowing factor applied by the position.
+    fn borrowing_factor(&self) -> &Self::Num;
+
+    /// Get a mutable reference to last borrowing factor applied by the position.
+    fn borrowing_factor_mut(&mut self) -> &mut Self::Num;
+
     /// Increased callback.
     fn increased(&mut self) -> crate::Result<()>;
 
@@ -103,6 +109,14 @@ impl<'a, const DECIMALS: u8, P: Position<DECIMALS>> Position<DECIMALS> for &'a m
 
     fn is_long(&self) -> bool {
         (**self).is_long()
+    }
+
+    fn borrowing_factor(&self) -> &Self::Num {
+        (**self).borrowing_factor()
+    }
+
+    fn borrowing_factor_mut(&mut self) -> &mut Self::Num {
+        (**self).borrowing_factor_mut()
     }
 
     fn increased(&mut self) -> crate::Result<()> {
@@ -562,6 +576,19 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
         Ok((impact, impact_diff))
     }
 
+    /// Get borrowing fee value.
+    fn borrowing_fee_value(&self) -> crate::Result<Self::Num> {
+        use crate::utils;
+        use num_traits::CheckedSub;
+
+        let latest_factor = self.market().borrowing_factor(self.is_long())?;
+        let diff_factor = latest_factor
+            .checked_sub(self.borrowing_factor())
+            .ok_or(crate::Error::Computation("invalid latest borrowing factor"))?;
+        utils::apply_factor(self.size_in_usd(), &diff_factor)
+            .ok_or(crate::Error::Computation("calculating borrowing fee value"))
+    }
+
     /// Get position fees.
     fn position_fees(
         &self,
@@ -569,12 +596,13 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
         size_delta_usd: &Self::Num,
         is_positive_impact: bool,
     ) -> crate::Result<PositionFees<Self::Num>> {
-        // TODO: apply funding and borrowing fees.
-        self.market().order_fee_params().position_fees(
-            collateral_token_price,
-            size_delta_usd,
-            is_positive_impact,
-        )
+        debug_assert!(!collateral_token_price.is_zero(), "must be non-zero");
+        // TODO: apply funding fees.
+        let borrowing_fee_value = self.borrowing_fee_value()?;
+        self.market()
+            .order_fee_params()
+            .base_position_fees(collateral_token_price, size_delta_usd, is_positive_impact)?
+            .apply_borrowing_fee(collateral_token_price, borrowing_fee_value)
     }
 }
 

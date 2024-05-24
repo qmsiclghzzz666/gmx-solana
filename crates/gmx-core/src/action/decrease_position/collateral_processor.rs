@@ -492,11 +492,11 @@ where
                         let is_collateral_token_long = processor.state.is_output_token_long;
                         processor.market.apply_delta(
                             is_collateral_token_long,
-                            &fees.base().fee_amount_for_pool().to_signed()?,
+                            &fees.for_pool()?.to_signed()?,
                         )?;
                         processor.market.apply_delta_to_claimable_fee_pool(
                             is_collateral_token_long,
-                            &fees.base().fee_receiver_amount().to_signed()?,
+                            &fees.for_receiver().to_signed()?,
                         )?;
                         // TODO: apply ui fee.
                     } else {
