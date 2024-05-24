@@ -9,11 +9,17 @@ pub struct DistributePositionImpact<M: Market<DECIMALS>, const DECIMALS: u8> {
 /// Distribute Position Impact Report.
 #[derive(Debug)]
 pub struct DistributePositionImpactReport<T> {
+    duration_in_seconds: u64,
     distribution_amount: T,
     next_position_impact_pool_amount: T,
 }
 
 impl<T> DistributePositionImpactReport<T> {
+    /// Get considered duration in seconds.
+    pub fn duration_in_seconds(&self) -> u64 {
+        self.duration_in_seconds
+    }
+
     /// Get distribution amount.
     pub fn distribution_amount(&self) -> &T {
         &self.distribution_amount
@@ -40,6 +46,7 @@ impl<M: Market<DECIMALS>, const DECIMALS: u8> DistributePositionImpact<M, DECIMA
             .apply_delta_to_position_impact_pool(&distribution_amount.to_opposite_signed()?)?;
 
         Ok(DistributePositionImpactReport {
+            duration_in_seconds,
             distribution_amount,
             next_position_impact_pool_amount,
         })

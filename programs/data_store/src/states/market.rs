@@ -367,15 +367,19 @@ impl<'a, 'info> gmx_core::Market<{ constants::MARKET_DECIMALS }> for AsMarket<'a
             .get_mut(&(clock as u8))
             .ok_or(gmx_core::Error::MissingClockKind(clock))?;
         let duration = match clock {
-            Some(last) => current.saturating_sub(*last),
-            None => 0,
+            Some(last) => {
+                let duration = current.saturating_sub(*last);
+                if duration > 0 {
+                    *clock = Some(current);
+                }
+                duration
+            }
+            None => {
+                *clock = Some(current);
+                0
+            }
         };
-        if duration > 0 {
-            *clock = Some(current);
-            Ok(duration as u64)
-        } else {
-            Ok(0)
-        }
+        Ok(duration as u64)
     }
 
     fn usd_to_amount_divisor(&self) -> Self::Num {
