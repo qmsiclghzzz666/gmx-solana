@@ -5,4 +5,6 @@
 pub enum ClockKind {
     /// Price Impact Distribution.
     PriceImpactDistribution,
+    /// Borrowing.
+    Borrowing,
 }

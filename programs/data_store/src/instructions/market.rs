@@ -11,7 +11,7 @@ use crate::{
 pub const NUM_POOLS: u8 = 8;
 
 /// Number of clocks.
-pub const NUM_CLOCKS: u8 = 1;
+pub const NUM_CLOCKS: u8 = 2;
 
 /// Initialize the account for [`Market`].
 pub fn initialize_market(
