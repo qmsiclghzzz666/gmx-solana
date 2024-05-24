@@ -186,6 +186,20 @@ impl<'info> ExecuteOrder<'info> {
         let prices = self.prices()?;
         let mut should_remove = false;
         let kind = &self.order.fixed.params.kind;
+        if matches!(
+            kind,
+            OrderKind::MarketIncrease | OrderKind::MarketDecrease | OrderKind::Liquidation
+        ) {
+            // Update borrowing state.
+            let report = self
+                .market
+                .as_market(&mut self.market_token_mint)
+                .update_borrowing_state(&prices)
+                .map_err(GmxCoreError::from)?
+                .execute()
+                .map_err(GmxCoreError::from)?;
+            msg!("{:?}", report);
+        }
         match kind {
             OrderKind::MarketSwap => {
                 unimplemented!();
@@ -203,7 +217,9 @@ impl<'info> ExecuteOrder<'info> {
                 );
                 let collateral_token = position.load()?.collateral_token;
 
-                // CHECK: no modification before, and `reload` has been called later.
+                // Exit must be called to update the external state.
+                self.market.exit(&crate::ID)?;
+                // CHECK: `exit` has been called above, and `reload` will be called later.
                 let (collateral_increment_amount, _) = unchecked_swap_with_params(
                     &self.oracle,
                     swap,

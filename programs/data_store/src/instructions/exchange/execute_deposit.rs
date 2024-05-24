@@ -117,7 +117,9 @@ impl<'info> ExecuteDeposit<'info> {
         meta: &MarketMeta,
         remaining_accounts: &'info [AccountInfo<'info>],
     ) -> Result<(u64, u64)> {
-        // CHECK: no modification has been made here, and `reload` has been called after.
+        // Exit must be called to update the external state.
+        self.market.exit(&crate::ID)?;
+        // CHECK: `exit` has been called above, and `reload` will be called after.
         let res = unchecked_swap_with_params(
             &self.oracle,
             &self.deposit.dynamic.swap_params,

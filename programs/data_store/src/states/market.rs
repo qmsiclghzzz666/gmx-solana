@@ -26,7 +26,7 @@ pub struct Market {
     pub(crate) bump: u8,
     pub(crate) meta: MarketMeta,
     pools: Pools,
-    clocks: DynamicMapStore<u8, Option<i64>>,
+    clocks: DynamicMapStore<u8, i64>,
 }
 
 impl Market {
@@ -102,7 +102,7 @@ impl Market {
         short_token_mint: Pubkey,
         num_pools: u8,
         num_clocks: u8,
-    ) {
+    ) -> Result<()> {
         self.bump = bump;
         self.meta.market_token_mint = market_token_mint;
         self.meta.index_token_mint = index_token_mint;
@@ -112,7 +112,9 @@ impl Market {
         self.pools.init_with(num_pools, |kind| {
             Pool::default().with_is_pure(is_pure && !(NOT_PURE_POOLS.contains(&kind)))
         });
-        self.clocks.init_with(num_clocks, |_| None);
+        let current = Clock::get()?.unix_timestamp;
+        self.clocks.init_with(num_clocks, |_| current);
+        Ok(())
     }
 
     /// Get pool of the given kind.
@@ -268,7 +270,7 @@ impl gmx_core::Pool for Pool {
 }
 
 type PoolsMap<'a> = DualVecMap<&'a mut Vec<u8>, &'a mut Vec<Pool>>;
-type ClocksMap<'a> = DualVecMap<&'a mut Vec<u8>, &'a mut Vec<Option<i64>>>;
+type ClocksMap<'a> = DualVecMap<&'a mut Vec<u8>, &'a mut Vec<i64>>;
 
 /// Convert to a [`Market`](gmx_core::Market).
 pub struct AsMarket<'a, 'info> {
@@ -372,23 +374,14 @@ impl<'a, 'info> gmx_core::Market<{ constants::MARKET_DECIMALS }> for AsMarket<'a
 
     fn just_passed_in_seconds(&mut self, clock: ClockKind) -> gmx_core::Result<u64> {
         let current = Clock::get().map_err(Error::from)?.unix_timestamp;
-        let clock = self
+        let last = self
             .clocks
             .get_mut(&(clock as u8))
             .ok_or(gmx_core::Error::MissingClockKind(clock))?;
-        let duration = match clock {
-            Some(last) => {
-                let duration = current.saturating_sub(*last);
-                if duration > 0 {
-                    *clock = Some(current);
-                }
-                duration
-            }
-            None => {
-                *clock = Some(current);
-                0
-            }
-        };
+        let duration = current.saturating_sub(*last);
+        if duration > 0 {
+            *last = current;
+        }
         Ok(duration as u64)
     }
 

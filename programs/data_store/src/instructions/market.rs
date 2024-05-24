@@ -30,7 +30,7 @@ pub fn initialize_market(
         short_token_mint,
         NUM_POOLS,
         NUM_CLOCKS,
-    );
+    )?;
     emit!(MarketChangeEvent {
         address: market.key(),
         action: Action::Init,

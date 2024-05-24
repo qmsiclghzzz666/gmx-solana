@@ -359,12 +359,11 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
     fn update_borrowing_state(
         &mut self,
         prices: &Prices<Self::Num>,
-        is_long: bool,
     ) -> crate::Result<UpdateBorrowingState<&mut Self, DECIMALS>>
     where
         Self: Sized,
     {
-        UpdateBorrowingState::try_new(self, prices, is_long)
+        UpdateBorrowingState::try_new(self, prices)
     }
 
     /// Get the swap impact amount with cap.
@@ -522,7 +521,7 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
     ) -> crate::Result<(Self::Num, Self::Num)> {
         use num_traits::{CheckedMul, FromPrimitive};
 
-        let borrowing_factor_per_second = dbg!(self.borrowing_factor_per_second(is_long, prices)?);
+        let borrowing_factor_per_second = self.borrowing_factor_per_second(is_long, prices)?;
         let current_factor = if is_long {
             self.borrowing_factor_pool()?.long_amount()?
         } else {
