@@ -13,6 +13,9 @@ pub mod increase_position;
 /// Decrease Position.
 pub mod decrease_position;
 
+/// Distribute position impact.
+pub mod distribute_position_impact;
+
 /// Prices of a market.
 #[derive(Debug, Clone, Copy)]
 pub struct Prices<T> {

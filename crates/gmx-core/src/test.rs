@@ -1,10 +1,13 @@
-use std::fmt;
+use std::{collections::HashMap, fmt, time::Instant};
 
 use crate::{
+    clock::ClockKind,
     fixed::FixedPointOps,
     market::Market,
     num::{MulDiv, Num, UnsignedAbs},
-    params::{FeeParams, PositionParams, PriceImpactParams},
+    params::{
+        position::PositionImpactDistributionParams, FeeParams, PositionParams, PriceImpactParams,
+    },
     pool::{Balance, Pool, PoolKind},
     position::Position,
 };
@@ -79,12 +82,14 @@ pub struct TestMarket<T, const DECIMALS: u8> {
     position_params: PositionParams<T>,
     position_impact_params: PriceImpactParams<T>,
     order_fee_params: FeeParams<T>,
+    position_impact_distribution_params: PositionImpactDistributionParams<T>,
     primary: TestPool<T>,
     swap_impact: TestPool<T>,
     fee: TestPool<T>,
     open_interest: (TestPool<T>, TestPool<T>),
     open_interest_in_tokens: (TestPool<T>, TestPool<T>),
     position_impact: TestPool<T>,
+    clocks: HashMap<ClockKind, Instant>,
 }
 
 impl Default for TestMarket<u64, 9> {
@@ -122,12 +127,17 @@ impl Default for TestMarket<u64, 9> {
                 .with_positive_impact_fee_factor(500_000)
                 .with_negative_impact_fee_factor(700_000)
                 .build(),
+            position_impact_distribution_params: PositionImpactDistributionParams::builder()
+                .distribute_factor(1_000_000_000)
+                .min_position_impact_pool_amount(1_000_000_000)
+                .build(),
             primary: Default::default(),
             swap_impact: Default::default(),
             fee: Default::default(),
             open_interest: Default::default(),
             open_interest_in_tokens: Default::default(),
             position_impact: Default::default(),
+            clocks: Default::default(),
         }
     }
 }
@@ -168,12 +178,17 @@ impl Default for TestMarket<u128, 20> {
                 .with_positive_impact_fee_factor(50_000_000_000_000_000)
                 .with_negative_impact_fee_factor(70_000_000_000_000_000)
                 .build(),
+            position_impact_distribution_params: PositionImpactDistributionParams::builder()
+                .distribute_factor(100_000_000_000_000_000_000)
+                .min_position_impact_pool_amount(1_000_000_000)
+                .build(),
             primary: Default::default(),
             swap_impact: Default::default(),
             fee: Default::default(),
             open_interest: Default::default(),
             open_interest_in_tokens: Default::default(),
             position_impact: Default::default(),
+            clocks: Default::default(),
         }
     }
 }
@@ -237,6 +252,14 @@ where
         Ok(())
     }
 
+    fn just_passed_in_seconds(&mut self, clock: ClockKind) -> crate::Result<u64> {
+        let now = Instant::now();
+        let clock = self.clocks.entry(clock).or_insert(now);
+        let duration = now.saturating_duration_since(*clock);
+        *clock = now;
+        Ok(duration.as_secs())
+    }
+
     fn usd_to_amount_divisor(&self) -> Self::Num {
         self.value_to_amount_divisor.clone()
     }
@@ -259,6 +282,10 @@ where
 
     fn order_fee_params(&self) -> FeeParams<Self::Num> {
         self.order_fee_params.clone()
+    }
+
+    fn position_impact_distribution_params(&self) -> PositionImpactDistributionParams<Self::Num> {
+        self.position_impact_distribution_params.clone()
     }
 }
 

@@ -2,16 +2,19 @@ use anchor_lang::{prelude::*, Bump};
 use anchor_spl::token::Mint;
 use dual_vec_map::DualVecMap;
 use gmx_core::{
-    params::{FeeParams, PositionParams, PriceImpactParams},
-    PoolKind,
+    params::{
+        position::PositionImpactDistributionParams, FeeParams, PositionParams, PriceImpactParams,
+    },
+    ClockKind, PoolKind,
 };
 use gmx_solana_utils::to_seed;
 
 use crate::{constants, utils::internal::TransferUtils, DataStoreError};
 
 use super::{
+    common::map::{pools::Pools, DynamicMapStore},
     position::{Position, PositionOps},
-    Data, DataStore, Seed,
+    Data, DataStore, InitSpace, Seed,
 };
 
 /// Market.
@@ -22,11 +25,14 @@ pub struct Market {
     pub(crate) bump: u8,
     pub(crate) meta: MarketMeta,
     pools: Pools,
+    clocks: DynamicMapStore<u8, Option<i64>>,
 }
 
 impl Market {
-    pub(crate) fn init_space(num_pools: u8) -> usize {
-        1 + MarketMeta::INIT_SPACE + Pools::init_space(num_pools)
+    pub(crate) fn init_space(num_pools: u8, num_clocks: u8) -> usize {
+        1 + MarketMeta::INIT_SPACE
+            + DynamicMapStore::<u8, Pool>::init_space(num_pools)
+            + DynamicMapStore::<u8, Option<i64>>::init_space(num_clocks)
     }
 
     /// Get meta.
@@ -75,52 +81,9 @@ impl MarketMeta {
     }
 }
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
-#[cfg_attr(feature = "debug", derive(Debug))]
-pub struct Pools {
-    pools: Vec<Pool>,
-    keys: Vec<u8>,
-}
-
-type PoolsMap<'a> = DualVecMap<&'a mut Vec<u8>, &'a mut Vec<Pool>>;
-
-impl Pools {
-    pub(crate) fn init_space(num_pools: u8) -> usize {
-        let len = num_pools as usize;
-        (4 + Pool::INIT_SPACE * len) + (4 + len)
-    }
-
-    fn init(&mut self, is_pure: bool, num_pools: u8) {
-        let mut map: DualVecMap<Vec<u8>, Vec<Pool>> = DualVecMap::new_vecs();
-        for kind in 0..num_pools {
-            map.insert(kind, Pool::default().with_is_pure(is_pure));
-        }
-        let (keys, pools) = map.into_inner();
-        self.keys = keys;
-        self.pools = pools;
-    }
-
-    fn as_map(&self) -> DualVecMap<&Vec<u8>, &Vec<Pool>> {
-        DualVecMap::from_sorted_stores_unchecked(&self.keys, &self.pools)
-    }
-
-    fn as_map_mut(&mut self) -> DualVecMap<&mut Vec<u8>, &mut Vec<Pool>> {
-        DualVecMap::from_sorted_stores_unchecked(&mut self.keys, &mut self.pools)
-    }
-
-    fn pool(&self, kind: PoolKind) -> Option<Pool> {
-        self.as_map().get(&(kind as u8)).cloned()
-    }
-
-    fn with_pool_mut<T>(&mut self, kind: PoolKind, f: impl FnOnce(&mut Pool) -> T) -> Option<T> {
-        let mut map = self.as_map_mut();
-        let pool = map.get_mut(&(kind as u8))?;
-        Some(f(pool))
-    }
-}
-
 impl Market {
     /// Initialize the market.
+    #[allow(clippy::too_many_arguments)]
     pub fn init(
         &mut self,
         bump: u8,
@@ -129,6 +92,7 @@ impl Market {
         long_token_mint: Pubkey,
         short_token_mint: Pubkey,
         num_pools: u8,
+        num_clocks: u8,
     ) {
         self.bump = bump;
         self.meta.market_token_mint = market_token_mint;
@@ -136,13 +100,15 @@ impl Market {
         self.meta.long_token_mint = long_token_mint;
         self.meta.short_token_mint = short_token_mint;
         let is_pure = self.meta.long_token_mint == self.meta.short_token_mint;
-        self.pools.init(is_pure, num_pools);
+        self.pools
+            .init_with(num_pools, |_| Pool::default().with_is_pure(is_pure));
+        self.clocks.init_with(num_clocks, |_| None);
     }
 
     /// Get pool of the given kind.
     #[inline]
     pub fn pool(&self, kind: PoolKind) -> Option<Pool> {
-        self.pools.pool(kind)
+        self.pools.get_with(kind, |pool| pool.cloned())
     }
 
     /// Get mutable reference to the pool of the given kind.
@@ -152,7 +118,7 @@ impl Market {
         kind: PoolKind,
         f: impl FnOnce(&mut Pool) -> T,
     ) -> Option<T> {
-        self.pools.with_pool_mut(kind, f)
+        self.pools.get_mut_with(kind, |pool| pool.map(f))
     }
 
     /// Get the expected key.
@@ -183,6 +149,7 @@ impl Market {
         AsMarket {
             meta: &self.meta,
             pools: self.pools.as_map_mut(),
+            clocks: self.clocks.as_map_mut(),
             mint,
             transfer: None,
             receiver: None,
@@ -222,6 +189,10 @@ pub struct Pool {
     long_token_amount: u128,
     /// Short token amount.
     short_token_amount: u128,
+}
+
+impl InitSpace for Pool {
+    const INIT_SPACE: usize = <Self as Space>::INIT_SPACE;
 }
 
 impl Pool {
@@ -286,10 +257,14 @@ impl gmx_core::Pool for Pool {
     }
 }
 
+type PoolsMap<'a> = DualVecMap<&'a mut Vec<u8>, &'a mut Vec<Pool>>;
+type ClocksMap<'a> = DualVecMap<&'a mut Vec<u8>, &'a mut Vec<Option<i64>>>;
+
 /// Convert to a [`Market`](gmx_core::Market).
 pub struct AsMarket<'a, 'info> {
     meta: &'a MarketMeta,
     pools: PoolsMap<'a>,
+    clocks: ClocksMap<'a>,
     mint: &'a mut Account<'info, Mint>,
     transfer: Option<TransferUtils<'a, 'info>>,
     receiver: Option<AccountInfo<'info>>,
@@ -385,6 +360,28 @@ impl<'a, 'info> gmx_core::Market<{ constants::MARKET_DECIMALS }> for AsMarket<'a
         Ok(())
     }
 
+    fn just_passed_in_seconds(&mut self, clock: ClockKind) -> gmx_core::Result<u64> {
+        let current = Clock::get().map_err(Error::from)?.unix_timestamp;
+        let clock = self
+            .clocks
+            .get_mut(&(clock as u8))
+            .ok_or(gmx_core::Error::MissingClockKind(clock))?;
+        let duration = match clock {
+            Some(last) => {
+                let duration = current.saturating_sub(*last);
+                if duration > 0 {
+                    *clock = Some(current);
+                }
+                duration
+            }
+            None => {
+                *clock = Some(current);
+                0
+            }
+        };
+        Ok(duration as u64)
+    }
+
     fn usd_to_amount_divisor(&self) -> Self::Num {
         constants::MARKET_USD_TO_AMOUNT_DIVISOR
     }
@@ -426,11 +423,18 @@ impl<'a, 'info> gmx_core::Market<{ constants::MARKET_DECIMALS }> for AsMarket<'a
             .unwrap()
     }
 
-    fn order_fee_params(&self) -> gmx_core::params::FeeParams<Self::Num> {
+    fn order_fee_params(&self) -> FeeParams<Self::Num> {
         FeeParams::builder()
             .with_fee_receiver_factor(37_000_000_000_000_000_000)
             .with_positive_impact_fee_factor(50_000_000_000_000_000)
             .with_negative_impact_fee_factor(70_000_000_000_000_000)
+            .build()
+    }
+
+    fn position_impact_distribution_params(&self) -> PositionImpactDistributionParams<Self::Num> {
+        PositionImpactDistributionParams::builder()
+            .distribute_factor(constants::MARKET_USD_UNIT)
+            .min_position_impact_pool_amount(1_000_000_000)
             .build()
     }
 }

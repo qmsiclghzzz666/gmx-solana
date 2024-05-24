@@ -1,4 +1,4 @@
-use crate::{position::LiquidatableReason, PoolKind};
+use crate::{position::LiquidatableReason, ClockKind, PoolKind};
 
 /// Error type.
 #[derive(Debug, thiserror::Error)]
@@ -46,9 +46,12 @@ pub enum Error {
     /// Build params error.
     #[error("build params: {0}")]
     BuildParams(String),
-    /// Missing pool kind.
+    /// Missing pool of kind.
     #[error("missing pool of kind: {0}")]
     MissingPoolKind(PoolKind),
+    /// Missing clock of kind.
+    #[error("missing clock of kind: {0:?}")]
+    MissingClockKind(ClockKind),
     /// Mint receiver not set.
     #[error("mint receiver not set")]
     MintReceiverNotSet,

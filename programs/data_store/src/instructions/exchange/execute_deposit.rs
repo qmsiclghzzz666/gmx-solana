@@ -50,7 +50,9 @@ pub fn execute_deposit<'info>(
     ctx: Context<'_, '_, 'info, 'info, ExecuteDeposit<'info>>,
 ) -> Result<()> {
     ctx.accounts.validate()?;
-    ctx.accounts.execute(ctx.remaining_accounts)
+    ctx.accounts.pre_execute()?;
+    ctx.accounts.execute(ctx.remaining_accounts)?;
+    Ok(())
 }
 
 impl<'info> internal::Authentication<'info> for ExecuteDeposit<'info> {
@@ -87,6 +89,18 @@ impl<'info> ValidateOracleTime for ExecuteDeposit<'info> {
 impl<'info> ExecuteDeposit<'info> {
     fn validate(&self) -> Result<()> {
         self.oracle.validate_time(self)?;
+        Ok(())
+    }
+
+    fn pre_execute(&mut self) -> Result<()> {
+        let report = self
+            .market
+            .as_market(&mut self.market_token_mint)
+            .distribute_position_impact()
+            .map_err(GmxCoreError::from)?
+            .execute()
+            .map_err(GmxCoreError::from)?;
+        msg!("{:?}", report);
         Ok(())
     }
 

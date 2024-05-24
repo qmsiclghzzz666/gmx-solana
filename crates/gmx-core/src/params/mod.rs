@@ -1,7 +1,7 @@
 /// Price Impact Parameters.
 pub mod price_impact;
 
-/// Basic position parameters.
+/// Position parameters.
 pub mod position;
 
 /// Fee Parameters.

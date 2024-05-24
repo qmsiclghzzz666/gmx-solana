@@ -101,6 +101,10 @@ impl InitSpace for u8 {
     const INIT_SPACE: usize = 1;
 }
 
+impl InitSpace for i64 {
+    const INIT_SPACE: usize = 8;
+}
+
 impl InitSpace for Factor {
     const INIT_SPACE: usize = 16;
 }
@@ -114,4 +118,11 @@ where
     T: InitSpace,
 {
     const INIT_SPACE: usize = T::INIT_SPACE * LEN;
+}
+
+impl<T> InitSpace for Option<T>
+where
+    T: InitSpace,
+{
+    const INIT_SPACE: usize = 1 + T::INIT_SPACE;
 }

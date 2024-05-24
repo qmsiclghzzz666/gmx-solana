@@ -88,6 +88,7 @@ pub fn execute_order<'info>(
     ctx.accounts.validate_time()?;
     // TODO: validate non-empty order.
     // TODO: validate order trigger price.
+    ctx.accounts.pre_execute()?;
     let should_remove = ctx.accounts.execute(ctx.remaining_accounts)?;
     // TODO: validate market state.
     // TODO: emit order executed event.
@@ -167,6 +168,18 @@ impl<'info> ExecuteOrder<'info> {
                 .max
                 .to_unit_price(),
         })
+    }
+
+    fn pre_execute(&mut self) -> Result<()> {
+        let report = self
+            .market
+            .as_market(&mut self.market_token_mint)
+            .distribute_position_impact()
+            .map_err(GmxCoreError::from)?
+            .execute()
+            .map_err(GmxCoreError::from)?;
+        msg!("{:?}", report);
+        Ok(())
     }
 
     fn execute(&mut self, remaining_accounts: &'info [AccountInfo<'info>]) -> Result<bool> {

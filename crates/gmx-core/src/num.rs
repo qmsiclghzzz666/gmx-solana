@@ -1,13 +1,23 @@
-use num_traits::{CheckedAdd, CheckedMul, CheckedNeg, CheckedSub, One, Signed, Zero};
+use num_traits::{
+    CheckedAdd, CheckedMul, CheckedNeg, CheckedSub, FromPrimitive, One, Signed, Zero,
+};
 
 /// Num trait used in GMX.
 pub trait Num:
-    num_traits::Num + CheckedAdd + CheckedMul + CheckedSub + CheckedNeg + Clone + Ord
+    num_traits::Num + CheckedAdd + CheckedMul + CheckedSub + CheckedNeg + Clone + Ord + FromPrimitive
 {
 }
 
-impl<T: num_traits::Num + CheckedAdd + CheckedMul + CheckedSub + CheckedNeg + Clone + Ord> Num
-    for T
+impl<
+        T: num_traits::Num
+            + CheckedAdd
+            + CheckedMul
+            + CheckedSub
+            + CheckedNeg
+            + Clone
+            + Ord
+            + FromPrimitive,
+    > Num for T
 {
 }
 
