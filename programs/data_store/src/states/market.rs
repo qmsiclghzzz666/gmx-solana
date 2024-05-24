@@ -33,7 +33,7 @@ impl Market {
     pub(crate) fn init_space(num_pools: u8, num_clocks: u8) -> usize {
         1 + MarketMeta::INIT_SPACE
             + DynamicMapStore::<u8, Pool>::init_space(num_pools)
-            + DynamicMapStore::<u8, Option<i64>>::init_space(num_clocks)
+            + DynamicMapStore::<u8, i64>::init_space(num_clocks)
     }
 
     /// Get meta.
