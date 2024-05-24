@@ -1,12 +1,13 @@
 use crate::{
     action::{
         deposit::Deposit, distribute_position_impact::DistributePositionImpact, swap::Swap,
-        withdraw::Withdrawal,
+        update_borrowing_state::UpdateBorrowingState, withdraw::Withdrawal, Prices,
     },
     clock::ClockKind,
     fixed::FixedPointOps,
     num::{MulDiv, Num, UnsignedAbs},
     params::{
+        fee::BorrowingFeeParams,
         position::{PositionImpactDistributionParams, PositionParams},
         FeeParams, PriceImpactParams,
     },
@@ -68,6 +69,9 @@ pub trait Market<const DECIMALS: u8> {
 
     /// Get position impact distribution params.
     fn position_impact_distribution_params(&self) -> PositionImpactDistributionParams<Self::Num>;
+
+    /// Get borrowing fee params.
+    fn borrowing_fee_params(&self) -> BorrowingFeeParams<Self::Num>;
 }
 
 impl<'a, const DECIMALS: u8, M: Market<DECIMALS>> Market<DECIMALS> for &'a mut M {
@@ -127,6 +131,10 @@ impl<'a, const DECIMALS: u8, M: Market<DECIMALS>> Market<DECIMALS> for &'a mut M
 
     fn position_impact_distribution_params(&self) -> PositionImpactDistributionParams<Self::Num> {
         (**self).position_impact_distribution_params()
+    }
+
+    fn borrowing_fee_params(&self) -> BorrowingFeeParams<Self::Num> {
+        (**self).borrowing_fee_params()
     }
 }
 
@@ -238,6 +246,20 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
         self.position_impact_pool()?.long_amount()
     }
 
+    /// Get borrowing factor pool.
+    #[inline]
+    fn borrowing_factor_pool(&self) -> crate::Result<&Self::Pool> {
+        self.pool(PoolKind::BorrowingFactor)?
+            .ok_or(crate::Error::MissingPoolKind(PoolKind::BorrowingFactor))
+    }
+
+    /// Get the mutable reference to borrowing factor pool.
+    #[inline]
+    fn borrowing_factor_pool_mut(&mut self) -> crate::Result<&mut Self::Pool> {
+        self.pool_mut(PoolKind::BorrowingFactor)?
+            .ok_or(crate::Error::MissingPoolKind(PoolKind::BorrowingFactor))
+    }
+
     /// Get the usd value of primary pool.
     fn pool_value(
         &self,
@@ -256,6 +278,13 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
         Ok(self
             .open_interest_pool(true)?
             .merge(self.open_interest_pool(false)?))
+    }
+
+    /// Get total open interest in tokens as a [`Balance`].
+    fn open_interest_in_tokens(&self) -> crate::Result<Merged<&Self::Pool, &Self::Pool>> {
+        Ok(self
+            .open_interest_in_tokens_pool(true)?
+            .merge(self.open_interest_in_tokens_pool(false)?))
     }
 
     /// Create a [`Deposit`] action.
@@ -316,7 +345,7 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
         )
     }
 
-    /// Create a [`DistrubtePositionImpact`] action.
+    /// Create a [`DistributePositionImpact`] action.
     fn distribute_position_impact(
         &mut self,
     ) -> crate::Result<DistributePositionImpact<&mut Self, DECIMALS>>
@@ -324,6 +353,18 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
         Self: Sized,
     {
         Ok(DistributePositionImpact::from(self))
+    }
+
+    /// Create a [`UpdateBorrowingState`] action.
+    fn update_borrowing_state(
+        &mut self,
+        prices: &Prices<Self::Num>,
+        is_long: bool,
+    ) -> crate::Result<UpdateBorrowingState<&mut Self, DECIMALS>>
+    where
+        Self: Sized,
+    {
+        UpdateBorrowingState::try_new(self, prices, is_long)
     }
 
     /// Get the swap impact amount with cap.
@@ -409,6 +450,101 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
         Ok((distribution_amount, next_amount))
     }
 
+    /// Get reseved value.
+    fn reserved(&self, is_long: bool, index_token_price: &Self::Num) -> crate::Result<Self::Num> {
+        use num_traits::CheckedMul;
+
+        if is_long {
+            let amount = self.open_interest_in_tokens()?.amount(is_long)?;
+            // TODO: use max price.
+            amount
+                .checked_mul(index_token_price)
+                .ok_or(crate::Error::Computation("calculating reserved value"))
+        } else {
+            self.open_interest()?.amount(is_long)
+        }
+    }
+
+    /// Get borrowing factor per second.
+    fn borrowing_factor_per_second(
+        &self,
+        is_long: bool,
+        prices: &Prices<Self::Num>,
+    ) -> crate::Result<Self::Num> {
+        use crate::utils;
+
+        let reserved_value = self.reserved(is_long, &prices.index_token_price)?;
+
+        if reserved_value.is_zero() {
+            return Ok(Zero::zero());
+        }
+
+        let params = self.borrowing_fee_params();
+
+        if params.skip_borrowing_fee_for_smaller_side() {
+            let open_interest = self.open_interest()?;
+            let long_interest = open_interest.long_amount()?;
+            let short_interest = open_interest.short_amount()?;
+            if (is_long && long_interest < short_interest)
+                || (!is_long && short_interest < long_interest)
+            {
+                return Ok(Zero::zero());
+            }
+        }
+
+        let pool_value = self.pool_value(&prices.long_token_price, &prices.short_token_price)?;
+
+        if pool_value.is_zero() {
+            return Err(crate::Error::UnableToGetBorrowingFactorEmptyPoolValue);
+        }
+
+        // TODO: apply optimal usage factor.
+
+        let reserved_value_after_exponent =
+            utils::apply_exponent_factor(reserved_value, params.exponent(is_long).clone()).ok_or(
+                crate::Error::Computation("calculating reserved value after exponent"),
+            )?;
+        let reversed_value_to_pool_factor =
+            utils::div_to_factor(&reserved_value_after_exponent, &pool_value, false).ok_or(
+                crate::Error::Computation("calculating reserved value to pool factor"),
+            )?;
+        utils::apply_factor(&reversed_value_to_pool_factor, params.factor(is_long)).ok_or(
+            crate::Error::Computation("calculating borrowing factort per second"),
+        )
+    }
+
+    /// Get next cumulative borrowing factor of the given side.
+    fn next_cumulative_borrowing_factor(
+        &self,
+        is_long: bool,
+        prices: &Prices<Self::Num>,
+        duration_in_second: u64,
+    ) -> crate::Result<(Self::Num, Self::Num)> {
+        use num_traits::{CheckedMul, FromPrimitive};
+
+        let borrowing_factor_per_second = dbg!(self.borrowing_factor_per_second(is_long, prices)?);
+        let current_factor = if is_long {
+            self.borrowing_factor_pool()?.long_amount()?
+        } else {
+            self.borrowing_factor_pool()?.short_amount()?
+        };
+
+        let duration_value =
+            Self::Num::from_u64(duration_in_second).ok_or(crate::Error::Convert)?;
+        let delta = borrowing_factor_per_second
+            .checked_mul(&duration_value)
+            .ok_or(crate::Error::Computation(
+                "calculating borrowing factor delta",
+            ))?;
+        let next_cumulative_borrowing_factor =
+            current_factor
+                .checked_add(&delta)
+                .ok_or(crate::Error::Computation(
+                    "calculating next borrowing factor",
+                ))?;
+        Ok((next_cumulative_borrowing_factor, delta))
+    }
+
     /// Apply a swap impact value to the price impact pool.
     ///
     /// - If it is a positive impact amount, cap the impact amount to the amount available in the price impact pool,
@@ -462,6 +598,16 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
     fn apply_delta_to_position_impact_pool(&mut self, delta: &Self::Signed) -> crate::Result<()> {
         self.position_impact_pool_mut()?
             .apply_delta_to_long_amount(delta)
+    }
+
+    /// Apply delta to borrowing factor.
+    fn apply_delta_to_borrowing_factor(
+        &mut self,
+        is_long: bool,
+        delta: &Self::Signed,
+    ) -> crate::Result<()> {
+        self.borrowing_factor_pool_mut()?
+            .apply_delta_amount(is_long, delta)
     }
 }
 

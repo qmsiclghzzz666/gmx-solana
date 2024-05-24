@@ -22,11 +22,8 @@ pub trait Pool: Balance {
 /// Extension trait for [`Pool`] with utils.
 pub trait PoolExt: Pool {
     /// Apply delta.
-    fn apply_delta_amount(
-        &mut self,
-        is_long: bool,
-        delta: &Self::Signed,
-    ) -> Result<(), crate::Error> {
+    #[inline]
+    fn apply_delta_amount(&mut self, is_long: bool, delta: &Self::Signed) -> crate::Result<()> {
         if is_long {
             self.apply_delta_to_long_amount(delta)
         } else {
@@ -70,6 +67,8 @@ pub enum PoolKind {
     OpenInterestInTokensForShortCollateral,
     /// Position impact.
     PositionImpact,
+    /// Borrowing Factor.
+    BorrowingFactor,
 }
 
 impl fmt::Display for PoolKind {
@@ -85,6 +84,7 @@ impl fmt::Display for PoolKind {
                 "OpenInterestInTokensForShortCollateral"
             }
             Self::PositionImpact => "PositionImpact",
+            Self::BorrowingFactor => "BorrowingFactor",
         };
         write!(f, "{name}")
     }

@@ -3,7 +3,8 @@ use anchor_spl::token::Mint;
 use dual_vec_map::DualVecMap;
 use gmx_core::{
     params::{
-        position::PositionImpactDistributionParams, FeeParams, PositionParams, PriceImpactParams,
+        fee::BorrowingFeeParams, position::PositionImpactDistributionParams, FeeParams,
+        PositionParams, PriceImpactParams,
     },
     ClockKind, PoolKind,
 };
@@ -81,6 +82,14 @@ impl MarketMeta {
     }
 }
 
+const NOT_PURE_POOLS: [u8; 5] = [
+    PoolKind::OpenInterestForLongCollateral as u8,
+    PoolKind::OpenInterestForShortCollateral as u8,
+    PoolKind::OpenInterestInTokensForLongCollateral as u8,
+    PoolKind::OpenInterestInTokensForShortCollateral as u8,
+    PoolKind::BorrowingFactor as u8,
+];
+
 impl Market {
     /// Initialize the market.
     #[allow(clippy::too_many_arguments)]
@@ -100,8 +109,9 @@ impl Market {
         self.meta.long_token_mint = long_token_mint;
         self.meta.short_token_mint = short_token_mint;
         let is_pure = self.meta.long_token_mint == self.meta.short_token_mint;
-        self.pools
-            .init_with(num_pools, |_| Pool::default().with_is_pure(is_pure));
+        self.pools.init_with(num_pools, |kind| {
+            Pool::default().with_is_pure(is_pure && !(NOT_PURE_POOLS.contains(&kind)))
+        });
         self.clocks.init_with(num_clocks, |_| None);
     }
 
@@ -435,6 +445,15 @@ impl<'a, 'info> gmx_core::Market<{ constants::MARKET_DECIMALS }> for AsMarket<'a
         PositionImpactDistributionParams::builder()
             .distribute_factor(constants::MARKET_USD_UNIT)
             .min_position_impact_pool_amount(1_000_000_000)
+            .build()
+    }
+
+    fn borrowing_fee_params(&self) -> BorrowingFeeParams<Self::Num> {
+        BorrowingFeeParams::builder()
+            .factor_for_long(2_820_000_000_000)
+            .factor_for_short(2_820_000_000_000)
+            .exponent_for_long(100_000_000_000_000_000_000)
+            .exponent_for_short(100_000_000_000_000_000_000)
             .build()
     }
 }

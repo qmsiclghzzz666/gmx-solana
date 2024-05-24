@@ -8,7 +8,7 @@ use crate::{
 };
 
 /// Number of pools.
-pub const NUM_POOLS: u8 = 8;
+pub const NUM_POOLS: u8 = 9;
 
 /// Number of clocks.
 pub const NUM_CLOCKS: u8 = 2;

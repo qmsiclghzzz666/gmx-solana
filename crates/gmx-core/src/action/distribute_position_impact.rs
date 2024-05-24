@@ -113,7 +113,7 @@ mod tests {
                 .execute()?;
         }
         println!("{market:#?}");
-        sleep(Duration::from_secs(5));
+        sleep(Duration::from_secs(1));
         let report = market.distribute_position_impact()?.execute()?;
         println!("{report:#?}");
         println!("{market:#?}");

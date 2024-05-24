@@ -1,4 +1,5 @@
 use num_traits::{CheckedAdd, Zero};
+use typed_builder::TypedBuilder;
 
 use crate::{fixed::FixedPointOps, utils};
 
@@ -21,6 +22,42 @@ impl<T> FeeParams<T> {
             negative_impact_factor: Zero::zero(),
             fee_receiver_factor: Zero::zero(),
         }
+    }
+}
+
+/// Borrowing Fee Parameters.
+#[derive(Debug, Clone, Copy, TypedBuilder)]
+pub struct BorrowingFeeParams<T> {
+    exponent_for_long: T,
+    exponent_for_short: T,
+    factor_for_long: T,
+    factor_for_short: T,
+    #[builder(default = true)]
+    skip_borrowing_fee_for_smaller_side: bool,
+}
+
+impl<T> BorrowingFeeParams<T> {
+    /// Get borrowing exponent factor.
+    pub fn exponent(&self, is_long: bool) -> &T {
+        if is_long {
+            &self.exponent_for_long
+        } else {
+            &self.exponent_for_short
+        }
+    }
+
+    /// Get borrowing factor.
+    pub fn factor(&self, is_long: bool) -> &T {
+        if is_long {
+            &self.factor_for_long
+        } else {
+            &self.factor_for_short
+        }
+    }
+
+    /// Get whether to skip borrowing fee for smaller side.
+    pub fn skip_borrowing_fee_for_smaller_side(&self) -> bool {
+        self.skip_borrowing_fee_for_smaller_side
     }
 }
 

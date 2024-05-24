@@ -16,6 +16,9 @@ pub mod decrease_position;
 /// Distribute position impact.
 pub mod distribute_position_impact;
 
+/// Update borrowing state.
+pub mod update_borrowing_state;
+
 /// Prices of a market.
 #[derive(Debug, Clone, Copy)]
 pub struct Prices<T> {
@@ -47,5 +50,14 @@ where
         !self.index_token_price.is_zero()
             && !self.long_token_price.is_zero()
             && !self.short_token_price.is_zero()
+    }
+
+    /// Validate the prices.
+    pub fn validate(&self) -> crate::Result<()> {
+        if self.is_valid() {
+            Ok(())
+        } else {
+            Err(crate::Error::invalid_argument("invalid prices"))
+        }
     }
 }

@@ -6,7 +6,8 @@ use crate::{
     market::Market,
     num::{MulDiv, Num, UnsignedAbs},
     params::{
-        position::PositionImpactDistributionParams, FeeParams, PositionParams, PriceImpactParams,
+        fee::BorrowingFeeParams, position::PositionImpactDistributionParams, FeeParams,
+        PositionParams, PriceImpactParams,
     },
     pool::{Balance, Pool, PoolKind},
     position::Position,
@@ -83,12 +84,14 @@ pub struct TestMarket<T, const DECIMALS: u8> {
     position_impact_params: PriceImpactParams<T>,
     order_fee_params: FeeParams<T>,
     position_impact_distribution_params: PositionImpactDistributionParams<T>,
+    borrowing_fee_params: BorrowingFeeParams<T>,
     primary: TestPool<T>,
     swap_impact: TestPool<T>,
     fee: TestPool<T>,
     open_interest: (TestPool<T>, TestPool<T>),
     open_interest_in_tokens: (TestPool<T>, TestPool<T>),
     position_impact: TestPool<T>,
+    borrowing_factor: TestPool<T>,
     clocks: HashMap<ClockKind, Instant>,
 }
 
@@ -131,12 +134,19 @@ impl Default for TestMarket<u64, 9> {
                 .distribute_factor(1_000_000_000)
                 .min_position_impact_pool_amount(1_000_000_000)
                 .build(),
+            borrowing_fee_params: BorrowingFeeParams::builder()
+                .factor_for_long(28)
+                .factor_for_short(28)
+                .exponent_for_long(1_000_000_000)
+                .exponent_for_short(1_000_000_000)
+                .build(),
             primary: Default::default(),
             swap_impact: Default::default(),
             fee: Default::default(),
             open_interest: Default::default(),
             open_interest_in_tokens: Default::default(),
             position_impact: Default::default(),
+            borrowing_factor: Default::default(),
             clocks: Default::default(),
         }
     }
@@ -182,12 +192,19 @@ impl Default for TestMarket<u128, 20> {
                 .distribute_factor(100_000_000_000_000_000_000)
                 .min_position_impact_pool_amount(1_000_000_000)
                 .build(),
+            borrowing_fee_params: BorrowingFeeParams::builder()
+                .factor_for_long(2_820_000_000_000)
+                .factor_for_short(2_820_000_000_000)
+                .exponent_for_long(100_000_000_000_000_000_000)
+                .exponent_for_short(100_000_000_000_000_000_000)
+                .build(),
             primary: Default::default(),
             swap_impact: Default::default(),
             fee: Default::default(),
             open_interest: Default::default(),
             open_interest_in_tokens: Default::default(),
             position_impact: Default::default(),
+            borrowing_factor: Default::default(),
             clocks: Default::default(),
         }
     }
@@ -214,6 +231,7 @@ where
             PoolKind::OpenInterestInTokensForLongCollateral => &self.open_interest_in_tokens.0,
             PoolKind::OpenInterestInTokensForShortCollateral => &self.open_interest_in_tokens.1,
             PoolKind::PositionImpact => &self.position_impact,
+            PoolKind::BorrowingFactor => &self.borrowing_factor,
         };
         Ok(Some(pool))
     }
@@ -228,6 +246,7 @@ where
             PoolKind::OpenInterestInTokensForLongCollateral => &mut self.open_interest_in_tokens.0,
             PoolKind::OpenInterestInTokensForShortCollateral => &mut self.open_interest_in_tokens.1,
             PoolKind::PositionImpact => &mut self.position_impact,
+            PoolKind::BorrowingFactor => &mut self.borrowing_factor,
         };
         Ok(Some(pool))
     }
@@ -286,6 +305,10 @@ where
 
     fn position_impact_distribution_params(&self) -> PositionImpactDistributionParams<Self::Num> {
         self.position_impact_distribution_params.clone()
+    }
+
+    fn borrowing_fee_params(&self) -> BorrowingFeeParams<Self::Num> {
+        self.borrowing_fee_params.clone()
     }
 }
 
