@@ -26,7 +26,7 @@ impl<M: Market<DECIMALS>, const DECIMALS: u8> UpdateBorrowingState<M, DECIMALS> 
     ) -> crate::Result<M::Num> {
         let (next_cumulative_borrowing_factor, delta) = self
             .market
-            .next_cumulative_borrowing_factor(is_long, &self.prices, duration_in_seconds)?;
+            .calc_next_cumulative_borrowing_factor(is_long, &self.prices, duration_in_seconds)?;
         self.market
             .apply_delta_to_borrowing_factor(is_long, &delta.to_signed()?)?;
         Ok(next_cumulative_borrowing_factor)
@@ -104,6 +104,11 @@ mod tests {
         println!("{market:#?}");
         sleep(Duration::from_secs(2));
         let report = market.update_borrowing_state(&prices)?.execute()?;
+        println!("{report:#?}");
+        let report = position
+            .ops(&mut market)
+            .decrease(prices, 50_000_000_000_000, None, 0, false, false)?
+            .execute()?;
         println!("{report:#?}");
         println!("{market:#?}");
         Ok(())

@@ -251,4 +251,12 @@ impl<'a, 'info> gmx_core::Position<{ constants::MARKET_DECIMALS }> for PositionO
         self.position.decreased()?;
         Ok(())
     }
+
+    fn borrowing_factor(&self) -> &Self::Num {
+        &self.position.borrowing_factor
+    }
+
+    fn borrowing_factor_mut(&mut self) -> &mut Self::Num {
+        &mut self.position.borrowing_factor
+    }
 }

@@ -320,6 +320,7 @@ pub struct TestPosition<T, const DECIMALS: u8> {
     collateral_token_amount: T,
     size_in_usd: T,
     size_in_tokens: T,
+    borrowing_factor: T,
 }
 
 impl<T, const DECIMALS: u8> TestPosition<T, DECIMALS> {
@@ -423,5 +424,13 @@ where
 
     fn decreased(&mut self) -> crate::Result<()> {
         Ok(())
+    }
+
+    fn borrowing_factor(&self) -> &Self::Num {
+        &self.position.borrowing_factor
+    }
+
+    fn borrowing_factor_mut(&mut self) -> &mut Self::Num {
+        &mut self.position.borrowing_factor
     }
 }

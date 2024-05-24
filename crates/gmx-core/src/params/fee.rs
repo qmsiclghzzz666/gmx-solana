@@ -182,8 +182,8 @@ impl<T> FeeParams<T> {
         })
     }
 
-    /// Get position fees.
-    pub fn position_fees<const DECIMALS: u8>(
+    /// Get base position fees.
+    pub fn base_position_fees<const DECIMALS: u8>(
         &self,
         collateral_token_price: &T,
         size_delta_usd: &T,
@@ -194,7 +194,10 @@ impl<T> FeeParams<T> {
     {
         let OrderFees { base } =
             self.order_fees(collateral_token_price, size_delta_usd, is_positive_impact)?;
-        Ok(PositionFees { base })
+        Ok(PositionFees {
+            base,
+            borrowing: Default::default(),
+        })
     }
 }
 
@@ -203,16 +206,56 @@ pub struct OrderFees<T> {
     base: Fees<T>,
 }
 
+/// Borrowing Fee.
+#[derive(Debug, Clone, Copy)]
+pub struct BorrowingFee<T> {
+    amount: T,
+}
+
+impl<T> BorrowingFee<T> {
+    /// Get borrowing fee amount.
+    pub fn amount(&self) -> &T {
+        &self.amount
+    }
+}
+
+impl<T: Zero> Default for BorrowingFee<T> {
+    fn default() -> Self {
+        Self {
+            amount: Zero::zero(),
+        }
+    }
+}
+
 /// Position Fees.
 #[derive(Debug, Clone, Copy)]
 pub struct PositionFees<T> {
     base: Fees<T>,
+    borrowing: BorrowingFee<T>,
 }
 
 impl<T> PositionFees<T> {
-    /// Get base fees.
-    pub fn base(&self) -> &Fees<T> {
-        &self.base
+    /// Get fee for receiver.
+    pub fn for_receiver(&self) -> &T {
+        &self.base.fee_receiver_amount
+    }
+
+    /// Get fee for pool.
+    pub fn for_pool<const DECIMALS: u8>(&self) -> crate::Result<T>
+    where
+        T: FixedPointOps<DECIMALS>,
+    {
+        let amount = self
+            .base
+            .fee_amount_for_pool
+            .checked_add(&self.borrowing.amount)
+            .ok_or(crate::Error::Computation("calculating fee for pool"))?;
+        Ok(amount)
+    }
+
+    /// Get borrowing fee.
+    pub fn borrowing(&self) -> &BorrowingFee<T> {
+        &self.borrowing
     }
 
     /// Get total cost amount in collateral tokens.
@@ -231,6 +274,7 @@ impl<T> PositionFees<T> {
         self.base
             .fee_amount_for_pool
             .checked_add(&self.base.fee_receiver_amount)
+            .and_then(|acc| acc.checked_add(&self.borrowing.amount))
             .ok_or(crate::Error::Overflow)
     }
 
@@ -240,6 +284,22 @@ impl<T> PositionFees<T> {
         T: Zero,
     {
         self.base = Fees::default();
+        self.borrowing = BorrowingFee::default();
+    }
+
+    /// Apply borrowing fee.
+    pub fn apply_borrowing_fee<const DECIMALS: u8>(
+        mut self,
+        price: &T,
+        value: T,
+    ) -> crate::Result<Self>
+    where
+        T: FixedPointOps<DECIMALS>,
+    {
+        debug_assert!(!price.is_zero(), "must be non-zero");
+        let amount = value / price.clone();
+        self.borrowing.amount = amount;
+        Ok(self)
     }
 }
 
@@ -247,6 +307,7 @@ impl<T: Zero> Default for PositionFees<T> {
     fn default() -> Self {
         Self {
             base: Default::default(),
+            borrowing: Default::default(),
         }
     }
 }

@@ -169,6 +169,8 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> IncreasePosition<P, DECIMALS> {
             .size_in_tokens_mut()
             .checked_add(&execution.size_delta_in_tokens)
             .ok_or(crate::Error::Computation("size in tokens overflow"))?;
+        let is_long = self.position.is_long();
+        *self.position.borrowing_factor_mut() = self.position.market().borrowing_factor(is_long)?;
         // TODO: update other position state
 
         self.position.apply_delta_to_open_interest(
@@ -330,13 +332,12 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> IncreasePosition<P, DECIMALS> {
             .market_mut()
             .apply_delta_to_claimable_fee_pool(
                 is_collateral_token_long,
-                &fees.base().fee_receiver_amount().to_signed()?,
+                &fees.for_receiver().to_signed()?,
             )?;
 
-        self.position.market_mut().apply_delta(
-            is_collateral_token_long,
-            &fees.base().fee_amount_for_pool().to_signed()?,
-        )?;
+        self.position
+            .market_mut()
+            .apply_delta(is_collateral_token_long, &fees.for_pool()?.to_signed()?)?;
 
         // TODO: apply claimable ui fee amount.
 

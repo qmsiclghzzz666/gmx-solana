@@ -4,7 +4,7 @@ use crate::{
     num::{MulDiv, Unsigned},
     params::fee::PositionFees,
     position::{CollateralDelta, Position, PositionExt, WillCollateralBeSufficient},
-    Market,
+    Market, MarketExt,
 };
 
 use self::{
@@ -111,7 +111,7 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
 
         // TODO: distribute position impact pool.
 
-        // TODO: update funding and borrowing state.
+        // TODO: update funding state.
 
         self.check_liquiation()?;
 
@@ -127,7 +127,7 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
                 "calculating next position size in usd",
             ))?;
 
-        // TODO: update borrowing state.
+        // TODO: update total borrowing state.
 
         let next_position_size_in_tokens = self
             .position
@@ -140,23 +140,26 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
         // TODO: update claimable funding amount.
 
         let should_remove =
-            if next_position_size_in_usd.is_zero() || next_position_size_in_tokens.is_zero() {
-                *self.position.size_in_usd_mut() = Zero::zero();
-                *self.position.size_in_tokens_mut() = Zero::zero();
-                *self.position.collateral_amount_mut() = Zero::zero();
-                execution.collateral.output_amount = execution
-                    .collateral
-                    .output_amount
-                    .checked_add(&next_position_collateral_amount)
-                    .ok_or(crate::Error::Computation("calculating output amount"))?;
-                true
-            } else {
-                // TODO: update funding and borrowing states of position.
-                *self.position.size_in_usd_mut() = next_position_size_in_usd;
-                *self.position.size_in_tokens_mut() = next_position_size_in_tokens;
-                *self.position.collateral_amount_mut() = next_position_collateral_amount;
-                false
-            };
+            next_position_size_in_usd.is_zero() || next_position_size_in_tokens.is_zero();
+
+        if should_remove {
+            *self.position.size_in_usd_mut() = Zero::zero();
+            *self.position.size_in_tokens_mut() = Zero::zero();
+            *self.position.collateral_amount_mut() = Zero::zero();
+            execution.collateral.output_amount = execution
+                .collateral
+                .output_amount
+                .checked_add(&next_position_collateral_amount)
+                .ok_or(crate::Error::Computation("calculating output amount"))?;
+        } else {
+            // TODO: update funding states of position.
+            let is_long = self.position.is_long();
+            *self.position.size_in_usd_mut() = next_position_size_in_usd;
+            *self.position.size_in_tokens_mut() = next_position_size_in_tokens;
+            *self.position.collateral_amount_mut() = next_position_collateral_amount;
+            *self.position.borrowing_factor_mut() =
+                self.position.market().borrowing_factor(is_long)?;
+        };
 
         // TODO: update global states.
 

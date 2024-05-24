@@ -465,7 +465,7 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
     }
 
     /// Get borrowing factor per second.
-    fn borrowing_factor_per_second(
+    fn calc_borrowing_factor_per_second(
         &self,
         is_long: bool,
         prices: &Prices<Self::Num>,
@@ -513,7 +513,7 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
     }
 
     /// Get next cumulative borrowing factor of the given side.
-    fn next_cumulative_borrowing_factor(
+    fn calc_next_cumulative_borrowing_factor(
         &self,
         is_long: bool,
         prices: &Prices<Self::Num>,
@@ -521,12 +521,8 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
     ) -> crate::Result<(Self::Num, Self::Num)> {
         use num_traits::{CheckedMul, FromPrimitive};
 
-        let borrowing_factor_per_second = self.borrowing_factor_per_second(is_long, prices)?;
-        let current_factor = if is_long {
-            self.borrowing_factor_pool()?.long_amount()?
-        } else {
-            self.borrowing_factor_pool()?.short_amount()?
-        };
+        let borrowing_factor_per_second = self.calc_borrowing_factor_per_second(is_long, prices)?;
+        let current_factor = self.borrowing_factor(is_long)?;
 
         let duration_value =
             Self::Num::from_u64(duration_in_second).ok_or(crate::Error::Convert)?;
@@ -542,6 +538,12 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
                     "calculating next borrowing factor",
                 ))?;
         Ok((next_cumulative_borrowing_factor, delta))
+    }
+
+    /// Get current borrowing factor.
+    #[inline]
+    fn borrowing_factor(&self, is_long: bool) -> crate::Result<Self::Num> {
+        self.borrowing_factor_pool()?.amount(is_long)
     }
 
     /// Apply a swap impact value to the price impact pool.
