@@ -10,6 +10,9 @@ use crate::{
 /// Number of pools.
 pub const NUM_POOLS: u8 = 8;
 
+/// Number of clocks.
+pub const NUM_CLOCKS: u8 = 1;
+
 /// Initialize the account for [`Market`].
 pub fn initialize_market(
     ctx: Context<InitializeMarket>,
@@ -26,6 +29,7 @@ pub fn initialize_market(
         long_token_mint,
         short_token_mint,
         NUM_POOLS,
+        NUM_CLOCKS,
     );
     emit!(MarketChangeEvent {
         address: market.key(),
@@ -45,7 +49,7 @@ pub struct InitializeMarket<'info> {
     #[account(
         init,
         payer = authority,
-        space = 8 + Market::init_space(NUM_POOLS),
+        space = 8 + Market::init_space(NUM_POOLS, NUM_CLOCKS),
         seeds = [
             Market::SEED,
             store.key().as_ref(),

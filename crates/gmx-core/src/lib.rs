@@ -11,6 +11,9 @@ pub mod pool;
 /// Market.
 pub mod market;
 
+/// Clock.
+pub mod clock;
+
 /// Position.
 pub mod position;
 
@@ -36,6 +39,7 @@ pub mod utils;
 #[cfg(any(test, feature = "test"))]
 pub mod test;
 
+pub use clock::ClockKind;
 pub use error::Error;
 pub use market::{Market, MarketExt};
 pub use pool::{Balance, BalanceExt, Pool, PoolExt, PoolKind};

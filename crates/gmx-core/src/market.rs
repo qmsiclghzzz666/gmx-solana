@@ -1,5 +1,6 @@
 use crate::{
     action::{deposit::Deposit, swap::Swap, withdraw::Withdrawal},
+    clock::ClockKind,
     fixed::FixedPointOps,
     num::{MulDiv, Num, UnsignedAbs},
     params::{position::PositionParams, FeeParams, PriceImpactParams},
@@ -35,6 +36,9 @@ pub trait Market<const DECIMALS: u8> {
 
     /// Perform burn.
     fn burn(&mut self, amount: &Self::Num) -> crate::Result<()>;
+
+    /// Get the just passed time in seconds for the given kind of clock.
+    fn just_passed_in_seconds(&mut self, clock: ClockKind) -> crate::Result<u64>;
 
     /// USD value to market token amount divisor.
     ///
@@ -82,6 +86,10 @@ impl<'a, const DECIMALS: u8, M: Market<DECIMALS>> Market<DECIMALS> for &'a mut M
 
     fn burn(&mut self, amount: &Self::Num) -> crate::Result<()> {
         (**self).burn(amount)
+    }
+
+    fn just_passed_in_seconds(&mut self, clock: ClockKind) -> crate::Result<u64> {
+        (**self).just_passed_in_seconds(clock)
     }
 
     fn usd_to_amount_divisor(&self) -> Self::Num {

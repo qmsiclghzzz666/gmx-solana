@@ -1,6 +1,7 @@
-use std::fmt;
+use std::{collections::HashMap, fmt, time::Instant};
 
 use crate::{
+    clock::ClockKind,
     fixed::FixedPointOps,
     market::Market,
     num::{MulDiv, Num, UnsignedAbs},
@@ -85,6 +86,7 @@ pub struct TestMarket<T, const DECIMALS: u8> {
     open_interest: (TestPool<T>, TestPool<T>),
     open_interest_in_tokens: (TestPool<T>, TestPool<T>),
     position_impact: TestPool<T>,
+    clocks: HashMap<ClockKind, Instant>,
 }
 
 impl Default for TestMarket<u64, 9> {
@@ -128,6 +130,7 @@ impl Default for TestMarket<u64, 9> {
             open_interest: Default::default(),
             open_interest_in_tokens: Default::default(),
             position_impact: Default::default(),
+            clocks: Default::default(),
         }
     }
 }
@@ -174,6 +177,7 @@ impl Default for TestMarket<u128, 20> {
             open_interest: Default::default(),
             open_interest_in_tokens: Default::default(),
             position_impact: Default::default(),
+            clocks: Default::default(),
         }
     }
 }
@@ -235,6 +239,14 @@ where
             .checked_sub(amount)
             .ok_or(crate::Error::Underflow)?;
         Ok(())
+    }
+
+    fn just_passed_in_seconds(&mut self, clock: ClockKind) -> crate::Result<u64> {
+        let now = Instant::now();
+        let clock = self.clocks.entry(clock).or_insert(now);
+        let duration = now.saturating_duration_since(*clock);
+        *clock = now;
+        Ok(duration.as_secs())
     }
 
     fn usd_to_amount_divisor(&self) -> Self::Num {

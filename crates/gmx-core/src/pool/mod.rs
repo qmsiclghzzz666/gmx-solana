@@ -39,7 +39,16 @@ impl<P: Pool + ?Sized> PoolExt for P {}
 
 /// Pool kind.
 #[derive(
-    Debug, Clone, Copy, Default, num_enum::TryFromPrimitive, PartialEq, Eq, PartialOrd, Ord,
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    num_enum::TryFromPrimitive,
+    num_enum::IntoPrimitive,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
 )]
 #[repr(u8)]
 #[non_exhaustive]
