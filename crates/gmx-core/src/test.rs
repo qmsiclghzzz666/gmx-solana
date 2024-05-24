@@ -5,7 +5,9 @@ use crate::{
     fixed::FixedPointOps,
     market::Market,
     num::{MulDiv, Num, UnsignedAbs},
-    params::{FeeParams, PositionParams, PriceImpactParams},
+    params::{
+        position::PositionImpactDistributionParams, FeeParams, PositionParams, PriceImpactParams,
+    },
     pool::{Balance, Pool, PoolKind},
     position::Position,
 };
@@ -80,6 +82,7 @@ pub struct TestMarket<T, const DECIMALS: u8> {
     position_params: PositionParams<T>,
     position_impact_params: PriceImpactParams<T>,
     order_fee_params: FeeParams<T>,
+    position_impact_distribution_params: PositionImpactDistributionParams<T>,
     primary: TestPool<T>,
     swap_impact: TestPool<T>,
     fee: TestPool<T>,
@@ -123,6 +126,10 @@ impl Default for TestMarket<u64, 9> {
                 .with_fee_receiver_factor(370_000_000)
                 .with_positive_impact_fee_factor(500_000)
                 .with_negative_impact_fee_factor(700_000)
+                .build(),
+            position_impact_distribution_params: PositionImpactDistributionParams::builder()
+                .distribute_factor(1_000_000_000)
+                .min_position_impact_pool_amount(1_000_000_000)
                 .build(),
             primary: Default::default(),
             swap_impact: Default::default(),
@@ -170,6 +177,10 @@ impl Default for TestMarket<u128, 20> {
                 .with_fee_receiver_factor(37_000_000_000_000_000_000)
                 .with_positive_impact_fee_factor(50_000_000_000_000_000)
                 .with_negative_impact_fee_factor(70_000_000_000_000_000)
+                .build(),
+            position_impact_distribution_params: PositionImpactDistributionParams::builder()
+                .distribute_factor(100_000_000_000_000_000_000)
+                .min_position_impact_pool_amount(1_000_000_000)
                 .build(),
             primary: Default::default(),
             swap_impact: Default::default(),
@@ -271,6 +282,10 @@ where
 
     fn order_fee_params(&self) -> FeeParams<Self::Num> {
         self.order_fee_params.clone()
+    }
+
+    fn position_impact_distribution_params(&self) -> PositionImpactDistributionParams<Self::Num> {
+        self.position_impact_distribution_params.clone()
     }
 }
 

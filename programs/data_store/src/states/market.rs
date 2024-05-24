@@ -2,7 +2,9 @@ use anchor_lang::{prelude::*, Bump};
 use anchor_spl::token::Mint;
 use dual_vec_map::DualVecMap;
 use gmx_core::{
-    params::{FeeParams, PositionParams, PriceImpactParams},
+    params::{
+        position::PositionImpactDistributionParams, FeeParams, PositionParams, PriceImpactParams,
+    },
     ClockKind, PoolKind,
 };
 use gmx_solana_utils::to_seed;
@@ -417,11 +419,18 @@ impl<'a, 'info> gmx_core::Market<{ constants::MARKET_DECIMALS }> for AsMarket<'a
             .unwrap()
     }
 
-    fn order_fee_params(&self) -> gmx_core::params::FeeParams<Self::Num> {
+    fn order_fee_params(&self) -> FeeParams<Self::Num> {
         FeeParams::builder()
             .with_fee_receiver_factor(37_000_000_000_000_000_000)
             .with_positive_impact_fee_factor(50_000_000_000_000_000)
             .with_negative_impact_fee_factor(70_000_000_000_000_000)
+            .build()
+    }
+
+    fn position_impact_distribution_params(&self) -> PositionImpactDistributionParams<Self::Num> {
+        PositionImpactDistributionParams::builder()
+            .distribute_factor(constants::MARKET_USD_UNIT)
+            .min_position_impact_pool_amount(1_000_000_000)
             .build()
     }
 }

@@ -1,9 +1,15 @@
 use crate::{
-    action::{deposit::Deposit, swap::Swap, withdraw::Withdrawal},
+    action::{
+        deposit::Deposit, distribute_position_impact::DistributePositionImpact, swap::Swap,
+        withdraw::Withdrawal,
+    },
     clock::ClockKind,
     fixed::FixedPointOps,
     num::{MulDiv, Num, UnsignedAbs},
-    params::{position::PositionParams, FeeParams, PriceImpactParams},
+    params::{
+        position::{PositionImpactDistributionParams, PositionParams},
+        FeeParams, PriceImpactParams,
+    },
     pool::{balance::Merged, Balance, BalanceExt, Pool, PoolKind},
     PoolExt,
 };
@@ -51,7 +57,7 @@ pub trait Market<const DECIMALS: u8> {
     /// Get the swap fee params.
     fn swap_fee_params(&self) -> FeeParams<Self::Num>;
 
-    /// Get basic position params.
+    /// Get basic market params.
     fn position_params(&self) -> PositionParams<Self::Num>;
 
     /// Get the position impact params.
@@ -59,6 +65,9 @@ pub trait Market<const DECIMALS: u8> {
 
     /// Get the order fee params.
     fn order_fee_params(&self) -> FeeParams<Self::Num>;
+
+    /// Get position impact distribution params.
+    fn position_impact_distribution_params(&self) -> PositionImpactDistributionParams<Self::Num>;
 }
 
 impl<'a, const DECIMALS: u8, M: Market<DECIMALS>> Market<DECIMALS> for &'a mut M {
@@ -114,6 +123,10 @@ impl<'a, const DECIMALS: u8, M: Market<DECIMALS>> Market<DECIMALS> for &'a mut M
 
     fn order_fee_params(&self) -> FeeParams<Self::Num> {
         (**self).order_fee_params()
+    }
+
+    fn position_impact_distribution_params(&self) -> PositionImpactDistributionParams<Self::Num> {
+        (**self).position_impact_distribution_params()
     }
 }
 
@@ -303,6 +316,16 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
         )
     }
 
+    /// Create a [`DistrubtePositionImpact`] action.
+    fn distribute_position_impact(
+        &mut self,
+    ) -> crate::Result<DistributePositionImpact<&mut Self, DECIMALS>>
+    where
+        Self: Sized,
+    {
+        Ok(DistributePositionImpact::from(self))
+    }
+
     /// Get the swap impact amount with cap.
     fn swap_impact_amount_with_cap(
         &self,
@@ -347,6 +370,43 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
         } else {
             Ok(Zero::zero())
         }
+    }
+
+    /// Get pending position impact pool distribution amount.
+    fn pending_position_impact_pool_distribution_amount(
+        &self,
+        duration_in_secs: u64,
+    ) -> crate::Result<(Self::Num, Self::Num)> {
+        use crate::utils;
+        use num_traits::FromPrimitive;
+
+        let current_amount = self.position_impact_pool_amount()?;
+        let params = self.position_impact_distribution_params();
+        if params.distribute_factor().is_zero()
+            || current_amount <= *params.min_position_impact_pool_amount()
+        {
+            return Ok((Zero::zero(), current_amount));
+        }
+        let max_distribution_amount = current_amount
+            .checked_sub(params.min_position_impact_pool_amount())
+            .ok_or(crate::Error::Computation(
+                "calculating max distribution amount",
+            ))?;
+
+        let duration_value = Self::Num::from_u64(duration_in_secs).ok_or(crate::Error::Convert)?;
+        let mut distribution_amount =
+            utils::apply_factor(&duration_value, params.distribute_factor())
+                .ok_or(crate::Error::Computation("calculating distribution amount"))?;
+        if distribution_amount > max_distribution_amount {
+            distribution_amount = max_distribution_amount;
+        }
+        let next_amount =
+            current_amount
+                .checked_sub(&distribution_amount)
+                .ok_or(crate::Error::Computation(
+                    "calculating next position impact amount",
+                ))?;
+        Ok((distribution_amount, next_amount))
     }
 
     /// Apply a swap impact value to the price impact pool.

@@ -19,6 +19,18 @@ impl<const DECIMALS: u8> FixedPointOps<DECIMALS> for u64 {
     fn checked_pow_fixed(&self, exponent: &Self) -> Option<Self> {
         use rust_decimal::{Decimal, MathematicalOps};
 
+        let unit = <Self as FixedPointOps<DECIMALS>>::UNIT;
+        if *exponent % unit == 0 {
+            let exp = exponent / unit;
+            // TODO: use a better algorithm.
+            let mut ans = Fixed::<Self, DECIMALS>::one();
+            let base = Fixed::<Self, DECIMALS>::from_inner(*self);
+            for _ in 0..exp {
+                ans = ans.checked_mul(&base)?;
+            }
+            return Some(ans.0);
+        }
+
         // `scale > 28` is not supported by `rust_decimal`.
         if DECIMALS > 28 {
             return None;
@@ -37,6 +49,18 @@ impl<const DECIMALS: u8> FixedPointOps<DECIMALS> for u128 {
 
     fn checked_pow_fixed(&self, exponent: &Self) -> Option<Self> {
         use std::cmp::Ordering;
+
+        let unit = <Self as FixedPointOps<DECIMALS>>::UNIT;
+        if *exponent % unit == 0 {
+            let exp = exponent / unit;
+            // TODO: use a better algorithm.
+            let mut ans = Fixed::<Self, DECIMALS>::one();
+            let base = Fixed::<Self, DECIMALS>::from_inner(*self);
+            for _ in 0..exp {
+                ans = ans.checked_mul(&base)?;
+            }
+            return Some(ans.0);
+        }
 
         type Convert = U64D9;
 

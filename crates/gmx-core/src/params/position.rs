@@ -1,3 +1,5 @@
+use typed_builder::TypedBuilder;
+
 /// Basic Position Parameters.
 #[derive(Debug, Clone, Copy)]
 pub struct PositionParams<T> {
@@ -57,5 +59,24 @@ impl<T> PositionParams<T> {
     /// Get max position impact factor for liquidations.
     pub fn max_position_impact_factor_for_liquidations(&self) -> &T {
         &self.max_position_impact_factor_for_liquidations
+    }
+}
+
+/// Position Impact Distribution Parameters.
+#[derive(Debug, Clone, Copy, TypedBuilder)]
+pub struct PositionImpactDistributionParams<T> {
+    distribute_factor: T,
+    min_position_impact_pool_amount: T,
+}
+
+impl<T> PositionImpactDistributionParams<T> {
+    /// Get distribution rate factor.
+    pub fn distribute_factor(&self) -> &T {
+        &self.distribute_factor
+    }
+
+    /// Get min position impact pool amount.
+    pub fn min_position_impact_pool_amount(&self) -> &T {
+        &self.min_position_impact_pool_amount
     }
 }
