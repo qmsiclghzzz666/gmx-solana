@@ -1,7 +1,7 @@
 use num_traits::{CheckedAdd, Zero};
 use typed_builder::TypedBuilder;
 
-use crate::{fixed::FixedPointOps, utils};
+use crate::{fixed::FixedPointOps, num::Unsigned, utils};
 
 /// Fee Parameters.
 #[derive(Debug, Clone, Copy)]
@@ -59,6 +59,104 @@ impl<T> BorrowingFeeParams<T> {
     pub fn skip_borrowing_fee_for_smaller_side(&self) -> bool {
         self.skip_borrowing_fee_for_smaller_side
     }
+}
+
+/// Funding Fee Parameters.
+#[derive(Debug, Clone, Copy, TypedBuilder)]
+pub struct FundingFeeParams<T> {
+    exponent: T,
+    funding_factor: T,
+    increase_factor_per_second: T,
+    decrease_factor_per_second: T,
+    max_factor_per_second: T,
+    min_factor_per_second: T,
+    threshold_for_stable_funding: T,
+    threshold_for_decrease_funding: T,
+}
+
+impl<T> FundingFeeParams<T> {
+    /// Get funding exponent factor.
+    pub fn exponent(&self) -> &T {
+        &self.exponent
+    }
+
+    /// Get funding increase factor per second.
+    pub fn increase_factor_per_second(&self) -> &T {
+        &self.increase_factor_per_second
+    }
+
+    /// Get funding decrease factor per second.
+    pub fn decrease_factor_per_second(&self) -> &T {
+        &self.decrease_factor_per_second
+    }
+
+    /// Get max funding factor per second.
+    pub fn max_factor_per_second(&self) -> &T {
+        &self.max_factor_per_second
+    }
+
+    /// Get min funding factor per second.
+    pub fn min_factor_per_second(&self) -> &T {
+        &self.min_factor_per_second
+    }
+
+    /// Fallback funding factor.
+    pub fn factor(&self) -> &T {
+        &self.funding_factor
+    }
+
+    /// Threshold for stable funding.
+    pub fn threshold_for_stable_funding(&self) -> &T {
+        &self.threshold_for_stable_funding
+    }
+
+    /// Threshold for decrease funding.
+    pub fn threshold_for_decrease_funding(&self) -> &T {
+        &self.threshold_for_decrease_funding
+    }
+
+    /// Get change type for next funding rate.
+    pub fn change(
+        &self,
+        funding_factor_per_second: &T::Signed,
+        long_open_interest: &T,
+        short_open_interest: &T,
+        diff_factor: &T,
+    ) -> FundingRateChangeType
+    where
+        T: Ord + Unsigned,
+    {
+        use num_traits::Signed;
+
+        let is_skew_the_same_direction_as_funding = (funding_factor_per_second.is_positive()
+            && *long_open_interest > *short_open_interest)
+            || (funding_factor_per_second.is_negative()
+                && *long_open_interest < *short_open_interest);
+
+        if is_skew_the_same_direction_as_funding {
+            if *diff_factor > self.threshold_for_stable_funding {
+                FundingRateChangeType::Increase
+            } else if *diff_factor < self.threshold_for_decrease_funding {
+                FundingRateChangeType::Decrease
+            } else {
+                FundingRateChangeType::NoChange
+            }
+        } else {
+            FundingRateChangeType::Increase
+        }
+    }
+}
+
+/// Funding Rate Change Type.
+#[derive(Default, Debug)]
+pub enum FundingRateChangeType {
+    /// No Change.
+    #[default]
+    NoChange,
+    /// Increase.
+    Increase,
+    /// Decrease.
+    Decrease,
 }
 
 /// Fees.

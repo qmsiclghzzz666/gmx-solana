@@ -47,7 +47,7 @@ pub enum Error {
     #[error("build params: {0}")]
     BuildParams(String),
     /// Missing pool of kind.
-    #[error("missing pool of kind: {0}")]
+    #[error("missing pool of kind: {0:?}")]
     MissingPoolKind(PoolKind),
     /// Missing clock of kind.
     #[error("missing clock of kind: {0:?}")]

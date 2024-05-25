@@ -1,7 +1,11 @@
 use std::fmt;
 
 use crate::{
-    action::update_borrowing_state::UpdateBorrowingReport, num::Unsigned, params::fee::PositionFees,
+    action::{
+        update_borrowing_state::UpdateBorrowingReport, update_funding_state::UpdateFundingReport,
+    },
+    num::Unsigned,
+    params::fee::PositionFees,
 };
 
 use super::{DecreasePositionParams, ProcessCollateralResult};
@@ -19,6 +23,7 @@ pub struct DecreasePositionReport<T: Unsigned> {
     withdrawable_collateral_amount: T,
     size_delta_usd: T,
     borrowing: UpdateBorrowingReport<T>,
+    funding: UpdateFundingReport<T>,
 
     // Output.
     is_output_token_long: bool,
@@ -45,6 +50,7 @@ where
             )
             .field("size_delta_usd", &self.size_delta_usd)
             .field("borrowing", &self.borrowing)
+            .field("funding", &self.funding)
             .field("is_output_token_long", &self.is_output_token_long)
             .field("output_amount", &self.output_amount)
             .field("secondary_output_amount", &self.secondary_output_amount)
@@ -60,6 +66,7 @@ impl<T: Unsigned> DecreasePositionReport<T> {
         withdrawable_collateral_amount: T,
         size_delta_usd: T,
         borrowing: UpdateBorrowingReport<T>,
+        funding: UpdateFundingReport<T>,
     ) -> Self {
         Self {
             should_remove,
@@ -75,6 +82,7 @@ impl<T: Unsigned> DecreasePositionReport<T> {
             size_delta_usd,
             price_impact_diff: execution.price_impact_diff,
             borrowing,
+            funding,
         }
     }
 
@@ -126,5 +134,15 @@ impl<T: Unsigned> DecreasePositionReport<T> {
     /// Get withdrawable collateral amount.
     pub fn withdrawable_collateral_amount(&self) -> &T {
         &self.withdrawable_collateral_amount
+    }
+
+    /// Get borrowing report.
+    pub fn borrowing(&self) -> &UpdateBorrowingReport<T> {
+        &self.borrowing
+    }
+
+    /// Get funding report.
+    pub fn funding(&self) -> &UpdateFundingReport<T> {
+        &self.funding
     }
 }

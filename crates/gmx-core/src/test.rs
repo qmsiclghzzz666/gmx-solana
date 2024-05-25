@@ -4,10 +4,11 @@ use crate::{
     clock::ClockKind,
     fixed::FixedPointOps,
     market::Market,
-    num::{MulDiv, Num, UnsignedAbs},
+    num::{MulDiv, Num, Unsigned, UnsignedAbs},
     params::{
-        fee::BorrowingFeeParams, position::PositionImpactDistributionParams, FeeParams,
-        PositionParams, PriceImpactParams,
+        fee::{BorrowingFeeParams, FundingFeeParams},
+        position::PositionImpactDistributionParams,
+        FeeParams, PositionParams, PriceImpactParams,
     },
     pool::{Balance, Pool, PoolKind},
     position::Position,
@@ -75,9 +76,10 @@ where
 
 /// Test Market.
 #[derive(Debug, Clone)]
-pub struct TestMarket<T, const DECIMALS: u8> {
+pub struct TestMarket<T: Unsigned, const DECIMALS: u8> {
     total_supply: T,
     value_to_amount_divisor: T,
+    funding_amount_per_size_adjustment: T,
     swap_impact_params: PriceImpactParams<T>,
     swap_fee_params: FeeParams<T>,
     position_params: PositionParams<T>,
@@ -85,6 +87,7 @@ pub struct TestMarket<T, const DECIMALS: u8> {
     order_fee_params: FeeParams<T>,
     position_impact_distribution_params: PositionImpactDistributionParams<T>,
     borrowing_fee_params: BorrowingFeeParams<T>,
+    funding_fee_params: FundingFeeParams<T>,
     primary: TestPool<T>,
     swap_impact: TestPool<T>,
     fee: TestPool<T>,
@@ -92,6 +95,9 @@ pub struct TestMarket<T, const DECIMALS: u8> {
     open_interest_in_tokens: (TestPool<T>, TestPool<T>),
     position_impact: TestPool<T>,
     borrowing_factor: TestPool<T>,
+    funding_factor_per_second: T::Signed,
+    funding_amount_per_size: (TestPool<T>, TestPool<T>),
+    claimable_funding_amount_per_size: (TestPool<T>, TestPool<T>),
     clocks: HashMap<ClockKind, Instant>,
 }
 
@@ -100,6 +106,7 @@ impl Default for TestMarket<u64, 9> {
         Self {
             total_supply: Default::default(),
             value_to_amount_divisor: 1,
+            funding_amount_per_size_adjustment: 10_000,
             swap_impact_params: PriceImpactParams::builder()
                 .with_exponent(2_000_000_000)
                 .with_positive_factor(4)
@@ -140,6 +147,16 @@ impl Default for TestMarket<u64, 9> {
                 .exponent_for_long(1_000_000_000)
                 .exponent_for_short(1_000_000_000)
                 .build(),
+            funding_fee_params: FundingFeeParams::builder()
+                .exponent(1_000_000_000)
+                .funding_factor(20)
+                .max_factor_per_second(10)
+                .min_factor_per_second(1)
+                .increase_factor_per_second(10)
+                .decrease_factor_per_second(0)
+                .threshold_for_stable_funding(50_000_000)
+                .threshold_for_decrease_funding(0)
+                .build(),
             primary: Default::default(),
             swap_impact: Default::default(),
             fee: Default::default(),
@@ -147,6 +164,9 @@ impl Default for TestMarket<u64, 9> {
             open_interest_in_tokens: Default::default(),
             position_impact: Default::default(),
             borrowing_factor: Default::default(),
+            funding_factor_per_second: Default::default(),
+            funding_amount_per_size: Default::default(),
+            claimable_funding_amount_per_size: Default::default(),
             clocks: Default::default(),
         }
     }
@@ -158,6 +178,7 @@ impl Default for TestMarket<u128, 20> {
         Self {
             total_supply: Default::default(),
             value_to_amount_divisor: 10u128.pow(20 - 9),
+            funding_amount_per_size_adjustment: 10u128.pow(10),
             swap_impact_params: PriceImpactParams::builder()
                 .with_exponent(200_000_000_000_000_000_000)
                 .with_positive_factor(400_000_000_000)
@@ -198,6 +219,16 @@ impl Default for TestMarket<u128, 20> {
                 .exponent_for_long(100_000_000_000_000_000_000)
                 .exponent_for_short(100_000_000_000_000_000_000)
                 .build(),
+            funding_fee_params: FundingFeeParams::builder()
+                .exponent(100_000_000_000_000_000_000)
+                .funding_factor(2_000_000_000_000)
+                .max_factor_per_second(1_000_000_000_000)
+                .min_factor_per_second(30_000_000_000)
+                .increase_factor_per_second(790_000_000)
+                .decrease_factor_per_second(0)
+                .threshold_for_stable_funding(5_000_000_000_000_000_000)
+                .threshold_for_decrease_funding(0)
+                .build(),
             primary: Default::default(),
             swap_impact: Default::default(),
             fee: Default::default(),
@@ -205,6 +236,9 @@ impl Default for TestMarket<u128, 20> {
             open_interest_in_tokens: Default::default(),
             position_impact: Default::default(),
             borrowing_factor: Default::default(),
+            funding_factor_per_second: Default::default(),
+            funding_amount_per_size: Default::default(),
+            claimable_funding_amount_per_size: Default::default(),
             clocks: Default::default(),
         }
     }
@@ -226,12 +260,20 @@ where
             PoolKind::Primary => &self.primary,
             PoolKind::SwapImpact => &self.swap_impact,
             PoolKind::ClaimableFee => &self.fee,
-            PoolKind::OpenInterestForLongCollateral => &self.open_interest.0,
-            PoolKind::OpenInterestForShortCollateral => &self.open_interest.1,
-            PoolKind::OpenInterestInTokensForLongCollateral => &self.open_interest_in_tokens.0,
-            PoolKind::OpenInterestInTokensForShortCollateral => &self.open_interest_in_tokens.1,
+            PoolKind::OpenInterestForLong => &self.open_interest.0,
+            PoolKind::OpenInterestForShort => &self.open_interest.1,
+            PoolKind::OpenInterestInTokensForLong => &self.open_interest_in_tokens.0,
+            PoolKind::OpenInterestInTokensForShort => &self.open_interest_in_tokens.1,
             PoolKind::PositionImpact => &self.position_impact,
             PoolKind::BorrowingFactor => &self.borrowing_factor,
+            PoolKind::FundingAmountPerSizeForLong => &self.funding_amount_per_size.0,
+            PoolKind::FundingAmountPerSizeForShort => &self.funding_amount_per_size.1,
+            PoolKind::ClaimableFundingAmountPerSizeForLong => {
+                &self.claimable_funding_amount_per_size.0
+            }
+            PoolKind::ClaimableFundingAmountPerSizeForShort => {
+                &self.claimable_funding_amount_per_size.1
+            }
         };
         Ok(Some(pool))
     }
@@ -241,12 +283,20 @@ where
             PoolKind::Primary => &mut self.primary,
             PoolKind::SwapImpact => &mut self.swap_impact,
             PoolKind::ClaimableFee => &mut self.fee,
-            PoolKind::OpenInterestForLongCollateral => &mut self.open_interest.0,
-            PoolKind::OpenInterestForShortCollateral => &mut self.open_interest.1,
-            PoolKind::OpenInterestInTokensForLongCollateral => &mut self.open_interest_in_tokens.0,
-            PoolKind::OpenInterestInTokensForShortCollateral => &mut self.open_interest_in_tokens.1,
+            PoolKind::OpenInterestForLong => &mut self.open_interest.0,
+            PoolKind::OpenInterestForShort => &mut self.open_interest.1,
+            PoolKind::OpenInterestInTokensForLong => &mut self.open_interest_in_tokens.0,
+            PoolKind::OpenInterestInTokensForShort => &mut self.open_interest_in_tokens.1,
             PoolKind::PositionImpact => &mut self.position_impact,
             PoolKind::BorrowingFactor => &mut self.borrowing_factor,
+            PoolKind::FundingAmountPerSizeForLong => &mut self.funding_amount_per_size.0,
+            PoolKind::FundingAmountPerSizeForShort => &mut self.funding_amount_per_size.1,
+            PoolKind::ClaimableFundingAmountPerSizeForLong => {
+                &mut self.claimable_funding_amount_per_size.0
+            }
+            PoolKind::ClaimableFundingAmountPerSizeForShort => {
+                &mut self.claimable_funding_amount_per_size.1
+            }
         };
         Ok(Some(pool))
     }
@@ -283,6 +333,10 @@ where
         self.value_to_amount_divisor.clone()
     }
 
+    fn funding_amount_per_size_adjustment(&self) -> Self::Num {
+        self.funding_amount_per_size_adjustment.clone()
+    }
+
     fn swap_impact_params(&self) -> PriceImpactParams<Self::Num> {
         self.swap_impact_params.clone()
     }
@@ -310,6 +364,18 @@ where
     fn borrowing_fee_params(&self) -> BorrowingFeeParams<Self::Num> {
         self.borrowing_fee_params.clone()
     }
+
+    fn funding_fee_params(&self) -> FundingFeeParams<Self::Num> {
+        self.funding_fee_params.clone()
+    }
+
+    fn funding_factor_per_second(&self) -> &Self::Signed {
+        &self.funding_factor_per_second
+    }
+
+    fn funding_factor_per_second_mut(&mut self) -> &mut Self::Signed {
+        &mut self.funding_factor_per_second
+    }
 }
 
 /// Test Position
@@ -323,7 +389,10 @@ pub struct TestPosition<T, const DECIMALS: u8> {
     borrowing_factor: T,
 }
 
-impl<T, const DECIMALS: u8> TestPosition<T, DECIMALS> {
+impl<T: Unsigned, const DECIMALS: u8> TestPosition<T, DECIMALS>
+where
+    T::Signed: fmt::Debug,
+{
     /// Create a [`TestPositionOps`] for ops.
     pub fn ops<'a>(
         &'a mut self,
@@ -362,7 +431,10 @@ impl<T, const DECIMALS: u8> TestPosition<T, DECIMALS> {
 
 /// Test Position.
 #[derive(Debug)]
-pub struct TestPositionOps<'a, T, const DECIMALS: u8> {
+pub struct TestPositionOps<'a, T: Unsigned, const DECIMALS: u8>
+where
+    T::Signed: fmt::Debug,
+{
     market: &'a mut TestMarket<T, DECIMALS>,
     position: &'a mut TestPosition<T, DECIMALS>,
 }

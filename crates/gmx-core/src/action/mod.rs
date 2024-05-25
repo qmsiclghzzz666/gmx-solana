@@ -19,6 +19,9 @@ pub mod distribute_position_impact;
 /// Update borrowing state.
 pub mod update_borrowing_state;
 
+/// Update funding state.
+pub mod update_funding_state;
+
 /// Prices of a market.
 #[derive(Debug, Clone, Copy)]
 pub struct Prices<T> {

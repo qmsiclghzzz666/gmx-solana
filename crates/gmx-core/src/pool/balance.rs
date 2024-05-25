@@ -71,8 +71,11 @@ pub trait BalanceExt: Balance {
     }
 
     /// Merge the amounts with other [`Balance`].
-    fn merge<B: Balance>(&self, other: B) -> Merged<&Self, B> {
-        Merged(self, other)
+    ///
+    /// The result [`Balance`] will consider the total amounts (`long_amount + short_amount`) of `self` as the long amount,
+    /// and the total amount of `short` as the short amount.
+    fn merge<B: Balance>(&self, short: B) -> Merged<&Self, B> {
+        Merged(self, short)
     }
 
     /// Get amount by side.
@@ -120,13 +123,13 @@ where
     fn long_amount(&self) -> crate::Result<Self::Num> {
         self.0
             .long_amount()?
-            .checked_add(&self.1.long_amount()?)
+            .checked_add(&self.0.short_amount()?)
             .ok_or(crate::Error::Overflow)
     }
 
     fn short_amount(&self) -> crate::Result<Self::Num> {
-        self.0
-            .short_amount()?
+        self.1
+            .long_amount()?
             .checked_add(&self.1.short_amount()?)
             .ok_or(crate::Error::Overflow)
     }

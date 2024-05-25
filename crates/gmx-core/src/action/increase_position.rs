@@ -8,7 +8,10 @@ use crate::{
     MarketExt,
 };
 
-use super::{update_borrowing_state::UpdateBorrowingReport, Prices};
+use super::{
+    update_borrowing_state::UpdateBorrowingReport, update_funding_state::UpdateFundingReport,
+    Prices,
+};
 
 /// Increase the position.
 #[must_use]
@@ -33,6 +36,7 @@ pub struct IncreasePositionReport<T: Unsigned> {
     collateral_delta_amount: T,
     fees: PositionFees<T>,
     borrowing: UpdateBorrowingReport<T>,
+    funding: UpdateFundingReport<T>,
 }
 
 impl<T: Unsigned + fmt::Debug> fmt::Debug for IncreasePositionReport<T>
@@ -46,6 +50,7 @@ where
             .field("collateral_delta_amount", &self.collateral_delta_amount)
             .field("fees", &self.fees)
             .field("borrowing", &self.borrowing)
+            .field("funding", &self.funding)
             .finish()
     }
 }
@@ -57,6 +62,7 @@ impl<T: Unsigned> IncreasePositionReport<T> {
         collateral_delta_amount: T,
         fees: PositionFees<T>,
         borrowing: UpdateBorrowingReport<T>,
+        funding: UpdateFundingReport<T>,
     ) -> Self {
         Self {
             params,
@@ -64,6 +70,7 @@ impl<T: Unsigned> IncreasePositionReport<T> {
             collateral_delta_amount,
             fees,
             borrowing,
+            funding,
         }
     }
 
@@ -85,6 +92,16 @@ impl<T: Unsigned> IncreasePositionReport<T> {
     /// Get position fees.
     pub fn fees(&self) -> &PositionFees<T> {
         &self.fees
+    }
+
+    /// Get borrowing report.
+    pub fn borrowing(&self) -> &UpdateBorrowingReport<T> {
+        &self.borrowing
+    }
+
+    /// Get funding report.
+    pub fn funding(&self) -> &UpdateFundingReport<T> {
+        &self.funding
     }
 }
 
@@ -139,6 +156,11 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> IncreasePosition<P, DECIMALS> {
             .position
             .market_mut()
             .update_borrowing(&self.params.prices)?
+            .execute()?;
+        let funding = self
+            .position
+            .market_mut()
+            .update_funding(&self.params.prices)?
             .execute()?;
 
         let execution = self.get_execution_params()?;
@@ -221,6 +243,7 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> IncreasePosition<P, DECIMALS> {
             collateral_delta_amount,
             fees,
             borrowing,
+            funding,
         ))
     }
 
