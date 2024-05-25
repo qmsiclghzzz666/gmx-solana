@@ -635,6 +635,28 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
         self.borrowing_factor_pool()?.amount(is_long)
     }
 
+    /// Get current funding fee amount per size.
+    #[inline]
+    fn funding_fee_amount_per_size(
+        &self,
+        is_long: bool,
+        is_long_collateral: bool,
+    ) -> crate::Result<Self::Num> {
+        self.funding_amount_per_size_pool(is_long)?
+            .amount(is_long_collateral)
+    }
+
+    /// Get current claimable funding fee amount per size.
+    #[inline]
+    fn claimable_funding_fee_amount_per_size(
+        &self,
+        is_long: bool,
+        is_long_collateral: bool,
+    ) -> crate::Result<Self::Num> {
+        self.claimable_funding_amount_per_size_pool(is_long)?
+            .amount(is_long_collateral)
+    }
+
     /// Apply a swap impact value to the price impact pool.
     ///
     /// - If it is a positive impact amount, cap the impact amount to the amount available in the price impact pool,

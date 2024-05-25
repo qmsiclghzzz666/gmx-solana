@@ -387,6 +387,8 @@ pub struct TestPosition<T, const DECIMALS: u8> {
     size_in_usd: T,
     size_in_tokens: T,
     borrowing_factor: T,
+    funding_fee_amount_per_size: T,
+    claimable_funding_fee_amount_per_size: (T, T),
 }
 
 impl<T: Unsigned, const DECIMALS: u8> TestPosition<T, DECIMALS>
@@ -504,5 +506,32 @@ where
 
     fn borrowing_factor_mut(&mut self) -> &mut Self::Num {
         &mut self.position.borrowing_factor
+    }
+
+    fn funding_fee_amount_per_size(&self) -> &Self::Num {
+        &self.position.funding_fee_amount_per_size
+    }
+
+    fn funding_fee_amount_per_size_mut(&mut self) -> &mut Self::Num {
+        &mut self.position.funding_fee_amount_per_size
+    }
+
+    fn claimable_funding_fee_amount_per_size(&self, is_long_collateral: bool) -> &Self::Num {
+        if is_long_collateral {
+            &self.position.claimable_funding_fee_amount_per_size.0
+        } else {
+            &self.position.claimable_funding_fee_amount_per_size.1
+        }
+    }
+
+    fn claimable_funding_fee_amount_per_size_mut(
+        &mut self,
+        is_long_collateral: bool,
+    ) -> &mut Self::Num {
+        if is_long_collateral {
+            &mut self.position.claimable_funding_fee_amount_per_size.0
+        } else {
+            &mut self.position.claimable_funding_fee_amount_per_size.1
+        }
     }
 }

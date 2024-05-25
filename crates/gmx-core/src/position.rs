@@ -3,10 +3,13 @@ use std::{fmt, ops::Deref};
 use num_traits::{One, Zero};
 
 use crate::{
-    action::{decrease_position::DecreasePosition, increase_position::IncreasePosition, Prices},
+    action::{
+        decrease_position::DecreasePosition, increase_position::IncreasePosition,
+        update_funding_state::unpack_to_funding_amount, Prices,
+    },
     fixed::FixedPointOps,
     num::{MulDiv, Num, Unsigned, UnsignedAbs},
-    params::fee::PositionFees,
+    params::fee::{FundingFees, PositionFees},
     BalanceExt, Market, MarketExt, Pool,
 };
 
@@ -56,6 +59,21 @@ pub trait Position<const DECIMALS: u8> {
 
     /// Get a mutable reference to last borrowing factor applied by the position.
     fn borrowing_factor_mut(&mut self) -> &mut Self::Num;
+
+    /// Get a reference to the funding fee amount per size.
+    fn funding_fee_amount_per_size(&self) -> &Self::Num;
+
+    /// Get a mutable reference to the funding fee amount per size.
+    fn funding_fee_amount_per_size_mut(&mut self) -> &mut Self::Num;
+
+    /// Get a reference to claimable funding fee amount per size of the given collateral.
+    fn claimable_funding_fee_amount_per_size(&self, is_long_collateral: bool) -> &Self::Num;
+
+    /// Get a mutable reference to claimable funding fee amount per size of the given collateral.
+    fn claimable_funding_fee_amount_per_size_mut(
+        &mut self,
+        is_long_collateral: bool,
+    ) -> &mut Self::Num;
 
     /// Increased callback.
     fn increased(&mut self) -> crate::Result<()>;
@@ -117,6 +135,25 @@ impl<'a, const DECIMALS: u8, P: Position<DECIMALS>> Position<DECIMALS> for &'a m
 
     fn borrowing_factor_mut(&mut self) -> &mut Self::Num {
         (**self).borrowing_factor_mut()
+    }
+
+    fn funding_fee_amount_per_size(&self) -> &Self::Num {
+        (**self).funding_fee_amount_per_size()
+    }
+
+    fn funding_fee_amount_per_size_mut(&mut self) -> &mut Self::Num {
+        (**self).funding_fee_amount_per_size_mut()
+    }
+
+    fn claimable_funding_fee_amount_per_size(&self, is_long_collateral: bool) -> &Self::Num {
+        (**self).claimable_funding_fee_amount_per_size(is_long_collateral)
+    }
+
+    fn claimable_funding_fee_amount_per_size_mut(
+        &mut self,
+        is_long_collateral: bool,
+    ) -> &mut Self::Num {
+        (**self).claimable_funding_fee_amount_per_size_mut(is_long_collateral)
     }
 
     fn increased(&mut self) -> crate::Result<()> {
@@ -587,6 +624,55 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
             .ok_or(crate::Error::Computation("calculating borrowing fee value"))
     }
 
+    /// Get funding fees.
+    fn funding_fees(&self) -> crate::Result<FundingFees<Self::Num>> {
+        let adjustment = self.market().funding_amount_per_size_adjustment();
+        let fees = FundingFees::builder()
+            .amount(
+                unpack_to_funding_amount(
+                    &adjustment,
+                    &self.market().funding_fee_amount_per_size(
+                        self.is_long(),
+                        self.is_collateral_token_long(),
+                    )?,
+                    self.funding_fee_amount_per_size(),
+                    self.size_in_usd(),
+                    true,
+                )
+                .ok_or(crate::Error::Computation("calculating funding fee amount"))?,
+            )
+            .claimable_long_token_amount(
+                unpack_to_funding_amount(
+                    &adjustment,
+                    &self
+                        .market()
+                        .claimable_funding_fee_amount_per_size(self.is_long(), true)?,
+                    self.claimable_funding_fee_amount_per_size(true),
+                    self.size_in_usd(),
+                    false,
+                )
+                .ok_or(crate::Error::Computation(
+                    "calculating claimable long token funding fee amount",
+                ))?,
+            )
+            .claimable_short_token_amount(
+                unpack_to_funding_amount(
+                    &adjustment,
+                    &self
+                        .market()
+                        .claimable_funding_fee_amount_per_size(self.is_long(), false)?,
+                    self.claimable_funding_fee_amount_per_size(false),
+                    self.size_in_usd(),
+                    false,
+                )
+                .ok_or(crate::Error::Computation(
+                    "calculating claimable short token funding fee amount",
+                ))?,
+            )
+            .build();
+        Ok(fees)
+    }
+
     /// Get position fees.
     fn position_fees(
         &self,
@@ -595,12 +681,13 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
         is_positive_impact: bool,
     ) -> crate::Result<PositionFees<Self::Num>> {
         debug_assert!(!collateral_token_price.is_zero(), "must be non-zero");
-        // TODO: apply funding fees.
-        let borrowing_fee_value = self.borrowing_fee_value()?;
-        self.market()
+        let fees = self
+            .market()
             .order_fee_params()
             .base_position_fees(collateral_token_price, size_delta_usd, is_positive_impact)?
-            .apply_borrowing_fee(collateral_token_price, borrowing_fee_value)
+            .apply_borrowing_fee(collateral_token_price, self.borrowing_fee_value()?)?
+            .apply_funding_fees(self.funding_fees()?);
+        Ok(fees)
     }
 }
 

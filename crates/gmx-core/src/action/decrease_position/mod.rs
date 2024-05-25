@@ -146,8 +146,6 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
         let next_position_collateral_amount =
             execution.collateral.remaining_collateral_amount.clone();
 
-        // TODO: update claimable funding amount.
-
         let should_remove =
             next_position_size_in_usd.is_zero() || next_position_size_in_tokens.is_zero();
 
@@ -161,13 +159,24 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
                 .checked_add(&next_position_collateral_amount)
                 .ok_or(crate::Error::Computation("calculating output amount"))?;
         } else {
-            // TODO: update funding states of position.
             let is_long = self.position.is_long();
             *self.position.size_in_usd_mut() = next_position_size_in_usd;
             *self.position.size_in_tokens_mut() = next_position_size_in_tokens;
             *self.position.collateral_amount_mut() = next_position_collateral_amount;
             *self.position.borrowing_factor_mut() =
                 self.position.market().borrowing_factor(is_long)?;
+            *self.position.funding_fee_amount_per_size_mut() = self
+                .position
+                .market()
+                .funding_fee_amount_per_size(is_long, self.position.is_collateral_token_long())?;
+            for is_long_collateral in [true, false] {
+                *self
+                    .position
+                    .claimable_funding_fee_amount_per_size_mut(is_long_collateral) = self
+                    .position
+                    .market()
+                    .claimable_funding_fee_amount_per_size(is_long, is_long_collateral)?;
+            }
         };
 
         // TODO: update global states.
@@ -324,7 +333,6 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
         let is_output_token_long = self.position.is_collateral_token_long();
         let is_pnl_token_long = self.position.is_long();
 
-        // TODO: calcualte fees.
         let mut fees = self.position.position_fees(
             self.params
                 .prices
@@ -346,7 +354,7 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
             ctx.add_pnl_if_positive(&base_pnl_usd)?
                 .add_price_impact_if_positive(&price_impact_value)?
                 .pay_for_pnl_if_negative(&base_pnl_usd)?
-                // TODO: pay for funding fees.
+                .pay_for_funding_fees(fees.funding_fees())?
                 .pay_for_fees_excluding_funding(&mut fees)?
                 .pay_for_price_impact_if_negative(&price_impact_value)?
                 .pay_for_price_impact_diff(&price_impact_diff)?;

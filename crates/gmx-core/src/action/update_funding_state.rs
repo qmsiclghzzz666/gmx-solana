@@ -407,6 +407,28 @@ where
     }
 }
 
+/// Calculate the funding amount for a position and unpack with the given `adjustment`.
+pub fn unpack_to_funding_amount<T, const DECIMALS: u8>(
+    adjustment: &T,
+    latest_funding_amount_per_size: &T,
+    position_funding_amount_per_size: &T,
+    size_in_usd: &T,
+    round_up_magnitude: bool,
+) -> Option<T>
+where
+    T: FixedPointOps<DECIMALS>,
+{
+    let funding_diff_factor =
+        latest_funding_amount_per_size.checked_sub(position_funding_amount_per_size)?;
+
+    let adjustment = adjustment.checked_mul(&T::UNIT)?;
+    if round_up_magnitude {
+        size_in_usd.checked_mul_div_ceil(&funding_diff_factor, &adjustment)
+    } else {
+        size_in_usd.checked_mul_div(&funding_diff_factor, &adjustment)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::{thread::sleep, time::Duration};

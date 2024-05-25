@@ -295,6 +295,7 @@ impl<T> FeeParams<T> {
         Ok(PositionFees {
             base,
             borrowing: Default::default(),
+            funding: Default::default(),
         })
     }
 }
@@ -325,11 +326,47 @@ impl<T: Zero> Default for BorrowingFee<T> {
     }
 }
 
+/// Funding Fees.
+#[derive(Debug, Clone, Copy, TypedBuilder)]
+pub struct FundingFees<T> {
+    amount: T,
+    claimable_long_token_amount: T,
+    claimable_short_token_amount: T,
+}
+
+impl<T> FundingFees<T> {
+    /// Get funding fee amount.
+    pub fn amount(&self) -> &T {
+        &self.amount
+    }
+
+    /// Get claimable long token funding fee amount.
+    pub fn claimable_long_token_amount(&self) -> &T {
+        &self.claimable_long_token_amount
+    }
+
+    /// Get claimble short token funding fee amount.
+    pub fn claimable_short_token_amount(&self) -> &T {
+        &self.claimable_short_token_amount
+    }
+}
+
+impl<T: Zero> Default for FundingFees<T> {
+    fn default() -> Self {
+        Self {
+            amount: Zero::zero(),
+            claimable_long_token_amount: Zero::zero(),
+            claimable_short_token_amount: Zero::zero(),
+        }
+    }
+}
+
 /// Position Fees.
 #[derive(Debug, Clone, Copy)]
 pub struct PositionFees<T> {
     base: Fees<T>,
     borrowing: BorrowingFee<T>,
+    funding: FundingFees<T>,
 }
 
 impl<T> PositionFees<T> {
@@ -356,12 +393,19 @@ impl<T> PositionFees<T> {
         &self.borrowing
     }
 
+    /// Get funding fees.
+    pub fn funding_fees(&self) -> &FundingFees<T> {
+        &self.funding
+    }
+
     /// Get total cost amount in collateral tokens.
     pub fn total_cost_amount(&self) -> crate::Result<T>
     where
         T: CheckedAdd,
     {
-        self.total_cost_excluding_funding()
+        self.total_cost_excluding_funding()?
+            .checked_add(&self.funding.amount)
+            .ok_or(crate::Error::Overflow)
     }
 
     /// Get total cost excluding funding fee.
@@ -399,6 +443,12 @@ impl<T> PositionFees<T> {
         self.borrowing.amount = amount;
         Ok(self)
     }
+
+    /// Apply funding fees.
+    pub fn apply_funding_fees(mut self, fees: FundingFees<T>) -> Self {
+        self.funding = fees;
+        self
+    }
 }
 
 impl<T: Zero> Default for PositionFees<T> {
@@ -406,6 +456,7 @@ impl<T: Zero> Default for PositionFees<T> {
         Self {
             base: Default::default(),
             borrowing: Default::default(),
+            funding: Default::default(),
         }
     }
 }
