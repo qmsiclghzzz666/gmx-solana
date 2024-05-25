@@ -126,6 +126,28 @@ pub trait Unsigned: num_traits::Unsigned {
         }
         Some(self.checked_add(divisor)?.checked_sub(&One::one())? / divisor.clone())
     }
+
+    /// Bound magnitude.
+    ///
+    /// ## Panic
+    /// Panic if `min > max`.
+    fn bound_magnitude(value: &Self::Signed, min: &Self, max: &Self) -> crate::Result<Self::Signed>
+    where
+        Self: Ord + Clone,
+        Self::Signed: Clone,
+    {
+        if min > max {
+            return Err(crate::Error::invalid_argument("min > max"));
+        }
+        let magnitude = value.unsigned_abs();
+        if magnitude < *min {
+            min.to_signed()
+        } else if magnitude > *max {
+            max.to_signed()
+        } else {
+            Ok(value.clone())
+        }
+    }
 }
 
 /// Convert signed value to unsigned.

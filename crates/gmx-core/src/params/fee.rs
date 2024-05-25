@@ -1,7 +1,7 @@
 use num_traits::{CheckedAdd, Zero};
 use typed_builder::TypedBuilder;
 
-use crate::{fixed::FixedPointOps, utils};
+use crate::{fixed::FixedPointOps, num::Unsigned, utils};
 
 /// Fee Parameters.
 #[derive(Debug, Clone, Copy)]
@@ -59,6 +59,104 @@ impl<T> BorrowingFeeParams<T> {
     pub fn skip_borrowing_fee_for_smaller_side(&self) -> bool {
         self.skip_borrowing_fee_for_smaller_side
     }
+}
+
+/// Funding Fee Parameters.
+#[derive(Debug, Clone, Copy, TypedBuilder)]
+pub struct FundingFeeParams<T> {
+    exponent: T,
+    funding_factor: T,
+    increase_factor_per_second: T,
+    decrease_factor_per_second: T,
+    max_factor_per_second: T,
+    min_factor_per_second: T,
+    threshold_for_stable_funding: T,
+    threshold_for_decrease_funding: T,
+}
+
+impl<T> FundingFeeParams<T> {
+    /// Get funding exponent factor.
+    pub fn exponent(&self) -> &T {
+        &self.exponent
+    }
+
+    /// Get funding increase factor per second.
+    pub fn increase_factor_per_second(&self) -> &T {
+        &self.increase_factor_per_second
+    }
+
+    /// Get funding decrease factor per second.
+    pub fn decrease_factor_per_second(&self) -> &T {
+        &self.decrease_factor_per_second
+    }
+
+    /// Get max funding factor per second.
+    pub fn max_factor_per_second(&self) -> &T {
+        &self.max_factor_per_second
+    }
+
+    /// Get min funding factor per second.
+    pub fn min_factor_per_second(&self) -> &T {
+        &self.min_factor_per_second
+    }
+
+    /// Fallback funding factor.
+    pub fn factor(&self) -> &T {
+        &self.funding_factor
+    }
+
+    /// Threshold for stable funding.
+    pub fn threshold_for_stable_funding(&self) -> &T {
+        &self.threshold_for_stable_funding
+    }
+
+    /// Threshold for decrease funding.
+    pub fn threshold_for_decrease_funding(&self) -> &T {
+        &self.threshold_for_decrease_funding
+    }
+
+    /// Get change type for next funding rate.
+    pub fn change(
+        &self,
+        funding_factor_per_second: &T::Signed,
+        long_open_interest: &T,
+        short_open_interest: &T,
+        diff_factor: &T,
+    ) -> FundingRateChangeType
+    where
+        T: Ord + Unsigned,
+    {
+        use num_traits::Signed;
+
+        let is_skew_the_same_direction_as_funding = (funding_factor_per_second.is_positive()
+            && *long_open_interest > *short_open_interest)
+            || (funding_factor_per_second.is_negative()
+                && *long_open_interest < *short_open_interest);
+
+        if is_skew_the_same_direction_as_funding {
+            if *diff_factor > self.threshold_for_stable_funding {
+                FundingRateChangeType::Increase
+            } else if *diff_factor < self.threshold_for_decrease_funding {
+                FundingRateChangeType::Decrease
+            } else {
+                FundingRateChangeType::NoChange
+            }
+        } else {
+            FundingRateChangeType::Increase
+        }
+    }
+}
+
+/// Funding Rate Change Type.
+#[derive(Default, Debug)]
+pub enum FundingRateChangeType {
+    /// No Change.
+    #[default]
+    NoChange,
+    /// Increase.
+    Increase,
+    /// Decrease.
+    Decrease,
 }
 
 /// Fees.
@@ -197,6 +295,7 @@ impl<T> FeeParams<T> {
         Ok(PositionFees {
             base,
             borrowing: Default::default(),
+            funding: Default::default(),
         })
     }
 }
@@ -227,11 +326,47 @@ impl<T: Zero> Default for BorrowingFee<T> {
     }
 }
 
+/// Funding Fees.
+#[derive(Debug, Clone, Copy, TypedBuilder)]
+pub struct FundingFees<T> {
+    amount: T,
+    claimable_long_token_amount: T,
+    claimable_short_token_amount: T,
+}
+
+impl<T> FundingFees<T> {
+    /// Get funding fee amount.
+    pub fn amount(&self) -> &T {
+        &self.amount
+    }
+
+    /// Get claimable long token funding fee amount.
+    pub fn claimable_long_token_amount(&self) -> &T {
+        &self.claimable_long_token_amount
+    }
+
+    /// Get claimble short token funding fee amount.
+    pub fn claimable_short_token_amount(&self) -> &T {
+        &self.claimable_short_token_amount
+    }
+}
+
+impl<T: Zero> Default for FundingFees<T> {
+    fn default() -> Self {
+        Self {
+            amount: Zero::zero(),
+            claimable_long_token_amount: Zero::zero(),
+            claimable_short_token_amount: Zero::zero(),
+        }
+    }
+}
+
 /// Position Fees.
 #[derive(Debug, Clone, Copy)]
 pub struct PositionFees<T> {
     base: Fees<T>,
     borrowing: BorrowingFee<T>,
+    funding: FundingFees<T>,
 }
 
 impl<T> PositionFees<T> {
@@ -258,12 +393,19 @@ impl<T> PositionFees<T> {
         &self.borrowing
     }
 
+    /// Get funding fees.
+    pub fn funding_fees(&self) -> &FundingFees<T> {
+        &self.funding
+    }
+
     /// Get total cost amount in collateral tokens.
     pub fn total_cost_amount(&self) -> crate::Result<T>
     where
         T: CheckedAdd,
     {
-        self.total_cost_excluding_funding()
+        self.total_cost_excluding_funding()?
+            .checked_add(&self.funding.amount)
+            .ok_or(crate::Error::Overflow)
     }
 
     /// Get total cost excluding funding fee.
@@ -301,6 +443,12 @@ impl<T> PositionFees<T> {
         self.borrowing.amount = amount;
         Ok(self)
     }
+
+    /// Apply funding fees.
+    pub fn apply_funding_fees(mut self, fees: FundingFees<T>) -> Self {
+        self.funding = fees;
+        self
+    }
 }
 
 impl<T: Zero> Default for PositionFees<T> {
@@ -308,6 +456,7 @@ impl<T: Zero> Default for PositionFees<T> {
         Self {
             base: Default::default(),
             borrowing: Default::default(),
+            funding: Default::default(),
         }
     }
 }

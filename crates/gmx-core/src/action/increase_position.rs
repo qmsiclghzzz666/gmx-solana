@@ -8,7 +8,10 @@ use crate::{
     MarketExt,
 };
 
-use super::{update_borrowing_state::UpdateBorrowingReport, Prices};
+use super::{
+    update_borrowing_state::UpdateBorrowingReport, update_funding_state::UpdateFundingReport,
+    Prices,
+};
 
 /// Increase the position.
 #[must_use]
@@ -27,12 +30,17 @@ pub struct IncreasePositionParams<T> {
 }
 
 /// Report of the execution of position increasing.
+#[must_use]
 pub struct IncreasePositionReport<T: Unsigned> {
     params: IncreasePositionParams<T>,
     execution: ExecutionParams<T>,
     collateral_delta_amount: T,
     fees: PositionFees<T>,
     borrowing: UpdateBorrowingReport<T>,
+    funding: UpdateFundingReport<T>,
+    /// Output amounts that must be processed.
+    claimble_funding_long_token_amount: T,
+    claimble_funding_short_token_amount: T,
 }
 
 impl<T: Unsigned + fmt::Debug> fmt::Debug for IncreasePositionReport<T>
@@ -46,25 +54,55 @@ where
             .field("collateral_delta_amount", &self.collateral_delta_amount)
             .field("fees", &self.fees)
             .field("borrowing", &self.borrowing)
+            .field("funding", &self.funding)
+            .field(
+                "claimble_funding_long_token_amount",
+                &self.claimble_funding_long_token_amount,
+            )
+            .field(
+                "claimble_funding_short_token_amount",
+                &self.claimble_funding_short_token_amount,
+            )
             .finish()
     }
 }
 
-impl<T: Unsigned> IncreasePositionReport<T> {
+impl<T: Unsigned + Clone> IncreasePositionReport<T> {
     fn new(
         params: IncreasePositionParams<T>,
         execution: ExecutionParams<T>,
         collateral_delta_amount: T,
         fees: PositionFees<T>,
         borrowing: UpdateBorrowingReport<T>,
+        funding: UpdateFundingReport<T>,
     ) -> Self {
         Self {
             params,
             execution,
             collateral_delta_amount,
-            fees,
             borrowing,
+            funding,
+            claimble_funding_long_token_amount: fees
+                .funding_fees()
+                .claimable_long_token_amount()
+                .clone(),
+            claimble_funding_short_token_amount: fees
+                .funding_fees()
+                .claimable_short_token_amount()
+                .clone(),
+            fees,
         }
+    }
+
+    /// Get claimble funding amounts, returns `(long_amount, short_amount)`.
+    ///
+    /// ## Must Use
+    /// These amounts is expected to be used by the caller.
+    pub fn claimble_funding_amounts(&self) -> (&T, &T) {
+        (
+            &self.claimble_funding_long_token_amount,
+            &self.claimble_funding_short_token_amount,
+        )
     }
 
     /// Get params.
@@ -85,6 +123,16 @@ impl<T: Unsigned> IncreasePositionReport<T> {
     /// Get position fees.
     pub fn fees(&self) -> &PositionFees<T> {
         &self.fees
+    }
+
+    /// Get borrowing report.
+    pub fn borrowing(&self) -> &UpdateBorrowingReport<T> {
+        &self.borrowing
+    }
+
+    /// Get funding report.
+    pub fn funding(&self) -> &UpdateFundingReport<T> {
+        &self.funding
     }
 }
 
@@ -134,17 +182,24 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> IncreasePosition<P, DECIMALS> {
 
     /// Execute.
     pub fn execute(mut self) -> crate::Result<IncreasePositionReport<P::Num>> {
-        // TODO: update funding state
         let borrowing = self
             .position
             .market_mut()
             .update_borrowing(&self.params.prices)?
             .execute()?;
+        let funding = self
+            .position
+            .market_mut()
+            .update_funding(&self.params.prices)?
+            .execute()?;
+
+        self.initialize_position_if_empty()?;
 
         let execution = self.get_execution_params()?;
 
         let (collateral_delta_amount, fees) =
             self.process_collateral(&execution.price_impact_value)?;
+
         *self.position.collateral_amount_mut() = self
             .position
             .collateral_amount_mut()
@@ -170,17 +225,32 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> IncreasePosition<P, DECIMALS> {
 
         // TODO: update total borrowing
 
-        // TODO: update claimable funding amount
-
+        // Update sizes.
         *self.position.size_in_usd_mut() = next_position_size_in_usd;
         *self.position.size_in_tokens_mut() = self
             .position
             .size_in_tokens_mut()
             .checked_add(&execution.size_delta_in_tokens)
             .ok_or(crate::Error::Computation("size in tokens overflow"))?;
+
         let is_long = self.position.is_long();
+
+        // Update funding fees state.
+        *self.position.funding_fee_amount_per_size_mut() = self
+            .position
+            .market()
+            .funding_fee_amount_per_size(is_long, self.position.is_collateral_token_long())?;
+        for is_long_collateral in [true, false] {
+            *self
+                .position
+                .claimable_funding_fee_amount_per_size_mut(is_long_collateral) = self
+                .position
+                .market()
+                .claimable_funding_fee_amount_per_size(is_long, is_long_collateral)?;
+        }
+
+        // Update borrowing fee state.
         *self.position.borrowing_factor_mut() = self.position.market().borrowing_factor(is_long)?;
-        // TODO: update other position state
 
         self.position.apply_delta_to_open_interest(
             &self.params.size_delta_usd.to_signed()?,
@@ -221,7 +291,32 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> IncreasePosition<P, DECIMALS> {
             collateral_delta_amount,
             fees,
             borrowing,
+            funding,
         ))
+    }
+
+    fn initialize_position_if_empty(&mut self) -> crate::Result<()> {
+        if self.position.size_in_usd().is_zero() {
+            let funding_fee_amount_per_size = self.position.market().funding_fee_amount_per_size(
+                self.position.is_long(),
+                self.position.is_collateral_token_long(),
+            )?;
+            *self.position.funding_fee_amount_per_size_mut() = funding_fee_amount_per_size;
+            for is_long_collateral in [true, false] {
+                let claimable_funding_fee_amount_per_size = self
+                    .position
+                    .market()
+                    .claimable_funding_fee_amount_per_size(
+                        self.position.is_long(),
+                        is_long_collateral,
+                    )?;
+                *self
+                    .position
+                    .claimable_funding_fee_amount_per_size_mut(is_long_collateral) =
+                    claimable_funding_fee_amount_per_size;
+            }
+        }
+        Ok(())
     }
 
     fn get_execution_params(&self) -> crate::Result<ExecutionParams<P::Num>> {

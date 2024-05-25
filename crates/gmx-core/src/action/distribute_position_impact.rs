@@ -82,7 +82,7 @@ mod tests {
         let mut position = TestPosition::long(true);
         for _ in 0..100 {
             market.distribute_position_impact()?.execute()?;
-            position
+            _ = position
                 .ops(&mut market)
                 .increase(
                     Prices {

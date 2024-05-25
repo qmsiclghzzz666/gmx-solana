@@ -1,5 +1,3 @@
-use std::fmt;
-
 use self::delta::PoolDelta;
 
 /// Balance.
@@ -57,35 +55,24 @@ pub enum PoolKind {
     SwapImpact,
     /// Claimable fee.
     ClaimableFee,
-    /// Open Interest for long collateral.
-    OpenInterestForLongCollateral,
-    /// Open Interest for short collateral.
-    OpenInterestForShortCollateral,
-    /// Open Interest in tokens for long collateral.
-    OpenInterestInTokensForLongCollateral,
-    /// Open Interest in tokens for short collateral.
-    OpenInterestInTokensForShortCollateral,
+    /// Open Interest for long.
+    OpenInterestForLong,
+    /// Open Interest for short.
+    OpenInterestForShort,
+    /// Open Interest in tokens for long.
+    OpenInterestInTokensForLong,
+    /// Open Interest in tokens for short.
+    OpenInterestInTokensForShort,
     /// Position impact.
     PositionImpact,
     /// Borrowing Factor.
     BorrowingFactor,
-}
-
-impl fmt::Display for PoolKind {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let name = match self {
-            Self::Primary => "Primary",
-            Self::SwapImpact => "SwapImpact",
-            Self::ClaimableFee => "ClaimableFee",
-            Self::OpenInterestForLongCollateral => "OpenInterestForLongCollateral",
-            Self::OpenInterestForShortCollateral => "OpenInterestForShortCollateral",
-            Self::OpenInterestInTokensForLongCollateral => "OpenInterestInTokensForLongCollateral",
-            Self::OpenInterestInTokensForShortCollateral => {
-                "OpenInterestInTokensForShortCollateral"
-            }
-            Self::PositionImpact => "PositionImpact",
-            Self::BorrowingFactor => "BorrowingFactor",
-        };
-        write!(f, "{name}")
-    }
+    /// Funding Amount Per Size for long.
+    FundingAmountPerSizeForLong,
+    /// Funding Amount Per Size for short.
+    FundingAmountPerSizeForShort,
+    /// Claimable Funding Amount Per Size for long.
+    ClaimableFundingAmountPerSizeForLong,
+    /// Claimable Funding Amount Per Size for short.
+    ClaimableFundingAmountPerSizeForShort,
 }

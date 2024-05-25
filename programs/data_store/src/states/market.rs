@@ -3,8 +3,9 @@ use anchor_spl::token::Mint;
 use dual_vec_map::DualVecMap;
 use gmx_core::{
     params::{
-        fee::BorrowingFeeParams, position::PositionImpactDistributionParams, FeeParams,
-        PositionParams, PriceImpactParams,
+        fee::{BorrowingFeeParams, FundingFeeParams},
+        position::PositionImpactDistributionParams,
+        FeeParams, PositionParams, PriceImpactParams,
     },
     ClockKind, PoolKind,
 };
@@ -27,11 +28,13 @@ pub struct Market {
     pub(crate) meta: MarketMeta,
     pools: Pools,
     clocks: DynamicMapStore<u8, i64>,
+    funding_factor_per_second: i128,
 }
 
 impl Market {
     pub(crate) fn init_space(num_pools: u8, num_clocks: u8) -> usize {
-        1 + MarketMeta::INIT_SPACE
+        1 + 16
+            + MarketMeta::INIT_SPACE
             + DynamicMapStore::<u8, Pool>::init_space(num_pools)
             + DynamicMapStore::<u8, i64>::init_space(num_clocks)
     }
@@ -82,13 +85,7 @@ impl MarketMeta {
     }
 }
 
-const NOT_PURE_POOLS: [u8; 5] = [
-    PoolKind::OpenInterestForLongCollateral as u8,
-    PoolKind::OpenInterestForShortCollateral as u8,
-    PoolKind::OpenInterestInTokensForLongCollateral as u8,
-    PoolKind::OpenInterestInTokensForShortCollateral as u8,
-    PoolKind::BorrowingFactor as u8,
-];
+const NOT_PURE_POOLS: [u8; 1] = [PoolKind::BorrowingFactor as u8];
 
 impl Market {
     /// Initialize the market.
@@ -114,6 +111,7 @@ impl Market {
         });
         let current = Clock::get()?.unix_timestamp;
         self.clocks.init_with(num_clocks, |_| current);
+        self.funding_factor_per_second = 0;
         Ok(())
     }
 
@@ -166,6 +164,7 @@ impl Market {
             transfer: None,
             receiver: None,
             vault: None,
+            funding_factor_per_second: &mut self.funding_factor_per_second,
         }
     }
 }
@@ -275,6 +274,7 @@ type ClocksMap<'a> = DualVecMap<&'a mut Vec<u8>, &'a mut Vec<i64>>;
 /// Convert to a [`Market`](gmx_core::Market).
 pub struct AsMarket<'a, 'info> {
     meta: &'a MarketMeta,
+    funding_factor_per_second: &'a mut i128,
     pools: PoolsMap<'a>,
     clocks: ClocksMap<'a>,
     mint: &'a mut Account<'info, Mint>,
@@ -389,6 +389,10 @@ impl<'a, 'info> gmx_core::Market<{ constants::MARKET_DECIMALS }> for AsMarket<'a
         constants::MARKET_USD_TO_AMOUNT_DIVISOR
     }
 
+    fn funding_amount_per_size_adjustment(&self) -> Self::Num {
+        constants::FUNDING_AMOUNT_PER_SIZE_ADJUSTMENT
+    }
+
     fn swap_impact_params(&self) -> gmx_core::params::PriceImpactParams<Self::Num> {
         PriceImpactParams::builder()
             .with_exponent(2 * constants::MARKET_USD_UNIT)
@@ -448,6 +452,27 @@ impl<'a, 'info> gmx_core::Market<{ constants::MARKET_DECIMALS }> for AsMarket<'a
             .exponent_for_long(100_000_000_000_000_000_000)
             .exponent_for_short(100_000_000_000_000_000_000)
             .build()
+    }
+
+    fn funding_fee_params(&self) -> FundingFeeParams<Self::Num> {
+        FundingFeeParams::builder()
+            .exponent(100_000_000_000_000_000_000)
+            .funding_factor(2_000_000_000_000)
+            .max_factor_per_second(1_000_000_000_000)
+            .min_factor_per_second(30_000_000_000)
+            .increase_factor_per_second(790_000_000)
+            .decrease_factor_per_second(0)
+            .threshold_for_stable_funding(5_000_000_000_000_000_000)
+            .threshold_for_decrease_funding(0)
+            .build()
+    }
+
+    fn funding_factor_per_second(&self) -> &Self::Signed {
+        self.funding_factor_per_second
+    }
+
+    fn funding_factor_per_second_mut(&mut self) -> &mut Self::Signed {
+        self.funding_factor_per_second
     }
 }
 

@@ -71,8 +71,11 @@ pub trait BalanceExt: Balance {
     }
 
     /// Merge the amounts with other [`Balance`].
-    fn merge<B: Balance>(&self, other: B) -> Merged<&Self, B> {
-        Merged(self, other)
+    ///
+    /// The result [`Balance`] will consider the total amounts (`long_amount + short_amount`) of `self` as the long amount,
+    /// and the total amount of `short` as the short amount.
+    fn merge<B: Balance>(&self, short: B) -> Merged<&Self, B> {
+        Merged(self, short)
     }
 
     /// Get amount by side.
@@ -120,13 +123,13 @@ where
     fn long_amount(&self) -> crate::Result<Self::Num> {
         self.0
             .long_amount()?
-            .checked_add(&self.1.long_amount()?)
+            .checked_add(&self.0.short_amount()?)
             .ok_or(crate::Error::Overflow)
     }
 
     fn short_amount(&self) -> crate::Result<Self::Num> {
-        self.0
-            .short_amount()?
+        self.1
+            .long_amount()?
             .checked_add(&self.1.short_amount()?)
             .ok_or(crate::Error::Overflow)
     }
@@ -139,19 +142,18 @@ mod tests {
 
     #[test]
     fn test_merge_balances() -> crate::Result<()> {
-        let mut open_interest_for_long_collateral = TestPool::<u64>::default();
-        let mut open_interest_for_short_collateral = TestPool::<u64>::default();
+        let mut open_interest_for_long = TestPool::<u64>::default();
+        let mut open_interest_for_short = TestPool::<u64>::default();
 
-        open_interest_for_long_collateral.apply_delta_to_long_amount(&1000)?;
-        open_interest_for_long_collateral.apply_delta_to_short_amount(&2000)?;
-        open_interest_for_short_collateral.apply_delta_to_long_amount(&3000)?;
-        open_interest_for_short_collateral.apply_delta_to_short_amount(&4000)?;
+        open_interest_for_long.apply_delta_to_long_amount(&1000)?;
+        open_interest_for_long.apply_delta_to_short_amount(&2000)?;
+        open_interest_for_short.apply_delta_to_long_amount(&3000)?;
+        open_interest_for_short.apply_delta_to_short_amount(&4000)?;
 
-        let open_interest =
-            open_interest_for_long_collateral.merge(&open_interest_for_short_collateral);
+        let open_interest = open_interest_for_long.merge(&open_interest_for_short);
 
-        assert_eq!(open_interest.long_amount()?, 4000);
-        assert_eq!(open_interest.short_amount()?, 6000);
+        assert_eq!(open_interest.long_amount()?, 3000);
+        assert_eq!(open_interest.short_amount()?, 7000);
 
         Ok(())
     }

@@ -2,7 +2,7 @@ use crate::{num::Unsigned, ClockKind, Market, MarketExt};
 
 use super::Prices;
 
-/// Update Borrowing State.
+/// Update Borrowing State Action.
 #[must_use]
 pub struct UpdateBorrowingState<M: Market<DECIMALS>, const DECIMALS: u8> {
     market: M,
@@ -61,14 +61,13 @@ impl<T> UpdateBorrowingReport<T> {
         self.duration_in_seconds
     }
 
-    /// Get next cumulative borrowing factor for long.
-    pub fn next_cumulative_borrowing_factor_for_long(&self) -> &T {
-        &self.next_cumulative_borrowing_factor_for_long
-    }
-
-    /// Get next cumulative borrowing factor for short.
-    pub fn next_cumulative_borrowing_factor_for_short(&self) -> &T {
-        &self.next_cumulative_borrowing_factor_for_short
+    /// Get next cumulative borrowing factor
+    pub fn next_cumulative_borrowing_factor(&self, is_long: bool) -> &T {
+        if is_long {
+            &self.next_cumulative_borrowing_factor_for_long
+        } else {
+            &self.next_cumulative_borrowing_factor_for_short
+        }
     }
 }
 

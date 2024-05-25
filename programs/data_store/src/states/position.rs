@@ -259,4 +259,31 @@ impl<'a, 'info> gmx_core::Position<{ constants::MARKET_DECIMALS }> for PositionO
     fn borrowing_factor_mut(&mut self) -> &mut Self::Num {
         &mut self.position.borrowing_factor
     }
+
+    fn funding_fee_amount_per_size(&self) -> &Self::Num {
+        &self.position.funding_fee_amount_per_size
+    }
+
+    fn funding_fee_amount_per_size_mut(&mut self) -> &mut Self::Num {
+        &mut self.position.funding_fee_amount_per_size
+    }
+
+    fn claimable_funding_fee_amount_per_size(&self, is_long_collateral: bool) -> &Self::Num {
+        if is_long_collateral {
+            &self.position.long_token_claimable_funding_amount_per_size
+        } else {
+            &self.position.short_token_claimable_funding_amount_per_size
+        }
+    }
+
+    fn claimable_funding_fee_amount_per_size_mut(
+        &mut self,
+        is_long_collateral: bool,
+    ) -> &mut Self::Num {
+        if is_long_collateral {
+            &mut self.position.long_token_claimable_funding_amount_per_size
+        } else {
+            &mut self.position.short_token_claimable_funding_amount_per_size
+        }
+    }
 }

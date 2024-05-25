@@ -1,13 +1,14 @@
 use crate::{
     action::{
         deposit::Deposit, distribute_position_impact::DistributePositionImpact, swap::Swap,
-        update_borrowing_state::UpdateBorrowingState, withdraw::Withdrawal, Prices,
+        update_borrowing_state::UpdateBorrowingState, update_funding_state::UpdateFundingState,
+        withdraw::Withdrawal, Prices,
     },
     clock::ClockKind,
     fixed::FixedPointOps,
     num::{MulDiv, Num, UnsignedAbs},
     params::{
-        fee::BorrowingFeeParams,
+        fee::{BorrowingFeeParams, FundingFeeParams},
         position::{PositionImpactDistributionParams, PositionParams},
         FeeParams, PriceImpactParams,
     },
@@ -52,6 +53,9 @@ pub trait Market<const DECIMALS: u8> {
     /// One should make sure it is non-zero.
     fn usd_to_amount_divisor(&self) -> Self::Num;
 
+    /// Adjustment factor for packing funding amount per size.
+    fn funding_amount_per_size_adjustment(&self) -> Self::Num;
+
     /// Get the swap impact params.
     fn swap_impact_params(&self) -> PriceImpactParams<Self::Num>;
 
@@ -72,6 +76,15 @@ pub trait Market<const DECIMALS: u8> {
 
     /// Get borrowing fee params.
     fn borrowing_fee_params(&self) -> BorrowingFeeParams<Self::Num>;
+
+    /// Get funding fee params.
+    fn funding_fee_params(&self) -> FundingFeeParams<Self::Num>;
+
+    /// Get funding factor per second.
+    fn funding_factor_per_second(&self) -> &Self::Signed;
+
+    /// Get the mutable reference to funding factor per second.
+    fn funding_factor_per_second_mut(&mut self) -> &mut Self::Signed;
 }
 
 impl<'a, const DECIMALS: u8, M: Market<DECIMALS>> Market<DECIMALS> for &'a mut M {
@@ -109,6 +122,10 @@ impl<'a, const DECIMALS: u8, M: Market<DECIMALS>> Market<DECIMALS> for &'a mut M
         (**self).usd_to_amount_divisor()
     }
 
+    fn funding_amount_per_size_adjustment(&self) -> Self::Num {
+        (**self).funding_amount_per_size_adjustment()
+    }
+
     fn swap_impact_params(&self) -> PriceImpactParams<Self::Num> {
         (**self).swap_impact_params()
     }
@@ -135,6 +152,18 @@ impl<'a, const DECIMALS: u8, M: Market<DECIMALS>> Market<DECIMALS> for &'a mut M
 
     fn borrowing_fee_params(&self) -> BorrowingFeeParams<Self::Num> {
         (**self).borrowing_fee_params()
+    }
+
+    fn funding_fee_params(&self) -> FundingFeeParams<Self::Num> {
+        (**self).funding_fee_params()
+    }
+
+    fn funding_factor_per_second(&self) -> &Self::Signed {
+        (**self).funding_factor_per_second()
+    }
+
+    fn funding_factor_per_second_mut(&mut self) -> &mut Self::Signed {
+        (**self).funding_factor_per_second_mut()
     }
 }
 
@@ -176,36 +205,33 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
 
     /// Get the reference of open interest pool.
     #[inline]
-    fn open_interest_pool(&self, is_long_collateral: bool) -> crate::Result<&Self::Pool> {
-        let kind = if is_long_collateral {
-            PoolKind::OpenInterestForLongCollateral
+    fn open_interest_pool(&self, is_long: bool) -> crate::Result<&Self::Pool> {
+        let kind = if is_long {
+            PoolKind::OpenInterestForLong
         } else {
-            PoolKind::OpenInterestForShortCollateral
+            PoolKind::OpenInterestForShort
         };
         self.pool(kind)?.ok_or(crate::Error::MissingPoolKind(kind))
     }
 
     /// Get the reference of open interest pool.
     #[inline]
-    fn open_interest_in_tokens_pool(&self, is_long_collateral: bool) -> crate::Result<&Self::Pool> {
-        let kind = if is_long_collateral {
-            PoolKind::OpenInterestInTokensForLongCollateral
+    fn open_interest_in_tokens_pool(&self, is_long: bool) -> crate::Result<&Self::Pool> {
+        let kind = if is_long {
+            PoolKind::OpenInterestInTokensForLong
         } else {
-            PoolKind::OpenInterestInTokensForShortCollateral
+            PoolKind::OpenInterestInTokensForShort
         };
         self.pool(kind)?.ok_or(crate::Error::MissingPoolKind(kind))
     }
 
     /// Get mutable reference of open interest pool.
     #[inline]
-    fn open_interest_pool_mut(
-        &mut self,
-        is_long_collateral: bool,
-    ) -> crate::Result<&mut Self::Pool> {
-        let kind = if is_long_collateral {
-            PoolKind::OpenInterestForLongCollateral
+    fn open_interest_pool_mut(&mut self, is_long: bool) -> crate::Result<&mut Self::Pool> {
+        let kind = if is_long {
+            PoolKind::OpenInterestForLong
         } else {
-            PoolKind::OpenInterestForShortCollateral
+            PoolKind::OpenInterestForShort
         };
         self.pool_mut(kind)?
             .ok_or(crate::Error::MissingPoolKind(kind))
@@ -215,12 +241,12 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
     #[inline]
     fn open_interest_in_tokens_pool_mut(
         &mut self,
-        is_long_collateral: bool,
+        is_long: bool,
     ) -> crate::Result<&mut Self::Pool> {
-        let kind = if is_long_collateral {
-            PoolKind::OpenInterestInTokensForLongCollateral
+        let kind = if is_long {
+            PoolKind::OpenInterestInTokensForLong
         } else {
-            PoolKind::OpenInterestInTokensForShortCollateral
+            PoolKind::OpenInterestInTokensForShort
         };
         self.pool_mut(kind)?
             .ok_or(crate::Error::MissingPoolKind(kind))
@@ -258,6 +284,58 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
     fn borrowing_factor_pool_mut(&mut self) -> crate::Result<&mut Self::Pool> {
         self.pool_mut(PoolKind::BorrowingFactor)?
             .ok_or(crate::Error::MissingPoolKind(PoolKind::BorrowingFactor))
+    }
+
+    /// Get a reference to funding amount per size pool.
+    #[inline]
+    fn funding_amount_per_size_pool(&self, is_long: bool) -> crate::Result<&Self::Pool> {
+        let kind = if is_long {
+            PoolKind::FundingAmountPerSizeForLong
+        } else {
+            PoolKind::FundingAmountPerSizeForShort
+        };
+        self.pool(kind)?.ok_or(crate::Error::MissingPoolKind(kind))
+    }
+
+    /// Get a reference to claimable funding amount per size pool.
+    #[inline]
+    fn claimable_funding_amount_per_size_pool(&self, is_long: bool) -> crate::Result<&Self::Pool> {
+        let kind = if is_long {
+            PoolKind::ClaimableFundingAmountPerSizeForLong
+        } else {
+            PoolKind::ClaimableFundingAmountPerSizeForShort
+        };
+        self.pool(kind)?.ok_or(crate::Error::MissingPoolKind(kind))
+    }
+
+    /// Get the mutable reference to funding amount per size pool.
+    #[inline]
+    fn funding_amount_per_size_pool_mut(
+        &mut self,
+        is_long: bool,
+    ) -> crate::Result<&mut Self::Pool> {
+        let kind = if is_long {
+            PoolKind::FundingAmountPerSizeForLong
+        } else {
+            PoolKind::FundingAmountPerSizeForShort
+        };
+        self.pool_mut(kind)?
+            .ok_or(crate::Error::MissingPoolKind(kind))
+    }
+
+    /// Get the mutable reference to claimable funding amount per size pool.
+    #[inline]
+    fn claimable_funding_amount_per_size_pool_mut(
+        &mut self,
+        is_long: bool,
+    ) -> crate::Result<&mut Self::Pool> {
+        let kind = if is_long {
+            PoolKind::ClaimableFundingAmountPerSizeForLong
+        } else {
+            PoolKind::ClaimableFundingAmountPerSizeForShort
+        };
+        self.pool_mut(kind)?
+            .ok_or(crate::Error::MissingPoolKind(kind))
     }
 
     /// Get the usd value of primary pool.
@@ -364,6 +442,17 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
         Self: Sized,
     {
         UpdateBorrowingState::try_new(self, prices)
+    }
+
+    /// Create a [`UpdateFundingState`] action.
+    fn update_funding(
+        &mut self,
+        prices: &Prices<Self::Num>,
+    ) -> crate::Result<UpdateFundingState<&mut Self, DECIMALS>>
+    where
+        Self: Sized,
+    {
+        UpdateFundingState::try_new(self, prices)
     }
 
     /// Get the swap impact amount with cap.
@@ -546,6 +635,28 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
         self.borrowing_factor_pool()?.amount(is_long)
     }
 
+    /// Get current funding fee amount per size.
+    #[inline]
+    fn funding_fee_amount_per_size(
+        &self,
+        is_long: bool,
+        is_long_collateral: bool,
+    ) -> crate::Result<Self::Num> {
+        self.funding_amount_per_size_pool(is_long)?
+            .amount(is_long_collateral)
+    }
+
+    /// Get current claimable funding fee amount per size.
+    #[inline]
+    fn claimable_funding_fee_amount_per_size(
+        &self,
+        is_long: bool,
+        is_long_collateral: bool,
+    ) -> crate::Result<Self::Num> {
+        self.claimable_funding_amount_per_size_pool(is_long)?
+            .amount(is_long_collateral)
+    }
+
     /// Apply a swap impact value to the price impact pool.
     ///
     /// - If it is a positive impact amount, cap the impact amount to the amount available in the price impact pool,
@@ -609,6 +720,28 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
     ) -> crate::Result<()> {
         self.borrowing_factor_pool_mut()?
             .apply_delta_amount(is_long, delta)
+    }
+
+    /// Apply delta to funding amount per size.
+    fn apply_delta_to_funding_amount_per_size(
+        &mut self,
+        is_long: bool,
+        is_long_collateral: bool,
+        delta: &Self::Signed,
+    ) -> crate::Result<()> {
+        self.funding_amount_per_size_pool_mut(is_long)?
+            .apply_delta_amount(is_long_collateral, delta)
+    }
+
+    /// Apply delta to claimable funding amount per size.
+    fn apply_delta_to_claimable_funding_amount_per_size(
+        &mut self,
+        is_long: bool,
+        is_long_collateral: bool,
+        delta: &Self::Signed,
+    ) -> crate::Result<()> {
+        self.claimable_funding_amount_per_size_pool_mut(is_long)?
+            .apply_delta_amount(is_long_collateral, delta)
     }
 }
 
