@@ -142,19 +142,18 @@ mod tests {
 
     #[test]
     fn test_merge_balances() -> crate::Result<()> {
-        let mut open_interest_for_long_collateral = TestPool::<u64>::default();
-        let mut open_interest_for_short_collateral = TestPool::<u64>::default();
+        let mut open_interest_for_long = TestPool::<u64>::default();
+        let mut open_interest_for_short = TestPool::<u64>::default();
 
-        open_interest_for_long_collateral.apply_delta_to_long_amount(&1000)?;
-        open_interest_for_long_collateral.apply_delta_to_short_amount(&2000)?;
-        open_interest_for_short_collateral.apply_delta_to_long_amount(&3000)?;
-        open_interest_for_short_collateral.apply_delta_to_short_amount(&4000)?;
+        open_interest_for_long.apply_delta_to_long_amount(&1000)?;
+        open_interest_for_long.apply_delta_to_short_amount(&2000)?;
+        open_interest_for_short.apply_delta_to_long_amount(&3000)?;
+        open_interest_for_short.apply_delta_to_short_amount(&4000)?;
 
-        let open_interest =
-            open_interest_for_long_collateral.merge(&open_interest_for_short_collateral);
+        let open_interest = open_interest_for_long.merge(&open_interest_for_short);
 
-        assert_eq!(open_interest.long_amount()?, 4000);
-        assert_eq!(open_interest.short_amount()?, 6000);
+        assert_eq!(open_interest.long_amount()?, 3000);
+        assert_eq!(open_interest.short_amount()?, 7000);
 
         Ok(())
     }
