@@ -56,6 +56,7 @@ struct ProcessCollateralResult<T: Unsigned> {
     execution_price: T,
     size_delta_in_tokens: T,
     is_output_token_long: bool,
+    is_secondary_output_token_long: bool,
     collateral: ProcessReport<T>,
     fees: PositionFees<T>,
 }
@@ -387,6 +388,7 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
             execution_price,
             size_delta_in_tokens,
             is_output_token_long,
+            is_secondary_output_token_long: is_pnl_token_long,
             collateral: report,
             fees,
         })

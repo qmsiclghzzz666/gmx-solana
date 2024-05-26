@@ -1,5 +1,7 @@
 use std::fmt;
 
+use num_traits::Zero;
+
 use crate::{
     action::{
         update_borrowing_state::UpdateBorrowingReport, update_funding_state::UpdateFundingReport,
@@ -27,10 +29,14 @@ pub struct DecreasePositionReport<T: Unsigned> {
     // Output.
     should_remove: bool,
     is_output_token_long: bool,
+    is_secondary_output_token_long: bool,
     output_amount: T,
     secondary_output_amount: T,
-    claimble_funding_long_token_amount: T,
-    claimble_funding_short_token_amount: T,
+    claimable_funding_long_token_amount: T,
+    claimable_funding_short_token_amount: T,
+    claimable_secondary_output_amount_for_treasury: T,
+    claimable_output_amount_for_user: T,
+    claimable_secondary_output_amount_for_user: T,
 }
 
 impl<T: Unsigned + fmt::Debug> fmt::Debug for DecreasePositionReport<T>
@@ -39,7 +45,6 @@ where
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("DecreasePositionReport")
-            .field("should_remove", &self.should_remove)
             .field("params", &self.params)
             .field("price_impact_value", &self.price_impact_value)
             .field("price_impact_diff", &self.price_impact_diff)
@@ -53,16 +58,33 @@ where
             .field("size_delta_usd", &self.size_delta_usd)
             .field("borrowing", &self.borrowing)
             .field("funding", &self.funding)
+            .field("should_remove", &self.should_remove)
             .field("is_output_token_long", &self.is_output_token_long)
+            .field(
+                "is_secondary_output_token_long",
+                &self.is_secondary_output_token_long,
+            )
             .field("output_amount", &self.output_amount)
             .field("secondary_output_amount", &self.secondary_output_amount)
             .field(
-                "claimble_funding_long_token_amount",
-                &self.claimble_funding_long_token_amount,
+                "claimable_funding_long_token_amount",
+                &self.claimable_funding_long_token_amount,
             )
             .field(
-                "claimble_funding_short_token_amount",
-                &self.claimble_funding_short_token_amount,
+                "claimable_funding_short_token_amount",
+                &self.claimable_funding_short_token_amount,
+            )
+            .field(
+                "claimable_secondary_output_amount_for_treasury",
+                &self.claimable_secondary_output_amount_for_treasury,
+            )
+            .field(
+                "claimable_output_amount_for_user",
+                &self.claimable_output_amount_for_user,
+            )
+            .field(
+                "claimable_secondary_output_amount_for_user",
+                &self.claimable_secondary_output_amount_for_user,
             )
             .finish()
     }
@@ -87,21 +109,25 @@ impl<T: Unsigned + Clone> DecreasePositionReport<T> {
             borrowing,
             funding,
             is_output_token_long: execution.is_output_token_long,
+            is_secondary_output_token_long: execution.is_secondary_output_token_long,
             output_amount: execution.collateral.output_amount,
             secondary_output_amount: execution.collateral.secondary_output_amount,
             withdrawable_collateral_amount,
             size_delta_usd,
             price_impact_diff: execution.price_impact_diff,
-            claimble_funding_long_token_amount: execution
+            claimable_funding_long_token_amount: execution
                 .fees
                 .funding_fees()
                 .claimable_long_token_amount()
                 .clone(),
-            claimble_funding_short_token_amount: execution
+            claimable_funding_short_token_amount: execution
                 .fees
                 .funding_fees()
                 .claimable_short_token_amount()
                 .clone(),
+            claimable_secondary_output_amount_for_treasury: Zero::zero(),
+            claimable_output_amount_for_user: Zero::zero(),
+            claimable_secondary_output_amount_for_user: Zero::zero(),
             fees: execution.fees,
         }
     }
@@ -131,18 +157,26 @@ impl<T: Unsigned + Clone> DecreasePositionReport<T> {
         &self.fees
     }
 
-    /// Returns whether the output token is long token.
+    /// Returns whether the output token (collateral token) is long token.
     ///
     /// ## Must Use
-    /// Must use by the caller.
+    /// Must be used by the caller.
     pub fn is_output_token_long(&self) -> bool {
         self.is_output_token_long
+    }
+
+    /// Returns whether the secondary output token (pnl token) is long token.
+    ///
+    /// ## Must Use
+    /// Must be used by the caller.
+    pub fn is_secondary_output_token_long(&self) -> bool {
+        self.is_secondary_output_token_long
     }
 
     /// Get output amount.
     ///
     /// ## Must Use
-    /// Must use by the caller.
+    /// Must be used by the caller.
     pub fn output_amount(&self) -> &T {
         &self.output_amount
     }
@@ -150,7 +184,7 @@ impl<T: Unsigned + Clone> DecreasePositionReport<T> {
     /// Get secondary output amount.
     ///
     /// ## Must Use
-    /// Must use by the caller.
+    /// Must be used by the caller.
     pub fn secondary_output_amount(&self) -> &T {
         &self.secondary_output_amount
     }
@@ -158,7 +192,7 @@ impl<T: Unsigned + Clone> DecreasePositionReport<T> {
     /// Get should remove.
     ///
     /// ## Must Use
-    /// Must use by the caller.
+    /// Must be used by the caller.
     pub fn should_remove(&self) -> bool {
         self.should_remove
     }
@@ -166,7 +200,7 @@ impl<T: Unsigned + Clone> DecreasePositionReport<T> {
     /// Get withdrawable collateral amount.
     ///
     /// ## Must Use
-    /// Must use by the caller.
+    /// Must be used by the caller.
     pub fn withdrawable_collateral_amount(&self) -> &T {
         &self.withdrawable_collateral_amount
     }
@@ -174,12 +208,32 @@ impl<T: Unsigned + Clone> DecreasePositionReport<T> {
     /// Get claimable funding amounts.
     ///
     /// ## Must Use
-    /// Must use by the caller.
-    pub fn cliamble_funding_amounts(&self) -> (&T, &T) {
+    /// Must be used by the caller.
+    pub fn claimable_funding_amounts(&self) -> (&T, &T) {
         (
-            &self.claimble_funding_long_token_amount,
-            &self.claimble_funding_short_token_amount,
+            &self.claimable_funding_long_token_amount,
+            &self.claimable_funding_short_token_amount,
         )
+    }
+
+    /// Get claimable secondary output amount for treasury.
+    ///
+    /// ## Must Use
+    /// Must be used by the caller.
+    pub fn claimable_secondary_output_amount_for_treasury(&self) -> &T {
+        &self.claimable_secondary_output_amount_for_treasury
+    }
+
+    /// Get Get claimable amount for user.
+    ///
+    /// ## Must Use
+    /// Must be used by the caller.
+    pub fn claimable_amount_for_user(&self, is_output_token: bool) -> &T {
+        if is_output_token {
+            &self.claimable_output_amount_for_user
+        } else {
+            &self.claimable_secondary_output_amount_for_user
+        }
     }
 
     /// Get borrowing report.
