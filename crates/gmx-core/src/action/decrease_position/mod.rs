@@ -7,10 +7,7 @@ use crate::{
     Market, MarketExt,
 };
 
-use self::{
-    collateral_processor::{CollateralProcessor, ProcessReport},
-    report::DecreasePositionReport,
-};
+use self::collateral_processor::{CollateralProcessor, ProcessReport};
 
 use super::Prices;
 
@@ -19,7 +16,7 @@ mod collateral_processor;
 mod report;
 mod utils;
 
-pub use self::claimable::ClaimableCollateral;
+pub use self::{claimable::ClaimableCollateral, report::DecreasePositionReport};
 
 /// Decrease the position.
 #[must_use]
@@ -200,7 +197,7 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
 
         self.position.decreased()?;
 
-        Ok(DecreasePositionReport::new(
+        let mut report = DecreasePositionReport::new(
             should_remove,
             self.params,
             execution,
@@ -208,7 +205,11 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
             self.size_delta_usd,
             borrowing,
             funding,
-        ))
+        );
+
+        Self::swap_output_tokens_if_needed(self.position.market_mut(), &mut report)?;
+
+        Ok(report)
     }
 
     /// Do a check when the position will be partially decreased.
@@ -423,6 +424,48 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
         )?;
 
         Ok((price_impact_value, price_impact_diff_usd, execution_price))
+    }
+
+    /// Swap the secondary output tokens to output tokens if needed.
+    fn swap_output_tokens_if_needed(
+        market: &mut P::Market,
+        report: &mut DecreasePositionReport<P::Num>,
+    ) -> crate::Result<()> {
+        let (
+            is_output_token_long,
+            is_secondary_output_token_long,
+            long_token_price,
+            short_token_price,
+        ) = (
+            report.is_output_token_long(),
+            report.is_secondary_output_token_long(),
+            report.params().prices.long_token_price.clone(),
+            report.params().prices.short_token_price.clone(),
+        );
+        let output_amount = &mut report.output_amount;
+        let secondary_output_amount = &mut report.secondary_output_amount;
+        if !secondary_output_amount.is_zero() {
+            if is_output_token_long == is_secondary_output_token_long {
+                *output_amount = output_amount
+                    .checked_add(secondary_output_amount)
+                    .ok_or(crate::Error::Computation("merging output tokens"))?;
+                *secondary_output_amount = Zero::zero();
+            } else {
+                let report = market
+                    .swap(
+                        is_secondary_output_token_long,
+                        secondary_output_amount.clone(),
+                        long_token_price,
+                        short_token_price,
+                    )?
+                    .execute()?;
+                *output_amount = output_amount
+                    .checked_add(report.token_out_amount())
+                    .ok_or(crate::Error::Computation("adding swapped output tokens"))?;
+                *secondary_output_amount = Zero::zero();
+            }
+        }
+        Ok(())
     }
 }
 

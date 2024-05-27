@@ -1,6 +1,12 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token, TokenAccount};
-use gmx_core::{action::Prices, MarketExt, Position as _, PositionExt};
+use gmx_core::{
+    action::{
+        decrease_position::DecreasePositionReport, increase_position::IncreasePositionReport,
+        Prices,
+    },
+    MarketExt, PositionExt,
+};
 
 use crate::{
     constants,
@@ -233,18 +239,19 @@ impl<'info> ExecuteOrder<'info> {
                     .map_err(GmxCoreError::from)?
                     .execute()
                     .map_err(GmxCoreError::from)?;
-                msg!("{:?}", report);
+                self.process_increase_report(report)?;
             }
             OrderKind::MarketDecrease | OrderKind::Liquidation => {
-                let Some(position) = self.position.as_mut() else {
-                    return err!(DataStoreError::PositionNotProvided);
-                };
-                let params = &self.order.fixed.params;
-                let collateral_withdrawal_amount = params.initial_collateral_delta_amount as u128;
-                let size_delta_usd = params.size_delta_usd;
-                let acceptable_price = params.acceptable_price;
+                let report = {
+                    let Some(position) = self.position.as_mut() else {
+                        return err!(DataStoreError::PositionNotProvided);
+                    };
+                    let params = &self.order.fixed.params;
+                    let collateral_withdrawal_amount =
+                        params.initial_collateral_delta_amount as u128;
+                    let size_delta_usd = params.size_delta_usd;
+                    let acceptable_price = params.acceptable_price;
 
-                let (is_output_token_long, output_amount, secondary_output_amount) = {
                     let mut position = self
                         .market
                         .as_market(&mut self.market_token_mint)
@@ -262,82 +269,79 @@ impl<'info> ExecuteOrder<'info> {
                         .map_err(GmxCoreError::from)?
                         .execute()
                         .map_err(GmxCoreError::from)?;
-                    msg!("{:?}", report);
-
-                    let mut output_amount = *report.output_amount();
-                    let mut secondary_output_amount = *report.secondary_output_amount();
-                    if secondary_output_amount != 0 {
-                        require!(
-                            report.is_output_token_long() != position.is_long(),
-                            DataStoreError::SameSecondaryTokensNotMerged,
-                        );
-                        // Swap the secondary output tokens to output tokens.
-                        let report = position
-                            .into_market()
-                            .swap(
-                                !report.is_output_token_long(),
-                                secondary_output_amount,
-                                prices.long_token_price,
-                                prices.short_token_price,
-                            )
-                            .map_err(GmxCoreError::from)?
-                            .execute()
-                            .map_err(GmxCoreError::from)?;
-                        output_amount = output_amount
-                            .checked_add(*report.token_out_amount())
-                            .ok_or(DataStoreError::AmountOverflow)?;
-                        secondary_output_amount = 0;
-                    }
                     should_remove = report.should_remove();
-                    (
-                        report.is_output_token_long(),
-                        output_amount
-                            .try_into()
-                            .map_err(|_| DataStoreError::AmountOverflow)?,
-                        secondary_output_amount
-                            .try_into()
-                            .map_err(|_| DataStoreError::AmountOverflow)?,
-                    )
+                    report
                 };
-
-                // Swap output token to the expected output token.
-                let meta = self.market.meta();
-                let token_ins = if is_output_token_long {
-                    (Some(meta.long_token_mint), Some(meta.short_token_mint))
-                } else {
-                    (Some(meta.short_token_mint), Some(meta.long_token_mint))
-                };
-
-                // Since we have checked that secondary_amount must be zero if output_token == secondary_output_token,
-                // the swap should still be correct.
-
-                // Call exit to make sure the data are written to the storage.
-                // In case that there are markets also appear in the swap paths.
-                self.market.exit(&crate::ID)?;
-                // CHECK: `exit` and `reload` have been called on the modified market account before and after the swap.
-                let (output_amount, secondary_amount) = unchecked_swap_with_params(
-                    &self.oracle,
-                    &self.order.swap,
-                    remaining_accounts,
-                    (
-                        self.order
-                            .fixed
-                            .tokens
-                            .final_output_token
-                            .ok_or(DataStoreError::MissingTokenMint)?,
-                        self.order.fixed.tokens.secondary_output_token,
-                    ),
-                    token_ins,
-                    (output_amount, secondary_output_amount),
-                )?;
-                // Call `reload` to make sure the state is up-to-date.
-                self.market.reload()?;
-
-                self.transfer_out(false, output_amount)?;
-                self.transfer_out(true, secondary_amount)?;
+                self.process_decrease_report(remaining_accounts, report)?;
             }
         }
         Ok(should_remove)
+    }
+
+    fn process_increase_report(&self, report: IncreasePositionReport<u128>) -> Result<()> {
+        msg!("{:?}", report);
+        Ok(())
+    }
+
+    fn process_decrease_report(
+        &mut self,
+        remaining_accounts: &'info [AccountInfo<'info>],
+        report: DecreasePositionReport<u128>,
+    ) -> Result<()> {
+        msg!("{:?}", report);
+
+        require!(
+            *report.secondary_output_amount() == 0
+                || (report.is_output_token_long() != report.is_secondary_output_token_long()),
+            DataStoreError::SameSecondaryTokensNotMerged,
+        );
+
+        let (is_output_token_long, output_amount, secondary_output_amount) = (
+            report.is_output_token_long(),
+            (*report.output_amount())
+                .try_into()
+                .map_err(|_| DataStoreError::AmountOverflow)?,
+            (*report.secondary_output_amount())
+                .try_into()
+                .map_err(|_| DataStoreError::AmountOverflow)?,
+        );
+
+        // Swap output token to the expected output token.
+        let meta = self.market.meta();
+        let token_ins = if is_output_token_long {
+            (Some(meta.long_token_mint), Some(meta.short_token_mint))
+        } else {
+            (Some(meta.short_token_mint), Some(meta.long_token_mint))
+        };
+
+        // Since we have checked that secondary_amount must be zero if output_token == secondary_output_token,
+        // the swap should still be correct.
+
+        // Call exit to make sure the data are written to the storage.
+        // In case that there are markets also appear in the swap paths.
+        self.market.exit(&crate::ID)?;
+        // CHECK: `exit` and `reload` have been called on the modified market account before and after the swap.
+        let (output_amount, secondary_amount) = unchecked_swap_with_params(
+            &self.oracle,
+            &self.order.swap,
+            remaining_accounts,
+            (
+                self.order
+                    .fixed
+                    .tokens
+                    .final_output_token
+                    .ok_or(DataStoreError::MissingTokenMint)?,
+                self.order.fixed.tokens.secondary_output_token,
+            ),
+            token_ins,
+            (output_amount, secondary_output_amount),
+        )?;
+        // Call `reload` to make sure the state is up-to-date.
+        self.market.reload()?;
+
+        self.transfer_out(false, output_amount)?;
+        self.transfer_out(true, secondary_amount)?;
+        Ok(())
     }
 
     fn transfer_out(&self, is_secondary: bool, amount: u64) -> Result<()> {
