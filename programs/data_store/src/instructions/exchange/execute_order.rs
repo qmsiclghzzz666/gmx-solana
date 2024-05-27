@@ -300,11 +300,12 @@ impl<'info> ExecuteOrder<'info> {
                         )
                         .map_err(GmxCoreError::from)?
                         .execute()
+                        .map(Box::new)
                         .map_err(GmxCoreError::from)?;
                     should_remove = report.should_remove();
                     report
                 };
-                self.process_decrease_report(remaining_accounts, report)?;
+                self.process_decrease_report(remaining_accounts, &report)?;
             }
         }
         Ok(should_remove)
@@ -318,7 +319,7 @@ impl<'info> ExecuteOrder<'info> {
     fn process_decrease_report(
         &mut self,
         remaining_accounts: &'info [AccountInfo<'info>],
-        report: DecreasePositionReport<u128>,
+        report: &DecreasePositionReport<u128>,
     ) -> Result<()> {
         msg!("{:?}", report);
 
