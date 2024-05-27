@@ -14,9 +14,12 @@ use self::{
 
 use super::Prices;
 
+mod claimable;
 mod collateral_processor;
 mod report;
 mod utils;
+
+pub use self::claimable::ClaimableCollateral;
 
 /// Decrease the position.
 #[must_use]

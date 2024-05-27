@@ -1,7 +1,5 @@
 use std::fmt;
 
-use num_traits::Zero;
-
 use crate::{
     action::{
         update_borrowing_state::UpdateBorrowingReport, update_funding_state::UpdateFundingReport,
@@ -10,10 +8,10 @@ use crate::{
     params::fee::PositionFees,
 };
 
-use super::{DecreasePositionParams, ProcessCollateralResult};
+use super::{ClaimableCollateral, DecreasePositionParams, ProcessCollateralResult};
 
 /// Report of the execution of posiiton decreasing.
-#[must_use = "`should_remove`, `output_amount`, `secondary_output_amount` must use"]
+#[must_use]
 pub struct DecreasePositionReport<T: Unsigned> {
     params: DecreasePositionParams<T>,
     price_impact_value: T::Signed,
@@ -34,9 +32,8 @@ pub struct DecreasePositionReport<T: Unsigned> {
     secondary_output_amount: T,
     claimable_funding_long_token_amount: T,
     claimable_funding_short_token_amount: T,
-    claimable_secondary_output_amount_for_treasury: T,
-    claimable_output_amount_for_user: T,
-    claimable_secondary_output_amount_for_user: T,
+    for_holding: ClaimableCollateral<T>,
+    for_user: ClaimableCollateral<T>,
 }
 
 impl<T: Unsigned + fmt::Debug> fmt::Debug for DecreasePositionReport<T>
@@ -74,18 +71,8 @@ where
                 "claimable_funding_short_token_amount",
                 &self.claimable_funding_short_token_amount,
             )
-            .field(
-                "claimable_secondary_output_amount_for_treasury",
-                &self.claimable_secondary_output_amount_for_treasury,
-            )
-            .field(
-                "claimable_output_amount_for_user",
-                &self.claimable_output_amount_for_user,
-            )
-            .field(
-                "claimable_secondary_output_amount_for_user",
-                &self.claimable_secondary_output_amount_for_user,
-            )
+            .field("for_holding", &self.for_holding)
+            .field("for_user", &self.for_user)
             .finish()
     }
 }
@@ -125,9 +112,8 @@ impl<T: Unsigned + Clone> DecreasePositionReport<T> {
                 .funding_fees()
                 .claimable_short_token_amount()
                 .clone(),
-            claimable_secondary_output_amount_for_treasury: Zero::zero(),
-            claimable_output_amount_for_user: Zero::zero(),
-            claimable_secondary_output_amount_for_user: Zero::zero(),
+            for_holding: execution.collateral.for_holding,
+            for_user: execution.collateral.for_user,
             fees: execution.fees,
         }
     }
@@ -216,24 +202,20 @@ impl<T: Unsigned + Clone> DecreasePositionReport<T> {
         )
     }
 
-    /// Get claimable secondary output amount for treasury.
+    /// Get claimable collateral for holding.
     ///
     /// ## Must Use
     /// Must be used by the caller.
-    pub fn claimable_secondary_output_amount_for_treasury(&self) -> &T {
-        &self.claimable_secondary_output_amount_for_treasury
+    pub fn claimable_collateral_for_holding(&self) -> &ClaimableCollateral<T> {
+        &self.for_holding
     }
 
-    /// Get Get claimable amount for user.
+    /// Get Get claimable collateral for user.
     ///
     /// ## Must Use
     /// Must be used by the caller.
-    pub fn claimable_amount_for_user(&self, is_output_token: bool) -> &T {
-        if is_output_token {
-            &self.claimable_output_amount_for_user
-        } else {
-            &self.claimable_secondary_output_amount_for_user
-        }
+    pub fn claimable_collateral_for_user(&self) -> &ClaimableCollateral<T> {
+        &self.for_user
     }
 
     /// Get borrowing report.
