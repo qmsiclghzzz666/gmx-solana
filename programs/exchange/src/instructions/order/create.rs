@@ -47,12 +47,10 @@ pub struct CreateOrder<'info> {
     pub market: UncheckedAccount<'info>,
     #[account(mut)]
     pub initial_collateral_token_account: Option<Box<Account<'info, TokenAccount>>>,
-    /// CHECK: check by CPI.
     pub final_output_token_account: Option<Box<Account<'info, TokenAccount>>>,
-    /// CHECK: check by CPI.
     pub secondary_output_token_account: Option<Box<Account<'info, TokenAccount>>>,
     #[account(
-        mut,
+        mut, 
         token::mint = initial_collateral_token_account.as_ref().expect("sender must be provided").mint,
         seeds = [
             data_store::constants::MARKET_VAULT_SEED,
@@ -64,6 +62,8 @@ pub struct CreateOrder<'info> {
         seeds::program = data_store_program.key(),
     )]
     pub initial_collateral_token_vault: Option<Box<Account<'info, TokenAccount>>>,
+    pub long_token_account: Box<Account<'info, TokenAccount>>,
+    pub short_token_account: Box<Account<'info, TokenAccount>>,
     pub data_store_program: Program<'info, DataStore>,
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,
@@ -173,6 +173,8 @@ impl<'info> CreateOrder<'info> {
                     .secondary_output_token_account
                     .as_ref()
                     .map(|a| a.to_account_info()),
+                long_token_account: self.long_token_account.to_account_info(),
+                short_token_account: self.short_token_account.to_account_info(),
                 system_program: self.system_program.to_account_info(),
             },
         )

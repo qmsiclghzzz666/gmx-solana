@@ -5,6 +5,7 @@ use anchor_client::{
     solana_sdk::{instruction::AccountMeta, pubkey::Pubkey, signer::Signer},
     Program, RequestBuilder,
 };
+use anchor_spl::associated_token::get_associated_token_address;
 use data_store::states::{
     common::TokensWithFeed,
     order::{OrderKind, OrderParams},
@@ -81,6 +82,8 @@ pub struct CreateOrderBuilder<'a, C> {
     initial_token: TokenAccountParams,
     final_token: TokenAccountParams,
     secondary_token_account: Option<Pubkey>,
+    long_token_account: Option<Pubkey>,
+    short_token_account: Option<Pubkey>,
 }
 
 #[derive(Clone, Copy)]
@@ -115,6 +118,8 @@ where
             initial_token: Default::default(),
             final_token: Default::default(),
             secondary_token_account: None,
+            long_token_account: None,
+            short_token_account: None,
         }
     }
 
@@ -170,6 +175,18 @@ where
     /// Set secondary output token account.
     pub fn secondary_output_token_account(&mut self, account: &Pubkey) -> &mut Self {
         self.secondary_token_account = Some(*account);
+        self
+    }
+
+    /// Set long token account.
+    pub fn long_token_account(&mut self, account: &Pubkey) -> &mut Self {
+        self.long_token_account = Some(*account);
+        self
+    }
+
+    /// Set short token account.
+    pub fn short_token_account(&mut self, account: &Pubkey) -> &mut Self {
+        self.short_token_account = Some(*account);
         self
     }
 
@@ -314,6 +331,18 @@ where
         }
     }
 
+    async fn collateral_token_accounts(&mut self) -> crate::Result<(Pubkey, Pubkey)> {
+        let hint = self.prepare_hint().await?;
+        let payer = self.program.payer();
+        let long_token_account = self
+            .long_token_account
+            .unwrap_or(get_associated_token_address(&payer, &hint.long_token));
+        let short_token_account = self
+            .short_token_account
+            .unwrap_or(get_associated_token_address(&payer, &hint.short_token));
+        Ok((long_token_account, short_token_account))
+    }
+
     /// Create [`RequestBuilder`] and return order address.
     pub async fn build_with_address(&mut self) -> crate::Result<(RequestBuilder<'a, C>, Pubkey)> {
         let authority = ControllerSeeds::find_with_address(&self.store).1;
@@ -323,6 +352,7 @@ where
         let (initial_collateral_token_account, initial_collateral_token_vault) =
             self.initial_collateral_accounts().await?.unzip();
         let (output_token, position) = self.output_token_and_position().await?;
+        let (long_token_account, short_token_account) = self.collateral_token_accounts().await?;
         let builder = self
             .program
             .request()
@@ -340,6 +370,8 @@ where
                 secondary_output_token_account: self.get_secondary_output_token_account().await?,
                 initial_collateral_token_vault,
                 data_store_program: data_store::id(),
+                long_token_account,
+                short_token_account,
                 system_program: system_program::ID,
                 token_program: anchor_spl::token::ID,
             })
@@ -394,6 +426,10 @@ pub struct ExecuteOrderHint {
     secondary_output_token: Pubkey,
     final_output_token_account: Option<Pubkey>,
     secondary_output_token_account: Option<Pubkey>,
+    long_token_account: Pubkey,
+    short_token_account: Pubkey,
+    long_token_vault: Pubkey,
+    short_token_vault: Pubkey,
     /// Feeds.
     pub feeds: TokensWithFeed,
     swap_path: Vec<Pubkey>,
@@ -435,7 +471,7 @@ where
     }
 
     /// Set hint with the given order.
-    pub fn hint(&mut self, order: &Order) -> &mut Self {
+    pub fn hint(&mut self, order: &Order, market: &Market) -> &mut Self {
         self.hint = Some(ExecuteOrderHint {
             market_token: order.fixed.tokens.market_token,
             position: order.fixed.position,
@@ -444,6 +480,18 @@ where
             secondary_output_token: order.fixed.tokens.secondary_output_token,
             final_output_token_account: order.fixed.receivers.final_output_token_account,
             secondary_output_token_account: order.fixed.receivers.secondary_output_token_account,
+            long_token_account: order.fixed.receivers.long_token_account,
+            short_token_account: order.fixed.receivers.short_token_account,
+            long_token_vault: find_market_vault_address(
+                &self.store,
+                &market.meta().long_token_mint,
+            )
+            .0,
+            short_token_vault: find_market_vault_address(
+                &self.store,
+                &market.meta().short_token_mint,
+            )
+            .0,
             feeds: order.prices.clone(),
             swap_path: order.swap.long_token_swap_path.clone(),
         });
@@ -464,7 +512,8 @@ where
                 Some(hint) => return Ok(hint.clone()),
                 None => {
                     let order: Order = self.program.account(self.order).await?;
-                    self.hint(&order);
+                    let market: Market = self.program.account(order.fixed.market).await?;
+                    self.hint(&order, &market);
                 }
             }
         }
@@ -511,6 +560,10 @@ where
                 ),
                 final_output_token_account: hint.final_output_token_account,
                 secondary_output_token_account: hint.secondary_output_token_account,
+                long_token_vault: hint.long_token_vault,
+                short_token_vault: hint.short_token_vault,
+                long_token_account: hint.long_token_account,
+                short_token_account: hint.short_token_account,
                 data_store_program: data_store::id(),
                 token_program: anchor_spl::token::ID,
                 price_provider: self.price_provider,

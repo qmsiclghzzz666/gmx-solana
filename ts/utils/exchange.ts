@@ -5,7 +5,7 @@ import { createDepositPDA, createMarketPDA, createMarketTokenMintPDA, createMark
 import { getAccount } from "@solana/spl-token";
 import { BTC_TOKEN_MINT, SOL_TOKEN_MINT } from "./token";
 import { IxWithOutput, makeInvoke } from "./invoke";
-import { DataStoreProgram, PriceProvider, findConfigPDA, toBN } from "gmsol";
+import { DataStoreProgram, PriceProvider, findConfigPDA, findMarketPDA, findMarketVaultPDA, toBN } from "gmsol";
 import { PYTH_ID } from "./external";
 import { findKey } from "lodash";
 import { findPythPriceFeedPDA } from "gmsol";
@@ -459,6 +459,10 @@ export interface OrderHint {
     secondaryOutputToken: PublicKey | null,
     finalOutputTokenAccount: PublicKey | null,
     secondaryOutputTokenAccount: PublicKey | null,
+    longTokenVault: PublicKey,
+    shortTokenVault: PublicKey,
+    longTokenAccount: PublicKey,
+    shortTokenAccount: PublicKey,
     providerMapper: (number) => number | undefined,
 }
 
@@ -476,21 +480,25 @@ export type MakeExecuteOrderParams = {
     },
 };
 
-const fetchOrderHint = async (dataStore: DataStoreProgram, order: PublicKey) => {
-    return await dataStore.account.order.fetch(order).then(order => {
-        return {
-            user: order.fixed.user,
-            marketTokenMint: order.fixed.tokens.marketToken,
-            position: order.fixed.position ?? null,
-            finalOutputToken: order.fixed.tokens.finalOutputToken ?? null,
-            secondaryOutputToken: order.fixed.tokens.secondaryOutputToken ?? null,
-            finalOutputTokenAccount: order.fixed.receivers.finalOutputTokenAccount ?? null,
-            secondaryOutputTokenAccount: order.fixed.receivers.secondaryOutputTokenAccount ?? null,
-            feeds: order.prices.feeds,
-            swapPath: order.swap.longTokenSwapPath,
-            providerMapper: makeProviderMapper([...order.prices.providers], order.prices.nums),
-        };
-    }) satisfies OrderHint as OrderHint;
+const fetchOrderHint = async (dataStore: DataStoreProgram, orderAddress: PublicKey, store: PublicKey) => {
+    const order = await dataStore.account.order.fetch(orderAddress);
+    const market = await dataStore.account.market.fetch(order.fixed.market);
+    return {
+        user: order.fixed.user,
+        marketTokenMint: order.fixed.tokens.marketToken,
+        position: order.fixed.position ?? null,
+        finalOutputToken: order.fixed.tokens.finalOutputToken ?? null,
+        secondaryOutputToken: order.fixed.tokens.secondaryOutputToken ?? null,
+        finalOutputTokenAccount: order.fixed.receivers.finalOutputTokenAccount ?? null,
+        secondaryOutputTokenAccount: order.fixed.receivers.secondaryOutputTokenAccount ?? null,
+        longTokenAccount: order.fixed.receivers.longTokenAccount,
+        shortTokenAccount: order.fixed.receivers.shortTokenAccount,
+        longTokenVault: findMarketVaultPDA(store, market.meta.longTokenMint)[0],
+        shortTokenVault: findMarketVaultPDA(store, market.meta.shortTokenMint)[0],
+        feeds: order.prices.feeds,
+        swapPath: order.swap.longTokenSwapPath,
+        providerMapper: makeProviderMapper([...order.prices.providers], order.prices.nums),
+    } satisfies OrderHint as OrderHint;
 }
 
 export const makeExecuteOrderInstruction = async ({
@@ -508,10 +516,14 @@ export const makeExecuteOrderInstruction = async ({
         finalOutputTokenAccount,
         secondaryOutputToken,
         secondaryOutputTokenAccount,
+        longTokenAccount,
+        shortTokenAccount,
+        longTokenVault,
+        shortTokenVault,
         feeds,
         swapPath,
         providerMapper,
-    } = options?.hints?.order ?? await fetchOrderHint(dataStore, order);
+    } = options?.hints?.order ?? await fetchOrderHint(dataStore, order, store);
     const [onlyOrderKeeper] = createRolesPDA(store, authority);
     const feedAccounts = feeds.map((pubkey, idx) => {
         return getFeedAccountMeta(providerMapper(idx), pubkey);
@@ -546,6 +558,10 @@ export const makeExecuteOrderInstruction = async ({
         secondaryOutputTokenAccount,
         finalOutputTokenVault: finalOutputTokenAccount ? createMarketVaultPDA(store, finalOutputToken)[0] : null,
         secondaryOutputTokenVault: secondaryOutputTokenAccount ? createMarketVaultPDA(store, secondaryOutputToken)[0] : null,
+        longTokenAccount,
+        shortTokenAccount,
+        longTokenVault,
+        shortTokenVault,
         priceProvider: options.priceProvider ?? PYTH_ID,
     }).remainingAccounts([...feedAccounts, ...swapMarkets, ...swapMarketMints]).instruction();
 };
@@ -556,12 +572,12 @@ export const executeOrder = async (simulate: boolean, ...args: Parameters<typeof
     if (simulate) {
         return ["not executed because this is just a simulation"];
     }
-    const [connection, { authority, order, options }] = args;
+    const [connection, { authority, order, store, options }] = args;
     if (options?.priceProvider?.toBase58() ?? PYTH_ID === PYTH_ID) {
         if (!(authority instanceof Keypair)) {
             throw Error("Currently only support to call with `Keypair`");
         }
-        const { feeds, providerMapper } = options?.hints?.order ?? await fetchOrderHint(dataStore, order);
+        const { feeds, providerMapper } = options?.hints?.order ?? await fetchOrderHint(dataStore, order, store);
         await postPriceFeeds(connection, authority as Keypair, feeds, providerMapper);
     }
     return await invokeExecuteOrder(...args);

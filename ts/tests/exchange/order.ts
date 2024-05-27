@@ -44,6 +44,10 @@ describe("exchange: order", () => {
                     swapPath: [
                         GMFakeFakeUsdG
                     ],
+                    hint: {
+                        longToken: fakeTokenMint,
+                        shortToken: usdGTokenMint,
+                    }
                 }
             });
             increaseOrder = address;

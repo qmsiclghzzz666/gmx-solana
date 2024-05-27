@@ -136,6 +136,10 @@ pub struct Receivers {
     pub final_output_token_account: Option<Pubkey>,
     /// The token account for receiving the secondary output tokens.
     pub secondary_output_token_account: Option<Pubkey>,
+    /// Long token account.
+    pub long_token_account: Pubkey,
+    /// Short token account.
+    pub short_token_account: Pubkey,
 }
 
 /// Token config for [`Order`].

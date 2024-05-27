@@ -48,6 +48,18 @@ pub struct ExecuteOrder<'info> {
     /// CHECK: check by CPI.
     #[account(mut)]
     pub secondary_output_token_account: Option<UncheckedAccount<'info>>,
+    /// CHECK: check by CPI.
+    #[account(mut)]
+    pub long_token_vault: UncheckedAccount<'info>,
+    /// CHECK: check by CPI.
+    #[account(mut)]
+    pub short_token_vault: UncheckedAccount<'info>,
+    /// CHECK: check by CPI.
+    #[account(mut)]
+    pub long_token_account: UncheckedAccount<'info>,
+    /// CHECK: check by CPI.
+    #[account(mut)]
+    pub short_token_account: UncheckedAccount<'info>,
     pub data_store_program: Program<'info, DataStore>,
     pub token_program: Program<'info, Token>,
     pub price_provider: Interface<'info, PriceProvider>,
@@ -158,6 +170,10 @@ impl<'info> ExecuteOrder<'info> {
                     .secondary_output_token_account
                     .as_ref()
                     .map(|a| a.to_account_info()),
+                long_token_vault: self.long_token_vault.to_account_info(),
+                short_token_vault: self.short_token_vault.to_account_info(),
+                long_token_account: self.long_token_account.to_account_info(),
+                short_token_account: self.short_token_account.to_account_info(),
                 token_program: self.token_program.to_account_info(),
             },
         )

@@ -56,6 +56,10 @@ pub struct InitializeOrder<'info> {
     pub final_output_token_account: Option<Box<Account<'info, TokenAccount>>>,
     #[account(token::authority = payer)]
     pub secondary_output_token_account: Option<Box<Account<'info, TokenAccount>>>,
+    #[account(token::authority = payer, token::mint = market.meta.long_token_mint)]
+    pub long_token_account: Box<Account<'info, TokenAccount>>,
+    #[account(token::authority = payer, token::mint = market.meta.short_token_mint)]
+    pub short_token_account: Box<Account<'info, TokenAccount>>,
     pub system_program: Program<'info, System>,
 }
 
@@ -116,6 +120,8 @@ pub fn initialize_order(
                 ui_fee: ui_fee_receiver,
                 final_output_token_account: Some(ctx.accounts.final_output_token_account()?.key()),
                 secondary_output_token_account: None,
+                long_token_account: ctx.accounts.long_token_account.key(),
+                short_token_account: ctx.accounts.short_token_account.key(),
             },
         ),
         OrderKind::MarketIncrease => (
@@ -128,6 +134,8 @@ pub fn initialize_order(
                 ui_fee: ui_fee_receiver,
                 final_output_token_account: None,
                 secondary_output_token_account: None,
+                long_token_account: ctx.accounts.long_token_account.key(),
+                short_token_account: ctx.accounts.short_token_account.key(),
             },
         ),
         OrderKind::MarketDecrease | OrderKind::Liquidation => (
@@ -140,6 +148,8 @@ pub fn initialize_order(
                 secondary_output_token_account: Some(
                     ctx.accounts.secondary_output_token_account()?.key(),
                 ),
+                long_token_account: ctx.accounts.long_token_account.key(),
+                short_token_account: ctx.accounts.short_token_account.key(),
             },
         ),
     };

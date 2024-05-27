@@ -24,24 +24,26 @@ use super::utils::swap::unchecked_swap_with_params;
 #[derive(Accounts)]
 pub struct ExecuteOrder<'info> {
     pub authority: Signer<'info>,
-    pub store: Account<'info, DataStore>,
+    pub store: Box<Account<'info, DataStore>>,
     pub only_order_keeper: Account<'info, Roles>,
     #[account(
         seeds = [Config::SEED, store.key().as_ref()],
         bump = config.bump,
     )]
-    config: Account<'info, Config>,
-    pub oracle: Account<'info, Oracle>,
+    config: Box<Account<'info, Config>>,
+    pub oracle: Box<Account<'info, Oracle>>,
     #[account(
         constraint = order.fixed.market == market.key(),
         constraint = order.fixed.tokens.market_token == market_token_mint.key(),
         constraint = order.fixed.receivers.final_output_token_account == final_output_token_account.as_ref().map(|a| a.key()),
         constraint = order.fixed.receivers.secondary_output_token_account == secondary_output_token_account.as_ref().map(|a| a.key()),
+        constraint = order.fixed.receivers.long_token_account == long_token_account.key(),
+        constraint = order.fixed.receivers.short_token_account == short_token_account.key(),
     )]
-    pub order: Account<'info, Order>,
+    pub order: Box<Account<'info, Order>>,
     #[account(mut)]
-    pub market: Account<'info, Market>,
-    pub market_token_mint: Account<'info, Mint>,
+    pub market: Box<Account<'info, Market>>,
+    pub market_token_mint: Box<Account<'info, Mint>>,
     #[account(
         mut,
         constraint = position.load()?.owner == order.fixed.user,
@@ -67,7 +69,7 @@ pub struct ExecuteOrder<'info> {
         ],
         bump,
     )]
-    pub final_output_token_vault: Option<Account<'info, TokenAccount>>,
+    pub final_output_token_vault: Option<Box<Account<'info, TokenAccount>>>,
     #[account(
         mut,
         token::mint = secondary_output_token_account.as_ref().expect("must provided").mint,
@@ -79,11 +81,41 @@ pub struct ExecuteOrder<'info> {
         ],
         bump,
     )]
-    pub secondary_output_token_vault: Option<Account<'info, TokenAccount>>,
+    pub secondary_output_token_vault: Option<Box<Account<'info, TokenAccount>>>,
     #[account(mut)]
-    pub final_output_token_account: Option<Account<'info, TokenAccount>>,
+    pub final_output_token_account: Option<Box<Account<'info, TokenAccount>>>,
     #[account(mut)]
-    pub secondary_output_token_account: Option<Account<'info, TokenAccount>>,
+    pub secondary_output_token_account: Option<Box<Account<'info, TokenAccount>>>,
+    #[account(
+        mut,
+        token::mint = market.meta.long_token_mint,
+        seeds = [
+            constants::MARKET_VAULT_SEED,
+            store.key().as_ref(),
+            market.meta.long_token_mint.as_ref(),
+            &[],
+        ],
+        bump,
+    )]
+    pub long_token_vault: Account<'info, TokenAccount>,
+    #[account(
+        mut,
+        token::mint = market.meta.short_token_mint,
+        seeds = [
+            constants::MARKET_VAULT_SEED,
+            store.key().as_ref(),
+            market.meta.short_token_mint.as_ref(),
+            &[],
+        ],
+        bump,
+    )]
+    pub short_token_vault: Account<'info, TokenAccount>,
+    /// CHECK: check by token program.
+    #[account(mut)]
+    pub long_token_account: UncheckedAccount<'info>,
+    /// CHECK: check by token program.
+    #[account(mut)]
+    pub short_token_account: UncheckedAccount<'info>,
     pub token_program: Program<'info, Token>,
 }
 
