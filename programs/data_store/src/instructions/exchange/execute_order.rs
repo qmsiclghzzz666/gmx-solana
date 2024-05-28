@@ -313,6 +313,8 @@ impl<'info> ExecuteOrder<'info> {
 
     fn process_increase_report(&self, report: IncreasePositionReport<u128>) -> Result<()> {
         msg!("{:?}", report);
+        let (long_amount, short_amount) = report.claimable_funding_amounts();
+        self.transfer_out_funding_amounts(long_amount, short_amount)?;
         Ok(())
     }
 
@@ -323,6 +325,22 @@ impl<'info> ExecuteOrder<'info> {
     ) -> Result<()> {
         msg!("{:?}", report);
 
+        self.process_decrease_swap(remaining_accounts, report)?;
+
+        // Transfer out funding rebate.
+        let (long_amount, short_amount) = report.claimable_funding_amounts();
+        self.transfer_out_funding_amounts(long_amount, short_amount)?;
+
+        self.process_claimable_collateral_for_decrease(report)?;
+
+        Ok(())
+    }
+
+    fn process_decrease_swap(
+        &mut self,
+        remaining_accounts: &'info [AccountInfo<'info>],
+        report: &DecreasePositionReport<u128>,
+    ) -> Result<()> {
         require!(
             *report.secondary_output_amount() == 0
                 || (report.is_output_token_long() != report.is_secondary_output_token_long()),
@@ -377,6 +395,51 @@ impl<'info> ExecuteOrder<'info> {
         Ok(())
     }
 
+    fn process_claimable_collateral_for_decrease(
+        &self,
+        report: &DecreasePositionReport<u128>,
+    ) -> Result<()> {
+        let for_holding = report.claimable_collateral_for_holding();
+        require!(
+            *for_holding.output_token_amount() == 0,
+            DataStoreError::ClaimbleCollateralInOutputTokenForHolding
+        );
+
+        let is_output_token_long = report.is_output_token_long();
+        let is_secondary_token_long = report.is_secondary_output_token_long();
+
+        let _secondary_amount = for_holding.secondary_output_token_amount();
+        // TODO: send secondary amount to holding account.
+
+        let for_user = report.claimable_collateral_for_user();
+        // TODO: send to locked accounts.
+        let to = if is_output_token_long {
+            self.long_token_account.to_account_info()
+        } else {
+            self.short_token_account.to_account_info()
+        };
+        self.transfer_out_collateral(
+            is_output_token_long,
+            to,
+            (*for_user.output_token_amount())
+                .try_into()
+                .map_err(|_| error!(DataStoreError::AmountOverflow))?,
+        )?;
+        let to = if is_secondary_token_long {
+            self.long_token_account.to_account_info()
+        } else {
+            self.short_token_account.to_account_info()
+        };
+        self.transfer_out_collateral(
+            is_secondary_token_long,
+            to,
+            (*for_user.secondary_output_token_amount())
+                .try_into()
+                .map_err(|_| error!(DataStoreError::AmountOverflow))?,
+        )?;
+        Ok(())
+    }
+
     fn transfer_out(&self, is_secondary: bool, amount: u64) -> Result<()> {
         let (from, to) = if is_secondary {
             (
@@ -397,5 +460,41 @@ impl<'info> ExecuteOrder<'info> {
             to.to_account_info(),
             amount,
         )
+    }
+
+    fn transfer_out_collateral(
+        &self,
+        is_long: bool,
+        to: AccountInfo<'info>,
+        amount: u64,
+    ) -> Result<()> {
+        let from = if is_long {
+            self.long_token_vault.to_account_info()
+        } else {
+            self.short_token_vault.to_account_info()
+        };
+        TransferUtils::new(self.token_program.to_account_info(), &self.store, None).transfer_out(
+            from.to_account_info(),
+            to,
+            amount,
+        )
+    }
+
+    fn transfer_out_funding_amounts(&self, long_amount: &u128, short_amount: &u128) -> Result<()> {
+        self.transfer_out_collateral(
+            true,
+            self.long_token_account.to_account_info(),
+            (*long_amount)
+                .try_into()
+                .map_err(|_| error!(DataStoreError::AmountOverflow))?,
+        )?;
+        self.transfer_out_collateral(
+            false,
+            self.short_token_account.to_account_info(),
+            (*short_amount)
+                .try_into()
+                .map_err(|_| error!(DataStoreError::AmountOverflow))?,
+        )?;
+        Ok(())
     }
 }

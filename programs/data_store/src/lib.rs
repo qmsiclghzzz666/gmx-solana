@@ -568,6 +568,8 @@ pub enum DataStoreError {
     // Order.
     #[msg("missing sender")]
     MissingSender,
+    #[msg("claimable collateral in output token for holding is not supported")]
+    ClaimbleCollateralInOutputTokenForHolding,
     // Token Config.
     #[msg("synthetic flag does not match")]
     InvalidSynthetic,
