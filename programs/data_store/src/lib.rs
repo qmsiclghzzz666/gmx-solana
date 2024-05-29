@@ -120,6 +120,16 @@ pub mod data_store {
         instructions::insert_factor(ctx, &key, amount, new)
     }
 
+    #[access_control(internal::Authenticate::only_controller(&ctx))]
+    pub fn insert_address(
+        ctx: Context<InsertAddress>,
+        key: String,
+        address: Pubkey,
+        new: bool,
+    ) -> Result<()> {
+        instructions::insert_address(ctx, &key, address, new)
+    }
+
     // Token Config.
     #[access_control(internal::Authenticate::only_controller(&ctx))]
     pub fn initialize_token_config_map(
@@ -566,10 +576,22 @@ pub enum DataStoreError {
     #[msg("invalid position")]
     InvalidPosition,
     // Order.
+    #[msg("missing holding address")]
+    MissingHoldingAddress,
     #[msg("missing sender")]
     MissingSender,
+    #[msg("missing position")]
+    MissingPosition,
+    #[msg("missing claimable long collateral account for user")]
+    MissingClaimableLongCollateralAccountForUser,
+    #[msg("missing claimable short collateral account for user")]
+    MissingClaimableShortCollateralAccountForUser,
+    #[msg("missing claimable pnl token account for holding")]
+    MissingClaimablePnlTokenAccountForHolding,
     #[msg("claimable collateral in output token for holding is not supported")]
     ClaimbleCollateralInOutputTokenForHolding,
+    #[msg("no delegated authority is set")]
+    NoDelegatedAuthorityIsSet,
     // Token Config.
     #[msg("synthetic flag does not match")]
     InvalidSynthetic,

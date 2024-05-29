@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    constants::keys::{GLOBAL, REQUEST_EXPIRATION_TIME},
+    constants::keys::{GLOBAL, HOLDING, REQUEST_EXPIRATION_TIME},
     DataStoreError,
 };
 
@@ -17,6 +17,8 @@ pub const DEFAULT_REQUEST_EXPIRATION_TIME: u64 = 300;
 pub struct Config {
     /// Bump.
     pub bump: u8,
+    /// Addresses.
+    addresses: MapStore<[u8; 32], Pubkey, 4>,
     /// Factors.
     factors: MapStore<[u8; 32], u128, 32>,
     /// Amounts or seconds.
@@ -60,6 +62,22 @@ impl Config {
         }
     }
 
+    /// Insert a new address.
+    pub fn insert_address(
+        &mut self,
+        namespace: &str,
+        key: &str,
+        address: &Pubkey,
+        new: bool,
+    ) -> Result<Option<Pubkey>> {
+        if new {
+            self.addresses.insert_new(namespace, key, *address)?;
+            Ok(None)
+        } else {
+            Ok(self.addresses.insert(namespace, key, *address))
+        }
+    }
+
     /// Get amount.
     pub fn amount(&self, namespace: &str, key: &str) -> Option<Amount> {
         self.amounts
@@ -70,6 +88,12 @@ impl Config {
     pub fn factor(&self, namespace: &str, key: &str) -> Option<Factor> {
         self.factors
             .get_with(namespace, key, |factor| factor.copied())
+    }
+
+    /// Get Address.
+    pub fn address(&self, namespace: &str, key: &str) -> Option<Pubkey> {
+        self.addresses
+            .get_with(namespace, key, |address| address.copied())
     }
 
     /// Get request expiration time config.
@@ -83,5 +107,12 @@ impl Config {
         start
             .checked_add_unsigned(self.request_expiration())
             .ok_or(error!(DataStoreError::AmountOverflow))
+    }
+
+    /// Get holding address.
+    #[inline]
+    pub fn holding(&self) -> Result<Pubkey> {
+        self.address(GLOBAL, HOLDING)
+            .ok_or(error!(DataStoreError::MissingHoldingAddress))
     }
 }

@@ -175,6 +175,9 @@ impl<'info> ExecuteOrder<'info> {
                 long_token_account: self.long_token_account.to_account_info(),
                 short_token_account: self.short_token_account.to_account_info(),
                 token_program: self.token_program.to_account_info(),
+                claimable_long_token_account_for_user: None,
+                claimable_short_token_account_for_user: None,
+                claimable_pnl_token_account_for_holding: None,
             },
         )
     }

@@ -116,6 +116,27 @@ pub struct ExecuteOrder<'info> {
     /// CHECK: check by token program.
     #[account(mut)]
     pub short_token_account: UncheckedAccount<'info>,
+    #[account(
+        mut,
+        token::mint = market.meta.long_token_mint,
+        token::authority = store,
+        constraint = check_delegation(claimable_long_token_account_for_user, order.fixed.user)?,
+    )]
+    pub claimable_long_token_account_for_user: Option<Account<'info, TokenAccount>>,
+    #[account(
+        mut,
+        token::mint = market.meta.short_token_mint,
+        token::authority = store,
+        constraint = check_delegation(claimable_short_token_account_for_user, order.fixed.user)?,
+    )]
+    pub claimable_short_token_account_for_user: Option<Account<'info, TokenAccount>>,
+    #[account(
+        mut,
+        token::mint = get_pnl_token(&position, &market)?,
+        token::authority = store,
+        constraint = check_delegation(claimable_pnl_token_account_for_holding, config.holding()?)?,
+    )]
+    pub claimable_pnl_token_account_for_holding: Option<Account<'info, TokenAccount>>,
     pub token_program: Program<'info, Token>,
 }
 
@@ -408,15 +429,29 @@ impl<'info> ExecuteOrder<'info> {
         let is_output_token_long = report.is_output_token_long();
         let is_secondary_token_long = report.is_secondary_output_token_long();
 
-        let _secondary_amount = for_holding.secondary_output_token_amount();
-        // TODO: send secondary amount to holding account.
+        let secondary_amount = (*for_holding.secondary_output_token_amount())
+            .try_into()
+            .map_err(|_| error!(DataStoreError::AmountOverflow))?;
+        self.transfer_out_collateral(
+            is_secondary_token_long,
+            self.claimable_pnl_token_account_for_holding
+                .as_ref()
+                .ok_or(DataStoreError::MissingClaimablePnlTokenAccountForHolding)?
+                .to_account_info(),
+            secondary_amount,
+        )?;
 
         let for_user = report.claimable_collateral_for_user();
-        // TODO: send to locked accounts.
         let to = if is_output_token_long {
-            self.long_token_account.to_account_info()
+            self.claimable_long_token_account_for_user
+                .as_ref()
+                .ok_or(DataStoreError::MissingClaimableLongCollateralAccountForUser)?
+                .to_account_info()
         } else {
-            self.short_token_account.to_account_info()
+            self.claimable_short_token_account_for_user
+                .as_ref()
+                .ok_or(DataStoreError::MissingClaimableLongCollateralAccountForUser)?
+                .to_account_info()
         };
         self.transfer_out_collateral(
             is_output_token_long,
@@ -497,4 +532,28 @@ impl<'info> ExecuteOrder<'info> {
         )?;
         Ok(())
     }
+}
+
+fn get_pnl_token(
+    position: &Option<AccountLoader<'_, Position>>,
+    market: &Market,
+) -> Result<Pubkey> {
+    let is_long = position
+        .as_ref()
+        .ok_or(error!(DataStoreError::MissingPosition))?
+        .load()?
+        .is_long()?;
+    if is_long {
+        Ok(market.meta().long_token_mint)
+    } else {
+        Ok(market.meta.short_token_mint)
+    }
+}
+
+fn check_delegation(account: &TokenAccount, target: Pubkey) -> Result<bool> {
+    let is_matched = account
+        .delegate
+        .map(|delegate| delegate == target)
+        .ok_or(error!(DataStoreError::NoDelegatedAuthorityIsSet))?;
+    Ok(is_matched)
 }
