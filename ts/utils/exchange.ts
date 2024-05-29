@@ -252,9 +252,9 @@ const postPriceFeeds = async (
     signer: Keypair,
     feeds: PublicKey[],
     providerMapper: (index: number) => number,
-    wait: number = 2000,
+    wait: number = 3000,
 ) => {
-    // Wait for 2s.
+    // Wait for `wait` ms.
     await new Promise(resolve => setTimeout(resolve, wait));
     const hermes = new PriceServiceConnection(
         "https://hermes.pyth.network/",

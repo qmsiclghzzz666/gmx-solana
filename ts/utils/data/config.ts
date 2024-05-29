@@ -1,3 +1,4 @@
+import { Address, translateAddress } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
 import { DataStoreProgram, makeInvoke, toBN } from "gmsol";
 
@@ -55,3 +56,21 @@ export const makeInsertFactorInstruction = async (
 }
 
 export const invokeInsertFactor = makeInvoke(makeInsertFactorInstruction, ["authority"]);
+
+export const makeInsertAddressInstruction = async (
+    program: DataStoreProgram,
+    { authority, store, key, address, insertNew }: {
+        authority: PublicKey,
+        store: PublicKey,
+        key: string,
+        address: Address,
+        insertNew?: boolean,
+    }
+) => {
+    return await program.methods.insertAddress(key, translateAddress(address), insertNew).accounts({
+        authority,
+        store,
+    }).instruction();
+}
+
+export const invokeInsertAddress = makeInvoke(makeInsertAddressInstruction, ["authority"]);
