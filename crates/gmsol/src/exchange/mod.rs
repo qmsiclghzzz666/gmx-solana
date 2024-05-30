@@ -99,7 +99,7 @@ pub trait ExchangeOps<C> {
         store: &Pubkey,
         oracle: &Pubkey,
         order: &Pubkey,
-    ) -> ExecuteOrderBuilder<C>;
+    ) -> crate::Result<ExecuteOrderBuilder<C>>;
 
     /// Create a market increase position order.
     fn market_increase(
@@ -253,8 +253,8 @@ where
         store: &Pubkey,
         oracle: &Pubkey,
         order: &Pubkey,
-    ) -> ExecuteOrderBuilder<C> {
-        ExecuteOrderBuilder::new(self, store, oracle, order)
+    ) -> crate::Result<ExecuteOrderBuilder<C>> {
+        ExecuteOrderBuilder::try_new(self, store, oracle, order)
     }
 }
 
