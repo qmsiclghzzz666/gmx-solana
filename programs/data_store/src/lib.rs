@@ -302,6 +302,24 @@ pub mod data_store {
         instructions::market_vault_transfer_out(ctx, amount)
     }
 
+    #[access_control(internal::Authenticate::only_controller(&ctx))]
+    pub fn use_claimable_account(
+        ctx: Context<UseClaimableAccount>,
+        timestamp: i64,
+        amount: u64,
+    ) -> Result<()> {
+        instructions::use_claimable_account(ctx, timestamp, amount)
+    }
+
+    #[access_control(internal::Authenticate::only_controller(&ctx))]
+    pub fn close_empty_claimable_account(
+        ctx: Context<CloseEmptyClaimableAccount>,
+        user: Pubkey,
+        timestamp: i64,
+    ) -> Result<()> {
+        instructions::close_empty_claimable_account(ctx, user, timestamp)
+    }
+
     // Oracle.
     #[access_control(internal::Authenticate::only_controller(&ctx))]
     pub fn initialize_oracle(ctx: Context<InitializeOracle>, index: u8) -> Result<()> {
@@ -473,6 +491,8 @@ pub enum DataStoreError {
     MissingAmount,
     #[msg("Missing factor")]
     MissingFactor,
+    #[msg("Cannot be zero")]
+    CannotBeZero,
     // Roles.
     #[msg("Too many admins")]
     TooManyAdmins,
@@ -576,6 +596,8 @@ pub enum DataStoreError {
     #[msg("invalid position")]
     InvalidPosition,
     // Order.
+    #[msg("missing claimable time window")]
+    MissingClaimableTimeWindow,
     #[msg("missing holding address")]
     MissingHoldingAddress,
     #[msg("missing sender")]

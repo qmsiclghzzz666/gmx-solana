@@ -6,11 +6,14 @@ use gmx_solana_utils::price::Decimal;
 /// Market Token Mint Address Seed.
 pub const MAREKT_TOKEN_MINT_SEED: &[u8] = b"market_token_mint";
 
-/// Decimals of a market token.
-pub const MARKET_TOKEN_DECIMALS: u8 = 9;
-
 /// Market Vault Seed.
 pub const MARKET_VAULT_SEED: &[u8] = b"market_vault";
+
+/// Claimable Account Seed.
+pub const CLAIMABLE_ACCOUNT_SEED: &[u8] = b"claimable_account";
+
+/// Decimals of a market token.
+pub const MARKET_TOKEN_DECIMALS: u8 = 9;
 
 /// Unit USD value i.e. `one`.
 pub const MARKET_USD_UNIT: u128 = 10u128.pow(MARKET_DECIMALS as u32);

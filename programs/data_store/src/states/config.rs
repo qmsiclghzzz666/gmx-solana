@@ -1,7 +1,9 @@
+use std::num::NonZeroU64;
+
 use anchor_lang::prelude::*;
 
 use crate::{
-    constants::keys::{GLOBAL, HOLDING, REQUEST_EXPIRATION_TIME},
+    constants::keys::{self, GLOBAL, HOLDING, REQUEST_EXPIRATION_TIME},
     DataStoreError,
 };
 
@@ -114,5 +116,30 @@ impl Config {
     pub fn holding(&self) -> Result<Pubkey> {
         self.address(GLOBAL, HOLDING)
             .ok_or(error!(DataStoreError::MissingHoldingAddress))
+    }
+
+    /// Get claimable time window size.
+    #[inline]
+    pub fn claimable_time_window(&self) -> Result<NonZeroU64> {
+        let amount = self
+            .amount(GLOBAL, keys::CLAIMABLE_TIME_WINDOW)
+            .ok_or(error!(DataStoreError::MissingClaimableTimeWindow))?;
+        NonZeroU64::new(amount).ok_or(error!(DataStoreError::CannotBeZero))
+    }
+
+    /// Get claimable time window index for the given timestamp.
+    pub fn claimable_time_window_index(&self, timestamp: i64) -> Result<i64> {
+        let window: i64 = self
+            .claimable_time_window()?
+            .get()
+            .try_into()
+            .map_err(|_| error!(DataStoreError::AmountOverflow))?;
+        Ok(timestamp / window)
+    }
+
+    /// Get claimable time key for the given timestamp.
+    pub fn claimable_time_key(&self, timestamp: i64) -> Result<[u8; 8]> {
+        let index = self.claimable_time_window_index(timestamp)?;
+        Ok(index.to_be_bytes())
     }
 }

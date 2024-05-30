@@ -17,3 +17,5 @@ pub const MAX_ORACLE_TIMESTAMP_RANGE: &str = "max_oracle_timestamp_range";
 // Order related global keys.
 /// Holding address (`Pubkey`).
 pub const HOLDING: &str = "holding";
+/// Claimable time window (secs, `amount`)
+pub const CLAIMABLE_TIME_WINDOW: &str = "claimable_time_window";
