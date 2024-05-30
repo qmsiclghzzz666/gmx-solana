@@ -95,7 +95,7 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
     }
 
     /// Execute.
-    pub fn execute(mut self) -> crate::Result<DecreasePositionReport<P::Num>> {
+    pub fn execute(mut self) -> crate::Result<Box<DecreasePositionReport<P::Num>>> {
         debug_assert!(
             self.size_delta_usd <= *self.position.size_in_usd_mut(),
             "must have been checked or capped by the position size"
@@ -129,56 +129,60 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
 
         let mut execution = self.process_collateral()?;
 
-        let next_position_size_in_usd = self
-            .position
-            .size_in_usd_mut()
-            .checked_sub(&self.size_delta_usd)
-            .ok_or(crate::Error::Computation(
-                "calculating next position size in usd",
-            ))?;
-
-        // TODO: update total borrowing state.
-
-        let next_position_size_in_tokens = self
-            .position
-            .size_in_tokens_mut()
-            .checked_sub(&execution.size_delta_in_tokens)
-            .ok_or(crate::Error::Computation("calculating next size in tokens"))?;
-        let next_position_collateral_amount =
-            execution.collateral.remaining_collateral_amount.clone();
-
-        let should_remove =
-            next_position_size_in_usd.is_zero() || next_position_size_in_tokens.is_zero();
-
-        if should_remove {
-            *self.position.size_in_usd_mut() = Zero::zero();
-            *self.position.size_in_tokens_mut() = Zero::zero();
-            *self.position.collateral_amount_mut() = Zero::zero();
-            execution.collateral.output_amount = execution
-                .collateral
-                .output_amount
-                .checked_add(&next_position_collateral_amount)
-                .ok_or(crate::Error::Computation("calculating output amount"))?;
-        } else {
-            let is_long = self.position.is_long();
-            *self.position.size_in_usd_mut() = next_position_size_in_usd;
-            *self.position.size_in_tokens_mut() = next_position_size_in_tokens;
-            *self.position.collateral_amount_mut() = next_position_collateral_amount;
-            *self.position.borrowing_factor_mut() =
-                self.position.market().borrowing_factor(is_long)?;
-            *self.position.funding_fee_amount_per_size_mut() = self
+        let should_remove;
+        {
+            let next_position_size_in_usd = self
                 .position
-                .market()
-                .funding_fee_amount_per_size(is_long, self.position.is_collateral_token_long())?;
-            for is_long_collateral in [true, false] {
-                *self
-                    .position
-                    .claimable_funding_fee_amount_per_size_mut(is_long_collateral) = self
-                    .position
-                    .market()
-                    .claimable_funding_fee_amount_per_size(is_long, is_long_collateral)?;
-            }
-        };
+                .size_in_usd_mut()
+                .checked_sub(&self.size_delta_usd)
+                .ok_or(crate::Error::Computation(
+                    "calculating next position size in usd",
+                ))?;
+
+            // TODO: update total borrowing state.
+
+            let next_position_size_in_tokens = self
+                .position
+                .size_in_tokens_mut()
+                .checked_sub(&execution.size_delta_in_tokens)
+                .ok_or(crate::Error::Computation("calculating next size in tokens"))?;
+            let next_position_collateral_amount =
+                execution.collateral.remaining_collateral_amount.clone();
+
+            should_remove =
+                next_position_size_in_usd.is_zero() || next_position_size_in_tokens.is_zero();
+
+            if should_remove {
+                *self.position.size_in_usd_mut() = Zero::zero();
+                *self.position.size_in_tokens_mut() = Zero::zero();
+                *self.position.collateral_amount_mut() = Zero::zero();
+                execution.collateral.output_amount = execution
+                    .collateral
+                    .output_amount
+                    .checked_add(&next_position_collateral_amount)
+                    .ok_or(crate::Error::Computation("calculating output amount"))?;
+            } else {
+                let is_long = self.position.is_long();
+                *self.position.size_in_usd_mut() = next_position_size_in_usd;
+                *self.position.size_in_tokens_mut() = next_position_size_in_tokens;
+                *self.position.collateral_amount_mut() = next_position_collateral_amount;
+                *self.position.borrowing_factor_mut() =
+                    self.position.market().borrowing_factor(is_long)?;
+                *self.position.funding_fee_amount_per_size_mut() =
+                    self.position.market().funding_fee_amount_per_size(
+                        is_long,
+                        self.position.is_collateral_token_long(),
+                    )?;
+                for is_long_collateral in [true, false] {
+                    *self
+                        .position
+                        .claimable_funding_fee_amount_per_size_mut(is_long_collateral) = self
+                        .position
+                        .market()
+                        .claimable_funding_fee_amount_per_size(is_long, is_long_collateral)?;
+                }
+            };
+        }
 
         // TODO: update global states.
 
@@ -197,7 +201,7 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
 
         self.position.decreased()?;
 
-        let mut report = DecreasePositionReport::new(
+        let mut report = Box::new(DecreasePositionReport::new(
             should_remove,
             self.params,
             execution,
@@ -205,7 +209,7 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
             self.size_delta_usd,
             borrowing,
             funding,
-        );
+        ));
 
         Self::swap_output_tokens_if_needed(self.position.market_mut(), &mut report)?;
 

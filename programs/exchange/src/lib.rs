@@ -84,9 +84,10 @@ pub mod exchange {
     #[access_control(Authenticate::only_order_keeper(&ctx))]
     pub fn execute_order<'info>(
         ctx: Context<'_, '_, 'info, 'info, ExecuteOrder<'info>>,
+        recent_timestamp: i64,
         execution_fee: u64,
     ) -> Result<()> {
-        instructions::execute_order(ctx, execution_fee)
+        instructions::execute_order(ctx, recent_timestamp, execution_fee)
     }
 }
 

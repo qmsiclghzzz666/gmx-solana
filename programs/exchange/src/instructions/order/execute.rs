@@ -78,6 +78,7 @@ pub struct ExecuteOrder<'info> {
 /// Execute an order.
 pub fn execute_order<'info>(
     ctx: Context<'_, '_, 'info, 'info, ExecuteOrder<'info>>,
+    recent_timestamp: i64,
     execution_fee: u64,
 ) -> Result<()> {
     let order = &ctx.accounts.order;
@@ -93,6 +94,7 @@ pub fn execute_order<'info>(
                 accounts
                     .execute_order_ctx()
                     .with_remaining_accounts(remaining_accounts.to_vec()),
+                recent_timestamp,
             )?
             .get();
             Ok(should_remove_position)

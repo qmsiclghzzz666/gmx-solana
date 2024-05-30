@@ -127,6 +127,13 @@ impl Config {
         NonZeroU64::new(amount).ok_or(error!(DataStoreError::CannotBeZero))
     }
 
+    /// Get recent time window size.
+    #[inline]
+    pub fn recent_time_window(&self) -> Result<u64> {
+        self.amount(GLOBAL, keys::RECENT_TIME_WINDOW)
+            .ok_or(error!(DataStoreError::MissingRecentTimeWindow))
+    }
+
     /// Get claimable time window index for the given timestamp.
     pub fn claimable_time_window_index(&self, timestamp: i64) -> Result<i64> {
         let window: i64 = self

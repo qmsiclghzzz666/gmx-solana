@@ -22,6 +22,7 @@ use crate::{
 use super::utils::swap::unchecked_swap_with_params;
 
 #[derive(Accounts)]
+#[instruction(recent_timestamp: i64)]
 pub struct ExecuteOrder<'info> {
     pub authority: Signer<'info>,
     pub store: Box<Account<'info, DataStore>>,
@@ -121,6 +122,14 @@ pub struct ExecuteOrder<'info> {
         token::mint = market.meta.long_token_mint,
         token::authority = store,
         constraint = check_delegation(claimable_long_token_account_for_user, order.fixed.user)?,
+        seeds = [
+            constants::CLAIMABLE_ACCOUNT_SEED,
+            store.key().as_ref(),
+            market.meta.long_token_mint.as_ref(),
+            order.fixed.user.as_ref(),
+            &config.claimable_time_key(validated_recent_timestamp(&config, recent_timestamp)?)?,
+        ],
+        bump,
     )]
     pub claimable_long_token_account_for_user: Option<Account<'info, TokenAccount>>,
     #[account(
@@ -128,6 +137,14 @@ pub struct ExecuteOrder<'info> {
         token::mint = market.meta.short_token_mint,
         token::authority = store,
         constraint = check_delegation(claimable_short_token_account_for_user, order.fixed.user)?,
+        seeds = [
+            constants::CLAIMABLE_ACCOUNT_SEED,
+            store.key().as_ref(),
+            market.meta.short_token_mint.as_ref(),
+            order.fixed.user.as_ref(),
+            &config.claimable_time_key(validated_recent_timestamp(&config, recent_timestamp)?)?,
+        ],
+        bump,
     )]
     pub claimable_short_token_account_for_user: Option<Account<'info, TokenAccount>>,
     #[account(
@@ -135,6 +152,14 @@ pub struct ExecuteOrder<'info> {
         token::mint = get_pnl_token(&position, &market)?,
         token::authority = store,
         constraint = check_delegation(claimable_pnl_token_account_for_holding, config.holding()?)?,
+        seeds = [
+            constants::CLAIMABLE_ACCOUNT_SEED,
+            store.key().as_ref(),
+            get_pnl_token(&position, &market)?.as_ref(),
+            config.holding()?.as_ref(),
+            &config.claimable_time_key(validated_recent_timestamp(&config, recent_timestamp)?)?,
+        ],
+        bump,
     )]
     pub claimable_pnl_token_account_for_holding: Option<Account<'info, TokenAccount>>,
     pub token_program: Program<'info, Token>,
@@ -143,6 +168,7 @@ pub struct ExecuteOrder<'info> {
 /// Execute an order.
 pub fn execute_order<'info>(
     ctx: Context<'_, '_, 'info, 'info, ExecuteOrder<'info>>,
+    _recent_timestamp: i64,
 ) -> Result<bool> {
     ctx.accounts.validate_time()?;
     // TODO: validate non-empty order.
@@ -321,7 +347,6 @@ impl<'info> ExecuteOrder<'info> {
                         )
                         .map_err(GmxCoreError::from)?
                         .execute()
-                        .map(Box::new)
                         .map_err(GmxCoreError::from)?;
                     should_remove = report.should_remove();
                     report
@@ -476,6 +501,9 @@ impl<'info> ExecuteOrder<'info> {
     }
 
     fn transfer_out(&self, is_secondary: bool, amount: u64) -> Result<()> {
+        if amount == 0 {
+            return Ok(());
+        }
         let (from, to) = if is_secondary {
             (
                 &self.secondary_output_token_vault,
@@ -503,6 +531,9 @@ impl<'info> ExecuteOrder<'info> {
         to: AccountInfo<'info>,
         amount: u64,
     ) -> Result<()> {
+        if amount == 0 {
+            return Ok(());
+        }
         let from = if is_long {
             self.long_token_vault.to_account_info()
         } else {
@@ -556,4 +587,15 @@ fn check_delegation(account: &TokenAccount, target: Pubkey) -> Result<bool> {
         .map(|delegate| delegate == target)
         .ok_or(error!(DataStoreError::NoDelegatedAuthorityIsSet))?;
     Ok(is_matched)
+}
+
+fn validated_recent_timestamp(config: &Config, timestamp: i64) -> Result<i64> {
+    let recent_time_window = config.recent_time_window()?;
+    let expiration_time = timestamp.saturating_add_unsigned(recent_time_window);
+    let clock = Clock::get()?;
+    if timestamp <= clock.unix_timestamp && clock.unix_timestamp <= expiration_time {
+        Ok(timestamp)
+    } else {
+        err!(DataStoreError::InvalidArgument)
+    }
 }

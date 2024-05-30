@@ -429,8 +429,9 @@ pub mod data_store {
     #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
     pub fn execute_order<'info>(
         ctx: Context<'_, '_, 'info, 'info, ExecuteOrder<'info>>,
+        recent_timestamp: i64,
     ) -> Result<bool> {
-        instructions::execute_order(ctx)
+        instructions::execute_order(ctx, recent_timestamp)
     }
 
     #[access_control(internal::Authenticate::only_controller(&ctx))]
@@ -598,6 +599,8 @@ pub enum DataStoreError {
     // Order.
     #[msg("missing claimable time window")]
     MissingClaimableTimeWindow,
+    #[msg("missing recent time window")]
+    MissingRecentTimeWindow,
     #[msg("missing holding address")]
     MissingHoldingAddress,
     #[msg("missing sender")]

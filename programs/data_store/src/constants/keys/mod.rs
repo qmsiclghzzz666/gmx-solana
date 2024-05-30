@@ -19,3 +19,5 @@ pub const MAX_ORACLE_TIMESTAMP_RANGE: &str = "max_oracle_timestamp_range";
 pub const HOLDING: &str = "holding";
 /// Claimable time window (secs, `amount`)
 pub const CLAIMABLE_TIME_WINDOW: &str = "claimable_time_window";
+/// Recent time window (secs, `amount`)
+pub const RECENT_TIME_WINDOW: &str = "recent_time_window";

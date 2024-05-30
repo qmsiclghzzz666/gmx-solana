@@ -521,6 +521,8 @@ where
 
     /// Build [`RpcBuilder`] for `execute_order` instruction.
     pub async fn build(&mut self) -> crate::Result<RpcBuilder<'a, C>> {
+        use std::time::SystemTime;
+
         let hint = self.prepare_hint().await?;
         let authority = self.program.payer();
         let feeds = self
@@ -537,6 +539,12 @@ where
             is_signer: false,
             is_writable: false,
         });
+        let recent_timestamp = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .map_err(crate::Error::unknown)?
+            .as_secs()
+            .try_into()
+            .map_err(|_| crate::Error::unknown("failed to convert timestamp"))?;
         Ok(RpcBuilder::new(self.program)
             .accounts(accounts::ExecuteOrder {
                 authority,
@@ -573,6 +581,7 @@ where
                 system_program: system_program::ID,
             })
             .args(instruction::ExecuteOrder {
+                recent_timestamp,
                 execution_fee: self.execution_fee,
             })
             .accounts(
