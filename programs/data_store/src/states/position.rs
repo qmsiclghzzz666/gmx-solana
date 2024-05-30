@@ -189,10 +189,6 @@ impl<'a, 'info> PositionOps<'a, 'info> {
             is_long,
         })
     }
-
-    pub(crate) fn into_market(self) -> AsMarket<'a, 'info> {
-        self.market
-    }
 }
 
 impl<'a, 'info> gmx_core::Position<{ constants::MARKET_DECIMALS }> for PositionOps<'a, 'info> {

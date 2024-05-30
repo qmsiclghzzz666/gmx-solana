@@ -5,12 +5,14 @@ import { createDepositPDA, createMarketPDA, createMarketTokenMintPDA, createMark
 import { getAccount } from "@solana/spl-token";
 import { BTC_TOKEN_MINT, SOL_TOKEN_MINT } from "./token";
 import { IxWithOutput, makeInvoke } from "./invoke";
-import { DataStoreProgram, PriceProvider, findConfigPDA, toBN } from "gmsol";
+import { DataStoreProgram, PriceProvider, findConfigPDA, findMarketPDA, findMarketVaultPDA, toBN } from "gmsol";
 import { PYTH_ID } from "./external";
-import { findKey } from "lodash";
+import { findKey, toInteger } from "lodash";
 import { findPythPriceFeedPDA } from "gmsol";
 import { PriceServiceConnection } from "@pythnetwork/price-service-client";
 import { PythSolanaReceiver } from "@pythnetwork/pyth-solana-receiver";
+import { findClaimableAccountPDA, getTimeKey, invokeCloseEmptyClaimableAccount, invokeUseClaimableAccount } from "./data/token";
+import { TIME_WINDOW } from "./data/constants";
 
 export const exchange = workspace.Exchange as Program<Exchange>;
 
@@ -252,9 +254,9 @@ const postPriceFeeds = async (
     signer: Keypair,
     feeds: PublicKey[],
     providerMapper: (index: number) => number,
-    wait: number = 2000,
+    wait: number = 3000,
 ) => {
-    // Wait for 2s.
+    // Wait for `wait` ms.
     await new Promise(resolve => setTimeout(resolve, wait));
     const hermes = new PriceServiceConnection(
         "https://hermes.pyth.network/",
@@ -451,6 +453,7 @@ export const executeWithdrawal = async (simulate: boolean, ...args: Parameters<t
 
 export interface OrderHint {
     user: PublicKey,
+    isDecrease: boolean,
     marketTokenMint: PublicKey,
     position: PublicKey | null,
     feeds: PublicKey[],
@@ -459,6 +462,11 @@ export interface OrderHint {
     secondaryOutputToken: PublicKey | null,
     finalOutputTokenAccount: PublicKey | null,
     secondaryOutputTokenAccount: PublicKey | null,
+    isLong: boolean,
+    longTokenMint: PublicKey,
+    shortTokenMint: PublicKey,
+    longTokenAccount: PublicKey,
+    shortTokenAccount: PublicKey,
     providerMapper: (number) => number | undefined,
 }
 
@@ -467,6 +475,8 @@ export type MakeExecuteOrderParams = {
     store: PublicKey,
     oracle: PublicKey,
     order: PublicKey,
+    recentTimestamp: bigint | number,
+    holding: PublicKey,
     options?: {
         executionFee?: number | bigint,
         priceProvider?: PublicKey,
@@ -476,21 +486,27 @@ export type MakeExecuteOrderParams = {
     },
 };
 
-const fetchOrderHint = async (dataStore: DataStoreProgram, order: PublicKey) => {
-    return await dataStore.account.order.fetch(order).then(order => {
-        return {
-            user: order.fixed.user,
-            marketTokenMint: order.fixed.tokens.marketToken,
-            position: order.fixed.position ?? null,
-            finalOutputToken: order.fixed.tokens.finalOutputToken ?? null,
-            secondaryOutputToken: order.fixed.tokens.secondaryOutputToken ?? null,
-            finalOutputTokenAccount: order.fixed.receivers.finalOutputTokenAccount ?? null,
-            secondaryOutputTokenAccount: order.fixed.receivers.secondaryOutputTokenAccount ?? null,
-            feeds: order.prices.feeds,
-            swapPath: order.swap.longTokenSwapPath,
-            providerMapper: makeProviderMapper([...order.prices.providers], order.prices.nums),
-        };
-    }) satisfies OrderHint as OrderHint;
+const fetchOrderHint = async (dataStore: DataStoreProgram, orderAddress: PublicKey, store: PublicKey) => {
+    const order = await dataStore.account.order.fetch(orderAddress);
+    const market = await dataStore.account.market.fetch(order.fixed.market);
+    return {
+        user: order.fixed.user,
+        isDecrease: Boolean(order.fixed.params.kind.marketDecrease),
+        marketTokenMint: order.fixed.tokens.marketToken,
+        position: order.fixed.position ?? null,
+        finalOutputToken: order.fixed.tokens.finalOutputToken ?? null,
+        secondaryOutputToken: order.fixed.tokens.secondaryOutputToken ?? null,
+        finalOutputTokenAccount: order.fixed.receivers.finalOutputTokenAccount ?? null,
+        secondaryOutputTokenAccount: order.fixed.receivers.secondaryOutputTokenAccount ?? null,
+        longTokenAccount: order.fixed.receivers.longTokenAccount,
+        shortTokenAccount: order.fixed.receivers.shortTokenAccount,
+        isLong: order.fixed.params.isLong,
+        longTokenMint: market.meta.longTokenMint,
+        shortTokenMint: market.meta.shortTokenMint,
+        feeds: order.prices.feeds,
+        swapPath: order.swap.longTokenSwapPath,
+        providerMapper: makeProviderMapper([...order.prices.providers], order.prices.nums),
+    } satisfies OrderHint as OrderHint;
 }
 
 export const makeExecuteOrderInstruction = async ({
@@ -498,20 +514,28 @@ export const makeExecuteOrderInstruction = async ({
     store,
     oracle,
     order,
+    recentTimestamp,
+    holding,
     options,
 }: MakeExecuteOrderParams) => {
     const {
         user,
+        isDecrease,
+        isLong,
         marketTokenMint,
         position,
         finalOutputToken,
         finalOutputTokenAccount,
         secondaryOutputToken,
         secondaryOutputTokenAccount,
+        longTokenAccount,
+        shortTokenAccount,
+        longTokenMint,
+        shortTokenMint,
         feeds,
         swapPath,
         providerMapper,
-    } = options?.hints?.order ?? await fetchOrderHint(dataStore, order);
+    } = options?.hints?.order ?? await fetchOrderHint(dataStore, order, store);
     const [onlyOrderKeeper] = createRolesPDA(store, authority);
     const feedAccounts = feeds.map((pubkey, idx) => {
         return getFeedAccountMeta(providerMapper(idx), pubkey);
@@ -530,7 +554,8 @@ export const makeExecuteOrderInstruction = async ({
             isWritable: false,
         }
     });
-    return await exchange.methods.executeOrder(toBN(options?.executionFee ?? 0)).accounts({
+    const pnlTokenMint = isLong ? longTokenMint : shortTokenMint;
+    return await exchange.methods.executeOrder(toBN(recentTimestamp), toBN(options?.executionFee ?? 0)).accounts({
         authority,
         onlyOrderKeeper,
         store,
@@ -546,6 +571,13 @@ export const makeExecuteOrderInstruction = async ({
         secondaryOutputTokenAccount,
         finalOutputTokenVault: finalOutputTokenAccount ? createMarketVaultPDA(store, finalOutputToken)[0] : null,
         secondaryOutputTokenVault: secondaryOutputTokenAccount ? createMarketVaultPDA(store, secondaryOutputToken)[0] : null,
+        longTokenAccount,
+        shortTokenAccount,
+        longTokenVault: findMarketVaultPDA(store, longTokenMint)[0],
+        shortTokenVault: findMarketVaultPDA(store, shortTokenMint)[0],
+        claimableLongTokenAccountForUser: isDecrease ? findClaimableAccountPDA(store, longTokenMint, user, getTimeKey(recentTimestamp, TIME_WINDOW))[0] : null,
+        claimableShortTokenAccountForUser: isDecrease ? findClaimableAccountPDA(store, shortTokenMint, user, getTimeKey(recentTimestamp, TIME_WINDOW))[0] : null,
+        claimablePnlTokenAccountForHolding: isDecrease ? findClaimableAccountPDA(store, pnlTokenMint, holding, getTimeKey(recentTimestamp, TIME_WINDOW))[0] : null,
         priceProvider: options.priceProvider ?? PYTH_ID,
     }).remainingAccounts([...feedAccounts, ...swapMarkets, ...swapMarketMints]).instruction();
 };
@@ -556,15 +588,62 @@ export const executeOrder = async (simulate: boolean, ...args: Parameters<typeof
     if (simulate) {
         return ["not executed because this is just a simulation"];
     }
-    const [connection, { authority, order, options }] = args;
+    const [connection, { authority, order, store, recentTimestamp, holding, options }] = args;
+    const { user, longTokenMint, shortTokenMint, isLong, isDecrease, feeds, providerMapper } = options?.hints?.order ?? await fetchOrderHint(dataStore, order, store);
     if (options?.priceProvider?.toBase58() ?? PYTH_ID === PYTH_ID) {
         if (!(authority instanceof Keypair)) {
             throw Error("Currently only support to call with `Keypair`");
         }
-        const { feeds, providerMapper } = options?.hints?.order ?? await fetchOrderHint(dataStore, order);
         await postPriceFeeds(connection, authority as Keypair, feeds, providerMapper);
     }
-    return await invokeExecuteOrder(...args);
+    if (isDecrease) {
+        await invokeUseClaimableAccount(dataStore, {
+            authority,
+            store,
+            user,
+            mint: longTokenMint,
+            timestamp: recentTimestamp,
+        });
+        await invokeUseClaimableAccount(dataStore, {
+            authority,
+            store,
+            user,
+            mint: shortTokenMint,
+            timestamp: recentTimestamp,
+        });
+        await invokeUseClaimableAccount(dataStore, {
+            authority,
+            store,
+            user: holding,
+            mint: isLong ? longTokenMint : shortTokenMint,
+            timestamp: recentTimestamp,
+        });
+        const signature = await invokeExecuteOrder(...args);
+        await invokeCloseEmptyClaimableAccount(dataStore, {
+            authority,
+            store,
+            user,
+            mint: longTokenMint,
+            timestamp: recentTimestamp,
+        });
+        await invokeCloseEmptyClaimableAccount(dataStore, {
+            authority,
+            store,
+            user,
+            mint: shortTokenMint,
+            timestamp: recentTimestamp,
+        });
+        await invokeCloseEmptyClaimableAccount(dataStore, {
+            authority,
+            store,
+            user: holding,
+            mint: isLong ? longTokenMint : shortTokenMint,
+            timestamp: recentTimestamp,
+        });
+        return signature;
+    } else {
+        return await invokeExecuteOrder(...args);
+    }
 };
 
 export const initializeMarkets = async (signer: Keypair, dataStoreAddress: PublicKey, fakeTokenMint: PublicKey, usdGMint: PublicKey) => {

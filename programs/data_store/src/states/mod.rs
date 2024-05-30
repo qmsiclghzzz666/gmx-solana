@@ -113,6 +113,10 @@ impl InitSpace for Amount {
     const INIT_SPACE: usize = 8;
 }
 
+impl InitSpace for Pubkey {
+    const INIT_SPACE: usize = 32;
+}
+
 impl<T, const LEN: usize> InitSpace for [T; LEN]
 where
     T: InitSpace,

@@ -120,6 +120,16 @@ pub mod data_store {
         instructions::insert_factor(ctx, &key, amount, new)
     }
 
+    #[access_control(internal::Authenticate::only_controller(&ctx))]
+    pub fn insert_address(
+        ctx: Context<InsertAddress>,
+        key: String,
+        address: Pubkey,
+        new: bool,
+    ) -> Result<()> {
+        instructions::insert_address(ctx, &key, address, new)
+    }
+
     // Token Config.
     #[access_control(internal::Authenticate::only_controller(&ctx))]
     pub fn initialize_token_config_map(
@@ -292,6 +302,24 @@ pub mod data_store {
         instructions::market_vault_transfer_out(ctx, amount)
     }
 
+    #[access_control(internal::Authenticate::only_controller(&ctx))]
+    pub fn use_claimable_account(
+        ctx: Context<UseClaimableAccount>,
+        timestamp: i64,
+        amount: u64,
+    ) -> Result<()> {
+        instructions::use_claimable_account(ctx, timestamp, amount)
+    }
+
+    #[access_control(internal::Authenticate::only_controller(&ctx))]
+    pub fn close_empty_claimable_account(
+        ctx: Context<CloseEmptyClaimableAccount>,
+        user: Pubkey,
+        timestamp: i64,
+    ) -> Result<()> {
+        instructions::close_empty_claimable_account(ctx, user, timestamp)
+    }
+
     // Oracle.
     #[access_control(internal::Authenticate::only_controller(&ctx))]
     pub fn initialize_oracle(ctx: Context<InitializeOracle>, index: u8) -> Result<()> {
@@ -401,8 +429,9 @@ pub mod data_store {
     #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
     pub fn execute_order<'info>(
         ctx: Context<'_, '_, 'info, 'info, ExecuteOrder<'info>>,
+        recent_timestamp: i64,
     ) -> Result<bool> {
-        instructions::execute_order(ctx)
+        instructions::execute_order(ctx, recent_timestamp)
     }
 
     #[access_control(internal::Authenticate::only_controller(&ctx))]
@@ -463,6 +492,8 @@ pub enum DataStoreError {
     MissingAmount,
     #[msg("Missing factor")]
     MissingFactor,
+    #[msg("Cannot be zero")]
+    CannotBeZero,
     // Roles.
     #[msg("Too many admins")]
     TooManyAdmins,
@@ -566,8 +597,26 @@ pub enum DataStoreError {
     #[msg("invalid position")]
     InvalidPosition,
     // Order.
+    #[msg("missing claimable time window")]
+    MissingClaimableTimeWindow,
+    #[msg("missing recent time window")]
+    MissingRecentTimeWindow,
+    #[msg("missing holding address")]
+    MissingHoldingAddress,
     #[msg("missing sender")]
     MissingSender,
+    #[msg("missing position")]
+    MissingPosition,
+    #[msg("missing claimable long collateral account for user")]
+    MissingClaimableLongCollateralAccountForUser,
+    #[msg("missing claimable short collateral account for user")]
+    MissingClaimableShortCollateralAccountForUser,
+    #[msg("missing claimable pnl token account for holding")]
+    MissingClaimablePnlTokenAccountForHolding,
+    #[msg("claimable collateral in output token for holding is not supported")]
+    ClaimbleCollateralInOutputTokenForHolding,
+    #[msg("no delegated authority is set")]
+    NoDelegatedAuthorityIsSet,
     // Token Config.
     #[msg("synthetic flag does not match")]
     InvalidSynthetic,

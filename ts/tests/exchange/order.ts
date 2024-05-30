@@ -2,6 +2,8 @@ import { PublicKey } from "@solana/web3.js";
 import { getAddresses, getMarkets, getProvider, getUsers } from "../../utils/fixtures";
 import { exchange, executeOrder } from "../../utils/exchange";
 import { findPositionPDA, invokeCreateDecreaseOrderWithPayerAsSigner, invokeCreateIncreaseOrderWithPayerAsSigner } from "gmsol";
+import { toInteger } from "lodash";
+import { dataStore } from "../../utils/data";
 
 describe("exchange: order", () => {
     const provider = getProvider();
@@ -28,6 +30,7 @@ describe("exchange: order", () => {
     });
 
     it("increase and decrease position", async () => {
+        const recentTimestamp = toInteger(Date.now() / 1000);
         // Increase position.
         let increaseOrder: PublicKey;
         try {
@@ -44,6 +47,10 @@ describe("exchange: order", () => {
                     swapPath: [
                         GMFakeFakeUsdG
                     ],
+                    hint: {
+                        longToken: fakeTokenMint,
+                        shortToken: usdGTokenMint,
+                    }
                 }
             });
             increaseOrder = address;
@@ -58,6 +65,8 @@ describe("exchange: order", () => {
                 store: dataStoreAddress,
                 oracle: oracleAddress,
                 order: increaseOrder,
+                recentTimestamp,
+                holding: dataStore.provider.publicKey,
                 options: {
                     executionFee: 5001,
                 }
@@ -108,6 +117,8 @@ describe("exchange: order", () => {
                 store: dataStoreAddress,
                 oracle: oracleAddress,
                 order: decreaseOrder,
+                recentTimestamp,
+                holding: dataStore.provider.publicKey,
                 options: {
                     executionFee: 5001,
                 }

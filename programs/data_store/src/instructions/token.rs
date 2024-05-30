@@ -3,7 +3,7 @@ use anchor_spl::token::{Burn, Mint, MintTo, Token, TokenAccount, Transfer};
 
 use crate::{
     constants,
-    states::{DataStore, Roles},
+    states::{Config, DataStore, Roles, Seed},
     utils::internal,
 };
 
@@ -259,5 +259,159 @@ impl<'info> MarketVaultTransferOut<'info> {
                 authority: self.store.to_account_info(),
             },
         )
+    }
+}
+
+#[derive(Accounts)]
+#[instruction(timestamp: i64)]
+pub struct UseClaimableAccount<'info> {
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    #[account(
+        seeds = [
+            Roles::SEED,
+            store.key().as_ref(),
+            authority.key().as_ref(),
+        ],
+        bump = only_controller.bump,
+    )]
+    pub only_controller: Account<'info, Roles>,
+    pub store: Account<'info, DataStore>,
+    #[account(
+        seeds = [Config::SEED, store.key().as_ref()],
+        bump = config.bump,
+    )]
+    pub config: Account<'info, Config>,
+    pub mint: Account<'info, Mint>,
+    /// CHECK: check by CPI.
+    pub user: UncheckedAccount<'info>,
+    #[account(
+        init_if_needed,
+        payer = authority,
+        token::mint = mint,
+        // We use the store as the authority of the token account.
+        token::authority = store,
+        seeds = [
+            constants::CLAIMABLE_ACCOUNT_SEED,
+            store.key().as_ref(),
+            mint.key().as_ref(),
+            user.key().as_ref(),
+            &config.claimable_time_key(timestamp)?,
+        ],
+        bump,
+    )]
+    pub account: Account<'info, TokenAccount>,
+    pub system_program: Program<'info, System>,
+    pub token_program: Program<'info, Token>,
+}
+
+/// Prepare claimable account.
+pub fn use_claimable_account(
+    ctx: Context<UseClaimableAccount>,
+    _timestamp: i64,
+    amount: u64,
+) -> Result<()> {
+    if ctx.accounts.account.delegate.is_none() || ctx.accounts.account.delegated_amount != amount {
+        anchor_spl::token::approve(
+            CpiContext::new_with_signer(
+                ctx.accounts.token_program.to_account_info(),
+                anchor_spl::token::Approve {
+                    to: ctx.accounts.account.to_account_info(),
+                    delegate: ctx.accounts.user.to_account_info(),
+                    authority: ctx.accounts.store.to_account_info(),
+                },
+                &[&ctx.accounts.store.pda_seeds()],
+            ),
+            0,
+        )?;
+    }
+    Ok(())
+}
+
+impl<'info> internal::Authentication<'info> for UseClaimableAccount<'info> {
+    fn authority(&self) -> &Signer<'info> {
+        &self.authority
+    }
+
+    fn store(&self) -> &Account<'info, DataStore> {
+        &self.store
+    }
+
+    fn roles(&self) -> &Account<'info, Roles> {
+        &self.only_controller
+    }
+}
+
+#[derive(Accounts)]
+#[instruction(user: Pubkey, timestamp: i64)]
+pub struct CloseEmptyClaimableAccount<'info> {
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    #[account(
+        seeds = [
+            Roles::SEED,
+            store.key().as_ref(),
+            authority.key().as_ref(),
+        ],
+        bump = only_controller.bump,
+    )]
+    pub only_controller: Account<'info, Roles>,
+    pub store: Account<'info, DataStore>,
+    #[account(
+        seeds = [Config::SEED, store.key().as_ref()],
+        bump = config.bump,
+    )]
+    pub config: Account<'info, Config>,
+    pub mint: Account<'info, Mint>,
+    #[account(
+        mut,
+        token::mint = mint,
+        // We use the store as the authority of the token account.
+        token::authority = store,
+        seeds = [
+            constants::CLAIMABLE_ACCOUNT_SEED,
+            store.key().as_ref(),
+            mint.key().as_ref(),
+            user.key().as_ref(),
+            &config.claimable_time_key(timestamp)?,
+        ],
+        bump,
+    )]
+    pub account: Account<'info, TokenAccount>,
+    pub system_program: Program<'info, System>,
+    pub token_program: Program<'info, Token>,
+}
+
+/// Close claimable account if it is empty.
+pub fn close_empty_claimable_account(
+    ctx: Context<CloseEmptyClaimableAccount>,
+    _user: Pubkey,
+    _timestamp: i64,
+) -> Result<()> {
+    if ctx.accounts.account.amount == 0 {
+        anchor_spl::token::close_account(CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(),
+            anchor_spl::token::CloseAccount {
+                account: ctx.accounts.account.to_account_info(),
+                destination: ctx.accounts.authority.to_account_info(),
+                authority: ctx.accounts.store.to_account_info(),
+            },
+            &[&ctx.accounts.store.pda_seeds()],
+        ))?;
+    }
+    Ok(())
+}
+
+impl<'info> internal::Authentication<'info> for CloseEmptyClaimableAccount<'info> {
+    fn authority(&self) -> &Signer<'info> {
+        &self.authority
+    }
+
+    fn store(&self) -> &Account<'info, DataStore> {
+        &self.store
+    }
+
+    fn roles(&self) -> &Account<'info, Roles> {
+        &self.only_controller
     }
 }

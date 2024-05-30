@@ -206,7 +206,7 @@ impl KeeperArgs {
             Command::ExecuteOrder { order } => {
                 let program = client.program(exchange::id())?;
                 let mut builder =
-                    program.execute_order(store, &self.oracle.address(Some(store))?, order);
+                    program.execute_order(store, &self.oracle.address(Some(store))?, order)?;
                 let execution_fee = self
                     .get_or_estimate_execution_fee(&program, builder.build().await?)
                     .await?;

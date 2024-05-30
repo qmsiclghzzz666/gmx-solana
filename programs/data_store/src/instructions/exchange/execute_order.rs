@@ -1,6 +1,12 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token, TokenAccount};
-use gmx_core::{action::Prices, MarketExt, Position as _, PositionExt};
+use gmx_core::{
+    action::{
+        decrease_position::DecreasePositionReport, increase_position::IncreasePositionReport,
+        Prices,
+    },
+    MarketExt, PositionExt,
+};
 
 use crate::{
     constants,
@@ -16,26 +22,29 @@ use crate::{
 use super::utils::swap::unchecked_swap_with_params;
 
 #[derive(Accounts)]
+#[instruction(recent_timestamp: i64)]
 pub struct ExecuteOrder<'info> {
     pub authority: Signer<'info>,
-    pub store: Account<'info, DataStore>,
+    pub store: Box<Account<'info, DataStore>>,
     pub only_order_keeper: Account<'info, Roles>,
     #[account(
         seeds = [Config::SEED, store.key().as_ref()],
         bump = config.bump,
     )]
-    config: Account<'info, Config>,
-    pub oracle: Account<'info, Oracle>,
+    config: Box<Account<'info, Config>>,
+    pub oracle: Box<Account<'info, Oracle>>,
     #[account(
         constraint = order.fixed.market == market.key(),
         constraint = order.fixed.tokens.market_token == market_token_mint.key(),
         constraint = order.fixed.receivers.final_output_token_account == final_output_token_account.as_ref().map(|a| a.key()),
         constraint = order.fixed.receivers.secondary_output_token_account == secondary_output_token_account.as_ref().map(|a| a.key()),
+        constraint = order.fixed.receivers.long_token_account == long_token_account.key(),
+        constraint = order.fixed.receivers.short_token_account == short_token_account.key(),
     )]
-    pub order: Account<'info, Order>,
+    pub order: Box<Account<'info, Order>>,
     #[account(mut)]
-    pub market: Account<'info, Market>,
-    pub market_token_mint: Account<'info, Mint>,
+    pub market: Box<Account<'info, Market>>,
+    pub market_token_mint: Box<Account<'info, Mint>>,
     #[account(
         mut,
         constraint = position.load()?.owner == order.fixed.user,
@@ -61,7 +70,7 @@ pub struct ExecuteOrder<'info> {
         ],
         bump,
     )]
-    pub final_output_token_vault: Option<Account<'info, TokenAccount>>,
+    pub final_output_token_vault: Option<Box<Account<'info, TokenAccount>>>,
     #[account(
         mut,
         token::mint = secondary_output_token_account.as_ref().expect("must provided").mint,
@@ -73,17 +82,93 @@ pub struct ExecuteOrder<'info> {
         ],
         bump,
     )]
-    pub secondary_output_token_vault: Option<Account<'info, TokenAccount>>,
+    pub secondary_output_token_vault: Option<Box<Account<'info, TokenAccount>>>,
     #[account(mut)]
-    pub final_output_token_account: Option<Account<'info, TokenAccount>>,
+    pub final_output_token_account: Option<Box<Account<'info, TokenAccount>>>,
     #[account(mut)]
-    pub secondary_output_token_account: Option<Account<'info, TokenAccount>>,
+    pub secondary_output_token_account: Option<Box<Account<'info, TokenAccount>>>,
+    #[account(
+        mut,
+        token::mint = market.meta.long_token_mint,
+        seeds = [
+            constants::MARKET_VAULT_SEED,
+            store.key().as_ref(),
+            market.meta.long_token_mint.as_ref(),
+            &[],
+        ],
+        bump,
+    )]
+    pub long_token_vault: Account<'info, TokenAccount>,
+    #[account(
+        mut,
+        token::mint = market.meta.short_token_mint,
+        seeds = [
+            constants::MARKET_VAULT_SEED,
+            store.key().as_ref(),
+            market.meta.short_token_mint.as_ref(),
+            &[],
+        ],
+        bump,
+    )]
+    pub short_token_vault: Account<'info, TokenAccount>,
+    /// CHECK: check by token program.
+    #[account(mut)]
+    pub long_token_account: UncheckedAccount<'info>,
+    /// CHECK: check by token program.
+    #[account(mut)]
+    pub short_token_account: UncheckedAccount<'info>,
+    #[account(
+        mut,
+        token::mint = market.meta.long_token_mint,
+        token::authority = store,
+        constraint = check_delegation(claimable_long_token_account_for_user, order.fixed.user)?,
+        seeds = [
+            constants::CLAIMABLE_ACCOUNT_SEED,
+            store.key().as_ref(),
+            market.meta.long_token_mint.as_ref(),
+            order.fixed.user.as_ref(),
+            &config.claimable_time_key(validated_recent_timestamp(&config, recent_timestamp)?)?,
+        ],
+        bump,
+    )]
+    pub claimable_long_token_account_for_user: Option<Account<'info, TokenAccount>>,
+    #[account(
+        mut,
+        token::mint = market.meta.short_token_mint,
+        token::authority = store,
+        constraint = check_delegation(claimable_short_token_account_for_user, order.fixed.user)?,
+        seeds = [
+            constants::CLAIMABLE_ACCOUNT_SEED,
+            store.key().as_ref(),
+            market.meta.short_token_mint.as_ref(),
+            order.fixed.user.as_ref(),
+            &config.claimable_time_key(validated_recent_timestamp(&config, recent_timestamp)?)?,
+        ],
+        bump,
+    )]
+    pub claimable_short_token_account_for_user: Option<Account<'info, TokenAccount>>,
+    #[account(
+        mut,
+        token::mint = get_pnl_token(&position, &market)?,
+        token::authority = store,
+        constraint = check_delegation(claimable_pnl_token_account_for_holding, config.holding()?)?,
+        seeds = [
+            constants::CLAIMABLE_ACCOUNT_SEED,
+            store.key().as_ref(),
+            get_pnl_token(&position, &market)?.as_ref(),
+            config.holding()?.as_ref(),
+            &config.claimable_time_key(validated_recent_timestamp(&config, recent_timestamp)?)?,
+        ],
+        bump,
+    )]
+    pub claimable_pnl_token_account_for_holding: Option<Account<'info, TokenAccount>>,
     pub token_program: Program<'info, Token>,
 }
 
 /// Execute an order.
 pub fn execute_order<'info>(
     ctx: Context<'_, '_, 'info, 'info, ExecuteOrder<'info>>,
+    _recent_timestamp: i64,
 ) -> Result<bool> {
     ctx.accounts.validate_time()?;
     // TODO: validate non-empty order.
@@ -233,18 +318,19 @@ impl<'info> ExecuteOrder<'info> {
                     .map_err(GmxCoreError::from)?
                     .execute()
                     .map_err(GmxCoreError::from)?;
-                msg!("{:?}", report);
+                self.process_increase_report(report)?;
             }
             OrderKind::MarketDecrease | OrderKind::Liquidation => {
-                let Some(position) = self.position.as_mut() else {
-                    return err!(DataStoreError::PositionNotProvided);
-                };
-                let params = &self.order.fixed.params;
-                let collateral_withdrawal_amount = params.initial_collateral_delta_amount as u128;
-                let size_delta_usd = params.size_delta_usd;
-                let acceptable_price = params.acceptable_price;
+                let report = {
+                    let Some(position) = self.position.as_mut() else {
+                        return err!(DataStoreError::PositionNotProvided);
+                    };
+                    let params = &self.order.fixed.params;
+                    let collateral_withdrawal_amount =
+                        params.initial_collateral_delta_amount as u128;
+                    let size_delta_usd = params.size_delta_usd;
+                    let acceptable_price = params.acceptable_price;
 
-                let (is_output_token_long, output_amount, secondary_output_amount) = {
                     let mut position = self
                         .market
                         .as_market(&mut self.market_token_mint)
@@ -262,85 +348,162 @@ impl<'info> ExecuteOrder<'info> {
                         .map_err(GmxCoreError::from)?
                         .execute()
                         .map_err(GmxCoreError::from)?;
-                    msg!("{:?}", report);
-
-                    let mut output_amount = *report.output_amount();
-                    let mut secondary_output_amount = *report.secondary_output_amount();
-                    if secondary_output_amount != 0 {
-                        require!(
-                            report.is_output_token_long() != position.is_long(),
-                            DataStoreError::SameSecondaryTokensNotMerged,
-                        );
-                        // Swap the secondary output tokens to output tokens.
-                        let report = position
-                            .into_market()
-                            .swap(
-                                !report.is_output_token_long(),
-                                secondary_output_amount,
-                                prices.long_token_price,
-                                prices.short_token_price,
-                            )
-                            .map_err(GmxCoreError::from)?
-                            .execute()
-                            .map_err(GmxCoreError::from)?;
-                        output_amount = output_amount
-                            .checked_add(*report.token_out_amount())
-                            .ok_or(DataStoreError::AmountOverflow)?;
-                        secondary_output_amount = 0;
-                    }
                     should_remove = report.should_remove();
-                    (
-                        report.is_output_token_long(),
-                        output_amount
-                            .try_into()
-                            .map_err(|_| DataStoreError::AmountOverflow)?,
-                        secondary_output_amount
-                            .try_into()
-                            .map_err(|_| DataStoreError::AmountOverflow)?,
-                    )
+                    report
                 };
-
-                // Swap output token to the expected output token.
-                let meta = self.market.meta();
-                let token_ins = if is_output_token_long {
-                    (Some(meta.long_token_mint), Some(meta.short_token_mint))
-                } else {
-                    (Some(meta.short_token_mint), Some(meta.long_token_mint))
-                };
-
-                // Since we have checked that secondary_amount must be zero if output_token == secondary_output_token,
-                // the swap should still be correct.
-
-                // Call exit to make sure the data are written to the storage.
-                // In case that there are markets also appear in the swap paths.
-                self.market.exit(&crate::ID)?;
-                // CHECK: `exit` and `reload` have been called on the modified market account before and after the swap.
-                let (output_amount, secondary_amount) = unchecked_swap_with_params(
-                    &self.oracle,
-                    &self.order.swap,
-                    remaining_accounts,
-                    (
-                        self.order
-                            .fixed
-                            .tokens
-                            .final_output_token
-                            .ok_or(DataStoreError::MissingTokenMint)?,
-                        self.order.fixed.tokens.secondary_output_token,
-                    ),
-                    token_ins,
-                    (output_amount, secondary_output_amount),
-                )?;
-                // Call `reload` to make sure the state is up-to-date.
-                self.market.reload()?;
-
-                self.transfer_out(false, output_amount)?;
-                self.transfer_out(true, secondary_amount)?;
+                self.process_decrease_report(remaining_accounts, &report)?;
             }
         }
         Ok(should_remove)
     }
 
+    fn process_increase_report(&self, report: IncreasePositionReport<u128>) -> Result<()> {
+        msg!("{:?}", report);
+        let (long_amount, short_amount) = report.claimable_funding_amounts();
+        self.transfer_out_funding_amounts(long_amount, short_amount)?;
+        Ok(())
+    }
+
+    fn process_decrease_report(
+        &mut self,
+        remaining_accounts: &'info [AccountInfo<'info>],
+        report: &DecreasePositionReport<u128>,
+    ) -> Result<()> {
+        msg!("{:?}", report);
+
+        self.process_decrease_swap(remaining_accounts, report)?;
+
+        // Transfer out funding rebate.
+        let (long_amount, short_amount) = report.claimable_funding_amounts();
+        self.transfer_out_funding_amounts(long_amount, short_amount)?;
+
+        self.process_claimable_collateral_for_decrease(report)?;
+
+        Ok(())
+    }
+
+    fn process_decrease_swap(
+        &mut self,
+        remaining_accounts: &'info [AccountInfo<'info>],
+        report: &DecreasePositionReport<u128>,
+    ) -> Result<()> {
+        require!(
+            *report.secondary_output_amount() == 0
+                || (report.is_output_token_long() != report.is_secondary_output_token_long()),
+            DataStoreError::SameSecondaryTokensNotMerged,
+        );
+
+        let (is_output_token_long, output_amount, secondary_output_amount) = (
+            report.is_output_token_long(),
+            (*report.output_amount())
+                .try_into()
+                .map_err(|_| DataStoreError::AmountOverflow)?,
+            (*report.secondary_output_amount())
+                .try_into()
+                .map_err(|_| DataStoreError::AmountOverflow)?,
+        );
+
+        // Swap output token to the expected output token.
+        let meta = self.market.meta();
+        let token_ins = if is_output_token_long {
+            (Some(meta.long_token_mint), Some(meta.short_token_mint))
+        } else {
+            (Some(meta.short_token_mint), Some(meta.long_token_mint))
+        };
+
+        // Since we have checked that secondary_amount must be zero if output_token == secondary_output_token,
+        // the swap should still be correct.
+
+        // Call exit to make sure the data are written to the storage.
+        // In case that there are markets also appear in the swap paths.
+        self.market.exit(&crate::ID)?;
+        // CHECK: `exit` and `reload` have been called on the modified market account before and after the swap.
+        let (output_amount, secondary_amount) = unchecked_swap_with_params(
+            &self.oracle,
+            &self.order.swap,
+            remaining_accounts,
+            (
+                self.order
+                    .fixed
+                    .tokens
+                    .final_output_token
+                    .ok_or(DataStoreError::MissingTokenMint)?,
+                self.order.fixed.tokens.secondary_output_token,
+            ),
+            token_ins,
+            (output_amount, secondary_output_amount),
+        )?;
+        // Call `reload` to make sure the state is up-to-date.
+        self.market.reload()?;
+
+        self.transfer_out(false, output_amount)?;
+        self.transfer_out(true, secondary_amount)?;
+        Ok(())
+    }
+
+    fn process_claimable_collateral_for_decrease(
+        &self,
+        report: &DecreasePositionReport<u128>,
+    ) -> Result<()> {
+        let for_holding = report.claimable_collateral_for_holding();
+        require!(
+            *for_holding.output_token_amount() == 0,
+            DataStoreError::ClaimbleCollateralInOutputTokenForHolding
+        );
+
+        let is_output_token_long = report.is_output_token_long();
+        let is_secondary_token_long = report.is_secondary_output_token_long();
+
+        let secondary_amount = (*for_holding.secondary_output_token_amount())
+            .try_into()
+            .map_err(|_| error!(DataStoreError::AmountOverflow))?;
+        self.transfer_out_collateral(
+            is_secondary_token_long,
+            self.claimable_pnl_token_account_for_holding
+                .as_ref()
+                .ok_or(DataStoreError::MissingClaimablePnlTokenAccountForHolding)?
+                .to_account_info(),
+            secondary_amount,
+        )?;
+
+        let for_user = report.claimable_collateral_for_user();
+        let to = if is_output_token_long {
+            self.claimable_long_token_account_for_user
+                .as_ref()
+                .ok_or(DataStoreError::MissingClaimableLongCollateralAccountForUser)?
+                .to_account_info()
+        } else {
+            self.claimable_short_token_account_for_user
+                .as_ref()
+                .ok_or(DataStoreError::MissingClaimableLongCollateralAccountForUser)?
+                .to_account_info()
+        };
+        self.transfer_out_collateral(
+            is_output_token_long,
+            to,
+            (*for_user.output_token_amount())
+                .try_into()
+                .map_err(|_| error!(DataStoreError::AmountOverflow))?,
+        )?;
+        let to = if is_secondary_token_long {
+            self.long_token_account.to_account_info()
+        } else {
+            self.short_token_account.to_account_info()
+        };
+        self.transfer_out_collateral(
+            is_secondary_token_long,
+            to,
+            (*for_user.secondary_output_token_amount())
+                .try_into()
+                .map_err(|_| error!(DataStoreError::AmountOverflow))?,
+        )?;
+        Ok(())
+    }
+
     fn transfer_out(&self, is_secondary: bool, amount: u64) -> Result<()> {
+        if amount == 0 {
+            return Ok(());
+        }
         let (from, to) = if is_secondary {
             (
                 &self.secondary_output_token_vault,
@@ -360,5 +523,79 @@ impl<'info> ExecuteOrder<'info> {
             to.to_account_info(),
             amount,
         )
+    }
+
+    fn transfer_out_collateral(
+        &self,
+        is_long: bool,
+        to: AccountInfo<'info>,
+        amount: u64,
+    ) -> Result<()> {
+        if amount == 0 {
+            return Ok(());
+        }
+        let from = if is_long {
+            self.long_token_vault.to_account_info()
+        } else {
+            self.short_token_vault.to_account_info()
+        };
+        TransferUtils::new(self.token_program.to_account_info(), &self.store, None).transfer_out(
+            from.to_account_info(),
+            to,
+            amount,
+        )
+    }
+
+    fn transfer_out_funding_amounts(&self, long_amount: &u128, short_amount: &u128) -> Result<()> {
+        self.transfer_out_collateral(
+            true,
+            self.long_token_account.to_account_info(),
+            (*long_amount)
+                .try_into()
+                .map_err(|_| error!(DataStoreError::AmountOverflow))?,
+        )?;
+        self.transfer_out_collateral(
+            false,
+            self.short_token_account.to_account_info(),
+            (*short_amount)
+                .try_into()
+                .map_err(|_| error!(DataStoreError::AmountOverflow))?,
+        )?;
+        Ok(())
+    }
+}
+
+fn get_pnl_token(
+    position: &Option<AccountLoader<'_, Position>>,
+    market: &Market,
+) -> Result<Pubkey> {
+    let is_long = position
+        .as_ref()
+        .ok_or(error!(DataStoreError::MissingPosition))?
+        .load()?
+        .is_long()?;
+    if is_long {
+        Ok(market.meta().long_token_mint)
+    } else {
+        Ok(market.meta.short_token_mint)
+    }
+}
+
+fn check_delegation(account: &TokenAccount, target: Pubkey) -> Result<bool> {
+    let is_matched = account
+        .delegate
+        .map(|delegate| delegate == target)
+        .ok_or(error!(DataStoreError::NoDelegatedAuthorityIsSet))?;
+    Ok(is_matched)
+}
+
+fn validated_recent_timestamp(config: &Config, timestamp: i64) -> Result<i64> {
+    let recent_time_window = config.recent_time_window()?;
+    let expiration_time = timestamp.saturating_add_unsigned(recent_time_window);
+    let clock = Clock::get()?;
+    if timestamp <= clock.unix_timestamp && clock.unix_timestamp <= expiration_time {
+        Ok(timestamp)
+    } else {
+        err!(DataStoreError::InvalidArgument)
     }
 }

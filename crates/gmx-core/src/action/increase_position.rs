@@ -98,7 +98,7 @@ impl<T: Unsigned + Clone> IncreasePositionReport<T> {
     ///
     /// ## Must Use
     /// These amounts is expected to be used by the caller.
-    pub fn claimble_funding_amounts(&self) -> (&T, &T) {
+    pub fn claimable_funding_amounts(&self) -> (&T, &T) {
         (
             &self.claimble_funding_long_token_amount,
             &self.claimble_funding_short_token_amount,

@@ -9,6 +9,8 @@ use crate::{
 
 use num_traits::{CheckedAdd, Signed, Zero};
 
+use super::ClaimableCollateral;
+
 /// Collateral Processor.
 #[must_use]
 pub(super) struct CollateralProcessor<'a, M: Market<DECIMALS>, const DECIMALS: u8> {
@@ -23,6 +25,8 @@ pub(super) struct ProcessReport<T> {
     pub(super) output_amount: T,
     pub(super) secondary_output_amount: T,
     pub(super) remaining_collateral_amount: T,
+    pub(super) for_holding: ClaimableCollateral<T>,
+    pub(super) for_user: ClaimableCollateral<T>,
 }
 
 struct State<T> {
@@ -31,9 +35,21 @@ struct State<T> {
     index_token_price: T,
     is_pnl_token_long: bool,
     is_output_token_long: bool,
-    output_amount: T,
-    secondary_output_amount: T,
-    remaining_collateral_amount: T,
+    report: ProcessReport<T>,
+}
+
+impl<T> Deref for State<T> {
+    type Target = ProcessReport<T>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.report
+    }
+}
+
+impl<T> DerefMut for State<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.report
+    }
 }
 
 impl<T> State<T> {
@@ -234,14 +250,18 @@ where
         Self {
             market,
             state: State {
-                remaining_collateral_amount,
                 long_token_price: prices.long_token_price.clone(),
                 short_token_price: prices.short_token_price.clone(),
                 index_token_price: prices.index_token_price.clone(),
                 is_pnl_token_long,
                 is_output_token_long,
-                output_amount: Zero::zero(),
-                secondary_output_amount: Zero::zero(),
+                report: ProcessReport {
+                    remaining_collateral_amount,
+                    output_amount: Zero::zero(),
+                    secondary_output_amount: Zero::zero(),
+                    for_holding: ClaimableCollateral::default(),
+                    for_user: ClaimableCollateral::default(),
+                },
             },
             is_insolvent_close_allowed,
         }
@@ -269,11 +289,7 @@ where
     }
 
     fn into_report(self) -> ProcessReport<M::Num> {
-        ProcessReport {
-            output_amount: self.state.output_amount,
-            remaining_collateral_amount: self.state.remaining_collateral_amount,
-            secondary_output_amount: self.state.secondary_output_amount,
-        }
+        self.state.report
     }
 
     pub(super) fn process(
@@ -484,9 +500,13 @@ where
                 .ok_or(crate::Error::Computation("calculating funding fee cost"))?;
             self.pay_for_cost(
                 cost,
-                |_processor, paid_in_collateral_amount, paid_in_secondary_output_amount, _| {
+                |processor, paid_in_collateral_amount, paid_in_secondary_output_amount, _| {
                     if !paid_in_secondary_output_amount.is_zero() {
-                        // TODO: pay to claimable collateral amount.
+                        // Pay to holding account.
+                        processor
+                            .state
+                            .for_holding
+                            .try_add_amount(paid_in_secondary_output_amount, false)?;
                     }
                     if paid_in_collateral_amount < cost_amount {
                         // TODO: emit an event to warn the insufficient funding fee payment.
@@ -547,8 +567,27 @@ where
         price_impact_diff: &M::Num,
     ) -> crate::Result<&mut Self> {
         if !price_impact_diff.is_zero() {
-            // TODO: apply to the debt.
-            // self.debt.add_claimable_collateral_debt(price_impact_diff)?;
+            self.pay_for_cost(
+                price_impact_diff.clone(),
+                |processor,
+                 paid_in_collateral_amount,
+                 paid_in_secondary_output_amount,
+                 _remaining_cost| {
+                    if !paid_in_collateral_amount.is_zero() {
+                        processor
+                            .state
+                            .for_user
+                            .try_add_amount(paid_in_collateral_amount, true)?;
+                    }
+                    if !paid_in_secondary_output_amount.is_zero() {
+                        processor
+                            .state
+                            .for_user
+                            .try_add_amount(paid_in_secondary_output_amount, false)?;
+                    }
+                    Ok(())
+                },
+            )?;
         }
         Ok(self)
     }

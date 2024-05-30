@@ -187,6 +187,8 @@ export type MakeCreateDecreaseOrderParams = {
         finalOutputToken?: PublicKey,
         finalOutputTokenAccount?: PublicKey,
         secondaryOutputTokenAccount?: PublicKey,
+        longTokenAccount?: PublicKey,
+        shortTokenAccount?: PublicKey,
         hint?: {
             market: {
                 marketToken: PublicKey,
@@ -215,8 +217,11 @@ export const makeCreateDecreaseOrderInstruction = async (
     let collateralToken: PublicKey;
     let market: PublicKey;
     let isLong: boolean;
+    let longToken: PublicKey;
+    let shortToken: PublicKey;
     if (options.hint) {
-        const { marketToken, longToken, shortToken } = options.hint.market;
+        const { marketToken, ...rest } = options.hint.market;
+        ({ longToken, shortToken } = rest);
         isLong = options.hint.isLong;
         collateralToken = options.hint.collateralToken;
         [market] = findMarketPDA(store, marketToken);
@@ -228,6 +233,8 @@ export const makeCreateDecreaseOrderInstruction = async (
         collateralToken = fetchedCollateralToken;
         [market] = findMarketPDA(store, marketToken);
         const { meta: { longTokenMint, shortTokenMint } } = await program.account.market.fetch(market);
+        longToken = longTokenMint;
+        shortToken = shortTokenMint;
         pnlToken = isLong ? longTokenMint : shortTokenMint;
     } else {
         throw Error("Must provide either `hints` or `dataStore` program");
@@ -242,6 +249,8 @@ export const makeCreateDecreaseOrderInstruction = async (
     const finalOutputToken = options?.finalOutputToken ?? collateralToken;
     const finalOutputTokenAccount = getTokenAccount(payer, finalOutputToken, options?.finalOutputTokenAccount);
     const secondaryOutputTokenAccount = getTokenAccount(payer, pnlToken, options?.secondaryOutputTokenAccount);
+    const longTokenAccount = getTokenAccount(payer, longToken, options?.longTokenAccount);
+    const shortTokenAccount = getTokenAccount(payer, shortToken, options?.shortTokenAccount);
 
     const instruction = await exchange.methods.createOrder(
         [...nonce],
@@ -270,6 +279,8 @@ export const makeCreateDecreaseOrderInstruction = async (
             finalOutputTokenAccount,
             secondaryOutputTokenAccount,
             initialCollateralTokenVault: null,
+            longTokenAccount,
+            shortTokenAccount,
         }).remainingAccounts(swapPath.map(mint => {
             return {
                 pubkey: findMarketPDA(store, mint)[0],
@@ -299,6 +310,13 @@ export type MakeCreateIncreaseOrderParams = {
         acceptablePrice?: number | bigint,
         initialCollateralToken?: PublicKey,
         initialCollateralTokenAccount?: PublicKey,
+        longTokenAccount?: PublicKey,
+        shortTokenAccount?: PublicKey,
+        hint?: {
+            longToken: PublicKey,
+            shortToken: PublicKey,
+        },
+        dataStore?: DataStoreProgram,
     }
 };
 
@@ -323,6 +341,18 @@ export const makeCreateIncreaseOrderInstruction = async (
     const acceptablePrice = options?.acceptablePrice;
     const initialCollateralToken = options?.initialCollateralToken ?? collateralToken;
     const initialCollateralTokenAccount = getTokenAccount(payer, initialCollateralToken, options?.initialCollateralTokenAccount);
+    const [market] = findMarketPDA(store, marketToken);
+    const collateralTokens = options?.hint ? options.hint : options?.dataStore ? (await options.dataStore.account.market.fetch(market).then(market => {
+        return {
+            longToken: market.meta.longTokenMint,
+            shortToken: market.meta.shortTokenMint,
+        };
+    })) : undefined;
+
+    if (!collateralTokens) throw Error("Neither `hint` nor `dataStoreProgram` provided");
+    const { longToken, shortToken } = collateralTokens;
+    const longTokenAccount = getTokenAccount(payer, longToken, options?.longTokenAccount);
+    const shortTokenAccount = getTokenAccount(payer, shortToken, options?.shortTokenAccount);
 
     const instruction = await exchange.methods.createOrder(
         [...nonce],
@@ -350,7 +380,9 @@ export const makeCreateIncreaseOrderInstruction = async (
             initialCollateralTokenAccount: initialCollateralTokenAccount,
             initialCollateralTokenVault: findMarketVaultPDA(store, initialCollateralToken)[0],
             finalOutputTokenAccount: null,
-            secondaryOutputTokenAccount: null
+            secondaryOutputTokenAccount: null,
+            longTokenAccount,
+            shortTokenAccount,
         }).remainingAccounts(swapPath.map(mint => {
             return {
                 pubkey: findMarketPDA(store, mint)[0],

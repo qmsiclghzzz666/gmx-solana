@@ -137,3 +137,48 @@ impl<'info> internal::Authentication<'info> for InsertFactor<'info> {
         &self.only_controller
     }
 }
+
+#[derive(Accounts)]
+pub struct InsertAddress<'info> {
+    #[account(mut)]
+    authority: Signer<'info>,
+    #[account(
+        seeds = [Roles::SEED, store.key().as_ref(), authority.key().as_ref()],
+        bump = only_controller.bump,
+    )]
+    only_controller: Account<'info, Roles>,
+    store: Account<'info, DataStore>,
+    #[account(
+        mut,
+        seeds = [Config::SEED, store.key().as_ref()],
+        bump = config.bump,
+    )]
+    config: Account<'info, Config>,
+}
+
+/// Insert address.
+pub fn insert_address(
+    ctx: Context<InsertAddress>,
+    key: &str,
+    address: Pubkey,
+    new: bool,
+) -> Result<()> {
+    ctx.accounts
+        .config
+        .insert_address(GLOBAL, key, &address, new)?;
+    Ok(())
+}
+
+impl<'info> internal::Authentication<'info> for InsertAddress<'info> {
+    fn authority(&self) -> &Signer<'info> {
+        &self.authority
+    }
+
+    fn store(&self) -> &Account<'info, DataStore> {
+        &self.store
+    }
+
+    fn roles(&self) -> &Account<'info, Roles> {
+        &self.only_controller
+    }
+}

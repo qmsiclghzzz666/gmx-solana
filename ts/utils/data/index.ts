@@ -9,7 +9,8 @@ import { dataStore } from "./program";
 import { initializeTokenConfigMap, insertTokenConfig } from "./token_config";
 import { createRolesPDA, initializeRoles } from "./roles";
 import { createControllerPDA } from "../exchange";
-import { invokeInitializeConfig, invokeInsertAmount, invokeInsertFactor } from "./config";
+import { invokeInitializeConfig, invokeInsertAddress, invokeInsertAmount, invokeInsertFactor } from "./config";
+import { TIME_WINDOW } from "./constants";
 
 export const encodeUtf8 = anchor.utils.bytes.utf8.encode;
 
@@ -297,7 +298,10 @@ export const initializeDataStore = async (
         invokeInsertAmount(dataStore, { authority: signer, store: dataStorePDA, key: "max_age", amount: 3600, insertNew: true });
         invokeInsertAmount(dataStore, { authority: signer, store: dataStorePDA, key: "request_expiration_time", amount: 3600, insertNew: true });
         invokeInsertAmount(dataStore, { authority: signer, store: dataStorePDA, key: "max_oracle_timestamp_range", amount: 300, insertNew: true });
+        invokeInsertAmount(dataStore, { authority: signer, store: dataStorePDA, key: "claimable_time_window", amount: TIME_WINDOW, insertNew: true });
+        invokeInsertAmount(dataStore, { authority: signer, store: dataStorePDA, key: "recent_time_window", amount: 120, insertNew: true });
         invokeInsertFactor(dataStore, { authority: signer, store: dataStorePDA, key: "ref_price_deviation", factor: 1_000_000_000_000_000, insertNew: true });
+        invokeInsertAddress(dataStore, { authority: signer, store: dataStorePDA, key: "holding", address: dataStore.provider.publicKey, insertNew: true });
     } catch (error) {
         console.warn("Failed to init config account", error);
     }

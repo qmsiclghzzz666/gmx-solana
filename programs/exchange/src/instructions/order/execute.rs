@@ -48,6 +48,27 @@ pub struct ExecuteOrder<'info> {
     /// CHECK: check by CPI.
     #[account(mut)]
     pub secondary_output_token_account: Option<UncheckedAccount<'info>>,
+    /// CHECK: check by CPI.
+    #[account(mut)]
+    pub long_token_vault: UncheckedAccount<'info>,
+    /// CHECK: check by CPI.
+    #[account(mut)]
+    pub short_token_vault: UncheckedAccount<'info>,
+    /// CHECK: check by CPI.
+    #[account(mut)]
+    pub long_token_account: UncheckedAccount<'info>,
+    /// CHECK: check by CPI.
+    #[account(mut)]
+    pub short_token_account: UncheckedAccount<'info>,
+    /// CHECK: check by CPI.
+    #[account(mut)]
+    pub claimable_long_token_account_for_user: Option<UncheckedAccount<'info>>,
+    /// CHECK: check by CPI.
+    #[account(mut)]
+    pub claimable_short_token_account_for_user: Option<UncheckedAccount<'info>>,
+    /// CHECK: check by CPI.
+    #[account(mut)]
+    pub claimable_pnl_token_account_for_holding: Option<UncheckedAccount<'info>>,
     pub data_store_program: Program<'info, DataStore>,
     pub token_program: Program<'info, Token>,
     pub price_provider: Interface<'info, PriceProvider>,
@@ -57,6 +78,7 @@ pub struct ExecuteOrder<'info> {
 /// Execute an order.
 pub fn execute_order<'info>(
     ctx: Context<'_, '_, 'info, 'info, ExecuteOrder<'info>>,
+    recent_timestamp: i64,
     execution_fee: u64,
 ) -> Result<()> {
     let order = &ctx.accounts.order;
@@ -72,6 +94,7 @@ pub fn execute_order<'info>(
                 accounts
                     .execute_order_ctx()
                     .with_remaining_accounts(remaining_accounts.to_vec()),
+                recent_timestamp,
             )?
             .get();
             Ok(should_remove_position)
@@ -158,7 +181,23 @@ impl<'info> ExecuteOrder<'info> {
                     .secondary_output_token_account
                     .as_ref()
                     .map(|a| a.to_account_info()),
+                long_token_vault: self.long_token_vault.to_account_info(),
+                short_token_vault: self.short_token_vault.to_account_info(),
+                long_token_account: self.long_token_account.to_account_info(),
+                short_token_account: self.short_token_account.to_account_info(),
                 token_program: self.token_program.to_account_info(),
+                claimable_long_token_account_for_user: self
+                    .claimable_long_token_account_for_user
+                    .as_ref()
+                    .map(|a| a.to_account_info()),
+                claimable_short_token_account_for_user: self
+                    .claimable_short_token_account_for_user
+                    .as_ref()
+                    .map(|a| a.to_account_info()),
+                claimable_pnl_token_account_for_holding: self
+                    .claimable_pnl_token_account_for_holding
+                    .as_ref()
+                    .map(|a| a.to_account_info()),
             },
         )
     }
