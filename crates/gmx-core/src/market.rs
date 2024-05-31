@@ -435,19 +435,12 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
         &mut self,
         is_token_in_long: bool,
         token_in_amount: Self::Num,
-        long_token_price: Self::Num,
-        short_token_price: Self::Num,
+        prices: Prices<Self::Num>,
     ) -> crate::Result<Swap<&mut Self, DECIMALS>>
     where
         Self: Sized,
     {
-        Swap::try_new(
-            self,
-            is_token_in_long,
-            token_in_amount,
-            long_token_price,
-            short_token_price,
-        )
+        Swap::try_new(self, is_token_in_long, token_in_amount, prices)
     }
 
     /// Create a [`DistributePositionImpact`] action.

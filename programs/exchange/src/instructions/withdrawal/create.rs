@@ -106,6 +106,7 @@ pub fn create_withdrawal<'info>(
         market_meta.market_token_mint,
         ExchangeError::MismatchedMarketTokenMint
     );
+    tokens.insert(market_meta.index_token_mint);
     tokens.insert(market_meta.long_token_mint);
     tokens.insert(market_meta.short_token_mint);
 

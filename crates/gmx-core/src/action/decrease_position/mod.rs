@@ -435,16 +435,10 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
         market: &mut P::Market,
         report: &mut DecreasePositionReport<P::Num>,
     ) -> crate::Result<()> {
-        let (
-            is_output_token_long,
-            is_secondary_output_token_long,
-            long_token_price,
-            short_token_price,
-        ) = (
+        let (is_output_token_long, is_secondary_output_token_long, prices) = (
             report.is_output_token_long(),
             report.is_secondary_output_token_long(),
-            report.params().prices.long_token_price.clone(),
-            report.params().prices.short_token_price.clone(),
+            report.params().prices.clone(),
         );
         let output_amount = &mut report.output_amount;
         let secondary_output_amount = &mut report.secondary_output_amount;
@@ -459,8 +453,7 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
                     .swap(
                         is_secondary_output_token_long,
                         secondary_output_amount.clone(),
-                        long_token_price,
-                        short_token_price,
+                        prices,
                     )?
                     .execute()?;
                 *output_amount = output_amount

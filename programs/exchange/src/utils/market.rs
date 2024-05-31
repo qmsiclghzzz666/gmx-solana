@@ -37,6 +37,7 @@ pub(crate) fn get_and_validate_swap_path<'info>(
             } else {
                 return Err(ExchangeError::InvalidSwapPath.into());
             }
+            tokens.insert(meta.index_token_mint);
             tokens.insert(meta.long_token_mint);
             tokens.insert(meta.short_token_mint);
             Ok(meta.market_token_mint)
