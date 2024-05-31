@@ -258,6 +258,8 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Swap<M, DECIMALS> {
         )?;
 
         self.market
+            .validate_pool_amount(self.params.is_token_in_long)?;
+        self.market
             .validate_reserve(&self.params.prices, !self.params.is_token_in_long)?;
 
         let (long_kind, short_kind) = if self.params.is_token_in_long {

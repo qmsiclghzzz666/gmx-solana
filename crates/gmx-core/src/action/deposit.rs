@@ -232,7 +232,7 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Deposit<M, DECIMALS> {
                     .try_into()
                     .map_err(|_| crate::Error::Convert)?,
             )?;
-            // TODO: validate the amounts.
+            self.market.validate_pool_amount(!is_long_token)?;
         } else if price_impact.is_negative() {
             let negative_impact_amount = self.market.apply_swap_impact_value_with_cap(
                 is_long_token,
@@ -263,7 +263,9 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Deposit<M, DECIMALS> {
             .try_into()
             .map_err(|_| crate::Error::Convert)?,
         )?;
-        // TODO: validate the amounts.
+        self.market.validate_pool_amount(is_long_token)?;
+        self.market
+            .validate_pool_value_for_deposit(&self.params.prices, is_long_token)?;
         Ok((mint_amount, fees))
     }
 

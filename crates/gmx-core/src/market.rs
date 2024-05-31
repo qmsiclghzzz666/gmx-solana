@@ -94,6 +94,12 @@ pub trait Market<const DECIMALS: u8> {
 
     /// Get max pnl factor.
     fn max_pnl_factor(&self, kind: PnlFactorKind, is_long: bool) -> crate::Result<Self::Num>;
+
+    /// Get max pool amount.
+    fn max_pool_amount(&self, is_long_token: bool) -> crate::Result<Self::Num>;
+
+    /// Get max pool value for deposit.
+    fn max_pool_value_for_deposit(&self, is_long_token: bool) -> crate::Result<Self::Num>;
 }
 
 /// Pnl Factor Kind.
@@ -195,6 +201,14 @@ impl<'a, const DECIMALS: u8, M: Market<DECIMALS>> Market<DECIMALS> for &'a mut M
 
     fn max_pnl_factor(&self, kind: PnlFactorKind, is_long: bool) -> crate::Result<Self::Num> {
         (**self).max_pnl_factor(kind, is_long)
+    }
+
+    fn max_pool_amount(&self, is_long_token: bool) -> crate::Result<Self::Num> {
+        (**self).max_pool_amount(is_long_token)
+    }
+
+    fn max_pool_value_for_deposit(&self, is_long_token: bool) -> crate::Result<Self::Num> {
+        (**self).max_pool_value_for_deposit(is_long_token)
     }
 }
 
@@ -889,8 +903,10 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
         let max_pnl_factor = self.max_pnl_factor(kind, is_long)?;
 
         if pnl_factor.is_positive() && pnl_factor.unsigned_abs() > max_pnl_factor {
-            let msg = if is_long { "for long" } else { "for short" };
-            Err(crate::Error::PnlFactorExceeded(kind, msg))
+            Err(crate::Error::PnlFactorExceeded(
+                kind,
+                get_msg_by_side(is_long),
+            ))
         } else {
             Ok(())
         }
@@ -907,6 +923,45 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
         self.validate_pnl_factor(prices, short_kind, false)?;
         Ok(())
     }
+
+    /// Validate (primary) pool value for deposit.
+    fn validate_pool_value_for_deposit(
+        &self,
+        prices: &Prices<Self::Num>,
+        is_long_token: bool,
+    ) -> crate::Result<()> {
+        let pool_value = self.pool_value_for_one_side(prices, is_long_token, true)?;
+        let max_pool_value = self.max_pool_value_for_deposit(is_long_token)?;
+        if pool_value > max_pool_value {
+            Err(crate::Error::MaxPoolAmountExceeded(get_msg_by_side(
+                is_long_token,
+            )))
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Validate (primary) pool amount.
+    fn validate_pool_amount(&self, is_long_token: bool) -> crate::Result<()> {
+        let amount = self.primary_pool()?.amount(is_long_token)?;
+        let max_pool_amount = self.max_pool_amount(is_long_token)?;
+        if amount > max_pool_amount {
+            Err(crate::Error::MaxPoolAmountExceeded(get_msg_by_side(
+                is_long_token,
+            )))
+        } else {
+            Ok(())
+        }
+    }
 }
 
 impl<const DECIMALS: u8, M: Market<DECIMALS>> MarketExt<DECIMALS> for M {}
+
+#[inline]
+fn get_msg_by_side(is_long: bool) -> &'static str {
+    if is_long {
+        "for long"
+    } else {
+        "for short"
+    }
+}

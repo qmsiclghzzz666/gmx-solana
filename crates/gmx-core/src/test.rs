@@ -97,6 +97,8 @@ pub struct TestMarket<T: Unsigned, const DECIMALS: u8> {
     reserve_factor: T,
     open_interest_reserve_factor: T,
     max_pnl_factors: MaxPnlFactors<T>,
+    max_pool_amount: T,
+    max_pool_value_for_deposit: T,
     primary: TestPool<T>,
     swap_impact: TestPool<T>,
     fee: TestPool<T>,
@@ -172,6 +174,8 @@ impl Default for TestMarket<u64, 9> {
                 withdrawal: 300_000_000,
             },
             open_interest_reserve_factor: 1_000_000_000,
+            max_pool_amount: 1_000_000_000 * 1_000_000_000,
+            max_pool_value_for_deposit: u64::MAX,
             primary: Default::default(),
             swap_impact: Default::default(),
             fee: Default::default(),
@@ -245,11 +249,13 @@ impl Default for TestMarket<u128, 20> {
                 .threshold_for_decrease_funding(0)
                 .build(),
             reserve_factor: 10u128.pow(20),
+            open_interest_reserve_factor: 10u128.pow(20),
             max_pnl_factors: MaxPnlFactors {
                 deposit: 60_000_000_000_000_000_000,
                 withdrawal: 30_000_000_000_000_000_000,
             },
-            open_interest_reserve_factor: 10u128.pow(20),
+            max_pool_amount: 1_000_000_000 * 10u128.pow(20),
+            max_pool_value_for_deposit: 1_000_000_000_000_000 * 10u128.pow(20),
             primary: Default::default(),
             swap_impact: Default::default(),
             fee: Default::default(),
@@ -412,6 +418,14 @@ where
             PnlFactorKind::Withdrawal => self.max_pnl_factors.withdrawal.clone(),
         };
         Ok(factor)
+    }
+
+    fn max_pool_amount(&self, _is_long_token: bool) -> crate::Result<Self::Num> {
+        Ok(self.max_pool_amount.clone())
+    }
+
+    fn max_pool_value_for_deposit(&self, _is_long_token: bool) -> crate::Result<Self::Num> {
+        Ok(self.max_pool_value_for_deposit.clone())
     }
 }
 

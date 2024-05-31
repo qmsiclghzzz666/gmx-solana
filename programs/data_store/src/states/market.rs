@@ -496,6 +496,14 @@ impl<'a, 'info> gmx_core::Market<{ constants::MARKET_DECIMALS }> for AsMarket<'a
             _ => Err(error!(DataStoreError::RequiredResourceNotFound).into()),
         }
     }
+
+    fn max_pool_amount(&self, _is_long_token: bool) -> gmx_core::Result<Self::Num> {
+        Ok(1_000_000_000 * constants::MARKET_USD_UNIT)
+    }
+
+    fn max_pool_value_for_deposit(&self, _is_long_token: bool) -> gmx_core::Result<Self::Num> {
+        Ok(1_000_000_000_000_000 * constants::MARKET_USD_UNIT)
+    }
 }
 
 #[event]

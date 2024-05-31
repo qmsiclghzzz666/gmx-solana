@@ -82,6 +82,12 @@ pub enum Error {
     /// Pnl Factor Exceeded.
     #[error("pnl factor ({0:?}) exceeded {1}")]
     PnlFactorExceeded(PnlFactorKind, &'static str),
+    /// Max pool amount exceeded.
+    #[error("max pool amount exceeded: {0}")]
+    MaxPoolAmountExceeded(&'static str),
+    /// Max pool value for deposit exceeded.
+    #[error("max pool value exceeded: {0}")]
+    MaxPoolValueExceeded(&'static str),
 }
 
 impl Error {
