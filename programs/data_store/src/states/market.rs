@@ -474,6 +474,14 @@ impl<'a, 'info> gmx_core::Market<{ constants::MARKET_DECIMALS }> for AsMarket<'a
     fn funding_factor_per_second_mut(&mut self) -> &mut Self::Signed {
         self.funding_factor_per_second
     }
+
+    fn reserve_factor(&self) -> &Self::Num {
+        &constants::MARKET_USD_UNIT
+    }
+
+    fn open_interest_reserve_factor(&self) -> &Self::Num {
+        &constants::MARKET_USD_UNIT
+    }
 }
 
 #[event]

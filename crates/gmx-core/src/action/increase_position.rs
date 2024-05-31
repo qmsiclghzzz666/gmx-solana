@@ -258,8 +258,9 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> IncreasePosition<P, DECIMALS> {
         )?;
 
         if !self.params.size_delta_usd.is_zero() {
-            // TODO: validate reserve.
-            // TODO: validate open interset reserve.
+            let market = self.position.market();
+            market.validate_reserve(self.position.is_long(), &self.params.prices)?;
+            market.validate_open_interest_reserve(self.position.is_long(), &self.params.prices)?;
 
             let delta = CollateralDelta::new(
                 self.position.size_in_usd().clone(),

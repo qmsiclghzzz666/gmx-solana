@@ -88,6 +88,8 @@ pub struct TestMarket<T: Unsigned, const DECIMALS: u8> {
     position_impact_distribution_params: PositionImpactDistributionParams<T>,
     borrowing_fee_params: BorrowingFeeParams<T>,
     funding_fee_params: FundingFeeParams<T>,
+    reserve_factor: T,
+    open_interest_reserve_factor: T,
     primary: TestPool<T>,
     swap_impact: TestPool<T>,
     fee: TestPool<T>,
@@ -157,6 +159,8 @@ impl Default for TestMarket<u64, 9> {
                 .threshold_for_stable_funding(50_000_000)
                 .threshold_for_decrease_funding(0)
                 .build(),
+            reserve_factor: 1_000_000_000,
+            open_interest_reserve_factor: 1_000_000_000,
             primary: Default::default(),
             swap_impact: Default::default(),
             fee: Default::default(),
@@ -229,6 +233,8 @@ impl Default for TestMarket<u128, 20> {
                 .threshold_for_stable_funding(5_000_000_000_000_000_000)
                 .threshold_for_decrease_funding(0)
                 .build(),
+            reserve_factor: 10u128.pow(20),
+            open_interest_reserve_factor: 10u128.pow(20),
             primary: Default::default(),
             swap_impact: Default::default(),
             fee: Default::default(),
@@ -375,6 +381,14 @@ where
 
     fn funding_factor_per_second_mut(&mut self) -> &mut Self::Signed {
         &mut self.funding_factor_per_second
+    }
+
+    fn reserve_factor(&self) -> &Self::Num {
+        &self.reserve_factor
+    }
+
+    fn open_interest_reserve_factor(&self) -> &Self::Num {
+        &self.open_interest_reserve_factor
     }
 }
 

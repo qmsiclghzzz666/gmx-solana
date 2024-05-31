@@ -73,6 +73,12 @@ pub enum Error {
     /// Unable to get borrowing factor for empty pool value.
     #[error("unable to get borrowing factor for empty pool value")]
     UnableToGetBorrowingFactorEmptyPoolValue,
+    /// Insufficient reserve.
+    #[error("insufficient reserve")]
+    InsufficientReserve,
+    /// Insufficient reserve for open interest.
+    #[error("insufficient reserve for open interest")]
+    InsufficientReserveForOpenInterest,
 }
 
 impl Error {

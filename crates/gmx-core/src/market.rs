@@ -85,6 +85,12 @@ pub trait Market<const DECIMALS: u8> {
 
     /// Get the mutable reference to funding factor per second.
     fn funding_factor_per_second_mut(&mut self) -> &mut Self::Signed;
+
+    /// Get reserve factor.
+    fn reserve_factor(&self) -> &Self::Num;
+
+    /// Get open interest reserve factor.
+    fn open_interest_reserve_factor(&self) -> &Self::Num;
 }
 
 impl<'a, const DECIMALS: u8, M: Market<DECIMALS>> Market<DECIMALS> for &'a mut M {
@@ -164,6 +170,14 @@ impl<'a, const DECIMALS: u8, M: Market<DECIMALS>> Market<DECIMALS> for &'a mut M
 
     fn funding_factor_per_second_mut(&mut self) -> &mut Self::Signed {
         (**self).funding_factor_per_second_mut()
+    }
+
+    fn reserve_factor(&self) -> &Self::Num {
+        (**self).reserve_factor()
+    }
+
+    fn open_interest_reserve_factor(&self) -> &Self::Num {
+        (**self).open_interest_reserve_factor()
     }
 }
 
@@ -338,6 +352,16 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
             .ok_or(crate::Error::MissingPoolKind(kind))
     }
 
+    /// Get the usd value of primary pool of one side.
+    #[inline]
+    fn pool_value_one_side(&self, price: &Self::Num, is_long: bool) -> crate::Result<Self::Num> {
+        if is_long {
+            self.primary_pool()?.long_usd_value(price)
+        } else {
+            self.primary_pool()?.short_usd_value(price)
+        }
+    }
+
     /// Get the usd value of primary pool.
     fn pool_value(
         &self,
@@ -358,7 +382,10 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
             .merge(self.open_interest_pool(false)?))
     }
 
-    /// Get total open interest in tokens as a [`Balance`].
+    /// Get total open interest in tokens as a merged [`Balance`].
+    ///
+    /// The long amount is the total long open interest in tokens,
+    /// while the short amount is the total short open interest in tokens.
     fn open_interest_in_tokens(&self) -> crate::Result<Merged<&Self::Pool, &Self::Pool>> {
         Ok(self
             .open_interest_in_tokens_pool(true)?
@@ -742,6 +769,69 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
     ) -> crate::Result<()> {
         self.claimable_funding_amount_per_size_pool_mut(is_long)?
             .apply_delta_amount(is_long_collateral, delta)
+    }
+
+    /// Get reserved value.
+    fn reserved_value(
+        &self,
+        index_token_price: &Self::Num,
+        is_long: bool,
+    ) -> crate::Result<Self::Num> {
+        // TODO: add comment to explain the difference.
+        if is_long {
+            // TODO: use max price.
+            self.open_interest_in_tokens()?
+                .long_usd_value(index_token_price)
+        } else {
+            self.open_interest()?.short_amount()
+        }
+    }
+
+    /// Validate reserve.
+    fn validate_reserve(&self, is_long: bool, prices: &Prices<Self::Num>) -> crate::Result<()> {
+        let price = if is_long {
+            &prices.long_token_price
+        } else {
+            &prices.short_token_price
+        };
+        let pool_value = self.pool_value_one_side(price, is_long)?;
+
+        let max_reserved_value = crate::utils::apply_factor(&pool_value, self.reserve_factor())
+            .ok_or(crate::Error::Computation("calculating max reserved value"))?;
+
+        let reserved_value = self.reserved_value(&prices.index_token_price, is_long)?;
+
+        if reserved_value > max_reserved_value {
+            Err(crate::Error::InsufficientReserve)
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Validate open interest reserve.
+    fn validate_open_interest_reserve(
+        &self,
+        is_long: bool,
+        prices: &Prices<Self::Num>,
+    ) -> crate::Result<()> {
+        let price = if is_long {
+            &prices.long_token_price
+        } else {
+            &prices.short_token_price
+        };
+        let pool_value = self.pool_value_one_side(price, is_long)?;
+
+        let max_reserved_value =
+            crate::utils::apply_factor(&pool_value, self.open_interest_reserve_factor())
+                .ok_or(crate::Error::Computation("calculating max reserved value"))?;
+
+        let reserved_value = self.reserved_value(&prices.index_token_price, is_long)?;
+
+        if reserved_value > max_reserved_value {
+            Err(crate::Error::InsufficientReserveForOpenInterest)
+        } else {
+            Ok(())
+        }
     }
 }
 
