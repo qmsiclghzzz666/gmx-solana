@@ -75,8 +75,13 @@ mod tests {
     fn test_distribute_position_impact() -> crate::Result<()> {
         let mut market = TestMarket::<u64, 9>::default();
         market.distribute_position_impact()?.execute()?;
+        let prices = Prices {
+            index_token_price: 120,
+            long_token_price: 120,
+            short_token_price: 1,
+        };
         market
-            .deposit(1_000_000_000_000, 100_000_000_000_000, 120, 1)?
+            .deposit(1_000_000_000_000, 100_000_000_000_000, prices)?
             .execute()?;
         println!("{market:#?}");
         let mut position = TestPosition::long(true);

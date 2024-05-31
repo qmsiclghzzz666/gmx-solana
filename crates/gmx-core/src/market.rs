@@ -91,6 +91,19 @@ pub trait Market<const DECIMALS: u8> {
 
     /// Get open interest reserve factor.
     fn open_interest_reserve_factor(&self) -> &Self::Num;
+
+    /// Get max pnl factor.
+    fn max_pnl_factor(&self, kind: PnlFactorKind, is_long: bool) -> crate::Result<Self::Num>;
+}
+
+/// Pnl Factor Kind.
+#[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
+pub enum PnlFactorKind {
+    /// For deposit.
+    Deposit,
+    /// For withdrawal.
+    Withdrawal,
 }
 
 impl<'a, const DECIMALS: u8, M: Market<DECIMALS>> Market<DECIMALS> for &'a mut M {
@@ -178,6 +191,10 @@ impl<'a, const DECIMALS: u8, M: Market<DECIMALS>> Market<DECIMALS> for &'a mut M
 
     fn open_interest_reserve_factor(&self) -> &Self::Num {
         (**self).open_interest_reserve_factor()
+    }
+
+    fn max_pnl_factor(&self, kind: PnlFactorKind, is_long: bool) -> crate::Result<Self::Num> {
+        (**self).max_pnl_factor(kind, is_long)
     }
 }
 
@@ -352,13 +369,21 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
             .ok_or(crate::Error::MissingPoolKind(kind))
     }
 
-    /// Get the usd value of primary pool of one side.
+    /// Get the usd value of primary pool for one side.
     #[inline]
-    fn pool_value_one_side(&self, price: &Self::Num, is_long: bool) -> crate::Result<Self::Num> {
+    fn pool_value_for_one_side(
+        &self,
+        prices: &Prices<Self::Num>,
+        is_long: bool,
+        _maximize: bool,
+    ) -> crate::Result<Self::Num> {
+        // TODO: apply maximize by choosing price.
         if is_long {
-            self.primary_pool()?.long_usd_value(price)
+            self.primary_pool()?
+                .long_usd_value(&prices.long_token_price)
         } else {
-            self.primary_pool()?.short_usd_value(price)
+            self.primary_pool()?
+                .short_usd_value(&prices.short_token_price)
         }
     }
 
@@ -397,19 +422,12 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
         &mut self,
         long_token_amount: Self::Num,
         short_token_amount: Self::Num,
-        long_token_price: Self::Num,
-        short_token_price: Self::Num,
+        prices: Prices<Self::Num>,
     ) -> Result<Deposit<&mut Self, DECIMALS>, crate::Error>
     where
         Self: Sized,
     {
-        Deposit::try_new(
-            self,
-            long_token_amount,
-            short_token_amount,
-            long_token_price,
-            short_token_price,
-        )
+        Deposit::try_new(self, long_token_amount, short_token_amount, prices)
     }
 
     /// Create a [`Withdrawal`].
@@ -775,13 +793,8 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
     }
 
     /// Validate reserve.
-    fn validate_reserve(&self, is_long: bool, prices: &Prices<Self::Num>) -> crate::Result<()> {
-        let price = if is_long {
-            &prices.long_token_price
-        } else {
-            &prices.short_token_price
-        };
-        let pool_value = self.pool_value_one_side(price, is_long)?;
+    fn validate_reserve(&self, prices: &Prices<Self::Num>, is_long: bool) -> crate::Result<()> {
+        let pool_value = self.pool_value_for_one_side(prices, is_long, false)?;
 
         let max_reserved_value = crate::utils::apply_factor(&pool_value, self.reserve_factor())
             .ok_or(crate::Error::Computation("calculating max reserved value"))?;
@@ -798,15 +811,10 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
     /// Validate open interest reserve.
     fn validate_open_interest_reserve(
         &self,
-        is_long: bool,
         prices: &Prices<Self::Num>,
+        is_long: bool,
     ) -> crate::Result<()> {
-        let price = if is_long {
-            &prices.long_token_price
-        } else {
-            &prices.short_token_price
-        };
-        let pool_value = self.pool_value_one_side(price, is_long)?;
+        let pool_value = self.pool_value_for_one_side(prices, is_long, false)?;
 
         let max_reserved_value =
             crate::utils::apply_factor(&pool_value, self.open_interest_reserve_factor())
@@ -819,6 +827,85 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
         } else {
             Ok(())
         }
+    }
+
+    /// Get total pnl of the market for one side.
+    fn pnl(
+        &self,
+        index_token_price: &Self::Num,
+        is_long: bool,
+        _maximize: bool,
+    ) -> crate::Result<Self::Signed> {
+        use crate::num::Unsigned;
+        use num_traits::CheckedMul;
+
+        let open_interest = self.open_interest()?.amount(is_long)?;
+        let open_interest_in_tokens = self.open_interest_in_tokens()?.amount(is_long)?;
+        if open_interest.is_zero() && open_interest_in_tokens.is_zero() {
+            return Ok(Zero::zero());
+        }
+
+        // TODO: pick price according to the `maximize` flag.
+        let price = index_token_price;
+
+        let open_interest_value = open_interest_in_tokens
+            .checked_mul(price)
+            .ok_or(crate::Error::Computation("calculating open interest value"))?;
+
+        if is_long {
+            open_interest_value
+                .to_signed()?
+                .checked_sub(&open_interest.to_signed()?)
+                .ok_or(crate::Error::Computation("calculating pnl for long"))
+        } else {
+            open_interest
+                .to_signed()?
+                .checked_sub(&open_interest_value.to_signed()?)
+                .ok_or(crate::Error::Computation("calculating pnl for short"))
+        }
+    }
+
+    /// Get pnl factor.
+    fn pnl_factor(
+        &self,
+        prices: &Prices<Self::Num>,
+        is_long: bool,
+        maximize: bool,
+    ) -> crate::Result<Self::Signed> {
+        let pool_value = self.pool_value_for_one_side(prices, is_long, !maximize)?;
+        let pnl = self.pnl(&prices.index_token_price, is_long, maximize)?;
+        crate::utils::div_to_factor_signed(&pnl, &pool_value)
+            .ok_or(crate::Error::Computation("calculating pnl factor"))
+    }
+
+    /// Validate pnl factor.
+    fn validate_pnl_factor(
+        &self,
+        prices: &Prices<Self::Num>,
+        kind: PnlFactorKind,
+        is_long: bool,
+    ) -> crate::Result<()> {
+        let pnl_factor = self.pnl_factor(prices, is_long, true)?;
+        let max_pnl_factor = self.max_pnl_factor(kind, is_long)?;
+
+        if pnl_factor.is_positive() && pnl_factor.unsigned_abs() > max_pnl_factor {
+            let msg = if is_long { "for long" } else { "for short" };
+            Err(crate::Error::PnlFactorExceeded(kind, msg))
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Validate max pnl.
+    fn validate_max_pnl(
+        &self,
+        prices: &Prices<Self::Num>,
+        long_kind: PnlFactorKind,
+        short_kind: PnlFactorKind,
+    ) -> crate::Result<()> {
+        self.validate_pnl_factor(prices, long_kind, true)?;
+        self.validate_pnl_factor(prices, short_kind, false)?;
+        Ok(())
     }
 }
 

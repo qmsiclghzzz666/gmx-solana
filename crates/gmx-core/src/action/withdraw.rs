@@ -1,4 +1,7 @@
-use crate::{num::MulDiv, params::Fees, utils, BalanceExt, Market, MarketExt, PoolExt, PoolKind};
+use crate::{
+    num::MulDiv, params::Fees, utils, BalanceExt, Market, MarketExt, PnlFactorKind, PoolExt,
+    PoolKind,
+};
 use num_traits::{CheckedAdd, Zero};
 
 use super::Prices;
@@ -140,10 +143,13 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Withdrawal<M, DECIMALS> {
             &-delta.try_into().map_err(|_| crate::Error::Convert)?,
         )?;
 
-        self.market.validate_reserve(true, &self.params.prices)?;
-        self.market.validate_reserve(false, &self.params.prices)?;
-
-        // TODO: validate max pnl.
+        self.market.validate_reserve(&self.params.prices, true)?;
+        self.market.validate_reserve(&self.params.prices, false)?;
+        self.market.validate_max_pnl(
+            &self.params.prices,
+            PnlFactorKind::Deposit,
+            PnlFactorKind::Deposit,
+        )?;
 
         self.market.burn(&self.params.market_token_amount)?;
 
@@ -203,9 +209,14 @@ mod tests {
     #[test]
     fn basic() -> crate::Result<()> {
         let mut market = TestMarket::<u64, 9>::default();
-        market.deposit(1_000_000_000, 0, 120, 1)?.execute()?;
-        market.deposit(1_000_000_000, 0, 120, 1)?.execute()?;
-        market.deposit(0, 1_000_000_000, 120, 1)?.execute()?;
+        let prices = Prices {
+            index_token_price: 120,
+            long_token_price: 120,
+            short_token_price: 1,
+        };
+        market.deposit(1_000_000_000, 0, prices)?.execute()?;
+        market.deposit(1_000_000_000, 0, prices)?.execute()?;
+        market.deposit(0, 1_000_000_000, prices)?.execute()?;
         println!("{market:#?}");
         let before_supply = market.total_supply();
         let before_long_amount = market.primary_pool()?.long_amount()?;

@@ -149,3 +149,22 @@ where
         value.checked_mul_div(&T::UNIT, divisor)
     }
 }
+
+/// Convert the `value` to a factor after dividing by the `divisor`.
+///
+/// ## Notes
+/// - Return `zero` if the `divisor` is zero.
+#[inline]
+pub fn div_to_factor_signed<T, const DECIMALS: u8>(
+    value: &T::Signed,
+    divisor: &T,
+) -> Option<T::Signed>
+where
+    T: FixedPointOps<DECIMALS>,
+{
+    if divisor.is_zero() {
+        return Some(Zero::zero());
+    }
+
+    T::UNIT.checked_mul_div_with_signed_numberator(value, divisor)
+}

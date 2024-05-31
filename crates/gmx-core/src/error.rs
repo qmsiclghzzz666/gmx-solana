@@ -1,4 +1,4 @@
-use crate::{position::LiquidatableReason, ClockKind, PoolKind};
+use crate::{position::LiquidatableReason, ClockKind, PnlFactorKind, PoolKind};
 
 /// Error type.
 #[derive(Debug, thiserror::Error)]
@@ -79,6 +79,9 @@ pub enum Error {
     /// Insufficient reserve for open interest.
     #[error("insufficient reserve for open interest")]
     InsufficientReserveForOpenInterest,
+    /// Pnl Factor Exceeded.
+    #[error("pnl factor ({0:?}) exceeded {1}")]
+    PnlFactorExceeded(PnlFactorKind, &'static str),
 }
 
 impl Error {

@@ -145,18 +145,25 @@ impl<'info> ExecuteDeposit<'info> {
         long_amount: u64,
         short_amount: u64,
     ) -> Result<()> {
-        let long_price = self
+        let index_token_price = self
+            .oracle
+            .primary
+            .get(&meta.index_token_mint)
+            .ok_or(error!(DataStoreError::InvalidArgument))?
+            .max
+            .to_unit_price();
+        let long_token_price = self
             .oracle
             .primary
             .get(&meta.long_token_mint)
-            .ok_or(DataStoreError::InvalidArgument)?
+            .ok_or(error!(DataStoreError::InvalidArgument))?
             .max
             .to_unit_price();
-        let short_price = self
+        let short_token_price = self
             .oracle
             .primary
             .get(&meta.short_token_mint)
-            .ok_or(DataStoreError::InvalidArgument)?
+            .ok_or(error!(DataStoreError::InvalidArgument))?
             .max
             .to_unit_price();
         let report = self
@@ -167,8 +174,11 @@ impl<'info> ExecuteDeposit<'info> {
             .deposit(
                 long_amount.into(),
                 short_amount.into(),
-                long_price,
-                short_price,
+                gmx_core::action::Prices {
+                    index_token_price,
+                    long_token_price,
+                    short_token_price,
+                },
             )
             .map_err(GmxCoreError::from)?
             .execute()

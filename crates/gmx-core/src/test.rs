@@ -3,7 +3,7 @@ use std::{collections::HashMap, fmt, time::Instant};
 use crate::{
     clock::ClockKind,
     fixed::FixedPointOps,
-    market::Market,
+    market::{Market, PnlFactorKind},
     num::{MulDiv, Num, Unsigned, UnsignedAbs},
     params::{
         fee::{BorrowingFeeParams, FundingFeeParams},
@@ -74,6 +74,12 @@ where
     }
 }
 
+#[derive(Debug, Clone)]
+struct MaxPnlFactors<T> {
+    deposit: T,
+    withdrawal: T,
+}
+
 /// Test Market.
 #[derive(Debug, Clone)]
 pub struct TestMarket<T: Unsigned, const DECIMALS: u8> {
@@ -90,6 +96,7 @@ pub struct TestMarket<T: Unsigned, const DECIMALS: u8> {
     funding_fee_params: FundingFeeParams<T>,
     reserve_factor: T,
     open_interest_reserve_factor: T,
+    max_pnl_factors: MaxPnlFactors<T>,
     primary: TestPool<T>,
     swap_impact: TestPool<T>,
     fee: TestPool<T>,
@@ -160,6 +167,10 @@ impl Default for TestMarket<u64, 9> {
                 .threshold_for_decrease_funding(0)
                 .build(),
             reserve_factor: 1_000_000_000,
+            max_pnl_factors: MaxPnlFactors {
+                deposit: 600_000_000,
+                withdrawal: 300_000_000,
+            },
             open_interest_reserve_factor: 1_000_000_000,
             primary: Default::default(),
             swap_impact: Default::default(),
@@ -234,6 +245,10 @@ impl Default for TestMarket<u128, 20> {
                 .threshold_for_decrease_funding(0)
                 .build(),
             reserve_factor: 10u128.pow(20),
+            max_pnl_factors: MaxPnlFactors {
+                deposit: 60_000_000_000_000_000_000,
+                withdrawal: 30_000_000_000_000_000_000,
+            },
             open_interest_reserve_factor: 10u128.pow(20),
             primary: Default::default(),
             swap_impact: Default::default(),
@@ -389,6 +404,14 @@ where
 
     fn open_interest_reserve_factor(&self) -> &Self::Num {
         &self.open_interest_reserve_factor
+    }
+
+    fn max_pnl_factor(&self, kind: PnlFactorKind, _is_long: bool) -> crate::Result<Self::Num> {
+        let factor = match kind {
+            PnlFactorKind::Deposit => self.max_pnl_factors.deposit.clone(),
+            PnlFactorKind::Withdrawal => self.max_pnl_factors.withdrawal.clone(),
+        };
+        Ok(factor)
     }
 }
 

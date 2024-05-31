@@ -1,7 +1,7 @@
 use crate::{
     num::{MulDiv, Unsigned},
     params::Fees,
-    BalanceExt, Market, MarketExt, PoolExt,
+    BalanceExt, Market, MarketExt, PnlFactorKind, PoolExt,
 };
 
 use num_traits::{CheckedAdd, CheckedMul, CheckedSub, Signed, Zero};
@@ -258,9 +258,15 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Swap<M, DECIMALS> {
         )?;
 
         self.market
-            .validate_reserve(!self.params.is_token_in_long, &self.params.prices)?;
+            .validate_reserve(&self.params.prices, !self.params.is_token_in_long)?;
 
-        // TODO: validate max pnl.
+        let (long_kind, short_kind) = if self.params.is_token_in_long {
+            (PnlFactorKind::Deposit, PnlFactorKind::Withdrawal)
+        } else {
+            (PnlFactorKind::Withdrawal, PnlFactorKind::Deposit)
+        };
+        self.market
+            .validate_max_pnl(&self.params.prices, long_kind, short_kind)?;
 
         Ok(SwapReport {
             params: self.params,
@@ -279,9 +285,18 @@ mod tests {
     #[test]
     fn basic() -> crate::Result<()> {
         let mut market = TestMarket::<u64, 9>::default();
-        market.deposit(1_000_000_000, 0, 120, 1)?.execute()?;
-        market.deposit(1_000_000_000, 0, 121, 1)?.execute()?;
-        market.deposit(0, 1_000_000_000, 122, 1)?.execute()?;
+        let mut prices = Prices {
+            index_token_price: 120,
+            long_token_price: 120,
+            short_token_price: 1,
+        };
+        market.deposit(1_000_000_000, 0, prices)?.execute()?;
+        prices.index_token_price = 121;
+        prices.long_token_price = 121;
+        market.deposit(1_000_000_000, 0, prices)?.execute()?;
+        prices.index_token_price = 122;
+        prices.long_token_price = 122;
+        market.deposit(0, 1_000_000_000, prices)?.execute()?;
         println!("{market:#?}");
 
         let prices = Prices {
