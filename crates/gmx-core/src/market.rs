@@ -100,6 +100,9 @@ pub trait Market<const DECIMALS: u8> {
 
     /// Get max pool value for deposit.
     fn max_pool_value_for_deposit(&self, is_long_token: bool) -> crate::Result<Self::Num>;
+
+    /// Get max open interest.
+    fn max_open_interest(&self, is_long: bool) -> crate::Result<Self::Num>;
 }
 
 /// Pnl Factor Kind.
@@ -209,6 +212,10 @@ impl<'a, const DECIMALS: u8, M: Market<DECIMALS>> Market<DECIMALS> for &'a mut M
 
     fn max_pool_value_for_deposit(&self, is_long_token: bool) -> crate::Result<Self::Num> {
         (**self).max_pool_value_for_deposit(is_long_token)
+    }
+
+    fn max_open_interest(&self, is_long: bool) -> crate::Result<Self::Num> {
+        (**self).max_open_interest(is_long)
     }
 }
 

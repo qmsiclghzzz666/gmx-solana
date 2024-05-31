@@ -88,6 +88,9 @@ pub enum Error {
     /// Max pool value for deposit exceeded.
     #[error("max pool value exceeded: {0}")]
     MaxPoolValueExceeded(&'static str),
+    /// Max open interest exceeded.
+    #[error("max open interest exceeded")]
+    MaxOpenInterestExceeded,
 }
 
 impl Error {
