@@ -277,7 +277,7 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
 
             // Close all if collateral or position size too small.
 
-            let params = self.position.market().position_params();
+            let params = self.position.market().position_params()?;
 
             let remaining_value = will_be_sufficient
                 .checked_add(&estimated_remaining_pnl)

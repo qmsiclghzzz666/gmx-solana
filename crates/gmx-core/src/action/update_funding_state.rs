@@ -207,7 +207,7 @@ impl<M: Market<DECIMALS>, const DECIMALS: u8> UpdateFundingState<M, DECIMALS> {
             "this should not be possible"
         );
 
-        let params = self.market.funding_fee_params();
+        let params = self.market.funding_fee_params()?;
 
         let diff_value_after_exponent =
             utils::apply_exponent_factor(diff_value, params.exponent().clone()).ok_or(

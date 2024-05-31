@@ -369,36 +369,38 @@ where
         self.funding_amount_per_size_adjustment.clone()
     }
 
-    fn swap_impact_params(&self) -> PriceImpactParams<Self::Num> {
-        self.swap_impact_params.clone()
+    fn swap_impact_params(&self) -> crate::Result<PriceImpactParams<Self::Num>> {
+        Ok(self.swap_impact_params.clone())
     }
 
-    fn swap_fee_params(&self) -> crate::params::FeeParams<Self::Num> {
-        self.swap_fee_params.clone()
+    fn swap_fee_params(&self) -> crate::Result<FeeParams<Self::Num>> {
+        Ok(self.swap_fee_params.clone())
     }
 
-    fn position_params(&self) -> crate::params::PositionParams<Self::Num> {
-        self.position_params.clone()
+    fn position_params(&self) -> crate::Result<PositionParams<Self::Num>> {
+        Ok(self.position_params.clone())
     }
 
-    fn position_impact_params(&self) -> PriceImpactParams<Self::Num> {
-        self.position_impact_params.clone()
+    fn position_impact_params(&self) -> crate::Result<PriceImpactParams<Self::Num>> {
+        Ok(self.position_impact_params.clone())
     }
 
-    fn order_fee_params(&self) -> FeeParams<Self::Num> {
-        self.order_fee_params.clone()
+    fn order_fee_params(&self) -> crate::Result<FeeParams<Self::Num>> {
+        Ok(self.order_fee_params.clone())
     }
 
-    fn position_impact_distribution_params(&self) -> PositionImpactDistributionParams<Self::Num> {
-        self.position_impact_distribution_params.clone()
+    fn position_impact_distribution_params(
+        &self,
+    ) -> crate::Result<PositionImpactDistributionParams<Self::Num>> {
+        Ok(self.position_impact_distribution_params.clone())
     }
 
-    fn borrowing_fee_params(&self) -> BorrowingFeeParams<Self::Num> {
-        self.borrowing_fee_params.clone()
+    fn borrowing_fee_params(&self) -> crate::Result<BorrowingFeeParams<Self::Num>> {
+        Ok(self.borrowing_fee_params.clone())
     }
 
-    fn funding_fee_params(&self) -> FundingFeeParams<Self::Num> {
-        self.funding_fee_params.clone()
+    fn funding_fee_params(&self) -> crate::Result<FundingFeeParams<Self::Num>> {
+        Ok(self.funding_fee_params.clone())
     }
 
     fn funding_factor_per_second(&self) -> &Self::Signed {
@@ -409,12 +411,12 @@ where
         &mut self.funding_factor_per_second
     }
 
-    fn reserve_factor(&self) -> &Self::Num {
-        &self.reserve_factor
+    fn reserve_factor(&self) -> crate::Result<Self::Num> {
+        Ok(self.reserve_factor.clone())
     }
 
-    fn open_interest_reserve_factor(&self) -> &Self::Num {
-        &self.open_interest_reserve_factor
+    fn open_interest_reserve_factor(&self) -> crate::Result<Self::Num> {
+        Ok(self.open_interest_reserve_factor.clone())
     }
 
     fn max_pnl_factor(&self, kind: PnlFactorKind, _is_long: bool) -> crate::Result<Self::Num> {

@@ -393,70 +393,70 @@ impl<'a, 'info> gmx_core::Market<{ constants::MARKET_DECIMALS }> for AsMarket<'a
         constants::FUNDING_AMOUNT_PER_SIZE_ADJUSTMENT
     }
 
-    fn swap_impact_params(&self) -> gmx_core::params::PriceImpactParams<Self::Num> {
+    fn swap_impact_params(&self) -> gmx_core::Result<PriceImpactParams<Self::Num>> {
         PriceImpactParams::builder()
             .with_exponent(2 * constants::MARKET_USD_UNIT)
             .with_positive_factor(400_000_000_000)
             .with_negative_factor(800_000_000_000)
             .build()
-            .unwrap()
     }
 
-    fn swap_fee_params(&self) -> gmx_core::params::FeeParams<Self::Num> {
-        FeeParams::builder()
+    fn swap_fee_params(&self) -> gmx_core::Result<FeeParams<Self::Num>> {
+        Ok(FeeParams::builder()
             .with_fee_receiver_factor(37_000_000_000_000_000_000)
             .with_positive_impact_fee_factor(50_000_000_000_000_000)
             .with_negative_impact_fee_factor(70_000_000_000_000_000)
-            .build()
+            .build())
     }
 
-    fn position_params(&self) -> gmx_core::params::PositionParams<Self::Num> {
-        PositionParams::new(
+    fn position_params(&self) -> gmx_core::Result<PositionParams<Self::Num>> {
+        Ok(PositionParams::new(
             constants::MARKET_USD_UNIT,
             constants::MARKET_USD_UNIT,
             constants::MARKET_USD_UNIT / 100,
             500_000_000_000_000_000,
             500_000_000_000_000_000,
             250_000_000_000_000_000,
-        )
+        ))
     }
 
-    fn position_impact_params(&self) -> PriceImpactParams<Self::Num> {
+    fn position_impact_params(&self) -> gmx_core::Result<PriceImpactParams<Self::Num>> {
         PriceImpactParams::builder()
             .with_exponent(2 * constants::MARKET_USD_UNIT)
             .with_positive_factor(9_000_000_000)
             .with_negative_factor(15_000_000_000)
             .build()
-            .unwrap()
     }
 
-    fn order_fee_params(&self) -> FeeParams<Self::Num> {
-        FeeParams::builder()
+    fn order_fee_params(&self) -> gmx_core::Result<FeeParams<Self::Num>> {
+        Ok(FeeParams::builder()
             .with_fee_receiver_factor(37_000_000_000_000_000_000)
             .with_positive_impact_fee_factor(50_000_000_000_000_000)
             .with_negative_impact_fee_factor(70_000_000_000_000_000)
-            .build()
+            .build())
     }
 
-    fn position_impact_distribution_params(&self) -> PositionImpactDistributionParams<Self::Num> {
-        PositionImpactDistributionParams::builder()
+    fn position_impact_distribution_params(
+        &self,
+    ) -> gmx_core::Result<PositionImpactDistributionParams<Self::Num>> {
+        Ok(PositionImpactDistributionParams::builder()
             .distribute_factor(constants::MARKET_USD_UNIT)
             .min_position_impact_pool_amount(1_000_000_000)
-            .build()
+            .build())
     }
 
-    fn borrowing_fee_params(&self) -> BorrowingFeeParams<Self::Num> {
-        BorrowingFeeParams::builder()
+    fn borrowing_fee_params(&self) -> gmx_core::Result<BorrowingFeeParams<Self::Num>> {
+        Ok(BorrowingFeeParams::builder()
             .receiver_factor(37_000_000_000_000_000_000)
             .factor_for_long(2_820_000_000_000)
             .factor_for_short(2_820_000_000_000)
             .exponent_for_long(100_000_000_000_000_000_000)
             .exponent_for_short(100_000_000_000_000_000_000)
-            .build()
+            .build())
     }
 
-    fn funding_fee_params(&self) -> FundingFeeParams<Self::Num> {
-        FundingFeeParams::builder()
+    fn funding_fee_params(&self) -> gmx_core::Result<FundingFeeParams<Self::Num>> {
+        Ok(FundingFeeParams::builder()
             .exponent(100_000_000_000_000_000_000)
             .funding_factor(2_000_000_000_000)
             .max_factor_per_second(1_000_000_000_000)
@@ -465,7 +465,7 @@ impl<'a, 'info> gmx_core::Market<{ constants::MARKET_DECIMALS }> for AsMarket<'a
             .decrease_factor_per_second(0)
             .threshold_for_stable_funding(5_000_000_000_000_000_000)
             .threshold_for_decrease_funding(0)
-            .build()
+            .build())
     }
 
     fn funding_factor_per_second(&self) -> &Self::Signed {
@@ -476,12 +476,12 @@ impl<'a, 'info> gmx_core::Market<{ constants::MARKET_DECIMALS }> for AsMarket<'a
         self.funding_factor_per_second
     }
 
-    fn reserve_factor(&self) -> &Self::Num {
-        &constants::MARKET_USD_UNIT
+    fn reserve_factor(&self) -> gmx_core::Result<Self::Num> {
+        Ok(constants::MARKET_USD_UNIT)
     }
 
-    fn open_interest_reserve_factor(&self) -> &Self::Num {
-        &constants::MARKET_USD_UNIT
+    fn open_interest_reserve_factor(&self) -> gmx_core::Result<Self::Num> {
+        Ok(constants::MARKET_USD_UNIT)
     }
 
     fn max_pnl_factor(

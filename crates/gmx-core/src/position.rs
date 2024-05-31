@@ -342,7 +342,7 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
         // TODO: validate market is enabled.
 
         if should_validate_min_position_size
-            && self.size_in_usd() < self.market().position_params().min_position_size_usd()
+            && self.size_in_usd() < self.market().position_params()?.min_position_size_usd()
         {
             return Err(crate::Error::InvalidPosition("size in usd too small"));
         }
@@ -429,7 +429,7 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
                 "calculating remaining collateral value",
             ))?;
 
-        let params = self.market().position_params();
+        let params = self.market().position_params()?;
 
         let min_collateral_usd_for_leverage =
             crate::utils::apply_factor(self.size_in_usd(), params.min_collateral_factor()).ok_or(
@@ -516,7 +516,7 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
                 &usd_price,
                 &usd_price,
             )?
-            .price_impact(&self.market().position_impact_params())?;
+            .price_impact(&self.market().position_impact_params()?)?;
         Ok(price_impact_value)
     }
 
@@ -544,7 +544,7 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
             }
 
             // Cap price impact based on max factor.
-            let params = self.market().position_params();
+            let params = self.market().position_params()?;
             let max_impact_factor = params.max_positive_position_impact_factor();
             let max_impact = utils::apply_factor(&size_delta_usd.unsigned_abs(), max_impact_factor)
                 .ok_or(crate::Error::Computation(
@@ -570,7 +570,7 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
 
         let mut impact_diff = Zero::zero();
         if impact.is_negative() {
-            let params = self.market().position_params();
+            let params = self.market().position_params()?;
             let max_impact_factor = if for_liquidations {
                 params.max_position_impact_factor_for_liquidations()
             } else {
@@ -695,10 +695,10 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
         debug_assert!(!collateral_token_price.is_zero(), "must be non-zero");
         let fees = self
             .market()
-            .order_fee_params()
+            .order_fee_params()?
             .base_position_fees(collateral_token_price, size_delta_usd, is_positive_impact)?
             .apply_borrowing_fee(
-                self.market().borrowing_fee_params().receiver_factor(),
+                self.market().borrowing_fee_params()?.receiver_factor(),
                 collateral_token_price,
                 self.borrowing_fee_value()?,
             )?

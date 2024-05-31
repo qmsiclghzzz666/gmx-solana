@@ -57,28 +57,30 @@ pub trait Market<const DECIMALS: u8> {
     fn funding_amount_per_size_adjustment(&self) -> Self::Num;
 
     /// Get the swap impact params.
-    fn swap_impact_params(&self) -> PriceImpactParams<Self::Num>;
+    fn swap_impact_params(&self) -> crate::Result<PriceImpactParams<Self::Num>>;
 
     /// Get the swap fee params.
-    fn swap_fee_params(&self) -> FeeParams<Self::Num>;
+    fn swap_fee_params(&self) -> crate::Result<FeeParams<Self::Num>>;
 
     /// Get basic market params.
-    fn position_params(&self) -> PositionParams<Self::Num>;
+    fn position_params(&self) -> crate::Result<PositionParams<Self::Num>>;
 
     /// Get the position impact params.
-    fn position_impact_params(&self) -> PriceImpactParams<Self::Num>;
+    fn position_impact_params(&self) -> crate::Result<PriceImpactParams<Self::Num>>;
 
     /// Get the order fee params.
-    fn order_fee_params(&self) -> FeeParams<Self::Num>;
+    fn order_fee_params(&self) -> crate::Result<FeeParams<Self::Num>>;
 
     /// Get position impact distribution params.
-    fn position_impact_distribution_params(&self) -> PositionImpactDistributionParams<Self::Num>;
+    fn position_impact_distribution_params(
+        &self,
+    ) -> crate::Result<PositionImpactDistributionParams<Self::Num>>;
 
     /// Get borrowing fee params.
-    fn borrowing_fee_params(&self) -> BorrowingFeeParams<Self::Num>;
+    fn borrowing_fee_params(&self) -> crate::Result<BorrowingFeeParams<Self::Num>>;
 
     /// Get funding fee params.
-    fn funding_fee_params(&self) -> FundingFeeParams<Self::Num>;
+    fn funding_fee_params(&self) -> crate::Result<FundingFeeParams<Self::Num>>;
 
     /// Get funding factor per second.
     fn funding_factor_per_second(&self) -> &Self::Signed;
@@ -87,10 +89,10 @@ pub trait Market<const DECIMALS: u8> {
     fn funding_factor_per_second_mut(&mut self) -> &mut Self::Signed;
 
     /// Get reserve factor.
-    fn reserve_factor(&self) -> &Self::Num;
+    fn reserve_factor(&self) -> crate::Result<Self::Num>;
 
     /// Get open interest reserve factor.
-    fn open_interest_reserve_factor(&self) -> &Self::Num;
+    fn open_interest_reserve_factor(&self) -> crate::Result<Self::Num>;
 
     /// Get max pnl factor.
     fn max_pnl_factor(&self, kind: PnlFactorKind, is_long: bool) -> crate::Result<Self::Num>;
@@ -154,35 +156,37 @@ impl<'a, const DECIMALS: u8, M: Market<DECIMALS>> Market<DECIMALS> for &'a mut M
         (**self).funding_amount_per_size_adjustment()
     }
 
-    fn swap_impact_params(&self) -> PriceImpactParams<Self::Num> {
+    fn swap_impact_params(&self) -> crate::Result<PriceImpactParams<Self::Num>> {
         (**self).swap_impact_params()
     }
 
-    fn swap_fee_params(&self) -> FeeParams<Self::Num> {
+    fn swap_fee_params(&self) -> crate::Result<FeeParams<Self::Num>> {
         (**self).swap_fee_params()
     }
 
-    fn position_params(&self) -> PositionParams<Self::Num> {
+    fn position_params(&self) -> crate::Result<PositionParams<Self::Num>> {
         (**self).position_params()
     }
 
-    fn position_impact_params(&self) -> PriceImpactParams<Self::Num> {
+    fn position_impact_params(&self) -> crate::Result<PriceImpactParams<Self::Num>> {
         (**self).position_impact_params()
     }
 
-    fn order_fee_params(&self) -> FeeParams<Self::Num> {
+    fn order_fee_params(&self) -> crate::Result<FeeParams<Self::Num>> {
         (**self).order_fee_params()
     }
 
-    fn position_impact_distribution_params(&self) -> PositionImpactDistributionParams<Self::Num> {
+    fn position_impact_distribution_params(
+        &self,
+    ) -> crate::Result<PositionImpactDistributionParams<Self::Num>> {
         (**self).position_impact_distribution_params()
     }
 
-    fn borrowing_fee_params(&self) -> BorrowingFeeParams<Self::Num> {
+    fn borrowing_fee_params(&self) -> crate::Result<BorrowingFeeParams<Self::Num>> {
         (**self).borrowing_fee_params()
     }
 
-    fn funding_fee_params(&self) -> FundingFeeParams<Self::Num> {
+    fn funding_fee_params(&self) -> crate::Result<FundingFeeParams<Self::Num>> {
         (**self).funding_fee_params()
     }
 
@@ -194,11 +198,11 @@ impl<'a, const DECIMALS: u8, M: Market<DECIMALS>> Market<DECIMALS> for &'a mut M
         (**self).funding_factor_per_second_mut()
     }
 
-    fn reserve_factor(&self) -> &Self::Num {
+    fn reserve_factor(&self) -> crate::Result<Self::Num> {
         (**self).reserve_factor()
     }
 
-    fn open_interest_reserve_factor(&self) -> &Self::Num {
+    fn open_interest_reserve_factor(&self) -> crate::Result<Self::Num> {
         (**self).open_interest_reserve_factor()
     }
 
@@ -563,7 +567,7 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
         use num_traits::FromPrimitive;
 
         let current_amount = self.position_impact_pool_amount()?;
-        let params = self.position_impact_distribution_params();
+        let params = self.position_impact_distribution_params()?;
         if params.distribute_factor().is_zero()
             || current_amount <= *params.min_position_impact_pool_amount()
         {
@@ -620,7 +624,7 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
             return Ok(Zero::zero());
         }
 
-        let params = self.borrowing_fee_params();
+        let params = self.borrowing_fee_params()?;
 
         if params.skip_borrowing_fee_for_smaller_side() {
             let open_interest = self.open_interest()?;
@@ -817,8 +821,9 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
     fn validate_reserve(&self, prices: &Prices<Self::Num>, is_long: bool) -> crate::Result<()> {
         let pool_value = self.pool_value_for_one_side(prices, is_long, false)?;
 
-        let max_reserved_value = crate::utils::apply_factor(&pool_value, self.reserve_factor())
-            .ok_or(crate::Error::Computation("calculating max reserved value"))?;
+        let max_reserved_value =
+            crate::utils::apply_factor(&pool_value, &self.reserve_factor()?)
+                .ok_or(crate::Error::Computation("calculating max reserved value"))?;
 
         let reserved_value = self.reserved_value(&prices.index_token_price, is_long)?;
 
@@ -838,7 +843,7 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
         let pool_value = self.pool_value_for_one_side(prices, is_long, false)?;
 
         let max_reserved_value =
-            crate::utils::apply_factor(&pool_value, self.open_interest_reserve_factor())
+            crate::utils::apply_factor(&pool_value, &self.open_interest_reserve_factor()?)
                 .ok_or(crate::Error::Computation("calculating max reserved value"))?;
 
         let reserved_value = self.reserved_value(&prices.index_token_price, is_long)?;

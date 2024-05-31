@@ -194,7 +194,7 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Withdrawal<M, DECIMALS> {
     fn charge_fees(&self, amount: &mut M::Num) -> crate::Result<Fees<M::Num>> {
         let (amount_after_fees, fees) = self
             .market
-            .swap_fee_params()
+            .swap_fee_params()?
             .apply_fees(false, amount)
             .ok_or(crate::Error::Computation("apply fees"))?;
         *amount = amount_after_fees;

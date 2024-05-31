@@ -141,7 +141,7 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Deposit<M, DECIMALS> {
             self.params.long_token_price(),
             self.params.short_token_price(),
         )?;
-        let price_impact = delta.price_impact(&self.market.swap_impact_params())?;
+        let price_impact = delta.price_impact(&self.market.swap_impact_params()?)?;
         let delta = delta.delta();
         debug_assert!(!delta.long_value().is_negative(), "must be non-negative");
         debug_assert!(!delta.short_value().is_negative(), "must be non-negative");
@@ -162,7 +162,7 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Deposit<M, DECIMALS> {
     ) -> crate::Result<Fees<M::Num>> {
         let (amount_after_fees, fees) = self
             .market
-            .swap_fee_params()
+            .swap_fee_params()?
             .apply_fees(is_positive_impact, amount)
             .ok_or(crate::Error::Computation("apply fees"))?;
         *amount = amount_after_fees;
