@@ -416,18 +416,12 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
     fn withdraw(
         &mut self,
         market_token_amount: Self::Num,
-        long_token_price: Self::Num,
-        short_token_price: Self::Num,
+        prices: Prices<Self::Num>,
     ) -> crate::Result<Withdrawal<&mut Self, DECIMALS>>
     where
         Self: Sized,
     {
-        Withdrawal::try_new(
-            self,
-            market_token_amount,
-            long_token_price,
-            short_token_price,
-        )
+        Withdrawal::try_new(self, market_token_amount, prices)
     }
 
     /// Create a [`Swap`].

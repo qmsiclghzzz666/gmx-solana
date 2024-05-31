@@ -1,6 +1,8 @@
 use crate::{num::MulDiv, params::Fees, utils, BalanceExt, Market, MarketExt, PoolExt, PoolKind};
 use num_traits::{CheckedAdd, Zero};
 
+use super::Prices;
+
 /// A withdrawal.
 #[must_use]
 pub struct Withdrawal<M: Market<DECIMALS>, const DECIMALS: u8> {
@@ -12,8 +14,7 @@ pub struct Withdrawal<M: Market<DECIMALS>, const DECIMALS: u8> {
 #[derive(Debug, Clone, Copy)]
 pub struct WithdrawParams<T> {
     market_token_amount: T,
-    long_token_price: T,
-    short_token_price: T,
+    prices: Prices<T>,
 }
 
 impl<T> WithdrawParams<T> {
@@ -24,12 +25,12 @@ impl<T> WithdrawParams<T> {
 
     /// Get long token price.
     pub fn long_token_price(&self) -> &T {
-        &self.long_token_price
+        &self.prices.long_token_price
     }
 
     /// Get short token price.
     pub fn short_token_price(&self) -> &T {
-        &self.short_token_price
+        &self.prices.short_token_price
     }
 }
 
@@ -76,21 +77,17 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Withdrawal<M, DECIMALS> {
     pub fn try_new(
         market: M,
         market_token_amount: M::Num,
-        long_token_price: M::Num,
-        short_token_price: M::Num,
+        prices: Prices<M::Num>,
     ) -> crate::Result<Self> {
         if market_token_amount.is_zero() {
             return Err(crate::Error::EmptyWithdrawal);
         }
-        if long_token_price.is_zero() || short_token_price.is_zero() {
-            return Err(crate::Error::InvalidPrices);
-        }
+        prices.validate()?;
         Ok(Self {
             market,
             params: WithdrawParams {
                 market_token_amount,
-                long_token_price,
-                short_token_price,
+                prices,
             },
         })
     }
@@ -143,8 +140,13 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Withdrawal<M, DECIMALS> {
             &-delta.try_into().map_err(|_| crate::Error::Convert)?,
         )?;
 
-        // TODO: validate amounts.
+        self.market.validate_reserve(true, &self.params.prices)?;
+        self.market.validate_reserve(false, &self.params.prices)?;
+
+        // TODO: validate max pnl.
+
         self.market.burn(&self.params.market_token_amount)?;
+
         Ok(WithdrawReport {
             params: self.params,
             long_token_fees,
@@ -156,16 +158,16 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Withdrawal<M, DECIMALS> {
 
     fn output_amounts(&self) -> crate::Result<(M::Num, M::Num)> {
         let pool_value = self.market.pool_value(
-            &self.params.long_token_price,
-            &self.params.short_token_price,
+            self.params.long_token_price(),
+            self.params.short_token_price(),
         )?;
         if pool_value.is_zero() {
             return Err(crate::Error::invalid_pool_value("withdrawal"));
         }
         let total_supply = self.market.total_supply();
         let pool = self.market.primary_pool()?;
-        let long_token_value = pool.long_usd_value(&self.params.long_token_price)?;
-        let short_token_value = pool.short_usd_value(&self.params.short_token_price)?;
+        let long_token_value = pool.long_usd_value(self.params.long_token_price())?;
+        let short_token_value = pool.short_usd_value(self.params.short_token_price())?;
         let market_token_value = utils::market_token_amount_to_usd(
             &self.params.market_token_amount,
             &pool_value,
@@ -175,11 +177,11 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Withdrawal<M, DECIMALS> {
         let long_token_amount = market_token_value
             .checked_mul_div(&long_token_value, &pool_value)
             .ok_or(crate::Error::Computation("long token amount"))?
-            / self.params.long_token_price.clone();
+            / self.params.long_token_price().clone();
         let short_token_amount = market_token_value
             .checked_mul_div(&short_token_value, &pool_value)
             .ok_or(crate::Error::Computation("short token amount"))?
-            / self.params.short_token_price.clone();
+            / self.params.short_token_price().clone();
         Ok((long_token_amount, short_token_amount))
     }
 
@@ -196,7 +198,7 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Withdrawal<M, DECIMALS> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{pool::Balance, test::TestMarket, Market, MarketExt};
+    use crate::{action::Prices, pool::Balance, test::TestMarket, Market, MarketExt};
 
     #[test]
     fn basic() -> crate::Result<()> {
@@ -208,7 +210,12 @@ mod tests {
         let before_supply = market.total_supply();
         let before_long_amount = market.primary_pool()?.long_amount()?;
         let before_short_amount = market.primary_pool()?.short_amount()?;
-        let report = market.withdraw(1_000_000_000, 120, 1)?.execute()?;
+        let prices = Prices {
+            index_token_price: 120,
+            long_token_price: 120,
+            short_token_price: 1,
+        };
+        let report = market.withdraw(1_000_000_000, prices)?.execute()?;
         println!("{report:#?}");
         println!("{market:#?}");
         assert_eq!(
