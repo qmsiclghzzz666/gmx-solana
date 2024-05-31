@@ -28,6 +28,7 @@ impl<T> FeeParams<T> {
 /// Borrowing Fee Parameters.
 #[derive(Debug, Clone, Copy, TypedBuilder)]
 pub struct BorrowingFeeParams<T> {
+    receiver_factor: T,
     exponent_for_long: T,
     exponent_for_short: T,
     factor_for_long: T,
@@ -58,6 +59,11 @@ impl<T> BorrowingFeeParams<T> {
     /// Get whether to skip borrowing fee for smaller side.
     pub fn skip_borrowing_fee_for_smaller_side(&self) -> bool {
         self.skip_borrowing_fee_for_smaller_side
+    }
+
+    /// Get borrowing fee receiver factor.
+    pub fn receiver_factor(&self) -> &T {
+        &self.receiver_factor
     }
 }
 
@@ -309,12 +315,18 @@ pub struct OrderFees<T> {
 #[derive(Debug, Clone, Copy)]
 pub struct BorrowingFee<T> {
     amount: T,
+    amount_for_receiver: T,
 }
 
 impl<T> BorrowingFee<T> {
-    /// Get borrowing fee amount.
+    /// Get total borrowing fee amount.
     pub fn amount(&self) -> &T {
         &self.amount
+    }
+
+    /// Get borrowing fee amount for receiver.
+    pub fn amount_for_receiver(&self) -> &T {
+        &self.amount_for_receiver
     }
 }
 
@@ -322,6 +334,7 @@ impl<T: Zero> Default for BorrowingFee<T> {
     fn default() -> Self {
         Self {
             amount: Zero::zero(),
+            amount_for_receiver: Zero::zero(),
         }
     }
 }
@@ -371,8 +384,14 @@ pub struct PositionFees<T> {
 
 impl<T> PositionFees<T> {
     /// Get fee for receiver.
-    pub fn for_receiver(&self) -> &T {
-        &self.base.fee_receiver_amount
+    pub fn for_receiver(&self) -> crate::Result<T>
+    where
+        T: CheckedAdd,
+    {
+        self.base
+            .fee_receiver_amount
+            .checked_add(self.borrowing.amount_for_receiver())
+            .ok_or(crate::Error::Computation("calculating fee for receiver"))
     }
 
     /// Get fee for pool.
@@ -384,6 +403,7 @@ impl<T> PositionFees<T> {
             .base
             .fee_amount_for_pool
             .checked_add(&self.borrowing.amount)
+            .and_then(|total| total.checked_sub(self.borrowing.amount_for_receiver()))
             .ok_or(crate::Error::Computation("calculating fee for pool"))?;
         Ok(amount)
     }
@@ -432,6 +452,7 @@ impl<T> PositionFees<T> {
     /// Apply borrowing fee.
     pub fn apply_borrowing_fee<const DECIMALS: u8>(
         mut self,
+        receiver_factor: &T,
         price: &T,
         value: T,
     ) -> crate::Result<Self>
@@ -440,6 +461,10 @@ impl<T> PositionFees<T> {
     {
         debug_assert!(!price.is_zero(), "must be non-zero");
         let amount = value / price.clone();
+        self.borrowing.amount_for_receiver = crate::utils::apply_factor(&amount, receiver_factor)
+            .ok_or(crate::Error::Computation(
+            "calculating borrowing fee amount for receiver",
+        ))?;
         self.borrowing.amount = amount;
         Ok(self)
     }

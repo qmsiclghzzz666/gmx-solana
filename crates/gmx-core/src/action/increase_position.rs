@@ -438,7 +438,7 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> IncreasePosition<P, DECIMALS> {
             .market_mut()
             .apply_delta_to_claimable_fee_pool(
                 is_collateral_token_long,
-                &fees.for_receiver().to_signed()?,
+                &fees.for_receiver()?.to_signed()?,
             )?;
 
         self.position

@@ -447,6 +447,7 @@ impl<'a, 'info> gmx_core::Market<{ constants::MARKET_DECIMALS }> for AsMarket<'a
 
     fn borrowing_fee_params(&self) -> BorrowingFeeParams<Self::Num> {
         BorrowingFeeParams::builder()
+            .receiver_factor(37_000_000_000_000_000_000)
             .factor_for_long(2_820_000_000_000)
             .factor_for_short(2_820_000_000_000)
             .exponent_for_long(100_000_000_000_000_000_000)

@@ -154,6 +154,7 @@ impl Default for TestMarket<u64, 9> {
                 .min_position_impact_pool_amount(1_000_000_000)
                 .build(),
             borrowing_fee_params: BorrowingFeeParams::builder()
+                .receiver_factor(370_000_000)
                 .factor_for_long(28)
                 .factor_for_short(28)
                 .exponent_for_long(1_000_000_000)
@@ -235,6 +236,7 @@ impl Default for TestMarket<u128, 20> {
                 .min_position_impact_pool_amount(1_000_000_000)
                 .build(),
             borrowing_fee_params: BorrowingFeeParams::builder()
+                .receiver_factor(37_000_000_000_000_000_000)
                 .factor_for_long(2_820_000_000_000)
                 .factor_for_short(2_820_000_000_000)
                 .exponent_for_long(100_000_000_000_000_000_000)
