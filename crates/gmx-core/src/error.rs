@@ -1,4 +1,4 @@
-use crate::{position::LiquidatableReason, ClockKind, PoolKind};
+use crate::{position::LiquidatableReason, ClockKind, PnlFactorKind, PoolKind};
 
 /// Error type.
 #[derive(Debug, thiserror::Error)]
@@ -73,6 +73,24 @@ pub enum Error {
     /// Unable to get borrowing factor for empty pool value.
     #[error("unable to get borrowing factor for empty pool value")]
     UnableToGetBorrowingFactorEmptyPoolValue,
+    /// Insufficient reserve.
+    #[error("insufficient reserve")]
+    InsufficientReserve,
+    /// Insufficient reserve for open interest.
+    #[error("insufficient reserve for open interest")]
+    InsufficientReserveForOpenInterest,
+    /// Pnl Factor Exceeded.
+    #[error("pnl factor ({0:?}) exceeded {1}")]
+    PnlFactorExceeded(PnlFactorKind, &'static str),
+    /// Max pool amount exceeded.
+    #[error("max pool amount exceeded: {0}")]
+    MaxPoolAmountExceeded(&'static str),
+    /// Max pool value for deposit exceeded.
+    #[error("max pool value exceeded: {0}")]
+    MaxPoolValueExceeded(&'static str),
+    /// Max open interest exceeded.
+    #[error("max open interest exceeded")]
+    MaxOpenInterestExceeded,
 }
 
 impl Error {

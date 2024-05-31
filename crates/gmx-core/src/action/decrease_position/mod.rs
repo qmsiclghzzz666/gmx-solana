@@ -435,16 +435,10 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
         market: &mut P::Market,
         report: &mut DecreasePositionReport<P::Num>,
     ) -> crate::Result<()> {
-        let (
-            is_output_token_long,
-            is_secondary_output_token_long,
-            long_token_price,
-            short_token_price,
-        ) = (
+        let (is_output_token_long, is_secondary_output_token_long, prices) = (
             report.is_output_token_long(),
             report.is_secondary_output_token_long(),
-            report.params().prices.long_token_price.clone(),
-            report.params().prices.short_token_price.clone(),
+            report.params().prices.clone(),
         );
         let output_amount = &mut report.output_amount;
         let secondary_output_amount = &mut report.secondary_output_amount;
@@ -459,8 +453,7 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
                     .swap(
                         is_secondary_output_token_long,
                         secondary_output_amount.clone(),
-                        long_token_price,
-                        short_token_price,
+                        prices,
                     )?
                     .execute()?;
                 *output_amount = output_amount
@@ -486,8 +479,13 @@ mod tests {
     #[test]
     fn basic() -> crate::Result<()> {
         let mut market = TestMarket::<u64, 9>::default();
-        market.deposit(1_000_000_000, 0, 120, 1)?.execute()?;
-        market.deposit(0, 1_000_000_000, 120, 1)?.execute()?;
+        let prices = Prices {
+            index_token_price: 120,
+            long_token_price: 120,
+            short_token_price: 1,
+        };
+        market.deposit(1_000_000_000, 0, prices)?.execute()?;
+        market.deposit(0, 1_000_000_000, prices)?.execute()?;
         println!("{market:#?}");
         let mut position = TestPosition::long(true);
         let report = position

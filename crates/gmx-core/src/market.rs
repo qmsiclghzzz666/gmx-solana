@@ -85,6 +85,34 @@ pub trait Market<const DECIMALS: u8> {
 
     /// Get the mutable reference to funding factor per second.
     fn funding_factor_per_second_mut(&mut self) -> &mut Self::Signed;
+
+    /// Get reserve factor.
+    fn reserve_factor(&self) -> &Self::Num;
+
+    /// Get open interest reserve factor.
+    fn open_interest_reserve_factor(&self) -> &Self::Num;
+
+    /// Get max pnl factor.
+    fn max_pnl_factor(&self, kind: PnlFactorKind, is_long: bool) -> crate::Result<Self::Num>;
+
+    /// Get max pool amount.
+    fn max_pool_amount(&self, is_long_token: bool) -> crate::Result<Self::Num>;
+
+    /// Get max pool value for deposit.
+    fn max_pool_value_for_deposit(&self, is_long_token: bool) -> crate::Result<Self::Num>;
+
+    /// Get max open interest.
+    fn max_open_interest(&self, is_long: bool) -> crate::Result<Self::Num>;
+}
+
+/// Pnl Factor Kind.
+#[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
+pub enum PnlFactorKind {
+    /// For deposit.
+    Deposit,
+    /// For withdrawal.
+    Withdrawal,
 }
 
 impl<'a, const DECIMALS: u8, M: Market<DECIMALS>> Market<DECIMALS> for &'a mut M {
@@ -164,6 +192,30 @@ impl<'a, const DECIMALS: u8, M: Market<DECIMALS>> Market<DECIMALS> for &'a mut M
 
     fn funding_factor_per_second_mut(&mut self) -> &mut Self::Signed {
         (**self).funding_factor_per_second_mut()
+    }
+
+    fn reserve_factor(&self) -> &Self::Num {
+        (**self).reserve_factor()
+    }
+
+    fn open_interest_reserve_factor(&self) -> &Self::Num {
+        (**self).open_interest_reserve_factor()
+    }
+
+    fn max_pnl_factor(&self, kind: PnlFactorKind, is_long: bool) -> crate::Result<Self::Num> {
+        (**self).max_pnl_factor(kind, is_long)
+    }
+
+    fn max_pool_amount(&self, is_long_token: bool) -> crate::Result<Self::Num> {
+        (**self).max_pool_amount(is_long_token)
+    }
+
+    fn max_pool_value_for_deposit(&self, is_long_token: bool) -> crate::Result<Self::Num> {
+        (**self).max_pool_value_for_deposit(is_long_token)
+    }
+
+    fn max_open_interest(&self, is_long: bool) -> crate::Result<Self::Num> {
+        (**self).max_open_interest(is_long)
     }
 }
 
@@ -338,6 +390,24 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
             .ok_or(crate::Error::MissingPoolKind(kind))
     }
 
+    /// Get the usd value of primary pool for one side.
+    #[inline]
+    fn pool_value_for_one_side(
+        &self,
+        prices: &Prices<Self::Num>,
+        is_long: bool,
+        _maximize: bool,
+    ) -> crate::Result<Self::Num> {
+        // TODO: apply maximize by choosing price.
+        if is_long {
+            self.primary_pool()?
+                .long_usd_value(&prices.long_token_price)
+        } else {
+            self.primary_pool()?
+                .short_usd_value(&prices.short_token_price)
+        }
+    }
+
     /// Get the usd value of primary pool.
     fn pool_value(
         &self,
@@ -358,7 +428,10 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
             .merge(self.open_interest_pool(false)?))
     }
 
-    /// Get total open interest in tokens as a [`Balance`].
+    /// Get total open interest in tokens as a merged [`Balance`].
+    ///
+    /// The long amount is the total long open interest in tokens,
+    /// while the short amount is the total short open interest in tokens.
     fn open_interest_in_tokens(&self) -> crate::Result<Merged<&Self::Pool, &Self::Pool>> {
         Ok(self
             .open_interest_in_tokens_pool(true)?
@@ -370,37 +443,24 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
         &mut self,
         long_token_amount: Self::Num,
         short_token_amount: Self::Num,
-        long_token_price: Self::Num,
-        short_token_price: Self::Num,
+        prices: Prices<Self::Num>,
     ) -> Result<Deposit<&mut Self, DECIMALS>, crate::Error>
     where
         Self: Sized,
     {
-        Deposit::try_new(
-            self,
-            long_token_amount,
-            short_token_amount,
-            long_token_price,
-            short_token_price,
-        )
+        Deposit::try_new(self, long_token_amount, short_token_amount, prices)
     }
 
     /// Create a [`Withdrawal`].
     fn withdraw(
         &mut self,
         market_token_amount: Self::Num,
-        long_token_price: Self::Num,
-        short_token_price: Self::Num,
+        prices: Prices<Self::Num>,
     ) -> crate::Result<Withdrawal<&mut Self, DECIMALS>>
     where
         Self: Sized,
     {
-        Withdrawal::try_new(
-            self,
-            market_token_amount,
-            long_token_price,
-            short_token_price,
-        )
+        Withdrawal::try_new(self, market_token_amount, prices)
     }
 
     /// Create a [`Swap`].
@@ -408,19 +468,12 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
         &mut self,
         is_token_in_long: bool,
         token_in_amount: Self::Num,
-        long_token_price: Self::Num,
-        short_token_price: Self::Num,
+        prices: Prices<Self::Num>,
     ) -> crate::Result<Swap<&mut Self, DECIMALS>>
     where
         Self: Sized,
     {
-        Swap::try_new(
-            self,
-            is_token_in_long,
-            token_in_amount,
-            long_token_price,
-            short_token_price,
-        )
+        Swap::try_new(self, is_token_in_long, token_in_amount, prices)
     }
 
     /// Create a [`DistributePositionImpact`] action.
@@ -743,6 +796,179 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
         self.claimable_funding_amount_per_size_pool_mut(is_long)?
             .apply_delta_amount(is_long_collateral, delta)
     }
+
+    /// Get reserved value.
+    fn reserved_value(
+        &self,
+        index_token_price: &Self::Num,
+        is_long: bool,
+    ) -> crate::Result<Self::Num> {
+        // TODO: add comment to explain the difference.
+        if is_long {
+            // TODO: use max price.
+            self.open_interest_in_tokens()?
+                .long_usd_value(index_token_price)
+        } else {
+            self.open_interest()?.short_amount()
+        }
+    }
+
+    /// Validate reserve.
+    fn validate_reserve(&self, prices: &Prices<Self::Num>, is_long: bool) -> crate::Result<()> {
+        let pool_value = self.pool_value_for_one_side(prices, is_long, false)?;
+
+        let max_reserved_value = crate::utils::apply_factor(&pool_value, self.reserve_factor())
+            .ok_or(crate::Error::Computation("calculating max reserved value"))?;
+
+        let reserved_value = self.reserved_value(&prices.index_token_price, is_long)?;
+
+        if reserved_value > max_reserved_value {
+            Err(crate::Error::InsufficientReserve)
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Validate open interest reserve.
+    fn validate_open_interest_reserve(
+        &self,
+        prices: &Prices<Self::Num>,
+        is_long: bool,
+    ) -> crate::Result<()> {
+        let pool_value = self.pool_value_for_one_side(prices, is_long, false)?;
+
+        let max_reserved_value =
+            crate::utils::apply_factor(&pool_value, self.open_interest_reserve_factor())
+                .ok_or(crate::Error::Computation("calculating max reserved value"))?;
+
+        let reserved_value = self.reserved_value(&prices.index_token_price, is_long)?;
+
+        if reserved_value > max_reserved_value {
+            Err(crate::Error::InsufficientReserveForOpenInterest)
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Get total pnl of the market for one side.
+    fn pnl(
+        &self,
+        index_token_price: &Self::Num,
+        is_long: bool,
+        _maximize: bool,
+    ) -> crate::Result<Self::Signed> {
+        use crate::num::Unsigned;
+        use num_traits::CheckedMul;
+
+        let open_interest = self.open_interest()?.amount(is_long)?;
+        let open_interest_in_tokens = self.open_interest_in_tokens()?.amount(is_long)?;
+        if open_interest.is_zero() && open_interest_in_tokens.is_zero() {
+            return Ok(Zero::zero());
+        }
+
+        // TODO: pick price according to the `maximize` flag.
+        let price = index_token_price;
+
+        let open_interest_value = open_interest_in_tokens
+            .checked_mul(price)
+            .ok_or(crate::Error::Computation("calculating open interest value"))?;
+
+        if is_long {
+            open_interest_value
+                .to_signed()?
+                .checked_sub(&open_interest.to_signed()?)
+                .ok_or(crate::Error::Computation("calculating pnl for long"))
+        } else {
+            open_interest
+                .to_signed()?
+                .checked_sub(&open_interest_value.to_signed()?)
+                .ok_or(crate::Error::Computation("calculating pnl for short"))
+        }
+    }
+
+    /// Get pnl factor.
+    fn pnl_factor(
+        &self,
+        prices: &Prices<Self::Num>,
+        is_long: bool,
+        maximize: bool,
+    ) -> crate::Result<Self::Signed> {
+        let pool_value = self.pool_value_for_one_side(prices, is_long, !maximize)?;
+        let pnl = self.pnl(&prices.index_token_price, is_long, maximize)?;
+        crate::utils::div_to_factor_signed(&pnl, &pool_value)
+            .ok_or(crate::Error::Computation("calculating pnl factor"))
+    }
+
+    /// Validate pnl factor.
+    fn validate_pnl_factor(
+        &self,
+        prices: &Prices<Self::Num>,
+        kind: PnlFactorKind,
+        is_long: bool,
+    ) -> crate::Result<()> {
+        let pnl_factor = self.pnl_factor(prices, is_long, true)?;
+        let max_pnl_factor = self.max_pnl_factor(kind, is_long)?;
+
+        if pnl_factor.is_positive() && pnl_factor.unsigned_abs() > max_pnl_factor {
+            Err(crate::Error::PnlFactorExceeded(
+                kind,
+                get_msg_by_side(is_long),
+            ))
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Validate max pnl.
+    fn validate_max_pnl(
+        &self,
+        prices: &Prices<Self::Num>,
+        long_kind: PnlFactorKind,
+        short_kind: PnlFactorKind,
+    ) -> crate::Result<()> {
+        self.validate_pnl_factor(prices, long_kind, true)?;
+        self.validate_pnl_factor(prices, short_kind, false)?;
+        Ok(())
+    }
+
+    /// Validate (primary) pool value for deposit.
+    fn validate_pool_value_for_deposit(
+        &self,
+        prices: &Prices<Self::Num>,
+        is_long_token: bool,
+    ) -> crate::Result<()> {
+        let pool_value = self.pool_value_for_one_side(prices, is_long_token, true)?;
+        let max_pool_value = self.max_pool_value_for_deposit(is_long_token)?;
+        if pool_value > max_pool_value {
+            Err(crate::Error::MaxPoolAmountExceeded(get_msg_by_side(
+                is_long_token,
+            )))
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Validate (primary) pool amount.
+    fn validate_pool_amount(&self, is_long_token: bool) -> crate::Result<()> {
+        let amount = self.primary_pool()?.amount(is_long_token)?;
+        let max_pool_amount = self.max_pool_amount(is_long_token)?;
+        if amount > max_pool_amount {
+            Err(crate::Error::MaxPoolAmountExceeded(get_msg_by_side(
+                is_long_token,
+            )))
+        } else {
+            Ok(())
+        }
+    }
 }
 
 impl<const DECIMALS: u8, M: Market<DECIMALS>> MarketExt<DECIMALS> for M {}
+
+#[inline]
+fn get_msg_by_side(is_long: bool) -> &'static str {
+    if is_long {
+        "for long"
+    } else {
+        "for short"
+    }
+}

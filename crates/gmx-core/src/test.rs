@@ -3,7 +3,7 @@ use std::{collections::HashMap, fmt, time::Instant};
 use crate::{
     clock::ClockKind,
     fixed::FixedPointOps,
-    market::Market,
+    market::{Market, PnlFactorKind},
     num::{MulDiv, Num, Unsigned, UnsignedAbs},
     params::{
         fee::{BorrowingFeeParams, FundingFeeParams},
@@ -74,6 +74,12 @@ where
     }
 }
 
+#[derive(Debug, Clone)]
+struct MaxPnlFactors<T> {
+    deposit: T,
+    withdrawal: T,
+}
+
 /// Test Market.
 #[derive(Debug, Clone)]
 pub struct TestMarket<T: Unsigned, const DECIMALS: u8> {
@@ -88,6 +94,12 @@ pub struct TestMarket<T: Unsigned, const DECIMALS: u8> {
     position_impact_distribution_params: PositionImpactDistributionParams<T>,
     borrowing_fee_params: BorrowingFeeParams<T>,
     funding_fee_params: FundingFeeParams<T>,
+    reserve_factor: T,
+    open_interest_reserve_factor: T,
+    max_pnl_factors: MaxPnlFactors<T>,
+    max_pool_amount: T,
+    max_pool_value_for_deposit: T,
+    max_open_interest: T,
     primary: TestPool<T>,
     swap_impact: TestPool<T>,
     fee: TestPool<T>,
@@ -157,6 +169,15 @@ impl Default for TestMarket<u64, 9> {
                 .threshold_for_stable_funding(50_000_000)
                 .threshold_for_decrease_funding(0)
                 .build(),
+            reserve_factor: 1_000_000_000,
+            max_pnl_factors: MaxPnlFactors {
+                deposit: 600_000_000,
+                withdrawal: 300_000_000,
+            },
+            open_interest_reserve_factor: 1_000_000_000,
+            max_pool_amount: 1_000_000_000 * 1_000_000_000,
+            max_pool_value_for_deposit: u64::MAX,
+            max_open_interest: u64::MAX,
             primary: Default::default(),
             swap_impact: Default::default(),
             fee: Default::default(),
@@ -229,6 +250,15 @@ impl Default for TestMarket<u128, 20> {
                 .threshold_for_stable_funding(5_000_000_000_000_000_000)
                 .threshold_for_decrease_funding(0)
                 .build(),
+            reserve_factor: 10u128.pow(20),
+            open_interest_reserve_factor: 10u128.pow(20),
+            max_pnl_factors: MaxPnlFactors {
+                deposit: 60_000_000_000_000_000_000,
+                withdrawal: 30_000_000_000_000_000_000,
+            },
+            max_pool_amount: 1_000_000_000 * 10u128.pow(20),
+            max_pool_value_for_deposit: 1_000_000_000_000_000 * 10u128.pow(20),
+            max_open_interest: 1_000_000_000 * 10u128.pow(20),
             primary: Default::default(),
             swap_impact: Default::default(),
             fee: Default::default(),
@@ -375,6 +405,34 @@ where
 
     fn funding_factor_per_second_mut(&mut self) -> &mut Self::Signed {
         &mut self.funding_factor_per_second
+    }
+
+    fn reserve_factor(&self) -> &Self::Num {
+        &self.reserve_factor
+    }
+
+    fn open_interest_reserve_factor(&self) -> &Self::Num {
+        &self.open_interest_reserve_factor
+    }
+
+    fn max_pnl_factor(&self, kind: PnlFactorKind, _is_long: bool) -> crate::Result<Self::Num> {
+        let factor = match kind {
+            PnlFactorKind::Deposit => self.max_pnl_factors.deposit.clone(),
+            PnlFactorKind::Withdrawal => self.max_pnl_factors.withdrawal.clone(),
+        };
+        Ok(factor)
+    }
+
+    fn max_pool_amount(&self, _is_long_token: bool) -> crate::Result<Self::Num> {
+        Ok(self.max_pool_amount.clone())
+    }
+
+    fn max_pool_value_for_deposit(&self, _is_long_token: bool) -> crate::Result<Self::Num> {
+        Ok(self.max_pool_value_for_deposit.clone())
+    }
+
+    fn max_open_interest(&self, _is_long: bool) -> crate::Result<Self::Num> {
+        Ok(self.max_open_interest.clone())
     }
 }
 

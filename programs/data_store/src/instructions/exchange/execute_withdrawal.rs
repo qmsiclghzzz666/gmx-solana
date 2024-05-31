@@ -163,6 +163,13 @@ impl<'info> ExecuteWithdrawal<'info> {
 
     fn perform_withdrawal(&mut self) -> Result<(u64, u64)> {
         let meta = &self.market.meta;
+        let index_token_price = self
+            .oracle
+            .primary
+            .get(&meta.index_token_mint)
+            .ok_or(DataStoreError::RequiredResourceNotFound)?
+            .max
+            .to_unit_price();
         let long_token_price = self
             .oracle
             .primary
@@ -184,8 +191,11 @@ impl<'info> ExecuteWithdrawal<'info> {
             .with_vault(self.market_token_withdrawal_vault.to_account_info())
             .withdraw(
                 self.withdrawal.fixed.tokens.market_token_amount.into(),
-                long_token_price,
-                short_token_price,
+                gmx_core::action::Prices {
+                    index_token_price,
+                    long_token_price,
+                    short_token_price,
+                },
             )
             .map_err(GmxCoreError::from)?
             .execute()

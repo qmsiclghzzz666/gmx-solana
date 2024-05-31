@@ -4,8 +4,10 @@ use crate::{
     market::{Market, MarketExt},
     num::{MulDiv, UnsignedAbs},
     params::Fees,
-    utils, BalanceExt, PoolExt,
+    utils, BalanceExt, PnlFactorKind, PoolExt,
 };
+
+use super::Prices;
 
 /// A deposit.
 #[must_use]
@@ -19,8 +21,7 @@ pub struct Deposit<M: Market<DECIMALS>, const DECIMALS: u8> {
 pub struct DepositParams<T> {
     long_token_amount: T,
     short_token_amount: T,
-    long_token_price: T,
-    short_token_price: T,
+    prices: Prices<T>,
 }
 
 impl<T> DepositParams<T> {
@@ -36,12 +37,12 @@ impl<T> DepositParams<T> {
 
     /// Get long token price.
     pub fn long_token_price(&self) -> &T {
-        &self.long_token_price
+        &self.prices.long_token_price
     }
 
     /// Get short token price.
     pub fn short_token_price(&self) -> &T {
-        &self.short_token_price
+        &self.prices.short_token_price
     }
 }
 
@@ -107,8 +108,7 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Deposit<M, DECIMALS> {
         market: M,
         long_token_amount: M::Num,
         short_token_amount: M::Num,
-        long_token_price: M::Num,
-        short_token_price: M::Num,
+        prices: Prices<M::Num>,
     ) -> Result<Self, crate::Error> {
         if long_token_amount.is_zero() && short_token_amount.is_zero() {
             return Err(crate::Error::EmptyDeposit);
@@ -118,8 +118,7 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Deposit<M, DECIMALS> {
             params: DepositParams {
                 long_token_amount,
                 short_token_amount,
-                long_token_price,
-                short_token_price,
+                prices,
             },
         })
     }
@@ -139,8 +138,8 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Deposit<M, DECIMALS> {
                 .clone()
                 .try_into()
                 .map_err(|_| crate::Error::Convert)?,
-            &self.params.long_token_price,
-            &self.params.short_token_price,
+            self.params.long_token_price(),
+            self.params.short_token_price(),
         )?;
         let price_impact = delta.price_impact(&self.market.swap_impact_params())?;
         let delta = delta.delta();
@@ -181,17 +180,18 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Deposit<M, DECIMALS> {
         if pool_value.is_zero() && !supply.is_zero() {
             return Err(crate::Error::invalid_pool_value("deposit"));
         }
+
         let (mut amount, price, opposite_price) = if is_long_token {
             (
                 self.params.long_token_amount.clone(),
-                &self.params.long_token_price,
-                &self.params.short_token_price,
+                self.params.long_token_price(),
+                self.params.short_token_price(),
             )
         } else {
             (
                 self.params.short_token_amount.clone(),
-                &self.params.short_token_price,
-                &self.params.long_token_price,
+                self.params.short_token_price(),
+                self.params.long_token_price(),
             )
         };
         let fees = self.charge_fees(price_impact.is_positive(), &mut amount)?;
@@ -232,7 +232,7 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Deposit<M, DECIMALS> {
                     .try_into()
                     .map_err(|_| crate::Error::Convert)?,
             )?;
-            // TODO: validate the amounts.
+            self.market.validate_pool_amount(!is_long_token)?;
         } else if price_impact.is_negative() {
             let negative_impact_amount = self.market.apply_swap_impact_value_with_cap(
                 is_long_token,
@@ -263,7 +263,9 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Deposit<M, DECIMALS> {
             .try_into()
             .map_err(|_| crate::Error::Convert)?,
         )?;
-        // TODO: validate the amounts.
+        self.market.validate_pool_amount(is_long_token)?;
+        self.market
+            .validate_pool_value_for_deposit(&self.params.prices, is_long_token)?;
         Ok((mint_amount, fees))
     }
 
@@ -274,13 +276,22 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Deposit<M, DECIMALS> {
             "shouldn't be empty deposit"
         );
         // TODO: validate first deposit.
+
+        // Validate max pnl first.
+        // TODO: add comment for the reason.
+        self.market.validate_max_pnl(
+            &self.params.prices,
+            PnlFactorKind::Deposit,
+            PnlFactorKind::Deposit,
+        )?;
+
         let report = {
             let (price_impact, long_token_usd_value, short_token_usd_value) =
                 self.price_impact()?;
             let mut market_token_to_mint: M::Num = Zero::zero();
             let pool_value = self.market.pool_value(
-                &self.params.long_token_price,
-                &self.params.short_token_price,
+                self.params.long_token_price(),
+                self.params.short_token_price(),
             )?;
             let mut all_fees = [Default::default(), Default::default()];
             if !self.params.long_token_amount.is_zero() {
@@ -325,22 +336,27 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Deposit<M, DECIMALS> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{market::MarketExt, test::TestMarket};
+    use crate::{action::Prices, market::MarketExt, test::TestMarket};
 
     #[test]
     fn basic() -> Result<(), crate::Error> {
         let mut market = TestMarket::<u64, 9>::default();
+        let prices = Prices {
+            index_token_price: 120,
+            long_token_price: 120,
+            short_token_price: 1,
+        };
         println!(
             "{:#?}",
-            market.deposit(1_000_000_000, 0, 120, 1)?.execute()?
+            market.deposit(1_000_000_000, 0, prices)?.execute()?
         );
         println!(
             "{:#?}",
-            market.deposit(1_000_000_000, 0, 120, 1)?.execute()?
+            market.deposit(1_000_000_000, 0, prices)?.execute()?
         );
         println!(
             "{:#?}",
-            market.deposit(0, 1_000_000_000, 120, 1)?.execute()?
+            market.deposit(0, 1_000_000_000, prices)?.execute()?
         );
         println!("{market:#?}");
         Ok(())
@@ -349,18 +365,23 @@ mod tests {
     #[test]
     fn sequence() -> crate::Result<()> {
         let mut market_1 = TestMarket::<u64, 9>::default();
+        let prices = Prices {
+            index_token_price: 120,
+            long_token_price: 120,
+            short_token_price: 1,
+        };
         println!(
             "{:#?}",
-            market_1.deposit(1_000_000_000, 0, 120, 1)?.execute()?
+            market_1.deposit(1_000_000_000, 0, prices)?.execute()?
         );
         println!(
             "{:#?}",
-            market_1.deposit(1_000_000_000, 0, 120, 1)?.execute()?
+            market_1.deposit(1_000_000_000, 0, prices)?.execute()?
         );
         let mut market_2 = TestMarket::<u64, 9>::default();
         println!(
             "{:#?}",
-            market_2.deposit(2_000_000_000, 0, 120, 1)?.execute()?
+            market_2.deposit(2_000_000_000, 0, prices)?.execute()?
         );
         Ok(())
     }
@@ -369,23 +390,22 @@ mod tests {
     #[test]
     fn basic_u128() -> Result<(), crate::Error> {
         let mut market = TestMarket::<u128, 20>::default();
+        let prices = Prices {
+            index_token_price: 12_000_000_000_000,
+            long_token_price: 12_000_000_000_000,
+            short_token_price: 100_000_000_000,
+        };
         println!(
             "{:#?}",
-            market
-                .deposit(1_000_000_000, 0, 12_000_000_000_000, 100_000_000_000)?
-                .execute()?
+            market.deposit(1_000_000_000, 0, prices)?.execute()?
         );
         println!(
             "{:#?}",
-            market
-                .deposit(1_000_000_000, 0, 12_000_000_000_000, 100_000_000_000)?
-                .execute()?
+            market.deposit(1_000_000_000, 0, prices)?.execute()?
         );
         println!(
             "{:#?}",
-            market
-                .deposit(0, 1_000_000_000, 12_000_000_000_000, 100_000_000_000)?
-                .execute()?
+            market.deposit(0, 1_000_000_000, prices)?.execute()?
         );
         println!("{market:#?}");
         Ok(())

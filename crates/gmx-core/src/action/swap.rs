@@ -1,10 +1,12 @@
 use crate::{
     num::{MulDiv, Unsigned},
     params::Fees,
-    BalanceExt, Market, MarketExt, PoolExt,
+    BalanceExt, Market, MarketExt, PnlFactorKind, PoolExt,
 };
 
 use num_traits::{CheckedAdd, CheckedMul, CheckedSub, Signed, Zero};
+
+use super::Prices;
 
 /// A swap.
 #[must_use]
@@ -18,19 +20,18 @@ pub struct Swap<M: Market<DECIMALS>, const DECIMALS: u8> {
 pub struct SwapParams<T> {
     is_token_in_long: bool,
     token_in_amount: T,
-    long_token_price: T,
-    short_token_price: T,
+    prices: Prices<T>,
 }
 
 impl<T> SwapParams<T> {
     /// Get long token price.
     pub fn long_token_price(&self) -> &T {
-        &self.long_token_price
+        &self.prices.long_token_price
     }
 
     /// Get short token price.
     pub fn short_token_price(&self) -> &T {
-        &self.short_token_price
+        &self.prices.short_token_price
     }
 
     /// Whether the in token is long token.
@@ -111,22 +112,18 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Swap<M, DECIMALS> {
         market: M,
         is_token_in_long: bool,
         token_in_amount: M::Num,
-        long_token_price: M::Num,
-        short_token_price: M::Num,
+        prices: Prices<M::Num>,
     ) -> crate::Result<Self> {
         if token_in_amount.is_zero() {
             return Err(crate::Error::EmptySwap);
         }
-        if long_token_price.is_zero() || short_token_price.is_zero() {
-            return Err(crate::Error::InvalidPrices);
-        }
+        prices.validate()?;
         Ok(Self {
             market,
             params: SwapParams {
                 is_token_in_long,
                 token_in_amount,
-                long_token_price,
-                short_token_price,
+                prices,
             },
         })
     }
@@ -138,29 +135,29 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Swap<M, DECIMALS> {
             let long_delta_value: M::Signed = self
                 .params
                 .token_in_amount
-                .checked_mul(&self.params.long_token_price)
+                .checked_mul(self.params.long_token_price())
                 .ok_or(crate::Error::Computation("long delta value"))?
                 .try_into()
                 .map_err(|_| crate::Error::Convert)?;
             Ok(ReassignedValues::new(
                 long_delta_value.clone(),
                 -long_delta_value,
-                self.params.long_token_price.clone(),
-                self.params.short_token_price.clone(),
+                self.params.long_token_price().clone(),
+                self.params.short_token_price().clone(),
             ))
         } else {
             let short_delta_value: M::Signed = self
                 .params
                 .token_in_amount
-                .checked_mul(&self.params.short_token_price)
+                .checked_mul(self.params.short_token_price())
                 .ok_or(crate::Error::Computation("short delta value"))?
                 .try_into()
                 .map_err(|_| crate::Error::Convert)?;
             Ok(ReassignedValues::new(
                 -short_delta_value.clone(),
                 short_delta_value,
-                self.params.short_token_price.clone(),
-                self.params.long_token_price.clone(),
+                self.params.short_token_price().clone(),
+                self.params.long_token_price().clone(),
             ))
         }
     }
@@ -198,8 +195,8 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Swap<M, DECIMALS> {
             .pool_delta_with_values(
                 long_token_delta_value,
                 short_token_delta_value,
-                &self.params.long_token_price,
-                &self.params.short_token_price,
+                self.params.long_token_price(),
+                self.params.short_token_price(),
             )?
             .price_impact(&self.market.swap_impact_params())?;
 
@@ -260,6 +257,19 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Swap<M, DECIMALS> {
                 .map_err(|_| crate::Error::Convert)?,
         )?;
 
+        self.market
+            .validate_pool_amount(self.params.is_token_in_long)?;
+        self.market
+            .validate_reserve(&self.params.prices, !self.params.is_token_in_long)?;
+
+        let (long_kind, short_kind) = if self.params.is_token_in_long {
+            (PnlFactorKind::Deposit, PnlFactorKind::Withdrawal)
+        } else {
+            (PnlFactorKind::Withdrawal, PnlFactorKind::Deposit)
+        };
+        self.market
+            .validate_max_pnl(&self.params.prices, long_kind, short_kind)?;
+
         Ok(SwapReport {
             params: self.params,
             price_impact_value: price_impact,
@@ -272,20 +282,35 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Swap<M, DECIMALS> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{pool::Balance, test::TestMarket, Market, MarketExt};
+    use crate::{action::Prices, pool::Balance, test::TestMarket, Market, MarketExt};
 
     #[test]
     fn basic() -> crate::Result<()> {
         let mut market = TestMarket::<u64, 9>::default();
-        market.deposit(1_000_000_000, 0, 120, 1)?.execute()?;
-        market.deposit(1_000_000_000, 0, 121, 1)?.execute()?;
-        market.deposit(0, 1_000_000_000, 122, 1)?.execute()?;
+        let mut prices = Prices {
+            index_token_price: 120,
+            long_token_price: 120,
+            short_token_price: 1,
+        };
+        market.deposit(1_000_000_000, 0, prices)?.execute()?;
+        prices.index_token_price = 121;
+        prices.long_token_price = 121;
+        market.deposit(1_000_000_000, 0, prices)?.execute()?;
+        prices.index_token_price = 122;
+        prices.long_token_price = 122;
+        market.deposit(0, 1_000_000_000, prices)?.execute()?;
         println!("{market:#?}");
+
+        let prices = Prices {
+            index_token_price: 123,
+            long_token_price: 123,
+            short_token_price: 1,
+        };
 
         // Test for positive impact.
         let before_market = market.clone();
         let token_in_amount = 100_000_000;
-        let report = market.swap(false, token_in_amount, 123, 1)?.execute()?;
+        let report = market.swap(false, token_in_amount, prices)?.execute()?;
         println!("{report:#?}");
         println!("{market:#?}");
 
@@ -324,7 +349,14 @@ mod tests {
         // Test for negative impact.
         let before_market = market.clone();
         let token_in_amount = 100_000;
-        let report = market.swap(true, token_in_amount, 119, 1)?.execute()?;
+
+        let prices = Prices {
+            index_token_price: 119,
+            long_token_price: 119,
+            short_token_price: 1,
+        };
+
+        let report = market.swap(true, token_in_amount, prices)?.execute()?;
         println!("{report:#?}");
         println!("{market:#?}");
 

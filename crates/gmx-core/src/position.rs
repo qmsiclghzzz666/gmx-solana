@@ -10,7 +10,7 @@ use crate::{
     fixed::FixedPointOps,
     num::{MulDiv, Num, Unsigned, UnsignedAbs},
     params::fee::{FundingFees, PositionFees},
-    BalanceExt, Market, MarketExt, Pool,
+    Balance, BalanceExt, Market, MarketExt, Pool,
 };
 
 /// A position.
@@ -461,16 +461,28 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
         size_delta_usd: &Self::Signed,
         size_delta_in_tokens: &Self::Signed,
     ) -> crate::Result<()> {
+        use num_traits::CheckedAdd;
+
         if size_delta_usd.is_zero() {
             return Ok(());
         }
         let is_long_collateral = self.is_collateral_token_long();
         let is_long = self.is_long();
+        let max_open_interest = self.market().max_open_interest(is_long)?;
         let open_interest = self.market_mut().open_interest_pool_mut(is_long)?;
         if is_long_collateral {
             open_interest.apply_delta_to_long_amount(size_delta_usd)?;
         } else {
             open_interest.apply_delta_to_short_amount(size_delta_usd)?;
+        }
+
+        let is_exceeded = open_interest
+            .long_amount()?
+            .checked_add(&open_interest.short_amount()?)
+            .map(|total| total > max_open_interest)
+            .unwrap_or(true);
+        if is_exceeded {
+            return Err(crate::Error::MaxOpenInterestExceeded);
         }
 
         let open_interest_in_tokens = self

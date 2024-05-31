@@ -258,8 +258,9 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> IncreasePosition<P, DECIMALS> {
         )?;
 
         if !self.params.size_delta_usd.is_zero() {
-            // TODO: validate reserve.
-            // TODO: validate open interset reserve.
+            let market = self.position.market();
+            market.validate_reserve(&self.params.prices, self.position.is_long())?;
+            market.validate_open_interest_reserve(&self.params.prices, self.position.is_long())?;
 
             let delta = CollateralDelta::new(
                 self.position.size_in_usd().clone(),
@@ -495,8 +496,13 @@ mod tests {
     #[test]
     fn basic() -> crate::Result<()> {
         let mut market = TestMarket::<u64, 9>::default();
-        market.deposit(1_000_000_000, 0, 120, 1)?.execute()?;
-        market.deposit(0, 1_000_000_000, 120, 1)?.execute()?;
+        let prices = Prices {
+            index_token_price: 120,
+            long_token_price: 120,
+            short_token_price: 1,
+        };
+        market.deposit(1_000_000_000, 0, prices)?.execute()?;
+        market.deposit(0, 1_000_000_000, prices)?.execute()?;
         println!("{market:#?}");
         let mut position = TestPosition::long(true);
         let report = position

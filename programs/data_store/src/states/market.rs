@@ -474,6 +474,40 @@ impl<'a, 'info> gmx_core::Market<{ constants::MARKET_DECIMALS }> for AsMarket<'a
     fn funding_factor_per_second_mut(&mut self) -> &mut Self::Signed {
         self.funding_factor_per_second
     }
+
+    fn reserve_factor(&self) -> &Self::Num {
+        &constants::MARKET_USD_UNIT
+    }
+
+    fn open_interest_reserve_factor(&self) -> &Self::Num {
+        &constants::MARKET_USD_UNIT
+    }
+
+    fn max_pnl_factor(
+        &self,
+        kind: gmx_core::PnlFactorKind,
+        _is_long: bool,
+    ) -> gmx_core::Result<Self::Num> {
+        use gmx_core::PnlFactorKind;
+
+        match kind {
+            PnlFactorKind::Deposit => Ok(60_000_000_000_000_000_000),
+            PnlFactorKind::Withdrawal => Ok(30_000_000_000_000_000_000),
+            _ => Err(error!(DataStoreError::RequiredResourceNotFound).into()),
+        }
+    }
+
+    fn max_pool_amount(&self, _is_long_token: bool) -> gmx_core::Result<Self::Num> {
+        Ok(1_000_000_000 * constants::MARKET_USD_UNIT)
+    }
+
+    fn max_pool_value_for_deposit(&self, _is_long_token: bool) -> gmx_core::Result<Self::Num> {
+        Ok(1_000_000_000_000_000 * constants::MARKET_USD_UNIT)
+    }
+
+    fn max_open_interest(&self, _is_long: bool) -> gmx_core::Result<Self::Num> {
+        Ok(1_000_000_000 * constants::MARKET_USD_UNIT)
+    }
 }
 
 #[event]

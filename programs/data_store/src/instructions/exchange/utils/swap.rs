@@ -70,24 +70,32 @@ impl<'a, 'info> SwapUtils<'a, 'info> {
                 } else {
                     return Err(DataStoreError::InvalidSwapPath.into());
                 };
-                let long_token_price = self
-                    .oracle
-                    .primary
-                    .get(&meta.long_token_mint)
-                    .ok_or(DataStoreError::MissingOracelPrice)?;
-                let short_token_price = self
-                    .oracle
-                    .primary
-                    .get(&meta.short_token_mint)
-                    .ok_or(DataStoreError::MissingOracelPrice)?;
+                let prices = gmx_core::action::Prices {
+                    index_token_price: self
+                        .oracle
+                        .primary
+                        .get(&meta.index_token_mint)
+                        .ok_or(DataStoreError::MissingOracelPrice)?
+                        .max
+                        .to_unit_price(),
+                    long_token_price: self
+                        .oracle
+                        .primary
+                        .get(&meta.long_token_mint)
+                        .ok_or(DataStoreError::MissingOracelPrice)?
+                        .max
+                        .to_unit_price(),
+                    short_token_price: self
+                        .oracle
+                        .primary
+                        .get(&meta.short_token_mint)
+                        .ok_or(DataStoreError::MissingOracelPrice)?
+                        .max
+                        .to_unit_price(),
+                };
                 let report = market
                     .as_market(&mut mint)
-                    .swap(
-                        is_token_in_long,
-                        amount.into(),
-                        long_token_price.max.to_unit_price(),
-                        short_token_price.max.to_unit_price(),
-                    )
+                    .swap(is_token_in_long, amount.into(), prices)
                     .map_err(GmxCoreError::from)?
                     .execute()
                     .map_err(GmxCoreError::from)?;

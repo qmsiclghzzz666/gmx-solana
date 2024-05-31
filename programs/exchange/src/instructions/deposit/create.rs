@@ -137,6 +137,7 @@ pub fn create_deposit<'info>(
     }
 
     let market_meta = cpi::get_market_meta(ctx.accounts.get_market_meta_ctx())?.get();
+    tokens.insert(market_meta.index_token_mint);
     tokens.insert(market_meta.long_token_mint);
     tokens.insert(market_meta.short_token_mint);
 
