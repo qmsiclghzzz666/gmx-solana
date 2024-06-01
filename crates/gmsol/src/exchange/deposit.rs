@@ -255,9 +255,9 @@ where
                 market,
                 initial_long_token_account,
                 initial_short_token_account,
-                long_token_deposit_vault: long_token
+                initial_long_token_vault: long_token
                     .map(|token| find_market_vault_address(store, &token).0),
-                short_token_deposit_vault: short_token
+                initial_short_token_vault: short_token
                     .map(|token| find_market_vault_address(store, &token).0),
             })
             .args(instruction::CreateDeposit {

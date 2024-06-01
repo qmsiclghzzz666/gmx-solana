@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
 use anchor_lang::{prelude::*, system_program};
-use anchor_spl::token::{self, Token, TokenAccount};
+use anchor_spl::token::{Token, TokenAccount};
 use data_store::{
     cpi::accounts::{GetMarketMeta, GetTokenConfig, InitializeOrder},
     program::DataStore,
@@ -49,19 +49,9 @@ pub struct CreateOrder<'info> {
     pub initial_collateral_token_account: Option<Box<Account<'info, TokenAccount>>>,
     pub final_output_token_account: Option<Box<Account<'info, TokenAccount>>>,
     pub secondary_output_token_account: Option<Box<Account<'info, TokenAccount>>>,
-    #[account(
-        mut, 
-        token::mint = initial_collateral_token_account.as_ref().expect("sender must be provided").mint,
-        seeds = [
-            data_store::constants::MARKET_VAULT_SEED,
-            store.key().as_ref(),
-            initial_collateral_token_vault.mint.as_ref(),
-            &[],
-        ],
-        bump,
-        seeds::program = data_store_program.key(),
-    )]
-    pub initial_collateral_token_vault: Option<Box<Account<'info, TokenAccount>>>,
+    /// CHECK: check by CPI.
+    #[account(mut)]
+    pub initial_collateral_token_vault: Option<UncheckedAccount<'info>>,
     pub long_token_account: Box<Account<'info, TokenAccount>>,
     pub short_token_account: Box<Account<'info, TokenAccount>>,
     pub data_store_program: Program<'info, DataStore>,
@@ -79,19 +69,11 @@ pub fn create_order<'info>(
     let controller = ControllerSeeds::new(ctx.accounts.store.key, ctx.bumps.authority);
 
     let (tokens, swap) = match &order.kind {
-        OrderKind::MarketIncrease => {
-            if order.initial_collateral_delta_amount != 0 {
-                anchor_spl::token::transfer(
-                    ctx.accounts.token_transfer_ctx()?,
-                    order.initial_collateral_delta_amount,
-                )?;
-            }
-            ctx.accounts.handle_tokens_for_increase_order(
-                &params.output_token,
-                ctx.remaining_accounts,
-                params.swap_length as usize,
-            )?
-        }
+        OrderKind::MarketIncrease => ctx.accounts.handle_tokens_for_increase_order(
+            &params.output_token,
+            ctx.remaining_accounts,
+            params.swap_length as usize,
+        )?,
         OrderKind::MarketDecrease | OrderKind::Liquidation => {
             ctx.accounts.handle_tokens_for_decrease_order(
                 &params.output_token,
@@ -176,25 +158,13 @@ impl<'info> CreateOrder<'info> {
                 long_token_account: self.long_token_account.to_account_info(),
                 short_token_account: self.short_token_account.to_account_info(),
                 system_program: self.system_program.to_account_info(),
+                initial_collateral_token_vault: self
+                    .initial_collateral_token_vault
+                    .as_ref()
+                    .map(|a| a.to_account_info()),
+                token_program: self.token_program.to_account_info(),
             },
         )
-    }
-
-    fn token_transfer_ctx(&self) -> Result<CpiContext<'_, '_, '_, 'info, token::Transfer<'info>>> {
-        let (Some(from), Some(to)) = (
-            self.initial_collateral_token_account.as_ref(),
-            self.initial_collateral_token_vault.as_ref(),
-        ) else {
-            return err!(ExchangeError::MissingDepositTokenAccount);
-        };
-        Ok(CpiContext::new(
-            self.token_program.to_account_info(),
-            token::Transfer {
-                from: from.to_account_info(),
-                to: to.to_account_info(),
-                authority: self.payer.to_account_info(),
-            },
-        ))
     }
 
     fn transfer_ctx(&self) -> CpiContext<'_, '_, '_, 'info, system_program::Transfer<'info>> {
@@ -260,7 +230,7 @@ impl<'info> CreateOrder<'info> {
             .initial_collateral_token_account
             .as_ref()
             .map(|a| a.mint)
-            .ok_or(ExchangeError::MissingDepositTokenAccount)?;
+            .ok_or(ExchangeError::MissingTokenAccountForOrder)?;
         let swap_path = get_and_validate_swap_path(
             &self.data_store_program,
             &remaining_accounts[..length],
@@ -293,7 +263,7 @@ impl<'info> CreateOrder<'info> {
             .final_output_token_account
             .as_ref()
             .map(|a| a.mint)
-            .ok_or(ExchangeError::MissingDepositTokenAccount)?;
+            .ok_or(ExchangeError::MissingTokenAccountForOrder)?;
         let swap_path = get_and_validate_swap_path(
             &self.data_store_program,
             &remaining_accounts[..length],

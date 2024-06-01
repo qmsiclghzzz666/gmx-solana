@@ -34,6 +34,7 @@ pub struct ExecuteOrder<'info> {
     config: Box<Account<'info, Config>>,
     pub oracle: Box<Account<'info, Oracle>>,
     #[account(
+        mut,
         constraint = order.fixed.market == market.key(),
         constraint = order.fixed.tokens.market_token == market_token_mint.key(),
         constraint = order.fixed.receivers.final_output_token_account == final_output_token_account.as_ref().map(|a| a.key()),
@@ -319,6 +320,7 @@ impl<'info> ExecuteOrder<'info> {
                     .execute()
                     .map_err(GmxCoreError::from)?;
                 self.process_increase_report(report)?;
+                self.order.fixed.params.initial_collateral_delta_amount = 0;
             }
             OrderKind::MarketDecrease | OrderKind::Liquidation => {
                 let report = {

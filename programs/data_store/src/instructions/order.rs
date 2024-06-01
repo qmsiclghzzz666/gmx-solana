@@ -1,7 +1,8 @@
 use anchor_lang::{prelude::*, system_program};
-use anchor_spl::token::TokenAccount;
+use anchor_spl::token::{Token, TokenAccount, Transfer};
 
 use crate::{
+    constants,
     states::{
         common::{SwapParams, TokenRecord},
         order::{Order, OrderKind, OrderParams, Receivers, Senders, Tokens},
@@ -50,8 +51,20 @@ pub struct InitializeOrder<'info> {
     )]
     pub position: Option<AccountLoader<'info, Position>>,
     pub market: Box<Account<'info, Market>>,
-    #[account(token::authority = payer)]
+    #[account(mut, token::authority = payer)]
     pub initial_collateral_token_account: Option<Box<Account<'info, TokenAccount>>>,
+    #[account(
+        mut,
+        token::mint = initial_collateral_token_account.as_ref().expect("sender must be provided").mint,
+        seeds = [
+            constants::MARKET_VAULT_SEED,
+            store.key().as_ref(),
+            initial_collateral_token_vault.mint.as_ref(),
+            &[],
+        ],
+        bump,
+    )]
+    pub initial_collateral_token_vault: Option<Box<Account<'info, TokenAccount>>>,
     #[account(token::authority = payer)]
     pub final_output_token_account: Option<Box<Account<'info, TokenAccount>>>,
     #[account(token::authority = payer)]
@@ -61,6 +74,7 @@ pub struct InitializeOrder<'info> {
     #[account(token::authority = payer, token::mint = market.meta.short_token_mint)]
     pub short_token_account: Box<Account<'info, TokenAccount>>,
     pub system_program: Program<'info, System>,
+    pub token_program: Program<'info, Token>,
 }
 
 /// Initialize a new [`Order`] account.
@@ -73,6 +87,7 @@ pub fn initialize_order(
     output_token: Pubkey,
     ui_fee_receiver: Pubkey,
 ) -> Result<()> {
+    ctx.accounts.handle_tokens_in(&params)?;
     let meta = ctx.accounts.market.meta();
     // Validate and create `Tokens`.
     let tokens = match &params.kind {
@@ -185,6 +200,43 @@ impl<'info> internal::Authentication<'info> for InitializeOrder<'info> {
 }
 
 impl<'info> InitializeOrder<'info> {
+    fn handle_tokens_in(&self, params: &OrderParams) -> Result<()> {
+        match &params.kind {
+            OrderKind::MarketIncrease => {
+                if params.initial_collateral_delta_amount != 0 {
+                    anchor_spl::token::transfer(
+                        CpiContext::new(
+                            self.token_program.to_account_info(),
+                            Transfer {
+                                from: self
+                                    .initial_collateral_token_account
+                                    .as_ref()
+                                    .ok_or(error!(
+                                        DataStoreError::MissingInitializeTokenAccountForOrder
+                                    ))?
+                                    .to_account_info(),
+                                to: self
+                                    .initial_collateral_token_vault
+                                    .as_ref()
+                                    .ok_or(error!(
+                                        DataStoreError::MissingInitializeTokenAccountForOrder
+                                    ))?
+                                    .to_account_info(),
+                                authority: self.payer.to_account_info(),
+                            },
+                        ),
+                        params.initial_collateral_delta_amount,
+                    )?;
+                }
+            }
+            OrderKind::MarketSwap => {
+                unimplemented!();
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
     fn initial_collateral_token_account(&self) -> Result<&Account<'info, TokenAccount>> {
         let account = self
             .initial_collateral_token_account

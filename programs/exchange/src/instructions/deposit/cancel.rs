@@ -1,8 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Token, TokenAccount};
 use data_store::{
-    constants,
-    cpi::accounts::{MarketVaultTransferOut, RemoveDeposit},
+    cpi::accounts::RemoveDeposit,
     program::DataStore,
     states::Deposit,
     utils::{Authenticate, Authentication},
@@ -36,12 +35,7 @@ pub struct CancelDeposit<'info> {
     /// - Only the user who created the deposit can receive the funds,
     /// which is checked by [`remove_deposit`](data_store::instructions::remove_deposit)
     /// through CPI, who also checks whether the `store` matches.
-    #[account(
-        mut,
-        constraint = deposit.fixed.senders.user == user.key() @ ExchangeError::InvalidDepositToCancel,
-        constraint = deposit.fixed.tokens.initial_long_token == initial_long_token.as_ref().map(|a| a.mint) @ ExchangeError::InvalidDepositToCancel,
-        constraint = deposit.fixed.tokens.initial_short_token == initial_short_token.as_ref().map(|a| a.mint) @ ExchangeError::InvalidDepositToCancel,
-    )]
+    #[account(mut)]
     pub deposit: Account<'info, Deposit>,
     /// CHECK: check by access control.
     #[account(mut)]
@@ -52,31 +46,9 @@ pub struct CancelDeposit<'info> {
     /// The token account for receiving the initial short tokens.
     #[account(mut, token::authority = user)]
     pub initial_short_token: Option<Account<'info, TokenAccount>>,
-    #[account(
-        mut,
-        token::mint = initial_long_token.as_ref().expect("missing token account").mint,
-        seeds = [
-            constants::MARKET_VAULT_SEED,
-            store.key().as_ref(),
-            long_token_deposit_vault.mint.as_ref(),
-            &[],
-        ],
-        bump,
-        seeds::program = data_store_program.key(),
-    )]
+    #[account(mut)]
     pub long_token_deposit_vault: Option<Account<'info, TokenAccount>>,
-    #[account(
-        mut,
-        token::mint = initial_short_token.as_ref().expect("missing token account").mint,
-        seeds = [
-            constants::MARKET_VAULT_SEED,
-            store.key().as_ref(),
-            short_token_deposit_vault.mint.as_ref(),
-            &[],
-        ],
-        bump,
-        seeds::program = data_store_program.key(),
-    )]
+    #[account(mut)]
     pub short_token_deposit_vault: Option<Account<'info, TokenAccount>>,
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
@@ -84,26 +56,6 @@ pub struct CancelDeposit<'info> {
 
 /// Cancel a deposit.
 pub fn cancel_deposit(ctx: Context<CancelDeposit>, execution_fee: u64) -> Result<()> {
-    let initial_long_amount = ctx
-        .accounts
-        .deposit
-        .fixed
-        .tokens
-        .params
-        .initial_long_token_amount;
-    let initial_short_amount = ctx
-        .accounts
-        .deposit
-        .fixed
-        .tokens
-        .params
-        .initial_short_token_amount;
-    // FIXME: it seems that we don't have to check this?
-    // require!(
-    //     initial_long_amount != 0 || initial_short_amount != 0,
-    //     ExchangeError::EmptyDepositAmounts
-    // );
-
     // We will attach the controller seeds even it may not be provided.
     let controller = ControllerSeeds::find(ctx.accounts.store.key);
     let refund = ctx
@@ -118,24 +70,6 @@ pub fn cancel_deposit(ctx: Context<CancelDeposit>, execution_fee: u64) -> Result
             .with_signer(&[&controller.as_seeds()]),
         refund,
     )?;
-
-    if initial_long_amount != 0 {
-        data_store::cpi::market_vault_transfer_out(
-            ctx.accounts
-                .market_vault_transfer_out_ctx(true)?
-                .with_signer(&[&controller.as_seeds()]),
-            initial_long_amount,
-        )?;
-    }
-
-    if initial_short_amount != 0 {
-        data_store::cpi::market_vault_transfer_out(
-            ctx.accounts
-                .market_vault_transfer_out_ctx(false)?
-                .with_signer(&[&controller.as_seeds()]),
-            initial_short_amount,
-        )?;
-    }
 
     // TODO: emit deposit removed event.
     Ok(())
@@ -173,42 +107,25 @@ impl<'info> CancelDeposit<'info> {
                 store: self.store.to_account_info(),
                 deposit: self.deposit.to_account_info(),
                 user: self.user.to_account_info(),
+                initial_long_token: self
+                    .initial_long_token
+                    .as_ref()
+                    .map(|a| a.to_account_info()),
+                initial_short_token: self
+                    .initial_short_token
+                    .as_ref()
+                    .map(|a| a.to_account_info()),
+                long_token_deposit_vault: self
+                    .long_token_deposit_vault
+                    .as_ref()
+                    .map(|a| a.to_account_info()),
+                short_token_deposit_vault: self
+                    .short_token_deposit_vault
+                    .as_ref()
+                    .map(|a| a.to_account_info()),
                 system_program: self.system_program.to_account_info(),
-            },
-        )
-    }
-
-    fn market_vault_transfer_out_ctx(
-        &self,
-        is_long_token: bool,
-    ) -> Result<CpiContext<'_, '_, '_, 'info, MarketVaultTransferOut<'info>>> {
-        let (market_vault, to) = if is_long_token {
-            let (Some(market_vault), Some(to)) = (
-                self.long_token_deposit_vault.as_ref(),
-                self.initial_long_token.as_ref(),
-            ) else {
-                return Err(ExchangeError::MissingDepositTokenAccount.into());
-            };
-            (market_vault, to)
-        } else {
-            let (Some(market_vault), Some(to)) = (
-                self.short_token_deposit_vault.as_ref(),
-                self.initial_short_token.as_ref(),
-            ) else {
-                return Err(ExchangeError::MissingDepositTokenAccount.into());
-            };
-            (market_vault, to)
-        };
-        Ok(CpiContext::new(
-            self.data_store_program.to_account_info(),
-            MarketVaultTransferOut {
-                authority: self.authority.to_account_info(),
-                only_controller: self.only_controller.to_account_info(),
-                store: self.store.to_account_info(),
-                market_vault: market_vault.to_account_info(),
-                to: to.to_account_info(),
                 token_program: self.token_program.to_account_info(),
             },
-        ))
+        )
     }
 }

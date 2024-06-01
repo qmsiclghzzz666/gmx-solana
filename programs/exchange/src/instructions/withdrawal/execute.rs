@@ -33,9 +33,9 @@ pub struct ExecuteWithdrawal<'info> {
     /// - `user` is checked on the removal CPI of the withdrawal.
     #[account(
         mut,
-        constraint = withdrawal.fixed.tokens.market_token == market_token_mint.key() @ ExchangeError::InvalidWIthdrawalToExecute,
-        constraint = withdrawal.fixed.receivers.final_long_token_receiver == final_long_token_receiver.key() @ ExchangeError::InvalidWIthdrawalToExecute,
-        constraint = withdrawal.fixed.receivers.final_short_token_receiver == final_short_token_receiver.key() @ ExchangeError::InvalidWIthdrawalToExecute,
+        constraint = withdrawal.fixed.tokens.market_token == market_token_mint.key() @ ExchangeError::InvalidWithdrawalToExecute,
+        constraint = withdrawal.fixed.receivers.final_long_token_receiver == final_long_token_receiver.key() @ ExchangeError::InvalidWithdrawalToExecute,
+        constraint = withdrawal.fixed.receivers.final_short_token_receiver == final_short_token_receiver.key() @ ExchangeError::InvalidWithdrawalToExecute,
     )]
     pub withdrawal: Account<'info, Withdrawal>,
     /// CHECK: only used to invoke CPI and should be checked by it.
@@ -134,6 +134,9 @@ impl<'info> ExecuteWithdrawal<'info> {
                 withdrawal: self.withdrawal.to_account_info(),
                 user: self.user.to_account_info(),
                 system_program: self.system_program.to_account_info(),
+                market_token: None,
+                market_token_withdrawal_vault: None,
+                token_program: self.token_program.to_account_info(),
             },
         )
     }

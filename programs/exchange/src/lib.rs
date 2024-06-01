@@ -113,23 +113,17 @@ pub enum ExchangeError {
     EmptyDepositAmounts,
     #[msg("Failed to execute deposit")]
     FailedToExecuteDeposit,
-    #[msg("Invalid deposit to cancel")]
-    InvalidDepositToCancel,
-    #[msg("Missing deposit token account")]
-    MissingDepositTokenAccount,
     // Withdrawal.
     #[msg("Market token mint mismached")]
     MismatchedMarketTokenMint,
     #[msg("Empty withdrawal amount")]
     EmptyWithdrawalAmount,
-    #[msg("Invalid withdrawal to cancel")]
-    InvalidWithdrawalToCancel,
     #[msg("Invalid output amount")]
     InvalidOutputAmount,
     #[msg("Output amount too small")]
     OutputAmountTooSmall,
     #[msg("Invalid withdrawal to execute")]
-    InvalidWIthdrawalToExecute,
+    InvalidWithdrawalToExecute,
     // Order.
     #[msg("Unsupported order kind")]
     UnsupportedOrderKind,
@@ -139,4 +133,6 @@ pub enum ExchangeError {
     InvalidOutputToken,
     #[msg("Position is not provided")]
     PositionNotProvided,
+    #[msg("Missing token account for order")]
+    MissingTokenAccountForOrder,
 }

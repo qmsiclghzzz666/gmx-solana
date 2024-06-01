@@ -80,8 +80,8 @@ export const makeCreateDepositInstruction = async (
         receiver: toMarketTokenAccount,
         initialLongTokenAccount: fromInitialLongTokenAccount,
         initialShortTokenAccount: fromInitialShortTokenAccount,
-        longTokenDepositVault: fromInitialLongTokenAccount ? longTokenDepositVault : null,
-        shortTokenDepositVault: fromInitialShortTokenAccount ? shortTokenDepositVault : null,
+        initialLongTokenVault: fromInitialLongTokenAccount ? longTokenDepositVault : null,
+        initialShortTokenVault: fromInitialShortTokenAccount ? shortTokenDepositVault : null,
     }).remainingAccounts([...longSwapPath, ...shortSwapPath].map(mint => {
         return {
             pubkey: findMarketPDA(store, mint)[0],

@@ -23,6 +23,7 @@ pub struct ExecuteWithdrawal<'info> {
     config: Account<'info, Config>,
     pub oracle: Account<'info, Oracle>,
     #[account(
+        mut,
         constraint = withdrawal.fixed.market == market.key(),
         constraint = withdrawal.fixed.tokens.market_token == market_token_mint.key(),
         constraint = withdrawal.fixed.receivers.final_long_token_receiver == final_long_token_receiver.key(),
@@ -158,6 +159,7 @@ impl<'info> ExecuteWithdrawal<'info> {
         );
         self.transfer_out(true, final_long_amount)?;
         self.transfer_out(false, final_short_amount)?;
+        self.withdrawal.fixed.tokens.market_token_amount = 0;
         Ok(())
     }
 

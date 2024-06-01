@@ -1,9 +1,8 @@
 use std::collections::BTreeSet;
 
 use anchor_lang::{prelude::*, system_program};
-use anchor_spl::token::{self, Token, TokenAccount};
+use anchor_spl::token::{Token, TokenAccount};
 use data_store::{
-    constants,
     cpi::accounts::{GetMarketMeta, GetTokenConfig, InitializeWithdrawal},
     program::DataStore,
     states::{
@@ -65,19 +64,9 @@ pub struct CreateWithdrawal<'info> {
     /// [`get_market_token_mint`](data_store::instructions::get_market_token_mint) through CPI.
     #[account(mut)]
     pub market_token_account: Account<'info, TokenAccount>,
-    #[account(
-        mut,
-        token::mint = market_token_account.mint,
-        seeds = [
-            constants::MARKET_VAULT_SEED,
-            store.key().as_ref(),
-            market_token_withdrawal_vault.mint.as_ref(),
-            &[],
-        ],
-        seeds::program = data_store_program.key(),
-        bump,
-    )]
-    pub market_token_withdrawal_vault: Account<'info, TokenAccount>,
+    /// CHECK: check by CPI.
+    #[account(mut)]
+    pub market_token_withdrawal_vault: UncheckedAccount<'info>,
     pub final_long_token_receiver: Account<'info, TokenAccount>,
     pub final_short_token_receiver: Account<'info, TokenAccount>,
 }
@@ -147,12 +136,6 @@ pub fn create_withdrawal<'info>(
         })
         .collect::<Result<Vec<_>>>()?;
 
-    // Transfer the market tokens to the vault.
-    token::transfer(
-        ctx.accounts.token_transfer_ctx(),
-        params.market_token_amount,
-    )?;
-
     let controller = ControllerSeeds::new(ctx.accounts.store.key, ctx.bumps.authority);
     cpi::initialize_withdrawal(
         ctx.accounts
@@ -220,17 +203,8 @@ impl<'info> CreateWithdrawal<'info> {
                 final_long_token_receiver: self.final_long_token_receiver.to_account_info(),
                 final_short_token_receiver: self.final_short_token_receiver.to_account_info(),
                 system_program: self.system_program.to_account_info(),
-            },
-        )
-    }
-
-    fn token_transfer_ctx(&self) -> CpiContext<'_, '_, '_, 'info, token::Transfer<'info>> {
-        CpiContext::new(
-            self.token_program.to_account_info(),
-            token::Transfer {
-                from: self.market_token_account.to_account_info(),
-                to: self.market_token_withdrawal_vault.to_account_info(),
-                authority: self.payer.to_account_info(),
+                market_token_withdrawal_vault: self.market_token_withdrawal_vault.to_account_info(),
+                token_program: self.token_program.to_account_info(),
             },
         )
     }

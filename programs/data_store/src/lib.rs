@@ -567,9 +567,19 @@ pub enum DataStoreError {
     // Withdrawal.
     #[msg("User mismach")]
     UserMismatch,
+    #[msg("Empty withdrawal")]
+    EmptyWithdrawal,
+    #[msg("Invalid withdrawal to remove")]
+    InvalidWithdrawalToRemove,
+    #[msg("Unable to transfer out remaining withdrawal amount")]
+    UnableToTransferOutRemainingWithdrawalAmount,
     // Deposit.
     #[msg("Empty deposit")]
     EmptyDeposit,
+    #[msg("Missing deposit token account")]
+    MissingDepositTokenAccount,
+    #[msg("Invalid deposit to cancel")]
+    InvalidDepositToCancel,
     // Exchange.
     #[msg("Invalid position kind")]
     InvalidPositionKind,
@@ -597,6 +607,8 @@ pub enum DataStoreError {
     #[msg("invalid position")]
     InvalidPosition,
     // Order.
+    #[msg("missing initialial token account for order")]
+    MissingInitializeTokenAccountForOrder,
     #[msg("missing claimable time window")]
     MissingClaimableTimeWindow,
     #[msg("missing recent time window")]

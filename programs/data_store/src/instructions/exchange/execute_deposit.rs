@@ -24,6 +24,10 @@ pub struct ExecuteDeposit<'info> {
     config: Account<'info, Config>,
     pub oracle: Account<'info, Oracle>,
     #[account(
+        // The `mut` flag must be present, since we are mutating the deposit.
+        // It may not throw any errors sometimes if we forget to mark the account as mutable,
+        // so be careful.
+        mut,
         constraint = deposit.fixed.receivers.receiver == receiver.key(),
         constraint = deposit.fixed.tokens.market_token == market_token_mint.key(),
         constraint = deposit.fixed.market == market.key(),
@@ -109,6 +113,9 @@ impl<'info> ExecuteDeposit<'info> {
         let (long_amount, short_amount) = self.perform_swaps(&meta, remaining_accounts)?;
         msg!("{}, {}", long_amount, short_amount);
         self.perform_deposit(&meta, long_amount, short_amount)?;
+        // Set amounts to zero to make sure it can be removed without transferring out any tokens.
+        self.deposit.fixed.tokens.params.initial_long_token_amount = 0;
+        self.deposit.fixed.tokens.params.initial_short_token_amount = 0;
         Ok(())
     }
 
