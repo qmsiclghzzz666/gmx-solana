@@ -32,7 +32,7 @@ use gmx_solana_utils::price::Price;
 #[cfg_attr(test, macro_use)]
 extern crate static_assertions;
 
-declare_id!("EjfyBCoSMd6rjkUNz1SFfD7DBYbvAuaxhQs8phcu7Eb6");
+declare_id!("hndKzPMrB9Xzs3mwarnPdkSWpZPZN3gLeeNzHDcHotT");
 
 #[program]
 pub mod data_store {

@@ -15,7 +15,7 @@ pub mod events;
 use data_store::utils::Authenticate;
 use instructions::*;
 
-declare_id!("HY9NoGiu68nqu3H44UySTX3rZ1db8Mx3b2CFcDNAmSQJ");
+declare_id!("hnxiNKTc515NHvuq5fEUAc62dWkEu3m623FbwemWNJd");
 
 #[program]
 pub mod exchange {
