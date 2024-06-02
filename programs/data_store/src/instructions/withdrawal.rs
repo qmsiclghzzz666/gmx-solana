@@ -28,6 +28,7 @@ pub struct InitializeWithdrawal<'info> {
         bump,
     )]
     pub withdrawal: Account<'info, Withdrawal>,
+    #[account(has_one = store)]
     pub(crate) market: Account<'info, Market>,
     #[account(mut, token::authority = payer, token::mint = market.meta.market_token_mint)]
     pub market_token_account: Account<'info, TokenAccount>,

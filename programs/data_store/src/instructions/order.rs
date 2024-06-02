@@ -50,6 +50,7 @@ pub struct InitializeOrder<'info> {
         bump,
     )]
     pub position: Option<AccountLoader<'info, Position>>,
+    #[account(has_one = store)]
     pub market: Box<Account<'info, Market>>,
     #[account(mut, token::authority = payer)]
     pub initial_collateral_token_account: Option<Box<Account<'info, TokenAccount>>>,

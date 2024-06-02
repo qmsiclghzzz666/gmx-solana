@@ -37,7 +37,7 @@ pub struct ExecuteWithdrawal<'info> {
         bump = withdrawal.fixed.bump,
     )]
     pub withdrawal: Account<'info, Withdrawal>,
-    #[account(mut)]
+    #[account(mut, has_one = store)]
     pub market: Account<'info, Market>,
     #[account(mut)]
     pub market_token_mint: Account<'info, Mint>,

@@ -25,6 +25,7 @@ pub struct Market {
     /// Bump Seed.
     pub(crate) bump: u8,
     pub(crate) meta: MarketMeta,
+    pub(crate) store: Pubkey,
     pools: Pools,
     clocks: DynamicMapStore<u8, i64>,
     funding_factor_per_second: i128,
@@ -33,6 +34,7 @@ pub struct Market {
 impl Market {
     pub(crate) fn init_space(num_pools: u8, num_clocks: u8) -> usize {
         1 + 16
+            + 32
             + MarketMeta::INIT_SPACE
             + DynamicMapStore::<u8, Pool>::init_space(num_pools)
             + DynamicMapStore::<u8, i64>::init_space(num_clocks)
@@ -92,6 +94,7 @@ impl Market {
     pub fn init(
         &mut self,
         bump: u8,
+        store: Pubkey,
         market_token_mint: Pubkey,
         index_token_mint: Pubkey,
         long_token_mint: Pubkey,
@@ -100,6 +103,7 @@ impl Market {
         num_clocks: u8,
     ) -> Result<()> {
         self.bump = bump;
+        self.store = store;
         self.meta.market_token_mint = market_token_mint;
         self.meta.index_token_mint = index_token_mint;
         self.meta.long_token_mint = long_token_mint;

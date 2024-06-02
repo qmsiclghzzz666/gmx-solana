@@ -43,7 +43,7 @@ pub struct ExecuteOrder<'info> {
         constraint = order.fixed.receivers.short_token_account == short_token_account.key(),
     )]
     pub order: Box<Account<'info, Order>>,
-    #[account(mut)]
+    #[account(mut, has_one = store)]
     pub market: Box<Account<'info, Market>>,
     pub market_token_mint: Box<Account<'info, Mint>>,
     #[account(

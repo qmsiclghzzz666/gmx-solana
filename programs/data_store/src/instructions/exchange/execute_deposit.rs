@@ -40,7 +40,7 @@ pub struct ExecuteDeposit<'info> {
         bump = deposit.fixed.bump,
     )]
     pub deposit: Account<'info, Deposit>,
-    #[account(mut)]
+    #[account(mut, has_one = store)]
     pub market: Account<'info, Market>,
     #[account(mut)]
     pub market_token_mint: Account<'info, Mint>,

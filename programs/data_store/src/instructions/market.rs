@@ -24,6 +24,7 @@ pub fn initialize_market(
     let market = &mut ctx.accounts.market;
     market.init(
         ctx.bumps.market,
+        ctx.accounts.store.key(),
         market_token_mint,
         index_token_mint,
         long_token_mint,
@@ -94,6 +95,7 @@ pub struct RemoveMarket<'info> {
     store: Account<'info, DataStore>,
     #[account(
         mut,
+        has_one = store,
         seeds = [Market::SEED, store.key().as_ref(), market.meta.market_token_mint.as_ref()],
         bump = market.bump,
         close = authority,
@@ -145,7 +147,12 @@ pub struct ApplyDeltaToMarketPool<'info> {
     pub only_controller: Account<'info, Roles>,
     #[account(
         mut,
-        seeds = [Market::SEED, store.key().as_ref(), market.meta.market_token_mint.as_ref()],
+        has_one = store,
+        seeds = [
+            Market::SEED,
+            store.key().as_ref(),
+            market.meta.market_token_mint.as_ref(),
+        ],
         bump = market.bump,
     )]
     pub(crate) market: Account<'info, Market>,

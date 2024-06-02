@@ -56,6 +56,7 @@ pub struct InitializeDeposit<'info> {
         bump,
     )]
     pub short_token_deposit_vault: Option<Box<Account<'info, TokenAccount>>>,
+    #[account(has_one = store)]
     pub(crate) market: Box<Account<'info, Market>>,
     #[account(token::authority = payer, token::mint = market.meta.market_token_mint)]
     pub receiver: Box<Account<'info, TokenAccount>>,
