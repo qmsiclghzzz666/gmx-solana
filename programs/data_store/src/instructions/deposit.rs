@@ -94,6 +94,7 @@ pub fn initialize_deposit(
 
     ctx.accounts.deposit.init(
         ctx.bumps.deposit,
+        ctx.accounts.store.key(),
         &ctx.accounts.market,
         nonce,
         tokens_with_feed,
@@ -171,8 +172,9 @@ pub struct RemoveDeposit<'info> {
     pub store: Account<'info, DataStore>,
     #[account(
         mut,
-        constraint = deposit.to_account_info().lamports() >= refund @ DataStoreError::LamportsNotEnough,
         close = authority,
+        constraint = deposit.to_account_info().lamports() >= refund @ DataStoreError::LamportsNotEnough,
+        constraint = deposit.fixed.store == store.key() @ DataStoreError::InvalidDepositToRemove,
         constraint = deposit.fixed.senders.user == user.key() @ DataStoreError::UserMismatch,
         seeds = [
             Deposit::SEED,
@@ -196,7 +198,7 @@ pub struct RemoveDeposit<'info> {
     #[account(
         mut,
         token::mint = initial_long_token.as_ref().expect("missing token account").mint,
-        constraint = deposit.fixed.tokens.initial_long_token == initial_long_token.as_ref().map(|a| a.mint) @ DataStoreError::InvalidDepositToCancel,
+        constraint = deposit.fixed.tokens.initial_long_token == initial_long_token.as_ref().map(|a| a.mint) @ DataStoreError::InvalidDepositToRemove,
         seeds = [
             constants::MARKET_VAULT_SEED,
             store.key().as_ref(),
@@ -209,7 +211,7 @@ pub struct RemoveDeposit<'info> {
     #[account(
         mut,
         token::mint = initial_short_token.as_ref().expect("missing token account").mint,
-        constraint = deposit.fixed.tokens.initial_short_token == initial_short_token.as_ref().map(|a| a.mint) @ DataStoreError::InvalidDepositToCancel,
+        constraint = deposit.fixed.tokens.initial_short_token == initial_short_token.as_ref().map(|a| a.mint) @ DataStoreError::InvalidDepositToRemove,
         seeds = [
             constants::MARKET_VAULT_SEED,
             store.key().as_ref(),

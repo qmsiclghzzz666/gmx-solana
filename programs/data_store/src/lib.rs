@@ -578,8 +578,8 @@ pub enum DataStoreError {
     EmptyDeposit,
     #[msg("Missing deposit token account")]
     MissingDepositTokenAccount,
-    #[msg("Invalid deposit to cancel")]
-    InvalidDepositToCancel,
+    #[msg("Invalid deposit to remove")]
+    InvalidDepositToRemove,
     // Exchange.
     #[msg("Invalid position kind")]
     InvalidPositionKind,
@@ -629,6 +629,8 @@ pub enum DataStoreError {
     ClaimbleCollateralInOutputTokenForHolding,
     #[msg("no delegated authority is set")]
     NoDelegatedAuthorityIsSet,
+    #[msg("invalid order to remove")]
+    InvalidOrderToRemove,
     // Token Config.
     #[msg("synthetic flag does not match")]
     InvalidSynthetic,

@@ -18,16 +18,19 @@ pub struct ExecuteDeposit<'info> {
     pub only_order_keeper: Account<'info, Roles>,
     pub store: Account<'info, DataStore>,
     #[account(
+        has_one = store,
         seeds = [Config::SEED, store.key().as_ref()],
         bump = config.bump,
     )]
     config: Account<'info, Config>,
+    #[account(has_one = store)]
     pub oracle: Account<'info, Oracle>,
     #[account(
         // The `mut` flag must be present, since we are mutating the deposit.
         // It may not throw any errors sometimes if we forget to mark the account as mutable,
         // so be careful.
         mut,
+        constraint = deposit.fixed.store == store.key(),
         constraint = deposit.fixed.receivers.receiver == receiver.key(),
         constraint = deposit.fixed.tokens.market_token == market_token_mint.key(),
         constraint = deposit.fixed.market == market.key(),

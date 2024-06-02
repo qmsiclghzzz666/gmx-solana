@@ -28,13 +28,16 @@ pub struct ExecuteOrder<'info> {
     pub store: Box<Account<'info, DataStore>>,
     pub only_order_keeper: Account<'info, Roles>,
     #[account(
+        has_one = store,
         seeds = [Config::SEED, store.key().as_ref()],
         bump = config.bump,
     )]
     config: Box<Account<'info, Config>>,
+    #[account(has_one = store)]
     pub oracle: Box<Account<'info, Oracle>>,
     #[account(
         mut,
+        constraint = order.fixed.store == store.key(),
         constraint = order.fixed.market == market.key(),
         constraint = order.fixed.tokens.market_token == market_token_mint.key(),
         constraint = order.fixed.receivers.final_output_token_account == final_output_token_account.as_ref().map(|a| a.key()),
@@ -49,6 +52,7 @@ pub struct ExecuteOrder<'info> {
     #[account(
         mut,
         constraint = position.load()?.owner == order.fixed.user,
+        constraint = position.load()?.store == store.key(),
         seeds = [
             Position::SEED,
             store.key().as_ref(),

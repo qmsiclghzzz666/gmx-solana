@@ -48,6 +48,8 @@ pub struct InitializeOrder<'info> {
             &[params.to_position_kind()? as u8],
         ],
         bump,
+        // FIXME: It cannot be check like this when the position is not initialized.
+        // constraint = position.load()?.store == store.key(),
     )]
     pub position: Option<AccountLoader<'info, Position>>,
     #[account(has_one = store)]
@@ -172,6 +174,7 @@ pub fn initialize_order(
 
     ctx.accounts.order.init(
         ctx.bumps.order,
+        ctx.accounts.store.key(),
         &nonce,
         &ctx.accounts.market.key(),
         ctx.accounts.payer.key,
@@ -277,6 +280,7 @@ impl<'info> InitializeOrder<'info> {
                 position.try_init(
                     params.to_position_kind()?,
                     bump,
+                    self.store.key(),
                     self.payer.key,
                     &self.market.meta.market_token_mint,
                     output_token,
@@ -322,8 +326,9 @@ pub struct RemoveOrder<'info> {
     pub store: Account<'info, DataStore>,
     #[account(
         mut,
-        constraint = order.to_account_info().lamports() >= refund @ DataStoreError::LamportsNotEnough,
         close = authority,
+        constraint = order.fixed.store == store.key() @ DataStoreError::InvalidOrderToRemove,
+        constraint = order.to_account_info().lamports() >= refund @ DataStoreError::LamportsNotEnough,
         constraint = order.fixed.user == user.key() @ DataStoreError::UserMismatch,
         seeds = [
             Order::SEED,

@@ -77,6 +77,7 @@ pub fn initialize_withdrawal(
     )?;
     ctx.accounts.withdrawal.init(
         ctx.bumps.withdrawal,
+        ctx.accounts.store.key(),
         nonce,
         ctx.accounts.payer.key(),
         &ctx.accounts.market,
@@ -114,8 +115,9 @@ pub struct RemoveWithdrawal<'info> {
     pub only_controller: Account<'info, Roles>,
     #[account(
         mut,
-        constraint = withdrawal.to_account_info().lamports() >= refund @ DataStoreError::LamportsNotEnough,
         close = authority,
+        constraint = withdrawal.fixed.store == store.key() @ DataStoreError::InvalidWithdrawalToRemove,
+        constraint = withdrawal.to_account_info().lamports() >= refund @ DataStoreError::LamportsNotEnough,
         constraint = withdrawal.fixed.user == user.key() @ DataStoreError::UserMismatch,
         seeds = [
             Withdrawal::SEED,

@@ -36,6 +36,7 @@ impl Order {
     pub fn init(
         &mut self,
         bump: u8,
+        store: Pubkey,
         nonce: &NonceBytes,
         market: &Pubkey,
         user: &Pubkey,
@@ -48,7 +49,7 @@ impl Order {
         swap: SwapParams,
     ) -> Result<()> {
         self.fixed.init(
-            bump, nonce, market, user, position, params, tokens, senders, receivers,
+            bump, store, nonce, market, user, position, params, tokens, senders, receivers,
         )?;
         self.prices = TokensWithFeed::try_from_vec(tokens_with_feed)?;
         self.swap = swap;
@@ -66,6 +67,8 @@ impl Seed for Order {
 pub struct Fixed {
     /// The bump seed.
     pub bump: u8,
+    /// Store.
+    pub store: Pubkey,
     /// The nonce bytes for this order.
     pub nonce: [u8; 32],
     /// The slot that the order was last updated at.
@@ -93,6 +96,7 @@ impl Fixed {
     fn init(
         &mut self,
         bump: u8,
+        store: Pubkey,
         nonce: &NonceBytes,
         market: &Pubkey,
         user: &Pubkey,
@@ -104,6 +108,7 @@ impl Fixed {
     ) -> Result<()> {
         let clock = Clock::get()?;
         self.bump = bump;
+        self.store = store;
         self.nonce = *nonce;
         self.updated_at_slot = clock.slot;
         self.updated_at = clock.unix_timestamp;

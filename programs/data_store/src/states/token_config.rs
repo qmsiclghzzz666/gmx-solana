@@ -149,6 +149,7 @@ impl TokenConfigBuilder {
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub struct TokenConfigMap {
     pub(crate) bump: u8,
+    pub(crate) store: Pubkey,
     tokens: Vec<Pubkey>,
     configs: Vec<TokenConfig>,
 }
@@ -213,8 +214,9 @@ impl TokenConfigMap {
         Ok(())
     }
 
-    pub(crate) fn init(&mut self, bump: u8) {
+    pub(crate) fn init(&mut self, bump: u8, store: Pubkey) {
         self.bump = bump;
+        self.store = store;
         self.configs.clear();
         self.tokens.clear();
     }

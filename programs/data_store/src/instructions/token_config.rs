@@ -31,7 +31,9 @@ pub fn initialize_token_config_map(
     ctx: Context<InitializeTokenConfigMap>,
     _len: u16,
 ) -> Result<()> {
-    ctx.accounts.map.init(ctx.bumps.map);
+    ctx.accounts
+        .map
+        .init(ctx.bumps.map, ctx.accounts.store.key());
     Ok(())
 }
 
@@ -57,6 +59,7 @@ pub struct InsertTokenConfig<'info> {
     pub store: Account<'info, DataStore>,
     #[account(
         mut,
+        has_one = store,
         seeds = [TokenConfigMap::SEED, store.key().as_ref()],
         bump = map.bump,
         realloc = 8 + TokenConfigMap::init_space(map.length_after_insert(&token.key())),
@@ -104,6 +107,7 @@ pub struct InsertSyntheticTokenConfig<'info> {
     pub store: Account<'info, DataStore>,
     #[account(
         mut,
+        has_one = store,
         seeds = [TokenConfigMap::SEED, store.key().as_ref()],
         bump = map.bump,
         realloc = 8 + TokenConfigMap::init_space(map.length_after_insert(&token)),
@@ -149,6 +153,7 @@ pub struct ToggleTokenConfig<'info> {
     pub only_controller: Account<'info, Roles>,
     #[account(
         mut,
+        has_one = store,
         seeds = [TokenConfigMap::SEED, store.key().as_ref()],
         bump = map.bump,
     )]
@@ -185,6 +190,7 @@ pub struct SetExpectedProvider<'info> {
     pub only_controller: Account<'info, Roles>,
     #[account(
         mut,
+        has_one = store,
         seeds = [TokenConfigMap::SEED, store.key().as_ref()],
         bump = map.bump,
     )]
@@ -218,6 +224,7 @@ impl<'info> internal::Authentication<'info> for SetExpectedProvider<'info> {
 #[instruction(store: Pubkey)]
 pub struct GetTokenConfig<'info> {
     #[account(
+        has_one = store,
         seeds = [TokenConfigMap::SEED, store.as_ref()],
         bump = map.bump,
     )]
@@ -242,6 +249,7 @@ pub struct ExtendTokenConfigMap<'info> {
     pub store: Account<'info, DataStore>,
     #[account(
         mut,
+        has_one = store,
         seeds = [TokenConfigMap::SEED, store.key().as_ref()],
         bump = map.bump,
         realloc = 8 + TokenConfigMap::init_space(map.as_map().len() + len as usize),
@@ -282,6 +290,7 @@ pub struct InsertTokenConfigAmount<'info> {
     pub only_controller: Account<'info, Roles>,
     #[account(
         mut,
+        has_one = store,
         seeds = [TokenConfigMap::SEED, store.key().as_ref()],
         bump = map.bump,
     )]

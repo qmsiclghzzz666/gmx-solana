@@ -17,13 +17,16 @@ pub struct ExecuteWithdrawal<'info> {
     pub store: Account<'info, DataStore>,
     pub only_order_keeper: Account<'info, Roles>,
     #[account(
+        has_one = store,
         seeds = [Config::SEED, store.key().as_ref()],
         bump = config.bump,
     )]
     config: Account<'info, Config>,
+    #[account(has_one = store)]
     pub oracle: Account<'info, Oracle>,
     #[account(
         mut,
+        constraint = withdrawal.fixed.store == store.key(),
         constraint = withdrawal.fixed.market == market.key(),
         constraint = withdrawal.fixed.tokens.market_token == market_token_mint.key(),
         constraint = withdrawal.fixed.receivers.final_long_token_receiver == final_long_token_receiver.key(),

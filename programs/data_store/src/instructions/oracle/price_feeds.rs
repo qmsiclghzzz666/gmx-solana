@@ -19,6 +19,7 @@ pub struct SetPricesFromPriceFeed<'info> {
     config: Account<'info, Config>,
     #[account(
         mut,
+        has_one = store,
         seeds = [Oracle::SEED, store.key().as_ref(), &[oracle.index]],
         bump = oracle.bump,
     )]
@@ -26,6 +27,7 @@ pub struct SetPricesFromPriceFeed<'info> {
     #[account(
         seeds = [TokenConfigMap::SEED, store.key().as_ref()],
         bump = token_config_map.bump,
+        has_one = store,
     )]
     pub token_config_map: Account<'info, TokenConfigMap>,
     pub price_provider: Interface<'info, PriceProvider>,
