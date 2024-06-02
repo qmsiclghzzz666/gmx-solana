@@ -1,7 +1,6 @@
 import { PublicKey } from "@solana/web3.js";
 import { DATA_STORE_ID } from "../program";
 import { utils } from "@coral-xyz/anchor";
-import { keyToSeed } from "../utils/seed";
 
 const encodeUtf8 = utils.bytes.utf8.encode;
 
@@ -23,7 +22,7 @@ export const findTokenConfigMapPDA = (store: PublicKey) => PublicKey.findProgram
 export const findMarketPDA = (store: PublicKey, token: PublicKey) => PublicKey.findProgramAddressSync([
     encodeUtf8("market"),
     store.toBytes(),
-    keyToSeed(token.toBase58()),
+    token.toBytes(),
 ], DATA_STORE_ID);
 
 export const findMarketVaultPDA = (store: PublicKey, tokenMint: PublicKey, marketTokenMint?: PublicKey) => PublicKey.findProgramAddressSync([

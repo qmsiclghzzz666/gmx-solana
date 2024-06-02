@@ -9,14 +9,13 @@ use gmx_core::{
     },
     ClockKind, PoolKind,
 };
-use gmx_solana_utils::to_seed;
 
 use crate::{constants, utils::internal::TransferUtils, DataStoreError};
 
 use super::{
     common::map::{pools::Pools, DynamicMapStore},
     position::{Position, PositionOps},
-    Data, DataStore, InitSpace, Seed,
+    DataStore, InitSpace, Seed,
 };
 
 /// Market.
@@ -131,27 +130,6 @@ impl Market {
         self.pools.get_mut_with(kind, |pool| pool.map(f))
     }
 
-    /// Get the expected key.
-    pub fn expected_key(&self) -> String {
-        Self::create_key(&self.meta.market_token_mint)
-    }
-
-    /// Get the expected key seed.
-    pub fn expected_key_seed(&self) -> [u8; 32] {
-        to_seed(&self.expected_key())
-    }
-
-    /// Create key from tokens.
-    pub fn create_key(market_token: &Pubkey) -> String {
-        market_token.to_string()
-    }
-
-    /// Create key seed from tokens.
-    pub fn create_key_seed(market_token: &Pubkey) -> [u8; 32] {
-        let key = Self::create_key(market_token);
-        to_seed(&key)
-    }
-
     pub(crate) fn as_market<'a, 'info>(
         &'a mut self,
         mint: &'a mut Account<'info, Mint>,
@@ -177,15 +155,6 @@ impl Bump for Market {
 
 impl Seed for Market {
     const SEED: &'static [u8] = b"market";
-}
-
-impl Data for Market {
-    fn verify(&self, key: &str) -> Result<()> {
-        // FIXME: is there a better way to verify the key?
-        let expected = self.expected_key();
-        require_eq!(key, &expected, crate::DataStoreError::InvalidKey);
-        Ok(())
-    }
 }
 
 /// A pool for market.

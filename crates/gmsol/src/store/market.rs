@@ -9,7 +9,6 @@ use data_store::{
     accounts, constants, instruction,
     states::{Market, Seed},
 };
-use gmx_solana_utils::to_seed;
 
 use super::roles::find_roles_address;
 
@@ -48,7 +47,7 @@ pub fn find_market_token_address(
 /// Find PDA for [`Market`] account.
 pub fn find_market_address(store: &Pubkey, token: &Pubkey) -> (Pubkey, u8) {
     Pubkey::find_program_address(
-        &[Market::SEED, store.as_ref(), &to_seed(&token.to_string())],
+        &[Market::SEED, store.as_ref(), token.as_ref()],
         &data_store::id(),
     )
 }

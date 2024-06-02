@@ -53,7 +53,7 @@ pub struct InitializeMarket<'info> {
         seeds = [
             Market::SEED,
             store.key().as_ref(),
-            &Market::create_key_seed(&market_token),
+            market_token.as_ref(),
         ],
         bump,
     )]
@@ -94,7 +94,7 @@ pub struct RemoveMarket<'info> {
     store: Account<'info, DataStore>,
     #[account(
         mut,
-        seeds = [Market::SEED, store.key().as_ref(), &market.expected_key_seed()],
+        seeds = [Market::SEED, store.key().as_ref(), market.meta.market_token_mint.as_ref()],
         bump = market.bump,
         close = authority,
     )]
@@ -145,7 +145,7 @@ pub struct ApplyDeltaToMarketPool<'info> {
     pub only_controller: Account<'info, Roles>,
     #[account(
         mut,
-        seeds = [Market::SEED, store.key().as_ref(), &market.expected_key_seed()],
+        seeds = [Market::SEED, store.key().as_ref(), market.meta.market_token_mint.as_ref()],
         bump = market.bump,
     )]
     pub(crate) market: Account<'info, Market>,
