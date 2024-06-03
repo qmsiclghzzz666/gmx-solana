@@ -22,10 +22,8 @@ impl<'a> ControllerSeeds<'a> {
 
     /// Create a controller seeds with only store address.
     pub fn find_with_address(store: &'a Pubkey) -> (Self, Pubkey) {
-        let (address, bump) = Pubkey::find_program_address(
-            &[&constants::CONTROLLER_SEED, store.as_ref()],
-            &crate::ID,
-        );
+        let (address, bump) =
+            Pubkey::find_program_address(&[constants::CONTROLLER_SEED, store.as_ref()], &crate::ID);
         (Self::new(store, bump), address)
     }
 
@@ -37,7 +35,7 @@ impl<'a> ControllerSeeds<'a> {
     /// Convert to seeds slice.
     pub fn as_seeds(&self) -> [&[u8]; 3] {
         [
-            &constants::CONTROLLER_SEED,
+            constants::CONTROLLER_SEED,
             self.store.as_ref(),
             &self.bump_bytes,
         ]

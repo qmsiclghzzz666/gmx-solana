@@ -104,10 +104,10 @@ where
     }
 
     /// Get the value associated to the key.
-    pub fn get<Q: ?Sized>(&self, key: &Q) -> Option<&V::Value>
+    pub fn get<Q>(&self, key: &Q) -> Option<&V::Value>
     where
         K::Value: Borrow<Q>,
-        Q: Ord,
+        Q: ?Sized + Ord,
     {
         let index = self.keys.binary_search(key).ok()?;
         self.values.get(index)
@@ -124,10 +124,10 @@ where
     }
 
     /// Get a mutable reference of the value associated to the key.
-    pub fn get_mut<Q: ?Sized>(&mut self, key: &Q) -> Option<&mut V::Value>
+    pub fn get_mut<Q>(&mut self, key: &Q) -> Option<&mut V::Value>
     where
         K::Value: Borrow<Q>,
-        Q: Ord,
+        Q: ?Sized + Ord,
         V: StoreMut,
     {
         let index = self.keys.binary_search(key).ok()?;
@@ -178,10 +178,10 @@ where
     }
 
     /// Remove the key-value pair associated to the `key`, returning it if it exists.
-    pub fn remove<Q: ?Sized>(&mut self, key: &Q) -> Option<(K::Value, V::Value)>
+    pub fn remove<Q>(&mut self, key: &Q) -> Option<(K::Value, V::Value)>
     where
         K::Value: Borrow<Q>,
-        Q: Ord,
+        Q: ?Sized + Ord,
     {
         match self.keys.binary_search(key) {
             Ok(found) => {
