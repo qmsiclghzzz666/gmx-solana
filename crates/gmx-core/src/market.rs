@@ -965,6 +965,50 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
             Ok(())
         }
     }
+
+    /// Expected min token balance excluding collateral amount.
+    fn expected_min_token_balance_excluding_collateral_amount(
+        &self,
+        is_long_token: bool,
+    ) -> crate::Result<Self::Num> {
+        // Primary Pool Amount
+        let mut balance = self.primary_pool()?.amount(is_long_token)?;
+
+        // Swap Impact Pool Amount
+        balance = balance
+            .checked_add(&self.swap_impact_pool()?.amount(is_long_token)?)
+            .ok_or(crate::Error::Computation(
+                "overflow adding swap impact pool amount",
+            ))?;
+
+        // Claimable Fee Pool Amount
+        balance = balance
+            .checked_add(&self.claimable_fee_pool()?.amount(is_long_token)?)
+            .ok_or(crate::Error::Computation(
+                "overflow adding claimable fee amount",
+            ))?;
+
+        // TODO: Claimable UI Fee Amount.
+        // TODO: Affiliate  Reward Amount.
+        Ok(balance)
+    }
+
+    /// Validate token balance of the market.
+    fn validate_token_balance_for_one_side(
+        &self,
+        balance: &Self::Num,
+        is_long_token: bool,
+    ) -> crate::Result<()> {
+        if *balance < self.expected_min_token_balance_excluding_collateral_amount(is_long_token)? {
+            return Err(crate::Error::InvalidTokenBalance(
+                "Less than expected min token balance excluding collateral amount",
+            ));
+        }
+
+        // TODO: validate collateral amount.
+
+        Ok(())
+    }
 }
 
 impl<const DECIMALS: u8, M: Market<DECIMALS>> MarketExt<DECIMALS> for M {}

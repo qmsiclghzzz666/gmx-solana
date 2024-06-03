@@ -91,6 +91,9 @@ pub enum Error {
     /// Max open interest exceeded.
     #[error("max open interest exceeded")]
     MaxOpenInterestExceeded,
+    /// Invalid token balance.
+    #[error("invalid token balance: {0}")]
+    InvalidTokenBalance(&'static str),
 }
 
 impl Error {
