@@ -7,7 +7,7 @@ import { BTC_TOKEN_MINT, SOL_TOKEN_MINT } from "./token";
 import { IxWithOutput, makeInvoke } from "./invoke";
 import { DataStoreProgram, PriceProvider, findConfigPDA, findMarketPDA, findMarketVaultPDA, toBN } from "gmsol";
 import { PYTH_ID } from "./external";
-import { findKey, first, toInteger } from "lodash";
+import { findKey, first, last, toInteger } from "lodash";
 import { findPythPriceFeedPDA } from "gmsol";
 import { PriceServiceConnection } from "@pythnetwork/price-service-client";
 import { PythSolanaReceiver } from "@pythnetwork/pyth-solana-receiver";
@@ -418,6 +418,8 @@ export const makeExecuteWithdrawalInstruction = async ({
         finalShortTokenReceiver,
         finalLongTokenVault: createMarketVaultPDA(store, finalLongTokenMint)[0],
         finalShortTokenVault: createMarketVaultPDA(store, finalShortTokenMint)[0],
+        finalLongMarket: createMarketPDA(store, last(longSwapPath) ?? marketTokenMint)[0],
+        finalShortMarket: createMarketPDA(store, last(shortSwapPath) ?? marketTokenMint)[0],
         priceProvider: options.priceProvider ?? PYTH_ID,
     }).remainingAccounts([...feedAccounts, ...swapPathMarkets, ...swapPathMints]).instruction();
 };

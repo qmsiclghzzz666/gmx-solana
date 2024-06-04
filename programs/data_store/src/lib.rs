@@ -432,7 +432,7 @@ pub mod data_store {
     #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
     pub fn execute_withdrawal<'info>(
         ctx: Context<'_, '_, 'info, 'info, ExecuteWithdrawal<'info>>,
-    ) -> Result<()> {
+    ) -> Result<(u64, u64)> {
         instructions::execute_withdrawal(ctx)
     }
 

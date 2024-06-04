@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token, TokenAccount};
 use data_store::{
-    cpi::accounts::RemoveWithdrawal,
+    cpi::accounts::{MarketTransferOut, RemoveWithdrawal},
     program::DataStore,
     states::{PriceProvider, Withdrawal},
     utils::{Authentication, WithOracle, WithOracleExt},
@@ -56,6 +56,12 @@ pub struct ExecuteWithdrawal<'info> {
     pub final_long_token_vault: Account<'info, TokenAccount>,
     #[account(mut)]
     pub final_short_token_vault: Account<'info, TokenAccount>,
+    /// CHECK: check by CPI.
+    #[account(mut)]
+    pub final_long_market: UncheckedAccount<'info>,
+    /// CHECK: check by CPI.
+    #[account(mut)]
+    pub final_short_market: UncheckedAccount<'info>,
 }
 
 /// Execute the withdrawal.
@@ -68,17 +74,31 @@ pub fn execute_withdrawal<'info>(
         .get_lamports()
         .checked_sub(execution_fee.min(super::MAX_WITHDRAWAL_EXECUTION_FEE))
         .ok_or(ExchangeError::NotEnoughExecutionFee)?;
-    ctx.accounts.with_oracle_prices(
+    let (final_long_amount, final_short_amount) = ctx.accounts.with_oracle_prices(
         withdrawal.dynamic.tokens_with_feed.tokens.clone(),
         ctx.remaining_accounts,
         |accounts, remaining_accounts| {
-            data_store::cpi::execute_withdrawal(
+            let res = data_store::cpi::execute_withdrawal(
                 accounts
                     .execute_withdrawal_ctx()
                     .with_remaining_accounts(remaining_accounts.to_vec()),
-            )
+            )?
+            .get();
+            Ok(res)
         },
     )?;
+    if final_long_amount != 0 {
+        data_store::cpi::market_transfer_out(
+            ctx.accounts.market_transfer_out_ctx(true),
+            final_long_amount,
+        )?;
+    }
+    if final_short_amount != 0 {
+        data_store::cpi::market_transfer_out(
+            ctx.accounts.market_transfer_out_ctx(false),
+            final_short_amount,
+        )?;
+    }
     data_store::cpi::remove_withdrawal(ctx.accounts.remove_withdrawal_ctx(), refund)?;
     Ok(())
 }
@@ -160,6 +180,39 @@ impl<'info> ExecuteWithdrawal<'info> {
                 final_short_token_vault: self.final_short_token_vault.to_account_info(),
                 final_long_token_receiver: self.final_long_token_receiver.to_account_info(),
                 final_short_token_receiver: self.final_short_token_receiver.to_account_info(),
+                token_program: self.token_program.to_account_info(),
+            },
+        )
+    }
+
+    fn market_transfer_out_ctx(
+        &self,
+        is_long: bool,
+    ) -> CpiContext<'_, '_, '_, 'info, MarketTransferOut<'info>> {
+        let (market, to, vault) = if is_long {
+            (
+                self.final_long_market.to_account_info(),
+                self.final_long_token_receiver.to_account_info(),
+                self.final_long_token_vault.to_account_info(),
+            )
+        } else {
+            (
+                self.final_short_market.to_account_info(),
+                self.final_short_token_receiver.to_account_info(),
+                self.final_short_token_vault.to_account_info(),
+            )
+        };
+
+        CpiContext::new(
+            self.data_store_program.to_account_info(),
+            MarketTransferOut {
+                authority: self.authority.to_account_info(),
+                store: self.store.to_account_info(),
+                // TODO: use controller PDA.
+                only_controller: self.only_order_keeper.to_account_info(),
+                market,
+                to,
+                vault,
                 token_program: self.token_program.to_account_info(),
             },
         )

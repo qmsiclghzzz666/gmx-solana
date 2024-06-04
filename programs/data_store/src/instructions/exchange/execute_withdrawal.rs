@@ -5,7 +5,7 @@ use gmx_core::MarketExt;
 use crate::{
     constants,
     states::{Config, DataStore, Market, Oracle, Roles, Seed, ValidateOracleTime, Withdrawal},
-    utils::internal::{self, TransferUtils},
+    utils::internal::{self},
     DataStoreError, GmxCoreError,
 };
 
@@ -90,11 +90,10 @@ pub struct ExecuteWithdrawal<'info> {
 /// Execute a withdrawal.
 pub fn execute_withdrawal<'info>(
     ctx: Context<'_, '_, 'info, 'info, ExecuteWithdrawal<'info>>,
-) -> Result<()> {
+) -> Result<(u64, u64)> {
     ctx.accounts.validate()?;
     ctx.accounts.pre_execute()?;
-    ctx.accounts.execute(ctx.remaining_accounts)?;
-    Ok(())
+    ctx.accounts.execute(ctx.remaining_accounts)
 }
 
 impl<'info> internal::Authentication<'info> for ExecuteWithdrawal<'info> {
@@ -146,7 +145,7 @@ impl<'info> ExecuteWithdrawal<'info> {
         Ok(())
     }
 
-    fn execute(&mut self, remaining_accounts: &'info [AccountInfo<'info>]) -> Result<()> {
+    fn execute(&mut self, remaining_accounts: &'info [AccountInfo<'info>]) -> Result<(u64, u64)> {
         let (long_amount, short_amount) = self.perform_withdrawal()?;
         let (final_long_amount, final_short_amount) =
             self.perform_swaps(remaining_accounts, long_amount, short_amount)?;
@@ -160,10 +159,8 @@ impl<'info> ExecuteWithdrawal<'info> {
             self.withdrawal.fixed.tokens.params.min_short_token_amount,
             DataStoreError::OutputAmountTooSmall
         );
-        self.transfer_out(true, final_long_amount)?;
-        self.transfer_out(false, final_short_amount)?;
         self.withdrawal.fixed.tokens.market_token_amount = 0;
-        Ok(())
+        Ok((final_long_amount, final_short_amount))
     }
 
     fn perform_withdrawal(&mut self) -> Result<(u64, u64)> {
@@ -241,24 +238,5 @@ impl<'info> ExecuteWithdrawal<'info> {
         // Call `reload` to make sure the state is up-to-date.
         self.market.reload()?;
         Ok(res)
-    }
-
-    fn transfer_out(&self, is_long_token: bool, amount: u64) -> Result<()> {
-        let (from, to) = if is_long_token {
-            (
-                &self.final_long_token_vault,
-                &self.final_long_token_receiver,
-            )
-        } else {
-            (
-                &self.final_short_token_vault,
-                &self.final_short_token_receiver,
-            )
-        };
-        TransferUtils::new(self.token_program.to_account_info(), &self.store, None).transfer_out(
-            from.to_account_info(),
-            to.to_account_info(),
-            amount,
-        )
     }
 }
