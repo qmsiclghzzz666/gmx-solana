@@ -20,7 +20,7 @@ use self::{
         common::{SwapParams, TokenRecord},
         deposit::TokenParams as DepositTokenParams,
         market::{MarketMeta, Pool},
-        order::OrderParams,
+        order::{OrderParams, TransferOut},
         token_config::{TokenConfig, TokenConfigBuilder},
         withdrawal::TokenParams as WithdrawalTokenParams,
         PriceProviderKind,
@@ -440,7 +440,7 @@ pub mod data_store {
     pub fn execute_order<'info>(
         ctx: Context<'_, '_, 'info, 'info, ExecuteOrder<'info>>,
         recent_timestamp: i64,
-    ) -> Result<bool> {
+    ) -> Result<(bool, Box<TransferOut>)> {
         instructions::execute_order(ctx, recent_timestamp)
     }
 

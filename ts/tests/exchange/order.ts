@@ -123,7 +123,7 @@ describe("exchange: order", () => {
                     executionFee: 5001,
                 }
             }, {
-                computeUnits: 400_000,
+                computeUnits: 800_000,
             });
             console.log(`order ${decreaseOrder} executed at ${signature}`);
         } catch (error) {

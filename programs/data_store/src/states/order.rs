@@ -219,3 +219,24 @@ pub enum OrderKind {
     /// Liquidation: allows liquidation of positions if the criteria for liquidation are met.
     Liquidation,
 }
+
+/// Transfer Out.
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
+pub struct TransferOut {
+    /// Final output token.
+    pub final_output_token: u64,
+    /// Final secondary output token.
+    pub final_secondary_output_token: u64,
+    /// Long token.
+    pub long_token: u64,
+    /// Short token.
+    pub short_token: u64,
+    /// Long token amount for claimable account of user.
+    pub long_token_for_claimable_account_of_user: u64,
+    /// Short token amount for cliamable account of user.
+    pub short_token_for_claimable_account_of_user: u64,
+    /// Long token amount for claimable account of holding.
+    pub long_token_for_claimable_account_of_holding: u64,
+    /// Short token amount for claimable account of holding.
+    pub short_token_for_claimable_account_of_holding: u64,
+}

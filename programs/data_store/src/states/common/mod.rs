@@ -49,4 +49,11 @@ impl SwapParams {
             self.short_token_swap_path.last()
         }
     }
+
+    /// Iterate over both swap paths, long path first then short path.
+    pub fn iter(&self) -> impl Iterator<Item = &Pubkey> {
+        self.long_token_swap_path
+            .iter()
+            .chain(self.short_token_swap_path.iter())
+    }
 }

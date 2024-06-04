@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use anchor_lang::{prelude::*, system_program};
 use anchor_spl::token::{Token, TokenAccount};
 use data_store::{
-    cpi::accounts::{GetMarketMeta, GetTokenConfig, InitializeOrder},
+    cpi::accounts::{GetMarketMeta, GetTokenConfig, InitializeOrder, MarketTransferIn},
     program::DataStore,
     states::{
         common::{SwapParams, TokenRecord},
@@ -52,6 +52,9 @@ pub struct CreateOrder<'info> {
     /// CHECK: check by CPI.
     #[account(mut)]
     pub initial_collateral_token_vault: Option<UncheckedAccount<'info>>,
+    /// CHECK: check by CPI.
+    #[account(mut)]
+    pub initial_market: Option<UncheckedAccount<'info>>,
     pub long_token_account: Box<Account<'info, TokenAccount>>,
     pub short_token_account: Box<Account<'info, TokenAccount>>,
     pub data_store_program: Program<'info, DataStore>,
@@ -67,6 +70,8 @@ pub fn create_order<'info>(
 ) -> Result<()> {
     let order = &params.order;
     let controller = ControllerSeeds::new(ctx.accounts.store.key, ctx.bumps.authority);
+
+    ctx.accounts.handle_tokens_in(order, &controller)?;
 
     let (tokens, swap) = match &order.kind {
         OrderKind::MarketIncrease => ctx.accounts.handle_tokens_for_increase_order(
@@ -132,6 +137,25 @@ pub struct CreateOrderParams {
 }
 
 impl<'info> CreateOrder<'info> {
+    fn handle_tokens_in(&self, params: &OrderParams, seeds: &ControllerSeeds) -> Result<()> {
+        match &params.kind {
+            OrderKind::MarketIncrease => {
+                if params.initial_collateral_delta_amount != 0 {
+                    data_store::cpi::market_transfer_in(
+                        self.market_transfer_in_ctx()?
+                            .with_signer(&[&seeds.as_seeds()]),
+                        params.initial_collateral_delta_amount,
+                    )?;
+                }
+            }
+            OrderKind::MarketSwap => {
+                unimplemented!();
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
     fn initialize_order_ctx(&self) -> CpiContext<'_, '_, '_, 'info, InitializeOrder<'info>> {
         CpiContext::new(
             self.data_store_program.to_account_info(),
@@ -175,6 +199,36 @@ impl<'info> CreateOrder<'info> {
                 to: self.order.to_account_info(),
             },
         )
+    }
+
+    fn market_transfer_in_ctx(
+        &self,
+    ) -> Result<CpiContext<'_, '_, '_, 'info, MarketTransferIn<'info>>> {
+        Ok(CpiContext::new(
+            self.data_store_program.to_account_info(),
+            MarketTransferIn {
+                authority: self.authority.to_account_info(),
+                store: self.store.to_account_info(),
+                only_controller: self.only_controller.to_account_info(),
+                from_authority: self.payer.to_account_info(),
+                market: self
+                    .initial_market
+                    .as_ref()
+                    .ok_or(error!(ExchangeError::InvalidArgument))?
+                    .to_account_info(),
+                from: self
+                    .initial_collateral_token_account
+                    .as_ref()
+                    .ok_or(error!(ExchangeError::InvalidArgument))?
+                    .to_account_info(),
+                vault: self
+                    .initial_collateral_token_vault
+                    .as_ref()
+                    .ok_or(error!(ExchangeError::InvalidArgument))?
+                    .to_account_info(),
+                token_program: self.token_program.to_account_info(),
+            },
+        ))
     }
 
     fn common_tokens(

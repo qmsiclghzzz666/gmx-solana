@@ -1,5 +1,5 @@
 use anchor_lang::{prelude::*, system_program};
-use anchor_spl::token::{Token, TokenAccount, Transfer};
+use anchor_spl::token::{Token, TokenAccount};
 
 use crate::{
     constants,
@@ -90,7 +90,6 @@ pub fn initialize_order(
     output_token: Pubkey,
     ui_fee_receiver: Pubkey,
 ) -> Result<()> {
-    ctx.accounts.handle_tokens_in(&params)?;
     let meta = ctx.accounts.market.meta();
     // Validate and create `Tokens`.
     let tokens = match &params.kind {
@@ -204,43 +203,6 @@ impl<'info> internal::Authentication<'info> for InitializeOrder<'info> {
 }
 
 impl<'info> InitializeOrder<'info> {
-    fn handle_tokens_in(&self, params: &OrderParams) -> Result<()> {
-        match &params.kind {
-            OrderKind::MarketIncrease => {
-                if params.initial_collateral_delta_amount != 0 {
-                    anchor_spl::token::transfer(
-                        CpiContext::new(
-                            self.token_program.to_account_info(),
-                            Transfer {
-                                from: self
-                                    .initial_collateral_token_account
-                                    .as_ref()
-                                    .ok_or(error!(
-                                        DataStoreError::MissingInitializeTokenAccountForOrder
-                                    ))?
-                                    .to_account_info(),
-                                to: self
-                                    .initial_collateral_token_vault
-                                    .as_ref()
-                                    .ok_or(error!(
-                                        DataStoreError::MissingInitializeTokenAccountForOrder
-                                    ))?
-                                    .to_account_info(),
-                                authority: self.payer.to_account_info(),
-                            },
-                        ),
-                        params.initial_collateral_delta_amount,
-                    )?;
-                }
-            }
-            OrderKind::MarketSwap => {
-                unimplemented!();
-            }
-            _ => {}
-        }
-        Ok(())
-    }
-
     fn initial_collateral_token_account(&self) -> Result<&Account<'info, TokenAccount>> {
         let account = self
             .initial_collateral_token_account

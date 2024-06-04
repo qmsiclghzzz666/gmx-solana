@@ -561,6 +561,8 @@ export const makeExecuteOrderInstruction = async ({
         secondaryOutputTokenAccount,
         finalOutputTokenVault: finalOutputTokenAccount ? createMarketVaultPDA(store, finalOutputToken)[0] : null,
         secondaryOutputTokenVault: secondaryOutputTokenAccount ? createMarketVaultPDA(store, secondaryOutputToken)[0] : null,
+        finalOutputMarket: finalOutputTokenAccount ? createMarketPDA(store, last(swapPath) ?? marketTokenMint)[0] : null,
+        secondaryOutputMarket: secondaryOutputTokenAccount ? createMarketPDA(store, marketTokenMint)[0] : null,
         longTokenAccount,
         shortTokenAccount,
         longTokenVault: findMarketVaultPDA(store, longTokenMint)[0],
