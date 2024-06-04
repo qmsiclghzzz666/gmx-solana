@@ -418,8 +418,6 @@ export const makeExecuteWithdrawalInstruction = async ({
         finalShortTokenReceiver,
         finalLongTokenVault: createMarketVaultPDA(store, finalLongTokenMint)[0],
         finalShortTokenVault: createMarketVaultPDA(store, finalShortTokenMint)[0],
-        finalLongMarket: createMarketPDA(store, last(longSwapPath) ?? marketTokenMint)[0],
-        finalShortMarket: createMarketPDA(store, last(shortSwapPath) ?? marketTokenMint)[0],
         priceProvider: options.priceProvider ?? PYTH_ID,
     }).remainingAccounts([...feedAccounts, ...swapPathMarkets, ...swapPathMints]).instruction();
 };

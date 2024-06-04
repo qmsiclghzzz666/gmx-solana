@@ -130,6 +130,7 @@ impl<'info> ValidateOracleTime for ExecuteWithdrawal<'info> {
 impl<'info> ExecuteWithdrawal<'info> {
     fn validate(&self) -> Result<()> {
         self.oracle.validate_time(self)?;
+        self.market.validate(&self.store.key())?;
         Ok(())
     }
 

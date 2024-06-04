@@ -56,12 +56,6 @@ pub struct ExecuteWithdrawal<'info> {
     pub final_long_token_vault: Account<'info, TokenAccount>,
     #[account(mut)]
     pub final_short_token_vault: Account<'info, TokenAccount>,
-    /// CHECK: check by CPI.
-    #[account(mut)]
-    pub final_long_market: UncheckedAccount<'info>,
-    /// CHECK: check by CPI.
-    #[account(mut)]
-    pub final_short_market: UncheckedAccount<'info>,
 }
 
 /// Execute the withdrawal.
@@ -74,31 +68,49 @@ pub fn execute_withdrawal<'info>(
         .get_lamports()
         .checked_sub(execution_fee.min(super::MAX_WITHDRAWAL_EXECUTION_FEE))
         .ok_or(ExchangeError::NotEnoughExecutionFee)?;
-    let (final_long_amount, final_short_amount) = ctx.accounts.with_oracle_prices(
+    ctx.accounts.with_oracle_prices(
         withdrawal.dynamic.tokens_with_feed.tokens.clone(),
         ctx.remaining_accounts,
         |accounts, remaining_accounts| {
-            let res = data_store::cpi::execute_withdrawal(
+            let (final_long_amount, final_short_amount) = data_store::cpi::execute_withdrawal(
                 accounts
                     .execute_withdrawal_ctx()
                     .with_remaining_accounts(remaining_accounts.to_vec()),
             )?
             .get();
-            Ok(res)
+
+            // Transfer out final tokens.
+            let [long_swap_path, short_swap_path, ..] = accounts
+                .withdrawal
+                .dynamic
+                .swap
+                .split_swap_paths(remaining_accounts)?;
+
+            if final_long_amount != 0 {
+                // Must have been validated during the execution.
+                let market = long_swap_path
+                    .last()
+                    .cloned()
+                    .unwrap_or_else(|| accounts.market.to_account_info());
+                data_store::cpi::market_transfer_out(
+                    accounts.market_transfer_out_ctx(true, market),
+                    final_long_amount,
+                )?;
+            }
+            if final_short_amount != 0 {
+                // Must have been validated during the execution.
+                let market = short_swap_path
+                    .last()
+                    .cloned()
+                    .unwrap_or_else(|| accounts.market.to_account_info());
+                data_store::cpi::market_transfer_out(
+                    accounts.market_transfer_out_ctx(false, market),
+                    final_short_amount,
+                )?;
+            }
+            Ok(())
         },
     )?;
-    if final_long_amount != 0 {
-        data_store::cpi::market_transfer_out(
-            ctx.accounts.market_transfer_out_ctx(true),
-            final_long_amount,
-        )?;
-    }
-    if final_short_amount != 0 {
-        data_store::cpi::market_transfer_out(
-            ctx.accounts.market_transfer_out_ctx(false),
-            final_short_amount,
-        )?;
-    }
     data_store::cpi::remove_withdrawal(ctx.accounts.remove_withdrawal_ctx(), refund)?;
     Ok(())
 }
@@ -188,16 +200,15 @@ impl<'info> ExecuteWithdrawal<'info> {
     fn market_transfer_out_ctx(
         &self,
         is_long: bool,
+        market: AccountInfo<'info>,
     ) -> CpiContext<'_, '_, '_, 'info, MarketTransferOut<'info>> {
-        let (market, to, vault) = if is_long {
+        let (to, vault) = if is_long {
             (
-                self.final_long_market.to_account_info(),
                 self.final_long_token_receiver.to_account_info(),
                 self.final_long_token_vault.to_account_info(),
             )
         } else {
             (
-                self.final_short_market.to_account_info(),
                 self.final_short_token_receiver.to_account_info(),
                 self.final_short_token_vault.to_account_info(),
             )

@@ -155,14 +155,6 @@ pub(crate) fn unchecked_swap_with_params<'info>(
     token_ins: (Option<Pubkey>, Option<Pubkey>),
     token_in_amounts: (u64, u64),
 ) -> Result<(u64, u64)> {
-    let long_len = params.long_token_swap_path.len();
-    let total_len = params.long_token_swap_path.len() + params.short_token_swap_path.len();
-    require_gte!(
-        remaining_accounts.len(),
-        total_len * 2,
-        ErrorCode::AccountNotEnoughKeys
-    );
-
     require!(
         (token_in_amounts.0 == 0) || token_ins.0.is_some(),
         DataStoreError::AmountNonZeroMissingToken
@@ -172,14 +164,8 @@ pub(crate) fn unchecked_swap_with_params<'info>(
         DataStoreError::AmountNonZeroMissingToken
     );
 
-    // Markets.
-    let long_swap_path = &remaining_accounts[0..long_len];
-    let short_swap_path = &remaining_accounts[long_len..total_len];
-
-    // Mints.
-    let remaining_accounts = &remaining_accounts[total_len..];
-    let long_swap_path_mints = &remaining_accounts[0..long_len];
-    let short_swap_path_mints = &remaining_accounts[long_len..total_len];
+    let [long_swap_path, short_swap_path, long_swap_path_mints, short_swap_path_mints] =
+        params.split_swap_paths(remaining_accounts)?;
 
     let long_token_out_amount = token_ins
         .0

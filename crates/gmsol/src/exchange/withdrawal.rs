@@ -530,16 +530,6 @@ where
                     &hint.final_short_token,
                 )
                 .0,
-                final_long_market: find_market_address(
-                    &self.store,
-                    hint.long_swap_tokens.last().unwrap_or(&hint.market_token),
-                )
-                .0,
-                final_short_market: find_market_address(
-                    &self.store,
-                    hint.short_swap_tokens.last().unwrap_or(&hint.market_token),
-                )
-                .0,
             })
             .args(instruction::ExecuteWithdrawal {
                 execution_fee: self.execution_fee,

@@ -56,4 +56,35 @@ impl SwapParams {
             .iter()
             .chain(self.short_token_swap_path.iter())
     }
+
+    /// Split swap paths from accounts.
+    ///
+    /// Return `[long_path_markets, short_path_markets, long_path_mints, short_path_mints]`.
+    pub fn split_swap_paths<'a, 'info>(
+        &self,
+        remaining_accounts: &'a [AccountInfo<'info>],
+    ) -> Result<[&'a [AccountInfo<'info>]; 4]> {
+        let long_len = self.long_token_swap_path.len();
+        let total_len = self.long_token_swap_path.len() + self.short_token_swap_path.len();
+
+        require_gte!(
+            remaining_accounts.len(),
+            total_len * 2,
+            ErrorCode::AccountNotEnoughKeys
+        );
+
+        let long_swap_path = &remaining_accounts[0..long_len];
+        let short_swap_path = &remaining_accounts[long_len..total_len];
+
+        let remaining_accounts = &remaining_accounts[total_len..];
+        let long_swap_path_mints = &remaining_accounts[0..long_len];
+        let short_swap_path_mints = &remaining_accounts[long_len..total_len];
+
+        Ok([
+            long_swap_path,
+            short_swap_path,
+            long_swap_path_mints,
+            short_swap_path_mints,
+        ])
+    }
 }
