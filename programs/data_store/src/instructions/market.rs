@@ -1,7 +1,9 @@
 use anchor_lang::prelude::*;
+use anchor_spl::token::{Token, TokenAccount};
 use gmx_core::{Pool as GmxCorePool, PoolKind};
 
 use crate::{
+    constants,
     states::{Action, DataStore, Market, MarketChangeEvent, MarketMeta, Pool, Roles, Seed},
     utils::internal,
     DataStoreError,
@@ -200,4 +202,138 @@ pub fn get_market_meta(ctx: Context<GetMarketMeta>) -> Result<MarketMeta> {
 #[derive(Accounts)]
 pub struct GetMarketMeta<'info> {
     pub(crate) market: Account<'info, Market>,
+}
+
+#[derive(Accounts)]
+pub struct MarketTransferIn<'info> {
+    pub authority: Signer<'info>,
+    pub store: Account<'info, DataStore>,
+    #[account(
+        seeds = [Roles::SEED, store.key().as_ref(), authority.key().as_ref()],
+        bump = only_controller.bump,
+    )]
+    pub only_controller: Account<'info, Roles>,
+    pub from_authority: Signer<'info>,
+    #[account(mut, has_one = store)]
+    pub market: Account<'info, Market>,
+    #[account(mut, token::mint = vault.mint, constraint = from.key() != vault.key())]
+    pub from: Account<'info, TokenAccount>,
+    #[account(
+        mut,
+        token::authority = store,
+        seeds = [
+            constants::MARKET_VAULT_SEED,
+            store.key().as_ref(),
+            vault.mint.as_ref(),
+            &[],
+        ],
+        bump,
+    )]
+    pub vault: Account<'info, TokenAccount>,
+    pub token_program: Program<'info, Token>,
+}
+
+/// Transfer some tokens into the market.
+pub fn market_transfer_in(ctx: Context<MarketTransferIn>, amount: u64) -> Result<()> {
+    use anchor_spl::token;
+
+    if amount != 0 {
+        token::transfer(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                token::Transfer {
+                    from: ctx.accounts.from.to_account_info(),
+                    to: ctx.accounts.vault.to_account_info(),
+                    authority: ctx.accounts.from_authority.to_account_info(),
+                },
+            ),
+            amount,
+        )?;
+        let token = &ctx.accounts.vault.mint;
+        ctx.accounts
+            .market
+            .record_transferred_in_by_token(token, amount)?;
+    }
+
+    Ok(())
+}
+
+impl<'info> internal::Authentication<'info> for MarketTransferIn<'info> {
+    fn authority(&self) -> &Signer<'info> {
+        &self.authority
+    }
+
+    fn store(&self) -> &Account<'info, DataStore> {
+        &self.store
+    }
+
+    fn roles(&self) -> &Account<'info, Roles> {
+        &self.only_controller
+    }
+}
+
+#[derive(Accounts)]
+pub struct MarketTransferOut<'info> {
+    pub authority: Signer<'info>,
+    pub store: Account<'info, DataStore>,
+    #[account(
+        seeds = [Roles::SEED, store.key().as_ref(), authority.key().as_ref()],
+        bump = only_controller.bump,
+    )]
+    pub only_controller: Account<'info, Roles>,
+    #[account(mut, has_one = store)]
+    pub market: Account<'info, Market>,
+    #[account(mut, token::mint = vault.mint, constraint = to.key() != vault.key())]
+    pub to: Account<'info, TokenAccount>,
+    #[account(
+        mut,
+        token::authority = store,
+        seeds = [
+            constants::MARKET_VAULT_SEED,
+            store.key().as_ref(),
+            vault.mint.as_ref(),
+            &[],
+        ],
+        bump,
+    )]
+    pub vault: Account<'info, TokenAccount>,
+    pub token_program: Program<'info, Token>,
+}
+
+/// Transfer some tokens out of the market.
+pub fn market_transfer_out(ctx: Context<MarketTransferOut>, amount: u64) -> Result<()> {
+    use crate::utils::internal::TransferUtils;
+
+    if amount != 0 {
+        TransferUtils::new(
+            ctx.accounts.token_program.to_account_info(),
+            &ctx.accounts.store,
+            None,
+        )
+        .transfer_out(
+            ctx.accounts.vault.to_account_info(),
+            ctx.accounts.to.to_account_info(),
+            amount,
+        )?;
+        let token = &ctx.accounts.vault.mint;
+        ctx.accounts
+            .market
+            .record_transferred_out_by_token(token, amount)?;
+    }
+
+    Ok(())
+}
+
+impl<'info> internal::Authentication<'info> for MarketTransferOut<'info> {
+    fn authority(&self) -> &Signer<'info> {
+        &self.authority
+    }
+
+    fn store(&self) -> &Account<'info, DataStore> {
+        &self.store
+    }
+
+    fn roles(&self) -> &Account<'info, Roles> {
+        &self.only_controller
+    }
 }

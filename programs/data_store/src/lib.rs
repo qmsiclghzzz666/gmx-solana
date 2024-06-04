@@ -260,6 +260,16 @@ pub mod data_store {
         instructions::get_market_meta(ctx)
     }
 
+    #[access_control(internal::Authenticate::only_controller(&ctx))]
+    pub fn market_transfer_in(ctx: Context<MarketTransferIn>, amount: u64) -> Result<()> {
+        instructions::market_transfer_in(ctx, amount)
+    }
+
+    #[access_control(internal::Authenticate::only_controller(&ctx))]
+    pub fn market_transfer_out(ctx: Context<MarketTransferOut>, amount: u64) -> Result<()> {
+        instructions::market_transfer_out(ctx, amount)
+    }
+
     // Token.
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn initialize_market_token(
