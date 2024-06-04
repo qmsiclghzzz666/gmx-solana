@@ -7,7 +7,6 @@ import { IxWithOutput, makeInvoke } from "../utils/invoke";
 import { DataStoreProgram, ExchangeProgram } from "../program";
 import { BN } from "@coral-xyz/anchor";
 import { getPositionSide } from "./utils";
-import { first } from "lodash";
 
 export type MakeCreateDepositParams = {
     store: PublicKey,
@@ -280,7 +279,6 @@ export const makeCreateDecreaseOrderInstruction = async (
             secondaryOutputTokenAccount,
             initialCollateralTokenAccount: null,
             initialCollateralTokenVault: null,
-            initialMarket: null,
             longTokenAccount,
             shortTokenAccount,
         }).remainingAccounts(swapPath.map(mint => {
@@ -379,18 +377,17 @@ export const makeCreateIncreaseOrderInstruction = async (
             position: findPositionPDA(store, payer, marketToken, collateralToken, isLong)[0],
             tokenConfigMap: findTokenConfigMapPDA(store)[0],
             market: findMarketPDA(store, marketToken)[0],
-            initialMarket: findMarketPDA(store, first(swapPath) ?? marketToken)[0],
             initialCollateralTokenAccount: initialCollateralTokenAccount,
             initialCollateralTokenVault: findMarketVaultPDA(store, initialCollateralToken)[0],
             finalOutputTokenAccount: null,
             secondaryOutputTokenAccount: null,
             longTokenAccount,
             shortTokenAccount,
-        }).remainingAccounts(swapPath.map(mint => {
+        }).remainingAccounts(swapPath.map((mint, idx) => {
             return {
                 pubkey: findMarketPDA(store, mint)[0],
                 isSigner: false,
-                isWritable: false,
+                isWritable: idx == 0,
             }
         })).instruction();
     return [instruction, order] as IxWithOutput<PublicKey>;

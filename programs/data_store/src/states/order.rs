@@ -197,6 +197,11 @@ impl OrderParams {
             }
         }
     }
+
+    /// Need to transfer in.
+    pub fn need_to_transfer_in(&self) -> bool {
+        matches!(self.kind, OrderKind::MarketIncrease | OrderKind::MarketSwap)
+    }
 }
 
 /// Order Kind.

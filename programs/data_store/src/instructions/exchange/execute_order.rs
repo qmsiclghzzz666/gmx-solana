@@ -176,6 +176,7 @@ pub fn execute_order<'info>(
     _recent_timestamp: i64,
 ) -> Result<(bool, Box<TransferOut>)> {
     ctx.accounts.validate_time()?;
+    ctx.accounts.market.validate(&ctx.accounts.store.key())?;
     // TODO: validate non-empty order.
     // TODO: validate order trigger price.
     ctx.accounts.pre_execute()?;

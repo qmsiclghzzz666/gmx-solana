@@ -253,9 +253,7 @@ where
     /// Get initial collateral token account and vault.
     ///
     /// Returns `(initial_collateral_token_account, initial_collateral_token_vault)`.
-    async fn initial_collateral_accounts(
-        &mut self,
-    ) -> crate::Result<Option<(Pubkey, (Pubkey, Pubkey))>> {
+    async fn initial_collateral_accounts(&mut self) -> crate::Result<Option<(Pubkey, Pubkey)>> {
         match &self.params.kind {
             OrderKind::MarketIncrease | OrderKind::MarketSwap => {
                 if self.initial_token.is_empty() {
@@ -273,14 +271,7 @@ where
                 };
                 Ok(Some((
                     account,
-                    (
-                        find_market_vault_address(&self.store, &token).0,
-                        find_market_address(
-                            &self.store,
-                            self.swap_path.first().unwrap_or(&self.market_token),
-                        )
-                        .0,
-                    ),
+                    find_market_vault_address(&self.store, &token).0,
                 )))
             }
             OrderKind::MarketDecrease | OrderKind::Liquidation => Ok(None),
@@ -359,11 +350,11 @@ where
         let nonce = self.nonce.unwrap_or_else(generate_nonce);
         let payer = &self.program.payer();
         let order = find_order_address(&self.store, payer, &nonce).0;
-        let (initial_collateral_token_account, other) =
+        let (initial_collateral_token_account, initial_collateral_token_vault) =
             self.initial_collateral_accounts().await?.unzip();
-        let (initial_collateral_token_vault, initial_market) = other.unzip();
         let (output_token, position) = self.output_token_and_position().await?;
         let (long_token_account, short_token_account) = self.collateral_token_accounts().await?;
+        let need_to_transfer_in = self.params.need_to_transfer_in();
         let builder = self
             .program
             .request()
@@ -377,7 +368,6 @@ where
                 token_config_map: find_token_config_map(&self.store).0,
                 market: self.market(),
                 initial_collateral_token_account,
-                initial_market,
                 final_output_token_account: self.final_output_token_account().await?,
                 secondary_output_token_account: self.get_secondary_output_token_account().await?,
                 initial_collateral_token_vault,
@@ -404,10 +394,11 @@ where
             .accounts(
                 self.swap_path
                     .iter()
-                    .map(|mint| AccountMeta {
+                    .enumerate()
+                    .map(|(idx, mint)| AccountMeta {
                         pubkey: find_market_address(&self.store, mint).0,
                         is_signer: false,
-                        is_writable: false,
+                        is_writable: need_to_transfer_in && idx == 0,
                     })
                     .collect::<Vec<_>>(),
             );
@@ -441,8 +432,6 @@ pub struct ExecuteOrderHint {
     secondary_output_token: Pubkey,
     final_output_token_account: Option<Pubkey>,
     secondary_output_token_account: Option<Pubkey>,
-    final_output_market: Option<Pubkey>,
-    secondary_output_market: Option<Pubkey>,
     long_token_account: Pubkey,
     short_token_account: Pubkey,
     long_token_mint: Pubkey,
@@ -580,20 +569,6 @@ where
             secondary_output_token: order.fixed.tokens.secondary_output_token,
             final_output_token_account,
             secondary_output_token_account,
-            final_output_market: final_output_token_account.map(|_| {
-                find_market_address(
-                    &order.fixed.store,
-                    swap.last_market_token(true).unwrap_or(&market_token),
-                )
-                .0
-            }),
-            secondary_output_market: secondary_output_token_account.map(|_| {
-                find_market_address(
-                    &order.fixed.store,
-                    swap.last_market_token(false).unwrap_or(&market_token),
-                )
-                .0
-            }),
             long_token_account: order.fixed.receivers.long_token_account,
             short_token_account: order.fixed.receivers.short_token_account,
             long_token_mint: market.meta().long_token_mint,
@@ -693,8 +668,6 @@ where
                 order: self.order,
                 position: hint.position,
                 user: hint.user,
-                final_output_market: hint.final_output_market,
-                secondary_output_market: hint.secondary_output_market,
                 final_output_token_vault: hint
                     .final_output_token_account
                     .as_ref()

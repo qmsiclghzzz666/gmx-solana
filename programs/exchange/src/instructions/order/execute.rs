@@ -38,12 +38,6 @@ pub struct ExecuteOrder<'info> {
     pub user: UncheckedAccount<'info>,
     /// CHECK: check by CPI.
     #[account(mut)]
-    pub final_output_market: Option<UncheckedAccount<'info>>,
-    /// CHECK: check by CPI.
-    #[account(mut)]
-    pub secondary_output_market: Option<UncheckedAccount<'info>>,
-    /// CHECK: check by CPI.
-    #[account(mut)]
     pub final_output_token_vault: Option<UncheckedAccount<'info>>,
     /// CHECK: check by CPI.
     #[account(mut)]
@@ -92,21 +86,21 @@ pub fn execute_order<'info>(
         .get_lamports()
         .checked_sub(super::MAX_ORDER_EXECUTION_FEE.min(execution_fee))
         .ok_or(ExchangeError::NotEnoughExecutionFee)?;
-    let (should_remove_position, transfer_out) = ctx.accounts.with_oracle_prices(
+    let should_remove_position = ctx.accounts.with_oracle_prices(
         order.prices.tokens.clone(),
         ctx.remaining_accounts,
         |accounts, remaining_accounts| {
-            let res = data_store::cpi::execute_order(
+            let (should_remove_position, transfer_out) = data_store::cpi::execute_order(
                 accounts
                     .execute_order_ctx()
                     .with_remaining_accounts(remaining_accounts.to_vec()),
                 recent_timestamp,
             )?
             .get();
-            Ok(res)
+            accounts.process_transfer_out(&transfer_out, remaining_accounts)?;
+            Ok(should_remove_position)
         },
     )?;
-    ctx.accounts.process_transfer_out(&transfer_out)?;
     data_store::cpi::remove_order(ctx.accounts.remove_order_ctx(), refund)?;
     if should_remove_position {
         // Refund all lamports.
@@ -283,7 +277,14 @@ impl<'info> ExecuteOrder<'info> {
         Ok(())
     }
 
-    fn process_transfer_out(&self, transfer_out: &TransferOut) -> Result<()> {
+    fn process_transfer_out(
+        &self,
+        transfer_out: &TransferOut,
+        remaining_accounts: &[AccountInfo<'info>],
+    ) -> Result<()> {
+        let [long_swap_path, short_swap_path, ..] =
+            self.order.swap.split_swap_paths(remaining_accounts)?;
+
         let TransferOut {
             final_output_token,
             final_secondary_output_token,
@@ -296,10 +297,13 @@ impl<'info> ExecuteOrder<'info> {
         } = transfer_out;
 
         if *final_output_token != 0 {
+            // Must have been validated during the execution.
+            let market = long_swap_path
+                .last()
+                .cloned()
+                .unwrap_or_else(|| self.market.to_account_info());
             self.market_transfer_out(
-                self.final_output_market
-                    .as_ref()
-                    .map(|a| a.to_account_info()),
+                Some(market),
                 self.final_output_token_vault
                     .as_ref()
                     .map(|a| a.to_account_info()),
@@ -311,10 +315,13 @@ impl<'info> ExecuteOrder<'info> {
         }
 
         if *final_secondary_output_token != 0 {
+            // Must have been validated during the execution.
+            let market = short_swap_path
+                .last()
+                .cloned()
+                .unwrap_or_else(|| self.market.to_account_info());
             self.market_transfer_out(
-                self.secondary_output_market
-                    .as_ref()
-                    .map(|a| a.to_account_info()),
+                Some(market),
                 self.secondary_output_token_vault
                     .as_ref()
                     .map(|a| a.to_account_info()),

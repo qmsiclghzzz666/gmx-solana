@@ -52,9 +52,6 @@ pub struct CreateOrder<'info> {
     /// CHECK: check by CPI.
     #[account(mut)]
     pub initial_collateral_token_vault: Option<UncheckedAccount<'info>>,
-    /// CHECK: check by CPI.
-    #[account(mut)]
-    pub initial_market: Option<UncheckedAccount<'info>>,
     pub long_token_account: Box<Account<'info, TokenAccount>>,
     pub short_token_account: Box<Account<'info, TokenAccount>>,
     pub data_store_program: Program<'info, DataStore>,
@@ -71,25 +68,35 @@ pub fn create_order<'info>(
     let order = &params.order;
     let controller = ControllerSeeds::new(ctx.accounts.store.key, ctx.bumps.authority);
 
-    ctx.accounts.handle_tokens_in(order, &controller)?;
-
-    let (tokens, swap) = match &order.kind {
+    let (tokens, swap, need_to_transfer_in) = match &order.kind {
         OrderKind::MarketIncrease => ctx.accounts.handle_tokens_for_increase_order(
             &params.output_token,
             ctx.remaining_accounts,
             params.swap_length as usize,
         )?,
         OrderKind::MarketDecrease | OrderKind::Liquidation => {
-            ctx.accounts.handle_tokens_for_decrease_order(
+            let (tokens, swap) = ctx.accounts.handle_tokens_for_decrease_order(
                 &params.output_token,
                 ctx.remaining_accounts,
                 params.swap_length as usize,
-            )?
+            )?;
+            (tokens, swap, None)
         }
         _ => {
             return err!(ExchangeError::UnsupportedOrderKind);
         }
     };
+
+    if let Some(market) = need_to_transfer_in {
+        if order.initial_collateral_delta_amount != 0 {
+            data_store::cpi::market_transfer_in(
+                ctx.accounts
+                    .market_transfer_in_ctx(market)?
+                    .with_signer(&[&controller.as_seeds()]),
+                order.initial_collateral_delta_amount,
+            )?;
+        }
+    }
 
     data_store::cpi::initialize_order(
         ctx.accounts
@@ -137,25 +144,6 @@ pub struct CreateOrderParams {
 }
 
 impl<'info> CreateOrder<'info> {
-    fn handle_tokens_in(&self, params: &OrderParams, seeds: &ControllerSeeds) -> Result<()> {
-        match &params.kind {
-            OrderKind::MarketIncrease => {
-                if params.initial_collateral_delta_amount != 0 {
-                    data_store::cpi::market_transfer_in(
-                        self.market_transfer_in_ctx()?
-                            .with_signer(&[&seeds.as_seeds()]),
-                        params.initial_collateral_delta_amount,
-                    )?;
-                }
-            }
-            OrderKind::MarketSwap => {
-                unimplemented!();
-            }
-            _ => {}
-        }
-        Ok(())
-    }
-
     fn initialize_order_ctx(&self) -> CpiContext<'_, '_, '_, 'info, InitializeOrder<'info>> {
         CpiContext::new(
             self.data_store_program.to_account_info(),
@@ -203,6 +191,7 @@ impl<'info> CreateOrder<'info> {
 
     fn market_transfer_in_ctx(
         &self,
+        market: AccountInfo<'info>,
     ) -> Result<CpiContext<'_, '_, '_, 'info, MarketTransferIn<'info>>> {
         Ok(CpiContext::new(
             self.data_store_program.to_account_info(),
@@ -211,11 +200,7 @@ impl<'info> CreateOrder<'info> {
                 store: self.store.to_account_info(),
                 only_controller: self.only_controller.to_account_info(),
                 from_authority: self.payer.to_account_info(),
-                market: self
-                    .initial_market
-                    .as_ref()
-                    .ok_or(error!(ExchangeError::InvalidArgument))?
-                    .to_account_info(),
+                market,
                 from: self
                     .initial_collateral_token_account
                     .as_ref()
@@ -274,7 +259,7 @@ impl<'info> CreateOrder<'info> {
         output_token: &Pubkey,
         remaining_accounts: &[AccountInfo<'info>],
         length: usize,
-    ) -> Result<(BTreeSet<Pubkey>, SwapParams)> {
+    ) -> Result<(BTreeSet<Pubkey>, SwapParams, Option<AccountInfo<'info>>)> {
         let mut tokens = self.common_tokens(output_token, true)?;
         require_gte!(
             remaining_accounts.len(),
@@ -294,12 +279,17 @@ impl<'info> CreateOrder<'info> {
             output_token,
             &mut tokens,
         )?;
+        let transfer_in_market = remaining_accounts
+            .first()
+            .cloned()
+            .unwrap_or_else(|| self.market.to_account_info());
         Ok((
             tokens,
             SwapParams {
                 long_token_swap_path: swap_path,
                 short_token_swap_path: vec![],
             },
+            Some(transfer_in_market),
         ))
     }
 
@@ -328,6 +318,7 @@ impl<'info> CreateOrder<'info> {
             &final_token,
             &mut tokens,
         )?;
+        // FIXME: allow swap for secondary output token.
         Ok((
             tokens,
             SwapParams {
