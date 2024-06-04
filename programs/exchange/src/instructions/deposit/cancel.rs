@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Token, TokenAccount};
 use data_store::{
-    cpi::accounts::RemoveDeposit,
+    cpi::accounts::{MarketTransferOut, RemoveDeposit},
     program::DataStore,
     states::Deposit,
     utils::{Authenticate, Authentication},
@@ -64,6 +64,27 @@ pub struct CancelDeposit<'info> {
 pub fn cancel_deposit(ctx: Context<CancelDeposit>, execution_fee: u64) -> Result<()> {
     // We will attach the controller seeds even it may not be provided.
     let controller = ControllerSeeds::find(ctx.accounts.store.key);
+
+    let deposit = &ctx.accounts.deposit;
+    let initial_long_token_amount = deposit.fixed.tokens.params.initial_long_token_amount;
+    if initial_long_token_amount != 0 {
+        data_store::cpi::market_transfer_out(
+            ctx.accounts
+                .market_transfer_out_ctx(true)?
+                .with_signer(&[&controller.as_seeds()]),
+            initial_long_token_amount,
+        )?;
+    }
+    let initial_short_token_amount = deposit.fixed.tokens.params.initial_short_token_amount;
+    if initial_short_token_amount != 0 {
+        data_store::cpi::market_transfer_out(
+            ctx.accounts
+                .market_transfer_out_ctx(false)?
+                .with_signer(&[&controller.as_seeds()]),
+            initial_short_token_amount,
+        )?;
+    }
+
     let refund = ctx
         .accounts
         .deposit
@@ -121,25 +142,59 @@ impl<'info> CancelDeposit<'info> {
                     .initial_short_token
                     .as_ref()
                     .map(|a| a.to_account_info()),
-                long_token_deposit_vault: self
-                    .long_token_deposit_vault
-                    .as_ref()
-                    .map(|a| a.to_account_info()),
-                short_token_deposit_vault: self
-                    .short_token_deposit_vault
-                    .as_ref()
-                    .map(|a| a.to_account_info()),
-                initial_long_market: self
-                    .initial_long_market
-                    .as_ref()
-                    .map(|a| a.to_account_info()),
-                initial_short_market: self
-                    .initial_short_market
-                    .as_ref()
-                    .map(|a| a.to_account_info()),
                 system_program: self.system_program.to_account_info(),
                 token_program: self.token_program.to_account_info(),
             },
         )
+    }
+
+    fn market_transfer_out_ctx(
+        &self,
+        is_long: bool,
+    ) -> Result<CpiContext<'_, '_, '_, 'info, MarketTransferOut<'info>>> {
+        let (market, to, vault) = if is_long {
+            (
+                self.initial_long_market
+                    .as_ref()
+                    .ok_or(error!(ExchangeError::InvalidArgument))?
+                    .to_account_info(),
+                self.initial_long_token
+                    .as_ref()
+                    .ok_or(error!(ExchangeError::InvalidArgument))?
+                    .to_account_info(),
+                self.long_token_deposit_vault
+                    .as_ref()
+                    .ok_or(error!(ExchangeError::InvalidArgument))?
+                    .to_account_info(),
+            )
+        } else {
+            (
+                self.initial_short_market
+                    .as_ref()
+                    .ok_or(error!(ExchangeError::InvalidArgument))?
+                    .to_account_info(),
+                self.initial_short_token
+                    .as_ref()
+                    .ok_or(error!(ExchangeError::InvalidArgument))?
+                    .to_account_info(),
+                self.short_token_deposit_vault
+                    .as_ref()
+                    .ok_or(error!(ExchangeError::InvalidArgument))?
+                    .to_account_info(),
+            )
+        };
+
+        Ok(CpiContext::new(
+            self.data_store_program.to_account_info(),
+            MarketTransferOut {
+                authority: self.authority.to_account_info(),
+                store: self.store.to_account_info(),
+                only_controller: self.only_controller.to_account_info(),
+                market,
+                to,
+                vault,
+                token_program: self.token_program.to_account_info(),
+            },
+        ))
     }
 }

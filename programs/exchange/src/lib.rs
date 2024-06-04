@@ -108,6 +108,8 @@ pub enum ExchangeError {
     MissingOraclePrice,
     #[msg("Amount overflow")]
     AmountOverflow,
+    #[msg("Invalid Argument")]
+    InvalidArgument,
     // Deposit.
     #[msg("Empty deposit amounts")]
     EmptyDepositAmounts,

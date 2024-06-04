@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use anchor_lang::{prelude::*, system_program};
 use anchor_spl::token::{Token, TokenAccount};
 use data_store::{
-    cpi::accounts::{GetMarketMeta, GetTokenConfig, InitializeDeposit},
+    cpi::accounts::{GetMarketMeta, GetTokenConfig, InitializeDeposit, MarketTransferIn},
     program::DataStore,
     states::{
         common::{SwapParams, TokenRecord},
@@ -90,6 +90,26 @@ pub fn create_deposit<'info>(
         ExchangeError::EmptyDepositAmounts
     );
 
+    let controller = ControllerSeeds::new(ctx.accounts.store.key, ctx.bumps.authority);
+
+    if params.initial_long_token_amount != 0 {
+        cpi::market_transfer_in(
+            ctx.accounts
+                .market_transfer_in_ctx(true)?
+                .with_signer(&[&controller.as_seeds()]),
+            params.initial_long_token_amount,
+        )?;
+    }
+
+    if params.initial_short_token_amount != 0 {
+        cpi::market_transfer_in(
+            ctx.accounts
+                .market_transfer_in_ctx(false)?
+                .with_signer(&[&controller.as_seeds()]),
+            params.initial_short_token_amount,
+        )?;
+    }
+
     let mut tokens = BTreeSet::default();
     let initial_long_token_mint = ctx
         .accounts
@@ -153,7 +173,6 @@ pub fn create_deposit<'info>(
             TokenRecord::from_config(token, &config)
         })
         .collect::<Result<Vec<_>>>()?;
-    let controller = ControllerSeeds::new(ctx.accounts.store.key, ctx.bumps.authority);
     cpi::initialize_deposit(
         ctx.accounts
             .initialize_deposit_ctx()
@@ -226,24 +245,8 @@ impl<'info> CreateDeposit<'info> {
                     .as_ref()
                     .map(|a| a.to_account_info()),
                 market: self.market.to_account_info(),
-                initial_long_market: self
-                    .initial_long_market
-                    .as_ref()
-                    .map(|a| a.to_account_info()),
-                initial_short_market: self
-                    .initial_short_market
-                    .as_ref()
-                    .map(|a| a.to_account_info()),
                 receiver: self.receiver.to_account_info(),
                 system_program: self.system_program.to_account_info(),
-                long_token_deposit_vault: self
-                    .initial_long_token_vault
-                    .as_ref()
-                    .map(|a| a.to_account_info()),
-                short_token_deposit_vault: self
-                    .initial_short_token_vault
-                    .as_ref()
-                    .map(|a| a.to_account_info()),
                 token_program: self.token_program.to_account_info(),
             },
         )
@@ -257,5 +260,55 @@ impl<'info> CreateDeposit<'info> {
                 to: self.deposit.to_account_info(),
             },
         )
+    }
+
+    fn market_transfer_in_ctx(
+        &self,
+        is_long: bool,
+    ) -> Result<CpiContext<'_, '_, '_, 'info, MarketTransferIn<'info>>> {
+        let (market, from, vault) = if is_long {
+            (
+                self.initial_long_market
+                    .as_ref()
+                    .ok_or(error!(ExchangeError::InvalidArgument))?
+                    .to_account_info(),
+                self.initial_long_token_account
+                    .as_ref()
+                    .ok_or(error!(ExchangeError::InvalidArgument))?
+                    .to_account_info(),
+                self.initial_long_token_vault
+                    .as_ref()
+                    .ok_or(error!(ExchangeError::InvalidArgument))?
+                    .to_account_info(),
+            )
+        } else {
+            (
+                self.initial_short_market
+                    .as_ref()
+                    .ok_or(error!(ExchangeError::InvalidArgument))?
+                    .to_account_info(),
+                self.initial_short_token_account
+                    .as_ref()
+                    .ok_or(error!(ExchangeError::InvalidArgument))?
+                    .to_account_info(),
+                self.initial_short_token_vault
+                    .as_ref()
+                    .ok_or(error!(ExchangeError::InvalidArgument))?
+                    .to_account_info(),
+            )
+        };
+        Ok(CpiContext::new(
+            self.data_store_program.to_account_info(),
+            MarketTransferIn {
+                authority: self.authority.to_account_info(),
+                store: self.store.to_account_info(),
+                only_controller: self.only_controller.to_account_info(),
+                from_authority: self.payer.to_account_info(),
+                market,
+                from,
+                vault,
+                token_program: self.token_program.to_account_info(),
+            },
+        ))
     }
 }
