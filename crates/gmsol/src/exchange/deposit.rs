@@ -259,20 +259,6 @@ where
                     .map(|token| find_market_vault_address(store, &token).0),
                 initial_short_token_vault: short_token
                     .map(|token| find_market_vault_address(store, &token).0),
-                initial_long_market: long_token.map(|_| {
-                    find_market_address(
-                        store,
-                        long_token_swap_path.first().unwrap_or(&self.market_token),
-                    )
-                    .0
-                }),
-                initial_short_market: long_token.map(|_| {
-                    find_market_address(
-                        store,
-                        short_token_swap_path.first().unwrap_or(&self.market_token),
-                    )
-                    .0
-                }),
             })
             .args(instruction::CreateDeposit {
                 nonce,
@@ -296,12 +282,19 @@ where
             .accounts(
                 long_token_swap_path
                     .iter()
-                    .chain(short_token_swap_path.iter())
-                    .map(|mint| AccountMeta {
+                    .enumerate()
+                    .map(|(idx, mint)| AccountMeta {
                         pubkey: find_market_address(store, mint).0,
                         is_signer: false,
-                        is_writable: false,
+                        is_writable: idx == 0,
                     })
+                    .chain(short_token_swap_path.iter().enumerate().map(|(idx, mint)| {
+                        AccountMeta {
+                            pubkey: find_market_address(store, mint).0,
+                            is_signer: false,
+                            is_writable: idx == 0,
+                        }
+                    }))
                     .collect::<Vec<_>>(),
             );
         Ok((builder, deposit))

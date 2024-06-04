@@ -83,13 +83,11 @@ export const makeCreateDepositInstruction = async (
         initialShortTokenAccount: fromInitialShortTokenAccount,
         initialLongTokenVault: fromInitialLongTokenAccount ? longTokenDepositVault : null,
         initialShortTokenVault: fromInitialShortTokenAccount ? shortTokenDepositVault : null,
-        initialLongMarket: fromInitialLongTokenAccount ? findMarketPDA(store, first(longSwapPath) ?? marketToken)[0] : null,
-        initialShortMarket: fromInitialShortTokenAccount ? findMarketPDA(store, first(shortSwapPath) ?? marketToken)[0] : null,
     }).remainingAccounts([...longSwapPath, ...shortSwapPath].map(mint => {
         return {
             pubkey: findMarketPDA(store, mint)[0],
             isSigner: false,
-            isWritable: false,
+            isWritable: true,
         }
     })).instruction();
 

@@ -58,13 +58,8 @@ pub struct CreateDeposit<'info> {
     /// CHECK: check by CPI.
     pub token_config_map: UncheckedAccount<'info>,
     /// CHECK: only used to invoke CPI and should be checked by it.
+    #[account(mut)]
     pub market: UncheckedAccount<'info>,
-    /// CHECK: only used to invoke CPI and should be checked by it.
-    #[account(mut)]
-    pub initial_long_market: Option<UncheckedAccount<'info>>,
-    /// CHECK: only used to invoke CPI and should be checked by it.
-    #[account(mut)]
-    pub initial_short_market: Option<UncheckedAccount<'info>>,
     #[account(mut)]
     pub initial_long_token_account: Option<Box<Account<'info, TokenAccount>>>,
     #[account(mut)]
@@ -91,24 +86,6 @@ pub fn create_deposit<'info>(
     );
 
     let controller = ControllerSeeds::new(ctx.accounts.store.key, ctx.bumps.authority);
-
-    if params.initial_long_token_amount != 0 {
-        cpi::market_transfer_in(
-            ctx.accounts
-                .market_transfer_in_ctx(true)?
-                .with_signer(&[&controller.as_seeds()]),
-            params.initial_long_token_amount,
-        )?;
-    }
-
-    if params.initial_short_token_amount != 0 {
-        cpi::market_transfer_in(
-            ctx.accounts
-                .market_transfer_in_ctx(false)?
-                .with_signer(&[&controller.as_seeds()]),
-            params.initial_short_token_amount,
-        )?;
-    }
 
     let mut tokens = BTreeSet::default();
     let initial_long_token_mint = ctx
@@ -137,31 +114,67 @@ pub fn create_deposit<'info>(
     // Handle the swap paths.
     let long_swap_length = params.long_token_swap_length as usize;
     let short_swap_length = params.short_token_swap_length as usize;
+
     require_gte!(
         ctx.remaining_accounts.len(),
         long_swap_length + short_swap_length,
         ExchangeError::NotEnoughRemainingAccounts,
     );
-    let long_token_swap_path = get_and_validate_swap_path(
+
+    let long_swap_path = &ctx.remaining_accounts[..long_swap_length];
+    let long_swap_path_market_tokens = get_and_validate_swap_path(
         &ctx.accounts.data_store_program,
         ctx.accounts.store.to_account_info(),
-        &ctx.remaining_accounts[..long_swap_length],
+        long_swap_path,
         initial_long_token_mint
             .as_ref()
             .unwrap_or(&market_meta.long_token_mint),
         &market_meta.long_token_mint,
         &mut tokens,
     )?;
-    let short_token_swap_path = get_and_validate_swap_path(
+
+    let short_swap_path =
+        &ctx.remaining_accounts[long_swap_length..(long_swap_length + short_swap_length)];
+    let short_swap_path_market_tokens = get_and_validate_swap_path(
         &ctx.accounts.data_store_program,
         ctx.accounts.store.to_account_info(),
-        &ctx.remaining_accounts[long_swap_length..(long_swap_length + short_swap_length)],
+        short_swap_path,
         initial_short_token_mint
             .as_ref()
             .unwrap_or(&market_meta.short_token_mint),
         &market_meta.short_token_mint,
         &mut tokens,
     )?;
+
+    if params.initial_long_token_amount != 0 {
+        // Both `market` and the first market in the swap path has been validated by CPI.
+        let market = long_swap_path
+            .first()
+            .cloned()
+            .unwrap_or_else(|| ctx.accounts.market.to_account_info());
+
+        cpi::market_transfer_in(
+            ctx.accounts
+                .market_transfer_in_ctx(true, market)?
+                .with_signer(&[&controller.as_seeds()]),
+            params.initial_long_token_amount,
+        )?;
+    }
+
+    if params.initial_short_token_amount != 0 {
+        // Both `market` and the first market in the swap path has been validated by CPI.
+        let market = short_swap_path
+            .first()
+            .cloned()
+            .unwrap_or_else(|| ctx.accounts.market.to_account_info());
+
+        cpi::market_transfer_in(
+            ctx.accounts
+                .market_transfer_in_ctx(false, market)?
+                .with_signer(&[&controller.as_seeds()]),
+            params.initial_short_token_amount,
+        )?;
+    }
 
     let tokens_with_feed = tokens
         .into_iter()
@@ -176,6 +189,7 @@ pub fn create_deposit<'info>(
             TokenRecord::from_config(token, &config)
         })
         .collect::<Result<Vec<_>>>()?;
+
     cpi::initialize_deposit(
         ctx.accounts
             .initialize_deposit_ctx()
@@ -183,8 +197,8 @@ pub fn create_deposit<'info>(
         nonce,
         tokens_with_feed,
         SwapParams {
-            long_token_swap_path,
-            short_token_swap_path,
+            long_token_swap_path: long_swap_path_market_tokens,
+            short_token_swap_path: short_swap_path_market_tokens,
         },
         TokenParams {
             initial_long_token_amount: params.initial_long_token_amount,
@@ -194,6 +208,7 @@ pub fn create_deposit<'info>(
         },
         params.ui_fee_receiver,
     )?;
+
     // FIXME: should we allow using WNT to pay for the execution fee?
     require_gte!(
         ctx.accounts.deposit.lamports() + params.execution_fee,
@@ -271,13 +286,10 @@ impl<'info> CreateDeposit<'info> {
     fn market_transfer_in_ctx(
         &self,
         is_long: bool,
+        market: AccountInfo<'info>,
     ) -> Result<CpiContext<'_, '_, '_, 'info, MarketTransferIn<'info>>> {
-        let (market, from, vault) = if is_long {
+        let (from, vault) = if is_long {
             (
-                self.initial_long_market
-                    .as_ref()
-                    .ok_or(error!(ExchangeError::InvalidArgument))?
-                    .to_account_info(),
                 self.initial_long_token_account
                     .as_ref()
                     .ok_or(error!(ExchangeError::InvalidArgument))?
@@ -289,10 +301,6 @@ impl<'info> CreateDeposit<'info> {
             )
         } else {
             (
-                self.initial_short_market
-                    .as_ref()
-                    .ok_or(error!(ExchangeError::InvalidArgument))?
-                    .to_account_info(),
                 self.initial_short_token_account
                     .as_ref()
                     .ok_or(error!(ExchangeError::InvalidArgument))?

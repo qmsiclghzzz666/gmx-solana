@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Token, TokenAccount};
 use data_store::{
-    cpi::accounts::{MarketTransferOut, RemoveDeposit},
+    cpi::accounts::{GetValidatedMarketMeta, MarketTransferOut, RemoveDeposit},
     program::DataStore,
     states::Deposit,
     utils::{Authenticate, Authentication},
@@ -148,16 +148,44 @@ impl<'info> CancelDeposit<'info> {
         )
     }
 
+    fn get_validated_market_token_mint(&self, market: &AccountInfo<'info>) -> Result<Pubkey> {
+        let mint = data_store::cpi::get_validated_market_meta(CpiContext::new(
+            self.data_store_program.to_account_info(),
+            GetValidatedMarketMeta {
+                store: self.store.to_account_info(),
+                market: market.clone(),
+            },
+        ))?
+        .get()
+        .market_token_mint;
+        Ok(mint)
+    }
+
     fn market_transfer_out_ctx(
         &self,
         is_long: bool,
     ) -> Result<CpiContext<'_, '_, '_, 'info, MarketTransferOut<'info>>> {
         let (market, to, vault) = if is_long {
+            // Validate the market.
+            let market = self
+                .initial_long_market
+                .as_ref()
+                .ok_or(error!(ExchangeError::InvalidArgument))?
+                .to_account_info();
+            let validated_market_token = self.get_validated_market_token_mint(&market)?;
+            let expected_market_token = self
+                .deposit
+                .dynamic
+                .swap_params
+                .first_market_token(true)
+                .unwrap_or(&self.deposit.fixed.tokens.market_token);
+            require_eq!(
+                validated_market_token,
+                *expected_market_token,
+                ExchangeError::InvalidArgument
+            );
             (
-                self.initial_long_market
-                    .as_ref()
-                    .ok_or(error!(ExchangeError::InvalidArgument))?
-                    .to_account_info(),
+                market,
                 self.initial_long_token
                     .as_ref()
                     .ok_or(error!(ExchangeError::InvalidArgument))?
@@ -168,11 +196,26 @@ impl<'info> CancelDeposit<'info> {
                     .to_account_info(),
             )
         } else {
+            // Validate the market.
+            let market = self
+                .initial_short_market
+                .as_ref()
+                .ok_or(error!(ExchangeError::InvalidArgument))?
+                .to_account_info();
+            let validated_market_token = self.get_validated_market_token_mint(&market)?;
+            let expected_market_token = self
+                .deposit
+                .dynamic
+                .swap_params
+                .first_market_token(false)
+                .unwrap_or(&self.deposit.fixed.tokens.market_token);
+            require_eq!(
+                validated_market_token,
+                *expected_market_token,
+                ExchangeError::InvalidArgument
+            );
             (
-                self.initial_short_market
-                    .as_ref()
-                    .ok_or(error!(ExchangeError::InvalidArgument))?
-                    .to_account_info(),
+                market,
                 self.initial_short_token
                     .as_ref()
                     .ok_or(error!(ExchangeError::InvalidArgument))?

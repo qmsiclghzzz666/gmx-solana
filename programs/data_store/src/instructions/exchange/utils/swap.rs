@@ -57,6 +57,7 @@ impl<'a, 'info> SwapUtils<'a, 'info> {
             require!(market.is_writable, DataStoreError::InvalidSwapPath);
             let mut market = Account::<'info, Market>::try_from(market)?;
             {
+                market.validate(&self.oracle.store)?;
                 let meta = &market.meta;
                 let mut mint = Account::<Mint>::try_from(&self.mints[idx])?;
                 require_eq!(

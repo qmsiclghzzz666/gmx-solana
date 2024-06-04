@@ -96,6 +96,7 @@ impl<'info> ValidateOracleTime for ExecuteDeposit<'info> {
 impl<'info> ExecuteDeposit<'info> {
     fn validate(&self) -> Result<()> {
         self.oracle.validate_time(self)?;
+        self.market.validate(&self.store.key())?;
         Ok(())
     }
 
