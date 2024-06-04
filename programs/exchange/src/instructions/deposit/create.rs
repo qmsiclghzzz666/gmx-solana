@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use anchor_lang::{prelude::*, system_program};
 use anchor_spl::token::{Token, TokenAccount};
 use data_store::{
-    cpi::accounts::{GetMarketMeta, GetTokenConfig, InitializeDeposit, MarketTransferIn},
+    cpi::accounts::{GetTokenConfig, GetValidatedMarketMeta, InitializeDeposit, MarketTransferIn},
     program::DataStore,
     states::{
         common::{SwapParams, TokenRecord},
@@ -128,7 +128,8 @@ pub fn create_deposit<'info>(
         tokens.insert(mint);
     }
 
-    let market_meta = cpi::get_market_meta(ctx.accounts.get_market_meta_ctx())?.get();
+    let market_meta =
+        cpi::get_validated_market_meta(ctx.accounts.get_validated_market_meta_ctx())?.get();
     tokens.insert(market_meta.index_token_mint);
     tokens.insert(market_meta.long_token_mint);
     tokens.insert(market_meta.short_token_mint);
@@ -143,6 +144,7 @@ pub fn create_deposit<'info>(
     );
     let long_token_swap_path = get_and_validate_swap_path(
         &ctx.accounts.data_store_program,
+        ctx.accounts.store.to_account_info(),
         &ctx.remaining_accounts[..long_swap_length],
         initial_long_token_mint
             .as_ref()
@@ -152,6 +154,7 @@ pub fn create_deposit<'info>(
     )?;
     let short_token_swap_path = get_and_validate_swap_path(
         &ctx.accounts.data_store_program,
+        ctx.accounts.store.to_account_info(),
         &ctx.remaining_accounts[long_swap_length..(long_swap_length + short_swap_length)],
         initial_short_token_mint
             .as_ref()
@@ -209,10 +212,13 @@ pub fn create_deposit<'info>(
 }
 
 impl<'info> CreateDeposit<'info> {
-    fn get_market_meta_ctx(&self) -> CpiContext<'_, '_, '_, 'info, GetMarketMeta<'info>> {
+    fn get_validated_market_meta_ctx(
+        &self,
+    ) -> CpiContext<'_, '_, '_, 'info, GetValidatedMarketMeta<'info>> {
         CpiContext::new(
             self.data_store_program.to_account_info(),
-            GetMarketMeta {
+            GetValidatedMarketMeta {
+                store: self.store.to_account_info(),
                 market: self.market.to_account_info(),
             },
         )

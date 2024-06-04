@@ -19,7 +19,7 @@ use self::{
     states::{
         common::{SwapParams, TokenRecord},
         deposit::TokenParams as DepositTokenParams,
-        market::{MarketMeta, Pool},
+        market::MarketMeta,
         order::{OrderParams, TransferOut},
         token_config::{TokenConfig, TokenConfigBuilder},
         withdrawal::TokenParams as WithdrawalTokenParams,
@@ -228,36 +228,8 @@ pub mod data_store {
         instructions::remove_market(ctx)
     }
 
-    #[access_control(internal::Authenticate::only_controller(&ctx))]
-    pub fn apply_delta_to_market_pool(
-        ctx: Context<ApplyDeltaToMarketPool>,
-        pool: u8,
-        is_long_token: bool,
-        delta: i128,
-    ) -> Result<()> {
-        instructions::apply_delta_to_market_pool(
-            ctx,
-            pool.try_into()
-                .map_err(|_| DataStoreError::InvalidArgument)?,
-            is_long_token,
-            delta,
-        )
-    }
-
-    pub fn get_pool(ctx: Context<GetPool>, pool: u8) -> Result<Option<Pool>> {
-        instructions::get_pool(
-            ctx,
-            pool.try_into()
-                .map_err(|_| DataStoreError::InvalidArgument)?,
-        )
-    }
-
-    pub fn get_market_token_mint(ctx: Context<GetMarketTokenMint>) -> Result<Pubkey> {
-        instructions::get_market_token_mint(ctx)
-    }
-
-    pub fn get_market_meta(ctx: Context<GetMarketMeta>) -> Result<MarketMeta> {
-        instructions::get_market_meta(ctx)
+    pub fn get_validated_market_meta(ctx: Context<GetValidatedMarketMeta>) -> Result<MarketMeta> {
+        instructions::get_validated_market_meta(ctx)
     }
 
     #[access_control(internal::Authenticate::only_controller(&ctx))]
@@ -565,6 +537,10 @@ pub enum DataStoreError {
     UnsupportedPoolKind,
     #[msg("Invalid collateral token")]
     InvalidCollateralToken,
+    #[msg("Invalid market")]
+    InvalidMarket,
+    #[msg("Disabled market")]
+    DisabledMarket,
     // Exchange Common.
     #[msg("Invalid swap path")]
     InvalidSwapPath,

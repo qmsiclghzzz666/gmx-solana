@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use anchor_lang::{prelude::*, system_program};
 use anchor_spl::token::{Token, TokenAccount};
 use data_store::{
-    cpi::accounts::{GetMarketMeta, GetTokenConfig, InitializeWithdrawal},
+    cpi::accounts::{GetTokenConfig, GetValidatedMarketMeta, InitializeWithdrawal},
     program::DataStore,
     states::{
         common::{SwapParams, TokenRecord},
@@ -89,7 +89,8 @@ pub fn create_withdrawal<'info>(
     tokens.insert(ctx.accounts.final_short_token_receiver.mint);
 
     // The market token mint used to withdraw must match the `market`'s.
-    let market_meta = cpi::get_market_meta(ctx.accounts.get_market_meta_ctx())?.get();
+    let market_meta =
+        cpi::get_validated_market_meta(ctx.accounts.get_validated_market_meta_ctx())?.get();
     require_eq!(
         ctx.accounts.market_token_account.mint,
         market_meta.market_token_mint,
@@ -109,6 +110,7 @@ pub fn create_withdrawal<'info>(
     );
     let long_token_swap_path = get_and_validate_swap_path(
         &ctx.accounts.data_store_program,
+        ctx.accounts.store.to_account_info(),
         &ctx.remaining_accounts[..long_swap_length],
         &market_meta.long_token_mint,
         &ctx.accounts.final_long_token_receiver.mint,
@@ -116,6 +118,7 @@ pub fn create_withdrawal<'info>(
     )?;
     let short_token_swap_path = get_and_validate_swap_path(
         &ctx.accounts.data_store_program,
+        ctx.accounts.store.to_account_info(),
         &ctx.remaining_accounts[long_swap_length..(long_swap_length + short_swap_length)],
         &market_meta.short_token_mint,
         &ctx.accounts.final_short_token_receiver.mint,
@@ -178,10 +181,13 @@ impl<'info> CreateWithdrawal<'info> {
         )
     }
 
-    fn get_market_meta_ctx(&self) -> CpiContext<'_, '_, '_, 'info, GetMarketMeta<'info>> {
+    fn get_validated_market_meta_ctx(
+        &self,
+    ) -> CpiContext<'_, '_, '_, 'info, GetValidatedMarketMeta<'info>> {
         CpiContext::new(
             self.data_store_program.to_account_info(),
-            GetMarketMeta {
+            GetValidatedMarketMeta {
+                store: self.store.to_account_info(),
                 market: self.market.to_account_info(),
             },
         )

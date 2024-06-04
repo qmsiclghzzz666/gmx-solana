@@ -1,12 +1,10 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Token, TokenAccount};
-use gmx_core::{Pool as GmxCorePool, PoolKind};
 
 use crate::{
     constants,
-    states::{Action, DataStore, Market, MarketChangeEvent, MarketMeta, Pool, Roles, Seed},
+    states::{Action, DataStore, Market, MarketChangeEvent, MarketMeta, Roles, Seed},
     utils::internal,
-    DataStoreError,
 };
 
 /// Number of pools.
@@ -33,6 +31,7 @@ pub fn initialize_market(
         short_token_mint,
         NUM_POOLS,
         NUM_CLOCKS,
+        true,
     )?;
     emit!(MarketChangeEvent {
         address: market.key(),
@@ -119,89 +118,17 @@ impl<'info> internal::Authentication<'info> for RemoveMarket<'info> {
     }
 }
 
-/// Apply delta to market pool.
-pub fn apply_delta_to_market_pool(
-    ctx: Context<ApplyDeltaToMarketPool>,
-    pool: PoolKind,
-    is_long_token: bool,
-    delta: i128,
-) -> Result<()> {
-    let market = &mut ctx.accounts.market;
-    market
-        .with_pool_mut(pool, |pool| {
-            if is_long_token {
-                pool.apply_delta_to_long_amount(&delta)
-                    .map_err(|_| DataStoreError::Computation)?;
-            } else {
-                pool.apply_delta_to_short_amount(&delta)
-                    .map_err(|_| DataStoreError::Computation)?;
-            }
-            Result::Ok(())
-        })
-        .ok_or(DataStoreError::UnsupportedPoolKind)??;
-    Ok(())
-}
-
 #[derive(Accounts)]
-pub struct ApplyDeltaToMarketPool<'info> {
-    pub authority: Signer<'info>,
-    pub store: Account<'info, DataStore>,
-    pub only_controller: Account<'info, Roles>,
-    #[account(
-        mut,
-        has_one = store,
-        seeds = [
-            Market::SEED,
-            store.key().as_ref(),
-            market.meta.market_token_mint.as_ref(),
-        ],
-        bump = market.bump,
-    )]
+pub struct GetValidatedMarketMeta<'info> {
+    pub(crate) store: Account<'info, DataStore>,
+    #[account(has_one = store)]
     pub(crate) market: Account<'info, Market>,
 }
 
-impl<'info> internal::Authentication<'info> for ApplyDeltaToMarketPool<'info> {
-    fn authority(&self) -> &Signer<'info> {
-        &self.authority
-    }
-
-    fn store(&self) -> &Account<'info, DataStore> {
-        &self.store
-    }
-
-    fn roles(&self) -> &Account<'info, Roles> {
-        &self.only_controller
-    }
-}
-
-/// Get the given pool info of the market.
-pub fn get_pool(ctx: Context<GetPool>, pool: PoolKind) -> Result<Option<Pool>> {
-    Ok(ctx.accounts.market.pool(pool))
-}
-
-#[derive(Accounts)]
-pub struct GetPool<'info> {
-    pub(crate) market: Account<'info, Market>,
-}
-
-/// Get the market token mint of the market.
-pub fn get_market_token_mint(ctx: Context<GetMarketTokenMint>) -> Result<Pubkey> {
-    Ok(ctx.accounts.market.meta.market_token_mint)
-}
-
-#[derive(Accounts)]
-pub struct GetMarketTokenMint<'info> {
-    pub(crate) market: Account<'info, Market>,
-}
-
-/// Get the meta of the market.
-pub fn get_market_meta(ctx: Context<GetMarketMeta>) -> Result<MarketMeta> {
+/// Get the meta of the market after validation.
+pub fn get_validated_market_meta(ctx: Context<GetValidatedMarketMeta>) -> Result<MarketMeta> {
+    ctx.accounts.market.validate(&ctx.accounts.store.key())?;
     Ok(ctx.accounts.market.meta.clone())
-}
-
-#[derive(Accounts)]
-pub struct GetMarketMeta<'info> {
-    pub(crate) market: Account<'info, Market>,
 }
 
 #[derive(Accounts)]
@@ -236,6 +163,8 @@ pub struct MarketTransferIn<'info> {
 /// Transfer some tokens into the market.
 pub fn market_transfer_in(ctx: Context<MarketTransferIn>, amount: u64) -> Result<()> {
     use anchor_spl::token;
+
+    ctx.accounts.market.validate(&ctx.accounts.store.key())?;
 
     if amount != 0 {
         token::transfer(
@@ -303,6 +232,8 @@ pub struct MarketTransferOut<'info> {
 /// Transfer some tokens out of the market.
 pub fn market_transfer_out(ctx: Context<MarketTransferOut>, amount: u64) -> Result<()> {
     use crate::utils::internal::TransferUtils;
+
+    ctx.accounts.market.validate(&ctx.accounts.store.key())?;
 
     if amount != 0 {
         TransferUtils::new(

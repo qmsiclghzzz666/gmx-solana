@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use anchor_lang::{prelude::*, system_program};
 use anchor_spl::token::{Token, TokenAccount};
 use data_store::{
-    cpi::accounts::{GetMarketMeta, GetTokenConfig, InitializeOrder, MarketTransferIn},
+    cpi::accounts::{GetTokenConfig, GetValidatedMarketMeta, InitializeOrder, MarketTransferIn},
     program::DataStore,
     states::{
         common::{SwapParams, TokenRecord},
@@ -239,11 +239,12 @@ impl<'info> CreateOrder<'info> {
         let mut tokens = BTreeSet::default();
         let ctx = CpiContext::new(
             self.data_store_program.to_account_info(),
-            GetMarketMeta {
+            GetValidatedMarketMeta {
+                store: self.store.to_account_info(),
                 market: self.market.to_account_info(),
             },
         );
-        let meta = data_store::cpi::get_market_meta(ctx)?.get();
+        let meta = data_store::cpi::get_validated_market_meta(ctx)?.get();
         tokens.insert(meta.long_token_mint);
         tokens.insert(meta.short_token_mint);
         if include_index_token {
@@ -287,6 +288,7 @@ impl<'info> CreateOrder<'info> {
             .ok_or(ExchangeError::MissingTokenAccountForOrder)?;
         let swap_path = get_and_validate_swap_path(
             &self.data_store_program,
+            self.store.to_account_info(),
             &remaining_accounts[..length],
             &initial_token,
             output_token,
@@ -320,6 +322,7 @@ impl<'info> CreateOrder<'info> {
             .ok_or(ExchangeError::MissingTokenAccountForOrder)?;
         let swap_path = get_and_validate_swap_path(
             &self.data_store_program,
+            self.store.to_account_info(),
             &remaining_accounts[..length],
             output_token,
             &final_token,

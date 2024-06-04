@@ -26,6 +26,7 @@ pub struct Market {
     pub(crate) bump: u8,
     pub(crate) meta: MarketMeta,
     pub(crate) store: Pubkey,
+    is_enabled: bool,
     is_pure: bool,
     long_token_balance: u64,
     short_token_balance: u64,
@@ -81,6 +82,7 @@ impl Market {
         1 + 16
             + 32
             + MarketMeta::INIT_SPACE
+            + 1
             + 1
             + (8 * 2)
             + DynamicMapStore::<u8, Pool>::init_space(num_pools)
@@ -178,9 +180,11 @@ impl Market {
         short_token_mint: Pubkey,
         num_pools: u8,
         num_clocks: u8,
+        is_enabled: bool,
     ) -> Result<()> {
         self.bump = bump;
         self.store = store;
+        self.is_enabled = is_enabled;
         self.meta.market_token_mint = market_token_mint;
         self.meta.index_token_mint = index_token_mint;
         self.meta.long_token_mint = long_token_mint;
@@ -206,7 +210,7 @@ impl Market {
 
     /// Get mutable reference to the pool of the given kind.
     #[inline]
-    pub(crate) fn with_pool_mut<T>(
+    pub(crate) fn _with_pool_mut<T>(
         &mut self,
         kind: PoolKind,
         f: impl FnOnce(&mut Pool) -> T,
@@ -228,6 +232,13 @@ impl Market {
             vault: None,
             funding_factor_per_second: &mut self.funding_factor_per_second,
         }
+    }
+
+    /// Validate the market.
+    pub fn validate(&self, store: &Pubkey) -> Result<()> {
+        require_eq!(*store, self.store, DataStoreError::InvalidMarket);
+        require!(self.is_enabled, DataStoreError::DisabledMarket);
+        Ok(())
     }
 }
 
