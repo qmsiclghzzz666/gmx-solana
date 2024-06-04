@@ -494,6 +494,8 @@ pub enum DataStoreError {
     MissingFactor,
     #[msg("Cannot be zero")]
     CannotBeZero,
+    #[msg("Missing Market Account")]
+    MissingMarketAccount,
     // Roles.
     #[msg("Too many admins")]
     TooManyAdmins,

@@ -59,6 +59,12 @@ pub struct CreateDeposit<'info> {
     pub token_config_map: UncheckedAccount<'info>,
     /// CHECK: only used to invoke CPI and should be checked by it.
     pub market: UncheckedAccount<'info>,
+    /// CHECK: only used to invoke CPI and should be checked by it.
+    #[account(mut)]
+    pub initial_long_market: Option<UncheckedAccount<'info>>,
+    /// CHECK: only used to invoke CPI and should be checked by it.
+    #[account(mut)]
+    pub initial_short_market: Option<UncheckedAccount<'info>>,
     #[account(mut)]
     pub initial_long_token_account: Option<Box<Account<'info, TokenAccount>>>,
     #[account(mut)]
@@ -220,6 +226,14 @@ impl<'info> CreateDeposit<'info> {
                     .as_ref()
                     .map(|a| a.to_account_info()),
                 market: self.market.to_account_info(),
+                initial_long_market: self
+                    .initial_long_market
+                    .as_ref()
+                    .map(|a| a.to_account_info()),
+                initial_short_market: self
+                    .initial_short_market
+                    .as_ref()
+                    .map(|a| a.to_account_info()),
                 receiver: self.receiver.to_account_info(),
                 system_program: self.system_program.to_account_info(),
                 long_token_deposit_vault: self

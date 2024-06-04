@@ -50,6 +50,12 @@ pub struct CancelDeposit<'info> {
     pub long_token_deposit_vault: Option<Account<'info, TokenAccount>>,
     #[account(mut)]
     pub short_token_deposit_vault: Option<Account<'info, TokenAccount>>,
+    /// CHECK: check by CPI.
+    #[account(mut)]
+    pub initial_long_market: Option<UncheckedAccount<'info>>,
+    /// CHECK: check by CPI.
+    #[account(mut)]
+    pub initial_short_market: Option<UncheckedAccount<'info>>,
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
 }
@@ -121,6 +127,14 @@ impl<'info> CancelDeposit<'info> {
                     .map(|a| a.to_account_info()),
                 short_token_deposit_vault: self
                     .short_token_deposit_vault
+                    .as_ref()
+                    .map(|a| a.to_account_info()),
+                initial_long_market: self
+                    .initial_long_market
+                    .as_ref()
+                    .map(|a| a.to_account_info()),
+                initial_short_market: self
+                    .initial_short_market
                     .as_ref()
                     .map(|a| a.to_account_info()),
                 system_program: self.system_program.to_account_info(),

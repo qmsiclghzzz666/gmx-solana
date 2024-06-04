@@ -74,6 +74,8 @@ impl<'info> ExecuteDeposit<'info> {
                 initial_short_token: None,
                 long_token_deposit_vault: None,
                 short_token_deposit_vault: None,
+                initial_long_market: None,
+                initial_short_market: None,
                 token_program: self.token_program.to_account_info(),
             },
         )

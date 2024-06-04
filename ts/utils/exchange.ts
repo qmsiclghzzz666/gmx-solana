@@ -7,7 +7,7 @@ import { BTC_TOKEN_MINT, SOL_TOKEN_MINT } from "./token";
 import { IxWithOutput, makeInvoke } from "./invoke";
 import { DataStoreProgram, PriceProvider, findConfigPDA, findMarketPDA, findMarketVaultPDA, toBN } from "gmsol";
 import { PYTH_ID } from "./external";
-import { findKey, toInteger } from "lodash";
+import { findKey, first, toInteger } from "lodash";
 import { findPythPriceFeedPDA } from "gmsol";
 import { PriceServiceConnection } from "@pythnetwork/price-service-client";
 import { PythSolanaReceiver } from "@pythnetwork/pyth-solana-receiver";
@@ -47,29 +47,6 @@ export const createMarket = async (
     return marketTokenMint;
 };
 
-export type MakeCreateDepositParams = {
-    store: PublicKey,
-    payer: PublicKey,
-    marketToken: PublicKey,
-    toMarketTokenAccount: PublicKey,
-    fromInitialLongTokenAccount?: PublicKey,
-    fromInitialShortTokenAccount?: PublicKey,
-    initialLongTokenAmount?: number | bigint,
-    initialShortTokenAmount?: number | bigint,
-    options?: {
-        nonce?: Buffer,
-        executionFee?: number | bigint,
-        longTokenSwapPath?: PublicKey[],
-        shortTokenSwapPath?: PublicKey[],
-        minMarketToken?: number | bigint,
-        shouldUnwrapNativeToken?: boolean,
-        hints?: {
-            initialLongToken?: PublicKey,
-            initialShortToken?: PublicKey,
-        },
-    },
-}
-
 export type MakeCancelDepositParams = {
     authority: PublicKey,
     store: PublicKey,
@@ -83,6 +60,8 @@ export type MakeCancelDepositParams = {
                 fromInitialShortTokenAccount: PublicKey | null,
                 initialLongToken: PublicKey | null,
                 initialShortToken: PublicKey | null,
+                initialLongMarket: PublicKey | null,
+                initialShortMarket: PublicKey | null,
             }
         }
     }
@@ -100,13 +79,20 @@ export const makeCancelDepositInstruction = async ({
         fromInitialShortTokenAccount,
         initialLongToken,
         initialShortToken,
+        initialLongMarket,
+        initialShortMarket,
     } = options?.hints?.deposit ?? await dataStore.account.deposit.fetch(deposit).then(deposit => {
+        const marketToken = deposit.fixed.tokens.marketToken;
+        const initialLongToken = deposit.fixed.tokens.initialLongToken ?? null;
+        const initialShortToken = deposit.fixed.tokens.initialShortToken ?? null;
         return {
             user: deposit.fixed.senders.user,
             fromInitialLongTokenAccount: deposit.fixed.senders.initialLongTokenAccount ?? null,
             fromInitialShortTokenAccount: deposit.fixed.senders.initialShortTokenAccount ?? null,
-            initialLongToken: deposit.fixed.tokens.initialLongToken ?? null,
-            initialShortToken: deposit.fixed.tokens.initialShortToken ?? null,
+            initialLongToken,
+            initialShortToken,
+            initialLongMarket: initialLongToken ? findMarketPDA(deposit.fixed.store, first(deposit.dynamic.swapParams.longTokenSwapPath) ?? marketToken)[0] : null,
+            initialShortMarket: initialShortToken ? findMarketPDA(deposit.fixed.store, first(deposit.dynamic.swapParams.shortTokenSwapPath) ?? marketToken)[0] : null,
         }
     });
 
@@ -120,6 +106,8 @@ export const makeCancelDepositInstruction = async ({
         initialShortToken: fromInitialShortTokenAccount,
         longTokenDepositVault: initialLongToken ? createMarketVaultPDA(store, initialLongToken)[0] : null,
         shortTokenDepositVault: initialShortToken ? createMarketVaultPDA(store, initialShortToken)[0] : null,
+        initialLongMarket,
+        initialShortMarket,
     }).instruction();
 };
 

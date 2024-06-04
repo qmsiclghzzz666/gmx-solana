@@ -32,6 +32,13 @@ impl<'a, 'info> SwapUtils<'a, 'info> {
         }
     }
 
+    /// Execute the swaps.
+    ///
+    /// ## Assumptions
+    /// - `token_in_amount` should have been recorded in the first market's balance.
+    ///
+    /// ## Notes
+    /// - The final amount is still recorded in the last market's balance, i.e., not transferred out.
     fn execute(
         self,
         expected_token_out: Pubkey,
@@ -43,8 +50,11 @@ impl<'a, 'info> SwapUtils<'a, 'info> {
         }
         let mut flags = BTreeSet::default();
         let mut amount = *token_in_amount;
+        let last_idx = self.markets.len().saturating_sub(1);
+        // Invariant: `token_in_amount` has been record.
         for (idx, market) in self.markets.iter().enumerate() {
             require!(flags.insert(market.key), DataStoreError::InvalidSwapPath);
+            require!(market.is_writable, DataStoreError::InvalidSwapPath);
             let mut market = Account::<'info, Market>::try_from(market)?;
             {
                 let meta = &market.meta;
@@ -93,6 +103,9 @@ impl<'a, 'info> SwapUtils<'a, 'info> {
                         .max
                         .to_unit_price(),
                 };
+                if idx != 0 {
+                    market.record_transferred_in_by_token(&token_in, amount)?;
+                }
                 let report = market
                     .as_market(&mut mint)
                     .swap(is_token_in_long, amount.into(), prices)
@@ -103,6 +116,9 @@ impl<'a, 'info> SwapUtils<'a, 'info> {
                 amount = (*report.token_out_amount())
                     .try_into()
                     .map_err(|_| DataStoreError::AmountOverflow)?;
+                if idx != last_idx {
+                    market.record_transferred_out_by_token(&token_out, amount)?;
+                }
                 msg!("{:?}", report);
             }
             // `exit` must be called to ensure data is written to the storage.
@@ -126,6 +142,10 @@ impl<'a, 'info> SwapUtils<'a, 'info> {
 /// ## Check
 /// - All remaining_accounts must contain the most recent state.
 ///  The `exit` and `reload` functions can be called to synchronize any accounts that might have an unsynchronized state.
+/// - The `token_in_amount`s are assumed to be recorded in the first market of each swap path.
+///
+/// ## Notes
+/// - The swap out amounts are still being recorded in the last market of each swap path, i.e., they are not transferred out.
 pub(crate) fn unchecked_swap_with_params<'info>(
     oracle: &Oracle,
     params: &SwapParams,

@@ -31,4 +31,22 @@ impl SwapParams {
     pub(crate) fn init_space(long_path_len: usize, short_path_len: usize) -> usize {
         (4 + 32 * long_path_len) + (4 + 32 * short_path_len)
     }
+
+    /// Get the first market token in the swap path.
+    pub fn first_market_token(&self, is_long: bool) -> Option<&Pubkey> {
+        if is_long {
+            self.long_token_swap_path.first()
+        } else {
+            self.short_token_swap_path.first()
+        }
+    }
+
+    /// Get the last market token in the swap path.
+    pub fn last_market_token(&self, is_long: bool) -> Option<&Pubkey> {
+        if is_long {
+            self.long_token_swap_path.last()
+        } else {
+            self.short_token_swap_path.last()
+        }
+    }
 }

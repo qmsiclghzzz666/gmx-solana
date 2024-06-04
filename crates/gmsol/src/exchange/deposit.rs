@@ -259,6 +259,20 @@ where
                     .map(|token| find_market_vault_address(store, &token).0),
                 initial_short_token_vault: short_token
                     .map(|token| find_market_vault_address(store, &token).0),
+                initial_long_market: long_token.map(|_| {
+                    find_market_address(
+                        store,
+                        long_token_swap_path.first().unwrap_or(&self.market_token),
+                    )
+                    .0
+                }),
+                initial_short_market: long_token.map(|_| {
+                    find_market_address(
+                        store,
+                        short_token_swap_path.first().unwrap_or(&self.market_token),
+                    )
+                    .0
+                }),
             })
             .args(instruction::CreateDeposit {
                 nonce,
@@ -310,6 +324,8 @@ struct CancelDepositHint {
     initial_short_token: Option<Pubkey>,
     initial_long_token_account: Option<Pubkey>,
     initial_short_token_account: Option<Pubkey>,
+    initial_long_market: Option<Pubkey>,
+    initial_short_market: Option<Pubkey>,
 }
 
 impl<'a> From<&'a Deposit> for CancelDepositHint {
@@ -319,6 +335,28 @@ impl<'a> From<&'a Deposit> for CancelDepositHint {
             initial_short_token: deposit.fixed.tokens.initial_short_token,
             initial_long_token_account: deposit.fixed.senders.initial_long_token_account,
             initial_short_token_account: deposit.fixed.senders.initial_short_token_account,
+            initial_long_market: deposit.fixed.tokens.initial_long_token.map(|_| {
+                find_market_address(
+                    &deposit.fixed.store,
+                    deposit
+                        .dynamic
+                        .swap_params
+                        .first_market_token(true)
+                        .unwrap_or(&deposit.fixed.tokens.market_token),
+                )
+                .0
+            }),
+            initial_short_market: deposit.fixed.tokens.initial_short_token.map(|_| {
+                find_market_address(
+                    &deposit.fixed.store,
+                    deposit
+                        .dynamic
+                        .swap_params
+                        .first_market_token(false)
+                        .unwrap_or(&deposit.fixed.tokens.market_token),
+                )
+                .0
+            }),
         }
     }
 }
@@ -406,6 +444,8 @@ where
                 short_token_deposit_vault: hint
                     .initial_short_token
                     .map(|token| find_market_vault_address(store, &token).0),
+                initial_long_market: hint.initial_long_market,
+                initial_short_market: hint.initial_short_market,
                 token_program: anchor_spl::token::ID,
                 system_program: system_program::ID,
             })

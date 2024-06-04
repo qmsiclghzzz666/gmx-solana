@@ -407,7 +407,7 @@ describe("exchange: deposit", () => {
                     executionFee: 5_001,
                 }
             }, {
-                computeUnits: 400_000,
+                computeUnits: 800_000,
                 skipPreflight: true,
             });
             console.log(`withdrawal executed at ${signature}`);
