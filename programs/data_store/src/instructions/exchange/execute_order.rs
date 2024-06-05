@@ -10,12 +10,13 @@ use gmx_core::{
 
 use crate::{
     constants,
+    instructions::utils::swap::unchecked_transfer_to_market,
     states::{
         order::{Order, OrderKind, TransferOut},
         position::Position,
         Config, DataStore, Market, Oracle, Roles, Seed, ValidateOracleTime,
     },
-    utils::internal::{self},
+    utils::internal,
     DataStoreError, GmxCoreError,
 };
 
@@ -280,6 +281,7 @@ impl<'info> ExecuteOrder<'info> {
         let mut transfer_out = Box::default();
         let prices = self.prices()?;
         let mut should_remove = false;
+        let mut is_output_token_long = None;
         let kind = &self.order.fixed.params.kind;
         match kind {
             OrderKind::MarketSwap => {
@@ -364,14 +366,16 @@ impl<'info> ExecuteOrder<'info> {
                     should_remove = report.should_remove();
                     report
                 };
+                is_output_token_long = Some(report.is_output_token_long());
                 self.process_decrease_report(&mut transfer_out, remaining_accounts, &report)?;
             }
         }
+        self.validate_market(&transfer_out, is_output_token_long)?;
         Ok((should_remove, transfer_out))
     }
 
     fn process_increase_report(
-        &self,
+        &mut self,
         ctx: &mut TransferOut,
         report: IncreasePositionReport<u128>,
     ) -> Result<()> {
@@ -432,6 +436,34 @@ impl<'info> ExecuteOrder<'info> {
 
         // Since we have checked that secondary_amount must be zero if output_token == secondary_output_token,
         // the swap should still be correct.
+
+        // Transfer to first markets.
+        let [long_swap_path, short_swap_path, ..] =
+            self.order.swap.split_swap_paths(remaining_accounts)?;
+        if let Some(to) = long_swap_path.first() {
+            let token = token_ins.0.unwrap();
+            if to.key() != self.market.key() {
+                unchecked_transfer_to_market(
+                    &self.store.key(),
+                    &mut self.market,
+                    to,
+                    &token,
+                    output_amount,
+                )?;
+            }
+        }
+        if let Some(to) = short_swap_path.first() {
+            let token = token_ins.1.unwrap();
+            if to.key() != self.market.key() {
+                unchecked_transfer_to_market(
+                    &self.store.key(),
+                    &mut self.market,
+                    to,
+                    &token,
+                    secondary_output_amount,
+                )?;
+            }
+        }
 
         // Call exit to make sure the data are written to the storage.
         // In case that there are markets also appear in the swap paths.
@@ -598,6 +630,57 @@ impl<'info> ExecuteOrder<'info> {
                 .try_into()
                 .map_err(|_| error!(DataStoreError::AmountOverflow))?,
         )?;
+        Ok(())
+    }
+
+    fn validate_market(
+        &mut self,
+        transfer_out: &TransferOut,
+        is_output_token_long: Option<bool>,
+    ) -> Result<()> {
+        let transferred_in = self.order.fixed.params.need_to_transfer_in();
+
+        let mut long_amount = transfer_out
+            .long_token
+            .checked_add(transfer_out.long_token_for_claimable_account_of_holding)
+            .and_then(|a| a.checked_add(transfer_out.long_token_for_claimable_account_of_user))
+            .ok_or(error!(DataStoreError::AmountOverflow))?;
+        let mut short_amount = transfer_out
+            .short_token
+            .checked_add(transfer_out.short_token_for_claimable_account_of_holding)
+            .and_then(|a| a.checked_add(transfer_out.short_token_for_claimable_account_of_user))
+            .ok_or(error!(DataStoreError::AmountOverflow))?;
+
+        if transfer_out.final_output_token != 0
+            && is_output_token_long.is_some()
+            && (transferred_in || self.order.swap.long_token_swap_path.is_empty())
+        {
+            let amount = if is_output_token_long.unwrap() {
+                &mut long_amount
+            } else {
+                &mut short_amount
+            };
+            *amount = amount
+                .checked_add(transfer_out.final_output_token)
+                .ok_or(error!(DataStoreError::AmountOverflow))?;
+        }
+
+        if transfer_out.final_secondary_output_token != 0
+            && (transferred_in || self.order.swap.short_token_swap_path.is_empty())
+        {
+            let amount = if self.order.fixed.params.is_long {
+                &mut long_amount
+            } else {
+                &mut short_amount
+            };
+            *amount = amount
+                .checked_add(transfer_out.final_secondary_output_token)
+                .ok_or(error!(DataStoreError::AmountOverflow))?;
+        }
+
+        self.market
+            .as_market(&mut self.market_token_mint)
+            .validate_market_balances(long_amount, short_amount)?;
         Ok(())
     }
 }

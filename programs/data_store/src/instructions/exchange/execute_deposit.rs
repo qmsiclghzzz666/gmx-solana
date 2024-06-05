@@ -200,7 +200,7 @@ impl<'info> ExecuteDeposit<'info> {
                 msg!(&err.to_string());
                 GmxCoreError::from(err)
             })?;
-        market.validate_market_balances()?;
+        market.validate_market_balances(0, 0)?;
         msg!("{:?}", report);
         Ok(())
     }

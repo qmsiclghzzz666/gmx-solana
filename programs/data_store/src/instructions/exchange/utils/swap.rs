@@ -53,15 +53,18 @@ impl<'a, 'info> SwapUtils<'a, 'info> {
         let last_idx = self.markets.len().saturating_sub(1);
         let mut final_market = None;
         // Invariant: `token_in_amount` has been record.
-        for (idx, market) in self.markets.iter().enumerate() {
-            require!(flags.insert(market.key), DataStoreError::InvalidSwapPath);
-            require!(market.is_writable, DataStoreError::InvalidSwapPath);
-            final_market = Some(market);
-            let mut market = Account::<'info, Market>::try_from(market)?;
+        for (idx, market_info) in self.markets.iter().enumerate() {
+            require!(
+                flags.insert(market_info.key),
+                DataStoreError::InvalidSwapPath
+            );
+            require!(market_info.is_writable, DataStoreError::InvalidSwapPath);
+            let mut market = Account::<'info, Market>::try_from(market_info)?;
             {
                 market.validate(&self.oracle.store)?;
                 let meta = &market.meta;
-                let mut mint = Account::<Mint>::try_from(&self.mints[idx])?;
+                let mint_info = &self.mints[idx];
+                let mut mint = Account::<Mint>::try_from(mint_info)?;
                 require_eq!(
                     meta.market_token_mint,
                     mint.key(),
@@ -83,6 +86,7 @@ impl<'a, 'info> SwapUtils<'a, 'info> {
                 } else {
                     return Err(DataStoreError::InvalidSwapPath.into());
                 };
+                final_market = Some(market_info);
                 let prices = gmx_core::action::Prices {
                     index_token_price: self
                         .oracle
@@ -121,6 +125,11 @@ impl<'a, 'info> SwapUtils<'a, 'info> {
                     .map_err(|_| DataStoreError::AmountOverflow)?;
                 if idx != last_idx {
                     market.record_transferred_out_by_token(&token_out, amount)?;
+                    market.as_market(&mut mint).validate_market_balances(0, 0)?;
+                } else {
+                    market
+                        .as_market(&mut mint)
+                        .validate_market_balances_excluding_token_amount(&token_out, amount)?;
                 }
                 msg!("{:?}", report);
             }
@@ -135,7 +144,7 @@ impl<'a, 'info> SwapUtils<'a, 'info> {
         Ok(SwapOut {
             token: expected_token_out,
             amount,
-            market: final_market,
+            output_market: final_market,
         })
     }
 }
@@ -206,7 +215,7 @@ pub(crate) fn unchecked_swap_with_params<'info>(
 pub(crate) struct SwapOut<'info> {
     token: Pubkey,
     amount: u64,
-    market: Option<&'info AccountInfo<'info>>,
+    output_market: Option<&'info AccountInfo<'info>>,
 }
 
 impl<'info> SwapOut<'info> {
@@ -218,7 +227,7 @@ impl<'info> SwapOut<'info> {
         target: &mut Account<'info, Market>,
         unknown_as_target: bool,
     ) -> Result<u64> {
-        let Some(from) = self.market else {
+        let Some(from) = self.output_market else {
             return if unknown_as_target {
                 Ok(self.amount)
             } else {
@@ -242,4 +251,29 @@ impl<'info> SwapOut<'info> {
     pub(crate) fn into_amount(self) -> u64 {
         self.amount
     }
+}
+
+/// Transfer tokens from one market to another.
+///
+/// ## CHECK
+/// - `to` account must be exited before calling this function, and should be reloaded after.
+pub(crate) fn unchecked_transfer_to_market<'info>(
+    store: &Pubkey,
+    from: &mut Account<'info, Market>,
+    to: &'info AccountInfo<'info>,
+    token: &Pubkey,
+    amount: u64,
+) -> Result<()> {
+    if amount == 0 {
+        return Ok(());
+    }
+    require!(from.key() != to.key(), DataStoreError::InvalidArgument);
+    from.record_transferred_out_by_token(token, amount)?;
+    {
+        let mut market = Account::<'info, Market>::try_from(to)?;
+        market.validate(store)?;
+        market.record_transferred_in_by_token(token, amount)?;
+        market.exit(&crate::ID)?;
+    }
+    Ok(())
 }

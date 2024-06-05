@@ -396,12 +396,48 @@ impl<'a, 'info> AsMarket<'a, 'info> {
         PositionOps::try_new(self, position)
     }
 
-    pub(crate) fn validate_market_balances(&self) -> Result<()> {
-        self.validate_token_balance_for_one_side(&((*self.long_token_balance) as u128), true)
+    fn balance_after_excluding(&self, is_long_token: bool, excluding_amount: u64) -> Result<u64> {
+        let balance = if is_long_token {
+            self.long_token_balance
+        } else {
+            self.short_token_balance
+        };
+        if excluding_amount != 0 {
+            balance
+                .checked_sub(excluding_amount)
+                .ok_or(error!(DataStoreError::AmountOverflow))
+        } else {
+            Ok(*balance)
+        }
+    }
+
+    pub(crate) fn validate_market_balances(
+        &self,
+        long_excluding_amount: u64,
+        short_excluding_amount: u64,
+    ) -> Result<()> {
+        let long_token_balance = self.balance_after_excluding(true, long_excluding_amount)? as u128;
+        self.validate_token_balance_for_one_side(&long_token_balance, true)
             .map_err(GmxCoreError::from)?;
-        self.validate_token_balance_for_one_side(&((*self.short_token_balance) as u128), false)
+        let short_token_balance =
+            self.balance_after_excluding(false, short_excluding_amount)? as u128;
+        self.validate_token_balance_for_one_side(&short_token_balance, false)
             .map_err(GmxCoreError::from)?;
         Ok(())
+    }
+
+    pub(crate) fn validate_market_balances_excluding_token_amount(
+        &self,
+        token: &Pubkey,
+        amount: u64,
+    ) -> Result<()> {
+        if *token == self.meta.long_token_mint {
+            self.validate_market_balances(amount, 0)
+        } else if *token == self.meta.short_token_mint {
+            self.validate_market_balances(0, amount)
+        } else {
+            Err(error!(DataStoreError::InvalidCollateralToken))
+        }
     }
 }
 

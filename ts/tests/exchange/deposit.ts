@@ -206,7 +206,11 @@ describe("exchange: deposit", () => {
                     deposit,
                     options: {
                         executionFee: 5000,
-                    }
+                    },
+
+                },
+                {
+                    computeUnits: 400_000,
                 }
             );
             console.log(`deposit cancelled at ${signature}`);

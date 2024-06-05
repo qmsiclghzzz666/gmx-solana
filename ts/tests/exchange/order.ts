@@ -52,6 +52,8 @@ describe("exchange: order", () => {
                         shortToken: usdGTokenMint,
                     }
                 }
+            }, {
+                computeUnits: 400_000,
             });
             increaseOrder = address;
             console.log(`order ${increaseOrder} created at ${signature}`);

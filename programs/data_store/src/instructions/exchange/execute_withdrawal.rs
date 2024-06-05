@@ -9,7 +9,7 @@ use crate::{
     DataStoreError, GmxCoreError,
 };
 
-use super::utils::swap::unchecked_swap_with_params;
+use super::utils::swap::{unchecked_swap_with_params, unchecked_transfer_to_market};
 
 #[derive(Accounts)]
 pub struct ExecuteWithdrawal<'info> {
@@ -93,7 +93,29 @@ pub fn execute_withdrawal<'info>(
 ) -> Result<(u64, u64)> {
     ctx.accounts.validate()?;
     ctx.accounts.pre_execute()?;
-    ctx.accounts.execute(ctx.remaining_accounts)
+    let (final_long_amount, final_short_amount) = ctx.accounts.execute(ctx.remaining_accounts)?;
+
+    // Validate market balances.
+    let swap = &ctx.accounts.withdrawal.dynamic.swap;
+
+    let long_amount = if swap.long_token_swap_path.is_empty() {
+        final_long_amount
+    } else {
+        0
+    };
+
+    let short_amount = if swap.short_token_swap_path.is_empty() {
+        final_short_amount
+    } else {
+        0
+    };
+
+    ctx.accounts
+        .market
+        .as_market(&mut ctx.accounts.market_token_mint)
+        .validate_market_balances(long_amount, short_amount)?;
+
+    Ok((final_long_amount, final_short_amount))
 }
 
 impl<'info> internal::Authentication<'info> for ExecuteWithdrawal<'info> {
@@ -220,6 +242,35 @@ impl<'info> ExecuteWithdrawal<'info> {
         long_amount: u64,
         short_amount: u64,
     ) -> Result<(u64, u64)> {
+        let [long_swap_path, short_swap_path, ..] = self
+            .withdrawal
+            .dynamic
+            .swap
+            .split_swap_paths(remaining_accounts)?;
+        if let Some(to) = long_swap_path.first() {
+            let token = self.market.meta.long_token_mint;
+            if to.key() != self.market.key() {
+                unchecked_transfer_to_market(
+                    &self.store.key(),
+                    &mut self.market,
+                    to,
+                    &token,
+                    long_amount,
+                )?;
+            }
+        }
+        if let Some(to) = short_swap_path.first() {
+            let token = self.market.meta.short_token_mint;
+            if to.key() != self.market.key() {
+                unchecked_transfer_to_market(
+                    &self.store.key(),
+                    &mut self.market,
+                    to,
+                    &token,
+                    short_amount,
+                )?;
+            }
+        }
         let meta = &self.market.meta;
         // Call exit and reload to make sure the data are written to the storage.
         // In case that there are markets also appear in the swap paths.
