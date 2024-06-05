@@ -7,10 +7,10 @@ use gmx_core::{
         position::PositionImpactDistributionParams,
         FeeParams, PositionParams, PriceImpactParams,
     },
-    ClockKind, PoolKind,
+    ClockKind, MarketExt, PoolKind,
 };
 
-use crate::{constants, utils::internal::TransferUtils, DataStoreError};
+use crate::{constants, utils::internal::TransferUtils, DataStoreError, GmxCoreError};
 
 use super::{
     common::map::{pools::Pools, DynamicMapStore},
@@ -224,6 +224,8 @@ impl Market {
     ) -> AsMarket<'a, 'info> {
         AsMarket {
             meta: &self.meta,
+            long_token_balance: &self.long_token_balance,
+            short_token_balance: &self.short_token_balance,
             pools: self.pools.as_map_mut(),
             clocks: self.clocks.as_map_mut(),
             mint,
@@ -338,6 +340,8 @@ type ClocksMap<'a> = DualVecMap<&'a mut Vec<u8>, &'a mut Vec<i64>>;
 /// Convert to a [`Market`](gmx_core::Market).
 pub struct AsMarket<'a, 'info> {
     meta: &'a MarketMeta,
+    long_token_balance: &'a u64,
+    short_token_balance: &'a u64,
     funding_factor_per_second: &'a mut i128,
     pools: PoolsMap<'a>,
     clocks: ClocksMap<'a>,
@@ -380,6 +384,14 @@ impl<'a, 'info> AsMarket<'a, 'info> {
         position: &'a mut AccountLoader<'info, Position>,
     ) -> Result<PositionOps<'a, 'info>> {
         PositionOps::try_new(self, position)
+    }
+
+    pub(crate) fn validate_market_balances(&self) -> Result<()> {
+        self.validate_token_balance_for_one_side(&((*self.long_token_balance) as u128), true)
+            .map_err(GmxCoreError::from)?;
+        self.validate_token_balance_for_one_side(&((*self.short_token_balance) as u128), false)
+            .map_err(GmxCoreError::from)?;
+        Ok(())
     }
 }
 

@@ -15,6 +15,7 @@ pub trait Num:
     + Ord
     + FromPrimitive
     + fmt::Debug
+    + fmt::Display
 {
 }
 
@@ -27,7 +28,8 @@ impl<
             + Clone
             + Ord
             + FromPrimitive
-            + fmt::Debug,
+            + fmt::Debug
+            + fmt::Display,
     > Num for T
 {
 }

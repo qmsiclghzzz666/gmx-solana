@@ -999,9 +999,13 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
         balance: &Self::Num,
         is_long_token: bool,
     ) -> crate::Result<()> {
-        if *balance < self.expected_min_token_balance_excluding_collateral_amount(is_long_token)? {
+        let expected =
+            self.expected_min_token_balance_excluding_collateral_amount(is_long_token)?;
+        if *balance < expected {
             return Err(crate::Error::InvalidTokenBalance(
                 "Less than expected min token balance excluding collateral amount",
+                expected.to_string(),
+                balance.to_string(),
             ));
         }
 

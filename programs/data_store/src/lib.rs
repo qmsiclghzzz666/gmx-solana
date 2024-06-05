@@ -466,10 +466,12 @@ pub enum DataStoreError {
     LamportsNotEnough,
     #[msg("Required resource not found")]
     RequiredResourceNotFound,
-    #[msg("amount overflow")]
+    #[msg("Amount overflow")]
     AmountOverflow,
     #[msg("Unknown error")]
     Unknown,
+    #[msg("Gmx Core Error")]
+    Core,
     #[msg("Missing amount")]
     MissingAmount,
     #[msg("Missing factor")]

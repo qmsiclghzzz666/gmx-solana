@@ -28,9 +28,9 @@ impl From<GmxCoreError> for anchor_lang::prelude::Error {
         match err.0 {
             gmx_core::Error::EmptyDeposit => DataStoreError::EmptyDeposit.into(),
             gmx_core::Error::Solana(err) => err,
-            err => {
-                crate::msg!("GmxCoreError occurred. Error Message: {}", err);
-                DataStoreError::Unknown.into()
+            core_error => {
+                crate::msg!("GmxCoreError occurred. Error Message: {}", core_error);
+                DataStoreError::Core.into()
             }
         }
     }

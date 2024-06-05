@@ -177,11 +177,12 @@ impl<'info> ExecuteDeposit<'info> {
             .ok_or(error!(DataStoreError::InvalidArgument))?
             .max
             .to_unit_price();
-        let report = self
+        let mut market = self
             .market
             .as_market(&mut self.market_token_mint)
             .enable_transfer(self.token_program.to_account_info(), &self.store)
-            .with_receiver(self.receiver.to_account_info())
+            .with_receiver(self.receiver.to_account_info());
+        let report = market
             .deposit(
                 long_amount.into(),
                 short_amount.into(),
@@ -197,6 +198,7 @@ impl<'info> ExecuteDeposit<'info> {
                 msg!(&err.to_string());
                 GmxCoreError::from(err)
             })?;
+        market.validate_market_balances()?;
         msg!("{:?}", report);
         Ok(())
     }
