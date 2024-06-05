@@ -115,7 +115,6 @@ impl<'info> ExecuteDeposit<'info> {
     fn execute(&mut self, remaining_accounts: &'info [AccountInfo<'info>]) -> Result<()> {
         let meta = self.market.meta.clone();
         let (long_amount, short_amount) = self.perform_swaps(&meta, remaining_accounts)?;
-        msg!("{}, {}", long_amount, short_amount);
         self.perform_deposit(&meta, long_amount, short_amount)?;
         // Set amounts to zero to make sure it can be removed without transferring out any tokens.
         self.deposit.fixed.tokens.params.initial_long_token_amount = 0;
@@ -131,7 +130,7 @@ impl<'info> ExecuteDeposit<'info> {
         // Exit must be called to update the external state.
         self.market.exit(&crate::ID)?;
         // CHECK: `exit` has been called above, and `reload` will be called after.
-        let res = unchecked_swap_with_params(
+        let (long_swap_out, short_swap_out) = unchecked_swap_with_params(
             &self.oracle,
             &self.deposit.dynamic.swap_params,
             remaining_accounts,
@@ -147,7 +146,10 @@ impl<'info> ExecuteDeposit<'info> {
         )?;
         // Call `reload` to make sure the state is up-to-date.
         self.market.reload()?;
-        Ok(res)
+        Ok((
+            long_swap_out.transfer_to_market(&mut self.market, true)?,
+            short_swap_out.transfer_to_market(&mut self.market, true)?,
+        ))
     }
 
     fn perform_deposit(

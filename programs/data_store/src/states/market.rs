@@ -138,7 +138,12 @@ impl Market {
                 .checked_add(amount)
                 .ok_or(error!(DataStoreError::AmountOverflow))?;
         }
-        msg!("{},{}", self.long_token_balance, self.short_token_balance);
+        msg!(
+            "{}: {},{}",
+            self.meta.market_token_mint,
+            self.long_token_balance,
+            self.short_token_balance
+        );
         Ok(())
     }
 
@@ -164,7 +169,12 @@ impl Market {
                 .checked_sub(amount)
                 .ok_or(error!(DataStoreError::AmountOverflow))?;
         }
-        msg!("{},{}", self.long_token_balance, self.short_token_balance);
+        msg!(
+            "{}: {},{}",
+            self.meta.market_token_mint,
+            self.long_token_balance,
+            self.short_token_balance
+        );
         Ok(())
     }
 

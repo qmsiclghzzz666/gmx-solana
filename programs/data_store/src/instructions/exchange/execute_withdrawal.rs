@@ -225,7 +225,7 @@ impl<'info> ExecuteWithdrawal<'info> {
         // In case that there are markets also appear in the swap paths.
         self.market.exit(&crate::ID)?;
         // CHECK: `exit` and `reload` have been called on the modified market account before and after the swap.
-        let res = unchecked_swap_with_params(
+        let (long_swap_out, short_swap_out) = unchecked_swap_with_params(
             &self.oracle,
             &self.withdrawal.dynamic.swap,
             remaining_accounts,
@@ -238,6 +238,6 @@ impl<'info> ExecuteWithdrawal<'info> {
         )?;
         // Call `reload` to make sure the state is up-to-date.
         self.market.reload()?;
-        Ok(res)
+        Ok((long_swap_out.into_amount(), short_swap_out.into_amount()))
     }
 }

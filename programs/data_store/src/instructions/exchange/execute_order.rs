@@ -301,7 +301,7 @@ impl<'info> ExecuteOrder<'info> {
                 // Exit must be called to update the external state.
                 self.market.exit(&crate::ID)?;
                 // CHECK: `exit` has been called above, and `reload` will be called later.
-                let (collateral_increment_amount, _) = unchecked_swap_with_params(
+                let (swap_out, _) = unchecked_swap_with_params(
                     &self.oracle,
                     swap,
                     remaining_accounts,
@@ -311,6 +311,8 @@ impl<'info> ExecuteOrder<'info> {
                 )?;
                 // Call `reload` to make sure the state is up-to-date.
                 self.market.reload()?;
+                let collateral_increment_amount =
+                    swap_out.transfer_to_market(&mut self.market, true)?;
 
                 let size_delta_usd = params.size_delta_usd;
                 let acceptable_price = params.acceptable_price;
@@ -435,7 +437,7 @@ impl<'info> ExecuteOrder<'info> {
         // In case that there are markets also appear in the swap paths.
         self.market.exit(&crate::ID)?;
         // CHECK: `exit` and `reload` have been called on the modified market account before and after the swap.
-        let (output_amount, secondary_amount) = unchecked_swap_with_params(
+        let (swap_out, secondary_swap_out) = unchecked_swap_with_params(
             &self.oracle,
             &self.order.swap,
             remaining_accounts,
@@ -453,8 +455,8 @@ impl<'info> ExecuteOrder<'info> {
         // Call `reload` to make sure the state is up-to-date.
         self.market.reload()?;
 
-        self.transfer_out(ctx, false, output_amount)?;
-        self.transfer_out(ctx, true, secondary_amount)?;
+        self.transfer_out(ctx, false, swap_out.into_amount())?;
+        self.transfer_out(ctx, true, secondary_swap_out.into_amount())?;
         Ok(())
     }
 

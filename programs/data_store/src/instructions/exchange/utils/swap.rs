@@ -35,7 +35,7 @@ impl<'a, 'info> SwapUtils<'a, 'info> {
     /// Execute the swaps.
     ///
     /// ## Assumptions
-    /// - `token_in_amount` should have been recorded in the first market's balance.
+    /// - `token_in_amount` should have been recorded in the first market's balance if the swap path is non-empty.
     ///
     /// ## Notes
     /// - The final amount is still recorded in the last market's balance, i.e., not transferred out.
@@ -44,17 +44,19 @@ impl<'a, 'info> SwapUtils<'a, 'info> {
         expected_token_out: Pubkey,
         mut token_in: Pubkey,
         token_in_amount: &u64,
-    ) -> Result<u64> {
+    ) -> Result<SwapOut<'info>> {
         if *token_in_amount == 0 {
-            return Ok(0);
+            return Ok(Default::default());
         }
         let mut flags = BTreeSet::default();
         let mut amount = *token_in_amount;
         let last_idx = self.markets.len().saturating_sub(1);
+        let mut final_market = None;
         // Invariant: `token_in_amount` has been record.
         for (idx, market) in self.markets.iter().enumerate() {
             require!(flags.insert(market.key), DataStoreError::InvalidSwapPath);
             require!(market.is_writable, DataStoreError::InvalidSwapPath);
+            final_market = Some(market);
             let mut market = Account::<'info, Market>::try_from(market)?;
             {
                 market.validate(&self.oracle.store)?;
@@ -130,7 +132,11 @@ impl<'a, 'info> SwapUtils<'a, 'info> {
             expected_token_out,
             DataStoreError::InvalidSwapPath
         );
-        Ok(amount)
+        Ok(SwapOut {
+            token: expected_token_out,
+            amount,
+            market: final_market,
+        })
     }
 }
 
@@ -143,7 +149,7 @@ impl<'a, 'info> SwapUtils<'a, 'info> {
 /// ## Check
 /// - All remaining_accounts must contain the most recent state.
 ///  The `exit` and `reload` functions can be called to synchronize any accounts that might have an unsynchronized state.
-/// - The `token_in_amount`s are assumed to be recorded in the first market of each swap path.
+/// - The `token_in_amount`s are assumed to be recorded in the first market of each non-empty swap path.
 ///
 /// ## Notes
 /// - The swap out amounts are still being recorded in the last market of each swap path, i.e., they are not transferred out.
@@ -154,7 +160,7 @@ pub(crate) fn unchecked_swap_with_params<'info>(
     expected_token_outs: (Pubkey, Pubkey),
     token_ins: (Option<Pubkey>, Option<Pubkey>),
     token_in_amounts: (u64, u64),
-) -> Result<(u64, u64)> {
+) -> Result<(SwapOut<'info>, SwapOut<'info>)> {
     require!(
         (token_in_amounts.0 == 0) || token_ins.0.is_some(),
         DataStoreError::AmountNonZeroMissingToken
@@ -194,4 +200,46 @@ pub(crate) fn unchecked_swap_with_params<'info>(
         .transpose()?
         .unwrap_or_default();
     Ok((long_token_out_amount, short_token_out_amount))
+}
+
+#[derive(Default)]
+pub(crate) struct SwapOut<'info> {
+    token: Pubkey,
+    amount: u64,
+    market: Option<&'info AccountInfo<'info>>,
+}
+
+impl<'info> SwapOut<'info> {
+    /// Transfer the amount to the given `market`, return the transferred amount.
+    ///
+    /// If `unknown_as_target` is set, `swap_out_market` and `target` will be treated as the same.
+    pub(crate) fn transfer_to_market(
+        self,
+        target: &mut Account<'info, Market>,
+        unknown_as_target: bool,
+    ) -> Result<u64> {
+        let Some(from) = self.market else {
+            return if unknown_as_target {
+                Ok(self.amount)
+            } else {
+                Err(error!(DataStoreError::UnknownSwapOutMarket))
+            };
+        };
+        if from.key() == target.key() {
+            return Ok(self.amount);
+        }
+        {
+            let mut market = Account::<'info, Market>::try_from(from)?;
+            // The `market` must have be validated during the swap.
+            market.record_transferred_out_by_token(&self.token, self.amount)?;
+            market.exit(&crate::ID)?;
+        }
+        target.record_transferred_in_by_token(&self.token, self.amount)?;
+        Ok(self.amount)
+    }
+
+    /// Keep the amount in the swap out market.
+    pub(crate) fn into_amount(self) -> u64 {
+        self.amount
+    }
 }

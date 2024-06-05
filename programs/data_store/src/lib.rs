@@ -543,6 +543,8 @@ pub enum DataStoreError {
     InvalidMarket,
     #[msg("Disabled market")]
     DisabledMarket,
+    #[msg("Unknown swap out market")]
+    UnknownSwapOutMarket,
     // Exchange Common.
     #[msg("Invalid swap path")]
     InvalidSwapPath,
