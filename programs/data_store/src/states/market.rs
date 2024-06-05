@@ -7,16 +7,15 @@ use gmx_core::{
         position::PositionImpactDistributionParams,
         FeeParams, PositionParams, PriceImpactParams,
     },
-    ClockKind, PoolKind,
+    ClockKind, MarketExt, PoolKind,
 };
-use gmx_solana_utils::to_seed;
 
-use crate::{constants, utils::internal::TransferUtils, DataStoreError};
+use crate::{constants, utils::internal::TransferUtils, DataStoreError, GmxCoreError};
 
 use super::{
     common::map::{pools::Pools, DynamicMapStore},
     position::{Position, PositionOps},
-    Data, DataStore, InitSpace, Seed,
+    DataStore, InitSpace, Seed,
 };
 
 /// Market.
@@ -26,23 +25,14 @@ pub struct Market {
     /// Bump Seed.
     pub(crate) bump: u8,
     pub(crate) meta: MarketMeta,
+    pub(crate) store: Pubkey,
+    is_enabled: bool,
+    is_pure: bool,
+    long_token_balance: u64,
+    short_token_balance: u64,
     pools: Pools,
     clocks: DynamicMapStore<u8, i64>,
     funding_factor_per_second: i128,
-}
-
-impl Market {
-    pub(crate) fn init_space(num_pools: u8, num_clocks: u8) -> usize {
-        1 + 16
-            + MarketMeta::INIT_SPACE
-            + DynamicMapStore::<u8, Pool>::init_space(num_pools)
-            + DynamicMapStore::<u8, i64>::init_space(num_clocks)
-    }
-
-    /// Get meta.
-    pub fn meta(&self) -> &MarketMeta {
-        &self.meta
-    }
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, InitSpace)]
@@ -88,24 +78,131 @@ impl MarketMeta {
 const NOT_PURE_POOLS: [u8; 1] = [PoolKind::BorrowingFactor as u8];
 
 impl Market {
+    pub(crate) fn init_space(num_pools: u8, num_clocks: u8) -> usize {
+        1 + 16
+            + 32
+            + MarketMeta::INIT_SPACE
+            + 1
+            + 1
+            + (8 * 2)
+            + DynamicMapStore::<u8, Pool>::init_space(num_pools)
+            + DynamicMapStore::<u8, i64>::init_space(num_clocks)
+    }
+
+    /// Get meta.
+    pub fn meta(&self) -> &MarketMeta {
+        &self.meta
+    }
+
+    /// Record transferred in by the given token.
+    pub fn record_transferred_in_by_token(&mut self, token: &Pubkey, amount: u64) -> Result<()> {
+        if self.meta.long_token_mint == *token {
+            self.record_transferred_in(true, amount)
+        } else if self.meta.short_token_mint == *token {
+            self.record_transferred_in(false, amount)
+        } else {
+            Err(error!(DataStoreError::InvalidCollateralToken))
+        }
+    }
+
+    /// Record transferred out by the given token.
+    pub fn record_transferred_out_by_token(&mut self, token: &Pubkey, amount: u64) -> Result<()> {
+        if self.meta.long_token_mint == *token {
+            self.record_transferred_out(true, amount)
+        } else if self.meta.short_token_mint == *token {
+            self.record_transferred_out(false, amount)
+        } else {
+            Err(error!(DataStoreError::InvalidCollateralToken))
+        }
+    }
+
+    /// Record transferred in.
+    fn record_transferred_in(&mut self, is_long_token: bool, amount: u64) -> Result<()> {
+        // TODO: use event
+        msg!(
+            "{}: {},{}(+{},{})",
+            self.meta.market_token_mint,
+            self.long_token_balance,
+            self.short_token_balance,
+            amount,
+            is_long_token
+        );
+        if self.is_pure || is_long_token {
+            self.long_token_balance = self
+                .long_token_balance
+                .checked_add(amount)
+                .ok_or(error!(DataStoreError::AmountOverflow))?;
+        } else {
+            self.short_token_balance = self
+                .short_token_balance
+                .checked_add(amount)
+                .ok_or(error!(DataStoreError::AmountOverflow))?;
+        }
+        msg!(
+            "{}: {},{}",
+            self.meta.market_token_mint,
+            self.long_token_balance,
+            self.short_token_balance
+        );
+        Ok(())
+    }
+
+    /// Record transferred out.
+    fn record_transferred_out(&mut self, is_long_token: bool, amount: u64) -> Result<()> {
+        // TODO: use event
+        msg!(
+            "{}: {},{}(-{},{})",
+            self.meta.market_token_mint,
+            self.long_token_balance,
+            self.short_token_balance,
+            amount,
+            is_long_token
+        );
+        if self.is_pure || is_long_token {
+            self.long_token_balance = self
+                .long_token_balance
+                .checked_sub(amount)
+                .ok_or(error!(DataStoreError::AmountOverflow))?;
+        } else {
+            self.short_token_balance = self
+                .short_token_balance
+                .checked_sub(amount)
+                .ok_or(error!(DataStoreError::AmountOverflow))?;
+        }
+        msg!(
+            "{}: {},{}",
+            self.meta.market_token_mint,
+            self.long_token_balance,
+            self.short_token_balance
+        );
+        Ok(())
+    }
+
     /// Initialize the market.
     #[allow(clippy::too_many_arguments)]
     pub fn init(
         &mut self,
         bump: u8,
+        store: Pubkey,
         market_token_mint: Pubkey,
         index_token_mint: Pubkey,
         long_token_mint: Pubkey,
         short_token_mint: Pubkey,
         num_pools: u8,
         num_clocks: u8,
+        is_enabled: bool,
     ) -> Result<()> {
         self.bump = bump;
+        self.store = store;
+        self.is_enabled = is_enabled;
         self.meta.market_token_mint = market_token_mint;
         self.meta.index_token_mint = index_token_mint;
         self.meta.long_token_mint = long_token_mint;
         self.meta.short_token_mint = short_token_mint;
         let is_pure = self.meta.long_token_mint == self.meta.short_token_mint;
+        self.is_pure = is_pure;
+        self.long_token_balance = 0;
+        self.short_token_balance = 0;
         self.pools.init_with(num_pools, |kind| {
             Pool::default().with_is_pure(is_pure && !(NOT_PURE_POOLS.contains(&kind)))
         });
@@ -123,33 +220,12 @@ impl Market {
 
     /// Get mutable reference to the pool of the given kind.
     #[inline]
-    pub(crate) fn with_pool_mut<T>(
+    pub(crate) fn _with_pool_mut<T>(
         &mut self,
         kind: PoolKind,
         f: impl FnOnce(&mut Pool) -> T,
     ) -> Option<T> {
         self.pools.get_mut_with(kind, |pool| pool.map(f))
-    }
-
-    /// Get the expected key.
-    pub fn expected_key(&self) -> String {
-        Self::create_key(&self.meta.market_token_mint)
-    }
-
-    /// Get the expected key seed.
-    pub fn expected_key_seed(&self) -> [u8; 32] {
-        to_seed(&self.expected_key())
-    }
-
-    /// Create key from tokens.
-    pub fn create_key(market_token: &Pubkey) -> String {
-        market_token.to_string()
-    }
-
-    /// Create key seed from tokens.
-    pub fn create_key_seed(market_token: &Pubkey) -> [u8; 32] {
-        let key = Self::create_key(market_token);
-        to_seed(&key)
     }
 
     pub(crate) fn as_market<'a, 'info>(
@@ -158,6 +234,8 @@ impl Market {
     ) -> AsMarket<'a, 'info> {
         AsMarket {
             meta: &self.meta,
+            long_token_balance: &self.long_token_balance,
+            short_token_balance: &self.short_token_balance,
             pools: self.pools.as_map_mut(),
             clocks: self.clocks.as_map_mut(),
             mint,
@@ -166,6 +244,13 @@ impl Market {
             vault: None,
             funding_factor_per_second: &mut self.funding_factor_per_second,
         }
+    }
+
+    /// Validate the market.
+    pub fn validate(&self, store: &Pubkey) -> Result<()> {
+        require_eq!(*store, self.store, DataStoreError::InvalidMarket);
+        require!(self.is_enabled, DataStoreError::DisabledMarket);
+        Ok(())
     }
 }
 
@@ -177,15 +262,6 @@ impl Bump for Market {
 
 impl Seed for Market {
     const SEED: &'static [u8] = b"market";
-}
-
-impl Data for Market {
-    fn verify(&self, key: &str) -> Result<()> {
-        // FIXME: is there a better way to verify the key?
-        let expected = self.expected_key();
-        require_eq!(key, &expected, crate::DataStoreError::InvalidKey);
-        Ok(())
-    }
 }
 
 /// A pool for market.
@@ -274,6 +350,8 @@ type ClocksMap<'a> = DualVecMap<&'a mut Vec<u8>, &'a mut Vec<i64>>;
 /// Convert to a [`Market`](gmx_core::Market).
 pub struct AsMarket<'a, 'info> {
     meta: &'a MarketMeta,
+    long_token_balance: &'a u64,
+    short_token_balance: &'a u64,
     funding_factor_per_second: &'a mut i128,
     pools: PoolsMap<'a>,
     clocks: ClocksMap<'a>,
@@ -316,6 +394,50 @@ impl<'a, 'info> AsMarket<'a, 'info> {
         position: &'a mut AccountLoader<'info, Position>,
     ) -> Result<PositionOps<'a, 'info>> {
         PositionOps::try_new(self, position)
+    }
+
+    fn balance_after_excluding(&self, is_long_token: bool, excluding_amount: u64) -> Result<u64> {
+        let balance = if is_long_token {
+            self.long_token_balance
+        } else {
+            self.short_token_balance
+        };
+        if excluding_amount != 0 {
+            balance
+                .checked_sub(excluding_amount)
+                .ok_or(error!(DataStoreError::AmountOverflow))
+        } else {
+            Ok(*balance)
+        }
+    }
+
+    pub(crate) fn validate_market_balances(
+        &self,
+        long_excluding_amount: u64,
+        short_excluding_amount: u64,
+    ) -> Result<()> {
+        let long_token_balance = self.balance_after_excluding(true, long_excluding_amount)? as u128;
+        self.validate_token_balance_for_one_side(&long_token_balance, true)
+            .map_err(GmxCoreError::from)?;
+        let short_token_balance =
+            self.balance_after_excluding(false, short_excluding_amount)? as u128;
+        self.validate_token_balance_for_one_side(&short_token_balance, false)
+            .map_err(GmxCoreError::from)?;
+        Ok(())
+    }
+
+    pub(crate) fn validate_market_balances_excluding_token_amount(
+        &self,
+        token: &Pubkey,
+        amount: u64,
+    ) -> Result<()> {
+        if *token == self.meta.long_token_mint {
+            self.validate_market_balances(amount, 0)
+        } else if *token == self.meta.short_token_mint {
+            self.validate_market_balances(0, amount)
+        } else {
+            Err(error!(DataStoreError::InvalidCollateralToken))
+        }
     }
 }
 

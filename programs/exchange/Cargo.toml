@@ -24,7 +24,7 @@ devnet = ["data_store/devnet"]
 
 [dependencies]
 anchor-lang = { workspace = true }
-anchor-spl = { workspace = true, default_features = false, features = [
+anchor-spl = { workspace = true, default-features = false, features = [
     "token",
     "token_2022",
 ] }

@@ -1,9 +1,9 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token};
 use data_store::{
-    cpi::accounts::{RemoveOrder, RemovePosition},
+    cpi::accounts::{MarketTransferOut, RemoveOrder, RemovePosition},
     program::DataStore,
-    states::{Oracle, Order, PriceProvider},
+    states::{order::TransferOut, Oracle, Order, PriceProvider},
     utils::{Authentication, WithOracle, WithOracleExt},
 };
 
@@ -90,13 +90,14 @@ pub fn execute_order<'info>(
         order.prices.tokens.clone(),
         ctx.remaining_accounts,
         |accounts, remaining_accounts| {
-            let should_remove_position = data_store::cpi::execute_order(
+            let (should_remove_position, transfer_out) = data_store::cpi::execute_order(
                 accounts
                     .execute_order_ctx()
                     .with_remaining_accounts(remaining_accounts.to_vec()),
                 recent_timestamp,
             )?
             .get();
+            accounts.process_transfer_out(&transfer_out, remaining_accounts)?;
             Ok(should_remove_position)
         },
     )?;
@@ -235,5 +236,164 @@ impl<'info> ExecuteOrder<'info> {
                 system_program: self.system_program.to_account_info(),
             },
         ))
+    }
+
+    fn market_transfer_out_ctx(
+        &self,
+        market: AccountInfo<'info>,
+        vault: AccountInfo<'info>,
+        to: AccountInfo<'info>,
+    ) -> CpiContext<'_, '_, '_, 'info, MarketTransferOut<'info>> {
+        CpiContext::new(
+            self.data_store_program.to_account_info(),
+            MarketTransferOut {
+                authority: self.authority.to_account_info(),
+                store: self.store.to_account_info(),
+                // TODO: use controller PDA.
+                only_controller: self.only_order_keeper.to_account_info(),
+                market,
+                to,
+                vault,
+                token_program: self.token_program.to_account_info(),
+            },
+        )
+    }
+
+    fn market_transfer_out(
+        &self,
+        market: Option<AccountInfo<'info>>,
+        vault: Option<AccountInfo<'info>>,
+        to: Option<AccountInfo<'info>>,
+        amount: u64,
+    ) -> Result<()> {
+        data_store::cpi::market_transfer_out(
+            self.market_transfer_out_ctx(
+                market.ok_or(error!(ExchangeError::InvalidArgument))?,
+                vault.ok_or(error!(ExchangeError::InvalidArgument))?,
+                to.ok_or(error!(ExchangeError::InvalidArgument))?,
+            ),
+            amount,
+        )?;
+        Ok(())
+    }
+
+    fn process_transfer_out(
+        &self,
+        transfer_out: &TransferOut,
+        remaining_accounts: &[AccountInfo<'info>],
+    ) -> Result<()> {
+        let [long_swap_path, short_swap_path, ..] =
+            self.order.swap.split_swap_paths(remaining_accounts)?;
+
+        let TransferOut {
+            final_output_token,
+            final_secondary_output_token,
+            long_token,
+            short_token,
+            long_token_for_claimable_account_of_user,
+            short_token_for_claimable_account_of_user,
+            long_token_for_claimable_account_of_holding,
+            short_token_for_claimable_account_of_holding,
+        } = transfer_out;
+
+        if *final_output_token != 0 {
+            // Must have been validated during the execution.
+            let market = long_swap_path
+                .last()
+                .cloned()
+                .unwrap_or_else(|| self.market.to_account_info());
+            self.market_transfer_out(
+                Some(market),
+                self.final_output_token_vault
+                    .as_ref()
+                    .map(|a| a.to_account_info()),
+                self.final_output_token_account
+                    .as_ref()
+                    .map(|a| a.to_account_info()),
+                *final_output_token,
+            )?;
+        }
+
+        if *final_secondary_output_token != 0 {
+            // Must have been validated during the execution.
+            let market = short_swap_path
+                .last()
+                .cloned()
+                .unwrap_or_else(|| self.market.to_account_info());
+            self.market_transfer_out(
+                Some(market),
+                self.secondary_output_token_vault
+                    .as_ref()
+                    .map(|a| a.to_account_info()),
+                self.secondary_output_token_account
+                    .as_ref()
+                    .map(|a| a.to_account_info()),
+                *final_secondary_output_token,
+            )?;
+        }
+
+        if *long_token != 0 {
+            self.market_transfer_out(
+                Some(self.market.to_account_info()),
+                Some(self.long_token_vault.to_account_info()),
+                Some(self.long_token_account.to_account_info()),
+                *long_token,
+            )?;
+        }
+
+        if *short_token != 0 {
+            self.market_transfer_out(
+                Some(self.market.to_account_info()),
+                Some(self.short_token_vault.to_account_info()),
+                Some(self.short_token_account.to_account_info()),
+                *short_token,
+            )?;
+        }
+
+        if *long_token_for_claimable_account_of_user != 0 {
+            self.market_transfer_out(
+                Some(self.market.to_account_info()),
+                Some(self.long_token_vault.to_account_info()),
+                self.claimable_long_token_account_for_user
+                    .as_ref()
+                    .map(|a| a.to_account_info()),
+                *long_token_for_claimable_account_of_user,
+            )?;
+        }
+
+        if *short_token_for_claimable_account_of_user != 0 {
+            self.market_transfer_out(
+                Some(self.market.to_account_info()),
+                Some(self.short_token_vault.to_account_info()),
+                self.claimable_short_token_account_for_user
+                    .as_ref()
+                    .map(|a| a.to_account_info()),
+                *short_token_for_claimable_account_of_user,
+            )?;
+        }
+
+        if *long_token_for_claimable_account_of_holding != 0 {
+            self.market_transfer_out(
+                Some(self.market.to_account_info()),
+                Some(self.long_token_vault.to_account_info()),
+                self.claimable_pnl_token_account_for_holding
+                    .as_ref()
+                    .map(|a| a.to_account_info()),
+                *long_token_for_claimable_account_of_holding,
+            )?;
+        }
+
+        if *short_token_for_claimable_account_of_holding != 0 {
+            self.market_transfer_out(
+                Some(self.market.to_account_info()),
+                Some(self.short_token_vault.to_account_info()),
+                self.claimable_pnl_token_account_for_holding
+                    .as_ref()
+                    .map(|a| a.to_account_info()),
+                *short_token_for_claimable_account_of_holding,
+            )?;
+        }
+
+        Ok(())
     }
 }

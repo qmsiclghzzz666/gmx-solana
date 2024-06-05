@@ -1,5 +1,5 @@
 use anchor_lang::{prelude::*, system_program};
-use anchor_spl::token::TokenAccount;
+use anchor_spl::token::{Token, TokenAccount};
 
 use crate::{
     states::{
@@ -10,32 +10,6 @@ use crate::{
     utils::internal,
     DataStoreError,
 };
-
-/// Initialize a new [`Deposit`] account.
-pub fn initialize_deposit(
-    ctx: Context<InitializeDeposit>,
-    nonce: NonceBytes,
-    tokens_with_feed: Vec<TokenRecord>,
-    swap_params: SwapParams,
-    token_params: TokenParams,
-    ui_fee_receiver: Pubkey,
-) -> Result<()> {
-    ctx.accounts.deposit.init(
-        ctx.bumps.deposit,
-        &ctx.accounts.market,
-        nonce,
-        tokens_with_feed,
-        ctx.accounts.payer.key(),
-        ctx.accounts.initial_long_token_account.as_deref(),
-        ctx.accounts.initial_short_token_account.as_deref(),
-        Receivers {
-            receiver: ctx.accounts.receiver.key(),
-            ui_fee_receiver,
-        },
-        token_params,
-        swap_params,
-    )
-}
 
 #[derive(Accounts)]
 #[instruction(nonce: [u8; 32], tokens_with_feed: Vec<TokenRecord>, swap_params: SwapParams)]
@@ -57,10 +31,44 @@ pub struct InitializeDeposit<'info> {
     pub initial_long_token_account: Option<Box<Account<'info, TokenAccount>>>,
     #[account(token::authority = payer)]
     pub initial_short_token_account: Option<Box<Account<'info, TokenAccount>>>,
+    #[account(has_one = store)]
     pub(crate) market: Box<Account<'info, Market>>,
     #[account(token::authority = payer, token::mint = market.meta.market_token_mint)]
     pub receiver: Box<Account<'info, TokenAccount>>,
     pub system_program: Program<'info, System>,
+    pub token_program: Program<'info, Token>,
+}
+
+/// Initialize a new [`Deposit`] account.
+pub fn initialize_deposit(
+    ctx: Context<InitializeDeposit>,
+    nonce: NonceBytes,
+    tokens_with_feed: Vec<TokenRecord>,
+    swap_params: SwapParams,
+    token_params: TokenParams,
+    ui_fee_receiver: Pubkey,
+) -> Result<()> {
+    require!(
+        token_params.initial_long_token_amount != 0 || token_params.initial_short_token_amount != 0,
+        DataStoreError::EmptyDeposit
+    );
+
+    ctx.accounts.deposit.init(
+        ctx.bumps.deposit,
+        ctx.accounts.store.key(),
+        &ctx.accounts.market,
+        nonce,
+        tokens_with_feed,
+        ctx.accounts.payer.key(),
+        ctx.accounts.initial_long_token_account.as_deref(),
+        ctx.accounts.initial_short_token_account.as_deref(),
+        Receivers {
+            receiver: ctx.accounts.receiver.key(),
+            ui_fee_receiver,
+        },
+        token_params,
+        swap_params,
+    )
 }
 
 impl<'info> internal::Authentication<'info> for InitializeDeposit<'info> {
@@ -77,11 +85,6 @@ impl<'info> internal::Authentication<'info> for InitializeDeposit<'info> {
     }
 }
 
-/// Remove a deposit.
-pub fn remove_deposit(ctx: Context<RemoveDeposit>, refund: u64) -> Result<()> {
-    system_program::transfer(ctx.accounts.transfer_ctx(), refund)
-}
-
 #[derive(Accounts)]
 #[instruction(refund: u64)]
 pub struct RemoveDeposit<'info> {
@@ -91,8 +94,9 @@ pub struct RemoveDeposit<'info> {
     pub store: Account<'info, DataStore>,
     #[account(
         mut,
-        constraint = deposit.to_account_info().lamports() >= refund @ DataStoreError::LamportsNotEnough,
         close = authority,
+        constraint = deposit.to_account_info().lamports() >= refund @ DataStoreError::LamportsNotEnough,
+        constraint = deposit.fixed.store == store.key() @ DataStoreError::InvalidDepositToRemove,
         constraint = deposit.fixed.senders.user == user.key() @ DataStoreError::UserMismatch,
         seeds = [
             Deposit::SEED,
@@ -107,7 +111,19 @@ pub struct RemoveDeposit<'info> {
     /// and has been checked in `deposit`'s constraint.
     #[account(mut)]
     pub user: UncheckedAccount<'info>,
+    /// The token account for receiving the initial long tokens.
+    #[account(token::authority = user)]
+    pub initial_long_token: Option<Account<'info, TokenAccount>>,
+    /// The token account for receiving the initial short tokens.
+    #[account(token::authority = user)]
+    pub initial_short_token: Option<Account<'info, TokenAccount>>,
+    pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
+}
+
+/// Remove a deposit.
+pub fn remove_deposit(ctx: Context<RemoveDeposit>, refund: u64) -> Result<()> {
+    system_program::transfer(ctx.accounts.transfer_ctx(), refund)
 }
 
 impl<'info> internal::Authentication<'info> for RemoveDeposit<'info> {

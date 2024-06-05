@@ -36,6 +36,7 @@ impl Order {
     pub fn init(
         &mut self,
         bump: u8,
+        store: Pubkey,
         nonce: &NonceBytes,
         market: &Pubkey,
         user: &Pubkey,
@@ -48,7 +49,7 @@ impl Order {
         swap: SwapParams,
     ) -> Result<()> {
         self.fixed.init(
-            bump, nonce, market, user, position, params, tokens, senders, receivers,
+            bump, store, nonce, market, user, position, params, tokens, senders, receivers,
         )?;
         self.prices = TokensWithFeed::try_from_vec(tokens_with_feed)?;
         self.swap = swap;
@@ -66,6 +67,8 @@ impl Seed for Order {
 pub struct Fixed {
     /// The bump seed.
     pub bump: u8,
+    /// Store.
+    pub store: Pubkey,
     /// The nonce bytes for this order.
     pub nonce: [u8; 32],
     /// The slot that the order was last updated at.
@@ -93,6 +96,7 @@ impl Fixed {
     fn init(
         &mut self,
         bump: u8,
+        store: Pubkey,
         nonce: &NonceBytes,
         market: &Pubkey,
         user: &Pubkey,
@@ -104,6 +108,7 @@ impl Fixed {
     ) -> Result<()> {
         let clock = Clock::get()?;
         self.bump = bump;
+        self.store = store;
         self.nonce = *nonce;
         self.updated_at_slot = clock.slot;
         self.updated_at = clock.unix_timestamp;
@@ -192,6 +197,11 @@ impl OrderParams {
             }
         }
     }
+
+    /// Need to transfer in.
+    pub fn need_to_transfer_in(&self) -> bool {
+        matches!(self.kind, OrderKind::MarketIncrease | OrderKind::MarketSwap)
+    }
 }
 
 /// Order Kind.
@@ -213,4 +223,25 @@ pub enum OrderKind {
     MarketDecrease,
     /// Liquidation: allows liquidation of positions if the criteria for liquidation are met.
     Liquidation,
+}
+
+/// Transfer Out.
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
+pub struct TransferOut {
+    /// Final output token.
+    pub final_output_token: u64,
+    /// Final secondary output token.
+    pub final_secondary_output_token: u64,
+    /// Long token.
+    pub long_token: u64,
+    /// Short token.
+    pub short_token: u64,
+    /// Long token amount for claimable account of user.
+    pub long_token_for_claimable_account_of_user: u64,
+    /// Short token amount for cliamable account of user.
+    pub short_token_for_claimable_account_of_user: u64,
+    /// Long token amount for claimable account of holding.
+    pub long_token_for_claimable_account_of_holding: u64,
+    /// Short token amount for claimable account of holding.
+    pub short_token_for_claimable_account_of_holding: u64,
 }

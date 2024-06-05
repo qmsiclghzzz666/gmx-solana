@@ -1,7 +1,8 @@
 use anchor_lang::{prelude::*, system_program};
-use anchor_spl::token::TokenAccount;
+use anchor_spl::token::{Token, TokenAccount};
 
 use crate::{
+    constants,
     states::{
         common::{SwapParams, TokenRecord},
         order::{Order, OrderKind, OrderParams, Receivers, Senders, Tokens},
@@ -47,11 +48,26 @@ pub struct InitializeOrder<'info> {
             &[params.to_position_kind()? as u8],
         ],
         bump,
+        // FIXME: It cannot be check like this when the position is not initialized.
+        // constraint = position.load()?.store == store.key(),
     )]
     pub position: Option<AccountLoader<'info, Position>>,
+    #[account(has_one = store)]
     pub market: Box<Account<'info, Market>>,
-    #[account(token::authority = payer)]
+    #[account(mut, token::authority = payer)]
     pub initial_collateral_token_account: Option<Box<Account<'info, TokenAccount>>>,
+    #[account(
+        mut,
+        token::mint = initial_collateral_token_account.as_ref().expect("sender must be provided").mint,
+        seeds = [
+            constants::MARKET_VAULT_SEED,
+            store.key().as_ref(),
+            initial_collateral_token_vault.mint.as_ref(),
+            &[],
+        ],
+        bump,
+    )]
+    pub initial_collateral_token_vault: Option<Box<Account<'info, TokenAccount>>>,
     #[account(token::authority = payer)]
     pub final_output_token_account: Option<Box<Account<'info, TokenAccount>>>,
     #[account(token::authority = payer)]
@@ -61,6 +77,7 @@ pub struct InitializeOrder<'info> {
     #[account(token::authority = payer, token::mint = market.meta.short_token_mint)]
     pub short_token_account: Box<Account<'info, TokenAccount>>,
     pub system_program: Program<'info, System>,
+    pub token_program: Program<'info, Token>,
 }
 
 /// Initialize a new [`Order`] account.
@@ -156,6 +173,7 @@ pub fn initialize_order(
 
     ctx.accounts.order.init(
         ctx.bumps.order,
+        ctx.accounts.store.key(),
         &nonce,
         &ctx.accounts.market.key(),
         ctx.accounts.payer.key,
@@ -224,6 +242,7 @@ impl<'info> InitializeOrder<'info> {
                 position.try_init(
                     params.to_position_kind()?,
                     bump,
+                    self.store.key(),
                     self.payer.key,
                     &self.market.meta.market_token_mint,
                     output_token,
@@ -269,8 +288,9 @@ pub struct RemoveOrder<'info> {
     pub store: Account<'info, DataStore>,
     #[account(
         mut,
-        constraint = order.to_account_info().lamports() >= refund @ DataStoreError::LamportsNotEnough,
         close = authority,
+        constraint = order.fixed.store == store.key() @ DataStoreError::InvalidOrderToRemove,
+        constraint = order.to_account_info().lamports() >= refund @ DataStoreError::LamportsNotEnough,
         constraint = order.fixed.user == user.key() @ DataStoreError::UserMismatch,
         seeds = [
             Order::SEED,

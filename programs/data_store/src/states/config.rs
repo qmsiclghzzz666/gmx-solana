@@ -19,6 +19,8 @@ pub const DEFAULT_REQUEST_EXPIRATION_TIME: u64 = 300;
 pub struct Config {
     /// Bump.
     pub bump: u8,
+    /// Store.
+    pub store: Pubkey,
     /// Addresses.
     addresses: MapStore<[u8; 32], Pubkey, 4>,
     /// Factors.

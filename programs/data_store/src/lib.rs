@@ -19,8 +19,8 @@ use self::{
     states::{
         common::{SwapParams, TokenRecord},
         deposit::TokenParams as DepositTokenParams,
-        market::{MarketMeta, Pool},
-        order::OrderParams,
+        market::MarketMeta,
+        order::{OrderParams, TransferOut},
         token_config::{TokenConfig, TokenConfigBuilder},
         withdrawal::TokenParams as WithdrawalTokenParams,
         PriceProviderKind,
@@ -228,36 +228,18 @@ pub mod data_store {
         instructions::remove_market(ctx)
     }
 
+    pub fn get_validated_market_meta(ctx: Context<GetValidatedMarketMeta>) -> Result<MarketMeta> {
+        instructions::get_validated_market_meta(ctx)
+    }
+
     #[access_control(internal::Authenticate::only_controller(&ctx))]
-    pub fn apply_delta_to_market_pool(
-        ctx: Context<ApplyDeltaToMarketPool>,
-        pool: u8,
-        is_long_token: bool,
-        delta: i128,
-    ) -> Result<()> {
-        instructions::apply_delta_to_market_pool(
-            ctx,
-            pool.try_into()
-                .map_err(|_| DataStoreError::InvalidArgument)?,
-            is_long_token,
-            delta,
-        )
+    pub fn market_transfer_in(ctx: Context<MarketTransferIn>, amount: u64) -> Result<()> {
+        instructions::market_transfer_in(ctx, amount)
     }
 
-    pub fn get_pool(ctx: Context<GetPool>, pool: u8) -> Result<Option<Pool>> {
-        instructions::get_pool(
-            ctx,
-            pool.try_into()
-                .map_err(|_| DataStoreError::InvalidArgument)?,
-        )
-    }
-
-    pub fn get_market_token_mint(ctx: Context<GetMarketTokenMint>) -> Result<Pubkey> {
-        instructions::get_market_token_mint(ctx)
-    }
-
-    pub fn get_market_meta(ctx: Context<GetMarketMeta>) -> Result<MarketMeta> {
-        instructions::get_market_meta(ctx)
+    #[access_control(internal::Authenticate::only_controller(&ctx))]
+    pub fn market_transfer_out(ctx: Context<MarketTransferOut>, amount: u64) -> Result<()> {
+        instructions::market_transfer_out(ctx, amount)
     }
 
     // Token.
@@ -422,7 +404,7 @@ pub mod data_store {
     #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
     pub fn execute_withdrawal<'info>(
         ctx: Context<'_, '_, 'info, 'info, ExecuteWithdrawal<'info>>,
-    ) -> Result<()> {
+    ) -> Result<(u64, u64)> {
         instructions::execute_withdrawal(ctx)
     }
 
@@ -430,7 +412,7 @@ pub mod data_store {
     pub fn execute_order<'info>(
         ctx: Context<'_, '_, 'info, 'info, ExecuteOrder<'info>>,
         recent_timestamp: i64,
-    ) -> Result<bool> {
+    ) -> Result<(bool, Box<TransferOut>)> {
         instructions::execute_order(ctx, recent_timestamp)
     }
 
@@ -484,16 +466,20 @@ pub enum DataStoreError {
     LamportsNotEnough,
     #[msg("Required resource not found")]
     RequiredResourceNotFound,
-    #[msg("amount overflow")]
+    #[msg("Amount overflow")]
     AmountOverflow,
     #[msg("Unknown error")]
     Unknown,
+    #[msg("Gmx Core Error")]
+    Core,
     #[msg("Missing amount")]
     MissingAmount,
     #[msg("Missing factor")]
     MissingFactor,
     #[msg("Cannot be zero")]
     CannotBeZero,
+    #[msg("Missing Market Account")]
+    MissingMarketAccount,
     // Roles.
     #[msg("Too many admins")]
     TooManyAdmins,
@@ -553,6 +539,12 @@ pub enum DataStoreError {
     UnsupportedPoolKind,
     #[msg("Invalid collateral token")]
     InvalidCollateralToken,
+    #[msg("Invalid market")]
+    InvalidMarket,
+    #[msg("Disabled market")]
+    DisabledMarket,
+    #[msg("Unknown swap out market")]
+    UnknownSwapOutMarket,
     // Exchange Common.
     #[msg("Invalid swap path")]
     InvalidSwapPath,
@@ -567,9 +559,19 @@ pub enum DataStoreError {
     // Withdrawal.
     #[msg("User mismach")]
     UserMismatch,
+    #[msg("Empty withdrawal")]
+    EmptyWithdrawal,
+    #[msg("Invalid withdrawal to remove")]
+    InvalidWithdrawalToRemove,
+    #[msg("Unable to transfer out remaining withdrawal amount")]
+    UnableToTransferOutRemainingWithdrawalAmount,
     // Deposit.
     #[msg("Empty deposit")]
     EmptyDeposit,
+    #[msg("Missing deposit token account")]
+    MissingDepositTokenAccount,
+    #[msg("Invalid deposit to remove")]
+    InvalidDepositToRemove,
     // Exchange.
     #[msg("Invalid position kind")]
     InvalidPositionKind,
@@ -597,6 +599,8 @@ pub enum DataStoreError {
     #[msg("invalid position")]
     InvalidPosition,
     // Order.
+    #[msg("missing initialial token account for order")]
+    MissingInitializeTokenAccountForOrder,
     #[msg("missing claimable time window")]
     MissingClaimableTimeWindow,
     #[msg("missing recent time window")]
@@ -617,6 +621,8 @@ pub enum DataStoreError {
     ClaimbleCollateralInOutputTokenForHolding,
     #[msg("no delegated authority is set")]
     NoDelegatedAuthorityIsSet,
+    #[msg("invalid order to remove")]
+    InvalidOrderToRemove,
     // Token Config.
     #[msg("synthetic flag does not match")]
     InvalidSynthetic,

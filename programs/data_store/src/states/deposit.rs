@@ -28,6 +28,8 @@ impl Deposit {
 pub struct Fixed {
     /// The bump seed.
     pub bump: u8,
+    /// Store.
+    pub store: Pubkey,
     /// The nonce bytes for this deposit.
     pub nonce: [u8; 32],
     /// The slot that the deposit was last updated at.
@@ -99,6 +101,7 @@ impl Deposit {
     pub(crate) fn init(
         &mut self,
         bump: u8,
+        store: Pubkey,
         market: &Account<Market>,
         nonce: NonceBytes,
         tokens_with_feed: Vec<TokenRecord>,
@@ -113,6 +116,7 @@ impl Deposit {
         *self = Self {
             fixed: Fixed {
                 bump,
+                store,
                 nonce,
                 updated_at_slot: clock.slot,
                 updated_at: clock.unix_timestamp,

@@ -49,6 +49,8 @@ describe("exchange: deposit", () => {
                 initialShortToken: usdGTokenMint,
                 initialLongTokenAmount: 1_000_000_000,
                 initialShortTokenAmount: 70_000 * 100_000_000,
+            }, {
+                computeUnits: 400_000,
             });
             console.log(`deposit created at ${signature}`);
             deposit = address;
@@ -189,6 +191,9 @@ describe("exchange: deposit", () => {
                 initialShortToken: usdGTokenMint,
                 initialLongTokenAmount: 2_000_000_000,
                 initialShortTokenAmount: 200_000_000,
+            },
+            {
+                computeUnits: 400_000,
             }
         );
         console.log(`deposit created at ${signature}`);
@@ -201,7 +206,11 @@ describe("exchange: deposit", () => {
                     deposit,
                     options: {
                         executionFee: 5000,
-                    }
+                    },
+
+                },
+                {
+                    computeUnits: 400_000,
                 }
             );
             console.log(`deposit cancelled at ${signature}`);
@@ -230,6 +239,9 @@ describe("exchange: deposit", () => {
                 options: {
                     longTokenSwapPath: [GMFakeFakeUsdG],
                 }
+            },
+            {
+                computeUnits: 400_000,
             }
         )).rejectedWith(Error, "Invalid swap path");
     });
@@ -297,6 +309,9 @@ describe("exchange: deposit", () => {
                     options: {
                         shortTokenSwapPath: [GMFakeFakeUsdG],
                     }
+                },
+                {
+                    computeUnits: 400_000,
                 }
             );
             deposit = depositAddress;
@@ -336,6 +351,9 @@ describe("exchange: deposit", () => {
                     options: {
                         shortTokenSwapPath: [GMFakeFakeUsdG],
                     }
+                },
+                {
+                    computeUnits: 400_000,
                 }
             );
             deposit = depositAddress;
@@ -407,7 +425,7 @@ describe("exchange: deposit", () => {
                     executionFee: 5_001,
                 }
             }, {
-                computeUnits: 400_000,
+                computeUnits: 800_000,
                 skipPreflight: true,
             });
             console.log(`withdrawal executed at ${signature}`);

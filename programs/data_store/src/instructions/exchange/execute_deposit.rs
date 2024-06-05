@@ -18,12 +18,19 @@ pub struct ExecuteDeposit<'info> {
     pub only_order_keeper: Account<'info, Roles>,
     pub store: Account<'info, DataStore>,
     #[account(
+        has_one = store,
         seeds = [Config::SEED, store.key().as_ref()],
         bump = config.bump,
     )]
     config: Account<'info, Config>,
+    #[account(has_one = store)]
     pub oracle: Account<'info, Oracle>,
     #[account(
+        // The `mut` flag must be present, since we are mutating the deposit.
+        // It may not throw any errors sometimes if we forget to mark the account as mutable,
+        // so be careful.
+        mut,
+        constraint = deposit.fixed.store == store.key(),
         constraint = deposit.fixed.receivers.receiver == receiver.key(),
         constraint = deposit.fixed.tokens.market_token == market_token_mint.key(),
         constraint = deposit.fixed.market == market.key(),
@@ -36,7 +43,7 @@ pub struct ExecuteDeposit<'info> {
         bump = deposit.fixed.bump,
     )]
     pub deposit: Account<'info, Deposit>,
-    #[account(mut)]
+    #[account(mut, has_one = store)]
     pub market: Account<'info, Market>,
     #[account(mut)]
     pub market_token_mint: Account<'info, Mint>,
@@ -89,6 +96,7 @@ impl<'info> ValidateOracleTime for ExecuteDeposit<'info> {
 impl<'info> ExecuteDeposit<'info> {
     fn validate(&self) -> Result<()> {
         self.oracle.validate_time(self)?;
+        self.market.validate(&self.store.key())?;
         Ok(())
     }
 
@@ -107,8 +115,10 @@ impl<'info> ExecuteDeposit<'info> {
     fn execute(&mut self, remaining_accounts: &'info [AccountInfo<'info>]) -> Result<()> {
         let meta = self.market.meta.clone();
         let (long_amount, short_amount) = self.perform_swaps(&meta, remaining_accounts)?;
-        msg!("{}, {}", long_amount, short_amount);
         self.perform_deposit(&meta, long_amount, short_amount)?;
+        // Set amounts to zero to make sure it can be removed without transferring out any tokens.
+        self.deposit.fixed.tokens.params.initial_long_token_amount = 0;
+        self.deposit.fixed.tokens.params.initial_short_token_amount = 0;
         Ok(())
     }
 
@@ -120,7 +130,7 @@ impl<'info> ExecuteDeposit<'info> {
         // Exit must be called to update the external state.
         self.market.exit(&crate::ID)?;
         // CHECK: `exit` has been called above, and `reload` will be called after.
-        let res = unchecked_swap_with_params(
+        let (long_swap_out, short_swap_out) = unchecked_swap_with_params(
             &self.oracle,
             &self.deposit.dynamic.swap_params,
             remaining_accounts,
@@ -136,7 +146,10 @@ impl<'info> ExecuteDeposit<'info> {
         )?;
         // Call `reload` to make sure the state is up-to-date.
         self.market.reload()?;
-        Ok(res)
+        Ok((
+            long_swap_out.transfer_to_market(&mut self.market, true)?,
+            short_swap_out.transfer_to_market(&mut self.market, true)?,
+        ))
     }
 
     fn perform_deposit(
@@ -166,11 +179,12 @@ impl<'info> ExecuteDeposit<'info> {
             .ok_or(error!(DataStoreError::InvalidArgument))?
             .max
             .to_unit_price();
-        let report = self
+        let mut market = self
             .market
             .as_market(&mut self.market_token_mint)
             .enable_transfer(self.token_program.to_account_info(), &self.store)
-            .with_receiver(self.receiver.to_account_info())
+            .with_receiver(self.receiver.to_account_info());
+        let report = market
             .deposit(
                 long_amount.into(),
                 short_amount.into(),
@@ -186,6 +200,7 @@ impl<'info> ExecuteDeposit<'info> {
                 msg!(&err.to_string());
                 GmxCoreError::from(err)
             })?;
+        market.validate_market_balances(0, 0)?;
         msg!("{:?}", report);
         Ok(())
     }

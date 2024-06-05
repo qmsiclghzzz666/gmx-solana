@@ -1,8 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Token, TokenAccount};
 use data_store::{
-    constants,
-    cpi::accounts::{MarketVaultTransferOut, RemoveWithdrawal},
+    cpi::accounts::RemoveWithdrawal,
     program::DataStore,
     states::Withdrawal,
     utils::{Authenticate, Authentication},
@@ -36,13 +35,7 @@ pub struct CancelWithdrawal<'info> {
     /// - Only the user who created the withdrawal can receive the funds,
     /// which is checked by [`remove_withdrawal`](data_store::instructions::remove_withdrawal)
     /// through CPI.
-    #[account(
-        mut,
-        // We must check that the user is the creator of the withdrawal.
-        constraint = withdrawal.fixed.user == user.key() @ ExchangeError::InvalidWithdrawalToCancel,
-        constraint = withdrawal.fixed.market_token_account == market_token.key() @ ExchangeError::InvalidWithdrawalToCancel,
-        constraint = withdrawal.fixed.tokens.market_token == market_token.mint @ ExchangeError::InvalidWithdrawalToCancel,
-    )]
+    #[account(mut)]
     pub withdrawal: Account<'info, Withdrawal>,
     /// CHECK: check by access control.
     #[account(mut)]
@@ -50,18 +43,8 @@ pub struct CancelWithdrawal<'info> {
     /// Token account for receiving the market tokens.
     #[account(mut, token::authority = user)]
     pub market_token: Account<'info, TokenAccount>,
-    /// The vault saving the market tokens for withdrawal.
-    #[account(mut,
-        token::mint = market_token.mint,
-        seeds = [
-            constants::MARKET_VAULT_SEED,
-            store.key().as_ref(),
-            market_token_withdrawal_vault.mint.as_ref(),
-            &[],
-        ],
-        bump,
-        seeds::program = data_store_program.key(),
-    )]
+    /// CHECK: check by CPI.
+    #[account(mut)]
     pub market_token_withdrawal_vault: Account<'info, TokenAccount>,
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
@@ -70,12 +53,6 @@ pub struct CancelWithdrawal<'info> {
 /// Cancel Withdrawal.
 pub fn cancel_withdrawal(ctx: Context<CancelWithdrawal>, execution_fee: u64) -> Result<()> {
     let controller = ControllerSeeds::find(ctx.accounts.store.key);
-    let market_token_amount = ctx.accounts.withdrawal.fixed.tokens.market_token_amount;
-    // FIXME: it seems that we don't have to check this?
-    // require!(
-    //     market_token_amount != 0,
-    //     ExchangeError::EmptyWithdrawalAmount,
-    // );
     let refund = ctx
         .accounts
         .withdrawal
@@ -88,15 +65,6 @@ pub fn cancel_withdrawal(ctx: Context<CancelWithdrawal>, execution_fee: u64) -> 
             .with_signer(&[&controller.as_seeds()]),
         refund,
     )?;
-
-    if market_token_amount != 0 {
-        data_store::cpi::market_vault_transfer_out(
-            ctx.accounts
-                .market_vault_transfer_out_ctx()
-                .with_signer(&[&controller.as_seeds()]),
-            market_token_amount,
-        )?;
-    }
     Ok(())
 }
 
@@ -133,21 +101,10 @@ impl<'info> CancelWithdrawal<'info> {
                 withdrawal: self.withdrawal.to_account_info(),
                 user: self.user.to_account_info(),
                 system_program: self.system_program.to_account_info(),
-            },
-        )
-    }
-
-    fn market_vault_transfer_out_ctx(
-        &self,
-    ) -> CpiContext<'_, '_, '_, 'info, MarketVaultTransferOut<'info>> {
-        CpiContext::new(
-            self.data_store_program.to_account_info(),
-            MarketVaultTransferOut {
-                authority: self.authority.to_account_info(),
-                only_controller: self.only_controller.to_account_info(),
-                store: self.store.to_account_info(),
-                market_vault: self.market_token_withdrawal_vault.to_account_info(),
-                to: self.market_token.to_account_info(),
+                market_token: Some(self.market_token.to_account_info()),
+                market_token_withdrawal_vault: Some(
+                    self.market_token_withdrawal_vault.to_account_info(),
+                ),
                 token_program: self.token_program.to_account_info(),
             },
         )

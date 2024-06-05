@@ -7,7 +7,7 @@ use anchor_client::{
 };
 use anchor_spl::associated_token::get_associated_token_address;
 use data_store::states::{
-    common::TokensWithFeed,
+    common::{SwapParams, TokensWithFeed},
     order::{OrderKind, OrderParams},
     position::PositionKind,
     Config, Market, MarketMeta, NonceBytes, Order, Position, Pyth, Seed,
@@ -354,6 +354,7 @@ where
             self.initial_collateral_accounts().await?.unzip();
         let (output_token, position) = self.output_token_and_position().await?;
         let (long_token_account, short_token_account) = self.collateral_token_accounts().await?;
+        let need_to_transfer_in = self.params.need_to_transfer_in();
         let builder = self
             .program
             .request()
@@ -393,10 +394,11 @@ where
             .accounts(
                 self.swap_path
                     .iter()
-                    .map(|mint| AccountMeta {
+                    .enumerate()
+                    .map(|(idx, mint)| AccountMeta {
                         pubkey: find_market_address(&self.store, mint).0,
                         is_signer: false,
-                        is_writable: false,
+                        is_writable: need_to_transfer_in && idx == 0,
                     })
                     .collect::<Vec<_>>(),
             );
@@ -437,7 +439,7 @@ pub struct ExecuteOrderHint {
     pnl_token_mint: Pubkey,
     /// Feeds.
     pub feeds: TokensWithFeed,
-    swap_path: Vec<Pubkey>,
+    swap: SwapParams,
 }
 
 impl ExecuteOrderHint {
@@ -553,16 +555,20 @@ where
 
     /// Set hint with the given order.
     pub fn hint(&mut self, order: &Order, market: &Market, config: &Config) -> &mut Self {
+        let swap = order.swap.clone();
+        let market_token = order.fixed.tokens.market_token;
+        let final_output_token_account = order.fixed.receivers.final_output_token_account;
+        let secondary_output_token_account = order.fixed.receivers.secondary_output_token_account;
         self.hint = Some(ExecuteOrderHint {
             has_claimable: matches!(order.fixed.params.kind, OrderKind::MarketDecrease),
             config: config.clone(),
-            market_token: order.fixed.tokens.market_token,
+            market_token,
             position: order.fixed.position,
             user: order.fixed.user,
             final_output_token: order.fixed.tokens.final_output_token,
             secondary_output_token: order.fixed.tokens.secondary_output_token,
-            final_output_token_account: order.fixed.receivers.final_output_token_account,
-            secondary_output_token_account: order.fixed.receivers.secondary_output_token_account,
+            final_output_token_account,
+            secondary_output_token_account,
             long_token_account: order.fixed.receivers.long_token_account,
             short_token_account: order.fixed.receivers.short_token_account,
             long_token_mint: market.meta().long_token_mint,
@@ -573,7 +579,7 @@ where
                 market.meta().short_token_mint
             },
             feeds: order.prices.clone(),
-            swap_path: order.swap.long_token_swap_path.clone(),
+            swap,
         });
         self
     }
@@ -638,12 +644,12 @@ where
             .feeds_parser
             .parse(&hint.feeds)
             .collect::<Result<Vec<_>, _>>()?;
-        let swap_markets = hint.swap_path.iter().map(|mint| AccountMeta {
+        let swap_markets = hint.swap.iter().map(|mint| AccountMeta {
             pubkey: find_market_address(&self.store, mint).0,
             is_signer: false,
             is_writable: true,
         });
-        let swap_market_mints = hint.swap_path.iter().map(|pubkey| AccountMeta {
+        let swap_market_mints = hint.swap.iter().map(|pubkey| AccountMeta {
             pubkey: *pubkey,
             is_signer: false,
             is_writable: false,

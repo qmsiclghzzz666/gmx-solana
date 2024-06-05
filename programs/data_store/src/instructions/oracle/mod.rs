@@ -31,7 +31,9 @@ pub struct InitializeOracle<'info> {
 
 /// Initialize an [`Oracle`] account with the given `index`.
 pub fn initialize_oracle(ctx: Context<InitializeOracle>, index: u8) -> Result<()> {
-    ctx.accounts.oracle.init(ctx.bumps.oracle, index);
+    ctx.accounts
+        .oracle
+        .init(ctx.bumps.oracle, ctx.accounts.store.key(), index);
     Ok(())
 }
 
@@ -56,6 +58,7 @@ pub struct ClearAllPrices<'info> {
     pub only_controller: Account<'info, Roles>,
     #[account(
         mut,
+        has_one = store,
         seeds = [Oracle::SEED, store.key().as_ref(), &[oracle.index]],
         bump = oracle.bump,
     )]
@@ -89,6 +92,7 @@ pub struct SetPrice<'info> {
     pub store: Account<'info, DataStore>,
     #[account(
         mut,
+        has_one = store,
         seeds = [Oracle::SEED, store.key().as_ref(), &[oracle.index]],
         bump = oracle.bump,
     )]

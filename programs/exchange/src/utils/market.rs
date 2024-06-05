@@ -1,12 +1,13 @@
 use std::collections::BTreeSet;
 
 use anchor_lang::prelude::*;
-use data_store::{cpi::accounts::GetMarketMeta, program::DataStore};
+use data_store::{cpi::accounts::GetValidatedMarketMeta, program::DataStore};
 
 use crate::ExchangeError;
 
 pub(crate) fn get_and_validate_swap_path<'info>(
     program: &Program<'info, DataStore>,
+    store: AccountInfo<'info>,
     accounts: &[AccountInfo<'info>],
     initial_token: &Pubkey,
     final_token: &Pubkey,
@@ -20,9 +21,10 @@ pub(crate) fn get_and_validate_swap_path<'info>(
             if !flags.insert(account.key) {
                 return Err(ExchangeError::InvalidSwapPath.into());
             }
-            let meta = data_store::cpi::get_market_meta(CpiContext::new(
+            let meta = data_store::cpi::get_validated_market_meta(CpiContext::new(
                 program.to_account_info(),
-                GetMarketMeta {
+                GetValidatedMarketMeta {
+                    store: store.clone(),
                     market: account.clone(),
                 },
             ))?

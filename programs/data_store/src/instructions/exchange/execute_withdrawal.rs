@@ -5,11 +5,11 @@ use gmx_core::MarketExt;
 use crate::{
     constants,
     states::{Config, DataStore, Market, Oracle, Roles, Seed, ValidateOracleTime, Withdrawal},
-    utils::internal::{self, TransferUtils},
+    utils::internal::{self},
     DataStoreError, GmxCoreError,
 };
 
-use super::utils::swap::unchecked_swap_with_params;
+use super::utils::swap::{unchecked_swap_with_params, unchecked_transfer_to_market};
 
 #[derive(Accounts)]
 pub struct ExecuteWithdrawal<'info> {
@@ -17,12 +17,16 @@ pub struct ExecuteWithdrawal<'info> {
     pub store: Account<'info, DataStore>,
     pub only_order_keeper: Account<'info, Roles>,
     #[account(
+        has_one = store,
         seeds = [Config::SEED, store.key().as_ref()],
         bump = config.bump,
     )]
     config: Account<'info, Config>,
+    #[account(has_one = store)]
     pub oracle: Account<'info, Oracle>,
     #[account(
+        mut,
+        constraint = withdrawal.fixed.store == store.key(),
         constraint = withdrawal.fixed.market == market.key(),
         constraint = withdrawal.fixed.tokens.market_token == market_token_mint.key(),
         constraint = withdrawal.fixed.receivers.final_long_token_receiver == final_long_token_receiver.key(),
@@ -36,7 +40,7 @@ pub struct ExecuteWithdrawal<'info> {
         bump = withdrawal.fixed.bump,
     )]
     pub withdrawal: Account<'info, Withdrawal>,
-    #[account(mut)]
+    #[account(mut, has_one = store)]
     pub market: Account<'info, Market>,
     #[account(mut)]
     pub market_token_mint: Account<'info, Mint>,
@@ -86,11 +90,32 @@ pub struct ExecuteWithdrawal<'info> {
 /// Execute a withdrawal.
 pub fn execute_withdrawal<'info>(
     ctx: Context<'_, '_, 'info, 'info, ExecuteWithdrawal<'info>>,
-) -> Result<()> {
+) -> Result<(u64, u64)> {
     ctx.accounts.validate()?;
     ctx.accounts.pre_execute()?;
-    ctx.accounts.execute(ctx.remaining_accounts)?;
-    Ok(())
+    let (final_long_amount, final_short_amount) = ctx.accounts.execute(ctx.remaining_accounts)?;
+
+    // Validate market balances.
+    let swap = &ctx.accounts.withdrawal.dynamic.swap;
+
+    let long_amount = if swap.long_token_swap_path.is_empty() {
+        final_long_amount
+    } else {
+        0
+    };
+
+    let short_amount = if swap.short_token_swap_path.is_empty() {
+        final_short_amount
+    } else {
+        0
+    };
+
+    ctx.accounts
+        .market
+        .as_market(&mut ctx.accounts.market_token_mint)
+        .validate_market_balances(long_amount, short_amount)?;
+
+    Ok((final_long_amount, final_short_amount))
 }
 
 impl<'info> internal::Authentication<'info> for ExecuteWithdrawal<'info> {
@@ -127,6 +152,7 @@ impl<'info> ValidateOracleTime for ExecuteWithdrawal<'info> {
 impl<'info> ExecuteWithdrawal<'info> {
     fn validate(&self) -> Result<()> {
         self.oracle.validate_time(self)?;
+        self.market.validate(&self.store.key())?;
         Ok(())
     }
 
@@ -142,7 +168,7 @@ impl<'info> ExecuteWithdrawal<'info> {
         Ok(())
     }
 
-    fn execute(&mut self, remaining_accounts: &'info [AccountInfo<'info>]) -> Result<()> {
+    fn execute(&mut self, remaining_accounts: &'info [AccountInfo<'info>]) -> Result<(u64, u64)> {
         let (long_amount, short_amount) = self.perform_withdrawal()?;
         let (final_long_amount, final_short_amount) =
             self.perform_swaps(remaining_accounts, long_amount, short_amount)?;
@@ -156,9 +182,8 @@ impl<'info> ExecuteWithdrawal<'info> {
             self.withdrawal.fixed.tokens.params.min_short_token_amount,
             DataStoreError::OutputAmountTooSmall
         );
-        self.transfer_out(true, final_long_amount)?;
-        self.transfer_out(false, final_short_amount)?;
-        Ok(())
+        self.withdrawal.fixed.tokens.market_token_amount = 0;
+        Ok((final_long_amount, final_short_amount))
     }
 
     fn perform_withdrawal(&mut self) -> Result<(u64, u64)> {
@@ -217,12 +242,41 @@ impl<'info> ExecuteWithdrawal<'info> {
         long_amount: u64,
         short_amount: u64,
     ) -> Result<(u64, u64)> {
+        let [long_swap_path, short_swap_path, ..] = self
+            .withdrawal
+            .dynamic
+            .swap
+            .split_swap_paths(remaining_accounts)?;
+        if let Some(to) = long_swap_path.first() {
+            let token = self.market.meta.long_token_mint;
+            if to.key() != self.market.key() {
+                unchecked_transfer_to_market(
+                    &self.store.key(),
+                    &mut self.market,
+                    to,
+                    &token,
+                    long_amount,
+                )?;
+            }
+        }
+        if let Some(to) = short_swap_path.first() {
+            let token = self.market.meta.short_token_mint;
+            if to.key() != self.market.key() {
+                unchecked_transfer_to_market(
+                    &self.store.key(),
+                    &mut self.market,
+                    to,
+                    &token,
+                    short_amount,
+                )?;
+            }
+        }
         let meta = &self.market.meta;
         // Call exit and reload to make sure the data are written to the storage.
         // In case that there are markets also appear in the swap paths.
         self.market.exit(&crate::ID)?;
         // CHECK: `exit` and `reload` have been called on the modified market account before and after the swap.
-        let res = unchecked_swap_with_params(
+        let (long_swap_out, short_swap_out) = unchecked_swap_with_params(
             &self.oracle,
             &self.withdrawal.dynamic.swap,
             remaining_accounts,
@@ -235,25 +289,6 @@ impl<'info> ExecuteWithdrawal<'info> {
         )?;
         // Call `reload` to make sure the state is up-to-date.
         self.market.reload()?;
-        Ok(res)
-    }
-
-    fn transfer_out(&self, is_long_token: bool, amount: u64) -> Result<()> {
-        let (from, to) = if is_long_token {
-            (
-                &self.final_long_token_vault,
-                &self.final_long_token_receiver,
-            )
-        } else {
-            (
-                &self.final_short_token_vault,
-                &self.final_short_token_receiver,
-            )
-        };
-        TransferUtils::new(self.token_program.to_account_info(), &self.store, None).transfer_out(
-            from.to_account_info(),
-            to.to_account_info(),
-            amount,
-        )
+        Ok((long_swap_out.into_amount(), short_swap_out.into_amount()))
     }
 }

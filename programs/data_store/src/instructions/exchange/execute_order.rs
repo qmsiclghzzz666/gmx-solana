@@ -10,12 +10,13 @@ use gmx_core::{
 
 use crate::{
     constants,
+    instructions::utils::swap::unchecked_transfer_to_market,
     states::{
-        order::{Order, OrderKind},
+        order::{Order, OrderKind, TransferOut},
         position::Position,
         Config, DataStore, Market, Oracle, Roles, Seed, ValidateOracleTime,
     },
-    utils::internal::{self, TransferUtils},
+    utils::internal,
     DataStoreError, GmxCoreError,
 };
 
@@ -28,12 +29,16 @@ pub struct ExecuteOrder<'info> {
     pub store: Box<Account<'info, DataStore>>,
     pub only_order_keeper: Account<'info, Roles>,
     #[account(
+        has_one = store,
         seeds = [Config::SEED, store.key().as_ref()],
         bump = config.bump,
     )]
     config: Box<Account<'info, Config>>,
+    #[account(has_one = store)]
     pub oracle: Box<Account<'info, Oracle>>,
     #[account(
+        mut,
+        constraint = order.fixed.store == store.key(),
         constraint = order.fixed.market == market.key(),
         constraint = order.fixed.tokens.market_token == market_token_mint.key(),
         constraint = order.fixed.receivers.final_output_token_account == final_output_token_account.as_ref().map(|a| a.key()),
@@ -42,12 +47,13 @@ pub struct ExecuteOrder<'info> {
         constraint = order.fixed.receivers.short_token_account == short_token_account.key(),
     )]
     pub order: Box<Account<'info, Order>>,
-    #[account(mut)]
+    #[account(mut, has_one = store)]
     pub market: Box<Account<'info, Market>>,
     pub market_token_mint: Box<Account<'info, Mint>>,
     #[account(
         mut,
         constraint = position.load()?.owner == order.fixed.user,
+        constraint = position.load()?.store == store.key(),
         seeds = [
             Position::SEED,
             store.key().as_ref(),
@@ -169,15 +175,16 @@ pub struct ExecuteOrder<'info> {
 pub fn execute_order<'info>(
     ctx: Context<'_, '_, 'info, 'info, ExecuteOrder<'info>>,
     _recent_timestamp: i64,
-) -> Result<bool> {
+) -> Result<(bool, Box<TransferOut>)> {
     ctx.accounts.validate_time()?;
+    ctx.accounts.market.validate(&ctx.accounts.store.key())?;
     // TODO: validate non-empty order.
     // TODO: validate order trigger price.
     ctx.accounts.pre_execute()?;
-    let should_remove = ctx.accounts.execute(ctx.remaining_accounts)?;
+    let res = ctx.accounts.execute(ctx.remaining_accounts)?;
     // TODO: validate market state.
     // TODO: emit order executed event.
-    Ok(should_remove)
+    Ok(res)
 }
 
 impl<'info> internal::Authentication<'info> for ExecuteOrder<'info> {
@@ -267,9 +274,14 @@ impl<'info> ExecuteOrder<'info> {
         Ok(())
     }
 
-    fn execute(&mut self, remaining_accounts: &'info [AccountInfo<'info>]) -> Result<bool> {
+    fn execute(
+        &mut self,
+        remaining_accounts: &'info [AccountInfo<'info>],
+    ) -> Result<(bool, Box<TransferOut>)> {
+        let mut transfer_out = Box::default();
         let prices = self.prices()?;
         let mut should_remove = false;
+        let mut is_output_token_long = None;
         let kind = &self.order.fixed.params.kind;
         match kind {
             OrderKind::MarketSwap => {
@@ -291,7 +303,7 @@ impl<'info> ExecuteOrder<'info> {
                 // Exit must be called to update the external state.
                 self.market.exit(&crate::ID)?;
                 // CHECK: `exit` has been called above, and `reload` will be called later.
-                let (collateral_increment_amount, _) = unchecked_swap_with_params(
+                let (swap_out, _) = unchecked_swap_with_params(
                     &self.oracle,
                     swap,
                     remaining_accounts,
@@ -301,6 +313,8 @@ impl<'info> ExecuteOrder<'info> {
                 )?;
                 // Call `reload` to make sure the state is up-to-date.
                 self.market.reload()?;
+                let collateral_increment_amount =
+                    swap_out.transfer_to_market(&mut self.market, true)?;
 
                 let size_delta_usd = params.size_delta_usd;
                 let acceptable_price = params.acceptable_price;
@@ -318,7 +332,8 @@ impl<'info> ExecuteOrder<'info> {
                     .map_err(GmxCoreError::from)?
                     .execute()
                     .map_err(GmxCoreError::from)?;
-                self.process_increase_report(report)?;
+                self.process_increase_report(&mut transfer_out, report)?;
+                self.order.fixed.params.initial_collateral_delta_amount = 0;
             }
             OrderKind::MarketDecrease | OrderKind::Liquidation => {
                 let report = {
@@ -351,39 +366,47 @@ impl<'info> ExecuteOrder<'info> {
                     should_remove = report.should_remove();
                     report
                 };
-                self.process_decrease_report(remaining_accounts, &report)?;
+                is_output_token_long = Some(report.is_output_token_long());
+                self.process_decrease_report(&mut transfer_out, remaining_accounts, &report)?;
             }
         }
-        Ok(should_remove)
+        self.validate_market(&transfer_out, is_output_token_long)?;
+        Ok((should_remove, transfer_out))
     }
 
-    fn process_increase_report(&self, report: IncreasePositionReport<u128>) -> Result<()> {
+    fn process_increase_report(
+        &mut self,
+        ctx: &mut TransferOut,
+        report: IncreasePositionReport<u128>,
+    ) -> Result<()> {
         msg!("{:?}", report);
         let (long_amount, short_amount) = report.claimable_funding_amounts();
-        self.transfer_out_funding_amounts(long_amount, short_amount)?;
+        self.transfer_out_funding_amounts(ctx, long_amount, short_amount)?;
         Ok(())
     }
 
     fn process_decrease_report(
         &mut self,
+        ctx: &mut TransferOut,
         remaining_accounts: &'info [AccountInfo<'info>],
         report: &DecreasePositionReport<u128>,
     ) -> Result<()> {
         msg!("{:?}", report);
 
-        self.process_decrease_swap(remaining_accounts, report)?;
+        self.process_decrease_swap(ctx, remaining_accounts, report)?;
 
         // Transfer out funding rebate.
         let (long_amount, short_amount) = report.claimable_funding_amounts();
-        self.transfer_out_funding_amounts(long_amount, short_amount)?;
+        self.transfer_out_funding_amounts(ctx, long_amount, short_amount)?;
 
-        self.process_claimable_collateral_for_decrease(report)?;
+        self.process_claimable_collateral_for_decrease(ctx, report)?;
 
         Ok(())
     }
 
     fn process_decrease_swap(
         &mut self,
+        ctx: &mut TransferOut,
         remaining_accounts: &'info [AccountInfo<'info>],
         report: &DecreasePositionReport<u128>,
     ) -> Result<()> {
@@ -414,11 +437,39 @@ impl<'info> ExecuteOrder<'info> {
         // Since we have checked that secondary_amount must be zero if output_token == secondary_output_token,
         // the swap should still be correct.
 
+        // Transfer to first markets.
+        let [long_swap_path, short_swap_path, ..] =
+            self.order.swap.split_swap_paths(remaining_accounts)?;
+        if let Some(to) = long_swap_path.first() {
+            let token = token_ins.0.unwrap();
+            if to.key() != self.market.key() {
+                unchecked_transfer_to_market(
+                    &self.store.key(),
+                    &mut self.market,
+                    to,
+                    &token,
+                    output_amount,
+                )?;
+            }
+        }
+        if let Some(to) = short_swap_path.first() {
+            let token = token_ins.1.unwrap();
+            if to.key() != self.market.key() {
+                unchecked_transfer_to_market(
+                    &self.store.key(),
+                    &mut self.market,
+                    to,
+                    &token,
+                    secondary_output_amount,
+                )?;
+            }
+        }
+
         // Call exit to make sure the data are written to the storage.
         // In case that there are markets also appear in the swap paths.
         self.market.exit(&crate::ID)?;
         // CHECK: `exit` and `reload` have been called on the modified market account before and after the swap.
-        let (output_amount, secondary_amount) = unchecked_swap_with_params(
+        let (swap_out, secondary_swap_out) = unchecked_swap_with_params(
             &self.oracle,
             &self.order.swap,
             remaining_accounts,
@@ -436,13 +487,14 @@ impl<'info> ExecuteOrder<'info> {
         // Call `reload` to make sure the state is up-to-date.
         self.market.reload()?;
 
-        self.transfer_out(false, output_amount)?;
-        self.transfer_out(true, secondary_amount)?;
+        self.transfer_out(ctx, false, swap_out.into_amount())?;
+        self.transfer_out(ctx, true, secondary_swap_out.into_amount())?;
         Ok(())
     }
 
     fn process_claimable_collateral_for_decrease(
         &self,
+        ctx: &mut TransferOut,
         report: &DecreasePositionReport<u128>,
     ) -> Result<()> {
         let for_holding = report.claimable_collateral_for_holding();
@@ -458,41 +510,25 @@ impl<'info> ExecuteOrder<'info> {
             .try_into()
             .map_err(|_| error!(DataStoreError::AmountOverflow))?;
         self.transfer_out_collateral(
+            ctx,
             is_secondary_token_long,
-            self.claimable_pnl_token_account_for_holding
-                .as_ref()
-                .ok_or(DataStoreError::MissingClaimablePnlTokenAccountForHolding)?
-                .to_account_info(),
+            CollateralReceiver::ClaimableForHolding,
             secondary_amount,
         )?;
 
         let for_user = report.claimable_collateral_for_user();
-        let to = if is_output_token_long {
-            self.claimable_long_token_account_for_user
-                .as_ref()
-                .ok_or(DataStoreError::MissingClaimableLongCollateralAccountForUser)?
-                .to_account_info()
-        } else {
-            self.claimable_short_token_account_for_user
-                .as_ref()
-                .ok_or(DataStoreError::MissingClaimableLongCollateralAccountForUser)?
-                .to_account_info()
-        };
         self.transfer_out_collateral(
+            ctx,
             is_output_token_long,
-            to,
+            CollateralReceiver::ClaimableForUser,
             (*for_user.output_token_amount())
                 .try_into()
                 .map_err(|_| error!(DataStoreError::AmountOverflow))?,
         )?;
-        let to = if is_secondary_token_long {
-            self.long_token_account.to_account_info()
-        } else {
-            self.short_token_account.to_account_info()
-        };
         self.transfer_out_collateral(
+            ctx,
             is_secondary_token_long,
-            to,
+            CollateralReceiver::ClaimableForUser,
             (*for_user.secondary_output_token_amount())
                 .try_into()
                 .map_err(|_| error!(DataStoreError::AmountOverflow))?,
@@ -500,67 +536,151 @@ impl<'info> ExecuteOrder<'info> {
         Ok(())
     }
 
-    fn transfer_out(&self, is_secondary: bool, amount: u64) -> Result<()> {
+    fn transfer_out(&self, ctx: &mut TransferOut, is_secondary: bool, amount: u64) -> Result<()> {
         if amount == 0 {
             return Ok(());
         }
-        let (from, to) = if is_secondary {
-            (
-                &self.secondary_output_token_vault,
-                &self.secondary_output_token_account,
-            )
+        if is_secondary {
+            ctx.final_secondary_output_token = ctx
+                .final_secondary_output_token
+                .checked_add(amount)
+                .ok_or(error!(DataStoreError::AmountOverflow))?;
         } else {
-            (
-                &self.final_output_token_vault,
-                &self.final_output_token_account,
-            )
-        };
-        let (Some(from), Some(to)) = (from, to) else {
-            return err!(DataStoreError::MissingReceivers);
-        };
-        TransferUtils::new(self.token_program.to_account_info(), &self.store, None).transfer_out(
-            from.to_account_info(),
-            to.to_account_info(),
-            amount,
-        )
+            ctx.final_output_token = ctx
+                .final_output_token
+                .checked_add(amount)
+                .ok_or(error!(DataStoreError::AmountOverflow))?;
+        }
+        Ok(())
     }
 
     fn transfer_out_collateral(
         &self,
+        ctx: &mut TransferOut,
         is_long: bool,
-        to: AccountInfo<'info>,
+        to: CollateralReceiver,
         amount: u64,
     ) -> Result<()> {
         if amount == 0 {
             return Ok(());
         }
-        let from = if is_long {
-            self.long_token_vault.to_account_info()
-        } else {
-            self.short_token_vault.to_account_info()
-        };
-        TransferUtils::new(self.token_program.to_account_info(), &self.store, None).transfer_out(
-            from.to_account_info(),
-            to,
-            amount,
-        )
+        match to {
+            CollateralReceiver::Funding => {
+                if is_long {
+                    ctx.long_token = ctx
+                        .long_token
+                        .checked_add(amount)
+                        .ok_or(error!(DataStoreError::AmountOverflow))?;
+                } else {
+                    ctx.short_token = ctx
+                        .short_token
+                        .checked_add(amount)
+                        .ok_or(error!(DataStoreError::AmountOverflow))?;
+                }
+            }
+            CollateralReceiver::ClaimableForHolding => {
+                if is_long {
+                    ctx.long_token_for_claimable_account_of_holding = ctx
+                        .long_token_for_claimable_account_of_holding
+                        .checked_add(amount)
+                        .ok_or(error!(DataStoreError::AmountOverflow))?;
+                } else {
+                    ctx.short_token_for_claimable_account_of_holding = ctx
+                        .short_token_for_claimable_account_of_holding
+                        .checked_add(amount)
+                        .ok_or(error!(DataStoreError::AmountOverflow))?;
+                }
+            }
+            CollateralReceiver::ClaimableForUser => {
+                if is_long {
+                    ctx.long_token_for_claimable_account_of_user = ctx
+                        .long_token_for_claimable_account_of_user
+                        .checked_add(amount)
+                        .ok_or(error!(DataStoreError::AmountOverflow))?;
+                } else {
+                    ctx.short_token_for_claimable_account_of_user = ctx
+                        .short_token_for_claimable_account_of_user
+                        .checked_add(amount)
+                        .ok_or(error!(DataStoreError::AmountOverflow))?;
+                }
+            }
+        }
+        Ok(())
     }
 
-    fn transfer_out_funding_amounts(&self, long_amount: &u128, short_amount: &u128) -> Result<()> {
+    fn transfer_out_funding_amounts(
+        &self,
+        ctx: &mut TransferOut,
+        long_amount: &u128,
+        short_amount: &u128,
+    ) -> Result<()> {
         self.transfer_out_collateral(
+            ctx,
             true,
-            self.long_token_account.to_account_info(),
+            CollateralReceiver::Funding,
             (*long_amount)
                 .try_into()
                 .map_err(|_| error!(DataStoreError::AmountOverflow))?,
         )?;
         self.transfer_out_collateral(
+            ctx,
             false,
-            self.short_token_account.to_account_info(),
+            CollateralReceiver::Funding,
             (*short_amount)
                 .try_into()
                 .map_err(|_| error!(DataStoreError::AmountOverflow))?,
         )?;
+        Ok(())
+    }
+
+    fn validate_market(
+        &mut self,
+        transfer_out: &TransferOut,
+        is_output_token_long: Option<bool>,
+    ) -> Result<()> {
+        let transferred_in = self.order.fixed.params.need_to_transfer_in();
+
+        let mut long_amount = transfer_out
+            .long_token
+            .checked_add(transfer_out.long_token_for_claimable_account_of_holding)
+            .and_then(|a| a.checked_add(transfer_out.long_token_for_claimable_account_of_user))
+            .ok_or(error!(DataStoreError::AmountOverflow))?;
+        let mut short_amount = transfer_out
+            .short_token
+            .checked_add(transfer_out.short_token_for_claimable_account_of_holding)
+            .and_then(|a| a.checked_add(transfer_out.short_token_for_claimable_account_of_user))
+            .ok_or(error!(DataStoreError::AmountOverflow))?;
+
+        if transfer_out.final_output_token != 0
+            && is_output_token_long.is_some()
+            && (transferred_in || self.order.swap.long_token_swap_path.is_empty())
+        {
+            let amount = if is_output_token_long.unwrap() {
+                &mut long_amount
+            } else {
+                &mut short_amount
+            };
+            *amount = amount
+                .checked_add(transfer_out.final_output_token)
+                .ok_or(error!(DataStoreError::AmountOverflow))?;
+        }
+
+        if transfer_out.final_secondary_output_token != 0
+            && (transferred_in || self.order.swap.short_token_swap_path.is_empty())
+        {
+            let amount = if self.order.fixed.params.is_long {
+                &mut long_amount
+            } else {
+                &mut short_amount
+            };
+            *amount = amount
+                .checked_add(transfer_out.final_secondary_output_token)
+                .ok_or(error!(DataStoreError::AmountOverflow))?;
+        }
+
+        self.market
+            .as_market(&mut self.market_token_mint)
+            .validate_market_balances(long_amount, short_amount)?;
         Ok(())
     }
 }
@@ -598,4 +718,10 @@ fn validated_recent_timestamp(config: &Config, timestamp: i64) -> Result<i64> {
     } else {
         err!(DataStoreError::InvalidArgument)
     }
+}
+
+enum CollateralReceiver {
+    Funding,
+    ClaimableForHolding,
+    ClaimableForUser,
 }

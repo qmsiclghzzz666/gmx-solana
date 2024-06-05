@@ -31,6 +31,7 @@ pub struct InitializeConfig<'info> {
 pub fn initialize_config(ctx: Context<InitializeConfig>) -> Result<()> {
     let config = &mut ctx.accounts.config;
     config.bump = ctx.bumps.config;
+    config.store = ctx.accounts.store.key();
     Ok(())
 }
 
@@ -60,6 +61,7 @@ pub struct InsertAmount<'info> {
     store: Account<'info, DataStore>,
     #[account(
         mut,
+        has_one = store,
         seeds = [Config::SEED, store.key().as_ref()],
         bump = config.bump,
     )]
@@ -105,6 +107,7 @@ pub struct InsertFactor<'info> {
     store: Account<'info, DataStore>,
     #[account(
         mut,
+        has_one = store,
         seeds = [Config::SEED, store.key().as_ref()],
         bump = config.bump,
     )]
@@ -150,6 +153,7 @@ pub struct InsertAddress<'info> {
     store: Account<'info, DataStore>,
     #[account(
         mut,
+        has_one = store,
         seeds = [Config::SEED, store.key().as_ref()],
         bump = config.bump,
     )]

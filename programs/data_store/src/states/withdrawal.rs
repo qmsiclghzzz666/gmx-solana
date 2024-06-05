@@ -28,6 +28,8 @@ impl Withdrawal {
 pub struct Fixed {
     /// The bump seed.
     pub bump: u8,
+    /// Store.
+    pub store: Pubkey,
     /// The nonce bytes for this withdrawal.
     pub nonce: [u8; 32],
     /// The slot that the withdrawal was last updated at.
@@ -115,6 +117,7 @@ impl Withdrawal {
     pub(crate) fn init(
         &mut self,
         bump: u8,
+        store: Pubkey,
         nonce: NonceBytes,
         user: Pubkey,
         market: &Account<Market>,
@@ -131,6 +134,7 @@ impl Withdrawal {
         *self = Self {
             fixed: Box::new(Fixed {
                 bump,
+                store,
                 nonce,
                 updated_at_slot: clock.slot,
                 updated_at: clock.unix_timestamp,

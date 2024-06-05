@@ -80,13 +80,13 @@ export const makeCreateDepositInstruction = async (
         receiver: toMarketTokenAccount,
         initialLongTokenAccount: fromInitialLongTokenAccount,
         initialShortTokenAccount: fromInitialShortTokenAccount,
-        longTokenDepositVault: fromInitialLongTokenAccount ? longTokenDepositVault : null,
-        shortTokenDepositVault: fromInitialShortTokenAccount ? shortTokenDepositVault : null,
+        initialLongTokenVault: fromInitialLongTokenAccount ? longTokenDepositVault : null,
+        initialShortTokenVault: fromInitialShortTokenAccount ? shortTokenDepositVault : null,
     }).remainingAccounts([...longSwapPath, ...shortSwapPath].map(mint => {
         return {
             pubkey: findMarketPDA(store, mint)[0],
             isSigner: false,
-            isWritable: false,
+            isWritable: true,
         }
     })).instruction();
 
@@ -275,9 +275,9 @@ export const makeCreateDecreaseOrderInstruction = async (
             position,
             tokenConfigMap: findTokenConfigMapPDA(store)[0],
             market,
-            initialCollateralTokenAccount: null,
             finalOutputTokenAccount,
             secondaryOutputTokenAccount,
+            initialCollateralTokenAccount: null,
             initialCollateralTokenVault: null,
             longTokenAccount,
             shortTokenAccount,
@@ -383,11 +383,11 @@ export const makeCreateIncreaseOrderInstruction = async (
             secondaryOutputTokenAccount: null,
             longTokenAccount,
             shortTokenAccount,
-        }).remainingAccounts(swapPath.map(mint => {
+        }).remainingAccounts(swapPath.map((mint, idx) => {
             return {
                 pubkey: findMarketPDA(store, mint)[0],
                 isSigner: false,
-                isWritable: false,
+                isWritable: idx == 0,
             }
         })).instruction();
     return [instruction, order] as IxWithOutput<PublicKey>;

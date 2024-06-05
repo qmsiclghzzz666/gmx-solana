@@ -12,6 +12,8 @@ use super::{AsMarket, Seed};
 pub struct Position {
     /// Bump seed.
     pub bump: u8,
+    /// Store.
+    pub store: Pubkey,
     /// Position kind (the representation of [`PositionKind`]).
     pub kind: u8,
     /// Padding.
@@ -48,7 +50,7 @@ pub struct Position {
 
 impl Space for Position {
     #[allow(clippy::identity_op)]
-    const INIT_SPACE: usize = (1 * 2) + (1 * 14) + (32 * 3) + (8 * 4) + (16 * 7);
+    const INIT_SPACE: usize = (1 * 2) + 32 + (1 * 14) + (32 * 3) + (8 * 4) + (16 * 7);
 }
 
 impl Seed for Position {
@@ -88,6 +90,7 @@ impl Position {
         &mut self,
         kind: PositionKind,
         bump: u8,
+        store: Pubkey,
         owner: &Pubkey,
         market_token: &Pubkey,
         collateral_token: &Pubkey,
@@ -100,6 +103,7 @@ impl Position {
         }
         self.kind = kind as u8;
         self.bump = bump;
+        self.store = store;
         self.padding_0 = [0; 14];
         self.owner = *owner;
         self.market_token = *market_token;

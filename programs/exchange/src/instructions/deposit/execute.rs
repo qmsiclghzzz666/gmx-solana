@@ -70,6 +70,9 @@ impl<'info> ExecuteDeposit<'info> {
                 deposit: self.deposit.to_account_info(),
                 user: self.user.to_account_info(),
                 system_program: self.system_program.to_account_info(),
+                initial_long_token: None,
+                initial_short_token: None,
+                token_program: self.token_program.to_account_info(),
             },
         )
     }
@@ -137,7 +140,6 @@ impl<'info> WithOracle<'info> for ExecuteDeposit<'info> {
 
 impl<'info> ExecuteDeposit<'info> {
     fn execute(&mut self, remaining_accounts: &'info [AccountInfo<'info>]) -> Result<()> {
-        // self.oracle.reload()?;
         cpi::execute_deposit(
             self.execute_deposit_ctx()
                 .with_remaining_accounts(remaining_accounts.to_vec()),

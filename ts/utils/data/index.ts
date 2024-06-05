@@ -47,7 +47,7 @@ export const createDataStorePDA = (key: string) => anchor.web3.PublicKey.findPro
 export const createMarketPDA = (store: PublicKey, marketToken: PublicKey) => PublicKey.findProgramAddressSync([
     MARKET_SEED,
     store.toBytes(),
-    keyToSeed(marketToken.toBase58()),
+    marketToken.toBytes(),
 ], dataStore.programId);
 
 export const createMarketTokenMintPDA = (

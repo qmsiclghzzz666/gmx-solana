@@ -35,6 +35,7 @@ pub use self::{
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub struct Oracle {
     pub bump: u8,
+    pub store: Pubkey,
     pub index: u8,
     pub primary: PriceMap,
     pub min_oracle_ts: i64,
@@ -48,9 +49,10 @@ impl Seed for Oracle {
 
 impl Oracle {
     /// Initialize the [`Oracle`].
-    pub(crate) fn init(&mut self, bump: u8, index: u8) {
+    pub(crate) fn init(&mut self, bump: u8, store: Pubkey, index: u8) {
         self.clear_all_prices();
         self.bump = bump;
+        self.store = store;
         self.index = index;
     }
 

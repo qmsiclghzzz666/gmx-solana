@@ -25,7 +25,7 @@ anchor-lang = { workspace = true, features = ["init-if-needed"] }
 gmx-core = { path = "../../crates/gmx-core", features = ["u128", "solana"] }
 gmx-solana-utils = { path = "../../crates/gmx-solana-utils" }
 dual-vec-map = { path = "../../crates/dual-vec-map" }
-anchor-spl = { workspace = true, default_features = false, features = [
+anchor-spl = { workspace = true, default-features = false, features = [
     "token",
     "token_2022",
     "token_2022_extensions",

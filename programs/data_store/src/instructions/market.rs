@@ -1,10 +1,10 @@
 use anchor_lang::prelude::*;
-use gmx_core::{Pool as GmxCorePool, PoolKind};
+use anchor_spl::token::{Token, TokenAccount};
 
 use crate::{
-    states::{Action, DataStore, Market, MarketChangeEvent, MarketMeta, Pool, Roles, Seed},
+    constants,
+    states::{Action, DataStore, Market, MarketChangeEvent, MarketMeta, Roles, Seed},
     utils::internal,
-    DataStoreError,
 };
 
 /// Number of pools.
@@ -24,12 +24,14 @@ pub fn initialize_market(
     let market = &mut ctx.accounts.market;
     market.init(
         ctx.bumps.market,
+        ctx.accounts.store.key(),
         market_token_mint,
         index_token_mint,
         long_token_mint,
         short_token_mint,
         NUM_POOLS,
         NUM_CLOCKS,
+        true,
     )?;
     emit!(MarketChangeEvent {
         address: market.key(),
@@ -53,7 +55,7 @@ pub struct InitializeMarket<'info> {
         seeds = [
             Market::SEED,
             store.key().as_ref(),
-            &Market::create_key_seed(&market_token),
+            market_token.as_ref(),
         ],
         bump,
     )]
@@ -94,7 +96,8 @@ pub struct RemoveMarket<'info> {
     store: Account<'info, DataStore>,
     #[account(
         mut,
-        seeds = [Market::SEED, store.key().as_ref(), &market.expected_key_seed()],
+        has_one = store,
+        seeds = [Market::SEED, store.key().as_ref(), market.meta.market_token_mint.as_ref()],
         bump = market.bump,
         close = authority,
     )]
@@ -115,43 +118,76 @@ impl<'info> internal::Authentication<'info> for RemoveMarket<'info> {
     }
 }
 
-/// Apply delta to market pool.
-pub fn apply_delta_to_market_pool(
-    ctx: Context<ApplyDeltaToMarketPool>,
-    pool: PoolKind,
-    is_long_token: bool,
-    delta: i128,
-) -> Result<()> {
-    let market = &mut ctx.accounts.market;
-    market
-        .with_pool_mut(pool, |pool| {
-            if is_long_token {
-                pool.apply_delta_to_long_amount(&delta)
-                    .map_err(|_| DataStoreError::Computation)?;
-            } else {
-                pool.apply_delta_to_short_amount(&delta)
-                    .map_err(|_| DataStoreError::Computation)?;
-            }
-            Result::Ok(())
-        })
-        .ok_or(DataStoreError::UnsupportedPoolKind)??;
-    Ok(())
-}
-
 #[derive(Accounts)]
-pub struct ApplyDeltaToMarketPool<'info> {
-    pub authority: Signer<'info>,
-    pub store: Account<'info, DataStore>,
-    pub only_controller: Account<'info, Roles>,
-    #[account(
-        mut,
-        seeds = [Market::SEED, store.key().as_ref(), &market.expected_key_seed()],
-        bump = market.bump,
-    )]
+pub struct GetValidatedMarketMeta<'info> {
+    pub(crate) store: Account<'info, DataStore>,
+    #[account(has_one = store)]
     pub(crate) market: Account<'info, Market>,
 }
 
-impl<'info> internal::Authentication<'info> for ApplyDeltaToMarketPool<'info> {
+/// Get the meta of the market after validation.
+pub fn get_validated_market_meta(ctx: Context<GetValidatedMarketMeta>) -> Result<MarketMeta> {
+    ctx.accounts.market.validate(&ctx.accounts.store.key())?;
+    Ok(ctx.accounts.market.meta.clone())
+}
+
+#[derive(Accounts)]
+pub struct MarketTransferIn<'info> {
+    pub authority: Signer<'info>,
+    pub store: Account<'info, DataStore>,
+    #[account(
+        seeds = [Roles::SEED, store.key().as_ref(), authority.key().as_ref()],
+        bump = only_controller.bump,
+    )]
+    pub only_controller: Account<'info, Roles>,
+    pub from_authority: Signer<'info>,
+    #[account(mut, has_one = store)]
+    pub market: Account<'info, Market>,
+    #[account(mut, token::mint = vault.mint, constraint = from.key() != vault.key())]
+    pub from: Account<'info, TokenAccount>,
+    #[account(
+        mut,
+        token::authority = store,
+        seeds = [
+            constants::MARKET_VAULT_SEED,
+            store.key().as_ref(),
+            vault.mint.as_ref(),
+            &[],
+        ],
+        bump,
+    )]
+    pub vault: Account<'info, TokenAccount>,
+    pub token_program: Program<'info, Token>,
+}
+
+/// Transfer some tokens into the market.
+pub fn market_transfer_in(ctx: Context<MarketTransferIn>, amount: u64) -> Result<()> {
+    use anchor_spl::token;
+
+    ctx.accounts.market.validate(&ctx.accounts.store.key())?;
+
+    if amount != 0 {
+        token::transfer(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                token::Transfer {
+                    from: ctx.accounts.from.to_account_info(),
+                    to: ctx.accounts.vault.to_account_info(),
+                    authority: ctx.accounts.from_authority.to_account_info(),
+                },
+            ),
+            amount,
+        )?;
+        let token = &ctx.accounts.vault.mint;
+        ctx.accounts
+            .market
+            .record_transferred_in_by_token(token, amount)?;
+    }
+
+    Ok(())
+}
+
+impl<'info> internal::Authentication<'info> for MarketTransferIn<'info> {
     fn authority(&self) -> &Signer<'info> {
         &self.authority
     }
@@ -165,32 +201,70 @@ impl<'info> internal::Authentication<'info> for ApplyDeltaToMarketPool<'info> {
     }
 }
 
-/// Get the given pool info of the market.
-pub fn get_pool(ctx: Context<GetPool>, pool: PoolKind) -> Result<Option<Pool>> {
-    Ok(ctx.accounts.market.pool(pool))
-}
-
 #[derive(Accounts)]
-pub struct GetPool<'info> {
-    pub(crate) market: Account<'info, Market>,
+pub struct MarketTransferOut<'info> {
+    pub authority: Signer<'info>,
+    pub store: Account<'info, DataStore>,
+    #[account(
+        seeds = [Roles::SEED, store.key().as_ref(), authority.key().as_ref()],
+        bump = only_controller.bump,
+    )]
+    pub only_controller: Account<'info, Roles>,
+    #[account(mut, has_one = store)]
+    pub market: Account<'info, Market>,
+    #[account(mut, token::mint = vault.mint, constraint = to.key() != vault.key())]
+    pub to: Account<'info, TokenAccount>,
+    #[account(
+        mut,
+        token::authority = store,
+        seeds = [
+            constants::MARKET_VAULT_SEED,
+            store.key().as_ref(),
+            vault.mint.as_ref(),
+            &[],
+        ],
+        bump,
+    )]
+    pub vault: Account<'info, TokenAccount>,
+    pub token_program: Program<'info, Token>,
 }
 
-/// Get the market token mint of the market.
-pub fn get_market_token_mint(ctx: Context<GetMarketTokenMint>) -> Result<Pubkey> {
-    Ok(ctx.accounts.market.meta.market_token_mint)
+/// Transfer some tokens out of the market.
+pub fn market_transfer_out(ctx: Context<MarketTransferOut>, amount: u64) -> Result<()> {
+    use crate::utils::internal::TransferUtils;
+
+    ctx.accounts.market.validate(&ctx.accounts.store.key())?;
+
+    if amount != 0 {
+        TransferUtils::new(
+            ctx.accounts.token_program.to_account_info(),
+            &ctx.accounts.store,
+            None,
+        )
+        .transfer_out(
+            ctx.accounts.vault.to_account_info(),
+            ctx.accounts.to.to_account_info(),
+            amount,
+        )?;
+        let token = &ctx.accounts.vault.mint;
+        ctx.accounts
+            .market
+            .record_transferred_out_by_token(token, amount)?;
+    }
+
+    Ok(())
 }
 
-#[derive(Accounts)]
-pub struct GetMarketTokenMint<'info> {
-    pub(crate) market: Account<'info, Market>,
-}
+impl<'info> internal::Authentication<'info> for MarketTransferOut<'info> {
+    fn authority(&self) -> &Signer<'info> {
+        &self.authority
+    }
 
-/// Get the meta of the market.
-pub fn get_market_meta(ctx: Context<GetMarketMeta>) -> Result<MarketMeta> {
-    Ok(ctx.accounts.market.meta.clone())
-}
+    fn store(&self) -> &Account<'info, DataStore> {
+        &self.store
+    }
 
-#[derive(Accounts)]
-pub struct GetMarketMeta<'info> {
-    pub(crate) market: Account<'info, Market>,
+    fn roles(&self) -> &Account<'info, Roles> {
+        &self.only_controller
+    }
 }

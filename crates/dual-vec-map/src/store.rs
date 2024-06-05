@@ -69,10 +69,10 @@ pub trait SearchStore: Store {
     ///
     /// See the `binary_search` method of [`std::slice`] for more details.
     #[inline]
-    fn binary_search<Q: ?Sized>(&self, key: &Q) -> Result<usize, usize>
+    fn binary_search<Q>(&self, key: &Q) -> Result<usize, usize>
     where
         Self::Value: Borrow<Q>,
-        Q: Ord,
+        Q: ?Sized + Ord,
     {
         self.binary_search_by(|k| k.borrow().cmp(key))
     }
@@ -178,10 +178,10 @@ impl<'b, S> SearchStore for &'b mut S
 where
     S: SearchStore,
 {
-    fn binary_search<Q: ?Sized>(&self, key: &Q) -> Result<usize, usize>
+    fn binary_search<Q>(&self, key: &Q) -> Result<usize, usize>
     where
         Self::Value: Borrow<Q>,
-        Q: Ord,
+        Q: ?Sized + Ord,
     {
         (**self).binary_search(key)
     }
@@ -252,10 +252,10 @@ impl<'b, S> SearchStore for &'b S
 where
     S: SearchStore,
 {
-    fn binary_search<Q: ?Sized>(&self, key: &Q) -> Result<usize, usize>
+    fn binary_search<Q>(&self, key: &Q) -> Result<usize, usize>
     where
         Self::Value: Borrow<Q>,
-        Q: Ord,
+        Q: ?Sized + Ord,
     {
         (**self).binary_search(key)
     }
