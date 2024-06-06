@@ -41,3 +41,20 @@ pub fn find_token_config_map(store: &Pubkey, store_program_id: &Pubkey) -> (Pubk
 pub fn find_config_pda(store: &Pubkey, store_program_id: &Pubkey) -> (Pubkey, u8) {
     Pubkey::find_program_address(&[Config::SEED, store.as_ref()], store_program_id)
 }
+
+/// Find PDA for the market vault.
+pub fn find_market_vault_address(
+    store: &Pubkey,
+    token: &Pubkey,
+    store_program_id: &Pubkey,
+) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[
+            data_store::constants::MARKET_VAULT_SEED,
+            store.as_ref(),
+            token.as_ref(),
+            &[],
+        ],
+        store_program_id,
+    )
+}
