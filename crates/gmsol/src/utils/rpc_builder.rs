@@ -242,17 +242,25 @@ impl<'a, C: Deref<Target = impl Signer> + Clone, T> RpcBuilder<'a, C, T> {
 
     /// Build [`RequestBuilder`](anchor_client::RequestBuilder).
     pub fn build(self) -> anchor_client::RequestBuilder<'a, C> {
-        self.build_with_output().0
+        self.build_with_output(false).0
+    }
+
+    /// Build [`RequestBuilder`](anchor_client::RequestBuilder) without compute budget.
+    pub fn build_without_compute_budget(self) -> anchor_client::RequestBuilder<'a, C> {
+        self.build_with_output(true).0
     }
 
     /// Build and output.
-    pub fn build_with_output(self) -> (anchor_client::RequestBuilder<'a, C>, T) {
+    pub fn build_with_output(
+        self,
+        without_compute_budget: bool,
+    ) -> (anchor_client::RequestBuilder<'a, C>, T) {
         debug_assert!(
             self.builder.instructions().unwrap().is_empty(),
             "non-empty builder"
         );
         let request = self
-            .instructions(false)
+            .instructions(without_compute_budget)
             .into_iter()
             .fold(self.builder.program(self.program_id), |acc, ix| {
                 acc.instruction(ix)

@@ -193,7 +193,9 @@ impl ControllerArgs {
             }
             Command::InitializeConfig => {
                 crate::utils::send_or_serialize(
-                    client.initialize_config(store).build(),
+                    client
+                        .initialize_config(store)
+                        .build_without_compute_budget(),
                     serialize_only,
                     |signature| {
                         println!("{signature}");
@@ -206,7 +208,7 @@ impl ControllerArgs {
                 crate::utils::send_or_serialize(
                     client
                         .insert_global_amount(store, key, *amount, *new)
-                        .build(),
+                        .build_without_compute_budget(),
                     serialize_only,
                     |signature| {
                         println!("{signature}");
@@ -219,7 +221,7 @@ impl ControllerArgs {
                 crate::utils::send_or_serialize(
                     client
                         .insert_global_factor(store, key, *factor, *new)
-                        .build(),
+                        .build_without_compute_budget(),
                     serialize_only,
                     |signature| {
                         println!("{signature}");
@@ -232,7 +234,7 @@ impl ControllerArgs {
                 crate::utils::send_or_serialize(
                     client
                         .insert_global_address(store, key, address, *new)
-                        .build(),
+                        .build_without_compute_budget(),
                     serialize_only,
                     |signature| {
                         println!("{signature}");

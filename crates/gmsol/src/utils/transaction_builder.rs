@@ -89,7 +89,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> TransactionBuilder<'a, C> {
 
     /// Send all in order and returns the signatures of the success transactions.
     pub async fn send_all(self) -> Result<Vec<Signature>, (Vec<Signature>, crate::Error)> {
-        self.send_all_with_opts(None, RpcSendTransactionConfig::default())
+        self.send_all_with_opts(None, RpcSendTransactionConfig::default(), false)
             .await
     }
 
@@ -98,6 +98,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> TransactionBuilder<'a, C> {
         self,
         compute_unit_price_micro_lamports: Option<u64>,
         config: RpcSendTransactionConfig,
+        without_compute_budget: bool,
     ) -> Result<Vec<Signature>, (Vec<Signature>, crate::Error)> {
         let txs = FuturesOrdered::from_iter(self.builders.into_iter().enumerate().map(
             |(idx, mut builder)| {
@@ -109,7 +110,11 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> TransactionBuilder<'a, C> {
                         size = builder.transaction_size(false),
                         "signing transaction {idx}"
                     );
-                    builder.build().signed_transaction().await
+                    builder
+                        .build_with_output(without_compute_budget)
+                        .0
+                        .signed_transaction()
+                        .await
                 }
             },
         ))
