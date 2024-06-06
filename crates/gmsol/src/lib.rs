@@ -1,3 +1,6 @@
+/// Program Derived Addresses for GMSOL Programs.
+pub mod pda;
+
 /// GMSOL Client.
 pub mod client;
 
@@ -16,6 +19,7 @@ pub mod pyth;
 /// Utils.
 pub mod utils;
 
+pub use client::{Client, ClientOptions};
 pub use error::Error;
 
 pub type Result<T> = std::result::Result<T, Error>;
