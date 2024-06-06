@@ -6,7 +6,7 @@ use anchor_client::{
         signature::{read_keypair_file, NullSigner},
         signer::Signer,
     },
-    Client, Cluster,
+    Cluster,
 };
 use clap::Parser;
 use eyre::{eyre, ContextCompat};
@@ -89,7 +89,6 @@ async fn main() -> eyre::Result<()> {
     Ok(())
 }
 
-type SharedClient = Client<SignerRef>;
 type GMSOLClient = gmsol::Client<SignerRef>;
 
 impl Cli {
@@ -112,18 +111,6 @@ impl Cli {
         self.cluster
             .parse()
             .map_err(|err| eyre!("Invalid cluster: {err}"))
-    }
-
-    fn client(&self) -> eyre::Result<(SharedClient, Pubkey)> {
-        let cluster = self.cluster()?;
-        tracing::debug!("using cluster: {cluster}");
-        let wallet = self.wallet()?;
-        let payer = wallet.pubkey();
-        tracing::debug!("using wallet: {}", payer);
-        let commitment = self.commitment;
-        tracing::debug!("using commitment config: {}", commitment.commitment);
-        let client = Client::new_with_options(cluster, wallet, self.commitment);
-        Ok((client, payer))
     }
 
     fn store(&self) -> eyre::Result<&Pubkey> {
@@ -151,22 +138,28 @@ impl Cli {
     }
 
     async fn run(&self) -> eyre::Result<()> {
-        let (client, payer) = self.client()?;
-        let gmsol = self.gmsol_client()?;
+        let client = self.gmsol_client()?;
         match &self.command {
             Command::Whoami => {
-                println!("{payer}");
+                println!("{}", client.payer());
             }
             Command::Admin(args) => {
-                args.run(&gmsol, self.store.as_ref(), self.serialize_only)
+                args.run(&client, self.store.as_ref(), self.serialize_only)
                     .await?
             }
-            Command::Inspect(args) => args.run(&gmsol, self.store.as_ref()).await?,
-            Command::Roles(args) => args.run(&gmsol, self.store()?, self.serialize_only).await?,
+            Command::Inspect(args) => args.run(&client, self.store.as_ref()).await?,
+            Command::Roles(args) => {
+                args.run(&client, self.store()?, self.serialize_only)
+                    .await?
+            }
             Command::Exchange(args) => args.run(&client, self.store()?).await?,
-            Command::Keeper(args) => args.run(&client, self.store()?).await?,
+            Command::Keeper(args) => {
+                args.run(&client, self.store()?, self.serialize_only)
+                    .await?
+            }
             Command::Controller(args) => {
-                args.run(&gmsol, self.store()?, self.serialize_only).await?
+                args.run(&client, self.store()?, self.serialize_only)
+                    .await?
             }
         }
         Ok(())

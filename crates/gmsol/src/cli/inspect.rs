@@ -1,7 +1,7 @@
 use anchor_client::solana_sdk::pubkey::Pubkey;
 use data_store::states::{self};
 use eyre::ContextCompat;
-use gmsol::{store::market::find_market_address, utils};
+use gmsol::utils;
 use pyth_sdk::Identifier;
 
 use crate::{utils::Oracle, GMSOLClient};
@@ -130,8 +130,8 @@ impl InspectArgs {
                 show_market_address,
             } => {
                 if !as_market_address {
-                    address =
-                        find_market_address(store.wrap_err("`store` not provided")?, &address).0;
+                    address = client
+                        .find_market_address(store.wrap_err("`store` not provided")?, &address);
                 }
                 println!("{:#?}", program.account::<states::Market>(address).await?);
                 if *show_market_address {
@@ -152,7 +152,7 @@ impl InspectArgs {
                 println!("{controller}");
             }
             Command::Oracle { oracle } => {
-                let address = oracle.address(store)?;
+                let address = oracle.address(store, &client.data_store_program_id())?;
                 println!("{address}");
                 println!("{:#?}", program.account::<states::Oracle>(address).await?);
             }

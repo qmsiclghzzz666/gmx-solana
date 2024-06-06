@@ -5,7 +5,7 @@ use anchor_client::{
     Cluster, Program,
 };
 
-use data_store::states::TokenConfig;
+use data_store::states::{position::PositionKind, NonceBytes, TokenConfig};
 use typed_builder::TypedBuilder;
 
 use crate::utils::RpcBuilder;
@@ -86,6 +86,16 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         &self.exchange
     }
 
+    /// Create a new `DataStore` Program.
+    pub fn new_data_store(&self) -> crate::Result<Program<C>> {
+        self.program(self.data_store_program_id())
+    }
+
+    /// Create a new `Exchange` Program.
+    pub fn new_exchange(&self) -> crate::Result<Program<C>> {
+        self.program(self.exchange_program_id())
+    }
+
     /// Get the program id of `DataStore` program.
     pub fn data_store_program_id(&self) -> Pubkey {
         self.data_store().id()
@@ -126,6 +136,11 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         Ok(output)
     }
 
+    /// Find Event Authority Address.
+    pub fn find_event_authority_address(&self) -> Pubkey {
+        crate::pda::find_event_authority_address(&self.exchange_program_id()).0
+    }
+
     /// Find PDA for [`DataStore`](data_store::states::DataStore) account.
     pub fn find_store_address(&self, key: &str) -> Pubkey {
         crate::pda::find_store_address(key, &self.data_store_program_id()).0
@@ -164,5 +179,91 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
     /// Find PDA for market vault account.
     pub fn find_market_vault_address(&self, store: &Pubkey, token: &Pubkey) -> Pubkey {
         crate::pda::find_market_vault_address(store, token, &self.data_store_program_id()).0
+    }
+
+    /// Find PDA for market token mint account.
+    pub fn find_market_token_address(
+        &self,
+        store: &Pubkey,
+        index_token: &Pubkey,
+        long_token: &Pubkey,
+        short_token: &Pubkey,
+    ) -> Pubkey {
+        crate::pda::find_market_token_address(
+            store,
+            index_token,
+            long_token,
+            short_token,
+            &self.data_store_program_id(),
+        )
+        .0
+    }
+
+    /// Find PDA for market account.
+    pub fn find_market_address(&self, store: &Pubkey, token: &Pubkey) -> Pubkey {
+        crate::pda::find_market_address(store, token, &self.data_store_program_id()).0
+    }
+
+    /// Find PDA for deposit account.
+    pub fn find_deposit_address(
+        &self,
+        store: &Pubkey,
+        user: &Pubkey,
+        nonce: &NonceBytes,
+    ) -> Pubkey {
+        crate::pda::find_deposit_address(store, user, nonce, &self.data_store_program_id()).0
+    }
+
+    /// Find DPA for withdrawal account.
+    pub fn find_withdrawal_address(
+        &self,
+        store: &Pubkey,
+        user: &Pubkey,
+        nonce: &NonceBytes,
+    ) -> Pubkey {
+        crate::pda::find_withdrawal_address(store, user, nonce, &self.data_store_program_id()).0
+    }
+
+    /// Find PDA for order.
+    pub fn find_order_address(&self, store: &Pubkey, user: &Pubkey, nonce: &NonceBytes) -> Pubkey {
+        crate::pda::find_order_address(store, user, nonce, &self.data_store_program_id()).0
+    }
+
+    /// Find PDA for position.
+    pub fn find_position_address(
+        &self,
+        store: &Pubkey,
+        user: &Pubkey,
+        market_token: &Pubkey,
+        collateral_token: &Pubkey,
+        kind: PositionKind,
+    ) -> crate::Result<Pubkey> {
+        Ok(crate::pda::find_position_address(
+            store,
+            user,
+            market_token,
+            collateral_token,
+            kind,
+            &self.data_store_program_id(),
+        )?
+        .0)
+    }
+
+    /// Find claimable account address.
+    pub fn find_claimable_account_address(
+        &self,
+        store: &Pubkey,
+        mint: &Pubkey,
+        user: &Pubkey,
+        time_key: &[u8],
+    ) -> Pubkey {
+        crate::pda::find_claimable_account_pda(
+            store,
+            mint,
+            user,
+            time_key,
+            &self.data_store_program_id(),
+        )
+        .0
     }
 }

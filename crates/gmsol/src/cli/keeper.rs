@@ -13,7 +13,7 @@ use gmsol::{
     utils::{ComputeBudget, RpcBuilder},
 };
 
-use crate::{utils::Oracle, SharedClient};
+use crate::{utils::Oracle, GMSOLClient};
 
 #[derive(clap::Args, Clone)]
 pub(super) struct KeeperArgs {
@@ -96,18 +96,27 @@ impl KeeperArgs {
         self.pull_oracle && matches!(self.provider, PriceProviderKind::Pyth)
     }
 
-    pub(super) async fn run(&self, client: &SharedClient, store: &Pubkey) -> gmsol::Result<()> {
+    pub(super) async fn run(
+        &self,
+        client: &GMSOLClient,
+        store: &Pubkey,
+        serialize_only: bool,
+    ) -> gmsol::Result<()> {
         match &self.command {
             Command::Watch => {
                 let task = Box::pin(self.start_watching(client, store));
                 task.await?;
             }
             Command::ExecuteDeposit { deposit } => {
-                let program = client.program(exchange::id())?;
-                let mut builder =
-                    program.execute_deposit(store, &self.oracle.address(Some(store))?, deposit);
+                let mut builder = client.execute_deposit(
+                    store,
+                    &self
+                        .oracle
+                        .address(Some(store), &client.data_store_program_id())?,
+                    deposit,
+                );
                 let execution_fee = self
-                    .get_or_estimate_execution_fee(&program, builder.build().await?)
+                    .get_or_estimate_execution_fee(client.data_store(), builder.build().await?)
                     .await?;
                 builder
                     .execution_fee(execution_fee)
@@ -119,7 +128,7 @@ impl KeeperArgs {
                     if feed_ids.is_empty() {
                         tracing::error!(%deposit, "empty feed ids");
                     }
-                    let oracle = PythPullOracle::try_new(client)?;
+                    let oracle = PythPullOracle::try_new(client.anchor())?;
                     let hermes = Hermes::default();
                     let update = hermes
                         .latest_price_updates(feed_ids, Some(EncodingType::Base64))
@@ -152,14 +161,15 @@ impl KeeperArgs {
                 }
             }
             Command::ExecuteWithdrawal { withdrawal } => {
-                let program = client.program(exchange::id())?;
-                let mut builder = program.execute_withdrawal(
+                let mut builder = client.execute_withdrawal(
                     store,
-                    &self.oracle.address(Some(store))?,
+                    &self
+                        .oracle
+                        .address(Some(store), &client.data_store_program_id())?,
                     withdrawal,
                 );
                 let execution_fee = self
-                    .get_or_estimate_execution_fee(&program, builder.build().await?)
+                    .get_or_estimate_execution_fee(client.data_store(), builder.build().await?)
                     .await?;
                 builder
                     .execution_fee(execution_fee)
@@ -171,7 +181,7 @@ impl KeeperArgs {
                     if feed_ids.is_empty() {
                         tracing::error!(%withdrawal, "empty feed ids");
                     }
-                    let oracle = PythPullOracle::try_new(client)?;
+                    let oracle = PythPullOracle::try_new(client.anchor())?;
                     let hermes = Hermes::default();
                     let update = hermes
                         .latest_price_updates(feed_ids, Some(EncodingType::Base64))
@@ -204,11 +214,15 @@ impl KeeperArgs {
                 }
             }
             Command::ExecuteOrder { order } => {
-                let program = client.program(exchange::id())?;
-                let mut builder =
-                    program.execute_order(store, &self.oracle.address(Some(store))?, order)?;
+                let mut builder = client.execute_order(
+                    store,
+                    &self
+                        .oracle
+                        .address(Some(store), &client.data_store_program_id())?,
+                    order,
+                )?;
                 let execution_fee = self
-                    .get_or_estimate_execution_fee(&program, builder.build().await?)
+                    .get_or_estimate_execution_fee(client.data_store(), builder.build().await?)
                     .await?;
                 builder
                     .execution_fee(execution_fee)
@@ -220,7 +234,7 @@ impl KeeperArgs {
                     if feed_ids.is_empty() {
                         tracing::error!(%order, "empty feed ids");
                     }
-                    let oracle = PythPullOracle::try_new(client)?;
+                    let oracle = PythPullOracle::try_new(client.anchor())?;
                     let hermes = Hermes::default();
                     let update = hermes
                         .latest_price_updates(feed_ids, Some(EncodingType::Base64))
@@ -253,23 +267,26 @@ impl KeeperArgs {
                 }
             }
             Command::InitializeVault { token } => {
-                let program = client.program(data_store::id())?;
-                let (request, vault) = program.initialize_market_vault(store, token);
-                let signature = request.send().await?;
-                println!("created a new vault {vault} at tx {signature}");
+                let (request, vault) = client.initialize_market_vault(store, token);
+                crate::utils::send_or_serialize(request, serialize_only, |signature| {
+                    println!("created a new vault {vault} at tx {signature}");
+                    Ok(())
+                })
+                .await?;
             }
             Command::CreateMarket {
                 index_token,
                 long_token,
                 short_token,
             } => {
-                let program = client.program(exchange::id())?;
                 let (request, market_token) =
-                    program.create_market(store, index_token, long_token, short_token);
-                let signature = request.send().await?;
-                println!(
-                    "created a new market with {market_token} as its token address at tx {signature}"
-                );
+                    client.create_market(store, index_token, long_token, short_token);
+                crate::utils::send_or_serialize(request, serialize_only, |signature| {
+                    println!(
+                        "created a new market with {market_token} as its token address at tx {signature}"
+                    );
+                    Ok(())
+                }).await?;
             }
         }
         Ok(())
@@ -281,7 +298,7 @@ impl KeeperArgs {
         args
     }
 
-    async fn start_watching(&self, client: &SharedClient, store: &Pubkey) -> gmsol::Result<()> {
+    async fn start_watching(&self, client: &GMSOLClient, store: &Pubkey) -> gmsol::Result<()> {
         use tokio::sync::mpsc;
 
         let store = *store;
@@ -289,7 +306,7 @@ impl KeeperArgs {
         let mut unsubscribers = vec![];
 
         // Subscribe deposit creation event.
-        let deposit_program = client.program(exchange::id())?;
+        let deposit_program = client.new_exchange()?;
         let unsubscriber =
             deposit_program
             .on::<DepositCreatedEvent>({
@@ -311,7 +328,7 @@ impl KeeperArgs {
         tracing::info!("deposit creation subscribed");
 
         // Subscribe withdrawal creation event.
-        let withdrawal_program = client.program(exchange::id())?;
+        let withdrawal_program = client.new_exchange()?;
         let unsubscriber = withdrawal_program
             .on::<WithdrawalCreatedEvent>({
                 let tx = tx.clone();
@@ -332,7 +349,7 @@ impl KeeperArgs {
         tracing::info!("withdrawal creation subscribed");
 
         // Subscribe order creation event.
-        let order_program = client.program(exchange::id())?;
+        let order_program = client.new_exchange()?;
         let unsubscriber = order_program
             .on::<OrderCreatedEvent>({
                 let tx = tx.clone();
@@ -355,7 +372,7 @@ impl KeeperArgs {
         let worker = async move {
             while let Some(command) = rx.recv().await {
                 tracing::info!(?command, "received new command");
-                match self.with_command(command).run(client, &store).await {
+                match self.with_command(command).run(client, &store, false).await {
                     Ok(()) => {
                         tracing::info!("command executed");
                     }

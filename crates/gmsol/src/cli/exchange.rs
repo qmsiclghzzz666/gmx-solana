@@ -1,8 +1,8 @@
 use anchor_client::solana_sdk::pubkey::Pubkey;
 use data_store::states::{Market, Position};
-use gmsol::{exchange::ExchangeOps, store::market::find_market_address, utils};
+use gmsol::{exchange::ExchangeOps, utils};
 
-use crate::SharedClient;
+use crate::GMSOLClient;
 
 #[derive(clap::Args)]
 pub(super) struct ExchangeArgs {
@@ -188,8 +188,7 @@ impl Side {
 }
 
 impl ExchangeArgs {
-    pub(super) async fn run(&self, client: &SharedClient, store: &Pubkey) -> gmsol::Result<()> {
-        let program = client.program(exchange::id())?;
+    pub(super) async fn run(&self, client: &GMSOLClient, store: &Pubkey) -> gmsol::Result<()> {
         match &self.command {
             Command::CreateDeposit {
                 extra_execution_fee,
@@ -205,7 +204,7 @@ impl ExchangeArgs {
                 long_swap,
                 short_swap,
             } => {
-                let mut builder = program.create_deposit(store, market_token);
+                let mut builder = client.create_deposit(store, market_token);
                 if let Some(receiver) = receiver {
                     builder.receiver(receiver);
                 }
@@ -234,7 +233,7 @@ impl ExchangeArgs {
                 println!("created deposit {deposit} at {signature}");
             }
             Command::CancelDeposit { deposit } => {
-                let signature = program
+                let signature = client
                     .cancel_deposit(store, deposit)
                     .build()
                     .await?
@@ -257,7 +256,7 @@ impl ExchangeArgs {
                 long_swap,
                 short_swap,
             } => {
-                let mut builder = program.create_withdrawal(store, market_token, *amount);
+                let mut builder = client.create_withdrawal(store, market_token, *amount);
                 if let Some(account) = market_token_account {
                     builder.market_token_account(account);
                 }
@@ -279,7 +278,7 @@ impl ExchangeArgs {
                 println!("created withdrawal {withdrawal} at {signature}");
             }
             Command::CancelWithdrawal { withdrawal } => {
-                let signature = program
+                let signature = client
                     .cancel_withdrawal(store, withdrawal)
                     .build()
                     .await?
@@ -298,7 +297,7 @@ impl ExchangeArgs {
                 size,
                 swap,
             } => {
-                let mut builder = program.market_increase(
+                let mut builder = client.market_increase(
                     store,
                     market_token,
                     collateral_side.is_long(),
@@ -326,7 +325,7 @@ impl ExchangeArgs {
                 secondary_output_token_account,
                 swap,
             } => {
-                let mut builder = program.market_decrease(
+                let mut builder = client.market_decrease(
                     store,
                     market_token,
                     collateral_side.is_long(),
@@ -351,11 +350,13 @@ impl ExchangeArgs {
                 secondary_output_token_account,
                 swap,
             } => {
-                let position =
-                    utils::try_deserailize_account::<Position>(&program.async_rpc(), position)
-                        .await?;
-                let market = find_market_address(store, &position.market_token).0;
-                let market = program.account::<Market>(market).await?;
+                let position = utils::try_deserailize_account::<Position>(
+                    &client.data_store().async_rpc(),
+                    position,
+                )
+                .await?;
+                let market = client.find_market_address(store, &position.market_token);
+                let market = client.data_store().account::<Market>(market).await?;
                 let is_collateral_token_long =
                     if market.meta().long_token_mint == position.collateral_token {
                         true
@@ -366,7 +367,7 @@ impl ExchangeArgs {
                             "the collateral token is not valid in the market",
                         ));
                     };
-                let mut builder = program.liquidate(
+                let mut builder = client.liquidate(
                     store,
                     &position.market_token,
                     is_collateral_token_long,

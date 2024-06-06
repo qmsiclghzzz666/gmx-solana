@@ -3,20 +3,14 @@ use std::ops::Deref;
 use anchor_client::{
     anchor_lang::{system_program, Id},
     solana_sdk::{instruction::AccountMeta, pubkey::Pubkey, signer::Signer},
-    Program, RequestBuilder,
+    RequestBuilder,
 };
 use anchor_spl::associated_token::get_associated_token_address;
-use data_store::states::{common::TokensWithFeed, Deposit, Market, NonceBytes, Pyth, Seed};
-use exchange::{accounts, instruction, instructions::CreateDepositParams, utils::ControllerSeeds};
+use data_store::states::{common::TokensWithFeed, Deposit, Market, NonceBytes, Pyth};
+use exchange::{accounts, instruction, instructions::CreateDepositParams};
 
 use crate::{
-    store::{
-        config::find_config_pda,
-        market::{find_market_address, find_market_vault_address},
-        roles::find_roles_address,
-        token_config::find_token_config_map,
-        utils::FeedsParser,
-    },
+    store::utils::FeedsParser,
     utils::{ComputeBudget, RpcBuilder},
 };
 
@@ -28,17 +22,9 @@ use crate::pyth::pull_oracle::Prices;
 /// `execute_deposit` compute budget.
 pub const EXECUTE_DEPOSIT_COMPUTE_BUDGET: u32 = 400_000;
 
-/// Create PDA for deposit.
-pub fn find_deposit_address(store: &Pubkey, user: &Pubkey, nonce: &NonceBytes) -> (Pubkey, u8) {
-    Pubkey::find_program_address(
-        &[Deposit::SEED, store.as_ref(), user.as_ref(), nonce],
-        &data_store::id(),
-    )
-}
-
 /// Create Deposit Builder.
 pub struct CreateDepositBuilder<'a, C> {
-    program: &'a Program<C>,
+    client: &'a crate::Client<C>,
     store: Pubkey,
     market_token: Pubkey,
     receiver: Option<Pubkey>,
@@ -62,9 +48,9 @@ where
     C: Deref<Target = S> + Clone,
     S: Signer,
 {
-    pub(super) fn new(program: &'a Program<C>, store: Pubkey, market_token: Pubkey) -> Self {
+    pub(super) fn new(client: &'a crate::Client<C>, store: Pubkey, market_token: Pubkey) -> Self {
         Self {
-            program,
+            client,
             store,
             nonce: None,
             market_token,
@@ -125,7 +111,7 @@ where
         let token = token?;
         match self.initial_long_token_account {
             Some(account) => Some(account),
-            None => Some(get_associated_token_address(&self.program.payer(), token)),
+            None => Some(get_associated_token_address(&self.client.payer(), token)),
         }
     }
 
@@ -136,7 +122,7 @@ where
         let token = token?;
         match self.initial_short_token_account {
             Some(account) => Some(account),
-            None => Some(get_associated_token_address(&self.program.payer(), token)),
+            None => Some(get_associated_token_address(&self.client.payer(), token)),
         }
     }
 
@@ -161,7 +147,7 @@ where
                     (long_token.is_none() && long_amount != 0)
                         || (short_token.is_none() && short_amount != 0)
                 );
-                let market: Market = self.program.account(*market).await?;
+                let market: Market = self.client.data_store().account(*market).await?;
                 if long_amount != 0 {
                     long_token = Some(market.meta().long_token_mint);
                 }
@@ -204,7 +190,7 @@ where
         match self.receiver {
             Some(token_account) => token_account,
             None => anchor_spl::associated_token::get_associated_token_address(
-                &self.program.payer(),
+                &self.client.payer(),
                 &self.market_token,
             ),
         }
@@ -214,7 +200,7 @@ where
     pub async fn build_with_address(&self) -> crate::Result<(RequestBuilder<'a, C>, Pubkey)> {
         let receiver = self.get_receiver();
         let Self {
-            program,
+            client,
             store,
             nonce,
             market_token,
@@ -229,36 +215,37 @@ where
             ..
         } = self;
         let nonce = nonce.unwrap_or_else(generate_nonce);
-        let payer = program.payer();
-        let deposit = find_deposit_address(store, &payer, &nonce).0;
-        let (_, authority) = ControllerSeeds::find_with_address(store);
-        let only_controller = find_roles_address(store, &authority).0;
-        let market = find_market_address(store, market_token).0;
+        let payer = client.payer();
+        let deposit = client.find_deposit_address(store, &payer, &nonce);
+        let authority = client.controller_address(store);
+        let only_controller = client.find_roles_address(store, &authority);
+        let market = client.find_market_address(store, market_token);
         let (long_token, short_token) = self.get_or_fetch_initial_tokens(&market).await?;
         let initial_long_token_account =
             self.get_or_find_associated_initial_long_token_account(long_token.as_ref());
         let initial_short_token_account =
             self.get_or_find_associated_initial_short_token_account(short_token.as_ref());
-        let builder = program
+        let builder = client
+            .exchange()
             .request()
             .accounts(accounts::CreateDeposit {
                 authority,
                 store: *store,
                 only_controller,
-                data_store_program: data_store::id(),
+                data_store_program: client.data_store_program_id(),
                 system_program: system_program::ID,
                 token_program: anchor_spl::token::ID,
                 deposit,
                 payer,
                 receiver,
-                token_config_map: find_token_config_map(store).0,
+                token_config_map: client.find_token_config_map(store),
                 market,
                 initial_long_token_account,
                 initial_short_token_account,
                 initial_long_token_vault: long_token
-                    .map(|token| find_market_vault_address(store, &token).0),
+                    .map(|token| client.find_market_vault_address(store, &token)),
                 initial_short_token_vault: short_token
-                    .map(|token| find_market_vault_address(store, &token).0),
+                    .map(|token| client.find_market_vault_address(store, &token)),
             })
             .args(instruction::CreateDeposit {
                 nonce,
@@ -284,13 +271,13 @@ where
                     .iter()
                     .enumerate()
                     .map(|(idx, mint)| AccountMeta {
-                        pubkey: find_market_address(store, mint).0,
+                        pubkey: client.find_market_address(store, mint),
                         is_signer: false,
                         is_writable: idx == 0,
                     })
                     .chain(short_token_swap_path.iter().enumerate().map(|(idx, mint)| {
                         AccountMeta {
-                            pubkey: find_market_address(store, mint).0,
+                            pubkey: client.find_market_address(store, mint),
                             is_signer: false,
                             is_writable: idx == 0,
                         }
@@ -303,7 +290,7 @@ where
 
 /// Cancel Deposit Builder.
 pub struct CancelDepositBuilder<'a, C> {
-    program: &'a Program<C>,
+    client: &'a crate::Client<C>,
     store: Pubkey,
     deposit: Pubkey,
     cancel_for_user: Option<Pubkey>,
@@ -321,32 +308,34 @@ struct CancelDepositHint {
     initial_short_market: Option<Pubkey>,
 }
 
-impl<'a> From<&'a Deposit> for CancelDepositHint {
-    fn from(deposit: &'a Deposit) -> Self {
+impl<'a> CancelDepositHint {
+    fn new(deposit: &'a Deposit, store_program_id: &Pubkey) -> Self {
         Self {
             initial_long_token: deposit.fixed.tokens.initial_long_token,
             initial_short_token: deposit.fixed.tokens.initial_short_token,
             initial_long_token_account: deposit.fixed.senders.initial_long_token_account,
             initial_short_token_account: deposit.fixed.senders.initial_short_token_account,
             initial_long_market: deposit.fixed.tokens.initial_long_token.map(|_| {
-                find_market_address(
+                crate::pda::find_market_address(
                     &deposit.fixed.store,
                     deposit
                         .dynamic
                         .swap_params
                         .first_market_token(true)
                         .unwrap_or(&deposit.fixed.tokens.market_token),
+                    store_program_id,
                 )
                 .0
             }),
             initial_short_market: deposit.fixed.tokens.initial_short_token.map(|_| {
-                find_market_address(
+                crate::pda::find_market_address(
                     &deposit.fixed.store,
                     deposit
                         .dynamic
                         .swap_params
                         .first_market_token(false)
                         .unwrap_or(&deposit.fixed.tokens.market_token),
+                    store_program_id,
                 )
                 .0
             }),
@@ -359,9 +348,9 @@ where
     C: Deref<Target = S> + Clone,
     S: Signer,
 {
-    pub(super) fn new(program: &'a Program<C>, store: &Pubkey, deposit: &Pubkey) -> Self {
+    pub(super) fn new(client: &'a crate::Client<C>, store: &Pubkey, deposit: &Pubkey) -> Self {
         Self {
-            program,
+            client,
             store: *store,
             deposit: *deposit,
             cancel_for_user: None,
@@ -384,16 +373,19 @@ where
 
     /// Set hint with the given deposit.
     pub fn hint(&mut self, deposit: &Deposit) -> &mut Self {
-        self.hint = Some(deposit.into());
+        self.hint = Some(CancelDepositHint::new(
+            deposit,
+            &self.client.data_store_program_id(),
+        ));
         self
     }
 
     fn get_user_and_authority(&self) -> (Pubkey, Pubkey) {
         match self.cancel_for_user {
-            Some(user) => (user, self.program.payer()),
+            Some(user) => (user, self.client.payer()),
             None => (
-                self.program.payer(),
-                ControllerSeeds::find_with_address(&self.store).1,
+                self.client.payer(),
+                self.client.controller_address(&self.store),
             ),
         }
     }
@@ -402,8 +394,11 @@ where
         match &self.hint {
             Some(hint) => Ok(*hint),
             None => {
-                let deposit: Deposit = self.program.account(self.deposit).await?;
-                Ok((&deposit).into())
+                let deposit: Deposit = self.client.data_store().account(self.deposit).await?;
+                Ok(CancelDepositHint::new(
+                    &deposit,
+                    &self.client.data_store_program_id(),
+                ))
             }
         }
     }
@@ -413,30 +408,31 @@ where
         let (user, authority) = self.get_user_and_authority();
         let hint = self.get_or_fetch_deposit_info().await?;
         let Self {
-            program,
+            client,
             store,
             deposit,
             execution_fee,
             ..
         } = self;
-        let only_controller = find_roles_address(store, &authority).0;
-        Ok(program
+        let only_controller = self.client.find_roles_address(store, &authority);
+        Ok(client
+            .exchange()
             .request()
             .accounts(accounts::CancelDeposit {
                 authority,
                 store: *store,
                 only_controller,
-                data_store_program: data_store::id(),
+                data_store_program: client.data_store_program_id(),
                 deposit: *deposit,
                 user,
                 initial_long_token: hint.initial_long_token_account,
                 initial_short_token: hint.initial_short_token_account,
                 long_token_deposit_vault: hint
                     .initial_long_token
-                    .map(|token| find_market_vault_address(store, &token).0),
+                    .map(|token| client.find_market_vault_address(store, &token)),
                 short_token_deposit_vault: hint
                     .initial_short_token
-                    .map(|token| find_market_vault_address(store, &token).0),
+                    .map(|token| client.find_market_vault_address(store, &token)),
                 initial_long_market: hint.initial_long_market,
                 initial_short_market: hint.initial_short_market,
                 token_program: anchor_spl::token::ID,
@@ -450,7 +446,7 @@ where
 
 /// Execute Deposit Builder.
 pub struct ExecuteDepositBuilder<'a, C> {
-    program: &'a Program<C>,
+    client: &'a crate::Client<C>,
     store: Pubkey,
     oracle: Pubkey,
     deposit: Pubkey,
@@ -491,13 +487,13 @@ where
     S: Signer,
 {
     pub(super) fn new(
-        program: &'a Program<C>,
+        client: &'a crate::Client<C>,
         store: &Pubkey,
         oracle: &Pubkey,
         deposit: &Pubkey,
     ) -> Self {
         Self {
-            program,
+            client,
             store: *store,
             oracle: *oracle,
             deposit: *deposit,
@@ -538,7 +534,7 @@ where
         match &self.hint {
             Some(hint) => Ok(hint.clone()),
             None => {
-                let deposit: Deposit = self.program.account(self.deposit).await?;
+                let deposit: Deposit = self.client.data_store().account(self.deposit).await?;
                 let hint: ExecuteDepositHint = (&deposit).into();
                 self.hint = Some(hint.clone());
                 Ok(hint)
@@ -550,7 +546,7 @@ where
     pub async fn build(&mut self) -> crate::Result<RpcBuilder<'a, C>> {
         let hint = self.prepare_hint().await?;
         let Self {
-            program,
+            client,
             store,
             oracle,
             deposit,
@@ -558,8 +554,8 @@ where
             price_provider,
             ..
         } = self;
-        let authority = program.payer();
-        let only_order_keeper = find_roles_address(store, &authority).0;
+        let authority = client.payer();
+        let only_order_keeper = client.payer_roles_address(store);
         let feeds = self
             .feeds_parser
             .parse(&hint.feeds)
@@ -569,7 +565,7 @@ where
             .iter()
             .chain(hint.short_swap_tokens.iter())
             .map(|mint| AccountMeta {
-                pubkey: find_market_address(store, mint).0,
+                pubkey: client.find_market_address(store, mint),
                 is_signer: false,
                 is_writable: true,
             });
@@ -583,21 +579,22 @@ where
                 is_writable: false,
             });
         tracing::debug!(%price_provider, "constructing `execute_deposit` ix...");
-        Ok(RpcBuilder::new(program)
+        Ok(client
+            .exchange_request()
             .accounts(accounts::ExecuteDeposit {
                 authority,
                 only_order_keeper,
                 store: *store,
-                data_store_program: data_store::id(),
+                data_store_program: client.data_store_program_id(),
                 price_provider: *price_provider,
                 token_program: anchor_spl::token::ID,
-                config: find_config_pda(store).0,
+                config: client.find_config_address(store),
                 oracle: *oracle,
-                token_config_map: find_token_config_map(store).0,
+                token_config_map: client.find_token_config_map(store),
                 deposit: *deposit,
                 user: hint.user,
                 receiver: hint.receiver,
-                market: find_market_address(store, &hint.market_token_mint).0,
+                market: client.find_market_address(store, &hint.market_token_mint),
                 market_token_mint: hint.market_token_mint,
                 system_program: system_program::ID,
             })

@@ -3,24 +3,16 @@ use std::ops::Deref;
 use anchor_client::{
     anchor_lang::{system_program, Id},
     solana_sdk::{instruction::AccountMeta, pubkey::Pubkey, signer::Signer},
-    Program, RequestBuilder,
+    RequestBuilder,
 };
 use anchor_spl::associated_token::get_associated_token_address;
 use data_store::states::{
-    common::TokensWithFeed, withdrawal::TokenParams, Market, NonceBytes, Pyth, Seed, Withdrawal,
+    common::TokensWithFeed, withdrawal::TokenParams, Market, NonceBytes, Pyth, Withdrawal,
 };
-use exchange::{
-    accounts, instruction, instructions::CreateWithdrawalParams, utils::ControllerSeeds,
-};
+use exchange::{accounts, instruction, instructions::CreateWithdrawalParams};
 
 use crate::{
-    store::{
-        config::find_config_pda,
-        market::{find_market_address, find_market_vault_address},
-        roles::find_roles_address,
-        token_config::find_token_config_map,
-        utils::FeedsParser,
-    },
+    store::utils::FeedsParser,
     utils::{ComputeBudget, RpcBuilder},
 };
 
@@ -32,17 +24,9 @@ use crate::pyth::pull_oracle::Prices;
 /// `execute_withdrawal` compute budget.
 pub const EXECUTE_WITHDRAWAL_COMPUTE_BUDGET: u32 = 400_000;
 
-/// Create PDA for withdrawal.
-pub fn find_withdrawal_address(store: &Pubkey, user: &Pubkey, nonce: &NonceBytes) -> (Pubkey, u8) {
-    Pubkey::find_program_address(
-        &[Withdrawal::SEED, store.as_ref(), user.as_ref(), nonce],
-        &data_store::id(),
-    )
-}
-
 /// Create Withdrawal Builder.
 pub struct CreateWithdrawalBuilder<'a, C> {
-    program: &'a Program<C>,
+    client: &'a crate::Client<C>,
     store: Pubkey,
     market_token: Pubkey,
     nonce: Option<NonceBytes>,
@@ -67,13 +51,13 @@ where
     S: Signer,
 {
     pub(super) fn new(
-        program: &'a Program<C>,
+        client: &'a crate::Client<C>,
         store: Pubkey,
         market_token: Pubkey,
         amount: u64,
     ) -> Self {
         Self {
-            program,
+            client,
             store,
             market_token,
             nonce: None,
@@ -156,21 +140,21 @@ where
     fn get_or_find_associated_market_token_account(&self) -> Pubkey {
         match self.market_token_account {
             Some(account) => account,
-            None => get_associated_token_address(&self.program.payer(), &self.market_token),
+            None => get_associated_token_address(&self.client.payer(), &self.market_token),
         }
     }
 
     fn get_or_find_associated_final_long_token_account(&self, token: &Pubkey) -> Pubkey {
         match self.final_long_token_receiver {
             Some(account) => account,
-            None => get_associated_token_address(&self.program.payer(), token),
+            None => get_associated_token_address(&self.client.payer(), token),
         }
     }
 
     fn get_or_find_associated_final_short_token_account(&self, token: &Pubkey) -> Pubkey {
         match self.final_short_token_receiver {
             Some(account) => account,
-            None => get_associated_token_address(&self.program.payer(), token),
+            None => get_associated_token_address(&self.client.payer(), token),
         }
     }
 
@@ -180,7 +164,7 @@ where
         {
             return Ok((long_token, short_token));
         }
-        let market: Market = self.program.account(*market).await?;
+        let market: Market = self.client.data_store().account(*market).await?;
         Ok((
             self.final_long_token
                 .unwrap_or_else(|| market.meta().long_token_mint),
@@ -191,25 +175,31 @@ where
 
     /// Create the [`RequestBuilder`] and return withdrawal address.
     pub async fn build_with_address(&self) -> crate::Result<(RequestBuilder<'a, C>, Pubkey)> {
-        let payer = self.program.payer();
-        let authority = ControllerSeeds::find_with_address(&self.store).1;
-        let market_token_withdrawal_vault =
-            find_market_vault_address(&self.store, &self.market_token).0;
+        let payer = self.client.payer();
+        let authority = self.client.controller_address(&self.store);
+        let market_token_withdrawal_vault = self
+            .client
+            .find_market_vault_address(&self.store, &self.market_token);
         let nonce = self.nonce.unwrap_or_else(generate_nonce);
-        let withdrawal = find_withdrawal_address(&self.store, &payer, &nonce).0;
-        let market = find_market_address(&self.store, &self.market_token).0;
+        let withdrawal = self
+            .client
+            .find_withdrawal_address(&self.store, &payer, &nonce);
+        let market = self
+            .client
+            .find_market_address(&self.store, &self.market_token);
         let (long_token, short_token) = self.get_or_fetch_final_tokens(&market).await?;
         let builder = self
-            .program
+            .client
+            .exchange()
             .request()
             .accounts(accounts::CreateWithdrawal {
                 authority,
                 store: self.store,
-                only_controller: find_roles_address(&self.store, &authority).0,
-                data_store_program: data_store::id(),
+                only_controller: self.client.find_roles_address(&self.store, &authority),
+                data_store_program: self.client.data_store_program_id(),
                 token_program: anchor_spl::token::ID,
                 system_program: system_program::ID,
-                token_config_map: find_token_config_map(&self.store).0,
+                token_config_map: self.client.find_token_config_map(&self.store),
                 market,
                 withdrawal,
                 payer,
@@ -248,7 +238,7 @@ where
                     .iter()
                     .chain(self.short_token_swap_path.iter())
                     .map(|mint| AccountMeta {
-                        pubkey: find_market_address(&self.store, mint).0,
+                        pubkey: self.client.find_market_address(&self.store, mint),
                         is_signer: false,
                         is_writable: false,
                     })
@@ -261,7 +251,7 @@ where
 
 /// Cancel Withdrawal Builder.
 pub struct CancelWithdrawalBuilder<'a, C> {
-    program: &'a Program<C>,
+    client: &'a crate::Client<C>,
     store: Pubkey,
     withdrawal: Pubkey,
     cancel_for_user: Option<Pubkey>,
@@ -289,9 +279,9 @@ where
     C: Deref<Target = S> + Clone,
     S: Signer,
 {
-    pub(super) fn new(program: &'a Program<C>, store: &Pubkey, withdrawal: &Pubkey) -> Self {
+    pub(super) fn new(client: &'a crate::Client<C>, store: &Pubkey, withdrawal: &Pubkey) -> Self {
         Self {
-            program,
+            client,
             store: *store,
             withdrawal: *withdrawal,
             cancel_for_user: None,
@@ -320,10 +310,10 @@ where
 
     fn get_user_and_authority(&self) -> (Pubkey, Pubkey) {
         match self.cancel_for_user {
-            Some(user) => (user, self.program.payer()),
+            Some(user) => (user, self.client.payer()),
             None => (
-                self.program.payer(),
-                ControllerSeeds::find_with_address(&self.store).1,
+                self.client.payer(),
+                self.client.controller_address(&self.store),
             ),
         }
     }
@@ -332,7 +322,8 @@ where
         match &self.hint {
             Some(hint) => Ok(*hint),
             None => {
-                let withdrawal: Withdrawal = self.program.account(self.withdrawal).await?;
+                let withdrawal: Withdrawal =
+                    self.client.data_store().account(self.withdrawal).await?;
                 Ok((&withdrawal).into())
             }
         }
@@ -343,21 +334,20 @@ where
         let (user, authority) = self.get_user_and_authority();
         let hint = self.get_or_fetch_withdrawal_hint().await?;
         Ok(self
-            .program
+            .client
+            .exchange()
             .request()
             .accounts(accounts::CancelWithdrawal {
                 authority,
                 store: self.store,
-                only_controller: find_roles_address(&self.store, &authority).0,
-                data_store_program: data_store::id(),
+                only_controller: self.client.find_roles_address(&self.store, &authority),
+                data_store_program: self.client.data_store_program_id(),
                 withdrawal: self.withdrawal,
                 user,
                 market_token: hint.market_token_account,
-                market_token_withdrawal_vault: find_market_vault_address(
-                    &self.store,
-                    &hint.market_token,
-                )
-                .0,
+                market_token_withdrawal_vault: self
+                    .client
+                    .find_market_vault_address(&self.store, &hint.market_token),
                 token_program: anchor_spl::token::ID,
                 system_program: system_program::ID,
             })
@@ -369,7 +359,7 @@ where
 
 /// Execute Withdrawal Builder.
 pub struct ExecuteWithdrawalBuilder<'a, C> {
-    program: &'a Program<C>,
+    client: &'a crate::Client<C>,
     store: Pubkey,
     oracle: Pubkey,
     withdrawal: Pubkey,
@@ -416,13 +406,13 @@ where
     S: Signer,
 {
     pub(super) fn new(
-        program: &'a Program<C>,
+        client: &'a crate::Client<C>,
         store: &Pubkey,
         oracle: &Pubkey,
         withdrawal: &Pubkey,
     ) -> Self {
         Self {
-            program,
+            client,
             store: *store,
             oracle: *oracle,
             withdrawal: *withdrawal,
@@ -463,7 +453,8 @@ where
         match &self.hint {
             Some(hint) => Ok(hint.clone()),
             None => {
-                let withdrawal: Withdrawal = self.program.account(self.withdrawal).await?;
+                let withdrawal: Withdrawal =
+                    self.client.data_store().account(self.withdrawal).await?;
                 let hint: ExecuteWithdrawalHint = (&withdrawal).into();
                 self.hint = Some(hint.clone());
                 Ok(hint)
@@ -473,7 +464,7 @@ where
 
     /// Build [`RpcBuilder`] for `execute_withdrawal` instruction.
     pub async fn build(&mut self) -> crate::Result<RpcBuilder<'a, C>> {
-        let authority = self.program.payer();
+        let authority = self.client.payer();
         let hint = self.prepare_hint().await?;
         let feeds = self
             .feeds_parser
@@ -484,7 +475,7 @@ where
             .iter()
             .chain(hint.short_swap_tokens.iter())
             .map(|mint| AccountMeta {
-                pubkey: find_market_address(&self.store, mint).0,
+                pubkey: self.client.find_market_address(&self.store, mint),
                 is_signer: false,
                 is_writable: true,
             });
@@ -497,39 +488,37 @@ where
                 is_signer: false,
                 is_writable: false,
             });
-        Ok(RpcBuilder::new(self.program)
+        Ok(self
+            .client
+            .exchange_request()
             .accounts(accounts::ExecuteWithdrawal {
                 authority,
                 store: self.store,
-                only_order_keeper: find_roles_address(&self.store, &authority).0,
-                data_store_program: data_store::id(),
+                only_order_keeper: self.client.find_roles_address(&self.store, &authority),
+                data_store_program: self.client.data_store_program_id(),
                 price_provider: self.price_provider,
                 token_program: anchor_spl::token::ID,
                 system_program: system_program::ID,
                 oracle: self.oracle,
-                config: find_config_pda(&self.store).0,
-                token_config_map: find_token_config_map(&self.store).0,
+                config: self.client.find_config_address(&self.store),
+                token_config_map: self.client.find_token_config_map(&self.store),
                 withdrawal: self.withdrawal,
-                market: find_market_address(&self.store, &hint.market_token).0,
+                market: self
+                    .client
+                    .find_market_address(&self.store, &hint.market_token),
                 user: hint.user,
                 market_token_mint: hint.market_token,
-                market_token_withdrawal_vault: find_market_vault_address(
-                    &self.store,
-                    &hint.market_token,
-                )
-                .0,
+                market_token_withdrawal_vault: self
+                    .client
+                    .find_market_vault_address(&self.store, &hint.market_token),
                 final_long_token_receiver: hint.final_long_token_receiver,
                 final_short_token_receiver: hint.final_short_token_receiver,
-                final_long_token_vault: find_market_vault_address(
-                    &self.store,
-                    &hint.final_long_token,
-                )
-                .0,
-                final_short_token_vault: find_market_vault_address(
-                    &self.store,
-                    &hint.final_short_token,
-                )
-                .0,
+                final_long_token_vault: self
+                    .client
+                    .find_market_vault_address(&self.store, &hint.final_long_token),
+                final_short_token_vault: self
+                    .client
+                    .find_market_vault_address(&self.store, &hint.final_short_token),
             })
             .args(instruction::ExecuteWithdrawal {
                 execution_fee: self.execution_fee,

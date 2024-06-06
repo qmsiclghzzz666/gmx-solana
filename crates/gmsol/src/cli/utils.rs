@@ -5,7 +5,6 @@ use anchor_client::{
     RequestBuilder,
 };
 use eyre::ContextCompat;
-use gmsol::store::oracle::find_oracle_address;
 
 #[derive(clap::Args, Clone)]
 #[group(required = false, multiple = false, id = "oracle_address")]
@@ -17,12 +16,17 @@ pub(crate) struct Oracle {
 }
 
 impl Oracle {
-    pub(crate) fn address(&self, store: Option<&Pubkey>) -> gmsol::Result<Pubkey> {
+    pub(crate) fn address(
+        &self,
+        store: Option<&Pubkey>,
+        store_program_id: &Pubkey,
+    ) -> gmsol::Result<Pubkey> {
         match self.oracle {
             Some(address) => Ok(address),
-            None => Ok(find_oracle_address(
+            None => Ok(gmsol::pda::find_oracle_address(
                 store.wrap_err("`store` not provided")?,
                 self.oracle_index,
+                store_program_id,
             )
             .0),
         }

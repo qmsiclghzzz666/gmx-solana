@@ -12,7 +12,7 @@ use std::ops::Deref;
 use anchor_client::{
     anchor_lang::system_program,
     solana_sdk::{pubkey::Pubkey, signer::Signer},
-    Program, RequestBuilder,
+    RequestBuilder,
 };
 use data_store::states::{
     order::{OrderKind, OrderParams},
@@ -21,24 +21,11 @@ use data_store::states::{
 use exchange::{accounts, instruction};
 use rand::{distributions::Standard, Rng};
 
-use crate::{
-    store::{
-        market::{find_market_address, find_market_token_address, find_market_vault_address},
-        roles::find_roles_address,
-    },
-    utils::EVENT_AUTHORITY_SEED,
-};
-
 use self::{
     deposit::{CancelDepositBuilder, CreateDepositBuilder, ExecuteDepositBuilder},
     order::{CreateOrderBuilder, ExecuteOrderBuilder},
     withdrawal::{CancelWithdrawalBuilder, CreateWithdrawalBuilder, ExecuteWithdrawalBuilder},
 };
-
-/// Find PDA for `event_authority` account.
-pub fn find_event_authority_address() -> (Pubkey, u8) {
-    Pubkey::find_program_address(&[EVENT_AUTHORITY_SEED], &exchange::id())
-}
 
 /// Exchange instructions for GMSOL.
 pub trait ExchangeOps<C> {
@@ -164,7 +151,7 @@ pub trait ExchangeOps<C> {
     }
 }
 
-impl<S, C> ExchangeOps<C> for Program<C>
+impl<S, C> ExchangeOps<C> for crate::Client<C>
 where
     C: Deref<Target = S> + Clone,
     S: Signer,
@@ -216,19 +203,21 @@ where
         short_token: &Pubkey,
     ) -> (RequestBuilder<C>, Pubkey) {
         let authority = self.payer();
-        let market_token = find_market_token_address(store, index_token, long_token, short_token).0;
+        let market_token =
+            self.find_market_token_address(store, index_token, long_token, short_token);
         let builder = self
+            .exchange()
             .request()
             .accounts(accounts::CreateMarket {
                 authority,
-                only_market_keeper: find_roles_address(store, &authority).0,
+                only_market_keeper: self.payer_roles_address(store),
                 data_store: *store,
-                market: find_market_address(store, &market_token).0,
+                market: self.find_market_address(store, &market_token),
                 market_token_mint: market_token,
                 long_token_mint: *long_token,
                 short_token_mint: *short_token,
-                market_token_vault: find_market_vault_address(store, &market_token).0,
-                data_store_program: data_store::id(),
+                market_token_vault: self.find_market_vault_address(store, &market_token),
+                data_store_program: self.data_store_program_id(),
                 system_program: system_program::ID,
                 token_program: anchor_spl::token::ID,
             })

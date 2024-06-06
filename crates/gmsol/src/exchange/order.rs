@@ -3,26 +3,18 @@ use std::ops::Deref;
 use anchor_client::{
     anchor_lang::{system_program, Id},
     solana_sdk::{instruction::AccountMeta, pubkey::Pubkey, signer::Signer},
-    Program, RequestBuilder,
+    RequestBuilder,
 };
 use anchor_spl::associated_token::get_associated_token_address;
 use data_store::states::{
     common::{SwapParams, TokensWithFeed},
     order::{OrderKind, OrderParams},
-    position::PositionKind,
-    Config, Market, MarketMeta, NonceBytes, Order, Position, Pyth, Seed,
+    Config, Market, MarketMeta, NonceBytes, Order, Pyth,
 };
-use exchange::{accounts, instruction, instructions::CreateOrderParams, utils::ControllerSeeds};
+use exchange::{accounts, instruction, instructions::CreateOrderParams};
 
 use crate::{
-    store::{
-        config::find_config_pda,
-        market::{find_market_address, find_market_vault_address},
-        roles::find_roles_address,
-        token::find_claimable_account_pda,
-        token_config::find_token_config_map,
-        utils::FeedsParser,
-    },
+    store::utils::FeedsParser,
     utils::{ComputeBudget, RpcBuilder, TokenAccountParams},
 };
 
@@ -34,43 +26,9 @@ use crate::pyth::pull_oracle::Prices;
 /// `execute_order` compute budget.
 pub const EXECUTE_ORDER_COMPUTE_BUDGET: u32 = 400_000;
 
-/// Create PDA for order.
-pub fn find_order_address(store: &Pubkey, user: &Pubkey, nonce: &NonceBytes) -> (Pubkey, u8) {
-    Pubkey::find_program_address(
-        &[Order::SEED, store.as_ref(), user.as_ref(), nonce],
-        &data_store::id(),
-    )
-}
-
-/// Create PDA for position.
-pub fn find_position_address(
-    store: &Pubkey,
-    user: &Pubkey,
-    market_token: &Pubkey,
-    collateral_token: &Pubkey,
-    kind: PositionKind,
-) -> crate::Result<(Pubkey, u8)> {
-    if matches!(kind, PositionKind::Uninitialized) {
-        return Err(crate::Error::invalid_argument(
-            "uninitialized position kind is not allowed",
-        ));
-    }
-    Ok(Pubkey::find_program_address(
-        &[
-            Position::SEED,
-            store.as_ref(),
-            user.as_ref(),
-            market_token.as_ref(),
-            collateral_token.as_ref(),
-            &[kind as u8],
-        ],
-        &data_store::id(),
-    ))
-}
-
 /// Create Order Builder.
 pub struct CreateOrderBuilder<'a, C> {
-    program: &'a Program<C>,
+    client: &'a crate::Client<C>,
     store: Pubkey,
     market_token: Pubkey,
     is_output_token_long: bool,
@@ -99,14 +57,14 @@ where
     S: Signer,
 {
     pub(super) fn new(
-        program: &'a Program<C>,
+        client: &'a crate::Client<C>,
         store: &Pubkey,
         market_token: &Pubkey,
         params: OrderParams,
         is_output_token_long: bool,
     ) -> Self {
         Self {
-            program,
+            client,
             store: *store,
             market_token: *market_token,
             nonce: None,
@@ -204,7 +162,8 @@ where
     }
 
     fn market(&self) -> Pubkey {
-        find_market_address(&self.store, &self.market_token).0
+        self.client
+            .find_market_address(&self.store, &self.market_token)
     }
 
     async fn prepare_hint(&mut self) -> crate::Result<CreateOrderHint> {
@@ -212,7 +171,11 @@ where
             if let Some(hint) = self.hint {
                 return Ok(hint);
             }
-            let market = self.program.account::<Market>(self.market()).await?;
+            let market = self
+                .client
+                .data_store()
+                .account::<Market>(self.market())
+                .await?;
             self.hint(market.meta());
         }
     }
@@ -231,16 +194,15 @@ where
         let output_token = self.output_token().await?;
         match &self.params.kind {
             OrderKind::MarketIncrease | OrderKind::MarketDecrease | OrderKind::Liquidation => {
-                let position = find_position_address(
+                let position = self.client.find_position_address(
                     &self.store,
-                    &self.program.payer(),
+                    &self.client.payer(),
                     &self.market_token,
                     &output_token,
                     self.params
                         .to_position_kind()
                         .map_err(anchor_client::ClientError::from)?,
-                )?
-                .0;
+                )?;
                 Ok((output_token, Some(position)))
             }
             OrderKind::MarketSwap => Ok((output_token, None)),
@@ -262,7 +224,10 @@ where
                 }
                 let Some((token, account)) = self
                     .initial_token
-                    .get_or_fetch_token_and_token_account(self.program, Some(&self.program.payer()))
+                    .get_or_fetch_token_and_token_account(
+                        self.client.exchange(),
+                        Some(&self.client.payer()),
+                    )
                     .await?
                 else {
                     return Err(crate::Error::invalid_argument(
@@ -271,7 +236,7 @@ where
                 };
                 Ok(Some((
                     account,
-                    find_market_vault_address(&self.store, &token).0,
+                    self.client.find_market_vault_address(&self.store, &token),
                 )))
             }
             OrderKind::MarketDecrease | OrderKind::Liquidation => Ok(None),
@@ -290,7 +255,7 @@ where
                 }
                 let Some(account) = self
                     .final_token
-                    .get_or_find_associated_token_account(Some(&self.program.payer()))
+                    .get_or_find_associated_token_account(Some(&self.client.payer()))
                 else {
                     return Err(crate::Error::invalid_argument(
                         "missing final output token parameters",
@@ -324,7 +289,7 @@ where
                 let secondary_output_token = self.secondary_output_token().await?;
                 Ok(TokenAccountParams::default()
                     .set_token(secondary_output_token)
-                    .get_or_find_associated_token_account(Some(&self.program.payer())))
+                    .get_or_find_associated_token_account(Some(&self.client.payer())))
             }
             kind => Err(crate::Error::invalid_argument(format!(
                 "unsupported order kind: {kind:?}"
@@ -334,7 +299,7 @@ where
 
     async fn collateral_token_accounts(&mut self) -> crate::Result<(Pubkey, Pubkey)> {
         let hint = self.prepare_hint().await?;
-        let payer = self.program.payer();
+        let payer = self.client.payer();
         let long_token_account = self
             .long_token_account
             .unwrap_or(get_associated_token_address(&payer, &hint.long_token));
@@ -346,32 +311,33 @@ where
 
     /// Create [`RequestBuilder`] and return order address.
     pub async fn build_with_address(&mut self) -> crate::Result<(RequestBuilder<'a, C>, Pubkey)> {
-        let authority = ControllerSeeds::find_with_address(&self.store).1;
+        let authority = self.client.controller_address(&self.store);
         let nonce = self.nonce.unwrap_or_else(generate_nonce);
-        let payer = &self.program.payer();
-        let order = find_order_address(&self.store, payer, &nonce).0;
+        let payer = &self.client.payer();
+        let order = self.client.find_order_address(&self.store, payer, &nonce);
         let (initial_collateral_token_account, initial_collateral_token_vault) =
             self.initial_collateral_accounts().await?.unzip();
         let (output_token, position) = self.output_token_and_position().await?;
         let (long_token_account, short_token_account) = self.collateral_token_accounts().await?;
         let need_to_transfer_in = self.params.need_to_transfer_in();
         let builder = self
-            .program
+            .client
+            .exchange()
             .request()
             .accounts(accounts::CreateOrder {
                 authority,
                 store: self.store,
-                only_controller: find_roles_address(&self.store, &authority).0,
+                only_controller: self.client.find_roles_address(&self.store, &authority),
                 payer: *payer,
                 order,
                 position,
-                token_config_map: find_token_config_map(&self.store).0,
+                token_config_map: self.client.find_token_config_map(&self.store),
                 market: self.market(),
                 initial_collateral_token_account,
                 final_output_token_account: self.final_output_token_account().await?,
                 secondary_output_token_account: self.get_secondary_output_token_account().await?,
                 initial_collateral_token_vault,
-                data_store_program: data_store::id(),
+                data_store_program: self.client.data_store_program_id(),
                 long_token_account,
                 short_token_account,
                 system_program: system_program::ID,
@@ -396,7 +362,7 @@ where
                     .iter()
                     .enumerate()
                     .map(|(idx, mint)| AccountMeta {
-                        pubkey: find_market_address(&self.store, mint).0,
+                        pubkey: self.client.find_market_address(&self.store, mint),
                         is_signer: false,
                         is_writable: need_to_transfer_in && idx == 0,
                     })
@@ -409,7 +375,7 @@ where
 
 /// Execute Order Builder.
 pub struct ExecuteOrderBuilder<'a, C> {
-    program: &'a Program<C>,
+    client: &'a crate::Client<C>,
     store: Pubkey,
     oracle: Pubkey,
     order: Pubkey,
@@ -423,6 +389,7 @@ pub struct ExecuteOrderBuilder<'a, C> {
 /// Hint for executing order.
 #[derive(Clone)]
 pub struct ExecuteOrderHint {
+    store_program_id: Pubkey,
     has_claimable: bool,
     config: Config,
     market_token: Pubkey,
@@ -444,11 +411,13 @@ pub struct ExecuteOrderHint {
 
 impl ExecuteOrderHint {
     fn long_token_vault(&self, store: &Pubkey) -> Pubkey {
-        find_market_vault_address(store, &self.long_token_mint).0
+        crate::pda::find_market_vault_address(store, &self.long_token_mint, &self.store_program_id)
+            .0
     }
 
     fn short_token_vault(&self, store: &Pubkey) -> Pubkey {
-        find_market_vault_address(store, &self.short_token_mint).0
+        crate::pda::find_market_vault_address(store, &self.short_token_mint, &self.store_program_id)
+            .0
     }
 
     fn claimable_long_token_account(
@@ -460,11 +429,12 @@ impl ExecuteOrderHint {
             return Ok(None);
         }
         Ok(Some(
-            find_claimable_account_pda(
+            crate::pda::find_claimable_account_pda(
                 store,
                 &self.long_token_mint,
                 &self.user,
                 &self.config.claimable_time_key(timestamp)?,
+                &self.store_program_id,
             )
             .0,
         ))
@@ -479,11 +449,12 @@ impl ExecuteOrderHint {
             return Ok(None);
         }
         Ok(Some(
-            find_claimable_account_pda(
+            crate::pda::find_claimable_account_pda(
                 store,
                 &self.short_token_mint,
                 &self.user,
                 &self.config.claimable_time_key(timestamp)?,
+                &self.store_program_id,
             )
             .0,
         ))
@@ -498,11 +469,12 @@ impl ExecuteOrderHint {
             return Ok(None);
         }
         Ok(Some(
-            find_claimable_account_pda(
+            crate::pda::find_claimable_account_pda(
                 store,
                 &self.pnl_token_mint,
                 &self.config.holding()?,
                 &self.config.claimable_time_key(timestamp)?,
+                &self.store_program_id,
             )
             .0,
         ))
@@ -515,7 +487,7 @@ where
     S: Signer,
 {
     pub(super) fn try_new(
-        program: &'a Program<C>,
+        client: &'a crate::Client<C>,
         store: &Pubkey,
         oracle: &Pubkey,
         order: &Pubkey,
@@ -529,7 +501,7 @@ where
             .try_into()
             .map_err(|_| crate::Error::unknown("failed to convert timestamp"))?;
         Ok(Self {
-            program,
+            client,
             store: *store,
             oracle: *oracle,
             order: *order,
@@ -560,6 +532,7 @@ where
         let final_output_token_account = order.fixed.receivers.final_output_token_account;
         let secondary_output_token_account = order.fixed.receivers.secondary_output_token_account;
         self.hint = Some(ExecuteOrderHint {
+            store_program_id: self.client.data_store_program_id(),
             has_claimable: matches!(order.fixed.params.kind, OrderKind::MarketDecrease),
             config: config.clone(),
             market_token,
@@ -597,9 +570,14 @@ where
             match &self.hint {
                 Some(hint) => return Ok(hint.clone()),
                 None => {
-                    let order: Order = self.program.account(self.order).await?;
-                    let market: Market = self.program.account(order.fixed.market).await?;
-                    let config: Config = self.program.account(self.config_address()).await?;
+                    let order: Order = self.client.data_store().account(self.order).await?;
+                    let market: Market =
+                        self.client.data_store().account(order.fixed.market).await?;
+                    let config: Config = self
+                        .client
+                        .data_store()
+                        .account(self.config_address())
+                        .await?;
                     self.hint(&order, &market, &config);
                 }
             }
@@ -629,7 +607,7 @@ where
     }
 
     fn config_address(&self) -> Pubkey {
-        find_config_pda(&self.store).0
+        self.client.find_config_address(&self.store)
     }
 
     /// Build [`RpcBuilder`] for `execute_order` instruction.
@@ -639,13 +617,13 @@ where
         let hint = self.prepare_hint().await?;
         let [claimable_long_token_account_for_user, claimable_short_token_account_for_user, claimable_pnl_token_account_for_holding] =
             self.claimable_accounts().await?;
-        let authority = self.program.payer();
+        let authority = self.client.payer();
         let feeds = self
             .feeds_parser
             .parse(&hint.feeds)
             .collect::<Result<Vec<_>, _>>()?;
         let swap_markets = hint.swap.iter().map(|mint| AccountMeta {
-            pubkey: find_market_address(&self.store, mint).0,
+            pubkey: self.client.find_market_address(&self.store, mint),
             is_signer: false,
             is_writable: true,
         });
@@ -655,15 +633,19 @@ where
             is_writable: false,
         });
 
-        let execute_order = RpcBuilder::new(self.program)
+        let execute_order = self
+            .client
+            .exchange_request()
             .accounts(accounts::ExecuteOrder {
                 authority,
-                only_order_keeper: find_roles_address(&self.store, &authority).0,
+                only_order_keeper: self.client.find_roles_address(&self.store, &authority),
                 store: self.store,
                 oracle: self.oracle,
                 config: self.config_address(),
-                token_config_map: find_token_config_map(&self.store).0,
-                market: find_market_address(&self.store, &hint.market_token).0,
+                token_config_map: self.client.find_token_config_map(&self.store),
+                market: self
+                    .client
+                    .find_market_address(&self.store, &hint.market_token),
                 market_token_mint: hint.market_token,
                 order: self.order,
                 position: hint.position,
@@ -672,9 +654,12 @@ where
                     .final_output_token_account
                     .as_ref()
                     .and(hint.final_output_token.as_ref())
-                    .map(|token| find_market_vault_address(&self.store, token).0),
+                    .map(|token| self.client.find_market_vault_address(&self.store, token)),
                 secondary_output_token_vault: hint.secondary_output_token_account.as_ref().map(
-                    |_| find_market_vault_address(&self.store, &hint.secondary_output_token).0,
+                    |_| {
+                        self.client
+                            .find_market_vault_address(&self.store, &hint.secondary_output_token)
+                    },
                 ),
                 final_output_token_account: hint.final_output_token_account,
                 secondary_output_token_account: hint.secondary_output_token_account,
@@ -685,7 +670,7 @@ where
                 claimable_long_token_account_for_user,
                 claimable_short_token_account_for_user,
                 claimable_pnl_token_account_for_holding,
-                data_store_program: data_store::id(),
+                data_store_program: self.client.data_store_program_id(),
                 token_program: anchor_spl::token::ID,
                 price_provider: self.price_provider,
                 system_program: system_program::ID,
@@ -703,85 +688,61 @@ where
             )
             .compute_budget(ComputeBudget::default().with_limit(EXECUTE_ORDER_COMPUTE_BUDGET));
 
-        let mut pre_builder = RpcBuilder::new(self.program);
-        let mut post_builder = RpcBuilder::new(self.program);
+        let mut pre_builder = self.client.exchange_request();
+        let mut post_builder = self.client.exchange_request();
 
         // Merge claimable accounts.
         if let Some(account) = claimable_long_token_account_for_user.as_ref() {
-            pre_builder = pre_builder.merge(
-                self.program
-                    .use_claimable_account(
-                        &self.store,
-                        &hint.long_token_mint,
-                        &hint.user,
-                        self.recent_timestamp,
-                        account,
-                        0,
-                    )
-                    .program(data_store::id()),
-            );
-            post_builder = post_builder.merge(
-                self.program
-                    .close_empty_claimable_account(
-                        &self.store,
-                        &hint.long_token_mint,
-                        &hint.user,
-                        self.recent_timestamp,
-                        account,
-                    )
-                    .program(data_store::id()),
-            )
+            pre_builder = pre_builder.merge(self.client.use_claimable_account(
+                &self.store,
+                &hint.long_token_mint,
+                &hint.user,
+                self.recent_timestamp,
+                account,
+                0,
+            ));
+            post_builder = post_builder.merge(self.client.close_empty_claimable_account(
+                &self.store,
+                &hint.long_token_mint,
+                &hint.user,
+                self.recent_timestamp,
+                account,
+            ))
         }
         if let Some(account) = claimable_short_token_account_for_user.as_ref() {
-            pre_builder = pre_builder.merge(
-                self.program
-                    .use_claimable_account(
-                        &self.store,
-                        &hint.short_token_mint,
-                        &hint.user,
-                        self.recent_timestamp,
-                        account,
-                        0,
-                    )
-                    .program(data_store::id()),
-            );
-            post_builder = post_builder.merge(
-                self.program
-                    .close_empty_claimable_account(
-                        &self.store,
-                        &hint.short_token_mint,
-                        &hint.user,
-                        self.recent_timestamp,
-                        account,
-                    )
-                    .program(data_store::id()),
-            )
+            pre_builder = pre_builder.merge(self.client.use_claimable_account(
+                &self.store,
+                &hint.short_token_mint,
+                &hint.user,
+                self.recent_timestamp,
+                account,
+                0,
+            ));
+            post_builder = post_builder.merge(self.client.close_empty_claimable_account(
+                &self.store,
+                &hint.short_token_mint,
+                &hint.user,
+                self.recent_timestamp,
+                account,
+            ))
         }
         if let Some(account) = claimable_pnl_token_account_for_holding.as_ref() {
             let holding = hint.config.holding()?;
-            pre_builder = pre_builder.merge(
-                self.program
-                    .use_claimable_account(
-                        &self.store,
-                        &hint.pnl_token_mint,
-                        &holding,
-                        self.recent_timestamp,
-                        account,
-                        0,
-                    )
-                    .program(data_store::id()),
-            );
-            post_builder = post_builder.merge(
-                self.program
-                    .close_empty_claimable_account(
-                        &self.store,
-                        &hint.pnl_token_mint,
-                        &holding,
-                        self.recent_timestamp,
-                        account,
-                    )
-                    .program(data_store::id()),
-            )
+            pre_builder = pre_builder.merge(self.client.use_claimable_account(
+                &self.store,
+                &hint.pnl_token_mint,
+                &holding,
+                self.recent_timestamp,
+                account,
+                0,
+            ));
+            post_builder = post_builder.merge(self.client.close_empty_claimable_account(
+                &self.store,
+                &hint.pnl_token_mint,
+                &holding,
+                self.recent_timestamp,
+                account,
+            ))
         }
         Ok(pre_builder.merge(execute_order).merge(post_builder))
     }
