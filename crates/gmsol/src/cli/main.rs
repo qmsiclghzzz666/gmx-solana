@@ -161,7 +161,7 @@ impl Cli {
                 args.run(&gmsol, self.store.as_ref(), self.serialize_only)
                     .await?
             }
-            Command::Inspect(args) => args.run(&client, self.store.as_ref()).await?,
+            Command::Inspect(args) => args.run(&gmsol, self.store.as_ref()).await?,
             Command::Roles(args) => args.run(&client, self.store()?).await?,
             Command::Exchange(args) => args.run(&client, self.store()?).await?,
             Command::Keeper(args) => args.run(&client, self.store()?).await?,

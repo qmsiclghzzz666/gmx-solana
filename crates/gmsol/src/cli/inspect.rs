@@ -12,7 +12,7 @@ use gmsol::{
 };
 use pyth_sdk::Identifier;
 
-use crate::{utils::Oracle, SharedClient};
+use crate::{utils::Oracle, GMSOLClient};
 
 #[derive(clap::Args)]
 pub(super) struct InspectArgs {
@@ -23,7 +23,13 @@ pub(super) struct InspectArgs {
 #[derive(clap::Subcommand)]
 enum Command {
     /// `DataStore` account.
-    DataStore { address: Option<Pubkey> },
+    DataStore {
+        address: Option<Pubkey>,
+        #[arg(long, short)]
+        key: Option<String>,
+        #[arg(long)]
+        current: bool,
+    },
     /// `Roles` account.
     Roles { address: Pubkey },
     /// `Config` account.
@@ -76,18 +82,27 @@ enum Command {
 impl InspectArgs {
     pub(super) async fn run(
         &self,
-        client: &SharedClient,
+        client: &GMSOLClient,
         store: Option<&Pubkey>,
     ) -> gmsol::Result<()> {
-        let program = client.program(data_store::id())?;
+        let program = client.data_store();
         match &self.command {
             Command::Discriminator { name } => {
                 println!("{:?}", crate::utils::generate_discriminator(name));
             }
-            Command::DataStore { address } => {
-                let address = address
-                    .or(store.copied())
-                    .wrap_err("missing store address")?;
+            Command::DataStore {
+                address,
+                key,
+                current,
+            } => {
+                let address = if *current {
+                    *store.wrap_err("current store address not set")?
+                } else {
+                    address.unwrap_or_else(|| {
+                        client.find_store_address(key.as_deref().unwrap_or_default())
+                    })
+                };
+                println!("Store: {address}");
                 println!(
                     "{:#?}",
                     program.account::<states::DataStore>(address).await?
@@ -149,7 +164,7 @@ impl InspectArgs {
             }
             Command::TokenConfig { token } => {
                 let store = store.wrap_err("missing store address")?;
-                let config = get_token_config(&program, store, token)
+                let config = get_token_config(program, store, token)
                     .await?
                     .ok_or(gmsol::Error::NotFound)?;
                 println!("{config:#?}");
@@ -194,7 +209,7 @@ impl InspectArgs {
                 tracing::info!("{:#?}", update.parsed());
 
                 if *post {
-                    let oracle = PythPullOracle::try_new(client)?;
+                    let oracle = PythPullOracle::try_new(client.anchor())?;
                     let ctx = PythPullOracleContext::new(feed_ids);
                     let prices = oracle
                         .with_pyth_prices(&ctx, &update, |prices| {

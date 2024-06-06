@@ -58,6 +58,11 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         Self::new_with_options(cluster, payer, ClientOptions::default())
     }
 
+    /// Get anchor client.
+    pub fn anchor(&self) -> &anchor_client::Client<C> {
+        &self.anchor
+    }
+
     /// Get payer.
     pub fn payer(&self) -> Pubkey {
         self.wallet.pubkey()

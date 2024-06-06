@@ -1,8 +1,5 @@
 use anchor_client::solana_sdk::pubkey::Pubkey;
-use gmsol::store::{
-    data_store::{find_store_address, StoreOps},
-    roles::RolesOps,
-};
+use gmsol::store::{data_store::StoreOps, roles::RolesOps};
 
 use crate::GMSOLClient;
 
@@ -36,16 +33,16 @@ impl AdminArgs {
     ) -> gmsol::Result<()> {
         match (&self.command, store) {
             (Command::InitializeStore { key }, _) => {
-                let key = key.clone().unwrap_or_else(|| client.payer().to_string());
-                let req = client.initialize_store(&key);
+                let key = key.as_deref().unwrap_or_default();
+                println!("Initialize store: {}", client.find_store_address(key));
+                let req = client.initialize_store(key);
                 if serialize_only {
                     for ix in req.instructions()? {
                         println!("{}", gmsol::utils::serialize_instruction(&ix)?);
                     }
                 } else {
-                    let signature = client.initialize_store(&key).send().await?;
+                    let signature = client.initialize_store(key).send().await?;
                     tracing::info!("initialized a new data store at tx {signature}");
-                    println!("{}", find_store_address(&key).0);
                 }
             }
             (Command::EnableRole { role }, Some(store)) => {
