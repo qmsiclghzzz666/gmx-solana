@@ -27,7 +27,7 @@ pub fn find_claimable_account_pda(
             user.as_ref(),
             time_key,
         ],
-        &data_store::ID,
+        &data_store::id(),
     )
 }
 
