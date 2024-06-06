@@ -35,23 +35,37 @@ impl AdminArgs {
             (Command::InitializeStore { key }, _) => {
                 let key = key.as_deref().unwrap_or_default();
                 println!("Initialize store: {}", client.find_store_address(key));
-                let req = client.initialize_store(key);
-                if serialize_only {
-                    for ix in req.instructions()? {
-                        println!("{}", gmsol::utils::serialize_instruction(&ix)?);
-                    }
-                } else {
-                    let signature = client.initialize_store(key).send().await?;
-                    tracing::info!("initialized a new data store at tx {signature}");
-                }
+                crate::utils::send_or_serialize(
+                    client.initialize_store(key),
+                    serialize_only,
+                    |signature| {
+                        tracing::info!("initialized a new data store at tx {signature}");
+                        Ok(())
+                    },
+                )
+                .await?;
             }
             (Command::EnableRole { role }, Some(store)) => {
-                let signature = client.enable_role(store, role).send().await?;
-                tracing::info!("enabled role `{role}` at tx {signature}");
+                crate::utils::send_or_serialize(
+                    client.enable_role(store, role),
+                    serialize_only,
+                    |signature| {
+                        tracing::info!("enabled role `{role}` at tx {signature}");
+                        Ok(())
+                    },
+                )
+                .await?;
             }
             (Command::GrantRole { role, authority }, Some(store)) => {
-                let signature = client.grant_role(store, authority, role).send().await?;
-                tracing::info!("grant a role for user {authority} at tx {signature}");
+                crate::utils::send_or_serialize(
+                    client.grant_role(store, authority, role),
+                    serialize_only,
+                    |signature| {
+                        tracing::info!("grant a role for user {authority} at tx {signature}");
+                        Ok(())
+                    },
+                )
+                .await?;
             }
             (_, None) => return Err(gmsol::Error::unknown("missing `store` address")),
         }

@@ -1,4 +1,9 @@
-use anchor_client::solana_sdk::pubkey::Pubkey;
+use std::ops::Deref;
+
+use anchor_client::{
+    solana_sdk::{pubkey::Pubkey, signature::Signature, signer::Signer},
+    RequestBuilder,
+};
 use eyre::ContextCompat;
 use gmsol::store::oracle::find_oracle_address;
 
@@ -29,4 +34,24 @@ pub(crate) fn generate_discriminator(name: &str) -> [u8; 8] {
     use heck::AsSnakeCase;
 
     sighash(SIGHASH_GLOBAL_NAMESPACE, &AsSnakeCase(name).to_string())
+}
+
+pub(crate) async fn send_or_serialize<C, S>(
+    req: RequestBuilder<'_, C>,
+    serialize_only: bool,
+    callback: impl FnOnce(Signature) -> gmsol::Result<()>,
+) -> gmsol::Result<()>
+where
+    C: Clone + Deref<Target = S>,
+    S: Signer,
+{
+    if serialize_only {
+        for (idx, ix) in req.instructions()?.into_iter().enumerate() {
+            println!("ix[{idx}]: {}", gmsol::utils::serialize_instruction(&ix)?);
+        }
+    } else {
+        let signature = req.send().await?;
+        (callback)(signature)?;
+    }
+    Ok(())
 }
