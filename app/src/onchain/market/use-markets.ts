@@ -31,8 +31,8 @@ export const useMarkets = (params?: { store: PublicKey, marketTokens: PublicKey[
           indexTokenAddress: market.meta.indexTokenMint,
           longTokenAddress: market.meta.longTokenMint,
           shortTokenAddress: market.meta.shortTokenMint,
-          longPoolAmount: isSingle ? market.pools.pools[0].longTokenAmount.div(BN_TWO) : market.pools.pools[0].longTokenAmount,
-          shortPoolAmount: isSingle ? market.pools.pools[0].longTokenAmount.div(BN_TWO) : market.pools.pools[0].shortTokenAmount,
+          longPoolAmount: isSingle ? market.pools.values[0].longTokenAmount.div(BN_TWO) : market.pools.values[0].longTokenAmount,
+          shortPoolAmount: isSingle ? market.pools.values[0].longTokenAmount.div(BN_TWO) : market.pools.values[0].shortTokenAmount,
           isSingle,
         };
         return data;
