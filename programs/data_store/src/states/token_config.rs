@@ -157,7 +157,7 @@ pub struct TokenConfigMap {
 impl TokenConfigMap {
     /// Get init space.
     pub const fn init_space(len: usize) -> usize {
-        1 + (4 + TokenConfig::INIT_SPACE * len) + (4 + 32 * len)
+        1 + 32 + (4 + TokenConfig::INIT_SPACE * len) + (4 + 32 * len)
     }
 
     pub(crate) fn as_map(&self) -> DualVecMap<&Vec<Pubkey>, &Vec<TokenConfig>> {

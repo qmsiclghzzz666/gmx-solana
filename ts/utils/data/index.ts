@@ -215,7 +215,7 @@ export const initializeDataStore = async (
 
     // Initialize token config map.
     try {
-        const tokenConfigMapAddress = await initializeTokenConfigMap(signer, dataStorePDA, 4);
+        const tokenConfigMapAddress = await initializeTokenConfigMap(signer, dataStorePDA, 0);
         console.log(`Intialized token config map: ${tokenConfigMapAddress}`);
     } catch (error) {
         console.log("Failed to initialize token config map", error);
