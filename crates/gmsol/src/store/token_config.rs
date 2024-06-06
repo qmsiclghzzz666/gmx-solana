@@ -209,3 +209,134 @@ where
             })
     }
 }
+
+impl<C, S> TokenConfigOps<C> for crate::Client<C>
+where
+    C: Deref<Target = S> + Clone,
+    S: Signer,
+{
+    fn initialize_token_config_map(&self, store: &Pubkey) -> (RequestBuilder<C>, Pubkey) {
+        let authority = self.payer();
+        let map = self.find_token_config_map(store);
+        let builder = self
+            .data_store()
+            .request()
+            .accounts(accounts::InitializeTokenConfigMap {
+                authority,
+                only_controller: self.payer_roles_address(store),
+                store: *store,
+                map,
+                system_program: system_program::ID,
+            })
+            .args(instruction::InitializeTokenConfigMap { len: 0 });
+        (builder, map)
+    }
+
+    fn insert_token_config(
+        &self,
+        store: &Pubkey,
+        token: &Pubkey,
+        builder: TokenConfigBuilder,
+        enable: bool,
+    ) -> RequestBuilder<C> {
+        let authority = self.payer();
+        let only_controller = self.payer_roles_address(store);
+        let map = self.find_token_config_map(store);
+        self.data_store()
+            .request()
+            .accounts(accounts::InsertTokenConfig {
+                authority,
+                only_controller,
+                store: *store,
+                map,
+                token: *token,
+                system_program: system_program::ID,
+            })
+            .args(instruction::InsertTokenConfig { builder, enable })
+    }
+
+    fn insert_synthetic_token_config(
+        &self,
+        store: &Pubkey,
+        token: &Pubkey,
+        decimals: u8,
+        builder: TokenConfigBuilder,
+        enable: bool,
+    ) -> RequestBuilder<C> {
+        let authority = self.payer();
+        let only_controller = self.payer_roles_address(store);
+        let map = self.find_token_config_map(store);
+        self.data_store()
+            .request()
+            .accounts(accounts::InsertSyntheticTokenConfig {
+                authority,
+                only_controller,
+                store: *store,
+                map,
+                system_program: system_program::ID,
+            })
+            .args(instruction::InsertSyntheticTokenConfig {
+                token: *token,
+                decimals,
+                builder,
+                enable,
+            })
+    }
+
+    fn get_token_config(&self, store: &Pubkey, token: &Pubkey) -> RequestBuilder<C> {
+        let map = self.find_token_config_map(store);
+        self.data_store()
+            .request()
+            .accounts(accounts::GetTokenConfig { map })
+            .args(instruction::GetTokenConfig {
+                store: *store,
+                token: *token,
+            })
+    }
+
+    fn toggle_token_config(
+        &self,
+        store: &Pubkey,
+        token: &Pubkey,
+        enable: bool,
+    ) -> RequestBuilder<C> {
+        let authority = self.payer();
+        let only_controller = self.payer_roles_address(store);
+        let map = self.find_token_config_map(store);
+        self.data_store()
+            .request()
+            .accounts(accounts::ToggleTokenConfig {
+                authority,
+                store: *store,
+                only_controller,
+                map,
+            })
+            .args(instruction::ToggleTokenConfig {
+                token: *token,
+                enable,
+            })
+    }
+
+    fn set_expected_provider(
+        &self,
+        store: &Pubkey,
+        token: &Pubkey,
+        provider: PriceProviderKind,
+    ) -> RequestBuilder<C> {
+        let authority = self.payer();
+        let only_controller = self.payer_roles_address(store);
+        let map = self.find_token_config_map(store);
+        self.data_store()
+            .request()
+            .accounts(accounts::SetExpectedProvider {
+                authority,
+                store: *store,
+                only_controller,
+                map,
+            })
+            .args(instruction::SetExpectedProvider {
+                token: *token,
+                provider: provider as u8,
+            })
+    }
+}

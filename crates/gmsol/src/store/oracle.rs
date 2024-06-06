@@ -44,3 +44,26 @@ where
         (builder, oracle)
     }
 }
+
+impl<C, S> OracleOps<C> for crate::Client<C>
+where
+    C: Deref<Target = S> + Clone,
+    S: Signer,
+{
+    fn initialize_oracle(&self, store: &Pubkey, index: u8) -> (RequestBuilder<C>, Pubkey) {
+        let authority = self.payer();
+        let oracle = self.find_oracle_address(store, index);
+        let builder = self
+            .data_store()
+            .request()
+            .accounts(accounts::InitializeOracle {
+                authority,
+                store: *store,
+                only_controller: self.payer_roles_address(store),
+                oracle,
+                system_program: system_program::ID,
+            })
+            .args(instruction::InitializeOracle { index });
+        (builder, oracle)
+    }
+}

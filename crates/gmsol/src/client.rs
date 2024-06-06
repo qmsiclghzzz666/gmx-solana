@@ -112,4 +112,14 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
     pub fn controller_address(&self, store: &Pubkey) -> Pubkey {
         crate::pda::find_controller_address(store, &self.exchange_program_id()).0
     }
+
+    /// Find PDA for [`Oracle`](data_store::states::Oracle) account.
+    pub fn find_oracle_address(&self, store: &Pubkey, index: u8) -> Pubkey {
+        crate::pda::find_oracle_address(store, index, &self.data_store_program_id()).0
+    }
+
+    /// Find PDA for [`TokenConfigMap`](data_store::states::TokenConfigMap) account.
+    pub fn find_token_config_map(&self, store: &Pubkey) -> Pubkey {
+        crate::pda::find_token_config_map(store, &self.data_store_program_id()).0
+    }
 }

@@ -2,7 +2,7 @@ use anchor_client::solana_sdk::pubkey::Pubkey;
 use data_store::states::{PriceProviderKind, TokenConfigBuilder};
 use gmsol::store::{oracle::OracleOps, token_config::TokenConfigOps};
 
-use crate::SharedClient;
+use crate::GMSOLClient;
 
 #[derive(clap::Args)]
 pub(super) struct ControllerArgs {
@@ -75,18 +75,28 @@ impl Toggle {
 }
 
 impl ControllerArgs {
-    pub(super) async fn run(&self, client: &SharedClient, store: &Pubkey) -> gmsol::Result<()> {
-        let program = client.program(data_store::id())?;
+    pub(super) async fn run(
+        &self,
+        client: &GMSOLClient,
+        store: &Pubkey,
+        serialize_only: bool,
+    ) -> gmsol::Result<()> {
         match &self.command {
             Command::InitializeOracle { index } => {
-                let (request, oracle) = program.initialize_oracle(store, *index);
-                let signature = request.send().await?;
-                println!("created oracle {oracle} at tx {signature}");
+                let (request, oracle) = client.initialize_oracle(store, *index);
+                crate::utils::send_or_serialize(request, serialize_only, |signature| {
+                    println!("created oracle {oracle} at tx {signature}");
+                    Ok(())
+                })
+                .await?;
             }
             Command::InitializeTokenConfigMap => {
-                let (request, map) = program.initialize_token_config_map(store);
-                let signature = request.send().await?;
-                println!("created token config map {map} at tx {signature}");
+                let (request, map) = client.initialize_token_config_map(store);
+                crate::utils::send_or_serialize(request, serialize_only, |signature| {
+                    println!("created token config map {map} at tx {signature}");
+                    Ok(())
+                })
+                .await?;
             }
             Command::InsertTokenConfig {
                 token,
@@ -119,32 +129,38 @@ impl ControllerArgs {
                         .update_price_feed(&PriceProviderKind::Chainlink, feed)
                         .map_err(anchor_client::ClientError::from)?;
                 }
-                let signature = if let Some(decimals) = fake_decimals {
-                    program
-                        .insert_synthetic_token_config(store, token, *decimals, builder, true)
-                        .send()
-                        .await?
+                let req = if let Some(decimals) = fake_decimals {
+                    client.insert_synthetic_token_config(store, token, *decimals, builder, true)
                 } else {
-                    program
-                        .insert_token_config(store, token, builder, true)
-                        .send()
-                        .await?
+                    client.insert_token_config(store, token, builder, true)
                 };
-                println!("{signature}");
+                crate::utils::send_or_serialize(req, serialize_only, |signature| {
+                    println!("{signature}");
+                    Ok(())
+                })
+                .await?;
             }
             Command::ToggleTokenConfig { token, toggle } => {
-                let signature = program
-                    .toggle_token_config(store, token, toggle.is_enable())
-                    .send()
-                    .await?;
-                println!("{signature}");
+                crate::utils::send_or_serialize(
+                    client.toggle_token_config(store, token, toggle.is_enable()),
+                    serialize_only,
+                    |signature| {
+                        println!("{signature}");
+                        Ok(())
+                    },
+                )
+                .await?;
             }
             Command::SetExpectedProvider { token, provider } => {
-                let signature = program
-                    .set_expected_provider(store, token, *provider)
-                    .send()
-                    .await?;
-                println!("{signature}");
+                crate::utils::send_or_serialize(
+                    client.set_expected_provider(store, token, *provider),
+                    serialize_only,
+                    |signature| {
+                        println!("{signature}");
+                        Ok(())
+                    },
+                )
+                .await?;
             }
         }
         Ok(())
