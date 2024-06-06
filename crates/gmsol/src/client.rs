@@ -88,6 +88,11 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         self.data_store().id()
     }
 
+    /// Get the program id of `Exchange` program.
+    pub fn exchange_program_id(&self) -> Pubkey {
+        self.exchange().id()
+    }
+
     /// Find PDA for [`DataStore`](data_store::states::DataStore) account.
     pub fn find_store_address(&self, key: &str) -> Pubkey {
         crate::pda::find_store_address(key, &self.data_store_program_id()).0
@@ -101,5 +106,10 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
     /// Get the roles address for payer.
     pub fn payer_roles_address(&self, store: &Pubkey) -> Pubkey {
         self.find_roles_address(store, &self.payer())
+    }
+
+    /// Get the controller address for the exchange program.
+    pub fn controller_address(&self, store: &Pubkey) -> Pubkey {
+        crate::pda::find_controller_address(store, &self.exchange_program_id()).0
     }
 }

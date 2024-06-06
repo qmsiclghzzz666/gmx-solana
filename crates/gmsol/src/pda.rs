@@ -14,3 +14,11 @@ pub fn find_roles_address(store: &Pubkey, authority: &Pubkey, program_id: &Pubke
         program_id,
     )
 }
+
+/// Find PDA for the controller address of exchange program.
+pub fn find_controller_address(store: &Pubkey, exchange_program_id: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[exchange::constants::CONTROLLER_SEED, store.as_ref()],
+        exchange_program_id,
+    )
+}

@@ -1,7 +1,7 @@
 use anchor_client::solana_sdk::pubkey::Pubkey;
-use gmsol::store::roles::{find_roles_address, RolesOps};
+use gmsol::store::roles::RolesOps;
 
-use crate::SharedClient;
+use crate::GMSOLClient;
 
 #[derive(clap::Args)]
 pub(super) struct RolesArgs {
@@ -22,17 +22,27 @@ enum RolesAction {
 }
 
 impl RolesArgs {
-    pub(super) async fn run(&self, client: &SharedClient, store: &Pubkey) -> gmsol::Result<()> {
-        let program = client.program(data_store::id())?;
+    pub(super) async fn run(
+        &self,
+        client: &GMSOLClient,
+        store: &Pubkey,
+        serialize_only: bool,
+    ) -> gmsol::Result<()> {
         match &self.action {
             Some(RolesAction::Get) | None => {
-                let address = find_roles_address(store, &program.payer()).0;
+                let address = client.payer_roles_address(store);
                 println!("{address}");
             }
             Some(RolesAction::Init { authority }) => {
-                let authority = authority.unwrap_or(program.payer());
-                let signature = program.initialize_roles(store, &authority).send().await?;
-                tracing::info!("initialized a new roles account at {signature}");
+                crate::utils::send_or_serialize(
+                    client.initialize_roles(store, &authority.unwrap_or(client.payer())),
+                    serialize_only,
+                    |signature| {
+                        tracing::info!("initialized a new roles account at {signature}");
+                        Ok(())
+                    },
+                )
+                .await?;
             }
         }
         Ok(())

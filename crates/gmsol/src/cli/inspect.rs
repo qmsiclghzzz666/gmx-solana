@@ -1,6 +1,5 @@
 use anchor_client::solana_sdk::pubkey::Pubkey;
 use data_store::states::{self};
-use exchange::utils::ControllerSeeds;
 use eyre::ContextCompat;
 use gmsol::{
     store::{
@@ -152,9 +151,7 @@ impl InspectArgs {
                 );
             }
             Command::Controller => {
-                let controller =
-                    ControllerSeeds::find_with_address(store.wrap_err("missing `store` address")?)
-                        .1;
+                let controller = client.controller_address(store.wrap_err("`store` not provided")?);
                 println!("{controller}");
             }
             Command::Oracle { oracle } => {
