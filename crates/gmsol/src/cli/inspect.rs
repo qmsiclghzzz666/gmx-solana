@@ -1,14 +1,7 @@
 use anchor_client::solana_sdk::pubkey::Pubkey;
 use data_store::states::{self};
 use eyre::ContextCompat;
-use gmsol::{
-    store::{
-        config::find_config_pda,
-        market::find_market_address,
-        token_config::{find_token_config_map, get_token_config},
-    },
-    utils,
-};
+use gmsol::{store::market::find_market_address, utils};
 use pyth_sdk::Identifier;
 
 use crate::{utils::Oracle, GMSOLClient};
@@ -112,7 +105,7 @@ impl InspectArgs {
             }
             Command::Config { address } => {
                 let address = address
-                    .or_else(|| store.map(|store| find_config_pda(store).0))
+                    .or_else(|| store.map(|store| client.find_config_address(store)))
                     .wrap_err(
                         "neither the address of config account nor the address of store provided",
                     )?;
@@ -120,7 +113,11 @@ impl InspectArgs {
             }
             Command::TokenConfigMap { address } => {
                 let address = address
-                    .or_else(|| store.as_ref().map(|store| find_token_config_map(store).0))
+                    .or_else(|| {
+                        store
+                            .as_ref()
+                            .map(|store| client.find_token_config_map(store))
+                    })
                     .wrap_err("missing store address")?;
                 println!(
                     "{:#?}",
@@ -161,7 +158,8 @@ impl InspectArgs {
             }
             Command::TokenConfig { token } => {
                 let store = store.wrap_err("missing store address")?;
-                let config = get_token_config(program, store, token)
+                let config = client
+                    .token_config(store, token)
                     .await?
                     .ok_or(gmsol::Error::NotFound)?;
                 println!("{config:#?}");

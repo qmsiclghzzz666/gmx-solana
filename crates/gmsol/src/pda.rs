@@ -1,5 +1,5 @@
 use anchor_client::solana_sdk::pubkey::Pubkey;
-use data_store::states::{DataStore, Oracle, Roles, Seed, TokenConfigMap};
+use data_store::states::{Config, DataStore, Oracle, Roles, Seed, TokenConfigMap};
 use gmx_solana_utils::to_seed;
 
 /// Find PDA for [`DataStore`] account.
@@ -35,4 +35,9 @@ pub fn find_oracle_address(store: &Pubkey, index: u8, store_program_id: &Pubkey)
 /// Find PDA for [`TokenConfigMap`] account.
 pub fn find_token_config_map(store: &Pubkey, store_program_id: &Pubkey) -> (Pubkey, u8) {
     Pubkey::find_program_address(&[TokenConfigMap::SEED, store.as_ref()], store_program_id)
+}
+
+/// Find PDA for [`Config`] account.
+pub fn find_config_pda(store: &Pubkey, store_program_id: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(&[Config::SEED, store.as_ref()], store_program_id)
 }

@@ -1,6 +1,6 @@
 use anchor_client::solana_sdk::pubkey::Pubkey;
-use data_store::states::{PriceProviderKind, TokenConfigBuilder};
-use gmsol::store::{oracle::OracleOps, token_config::TokenConfigOps};
+use data_store::states::{Amount, Factor, PriceProviderKind, TokenConfigBuilder};
+use gmsol::store::{config::ConfigOps, oracle::OracleOps, token_config::TokenConfigOps};
 
 use crate::GMSOLClient;
 
@@ -41,6 +41,35 @@ enum Command {
     SetExpectedProvider {
         token: Pubkey,
         provider: PriceProviderKind,
+    },
+    /// Initialize Config Account.
+    InitializeConfig,
+    /// Insert an amount to the config.
+    InsertAmount {
+        amount: Amount,
+        #[arg(long, short)]
+        key: String,
+        /// Force new.
+        #[arg(long)]
+        new: bool,
+    },
+    /// Insert a factor to the config.
+    InsertFactor {
+        factor: Factor,
+        #[arg(long, short)]
+        key: String,
+        /// Force new.
+        #[arg(long)]
+        new: bool,
+    },
+    /// Insert an address to the config.
+    InsertAddress {
+        address: Pubkey,
+        #[arg(long, short)]
+        key: String,
+        /// Force new.
+        #[arg(long)]
+        new: bool,
     },
 }
 
@@ -154,6 +183,56 @@ impl ControllerArgs {
             Command::SetExpectedProvider { token, provider } => {
                 crate::utils::send_or_serialize(
                     client.set_expected_provider(store, token, *provider),
+                    serialize_only,
+                    |signature| {
+                        println!("{signature}");
+                        Ok(())
+                    },
+                )
+                .await?;
+            }
+            Command::InitializeConfig => {
+                crate::utils::send_or_serialize(
+                    client.initialize_config(store).build(),
+                    serialize_only,
+                    |signature| {
+                        println!("{signature}");
+                        Ok(())
+                    },
+                )
+                .await?;
+            }
+            Command::InsertAmount { amount, key, new } => {
+                crate::utils::send_or_serialize(
+                    client
+                        .insert_global_amount(store, key, *amount, *new)
+                        .build(),
+                    serialize_only,
+                    |signature| {
+                        println!("{signature}");
+                        Ok(())
+                    },
+                )
+                .await?;
+            }
+            Command::InsertFactor { factor, key, new } => {
+                crate::utils::send_or_serialize(
+                    client
+                        .insert_global_factor(store, key, *factor, *new)
+                        .build(),
+                    serialize_only,
+                    |signature| {
+                        println!("{signature}");
+                        Ok(())
+                    },
+                )
+                .await?;
+            }
+            Command::InsertAddress { address, key, new } => {
+                crate::utils::send_or_serialize(
+                    client
+                        .insert_global_address(store, key, address, *new)
+                        .build(),
                     serialize_only,
                     |signature| {
                         println!("{signature}");

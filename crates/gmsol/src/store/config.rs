@@ -144,3 +144,96 @@ where
             })
     }
 }
+
+impl<C, S> ConfigOps<C> for crate::Client<C>
+where
+    C: Deref<Target = S> + Clone,
+    S: Signer,
+{
+    fn initialize_config(&self, store: &Pubkey) -> RpcBuilder<C> {
+        let authority = self.payer();
+        let only_controller = self.payer_roles_address(store);
+        let config = self.find_config_address(store);
+        self.data_store_request()
+            .args(instruction::InitializeConfig {})
+            .accounts(accounts::InitializeConfig {
+                authority,
+                only_controller,
+                store: *store,
+                config,
+                system_program: System::id(),
+            })
+    }
+
+    fn insert_global_amount(
+        &self,
+        store: &Pubkey,
+        key: &str,
+        amount: Amount,
+        new: bool,
+    ) -> RpcBuilder<C> {
+        let authority = self.payer();
+        let only_controller = self.payer_roles_address(store);
+        let config = self.find_config_address(store);
+        self.data_store_request()
+            .args(instruction::InsertAmount {
+                key: key.to_string(),
+                amount,
+                new,
+            })
+            .accounts(accounts::InsertAmount {
+                authority,
+                only_controller,
+                store: *store,
+                config,
+            })
+    }
+
+    fn insert_global_factor(
+        &self,
+        store: &Pubkey,
+        key: &str,
+        factor: Factor,
+        new: bool,
+    ) -> RpcBuilder<C> {
+        let authority = self.payer();
+        let only_controller = self.payer_roles_address(store);
+        let config = self.find_config_address(store);
+        self.data_store_request()
+            .args(instruction::InsertFactor {
+                key: key.to_string(),
+                amount: factor,
+                new,
+            })
+            .accounts(accounts::InsertFactor {
+                authority,
+                only_controller,
+                store: *store,
+                config,
+            })
+    }
+
+    fn insert_global_address(
+        &self,
+        store: &Pubkey,
+        key: &str,
+        address: &Pubkey,
+        new: bool,
+    ) -> RpcBuilder<C> {
+        let authority = self.payer();
+        let only_controller = self.payer_roles_address(store);
+        let config = self.find_config_address(store);
+        self.data_store_request()
+            .args(instruction::InsertAddress {
+                key: key.to_string(),
+                address: *address,
+                new,
+            })
+            .accounts(accounts::InsertAddress {
+                authority,
+                only_controller,
+                store: *store,
+                config,
+            })
+    }
+}

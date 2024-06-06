@@ -5,7 +5,10 @@ use anchor_client::{
     Cluster, Program,
 };
 
+use data_store::states::TokenConfig;
 use typed_builder::TypedBuilder;
+
+use crate::utils::RpcBuilder;
 
 /// Options for [`Client`].
 #[derive(Debug, Clone, TypedBuilder)]
@@ -93,6 +96,36 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         self.exchange().id()
     }
 
+    /// Create a request for `DataStore` Program.
+    pub fn data_store_request(&self) -> RpcBuilder<'_, C> {
+        RpcBuilder::new(&self.data_store)
+    }
+
+    /// Create a request for `Exchange` Program.
+    pub fn exchange_request(&self) -> RpcBuilder<'_, C> {
+        RpcBuilder::new(&self.exchange)
+    }
+
+    /// Get token config for the given token.
+    pub async fn token_config(
+        &self,
+        store: &Pubkey,
+        token: &Pubkey,
+    ) -> crate::Result<Option<TokenConfig>> {
+        use crate::{store::token_config::TokenConfigOps, utils::view};
+
+        let client = self.data_store().async_rpc();
+        let output = view(
+            &client,
+            &self
+                .get_token_config(store, token)
+                .signed_transaction()
+                .await?,
+        )
+        .await?;
+        Ok(output)
+    }
+
     /// Find PDA for [`DataStore`](data_store::states::DataStore) account.
     pub fn find_store_address(&self, key: &str) -> Pubkey {
         crate::pda::find_store_address(key, &self.data_store_program_id()).0
@@ -121,5 +154,10 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
     /// Find PDA for [`TokenConfigMap`](data_store::states::TokenConfigMap) account.
     pub fn find_token_config_map(&self, store: &Pubkey) -> Pubkey {
         crate::pda::find_token_config_map(store, &self.data_store_program_id()).0
+    }
+
+    /// Find PDA for [`Config`](data_store::states::Config) account.
+    pub fn find_config_address(&self, store: &Pubkey) -> Pubkey {
+        crate::pda::find_config_pda(store, &self.data_store_program_id()).0
     }
 }
