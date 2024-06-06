@@ -26,7 +26,7 @@ pub async fn get_token_config<C, S>(
     token: &Pubkey,
 ) -> crate::Result<Option<TokenConfig>>
 where
-    C: Deref<Target = S> + Clone + Send + Sync,
+    C: Deref<Target = S> + Clone,
     S: Signer,
 {
     let client = program.async_rpc();
@@ -87,7 +87,7 @@ pub trait TokenConfigOps<C> {
 
 impl<C, S> TokenConfigOps<C> for Program<C>
 where
-    C: Deref<Target = S> + Clone + Send + Sync,
+    C: Deref<Target = S> + Clone,
     S: Signer,
 {
     fn initialize_token_config_map(&self, store: &Pubkey) -> (RequestBuilder<C>, Pubkey) {

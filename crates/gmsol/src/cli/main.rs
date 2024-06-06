@@ -1,17 +1,16 @@
-use std::sync::Arc;
-
 use admin::AdminArgs;
 use anchor_client::{
     solana_sdk::{
         commitment_config::CommitmentConfig,
         pubkey::Pubkey,
-        signature::{read_keypair_file, Keypair},
+        signature::{read_keypair_file, NullSigner},
         signer::Signer,
     },
     Client, Cluster,
 };
 use clap::Parser;
 use eyre::{eyre, ContextCompat};
+use gmsol::utils::SignerRef;
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::EnvFilter;
 
@@ -38,6 +37,21 @@ struct Cli {
     /// The address of the `DataStore` account.
     #[arg(long, env)]
     store: Option<Pubkey>,
+    /// `DataStore` Program ID.
+    #[arg(long, env)]
+    store_program: Option<Pubkey>,
+    /// `Exchange` Program ID.
+    #[arg(long, env)]
+    exchange_program: Option<Pubkey>,
+    /// Print the Based64 encoded serialized instructions,
+    /// instead of sending the transaction.
+    #[arg(long)]
+    serialize_only: bool,
+    /// Use this address as payer.
+    ///
+    /// Only available in `serialize-only` mode.
+    #[arg(long, requires = "serialize_only")]
+    payer: Option<Pubkey>,
     /// Commands.
     #[command(subcommand)]
     command: Command,
@@ -75,13 +89,23 @@ async fn main() -> eyre::Result<()> {
     Ok(())
 }
 
-type SharedClient = Arc<Client<Arc<Keypair>>>;
+type SharedClient = Client<SignerRef>;
+type GMSOLClient = gmsol::Client<SignerRef>;
 
 impl Cli {
-    fn wallet(&self) -> eyre::Result<Arc<Keypair>> {
-        let payer = read_keypair_file(&*shellexpand::full(&self.wallet)?)
-            .map_err(|err| eyre!("Failed to read keypair: {err}"))?;
-        Ok(Arc::new(payer))
+    fn wallet(&self) -> eyre::Result<SignerRef> {
+        if let Some(payer) = self.payer {
+            if self.serialize_only {
+                let payer = NullSigner::new(&payer);
+                Ok(gmsol::utils::shared_signer(payer))
+            } else {
+                eyre::bail!("Setting payer is only allowed in `serialize-only` mode");
+            }
+        } else {
+            let payer = read_keypair_file(&*shellexpand::full(&self.wallet)?)
+                .map_err(|err| eyre!("Failed to read keypair: {err}"))?;
+            Ok(gmsol::utils::shared_signer(payer))
+        }
     }
 
     fn cluster(&self) -> eyre::Result<Cluster> {
@@ -99,20 +123,44 @@ impl Cli {
         let commitment = self.commitment;
         tracing::debug!("using commitment config: {}", commitment.commitment);
         let client = Client::new_with_options(cluster, wallet, self.commitment);
-        Ok((Arc::new(client), payer))
+        Ok((client, payer))
     }
 
     fn store(&self) -> eyre::Result<&Pubkey> {
         self.store.as_ref().wrap_err("missing store address")
     }
 
+    fn options(&self) -> gmsol::ClientOptions {
+        gmsol::ClientOptions::builder()
+            .commitment(self.commitment)
+            .data_store_program_id(self.store_program)
+            .exchange_program_id(self.exchange_program)
+            .build()
+    }
+
+    fn gmsol_client(&self) -> eyre::Result<GMSOLClient> {
+        let cluster = self.cluster()?;
+        tracing::debug!("using cluster: {cluster}");
+        let wallet = self.wallet()?;
+        let payer = wallet.pubkey();
+        tracing::debug!("using wallet: {}", payer);
+        let commitment = self.commitment;
+        tracing::debug!("using commitment config: {}", commitment.commitment);
+        let client = gmsol::Client::new_with_options(cluster, wallet, self.options())?;
+        Ok(client)
+    }
+
     async fn run(&self) -> eyre::Result<()> {
         let (client, payer) = self.client()?;
+        let gmsol = self.gmsol_client()?;
         match &self.command {
             Command::Whoami => {
                 println!("{payer}");
             }
-            Command::Admin(args) => args.run(&client, self.store.as_ref()).await?,
+            Command::Admin(args) => {
+                args.run(&gmsol, self.store.as_ref(), self.serialize_only)
+                    .await?
+            }
             Command::Inspect(args) => args.run(&client, self.store.as_ref()).await?,
             Command::Roles(args) => args.run(&client, self.store()?).await?,
             Command::Exchange(args) => args.run(&client, self.store()?).await?,

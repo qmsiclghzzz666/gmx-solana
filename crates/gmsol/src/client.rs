@@ -10,10 +10,10 @@ use typed_builder::TypedBuilder;
 /// Options for [`Client`].
 #[derive(Debug, Clone, TypedBuilder)]
 pub struct ClientOptions {
-    #[builder(default = data_store::ID)]
-    data_store_program_id: Pubkey,
-    #[builder(default = exchange::ID)]
-    exchange_program_id: Pubkey,
+    #[builder(default)]
+    data_store_program_id: Option<Pubkey>,
+    #[builder(default)]
+    exchange_program_id: Option<Pubkey>,
     #[builder(default)]
     commitment: CommitmentConfig,
 }
@@ -47,8 +47,8 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         let anchor = anchor_client::Client::new_with_options(cluster, payer.clone(), commitment);
         Ok(Self {
             wallet: payer,
-            data_store: anchor.program(data_store_program_id)?,
-            exchange: anchor.program(exchange_program_id)?,
+            data_store: anchor.program(data_store_program_id.unwrap_or(data_store::id()))?,
+            exchange: anchor.program(exchange_program_id.unwrap_or(exchange::id()))?,
             anchor,
         })
     }

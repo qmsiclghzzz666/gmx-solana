@@ -22,9 +22,19 @@ pub mod transaction_builder;
 /// Transaction size.
 pub mod transaction_size;
 
+/// Instruction utils.
+pub mod instruction;
+
+/// Signer.
+pub mod signer;
+
 pub use self::{
-    compute_budget::ComputeBudget, rpc_builder::RpcBuilder,
-    transaction_builder::TransactionBuilder, transaction_size::transaction_size,
+    compute_budget::ComputeBudget,
+    instruction::serialize_instruction,
+    rpc_builder::RpcBuilder,
+    signer::{shared_signer, SignerRef},
+    transaction_builder::TransactionBuilder,
+    transaction_size::transaction_size,
 };
 
 /// View the return data by simulating the transaction.

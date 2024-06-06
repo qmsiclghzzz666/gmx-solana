@@ -4,7 +4,7 @@ use gmsol::store::{
     roles::RolesOps,
 };
 
-use crate::SharedClient;
+use crate::GMSOLClient;
 
 #[derive(clap::Args)]
 pub(super) struct AdminArgs {
@@ -30,23 +30,30 @@ enum Command {
 impl AdminArgs {
     pub(super) async fn run(
         &self,
-        client: &SharedClient,
+        client: &GMSOLClient,
         store: Option<&Pubkey>,
+        serialize_only: bool,
     ) -> gmsol::Result<()> {
-        let program = client.program(data_store::id())?;
         match (&self.command, store) {
             (Command::InitializeStore { key }, _) => {
-                let key = key.clone().unwrap_or_else(|| program.payer().to_string());
-                let signature = program.initialize_store(&key).send().await?;
-                tracing::info!("initialized a new data store at tx {signature}");
-                println!("{}", find_store_address(&key).0);
+                let key = key.clone().unwrap_or_else(|| client.payer().to_string());
+                let req = client.initialize_store(&key);
+                if serialize_only {
+                    for ix in req.instructions()? {
+                        println!("{}", gmsol::utils::serialize_instruction(&ix)?);
+                    }
+                } else {
+                    let signature = client.initialize_store(&key).send().await?;
+                    tracing::info!("initialized a new data store at tx {signature}");
+                    println!("{}", find_store_address(&key).0);
+                }
             }
             (Command::EnableRole { role }, Some(store)) => {
-                let signature = program.enable_role(store, role).send().await?;
+                let signature = client.enable_role(store, role).send().await?;
                 tracing::info!("enabled role `{role}` at tx {signature}");
             }
             (Command::GrantRole { role, authority }, Some(store)) => {
-                let signature = program.grant_role(store, authority, role).send().await?;
+                let signature = client.grant_role(store, authority, role).send().await?;
                 tracing::info!("grant a role for user {authority} at tx {signature}");
             }
             (_, None) => return Err(gmsol::Error::unknown("missing `store` address")),
