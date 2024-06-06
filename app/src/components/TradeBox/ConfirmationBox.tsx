@@ -7,7 +7,7 @@ import { Trans, t } from "@lingui/macro";
 import { useTradeStage, useSetTradeStage } from "@/contexts/shared/hooks";
 import Button from "../Button/Button";
 import LoadingDots from "../Common/LoadingDots/LoadingDots";
-import { useExchange } from "@/contexts/anchor";
+import { useDataStore, useExchange } from "@/contexts/anchor";
 import { useTriggerInvocation } from "@/onchain/transaction";
 import { invokeCreateIncreaseOrder } from "gmsol";
 import { GMSOL_DEPLOYMENT } from "@/config/deployment";
@@ -262,6 +262,7 @@ function useTriggerCreateOrder() {
   const increaseSwapParams = useSharedStatesSelector(selectIncreaseSwapParams);
   const isSwapfulfilled = increaseSwapParams?.isSwapfulfilled;
   const exchange = useExchange();
+  const store = useDataStore();
 
   const { mutate } = useSWRConfig();
   const mutateStates = useCallback(() => {
@@ -289,6 +290,7 @@ function useTriggerCreateOrder() {
         options: {
           swapPath: swapPath.map(translateAddress),
           initialCollateralToken: initialCollateralToken.address,
+          dataStore: store,
         }
       }, { skipPreflight, computeUnits: 400000 });
       console.log(`created increase order ${order.toBase58()} at tx ${signatrue}`);
@@ -296,7 +298,7 @@ function useTriggerCreateOrder() {
     } else {
       throw Error("Unsupprted order type");
     }
-  }, [exchange, marketTokenAddress, collateralTokenAddress, isMarket, isIncrease, increaseAmounts, increaseSwapParams, isLong]);
+  }, [exchange, marketTokenAddress, collateralTokenAddress, isMarket, isIncrease, increaseAmounts, increaseSwapParams, isLong, store]);
 
   const { trigger, isSending } = useTriggerInvocation({
     key: "create-increase-order",
