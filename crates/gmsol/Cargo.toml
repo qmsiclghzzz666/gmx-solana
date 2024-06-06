@@ -32,6 +32,28 @@ pyth-pull-oracle = [
 ]
 
 [dependencies]
+# Dependencies for cli
+clap = { workspace = true, optional = true, features = ["derive", "env"] }
+tracing-subscriber = { version = "0.3.18", optional = true, features = [
+    "env-filter",
+] }
+shellexpand = { version = "3.1.0", optional = true }
+pyth-sdk = "0.8.0"
+
+# Dependencies for pyth support
+reqwest = { version = "0.12.4", optional = true, features = ["json"] }
+url = { version = "2.5.0", optional = true }
+serde_json = { version = "1.0.117", optional = true }
+serde = { version = "1.0.201", optional = true, features = ["derive"] }
+eventsource-stream = { version = "0.2.3", optional = true }
+pythnet-sdk = { version = "2.1.0", optional = true }
+pyth-solana-receiver-sdk = { workspace = true, optional = true }
+anchor-syn = { version = "0.30.0", optional = true }
+heck = { version = "0.5.0", optional = true }
+byteorder = { version = "1.5.0", optional = true }
+
+# Other deps
+typed-builder = "0.18.2"
 eyre = { version = "0.6.12" }
 tokio = "1.37.0"
 thiserror = "1.0.58"
@@ -56,23 +78,3 @@ exchange = { path = "../../programs/exchange", features = [
 ] }
 rand = { version = "0.8.5" }
 futures-util = { version = "0.3.30" }
-
-# Dependencies for cli
-clap = { workspace = true, optional = true, features = ["derive", "env"] }
-tracing-subscriber = { version = "0.3.18", optional = true, features = [
-    "env-filter",
-] }
-shellexpand = { version = "3.1.0", optional = true }
-pyth-sdk = "0.8.0"
-
-# Dependencies for pyth support
-reqwest = { version = "0.12.4", optional = true, features = ["json"] }
-url = { version = "2.5.0", optional = true }
-serde_json = { version = "1.0.117", optional = true }
-serde = { version = "1.0.201", optional = true, features = ["derive"] }
-eventsource-stream = { version = "0.2.3", optional = true }
-pythnet-sdk = { version = "2.1.0", optional = true }
-pyth-solana-receiver-sdk = { workspace = true, optional = true }
-anchor-syn = { version = "0.30.0", optional = true }
-heck = { version = "0.5.0", optional = true }
-byteorder = { version = "1.5.0", optional = true }

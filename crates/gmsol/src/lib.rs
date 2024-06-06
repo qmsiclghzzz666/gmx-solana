@@ -1,3 +1,6 @@
+/// GMSOL Client.
+pub mod client;
+
 /// Error type for `gmsol`.
 pub mod error;
 
