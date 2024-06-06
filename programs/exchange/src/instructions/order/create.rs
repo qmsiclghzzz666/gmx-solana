@@ -44,6 +44,7 @@ pub struct CreateOrder<'info> {
     /// CHECK: check by CPI.
     pub token_config_map: UncheckedAccount<'info>,
     /// CHECK: check by CPI.
+    #[account(mut)]
     pub market: UncheckedAccount<'info>,
     #[account(mut)]
     pub initial_collateral_token_account: Option<Box<Account<'info, TokenAccount>>>,
