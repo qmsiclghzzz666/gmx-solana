@@ -156,8 +156,12 @@ impl<'a, C: Deref<Target = impl Signer> + Clone, T> RpcBuilder<'a, C, T> {
         &mut self.compute_budget
     }
 
-    fn get_compute_budget_instructions(&self) -> Vec<Instruction> {
-        self.compute_budget.compute_budget_instructions()
+    fn get_compute_budget_instructions(
+        &self,
+        compute_unit_price_micro_lamports: Option<u64>,
+    ) -> Vec<Instruction> {
+        self.compute_budget
+            .compute_budget_instructions(compute_unit_price_micro_lamports)
     }
 
     fn get_rpc_instruction(&self) -> Option<Instruction> {
@@ -170,11 +174,20 @@ impl<'a, C: Deref<Target = impl Signer> + Clone, T> RpcBuilder<'a, C, T> {
     }
 
     /// Get all instructions.
-    pub fn instructions(&self, without_compute_budget: bool) -> Vec<Instruction> {
+    pub fn instructions(&self) -> Vec<Instruction> {
+        self.instructions_with_options(false, None)
+    }
+
+    /// Get all instructions with options.
+    pub fn instructions_with_options(
+        &self,
+        without_compute_budget: bool,
+        compute_unit_price_micro_lamports: Option<u64>,
+    ) -> Vec<Instruction> {
         let mut instructions = if without_compute_budget {
             Vec::default()
         } else {
-            self.get_compute_budget_instructions()
+            self.get_compute_budget_instructions(compute_unit_price_micro_lamports)
         };
         instructions.append(&mut self.pre_instructions.clone());
         if let Some(ix) = self.get_rpc_instruction() {
@@ -242,25 +255,26 @@ impl<'a, C: Deref<Target = impl Signer> + Clone, T> RpcBuilder<'a, C, T> {
 
     /// Build [`RequestBuilder`](anchor_client::RequestBuilder).
     pub fn build(self) -> anchor_client::RequestBuilder<'a, C> {
-        self.build_with_output(false).0
+        self.build_with_options(false, None).0
     }
 
     /// Build [`RequestBuilder`](anchor_client::RequestBuilder) without compute budget.
     pub fn build_without_compute_budget(self) -> anchor_client::RequestBuilder<'a, C> {
-        self.build_with_output(true).0
+        self.build_with_options(true, None).0
     }
 
     /// Build and output.
-    pub fn build_with_output(
+    pub fn build_with_options(
         self,
         without_compute_budget: bool,
+        compute_unit_price_micro_lamports: Option<u64>,
     ) -> (anchor_client::RequestBuilder<'a, C>, T) {
         debug_assert!(
             self.builder.instructions().unwrap().is_empty(),
             "non-empty builder"
         );
         let request = self
-            .instructions(without_compute_budget)
+            .instructions_with_options(without_compute_budget, compute_unit_price_micro_lamports)
             .into_iter()
             .fold(self.builder.program(self.program_id), |acc, ix| {
                 acc.instruction(ix)
@@ -276,14 +290,18 @@ impl<'a, C: Deref<Target = impl Signer> + Clone, T> RpcBuilder<'a, C, T> {
     ///
     /// See [`transaction_size`] for more information.
     pub fn transaction_size(&self, is_versioned_transaction: bool) -> usize {
-        transaction_size(&self.instructions(false), is_versioned_transaction)
+        transaction_size(&self.instructions(), is_versioned_transaction)
     }
 
     /// Estimated the execution fee of the result transaction.
-    pub async fn estimate_execution_fee(&self, client: &RpcClient) -> crate::Result<u64> {
+    pub async fn estimate_execution_fee(
+        &self,
+        client: &RpcClient,
+        compute_unit_price_micro_lamports: Option<u64>,
+    ) -> crate::Result<u64> {
         use anchor_client::solana_sdk::message::Message;
 
-        let ixs = self.instructions(false);
+        let ixs = self.instructions_with_options(false, compute_unit_price_micro_lamports);
         let blockhash = client
             .get_latest_blockhash()
             .await

@@ -6,6 +6,7 @@ use anchor_client::{
 };
 use data_store::states::PriceProviderKind;
 use exchange::events::{DepositCreatedEvent, OrderCreatedEvent, WithdrawalCreatedEvent};
+use futures_util::{FutureExt, TryFutureExt};
 use gmsol::{
     exchange::ExchangeOps,
     pyth::{EncodingType, Hermes, PythPullOracle, PythPullOracleContext, PythPullOracleOps},
@@ -89,7 +90,7 @@ impl KeeperArgs {
         } else {
             rpc.compute_budget_mut().set_price(self.compute_unit_price);
         }
-        rpc.estimate_execution_fee(&program.async_rpc()).await
+        rpc.estimate_execution_fee(&program.async_rpc(), None).await
     }
 
     fn use_pyth_pull_oracle(&self) -> bool {
@@ -222,7 +223,18 @@ impl KeeperArgs {
                     order,
                 )?;
                 let execution_fee = self
-                    .get_or_estimate_execution_fee(client.data_store(), builder.build().await?)
+                    .execution_fee
+                    .map(|fee| futures_util::future::ready(Ok(fee)).left_future())
+                    .unwrap_or_else(|| {
+                        builder
+                            .build()
+                            .and_then(|builder| async move {
+                                builder
+                                    .estimated_execution_fee(Some(self.compute_unit_price))
+                                    .await
+                            })
+                            .right_future()
+                    })
                     .await?;
                 builder
                     .execution_fee(execution_fee)
@@ -241,29 +253,33 @@ impl KeeperArgs {
                         .await?;
                     let with_prices = oracle
                         .with_pyth_prices(&ctx, &update, |prices| async {
-                            let rpc = builder
+                            let builder = builder
                                 .parse_with_pyth_price_updates(prices)
                                 .build()
                                 .await?;
-                            Ok(Some(rpc))
+                            Ok(builder)
                         })
                         .await?;
                     match with_prices.send_all(Some(self.compute_unit_price)).await {
                         Ok(signatures) => {
-                            tracing::info!(%order, "executed order with txs {signatures:#?}");
+                            tracing::info!(%order, %execution_fee, "executed order with txs {signatures:#?}");
                         }
                         Err((signatures, err)) => {
                             tracing::error!(%err, %order, "failed to execute order, successful txs: {signatures:#?}");
                         }
                     }
                 } else {
-                    let mut rpc = builder.build().await?;
-                    if let Some(budget) = self.get_compute_budget() {
-                        rpc = rpc.compute_budget(budget)
-                    }
-                    let signature = rpc.build().send().await?;
-                    tracing::info!(%order, "executed order at tx {signature}");
-                    println!("{signature}");
+                    let builder = builder.build().await?;
+                    let compute_unit_price_micro_lamports =
+                        self.get_compute_budget().map(|budget| budget.price());
+                    let signatures = builder
+                        .send_all_with_opts(
+                            compute_unit_price_micro_lamports,
+                            Default::default(),
+                            false,
+                        )
+                        .await?;
+                    tracing::info!(%order, %execution_fee, "executed order with txs: {signatures:#?}");
                 }
             }
             Command::InitializeVault { token } => {

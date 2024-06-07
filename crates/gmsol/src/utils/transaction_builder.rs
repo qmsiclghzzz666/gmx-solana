@@ -45,8 +45,8 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> TransactionBuilder<'a, C> {
             self.builders.push(rpc);
         } else {
             let last = self.builders.last_mut().unwrap();
-            let mut ixs_after_merge = last.instructions(false);
-            ixs_after_merge.append(&mut rpc.instructions(true));
+            let mut ixs_after_merge = last.instructions_with_options(false, None);
+            ixs_after_merge.append(&mut rpc.instructions_with_options(true, None));
             let size_after_merge = transaction_size(&ixs_after_merge, true);
             if size_after_merge <= PACKET_DATA_SIZE {
                 tracing::debug!(size_after_merge, "adding to the last tx");
@@ -101,27 +101,45 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> TransactionBuilder<'a, C> {
         without_compute_budget: bool,
     ) -> Result<Vec<Signature>, (Vec<Signature>, crate::Error)> {
         let txs = FuturesOrdered::from_iter(self.builders.into_iter().enumerate().map(
-            |(idx, mut builder)| {
-                if let Some(price) = compute_unit_price_micro_lamports {
-                    builder.compute_budget_mut().set_price(price);
-                }
-                async move {
-                    tracing::debug!(
-                        size = builder.transaction_size(false),
-                        "signing transaction {idx}"
-                    );
-                    builder
-                        .build_with_output(without_compute_budget)
-                        .0
-                        .signed_transaction()
-                        .await
-                }
+            |(idx, builder)| async move {
+                tracing::debug!(
+                    size = builder.transaction_size(false),
+                    "signing transaction {idx}"
+                );
+                builder
+                    .build_with_options(without_compute_budget, compute_unit_price_micro_lamports)
+                    .0
+                    .signed_transaction()
+                    .await
             },
         ))
         .try_collect::<Vec<_>>()
         .await
         .map_err(|err| (vec![], err.into()))?;
         send_all_txs(&self.client, txs, config).await
+    }
+
+    /// Estimated execution fee.
+    pub async fn estimated_execution_fee(
+        &self,
+        compute_unit_price_micro_lamports: Option<u64>,
+    ) -> crate::Result<u64> {
+        self.builders
+            .iter()
+            .map(|rpc| rpc.estimate_execution_fee(&self.client, compute_unit_price_micro_lamports))
+            .collect::<futures_util::stream::FuturesUnordered<_>>()
+            .try_fold(0, |acc, fee| futures_util::future::ready(Ok(acc + fee)))
+            .await
+    }
+}
+
+impl<'a, C> IntoIterator for TransactionBuilder<'a, C> {
+    type Item = RpcBuilder<'a, C>;
+
+    type IntoIter = <Vec<RpcBuilder<'a, C>> as IntoIterator>::IntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.builders.into_iter()
     }
 }
 

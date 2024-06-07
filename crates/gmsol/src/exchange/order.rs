@@ -15,7 +15,7 @@ use exchange::{accounts, instruction, instructions::CreateOrderParams};
 
 use crate::{
     store::utils::FeedsParser,
-    utils::{ComputeBudget, RpcBuilder, TokenAccountParams},
+    utils::{ComputeBudget, TokenAccountParams, TransactionBuilder},
 };
 
 use super::generate_nonce;
@@ -610,8 +610,8 @@ where
         self.client.find_config_address(&self.store)
     }
 
-    /// Build [`RpcBuilder`] for `execute_order` instruction.
-    pub async fn build(&mut self) -> crate::Result<RpcBuilder<'a, C>> {
+    /// Build [`TransactionBuilder`] for `execute_order` instructions.
+    pub async fn build(&mut self) -> crate::Result<TransactionBuilder<'a, C>> {
         use crate::store::token::TokenAccountOps;
 
         let hint = self.prepare_hint().await?;
@@ -744,6 +744,11 @@ where
                 account,
             ))
         }
-        Ok(pre_builder.merge(execute_order).merge(post_builder))
+        let mut transaction_builder = TransactionBuilder::new(self.client.exchange().async_rpc());
+        transaction_builder
+            .try_push(pre_builder)?
+            .try_push(execute_order)?
+            .try_push(post_builder)?;
+        Ok(transaction_builder)
     }
 }

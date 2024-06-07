@@ -48,10 +48,15 @@ impl ComputeBudget {
     }
 
     /// Build compute budget instructions.
-    pub fn compute_budget_instructions(&self) -> Vec<Instruction> {
+    pub fn compute_budget_instructions(
+        &self,
+        compute_unit_price_micro_lamports: Option<u64>,
+    ) -> Vec<Instruction> {
         vec![
             ComputeBudgetInstruction::set_compute_unit_limit(self.limit_units),
-            ComputeBudgetInstruction::set_compute_unit_price(self.price_micro_lamports),
+            ComputeBudgetInstruction::set_compute_unit_price(
+                compute_unit_price_micro_lamports.unwrap_or(self.price_micro_lamports),
+            ),
         ]
     }
 
