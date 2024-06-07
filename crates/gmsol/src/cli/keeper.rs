@@ -44,7 +44,10 @@ pub(super) struct KeeperArgs {
 #[derive(clap::Subcommand, Clone, Debug)]
 enum Command {
     /// Watch for items creation and execute them.
-    Watch,
+    Watch {
+        #[arg(long, default_value_t = 2)]
+        wait: u64,
+    },
     /// Execute Deposit.
     ExecuteDeposit { deposit: Pubkey },
     /// Execute Withdrawal.
@@ -105,8 +108,8 @@ impl KeeperArgs {
         serialize_only: bool,
     ) -> gmsol::Result<()> {
         match &self.command {
-            Command::Watch => {
-                let task = Box::pin(self.start_watching(client, store));
+            Command::Watch { wait } => {
+                let task = Box::pin(self.start_watching(client, store, *wait));
                 task.await?;
             }
             Command::ExecuteDeposit { deposit } => {
@@ -315,14 +318,19 @@ impl KeeperArgs {
         args
     }
 
-    async fn start_watching(&self, client: &GMSOLClient, store: &Pubkey) -> gmsol::Result<()> {
+    async fn start_watching(
+        &self,
+        client: &GMSOLClient,
+        store: &Pubkey,
+        wait: u64,
+    ) -> gmsol::Result<()> {
         use tokio::sync::mpsc;
 
         let store = *store;
         let (tx, mut rx) = mpsc::unbounded_channel();
         let mut unsubscribers = vec![];
 
-        let after = Duration::from_secs(1);
+        let after = Duration::from_secs(wait);
         // Subscribe deposit creation event.
         let deposit_program = client.new_exchange()?;
         let unsubscriber =
