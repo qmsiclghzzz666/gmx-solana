@@ -7,12 +7,23 @@ use data_store::{
     utils::{Authentication, WithOracle, WithOracleExt},
 };
 
-use crate::ExchangeError;
+use crate::{utils::ControllerSeeds, ExchangeError};
 
 #[derive(Accounts)]
 pub struct ExecuteWithdrawal<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
+    /// CHECK: only used as signing PDA.
+    #[account(
+        seeds = [
+            crate::constants::CONTROLLER_SEED,
+            store.key().as_ref(),
+        ],
+        bump,
+    )]
+    pub controller: UncheckedAccount<'info>,
+    /// CHECK: only used by CPI.
+    pub only_controller: UncheckedAccount<'info>,
     /// CHECK: only used to invoke CPI.
     pub store: UncheckedAccount<'info>,
     /// CHECK: only used to invoke CPI.
@@ -63,6 +74,8 @@ pub fn execute_withdrawal<'info>(
     ctx: Context<'_, '_, 'info, 'info, ExecuteWithdrawal<'info>>,
     execution_fee: u64,
 ) -> Result<()> {
+    let store = ctx.accounts.store.key();
+    let controller = ControllerSeeds::find(&store);
     let withdrawal = &ctx.accounts.withdrawal;
     let refund = withdrawal
         .get_lamports()
@@ -75,6 +88,7 @@ pub fn execute_withdrawal<'info>(
             let (final_long_amount, final_short_amount) = data_store::cpi::execute_withdrawal(
                 accounts
                     .execute_withdrawal_ctx()
+                    .with_signer(&[&controller.as_seeds()])
                     .with_remaining_accounts(remaining_accounts.to_vec()),
             )?
             .get();
@@ -93,7 +107,9 @@ pub fn execute_withdrawal<'info>(
                     .cloned()
                     .unwrap_or_else(|| accounts.market.to_account_info());
                 data_store::cpi::market_transfer_out(
-                    accounts.market_transfer_out_ctx(true, market),
+                    accounts
+                        .market_transfer_out_ctx(true, market)
+                        .with_signer(&[&controller.as_seeds()]),
                     final_long_amount,
                 )?;
             }
@@ -104,14 +120,21 @@ pub fn execute_withdrawal<'info>(
                     .cloned()
                     .unwrap_or_else(|| accounts.market.to_account_info());
                 data_store::cpi::market_transfer_out(
-                    accounts.market_transfer_out_ctx(false, market),
+                    accounts
+                        .market_transfer_out_ctx(false, market)
+                        .with_signer(&[&controller.as_seeds()]),
                     final_short_amount,
                 )?;
             }
             Ok(())
         },
     )?;
-    data_store::cpi::remove_withdrawal(ctx.accounts.remove_withdrawal_ctx(), refund)?;
+    data_store::cpi::remove_withdrawal(
+        ctx.accounts
+            .remove_withdrawal_ctx()
+            .with_signer(&[&controller.as_seeds()]),
+        refund,
+    )?;
     Ok(())
 }
 
@@ -160,9 +183,10 @@ impl<'info> ExecuteWithdrawal<'info> {
         CpiContext::new(
             self.data_store_program.to_account_info(),
             RemoveWithdrawal {
-                authority: self.authority.to_account_info(),
+                payer: self.authority.to_account_info(),
+                authority: self.controller.to_account_info(),
                 store: self.store.to_account_info(),
-                only_controller: self.only_order_keeper.to_account_info(),
+                only_controller: self.only_controller.to_account_info(),
                 withdrawal: self.withdrawal.to_account_info(),
                 user: self.user.to_account_info(),
                 system_program: self.system_program.to_account_info(),
@@ -179,9 +203,9 @@ impl<'info> ExecuteWithdrawal<'info> {
         CpiContext::new(
             self.data_store_program.to_account_info(),
             data_store::cpi::accounts::ExecuteWithdrawal {
-                authority: self.authority.to_account_info(),
+                authority: self.controller.to_account_info(),
                 store: self.store.to_account_info(),
-                only_order_keeper: self.only_order_keeper.to_account_info(),
+                only_controller: self.only_controller.to_account_info(),
                 config: self.config.to_account_info(),
                 oracle: self.oracle.to_account_info(),
                 withdrawal: self.withdrawal.to_account_info(),
@@ -217,10 +241,9 @@ impl<'info> ExecuteWithdrawal<'info> {
         CpiContext::new(
             self.data_store_program.to_account_info(),
             MarketTransferOut {
-                authority: self.authority.to_account_info(),
+                authority: self.controller.to_account_info(),
                 store: self.store.to_account_info(),
-                // TODO: use controller PDA.
-                only_controller: self.only_order_keeper.to_account_info(),
+                only_controller: self.only_controller.to_account_info(),
                 market,
                 to,
                 vault,

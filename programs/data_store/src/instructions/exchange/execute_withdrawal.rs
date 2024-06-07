@@ -14,8 +14,8 @@ use super::utils::swap::{unchecked_swap_with_params, unchecked_transfer_to_marke
 #[derive(Accounts)]
 pub struct ExecuteWithdrawal<'info> {
     pub authority: Signer<'info>,
-    pub store: Account<'info, DataStore>,
-    pub only_order_keeper: Account<'info, Roles>,
+    pub store: Box<Account<'info, DataStore>>,
+    pub only_controller: Account<'info, Roles>,
     #[account(
         has_one = store,
         seeds = [Config::SEED, store.key().as_ref()],
@@ -55,7 +55,7 @@ pub struct ExecuteWithdrawal<'info> {
         ],
         bump,
     )]
-    pub market_token_withdrawal_vault: Account<'info, TokenAccount>,
+    pub market_token_withdrawal_vault: Box<Account<'info, TokenAccount>>,
     #[account(
         mut,
         token::mint = final_long_token_receiver.mint,
@@ -67,7 +67,7 @@ pub struct ExecuteWithdrawal<'info> {
         ],
         bump,
     )]
-    pub final_long_token_vault: Account<'info, TokenAccount>,
+    pub final_long_token_vault: Box<Account<'info, TokenAccount>>,
     #[account(
         mut,
         token::mint = final_short_token_receiver.mint,
@@ -79,11 +79,11 @@ pub struct ExecuteWithdrawal<'info> {
         ],
         bump,
     )]
-    pub final_short_token_vault: Account<'info, TokenAccount>,
+    pub final_short_token_vault: Box<Account<'info, TokenAccount>>,
     #[account(mut)]
-    pub final_long_token_receiver: Account<'info, TokenAccount>,
+    pub final_long_token_receiver: Box<Account<'info, TokenAccount>>,
     #[account(mut)]
-    pub final_short_token_receiver: Account<'info, TokenAccount>,
+    pub final_short_token_receiver: Box<Account<'info, TokenAccount>>,
     pub token_program: Program<'info, Token>,
 }
 
@@ -128,7 +128,7 @@ impl<'info> internal::Authentication<'info> for ExecuteWithdrawal<'info> {
     }
 
     fn roles(&self) -> &Account<'info, Roles> {
-        &self.only_order_keeper
+        &self.only_controller
     }
 }
 

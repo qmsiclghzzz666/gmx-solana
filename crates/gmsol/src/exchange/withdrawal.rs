@@ -494,6 +494,8 @@ where
             .accounts(accounts::ExecuteWithdrawal {
                 authority,
                 store: self.store,
+                controller: self.client.controller_address(&self.store),
+                only_controller: self.client.controller_roles_address(&self.store),
                 only_order_keeper: self.client.find_roles_address(&self.store, &authority),
                 data_store_program: self.client.data_store_program_id(),
                 price_provider: self.price_provider,

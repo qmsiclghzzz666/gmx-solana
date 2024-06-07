@@ -394,21 +394,21 @@ pub mod data_store {
     }
 
     // Exchange.
-    #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
+    #[access_control(internal::Authenticate::only_controller(&ctx))]
     pub fn execute_deposit<'info>(
         ctx: Context<'_, '_, 'info, 'info, ExecuteDeposit<'info>>,
     ) -> Result<()> {
         instructions::execute_deposit(ctx)
     }
 
-    #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
+    #[access_control(internal::Authenticate::only_controller(&ctx))]
     pub fn execute_withdrawal<'info>(
         ctx: Context<'_, '_, 'info, 'info, ExecuteWithdrawal<'info>>,
     ) -> Result<(u64, u64)> {
         instructions::execute_withdrawal(ctx)
     }
 
-    #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
+    #[access_control(internal::Authenticate::only_controller(&ctx))]
     pub fn execute_order<'info>(
         ctx: Context<'_, '_, 'info, 'info, ExecuteOrder<'info>>,
         recent_timestamp: i64,

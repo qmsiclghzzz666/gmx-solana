@@ -27,7 +27,7 @@ use super::utils::swap::unchecked_swap_with_params;
 pub struct ExecuteOrder<'info> {
     pub authority: Signer<'info>,
     pub store: Box<Account<'info, DataStore>>,
-    pub only_order_keeper: Account<'info, Roles>,
+    pub only_controller: Account<'info, Roles>,
     #[account(
         has_one = store,
         seeds = [Config::SEED, store.key().as_ref()],
@@ -197,7 +197,7 @@ impl<'info> internal::Authentication<'info> for ExecuteOrder<'info> {
     }
 
     fn roles(&self) -> &Account<'info, Roles> {
-        &self.only_order_keeper
+        &self.only_controller
     }
 }
 

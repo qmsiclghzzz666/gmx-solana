@@ -15,7 +15,7 @@ use super::utils::swap::unchecked_swap_with_params;
 #[derive(Accounts)]
 pub struct ExecuteDeposit<'info> {
     pub authority: Signer<'info>,
-    pub only_order_keeper: Account<'info, Roles>,
+    pub only_controller: Account<'info, Roles>,
     pub store: Account<'info, DataStore>,
     #[account(
         has_one = store,
@@ -72,7 +72,7 @@ impl<'info> internal::Authentication<'info> for ExecuteDeposit<'info> {
     }
 
     fn roles(&self) -> &Account<'info, Roles> {
-        &self.only_order_keeper
+        &self.only_controller
     }
 }
 

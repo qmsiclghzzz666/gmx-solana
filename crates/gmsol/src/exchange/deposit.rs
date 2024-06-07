@@ -592,6 +592,8 @@ where
             .accounts(accounts::ExecuteDeposit {
                 authority,
                 only_order_keeper,
+                controller: client.controller_address(store),
+                only_controller: client.controller_roles_address(store),
                 store: *store,
                 data_store_program: client.data_store_program_id(),
                 price_provider: *price_provider,

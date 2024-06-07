@@ -89,12 +89,13 @@ impl<'info> internal::Authentication<'info> for InitializeDeposit<'info> {
 #[instruction(refund: u64)]
 pub struct RemoveDeposit<'info> {
     #[account(mut)]
+    pub payer: Signer<'info>,
     pub authority: Signer<'info>,
     pub only_controller: Account<'info, Roles>,
     pub store: Account<'info, DataStore>,
     #[account(
         mut,
-        close = authority,
+        close = payer,
         constraint = deposit.to_account_info().lamports() >= refund @ DataStoreError::LamportsNotEnough,
         constraint = deposit.fixed.store == store.key() @ DataStoreError::InvalidDepositToRemove,
         constraint = deposit.fixed.senders.user == user.key() @ DataStoreError::UserMismatch,
@@ -145,7 +146,7 @@ impl<'info> RemoveDeposit<'info> {
         CpiContext::new(
             self.system_program.to_account_info(),
             system_program::Transfer {
-                from: self.authority.to_account_info(),
+                from: self.payer.to_account_info(),
                 to: self.user.to_account_info(),
             },
         )

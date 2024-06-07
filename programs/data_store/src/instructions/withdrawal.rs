@@ -110,12 +110,13 @@ impl<'info> internal::Authentication<'info> for InitializeWithdrawal<'info> {
 #[instruction(refund: u64)]
 pub struct RemoveWithdrawal<'info> {
     #[account(mut)]
+    pub payer: Signer<'info>,
     pub authority: Signer<'info>,
     pub store: Account<'info, DataStore>,
     pub only_controller: Account<'info, Roles>,
     #[account(
         mut,
-        close = authority,
+        close = payer,
         constraint = withdrawal.fixed.store == store.key() @ DataStoreError::InvalidWithdrawalToRemove,
         constraint = withdrawal.to_account_info().lamports() >= refund @ DataStoreError::LamportsNotEnough,
         constraint = withdrawal.fixed.user == user.key() @ DataStoreError::UserMismatch,
@@ -210,7 +211,7 @@ impl<'info> RemoveWithdrawal<'info> {
         CpiContext::new(
             self.system_program.to_account_info(),
             system_program::Transfer {
-                from: self.authority.to_account_info(),
+                from: self.payer.to_account_info(),
                 to: self.user.to_account_info(),
             },
         )

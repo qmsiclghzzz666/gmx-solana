@@ -7,13 +7,15 @@ use data_store::{
     utils::{Authentication, WithOracle, WithOracleExt},
 };
 
-use crate::ExchangeError;
+use crate::{utils::ControllerSeeds, ExchangeError};
 
 /// Execute a deposit.
 pub fn execute_deposit<'info>(
     ctx: Context<'_, '_, 'info, 'info, ExecuteDeposit<'info>>,
     execution_fee: u64,
 ) -> Result<()> {
+    let store = ctx.accounts.store.key();
+    let controller = ControllerSeeds::find(&store);
     let deposit = &ctx.accounts.deposit;
     let refund = deposit
         .get_lamports()
@@ -22,9 +24,14 @@ pub fn execute_deposit<'info>(
     ctx.accounts.with_oracle_prices(
         deposit.dynamic.tokens_with_feed.tokens.clone(),
         ctx.remaining_accounts,
-        |accounts, remaining_accounts| accounts.execute(remaining_accounts),
+        |accounts, remaining_accounts| accounts.execute(&controller, remaining_accounts),
     )?;
-    data_store::cpi::remove_deposit(ctx.accounts.remove_deposit_ctx(), refund)
+    data_store::cpi::remove_deposit(
+        ctx.accounts
+            .remove_deposit_ctx()
+            .with_signer(&[&controller.as_seeds()]),
+        refund,
+    )
 }
 
 #[derive(Accounts)]
@@ -33,6 +40,17 @@ pub struct ExecuteDeposit<'info> {
     pub authority: Signer<'info>,
     /// CHECK: used and checked by CPI.
     pub only_order_keeper: UncheckedAccount<'info>,
+    /// CHECK: only used as signing PDA.
+    #[account(
+        seeds = [
+            crate::constants::CONTROLLER_SEED,
+            store.key().as_ref(),
+        ],
+        bump,
+    )]
+    pub controller: UncheckedAccount<'info>,
+    /// CHECK: only used by CPI.
+    pub only_controller: UncheckedAccount<'info>,
     /// CHECK: used and checked by CPI.
     pub store: UncheckedAccount<'info>,
     pub data_store_program: Program<'info, DataStore>,
@@ -64,8 +82,9 @@ impl<'info> ExecuteDeposit<'info> {
         CpiContext::new(
             self.data_store_program.to_account_info(),
             RemoveDeposit {
-                authority: self.authority.to_account_info(),
-                only_controller: self.only_order_keeper.to_account_info(),
+                payer: self.authority.to_account_info(),
+                authority: self.controller.to_account_info(),
+                only_controller: self.only_controller.to_account_info(),
                 store: self.store.to_account_info(),
                 deposit: self.deposit.to_account_info(),
                 user: self.user.to_account_info(),
@@ -83,8 +102,8 @@ impl<'info> ExecuteDeposit<'info> {
         CpiContext::new(
             self.data_store_program.to_account_info(),
             cpi::accounts::ExecuteDeposit {
-                authority: self.authority.to_account_info(),
-                only_order_keeper: self.only_order_keeper.to_account_info(),
+                authority: self.controller.to_account_info(),
+                only_controller: self.only_controller.to_account_info(),
                 store: self.store.to_account_info(),
                 config: self.config.to_account_info(),
                 oracle: self.oracle.to_account_info(),
@@ -139,9 +158,14 @@ impl<'info> WithOracle<'info> for ExecuteDeposit<'info> {
 }
 
 impl<'info> ExecuteDeposit<'info> {
-    fn execute(&mut self, remaining_accounts: &'info [AccountInfo<'info>]) -> Result<()> {
+    fn execute(
+        &mut self,
+        controller_seeds: &ControllerSeeds,
+        remaining_accounts: &'info [AccountInfo<'info>],
+    ) -> Result<()> {
         cpi::execute_deposit(
             self.execute_deposit_ctx()
+                .with_signer(&[&controller_seeds.as_seeds()])
                 .with_remaining_accounts(remaining_accounts.to_vec()),
         )?;
         Ok(())
