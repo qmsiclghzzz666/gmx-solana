@@ -23,6 +23,7 @@ pub struct DataStore {
     #[max_len(MAX_LEN)]
     key_seed: Vec<u8>,
     pub bump: [u8; 1],
+    reserved: [u8; 64],
 }
 
 impl Seed for DataStore {
@@ -173,6 +174,7 @@ mod tests {
             num_admins: 0,
             key_seed: vec![],
             bump: [0],
+            reserved: [0; 64],
         }
     }
 
