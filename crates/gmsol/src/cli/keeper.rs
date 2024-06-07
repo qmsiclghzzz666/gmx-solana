@@ -1,4 +1,4 @@
-use std::ops::Deref;
+use std::{ops::Deref, time::Duration};
 
 use anchor_client::{
     solana_sdk::{pubkey::Pubkey, signer::Signer},
@@ -13,6 +13,7 @@ use gmsol::{
     store::market::VaultOps,
     utils::{ComputeBudget, RpcBuilder},
 };
+use tokio::{sync::mpsc::UnboundedSender, time::Instant};
 
 use crate::{utils::Oracle, GMSOLClient};
 
@@ -321,6 +322,7 @@ impl KeeperArgs {
         let (tx, mut rx) = mpsc::unbounded_channel();
         let mut unsubscribers = vec![];
 
+        let after = Duration::from_secs(1);
         // Subscribe deposit creation event.
         let deposit_program = client.new_exchange()?;
         let unsubscriber =
@@ -330,10 +332,9 @@ impl KeeperArgs {
                 move |ctx, event| {
                 if event.store == store {
                     tracing::info!(slot=%ctx.slot, ?event, "received a new deposit creation event");
-                    tx.send(Command::ExecuteDeposit {
+                    send_command_after(&tx, event.ts, after, Command::ExecuteDeposit {
                         deposit: event.deposit,
-                    })
-                    .unwrap();
+                    });
                 } else {
                     tracing::debug!(slot=%ctx.slot, ?event, "received deposit creation event from other store");
                 }
@@ -351,10 +352,9 @@ impl KeeperArgs {
                 move |ctx, event| {
                 if event.store == store {
                     tracing::info!(slot=%ctx.slot, ?event, "received a new withdrawal creation event");
-                    tx.send(Command::ExecuteWithdrawal {
+                    send_command_after(&tx, event.ts, after, Command::ExecuteWithdrawal {
                         withdrawal: event.withdrawal,
-                    })
-                    .unwrap();
+                    });
                 } else {
                     tracing::debug!(slot=%ctx.slot, ?event, "received withdrawal creation event from other store");
                 }
@@ -372,10 +372,9 @@ impl KeeperArgs {
                 move |ctx, event| {
                 if event.store == store {
                     tracing::info!(slot=%ctx.slot, ?event, "received a new order creation event");
-                    tx.send(Command::ExecuteOrder {
+                    send_command_after(&tx, event.ts, after, Command::ExecuteOrder {
                         order: event.order,
-                    })
-                    .unwrap();
+                    });
                 } else {
                     tracing::debug!(slot=%ctx.slot, ?event, "received order creation event from other store");
                 }
@@ -420,4 +419,26 @@ impl KeeperArgs {
         }
         Ok(())
     }
+}
+
+fn send_command_until(tx: &UnboundedSender<Command>, deadline: Instant, command: Command) {
+    use tokio::time::sleep_until;
+
+    tokio::spawn({
+        let tx = tx.clone();
+        async move {
+            sleep_until(deadline).await;
+            tx.send(command).unwrap();
+        }
+    });
+}
+
+fn send_command_after(tx: &UnboundedSender<Command>, ts: i64, after: Duration, command: Command) {
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    let wait = Duration::from_secs(ts as u64)
+        .saturating_add(after)
+        .saturating_sub(SystemTime::now().duration_since(UNIX_EPOCH).unwrap());
+    let deadline = Instant::now().checked_add(wait).unwrap();
+    send_command_until(tx, deadline, command);
 }
