@@ -191,6 +191,7 @@ pub trait PythPullOracleOps<C> {
                     .try_push(verify)?;
                 close.try_push(close_encoded_vaa)?;
 
+                let mut price_updates = HashMap::<Pubkey, _>::default();
                 for update in utils::get_merkle_price_updates(proof) {
                     let feed_id = utils::parse_feed_id(update)?;
                     let Some(price_update) = ctx.feeds.get(&feed_id) else {
@@ -200,7 +201,10 @@ pub trait PythPullOracleOps<C> {
                         .post_price_update(price_update, update, &draft_vaa)?
                         .swap_output(());
                     prices.insert(feed_id, price_update);
-                    post.try_push(post_price_update)?;
+                    price_updates.insert(price_update, post_price_update);
+                }
+                for (price_update, post_rpc) in price_updates {
+                    post.try_push(post_rpc)?;
                     close.try_push(pyth.reclaim_rent(&price_update))?;
                 }
             }
