@@ -28,9 +28,13 @@ pub mod instruction;
 /// Signer.
 pub mod signer;
 
+/// Workaround for optional accounts.
+pub mod optional;
+
 pub use self::{
     compute_budget::ComputeBudget,
     instruction::serialize_instruction,
+    optional::fix_optional_account_metas,
     rpc_builder::RpcBuilder,
     signer::{shared_signer, SignerRef},
     transaction_builder::TransactionBuilder,

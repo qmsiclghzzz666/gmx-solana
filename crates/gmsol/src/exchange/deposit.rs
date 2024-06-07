@@ -228,25 +228,29 @@ where
         let builder = client
             .exchange()
             .request()
-            .accounts(accounts::CreateDeposit {
-                authority,
-                store: *store,
-                only_controller,
-                data_store_program: client.data_store_program_id(),
-                system_program: system_program::ID,
-                token_program: anchor_spl::token::ID,
-                deposit,
-                payer,
-                receiver,
-                token_config_map: client.find_token_config_map(store),
-                market,
-                initial_long_token_account,
-                initial_short_token_account,
-                initial_long_token_vault: long_token
-                    .map(|token| client.find_market_vault_address(store, &token)),
-                initial_short_token_vault: short_token
-                    .map(|token| client.find_market_vault_address(store, &token)),
-            })
+            .accounts(crate::utils::fix_optional_account_metas(
+                accounts::CreateDeposit {
+                    authority,
+                    store: *store,
+                    only_controller,
+                    data_store_program: client.data_store_program_id(),
+                    system_program: system_program::ID,
+                    token_program: anchor_spl::token::ID,
+                    deposit,
+                    payer,
+                    receiver,
+                    token_config_map: client.find_token_config_map(store),
+                    market,
+                    initial_long_token_account,
+                    initial_short_token_account,
+                    initial_long_token_vault: long_token
+                        .map(|token| client.find_market_vault_address(store, &token)),
+                    initial_short_token_vault: short_token
+                        .map(|token| client.find_market_vault_address(store, &token)),
+                },
+                &exchange::id(),
+                &client.exchange_program_id(),
+            ))
             .args(instruction::CreateDeposit {
                 nonce,
                 params: CreateDepositParams {
@@ -418,26 +422,30 @@ where
         Ok(client
             .exchange()
             .request()
-            .accounts(accounts::CancelDeposit {
-                authority,
-                store: *store,
-                only_controller,
-                data_store_program: client.data_store_program_id(),
-                deposit: *deposit,
-                user,
-                initial_long_token: hint.initial_long_token_account,
-                initial_short_token: hint.initial_short_token_account,
-                long_token_deposit_vault: hint
-                    .initial_long_token
-                    .map(|token| client.find_market_vault_address(store, &token)),
-                short_token_deposit_vault: hint
-                    .initial_short_token
-                    .map(|token| client.find_market_vault_address(store, &token)),
-                initial_long_market: hint.initial_long_market,
-                initial_short_market: hint.initial_short_market,
-                token_program: anchor_spl::token::ID,
-                system_program: system_program::ID,
-            })
+            .accounts(crate::utils::fix_optional_account_metas(
+                accounts::CancelDeposit {
+                    authority,
+                    store: *store,
+                    only_controller,
+                    data_store_program: client.data_store_program_id(),
+                    deposit: *deposit,
+                    user,
+                    initial_long_token: hint.initial_long_token_account,
+                    initial_short_token: hint.initial_short_token_account,
+                    long_token_deposit_vault: hint
+                        .initial_long_token
+                        .map(|token| client.find_market_vault_address(store, &token)),
+                    short_token_deposit_vault: hint
+                        .initial_short_token
+                        .map(|token| client.find_market_vault_address(store, &token)),
+                    initial_long_market: hint.initial_long_market,
+                    initial_short_market: hint.initial_short_market,
+                    token_program: anchor_spl::token::ID,
+                    system_program: system_program::ID,
+                },
+                &exchange::id(),
+                &client.exchange_program_id(),
+            ))
             .args(instruction::CancelDeposit {
                 execution_fee: *execution_fee,
             }))

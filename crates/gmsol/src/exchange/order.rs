@@ -324,25 +324,31 @@ where
             .client
             .exchange()
             .request()
-            .accounts(accounts::CreateOrder {
-                authority,
-                store: self.store,
-                only_controller: self.client.find_roles_address(&self.store, &authority),
-                payer: *payer,
-                order,
-                position,
-                token_config_map: self.client.find_token_config_map(&self.store),
-                market: self.market(),
-                initial_collateral_token_account,
-                final_output_token_account: self.final_output_token_account().await?,
-                secondary_output_token_account: self.get_secondary_output_token_account().await?,
-                initial_collateral_token_vault,
-                data_store_program: self.client.data_store_program_id(),
-                long_token_account,
-                short_token_account,
-                system_program: system_program::ID,
-                token_program: anchor_spl::token::ID,
-            })
+            .accounts(crate::utils::fix_optional_account_metas(
+                accounts::CreateOrder {
+                    authority,
+                    store: self.store,
+                    only_controller: self.client.find_roles_address(&self.store, &authority),
+                    payer: *payer,
+                    order,
+                    position,
+                    token_config_map: self.client.find_token_config_map(&self.store),
+                    market: self.market(),
+                    initial_collateral_token_account,
+                    final_output_token_account: self.final_output_token_account().await?,
+                    secondary_output_token_account: self
+                        .get_secondary_output_token_account()
+                        .await?,
+                    initial_collateral_token_vault,
+                    data_store_program: self.client.data_store_program_id(),
+                    long_token_account,
+                    short_token_account,
+                    system_program: system_program::ID,
+                    token_program: anchor_spl::token::ID,
+                },
+                &exchange::id(),
+                &self.client.exchange_program_id(),
+            ))
             .args(instruction::CreateOrder {
                 nonce,
                 params: CreateOrderParams {
@@ -636,45 +642,51 @@ where
         let execute_order = self
             .client
             .exchange_request()
-            .accounts(accounts::ExecuteOrder {
-                authority,
-                only_order_keeper: self.client.find_roles_address(&self.store, &authority),
-                store: self.store,
-                oracle: self.oracle,
-                config: self.config_address(),
-                token_config_map: self.client.find_token_config_map(&self.store),
-                market: self
-                    .client
-                    .find_market_address(&self.store, &hint.market_token),
-                market_token_mint: hint.market_token,
-                order: self.order,
-                position: hint.position,
-                user: hint.user,
-                final_output_token_vault: hint
-                    .final_output_token_account
-                    .as_ref()
-                    .and(hint.final_output_token.as_ref())
-                    .map(|token| self.client.find_market_vault_address(&self.store, token)),
-                secondary_output_token_vault: hint.secondary_output_token_account.as_ref().map(
-                    |_| {
-                        self.client
-                            .find_market_vault_address(&self.store, &hint.secondary_output_token)
-                    },
-                ),
-                final_output_token_account: hint.final_output_token_account,
-                secondary_output_token_account: hint.secondary_output_token_account,
-                long_token_vault: hint.long_token_vault(&self.store),
-                short_token_vault: hint.short_token_vault(&self.store),
-                long_token_account: hint.long_token_account,
-                short_token_account: hint.short_token_account,
-                claimable_long_token_account_for_user,
-                claimable_short_token_account_for_user,
-                claimable_pnl_token_account_for_holding,
-                data_store_program: self.client.data_store_program_id(),
-                token_program: anchor_spl::token::ID,
-                price_provider: self.price_provider,
-                system_program: system_program::ID,
-            })
+            .accounts(crate::utils::fix_optional_account_metas(
+                accounts::ExecuteOrder {
+                    authority,
+                    only_order_keeper: self.client.find_roles_address(&self.store, &authority),
+                    store: self.store,
+                    oracle: self.oracle,
+                    config: self.config_address(),
+                    token_config_map: self.client.find_token_config_map(&self.store),
+                    market: self
+                        .client
+                        .find_market_address(&self.store, &hint.market_token),
+                    market_token_mint: hint.market_token,
+                    order: self.order,
+                    position: hint.position,
+                    user: hint.user,
+                    final_output_token_vault: hint
+                        .final_output_token_account
+                        .as_ref()
+                        .and(hint.final_output_token.as_ref())
+                        .map(|token| self.client.find_market_vault_address(&self.store, token)),
+                    secondary_output_token_vault: hint.secondary_output_token_account.as_ref().map(
+                        |_| {
+                            self.client.find_market_vault_address(
+                                &self.store,
+                                &hint.secondary_output_token,
+                            )
+                        },
+                    ),
+                    final_output_token_account: hint.final_output_token_account,
+                    secondary_output_token_account: hint.secondary_output_token_account,
+                    long_token_vault: hint.long_token_vault(&self.store),
+                    short_token_vault: hint.short_token_vault(&self.store),
+                    long_token_account: hint.long_token_account,
+                    short_token_account: hint.short_token_account,
+                    claimable_long_token_account_for_user,
+                    claimable_short_token_account_for_user,
+                    claimable_pnl_token_account_for_holding,
+                    data_store_program: self.client.data_store_program_id(),
+                    token_program: anchor_spl::token::ID,
+                    price_provider: self.price_provider,
+                    system_program: system_program::ID,
+                },
+                &exchange::id(),
+                &self.client.exchange_program_id(),
+            ))
             .args(instruction::ExecuteOrder {
                 recent_timestamp: self.recent_timestamp,
                 execution_fee: self.execution_fee,
