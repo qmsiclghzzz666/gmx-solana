@@ -646,6 +646,8 @@ where
                 accounts::ExecuteOrder {
                     authority,
                     only_order_keeper: self.client.find_roles_address(&self.store, &authority),
+                    controller: self.client.controller_address(&self.store),
+                    only_controller: self.client.controller_roles_address(&self.store),
                     store: self.store,
                     oracle: self.oracle,
                     config: self.config_address(),

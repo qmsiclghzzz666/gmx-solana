@@ -283,12 +283,13 @@ impl<'info> InitializeOrder<'info> {
 #[instruction(refund: u64)]
 pub struct RemoveOrder<'info> {
     #[account(mut)]
+    pub payer: Signer<'info>,
     pub authority: Signer<'info>,
     pub only_controller: Account<'info, Roles>,
     pub store: Account<'info, DataStore>,
     #[account(
         mut,
-        close = authority,
+        close = payer,
         constraint = order.fixed.store == store.key() @ DataStoreError::InvalidOrderToRemove,
         constraint = order.to_account_info().lamports() >= refund @ DataStoreError::LamportsNotEnough,
         constraint = order.fixed.user == user.key() @ DataStoreError::UserMismatch,
@@ -332,7 +333,7 @@ impl<'info> RemoveOrder<'info> {
         CpiContext::new(
             self.system_program.to_account_info(),
             system_program::Transfer {
-                from: self.authority.to_account_info(),
+                from: self.payer.to_account_info(),
                 to: self.user.to_account_info(),
             },
         )

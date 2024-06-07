@@ -129,6 +129,7 @@ impl<'info> CancelDeposit<'info> {
         CpiContext::new(
             self.data_store_program.to_account_info(),
             RemoveDeposit {
+                payer: self.authority.to_account_info(),
                 authority: self.authority.to_account_info(),
                 only_controller: self.only_controller.to_account_info(),
                 store: self.store.to_account_info(),

@@ -1,6 +1,9 @@
 /// Data Store.
 pub mod data_store;
 
+/// Roles.
+pub mod roles;
+
 /// Config.
 pub mod config;
 
@@ -39,6 +42,7 @@ pub use nonce::*;
 pub use oracle::*;
 pub use order::Order;
 pub use position::Position;
+pub use roles::*;
 pub use token_config::*;
 pub use withdrawal::Withdrawal;
 

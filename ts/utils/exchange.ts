@@ -5,7 +5,7 @@ import { createDepositPDA, createMarketPDA, createMarketTokenMintPDA, createMark
 import { getAccount } from "@solana/spl-token";
 import { BTC_TOKEN_MINT, SOL_TOKEN_MINT } from "./token";
 import { IxWithOutput, makeInvoke } from "./invoke";
-import { DataStoreProgram, PriceProvider, findConfigPDA, findMarketPDA, findMarketVaultPDA, toBN } from "gmsol";
+import { DataStoreProgram, PriceProvider, findConfigPDA, findControllerPDA, findMarketPDA, findMarketVaultPDA, findRolesPDA, toBN } from "gmsol";
 import { PYTH_ID } from "./external";
 import { findKey, first, last, toInteger } from "lodash";
 import { findPythPriceFeedPDA } from "gmsol";
@@ -219,10 +219,13 @@ export const makeExecuteDepositInstruction = async ({
             isWritable: true,
         };
     });
+    const [controller] = findControllerPDA(store);
+    const [onlyController] = findRolesPDA(store, controller);
     return await exchange.methods.executeDeposit(toBN(options?.executionFee ?? 0)).accounts({
         authority,
         store,
         onlyOrderKeeper: createRolesPDA(store, authority)[0],
+        onlyController,
         oracle,
         config: findConfigPDA(store)[0],
         tokenConfigMap: createTokenConfigMapPDA(store)[0],
@@ -402,9 +405,12 @@ export const makeExecuteWithdrawalInstruction = async ({
             isWritable: true,
         };
     });
+    const [controller] = findControllerPDA(store);
+    const [onlyController] = findRolesPDA(store, controller);
     return await exchange.methods.executeWithdrawal(toBN(options?.executionFee ?? 0)).accounts({
         authority,
         store,
+        onlyController,
         onlyOrderKeeper: createRolesPDA(store, authority)[0],
         oracle,
         config: findConfigPDA(store)[0],
@@ -543,9 +549,12 @@ export const makeExecuteOrderInstruction = async ({
         }
     });
     const pnlTokenMint = isLong ? longTokenMint : shortTokenMint;
+    const [controller] = findControllerPDA(store);
+    const [onlyController] = findRolesPDA(store, controller);
     return await exchange.methods.executeOrder(toBN(recentTimestamp), toBN(options?.executionFee ?? 0)).accounts({
         authority,
         onlyOrderKeeper,
+        onlyController,
         store,
         oracle,
         config: findConfigPDA(store)[0],

@@ -7,7 +7,7 @@ use data_store::{
     utils::{Authentication, WithOracle, WithOracleExt},
 };
 
-use crate::ExchangeError;
+use crate::{utils::ControllerSeeds, ExchangeError};
 
 #[derive(Accounts)]
 pub struct ExecuteOrder<'info> {
@@ -15,6 +15,17 @@ pub struct ExecuteOrder<'info> {
     pub authority: Signer<'info>,
     /// CHECK: used and checked by CPI.
     pub only_order_keeper: UncheckedAccount<'info>,
+    /// CHECK: only used as signing PDA.
+    #[account(
+        seeds = [
+            crate::constants::CONTROLLER_SEED,
+            store.key().as_ref(),
+        ],
+        bump,
+    )]
+    pub controller: UncheckedAccount<'info>,
+    /// CHECK: only used by CPI.
+    pub only_controller: UncheckedAccount<'info>,
     /// CHECK: used and checked by CPI.
     pub store: UncheckedAccount<'info>,
     /// CHECK: only use and check by CPI.
@@ -81,6 +92,8 @@ pub fn execute_order<'info>(
     recent_timestamp: i64,
     execution_fee: u64,
 ) -> Result<()> {
+    let store = ctx.accounts.store.key();
+    let controller = ControllerSeeds::find(&store);
     let order = &ctx.accounts.order;
     let refund = order
         .get_lamports()
@@ -93,19 +106,30 @@ pub fn execute_order<'info>(
             let (should_remove_position, transfer_out) = data_store::cpi::execute_order(
                 accounts
                     .execute_order_ctx()
+                    .with_signer(&[&controller.as_seeds()])
                     .with_remaining_accounts(remaining_accounts.to_vec()),
                 recent_timestamp,
             )?
             .get();
-            accounts.process_transfer_out(&transfer_out, remaining_accounts)?;
+            accounts.process_transfer_out(&controller, &transfer_out, remaining_accounts)?;
             Ok(should_remove_position)
         },
     )?;
-    data_store::cpi::remove_order(ctx.accounts.remove_order_ctx(), refund)?;
+    data_store::cpi::remove_order(
+        ctx.accounts
+            .remove_order_ctx()
+            .with_signer(&[&controller.as_seeds()]),
+        refund,
+    )?;
     if should_remove_position {
         // Refund all lamports.
         let refund = ctx.accounts.position()?.get_lamports();
-        data_store::cpi::remove_position(ctx.accounts.remove_position_ctx()?, refund)?;
+        data_store::cpi::remove_position(
+            ctx.accounts
+                .remove_position_ctx()?
+                .with_signer(&[&controller.as_seeds()]),
+            refund,
+        )?;
     }
     Ok(())
 }
@@ -157,9 +181,9 @@ impl<'info> ExecuteOrder<'info> {
         CpiContext::new(
             self.data_store_program.to_account_info(),
             data_store::cpi::accounts::ExecuteOrder {
-                authority: self.authority.to_account_info(),
+                authority: self.controller.to_account_info(),
                 store: self.store.to_account_info(),
-                only_order_keeper: self.only_order_keeper.to_account_info(),
+                only_controller: self.only_controller.to_account_info(),
                 config: self.config.to_account_info(),
                 oracle: self.oracle.to_account_info(),
                 order: self.order.to_account_info(),
@@ -207,8 +231,9 @@ impl<'info> ExecuteOrder<'info> {
         CpiContext::new(
             self.data_store_program.to_account_info(),
             RemoveOrder {
-                authority: self.authority.to_account_info(),
-                only_controller: self.only_order_keeper.to_account_info(),
+                payer: self.authority.to_account_info(),
+                authority: self.controller.to_account_info(),
+                only_controller: self.only_controller.to_account_info(),
                 store: self.store.to_account_info(),
                 order: self.order.to_account_info(),
                 user: self.user.to_account_info(),
@@ -228,8 +253,9 @@ impl<'info> ExecuteOrder<'info> {
         Ok(CpiContext::new(
             self.data_store_program.to_account_info(),
             RemovePosition {
-                authority: self.authority.to_account_info(),
-                only_controller: self.only_order_keeper.to_account_info(),
+                payer: self.authority.to_account_info(),
+                authority: self.controller.to_account_info(),
+                only_controller: self.only_controller.to_account_info(),
                 store: self.store.to_account_info(),
                 position: self.position()?.to_account_info(),
                 user: self.user.to_account_info(),
@@ -247,10 +273,9 @@ impl<'info> ExecuteOrder<'info> {
         CpiContext::new(
             self.data_store_program.to_account_info(),
             MarketTransferOut {
-                authority: self.authority.to_account_info(),
+                authority: self.controller.to_account_info(),
                 store: self.store.to_account_info(),
-                // TODO: use controller PDA.
-                only_controller: self.only_order_keeper.to_account_info(),
+                only_controller: self.only_controller.to_account_info(),
                 market,
                 to,
                 vault,
@@ -261,6 +286,7 @@ impl<'info> ExecuteOrder<'info> {
 
     fn market_transfer_out(
         &self,
+        controller: &ControllerSeeds,
         market: Option<AccountInfo<'info>>,
         vault: Option<AccountInfo<'info>>,
         to: Option<AccountInfo<'info>>,
@@ -271,7 +297,8 @@ impl<'info> ExecuteOrder<'info> {
                 market.ok_or(error!(ExchangeError::InvalidArgument))?,
                 vault.ok_or(error!(ExchangeError::InvalidArgument))?,
                 to.ok_or(error!(ExchangeError::InvalidArgument))?,
-            ),
+            )
+            .with_signer(&[&controller.as_seeds()]),
             amount,
         )?;
         Ok(())
@@ -279,6 +306,7 @@ impl<'info> ExecuteOrder<'info> {
 
     fn process_transfer_out(
         &self,
+        controller: &ControllerSeeds,
         transfer_out: &TransferOut,
         remaining_accounts: &[AccountInfo<'info>],
     ) -> Result<()> {
@@ -303,6 +331,7 @@ impl<'info> ExecuteOrder<'info> {
                 .cloned()
                 .unwrap_or_else(|| self.market.to_account_info());
             self.market_transfer_out(
+                controller,
                 Some(market),
                 self.final_output_token_vault
                     .as_ref()
@@ -321,6 +350,7 @@ impl<'info> ExecuteOrder<'info> {
                 .cloned()
                 .unwrap_or_else(|| self.market.to_account_info());
             self.market_transfer_out(
+                controller,
                 Some(market),
                 self.secondary_output_token_vault
                     .as_ref()
@@ -334,6 +364,7 @@ impl<'info> ExecuteOrder<'info> {
 
         if *long_token != 0 {
             self.market_transfer_out(
+                controller,
                 Some(self.market.to_account_info()),
                 Some(self.long_token_vault.to_account_info()),
                 Some(self.long_token_account.to_account_info()),
@@ -343,6 +374,7 @@ impl<'info> ExecuteOrder<'info> {
 
         if *short_token != 0 {
             self.market_transfer_out(
+                controller,
                 Some(self.market.to_account_info()),
                 Some(self.short_token_vault.to_account_info()),
                 Some(self.short_token_account.to_account_info()),
@@ -352,6 +384,7 @@ impl<'info> ExecuteOrder<'info> {
 
         if *long_token_for_claimable_account_of_user != 0 {
             self.market_transfer_out(
+                controller,
                 Some(self.market.to_account_info()),
                 Some(self.long_token_vault.to_account_info()),
                 self.claimable_long_token_account_for_user
@@ -363,6 +396,7 @@ impl<'info> ExecuteOrder<'info> {
 
         if *short_token_for_claimable_account_of_user != 0 {
             self.market_transfer_out(
+                controller,
                 Some(self.market.to_account_info()),
                 Some(self.short_token_vault.to_account_info()),
                 self.claimable_short_token_account_for_user
@@ -374,6 +408,7 @@ impl<'info> ExecuteOrder<'info> {
 
         if *long_token_for_claimable_account_of_holding != 0 {
             self.market_transfer_out(
+                controller,
                 Some(self.market.to_account_info()),
                 Some(self.long_token_vault.to_account_info()),
                 self.claimable_pnl_token_account_for_holding
@@ -385,6 +420,7 @@ impl<'info> ExecuteOrder<'info> {
 
         if *short_token_for_claimable_account_of_holding != 0 {
             self.market_transfer_out(
+                controller,
                 Some(self.market.to_account_info()),
                 Some(self.short_token_vault.to_account_info()),
                 self.claimable_pnl_token_account_for_holding
