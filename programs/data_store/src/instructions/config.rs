@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 use crate::{
     constants::keys::GLOBAL,
-    states::{Amount, Config, DataStore, Factor, Roles, Seed},
+    states::{Amount, Config, Store, Factor, Roles, Seed},
     utils::internal,
 };
 
@@ -15,7 +15,7 @@ pub struct InitializeConfig<'info> {
         bump = only_controller.bump,
     )]
     only_controller: Account<'info, Roles>,
-    store: Account<'info, DataStore>,
+    store: Account<'info, Store>,
     #[account(
         init,
         payer = authority,
@@ -40,7 +40,7 @@ impl<'info> internal::Authentication<'info> for InitializeConfig<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, DataStore> {
+    fn store(&self) -> &Account<'info, Store> {
         &self.store
     }
 
@@ -58,7 +58,7 @@ pub struct InsertAmount<'info> {
         bump = only_controller.bump,
     )]
     only_controller: Account<'info, Roles>,
-    store: Account<'info, DataStore>,
+    store: Account<'info, Store>,
     #[account(
         mut,
         has_one = store,
@@ -86,7 +86,7 @@ impl<'info> internal::Authentication<'info> for InsertAmount<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, DataStore> {
+    fn store(&self) -> &Account<'info, Store> {
         &self.store
     }
 
@@ -104,7 +104,7 @@ pub struct InsertFactor<'info> {
         bump = only_controller.bump,
     )]
     only_controller: Account<'info, Roles>,
-    store: Account<'info, DataStore>,
+    store: Account<'info, Store>,
     #[account(
         mut,
         has_one = store,
@@ -132,7 +132,7 @@ impl<'info> internal::Authentication<'info> for InsertFactor<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, DataStore> {
+    fn store(&self) -> &Account<'info, Store> {
         &self.store
     }
 
@@ -150,7 +150,7 @@ pub struct InsertAddress<'info> {
         bump = only_controller.bump,
     )]
     only_controller: Account<'info, Roles>,
-    store: Account<'info, DataStore>,
+    store: Account<'info, Store>,
     #[account(
         mut,
         has_one = store,
@@ -178,7 +178,7 @@ impl<'info> internal::Authentication<'info> for InsertAddress<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, DataStore> {
+    fn store(&self) -> &Account<'info, Store> {
         &self.store
     }
 

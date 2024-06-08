@@ -5,7 +5,7 @@ use crate::{
     states::{
         common::{SwapParams, TokenRecord},
         deposit::{Receivers, TokenParams},
-        DataStore, Deposit, Market, NonceBytes, Roles, Seed,
+        Store, Deposit, Market, NonceBytes, Roles, Seed,
     },
     utils::internal,
     DataStoreError,
@@ -18,7 +18,7 @@ pub struct InitializeDeposit<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
     pub only_controller: Account<'info, Roles>,
-    pub store: Account<'info, DataStore>,
+    pub store: Account<'info, Store>,
     #[account(
         init,
         space = 8 + Deposit::init_space(&tokens_with_feed, &swap_params),
@@ -76,7 +76,7 @@ impl<'info> internal::Authentication<'info> for InitializeDeposit<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, DataStore> {
+    fn store(&self) -> &Account<'info, Store> {
         &self.store
     }
 
@@ -92,7 +92,7 @@ pub struct RemoveDeposit<'info> {
     pub payer: Signer<'info>,
     pub authority: Signer<'info>,
     pub only_controller: Account<'info, Roles>,
-    pub store: Account<'info, DataStore>,
+    pub store: Account<'info, Store>,
     #[account(
         mut,
         close = payer,
@@ -132,7 +132,7 @@ impl<'info> internal::Authentication<'info> for RemoveDeposit<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, DataStore> {
+    fn store(&self) -> &Account<'info, Store> {
         &self.store
     }
 

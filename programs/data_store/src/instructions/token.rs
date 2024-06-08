@@ -3,7 +3,7 @@ use anchor_spl::token::{Burn, Mint, MintTo, Token, TokenAccount, Transfer};
 
 use crate::{
     constants,
-    states::{Config, DataStore, Roles, Seed},
+    states::{Config, Store, Roles, Seed},
     utils::internal,
 };
 
@@ -24,7 +24,7 @@ pub struct InitializeMarketToken<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
     pub only_market_keeper: Account<'info, Roles>,
-    pub store: Account<'info, DataStore>,
+    pub store: Account<'info, Store>,
     #[account(
         init,
         payer = authority,
@@ -50,7 +50,7 @@ impl<'info> internal::Authentication<'info> for InitializeMarketToken<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, DataStore> {
+    fn store(&self) -> &Account<'info, Store> {
         &self.store
     }
 
@@ -73,7 +73,7 @@ pub fn mint_market_token_to(ctx: Context<MintMarketTokenTo>, amount: u64) -> Res
 pub struct MintMarketTokenTo<'info> {
     pub authority: Signer<'info>,
     pub only_controller: Account<'info, Roles>,
-    pub store: Account<'info, DataStore>,
+    pub store: Account<'info, Store>,
     #[account(mut)]
     pub market_token_mint: Account<'info, Mint>,
     #[account(mut, token::mint = market_token_mint)]
@@ -86,7 +86,7 @@ impl<'info> internal::Authentication<'info> for MintMarketTokenTo<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, DataStore> {
+    fn store(&self) -> &Account<'info, Store> {
         &self.store
     }
 
@@ -125,7 +125,7 @@ pub fn burn_market_token_from(ctx: Context<BurnMarketTokenFrom>, amount: u64) ->
 pub struct BurnMarketTokenFrom<'info> {
     pub authority: Signer<'info>,
     pub only_controller: Account<'info, Roles>,
-    pub store: Account<'info, DataStore>,
+    pub store: Account<'info, Store>,
     #[account(mut)]
     pub market_token_mint: Account<'info, Mint>,
     #[account(mut, token::mint = market_token_mint)]
@@ -138,7 +138,7 @@ impl<'info> internal::Authentication<'info> for BurnMarketTokenFrom<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, DataStore> {
+    fn store(&self) -> &Account<'info, Store> {
         &self.store
     }
 
@@ -176,7 +176,7 @@ pub struct InitializeMarketVault<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
     pub only_market_keeper: Account<'info, Roles>,
-    pub store: Account<'info, DataStore>,
+    pub store: Account<'info, Store>,
     pub mint: Account<'info, Mint>,
     #[account(
         init,
@@ -202,7 +202,7 @@ impl<'info> internal::Authentication<'info> for InitializeMarketVault<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, DataStore> {
+    fn store(&self) -> &Account<'info, Store> {
         &self.store
     }
 
@@ -226,7 +226,7 @@ pub struct MarketVaultTransferOut<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
     pub only_controller: Account<'info, Roles>,
-    pub store: Account<'info, DataStore>,
+    pub store: Account<'info, Store>,
     // FIXME: this is a bug to not checking the store.
     #[account(mut)]
     pub market_vault: Account<'info, TokenAccount>,
@@ -240,7 +240,7 @@ impl<'info> internal::Authentication<'info> for MarketVaultTransferOut<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, DataStore> {
+    fn store(&self) -> &Account<'info, Store> {
         &self.store
     }
 
@@ -276,7 +276,7 @@ pub struct UseClaimableAccount<'info> {
         bump = only_controller.bump,
     )]
     pub only_controller: Account<'info, Roles>,
-    pub store: Account<'info, DataStore>,
+    pub store: Account<'info, Store>,
     #[account(
         seeds = [Config::SEED, store.key().as_ref()],
         bump = config.bump,
@@ -333,7 +333,7 @@ impl<'info> internal::Authentication<'info> for UseClaimableAccount<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, DataStore> {
+    fn store(&self) -> &Account<'info, Store> {
         &self.store
     }
 
@@ -356,7 +356,7 @@ pub struct CloseEmptyClaimableAccount<'info> {
         bump = only_controller.bump,
     )]
     pub only_controller: Account<'info, Roles>,
-    pub store: Account<'info, DataStore>,
+    pub store: Account<'info, Store>,
     #[account(
         seeds = [Config::SEED, store.key().as_ref()],
         bump = config.bump,
@@ -407,7 +407,7 @@ impl<'info> internal::Authentication<'info> for CloseEmptyClaimableAccount<'info
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, DataStore> {
+    fn store(&self) -> &Account<'info, Store> {
         &self.store
     }
 

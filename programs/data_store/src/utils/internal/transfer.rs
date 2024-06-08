@@ -1,10 +1,10 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Burn, MintTo, Transfer};
 
-use crate::{states::DataStore, DataStoreError};
+use crate::{states::Store, DataStoreError};
 
 pub(crate) struct TransferUtils<'a, 'info> {
-    store: &'a Account<'info, DataStore>,
+    store: &'a Account<'info, Store>,
     token_program: AccountInfo<'info>,
     mint: Option<AccountInfo<'info>>,
 }
@@ -12,7 +12,7 @@ pub(crate) struct TransferUtils<'a, 'info> {
 impl<'a, 'info> TransferUtils<'a, 'info> {
     pub(crate) fn new(
         token_program: AccountInfo<'info>,
-        store: &'a Account<'info, DataStore>,
+        store: &'a Account<'info, Store>,
         mint: Option<AccountInfo<'info>>,
     ) -> Self {
         Self {

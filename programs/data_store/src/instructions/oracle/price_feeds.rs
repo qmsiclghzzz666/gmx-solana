@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 use crate::{
     states::{
-        Config, DataStore, Oracle, PriceProvider, PriceValidator, Roles, Seed, TokenConfigMap,
+        Config, Store, Oracle, PriceProvider, PriceValidator, Roles, Seed, TokenConfigMap,
     },
     utils::internal,
 };
@@ -11,7 +11,7 @@ use crate::{
 pub struct SetPricesFromPriceFeed<'info> {
     pub authority: Signer<'info>,
     pub only_controller: Account<'info, Roles>,
-    pub store: Account<'info, DataStore>,
+    pub store: Account<'info, Store>,
     #[account(
         seeds = [Config::SEED, store.key().as_ref()],
         bump = config.bump,
@@ -53,7 +53,7 @@ impl<'info> internal::Authentication<'info> for SetPricesFromPriceFeed<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, DataStore> {
+    fn store(&self) -> &Account<'info, Store> {
         &self.store
     }
 

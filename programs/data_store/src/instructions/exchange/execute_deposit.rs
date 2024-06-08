@@ -4,7 +4,7 @@ use gmx_core::MarketExt;
 
 use crate::{
     states::{
-        Config, DataStore, Deposit, Market, MarketMeta, Oracle, Roles, Seed, ValidateOracleTime,
+        Config, Store, Deposit, Market, MarketMeta, Oracle, Roles, Seed, ValidateOracleTime,
     },
     utils::internal,
     DataStoreError, GmxCoreError,
@@ -16,7 +16,7 @@ use super::utils::swap::unchecked_swap_with_params;
 pub struct ExecuteDeposit<'info> {
     pub authority: Signer<'info>,
     pub only_controller: Account<'info, Roles>,
-    pub store: Account<'info, DataStore>,
+    pub store: Account<'info, Store>,
     #[account(
         has_one = store,
         seeds = [Config::SEED, store.key().as_ref()],
@@ -67,7 +67,7 @@ impl<'info> internal::Authentication<'info> for ExecuteDeposit<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, DataStore> {
+    fn store(&self) -> &Account<'info, Store> {
         &self.store
     }
 

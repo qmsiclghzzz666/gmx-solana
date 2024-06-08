@@ -1,6 +1,6 @@
 use anchor_client::solana_sdk::pubkey::Pubkey;
 use data_store::states::{
-    position::PositionKind, Config, DataStore, Deposit, Market, NonceBytes, Oracle, Order,
+    position::PositionKind, Config, Store, Deposit, Market, NonceBytes, Oracle, Order,
     Position, Roles, Seed, TokenConfigMap, Withdrawal,
 };
 use gmx_solana_utils::to_seed;
@@ -14,7 +14,7 @@ pub fn find_event_authority_address(exchange_program_id: &Pubkey) -> (Pubkey, u8
 
 /// Find PDA for [`DataStore`] account.
 pub fn find_store_address(key: &str, store_program_id: &Pubkey) -> (Pubkey, u8) {
-    Pubkey::find_program_address(&[DataStore::SEED, &to_seed(key)], store_program_id)
+    Pubkey::find_program_address(&[Store::SEED, &to_seed(key)], store_program_id)
 }
 
 /// Find PDA for [`Roles`] account.

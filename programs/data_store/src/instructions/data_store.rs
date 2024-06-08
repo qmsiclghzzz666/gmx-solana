@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use gmx_solana_utils::to_seed;
 
-use crate::states::{DataStore, DataStoreInitEvent, Roles, Seed};
+use crate::states::{Store, DataStoreInitEvent, Roles, Seed};
 
 #[derive(Accounts)]
 #[instruction(key: String)]
@@ -11,11 +11,11 @@ pub struct Initialize<'info> {
     #[account(
         init,
         payer = authority,
-        space = 8 + DataStore::INIT_SPACE,
-        seeds = [DataStore::SEED, &to_seed(&key)],
+        space = 8 + Store::INIT_SPACE,
+        seeds = [Store::SEED, &to_seed(&key)],
         bump,
     )]
-    pub data_store: Account<'info, DataStore>,
+    pub data_store: Account<'info, Store>,
     #[account(
         init,
         payer = authority,

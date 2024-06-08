@@ -3,7 +3,7 @@ use anchor_spl::token::Mint;
 
 use crate::{
     states::{
-        DataStore, PriceProviderKind, Roles, Seed, TokenConfig, TokenConfigBuilder, TokenConfigMap,
+        Store, PriceProviderKind, Roles, Seed, TokenConfig, TokenConfigBuilder, TokenConfigMap,
     },
     utils::internal,
 };
@@ -14,7 +14,7 @@ pub struct InitializeTokenConfigMap<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
     pub only_controller: Account<'info, Roles>,
-    pub store: Account<'info, DataStore>,
+    pub store: Account<'info, Store>,
     #[account(
         init,
         space = 8 + TokenConfigMap::init_space(len as usize),
@@ -42,7 +42,7 @@ impl<'info> internal::Authentication<'info> for InitializeTokenConfigMap<'info> 
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, DataStore> {
+    fn store(&self) -> &Account<'info, Store> {
         &self.store
     }
 
@@ -56,7 +56,7 @@ pub struct InsertTokenConfig<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
     pub only_controller: Account<'info, Roles>,
-    pub store: Account<'info, DataStore>,
+    pub store: Account<'info, Store>,
     #[account(
         mut,
         has_one = store,
@@ -89,7 +89,7 @@ impl<'info> internal::Authentication<'info> for InsertTokenConfig<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, DataStore> {
+    fn store(&self) -> &Account<'info, Store> {
         &self.store
     }
 
@@ -104,7 +104,7 @@ pub struct InsertSyntheticTokenConfig<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
     pub only_controller: Account<'info, Roles>,
-    pub store: Account<'info, DataStore>,
+    pub store: Account<'info, Store>,
     #[account(
         mut,
         has_one = store,
@@ -137,7 +137,7 @@ impl<'info> internal::Authentication<'info> for InsertSyntheticTokenConfig<'info
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, DataStore> {
+    fn store(&self) -> &Account<'info, Store> {
         &self.store
     }
 
@@ -149,7 +149,7 @@ impl<'info> internal::Authentication<'info> for InsertSyntheticTokenConfig<'info
 #[derive(Accounts)]
 pub struct ToggleTokenConfig<'info> {
     pub authority: Signer<'info>,
-    pub store: Account<'info, DataStore>,
+    pub store: Account<'info, Store>,
     pub only_controller: Account<'info, Roles>,
     #[account(
         mut,
@@ -174,7 +174,7 @@ impl<'info> internal::Authentication<'info> for ToggleTokenConfig<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, DataStore> {
+    fn store(&self) -> &Account<'info, Store> {
         &self.store
     }
 
@@ -186,7 +186,7 @@ impl<'info> internal::Authentication<'info> for ToggleTokenConfig<'info> {
 #[derive(Accounts)]
 pub struct SetExpectedProvider<'info> {
     pub authority: Signer<'info>,
-    pub store: Account<'info, DataStore>,
+    pub store: Account<'info, Store>,
     pub only_controller: Account<'info, Roles>,
     #[account(
         mut,
@@ -211,7 +211,7 @@ impl<'info> internal::Authentication<'info> for SetExpectedProvider<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, DataStore> {
+    fn store(&self) -> &Account<'info, Store> {
         &self.store
     }
 
@@ -246,7 +246,7 @@ pub struct ExtendTokenConfigMap<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
     pub only_controller: Account<'info, Roles>,
-    pub store: Account<'info, DataStore>,
+    pub store: Account<'info, Store>,
     #[account(
         mut,
         has_one = store,
@@ -270,7 +270,7 @@ impl<'info> internal::Authentication<'info> for ExtendTokenConfigMap<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, DataStore> {
+    fn store(&self) -> &Account<'info, Store> {
         &self.store
     }
 
@@ -282,7 +282,7 @@ impl<'info> internal::Authentication<'info> for ExtendTokenConfigMap<'info> {
 #[derive(Accounts)]
 pub struct InsertTokenConfigAmount<'info> {
     pub authority: Signer<'info>,
-    pub store: Account<'info, DataStore>,
+    pub store: Account<'info, Store>,
     #[account(
         seeds = [Roles::SEED, store.key().as_ref(), authority.key().as_ref()],
         bump = only_controller.bump,
@@ -312,7 +312,7 @@ impl<'info> internal::Authentication<'info> for InsertTokenConfigAmount<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, DataStore> {
+    fn store(&self) -> &Account<'info, Store> {
         &self.store
     }
 

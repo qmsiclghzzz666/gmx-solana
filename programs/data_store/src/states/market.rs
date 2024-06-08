@@ -15,7 +15,7 @@ use crate::{constants, utils::internal::TransferUtils, DataStoreError, GmxCoreEr
 use super::{
     common::map::{pools::Pools, DynamicMapStore},
     position::{Position, PositionOps},
-    DataStore, InitSpace, Seed,
+    Store, InitSpace, Seed,
 };
 
 /// Market.
@@ -365,7 +365,7 @@ impl<'a, 'info> AsMarket<'a, 'info> {
     pub(crate) fn enable_transfer(
         mut self,
         token_program: AccountInfo<'info>,
-        store: &'a Account<'info, DataStore>,
+        store: &'a Account<'info, Store>,
     ) -> Self {
         self.transfer = Some(TransferUtils::new(
             token_program,

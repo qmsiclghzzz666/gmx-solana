@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    states::{DataStore, Roles, Seed},
+    states::{Store, Roles, Seed},
     utils::internal,
     DataStoreError,
 };
@@ -19,7 +19,7 @@ pub fn initialize_roles(ctx: Context<InitializeRoles>, authority: Pubkey) -> Res
 pub struct InitializeRoles<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
-    pub store: Account<'info, DataStore>,
+    pub store: Account<'info, Store>,
     #[account(
         init,
         payer = payer,
@@ -34,7 +34,7 @@ pub struct InitializeRoles<'info> {
 #[derive(Accounts)]
 pub struct CheckRole<'info> {
     pub authority: Signer<'info>,
-    pub store: Account<'info, DataStore>,
+    pub store: Account<'info, Store>,
     #[account(
         has_one = store @ DataStoreError::PermissionDenied,
         has_one = authority @ DataStoreError::PermissionDenied,
@@ -57,7 +57,7 @@ pub fn check_admin(ctx: Context<CheckRole>) -> Result<bool> {
 #[derive(Accounts)]
 #[instruction(authority: Pubkey)]
 pub struct HasRole<'info> {
-    pub store: Account<'info, DataStore>,
+    pub store: Account<'info, Store>,
     #[account(
         has_one = store @ DataStoreError::PermissionDenied,
         has_one = authority @ DataStoreError::PermissionDenied,
@@ -86,7 +86,7 @@ pub fn enable_role(ctx: Context<EnableRole>, role: String) -> Result<()> {
 pub struct EnableRole<'info> {
     pub authority: Signer<'info>,
     #[account(mut)]
-    pub store: Account<'info, DataStore>,
+    pub store: Account<'info, Store>,
     pub only_admin: Account<'info, Roles>,
 }
 
@@ -95,7 +95,7 @@ impl<'info> internal::Authentication<'info> for EnableRole<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, DataStore> {
+    fn store(&self) -> &Account<'info, Store> {
         &self.store
     }
 
@@ -113,7 +113,7 @@ pub fn disable_role(ctx: Context<DisableRole>, role: String) -> Result<()> {
 pub struct DisableRole<'info> {
     pub authority: Signer<'info>,
     #[account(mut)]
-    pub store: Account<'info, DataStore>,
+    pub store: Account<'info, Store>,
     pub only_admin: Account<'info, Roles>,
 }
 
@@ -122,7 +122,7 @@ impl<'info> internal::Authentication<'info> for DisableRole<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, DataStore> {
+    fn store(&self) -> &Account<'info, Store> {
         &self.store
     }
 
@@ -143,7 +143,7 @@ pub fn grant_role(ctx: Context<GrantRole>, _user: Pubkey, role: String) -> Resul
 pub struct GrantRole<'info> {
     pub authority: Signer<'info>,
     #[account(mut)]
-    pub store: Account<'info, DataStore>,
+    pub store: Account<'info, Store>,
     pub only_admin: Account<'info, Roles>,
     #[account(
         mut,
@@ -160,7 +160,7 @@ impl<'info> internal::Authentication<'info> for GrantRole<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, DataStore> {
+    fn store(&self) -> &Account<'info, Store> {
         &self.store
     }
 
@@ -181,7 +181,7 @@ pub fn revoke_role(ctx: Context<RevokeRole>, _user: Pubkey, role: String) -> Res
 pub struct RevokeRole<'info> {
     pub authority: Signer<'info>,
     #[account(mut)]
-    pub store: Account<'info, DataStore>,
+    pub store: Account<'info, Store>,
     pub only_admin: Account<'info, Roles>,
     #[account(
         mut,
@@ -198,7 +198,7 @@ impl<'info> internal::Authentication<'info> for RevokeRole<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, DataStore> {
+    fn store(&self) -> &Account<'info, Store> {
         &self.store
     }
 
@@ -217,7 +217,7 @@ pub fn add_admin(ctx: Context<AddAdmin>, _user: Pubkey) -> Result<()> {
 pub struct AddAdmin<'info> {
     pub authority: Signer<'info>,
     #[account(mut)]
-    pub store: Account<'info, DataStore>,
+    pub store: Account<'info, Store>,
     pub only_admin: Account<'info, Roles>,
     #[account(
         mut,
@@ -234,7 +234,7 @@ impl<'info> internal::Authentication<'info> for AddAdmin<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, DataStore> {
+    fn store(&self) -> &Account<'info, Store> {
         &self.store
     }
 
@@ -255,7 +255,7 @@ pub fn remove_admin(ctx: Context<RemoveAdmin>, _user: Pubkey) -> Result<()> {
 pub struct RemoveAdmin<'info> {
     pub authority: Signer<'info>,
     #[account(mut)]
-    pub store: Account<'info, DataStore>,
+    pub store: Account<'info, Store>,
     pub only_admin: Account<'info, Roles>,
     #[account(
         mut,
@@ -272,7 +272,7 @@ impl<'info> internal::Authentication<'info> for RemoveAdmin<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, DataStore> {
+    fn store(&self) -> &Account<'info, Store> {
         &self.store
     }
 

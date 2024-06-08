@@ -97,7 +97,7 @@ impl InspectArgs {
                 println!("Store: {address}");
                 println!(
                     "{:#?}",
-                    program.account::<states::DataStore>(address).await?
+                    program.account::<states::Store>(address).await?
                 );
             }
             Command::Roles { address } => {

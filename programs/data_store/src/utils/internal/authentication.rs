@@ -1,7 +1,7 @@
 use anchor_lang::{prelude::*, Bumps};
 
 use crate::{
-    states::{DataStore, RoleKey, Roles, Seed},
+    states::{Store, RoleKey, Roles, Seed},
     DataStoreError,
 };
 
@@ -11,7 +11,7 @@ pub(crate) trait Authentication<'info> {
     fn authority(&self) -> &Signer<'info>;
 
     /// Get the data store account.
-    fn store(&self) -> &Account<'info, DataStore>;
+    fn store(&self) -> &Account<'info, Store>;
 
     /// Get the roles account.
     fn roles(&self) -> &Account<'info, Roles>;

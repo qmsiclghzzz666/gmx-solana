@@ -7,7 +7,7 @@ use crate::{
         common::{SwapParams, TokenRecord},
         order::{Order, OrderKind, OrderParams, Receivers, Senders, Tokens},
         position::Position,
-        DataStore, Market, NonceBytes, Roles, Seed,
+        Market, NonceBytes, Roles, Seed, Store,
     },
     utils::internal,
     DataStoreError,
@@ -23,7 +23,7 @@ use crate::{
 )]
 pub struct InitializeOrder<'info> {
     pub authority: Signer<'info>,
-    pub store: Account<'info, DataStore>,
+    pub store: Account<'info, Store>,
     pub only_controller: Account<'info, Roles>,
     #[account(mut)]
     pub payer: Signer<'info>,
@@ -193,7 +193,7 @@ impl<'info> internal::Authentication<'info> for InitializeOrder<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, DataStore> {
+    fn store(&self) -> &Account<'info, Store> {
         &self.store
     }
 
@@ -286,7 +286,7 @@ pub struct RemoveOrder<'info> {
     pub payer: Signer<'info>,
     pub authority: Signer<'info>,
     pub only_controller: Account<'info, Roles>,
-    pub store: Account<'info, DataStore>,
+    pub store: Account<'info, Store>,
     #[account(
         mut,
         close = payer,
@@ -319,7 +319,7 @@ impl<'info> internal::Authentication<'info> for RemoveOrder<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, DataStore> {
+    fn store(&self) -> &Account<'info, Store> {
         &self.store
     }
 

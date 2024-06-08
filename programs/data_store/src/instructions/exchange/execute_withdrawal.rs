@@ -4,7 +4,7 @@ use gmx_core::MarketExt;
 
 use crate::{
     constants,
-    states::{Config, DataStore, Market, Oracle, Roles, Seed, ValidateOracleTime, Withdrawal},
+    states::{Config, Store, Market, Oracle, Roles, Seed, ValidateOracleTime, Withdrawal},
     utils::internal::{self},
     DataStoreError, GmxCoreError,
 };
@@ -14,7 +14,7 @@ use super::utils::swap::{unchecked_swap_with_params, unchecked_transfer_to_marke
 #[derive(Accounts)]
 pub struct ExecuteWithdrawal<'info> {
     pub authority: Signer<'info>,
-    pub store: Box<Account<'info, DataStore>>,
+    pub store: Box<Account<'info, Store>>,
     pub only_controller: Account<'info, Roles>,
     #[account(
         has_one = store,
@@ -123,7 +123,7 @@ impl<'info> internal::Authentication<'info> for ExecuteWithdrawal<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, DataStore> {
+    fn store(&self) -> &Account<'info, Store> {
         &self.store
     }
 

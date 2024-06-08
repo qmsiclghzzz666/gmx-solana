@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    states::{DataStore, Nonce, NonceBytes, Roles, Seed},
+    states::{Store, Nonce, NonceBytes, Roles, Seed},
     utils::internal,
 };
 
@@ -16,7 +16,7 @@ pub struct InitializeNonce<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
     pub only_controller: Account<'info, Roles>,
-    pub store: Account<'info, DataStore>,
+    pub store: Account<'info, Store>,
     #[account(
         init,
         space = 8 + Nonce::INIT_SPACE,
@@ -33,7 +33,7 @@ impl<'info> internal::Authentication<'info> for InitializeNonce<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, DataStore> {
+    fn store(&self) -> &Account<'info, Store> {
         &self.store
     }
 
@@ -53,7 +53,7 @@ pub fn increment_nonce(ctx: Context<IncrementNonce>) -> Result<NonceBytes> {
 pub struct IncrementNonce<'info> {
     pub authority: Signer<'info>,
     pub only_controller: Account<'info, Roles>,
-    pub store: Account<'info, DataStore>,
+    pub store: Account<'info, Store>,
     #[account(
         mut,
         seeds = [Nonce::SEED, store.key().as_ref()],
@@ -67,7 +67,7 @@ impl<'info> internal::Authentication<'info> for IncrementNonce<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, DataStore> {
+    fn store(&self) -> &Account<'info, Store> {
         &self.store
     }
 

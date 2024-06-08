@@ -5,7 +5,7 @@ use anchor_lang::prelude::*;
 use gmx_solana_utils::price::Price;
 
 use crate::{
-    states::{DataStore, Oracle, Roles, Seed},
+    states::{Store, Oracle, Roles, Seed},
     utils::internal,
 };
 
@@ -16,7 +16,7 @@ pub use self::price_feeds::*;
 pub struct InitializeOracle<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
-    pub store: Account<'info, DataStore>,
+    pub store: Account<'info, Store>,
     pub only_controller: Account<'info, Roles>,
     #[account(
         init,
@@ -42,7 +42,7 @@ impl<'info> internal::Authentication<'info> for InitializeOracle<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, DataStore> {
+    fn store(&self) -> &Account<'info, Store> {
         &self.store
     }
 
@@ -54,7 +54,7 @@ impl<'info> internal::Authentication<'info> for InitializeOracle<'info> {
 #[derive(Accounts)]
 pub struct ClearAllPrices<'info> {
     pub authority: Signer<'info>,
-    pub store: Account<'info, DataStore>,
+    pub store: Account<'info, Store>,
     pub only_controller: Account<'info, Roles>,
     #[account(
         mut,
@@ -76,7 +76,7 @@ impl<'info> internal::Authentication<'info> for ClearAllPrices<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, DataStore> {
+    fn store(&self) -> &Account<'info, Store> {
         &self.store
     }
 
@@ -89,7 +89,7 @@ impl<'info> internal::Authentication<'info> for ClearAllPrices<'info> {
 pub struct SetPrice<'info> {
     pub authority: Signer<'info>,
     pub only_controller: Account<'info, Roles>,
-    pub store: Account<'info, DataStore>,
+    pub store: Account<'info, Store>,
     #[account(
         mut,
         has_one = store,
@@ -104,7 +104,7 @@ impl<'info> internal::Authentication<'info> for SetPrice<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, DataStore> {
+    fn store(&self) -> &Account<'info, Store> {
         &self.store
     }
 

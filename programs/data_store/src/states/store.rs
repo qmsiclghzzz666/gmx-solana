@@ -14,7 +14,7 @@ const MAX_LEN: usize = 32;
 #[account]
 #[derive(InitSpace)]
 #[cfg_attr(feature = "debug", derive(Debug))]
-pub struct DataStore {
+pub struct Store {
     #[max_len(MAX_ROLES)]
     roles_metadata: Vec<RoleMetadata>,
     #[max_len(MAX_ROLES)]
@@ -26,11 +26,11 @@ pub struct DataStore {
     reserved: [u8; 64],
 }
 
-impl Seed for DataStore {
+impl Seed for Store {
     const SEED: &'static [u8] = b"data_store";
 }
 
-impl DataStore {
+impl Store {
     /// Maximum length of key.
     pub const MAX_LEN: usize = MAX_LEN;
 
@@ -167,8 +167,8 @@ pub struct DataStoreInitEvent {
 mod tests {
     use super::*;
 
-    fn new_uninited_store() -> DataStore {
-        DataStore {
+    fn new_uninited_store() -> Store {
+        Store {
             roles_metadata: vec![],
             roles: vec![],
             num_admins: 0,
@@ -188,7 +188,7 @@ mod tests {
         }
     }
 
-    fn new_store(roles: &mut Roles) -> DataStore {
+    fn new_store(roles: &mut Roles) -> Store {
         let mut store = new_uninited_store();
         store.init(roles, "hello", 255).unwrap();
         store

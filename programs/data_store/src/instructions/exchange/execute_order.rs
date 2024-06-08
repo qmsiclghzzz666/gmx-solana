@@ -14,7 +14,7 @@ use crate::{
     states::{
         order::{Order, OrderKind, TransferOut},
         position::Position,
-        Config, DataStore, Market, Oracle, Roles, Seed, ValidateOracleTime,
+        Config, Store, Market, Oracle, Roles, Seed, ValidateOracleTime,
     },
     utils::internal,
     DataStoreError, GmxCoreError,
@@ -26,7 +26,7 @@ use super::utils::swap::unchecked_swap_with_params;
 #[instruction(recent_timestamp: i64)]
 pub struct ExecuteOrder<'info> {
     pub authority: Signer<'info>,
-    pub store: Box<Account<'info, DataStore>>,
+    pub store: Box<Account<'info, Store>>,
     pub only_controller: Account<'info, Roles>,
     #[account(
         has_one = store,
@@ -192,7 +192,7 @@ impl<'info> internal::Authentication<'info> for ExecuteOrder<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, DataStore> {
+    fn store(&self) -> &Account<'info, Store> {
         &self.store
     }
 
