@@ -11,7 +11,7 @@ pub fn to_key(key: &str) -> MapKey {
 #[macro_export]
 macro_rules! fixed_map {
     ($map:ident, $value:ty, $len:expr, $padding:expr) => {
-        fixed_map!($map, str, $crate::states::common::fixed_map::to_key, $value, $len, $padding);
+        $crate::fixed_map!($map, str, $crate::states::common::fixed_map::to_key, $value, $len, $padding);
     };
     ($map:ident, $key:ty, $to_key:path, $value:ty, $len:expr, $padding:expr) => {
         paste::paste! {
@@ -40,6 +40,16 @@ macro_rules! fixed_map {
                 count: usize,
                 padding: [u8; $padding],
             }
+
+            impl $crate::states::InitSpace for $map {
+                const INIT_SPACE: usize = std::mem::size_of::<$map>();
+            }
+
+            #[cfg(test)]
+            const_assert_eq!(
+                std::mem::size_of::<$map>(),
+                <$map as $crate::states::InitSpace>::INIT_SPACE
+            );
 
             impl Default for $map {
                 fn default() -> Self {

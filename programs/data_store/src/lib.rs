@@ -499,6 +499,10 @@ pub enum DataStoreError {
     InvalidRoles,
     #[msg("Permission denied")]
     PermissionDenied,
+    #[msg("No such role")]
+    NoSuchRole,
+    #[msg("The role is disabled")]
+    DisabledRole,
     // Oracle.
     #[msg("Oracle is not empty")]
     PricesAlreadySet,
