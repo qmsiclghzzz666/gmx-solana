@@ -31,8 +31,6 @@ pub struct CreateOrder<'info> {
     pub authority: UncheckedAccount<'info>,
     /// CHECK: only used to invoke CPI.
     pub store: UncheckedAccount<'info>,
-    /// CHECK: only used to invoke CPI.
-    pub only_controller: UncheckedAccount<'info>,
     #[account(mut)]
     pub payer: Signer<'info>,
     /// CHECK: only used to invoke CPI and then checked and initilized by it.
@@ -151,7 +149,6 @@ impl<'info> CreateOrder<'info> {
             InitializeOrder {
                 authority: self.authority.to_account_info(),
                 store: self.store.to_account_info(),
-                only_controller: self.only_controller.to_account_info(),
                 payer: self.payer.to_account_info(),
                 order: self.order.to_account_info(),
                 position: self.position.as_ref().map(|a| a.to_account_info()),
@@ -199,7 +196,6 @@ impl<'info> CreateOrder<'info> {
             MarketTransferIn {
                 authority: self.authority.to_account_info(),
                 store: self.store.to_account_info(),
-                only_controller: self.only_controller.to_account_info(),
                 from_authority: self.payer.to_account_info(),
                 market,
                 from: self

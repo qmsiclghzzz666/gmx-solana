@@ -22,8 +22,6 @@ enum Command {
         #[arg(long)]
         current: bool,
     },
-    /// `Roles` account.
-    Roles { address: Pubkey },
     /// `Config` account.
     Config { address: Option<Pubkey> },
     /// `TokenConfigMap` account.
@@ -95,13 +93,7 @@ impl InspectArgs {
                     })
                 };
                 println!("Store: {address}");
-                println!(
-                    "{:#?}",
-                    program.account::<states::Store>(address).await?
-                );
-            }
-            Command::Roles { address } => {
-                println!("{:#?}", program.account::<states::Roles>(*address).await?);
+                println!("{:#?}", program.account::<states::Store>(address).await?);
             }
             Command::Config { address } => {
                 let address = address

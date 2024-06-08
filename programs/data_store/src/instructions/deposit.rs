@@ -5,7 +5,7 @@ use crate::{
     states::{
         common::{SwapParams, TokenRecord},
         deposit::{Receivers, TokenParams},
-        Store, Deposit, Market, NonceBytes, Roles, Seed,
+        Deposit, Market, NonceBytes, Seed, Store,
     },
     utils::internal,
     DataStoreError,
@@ -17,8 +17,7 @@ pub struct InitializeDeposit<'info> {
     pub authority: Signer<'info>,
     #[account(mut)]
     pub payer: Signer<'info>,
-    pub only_controller: Account<'info, Roles>,
-    pub store: Account<'info, Store>,
+    pub store: AccountLoader<'info, Store>,
     #[account(
         init,
         space = 8 + Deposit::init_space(&tokens_with_feed, &swap_params),
@@ -76,12 +75,8 @@ impl<'info> internal::Authentication<'info> for InitializeDeposit<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, Store> {
+    fn store(&self) -> &AccountLoader<'info, Store> {
         &self.store
-    }
-
-    fn roles(&self) -> &Account<'info, Roles> {
-        &self.only_controller
     }
 }
 
@@ -91,8 +86,7 @@ pub struct RemoveDeposit<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
     pub authority: Signer<'info>,
-    pub only_controller: Account<'info, Roles>,
-    pub store: Account<'info, Store>,
+    pub store: AccountLoader<'info, Store>,
     #[account(
         mut,
         close = payer,
@@ -132,12 +126,8 @@ impl<'info> internal::Authentication<'info> for RemoveDeposit<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, Store> {
+    fn store(&self) -> &AccountLoader<'info, Store> {
         &self.store
-    }
-
-    fn roles(&self) -> &Account<'info, Roles> {
-        &self.only_controller
     }
 }
 

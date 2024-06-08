@@ -43,7 +43,6 @@ where
             .request()
             .accounts(accounts::InitializeMarketVault {
                 authority,
-                only_market_keeper: self.payer_roles_address(store),
                 store: *store,
                 mint: *token,
                 vault,
@@ -68,7 +67,6 @@ where
             .request()
             .accounts(accounts::MarketVaultTransferOut {
                 authority,
-                only_controller: self.payer_roles_address(store),
                 store: *store,
                 market_vault: self.find_market_vault_address(store, token),
                 to: *to,

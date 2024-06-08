@@ -1,7 +1,7 @@
 use anchor_lang::{prelude::*, Bumps};
 
 use crate::{
-    states::{Store, RoleKey, Roles, Seed},
+    states::{RoleKey, Store},
     DataStoreError,
 };
 
@@ -11,32 +11,13 @@ pub(crate) trait Authentication<'info> {
     fn authority(&self) -> &Signer<'info>;
 
     /// Get the data store account.
-    fn store(&self) -> &Account<'info, Store>;
-
-    /// Get the roles account.
-    fn roles(&self) -> &Account<'info, Roles>;
+    fn store(&self) -> &AccountLoader<'info, Store>;
 }
 
 /// Provides access control utils for [`Authentication`]s.
 pub(crate) trait Authenticate<'info>: Authentication<'info> + Bumps + Sized {
     /// Verify that context matches.
-    fn verify(ctx: &Context<Self>) -> Result<()> {
-        let authority = ctx.accounts.authority().key();
-        let store_key = ctx.accounts.store().key();
-        let roles = ctx.accounts.roles();
-        require_eq!(roles.authority, authority, DataStoreError::PermissionDenied);
-        require_eq!(roles.store, store_key, DataStoreError::PermissionDenied);
-        let expected = Pubkey::create_program_address(
-            &[
-                Roles::SEED,
-                store_key.as_ref(),
-                authority.as_ref(),
-                &[roles.bump],
-            ],
-            &crate::ID,
-        )
-        .map_err(|_| DataStoreError::InvalidPDA)?;
-        require_eq!(roles.key(), expected, DataStoreError::PermissionDenied);
+    fn verify(_ctx: &Context<Self>) -> Result<()> {
         Ok(())
     }
 
@@ -44,7 +25,10 @@ pub(crate) trait Authenticate<'info>: Authentication<'info> + Bumps + Sized {
     fn only(ctx: &Context<Self>, role: &str) -> Result<()> {
         Self::verify(ctx)?;
         require!(
-            ctx.accounts.store().has_role(ctx.accounts.roles(), role)?,
+            ctx.accounts
+                .store()
+                .load()?
+                .has_role(ctx.accounts.authority().key, role)?,
             DataStoreError::PermissionDenied
         );
         Ok(())
@@ -53,7 +37,13 @@ pub(crate) trait Authenticate<'info>: Authentication<'info> + Bumps + Sized {
     /// Check that the `authority` is an admin.
     fn only_admin(ctx: &Context<Self>) -> Result<()> {
         Self::verify(ctx)?;
-        require!(ctx.accounts.roles().is_admin(), DataStoreError::NotAnAdmin);
+        require!(
+            ctx.accounts
+                .store()
+                .load()?
+                .is_authority(ctx.accounts.authority().key),
+            DataStoreError::NotAnAdmin
+        );
         Ok(())
     }
 

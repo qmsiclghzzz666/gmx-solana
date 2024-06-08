@@ -5,7 +5,7 @@ use bitmaps::Bitmap;
 
 use crate::DataStoreError;
 
-use super::{InitSpace, Seed};
+use super::InitSpace;
 
 const MAX_LEN: usize = 32;
 
@@ -56,55 +56,8 @@ impl<'a> From<&'a str> for RoleKey {
     }
 }
 
-/// Account that stores the roles of an address.
-#[account]
-#[derive(InitSpace)]
-#[cfg_attr(feature = "debug", derive(Debug))]
-pub struct Roles {
-    /// Authority.
-    pub authority: Pubkey,
-    /// Store.
-    pub store: Pubkey,
-    /// Is admin.
-    pub(super) is_admin: bool,
-    /// Roles value (a bitmap).
-    pub(super) value: u32,
-    pub bump: u8,
-}
-
 type RoleBitmap = Bitmap<MAX_ROLES>;
 type RoleBitmapValue = u32;
-
-impl Roles {
-    /// Initialize the [`Roles`]
-    pub fn init(&mut self, authority: Pubkey, store: Pubkey, bump: u8) {
-        self.is_admin = false;
-        self.value = RoleBitmap::new().into_value();
-        self.authority = authority;
-        self.store = store;
-        self.bump = bump;
-    }
-
-    pub(super) fn get(&self, index: u8) -> bool {
-        let map = RoleBitmap::from_value(self.value);
-        map.get(index as usize)
-    }
-
-    pub(super) fn set(&mut self, index: u8, enable: bool) {
-        let mut map = RoleBitmap::from_value(self.value);
-        map.set(index as usize, enable);
-        self.value = map.into_value();
-    }
-
-    /// Returns whether it is an admin.
-    pub fn is_admin(&self) -> bool {
-        self.is_admin
-    }
-}
-
-impl Seed for Roles {
-    const SEED: &'static [u8] = b"roles";
-}
 
 /// Role Metadata.
 #[zero_copy]
@@ -192,6 +145,7 @@ crate::fixed_map!(
 
 /// Role Store.
 #[zero_copy]
+#[cfg_attr(feature = "debug", derive(Debug))]
 pub struct RoleStore {
     roles: RoleMap,
     members: Members,

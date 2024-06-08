@@ -38,8 +38,6 @@ pub fn execute_deposit<'info>(
 pub struct ExecuteDeposit<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
-    /// CHECK: used and checked by CPI.
-    pub only_order_keeper: UncheckedAccount<'info>,
     /// CHECK: only used as signing PDA.
     #[account(
         seeds = [
@@ -49,8 +47,6 @@ pub struct ExecuteDeposit<'info> {
         bump,
     )]
     pub controller: UncheckedAccount<'info>,
-    /// CHECK: only used by CPI.
-    pub only_controller: UncheckedAccount<'info>,
     /// CHECK: used and checked by CPI.
     pub store: UncheckedAccount<'info>,
     pub data_store_program: Program<'info, DataStore>,
@@ -84,7 +80,6 @@ impl<'info> ExecuteDeposit<'info> {
             RemoveDeposit {
                 payer: self.authority.to_account_info(),
                 authority: self.controller.to_account_info(),
-                only_controller: self.only_controller.to_account_info(),
                 store: self.store.to_account_info(),
                 deposit: self.deposit.to_account_info(),
                 user: self.user.to_account_info(),
@@ -103,7 +98,6 @@ impl<'info> ExecuteDeposit<'info> {
             self.data_store_program.to_account_info(),
             cpi::accounts::ExecuteDeposit {
                 authority: self.controller.to_account_info(),
-                only_controller: self.only_controller.to_account_info(),
                 store: self.store.to_account_info(),
                 config: self.config.to_account_info(),
                 oracle: self.oracle.to_account_info(),
@@ -132,10 +126,6 @@ impl<'info> Authentication<'info> for ExecuteDeposit<'info> {
 
     fn store(&self) -> AccountInfo<'info> {
         self.store.to_account_info()
-    }
-
-    fn roles(&self) -> AccountInfo<'info> {
-        self.only_order_keeper.to_account_info()
     }
 }
 

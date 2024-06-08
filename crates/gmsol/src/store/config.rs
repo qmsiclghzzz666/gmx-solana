@@ -51,13 +51,11 @@ where
 {
     fn initialize_config(&self, store: &Pubkey) -> RpcBuilder<C> {
         let authority = self.payer();
-        let only_controller = self.payer_roles_address(store);
         let config = self.find_config_address(store);
         self.data_store_request()
             .args(instruction::InitializeConfig {})
             .accounts(accounts::InitializeConfig {
                 authority,
-                only_controller,
                 store: *store,
                 config,
                 system_program: System::id(),
@@ -72,7 +70,6 @@ where
         new: bool,
     ) -> RpcBuilder<C> {
         let authority = self.payer();
-        let only_controller = self.payer_roles_address(store);
         let config = self.find_config_address(store);
         self.data_store_request()
             .args(instruction::InsertAmount {
@@ -82,7 +79,6 @@ where
             })
             .accounts(accounts::InsertAmount {
                 authority,
-                only_controller,
                 store: *store,
                 config,
             })
@@ -96,7 +92,6 @@ where
         new: bool,
     ) -> RpcBuilder<C> {
         let authority = self.payer();
-        let only_controller = self.payer_roles_address(store);
         let config = self.find_config_address(store);
         self.data_store_request()
             .args(instruction::InsertFactor {
@@ -106,7 +101,6 @@ where
             })
             .accounts(accounts::InsertFactor {
                 authority,
-                only_controller,
                 store: *store,
                 config,
             })
@@ -120,7 +114,6 @@ where
         new: bool,
     ) -> RpcBuilder<C> {
         let authority = self.payer();
-        let only_controller = self.payer_roles_address(store);
         let config = self.find_config_address(store);
         self.data_store_request()
             .args(instruction::InsertAddress {
@@ -130,7 +123,6 @@ where
             })
             .accounts(accounts::InsertAddress {
                 authority,
-                only_controller,
                 store: *store,
                 config,
             })

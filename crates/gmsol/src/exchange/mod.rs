@@ -210,7 +210,6 @@ where
             .request()
             .accounts(accounts::CreateMarket {
                 authority,
-                only_market_keeper: self.payer_roles_address(store),
                 data_store: *store,
                 market: self.find_market_address(store, &market_token),
                 market_token_mint: market_token,

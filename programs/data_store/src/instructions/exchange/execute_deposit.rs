@@ -3,9 +3,7 @@ use anchor_spl::token::{Mint, Token, TokenAccount};
 use gmx_core::MarketExt;
 
 use crate::{
-    states::{
-        Config, Store, Deposit, Market, MarketMeta, Oracle, Roles, Seed, ValidateOracleTime,
-    },
+    states::{Config, Deposit, Market, MarketMeta, Oracle, Seed, Store, ValidateOracleTime},
     utils::internal,
     DataStoreError, GmxCoreError,
 };
@@ -15,8 +13,7 @@ use super::utils::swap::unchecked_swap_with_params;
 #[derive(Accounts)]
 pub struct ExecuteDeposit<'info> {
     pub authority: Signer<'info>,
-    pub only_controller: Account<'info, Roles>,
-    pub store: Account<'info, Store>,
+    pub store: AccountLoader<'info, Store>,
     #[account(
         has_one = store,
         seeds = [Config::SEED, store.key().as_ref()],
@@ -67,12 +64,8 @@ impl<'info> internal::Authentication<'info> for ExecuteDeposit<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, Store> {
+    fn store(&self) -> &AccountLoader<'info, Store> {
         &self.store
-    }
-
-    fn roles(&self) -> &Account<'info, Roles> {
-        &self.only_controller
     }
 }
 

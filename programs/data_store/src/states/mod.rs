@@ -10,9 +10,6 @@ pub mod config;
 /// Common types.
 pub mod common;
 
-/// Nonce.
-pub mod nonce;
-
 /// Token Config.
 pub mod token_config;
 
@@ -37,7 +34,6 @@ pub mod position;
 pub use config::Config;
 pub use deposit::Deposit;
 pub use market::*;
-pub use nonce::*;
 pub use oracle::*;
 pub use order::Order;
 pub use position::Position;
@@ -77,6 +73,9 @@ pub trait Data: Bump + Seed {
         Ok(pda)
     }
 }
+
+/// Nonce Bytes.
+pub type NonceBytes = [u8; 32];
 
 /// Action.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq)]

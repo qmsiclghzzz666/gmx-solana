@@ -42,8 +42,6 @@ pub struct CreateWithdrawal<'info> {
     pub authority: UncheckedAccount<'info>,
     /// CHECK: only used to invoke CPI.
     pub store: UncheckedAccount<'info>,
-    /// CHECK: only used to invoke CPI.
-    pub only_controller: UncheckedAccount<'info>,
     pub data_store_program: Program<'info, DataStore>,
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
@@ -201,7 +199,6 @@ impl<'info> CreateWithdrawal<'info> {
             InitializeWithdrawal {
                 authority: self.authority.to_account_info(),
                 store: self.store.to_account_info(),
-                only_controller: self.only_controller.to_account_info(),
                 payer: self.payer.to_account_info(),
                 withdrawal: self.withdrawal.to_account_info(),
                 market_token_account: self.market_token_account.to_account_info(),

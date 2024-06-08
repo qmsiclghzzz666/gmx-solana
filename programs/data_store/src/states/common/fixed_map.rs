@@ -37,8 +37,8 @@ macro_rules! fixed_map {
             #[cfg_attr(feature = "debug", derive(Debug))]
             pub struct $map {
                 data: [[<$map Entry>]; $len],
-                count: usize,
                 padding: [u8; $padding],
+                count: u32,
             }
 
             impl $crate::states::InitSpace for $map {
@@ -63,7 +63,7 @@ macro_rules! fixed_map {
 
             impl $map {
                 fn binanry_search(&self, key: &$crate::states::common::fixed_map::MapKey) -> std::result::Result<usize, usize> {
-                    self.data[..self.count].binary_search_by(|entry| entry.key.cmp(key))
+                    self.data[..self.len()].binary_search_by(|entry| entry.key.cmp(key))
                 }
 
                 /// Get.
@@ -110,7 +110,7 @@ macro_rules! fixed_map {
                             if self.count >= 32 {
                                 anchor_lang::err!($crate::DataStoreError::ExceedMaxLengthLimit)
                             } else {
-                                for i in (index..self.count).rev() {
+                                for i in (index..self.len()).rev() {
                                     self.data[i + 1] = self.data[i];
                                 }
                                 self.data[index] = [<$map Entry>] { key, value };
@@ -126,7 +126,7 @@ macro_rules! fixed_map {
                     let key = $to_key(key);
                     self.binanry_search(&key).ok().map(|index| {
                         let value = std::mem::take(&mut self.data[index].value);
-                        let len = self.count;
+                        let len = self.len();
                         for i in index..len {
                             self.data[i] = self.data[i + 1];
                         }
@@ -138,7 +138,7 @@ macro_rules! fixed_map {
 
                 /// Get length.
                 pub fn len(&self) -> usize {
-                    self.count
+                    self.count as usize
                 }
 
                 /// Is empty.
@@ -154,7 +154,7 @@ macro_rules! fixed_map {
 mod tests {
     use anchor_lang::solana_program::pubkey::Pubkey;
 
-    fixed_map!(FixedFactorMap, u128, 32, 8);
+    fixed_map!(FixedFactorMap, u128, 32, 12);
 
     #[test]
     fn test_insert_and_get() {
@@ -197,7 +197,7 @@ mod tests {
         key.to_bytes()
     }
 
-    fixed_map!(RolesMap, Pubkey, to_bytes, u64, 32, 0);
+    fixed_map!(RolesMap, Pubkey, to_bytes, u64, 32, 4);
 
     #[test]
     fn test_insert_and_get_for_roles_map() {

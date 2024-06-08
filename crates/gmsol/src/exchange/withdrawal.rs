@@ -195,7 +195,6 @@ where
             .accounts(accounts::CreateWithdrawal {
                 authority,
                 store: self.store,
-                only_controller: self.client.find_roles_address(&self.store, &authority),
                 data_store_program: self.client.data_store_program_id(),
                 token_program: anchor_spl::token::ID,
                 system_program: system_program::ID,
@@ -340,7 +339,6 @@ where
             .accounts(accounts::CancelWithdrawal {
                 authority,
                 store: self.store,
-                only_controller: self.client.find_roles_address(&self.store, &authority),
                 data_store_program: self.client.data_store_program_id(),
                 withdrawal: self.withdrawal,
                 user,
@@ -495,8 +493,6 @@ where
                 authority,
                 store: self.store,
                 controller: self.client.controller_address(&self.store),
-                only_controller: self.client.controller_roles_address(&self.store),
-                only_order_keeper: self.client.find_roles_address(&self.store, &authority),
                 data_store_program: self.client.data_store_program_id(),
                 price_provider: self.price_provider,
                 token_program: anchor_spl::token::ID,

@@ -27,7 +27,6 @@ where
             .accounts(accounts::InitializeOracle {
                 authority,
                 store: *store,
-                only_controller: self.payer_roles_address(store),
                 oracle,
                 system_program: system_program::ID,
             })

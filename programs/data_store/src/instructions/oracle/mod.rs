@@ -5,7 +5,7 @@ use anchor_lang::prelude::*;
 use gmx_solana_utils::price::Price;
 
 use crate::{
-    states::{Store, Oracle, Roles, Seed},
+    states::{Oracle, Seed, Store},
     utils::internal,
 };
 
@@ -16,8 +16,7 @@ pub use self::price_feeds::*;
 pub struct InitializeOracle<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
-    pub store: Account<'info, Store>,
-    pub only_controller: Account<'info, Roles>,
+    pub store: AccountLoader<'info, Store>,
     #[account(
         init,
         payer = authority,
@@ -42,20 +41,15 @@ impl<'info> internal::Authentication<'info> for InitializeOracle<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, Store> {
+    fn store(&self) -> &AccountLoader<'info, Store> {
         &self.store
-    }
-
-    fn roles(&self) -> &Account<'info, Roles> {
-        &self.only_controller
     }
 }
 
 #[derive(Accounts)]
 pub struct ClearAllPrices<'info> {
     pub authority: Signer<'info>,
-    pub store: Account<'info, Store>,
-    pub only_controller: Account<'info, Roles>,
+    pub store: AccountLoader<'info, Store>,
     #[account(
         mut,
         has_one = store,
@@ -76,20 +70,15 @@ impl<'info> internal::Authentication<'info> for ClearAllPrices<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, Store> {
+    fn store(&self) -> &AccountLoader<'info, Store> {
         &self.store
-    }
-
-    fn roles(&self) -> &Account<'info, Roles> {
-        &self.only_controller
     }
 }
 
 #[derive(Accounts)]
 pub struct SetPrice<'info> {
     pub authority: Signer<'info>,
-    pub only_controller: Account<'info, Roles>,
-    pub store: Account<'info, Store>,
+    pub store: AccountLoader<'info, Store>,
     #[account(
         mut,
         has_one = store,
@@ -104,12 +93,8 @@ impl<'info> internal::Authentication<'info> for SetPrice<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, Store> {
+    fn store(&self) -> &AccountLoader<'info, Store> {
         &self.store
-    }
-
-    fn roles(&self) -> &Account<'info, Roles> {
-        &self.only_controller
     }
 }
 

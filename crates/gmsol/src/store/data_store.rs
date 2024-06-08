@@ -16,13 +16,11 @@ where
 {
     fn initialize_store(&self, key: &str) -> RequestBuilder<C> {
         let store = self.find_store_address(key);
-        let roles = self.payer_roles_address(&store);
         self.data_store()
             .request()
             .accounts(accounts::Initialize {
                 authority: self.payer(),
                 data_store: store,
-                roles,
                 system_program: system_program::ID,
             })
             .args(instruction::Initialize {

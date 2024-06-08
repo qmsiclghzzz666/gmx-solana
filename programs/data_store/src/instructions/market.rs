@@ -3,7 +3,7 @@ use anchor_spl::token::{Token, TokenAccount};
 
 use crate::{
     constants,
-    states::{Action, Market, MarketChangeEvent, MarketMeta, Roles, Seed, Store},
+    states::{Action, Market, MarketChangeEvent, MarketMeta, Seed, Store},
     utils::internal,
 };
 
@@ -46,8 +46,7 @@ pub fn initialize_market(
 pub struct InitializeMarket<'info> {
     #[account(mut)]
     authority: Signer<'info>,
-    only_market_keeper: Account<'info, Roles>,
-    store: Account<'info, Store>,
+    store: AccountLoader<'info, Store>,
     #[account(
         init,
         payer = authority,
@@ -68,12 +67,8 @@ impl<'info> internal::Authentication<'info> for InitializeMarket<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, Store> {
+    fn store(&self) -> &AccountLoader<'info, Store> {
         &self.store
-    }
-
-    fn roles(&self) -> &Account<'info, Roles> {
-        &self.only_market_keeper
     }
 }
 
@@ -92,8 +87,7 @@ pub fn remove_market(ctx: Context<RemoveMarket>) -> Result<()> {
 pub struct RemoveMarket<'info> {
     #[account(mut)]
     authority: Signer<'info>,
-    only_market_keeper: Account<'info, Roles>,
-    store: Account<'info, Store>,
+    store: AccountLoader<'info, Store>,
     #[account(
         mut,
         has_one = store,
@@ -109,18 +103,14 @@ impl<'info> internal::Authentication<'info> for RemoveMarket<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, Store> {
+    fn store(&self) -> &AccountLoader<'info, Store> {
         &self.store
-    }
-
-    fn roles(&self) -> &Account<'info, Roles> {
-        &self.only_market_keeper
     }
 }
 
 #[derive(Accounts)]
 pub struct GetValidatedMarketMeta<'info> {
-    pub(crate) store: Account<'info, Store>,
+    pub(crate) store: AccountLoader<'info, Store>,
     #[account(has_one = store)]
     pub(crate) market: Account<'info, Market>,
 }
@@ -134,12 +124,7 @@ pub fn get_validated_market_meta(ctx: Context<GetValidatedMarketMeta>) -> Result
 #[derive(Accounts)]
 pub struct MarketTransferIn<'info> {
     pub authority: Signer<'info>,
-    pub store: Account<'info, Store>,
-    #[account(
-        seeds = [Roles::SEED, store.key().as_ref(), authority.key().as_ref()],
-        bump = only_controller.bump,
-    )]
-    pub only_controller: Account<'info, Roles>,
+    pub store: AccountLoader<'info, Store>,
     pub from_authority: Signer<'info>,
     #[account(mut, has_one = store)]
     pub market: Account<'info, Market>,
@@ -192,24 +177,15 @@ impl<'info> internal::Authentication<'info> for MarketTransferIn<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, Store> {
+    fn store(&self) -> &AccountLoader<'info, Store> {
         &self.store
-    }
-
-    fn roles(&self) -> &Account<'info, Roles> {
-        &self.only_controller
     }
 }
 
 #[derive(Accounts)]
 pub struct MarketTransferOut<'info> {
     pub authority: Signer<'info>,
-    pub store: Account<'info, Store>,
-    #[account(
-        seeds = [Roles::SEED, store.key().as_ref(), authority.key().as_ref()],
-        bump = only_controller.bump,
-    )]
-    pub only_controller: Account<'info, Roles>,
+    pub store: AccountLoader<'info, Store>,
     #[account(mut, has_one = store)]
     pub market: Account<'info, Market>,
     #[account(mut, token::mint = vault.mint, constraint = to.key() != vault.key())]
@@ -260,11 +236,7 @@ impl<'info> internal::Authentication<'info> for MarketTransferOut<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, Store> {
+    fn store(&self) -> &AccountLoader<'info, Store> {
         &self.store
-    }
-
-    fn roles(&self) -> &Account<'info, Roles> {
-        &self.only_controller
     }
 }

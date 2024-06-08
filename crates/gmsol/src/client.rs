@@ -146,24 +146,9 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         crate::pda::find_store_address(key, &self.data_store_program_id()).0
     }
 
-    /// Find PDA for [`Roles`](data_store::states::Roles) account.
-    pub fn find_roles_address(&self, store: &Pubkey, authority: &Pubkey) -> Pubkey {
-        crate::pda::find_roles_address(store, authority, &self.data_store_program_id()).0
-    }
-
-    /// Get the roles address for payer.
-    pub fn payer_roles_address(&self, store: &Pubkey) -> Pubkey {
-        self.find_roles_address(store, &self.payer())
-    }
-
     /// Get the controller address for the exchange program.
     pub fn controller_address(&self, store: &Pubkey) -> Pubkey {
         crate::pda::find_controller_address(store, &self.exchange_program_id()).0
-    }
-
-    /// Get the roles address for the controller of the exchange program.
-    pub fn controller_roles_address(&self, store: &Pubkey) -> Pubkey {
-        self.find_roles_address(store, &self.controller_address(store))
     }
 
     /// Find PDA for [`Oracle`](data_store::states::Oracle) account.
