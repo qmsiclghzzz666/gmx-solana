@@ -14,13 +14,15 @@ pub(super) struct InspectArgs {
 
 #[derive(clap::Subcommand)]
 enum Command {
-    /// `DataStore` account.
-    DataStore {
+    /// `Store` account.
+    Store {
         address: Option<Pubkey>,
         #[arg(long, short)]
         key: Option<String>,
         #[arg(long)]
         current: bool,
+        #[arg(long)]
+        debug: bool,
     },
     /// `Config` account.
     Config { address: Option<Pubkey> },
@@ -80,10 +82,11 @@ impl InspectArgs {
             Command::Discriminator { name } => {
                 println!("{:?}", crate::utils::generate_discriminator(name));
             }
-            Command::DataStore {
+            Command::Store {
                 address,
                 key,
                 current,
+                debug,
             } => {
                 let address = if *current {
                     *store.wrap_err("current store address not set")?
@@ -92,8 +95,13 @@ impl InspectArgs {
                         client.find_store_address(key.as_deref().unwrap_or_default())
                     })
                 };
-                println!("Store: {address}");
-                println!("{:#?}", program.account::<states::Store>(address).await?);
+                println!("Store Address: {address}");
+                let store = program.account::<states::Store>(address).await?;
+                if *debug {
+                    println!("{store:?}");
+                } else {
+                    println!("{store}");
+                }
             }
             Command::Config { address } => {
                 let address = address

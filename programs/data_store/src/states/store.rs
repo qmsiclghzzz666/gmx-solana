@@ -5,21 +5,6 @@ use super::{InitSpace, RoleStore, Seed};
 
 const MAX_LEN: usize = 32;
 
-// #[account]
-// #[derive(InitSpace)]
-// #[cfg_attr(feature = "debug", derive(Debug))]
-// pub struct Store {
-//     #[max_len(MAX_ROLES)]
-//     roles_metadata: Vec<RoleMetadata>,
-//     #[max_len(MAX_ROLES)]
-//     roles: Vec<RoleKey>,
-//     num_admins: u32,
-//     #[max_len(MAX_LEN)]
-//     key_seed: Vec<u8>,
-//     pub bump: [u8; 1],
-//     reserved: [u8; 64],
-// }
-
 /// Data Store.
 #[account(zero_copy)]
 #[cfg_attr(feature = "debug", derive(Debug))]
@@ -27,6 +12,7 @@ pub struct Store {
     bump: [u8; 1],
     authority: Pubkey,
     key_seed: [u8; 32],
+    key: [u8; MAX_LEN],
     padding: [u8; 7],
     role: RoleStore,
 }
@@ -39,6 +25,20 @@ impl Seed for Store {
     const SEED: &'static [u8] = b"data_store";
 }
 
+#[cfg(feature = "display")]
+impl std::fmt::Display for Store {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Store({}): authority={} roles={} members={}",
+            self.key().unwrap_or("*failed to parse*"),
+            self.authority,
+            self.role.num_roles(),
+            self.role.num_members(),
+        )
+    }
+}
+
 impl Store {
     /// Maximum length of key.
     pub const MAX_LEN: usize = MAX_LEN;
@@ -47,6 +47,7 @@ impl Store {
     /// # Warning
     /// The `roles` is assumed to be initialized with `is_admin == false`.
     pub fn init(&mut self, authority: Pubkey, key: &str, bump: u8) -> Result<()> {
+        self.key = crate::utils::fixed_str::fixed_str_to_bytes(key)?;
         self.key_seed = to_seed(key);
         self.bump = [bump];
         self.authority = authority;
@@ -55,6 +56,16 @@ impl Store {
 
     pub(crate) fn pda_seeds(&self) -> [&[u8]; 3] {
         [Self::SEED, &self.key_seed, &self.bump]
+    }
+
+    /// Get the role store.
+    pub fn role(&self) -> &RoleStore {
+        &self.role
+    }
+
+    /// Get the key of the store.
+    pub fn key(&self) -> Result<&str> {
+        crate::utils::fixed_str::bytes_to_fixed_str(&self.key)
     }
 
     /// Enable a role.

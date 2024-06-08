@@ -34,14 +34,6 @@ impl RoleKey {
     pub const ORDER_KEEPER: &'static str = "ORDER_KEEPER";
 }
 
-/// Metadata of a role.
-#[derive(Clone, AnchorSerialize, AnchorDeserialize, InitSpace)]
-#[cfg_attr(feature = "debug", derive(Debug))]
-pub struct RoleMetadata {
-    pub(super) enabled: bool,
-    pub(super) index: u8,
-}
-
 impl Borrow<str> for RoleKey {
     fn borrow(&self) -> &str {
         &self.name
@@ -63,43 +55,32 @@ type RoleBitmapValue = u32;
 #[zero_copy]
 #[derive(Default)]
 #[cfg_attr(feature = "debug", derive(Debug))]
-pub struct RoleMetadataV2 {
+pub struct RoleMetadata {
     name: [u8; MAX_LEN],
     enabled: u8,
     index: u8,
 }
 
-impl InitSpace for RoleMetadataV2 {
+impl InitSpace for RoleMetadata {
     const INIT_SPACE: usize = 32 + 2;
 }
 
 #[cfg(test)]
 const_assert_eq!(
-    std::mem::size_of::<RoleMetadataV2>(),
-    RoleMetadataV2::INIT_SPACE
+    std::mem::size_of::<RoleMetadata>(),
+    RoleMetadata::INIT_SPACE
 );
 
-impl RoleMetadataV2 {
+impl RoleMetadata {
     /// A `u8` value indicates that this role is enabled.
     pub const ROLE_ENABLED: u8 = u8::MAX;
 
     fn name_to_bytes(name: &str) -> Result<[u8; MAX_LEN]> {
-        let bytes = name.as_bytes();
-        require!(
-            bytes.len() <= MAX_LEN,
-            DataStoreError::ExceedMaxStringLengthLimit
-        );
-        let mut buffer = [0; 32];
-        buffer[..bytes.len()].copy_from_slice(bytes);
-        Ok(buffer)
+        crate::utils::fixed_str::fixed_str_to_bytes(name)
     }
 
     fn bytes_to_name(bytes: &[u8; 32]) -> Result<&str> {
-        let Some(end) = bytes.iter().position(|&x| x == 0) else {
-            return err!(DataStoreError::InvalidRole);
-        };
-        let valid_bytes = &bytes[..end];
-        std::str::from_utf8(valid_bytes).map_err(|_| error!(DataStoreError::InvalidRole))
+        crate::utils::fixed_str::bytes_to_fixed_str(bytes)
     }
 
     /// Create a new role metadata.
@@ -132,7 +113,7 @@ impl RoleMetadataV2 {
     }
 }
 
-crate::fixed_map!(RoleMap, RoleMetadataV2, MAX_ROLES, 0);
+crate::fixed_map!(RoleMap, RoleMetadata, MAX_ROLES, 0);
 
 crate::fixed_map!(
     Members,
@@ -170,7 +151,7 @@ impl RoleStore {
                     .try_into()
                     .map_err(|_| error!(DataStoreError::ExceedMaxLengthLimit))?;
                 self.roles
-                    .insert_with_options(role, RoleMetadataV2::new(role, index)?, true)?;
+                    .insert_with_options(role, RoleMetadata::new(role, index)?, true)?;
             }
         }
         Ok(())
@@ -241,6 +222,16 @@ impl RoleStore {
         bitmap.set(index as usize, false);
         *value = bitmap.into_value();
         Ok(())
+    }
+
+    /// Get the number of roles.
+    pub fn num_roles(&self) -> usize {
+        self.roles.len()
+    }
+
+    /// Get the number of members.
+    pub fn num_members(&self) -> usize {
+        self.members.len()
     }
 }
 
