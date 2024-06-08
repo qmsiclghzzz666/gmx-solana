@@ -7,7 +7,7 @@ import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 
 import { dataStore } from "./program";
 import { initializeTokenConfigMap, insertTokenConfig } from "./token_config";
-import { createRolesPDA, initializeRoles } from "./roles";
+import { createRolesPDA } from "./roles";
 import { createControllerPDA } from "../exchange";
 import { invokeInitializeConfig, invokeInsertAddress, invokeInsertAmount, invokeInsertFactor } from "./config";
 import { TIME_WINDOW } from "./constants";
@@ -117,7 +117,6 @@ export const createMarketVault = async (provider: anchor.AnchorProvider, signer:
 
     await dataStore.methods.initializeMarketVault(null).accountsPartial({
         authority: signer.publicKey,
-        onlyMarketKeeper: roles,
         store: dataStoreAddress,
         mint,
         vault,
@@ -148,38 +147,14 @@ export const initializeDataStore = async (
         const tx = await dataStore.methods.initialize(dataStoreKey).accountsPartial({
             authority: provider.publicKey,
             dataStore: dataStorePDA,
-            roles: rolesPDA,
         }).rpc();
         console.log(`Initialized a new data store account ${dataStorePDA.toBase58()} in tx: ${tx}`);
     } catch (error) {
         console.warn("Failed to initialize a data store with the given key:", error);
     }
 
-    // Initiliaze a roles account for `signer`.
-    try {
-        const roles = await initializeRoles(signer, signer.publicKey, dataStorePDA);
-        console.log(`Initialized a roles account ${roles} for ${signer.publicKey}`);
-    } catch (error) {
-        console.warn("Failed to initialize roles account:", error);
-    }
-
-    // Initiliaze a roles account for `user`.
-    try {
-        const roles = await initializeRoles(signer, user.publicKey, dataStorePDA);
-        console.log(`Initialized a roles account ${roles} for ${user.publicKey}`);
-    } catch (error) {
-        console.warn("Failed to initialize roles account:", error);
-    }
-
     // Initiliaze a roles account for Exchange Program.
     const [controller] = createControllerPDA(dataStorePDA);
-    let controllerRoles: PublicKey;
-    try {
-        controllerRoles = await initializeRoles(signer, controller, dataStorePDA);
-        console.log(`Initialized a roles account ${controllerRoles} for ${controller}`);
-    } catch (error) {
-        console.warn("Failed to initialize roles account:", error);
-    }
 
     // Enable the required roles and grant to `signer` and `controller`
     const enabled_roles = [CONTROLLER, MARKET_KEEPER, ORDER_KEEPER];
@@ -189,7 +164,6 @@ export const initializeDataStore = async (
             const tx = await dataStore.methods.enableRole(role).accounts({
                 authority: provider.publicKey,
                 store: dataStorePDA,
-                onlyAdmin: rolesPDA,
             }).rpc();
             console.log(`Enabled ${role} in tx: ${tx}`);
         }
@@ -197,8 +171,6 @@ export const initializeDataStore = async (
             const tx = await dataStore.methods.grantRole(signer.publicKey, role).accountsPartial({
                 authority: provider.publicKey,
                 store: dataStorePDA,
-                onlyAdmin: rolesPDA,
-                userRoles: signerRoles,
             }).rpc();
             console.log(`Grant ${role} to signer in tx: ${tx}`);
         }
@@ -206,8 +178,6 @@ export const initializeDataStore = async (
             const tx = await dataStore.methods.grantRole(controller, role).accountsPartial({
                 authority: provider.publicKey,
                 store: dataStorePDA,
-                onlyAdmin: rolesPDA,
-                userRoles: controllerRoles,
             }).rpc();
             console.log(`Grant ${role} to exchange program in tx: ${tx}`);
         }
@@ -269,26 +239,11 @@ export const initializeDataStore = async (
         const tx = await dataStore.methods.initializeOracle(oracleIndex).accounts({
             authority: signer.publicKey,
             store: dataStorePDA,
-            onlyController: signerRoles,
             oracle: oraclePDA,
         }).signers([signer]).rpc();
         console.log(`Inited an oracle account ${oraclePDA} in tx: ${tx}`);
     } catch (error) {
         console.warn(`Failed to init an oracle account with index ${oracleIndex}:`, error);
-    }
-
-    // Init a nonce.
-    try {
-        const [noncePDA] = createNoncePDA(dataStorePDA);
-        const tx = await dataStore.methods.initializeNonce().accountsPartial({
-            authority: signer.publicKey,
-            store: dataStorePDA,
-            onlyController: signerRoles,
-            nonce: noncePDA,
-        }).signers([signer]).rpc();
-        console.log(`Inited a nonce account ${noncePDA} in tx: ${tx}`);
-    } catch (error) {
-        console.warn("Failed to init a nonce account", error);
     }
 
     // Init the config.

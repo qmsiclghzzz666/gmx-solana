@@ -6,7 +6,7 @@ use crate::{
     states::{
         common::{SwapParams, TokenRecord},
         withdrawal::TokenParams,
-        DataStore, Market, NonceBytes, Roles, Seed, Withdrawal,
+        Market, NonceBytes, Seed, Store, Withdrawal,
     },
     utils::internal,
     DataStoreError,
@@ -16,8 +16,7 @@ use crate::{
 #[instruction(nonce: [u8; 32], swap_params: SwapParams, tokens_with_feed: Vec<TokenRecord>)]
 pub struct InitializeWithdrawal<'info> {
     pub authority: Signer<'info>,
-    pub store: Account<'info, DataStore>,
-    pub only_controller: Account<'info, Roles>,
+    pub store: AccountLoader<'info, Store>,
     #[account(mut)]
     pub payer: Signer<'info>,
     #[account(
@@ -97,12 +96,8 @@ impl<'info> internal::Authentication<'info> for InitializeWithdrawal<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, DataStore> {
+    fn store(&self) -> &AccountLoader<'info, Store> {
         &self.store
-    }
-
-    fn roles(&self) -> &Account<'info, Roles> {
-        &self.only_controller
     }
 }
 
@@ -112,8 +107,7 @@ pub struct RemoveWithdrawal<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
     pub authority: Signer<'info>,
-    pub store: Account<'info, DataStore>,
-    pub only_controller: Account<'info, Roles>,
+    pub store: AccountLoader<'info, Store>,
     #[account(
         mut,
         close = payer,
@@ -197,12 +191,8 @@ impl<'info> internal::Authentication<'info> for RemoveWithdrawal<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, DataStore> {
+    fn store(&self) -> &AccountLoader<'info, Store> {
         &self.store
-    }
-
-    fn roles(&self) -> &Account<'info, Roles> {
-        &self.only_controller
     }
 }
 

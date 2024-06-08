@@ -35,7 +35,7 @@ export const getUsers = () => {
 
 // Keys.
 const randomeKey = anchor.web3.Keypair.generate().publicKey.toBase58();
-const dataStoreKey = isDevNet ? randomeKey : "data_store_0";
+const dataStoreKey = isDevNet ? randomeKey.slice(0, 10) : "data_store_0";
 const oracleIndex = 255;
 
 export const getKeys = () => {

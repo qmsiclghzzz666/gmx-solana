@@ -44,10 +44,6 @@ pub mod data_store {
     }
 
     // Roles.
-    pub fn initialize_roles(ctx: Context<InitializeRoles>, authority: Pubkey) -> Result<()> {
-        instructions::initialize_roles(ctx, authority)
-    }
-
     pub fn check_admin(ctx: Context<CheckRole>) -> Result<bool> {
         instructions::check_admin(ctx)
     }
@@ -82,16 +78,6 @@ pub mod data_store {
     #[access_control(internal::Authenticate::only_admin(&ctx))]
     pub fn revoke_role(ctx: Context<RevokeRole>, user: Pubkey, role: String) -> Result<()> {
         instructions::revoke_role(ctx, user, role)
-    }
-
-    #[access_control(internal::Authenticate::only_admin(&ctx))]
-    pub fn add_admin(ctx: Context<AddAdmin>, user: Pubkey) -> Result<()> {
-        instructions::add_admin(ctx, user)
-    }
-
-    #[access_control(internal::Authenticate::only_admin(&ctx))]
-    pub fn remove_admin(ctx: Context<RemoveAdmin>, user: Pubkey) -> Result<()> {
-        instructions::remove_admin(ctx, user)
     }
 
     // Config.
@@ -326,21 +312,6 @@ pub mod data_store {
         instructions::set_prices_from_price_feed(ctx, tokens)
     }
 
-    // Nonce.
-    #[access_control(internal::Authenticate::only_controller(&ctx))]
-    pub fn initialize_nonce(ctx: Context<InitializeNonce>) -> Result<()> {
-        instructions::initialize_nonce(ctx)
-    }
-
-    #[access_control(internal::Authenticate::only_controller(&ctx))]
-    pub fn increment_nonce(ctx: Context<IncrementNonce>) -> Result<[u8; 32]> {
-        instructions::increment_nonce(ctx)
-    }
-
-    pub fn get_nonce_bytes(ctx: Context<GetNonceBytes>) -> Result<[u8; 32]> {
-        instructions::get_nonce_bytes(ctx)
-    }
-
     // Deposit.
     #[access_control(internal::Authenticate::only_controller(&ctx))]
     pub fn initialize_deposit(
@@ -456,6 +427,8 @@ pub enum DataStoreError {
     InvalidPDA,
     #[msg("Invalid key")]
     InvalidKey,
+    #[msg("Aready exist")]
+    AlreadyExist,
     #[msg("Exceed max length limit")]
     ExceedMaxLengthLimit,
     #[msg("Exceed max string length limit")]
@@ -497,6 +470,10 @@ pub enum DataStoreError {
     InvalidRoles,
     #[msg("Permission denied")]
     PermissionDenied,
+    #[msg("No such role")]
+    NoSuchRole,
+    #[msg("The role is disabled")]
+    DisabledRole,
     // Oracle.
     #[msg("Oracle is not empty")]
     PricesAlreadySet,

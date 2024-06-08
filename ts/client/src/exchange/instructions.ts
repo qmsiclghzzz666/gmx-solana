@@ -1,8 +1,7 @@
 import { Keypair, PublicKey } from "@solana/web3.js";
-import { findControllerPDA } from ".";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { toBN } from "../utils/number";
-import { findDepositPDA, findMarketPDA, findMarketVaultPDA, findOrderPDA, findPositionPDA, findRolesPDA, findTokenConfigMapPDA, findWithdrawalPDA } from "../store";
+import { findDepositPDA, findMarketPDA, findMarketVaultPDA, findOrderPDA, findPositionPDA, findTokenConfigMapPDA, findWithdrawalPDA } from "../store";
 import { IxWithOutput, makeInvoke } from "../utils/invoke";
 import { DataStoreProgram, ExchangeProgram } from "../program";
 import { BN } from "@coral-xyz/anchor";
@@ -51,7 +50,7 @@ export const makeCreateDepositInstruction = async (
     const fromInitialLongTokenAccount = initialLongTokenAmountBN.isZero() ? null : getTokenAccount(payer, initialLongToken, options?.fromInitialLongTokenAccount);
     const fromInitialShortTokenAccount = initialShortTokenAmountBN.isZero() ? null : getTokenAccount(payer, initialShortToken, options?.fromInitialShortTokenAccount);
     const toMarketTokenAccount = getTokenAccount(payer, marketToken, options?.toMarketTokenAccount);
-    const [authority] = findControllerPDA(store);
+    // const [authority] = findControllerPDA(store);
     const depositNonce = options?.nonce ?? Keypair.generate().publicKey.toBuffer();
     const [deposit] = findDepositPDA(store, payer, depositNonce);
     const [longTokenDepositVault] = findMarketVaultPDA(store, initialLongToken);
@@ -72,7 +71,6 @@ export const makeCreateDepositInstruction = async (
         }
     ).accounts({
         store,
-        onlyController: findRolesPDA(store, authority)[0],
         market,
         tokenConfigMap: findTokenConfigMapPDA(store)[0],
         deposit,
@@ -128,7 +126,7 @@ export const makeCreateWithdrawalInstruction = async (
         finalShortToken,
         options,
     }: MakeCreateWithdrawalParams) => {
-    const [authority] = findControllerPDA(store);
+    // const [authority] = findControllerPDA(store);
     const fromMarketTokenAccount = getTokenAccount(payer, marketToken, options?.fromMarketTokenAccount);
     const toLongTokenAccount = getTokenAccount(payer, finalLongToken, options?.toLongTokenAccount);
     const toShortTokenAccount = getTokenAccount(payer, finalShortToken, options?.toShortTokenAccount);
@@ -149,7 +147,6 @@ export const makeCreateWithdrawalInstruction = async (
         shortTokenSwapLength: shortSwapPath.length,
     }).accounts({
         store,
-        onlyController: findRolesPDA(store, authority)[0],
         tokenConfigMap: findTokenConfigMapPDA(store)[0],
         market: findMarketPDA(store, marketToken)[0],
         withdrawal: withdrawalAddress,
@@ -241,8 +238,7 @@ export const makeCreateDecreaseOrderInstruction = async (
     }
 
     const swapPath = options?.swapPath ?? [];
-    const [authority] = findControllerPDA(store);
-    const [onlyController] = findRolesPDA(store, authority);
+    // const [authority] = findControllerPDA(store);
     const nonce = options?.nonce ?? Keypair.generate().publicKey.toBuffer();
     const [order] = findOrderPDA(store, payer, nonce);
     const acceptablePrice = options?.acceptablePrice;
@@ -269,7 +265,6 @@ export const makeCreateDecreaseOrderInstruction = async (
             swapLength: swapPath.length,
         }).accounts({
             store,
-            onlyController,
             payer,
             order,
             position,
@@ -334,8 +329,7 @@ export const makeCreateIncreaseOrderInstruction = async (
     }: MakeCreateIncreaseOrderParams
 ) => {
     const swapPath = options?.swapPath ?? [];
-    const [authority] = findControllerPDA(store);
-    const [onlyController] = findRolesPDA(store, authority);
+    // const [authority] = findControllerPDA(store);
     const nonce = options?.nonce ?? Keypair.generate().publicKey.toBuffer();
     const [order] = findOrderPDA(store, payer, nonce);
     const acceptablePrice = options?.acceptablePrice;
@@ -371,7 +365,6 @@ export const makeCreateIncreaseOrderInstruction = async (
             swapLength: swapPath.length,
         }).accounts({
             store,
-            onlyController,
             payer,
             order,
             position: findPositionPDA(store, payer, marketToken, collateralToken, isLong)[0],

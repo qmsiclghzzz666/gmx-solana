@@ -35,7 +35,6 @@ export const createMarket = async (
 
     await exchange.methods.createMarket(indexTokenMint).accounts({
         authority: signer.publicKey,
-        onlyMarketKeeper: roles,
         dataStore: dataStoreAddress,
         market: marketAddress,
         marketTokenMint,
@@ -99,7 +98,6 @@ export const makeCancelDepositInstruction = async ({
     return await exchange.methods.cancelDeposit(toBN(options?.executionFee ?? 0)).accounts({
         authority,
         store,
-        onlyController: createRolesPDA(store, authority)[0],
         user,
         deposit,
         initialLongToken: fromInitialLongTokenAccount,
@@ -224,8 +222,6 @@ export const makeExecuteDepositInstruction = async ({
     return await exchange.methods.executeDeposit(toBN(options?.executionFee ?? 0)).accounts({
         authority,
         store,
-        onlyOrderKeeper: createRolesPDA(store, authority)[0],
-        onlyController,
         oracle,
         config: findConfigPDA(store)[0],
         tokenConfigMap: createTokenConfigMapPDA(store)[0],
@@ -312,7 +308,6 @@ export const makeCancelWithdrawalInstruction = async ({
     return await exchange.methods.cancelWithdrawal(toBN(options?.executionFee ?? 0)).accounts({
         authority,
         store,
-        onlyController: createRolesPDA(store, authority)[0],
         withdrawal,
         user,
         marketToken: toMarketTokenAccount,
@@ -410,8 +405,6 @@ export const makeExecuteWithdrawalInstruction = async ({
     return await exchange.methods.executeWithdrawal(toBN(options?.executionFee ?? 0)).accounts({
         authority,
         store,
-        onlyController,
-        onlyOrderKeeper: createRolesPDA(store, authority)[0],
         oracle,
         config: findConfigPDA(store)[0],
         tokenConfigMap: createTokenConfigMapPDA(store)[0],
@@ -553,8 +546,6 @@ export const makeExecuteOrderInstruction = async ({
     const [onlyController] = findRolesPDA(store, controller);
     return await exchange.methods.executeOrder(toBN(recentTimestamp), toBN(options?.executionFee ?? 0)).accounts({
         authority,
-        onlyOrderKeeper,
-        onlyController,
         store,
         oracle,
         config: findConfigPDA(store)[0],

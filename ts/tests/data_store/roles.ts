@@ -21,7 +21,6 @@ describe("data store: Roles", () => {
         await dataStore.methods.enableRole(otherRole).accounts({
             authority: provider.publicKey,
             store: dataStoreAddress,
-            onlyAdmin: providerRoles,
         }).rpc();
     });
 
@@ -29,7 +28,6 @@ describe("data store: Roles", () => {
         await dataStore.methods.disableRole(otherRole).accounts({
             authority: provider.publicKey,
             store: dataStoreAddress,
-            onlyAdmin: providerRoles,
         }).rpc();
     });
 
@@ -37,7 +35,6 @@ describe("data store: Roles", () => {
     it("check admin success", async () => {
         const isAdmin: boolean = await dataStore.methods.hasAdmin(provider.publicKey).accounts({
             store: dataStoreAddress,
-            roles: providerRoles,
         }).view();
         expect(isAdmin).true;
     });
@@ -45,7 +42,6 @@ describe("data store: Roles", () => {
     it("check admin failure", async () => {
         const isAdmin = await dataStore.methods.hasAdmin(signer0.publicKey).accounts({
             store: dataStoreAddress,
-            roles: signer0Roles,
         }).view();
         expect(isAdmin).false;
     });
@@ -54,7 +50,6 @@ describe("data store: Roles", () => {
         await expect(dataStore.methods.enableRole("FOO").accounts({
             authority: signer0.publicKey,
             store: dataStoreAddress,
-            onlyAdmin: signer0Roles,
         }).signers([signer0]).rpc()).to.rejectedWith(AnchorError, "Not an admin");
     });
 
@@ -62,7 +57,6 @@ describe("data store: Roles", () => {
         await expect(dataStore.methods.disableRole("CONTROLLER").accounts({
             authority: signer0.publicKey,
             store: dataStoreAddress,
-            onlyAdmin: signer0Roles,
         }).signers([signer0]).rpc()).to.rejectedWith(AnchorError, "Not an admin");
     });
 
@@ -70,12 +64,10 @@ describe("data store: Roles", () => {
         await expect(dataStore.methods.enableRole("FOO").accounts({
             authority: provider.publicKey,
             store: dataStoreAddress,
-            onlyAdmin: signer0Roles,
         }).rpc());
         await expect(dataStore.methods.disableRole("FOO").accounts({
             authority: provider.publicKey,
             store: dataStoreAddress,
-            onlyAdmin: providerRoles,
         }).rpc());
     });
 
@@ -83,28 +75,23 @@ describe("data store: Roles", () => {
         await expect(dataStore.methods.enableRole("FOO").accounts({
             authority: signer0.publicKey,
             store: dataStoreAddress,
-            onlyAdmin: providerRoles,
-        }).signers([signer0]).rpc()).to.rejectedWith(AnchorError, "Permission denied");
+        }).signers([signer0]).rpc()).to.rejectedWith(AnchorError, "Not an admin");
 
         await expect(dataStore.methods.enableRole("FOO").accounts({
             authority: signer0.publicKey,
             store: dataStoreAddress,
-            onlyAdmin: providerRoles,
-        }).signers([signer0]).rpc()).to.rejectedWith(AnchorError, "Permission denied");
+        }).signers([signer0]).rpc()).to.rejectedWith(AnchorError, "Not an admin");
     });
 
     it("grant, check and revoke a role to user", async () => {
         await dataStore.methods.grantRole(signer0.publicKey, otherRole).accountsPartial({
             authority: provider.publicKey,
             store: dataStoreAddress,
-            onlyAdmin: providerRoles,
-            userRoles: signer0Roles,
         }).rpc();
 
         {
             const hasRole = await dataStore.methods.hasRole(signer0.publicKey, otherRole).accounts({
                 store: dataStoreAddress,
-                roles: signer0Roles,
             }).view();
             expect(hasRole).true;
         }
@@ -112,14 +99,11 @@ describe("data store: Roles", () => {
         await dataStore.methods.revokeRole(signer0.publicKey, otherRole).accountsPartial({
             authority: provider.publicKey,
             store: dataStoreAddress,
-            onlyAdmin: providerRoles,
-            userRoles: signer0Roles,
         }).rpc();
 
         {
             const hasRole = await dataStore.methods.hasRole(signer0.publicKey, otherRole).accounts({
                 store: dataStoreAddress,
-                roles: signer0Roles,
             }).view();
             expect(hasRole).false;
         }
@@ -127,15 +111,11 @@ describe("data store: Roles", () => {
         await expect(dataStore.methods.grantRole(signer0.publicKey, otherRole).accountsPartial({
             authority: signer0.publicKey,
             store: dataStoreAddress,
-            onlyAdmin: signer0Roles,
-            userRoles: signer0Roles,
         }).signers([signer0]).rpc()).to.rejectedWith(AnchorError, "Not an admin");
 
         await expect(dataStore.methods.revokeRole(signer0.publicKey, otherRole).accountsPartial({
             authority: signer0.publicKey,
             store: dataStoreAddress,
-            onlyAdmin: signer0Roles,
-            userRoles: signer0Roles,
         }).signers([signer0]).rpc()).to.rejectedWith(AnchorError, "Not an admin");
     });
 });

@@ -51,7 +51,6 @@ where
             .args(instruction::UseClaimableAccount { timestamp, amount })
             .accounts(accounts::UseClaimableAccount {
                 authority,
-                only_controller: self.payer_roles_address(store),
                 store: *store,
                 config: self.find_config_address(store),
                 mint: *mint,
@@ -78,7 +77,6 @@ where
             })
             .accounts(accounts::CloseEmptyClaimableAccount {
                 authority,
-                only_controller: self.payer_roles_address(store),
                 store: *store,
                 config: self.find_config_address(store),
                 mint: *mint,

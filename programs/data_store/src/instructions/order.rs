@@ -7,7 +7,7 @@ use crate::{
         common::{SwapParams, TokenRecord},
         order::{Order, OrderKind, OrderParams, Receivers, Senders, Tokens},
         position::Position,
-        DataStore, Market, NonceBytes, Roles, Seed,
+        Market, NonceBytes, Seed, Store,
     },
     utils::internal,
     DataStoreError,
@@ -23,8 +23,7 @@ use crate::{
 )]
 pub struct InitializeOrder<'info> {
     pub authority: Signer<'info>,
-    pub store: Account<'info, DataStore>,
-    pub only_controller: Account<'info, Roles>,
+    pub store: AccountLoader<'info, Store>,
     #[account(mut)]
     pub payer: Signer<'info>,
     #[account(
@@ -193,12 +192,8 @@ impl<'info> internal::Authentication<'info> for InitializeOrder<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, DataStore> {
+    fn store(&self) -> &AccountLoader<'info, Store> {
         &self.store
-    }
-
-    fn roles(&self) -> &Account<'info, Roles> {
-        &self.only_controller
     }
 }
 
@@ -285,8 +280,7 @@ pub struct RemoveOrder<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
     pub authority: Signer<'info>,
-    pub only_controller: Account<'info, Roles>,
-    pub store: Account<'info, DataStore>,
+    pub store: AccountLoader<'info, Store>,
     #[account(
         mut,
         close = payer,
@@ -319,12 +313,8 @@ impl<'info> internal::Authentication<'info> for RemoveOrder<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, DataStore> {
+    fn store(&self) -> &AccountLoader<'info, Store> {
         &self.store
-    }
-
-    fn roles(&self) -> &Account<'info, Roles> {
-        &self.only_controller
     }
 }
 

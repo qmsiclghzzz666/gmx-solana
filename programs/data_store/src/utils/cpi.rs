@@ -19,9 +19,6 @@ pub trait Authentication<'info>: Bumps + Sized {
     /// Get data store.
     fn store(&self) -> AccountInfo<'info>;
 
-    /// Get roles for `authority`.
-    fn roles(&self) -> AccountInfo<'info>;
-
     /// Get the cpi context for checking role or admin permission.
     fn check_role_ctx(&self) -> CpiContext<'_, '_, '_, 'info, CheckRole<'info>> {
         CpiContext::new(
@@ -29,7 +26,6 @@ pub trait Authentication<'info>: Bumps + Sized {
             CheckRole {
                 authority: self.authority(),
                 store: self.store(),
-                roles: self.roles(),
             },
         )
     }
@@ -106,7 +102,6 @@ pub trait WithOracleExt<'info>: WithOracle<'info> {
             check_role.program,
             SetPricesFromPriceFeed {
                 authority: self.authority().to_account_info(),
-                only_controller: check_role.accounts.roles,
                 store: check_role.accounts.store,
                 config: self.config(),
                 token_config_map: self.token_config_map(),
@@ -124,7 +119,6 @@ pub trait WithOracleExt<'info>: WithOracle<'info> {
             check_role.program,
             ClearAllPrices {
                 authority: self.authority().to_account_info(),
-                only_controller: check_role.accounts.roles,
                 store: check_role.accounts.store,
                 oracle: self.oracle(),
             },

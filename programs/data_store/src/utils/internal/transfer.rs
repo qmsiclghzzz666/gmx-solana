@@ -1,10 +1,10 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Burn, MintTo, Transfer};
 
-use crate::{states::DataStore, DataStoreError};
+use crate::{states::Store, DataStoreError};
 
 pub(crate) struct TransferUtils<'a, 'info> {
-    store: &'a Account<'info, DataStore>,
+    store: &'a AccountLoader<'info, Store>,
     token_program: AccountInfo<'info>,
     mint: Option<AccountInfo<'info>>,
 }
@@ -12,7 +12,7 @@ pub(crate) struct TransferUtils<'a, 'info> {
 impl<'a, 'info> TransferUtils<'a, 'info> {
     pub(crate) fn new(
         token_program: AccountInfo<'info>,
-        store: &'a Account<'info, DataStore>,
+        store: &'a AccountLoader<'info, Store>,
         mint: Option<AccountInfo<'info>>,
     ) -> Self {
         Self {
@@ -25,14 +25,15 @@ impl<'a, 'info> TransferUtils<'a, 'info> {
     pub(crate) fn mint_to(&self, to: &AccountInfo<'info>, amount: u64) -> Result<()> {
         anchor_spl::token::mint_to(
             self.mint_to_ctx(to)?
-                .with_signer(&[&self.store.pda_seeds()]),
+                .with_signer(&[&self.store.load()?.pda_seeds()]),
             amount,
         )
     }
 
     pub(crate) fn burn_from(&self, from: &AccountInfo<'info>, amount: u64) -> Result<()> {
         anchor_spl::token::burn(
-            self.burn_ctx(from)?.with_signer(&[&self.store.pda_seeds()]),
+            self.burn_ctx(from)?
+                .with_signer(&[&self.store.load()?.pda_seeds()]),
             amount,
         )
     }
@@ -45,7 +46,7 @@ impl<'a, 'info> TransferUtils<'a, 'info> {
     ) -> Result<()> {
         anchor_spl::token::transfer(
             self.transfer_ctx(from, to)
-                .with_signer(&[&self.store.pda_seeds()]),
+                .with_signer(&[&self.store.load()?.pda_seeds()]),
             amount,
         )
     }

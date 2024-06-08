@@ -16,6 +16,7 @@ cpi = ["no-entrypoint"]
 default = []
 idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
 debug = []
+display = []
 utils = []
 devnet = []
 
@@ -37,3 +38,4 @@ static_assertions = "1.1.0"
 clap = { workspace = true, optional = true }
 pyth-sdk-solana = "0.10.1"
 pyth-solana-receiver-sdk = { workspace = true }
+paste = "1.0.15"

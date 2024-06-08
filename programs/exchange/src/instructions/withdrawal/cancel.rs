@@ -26,8 +26,6 @@ pub struct CancelWithdrawal<'info> {
     pub authority: UncheckedAccount<'info>,
     /// CHECK: used and checked by CPI.
     pub store: UncheckedAccount<'info>,
-    /// CHECK: used and checked by CPI.
-    pub only_controller: UncheckedAccount<'info>,
     pub data_store_program: Program<'info, DataStore>,
     /// The withdrawal to cancel.
     ///
@@ -84,10 +82,6 @@ impl<'info> Authentication<'info> for CancelWithdrawal<'info> {
     fn store(&self) -> AccountInfo<'info> {
         self.store.to_account_info()
     }
-
-    fn roles(&self) -> AccountInfo<'info> {
-        self.only_controller.to_account_info()
-    }
 }
 
 impl<'info> CancelWithdrawal<'info> {
@@ -98,7 +92,6 @@ impl<'info> CancelWithdrawal<'info> {
                 payer: self.authority.to_account_info(),
                 authority: self.authority.to_account_info(),
                 store: self.store.to_account_info(),
-                only_controller: self.only_controller.to_account_info(),
                 withdrawal: self.withdrawal.to_account_info(),
                 user: self.user.to_account_info(),
                 system_program: self.system_program.to_account_info(),

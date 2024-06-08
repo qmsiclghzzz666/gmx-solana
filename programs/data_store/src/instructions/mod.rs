@@ -7,9 +7,6 @@ pub mod config;
 /// Instructions for roles management.
 pub mod roles;
 
-/// Instructions for incrementing nonce value.
-pub mod nonce;
-
 /// Instructions for Token Config.
 pub mod token_config;
 
@@ -42,7 +39,6 @@ pub use data_store::*;
 pub use deposit::*;
 pub use exchange::*;
 pub use market::*;
-pub use nonce::*;
 pub use oracle::*;
 pub use order::*;
 pub use position::*;

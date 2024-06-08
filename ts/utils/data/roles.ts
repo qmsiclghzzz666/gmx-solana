@@ -11,11 +11,3 @@ export const createRolesPDA = (store: PublicKey, authority: PublicKey) => Public
     authority.toBytes(),
 ], dataStore.programId);
 
-export const initializeRoles = async (payer: Signer, authority: PublicKey, store: PublicKey) => {
-    const [roles] = createRolesPDA(store, authority);
-    await dataStore.methods.initializeRoles(authority).accounts({
-        payer: payer.publicKey,
-        store,
-    }).signers([payer]).rpc();
-    return roles;
-};

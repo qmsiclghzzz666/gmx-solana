@@ -13,8 +13,6 @@ use crate::{utils::ControllerSeeds, ExchangeError};
 pub struct ExecuteOrder<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
-    /// CHECK: used and checked by CPI.
-    pub only_order_keeper: UncheckedAccount<'info>,
     /// CHECK: only used as signing PDA.
     #[account(
         seeds = [
@@ -24,8 +22,6 @@ pub struct ExecuteOrder<'info> {
         bump,
     )]
     pub controller: UncheckedAccount<'info>,
-    /// CHECK: only used by CPI.
-    pub only_controller: UncheckedAccount<'info>,
     /// CHECK: used and checked by CPI.
     pub store: UncheckedAccount<'info>,
     /// CHECK: only use and check by CPI.
@@ -150,10 +146,6 @@ impl<'info> Authentication<'info> for ExecuteOrder<'info> {
     fn store(&self) -> AccountInfo<'info> {
         self.store.to_account_info()
     }
-
-    fn roles(&self) -> AccountInfo<'info> {
-        self.only_order_keeper.to_account_info()
-    }
 }
 
 impl<'info> WithOracle<'info> for ExecuteOrder<'info> {
@@ -183,7 +175,6 @@ impl<'info> ExecuteOrder<'info> {
             data_store::cpi::accounts::ExecuteOrder {
                 authority: self.controller.to_account_info(),
                 store: self.store.to_account_info(),
-                only_controller: self.only_controller.to_account_info(),
                 config: self.config.to_account_info(),
                 oracle: self.oracle.to_account_info(),
                 order: self.order.to_account_info(),
@@ -233,7 +224,6 @@ impl<'info> ExecuteOrder<'info> {
             RemoveOrder {
                 payer: self.authority.to_account_info(),
                 authority: self.controller.to_account_info(),
-                only_controller: self.only_controller.to_account_info(),
                 store: self.store.to_account_info(),
                 order: self.order.to_account_info(),
                 user: self.user.to_account_info(),
@@ -255,7 +245,6 @@ impl<'info> ExecuteOrder<'info> {
             RemovePosition {
                 payer: self.authority.to_account_info(),
                 authority: self.controller.to_account_info(),
-                only_controller: self.only_controller.to_account_info(),
                 store: self.store.to_account_info(),
                 position: self.position()?.to_account_info(),
                 user: self.user.to_account_info(),
@@ -275,7 +264,6 @@ impl<'info> ExecuteOrder<'info> {
             MarketTransferOut {
                 authority: self.controller.to_account_info(),
                 store: self.store.to_account_info(),
-                only_controller: self.only_controller.to_account_info(),
                 market,
                 to,
                 vault,

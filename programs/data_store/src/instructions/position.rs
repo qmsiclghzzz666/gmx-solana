@@ -1,7 +1,7 @@
 use anchor_lang::{prelude::*, system_program};
 
 use crate::{
-    states::{DataStore, Position, Roles, Seed},
+    states::{Position, Seed, Store},
     utils::internal,
     DataStoreError,
 };
@@ -12,8 +12,7 @@ pub struct RemovePosition<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
     pub authority: Signer<'info>,
-    pub only_controller: Account<'info, Roles>,
-    pub store: Account<'info, DataStore>,
+    pub store: AccountLoader<'info, Store>,
     #[account(
         mut,
         constraint = position.to_account_info().lamports() >= refund @ DataStoreError::LamportsNotEnough,
@@ -47,12 +46,8 @@ impl<'info> internal::Authentication<'info> for RemovePosition<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, DataStore> {
+    fn store(&self) -> &AccountLoader<'info, Store> {
         &self.store
-    }
-
-    fn roles(&self) -> &Account<'info, Roles> {
-        &self.only_controller
     }
 }
 

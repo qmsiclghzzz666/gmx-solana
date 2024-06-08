@@ -26,8 +26,6 @@ pub struct CancelDeposit<'info> {
     pub authority: UncheckedAccount<'info>,
     /// CHECK: only used to invoke CPI.
     pub store: UncheckedAccount<'info>,
-    /// CHECK: only used to invoke CPI.
-    pub only_controller: UncheckedAccount<'info>,
     pub data_store_program: Program<'info, DataStore>,
     /// The deposit to cancel.
     ///
@@ -118,10 +116,6 @@ impl<'info> Authentication<'info> for CancelDeposit<'info> {
     fn store(&self) -> AccountInfo<'info> {
         self.store.to_account_info()
     }
-
-    fn roles(&self) -> AccountInfo<'info> {
-        self.only_controller.to_account_info()
-    }
 }
 
 impl<'info> CancelDeposit<'info> {
@@ -131,7 +125,6 @@ impl<'info> CancelDeposit<'info> {
             RemoveDeposit {
                 payer: self.authority.to_account_info(),
                 authority: self.authority.to_account_info(),
-                only_controller: self.only_controller.to_account_info(),
                 store: self.store.to_account_info(),
                 deposit: self.deposit.to_account_info(),
                 user: self.user.to_account_info(),
@@ -233,7 +226,6 @@ impl<'info> CancelDeposit<'info> {
             MarketTransferOut {
                 authority: self.authority.to_account_info(),
                 store: self.store.to_account_info(),
-                only_controller: self.only_controller.to_account_info(),
                 market,
                 to,
                 vault,

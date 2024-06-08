@@ -17,7 +17,6 @@ export const initializeTokenConfigMap = async (authority: Signer, store: PublicK
     await dataStore.methods.initializeTokenConfigMap(len).accounts({
         authority: authority.publicKey,
         store,
-        onlyController: createRolesPDA(store, authority.publicKey)[0],
     }).signers([authority]).rpc();
     return map;
 };
@@ -59,7 +58,6 @@ export const insertTokenConfig = async (
     }, true).accounts({
         authority: authority.publicKey,
         store,
-        onlyController: createRolesPDA(store, authority.publicKey)[0],
         token,
     }).signers([authority]).rpc();
 };
@@ -90,7 +88,6 @@ export const insertSyntheticTokenConfig = async (
     }, true).accounts({
         authority: authority.publicKey,
         store,
-        onlyController: createRolesPDA(store, authority.publicKey)[0],
     }).signers([authority]).rpc();
 };
 
@@ -103,7 +100,6 @@ export const toggleTokenConfig = async (
     await dataStore.methods.toggleTokenConfig(token, enable).accounts({
         authority: authority.publicKey,
         store,
-        onlyController: createRolesPDA(store, authority.publicKey)[0],
     }).signers([authority]).rpc();
 };
 
@@ -116,7 +112,6 @@ export const setExpectedProvider = async (
     await dataStore.methods.setExpectedProvider(token, provider).accounts({
         authority: authority.publicKey,
         store,
-        onlyController: createRolesPDA(store, authority.publicKey)[0],
     }).signers([authority]).rpc();
 };
 
@@ -140,7 +135,6 @@ export const extendTokenConfigMap = async (authority: Signer, store: PublicKey, 
     await dataStore.methods.extendTokenConfigMap(extendLen).accounts({
         authority: authority.publicKey,
         store,
-        onlyController: createRolesPDA(store, authority.publicKey)[0],
     }).signers([authority]).rpc();
 };
 

@@ -218,7 +218,6 @@ where
         let payer = client.payer();
         let deposit = client.find_deposit_address(store, &payer, &nonce);
         let authority = client.controller_address(store);
-        let only_controller = client.find_roles_address(store, &authority);
         let market = client.find_market_address(store, market_token);
         let (long_token, short_token) = self.get_or_fetch_initial_tokens(&market).await?;
         let initial_long_token_account =
@@ -232,7 +231,6 @@ where
                 accounts::CreateDeposit {
                     authority,
                     store: *store,
-                    only_controller,
                     data_store_program: client.data_store_program_id(),
                     system_program: system_program::ID,
                     token_program: anchor_spl::token::ID,
@@ -418,7 +416,6 @@ where
             execution_fee,
             ..
         } = self;
-        let only_controller = self.client.find_roles_address(store, &authority);
         Ok(client
             .exchange()
             .request()
@@ -426,7 +423,6 @@ where
                 accounts::CancelDeposit {
                     authority,
                     store: *store,
-                    only_controller,
                     data_store_program: client.data_store_program_id(),
                     deposit: *deposit,
                     user,
@@ -563,7 +559,6 @@ where
             ..
         } = self;
         let authority = client.payer();
-        let only_order_keeper = client.payer_roles_address(store);
         let feeds = self
             .feeds_parser
             .parse(&hint.feeds)
@@ -591,9 +586,7 @@ where
             .exchange_request()
             .accounts(accounts::ExecuteDeposit {
                 authority,
-                only_order_keeper,
                 controller: client.controller_address(store),
-                only_controller: client.controller_roles_address(store),
                 store: *store,
                 data_store_program: client.data_store_program_id(),
                 price_provider: *price_provider,

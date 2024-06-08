@@ -3,7 +3,7 @@ use anchor_spl::token::{Burn, Mint, MintTo, Token, TokenAccount, Transfer};
 
 use crate::{
     constants,
-    states::{Config, DataStore, Roles, Seed},
+    states::{Config, Seed, Store},
     utils::internal,
 };
 
@@ -23,8 +23,7 @@ pub fn initialize_market_token(
 pub struct InitializeMarketToken<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
-    pub only_market_keeper: Account<'info, Roles>,
-    pub store: Account<'info, DataStore>,
+    pub store: AccountLoader<'info, Store>,
     #[account(
         init,
         payer = authority,
@@ -50,12 +49,8 @@ impl<'info> internal::Authentication<'info> for InitializeMarketToken<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, DataStore> {
+    fn store(&self) -> &AccountLoader<'info, Store> {
         &self.store
-    }
-
-    fn roles(&self) -> &Account<'info, Roles> {
-        &self.only_market_keeper
     }
 }
 
@@ -64,7 +59,7 @@ pub fn mint_market_token_to(ctx: Context<MintMarketTokenTo>, amount: u64) -> Res
     anchor_spl::token::mint_to(
         ctx.accounts
             .mint_to_ctx()
-            .with_signer(&[&ctx.accounts.store.pda_seeds()]),
+            .with_signer(&[&ctx.accounts.store.load()?.pda_seeds()]),
         amount,
     )
 }
@@ -72,8 +67,7 @@ pub fn mint_market_token_to(ctx: Context<MintMarketTokenTo>, amount: u64) -> Res
 #[derive(Accounts)]
 pub struct MintMarketTokenTo<'info> {
     pub authority: Signer<'info>,
-    pub only_controller: Account<'info, Roles>,
-    pub store: Account<'info, DataStore>,
+    pub store: AccountLoader<'info, Store>,
     #[account(mut)]
     pub market_token_mint: Account<'info, Mint>,
     #[account(mut, token::mint = market_token_mint)]
@@ -86,12 +80,8 @@ impl<'info> internal::Authentication<'info> for MintMarketTokenTo<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, DataStore> {
+    fn store(&self) -> &AccountLoader<'info, Store> {
         &self.store
-    }
-
-    fn roles(&self) -> &Account<'info, Roles> {
-        &self.only_controller
     }
 }
 
@@ -116,7 +106,7 @@ pub fn burn_market_token_from(ctx: Context<BurnMarketTokenFrom>, amount: u64) ->
     anchor_spl::token::burn(
         ctx.accounts
             .burn_ctx()
-            .with_signer(&[&ctx.accounts.store.pda_seeds()]),
+            .with_signer(&[&ctx.accounts.store.load()?.pda_seeds()]),
         amount,
     )
 }
@@ -124,8 +114,7 @@ pub fn burn_market_token_from(ctx: Context<BurnMarketTokenFrom>, amount: u64) ->
 #[derive(Accounts)]
 pub struct BurnMarketTokenFrom<'info> {
     pub authority: Signer<'info>,
-    pub only_controller: Account<'info, Roles>,
-    pub store: Account<'info, DataStore>,
+    pub store: AccountLoader<'info, Store>,
     #[account(mut)]
     pub market_token_mint: Account<'info, Mint>,
     #[account(mut, token::mint = market_token_mint)]
@@ -138,12 +127,8 @@ impl<'info> internal::Authentication<'info> for BurnMarketTokenFrom<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, DataStore> {
+    fn store(&self) -> &AccountLoader<'info, Store> {
         &self.store
-    }
-
-    fn roles(&self) -> &Account<'info, Roles> {
-        &self.only_controller
     }
 }
 
@@ -175,8 +160,7 @@ pub fn initialize_market_vault(
 pub struct InitializeMarketVault<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
-    pub only_market_keeper: Account<'info, Roles>,
-    pub store: Account<'info, DataStore>,
+    pub store: AccountLoader<'info, Store>,
     pub mint: Account<'info, Mint>,
     #[account(
         init,
@@ -202,12 +186,8 @@ impl<'info> internal::Authentication<'info> for InitializeMarketVault<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, DataStore> {
+    fn store(&self) -> &AccountLoader<'info, Store> {
         &self.store
-    }
-
-    fn roles(&self) -> &Account<'info, Roles> {
-        &self.only_market_keeper
     }
 }
 
@@ -216,7 +196,7 @@ pub fn market_vault_transfer_out(ctx: Context<MarketVaultTransferOut>, amount: u
     anchor_spl::token::transfer(
         ctx.accounts
             .transfer_ctx()
-            .with_signer(&[&ctx.accounts.store.pda_seeds()]),
+            .with_signer(&[&ctx.accounts.store.load()?.pda_seeds()]),
         amount,
     )
 }
@@ -225,8 +205,7 @@ pub fn market_vault_transfer_out(ctx: Context<MarketVaultTransferOut>, amount: u
 pub struct MarketVaultTransferOut<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
-    pub only_controller: Account<'info, Roles>,
-    pub store: Account<'info, DataStore>,
+    pub store: AccountLoader<'info, Store>,
     // FIXME: this is a bug to not checking the store.
     #[account(mut)]
     pub market_vault: Account<'info, TokenAccount>,
@@ -240,12 +219,8 @@ impl<'info> internal::Authentication<'info> for MarketVaultTransferOut<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, DataStore> {
+    fn store(&self) -> &AccountLoader<'info, Store> {
         &self.store
-    }
-
-    fn roles(&self) -> &Account<'info, Roles> {
-        &self.only_controller
     }
 }
 
@@ -267,16 +242,7 @@ impl<'info> MarketVaultTransferOut<'info> {
 pub struct UseClaimableAccount<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
-    #[account(
-        seeds = [
-            Roles::SEED,
-            store.key().as_ref(),
-            authority.key().as_ref(),
-        ],
-        bump = only_controller.bump,
-    )]
-    pub only_controller: Account<'info, Roles>,
-    pub store: Account<'info, DataStore>,
+    pub store: AccountLoader<'info, Store>,
     #[account(
         seeds = [Config::SEED, store.key().as_ref()],
         bump = config.bump,
@@ -320,7 +286,7 @@ pub fn use_claimable_account(
                     delegate: ctx.accounts.user.to_account_info(),
                     authority: ctx.accounts.store.to_account_info(),
                 },
-                &[&ctx.accounts.store.pda_seeds()],
+                &[&ctx.accounts.store.load()?.pda_seeds()],
             ),
             0,
         )?;
@@ -333,12 +299,8 @@ impl<'info> internal::Authentication<'info> for UseClaimableAccount<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, DataStore> {
+    fn store(&self) -> &AccountLoader<'info, Store> {
         &self.store
-    }
-
-    fn roles(&self) -> &Account<'info, Roles> {
-        &self.only_controller
     }
 }
 
@@ -347,16 +309,7 @@ impl<'info> internal::Authentication<'info> for UseClaimableAccount<'info> {
 pub struct CloseEmptyClaimableAccount<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
-    #[account(
-        seeds = [
-            Roles::SEED,
-            store.key().as_ref(),
-            authority.key().as_ref(),
-        ],
-        bump = only_controller.bump,
-    )]
-    pub only_controller: Account<'info, Roles>,
-    pub store: Account<'info, DataStore>,
+    pub store: AccountLoader<'info, Store>,
     #[account(
         seeds = [Config::SEED, store.key().as_ref()],
         bump = config.bump,
@@ -396,7 +349,7 @@ pub fn close_empty_claimable_account(
                 destination: ctx.accounts.authority.to_account_info(),
                 authority: ctx.accounts.store.to_account_info(),
             },
-            &[&ctx.accounts.store.pda_seeds()],
+            &[&ctx.accounts.store.load()?.pda_seeds()],
         ))?;
     }
     Ok(())
@@ -407,11 +360,7 @@ impl<'info> internal::Authentication<'info> for CloseEmptyClaimableAccount<'info
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, DataStore> {
+    fn store(&self) -> &AccountLoader<'info, Store> {
         &self.store
-    }
-
-    fn roles(&self) -> &Account<'info, Roles> {
-        &self.only_controller
     }
 }

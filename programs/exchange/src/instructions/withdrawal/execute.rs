@@ -22,12 +22,8 @@ pub struct ExecuteWithdrawal<'info> {
         bump,
     )]
     pub controller: UncheckedAccount<'info>,
-    /// CHECK: only used by CPI.
-    pub only_controller: UncheckedAccount<'info>,
     /// CHECK: only used to invoke CPI.
     pub store: UncheckedAccount<'info>,
-    /// CHECK: only used to invoke CPI.
-    pub only_order_keeper: UncheckedAccount<'info>,
     pub data_store_program: Program<'info, DataStore>,
     pub price_provider: Interface<'info, PriceProvider>,
     pub token_program: Program<'info, Token>,
@@ -154,10 +150,6 @@ impl<'info> Authentication<'info> for ExecuteWithdrawal<'info> {
     fn store(&self) -> AccountInfo<'info> {
         self.store.to_account_info()
     }
-
-    fn roles(&self) -> AccountInfo<'info> {
-        self.only_order_keeper.to_account_info()
-    }
 }
 
 impl<'info> WithOracle<'info> for ExecuteWithdrawal<'info> {
@@ -186,7 +178,6 @@ impl<'info> ExecuteWithdrawal<'info> {
                 payer: self.authority.to_account_info(),
                 authority: self.controller.to_account_info(),
                 store: self.store.to_account_info(),
-                only_controller: self.only_controller.to_account_info(),
                 withdrawal: self.withdrawal.to_account_info(),
                 user: self.user.to_account_info(),
                 system_program: self.system_program.to_account_info(),
@@ -205,7 +196,6 @@ impl<'info> ExecuteWithdrawal<'info> {
             data_store::cpi::accounts::ExecuteWithdrawal {
                 authority: self.controller.to_account_info(),
                 store: self.store.to_account_info(),
-                only_controller: self.only_controller.to_account_info(),
                 config: self.config.to_account_info(),
                 oracle: self.oracle.to_account_info(),
                 withdrawal: self.withdrawal.to_account_info(),
@@ -243,7 +233,6 @@ impl<'info> ExecuteWithdrawal<'info> {
             MarketTransferOut {
                 authority: self.controller.to_account_info(),
                 store: self.store.to_account_info(),
-                only_controller: self.only_controller.to_account_info(),
                 market,
                 to,
                 vault,

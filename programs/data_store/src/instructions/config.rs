@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 use crate::{
     constants::keys::GLOBAL,
-    states::{Amount, Config, DataStore, Factor, Roles, Seed},
+    states::{Amount, Config, Factor, Seed, Store},
     utils::internal,
 };
 
@@ -10,12 +10,7 @@ use crate::{
 pub struct InitializeConfig<'info> {
     #[account(mut)]
     authority: Signer<'info>,
-    #[account(
-        seeds = [Roles::SEED, store.key().as_ref(), authority.key().as_ref()],
-        bump = only_controller.bump,
-    )]
-    only_controller: Account<'info, Roles>,
-    store: Account<'info, DataStore>,
+    store: AccountLoader<'info, Store>,
     #[account(
         init,
         payer = authority,
@@ -40,12 +35,8 @@ impl<'info> internal::Authentication<'info> for InitializeConfig<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, DataStore> {
+    fn store(&self) -> &AccountLoader<'info, Store> {
         &self.store
-    }
-
-    fn roles(&self) -> &Account<'info, Roles> {
-        &self.only_controller
     }
 }
 
@@ -53,12 +44,7 @@ impl<'info> internal::Authentication<'info> for InitializeConfig<'info> {
 pub struct InsertAmount<'info> {
     #[account(mut)]
     authority: Signer<'info>,
-    #[account(
-        seeds = [Roles::SEED, store.key().as_ref(), authority.key().as_ref()],
-        bump = only_controller.bump,
-    )]
-    only_controller: Account<'info, Roles>,
-    store: Account<'info, DataStore>,
+    store: AccountLoader<'info, Store>,
     #[account(
         mut,
         has_one = store,
@@ -86,12 +72,8 @@ impl<'info> internal::Authentication<'info> for InsertAmount<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, DataStore> {
+    fn store(&self) -> &AccountLoader<'info, Store> {
         &self.store
-    }
-
-    fn roles(&self) -> &Account<'info, Roles> {
-        &self.only_controller
     }
 }
 
@@ -99,12 +81,7 @@ impl<'info> internal::Authentication<'info> for InsertAmount<'info> {
 pub struct InsertFactor<'info> {
     #[account(mut)]
     authority: Signer<'info>,
-    #[account(
-        seeds = [Roles::SEED, store.key().as_ref(), authority.key().as_ref()],
-        bump = only_controller.bump,
-    )]
-    only_controller: Account<'info, Roles>,
-    store: Account<'info, DataStore>,
+    store: AccountLoader<'info, Store>,
     #[account(
         mut,
         has_one = store,
@@ -132,12 +109,8 @@ impl<'info> internal::Authentication<'info> for InsertFactor<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, DataStore> {
+    fn store(&self) -> &AccountLoader<'info, Store> {
         &self.store
-    }
-
-    fn roles(&self) -> &Account<'info, Roles> {
-        &self.only_controller
     }
 }
 
@@ -145,12 +118,7 @@ impl<'info> internal::Authentication<'info> for InsertFactor<'info> {
 pub struct InsertAddress<'info> {
     #[account(mut)]
     authority: Signer<'info>,
-    #[account(
-        seeds = [Roles::SEED, store.key().as_ref(), authority.key().as_ref()],
-        bump = only_controller.bump,
-    )]
-    only_controller: Account<'info, Roles>,
-    store: Account<'info, DataStore>,
+    store: AccountLoader<'info, Store>,
     #[account(
         mut,
         has_one = store,
@@ -178,11 +146,7 @@ impl<'info> internal::Authentication<'info> for InsertAddress<'info> {
         &self.authority
     }
 
-    fn store(&self) -> &Account<'info, DataStore> {
+    fn store(&self) -> &AccountLoader<'info, Store> {
         &self.store
-    }
-
-    fn roles(&self) -> &Account<'info, Roles> {
-        &self.only_controller
     }
 }

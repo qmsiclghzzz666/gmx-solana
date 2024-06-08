@@ -67,7 +67,6 @@ where
             .request()
             .accounts(accounts::InitializeTokenConfigMap {
                 authority,
-                only_controller: self.payer_roles_address(store),
                 store: *store,
                 map,
                 system_program: system_program::ID,
@@ -84,13 +83,11 @@ where
         enable: bool,
     ) -> RequestBuilder<C> {
         let authority = self.payer();
-        let only_controller = self.payer_roles_address(store);
         let map = self.find_token_config_map(store);
         self.data_store()
             .request()
             .accounts(accounts::InsertTokenConfig {
                 authority,
-                only_controller,
                 store: *store,
                 map,
                 token: *token,
@@ -108,13 +105,11 @@ where
         enable: bool,
     ) -> RequestBuilder<C> {
         let authority = self.payer();
-        let only_controller = self.payer_roles_address(store);
         let map = self.find_token_config_map(store);
         self.data_store()
             .request()
             .accounts(accounts::InsertSyntheticTokenConfig {
                 authority,
-                only_controller,
                 store: *store,
                 map,
                 system_program: system_program::ID,
@@ -145,14 +140,12 @@ where
         enable: bool,
     ) -> RequestBuilder<C> {
         let authority = self.payer();
-        let only_controller = self.payer_roles_address(store);
         let map = self.find_token_config_map(store);
         self.data_store()
             .request()
             .accounts(accounts::ToggleTokenConfig {
                 authority,
                 store: *store,
-                only_controller,
                 map,
             })
             .args(instruction::ToggleTokenConfig {
@@ -168,14 +161,12 @@ where
         provider: PriceProviderKind,
     ) -> RequestBuilder<C> {
         let authority = self.payer();
-        let only_controller = self.payer_roles_address(store);
         let map = self.find_token_config_map(store);
         self.data_store()
             .request()
             .accounts(accounts::SetExpectedProvider {
                 authority,
                 store: *store,
-                only_controller,
                 map,
             })
             .args(instruction::SetExpectedProvider {
