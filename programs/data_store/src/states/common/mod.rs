@@ -8,6 +8,9 @@ pub mod token_with_feeds;
 /// Dual Vec Map.
 pub mod map;
 
+/// Fixed-size map.
+pub mod fixed_map;
+
 pub use map::MapStore;
 pub use token_with_feeds::{TokenRecord, TokensWithFeed};
 

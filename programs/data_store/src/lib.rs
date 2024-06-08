@@ -456,6 +456,8 @@ pub enum DataStoreError {
     InvalidPDA,
     #[msg("Invalid key")]
     InvalidKey,
+    #[msg("Aready exist")]
+    AlreadyExist,
     #[msg("Exceed max length limit")]
     ExceedMaxLengthLimit,
     #[msg("Exceed max string length limit")]
