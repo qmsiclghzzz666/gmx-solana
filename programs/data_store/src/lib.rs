@@ -130,6 +130,15 @@ pub mod data_store {
         instructions::initialize_token_map(ctx)
     }
 
+    #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
+    pub fn push_to_token_map(
+        ctx: Context<PushToTokenMap>,
+        builder: TokenConfigBuilder,
+        enable: bool,
+    ) -> Result<()> {
+        instructions::unchecked_push_to_token_map(ctx, builder, enable)
+    }
+
     #[access_control(internal::Authenticate::only_controller(&ctx))]
     pub fn initialize_token_config_map(
         ctx: Context<InitializeTokenConfigMap>,
@@ -446,6 +455,8 @@ pub enum DataStoreError {
     ExceedMaxLengthLimit,
     #[msg("Exceed max string length limit")]
     ExceedMaxStringLengthLimit,
+    #[msg("No space for new data")]
+    NoSpaceForNewData,
     #[msg("Invalid argument")]
     InvalidArgument,
     #[msg("Lamports not enough")]
@@ -616,6 +627,8 @@ pub enum DataStoreError {
     // Token Config.
     #[msg("synthetic flag does not match")]
     InvalidSynthetic,
+    #[msg("invalid token map")]
+    InvalidTokenMap,
     // Invalid Provider Kind.
     #[msg("invalid provider kind index")]
     InvalidProviderKindIndex,

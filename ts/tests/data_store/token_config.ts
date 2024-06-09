@@ -1,7 +1,7 @@
 import { Keypair, PublicKey } from '@solana/web3.js';
 
 import { expect, getAddresses, getProvider, getUsers } from "../../utils/fixtures";
-import { MARKET_KEEPER, createDataStorePDA, createRolesPDA, dataStore, extendTokenConfigMap, getTokenConfig, insertSyntheticTokenConfig, insertTokenConfig, invokeInitializeTokenMap, invokeInsertTokenConfigAmount, invokeSetTokenMap, setExpectedProvider, toggleTokenConfig } from "../../utils/data";
+import { MARKET_KEEPER, createDataStorePDA, createRolesPDA, dataStore, extendTokenConfigMap, getTokenConfig, insertSyntheticTokenConfig, insertTokenConfig, invokeInitializeTokenMap, invokeInsertTokenConfigAmount, invokePushToTokenMap, invokeSetTokenMap, setExpectedProvider, toggleTokenConfig } from "../../utils/data";
 import { AnchorError } from '@coral-xyz/anchor';
 import { createMint } from '@solana/spl-token';
 import { BTC_FEED, SOL_FEED } from '../../utils/token';
@@ -153,5 +153,24 @@ describe("data store: TokenConfig", () => {
 
         const afterSet = await dataStore.methods.getTokenMap().accounts({ store }).view();
         expect(tokenMap.publicKey.equals(afterSet));
+
+        const beforeSize = (await dataStore.account.tokenMapHeader.getAccountInfo(tokenMap.publicKey)).data.byteLength;
+        console.log(`size before the push: ${beforeSize}`);
+        await invokePushToTokenMap(dataStore, {
+            authority: signer0,
+            store,
+            tokenMap: tokenMap.publicKey,
+            token: fakeTokenMint,
+            heartbeatDuration: 120,
+            precision: 4,
+            feeds: {
+                chainlinkFeed: BTC_FEED,
+                expectedProvider: PriceProvider.Chainlink,
+            }
+        }, {
+            skipPreflight: true,
+        });
+        const afterSize = (await dataStore.account.tokenMapHeader.getAccountInfo(tokenMap.publicKey)).data.byteLength;
+        console.log(`size after the push: ${afterSize}`);
     });
 });

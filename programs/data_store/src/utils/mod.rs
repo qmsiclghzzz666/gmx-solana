@@ -14,3 +14,6 @@ pub mod pubkey;
 
 /// Fixed-size string.
 pub mod fixed_str;
+
+/// Dynamic Access.
+pub mod dynamic_access;

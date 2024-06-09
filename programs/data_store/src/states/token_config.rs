@@ -1,3 +1,8 @@
+use std::{
+    cell::{Ref, RefMut},
+    mem::size_of,
+};
+
 use anchor_lang::prelude::*;
 use bitmaps::Bitmap;
 use dual_vec_map::DualVecMap;
@@ -103,6 +108,8 @@ impl TokenConfig {
 #[repr(u8)]
 #[non_exhaustive]
 pub enum Flag {
+    /// Is initialized.
+    Initialized,
     /// Enabled.
     Enabled,
     /// Is a synthetic asset.
@@ -114,6 +121,7 @@ type TokenFlags = Bitmap<MAX_FLAGS>;
 type TokenFlagsValue = u8;
 
 #[zero_copy]
+#[derive(PartialEq, Eq)]
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub struct TokenConfigV2 {
     /// Flags.
@@ -193,6 +201,11 @@ impl TokenConfigV2 {
         builder: TokenConfigBuilder,
         enable: bool,
     ) -> Result<()> {
+        require!(
+            !self.flag(Flag::Initialized),
+            DataStoreError::InvalidArgument
+        );
+        self.set_flag(Flag::Initialized, true);
         let TokenConfigBuilder {
             heartbeat_duration,
             precision,
@@ -394,8 +407,6 @@ crate::fixed_map!(
 pub struct TokenMapHeader {
     pub(crate) store: Pubkey,
     tokens: Tokens,
-    padding: [u8; 3],
-    num_configs: u8,
     reserved: [u8; 64],
 }
 
@@ -407,5 +418,122 @@ impl TokenMapHeader {
     /// Get the space of the whole `TokenMap` required, excluding discriminator.
     pub fn space(num_configs: u8) -> usize {
         TokenMapHeader::INIT_SPACE + (usize::from(num_configs) * TokenConfigV2::INIT_SPACE)
+    }
+
+    /// Get the space after push.
+    pub fn space_after_push(&self) -> Result<usize> {
+        let num_configs: u8 = self
+            .tokens
+            .len()
+            .checked_add(1)
+            .ok_or(error!(DataStoreError::ExceedMaxLengthLimit))?
+            .try_into()
+            .map_err(|_| error!(DataStoreError::AmountOverflow))?;
+        Ok(Self::space(num_configs))
+    }
+}
+
+/// Reference to Token Map.
+pub struct TokenMapRef<'a> {
+    header: Ref<'a, TokenMapHeader>,
+    configs: Ref<'a, [u8]>,
+}
+
+/// Mutable Reference to Token Map.
+pub struct TokenMapMut<'a> {
+    header: RefMut<'a, TokenMapHeader>,
+    configs: RefMut<'a, [u8]>,
+}
+
+/// Token Map Loader.
+pub trait TokenMapLoader<'info> {
+    fn load_token_map(&self) -> Result<TokenMapRef>;
+    fn load_token_map_mut(&self) -> Result<TokenMapMut>;
+}
+
+impl<'info> TokenMapLoader<'info> for AccountLoader<'info, TokenMapHeader> {
+    fn load_token_map(&self) -> Result<TokenMapRef> {
+        // Check the account.
+        self.load()?;
+
+        let data = self.as_ref().try_borrow_data()?;
+        let (_disc, data) = Ref::map_split(data, |d| d.split_at(8));
+        let (header, configs) = Ref::map_split(data, |d| d.split_at(size_of::<TokenMapHeader>()));
+
+        Ok(TokenMapRef {
+            header: Ref::map(header, bytemuck::from_bytes),
+            configs,
+        })
+    }
+
+    fn load_token_map_mut(&self) -> Result<TokenMapMut> {
+        // Check the account for mutablely access.
+        self.load_mut()?;
+
+        let data = self.as_ref().try_borrow_mut_data()?;
+        let (_disc, data) = RefMut::map_split(data, |d| d.split_at_mut(8));
+        let (header, configs) =
+            RefMut::map_split(data, |d| d.split_at_mut(size_of::<TokenMapHeader>()));
+        Ok(TokenMapMut {
+            header: RefMut::map(header, bytemuck::from_bytes_mut),
+            configs,
+        })
+    }
+}
+
+/// Read Token Map.
+pub trait TokenMapAccess {
+    /// Get the config of the given token.
+    fn get(&self, token: &Pubkey) -> Option<&TokenConfigV2>;
+}
+
+impl<'a> TokenMapAccess for TokenMapRef<'a> {
+    fn get(&self, token: &Pubkey) -> Option<&TokenConfigV2> {
+        let index = usize::from(*self.header.tokens.get(token)?);
+        crate::utils::dynamic_access::get(&self.configs, index)
+    }
+}
+
+/// Token Map Operations.
+///
+/// The token map is append-only.
+pub trait TokenMapMutAccess {
+    /// Get mutably the config of the given token.
+    fn get_mut(&mut self, token: &Pubkey) -> Option<&mut TokenConfigV2>;
+
+    /// Push a new token config.
+    fn push_with(
+        &mut self,
+        token: &Pubkey,
+        f: impl FnOnce(&mut TokenConfigV2) -> Result<()>,
+    ) -> Result<()>;
+}
+
+impl<'a> TokenMapMutAccess for TokenMapMut<'a> {
+    fn get_mut(&mut self, token: &Pubkey) -> Option<&mut TokenConfigV2> {
+        let index = usize::from(*self.header.tokens.get(token)?);
+        crate::utils::dynamic_access::get_mut(&mut self.configs, index)
+    }
+
+    fn push_with(
+        &mut self,
+        token: &Pubkey,
+        f: impl FnOnce(&mut TokenConfigV2) -> Result<()>,
+    ) -> Result<()> {
+        let next_index = self.header.tokens.len();
+        require!(
+            next_index < MAX_TOKENS,
+            DataStoreError::ExceedMaxLengthLimit
+        );
+        let index = next_index
+            .try_into()
+            .map_err(|_| error!(DataStoreError::AmountOverflow))?;
+        self.header.tokens.insert_with_options(token, index, true)?;
+        let Some(dst) =
+            crate::utils::dynamic_access::get_mut::<TokenConfigV2>(&mut self.configs, next_index)
+        else {
+            return err!(DataStoreError::NoSpaceForNewData);
+        };
+        (f)(dst)
     }
 }

@@ -4,7 +4,7 @@ use anchor_spl::token::Mint;
 use crate::{
     states::{
         PriceProviderKind, Seed, Store, TokenConfig, TokenConfigBuilder, TokenConfigMap,
-        TokenMapHeader,
+        TokenMapHeader, TokenMapLoader, TokenMapMutAccess,
     },
     utils::internal,
 };
@@ -301,4 +301,75 @@ pub struct InitializeTokenMap<'info> {
 pub fn initialize_token_map(ctx: Context<InitializeTokenMap>) -> Result<()> {
     ctx.accounts.token_map.load_init()?.store = ctx.accounts.store.key();
     Ok(())
+}
+
+#[derive(Accounts)]
+pub struct PushToTokenMap<'info> {
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    pub store: AccountLoader<'info, Store>,
+    #[account(
+        mut,
+        has_one = store,
+    )]
+    pub token_map: AccountLoader<'info, TokenMapHeader>,
+    pub token: Account<'info, Mint>,
+    pub system_program: Program<'info, System>,
+}
+
+/// Push a new token config to the token map.
+///
+/// ## CHECK
+/// - Only [`MARKET_KEEPER`](crate::states::RoleKey::MARKET_KEEPER) can perform this action.
+pub fn unchecked_push_to_token_map(
+    ctx: Context<PushToTokenMap>,
+    builder: TokenConfigBuilder,
+    enable: bool,
+) -> Result<()> {
+    let token_map_loader = &ctx.accounts.token_map;
+    // FIXME: We have to do the realloc manually because the current implementation of
+    // the `realloc` constraint group will throw an error on the following statement:
+    // `realloc = 8 + token_map.load()?.space_after_push()?`.
+    // The cause of the error is that the generated code directly inserts the above statement
+    // into the realloc method, leading to an `already borrowed` error.
+    {
+        let new_space = 8 + token_map_loader.load()?.space_after_push()?;
+        let current_space = token_map_loader.as_ref().data_len();
+        let current_lamports = token_map_loader.as_ref().lamports();
+        let new_rent_minimum = Rent::get()?.minimum_balance(new_space);
+        // Only realloc when we need more space.
+        if new_space > current_space {
+            if current_lamports < new_rent_minimum {
+                anchor_lang::system_program::transfer(
+                    CpiContext::new(
+                        ctx.accounts.system_program.to_account_info(),
+                        anchor_lang::system_program::Transfer {
+                            from: ctx.accounts.authority.to_account_info(),
+                            to: token_map_loader.to_account_info(),
+                        },
+                    ),
+                    new_rent_minimum.saturating_sub(current_lamports),
+                )?;
+            }
+            token_map_loader.as_ref().realloc(new_space, false)?;
+        }
+    }
+
+    let token = ctx.accounts.token.key();
+    let token_decimals = ctx.accounts.token.decimals;
+    let mut token_map = token_map_loader.load_token_map_mut()?;
+    token_map.push_with(&token, |config| {
+        config.init(false, token_decimals, builder, enable)
+    })?;
+    Ok(())
+}
+
+impl<'info> internal::Authentication<'info> for PushToTokenMap<'info> {
+    fn authority(&self) -> &Signer<'info> {
+        &self.authority
+    }
+
+    fn store(&self) -> &AccountLoader<'info, Store> {
+        &self.store
+    }
 }

@@ -171,3 +171,50 @@ export const makeInitializeTokenMapInstruction = async (
 }
 
 export const invokeInitializeTokenMap = makeInvoke(makeInitializeTokenMapInstruction, ["payer", "tokenMap"]);
+
+export const makePushToTokenMapInstruction = async (
+    program: DataStoreProgram,
+    {
+        authority,
+        store,
+        tokenMap,
+        token,
+        heartbeatDuration,
+        precision,
+        feeds: {
+            pythFeedId,
+            chainlinkFeed,
+            pythDevFeed,
+            expectedProvider,
+        },
+        enable = true,
+    }: {
+        authority: PublicKey,
+        store: PublicKey,
+        tokenMap: PublicKey,
+        token: PublicKey,
+        heartbeatDuration: number,
+        precision: number,
+        feeds: FeedsOptions,
+        enable?: boolean,
+    }
+) => {
+    return await program.methods.pushToTokenMap({
+        heartbeatDuration,
+        precision,
+        feeds: [
+            pythFeedId ? hexStringToPublicKey(pythFeedId) : PublicKey.default,
+            chainlinkFeed ?? PublicKey.default,
+            pythDevFeed ?? PublicKey.default,
+            PublicKey.default,
+        ],
+        expectedProvider,
+    }, enable).accountsPartial({
+        authority,
+        store,
+        tokenMap,
+        token,
+    }).instruction();
+};
+
+export const invokePushToTokenMap = makeInvoke(makePushToTokenMapInstruction, ["authority"]);
