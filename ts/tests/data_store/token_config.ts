@@ -1,7 +1,7 @@
 import { Keypair, PublicKey } from '@solana/web3.js';
 
 import { expect, getAddresses, getProvider, getUsers } from "../../utils/fixtures";
-import { createRolesPDA, dataStore, extendTokenConfigMap, getTokenConfig, insertSyntheticTokenConfig, insertTokenConfig, invokeInsertTokenConfigAmount, setExpectedProvider, toggleTokenConfig } from "../../utils/data";
+import { MARKET_KEEPER, createDataStorePDA, createRolesPDA, dataStore, extendTokenConfigMap, getTokenConfig, insertSyntheticTokenConfig, insertTokenConfig, invokeInitializeTokenMap, invokeInsertTokenConfigAmount, invokeSetTokenMap, setExpectedProvider, toggleTokenConfig } from "../../utils/data";
 import { AnchorError } from '@coral-xyz/anchor';
 import { createMint } from '@solana/spl-token';
 import { BTC_FEED, SOL_FEED } from '../../utils/token';
@@ -107,5 +107,51 @@ describe("data store: TokenConfig", () => {
             expect(config.precision).equals(3);
             expect(config.tokenDecimals).equals(6);
         }
+    });
+
+    it("initialize a new token map and set to a new store", async () => {
+        const randomKey = Keypair.generate().publicKey.toBase58().slice(0, 10);
+        const [store] = createDataStorePDA(randomKey);
+        await dataStore.methods.initialize(randomKey).accounts({
+            authority: provider.publicKey,
+            dataStore: store,
+        }).rpc();
+        await dataStore.methods.enableRole(MARKET_KEEPER).accounts({
+            authority: provider.publicKey,
+            store,
+        }).rpc();
+        console.log(`initialized a new store ${store} and enabled MARKET_KEEPER role`);
+
+        const beforeSet = await dataStore.methods.getTokenMap().accounts({ store }).view();
+        expect(beforeSet).null;
+
+        const tokenMap = Keypair.generate();
+        await invokeInitializeTokenMap(dataStore, {
+            payer: signer0,
+            store,
+            tokenMap,
+        });
+        console.log(`initialized a new token map ${tokenMap.publicKey}`);
+
+        // Only MARKET_KEEPER can set token map.
+        await expect(invokeSetTokenMap(dataStore, {
+            authority: signer0,
+            store,
+            tokenMap: tokenMap.publicKey,
+        })).rejectedWith(Error, "Permission denied");
+
+        await dataStore.methods.grantRole(signer0.publicKey, MARKET_KEEPER).accounts({
+            authority: provider.publicKey,
+            store,
+        }).rpc();
+
+        await invokeSetTokenMap(dataStore, {
+            authority: signer0,
+            store,
+            tokenMap: tokenMap.publicKey,
+        });
+
+        const afterSet = await dataStore.methods.getTokenMap().accounts({ store }).view();
+        expect(tokenMap.publicKey.equals(afterSet));
     });
 });

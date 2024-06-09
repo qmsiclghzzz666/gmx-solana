@@ -2,7 +2,10 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::Mint;
 
 use crate::{
-    states::{PriceProviderKind, Seed, Store, TokenConfig, TokenConfigBuilder, TokenConfigMap},
+    states::{
+        PriceProviderKind, Seed, Store, TokenConfig, TokenConfigBuilder, TokenConfigMap,
+        TokenMapHeader,
+    },
     utils::internal,
 };
 
@@ -278,4 +281,24 @@ impl<'info> internal::Authentication<'info> for InsertTokenConfigAmount<'info> {
     fn store(&self) -> &AccountLoader<'info, Store> {
         &self.store
     }
+}
+
+#[derive(Accounts)]
+pub struct InitializeTokenMap<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    pub store: AccountLoader<'info, Store>,
+    #[account(
+        init,
+        payer = payer,
+        space = 8 + TokenMapHeader::space(0),
+    )]
+    pub token_map: AccountLoader<'info, TokenMapHeader>,
+    pub system_program: Program<'info, System>,
+}
+
+/// Initialize a new token map.
+pub fn initialize_token_map(ctx: Context<InitializeTokenMap>) -> Result<()> {
+    ctx.accounts.token_map.load_init()?.store = ctx.accounts.store.key();
+    Ok(())
 }

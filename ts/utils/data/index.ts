@@ -265,3 +265,4 @@ export const initializeDataStore = async (
 export * from "./program";
 export * from "./token_config";
 export * from "./roles";
+export * from "./store";

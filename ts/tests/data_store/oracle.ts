@@ -46,10 +46,9 @@ describe("data store: oracle", () => {
             SOL_TOKEN_MINT,
             fakeTokenMint,
             usdGTokenMint,
-        ]).accounts({
+        ]).accountsPartial({
             store: dataStoreAddress,
             authority: signer0.publicKey,
-            onlyController: roles,
             oracle: oracleAddress,
             priceProvider: PYTH_ID,
         }).remainingAccounts([
@@ -78,10 +77,9 @@ describe("data store: oracle", () => {
         // console.log(setData.primary.prices);
         expect(setData.primary.prices.length).to.equal(4);
 
-        await dataStore.methods.clearAllPrices().accounts({
+        await dataStore.methods.clearAllPrices().accountsPartial({
             store: dataStoreAddress,
             authority: signer0.publicKey,
-            onlyController: roles,
             oracle: oracleAddress,
         }).signers([signer0]).rpc();
         const clearedData = await dataStore.account.oracle.fetch(oracleAddress);

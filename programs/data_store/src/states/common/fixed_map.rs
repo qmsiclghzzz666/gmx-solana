@@ -53,11 +53,7 @@ macro_rules! fixed_map {
 
             impl Default for $map {
                 fn default() -> Self {
-                    Self {
-                        data: Default::default(),
-                        count: 0,
-                        padding: Default::default(),
-                    }
+                    bytemuck::Zeroable::zeroed()
                 }
             }
 

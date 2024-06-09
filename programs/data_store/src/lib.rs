@@ -43,6 +43,15 @@ pub mod data_store {
         instructions::initialize(ctx, key)
     }
 
+    #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
+    pub fn set_token_map(ctx: Context<SetTokenMap>) -> Result<()> {
+        instructions::unchecked_set_token_map(ctx)
+    }
+
+    pub fn get_token_map(ctx: Context<ReadStore>) -> Result<Option<Pubkey>> {
+        instructions::get_token_map(ctx)
+    }
+
     // Roles.
     pub fn check_admin(ctx: Context<CheckRole>) -> Result<bool> {
         instructions::check_admin(ctx)
@@ -117,6 +126,10 @@ pub mod data_store {
     }
 
     // Token Config.
+    pub fn initialize_token_map(ctx: Context<InitializeTokenMap>) -> Result<()> {
+        instructions::initialize_token_map(ctx)
+    }
+
     #[access_control(internal::Authenticate::only_controller(&ctx))]
     pub fn initialize_token_config_map(
         ctx: Context<InitializeTokenConfigMap>,

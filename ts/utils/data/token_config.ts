@@ -1,6 +1,5 @@
-import { PublicKey, Signer } from "@solana/web3.js";
+import { Keypair, PublicKey, Signer } from "@solana/web3.js";
 import { dataStore } from "./program";
-import { createRolesPDA } from ".";
 import { utils } from "@coral-xyz/anchor";
 import { DataStoreProgram, PriceProvider, makeInvoke, toBN } from "gmsol";
 
@@ -55,7 +54,7 @@ export const insertTokenConfig = async (
             pythDevFeed ?? PublicKey.default,
         ],
         expectedProvider,
-    }, true).accounts({
+    }, true).accountsPartial({
         authority: authority.publicKey,
         store,
         token,
@@ -85,7 +84,7 @@ export const insertSyntheticTokenConfig = async (
             pythDevFeed ?? PublicKey.default,
         ],
         expectedProvider,
-    }, true).accounts({
+    }, true).accountsPartial({
         authority: authority.publicKey,
         store,
     }).signers([authority]).rpc();
@@ -97,7 +96,7 @@ export const toggleTokenConfig = async (
     token: PublicKey,
     enable: boolean,
 ) => {
-    await dataStore.methods.toggleTokenConfig(token, enable).accounts({
+    await dataStore.methods.toggleTokenConfig(token, enable).accountsPartial({
         authority: authority.publicKey,
         store,
     }).signers([authority]).rpc();
@@ -109,7 +108,7 @@ export const setExpectedProvider = async (
     token: PublicKey,
     provider: PriceProvider,
 ) => {
-    await dataStore.methods.setExpectedProvider(token, provider).accounts({
+    await dataStore.methods.setExpectedProvider(token, provider).accountsPartial({
         authority: authority.publicKey,
         store,
     }).signers([authority]).rpc();
@@ -132,7 +131,7 @@ export const getTokenConfig = async (store: PublicKey, token: PublicKey) => {
 }
 
 export const extendTokenConfigMap = async (authority: Signer, store: PublicKey, extendLen: number) => {
-    await dataStore.methods.extendTokenConfigMap(extendLen).accounts({
+    await dataStore.methods.extendTokenConfigMap(extendLen).accountsPartial({
         authority: authority.publicKey,
         store,
     }).signers([authority]).rpc();
@@ -148,10 +147,27 @@ export const makeInsertTokenConfigAmountInstruction = async (
         amount: number | bigint,
     }
 ) => {
-    return await program.methods.insertTokenConfigAmount(token, key, toBN(amount)).accounts({
+    return await program.methods.insertTokenConfigAmount(token, key, toBN(amount)).accountsPartial({
         authority,
         store,
     }).instruction();
 };
 
 export const invokeInsertTokenConfigAmount = makeInvoke(makeInsertTokenConfigAmountInstruction, ["authority"]);
+
+export const makeInitializeTokenMapInstruction = async (
+    program: DataStoreProgram,
+    { payer, store, tokenMap }: {
+        payer: PublicKey,
+        store: PublicKey,
+        tokenMap: PublicKey,
+    }
+) => {
+    return await program.methods.initializeTokenMap().accounts({
+        payer,
+        store,
+        tokenMap,
+    }).instruction();
+}
+
+export const invokeInitializeTokenMap = makeInvoke(makeInitializeTokenMapInstruction, ["payer", "tokenMap"]);

@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use bitmaps::Bitmap;
 use dual_vec_map::DualVecMap;
 
 use crate::{
@@ -6,9 +7,20 @@ use crate::{
     DataStoreError,
 };
 
-use super::{common::MapStore, PriceProviderKind, Seed};
+use super::{common::MapStore, InitSpace, PriceProviderKind, Seed};
 
-const FEEDS_LEN: usize = 4;
+/// Default heartbeat duration for price updates.
+pub const DEFAULT_HEARTBEAT_DURATION: u32 = 30;
+
+/// Default precision for price.
+pub const DEFAULT_PRECISION: u8 = 4;
+
+/// Default timestamp adjustment.
+pub const DEFAULT_TIMESTAMP_ADJUSTMENT: u32 = 0;
+
+const MAX_FEEDS: usize = 4;
+const MAX_FLAGS: usize = 8;
+const MAX_TOKENS: usize = 256;
 
 #[derive(AnchorSerialize, AnchorDeserialize, InitSpace, Clone)]
 #[cfg_attr(feature = "debug", derive(Debug))]
@@ -24,7 +36,7 @@ pub struct TokenConfig {
     /// Precision.
     pub precision: u8,
     /// Price Feeds.
-    #[max_len(FEEDS_LEN)]
+    #[max_len(MAX_FEEDS)]
     pub feeds: Vec<Pubkey>,
     /// Expected provider.
     pub expected_provider: u8,
@@ -87,11 +99,143 @@ impl TokenConfig {
     }
 }
 
-/// Default heartbeat duration for price updates.
-pub const DEFAULT_HEARTBEAT_DURATION: u32 = 30;
+/// Token Flags.
+#[repr(u8)]
+#[non_exhaustive]
+pub enum Flag {
+    /// Enabled.
+    Enabled,
+    /// Is a synthetic asset.
+    Synthetic,
+    // WARNING: Cannot have more than `MAX_FLAGS` flags.
+}
 
-/// Default precision for price.
-pub const DEFAULT_PRECISION: u8 = 4;
+type TokenFlags = Bitmap<MAX_FLAGS>;
+type TokenFlagsValue = u8;
+
+#[zero_copy]
+#[cfg_attr(feature = "debug", derive(Debug))]
+pub struct TokenConfigV2 {
+    /// Flags.
+    flags: TokenFlagsValue,
+    /// Token decimals.
+    token_decimals: u8,
+    /// Precision.
+    precision: u8,
+    /// Expected provider.
+    expected_provider: u8,
+    /// Price Feeds.
+    feeds: [Pubkey; MAX_FEEDS],
+    /// Heartbeat duration.
+    heartbeat_duration: u32,
+    /// Timestamp adjustment.
+    timestamp_adjustment: u32,
+    reserved: [u8; 32],
+}
+
+impl TokenConfigV2 {
+    /// Get the corresponding price feed address.
+    pub fn get_feed(&self, kind: &PriceProviderKind) -> Result<Pubkey> {
+        let index = *kind as usize;
+        let feed = self
+            .feeds
+            .get(index)
+            .ok_or(DataStoreError::PriceFeedNotSet)?;
+        if *feed == Pubkey::default() {
+            err!(DataStoreError::PriceFeedNotSet)
+        } else {
+            Ok(*feed)
+        }
+    }
+
+    /// Get expected price provider kind.
+    pub fn expected_provider(&self) -> Result<PriceProviderKind> {
+        let kind = PriceProviderKind::try_from(self.expected_provider)
+            .map_err(|_| DataStoreError::InvalidProviderKindIndex)?;
+        Ok(kind)
+    }
+
+    /// Get price feed address for the expected provider.
+    pub fn get_expected_feed(&self) -> Result<Pubkey> {
+        self.get_feed(&self.expected_provider()?)
+    }
+
+    /// Set enabled.
+    pub fn set_enabled(&mut self, enable: bool) {
+        self.set_flag(Flag::Enabled, enable)
+    }
+
+    /// Set synthetic.
+    pub fn set_synthetic(&mut self, is_synthetic: bool) {
+        self.set_flag(Flag::Synthetic, is_synthetic)
+    }
+
+    /// Set flag
+    pub fn set_flag(&mut self, flag: Flag, value: bool) {
+        let mut bitmap = TokenFlags::from_value(self.flags);
+        let index = flag as usize;
+        bitmap.set(index, value);
+        self.flags = bitmap.into_value();
+    }
+
+    /// Get flag.
+    pub fn flag(&self, flag: Flag) -> bool {
+        let bitmap = TokenFlags::from_value(self.flags);
+        let index = flag as usize;
+        bitmap.get(index)
+    }
+
+    /// Create a new token config from builder.
+    pub fn init(
+        &mut self,
+        synthetic: bool,
+        token_decimals: u8,
+        builder: TokenConfigBuilder,
+        enable: bool,
+    ) -> Result<()> {
+        let TokenConfigBuilder {
+            heartbeat_duration,
+            precision,
+            feeds,
+            expected_provider,
+        } = builder;
+        self.set_synthetic(synthetic);
+        self.set_enabled(enable);
+        self.token_decimals = token_decimals;
+        self.precision = precision;
+        self.feeds = feeds
+            .try_into()
+            .map_err(|_| error!(DataStoreError::InvalidArgument))?;
+        self.expected_provider = expected_provider.unwrap_or(PriceProviderKind::default() as u8);
+        self.heartbeat_duration = heartbeat_duration;
+        self.timestamp_adjustment = DEFAULT_TIMESTAMP_ADJUSTMENT;
+        Ok(())
+    }
+
+    /// Token decimals.
+    pub fn token_decimals(&self) -> u8 {
+        self.token_decimals
+    }
+
+    /// Price Precision.
+    pub fn precision(&self) -> u8 {
+        self.precision
+    }
+
+    /// Get timestamp adjustment.
+    pub fn timestamp_adjustment(&self) -> u32 {
+        self.timestamp_adjustment
+    }
+
+    /// Heartbeat duration.
+    pub fn heartbeat_duration(&self) -> u32 {
+        self.heartbeat_duration
+    }
+}
+
+impl InitSpace for TokenConfigV2 {
+    const INIT_SPACE: usize = std::mem::size_of::<Self>();
+}
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 #[cfg_attr(feature = "debug", derive(Debug))]
@@ -107,7 +251,7 @@ impl Default for TokenConfigBuilder {
         Self {
             heartbeat_duration: DEFAULT_HEARTBEAT_DURATION,
             precision: DEFAULT_PRECISION,
-            feeds: vec![Pubkey::default(); FEEDS_LEN],
+            feeds: vec![Pubkey::default(); MAX_FEEDS],
             expected_provider: None,
         }
     }
@@ -233,4 +377,35 @@ impl TokenConfigMap {
 
 impl Seed for TokenConfigMap {
     const SEED: &'static [u8] = b"token_config_map";
+}
+
+crate::fixed_map!(
+    Tokens,
+    Pubkey,
+    crate::utils::pubkey::to_bytes,
+    u8,
+    MAX_TOKENS,
+    0
+);
+
+/// Header of `TokenMap`.
+#[account(zero_copy)]
+#[cfg_attr(feature = "debug", derive(Debug))]
+pub struct TokenMapHeader {
+    pub(crate) store: Pubkey,
+    tokens: Tokens,
+    padding: [u8; 3],
+    num_configs: u8,
+    reserved: [u8; 64],
+}
+
+impl InitSpace for TokenMapHeader {
+    const INIT_SPACE: usize = std::mem::size_of::<TokenMapHeader>();
+}
+
+impl TokenMapHeader {
+    /// Get the space of the whole `TokenMap` required, excluding discriminator.
+    pub fn space(num_configs: u8) -> usize {
+        TokenMapHeader::INIT_SPACE + (usize::from(num_configs) * TokenConfigV2::INIT_SPACE)
+    }
 }

@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use bytemuck::Zeroable;
 use gmx_solana_utils::to_seed;
 
 use super::{InitSpace, RoleStore, Seed};
@@ -15,6 +16,7 @@ pub struct Store {
     key: [u8; MAX_LEN],
     padding: [u8; 7],
     role: RoleStore,
+    pub(crate) token_map: Pubkey,
 }
 
 impl InitSpace for Store {
@@ -30,11 +32,14 @@ impl std::fmt::Display for Store {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Store({}): authority={} roles={} members={}",
+            "Store({}): authority={} roles={} members={} token_map={}",
             self.key().unwrap_or("*failed to parse*"),
             self.authority,
             self.role.num_roles(),
             self.role.num_members(),
+            self.token_map()
+                .map(|pubkey| pubkey.to_string())
+                .unwrap_or("*unset*".to_string()),
         )
     }
 }
@@ -97,6 +102,15 @@ impl Store {
     /// Check if the given pubkey is the authority of the store.
     pub fn is_authority(&self, authority: &Pubkey) -> bool {
         self.authority == *authority
+    }
+
+    /// Get token map address.
+    pub fn token_map(&self) -> Option<&Pubkey> {
+        if self.token_map == Pubkey::zeroed() {
+            None
+        } else {
+            Some(&self.token_map)
+        }
     }
 }
 
