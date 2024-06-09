@@ -14,8 +14,9 @@ describe("data store: TokenConfig", () => {
     let dataStoreAddress: PublicKey;
     let roles: PublicKey;
     let fakeTokenMint: PublicKey;
+    let usdGTokenMint: PublicKey;
     before("init token config", async () => {
-        ({ dataStoreAddress, fakeTokenMint } = await getAddresses());
+        ({ dataStoreAddress, fakeTokenMint, usdGTokenMint } = await getAddresses());
         [roles] = createRolesPDA(dataStoreAddress, signer0.publicKey);
     });
 
@@ -153,24 +154,68 @@ describe("data store: TokenConfig", () => {
 
         const afterSet = await dataStore.methods.getTokenMap().accounts({ store }).view();
         expect(tokenMap.publicKey.equals(afterSet));
-
         const beforeSize = (await dataStore.account.tokenMapHeader.getAccountInfo(tokenMap.publicKey)).data.byteLength;
         console.log(`size before the push: ${beforeSize}`);
-        await invokePushToTokenMap(dataStore, {
-            authority: signer0,
-            store,
-            tokenMap: tokenMap.publicKey,
-            token: fakeTokenMint,
-            heartbeatDuration: 120,
-            precision: 4,
-            feeds: {
-                chainlinkFeed: BTC_FEED,
-                expectedProvider: PriceProvider.Chainlink,
-            }
-        }, {
-            skipPreflight: true,
-        });
-        const afterSize = (await dataStore.account.tokenMapHeader.getAccountInfo(tokenMap.publicKey)).data.byteLength;
-        console.log(`size after the push: ${afterSize}`);
+
+        {
+            await invokePushToTokenMap(dataStore, {
+                authority: signer0,
+                store,
+                tokenMap: tokenMap.publicKey,
+                token: fakeTokenMint,
+                heartbeatDuration: 120,
+                precision: 4,
+                feeds: {
+                    chainlinkFeed: BTC_FEED,
+                    expectedProvider: PriceProvider.Chainlink,
+                }
+            }, {
+                skipPreflight: true,
+            });
+            const afterSize = (await dataStore.account.tokenMapHeader.getAccountInfo(tokenMap.publicKey)).data.byteLength;
+            console.log(`size after the push: ${afterSize}`);
+            const feed = await dataStore.methods.tokenFeed(fakeTokenMint, PriceProvider.Chainlink).accounts({ tokenMap: tokenMap.publicKey }).view();
+            expect(BTC_FEED.equals(feed));
+        }
+
+        {
+            await expect(invokePushToTokenMap(dataStore, {
+                authority: signer0,
+                store,
+                tokenMap: tokenMap.publicKey,
+                token: fakeTokenMint,
+                heartbeatDuration: 120,
+                precision: 4,
+                feeds: {
+                    chainlinkFeed: BTC_FEED,
+                    expectedProvider: PriceProvider.Chainlink,
+                }
+            }, {
+                skipPreflight: false,
+            })).rejectedWith(Error, "Aready exist");
+        }
+
+        {
+            await invokePushToTokenMap(dataStore, {
+                authority: signer0,
+                store,
+                tokenMap: tokenMap.publicKey,
+                token: usdGTokenMint,
+                heartbeatDuration: 120,
+                precision: 4,
+                feeds: {
+                    chainlinkFeed: SOL_FEED,
+                    expectedProvider: PriceProvider.Chainlink,
+                }
+            }, {
+                skipPreflight: true,
+            });
+            const afterSize = (await dataStore.account.tokenMapHeader.getAccountInfo(tokenMap.publicKey)).data.byteLength;
+            console.log(`size after the push: ${afterSize}`);
+        }
+        const fakeFeed = await dataStore.methods.tokenFeed(fakeTokenMint, PriceProvider.Chainlink).accounts({ tokenMap: tokenMap.publicKey }).view();
+        expect(BTC_FEED.equals(fakeFeed));
+        const usdGFeed = await dataStore.methods.tokenFeed(usdGTokenMint, PriceProvider.Chainlink).accounts({ tokenMap: tokenMap.publicKey }).view();
+        expect(SOL_FEED.equals(usdGFeed));
     });
 });

@@ -4,9 +4,10 @@ use anchor_spl::token::Mint;
 use crate::{
     states::{
         PriceProviderKind, Seed, Store, TokenConfig, TokenConfigBuilder, TokenConfigMap,
-        TokenMapHeader, TokenMapLoader, TokenMapMutAccess,
+        TokenMapAccess, TokenMapHeader, TokenMapLoader, TokenMapMutAccess,
     },
     utils::internal,
+    DataStoreError,
 };
 
 #[derive(Accounts)]
@@ -372,4 +373,57 @@ impl<'info> internal::Authentication<'info> for PushToTokenMap<'info> {
     fn store(&self) -> &AccountLoader<'info, Store> {
         &self.store
     }
+}
+
+#[derive(Accounts)]
+pub struct ReadTokenMap<'info> {
+    token_map: AccountLoader<'info, TokenMapHeader>,
+}
+
+/// Get token config for the given token.
+pub fn is_token_config_enabled(ctx: Context<ReadTokenMap>, token: &Pubkey) -> Result<bool> {
+    ctx.accounts
+        .token_map
+        .load_token_map()?
+        .get(token)
+        .map(|config| config.is_enabled())
+        .ok_or(error!(DataStoreError::RequiredResourceNotFound))
+}
+
+/// Get expected provider for the given token.
+pub fn token_expected_provider(
+    ctx: Context<ReadTokenMap>,
+    token: &Pubkey,
+) -> Result<PriceProviderKind> {
+    ctx.accounts
+        .token_map
+        .load_token_map()?
+        .get(token)
+        .ok_or(error!(DataStoreError::RequiredResourceNotFound))?
+        .expected_provider()
+}
+
+/// Get feed address of the price provider of the given token.
+pub fn token_feed(
+    ctx: Context<ReadTokenMap>,
+    token: &Pubkey,
+    provider: &PriceProviderKind,
+) -> Result<Pubkey> {
+    ctx.accounts
+        .token_map
+        .load_token_map()?
+        .get(token)
+        .ok_or(error!(DataStoreError::RequiredResourceNotFound))?
+        .get_feed(provider)
+}
+
+/// Get timestamp adjustemnt of the given token.
+pub fn token_timestamp_adjustment(ctx: Context<ReadTokenMap>, token: &Pubkey) -> Result<u32> {
+    Ok(ctx
+        .accounts
+        .token_map
+        .load_token_map()?
+        .get(token)
+        .ok_or(error!(DataStoreError::RequiredResourceNotFound))?
+        .timestamp_adjustment())
 }

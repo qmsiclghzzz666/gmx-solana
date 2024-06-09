@@ -139,6 +139,27 @@ pub mod data_store {
         instructions::unchecked_push_to_token_map(ctx, builder, enable)
     }
 
+    pub fn is_token_config_enabled(ctx: Context<ReadTokenMap>, token: Pubkey) -> Result<bool> {
+        instructions::is_token_config_enabled(ctx, &token)
+    }
+
+    pub fn token_expected_provider(ctx: Context<ReadTokenMap>, token: Pubkey) -> Result<u8> {
+        instructions::token_expected_provider(ctx, &token).map(|kind| kind as u8)
+    }
+
+    pub fn token_feed(ctx: Context<ReadTokenMap>, token: Pubkey, provider: u8) -> Result<Pubkey> {
+        instructions::token_feed(
+            ctx,
+            &token,
+            &PriceProviderKind::try_from(provider)
+                .map_err(|_| DataStoreError::InvalidProviderKindIndex)?,
+        )
+    }
+
+    pub fn token_timestamp_adjustment(ctx: Context<ReadTokenMap>, token: Pubkey) -> Result<u32> {
+        instructions::token_timestamp_adjustment(ctx, &token)
+    }
+
     #[access_control(internal::Authenticate::only_controller(&ctx))]
     pub fn initialize_token_config_map(
         ctx: Context<InitializeTokenConfigMap>,

@@ -178,6 +178,16 @@ impl TokenConfigV2 {
         self.set_flag(Flag::Synthetic, is_synthetic)
     }
 
+    /// Is enabled.
+    pub fn is_enabled(&self) -> bool {
+        self.flag(Flag::Enabled)
+    }
+
+    /// Is synthetic.
+    pub fn is_synthetic(&self) -> bool {
+        self.flag(Flag::Synthetic)
+    }
+
     /// Set flag
     pub fn set_flag(&mut self, flag: Flag, value: bool) {
         let mut bitmap = TokenFlags::from_value(self.flags);
@@ -490,6 +500,7 @@ pub trait TokenMapAccess {
 impl<'a> TokenMapAccess for TokenMapRef<'a> {
     fn get(&self, token: &Pubkey) -> Option<&TokenConfigV2> {
         let index = usize::from(*self.header.tokens.get(token)?);
+        msg!("{}", index);
         crate::utils::dynamic_access::get(&self.configs, index)
     }
 }
