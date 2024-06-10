@@ -2,7 +2,9 @@ use anchor_lang::prelude::*;
 use bytemuck::Zeroable;
 use gmx_solana_utils::to_seed;
 
-use super::{InitSpace, RoleStore, Seed};
+use crate::constants;
+
+use super::{Amount, Factor, InitSpace, RoleStore, Seed};
 
 const MAX_LEN: usize = 32;
 
@@ -11,13 +13,22 @@ const MAX_LEN: usize = 32;
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub struct Store {
     bump: [u8; 1],
-    authority: Pubkey,
     key_seed: [u8; 32],
     key: [u8; MAX_LEN],
     padding: [u8; 7],
     role: RoleStore,
+    /// Store authority.
+    pub authority: Pubkey,
     /// The token map to used.
     pub token_map: Pubkey,
+    /// Treasury Config.
+    treasury: Treasury,
+    /// Amounts.
+    pub(crate) amount: Amounts,
+    /// Factors.
+    pub(crate) factor: Factors,
+    /// Addresses.
+    pub(crate) address: Addresses,
 }
 
 impl InitSpace for Store {
@@ -57,6 +68,10 @@ impl Store {
         self.key_seed = to_seed(key);
         self.bump = [bump];
         self.authority = authority;
+        self.treasury.init(authority, authority);
+        self.amount.init();
+        self.factor.init();
+        self.address.init(authority);
         Ok(())
     }
 
@@ -112,6 +127,79 @@ impl Store {
         } else {
             Some(&self.token_map)
         }
+    }
+}
+
+/// Treasury.
+#[account(zero_copy)]
+#[cfg_attr(feature = "debug", derive(Debug))]
+pub struct Treasury {
+    /// Receiver.
+    receiver: Pubkey,
+    /// Treasury.
+    treasury: Pubkey,
+    /// Treasury claim factor.
+    treasury_factor: u128,
+    /// Next treasury claim factor.
+    next_treasury_factor: u128,
+}
+
+impl Treasury {
+    fn init(&mut self, receiver: Pubkey, treasury: Pubkey) {
+        self.receiver = receiver;
+        self.treasury = treasury;
+    }
+}
+
+/// Amounts.
+#[account(zero_copy)]
+#[cfg_attr(feature = "debug", derive(Debug))]
+pub struct Amounts {
+    pub(crate) claimable_time_window: Amount,
+    pub(crate) recent_time_window: Amount,
+    pub(crate) request_expiration: Amount,
+    pub(crate) oracle_max_age: Amount,
+    pub(crate) oracle_max_timestamp_range: Amount,
+    reserved_1: [Amount; 27],
+    reserved_2: [Amount; 96],
+}
+
+impl Amounts {
+    fn init(&mut self) {
+        self.claimable_time_window = constants::DEFAULT_CLAIMABLE_TIME_WINDOW;
+        self.recent_time_window = constants::DEFAULT_RECENT_TIME_WINDOW;
+        self.request_expiration = constants::DEFAULT_REQUEST_EXPIRATION;
+        self.oracle_max_age = constants::DEFAULT_ORACLE_MAX_AGE;
+        self.oracle_max_timestamp_range = constants::DEFAULT_ORACLE_MAX_TIMESTAMP_RANGE;
+    }
+}
+
+/// Factors.
+#[account(zero_copy)]
+#[cfg_attr(feature = "debug", derive(Debug))]
+pub struct Factors {
+    pub(crate) oracle_ref_price_deviation: Factor,
+    reserved_1: [Factor; 31],
+    reserved_2: [Factor; 32],
+}
+
+impl Factors {
+    fn init(&mut self) {
+        self.oracle_ref_price_deviation = constants::DEFAULT_ORACLE_REF_PRICE_DEVIATION;
+    }
+}
+
+/// Addresses.
+#[account(zero_copy)]
+#[cfg_attr(feature = "debug", derive(Debug))]
+pub struct Addresses {
+    pub(crate) holding: Pubkey,
+    reserved: [Pubkey; 31],
+}
+
+impl Addresses {
+    fn init(&mut self, holding: Pubkey) {
+        self.holding = holding;
     }
 }
 

@@ -3,6 +3,8 @@ pub mod keys;
 
 use gmx_solana_utils::price::Decimal;
 
+use crate::states::{Amount, Factor};
+
 /// Market Token Mint Address Seed.
 pub const MAREKT_TOKEN_MINT_SEED: &[u8] = b"market_token_mint";
 
@@ -27,3 +29,21 @@ pub const MARKET_USD_TO_AMOUNT_DIVISOR: u128 =
 
 /// Deicmals of usd values of factors.
 pub const MARKET_DECIMALS: u8 = Decimal::MAX_DECIMALS;
+
+/// Default claimable time window.
+pub const DEFAULT_CLAIMABLE_TIME_WINDOW: Amount = 3600;
+
+/// Default recent time window.
+pub const DEFAULT_RECENT_TIME_WINDOW: Amount = 300;
+
+/// Default request expiration.
+pub const DEFAULT_REQUEST_EXPIRATION: Amount = 3600;
+
+/// Default oracle max age.
+pub const DEFAULT_ORACLE_MAX_AGE: Amount = 3600;
+
+/// Default oracle max timestamp range.
+pub const DEFAULT_ORACLE_MAX_TIMESTAMP_RANGE: Amount = 300;
+
+/// Default oracle ref price deviation.
+pub const DEFAULT_ORACLE_REF_PRICE_DEVIATION: Factor = 1_000_000_000_000_000;
