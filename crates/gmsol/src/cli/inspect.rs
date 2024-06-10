@@ -1,7 +1,10 @@
 use anchor_client::solana_sdk::pubkey::Pubkey;
 use data_store::states::{self};
 use eyre::ContextCompat;
-use gmsol::{store::utils::token_map, utils};
+use gmsol::{
+    store::utils::{read_store, token_map},
+    utils::{self, try_deserailize_account},
+};
 use pyth_sdk::Identifier;
 
 use crate::{utils::Oracle, GMSOLClient};
@@ -102,20 +105,18 @@ impl InspectArgs {
                         client.find_store_address(key.as_deref().unwrap_or_default())
                     })
                 };
-                println!("Store Address: {address}");
-                let store = program.account::<states::Store>(address).await?;
+                let store = read_store(&client.data_store().async_rpc(), &address).await?;
                 if let Some(key) = get_amount {
                     println!("{}", store.get_amount(key)?);
-                }
-                if let Some(key) = get_factor {
+                } else if let Some(key) = get_factor {
                     println!("{}", store.get_factor(key)?);
-                }
-                if let Some(key) = get_address {
+                } else if let Some(key) = get_address {
                     println!("{}", store.get_address(key)?);
-                }
-                if *debug {
+                } else if *debug {
+                    println!("Store Address: {address}");
                     println!("{store:?}");
                 } else {
+                    println!("Store Address: {address}");
                     println!("{store}");
                 }
             }
@@ -127,7 +128,11 @@ impl InspectArgs {
                 };
                 println!(
                     "{:#?}",
-                    program.account::<states::TokenMapHeader>(address).await?
+                    try_deserailize_account::<states::TokenMapHeader>(
+                        &program.async_rpc(),
+                        &address
+                    )
+                    .await?,
                 );
             }
             Command::Market {

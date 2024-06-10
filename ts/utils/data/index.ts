@@ -9,7 +9,7 @@ import { dataStore } from "./program";
 import { invokeInitializeTokenMap, invokePushToTokenMap } from "./token_config";
 import { createRolesPDA } from "./roles";
 import { createControllerPDA } from "../exchange";
-import { invokeInitializeConfig, invokeInsertAddress, invokeInsertAmount, invokeInsertFactor } from "./config";
+import { invokeInsertAddress, invokeInsertAmount, invokeInsertFactor } from "./config";
 import { TIME_WINDOW } from "./constants";
 import { invokeSetTokenMap } from "./store";
 
@@ -285,15 +285,13 @@ export const initializeDataStore = async (
 
     // Init the config.
     try {
-        const tx = await invokeInitializeConfig(dataStore, { authority: signer, store: dataStorePDA });
-        console.log(`Inited the config account at tx: ${tx}`);
-        invokeInsertAmount(dataStore, { authority: signer, store: dataStorePDA, key: "max_age", amount: 3600, insertNew: true });
-        invokeInsertAmount(dataStore, { authority: signer, store: dataStorePDA, key: "request_expiration_time", amount: 3600, insertNew: true });
-        invokeInsertAmount(dataStore, { authority: signer, store: dataStorePDA, key: "max_oracle_timestamp_range", amount: 300, insertNew: true });
-        invokeInsertAmount(dataStore, { authority: signer, store: dataStorePDA, key: "claimable_time_window", amount: TIME_WINDOW, insertNew: true });
-        invokeInsertAmount(dataStore, { authority: signer, store: dataStorePDA, key: "recent_time_window", amount: 120, insertNew: true });
-        invokeInsertFactor(dataStore, { authority: signer, store: dataStorePDA, key: "ref_price_deviation", factor: 1_000_000_000_000_000, insertNew: true });
-        invokeInsertAddress(dataStore, { authority: signer, store: dataStorePDA, key: "holding", address: dataStore.provider.publicKey, insertNew: true });
+        invokeInsertAmount(dataStore, { authority: signer, store: dataStorePDA, key: "oracle_max_age", amount: 3600 });
+        invokeInsertAmount(dataStore, { authority: signer, store: dataStorePDA, key: "request_expiration", amount: 3600 });
+        invokeInsertAmount(dataStore, { authority: signer, store: dataStorePDA, key: "oracle_max_timestamp_range", amount: 300 });
+        invokeInsertAmount(dataStore, { authority: signer, store: dataStorePDA, key: "claimable_time_window", amount: TIME_WINDOW });
+        invokeInsertAmount(dataStore, { authority: signer, store: dataStorePDA, key: "recent_time_window", amount: 120 });
+        invokeInsertFactor(dataStore, { authority: signer, store: dataStorePDA, key: "oracle_ref_price_deviation", factor: 1_000_000_000_000_000 });
+        invokeInsertAddress(dataStore, { authority: signer, store: dataStorePDA, key: "holding", address: dataStore.provider.publicKey });
     } catch (error) {
         console.warn("Failed to init config account", error);
     }

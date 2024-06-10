@@ -6,6 +6,7 @@ use std::{
 };
 
 use anchor_client::{
+    solana_client::nonblocking::rpc_client::RpcClient,
     solana_sdk::{instruction::AccountMeta, pubkey::Pubkey, signer::Signer},
     Program,
 };
@@ -151,7 +152,7 @@ where
     C: Deref<Target = S> + Clone,
     S: Signer,
 {
-    let store = program.account::<Store>(*store).await?;
+    let store = read_store(&program.async_rpc(), store).await?;
     let token_map = store.token_map;
     if token_map == Pubkey::default() {
         Err(crate::Error::invalid_argument(
@@ -160,4 +161,9 @@ where
     } else {
         Ok(token_map)
     }
+}
+
+/// Read store account.
+pub async fn read_store(client: &RpcClient, store: &Pubkey) -> crate::Result<Store> {
+    crate::utils::try_deserailize_account(client, store).await
 }
