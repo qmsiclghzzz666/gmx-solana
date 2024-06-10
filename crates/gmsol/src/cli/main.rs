@@ -153,7 +153,10 @@ impl Cli {
                 args.run(&client, self.store()?, self.serialize_only)
                     .await?
             }
-            Command::MarketKeeper(args) => args.run(&client, self.store()?).await?,
+            Command::MarketKeeper(args) => {
+                args.run(&client, self.store()?, self.serialize_only)
+                    .await?
+            }
             Command::Controller(args) => {
                 args.run(&client, self.store()?, self.serialize_only)
                     .await?

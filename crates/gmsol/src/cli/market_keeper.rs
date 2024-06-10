@@ -31,8 +31,6 @@ enum Command {
         #[arg(long, value_name = "DECIMALS")]
         synthetic: Option<u8>,
         #[arg(long)]
-        serialize_only: bool,
-        #[arg(long)]
         update: bool,
     },
     /// Toggle token config of token.
@@ -40,15 +38,11 @@ enum Command {
         token: Pubkey,
         #[command(flatten)]
         toggle: Toggle,
-        #[arg(long)]
-        serialize_only: bool,
     },
     /// Set expected provider of token.
     SetExpectedProvider {
         token: Pubkey,
         provider: PriceProviderKind,
-        #[arg(long)]
-        serialize_only: bool,
     },
 }
 
@@ -83,9 +77,19 @@ impl Toggle {
 }
 
 impl Args {
-    pub(super) async fn run(&self, client: &GMSOLClient, store: &Pubkey) -> gmsol::Result<()> {
+    pub(super) async fn run(
+        &self,
+        client: &GMSOLClient,
+        store: &Pubkey,
+        serialize_only: bool,
+    ) -> gmsol::Result<()> {
         match &self.command {
             Command::InitializeTokenMap => {
+                if serialize_only {
+                    return Err(gmsol::Error::invalid_argument(
+                        "serialize-only mode is not supported for this command",
+                    ));
+                }
                 let token_map = Keypair::new();
                 let (request, map) = client.initialize_token_map(store, &token_map);
                 crate::utils::send_or_serialize(request, false, |signature| {
@@ -101,7 +105,6 @@ impl Args {
                 heartbeat_duration,
                 precision,
                 synthetic: fake_decimals,
-                serialize_only,
                 update,
             } => {
                 let mut builder = TokenConfigBuilder::default()
@@ -135,21 +138,17 @@ impl Args {
                 } else {
                     client.insert_token_config(store, &token_map, token, builder, true, !*update)
                 };
-                crate::utils::send_or_serialize(req, *serialize_only, |signature| {
+                crate::utils::send_or_serialize(req, serialize_only, |signature| {
                     println!("{signature}");
                     Ok(())
                 })
                 .await?;
             }
-            Command::ToggleTokenConfig {
-                token,
-                toggle,
-                serialize_only,
-            } => {
+            Command::ToggleTokenConfig { token, toggle } => {
                 let token_map = self.token_map(client, store).await?;
                 crate::utils::send_or_serialize(
                     client.toggle_token_config(store, &token_map, token, toggle.is_enable()),
-                    *serialize_only,
+                    serialize_only,
                     |signature| {
                         println!("{signature}");
                         Ok(())
@@ -157,15 +156,11 @@ impl Args {
                 )
                 .await?;
             }
-            Command::SetExpectedProvider {
-                token,
-                provider,
-                serialize_only,
-            } => {
+            Command::SetExpectedProvider { token, provider } => {
                 let token_map = self.token_map(client, store).await?;
                 crate::utils::send_or_serialize(
                     client.set_expected_provider(store, &token_map, token, *provider),
-                    *serialize_only,
+                    serialize_only,
                     |signature| {
                         println!("{signature}");
                         Ok(())
