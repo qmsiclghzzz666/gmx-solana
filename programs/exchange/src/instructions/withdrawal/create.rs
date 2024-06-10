@@ -3,12 +3,12 @@ use std::collections::BTreeSet;
 use anchor_lang::{prelude::*, system_program};
 use anchor_spl::token::{Token, TokenAccount};
 use data_store::{
-    cpi::accounts::{GetTokenConfig, GetValidatedMarketMeta, InitializeWithdrawal},
+    cpi::accounts::{GetValidatedMarketMeta, InitializeWithdrawal},
     program::DataStore,
     states::{
         common::{SwapParams, TokenRecord},
         withdrawal::TokenParams,
-        NonceBytes,
+        NonceBytes, Store, TokenMapAccess, TokenMapHeader, TokenMapLoader,
     },
 };
 
@@ -40,13 +40,13 @@ pub struct CreateWithdrawal<'info> {
         bump,
     )]
     pub authority: UncheckedAccount<'info>,
-    /// CHECK: only used to invoke CPI.
-    pub store: UncheckedAccount<'info>,
+    #[account(has_one = token_map)]
+    pub store: AccountLoader<'info, Store>,
+    #[account(has_one = store)]
+    pub token_map: AccountLoader<'info, TokenMapHeader>,
     pub data_store_program: Program<'info, DataStore>,
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
-    /// CHECK: check by CPI.
-    pub token_config_map: UncheckedAccount<'info>,
     /// CHECK: only used to invoke CPI and should be checked by it.
     pub market: UncheckedAccount<'info>,
     /// CHECK: only used to invoke CPI which will then initalize the account.
@@ -123,21 +123,19 @@ pub fn create_withdrawal<'info>(
         &mut tokens,
     )?;
 
+    let token_map = ctx.accounts.token_map.load_token_map()?;
     let tokens_with_feed = tokens
         .into_iter()
         .map(|token| {
-            let config = cpi::get_token_config(
-                ctx.accounts.get_token_config_ctx(),
-                ctx.accounts.store.key(),
-                token,
-            )?
-            .get()
-            .ok_or(ExchangeError::ResourceNotFound)?;
-            TokenRecord::from_config(token, &config)
+            let config = token_map
+                .get(&token)
+                .ok_or(error!(ExchangeError::ResourceNotFound))?;
+            TokenRecord::from_config(token, config)
         })
         .collect::<Result<Vec<_>>>()?;
 
-    let controller = ControllerSeeds::new(ctx.accounts.store.key, ctx.bumps.authority);
+    let store = ctx.accounts.store.key();
+    let controller = ControllerSeeds::new(&store, ctx.bumps.authority);
     cpi::initialize_withdrawal(
         ctx.accounts
             .initialize_withdrawal_ctx()
@@ -170,15 +168,6 @@ pub fn create_withdrawal<'info>(
 }
 
 impl<'info> CreateWithdrawal<'info> {
-    fn get_token_config_ctx(&self) -> CpiContext<'_, '_, '_, 'info, GetTokenConfig<'info>> {
-        CpiContext::new(
-            self.data_store_program.to_account_info(),
-            GetTokenConfig {
-                map: self.token_config_map.to_account_info(),
-            },
-        )
-    }
-
     fn get_validated_market_meta_ctx(
         &self,
     ) -> CpiContext<'_, '_, '_, 'info, GetValidatedMarketMeta<'info>> {

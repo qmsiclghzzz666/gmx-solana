@@ -25,8 +25,11 @@ impl Pyth {
     ) -> Result<(u64, i64, Price)> {
         let feed = Account::<PriceUpdateV2>::try_from(feed)?;
         let feed_id = feed_id.to_bytes();
-        let price =
-            feed.get_price_no_older_than(clock, token_config.heartbeat_duration.into(), &feed_id)?;
+        let price = feed.get_price_no_older_than(
+            clock,
+            token_config.heartbeat_duration().into(),
+            &feed_id,
+        )?;
         let mid_price: u64 = price
             .price
             .try_into()
@@ -69,8 +72,8 @@ impl Pyth {
         let price = Decimal::try_from_price(
             value as u128,
             decimals,
-            token_config.token_decimals,
-            token_config.precision,
+            token_config.token_decimals(),
+            token_config.precision(),
         )
         .map_err(|_| DataStoreError::InvalidPriceFeedPrice)?;
         Ok(price)
@@ -91,9 +94,10 @@ impl PythLegacy {
             msg!("Pyth Error: {}", err);
             DataStoreError::Unknown
         })?;
-        let Some(price) = feed
-            .get_price_no_older_than(clock.unix_timestamp, token_config.heartbeat_duration.into())
-        else {
+        let Some(price) = feed.get_price_no_older_than(
+            clock.unix_timestamp,
+            token_config.heartbeat_duration().into(),
+        ) else {
             return err!(DataStoreError::PriceFeedNotUpdated);
         };
         let mid_price: u64 = price

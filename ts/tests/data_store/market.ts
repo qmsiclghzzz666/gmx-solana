@@ -26,9 +26,8 @@ describe("data store: Market", () => {
     });
 
     it("init and remove a market", async () => {
-        await dataStore.methods.initializeMarket(marketToken, indexToken, longToken, shortToken).accounts({
+        await dataStore.methods.initializeMarket(marketToken, indexToken, longToken, shortToken).accountsPartial({
             authority: signer0.publicKey,
-            onlyMarketKeeper: roles,
             store: dataStoreAddress,
             market: marketPDA,
         }).signers([signer0]).rpc();
@@ -41,7 +40,6 @@ describe("data store: Market", () => {
         }
         await dataStore.methods.removeMarket().accountsPartial({
             authority: signer0.publicKey,
-            onlyMarketKeeper: roles,
             store: dataStoreAddress,
             market: marketPDA,
         }).signers([signer0]).rpc();
@@ -56,7 +54,6 @@ describe("data store: Market", () => {
         await dataStore.methods.initializeMarketToken(indexToken, longToken, shortToken).accountsPartial({
             store: dataStoreAddress,
             authority: signer0.publicKey,
-            onlyMarketKeeper: roles,
             marketTokenMint,
         }).signers([signer0]).rpc();
 
@@ -71,7 +68,6 @@ describe("data store: Market", () => {
         await dataStore.methods.mintMarketTokenTo(new BN("100000000").mul(new BN(100))).accounts({
             authority: signer0.publicKey,
             store: dataStoreAddress,
-            onlyController: roles,
             marketTokenMint,
             to: userTokenAccount,
         }).signers([signer0]).rpc();
@@ -80,7 +76,6 @@ describe("data store: Market", () => {
         await dataStore.methods.initializeMarketVault(null).accountsPartial({
             authority: signer0.publicKey,
             store: dataStoreAddress,
-            onlyMarketKeeper: roles,
             mint: marketTokenMint,
             vault: marketVault,
         }).signers([signer0]).rpc();
@@ -96,7 +91,6 @@ describe("data store: Market", () => {
 
         await dataStore.methods.marketVaultTransferOut(new BN("100000000").mul(new BN(11))).accounts({
             authority: signer0.publicKey,
-            onlyController: roles,
             store: dataStoreAddress,
             marketVault,
             to: userTokenAccount,

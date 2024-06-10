@@ -3,12 +3,12 @@ use std::collections::BTreeSet;
 use anchor_lang::{prelude::*, system_program};
 use anchor_spl::token::{Token, TokenAccount};
 use data_store::{
-    cpi::accounts::{GetTokenConfig, GetValidatedMarketMeta, InitializeDeposit, MarketTransferIn},
+    cpi::accounts::{GetValidatedMarketMeta, InitializeDeposit, MarketTransferIn},
     program::DataStore,
     states::{
         common::{SwapParams, TokenRecord},
         deposit::TokenParams,
-        NonceBytes,
+        NonceBytes, Store, TokenMapAccess, TokenMapHeader, TokenMapLoader,
     },
 };
 
@@ -42,19 +42,16 @@ pub struct CreateDeposit<'info> {
         bump,
     )]
     pub authority: UncheckedAccount<'info>,
-    /// CHECK: only used to invoke CPI.
-    pub store: UncheckedAccount<'info>,
-    pub data_store_program: Program<'info, DataStore>,
-    pub system_program: Program<'info, System>,
-    pub token_program: Program<'info, Token>,
+    #[account(has_one = token_map)]
+    pub store: AccountLoader<'info, Store>,
+    #[account(has_one = store)]
+    pub token_map: AccountLoader<'info, TokenMapHeader>,
     /// CHECK: only used to invoke CPI which will then initialize the account.
     #[account(mut)]
     pub deposit: UncheckedAccount<'info>,
     #[account(mut)]
     pub payer: Signer<'info>,
     pub receiver: Box<Account<'info, TokenAccount>>,
-    /// CHECK: check by CPI.
-    pub token_config_map: UncheckedAccount<'info>,
     /// CHECK: only used to invoke CPI and should be checked by it.
     #[account(mut)]
     pub market: UncheckedAccount<'info>,
@@ -68,6 +65,9 @@ pub struct CreateDeposit<'info> {
     /// CHECK: check by CPI.
     #[account(mut)]
     pub initial_short_token_vault: Option<UncheckedAccount<'info>>,
+    pub data_store_program: Program<'info, DataStore>,
+    pub system_program: Program<'info, System>,
+    pub token_program: Program<'info, Token>,
 }
 
 /// Create Deposit.
@@ -83,7 +83,8 @@ pub fn create_deposit<'info>(
         ExchangeError::EmptyDepositAmounts
     );
 
-    let controller = ControllerSeeds::new(ctx.accounts.store.key, ctx.bumps.authority);
+    let store = ctx.accounts.store.key();
+    let controller = ControllerSeeds::new(&store, ctx.bumps.authority);
 
     let mut tokens = BTreeSet::default();
     let initial_long_token_mint = ctx
@@ -174,17 +175,14 @@ pub fn create_deposit<'info>(
         )?;
     }
 
+    let token_map = ctx.accounts.token_map.load_token_map()?;
     let tokens_with_feed = tokens
         .into_iter()
         .map(|token| {
-            let config = cpi::get_token_config(
-                ctx.accounts.get_token_config_ctx(),
-                ctx.accounts.store.key(),
-                token,
-            )?
-            .get()
-            .ok_or(ExchangeError::ResourceNotFound)?;
-            TokenRecord::from_config(token, &config)
+            let config = token_map
+                .get(&token)
+                .ok_or(error!(ExchangeError::ResourceNotFound))?;
+            TokenRecord::from_config(token, config)
         })
         .collect::<Result<Vec<_>>>()?;
 
@@ -233,15 +231,6 @@ impl<'info> CreateDeposit<'info> {
             GetValidatedMarketMeta {
                 store: self.store.to_account_info(),
                 market: self.market.to_account_info(),
-            },
-        )
-    }
-
-    fn get_token_config_ctx(&self) -> CpiContext<'_, '_, '_, 'info, GetTokenConfig<'info>> {
-        CpiContext::new(
-            self.data_store_program.to_account_info(),
-            GetTokenConfig {
-                map: self.token_config_map.to_account_info(),
             },
         )
     }

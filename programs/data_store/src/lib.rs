@@ -21,7 +21,7 @@ use self::{
         deposit::TokenParams as DepositTokenParams,
         market::MarketMeta,
         order::{OrderParams, TransferOut},
-        token_config::{TokenConfig, TokenConfigBuilder},
+        token_config::TokenConfigBuilder,
         withdrawal::TokenParams as WithdrawalTokenParams,
         PriceProviderKind,
     },
@@ -41,6 +41,15 @@ pub mod data_store {
     // Data Store.
     pub fn initialize(ctx: Context<Initialize>, key: String) -> Result<()> {
         instructions::initialize(ctx, key)
+    }
+
+    #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
+    pub fn set_token_map(ctx: Context<SetTokenMap>) -> Result<()> {
+        instructions::unchecked_set_token_map(ctx)
+    }
+
+    pub fn get_token_map(ctx: Context<ReadStore>) -> Result<Option<Pubkey>> {
+        instructions::get_token_map(ctx)
     }
 
     // Roles.
@@ -117,78 +126,81 @@ pub mod data_store {
     }
 
     // Token Config.
-    #[access_control(internal::Authenticate::only_controller(&ctx))]
-    pub fn initialize_token_config_map(
-        ctx: Context<InitializeTokenConfigMap>,
-        len: u16,
-    ) -> Result<()> {
-        instructions::initialize_token_config_map(ctx, len)
+    pub fn initialize_token_map(ctx: Context<InitializeTokenMap>) -> Result<()> {
+        instructions::initialize_token_map(ctx)
     }
 
-    #[access_control(internal::Authenticate::only_controller(&ctx))]
-    pub fn insert_token_config(
-        ctx: Context<InsertTokenConfig>,
+    #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
+    pub fn push_to_token_map(
+        ctx: Context<PushToTokenMap>,
         builder: TokenConfigBuilder,
         enable: bool,
+        new: bool,
     ) -> Result<()> {
-        instructions::insert_token_config(ctx, builder, enable)
+        instructions::unchecked_push_to_token_map(ctx, builder, enable, new)
     }
 
-    #[access_control(internal::Authenticate::only_controller(&ctx))]
-    pub fn insert_synthetic_token_config(
-        ctx: Context<InsertSyntheticTokenConfig>,
+    #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
+    pub fn push_to_token_map_synthetic(
+        ctx: Context<PushToTokenMapSynthetic>,
         token: Pubkey,
-        decimals: u8,
+        token_decimals: u8,
         builder: TokenConfigBuilder,
         enable: bool,
+        new: bool,
     ) -> Result<()> {
-        instructions::insert_synthetic_token_config(ctx, token, decimals, builder, enable)
+        instructions::unchecked_push_to_token_map_synthetic(
+            ctx,
+            token,
+            token_decimals,
+            builder,
+            enable,
+            new,
+        )
     }
 
-    #[access_control(internal::Authenticate::only_controller(&ctx))]
+    pub fn is_token_config_enabled(ctx: Context<ReadTokenMap>, token: Pubkey) -> Result<bool> {
+        instructions::is_token_config_enabled(ctx, &token)
+    }
+
+    pub fn token_expected_provider(ctx: Context<ReadTokenMap>, token: Pubkey) -> Result<u8> {
+        instructions::token_expected_provider(ctx, &token).map(|kind| kind as u8)
+    }
+
+    pub fn token_feed(ctx: Context<ReadTokenMap>, token: Pubkey, provider: u8) -> Result<Pubkey> {
+        instructions::token_feed(
+            ctx,
+            &token,
+            &PriceProviderKind::try_from(provider)
+                .map_err(|_| DataStoreError::InvalidProviderKindIndex)?,
+        )
+    }
+
+    pub fn token_timestamp_adjustment(ctx: Context<ReadTokenMap>, token: Pubkey) -> Result<u32> {
+        instructions::token_timestamp_adjustment(ctx, &token)
+    }
+
+    #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn toggle_token_config(
         ctx: Context<ToggleTokenConfig>,
         token: Pubkey,
         enable: bool,
     ) -> Result<()> {
-        instructions::toggle_token_config(ctx, token, enable)
+        instructions::unchecked_toggle_token_config(ctx, token, enable)
     }
 
-    #[access_control(internal::Authenticate::only_controller(&ctx))]
+    #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn set_expected_provider(
         ctx: Context<SetExpectedProvider>,
         token: Pubkey,
         provider: u8,
     ) -> Result<()> {
-        instructions::set_expected_provider(
+        instructions::unchecked_set_expected_provider(
             ctx,
             token,
             PriceProviderKind::try_from(provider)
                 .map_err(|_| DataStoreError::InvalidProviderKindIndex)?,
         )
-    }
-
-    pub fn get_token_config(
-        ctx: Context<GetTokenConfig>,
-        store: Pubkey,
-        token: Pubkey,
-    ) -> Result<Option<TokenConfig>> {
-        instructions::get_token_config(ctx, store, token)
-    }
-
-    #[access_control(internal::Authenticate::only_controller(&ctx))]
-    pub fn extend_token_config_map(ctx: Context<ExtendTokenConfigMap>, len: u16) -> Result<()> {
-        instructions::extend_token_config_map(ctx, len)
-    }
-
-    #[access_control(internal::Authenticate::only_controller(&ctx))]
-    pub fn insert_token_config_amount(
-        ctx: Context<InsertTokenConfigAmount>,
-        token: Pubkey,
-        key: String,
-        amount: u64,
-    ) -> Result<()> {
-        instructions::insert_token_config_amount(ctx, &token, &key, amount)
     }
 
     // Market.
@@ -433,6 +445,8 @@ pub enum DataStoreError {
     ExceedMaxLengthLimit,
     #[msg("Exceed max string length limit")]
     ExceedMaxStringLengthLimit,
+    #[msg("No space for new data")]
+    NoSpaceForNewData,
     #[msg("Invalid argument")]
     InvalidArgument,
     #[msg("Lamports not enough")]
@@ -603,6 +617,8 @@ pub enum DataStoreError {
     // Token Config.
     #[msg("synthetic flag does not match")]
     InvalidSynthetic,
+    #[msg("invalid token map")]
+    InvalidTokenMap,
     // Invalid Provider Kind.
     #[msg("invalid provider kind index")]
     InvalidProviderKindIndex,

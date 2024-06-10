@@ -3,12 +3,12 @@ use std::collections::BTreeSet;
 use anchor_lang::{prelude::*, system_program};
 use anchor_spl::token::{Token, TokenAccount};
 use data_store::{
-    cpi::accounts::{GetTokenConfig, GetValidatedMarketMeta, InitializeOrder, MarketTransferIn},
+    cpi::accounts::{GetValidatedMarketMeta, InitializeOrder, MarketTransferIn},
     program::DataStore,
     states::{
         common::{SwapParams, TokenRecord},
         order::{OrderKind, OrderParams},
-        NonceBytes,
+        NonceBytes, Store, TokenMapAccess, TokenMapHeader, TokenMapLoader,
     },
 };
 
@@ -29,8 +29,10 @@ pub struct CreateOrder<'info> {
         bump,
     )]
     pub authority: UncheckedAccount<'info>,
-    /// CHECK: only used to invoke CPI.
-    pub store: UncheckedAccount<'info>,
+    #[account(has_one = token_map)]
+    pub store: AccountLoader<'info, Store>,
+    #[account(has_one = store)]
+    pub token_map: AccountLoader<'info, TokenMapHeader>,
     #[account(mut)]
     pub payer: Signer<'info>,
     /// CHECK: only used to invoke CPI and then checked and initilized by it.
@@ -39,8 +41,6 @@ pub struct CreateOrder<'info> {
     /// CHECK: check by CPI.
     #[account(mut)]
     pub position: Option<UncheckedAccount<'info>>,
-    /// CHECK: check by CPI.
-    pub token_config_map: UncheckedAccount<'info>,
     /// CHECK: check by CPI.
     #[account(mut)]
     pub market: UncheckedAccount<'info>,
@@ -65,7 +65,8 @@ pub fn create_order<'info>(
     params: CreateOrderParams,
 ) -> Result<()> {
     let order = &params.order;
-    let controller = ControllerSeeds::new(ctx.accounts.store.key, ctx.bumps.authority);
+    let store = ctx.accounts.store.key();
+    let controller = ControllerSeeds::new(&store, ctx.bumps.authority);
 
     let (tokens, swap, need_to_transfer_in) = match &order.kind {
         OrderKind::MarketIncrease => ctx.accounts.handle_tokens_for_increase_order(
@@ -329,19 +330,14 @@ impl<'info> CreateOrder<'info> {
         &self,
         tokens: impl IntoIterator<Item = Pubkey>,
     ) -> Result<Vec<TokenRecord>> {
+        let token_map = self.token_map.load_token_map()?;
         tokens
             .into_iter()
             .map(|token| {
-                let ctx = CpiContext::new(
-                    self.data_store_program.to_account_info(),
-                    GetTokenConfig {
-                        map: self.token_config_map.to_account_info(),
-                    },
-                );
-                let config = data_store::cpi::get_token_config(ctx, self.store.key(), token)?
-                    .get()
-                    .ok_or(ExchangeError::ResourceNotFound)?;
-                TokenRecord::from_config(token, &config)
+                let config = token_map
+                    .get(&token)
+                    .ok_or(error!(ExchangeError::ResourceNotFound))?;
+                TokenRecord::from_config(token, config)
             })
             .collect::<Result<Vec<_>>>()
     }

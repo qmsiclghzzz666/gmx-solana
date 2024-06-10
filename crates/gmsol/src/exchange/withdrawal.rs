@@ -43,6 +43,7 @@ pub struct CreateWithdrawalBuilder<'a, C> {
     final_short_token_receiver: Option<Pubkey>,
     long_token_swap_path: Vec<Pubkey>,
     short_token_swap_path: Vec<Pubkey>,
+    token_map: Option<Pubkey>,
 }
 
 impl<'a, C, S> CreateWithdrawalBuilder<'a, C>
@@ -74,6 +75,7 @@ where
             final_short_token_receiver: None,
             long_token_swap_path: vec![],
             short_token_swap_path: vec![],
+            token_map: None,
         }
     }
 
@@ -173,6 +175,20 @@ where
         ))
     }
 
+    async fn get_token_map(&self) -> crate::Result<Pubkey> {
+        if let Some(address) = self.token_map {
+            Ok(address)
+        } else {
+            crate::store::utils::token_map(self.client.data_store(), &self.store).await
+        }
+    }
+
+    /// Set token map.
+    pub fn token_map(&mut self, address: Pubkey) -> &mut Self {
+        self.token_map = Some(address);
+        self
+    }
+
     /// Create the [`RequestBuilder`] and return withdrawal address.
     pub async fn build_with_address(&self) -> crate::Result<(RequestBuilder<'a, C>, Pubkey)> {
         let payer = self.client.payer();
@@ -198,7 +214,7 @@ where
                 data_store_program: self.client.data_store_program_id(),
                 token_program: anchor_spl::token::ID,
                 system_program: system_program::ID,
-                token_config_map: self.client.find_token_config_map(&self.store),
+                token_map: self.get_token_map().await?,
                 market,
                 withdrawal,
                 payer,
@@ -365,6 +381,7 @@ pub struct ExecuteWithdrawalBuilder<'a, C> {
     price_provider: Pubkey,
     hint: Option<ExecuteWithdrawalHint>,
     feeds_parser: FeedsParser,
+    token_map: Option<Pubkey>,
 }
 
 /// Hint for withdrawal execution.
@@ -418,6 +435,7 @@ where
             price_provider: Pyth::id(),
             hint: None,
             feeds_parser: Default::default(),
+            token_map: None,
         }
     }
 
@@ -460,6 +478,20 @@ where
         }
     }
 
+    async fn get_token_map(&self) -> crate::Result<Pubkey> {
+        if let Some(address) = self.token_map {
+            Ok(address)
+        } else {
+            crate::store::utils::token_map(self.client.data_store(), &self.store).await
+        }
+    }
+
+    /// Set token map.
+    pub fn token_map(&mut self, address: Pubkey) -> &mut Self {
+        self.token_map = Some(address);
+        self
+    }
+
     /// Build [`RpcBuilder`] for `execute_withdrawal` instruction.
     pub async fn build(&mut self) -> crate::Result<RpcBuilder<'a, C>> {
         let authority = self.client.payer();
@@ -499,7 +531,7 @@ where
                 system_program: system_program::ID,
                 oracle: self.oracle,
                 config: self.client.find_config_address(&self.store),
-                token_config_map: self.client.find_token_config_map(&self.store),
+                token_map: self.get_token_map().await?,
                 withdrawal: self.withdrawal,
                 market: self
                     .client

@@ -43,6 +43,7 @@ pub struct CreateOrderBuilder<'a, C> {
     secondary_token_account: Option<Pubkey>,
     long_token_account: Option<Pubkey>,
     short_token_account: Option<Pubkey>,
+    token_map: Option<Pubkey>,
 }
 
 #[derive(Clone, Copy)]
@@ -79,6 +80,7 @@ where
             secondary_token_account: None,
             long_token_account: None,
             short_token_account: None,
+            token_map: None,
         }
     }
 
@@ -309,6 +311,20 @@ where
         Ok((long_token_account, short_token_account))
     }
 
+    async fn get_token_map(&self) -> crate::Result<Pubkey> {
+        if let Some(address) = self.token_map {
+            Ok(address)
+        } else {
+            crate::store::utils::token_map(self.client.data_store(), &self.store).await
+        }
+    }
+
+    /// Set token map.
+    pub fn token_map(&mut self, address: Pubkey) -> &mut Self {
+        self.token_map = Some(address);
+        self
+    }
+
     /// Create [`RequestBuilder`] and return order address.
     pub async fn build_with_address(&mut self) -> crate::Result<(RequestBuilder<'a, C>, Pubkey)> {
         let authority = self.client.controller_address(&self.store);
@@ -331,7 +347,7 @@ where
                     payer: *payer,
                     order,
                     position,
-                    token_config_map: self.client.find_token_config_map(&self.store),
+                    token_map: self.get_token_map().await?,
                     market: self.market(),
                     initial_collateral_token_account,
                     final_output_token_account: self.final_output_token_account().await?,
@@ -389,6 +405,7 @@ pub struct ExecuteOrderBuilder<'a, C> {
     feeds_parser: FeedsParser,
     recent_timestamp: i64,
     hint: Option<ExecuteOrderHint>,
+    token_map: Option<Pubkey>,
 }
 
 /// Hint for executing order.
@@ -515,6 +532,7 @@ where
             feeds_parser: Default::default(),
             recent_timestamp,
             hint: None,
+            token_map: None,
         })
     }
 
@@ -615,6 +633,20 @@ where
         self.client.find_config_address(&self.store)
     }
 
+    async fn get_token_map(&self) -> crate::Result<Pubkey> {
+        if let Some(address) = self.token_map {
+            Ok(address)
+        } else {
+            crate::store::utils::token_map(self.client.data_store(), &self.store).await
+        }
+    }
+
+    /// Set token map.
+    pub fn token_map(&mut self, address: Pubkey) -> &mut Self {
+        self.token_map = Some(address);
+        self
+    }
+
     /// Build [`TransactionBuilder`] for `execute_order` instructions.
     pub async fn build(&mut self) -> crate::Result<TransactionBuilder<'a, C>> {
         use crate::store::token::TokenAccountOps;
@@ -648,7 +680,7 @@ where
                     store: self.store,
                     oracle: self.oracle,
                     config: self.config_address(),
-                    token_config_map: self.client.find_token_config_map(&self.store),
+                    token_map: self.get_token_map().await?,
                     market: self
                         .client
                         .find_market_address(&self.store, &hint.market_token),

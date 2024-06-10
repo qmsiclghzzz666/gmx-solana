@@ -19,6 +19,7 @@ mod controller;
 mod exchange;
 mod inspect;
 mod keeper;
+mod market_keeper;
 mod utils;
 
 #[derive(Parser)]
@@ -67,8 +68,10 @@ enum Command {
     Inspect(inspect::InspectArgs),
     /// Commands for `Exchange` program.
     Exchange(exchange::ExchangeArgs),
-    /// Commands for keepers.
+    /// Commands for ORDER_KEEPER.
     Keeper(keeper::KeeperArgs),
+    /// Commands for MARKET_KEEPER.
+    MarketKeeper(market_keeper::Args),
     /// Commands for controllers.
     Controller(controller::ControllerArgs),
 }
@@ -150,6 +153,7 @@ impl Cli {
                 args.run(&client, self.store()?, self.serialize_only)
                     .await?
             }
+            Command::MarketKeeper(args) => args.run(&client, self.store()?).await?,
             Command::Controller(args) => {
                 args.run(&client, self.store()?, self.serialize_only)
                     .await?

@@ -53,11 +53,7 @@ macro_rules! fixed_map {
 
             impl Default for $map {
                 fn default() -> Self {
-                    Self {
-                        data: Default::default(),
-                        count: 0,
-                        padding: Default::default(),
-                    }
+                    bytemuck::Zeroable::zeroed()
                 }
             }
 
@@ -107,7 +103,7 @@ macro_rules! fixed_map {
                             }
                         }
                         Err(index) => {
-                            if self.count >= 32 {
+                            if self.len() >= $len {
                                 anchor_lang::err!($crate::DataStoreError::ExceedMaxLengthLimit)
                             } else {
                                 for i in (index..self.len()).rev() {

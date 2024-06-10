@@ -1,11 +1,15 @@
 use std::{
     collections::HashMap,
     iter::{Peekable, Zip},
+    ops::Deref,
     slice::Iter,
 };
 
-use anchor_client::solana_sdk::{instruction::AccountMeta, pubkey::Pubkey};
-use data_store::states::{common::TokensWithFeed, PriceProviderKind};
+use anchor_client::{
+    solana_sdk::{instruction::AccountMeta, pubkey::Pubkey, signer::Signer},
+    Program,
+};
+use data_store::states::{common::TokensWithFeed, PriceProviderKind, Store};
 
 use crate::pyth::find_pyth_feed_account;
 
@@ -138,5 +142,22 @@ impl<'a> Iterator for Feeds<'a> {
             self.current += 1;
             return Some(Ok((provider, *feed)));
         }
+    }
+}
+
+/// Get token map from the store.
+pub async fn token_map<C, S>(program: &Program<C>, store: &Pubkey) -> crate::Result<Pubkey>
+where
+    C: Deref<Target = S> + Clone,
+    S: Signer,
+{
+    let store = program.account::<Store>(*store).await?;
+    let token_map = store.token_map;
+    if token_map == Pubkey::default() {
+        Err(crate::Error::invalid_argument(
+            "the token map of the store is not set",
+        ))
+    } else {
+        Ok(token_map)
     }
 }

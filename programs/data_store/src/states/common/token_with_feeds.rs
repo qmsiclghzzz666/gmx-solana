@@ -1,8 +1,8 @@
 use anchor_lang::prelude::*;
 
-use crate::{utils::chunk_by::chunk_by, DataStoreError};
+use crate::{states::TokenConfig, utils::chunk_by::chunk_by, DataStoreError};
 
-use super::{PriceProviderKind, TokenConfig};
+use super::PriceProviderKind;
 
 /// Tokens with feed.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]

@@ -1,13 +1,16 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    states::{Config, Oracle, PriceProvider, PriceValidator, Seed, Store, TokenConfigMap},
+    states::{
+        Config, Oracle, PriceProvider, PriceValidator, Seed, Store, TokenMapHeader, TokenMapLoader,
+    },
     utils::internal,
 };
 
 #[derive(Accounts)]
 pub struct SetPricesFromPriceFeed<'info> {
     pub authority: Signer<'info>,
+    #[account(has_one = token_map)]
     pub store: AccountLoader<'info, Store>,
     #[account(
         seeds = [Config::SEED, store.key().as_ref()],
@@ -21,12 +24,8 @@ pub struct SetPricesFromPriceFeed<'info> {
         bump = oracle.bump,
     )]
     pub oracle: Account<'info, Oracle>,
-    #[account(
-        seeds = [TokenConfigMap::SEED, store.key().as_ref()],
-        bump = token_config_map.bump,
-        has_one = store,
-    )]
-    pub token_config_map: Account<'info, TokenConfigMap>,
+    #[account(has_one = store)]
+    pub token_map: AccountLoader<'info, TokenMapHeader>,
     pub price_provider: Interface<'info, PriceProvider>,
 }
 
@@ -36,10 +35,11 @@ pub fn set_prices_from_price_feed<'info>(
     tokens: Vec<Pubkey>,
 ) -> Result<()> {
     let validator = PriceValidator::try_from(ctx.accounts.config.as_ref())?;
+    let token_map = ctx.accounts.token_map.load_token_map()?;
     ctx.accounts.oracle.set_prices_from_remaining_accounts(
         validator,
         &ctx.accounts.price_provider,
-        &ctx.accounts.token_config_map,
+        &token_map,
         &tokens,
         ctx.remaining_accounts,
     )

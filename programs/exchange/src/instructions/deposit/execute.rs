@@ -49,6 +49,8 @@ pub struct ExecuteDeposit<'info> {
     pub controller: UncheckedAccount<'info>,
     /// CHECK: used and checked by CPI.
     pub store: UncheckedAccount<'info>,
+    /// CHECK: check by CPI.
+    pub token_map: UncheckedAccount<'info>,
     pub data_store_program: Program<'info, DataStore>,
     pub price_provider: Interface<'info, PriceProvider>,
     pub token_program: Program<'info, Token>,
@@ -56,8 +58,6 @@ pub struct ExecuteDeposit<'info> {
     pub config: UncheckedAccount<'info>,
     #[account(mut)]
     pub oracle: Account<'info, data_store::states::Oracle>,
-    /// CHECK: check by CPI.
-    pub token_config_map: UncheckedAccount<'info>,
     #[account(mut)]
     pub deposit: Account<'info, Deposit>,
     /// CHECK: only used to receive lamports.
@@ -138,8 +138,8 @@ impl<'info> WithOracle<'info> for ExecuteDeposit<'info> {
         self.oracle.to_account_info()
     }
 
-    fn token_config_map(&self) -> AccountInfo<'info> {
-        self.token_config_map.to_account_info()
+    fn token_map(&self) -> AccountInfo<'info> {
+        self.token_map.to_account_info()
     }
 
     fn config(&self) -> AccountInfo<'info> {

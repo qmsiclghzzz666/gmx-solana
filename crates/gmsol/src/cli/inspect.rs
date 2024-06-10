@@ -1,7 +1,7 @@
 use anchor_client::solana_sdk::pubkey::Pubkey;
 use data_store::states::{self};
 use eyre::ContextCompat;
-use gmsol::utils;
+use gmsol::{store::utils::token_map, utils};
 use pyth_sdk::Identifier;
 
 use crate::{utils::Oracle, GMSOLClient};
@@ -26,8 +26,8 @@ enum Command {
     },
     /// `Config` account.
     Config { address: Option<Pubkey> },
-    /// `TokenConfigMap` account.
-    TokenConfigMap { address: Option<Pubkey> },
+    /// `TokenMap` account.
+    TokenMap { address: Option<Pubkey> },
     /// `Market` account.
     Market {
         address: Pubkey,
@@ -111,17 +111,15 @@ impl InspectArgs {
                     )?;
                 println!("{:#?}", program.account::<states::Config>(address).await?);
             }
-            Command::TokenConfigMap { address } => {
-                let address = address
-                    .or_else(|| {
-                        store
-                            .as_ref()
-                            .map(|store| client.find_token_config_map(store))
-                    })
-                    .wrap_err("missing store address")?;
+            Command::TokenMap { address } => {
+                let address = if let Some(address) = address {
+                    *address
+                } else {
+                    token_map(program, store.wrap_err("neither the address of config account nor the address of store provided")?).await?
+                };
                 println!(
                     "{:#?}",
-                    program.account::<states::TokenConfigMap>(address).await?
+                    program.account::<states::TokenMapHeader>(address).await?
                 );
             }
             Command::Market {
@@ -156,13 +154,8 @@ impl InspectArgs {
                 println!("{address}");
                 println!("{:#?}", program.account::<states::Oracle>(address).await?);
             }
-            Command::TokenConfig { token } => {
-                let store = store.wrap_err("missing store address")?;
-                let config = client
-                    .token_config(store, token)
-                    .await?
-                    .ok_or(gmsol::Error::NotFound)?;
-                println!("{config:#?}");
+            Command::TokenConfig { token: _ } => {
+                unimplemented!();
             }
             Command::Order { address } => {
                 println!("{:#?}", program.account::<states::Order>(*address).await?);

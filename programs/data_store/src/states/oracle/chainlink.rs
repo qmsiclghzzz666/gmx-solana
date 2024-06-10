@@ -39,14 +39,14 @@ impl Chainlink {
         require_gt!(*answer, 0, DataStoreError::InvalidPriceFeedPrice);
         let timestamp = *timestamp as i64;
         let current = clock.unix_timestamp;
-        if current > timestamp && current - timestamp > token_config.heartbeat_duration.into() {
+        if current > timestamp && current - timestamp > token_config.heartbeat_duration().into() {
             return Err(DataStoreError::PriceFeedNotUpdated.into());
         }
         let price = Decimal::try_from_price(
             *answer as u128,
             decimals,
-            token_config.token_decimals,
-            token_config.precision,
+            token_config.token_decimals(),
+            token_config.precision(),
         )
         .map_err(|_| DataStoreError::InvalidPriceFeedPrice)?;
         Ok((
