@@ -128,18 +128,26 @@ impl TokenConfig {
     }
 
     /// Create a new token config from builder.
-    pub fn init(
+    pub fn update(
         &mut self,
         synthetic: bool,
         token_decimals: u8,
         builder: TokenConfigBuilder,
         enable: bool,
+        init: bool,
     ) -> Result<()> {
-        require!(
-            !self.flag(Flag::Initialized),
-            DataStoreError::InvalidArgument
-        );
-        self.set_flag(Flag::Initialized, true);
+        if init {
+            require!(
+                !self.flag(Flag::Initialized),
+                DataStoreError::InvalidArgument
+            );
+            self.set_flag(Flag::Initialized, true);
+        } else {
+            require!(
+                self.flag(Flag::Initialized),
+                DataStoreError::InvalidArgument
+            );
+        }
         let TokenConfigBuilder {
             heartbeat_duration,
             precision,
@@ -351,6 +359,7 @@ pub trait TokenMapMutAccess {
         &mut self,
         token: &Pubkey,
         f: impl FnOnce(&mut TokenConfig) -> Result<()>,
+        new: bool,
     ) -> Result<()>;
 }
 
@@ -364,19 +373,30 @@ impl<'a> TokenMapMutAccess for TokenMapMut<'a> {
         &mut self,
         token: &Pubkey,
         f: impl FnOnce(&mut TokenConfig) -> Result<()>,
+        new: bool,
     ) -> Result<()> {
-        let next_index = self.header.tokens.len();
-        require!(
-            next_index < MAX_TOKENS,
-            DataStoreError::ExceedMaxLengthLimit
-        );
-        let index = next_index
-            .try_into()
-            .map_err(|_| error!(DataStoreError::AmountOverflow))?;
-        self.header.tokens.insert_with_options(token, index, true)?;
-        let Some(dst) =
-            crate::utils::dynamic_access::get_mut::<TokenConfig>(&mut self.configs, next_index)
-        else {
+        let index = if new {
+            let next_index = self.header.tokens.len();
+            require!(
+                next_index < MAX_TOKENS,
+                DataStoreError::ExceedMaxLengthLimit
+            );
+            let index = next_index
+                .try_into()
+                .map_err(|_| error!(DataStoreError::AmountOverflow))?;
+            self.header.tokens.insert_with_options(token, index, true)?;
+            index
+        } else {
+            *self
+                .header
+                .tokens
+                .get(token)
+                .ok_or(error!(DataStoreError::RequiredResourceNotFound))?
+        };
+        let Some(dst) = crate::utils::dynamic_access::get_mut::<TokenConfig>(
+            &mut self.configs,
+            usize::from(index),
+        ) else {
             return err!(DataStoreError::NoSpaceForNewData);
         };
         (f)(dst)

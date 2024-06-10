@@ -78,6 +78,29 @@ describe("data store: TokenConfig", () => {
         //     expect(config.precision).equals(5);
         // }
 
+        // Issue a full update by inserting again.
+        {
+            await invokePushToTokenMap(dataStore, {
+                authority: signer0,
+                store: dataStoreAddress,
+                tokenMap,
+                token: newToken,
+                heartbeatDuration: 60,
+                precision: 3,
+                feeds: {
+                    chainlinkFeed: SOL_FEED,
+                    expectedProvider: PriceProvider.Chainlink,
+                },
+                update: true,
+            });
+            const enabled = await dataStore.methods.isTokenConfigEnabled(newToken).accounts({
+                tokenMap,
+            }).view();
+            expect(enabled).true;
+            const feed = await dataStore.methods.tokenFeed(newToken, 1).accounts({ tokenMap }).view();
+            expect(SOL_FEED.equals(feed));
+        }
+
         // We can disable the config temporarily.
         {
             await toggleTokenConfig(signer0, dataStoreAddress, tokenMap, newToken, false);

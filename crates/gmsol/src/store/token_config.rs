@@ -27,9 +27,12 @@ pub trait TokenConfigOps<C> {
         token: &Pubkey,
         builder: TokenConfigBuilder,
         enable: bool,
+        new: bool,
     ) -> RequestBuilder<C>;
 
     /// Insert or update config the given synthetic token.
+    // FIXME: reduce the number of args.
+    #[allow(clippy::too_many_arguments)]
     fn insert_synthetic_token_config(
         &self,
         store: &Pubkey,
@@ -38,6 +41,7 @@ pub trait TokenConfigOps<C> {
         decimals: u8,
         builder: TokenConfigBuilder,
         enable: bool,
+        new: bool,
     ) -> RequestBuilder<C>;
 
     /// Toggle token config.
@@ -90,6 +94,7 @@ where
         token: &Pubkey,
         builder: TokenConfigBuilder,
         enable: bool,
+        new: bool,
     ) -> RequestBuilder<C> {
         let authority = self.payer();
         self.data_store()
@@ -101,7 +106,11 @@ where
                 token: *token,
                 system_program: system_program::ID,
             })
-            .args(instruction::PushToTokenMap { builder, enable })
+            .args(instruction::PushToTokenMap {
+                builder,
+                enable,
+                new,
+            })
     }
 
     fn insert_synthetic_token_config(
@@ -112,6 +121,7 @@ where
         decimals: u8,
         builder: TokenConfigBuilder,
         enable: bool,
+        new: bool,
     ) -> RequestBuilder<C> {
         let authority = self.payer();
         self.data_store()
@@ -127,6 +137,7 @@ where
                 token_decimals: decimals,
                 builder,
                 enable,
+                new,
             })
     }
 

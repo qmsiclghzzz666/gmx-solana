@@ -2,6 +2,7 @@ import { Keypair, PublicKey, Signer } from "@solana/web3.js";
 import { dataStore } from "./program";
 import { utils } from "@coral-xyz/anchor";
 import { DataStoreProgram, PriceProvider, makeInvoke, toBN } from "gmsol";
+import { update } from "lodash";
 
 // Token Config map seed.
 export const TOKEN_CONFIG_MAP_SEED = utils.bytes.utf8.encode("token_config_map");
@@ -88,6 +89,7 @@ export const makePushToTokenMapInstruction = async (
             expectedProvider,
         },
         enable = true,
+        update = false,
     }: {
         authority: PublicKey,
         store: PublicKey,
@@ -97,6 +99,7 @@ export const makePushToTokenMapInstruction = async (
         precision: number,
         feeds: FeedsOptions,
         enable?: boolean,
+        update?: boolean,
     }
 ) => {
     return await program.methods.pushToTokenMap({
@@ -109,7 +112,7 @@ export const makePushToTokenMapInstruction = async (
             PublicKey.default,
         ],
         expectedProvider,
-    }, enable).accountsPartial({
+    }, enable, !update).accountsPartial({
         authority,
         store,
         tokenMap,
@@ -136,6 +139,7 @@ export const makePushToTokenMapSyntheticInstruction = async (
             expectedProvider,
         },
         enable = true,
+        update = false,
     }: {
         authority: PublicKey,
         store: PublicKey,
@@ -146,6 +150,7 @@ export const makePushToTokenMapSyntheticInstruction = async (
         precision: number,
         feeds: FeedsOptions,
         enable?: boolean,
+        update?: boolean,
     }
 ) => {
     return await program.methods.pushToTokenMapSynthetic(
@@ -161,7 +166,7 @@ export const makePushToTokenMapSyntheticInstruction = async (
                 PublicKey.default,
             ],
             expectedProvider,
-        }, enable).accountsPartial({
+        }, enable, !update).accountsPartial({
             authority,
             store,
             tokenMap,

@@ -52,6 +52,7 @@ pub fn unchecked_push_to_token_map(
     ctx: Context<PushToTokenMap>,
     builder: TokenConfigBuilder,
     enable: bool,
+    new: bool,
 ) -> Result<()> {
     let token = ctx.accounts.token.key();
     let token_decimals = ctx.accounts.token.decimals;
@@ -64,6 +65,7 @@ pub fn unchecked_push_to_token_map(
         token_decimals,
         builder,
         enable,
+        new,
     )
 }
 
@@ -97,6 +99,7 @@ pub fn unchecked_push_to_token_map_synthetic(
     token_decimals: u8,
     builder: TokenConfigBuilder,
     enable: bool,
+    new: bool,
 ) -> Result<()> {
     do_push_token_map(
         ctx.accounts.authority.to_account_info(),
@@ -107,6 +110,7 @@ pub fn unchecked_push_to_token_map_synthetic(
         token_decimals,
         builder,
         enable,
+        new,
     )
 }
 
@@ -258,6 +262,7 @@ fn do_push_token_map<'info>(
     token_decimals: u8,
     builder: TokenConfigBuilder,
     enable: bool,
+    new: bool,
 ) -> Result<()> {
     // FIXME: We have to do the realloc manually because the current implementation of
     // the `realloc` constraint group will throw an error on the following statement:
@@ -288,8 +293,10 @@ fn do_push_token_map<'info>(
     }
 
     let mut token_map = token_map_loader.load_token_map_mut()?;
-    token_map.push_with(token, |config| {
-        config.init(synthetic, token_decimals, builder, enable)
-    })?;
+    token_map.push_with(
+        token,
+        |config| config.update(synthetic, token_decimals, builder, enable, new),
+        new,
+    )?;
     Ok(())
 }

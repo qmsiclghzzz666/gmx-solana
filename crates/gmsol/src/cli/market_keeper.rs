@@ -32,6 +32,8 @@ enum Command {
         synthetic: Option<u8>,
         #[arg(long)]
         serialize_only: bool,
+        #[arg(long)]
+        update: bool,
     },
     /// Toggle token config of token.
     ToggleTokenConfig {
@@ -100,6 +102,7 @@ impl Args {
                 precision,
                 synthetic: fake_decimals,
                 serialize_only,
+                update,
             } => {
                 let mut builder = TokenConfigBuilder::default()
                     .with_heartbeat_duration(*heartbeat_duration)
@@ -127,10 +130,10 @@ impl Args {
                 let token_map = self.token_map(client, store).await?;
                 let req = if let Some(decimals) = fake_decimals {
                     client.insert_synthetic_token_config(
-                        store, &token_map, token, *decimals, builder, true,
+                        store, &token_map, token, *decimals, builder, true, !*update,
                     )
                 } else {
-                    client.insert_token_config(store, &token_map, token, builder, true)
+                    client.insert_token_config(store, &token_map, token, builder, true, !*update)
                 };
                 crate::utils::send_or_serialize(req, *serialize_only, |signature| {
                     println!("{signature}");
