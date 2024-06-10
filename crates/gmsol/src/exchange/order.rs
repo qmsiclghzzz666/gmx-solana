@@ -311,12 +311,18 @@ where
         Ok((long_token_account, short_token_account))
     }
 
-    async fn token_map(&self) -> crate::Result<Pubkey> {
+    async fn get_token_map(&self) -> crate::Result<Pubkey> {
         if let Some(address) = self.token_map {
             Ok(address)
         } else {
             crate::store::utils::token_map(self.client.data_store(), &self.store).await
         }
+    }
+
+    /// Set token map.
+    pub fn token_map(&mut self, address: Pubkey) -> &mut Self {
+        self.token_map = Some(address);
+        self
     }
 
     /// Create [`RequestBuilder`] and return order address.
@@ -341,7 +347,7 @@ where
                     payer: *payer,
                     order,
                     position,
-                    token_map: self.token_map().await?,
+                    token_map: self.get_token_map().await?,
                     market: self.market(),
                     initial_collateral_token_account,
                     final_output_token_account: self.final_output_token_account().await?,
@@ -627,12 +633,18 @@ where
         self.client.find_config_address(&self.store)
     }
 
-    async fn token_map(&self) -> crate::Result<Pubkey> {
+    async fn get_token_map(&self) -> crate::Result<Pubkey> {
         if let Some(address) = self.token_map {
             Ok(address)
         } else {
             crate::store::utils::token_map(self.client.data_store(), &self.store).await
         }
+    }
+
+    /// Set token map.
+    pub fn token_map(&mut self, address: Pubkey) -> &mut Self {
+        self.token_map = Some(address);
+        self
     }
 
     /// Build [`TransactionBuilder`] for `execute_order` instructions.
@@ -668,7 +680,7 @@ where
                     store: self.store,
                     oracle: self.oracle,
                     config: self.config_address(),
-                    token_map: self.token_map().await?,
+                    token_map: self.get_token_map().await?,
                     market: self
                         .client
                         .find_market_address(&self.store, &hint.market_token),

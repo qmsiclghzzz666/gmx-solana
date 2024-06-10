@@ -198,12 +198,18 @@ where
         }
     }
 
-    async fn token_map(&self) -> crate::Result<Pubkey> {
+    async fn get_token_map(&self) -> crate::Result<Pubkey> {
         if let Some(address) = self.token_map {
             Ok(address)
         } else {
             crate::store::utils::token_map(self.client.data_store(), &self.store).await
         }
+    }
+
+    /// Set token map address.
+    pub fn token_map(&mut self, address: Pubkey) -> &mut Self {
+        self.token_map = Some(address);
+        self
     }
 
     /// Build a [`RequestBuilder`] and return deposit address.
@@ -247,7 +253,7 @@ where
                     deposit,
                     payer,
                     receiver,
-                    token_map: self.token_map().await?,
+                    token_map: self.get_token_map().await?,
                     market,
                     initial_long_token_account,
                     initial_short_token_account,
@@ -558,7 +564,7 @@ where
         }
     }
 
-    async fn token_map(&self) -> crate::Result<Pubkey> {
+    async fn get_token_map(&self) -> crate::Result<Pubkey> {
         if let Some(address) = self.token_map {
             Ok(address)
         } else {
@@ -566,9 +572,15 @@ where
         }
     }
 
+    /// Set token map.
+    pub fn token_map(&mut self, address: Pubkey) -> &mut Self {
+        self.token_map = Some(address);
+        self
+    }
+
     /// Build [`RpcBuilder`] for executing the deposit.
     pub async fn build(&mut self) -> crate::Result<RpcBuilder<'a, C>> {
-        let token_map = self.token_map().await?;
+        let token_map = self.get_token_map().await?;
         let hint = self.prepare_hint().await?;
         let Self {
             client,
