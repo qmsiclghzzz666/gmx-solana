@@ -1,7 +1,7 @@
 import { Keypair, PublicKey } from "@solana/web3.js";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { toBN } from "../utils/number";
-import { findDepositPDA, findMarketPDA, findMarketVaultPDA, findOrderPDA, findPositionPDA, findTokenConfigMapPDA, findWithdrawalPDA } from "../store";
+import { findDepositPDA, findMarketPDA, findMarketVaultPDA, findOrderPDA, findPositionPDA, findWithdrawalPDA } from "../store";
 import { IxWithOutput, makeInvoke } from "../utils/invoke";
 import { DataStoreProgram, ExchangeProgram } from "../program";
 import { BN } from "@coral-xyz/anchor";
@@ -25,12 +25,21 @@ export type MakeCreateDepositParams = {
         fromInitialLongTokenAccount?: PublicKey,
         fromInitialShortTokenAccount?: PublicKey,
         toMarketTokenAccount?: PublicKey,
+        tokenMap?: PublicKey,
+        dataStore?: DataStoreProgram,
     },
 }
 
 const getTokenAccount = (payer: PublicKey, token: PublicKey, account?: PublicKey) => {
     return account ? account : getAssociatedTokenAddressSync(token, payer);
 }
+
+const getTokenMap = async (dataStoreProgram: DataStoreProgram | undefined, store: PublicKey) => {
+    if (!dataStoreProgram) throw Error("dataStoreProgram is not provided");
+    const tokenMap = (await dataStoreProgram.account.store.fetch(store)).tokenMap;
+    if (tokenMap.equals(PublicKey.default)) throw Error("token_map is not set for the store");
+    return tokenMap;
+};
 
 export const makeCreateDepositInstruction = async (
     exchange: ExchangeProgram,
@@ -57,6 +66,7 @@ export const makeCreateDepositInstruction = async (
     const [shortTokenDepositVault] = findMarketVaultPDA(store, initialShortToken);
     const longSwapPath = options?.longTokenSwapPath ?? [];
     const shortSwapPath = options?.shortTokenSwapPath ?? [];
+    const tokenMap = options?.tokenMap ?? (await getTokenMap(options?.dataStore, store));
     let instruction = await exchange.methods.createDeposit(
         [...depositNonce],
         {
@@ -69,10 +79,10 @@ export const makeCreateDepositInstruction = async (
             minMarketToken: toBN(options?.minMarketToken ?? 0),
             shouldUnwrapNativeToken: options?.shouldUnwrapNativeToken ?? false,
         }
-    ).accounts({
+    ).accountsPartial({
         store,
+        tokenMap,
         market,
-        tokenConfigMap: findTokenConfigMapPDA(store)[0],
         deposit,
         payer,
         receiver: toMarketTokenAccount,
@@ -112,6 +122,8 @@ export type MakeCreateWithdrawalParams = {
         longTokenSwapPath?: PublicKey[],
         shortTokenSwapPath?: PublicKey[],
         shouldUnwrapNativeToken?: boolean,
+        tokenMap?: PublicKey,
+        dataStore?: DataStoreProgram,
     }
 };
 
@@ -134,6 +146,7 @@ export const makeCreateWithdrawalInstruction = async (
     const [withdrawalAddress] = findWithdrawalPDA(store, payer, withdrawalNonce);
     const longSwapPath = options?.longTokenSwapPath ?? [];
     const shortSwapPath = options?.shortTokenSwapPath ?? [];
+    const tokenMap = options?.tokenMap ?? (await getTokenMap(options?.dataStore, store));
     const instruction = await exchange.methods.createWithdrawal([...withdrawalNonce], {
         marketTokenAmount: toBN(amount),
         executionFee: toBN(options?.executionFee ?? 0),
@@ -145,9 +158,9 @@ export const makeCreateWithdrawalInstruction = async (
         },
         longTokenSwapLength: longSwapPath.length,
         shortTokenSwapLength: shortSwapPath.length,
-    }).accounts({
+    }).accountsPartial({
         store,
-        tokenConfigMap: findTokenConfigMapPDA(store)[0],
+        tokenMap,
         market: findMarketPDA(store, marketToken)[0],
         withdrawal: withdrawalAddress,
         payer,
@@ -196,6 +209,7 @@ export type MakeCreateDecreaseOrderParams = {
             isLong: boolean,
         },
         dataStore?: DataStoreProgram,
+        tokenMap?: PublicKey,
     }
 };
 
@@ -247,7 +261,7 @@ export const makeCreateDecreaseOrderInstruction = async (
     const secondaryOutputTokenAccount = getTokenAccount(payer, pnlToken, options?.secondaryOutputTokenAccount);
     const longTokenAccount = getTokenAccount(payer, longToken, options?.longTokenAccount);
     const shortTokenAccount = getTokenAccount(payer, shortToken, options?.shortTokenAccount);
-
+    const tokenMap = options?.tokenMap ?? (await getTokenMap(options?.dataStore, store));
     const instruction = await exchange.methods.createOrder(
         [...nonce],
         {
@@ -263,12 +277,12 @@ export const makeCreateDecreaseOrderInstruction = async (
             uiFeeReceiver: PublicKey.default,
             executionFee: toBN(options?.executionFee ?? 0),
             swapLength: swapPath.length,
-        }).accounts({
+        }).accountsPartial({
             store,
+            tokenMap,
             payer,
             order,
             position,
-            tokenConfigMap: findTokenConfigMapPDA(store)[0],
             market,
             finalOutputTokenAccount,
             secondaryOutputTokenAccount,
@@ -312,6 +326,7 @@ export type MakeCreateIncreaseOrderParams = {
             shortToken: PublicKey,
         },
         dataStore?: DataStoreProgram,
+        tokenMap?: PublicKey,
     }
 };
 
@@ -347,7 +362,7 @@ export const makeCreateIncreaseOrderInstruction = async (
     const { longToken, shortToken } = collateralTokens;
     const longTokenAccount = getTokenAccount(payer, longToken, options?.longTokenAccount);
     const shortTokenAccount = getTokenAccount(payer, shortToken, options?.shortTokenAccount);
-
+    const tokenMap = options?.tokenMap ?? (await getTokenMap(options?.dataStore, store));
     const instruction = await exchange.methods.createOrder(
         [...nonce],
         {
@@ -363,12 +378,12 @@ export const makeCreateIncreaseOrderInstruction = async (
             uiFeeReceiver: PublicKey.default,
             executionFee: toBN(options?.executionFee ?? 0),
             swapLength: swapPath.length,
-        }).accounts({
+        }).accountsPartial({
             store,
+            tokenMap,
             payer,
             order,
             position: findPositionPDA(store, payer, marketToken, collateralToken, isLong)[0],
-            tokenConfigMap: findTokenConfigMapPDA(store)[0],
             market: findMarketPDA(store, marketToken)[0],
             initialCollateralTokenAccount: initialCollateralTokenAccount,
             initialCollateralTokenVault: findMarketVaultPDA(store, initialCollateralToken)[0],

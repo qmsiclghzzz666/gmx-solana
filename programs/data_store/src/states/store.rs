@@ -16,7 +16,8 @@ pub struct Store {
     key: [u8; MAX_LEN],
     padding: [u8; 7],
     role: RoleStore,
-    pub(crate) token_map: Pubkey,
+    /// The token map to used.
+    pub token_map: Pubkey,
 }
 
 impl InitSpace for Store {

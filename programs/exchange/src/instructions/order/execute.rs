@@ -157,7 +157,7 @@ impl<'info> WithOracle<'info> for ExecuteOrder<'info> {
         self.oracle.to_account_info()
     }
 
-    fn token_config_map(&self) -> AccountInfo<'info> {
+    fn token_map(&self) -> AccountInfo<'info> {
         self.token_config_map.to_account_info()
     }
 

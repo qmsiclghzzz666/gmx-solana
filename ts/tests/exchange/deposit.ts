@@ -12,6 +12,7 @@ describe("exchange: deposit", () => {
     const { signer0, user0 } = getUsers();
 
     let dataStoreAddress: PublicKey;
+    let tokenMap: PublicKey;
     let user0FakeTokenAccount: PublicKey;
     let user0UsdGTokenAccount: PublicKey;
     let user0WsolTokenAccount: PublicKey;
@@ -36,6 +37,7 @@ describe("exchange: deposit", () => {
             usdGTokenMint,
         } = await getAddresses());
         ({ GMFakeFakeUsdG, GMWsolWsolUsdG } = await getMarkets());
+        tokenMap = (await dataStore.account.store.fetch(dataStoreAddress)).tokenMap;
     });
 
     it("create and execute deposit and then withdraw", async () => {
@@ -49,6 +51,9 @@ describe("exchange: deposit", () => {
                 initialShortToken: usdGTokenMint,
                 initialLongTokenAmount: 1_000_000_000,
                 initialShortTokenAmount: 70_000 * 100_000_000,
+                options: {
+                    tokenMap,
+                }
             }, {
                 computeUnits: 400_000,
             });
@@ -91,6 +96,9 @@ describe("exchange: deposit", () => {
                     amount: 1_000_000_000_000,
                     finalLongToken: fakeTokenMint,
                     finalShortToken: usdGTokenMint,
+                    options: {
+                        tokenMap,
+                    }
                 }
             );
             console.log(`withdrawal created at ${signature}`);
@@ -138,6 +146,9 @@ describe("exchange: deposit", () => {
                     amount: 2_000 * 1_000_000_000,
                     finalLongToken: fakeTokenMint,
                     finalShortToken: usdGTokenMint,
+                    options: {
+                        tokenMap,
+                    }
                 }
             );
             console.log(`withdrawal created at ${signature}`);
@@ -191,6 +202,9 @@ describe("exchange: deposit", () => {
                 initialShortToken: usdGTokenMint,
                 initialLongTokenAmount: 2_000_000_000,
                 initialShortTokenAmount: 200_000_000,
+                options: {
+                    tokenMap,
+                }
             },
             {
                 computeUnits: 400_000,
@@ -207,7 +221,6 @@ describe("exchange: deposit", () => {
                     options: {
                         executionFee: 5000,
                     },
-
                 },
                 {
                     computeUnits: 400_000,
@@ -238,6 +251,7 @@ describe("exchange: deposit", () => {
                 initialShortTokenAmount: 200_000_000,
                 options: {
                     longTokenSwapPath: [GMFakeFakeUsdG],
+                    tokenMap,
                 }
             },
             {
@@ -258,6 +272,7 @@ describe("exchange: deposit", () => {
                 finalShortToken: usdGTokenMint,
                 options: {
                     longTokenSwapPath: [GMFakeFakeUsdG],
+                    tokenMap,
                 }
             }
         )).rejectedWith(Error, "Invalid swap path");
@@ -277,6 +292,7 @@ describe("exchange: deposit", () => {
                     finalShortToken: usdGTokenMint,
                     options: {
                         longTokenSwapPath: [GMFakeFakeUsdG],
+                        tokenMap,
                     }
                 }
             );
@@ -308,6 +324,7 @@ describe("exchange: deposit", () => {
                     initialShortTokenAmount: 1_000_000,
                     options: {
                         shortTokenSwapPath: [GMFakeFakeUsdG],
+                        tokenMap,
                     }
                 },
                 {
@@ -350,6 +367,7 @@ describe("exchange: deposit", () => {
                     initialShortTokenAmount: 20_000_000,
                     options: {
                         shortTokenSwapPath: [GMFakeFakeUsdG],
+                        tokenMap,
                     }
                 },
                 {
@@ -408,6 +426,7 @@ describe("exchange: deposit", () => {
                     options: {
                         longTokenSwapPath: [GMFakeFakeUsdG, GMWsolWsolUsdG],
                         shortTokenSwapPath: [GMWsolWsolUsdG],
+                        tokenMap,
                     }
                 }
             );

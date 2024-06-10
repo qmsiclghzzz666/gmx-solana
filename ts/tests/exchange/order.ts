@@ -10,6 +10,7 @@ describe("exchange: order", () => {
     const { signer0, user0 } = getUsers();
 
     let dataStoreAddress: PublicKey;
+    let tokenMap: PublicKey;
     let oracleAddress: PublicKey;
     let user0FakeTokenAccount: PublicKey;
     let user0UsdGTokenAccount: PublicKey;
@@ -27,6 +28,7 @@ describe("exchange: order", () => {
             fakeTokenMint,
         } = await getAddresses());
         ({ GMFakeFakeUsdG } = await getMarkets());
+        tokenMap = (await dataStore.account.store.fetch(dataStoreAddress)).tokenMap;
     });
 
     it("increase and decrease position", async () => {
@@ -50,7 +52,8 @@ describe("exchange: order", () => {
                     hint: {
                         longToken: fakeTokenMint,
                         shortToken: usdGTokenMint,
-                    }
+                    },
+                    tokenMap,
                 }
             }, {
                 computeUnits: 400_000,
@@ -104,7 +107,8 @@ describe("exchange: order", () => {
                         },
                         collateralToken: usdGTokenMint,
                         isLong: true,
-                    }
+                    },
+                    tokenMap,
                 }
             });
             decreaseOrder = address;

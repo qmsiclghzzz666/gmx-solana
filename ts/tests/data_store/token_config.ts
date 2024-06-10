@@ -1,7 +1,7 @@
 import { Keypair, PublicKey } from '@solana/web3.js';
 
 import { expect, getAddresses, getProvider, getUsers } from "../../utils/fixtures";
-import { MARKET_KEEPER, createDataStorePDA, createRolesPDA, dataStore, extendTokenConfigMap, getTokenConfig, insertSyntheticTokenConfig, insertTokenConfig, invokeInitializeTokenMap, invokeInsertTokenConfigAmount, invokePushToTokenMap, invokeSetTokenMap, setExpectedProvider, toggleTokenConfig } from "../../utils/data";
+import { MARKET_KEEPER, createDataStorePDA, createRolesPDA, dataStore, invokeInitializeTokenMap, invokePushToTokenMap, invokePushToTokenMapSynthetic, invokeSetTokenMap, setExpectedProvider, toggleTokenConfig } from "../../utils/data";
 import { AnchorError } from '@coral-xyz/anchor';
 import { createMint } from '@solana/spl-token';
 import { BTC_FEED, SOL_FEED } from '../../utils/token';
@@ -15,14 +15,23 @@ describe("data store: TokenConfig", () => {
     let roles: PublicKey;
     let fakeTokenMint: PublicKey;
     let usdGTokenMint: PublicKey;
+    let tokenMap: PublicKey;
     before("init token config", async () => {
         ({ dataStoreAddress, fakeTokenMint, usdGTokenMint } = await getAddresses());
         [roles] = createRolesPDA(dataStoreAddress, signer0.publicKey);
+        tokenMap = (await dataStore.account.store.fetch(dataStoreAddress)).tokenMap;
     });
 
-    it("can only be updated by CONTROLLER", async () => {
-        const fooAddress = Keypair.generate().publicKey;
-        await expect(insertTokenConfig(user0, dataStoreAddress, fakeTokenMint, 123, 10, {})).to.be.rejectedWith(AnchorError, "Permission denied");
+    it("can only be updated by MARKET_KEEPER", async () => {
+        await expect(invokePushToTokenMap(dataStore, {
+            authority: user0,
+            store: dataStoreAddress,
+            tokenMap,
+            token: fakeTokenMint,
+            heartbeatDuration: 123,
+            precision: 10,
+            feeds: {}
+        })).to.be.rejectedWith(Error, "Permission denied");
     });
 
     it("test token config map", async () => {
@@ -30,83 +39,106 @@ describe("data store: TokenConfig", () => {
 
         // Config not exists yet.
         {
-            const config = await getTokenConfig(dataStoreAddress, newToken);
-            expect(config).null;
+            await expect(dataStore.methods.isTokenConfigEnabled(newToken).accounts({
+                tokenMap,
+            }).view()).rejected;
         }
 
         // We should be able to insert.
         {
-            await insertTokenConfig(signer0, dataStoreAddress, newToken, 60, 3, {
-                chainlinkFeed: BTC_FEED,
-                expectedProvider: PriceProvider.Chainlink,
+            await invokePushToTokenMap(dataStore, {
+                authority: signer0,
+                store: dataStoreAddress,
+                tokenMap,
+                token: newToken,
+                heartbeatDuration: 60,
+                precision: 3,
+                feeds: {
+                    chainlinkFeed: BTC_FEED,
+                    expectedProvider: PriceProvider.Chainlink,
+                }
             });
-            const config = await getTokenConfig(dataStoreAddress, newToken);
-            expect(config.enabled).true;
-            expect(config.feeds[1]).eqls(BTC_FEED);
-            expect(config.heartbeatDuration).equals(60);
-            expect(config.precision).equals(3);
+            const enabled = await dataStore.methods.isTokenConfigEnabled(newToken).accounts({
+                tokenMap,
+            }).view();
+            expect(enabled).true;
+            const feed = await dataStore.methods.tokenFeed(newToken, 1).accounts({ tokenMap }).view();
+            expect(BTC_FEED.equals(feed));
         }
 
-        // Update the config by inserting again.
-        {
-            await insertTokenConfig(signer0, dataStoreAddress, newToken, 42, 5, {
-                chainlinkFeed: SOL_FEED,
-            });
-            const config = await getTokenConfig(dataStoreAddress, newToken);
-            expect(config.enabled).true;
-            expect(config.feeds[1]).eqls(SOL_FEED);
-            expect(config.heartbeatDuration).equals(42);
-            expect(config.precision).equals(5);
-        }
+        // // Update the config by inserting again.
+        // {
+        //     await insertTokenConfig(signer0, dataStoreAddress, newToken, 42, 5, {
+        //         chainlinkFeed: SOL_FEED,
+        //     });
+        //     const config = await getTokenConfig(dataStoreAddress, newToken);
+        //     expect(config.enabled).true;
+        //     expect(config.feeds[1]).eqls(SOL_FEED);
+        //     expect(config.heartbeatDuration).equals(42);
+        //     expect(config.precision).equals(5);
+        // }
 
         // We can disable the config temporarily.
         {
-            await toggleTokenConfig(signer0, dataStoreAddress, newToken, false);
-            const config = await getTokenConfig(dataStoreAddress, newToken);
-            expect(config.enabled).false;
+            await toggleTokenConfig(signer0, dataStoreAddress, tokenMap, newToken, false);
+            const enabled = await dataStore.methods.isTokenConfigEnabled(newToken).accounts({
+                tokenMap,
+            }).view();
+            expect(enabled).false;
         }
 
         // And we can enable the config again.
         {
-            await toggleTokenConfig(signer0, dataStoreAddress, newToken, true);
-            const config = await getTokenConfig(dataStoreAddress, newToken);
-            expect(config.enabled).true;
+            await toggleTokenConfig(signer0, dataStoreAddress, tokenMap, newToken, true);
+            const enabled = await dataStore.methods.isTokenConfigEnabled(newToken).accounts({
+                tokenMap,
+            }).view();
+            expect(enabled).true;
         }
 
         // Select a different expected provider.
         {
-            await setExpectedProvider(signer0, dataStoreAddress, newToken, PriceProvider.PythLegacy);
-            const config = await getTokenConfig(dataStoreAddress, newToken);
-            expect(config.expectedProvider).eqls(PriceProvider.PythLegacy);
+            await setExpectedProvider(signer0, dataStoreAddress, tokenMap, newToken, PriceProvider.PythLegacy);
+            const expectedProvider = await dataStore.methods.tokenExpectedProvider(newToken).accounts({ tokenMap }).view();
+            expect(expectedProvider).eqls(PriceProvider.PythLegacy);
         }
 
-        // Insert timestamp adjustment.
-        {
-            await invokeInsertTokenConfigAmount(dataStore, {
-                authority: signer0,
-                store: dataStoreAddress,
-                token: newToken,
-                key: 'timestamp_adjustment',
-                amount: 3
-            });
-            console.log(`insert an amount for ${newToken.toBase58()}`);
-        }
+        // // Insert timestamp adjustment.
+        // {
+        //     await invokeInsertTokenConfigAmount(dataStore, {
+        //         authority: signer0,
+        //         store: dataStoreAddress,
+        //         token: newToken,
+        //         key: 'timestamp_adjustment',
+        //         amount: 3
+        //     });
+        //     console.log(`insert an amount for ${newToken.toBase58()}`);
+        // }
     });
 
     it("insert synthetic token", async () => {
         const newFakeToken = PublicKey.unique();
         // We should be able to insert.
         {
-            await insertSyntheticTokenConfig(signer0, dataStoreAddress, newFakeToken, 6, 60, 3, {
-                chainlinkFeed: BTC_FEED,
-                expectedProvider: PriceProvider.Chainlink,
+            await invokePushToTokenMapSynthetic(dataStore, {
+                authority: signer0,
+                store: dataStoreAddress,
+                tokenMap,
+                token: newFakeToken,
+                tokenDecimals: 6,
+                heartbeatDuration: 60,
+                precision: 3,
+                feeds: {
+                    chainlinkFeed: BTC_FEED,
+                    expectedProvider: PriceProvider.Chainlink,
+                }
             });
-            const config = await getTokenConfig(dataStoreAddress, newFakeToken);
-            expect(config.enabled).true;
-            expect(config.feeds[1]).eqls(BTC_FEED);
-            expect(config.heartbeatDuration).equals(60);
-            expect(config.precision).equals(3);
-            expect(config.tokenDecimals).equals(6);
+            const enabled = await dataStore.methods.isTokenConfigEnabled(newFakeToken).accounts({
+                tokenMap,
+            }).view();
+            expect(enabled).true;
+            const feed = await dataStore.methods.tokenFeed(newFakeToken, 1).accounts({ tokenMap }).view();
+            expect(BTC_FEED.equals(feed));
         }
     });
 

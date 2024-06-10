@@ -5,14 +5,10 @@ use std::{
 
 use anchor_lang::prelude::*;
 use bitmaps::Bitmap;
-use dual_vec_map::DualVecMap;
 
-use crate::{
-    constants::keys::token::{TIMESTAMP_ADJUSTMENT, TOKEN},
-    DataStoreError,
-};
+use crate::DataStoreError;
 
-use super::{common::MapStore, InitSpace, PriceProviderKind, Seed};
+use super::{InitSpace, PriceProviderKind};
 
 /// Default heartbeat duration for price updates.
 pub const DEFAULT_HEARTBEAT_DURATION: u32 = 30;
@@ -26,83 +22,6 @@ pub const DEFAULT_TIMESTAMP_ADJUSTMENT: u32 = 0;
 const MAX_FEEDS: usize = 4;
 const MAX_FLAGS: usize = 8;
 const MAX_TOKENS: usize = 256;
-
-#[derive(AnchorSerialize, AnchorDeserialize, InitSpace, Clone)]
-#[cfg_attr(feature = "debug", derive(Debug))]
-pub struct TokenConfig {
-    /// Enabled.
-    pub enabled: bool,
-    /// Synthetic.
-    pub synthetic: bool,
-    /// Heartbeat duration.
-    pub heartbeat_duration: u32,
-    /// Token decimals.
-    pub token_decimals: u8,
-    /// Precision.
-    pub precision: u8,
-    /// Price Feeds.
-    #[max_len(MAX_FEEDS)]
-    pub feeds: Vec<Pubkey>,
-    /// Expected provider.
-    pub expected_provider: u8,
-    /// Amounts config.
-    pub amounts: MapStore<[u8; 32], u64, 1>,
-}
-
-impl TokenConfig {
-    /// Get the corresponding price feed address.
-    pub fn get_feed(&self, kind: &PriceProviderKind) -> Result<Pubkey> {
-        let index = *kind as usize;
-        let feed = self
-            .feeds
-            .get(index)
-            .ok_or(DataStoreError::PriceFeedNotSet)?;
-        if *feed == Pubkey::default() {
-            err!(DataStoreError::PriceFeedNotSet)
-        } else {
-            Ok(*feed)
-        }
-    }
-
-    /// Get expected price provider kind.
-    pub fn expected_provider(&self) -> Result<PriceProviderKind> {
-        let kind = PriceProviderKind::try_from(self.expected_provider)
-            .map_err(|_| DataStoreError::InvalidProviderKindIndex)?;
-        Ok(kind)
-    }
-
-    /// Get price feed address for the expected provider.
-    pub fn get_expected_feed(&self) -> Result<Pubkey> {
-        self.get_feed(&self.expected_provider()?)
-    }
-
-    /// Create a new token config from builder.
-    pub fn new(
-        synthetic: bool,
-        token_decimals: u8,
-        builder: TokenConfigBuilder,
-        enable: bool,
-    ) -> Self {
-        Self {
-            enabled: enable,
-            synthetic,
-            token_decimals,
-            heartbeat_duration: builder.heartbeat_duration,
-            precision: builder.precision,
-            feeds: builder.feeds,
-            expected_provider: builder
-                .expected_provider
-                .unwrap_or(PriceProviderKind::default() as u8),
-            amounts: Default::default(),
-        }
-    }
-
-    /// Get timestamp adjustment.
-    pub fn timestamp_adjustment(&self) -> Option<u64> {
-        self.amounts
-            .get_with(TOKEN, TIMESTAMP_ADJUSTMENT, |amount| amount.copied())
-    }
-}
 
 /// Token Flags.
 #[repr(u8)]
@@ -154,6 +73,11 @@ impl TokenConfigV2 {
         } else {
             Ok(*feed)
         }
+    }
+
+    /// Set expected provider.
+    pub fn set_expected_provider(&mut self, provider: PriceProviderKind) {
+        self.expected_provider = provider as u8;
     }
 
     /// Get expected price provider kind.
@@ -312,96 +236,6 @@ impl TokenConfigBuilder {
     }
 }
 
-#[account]
-#[cfg_attr(feature = "debug", derive(Debug))]
-pub struct TokenConfigMap {
-    pub(crate) bump: u8,
-    pub(crate) store: Pubkey,
-    tokens: Vec<Pubkey>,
-    configs: Vec<TokenConfig>,
-}
-
-impl TokenConfigMap {
-    /// Get init space.
-    pub const fn init_space(len: usize) -> usize {
-        1 + 32 + (4 + TokenConfig::INIT_SPACE * len) + (4 + 32 * len)
-    }
-
-    pub(crate) fn as_map(&self) -> DualVecMap<&Vec<Pubkey>, &Vec<TokenConfig>> {
-        DualVecMap::from_sorted_stores_unchecked(&self.tokens, &self.configs)
-    }
-
-    pub(crate) fn length_after_insert(&self, token: &Pubkey) -> usize {
-        let map = self.as_map();
-        match map.get(token) {
-            None => map.len() + 1,
-            Some(_) => map.len(),
-        }
-    }
-
-    /// Check if the synthetic flag is the same as `expected` if exists.
-    /// Always returns `true` if the config does not exist.
-    fn check_synthetic_or_does_not_exist(&self, key: &Pubkey, expected: bool) -> bool {
-        match self.as_map().get(key) {
-            Some(config) => config.synthetic == expected,
-            None => true,
-        }
-    }
-
-    pub(crate) fn checked_insert(&mut self, key: Pubkey, config: TokenConfig) -> Result<()> {
-        require!(
-            self.check_synthetic_or_does_not_exist(&key, config.synthetic),
-            DataStoreError::InvalidSynthetic
-        );
-        self.as_map_mut().insert(key, config);
-        Ok(())
-    }
-
-    pub(crate) fn toggle_token_config(&mut self, key: &Pubkey, enable: bool) -> Result<()> {
-        self.as_map_mut()
-            .get_mut(key)
-            .ok_or(DataStoreError::RequiredResourceNotFound)?
-            .enabled = enable;
-        Ok(())
-    }
-
-    fn as_map_mut(&mut self) -> DualVecMap<&mut Vec<Pubkey>, &mut Vec<TokenConfig>> {
-        DualVecMap::from_sorted_stores_unchecked(&mut self.tokens, &mut self.configs)
-    }
-
-    pub(crate) fn set_expected_provider(
-        &mut self,
-        key: &Pubkey,
-        kind: PriceProviderKind,
-    ) -> Result<()> {
-        self.as_map_mut()
-            .get_mut(key)
-            .ok_or(DataStoreError::RequiredResourceNotFound)?
-            .expected_provider = kind as u8;
-        Ok(())
-    }
-
-    pub(crate) fn init(&mut self, bump: u8, store: Pubkey) {
-        self.bump = bump;
-        self.store = store;
-        self.configs.clear();
-        self.tokens.clear();
-    }
-
-    pub(crate) fn insert_amount(&mut self, token: &Pubkey, key: &str, amount: u64) -> Result<()> {
-        self.as_map_mut()
-            .get_mut(token)
-            .ok_or(DataStoreError::RequiredResourceNotFound)?
-            .amounts
-            .insert(TOKEN, key, amount);
-        Ok(())
-    }
-}
-
-impl Seed for TokenConfigMap {
-    const SEED: &'static [u8] = b"token_config_map";
-}
-
 crate::fixed_map!(
     Tokens,
     Pubkey,
@@ -415,7 +249,8 @@ crate::fixed_map!(
 #[account(zero_copy)]
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub struct TokenMapHeader {
-    pub(crate) store: Pubkey,
+    /// The authorized store.
+    pub store: Pubkey,
     tokens: Tokens,
     reserved: [u8; 64],
 }
@@ -500,7 +335,6 @@ pub trait TokenMapAccess {
 impl<'a> TokenMapAccess for TokenMapRef<'a> {
     fn get(&self, token: &Pubkey) -> Option<&TokenConfigV2> {
         let index = usize::from(*self.header.tokens.get(token)?);
-        msg!("{}", index);
         crate::utils::dynamic_access::get(&self.configs, index)
     }
 }

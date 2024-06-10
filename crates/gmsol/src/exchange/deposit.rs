@@ -41,6 +41,7 @@ pub struct CreateDepositBuilder<'a, C> {
     min_market_token: u64,
     should_unwrap_native_token: bool,
     nonce: Option<NonceBytes>,
+    token_map: Option<Pubkey>,
 }
 
 impl<'a, C, S> CreateDepositBuilder<'a, C>
@@ -67,6 +68,7 @@ where
             initial_short_token_amount: 0,
             min_market_token: 0,
             should_unwrap_native_token: false,
+            token_map: None,
         }
     }
 
@@ -196,6 +198,14 @@ where
         }
     }
 
+    async fn token_map(&self) -> crate::Result<Pubkey> {
+        if let Some(address) = self.token_map {
+            Ok(address)
+        } else {
+            crate::store::utils::token_map(self.client.data_store(), &self.store).await
+        }
+    }
+
     /// Build a [`RequestBuilder`] and return deposit address.
     pub async fn build_with_address(&self) -> crate::Result<(RequestBuilder<'a, C>, Pubkey)> {
         let receiver = self.get_receiver();
@@ -237,7 +247,7 @@ where
                     deposit,
                     payer,
                     receiver,
-                    token_config_map: client.find_token_config_map(store),
+                    token_map: self.token_map().await?,
                     market,
                     initial_long_token_account,
                     initial_short_token_account,
@@ -458,6 +468,7 @@ pub struct ExecuteDepositBuilder<'a, C> {
     price_provider: Pubkey,
     feeds_parser: FeedsParser,
     hint: Option<ExecuteDepositHint>,
+    token_map: Option<Pubkey>,
 }
 
 /// Hint for executing deposit.
@@ -505,6 +516,7 @@ where
             price_provider: Pyth::id(),
             hint: None,
             feeds_parser: Default::default(),
+            token_map: None,
         }
     }
 
@@ -546,8 +558,17 @@ where
         }
     }
 
+    async fn token_map(&self) -> crate::Result<Pubkey> {
+        if let Some(address) = self.token_map {
+            Ok(address)
+        } else {
+            crate::store::utils::token_map(self.client.data_store(), &self.store).await
+        }
+    }
+
     /// Build [`RpcBuilder`] for executing the deposit.
     pub async fn build(&mut self) -> crate::Result<RpcBuilder<'a, C>> {
+        let token_map = self.token_map().await?;
         let hint = self.prepare_hint().await?;
         let Self {
             client,
@@ -593,7 +614,7 @@ where
                 token_program: anchor_spl::token::ID,
                 config: client.find_config_address(store),
                 oracle: *oracle,
-                token_config_map: client.find_token_config_map(store),
+                token_map,
                 deposit: *deposit,
                 user: hint.user,
                 receiver: hint.receiver,

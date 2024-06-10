@@ -6,11 +6,12 @@ import { BTC_FEED, BTC_FEED_ID, BTC_FEED_PYTH, BTC_TOKEN_MINT, SOL_FEED, SOL_FEE
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 
 import { dataStore } from "./program";
-import { initializeTokenConfigMap, insertTokenConfig } from "./token_config";
+import { invokeInitializeTokenMap, invokePushToTokenMap } from "./token_config";
 import { createRolesPDA } from "./roles";
 import { createControllerPDA } from "../exchange";
 import { invokeInitializeConfig, invokeInsertAddress, invokeInsertAmount, invokeInsertFactor } from "./config";
 import { TIME_WINDOW } from "./constants";
+import { invokeSetTokenMap } from "./store";
 
 export const encodeUtf8 = anchor.utils.bytes.utf8.encode;
 
@@ -184,19 +185,31 @@ export const initializeDataStore = async (
     }
 
     // Initialize token config map.
+    const tokenMapKeypair = Keypair.generate();
+    const tokenMap = tokenMapKeypair.publicKey;
     try {
-        const tokenConfigMapAddress = await initializeTokenConfigMap(signer, dataStorePDA, 0);
-        console.log(`Intialized token config map: ${tokenConfigMapAddress}`);
+        await invokeInitializeTokenMap(dataStore, { payer: signer, tokenMap: tokenMapKeypair, store: dataStorePDA });
+        console.log(`Intialized token map: ${tokenMap}`);
+        const [tx] = await invokeSetTokenMap(dataStore, { authority: signer, tokenMap, store: dataStorePDA });
+        console.log(`The new token map has been set to the store, tx: ${tx}`);
     } catch (error) {
-        console.log("Failed to initialize token config map", error);
+        console.log("Failed to initialize token map", error);
     }
 
     const HEARTBEAT = 240;
 
     // Insert BTC token config.
     try {
-        await insertTokenConfig(signer, dataStorePDA, BTC_TOKEN_MINT, HEARTBEAT, 2, {
-            pythFeedId: BTC_FEED_ID,
+        await invokePushToTokenMap(dataStore, {
+            authority: signer,
+            store: dataStorePDA,
+            token: BTC_TOKEN_MINT,
+            tokenMap,
+            heartbeatDuration: HEARTBEAT,
+            precision: 2,
+            feeds: {
+                pythFeedId: BTC_FEED_ID,
+            }
         });
         console.log(`Init a token config for ${BTC_TOKEN_MINT}`);
     } catch (error) {
@@ -205,8 +218,16 @@ export const initializeDataStore = async (
 
     // Insert SOL token config.
     try {
-        await insertTokenConfig(signer, dataStorePDA, SOL_TOKEN_MINT, HEARTBEAT, 4, {
-            pythFeedId: SOL_FEED_ID,
+        await invokePushToTokenMap(dataStore, {
+            authority: signer,
+            store: dataStorePDA,
+            token: SOL_TOKEN_MINT,
+            tokenMap,
+            heartbeatDuration: HEARTBEAT,
+            precision: 4,
+            feeds: {
+                pythFeedId: SOL_FEED_ID,
+            }
         });
         console.log(`Init a token config for ${SOL_TOKEN_MINT}`);
     } catch (error) {
@@ -215,8 +236,16 @@ export const initializeDataStore = async (
 
     // Insert FakeToken token config.
     try {
-        await insertTokenConfig(signer, dataStorePDA, fakeToken, HEARTBEAT, 2, {
-            pythFeedId: BTC_FEED_ID,
+        await invokePushToTokenMap(dataStore, {
+            authority: signer,
+            store: dataStorePDA,
+            token: fakeToken,
+            tokenMap,
+            heartbeatDuration: HEARTBEAT,
+            precision: 2,
+            feeds: {
+                pythFeedId: BTC_FEED_ID,
+            }
         });
         console.log(`Init a token config for ${fakeToken}`);
     } catch (error) {
@@ -225,8 +254,16 @@ export const initializeDataStore = async (
 
     // Insert UsdG token config.
     try {
-        await insertTokenConfig(signer, dataStorePDA, usdG, HEARTBEAT, 4, {
-            pythFeedId: USDC_FEED_ID,
+        await invokePushToTokenMap(dataStore, {
+            authority: signer,
+            store: dataStorePDA,
+            token: usdG,
+            tokenMap,
+            heartbeatDuration: HEARTBEAT,
+            precision: 4,
+            feeds: {
+                pythFeedId: USDC_FEED_ID,
+            }
         });
         console.log(`Init a token config for ${usdG}`);
     } catch (error) {

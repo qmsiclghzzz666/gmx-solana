@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use super::{PriceProviderKind, TokenConfig};
+use super::PriceProviderKind;
 
 /// Token with feeds.
 pub mod token_with_feeds;

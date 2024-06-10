@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use gmx_solana_utils::price::{Decimal, Price};
 
-use crate::{states::TokenConfig, DataStoreError};
+use crate::{states::TokenConfigV2, DataStoreError};
 
 /// The Chainlink Program.
 pub struct Chainlink;
@@ -17,7 +17,7 @@ impl Chainlink {
     pub(crate) fn check_and_get_chainlink_price<'info>(
         clock: &Clock,
         chainlink_program: &AccountInfo<'info>,
-        token_config: &TokenConfig,
+        token_config: &TokenConfigV2,
         feed: &AccountInfo<'info>,
     ) -> Result<(u64, i64, Price)> {
         let round = chainlink_solana::latest_round_data(chainlink_program.clone(), feed.clone())?;
@@ -31,7 +31,7 @@ impl Chainlink {
         clock: &Clock,
         round: &chainlink_solana::Round,
         decimals: u8,
-        token_config: &TokenConfig,
+        token_config: &TokenConfigV2,
     ) -> Result<(u64, i64, Price)> {
         let chainlink_solana::Round {
             answer, timestamp, ..
@@ -39,14 +39,14 @@ impl Chainlink {
         require_gt!(*answer, 0, DataStoreError::InvalidPriceFeedPrice);
         let timestamp = *timestamp as i64;
         let current = clock.unix_timestamp;
-        if current > timestamp && current - timestamp > token_config.heartbeat_duration.into() {
+        if current > timestamp && current - timestamp > token_config.heartbeat_duration().into() {
             return Err(DataStoreError::PriceFeedNotUpdated.into());
         }
         let price = Decimal::try_from_price(
             *answer as u128,
             decimals,
-            token_config.token_decimals,
-            token_config.precision,
+            token_config.token_decimals(),
+            token_config.precision(),
         )
         .map_err(|_| DataStoreError::InvalidPriceFeedPrice)?;
         Ok((

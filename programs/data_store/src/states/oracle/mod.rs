@@ -15,11 +15,11 @@ pub mod time;
 
 use core::fmt;
 
-use crate::DataStoreError;
+use crate::{states::TokenMapAccess, DataStoreError};
 use anchor_lang::{prelude::*, Ids};
 use num_enum::TryFromPrimitive;
 
-use super::{Seed, TokenConfigMap};
+use super::{Seed, TokenMapRef};
 
 pub use self::{
     chainlink::Chainlink,
@@ -61,7 +61,7 @@ impl Oracle {
         &mut self,
         mut validator: PriceValidator,
         provider: &Interface<'info, PriceProvider>,
-        map: &TokenConfigMap,
+        map: &TokenMapRef,
         tokens: &[Pubkey],
         remaining_accounts: &'info [AccountInfo<'info>],
     ) -> Result<()> {
@@ -79,11 +79,13 @@ impl Oracle {
         // [token_config, feed; tokens.len()] [..remaining]
         for (idx, token) in tokens.iter().enumerate() {
             let feed = &remaining_accounts[idx];
-            let map = map.as_map();
             let token_config = map
                 .get(token)
                 .ok_or(DataStoreError::RequiredResourceNotFound)?;
-            require!(token_config.enabled, DataStoreError::TokenConfigDisabled);
+            require!(
+                token_config.is_enabled(),
+                DataStoreError::TokenConfigDisabled
+            );
             require_eq!(token_config.expected_provider()?, *program.kind());
             let (oracle_slot, oracle_ts, price) = match &program {
                 PriceProviderProgram::Chainlink(program, kind) => {

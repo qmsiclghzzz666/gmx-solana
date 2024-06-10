@@ -5,7 +5,7 @@ use anchor_client::{
     Cluster, Program,
 };
 
-use data_store::states::{position::PositionKind, NonceBytes, TokenConfig};
+use data_store::states::{position::PositionKind, NonceBytes};
 use typed_builder::TypedBuilder;
 
 use crate::utils::RpcBuilder;
@@ -116,26 +116,6 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         RpcBuilder::new(&self.exchange)
     }
 
-    /// Get token config for the given token.
-    pub async fn token_config(
-        &self,
-        store: &Pubkey,
-        token: &Pubkey,
-    ) -> crate::Result<Option<TokenConfig>> {
-        use crate::{store::token_config::TokenConfigOps, utils::view};
-
-        let client = self.data_store().async_rpc();
-        let output = view(
-            &client,
-            &self
-                .get_token_config(store, token)
-                .signed_transaction()
-                .await?,
-        )
-        .await?;
-        Ok(output)
-    }
-
     /// Find Event Authority Address.
     pub fn find_event_authority_address(&self) -> Pubkey {
         crate::pda::find_event_authority_address(&self.exchange_program_id()).0
@@ -154,11 +134,6 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
     /// Find PDA for [`Oracle`](data_store::states::Oracle) account.
     pub fn find_oracle_address(&self, store: &Pubkey, index: u8) -> Pubkey {
         crate::pda::find_oracle_address(store, index, &self.data_store_program_id()).0
-    }
-
-    /// Find PDA for [`TokenConfigMap`](data_store::states::TokenConfigMap) account.
-    pub fn find_token_config_map(&self, store: &Pubkey) -> Pubkey {
-        crate::pda::find_token_config_map(store, &self.data_store_program_id()).0
     }
 
     /// Find PDA for [`Config`](data_store::states::Config) account.

@@ -1,7 +1,7 @@
 import { workspace, Program, utils, Wallet } from "@coral-xyz/anchor";
 import { Exchange } from "../../target/types/exchange";
 import { AccountMeta, Connection, Keypair, PublicKey } from "@solana/web3.js";
-import { createDepositPDA, createMarketPDA, createMarketTokenMintPDA, createMarketVaultPDA, createOrderPDA, createPositionPDA, createRolesPDA, createTokenConfigMapPDA, createWithdrawalPDA, dataStore } from "./data";
+import { createMarketPDA, createMarketTokenMintPDA, createMarketVaultPDA, createRolesPDA, dataStore } from "./data";
 import { getAccount } from "@solana/spl-token";
 import { BTC_TOKEN_MINT, SOL_TOKEN_MINT } from "./token";
 import { IxWithOutput, makeInvoke } from "./invoke";
@@ -217,14 +217,13 @@ export const makeExecuteDepositInstruction = async ({
             isWritable: true,
         };
     });
-    const [controller] = findControllerPDA(store);
-    const [onlyController] = findRolesPDA(store, controller);
+    const tokenMap = (await dataStore.account.store.fetch(store)).tokenMap;
     return await exchange.methods.executeDeposit(toBN(options?.executionFee ?? 0)).accounts({
         authority,
         store,
         oracle,
         config: findConfigPDA(store)[0],
-        tokenConfigMap: createTokenConfigMapPDA(store)[0],
+        tokenMap,
         market: createMarketPDA(store, marketToken)[0],
         marketTokenMint: marketToken,
         user,
@@ -400,14 +399,13 @@ export const makeExecuteWithdrawalInstruction = async ({
             isWritable: true,
         };
     });
-    const [controller] = findControllerPDA(store);
-    const [onlyController] = findRolesPDA(store, controller);
+    const tokenMap = (await dataStore.account.store.fetch(store)).tokenMap;
     return await exchange.methods.executeWithdrawal(toBN(options?.executionFee ?? 0)).accounts({
         authority,
         store,
         oracle,
         config: findConfigPDA(store)[0],
-        tokenConfigMap: createTokenConfigMapPDA(store)[0],
+        tokenConfigMap: tokenMap,
         withdrawal,
         user,
         market: createMarketPDA(store, marketTokenMint)[0],
@@ -542,14 +540,13 @@ export const makeExecuteOrderInstruction = async ({
         }
     });
     const pnlTokenMint = isLong ? longTokenMint : shortTokenMint;
-    const [controller] = findControllerPDA(store);
-    const [onlyController] = findRolesPDA(store, controller);
+    const tokenMap = (await dataStore.account.store.fetch(store)).tokenMap;
     return await exchange.methods.executeOrder(toBN(recentTimestamp), toBN(options?.executionFee ?? 0)).accounts({
         authority,
         store,
         oracle,
         config: findConfigPDA(store)[0],
-        tokenConfigMap: createTokenConfigMapPDA(store)[0],
+        tokenConfigMap: tokenMap,
         market: createMarketPDA(store, marketTokenMint)[0],
         marketTokenMint,
         order,
