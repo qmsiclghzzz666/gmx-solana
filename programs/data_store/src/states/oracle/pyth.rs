@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use gmx_solana_utils::price::{Decimal, Price};
 use pyth_solana_receiver_sdk::price_update::PriceUpdateV2;
 
-use crate::{states::TokenConfigV2, DataStoreError};
+use crate::{states::TokenConfig, DataStoreError};
 
 /// The Pyth receiver program.
 pub struct Pyth;
@@ -19,7 +19,7 @@ impl Pyth {
 
     pub(super) fn check_and_get_price<'info>(
         clock: &Clock,
-        token_config: &TokenConfigV2,
+        token_config: &TokenConfig,
         feed: &'info AccountInfo<'info>,
         feed_id: &Pubkey,
     ) -> Result<(u64, i64, Price)> {
@@ -51,7 +51,7 @@ impl Pyth {
     fn price_value_to_decimal(
         mut value: u64,
         exponent: i32,
-        token_config: &TokenConfigV2,
+        token_config: &TokenConfig,
     ) -> Result<Decimal> {
         // actual price == value * 10^exponent
         // - If `exponent` is not positive, then the `decimals` is set to `-exponent`.
@@ -86,7 +86,7 @@ pub struct PythLegacy;
 impl PythLegacy {
     pub(super) fn check_and_get_price<'info>(
         clock: &Clock,
-        token_config: &TokenConfigV2,
+        token_config: &TokenConfig,
         feed: &'info AccountInfo<'info>,
     ) -> Result<(u64, i64, Price)> {
         use pyth_sdk_solana::state::SolanaPriceAccount;

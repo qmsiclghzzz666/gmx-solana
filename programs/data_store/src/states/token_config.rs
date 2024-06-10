@@ -42,7 +42,7 @@ type TokenFlagsValue = u8;
 #[zero_copy]
 #[derive(PartialEq, Eq)]
 #[cfg_attr(feature = "debug", derive(Debug))]
-pub struct TokenConfigV2 {
+pub struct TokenConfig {
     /// Flags.
     flags: TokenFlagsValue,
     /// Token decimals.
@@ -60,7 +60,7 @@ pub struct TokenConfigV2 {
     reserved: [u8; 32],
 }
 
-impl TokenConfigV2 {
+impl TokenConfig {
     /// Get the corresponding price feed address.
     pub fn get_feed(&self, kind: &PriceProviderKind) -> Result<Pubkey> {
         let index = *kind as usize;
@@ -180,7 +180,7 @@ impl TokenConfigV2 {
     }
 }
 
-impl InitSpace for TokenConfigV2 {
+impl InitSpace for TokenConfig {
     const INIT_SPACE: usize = std::mem::size_of::<Self>();
 }
 
@@ -262,7 +262,7 @@ impl InitSpace for TokenMapHeader {
 impl TokenMapHeader {
     /// Get the space of the whole `TokenMap` required, excluding discriminator.
     pub fn space(num_configs: u8) -> usize {
-        TokenMapHeader::INIT_SPACE + (usize::from(num_configs) * TokenConfigV2::INIT_SPACE)
+        TokenMapHeader::INIT_SPACE + (usize::from(num_configs) * TokenConfig::INIT_SPACE)
     }
 
     /// Get the space after push.
@@ -329,11 +329,11 @@ impl<'info> TokenMapLoader<'info> for AccountLoader<'info, TokenMapHeader> {
 /// Read Token Map.
 pub trait TokenMapAccess {
     /// Get the config of the given token.
-    fn get(&self, token: &Pubkey) -> Option<&TokenConfigV2>;
+    fn get(&self, token: &Pubkey) -> Option<&TokenConfig>;
 }
 
 impl<'a> TokenMapAccess for TokenMapRef<'a> {
-    fn get(&self, token: &Pubkey) -> Option<&TokenConfigV2> {
+    fn get(&self, token: &Pubkey) -> Option<&TokenConfig> {
         let index = usize::from(*self.header.tokens.get(token)?);
         crate::utils::dynamic_access::get(&self.configs, index)
     }
@@ -344,18 +344,18 @@ impl<'a> TokenMapAccess for TokenMapRef<'a> {
 /// The token map is append-only.
 pub trait TokenMapMutAccess {
     /// Get mutably the config of the given token.
-    fn get_mut(&mut self, token: &Pubkey) -> Option<&mut TokenConfigV2>;
+    fn get_mut(&mut self, token: &Pubkey) -> Option<&mut TokenConfig>;
 
     /// Push a new token config.
     fn push_with(
         &mut self,
         token: &Pubkey,
-        f: impl FnOnce(&mut TokenConfigV2) -> Result<()>,
+        f: impl FnOnce(&mut TokenConfig) -> Result<()>,
     ) -> Result<()>;
 }
 
 impl<'a> TokenMapMutAccess for TokenMapMut<'a> {
-    fn get_mut(&mut self, token: &Pubkey) -> Option<&mut TokenConfigV2> {
+    fn get_mut(&mut self, token: &Pubkey) -> Option<&mut TokenConfig> {
         let index = usize::from(*self.header.tokens.get(token)?);
         crate::utils::dynamic_access::get_mut(&mut self.configs, index)
     }
@@ -363,7 +363,7 @@ impl<'a> TokenMapMutAccess for TokenMapMut<'a> {
     fn push_with(
         &mut self,
         token: &Pubkey,
-        f: impl FnOnce(&mut TokenConfigV2) -> Result<()>,
+        f: impl FnOnce(&mut TokenConfig) -> Result<()>,
     ) -> Result<()> {
         let next_index = self.header.tokens.len();
         require!(
@@ -375,7 +375,7 @@ impl<'a> TokenMapMutAccess for TokenMapMut<'a> {
             .map_err(|_| error!(DataStoreError::AmountOverflow))?;
         self.header.tokens.insert_with_options(token, index, true)?;
         let Some(dst) =
-            crate::utils::dynamic_access::get_mut::<TokenConfigV2>(&mut self.configs, next_index)
+            crate::utils::dynamic_access::get_mut::<TokenConfig>(&mut self.configs, next_index)
         else {
             return err!(DataStoreError::NoSpaceForNewData);
         };

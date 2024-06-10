@@ -3,7 +3,7 @@ use gmx_solana_utils::price::Price;
 
 use crate::{
     constants::keys::{GLOBAL, MAX_AGE, MAX_ORACLE_TIMESTAMP_RANGE, REF_PRICE_DEVIATION},
-    states::{Amount, Config, TokenConfigV2},
+    states::{Amount, Config, TokenConfig},
     DataStoreError,
 };
 
@@ -28,7 +28,7 @@ impl PriceValidator {
 
     pub(super) fn validate_one(
         &mut self,
-        token_config: &TokenConfigV2,
+        token_config: &TokenConfig,
         oracle_ts: i64,
         oracle_slot: u64,
         _price: &Price,

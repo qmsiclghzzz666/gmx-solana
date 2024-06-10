@@ -668,7 +668,7 @@ where
                     store: self.store,
                     oracle: self.oracle,
                     config: self.config_address(),
-                    token_config_map: self.token_map().await?,
+                    token_map: self.token_map().await?,
                     market: self
                         .client
                         .find_market_address(&self.store, &hint.market_token),

@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{states::TokenConfigV2, utils::chunk_by::chunk_by, DataStoreError};
+use crate::{states::TokenConfig, utils::chunk_by::chunk_by, DataStoreError};
 
 use super::PriceProviderKind;
 
@@ -42,7 +42,7 @@ impl TokenRecord {
 
     /// Create a new [`TokenRecord`] from token config,
     /// using the expected provider and feed.
-    pub fn from_config(token: Pubkey, config: &TokenConfigV2) -> Result<Self> {
+    pub fn from_config(token: Pubkey, config: &TokenConfig) -> Result<Self> {
         Ok(Self::new(
             token,
             config.get_expected_feed()?,
