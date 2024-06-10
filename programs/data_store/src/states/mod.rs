@@ -4,9 +4,6 @@ pub mod store;
 /// Roles.
 pub mod roles;
 
-/// Config.
-pub mod config;
-
 /// Common types.
 pub mod common;
 
@@ -31,7 +28,6 @@ pub mod order;
 /// Position.
 pub mod position;
 
-pub use config::Config;
 pub use deposit::Deposit;
 pub use market::*;
 pub use oracle::*;

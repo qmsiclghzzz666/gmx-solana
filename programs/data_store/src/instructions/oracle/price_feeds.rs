@@ -1,9 +1,9 @@
+use std::ops::Deref;
+
 use anchor_lang::prelude::*;
 
 use crate::{
-    states::{
-        Config, Oracle, PriceProvider, PriceValidator, Seed, Store, TokenMapHeader, TokenMapLoader,
-    },
+    states::{Oracle, PriceProvider, PriceValidator, Seed, Store, TokenMapHeader, TokenMapLoader},
     utils::internal,
 };
 
@@ -12,11 +12,6 @@ pub struct SetPricesFromPriceFeed<'info> {
     pub authority: Signer<'info>,
     #[account(has_one = token_map)]
     pub store: AccountLoader<'info, Store>,
-    #[account(
-        seeds = [Config::SEED, store.key().as_ref()],
-        bump = config.bump,
-    )]
-    config: Account<'info, Config>,
     #[account(
         mut,
         has_one = store,
@@ -34,7 +29,7 @@ pub fn set_prices_from_price_feed<'info>(
     ctx: Context<'_, '_, 'info, 'info, SetPricesFromPriceFeed<'info>>,
     tokens: Vec<Pubkey>,
 ) -> Result<()> {
-    let validator = PriceValidator::try_from(ctx.accounts.config.as_ref())?;
+    let validator = PriceValidator::try_from(ctx.accounts.store.load()?.deref())?;
     let token_map = ctx.accounts.token_map.load_token_map()?;
     ctx.accounts.oracle.set_prices_from_remaining_accounts(
         validator,

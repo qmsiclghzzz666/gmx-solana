@@ -1,7 +1,7 @@
 use anchor_client::solana_sdk::pubkey::Pubkey;
 use data_store::states::{
-    position::PositionKind, Config, Deposit, Market, NonceBytes, Oracle, Order, Position, Seed,
-    Store, Withdrawal,
+    position::PositionKind, Deposit, Market, NonceBytes, Oracle, Order, Position, Seed, Store,
+    Withdrawal,
 };
 use gmx_solana_utils::to_seed;
 
@@ -28,11 +28,6 @@ pub fn find_controller_address(store: &Pubkey, exchange_program_id: &Pubkey) -> 
 /// Find PDA for [`Oracle`] account.
 pub fn find_oracle_address(store: &Pubkey, index: u8, store_program_id: &Pubkey) -> (Pubkey, u8) {
     Pubkey::find_program_address(&[Oracle::SEED, store.as_ref(), &[index]], store_program_id)
-}
-
-/// Find PDA for [`Config`] account.
-pub fn find_config_pda(store: &Pubkey, store_program_id: &Pubkey) -> (Pubkey, u8) {
-    Pubkey::find_program_address(&[Config::SEED, store.as_ref()], store_program_id)
 }
 
 /// Find PDA for the market vault.

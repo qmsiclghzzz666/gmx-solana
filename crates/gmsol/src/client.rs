@@ -136,11 +136,6 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         crate::pda::find_oracle_address(store, index, &self.data_store_program_id()).0
     }
 
-    /// Find PDA for [`Config`](data_store::states::Config) account.
-    pub fn find_config_address(&self, store: &Pubkey) -> Pubkey {
-        crate::pda::find_config_pda(store, &self.data_store_program_id()).0
-    }
-
     /// Find PDA for market vault account.
     pub fn find_market_vault_address(&self, store: &Pubkey, token: &Pubkey) -> Pubkey {
         crate::pda::find_market_vault_address(store, token, &self.data_store_program_id()).0

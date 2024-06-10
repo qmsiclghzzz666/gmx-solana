@@ -21,11 +21,15 @@ enum Command {
         key: Option<String>,
         #[arg(long)]
         current: bool,
-        #[arg(long)]
+        #[arg(long, group = "get")]
         debug: bool,
+        #[arg(long, group = "get")]
+        get_amount: Option<String>,
+        #[arg(long, group = "get")]
+        get_factor: Option<String>,
+        #[arg(long, group = "get")]
+        get_address: Option<String>,
     },
-    /// `Config` account.
-    Config { address: Option<Pubkey> },
     /// `TokenMap` account.
     TokenMap { address: Option<Pubkey> },
     /// `Market` account.
@@ -87,6 +91,9 @@ impl InspectArgs {
                 key,
                 current,
                 debug,
+                get_address,
+                get_amount,
+                get_factor,
             } => {
                 let address = if *current {
                     *store.wrap_err("current store address not set")?
@@ -97,19 +104,20 @@ impl InspectArgs {
                 };
                 println!("Store Address: {address}");
                 let store = program.account::<states::Store>(address).await?;
+                if let Some(key) = get_amount {
+                    println!("{}", store.get_amount(key)?);
+                }
+                if let Some(key) = get_factor {
+                    println!("{}", store.get_factor(key)?);
+                }
+                if let Some(key) = get_address {
+                    println!("{}", store.get_address(key)?);
+                }
                 if *debug {
                     println!("{store:?}");
                 } else {
                     println!("{store}");
                 }
-            }
-            Command::Config { address } => {
-                let address = address
-                    .or_else(|| store.map(|store| client.find_config_address(store)))
-                    .wrap_err(
-                        "neither the address of config account nor the address of store provided",
-                    )?;
-                println!("{:#?}", program.account::<states::Config>(address).await?);
             }
             Command::TokenMap { address } => {
                 let address = if let Some(address) = address {

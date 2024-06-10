@@ -2,8 +2,7 @@ use anchor_lang::prelude::*;
 use gmx_solana_utils::price::Price;
 
 use crate::{
-    constants::keys::{GLOBAL, MAX_AGE, MAX_ORACLE_TIMESTAMP_RANGE, REF_PRICE_DEVIATION},
-    states::{Amount, Config, TokenConfig},
+    states::{Amount, Store, TokenConfig},
     DataStoreError,
 };
 
@@ -85,20 +84,14 @@ impl PriceValidator {
     }
 }
 
-impl<'a> TryFrom<&'a Config> for PriceValidator {
+impl<'a> TryFrom<&'a Store> for PriceValidator {
     type Error = anchor_lang::error::Error;
 
-    fn try_from(config: &'a Config) -> Result<Self> {
-        let max_age = config
-            .amount(GLOBAL, MAX_AGE)
-            .ok_or(error!(DataStoreError::MissingAmount))?;
+    fn try_from(config: &'a Store) -> Result<Self> {
+        let max_age = config.amount.oracle_max_age;
         // TODO: enable validation with ref price.
-        let _max_ref_price_deviation_factor = config
-            .factor(GLOBAL, REF_PRICE_DEVIATION)
-            .ok_or(DataStoreError::MissingFactor)?;
-        let max_oracle_timestamp_range = config
-            .amount(GLOBAL, MAX_ORACLE_TIMESTAMP_RANGE)
-            .ok_or(error!(DataStoreError::MissingAmount))?;
+        let _max_ref_price_deviation_factor = config.factor.oracle_ref_price_deviation;
+        let max_oracle_timestamp_range = config.amount.oracle_max_timestamp_range;
         Ok(Self {
             clock: Clock::get()?,
             max_age,

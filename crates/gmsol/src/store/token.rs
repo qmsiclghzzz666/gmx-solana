@@ -52,7 +52,6 @@ where
             .accounts(accounts::UseClaimableAccount {
                 authority,
                 store: *store,
-                config: self.find_config_address(store),
                 mint: *mint,
                 user: *user,
                 account: *account,
@@ -78,7 +77,6 @@ where
             .accounts(accounts::CloseEmptyClaimableAccount {
                 authority,
                 store: *store,
-                config: self.find_config_address(store),
                 mint: *mint,
                 account: *account,
                 system_program: System::id(),

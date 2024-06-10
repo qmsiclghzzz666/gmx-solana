@@ -530,7 +530,6 @@ where
                 token_program: anchor_spl::token::ID,
                 system_program: system_program::ID,
                 oracle: self.oracle,
-                config: self.client.find_config_address(&self.store),
                 token_map: self.get_token_map().await?,
                 withdrawal: self.withdrawal,
                 market: self

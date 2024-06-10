@@ -30,8 +30,6 @@ pub struct ExecuteWithdrawal<'info> {
     pub price_provider: Interface<'info, PriceProvider>,
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
-    /// CHECK: only use and check by CPI.
-    pub config: UncheckedAccount<'info>,
     #[account(mut)]
     pub oracle: Account<'info, data_store::states::Oracle>,
     /// Withdrawal to execute.
@@ -164,10 +162,6 @@ impl<'info> WithOracle<'info> for ExecuteWithdrawal<'info> {
     fn token_map(&self) -> AccountInfo<'info> {
         self.token_map.to_account_info()
     }
-
-    fn config(&self) -> AccountInfo<'info> {
-        self.config.to_account_info()
-    }
 }
 
 impl<'info> ExecuteWithdrawal<'info> {
@@ -196,7 +190,6 @@ impl<'info> ExecuteWithdrawal<'info> {
             data_store::cpi::accounts::ExecuteWithdrawal {
                 authority: self.controller.to_account_info(),
                 store: self.store.to_account_info(),
-                config: self.config.to_account_info(),
                 oracle: self.oracle.to_account_info(),
                 withdrawal: self.withdrawal.to_account_info(),
                 market: self.market.to_account_info(),

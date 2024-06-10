@@ -624,7 +624,6 @@ where
                 data_store_program: client.data_store_program_id(),
                 price_provider: *price_provider,
                 token_program: anchor_spl::token::ID,
-                config: client.find_config_address(store),
                 oracle: *oracle,
                 token_map,
                 deposit: *deposit,

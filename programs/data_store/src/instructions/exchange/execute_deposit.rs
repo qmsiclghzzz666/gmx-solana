@@ -3,7 +3,7 @@ use anchor_spl::token::{Mint, Token, TokenAccount};
 use gmx_core::MarketExt;
 
 use crate::{
-    states::{Config, Deposit, Market, MarketMeta, Oracle, Seed, Store, ValidateOracleTime},
+    states::{Deposit, Market, MarketMeta, Oracle, Seed, Store, ValidateOracleTime},
     utils::internal,
     DataStoreError, GmxCoreError,
 };
@@ -14,12 +14,6 @@ use super::utils::swap::unchecked_swap_with_params;
 pub struct ExecuteDeposit<'info> {
     pub authority: Signer<'info>,
     pub store: AccountLoader<'info, Store>,
-    #[account(
-        has_one = store,
-        seeds = [Config::SEED, store.key().as_ref()],
-        bump = config.bump,
-    )]
-    config: Account<'info, Config>,
     #[account(has_one = store)]
     pub oracle: Account<'info, Oracle>,
     #[account(
@@ -76,7 +70,8 @@ impl<'info> ValidateOracleTime for ExecuteDeposit<'info> {
 
     fn oracle_updated_before(&self) -> Result<Option<i64>> {
         let ts = self
-            .config
+            .store
+            .load()?
             .request_expiration_at(self.deposit.fixed.updated_at)?;
         Ok(Some(ts))
     }

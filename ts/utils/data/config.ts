@@ -9,29 +9,16 @@ export type MakeInitializeConfigParams = {
     store: PublicKey,
 }
 
-export const makeInitializeConfigInstruction = async (
-    program: DataStoreProgram,
-    { authority, store }: MakeInitializeConfigParams,
-) => {
-    return await program.methods.initializeConfig().accounts({
-        authority,
-        store,
-    }).instruction();
-}
-
-export const invokeInitializeConfig = makeInvoke(makeInitializeConfigInstruction, ["authority"]);
-
 export const makeInsertAmountInstruction = async (
     program: DataStoreProgram,
-    { authority, store, key, amount, insertNew }: {
+    { authority, store, key, amount }: {
         authority: PublicKey,
         store: PublicKey,
         key: string,
         amount: number | bigint,
-        insertNew?: boolean,
     }
 ) => {
-    return await program.methods.insertAmount(key, toBN(amount), insertNew).accounts({
+    return await program.methods.insertAmount(key, toBN(amount)).accounts({
         authority,
         store,
     }).instruction();
@@ -41,15 +28,14 @@ export const invokeInsertAmount = makeInvoke(makeInsertAmountInstruction, ["auth
 
 export const makeInsertFactorInstruction = async (
     program: DataStoreProgram,
-    { authority, store, key, factor, insertNew }: {
+    { authority, store, key, factor }: {
         authority: PublicKey,
         store: PublicKey,
         key: string,
         factor: number | bigint,
-        insertNew?: boolean,
     }
 ) => {
-    return await program.methods.insertFactor(key, toBN(factor), insertNew).accounts({
+    return await program.methods.insertFactor(key, toBN(factor)).accounts({
         authority,
         store,
     }).instruction();
@@ -59,15 +45,14 @@ export const invokeInsertFactor = makeInvoke(makeInsertFactorInstruction, ["auth
 
 export const makeInsertAddressInstruction = async (
     program: DataStoreProgram,
-    { authority, store, key, address, insertNew }: {
+    { authority, store, key, address }: {
         authority: PublicKey,
         store: PublicKey,
         key: string,
         address: Address,
-        insertNew?: boolean,
     }
 ) => {
-    return await program.methods.insertAddress(key, translateAddress(address), insertNew).accounts({
+    return await program.methods.insertAddress(key, translateAddress(address)).accounts({
         authority,
         store,
     }).instruction();

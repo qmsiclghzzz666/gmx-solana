@@ -91,38 +91,18 @@ pub mod data_store {
 
     // Config.
     #[access_control(internal::Authenticate::only_controller(&ctx))]
-    pub fn initialize_config(ctx: Context<InitializeConfig>) -> Result<()> {
-        instructions::initialize_config(ctx)
+    pub fn insert_amount(ctx: Context<InsertAmount>, key: String, amount: u64) -> Result<()> {
+        instructions::insert_amount(ctx, &key, amount)
     }
 
     #[access_control(internal::Authenticate::only_controller(&ctx))]
-    pub fn insert_amount(
-        ctx: Context<InsertAmount>,
-        key: String,
-        amount: u64,
-        new: bool,
-    ) -> Result<()> {
-        instructions::insert_amount(ctx, &key, amount, new)
+    pub fn insert_factor(ctx: Context<InsertFactor>, key: String, amount: u128) -> Result<()> {
+        instructions::insert_factor(ctx, &key, amount)
     }
 
     #[access_control(internal::Authenticate::only_controller(&ctx))]
-    pub fn insert_factor(
-        ctx: Context<InsertFactor>,
-        key: String,
-        amount: u128,
-        new: bool,
-    ) -> Result<()> {
-        instructions::insert_factor(ctx, &key, amount, new)
-    }
-
-    #[access_control(internal::Authenticate::only_controller(&ctx))]
-    pub fn insert_address(
-        ctx: Context<InsertAddress>,
-        key: String,
-        address: Pubkey,
-        new: bool,
-    ) -> Result<()> {
-        instructions::insert_address(ctx, &key, address, new)
+    pub fn insert_address(ctx: Context<InsertAddress>, key: String, address: Pubkey) -> Result<()> {
+        instructions::insert_address(ctx, &key, address)
     }
 
     // Token Config.

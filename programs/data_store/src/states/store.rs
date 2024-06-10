@@ -1,8 +1,10 @@
+use std::{num::NonZeroU64, str::FromStr};
+
 use anchor_lang::prelude::*;
 use bytemuck::Zeroable;
 use gmx_solana_utils::to_seed;
 
-use crate::constants;
+use crate::{constants, DataStoreError};
 
 use super::{Amount, Factor, InitSpace, RoleStore, Seed};
 
@@ -128,6 +130,76 @@ impl Store {
             Some(&self.token_map)
         }
     }
+
+    /// Get amount.
+    pub fn get_amount(&self, key: &str) -> Result<&Amount> {
+        let key = AmountKey::from_str(key).map_err(|_| error!(DataStoreError::InvalidKey))?;
+        Ok(self.amount.get(&key))
+    }
+
+    /// Get amount mutably
+    pub fn get_amount_mut(&mut self, key: &str) -> Result<&mut Amount> {
+        let key = AmountKey::from_str(key).map_err(|_| error!(DataStoreError::InvalidKey))?;
+        Ok(self.amount.get_mut(&key))
+    }
+
+    /// Get factor.
+    pub fn get_factor(&self, key: &str) -> Result<&Factor> {
+        let key = FactorKey::from_str(key).map_err(|_| error!(DataStoreError::InvalidKey))?;
+        Ok(self.factor.get(&key))
+    }
+
+    /// Get factor mutably
+    pub fn get_factor_mut(&mut self, key: &str) -> Result<&mut Factor> {
+        let key = FactorKey::from_str(key).map_err(|_| error!(DataStoreError::InvalidKey))?;
+        Ok(self.factor.get_mut(&key))
+    }
+
+    /// Get address.
+    pub fn get_address(&self, key: &str) -> Result<&Pubkey> {
+        let key = AddressKey::from_str(key).map_err(|_| error!(DataStoreError::InvalidKey))?;
+        Ok(self.address.get(&key))
+    }
+
+    /// Get address mutably
+    pub fn get_address_mut(&mut self, key: &str) -> Result<&mut Pubkey> {
+        let key = AddressKey::from_str(key).map_err(|_| error!(DataStoreError::InvalidKey))?;
+        Ok(self.address.get_mut(&key))
+    }
+
+    /// Calculate the request expiration time.
+    pub fn request_expiration_at(&self, start: i64) -> Result<i64> {
+        start
+            .checked_add_unsigned(self.amount.request_expiration)
+            .ok_or(error!(DataStoreError::AmountOverflow))
+    }
+
+    /// Get claimable time window size.
+    pub fn claimable_time_window(&self) -> Result<NonZeroU64> {
+        NonZeroU64::new(self.amount.claimable_time_window)
+            .ok_or(error!(DataStoreError::CannotBeZero))
+    }
+
+    /// Get claimable time window index for the given timestamp.
+    pub fn claimable_time_window_index(&self, timestamp: i64) -> Result<i64> {
+        let window: i64 = self
+            .claimable_time_window()?
+            .get()
+            .try_into()
+            .map_err(|_| error!(DataStoreError::AmountOverflow))?;
+        Ok(timestamp / window)
+    }
+
+    /// Get claimable time key for the given timestamp.
+    pub fn claimable_time_key(&self, timestamp: i64) -> Result<[u8; 8]> {
+        let index = self.claimable_time_window_index(timestamp)?;
+        Ok(index.to_be_bytes())
+    }
+
+    /// Get holding address.
+    pub fn holding(&self) -> &Pubkey {
+        &self.address.holding
+    }
 }
 
 /// Treasury.
@@ -164,6 +236,24 @@ pub struct Amounts {
     reserved_2: [Amount; 96],
 }
 
+/// Amount keys.
+#[derive(strum::EnumString)]
+#[strum(serialize_all = "snake_case")]
+#[non_exhaustive]
+#[cfg_attr(feature = "debug", derive(Debug))]
+pub enum AmountKey {
+    /// Claimable time window.
+    ClaimableTimeWindow,
+    /// Recent time window.
+    RecentTimeWindow,
+    /// Request expiration.
+    RequestExpiration,
+    /// Oracle max age.
+    OracleMaxAge,
+    /// Oracle max timestamp range.
+    OracleMaxTimestampRange,
+}
+
 impl Amounts {
     fn init(&mut self) {
         self.claimable_time_window = constants::DEFAULT_CLAIMABLE_TIME_WINDOW;
@@ -171,6 +261,28 @@ impl Amounts {
         self.request_expiration = constants::DEFAULT_REQUEST_EXPIRATION;
         self.oracle_max_age = constants::DEFAULT_ORACLE_MAX_AGE;
         self.oracle_max_timestamp_range = constants::DEFAULT_ORACLE_MAX_TIMESTAMP_RANGE;
+    }
+
+    /// Get.
+    fn get(&self, key: &AmountKey) -> &Amount {
+        match key {
+            AmountKey::ClaimableTimeWindow => &self.claimable_time_window,
+            AmountKey::RecentTimeWindow => &self.recent_time_window,
+            AmountKey::RequestExpiration => &self.request_expiration,
+            AmountKey::OracleMaxAge => &self.oracle_max_age,
+            AmountKey::OracleMaxTimestampRange => &self.oracle_max_timestamp_range,
+        }
+    }
+
+    /// Get mutably.
+    fn get_mut(&mut self, key: &AmountKey) -> &mut Amount {
+        match key {
+            AmountKey::ClaimableTimeWindow => &mut self.claimable_time_window,
+            AmountKey::RecentTimeWindow => &mut self.recent_time_window,
+            AmountKey::RequestExpiration => &mut self.request_expiration,
+            AmountKey::OracleMaxAge => &mut self.oracle_max_age,
+            AmountKey::OracleMaxTimestampRange => &mut self.oracle_max_timestamp_range,
+        }
     }
 }
 
@@ -183,9 +295,33 @@ pub struct Factors {
     reserved_2: [Factor; 32],
 }
 
+/// Factor keys.
+#[derive(strum::EnumString)]
+#[strum(serialize_all = "snake_case")]
+#[non_exhaustive]
+#[cfg_attr(feature = "debug", derive(Debug))]
+pub enum FactorKey {
+    /// Oracle Ref Price Deviation.
+    OracleRefPriceDeviation,
+}
+
 impl Factors {
     fn init(&mut self) {
         self.oracle_ref_price_deviation = constants::DEFAULT_ORACLE_REF_PRICE_DEVIATION;
+    }
+
+    /// Get.
+    fn get(&self, key: &FactorKey) -> &Factor {
+        match key {
+            FactorKey::OracleRefPriceDeviation => &self.oracle_ref_price_deviation,
+        }
+    }
+
+    /// Get mutably.
+    fn get_mut(&mut self, key: &FactorKey) -> &mut Factor {
+        match key {
+            FactorKey::OracleRefPriceDeviation => &mut self.oracle_ref_price_deviation,
+        }
     }
 }
 
@@ -197,9 +333,33 @@ pub struct Addresses {
     reserved: [Pubkey; 31],
 }
 
+/// Address keys.
+#[derive(strum::EnumString)]
+#[strum(serialize_all = "snake_case")]
+#[non_exhaustive]
+#[cfg_attr(feature = "debug", derive(Debug))]
+pub enum AddressKey {
+    /// Holding.
+    Holding,
+}
+
 impl Addresses {
     fn init(&mut self, holding: Pubkey) {
         self.holding = holding;
+    }
+
+    /// Get.
+    fn get(&self, key: &AddressKey) -> &Pubkey {
+        match key {
+            AddressKey::Holding => &self.holding,
+        }
+    }
+
+    /// Get mutably.
+    fn get_mut(&mut self, key: &AddressKey) -> &mut Pubkey {
+        match key {
+            AddressKey::Holding => &mut self.holding,
+        }
     }
 }
 

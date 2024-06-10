@@ -4,7 +4,7 @@ use gmx_core::MarketExt;
 
 use crate::{
     constants,
-    states::{Config, Market, Oracle, Seed, Store, ValidateOracleTime, Withdrawal},
+    states::{Market, Oracle, Seed, Store, ValidateOracleTime, Withdrawal},
     utils::internal::{self},
     DataStoreError, GmxCoreError,
 };
@@ -15,12 +15,6 @@ use super::utils::swap::{unchecked_swap_with_params, unchecked_transfer_to_marke
 pub struct ExecuteWithdrawal<'info> {
     pub authority: Signer<'info>,
     pub store: AccountLoader<'info, Store>,
-    #[account(
-        has_one = store,
-        seeds = [Config::SEED, store.key().as_ref()],
-        bump = config.bump,
-    )]
-    config: Account<'info, Config>,
     #[account(has_one = store)]
     pub oracle: Account<'info, Oracle>,
     #[account(
@@ -134,7 +128,8 @@ impl<'info> ValidateOracleTime for ExecuteWithdrawal<'info> {
 
     fn oracle_updated_before(&self) -> Result<Option<i64>> {
         let ts = self
-            .config
+            .store
+            .load()?
             .request_expiration_at(self.withdrawal.fixed.updated_at)?;
         Ok(Some(ts))
     }

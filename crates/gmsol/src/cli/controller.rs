@@ -14,34 +14,23 @@ pub(super) struct ControllerArgs {
 enum Command {
     /// Initialize a [`Oracle`](data_store::states::Oracle) account.
     InitializeOracle { index: u8 },
-    /// Initialize Config Account.
-    InitializeConfig,
     /// Insert an amount to the config.
     InsertAmount {
         amount: Amount,
         #[arg(long, short)]
         key: String,
-        /// Force new.
-        #[arg(long)]
-        new: bool,
     },
     /// Insert a factor to the config.
     InsertFactor {
         factor: Factor,
         #[arg(long, short)]
         key: String,
-        /// Force new.
-        #[arg(long)]
-        new: bool,
     },
     /// Insert an address to the config.
     InsertAddress {
         address: Pubkey,
         #[arg(long, short)]
         key: String,
-        /// Force new.
-        #[arg(long)]
-        new: bool,
     },
 }
 
@@ -61,10 +50,10 @@ impl ControllerArgs {
                 })
                 .await?;
             }
-            Command::InitializeConfig => {
+            Command::InsertAmount { amount, key } => {
                 crate::utils::send_or_serialize(
                     client
-                        .initialize_config(store)
+                        .insert_global_amount(store, key, *amount)
                         .build_without_compute_budget(),
                     serialize_only,
                     |signature| {
@@ -74,10 +63,10 @@ impl ControllerArgs {
                 )
                 .await?;
             }
-            Command::InsertAmount { amount, key, new } => {
+            Command::InsertFactor { factor, key } => {
                 crate::utils::send_or_serialize(
                     client
-                        .insert_global_amount(store, key, *amount, *new)
+                        .insert_global_factor(store, key, *factor)
                         .build_without_compute_budget(),
                     serialize_only,
                     |signature| {
@@ -87,23 +76,10 @@ impl ControllerArgs {
                 )
                 .await?;
             }
-            Command::InsertFactor { factor, key, new } => {
+            Command::InsertAddress { address, key } => {
                 crate::utils::send_or_serialize(
                     client
-                        .insert_global_factor(store, key, *factor, *new)
-                        .build_without_compute_budget(),
-                    serialize_only,
-                    |signature| {
-                        println!("{signature}");
-                        Ok(())
-                    },
-                )
-                .await?;
-            }
-            Command::InsertAddress { address, key, new } => {
-                crate::utils::send_or_serialize(
-                    client
-                        .insert_global_address(store, key, address, *new)
+                        .insert_global_address(store, key, address)
                         .build_without_compute_budget(),
                     serialize_only,
                     |signature| {

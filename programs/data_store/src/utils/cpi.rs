@@ -85,9 +85,6 @@ pub trait WithOracle<'info>: Authentication<'info> {
 
     /// Get the token map account.
     fn token_map(&self) -> AccountInfo<'info>;
-
-    /// Get config account.
-    fn config(&self) -> AccountInfo<'info>;
 }
 
 /// Extension trait for [`WithOracle`].
@@ -103,7 +100,6 @@ pub trait WithOracleExt<'info>: WithOracle<'info> {
             SetPricesFromPriceFeed {
                 authority: self.authority().to_account_info(),
                 store: check_role.accounts.store,
-                config: self.config(),
                 token_map: self.token_map(),
                 oracle: self.oracle(),
                 price_provider: self.price_provider(),

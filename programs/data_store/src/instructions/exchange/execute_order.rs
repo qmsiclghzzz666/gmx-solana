@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token, TokenAccount};
 use gmx_core::{
@@ -14,7 +16,7 @@ use crate::{
     states::{
         order::{Order, OrderKind, TransferOut},
         position::Position,
-        Config, Market, Oracle, Seed, Store, ValidateOracleTime,
+        Market, Oracle, Seed, Store, ValidateOracleTime,
     },
     utils::internal,
     DataStoreError, GmxCoreError,
@@ -27,12 +29,6 @@ use super::utils::swap::unchecked_swap_with_params;
 pub struct ExecuteOrder<'info> {
     pub authority: Signer<'info>,
     pub store: AccountLoader<'info, Store>,
-    #[account(
-        has_one = store,
-        seeds = [Config::SEED, store.key().as_ref()],
-        bump = config.bump,
-    )]
-    config: Box<Account<'info, Config>>,
     #[account(has_one = store)]
     pub oracle: Box<Account<'info, Oracle>>,
     #[account(
@@ -132,7 +128,7 @@ pub struct ExecuteOrder<'info> {
             store.key().as_ref(),
             market.meta.long_token_mint.as_ref(),
             order.fixed.user.as_ref(),
-            &config.claimable_time_key(validated_recent_timestamp(&config, recent_timestamp)?)?,
+            &store.load()?.claimable_time_key(validated_recent_timestamp(store.load()?.deref(), recent_timestamp)?)?,
         ],
         bump,
     )]
@@ -147,7 +143,7 @@ pub struct ExecuteOrder<'info> {
             store.key().as_ref(),
             market.meta.short_token_mint.as_ref(),
             order.fixed.user.as_ref(),
-            &config.claimable_time_key(validated_recent_timestamp(&config, recent_timestamp)?)?,
+            &store.load()?.claimable_time_key(validated_recent_timestamp(store.load()?.deref(), recent_timestamp)?)?,
         ],
         bump,
     )]
@@ -156,13 +152,13 @@ pub struct ExecuteOrder<'info> {
         mut,
         token::mint = get_pnl_token(&position, &market)?,
         token::authority = store,
-        constraint = check_delegation(claimable_pnl_token_account_for_holding, config.holding()?)?,
+        constraint = check_delegation(claimable_pnl_token_account_for_holding, store.load()?.address.holding)?,
         seeds = [
             constants::CLAIMABLE_ACCOUNT_SEED,
             store.key().as_ref(),
             get_pnl_token(&position, &market)?.as_ref(),
-            config.holding()?.as_ref(),
-            &config.claimable_time_key(validated_recent_timestamp(&config, recent_timestamp)?)?,
+            store.load()?.address.holding.as_ref(),
+            &store.load()?.claimable_time_key(validated_recent_timestamp(store.load()?.deref(), recent_timestamp)?)?,
         ],
         bump,
     )]
@@ -221,7 +217,7 @@ impl<'info> ValidateOracleTime for ExecuteOrder<'info> {
             }
             _ => None,
         };
-        ts.map(|ts| self.config.request_expiration_at(ts))
+        ts.map(|ts| self.store.load()?.request_expiration_at(ts))
             .transpose()
     }
 
@@ -704,8 +700,8 @@ fn check_delegation(account: &TokenAccount, target: Pubkey) -> Result<bool> {
     Ok(is_matched)
 }
 
-fn validated_recent_timestamp(config: &Config, timestamp: i64) -> Result<i64> {
-    let recent_time_window = config.recent_time_window()?;
+fn validated_recent_timestamp(config: &Store, timestamp: i64) -> Result<i64> {
+    let recent_time_window = config.amount.recent_time_window;
     let expiration_time = timestamp.saturating_add_unsigned(recent_time_window);
     let clock = Clock::get()?;
     if timestamp <= clock.unix_timestamp && clock.unix_timestamp <= expiration_time {

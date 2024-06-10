@@ -1,11 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Burn, Mint, MintTo, Token, TokenAccount, Transfer};
 
-use crate::{
-    constants,
-    states::{Config, Seed, Store},
-    utils::internal,
-};
+use crate::{constants, states::Store, utils::internal};
 
 /// Initialize a new market token.
 #[allow(unused_variables)]
@@ -243,11 +239,6 @@ pub struct UseClaimableAccount<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
     pub store: AccountLoader<'info, Store>,
-    #[account(
-        seeds = [Config::SEED, store.key().as_ref()],
-        bump = config.bump,
-    )]
-    pub config: Account<'info, Config>,
     pub mint: Account<'info, Mint>,
     /// CHECK: check by CPI.
     pub user: UncheckedAccount<'info>,
@@ -262,7 +253,7 @@ pub struct UseClaimableAccount<'info> {
             store.key().as_ref(),
             mint.key().as_ref(),
             user.key().as_ref(),
-            &config.claimable_time_key(timestamp)?,
+            &store.load()?.claimable_time_key(timestamp)?,
         ],
         bump,
     )]
@@ -310,11 +301,6 @@ pub struct CloseEmptyClaimableAccount<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
     pub store: AccountLoader<'info, Store>,
-    #[account(
-        seeds = [Config::SEED, store.key().as_ref()],
-        bump = config.bump,
-    )]
-    pub config: Account<'info, Config>,
     pub mint: Account<'info, Mint>,
     #[account(
         mut,
@@ -326,7 +312,7 @@ pub struct CloseEmptyClaimableAccount<'info> {
             store.key().as_ref(),
             mint.key().as_ref(),
             user.key().as_ref(),
-            &config.claimable_time_key(timestamp)?,
+            &store.load()?.claimable_time_key(timestamp)?,
         ],
         bump,
     )]

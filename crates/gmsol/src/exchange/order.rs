@@ -9,7 +9,7 @@ use anchor_spl::associated_token::get_associated_token_address;
 use data_store::states::{
     common::{SwapParams, TokensWithFeed},
     order::{OrderKind, OrderParams},
-    Config, Market, MarketMeta, NonceBytes, Order, Pyth,
+    Market, MarketMeta, NonceBytes, Order, Pyth, Store,
 };
 use exchange::{accounts, instruction, instructions::CreateOrderParams};
 
@@ -413,7 +413,7 @@ pub struct ExecuteOrderBuilder<'a, C> {
 pub struct ExecuteOrderHint {
     store_program_id: Pubkey,
     has_claimable: bool,
-    config: Config,
+    store: Store,
     market_token: Pubkey,
     position: Option<Pubkey>,
     user: Pubkey,
@@ -455,7 +455,7 @@ impl ExecuteOrderHint {
                 store,
                 &self.long_token_mint,
                 &self.user,
-                &self.config.claimable_time_key(timestamp)?,
+                &self.store.claimable_time_key(timestamp)?,
                 &self.store_program_id,
             )
             .0,
@@ -475,7 +475,7 @@ impl ExecuteOrderHint {
                 store,
                 &self.short_token_mint,
                 &self.user,
-                &self.config.claimable_time_key(timestamp)?,
+                &self.store.claimable_time_key(timestamp)?,
                 &self.store_program_id,
             )
             .0,
@@ -494,8 +494,8 @@ impl ExecuteOrderHint {
             crate::pda::find_claimable_account_pda(
                 store,
                 &self.pnl_token_mint,
-                &self.config.holding()?,
-                &self.config.claimable_time_key(timestamp)?,
+                self.store.holding(),
+                &self.store.claimable_time_key(timestamp)?,
                 &self.store_program_id,
             )
             .0,
@@ -549,7 +549,7 @@ where
     }
 
     /// Set hint with the given order.
-    pub fn hint(&mut self, order: &Order, market: &Market, config: &Config) -> &mut Self {
+    pub fn hint(&mut self, order: &Order, market: &Market, store: &Store) -> &mut Self {
         let swap = order.swap.clone();
         let market_token = order.fixed.tokens.market_token;
         let final_output_token_account = order.fixed.receivers.final_output_token_account;
@@ -557,7 +557,7 @@ where
         self.hint = Some(ExecuteOrderHint {
             store_program_id: self.client.data_store_program_id(),
             has_claimable: matches!(order.fixed.params.kind, OrderKind::MarketDecrease),
-            config: config.clone(),
+            store: *store,
             market_token,
             position: order.fixed.position,
             user: order.fixed.user,
@@ -596,12 +596,8 @@ where
                     let order: Order = self.client.data_store().account(self.order).await?;
                     let market: Market =
                         self.client.data_store().account(order.fixed.market).await?;
-                    let config: Config = self
-                        .client
-                        .data_store()
-                        .account(self.config_address())
-                        .await?;
-                    self.hint(&order, &market, &config);
+                    let store: Store = self.client.data_store().account(self.store).await?;
+                    self.hint(&order, &market, &store);
                 }
             }
         }
@@ -627,10 +623,6 @@ where
         let pnl_for_holding =
             hint.claimable_pnl_token_account_for_holding(&self.store, self.recent_timestamp)?;
         Ok([long_for_user, short_for_user, pnl_for_holding])
-    }
-
-    fn config_address(&self) -> Pubkey {
-        self.client.find_config_address(&self.store)
     }
 
     async fn get_token_map(&self) -> crate::Result<Pubkey> {
@@ -679,7 +671,6 @@ where
                     controller: self.client.controller_address(&self.store),
                     store: self.store,
                     oracle: self.oracle,
-                    config: self.config_address(),
                     token_map: self.get_token_map().await?,
                     market: self
                         .client
@@ -770,11 +761,11 @@ where
             ))
         }
         if let Some(account) = claimable_pnl_token_account_for_holding.as_ref() {
-            let holding = hint.config.holding()?;
+            let holding = hint.store.holding();
             pre_builder = pre_builder.merge(self.client.use_claimable_account(
                 &self.store,
                 &hint.pnl_token_mint,
-                &holding,
+                holding,
                 self.recent_timestamp,
                 account,
                 0,
@@ -782,7 +773,7 @@ where
             post_builder = post_builder.merge(self.client.close_empty_claimable_account(
                 &self.store,
                 &hint.pnl_token_mint,
-                &holding,
+                holding,
                 self.recent_timestamp,
                 account,
             ))

@@ -26,8 +26,6 @@ pub struct ExecuteOrder<'info> {
     pub store: UncheckedAccount<'info>,
     /// CHECK: check by CPI.
     pub token_map: UncheckedAccount<'info>,
-    /// CHECK: only use and check by CPI.
-    pub config: UncheckedAccount<'info>,
     #[account(mut)]
     pub oracle: Account<'info, Oracle>,
     /// CHECK: only used to invoke CPI and should be checked by it.
@@ -160,10 +158,6 @@ impl<'info> WithOracle<'info> for ExecuteOrder<'info> {
     fn token_map(&self) -> AccountInfo<'info> {
         self.token_map.to_account_info()
     }
-
-    fn config(&self) -> AccountInfo<'info> {
-        self.config.to_account_info()
-    }
 }
 
 impl<'info> ExecuteOrder<'info> {
@@ -175,7 +169,6 @@ impl<'info> ExecuteOrder<'info> {
             data_store::cpi::accounts::ExecuteOrder {
                 authority: self.controller.to_account_info(),
                 store: self.store.to_account_info(),
-                config: self.config.to_account_info(),
                 oracle: self.oracle.to_account_info(),
                 order: self.order.to_account_info(),
                 market: self.market.to_account_info(),
