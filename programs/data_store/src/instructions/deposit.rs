@@ -31,8 +31,8 @@ pub struct InitializeDeposit<'info> {
     #[account(token::authority = payer)]
     pub initial_short_token_account: Option<Box<Account<'info, TokenAccount>>>,
     #[account(has_one = store)]
-    pub(crate) market: Box<Account<'info, Market>>,
-    #[account(token::authority = payer, token::mint = market.meta.market_token_mint)]
+    pub(crate) market: AccountLoader<'info, Market>,
+    #[account(token::authority = payer, token::mint = market.load()?.meta().market_token_mint)]
     pub receiver: Box<Account<'info, TokenAccount>>,
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,

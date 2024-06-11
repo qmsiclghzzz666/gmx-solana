@@ -14,7 +14,7 @@ use data_store::states::{
 use exchange::{accounts, instruction, instructions::CreateOrderParams};
 
 use crate::{
-    store::utils::{read_store, FeedsParser},
+    store::utils::{read_market, read_store, FeedsParser},
     utils::{ComputeBudget, TokenAccountParams, TransactionBuilder},
 };
 
@@ -173,11 +173,7 @@ where
             if let Some(hint) = self.hint {
                 return Ok(hint);
             }
-            let market = self
-                .client
-                .data_store()
-                .account::<Market>(self.market())
-                .await?;
+            let market = read_market(&self.client.data_store().async_rpc(), &self.market()).await?;
             self.hint(market.meta());
         }
     }
@@ -594,8 +590,9 @@ where
                 Some(hint) => return Ok(hint.clone()),
                 None => {
                     let order: Order = self.client.data_store().account(self.order).await?;
-                    let market: Market =
-                        self.client.data_store().account(order.fixed.market).await?;
+                    let market =
+                        read_market(&self.client.data_store().async_rpc(), &order.fixed.market)
+                            .await?;
                     let store =
                         read_store(&self.client.data_store().async_rpc(), &self.store).await?;
                     self.hint(&order, &market, &store);

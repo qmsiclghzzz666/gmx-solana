@@ -42,7 +42,7 @@ pub struct InitializeOrder<'info> {
             Position::SEED,
             store.key().as_ref(),
             payer.key().as_ref(),
-            market.meta.market_token_mint.as_ref(),
+            market.load()?.meta().market_token_mint.as_ref(),
             output_token.as_ref(),
             &[params.to_position_kind()? as u8],
         ],
@@ -52,7 +52,7 @@ pub struct InitializeOrder<'info> {
     )]
     pub position: Option<AccountLoader<'info, Position>>,
     #[account(has_one = store)]
-    pub market: Box<Account<'info, Market>>,
+    pub market: AccountLoader<'info, Market>,
     #[account(mut, token::authority = payer)]
     pub initial_collateral_token_account: Option<Box<Account<'info, TokenAccount>>>,
     #[account(
@@ -71,9 +71,9 @@ pub struct InitializeOrder<'info> {
     pub final_output_token_account: Option<Box<Account<'info, TokenAccount>>>,
     #[account(token::authority = payer)]
     pub secondary_output_token_account: Option<Box<Account<'info, TokenAccount>>>,
-    #[account(token::authority = payer, token::mint = market.meta.long_token_mint)]
+    #[account(token::authority = payer, token::mint = market.load()?.meta().long_token_mint)]
     pub long_token_account: Box<Account<'info, TokenAccount>>,
-    #[account(token::authority = payer, token::mint = market.meta.short_token_mint)]
+    #[account(token::authority = payer, token::mint = market.load()?.meta().short_token_mint)]
     pub short_token_account: Box<Account<'info, TokenAccount>>,
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,
@@ -89,7 +89,7 @@ pub fn initialize_order(
     output_token: Pubkey,
     ui_fee_receiver: Pubkey,
 ) -> Result<()> {
-    let meta = ctx.accounts.market.meta();
+    let meta = *ctx.accounts.market.load()?.meta();
     // Validate and create `Tokens`.
     let tokens = match &params.kind {
         OrderKind::MarketSwap => Tokens {
@@ -228,7 +228,10 @@ impl<'info> InitializeOrder<'info> {
         bump: Option<u8>,
         output_token: &Pubkey,
     ) -> Result<()> {
-        self.market.meta().validate_collateral_token(output_token)?;
+        self.market
+            .load()?
+            .meta()
+            .validate_collateral_token(output_token)?;
         let (Some(position), Some(bump)) = (self.position.as_ref(), bump) else {
             return err!(DataStoreError::PositionIsNotProvided);
         };
@@ -239,7 +242,7 @@ impl<'info> InitializeOrder<'info> {
                     bump,
                     self.store.key(),
                     self.payer.key,
-                    &self.market.meta.market_token_mint,
+                    &self.market.load()?.meta().market_token_mint,
                     output_token,
                 )?;
                 false
@@ -264,7 +267,10 @@ impl<'info> InitializeOrder<'info> {
 
     /// Validate the position to make sure it is initialized and valid.
     fn validate_position(&self, bump: Option<u8>, output_token: &Pubkey) -> Result<()> {
-        self.market.meta().validate_collateral_token(output_token)?;
+        self.market
+            .load()?
+            .meta()
+            .validate_collateral_token(output_token)?;
         let (Some(position), Some(bump)) = (self.position.as_ref(), bump) else {
             return err!(DataStoreError::PositionIsNotProvided);
         };

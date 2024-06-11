@@ -2,7 +2,7 @@ use anchor_client::solana_sdk::pubkey::Pubkey;
 use data_store::states::{self};
 use eyre::ContextCompat;
 use gmsol::{
-    store::utils::{read_store, token_map},
+    store::utils::{read_market, read_store, token_map},
     utils::{self, try_deserailize_account},
 };
 use pyth_sdk::Identifier;
@@ -44,6 +44,8 @@ enum Command {
         /// Whether to display the market address.
         #[arg(long)]
         show_market_address: bool,
+        #[arg(long)]
+        debug: bool,
     },
     /// `Deposit` account.
     Deposit { address: Pubkey },
@@ -139,12 +141,18 @@ impl InspectArgs {
                 mut address,
                 as_market_address,
                 show_market_address,
+                debug,
             } => {
                 if !as_market_address {
                     address = client
                         .find_market_address(store.wrap_err("`store` not provided")?, &address);
                 }
-                println!("{:#?}", program.account::<states::Market>(address).await?);
+                let market = read_market(&program.async_rpc(), &address).await?;
+                if *debug {
+                    println!("{:?}", market);
+                } else {
+                    println!("{:#?}", market);
+                }
                 if *show_market_address {
                     println!("Market address: {address}");
                 }

@@ -120,7 +120,7 @@ impl Withdrawal {
         store: Pubkey,
         nonce: NonceBytes,
         user: Pubkey,
-        market: &Account<Market>,
+        market: &AccountLoader<Market>,
         market_token_account: Pubkey,
         market_token_amount: u64,
         token_params: TokenParams,
@@ -148,7 +148,7 @@ impl Withdrawal {
                 },
                 tokens: Tokens {
                     params: token_params,
-                    market_token: market.meta.market_token_mint,
+                    market_token: market.load()?.meta().market_token_mint,
                     final_long_token: final_long_token_receiver.mint,
                     final_short_token: final_short_token_receiver.mint,
                     market_token_amount,

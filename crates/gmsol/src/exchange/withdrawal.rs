@@ -7,12 +7,12 @@ use anchor_client::{
 };
 use anchor_spl::associated_token::get_associated_token_address;
 use data_store::states::{
-    common::TokensWithFeed, withdrawal::TokenParams, Market, NonceBytes, Pyth, Withdrawal,
+    common::TokensWithFeed, withdrawal::TokenParams, NonceBytes, Pyth, Withdrawal,
 };
 use exchange::{accounts, instruction, instructions::CreateWithdrawalParams};
 
 use crate::{
-    store::utils::FeedsParser,
+    store::utils::{read_market, FeedsParser},
     utils::{ComputeBudget, RpcBuilder},
 };
 
@@ -166,7 +166,7 @@ where
         {
             return Ok((long_token, short_token));
         }
-        let market: Market = self.client.data_store().account(*market).await?;
+        let market = read_market(&self.client.data_store().async_rpc(), market).await?;
         Ok((
             self.final_long_token
                 .unwrap_or_else(|| market.meta().long_token_mint),

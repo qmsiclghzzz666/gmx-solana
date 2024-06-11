@@ -192,7 +192,7 @@ pub mod data_store {
         long_token_mint: Pubkey,
         short_token_mint: Pubkey,
     ) -> Result<()> {
-        instructions::initialize_market(
+        instructions::unchecked_initialize_market(
             ctx,
             market_token_mint,
             index_token_mint,
@@ -203,7 +203,7 @@ pub mod data_store {
 
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn remove_market(ctx: Context<RemoveMarket>) -> Result<()> {
-        instructions::remove_market(ctx)
+        instructions::unchecked_remove_market(ctx)
     }
 
     pub fn get_validated_market_meta(ctx: Context<GetValidatedMarketMeta>) -> Result<MarketMeta> {
@@ -212,12 +212,12 @@ pub mod data_store {
 
     #[access_control(internal::Authenticate::only_controller(&ctx))]
     pub fn market_transfer_in(ctx: Context<MarketTransferIn>, amount: u64) -> Result<()> {
-        instructions::market_transfer_in(ctx, amount)
+        instructions::unchecked_market_transfer_in(ctx, amount)
     }
 
     #[access_control(internal::Authenticate::only_controller(&ctx))]
     pub fn market_transfer_out(ctx: Context<MarketTransferOut>, amount: u64) -> Result<()> {
-        instructions::market_transfer_out(ctx, amount)
+        instructions::unchecked_market_transfer_out(ctx, amount)
     }
 
     // Token.

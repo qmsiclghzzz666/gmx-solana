@@ -353,7 +353,7 @@ describe("exchange: deposit", () => {
         const market2 = createMarketPDA(dataStoreAddress, GMFakeFakeUsdG)[0];
         let deposit: PublicKey;
         try {
-            const pool2 = (await dataStore.account.market.fetch(market2)).pools.values[0];
+            const pool2 = (await dataStore.account.market.fetch(market2)).pools.primary;
             console.log(`${pool2.longTokenAmount}:${pool2.shortTokenAmount}`);
             const [signature, depositAddress] = await invokeCreateDepositWithPayerAsSigner(
                 exchange,
@@ -404,9 +404,9 @@ describe("exchange: deposit", () => {
             console.log(error);
             throw error;
         } finally {
-            const pool1 = (await dataStore.account.market.fetch(market1)).pools.values[0];
+            const pool1 = (await dataStore.account.market.fetch(market1)).pools.primary;
             console.log(`${pool1.longTokenAmount}:${pool1.shortTokenAmount}`);
-            const pool2 = (await dataStore.account.market.fetch(market2)).pools.values[0];
+            const pool2 = (await dataStore.account.market.fetch(market2)).pools.primary;
             console.log(`${pool2.longTokenAmount}:${pool2.shortTokenAmount}`);
         }
     });

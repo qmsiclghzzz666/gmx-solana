@@ -10,7 +10,7 @@ use anchor_client::{
     solana_sdk::{instruction::AccountMeta, pubkey::Pubkey, signer::Signer},
     Program,
 };
-use data_store::states::{common::TokensWithFeed, PriceProviderKind, Store};
+use data_store::states::{common::TokensWithFeed, Market, PriceProviderKind, Store};
 
 use crate::pyth::find_pyth_feed_account;
 
@@ -166,4 +166,9 @@ where
 /// Read store account.
 pub async fn read_store(client: &RpcClient, store: &Pubkey) -> crate::Result<Store> {
     crate::utils::try_deserailize_account(client, store).await
+}
+
+/// Read marekt account.
+pub async fn read_market(client: &RpcClient, market: &Pubkey) -> crate::Result<Market> {
+    crate::utils::try_deserailize_account(client, market).await
 }
