@@ -2,21 +2,20 @@ use anchor_lang::{prelude::*, Bump};
 use anchor_spl::token::Mint;
 use bitmaps::Bitmap;
 use borsh::{BorshDeserialize, BorshSerialize};
-use gmx_core::{
-    params::{
-        fee::{BorrowingFeeParams, FundingFeeParams},
-        position::PositionImpactDistributionParams,
-        FeeParams, PositionParams, PriceImpactParams,
-    },
-    ClockKind, MarketExt, PoolKind,
-};
+use config::MarketConfig;
+use gmx_core::{ClockKind, PoolKind};
 
-use crate::{constants, utils::internal::TransferUtils, DataStoreError, GmxCoreError};
+use crate::DataStoreError;
 
-use super::{
-    position::{Position, PositionOps},
-    InitSpace, Seed, Store,
-};
+use super::{InitSpace, Seed};
+
+pub use ops::AsMarket;
+
+/// Market Operations.
+pub mod ops;
+
+/// Market Config.
+pub mod config;
 
 /// Max number of flags.
 pub const MAX_FLAGS: usize = 8;
@@ -40,6 +39,7 @@ pub struct Market {
     pools: Pools,
     clocks: Clocks,
     state: MarketState,
+    config: MarketConfig,
 }
 
 impl Bump for Market {
@@ -80,6 +80,7 @@ impl Market {
         self.set_flag(MarketFlag::Pure, is_pure);
         self.pools.init(is_pure);
         self.clocks.init_to_current()?;
+        self.config.init();
         Ok(())
     }
 
@@ -214,18 +215,7 @@ impl Market {
         &'a mut self,
         mint: &'a mut Account<'info, Mint>,
     ) -> AsMarket<'a, 'info> {
-        AsMarket {
-            meta: &self.meta,
-            long_token_balance: &self.state.long_token_balance,
-            short_token_balance: &self.state.short_token_balance,
-            pools: &mut self.pools,
-            clocks: &mut self.clocks,
-            mint,
-            transfer: None,
-            receiver: None,
-            vault: None,
-            funding_factor_per_second: &mut self.state.funding_factor_per_second,
-        }
+        AsMarket::new(self, mint)
     }
 
     /// Validate the market.
@@ -514,292 +504,6 @@ impl gmx_core::Pool for Pool {
             .checked_add_signed(*delta)
             .ok_or(gmx_core::Error::Computation("apply delta to short amount"))?;
         Ok(())
-    }
-}
-
-/// Convert to a [`Market`](gmx_core::Market).
-pub struct AsMarket<'a, 'info> {
-    meta: &'a MarketMeta,
-    long_token_balance: &'a u64,
-    short_token_balance: &'a u64,
-    funding_factor_per_second: &'a mut i128,
-    pools: &'a mut Pools,
-    clocks: &'a mut Clocks,
-    mint: &'a mut Account<'info, Mint>,
-    transfer: Option<TransferUtils<'a, 'info>>,
-    receiver: Option<AccountInfo<'info>>,
-    vault: Option<AccountInfo<'info>>,
-}
-
-impl<'a, 'info> AsMarket<'a, 'info> {
-    pub(crate) fn enable_transfer(
-        mut self,
-        token_program: AccountInfo<'info>,
-        store: &'a AccountLoader<'info, Store>,
-    ) -> Self {
-        self.transfer = Some(TransferUtils::new(
-            token_program,
-            store,
-            Some(self.mint.to_account_info()),
-        ));
-        self
-    }
-
-    pub(crate) fn with_receiver(mut self, receiver: AccountInfo<'info>) -> Self {
-        self.receiver = Some(receiver);
-        self
-    }
-
-    pub(crate) fn with_vault(mut self, vault: AccountInfo<'info>) -> Self {
-        self.vault = Some(vault);
-        self
-    }
-
-    pub(crate) fn meta(&self) -> &MarketMeta {
-        self.meta
-    }
-
-    pub(crate) fn into_position_ops(
-        self,
-        position: &'a mut AccountLoader<'info, Position>,
-    ) -> Result<PositionOps<'a, 'info>> {
-        PositionOps::try_new(self, position)
-    }
-
-    fn balance_after_excluding(&self, is_long_token: bool, excluding_amount: u64) -> Result<u64> {
-        let balance = if is_long_token {
-            self.long_token_balance
-        } else {
-            self.short_token_balance
-        };
-        if excluding_amount != 0 {
-            balance
-                .checked_sub(excluding_amount)
-                .ok_or(error!(DataStoreError::AmountOverflow))
-        } else {
-            Ok(*balance)
-        }
-    }
-
-    pub(crate) fn validate_market_balances(
-        &self,
-        long_excluding_amount: u64,
-        short_excluding_amount: u64,
-    ) -> Result<()> {
-        let long_token_balance = self.balance_after_excluding(true, long_excluding_amount)? as u128;
-        self.validate_token_balance_for_one_side(&long_token_balance, true)
-            .map_err(GmxCoreError::from)?;
-        let short_token_balance =
-            self.balance_after_excluding(false, short_excluding_amount)? as u128;
-        self.validate_token_balance_for_one_side(&short_token_balance, false)
-            .map_err(GmxCoreError::from)?;
-        Ok(())
-    }
-
-    pub(crate) fn validate_market_balances_excluding_token_amount(
-        &self,
-        token: &Pubkey,
-        amount: u64,
-    ) -> Result<()> {
-        if *token == self.meta.long_token_mint {
-            self.validate_market_balances(amount, 0)
-        } else if *token == self.meta.short_token_mint {
-            self.validate_market_balances(0, amount)
-        } else {
-            Err(error!(DataStoreError::InvalidCollateralToken))
-        }
-    }
-}
-
-impl<'a, 'info> gmx_core::Market<{ constants::MARKET_DECIMALS }> for AsMarket<'a, 'info> {
-    type Num = u128;
-
-    type Signed = i128;
-
-    type Pool = Pool;
-
-    fn pool(&self, kind: PoolKind) -> gmx_core::Result<Option<&Self::Pool>> {
-        Ok(self.pools.get(kind))
-    }
-
-    fn pool_mut(&mut self, kind: PoolKind) -> gmx_core::Result<Option<&mut Self::Pool>> {
-        Ok(self.pools.get_mut(kind))
-    }
-
-    fn total_supply(&self) -> Self::Num {
-        self.mint.supply.into()
-    }
-
-    fn mint(&mut self, amount: &Self::Num) -> gmx_core::Result<()> {
-        let Some(transfer) = self.transfer.as_ref() else {
-            return Err(gmx_core::Error::invalid_argument("transfer not enabled"));
-        };
-        let Some(receiver) = self.receiver.as_ref() else {
-            return Err(gmx_core::Error::MintReceiverNotSet);
-        };
-        transfer.mint_to(
-            receiver,
-            (*amount)
-                .try_into()
-                .map_err(|_| gmx_core::Error::Overflow)?,
-        )?;
-        self.mint.reload()?;
-        Ok(())
-    }
-
-    fn burn(&mut self, amount: &Self::Num) -> gmx_core::Result<()> {
-        let Some(transfer) = self.transfer.as_ref() else {
-            return Err(gmx_core::Error::invalid_argument("transfer not enabled"));
-        };
-        let Some(vault) = self.vault.as_ref() else {
-            return Err(gmx_core::Error::WithdrawalVaultNotSet);
-        };
-        transfer.burn_from(
-            vault,
-            (*amount)
-                .try_into()
-                .map_err(|_| gmx_core::Error::Overflow)?,
-        )?;
-        self.mint.reload()?;
-        Ok(())
-    }
-
-    fn just_passed_in_seconds(&mut self, clock: ClockKind) -> gmx_core::Result<u64> {
-        let current = Clock::get().map_err(Error::from)?.unix_timestamp;
-        let last = self
-            .clocks
-            .get_mut(clock)
-            .ok_or(gmx_core::Error::MissingClockKind(clock))?;
-        let duration = current.saturating_sub(*last);
-        if duration > 0 {
-            *last = current;
-        }
-        Ok(duration as u64)
-    }
-
-    fn usd_to_amount_divisor(&self) -> Self::Num {
-        constants::MARKET_USD_TO_AMOUNT_DIVISOR
-    }
-
-    fn funding_amount_per_size_adjustment(&self) -> Self::Num {
-        constants::FUNDING_AMOUNT_PER_SIZE_ADJUSTMENT
-    }
-
-    fn swap_impact_params(&self) -> gmx_core::Result<PriceImpactParams<Self::Num>> {
-        PriceImpactParams::builder()
-            .with_exponent(2 * constants::MARKET_USD_UNIT)
-            .with_positive_factor(400_000_000_000)
-            .with_negative_factor(800_000_000_000)
-            .build()
-    }
-
-    fn swap_fee_params(&self) -> gmx_core::Result<FeeParams<Self::Num>> {
-        Ok(FeeParams::builder()
-            .with_fee_receiver_factor(37_000_000_000_000_000_000)
-            .with_positive_impact_fee_factor(50_000_000_000_000_000)
-            .with_negative_impact_fee_factor(70_000_000_000_000_000)
-            .build())
-    }
-
-    fn position_params(&self) -> gmx_core::Result<PositionParams<Self::Num>> {
-        Ok(PositionParams::new(
-            constants::MARKET_USD_UNIT,
-            constants::MARKET_USD_UNIT,
-            constants::MARKET_USD_UNIT / 100,
-            500_000_000_000_000_000,
-            500_000_000_000_000_000,
-            250_000_000_000_000_000,
-        ))
-    }
-
-    fn position_impact_params(&self) -> gmx_core::Result<PriceImpactParams<Self::Num>> {
-        PriceImpactParams::builder()
-            .with_exponent(2 * constants::MARKET_USD_UNIT)
-            .with_positive_factor(9_000_000_000)
-            .with_negative_factor(15_000_000_000)
-            .build()
-    }
-
-    fn order_fee_params(&self) -> gmx_core::Result<FeeParams<Self::Num>> {
-        Ok(FeeParams::builder()
-            .with_fee_receiver_factor(37_000_000_000_000_000_000)
-            .with_positive_impact_fee_factor(50_000_000_000_000_000)
-            .with_negative_impact_fee_factor(70_000_000_000_000_000)
-            .build())
-    }
-
-    fn position_impact_distribution_params(
-        &self,
-    ) -> gmx_core::Result<PositionImpactDistributionParams<Self::Num>> {
-        Ok(PositionImpactDistributionParams::builder()
-            .distribute_factor(constants::MARKET_USD_UNIT)
-            .min_position_impact_pool_amount(1_000_000_000)
-            .build())
-    }
-
-    fn borrowing_fee_params(&self) -> gmx_core::Result<BorrowingFeeParams<Self::Num>> {
-        Ok(BorrowingFeeParams::builder()
-            .receiver_factor(37_000_000_000_000_000_000)
-            .factor_for_long(2_820_000_000_000)
-            .factor_for_short(2_820_000_000_000)
-            .exponent_for_long(100_000_000_000_000_000_000)
-            .exponent_for_short(100_000_000_000_000_000_000)
-            .build())
-    }
-
-    fn funding_fee_params(&self) -> gmx_core::Result<FundingFeeParams<Self::Num>> {
-        Ok(FundingFeeParams::builder()
-            .exponent(100_000_000_000_000_000_000)
-            .funding_factor(2_000_000_000_000)
-            .max_factor_per_second(1_000_000_000_000)
-            .min_factor_per_second(30_000_000_000)
-            .increase_factor_per_second(790_000_000)
-            .decrease_factor_per_second(0)
-            .threshold_for_stable_funding(5_000_000_000_000_000_000)
-            .threshold_for_decrease_funding(0)
-            .build())
-    }
-
-    fn funding_factor_per_second(&self) -> &Self::Signed {
-        self.funding_factor_per_second
-    }
-
-    fn funding_factor_per_second_mut(&mut self) -> &mut Self::Signed {
-        self.funding_factor_per_second
-    }
-
-    fn reserve_factor(&self) -> gmx_core::Result<Self::Num> {
-        Ok(constants::MARKET_USD_UNIT)
-    }
-
-    fn open_interest_reserve_factor(&self) -> gmx_core::Result<Self::Num> {
-        Ok(constants::MARKET_USD_UNIT)
-    }
-
-    fn max_pnl_factor(
-        &self,
-        kind: gmx_core::PnlFactorKind,
-        _is_long: bool,
-    ) -> gmx_core::Result<Self::Num> {
-        use gmx_core::PnlFactorKind;
-
-        match kind {
-            PnlFactorKind::Deposit => Ok(60_000_000_000_000_000_000),
-            PnlFactorKind::Withdrawal => Ok(30_000_000_000_000_000_000),
-            _ => Err(error!(DataStoreError::RequiredResourceNotFound).into()),
-        }
-    }
-
-    fn max_pool_amount(&self, _is_long_token: bool) -> gmx_core::Result<Self::Num> {
-        Ok(1_000_000_000 * constants::MARKET_USD_UNIT)
-    }
-
-    fn max_pool_value_for_deposit(&self, _is_long_token: bool) -> gmx_core::Result<Self::Num> {
-        Ok(1_000_000_000_000_000 * constants::MARKET_USD_UNIT)
-    }
-
-    fn max_open_interest(&self, _is_long: bool) -> gmx_core::Result<Self::Num> {
-        Ok(1_000_000_000 * constants::MARKET_USD_UNIT)
     }
 }
 
