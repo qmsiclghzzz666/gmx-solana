@@ -1,5 +1,5 @@
 use anchor_client::solana_sdk::pubkey::Pubkey;
-use data_store::states::{self};
+use data_store::states::{self, AddressKey, AmountKey, FactorKey, MarketConfigKey};
 use eyre::ContextCompat;
 use gmsol::{
     store::utils::{read_market, read_store, token_map},
@@ -27,11 +27,11 @@ enum Command {
         #[arg(long, group = "get")]
         debug: bool,
         #[arg(long, group = "get")]
-        get_amount: Option<String>,
+        get_amount: Option<AmountKey>,
         #[arg(long, group = "get")]
-        get_factor: Option<String>,
+        get_factor: Option<FactorKey>,
         #[arg(long, group = "get")]
-        get_address: Option<String>,
+        get_address: Option<AddressKey>,
     },
     /// `TokenMap` account.
     TokenMap { address: Option<Pubkey> },
@@ -44,8 +44,10 @@ enum Command {
         /// Whether to display the market address.
         #[arg(long)]
         show_market_address: bool,
-        #[arg(long)]
+        #[arg(long, group = "get")]
         debug: bool,
+        #[arg(long, group = "get")]
+        get_config: Option<MarketConfigKey>,
     },
     /// `Deposit` account.
     Deposit { address: Pubkey },
@@ -109,11 +111,11 @@ impl InspectArgs {
                 };
                 let store = read_store(&client.data_store().async_rpc(), &address).await?;
                 if let Some(key) = get_amount {
-                    println!("{}", store.get_amount(key)?);
+                    println!("{}", store.get_amount_by_key(*key));
                 } else if let Some(key) = get_factor {
-                    println!("{}", store.get_factor(key)?);
+                    println!("{}", store.get_factor_by_key(*key));
                 } else if let Some(key) = get_address {
-                    println!("{}", store.get_address(key)?);
+                    println!("{}", store.get_address_by_key(*key));
                 } else if *debug {
                     println!("Store Address: {address}");
                     println!("{store:?}");
@@ -142,13 +144,16 @@ impl InspectArgs {
                 as_market_address,
                 show_market_address,
                 debug,
+                get_config,
             } => {
                 if !as_market_address {
                     address = client
                         .find_market_address(store.wrap_err("`store` not provided")?, &address);
                 }
                 let market = read_market(&program.async_rpc(), &address).await?;
-                if *debug {
+                if let Some(key) = get_config {
+                    println!("{}", market.get_config_by_key(*key));
+                } else if *debug {
                     println!("{:?}", market);
                 } else {
                     println!("{:#?}", market);

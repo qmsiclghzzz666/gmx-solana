@@ -353,11 +353,13 @@ impl MarketConfig {
 }
 
 /// Market config keys.
-#[derive(strum::EnumString)]
+#[derive(strum::EnumString, Clone, Copy)]
 #[strum(serialize_all = "snake_case")]
 #[non_exhaustive]
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[cfg_attr(feature = "enum-iter", derive(strum::EnumIter))]
+#[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
+#[cfg_attr(feature = "clap", clap(rename_all = "snake_case"))]
 pub enum MarketConfigKey {
     /// Swap impact exponent.
     SwapImpactExponent,

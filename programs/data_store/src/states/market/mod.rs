@@ -229,10 +229,16 @@ impl Market {
         Ok(())
     }
 
-    /// Get config by key.
+    /// Get config.
     pub fn get_config(&self, key: &str) -> Result<&Factor> {
         let key = MarketConfigKey::from_str(key).map_err(|_| error!(DataStoreError::InvalidKey))?;
-        Ok(self.config.get(key))
+        Ok(self.get_config_by_key(key))
+    }
+
+    /// Get config by key.
+    #[inline]
+    pub fn get_config_by_key(&self, key: MarketConfigKey) -> &Factor {
+        self.config.get(key)
     }
 
     /// Get config mutably by key

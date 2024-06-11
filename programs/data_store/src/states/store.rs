@@ -134,7 +134,13 @@ impl Store {
     /// Get amount.
     pub fn get_amount(&self, key: &str) -> Result<&Amount> {
         let key = AmountKey::from_str(key).map_err(|_| error!(DataStoreError::InvalidKey))?;
-        Ok(self.amount.get(&key))
+        Ok(self.get_amount_by_key(key))
+    }
+
+    /// Get amount by key.
+    #[inline]
+    pub fn get_amount_by_key(&self, key: AmountKey) -> &Amount {
+        self.amount.get(&key)
     }
 
     /// Get amount mutably
@@ -146,7 +152,13 @@ impl Store {
     /// Get factor.
     pub fn get_factor(&self, key: &str) -> Result<&Factor> {
         let key = FactorKey::from_str(key).map_err(|_| error!(DataStoreError::InvalidKey))?;
-        Ok(self.factor.get(&key))
+        Ok(self.get_factor_by_key(key))
+    }
+
+    /// Get factor by key.
+    #[inline]
+    pub fn get_factor_by_key(&self, key: FactorKey) -> &Factor {
+        self.factor.get(&key)
     }
 
     /// Get factor mutably
@@ -158,7 +170,13 @@ impl Store {
     /// Get address.
     pub fn get_address(&self, key: &str) -> Result<&Pubkey> {
         let key = AddressKey::from_str(key).map_err(|_| error!(DataStoreError::InvalidKey))?;
-        Ok(self.address.get(&key))
+        Ok(self.get_address_by_key(key))
+    }
+
+    /// Get address by key.
+    #[inline]
+    pub fn get_address_by_key(&self, key: AddressKey) -> &Pubkey {
+        self.address.get(&key)
     }
 
     /// Get address mutably
@@ -237,11 +255,13 @@ pub struct Amounts {
 }
 
 /// Amount keys.
-#[derive(strum::EnumString)]
+#[derive(strum::EnumString, Clone, Copy)]
 #[strum(serialize_all = "snake_case")]
 #[non_exhaustive]
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[cfg_attr(feature = "enum-iter", derive(strum::EnumIter))]
+#[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
+#[cfg_attr(feature = "clap", clap(rename_all = "snake_case"))]
 pub enum AmountKey {
     /// Claimable time window.
     ClaimableTimeWindow,
@@ -297,11 +317,13 @@ pub struct Factors {
 }
 
 /// Factor keys.
-#[derive(strum::EnumString)]
+#[derive(strum::EnumString, Clone, Copy)]
 #[strum(serialize_all = "snake_case")]
 #[non_exhaustive]
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[cfg_attr(feature = "enum-iter", derive(strum::EnumIter))]
+#[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
+#[cfg_attr(feature = "clap", clap(rename_all = "snake_case"))]
 pub enum FactorKey {
     /// Oracle Ref Price Deviation.
     OracleRefPriceDeviation,
@@ -336,11 +358,13 @@ pub struct Addresses {
 }
 
 /// Address keys.
-#[derive(strum::EnumString)]
+#[derive(strum::EnumString, Clone, Copy)]
 #[strum(serialize_all = "snake_case")]
 #[non_exhaustive]
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[cfg_attr(feature = "enum-iter", derive(strum::EnumIter))]
+#[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
+#[cfg_attr(feature = "clap", clap(rename_all = "snake_case"))]
 pub enum AddressKey {
     /// Holding.
     Holding,
