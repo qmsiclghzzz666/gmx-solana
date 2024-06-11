@@ -3,7 +3,7 @@ use anchor_spl::token::{Token, TokenAccount};
 
 use crate::{
     constants,
-    states::{Action, InitSpace, Market, MarketChangeEvent, MarketMeta, Seed, Store},
+    states::{Action, Factor, InitSpace, Market, MarketChangeEvent, MarketMeta, Seed, Store},
     utils::internal,
 };
 
@@ -248,6 +248,49 @@ pub fn unchecked_market_transfer_out(ctx: Context<MarketTransferOut>, amount: u6
 }
 
 impl<'info> internal::Authentication<'info> for MarketTransferOut<'info> {
+    fn authority(&self) -> &Signer<'info> {
+        &self.authority
+    }
+
+    fn store(&self) -> &AccountLoader<'info, Store> {
+        &self.store
+    }
+}
+
+/// Read Market.
+#[derive(Accounts)]
+pub struct ReadMarket<'info> {
+    market: AccountLoader<'info, Market>,
+}
+
+/// Get market config by key.
+pub fn get_market_config(ctx: Context<ReadMarket>, key: &str) -> Result<Factor> {
+    ctx.accounts.market.load()?.get_config(key).copied()
+}
+
+/// Update Market Config
+#[derive(Accounts)]
+pub struct UpdateMarketConfig<'info> {
+    authority: Signer<'info>,
+    store: AccountLoader<'info, Store>,
+    #[account(mut, has_one = store)]
+    market: AccountLoader<'info, Market>,
+}
+
+/// Update market config by key.
+///
+/// ## CHECK
+/// - Only MARKET_KEEPER can udpate the config of market.
+pub fn unchecked_update_market_config(
+    ctx: Context<UpdateMarketConfig>,
+    key: &str,
+    value: Factor,
+) -> Result<()> {
+    *ctx.accounts.market.load_mut()?.get_config_mut(key)? = value;
+    Ok(())
+}
+
+impl<'info> internal::Authentication<'info> for UpdateMarketConfig<'info> {
     fn authority(&self) -> &Signer<'info> {
         &self.authority
     }

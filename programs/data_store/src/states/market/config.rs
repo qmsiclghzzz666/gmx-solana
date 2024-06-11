@@ -5,6 +5,7 @@ use crate::{constants, states::Factor};
 /// Market Config.
 #[zero_copy]
 #[cfg_attr(feature = "debug", derive(Debug))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MarketConfig {
     // Swap impact.
     pub(super) swap_imapct_exponent: Factor,
@@ -18,6 +19,8 @@ pub struct MarketConfig {
     pub(super) min_position_size_usd: Factor,
     pub(super) min_collateral_value: Factor,
     pub(super) min_collateral_factor: Factor,
+    pub(super) min_collateral_factor_for_open_interest_for_long: Factor,
+    pub(super) min_collateral_factor_for_open_interest_for_short: Factor,
     pub(super) max_positive_position_impact_factor: Factor,
     pub(super) max_negative_position_impact_factor: Factor,
     pub(super) max_position_impact_factor_for_liquidations: Factor,
@@ -29,7 +32,7 @@ pub struct MarketConfig {
     pub(super) order_fee_receiver_factor: Factor,
     pub(super) order_fee_factor_for_positive_impact: Factor,
     pub(super) order_fee_factor_for_negative_impact: Factor,
-    // Position impact distribtuion.
+    // Position impact distribution.
     pub(super) position_impact_distribute_factor: Factor,
     pub(super) min_position_impact_pool_amount: Factor,
     // Borrowing fee.
@@ -80,6 +83,10 @@ impl MarketConfig {
         self.min_position_size_usd = constants::DEFAULT_MIN_POSITION_SIZE_USD;
         self.min_collateral_value = constants::DEFAULT_MIN_COLLATERAL_VALUE;
         self.min_collateral_factor = constants::DEFAULT_MIN_COLLATERAL_FACTOR;
+        self.min_collateral_factor_for_open_interest_for_long =
+            constants::DEFAULT_MIN_COLLATERAL_FACTOR_FOR_OPEN_INTEREST_FOR_LONG;
+        self.min_collateral_factor_for_open_interest_for_short =
+            constants::DEFAULT_MIN_COLLATERAL_FACTOR_FOR_OPEN_INTEREST_FOR_SHORT;
         self.max_positive_position_impact_factor =
             constants::DEFAULT_MAX_POSITIVE_POSITION_IMPACT_FACTOR;
         self.max_negative_position_impact_factor =
@@ -143,4 +150,307 @@ impl MarketConfig {
         self.max_open_interest_for_long = constants::DEFAULT_MAX_OPEN_INTEREST_FOR_LONG;
         self.max_open_interest_for_short = constants::DEFAULT_MAX_OPEN_INTEREST_FOR_SHORT;
     }
+
+    pub(super) fn get(&self, key: MarketConfigKey) -> &Factor {
+        match key {
+            MarketConfigKey::SwapImpactExponent => &self.swap_imapct_exponent,
+            MarketConfigKey::SwapImpactPositiveFactor => &self.swap_impact_positive_factor,
+            MarketConfigKey::SwapImpactNegativeFactor => &self.swap_impact_negative_factor,
+            MarketConfigKey::SwapFeeReceiverFactor => &self.swap_fee_receiver_factor,
+            MarketConfigKey::SwapFeeFactorForPositiveImpact => {
+                &self.swap_fee_factor_for_positive_impact
+            }
+            MarketConfigKey::SwapFeeFactorForNegativeImpact => {
+                &self.swap_fee_factor_for_negative_impact
+            }
+            MarketConfigKey::MinPositionSizeUsd => &self.min_position_size_usd,
+            MarketConfigKey::MinCollateralValue => &self.min_collateral_value,
+            MarketConfigKey::MinCollateralFactor => &self.min_collateral_factor,
+            MarketConfigKey::MinCollateralFactorForOpenInterestForLong => {
+                &self.min_collateral_factor_for_open_interest_for_long
+            }
+            MarketConfigKey::MinCollateralFactorForOpenInterestForShort => {
+                &self.min_collateral_factor_for_open_interest_for_short
+            }
+            MarketConfigKey::MaxPositionPositionImpactFactor => {
+                &self.max_positive_position_impact_factor
+            }
+            MarketConfigKey::MaxNegativePositionImpactFactor => {
+                &self.max_negative_position_impact_factor
+            }
+            MarketConfigKey::MaxPositionImpactFactorForLiquidations => {
+                &self.max_position_impact_factor_for_liquidations
+            }
+            MarketConfigKey::PositionImpactExponent => &self.position_impact_exponent,
+            MarketConfigKey::PositionImpactPositiveFactor => &self.position_impact_positive_factor,
+            MarketConfigKey::PositionImpactNegativeFactor => &self.position_impact_negative_factor,
+            MarketConfigKey::OrderFeeReceiverFactor => &self.order_fee_receiver_factor,
+            MarketConfigKey::OrderFeeFactorForPositiveImpact => {
+                &self.order_fee_factor_for_positive_impact
+            }
+            MarketConfigKey::OrderFeeFactorForNegativeImpact => {
+                &self.order_fee_factor_for_negative_impact
+            }
+            MarketConfigKey::PositionImpactDistributeFactor => {
+                &self.position_impact_distribute_factor
+            }
+            MarketConfigKey::MinPositionImpactPoolAmount => &self.min_position_impact_pool_amount,
+            MarketConfigKey::BorrowingFeeReceiverFactor => &self.borrowing_fee_receiver_factor,
+            MarketConfigKey::BorrowingFeeFactorForLong => &self.borrowing_fee_factor_for_long,
+            MarketConfigKey::BorrowingFeeFactorForShort => &self.borrowing_fee_factor_for_short,
+            MarketConfigKey::BorrowingFeeExponentForLong => &self.borrowing_fee_exponent_for_long,
+            MarketConfigKey::BorrowingFeeExponentForShort => &self.borrowing_fee_exponent_for_short,
+            MarketConfigKey::FundingFeeExponent => &self.funding_fee_exponent,
+            MarketConfigKey::FundingFeeFactor => &self.funding_fee_factor,
+            MarketConfigKey::FundingFeeMaxFactorPerSecond => {
+                &self.funding_fee_max_factor_per_second
+            }
+            MarketConfigKey::FundingFeeMinFactorPerSecond => {
+                &self.funding_fee_min_factor_per_second
+            }
+            MarketConfigKey::FundingFeeIncreaseFactorPerSecond => {
+                &self.funding_fee_increase_factor_per_second
+            }
+            MarketConfigKey::FundingFeeDecreaseFactorPerSecond => {
+                &self.funding_fee_decrease_factor_per_second
+            }
+            MarketConfigKey::FundingFeeThresholdForStableFunding => {
+                &self.funding_fee_threshold_for_stable_funding
+            }
+            MarketConfigKey::FundingFeeThresholdForDecreaseFunding => {
+                &self.funding_fee_threshold_for_decrease_funding
+            }
+            MarketConfigKey::ReserveFactor => &self.reserve_factor,
+            MarketConfigKey::OpenInterestReserveFactor => &self.open_interest_reserve_factor,
+            MarketConfigKey::MaxPnlFactorForLongDeposit => &self.max_pnl_factor_for_long_deposit,
+            MarketConfigKey::MaxPnlFactorForShortDeposit => &self.max_pnl_factor_for_short_deposit,
+            MarketConfigKey::MaxPnlFactorForLongWithdrawal => {
+                &self.max_pnl_factor_for_long_withdrawal
+            }
+            MarketConfigKey::MaxPnlFactorForShortWithdrawal => {
+                &self.max_pnl_factor_for_short_withdrawal
+            }
+            MarketConfigKey::MaxPoolAmountForLongToken => &self.max_pool_amount_for_long_token,
+            MarketConfigKey::MaxPoolAmountForShortToken => &self.max_pool_amount_for_short_token,
+            MarketConfigKey::MaxPoolValueForDepositForLongToken => {
+                &self.max_pool_value_for_deposit_for_long_token
+            }
+            MarketConfigKey::MaxPoolValueForDepositForShortToken => {
+                &self.max_pool_value_for_deposit_for_short_token
+            }
+            MarketConfigKey::MaxOpenInterestForLong => &self.max_open_interest_for_long,
+            MarketConfigKey::MaxOpenInterestForShort => &self.max_open_interest_for_short,
+        }
+    }
+
+    pub(super) fn get_mut(&mut self, key: MarketConfigKey) -> &mut Factor {
+        match key {
+            MarketConfigKey::SwapImpactExponent => &mut self.swap_imapct_exponent,
+            MarketConfigKey::SwapImpactPositiveFactor => &mut self.swap_impact_positive_factor,
+            MarketConfigKey::SwapImpactNegativeFactor => &mut self.swap_impact_negative_factor,
+            MarketConfigKey::SwapFeeReceiverFactor => &mut self.swap_fee_receiver_factor,
+            MarketConfigKey::SwapFeeFactorForPositiveImpact => {
+                &mut self.swap_fee_factor_for_positive_impact
+            }
+            MarketConfigKey::SwapFeeFactorForNegativeImpact => {
+                &mut self.swap_fee_factor_for_negative_impact
+            }
+            MarketConfigKey::MinPositionSizeUsd => &mut self.min_position_size_usd,
+            MarketConfigKey::MinCollateralValue => &mut self.min_collateral_value,
+            MarketConfigKey::MinCollateralFactor => &mut self.min_collateral_factor,
+            MarketConfigKey::MinCollateralFactorForOpenInterestForLong => {
+                &mut self.min_collateral_factor_for_open_interest_for_long
+            }
+            MarketConfigKey::MinCollateralFactorForOpenInterestForShort => {
+                &mut self.min_collateral_factor_for_open_interest_for_short
+            }
+            MarketConfigKey::MaxPositionPositionImpactFactor => {
+                &mut self.max_positive_position_impact_factor
+            }
+            MarketConfigKey::MaxNegativePositionImpactFactor => {
+                &mut self.max_negative_position_impact_factor
+            }
+            MarketConfigKey::MaxPositionImpactFactorForLiquidations => {
+                &mut self.max_position_impact_factor_for_liquidations
+            }
+            MarketConfigKey::PositionImpactExponent => &mut self.position_impact_exponent,
+            MarketConfigKey::PositionImpactPositiveFactor => {
+                &mut self.position_impact_positive_factor
+            }
+            MarketConfigKey::PositionImpactNegativeFactor => {
+                &mut self.position_impact_negative_factor
+            }
+            MarketConfigKey::OrderFeeReceiverFactor => &mut self.order_fee_receiver_factor,
+            MarketConfigKey::OrderFeeFactorForPositiveImpact => {
+                &mut self.order_fee_factor_for_positive_impact
+            }
+            MarketConfigKey::OrderFeeFactorForNegativeImpact => {
+                &mut self.order_fee_factor_for_negative_impact
+            }
+            MarketConfigKey::PositionImpactDistributeFactor => {
+                &mut self.position_impact_distribute_factor
+            }
+            MarketConfigKey::MinPositionImpactPoolAmount => {
+                &mut self.min_position_impact_pool_amount
+            }
+            MarketConfigKey::BorrowingFeeReceiverFactor => &mut self.borrowing_fee_receiver_factor,
+            MarketConfigKey::BorrowingFeeFactorForLong => &mut self.borrowing_fee_factor_for_long,
+            MarketConfigKey::BorrowingFeeFactorForShort => &mut self.borrowing_fee_factor_for_short,
+            MarketConfigKey::BorrowingFeeExponentForLong => {
+                &mut self.borrowing_fee_exponent_for_long
+            }
+            MarketConfigKey::BorrowingFeeExponentForShort => {
+                &mut self.borrowing_fee_exponent_for_short
+            }
+            MarketConfigKey::FundingFeeExponent => &mut self.funding_fee_exponent,
+            MarketConfigKey::FundingFeeFactor => &mut self.funding_fee_factor,
+            MarketConfigKey::FundingFeeMaxFactorPerSecond => {
+                &mut self.funding_fee_max_factor_per_second
+            }
+            MarketConfigKey::FundingFeeMinFactorPerSecond => {
+                &mut self.funding_fee_min_factor_per_second
+            }
+            MarketConfigKey::FundingFeeIncreaseFactorPerSecond => {
+                &mut self.funding_fee_increase_factor_per_second
+            }
+            MarketConfigKey::FundingFeeDecreaseFactorPerSecond => {
+                &mut self.funding_fee_decrease_factor_per_second
+            }
+            MarketConfigKey::FundingFeeThresholdForStableFunding => {
+                &mut self.funding_fee_threshold_for_stable_funding
+            }
+            MarketConfigKey::FundingFeeThresholdForDecreaseFunding => {
+                &mut self.funding_fee_threshold_for_decrease_funding
+            }
+            MarketConfigKey::ReserveFactor => &mut self.reserve_factor,
+            MarketConfigKey::OpenInterestReserveFactor => &mut self.open_interest_reserve_factor,
+            MarketConfigKey::MaxPnlFactorForLongDeposit => {
+                &mut self.max_pnl_factor_for_long_deposit
+            }
+            MarketConfigKey::MaxPnlFactorForShortDeposit => {
+                &mut self.max_pnl_factor_for_short_deposit
+            }
+            MarketConfigKey::MaxPnlFactorForLongWithdrawal => {
+                &mut self.max_pnl_factor_for_long_withdrawal
+            }
+            MarketConfigKey::MaxPnlFactorForShortWithdrawal => {
+                &mut self.max_pnl_factor_for_short_withdrawal
+            }
+            MarketConfigKey::MaxPoolAmountForLongToken => &mut self.max_pool_amount_for_long_token,
+            MarketConfigKey::MaxPoolAmountForShortToken => {
+                &mut self.max_pool_amount_for_short_token
+            }
+            MarketConfigKey::MaxPoolValueForDepositForLongToken => {
+                &mut self.max_pool_value_for_deposit_for_long_token
+            }
+            MarketConfigKey::MaxPoolValueForDepositForShortToken => {
+                &mut self.max_pool_value_for_deposit_for_short_token
+            }
+            MarketConfigKey::MaxOpenInterestForLong => &mut self.max_open_interest_for_long,
+            MarketConfigKey::MaxOpenInterestForShort => &mut self.max_open_interest_for_short,
+        }
+    }
+}
+
+/// Market config keys.
+#[derive(strum::EnumString)]
+#[strum(serialize_all = "snake_case")]
+#[non_exhaustive]
+#[cfg_attr(feature = "debug", derive(Debug))]
+#[cfg_attr(feature = "enum-iter", derive(strum::EnumIter))]
+pub enum MarketConfigKey {
+    /// Swap impact exponent.
+    SwapImpactExponent,
+    /// Swap impact positive factor.
+    SwapImpactPositiveFactor,
+    /// Swap impact negative factor.
+    SwapImpactNegativeFactor,
+    /// Swap fee receiver factor.
+    SwapFeeReceiverFactor,
+    /// Swap fee factor for positive impact.
+    SwapFeeFactorForPositiveImpact,
+    /// Swap fee factor for negative impact.
+    SwapFeeFactorForNegativeImpact,
+    /// Min position size usd.
+    MinPositionSizeUsd,
+    /// Min collateral value.
+    MinCollateralValue,
+    /// Min collateral factor.
+    MinCollateralFactor,
+    /// Min collateral factor for open interest for long.
+    MinCollateralFactorForOpenInterestForLong,
+    /// Min collateral factor for open interest for short.
+    MinCollateralFactorForOpenInterestForShort,
+    /// Max positive position impact factor.
+    MaxPositionPositionImpactFactor,
+    /// Max negative position impact factor.
+    MaxNegativePositionImpactFactor,
+    /// Max position impact factor for liquidations.
+    MaxPositionImpactFactorForLiquidations,
+    /// Position impact exponent.
+    PositionImpactExponent,
+    /// Position impact positive factor.
+    PositionImpactPositiveFactor,
+    /// Position impact negative factor.
+    PositionImpactNegativeFactor,
+    /// Order fee receiver factor.
+    OrderFeeReceiverFactor,
+    /// Order fee factor for positive impact.
+    OrderFeeFactorForPositiveImpact,
+    /// Order fee factor for negative impact.
+    OrderFeeFactorForNegativeImpact,
+    /// Position impact distribute factor.
+    PositionImpactDistributeFactor,
+    /// Min position impact pool amount.
+    MinPositionImpactPoolAmount,
+    /// Borrowing fee receiver factor.
+    BorrowingFeeReceiverFactor,
+    /// Borrowing fee factor for long.
+    BorrowingFeeFactorForLong,
+    /// Borrowing fee factor for short.
+    BorrowingFeeFactorForShort,
+    /// Borrowing fee exponent for long.
+    BorrowingFeeExponentForLong,
+    /// Borrowing fee exponent for short.
+    BorrowingFeeExponentForShort,
+    /// Funding fee exponent.
+    FundingFeeExponent,
+    /// Funding fee factor.
+    FundingFeeFactor,
+    /// Funding fee max factor per second.
+    FundingFeeMaxFactorPerSecond,
+    /// Funding fee min factor per second.
+    FundingFeeMinFactorPerSecond,
+    /// Funding fee increase factor per second.
+    FundingFeeIncreaseFactorPerSecond,
+    /// Funding fee decrease factor per second.
+    FundingFeeDecreaseFactorPerSecond,
+    /// Funding fee threshold for stable funding.
+    FundingFeeThresholdForStableFunding,
+    /// Funding fee threshold for decrease funding.
+    FundingFeeThresholdForDecreaseFunding,
+    /// Reserve factor.
+    ReserveFactor,
+    /// Open interest reserve factor.
+    OpenInterestReserveFactor,
+    /// Max PNL factor for long deposit.
+    MaxPnlFactorForLongDeposit,
+    /// Max PNL factor for short deposit.
+    MaxPnlFactorForShortDeposit,
+    /// Max PNL factor for long withdrawal.
+    MaxPnlFactorForLongWithdrawal,
+    /// Max PNL factor for short withdrawal.
+    MaxPnlFactorForShortWithdrawal,
+    /// Max pool amount for long token.
+    MaxPoolAmountForLongToken,
+    /// Max pool amount for short token.
+    MaxPoolAmountForShortToken,
+    /// Max pool value for deposit for long token.
+    MaxPoolValueForDepositForLongToken,
+    /// Max pool value for deposit for short token.
+    MaxPoolValueForDepositForShortToken,
+    /// Max open interest for long.
+    MaxOpenInterestForLong,
+    /// Max open interest for short.
+    MaxOpenInterestForShort,
 }

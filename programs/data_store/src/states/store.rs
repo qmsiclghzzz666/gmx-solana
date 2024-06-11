@@ -241,6 +241,7 @@ pub struct Amounts {
 #[strum(serialize_all = "snake_case")]
 #[non_exhaustive]
 #[cfg_attr(feature = "debug", derive(Debug))]
+#[cfg_attr(feature = "enum-iter", derive(strum::EnumIter))]
 pub enum AmountKey {
     /// Claimable time window.
     ClaimableTimeWindow,
@@ -300,6 +301,7 @@ pub struct Factors {
 #[strum(serialize_all = "snake_case")]
 #[non_exhaustive]
 #[cfg_attr(feature = "debug", derive(Debug))]
+#[cfg_attr(feature = "enum-iter", derive(strum::EnumIter))]
 pub enum FactorKey {
     /// Oracle Ref Price Deviation.
     OracleRefPriceDeviation,
@@ -338,6 +340,7 @@ pub struct Addresses {
 #[strum(serialize_all = "snake_case")]
 #[non_exhaustive]
 #[cfg_attr(feature = "debug", derive(Debug))]
+#[cfg_attr(feature = "enum-iter", derive(strum::EnumIter))]
 pub enum AddressKey {
     /// Holding.
     Holding,

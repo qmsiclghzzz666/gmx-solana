@@ -4,6 +4,7 @@ import { BN } from '@coral-xyz/anchor';
 import { expect, getAddresses, getPrograms, getProvider, getUsers } from "../../utils/fixtures";
 import { createMarketPDA, createMarketTokenMintPDA, createMarketVaultPDA, createRolesPDA } from "../../utils/data";
 import { createAssociatedTokenAccountInstruction, createTransferInstruction, getAssociatedTokenAddress } from "@solana/spl-token";
+import { invokeUpdateMarketConfig } from '../../utils/exchange';
 
 describe("data store: Market", () => {
     const { dataStore } = getPrograms();
@@ -25,7 +26,7 @@ describe("data store: Market", () => {
         [marketPDA] = createMarketPDA(dataStoreAddress, marketToken);
     });
 
-    it("init and remove a market", async () => {
+    it("create, update and remove a market", async () => {
         await dataStore.methods.initializeMarket(marketToken, indexToken, longToken, shortToken).accountsPartial({
             authority: signer0.publicKey,
             store: dataStoreAddress,
@@ -37,6 +38,27 @@ describe("data store: Market", () => {
             expect(market.meta.longTokenMint).eql(longToken);
             expect(market.meta.shortTokenMint).eql(shortToken);
             expect(market.meta.marketTokenMint).eql(marketToken);
+        }
+        {
+            await expect(invokeUpdateMarketConfig(dataStore, {
+                authority: user0,
+                store: dataStoreAddress,
+                marketToken,
+                key: "swap_fee_receiver_factor",
+                value: 99000000000000000001n,
+            })).rejectedWith(Error, "Permission denied");
+        }
+        {
+            const tx = await invokeUpdateMarketConfig(dataStore, {
+                authority: signer0,
+                store: dataStoreAddress,
+                marketToken,
+                key: "swap_fee_receiver_factor",
+                value: 37000000000000000001n,
+            });
+            console.log(`market config updated at ${tx}`);
+            const value = await dataStore.methods.getMarketConfig("swap_fee_receiver_factor").accounts({ market: marketPDA }).view();
+            expect((new BN("37000000000000000001")).eq(value));
         }
         await dataStore.methods.removeMarket().accountsPartial({
             authority: signer0.publicKey,

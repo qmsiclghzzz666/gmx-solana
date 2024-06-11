@@ -72,6 +72,8 @@ data_store = { path = "../../programs/data_store", features = [
     "debug",
     "display",
     "utils",
+    "serde",
+    "enum-iter",
 ] }
 exchange = { path = "../../programs/exchange", features = [
     "no-entrypoint",

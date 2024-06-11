@@ -224,6 +224,7 @@ impl<'a, 'info> gmx_core::Market<{ constants::MARKET_DECIMALS }> for AsMarket<'a
     }
 
     fn position_params(&self) -> gmx_core::Result<PositionParams<Self::Num>> {
+        // TODO: use min collateral factors for OI.
         Ok(PositionParams::new(
             self.config.min_position_size_usd,
             self.config.min_collateral_value,

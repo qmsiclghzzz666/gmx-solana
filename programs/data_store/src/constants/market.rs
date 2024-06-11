@@ -21,6 +21,12 @@ pub const DEFAULT_MIN_POSITION_SIZE_USD: Factor = super::MARKET_USD_UNIT;
 pub const DEFAULT_MIN_COLLATERAL_VALUE: Factor = super::MARKET_USD_UNIT;
 /// Default min collateral factor.
 pub const DEFAULT_MIN_COLLATERAL_FACTOR: Factor = super::MARKET_USD_UNIT / 50;
+/// Default min collateral factor for open interest for long
+pub const DEFAULT_MIN_COLLATERAL_FACTOR_FOR_OPEN_INTEREST_FOR_LONG: Factor =
+    super::MARKET_USD_UNIT / 50;
+/// Default min collateral factor for open interest for short
+pub const DEFAULT_MIN_COLLATERAL_FACTOR_FOR_OPEN_INTEREST_FOR_SHORT: Factor =
+    super::MARKET_USD_UNIT / 50;
 /// Default max positive position impact factor.
 pub const DEFAULT_MAX_POSITIVE_POSITION_IMPACT_FACTOR: Factor = 500_000_000_000_000_000;
 /// Default max negative position impact factor.

@@ -220,6 +220,19 @@ pub mod data_store {
         instructions::unchecked_market_transfer_out(ctx, amount)
     }
 
+    pub fn get_market_config(ctx: Context<ReadMarket>, key: String) -> Result<u128> {
+        instructions::get_market_config(ctx, &key)
+    }
+
+    #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
+    pub fn update_market_config(
+        ctx: Context<UpdateMarketConfig>,
+        key: String,
+        value: u128,
+    ) -> Result<()> {
+        instructions::unchecked_update_market_config(ctx, &key, value)
+    }
+
     // Token.
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn initialize_market_token(

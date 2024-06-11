@@ -1,15 +1,19 @@
+use std::str::FromStr;
+
 use anchor_lang::{prelude::*, Bump};
 use anchor_spl::token::Mint;
 use bitmaps::Bitmap;
 use borsh::{BorshDeserialize, BorshSerialize};
-use config::MarketConfig;
 use gmx_core::{ClockKind, PoolKind};
 
 use crate::DataStoreError;
 
-use super::{InitSpace, Seed};
+use super::{Factor, InitSpace, Seed};
 
-pub use ops::AsMarket;
+pub use self::{
+    config::{MarketConfig, MarketConfigKey},
+    ops::AsMarket,
+};
 
 /// Market Operations.
 pub mod ops;
@@ -223,6 +227,18 @@ impl Market {
         require_eq!(*store, self.store, DataStoreError::InvalidMarket);
         require!(self.is_enabled(), DataStoreError::DisabledMarket);
         Ok(())
+    }
+
+    /// Get config by key.
+    pub fn get_config(&self, key: &str) -> Result<&Factor> {
+        let key = MarketConfigKey::from_str(key).map_err(|_| error!(DataStoreError::InvalidKey))?;
+        Ok(self.config.get(key))
+    }
+
+    /// Get config mutably by key
+    pub fn get_config_mut(&mut self, key: &str) -> Result<&mut Factor> {
+        let key = MarketConfigKey::from_str(key).map_err(|_| error!(DataStoreError::InvalidKey))?;
+        Ok(self.config.get_mut(key))
     }
 }
 
