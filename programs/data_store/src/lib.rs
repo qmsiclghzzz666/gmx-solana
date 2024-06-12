@@ -96,8 +96,8 @@ pub mod data_store {
     }
 
     #[access_control(internal::Authenticate::only_controller(&ctx))]
-    pub fn insert_factor(ctx: Context<InsertFactor>, key: String, amount: u128) -> Result<()> {
-        instructions::insert_factor(ctx, &key, amount)
+    pub fn insert_factor(ctx: Context<InsertFactor>, key: String, factor: u128) -> Result<()> {
+        instructions::insert_factor(ctx, &key, factor)
     }
 
     #[access_control(internal::Authenticate::only_controller(&ctx))]

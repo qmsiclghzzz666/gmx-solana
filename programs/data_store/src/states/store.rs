@@ -255,7 +255,7 @@ pub struct Amounts {
 }
 
 /// Amount keys.
-#[derive(strum::EnumString, Clone, Copy)]
+#[derive(strum::EnumString, strum::Display, Clone, Copy)]
 #[strum(serialize_all = "snake_case")]
 #[non_exhaustive]
 #[cfg_attr(feature = "debug", derive(Debug))]
@@ -317,7 +317,7 @@ pub struct Factors {
 }
 
 /// Factor keys.
-#[derive(strum::EnumString, Clone, Copy)]
+#[derive(strum::EnumString, strum::Display, Clone, Copy)]
 #[strum(serialize_all = "snake_case")]
 #[non_exhaustive]
 #[cfg_attr(feature = "debug", derive(Debug))]
@@ -358,7 +358,7 @@ pub struct Addresses {
 }
 
 /// Address keys.
-#[derive(strum::EnumString, Clone, Copy)]
+#[derive(strum::EnumString, strum::Display, Clone, Copy)]
 #[strum(serialize_all = "snake_case")]
 #[non_exhaustive]
 #[cfg_attr(feature = "debug", derive(Debug))]
