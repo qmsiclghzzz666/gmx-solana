@@ -1,5 +1,8 @@
 use anchor_client::solana_sdk::pubkey::Pubkey;
-use gmsol::store::{data_store::StoreOps, roles::RolesOps};
+use gmsol::{
+    store::{data_store::StoreOps, roles::RolesOps},
+    utils::TransactionBuilder,
+};
 
 use crate::GMSOLClient;
 
@@ -22,6 +25,11 @@ enum Command {
         /// Role.
         role: String,
     },
+    /// Initialize all.
+    InitializeAll {
+        #[arg(long)]
+        skip_init_store: bool,
+    },
 }
 
 impl AdminArgs {
@@ -33,10 +41,23 @@ impl AdminArgs {
     ) -> gmsol::Result<()> {
         let store = client.find_store_address(store_key);
         match &self.command {
+            Command::InitializeAll {
+                skip_init_store: skip_store_initialization,
+            } => {
+                self.initialize_all(
+                    client,
+                    store_key,
+                    serialize_only,
+                    *skip_store_initialization,
+                )
+                .await?
+            }
             Command::InitializeStore => {
                 println!("Initialize store with key={store_key}, address={store}",);
                 crate::utils::send_or_serialize(
-                    client.initialize_store(store_key),
+                    client
+                        .initialize_store(store_key)
+                        .build_without_compute_budget(),
                     serialize_only,
                     |signature| {
                         tracing::info!("initialized a new data store at tx {signature}");
@@ -68,6 +89,37 @@ impl AdminArgs {
                 .await?;
             }
         }
+        Ok(())
+    }
+
+    async fn initialize_all(
+        &self,
+        client: &GMSOLClient,
+        store_key: &str,
+        serialize_only: bool,
+        skip_store_initialization: bool,
+    ) -> gmsol::Result<()> {
+        // let store = client.find_store_address(store_key);
+
+        let mut builder = TransactionBuilder::new(client.data_store().async_rpc());
+
+        if !skip_store_initialization {
+            // Insert initialize store instruction.
+            builder.try_push(client.initialize_store(store_key))?;
+        }
+
+        crate::utils::send_or_serialize_transactions(
+            builder,
+            serialize_only,
+            |signatures, error| {
+                println!("{signatures:#?}");
+                match error {
+                    None => Ok(()),
+                    Some(err) => Err(err),
+                }
+            },
+        )
+        .await?;
         Ok(())
     }
 }

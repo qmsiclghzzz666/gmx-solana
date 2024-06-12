@@ -5,6 +5,7 @@ use anchor_client::{
     RequestBuilder,
 };
 use eyre::ContextCompat;
+use gmsol::utils::TransactionBuilder;
 
 #[derive(clap::Args, Clone)]
 #[group(required = false, multiple = false, id = "oracle_address")]
@@ -56,6 +57,37 @@ where
     } else {
         let signature = req.send().await?;
         (callback)(signature)?;
+    }
+    Ok(())
+}
+
+pub(crate) async fn send_or_serialize_transactions<C, S>(
+    builder: TransactionBuilder<'_, C>,
+    serialize_only: bool,
+    callback: impl FnOnce(Vec<Signature>, Option<gmsol::Error>) -> gmsol::Result<()>,
+) -> gmsol::Result<()>
+where
+    C: Clone + Deref<Target = S>,
+    S: Signer,
+{
+    if serialize_only {
+        for (idx, rpc) in builder.into_builders().into_iter().enumerate() {
+            println!("Transaction {idx}:");
+            for (idx, ix) in rpc
+                .build_without_compute_budget()
+                .instructions()?
+                .into_iter()
+                .enumerate()
+            {
+                println!("ix[{idx}]: {}", gmsol::utils::serialize_instruction(&ix)?);
+            }
+            println!();
+        }
+    } else {
+        match builder.send_all().await {
+            Ok(signatures) => (callback)(signatures, None)?,
+            Err((signatures, error)) => (callback)(signatures, Some(error))?,
+        }
     }
     Ok(())
 }
