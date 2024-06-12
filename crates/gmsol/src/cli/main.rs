@@ -18,8 +18,8 @@ mod admin;
 mod controller;
 mod exchange;
 mod inspect;
-mod keeper;
 mod market_keeper;
+mod order_keeper;
 mod utils;
 
 #[derive(Parser)]
@@ -69,9 +69,9 @@ enum Command {
     /// Commands for `Exchange` program.
     Exchange(exchange::ExchangeArgs),
     /// Commands for ORDER_KEEPER.
-    Keeper(keeper::KeeperArgs),
+    Order(order_keeper::KeeperArgs),
     /// Commands for MARKET_KEEPER.
-    MarketKeeper(market_keeper::Args),
+    Market(market_keeper::Args),
     /// Commands for controllers.
     Controller(controller::ControllerArgs),
 }
@@ -149,11 +149,11 @@ impl Cli {
             }
             Command::Inspect(args) => args.run(&client, self.store.as_ref()).await?,
             Command::Exchange(args) => args.run(&client, self.store()?).await?,
-            Command::Keeper(args) => {
+            Command::Order(args) => {
                 args.run(&client, self.store()?, self.serialize_only)
                     .await?
             }
-            Command::MarketKeeper(args) => {
+            Command::Market(args) => {
                 args.run(&client, self.store()?, self.serialize_only)
                     .await?
             }

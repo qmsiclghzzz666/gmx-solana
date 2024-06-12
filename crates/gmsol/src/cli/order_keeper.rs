@@ -10,7 +10,6 @@ use futures_util::{FutureExt, TryFutureExt};
 use gmsol::{
     exchange::ExchangeOps,
     pyth::{EncodingType, Hermes, PythPullOracle, PythPullOracleContext, PythPullOracleOps},
-    store::market::VaultOps,
     utils::{ComputeBudget, RpcBuilder},
 };
 use tokio::{sync::mpsc::UnboundedSender, time::Instant};
@@ -54,17 +53,6 @@ enum Command {
     ExecuteWithdrawal { withdrawal: Pubkey },
     /// Execute Order.
     ExecuteOrder { order: Pubkey },
-    /// Initialize Market Vault.
-    InitializeVault { token: Pubkey },
-    /// Create Market.
-    CreateMarket {
-        #[arg(long)]
-        index_token: Pubkey,
-        #[arg(long)]
-        long_token: Pubkey,
-        #[arg(long)]
-        short_token: Pubkey,
-    },
 }
 
 impl KeeperArgs {
@@ -107,6 +95,11 @@ impl KeeperArgs {
         store: &Pubkey,
         serialize_only: bool,
     ) -> gmsol::Result<()> {
+        if serialize_only {
+            return Err(gmsol::Error::invalid_argument(
+                "serialize-only mode is not supported",
+            ));
+        }
         match &self.command {
             Command::Watch { wait } => {
                 let task = Box::pin(self.start_watching(client, store, *wait));
@@ -285,28 +278,6 @@ impl KeeperArgs {
                         .await?;
                     tracing::info!(%order, %execution_fee, "executed order with txs: {signatures:#?}");
                 }
-            }
-            Command::InitializeVault { token } => {
-                let (request, vault) = client.initialize_market_vault(store, token);
-                crate::utils::send_or_serialize(request, serialize_only, |signature| {
-                    println!("created a new vault {vault} at tx {signature}");
-                    Ok(())
-                })
-                .await?;
-            }
-            Command::CreateMarket {
-                index_token,
-                long_token,
-                short_token,
-            } => {
-                let (request, market_token) =
-                    client.create_market(store, index_token, long_token, short_token);
-                crate::utils::send_or_serialize(request, serialize_only, |signature| {
-                    println!(
-                        "created a new market with {market_token} as its token address at tx {signature}"
-                    );
-                    Ok(())
-                }).await?;
             }
         }
         Ok(())
