@@ -6,11 +6,11 @@ use anchor_client::{
     RequestBuilder,
 };
 use anchor_spl::associated_token::get_associated_token_address;
-use data_store::states::{common::TokensWithFeed, Deposit, Market, NonceBytes, Pyth};
+use data_store::states::{common::TokensWithFeed, Deposit, NonceBytes, Pyth};
 use exchange::{accounts, instruction, instructions::CreateDepositParams};
 
 use crate::{
-    store::utils::FeedsParser,
+    store::utils::{read_market, FeedsParser},
     utils::{ComputeBudget, RpcBuilder},
 };
 
@@ -149,7 +149,7 @@ where
                     (long_token.is_none() && long_amount != 0)
                         || (short_token.is_none() && short_amount != 0)
                 );
-                let market: Market = self.client.data_store().account(*market).await?;
+                let market = read_market(&self.client.data_store().async_rpc(), market).await?;
                 if long_amount != 0 {
                     long_token = Some(market.meta().long_token_mint);
                 }

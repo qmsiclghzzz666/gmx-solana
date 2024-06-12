@@ -96,8 +96,8 @@ pub mod data_store {
     }
 
     #[access_control(internal::Authenticate::only_controller(&ctx))]
-    pub fn insert_factor(ctx: Context<InsertFactor>, key: String, amount: u128) -> Result<()> {
-        instructions::insert_factor(ctx, &key, amount)
+    pub fn insert_factor(ctx: Context<InsertFactor>, key: String, factor: u128) -> Result<()> {
+        instructions::insert_factor(ctx, &key, factor)
     }
 
     #[access_control(internal::Authenticate::only_controller(&ctx))]
@@ -192,7 +192,7 @@ pub mod data_store {
         long_token_mint: Pubkey,
         short_token_mint: Pubkey,
     ) -> Result<()> {
-        instructions::initialize_market(
+        instructions::unchecked_initialize_market(
             ctx,
             market_token_mint,
             index_token_mint,
@@ -203,7 +203,7 @@ pub mod data_store {
 
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn remove_market(ctx: Context<RemoveMarket>) -> Result<()> {
-        instructions::remove_market(ctx)
+        instructions::unchecked_remove_market(ctx)
     }
 
     pub fn get_validated_market_meta(ctx: Context<GetValidatedMarketMeta>) -> Result<MarketMeta> {
@@ -212,12 +212,25 @@ pub mod data_store {
 
     #[access_control(internal::Authenticate::only_controller(&ctx))]
     pub fn market_transfer_in(ctx: Context<MarketTransferIn>, amount: u64) -> Result<()> {
-        instructions::market_transfer_in(ctx, amount)
+        instructions::unchecked_market_transfer_in(ctx, amount)
     }
 
     #[access_control(internal::Authenticate::only_controller(&ctx))]
     pub fn market_transfer_out(ctx: Context<MarketTransferOut>, amount: u64) -> Result<()> {
-        instructions::market_transfer_out(ctx, amount)
+        instructions::unchecked_market_transfer_out(ctx, amount)
+    }
+
+    pub fn get_market_config(ctx: Context<ReadMarket>, key: String) -> Result<u128> {
+        instructions::get_market_config(ctx, &key)
+    }
+
+    #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
+    pub fn update_market_config(
+        ctx: Context<UpdateMarketConfig>,
+        key: String,
+        value: u128,
+    ) -> Result<()> {
+        instructions::unchecked_update_market_config(ctx, &key, value)
     }
 
     // Token.
@@ -228,7 +241,7 @@ pub mod data_store {
         long_token_mint: Pubkey,
         short_token_mint: Pubkey,
     ) -> Result<()> {
-        instructions::initialize_market_token(
+        instructions::unchecked_initialize_market_token(
             ctx,
             index_token_mint,
             long_token_mint,
@@ -238,12 +251,12 @@ pub mod data_store {
 
     #[access_control(internal::Authenticate::only_controller(&ctx))]
     pub fn mint_market_token_to(ctx: Context<MintMarketTokenTo>, amount: u64) -> Result<()> {
-        instructions::mint_market_token_to(ctx, amount)
+        instructions::unchecked_mint_market_token_to(ctx, amount)
     }
 
     #[access_control(internal::Authenticate::only_controller(&ctx))]
     pub fn burn_market_token_from(ctx: Context<BurnMarketTokenFrom>, amount: u64) -> Result<()> {
-        instructions::burn_market_token_from(ctx, amount)
+        instructions::unchecked_burn_market_token_from(ctx, amount)
     }
 
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
@@ -251,7 +264,7 @@ pub mod data_store {
         ctx: Context<InitializeMarketVault>,
         market_token_mint: Option<Pubkey>,
     ) -> Result<()> {
-        instructions::initialize_market_vault(ctx, market_token_mint)
+        instructions::unchecked_initialize_market_vault(ctx, market_token_mint)
     }
 
     #[access_control(internal::Authenticate::only_controller(&ctx))]
@@ -259,7 +272,7 @@ pub mod data_store {
         ctx: Context<MarketVaultTransferOut>,
         amount: u64,
     ) -> Result<()> {
-        instructions::market_vault_transfer_out(ctx, amount)
+        instructions::unchecked_market_vault_transfer_out(ctx, amount)
     }
 
     #[access_control(internal::Authenticate::only_controller(&ctx))]
@@ -268,7 +281,7 @@ pub mod data_store {
         timestamp: i64,
         amount: u64,
     ) -> Result<()> {
-        instructions::use_claimable_account(ctx, timestamp, amount)
+        instructions::unchecked_use_claimable_account(ctx, timestamp, amount)
     }
 
     #[access_control(internal::Authenticate::only_controller(&ctx))]
@@ -277,7 +290,7 @@ pub mod data_store {
         user: Pubkey,
         timestamp: i64,
     ) -> Result<()> {
-        instructions::close_empty_claimable_account(ctx, user, timestamp)
+        instructions::unchecked_close_empty_claimable_account(ctx, user, timestamp)
     }
 
     // Oracle.

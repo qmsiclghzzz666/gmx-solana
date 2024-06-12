@@ -34,7 +34,7 @@ pub struct ExecuteWithdrawal<'info> {
     )]
     pub withdrawal: Account<'info, Withdrawal>,
     #[account(mut, has_one = store)]
-    pub market: Account<'info, Market>,
+    pub market: AccountLoader<'info, Market>,
     #[account(mut)]
     pub market_token_mint: Account<'info, Mint>,
     #[account(
@@ -105,6 +105,7 @@ pub fn execute_withdrawal<'info>(
 
     ctx.accounts
         .market
+        .load_mut()?
         .as_market(&mut ctx.accounts.market_token_mint)
         .validate_market_balances(long_amount, short_amount)?;
 
@@ -142,13 +143,14 @@ impl<'info> ValidateOracleTime for ExecuteWithdrawal<'info> {
 impl<'info> ExecuteWithdrawal<'info> {
     fn validate(&self) -> Result<()> {
         self.oracle.validate_time(self)?;
-        self.market.validate(&self.store.key())?;
+        self.market.load()?.validate(&self.store.key())?;
         Ok(())
     }
 
     fn pre_execute(&mut self) -> Result<()> {
         let report = self
             .market
+            .load_mut()?
             .as_market(&mut self.market_token_mint)
             .distribute_position_impact()
             .map_err(GmxCoreError::from)?
@@ -177,7 +179,7 @@ impl<'info> ExecuteWithdrawal<'info> {
     }
 
     fn perform_withdrawal(&mut self) -> Result<(u64, u64)> {
-        let meta = &self.market.meta;
+        let meta = &self.market.load()?.meta().clone();
         let index_token_price = self
             .oracle
             .primary
@@ -201,6 +203,7 @@ impl<'info> ExecuteWithdrawal<'info> {
             .to_unit_price();
         let report = self
             .market
+            .load_mut()?
             .as_market(&mut self.market_token_mint)
             .enable_transfer(self.token_program.to_account_info(), &self.store)
             .with_vault(self.market_token_withdrawal_vault.to_account_info())
@@ -238,11 +241,11 @@ impl<'info> ExecuteWithdrawal<'info> {
             .swap
             .split_swap_paths(remaining_accounts)?;
         if let Some(to) = long_swap_path.first() {
-            let token = self.market.meta.long_token_mint;
+            let token = self.market.load()?.meta().long_token_mint;
             if to.key() != self.market.key() {
                 unchecked_transfer_to_market(
                     &self.store.key(),
-                    &mut self.market,
+                    &self.market,
                     to,
                     &token,
                     long_amount,
@@ -250,21 +253,21 @@ impl<'info> ExecuteWithdrawal<'info> {
             }
         }
         if let Some(to) = short_swap_path.first() {
-            let token = self.market.meta.short_token_mint;
+            let token = self.market.load()?.meta().short_token_mint;
             if to.key() != self.market.key() {
                 unchecked_transfer_to_market(
                     &self.store.key(),
-                    &mut self.market,
+                    &self.market,
                     to,
                     &token,
                     short_amount,
                 )?;
             }
         }
-        let meta = &self.market.meta;
-        // Call exit and reload to make sure the data are written to the storage.
-        // In case that there are markets also appear in the swap paths.
-        self.market.exit(&crate::ID)?;
+        let meta = &self.market.load()?.meta().clone();
+        // // Call exit and reload to make sure the data are written to the storage.
+        // // In case that there are markets also appear in the swap paths.
+        // self.market.exit(&crate::ID)?;
         // CHECK: `exit` and `reload` have been called on the modified market account before and after the swap.
         let (long_swap_out, short_swap_out) = unchecked_swap_with_params(
             &self.oracle,
@@ -277,8 +280,8 @@ impl<'info> ExecuteWithdrawal<'info> {
             (Some(meta.long_token_mint), Some(meta.short_token_mint)),
             (long_amount, short_amount),
         )?;
-        // Call `reload` to make sure the state is up-to-date.
-        self.market.reload()?;
+        // // Call `reload` to make sure the state is up-to-date.
+        // self.market.reload()?;
         Ok((long_swap_out.into_amount(), short_swap_out.into_amount()))
     }
 }

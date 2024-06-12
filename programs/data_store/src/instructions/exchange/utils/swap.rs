@@ -59,8 +59,9 @@ impl<'a, 'info> SwapUtils<'a, 'info> {
                 DataStoreError::InvalidSwapPath
             );
             require!(market_info.is_writable, DataStoreError::InvalidSwapPath);
-            let mut market = Account::<'info, Market>::try_from(market_info)?;
+            let market = AccountLoader::<'info, Market>::try_from(market_info)?;
             {
+                let mut market = market.load_mut()?;
                 market.validate(&self.oracle.store)?;
                 let meta = &market.meta;
                 let mint_info = &self.mints[idx];
@@ -224,7 +225,7 @@ impl<'info> SwapOut<'info> {
     /// If `unknown_as_target` is set, `swap_out_market` and `target` will be treated as the same.
     pub(crate) fn transfer_to_market(
         self,
-        target: &mut Account<'info, Market>,
+        target: &AccountLoader<'info, Market>,
         unknown_as_target: bool,
     ) -> Result<u64> {
         let Some(from) = self.output_market else {
@@ -238,12 +239,16 @@ impl<'info> SwapOut<'info> {
             return Ok(self.amount);
         }
         {
-            let mut market = Account::<'info, Market>::try_from(from)?;
+            let market = AccountLoader::<'info, Market>::try_from(from)?;
             // The `market` must have be validated during the swap.
-            market.record_transferred_out_by_token(&self.token, self.amount)?;
+            market
+                .load_mut()?
+                .record_transferred_out_by_token(&self.token, self.amount)?;
             market.exit(&crate::ID)?;
         }
-        target.record_transferred_in_by_token(&self.token, self.amount)?;
+        target
+            .load_mut()?
+            .record_transferred_in_by_token(&self.token, self.amount)?;
         Ok(self.amount)
     }
 
@@ -259,7 +264,7 @@ impl<'info> SwapOut<'info> {
 /// - `to` account must be exited before calling this function, and should be reloaded after.
 pub(crate) fn unchecked_transfer_to_market<'info>(
     store: &Pubkey,
-    from: &mut Account<'info, Market>,
+    from: &AccountLoader<'info, Market>,
     to: &'info AccountInfo<'info>,
     token: &Pubkey,
     amount: u64,
@@ -268,11 +273,14 @@ pub(crate) fn unchecked_transfer_to_market<'info>(
         return Ok(());
     }
     require!(from.key() != to.key(), DataStoreError::InvalidArgument);
-    from.record_transferred_out_by_token(token, amount)?;
+    from.load_mut()?
+        .record_transferred_out_by_token(token, amount)?;
     {
-        let mut market = Account::<'info, Market>::try_from(to)?;
-        market.validate(store)?;
-        market.record_transferred_in_by_token(token, amount)?;
+        let market = AccountLoader::<'info, Market>::try_from(to)?;
+        market.load()?.validate(store)?;
+        market
+            .load_mut()?
+            .record_transferred_in_by_token(token, amount)?;
         market.exit(&crate::ID)?;
     }
     Ok(())

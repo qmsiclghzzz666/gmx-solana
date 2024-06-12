@@ -1,6 +1,12 @@
 use anchor_client::solana_sdk::{pubkey::Pubkey, signature::Keypair};
-use data_store::states::{PriceProviderKind, TokenConfigBuilder};
-use gmsol::store::token_config::TokenConfigOps;
+use data_store::states::{Factor, MarketConfigKey, PriceProviderKind, TokenConfigBuilder};
+use gmsol::{
+    exchange::ExchangeOps,
+    store::{
+        market::{MarketOps, VaultOps},
+        token_config::TokenConfigOps,
+    },
+};
 
 use crate::GMSOLClient;
 
@@ -43,6 +49,25 @@ enum Command {
     SetExpectedProvider {
         token: Pubkey,
         provider: PriceProviderKind,
+    },
+    /// Initialize Market Vault.
+    InitializeVault { token: Pubkey },
+    /// Create Market.
+    CreateMarket {
+        #[arg(long)]
+        index_token: Pubkey,
+        #[arg(long)]
+        long_token: Pubkey,
+        #[arg(long)]
+        short_token: Pubkey,
+    },
+    /// Update Market Config.
+    UpdateConfig {
+        market_token: Pubkey,
+        #[arg(long, short)]
+        key: MarketConfigKey,
+        #[arg(long, short)]
+        value: Factor,
     },
 }
 
@@ -163,6 +188,45 @@ impl Args {
                     serialize_only,
                     |signature| {
                         println!("{signature}");
+                        Ok(())
+                    },
+                )
+                .await?;
+            }
+            Command::InitializeVault { token } => {
+                let (request, vault) = client.initialize_market_vault(store, token);
+                crate::utils::send_or_serialize(request, serialize_only, |signature| {
+                    println!("created a new vault {vault} at tx {signature}");
+                    Ok(())
+                })
+                .await?;
+            }
+            Command::CreateMarket {
+                index_token,
+                long_token,
+                short_token,
+            } => {
+                let (request, market_token) =
+                    client.create_market(store, index_token, long_token, short_token);
+                crate::utils::send_or_serialize(request, serialize_only, |signature| {
+                    println!(
+                        "created a new market with {market_token} as its token address at tx {signature}"
+                    );
+                    Ok(())
+                }).await?;
+            }
+            Command::UpdateConfig {
+                market_token,
+                key,
+                value,
+            } => {
+                crate::utils::send_or_serialize(
+                    client
+                        .update_market_config_by_key(store, market_token, *key, value)?
+                        .build_without_compute_budget(),
+                    serialize_only,
+                    |signature| {
+                        println!("market config updated at tx {signature}");
                         Ok(())
                     },
                 )

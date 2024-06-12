@@ -3,17 +3,6 @@ use anchor_spl::token::{Burn, Mint, MintTo, Token, TokenAccount, Transfer};
 
 use crate::{constants, states::Store, utils::internal};
 
-/// Initialize a new market token.
-#[allow(unused_variables)]
-pub fn initialize_market_token(
-    ctx: Context<InitializeMarketToken>,
-    index_token_mint: Pubkey,
-    long_token_mint: Pubkey,
-    short_token_mint: Pubkey,
-) -> Result<()> {
-    Ok(())
-}
-
 #[derive(Accounts)]
 #[instruction(index_token_mint: Pubkey, long_token_mint: Pubkey, short_token_mint: Pubkey)]
 pub struct InitializeMarketToken<'info> {
@@ -40,6 +29,20 @@ pub struct InitializeMarketToken<'info> {
     pub token_program: Program<'info, Token>,
 }
 
+/// Initialize a new market token.
+///
+/// ## CHECK
+/// - Only MARKET_KEEPER can initialize market token.
+#[allow(unused_variables)]
+pub fn unchecked_initialize_market_token(
+    ctx: Context<InitializeMarketToken>,
+    index_token_mint: Pubkey,
+    long_token_mint: Pubkey,
+    short_token_mint: Pubkey,
+) -> Result<()> {
+    Ok(())
+}
+
 impl<'info> internal::Authentication<'info> for InitializeMarketToken<'info> {
     fn authority(&self) -> &Signer<'info> {
         &self.authority
@@ -48,16 +51,6 @@ impl<'info> internal::Authentication<'info> for InitializeMarketToken<'info> {
     fn store(&self) -> &AccountLoader<'info, Store> {
         &self.store
     }
-}
-
-/// Mint the given amount of market tokens to the destination account.
-pub fn mint_market_token_to(ctx: Context<MintMarketTokenTo>, amount: u64) -> Result<()> {
-    anchor_spl::token::mint_to(
-        ctx.accounts
-            .mint_to_ctx()
-            .with_signer(&[&ctx.accounts.store.load()?.pda_seeds()]),
-        amount,
-    )
 }
 
 #[derive(Accounts)]
@@ -69,6 +62,19 @@ pub struct MintMarketTokenTo<'info> {
     #[account(mut, token::mint = market_token_mint)]
     pub to: Account<'info, TokenAccount>,
     pub token_program: Program<'info, Token>,
+}
+
+/// Mint the given amount of market tokens to the destination account.
+///
+/// ## CHECK
+/// - Only CONTROLLER can mint market token.
+pub fn unchecked_mint_market_token_to(ctx: Context<MintMarketTokenTo>, amount: u64) -> Result<()> {
+    anchor_spl::token::mint_to(
+        ctx.accounts
+            .mint_to_ctx()
+            .with_signer(&[&ctx.accounts.store.load()?.pda_seeds()]),
+        amount,
+    )
 }
 
 impl<'info> internal::Authentication<'info> for MintMarketTokenTo<'info> {
@@ -94,19 +100,6 @@ impl<'info> MintMarketTokenTo<'info> {
     }
 }
 
-/// Burn the given amount of market tokens from the given account.
-///
-/// ## Notes
-/// - The `from` account is expected to be owned by `store`.
-pub fn burn_market_token_from(ctx: Context<BurnMarketTokenFrom>, amount: u64) -> Result<()> {
-    anchor_spl::token::burn(
-        ctx.accounts
-            .burn_ctx()
-            .with_signer(&[&ctx.accounts.store.load()?.pda_seeds()]),
-        amount,
-    )
-}
-
 #[derive(Accounts)]
 pub struct BurnMarketTokenFrom<'info> {
     pub authority: Signer<'info>,
@@ -116,6 +109,25 @@ pub struct BurnMarketTokenFrom<'info> {
     #[account(mut, token::mint = market_token_mint)]
     pub from: Account<'info, TokenAccount>,
     pub token_program: Program<'info, Token>,
+}
+
+/// Burn the given amount of market tokens from the given account.
+///
+/// ## CHECK
+/// - Only CONTROLLER can burn market tokens.
+///
+/// ## Notes
+/// - The `from` account is expected to be owned by `store`.
+pub fn unchecked_burn_market_token_from(
+    ctx: Context<BurnMarketTokenFrom>,
+    amount: u64,
+) -> Result<()> {
+    anchor_spl::token::burn(
+        ctx.accounts
+            .burn_ctx()
+            .with_signer(&[&ctx.accounts.store.load()?.pda_seeds()]),
+        amount,
+    )
 }
 
 impl<'info> internal::Authentication<'info> for BurnMarketTokenFrom<'info> {
@@ -139,16 +151,6 @@ impl<'info> BurnMarketTokenFrom<'info> {
             },
         )
     }
-}
-
-/// Initialize a vault of the given token for a market.
-/// The address is derived from token mint addresses (the `market_token_mint` seed is optional).
-#[allow(unused_variables)]
-pub fn initialize_market_vault(
-    ctx: Context<InitializeMarketVault>,
-    market_token_mint: Option<Pubkey>,
-) -> Result<()> {
-    Ok(())
 }
 
 #[derive(Accounts)]
@@ -177,6 +179,19 @@ pub struct InitializeMarketVault<'info> {
     pub token_program: Program<'info, Token>,
 }
 
+/// Initialize a vault of the given token for a market.
+/// The address is derived from token mint addresses (the `market_token_mint` seed is optional).
+///
+/// ## CHECK
+/// - Only MARKET_KEEPER can initialize market vault.
+#[allow(unused_variables)]
+pub fn unchecked_initialize_market_vault(
+    ctx: Context<InitializeMarketVault>,
+    market_token_mint: Option<Pubkey>,
+) -> Result<()> {
+    Ok(())
+}
+
 impl<'info> internal::Authentication<'info> for InitializeMarketVault<'info> {
     fn authority(&self) -> &Signer<'info> {
         &self.authority
@@ -185,16 +200,6 @@ impl<'info> internal::Authentication<'info> for InitializeMarketVault<'info> {
     fn store(&self) -> &AccountLoader<'info, Store> {
         &self.store
     }
-}
-
-/// Transfer the given amount of tokens out to the destination account.
-pub fn market_vault_transfer_out(ctx: Context<MarketVaultTransferOut>, amount: u64) -> Result<()> {
-    anchor_spl::token::transfer(
-        ctx.accounts
-            .transfer_ctx()
-            .with_signer(&[&ctx.accounts.store.load()?.pda_seeds()]),
-        amount,
-    )
 }
 
 #[derive(Accounts)]
@@ -208,6 +213,22 @@ pub struct MarketVaultTransferOut<'info> {
     #[account(mut, token::mint = market_vault.mint)]
     pub to: Account<'info, TokenAccount>,
     pub token_program: Program<'info, Token>,
+}
+
+/// Transfer the given amount of tokens out to the destination account.
+///
+/// ## CHECK
+/// - Only CONTROLLER can transfer out from market vault.
+pub fn unchecked_market_vault_transfer_out(
+    ctx: Context<MarketVaultTransferOut>,
+    amount: u64,
+) -> Result<()> {
+    anchor_spl::token::transfer(
+        ctx.accounts
+            .transfer_ctx()
+            .with_signer(&[&ctx.accounts.store.load()?.pda_seeds()]),
+        amount,
+    )
 }
 
 impl<'info> internal::Authentication<'info> for MarketVaultTransferOut<'info> {
@@ -263,7 +284,10 @@ pub struct UseClaimableAccount<'info> {
 }
 
 /// Prepare claimable account.
-pub fn use_claimable_account(
+///
+/// ## CHECK
+/// - Only CONTROLLER can use claimable account.
+pub fn unchecked_use_claimable_account(
     ctx: Context<UseClaimableAccount>,
     _timestamp: i64,
     amount: u64,
@@ -322,7 +346,10 @@ pub struct CloseEmptyClaimableAccount<'info> {
 }
 
 /// Close claimable account if it is empty.
-pub fn close_empty_claimable_account(
+///
+/// ## CHECK
+/// - Only CONTROLLER can close claimable account.
+pub fn unchecked_close_empty_claimable_account(
     ctx: Context<CloseEmptyClaimableAccount>,
     _user: Pubkey,
     _timestamp: i64,

@@ -1,6 +1,11 @@
 /// Keys.
 pub mod keys;
 
+/// Default market configs.
+pub mod market;
+
+pub use self::market::*;
+
 use gmx_solana_utils::price::Decimal;
 
 use crate::states::{Amount, Factor};

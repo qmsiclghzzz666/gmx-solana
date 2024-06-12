@@ -1,6 +1,6 @@
 use anchor_client::solana_sdk::pubkey::Pubkey;
-use data_store::states::{Market, Position};
-use gmsol::{exchange::ExchangeOps, utils};
+use data_store::states::Position;
+use gmsol::{exchange::ExchangeOps, store::utils::read_market, utils};
 
 use crate::GMSOLClient;
 
@@ -356,7 +356,7 @@ impl ExchangeArgs {
                 )
                 .await?;
                 let market = client.find_market_address(store, &position.market_token);
-                let market = client.data_store().account::<Market>(market).await?;
+                let market = read_market(&client.data_store().async_rpc(), &market).await?;
                 let is_collateral_token_long =
                     if market.meta().long_token_mint == position.collateral_token {
                         true

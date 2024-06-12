@@ -1,5 +1,5 @@
 use anchor_client::solana_sdk::pubkey::Pubkey;
-use data_store::states::{Amount, Factor};
+use data_store::states::{AddressKey, Amount, AmountKey, Factor, FactorKey};
 use gmsol::store::{config::ConfigOps, oracle::OracleOps};
 
 use crate::GMSOLClient;
@@ -18,19 +18,19 @@ enum Command {
     InsertAmount {
         amount: Amount,
         #[arg(long, short)]
-        key: String,
+        key: AmountKey,
     },
     /// Insert a factor to the config.
     InsertFactor {
         factor: Factor,
         #[arg(long, short)]
-        key: String,
+        key: FactorKey,
     },
     /// Insert an address to the config.
     InsertAddress {
         address: Pubkey,
         #[arg(long, short)]
-        key: String,
+        key: AddressKey,
     },
 }
 
@@ -53,7 +53,7 @@ impl ControllerArgs {
             Command::InsertAmount { amount, key } => {
                 crate::utils::send_or_serialize(
                     client
-                        .insert_global_amount(store, key, *amount)
+                        .insert_global_amount_by_key(store, *key, amount)
                         .build_without_compute_budget(),
                     serialize_only,
                     |signature| {
@@ -66,7 +66,7 @@ impl ControllerArgs {
             Command::InsertFactor { factor, key } => {
                 crate::utils::send_or_serialize(
                     client
-                        .insert_global_factor(store, key, *factor)
+                        .insert_global_factor_by_key(store, *key, factor)
                         .build_without_compute_budget(),
                     serialize_only,
                     |signature| {
@@ -79,7 +79,7 @@ impl ControllerArgs {
             Command::InsertAddress { address, key } => {
                 crate::utils::send_or_serialize(
                     client
-                        .insert_global_address(store, key, address)
+                        .insert_global_address_by_key(store, *key, address)
                         .build_without_compute_budget(),
                     serialize_only,
                     |signature| {

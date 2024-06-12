@@ -72,6 +72,8 @@ data_store = { path = "../../programs/data_store", features = [
     "debug",
     "display",
     "utils",
+    "serde",
+    "enum-iter",
 ] }
 exchange = { path = "../../programs/exchange", features = [
     "no-entrypoint",
@@ -80,3 +82,4 @@ exchange = { path = "../../programs/exchange", features = [
 rand = { version = "0.8.5" }
 futures-util = { version = "0.3.30" }
 spl-governance = { version = "4.0.0", features = ["no-entrypoint"] }
+strum = "0.26.2"

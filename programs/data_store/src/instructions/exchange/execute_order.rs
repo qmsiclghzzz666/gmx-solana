@@ -43,7 +43,7 @@ pub struct ExecuteOrder<'info> {
     )]
     pub order: Box<Account<'info, Order>>,
     #[account(mut, has_one = store)]
-    pub market: Box<Account<'info, Market>>,
+    pub market: AccountLoader<'info, Market>,
     pub market_token_mint: Box<Account<'info, Mint>>,
     #[account(
         mut,
@@ -90,11 +90,11 @@ pub struct ExecuteOrder<'info> {
     pub secondary_output_token_account: Option<Box<Account<'info, TokenAccount>>>,
     #[account(
         mut,
-        token::mint = market.meta.long_token_mint,
+        token::mint = market.load()?.meta().long_token_mint,
         seeds = [
             constants::MARKET_VAULT_SEED,
             store.key().as_ref(),
-            market.meta.long_token_mint.as_ref(),
+            market.load()?.meta().long_token_mint.as_ref(),
             &[],
         ],
         bump,
@@ -102,11 +102,11 @@ pub struct ExecuteOrder<'info> {
     pub long_token_vault: Account<'info, TokenAccount>,
     #[account(
         mut,
-        token::mint = market.meta.short_token_mint,
+        token::mint = market.load()?.meta().short_token_mint,
         seeds = [
             constants::MARKET_VAULT_SEED,
             store.key().as_ref(),
-            market.meta.short_token_mint.as_ref(),
+            market.load()?.meta().short_token_mint.as_ref(),
             &[],
         ],
         bump,
@@ -120,13 +120,13 @@ pub struct ExecuteOrder<'info> {
     pub short_token_account: UncheckedAccount<'info>,
     #[account(
         mut,
-        token::mint = market.meta.long_token_mint,
+        token::mint = market.load()?.meta().long_token_mint,
         token::authority = store,
         constraint = check_delegation(claimable_long_token_account_for_user, order.fixed.user)?,
         seeds = [
             constants::CLAIMABLE_ACCOUNT_SEED,
             store.key().as_ref(),
-            market.meta.long_token_mint.as_ref(),
+            market.load()?.meta().long_token_mint.as_ref(),
             order.fixed.user.as_ref(),
             &store.load()?.claimable_time_key(validated_recent_timestamp(store.load()?.deref(), recent_timestamp)?)?,
         ],
@@ -135,13 +135,13 @@ pub struct ExecuteOrder<'info> {
     pub claimable_long_token_account_for_user: Option<Account<'info, TokenAccount>>,
     #[account(
         mut,
-        token::mint = market.meta.short_token_mint,
+        token::mint = market.load()?.meta().short_token_mint,
         token::authority = store,
         constraint = check_delegation(claimable_short_token_account_for_user, order.fixed.user)?,
         seeds = [
             constants::CLAIMABLE_ACCOUNT_SEED,
             store.key().as_ref(),
-            market.meta.short_token_mint.as_ref(),
+            market.load()?.meta().short_token_mint.as_ref(),
             order.fixed.user.as_ref(),
             &store.load()?.claimable_time_key(validated_recent_timestamp(store.load()?.deref(), recent_timestamp)?)?,
         ],
@@ -150,13 +150,13 @@ pub struct ExecuteOrder<'info> {
     pub claimable_short_token_account_for_user: Option<Account<'info, TokenAccount>>,
     #[account(
         mut,
-        token::mint = get_pnl_token(&position, &market)?,
+        token::mint = get_pnl_token(&position, market.load()?.deref())?,
         token::authority = store,
         constraint = check_delegation(claimable_pnl_token_account_for_holding, store.load()?.address.holding)?,
         seeds = [
             constants::CLAIMABLE_ACCOUNT_SEED,
             store.key().as_ref(),
-            get_pnl_token(&position, &market)?.as_ref(),
+            get_pnl_token(&position, market.load()?.deref())?.as_ref(),
             store.load()?.address.holding.as_ref(),
             &store.load()?.claimable_time_key(validated_recent_timestamp(store.load()?.deref(), recent_timestamp)?)?,
         ],
@@ -172,7 +172,10 @@ pub fn execute_order<'info>(
     _recent_timestamp: i64,
 ) -> Result<(bool, Box<TransferOut>)> {
     ctx.accounts.validate_time()?;
-    ctx.accounts.market.validate(&ctx.accounts.store.key())?;
+    ctx.accounts
+        .market
+        .load()?
+        .validate(&ctx.accounts.store.key())?;
     // TODO: validate non-empty order.
     // TODO: validate order trigger price.
     ctx.accounts.pre_execute()?;
@@ -232,7 +235,7 @@ impl<'info> ExecuteOrder<'info> {
     }
 
     fn prices(&self) -> Result<Prices<u128>> {
-        let meta = self.market.meta();
+        let meta = *self.market.load()?.meta();
         let oracle = &self.oracle.primary;
         Ok(Prices {
             index_token_price: oracle
@@ -256,6 +259,7 @@ impl<'info> ExecuteOrder<'info> {
     fn pre_execute(&mut self) -> Result<()> {
         let report = self
             .market
+            .load_mut()?
             .as_market(&mut self.market_token_mint)
             .distribute_position_impact()
             .map_err(GmxCoreError::from)?
@@ -291,8 +295,8 @@ impl<'info> ExecuteOrder<'info> {
                 );
                 let collateral_token = position.load()?.collateral_token;
 
-                // Exit must be called to update the external state.
-                self.market.exit(&crate::ID)?;
+                // // Exit must be called to update the external state.
+                // self.market.exit(&crate::ID)?;
                 // CHECK: `exit` has been called above, and `reload` will be called later.
                 let (swap_out, _) = unchecked_swap_with_params(
                     &self.oracle,
@@ -302,16 +306,17 @@ impl<'info> ExecuteOrder<'info> {
                     (Some(self.order.fixed.tokens.initial_collateral_token), None),
                     (params.initial_collateral_delta_amount, 0),
                 )?;
-                // Call `reload` to make sure the state is up-to-date.
-                self.market.reload()?;
+                // // Call `reload` to make sure the state is up-to-date.
+                // self.market.reload()?;
                 let collateral_increment_amount =
-                    swap_out.transfer_to_market(&mut self.market, true)?;
+                    swap_out.transfer_to_market(&self.market, true)?;
 
                 let size_delta_usd = params.size_delta_usd;
                 let acceptable_price = params.acceptable_price;
 
                 let report = self
                     .market
+                    .load_mut()?
                     .as_market(&mut self.market_token_mint)
                     .into_position_ops(position)?
                     .increase(
@@ -328,6 +333,7 @@ impl<'info> ExecuteOrder<'info> {
             }
             OrderKind::MarketDecrease | OrderKind::Liquidation => {
                 let report = {
+                    let mut market = self.market.load_mut()?;
                     let Some(position) = self.position.as_mut() else {
                         return err!(DataStoreError::PositionNotProvided);
                     };
@@ -337,8 +343,7 @@ impl<'info> ExecuteOrder<'info> {
                     let size_delta_usd = params.size_delta_usd;
                     let acceptable_price = params.acceptable_price;
 
-                    let mut position = self
-                        .market
+                    let mut position = market
                         .as_market(&mut self.market_token_mint)
                         .into_position_ops(position)?;
 
@@ -418,7 +423,7 @@ impl<'info> ExecuteOrder<'info> {
         );
 
         // Swap output token to the expected output token.
-        let meta = self.market.meta();
+        let meta = *self.market.load()?.meta();
         let token_ins = if is_output_token_long {
             (Some(meta.long_token_mint), Some(meta.short_token_mint))
         } else {
@@ -436,7 +441,7 @@ impl<'info> ExecuteOrder<'info> {
             if to.key() != self.market.key() {
                 unchecked_transfer_to_market(
                     &self.store.key(),
-                    &mut self.market,
+                    &self.market,
                     to,
                     &token,
                     output_amount,
@@ -448,7 +453,7 @@ impl<'info> ExecuteOrder<'info> {
             if to.key() != self.market.key() {
                 unchecked_transfer_to_market(
                     &self.store.key(),
-                    &mut self.market,
+                    &self.market,
                     to,
                     &token,
                     secondary_output_amount,
@@ -456,9 +461,9 @@ impl<'info> ExecuteOrder<'info> {
             }
         }
 
-        // Call exit to make sure the data are written to the storage.
-        // In case that there are markets also appear in the swap paths.
-        self.market.exit(&crate::ID)?;
+        // // Call exit to make sure the data are written to the storage.
+        // // In case that there are markets also appear in the swap paths.
+        // self.market.exit(&crate::ID)?;
         // CHECK: `exit` and `reload` have been called on the modified market account before and after the swap.
         let (swap_out, secondary_swap_out) = unchecked_swap_with_params(
             &self.oracle,
@@ -475,8 +480,8 @@ impl<'info> ExecuteOrder<'info> {
             token_ins,
             (output_amount, secondary_output_amount),
         )?;
-        // Call `reload` to make sure the state is up-to-date.
-        self.market.reload()?;
+        // // Call `reload` to make sure the state is up-to-date.
+        // self.market.reload()?;
 
         self.transfer_out(ctx, false, swap_out.into_amount())?;
         self.transfer_out(ctx, true, secondary_swap_out.into_amount())?;
@@ -670,6 +675,7 @@ impl<'info> ExecuteOrder<'info> {
         }
 
         self.market
+            .load_mut()?
             .as_market(&mut self.market_token_mint)
             .validate_market_balances(long_amount, short_amount)?;
         Ok(())

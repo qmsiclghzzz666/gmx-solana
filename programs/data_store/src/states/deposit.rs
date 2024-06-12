@@ -102,7 +102,7 @@ impl Deposit {
         &mut self,
         bump: u8,
         store: Pubkey,
-        market: &Account<Market>,
+        market: &AccountLoader<Market>,
         nonce: NonceBytes,
         tokens_with_feed: Vec<TokenRecord>,
         user: Pubkey,
@@ -132,7 +132,7 @@ impl Deposit {
                 },
                 receivers,
                 tokens: Tokens {
-                    market_token: market.meta.market_token_mint,
+                    market_token: market.load()?.meta().market_token_mint,
                     initial_long_token: initial_long_token_account.as_ref().map(|a| a.mint),
                     initial_short_token: initial_short_token_account.as_ref().map(|a| a.mint),
                     params: token_params,

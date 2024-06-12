@@ -13,6 +13,7 @@ import { PriceServiceConnection } from "@pythnetwork/price-service-client";
 import { PythSolanaReceiver } from "@pythnetwork/pyth-solana-receiver";
 import { findClaimableAccountPDA, getTimeKey, invokeCloseEmptyClaimableAccount, invokeUseClaimableAccount } from "./data/token";
 import { TIME_WINDOW } from "./data/constants";
+import { makeInvoke as makeInvoke2 } from "gmsol";
 
 export const exchange = workspace.Exchange as Program<Exchange>;
 
@@ -65,6 +66,31 @@ export type MakeCancelDepositParams = {
         }
     }
 };
+
+export const makeUpdateMarketConfigInstruction = async (
+    program: DataStoreProgram,
+    {
+        authority,
+        store,
+        marketToken,
+        key,
+        value,
+    }: {
+        authority: PublicKey,
+        store: PublicKey,
+        marketToken: PublicKey,
+        key: string,
+        value: bigint | number,
+    }
+) => {
+    return await program.methods.updateMarketConfig(key, toBN(value)).accountsPartial({
+        authority,
+        store,
+        market: findMarketPDA(store, marketToken)[0],
+    }).instruction();
+};
+
+export const invokeUpdateMarketConfig = makeInvoke2(makeUpdateMarketConfigInstruction, ["authority"]);
 
 export const makeCancelDepositInstruction = async ({
     authority,
