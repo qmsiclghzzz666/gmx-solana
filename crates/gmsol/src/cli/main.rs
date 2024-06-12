@@ -9,8 +9,8 @@ use anchor_client::{
     Cluster,
 };
 use clap::Parser;
-use eyre::{eyre, ContextCompat};
-use gmsol::utils::SignerRef;
+use eyre::eyre;
+use gmsol::{store::utils::read_store, utils::SignerRef};
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::EnvFilter;
 
@@ -34,9 +34,17 @@ struct Cli {
     /// Commitment level.
     #[arg(long, env, default_value = "confirmed")]
     commitment: CommitmentConfig,
-    /// The address of the `DataStore` account.
-    #[arg(long, env)]
-    store: Option<Pubkey>,
+    /// The address of the `Store` account.
+    #[arg(long, env, group = "store-address")]
+    store_address: Option<Pubkey>,
+    /// The key fo the `Store` account to use.
+    #[arg(
+        long = "store",
+        short = 's',
+        group = "store-address",
+        default_value = ""
+    )]
+    store: String,
     /// `DataStore` Program ID.
     #[arg(long, env)]
     store_program: Option<Pubkey>,
@@ -113,8 +121,14 @@ impl Cli {
             .map_err(|err| eyre!("Invalid cluster: {err}"))
     }
 
-    fn store(&self) -> eyre::Result<&Pubkey> {
-        self.store.as_ref().wrap_err("missing store address")
+    async fn store(&self, client: &GMSOLClient) -> eyre::Result<(Pubkey, String)> {
+        if let Some(address) = self.store_address {
+            let store = read_store(&client.data_store().async_rpc(), &address).await?;
+            Ok((address, store.key()?.to_owned()))
+        } else {
+            let store = client.find_store_address(&self.store);
+            Ok((store, self.store.clone()))
+        }
     }
 
     fn options(&self) -> gmsol::ClientOptions {
@@ -139,28 +153,17 @@ impl Cli {
 
     async fn run(&self) -> eyre::Result<()> {
         let client = self.gmsol_client()?;
+        let (store, store_key) = self.store(&client).await?;
         match &self.command {
             Command::Whoami => {
                 println!("{}", client.payer());
             }
-            Command::Admin(args) => {
-                args.run(&client, self.store.as_ref(), self.serialize_only)
-                    .await?
-            }
-            Command::Inspect(args) => args.run(&client, self.store.as_ref()).await?,
-            Command::Exchange(args) => args.run(&client, self.store()?).await?,
-            Command::Order(args) => {
-                args.run(&client, self.store()?, self.serialize_only)
-                    .await?
-            }
-            Command::Market(args) => {
-                args.run(&client, self.store()?, self.serialize_only)
-                    .await?
-            }
-            Command::Controller(args) => {
-                args.run(&client, self.store()?, self.serialize_only)
-                    .await?
-            }
+            Command::Admin(args) => args.run(&client, &store_key, self.serialize_only).await?,
+            Command::Inspect(args) => args.run(&client, &store).await?,
+            Command::Exchange(args) => args.run(&client, &store).await?,
+            Command::Order(args) => args.run(&client, &store, self.serialize_only).await?,
+            Command::Market(args) => args.run(&client, &store, self.serialize_only).await?,
+            Command::Controller(args) => args.run(&client, &store, self.serialize_only).await?,
         }
         Ok(())
     }

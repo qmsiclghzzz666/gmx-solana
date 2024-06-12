@@ -12,7 +12,7 @@ pub(super) struct AdminArgs {
 #[derive(clap::Subcommand)]
 enum Command {
     /// Initialize a new data store.
-    InitializeStore { key: Option<String> },
+    InitializeStore,
     /// Enable a role.
     EnableRole { role: String },
     /// Grant a role to a user.
@@ -28,15 +28,15 @@ impl AdminArgs {
     pub(super) async fn run(
         &self,
         client: &GMSOLClient,
-        store: Option<&Pubkey>,
+        store_key: &str,
         serialize_only: bool,
     ) -> gmsol::Result<()> {
-        match (&self.command, store) {
-            (Command::InitializeStore { key }, _) => {
-                let key = key.as_deref().unwrap_or_default();
-                println!("Initialize store: {}", client.find_store_address(key));
+        let store = client.find_store_address(store_key);
+        match &self.command {
+            Command::InitializeStore => {
+                println!("Initialize store with key={store_key}, address={store}",);
                 crate::utils::send_or_serialize(
-                    client.initialize_store(key),
+                    client.initialize_store(store_key),
                     serialize_only,
                     |signature| {
                         tracing::info!("initialized a new data store at tx {signature}");
@@ -45,9 +45,9 @@ impl AdminArgs {
                 )
                 .await?;
             }
-            (Command::EnableRole { role }, Some(store)) => {
+            Command::EnableRole { role } => {
                 crate::utils::send_or_serialize(
-                    client.enable_role(store, role),
+                    client.enable_role(&store, role),
                     serialize_only,
                     |signature| {
                         tracing::info!("enabled role `{role}` at tx {signature}");
@@ -56,9 +56,9 @@ impl AdminArgs {
                 )
                 .await?;
             }
-            (Command::GrantRole { role, authority }, Some(store)) => {
+            Command::GrantRole { role, authority } => {
                 crate::utils::send_or_serialize(
-                    client.grant_role(store, authority, role),
+                    client.grant_role(&store, authority, role),
                     serialize_only,
                     |signature| {
                         tracing::info!("grant a role for user {authority} at tx {signature}");
@@ -67,7 +67,6 @@ impl AdminArgs {
                 )
                 .await?;
             }
-            (_, None) => return Err(gmsol::Error::unknown("missing `store` address")),
         }
         Ok(())
     }

@@ -1,6 +1,5 @@
 use anchor_client::solana_sdk::pubkey::Pubkey;
 use data_store::states::{self, AddressKey, AmountKey, FactorKey, MarketConfigKey};
-use eyre::ContextCompat;
 use gmsol::{
     store::utils::{read_market, read_store, token_map},
     utils::{self, try_deserailize_account},
@@ -19,11 +18,12 @@ pub(super) struct InspectArgs {
 enum Command {
     /// `Store` account.
     Store {
+        #[arg(long, short, group = "other-store")]
         address: Option<Pubkey>,
-        #[arg(long, short)]
+        #[arg(long, short, group = "other-store")]
         key: Option<String>,
         #[arg(long)]
-        current: bool,
+        show_address: bool,
         #[arg(long, group = "get")]
         debug: bool,
         #[arg(long, group = "get")]
@@ -83,11 +83,7 @@ enum Command {
 }
 
 impl InspectArgs {
-    pub(super) async fn run(
-        &self,
-        client: &GMSOLClient,
-        store: Option<&Pubkey>,
-    ) -> gmsol::Result<()> {
+    pub(super) async fn run(&self, client: &GMSOLClient, store: &Pubkey) -> gmsol::Result<()> {
         let program = client.data_store();
         match &self.command {
             Command::Discriminator { name } => {
@@ -96,18 +92,18 @@ impl InspectArgs {
             Command::Store {
                 address,
                 key,
-                current,
+                show_address,
                 debug,
                 get_address,
                 get_amount,
                 get_factor,
             } => {
-                let address = if *current {
-                    *store.wrap_err("current store address not set")?
+                let address = if let Some(address) = address {
+                    *address
+                } else if let Some(key) = key {
+                    client.find_store_address(key)
                 } else {
-                    address.unwrap_or_else(|| {
-                        client.find_store_address(key.as_deref().unwrap_or_default())
-                    })
+                    *store
                 };
                 let store = read_store(&client.data_store().async_rpc(), &address).await?;
                 if let Some(key) = get_amount {
@@ -117,18 +113,19 @@ impl InspectArgs {
                 } else if let Some(key) = get_address {
                     println!("{}", store.get_address_by_key(*key));
                 } else if *debug {
-                    println!("Store Address: {address}");
                     println!("{store:?}");
                 } else {
-                    println!("Store Address: {address}");
                     println!("{store}");
+                }
+                if *show_address {
+                    println!("Store Address: {address}");
                 }
             }
             Command::TokenMap { address } => {
                 let address = if let Some(address) = address {
                     *address
                 } else {
-                    token_map(program, store.wrap_err("neither the address of config account nor the address of store provided")?).await?
+                    token_map(program, store).await?
                 };
                 println!(
                     "{:#?}",
@@ -142,13 +139,12 @@ impl InspectArgs {
             Command::Market {
                 mut address,
                 as_market_address,
-                show_market_address,
+                show_market_address: show_address,
                 debug,
                 get_config,
             } => {
                 if !as_market_address {
-                    address = client
-                        .find_market_address(store.wrap_err("`store` not provided")?, &address);
+                    address = client.find_market_address(store, &address);
                 }
                 let market = read_market(&program.async_rpc(), &address).await?;
                 if let Some(key) = get_config {
@@ -158,7 +154,7 @@ impl InspectArgs {
                 } else {
                     println!("{:#?}", market);
                 }
-                if *show_market_address {
+                if *show_address {
                     println!("Market address: {address}");
                 }
             }
@@ -172,11 +168,11 @@ impl InspectArgs {
                 );
             }
             Command::Controller => {
-                let controller = client.controller_address(store.wrap_err("`store` not provided")?);
+                let controller = client.controller_address(store);
                 println!("{controller}");
             }
             Command::Oracle { oracle } => {
-                let address = oracle.address(store, &client.data_store_program_id())?;
+                let address = oracle.address(Some(store), &client.data_store_program_id())?;
                 println!("{address}");
                 println!("{:#?}", program.account::<states::Oracle>(address).await?);
             }

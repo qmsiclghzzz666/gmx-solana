@@ -5,7 +5,7 @@ use data_store::{accounts, instruction};
 
 /// Data Store management for GMSOL.
 pub trait StoreOps<C> {
-    /// Initialize [`DataStore`] account.
+    /// Initialize [`Store`] account.
     fn initialize_store(&self, key: &str) -> RequestBuilder<C>;
 }
 

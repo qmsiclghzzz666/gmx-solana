@@ -46,14 +46,17 @@ impl std::fmt::Display for Store {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Store({}): authority={} roles={} members={} token_map={}",
-            self.key().unwrap_or("*failed to parse*"),
+            "Store({}): authority={} roles={} members={} token_map={} treasury={}",
+            self.key()
+                .map(|s| if s.is_empty() { "*default*" } else { s })
+                .unwrap_or("*failed to parse*"),
             self.authority,
             self.role.num_roles(),
             self.role.num_members(),
             self.token_map()
                 .map(|pubkey| pubkey.to_string())
                 .unwrap_or("*unset*".to_string()),
+            self.treasury,
         )
     }
 }
@@ -232,6 +235,17 @@ pub struct Treasury {
     treasury_factor: u128,
     /// Next treasury claim factor.
     next_treasury_factor: u128,
+}
+
+#[cfg(feature = "display")]
+impl std::fmt::Display for Treasury {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{{ receiver={}, treasury={}, treasury_factor={} }}",
+            self.receiver, self.treasury, self.treasury_factor
+        )
+    }
 }
 
 impl Treasury {
