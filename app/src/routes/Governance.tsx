@@ -9,7 +9,7 @@ import Tab from "@/components/Tab/Tab";
 import Button from "@/components/Button/Button";
 import { ChangeEvent, useCallback, useMemo, useState } from "react";
 import { useDataStore, useExchange } from "@/contexts/anchor";
-import { BorshInstructionCoder, utils } from "@coral-xyz/anchor";
+import { BN, BorshInstructionCoder, utils } from "@coral-xyz/anchor";
 import { getInstructionDataFromBase64 } from "@solana/spl-governance";
 import { PublicKey } from "@solana/web3.js";
 
@@ -25,7 +25,7 @@ const FORMAT_LABELS = {
   [Format.Hex]: "Hex",
 };
 
-type InstructionArgs = Record<string, string | PublicKey | null>;
+type InstructionArgs = Record<string, string | PublicKey | BN | null>;
 
 interface Instruction {
   name: string,
@@ -166,8 +166,8 @@ function InstructionCard({ instruction }: { instruction?: Instruction }) {
   return (
     <div className="App-card Instruction-card">
       <div className="App-card-content">
-        <CardRow label={t`Instruction`} value={name ?? "*empty*"} />
         {decodedBy && <CardRow label={t`Program`} value={decodedBy} />}
+        <CardRow label={t`Instruction`} value={name ?? "*empty*"} />
         <div className="App-card-divider" />
         {
           Object.entries(args).map(([key, value]) => {
