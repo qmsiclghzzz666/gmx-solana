@@ -204,7 +204,6 @@ export default function Earn() {
         buySellActionHandler={buySellActionHandler}
         shouldScrollToTop={true}
       />
-
     </div>
   )
 }

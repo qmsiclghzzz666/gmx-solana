@@ -6,15 +6,13 @@ import { i18n } from "@lingui/core";
 import Earn from './routes/Earn';
 import Dashboard from './routes/Dashboard';
 import Exchange from './routes/Exchange';
-import { SharedStatesProvider } from './contexts/shared';
 import { earnLoader } from './routes/loaders';
-import { NativeTokenUtilsProvider } from './components/NativeTokenUtils';
 import { useEffect } from 'react';
 import { defaultLocale, dynamicActivate } from './utils/i18n';
 import { LANGUAGE_LOCALSTORAGE_KEY } from './config/localStorage';
-import { PendingStateProvider } from './contexts/pending';
 import { SWRConfig } from 'swr';
 import { AnchorStateProvider } from './contexts/anchor';
+import { Governance } from './routes/Governance';
 
 const router = createBrowserRouter([
   {
@@ -39,6 +37,10 @@ const router = createBrowserRouter([
         element: <Exchange />,
       }
     ]
+  },
+  {
+    path: "/governance",
+    element: <Governance />
   }
 ]);
 
@@ -48,21 +50,15 @@ const swrConfig = {
 
 export function App() {
   useEffect(() => {
-    const defaultLangugage = localStorage.getItem(LANGUAGE_LOCALSTORAGE_KEY) ?? defaultLocale;
-    void dynamicActivate(defaultLangugage);
+    const defaultLanguage = localStorage.getItem(LANGUAGE_LOCALSTORAGE_KEY) ?? defaultLocale;
+    void dynamicActivate(defaultLanguage);
   }, []);
 
   return (
     <I18nProvider i18n={i18n}>
       <SWRConfig value={swrConfig}>
         <AnchorStateProvider>
-          <PendingStateProvider>
-            <SharedStatesProvider>
-              <NativeTokenUtilsProvider>
-                <RouterProvider router={router} />
-              </NativeTokenUtilsProvider>
-            </SharedStatesProvider>
-          </PendingStateProvider>
+          <RouterProvider router={router} />
         </AnchorStateProvider>
       </SWRConfig>
     </I18nProvider>

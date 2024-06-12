@@ -12,6 +12,9 @@ import { Outlet } from "react-router-dom";
 import Footer from "@/components/Footer/Footer";
 import { ToastContainer, cssTransition } from "react-toastify";
 import { TOAST_AUTO_CLOSE_TIME } from '@/config/ui';
+import { NativeTokenUtilsProvider } from '@/components/NativeTokenUtils';
+import { SharedStatesProvider } from '@/contexts/shared';
+import { PendingStateProvider } from '@/contexts/pending';
 
 const Zoom = cssTransition({
   enter: "zoomIn",
@@ -23,26 +26,30 @@ const Zoom = cssTransition({
 
 export default function Root() {
   return (
-    <>
-      <div className="App">
-        <div className="App-content">
-          <Header />
-        </div>
-        <Outlet />
-        <Footer />
-        <ToastContainer
-          limit={1}
-          theme="dark"
-          transition={Zoom}
-          position="bottom-right"
-          autoClose={TOAST_AUTO_CLOSE_TIME}
-          hideProgressBar={true}
-          newestOnTop={false}
-          closeOnClick={false}
-          draggable={false}
-          pauseOnHover
-        />
-      </div>
-    </>
+    <PendingStateProvider>
+      <SharedStatesProvider>
+        <NativeTokenUtilsProvider>
+          <div className="App">
+            <div className="App-content">
+              <Header />
+            </div>
+            <Outlet />
+            <Footer />
+            <ToastContainer
+              limit={1}
+              theme="dark"
+              transition={Zoom}
+              position="bottom-right"
+              autoClose={TOAST_AUTO_CLOSE_TIME}
+              hideProgressBar={true}
+              newestOnTop={false}
+              closeOnClick={false}
+              draggable={false}
+              pauseOnHover
+            />
+          </div>
+        </NativeTokenUtilsProvider>
+      </SharedStatesProvider>
+    </PendingStateProvider>
   )
 }
