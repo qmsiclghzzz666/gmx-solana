@@ -18,6 +18,7 @@
     "@headlessui/react": "^1.7.19",
     "@lingui/react": "^4.10.0",
     "@pythnetwork/client": "^2.21.0",
+    "@solana/spl-governance": "^0.3.28",
     "@solana/spl-token": "^0.4.6",
     "@solana/wallet-adapter-base": "^0.9.23",
     "@solana/wallet-adapter-react": "^0.15.35",
