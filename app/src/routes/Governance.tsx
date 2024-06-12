@@ -68,6 +68,7 @@ export function Governance() {
 
   const handleDataChange = useCallback((e: ChangeEvent<HTMLTextAreaElement>) => {
     setData(e.target.value);
+    setInstruction(undefined);
   }, []);
 
   const handleSubmit = useCallback(() => {
@@ -116,6 +117,7 @@ export function Governance() {
                   onChange={(format) => {
                     setFormat(format);
                     setData("");
+                    setInstruction(undefined);
                   }}
                 />
                 <form onSubmit={(e) => {
@@ -170,7 +172,7 @@ function InstructionCard({ instruction }: { instruction?: Instruction }) {
         {
           Object.entries(args).map(([key, value]) => {
             return (
-              <CardRow key={key} label={key} value={value ? value.toString() : "null"} />
+              <CardRow key={key} label={key} value={value ? value.toString() : "*null*"} />
             );
           })
         }
