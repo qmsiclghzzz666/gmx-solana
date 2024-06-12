@@ -241,7 +241,7 @@ pub mod data_store {
         long_token_mint: Pubkey,
         short_token_mint: Pubkey,
     ) -> Result<()> {
-        instructions::initialize_market_token(
+        instructions::unchecked_initialize_market_token(
             ctx,
             index_token_mint,
             long_token_mint,
@@ -251,12 +251,12 @@ pub mod data_store {
 
     #[access_control(internal::Authenticate::only_controller(&ctx))]
     pub fn mint_market_token_to(ctx: Context<MintMarketTokenTo>, amount: u64) -> Result<()> {
-        instructions::mint_market_token_to(ctx, amount)
+        instructions::unchecked_mint_market_token_to(ctx, amount)
     }
 
     #[access_control(internal::Authenticate::only_controller(&ctx))]
     pub fn burn_market_token_from(ctx: Context<BurnMarketTokenFrom>, amount: u64) -> Result<()> {
-        instructions::burn_market_token_from(ctx, amount)
+        instructions::unchecked_burn_market_token_from(ctx, amount)
     }
 
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
@@ -264,7 +264,7 @@ pub mod data_store {
         ctx: Context<InitializeMarketVault>,
         market_token_mint: Option<Pubkey>,
     ) -> Result<()> {
-        instructions::initialize_market_vault(ctx, market_token_mint)
+        instructions::unchecked_initialize_market_vault(ctx, market_token_mint)
     }
 
     #[access_control(internal::Authenticate::only_controller(&ctx))]
@@ -272,7 +272,7 @@ pub mod data_store {
         ctx: Context<MarketVaultTransferOut>,
         amount: u64,
     ) -> Result<()> {
-        instructions::market_vault_transfer_out(ctx, amount)
+        instructions::unchecked_market_vault_transfer_out(ctx, amount)
     }
 
     #[access_control(internal::Authenticate::only_controller(&ctx))]
@@ -281,7 +281,7 @@ pub mod data_store {
         timestamp: i64,
         amount: u64,
     ) -> Result<()> {
-        instructions::use_claimable_account(ctx, timestamp, amount)
+        instructions::unchecked_use_claimable_account(ctx, timestamp, amount)
     }
 
     #[access_control(internal::Authenticate::only_controller(&ctx))]
@@ -290,7 +290,7 @@ pub mod data_store {
         user: Pubkey,
         timestamp: i64,
     ) -> Result<()> {
-        instructions::close_empty_claimable_account(ctx, user, timestamp)
+        instructions::unchecked_close_empty_claimable_account(ctx, user, timestamp)
     }
 
     // Oracle.

@@ -19,8 +19,8 @@ pub struct MarketConfig {
     pub(super) min_position_size_usd: Factor,
     pub(super) min_collateral_value: Factor,
     pub(super) min_collateral_factor: Factor,
-    pub(super) min_collateral_factor_for_open_interest_for_long: Factor,
-    pub(super) min_collateral_factor_for_open_interest_for_short: Factor,
+    pub(super) min_collateral_factor_for_open_interest_multiplier_for_long: Factor,
+    pub(super) min_collateral_factor_for_open_interest_multiplier_for_short: Factor,
     pub(super) max_positive_position_impact_factor: Factor,
     pub(super) max_negative_position_impact_factor: Factor,
     pub(super) max_position_impact_factor_for_liquidations: Factor,
@@ -83,9 +83,9 @@ impl MarketConfig {
         self.min_position_size_usd = constants::DEFAULT_MIN_POSITION_SIZE_USD;
         self.min_collateral_value = constants::DEFAULT_MIN_COLLATERAL_VALUE;
         self.min_collateral_factor = constants::DEFAULT_MIN_COLLATERAL_FACTOR;
-        self.min_collateral_factor_for_open_interest_for_long =
+        self.min_collateral_factor_for_open_interest_multiplier_for_long =
             constants::DEFAULT_MIN_COLLATERAL_FACTOR_FOR_OPEN_INTEREST_FOR_LONG;
-        self.min_collateral_factor_for_open_interest_for_short =
+        self.min_collateral_factor_for_open_interest_multiplier_for_short =
             constants::DEFAULT_MIN_COLLATERAL_FACTOR_FOR_OPEN_INTEREST_FOR_SHORT;
         self.max_positive_position_impact_factor =
             constants::DEFAULT_MAX_POSITIVE_POSITION_IMPACT_FACTOR;
@@ -166,11 +166,11 @@ impl MarketConfig {
             MarketConfigKey::MinPositionSizeUsd => &self.min_position_size_usd,
             MarketConfigKey::MinCollateralValue => &self.min_collateral_value,
             MarketConfigKey::MinCollateralFactor => &self.min_collateral_factor,
-            MarketConfigKey::MinCollateralFactorForOpenInterestForLong => {
-                &self.min_collateral_factor_for_open_interest_for_long
+            MarketConfigKey::MinCollateralFactorForOpenInterestMultiplierForLong => {
+                &self.min_collateral_factor_for_open_interest_multiplier_for_long
             }
-            MarketConfigKey::MinCollateralFactorForOpenInterestForShort => {
-                &self.min_collateral_factor_for_open_interest_for_short
+            MarketConfigKey::MinCollateralFactorForOpenInterestMultiplierForShort => {
+                &self.min_collateral_factor_for_open_interest_multiplier_for_short
             }
             MarketConfigKey::MaxPositionPositionImpactFactor => {
                 &self.max_positive_position_impact_factor
@@ -258,11 +258,11 @@ impl MarketConfig {
             MarketConfigKey::MinPositionSizeUsd => &mut self.min_position_size_usd,
             MarketConfigKey::MinCollateralValue => &mut self.min_collateral_value,
             MarketConfigKey::MinCollateralFactor => &mut self.min_collateral_factor,
-            MarketConfigKey::MinCollateralFactorForOpenInterestForLong => {
-                &mut self.min_collateral_factor_for_open_interest_for_long
+            MarketConfigKey::MinCollateralFactorForOpenInterestMultiplierForLong => {
+                &mut self.min_collateral_factor_for_open_interest_multiplier_for_long
             }
-            MarketConfigKey::MinCollateralFactorForOpenInterestForShort => {
-                &mut self.min_collateral_factor_for_open_interest_for_short
+            MarketConfigKey::MinCollateralFactorForOpenInterestMultiplierForShort => {
+                &mut self.min_collateral_factor_for_open_interest_multiplier_for_short
             }
             MarketConfigKey::MaxPositionPositionImpactFactor => {
                 &mut self.max_positive_position_impact_factor
@@ -379,10 +379,10 @@ pub enum MarketConfigKey {
     MinCollateralValue,
     /// Min collateral factor.
     MinCollateralFactor,
-    /// Min collateral factor for open interest for long.
-    MinCollateralFactorForOpenInterestForLong,
-    /// Min collateral factor for open interest for short.
-    MinCollateralFactorForOpenInterestForShort,
+    /// Min collateral factor for open interest multiplier for long.
+    MinCollateralFactorForOpenInterestMultiplierForLong,
+    /// Min collateral factor for open interest multiplier for short.
+    MinCollateralFactorForOpenInterestMultiplierForShort,
     /// Max positive position impact factor.
     MaxPositionPositionImpactFactor,
     /// Max negative position impact factor.
