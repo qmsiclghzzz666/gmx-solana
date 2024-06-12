@@ -595,21 +595,6 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
         Ok((distribution_amount, next_amount))
     }
 
-    /// Get reseved value.
-    fn reserved(&self, is_long: bool, index_token_price: &Self::Num) -> crate::Result<Self::Num> {
-        use num_traits::CheckedMul;
-
-        if is_long {
-            let amount = self.open_interest_in_tokens()?.amount(is_long)?;
-            // TODO: use max price.
-            amount
-                .checked_mul(index_token_price)
-                .ok_or(crate::Error::Computation("calculating reserved value"))
-        } else {
-            self.open_interest()?.amount(is_long)
-        }
-    }
-
     /// Get borrowing factor per second.
     fn calc_borrowing_factor_per_second(
         &self,
@@ -618,7 +603,7 @@ pub trait MarketExt<const DECIMALS: u8>: Market<DECIMALS> {
     ) -> crate::Result<Self::Num> {
         use crate::utils;
 
-        let reserved_value = self.reserved(is_long, &prices.index_token_price)?;
+        let reserved_value = self.reserved_value(&prices.index_token_price, is_long)?;
 
         if reserved_value.is_zero() {
             return Ok(Zero::zero());
