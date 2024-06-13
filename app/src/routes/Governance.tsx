@@ -12,6 +12,7 @@ import { useDataStore, useExchange } from "@/contexts/anchor";
 import { BN, BorshInstructionCoder, utils } from "@coral-xyz/anchor";
 import { getInstructionDataFromBase64 } from "@solana/spl-governance";
 import { PublicKey } from "@solana/web3.js";
+import { isNull, isUndefined } from "lodash";
 
 enum Format {
   Governance = "Governance",
@@ -25,7 +26,7 @@ const FORMAT_LABELS = {
   [Format.Hex]: "Hex",
 };
 
-type InstructionArgs = Record<string, string | PublicKey | BN | null>;
+type InstructionArgs = Record<string, boolean | string | PublicKey | BN | null>;
 
 interface Instruction {
   name: string,
@@ -165,8 +166,9 @@ function InstructionCard({ instruction }: { instruction?: Instruction }) {
         <div className="App-card-divider" />
         {
           Object.entries(args).map(([key, value]) => {
+            const display = (isNull(value) || isUndefined(value)) ? "*null*" : value.toString();
             return (
-              <CardRow key={key} label={key} value={value ? value.toString() : "*null*"} />
+              <CardRow key={key} label={key} value={display} />
             );
           })
         }
