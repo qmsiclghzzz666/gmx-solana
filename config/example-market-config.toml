@@ -1,0 +1,4 @@
+[ADVTTETv4Nbg7a2jPZWCxJ7uoQsPoewi4sJhK9DqpSpe]
+enable = true
+swap_fee_receiver_factor = "37_000_000_000_000_000_000"
+min_collateral_value = "500_000_000_000_000_000_000"

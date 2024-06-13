@@ -1,7 +1,9 @@
+use core::fmt;
 use std::{
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
     io::Read,
     path::{Path, PathBuf},
+    str::FromStr,
 };
 
 use anchor_client::solana_sdk::{pubkey::Pubkey, signature::Keypair};
@@ -102,6 +104,12 @@ enum Command {
         key: MarketConfigKey,
         #[arg(long, short)]
         value: Factor,
+    },
+    /// Update Market Configs from file.
+    UpdateConfigs {
+        path: PathBuf,
+        #[arg(long)]
+        skip_preflight: bool,
     },
     /// Toggle market.
     ToggleMarket {
@@ -341,6 +349,15 @@ impl Args {
                 )
                 .await?;
             }
+            Command::UpdateConfigs {
+                path,
+                skip_preflight,
+            } => {
+                let configs: MarketConfigs = toml_from_file(path)?;
+                configs
+                    .update(client, store, serialize_only, *skip_preflight)
+                    .await?;
+            }
             Command::ToggleMarket {
                 market_token,
                 toggle,
@@ -513,7 +530,7 @@ async fn create_markets(
                 Some(&token_map),
             )
             .await?;
-        println!("Adding instruction to create market `{name}` with token={token}");
+        tracing::info!("Adding instruction to create market `{name}` with token={token}");
         builder.try_push(rpc)?;
     }
 
@@ -531,6 +548,90 @@ async fn create_markets(
     )
     .await?;
     Ok(())
+}
+
+/// Market Configs.
+#[serde_with::serde_as]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct MarketConfigs {
+    #[serde_as(as = "HashMap<serde_with::DisplayFromStr, _>")]
+    #[serde(flatten)]
+    configs: HashMap<Pubkey, MarketConfig>,
+}
+
+#[derive(Debug)]
+struct SerdeFactor(Factor);
+
+impl fmt::Display for SerdeFactor {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl FromStr for SerdeFactor {
+    type Err = gmsol::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let s = s.replace('_', "");
+        let inner = s.parse::<u128>().map_err(gmsol::Error::unknown)?;
+        Ok(Self(inner))
+    }
+}
+
+#[serde_with::serde_as]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct MarketConfig {
+    #[serde(default)]
+    enable: Option<bool>,
+    #[serde_as(as = "BTreeMap<_, serde_with::DisplayFromStr>")]
+    #[serde(flatten)]
+    config: BTreeMap<MarketConfigKey, SerdeFactor>,
+}
+
+impl MarketConfigs {
+    async fn update(
+        &self,
+        client: &GMSOLClient,
+        store: &Pubkey,
+        serialize_only: bool,
+        skip_preflight: bool,
+    ) -> gmsol::Result<()> {
+        let mut builder = TransactionBuilder::new(client.data_store().async_rpc());
+
+        for (market_token, config) in &self.configs {
+            for (key, value) in &config.config {
+                tracing::info!(%market_token, "Add instruction to update `{key}` to `{value}`");
+                builder.try_push(client.update_market_config_by_key(
+                    store,
+                    market_token,
+                    *key,
+                    &value.0,
+                )?)?;
+            }
+            if let Some(enable) = config.enable {
+                tracing::info!(%market_token,
+                    "Add instruction to {} market",
+                    if enable { "enable" } else { "disable" },
+                );
+                builder.try_push(client.toggle_market(store, market_token, enable))?;
+            }
+        }
+
+        crate::utils::send_or_serialize_transactions(
+            builder,
+            serialize_only,
+            skip_preflight,
+            |signatures, error| {
+                println!("{signatures:#?}");
+                match error {
+                    None => Ok(()),
+                    Some(err) => Err(err),
+                }
+            },
+        )
+        .await?;
+        Ok(())
+    }
 }
 
 fn toml_from_file<T>(path: &impl AsRef<Path>) -> gmsol::Result<T>
