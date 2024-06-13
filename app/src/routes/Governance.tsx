@@ -7,7 +7,7 @@ import "./Governance.scss";
 import { CardRow } from "@/components/CardRow/CardRow";
 import Tab from "@/components/Tab/Tab";
 import Button from "@/components/Button/Button";
-import { ChangeEvent, useCallback, useMemo, useState } from "react";
+import { ChangeEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useDataStore, useExchange } from "@/contexts/anchor";
 import { BN, BorshInstructionCoder, utils } from "@coral-xyz/anchor";
 import { getInstructionDataFromBase64 } from "@solana/spl-governance";
@@ -68,18 +68,14 @@ export function Governance() {
 
   const handleDataChange = useCallback((e: ChangeEvent<HTMLTextAreaElement>) => {
     setData(e.target.value);
-    setInstruction(undefined);
   }, []);
 
-  const handleSubmit = useCallback(() => {
+  useEffect(() => {
     const decoded = decodeData(format, data);
     const decodedInstruction = decoded ? decoder(decoded) : null;
-    console.log(decodedInstruction);
+    console.debug("decoded:", decodedInstruction);
     if (!decodedInstruction) {
-      setInstruction({
-        name: "unknown",
-        args: {}
-      });
+      setInstruction(undefined);
     } else {
       const { instruction, decodedBy } = decodedInstruction;
       setInstruction({
@@ -116,13 +112,11 @@ export function Governance() {
                   option={format}
                   onChange={(format) => {
                     setFormat(format);
-                    setData("");
-                    setInstruction(undefined);
                   }}
                 />
                 <form onSubmit={(e) => {
                   e.preventDefault();
-                  handleSubmit();
+                  setData("");
                 }}>
                   <div className="InstructionBox-form-layout">
                     <div className="Exchange-swap-section-bottom">
@@ -144,7 +138,7 @@ export function Governance() {
                       variant="primary-action"
                       type="submit"
                     >
-                      Inspect
+                      Clear
                     </Button>
                   </div>
                 </form>
@@ -166,7 +160,7 @@ function InstructionCard({ instruction }: { instruction?: Instruction }) {
   return (
     <div className="App-card Instruction-card">
       <div className="App-card-content">
-        {decodedBy && <CardRow label={t`Program`} value={decodedBy} />}
+        <CardRow label={t`Program`} value={decodedBy ?? "*unknown*"} />
         <CardRow label={t`Instruction`} value={name ?? "*empty*"} />
         <div className="App-card-divider" />
         {
@@ -187,8 +181,12 @@ const decodeData = (format: Format, data: string) => {
     const byteNumbers = byteStrings.map(byte => parseInt(byte, 10));
     return Buffer.from(byteNumbers);
   } else if (format == Format.Governance) {
-    const ix = getInstructionDataFromBase64(data);
-    return Buffer.from(ix.data);
+    try {
+      const ix = getInstructionDataFromBase64(data);
+      return Buffer.from(ix.data);
+    } catch (error) {
+      return null;
+    }
   } else if (format == Format.Hex) {
     return utils.bytes.hex.decode(data);
   } else {
