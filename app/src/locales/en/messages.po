@@ -159,6 +159,10 @@ msgstr "Invalid closing position address"
 msgid "OTC"
 msgstr "OTC"
 
+#: src/routes/Governance.tsx
+msgid "Program"
+msgstr "Program"
+
 #: src/components/TradeBox/TradeBox.tsx
 #~ msgid "MarketMarket"
 #~ msgstr "MarketMarket"
@@ -509,6 +513,10 @@ msgstr "Search Pool"
 msgid "Open Long"
 msgstr "Open Long"
 
+#: src/routes/Governance.tsx
+msgid "Governance"
+msgstr "Governance"
+
 #: src/components/GmSwap/GmSwapBox/GmForm.tsx
 #: src/components/GmSwap/GmSwapBox/GmForm.tsx
 #: src/components/TradeBox/TradeForm.tsx
@@ -518,6 +526,10 @@ msgstr "Pay (wrap)"
 #: src/onchain/token/use-wrap-native-token.ts
 msgid "Wrapping SOL..."
 msgstr "Wrapping SOL..."
+
+#: src/routes/Governance.tsx
+msgid "Governance Utils"
+msgstr "Governance Utils"
 
 #: src/components/GmSwap/GmSwapBox/GmForm.tsx
 #: src/components/GmSwap/GmSwapBox/GmForm.tsx
@@ -641,6 +653,10 @@ msgstr "Pool"
 #: src/components/PositionList/PositionList.tsx
 msgid "Position"
 msgstr "Position"
+
+#: src/routes/Governance.tsx
+msgid "Instruction"
+msgstr "Instruction"
 
 #: src/routes/Earn.tsx
 msgid "Withdrawal created."

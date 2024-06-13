@@ -159,6 +159,10 @@ msgstr ""
 msgid "OTC"
 msgstr ""
 
+#: src/routes/Governance.tsx
+msgid "Program"
+msgstr ""
+
 #: src/components/TradeBox/TradeBox.tsx
 #~ msgid "MarketMarket"
 #~ msgstr ""
@@ -509,6 +513,10 @@ msgstr ""
 msgid "Open Long"
 msgstr ""
 
+#: src/routes/Governance.tsx
+msgid "Governance"
+msgstr ""
+
 #: src/components/GmSwap/GmSwapBox/GmForm.tsx
 #: src/components/GmSwap/GmSwapBox/GmForm.tsx
 #: src/components/TradeBox/TradeForm.tsx
@@ -517,6 +525,10 @@ msgstr ""
 
 #: src/onchain/token/use-wrap-native-token.ts
 msgid "Wrapping SOL..."
+msgstr ""
+
+#: src/routes/Governance.tsx
+msgid "Governance Utils"
 msgstr ""
 
 #: src/components/GmSwap/GmSwapBox/GmForm.tsx
@@ -640,6 +652,10 @@ msgstr ""
 
 #: src/components/PositionList/PositionList.tsx
 msgid "Position"
+msgstr ""
+
+#: src/routes/Governance.tsx
+msgid "Instruction"
 msgstr ""
 
 #: src/routes/Earn.tsx
