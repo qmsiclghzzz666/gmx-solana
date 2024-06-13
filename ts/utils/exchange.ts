@@ -24,21 +24,24 @@ export const createControllerPDA = (store: PublicKey) => PublicKey.findProgramAd
 
 export const createMarket = async (
     signer: Keypair,
+    name: string,
     dataStoreAddress: PublicKey,
     indexTokenMint: PublicKey,
     longTokenMint: PublicKey,
     shortTokenMint: PublicKey,
+    enable: boolean = true,
 ) => {
     const [marketTokenMint] = createMarketTokenMintPDA(dataStoreAddress, indexTokenMint, longTokenMint, shortTokenMint);
-    const [roles] = createRolesPDA(dataStoreAddress, signer.publicKey);
     const [marketAddress] = createMarketPDA(dataStoreAddress, marketTokenMint);
     const [marketTokenVault] = createMarketVaultPDA(dataStoreAddress, marketTokenMint);
     const [longTokenVault] = createMarketVaultPDA(dataStoreAddress, longTokenMint);
     const [shortTokenVault] = createMarketVaultPDA(dataStoreAddress, shortTokenMint);
+    const tokenMap = (await dataStore.account.store.fetch(dataStoreAddress)).tokenMap;
 
-    await exchange.methods.createMarket(indexTokenMint).accounts({
+    await exchange.methods.createMarket(name, indexTokenMint, enable).accounts({
         authority: signer.publicKey,
         dataStore: dataStoreAddress,
+        tokenMap,
         market: marketAddress,
         marketTokenMint,
         longTokenMint,
@@ -661,7 +664,7 @@ export const executeOrder = async (simulate: boolean, ...args: Parameters<typeof
 export const initializeMarkets = async (signer: Keypair, dataStoreAddress: PublicKey, fakeTokenMint: PublicKey, usdGMint: PublicKey) => {
     let GMWsolWsolBtc: PublicKey;
     try {
-        GMWsolWsolBtc = await createMarket(signer, dataStoreAddress, SOL_TOKEN_MINT, SOL_TOKEN_MINT, BTC_TOKEN_MINT);
+        GMWsolWsolBtc = await createMarket(signer, "A", dataStoreAddress, SOL_TOKEN_MINT, SOL_TOKEN_MINT, BTC_TOKEN_MINT);
         console.log(`New market has been created, mint: ${GMWsolWsolBtc}`);
     } catch (error) {
         console.warn("Failed to initialize market", error);
@@ -669,7 +672,7 @@ export const initializeMarkets = async (signer: Keypair, dataStoreAddress: Publi
 
     let GMWsolWsolUsdG: PublicKey;
     try {
-        GMWsolWsolUsdG = await createMarket(signer, dataStoreAddress, SOL_TOKEN_MINT, SOL_TOKEN_MINT, usdGMint);
+        GMWsolWsolUsdG = await createMarket(signer, "B", dataStoreAddress, SOL_TOKEN_MINT, SOL_TOKEN_MINT, usdGMint);
         console.log(`New market has been created, mint: ${GMWsolWsolUsdG}`);
     } catch (error) {
         console.warn("Failed to initialize market", error);
@@ -677,7 +680,7 @@ export const initializeMarkets = async (signer: Keypair, dataStoreAddress: Publi
 
     let GMFakeFakeUsdG: PublicKey;
     try {
-        GMFakeFakeUsdG = await createMarket(signer, dataStoreAddress, fakeTokenMint, fakeTokenMint, usdGMint);
+        GMFakeFakeUsdG = await createMarket(signer, "C", dataStoreAddress, fakeTokenMint, fakeTokenMint, usdGMint);
         console.log(`New market has been created, mint: ${GMFakeFakeUsdG}`);
     } catch (error) {
         console.warn("Failed to initialize market", error);

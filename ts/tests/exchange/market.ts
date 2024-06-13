@@ -1,8 +1,9 @@
 import { expect, getAddresses, getTokenMints, getUsers } from "../../utils/fixtures";
 import { Keypair, PublicKey } from "@solana/web3.js";
-import { createRolesPDA } from "../../utils/data";
+import { createMarketTokenMintPDA, createRolesPDA, dataStore, invokePushToTokenMapSynthetic } from "../../utils/data";
 import { createMarket } from "../../utils/exchange";
 import { AnchorError } from "@coral-xyz/anchor";
+import { findMarketPDA } from "gmsol";
 
 describe("exchange: market", () => {
     const { signer0, user0 } = getUsers();
@@ -17,13 +18,43 @@ describe("exchange: market", () => {
     before(async () => {
         ({ dataStoreAddress } = await getAddresses());
         [roles] = createRolesPDA(dataStoreAddress, signer0.publicKey);
+        const tokenMap = (await dataStore.account.store.fetch(dataStoreAddress)).tokenMap;
+        await invokePushToTokenMapSynthetic(dataStore, {
+            authority: signer0,
+            store: dataStoreAddress,
+            tokenMap,
+            name: "fake",
+            token: indexTokenMint,
+            tokenDecimals: 6,
+            heartbeatDuration: 33,
+            precision: 4,
+            feeds: {}
+        });
     });
 
     it("create market", async () => {
-        await createMarket(signer0, dataStoreAddress, indexTokenMint, longTokenMint, shortTokenMint);
+        const [marketTokenMint] = createMarketTokenMintPDA(dataStoreAddress, indexTokenMint, longTokenMint, shortTokenMint);
+        const [market] = findMarketPDA(dataStoreAddress, marketTokenMint);
+        await createMarket(signer0, "test", dataStoreAddress, indexTokenMint, longTokenMint, shortTokenMint);
+        // Only MARKET_KEEPER can toggle market.
+        {
+            await expect(dataStore.methods.toggleMarket(false).accounts({
+                authority: user0.publicKey,
+                market,
+            }).signers([user0]).rpc()).rejectedWith(Error, "Permission denied");
+        }
+        {
+            const beforeFlag = (await dataStore.account.market.fetch(market)).flag;
+            await dataStore.methods.toggleMarket(false).accounts({
+                authority: signer0.publicKey,
+                market,
+            }).signers([signer0]).rpc();
+            const afterFlag = (await dataStore.account.market.fetch(market)).flag;
+            expect(beforeFlag).not.eql(afterFlag);
+        }
     });
 
     it("only market keeper can create market", async () => {
-        (await expect(createMarket(user0, dataStoreAddress, indexTokenMint, longTokenMint, longTokenMint))).rejectedWith(AnchorError, "Permission denied");
+        (await expect(createMarket(user0, "test", dataStoreAddress, indexTokenMint, longTokenMint, longTokenMint))).rejectedWith(AnchorError, "Permission denied");
     });
 });

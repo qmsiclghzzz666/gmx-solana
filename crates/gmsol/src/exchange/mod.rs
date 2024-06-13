@@ -7,12 +7,11 @@ pub mod withdrawal;
 /// Order.
 pub mod order;
 
-use std::ops::Deref;
+use std::{future::Future, ops::Deref};
 
 use anchor_client::{
     anchor_lang::system_program,
     solana_sdk::{pubkey::Pubkey, signer::Signer},
-    RequestBuilder,
 };
 use data_store::states::{
     order::{OrderKind, OrderParams},
@@ -20,6 +19,8 @@ use data_store::states::{
 };
 use exchange::{accounts, instruction};
 use rand::{distributions::Standard, Rng};
+
+use crate::utils::RpcBuilder;
 
 use self::{
     deposit::{CancelDepositBuilder, CreateDepositBuilder, ExecuteDepositBuilder},
@@ -30,13 +31,17 @@ use self::{
 /// Exchange instructions for GMSOL.
 pub trait ExchangeOps<C> {
     /// Create a new market and return its token mint address.
+    #[allow(clippy::too_many_arguments)]
     fn create_market(
         &self,
         store: &Pubkey,
+        name: &str,
         index_token: &Pubkey,
         long_token: &Pubkey,
         short_token: &Pubkey,
-    ) -> (RequestBuilder<C>, Pubkey);
+        enable: bool,
+        token_map: Option<&Pubkey>,
+    ) -> impl Future<Output = crate::Result<(RpcBuilder<C>, Pubkey)>>;
 
     /// Create a deposit.
     fn create_deposit(&self, store: &Pubkey, market_token: &Pubkey) -> CreateDepositBuilder<C>;
@@ -195,22 +200,29 @@ where
         ExecuteWithdrawalBuilder::new(self, store, oracle, withdrawal)
     }
 
-    fn create_market(
+    async fn create_market(
         &self,
         store: &Pubkey,
+        name: &str,
         index_token: &Pubkey,
         long_token: &Pubkey,
         short_token: &Pubkey,
-    ) -> (RequestBuilder<C>, Pubkey) {
+        enable: bool,
+        token_map: Option<&Pubkey>,
+    ) -> crate::Result<(RpcBuilder<C>, Pubkey)> {
+        let token_map = match token_map {
+            Some(token_map) => *token_map,
+            None => crate::store::utils::token_map(self.data_store(), store).await?,
+        };
         let authority = self.payer();
         let market_token =
             self.find_market_token_address(store, index_token, long_token, short_token);
         let builder = self
-            .exchange()
-            .request()
+            .exchange_rpc()
             .accounts(accounts::CreateMarket {
                 authority,
                 data_store: *store,
+                token_map,
                 market: self.find_market_address(store, &market_token),
                 market_token_mint: market_token,
                 long_token_mint: *long_token,
@@ -223,9 +235,11 @@ where
                 token_program: anchor_spl::token::ID,
             })
             .args(instruction::CreateMarket {
+                name: name.to_string(),
                 index_token_mint: *index_token,
+                enable,
             });
-        (builder, market_token)
+        Ok((builder, market_token))
     }
 
     fn create_order(

@@ -23,8 +23,13 @@ pub mod exchange {
 
     // Market.
     #[access_control(Authenticate::only_market_keeper(&ctx))]
-    pub fn create_market(ctx: Context<CreateMarket>, index_token_mint: Pubkey) -> Result<()> {
-        instructions::create_market(ctx, index_token_mint)
+    pub fn create_market(
+        ctx: Context<CreateMarket>,
+        name: String,
+        index_token_mint: Pubkey,
+        enable: bool,
+    ) -> Result<()> {
+        instructions::create_market(ctx, name, index_token_mint, enable)
     }
 
     // Deposit.

@@ -6,7 +6,10 @@ use bitmaps::Bitmap;
 use borsh::{BorshDeserialize, BorshSerialize};
 use gmx_core::{ClockKind, PoolKind};
 
-use crate::DataStoreError;
+use crate::{
+    utils::fixed_str::{bytes_to_fixed_str, fixed_str_to_bytes},
+    DataStoreError,
+};
 
 use super::{Factor, InitSpace, Seed};
 
@@ -30,6 +33,8 @@ pub type MarketFlagValue = u8;
 /// Market Flag Bitmap.
 pub type MarketFlagBitmap = Bitmap<MAX_FLAGS>;
 
+const MAX_NAME_LEN: usize = 64;
+
 /// Market.
 #[account(zero_copy)]
 #[cfg_attr(feature = "debug", derive(Debug))]
@@ -38,6 +43,7 @@ pub struct Market {
     pub(crate) bump: u8,
     flag: MarketFlagValue,
     padding: [u8; 14],
+    name: [u8; MAX_NAME_LEN],
     pub(crate) meta: MarketMeta,
     pub(crate) store: Pubkey,
     pools: Pools,
@@ -67,6 +73,7 @@ impl Market {
         &mut self,
         bump: u8,
         store: Pubkey,
+        name: &str,
         market_token_mint: Pubkey,
         index_token_mint: Pubkey,
         long_token_mint: Pubkey,
@@ -75,6 +82,7 @@ impl Market {
     ) -> Result<()> {
         self.bump = bump;
         self.store = store;
+        self.name = fixed_str_to_bytes(name)?;
         self.set_enabled(is_enabled);
         self.meta.market_token_mint = market_token_mint;
         self.meta.index_token_mint = index_token_mint;
@@ -91,6 +99,11 @@ impl Market {
     /// Get meta.
     pub fn meta(&self) -> &MarketMeta {
         &self.meta
+    }
+
+    /// Get name.
+    pub fn name(&self) -> Result<&str> {
+        bytes_to_fixed_str(&self.name)
     }
 
     /// Record transferred in by the given token.

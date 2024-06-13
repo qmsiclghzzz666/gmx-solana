@@ -15,7 +15,7 @@ pub fn fixed_str_to_bytes<const MAX_LEN: usize>(name: &str) -> Result<[u8; MAX_L
 }
 
 /// Bytes to fixed size string.
-pub fn bytes_to_fixed_str(bytes: &[u8; 32]) -> Result<&str> {
+pub fn bytes_to_fixed_str<const MAX_LEN: usize>(bytes: &[u8; MAX_LEN]) -> Result<&str> {
     let Some(end) = bytes.iter().position(|&x| x == 0) else {
         return err!(DataStoreError::InvalidArgument);
     };

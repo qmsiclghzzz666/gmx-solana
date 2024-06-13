@@ -7,7 +7,12 @@ use data_store::utils::Authentication;
 use crate::ExchangeError;
 
 /// Create a new market.
-pub fn create_market(ctx: Context<CreateMarket>, index_token_mint: Pubkey) -> Result<()> {
+pub fn create_market(
+    ctx: Context<CreateMarket>,
+    name: String,
+    index_token_mint: Pubkey,
+    enable: bool,
+) -> Result<()> {
     data_store::cpi::initialize_market_token(
         ctx.accounts.initialize_market_token_ctx(),
         index_token_mint,
@@ -20,6 +25,8 @@ pub fn create_market(ctx: Context<CreateMarket>, index_token_mint: Pubkey) -> Re
         index_token_mint,
         ctx.accounts.long_token_mint.key(),
         ctx.accounts.short_token_mint.key(),
+        name,
+        enable,
     )?;
     data_store::cpi::initialize_market_vault(
         ctx.accounts.initialize_market_vault_ctx(TokenKind::Long),
@@ -49,6 +56,8 @@ pub struct CreateMarket<'info> {
     pub authority: Signer<'info>,
     /// CHECK: check by CPI.
     pub data_store: UncheckedAccount<'info>,
+    /// CHECK: check by CPI.
+    pub token_map: UncheckedAccount<'info>,
     /// CHECK: check and init by CPI.
     #[account(mut)]
     pub market: UncheckedAccount<'info>,
@@ -78,6 +87,7 @@ impl<'info> CreateMarket<'info> {
             InitializeMarket {
                 authority: self.authority.to_account_info(),
                 store: self.data_store.to_account_info(),
+                token_map: self.token_map.to_account_info(),
                 market: self.market.to_account_info(),
                 system_program: self.system_program.to_account_info(),
             },

@@ -1,4 +1,8 @@
-use std::{collections::HashMap, io::Read, path::PathBuf};
+use std::{
+    collections::HashMap,
+    io::Read,
+    path::{Path, PathBuf},
+};
 
 use anchor_client::solana_sdk::{pubkey::Pubkey, signature::Keypair};
 use data_store::states::{
@@ -14,6 +18,7 @@ use gmsol::{
     },
     utils::TransactionBuilder,
 };
+use serde::de::DeserializeOwned;
 
 use crate::GMSOLClient;
 
@@ -72,11 +77,23 @@ enum Command {
     /// Create Market.
     CreateMarket {
         #[arg(long)]
+        name: String,
+        #[arg(long)]
         index_token: Pubkey,
         #[arg(long)]
         long_token: Pubkey,
         #[arg(long)]
         short_token: Pubkey,
+        #[arg(long)]
+        enable: bool,
+    },
+    /// Create Markets from file.
+    CreateMarkets {
+        path: PathBuf,
+        #[arg(long)]
+        skip_preflight: bool,
+        #[arg(long)]
+        enable: bool,
     },
     /// Update Market Config.
     UpdateConfig {
@@ -85,6 +102,12 @@ enum Command {
         key: MarketConfigKey,
         #[arg(long, short)]
         value: Factor,
+    },
+    /// Toggle market.
+    ToggleMarket {
+        market_token: Pubkey,
+        #[command(flatten)]
+        toggle: Toggle,
     },
 }
 
@@ -164,10 +187,7 @@ impl Args {
                 token_map,
                 skip_preflight,
             } => {
-                let mut buffer = String::new();
-                std::fs::File::open(path)?.read_to_string(&mut buffer)?;
-                let configs: HashMap<String, TokenConfig> =
-                    toml::from_str(&buffer).map_err(gmsol::Error::invalid_argument)?;
+                let configs: HashMap<String, TokenConfig> = toml_from_file(path)?;
                 let token_map = match token_map {
                     Some(token_map) => *token_map,
                     None => get_token_map(client.data_store(), store).await?,
@@ -264,18 +284,45 @@ impl Args {
                 .await?;
             }
             Command::CreateMarket {
+                name,
                 index_token,
                 long_token,
                 short_token,
+                enable,
             } => {
-                let (request, market_token) =
-                    client.create_market(store, index_token, long_token, short_token);
-                crate::utils::send_or_serialize(request, serialize_only, |signature| {
+                let (request, market_token) = client
+                    .create_market(
+                        store,
+                        name,
+                        index_token,
+                        long_token,
+                        short_token,
+                        *enable,
+                        None,
+                    )
+                    .await?;
+                crate::utils::send_or_serialize(request.build_without_compute_budget(), serialize_only, |signature| {
                     println!(
                         "created a new market with {market_token} as its token address at tx {signature}"
                     );
                     Ok(())
                 }).await?;
+            }
+            Command::CreateMarkets {
+                path,
+                skip_preflight,
+                enable,
+            } => {
+                let markets: HashMap<String, Market> = toml_from_file(path)?;
+                create_markets(
+                    client,
+                    store,
+                    serialize_only,
+                    *skip_preflight,
+                    *enable,
+                    &markets,
+                )
+                .await?;
             }
             Command::UpdateConfig {
                 market_token,
@@ -289,6 +336,29 @@ impl Args {
                     serialize_only,
                     |signature| {
                         println!("market config updated at tx {signature}");
+                        Ok(())
+                    },
+                )
+                .await?;
+            }
+            Command::ToggleMarket {
+                market_token,
+                toggle,
+            } => {
+                crate::utils::send_or_serialize(
+                    client
+                        .toggle_market(store, market_token, toggle.is_enable())
+                        .build_without_compute_budget(),
+                    serialize_only,
+                    |signature| {
+                        println!(
+                            "market set to be {} at tx {signature}",
+                            if toggle.is_enable() {
+                                "enabled"
+                            } else {
+                                "disabled"
+                            }
+                        );
                         Ok(())
                     },
                 )
@@ -407,4 +477,67 @@ async fn insert_token_configs(
     .await?;
 
     Ok(())
+}
+
+/// Market
+#[serde_with::serde_as]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct Market {
+    #[serde_as(as = "serde_with::DisplayFromStr")]
+    index_token: Pubkey,
+    #[serde_as(as = "serde_with::DisplayFromStr")]
+    long_token: Pubkey,
+    #[serde_as(as = "serde_with::DisplayFromStr")]
+    short_token: Pubkey,
+}
+
+async fn create_markets(
+    client: &GMSOLClient,
+    store: &Pubkey,
+    serialize_only: bool,
+    skip_preflight: bool,
+    enable: bool,
+    markets: &HashMap<String, Market>,
+) -> gmsol::Result<()> {
+    let mut builder = TransactionBuilder::new(client.data_store().async_rpc());
+    let token_map = get_token_map(client.data_store(), store).await?;
+    for (name, market) in markets {
+        let (rpc, token) = client
+            .create_market(
+                store,
+                name,
+                &market.index_token,
+                &market.long_token,
+                &market.short_token,
+                enable,
+                Some(&token_map),
+            )
+            .await?;
+        println!("Adding instruction to create market `{name}` with token={token}");
+        builder.try_push(rpc)?;
+    }
+
+    crate::utils::send_or_serialize_transactions(
+        builder,
+        serialize_only,
+        skip_preflight,
+        |signatures, error| {
+            println!("{signatures:#?}");
+            match error {
+                None => Ok(()),
+                Some(err) => Err(err),
+            }
+        },
+    )
+    .await?;
+    Ok(())
+}
+
+fn toml_from_file<T>(path: &impl AsRef<Path>) -> gmsol::Result<T>
+where
+    T: DeserializeOwned,
+{
+    let mut buffer = String::new();
+    std::fs::File::open(path)?.read_to_string(&mut buffer)?;
+    toml::from_str(&buffer).map_err(gmsol::Error::invalid_argument)
 }

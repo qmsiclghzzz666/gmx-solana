@@ -245,6 +245,8 @@ pub mod data_store {
         index_token_mint: Pubkey,
         long_token_mint: Pubkey,
         short_token_mint: Pubkey,
+        name: String,
+        enable: bool,
     ) -> Result<()> {
         instructions::unchecked_initialize_market(
             ctx,
@@ -252,6 +254,8 @@ pub mod data_store {
             index_token_mint,
             long_token_mint,
             short_token_mint,
+            &name,
+            enable,
         )
     }
 
@@ -285,6 +289,11 @@ pub mod data_store {
         value: u128,
     ) -> Result<()> {
         instructions::unchecked_update_market_config(ctx, &key, value)
+    }
+
+    #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
+    pub fn toggle_market(ctx: Context<ToggleMarket>, enable: bool) -> Result<()> {
+        instructions::unchecked_toggle_market(ctx, enable)
     }
 
     // Token.

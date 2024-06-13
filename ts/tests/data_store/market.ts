@@ -2,9 +2,9 @@ import { Keypair, PublicKey, Transaction } from '@solana/web3.js';
 import { BN } from '@coral-xyz/anchor';
 
 import { expect, getAddresses, getPrograms, getProvider, getUsers } from "../../utils/fixtures";
-import { createMarketPDA, createMarketTokenMintPDA, createMarketVaultPDA, createRolesPDA } from "../../utils/data";
+import { createMarketPDA, createMarketTokenMintPDA, createMarketVaultPDA, createRolesPDA, invokePushToTokenMapSynthetic } from "../../utils/data";
 import { createAssociatedTokenAccountInstruction, createTransferInstruction, getAssociatedTokenAddress } from "@solana/spl-token";
-import { invokeUpdateMarketConfig } from '../../utils/exchange';
+import { createMarket, invokeUpdateMarketConfig } from '../../utils/exchange';
 
 describe("data store: Market", () => {
     const { dataStore } = getPrograms();
@@ -20,14 +20,30 @@ describe("data store: Market", () => {
     let dataStoreAddress: PublicKey;
     let roles: PublicKey;
     let marketPDA: PublicKey;
+    let tokenMap: PublicKey;
     before(async () => {
         ({ dataStoreAddress } = await getAddresses());
         [roles] = createRolesPDA(dataStoreAddress, signer0.publicKey);
         [marketPDA] = createMarketPDA(dataStoreAddress, marketToken);
+        tokenMap = (await dataStore.account.store.fetch(dataStoreAddress)).tokenMap;
     });
 
     it("create, update and remove a market", async () => {
-        await dataStore.methods.initializeMarket(marketToken, indexToken, longToken, shortToken).accountsPartial({
+        for (const token of [indexToken, longToken, shortToken]) {
+            await invokePushToTokenMapSynthetic(dataStore, {
+                authority: signer0,
+                store: dataStoreAddress,
+                tokenMap,
+                name: 'fake',
+                token,
+                tokenDecimals: 9,
+                heartbeatDuration: 60,
+                precision: 4,
+                feeds: {}
+            });
+        }
+        // Any address can be used as market token to initialize market.
+        await dataStore.methods.initializeMarket(marketToken, indexToken, longToken, shortToken, "test", true).accountsPartial({
             authority: signer0.publicKey,
             store: dataStoreAddress,
             market: marketPDA,

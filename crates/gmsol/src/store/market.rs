@@ -103,6 +103,9 @@ pub trait MarketOps<C> {
         let key = key.to_string();
         self.update_market_config(store, market_token, &key, value)
     }
+
+    /// Toggle market.
+    fn toggle_market(&self, store: &Pubkey, market_token: &Pubkey, enable: bool) -> RpcBuilder<C>;
 }
 
 impl<C, S> MarketOps<C> for crate::Client<C>
@@ -129,5 +132,15 @@ where
                 market: self.find_market_address(store, market_token),
             });
         Ok(req)
+    }
+
+    fn toggle_market(&self, store: &Pubkey, market_token: &Pubkey, enable: bool) -> RpcBuilder<C> {
+        self.data_store_rpc()
+            .args(instruction::ToggleMarket { enable })
+            .accounts(accounts::ToggleMarket {
+                authority: self.payer(),
+                store: *store,
+                market: self.find_market_address(store, market_token),
+            })
     }
 }

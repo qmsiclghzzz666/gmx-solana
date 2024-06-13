@@ -3,8 +3,12 @@ use anchor_spl::token::{Token, TokenAccount};
 
 use crate::{
     constants,
-    states::{Action, Factor, InitSpace, Market, MarketChangeEvent, MarketMeta, Seed, Store},
+    states::{
+        Action, Factor, InitSpace, Market, MarketChangeEvent, MarketMeta, Seed, Store,
+        TokenMapAccess, TokenMapHeader, TokenMapLoader,
+    },
     utils::internal,
+    DataStoreError,
 };
 
 /// Number of pools.
@@ -18,6 +22,7 @@ pub const NUM_CLOCKS: u8 = 3;
 pub struct InitializeMarket<'info> {
     #[account(mut)]
     authority: Signer<'info>,
+    #[account(has_one = token_map)]
     store: AccountLoader<'info, Store>,
     #[account(
         init,
@@ -31,6 +36,8 @@ pub struct InitializeMarket<'info> {
         bump,
     )]
     market: AccountLoader<'info, Market>,
+    #[account(has_one = store)]
+    token_map: AccountLoader<'info, TokenMapHeader>,
     system_program: Program<'info, System>,
 }
 
@@ -44,16 +51,43 @@ pub fn unchecked_initialize_market(
     index_token_mint: Pubkey,
     long_token_mint: Pubkey,
     short_token_mint: Pubkey,
+    name: &str,
+    enable: bool,
 ) -> Result<()> {
+    {
+        let token_map = ctx.accounts.token_map.load_token_map()?;
+        require!(
+            token_map
+                .get(&index_token_mint)
+                .ok_or(error!(DataStoreError::RequiredResourceNotFound))?
+                .is_enabled(),
+            DataStoreError::InvalidArgument
+        );
+        require!(
+            token_map
+                .get(&long_token_mint)
+                .ok_or(error!(DataStoreError::RequiredResourceNotFound))?
+                .is_enabled(),
+            DataStoreError::InvalidArgument
+        );
+        require!(
+            token_map
+                .get(&short_token_mint)
+                .ok_or(error!(DataStoreError::RequiredResourceNotFound))?
+                .is_enabled(),
+            DataStoreError::InvalidArgument
+        );
+    }
     let market = &ctx.accounts.market;
     market.load_init()?.init(
         ctx.bumps.market,
         ctx.accounts.store.key(),
+        name,
         market_token_mint,
         index_token_mint,
         long_token_mint,
         short_token_mint,
-        true,
+        enable,
     )?;
     emit!(MarketChangeEvent {
         address: market.key(),
@@ -291,6 +325,34 @@ pub fn unchecked_update_market_config(
 }
 
 impl<'info> internal::Authentication<'info> for UpdateMarketConfig<'info> {
+    fn authority(&self) -> &Signer<'info> {
+        &self.authority
+    }
+
+    fn store(&self) -> &AccountLoader<'info, Store> {
+        &self.store
+    }
+}
+
+/// Toggle Market.
+#[derive(Accounts)]
+pub struct ToggleMarket<'info> {
+    authority: Signer<'info>,
+    store: AccountLoader<'info, Store>,
+    #[account(mut, has_one = store)]
+    market: AccountLoader<'info, Market>,
+}
+
+/// Toggle Market.
+///
+/// ## CHECK
+/// - Only MARKET_KEEPER can toggle market.
+pub fn unchecked_toggle_market(ctx: Context<ToggleMarket>, enable: bool) -> Result<()> {
+    ctx.accounts.market.load_mut()?.set_enabled(enable);
+    Ok(())
+}
+
+impl<'info> internal::Authentication<'info> for ToggleMarket<'info> {
     fn authority(&self) -> &Signer<'info> {
         &self.authority
     }
