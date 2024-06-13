@@ -1,11 +1,10 @@
-use std::collections::HashSet;
-
 use anchor_client::solana_sdk::{pubkey::Pubkey, signature::Keypair};
 use data_store::states::RoleKey;
 use gmsol::{
     store::{roles::RolesOps, store_ops::StoreOps, token_config::TokenConfigOps},
     utils::TransactionBuilder,
 };
+use indexmap::IndexSet;
 
 use crate::GMSOLClient;
 
@@ -259,6 +258,6 @@ impl InitializeAll {
     }
 
     fn unique_order_keepers(&self) -> impl IntoIterator<Item = &Pubkey> {
-        self.order_keeper.iter().collect::<HashSet<_>>()
+        self.order_keeper.iter().collect::<IndexSet<_>>()
     }
 }

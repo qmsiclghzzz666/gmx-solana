@@ -1,6 +1,5 @@
 use core::fmt;
 use std::{
-    collections::{BTreeMap, HashMap},
     io::Read,
     path::{Path, PathBuf},
     str::FromStr,
@@ -20,6 +19,7 @@ use gmsol::{
     },
     utils::TransactionBuilder,
 };
+use indexmap::IndexMap;
 use serde::de::DeserializeOwned;
 
 use crate::GMSOLClient;
@@ -195,7 +195,7 @@ impl Args {
                 token_map,
                 skip_preflight,
             } => {
-                let configs: HashMap<String, TokenConfig> = toml_from_file(path)?;
+                let configs: IndexMap<String, TokenConfig> = toml_from_file(path)?;
                 let token_map = match token_map {
                     Some(token_map) => *token_map,
                     None => get_token_map(client.data_store(), store).await?,
@@ -321,7 +321,7 @@ impl Args {
                 skip_preflight,
                 enable,
             } => {
-                let markets: HashMap<String, Market> = toml_from_file(path)?;
+                let markets: IndexMap<String, Market> = toml_from_file(path)?;
                 create_markets(
                     client,
                     store,
@@ -449,7 +449,7 @@ async fn insert_token_configs(
     token_map: &Pubkey,
     serialize_only: bool,
     skip_preflight: bool,
-    configs: &HashMap<String, TokenConfig>,
+    configs: &IndexMap<String, TokenConfig>,
 ) -> gmsol::Result<()> {
     let mut builder = TransactionBuilder::new(client.data_store().async_rpc());
 
@@ -514,7 +514,7 @@ async fn create_markets(
     serialize_only: bool,
     skip_preflight: bool,
     enable: bool,
-    markets: &HashMap<String, Market>,
+    markets: &IndexMap<String, Market>,
 ) -> gmsol::Result<()> {
     let mut builder = TransactionBuilder::new(client.data_store().async_rpc());
     let token_map = get_token_map(client.data_store(), store).await?;
@@ -554,9 +554,9 @@ async fn create_markets(
 #[serde_with::serde_as]
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct MarketConfigs {
-    #[serde_as(as = "HashMap<serde_with::DisplayFromStr, _>")]
+    #[serde_as(as = "IndexMap<serde_with::DisplayFromStr, _>")]
     #[serde(flatten)]
-    configs: HashMap<Pubkey, MarketConfig>,
+    configs: IndexMap<Pubkey, MarketConfig>,
 }
 
 #[derive(Debug)]
@@ -583,9 +583,9 @@ impl FromStr for SerdeFactor {
 pub struct MarketConfig {
     #[serde(default)]
     enable: Option<bool>,
-    #[serde_as(as = "BTreeMap<_, serde_with::DisplayFromStr>")]
+    #[serde_as(as = "IndexMap<_, serde_with::DisplayFromStr>")]
     #[serde(flatten)]
-    config: BTreeMap<MarketConfigKey, SerdeFactor>,
+    config: IndexMap<MarketConfigKey, SerdeFactor>,
 }
 
 impl MarketConfigs {

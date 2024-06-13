@@ -353,7 +353,7 @@ impl MarketConfig {
 }
 
 /// Market config keys.
-#[derive(strum::EnumString, strum::Display, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(strum::EnumString, strum::Display, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[strum(serialize_all = "snake_case")]
 #[non_exhaustive]
 #[cfg_attr(feature = "debug", derive(Debug))]
