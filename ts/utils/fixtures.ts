@@ -174,9 +174,9 @@ export const mochaGlobalSetup = async () => {
 
         await initializeDataStore(provider, eventManager, signer0, user0, dataStoreKey, oracleIndex, fakeTokenMint, usdGTokenMint);
 
-        fakeTokenVault = await createMarketVault(provider, signer0, dataStoreAddress, fakeTokenMint);
-        usdGVault = await createMarketVault(provider, signer0, dataStoreAddress, usdGTokenMint);
-        wsolVault = await createMarketVault(provider, signer0, dataStoreAddress, SOL_TOKEN_MINT);
+        // fakeTokenVault = await createMarketVault(provider, signer0, dataStoreAddress, fakeTokenMint);
+        // usdGVault = await createMarketVault(provider, signer0, dataStoreAddress, usdGTokenMint);
+        // wsolVault = await createMarketVault(provider, signer0, dataStoreAddress, SOL_TOKEN_MINT);
 
         markets = await initializeMarkets(signer0, dataStoreAddress, fakeTokenMint, usdGTokenMint);
         user0FakeFakeUsdGTokenAccount = await createAssociatedTokenAccount(provider.connection, user0, markets.GMFakeFakeUsdG, user0.publicKey);

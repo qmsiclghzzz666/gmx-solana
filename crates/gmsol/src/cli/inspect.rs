@@ -1,7 +1,10 @@
 use anchor_client::solana_sdk::pubkey::Pubkey;
 use data_store::states::{self, AddressKey, AmountKey, FactorKey, MarketConfigKey};
 use gmsol::{
-    store::utils::{read_market, read_store, token_map},
+    store::{
+        token_config::TokenConfigOps,
+        utils::{read_market, read_store, token_map},
+    },
     utils::{self, try_deserailize_account},
 };
 use pyth_sdk::Identifier;
@@ -36,7 +39,11 @@ enum Command {
         get_roles: Option<Pubkey>,
     },
     /// `TokenMap` account.
-    TokenMap { address: Option<Pubkey> },
+    TokenMap {
+        address: Option<Pubkey>,
+        #[arg(long, value_name = "TOKEN")]
+        get: Option<Pubkey>,
+    },
     /// `Market` account.
     Market {
         address: Pubkey,
@@ -62,8 +69,6 @@ enum Command {
     },
     /// Get the CONTROLLER address.
     Controller,
-    /// Get token config.
-    TokenConfig { token: Pubkey },
     /// `Order` account.
     Order { address: Pubkey },
     /// `Position` account.
@@ -129,20 +134,23 @@ impl InspectArgs {
                     println!("Store Address: {address}");
                 }
             }
-            Command::TokenMap { address } => {
+            Command::TokenMap { address, get } => {
                 let address = if let Some(address) = address {
                     *address
                 } else {
                     token_map(program, store).await?
                 };
-                println!(
-                    "{:#?}",
-                    try_deserailize_account::<states::TokenMapHeader>(
+                if let Some(token) = get {
+                    let config = client.token_config(&address, token).await?;
+                    println!("{config:#?}");
+                } else {
+                    let token_map = try_deserailize_account::<states::TokenMapHeader>(
                         &program.async_rpc(),
-                        &address
+                        &address,
                     )
-                    .await?,
-                );
+                    .await?;
+                    println!("{token_map:#?}");
+                }
             }
             Command::Market {
                 mut address,
@@ -183,9 +191,6 @@ impl InspectArgs {
                 let address = oracle.address(Some(store), &client.data_store_program_id())?;
                 println!("{address}");
                 println!("{:#?}", program.account::<states::Oracle>(address).await?);
-            }
-            Command::TokenConfig { token: _ } => {
-                unimplemented!();
             }
             Command::Order { address } => {
                 println!("{:#?}", program.account::<states::Order>(*address).await?);

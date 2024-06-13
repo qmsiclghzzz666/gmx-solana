@@ -299,6 +299,39 @@ pub fn token_timestamp_adjustment(
         .timestamp_adjustment(provider)
 }
 
+/// Get the name of the given token.
+pub fn token_name(ctx: Context<ReadTokenMap>, token: &Pubkey) -> Result<String> {
+    ctx.accounts
+        .token_map
+        .load_token_map()?
+        .get(token)
+        .ok_or(error!(DataStoreError::RequiredResourceNotFound))?
+        .name()
+        .map(|s| s.to_owned())
+}
+
+/// Get the decimals of the given token.
+pub fn token_decimals(ctx: Context<ReadTokenMap>, token: &Pubkey) -> Result<u8> {
+    Ok(ctx
+        .accounts
+        .token_map
+        .load_token_map()?
+        .get(token)
+        .ok_or(error!(DataStoreError::RequiredResourceNotFound))?
+        .token_decimals())
+}
+
+/// Get the price precision of the given token.
+pub fn token_precision(ctx: Context<ReadTokenMap>, token: &Pubkey) -> Result<u8> {
+    Ok(ctx
+        .accounts
+        .token_map
+        .load_token_map()?
+        .get(token)
+        .ok_or(error!(DataStoreError::RequiredResourceNotFound))?
+        .precision())
+}
+
 #[allow(clippy::too_many_arguments)]
 fn do_push_token_map<'info>(
     authority: AccountInfo<'info>,

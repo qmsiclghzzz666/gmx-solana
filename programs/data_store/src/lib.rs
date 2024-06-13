@@ -184,6 +184,18 @@ pub mod data_store {
         )
     }
 
+    pub fn token_name(ctx: Context<ReadTokenMap>, token: Pubkey) -> Result<String> {
+        instructions::token_name(ctx, &token)
+    }
+
+    pub fn token_decimals(ctx: Context<ReadTokenMap>, token: Pubkey) -> Result<u8> {
+        instructions::token_decimals(ctx, &token)
+    }
+
+    pub fn token_precision(ctx: Context<ReadTokenMap>, token: Pubkey) -> Result<u8> {
+        instructions::token_precision(ctx, &token)
+    }
+
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn toggle_token_config(
         ctx: Context<ToggleTokenConfig>,

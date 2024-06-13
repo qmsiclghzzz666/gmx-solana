@@ -6,9 +6,6 @@ use data_store::utils::Authentication;
 
 use crate::ExchangeError;
 
-/// Decimals of market tokens.
-pub const MARKET_TOKEN_DECIMALS: u8 = 18;
-
 /// Create a new market.
 pub fn create_market(ctx: Context<CreateMarket>, index_token_mint: Pubkey) -> Result<()> {
     data_store::cpi::initialize_market_token(
@@ -24,8 +21,25 @@ pub fn create_market(ctx: Context<CreateMarket>, index_token_mint: Pubkey) -> Re
         ctx.accounts.long_token_mint.key(),
         ctx.accounts.short_token_mint.key(),
     )?;
-    data_store::cpi::initialize_market_vault(ctx.accounts.initialize_market_vault_ctx(), None)?;
+    data_store::cpi::initialize_market_vault(
+        ctx.accounts.initialize_market_vault_ctx(TokenKind::Long),
+        None,
+    )?;
+    data_store::cpi::initialize_market_vault(
+        ctx.accounts.initialize_market_vault_ctx(TokenKind::Short),
+        None,
+    )?;
+    data_store::cpi::initialize_market_vault(
+        ctx.accounts.initialize_market_vault_ctx(TokenKind::Market),
+        None,
+    )?;
     Ok(())
+}
+
+enum TokenKind {
+    Market,
+    Long,
+    Short,
 }
 
 #[derive(Accounts)]
@@ -46,6 +60,12 @@ pub struct CreateMarket<'info> {
     /// CHECK: check and init by CPI.
     #[account(mut)]
     pub market_token_vault: UncheckedAccount<'info>,
+    /// CHECK: check and init by CPI.
+    #[account(mut)]
+    pub long_token_vault: UncheckedAccount<'info>,
+    /// CHECK: check and init by CPI.
+    #[account(mut)]
+    pub short_token_vault: UncheckedAccount<'info>,
     pub data_store_program: Program<'info, DataStore>,
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,
@@ -81,14 +101,29 @@ impl<'info> CreateMarket<'info> {
 
     fn initialize_market_vault_ctx(
         &self,
+        kind: TokenKind,
     ) -> CpiContext<'_, '_, '_, 'info, InitializeMarketVault<'info>> {
+        let (mint, vault) = match kind {
+            TokenKind::Market => (
+                self.market_token_mint.to_account_info(),
+                self.market_token_vault.to_account_info(),
+            ),
+            TokenKind::Long => (
+                self.long_token_mint.to_account_info(),
+                self.long_token_vault.to_account_info(),
+            ),
+            TokenKind::Short => (
+                self.short_token_mint.to_account_info(),
+                self.short_token_vault.to_account_info(),
+            ),
+        };
         CpiContext::new(
             self.data_store_program.to_account_info(),
             InitializeMarketVault {
                 authority: self.authority.to_account_info(),
                 store: self.data_store.to_account_info(),
-                mint: self.market_token_mint.to_account_info(),
-                vault: self.market_token_vault.to_account_info(),
+                mint,
+                vault,
                 system_program: self.system_program.to_account_info(),
                 token_program: self.token_program.to_account_info(),
             },

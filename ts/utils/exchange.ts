@@ -1,7 +1,7 @@
 import { workspace, Program, utils, Wallet } from "@coral-xyz/anchor";
 import { Exchange } from "../../target/types/exchange";
 import { AccountMeta, Connection, Keypair, PublicKey } from "@solana/web3.js";
-import { createMarketPDA, createMarketTokenMintPDA, createMarketVaultPDA, createRolesPDA, dataStore } from "./data";
+import { createMarketPDA, createMarketTokenMintPDA, createMarketVault, createMarketVaultPDA, createRolesPDA, dataStore } from "./data";
 import { getAccount } from "@solana/spl-token";
 import { BTC_TOKEN_MINT, SOL_TOKEN_MINT } from "./token";
 import { IxWithOutput, makeInvoke } from "./invoke";
@@ -33,6 +33,8 @@ export const createMarket = async (
     const [roles] = createRolesPDA(dataStoreAddress, signer.publicKey);
     const [marketAddress] = createMarketPDA(dataStoreAddress, marketTokenMint);
     const [marketTokenVault] = createMarketVaultPDA(dataStoreAddress, marketTokenMint);
+    const [longTokenVault] = createMarketVaultPDA(dataStoreAddress, longTokenMint);
+    const [shortTokenVault] = createMarketVaultPDA(dataStoreAddress, shortTokenMint);
 
     await exchange.methods.createMarket(indexTokenMint).accounts({
         authority: signer.publicKey,
@@ -42,6 +44,8 @@ export const createMarket = async (
         longTokenMint,
         shortTokenMint,
         marketTokenVault,
+        longTokenVault,
+        shortTokenVault,
     }).signers([signer]).rpc();
 
     return marketTokenMint;

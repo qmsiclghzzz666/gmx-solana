@@ -1,4 +1,4 @@
-use std::ops::Deref;
+use std::{future::Future, ops::Deref};
 
 use anchor_client::{
     anchor_lang::system_program,
@@ -10,7 +10,44 @@ use data_store::{
     states::{PriceProviderKind, TokenConfigBuilder},
 };
 
-use crate::utils::RpcBuilder;
+use crate::utils::{view, RpcBuilder};
+
+/// Token Config.
+#[derive(Debug)]
+pub struct TokenConfig {
+    name: String,
+    decimals: u8,
+    precision: u8,
+    expected_provider: PriceProviderKind,
+    is_enbaled: bool,
+}
+
+impl TokenConfig {
+    /// Get name.
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Get token decimals.
+    pub fn decimals(&self) -> u8 {
+        self.decimals
+    }
+
+    /// Get price precision.
+    pub fn precision(&self) -> u8 {
+        self.precision
+    }
+
+    /// Get expected price provider.
+    pub fn expected_provider(&self) -> PriceProviderKind {
+        self.expected_provider
+    }
+
+    /// Get is enabled.
+    pub fn is_enabled(&self) -> bool {
+        self.is_enbaled
+    }
+}
 
 /// Token config management for GMSOL.
 pub trait TokenConfigOps<C> {
@@ -66,6 +103,44 @@ pub trait TokenConfigOps<C> {
         token: &Pubkey,
         provider: PriceProviderKind,
     ) -> RequestBuilder<C>;
+
+    /// Get the name for the given token.
+    fn token_name(&self, token_map: &Pubkey, token: &Pubkey) -> RequestBuilder<C>;
+
+    /// Get the token decimals for the given token.
+    fn token_decimals(&self, token_map: &Pubkey, token: &Pubkey) -> RequestBuilder<C>;
+
+    /// Get the price precision for the given token.
+    fn token_precision(&self, token_map: &Pubkey, token: &Pubkey) -> RequestBuilder<C>;
+
+    /// Check if the config of the given token is enbaled.
+    fn is_token_config_enabled(&self, token_map: &Pubkey, token: &Pubkey) -> RequestBuilder<C>;
+
+    /// Get expected provider for the given token.
+    fn token_expected_provider(&self, token_map: &Pubkey, token: &Pubkey) -> RequestBuilder<C>;
+
+    /// Get feed address of the provider of the given token.
+    fn token_feed(
+        &self,
+        token_map: &Pubkey,
+        token: &Pubkey,
+        provider: PriceProviderKind,
+    ) -> RequestBuilder<C>;
+
+    /// Get timestamp adjustment of the given token and provider.
+    fn token_timestamp_adjustment(
+        &self,
+        token_map: &Pubkey,
+        token: &Pubkey,
+        provider: PriceProviderKind,
+    ) -> RequestBuilder<C>;
+
+    /// Get basic token config.
+    fn token_config(
+        &self,
+        token_map: &Pubkey,
+        token: &Pubkey,
+    ) -> impl Future<Output = crate::Result<TokenConfig>>;
 }
 
 impl<C, S> TokenConfigOps<C> for crate::Client<C>
@@ -187,5 +262,119 @@ where
                 token: *token,
                 provider: provider as u8,
             })
+    }
+
+    fn token_name(&self, token_map: &Pubkey, token: &Pubkey) -> RequestBuilder<C> {
+        self.data_store()
+            .request()
+            .args(instruction::TokenName { token: *token })
+            .accounts(accounts::ReadTokenMap {
+                token_map: *token_map,
+            })
+    }
+
+    fn token_decimals(&self, token_map: &Pubkey, token: &Pubkey) -> RequestBuilder<C> {
+        self.data_store()
+            .request()
+            .args(instruction::TokenDecimals { token: *token })
+            .accounts(accounts::ReadTokenMap {
+                token_map: *token_map,
+            })
+    }
+
+    fn token_precision(&self, token_map: &Pubkey, token: &Pubkey) -> RequestBuilder<C> {
+        self.data_store()
+            .request()
+            .args(instruction::TokenPrecision { token: *token })
+            .accounts(accounts::ReadTokenMap {
+                token_map: *token_map,
+            })
+    }
+
+    fn is_token_config_enabled(&self, token_map: &Pubkey, token: &Pubkey) -> RequestBuilder<C> {
+        self.data_store()
+            .request()
+            .args(instruction::IsTokenConfigEnabled { token: *token })
+            .accounts(accounts::ReadTokenMap {
+                token_map: *token_map,
+            })
+    }
+
+    fn token_expected_provider(&self, token_map: &Pubkey, token: &Pubkey) -> RequestBuilder<C> {
+        self.data_store()
+            .request()
+            .args(instruction::TokenExpectedProvider { token: *token })
+            .accounts(accounts::ReadTokenMap {
+                token_map: *token_map,
+            })
+    }
+
+    fn token_feed(
+        &self,
+        token_map: &Pubkey,
+        token: &Pubkey,
+        provider: PriceProviderKind,
+    ) -> RequestBuilder<C> {
+        self.data_store()
+            .request()
+            .args(instruction::TokenFeed {
+                token: *token,
+                provider: provider as u8,
+            })
+            .accounts(accounts::ReadTokenMap {
+                token_map: *token_map,
+            })
+    }
+
+    fn token_timestamp_adjustment(
+        &self,
+        token_map: &Pubkey,
+        token: &Pubkey,
+        provider: PriceProviderKind,
+    ) -> RequestBuilder<C> {
+        self.data_store()
+            .request()
+            .args(instruction::TokenTimestampAdjustment {
+                token: *token,
+                provider: provider as u8,
+            })
+            .accounts(accounts::ReadTokenMap {
+                token_map: *token_map,
+            })
+    }
+
+    async fn token_config(&self, token_map: &Pubkey, token: &Pubkey) -> crate::Result<TokenConfig> {
+        let client = self.data_store().async_rpc();
+        let name = self
+            .token_name(token_map, token)
+            .signed_transaction()
+            .await?;
+        let token_decimals = self
+            .token_decimals(token_map, token)
+            .signed_transaction()
+            .await?;
+        let precision = self
+            .token_precision(token_map, token)
+            .signed_transaction()
+            .await?;
+        let expected_provider = self
+            .token_expected_provider(token_map, token)
+            .signed_transaction()
+            .await?;
+        let is_enabled = self
+            .is_token_config_enabled(token_map, token)
+            .signed_transaction()
+            .await?;
+
+        Ok(TokenConfig {
+            name: view(&client, &name).await?,
+            decimals: view(&client, &token_decimals).await?,
+            precision: view(&client, &precision).await?,
+            expected_provider: view::<u8>(&client, &expected_provider)
+                .await?
+                .try_into()
+                .map_err(crate::Error::unknown)?,
+            is_enbaled: view(&client, &is_enabled).await?,
+        })
     }
 }

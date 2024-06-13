@@ -216,6 +216,8 @@ where
                 long_token_mint: *long_token,
                 short_token_mint: *short_token,
                 market_token_vault: self.find_market_vault_address(store, &market_token),
+                long_token_vault: self.find_market_vault_address(store, long_token),
+                short_token_vault: self.find_market_vault_address(store, short_token),
                 data_store_program: self.data_store_program_id(),
                 system_program: system_program::ID,
                 token_program: anchor_spl::token::ID,

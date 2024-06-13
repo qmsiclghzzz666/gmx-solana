@@ -10,7 +10,7 @@ use gmsol::{
     store::{
         market::{MarketOps, VaultOps},
         token_config::TokenConfigOps,
-        utils::token_map,
+        utils::token_map as get_token_map,
     },
     utils::TransactionBuilder,
 };
@@ -32,6 +32,8 @@ enum Command {
     /// Read and insert token configs from file.
     InsertTokenConfigs {
         path: PathBuf,
+        #[arg(long)]
+        token_map: Option<Pubkey>,
         #[arg(long)]
         skip_preflight: bool,
     },
@@ -159,14 +161,26 @@ impl Args {
             }
             Command::InsertTokenConfigs {
                 path,
+                token_map,
                 skip_preflight,
             } => {
                 let mut buffer = String::new();
                 std::fs::File::open(path)?.read_to_string(&mut buffer)?;
                 let configs: HashMap<String, TokenConfig> =
                     toml::from_str(&buffer).map_err(gmsol::Error::invalid_argument)?;
-                insert_token_configs(client, store, serialize_only, *skip_preflight, &configs)
-                    .await?;
+                let token_map = match token_map {
+                    Some(token_map) => *token_map,
+                    None => get_token_map(client.data_store(), store).await?,
+                };
+                insert_token_configs(
+                    client,
+                    store,
+                    &token_map,
+                    serialize_only,
+                    *skip_preflight,
+                    &configs,
+                )
+                .await?;
             }
             Command::InsertTokenConfig {
                 name,
@@ -345,19 +359,19 @@ impl<'a> TryFrom<&'a TokenConfig> for TokenConfigBuilder {
 async fn insert_token_configs(
     client: &GMSOLClient,
     store: &Pubkey,
+    token_map: &Pubkey,
     serialize_only: bool,
     skip_preflight: bool,
     configs: &HashMap<String, TokenConfig>,
 ) -> gmsol::Result<()> {
     let mut builder = TransactionBuilder::new(client.data_store().async_rpc());
-    let token_map = token_map(client.data_store(), store).await?;
 
     for (name, config) in configs {
         let token = &config.address;
         if let Some(decimals) = config.synthetic {
             builder.try_push(client.insert_synthetic_token_config(
                 store,
-                &token_map,
+                token_map,
                 name,
                 token,
                 decimals,
@@ -368,7 +382,7 @@ async fn insert_token_configs(
         } else {
             builder.try_push(client.insert_token_config(
                 store,
-                &token_map,
+                token_map,
                 name,
                 token,
                 config.try_into()?,
