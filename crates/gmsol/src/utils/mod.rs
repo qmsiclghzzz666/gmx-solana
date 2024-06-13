@@ -50,6 +50,12 @@ pub async fn view<T: BorshDeserialize>(
         .simulate_transaction(transaction)
         .await
         .map_err(anchor_client::ClientError::from)?;
+    if let Some(error) = res.value.err {
+        return Err(crate::Error::unknown(format!(
+            "error={error}, logs={:#?}",
+            res.value.logs,
+        )));
+    }
     let (data, _encoding) = res
         .value
         .return_data

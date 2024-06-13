@@ -1,11 +1,13 @@
 use anchor_client::solana_sdk::pubkey::Pubkey;
-use data_store::states::{self, AddressKey, AmountKey, FactorKey, MarketConfigKey};
+use data_store::states::{
+    self, AddressKey, AmountKey, FactorKey, MarketConfigKey, PriceProviderKind,
+};
 use gmsol::{
     store::{
         token_config::TokenConfigOps,
         utils::{read_market, read_store, token_map},
     },
-    utils::{self, try_deserailize_account},
+    utils::{self, try_deserailize_account, view},
 };
 use pyth_sdk::Identifier;
 
@@ -43,6 +45,9 @@ enum Command {
         address: Option<Pubkey>,
         #[arg(long, value_name = "TOKEN")]
         get: Option<Pubkey>,
+        /// Modify the get command to get the feed of the given provider.
+        #[arg(long, value_name = "PROVIDER")]
+        feed: Option<PriceProviderKind>,
     },
     /// `Market` account.
     Market {
@@ -134,15 +139,32 @@ impl InspectArgs {
                     println!("Store Address: {address}");
                 }
             }
-            Command::TokenMap { address, get } => {
+            Command::TokenMap { address, get, feed } => {
                 let address = if let Some(address) = address {
                     *address
                 } else {
                     token_map(program, store).await?
                 };
                 if let Some(token) = get {
-                    let config = client.token_config(&address, token).await?;
-                    println!("{config:#?}");
+                    if let Some(provider) = feed {
+                        let transaction = client
+                            .token_feed(&address, token, *provider)
+                            .signed_transaction()
+                            .await?;
+                        let feed: Pubkey =
+                            view(&client.data_store().async_rpc(), &transaction).await?;
+                        match provider {
+                            PriceProviderKind::Pyth => {
+                                println!("0x{}", hex::encode(feed));
+                            }
+                            _ => {
+                                println!("{feed}");
+                            }
+                        }
+                    } else {
+                        let config = client.token_config(&address, token).await?;
+                        println!("{config:#?}");
+                    }
                 } else {
                     let token_map = try_deserailize_account::<states::TokenMapHeader>(
                         &program.async_rpc(),

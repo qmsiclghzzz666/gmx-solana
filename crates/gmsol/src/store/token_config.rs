@@ -16,10 +16,10 @@ use crate::utils::{view, RpcBuilder};
 #[derive(Debug)]
 pub struct TokenConfig {
     name: String,
+    is_enabled: bool,
     decimals: u8,
     precision: u8,
     expected_provider: PriceProviderKind,
-    is_enbaled: bool,
 }
 
 impl TokenConfig {
@@ -45,7 +45,7 @@ impl TokenConfig {
 
     /// Get is enabled.
     pub fn is_enabled(&self) -> bool {
-        self.is_enbaled
+        self.is_enabled
     }
 }
 
@@ -374,7 +374,7 @@ where
                 .await?
                 .try_into()
                 .map_err(crate::Error::unknown)?,
-            is_enbaled: view(&client, &is_enabled).await?,
+            is_enabled: view(&client, &is_enabled).await?,
         })
     }
 }
