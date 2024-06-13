@@ -60,7 +60,7 @@ where
 {
     fn insert_global_amount(&self, store: &Pubkey, key: &str, amount: &Amount) -> RpcBuilder<C> {
         let authority = self.payer();
-        self.data_store_request()
+        self.data_store_rpc()
             .args(instruction::InsertAmount {
                 key: key.to_string(),
                 amount: *amount,
@@ -73,7 +73,7 @@ where
 
     fn insert_global_factor(&self, store: &Pubkey, key: &str, factor: &Factor) -> RpcBuilder<C> {
         let authority = self.payer();
-        self.data_store_request()
+        self.data_store_rpc()
             .args(instruction::InsertFactor {
                 key: key.to_string(),
                 factor: *factor,
@@ -86,7 +86,7 @@ where
 
     fn insert_global_address(&self, store: &Pubkey, key: &str, address: &Pubkey) -> RpcBuilder<C> {
         let authority = self.payer();
-        self.data_store_request()
+        self.data_store_rpc()
             .args(instruction::InsertAddress {
                 key: key.to_string(),
                 address: *address,

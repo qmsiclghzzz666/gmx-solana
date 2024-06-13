@@ -116,11 +116,15 @@ impl Args {
                     ));
                 }
                 let token_map = Keypair::new();
-                let (request, map) = client.initialize_token_map(store, &token_map);
-                crate::utils::send_or_serialize(request, false, |signature| {
-                    println!("created token config map {map} at tx {signature}");
-                    Ok(())
-                })
+                let (rpc, map) = client.initialize_token_map(store, &token_map);
+                crate::utils::send_or_serialize(
+                    rpc.build_without_compute_budget(),
+                    false,
+                    |signature| {
+                        println!("created token config map {map} at tx {signature}");
+                        Ok(())
+                    },
+                )
                 .await?;
             }
             Command::InsertTokenConfig {

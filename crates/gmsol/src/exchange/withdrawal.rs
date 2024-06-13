@@ -520,7 +520,7 @@ where
             });
         Ok(self
             .client
-            .exchange_request()
+            .exchange_rpc()
             .accounts(accounts::ExecuteWithdrawal {
                 authority,
                 store: self.store,

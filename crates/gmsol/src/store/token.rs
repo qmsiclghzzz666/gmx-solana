@@ -47,7 +47,7 @@ where
         amount: u64,
     ) -> RpcBuilder<C> {
         let authority = self.payer();
-        self.data_store_request()
+        self.data_store_rpc()
             .args(instruction::UseClaimableAccount { timestamp, amount })
             .accounts(accounts::UseClaimableAccount {
                 authority,
@@ -69,7 +69,7 @@ where
         account: &Pubkey,
     ) -> RpcBuilder<C> {
         let authority = self.payer();
-        self.data_store_request()
+        self.data_store_rpc()
             .args(instruction::CloseEmptyClaimableAccount {
                 user: *user,
                 timestamp,

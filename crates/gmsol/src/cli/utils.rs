@@ -1,6 +1,7 @@
 use std::ops::Deref;
 
 use anchor_client::{
+    solana_client::rpc_config::RpcSendTransactionConfig,
     solana_sdk::{pubkey::Pubkey, signature::Signature, signer::Signer},
     RequestBuilder,
 };
@@ -64,6 +65,7 @@ where
 pub(crate) async fn send_or_serialize_transactions<C, S>(
     builder: TransactionBuilder<'_, C>,
     serialize_only: bool,
+    skip_preflight: bool,
     callback: impl FnOnce(Vec<Signature>, Option<gmsol::Error>) -> gmsol::Result<()>,
 ) -> gmsol::Result<()>
 where
@@ -84,7 +86,17 @@ where
             println!();
         }
     } else {
-        match builder.send_all().await {
+        match builder
+            .send_all_with_opts(
+                None,
+                RpcSendTransactionConfig {
+                    skip_preflight,
+                    ..Default::default()
+                },
+                false,
+            )
+            .await
+        {
             Ok(signatures) => (callback)(signatures, None)?,
             Err((signatures, error)) => (callback)(signatures, Some(error))?,
         }

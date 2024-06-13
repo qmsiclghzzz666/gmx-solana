@@ -118,7 +118,7 @@ where
         value: &Factor,
     ) -> crate::Result<RpcBuilder<C>> {
         let req = self
-            .data_store_request()
+            .data_store_rpc()
             .args(instruction::UpdateMarketConfig {
                 key: key.to_string(),
                 value: *value,

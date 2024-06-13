@@ -616,7 +616,7 @@ where
             });
         tracing::debug!(%price_provider, "constructing `execute_deposit` ix...");
         Ok(client
-            .exchange_request()
+            .exchange_rpc()
             .accounts(accounts::ExecuteDeposit {
                 authority,
                 controller: client.controller_address(store),

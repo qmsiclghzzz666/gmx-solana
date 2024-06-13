@@ -106,13 +106,13 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         self.exchange().id()
     }
 
-    /// Create a request for `DataStore` Program.
-    pub fn data_store_request(&self) -> RpcBuilder<'_, C> {
+    /// Create a rpc request for `DataStore` Program.
+    pub fn data_store_rpc(&self) -> RpcBuilder<'_, C> {
         RpcBuilder::new(&self.data_store)
     }
 
-    /// Create a request for `Exchange` Program.
-    pub fn exchange_request(&self) -> RpcBuilder<'_, C> {
+    /// Create a rpc request for `Exchange` Program.
+    pub fn exchange_rpc(&self) -> RpcBuilder<'_, C> {
         RpcBuilder::new(&self.exchange)
     }
 

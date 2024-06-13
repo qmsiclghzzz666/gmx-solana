@@ -21,14 +21,21 @@ use super::{transaction_size, RpcBuilder};
 pub struct TransactionBuilder<'a, C> {
     client: RpcClient,
     builders: Vec<RpcBuilder<'a, C>>,
+    force_one_transaction: bool,
 }
 
 impl<'a, C> TransactionBuilder<'a, C> {
     /// Create a new [`TransactionBuilder`].
     pub fn new(client: RpcClient) -> Self {
+        Self::new_with_force_one_transaction(client, false)
+    }
+
+    /// Create a new [`TransactionBuilder`] with the given options.
+    pub fn new_with_force_one_transaction(client: RpcClient, force_one_transaction: bool) -> Self {
         Self {
             client,
             builders: Default::default(),
+            force_one_transaction,
         }
     }
 }
@@ -42,6 +49,9 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> TransactionBuilder<'a, C> {
     ) -> Result<&mut Self, (RpcBuilder<'a, C>, crate::Error)> {
         if self.builders.is_empty() || new_transaction {
             tracing::debug!("adding to a new tx");
+            if !self.builders.is_empty() && self.force_one_transaction {
+                return Err((rpc, crate::Error::invalid_argument("cannot create more than one transaction because `force_one_transaction` is set")));
+            }
             self.builders.push(rpc);
         } else {
             let last = self.builders.last_mut().unwrap();
@@ -56,6 +66,9 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> TransactionBuilder<'a, C> {
                     size_after_merge,
                     "exceed packet data size limit, adding to a new tx"
                 );
+                if self.force_one_transaction {
+                    return Err((rpc, crate::Error::invalid_argument("cannot create more than one transaction because `force_one_transaction` is set")));
+                }
                 self.builders.push(rpc);
             }
         }
@@ -97,9 +110,12 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> TransactionBuilder<'a, C> {
     pub async fn send_all_with_opts(
         self,
         compute_unit_price_micro_lamports: Option<u64>,
-        config: RpcSendTransactionConfig,
+        mut config: RpcSendTransactionConfig,
         without_compute_budget: bool,
     ) -> Result<Vec<Signature>, (Vec<Signature>, crate::Error)> {
+        config.preflight_commitment = config
+            .preflight_commitment
+            .or(Some(self.client.commitment().commitment));
         let txs = FuturesOrdered::from_iter(self.builders.into_iter().enumerate().map(
             |(idx, builder)| async move {
                 tracing::debug!(

@@ -161,7 +161,7 @@ pub struct InitializeMarketVault<'info> {
     pub store: AccountLoader<'info, Store>,
     pub mint: Account<'info, Mint>,
     #[account(
-        init,
+        init_if_needed,
         payer = authority,
         token::mint = mint,
         // We use the store as the authority of the token account.

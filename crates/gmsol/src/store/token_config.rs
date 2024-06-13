@@ -10,6 +10,8 @@ use data_store::{
     states::{PriceProviderKind, TokenConfigBuilder},
 };
 
+use crate::utils::RpcBuilder;
+
 /// Token config management for GMSOL.
 pub trait TokenConfigOps<C> {
     /// Initialize a  `TokenMap` account.
@@ -17,7 +19,7 @@ pub trait TokenConfigOps<C> {
         &'a self,
         store: &Pubkey,
         token_map: &'a dyn Signer,
-    ) -> (RequestBuilder<'a, C>, Pubkey);
+    ) -> (RpcBuilder<'a, C>, Pubkey);
 
     /// Insert or update config for the given token.
     fn insert_token_config(
@@ -72,10 +74,9 @@ where
         &'a self,
         store: &Pubkey,
         token_map: &'a dyn Signer,
-    ) -> (RequestBuilder<'a, C>, Pubkey) {
+    ) -> (RpcBuilder<'a, C>, Pubkey) {
         let builder = self
-            .data_store()
-            .request()
+            .data_store_rpc()
             .accounts(accounts::InitializeTokenMap {
                 payer: self.payer(),
                 store: *store,

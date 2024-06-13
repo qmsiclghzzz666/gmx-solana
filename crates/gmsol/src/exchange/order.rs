@@ -662,7 +662,7 @@ where
 
         let execute_order = self
             .client
-            .exchange_request()
+            .exchange_rpc()
             .accounts(crate::utils::fix_optional_account_metas(
                 accounts::ExecuteOrder {
                     authority,
@@ -720,8 +720,8 @@ where
             )
             .compute_budget(ComputeBudget::default().with_limit(EXECUTE_ORDER_COMPUTE_BUDGET));
 
-        let mut pre_builder = self.client.exchange_request();
-        let mut post_builder = self.client.exchange_request();
+        let mut pre_builder = self.client.exchange_rpc();
+        let mut post_builder = self.client.exchange_rpc();
 
         // Merge claimable accounts.
         if let Some(account) = claimable_long_token_account_for_user.as_ref() {
