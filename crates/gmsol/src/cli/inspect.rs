@@ -32,6 +32,8 @@ enum Command {
         get_factor: Option<FactorKey>,
         #[arg(long, group = "get")]
         get_address: Option<AddressKey>,
+        #[arg(long, group = "get", value_name = "USER")]
+        get_roles: Option<Pubkey>,
     },
     /// `TokenMap` account.
     TokenMap { address: Option<Pubkey> },
@@ -97,6 +99,7 @@ impl InspectArgs {
                 get_address,
                 get_amount,
                 get_factor,
+                get_roles,
             } => {
                 let address = if let Some(address) = address {
                     *address
@@ -112,6 +115,11 @@ impl InspectArgs {
                     println!("{}", store.get_factor_by_key(*key));
                 } else if let Some(key) = get_address {
                     println!("{}", store.get_address_by_key(*key));
+                } else if let Some(user) = get_roles {
+                    match store.role().role_value(user) {
+                        Some(value) => println!("{value:#b}"),
+                        None => return Err(gmsol::Error::invalid_argument("Not a member")),
+                    }
                 } else if *debug {
                     println!("{store:?}");
                 } else {

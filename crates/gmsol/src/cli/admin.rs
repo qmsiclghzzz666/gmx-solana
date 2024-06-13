@@ -21,8 +21,17 @@ enum Command {
     InitializeStore,
     /// Enable a role.
     EnableRole { role: String },
+    /// Disable a role.
+    DisableRole { role: String },
     /// Grant a role to a user.
     GrantRole {
+        /// User.
+        authority: Pubkey,
+        /// Role.
+        role: String,
+    },
+    /// Revoke a role from the user.
+    RevokeRole {
         /// User.
         authority: Pubkey,
         /// Role.
@@ -71,6 +80,19 @@ impl AdminArgs {
                 )
                 .await?;
             }
+            Command::DisableRole { role } => {
+                crate::utils::send_or_serialize(
+                    client
+                        .disable_role(&store, role)
+                        .build_without_compute_budget(),
+                    serialize_only,
+                    |signature| {
+                        tracing::info!("disabled role `{role}` at tx {signature}");
+                        Ok(())
+                    },
+                )
+                .await?;
+            }
             Command::GrantRole { role, authority } => {
                 crate::utils::send_or_serialize(
                     client
@@ -78,7 +100,20 @@ impl AdminArgs {
                         .build_without_compute_budget(),
                     serialize_only,
                     |signature| {
-                        tracing::info!("grant a role for user {authority} at tx {signature}");
+                        tracing::info!("granted a role for user {authority} at tx {signature}");
+                        Ok(())
+                    },
+                )
+                .await?;
+            }
+            Command::RevokeRole { role, authority } => {
+                crate::utils::send_or_serialize(
+                    client
+                        .revoke_role(&store, authority, role)
+                        .build_without_compute_budget(),
+                    serialize_only,
+                    |signature| {
+                        tracing::info!("revoked a role for user {authority} at tx {signature}");
                         Ok(())
                     },
                 )

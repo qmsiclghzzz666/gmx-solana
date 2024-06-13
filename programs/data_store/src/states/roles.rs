@@ -233,6 +233,11 @@ impl RoleStore {
     pub fn num_members(&self) -> usize {
         self.members.len()
     }
+
+    /// Get role value for the user.
+    pub fn role_value(&self, user: &Pubkey) -> Option<RoleBitmapValue> {
+        self.members.get(user).copied()
+    }
 }
 
 #[cfg(test)]
