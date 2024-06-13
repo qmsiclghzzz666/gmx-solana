@@ -148,7 +148,7 @@ struct InitializeAll {
     #[arg(long)]
     order_keeper: Vec<Pubkey>,
     #[arg(long)]
-    force_one_transaction: bool,
+    allow_multiple_transactions: bool,
     #[arg(long)]
     skip_preflight: bool,
 }
@@ -167,7 +167,7 @@ impl InitializeAll {
 
         let mut builder = TransactionBuilder::new_with_force_one_transaction(
             client.data_store().async_rpc(),
-            self.force_one_transaction,
+            !self.allow_multiple_transactions,
         );
 
         if !self.skip_init_store {
