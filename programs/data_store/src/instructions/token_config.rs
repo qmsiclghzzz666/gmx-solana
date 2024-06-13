@@ -50,6 +50,7 @@ pub struct PushToTokenMap<'info> {
 /// - Only [`MARKET_KEEPER`](crate::states::RoleKey::MARKET_KEEPER) can perform this action.
 pub fn unchecked_push_to_token_map(
     ctx: Context<PushToTokenMap>,
+    name: &str,
     builder: TokenConfigBuilder,
     enable: bool,
     new: bool,
@@ -61,6 +62,7 @@ pub fn unchecked_push_to_token_map(
         &ctx.accounts.token_map,
         ctx.accounts.system_program.to_account_info(),
         false,
+        name,
         &token,
         token_decimals,
         builder,
@@ -95,6 +97,7 @@ pub struct PushToTokenMapSynthetic<'info> {
 /// - Only [`MARKET_KEEPER`](crate::states::RoleKey::MARKET_KEEPER) can perform this action.
 pub fn unchecked_push_to_token_map_synthetic(
     ctx: Context<PushToTokenMapSynthetic>,
+    name: &str,
     token: Pubkey,
     token_decimals: u8,
     builder: TokenConfigBuilder,
@@ -106,6 +109,7 @@ pub fn unchecked_push_to_token_map_synthetic(
         &ctx.accounts.token_map,
         ctx.accounts.system_program.to_account_info(),
         true,
+        name,
         &token,
         token_decimals,
         builder,
@@ -301,6 +305,7 @@ fn do_push_token_map<'info>(
     token_map_loader: &AccountLoader<'info, TokenMapHeader>,
     system_program: AccountInfo<'info>,
     synthetic: bool,
+    name: &str,
     token: &Pubkey,
     token_decimals: u8,
     builder: TokenConfigBuilder,
@@ -338,7 +343,7 @@ fn do_push_token_map<'info>(
     let mut token_map = token_map_loader.load_token_map_mut()?;
     token_map.push_with(
         token,
-        |config| config.update(synthetic, token_decimals, builder, enable, new),
+        |config| config.update(name, synthetic, token_decimals, builder, enable, new),
         new,
     )?;
     Ok(())

@@ -203,6 +203,7 @@ export const initializeDataStore = async (
         await invokePushToTokenMap(dataStore, {
             authority: signer,
             store: dataStorePDA,
+            name: "WBTC",
             token: BTC_TOKEN_MINT,
             tokenMap,
             heartbeatDuration: HEARTBEAT,
@@ -221,6 +222,7 @@ export const initializeDataStore = async (
         await invokePushToTokenMap(dataStore, {
             authority: signer,
             store: dataStorePDA,
+            name: "WSOL",
             token: SOL_TOKEN_MINT,
             tokenMap,
             heartbeatDuration: HEARTBEAT,
@@ -239,6 +241,7 @@ export const initializeDataStore = async (
         await invokePushToTokenMap(dataStore, {
             authority: signer,
             store: dataStorePDA,
+            name: "FAKE",
             token: fakeToken,
             tokenMap,
             heartbeatDuration: HEARTBEAT,
@@ -257,6 +260,7 @@ export const initializeDataStore = async (
         await invokePushToTokenMap(dataStore, {
             authority: signer,
             store: dataStorePDA,
+            name: "USDG",
             token: usdG,
             tokenMap,
             heartbeatDuration: HEARTBEAT,

@@ -80,6 +80,7 @@ export const makePushToTokenMapInstruction = async (
         store,
         tokenMap,
         token,
+        name,
         heartbeatDuration,
         precision,
         feeds: {
@@ -94,6 +95,7 @@ export const makePushToTokenMapInstruction = async (
         authority: PublicKey,
         store: PublicKey,
         tokenMap: PublicKey,
+        name: string,
         token: PublicKey,
         heartbeatDuration: number,
         precision: number,
@@ -102,22 +104,24 @@ export const makePushToTokenMapInstruction = async (
         update?: boolean,
     }
 ) => {
-    return await program.methods.pushToTokenMap({
-        heartbeatDuration,
-        precision,
-        feeds: [
-            pythFeedId ? hexStringToPublicKey(pythFeedId) : PublicKey.default,
-            chainlinkFeed ?? PublicKey.default,
-            pythDevFeed ?? PublicKey.default,
-            PublicKey.default,
-        ],
-        expectedProvider,
-    }, enable, !update).accountsPartial({
-        authority,
-        store,
-        tokenMap,
-        token,
-    }).instruction();
+    return await program.methods.pushToTokenMap(
+        name,
+        {
+            heartbeatDuration,
+            precision,
+            feeds: [
+                pythFeedId ? hexStringToPublicKey(pythFeedId) : PublicKey.default,
+                chainlinkFeed ?? PublicKey.default,
+                pythDevFeed ?? PublicKey.default,
+                PublicKey.default,
+            ],
+            expectedProvider,
+        }, enable, !update).accountsPartial({
+            authority,
+            store,
+            tokenMap,
+            token,
+        }).instruction();
 };
 
 export const invokePushToTokenMap = makeInvoke(makePushToTokenMapInstruction, ["authority"]);
@@ -128,6 +132,7 @@ export const makePushToTokenMapSyntheticInstruction = async (
         authority,
         store,
         tokenMap,
+        name,
         token,
         tokenDecimals,
         heartbeatDuration,
@@ -144,6 +149,7 @@ export const makePushToTokenMapSyntheticInstruction = async (
         authority: PublicKey,
         store: PublicKey,
         tokenMap: PublicKey,
+        name: string,
         token: PublicKey,
         tokenDecimals: number,
         heartbeatDuration: number,
@@ -154,6 +160,7 @@ export const makePushToTokenMapSyntheticInstruction = async (
     }
 ) => {
     return await program.methods.pushToTokenMapSynthetic(
+        name,
         token,
         tokenDecimals,
         {

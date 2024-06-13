@@ -6,7 +6,10 @@ use std::{
 use anchor_lang::prelude::*;
 use bitmaps::Bitmap;
 
-use crate::DataStoreError;
+use crate::{
+    utils::fixed_str::{bytes_to_fixed_str, fixed_str_to_bytes},
+    DataStoreError,
+};
 
 use super::{InitSpace, PriceProviderKind};
 
@@ -22,6 +25,7 @@ pub const DEFAULT_TIMESTAMP_ADJUSTMENT: u32 = 0;
 const MAX_FEEDS: usize = 4;
 const MAX_FLAGS: usize = 8;
 const MAX_TOKENS: usize = 256;
+const MAX_NAME_LEN: usize = 32;
 
 /// Token Flags.
 #[repr(u8)]
@@ -43,6 +47,8 @@ type TokenFlagsValue = u8;
 #[derive(PartialEq, Eq)]
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub struct TokenConfig {
+    /// Name.
+    name: [u8; MAX_NAME_LEN],
     /// Flags.
     flags: TokenFlagsValue,
     /// Token decimals.
@@ -148,6 +154,7 @@ impl TokenConfig {
     /// Create a new token config from builder.
     pub fn update(
         &mut self,
+        name: &str,
         synthetic: bool,
         token_decimals: u8,
         builder: TokenConfigBuilder,
@@ -172,6 +179,7 @@ impl TokenConfig {
             feeds,
             expected_provider,
         } = builder;
+        self.name = fixed_str_to_bytes(name)?;
         self.set_synthetic(synthetic);
         self.set_enabled(enable);
         self.token_decimals = token_decimals;
@@ -205,6 +213,11 @@ impl TokenConfig {
     /// Heartbeat duration.
     pub fn heartbeat_duration(&self) -> u32 {
         self.heartbeat_duration
+    }
+
+    /// Get token name.
+    pub fn name(&self) -> Result<&str> {
+        bytes_to_fixed_str(&self.name)
     }
 }
 

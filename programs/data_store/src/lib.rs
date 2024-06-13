@@ -125,16 +125,18 @@ pub mod data_store {
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn push_to_token_map(
         ctx: Context<PushToTokenMap>,
+        name: String,
         builder: TokenConfigBuilder,
         enable: bool,
         new: bool,
     ) -> Result<()> {
-        instructions::unchecked_push_to_token_map(ctx, builder, enable, new)
+        instructions::unchecked_push_to_token_map(ctx, &name, builder, enable, new)
     }
 
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn push_to_token_map_synthetic(
         ctx: Context<PushToTokenMapSynthetic>,
+        name: String,
         token: Pubkey,
         token_decimals: u8,
         builder: TokenConfigBuilder,
@@ -143,6 +145,7 @@ pub mod data_store {
     ) -> Result<()> {
         instructions::unchecked_push_to_token_map_synthetic(
             ctx,
+            &name,
             token,
             token_decimals,
             builder,

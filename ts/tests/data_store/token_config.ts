@@ -22,10 +22,14 @@ describe("data store: TokenConfig", () => {
         tokenMap = (await dataStore.account.store.fetch(dataStoreAddress)).tokenMap;
     });
 
+    const fakeTokenName = "FAKE";
+    const usdGTokenName = "USDG";
+
     it("can only be updated by MARKET_KEEPER", async () => {
         await expect(invokePushToTokenMap(dataStore, {
             authority: user0,
             store: dataStoreAddress,
+            name: fakeTokenName,
             tokenMap,
             token: fakeTokenMint,
             heartbeatDuration: 123,
@@ -50,6 +54,7 @@ describe("data store: TokenConfig", () => {
                 authority: signer0,
                 store: dataStoreAddress,
                 tokenMap,
+                name: fakeTokenName,
                 token: newToken,
                 heartbeatDuration: 60,
                 precision: 3,
@@ -84,6 +89,7 @@ describe("data store: TokenConfig", () => {
                 authority: signer0,
                 store: dataStoreAddress,
                 tokenMap,
+                name: fakeTokenName,
                 token: newToken,
                 heartbeatDuration: 60,
                 precision: 3,
@@ -147,6 +153,7 @@ describe("data store: TokenConfig", () => {
                 authority: signer0,
                 store: dataStoreAddress,
                 tokenMap,
+                name: fakeTokenName,
                 token: newFakeToken,
                 tokenDecimals: 6,
                 heartbeatDuration: 60,
@@ -216,6 +223,7 @@ describe("data store: TokenConfig", () => {
             await invokePushToTokenMap(dataStore, {
                 authority: signer0,
                 store,
+                name: fakeTokenName,
                 tokenMap: tokenMap.publicKey,
                 token: fakeTokenMint,
                 heartbeatDuration: 120,
@@ -238,6 +246,7 @@ describe("data store: TokenConfig", () => {
                 authority: signer0,
                 store,
                 tokenMap: tokenMap.publicKey,
+                name: fakeTokenName,
                 token: fakeTokenMint,
                 heartbeatDuration: 120,
                 precision: 4,
@@ -255,6 +264,7 @@ describe("data store: TokenConfig", () => {
                 authority: signer0,
                 store,
                 tokenMap: tokenMap.publicKey,
+                name: usdGTokenName,
                 token: usdGTokenMint,
                 heartbeatDuration: 120,
                 precision: 4,

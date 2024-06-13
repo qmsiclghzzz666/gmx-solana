@@ -22,15 +22,17 @@ pub trait TokenConfigOps<C> {
     ) -> (RpcBuilder<'a, C>, Pubkey);
 
     /// Insert or update config for the given token.
+    #[allow(clippy::too_many_arguments)]
     fn insert_token_config(
         &self,
         store: &Pubkey,
         token_map: &Pubkey,
+        name: &str,
         token: &Pubkey,
         builder: TokenConfigBuilder,
         enable: bool,
         new: bool,
-    ) -> RequestBuilder<C>;
+    ) -> RpcBuilder<C>;
 
     /// Insert or update config the given synthetic token.
     // FIXME: reduce the number of args.
@@ -39,12 +41,13 @@ pub trait TokenConfigOps<C> {
         &self,
         store: &Pubkey,
         token_map: &Pubkey,
+        name: &str,
         token: &Pubkey,
         decimals: u8,
         builder: TokenConfigBuilder,
         enable: bool,
         new: bool,
-    ) -> RequestBuilder<C>;
+    ) -> RpcBuilder<C>;
 
     /// Toggle token config.
     fn toggle_token_config(
@@ -92,14 +95,14 @@ where
         &self,
         store: &Pubkey,
         token_map: &Pubkey,
+        name: &str,
         token: &Pubkey,
         builder: TokenConfigBuilder,
         enable: bool,
         new: bool,
-    ) -> RequestBuilder<C> {
+    ) -> RpcBuilder<C> {
         let authority = self.payer();
-        self.data_store()
-            .request()
+        self.data_store_rpc()
             .accounts(accounts::PushToTokenMap {
                 authority,
                 store: *store,
@@ -108,6 +111,7 @@ where
                 system_program: system_program::ID,
             })
             .args(instruction::PushToTokenMap {
+                name: name.to_owned(),
                 builder,
                 enable,
                 new,
@@ -118,15 +122,15 @@ where
         &self,
         store: &Pubkey,
         token_map: &Pubkey,
+        name: &str,
         token: &Pubkey,
         decimals: u8,
         builder: TokenConfigBuilder,
         enable: bool,
         new: bool,
-    ) -> RequestBuilder<C> {
+    ) -> RpcBuilder<C> {
         let authority = self.payer();
-        self.data_store()
-            .request()
+        self.data_store_rpc()
             .accounts(accounts::PushToTokenMapSynthetic {
                 authority,
                 store: *store,
@@ -134,6 +138,7 @@ where
                 system_program: system_program::ID,
             })
             .args(instruction::PushToTokenMapSynthetic {
+                name: name.to_owned(),
                 token: *token,
                 token_decimals: decimals,
                 builder,

@@ -178,6 +178,8 @@ impl Ids for PriceProvider {
 #[repr(u8)]
 #[derive(Clone, Copy, Default, TryFromPrimitive, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "debug", derive(Debug))]
 #[non_exhaustive]
 pub enum PriceProviderKind {
     /// Pyth Oracle V2.
