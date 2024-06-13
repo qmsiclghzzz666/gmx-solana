@@ -174,3 +174,24 @@ export const makePushToTokenMapSyntheticInstruction = async (
 };
 
 export const invokePushToTokenMapSynthetic = makeInvoke(makePushToTokenMapSyntheticInstruction, ["authority"]);
+
+export const makeSetFeedConfigInstruction = async (
+    program: DataStoreProgram,
+    { authority, store, tokenMap, token, provider, feed, timestampAdjustment }: {
+        authority: PublicKey,
+        store: PublicKey,
+        tokenMap: PublicKey,
+        token: PublicKey,
+        provider: PriceProvider,
+        feed: PublicKey,
+        timestampAdjustment: number,
+    }
+) => {
+    return await program.methods.setFeedConfig(token, provider, feed, timestampAdjustment).accountsPartial({
+        authority,
+        store,
+        tokenMap,
+    }).instruction();
+}
+
+export const invokeSetFeedConfig = makeInvoke(makeSetFeedConfigInstruction, ["authority"]);

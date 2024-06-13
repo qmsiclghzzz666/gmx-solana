@@ -3,7 +3,7 @@ use anchor_spl::token::Mint;
 
 use crate::{
     states::{
-        PriceProviderKind, Store, TokenConfigBuilder, TokenMapAccess, TokenMapHeader,
+        FeedConfig, PriceProviderKind, Store, TokenConfigBuilder, TokenMapAccess, TokenMapHeader,
         TokenMapLoader, TokenMapMutAccess,
     },
     utils::internal,
@@ -200,6 +200,46 @@ impl<'info> internal::Authentication<'info> for SetExpectedProvider<'info> {
 }
 
 #[derive(Accounts)]
+pub struct SetFeedConfig<'info> {
+    pub authority: Signer<'info>,
+    pub store: AccountLoader<'info, Store>,
+    #[account(mut, has_one = store)]
+    pub token_map: AccountLoader<'info, TokenMapHeader>,
+}
+
+/// Set feed config for the given token.
+///
+/// ## CHECK
+/// - Only [`MARKET_KEEPER`](crate::states::RoleKey::MARKET_KEEPER) can perform this action.
+pub fn unchecked_set_feed_config(
+    ctx: Context<SetFeedConfig>,
+    token: Pubkey,
+    provider: &PriceProviderKind,
+    feed: Pubkey,
+    timestamp_adjustment: u32,
+) -> Result<()> {
+    ctx.accounts
+        .token_map
+        .load_token_map_mut()?
+        .get_mut(&token)
+        .ok_or(error!(DataStoreError::RequiredResourceNotFound))?
+        .set_feed_config(
+            provider,
+            FeedConfig::new(feed).with_timestamp_adjustment(timestamp_adjustment),
+        )
+}
+
+impl<'info> internal::Authentication<'info> for SetFeedConfig<'info> {
+    fn authority(&self) -> &Signer<'info> {
+        &self.authority
+    }
+
+    fn store(&self) -> &AccountLoader<'info, Store> {
+        &self.store
+    }
+}
+
+#[derive(Accounts)]
 pub struct ReadTokenMap<'info> {
     token_map: AccountLoader<'info, TokenMapHeader>,
 }
@@ -242,14 +282,17 @@ pub fn token_feed(
 }
 
 /// Get timestamp adjustemnt of the given token.
-pub fn token_timestamp_adjustment(ctx: Context<ReadTokenMap>, token: &Pubkey) -> Result<u32> {
-    Ok(ctx
-        .accounts
+pub fn token_timestamp_adjustment(
+    ctx: Context<ReadTokenMap>,
+    token: &Pubkey,
+    provider: &PriceProviderKind,
+) -> Result<u32> {
+    ctx.accounts
         .token_map
         .load_token_map()?
         .get(token)
         .ok_or(error!(DataStoreError::RequiredResourceNotFound))?
-        .timestamp_adjustment())
+        .timestamp_adjustment(provider)
 }
 
 #[allow(clippy::too_many_arguments)]

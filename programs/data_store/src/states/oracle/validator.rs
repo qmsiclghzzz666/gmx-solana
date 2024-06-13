@@ -6,6 +6,8 @@ use crate::{
     DataStoreError,
 };
 
+use super::PriceProviderKind;
+
 /// Default timestamp adjustment.
 pub const DEFAULT_TIMESTAMP_ADJUSTMENT: u64 = 1;
 
@@ -28,11 +30,12 @@ impl PriceValidator {
     pub(super) fn validate_one(
         &mut self,
         token_config: &TokenConfig,
+        provider: &PriceProviderKind,
         oracle_ts: i64,
         oracle_slot: u64,
         _price: &Price,
     ) -> Result<()> {
-        let timestamp_adjustment = token_config.timestamp_adjustment().into();
+        let timestamp_adjustment = token_config.timestamp_adjustment(provider)?.into();
         let ts = oracle_ts
             .checked_sub_unsigned(timestamp_adjustment)
             .ok_or(DataStoreError::AmountOverflow)?;

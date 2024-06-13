@@ -1,10 +1,10 @@
 import { Keypair, PublicKey } from '@solana/web3.js';
 
 import { expect, getAddresses, getProvider, getUsers } from "../../utils/fixtures";
-import { MARKET_KEEPER, createDataStorePDA, createRolesPDA, dataStore, invokeInitializeTokenMap, invokePushToTokenMap, invokePushToTokenMapSynthetic, invokeSetTokenMap, setExpectedProvider, toggleTokenConfig } from "../../utils/data";
+import { MARKET_KEEPER, createDataStorePDA, createRolesPDA, dataStore, invokeInitializeTokenMap, invokePushToTokenMap, invokePushToTokenMapSynthetic, invokeSetFeedConfig, invokeSetTokenMap, setExpectedProvider, toggleTokenConfig } from "../../utils/data";
 import { AnchorError } from '@coral-xyz/anchor';
 import { createMint } from '@solana/spl-token';
-import { BTC_FEED, SOL_FEED } from '../../utils/token';
+import { BTC_FEED, SOL_FEED, SOL_FEED_PYTH } from '../../utils/token';
 import { PriceProvider } from 'gmsol';
 
 describe("data store: TokenConfig", () => {
@@ -272,5 +272,37 @@ describe("data store: TokenConfig", () => {
         expect(BTC_FEED.equals(fakeFeed));
         const usdGFeed = await dataStore.methods.tokenFeed(usdGTokenMint, PriceProvider.Chainlink).accounts({ tokenMap: tokenMap.publicKey }).view();
         expect(SOL_FEED.equals(usdGFeed));
+
+        {
+            // Can only be set by MARKET_KEEPER.
+            await expect(invokeSetFeedConfig(dataStore, {
+                authority: user0,
+                store,
+                tokenMap: tokenMap.publicKey,
+                token: usdGTokenMint,
+                provider: PriceProvider.PythLegacy,
+                feed: SOL_FEED_PYTH,
+                timestampAdjustment: 3,
+            })).rejectedWith(Error, "Permission denied");
+        }
+
+        {
+            const tx = await invokeSetFeedConfig(dataStore, {
+                authority: signer0,
+                store,
+                tokenMap: tokenMap.publicKey,
+                token: usdGTokenMint,
+                provider: PriceProvider.PythLegacy,
+                feed: SOL_FEED_PYTH,
+                timestampAdjustment: 42,
+            });
+            console.log(`set feed config at tx ${tx}`);
+
+            const usdGFeed = await dataStore.methods.tokenFeed(usdGTokenMint, PriceProvider.PythLegacy).accounts({ tokenMap: tokenMap.publicKey }).view();
+            expect(SOL_FEED_PYTH.equals(usdGFeed));
+            const timestmapAdjustment = await dataStore.methods.tokenTimestampAdjustment(usdGTokenMint, PriceProvider.PythLegacy).accounts({ tokenMap: tokenMap.publicKey }).view();
+            expect(timestmapAdjustment).eqls(42);
+        }
+
     });
 });

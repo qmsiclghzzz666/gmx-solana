@@ -52,27 +52,45 @@ pub struct TokenConfig {
     /// Expected provider.
     expected_provider: u8,
     /// Price Feeds.
-    feeds: [Pubkey; MAX_FEEDS],
+    feeds: [FeedConfig; MAX_FEEDS],
     /// Heartbeat duration.
     heartbeat_duration: u32,
-    /// Timestamp adjustment.
-    timestamp_adjustment: u32,
     reserved: [u8; 32],
 }
 
 impl TokenConfig {
-    /// Get the corresponding price feed address.
-    pub fn get_feed(&self, kind: &PriceProviderKind) -> Result<Pubkey> {
+    /// Get the corresponding price feed config.
+    pub fn get_feed_config(&self, kind: &PriceProviderKind) -> Result<&FeedConfig> {
         let index = *kind as usize;
-        let feed = self
+        let config = self
             .feeds
             .get(index)
             .ok_or(DataStoreError::PriceFeedNotSet)?;
-        if *feed == Pubkey::default() {
+        if config.feed == Pubkey::default() {
             err!(DataStoreError::PriceFeedNotSet)
         } else {
-            Ok(*feed)
+            Ok(config)
         }
+    }
+
+    /// Set feed config.
+    pub fn set_feed_config(
+        &mut self,
+        kind: &PriceProviderKind,
+        new_config: FeedConfig,
+    ) -> Result<()> {
+        let index = *kind as usize;
+        let config = self
+            .feeds
+            .get_mut(index)
+            .ok_or(DataStoreError::InvalidProviderKindIndex)?;
+        *config = new_config;
+        Ok(())
+    }
+
+    /// Get the corresponding price feed address.
+    pub fn get_feed(&self, kind: &PriceProviderKind) -> Result<Pubkey> {
+        Ok(self.get_feed_config(kind)?.feed)
     }
 
     /// Set expected provider.
@@ -159,11 +177,13 @@ impl TokenConfig {
         self.token_decimals = token_decimals;
         self.precision = precision;
         self.feeds = feeds
+            .into_iter()
+            .map(FeedConfig::new)
+            .collect::<Vec<_>>()
             .try_into()
             .map_err(|_| error!(DataStoreError::InvalidArgument))?;
         self.expected_provider = expected_provider.unwrap_or(PriceProviderKind::default() as u8);
         self.heartbeat_duration = heartbeat_duration;
-        self.timestamp_adjustment = DEFAULT_TIMESTAMP_ADJUSTMENT;
         Ok(())
     }
 
@@ -178,8 +198,8 @@ impl TokenConfig {
     }
 
     /// Get timestamp adjustment.
-    pub fn timestamp_adjustment(&self) -> u32 {
-        self.timestamp_adjustment
+    pub fn timestamp_adjustment(&self, price_provider: &PriceProviderKind) -> Result<u32> {
+        Ok(self.get_feed_config(price_provider)?.timestamp_adjustment)
     }
 
     /// Heartbeat duration.
@@ -190,6 +210,33 @@ impl TokenConfig {
 
 impl InitSpace for TokenConfig {
     const INIT_SPACE: usize = std::mem::size_of::<Self>();
+}
+
+/// Price Feed Config.
+#[zero_copy]
+#[derive(PartialEq, Eq)]
+#[cfg_attr(feature = "debug", derive(Debug))]
+pub struct FeedConfig {
+    feed: Pubkey,
+    timestamp_adjustment: u32,
+    reserved: [u8; 28],
+}
+
+impl FeedConfig {
+    /// Create a new feed config.
+    pub fn new(feed: Pubkey) -> Self {
+        Self {
+            feed,
+            timestamp_adjustment: DEFAULT_TIMESTAMP_ADJUSTMENT,
+            reserved: Default::default(),
+        }
+    }
+
+    /// Change the timestamp adjustment.
+    pub fn with_timestamp_adjustment(mut self, timestamp_adjustment: u32) -> Self {
+        self.timestamp_adjustment = timestamp_adjustment;
+        self
+    }
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]

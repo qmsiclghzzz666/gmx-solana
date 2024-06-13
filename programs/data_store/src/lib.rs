@@ -168,8 +168,17 @@ pub mod data_store {
         )
     }
 
-    pub fn token_timestamp_adjustment(ctx: Context<ReadTokenMap>, token: Pubkey) -> Result<u32> {
-        instructions::token_timestamp_adjustment(ctx, &token)
+    pub fn token_timestamp_adjustment(
+        ctx: Context<ReadTokenMap>,
+        token: Pubkey,
+        provider: u8,
+    ) -> Result<u32> {
+        instructions::token_timestamp_adjustment(
+            ctx,
+            &token,
+            &PriceProviderKind::try_from(provider)
+                .map_err(|_| DataStoreError::InvalidProviderKindIndex)?,
+        )
     }
 
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
@@ -192,6 +201,24 @@ pub mod data_store {
             token,
             PriceProviderKind::try_from(provider)
                 .map_err(|_| DataStoreError::InvalidProviderKindIndex)?,
+        )
+    }
+
+    #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
+    pub fn set_feed_config(
+        ctx: Context<SetFeedConfig>,
+        token: Pubkey,
+        provider: u8,
+        feed: Pubkey,
+        timestamp_adjustment: u32,
+    ) -> Result<()> {
+        instructions::unchecked_set_feed_config(
+            ctx,
+            token,
+            &PriceProviderKind::try_from(provider)
+                .map_err(|_| DataStoreError::InvalidProviderKindIndex)?,
+            feed,
+            timestamp_adjustment,
         )
     }
 

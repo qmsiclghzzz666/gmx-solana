@@ -87,23 +87,26 @@ impl Oracle {
                 DataStoreError::TokenConfigDisabled
             );
             require_eq!(token_config.expected_provider()?, *program.kind());
-            let (oracle_slot, oracle_ts, price) = match &program {
+            let (oracle_slot, oracle_ts, price, kind) = match &program {
                 PriceProviderProgram::Chainlink(program, kind) => {
                     require_eq!(
                         token_config.get_feed(kind)?,
                         feed.key(),
                         DataStoreError::InvalidPriceFeedAccount
                     );
-                    Chainlink::check_and_get_chainlink_price(
+                    let (oracle_slot, oracle_ts, price) = Chainlink::check_and_get_chainlink_price(
                         validator.clock(),
                         program,
                         token_config,
                         feed,
-                    )?
+                    )?;
+                    (oracle_slot, oracle_ts, price, kind)
                 }
                 PriceProviderProgram::Pyth(_program, kind) => {
                     let feed_id = token_config.get_feed(kind)?;
-                    Pyth::check_and_get_price(validator.clock(), token_config, feed, &feed_id)?
+                    let (oracle_slot, oracle_ts, price) =
+                        Pyth::check_and_get_price(validator.clock(), token_config, feed, &feed_id)?;
+                    (oracle_slot, oracle_ts, price, kind)
                 }
                 PriceProviderProgram::PythLegacy(_program, kind) => {
                     require_eq!(
@@ -112,10 +115,12 @@ impl Oracle {
                         DataStoreError::InvalidPriceFeedAccount
                     );
                     // We don't have to check the `feed_id` because the `feed` account is set by the token config keeper.
-                    PythLegacy::check_and_get_price(validator.clock(), token_config, feed)?
+                    let (oracle_slot, oracle_ts, price) =
+                        PythLegacy::check_and_get_price(validator.clock(), token_config, feed)?;
+                    (oracle_slot, oracle_ts, price, kind)
                 }
             };
-            validator.validate_one(token_config, oracle_ts, oracle_slot, &price)?;
+            validator.validate_one(token_config, kind, oracle_ts, oracle_slot, &price)?;
             self.primary.set(token, price)?;
         }
         self.update_oracle_ts_and_slot(validator)?;
