@@ -1,8 +1,8 @@
 /// Roles management.
 pub mod roles;
 
-/// Data store management.
-pub mod data_store;
+/// Store management.
+pub mod store_ops;
 
 /// Oracle.
 pub mod oracle;

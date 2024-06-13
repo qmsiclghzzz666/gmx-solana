@@ -145,9 +145,9 @@ export const initializeDataStore = async (
 
     // Initialize a DataStore with the given key.
     try {
-        const tx = await dataStore.methods.initialize(dataStoreKey).accountsPartial({
-            authority: provider.publicKey,
-            dataStore: dataStorePDA,
+        const tx = await dataStore.methods.initialize(dataStoreKey, null).accountsPartial({
+            payer: provider.publicKey,
+            store: dataStorePDA,
         }).rpc();
         console.log(`Initialized a new data store account ${dataStorePDA.toBase58()} in tx: ${tx}`);
     } catch (error) {

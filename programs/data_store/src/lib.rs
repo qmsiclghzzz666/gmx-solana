@@ -39,8 +39,20 @@ pub mod data_store {
     use super::*;
 
     // Data Store.
-    pub fn initialize(ctx: Context<Initialize>, key: String) -> Result<()> {
-        instructions::initialize(ctx, key)
+    pub fn initialize(
+        ctx: Context<Initialize>,
+        key: String,
+        authority: Option<Pubkey>,
+    ) -> Result<()> {
+        instructions::initialize(ctx, key, authority)
+    }
+
+    #[access_control(internal::Authenticate::only_admin(&ctx))]
+    pub fn transfer_store_authority(
+        ctx: Context<TransferStoreAuthority>,
+        new_authority: Pubkey,
+    ) -> Result<()> {
+        instructions::unchecked_transfer_store_authority(ctx, new_authority)
     }
 
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]

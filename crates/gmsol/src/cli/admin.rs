@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use anchor_client::solana_sdk::{pubkey::Pubkey, signature::Keypair};
 use data_store::states::RoleKey;
 use gmsol::{
-    store::{data_store::StoreOps, roles::RolesOps, token_config::TokenConfigOps},
+    store::{roles::RolesOps, store_ops::StoreOps, token_config::TokenConfigOps},
     utils::TransactionBuilder,
 };
 
@@ -18,7 +18,17 @@ pub(super) struct AdminArgs {
 #[derive(clap::Subcommand)]
 enum Command {
     /// Initialize a new data store.
-    InitializeStore,
+    InitializeStore {
+        #[arg(long)]
+        admin: Option<Pubkey>,
+    },
+    /// Transfer store authority.
+    TransferStoreAuthority {
+        #[arg(long)]
+        new_authority: Pubkey,
+        #[arg(long)]
+        send: bool,
+    },
     /// Enable a role.
     EnableRole { role: String },
     /// Disable a role.
@@ -53,11 +63,14 @@ impl AdminArgs {
         let store = client.find_store_address(store_key);
         match &self.command {
             Command::InitializeAll(args) => args.run(client, store_key, serialize_only).await?,
-            Command::InitializeStore => {
-                println!("Initialize store with key={store_key}, address={store}",);
+            Command::InitializeStore { admin } => {
+                println!(
+                    "Initialize store with key={store_key}, address={store}, admin={}",
+                    admin.unwrap_or(client.payer())
+                );
                 crate::utils::send_or_serialize(
                     client
-                        .initialize_store(store_key)
+                        .initialize_store(store_key, admin.as_ref())
                         .build_without_compute_budget(),
                     serialize_only,
                     |signature| {
@@ -66,6 +79,37 @@ impl AdminArgs {
                     },
                 )
                 .await?;
+            }
+            Command::TransferStoreAuthority {
+                new_authority,
+                send,
+            } => {
+                let rpc = client.transfer_store_authority(&store, new_authority);
+                if *send || serialize_only {
+                    crate::utils::send_or_serialize(
+                        rpc.build_without_compute_budget(),
+                        serialize_only,
+                        |signature| {
+                            tracing::info!(
+                                "transferred store authority to `{new_authority}` at tx {signature}"
+                            );
+                            Ok(())
+                        },
+                    )
+                    .await?;
+                } else {
+                    let transaction = rpc.build().signed_transaction().await?;
+                    let response = client
+                        .data_store()
+                        .async_rpc()
+                        .simulate_transaction(&transaction)
+                        .await
+                        .map_err(anchor_client::ClientError::from)?;
+                    println!("Simulation result: {:#?}", response.value);
+                    if response.value.err.is_none() {
+                        println!("The simulation was successful, but this operation is very dangerous. If you are sure you want to proceed, please reauthorize the command with `--send` flag");
+                    }
+                }
             }
             Command::EnableRole { role } => {
                 crate::utils::send_or_serialize(
@@ -172,7 +216,7 @@ impl InitializeAll {
 
         if !self.skip_init_store {
             // Insert initialize store instruction.
-            builder.try_push(client.initialize_store(store_key))?;
+            builder.try_push(client.initialize_store(store_key, None))?;
         }
 
         builder

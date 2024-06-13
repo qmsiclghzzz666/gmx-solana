@@ -46,6 +46,26 @@ describe("data store: Roles", () => {
         expect(isAdmin).false;
     });
 
+    it("should fail to transfer store authority without admin role", async () => {
+        await expect(dataStore.methods.transferStoreAuthority(signer0.publicKey).accounts({
+            authority: signer0.publicKey,
+            store: dataStoreAddress,
+        }).signers([signer0]).rpc()).rejectedWith(AnchorError, "Not an admin");
+    });
+
+    it("transfer back and forth store authority", async () => {
+        await dataStore.methods.transferStoreAuthority(signer0.publicKey).accounts({
+            authority: provider.publicKey,
+            store: dataStoreAddress,
+        }).rpc();
+        await dataStore.methods.transferStoreAuthority(provider.publicKey).accounts({
+            authority: signer0.publicKey,
+            store: dataStoreAddress,
+        }).signers([signer0]).rpc();
+        const authority = (await dataStore.account.store.fetch(dataStoreAddress)).authority;
+        expect(authority.equals(provider.publicKey));
+    });
+
     it("should fail to enable role without admin role", async () => {
         await expect(dataStore.methods.enableRole("FOO").accounts({
             authority: signer0.publicKey,

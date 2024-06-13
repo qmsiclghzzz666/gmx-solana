@@ -168,9 +168,9 @@ describe("data store: TokenConfig", () => {
     it("initialize a new token map and set to a new store", async () => {
         const randomKey = Keypair.generate().publicKey.toBase58().slice(0, 10);
         const [store] = createDataStorePDA(randomKey);
-        await dataStore.methods.initialize(randomKey).accounts({
-            authority: provider.publicKey,
-            dataStore: store,
+        await dataStore.methods.initialize(randomKey, null).accounts({
+            payer: provider.publicKey,
+            store,
         }).rpc();
         await dataStore.methods.enableRole(MARKET_KEEPER).accounts({
             authority: provider.publicKey,
