@@ -58,7 +58,7 @@ pub(crate) trait Authenticate<'info>: Authentication<'info> + Bumps + Sized {
     }
 
     /// Check that the `authority` has the [`ORDER_KEEPER`](`RoleKey::ORDER_KEEPER`) role.
-    fn _only_order_keeper(ctx: &Context<Self>) -> Result<()> {
+    fn only_order_keeper(ctx: &Context<Self>) -> Result<()> {
         Self::only(ctx, RoleKey::ORDER_KEEPER)
     }
 }

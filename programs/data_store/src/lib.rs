@@ -338,7 +338,7 @@ pub mod data_store {
         instructions::unchecked_market_vault_transfer_out(ctx, amount)
     }
 
-    #[access_control(internal::Authenticate::only_controller(&ctx))]
+    #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
     pub fn use_claimable_account(
         ctx: Context<UseClaimableAccount>,
         timestamp: i64,
@@ -347,7 +347,7 @@ pub mod data_store {
         instructions::unchecked_use_claimable_account(ctx, timestamp, amount)
     }
 
-    #[access_control(internal::Authenticate::only_controller(&ctx))]
+    #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
     pub fn close_empty_claimable_account(
         ctx: Context<CloseEmptyClaimableAccount>,
         user: Pubkey,

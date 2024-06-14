@@ -286,7 +286,7 @@ pub struct UseClaimableAccount<'info> {
 /// Prepare claimable account.
 ///
 /// ## CHECK
-/// - Only CONTROLLER can use claimable account.
+/// - Only ORDER_KEEPER can use claimable account.
 pub fn unchecked_use_claimable_account(
     ctx: Context<UseClaimableAccount>,
     _timestamp: i64,
@@ -348,7 +348,7 @@ pub struct CloseEmptyClaimableAccount<'info> {
 /// Close claimable account if it is empty.
 ///
 /// ## CHECK
-/// - Only CONTROLLER can close claimable account.
+/// - Only ORDER_KEEPER can close claimable account.
 pub fn unchecked_close_empty_claimable_account(
     ctx: Context<CloseEmptyClaimableAccount>,
     _user: Pubkey,
