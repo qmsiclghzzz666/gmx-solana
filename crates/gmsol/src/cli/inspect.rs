@@ -5,7 +5,7 @@ use data_store::states::{
 use gmsol::{
     store::{
         token_config::TokenConfigOps,
-        utils::{read_market, read_store, token_map},
+        utils::{read_market, read_store, token_map, token_map_optional},
     },
     utils::{self, try_deserailize_account, view},
 };
@@ -53,11 +53,18 @@ enum Command {
     /// `TokenMap` account.
     TokenMap {
         address: Option<Pubkey>,
-        #[arg(long, value_name = "TOKEN")]
-        get: Option<Pubkey>,
+        #[arg(long, value_name = "TOKEN", group = "get")]
+        get_token: Option<Pubkey>,
         /// Modify the get command to get the feed of the given provider.
         #[arg(long, value_name = "PROVIDER")]
         feed: Option<PriceProviderKind>,
+        #[arg(long, group = "get")]
+        debug: bool,
+        /// List all tokens.
+        #[arg(long, group = "get")]
+        get_all_tokens: bool,
+        #[arg(long)]
+        show_address: bool,
     },
     /// `Market` account.
     Market {
@@ -178,16 +185,27 @@ impl InspectArgs {
                     println!("{store}");
                 }
                 if *show_address {
-                    println!("Store Address: {address}");
+                    println!("Address: {address}");
                 }
             }
-            Command::TokenMap { address, get, feed } => {
+            Command::TokenMap {
+                address,
+                get_token,
+                feed,
+                debug,
+                get_all_tokens,
+                show_address,
+            } => {
                 let address = if let Some(address) = address {
+                    let authorized_token_map = token_map_optional(program, store).await?;
+                    if authorized_token_map != Some(*address) {
+                        tracing::warn!("this token map is not authorized by the store");
+                    }
                     *address
                 } else {
                     token_map(program, store).await?
                 };
-                if let Some(token) = get {
+                if let Some(token) = get_token {
                     if let Some(provider) = feed {
                         let transaction = client
                             .token_feed(&address, token, *provider)
@@ -213,7 +231,23 @@ impl InspectArgs {
                         &address,
                     )
                     .await?;
-                    println!("{token_map:#?}");
+                    if *debug {
+                        println!("{token_map:#?}");
+                    } else if *get_all_tokens {
+                        let mut is_empty = true;
+                        for token in token_map.tokens() {
+                            println!("{token}");
+                            is_empty = false;
+                        }
+                        if is_empty {
+                            println!("*no tokens*");
+                        }
+                    } else {
+                        println!("{token_map}");
+                    }
+                }
+                if *show_address {
+                    println!("Address: {address}");
                 }
             }
             Command::Market {

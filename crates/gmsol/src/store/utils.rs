@@ -152,14 +152,26 @@ where
     C: Deref<Target = S> + Clone,
     S: Signer,
 {
+    token_map_optional(program, store)
+        .await?
+        .ok_or_else(|| crate::Error::invalid_argument("the token map of the store is not set"))
+}
+
+/// Get token map from the store.
+pub async fn token_map_optional<C, S>(
+    program: &Program<C>,
+    store: &Pubkey,
+) -> crate::Result<Option<Pubkey>>
+where
+    C: Deref<Target = S> + Clone,
+    S: Signer,
+{
     let store = read_store(&program.async_rpc(), store).await?;
     let token_map = store.token_map;
     if token_map == Pubkey::default() {
-        Err(crate::Error::invalid_argument(
-            "the token map of the store is not set",
-        ))
+        Ok(None)
     } else {
-        Ok(token_map)
+        Ok(Some(token_map))
     }
 }
 

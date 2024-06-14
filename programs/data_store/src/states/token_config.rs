@@ -327,6 +327,18 @@ impl InitSpace for TokenMapHeader {
     const INIT_SPACE: usize = std::mem::size_of::<TokenMapHeader>();
 }
 
+#[cfg(feature = "display")]
+impl std::fmt::Display for TokenMapHeader {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "TokenMap: store={}, tokens={}",
+            self.store,
+            self.tokens.len(),
+        )
+    }
+}
+
 impl TokenMapHeader {
     /// Get the space of the whole `TokenMap` required, excluding discriminator.
     pub fn space(num_configs: u8) -> usize {
@@ -343,6 +355,13 @@ impl TokenMapHeader {
             .try_into()
             .map_err(|_| error!(DataStoreError::AmountOverflow))?;
         Ok(Self::space(num_configs))
+    }
+
+    /// Get tokens.
+    pub fn tokens(&self) -> impl Iterator<Item = Pubkey> + '_ {
+        self.tokens
+            .entries()
+            .map(|(k, _)| Pubkey::new_from_array(*k))
     }
 }
 
