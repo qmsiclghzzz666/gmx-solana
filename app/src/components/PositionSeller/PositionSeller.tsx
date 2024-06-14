@@ -17,7 +17,7 @@ import { filterBalances } from "@/onchain/token";
 import { fitlerMarkets } from "@/onchain/market";
 import { fitlerPositions } from "@/onchain/position";
 import { MakeCreateDecreaseOrderParams, invokeCreateDecreaseOrder } from "gmsol";
-import { useExchange, useOpenConnectModal } from "@/contexts/anchor";
+import { useDataStore, useExchange, useOpenConnectModal } from "@/contexts/anchor";
 import { GMSOL_DEPLOYMENT } from "@/config/deployment";
 import { withInitializeTokenAccountGuard } from "../InitializeTokenAccountGuard";
 
@@ -72,6 +72,7 @@ function ConfirmationModalInner({ isVisible, onClose }: { isVisible: boolean, on
   }, [mutate]);
 
   const exchange = useExchange();
+  const dataStore = useDataStore();
   const payer = exchange.provider.publicKey;
   const openConnectModal = useOpenConnectModal();
 
@@ -114,10 +115,11 @@ function ConfirmationModalInner({ isVisible, onClose }: { isVisible: boolean, on
           },
           collateralToken: position.collateralToken.address,
           isLong: position.isLong,
-        }
+        },
+        dataStore,
       }
     }).then(handleClose);
-  }, [closeSizeUsd, handleClose, openConnectModal, payer, position, trigger]);
+  }, [closeSizeUsd, dataStore, handleClose, openConnectModal, payer, position, trigger]);
 
   return (
     <div className="PositionEditor PositionSeller">

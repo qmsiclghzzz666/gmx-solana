@@ -13,7 +13,7 @@ import { useCallback, useEffect, useRef } from "react";
 import { GmSwapBox } from "@/components/GmSwap/GmSwapBox/GmSwapBox";
 import { getGmSwapBoxAvailableModes } from "@/components/GmSwap/utils";
 import { CreateDepositParams, CreateWithdrawalParams, Mode, Operation } from "@/components/GmSwap/types";
-import { useAnchor, useExchange } from "@/contexts/anchor";
+import { useAnchor, useDataStore, useExchange } from "@/contexts/anchor";
 import { invokeCreateDeposit, invokeCreateWithdrawal } from "gmsol";
 import { GMSOL_DEPLOYMENT } from "@/config/deployment";
 import { useSWRConfig } from "swr";
@@ -25,6 +25,7 @@ import { useChainId } from "@/contexts/shared/hooks/use-chain-id";
 export default function Earn() {
   const chainId = useChainId();
   const exchange = useExchange();
+  const dataStore = useDataStore();
   const { owner } = useAnchor();
 
   const gmSwapBoxRef = useRef<HTMLDivElement>(null);
@@ -105,13 +106,16 @@ export default function Earn() {
         store: GMSOL_DEPLOYMENT?.store,
         payer,
         ...ixParams,
+        options: {
+          dataStore,
+        }
       }, { skipPreflight, computeUnits: 400000 });
       console.log(`created a deposit ${deposit.toBase58()} at tx ${signature}`);
       return signature;
     } else {
       throw Error("Wallet is not connected");
     }
-  }, [exchange]);
+  }, [dataStore, exchange]);
 
   const { trigger: triggerCreateDeposit, isSending: isCreatingDeposit } = useTriggerInvocation({
     key: "exchange-create-deposit",
@@ -129,13 +133,16 @@ export default function Earn() {
         store: GMSOL_DEPLOYMENT.store,
         payer,
         ...ixParams,
+        options: {
+          dataStore,
+        }
       }, { skipPreflight, computeUnits: 400000 });
       console.log(`created a withdrawal ${deposit.toBase58()} at tx ${signature}`);
       return signature;
     } else {
       throw Error("Wallet is not connected");
     }
-  }, [exchange]);
+  }, [dataStore, exchange]);
 
   const { trigger: triggerCreateWithdrawal, isSending: isCreatingWithdrawal } = useTriggerInvocation({
     key: "exchange-create-deposit",
