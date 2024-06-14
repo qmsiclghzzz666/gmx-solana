@@ -29,7 +29,10 @@ pub struct InitializeOracle<'info> {
 }
 
 /// Initialize an [`Oracle`] account with the given `index`.
-pub fn initialize_oracle(ctx: Context<InitializeOracle>, index: u8) -> Result<()> {
+///
+/// ## CHECK
+/// - Only MARKET_KEEPER can perform this action.
+pub fn unchecked_initialize_oracle(ctx: Context<InitializeOracle>, index: u8) -> Result<()> {
     ctx.accounts
         .oracle
         .init(ctx.bumps.oracle, ctx.accounts.store.key(), index);

@@ -357,9 +357,9 @@ pub mod data_store {
     }
 
     // Oracle.
-    #[access_control(internal::Authenticate::only_controller(&ctx))]
+    #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn initialize_oracle(ctx: Context<InitializeOracle>, index: u8) -> Result<()> {
-        instructions::initialize_oracle(ctx, index)
+        instructions::unchecked_initialize_oracle(ctx, index)
     }
 
     #[access_control(internal::Authenticate::only_controller(&ctx))]

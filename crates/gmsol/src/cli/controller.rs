@@ -1,6 +1,6 @@
 use anchor_client::solana_sdk::pubkey::Pubkey;
 use data_store::states::{AddressKey, Amount, AmountKey, Factor, FactorKey};
-use gmsol::store::{config::ConfigOps, oracle::OracleOps};
+use gmsol::store::config::ConfigOps;
 
 use crate::GMSOLClient;
 
@@ -10,10 +10,9 @@ pub(super) struct ControllerArgs {
     command: Command,
 }
 
+#[allow(clippy::enum_variant_names)]
 #[derive(clap::Subcommand)]
 enum Command {
-    /// Initialize a [`Oracle`](data_store::states::Oracle) account.
-    InitializeOracle { index: u8 },
     /// Insert an amount to the config.
     InsertAmount {
         amount: Amount,
@@ -42,14 +41,6 @@ impl ControllerArgs {
         serialize_only: bool,
     ) -> gmsol::Result<()> {
         match &self.command {
-            Command::InitializeOracle { index } => {
-                let (request, oracle) = client.initialize_oracle(store, *index);
-                crate::utils::send_or_serialize(request, serialize_only, |signature| {
-                    println!("created oracle {oracle} at tx {signature}");
-                    Ok(())
-                })
-                .await?;
-            }
             Command::InsertAmount { amount, key } => {
                 crate::utils::send_or_serialize(
                     client

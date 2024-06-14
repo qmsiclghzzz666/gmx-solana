@@ -14,6 +14,7 @@ use gmsol::{
     exchange::ExchangeOps,
     store::{
         market::{MarketOps, VaultOps},
+        oracle::OracleOps,
         store_ops::StoreOps,
         token_config::TokenConfigOps,
         utils::{token_map as get_token_map, token_map_optional},
@@ -35,6 +36,8 @@ pub(super) struct Args {
 
 #[derive(clap::Subcommand)]
 enum Command {
+    /// Initialize a [`Oracle`](data_store::states::Oracle) account.
+    InitializeOracle { index: u8 },
     /// Initialize a `TokenMap` account.
     InitializeTokenMap,
     /// Set token map.
@@ -48,6 +51,8 @@ enum Command {
         skip_preflight: bool,
         #[arg(long)]
         set_token_map: bool,
+        #[arg(long)]
+        init_oracle: Option<u8>,
         #[arg(long)]
         max_transaction_size: Option<usize>,
     },
@@ -183,6 +188,18 @@ impl Args {
         serialize_only: bool,
     ) -> gmsol::Result<()> {
         match &self.command {
+            Command::InitializeOracle { index } => {
+                let (request, oracle) = client.initialize_oracle(store, *index);
+                crate::utils::send_or_serialize(
+                    request.build_without_compute_budget(),
+                    serialize_only,
+                    |signature| {
+                        println!("created oracle {oracle} at tx {signature}");
+                        Ok(())
+                    },
+                )
+                .await?;
+            }
             Command::InitializeTokenMap => {
                 if serialize_only {
                     return Err(gmsol::Error::invalid_argument(
@@ -219,6 +236,7 @@ impl Args {
                 token_map,
                 skip_preflight,
                 set_token_map,
+                init_oracle,
                 max_transaction_size,
             } => {
                 let configs: IndexMap<String, TokenConfig> = toml_from_file(path)?;
@@ -242,6 +260,7 @@ impl Args {
                     serialize_only,
                     *skip_preflight,
                     *set_token_map,
+                    *init_oracle,
                     *max_transaction_size,
                     &configs,
                 )
@@ -497,6 +516,7 @@ async fn insert_token_configs(
     serialize_only: bool,
     skip_preflight: bool,
     set_token_map: bool,
+    init_oracle: Option<u8>,
     max_transaction_size: Option<usize>,
     configs: &IndexMap<String, TokenConfig>,
 ) -> gmsol::Result<()> {
@@ -508,6 +528,12 @@ async fn insert_token_configs(
 
     if set_token_map {
         builder.try_push(client.set_token_map(store, token_map))?;
+    }
+
+    if let Some(index) = init_oracle {
+        let (rpc, oracle) = client.initialize_oracle(store, index);
+        tracing::info!(%index, %oracle, "insert oracle initialization instruction");
+        builder.try_push(rpc)?;
     }
 
     for (name, config) in configs {
