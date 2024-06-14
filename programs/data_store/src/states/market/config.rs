@@ -8,7 +8,7 @@ use crate::{constants, states::Factor};
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MarketConfig {
     // Swap impact.
-    pub(super) swap_imapct_exponent: Factor,
+    pub(super) swap_impact_exponent: Factor,
     pub(super) swap_impact_positive_factor: Factor,
     pub(super) swap_impact_negative_factor: Factor,
     // Swap fee.
@@ -70,7 +70,7 @@ pub struct MarketConfig {
 
 impl MarketConfig {
     pub(super) fn init(&mut self) {
-        self.swap_imapct_exponent = constants::DEFAULT_SWAP_IMPACT_EXPONENT;
+        self.swap_impact_exponent = constants::DEFAULT_SWAP_IMPACT_EXPONENT;
         self.swap_impact_positive_factor = constants::DEFAULT_SWAP_IMPACT_POSITIVE_FACTOR;
         self.swap_impact_positive_factor = constants::DEFAULT_SWAP_IMPACT_NEGATIVE_FACTOR;
 
@@ -153,7 +153,7 @@ impl MarketConfig {
 
     pub(super) fn get(&self, key: MarketConfigKey) -> &Factor {
         match key {
-            MarketConfigKey::SwapImpactExponent => &self.swap_imapct_exponent,
+            MarketConfigKey::SwapImpactExponent => &self.swap_impact_exponent,
             MarketConfigKey::SwapImpactPositiveFactor => &self.swap_impact_positive_factor,
             MarketConfigKey::SwapImpactNegativeFactor => &self.swap_impact_negative_factor,
             MarketConfigKey::SwapFeeReceiverFactor => &self.swap_fee_receiver_factor,
@@ -172,7 +172,7 @@ impl MarketConfig {
             MarketConfigKey::MinCollateralFactorForOpenInterestMultiplierForShort => {
                 &self.min_collateral_factor_for_open_interest_multiplier_for_short
             }
-            MarketConfigKey::MaxPositionPositionImpactFactor => {
+            MarketConfigKey::MaxPositivePositionImpactFactor => {
                 &self.max_positive_position_impact_factor
             }
             MarketConfigKey::MaxNegativePositionImpactFactor => {
@@ -245,7 +245,7 @@ impl MarketConfig {
 
     pub(super) fn get_mut(&mut self, key: MarketConfigKey) -> &mut Factor {
         match key {
-            MarketConfigKey::SwapImpactExponent => &mut self.swap_imapct_exponent,
+            MarketConfigKey::SwapImpactExponent => &mut self.swap_impact_exponent,
             MarketConfigKey::SwapImpactPositiveFactor => &mut self.swap_impact_positive_factor,
             MarketConfigKey::SwapImpactNegativeFactor => &mut self.swap_impact_negative_factor,
             MarketConfigKey::SwapFeeReceiverFactor => &mut self.swap_fee_receiver_factor,
@@ -264,7 +264,7 @@ impl MarketConfig {
             MarketConfigKey::MinCollateralFactorForOpenInterestMultiplierForShort => {
                 &mut self.min_collateral_factor_for_open_interest_multiplier_for_short
             }
-            MarketConfigKey::MaxPositionPositionImpactFactor => {
+            MarketConfigKey::MaxPositivePositionImpactFactor => {
                 &mut self.max_positive_position_impact_factor
             }
             MarketConfigKey::MaxNegativePositionImpactFactor => {
@@ -386,7 +386,7 @@ pub enum MarketConfigKey {
     /// Min collateral factor for open interest multiplier for short.
     MinCollateralFactorForOpenInterestMultiplierForShort,
     /// Max positive position impact factor.
-    MaxPositionPositionImpactFactor,
+    MaxPositivePositionImpactFactor,
     /// Max negative position impact factor.
     MaxNegativePositionImpactFactor,
     /// Max position impact factor for liquidations.

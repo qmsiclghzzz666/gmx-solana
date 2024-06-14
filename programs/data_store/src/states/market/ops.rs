@@ -209,7 +209,7 @@ impl<'a, 'info> gmx_core::Market<{ constants::MARKET_DECIMALS }> for AsMarket<'a
 
     fn swap_impact_params(&self) -> gmx_core::Result<PriceImpactParams<Self::Num>> {
         PriceImpactParams::builder()
-            .with_exponent(self.config.swap_imapct_exponent)
+            .with_exponent(self.config.swap_impact_exponent)
             .with_positive_factor(self.config.swap_impact_positive_factor)
             .with_negative_factor(self.config.swap_impact_negative_factor)
             .build()

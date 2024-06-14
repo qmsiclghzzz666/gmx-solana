@@ -22,20 +22,34 @@ pub struct TransactionBuilder<'a, C> {
     client: RpcClient,
     builders: Vec<RpcBuilder<'a, C>>,
     force_one_transaction: bool,
+    max_packet_size: Option<usize>,
 }
 
 impl<'a, C> TransactionBuilder<'a, C> {
     /// Create a new [`TransactionBuilder`].
     pub fn new(client: RpcClient) -> Self {
-        Self::new_with_force_one_transaction(client, false)
+        Self::new_with_options(client, false, None)
     }
 
     /// Create a new [`TransactionBuilder`] with the given options.
-    pub fn new_with_force_one_transaction(client: RpcClient, force_one_transaction: bool) -> Self {
+    pub fn new_with_options(
+        client: RpcClient,
+        force_one_transaction: bool,
+        max_packet_size: Option<usize>,
+    ) -> Self {
         Self {
             client,
             builders: Default::default(),
             force_one_transaction,
+            max_packet_size,
+        }
+    }
+
+    /// Get packet size.
+    pub fn packet_size(&self) -> usize {
+        match self.max_packet_size {
+            Some(size) => size.min(PACKET_DATA_SIZE),
+            None => PACKET_DATA_SIZE,
         }
     }
 }
@@ -54,11 +68,12 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> TransactionBuilder<'a, C> {
             }
             self.builders.push(rpc);
         } else {
+            let packet_size = self.packet_size();
             let last = self.builders.last_mut().unwrap();
             let mut ixs_after_merge = last.instructions_with_options(false, None);
             ixs_after_merge.append(&mut rpc.instructions_with_options(true, None));
             let size_after_merge = transaction_size(&ixs_after_merge, true);
-            if size_after_merge <= PACKET_DATA_SIZE {
+            if size_after_merge <= packet_size {
                 tracing::debug!(size_after_merge, "adding to the last tx");
                 last.try_merge(&mut rpc).map_err(|err| (rpc, err))?;
             } else {

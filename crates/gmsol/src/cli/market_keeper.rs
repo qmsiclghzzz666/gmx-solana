@@ -48,6 +48,8 @@ enum Command {
         skip_preflight: bool,
         #[arg(long)]
         set_token_map: bool,
+        #[arg(long)]
+        max_transaction_size: Option<usize>,
     },
     /// Insert or update the config of token.
     InsertTokenConfig {
@@ -101,6 +103,8 @@ enum Command {
         skip_preflight: bool,
         #[arg(long)]
         enable: bool,
+        #[arg(long)]
+        max_transaction_size: Option<usize>,
     },
     /// Update Market Config.
     UpdateConfig {
@@ -115,6 +119,8 @@ enum Command {
         path: PathBuf,
         #[arg(long)]
         skip_preflight: bool,
+        #[arg(long)]
+        max_transaction_size: Option<usize>,
     },
     /// Toggle market.
     ToggleMarket {
@@ -213,6 +219,7 @@ impl Args {
                 token_map,
                 skip_preflight,
                 set_token_map,
+                max_transaction_size,
             } => {
                 let configs: IndexMap<String, TokenConfig> = toml_from_file(path)?;
                 let token_map = match token_map {
@@ -235,6 +242,7 @@ impl Args {
                     serialize_only,
                     *skip_preflight,
                     *set_token_map,
+                    *max_transaction_size,
                     &configs,
                 )
                 .await?;
@@ -349,6 +357,7 @@ impl Args {
                 path,
                 skip_preflight,
                 enable,
+                max_transaction_size,
             } => {
                 let markets: IndexMap<String, Market> = toml_from_file(path)?;
                 create_markets(
@@ -357,6 +366,7 @@ impl Args {
                     serialize_only,
                     *skip_preflight,
                     *enable,
+                    *max_transaction_size,
                     &markets,
                 )
                 .await?;
@@ -381,10 +391,17 @@ impl Args {
             Command::UpdateConfigs {
                 path,
                 skip_preflight,
+                max_transaction_size,
             } => {
                 let configs: MarketConfigs = toml_from_file(path)?;
                 configs
-                    .update(client, store, serialize_only, *skip_preflight)
+                    .update(
+                        client,
+                        store,
+                        serialize_only,
+                        *skip_preflight,
+                        *max_transaction_size,
+                    )
                     .await?;
             }
             Command::ToggleMarket {
@@ -472,6 +489,7 @@ impl<'a> TryFrom<&'a TokenConfig> for TokenConfigBuilder {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn insert_token_configs(
     client: &GMSOLClient,
     store: &Pubkey,
@@ -479,9 +497,14 @@ async fn insert_token_configs(
     serialize_only: bool,
     skip_preflight: bool,
     set_token_map: bool,
+    max_transaction_size: Option<usize>,
     configs: &IndexMap<String, TokenConfig>,
 ) -> gmsol::Result<()> {
-    let mut builder = TransactionBuilder::new(client.data_store().async_rpc());
+    let mut builder = TransactionBuilder::new_with_options(
+        client.data_store().async_rpc(),
+        false,
+        max_transaction_size,
+    );
 
     if set_token_map {
         builder.try_push(client.set_token_map(store, token_map))?;
@@ -548,9 +571,14 @@ async fn create_markets(
     serialize_only: bool,
     skip_preflight: bool,
     enable: bool,
+    max_transaction_size: Option<usize>,
     markets: &IndexMap<String, Market>,
 ) -> gmsol::Result<()> {
-    let mut builder = TransactionBuilder::new(client.data_store().async_rpc());
+    let mut builder = TransactionBuilder::new_with_options(
+        client.data_store().async_rpc(),
+        false,
+        max_transaction_size,
+    );
     let token_map = get_token_map(client.data_store(), store).await?;
     for (name, market) in markets {
         let (rpc, token) = client
@@ -629,8 +657,13 @@ impl MarketConfigs {
         store: &Pubkey,
         serialize_only: bool,
         skip_preflight: bool,
+        max_transaction_size: Option<usize>,
     ) -> gmsol::Result<()> {
-        let mut builder = TransactionBuilder::new(client.data_store().async_rpc());
+        let mut builder = TransactionBuilder::new_with_options(
+            client.data_store().async_rpc(),
+            false,
+            max_transaction_size,
+        );
 
         for (market_token, config) in &self.configs {
             for (key, value) in &config.config {

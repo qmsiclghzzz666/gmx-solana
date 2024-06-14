@@ -180,6 +180,8 @@ struct InitializeRoles {
     skip_preflight: bool,
     #[arg(long, value_name = "LAMPORTS")]
     fund_the_controller: Option<u64>,
+    #[arg(long)]
+    max_transaction_size: Option<usize>,
 }
 
 impl InitializeRoles {
@@ -192,9 +194,10 @@ impl InitializeRoles {
         let store = client.find_store_address(store_key);
         let controller = client.controller_address(&store);
 
-        let mut builder = TransactionBuilder::new_with_force_one_transaction(
+        let mut builder = TransactionBuilder::new_with_options(
             client.data_store().async_rpc(),
             !self.allow_multiple_transactions,
+            self.max_transaction_size,
         );
 
         if self.init_store {
