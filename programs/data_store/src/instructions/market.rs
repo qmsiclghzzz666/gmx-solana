@@ -321,6 +321,7 @@ pub fn unchecked_update_market_config(
     value: Factor,
 ) -> Result<()> {
     *ctx.accounts.market.load_mut()?.get_config_mut(key)? = value;
+    msg!("{}: set {} = {}", ctx.accounts.market.key(), key, value);
     Ok(())
 }
 
