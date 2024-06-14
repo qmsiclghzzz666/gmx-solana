@@ -227,3 +227,24 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         .0
     }
 }
+
+/// System Program Ops.
+pub trait SystemProgramOps<C> {
+    /// Transfer to.
+    fn transfer(&self, to: &Pubkey, lamports: u64) -> crate::Result<RpcBuilder<C>>;
+}
+
+impl<C: Clone + Deref<Target = impl Signer>> SystemProgramOps<C> for Client<C> {
+    fn transfer(&self, to: &Pubkey, lamports: u64) -> crate::Result<RpcBuilder<C>> {
+        use anchor_client::solana_sdk::system_instruction::transfer;
+
+        if lamports == 0 {
+            return Err(crate::Error::invalid_argument(
+                "transferring amount is zero",
+            ));
+        }
+        Ok(self
+            .data_store_rpc()
+            .pre_instruction(transfer(&self.payer(), to, lamports)))
+    }
+}

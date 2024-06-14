@@ -14,6 +14,7 @@ use gmsol::{
     exchange::ExchangeOps,
     store::{
         market::{MarketOps, VaultOps},
+        store_ops::StoreOps,
         token_config::TokenConfigOps,
         utils::token_map as get_token_map,
     },
@@ -36,6 +37,8 @@ pub(super) struct Args {
 enum Command {
     /// Initialize a `TokenMap` account.
     InitializeTokenMap,
+    /// Set token map.
+    SetTokenMap { token_map: Pubkey },
     /// Read and insert token configs from file.
     InsertTokenConfigs {
         path: PathBuf,
@@ -185,6 +188,19 @@ impl Args {
                     false,
                     |signature| {
                         println!("created token config map {map} at tx {signature}");
+                        Ok(())
+                    },
+                )
+                .await?;
+            }
+            Command::SetTokenMap { token_map } => {
+                crate::utils::send_or_serialize(
+                    client
+                        .set_token_map(store, token_map)
+                        .build_without_compute_budget(),
+                    serialize_only,
+                    |signature| {
+                        tracing::info!("set new token map at {signature}");
                         Ok(())
                     },
                 )

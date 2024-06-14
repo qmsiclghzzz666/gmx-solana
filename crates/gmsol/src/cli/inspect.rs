@@ -1,4 +1,4 @@
-use anchor_client::solana_sdk::pubkey::Pubkey;
+use anchor_client::solana_sdk::{native_token::lamports_to_sol, pubkey::Pubkey};
 use data_store::states::{
     self, AddressKey, AmountKey, FactorKey, MarketConfigKey, PriceProviderKind,
 };
@@ -207,7 +207,22 @@ impl InspectArgs {
             }
             Command::Controller => {
                 let controller = client.controller_address(store);
-                println!("{controller}");
+                println!("Exchange: {}", client.exchange_program_id());
+                println!("Controller: {controller}");
+                match client
+                    .data_store()
+                    .async_rpc()
+                    .get_balance(&controller)
+                    .await
+                {
+                    Ok(lamports) => {
+                        println!("Balance: {} SOL", lamports_to_sol(lamports));
+                    }
+                    Err(err) => {
+                        println!("Balance: *failed to get balance*");
+                        tracing::info!(%err, "failed to get balance");
+                    }
+                }
             }
             Command::Oracle { oracle } => {
                 let address = oracle.address(Some(store), &client.data_store_program_id())?;

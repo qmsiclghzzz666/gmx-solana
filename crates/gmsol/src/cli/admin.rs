@@ -1,7 +1,8 @@
-use anchor_client::solana_sdk::{pubkey::Pubkey, signature::Keypair};
+use anchor_client::solana_sdk::pubkey::Pubkey;
 use data_store::states::RoleKey;
 use gmsol::{
-    store::{roles::RolesOps, store_ops::StoreOps, token_config::TokenConfigOps},
+    client::SystemProgramOps,
+    store::{roles::RolesOps, store_ops::StoreOps},
     utils::TransactionBuilder,
 };
 use indexmap::IndexSet;
@@ -46,10 +47,8 @@ enum Command {
         /// Role.
         role: String,
     },
-    /// Initialize all.
-    InitializeAll(InitializeAll),
-    /// Set token map.
-    SetTokenMap { token_map: Pubkey },
+    /// Initialize roles.
+    InitializeRoles(InitializeRoles),
 }
 
 impl AdminArgs {
@@ -61,7 +60,7 @@ impl AdminArgs {
     ) -> gmsol::Result<()> {
         let store = client.find_store_address(store_key);
         match &self.command {
-            Command::InitializeAll(args) => args.run(client, store_key, serialize_only).await?,
+            Command::InitializeRoles(args) => args.run(client, store_key, serialize_only).await?,
             Command::InitializeStore { admin } => {
                 println!(
                     "Initialize store with key={store_key}, address={store}, admin={}",
@@ -162,41 +161,28 @@ impl AdminArgs {
                 )
                 .await?;
             }
-            Command::SetTokenMap { token_map } => {
-                crate::utils::send_or_serialize(
-                    client
-                        .set_token_map(&store, token_map)
-                        .build_without_compute_budget(),
-                    serialize_only,
-                    |signature| {
-                        tracing::info!("set new token map at {signature}");
-                        Ok(())
-                    },
-                )
-                .await?;
-            }
         }
         Ok(())
     }
 }
 
 #[derive(clap::Args)]
-struct InitializeAll {
+struct InitializeRoles {
     #[arg(long)]
-    skip_init_store: bool,
+    init_store: bool,
     #[arg(long)]
-    skip_init_token_map: bool,
-    #[arg(long)]
-    market_keeper: Option<Pubkey>,
+    market_keeper: Pubkey,
     #[arg(long)]
     order_keeper: Vec<Pubkey>,
     #[arg(long)]
     allow_multiple_transactions: bool,
     #[arg(long)]
     skip_preflight: bool,
+    #[arg(long, value_name = "LAMPORTS")]
+    fund_the_controller: Option<u64>,
 }
 
-impl InitializeAll {
+impl InitializeRoles {
     async fn run(
         &self,
         client: &GMSOLClient,
@@ -205,15 +191,13 @@ impl InitializeAll {
     ) -> gmsol::Result<()> {
         let store = client.find_store_address(store_key);
         let controller = client.controller_address(&store);
-        let token_map = (!self.skip_init_token_map).then(Keypair::new);
-        let admin = client.payer();
 
         let mut builder = TransactionBuilder::new_with_force_one_transaction(
             client.data_store().async_rpc(),
             !self.allow_multiple_transactions,
         );
 
-        if !self.skip_init_store {
+        if self.init_store {
             // Insert initialize store instruction.
             builder.try_push(client.initialize_store(store_key, None))?;
         }
@@ -222,23 +206,15 @@ impl InitializeAll {
             .try_push(client.enable_role(&store, RoleKey::CONTROLLER))?
             .try_push(client.enable_role(&store, RoleKey::MARKET_KEEPER))?
             .try_push(client.enable_role(&store, RoleKey::ORDER_KEEPER))?
-            .try_push(client.grant_role(&store, &controller, RoleKey::CONTROLLER))?;
-
-        if let Some(market_keeper) = self.market_keeper {
-            builder.try_push(client.grant_role(&store, &market_keeper, RoleKey::MARKET_KEEPER))?;
-        }
+            .try_push(client.grant_role(&store, &controller, RoleKey::CONTROLLER))?
+            .try_push(client.grant_role(&store, &self.market_keeper, RoleKey::MARKET_KEEPER))?;
 
         for keeper in self.unique_order_keepers() {
             builder.try_push(client.grant_role(&store, keeper, RoleKey::ORDER_KEEPER))?;
         }
 
-        if let Some(token_map) = token_map.as_ref() {
-            let (rpc, token_map) = client.initialize_token_map(&store, token_map);
-            builder
-                .try_push(client.grant_role(&store, &admin, RoleKey::MARKET_KEEPER))?
-                .try_push(rpc)?
-                .try_push(client.set_token_map(&store, &token_map))?
-                .try_push(client.revoke_role(&store, &admin, RoleKey::MARKET_KEEPER))?;
+        if let Some(lamports) = self.fund_the_controller {
+            builder.try_push(client.transfer(&controller, lamports)?)?;
         }
 
         crate::utils::send_or_serialize_transactions(
