@@ -16,7 +16,7 @@ use gmsol::{
         market::{MarketOps, VaultOps},
         store_ops::StoreOps,
         token_config::TokenConfigOps,
-        utils::token_map as get_token_map,
+        utils::{token_map as get_token_map, token_map_optional},
     },
     utils::TransactionBuilder,
 };
@@ -46,6 +46,8 @@ enum Command {
         token_map: Option<Pubkey>,
         #[arg(long)]
         skip_preflight: bool,
+        #[arg(long)]
+        set_token_map: bool,
     },
     /// Insert or update the config of token.
     InsertTokenConfig {
@@ -210,10 +212,20 @@ impl Args {
                 path,
                 token_map,
                 skip_preflight,
+                set_token_map,
             } => {
                 let configs: IndexMap<String, TokenConfig> = toml_from_file(path)?;
                 let token_map = match token_map {
-                    Some(token_map) => *token_map,
+                    Some(token_map) => {
+                        if *set_token_map {
+                            let authorized_token_map =
+                                token_map_optional(client.data_store(), store).await?;
+                            if authorized_token_map == Some(*token_map) {
+                                return Err(gmsol::Error::invalid_argument("the token map has been authorized, please remove `--set-token-map` and try again"));
+                            }
+                        }
+                        *token_map
+                    }
                     None => get_token_map(client.data_store(), store).await?,
                 };
                 insert_token_configs(
@@ -222,6 +234,7 @@ impl Args {
                     &token_map,
                     serialize_only,
                     *skip_preflight,
+                    *set_token_map,
                     &configs,
                 )
                 .await?;
@@ -465,9 +478,14 @@ async fn insert_token_configs(
     token_map: &Pubkey,
     serialize_only: bool,
     skip_preflight: bool,
+    set_token_map: bool,
     configs: &IndexMap<String, TokenConfig>,
 ) -> gmsol::Result<()> {
     let mut builder = TransactionBuilder::new(client.data_store().async_rpc());
+
+    if set_token_map {
+        builder.try_push(client.set_token_map(store, token_map))?;
+    }
 
     for (name, config) in configs {
         let token = &config.address;
