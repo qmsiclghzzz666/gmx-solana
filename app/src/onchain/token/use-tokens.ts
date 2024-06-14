@@ -30,7 +30,7 @@ export const useTokensWithPrices = ({
     return Object
       .keys(tokens)
       .map(address => tokens[address].feedAddress)
-      .filter(address => !(address === undefined)) as PublicKey[];
+      .filter(address => !(address === undefined)) as string[];
   }, [tokens]);
   const prices = usePriceFromFeeds({
     provider,
@@ -42,7 +42,7 @@ export const useTokensWithPrices = ({
     for (const address in tokens) {
       const token = tokens[address];
       if (token.feedAddress) {
-        const tokenPrices = prices[token.feedAddress.toBase58()];
+        const tokenPrices = prices[token.feedAddress];
         if (tokenPrices) {
           tokenDatas[address] = {
             ...token,

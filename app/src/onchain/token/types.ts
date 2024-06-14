@@ -6,7 +6,7 @@ export interface Token {
   address: PublicKey,
   decimals: number,
   priceDecimals?: number,
-  feedAddress?: PublicKey,
+  feedAddress?: string,
   isStable?: boolean,
   isNative?: boolean,
   wrappedAddress?: PublicKey,

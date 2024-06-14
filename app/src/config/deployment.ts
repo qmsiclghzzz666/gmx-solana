@@ -18,7 +18,7 @@ const parseToken = (address: string, token: TokenConfig) => {
     symbol: token.symbol,
     address: tokenAddress,
     decimals: token.decimals,
-    feedAddress: new PublicKey(token.feedAddress),
+    feedAddress: token.feedAddress,
     isWrappedNative: tokenAddress.equals(WRAPPED_NATIVE_TOKEN_ADDRESS),
     isNative: tokenAddress.equals(NATIVE_TOKEN_ADDRESS),
     isStable: token.isStable,

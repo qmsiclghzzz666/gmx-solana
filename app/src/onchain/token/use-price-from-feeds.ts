@@ -1,24 +1,36 @@
-import { DEFAULT_CLUSTER } from "@/config/env";
-import { PythConnection, getPythProgramKeyForCluster } from "@pythnetwork/client";
-import { useConnection } from "@solana/wallet-adapter-react";
-import { PublicKey } from "@solana/web3.js";
-import { useMemo } from "react";
+import { HermesClient } from "@pythnetwork/hermes-client";
+import { useMemo, useRef } from "react";
 import useSWRSubscription, { SWRSubscriptionOptions } from "swr/subscription";
 import { Prices, TokenPrices } from "./types";
-import { toBN } from "gmsol";
 import { expandDecimals } from "@/utils/number";
 import { USD_DECIMALS } from "@/config/constants";
+import { BN } from "@coral-xyz/anchor";
 
 export type PriceProvider = "pyth";
+
+const HERMES_ENDPOINT = "https://hermes.pyth.network";
 
 interface Request {
   key: "token-prices",
   provider: PriceProvider,
-  feeds: PublicKey[],
+  feeds: string[],
 }
 
-export const usePriceFromFeeds = ({ provider = "pyth", feeds }: { provider?: PriceProvider, feeds: PublicKey[] }) => {
-  const connection = useConnection();
+interface PythData {
+  parsed: PriceUpdate[]
+}
+
+interface PriceUpdate {
+  id: string,
+  price: {
+    price: string,
+    conf: string,
+    expo: number,
+  }
+}
+
+export const usePriceFromFeeds = ({ provider = "pyth", feeds }: { provider?: PriceProvider, feeds: string[] }) => {
+  const eventSource = useRef<EventSource | null>(null);
 
   const request = useMemo<Request | null>(() => {
     return feeds.length > 0 ? {
@@ -29,33 +41,38 @@ export const usePriceFromFeeds = ({ provider = "pyth", feeds }: { provider?: Pri
   }, [feeds, provider]);
 
   const { data } = useSWRSubscription(request, ({ feeds }, { next }: SWRSubscriptionOptions<Prices, Error>) => {
-    const pubkey = getPythProgramKeyForCluster(DEFAULT_CLUSTER);
-    const conn = new PythConnection(connection.connection, pubkey, undefined, feeds);
-    conn.onPriceChange((product, price) => {
-      const feedAddress = product.price_account;
-      const priceValue = price.aggregate.priceComponent;
-      const confidence = price.aggregate.confidenceComponent;
-      const decimals = price.exponent;
-      if (feedAddress && -decimals <= USD_DECIMALS) {
-        const minPrice = expandDecimals(toBN(priceValue - confidence), USD_DECIMALS + decimals);
-        const maxPrice = expandDecimals(toBN(priceValue + confidence), USD_DECIMALS + decimals);
-        next(null, prices => {
-          prices = prices ?? {};
-          return {
-            ...prices,
-            [feedAddress]: {
-              minPrice,
-              maxPrice,
-            } as TokenPrices,
-          }
-        });
+    // const conn = new PythConnection(connection.connection, pubkey, undefined, feeds);
+    const conn = new HermesClient(HERMES_ENDPOINT);
+    const subscribe = async () => {
+      eventSource.current = await conn.getPriceUpdatesStream(feeds) as EventSource;
+      eventSource.current.onmessage = (event: MessageEvent<string>) => {
+        const data = JSON.parse(event.data) as PythData;
+        for (const update of data.parsed) {
+          const feedId = `0x${update.id}`;
+          const midPrice = new BN(update.price.price);
+          const conf = new BN(update.price.conf);
+          const expo = update.price.expo;
+          const minPrice = expandDecimals((midPrice.sub(conf)), USD_DECIMALS + expo);
+          const maxPrice = expandDecimals((midPrice.add(conf)), USD_DECIMALS + expo);
+          next(null, prices => {
+            return {
+              ...prices,
+              [feedId]: {
+                minPrice,
+                maxPrice
+              } as TokenPrices,
+            }
+          });
+        }
       }
-    });
-    void conn.start();
+    };
+    void subscribe();
     console.debug("pyth subscribed");
     return () => {
       console.debug("pyth unsubscribe");
-      void conn.stop();
+      if (eventSource.current) {
+        eventSource.current.close();
+      }
     }
   });
 

@@ -12,7 +12,7 @@ export default defineConfig(async ({ mode }) => {
   return {
     plugins: [
       nodePolyfills({
-        include: ['buffer', 'crypto', 'stream', 'vm', 'util'],
+        include: ['buffer', 'crypto', 'stream', 'vm', 'util', 'http', 'https'],
         globals: {
           global: false,
         }
