@@ -238,6 +238,18 @@ impl RoleStore {
     pub fn role_value(&self, user: &Pubkey) -> Option<RoleBitmapValue> {
         self.members.get(user).copied()
     }
+
+    /// Get all members.
+    pub fn members(&self) -> impl Iterator<Item = Pubkey> + '_ {
+        self.members
+            .entries()
+            .map(|(key, _)| Pubkey::new_from_array(*key))
+    }
+
+    /// Get all roles.
+    pub fn roles(&self) -> impl Iterator<Item = Result<&str>> + '_ {
+        self.roles.entries().map(|(_, value)| value.name())
+    }
 }
 
 #[cfg(test)]

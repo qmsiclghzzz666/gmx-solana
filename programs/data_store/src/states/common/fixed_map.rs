@@ -57,6 +57,7 @@ macro_rules! fixed_map {
                 }
             }
 
+            #[allow(dead_code)]
             impl $map {
                 fn binanry_search(&self, key: &$crate::states::common::fixed_map::MapKey) -> std::result::Result<usize, usize> {
                     self.data[..self.len()].binary_search_by(|entry| entry.key.cmp(key))
@@ -140,6 +141,13 @@ macro_rules! fixed_map {
                 /// Is empty.
                 pub fn is_empty(&self) -> bool {
                     self.count == 0
+                }
+
+                /// Entries.
+                pub fn entries(&self) -> impl Iterator<Item = (&[u8; 32], &$value)> {
+                    self.data.iter().take(self.len()).map(|entry| {
+                        (&entry.key, &entry.value)
+                    })
                 }
             }
         }

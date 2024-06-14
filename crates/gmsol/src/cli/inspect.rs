@@ -37,8 +37,18 @@ enum Command {
         get_factor: Option<FactorKey>,
         #[arg(long, group = "get")]
         get_address: Option<AddressKey>,
+        /// Ger roles for a member.
         #[arg(long, group = "get", value_name = "USER")]
         get_roles: Option<Pubkey>,
+        /// Get members for the role.
+        #[arg(long, group = "get", value_name = "ROLE")]
+        get_members: Option<String>,
+        /// Get all roles.
+        #[arg(long, group = "get")]
+        get_all_roles: bool,
+        /// Get all members.
+        #[arg(long, group = "get")]
+        get_all_members: bool,
     },
     /// `TokenMap` account.
     TokenMap {
@@ -110,6 +120,9 @@ impl InspectArgs {
                 get_amount,
                 get_factor,
                 get_roles,
+                get_members,
+                get_all_roles,
+                get_all_members,
             } => {
                 let address = if let Some(address) = address {
                     *address
@@ -126,9 +139,38 @@ impl InspectArgs {
                 } else if let Some(key) = get_address {
                     println!("{}", store.get_address_by_key(*key));
                 } else if let Some(user) = get_roles {
-                    match store.role().role_value(user) {
-                        Some(value) => println!("{value:#b}"),
-                        None => return Err(gmsol::Error::invalid_argument("Not a member")),
+                    let role_store = store.role();
+                    for role in role_store.roles() {
+                        let name = role?;
+                        if role_store.has_role(user, name)? {
+                            println!("{name}");
+                        }
+                    }
+                } else if let Some(role) = get_members {
+                    let role_store = store.role();
+                    for member in role_store.members() {
+                        if role_store.has_role(&member, role)? {
+                            println!("{member}");
+                        }
+                    }
+                } else if *get_all_roles {
+                    for role in store.role().roles() {
+                        println!("{}", role.unwrap_or("*failed to parse role name*"));
+                    }
+                } else if *get_all_members {
+                    let role_store = store.role();
+                    let roles = role_store.roles().collect::<Result<Vec<_>, _>>()?;
+                    for member in role_store.members() {
+                        let roles = roles
+                            .iter()
+                            .filter_map(|role| match role_store.has_role(&member, role) {
+                                Ok(true) => Some(Ok(*role)),
+                                Ok(false) => None,
+                                Err(err) => Some(Err(err)),
+                            })
+                            .collect::<Result<Vec<_>, _>>()?
+                            .join("|");
+                        println!("{member}, roles={roles}");
                     }
                 } else if *debug {
                     println!("{store:?}");
