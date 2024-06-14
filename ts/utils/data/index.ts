@@ -175,7 +175,7 @@ export const initializeDataStore = async (
             }).rpc();
             console.log(`Grant ${role} to signer in tx: ${tx}`);
         }
-        {
+        if (role == CONTROLLER) {
             const tx = await dataStore.methods.grantRole(controller, role).accountsPartial({
                 authority: provider.publicKey,
                 store: dataStorePDA,

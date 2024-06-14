@@ -78,6 +78,7 @@ pub fn execute_withdrawal<'info>(
     ctx.accounts.with_oracle_prices(
         withdrawal.dynamic.tokens_with_feed.tokens.clone(),
         ctx.remaining_accounts,
+        &controller.as_seeds(),
         |accounts, remaining_accounts| {
             let (final_long_amount, final_short_amount) = data_store::cpi::execute_withdrawal(
                 accounts
@@ -161,6 +162,10 @@ impl<'info> WithOracle<'info> for ExecuteWithdrawal<'info> {
 
     fn token_map(&self) -> AccountInfo<'info> {
         self.token_map.to_account_info()
+    }
+
+    fn controller(&self) -> AccountInfo<'info> {
+        self.controller.to_account_info()
     }
 }
 

@@ -24,6 +24,7 @@ pub fn execute_deposit<'info>(
     ctx.accounts.with_oracle_prices(
         deposit.dynamic.tokens_with_feed.tokens.clone(),
         ctx.remaining_accounts,
+        &controller.as_seeds(),
         |accounts, remaining_accounts| accounts.execute(&controller, remaining_accounts),
     )?;
     data_store::cpi::remove_deposit(
@@ -137,6 +138,10 @@ impl<'info> WithOracle<'info> for ExecuteDeposit<'info> {
 
     fn token_map(&self) -> AccountInfo<'info> {
         self.token_map.to_account_info()
+    }
+
+    fn controller(&self) -> AccountInfo<'info> {
+        self.controller.to_account_info()
     }
 }
 

@@ -96,6 +96,7 @@ pub fn execute_order<'info>(
     let should_remove_position = ctx.accounts.with_oracle_prices(
         order.prices.tokens.clone(),
         ctx.remaining_accounts,
+        &controller.as_seeds(),
         |accounts, remaining_accounts| {
             let (should_remove_position, transfer_out) = data_store::cpi::execute_order(
                 accounts
@@ -157,6 +158,10 @@ impl<'info> WithOracle<'info> for ExecuteOrder<'info> {
 
     fn token_map(&self) -> AccountInfo<'info> {
         self.token_map.to_account_info()
+    }
+
+    fn controller(&self) -> AccountInfo<'info> {
+        self.controller.to_account_info()
     }
 }
 

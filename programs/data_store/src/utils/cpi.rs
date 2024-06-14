@@ -85,6 +85,9 @@ pub trait WithOracle<'info>: Authentication<'info> {
 
     /// Get the token map account.
     fn token_map(&self) -> AccountInfo<'info>;
+
+    /// Get controller account.
+    fn controller(&self) -> AccountInfo<'info>;
 }
 
 /// Extension trait for [`WithOracle`].
@@ -94,12 +97,11 @@ pub trait WithOracleExt<'info>: WithOracle<'info> {
         &self,
         feeds: Vec<AccountInfo<'info>>,
     ) -> CpiContext<'_, '_, '_, 'info, SetPricesFromPriceFeed<'info>> {
-        let check_role = self.check_role_ctx();
         CpiContext::new(
-            check_role.program,
+            self.data_store_program().to_account_info(),
             SetPricesFromPriceFeed {
-                authority: self.authority().to_account_info(),
-                store: check_role.accounts.store,
+                authority: self.controller(),
+                store: self.store(),
                 token_map: self.token_map(),
                 oracle: self.oracle(),
                 price_provider: self.price_provider(),
@@ -110,12 +112,11 @@ pub trait WithOracleExt<'info>: WithOracle<'info> {
 
     /// Get the CPI context for clear all prices.
     fn clear_all_prices_ctx(&self) -> CpiContext<'_, '_, '_, 'info, ClearAllPrices<'info>> {
-        let check_role = self.check_role_ctx();
         CpiContext::new(
-            check_role.program,
+            self.data_store_program().to_account_info(),
             ClearAllPrices {
-                authority: self.authority().to_account_info(),
-                store: check_role.accounts.store,
+                authority: self.controller(),
+                store: self.store(),
                 oracle: self.oracle(),
             },
         )
@@ -126,6 +127,7 @@ pub trait WithOracleExt<'info>: WithOracle<'info> {
         &mut self,
         tokens: Vec<Pubkey>,
         remaining_accounts: &'info [AccountInfo<'info>],
+        signer_seeds: &[&[u8]],
         f: impl FnOnce(&mut Self, &'info [AccountInfo<'info>]) -> Result<T>,
     ) -> Result<T> {
         require_gte!(
@@ -135,9 +137,13 @@ pub trait WithOracleExt<'info>: WithOracle<'info> {
         );
         let feeds = remaining_accounts[..tokens.len()].to_vec();
         let remaining_accounts = &remaining_accounts[tokens.len()..];
-        crate::cpi::set_prices_from_price_feed(self.set_prices_from_price_feed_ctx(feeds), tokens)?;
+        crate::cpi::set_prices_from_price_feed(
+            self.set_prices_from_price_feed_ctx(feeds)
+                .with_signer(&[signer_seeds]),
+            tokens,
+        )?;
         let output = f(self, remaining_accounts)?;
-        crate::cpi::clear_all_prices(self.clear_all_prices_ctx())?;
+        crate::cpi::clear_all_prices(self.clear_all_prices_ctx().with_signer(&[signer_seeds]))?;
         Ok(output)
     }
 }
