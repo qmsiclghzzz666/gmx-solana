@@ -113,11 +113,28 @@ impl<'a, 'info> AsMarket<'a, 'info> {
         }
     }
 
+    fn adjust_excluding_amounts(
+        &self,
+        long_excluding_amount: u64,
+        short_excluding_amount: u64,
+    ) -> Result<(u64, u64)> {
+        if self.is_pure {
+            let total = long_excluding_amount
+                .checked_add(short_excluding_amount)
+                .ok_or(DataStoreError::AmountOverflow)?;
+            Ok((total / 2, total / 2))
+        } else {
+            Ok((long_excluding_amount, short_excluding_amount))
+        }
+    }
+
     pub(crate) fn validate_market_balances(
         &self,
         long_excluding_amount: u64,
         short_excluding_amount: u64,
     ) -> Result<()> {
+        let (long_excluding_amount, short_excluding_amount) =
+            self.adjust_excluding_amounts(long_excluding_amount, short_excluding_amount)?;
         let long_token_balance = self.balance_after_excluding(true, long_excluding_amount)? as u128;
         self.validate_token_balance_for_one_side(&long_token_balance, true)
             .map_err(GmxCoreError::from)?;

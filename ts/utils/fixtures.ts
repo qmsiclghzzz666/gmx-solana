@@ -159,7 +159,7 @@ export const mochaGlobalSetup = async () => {
     try {
         console.log("[Setting up everything...]");
         anchor.setProvider(provider);
-        await initializeUsers(provider, [signer0, user0], 0.5);
+        await initializeUsers(provider, [signer0, user0], 2);
 
         // Init fakeToken and usdG.
         const fakeToken = await createSignedToken(signer0, 9);

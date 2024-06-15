@@ -1,4 +1,4 @@
-use std::ops::Deref;
+use std::{collections::HashSet, ops::Deref};
 
 use anchor_client::{
     anchor_lang::{system_program, Id},
@@ -724,6 +724,7 @@ where
         let mut post_builder = self.client.exchange_rpc();
 
         // Merge claimable accounts.
+        let mut accounts: HashSet<&Pubkey> = Default::default();
         if let Some(account) = claimable_long_token_account_for_user.as_ref() {
             pre_builder = pre_builder.merge(self.client.use_claimable_account(
                 &self.store,
@@ -739,42 +740,48 @@ where
                 &hint.user,
                 self.recent_timestamp,
                 account,
-            ))
+            ));
+            accounts.insert(account);
         }
         if let Some(account) = claimable_short_token_account_for_user.as_ref() {
-            pre_builder = pre_builder.merge(self.client.use_claimable_account(
-                &self.store,
-                &hint.short_token_mint,
-                &hint.user,
-                self.recent_timestamp,
-                account,
-                0,
-            ));
-            post_builder = post_builder.merge(self.client.close_empty_claimable_account(
-                &self.store,
-                &hint.short_token_mint,
-                &hint.user,
-                self.recent_timestamp,
-                account,
-            ))
+            if !accounts.contains(account) {
+                pre_builder = pre_builder.merge(self.client.use_claimable_account(
+                    &self.store,
+                    &hint.short_token_mint,
+                    &hint.user,
+                    self.recent_timestamp,
+                    account,
+                    0,
+                ));
+                post_builder = post_builder.merge(self.client.close_empty_claimable_account(
+                    &self.store,
+                    &hint.short_token_mint,
+                    &hint.user,
+                    self.recent_timestamp,
+                    account,
+                ));
+                accounts.insert(account);
+            }
         }
         if let Some(account) = claimable_pnl_token_account_for_holding.as_ref() {
-            let holding = hint.store.holding();
-            pre_builder = pre_builder.merge(self.client.use_claimable_account(
-                &self.store,
-                &hint.pnl_token_mint,
-                holding,
-                self.recent_timestamp,
-                account,
-                0,
-            ));
-            post_builder = post_builder.merge(self.client.close_empty_claimable_account(
-                &self.store,
-                &hint.pnl_token_mint,
-                holding,
-                self.recent_timestamp,
-                account,
-            ))
+            if !accounts.contains(account) {
+                let holding = hint.store.holding();
+                pre_builder = pre_builder.merge(self.client.use_claimable_account(
+                    &self.store,
+                    &hint.pnl_token_mint,
+                    holding,
+                    self.recent_timestamp,
+                    account,
+                    0,
+                ));
+                post_builder = post_builder.merge(self.client.close_empty_claimable_account(
+                    &self.store,
+                    &hint.pnl_token_mint,
+                    holding,
+                    self.recent_timestamp,
+                    account,
+                ));
+            }
         }
         let mut transaction_builder = TransactionBuilder::new(self.client.exchange().async_rpc());
         transaction_builder

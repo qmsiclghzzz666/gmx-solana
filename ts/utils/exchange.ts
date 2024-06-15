@@ -641,13 +641,15 @@ export const executeOrder = async (simulate: boolean, ...args: Parameters<typeof
             mint: longTokenMint,
             timestamp: recentTimestamp,
         });
-        await invokeCloseEmptyClaimableAccount(dataStore, {
-            authority,
-            store,
-            user,
-            mint: shortTokenMint,
-            timestamp: recentTimestamp,
-        });
+        if (!longTokenMint.equals(shortTokenMint)) {
+            await invokeCloseEmptyClaimableAccount(dataStore, {
+                authority,
+                store,
+                user,
+                mint: shortTokenMint,
+                timestamp: recentTimestamp,
+            });
+        }
         await invokeCloseEmptyClaimableAccount(dataStore, {
             authority,
             store,
