@@ -24,6 +24,7 @@ use super::{config::MarketConfig, Clocks, Market, MarketMeta, Pool, Pools};
 
 /// Convert to a [`Market`](gmx_core::Market).
 pub struct AsMarket<'a, 'info> {
+    is_pure: bool,
     meta: &'a MarketMeta,
     config: &'a MarketConfig,
     long_token_balance: &'a u64,
@@ -40,6 +41,7 @@ pub struct AsMarket<'a, 'info> {
 impl<'a, 'info> AsMarket<'a, 'info> {
     pub(super) fn new(market: &'a mut Market, mint: &'a mut Account<'info, Mint>) -> Self {
         Self {
+            is_pure: market.is_pure(),
             meta: &market.meta,
             config: &market.config,
             long_token_balance: &market.state.long_token_balance,
@@ -88,18 +90,26 @@ impl<'a, 'info> AsMarket<'a, 'info> {
         PositionOps::try_new(self, position)
     }
 
-    fn balance_after_excluding(&self, is_long_token: bool, excluding_amount: u64) -> Result<u64> {
-        let balance = if is_long_token {
-            self.long_token_balance
+    fn balance(&self, is_long_token: bool) -> u64 {
+        if is_long_token || self.is_pure {
+            if self.is_pure {
+                *self.long_token_balance / 2
+            } else {
+                *self.long_token_balance
+            }
         } else {
-            self.short_token_balance
-        };
+            *self.short_token_balance
+        }
+    }
+
+    fn balance_after_excluding(&self, is_long_token: bool, excluding_amount: u64) -> Result<u64> {
+        let balance = self.balance(is_long_token);
         if excluding_amount != 0 {
             balance
                 .checked_sub(excluding_amount)
                 .ok_or(error!(DataStoreError::AmountOverflow))
         } else {
-            Ok(*balance)
+            Ok(balance)
         }
     }
 
