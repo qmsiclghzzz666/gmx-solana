@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 
 use anchor_lang::prelude::*;
 use anchor_spl::token::Mint;
-use gmx_core::MarketExt;
+use gmx_core::SwapMarketExt;
 
 use crate::{
     states::{common::SwapParams, Market, Oracle},

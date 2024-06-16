@@ -2,10 +2,10 @@ use num_traits::{CheckedAdd, CheckedNeg, Signed, Zero};
 use std::fmt;
 
 use crate::{
+    market::{BaseMarketExt, PerpMarketExt},
     num::Unsigned,
     params::fee::PositionFees,
     position::{CollateralDelta, Position, PositionExt},
-    MarketExt,
 };
 
 use super::{
@@ -486,9 +486,9 @@ where
 #[cfg(test)]
 mod tests {
     use crate::{
+        market::LiquidityMarketExt,
         position::PositionExt,
         test::{TestMarket, TestPosition},
-        MarketExt,
     };
 
     use super::*;

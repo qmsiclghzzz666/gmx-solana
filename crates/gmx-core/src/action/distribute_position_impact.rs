@@ -1,8 +1,12 @@
-use crate::{num::Unsigned, ClockKind, Market, MarketExt};
+use crate::{
+    market::{BaseMarket, PerpMarket, PerpMarketExt},
+    num::Unsigned,
+    ClockKind,
+};
 
 /// Distribute Position Impact.
 #[must_use]
-pub struct DistributePositionImpact<M: Market<DECIMALS>, const DECIMALS: u8> {
+pub struct DistributePositionImpact<M: BaseMarket<DECIMALS>, const DECIMALS: u8> {
     market: M,
 }
 
@@ -31,7 +35,7 @@ impl<T> DistributePositionImpactReport<T> {
     }
 }
 
-impl<M: Market<DECIMALS>, const DECIMALS: u8> DistributePositionImpact<M, DECIMALS> {
+impl<M: PerpMarket<DECIMALS>, const DECIMALS: u8> DistributePositionImpact<M, DECIMALS> {
     /// Execute.
     pub fn execute(mut self) -> crate::Result<DistributePositionImpactReport<M::Num>> {
         let duration_in_seconds = self
@@ -53,7 +57,9 @@ impl<M: Market<DECIMALS>, const DECIMALS: u8> DistributePositionImpact<M, DECIMA
     }
 }
 
-impl<M: Market<DECIMALS>, const DECIMALS: u8> From<M> for DistributePositionImpact<M, DECIMALS> {
+impl<M: BaseMarket<DECIMALS>, const DECIMALS: u8> From<M>
+    for DistributePositionImpact<M, DECIMALS>
+{
     fn from(market: M) -> Self {
         Self { market }
     }
@@ -65,6 +71,7 @@ mod tests {
 
     use crate::{
         action::Prices,
+        market::LiquidityMarketExt,
         test::{TestMarket, TestPosition},
         PositionExt,
     };

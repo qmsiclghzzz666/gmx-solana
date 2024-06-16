@@ -7,7 +7,7 @@ use gmx_core::{
         decrease_position::DecreasePositionReport, increase_position::IncreasePositionReport,
         Prices,
     },
-    MarketExt, PositionExt,
+    PerpMarketExt, PositionExt,
 };
 
 use crate::{

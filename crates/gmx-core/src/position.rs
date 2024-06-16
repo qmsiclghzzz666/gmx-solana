@@ -8,9 +8,10 @@ use crate::{
         update_funding_state::unpack_to_funding_amount, Prices,
     },
     fixed::FixedPointOps,
+    market::{BaseMarketExt, PerpMarket, PerpMarketExt},
     num::{MulDiv, Num, Unsigned, UnsignedAbs},
     params::fee::{FundingFees, PositionFees},
-    Balance, BalanceExt, Market, MarketExt, Pool,
+    Balance, BalanceExt, Pool,
 };
 
 /// A position.
@@ -22,7 +23,7 @@ pub trait Position<const DECIMALS: u8> {
     type Signed: UnsignedAbs<Unsigned = Self::Num> + TryFrom<Self::Num> + Num;
 
     /// Market type.
-    type Market: Market<DECIMALS, Num = Self::Num, Signed = Self::Signed>;
+    type Market: PerpMarket<DECIMALS, Num = Self::Num, Signed = Self::Signed>;
 
     /// Get a reference to the market.
     fn market(&self) -> &Self::Market;

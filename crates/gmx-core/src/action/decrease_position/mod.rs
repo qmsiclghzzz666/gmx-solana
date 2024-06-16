@@ -1,10 +1,10 @@
 use num_traits::{CheckedAdd, CheckedSub, Zero};
 
 use crate::{
+    market::{PerpMarket, PerpMarketExt, SwapMarketExt},
     num::{MulDiv, Unsigned},
     params::fee::PositionFees,
     position::{CollateralDelta, Position, PositionExt, WillCollateralBeSufficient},
-    Market, MarketExt,
 };
 
 use self::collateral_processor::{CollateralProcessor, ProcessReport};
@@ -469,9 +469,9 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
 #[cfg(test)]
 mod tests {
     use crate::{
+        market::LiquidityMarketExt,
         position::PositionExt,
         test::{TestMarket, TestPosition},
-        MarketExt,
     };
 
     use super::*;

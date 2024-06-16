@@ -1,7 +1,8 @@
 use crate::{
+    market::{BaseMarket, BaseMarketExt, SwapMarket, SwapMarketExt},
     num::{MulDiv, Unsigned},
     params::Fees,
-    BalanceExt, Market, MarketExt, PnlFactorKind, PoolExt,
+    BalanceExt, PnlFactorKind, PoolExt,
 };
 
 use num_traits::{CheckedAdd, CheckedMul, CheckedSub, Signed, Zero};
@@ -10,7 +11,7 @@ use super::Prices;
 
 /// A swap.
 #[must_use]
-pub struct Swap<M: Market<DECIMALS>, const DECIMALS: u8> {
+pub struct Swap<M: BaseMarket<DECIMALS>, const DECIMALS: u8> {
     market: M,
     params: SwapParams<M::Num>,
 }
@@ -106,7 +107,7 @@ impl<T: Unsigned> ReassignedValues<T> {
     }
 }
 
-impl<const DECIMALS: u8, M: Market<DECIMALS>> Swap<M, DECIMALS> {
+impl<const DECIMALS: u8, M: SwapMarket<DECIMALS>> Swap<M, DECIMALS> {
     /// Create a new swap in the given market.
     pub fn try_new(
         market: M,
@@ -191,7 +192,7 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Swap<M, DECIMALS> {
         // Calculate price impact.
         let price_impact = self
             .market
-            .primary_pool()?
+            .liquidity_pool()?
             .pool_delta_with_values(
                 long_token_delta_value,
                 short_token_delta_value,
@@ -282,7 +283,13 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Swap<M, DECIMALS> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{action::Prices, pool::Balance, test::TestMarket, Market, MarketExt};
+    use crate::{
+        action::Prices,
+        market::{LiquidityMarketExt, SwapMarketExt},
+        pool::Balance,
+        test::TestMarket,
+        BaseMarket, LiquidityMarket,
+    };
 
     #[test]
     fn basic() -> crate::Result<()> {
@@ -317,14 +324,14 @@ mod tests {
         assert_eq!(before_market.total_supply(), market.total_supply());
 
         assert_eq!(
-            before_market.primary_pool()?.long_amount()?,
-            market.primary_pool()?.long_amount()? + report.token_out_amount
+            before_market.liquidity_pool()?.long_amount()?,
+            market.liquidity_pool()?.long_amount()? + report.token_out_amount
                 - report.price_impact_amount,
         );
         assert_eq!(
-            before_market.primary_pool()?.short_amount()? + token_in_amount
+            before_market.liquidity_pool()?.short_amount()? + token_in_amount
                 - report.token_in_fees.fee_receiver_amount(),
-            market.primary_pool()?.short_amount()?,
+            market.liquidity_pool()?.short_amount()?,
         );
 
         assert_eq!(
@@ -363,14 +370,14 @@ mod tests {
         assert_eq!(before_market.total_supply(), market.total_supply());
 
         assert_eq!(
-            before_market.primary_pool()?.long_amount()? + token_in_amount
+            before_market.liquidity_pool()?.long_amount()? + token_in_amount
                 - report.price_impact_amount
                 - report.token_in_fees.fee_receiver_amount(),
-            market.primary_pool()?.long_amount()?,
+            market.liquidity_pool()?.long_amount()?,
         );
         assert_eq!(
-            before_market.primary_pool()?.short_amount()? - report.token_out_amount,
-            market.primary_pool()?.short_amount()?,
+            before_market.liquidity_pool()?.short_amount()? - report.token_out_amount,
+            market.liquidity_pool()?.short_amount()?,
         );
 
         assert_eq!(

@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token, TokenAccount};
-use gmx_core::MarketExt;
+use gmx_core::{LiquidityMarketExt, PerpMarketExt};
 
 use crate::{
     states::{Deposit, Market, MarketMeta, Oracle, Seed, Store, ValidateOracleTime},

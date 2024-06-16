@@ -41,7 +41,10 @@ pub mod test;
 
 pub use clock::ClockKind;
 pub use error::Error;
-pub use market::{Market, MarketExt, PnlFactorKind};
+pub use market::{
+    BaseMarket, BaseMarketExt, LiquidityMarket, LiquidityMarketExt, PerpMarket, PerpMarketExt,
+    PnlFactorKind, SwapMarket, SwapMarketExt,
+};
 pub use pool::{Balance, BalanceExt, Pool, PoolExt, PoolKind};
 pub use position::{Position, PositionExt};
 

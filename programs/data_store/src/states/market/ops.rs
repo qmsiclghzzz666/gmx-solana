@@ -7,7 +7,7 @@ use gmx_core::{
         position::PositionImpactDistributionParams,
         FeeParams, PositionParams, PriceImpactParams,
     },
-    ClockKind, MarketExt, PoolKind,
+    BaseMarketExt, ClockKind, PoolKind,
 };
 
 use crate::{
@@ -158,23 +158,123 @@ impl<'a, 'info> AsMarket<'a, 'info> {
             Err(error!(DataStoreError::InvalidCollateralToken))
         }
     }
+
+    fn get_pool(&self, kind: PoolKind) -> gmx_core::Result<&Pool> {
+        self.pools
+            .get(kind)
+            .ok_or(gmx_core::Error::MissingPoolKind(kind))
+    }
+
+    fn get_pool_mut(&mut self, kind: PoolKind) -> gmx_core::Result<&mut Pool> {
+        self.pools
+            .get_mut(kind)
+            .ok_or(gmx_core::Error::MissingPoolKind(kind))
+    }
 }
 
-impl<'a, 'info> gmx_core::Market<{ constants::MARKET_DECIMALS }> for AsMarket<'a, 'info> {
+impl<'a, 'info> gmx_core::BaseMarket<{ constants::MARKET_DECIMALS }> for AsMarket<'a, 'info> {
     type Num = u128;
 
     type Signed = i128;
 
     type Pool = Pool;
 
-    fn pool(&self, kind: PoolKind) -> gmx_core::Result<Option<&Self::Pool>> {
-        Ok(self.pools.get(kind))
+    fn liquidity_pool(&self) -> gmx_core::Result<&Self::Pool> {
+        self.get_pool(PoolKind::Primary)
     }
 
-    fn pool_mut(&mut self, kind: PoolKind) -> gmx_core::Result<Option<&mut Self::Pool>> {
-        Ok(self.pools.get_mut(kind))
+    fn liquidity_pool_mut(&mut self) -> gmx_core::Result<&mut Self::Pool> {
+        self.get_pool_mut(PoolKind::Primary)
     }
 
+    fn usd_to_amount_divisor(&self) -> Self::Num {
+        constants::MARKET_USD_TO_AMOUNT_DIVISOR
+    }
+
+    fn reserve_factor(&self) -> gmx_core::Result<Self::Num> {
+        Ok(self.config.reserve_factor)
+    }
+
+    fn max_pnl_factor(
+        &self,
+        kind: gmx_core::PnlFactorKind,
+        is_long: bool,
+    ) -> gmx_core::Result<Self::Num> {
+        use gmx_core::PnlFactorKind;
+
+        match (kind, is_long) {
+            (PnlFactorKind::Deposit, true) => Ok(self.config.max_pnl_factor_for_long_deposit),
+            (PnlFactorKind::Deposit, false) => Ok(self.config.max_pnl_factor_for_short_deposit),
+            (PnlFactorKind::Withdrawal, true) => Ok(self.config.max_pnl_factor_for_long_withdrawal),
+            (PnlFactorKind::Withdrawal, false) => {
+                Ok(self.config.max_pnl_factor_for_short_withdrawal)
+            }
+            _ => Err(error!(DataStoreError::RequiredResourceNotFound).into()),
+        }
+    }
+
+    fn max_pool_amount(&self, is_long_token: bool) -> gmx_core::Result<Self::Num> {
+        if is_long_token {
+            Ok(self.config.max_pool_amount_for_long_token)
+        } else {
+            Ok(self.config.max_pool_amount_for_short_token)
+        }
+    }
+
+    fn claimable_fee_pool(&self) -> gmx_core::Result<&Self::Pool> {
+        self.get_pool(PoolKind::ClaimableFee)
+    }
+
+    fn claimable_fee_pool_mut(&mut self) -> gmx_core::Result<&mut Self::Pool> {
+        self.get_pool_mut(PoolKind::ClaimableFee)
+    }
+
+    fn swap_impact_pool(&self) -> gmx_core::Result<&Self::Pool> {
+        self.get_pool(PoolKind::SwapImpact)
+    }
+
+    fn open_interest_pool(&self, is_long: bool) -> gmx_core::Result<&Self::Pool> {
+        let kind = if is_long {
+            PoolKind::OpenInterestForLong
+        } else {
+            PoolKind::OpenInterestForShort
+        };
+        self.get_pool(kind)
+    }
+
+    fn open_interest_in_tokens_pool(&self, is_long: bool) -> gmx_core::Result<&Self::Pool> {
+        let kind = if is_long {
+            PoolKind::OpenInterestInTokensForLong
+        } else {
+            PoolKind::OpenInterestInTokensForShort
+        };
+        self.get_pool(kind)
+    }
+}
+
+impl<'a, 'info> gmx_core::SwapMarket<{ constants::MARKET_DECIMALS }> for AsMarket<'a, 'info> {
+    fn swap_impact_params(&self) -> gmx_core::Result<PriceImpactParams<Self::Num>> {
+        PriceImpactParams::builder()
+            .with_exponent(self.config.swap_impact_exponent)
+            .with_positive_factor(self.config.swap_impact_positive_factor)
+            .with_negative_factor(self.config.swap_impact_negative_factor)
+            .build()
+    }
+
+    fn swap_fee_params(&self) -> gmx_core::Result<FeeParams<Self::Num>> {
+        Ok(FeeParams::builder()
+            .with_fee_receiver_factor(self.config.swap_fee_receiver_factor)
+            .with_positive_impact_fee_factor(self.config.swap_fee_factor_for_positive_impact)
+            .with_negative_impact_fee_factor(self.config.swap_fee_factor_for_positive_impact)
+            .build())
+    }
+
+    fn swap_impact_pool_mut(&mut self) -> gmx_core::Result<&mut Self::Pool> {
+        self.get_pool_mut(PoolKind::SwapImpact)
+    }
+}
+
+impl<'a, 'info> gmx_core::LiquidityMarket<{ constants::MARKET_DECIMALS }> for AsMarket<'a, 'info> {
     fn total_supply(&self) -> Self::Num {
         self.mint.supply.into()
     }
@@ -213,6 +313,16 @@ impl<'a, 'info> gmx_core::Market<{ constants::MARKET_DECIMALS }> for AsMarket<'a
         Ok(())
     }
 
+    fn max_pool_value_for_deposit(&self, is_long_token: bool) -> gmx_core::Result<Self::Num> {
+        if is_long_token {
+            Ok(self.config.max_pool_value_for_deposit_for_long_token)
+        } else {
+            Ok(self.config.max_pool_value_for_deposit_for_short_token)
+        }
+    }
+}
+
+impl<'a, 'info> gmx_core::PerpMarket<{ constants::MARKET_DECIMALS }> for AsMarket<'a, 'info> {
     fn just_passed_in_seconds(&mut self, clock: ClockKind) -> gmx_core::Result<u64> {
         let current = Clock::get().map_err(Error::from)?.unix_timestamp;
         let last = self
@@ -226,28 +336,8 @@ impl<'a, 'info> gmx_core::Market<{ constants::MARKET_DECIMALS }> for AsMarket<'a
         Ok(duration as u64)
     }
 
-    fn usd_to_amount_divisor(&self) -> Self::Num {
-        constants::MARKET_USD_TO_AMOUNT_DIVISOR
-    }
-
     fn funding_amount_per_size_adjustment(&self) -> Self::Num {
         constants::FUNDING_AMOUNT_PER_SIZE_ADJUSTMENT
-    }
-
-    fn swap_impact_params(&self) -> gmx_core::Result<PriceImpactParams<Self::Num>> {
-        PriceImpactParams::builder()
-            .with_exponent(self.config.swap_impact_exponent)
-            .with_positive_factor(self.config.swap_impact_positive_factor)
-            .with_negative_factor(self.config.swap_impact_negative_factor)
-            .build()
-    }
-
-    fn swap_fee_params(&self) -> gmx_core::Result<FeeParams<Self::Num>> {
-        Ok(FeeParams::builder()
-            .with_fee_receiver_factor(self.config.swap_fee_receiver_factor)
-            .with_positive_impact_fee_factor(self.config.swap_fee_factor_for_positive_impact)
-            .with_negative_impact_fee_factor(self.config.swap_fee_factor_for_positive_impact)
-            .build())
     }
 
     fn position_params(&self) -> gmx_core::Result<PositionParams<Self::Num>> {
@@ -318,46 +408,8 @@ impl<'a, 'info> gmx_core::Market<{ constants::MARKET_DECIMALS }> for AsMarket<'a
         self.funding_factor_per_second
     }
 
-    fn reserve_factor(&self) -> gmx_core::Result<Self::Num> {
-        Ok(self.config.reserve_factor)
-    }
-
     fn open_interest_reserve_factor(&self) -> gmx_core::Result<Self::Num> {
         Ok(self.config.open_interest_reserve_factor)
-    }
-
-    fn max_pnl_factor(
-        &self,
-        kind: gmx_core::PnlFactorKind,
-        is_long: bool,
-    ) -> gmx_core::Result<Self::Num> {
-        use gmx_core::PnlFactorKind;
-
-        match (kind, is_long) {
-            (PnlFactorKind::Deposit, true) => Ok(self.config.max_pnl_factor_for_long_deposit),
-            (PnlFactorKind::Deposit, false) => Ok(self.config.max_pnl_factor_for_short_deposit),
-            (PnlFactorKind::Withdrawal, true) => Ok(self.config.max_pnl_factor_for_long_withdrawal),
-            (PnlFactorKind::Withdrawal, false) => {
-                Ok(self.config.max_pnl_factor_for_short_withdrawal)
-            }
-            _ => Err(error!(DataStoreError::RequiredResourceNotFound).into()),
-        }
-    }
-
-    fn max_pool_amount(&self, is_long_token: bool) -> gmx_core::Result<Self::Num> {
-        if is_long_token {
-            Ok(self.config.max_pool_amount_for_long_token)
-        } else {
-            Ok(self.config.max_pool_amount_for_short_token)
-        }
-    }
-
-    fn max_pool_value_for_deposit(&self, is_long_token: bool) -> gmx_core::Result<Self::Num> {
-        if is_long_token {
-            Ok(self.config.max_pool_value_for_deposit_for_long_token)
-        } else {
-            Ok(self.config.max_pool_value_for_deposit_for_short_token)
-        }
     }
 
     fn max_open_interest(&self, is_long: bool) -> gmx_core::Result<Self::Num> {
@@ -366,5 +418,83 @@ impl<'a, 'info> gmx_core::Market<{ constants::MARKET_DECIMALS }> for AsMarket<'a
         } else {
             Ok(self.config.max_open_interest_for_short)
         }
+    }
+
+    fn position_impact_pool(&self) -> gmx_core::Result<&Self::Pool> {
+        self.get_pool(PoolKind::PositionImpact)
+    }
+
+    fn position_impact_pool_mut(&mut self) -> gmx_core::Result<&mut Self::Pool> {
+        self.get_pool_mut(PoolKind::PositionImpact)
+    }
+
+    fn open_interest_pool_mut(&mut self, is_long: bool) -> gmx_core::Result<&mut Self::Pool> {
+        let kind = if is_long {
+            PoolKind::OpenInterestForLong
+        } else {
+            PoolKind::OpenInterestForShort
+        };
+        self.get_pool_mut(kind)
+    }
+
+    fn open_interest_in_tokens_pool_mut(
+        &mut self,
+        is_long: bool,
+    ) -> gmx_core::Result<&mut Self::Pool> {
+        let kind = if is_long {
+            PoolKind::OpenInterestInTokensForLong
+        } else {
+            PoolKind::OpenInterestInTokensForShort
+        };
+        self.get_pool_mut(kind)
+    }
+
+    fn borrowing_factor_pool(&self) -> gmx_core::Result<&Self::Pool> {
+        self.get_pool(PoolKind::BorrowingFactor)
+    }
+
+    fn borrowing_factor_pool_mut(&mut self) -> gmx_core::Result<&mut Self::Pool> {
+        self.get_pool_mut(PoolKind::BorrowingFactor)
+    }
+
+    fn funding_amount_per_size_pool(&self, is_long: bool) -> gmx_core::Result<&Self::Pool> {
+        self.get_pool(if is_long {
+            PoolKind::FundingAmountPerSizeForLong
+        } else {
+            PoolKind::FundingAmountPerSizeForShort
+        })
+    }
+
+    fn funding_amount_per_size_pool_mut(
+        &mut self,
+        is_long: bool,
+    ) -> gmx_core::Result<&mut Self::Pool> {
+        self.get_pool_mut(if is_long {
+            PoolKind::FundingAmountPerSizeForLong
+        } else {
+            PoolKind::FundingAmountPerSizeForShort
+        })
+    }
+
+    fn claimable_funding_amount_per_size_pool(
+        &self,
+        is_long: bool,
+    ) -> gmx_core::Result<&Self::Pool> {
+        self.get_pool(if is_long {
+            PoolKind::ClaimableFundingAmountPerSizeForLong
+        } else {
+            PoolKind::ClaimableFundingAmountPerSizeForShort
+        })
+    }
+
+    fn claimable_funding_amount_per_size_pool_mut(
+        &mut self,
+        is_long: bool,
+    ) -> gmx_core::Result<&mut Self::Pool> {
+        self.get_pool_mut(if is_long {
+            PoolKind::ClaimableFundingAmountPerSizeForLong
+        } else {
+            PoolKind::ClaimableFundingAmountPerSizeForShort
+        })
     }
 }

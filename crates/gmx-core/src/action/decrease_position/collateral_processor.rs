@@ -2,9 +2,9 @@ use std::ops::{Deref, DerefMut};
 
 use crate::{
     action::Prices,
+    market::{BaseMarket, BaseMarketExt, PerpMarket, PerpMarketExt},
     num::{MulDiv, Num, Unsigned, UnsignedAbs},
     params::fee::{FundingFees, PositionFees},
-    Market, MarketExt,
 };
 
 use num_traits::{CheckedAdd, Signed, Zero};
@@ -13,7 +13,7 @@ use super::ClaimableCollateral;
 
 /// Collateral Processor.
 #[must_use]
-pub(super) struct CollateralProcessor<'a, M: Market<DECIMALS>, const DECIMALS: u8> {
+pub(super) struct CollateralProcessor<'a, M: BaseMarket<DECIMALS>, const DECIMALS: u8> {
     market: &'a mut M,
     state: State<M::Num>,
     is_insolvent_close_allowed: bool,
@@ -237,7 +237,7 @@ where
 
 impl<'a, M, const DECIMALS: u8> CollateralProcessor<'a, M, DECIMALS>
 where
-    M: Market<DECIMALS>,
+    M: PerpMarket<DECIMALS>,
 {
     pub(super) fn new(
         market: &'a mut M,
@@ -348,14 +348,14 @@ where
 
 pub(super) struct Context<'a, 'market, M, const DECIMALS: u8>
 where
-    M: Market<DECIMALS>,
+    M: BaseMarket<DECIMALS>,
 {
     processor: &'a mut CollateralProcessor<'market, M, DECIMALS>,
 }
 
 impl<'a, 'market, M, const DECIMALS: u8> Deref for Context<'a, 'market, M, DECIMALS>
 where
-    M: Market<DECIMALS>,
+    M: BaseMarket<DECIMALS>,
 {
     type Target = CollateralProcessor<'market, M, DECIMALS>;
 
@@ -366,7 +366,7 @@ where
 
 impl<'a, 'market, M, const DECIMALS: u8> DerefMut for Context<'a, 'market, M, DECIMALS>
 where
-    M: Market<DECIMALS>,
+    M: BaseMarket<DECIMALS>,
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.processor
@@ -375,7 +375,7 @@ where
 
 impl<'a, 'market, M, const DECIMALS: u8> Context<'a, 'market, M, DECIMALS>
 where
-    M: Market<DECIMALS>,
+    M: PerpMarket<DECIMALS>,
 {
     pub(super) fn add_pnl_if_positive(&mut self, pnl: &M::Signed) -> crate::Result<&mut Self> {
         if pnl.is_positive() {
