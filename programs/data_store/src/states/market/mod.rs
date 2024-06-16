@@ -24,6 +24,9 @@ pub mod ops;
 /// Market Config.
 pub mod config;
 
+/// Revertible Market Operations.
+pub mod revertible;
+
 /// Max number of flags.
 pub const MAX_FLAGS: usize = 8;
 

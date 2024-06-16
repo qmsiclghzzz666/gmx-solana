@@ -43,3 +43,4 @@ pyth-solana-receiver-sdk = { workspace = true }
 paste = "1.0.15"
 strum = { version = "0.26.2", features = ["derive"] }
 serde = { version = "1.0.203", features = ["derive"], optional = true }
+indexmap = "2.2.6"
