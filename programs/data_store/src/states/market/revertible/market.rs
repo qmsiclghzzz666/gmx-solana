@@ -1,4 +1,4 @@
-use std::cell::RefMut;
+use std::{cell::RefMut, ops::Deref};
 
 use anchor_lang::prelude::*;
 use gmx_core::{Balance, PoolKind};
@@ -9,7 +9,7 @@ use crate::{
     DataStoreError, GmxCoreError,
 };
 
-use super::swap_market::AsSwapMarket;
+use super::{swap_market::AsSwapMarket, RevertibleBalance};
 
 /// Small Pool.
 pub struct SmallPool {
@@ -151,6 +151,7 @@ impl RevertiblePool {
 /// Revertible Market.
 pub struct RevertibleMarket<'a> {
     storage: RefMut<'a, Market>,
+    balance: RevertibleBalance,
     pub(crate) liquidity: RevertiblePool,
     pub(crate) claimable_fee: RevertiblePool,
     pub(crate) swap_impact: RevertiblePool,
@@ -178,8 +179,10 @@ impl<'a, 'info> TryFrom<&'a AccountLoader<'info, Market>> for RevertibleMarket<'
             .get(PoolKind::SwapImpact)
             .ok_or(error!(DataStoreError::RequiredResourceNotFound))?
             .into();
+        let balance = RevertibleBalance::from(storage.deref());
         Ok(Self {
             storage,
+            balance,
             liquidity: RevertiblePool::SmallPool(liquidity),
             claimable_fee: RevertiblePool::SmallPool(claimable_fee),
             swap_impact: RevertiblePool::SmallPool(swap_impact),
@@ -223,12 +226,41 @@ impl<'a> RevertibleMarket<'a> {
             .expect("must be exist");
         self.swap_impact.as_small_pool().write_to_pool(swap_impact);
 
+        self.balance.write_to_market(&mut self.storage);
+
         (f)(&mut self.storage)
     }
 
     /// Get market config.
     pub fn config(&self) -> &MarketConfig {
         &self.storage.config
+    }
+
+    /// Get balance.
+    pub fn balance(&self) -> &RevertibleBalance {
+        &self.balance
+    }
+
+    /// Record transferred in by the given token.
+    pub fn record_transferred_in_by_token(&mut self, token: &Pubkey, amount: u64) -> Result<()> {
+        if self.storage.meta.long_token_mint == *token {
+            self.balance.record_transferred_in(true, amount)
+        } else if self.storage.meta.short_token_mint == *token {
+            self.balance.record_transferred_in(false, amount)
+        } else {
+            Err(error!(DataStoreError::InvalidCollateralToken))
+        }
+    }
+
+    /// Record transferred out by the given token.
+    pub fn record_transferred_out_by_token(&mut self, token: &Pubkey, amount: u64) -> Result<()> {
+        if self.storage.meta.long_token_mint == *token {
+            self.balance.record_transferred_out(true, amount)
+        } else if self.storage.meta.short_token_mint == *token {
+            self.balance.record_transferred_out(false, amount)
+        } else {
+            Err(error!(DataStoreError::InvalidCollateralToken))
+        }
     }
 
     /// Get pool from storage.
