@@ -315,6 +315,28 @@ impl MarketMeta {
         }
     }
 
+    /// Check if the given token is long token or short token, and return it's side.
+    pub fn to_token_side(&self, token: &Pubkey) -> Result<bool> {
+        if *token == self.long_token_mint {
+            Ok(true)
+        } else if *token == self.short_token_mint {
+            Ok(false)
+        } else {
+            err!(DataStoreError::InvalidArgument)
+        }
+    }
+
+    /// Get opposite token.
+    pub fn opposite_token(&self, token: &Pubkey) -> Result<&Pubkey> {
+        if *token == self.long_token_mint {
+            Ok(&self.short_token_mint)
+        } else if *token == self.short_token_mint {
+            Ok(&self.long_token_mint)
+        } else {
+            err!(DataStoreError::InvalidArgument)
+        }
+    }
+
     /// Check if the given token is a valid collateral token,
     /// return error if it is not.
     pub fn validate_collateral_token(&self, token: &Pubkey) -> Result<()> {
@@ -323,6 +345,23 @@ impl MarketMeta {
         } else {
             Err(DataStoreError::InvalidCollateralToken.into())
         }
+    }
+}
+
+/// Type that has market meta.
+pub trait HasMarketMeta {
+    fn is_pure(&self) -> bool;
+
+    fn market_meta(&self) -> &MarketMeta;
+}
+
+impl HasMarketMeta for Market {
+    fn is_pure(&self) -> bool {
+        self.is_pure()
+    }
+
+    fn market_meta(&self) -> &MarketMeta {
+        &self.meta
     }
 }
 

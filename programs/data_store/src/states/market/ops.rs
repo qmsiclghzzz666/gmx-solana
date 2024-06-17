@@ -20,7 +20,7 @@ use crate::{
     DataStoreError, GmxCoreError,
 };
 
-use super::{config::MarketConfig, Clocks, Market, MarketMeta, Pool, Pools};
+use super::{config::MarketConfig, Clocks, HasMarketMeta, Market, MarketMeta, Pool, Pools};
 
 /// Convert to a [`Market`](gmx_core::Market).
 pub struct AsMarket<'a, 'info> {
@@ -497,4 +497,63 @@ impl<'a, 'info> gmx_core::PerpMarket<{ constants::MARKET_DECIMALS }> for AsMarke
             PoolKind::ClaimableFundingAmountPerSizeForShort
         })
     }
+}
+
+/// Extension trait for validating market balances.
+pub trait ValidateMarketBalances:
+    gmx_core::BaseMarket<{ constants::MARKET_DECIMALS }, Num = u128>
+    + gmx_core::Bank<Pubkey, Num = u64>
+    + HasMarketMeta
+{
+    /// Validate market balances.
+    fn validate_market_balances(
+        &self,
+        mut long_excluding_amount: u64,
+        mut short_excluding_amount: u64,
+    ) -> Result<()> {
+        if self.is_pure() {
+            let total = long_excluding_amount
+                .checked_add(short_excluding_amount)
+                .ok_or(DataStoreError::AmountOverflow)?;
+            (long_excluding_amount, short_excluding_amount) = (total / 2, total / 2);
+        }
+        let meta = self.market_meta();
+        let long_token_balance = self
+            .balance_excluding(&meta.long_token_mint, &long_excluding_amount)
+            .map_err(GmxCoreError::from)?
+            .into();
+        self.validate_token_balance_for_one_side(&long_token_balance, true)
+            .map_err(GmxCoreError::from)?;
+        let short_token_balance = self
+            .balance_excluding(&meta.short_token_mint, &short_excluding_amount)
+            .map_err(GmxCoreError::from)?
+            .into();
+        self.validate_token_balance_for_one_side(&short_token_balance, false)
+            .map_err(GmxCoreError::from)?;
+        Ok(())
+    }
+
+    /// Validate market balance for the given token.
+    fn validate_market_balances_excluding_token_amount(
+        &self,
+        token: &Pubkey,
+        amount: u64,
+    ) -> Result<()> {
+        let side = self.market_meta().to_token_side(token)?;
+        let balance = self
+            .balance_excluding(token, &amount)
+            .map_err(GmxCoreError::from)?
+            .into();
+        self.validate_token_balance_for_one_side(&balance, side)
+            .map_err(GmxCoreError::from)?;
+        Ok(())
+    }
+}
+
+impl<
+        M: gmx_core::BaseMarket<{ constants::MARKET_DECIMALS }, Num = u128>
+            + gmx_core::Bank<Pubkey, Num = u64>
+            + HasMarketMeta,
+    > ValidateMarketBalances for M
+{
 }

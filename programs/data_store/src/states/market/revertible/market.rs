@@ -1,11 +1,11 @@
-use std::{cell::RefMut, ops::Deref};
+use std::{borrow::Borrow, cell::RefMut, ops::Deref};
 
 use anchor_lang::prelude::*;
 use gmx_core::{Balance, PoolKind};
 
 use crate::{
     constants,
-    states::{Market, MarketConfig, Pool},
+    states::{HasMarketMeta, Market, MarketConfig, MarketMeta, Pool},
     DataStoreError, GmxCoreError,
 };
 
@@ -157,6 +157,12 @@ pub struct RevertibleMarket<'a> {
     pub(crate) swap_impact: RevertiblePool,
 }
 
+impl<'a> Key for RevertibleMarket<'a> {
+    fn key(&self) -> Pubkey {
+        self.storage.meta().market_token_mint
+    }
+}
+
 impl<'a, 'info> TryFrom<&'a AccountLoader<'info, Market>> for RevertibleMarket<'a> {
     type Error = Error;
 
@@ -236,33 +242,6 @@ impl<'a> RevertibleMarket<'a> {
         &self.storage.config
     }
 
-    /// Get balance.
-    pub fn balance(&self) -> &RevertibleBalance {
-        &self.balance
-    }
-
-    /// Record transferred in by the given token.
-    pub fn record_transferred_in_by_token(&mut self, token: &Pubkey, amount: u64) -> Result<()> {
-        if self.storage.meta.long_token_mint == *token {
-            self.balance.record_transferred_in(true, amount)
-        } else if self.storage.meta.short_token_mint == *token {
-            self.balance.record_transferred_in(false, amount)
-        } else {
-            Err(error!(DataStoreError::InvalidCollateralToken))
-        }
-    }
-
-    /// Record transferred out by the given token.
-    pub fn record_transferred_out_by_token(&mut self, token: &Pubkey, amount: u64) -> Result<()> {
-        if self.storage.meta.long_token_mint == *token {
-            self.balance.record_transferred_out(true, amount)
-        } else if self.storage.meta.short_token_mint == *token {
-            self.balance.record_transferred_out(false, amount)
-        } else {
-            Err(error!(DataStoreError::InvalidCollateralToken))
-        }
-    }
-
     /// Get pool from storage.
     pub fn get_pool_from_storage(&self, kind: PoolKind) -> Result<RevertiblePool> {
         let pool = self
@@ -279,6 +258,60 @@ impl<'a> RevertibleMarket<'a> {
     /// As a [`SwapMarket`](gmx_core::SwapMarket).
     pub fn as_swap_market(&mut self) -> Result<AsSwapMarket<'_, 'a>> {
         AsSwapMarket::new(self)
+    }
+
+    /// Get the balance field.
+    pub fn revertible_balance(&self) -> &RevertibleBalance {
+        &self.balance
+    }
+}
+
+impl<'a> HasMarketMeta for RevertibleMarket<'a> {
+    fn market_meta(&self) -> &MarketMeta {
+        self.storage.market_meta()
+    }
+
+    fn is_pure(&self) -> bool {
+        self.storage.is_pure()
+    }
+}
+
+impl<'a> gmx_core::Bank<Pubkey> for RevertibleMarket<'a> {
+    type Num = u64;
+
+    fn record_transferred_in_by_token<Q: ?Sized + Borrow<Pubkey>>(
+        &mut self,
+        token: &Q,
+        amount: &Self::Num,
+    ) -> gmx_core::Result<()> {
+        if self.storage.meta.long_token_mint == *token.borrow() {
+            self.balance.record_transferred_in(true, *amount)?;
+        } else if self.storage.meta.short_token_mint == *token.borrow() {
+            self.balance.record_transferred_in(false, *amount)?;
+        } else {
+            return Err(gmx_core::Error::invalid_argument("invalid token"));
+        }
+        Ok(())
+    }
+
+    fn record_transferred_out_by_token<Q: ?Sized + Borrow<Pubkey>>(
+        &mut self,
+        token: &Q,
+        amount: &Self::Num,
+    ) -> gmx_core::Result<()> {
+        if self.storage.meta.long_token_mint == *token.borrow() {
+            self.balance.record_transferred_out(true, *amount)?;
+        } else if self.storage.meta.short_token_mint == *token.borrow() {
+            self.balance.record_transferred_out(false, *amount)?;
+        } else {
+            return Err(gmx_core::Error::invalid_argument("invalid token"));
+        }
+        Ok(())
+    }
+
+    fn balance<Q: Borrow<Pubkey> + ?Sized>(&self, token: &Q) -> gmx_core::Result<Self::Num> {
+        let side = self.market_meta().to_token_side(token.borrow())?;
+        Ok(self.revertible_balance().balance_for_one_side(side))
     }
 }
 
