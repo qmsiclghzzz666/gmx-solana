@@ -12,7 +12,9 @@ pub mod balance;
 
 pub use self::{
     balance::RevertibleBalance,
+    liquidity_market::RevertibleLiquidityMarket,
     market::{RevertibleMarket, RevertiblePool},
+    swap_market::RevertibleSwapMarket,
 };
 
 /// Revertible type.

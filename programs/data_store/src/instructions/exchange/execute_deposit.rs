@@ -3,7 +3,14 @@ use anchor_spl::token::{Mint, Token, TokenAccount};
 use gmx_core::{LiquidityMarketExt, PositionImpactMarketExt};
 
 use crate::{
-    states::{Deposit, Market, MarketMeta, Oracle, Seed, Store, ValidateOracleTime},
+    states::{
+        ops::ValidateMarketBalances,
+        revertible::{
+            swap_market::{SwapDirection, SwapMarkets},
+            Revertible, RevertibleLiquidityMarket,
+        },
+        Deposit, HasMarketMeta, Market, MarketMeta, Oracle, Seed, Store, ValidateOracleTime,
+    },
     utils::internal,
     DataStoreError, GmxCoreError,
 };
@@ -46,11 +53,16 @@ pub struct ExecuteDeposit<'info> {
 /// Execute a deposit.
 pub fn execute_deposit<'info>(
     ctx: Context<'_, '_, 'info, 'info, ExecuteDeposit<'info>>,
-) -> Result<()> {
-    ctx.accounts.validate()?;
-    ctx.accounts.pre_execute()?;
-    ctx.accounts.execute(ctx.remaining_accounts)?;
-    Ok(())
+) -> Result<bool> {
+    ctx.accounts.validate_oracle()?;
+    match ctx.accounts.execute2(ctx.remaining_accounts) {
+        Ok(()) => Ok(true),
+        Err(err) => {
+            // TODO: catch and throw missing oracle price error.
+            msg!("Execute deposit error: {}", err);
+            Ok(false)
+        }
+    }
 }
 
 impl<'info> internal::Authentication<'info> for ExecuteDeposit<'info> {
@@ -82,6 +94,84 @@ impl<'info> ValidateOracleTime for ExecuteDeposit<'info> {
 }
 
 impl<'info> ExecuteDeposit<'info> {
+    fn validate_oracle(&self) -> Result<()> {
+        self.oracle.validate_time(self)
+    }
+
+    fn validate_market(&self) -> Result<()> {
+        self.market.load()?.validate(&self.store.key())
+    }
+
+    fn execute2(&mut self, remaining_accounts: &'info [AccountInfo<'info>]) -> Result<()> {
+        self.validate_market()?;
+
+        // Prepare the execution context.
+        let current_market = self.market.key();
+        let mut market = RevertibleLiquidityMarket::new(
+            &self.market,
+            &mut self.market_token_mint,
+            self.token_program.to_account_info(),
+            &self.store,
+        )?
+        .enable_mint(self.receiver.to_account_info());
+        let loaders = self
+            .deposit
+            .dynamic
+            .swap_params
+            .unpack_markets_for_swap(&current_market, remaining_accounts)?;
+        let mut swap_markets = SwapMarkets::new(&loaders, Some(&current_market))?;
+
+        // Distribute position impact.
+        {
+            let report = market
+                .distribute_position_impact()
+                .map_err(GmxCoreError::from)?
+                .execute()
+                .map_err(GmxCoreError::from)?;
+            msg!("Deposit pre-execute: {:?}", report);
+        }
+
+        // Swap tokens into the target market.
+        let (long_token_amount, short_token_amount) = {
+            let meta = market.market_meta();
+            let expected_token_outs = (meta.long_token_mint, meta.short_token_mint);
+            swap_markets.revertible_swap(
+                SwapDirection::Into(&mut market),
+                &self.oracle,
+                &self.deposit.dynamic.swap_params,
+                expected_token_outs,
+                (
+                    self.deposit.fixed.tokens.initial_long_token,
+                    self.deposit.fixed.tokens.initial_short_token,
+                ),
+                (
+                    self.deposit.fixed.tokens.params.initial_long_token_amount,
+                    self.deposit.fixed.tokens.params.initial_short_token_amount,
+                ),
+            )?
+        };
+
+        // Perform the deposit.
+        {
+            let prices = self.oracle.market_prices(&market)?;
+            let report = market
+                .deposit(long_token_amount.into(), short_token_amount.into(), prices)
+                .and_then(|d| d.execute())
+                .map_err(GmxCoreError::from)?;
+            market.validate_market_balances(0, 0)?;
+            msg!("Deposit executed: {:?}", report);
+        }
+
+        // Commit the changes.
+        market.commit();
+        swap_markets.commit();
+
+        // Set amounts to zero to make sure it can be removed without transferring out any tokens.
+        self.deposit.fixed.tokens.params.initial_long_token_amount = 0;
+        self.deposit.fixed.tokens.params.initial_short_token_amount = 0;
+        Ok(())
+    }
+
     fn validate(&self) -> Result<()> {
         self.oracle.validate_time(self)?;
         self.market.load()?.validate(&self.store.key())?;

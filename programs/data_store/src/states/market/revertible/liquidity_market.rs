@@ -7,30 +7,82 @@ use gmx_core::{
 
 use crate::{
     constants,
-    states::{clock::AsClock, Store},
+    states::{clock::AsClock, HasMarketMeta, Market, Store},
     utils::internal::TransferUtils,
 };
 
 use super::{swap_market::RevertibleSwapMarket, Revertible, RevertibleMarket, RevertiblePool};
 
 /// Convert a [`RevertibleMarket`] to a [`LiquidityMarket`](gmx_core::LiquidityMarket).
-pub struct AsLiquidityMarket<'a, 'info> {
+pub struct RevertibleLiquidityMarket<'a, 'info> {
     market: RevertibleSwapMarket<'a>,
     market_token: &'a mut Account<'info, Mint>,
     transfer: TransferUtils<'a, 'info>,
     receiver: Option<AccountInfo<'info>>,
-    vault: AccountInfo<'info>,
+    vault: Option<AccountInfo<'info>>,
     position_impact: RevertiblePool,
     position_impact_distribution_clock: i64,
     to_mint: u64,
     to_burn: u64,
 }
 
-impl<'a, 'info> AsLiquidityMarket<'a, 'info> {
+impl<'a, 'info> Key for RevertibleLiquidityMarket<'a, 'info> {
+    fn key(&self) -> Pubkey {
+        self.market.key()
+    }
+}
+
+impl<'a, 'info> HasMarketMeta for RevertibleLiquidityMarket<'a, 'info> {
+    fn is_pure(&self) -> bool {
+        self.market.is_pure()
+    }
+
+    fn market_meta(&self) -> &crate::states::MarketMeta {
+        self.market.market_meta()
+    }
+}
+
+impl<'a, 'info> gmx_core::Bank<Pubkey> for RevertibleLiquidityMarket<'a, 'info> {
+    type Num = u64;
+
+    fn record_transferred_in_by_token<Q: std::borrow::Borrow<Pubkey> + ?Sized>(
+        &mut self,
+        token: &Q,
+        amount: &Self::Num,
+    ) -> gmx_core::Result<()> {
+        self.market.record_transferred_in_by_token(token, amount)
+    }
+
+    fn record_transferred_out_by_token<Q: std::borrow::Borrow<Pubkey> + ?Sized>(
+        &mut self,
+        token: &Q,
+        amount: &Self::Num,
+    ) -> gmx_core::Result<()> {
+        self.market.record_transferred_out_by_token(token, amount)
+    }
+
+    fn balance<Q: std::borrow::Borrow<Pubkey> + ?Sized>(
+        &self,
+        token: &Q,
+    ) -> gmx_core::Result<Self::Num> {
+        self.market.balance(token)
+    }
+}
+
+impl<'a, 'info> RevertibleLiquidityMarket<'a, 'info> {
     pub(crate) fn new(
+        loader: &'a AccountLoader<'info, Market>,
+        market_token: &'a mut Account<'info, Mint>,
+        token_program: AccountInfo<'info>,
+        store: &'a AccountLoader<'info, Store>,
+    ) -> Result<Self> {
+        let market = loader.try_into()?;
+        Self::from_market(market, market_token, token_program, store)
+    }
+
+    pub(crate) fn from_market(
         market: RevertibleMarket<'a>,
         market_token: &'a mut Account<'info, Mint>,
-        vault: AccountInfo<'info>,
         token_program: AccountInfo<'info>,
         store: &'a AccountLoader<'info, Store>,
     ) -> Result<Self> {
@@ -38,7 +90,7 @@ impl<'a, 'info> AsLiquidityMarket<'a, 'info> {
         let position_impact_distribution_clock =
             market.get_clock(ClockKind::PriceImpactDistribution)?;
         Ok(Self {
-            market: RevertibleSwapMarket::new(market)?,
+            market: RevertibleSwapMarket::from_market(market)?,
             transfer: TransferUtils::new(
                 token_program,
                 store,
@@ -46,7 +98,7 @@ impl<'a, 'info> AsLiquidityMarket<'a, 'info> {
             ),
             market_token,
             receiver: None,
-            vault,
+            vault: None,
             position_impact,
             position_impact_distribution_clock,
             to_mint: 0,
@@ -58,10 +110,15 @@ impl<'a, 'info> AsLiquidityMarket<'a, 'info> {
         self.receiver = Some(receiver);
         self
     }
+
+    pub(crate) fn enable_burn(mut self, vault: AccountInfo<'info>) -> Self {
+        self.vault = Some(vault);
+        self
+    }
 }
 
 impl<'a, 'info> gmx_core::BaseMarket<{ constants::MARKET_DECIMALS }>
-    for AsLiquidityMarket<'a, 'info>
+    for RevertibleLiquidityMarket<'a, 'info>
 {
     type Num = u128;
 
@@ -119,7 +176,7 @@ impl<'a, 'info> gmx_core::BaseMarket<{ constants::MARKET_DECIMALS }>
 }
 
 impl<'a, 'info> gmx_core::SwapMarket<{ constants::MARKET_DECIMALS }>
-    for AsLiquidityMarket<'a, 'info>
+    for RevertibleLiquidityMarket<'a, 'info>
 {
     fn swap_impact_params(
         &self,
@@ -137,7 +194,7 @@ impl<'a, 'info> gmx_core::SwapMarket<{ constants::MARKET_DECIMALS }>
 }
 
 impl<'a, 'info> gmx_core::LiquidityMarket<{ constants::MARKET_DECIMALS }>
-    for AsLiquidityMarket<'a, 'info>
+    for RevertibleLiquidityMarket<'a, 'info>
 {
     fn total_supply(&self) -> Self::Num {
         self.market_token.supply.into()
@@ -195,7 +252,7 @@ impl<'a, 'info> gmx_core::LiquidityMarket<{ constants::MARKET_DECIMALS }>
 }
 
 impl<'a, 'info> gmx_core::PositionImpactMarket<{ constants::MARKET_DECIMALS }>
-    for AsLiquidityMarket<'a, 'info>
+    for RevertibleLiquidityMarket<'a, 'info>
 {
     fn position_impact_pool(&self) -> gmx_core::Result<&Self::Pool> {
         Ok(&self.position_impact)
@@ -229,7 +286,7 @@ impl<'a, 'info> gmx_core::PositionImpactMarket<{ constants::MARKET_DECIMALS }>
     }
 }
 
-impl<'a, 'info> Revertible for AsLiquidityMarket<'a, 'info> {
+impl<'a, 'info> Revertible for RevertibleLiquidityMarket<'a, 'info> {
     fn commit(self) {
         if self.to_mint != 0 {
             self.transfer
@@ -239,7 +296,7 @@ impl<'a, 'info> Revertible for AsLiquidityMarket<'a, 'info> {
         }
         if self.to_burn != 0 {
             self.transfer
-                .burn_from(&self.vault, self.to_burn)
+                .burn_from(&self.vault.expect("burn is not enabled"), self.to_burn)
                 .map_err(|err| panic!("burn error: {err}"))
                 .unwrap();
         }

@@ -436,7 +436,7 @@ pub mod data_store {
     #[access_control(internal::Authenticate::only_controller(&ctx))]
     pub fn execute_deposit<'info>(
         ctx: Context<'_, '_, 'info, 'info, ExecuteDeposit<'info>>,
-    ) -> Result<()> {
+    ) -> Result<bool> {
         instructions::execute_deposit(ctx)
     }
 

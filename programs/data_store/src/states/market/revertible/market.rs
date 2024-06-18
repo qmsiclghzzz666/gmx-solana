@@ -260,7 +260,7 @@ impl<'a> RevertibleMarket<'a> {
 
     /// As a [`SwapMarket`](gmx_core::SwapMarket).
     pub fn into_swap_market(self) -> Result<RevertibleSwapMarket<'a>> {
-        RevertibleSwapMarket::new(self)
+        RevertibleSwapMarket::from_market(self)
     }
 
     /// Get the balance field.

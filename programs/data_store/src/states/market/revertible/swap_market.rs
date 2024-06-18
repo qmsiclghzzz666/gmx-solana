@@ -34,9 +34,9 @@ impl<'a> SwapMarkets<'a> {
                 // Cannot have duplicated markets.
                 Entry::Occupied(_) => return err!(DataStoreError::InvalidSwapPath),
                 Entry::Vacant(e) => {
-                    e.insert(RevertibleSwapMarket::new(RevertibleMarket::try_from(
-                        loader,
-                    )?)?);
+                    e.insert(RevertibleSwapMarket::from_market(
+                        RevertibleMarket::try_from(loader)?,
+                    )?);
                 }
             }
         }
@@ -257,12 +257,12 @@ impl<'a> Revertible for SwapMarkets<'a> {
     }
 }
 
-pub(crate) enum SwapDirection<M> {
-    From(M),
-    Into(M),
+pub(crate) enum SwapDirection<'a, M> {
+    From(&'a mut M),
+    Into(&'a mut M),
 }
 
-impl<M> SwapDirection<M>
+impl<'a, M> SwapDirection<'a, M>
 where
     M: Key,
 {
@@ -273,7 +273,7 @@ where
     }
 }
 
-impl<M> SwapDirection<M>
+impl<'a, M> SwapDirection<'a, M>
 where
     M: HasMarketMeta + gmx_core::SwapMarket<{ constants::MARKET_DECIMALS }, Num = u128>,
 {
@@ -287,7 +287,7 @@ where
             Self::From(m) | Self::Into(m) => m,
         };
         let side = current.market_meta().to_token_side(token_in)?;
-        let prices = oracle.market_prices(current)?;
+        let prices = oracle.market_prices(*current)?;
         let report = current
             .swap(side, (*token_in_amount).into(), prices)
             .map_err(GmxCoreError::from)?
@@ -310,7 +310,7 @@ pub struct RevertibleSwapMarket<'a> {
 }
 
 impl<'a> RevertibleSwapMarket<'a> {
-    pub(crate) fn new(market: RevertibleMarket<'a>) -> Result<Self> {
+    pub(crate) fn from_market(market: RevertibleMarket<'a>) -> Result<Self> {
         let open_interest = (
             market.get_pool_from_storage(PoolKind::OpenInterestForLong)?,
             market.get_pool_from_storage(PoolKind::OpenInterestForShort)?,
