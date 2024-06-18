@@ -21,6 +21,9 @@ pub use self::{
 /// Market Operations.
 pub mod ops;
 
+/// Clock ops.
+pub mod clock;
+
 /// Market Config.
 pub mod config;
 
@@ -488,6 +491,16 @@ impl Clocks {
         self.borrowing = current;
         self.funding = current;
         Ok(())
+    }
+
+    fn get(&self, kind: ClockKind) -> Option<&i64> {
+        let clock = match kind {
+            ClockKind::PriceImpactDistribution => &self.price_impact_distribution,
+            ClockKind::Borrowing => &self.borrowing,
+            ClockKind::Funding => &self.funding,
+            _ => return None,
+        };
+        Some(clock)
     }
 
     fn get_mut(&mut self, kind: ClockKind) -> Option<&mut i64> {

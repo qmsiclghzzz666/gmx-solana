@@ -1,7 +1,7 @@
 use std::{borrow::Borrow, cell::RefMut, ops::Deref};
 
 use anchor_lang::prelude::*;
-use gmx_core::{Balance, PoolKind};
+use gmx_core::{Balance, ClockKind, PoolKind};
 
 use crate::{
     constants,
@@ -9,7 +9,7 @@ use crate::{
     DataStoreError, GmxCoreError,
 };
 
-use super::{swap_market::AsSwapMarket, RevertibleBalance};
+use super::{swap_market::RevertibleSwapMarket, Revertible, RevertibleBalance};
 
 /// Small Pool.
 pub struct SmallPool {
@@ -200,13 +200,6 @@ impl<'a> RevertibleMarket<'a> {
     /// Commit the changes.
     /// ## Panic
     /// - Panic if the storage doesn't have the requried pools.
-    pub fn commit(self) {
-        self.commit_with(|_| ());
-    }
-
-    /// Commit the changes.
-    /// ## Panic
-    /// - Panic if the storage doesn't have the requried pools.
     /// - Panic if `f` decides to do so.
     pub fn commit_with(mut self, f: impl FnOnce(&mut Market)) {
         let liquidity = self
@@ -255,14 +248,45 @@ impl<'a> RevertibleMarket<'a> {
         ))
     }
 
+    /// Create a revertible pool from the storage.
+    pub fn create_revertible_pool(&self, kind: PoolKind) -> Result<RevertiblePool> {
+        let pool = self
+            .storage
+            .pools
+            .get(kind)
+            .ok_or(error!(DataStoreError::RequiredResourceNotFound))?;
+        Ok(RevertiblePool::SmallPool(SmallPool::from(pool)))
+    }
+
     /// As a [`SwapMarket`](gmx_core::SwapMarket).
-    pub fn as_swap_market(&mut self) -> Result<AsSwapMarket<'_, 'a>> {
-        AsSwapMarket::new(self)
+    pub fn into_swap_market(self) -> Result<RevertibleSwapMarket<'a>> {
+        RevertibleSwapMarket::new(self)
     }
 
     /// Get the balance field.
     pub fn revertible_balance(&self) -> &RevertibleBalance {
         &self.balance
+    }
+
+    /// Get clock.
+    pub fn get_clock(&self, kind: ClockKind) -> Result<i64> {
+        let clock = self
+            .storage
+            .clocks
+            .get(kind)
+            .ok_or(error!(DataStoreError::RequiredResourceNotFound))?;
+        Ok(*clock)
+    }
+
+    /// Set clock.
+    pub fn set_clock(&mut self, kind: ClockKind, last: i64) -> Result<()> {
+        let clock = self
+            .storage
+            .clocks
+            .get_mut(kind)
+            .ok_or(error!(DataStoreError::RequiredResourceNotFound))?;
+        *clock = last;
+        Ok(())
     }
 }
 
@@ -384,5 +408,14 @@ impl<'a> gmx_core::BaseMarket<{ constants::MARKET_DECIMALS }> for RevertibleMark
 
     fn reserve_factor(&self) -> gmx_core::Result<Self::Num> {
         Ok(self.config().reserve_factor)
+    }
+}
+
+impl<'a> Revertible for RevertibleMarket<'a> {
+    /// Commit the changes.
+    /// ## Panic
+    /// - Panic if the storage doesn't have the requried pools.
+    fn commit(self) {
+        self.commit_with(|_| ());
     }
 }

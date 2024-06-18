@@ -13,10 +13,10 @@ use crate::{
     DataStoreError, GmxCoreError,
 };
 
-use super::{RevertibleMarket, RevertiblePool};
+use super::{Revertible, RevertibleMarket, RevertiblePool};
 
 /// A map of markets used for swaps where the key is the market token mint address.
-pub struct SwapMarkets<'a>(IndexMap<Pubkey, RevertibleMarket<'a>>);
+pub struct SwapMarkets<'a>(IndexMap<Pubkey, RevertibleSwapMarket<'a>>);
 
 impl<'a> SwapMarkets<'a> {
     /// Create a new [`SwapMarkets`] from loders.
@@ -34,24 +34,17 @@ impl<'a> SwapMarkets<'a> {
                 // Cannot have duplicated markets.
                 Entry::Occupied(_) => return err!(DataStoreError::InvalidSwapPath),
                 Entry::Vacant(e) => {
-                    e.insert(RevertibleMarket::try_from(loader)?);
+                    e.insert(RevertibleSwapMarket::new(RevertibleMarket::try_from(
+                        loader,
+                    )?)?);
                 }
             }
         }
         Ok(Self(map))
     }
 
-    /// Commit the swap.
-    /// ## Panic
-    /// Panic if one of the commitments panics.
-    pub fn commit(self) {
-        for market in self.0.into_values() {
-            market.commit();
-        }
-    }
-
     /// Get market mutably.
-    pub fn get_mut(&mut self, token: &Pubkey) -> Option<&mut RevertibleMarket<'a>> {
+    pub fn get_mut(&mut self, token: &Pubkey) -> Option<&mut RevertibleSwapMarket<'a>> {
         self.0.get_mut(token)
     }
 
@@ -124,20 +117,17 @@ impl<'a> SwapMarkets<'a> {
         }
         let last_idx = path.len().saturating_sub(1);
         for (idx, market_token) in path.iter().enumerate() {
-            let mut market = self
-                .get_mut(market_token)
-                .ok_or_else(|| {
-                    msg!("Swap Error: missing market account for {}", market_token);
-                    error!(DataStoreError::MissingMarketAccount)
-                })?
-                .as_swap_market()?;
+            let market = self.get_mut(market_token).ok_or_else(|| {
+                msg!("Swap Error: missing market account for {}", market_token);
+                error!(DataStoreError::MissingMarketAccount)
+            })?;
             if idx != 0 {
                 market
                     .record_transferred_in_by_token(token_in, token_in_amount)
                     .map_err(GmxCoreError::from)?;
             }
             let side = market.market_meta().to_token_side(token_in)?;
-            let prices = oracle.market_prices(&market)?;
+            let prices = oracle.market_prices(market)?;
             let report = market
                 .swap(side, (*token_in_amount).into(), prices)
                 .map_err(GmxCoreError::from)?
@@ -256,6 +246,17 @@ impl<'a> SwapMarkets<'a> {
     }
 }
 
+impl<'a> Revertible for SwapMarkets<'a> {
+    /// Commit the swap.
+    /// ## Panic
+    /// Panic if one of the commitments panics.
+    fn commit(self) {
+        for market in self.0.into_values() {
+            market.commit();
+        }
+    }
+}
+
 pub(crate) enum SwapDirection<M> {
     From(M),
     Into(M),
@@ -302,14 +303,14 @@ where
 }
 
 /// Convert a [`RevertibleMarket`] to a [`SwapMarket`](gmx_core::SwapMarket).
-pub struct AsSwapMarket<'a, 'market> {
-    market: &'a mut RevertibleMarket<'market>,
+pub struct RevertibleSwapMarket<'a> {
+    pub(super) market: RevertibleMarket<'a>,
     open_interest: (RevertiblePool, RevertiblePool),
     open_interest_in_tokens: (RevertiblePool, RevertiblePool),
 }
 
-impl<'a, 'market> AsSwapMarket<'a, 'market> {
-    pub(crate) fn new(market: &'a mut RevertibleMarket<'market>) -> Result<Self> {
+impl<'a> RevertibleSwapMarket<'a> {
+    pub(crate) fn new(market: RevertibleMarket<'a>) -> Result<Self> {
         let open_interest = (
             market.get_pool_from_storage(PoolKind::OpenInterestForLong)?,
             market.get_pool_from_storage(PoolKind::OpenInterestForShort)?,
@@ -326,7 +327,7 @@ impl<'a, 'market> AsSwapMarket<'a, 'market> {
     }
 }
 
-impl<'a, 'market> HasMarketMeta for AsSwapMarket<'a, 'market> {
+impl<'a> HasMarketMeta for RevertibleSwapMarket<'a> {
     fn is_pure(&self) -> bool {
         self.market.is_pure()
     }
@@ -336,9 +337,23 @@ impl<'a, 'market> HasMarketMeta for AsSwapMarket<'a, 'market> {
     }
 }
 
-impl<'a, 'market> gmx_core::BaseMarket<{ constants::MARKET_DECIMALS }>
-    for AsSwapMarket<'a, 'market>
-{
+impl<'a> Revertible for RevertibleSwapMarket<'a> {
+    fn commit(self) {
+        self.market.commit();
+    }
+}
+
+impl<'a> RevertibleSwapMarket<'a> {
+    /// Commit with the given function.
+    ///
+    /// ## Panic
+    /// Panic if the commitment cannot be done.
+    pub(crate) fn commit_with(self, f: impl FnOnce(&mut Market)) {
+        self.market.commit_with(f)
+    }
+}
+
+impl<'a> gmx_core::BaseMarket<{ constants::MARKET_DECIMALS }> for RevertibleSwapMarket<'a> {
     type Num = u128;
 
     type Signed = i128;
@@ -402,9 +417,7 @@ impl<'a, 'market> gmx_core::BaseMarket<{ constants::MARKET_DECIMALS }>
     }
 }
 
-impl<'a, 'market> gmx_core::SwapMarket<{ constants::MARKET_DECIMALS }>
-    for AsSwapMarket<'a, 'market>
-{
+impl<'a> gmx_core::SwapMarket<{ constants::MARKET_DECIMALS }> for RevertibleSwapMarket<'a> {
     fn swap_impact_params(&self) -> gmx_core::Result<PriceImpactParams<Self::Num>> {
         PriceImpactParams::builder()
             .with_exponent(self.market.config().swap_impact_exponent)
@@ -430,7 +443,7 @@ impl<'a, 'market> gmx_core::SwapMarket<{ constants::MARKET_DECIMALS }>
     }
 }
 
-impl<'a, 'market> gmx_core::Bank<Pubkey> for AsSwapMarket<'a, 'market> {
+impl<'a> gmx_core::Bank<Pubkey> for RevertibleSwapMarket<'a> {
     type Num = u64;
 
     fn record_transferred_in_by_token<Q: std::borrow::Borrow<Pubkey> + ?Sized>(
@@ -459,7 +472,7 @@ impl<'a, 'market> gmx_core::Bank<Pubkey> for AsSwapMarket<'a, 'market> {
     }
 }
 
-impl<'a, 'market> Key for AsSwapMarket<'a, 'market> {
+impl<'a> Key for RevertibleSwapMarket<'a> {
     fn key(&self) -> Pubkey {
         self.market.key()
     }

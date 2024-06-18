@@ -20,7 +20,9 @@ use crate::{
     DataStoreError, GmxCoreError,
 };
 
-use super::{config::MarketConfig, Clocks, HasMarketMeta, Market, MarketMeta, Pool, Pools};
+use super::{
+    clock::AsClock, config::MarketConfig, Clocks, HasMarketMeta, Market, MarketMeta, Pool, Pools,
+};
 
 /// Convert to a [`Market`](gmx_core::Market).
 pub struct AsMarket<'a, 'info> {
@@ -172,16 +174,11 @@ impl<'a, 'info> AsMarket<'a, 'info> {
     }
 
     fn just_passed_in_seconds(&mut self, clock: ClockKind) -> gmx_core::Result<u64> {
-        let current = Clock::get().map_err(Error::from)?.unix_timestamp;
         let last = self
             .clocks
             .get_mut(clock)
             .ok_or(gmx_core::Error::MissingClockKind(clock))?;
-        let duration = current.saturating_sub(*last);
-        if duration > 0 {
-            *last = current;
-        }
-        Ok(duration as u64)
+        AsClock::from(last).just_passed_in_seconds()
     }
 }
 
