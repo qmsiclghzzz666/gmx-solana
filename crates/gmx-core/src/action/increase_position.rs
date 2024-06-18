@@ -2,7 +2,7 @@ use num_traits::{CheckedAdd, CheckedNeg, Signed, Zero};
 use std::fmt;
 
 use crate::{
-    market::{BaseMarketExt, PerpMarketExt},
+    market::{BaseMarketExt, PerpMarketExt, PositionImpactMarketExt},
     num::Unsigned,
     params::fee::PositionFees,
     position::{CollateralDelta, Position, PositionExt},

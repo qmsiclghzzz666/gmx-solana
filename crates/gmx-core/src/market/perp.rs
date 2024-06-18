@@ -1,37 +1,32 @@
-use num_traits::{CheckedSub, Zero};
-
 use crate::{
     action::{
-        distribute_position_impact::DistributePositionImpact,
         update_borrowing_state::UpdateBorrowingState, update_funding_state::UpdateFundingState,
         Prices,
     },
     params::{
         fee::{BorrowingFeeParams, FundingFeeParams},
-        position::PositionImpactDistributionParams,
-        FeeParams, PositionParams, PriceImpactParams,
+        FeeParams, PositionParams,
     },
-    Balance, BalanceExt, ClockKind, Pool, PoolExt,
+    BalanceExt, PoolExt,
 };
 
-use super::{BaseMarketExt, SwapMarket};
+use super::{BaseMarketExt, PositionImpactMarket, SwapMarket};
 
 /// A perpetual market.
-pub trait PerpMarket<const DECIMALS: u8>: SwapMarket<DECIMALS> {
+pub trait PerpMarket<const DECIMALS: u8>:
+    SwapMarket<DECIMALS> + PositionImpactMarket<DECIMALS>
+{
     /// Get the just passed time in seconds for the given kind of clock.
-    fn just_passed_in_seconds(&mut self, clock: ClockKind) -> crate::Result<u64>;
+    fn just_passed_in_seconds_for_borrowing(&mut self) -> crate::Result<u64>;
+
+    /// Get the just passed time in seconds for the given kind of clock.
+    fn just_passed_in_seconds_for_funding(&mut self) -> crate::Result<u64>;
 
     /// Get funding factor per second.
     fn funding_factor_per_second(&self) -> &Self::Signed;
 
     /// Get funding factor per second mutably.
     fn funding_factor_per_second_mut(&mut self) -> &mut Self::Signed;
-
-    /// Get position impact pool.
-    fn position_impact_pool(&self) -> crate::Result<&Self::Pool>;
-
-    /// Get position impact pool mutably.
-    fn position_impact_pool_mut(&mut self) -> crate::Result<&mut Self::Pool>;
 
     /// Get mutable reference of open interest pool.
     fn open_interest_pool_mut(&mut self, is_long: bool) -> crate::Result<&mut Self::Pool>;
@@ -62,11 +57,6 @@ pub trait PerpMarket<const DECIMALS: u8>: SwapMarket<DECIMALS> {
         is_long: bool,
     ) -> crate::Result<&mut Self::Pool>;
 
-    /// Get position impact distribution params.
-    fn position_impact_distribution_params(
-        &self,
-    ) -> crate::Result<PositionImpactDistributionParams<Self::Num>>;
-
     /// Get borrowing fee params.
     fn borrowing_fee_params(&self) -> crate::Result<BorrowingFeeParams<Self::Num>>;
 
@@ -79,9 +69,6 @@ pub trait PerpMarket<const DECIMALS: u8>: SwapMarket<DECIMALS> {
     /// Get basic position params.
     fn position_params(&self) -> crate::Result<PositionParams<Self::Num>>;
 
-    /// Get the position impact params.
-    fn position_impact_params(&self) -> crate::Result<PriceImpactParams<Self::Num>>;
-
     /// Get the order fee params.
     fn order_fee_params(&self) -> crate::Result<FeeParams<Self::Num>>;
 
@@ -93,10 +80,6 @@ pub trait PerpMarket<const DECIMALS: u8>: SwapMarket<DECIMALS> {
 }
 
 impl<'a, M: PerpMarket<DECIMALS>, const DECIMALS: u8> PerpMarket<DECIMALS> for &'a mut M {
-    fn just_passed_in_seconds(&mut self, clock: ClockKind) -> crate::Result<u64> {
-        (**self).just_passed_in_seconds(clock)
-    }
-
     fn funding_factor_per_second(&self) -> &Self::Signed {
         (**self).funding_factor_per_second()
     }
@@ -114,20 +97,6 @@ impl<'a, M: PerpMarket<DECIMALS>, const DECIMALS: u8> PerpMarket<DECIMALS> for &
         is_long: bool,
     ) -> crate::Result<&mut Self::Pool> {
         (**self).open_interest_in_tokens_pool_mut(is_long)
-    }
-
-    fn position_impact_pool(&self) -> crate::Result<&Self::Pool> {
-        (**self).position_impact_pool()
-    }
-
-    fn position_impact_pool_mut(&mut self) -> crate::Result<&mut Self::Pool> {
-        (**self).position_impact_pool_mut()
-    }
-
-    fn position_impact_distribution_params(
-        &self,
-    ) -> crate::Result<PositionImpactDistributionParams<Self::Num>> {
-        (**self).position_impact_distribution_params()
     }
 
     fn borrowing_fee_params(&self) -> crate::Result<BorrowingFeeParams<Self::Num>> {
@@ -176,10 +145,6 @@ impl<'a, M: PerpMarket<DECIMALS>, const DECIMALS: u8> PerpMarket<DECIMALS> for &
         (**self).position_params()
     }
 
-    fn position_impact_params(&self) -> crate::Result<PriceImpactParams<Self::Num>> {
-        (**self).position_impact_params()
-    }
-
     fn order_fee_params(&self) -> crate::Result<FeeParams<Self::Num>> {
         (**self).order_fee_params()
     }
@@ -191,20 +156,18 @@ impl<'a, M: PerpMarket<DECIMALS>, const DECIMALS: u8> PerpMarket<DECIMALS> for &
     fn max_open_interest(&self, is_long: bool) -> crate::Result<Self::Num> {
         (**self).max_open_interest(is_long)
     }
+
+    fn just_passed_in_seconds_for_borrowing(&mut self) -> crate::Result<u64> {
+        (**self).just_passed_in_seconds_for_borrowing()
+    }
+
+    fn just_passed_in_seconds_for_funding(&mut self) -> crate::Result<u64> {
+        (**self).just_passed_in_seconds_for_funding()
+    }
 }
 
 /// Extension trait of [`PerpMarket`].
 pub trait PerpMarketExt<const DECIMALS: u8>: PerpMarket<DECIMALS> {
-    /// Create a [`DistributePositionImpact`] action.
-    fn distribute_position_impact(
-        &mut self,
-    ) -> crate::Result<DistributePositionImpact<&mut Self, DECIMALS>>
-    where
-        Self: Sized,
-    {
-        Ok(DistributePositionImpact::from(self))
-    }
-
     /// Create a [`UpdateBorrowingState`] action.
     fn update_borrowing(
         &mut self,
@@ -225,55 +188,6 @@ pub trait PerpMarketExt<const DECIMALS: u8>: PerpMarket<DECIMALS> {
         Self: Sized,
     {
         UpdateFundingState::try_new(self, prices)
-    }
-
-    /// Apply delta to the position impact pool.
-    fn apply_delta_to_position_impact_pool(&mut self, delta: &Self::Signed) -> crate::Result<()> {
-        self.position_impact_pool_mut()?
-            .apply_delta_to_long_amount(delta)
-    }
-
-    /// Get position impact pool amount.
-    #[inline]
-    fn position_impact_pool_amount(&self) -> crate::Result<Self::Num> {
-        self.position_impact_pool()?.long_amount()
-    }
-
-    /// Get pending position impact pool distribution amount.
-    fn pending_position_impact_pool_distribution_amount(
-        &self,
-        duration_in_secs: u64,
-    ) -> crate::Result<(Self::Num, Self::Num)> {
-        use crate::utils;
-        use num_traits::FromPrimitive;
-
-        let current_amount = self.position_impact_pool_amount()?;
-        let params = self.position_impact_distribution_params()?;
-        if params.distribute_factor().is_zero()
-            || current_amount <= *params.min_position_impact_pool_amount()
-        {
-            return Ok((Zero::zero(), current_amount));
-        }
-        let max_distribution_amount = current_amount
-            .checked_sub(params.min_position_impact_pool_amount())
-            .ok_or(crate::Error::Computation(
-                "calculating max distribution amount",
-            ))?;
-
-        let duration_value = Self::Num::from_u64(duration_in_secs).ok_or(crate::Error::Convert)?;
-        let mut distribution_amount =
-            utils::apply_factor(&duration_value, params.distribute_factor())
-                .ok_or(crate::Error::Computation("calculating distribution amount"))?;
-        if distribution_amount > max_distribution_amount {
-            distribution_amount = max_distribution_amount;
-        }
-        let next_amount =
-            current_amount
-                .checked_sub(&distribution_amount)
-                .ok_or(crate::Error::Computation(
-                    "calculating next position impact amount",
-                ))?;
-        Ok((distribution_amount, next_amount))
     }
 
     /// Get current borrowing factor.

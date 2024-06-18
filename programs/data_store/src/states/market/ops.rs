@@ -170,6 +170,19 @@ impl<'a, 'info> AsMarket<'a, 'info> {
             .get_mut(kind)
             .ok_or(gmx_core::Error::MissingPoolKind(kind))
     }
+
+    fn just_passed_in_seconds(&mut self, clock: ClockKind) -> gmx_core::Result<u64> {
+        let current = Clock::get().map_err(Error::from)?.unix_timestamp;
+        let last = self
+            .clocks
+            .get_mut(clock)
+            .ok_or(gmx_core::Error::MissingClockKind(clock))?;
+        let duration = current.saturating_sub(*last);
+        if duration > 0 {
+            *last = current;
+        }
+        Ok(duration as u64)
+    }
 }
 
 impl<'a, 'info> gmx_core::BaseMarket<{ constants::MARKET_DECIMALS }> for AsMarket<'a, 'info> {
@@ -274,6 +287,39 @@ impl<'a, 'info> gmx_core::SwapMarket<{ constants::MARKET_DECIMALS }> for AsMarke
     }
 }
 
+impl<'a, 'info> gmx_core::PositionImpactMarket<{ constants::MARKET_DECIMALS }>
+    for AsMarket<'a, 'info>
+{
+    fn position_impact_pool(&self) -> gmx_core::Result<&Self::Pool> {
+        self.get_pool(PoolKind::PositionImpact)
+    }
+
+    fn position_impact_pool_mut(&mut self) -> gmx_core::Result<&mut Self::Pool> {
+        self.get_pool_mut(PoolKind::PositionImpact)
+    }
+
+    fn just_passed_in_seconds_for_position_impact_distribution(&mut self) -> gmx_core::Result<u64> {
+        self.just_passed_in_seconds(ClockKind::PriceImpactDistribution)
+    }
+
+    fn position_impact_params(&self) -> gmx_core::Result<PriceImpactParams<Self::Num>> {
+        PriceImpactParams::builder()
+            .with_exponent(self.config.position_impact_exponent)
+            .with_positive_factor(self.config.position_impact_positive_factor)
+            .with_negative_factor(self.config.position_impact_negative_factor)
+            .build()
+    }
+
+    fn position_impact_distribution_params(
+        &self,
+    ) -> gmx_core::Result<PositionImpactDistributionParams<Self::Num>> {
+        Ok(PositionImpactDistributionParams::builder()
+            .distribute_factor(self.config.position_impact_distribute_factor)
+            .min_position_impact_pool_amount(self.config.min_position_impact_pool_amount)
+            .build())
+    }
+}
+
 impl<'a, 'info> gmx_core::LiquidityMarket<{ constants::MARKET_DECIMALS }> for AsMarket<'a, 'info> {
     fn total_supply(&self) -> Self::Num {
         self.mint.supply.into()
@@ -323,19 +369,6 @@ impl<'a, 'info> gmx_core::LiquidityMarket<{ constants::MARKET_DECIMALS }> for As
 }
 
 impl<'a, 'info> gmx_core::PerpMarket<{ constants::MARKET_DECIMALS }> for AsMarket<'a, 'info> {
-    fn just_passed_in_seconds(&mut self, clock: ClockKind) -> gmx_core::Result<u64> {
-        let current = Clock::get().map_err(Error::from)?.unix_timestamp;
-        let last = self
-            .clocks
-            .get_mut(clock)
-            .ok_or(gmx_core::Error::MissingClockKind(clock))?;
-        let duration = current.saturating_sub(*last);
-        if duration > 0 {
-            *last = current;
-        }
-        Ok(duration as u64)
-    }
-
     fn funding_amount_per_size_adjustment(&self) -> Self::Num {
         constants::FUNDING_AMOUNT_PER_SIZE_ADJUSTMENT
     }
@@ -352,28 +385,11 @@ impl<'a, 'info> gmx_core::PerpMarket<{ constants::MARKET_DECIMALS }> for AsMarke
         ))
     }
 
-    fn position_impact_params(&self) -> gmx_core::Result<PriceImpactParams<Self::Num>> {
-        PriceImpactParams::builder()
-            .with_exponent(self.config.position_impact_exponent)
-            .with_positive_factor(self.config.position_impact_positive_factor)
-            .with_negative_factor(self.config.position_impact_negative_factor)
-            .build()
-    }
-
     fn order_fee_params(&self) -> gmx_core::Result<FeeParams<Self::Num>> {
         Ok(FeeParams::builder()
             .with_fee_receiver_factor(self.config.order_fee_receiver_factor)
             .with_positive_impact_fee_factor(self.config.order_fee_factor_for_positive_impact)
             .with_negative_impact_fee_factor(self.config.order_fee_factor_for_negative_impact)
-            .build())
-    }
-
-    fn position_impact_distribution_params(
-        &self,
-    ) -> gmx_core::Result<PositionImpactDistributionParams<Self::Num>> {
-        Ok(PositionImpactDistributionParams::builder()
-            .distribute_factor(self.config.position_impact_distribute_factor)
-            .min_position_impact_pool_amount(self.config.min_position_impact_pool_amount)
             .build())
     }
 
@@ -418,14 +434,6 @@ impl<'a, 'info> gmx_core::PerpMarket<{ constants::MARKET_DECIMALS }> for AsMarke
         } else {
             Ok(self.config.max_open_interest_for_short)
         }
-    }
-
-    fn position_impact_pool(&self) -> gmx_core::Result<&Self::Pool> {
-        self.get_pool(PoolKind::PositionImpact)
-    }
-
-    fn position_impact_pool_mut(&mut self) -> gmx_core::Result<&mut Self::Pool> {
-        self.get_pool_mut(PoolKind::PositionImpact)
     }
 
     fn open_interest_pool_mut(&mut self, is_long: bool) -> gmx_core::Result<&mut Self::Pool> {
@@ -496,6 +504,14 @@ impl<'a, 'info> gmx_core::PerpMarket<{ constants::MARKET_DECIMALS }> for AsMarke
         } else {
             PoolKind::ClaimableFundingAmountPerSizeForShort
         })
+    }
+
+    fn just_passed_in_seconds_for_borrowing(&mut self) -> gmx_core::Result<u64> {
+        self.just_passed_in_seconds(ClockKind::Borrowing)
+    }
+
+    fn just_passed_in_seconds_for_funding(&mut self) -> gmx_core::Result<u64> {
+        self.just_passed_in_seconds(ClockKind::Funding)
     }
 }
 

@@ -7,6 +7,9 @@ pub mod liquidity;
 /// Swap Market.
 pub mod swap;
 
+/// Position Impact Market.
+pub mod position_impact;
+
 /// Perpetual Market.
 pub mod perp;
 
@@ -14,6 +17,7 @@ pub use self::{
     base::{BaseMarket, BaseMarketExt, PnlFactorKind},
     liquidity::{LiquidityMarket, LiquidityMarketExt},
     perp::{PerpMarket, PerpMarketExt},
+    position_impact::{PositionImpactMarket, PositionImpactMarketExt},
     swap::{SwapMarket, SwapMarketExt},
 };
 

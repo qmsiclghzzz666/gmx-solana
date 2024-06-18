@@ -3,7 +3,9 @@ use std::{collections::HashMap, fmt, time::Instant};
 use crate::{
     clock::ClockKind,
     fixed::FixedPointOps,
-    market::{BaseMarket, LiquidityMarket, PerpMarket, PnlFactorKind, SwapMarket},
+    market::{
+        BaseMarket, LiquidityMarket, PerpMarket, PnlFactorKind, PositionImpactMarket, SwapMarket,
+    },
     num::{MulDiv, Num, Unsigned, UnsignedAbs},
     params::{
         fee::{BorrowingFeeParams, FundingFeeParams},
@@ -276,6 +278,20 @@ impl Default for TestMarket<u128, 20> {
     }
 }
 
+impl<T, const DECIMALS: u8> TestMarket<T, DECIMALS>
+where
+    T: CheckedSub + fmt::Display + FixedPointOps<DECIMALS>,
+    T::Signed: Num + std::fmt::Debug,
+{
+    fn just_passed_in_seconds(&mut self, clock: ClockKind) -> crate::Result<u64> {
+        let now = Instant::now();
+        let clock = self.clocks.entry(clock).or_insert(now);
+        let duration = now.saturating_duration_since(*clock);
+        *clock = now;
+        Ok(duration.as_secs())
+    }
+}
+
 impl<T, const DECIMALS: u8> BaseMarket<DECIMALS> for TestMarket<T, DECIMALS>
 where
     T: CheckedSub + fmt::Display + FixedPointOps<DECIMALS>,
@@ -392,33 +408,45 @@ where
     }
 }
 
-impl<T, const DECIMALS: u8> PerpMarket<DECIMALS> for TestMarket<T, DECIMALS>
+impl<T, const DECIMALS: u8> PositionImpactMarket<DECIMALS> for TestMarket<T, DECIMALS>
 where
     T: CheckedSub + fmt::Display + FixedPointOps<DECIMALS>,
     T::Signed: Num + std::fmt::Debug,
 {
-    fn just_passed_in_seconds(&mut self, clock: ClockKind) -> crate::Result<u64> {
-        let now = Instant::now();
-        let clock = self.clocks.entry(clock).or_insert(now);
-        let duration = now.saturating_duration_since(*clock);
-        *clock = now;
-        Ok(duration.as_secs())
-    }
-
-    fn funding_factor_per_second(&self) -> &Self::Signed {
-        &self.funding_factor_per_second
-    }
-
-    fn funding_factor_per_second_mut(&mut self) -> &mut Self::Signed {
-        &mut self.funding_factor_per_second
-    }
-
     fn position_impact_pool(&self) -> crate::Result<&Self::Pool> {
         Ok(&self.position_impact)
     }
 
     fn position_impact_pool_mut(&mut self) -> crate::Result<&mut Self::Pool> {
         Ok(&mut self.position_impact)
+    }
+
+    fn just_passed_in_seconds_for_position_impact_distribution(&mut self) -> crate::Result<u64> {
+        self.just_passed_in_seconds(ClockKind::PriceImpactDistribution)
+    }
+
+    fn position_impact_params(&self) -> crate::Result<PriceImpactParams<Self::Num>> {
+        Ok(self.position_impact_params.clone())
+    }
+
+    fn position_impact_distribution_params(
+        &self,
+    ) -> crate::Result<PositionImpactDistributionParams<Self::Num>> {
+        Ok(self.position_impact_distribution_params.clone())
+    }
+}
+
+impl<T, const DECIMALS: u8> PerpMarket<DECIMALS> for TestMarket<T, DECIMALS>
+where
+    T: CheckedSub + fmt::Display + FixedPointOps<DECIMALS>,
+    T::Signed: Num + std::fmt::Debug,
+{
+    fn funding_factor_per_second(&self) -> &Self::Signed {
+        &self.funding_factor_per_second
+    }
+
+    fn funding_factor_per_second_mut(&mut self) -> &mut Self::Signed {
+        &mut self.funding_factor_per_second
     }
 
     fn open_interest_pool_mut(&mut self, is_long: bool) -> crate::Result<&mut Self::Pool> {
@@ -438,12 +466,6 @@ where
         } else {
             Ok(&mut self.open_interest_in_tokens.1)
         }
-    }
-
-    fn position_impact_distribution_params(
-        &self,
-    ) -> crate::Result<PositionImpactDistributionParams<Self::Num>> {
-        Ok(self.position_impact_distribution_params.clone())
     }
 
     fn borrowing_fee_params(&self) -> crate::Result<BorrowingFeeParams<Self::Num>> {
@@ -508,10 +530,6 @@ where
         Ok(self.position_params.clone())
     }
 
-    fn position_impact_params(&self) -> crate::Result<PriceImpactParams<Self::Num>> {
-        Ok(self.position_impact_params.clone())
-    }
-
     fn order_fee_params(&self) -> crate::Result<FeeParams<Self::Num>> {
         Ok(self.order_fee_params.clone())
     }
@@ -522,6 +540,14 @@ where
 
     fn max_open_interest(&self, _is_long: bool) -> crate::Result<Self::Num> {
         Ok(self.max_open_interest.clone())
+    }
+
+    fn just_passed_in_seconds_for_borrowing(&mut self) -> crate::Result<u64> {
+        self.just_passed_in_seconds(ClockKind::Borrowing)
+    }
+
+    fn just_passed_in_seconds_for_funding(&mut self) -> crate::Result<u64> {
+        self.just_passed_in_seconds(ClockKind::Funding)
     }
 }
 

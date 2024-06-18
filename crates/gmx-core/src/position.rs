@@ -8,7 +8,9 @@ use crate::{
         update_funding_state::unpack_to_funding_amount, Prices,
     },
     fixed::FixedPointOps,
-    market::{BaseMarketExt, PerpMarket, PerpMarketExt},
+    market::{
+        BaseMarketExt, PerpMarket, PerpMarketExt, PositionImpactMarket, PositionImpactMarketExt,
+    },
     num::{MulDiv, Num, Unsigned, UnsignedAbs},
     params::fee::{FundingFees, PositionFees},
     Balance, BalanceExt, Pool,

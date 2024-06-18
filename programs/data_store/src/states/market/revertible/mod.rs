@@ -1,7 +1,7 @@
 /// Revertible Market.
 pub mod market;
 
-/// Swap Markets.
+/// Revertible Swap Market.
 pub mod swap_market;
 
 /// Balance.

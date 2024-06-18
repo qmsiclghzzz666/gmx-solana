@@ -5,7 +5,7 @@ use crate::{
     market::{BaseMarket, BaseMarketExt, PerpMarket, PerpMarketExt},
     num::{MulDiv, Unsigned},
     params::fee::FundingRateChangeType,
-    Balance, BalanceExt, ClockKind,
+    Balance, BalanceExt,
 };
 
 use super::Prices;
@@ -31,7 +31,7 @@ impl<M: PerpMarket<DECIMALS>, const DECIMALS: u8> UpdateFundingState<M, DECIMALS
     pub fn execute(mut self) -> crate::Result<UpdateFundingReport<M::Num>> {
         const MATRIX: [(bool, bool); 4] =
             [(true, true), (true, false), (false, true), (false, false)];
-        let duration_in_seconds = self.market.just_passed_in_seconds(ClockKind::Funding)?;
+        let duration_in_seconds = self.market.just_passed_in_seconds_for_funding()?;
         let report = self.next_funding_amount_per_size(duration_in_seconds)?;
         for (is_long, is_long_collateral) in MATRIX {
             self.market.apply_delta_to_funding_amount_per_size(

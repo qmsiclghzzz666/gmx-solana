@@ -3,7 +3,7 @@ use num_traits::{CheckedAdd, Zero};
 use crate::{
     market::{BaseMarket, BaseMarketExt, PerpMarket, PerpMarketExt},
     num::Unsigned,
-    Balance, ClockKind, PoolExt,
+    Balance, PoolExt,
 };
 
 use super::Prices;
@@ -119,7 +119,7 @@ impl<M: PerpMarket<DECIMALS>, const DECIMALS: u8> UpdateBorrowingState<M, DECIMA
 
     /// Execute.
     pub fn execute(mut self) -> crate::Result<UpdateBorrowingReport<M::Num>> {
-        let duration_in_seconds = self.market.just_passed_in_seconds(ClockKind::Borrowing)?;
+        let duration_in_seconds = self.market.just_passed_in_seconds_for_borrowing()?;
         let next_cumulative_borrowing_factor_for_long =
             self.execute_one_side(true, duration_in_seconds)?;
         let next_cumulative_borrowing_factor_for_short =

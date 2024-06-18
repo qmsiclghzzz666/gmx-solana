@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token, TokenAccount};
-use gmx_core::{LiquidityMarketExt, PerpMarketExt};
+use gmx_core::{LiquidityMarketExt, PositionImpactMarketExt};
 
 use crate::{
     constants,
