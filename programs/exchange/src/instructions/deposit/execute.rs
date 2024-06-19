@@ -9,32 +9,6 @@ use data_store::{
 
 use crate::{utils::ControllerSeeds, ExchangeError};
 
-/// Execute a deposit.
-pub fn execute_deposit<'info>(
-    ctx: Context<'_, '_, 'info, 'info, ExecuteDeposit<'info>>,
-    execution_fee: u64,
-) -> Result<()> {
-    let store = ctx.accounts.store.key();
-    let controller = ControllerSeeds::find(&store);
-    let deposit = &ctx.accounts.deposit;
-    let refund = deposit
-        .get_lamports()
-        .checked_sub(super::MAX_DEPOSIT_EXECUTION_FEE.min(execution_fee))
-        .ok_or(ExchangeError::NotEnoughExecutionFee)?;
-    ctx.accounts.with_oracle_prices(
-        deposit.dynamic.tokens_with_feed.tokens.clone(),
-        ctx.remaining_accounts,
-        &controller.as_seeds(),
-        |accounts, remaining_accounts| accounts.execute(&controller, remaining_accounts),
-    )?;
-    data_store::cpi::remove_deposit(
-        ctx.accounts
-            .remove_deposit_ctx()
-            .with_signer(&[&controller.as_seeds()]),
-        refund,
-    )
-}
-
 #[derive(Accounts)]
 pub struct ExecuteDeposit<'info> {
     #[account(mut)]
@@ -72,7 +46,64 @@ pub struct ExecuteDeposit<'info> {
     pub system_program: Program<'info, System>,
 }
 
+/// Execute a deposit.
+pub fn execute_deposit<'info>(
+    ctx: Context<'_, '_, 'info, 'info, ExecuteDeposit<'info>>,
+    execution_fee: u64,
+) -> Result<()> {
+    ctx.accounts.try_dequeue()?;
+
+    let store = ctx.accounts.store.key();
+    let controller = ControllerSeeds::find(&store);
+
+    // Try to execute the deposit.
+    if ctx.accounts.is_executable()? {
+        let deposit = &ctx.accounts.deposit;
+        ctx.accounts.with_oracle_prices(
+            deposit.dynamic.tokens_with_feed.tokens.clone(),
+            ctx.remaining_accounts,
+            &controller.as_seeds(),
+            |accounts, remaining_accounts| accounts.execute(&controller, remaining_accounts),
+        )?;
+    }
+
+    ctx.accounts.try_remove(&controller, execution_fee)?;
+    Ok(())
+}
+
 impl<'info> ExecuteDeposit<'info> {
+    fn is_executable(&self) -> Result<bool> {
+        Ok(!crate::utils::must_be_uninitialized(&self.receiver))
+    }
+
+    fn try_removable(&self) -> Result<bool> {
+        // TODO: check whether the token accounts have been initialized if there are any input amounts in the deposit.
+        Ok(true)
+    }
+
+    fn try_dequeue(&self) -> Result<()> {
+        Ok(())
+    }
+
+    fn try_remove(&self, controller: &ControllerSeeds, execution_fee: u64) -> Result<()> {
+        if self.try_removable()? {
+            let refund = self
+                .deposit
+                .get_lamports()
+                .checked_sub(super::MAX_DEPOSIT_EXECUTION_FEE.min(execution_fee))
+                .ok_or(ExchangeError::NotEnoughExecutionFee)?;
+            data_store::cpi::remove_deposit(
+                self.remove_deposit_ctx()
+                    .with_signer(&[&controller.as_seeds()]),
+                refund,
+            )?;
+        } else {
+            // TODO: emit an event.
+            msg!("the deposit cannot be removed automatically, should remove by the user manually");
+        }
+        Ok(())
+    }
+
     fn remove_deposit_ctx(&self) -> CpiContext<'_, '_, '_, 'info, RemoveDeposit<'info>> {
         CpiContext::new(
             self.data_store_program.to_account_info(),
@@ -83,8 +114,6 @@ impl<'info> ExecuteDeposit<'info> {
                 deposit: self.deposit.to_account_info(),
                 user: self.user.to_account_info(),
                 system_program: self.system_program.to_account_info(),
-                initial_long_token: None,
-                initial_short_token: None,
                 token_program: self.token_program.to_account_info(),
             },
         )
@@ -156,6 +185,7 @@ impl<'info> ExecuteDeposit<'info> {
                 .with_signer(&[&controller_seeds.as_seeds()])
                 .with_remaining_accounts(remaining_accounts.to_vec()),
         )?;
+        self.deposit.reload()?;
         Ok(())
     }
 }

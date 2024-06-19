@@ -128,14 +128,6 @@ impl<'info> CancelDeposit<'info> {
                 store: self.store.to_account_info(),
                 deposit: self.deposit.to_account_info(),
                 user: self.user.to_account_info(),
-                initial_long_token: self
-                    .initial_long_token
-                    .as_ref()
-                    .map(|a| a.to_account_info()),
-                initial_short_token: self
-                    .initial_short_token
-                    .as_ref()
-                    .map(|a| a.to_account_info()),
                 system_program: self.system_program.to_account_info(),
                 token_program: self.token_program.to_account_info(),
             },
