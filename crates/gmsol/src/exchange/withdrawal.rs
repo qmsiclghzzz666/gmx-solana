@@ -269,8 +269,6 @@ pub struct CancelWithdrawalBuilder<'a, C> {
     client: &'a crate::Client<C>,
     store: Pubkey,
     withdrawal: Pubkey,
-    cancel_for_user: Option<Pubkey>,
-    execution_fee: u64,
     hint: Option<CancelWithdrawalHint>,
 }
 
@@ -299,38 +297,14 @@ where
             client,
             store: *store,
             withdrawal: *withdrawal,
-            cancel_for_user: None,
-            execution_fee: 0,
             hint: None,
         }
-    }
-
-    /// Cancel for the given user.
-    pub fn cancel_for_user(&mut self, user: &Pubkey) -> &mut Self {
-        self.cancel_for_user = Some(*user);
-        self
-    }
-
-    /// Set execution fee to used
-    pub fn execution_fee(&mut self, fee: u64) -> &mut Self {
-        self.execution_fee = fee;
-        self
     }
 
     /// Set hint with the given withdrawal.
     pub fn hint(&mut self, withdrawal: &Withdrawal) -> &mut Self {
         self.hint = Some(withdrawal.into());
         self
-    }
-
-    fn get_user_and_authority(&self) -> (Pubkey, Pubkey) {
-        match self.cancel_for_user {
-            Some(user) => (user, self.client.payer()),
-            None => (
-                self.client.payer(),
-                self.client.controller_address(&self.store),
-            ),
-        }
     }
 
     async fn get_or_fetch_withdrawal_hint(&self) -> crate::Result<CancelWithdrawalHint> {
@@ -346,28 +320,26 @@ where
 
     /// Build a [`RequestBuilder`] for `cancel_withdrawal` instruction.
     pub async fn build(&self) -> crate::Result<RequestBuilder<'a, C>> {
-        let (user, authority) = self.get_user_and_authority();
+        let user = self.client.payer();
         let hint = self.get_or_fetch_withdrawal_hint().await?;
         Ok(self
             .client
             .exchange()
             .request()
             .accounts(accounts::CancelWithdrawal {
-                authority,
-                store: self.store,
-                data_store_program: self.client.data_store_program_id(),
-                withdrawal: self.withdrawal,
                 user,
+                controller: self.client.controller_address(&self.store),
+                store: self.store,
+                withdrawal: self.withdrawal,
                 market_token: hint.market_token_account,
                 market_token_withdrawal_vault: self
                     .client
                     .find_market_vault_address(&self.store, &hint.market_token),
                 token_program: anchor_spl::token::ID,
                 system_program: system_program::ID,
+                data_store_program: self.client.data_store_program_id(),
             })
-            .args(instruction::CancelWithdrawal {
-                execution_fee: self.execution_fee,
-            }))
+            .args(instruction::CancelWithdrawal {}))
     }
 }
 
@@ -389,6 +361,7 @@ pub struct ExecuteWithdrawalBuilder<'a, C> {
 pub struct ExecuteWithdrawalHint {
     market_token: Pubkey,
     user: Pubkey,
+    market_token_account: Pubkey,
     final_long_token_receiver: Pubkey,
     final_short_token_receiver: Pubkey,
     final_long_token: Pubkey,
@@ -404,6 +377,7 @@ impl<'a> From<&'a Withdrawal> for ExecuteWithdrawalHint {
         Self {
             market_token: withdrawal.fixed.tokens.market_token,
             user: withdrawal.fixed.user,
+            market_token_account: withdrawal.fixed.market_token_account,
             final_long_token: withdrawal.fixed.tokens.final_long_token,
             final_short_token: withdrawal.fixed.tokens.final_short_token,
             final_long_token_receiver: withdrawal.fixed.receivers.final_long_token_receiver,
@@ -540,6 +514,7 @@ where
                 market_token_withdrawal_vault: self
                     .client
                     .find_market_vault_address(&self.store, &hint.market_token),
+                market_token_account: hint.market_token_account,
                 final_long_token_receiver: hint.final_long_token_receiver,
                 final_short_token_receiver: hint.final_short_token_receiver,
                 final_long_token_vault: self

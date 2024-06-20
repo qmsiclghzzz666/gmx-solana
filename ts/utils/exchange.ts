@@ -247,7 +247,8 @@ export const makeExecuteDepositInstruction = async ({
         const provider = providerMapper(idx);
         return getFeedAccountMeta(provider, feed);
     });
-    const swapPathMarkets = [...longSwapPath, ...shortSwapPath].map(mint => {
+    const uniqueMarkets = new Set([...longSwapPath, ...shortSwapPath]);
+    const swapPathMarkets = [...uniqueMarkets.values()].filter(mint => !mint.equals(marketToken)).map(mint => {
         return {
             pubkey: createMarketPDA(store, mint)[0],
             isSigner: false,
@@ -346,8 +347,8 @@ export const makeCancelWithdrawalInstruction = async ({
             toMarketTokenAccount: withdrawal.fixed.marketTokenAccount,
         }
     });
-    return await exchange.methods.cancelWithdrawal(toBN(options?.executionFee ?? 0)).accounts({
-        authority,
+    if (!authority.equals(user)) throw Error("invalid authority, expecting the creator of the withdrawal");
+    return await exchange.methods.cancelWithdrawal().accounts({
         store,
         withdrawal,
         user,
@@ -361,6 +362,7 @@ export const invokeCancelWithdrawal = makeInvoke(makeCancelWithdrawalInstruction
 export interface WithdrawalHint {
     user: PublicKey,
     marketTokenMint: PublicKey,
+    marketTokenAccount: PublicKey,
     finalLongTokenReceiver: PublicKey,
     finalShortTokenReceiver: PublicKey,
     finalLongTokenMint: PublicKey,
@@ -390,6 +392,7 @@ const fetchWithdrawalHint = async (dataStore: DataStoreProgram, withdrawal: Publ
         return {
             user: withdrawal.fixed.user,
             marketTokenMint: withdrawal.fixed.tokens.marketToken,
+            marketTokenAccount: withdrawal.fixed.marketTokenAccount,
             finalLongTokenMint: withdrawal.fixed.tokens.finalLongToken,
             finalShortTokenMint: withdrawal.fixed.tokens.finalShortToken,
             finalLongTokenReceiver: withdrawal.fixed.receivers.finalLongTokenReceiver,
@@ -415,6 +418,7 @@ export const makeExecuteWithdrawalInstruction = async ({
     const {
         user,
         marketTokenMint,
+        marketTokenAccount,
         finalLongTokenReceiver,
         finalShortTokenReceiver,
         finalLongTokenMint,
@@ -452,6 +456,7 @@ export const makeExecuteWithdrawalInstruction = async ({
         market: createMarketPDA(store, marketTokenMint)[0],
         marketTokenMint,
         marketTokenWithdrawalVault: createMarketVaultPDA(store, marketTokenMint)[0],
+        marketTokenAccount,
         finalLongTokenReceiver,
         finalShortTokenReceiver,
         finalLongTokenVault: createMarketVaultPDA(store, finalLongTokenMint)[0],

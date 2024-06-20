@@ -6,7 +6,10 @@ use anchor_client::{
     RequestBuilder,
 };
 use anchor_spl::associated_token::get_associated_token_address;
-use data_store::states::{common::TokensWithFeed, Deposit, NonceBytes, Pyth};
+use data_store::states::{
+    common::{SwapParams, TokensWithFeed},
+    Deposit, NonceBytes, Pyth,
+};
 use exchange::{accounts, instruction, instructions::CreateDepositParams};
 
 use crate::{
@@ -457,8 +460,7 @@ pub struct ExecuteDepositHint {
     market_token_mint: Pubkey,
     /// Feeds.
     pub feeds: TokensWithFeed,
-    long_swap_tokens: Vec<Pubkey>,
-    short_swap_tokens: Vec<Pubkey>,
+    swap: SwapParams,
     initial_long_token_account: Option<Pubkey>,
     initial_short_token_account: Option<Pubkey>,
     initial_long_token: Option<Pubkey>,
@@ -472,8 +474,7 @@ impl<'a> From<&'a Deposit> for ExecuteDepositHint {
             receiver: deposit.fixed.receivers.receiver,
             market_token_mint: deposit.fixed.tokens.market_token,
             feeds: deposit.dynamic.tokens_with_feed.clone(),
-            long_swap_tokens: deposit.dynamic.swap_params.long_token_swap_path.clone(),
-            short_swap_tokens: deposit.dynamic.swap_params.short_token_swap_path.clone(),
+            swap: deposit.dynamic.swap_params.clone(),
             initial_long_token: deposit.fixed.tokens.initial_long_token,
             initial_short_token: deposit.fixed.tokens.initial_short_token,
             initial_long_token_account: deposit.fixed.senders.initial_long_token_account,
@@ -577,9 +578,8 @@ where
             .parse(&hint.feeds)
             .collect::<Result<Vec<_>, _>>()?;
         let markets = hint
-            .long_swap_tokens
-            .iter()
-            .chain(hint.short_swap_tokens.iter())
+            .swap
+            .unique_market_tokens_excluding_current(&hint.market_token_mint)
             .map(|mint| AccountMeta {
                 pubkey: client.find_market_address(store, mint),
                 is_signer: false,
@@ -616,16 +616,16 @@ where
                 initial_long_market: hint.initial_long_token_account.as_ref().map(|_| {
                     client.find_market_address(
                         store,
-                        hint.long_swap_tokens
-                            .first()
+                        hint.swap
+                            .first_market_token(true)
                             .unwrap_or(&hint.market_token_mint),
                     )
                 }),
                 initial_short_market: hint.initial_short_token_account.as_ref().map(|_| {
                     client.find_market_address(
                         store,
-                        hint.short_swap_tokens
-                            .first()
+                        hint.swap
+                            .first_market_token(false)
                             .unwrap_or(&hint.market_token_mint),
                     )
                 }),

@@ -63,9 +63,8 @@ pub mod exchange {
         instructions::create_withdrawal(ctx, nonce, params)
     }
 
-    #[access_control(instructions::only_controller_or_withdrawal_creator(&ctx))]
-    pub fn cancel_withdrawal(ctx: Context<CancelWithdrawal>, execution_fee: u64) -> Result<()> {
-        instructions::cancel_withdrawal(ctx, execution_fee)
+    pub fn cancel_withdrawal(ctx: Context<CancelWithdrawal>) -> Result<()> {
+        instructions::cancel_withdrawal(ctx)
     }
 
     #[access_control(Authenticate::only_order_keeper(&ctx))]

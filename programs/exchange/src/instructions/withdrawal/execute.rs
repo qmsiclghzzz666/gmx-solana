@@ -41,6 +41,7 @@ pub struct ExecuteWithdrawal<'info> {
         constraint = withdrawal.fixed.tokens.market_token == market_token_mint.key() @ ExchangeError::InvalidWithdrawalToExecute,
         constraint = withdrawal.fixed.receivers.final_long_token_receiver == final_long_token_receiver.key() @ ExchangeError::InvalidWithdrawalToExecute,
         constraint = withdrawal.fixed.receivers.final_short_token_receiver == final_short_token_receiver.key() @ ExchangeError::InvalidWithdrawalToExecute,
+        constraint = withdrawal.fixed.market_token_account == market_token_account.key() @ ExchangeError::InvalidWithdrawalToExecute,
     )]
     pub withdrawal: Account<'info, Withdrawal>,
     /// CHECK: only used to invoke CPI and should be checked by it.
@@ -53,6 +54,9 @@ pub struct ExecuteWithdrawal<'info> {
     pub market_token_mint: Account<'info, Mint>,
     #[account(mut, token::mint = market_token_mint)]
     pub market_token_withdrawal_vault: Account<'info, TokenAccount>,
+    /// CHECK: check by `try_removable` method and CPI.
+    #[account(mut)]
+    pub market_token_account: UncheckedAccount<'info>,
     #[account(mut)]
     pub final_long_token_receiver: Account<'info, TokenAccount>,
     #[account(mut)]
