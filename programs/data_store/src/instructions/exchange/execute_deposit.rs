@@ -9,13 +9,11 @@ use crate::{
             swap_market::{SwapDirection, SwapMarkets},
             Revertible, RevertibleLiquidityMarket,
         },
-        Deposit, HasMarketMeta, Market, MarketMeta, Oracle, Seed, Store, ValidateOracleTime,
+        Deposit, HasMarketMeta, Market, Oracle, Seed, Store, ValidateOracleTime,
     },
     utils::internal,
-    DataStoreError, GmxCoreError,
+    GmxCoreError,
 };
-
-use super::utils::swap::unchecked_swap_with_params;
 
 #[derive(Accounts)]
 pub struct ExecuteDeposit<'info> {
@@ -128,7 +126,7 @@ impl<'info> ExecuteDeposit<'info> {
                 .map_err(GmxCoreError::from)?
                 .execute()
                 .map_err(GmxCoreError::from)?;
-            msg!("Deposit pre-execute: {:?}", report);
+            msg!("[Deposit] pre-execute: {:?}", report);
         }
 
         // Swap tokens into the target market.
@@ -159,7 +157,7 @@ impl<'info> ExecuteDeposit<'info> {
                 .and_then(|d| d.execute())
                 .map_err(GmxCoreError::from)?;
             market.validate_market_balances(0, 0)?;
-            msg!("Deposit executed: {:?}", report);
+            msg!("[Deposit] executed: {:?}", report);
         }
 
         // Commit the changes.
@@ -169,121 +167,6 @@ impl<'info> ExecuteDeposit<'info> {
         // Set amounts to zero to make sure it can be removed without transferring out any tokens.
         self.deposit.fixed.tokens.params.initial_long_token_amount = 0;
         self.deposit.fixed.tokens.params.initial_short_token_amount = 0;
-        Ok(())
-    }
-
-    fn validate(&self) -> Result<()> {
-        self.oracle.validate_time(self)?;
-        self.market.load()?.validate(&self.store.key())?;
-        Ok(())
-    }
-
-    fn pre_execute(&mut self) -> Result<()> {
-        let report = self
-            .market
-            .load_mut()?
-            .as_market(&mut self.market_token_mint)
-            .distribute_position_impact()
-            .map_err(GmxCoreError::from)?
-            .execute()
-            .map_err(GmxCoreError::from)?;
-        msg!("{:?}", report);
-        Ok(())
-    }
-
-    fn execute(&mut self, remaining_accounts: &'info [AccountInfo<'info>]) -> Result<()> {
-        let meta = *self.market.load()?.meta();
-        let (long_amount, short_amount) = self.perform_swaps(&meta, remaining_accounts)?;
-        self.perform_deposit(&meta, long_amount, short_amount)?;
-        // Set amounts to zero to make sure it can be removed without transferring out any tokens.
-        self.deposit.fixed.tokens.params.initial_long_token_amount = 0;
-        self.deposit.fixed.tokens.params.initial_short_token_amount = 0;
-        Ok(())
-    }
-
-    fn perform_swaps(
-        &mut self,
-        meta: &MarketMeta,
-        remaining_accounts: &'info [AccountInfo<'info>],
-    ) -> Result<(u64, u64)> {
-        // // Exit must be called to update the external state.
-        // self.market.exit(&crate::ID)?;
-        // CHECK: `exit` has been called above, and `reload` will be called after.
-        let (long_swap_out, short_swap_out) = unchecked_swap_with_params(
-            &self.oracle,
-            &self.deposit.dynamic.swap_params,
-            remaining_accounts,
-            (meta.long_token_mint, meta.short_token_mint),
-            (
-                self.deposit.fixed.tokens.initial_long_token,
-                self.deposit.fixed.tokens.initial_short_token,
-            ),
-            (
-                self.deposit.fixed.tokens.params.initial_long_token_amount,
-                self.deposit.fixed.tokens.params.initial_short_token_amount,
-            ),
-        )?;
-        // // Call `reload` to make sure the state is up-to-date.
-        // self.market.reload()?;
-        Ok((
-            long_swap_out.transfer_to_market(&self.market, true)?,
-            short_swap_out.transfer_to_market(&self.market, true)?,
-        ))
-    }
-
-    fn perform_deposit(
-        &mut self,
-        meta: &MarketMeta,
-        long_amount: u64,
-        short_amount: u64,
-    ) -> Result<()> {
-        let index_token_price = self
-            .oracle
-            .primary
-            .get(&meta.index_token_mint)
-            .ok_or(error!(DataStoreError::InvalidArgument))?
-            .max
-            .to_unit_price();
-        let long_token_price = self
-            .oracle
-            .primary
-            .get(&meta.long_token_mint)
-            .ok_or(error!(DataStoreError::InvalidArgument))?
-            .max
-            .to_unit_price();
-        let short_token_price = self
-            .oracle
-            .primary
-            .get(&meta.short_token_mint)
-            .ok_or(error!(DataStoreError::InvalidArgument))?
-            .max
-            .to_unit_price();
-        let report = {
-            let mut market = self.market.load_mut()?;
-            let mut market = market
-                .as_market(&mut self.market_token_mint)
-                .enable_transfer(self.token_program.to_account_info(), &self.store)
-                .with_receiver(self.receiver.to_account_info());
-            let report = market
-                .deposit(
-                    long_amount.into(),
-                    short_amount.into(),
-                    gmx_core::action::Prices {
-                        index_token_price,
-                        long_token_price,
-                        short_token_price,
-                    },
-                )
-                .map_err(GmxCoreError::from)?
-                .execute()
-                .map_err(|err| {
-                    msg!(&err.to_string());
-                    GmxCoreError::from(err)
-                })?;
-            market.validate_market_balances(0, 0)?;
-            report
-        };
-        msg!("{:?}", report);
         Ok(())
     }
 }

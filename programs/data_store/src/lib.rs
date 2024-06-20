@@ -278,6 +278,10 @@ pub mod data_store {
         instructions::unchecked_market_transfer_out(ctx, amount)
     }
 
+    pub fn get_market_meta(ctx: Context<ReadMarket>) -> Result<MarketMeta> {
+        instructions::get_market_meta(ctx)
+    }
+
     pub fn get_market_config(ctx: Context<ReadMarket>, key: String) -> Result<u128> {
         instructions::get_market_config(ctx, &key)
     }

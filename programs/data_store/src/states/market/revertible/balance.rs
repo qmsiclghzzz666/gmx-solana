@@ -5,8 +5,8 @@ use crate::{states::Market, DataStoreError};
 /// Balance.
 pub struct RevertibleBalance {
     is_pure: bool,
-    long_token_balance: u64,
-    short_token_balance: u64,
+    pub(super) long_token_balance: u64,
+    pub(super) short_token_balance: u64,
 }
 
 impl RevertibleBalance {
@@ -55,16 +55,24 @@ impl RevertibleBalance {
         }
     }
 
+    fn need_to_write(&self, market: &Market) -> bool {
+        market.state.long_token_balance != self.long_token_balance
+            || market.state.short_token_balance != self.short_token_balance
+    }
+
     /// Write to market.
     ///
     /// ## Panic
     /// Panic if the pure falg is not matched.
     pub(crate) fn write_to_market(&self, market: &mut Market) {
+        if !self.need_to_write(market) {
+            return;
+        }
         assert_eq!(market.is_pure(), self.is_pure);
         market.state.long_token_balance = self.long_token_balance;
         market.state.short_token_balance = self.short_token_balance;
         msg!(
-            "{}: {},{}",
+            "[Committed] {}: {},{}",
             market.meta.market_token_mint,
             market.state.long_token_balance,
             market.state.short_token_balance

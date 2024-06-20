@@ -127,11 +127,10 @@ export const makeCancelDepositInstruction = async ({
             initialShortMarket: initialShortToken ? findMarketPDA(deposit.fixed.store, first(deposit.dynamic.swapParams.shortTokenSwapPath) ?? marketToken)[0] : null,
         }
     });
-
-    return await exchange.methods.cancelDeposit(toBN(options?.executionFee ?? 0)).accounts({
-        authority,
+    if (!user.equals(authority)) throw Error("invalid authority, expecting the creator of the deposit");
+    return await exchange.methods.cancelDeposit().accounts({
+        user: authority,
         store,
-        user,
         deposit,
         initialLongToken: fromInitialLongTokenAccount,
         initialShortToken: fromInitialShortTokenAccount,
@@ -147,7 +146,11 @@ export const invokeCancelDeposit = makeInvoke(makeCancelDepositInstruction, ["au
 export interface DepositHint {
     user: PublicKey,
     marketToken: PublicKey,
+    initialLongToken: PublicKey | null,
+    initialShortToken: PublicKey | null,
     toMarketTokenAccount: PublicKey,
+    initialLongTokenAccount: PublicKey | null,
+    initialShortTokenAccount: PublicKey | null,
     feeds: PublicKey[],
     longSwapPath: PublicKey[],
     shortSwapPath: PublicKey[],
@@ -207,6 +210,10 @@ const fetchDepositHint = async (dataStore: DataStoreProgram, deposit: PublicKey)
             feeds: deposit.dynamic.tokensWithFeed.feeds,
             longSwapPath: deposit.dynamic.swapParams.longTokenSwapPath,
             shortSwapPath: deposit.dynamic.swapParams.shortTokenSwapPath,
+            initialLongToken: deposit.fixed.tokens.initialLongToken,
+            initialShortToken: deposit.fixed.tokens.initialShortToken,
+            initialLongTokenAccount: deposit.fixed.senders.initialLongTokenAccount,
+            initialShortTokenAccount: deposit.fixed.senders.initialShortTokenAccount,
             providerMapper: makeProviderMapper(
                 [...deposit.dynamic.tokensWithFeed.providers],
                 deposit.dynamic.tokensWithFeed.nums,
@@ -231,6 +238,10 @@ export const makeExecuteDepositInstruction = async ({
         longSwapPath,
         shortSwapPath,
         providerMapper,
+        initialLongToken,
+        initialShortToken,
+        initialLongTokenAccount,
+        initialShortTokenAccount,
     } = options?.hints?.deposit ?? await fetchDepositHint(dataStore, deposit);
     const feedAccounts = feeds.map((feed, idx) => {
         const provider = providerMapper(idx);
@@ -262,6 +273,12 @@ export const makeExecuteDepositInstruction = async ({
         deposit,
         receiver: toMarketTokenAccount,
         priceProvider: options.priceProvider ?? PYTH_ID,
+        initialLongTokenAccount,
+        initialShortTokenAccount,
+        initialLongTokenVault: initialLongToken ? findMarketVaultPDA(store, initialLongToken)[0] : null,
+        initialShortTokenVault: initialShortToken ? findMarketVaultPDA(store, initialShortToken)[0] : null,
+        initialLongMarket: initialLongTokenAccount ? findMarketPDA(store, longSwapPath[0] ?? marketToken)[0] : null,
+        initialShortMarket: initialShortTokenAccount ? findMarketPDA(store, shortSwapPath[0] ?? marketToken)[0] : null,
     }).remainingAccounts([...feedAccounts, ...swapPathMarkets, ...swapPathMints]).instruction();
 };
 

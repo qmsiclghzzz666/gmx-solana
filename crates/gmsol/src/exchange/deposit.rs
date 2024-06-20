@@ -311,8 +311,6 @@ pub struct CancelDepositBuilder<'a, C> {
     client: &'a crate::Client<C>,
     store: Pubkey,
     deposit: Pubkey,
-    cancel_for_user: Option<Pubkey>,
-    execution_fee: u64,
     hint: Option<CancelDepositHint>,
 }
 
@@ -371,22 +369,8 @@ where
             client,
             store: *store,
             deposit: *deposit,
-            cancel_for_user: None,
-            execution_fee: 0,
             hint: None,
         }
-    }
-
-    /// Cancel for the given user.
-    pub fn cancel_for_user(&mut self, user: &Pubkey) -> &mut Self {
-        self.cancel_for_user = Some(*user);
-        self
-    }
-
-    /// Set execution fee to used
-    pub fn execution_fee(&mut self, fee: u64) -> &mut Self {
-        self.execution_fee = fee;
-        self
     }
 
     /// Set hint with the given deposit.
@@ -396,16 +380,6 @@ where
             &self.client.data_store_program_id(),
         ));
         self
-    }
-
-    fn get_user_and_authority(&self) -> (Pubkey, Pubkey) {
-        match self.cancel_for_user {
-            Some(user) => (user, self.client.payer()),
-            None => (
-                self.client.payer(),
-                self.client.controller_address(&self.store),
-            ),
-        }
     }
 
     async fn get_or_fetch_deposit_info(&self) -> crate::Result<CancelDepositHint> {
@@ -423,13 +397,13 @@ where
 
     /// Build a [`RequestBuilder`] for `cancel_deposit` instruction.
     pub async fn build(&self) -> crate::Result<RequestBuilder<'a, C>> {
-        let (user, authority) = self.get_user_and_authority();
+        let user = self.client.payer();
+        let controller = self.client.controller_address(&self.store);
         let hint = self.get_or_fetch_deposit_info().await?;
         let Self {
             client,
             store,
             deposit,
-            execution_fee,
             ..
         } = self;
         Ok(client
@@ -437,11 +411,11 @@ where
             .request()
             .accounts(crate::utils::fix_optional_account_metas(
                 accounts::CancelDeposit {
-                    authority,
+                    user,
+                    controller,
                     store: *store,
                     data_store_program: client.data_store_program_id(),
                     deposit: *deposit,
-                    user,
                     initial_long_token: hint.initial_long_token_account,
                     initial_short_token: hint.initial_short_token_account,
                     long_token_deposit_vault: hint
@@ -458,9 +432,7 @@ where
                 &exchange::id(),
                 &client.exchange_program_id(),
             ))
-            .args(instruction::CancelDeposit {
-                execution_fee: *execution_fee,
-            }))
+            .args(instruction::CancelDeposit {}))
     }
 }
 
@@ -487,6 +459,10 @@ pub struct ExecuteDepositHint {
     pub feeds: TokensWithFeed,
     long_swap_tokens: Vec<Pubkey>,
     short_swap_tokens: Vec<Pubkey>,
+    initial_long_token_account: Option<Pubkey>,
+    initial_short_token_account: Option<Pubkey>,
+    initial_long_token: Option<Pubkey>,
+    initial_short_token: Option<Pubkey>,
 }
 
 impl<'a> From<&'a Deposit> for ExecuteDepositHint {
@@ -498,6 +474,10 @@ impl<'a> From<&'a Deposit> for ExecuteDepositHint {
             feeds: deposit.dynamic.tokens_with_feed.clone(),
             long_swap_tokens: deposit.dynamic.swap_params.long_token_swap_path.clone(),
             short_swap_tokens: deposit.dynamic.swap_params.short_token_swap_path.clone(),
+            initial_long_token: deposit.fixed.tokens.initial_long_token,
+            initial_short_token: deposit.fixed.tokens.initial_short_token,
+            initial_long_token_account: deposit.fixed.senders.initial_long_token_account,
+            initial_short_token_account: deposit.fixed.senders.initial_short_token_account,
         }
     }
 }
@@ -632,6 +612,32 @@ where
                 market: client.find_market_address(store, &hint.market_token_mint),
                 market_token_mint: hint.market_token_mint,
                 system_program: system_program::ID,
+                initial_long_token_account: hint.initial_long_token_account,
+                initial_short_token_account: hint.initial_short_token_account,
+                initial_long_token_vault: hint
+                    .initial_long_token
+                    .as_ref()
+                    .map(|token| client.find_market_vault_address(store, token)),
+                initial_short_token_vault: hint
+                    .initial_short_token
+                    .as_ref()
+                    .map(|token| client.find_market_vault_address(store, token)),
+                initial_long_market: hint.initial_long_token_account.as_ref().map(|_| {
+                    client.find_market_address(
+                        store,
+                        hint.long_swap_tokens
+                            .first()
+                            .unwrap_or(&hint.market_token_mint),
+                    )
+                }),
+                initial_short_market: hint.initial_short_token_account.as_ref().map(|_| {
+                    client.find_market_address(
+                        store,
+                        hint.short_swap_tokens
+                            .first()
+                            .unwrap_or(&hint.market_token_mint),
+                    )
+                }),
             })
             .args(instruction::ExecuteDeposit {
                 execution_fee: *execution_fee,

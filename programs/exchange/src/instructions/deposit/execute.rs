@@ -1,13 +1,15 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token, TokenAccount};
 use data_store::{
-    cpi::{self, accounts::RemoveDeposit},
+    cpi::{self},
     program::DataStore,
     states::{Deposit, PriceProvider},
     utils::{Authentication, WithOracle, WithOracleExt},
 };
 
 use crate::{utils::ControllerSeeds, ExchangeError};
+
+use super::utils::{CancelDepositUtils, TransferIn};
 
 #[derive(Accounts)]
 pub struct ExecuteDeposit<'info> {
@@ -26,23 +28,45 @@ pub struct ExecuteDeposit<'info> {
     pub store: UncheckedAccount<'info>,
     /// CHECK: check by CPI.
     pub token_map: UncheckedAccount<'info>,
-    pub data_store_program: Program<'info, DataStore>,
     pub price_provider: Interface<'info, PriceProvider>,
-    pub token_program: Program<'info, Token>,
     #[account(mut)]
     pub oracle: Account<'info, data_store::states::Oracle>,
-    #[account(mut)]
+    #[account(
+        mut,
+        constraint = initial_long_token_account.as_ref().map(|a| a.key()) == deposit.fixed.senders.initial_long_token_account,
+        constraint = initial_short_token_account.as_ref().map(|a| a.key()) == deposit.fixed.senders.initial_short_token_account,
+    )]
     pub deposit: Account<'info, Deposit>,
     /// CHECK: only used to receive lamports.
     #[account(mut)]
     pub user: UncheckedAccount<'info>,
     #[account(mut, constraint = receiver.key() == deposit.fixed.receivers.receiver)]
     pub receiver: Account<'info, TokenAccount>,
-    #[account(mut, constraint = market.key() == deposit.fixed.market)]
     /// CHECK: only used to invoke CPI and should be checked by it.
+    #[account(mut, constraint = market.key() == deposit.fixed.market)]
     pub market: UncheckedAccount<'info>,
     #[account(mut, constraint = market_token_mint.key() == deposit.fixed.tokens.market_token)]
     pub market_token_mint: Account<'info, Mint>,
+    /// CHECK: check by `try_removable` method.
+    #[account(mut)]
+    pub initial_long_token_account: Option<UncheckedAccount<'info>>,
+    /// CHECK: check by `try_removable` method.
+    #[account(mut)]
+    pub initial_short_token_account: Option<UncheckedAccount<'info>>,
+    /// CHECK: check by CPI.
+    #[account(mut)]
+    pub initial_long_token_vault: Option<UncheckedAccount<'info>>,
+    /// CHECK: check by CPI.
+    #[account(mut)]
+    pub initial_short_token_vault: Option<UncheckedAccount<'info>>,
+    /// CHECK: check by CPI and cancel utils.
+    #[account(mut)]
+    pub initial_long_market: Option<UncheckedAccount<'info>>,
+    /// CHECK: check by CPI and cancel utils.
+    #[account(mut)]
+    pub initial_short_market: Option<UncheckedAccount<'info>>,
+    pub data_store_program: Program<'info, DataStore>,
+    pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
 }
 
@@ -51,8 +75,6 @@ pub fn execute_deposit<'info>(
     ctx: Context<'_, '_, 'info, 'info, ExecuteDeposit<'info>>,
     execution_fee: u64,
 ) -> Result<()> {
-    ctx.accounts.try_dequeue()?;
-
     let store = ctx.accounts.store.key();
     let controller = ControllerSeeds::find(&store);
 
@@ -76,47 +98,70 @@ impl<'info> ExecuteDeposit<'info> {
         Ok(!crate::utils::must_be_uninitialized(&self.receiver))
     }
 
+    fn initial_transfer_in(&self, is_long: bool) -> Option<TransferIn<'info>> {
+        if is_long {
+            TransferIn::new(
+                self.initial_long_token_account.as_ref(),
+                self.initial_long_token_vault.as_ref(),
+                self.initial_long_market.as_ref(),
+            )
+        } else {
+            TransferIn::new(
+                self.initial_short_token_account.as_ref(),
+                self.initial_short_token_vault.as_ref(),
+                self.initial_short_market.as_ref(),
+            )
+        }
+    }
+
     fn try_removable(&self) -> Result<bool> {
-        // TODO: check whether the token accounts have been initialized if there are any input amounts in the deposit.
+        if self.deposit.fixed.tokens.params.initial_long_token_amount != 0
+            && self
+                .initial_transfer_in(true)
+                .map(|t| t.is_from_account_not_initialized())
+                .unwrap_or(true)
+        {
+            msg!("invalid `transfer_in` accounts for long");
+            return Ok(false);
+        }
+        if self.deposit.fixed.tokens.params.initial_short_token_amount != 0
+            && self
+                .initial_transfer_in(false)
+                .map(|t| t.is_from_account_not_initialized())
+                .unwrap_or(true)
+        {
+            msg!("invalid `transfer_in` accounts for short");
+            return Ok(false);
+        }
         Ok(true)
     }
 
-    fn try_dequeue(&self) -> Result<()> {
-        Ok(())
+    fn cancel_utils(&self) -> CancelDepositUtils<'_, 'info> {
+        CancelDepositUtils {
+            data_store_program: self.data_store_program.to_account_info(),
+            token_program: self.token_program.to_account_info(),
+            system_program: self.system_program.to_account_info(),
+            store: self.store.to_account_info(),
+            controller: self.controller.to_account_info(),
+            user: self.user.to_account_info(),
+            deposit: &self.deposit,
+            initial_long_token_transfer: self.initial_transfer_in(true),
+            initial_short_token_transfer: self.initial_transfer_in(false),
+        }
     }
 
     fn try_remove(&self, controller: &ControllerSeeds, execution_fee: u64) -> Result<()> {
         if self.try_removable()? {
-            let refund = self
-                .deposit
-                .get_lamports()
-                .checked_sub(super::MAX_DEPOSIT_EXECUTION_FEE.min(execution_fee))
-                .ok_or(ExchangeError::NotEnoughExecutionFee)?;
-            data_store::cpi::remove_deposit(
-                self.remove_deposit_ctx()
-                    .with_signer(&[&controller.as_seeds()]),
-                refund,
+            self.cancel_utils().execute(
+                self.authority.to_account_info(),
+                controller,
+                execution_fee,
             )?;
         } else {
             // TODO: emit an event.
             msg!("the deposit cannot be removed automatically, should remove by the user manually");
         }
         Ok(())
-    }
-
-    fn remove_deposit_ctx(&self) -> CpiContext<'_, '_, '_, 'info, RemoveDeposit<'info>> {
-        CpiContext::new(
-            self.data_store_program.to_account_info(),
-            RemoveDeposit {
-                payer: self.authority.to_account_info(),
-                authority: self.controller.to_account_info(),
-                store: self.store.to_account_info(),
-                deposit: self.deposit.to_account_info(),
-                user: self.user.to_account_info(),
-                system_program: self.system_program.to_account_info(),
-                token_program: self.token_program.to_account_info(),
-            },
-        )
     }
 
     fn execute_deposit_ctx(

@@ -133,7 +133,7 @@ impl<'a> SwapMarkets<'a> {
                 .map_err(GmxCoreError::from)?
                 .execute()
                 .map_err(GmxCoreError::from)?;
-            msg!("swap along the path: {:?}", report);
+            msg!("[Swap] swap along the path: {:?}", report);
             *token_in = *market.market_meta().opposite_token(token_in)?;
             *token_in_amount = (*report.token_out_amount())
                 .try_into()

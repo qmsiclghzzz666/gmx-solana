@@ -302,6 +302,12 @@ pub fn get_market_config(ctx: Context<ReadMarket>, key: &str) -> Result<Factor> 
     ctx.accounts.market.load()?.get_config(key).copied()
 }
 
+/// Get the meta of the market.
+pub fn get_market_meta(ctx: Context<ReadMarket>) -> Result<MarketMeta> {
+    let market = ctx.accounts.market.load()?;
+    Ok(*market.meta())
+}
+
 /// Update Market Config
 #[derive(Accounts)]
 pub struct UpdateMarketConfig<'info> {

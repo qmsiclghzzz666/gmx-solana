@@ -2,13 +2,10 @@ use std::collections::BTreeSet;
 
 use anchor_lang::prelude::*;
 use anchor_spl::token::Mint;
-use gmx_core::{num::Num, Bank, SwapMarketExt};
+use gmx_core::SwapMarketExt;
 
 use crate::{
-    constants,
-    states::{
-        common::SwapParams, revertible::swap_market::SwapMarkets, HasMarketMeta, Market, Oracle,
-    },
+    states::{common::SwapParams, Market, Oracle},
     DataStoreError, GmxCoreError,
 };
 

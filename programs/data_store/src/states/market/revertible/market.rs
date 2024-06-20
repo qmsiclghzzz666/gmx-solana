@@ -308,6 +308,15 @@ impl<'a> gmx_core::Bank<Pubkey> for RevertibleMarket<'a> {
         token: &Q,
         amount: &Self::Num,
     ) -> gmx_core::Result<()> {
+        // TODO: use event
+        msg!(
+            "[Not committed] {}: {},{}(+{} {})",
+            self.storage.meta.market_token_mint,
+            self.balance.long_token_balance,
+            self.balance.short_token_balance,
+            amount,
+            token.borrow(),
+        );
         if self.storage.meta.long_token_mint == *token.borrow() {
             self.balance.record_transferred_in(true, *amount)?;
         } else if self.storage.meta.short_token_mint == *token.borrow() {
@@ -323,6 +332,15 @@ impl<'a> gmx_core::Bank<Pubkey> for RevertibleMarket<'a> {
         token: &Q,
         amount: &Self::Num,
     ) -> gmx_core::Result<()> {
+        // TODO: use event
+        msg!(
+            "[Not committed] {}: {},{}(-{} {})",
+            self.storage.meta.market_token_mint,
+            self.balance.long_token_balance,
+            self.balance.short_token_balance,
+            amount,
+            token.borrow(),
+        );
         if self.storage.meta.long_token_mint == *token.borrow() {
             self.balance.record_transferred_out(true, *amount)?;
         } else if self.storage.meta.short_token_mint == *token.borrow() {

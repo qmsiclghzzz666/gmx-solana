@@ -104,6 +104,7 @@ impl SwapParams {
         );
         let loaders = remaining_accounts
             .iter()
+            .take(len)
             .map(AccountLoader::<'info, Market>::try_from)
             .collect::<Result<Vec<_>>>()?;
         Ok(loaders)
