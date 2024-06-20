@@ -7,7 +7,9 @@ use anchor_client::{
 };
 use anchor_spl::associated_token::get_associated_token_address;
 use data_store::states::{
-    common::TokensWithFeed, withdrawal::TokenParams, NonceBytes, Pyth, Withdrawal,
+    common::{SwapParams, TokensWithFeed},
+    withdrawal::TokenParams,
+    NonceBytes, Pyth, Withdrawal,
 };
 use exchange::{accounts, instruction, instructions::CreateWithdrawalParams};
 
@@ -368,8 +370,7 @@ pub struct ExecuteWithdrawalHint {
     final_short_token: Pubkey,
     /// Feeds.
     pub feeds: TokensWithFeed,
-    long_swap_tokens: Vec<Pubkey>,
-    short_swap_tokens: Vec<Pubkey>,
+    swap: SwapParams,
 }
 
 impl<'a> From<&'a Withdrawal> for ExecuteWithdrawalHint {
@@ -382,8 +383,7 @@ impl<'a> From<&'a Withdrawal> for ExecuteWithdrawalHint {
             final_short_token: withdrawal.fixed.tokens.final_short_token,
             final_long_token_receiver: withdrawal.fixed.receivers.final_long_token_receiver,
             final_short_token_receiver: withdrawal.fixed.receivers.final_short_token_receiver,
-            long_swap_tokens: withdrawal.dynamic.swap.long_token_swap_path.clone(),
-            short_swap_tokens: withdrawal.dynamic.swap.short_token_swap_path.clone(),
+            swap: withdrawal.dynamic.swap.clone(),
             feeds: withdrawal.dynamic.tokens_with_feed.clone(),
         }
     }
@@ -475,22 +475,12 @@ where
             .parse(&hint.feeds)
             .collect::<Result<Vec<_>, _>>()?;
         let swap_path_markets = hint
-            .long_swap_tokens
-            .iter()
-            .chain(hint.short_swap_tokens.iter())
+            .swap
+            .unique_market_tokens_excluding_current(&hint.market_token)
             .map(|mint| AccountMeta {
                 pubkey: self.client.find_market_address(&self.store, mint),
                 is_signer: false,
                 is_writable: true,
-            });
-        let swap_path_mints = hint
-            .long_swap_tokens
-            .iter()
-            .chain(hint.short_swap_tokens.iter())
-            .map(|pubkey| AccountMeta {
-                pubkey: *pubkey,
-                is_signer: false,
-                is_writable: false,
             });
         Ok(self
             .client
@@ -531,7 +521,6 @@ where
                 feeds
                     .into_iter()
                     .chain(swap_path_markets)
-                    .chain(swap_path_mints)
                     .collect::<Vec<_>>(),
             )
             .compute_budget(ComputeBudget::default().with_limit(EXECUTE_WITHDRAWAL_COMPUTE_BUDGET)))

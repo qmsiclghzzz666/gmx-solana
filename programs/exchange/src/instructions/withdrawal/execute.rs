@@ -1,13 +1,15 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token, TokenAccount};
 use data_store::{
-    cpi::accounts::{MarketTransferOut, RemoveWithdrawal},
+    cpi::accounts::MarketTransferOut,
     program::DataStore,
     states::{PriceProvider, Withdrawal},
     utils::{Authentication, WithOracle, WithOracleExt},
 };
 
 use crate::{utils::ControllerSeeds, ExchangeError};
+
+use super::utils::CancelWithdrawalUtils;
 
 #[derive(Accounts)]
 pub struct ExecuteWithdrawal<'info> {
@@ -75,65 +77,64 @@ pub fn execute_withdrawal<'info>(
     let store = ctx.accounts.store.key();
     let controller = ControllerSeeds::find(&store);
     let withdrawal = &ctx.accounts.withdrawal;
-    let refund = withdrawal
-        .get_lamports()
-        .checked_sub(execution_fee.min(super::MAX_WITHDRAWAL_EXECUTION_FEE))
-        .ok_or(ExchangeError::NotEnoughExecutionFee)?;
-    ctx.accounts.with_oracle_prices(
-        withdrawal.dynamic.tokens_with_feed.tokens.clone(),
-        ctx.remaining_accounts,
-        &controller.as_seeds(),
-        |accounts, remaining_accounts| {
-            let (final_long_amount, final_short_amount) = data_store::cpi::execute_withdrawal(
-                accounts
-                    .execute_withdrawal_ctx()
-                    .with_signer(&[&controller.as_seeds()])
-                    .with_remaining_accounts(remaining_accounts.to_vec()),
-            )?
-            .get();
 
-            // Transfer out final tokens.
-            let [long_swap_path, short_swap_path, ..] = accounts
-                .withdrawal
-                .dynamic
-                .swap
-                .split_swap_paths(remaining_accounts)?;
-
-            if final_long_amount != 0 {
-                // Must have been validated during the execution.
-                let market = long_swap_path
-                    .last()
-                    .cloned()
-                    .unwrap_or_else(|| accounts.market.to_account_info());
-                data_store::cpi::market_transfer_out(
+    // TODO: check for the pre-condition of the execution.
+    let (final_long_amount, final_long_market, final_short_amount, final_short_market) =
+        ctx.accounts.with_oracle_prices(
+            withdrawal.dynamic.tokens_with_feed.tokens.clone(),
+            ctx.remaining_accounts,
+            &controller.as_seeds(),
+            |accounts, remaining_accounts| {
+                let store = accounts.store.key;
+                let swap = &accounts.withdrawal.dynamic.swap;
+                let final_long_market = swap
+                    .find_last_market(store, true, remaining_accounts)
+                    .unwrap_or(accounts.market.to_account_info());
+                let final_short_market = swap
+                    .find_last_market(store, false, remaining_accounts)
+                    .unwrap_or(accounts.market.to_account_info());
+                let (final_long_amount, final_short_amount) = data_store::cpi::execute_withdrawal(
                     accounts
-                        .market_transfer_out_ctx(true, market)
-                        .with_signer(&[&controller.as_seeds()]),
+                        .execute_withdrawal_ctx()
+                        .with_signer(&[&controller.as_seeds()])
+                        .with_remaining_accounts(remaining_accounts.to_vec()),
+                )?
+                .get();
+                Ok((
                     final_long_amount,
-                )?;
-            }
-            if final_short_amount != 0 {
-                // Must have been validated during the execution.
-                let market = short_swap_path
-                    .last()
-                    .cloned()
-                    .unwrap_or_else(|| accounts.market.to_account_info());
-                data_store::cpi::market_transfer_out(
-                    accounts
-                        .market_transfer_out_ctx(false, market)
-                        .with_signer(&[&controller.as_seeds()]),
+                    final_long_market,
                     final_short_amount,
-                )?;
-            }
-            Ok(())
-        },
+                    final_short_market,
+                ))
+            },
+        )?;
+
+    // Transfer out final tokens.
+    if final_long_amount != 0 {
+        // Must have been validated during the execution.
+        data_store::cpi::market_transfer_out(
+            ctx.accounts
+                .market_transfer_out_ctx(true, final_long_market)
+                .with_signer(&[&controller.as_seeds()]),
+            final_long_amount,
+        )?;
+    }
+    if final_short_amount != 0 {
+        // Must have been validated during the execution.
+        data_store::cpi::market_transfer_out(
+            ctx.accounts
+                .market_transfer_out_ctx(false, final_short_market)
+                .with_signer(&[&controller.as_seeds()]),
+            final_short_amount,
+        )?;
+    }
+
+    ctx.accounts.cancel_utils().execute(
+        ctx.accounts.authority.to_account_info(),
+        &controller,
+        execution_fee,
     )?;
-    data_store::cpi::remove_withdrawal(
-        ctx.accounts
-            .remove_withdrawal_ctx()
-            .with_signer(&[&controller.as_seeds()]),
-        refund,
-    )?;
+
     Ok(())
 }
 
@@ -174,21 +175,18 @@ impl<'info> WithOracle<'info> for ExecuteWithdrawal<'info> {
 }
 
 impl<'info> ExecuteWithdrawal<'info> {
-    fn remove_withdrawal_ctx(&self) -> CpiContext<'_, '_, '_, 'info, RemoveWithdrawal<'info>> {
-        CpiContext::new(
-            self.data_store_program.to_account_info(),
-            RemoveWithdrawal {
-                payer: self.authority.to_account_info(),
-                authority: self.controller.to_account_info(),
-                store: self.store.to_account_info(),
-                withdrawal: self.withdrawal.to_account_info(),
-                user: self.user.to_account_info(),
-                system_program: self.system_program.to_account_info(),
-                market_token: None,
-                market_token_withdrawal_vault: None,
-                token_program: self.token_program.to_account_info(),
-            },
-        )
+    fn cancel_utils(&self) -> CancelWithdrawalUtils<'_, 'info> {
+        CancelWithdrawalUtils {
+            data_store_program: self.data_store_program.to_account_info(),
+            token_program: self.token_program.to_account_info(),
+            system_program: self.system_program.to_account_info(),
+            controller: self.controller.to_account_info(),
+            store: self.store.to_account_info(),
+            user: self.user.to_account_info(),
+            withdrawal: &self.withdrawal,
+            market_token_account: self.market_token_account.to_account_info(),
+            market_token_vault: self.market_token_withdrawal_vault.to_account_info(),
+        }
     }
 
     fn execute_withdrawal_ctx(

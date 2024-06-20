@@ -2,7 +2,10 @@ use std::collections::HashSet;
 
 use anchor_lang::prelude::*;
 
-use crate::{states::Market, DataStoreError};
+use crate::{
+    states::{find_market_address, Market},
+    DataStoreError,
+};
 
 /// Swap params.
 #[derive(AnchorDeserialize, AnchorSerialize, Clone)]
@@ -84,19 +87,21 @@ impl SwapParams {
     /// Get unique market tokens excluding current market token.
     pub fn unique_market_tokens_excluding_current<'a>(
         &'a self,
-        current: &'a Pubkey,
+        current_market_token: &'a Pubkey,
     ) -> impl Iterator<Item = &Pubkey> + 'a {
-        let mut seen = HashSet::from([current]);
+        let mut seen = HashSet::from([current_market_token]);
         self.iter().filter(move |token| seen.insert(token))
     }
 
     /// Unpack markets for swap.
     pub fn unpack_markets_for_swap<'info>(
         &self,
-        current: &Pubkey,
+        current_market_token: &Pubkey,
         remaining_accounts: &'info [AccountInfo<'info>],
     ) -> Result<Vec<AccountLoader<'info, Market>>> {
-        let len = self.unique_market_tokens_excluding_current(current).count();
+        let len = self
+            .unique_market_tokens_excluding_current(current_market_token)
+            .count();
         require_gte!(
             remaining_accounts.len(),
             len,
@@ -108,6 +113,23 @@ impl SwapParams {
             .map(AccountLoader::<'info, Market>::try_from)
             .collect::<Result<Vec<_>>>()?;
         Ok(loaders)
+    }
+
+    /// Find last market.
+    pub fn find_last_market<'info>(
+        &self,
+        store: &Pubkey,
+        is_long: bool,
+        remaining_accounts: &'info [AccountInfo<'info>],
+    ) -> Option<AccountInfo<'info>> {
+        let path = if is_long {
+            &self.long_token_swap_path
+        } else {
+            &self.short_token_swap_path
+        };
+        let target = find_market_address(store, path.last()?, &crate::ID).0;
+        let info = remaining_accounts.iter().find(|info| *info.key == target)?;
+        Some(info.clone())
     }
 
     /// Get validated long path.

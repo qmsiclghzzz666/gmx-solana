@@ -431,14 +431,7 @@ export const makeExecuteWithdrawalInstruction = async ({
     const feedAccounts = feeds.map((feed, idx) => {
         return getFeedAccountMeta(providerMapper(idx), feed);
     });
-    const swapPathMints = [...longSwapPath, ...shortSwapPath].map(mint => {
-        return {
-            pubkey: mint,
-            isSigner: false,
-            isWritable: false,
-        }
-    });
-    const swapPathMarkets = [...longSwapPath, ...shortSwapPath].map(mint => {
+    const swapPathMarkets = [...new Set([...longSwapPath, ...shortSwapPath])].filter(mint => !mint.equals(marketTokenMint)).map(mint => {
         return {
             pubkey: createMarketPDA(store, mint)[0],
             isSigner: false,
@@ -462,7 +455,7 @@ export const makeExecuteWithdrawalInstruction = async ({
         finalLongTokenVault: createMarketVaultPDA(store, finalLongTokenMint)[0],
         finalShortTokenVault: createMarketVaultPDA(store, finalShortTokenMint)[0],
         priceProvider: options.priceProvider ?? PYTH_ID,
-    }).remainingAccounts([...feedAccounts, ...swapPathMarkets, ...swapPathMints]).instruction();
+    }).remainingAccounts([...feedAccounts, ...swapPathMarkets]).instruction();
 };
 
 export const invokeExecuteWithdrawal = makeInvoke(makeExecuteWithdrawalInstruction, ["authority"]);

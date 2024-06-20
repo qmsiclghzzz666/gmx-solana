@@ -104,7 +104,7 @@ impl<'info> ExecuteDeposit<'info> {
         self.validate_market()?;
 
         // Prepare the execution context.
-        let current_market = self.market.key();
+        let current_market_token = self.market_token_mint.key();
         let mut market = RevertibleLiquidityMarket::new(
             &self.market,
             &mut self.market_token_mint,
@@ -116,8 +116,9 @@ impl<'info> ExecuteDeposit<'info> {
             .deposit
             .dynamic
             .swap_params
-            .unpack_markets_for_swap(&current_market, remaining_accounts)?;
-        let mut swap_markets = SwapMarkets::new(&loaders, Some(&current_market))?;
+            .unpack_markets_for_swap(&current_market_token, remaining_accounts)?;
+        let mut swap_markets =
+            SwapMarkets::new(&self.store.key(), &loaders, Some(&current_market_token))?;
 
         // Distribute position impact.
         {

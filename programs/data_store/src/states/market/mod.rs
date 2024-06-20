@@ -41,6 +41,18 @@ pub type MarketFlagBitmap = Bitmap<MAX_FLAGS>;
 
 const MAX_NAME_LEN: usize = 64;
 
+/// Find PDA for [`Market`] account.
+pub fn find_market_address(
+    store: &Pubkey,
+    token: &Pubkey,
+    store_program_id: &Pubkey,
+) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[Market::SEED, store.as_ref(), token.as_ref()],
+        store_program_id,
+    )
+}
+
 /// Market.
 #[account(zero_copy)]
 #[cfg_attr(feature = "debug", derive(Debug))]

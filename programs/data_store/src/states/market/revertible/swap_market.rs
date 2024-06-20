@@ -21,22 +21,24 @@ pub struct SwapMarkets<'a>(IndexMap<Pubkey, RevertibleSwapMarket<'a>>);
 impl<'a> SwapMarkets<'a> {
     /// Create a new [`SwapMarkets`] from loders.
     pub fn new<'info>(
+        store: &Pubkey,
         loaders: &'a [AccountLoader<'info, Market>],
-        current_market: Option<&Pubkey>,
+        current_market_token: Option<&Pubkey>,
     ) -> Result<Self> {
         let mut map = IndexMap::with_capacity(loaders.len());
         for loader in loaders {
             let key = loader.load()?.meta().market_token_mint;
-            if let Some(market) = current_market {
-                require!(key != *market, DataStoreError::InvalidSwapPath);
+            if let Some(market_token) = current_market_token {
+                require!(key != *market_token, DataStoreError::InvalidSwapPath);
             }
             match map.entry(key) {
                 // Cannot have duplicated markets.
                 Entry::Occupied(_) => return err!(DataStoreError::InvalidSwapPath),
                 Entry::Vacant(e) => {
-                    e.insert(RevertibleSwapMarket::from_market(
-                        RevertibleMarket::try_from(loader)?,
-                    )?);
+                    loader.load()?.validate(store)?;
+                    let market =
+                        RevertibleSwapMarket::from_market(RevertibleMarket::try_from(loader)?)?;
+                    e.insert(market);
                 }
             }
         }
@@ -145,7 +147,7 @@ impl<'a> SwapMarkets<'a> {
                 market.validate_market_balances(0, 0)?;
             } else {
                 market
-                    .validate_market_balances_excluding_token_amount(token_in, *token_in_amount)?;
+                    .validate_market_balance_excluding_token_amount(token_in, *token_in_amount)?;
             }
         }
         Ok(())
@@ -191,6 +193,7 @@ impl<'a> SwapMarkets<'a> {
                     from_market
                         .record_transferred_out_by_token(&token_in, &token_in_amount)
                         .map_err(GmxCoreError::from)?;
+                    from_market.validate_market_balance_excluding_token_amount(&token_in, 0)?;
                     first_market
                         .record_transferred_in_by_token(&token_in, &token_in_amount)
                         .map_err(GmxCoreError::from)?;
@@ -275,7 +278,9 @@ where
 
 impl<'a, M> SwapDirection<'a, M>
 where
-    M: HasMarketMeta + gmx_core::SwapMarket<{ constants::MARKET_DECIMALS }, Num = u128>,
+    M: HasMarketMeta
+        + gmx_core::SwapMarket<{ constants::MARKET_DECIMALS }, Num = u128>
+        + gmx_core::Bank<Pubkey, Num = u64>,
 {
     fn swap_with_current(
         &mut self,
@@ -293,7 +298,8 @@ where
             .map_err(GmxCoreError::from)?
             .execute()
             .map_err(GmxCoreError::from)?;
-        msg!("swap in current market: {:?}", report);
+        current.validate_market_balances(0, 0)?;
+        msg!("[Swap] in current market: {:?}", report);
         *token_in_amount = (*report.token_out_amount())
             .try_into()
             .map_err(|_| error!(DataStoreError::AmountOverflow))?;

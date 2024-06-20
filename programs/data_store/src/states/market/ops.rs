@@ -547,7 +547,7 @@ pub trait ValidateMarketBalances:
     }
 
     /// Validate market balance for the given token.
-    fn validate_market_balances_excluding_token_amount(
+    fn validate_market_balance_excluding_token_amount(
         &self,
         token: &Pubkey,
         amount: u64,

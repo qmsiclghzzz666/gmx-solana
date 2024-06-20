@@ -1,9 +1,10 @@
 use anchor_client::solana_sdk::pubkey::Pubkey;
 use data_store::states::{
-    position::PositionKind, Deposit, Market, NonceBytes, Oracle, Order, Position, Seed, Store,
-    Withdrawal,
+    position::PositionKind, Deposit, NonceBytes, Oracle, Order, Position, Seed, Store, Withdrawal,
 };
 use gmx_solana_utils::to_seed;
+
+pub use data_store::states::market::find_market_address;
 
 use crate::utils::EVENT_AUTHORITY_SEED;
 
@@ -63,18 +64,6 @@ pub fn find_market_token_address(
             long_token.as_ref(),
             short_token.as_ref(),
         ],
-        store_program_id,
-    )
-}
-
-/// Find PDA for [`Market`] account.
-pub fn find_market_address(
-    store: &Pubkey,
-    token: &Pubkey,
-    store_program_id: &Pubkey,
-) -> (Pubkey, u8) {
-    Pubkey::find_program_address(
-        &[Market::SEED, store.as_ref(), token.as_ref()],
         store_program_id,
     )
 }
