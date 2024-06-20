@@ -247,13 +247,6 @@ export const makeExecuteDepositInstruction = async ({
         const provider = providerMapper(idx);
         return getFeedAccountMeta(provider, feed);
     });
-    const swapPathMints = [...longSwapPath, ...shortSwapPath].map(mint => {
-        return {
-            pubkey: mint,
-            isSigner: false,
-            isWritable: false,
-        }
-    });
     const swapPathMarkets = [...longSwapPath, ...shortSwapPath].map(mint => {
         return {
             pubkey: createMarketPDA(store, mint)[0],
@@ -279,7 +272,7 @@ export const makeExecuteDepositInstruction = async ({
         initialShortTokenVault: initialShortToken ? findMarketVaultPDA(store, initialShortToken)[0] : null,
         initialLongMarket: initialLongTokenAccount ? findMarketPDA(store, longSwapPath[0] ?? marketToken)[0] : null,
         initialShortMarket: initialShortTokenAccount ? findMarketPDA(store, shortSwapPath[0] ?? marketToken)[0] : null,
-    }).remainingAccounts([...feedAccounts, ...swapPathMarkets, ...swapPathMints]).instruction();
+    }).remainingAccounts([...feedAccounts, ...swapPathMarkets]).instruction();
 };
 
 export const invokeExecuteDeposit = makeInvoke(makeExecuteDepositInstruction, ["authority"]);

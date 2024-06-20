@@ -159,7 +159,7 @@ impl<'info> ExecuteDeposit<'info> {
             )?;
         } else {
             // TODO: emit an event.
-            msg!("the deposit cannot be removed automatically, should remove by the user manually");
+            msg!("[Unable to cancel] the deposit cannot be removed automatically, should be removed by the user manually");
         }
         Ok(())
     }

@@ -585,15 +585,6 @@ where
                 is_signer: false,
                 is_writable: true,
             });
-        let market_tokens = hint
-            .long_swap_tokens
-            .iter()
-            .chain(hint.short_swap_tokens.iter())
-            .map(|mint| AccountMeta {
-                pubkey: *mint,
-                is_signer: false,
-                is_writable: false,
-            });
         tracing::debug!(%price_provider, "constructing `execute_deposit` ix...");
         Ok(client
             .exchange_rpc()
@@ -642,13 +633,7 @@ where
             .args(instruction::ExecuteDeposit {
                 execution_fee: *execution_fee,
             })
-            .accounts(
-                feeds
-                    .into_iter()
-                    .chain(markets)
-                    .chain(market_tokens)
-                    .collect::<Vec<_>>(),
-            )
+            .accounts(feeds.into_iter().chain(markets).collect::<Vec<_>>())
             .compute_budget(ComputeBudget::default().with_limit(EXECUTE_DEPOSIT_COMPUTE_BUDGET)))
     }
 }
