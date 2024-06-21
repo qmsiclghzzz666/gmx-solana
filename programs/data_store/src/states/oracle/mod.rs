@@ -19,7 +19,7 @@ use crate::{states::TokenMapAccess, DataStoreError};
 use anchor_lang::{prelude::*, Ids};
 use num_enum::TryFromPrimitive;
 
-use super::{Seed, TokenMapRef};
+use super::{HasMarketMeta, Seed, TokenMapRef};
 
 pub use self::{
     chainlink::Chainlink,
@@ -156,6 +156,35 @@ impl Oracle {
         target.validate_min_oracle_ts(self)?;
         target.validate_max_oracle_ts(self)?;
         Ok(())
+    }
+
+    /// Get prices for the market
+    pub(crate) fn market_prices(
+        &self,
+        market: &impl HasMarketMeta,
+    ) -> Result<gmx_core::action::Prices<u128>> {
+        let meta = market.market_meta();
+        let prices = gmx_core::action::Prices {
+            index_token_price: self
+                .primary
+                .get(&meta.index_token_mint)
+                .ok_or(DataStoreError::MissingOracelPrice)?
+                .max
+                .to_unit_price(),
+            long_token_price: self
+                .primary
+                .get(&meta.long_token_mint)
+                .ok_or(DataStoreError::MissingOracelPrice)?
+                .max
+                .to_unit_price(),
+            short_token_price: self
+                .primary
+                .get(&meta.short_token_mint)
+                .ok_or(DataStoreError::MissingOracelPrice)?
+                .max
+                .to_unit_price(),
+        };
+        Ok(prices)
     }
 }
 

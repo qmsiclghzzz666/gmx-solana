@@ -1,6 +1,8 @@
 use crate::{
-    num::MulDiv, params::Fees, utils, BalanceExt, Market, MarketExt, PnlFactorKind, PoolExt,
-    PoolKind,
+    market::{BaseMarket, BaseMarketExt, LiquidityMarket},
+    num::MulDiv,
+    params::Fees,
+    utils, BalanceExt, PnlFactorKind, PoolExt,
 };
 use num_traits::{CheckedAdd, Zero};
 
@@ -8,7 +10,7 @@ use super::Prices;
 
 /// A withdrawal.
 #[must_use]
-pub struct Withdrawal<M: Market<DECIMALS>, const DECIMALS: u8> {
+pub struct Withdrawal<M: BaseMarket<DECIMALS>, const DECIMALS: u8> {
     market: M,
     params: WithdrawParams<M::Num>,
 }
@@ -75,7 +77,7 @@ impl<T> WithdrawReport<T> {
     }
 }
 
-impl<const DECIMALS: u8, M: Market<DECIMALS>> Withdrawal<M, DECIMALS> {
+impl<const DECIMALS: u8, M: LiquidityMarket<DECIMALS>> Withdrawal<M, DECIMALS> {
     /// Create a new withdrawal from the given market.
     pub fn try_new(
         market: M,
@@ -101,10 +103,7 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Withdrawal<M, DECIMALS> {
         let long_token_fees = self.charge_fees(&mut long_token_amount)?;
         let short_token_fees = self.charge_fees(&mut short_token_amount)?;
         // Apply claimable fees delta.
-        let pool = self
-            .market
-            .pool_mut(PoolKind::ClaimableFee)?
-            .ok_or(crate::Error::MissingPoolKind(PoolKind::ClaimableFee))?;
+        let pool = self.market.claimable_fee_pool_mut()?;
         pool.apply_delta_amount(
             true,
             &long_token_fees
@@ -123,10 +122,7 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Withdrawal<M, DECIMALS> {
         )?;
         // Apply pool delta.
         // The delta must be the amount leaves the pool: -(amount_after_fees + fee_receiver_amount)
-        let pool = self
-            .market
-            .pool_mut(PoolKind::Primary)?
-            .ok_or(crate::Error::MissingPoolKind(PoolKind::Primary))?;
+        let pool = self.market.liquidity_pool_mut()?;
 
         let delta = long_token_fees
             .fee_receiver_amount()
@@ -171,7 +167,7 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Withdrawal<M, DECIMALS> {
             return Err(crate::Error::invalid_pool_value("withdrawal"));
         }
         let total_supply = self.market.total_supply();
-        let pool = self.market.primary_pool()?;
+        let pool = self.market.liquidity_pool()?;
         let long_token_value = pool.long_usd_value(self.params.long_token_price())?;
         let short_token_value = pool.short_usd_value(self.params.short_token_price())?;
         let market_token_value = utils::market_token_amount_to_usd(
@@ -204,7 +200,10 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Withdrawal<M, DECIMALS> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{action::Prices, pool::Balance, test::TestMarket, Market, MarketExt};
+    use crate::{
+        action::Prices, market::LiquidityMarketExt, pool::Balance, test::TestMarket, BaseMarket,
+        LiquidityMarket,
+    };
 
     #[test]
     fn basic() -> crate::Result<()> {
@@ -219,8 +218,8 @@ mod tests {
         market.deposit(0, 1_000_000_000, prices)?.execute()?;
         println!("{market:#?}");
         let before_supply = market.total_supply();
-        let before_long_amount = market.primary_pool()?.long_amount()?;
-        let before_short_amount = market.primary_pool()?.short_amount()?;
+        let before_long_amount = market.liquidity_pool()?.long_amount()?;
+        let before_short_amount = market.liquidity_pool()?.short_amount()?;
         let prices = Prices {
             index_token_price: 120,
             long_token_price: 120,
@@ -234,13 +233,13 @@ mod tests {
             before_supply
         );
         assert_eq!(
-            market.primary_pool()?.long_amount()?
+            market.liquidity_pool()?.long_amount()?
                 + report.long_token_fees.fee_receiver_amount()
                 + report.long_token_output,
             before_long_amount
         );
         assert_eq!(
-            market.primary_pool()?.short_amount()?
+            market.liquidity_pool()?.short_amount()?
                 + report.short_token_fees.fee_receiver_amount()
                 + report.short_token_output,
             before_short_amount

@@ -1,4 +1,4 @@
-import { workspace, Program, utils, Wallet } from "@coral-xyz/anchor";
+import { workspace, Program, utils, Wallet, translateAddress } from "@coral-xyz/anchor";
 import { Exchange } from "../../target/types/exchange";
 import { AccountMeta, Connection, Keypair, PublicKey } from "@solana/web3.js";
 import { createMarketPDA, createMarketTokenMintPDA, createMarketVault, createMarketVaultPDA, createRolesPDA, dataStore } from "./data";
@@ -127,11 +127,10 @@ export const makeCancelDepositInstruction = async ({
             initialShortMarket: initialShortToken ? findMarketPDA(deposit.fixed.store, first(deposit.dynamic.swapParams.shortTokenSwapPath) ?? marketToken)[0] : null,
         }
     });
-
-    return await exchange.methods.cancelDeposit(toBN(options?.executionFee ?? 0)).accounts({
-        authority,
+    if (!user.equals(authority)) throw Error("invalid authority, expecting the creator of the deposit");
+    return await exchange.methods.cancelDeposit().accounts({
+        user: authority,
         store,
-        user,
         deposit,
         initialLongToken: fromInitialLongTokenAccount,
         initialShortToken: fromInitialShortTokenAccount,
@@ -147,7 +146,11 @@ export const invokeCancelDeposit = makeInvoke(makeCancelDepositInstruction, ["au
 export interface DepositHint {
     user: PublicKey,
     marketToken: PublicKey,
+    initialLongToken: PublicKey | null,
+    initialShortToken: PublicKey | null,
     toMarketTokenAccount: PublicKey,
+    initialLongTokenAccount: PublicKey | null,
+    initialShortTokenAccount: PublicKey | null,
     feeds: PublicKey[],
     longSwapPath: PublicKey[],
     shortSwapPath: PublicKey[],
@@ -160,6 +163,7 @@ export type MakeExecuteDepositParams = {
     oracle: PublicKey,
     deposit: PublicKey,
     options?: {
+        cancelOnExecutionError?: boolean,
         executionFee?: number | bigint,
         priceProvider?: PublicKey,
         hints?: {
@@ -207,6 +211,10 @@ const fetchDepositHint = async (dataStore: DataStoreProgram, deposit: PublicKey)
             feeds: deposit.dynamic.tokensWithFeed.feeds,
             longSwapPath: deposit.dynamic.swapParams.longTokenSwapPath,
             shortSwapPath: deposit.dynamic.swapParams.shortTokenSwapPath,
+            initialLongToken: deposit.fixed.tokens.initialLongToken,
+            initialShortToken: deposit.fixed.tokens.initialShortToken,
+            initialLongTokenAccount: deposit.fixed.senders.initialLongTokenAccount,
+            initialShortTokenAccount: deposit.fixed.senders.initialShortTokenAccount,
             providerMapper: makeProviderMapper(
                 [...deposit.dynamic.tokensWithFeed.providers],
                 deposit.dynamic.tokensWithFeed.nums,
@@ -231,27 +239,24 @@ export const makeExecuteDepositInstruction = async ({
         longSwapPath,
         shortSwapPath,
         providerMapper,
+        initialLongToken,
+        initialShortToken,
+        initialLongTokenAccount,
+        initialShortTokenAccount,
     } = options?.hints?.deposit ?? await fetchDepositHint(dataStore, deposit);
     const feedAccounts = feeds.map((feed, idx) => {
         const provider = providerMapper(idx);
         return getFeedAccountMeta(provider, feed);
     });
-    const swapPathMints = [...longSwapPath, ...shortSwapPath].map(mint => {
+    const swapPathMarkets = Array.from(new Set([...longSwapPath, ...shortSwapPath].filter(mint => !mint.equals(marketToken)).map(mint => mint.toBase58()))).map(mint => {
         return {
-            pubkey: mint,
-            isSigner: false,
-            isWritable: false,
-        }
-    });
-    const swapPathMarkets = [...longSwapPath, ...shortSwapPath].map(mint => {
-        return {
-            pubkey: createMarketPDA(store, mint)[0],
+            pubkey: createMarketPDA(store, translateAddress(mint))[0],
             isSigner: false,
             isWritable: true,
         };
     });
     const tokenMap = (await dataStore.account.store.fetch(store)).tokenMap;
-    return await exchange.methods.executeDeposit(toBN(options?.executionFee ?? 0)).accounts({
+    return await exchange.methods.executeDeposit(toBN(options?.executionFee ?? 0), options?.cancelOnExecutionError ?? false).accounts({
         authority,
         store,
         oracle,
@@ -262,7 +267,13 @@ export const makeExecuteDepositInstruction = async ({
         deposit,
         receiver: toMarketTokenAccount,
         priceProvider: options.priceProvider ?? PYTH_ID,
-    }).remainingAccounts([...feedAccounts, ...swapPathMarkets, ...swapPathMints]).instruction();
+        initialLongTokenAccount,
+        initialShortTokenAccount,
+        initialLongTokenVault: initialLongToken ? findMarketVaultPDA(store, initialLongToken)[0] : null,
+        initialShortTokenVault: initialShortToken ? findMarketVaultPDA(store, initialShortToken)[0] : null,
+        initialLongMarket: initialLongTokenAccount ? findMarketPDA(store, longSwapPath[0] ?? marketToken)[0] : null,
+        initialShortMarket: initialShortTokenAccount ? findMarketPDA(store, shortSwapPath[0] ?? marketToken)[0] : null,
+    }).remainingAccounts([...feedAccounts, ...swapPathMarkets]).instruction();
 };
 
 export const invokeExecuteDeposit = makeInvoke(makeExecuteDepositInstruction, ["authority"]);
@@ -336,8 +347,8 @@ export const makeCancelWithdrawalInstruction = async ({
             toMarketTokenAccount: withdrawal.fixed.marketTokenAccount,
         }
     });
-    return await exchange.methods.cancelWithdrawal(toBN(options?.executionFee ?? 0)).accounts({
-        authority,
+    if (!authority.equals(user)) throw Error("invalid authority, expecting the creator of the withdrawal");
+    return await exchange.methods.cancelWithdrawal().accounts({
         store,
         withdrawal,
         user,
@@ -351,6 +362,7 @@ export const invokeCancelWithdrawal = makeInvoke(makeCancelWithdrawalInstruction
 export interface WithdrawalHint {
     user: PublicKey,
     marketTokenMint: PublicKey,
+    marketTokenAccount: PublicKey,
     finalLongTokenReceiver: PublicKey,
     finalShortTokenReceiver: PublicKey,
     finalLongTokenMint: PublicKey,
@@ -367,6 +379,7 @@ export type MakeExecuteWithdrawalParams = {
     oracle: PublicKey,
     withdrawal: PublicKey,
     options?: {
+        cancelOnExecutionError?: boolean,
         executionFee?: number | bigint,
         priceProvider?: PublicKey,
         hints?: {
@@ -380,6 +393,7 @@ const fetchWithdrawalHint = async (dataStore: DataStoreProgram, withdrawal: Publ
         return {
             user: withdrawal.fixed.user,
             marketTokenMint: withdrawal.fixed.tokens.marketToken,
+            marketTokenAccount: withdrawal.fixed.marketTokenAccount,
             finalLongTokenMint: withdrawal.fixed.tokens.finalLongToken,
             finalShortTokenMint: withdrawal.fixed.tokens.finalShortToken,
             finalLongTokenReceiver: withdrawal.fixed.receivers.finalLongTokenReceiver,
@@ -405,6 +419,7 @@ export const makeExecuteWithdrawalInstruction = async ({
     const {
         user,
         marketTokenMint,
+        marketTokenAccount,
         finalLongTokenReceiver,
         finalShortTokenReceiver,
         finalLongTokenMint,
@@ -417,22 +432,15 @@ export const makeExecuteWithdrawalInstruction = async ({
     const feedAccounts = feeds.map((feed, idx) => {
         return getFeedAccountMeta(providerMapper(idx), feed);
     });
-    const swapPathMints = [...longSwapPath, ...shortSwapPath].map(mint => {
+    const swapPathMarkets = Array.from(new Set([...longSwapPath, ...shortSwapPath].filter(mint => !mint.equals(marketTokenMint)).map(mint => mint.toBase58()))).map(mint => {
         return {
-            pubkey: mint,
-            isSigner: false,
-            isWritable: false,
-        }
-    });
-    const swapPathMarkets = [...longSwapPath, ...shortSwapPath].map(mint => {
-        return {
-            pubkey: createMarketPDA(store, mint)[0],
+            pubkey: createMarketPDA(store, translateAddress(mint))[0],
             isSigner: false,
             isWritable: true,
         };
     });
     const tokenMap = (await dataStore.account.store.fetch(store)).tokenMap;
-    return await exchange.methods.executeWithdrawal(toBN(options?.executionFee ?? 0)).accounts({
+    return await exchange.methods.executeWithdrawal(toBN(options?.executionFee ?? 0), options?.cancelOnExecutionError ?? false).accounts({
         authority,
         store,
         oracle,
@@ -442,12 +450,13 @@ export const makeExecuteWithdrawalInstruction = async ({
         market: createMarketPDA(store, marketTokenMint)[0],
         marketTokenMint,
         marketTokenWithdrawalVault: createMarketVaultPDA(store, marketTokenMint)[0],
+        marketTokenAccount,
         finalLongTokenReceiver,
         finalShortTokenReceiver,
         finalLongTokenVault: createMarketVaultPDA(store, finalLongTokenMint)[0],
         finalShortTokenVault: createMarketVaultPDA(store, finalShortTokenMint)[0],
         priceProvider: options.priceProvider ?? PYTH_ID,
-    }).remainingAccounts([...feedAccounts, ...swapPathMarkets, ...swapPathMints]).instruction();
+    }).remainingAccounts([...feedAccounts, ...swapPathMarkets]).instruction();
 };
 
 export const invokeExecuteWithdrawal = makeInvoke(makeExecuteWithdrawalInstruction, ["authority"]);
@@ -483,6 +492,8 @@ export interface OrderHint {
     shortTokenMint: PublicKey,
     longTokenAccount: PublicKey,
     shortTokenAccount: PublicKey,
+    initialCollateralTokenAccount: PublicKey | null,
+    initialCollateralToken: PublicKey | null,
     providerMapper: (number) => number | undefined,
 }
 
@@ -494,6 +505,7 @@ export type MakeExecuteOrderParams = {
     recentTimestamp: bigint | number,
     holding: PublicKey,
     options?: {
+        cancelOnExecutionError?: boolean,
         executionFee?: number | bigint,
         priceProvider?: PublicKey,
         hints?: {
@@ -521,6 +533,8 @@ const fetchOrderHint = async (dataStore: DataStoreProgram, orderAddress: PublicK
         shortTokenMint: market.meta.shortTokenMint,
         feeds: order.prices.feeds,
         swapPath: order.swap.longTokenSwapPath,
+        initialCollateralTokenAccount: order.fixed.senders.initialCollateralTokenAccount,
+        initialCollateralToken: order.fixed.senders.initialCollateralTokenAccount ? order.fixed.tokens.initialCollateralToken : null,
         providerMapper: makeProviderMapper([...order.prices.providers], order.prices.nums),
     } satisfies OrderHint as OrderHint;
 }
@@ -550,29 +564,23 @@ export const makeExecuteOrderInstruction = async ({
         shortTokenMint,
         feeds,
         swapPath,
+        initialCollateralToken,
+        initialCollateralTokenAccount,
         providerMapper,
     } = options?.hints?.order ?? await fetchOrderHint(dataStore, order, store);
-    const [onlyOrderKeeper] = createRolesPDA(store, authority);
     const feedAccounts = feeds.map((pubkey, idx) => {
         return getFeedAccountMeta(providerMapper(idx), pubkey);
     });
-    const swapMarkets = swapPath.map(mint => {
+    const swapMarkets = Array.from(new Set(swapPath.filter(mint => !mint.equals(marketTokenMint)).map(mint => mint.toBase58()))).map(mint => {
         return {
-            pubkey: createMarketPDA(store, mint)[0],
+            pubkey: createMarketPDA(store, translateAddress(mint))[0],
             isSigner: false,
             isWritable: true,
         }
     });
-    const swapMarketMints = swapPath.map(pubkey => {
-        return {
-            pubkey,
-            isSigner: false,
-            isWritable: false,
-        }
-    });
     const pnlTokenMint = isLong ? longTokenMint : shortTokenMint;
     const tokenMap = (await dataStore.account.store.fetch(store)).tokenMap;
-    return await exchange.methods.executeOrder(toBN(recentTimestamp), toBN(options?.executionFee ?? 0)).accounts({
+    return await exchange.methods.executeOrder(toBN(recentTimestamp), toBN(options?.executionFee ?? 0), options?.cancelOnExecutionError ?? false).accounts({
         authority,
         store,
         oracle,
@@ -594,7 +602,10 @@ export const makeExecuteOrderInstruction = async ({
         claimableShortTokenAccountForUser: isDecrease ? findClaimableAccountPDA(store, shortTokenMint, user, getTimeKey(recentTimestamp, TIME_WINDOW))[0] : null,
         claimablePnlTokenAccountForHolding: isDecrease ? findClaimableAccountPDA(store, pnlTokenMint, holding, getTimeKey(recentTimestamp, TIME_WINDOW))[0] : null,
         priceProvider: options.priceProvider ?? PYTH_ID,
-    }).remainingAccounts([...feedAccounts, ...swapMarkets, ...swapMarketMints]).instruction();
+        initialCollateralTokenAccount,
+        initialCollateralTokenVault: initialCollateralTokenAccount ? findMarketVaultPDA(store, initialCollateralToken)[0] : null,
+        initialMarket: findMarketPDA(store, swapPath[0] ?? marketTokenMint)[0],
+    }).remainingAccounts([...feedAccounts, ...swapMarkets]).instruction();
 };
 
 export const invokeExecuteOrder = makeInvoke(makeExecuteOrderInstruction, ["authority"]);

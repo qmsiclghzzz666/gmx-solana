@@ -3,6 +3,9 @@ use crate::{position::LiquidatableReason, ClockKind, PnlFactorKind, PoolKind};
 /// Error type.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    /// Unimplemented.
+    #[error("unimplemented")]
+    Unimplemented,
     /// Invalid Argument.
     #[error("invalid argument: {0}")]
     InvalidArgument(&'static str),

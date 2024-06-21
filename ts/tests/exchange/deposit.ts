@@ -117,7 +117,7 @@ describe("exchange: deposit", () => {
             const [signature] = await invokeCancelWithdrawal(
                 provider.connection,
                 {
-                    authority: signer0,
+                    authority: user0,
                     store: dataStoreAddress,
                     withdrawal,
                     options: {
@@ -215,7 +215,7 @@ describe("exchange: deposit", () => {
             const signature = await invokeCancelDeposit(
                 provider.connection,
                 {
-                    authority: signer0,
+                    authority: user0,
                     store: dataStoreAddress,
                     deposit,
                     options: {
@@ -302,7 +302,7 @@ describe("exchange: deposit", () => {
 
         {
             const [signature] = await invokeCancelWithdrawal(provider.connection, {
-                authority: signer0,
+                authority: user0,
                 store: dataStoreAddress,
                 withdrawal,
             });
@@ -339,7 +339,7 @@ describe("exchange: deposit", () => {
             const [signature] = await invokeCancelDeposit(
                 provider.connection,
                 {
-                    authority: signer0,
+                    authority: user0,
                     store: dataStoreAddress,
                     deposit,
                 }

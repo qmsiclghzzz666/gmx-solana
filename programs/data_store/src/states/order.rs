@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use gmx_core::action::decrease_position::DecreasePositionReport;
 
 use crate::DataStoreError;
 
@@ -205,7 +206,7 @@ impl OrderParams {
 }
 
 /// Order Kind.
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, InitSpace)]
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, InitSpace, Copy)]
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[non_exhaustive]
 pub enum OrderKind {
@@ -244,4 +245,160 @@ pub struct TransferOut {
     pub long_token_for_claimable_account_of_holding: u64,
     /// Short token amount for claimable account of holding.
     pub short_token_for_claimable_account_of_holding: u64,
+}
+
+/// Recevier Kind.
+pub enum CollateralReceiver {
+    Funding,
+    ClaimableForHolding,
+    ClaimableForUser,
+}
+
+impl TransferOut {
+    pub(crate) fn total_long_token_amount(&self) -> Result<u64> {
+        self.long_token
+            .checked_add(self.long_token_for_claimable_account_of_user)
+            .and_then(|a| a.checked_add(self.long_token_for_claimable_account_of_holding))
+            .ok_or(error!(DataStoreError::AmountOverflow))
+    }
+
+    pub(crate) fn total_short_token_amount(&self) -> Result<u64> {
+        self.short_token
+            .checked_add(self.short_token_for_claimable_account_of_user)
+            .and_then(|a| a.checked_add(self.short_token_for_claimable_account_of_holding))
+            .ok_or(error!(DataStoreError::AmountOverflow))
+    }
+
+    pub(crate) fn transfer_out(&mut self, is_secondary: bool, amount: u64) -> Result<()> {
+        if amount == 0 {
+            return Ok(());
+        }
+        if is_secondary {
+            self.final_secondary_output_token = self
+                .final_secondary_output_token
+                .checked_add(amount)
+                .ok_or(error!(DataStoreError::AmountOverflow))?;
+        } else {
+            self.final_output_token = self
+                .final_output_token
+                .checked_add(amount)
+                .ok_or(error!(DataStoreError::AmountOverflow))?;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn transfer_out_funding_amounts(
+        &mut self,
+        long_amount: &u128,
+        short_amount: &u128,
+    ) -> Result<()> {
+        self.transfer_out_collateral(
+            true,
+            CollateralReceiver::Funding,
+            (*long_amount)
+                .try_into()
+                .map_err(|_| error!(DataStoreError::AmountOverflow))?,
+        )?;
+        self.transfer_out_collateral(
+            false,
+            CollateralReceiver::Funding,
+            (*short_amount)
+                .try_into()
+                .map_err(|_| error!(DataStoreError::AmountOverflow))?,
+        )?;
+        Ok(())
+    }
+
+    pub(crate) fn process_claimable_collateral_for_decrease(
+        &mut self,
+        report: &DecreasePositionReport<u128>,
+    ) -> Result<()> {
+        let for_holding = report.claimable_collateral_for_holding();
+        require!(
+            *for_holding.output_token_amount() == 0,
+            DataStoreError::ClaimbleCollateralInOutputTokenForHolding
+        );
+
+        let is_output_token_long = report.is_output_token_long();
+        let is_secondary_token_long = report.is_secondary_output_token_long();
+
+        let secondary_amount = (*for_holding.secondary_output_token_amount())
+            .try_into()
+            .map_err(|_| error!(DataStoreError::AmountOverflow))?;
+        self.transfer_out_collateral(
+            is_secondary_token_long,
+            CollateralReceiver::ClaimableForHolding,
+            secondary_amount,
+        )?;
+
+        let for_user = report.claimable_collateral_for_user();
+        self.transfer_out_collateral(
+            is_output_token_long,
+            CollateralReceiver::ClaimableForUser,
+            (*for_user.output_token_amount())
+                .try_into()
+                .map_err(|_| error!(DataStoreError::AmountOverflow))?,
+        )?;
+        self.transfer_out_collateral(
+            is_secondary_token_long,
+            CollateralReceiver::ClaimableForUser,
+            (*for_user.secondary_output_token_amount())
+                .try_into()
+                .map_err(|_| error!(DataStoreError::AmountOverflow))?,
+        )?;
+        Ok(())
+    }
+
+    pub(crate) fn transfer_out_collateral(
+        &mut self,
+        is_long: bool,
+        to: CollateralReceiver,
+        amount: u64,
+    ) -> Result<()> {
+        if amount == 0 {
+            return Ok(());
+        }
+        match to {
+            CollateralReceiver::Funding => {
+                if is_long {
+                    self.long_token = self
+                        .long_token
+                        .checked_add(amount)
+                        .ok_or(error!(DataStoreError::AmountOverflow))?;
+                } else {
+                    self.short_token = self
+                        .short_token
+                        .checked_add(amount)
+                        .ok_or(error!(DataStoreError::AmountOverflow))?;
+                }
+            }
+            CollateralReceiver::ClaimableForHolding => {
+                if is_long {
+                    self.long_token_for_claimable_account_of_holding = self
+                        .long_token_for_claimable_account_of_holding
+                        .checked_add(amount)
+                        .ok_or(error!(DataStoreError::AmountOverflow))?;
+                } else {
+                    self.short_token_for_claimable_account_of_holding = self
+                        .short_token_for_claimable_account_of_holding
+                        .checked_add(amount)
+                        .ok_or(error!(DataStoreError::AmountOverflow))?;
+                }
+            }
+            CollateralReceiver::ClaimableForUser => {
+                if is_long {
+                    self.long_token_for_claimable_account_of_user = self
+                        .long_token_for_claimable_account_of_user
+                        .checked_add(amount)
+                        .ok_or(error!(DataStoreError::AmountOverflow))?;
+                } else {
+                    self.short_token_for_claimable_account_of_user = self
+                        .short_token_for_claimable_account_of_user
+                        .checked_add(amount)
+                        .ok_or(error!(DataStoreError::AmountOverflow))?;
+                }
+            }
+        }
+        Ok(())
+    }
 }

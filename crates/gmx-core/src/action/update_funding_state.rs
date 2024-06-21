@@ -2,21 +2,22 @@ use num_traits::Zero;
 
 use crate::{
     fixed::FixedPointOps,
+    market::{BaseMarket, BaseMarketExt, PerpMarket, PerpMarketExt},
     num::{MulDiv, Unsigned},
     params::fee::FundingRateChangeType,
-    Balance, BalanceExt, ClockKind, Market, MarketExt,
+    Balance, BalanceExt,
 };
 
 use super::Prices;
 
 /// Update Funding State Action.
 #[must_use]
-pub struct UpdateFundingState<M: Market<DECIMALS>, const DECIMALS: u8> {
+pub struct UpdateFundingState<M: BaseMarket<DECIMALS>, const DECIMALS: u8> {
     market: M,
     prices: Prices<M::Num>,
 }
 
-impl<M: Market<DECIMALS>, const DECIMALS: u8> UpdateFundingState<M, DECIMALS> {
+impl<M: PerpMarket<DECIMALS>, const DECIMALS: u8> UpdateFundingState<M, DECIMALS> {
     /// Create a new [`UpdateFundingState`] action.
     pub fn try_new(market: M, prices: &Prices<M::Num>) -> crate::Result<Self> {
         prices.validate()?;
@@ -30,7 +31,7 @@ impl<M: Market<DECIMALS>, const DECIMALS: u8> UpdateFundingState<M, DECIMALS> {
     pub fn execute(mut self) -> crate::Result<UpdateFundingReport<M::Num>> {
         const MATRIX: [(bool, bool); 4] =
             [(true, true), (true, false), (false, true), (false, false)];
-        let duration_in_seconds = self.market.just_passed_in_seconds(ClockKind::Funding)?;
+        let duration_in_seconds = self.market.just_passed_in_seconds_for_funding()?;
         let report = self.next_funding_amount_per_size(duration_in_seconds)?;
         for (is_long, is_long_collateral) in MATRIX {
             self.market.apply_delta_to_funding_amount_per_size(
@@ -434,6 +435,7 @@ mod tests {
     use std::{thread::sleep, time::Duration};
 
     use crate::{
+        market::LiquidityMarketExt,
         test::{TestMarket, TestPosition},
         PositionExt,
     };

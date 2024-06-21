@@ -3,14 +3,16 @@ use std::{collections::HashMap, fmt, time::Instant};
 use crate::{
     clock::ClockKind,
     fixed::FixedPointOps,
-    market::{Market, PnlFactorKind},
+    market::{
+        BaseMarket, LiquidityMarket, PerpMarket, PnlFactorKind, PositionImpactMarket, SwapMarket,
+    },
     num::{MulDiv, Num, Unsigned, UnsignedAbs},
     params::{
         fee::{BorrowingFeeParams, FundingFeeParams},
         position::PositionImpactDistributionParams,
         FeeParams, PositionParams, PriceImpactParams,
     },
-    pool::{Balance, Pool, PoolKind},
+    pool::{Balance, Pool},
     position::Position,
 };
 use num_traits::{CheckedSub, Signed};
@@ -276,7 +278,21 @@ impl Default for TestMarket<u128, 20> {
     }
 }
 
-impl<T, const DECIMALS: u8> Market<DECIMALS> for TestMarket<T, DECIMALS>
+impl<T, const DECIMALS: u8> TestMarket<T, DECIMALS>
+where
+    T: CheckedSub + fmt::Display + FixedPointOps<DECIMALS>,
+    T::Signed: Num + std::fmt::Debug,
+{
+    fn just_passed_in_seconds(&mut self, clock: ClockKind) -> crate::Result<u64> {
+        let now = Instant::now();
+        let clock = self.clocks.entry(clock).or_insert(now);
+        let duration = now.saturating_duration_since(*clock);
+        *clock = now;
+        Ok(duration.as_secs())
+    }
+}
+
+impl<T, const DECIMALS: u8> BaseMarket<DECIMALS> for TestMarket<T, DECIMALS>
 where
     T: CheckedSub + fmt::Display + FixedPointOps<DECIMALS>,
     T::Signed: Num + std::fmt::Debug,
@@ -287,54 +303,92 @@ where
 
     type Pool = TestPool<T>;
 
-    fn pool(&self, kind: PoolKind) -> crate::Result<Option<&Self::Pool>> {
-        let pool = match kind {
-            PoolKind::Primary => &self.primary,
-            PoolKind::SwapImpact => &self.swap_impact,
-            PoolKind::ClaimableFee => &self.fee,
-            PoolKind::OpenInterestForLong => &self.open_interest.0,
-            PoolKind::OpenInterestForShort => &self.open_interest.1,
-            PoolKind::OpenInterestInTokensForLong => &self.open_interest_in_tokens.0,
-            PoolKind::OpenInterestInTokensForShort => &self.open_interest_in_tokens.1,
-            PoolKind::PositionImpact => &self.position_impact,
-            PoolKind::BorrowingFactor => &self.borrowing_factor,
-            PoolKind::FundingAmountPerSizeForLong => &self.funding_amount_per_size.0,
-            PoolKind::FundingAmountPerSizeForShort => &self.funding_amount_per_size.1,
-            PoolKind::ClaimableFundingAmountPerSizeForLong => {
-                &self.claimable_funding_amount_per_size.0
-            }
-            PoolKind::ClaimableFundingAmountPerSizeForShort => {
-                &self.claimable_funding_amount_per_size.1
-            }
-        };
-        Ok(Some(pool))
+    fn liquidity_pool(&self) -> crate::Result<&Self::Pool> {
+        Ok(&self.primary)
     }
 
-    fn pool_mut(&mut self, kind: PoolKind) -> crate::Result<Option<&mut Self::Pool>> {
-        let pool = match kind {
-            PoolKind::Primary => &mut self.primary,
-            PoolKind::SwapImpact => &mut self.swap_impact,
-            PoolKind::ClaimableFee => &mut self.fee,
-            PoolKind::OpenInterestForLong => &mut self.open_interest.0,
-            PoolKind::OpenInterestForShort => &mut self.open_interest.1,
-            PoolKind::OpenInterestInTokensForLong => &mut self.open_interest_in_tokens.0,
-            PoolKind::OpenInterestInTokensForShort => &mut self.open_interest_in_tokens.1,
-            PoolKind::PositionImpact => &mut self.position_impact,
-            PoolKind::BorrowingFactor => &mut self.borrowing_factor,
-            PoolKind::FundingAmountPerSizeForLong => &mut self.funding_amount_per_size.0,
-            PoolKind::FundingAmountPerSizeForShort => &mut self.funding_amount_per_size.1,
-            PoolKind::ClaimableFundingAmountPerSizeForLong => {
-                &mut self.claimable_funding_amount_per_size.0
-            }
-            PoolKind::ClaimableFundingAmountPerSizeForShort => {
-                &mut self.claimable_funding_amount_per_size.1
-            }
-        };
-        Ok(Some(pool))
+    fn liquidity_pool_mut(&mut self) -> crate::Result<&mut Self::Pool> {
+        Ok(&mut self.primary)
     }
 
+    fn claimable_fee_pool(&self) -> crate::Result<&Self::Pool> {
+        Ok(&self.fee)
+    }
+
+    fn claimable_fee_pool_mut(&mut self) -> crate::Result<&mut Self::Pool> {
+        Ok(&mut self.fee)
+    }
+
+    fn swap_impact_pool(&self) -> crate::Result<&Self::Pool> {
+        Ok(&self.swap_impact)
+    }
+
+    fn open_interest_pool(&self, is_long: bool) -> crate::Result<&Self::Pool> {
+        if is_long {
+            Ok(&self.open_interest.0)
+        } else {
+            Ok(&self.open_interest.1)
+        }
+    }
+
+    fn open_interest_in_tokens_pool(&self, is_long: bool) -> crate::Result<&Self::Pool> {
+        if is_long {
+            Ok(&self.open_interest_in_tokens.0)
+        } else {
+            Ok(&self.open_interest_in_tokens.1)
+        }
+    }
+
+    fn usd_to_amount_divisor(&self) -> Self::Num {
+        self.value_to_amount_divisor.clone()
+    }
+
+    fn max_pool_amount(&self, _is_long_token: bool) -> crate::Result<Self::Num> {
+        Ok(self.max_pool_amount.clone())
+    }
+
+    fn max_pnl_factor(&self, kind: PnlFactorKind, _is_long: bool) -> crate::Result<Self::Num> {
+        let factor = match kind {
+            PnlFactorKind::Deposit => self.max_pnl_factors.deposit.clone(),
+            PnlFactorKind::Withdrawal => self.max_pnl_factors.withdrawal.clone(),
+        };
+        Ok(factor)
+    }
+
+    fn reserve_factor(&self) -> crate::Result<Self::Num> {
+        Ok(self.reserve_factor.clone())
+    }
+}
+
+impl<T, const DECIMALS: u8> SwapMarket<DECIMALS> for TestMarket<T, DECIMALS>
+where
+    T: CheckedSub + fmt::Display + FixedPointOps<DECIMALS>,
+    T::Signed: Num + std::fmt::Debug,
+{
+    fn swap_impact_params(&self) -> crate::Result<PriceImpactParams<Self::Num>> {
+        Ok(self.swap_impact_params.clone())
+    }
+
+    fn swap_fee_params(&self) -> crate::Result<FeeParams<Self::Num>> {
+        Ok(self.swap_fee_params.clone())
+    }
+
+    fn swap_impact_pool_mut(&mut self) -> crate::Result<&mut Self::Pool> {
+        Ok(&mut self.swap_impact)
+    }
+}
+
+impl<T, const DECIMALS: u8> LiquidityMarket<DECIMALS> for TestMarket<T, DECIMALS>
+where
+    T: CheckedSub + fmt::Display + FixedPointOps<DECIMALS>,
+    T::Signed: Num + std::fmt::Debug,
+{
     fn total_supply(&self) -> Self::Num {
         self.total_supply.clone()
+    }
+
+    fn max_pool_value_for_deposit(&self, _is_long_token: bool) -> crate::Result<Self::Num> {
+        Ok(self.max_pool_value_for_deposit.clone())
     }
 
     fn mint(&mut self, amount: &Self::Num) -> Result<(), crate::Error> {
@@ -352,41 +406,27 @@ where
             .ok_or(crate::Error::Underflow)?;
         Ok(())
     }
+}
 
-    fn just_passed_in_seconds(&mut self, clock: ClockKind) -> crate::Result<u64> {
-        let now = Instant::now();
-        let clock = self.clocks.entry(clock).or_insert(now);
-        let duration = now.saturating_duration_since(*clock);
-        *clock = now;
-        Ok(duration.as_secs())
+impl<T, const DECIMALS: u8> PositionImpactMarket<DECIMALS> for TestMarket<T, DECIMALS>
+where
+    T: CheckedSub + fmt::Display + FixedPointOps<DECIMALS>,
+    T::Signed: Num + std::fmt::Debug,
+{
+    fn position_impact_pool(&self) -> crate::Result<&Self::Pool> {
+        Ok(&self.position_impact)
     }
 
-    fn usd_to_amount_divisor(&self) -> Self::Num {
-        self.value_to_amount_divisor.clone()
+    fn position_impact_pool_mut(&mut self) -> crate::Result<&mut Self::Pool> {
+        Ok(&mut self.position_impact)
     }
 
-    fn funding_amount_per_size_adjustment(&self) -> Self::Num {
-        self.funding_amount_per_size_adjustment.clone()
-    }
-
-    fn swap_impact_params(&self) -> crate::Result<PriceImpactParams<Self::Num>> {
-        Ok(self.swap_impact_params.clone())
-    }
-
-    fn swap_fee_params(&self) -> crate::Result<FeeParams<Self::Num>> {
-        Ok(self.swap_fee_params.clone())
-    }
-
-    fn position_params(&self) -> crate::Result<PositionParams<Self::Num>> {
-        Ok(self.position_params.clone())
+    fn just_passed_in_seconds_for_position_impact_distribution(&mut self) -> crate::Result<u64> {
+        self.just_passed_in_seconds(ClockKind::PriceImpactDistribution)
     }
 
     fn position_impact_params(&self) -> crate::Result<PriceImpactParams<Self::Num>> {
         Ok(self.position_impact_params.clone())
-    }
-
-    fn order_fee_params(&self) -> crate::Result<FeeParams<Self::Num>> {
-        Ok(self.order_fee_params.clone())
     }
 
     fn position_impact_distribution_params(
@@ -394,15 +434,13 @@ where
     ) -> crate::Result<PositionImpactDistributionParams<Self::Num>> {
         Ok(self.position_impact_distribution_params.clone())
     }
+}
 
-    fn borrowing_fee_params(&self) -> crate::Result<BorrowingFeeParams<Self::Num>> {
-        Ok(self.borrowing_fee_params.clone())
-    }
-
-    fn funding_fee_params(&self) -> crate::Result<FundingFeeParams<Self::Num>> {
-        Ok(self.funding_fee_params.clone())
-    }
-
+impl<T, const DECIMALS: u8> PerpMarket<DECIMALS> for TestMarket<T, DECIMALS>
+where
+    T: CheckedSub + fmt::Display + FixedPointOps<DECIMALS>,
+    T::Signed: Num + std::fmt::Debug,
+{
     fn funding_factor_per_second(&self) -> &Self::Signed {
         &self.funding_factor_per_second
     }
@@ -411,32 +449,105 @@ where
         &mut self.funding_factor_per_second
     }
 
-    fn reserve_factor(&self) -> crate::Result<Self::Num> {
-        Ok(self.reserve_factor.clone())
+    fn open_interest_pool_mut(&mut self, is_long: bool) -> crate::Result<&mut Self::Pool> {
+        if is_long {
+            Ok(&mut self.open_interest.0)
+        } else {
+            Ok(&mut self.open_interest.1)
+        }
+    }
+
+    fn open_interest_in_tokens_pool_mut(
+        &mut self,
+        is_long: bool,
+    ) -> crate::Result<&mut Self::Pool> {
+        if is_long {
+            Ok(&mut self.open_interest_in_tokens.0)
+        } else {
+            Ok(&mut self.open_interest_in_tokens.1)
+        }
+    }
+
+    fn borrowing_fee_params(&self) -> crate::Result<BorrowingFeeParams<Self::Num>> {
+        Ok(self.borrowing_fee_params.clone())
+    }
+
+    fn borrowing_factor_pool(&self) -> crate::Result<&Self::Pool> {
+        Ok(&self.borrowing_factor)
+    }
+
+    fn borrowing_factor_pool_mut(&mut self) -> crate::Result<&mut Self::Pool> {
+        Ok(&mut self.borrowing_factor)
+    }
+
+    fn funding_amount_per_size_adjustment(&self) -> Self::Num {
+        self.funding_amount_per_size_adjustment.clone()
+    }
+
+    fn funding_fee_params(&self) -> crate::Result<FundingFeeParams<Self::Num>> {
+        Ok(self.funding_fee_params.clone())
+    }
+
+    fn funding_amount_per_size_pool_mut(
+        &mut self,
+        is_long: bool,
+    ) -> crate::Result<&mut Self::Pool> {
+        if is_long {
+            Ok(&mut self.funding_amount_per_size.0)
+        } else {
+            Ok(&mut self.funding_amount_per_size.1)
+        }
+    }
+
+    fn claimable_funding_amount_per_size_pool_mut(
+        &mut self,
+        is_long: bool,
+    ) -> crate::Result<&mut Self::Pool> {
+        if is_long {
+            Ok(&mut self.claimable_funding_amount_per_size.0)
+        } else {
+            Ok(&mut self.claimable_funding_amount_per_size.1)
+        }
+    }
+
+    fn funding_amount_per_size_pool(&self, is_long: bool) -> crate::Result<&Self::Pool> {
+        if is_long {
+            Ok(&self.funding_amount_per_size.0)
+        } else {
+            Ok(&self.funding_amount_per_size.1)
+        }
+    }
+
+    fn claimable_funding_amount_per_size_pool(&self, is_long: bool) -> crate::Result<&Self::Pool> {
+        if is_long {
+            Ok(&self.claimable_funding_amount_per_size.0)
+        } else {
+            Ok(&self.claimable_funding_amount_per_size.1)
+        }
+    }
+
+    fn position_params(&self) -> crate::Result<PositionParams<Self::Num>> {
+        Ok(self.position_params.clone())
+    }
+
+    fn order_fee_params(&self) -> crate::Result<FeeParams<Self::Num>> {
+        Ok(self.order_fee_params.clone())
     }
 
     fn open_interest_reserve_factor(&self) -> crate::Result<Self::Num> {
         Ok(self.open_interest_reserve_factor.clone())
     }
 
-    fn max_pnl_factor(&self, kind: PnlFactorKind, _is_long: bool) -> crate::Result<Self::Num> {
-        let factor = match kind {
-            PnlFactorKind::Deposit => self.max_pnl_factors.deposit.clone(),
-            PnlFactorKind::Withdrawal => self.max_pnl_factors.withdrawal.clone(),
-        };
-        Ok(factor)
-    }
-
-    fn max_pool_amount(&self, _is_long_token: bool) -> crate::Result<Self::Num> {
-        Ok(self.max_pool_amount.clone())
-    }
-
-    fn max_pool_value_for_deposit(&self, _is_long_token: bool) -> crate::Result<Self::Num> {
-        Ok(self.max_pool_value_for_deposit.clone())
-    }
-
     fn max_open_interest(&self, _is_long: bool) -> crate::Result<Self::Num> {
         Ok(self.max_open_interest.clone())
+    }
+
+    fn just_passed_in_seconds_for_borrowing(&mut self) -> crate::Result<u64> {
+        self.just_passed_in_seconds(ClockKind::Borrowing)
+    }
+
+    fn just_passed_in_seconds_for_funding(&mut self) -> crate::Result<u64> {
+        self.just_passed_in_seconds(ClockKind::Funding)
     }
 }
 

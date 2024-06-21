@@ -7,7 +7,9 @@ use anchor_client::{
 };
 use anchor_spl::associated_token::get_associated_token_address;
 use data_store::states::{
-    common::TokensWithFeed, withdrawal::TokenParams, NonceBytes, Pyth, Withdrawal,
+    common::{SwapParams, TokensWithFeed},
+    withdrawal::TokenParams,
+    NonceBytes, Pyth, Withdrawal,
 };
 use exchange::{accounts, instruction, instructions::CreateWithdrawalParams};
 
@@ -269,8 +271,6 @@ pub struct CancelWithdrawalBuilder<'a, C> {
     client: &'a crate::Client<C>,
     store: Pubkey,
     withdrawal: Pubkey,
-    cancel_for_user: Option<Pubkey>,
-    execution_fee: u64,
     hint: Option<CancelWithdrawalHint>,
 }
 
@@ -299,38 +299,14 @@ where
             client,
             store: *store,
             withdrawal: *withdrawal,
-            cancel_for_user: None,
-            execution_fee: 0,
             hint: None,
         }
-    }
-
-    /// Cancel for the given user.
-    pub fn cancel_for_user(&mut self, user: &Pubkey) -> &mut Self {
-        self.cancel_for_user = Some(*user);
-        self
-    }
-
-    /// Set execution fee to used
-    pub fn execution_fee(&mut self, fee: u64) -> &mut Self {
-        self.execution_fee = fee;
-        self
     }
 
     /// Set hint with the given withdrawal.
     pub fn hint(&mut self, withdrawal: &Withdrawal) -> &mut Self {
         self.hint = Some(withdrawal.into());
         self
-    }
-
-    fn get_user_and_authority(&self) -> (Pubkey, Pubkey) {
-        match self.cancel_for_user {
-            Some(user) => (user, self.client.payer()),
-            None => (
-                self.client.payer(),
-                self.client.controller_address(&self.store),
-            ),
-        }
     }
 
     async fn get_or_fetch_withdrawal_hint(&self) -> crate::Result<CancelWithdrawalHint> {
@@ -346,28 +322,26 @@ where
 
     /// Build a [`RequestBuilder`] for `cancel_withdrawal` instruction.
     pub async fn build(&self) -> crate::Result<RequestBuilder<'a, C>> {
-        let (user, authority) = self.get_user_and_authority();
+        let user = self.client.payer();
         let hint = self.get_or_fetch_withdrawal_hint().await?;
         Ok(self
             .client
             .exchange()
             .request()
             .accounts(accounts::CancelWithdrawal {
-                authority,
-                store: self.store,
-                data_store_program: self.client.data_store_program_id(),
-                withdrawal: self.withdrawal,
                 user,
+                controller: self.client.controller_address(&self.store),
+                store: self.store,
+                withdrawal: self.withdrawal,
                 market_token: hint.market_token_account,
                 market_token_withdrawal_vault: self
                     .client
                     .find_market_vault_address(&self.store, &hint.market_token),
                 token_program: anchor_spl::token::ID,
                 system_program: system_program::ID,
+                data_store_program: self.client.data_store_program_id(),
             })
-            .args(instruction::CancelWithdrawal {
-                execution_fee: self.execution_fee,
-            }))
+            .args(instruction::CancelWithdrawal {}))
     }
 }
 
@@ -382,6 +356,7 @@ pub struct ExecuteWithdrawalBuilder<'a, C> {
     hint: Option<ExecuteWithdrawalHint>,
     feeds_parser: FeedsParser,
     token_map: Option<Pubkey>,
+    cancel_on_execution_error: bool,
 }
 
 /// Hint for withdrawal execution.
@@ -389,14 +364,14 @@ pub struct ExecuteWithdrawalBuilder<'a, C> {
 pub struct ExecuteWithdrawalHint {
     market_token: Pubkey,
     user: Pubkey,
+    market_token_account: Pubkey,
     final_long_token_receiver: Pubkey,
     final_short_token_receiver: Pubkey,
     final_long_token: Pubkey,
     final_short_token: Pubkey,
     /// Feeds.
     pub feeds: TokensWithFeed,
-    long_swap_tokens: Vec<Pubkey>,
-    short_swap_tokens: Vec<Pubkey>,
+    swap: SwapParams,
 }
 
 impl<'a> From<&'a Withdrawal> for ExecuteWithdrawalHint {
@@ -404,12 +379,12 @@ impl<'a> From<&'a Withdrawal> for ExecuteWithdrawalHint {
         Self {
             market_token: withdrawal.fixed.tokens.market_token,
             user: withdrawal.fixed.user,
+            market_token_account: withdrawal.fixed.market_token_account,
             final_long_token: withdrawal.fixed.tokens.final_long_token,
             final_short_token: withdrawal.fixed.tokens.final_short_token,
             final_long_token_receiver: withdrawal.fixed.receivers.final_long_token_receiver,
             final_short_token_receiver: withdrawal.fixed.receivers.final_short_token_receiver,
-            long_swap_tokens: withdrawal.dynamic.swap.long_token_swap_path.clone(),
-            short_swap_tokens: withdrawal.dynamic.swap.short_token_swap_path.clone(),
+            swap: withdrawal.dynamic.swap.clone(),
             feeds: withdrawal.dynamic.tokens_with_feed.clone(),
         }
     }
@@ -425,6 +400,7 @@ where
         store: &Pubkey,
         oracle: &Pubkey,
         withdrawal: &Pubkey,
+        cancel_on_execution_error: bool,
     ) -> Self {
         Self {
             client,
@@ -436,6 +412,7 @@ where
             hint: None,
             feeds_parser: Default::default(),
             token_map: None,
+            cancel_on_execution_error,
         }
     }
 
@@ -501,22 +478,12 @@ where
             .parse(&hint.feeds)
             .collect::<Result<Vec<_>, _>>()?;
         let swap_path_markets = hint
-            .long_swap_tokens
-            .iter()
-            .chain(hint.short_swap_tokens.iter())
+            .swap
+            .unique_market_tokens_excluding_current(&hint.market_token)
             .map(|mint| AccountMeta {
                 pubkey: self.client.find_market_address(&self.store, mint),
                 is_signer: false,
                 is_writable: true,
-            });
-        let swap_path_mints = hint
-            .long_swap_tokens
-            .iter()
-            .chain(hint.short_swap_tokens.iter())
-            .map(|pubkey| AccountMeta {
-                pubkey: *pubkey,
-                is_signer: false,
-                is_writable: false,
             });
         Ok(self
             .client
@@ -540,6 +507,7 @@ where
                 market_token_withdrawal_vault: self
                     .client
                     .find_market_vault_address(&self.store, &hint.market_token),
+                market_token_account: hint.market_token_account,
                 final_long_token_receiver: hint.final_long_token_receiver,
                 final_short_token_receiver: hint.final_short_token_receiver,
                 final_long_token_vault: self
@@ -551,12 +519,12 @@ where
             })
             .args(instruction::ExecuteWithdrawal {
                 execution_fee: self.execution_fee,
+                cancel_on_execution_error: self.cancel_on_execution_error,
             })
             .accounts(
                 feeds
                     .into_iter()
                     .chain(swap_path_markets)
-                    .chain(swap_path_mints)
                     .collect::<Vec<_>>(),
             )
             .compute_budget(ComputeBudget::default().with_limit(EXECUTE_WITHDRAWAL_COMPUTE_BUDGET)))

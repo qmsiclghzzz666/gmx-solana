@@ -1,7 +1,6 @@
 use std::str::FromStr;
 
 use anchor_lang::{prelude::*, Bump};
-use anchor_spl::token::Mint;
 use bitmaps::Bitmap;
 use borsh::{BorshDeserialize, BorshSerialize};
 use gmx_core::{ClockKind, PoolKind};
@@ -15,14 +14,20 @@ use super::{Factor, InitSpace, Seed};
 
 pub use self::{
     config::{MarketConfig, MarketConfigKey},
-    ops::AsMarket,
+    ops::ValidateMarketBalances,
 };
 
 /// Market Operations.
 pub mod ops;
 
+/// Clock ops.
+pub mod clock;
+
 /// Market Config.
 pub mod config;
+
+/// Revertible Market Operations.
+pub mod revertible;
 
 /// Max number of flags.
 pub const MAX_FLAGS: usize = 8;
@@ -34,6 +39,18 @@ pub type MarketFlagValue = u8;
 pub type MarketFlagBitmap = Bitmap<MAX_FLAGS>;
 
 const MAX_NAME_LEN: usize = 64;
+
+/// Find PDA for [`Market`] account.
+pub fn find_market_address(
+    store: &Pubkey,
+    token: &Pubkey,
+    store_program_id: &Pubkey,
+) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[Market::SEED, store.as_ref(), token.as_ref()],
+        store_program_id,
+    )
+}
 
 /// Market.
 #[account(zero_copy)]
@@ -228,13 +245,6 @@ impl Market {
         self.pools.get(kind).copied()
     }
 
-    pub(crate) fn as_market<'a, 'info>(
-        &'a mut self,
-        mint: &'a mut Account<'info, Mint>,
-    ) -> AsMarket<'a, 'info> {
-        AsMarket::new(self, mint)
-    }
-
     /// Validate the market.
     pub fn validate(&self, store: &Pubkey) -> Result<()> {
         require_eq!(*store, self.store, DataStoreError::InvalidMarket);
@@ -312,6 +322,28 @@ impl MarketMeta {
         }
     }
 
+    /// Check if the given token is long token or short token, and return it's side.
+    pub fn to_token_side(&self, token: &Pubkey) -> Result<bool> {
+        if *token == self.long_token_mint {
+            Ok(true)
+        } else if *token == self.short_token_mint {
+            Ok(false)
+        } else {
+            err!(DataStoreError::InvalidArgument)
+        }
+    }
+
+    /// Get opposite token.
+    pub fn opposite_token(&self, token: &Pubkey) -> Result<&Pubkey> {
+        if *token == self.long_token_mint {
+            Ok(&self.short_token_mint)
+        } else if *token == self.short_token_mint {
+            Ok(&self.long_token_mint)
+        } else {
+            err!(DataStoreError::InvalidArgument)
+        }
+    }
+
     /// Check if the given token is a valid collateral token,
     /// return error if it is not.
     pub fn validate_collateral_token(&self, token: &Pubkey) -> Result<()> {
@@ -320,6 +352,23 @@ impl MarketMeta {
         } else {
             Err(DataStoreError::InvalidCollateralToken.into())
         }
+    }
+}
+
+/// Type that has market meta.
+pub trait HasMarketMeta {
+    fn is_pure(&self) -> bool;
+
+    fn market_meta(&self) -> &MarketMeta;
+}
+
+impl HasMarketMeta for Market {
+    fn is_pure(&self) -> bool {
+        self.is_pure()
+    }
+
+    fn market_meta(&self) -> &MarketMeta {
+        &self.meta
     }
 }
 
@@ -446,6 +495,16 @@ impl Clocks {
         self.borrowing = current;
         self.funding = current;
         Ok(())
+    }
+
+    fn get(&self, kind: ClockKind) -> Option<&i64> {
+        let clock = match kind {
+            ClockKind::PriceImpactDistribution => &self.price_impact_distribution,
+            ClockKind::Borrowing => &self.borrowing,
+            ClockKind::Funding => &self.funding,
+            _ => return None,
+        };
+        Some(clock)
     }
 
     fn get_mut(&mut self, kind: ClockKind) -> Option<&mut i64> {

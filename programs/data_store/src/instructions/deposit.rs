@@ -106,12 +106,6 @@ pub struct RemoveDeposit<'info> {
     /// and has been checked in `deposit`'s constraint.
     #[account(mut)]
     pub user: UncheckedAccount<'info>,
-    /// The token account for receiving the initial long tokens.
-    #[account(token::authority = user)]
-    pub initial_long_token: Option<Account<'info, TokenAccount>>,
-    /// The token account for receiving the initial short tokens.
-    #[account(token::authority = user)]
-    pub initial_short_token: Option<Account<'info, TokenAccount>>,
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
 }

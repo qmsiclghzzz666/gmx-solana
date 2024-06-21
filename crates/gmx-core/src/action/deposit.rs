@@ -1,7 +1,7 @@
 use num_traits::{CheckedAdd, CheckedMul, CheckedSub, Signed, Zero};
 
 use crate::{
-    market::{Market, MarketExt},
+    market::{BaseMarket, BaseMarketExt, LiquidityMarket, LiquidityMarketExt, SwapMarketExt},
     num::{MulDiv, UnsignedAbs},
     params::Fees,
     utils, BalanceExt, PnlFactorKind, PoolExt,
@@ -11,7 +11,7 @@ use super::Prices;
 
 /// A deposit.
 #[must_use]
-pub struct Deposit<M: Market<DECIMALS>, const DECIMALS: u8> {
+pub struct Deposit<M: BaseMarket<DECIMALS>, const DECIMALS: u8> {
     market: M,
     params: DepositParams<M::Num>,
 }
@@ -102,7 +102,7 @@ where
     }
 }
 
-impl<const DECIMALS: u8, M: Market<DECIMALS>> Deposit<M, DECIMALS> {
+impl<const DECIMALS: u8, M: LiquidityMarket<DECIMALS>> Deposit<M, DECIMALS> {
     /// Create a new deposit to the given market.
     pub fn try_new(
         market: M,
@@ -125,7 +125,7 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Deposit<M, DECIMALS> {
 
     /// Get the price impact USD value.
     fn price_impact(&self) -> crate::Result<(M::Signed, M::Num, M::Num)> {
-        let delta = self.market.primary_pool()?.pool_delta_with_amounts(
+        let delta = self.market.liquidity_pool()?.pool_delta_with_amounts(
             &self
                 .params
                 .long_token_amount
@@ -336,7 +336,7 @@ impl<const DECIMALS: u8, M: Market<DECIMALS>> Deposit<M, DECIMALS> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{action::Prices, market::MarketExt, test::TestMarket};
+    use crate::{action::Prices, market::LiquidityMarketExt, test::TestMarket};
 
     #[test]
     fn basic() -> Result<(), crate::Error> {

@@ -7,8 +7,6 @@ pub mod execute_withdrawal;
 /// Execute Order.
 pub mod execute_order;
 
-pub(crate) mod utils;
-
 pub use execute_deposit::*;
 pub use execute_order::*;
 pub use execute_withdrawal::*;

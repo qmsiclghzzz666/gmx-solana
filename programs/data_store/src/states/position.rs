@@ -1,10 +1,8 @@
-use std::cell::RefMut;
-
-use crate::{constants, DataStoreError};
+use crate::DataStoreError;
 use anchor_lang::prelude::*;
 use num_enum::TryFromPrimitive;
 
-use super::{AsMarket, Seed};
+use super::Seed;
 
 /// Position.
 #[account(zero_copy)]
@@ -24,6 +22,14 @@ pub struct Position {
     pub market_token: Pubkey,
     /// Collateral token.
     pub collateral_token: Pubkey,
+    /// Position State.
+    pub state: PositionState,
+}
+
+/// Position State.
+#[cfg_attr(feature = "debug", derive(Debug))]
+#[account(zero_copy)]
+pub struct PositionState {
     /// Increased at slot.
     pub increased_at_slot: u64,
     /// The time that the position last increased at.
@@ -108,33 +114,22 @@ impl Position {
         self.owner = *owner;
         self.market_token = *market_token;
         self.collateral_token = *collateral_token;
-        self.increased_at_slot = 0;
-        self.increased_at = 0;
-        self.decreased_at_slot = 0;
-        self.decreased_at = 0;
-        self.size_in_tokens = 0;
-        self.collateral_amount = 0;
-        self.size_in_usd = 0;
-        self.borrowing_factor = 0;
-        self.funding_fee_amount_per_size = 0;
-        self.long_token_claimable_funding_amount_per_size = 0;
-        self.short_token_claimable_funding_amount_per_size = 0;
         Ok(())
     }
 
     /// Update state after increased.
     pub fn increased(&mut self) -> Result<()> {
         let clock = Clock::get()?;
-        self.increased_at_slot = clock.slot;
-        self.increased_at = clock.unix_timestamp;
+        self.state.increased_at_slot = clock.slot;
+        self.state.increased_at = clock.unix_timestamp;
         Ok(())
     }
 
     /// Update state after decreased.
     pub fn decreased(&mut self) -> Result<()> {
         let clock = Clock::get()?;
-        self.decreased_at_slot = clock.slot;
-        self.decreased_at = clock.unix_timestamp;
+        self.state.decreased_at_slot = clock.slot;
+        self.state.decreased_at = clock.unix_timestamp;
         Ok(())
     }
 }
@@ -152,138 +147,4 @@ pub enum PositionKind {
     Long,
     /// Short position.
     Short,
-}
-
-/// Position Operations.
-pub struct PositionOps<'a, 'info> {
-    position: RefMut<'a, Position>,
-    market: AsMarket<'a, 'info>,
-    is_collateral_token_long: bool,
-    is_long: bool,
-}
-
-impl<'a, 'info> PositionOps<'a, 'info> {
-    pub(crate) fn try_new(
-        market: AsMarket<'a, 'info>,
-        position: &'a mut AccountLoader<'info, Position>,
-    ) -> Result<Self> {
-        let position = position.load_mut()?;
-
-        let is_long = position.is_long()?;
-
-        let meta = market.meta();
-        require_eq!(
-            position.market_token,
-            meta.market_token_mint,
-            DataStoreError::InvalidPositionMarket
-        );
-
-        let is_collateral_token_long = if meta.long_token_mint == position.collateral_token {
-            true
-        } else if meta.short_token_mint == position.collateral_token {
-            false
-        } else {
-            return err!(DataStoreError::InvalidPositionCollateralToken);
-        };
-
-        Ok(Self {
-            market,
-            position,
-            is_collateral_token_long,
-            is_long,
-        })
-    }
-}
-
-impl<'a, 'info> gmx_core::Position<{ constants::MARKET_DECIMALS }> for PositionOps<'a, 'info> {
-    type Num = u128;
-
-    type Signed = i128;
-
-    type Market = AsMarket<'a, 'info>;
-
-    fn market(&self) -> &Self::Market {
-        &self.market
-    }
-
-    fn market_mut(&mut self) -> &mut Self::Market {
-        &mut self.market
-    }
-
-    fn is_collateral_token_long(&self) -> bool {
-        self.is_collateral_token_long
-    }
-
-    fn collateral_amount(&self) -> &Self::Num {
-        &self.position.collateral_amount
-    }
-
-    fn collateral_amount_mut(&mut self) -> &mut Self::Num {
-        &mut self.position.collateral_amount
-    }
-
-    fn size_in_usd(&self) -> &Self::Num {
-        &self.position.size_in_usd
-    }
-
-    fn size_in_tokens(&self) -> &Self::Num {
-        &self.position.size_in_tokens
-    }
-
-    fn size_in_usd_mut(&mut self) -> &mut Self::Num {
-        &mut self.position.size_in_usd
-    }
-
-    fn size_in_tokens_mut(&mut self) -> &mut Self::Num {
-        &mut self.position.size_in_tokens
-    }
-
-    fn is_long(&self) -> bool {
-        self.is_long
-    }
-
-    fn increased(&mut self) -> gmx_core::Result<()> {
-        self.position.increased()?;
-        Ok(())
-    }
-
-    fn decreased(&mut self) -> gmx_core::Result<()> {
-        self.position.decreased()?;
-        Ok(())
-    }
-
-    fn borrowing_factor(&self) -> &Self::Num {
-        &self.position.borrowing_factor
-    }
-
-    fn borrowing_factor_mut(&mut self) -> &mut Self::Num {
-        &mut self.position.borrowing_factor
-    }
-
-    fn funding_fee_amount_per_size(&self) -> &Self::Num {
-        &self.position.funding_fee_amount_per_size
-    }
-
-    fn funding_fee_amount_per_size_mut(&mut self) -> &mut Self::Num {
-        &mut self.position.funding_fee_amount_per_size
-    }
-
-    fn claimable_funding_fee_amount_per_size(&self, is_long_collateral: bool) -> &Self::Num {
-        if is_long_collateral {
-            &self.position.long_token_claimable_funding_amount_per_size
-        } else {
-            &self.position.short_token_claimable_funding_amount_per_size
-        }
-    }
-
-    fn claimable_funding_fee_amount_per_size_mut(
-        &mut self,
-        is_long_collateral: bool,
-    ) -> &mut Self::Num {
-        if is_long_collateral {
-            &mut self.position.long_token_claimable_funding_amount_per_size
-        } else {
-            &mut self.position.short_token_claimable_funding_amount_per_size
-        }
-    }
 }

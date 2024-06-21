@@ -374,7 +374,7 @@ impl ExchangeArgs {
                     position
                         .is_long()
                         .map_err(anchor_client::ClientError::from)?,
-                    Some(position.size_in_usd),
+                    Some(position.state.size_in_usd),
                 );
                 if let Some(token) = final_output_token {
                     builder.final_output_token(token, final_output_token_account.as_ref());

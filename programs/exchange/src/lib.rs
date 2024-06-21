@@ -46,13 +46,13 @@ pub mod exchange {
     pub fn execute_deposit<'info>(
         ctx: Context<'_, '_, 'info, 'info, ExecuteDeposit<'info>>,
         execution_fee: u64,
+        cancel_on_execution_error: bool,
     ) -> Result<()> {
-        instructions::execute_deposit(ctx, execution_fee)
+        instructions::execute_deposit(ctx, execution_fee, cancel_on_execution_error)
     }
 
-    #[access_control(instructions::only_controller_or_deposit_creator(&ctx))]
-    pub fn cancel_deposit(ctx: Context<CancelDeposit>, execution_fee: u64) -> Result<()> {
-        instructions::cancel_deposit(ctx, execution_fee)
+    pub fn cancel_deposit(ctx: Context<CancelDeposit>) -> Result<()> {
+        instructions::cancel_deposit(ctx)
     }
 
     // Withdrawal.
@@ -64,17 +64,17 @@ pub mod exchange {
         instructions::create_withdrawal(ctx, nonce, params)
     }
 
-    #[access_control(instructions::only_controller_or_withdrawal_creator(&ctx))]
-    pub fn cancel_withdrawal(ctx: Context<CancelWithdrawal>, execution_fee: u64) -> Result<()> {
-        instructions::cancel_withdrawal(ctx, execution_fee)
+    pub fn cancel_withdrawal(ctx: Context<CancelWithdrawal>) -> Result<()> {
+        instructions::cancel_withdrawal(ctx)
     }
 
     #[access_control(Authenticate::only_order_keeper(&ctx))]
     pub fn execute_withdrawal<'info>(
         ctx: Context<'_, '_, 'info, 'info, ExecuteWithdrawal<'info>>,
         execution_fee: u64,
+        cancel_on_execution_error: bool,
     ) -> Result<()> {
-        instructions::execute_withdrawal(ctx, execution_fee)
+        instructions::execute_withdrawal(ctx, execution_fee, cancel_on_execution_error)
     }
 
     // Order.
@@ -91,8 +91,14 @@ pub mod exchange {
         ctx: Context<'_, '_, 'info, 'info, ExecuteOrder<'info>>,
         recent_timestamp: i64,
         execution_fee: u64,
+        cancel_on_execution_error: bool,
     ) -> Result<()> {
-        instructions::execute_order(ctx, recent_timestamp, execution_fee)
+        instructions::execute_order(
+            ctx,
+            recent_timestamp,
+            execution_fee,
+            cancel_on_execution_error,
+        )
     }
 }
 

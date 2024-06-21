@@ -1,32 +1,26 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Token, TokenAccount};
-use data_store::{
-    cpi::accounts::RemoveWithdrawal,
-    program::DataStore,
-    states::Withdrawal,
-    utils::{Authenticate, Authentication},
-};
+use data_store::{program::DataStore, states::Withdrawal};
 
-use crate::{utils::ControllerSeeds, ExchangeError};
+use crate::utils::ControllerSeeds;
 
-pub(crate) fn only_controller_or_withdrawal_creator(ctx: &Context<CancelWithdrawal>) -> Result<()> {
-    if ctx.accounts.user.is_signer {
-        // The creator is signed for the cancellation.
-        Ok(())
-    } else {
-        // `check_role` CPI will only pass when `authority` is a signer.
-        Authenticate::only_controller(ctx)
-    }
-}
+use super::utils::CancelWithdrawalUtils;
 
 #[derive(Accounts)]
 pub struct CancelWithdrawal<'info> {
-    /// CHECK: check by access control.
     #[account(mut)]
-    pub authority: UncheckedAccount<'info>,
+    pub user: Signer<'info>,
+    /// CHECK: only used as signing PDA.
+    #[account(
+        seeds = [
+            crate::constants::CONTROLLER_SEED,
+            store.key().as_ref(),
+        ],
+        bump,
+    )]
+    pub controller: UncheckedAccount<'info>,
     /// CHECK: used and checked by CPI.
     pub store: UncheckedAccount<'info>,
-    pub data_store_program: Program<'info, DataStore>,
     /// The withdrawal to cancel.
     ///
     /// ## Notes
@@ -35,9 +29,6 @@ pub struct CancelWithdrawal<'info> {
     /// through CPI.
     #[account(mut)]
     pub withdrawal: Account<'info, Withdrawal>,
-    /// CHECK: check by access control.
-    #[account(mut)]
-    pub user: UncheckedAccount<'info>,
     /// Token account for receiving the market tokens.
     #[account(mut, token::authority = user)]
     pub market_token: Account<'info, TokenAccount>,
@@ -46,61 +37,30 @@ pub struct CancelWithdrawal<'info> {
     pub market_token_withdrawal_vault: Account<'info, TokenAccount>,
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
+    pub data_store_program: Program<'info, DataStore>,
 }
 
 /// Cancel Withdrawal.
-pub fn cancel_withdrawal(ctx: Context<CancelWithdrawal>, execution_fee: u64) -> Result<()> {
+pub fn cancel_withdrawal(ctx: Context<CancelWithdrawal>) -> Result<()> {
     let controller = ControllerSeeds::find(ctx.accounts.store.key);
-    let refund = ctx
-        .accounts
-        .withdrawal
-        .get_lamports()
-        .checked_sub(execution_fee.min(super::MAX_WITHDRAWAL_EXECUTION_FEE))
-        .ok_or(ExchangeError::NotEnoughExecutionFee)?;
-    data_store::cpi::remove_withdrawal(
-        ctx.accounts
-            .remove_withdrawal_ctx()
-            .with_signer(&[&controller.as_seeds()]),
-        refund,
-    )?;
+    ctx.accounts
+        .cancel_utils()
+        .execute(ctx.accounts.user.to_account_info(), &controller, 0)?;
     Ok(())
 }
 
-impl<'info> Authentication<'info> for CancelWithdrawal<'info> {
-    fn authority(&self) -> AccountInfo<'info> {
-        self.authority.to_account_info()
-    }
-
-    fn on_error(&self) -> Result<()> {
-        Err(error!(ExchangeError::PermissionDenied))
-    }
-
-    fn data_store_program(&self) -> AccountInfo<'info> {
-        self.data_store_program.to_account_info()
-    }
-
-    fn store(&self) -> AccountInfo<'info> {
-        self.store.to_account_info()
-    }
-}
-
 impl<'info> CancelWithdrawal<'info> {
-    fn remove_withdrawal_ctx(&self) -> CpiContext<'_, '_, '_, 'info, RemoveWithdrawal<'info>> {
-        CpiContext::new(
-            self.data_store_program.to_account_info(),
-            RemoveWithdrawal {
-                payer: self.authority.to_account_info(),
-                authority: self.authority.to_account_info(),
-                store: self.store.to_account_info(),
-                withdrawal: self.withdrawal.to_account_info(),
-                user: self.user.to_account_info(),
-                system_program: self.system_program.to_account_info(),
-                market_token: Some(self.market_token.to_account_info()),
-                market_token_withdrawal_vault: Some(
-                    self.market_token_withdrawal_vault.to_account_info(),
-                ),
-                token_program: self.token_program.to_account_info(),
-            },
-        )
+    fn cancel_utils(&self) -> CancelWithdrawalUtils<'_, 'info> {
+        CancelWithdrawalUtils {
+            data_store_program: self.data_store_program.to_account_info(),
+            token_program: self.token_program.to_account_info(),
+            system_program: self.system_program.to_account_info(),
+            controller: self.controller.to_account_info(),
+            store: self.store.to_account_info(),
+            user: self.user.to_account_info(),
+            withdrawal: &self.withdrawal,
+            market_token_account: self.market_token.to_account_info(),
+            market_token_vault: self.market_token_withdrawal_vault.to_account_info(),
+        }
     }
 }

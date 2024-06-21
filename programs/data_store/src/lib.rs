@@ -278,6 +278,10 @@ pub mod data_store {
         instructions::unchecked_market_transfer_out(ctx, amount)
     }
 
+    pub fn get_market_meta(ctx: Context<ReadMarket>) -> Result<MarketMeta> {
+        instructions::get_market_meta(ctx)
+    }
+
     pub fn get_market_config(ctx: Context<ReadMarket>, key: String) -> Result<u128> {
         instructions::get_market_config(ctx, &key)
     }
@@ -436,23 +440,26 @@ pub mod data_store {
     #[access_control(internal::Authenticate::only_controller(&ctx))]
     pub fn execute_deposit<'info>(
         ctx: Context<'_, '_, 'info, 'info, ExecuteDeposit<'info>>,
-    ) -> Result<()> {
-        instructions::execute_deposit(ctx)
+        throw_on_execution_error: bool,
+    ) -> Result<bool> {
+        instructions::execute_deposit(ctx, throw_on_execution_error)
     }
 
     #[access_control(internal::Authenticate::only_controller(&ctx))]
     pub fn execute_withdrawal<'info>(
         ctx: Context<'_, '_, 'info, 'info, ExecuteWithdrawal<'info>>,
+        throw_on_execution_error: bool,
     ) -> Result<(u64, u64)> {
-        instructions::execute_withdrawal(ctx)
+        instructions::execute_withdrawal(ctx, throw_on_execution_error)
     }
 
     #[access_control(internal::Authenticate::only_controller(&ctx))]
     pub fn execute_order<'info>(
         ctx: Context<'_, '_, 'info, 'info, ExecuteOrder<'info>>,
         recent_timestamp: i64,
+        throw_on_execution_error: bool,
     ) -> Result<(bool, Box<TransferOut>)> {
-        instructions::execute_order(ctx, recent_timestamp)
+        instructions::execute_order(ctx, recent_timestamp, throw_on_execution_error)
     }
 
     #[access_control(internal::Authenticate::only_controller(&ctx))]

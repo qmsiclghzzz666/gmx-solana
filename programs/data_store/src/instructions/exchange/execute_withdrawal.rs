@@ -1,15 +1,20 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token, TokenAccount};
-use gmx_core::MarketExt;
+use gmx_core::{LiquidityMarketExt, PositionImpactMarketExt};
 
 use crate::{
     constants,
-    states::{Market, Oracle, Seed, Store, ValidateOracleTime, Withdrawal},
-    utils::internal::{self},
+    states::{
+        ops::ValidateMarketBalances,
+        revertible::{
+            swap_market::{SwapDirection, SwapMarkets},
+            Revertible, RevertibleLiquidityMarket,
+        },
+        HasMarketMeta, Market, Oracle, Seed, Store, ValidateOracleTime, Withdrawal,
+    },
+    utils::internal,
     DataStoreError, GmxCoreError,
 };
-
-use super::utils::swap::{unchecked_swap_with_params, unchecked_transfer_to_market};
 
 #[derive(Accounts)]
 pub struct ExecuteWithdrawal<'info> {
@@ -83,33 +88,18 @@ pub struct ExecuteWithdrawal<'info> {
 /// Execute a withdrawal.
 pub fn execute_withdrawal<'info>(
     ctx: Context<'_, '_, 'info, 'info, ExecuteWithdrawal<'info>>,
+    throw_on_execution_error: bool,
 ) -> Result<(u64, u64)> {
-    ctx.accounts.validate()?;
-    ctx.accounts.pre_execute()?;
-    let (final_long_amount, final_short_amount) = ctx.accounts.execute(ctx.remaining_accounts)?;
-
-    // Validate market balances.
-    let swap = &ctx.accounts.withdrawal.dynamic.swap;
-
-    let long_amount = if swap.long_token_swap_path.is_empty() {
-        final_long_amount
-    } else {
-        0
-    };
-
-    let short_amount = if swap.short_token_swap_path.is_empty() {
-        final_short_amount
-    } else {
-        0
-    };
-
-    ctx.accounts
-        .market
-        .load_mut()?
-        .as_market(&mut ctx.accounts.market_token_mint)
-        .validate_market_balances(long_amount, short_amount)?;
-
-    Ok((final_long_amount, final_short_amount))
+    ctx.accounts.validate_oracle()?;
+    match ctx.accounts.execute2(ctx.remaining_accounts) {
+        Ok(res) => Ok(res),
+        Err(err) if !throw_on_execution_error => {
+            // TODO: catch and throw missing oracle price error.
+            msg!("Execute withdrawal error: {}", err);
+            Ok((0, 0))
+        }
+        Err(err) => Err(err),
+    }
 }
 
 impl<'info> internal::Authentication<'info> for ExecuteWithdrawal<'info> {
@@ -141,147 +131,90 @@ impl<'info> ValidateOracleTime for ExecuteWithdrawal<'info> {
 }
 
 impl<'info> ExecuteWithdrawal<'info> {
-    fn validate(&self) -> Result<()> {
-        self.oracle.validate_time(self)?;
-        self.market.load()?.validate(&self.store.key())?;
-        Ok(())
+    fn validate_oracle(&self) -> Result<()> {
+        self.oracle.validate_time(self)
     }
 
-    fn pre_execute(&mut self) -> Result<()> {
-        let report = self
-            .market
-            .load_mut()?
-            .as_market(&mut self.market_token_mint)
-            .distribute_position_impact()
-            .map_err(GmxCoreError::from)?
-            .execute()
-            .map_err(GmxCoreError::from)?;
-        msg!("{:?}", report);
-        Ok(())
+    fn validate_market(&self) -> Result<()> {
+        self.market.load()?.validate(&self.store.key())
     }
 
-    fn execute(&mut self, remaining_accounts: &'info [AccountInfo<'info>]) -> Result<(u64, u64)> {
-        let (long_amount, short_amount) = self.perform_withdrawal()?;
-        let (final_long_amount, final_short_amount) =
-            self.perform_swaps(remaining_accounts, long_amount, short_amount)?;
-        require_gte!(
-            final_long_amount,
-            self.withdrawal.fixed.tokens.params.min_long_token_amount,
-            DataStoreError::OutputAmountTooSmall
-        );
-        require_gte!(
-            final_short_amount,
-            self.withdrawal.fixed.tokens.params.min_short_token_amount,
-            DataStoreError::OutputAmountTooSmall
-        );
-        self.withdrawal.fixed.tokens.market_token_amount = 0;
-        Ok((final_long_amount, final_short_amount))
-    }
+    fn execute2(&mut self, remaining_accounts: &'info [AccountInfo<'info>]) -> Result<(u64, u64)> {
+        self.validate_market()?;
 
-    fn perform_withdrawal(&mut self) -> Result<(u64, u64)> {
-        let meta = &self.market.load()?.meta().clone();
-        let index_token_price = self
-            .oracle
-            .primary
-            .get(&meta.index_token_mint)
-            .ok_or(DataStoreError::RequiredResourceNotFound)?
-            .max
-            .to_unit_price();
-        let long_token_price = self
-            .oracle
-            .primary
-            .get(&meta.long_token_mint)
-            .ok_or(DataStoreError::RequiredResourceNotFound)?
-            .max
-            .to_unit_price();
-        let short_token_price = self
-            .oracle
-            .primary
-            .get(&meta.short_token_mint)
-            .ok_or(DataStoreError::RequiredResourceNotFound)?
-            .max
-            .to_unit_price();
-        let report = self
-            .market
-            .load_mut()?
-            .as_market(&mut self.market_token_mint)
-            .enable_transfer(self.token_program.to_account_info(), &self.store)
-            .with_vault(self.market_token_withdrawal_vault.to_account_info())
-            .withdraw(
-                self.withdrawal.fixed.tokens.market_token_amount.into(),
-                gmx_core::action::Prices {
-                    index_token_price,
-                    long_token_price,
-                    short_token_price,
-                },
-            )
-            .map_err(GmxCoreError::from)?
-            .execute()
-            .map_err(GmxCoreError::from)?;
-        msg!("{:?}", report);
-        Ok((
-            (*report.long_token_output())
-                .try_into()
-                .map_err(|_| DataStoreError::AmountOverflow)?,
-            (*report.short_token_output())
-                .try_into()
-                .map_err(|_| DataStoreError::AmountOverflow)?,
-        ))
-    }
-
-    fn perform_swaps(
-        &mut self,
-        remaining_accounts: &'info [AccountInfo<'info>],
-        long_amount: u64,
-        short_amount: u64,
-    ) -> Result<(u64, u64)> {
-        let [long_swap_path, short_swap_path, ..] = self
+        // Prepare the execution context.
+        let current_market_token = self.market_token_mint.key();
+        let mut market = RevertibleLiquidityMarket::new(
+            &self.market,
+            &mut self.market_token_mint,
+            self.token_program.to_account_info(),
+            &self.store,
+        )?
+        .enable_burn(self.market_token_withdrawal_vault.to_account_info());
+        let loaders = self
             .withdrawal
             .dynamic
             .swap
-            .split_swap_paths(remaining_accounts)?;
-        if let Some(to) = long_swap_path.first() {
-            let token = self.market.load()?.meta().long_token_mint;
-            if to.key() != self.market.key() {
-                unchecked_transfer_to_market(
-                    &self.store.key(),
-                    &self.market,
-                    to,
-                    &token,
-                    long_amount,
-                )?;
-            }
+            .unpack_markets_for_swap(&current_market_token, remaining_accounts)?;
+        let mut swap_markets =
+            SwapMarkets::new(&self.store.key(), &loaders, Some(&current_market_token))?;
+
+        // Distribute position impact.
+        {
+            let report = market
+                .distribute_position_impact()
+                .map_err(GmxCoreError::from)?
+                .execute()
+                .map_err(GmxCoreError::from)?;
+            msg!("[Withdrawal] pre-execute: {:?}", report);
         }
-        if let Some(to) = short_swap_path.first() {
-            let token = self.market.load()?.meta().short_token_mint;
-            if to.key() != self.market.key() {
-                unchecked_transfer_to_market(
-                    &self.store.key(),
-                    &self.market,
-                    to,
-                    &token,
-                    short_amount,
-                )?;
-            }
-        }
-        let meta = &self.market.load()?.meta().clone();
-        // // Call exit and reload to make sure the data are written to the storage.
-        // // In case that there are markets also appear in the swap paths.
-        // self.market.exit(&crate::ID)?;
-        // CHECK: `exit` and `reload` have been called on the modified market account before and after the swap.
-        let (long_swap_out, short_swap_out) = unchecked_swap_with_params(
-            &self.oracle,
-            &self.withdrawal.dynamic.swap,
-            remaining_accounts,
-            (
-                self.withdrawal.fixed.tokens.final_long_token,
-                self.withdrawal.fixed.tokens.final_short_token,
-            ),
-            (Some(meta.long_token_mint), Some(meta.short_token_mint)),
-            (long_amount, short_amount),
-        )?;
-        // // Call `reload` to make sure the state is up-to-date.
-        // self.market.reload()?;
-        Ok((long_swap_out.into_amount(), short_swap_out.into_amount()))
+
+        // Perform the withdrawal.
+        let (long_amount, short_amount) = {
+            let prices = self.oracle.market_prices(&market)?;
+            let report = market
+                .withdraw(
+                    self.withdrawal.fixed.tokens.market_token_amount.into(),
+                    prices,
+                )
+                .and_then(|w| w.execute())
+                .map_err(GmxCoreError::from)?;
+            let (long_amount, short_amount) = (
+                (*report.long_token_output())
+                    .try_into()
+                    .map_err(|_| DataStoreError::AmountOverflow)?,
+                (*report.short_token_output())
+                    .try_into()
+                    .map_err(|_| DataStoreError::AmountOverflow)?,
+            );
+            // Validate current market.
+            market.validate_market_balances(long_amount, short_amount)?;
+            msg!("[Withdrawal] executed: {:?}", report);
+            (long_amount, short_amount)
+        };
+
+        // Perform the swap.
+        let (final_long_amount, final_short_amount) = {
+            let meta = *market.market_meta();
+            swap_markets.revertible_swap(
+                SwapDirection::From(&mut market),
+                &self.oracle,
+                &self.withdrawal.dynamic.swap,
+                (
+                    self.withdrawal.fixed.tokens.final_long_token,
+                    self.withdrawal.fixed.tokens.final_short_token,
+                ),
+                (Some(meta.long_token_mint), Some(meta.short_token_mint)),
+                (long_amount, short_amount),
+            )?
+        };
+
+        // Commit the changes.
+        market.commit();
+        swap_markets.commit();
+
+        self.withdrawal.fixed.tokens.market_token_amount = 0;
+
+        Ok((final_long_amount, final_short_amount))
     }
 }
