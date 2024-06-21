@@ -1,11 +1,18 @@
 use std::{borrow::Borrow, cell::RefMut, ops::Deref};
 
 use anchor_lang::prelude::*;
-use gmx_core::{Balance, ClockKind, PoolKind};
+use gmx_core::{
+    params::{
+        fee::{BorrowingFeeParams, FundingFeeParams},
+        position::PositionImpactDistributionParams,
+        FeeParams, PositionParams, PriceImpactParams,
+    },
+    Balance, ClockKind, PoolKind,
+};
 
 use crate::{
     constants,
-    states::{HasMarketMeta, Market, MarketConfig, MarketMeta, Pool},
+    states::{Factor, HasMarketMeta, Market, MarketConfig, MarketMeta, MarketState, Pool},
     DataStoreError, GmxCoreError,
 };
 
@@ -263,9 +270,18 @@ impl<'a> RevertibleMarket<'a> {
         RevertibleSwapMarket::from_market(self)
     }
 
+    pub(super) fn funding_amount_per_size_adjustment(&self) -> Factor {
+        constants::FUNDING_AMOUNT_PER_SIZE_ADJUSTMENT
+    }
+
     /// Get the balance field.
     pub fn revertible_balance(&self) -> &RevertibleBalance {
         &self.balance
+    }
+
+    /// Get market state.
+    pub fn state(&self) -> &MarketState {
+        &self.storage.state
     }
 
     /// Get clock.
@@ -287,6 +303,86 @@ impl<'a> RevertibleMarket<'a> {
             .ok_or(error!(DataStoreError::RequiredResourceNotFound))?;
         *clock = last;
         Ok(())
+    }
+
+    pub(super) fn swap_impact_params(&self) -> gmx_core::Result<PriceImpactParams<Factor>> {
+        PriceImpactParams::builder()
+            .with_exponent(self.config().swap_impact_exponent)
+            .with_positive_factor(self.config().swap_impact_positive_factor)
+            .with_negative_factor(self.config().swap_impact_negative_factor)
+            .build()
+    }
+
+    pub(super) fn swap_fee_params(&self) -> gmx_core::Result<FeeParams<Factor>> {
+        Ok(FeeParams::builder()
+            .with_fee_receiver_factor(self.config().swap_fee_receiver_factor)
+            .with_positive_impact_fee_factor(self.config().swap_fee_factor_for_positive_impact)
+            .with_negative_impact_fee_factor(self.config().swap_fee_factor_for_positive_impact)
+            .build())
+    }
+
+    pub(super) fn position_impact_params(&self) -> gmx_core::Result<PriceImpactParams<Factor>> {
+        let config = self.config();
+        PriceImpactParams::builder()
+            .with_exponent(config.position_impact_exponent)
+            .with_positive_factor(config.position_impact_positive_factor)
+            .with_negative_factor(config.position_impact_negative_factor)
+            .build()
+    }
+
+    pub(super) fn position_impact_distribution_params(
+        &self,
+    ) -> gmx_core::Result<PositionImpactDistributionParams<Factor>> {
+        let config = self.config();
+        Ok(PositionImpactDistributionParams::builder()
+            .distribute_factor(config.position_impact_distribute_factor)
+            .min_position_impact_pool_amount(config.min_position_impact_pool_amount)
+            .build())
+    }
+
+    pub(super) fn borrowing_fee_params(&self) -> gmx_core::Result<BorrowingFeeParams<Factor>> {
+        Ok(BorrowingFeeParams::builder()
+            .receiver_factor(self.config().borrowing_fee_receiver_factor)
+            .factor_for_long(self.config().borrowing_fee_factor_for_long)
+            .factor_for_short(self.config().borrowing_fee_factor_for_short)
+            .exponent_for_long(self.config().borrowing_fee_exponent_for_long)
+            .exponent_for_short(self.config().borrowing_fee_exponent_for_short)
+            .build())
+    }
+
+    pub(super) fn funding_fee_params(&self) -> gmx_core::Result<FundingFeeParams<Factor>> {
+        Ok(FundingFeeParams::builder()
+            .exponent(self.config().funding_fee_exponent)
+            .funding_factor(self.config().funding_fee_factor)
+            .max_factor_per_second(self.config().funding_fee_max_factor_per_second)
+            .min_factor_per_second(self.config().funding_fee_min_factor_per_second)
+            .increase_factor_per_second(self.config().funding_fee_increase_factor_per_second)
+            .decrease_factor_per_second(self.config().funding_fee_decrease_factor_per_second)
+            .threshold_for_stable_funding(self.config().funding_fee_threshold_for_stable_funding)
+            .threshold_for_decrease_funding(
+                self.config().funding_fee_threshold_for_decrease_funding,
+            )
+            .build())
+    }
+
+    pub(super) fn position_params(&self) -> gmx_core::Result<PositionParams<Factor>> {
+        // TODO: use min collateral factors for OI.
+        Ok(PositionParams::new(
+            self.config().min_position_size_usd,
+            self.config().min_collateral_value,
+            self.config().min_collateral_factor,
+            self.config().max_positive_position_impact_factor,
+            self.config().max_negative_position_impact_factor,
+            self.config().max_position_impact_factor_for_liquidations,
+        ))
+    }
+
+    pub(super) fn order_fee_params(&self) -> gmx_core::Result<FeeParams<Factor>> {
+        Ok(FeeParams::builder()
+            .with_fee_receiver_factor(self.config().order_fee_receiver_factor)
+            .with_positive_impact_fee_factor(self.config().order_fee_factor_for_positive_impact)
+            .with_negative_impact_fee_factor(self.config().order_fee_factor_for_negative_impact)
+            .build())
     }
 }
 

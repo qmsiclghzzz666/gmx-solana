@@ -267,22 +267,13 @@ impl<'a, 'info> gmx_core::PositionImpactMarket<{ constants::MARKET_DECIMALS }>
     }
 
     fn position_impact_params(&self) -> gmx_core::Result<PriceImpactParams<Self::Num>> {
-        let config = self.market.market.config();
-        PriceImpactParams::builder()
-            .with_exponent(config.position_impact_exponent)
-            .with_positive_factor(config.position_impact_positive_factor)
-            .with_negative_factor(config.position_impact_negative_factor)
-            .build()
+        self.market.market.position_impact_params()
     }
 
     fn position_impact_distribution_params(
         &self,
     ) -> gmx_core::Result<PositionImpactDistributionParams<Self::Num>> {
-        let config = self.market.market.config();
-        Ok(PositionImpactDistributionParams::builder()
-            .distribute_factor(config.position_impact_distribute_factor)
-            .min_position_impact_pool_amount(config.min_position_impact_pool_amount)
-            .build())
+        self.market.market.position_impact_distribution_params()
     }
 }
 

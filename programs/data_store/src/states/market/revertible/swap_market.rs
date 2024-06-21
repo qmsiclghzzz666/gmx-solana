@@ -540,23 +540,11 @@ impl<'a> gmx_core::BaseMarket<{ constants::MARKET_DECIMALS }> for RevertibleSwap
 
 impl<'a> gmx_core::SwapMarket<{ constants::MARKET_DECIMALS }> for RevertibleSwapMarket<'a> {
     fn swap_impact_params(&self) -> gmx_core::Result<PriceImpactParams<Self::Num>> {
-        PriceImpactParams::builder()
-            .with_exponent(self.market.config().swap_impact_exponent)
-            .with_positive_factor(self.market.config().swap_impact_positive_factor)
-            .with_negative_factor(self.market.config().swap_impact_negative_factor)
-            .build()
+        self.market.swap_impact_params()
     }
 
     fn swap_fee_params(&self) -> gmx_core::Result<FeeParams<Self::Num>> {
-        Ok(FeeParams::builder()
-            .with_fee_receiver_factor(self.market.config().swap_fee_receiver_factor)
-            .with_positive_impact_fee_factor(
-                self.market.config().swap_fee_factor_for_positive_impact,
-            )
-            .with_negative_impact_fee_factor(
-                self.market.config().swap_fee_factor_for_positive_impact,
-            )
-            .build())
+        self.market.swap_fee_params()
     }
 
     fn swap_impact_pool_mut(&mut self) -> gmx_core::Result<&mut Self::Pool> {
