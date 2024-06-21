@@ -492,6 +492,8 @@ export interface OrderHint {
     shortTokenMint: PublicKey,
     longTokenAccount: PublicKey,
     shortTokenAccount: PublicKey,
+    initialCollateralTokenAccount: PublicKey | null,
+    initialCollateralToken: PublicKey | null,
     providerMapper: (number) => number | undefined,
 }
 
@@ -503,6 +505,7 @@ export type MakeExecuteOrderParams = {
     recentTimestamp: bigint | number,
     holding: PublicKey,
     options?: {
+        cancelOnExecutionError?: boolean,
         executionFee?: number | bigint,
         priceProvider?: PublicKey,
         hints?: {
@@ -530,6 +533,8 @@ const fetchOrderHint = async (dataStore: DataStoreProgram, orderAddress: PublicK
         shortTokenMint: market.meta.shortTokenMint,
         feeds: order.prices.feeds,
         swapPath: order.swap.longTokenSwapPath,
+        initialCollateralTokenAccount: order.fixed.senders.initialCollateralTokenAccount,
+        initialCollateralToken: order.fixed.senders.initialCollateralTokenAccount ? order.fixed.tokens.initialCollateralToken : null,
         providerMapper: makeProviderMapper([...order.prices.providers], order.prices.nums),
     } satisfies OrderHint as OrderHint;
 }
@@ -559,29 +564,23 @@ export const makeExecuteOrderInstruction = async ({
         shortTokenMint,
         feeds,
         swapPath,
+        initialCollateralToken,
+        initialCollateralTokenAccount,
         providerMapper,
     } = options?.hints?.order ?? await fetchOrderHint(dataStore, order, store);
-    const [onlyOrderKeeper] = createRolesPDA(store, authority);
     const feedAccounts = feeds.map((pubkey, idx) => {
         return getFeedAccountMeta(providerMapper(idx), pubkey);
     });
-    const swapMarkets = swapPath.map(mint => {
+    const swapMarkets = Array.from(new Set(swapPath.filter(mint => !mint.equals(marketTokenMint)).map(mint => mint.toBase58()))).map(mint => {
         return {
-            pubkey: createMarketPDA(store, mint)[0],
+            pubkey: createMarketPDA(store, translateAddress(mint))[0],
             isSigner: false,
             isWritable: true,
         }
     });
-    const swapMarketMints = swapPath.map(pubkey => {
-        return {
-            pubkey,
-            isSigner: false,
-            isWritable: false,
-        }
-    });
     const pnlTokenMint = isLong ? longTokenMint : shortTokenMint;
     const tokenMap = (await dataStore.account.store.fetch(store)).tokenMap;
-    return await exchange.methods.executeOrder(toBN(recentTimestamp), toBN(options?.executionFee ?? 0)).accounts({
+    return await exchange.methods.executeOrder(toBN(recentTimestamp), toBN(options?.executionFee ?? 0), options?.cancelOnExecutionError ?? false).accounts({
         authority,
         store,
         oracle,
@@ -603,7 +602,10 @@ export const makeExecuteOrderInstruction = async ({
         claimableShortTokenAccountForUser: isDecrease ? findClaimableAccountPDA(store, shortTokenMint, user, getTimeKey(recentTimestamp, TIME_WINDOW))[0] : null,
         claimablePnlTokenAccountForHolding: isDecrease ? findClaimableAccountPDA(store, pnlTokenMint, holding, getTimeKey(recentTimestamp, TIME_WINDOW))[0] : null,
         priceProvider: options.priceProvider ?? PYTH_ID,
-    }).remainingAccounts([...feedAccounts, ...swapMarkets, ...swapMarketMints]).instruction();
+        initialCollateralTokenAccount,
+        initialCollateralTokenVault: initialCollateralTokenAccount ? findMarketVaultPDA(store, initialCollateralToken)[0] : null,
+        initialMarket: findMarketPDA(store, swapPath[0] ?? marketTokenMint)[0],
+    }).remainingAccounts([...feedAccounts, ...swapMarkets]).instruction();
 };
 
 export const invokeExecuteOrder = makeInvoke(makeExecuteOrderInstruction, ["authority"]);

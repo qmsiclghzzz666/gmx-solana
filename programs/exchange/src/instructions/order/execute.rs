@@ -1,13 +1,15 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token};
 use data_store::{
-    cpi::accounts::{MarketTransferOut, RemoveOrder, RemovePosition},
+    cpi::accounts::{MarketTransferOut, RemovePosition},
     program::DataStore,
     states::{order::TransferOut, Oracle, Order, PriceProvider},
     utils::{Authentication, WithOracle, WithOracleExt},
 };
 
 use crate::{utils::ControllerSeeds, ExchangeError};
+
+use super::utils::CancelOrderUtil;
 
 #[derive(Accounts)]
 pub struct ExecuteOrder<'info> {
@@ -33,7 +35,10 @@ pub struct ExecuteOrder<'info> {
     pub market: UncheckedAccount<'info>,
     #[account(mut, constraint = market_token_mint.key() == order.fixed.tokens.market_token)]
     pub market_token_mint: Account<'info, Mint>,
-    #[account(mut)]
+    #[account(
+        mut,
+        constraint = order.fixed.senders.initial_collateral_token_account == initial_collateral_token_account.as_ref().map(|a| a.key()),
+    )]
     pub order: Account<'info, Order>,
     /// CHECK: check by CPI.
     #[account(mut)]
@@ -74,6 +79,15 @@ pub struct ExecuteOrder<'info> {
     /// CHECK: check by CPI.
     #[account(mut)]
     pub claimable_pnl_token_account_for_holding: Option<UncheckedAccount<'info>>,
+    /// CHECK: check by CPI.
+    #[account(mut)]
+    pub initial_collateral_token_account: Option<UncheckedAccount<'info>>,
+    /// CHECK: check by CPI.
+    #[account(mut)]
+    pub initial_collateral_token_vault: Option<UncheckedAccount<'info>>,
+    /// CHECK: check by CPI and cancel utils.
+    #[account(mut)]
+    pub initial_market: Option<UncheckedAccount<'info>>,
     pub data_store_program: Program<'info, DataStore>,
     pub token_program: Program<'info, Token>,
     pub price_provider: Interface<'info, PriceProvider>,
@@ -85,36 +99,49 @@ pub fn execute_order<'info>(
     ctx: Context<'_, '_, 'info, 'info, ExecuteOrder<'info>>,
     recent_timestamp: i64,
     execution_fee: u64,
+    cancel_on_execution_error: bool,
 ) -> Result<()> {
     let store = ctx.accounts.store.key();
     let controller = ControllerSeeds::find(&store);
     let order = &ctx.accounts.order;
-    let refund = order
-        .get_lamports()
-        .checked_sub(super::MAX_ORDER_EXECUTION_FEE.min(execution_fee))
-        .ok_or(ExchangeError::NotEnoughExecutionFee)?;
-    let should_remove_position = ctx.accounts.with_oracle_prices(
-        order.prices.tokens.clone(),
-        ctx.remaining_accounts,
-        &controller.as_seeds(),
-        |accounts, remaining_accounts| {
-            let (should_remove_position, transfer_out) = data_store::cpi::execute_order(
-                accounts
-                    .execute_order_ctx()
-                    .with_signer(&[&controller.as_seeds()])
-                    .with_remaining_accounts(remaining_accounts.to_vec()),
-                recent_timestamp,
-            )?
-            .get();
-            accounts.process_transfer_out(&controller, &transfer_out, remaining_accounts)?;
-            Ok(should_remove_position)
-        },
-    )?;
-    data_store::cpi::remove_order(
-        ctx.accounts
-            .remove_order_ctx()
-            .with_signer(&[&controller.as_seeds()]),
-        refund,
+    // TODO: validate the pre-condition of transferring out before execution.
+    let (should_remove_position, transfer_out, final_output_market, final_secondary_output_market) =
+        ctx.accounts.with_oracle_prices(
+            order.prices.tokens.clone(),
+            ctx.remaining_accounts,
+            &controller.as_seeds(),
+            |accounts, remaining_accounts| {
+                let store = accounts.store.key;
+                let swap = &accounts.order.swap;
+                let final_output_market = swap
+                    .find_last_market(store, true, remaining_accounts)
+                    .unwrap_or(accounts.market.to_account_info());
+                let final_secondary_output_market = swap
+                    .find_last_market(store, false, remaining_accounts)
+                    .unwrap_or(accounts.market.to_account_info());
+                let (should_remove_position, transfer_out) = data_store::cpi::execute_order(
+                    accounts
+                        .execute_order_ctx()
+                        .with_signer(&[&controller.as_seeds()])
+                        .with_remaining_accounts(remaining_accounts.to_vec()),
+                    recent_timestamp,
+                    !cancel_on_execution_error,
+                )?
+                .get();
+                accounts.order.reload()?;
+                Ok((
+                    should_remove_position,
+                    transfer_out,
+                    final_output_market,
+                    final_secondary_output_market,
+                ))
+            },
+        )?;
+    ctx.accounts.process_transfer_out(
+        &controller,
+        &transfer_out,
+        final_output_market,
+        final_secondary_output_market,
     )?;
     if should_remove_position {
         // Refund all lamports.
@@ -126,6 +153,11 @@ pub fn execute_order<'info>(
             refund,
         )?;
     }
+    ctx.accounts.cancel_util().execute(
+        ctx.accounts.authority.to_account_info(),
+        &controller,
+        execution_fee,
+    )?;
     Ok(())
 }
 
@@ -166,6 +198,27 @@ impl<'info> WithOracle<'info> for ExecuteOrder<'info> {
 }
 
 impl<'info> ExecuteOrder<'info> {
+    fn cancel_util(&self) -> CancelOrderUtil<'_, 'info> {
+        CancelOrderUtil {
+            data_store_program: self.data_store_program.to_account_info(),
+            token_program: self.token_program.to_account_info(),
+            system_program: self.system_program.to_account_info(),
+            controller: self.controller.to_account_info(),
+            store: self.store.to_account_info(),
+            user: self.user.to_account_info(),
+            order: &self.order,
+            initial_market: self.initial_market.as_ref().map(|a| a.to_account_info()),
+            initial_collateral_token_account: self
+                .initial_collateral_token_account
+                .as_ref()
+                .map(|a| a.to_account_info()),
+            initial_collateral_token_vault: self
+                .initial_collateral_token_vault
+                .as_ref()
+                .map(|a| a.to_account_info()),
+        }
+    }
+
     fn execute_order_ctx(
         &self,
     ) -> CpiContext<'_, '_, '_, 'info, data_store::cpi::accounts::ExecuteOrder<'info>> {
@@ -212,20 +265,6 @@ impl<'info> ExecuteOrder<'info> {
                     .claimable_pnl_token_account_for_holding
                     .as_ref()
                     .map(|a| a.to_account_info()),
-            },
-        )
-    }
-
-    fn remove_order_ctx(&self) -> CpiContext<'_, '_, '_, 'info, RemoveOrder<'info>> {
-        CpiContext::new(
-            self.data_store_program.to_account_info(),
-            RemoveOrder {
-                payer: self.authority.to_account_info(),
-                authority: self.controller.to_account_info(),
-                store: self.store.to_account_info(),
-                order: self.order.to_account_info(),
-                user: self.user.to_account_info(),
-                system_program: self.system_program.to_account_info(),
             },
         )
     }
@@ -294,11 +333,9 @@ impl<'info> ExecuteOrder<'info> {
         &self,
         controller: &ControllerSeeds,
         transfer_out: &TransferOut,
-        remaining_accounts: &[AccountInfo<'info>],
+        final_output_market: AccountInfo<'info>,
+        final_secondary_output_market: AccountInfo<'info>,
     ) -> Result<()> {
-        let [long_swap_path, short_swap_path, ..] =
-            self.order.swap.split_swap_paths(remaining_accounts)?;
-
         let TransferOut {
             final_output_token,
             final_secondary_output_token,
@@ -312,13 +349,9 @@ impl<'info> ExecuteOrder<'info> {
 
         if *final_output_token != 0 {
             // Must have been validated during the execution.
-            let market = long_swap_path
-                .last()
-                .cloned()
-                .unwrap_or_else(|| self.market.to_account_info());
             self.market_transfer_out(
                 controller,
-                Some(market),
+                Some(final_output_market),
                 self.final_output_token_vault
                     .as_ref()
                     .map(|a| a.to_account_info()),
@@ -331,13 +364,9 @@ impl<'info> ExecuteOrder<'info> {
 
         if *final_secondary_output_token != 0 {
             // Must have been validated during the execution.
-            let market = short_swap_path
-                .last()
-                .cloned()
-                .unwrap_or_else(|| self.market.to_account_info());
             self.market_transfer_out(
                 controller,
-                Some(market),
+                Some(final_secondary_output_market),
                 self.secondary_output_token_vault
                     .as_ref()
                     .map(|a| a.to_account_info()),

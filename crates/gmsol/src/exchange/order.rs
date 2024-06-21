@@ -402,6 +402,7 @@ pub struct ExecuteOrderBuilder<'a, C> {
     recent_timestamp: i64,
     hint: Option<ExecuteOrderHint>,
     token_map: Option<Pubkey>,
+    cancel_on_execution_error: bool,
 }
 
 /// Hint for executing order.
@@ -425,6 +426,8 @@ pub struct ExecuteOrderHint {
     /// Feeds.
     pub feeds: TokensWithFeed,
     swap: SwapParams,
+    initial_collateral_token: Option<Pubkey>,
+    initial_collateral_token_account: Option<Pubkey>,
 }
 
 impl ExecuteOrderHint {
@@ -509,6 +512,7 @@ where
         store: &Pubkey,
         oracle: &Pubkey,
         order: &Pubkey,
+        cancel_on_execution_error: bool,
     ) -> crate::Result<Self> {
         use std::time::SystemTime;
 
@@ -529,6 +533,7 @@ where
             recent_timestamp,
             hint: None,
             token_map: None,
+            cancel_on_execution_error,
         })
     }
 
@@ -572,6 +577,12 @@ where
             },
             feeds: order.prices.clone(),
             swap,
+            initial_collateral_token: order
+                .fixed
+                .senders
+                .initial_collateral_token_account
+                .map(|_| order.fixed.tokens.initial_collateral_token),
+            initial_collateral_token_account: order.fixed.senders.initial_collateral_token_account,
         });
         self
     }
@@ -649,16 +660,14 @@ where
             .feeds_parser
             .parse(&hint.feeds)
             .collect::<Result<Vec<_>, _>>()?;
-        let swap_markets = hint.swap.iter().map(|mint| AccountMeta {
-            pubkey: self.client.find_market_address(&self.store, mint),
-            is_signer: false,
-            is_writable: true,
-        });
-        let swap_market_mints = hint.swap.iter().map(|pubkey| AccountMeta {
-            pubkey: *pubkey,
-            is_signer: false,
-            is_writable: false,
-        });
+        let swap_markets = hint
+            .swap
+            .unique_market_tokens_excluding_current(&hint.market_token)
+            .map(|mint| AccountMeta {
+                pubkey: self.client.find_market_address(&self.store, mint),
+                is_signer: false,
+                is_writable: true,
+            });
 
         let execute_order = self
             .client
@@ -703,6 +712,18 @@ where
                     token_program: anchor_spl::token::ID,
                     price_provider: self.price_provider,
                     system_program: system_program::ID,
+                    initial_collateral_token_account: hint.initial_collateral_token_account,
+                    initial_collateral_token_vault: hint
+                        .initial_collateral_token
+                        .map(|token| self.client.find_market_vault_address(&self.store, &token)),
+                    initial_market: hint
+                        .initial_collateral_token_account
+                        .map(|_| {
+                            hint.swap
+                                .first_market_token(true)
+                                .unwrap_or(&hint.market_token)
+                        })
+                        .copied(),
                 },
                 &exchange::id(),
                 &self.client.exchange_program_id(),
@@ -710,14 +731,9 @@ where
             .args(instruction::ExecuteOrder {
                 recent_timestamp: self.recent_timestamp,
                 execution_fee: self.execution_fee,
+                cancel_on_execution_error: self.cancel_on_execution_error,
             })
-            .accounts(
-                feeds
-                    .into_iter()
-                    .chain(swap_markets)
-                    .chain(swap_market_mints)
-                    .collect::<Vec<_>>(),
-            )
+            .accounts(feeds.into_iter().chain(swap_markets).collect::<Vec<_>>())
             .compute_budget(ComputeBudget::default().with_limit(EXECUTE_ORDER_COMPUTE_BUDGET));
 
         let mut pre_builder = self.client.exchange_rpc();

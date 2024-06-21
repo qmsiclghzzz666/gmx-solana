@@ -91,8 +91,14 @@ pub mod exchange {
         ctx: Context<'_, '_, 'info, 'info, ExecuteOrder<'info>>,
         recent_timestamp: i64,
         execution_fee: u64,
+        cancel_on_execution_error: bool,
     ) -> Result<()> {
-        instructions::execute_order(ctx, recent_timestamp, execution_fee)
+        instructions::execute_order(
+            ctx,
+            recent_timestamp,
+            execution_fee,
+            cancel_on_execution_error,
+        )
     }
 }
 

@@ -1,7 +1,6 @@
 use std::str::FromStr;
 
 use anchor_lang::{prelude::*, Bump};
-use anchor_spl::token::Mint;
 use bitmaps::Bitmap;
 use borsh::{BorshDeserialize, BorshSerialize};
 use gmx_core::{ClockKind, PoolKind};
@@ -15,7 +14,7 @@ use super::{Factor, InitSpace, Seed};
 
 pub use self::{
     config::{MarketConfig, MarketConfigKey},
-    ops::AsMarket,
+    ops::ValidateMarketBalances,
 };
 
 /// Market Operations.
@@ -244,13 +243,6 @@ impl Market {
     #[inline]
     pub fn pool(&self, kind: PoolKind) -> Option<Pool> {
         self.pools.get(kind).copied()
-    }
-
-    pub(crate) fn as_market<'a, 'info>(
-        &'a mut self,
-        mint: &'a mut Account<'info, Mint>,
-    ) -> AsMarket<'a, 'info> {
-        AsMarket::new(self, mint)
     }
 
     /// Validate the market.

@@ -457,8 +457,9 @@ pub mod data_store {
     pub fn execute_order<'info>(
         ctx: Context<'_, '_, 'info, 'info, ExecuteOrder<'info>>,
         recent_timestamp: i64,
+        throw_on_execution_error: bool,
     ) -> Result<(bool, Box<TransferOut>)> {
-        instructions::execute_order(ctx, recent_timestamp)
+        instructions::execute_order(ctx, recent_timestamp, throw_on_execution_error)
     }
 
     #[access_control(internal::Authenticate::only_controller(&ctx))]

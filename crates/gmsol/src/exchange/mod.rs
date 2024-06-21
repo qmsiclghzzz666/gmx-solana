@@ -93,6 +93,7 @@ pub trait ExchangeOps<C> {
         store: &Pubkey,
         oracle: &Pubkey,
         order: &Pubkey,
+        cancel_on_execution_error: bool,
     ) -> crate::Result<ExecuteOrderBuilder<C>>;
 
     /// Create a market increase position order.
@@ -261,8 +262,9 @@ where
         store: &Pubkey,
         oracle: &Pubkey,
         order: &Pubkey,
+        cancel_on_execution_error: bool,
     ) -> crate::Result<ExecuteOrderBuilder<C>> {
-        ExecuteOrderBuilder::try_new(self, store, oracle, order)
+        ExecuteOrderBuilder::try_new(self, store, oracle, order, cancel_on_execution_error)
     }
 }
 

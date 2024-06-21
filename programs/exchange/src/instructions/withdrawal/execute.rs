@@ -102,6 +102,7 @@ pub fn execute_withdrawal<'info>(
                     !cancel_on_execution_error,
                 )?
                 .get();
+                accounts.withdrawal.reload()?;
                 Ok((
                     final_long_amount,
                     final_long_market,

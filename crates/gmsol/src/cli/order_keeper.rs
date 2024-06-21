@@ -220,6 +220,7 @@ impl KeeperArgs {
                         .oracle
                         .address(Some(store), &client.data_store_program_id())?,
                     order,
+                    true,
                 )?;
                 let execution_fee = self
                     .execution_fee

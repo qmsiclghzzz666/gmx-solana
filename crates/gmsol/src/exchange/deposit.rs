@@ -592,48 +592,52 @@ where
         tracing::debug!(%price_provider, "constructing `execute_deposit` ix...");
         Ok(client
             .exchange_rpc()
-            .accounts(accounts::ExecuteDeposit {
-                authority,
-                controller: client.controller_address(store),
-                store: *store,
-                data_store_program: client.data_store_program_id(),
-                price_provider: *price_provider,
-                token_program: anchor_spl::token::ID,
-                oracle: *oracle,
-                token_map,
-                deposit: *deposit,
-                user: hint.user,
-                receiver: hint.receiver,
-                market: client.find_market_address(store, &hint.market_token_mint),
-                market_token_mint: hint.market_token_mint,
-                system_program: system_program::ID,
-                initial_long_token_account: hint.initial_long_token_account,
-                initial_short_token_account: hint.initial_short_token_account,
-                initial_long_token_vault: hint
-                    .initial_long_token
-                    .as_ref()
-                    .map(|token| client.find_market_vault_address(store, token)),
-                initial_short_token_vault: hint
-                    .initial_short_token
-                    .as_ref()
-                    .map(|token| client.find_market_vault_address(store, token)),
-                initial_long_market: hint.initial_long_token_account.as_ref().map(|_| {
-                    client.find_market_address(
-                        store,
-                        hint.swap
-                            .first_market_token(true)
-                            .unwrap_or(&hint.market_token_mint),
-                    )
-                }),
-                initial_short_market: hint.initial_short_token_account.as_ref().map(|_| {
-                    client.find_market_address(
-                        store,
-                        hint.swap
-                            .first_market_token(false)
-                            .unwrap_or(&hint.market_token_mint),
-                    )
-                }),
-            })
+            .accounts(crate::utils::fix_optional_account_metas(
+                accounts::ExecuteDeposit {
+                    authority,
+                    controller: client.controller_address(store),
+                    store: *store,
+                    data_store_program: client.data_store_program_id(),
+                    price_provider: *price_provider,
+                    token_program: anchor_spl::token::ID,
+                    oracle: *oracle,
+                    token_map,
+                    deposit: *deposit,
+                    user: hint.user,
+                    receiver: hint.receiver,
+                    market: client.find_market_address(store, &hint.market_token_mint),
+                    market_token_mint: hint.market_token_mint,
+                    system_program: system_program::ID,
+                    initial_long_token_account: hint.initial_long_token_account,
+                    initial_short_token_account: hint.initial_short_token_account,
+                    initial_long_token_vault: hint
+                        .initial_long_token
+                        .as_ref()
+                        .map(|token| client.find_market_vault_address(store, token)),
+                    initial_short_token_vault: hint
+                        .initial_short_token
+                        .as_ref()
+                        .map(|token| client.find_market_vault_address(store, token)),
+                    initial_long_market: hint.initial_long_token_account.as_ref().map(|_| {
+                        client.find_market_address(
+                            store,
+                            hint.swap
+                                .first_market_token(true)
+                                .unwrap_or(&hint.market_token_mint),
+                        )
+                    }),
+                    initial_short_market: hint.initial_short_token_account.as_ref().map(|_| {
+                        client.find_market_address(
+                            store,
+                            hint.swap
+                                .first_market_token(false)
+                                .unwrap_or(&hint.market_token_mint),
+                        )
+                    }),
+                },
+                &exchange::ID,
+                &self.client.exchange_program_id(),
+            ))
             .args(instruction::ExecuteDeposit {
                 execution_fee: *execution_fee,
                 cancel_on_execution_error: *cancel_on_execution_error,

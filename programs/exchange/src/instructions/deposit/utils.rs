@@ -1,10 +1,13 @@
 use anchor_lang::prelude::*;
 use data_store::{
-    cpi::accounts::{MarketTransferOut, ReadMarket, RemoveDeposit},
+    cpi::accounts::{MarketTransferOut, RemoveDeposit},
     states::Deposit,
 };
 
-use crate::{utils::ControllerSeeds, ExchangeError};
+use crate::{
+    utils::{market::get_market_token_mint, ControllerSeeds},
+    ExchangeError,
+};
 
 pub(super) struct TransferIn<'info> {
     from_account: AccountInfo<'info>,
@@ -141,18 +144,4 @@ impl<'a, 'info> CancelDepositUtils<'a, 'info> {
             },
         )
     }
-}
-
-fn get_market_token_mint<'info>(
-    data_store_program: &AccountInfo<'info>,
-    market: &AccountInfo<'info>,
-) -> Result<Pubkey> {
-    let meta = data_store::cpi::get_market_meta(CpiContext::new(
-        data_store_program.clone(),
-        ReadMarket {
-            market: market.clone(),
-        },
-    ))?
-    .get();
-    Ok(meta.market_token_mint)
 }
