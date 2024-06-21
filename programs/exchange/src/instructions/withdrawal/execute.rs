@@ -28,10 +28,7 @@ pub struct ExecuteWithdrawal<'info> {
     pub store: UncheckedAccount<'info>,
     /// CHECK: check by CPI.
     pub token_map: UncheckedAccount<'info>,
-    pub data_store_program: Program<'info, DataStore>,
     pub price_provider: Interface<'info, PriceProvider>,
-    pub token_program: Program<'info, Token>,
-    pub system_program: Program<'info, System>,
     #[account(mut)]
     pub oracle: Account<'info, data_store::states::Oracle>,
     /// Withdrawal to execute.
@@ -67,12 +64,16 @@ pub struct ExecuteWithdrawal<'info> {
     pub final_long_token_vault: Account<'info, TokenAccount>,
     #[account(mut)]
     pub final_short_token_vault: Account<'info, TokenAccount>,
+    pub data_store_program: Program<'info, DataStore>,
+    pub token_program: Program<'info, Token>,
+    pub system_program: Program<'info, System>,
 }
 
 /// Execute the withdrawal.
 pub fn execute_withdrawal<'info>(
     ctx: Context<'_, '_, 'info, 'info, ExecuteWithdrawal<'info>>,
     execution_fee: u64,
+    cancel_on_execution_error: bool,
 ) -> Result<()> {
     let store = ctx.accounts.store.key();
     let controller = ControllerSeeds::find(&store);
@@ -98,6 +99,7 @@ pub fn execute_withdrawal<'info>(
                         .execute_withdrawal_ctx()
                         .with_signer(&[&controller.as_seeds()])
                         .with_remaining_accounts(remaining_accounts.to_vec()),
+                    !cancel_on_execution_error,
                 )?
                 .get();
                 Ok((

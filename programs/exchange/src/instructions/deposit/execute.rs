@@ -74,6 +74,7 @@ pub struct ExecuteDeposit<'info> {
 pub fn execute_deposit<'info>(
     ctx: Context<'_, '_, 'info, 'info, ExecuteDeposit<'info>>,
     execution_fee: u64,
+    cancel_on_execution_error: bool,
 ) -> Result<()> {
     let store = ctx.accounts.store.key();
     let controller = ControllerSeeds::find(&store);
@@ -85,7 +86,9 @@ pub fn execute_deposit<'info>(
             deposit.dynamic.tokens_with_feed.tokens.clone(),
             ctx.remaining_accounts,
             &controller.as_seeds(),
-            |accounts, remaining_accounts| accounts.execute(&controller, remaining_accounts),
+            |accounts, remaining_accounts| {
+                accounts.execute(&controller, remaining_accounts, cancel_on_execution_error)
+            },
         )?;
     }
 
@@ -224,11 +227,13 @@ impl<'info> ExecuteDeposit<'info> {
         &mut self,
         controller_seeds: &ControllerSeeds,
         remaining_accounts: &'info [AccountInfo<'info>],
+        cancel_on_execution_error: bool,
     ) -> Result<()> {
         cpi::execute_deposit(
             self.execute_deposit_ctx()
                 .with_signer(&[&controller_seeds.as_seeds()])
                 .with_remaining_accounts(remaining_accounts.to_vec()),
+            !cancel_on_execution_error,
         )?;
         self.deposit.reload()?;
         Ok(())

@@ -527,7 +527,7 @@ pub trait ValidateMarketBalances:
         if self.is_pure() {
             let total = long_excluding_amount
                 .checked_add(short_excluding_amount)
-                .ok_or(DataStoreError::AmountOverflow)?;
+                .ok_or(error!(DataStoreError::AmountOverflow))?;
             (long_excluding_amount, short_excluding_amount) = (total / 2, total / 2);
         }
         let meta = self.market_meta();
@@ -546,8 +546,40 @@ pub trait ValidateMarketBalances:
         Ok(())
     }
 
+    /// Validate market balances excluding the given token amounts.
+    fn validate_market_balances_excluding_the_given_token_amounts(
+        &self,
+        first_token: &Pubkey,
+        second_token: &Pubkey,
+        first_excluding_amount: u64,
+        second_excluding_amount: u64,
+    ) -> Result<()> {
+        let mut long_excluding_amount = 0u64;
+        let mut short_excluding_amount = 0u64;
+
+        for (token, amount) in [
+            (first_token, first_excluding_amount),
+            (second_token, second_excluding_amount),
+        ] {
+            if amount == 0 {
+                continue;
+            }
+            let is_long = self.market_meta().to_token_side(token)?;
+            if is_long {
+                long_excluding_amount = long_excluding_amount
+                    .checked_add(amount)
+                    .ok_or(error!(DataStoreError::AmountOverflow))?;
+            } else {
+                short_excluding_amount = short_excluding_amount
+                    .checked_add(amount)
+                    .ok_or(error!(DataStoreError::AmountOverflow))?;
+            }
+        }
+        self.validate_market_balances(long_excluding_amount, short_excluding_amount)
+    }
+
     /// Validate market balance for the given token.
-    fn validate_market_balance_excluding_token_amount(
+    fn validate_market_balance_for_the_given_token(
         &self,
         token: &Pubkey,
         amount: u64,

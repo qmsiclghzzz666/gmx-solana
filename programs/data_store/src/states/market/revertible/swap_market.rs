@@ -50,6 +50,11 @@ impl<'a> SwapMarkets<'a> {
         self.0.get_mut(token)
     }
 
+    /// Get market.
+    pub fn get(&self, token: &Pubkey) -> Option<&RevertibleSwapMarket<'a>> {
+        self.0.get(token)
+    }
+
     /// Revertible Swap.
     pub(crate) fn revertible_swap<M>(
         &mut self,
@@ -96,6 +101,73 @@ impl<'a> SwapMarkets<'a> {
             })
             .transpose()?
             .unwrap_or_default();
+
+        // Validate token balances of output markets and current market.
+        let current = direction.current();
+        let mut long_output_market_token = long_path.last().unwrap_or(&current);
+        let mut short_output_market_token = short_path.last().unwrap_or(&current);
+
+        // When the swap direction is swapping into current market,
+        // the balances should have been transferred into current market.
+        if direction.is_into() {
+            long_output_market_token = &current;
+            short_output_market_token = &current;
+        }
+
+        let mut current_validated = false;
+        if *long_output_market_token == *short_output_market_token {
+            if *long_output_market_token != current {
+                self.get(long_output_market_token)
+                    .expect("must exist")
+                    .validate_market_balances_excluding_the_given_token_amounts(
+                        &expected_token_outs.0,
+                        &expected_token_outs.1,
+                        long_output_amount,
+                        short_output_amount,
+                    )?;
+            } else {
+                direction
+                    .current_market()
+                    .validate_market_balances_excluding_the_given_token_amounts(
+                        &expected_token_outs.0,
+                        &expected_token_outs.1,
+                        long_output_amount,
+                        short_output_amount,
+                    )?;
+                current_validated = true;
+            }
+        } else {
+            for (market_token, amount, token) in [
+                (
+                    long_output_market_token,
+                    long_output_amount,
+                    &expected_token_outs.0,
+                ),
+                (
+                    short_output_market_token,
+                    short_output_amount,
+                    &expected_token_outs.1,
+                ),
+            ] {
+                if *market_token != current {
+                    self.get(market_token)
+                        .expect("must exist")
+                        .validate_market_balances_excluding_the_given_token_amounts(
+                            token, token, amount, 0,
+                        )?;
+                } else {
+                    direction
+                        .current_market()
+                        .validate_market_balances_excluding_the_given_token_amounts(
+                            token, token, amount, 0,
+                        )?;
+                    current_validated = true;
+                }
+            }
+        }
+        if !current_validated {
+            direction.current_market().validate_market_balances(0, 0)?;
+        }
         Ok((long_output_amount, short_output_amount))
     }
 
@@ -140,14 +212,12 @@ impl<'a> SwapMarkets<'a> {
             *token_in_amount = (*report.token_out_amount())
                 .try_into()
                 .map_err(|_| error!(DataStoreError::AmountOverflow))?;
+            // Only validate the market without extra balances.
             if idx != last_idx {
                 market
                     .record_transferred_out_by_token(token_in, token_in_amount)
                     .map_err(GmxCoreError::from)?;
                 market.validate_market_balances(0, 0)?;
-            } else {
-                market
-                    .validate_market_balance_excluding_token_amount(token_in, *token_in_amount)?;
             }
         }
         Ok(())
@@ -193,16 +263,38 @@ impl<'a> SwapMarkets<'a> {
                     from_market
                         .record_transferred_out_by_token(&token_in, &token_in_amount)
                         .map_err(GmxCoreError::from)?;
-                    from_market.validate_market_balance_excluding_token_amount(&token_in, 0)?;
+                    // FIXME: is this validation needed?
+                    from_market.validate_market_balance_for_the_given_token(&token_in, 0)?;
                     first_market
                         .record_transferred_in_by_token(&token_in, &token_in_amount)
                         .map_err(GmxCoreError::from)?;
                 }
             }
 
-            if *first_market_token == direction.current() {
+            if *first_market_token == current {
+                // The validation of current market is delayed.
                 direction.swap_with_current(oracle, &mut token_in, &mut token_in_amount)?;
                 path = &path[1..];
+                if let Some(first_market_token_to_swap_at) = path.first() {
+                    debug_assert!(*first_market_token_to_swap_at != current);
+                    let first_market =
+                        self.get_mut(first_market_token_to_swap_at).ok_or_else(|| {
+                            msg!(
+                                "Swap Error: missing market account for {}",
+                                first_market_token
+                            );
+                            error!(DataStoreError::MissingMarketAccount)
+                        })?;
+                    // We are assuming that they are sharing the same vault of `token_in`.
+                    direction
+                        .current_market_mut()
+                        .record_transferred_out_by_token(&token_in, &token_in_amount)
+                        .map_err(GmxCoreError::from)?;
+                    // The validation of current market is delayed.
+                    first_market
+                        .record_transferred_in_by_token(&token_in, &token_in_amount)
+                        .map_err(GmxCoreError::from)?;
+                }
             }
 
             if !path.is_empty() {
@@ -217,22 +309,32 @@ impl<'a> SwapMarkets<'a> {
                 self.swap_along_the_path(oracle, path, &mut token_in, &mut token_in_amount)?;
 
                 if should_swap_with_current {
+                    if let Some(last_swapped_market_token) = path.last() {
+                        debug_assert!(*last_swapped_market_token != current);
+                        let last_market =
+                            self.get_mut(last_swapped_market_token).expect("must exist");
+                        // We are assuming that they are sharing the same vault of `token_in`.
+                        last_market
+                            .record_transferred_out_by_token(&token_in, &token_in_amount)
+                            .map_err(GmxCoreError::from)?;
+                        last_market.validate_market_balances(0, 0)?;
+                        direction
+                            .current_market_mut()
+                            .record_transferred_in_by_token(&token_in, &token_in_amount)
+                            .map_err(GmxCoreError::from)?;
+                    }
+                    // The validation of current market is delayed.
                     direction.swap_with_current(oracle, &mut token_in, &mut token_in_amount)?;
                 }
 
                 if let SwapDirection::Into(into_market) = direction {
                     if *last_market_token != current {
-                        let last_market = self.get_mut(last_market_token).ok_or_else(|| {
-                            msg!(
-                                "Swap Error: missing market account for {}",
-                                last_market_token
-                            );
-                            error!(DataStoreError::MissingMarketAccount)
-                        })?;
+                        let last_market = self.get_mut(last_market_token).expect("must exist");
                         // We are assuming that they are sharing the same vault of `token_in`.
                         last_market
                             .record_transferred_out_by_token(&token_in, &token_in_amount)
                             .map_err(GmxCoreError::from)?;
+                        last_market.validate_market_balances(0, 0)?;
                         into_market
                             .record_transferred_in_by_token(&token_in, &token_in_amount)
                             .map_err(GmxCoreError::from)?;
@@ -274,13 +376,27 @@ where
             Self::From(p) | Self::Into(p) => p.key(),
         }
     }
+
+    fn current_market_mut(&mut self) -> &mut M {
+        match self {
+            Self::From(m) | Self::Into(m) => m,
+        }
+    }
+
+    fn current_market(&self) -> &M {
+        match self {
+            Self::From(m) | Self::Into(m) => m,
+        }
+    }
+
+    fn is_into(&self) -> bool {
+        matches!(self, Self::Into(_))
+    }
 }
 
 impl<'a, M> SwapDirection<'a, M>
 where
-    M: HasMarketMeta
-        + gmx_core::SwapMarket<{ constants::MARKET_DECIMALS }, Num = u128>
-        + gmx_core::Bank<Pubkey, Num = u64>,
+    M: HasMarketMeta + gmx_core::SwapMarket<{ constants::MARKET_DECIMALS }, Num = u128>,
 {
     fn swap_with_current(
         &mut self,
@@ -298,7 +414,6 @@ where
             .map_err(GmxCoreError::from)?
             .execute()
             .map_err(GmxCoreError::from)?;
-        current.validate_market_balances(0, 0)?;
         msg!("[Swap] in current market: {:?}", report);
         *token_in_amount = (*report.token_out_amount())
             .try_into()

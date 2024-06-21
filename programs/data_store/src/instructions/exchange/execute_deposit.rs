@@ -51,15 +51,17 @@ pub struct ExecuteDeposit<'info> {
 /// Execute a deposit.
 pub fn execute_deposit<'info>(
     ctx: Context<'_, '_, 'info, 'info, ExecuteDeposit<'info>>,
+    throw_on_execution_error: bool,
 ) -> Result<bool> {
     ctx.accounts.validate_oracle()?;
     match ctx.accounts.execute2(ctx.remaining_accounts) {
         Ok(()) => Ok(true),
-        Err(err) => {
+        Err(err) if !throw_on_execution_error => {
             // TODO: catch and throw missing oracle price error.
             msg!("Execute deposit error: {}", err);
             Ok(false)
         }
+        Err(err) => Err(err),
     }
 }
 

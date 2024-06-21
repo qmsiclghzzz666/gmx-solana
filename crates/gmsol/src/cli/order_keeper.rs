@@ -112,6 +112,7 @@ impl KeeperArgs {
                         .oracle
                         .address(Some(store), &client.data_store_program_id())?,
                     deposit,
+                    true,
                 );
                 let execution_fee = self
                     .get_or_estimate_execution_fee(client.data_store(), builder.build().await?)
@@ -165,6 +166,7 @@ impl KeeperArgs {
                         .oracle
                         .address(Some(store), &client.data_store_program_id())?,
                     withdrawal,
+                    true,
                 );
                 let execution_fee = self
                     .get_or_estimate_execution_fee(client.data_store(), builder.build().await?)

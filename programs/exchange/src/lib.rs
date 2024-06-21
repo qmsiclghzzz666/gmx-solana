@@ -46,8 +46,9 @@ pub mod exchange {
     pub fn execute_deposit<'info>(
         ctx: Context<'_, '_, 'info, 'info, ExecuteDeposit<'info>>,
         execution_fee: u64,
+        cancel_on_execution_error: bool,
     ) -> Result<()> {
-        instructions::execute_deposit(ctx, execution_fee)
+        instructions::execute_deposit(ctx, execution_fee, cancel_on_execution_error)
     }
 
     pub fn cancel_deposit(ctx: Context<CancelDeposit>) -> Result<()> {
@@ -71,8 +72,9 @@ pub mod exchange {
     pub fn execute_withdrawal<'info>(
         ctx: Context<'_, '_, 'info, 'info, ExecuteWithdrawal<'info>>,
         execution_fee: u64,
+        cancel_on_execution_error: bool,
     ) -> Result<()> {
-        instructions::execute_withdrawal(ctx, execution_fee)
+        instructions::execute_withdrawal(ctx, execution_fee, cancel_on_execution_error)
     }
 
     // Order.

@@ -440,15 +440,17 @@ pub mod data_store {
     #[access_control(internal::Authenticate::only_controller(&ctx))]
     pub fn execute_deposit<'info>(
         ctx: Context<'_, '_, 'info, 'info, ExecuteDeposit<'info>>,
+        throw_on_execution_error: bool,
     ) -> Result<bool> {
-        instructions::execute_deposit(ctx)
+        instructions::execute_deposit(ctx, throw_on_execution_error)
     }
 
     #[access_control(internal::Authenticate::only_controller(&ctx))]
     pub fn execute_withdrawal<'info>(
         ctx: Context<'_, '_, 'info, 'info, ExecuteWithdrawal<'info>>,
+        throw_on_execution_error: bool,
     ) -> Result<(u64, u64)> {
-        instructions::execute_withdrawal(ctx)
+        instructions::execute_withdrawal(ctx, throw_on_execution_error)
     }
 
     #[access_control(internal::Authenticate::only_controller(&ctx))]

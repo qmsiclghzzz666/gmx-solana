@@ -52,7 +52,7 @@ impl<'a, 'info> SwapUtils<'a, 'info> {
         let mut amount = *token_in_amount;
         let last_idx = self.markets.len().saturating_sub(1);
         let mut final_market = None;
-        // Invariant: `token_in_amount` has been record.
+        // Invariant: `token_in_amount` has been recorded.
         for (idx, market_info) in self.markets.iter().enumerate() {
             require!(
                 flags.insert(market_info.key),
@@ -134,8 +134,6 @@ impl<'a, 'info> SwapUtils<'a, 'info> {
                 }
                 msg!("{:?}", report);
             }
-            // `exit` must be called to ensure data is written to the storage.
-            market.exit(&crate::ID)?;
         }
         require_eq!(
             token_in,

@@ -356,6 +356,7 @@ pub struct ExecuteWithdrawalBuilder<'a, C> {
     hint: Option<ExecuteWithdrawalHint>,
     feeds_parser: FeedsParser,
     token_map: Option<Pubkey>,
+    cancel_on_execution_error: bool,
 }
 
 /// Hint for withdrawal execution.
@@ -399,6 +400,7 @@ where
         store: &Pubkey,
         oracle: &Pubkey,
         withdrawal: &Pubkey,
+        cancel_on_execution_error: bool,
     ) -> Self {
         Self {
             client,
@@ -410,6 +412,7 @@ where
             hint: None,
             feeds_parser: Default::default(),
             token_map: None,
+            cancel_on_execution_error,
         }
     }
 
@@ -516,6 +519,7 @@ where
             })
             .args(instruction::ExecuteWithdrawal {
                 execution_fee: self.execution_fee,
+                cancel_on_execution_error: self.cancel_on_execution_error,
             })
             .accounts(
                 feeds

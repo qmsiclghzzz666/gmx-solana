@@ -1,4 +1,4 @@
-import { workspace, Program, utils, Wallet } from "@coral-xyz/anchor";
+import { workspace, Program, utils, Wallet, translateAddress } from "@coral-xyz/anchor";
 import { Exchange } from "../../target/types/exchange";
 import { AccountMeta, Connection, Keypair, PublicKey } from "@solana/web3.js";
 import { createMarketPDA, createMarketTokenMintPDA, createMarketVault, createMarketVaultPDA, createRolesPDA, dataStore } from "./data";
@@ -163,6 +163,7 @@ export type MakeExecuteDepositParams = {
     oracle: PublicKey,
     deposit: PublicKey,
     options?: {
+        cancelOnExecutionError?: boolean,
         executionFee?: number | bigint,
         priceProvider?: PublicKey,
         hints?: {
@@ -247,16 +248,15 @@ export const makeExecuteDepositInstruction = async ({
         const provider = providerMapper(idx);
         return getFeedAccountMeta(provider, feed);
     });
-    const uniqueMarkets = new Set([...longSwapPath, ...shortSwapPath]);
-    const swapPathMarkets = [...uniqueMarkets.values()].filter(mint => !mint.equals(marketToken)).map(mint => {
+    const swapPathMarkets = Array.from(new Set([...longSwapPath, ...shortSwapPath].filter(mint => !mint.equals(marketToken)).map(mint => mint.toBase58()))).map(mint => {
         return {
-            pubkey: createMarketPDA(store, mint)[0],
+            pubkey: createMarketPDA(store, translateAddress(mint))[0],
             isSigner: false,
             isWritable: true,
         };
     });
     const tokenMap = (await dataStore.account.store.fetch(store)).tokenMap;
-    return await exchange.methods.executeDeposit(toBN(options?.executionFee ?? 0)).accounts({
+    return await exchange.methods.executeDeposit(toBN(options?.executionFee ?? 0), options?.cancelOnExecutionError ?? false).accounts({
         authority,
         store,
         oracle,
@@ -379,6 +379,7 @@ export type MakeExecuteWithdrawalParams = {
     oracle: PublicKey,
     withdrawal: PublicKey,
     options?: {
+        cancelOnExecutionError?: boolean,
         executionFee?: number | bigint,
         priceProvider?: PublicKey,
         hints?: {
@@ -431,15 +432,15 @@ export const makeExecuteWithdrawalInstruction = async ({
     const feedAccounts = feeds.map((feed, idx) => {
         return getFeedAccountMeta(providerMapper(idx), feed);
     });
-    const swapPathMarkets = [...new Set([...longSwapPath, ...shortSwapPath])].filter(mint => !mint.equals(marketTokenMint)).map(mint => {
+    const swapPathMarkets = Array.from(new Set([...longSwapPath, ...shortSwapPath].filter(mint => !mint.equals(marketTokenMint)).map(mint => mint.toBase58()))).map(mint => {
         return {
-            pubkey: createMarketPDA(store, mint)[0],
+            pubkey: createMarketPDA(store, translateAddress(mint))[0],
             isSigner: false,
             isWritable: true,
         };
     });
     const tokenMap = (await dataStore.account.store.fetch(store)).tokenMap;
-    return await exchange.methods.executeWithdrawal(toBN(options?.executionFee ?? 0)).accounts({
+    return await exchange.methods.executeWithdrawal(toBN(options?.executionFee ?? 0), options?.cancelOnExecutionError ?? false).accounts({
         authority,
         store,
         oracle,

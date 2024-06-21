@@ -450,6 +450,7 @@ pub struct ExecuteDepositBuilder<'a, C> {
     feeds_parser: FeedsParser,
     hint: Option<ExecuteDepositHint>,
     token_map: Option<Pubkey>,
+    cancel_on_execution_error: bool,
 }
 
 /// Hint for executing deposit.
@@ -493,6 +494,7 @@ where
         store: &Pubkey,
         oracle: &Pubkey,
         deposit: &Pubkey,
+        cancel_on_execution_error: bool,
     ) -> Self {
         Self {
             client,
@@ -504,6 +506,7 @@ where
             hint: None,
             feeds_parser: Default::default(),
             token_map: None,
+            cancel_on_execution_error,
         }
     }
 
@@ -570,6 +573,7 @@ where
             deposit,
             execution_fee,
             price_provider,
+            cancel_on_execution_error,
             ..
         } = self;
         let authority = client.payer();
@@ -632,6 +636,7 @@ where
             })
             .args(instruction::ExecuteDeposit {
                 execution_fee: *execution_fee,
+                cancel_on_execution_error: *cancel_on_execution_error,
             })
             .accounts(feeds.into_iter().chain(markets).collect::<Vec<_>>())
             .compute_budget(ComputeBudget::default().with_limit(EXECUTE_DEPOSIT_COMPUTE_BUDGET)))

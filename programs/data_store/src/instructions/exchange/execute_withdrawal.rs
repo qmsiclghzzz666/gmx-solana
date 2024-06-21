@@ -88,15 +88,17 @@ pub struct ExecuteWithdrawal<'info> {
 /// Execute a withdrawal.
 pub fn execute_withdrawal<'info>(
     ctx: Context<'_, '_, 'info, 'info, ExecuteWithdrawal<'info>>,
+    throw_on_execution_error: bool,
 ) -> Result<(u64, u64)> {
     ctx.accounts.validate_oracle()?;
     match ctx.accounts.execute2(ctx.remaining_accounts) {
         Ok(res) => Ok(res),
-        Err(err) => {
+        Err(err) if !throw_on_execution_error => {
             // TODO: catch and throw missing oracle price error.
             msg!("Execute withdrawal error: {}", err);
             Ok((0, 0))
         }
+        Err(err) => Err(err),
     }
 }
 
@@ -185,6 +187,7 @@ impl<'info> ExecuteWithdrawal<'info> {
                     .try_into()
                     .map_err(|_| DataStoreError::AmountOverflow)?,
             );
+            // Validate current market.
             market.validate_market_balances(long_amount, short_amount)?;
             msg!("[Withdrawal] executed: {:?}", report);
             (long_amount, short_amount)

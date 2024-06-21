@@ -55,6 +55,7 @@ pub trait ExchangeOps<C> {
         store: &Pubkey,
         oracle: &Pubkey,
         deposit: &Pubkey,
+        cancel_on_execution_error: bool,
     ) -> ExecuteDepositBuilder<C>;
 
     /// Create a withdrawal.
@@ -74,6 +75,7 @@ pub trait ExchangeOps<C> {
         store: &Pubkey,
         oracle: &Pubkey,
         withdrawal: &Pubkey,
+        cancel_on_execution_error: bool,
     ) -> ExecuteWithdrawalBuilder<C>;
 
     /// Create an order.
@@ -174,8 +176,9 @@ where
         store: &Pubkey,
         oracle: &Pubkey,
         deposit: &Pubkey,
+        cancel_on_execution_error: bool,
     ) -> ExecuteDepositBuilder<C> {
-        ExecuteDepositBuilder::new(self, store, oracle, deposit)
+        ExecuteDepositBuilder::new(self, store, oracle, deposit, cancel_on_execution_error)
     }
 
     fn create_withdrawal(
@@ -196,8 +199,9 @@ where
         store: &Pubkey,
         oracle: &Pubkey,
         withdrawal: &Pubkey,
+        cancel_on_execution_error: bool,
     ) -> ExecuteWithdrawalBuilder<C> {
-        ExecuteWithdrawalBuilder::new(self, store, oracle, withdrawal)
+        ExecuteWithdrawalBuilder::new(self, store, oracle, withdrawal, cancel_on_execution_error)
     }
 
     async fn create_market(
