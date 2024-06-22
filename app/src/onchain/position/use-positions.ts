@@ -46,9 +46,9 @@ export const usePositions = (params?: { store: Address, markets: Market[] }) => 
         marketTokenAddress: position!.marketToken,
         collateralTokenAddress: position!.collateralToken,
         isLong: position!.kind === 1,
-        sizeInUsd: position!.sizeInUsd,
-        sizeInTokens: position!.sizeInTokens,
-        collateralAmount: position!.collateralAmount,
+        sizeInUsd: position!.state.sizeInUsd,
+        sizeInTokens: position!.state.sizeInTokens,
+        collateralAmount: position!.state.collateralAmount,
       } satisfies Position as Position;
     });
     return positions.reduce((acc, position) => {
