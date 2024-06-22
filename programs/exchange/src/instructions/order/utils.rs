@@ -59,11 +59,11 @@ impl<'a, 'info> CancelOrderUtil<'a, 'info> {
         &self,
     ) -> Result<CpiContext<'_, '_, '_, 'info, MarketTransferOut<'info>>> {
         let (market, to, vault) = match (
+            &self.initial_market,
             &self.initial_collateral_token_account,
             &self.initial_collateral_token_vault,
-            &self.initial_market,
         ) {
-            (Some(account), Some(vault), Some(market)) => (
+            (Some(market), Some(account), Some(vault)) => (
                 market.to_account_info(),
                 account.to_account_info(),
                 vault.to_account_info(),

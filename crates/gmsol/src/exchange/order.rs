@@ -716,14 +716,14 @@ where
                     initial_collateral_token_vault: hint
                         .initial_collateral_token
                         .map(|token| self.client.find_market_vault_address(&self.store, &token)),
-                    initial_market: hint
-                        .initial_collateral_token_account
-                        .map(|_| {
+                    initial_market: hint.initial_collateral_token_account.map(|_| {
+                        self.client.find_market_address(
+                            &self.store,
                             hint.swap
                                 .first_market_token(true)
-                                .unwrap_or(&hint.market_token)
-                        })
-                        .copied(),
+                                .unwrap_or(&hint.market_token),
+                        )
+                    }),
                 },
                 &exchange::id(),
                 &self.client.exchange_program_id(),
