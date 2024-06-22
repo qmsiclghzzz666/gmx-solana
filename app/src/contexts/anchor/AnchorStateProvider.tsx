@@ -26,7 +26,8 @@ function Inner({ children }: { children: ReactNode }) {
 }
 
 export function AnchorStateProvider({ children }: { children: ReactNode }) {
-  const endpoint = clusterApiUrl(DEFAULT_CLUSTER);
+  const endpoint = import.meta.env.VITE_SOLANA_ENDPOINT ?? clusterApiUrl(DEFAULT_CLUSTER);
+  console.debug(`Using endpoint ${endpoint}`);
   return (
     <ConnectionProvider endpoint={endpoint}>
       <WalletProvider wallets={[]} autoConnect={true} onError={(e) => console.error("wallet error:", e)}>
