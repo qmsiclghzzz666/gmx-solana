@@ -39,12 +39,25 @@ pub trait Unsigned: num_traits::Unsigned {
     /// The signed type.
     type Signed: TryFrom<Self> + UnsignedAbs<Unsigned = Self>;
 
-    /// Convert to signed.
+    /// Convert to a signed value
     fn to_signed(&self) -> crate::Result<Self::Signed>
     where
         Self: Clone,
     {
         self.clone().try_into().map_err(|_| crate::Error::Convert)
+    }
+
+    /// Convert to a signed value with the given sign.
+    fn to_signed_with_sign(&self, negative: bool) -> crate::Result<Self::Signed>
+    where
+        Self: Clone,
+        Self::Signed: CheckedSub,
+    {
+        if negative {
+            self.to_opposite_signed()
+        } else {
+            self.to_signed()
+        }
     }
 
     /// Convert to opposite signed.
@@ -136,16 +149,17 @@ pub trait Unsigned: num_traits::Unsigned {
     fn bound_magnitude(value: &Self::Signed, min: &Self, max: &Self) -> crate::Result<Self::Signed>
     where
         Self: Ord + Clone,
-        Self::Signed: Clone,
+        Self::Signed: Clone + CheckedSub,
     {
         if min > max {
             return Err(crate::Error::invalid_argument("min > max"));
         }
         let magnitude = value.unsigned_abs();
+        let negative = value.is_negative();
         if magnitude < *min {
-            min.to_signed()
+            min.to_signed_with_sign(negative)
         } else if magnitude > *max {
-            max.to_signed()
+            max.to_signed_with_sign(negative)
         } else {
             Ok(value.clone())
         }
@@ -321,5 +335,24 @@ mod tests {
         let c = 80_000_000_000u128;
         assert_eq!(a.checked_mul_div_ceil(&b, &c).unwrap(), 325_203_252);
         assert_eq!(a2.checked_mul_div_ceil(&b, &c).unwrap(), 325_203_253);
+    }
+
+    #[test]
+    fn bound_magnitude() {
+        let a = -123i64;
+        assert_eq!(Unsigned::bound_magnitude(&a, &0, &124u64).unwrap(), -123);
+        assert_eq!(Unsigned::bound_magnitude(&a, &0, &120u64).unwrap(), -120);
+        assert_eq!(Unsigned::bound_magnitude(&a, &124, &256u64).unwrap(), -124);
+
+        let b = 123i64;
+        assert_eq!(Unsigned::bound_magnitude(&b, &0, &124u64).unwrap(), 123);
+        assert_eq!(Unsigned::bound_magnitude(&b, &0, &120u64).unwrap(), 120);
+        assert_eq!(Unsigned::bound_magnitude(&b, &124, &256u64).unwrap(), 124);
+
+        let c = 0i64;
+        assert_eq!(Unsigned::bound_magnitude(&c, &1, &124u64).unwrap(), 1);
+
+        let d = -0i64;
+        assert_eq!(Unsigned::bound_magnitude(&d, &1, &124u64).unwrap(), 1);
     }
 }
