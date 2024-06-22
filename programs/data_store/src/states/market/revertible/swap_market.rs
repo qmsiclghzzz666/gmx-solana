@@ -74,6 +74,7 @@ impl<'a> SwapMarkets<'a> {
         let long_path = params.validated_long_path()?;
         let long_output_amount = token_ins
             .0
+            .and_then(|token| (token_in_amounts.0 != 0).then_some(token))
             .map(|token_in| {
                 self.revertible_swap_for_one_side(
                     &mut direction,
@@ -89,6 +90,7 @@ impl<'a> SwapMarkets<'a> {
         let short_path = params.validated_short_path()?;
         let short_output_amount = token_ins
             .1
+            .and_then(|token| (token_in_amounts.1 != 0).then_some(token))
             .map(|token_in| {
                 self.revertible_swap_for_one_side(
                     &mut direction,
