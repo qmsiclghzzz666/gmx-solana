@@ -13,7 +13,7 @@
     "compile": "lingui compile --typescript"
   },
   "dependencies": {
-    "@coral-xyz/anchor": "^0.30.0",
+    "@coral-xyz/anchor": "^0.30.1",
     "@floating-ui/dom": "^1.6.3",
     "@headlessui/react": "^1.7.19",
     "@lingui/react": "^4.10.0",

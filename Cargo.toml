@@ -3,18 +3,18 @@ resolver = "2"
 members = ["programs/*", "crates/*"]
 
 [workspace.dependencies]
-anchor-lang = "0.30.0"
-anchor-spl = { version = "0.30.0", default-features = false }
+anchor-lang = "0.30.1"
+anchor-spl = { version = "0.30.1", default-features = false }
 thiserror = "1.0.58"
 bytemuck = "1.15.0"
 clap = "4.5.0"
 
-# FIXME: use the crates.io version when it can compile with anchor v0.30
+# FIXME: use the crates.io version when it can compile with `anchor v0.30`.
+# See https://github.com/pyth-network/pyth-crosschain/issues/1522 for more information.
 [workspace.dependencies.pyth-solana-receiver-sdk]
 version = "0.2.0"
 git = "https://github.com/pyth-network/pyth-crosschain"
-rev = "308599714ff07aa6bbb31c36d79e8095bfc98c74"
-
+tag = "pyth-solana-receiver-sdk-v0.2.0"
 
 [profile.release]
 overflow-checks = true
