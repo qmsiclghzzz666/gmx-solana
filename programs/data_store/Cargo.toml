@@ -1,8 +1,7 @@
 [package]
 name = "data_store"
-version = "0.1.0"
-description = "Created with Anchor"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 
 [lib]
 crate-type = ["cdylib", "lib"]
@@ -33,14 +32,14 @@ anchor-spl = { workspace = true, default-features = false, features = [
     "token_2022",
     "token_2022_extensions",
 ] }
-bitmaps = "3.2.1"
-chainlink_solana = "1.0.0"
-num_enum = "0.7.2"
-static_assertions = "1.1.0"
+bitmaps = { workspace = true }
+chainlink_solana = { workspace = true }
+num_enum = { workspace = true }
+static_assertions = { workspace = true }
 clap = { workspace = true, optional = true }
-pyth-sdk-solana = "0.10.1"
+pyth-sdk-solana = { workspace = true }
 pyth-solana-receiver-sdk = { workspace = true }
-paste = "1.0.15"
-strum = { version = "0.26.2", features = ["derive"] }
-serde = { version = "1.0.203", features = ["derive"], optional = true }
-indexmap = "2.2.6"
+paste = { workspace = true }
+strum = { workspace = true, features = ["derive"] }
+serde = { workspace = true, features = ["derive"], optional = true }
+indexmap = { workspace = true }
