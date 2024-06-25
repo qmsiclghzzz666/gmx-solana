@@ -32,7 +32,7 @@ struct Cli {
     #[arg(long, short, env, default_value = "~/.config/solana/id.json")]
     wallet: String,
     /// Cluster to connect to.
-    #[arg(long, short, env, default_value = "devnet")]
+    #[arg(long = "url", short = 'u', env, default_value = "devnet")]
     cluster: String,
     /// Commitment level.
     #[arg(long, env, default_value = "confirmed")]
