@@ -89,8 +89,6 @@ enum Command {
         #[command(flatten)]
         oracle: Oracle,
     },
-    /// Get the CONTROLLER address.
-    Controller,
     /// `Order` account.
     Order { address: Pubkey },
     /// `Position` account.
@@ -107,6 +105,10 @@ enum Command {
         #[arg(long)]
         post: bool,
     },
+    /// Get the CONTROLLER address.
+    Controller,
+    /// Get the event authority address.
+    EventAuthority,
     /// Generate Anchor Discriminator with the given name.
     Discriminator { name: String },
 }
@@ -299,6 +301,10 @@ impl InspectArgs {
                         tracing::info!(%err, "failed to get balance");
                     }
                 }
+            }
+            Command::EventAuthority => {
+                println!("DataStore: {}", client.data_store_program_id());
+                println!("Event Authority: {}", client.data_store_event_authority());
             }
             Command::Oracle { oracle } => {
                 let address = oracle.address(Some(store), &client.data_store_program_id())?;

@@ -12,6 +12,7 @@ use crate::{
 
 pub(crate) struct CancelOrderUtil<'a, 'info> {
     pub(super) data_store_program: AccountInfo<'info>,
+    pub(super) event_authority: AccountInfo<'info>,
     pub(super) token_program: AccountInfo<'info>,
     pub(super) system_program: AccountInfo<'info>,
     pub(super) controller: AccountInfo<'info>,
@@ -110,6 +111,8 @@ impl<'a, 'info> CancelOrderUtil<'a, 'info> {
                 order: self.order.to_account_info(),
                 user: self.user.to_account_info(),
                 system_program: self.system_program.to_account_info(),
+                event_authority: self.event_authority.to_account_info(),
+                program: self.data_store_program.to_account_info(),
             },
         )
     }

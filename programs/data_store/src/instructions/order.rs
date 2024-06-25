@@ -280,6 +280,7 @@ impl<'info> InitializeOrder<'info> {
     }
 }
 
+#[event_cpi]
 #[derive(Accounts)]
 #[instruction(refund: u64)]
 pub struct RemoveOrder<'info> {
@@ -311,7 +312,14 @@ pub struct RemoveOrder<'info> {
 
 /// Remove an order.
 pub fn remove_order(ctx: Context<RemoveOrder>, refund: u64) -> Result<()> {
-    system_program::transfer(ctx.accounts.transfer_ctx(), refund)
+    system_program::transfer(ctx.accounts.transfer_ctx(), refund)?;
+    emit_cpi!(RemoveOrderEvent {
+        store: ctx.accounts.store.key(),
+        order: ctx.accounts.order.key(),
+        market_token: ctx.accounts.order.fixed.tokens.market_token,
+        user: ctx.accounts.order.fixed.user,
+    });
+    Ok(())
 }
 
 impl<'info> internal::Authentication<'info> for RemoveOrder<'info> {
@@ -334,4 +342,17 @@ impl<'info> RemoveOrder<'info> {
             },
         )
     }
+}
+
+/// Order removed event.
+#[event]
+pub struct RemoveOrderEvent {
+    /// Store.
+    pub store: Pubkey,
+    /// Order.
+    pub order: Pubkey,
+    /// Market token.
+    pub market_token: Pubkey,
+    /// User.
+    pub user: Pubkey,
 }

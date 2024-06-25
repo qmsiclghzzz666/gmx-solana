@@ -9,8 +9,8 @@ pub use data_store::states::market::find_market_address;
 use crate::utils::EVENT_AUTHORITY_SEED;
 
 /// Find PDA for `event_authority` account.
-pub fn find_event_authority_address(exchange_program_id: &Pubkey) -> (Pubkey, u8) {
-    Pubkey::find_program_address(&[EVENT_AUTHORITY_SEED], exchange_program_id)
+pub fn find_event_authority_address(program_id: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(&[EVENT_AUTHORITY_SEED], program_id)
 }
 
 /// Find PDA for [`DataStore`] account.

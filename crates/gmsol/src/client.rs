@@ -131,6 +131,11 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         crate::pda::find_controller_address(store, &self.exchange_program_id()).0
     }
 
+    /// Get the event authority address for the data store program.
+    pub fn data_store_event_authority(&self) -> Pubkey {
+        crate::pda::find_event_authority_address(&self.data_store_program_id()).0
+    }
+
     /// Find PDA for [`Oracle`](data_store::states::Oracle) account.
     pub fn find_oracle_address(&self, store: &Pubkey, index: u8) -> Pubkey {
         crate::pda::find_oracle_address(store, index, &self.data_store_program_id()).0

@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token};
 use data_store::{
+    constants::EVENT_AUTHORITY_SEED,
     cpi::accounts::{MarketTransferOut, RemovePosition},
     program::DataStore,
     states::{order::TransferOut, Oracle, Order, PriceProvider},
@@ -88,6 +89,9 @@ pub struct ExecuteOrder<'info> {
     /// CHECK: check by CPI and cancel utils.
     #[account(mut)]
     pub initial_market: Option<UncheckedAccount<'info>>,
+    /// CHECK: Only the event authority can invoke self-CPI
+    #[account(seeds = [EVENT_AUTHORITY_SEED], bump, seeds::program = data_store_program.key())]
+    pub event_authority: UncheckedAccount<'info>,
     pub data_store_program: Program<'info, DataStore>,
     pub token_program: Program<'info, Token>,
     pub price_provider: Interface<'info, PriceProvider>,
@@ -200,6 +204,7 @@ impl<'info> WithOracle<'info> for ExecuteOrder<'info> {
 impl<'info> ExecuteOrder<'info> {
     fn cancel_util(&self) -> CancelOrderUtil<'_, 'info> {
         CancelOrderUtil {
+            event_authority: self.event_authority.to_account_info(),
             data_store_program: self.data_store_program.to_account_info(),
             token_program: self.token_program.to_account_info(),
             system_program: self.system_program.to_account_info(),

@@ -10,6 +10,9 @@ use gmx_solana_utils::price::Decimal;
 
 use crate::states::{Amount, Factor};
 
+/// Event authority SEED.
+pub const EVENT_AUTHORITY_SEED: &[u8] = b"__event_authority";
+
 /// Market Token Mint Address Seed.
 pub const MAREKT_TOKEN_MINT_SEED: &[u8] = b"market_token_mint";
 

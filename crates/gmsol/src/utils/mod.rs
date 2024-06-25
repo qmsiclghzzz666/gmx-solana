@@ -172,5 +172,4 @@ impl TokenAccountParams {
     }
 }
 
-/// Event authority SEED.
-pub const EVENT_AUTHORITY_SEED: &[u8] = b"__event_authority";
+pub use data_store::constants::EVENT_AUTHORITY_SEED;

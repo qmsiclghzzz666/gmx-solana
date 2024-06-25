@@ -35,6 +35,7 @@ impl<'info> TransferIn<'info> {
 
 pub(super) struct CancelDepositUtils<'a, 'info> {
     pub(super) data_store_program: AccountInfo<'info>,
+    pub(super) event_authority: AccountInfo<'info>,
     pub(super) token_program: AccountInfo<'info>,
     pub(super) system_program: AccountInfo<'info>,
     pub(super) store: AccountInfo<'info>,
@@ -141,6 +142,8 @@ impl<'a, 'info> CancelDepositUtils<'a, 'info> {
                 user: self.user.to_account_info(),
                 system_program: self.system_program.to_account_info(),
                 token_program: self.token_program.to_account_info(),
+                event_authority: self.event_authority.to_account_info(),
+                program: self.data_store_program.to_account_info(),
             },
         )
     }

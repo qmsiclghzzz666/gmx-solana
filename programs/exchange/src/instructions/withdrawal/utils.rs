@@ -5,6 +5,7 @@ use crate::{utils::ControllerSeeds, ExchangeError};
 
 pub(crate) struct CancelWithdrawalUtils<'a, 'info> {
     pub(super) data_store_program: AccountInfo<'info>,
+    pub(super) event_authority: AccountInfo<'info>,
     pub(super) token_program: AccountInfo<'info>,
     pub(super) system_program: AccountInfo<'info>,
     pub(super) controller: AccountInfo<'info>,
@@ -51,6 +52,8 @@ impl<'a, 'info> CancelWithdrawalUtils<'a, 'info> {
                 market_token: Some(self.market_token_account.to_account_info()),
                 market_token_withdrawal_vault: Some(self.market_token_vault.to_account_info()),
                 token_program: self.token_program.to_account_info(),
+                event_authority: self.event_authority.to_account_info(),
+                program: self.data_store_program.to_account_info(),
             },
         )
     }

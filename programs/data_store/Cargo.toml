@@ -23,7 +23,7 @@ enum-iter = []
 
 [dependencies]
 bytemuck = { workspace = true }
-anchor-lang = { workspace = true, features = ["init-if-needed"] }
+anchor-lang = { workspace = true, features = ["init-if-needed", "event-cpi"] }
 gmx-core = { path = "../../crates/gmx-core", features = ["u128", "solana"] }
 gmx-solana-utils = { path = "../../crates/gmx-solana-utils" }
 dual-vec-map = { path = "../../crates/dual-vec-map" }

@@ -80,6 +80,7 @@ impl<'info> internal::Authentication<'info> for InitializeDeposit<'info> {
     }
 }
 
+#[event_cpi]
 #[derive(Accounts)]
 #[instruction(refund: u64)]
 pub struct RemoveDeposit<'info> {
@@ -112,7 +113,14 @@ pub struct RemoveDeposit<'info> {
 
 /// Remove a deposit.
 pub fn remove_deposit(ctx: Context<RemoveDeposit>, refund: u64) -> Result<()> {
-    system_program::transfer(ctx.accounts.transfer_ctx(), refund)
+    system_program::transfer(ctx.accounts.transfer_ctx(), refund)?;
+    emit_cpi!(RemoveDepositEvent {
+        store: ctx.accounts.store.key(),
+        deposit: ctx.accounts.deposit.key(),
+        market_token: ctx.accounts.deposit.fixed.tokens.market_token,
+        user: ctx.accounts.deposit.fixed.senders.user,
+    });
+    Ok(())
 }
 
 impl<'info> internal::Authentication<'info> for RemoveDeposit<'info> {
@@ -135,4 +143,17 @@ impl<'info> RemoveDeposit<'info> {
             },
         )
     }
+}
+
+/// Deposit removed event.
+#[event]
+pub struct RemoveDepositEvent {
+    /// Store.
+    pub store: Pubkey,
+    /// Deposit.
+    pub deposit: Pubkey,
+    /// Market token.
+    pub market_token: Pubkey,
+    /// User.
+    pub user: Pubkey,
 }

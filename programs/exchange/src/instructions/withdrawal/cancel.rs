@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Token, TokenAccount};
-use data_store::{program::DataStore, states::Withdrawal};
+use data_store::{constants::EVENT_AUTHORITY_SEED, program::DataStore, states::Withdrawal};
 
 use crate::utils::ControllerSeeds;
 
@@ -37,6 +37,9 @@ pub struct CancelWithdrawal<'info> {
     pub market_token_withdrawal_vault: Account<'info, TokenAccount>,
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
+    /// CHECK: Only the event authority can invoke self-CPI
+    #[account(seeds = [EVENT_AUTHORITY_SEED], bump, seeds::program = data_store_program.key())]
+    pub event_authority: UncheckedAccount<'info>,
     pub data_store_program: Program<'info, DataStore>,
 }
 
@@ -52,6 +55,7 @@ pub fn cancel_withdrawal(ctx: Context<CancelWithdrawal>) -> Result<()> {
 impl<'info> CancelWithdrawal<'info> {
     fn cancel_utils(&self) -> CancelWithdrawalUtils<'_, 'info> {
         CancelWithdrawalUtils {
+            event_authority: self.event_authority.to_account_info(),
             data_store_program: self.data_store_program.to_account_info(),
             token_program: self.token_program.to_account_info(),
             system_program: self.system_program.to_account_info(),

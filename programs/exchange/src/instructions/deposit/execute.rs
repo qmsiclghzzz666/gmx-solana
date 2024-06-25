@@ -1,7 +1,8 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token, TokenAccount};
 use data_store::{
-    cpi::{self},
+    constants::EVENT_AUTHORITY_SEED,
+    cpi,
     program::DataStore,
     states::{Deposit, PriceProvider},
     utils::{Authentication, WithOracle, WithOracleExt},
@@ -65,6 +66,9 @@ pub struct ExecuteDeposit<'info> {
     /// CHECK: check by CPI and cancel utils.
     #[account(mut)]
     pub initial_short_market: Option<UncheckedAccount<'info>>,
+    /// CHECK: Only the event authority can invoke self-CPI
+    #[account(seeds = [EVENT_AUTHORITY_SEED], bump, seeds::program = data_store_program.key())]
+    pub event_authority: UncheckedAccount<'info>,
     pub data_store_program: Program<'info, DataStore>,
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
@@ -141,6 +145,7 @@ impl<'info> ExecuteDeposit<'info> {
 
     fn cancel_utils(&self) -> CancelDepositUtils<'_, 'info> {
         CancelDepositUtils {
+            event_authority: self.event_authority.to_account_info(),
             data_store_program: self.data_store_program.to_account_info(),
             token_program: self.token_program.to_account_info(),
             system_program: self.system_program.to_account_info(),

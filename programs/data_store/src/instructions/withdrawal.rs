@@ -101,6 +101,7 @@ impl<'info> internal::Authentication<'info> for InitializeWithdrawal<'info> {
     }
 }
 
+#[event_cpi]
 #[derive(Accounts)]
 #[instruction(refund: u64)]
 pub struct RemoveWithdrawal<'info> {
@@ -183,7 +184,16 @@ pub fn remove_withdrawal(ctx: Context<RemoveWithdrawal>, refund: u64) -> Result<
         )?;
     }
 
-    system_program::transfer(ctx.accounts.transfer_ctx(), refund)
+    system_program::transfer(ctx.accounts.transfer_ctx(), refund)?;
+
+    emit_cpi!(RemoveWithdrawalEvent {
+        store: ctx.accounts.store.key(),
+        withdrawal: ctx.accounts.withdrawal.key(),
+        market_token: ctx.accounts.withdrawal.fixed.tokens.market_token,
+        user: ctx.accounts.withdrawal.fixed.user,
+    });
+
+    Ok(())
 }
 
 impl<'info> internal::Authentication<'info> for RemoveWithdrawal<'info> {
@@ -206,4 +216,17 @@ impl<'info> RemoveWithdrawal<'info> {
             },
         )
     }
+}
+
+/// Withdrawal removed event.
+#[event]
+pub struct RemoveWithdrawalEvent {
+    /// Store.
+    pub store: Pubkey,
+    /// Withdrawal.
+    pub withdrawal: Pubkey,
+    /// Market token.
+    pub market_token: Pubkey,
+    /// User.
+    pub user: Pubkey,
 }

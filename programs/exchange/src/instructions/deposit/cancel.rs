@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Token, TokenAccount};
-use data_store::{program::DataStore, states::Deposit};
+use data_store::{constants::EVENT_AUTHORITY_SEED, program::DataStore, states::Deposit};
 
 use crate::utils::ControllerSeeds;
 
@@ -21,7 +21,6 @@ pub struct CancelDeposit<'info> {
     pub controller: UncheckedAccount<'info>,
     /// CHECK: only used to invoke CPI.
     pub store: UncheckedAccount<'info>,
-    pub data_store_program: Program<'info, DataStore>,
     /// The deposit to cancel.
     ///
     /// ## Notes
@@ -49,6 +48,10 @@ pub struct CancelDeposit<'info> {
     /// CHECK: check by cancen utils.
     #[account(mut)]
     pub initial_short_market: Option<UncheckedAccount<'info>>,
+    /// CHECK: Only the event authority can invoke self-CPI
+    #[account(seeds = [EVENT_AUTHORITY_SEED], bump, seeds::program = data_store_program.key())]
+    pub event_authority: UncheckedAccount<'info>,
+    pub data_store_program: Program<'info, DataStore>,
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
 }
@@ -67,6 +70,7 @@ pub fn cancel_deposit(ctx: Context<CancelDeposit>) -> Result<()> {
 impl<'info> CancelDeposit<'info> {
     fn cancel_utils(&self) -> CancelDepositUtils<'_, 'info> {
         CancelDepositUtils {
+            event_authority: self.event_authority.to_account_info(),
             data_store_program: self.data_store_program.to_account_info(),
             token_program: self.token_program.to_account_info(),
             system_program: self.system_program.to_account_info(),
