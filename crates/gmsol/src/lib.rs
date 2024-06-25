@@ -19,6 +19,9 @@ pub mod pyth;
 /// Utils.
 pub mod utils;
 
+/// GMSOL types.
+pub mod types;
+
 pub use client::{Client, ClientOptions};
 pub use error::Error;
 
