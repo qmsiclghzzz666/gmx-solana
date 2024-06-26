@@ -1922,6 +1922,7 @@ dependencies = [
  "exchange",
  "eyre",
  "futures-util",
+ "gmx-core",
  "gmx-solana-utils",
  "heck 0.5.0",
  "hex",

@@ -63,6 +63,21 @@ heck = { workspace = true, optional = true }
 byteorder = { workspace = true, optional = true }
 
 # Other deps
+gmx-solana-utils = { path = "../gmx-solana-utils" }
+data_store = { path = "../../programs/data_store", features = [
+    "no-entrypoint",
+    "debug",
+    "display",
+    "utils",
+    "serde",
+    "enum-iter",
+] }
+exchange = { path = "../../programs/exchange", features = [
+    "no-entrypoint",
+    "debug",
+] }
+gmx-core = { path = "../gmx-core" }
+
 pyth-sdk = { workspace = true }
 typed-builder = { workspace = true }
 eyre = { workspace = true }
@@ -77,19 +92,6 @@ anchor-spl = { workspace = true, default-features = false, features = [
     "associated_token",
 ] }
 bytemuck = { workspace = true }
-gmx-solana-utils = { path = "../gmx-solana-utils" }
-data_store = { path = "../../programs/data_store", features = [
-    "no-entrypoint",
-    "debug",
-    "display",
-    "utils",
-    "serde",
-    "enum-iter",
-] }
-exchange = { path = "../../programs/exchange", features = [
-    "no-entrypoint",
-    "debug",
-] }
 rand = { workspace = true }
 futures-util = { workspace = true }
 spl-governance = { workspace = true, features = ["no-entrypoint"] }

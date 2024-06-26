@@ -269,6 +269,11 @@ impl Market {
         let key = MarketConfigKey::from_str(key).map_err(|_| error!(DataStoreError::InvalidKey))?;
         Ok(self.config.get_mut(key))
     }
+
+    /// Get market state.
+    pub fn state(&self) -> &MarketState {
+        &self.state
+    }
 }
 
 /// Market Flags.
@@ -289,6 +294,23 @@ pub struct MarketState {
     short_token_balance: u64,
     funding_factor_per_second: i128,
     reserved: [u8; 32],
+}
+
+impl MarketState {
+    /// Get long token balance.
+    pub fn long_token_balance_raw(&self) -> u64 {
+        self.long_token_balance
+    }
+
+    /// Get short token balance.
+    pub fn short_token_balance_raw(&self) -> u64 {
+        self.short_token_balance
+    }
+
+    /// Get funding factor per second.
+    pub fn funding_factor_per_second(&self) -> i128 {
+        self.funding_factor_per_second
+    }
 }
 
 /// Market Metadata.
