@@ -2,6 +2,7 @@ use anchor_lang::{prelude::*, system_program};
 use anchor_spl::token::{Token, TokenAccount};
 
 use crate::{
+    events::RemoveDepositEvent,
     states::{
         common::{SwapParams, TokenRecord},
         deposit::{Receivers, TokenParams},
@@ -143,17 +144,4 @@ impl<'info> RemoveDeposit<'info> {
             },
         )
     }
-}
-
-/// Deposit removed event.
-#[event]
-pub struct RemoveDepositEvent {
-    /// Store.
-    pub store: Pubkey,
-    /// Deposit.
-    pub deposit: Pubkey,
-    /// Market token.
-    pub market_token: Pubkey,
-    /// User.
-    pub user: Pubkey,
 }

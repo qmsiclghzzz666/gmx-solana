@@ -12,6 +12,9 @@ pub mod constants;
 /// Utils.
 pub mod utils;
 
+/// Events.
+pub mod events;
+
 pub use self::states::Data;
 
 use self::{

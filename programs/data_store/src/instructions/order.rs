@@ -3,6 +3,7 @@ use anchor_spl::token::{Token, TokenAccount};
 
 use crate::{
     constants,
+    events::RemoveOrderEvent,
     states::{
         common::{SwapParams, TokenRecord},
         order::{Order, OrderKind, OrderParams, Receivers, Senders, Tokens},
@@ -342,17 +343,4 @@ impl<'info> RemoveOrder<'info> {
             },
         )
     }
-}
-
-/// Order removed event.
-#[event]
-pub struct RemoveOrderEvent {
-    /// Store.
-    pub store: Pubkey,
-    /// Order.
-    pub order: Pubkey,
-    /// Market token.
-    pub market_token: Pubkey,
-    /// User.
-    pub user: Pubkey,
 }

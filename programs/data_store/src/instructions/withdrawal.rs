@@ -3,6 +3,7 @@ use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 
 use crate::{
     constants,
+    events::RemoveWithdrawalEvent,
     states::{
         common::{SwapParams, TokenRecord},
         withdrawal::TokenParams,
@@ -216,17 +217,4 @@ impl<'info> RemoveWithdrawal<'info> {
             },
         )
     }
-}
-
-/// Withdrawal removed event.
-#[event]
-pub struct RemoveWithdrawalEvent {
-    /// Store.
-    pub store: Pubkey,
-    /// Withdrawal.
-    pub withdrawal: Pubkey,
-    /// Market token.
-    pub market_token: Pubkey,
-    /// User.
-    pub user: Pubkey,
 }
