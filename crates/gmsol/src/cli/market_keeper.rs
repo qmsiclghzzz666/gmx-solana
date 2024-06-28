@@ -36,10 +36,10 @@ pub(super) struct Args {
 
 #[derive(clap::Subcommand)]
 enum Command {
-    /// Initialize a [`Oracle`](data_store::states::Oracle) account.
-    InitializeOracle { index: u8 },
-    /// Initialize a `TokenMap` account.
-    InitializeTokenMap,
+    /// Create an `Oracle` account.
+    CreateOracle { index: u8 },
+    /// Create a `TokenMap` account.
+    CreateTokenMap,
     /// Set token map.
     SetTokenMap { token_map: Pubkey },
     /// Read and insert token configs from file.
@@ -86,8 +86,8 @@ enum Command {
         token: Pubkey,
         provider: PriceProviderKind,
     },
-    /// Initialize Market Vault.
-    InitializeVault { token: Pubkey },
+    /// Create Market Vault.
+    CreateVault { token: Pubkey },
     /// Create Market.
     CreateMarket {
         #[arg(long)]
@@ -188,19 +188,20 @@ impl Args {
         serialize_only: bool,
     ) -> gmsol::Result<()> {
         match &self.command {
-            Command::InitializeOracle { index } => {
+            Command::CreateOracle { index } => {
                 let (request, oracle) = client.initialize_oracle(store, *index);
                 crate::utils::send_or_serialize(
                     request.build_without_compute_budget(),
                     serialize_only,
                     |signature| {
-                        println!("created oracle {oracle} at tx {signature}");
+                        tracing::info!("created oracle {oracle} at tx {signature}");
+                        println!("{oracle}");
                         Ok(())
                     },
                 )
                 .await?;
             }
-            Command::InitializeTokenMap => {
+            Command::CreateTokenMap => {
                 if serialize_only {
                     return Err(gmsol::Error::invalid_argument(
                         "serialize-only mode is not supported for this command",
@@ -212,7 +213,8 @@ impl Args {
                     rpc.build_without_compute_budget(),
                     false,
                     |signature| {
-                        println!("created token config map {map} at tx {signature}");
+                        tracing::info!("created token config map {map} at tx {signature}");
+                        println!("{map}");
                         Ok(())
                     },
                 )
@@ -339,10 +341,11 @@ impl Args {
                 )
                 .await?;
             }
-            Command::InitializeVault { token } => {
+            Command::CreateVault { token } => {
                 let (request, vault) = client.initialize_market_vault(store, token);
                 crate::utils::send_or_serialize(request, serialize_only, |signature| {
-                    println!("created a new vault {vault} at tx {signature}");
+                    tracing::info!("created a new vault {vault} at tx {signature}");
+                    println!("{vault}");
                     Ok(())
                 })
                 .await?;
@@ -366,9 +369,10 @@ impl Args {
                     )
                     .await?;
                 crate::utils::send_or_serialize(request.build_without_compute_budget(), serialize_only, |signature| {
-                    println!(
+                    tracing::info!(
                         "created a new market with {market_token} as its token address at tx {signature}"
                     );
+                    println!("{market_token}");
                     Ok(())
                 }).await?;
             }
@@ -401,7 +405,7 @@ impl Args {
                         .build_without_compute_budget(),
                     serialize_only,
                     |signature| {
-                        println!("market config updated at tx {signature}");
+                        tracing::info!("market config updated at tx {signature}");
                         Ok(())
                     },
                 )
@@ -433,7 +437,7 @@ impl Args {
                         .build_without_compute_budget(),
                     serialize_only,
                     |signature| {
-                        println!(
+                        tracing::info!(
                             "market set to be {} at tx {signature}",
                             if toggle.is_enable() {
                                 "enabled"

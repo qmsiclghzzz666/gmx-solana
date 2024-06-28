@@ -102,6 +102,7 @@ async fn main() -> eyre::Result<()> {
                 .with_default_directive(LevelFilter::INFO.into())
                 .from_env_lossy(),
         )
+        .with_writer(std::io::stderr)
         .init();
     Cli::parse().run().await?;
     Ok(())

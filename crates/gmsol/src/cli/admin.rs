@@ -17,8 +17,8 @@ pub(super) struct AdminArgs {
 
 #[derive(clap::Subcommand)]
 enum Command {
-    /// Initialize a new data store.
-    InitializeStore {
+    /// Create a new data store.
+    CreateStore {
         #[arg(long)]
         admin: Option<Pubkey>,
     },
@@ -48,7 +48,7 @@ enum Command {
         role: String,
     },
     /// Initialize roles.
-    InitializeRoles(InitializeRoles),
+    InitRoles(InitializeRoles),
 }
 
 impl AdminArgs {
@@ -60,9 +60,9 @@ impl AdminArgs {
     ) -> gmsol::Result<()> {
         let store = client.find_store_address(store_key);
         match &self.command {
-            Command::InitializeRoles(args) => args.run(client, store_key, serialize_only).await?,
-            Command::InitializeStore { admin } => {
-                println!(
+            Command::InitRoles(args) => args.run(client, store_key, serialize_only).await?,
+            Command::CreateStore { admin } => {
+                tracing::info!(
                     "Initialize store with key={store_key}, address={store}, admin={}",
                     admin.unwrap_or(client.payer())
                 );
@@ -73,6 +73,7 @@ impl AdminArgs {
                     serialize_only,
                     |signature| {
                         tracing::info!("initialized a new data store at tx {signature}");
+                        println!("{store}");
                         Ok(())
                     },
                 )
@@ -103,9 +104,9 @@ impl AdminArgs {
                         .simulate_transaction(&transaction)
                         .await
                         .map_err(anchor_client::ClientError::from)?;
-                    println!("Simulation result: {:#?}", response.value);
+                    tracing::info!("Simulation result: {:#?}", response.value);
                     if response.value.err.is_none() {
-                        println!("The simulation was successful, but this operation is very dangerous. If you are sure you want to proceed, please reauthorize the command with `--send` flag");
+                        tracing::info!("The simulation was successful, but this operation is very dangerous. If you are sure you want to proceed, please reauthorize the command with `--send` flag");
                     }
                 }
             }
