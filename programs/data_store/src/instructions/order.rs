@@ -317,6 +317,7 @@ pub fn remove_order(ctx: Context<RemoveOrder>, refund: u64) -> Result<()> {
     emit_cpi!(RemoveOrderEvent {
         store: ctx.accounts.store.key(),
         order: ctx.accounts.order.key(),
+        kind: ctx.accounts.order.fixed.params.kind,
         market_token: ctx.accounts.order.fixed.tokens.market_token,
         user: ctx.accounts.order.fixed.user,
     });

@@ -1,5 +1,7 @@
 use anchor_lang::prelude::*;
 
+use crate::states::order::OrderKind;
+
 /// Deposit removed event.
 #[event]
 #[cfg_attr(feature = "debug", derive(Debug))]
@@ -20,6 +22,8 @@ pub struct RemoveDepositEvent {
 pub struct RemoveOrderEvent {
     /// Store.
     pub store: Pubkey,
+    /// Kind.
+    pub kind: OrderKind,
     /// Order.
     pub order: Pubkey,
     /// Market token.
