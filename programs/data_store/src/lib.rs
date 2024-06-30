@@ -408,8 +408,8 @@ pub mod data_store {
     }
 
     #[access_control(internal::Authenticate::only_controller(&ctx))]
-    pub fn remove_deposit(ctx: Context<RemoveDeposit>, refund: u64) -> Result<()> {
-        instructions::remove_deposit(ctx, refund)
+    pub fn remove_deposit(ctx: Context<RemoveDeposit>, refund: u64, reason: String) -> Result<()> {
+        instructions::remove_deposit(ctx, refund, &reason)
     }
 
     // Withdrawal.
@@ -435,8 +435,12 @@ pub mod data_store {
     }
 
     #[access_control(internal::Authenticate::only_controller(&ctx))]
-    pub fn remove_withdrawal(ctx: Context<RemoveWithdrawal>, refund: u64) -> Result<()> {
-        instructions::remove_withdrawal(ctx, refund)
+    pub fn remove_withdrawal(
+        ctx: Context<RemoveWithdrawal>,
+        refund: u64,
+        reason: String,
+    ) -> Result<()> {
+        instructions::remove_withdrawal(ctx, refund, &reason)
     }
 
     // Exchange.
@@ -487,8 +491,8 @@ pub mod data_store {
     }
 
     #[access_control(internal::Authenticate::only_controller(&ctx))]
-    pub fn remove_order(ctx: Context<RemoveOrder>, refund: u64) -> Result<()> {
-        instructions::remove_order(ctx, refund)
+    pub fn remove_order(ctx: Context<RemoveOrder>, refund: u64, reason: String) -> Result<()> {
+        instructions::remove_order(ctx, refund, &reason)
     }
 
     // Position.

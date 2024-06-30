@@ -53,7 +53,7 @@ pub fn cancel_withdrawal(ctx: Context<CancelWithdrawal>) -> Result<()> {
 }
 
 impl<'info> CancelWithdrawal<'info> {
-    fn cancel_utils(&self) -> CancelWithdrawalUtils<'_, 'info> {
+    fn cancel_utils<'a>(&'a self) -> CancelWithdrawalUtils<'a, 'info> {
         CancelWithdrawalUtils {
             event_authority: self.event_authority.to_account_info(),
             data_store_program: self.data_store_program.to_account_info(),
@@ -65,6 +65,7 @@ impl<'info> CancelWithdrawal<'info> {
             withdrawal: &self.withdrawal,
             market_token_account: self.market_token.to_account_info(),
             market_token_vault: self.market_token_withdrawal_vault.to_account_info(),
+            reason: "canceled by the user",
         }
     }
 }

@@ -44,6 +44,7 @@ pub(super) struct CancelDepositUtils<'a, 'info> {
     pub(super) deposit: &'a Account<'info, Deposit>,
     pub(super) initial_long_token_transfer: Option<TransferIn<'info>>,
     pub(super) initial_short_token_transfer: Option<TransferIn<'info>>,
+    pub(super) reason: &'a str,
 }
 
 impl<'a, 'info> CancelDepositUtils<'a, 'info> {
@@ -84,6 +85,7 @@ impl<'a, 'info> CancelDepositUtils<'a, 'info> {
             self.remove_deposit_ctx(payer)
                 .with_signer(&[&controller.as_seeds()]),
             refund,
+            self.reason.to_string(),
         )?;
         Ok(())
     }

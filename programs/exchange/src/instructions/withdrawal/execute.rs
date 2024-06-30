@@ -116,6 +116,7 @@ pub fn execute_withdrawal<'info>(
             },
         )?;
 
+    let mut reason = "execution failed";
     // Transfer out final tokens.
     if final_long_amount != 0 {
         // Must have been validated during the execution.
@@ -125,6 +126,7 @@ pub fn execute_withdrawal<'info>(
                 .with_signer(&[&controller.as_seeds()]),
             final_long_amount,
         )?;
+        reason = "executed";
     }
     if final_short_amount != 0 {
         // Must have been validated during the execution.
@@ -134,9 +136,10 @@ pub fn execute_withdrawal<'info>(
                 .with_signer(&[&controller.as_seeds()]),
             final_short_amount,
         )?;
+        reason = "executed";
     }
 
-    ctx.accounts.cancel_utils().execute(
+    ctx.accounts.cancel_utils(reason).execute(
         ctx.accounts.authority.to_account_info(),
         &controller,
         execution_fee,
@@ -182,7 +185,7 @@ impl<'info> WithOracle<'info> for ExecuteWithdrawal<'info> {
 }
 
 impl<'info> ExecuteWithdrawal<'info> {
-    fn cancel_utils(&self) -> CancelWithdrawalUtils<'_, 'info> {
+    fn cancel_utils<'a>(&'a self, reason: &'a str) -> CancelWithdrawalUtils<'a, 'info> {
         CancelWithdrawalUtils {
             event_authority: self.event_authority.to_account_info(),
             data_store_program: self.data_store_program.to_account_info(),
@@ -194,6 +197,7 @@ impl<'info> ExecuteWithdrawal<'info> {
             withdrawal: &self.withdrawal,
             market_token_account: self.market_token_account.to_account_info(),
             market_token_vault: self.market_token_withdrawal_vault.to_account_info(),
+            reason,
         }
     }
 

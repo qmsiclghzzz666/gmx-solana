@@ -177,7 +177,10 @@ pub fn execute_order<'info>(
     // TODO: validate non-empty order.
     // TODO: validate order trigger price.
     match ctx.accounts.execute2(prices, ctx.remaining_accounts) {
-        Ok(res) => Ok(res),
+        Ok((should_remove_position, mut transfer_out)) => {
+            transfer_out.executed = true;
+            Ok((should_remove_position, transfer_out))
+        }
         Err(err) if !throw_on_execution_error => {
             msg!("Execute order error: {}", err);
             Ok((false, Default::default()))

@@ -88,6 +88,7 @@ impl<'info> CancelDeposit<'info> {
                 self.short_token_deposit_vault.as_ref(),
                 self.initial_short_market.as_ref(),
             ),
+            reason: "canceled by the user",
         }
     }
 }

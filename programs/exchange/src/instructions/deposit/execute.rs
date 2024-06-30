@@ -83,10 +83,11 @@ pub fn execute_deposit<'info>(
     let store = ctx.accounts.store.key();
     let controller = ControllerSeeds::find(&store);
 
+    let mut reason = "execution failed";
     // Try to execute the deposit.
     if ctx.accounts.is_executable()? {
         let deposit = &ctx.accounts.deposit;
-        ctx.accounts.with_oracle_prices(
+        let executed = ctx.accounts.with_oracle_prices(
             deposit.dynamic.tokens_with_feed.tokens.clone(),
             ctx.remaining_accounts,
             &controller.as_seeds(),
@@ -94,9 +95,13 @@ pub fn execute_deposit<'info>(
                 accounts.execute(&controller, remaining_accounts, cancel_on_execution_error)
             },
         )?;
+        if executed {
+            reason = "executed";
+        }
     }
 
-    ctx.accounts.try_remove(&controller, execution_fee)?;
+    ctx.accounts
+        .try_remove(&controller, execution_fee, reason)?;
     Ok(())
 }
 
@@ -143,7 +148,7 @@ impl<'info> ExecuteDeposit<'info> {
         Ok(true)
     }
 
-    fn cancel_utils(&self) -> CancelDepositUtils<'_, 'info> {
+    fn cancel_utils<'a>(&'a self, reason: &'a str) -> CancelDepositUtils<'a, 'info> {
         CancelDepositUtils {
             event_authority: self.event_authority.to_account_info(),
             data_store_program: self.data_store_program.to_account_info(),
@@ -155,12 +160,18 @@ impl<'info> ExecuteDeposit<'info> {
             deposit: &self.deposit,
             initial_long_token_transfer: self.initial_transfer_in(true),
             initial_short_token_transfer: self.initial_transfer_in(false),
+            reason,
         }
     }
 
-    fn try_remove(&self, controller: &ControllerSeeds, execution_fee: u64) -> Result<()> {
+    fn try_remove(
+        &self,
+        controller: &ControllerSeeds,
+        execution_fee: u64,
+        reason: &str,
+    ) -> Result<()> {
         if self.try_removable()? {
-            self.cancel_utils().execute(
+            self.cancel_utils(reason).execute(
                 self.authority.to_account_info(),
                 controller,
                 execution_fee,
@@ -233,14 +244,15 @@ impl<'info> ExecuteDeposit<'info> {
         controller_seeds: &ControllerSeeds,
         remaining_accounts: &'info [AccountInfo<'info>],
         cancel_on_execution_error: bool,
-    ) -> Result<()> {
-        cpi::execute_deposit(
+    ) -> Result<bool> {
+        let executed = cpi::execute_deposit(
             self.execute_deposit_ctx()
                 .with_signer(&[&controller_seeds.as_seeds()])
                 .with_remaining_accounts(remaining_accounts.to_vec()),
             !cancel_on_execution_error,
-        )?;
+        )?
+        .get();
         self.deposit.reload()?;
-        Ok(())
+        Ok(executed)
     }
 }

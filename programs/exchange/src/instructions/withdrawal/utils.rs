@@ -14,6 +14,7 @@ pub(crate) struct CancelWithdrawalUtils<'a, 'info> {
     pub(super) withdrawal: &'a Account<'info, Withdrawal>,
     pub(super) market_token_account: AccountInfo<'info>,
     pub(super) market_token_vault: AccountInfo<'info>,
+    pub(super) reason: &'a str,
 }
 
 impl<'a, 'info> CancelWithdrawalUtils<'a, 'info> {
@@ -32,6 +33,7 @@ impl<'a, 'info> CancelWithdrawalUtils<'a, 'info> {
             self.remove_withdrawal_ctx(payer)
                 .with_signer(&[&controller.as_seeds()]),
             refund,
+            self.reason.to_string(),
         )?;
         Ok(())
     }

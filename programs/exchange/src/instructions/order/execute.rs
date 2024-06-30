@@ -157,7 +157,12 @@ pub fn execute_order<'info>(
             refund,
         )?;
     }
-    ctx.accounts.cancel_util().execute(
+    let reason = if transfer_out.executed {
+        "executed"
+    } else {
+        "execution failed"
+    };
+    ctx.accounts.cancel_util(reason).execute(
         ctx.accounts.authority.to_account_info(),
         &controller,
         execution_fee,
@@ -202,7 +207,7 @@ impl<'info> WithOracle<'info> for ExecuteOrder<'info> {
 }
 
 impl<'info> ExecuteOrder<'info> {
-    fn cancel_util(&self) -> CancelOrderUtil<'_, 'info> {
+    fn cancel_util<'a>(&'a self, reason: &'a str) -> CancelOrderUtil<'a, 'info> {
         CancelOrderUtil {
             event_authority: self.event_authority.to_account_info(),
             data_store_program: self.data_store_program.to_account_info(),
@@ -221,6 +226,7 @@ impl<'info> ExecuteOrder<'info> {
                 .initial_collateral_token_vault
                 .as_ref()
                 .map(|a| a.to_account_info()),
+            reason,
         }
     }
 
@@ -350,6 +356,7 @@ impl<'info> ExecuteOrder<'info> {
             short_token_for_claimable_account_of_user,
             long_token_for_claimable_account_of_holding,
             short_token_for_claimable_account_of_holding,
+            ..
         } = transfer_out;
 
         if *final_output_token != 0 {

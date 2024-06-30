@@ -229,6 +229,8 @@ pub enum OrderKind {
 /// Transfer Out.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct TransferOut {
+    /// Executed.
+    pub executed: bool,
     /// Final output token.
     pub final_output_token: u64,
     /// Final secondary output token.

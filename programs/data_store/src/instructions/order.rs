@@ -312,15 +312,16 @@ pub struct RemoveOrder<'info> {
 }
 
 /// Remove an order.
-pub fn remove_order(ctx: Context<RemoveOrder>, refund: u64) -> Result<()> {
+pub fn remove_order(ctx: Context<RemoveOrder>, refund: u64, reason: &str) -> Result<()> {
     system_program::transfer(ctx.accounts.transfer_ctx(), refund)?;
-    emit_cpi!(RemoveOrderEvent {
-        store: ctx.accounts.store.key(),
-        order: ctx.accounts.order.key(),
-        kind: ctx.accounts.order.fixed.params.kind,
-        market_token: ctx.accounts.order.fixed.tokens.market_token,
-        user: ctx.accounts.order.fixed.user,
-    });
+    emit_cpi!(RemoveOrderEvent::new(
+        ctx.accounts.store.key(),
+        ctx.accounts.order.key(),
+        ctx.accounts.order.fixed.params.kind,
+        ctx.accounts.order.fixed.tokens.market_token,
+        ctx.accounts.order.fixed.user,
+        reason,
+    )?);
     Ok(())
 }
 

@@ -155,7 +155,7 @@ pub struct RemoveWithdrawal<'info> {
 }
 
 /// Remove a withdrawal.
-pub fn remove_withdrawal(ctx: Context<RemoveWithdrawal>, refund: u64) -> Result<()> {
+pub fn remove_withdrawal(ctx: Context<RemoveWithdrawal>, refund: u64, reason: &str) -> Result<()> {
     use crate::internal::TransferUtils;
 
     let amount = ctx.accounts.withdrawal.fixed.tokens.market_token_amount;
@@ -187,12 +187,13 @@ pub fn remove_withdrawal(ctx: Context<RemoveWithdrawal>, refund: u64) -> Result<
 
     system_program::transfer(ctx.accounts.transfer_ctx(), refund)?;
 
-    emit_cpi!(RemoveWithdrawalEvent {
-        store: ctx.accounts.store.key(),
-        withdrawal: ctx.accounts.withdrawal.key(),
-        market_token: ctx.accounts.withdrawal.fixed.tokens.market_token,
-        user: ctx.accounts.withdrawal.fixed.user,
-    });
+    emit_cpi!(RemoveWithdrawalEvent::new(
+        ctx.accounts.store.key(),
+        ctx.accounts.withdrawal.key(),
+        ctx.accounts.withdrawal.fixed.tokens.market_token,
+        ctx.accounts.withdrawal.fixed.user,
+        reason,
+    )?);
 
     Ok(())
 }

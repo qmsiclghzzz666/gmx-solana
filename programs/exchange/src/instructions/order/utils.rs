@@ -22,6 +22,7 @@ pub(crate) struct CancelOrderUtil<'a, 'info> {
     pub(super) initial_market: Option<AccountInfo<'info>>,
     pub(super) initial_collateral_token_account: Option<AccountInfo<'info>>,
     pub(super) initial_collateral_token_vault: Option<AccountInfo<'info>>,
+    pub(super) reason: &'a str,
 }
 
 impl<'a, 'info> CancelOrderUtil<'a, 'info> {
@@ -52,6 +53,7 @@ impl<'a, 'info> CancelOrderUtil<'a, 'info> {
             self.remove_order_ctx(payer)
                 .with_signer(&[&controller.as_seeds()]),
             refund,
+            self.reason.to_string(),
         )?;
         Ok(())
     }

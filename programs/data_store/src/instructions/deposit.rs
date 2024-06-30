@@ -113,14 +113,15 @@ pub struct RemoveDeposit<'info> {
 }
 
 /// Remove a deposit.
-pub fn remove_deposit(ctx: Context<RemoveDeposit>, refund: u64) -> Result<()> {
+pub fn remove_deposit(ctx: Context<RemoveDeposit>, refund: u64, reason: &str) -> Result<()> {
     system_program::transfer(ctx.accounts.transfer_ctx(), refund)?;
-    emit_cpi!(RemoveDepositEvent {
-        store: ctx.accounts.store.key(),
-        deposit: ctx.accounts.deposit.key(),
-        market_token: ctx.accounts.deposit.fixed.tokens.market_token,
-        user: ctx.accounts.deposit.fixed.senders.user,
-    });
+    emit_cpi!(RemoveDepositEvent::new(
+        ctx.accounts.store.key(),
+        ctx.accounts.deposit.key(),
+        ctx.accounts.deposit.fixed.tokens.market_token,
+        ctx.accounts.deposit.fixed.senders.user,
+        reason,
+    )?);
     Ok(())
 }
 
