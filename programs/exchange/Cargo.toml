@@ -29,3 +29,4 @@ anchor-spl = { workspace = true, default-features = false, features = [
 ] }
 gmx-core = { path = "../../crates/gmx-core", features = ["u128", "solana"] }
 data_store = { path = "../data_store", features = ["cpi"] }
+bytemuck = { workspace = true }

@@ -2,6 +2,7 @@ use anchor_client::solana_sdk::pubkey::Pubkey;
 use data_store::states::RoleKey;
 use gmsol::{
     client::SystemProgramOps,
+    exchange::ExchangeOps,
     store::{roles::RolesOps, store_ops::StoreOps},
     utils::TransactionBuilder,
 };
@@ -47,8 +48,10 @@ enum Command {
         /// Role.
         role: String,
     },
-    /// Initialize roles.
-    InitRoles(InitializeRoles),
+    /// Initialize roles and controller account.
+    InitRolesAndController(InitializeRolesAndController),
+    /// Initialize Controller.
+    InitController,
 }
 
 impl AdminArgs {
@@ -60,7 +63,9 @@ impl AdminArgs {
     ) -> gmsol::Result<()> {
         let store = client.find_store_address(store_key);
         match &self.command {
-            Command::InitRoles(args) => args.run(client, store_key, serialize_only).await?,
+            Command::InitRolesAndController(args) => {
+                args.run(client, store_key, serialize_only).await?
+            }
             Command::CreateStore { admin } => {
                 tracing::info!(
                     "Initialize store with key={store_key}, address={store}, admin={}",
@@ -162,15 +167,28 @@ impl AdminArgs {
                 )
                 .await?;
             }
+            Command::InitController => {
+                crate::utils::send_or_serialize(
+                    client.initialize_controller(&store).build(),
+                    serialize_only,
+                    |signature| {
+                        tracing::info!("initialized the controller account at tx {signature}");
+                        Ok(())
+                    },
+                )
+                .await?
+            }
         }
         Ok(())
     }
 }
 
 #[derive(clap::Args)]
-struct InitializeRoles {
+struct InitializeRolesAndController {
     #[arg(long)]
     init_store: bool,
+    #[arg(long)]
+    not_init_controller: bool,
     #[arg(long)]
     market_keeper: Pubkey,
     #[arg(long)]
@@ -185,7 +203,7 @@ struct InitializeRoles {
     max_transaction_size: Option<usize>,
 }
 
-impl InitializeRoles {
+impl InitializeRolesAndController {
     async fn run(
         &self,
         client: &GMSOLClient,
@@ -204,6 +222,11 @@ impl InitializeRoles {
         if self.init_store {
             // Insert initialize store instruction.
             builder.try_push(client.initialize_store(store_key, None))?;
+        }
+
+        if !self.not_init_controller {
+            // Insert initialize controller instuction.
+            builder.try_push(client.initialize_controller(&store))?;
         }
 
         builder

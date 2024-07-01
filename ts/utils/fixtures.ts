@@ -9,7 +9,7 @@ chai.use(chaiAsPromised);
 import { setInitialized, waitForSetup } from "./setup";
 import { EventManager } from "./event";
 import { createDataStorePDA, createMarketTokenMintPDA, createMarketVault, createOraclePDA, dataStore, initializeDataStore } from "./data";
-import { initializeMarkets, exchange } from "./exchange";
+import { initializeMarkets, exchange, invokeInitializeController } from "./exchange";
 
 import { IDL as chainlinkIDL } from "../../external-programs/chainlink-store";
 import { BTC_TOKEN_MINT, SOL_TOKEN_MINT, createSignedToken } from "./token";
@@ -173,6 +173,7 @@ export const mochaGlobalSetup = async () => {
         usdG.mintTo(user0UsdGTokenAccount, 1_000_000 * 100_000_000);
 
         await initializeDataStore(provider, eventManager, signer0, user0, dataStoreKey, oracleIndex, fakeTokenMint, usdGTokenMint);
+        await invokeInitializeController(exchange, { payer: signer0, store: dataStoreAddress });
 
         // fakeTokenVault = await createMarketVault(provider, signer0, dataStoreAddress, fakeTokenMint);
         // usdGVault = await createMarketVault(provider, signer0, dataStoreAddress, usdGTokenMint);

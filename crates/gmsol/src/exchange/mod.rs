@@ -30,6 +30,9 @@ use self::{
 
 /// Exchange instructions for GMSOL.
 pub trait ExchangeOps<C> {
+    /// Initialize Controller Account.
+    fn initialize_controller(&self, store: &Pubkey) -> RpcBuilder<C>;
+
     /// Create a new market and return its token mint address.
     #[allow(clippy::too_many_arguments)]
     fn create_market(
@@ -164,6 +167,17 @@ where
     C: Deref<Target = S> + Clone,
     S: Signer,
 {
+    fn initialize_controller(&self, store: &Pubkey) -> RpcBuilder<C> {
+        self.exchange_rpc()
+            .args(instruction::InitializeController {})
+            .accounts(accounts::InitializeController {
+                payer: self.payer(),
+                store: *store,
+                controller: self.controller_address(store),
+                system_program: system_program::ID,
+            })
+    }
+
     fn create_deposit(&self, store: &Pubkey, market_token: &Pubkey) -> CreateDepositBuilder<C> {
         CreateDepositBuilder::new(self, *store, *market_token)
     }

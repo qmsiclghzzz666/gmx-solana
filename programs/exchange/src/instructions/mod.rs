@@ -1,3 +1,6 @@
+/// Controller instructions.
+pub mod controller;
+
 /// Market Management.
 pub mod market;
 
@@ -10,6 +13,7 @@ pub mod withdrawal;
 /// Instructions for order.
 pub mod order;
 
+pub use controller::*;
 pub use deposit::*;
 pub use market::*;
 pub use order::*;

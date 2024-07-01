@@ -5,7 +5,7 @@ import { createMarketPDA, createMarketTokenMintPDA, createMarketVault, createMar
 import { getAccount } from "@solana/spl-token";
 import { BTC_TOKEN_MINT, SOL_TOKEN_MINT } from "./token";
 import { IxWithOutput, makeInvoke } from "./invoke";
-import { DataStoreProgram, PriceProvider, findConfigPDA, findControllerPDA, findMarketPDA, findMarketVaultPDA, findRolesPDA, toBN } from "gmsol";
+import { DataStoreProgram, ExchangeProgram, PriceProvider, findConfigPDA, findControllerPDA, findMarketPDA, findMarketVaultPDA, findRolesPDA, toBN } from "gmsol";
 import { PYTH_ID } from "./external";
 import { findKey, first, last, toInteger } from "lodash";
 import { findPythPriceFeedPDA } from "gmsol";
@@ -16,6 +16,15 @@ import { TIME_WINDOW } from "./data/constants";
 import { makeInvoke as makeInvoke2 } from "gmsol";
 
 export const exchange = workspace.Exchange as Program<Exchange>;
+
+export const makeInitializeControllerInstruction = async (program: ExchangeProgram, { payer, store }: { payer: PublicKey, store: PublicKey }) => {
+    return await exchange.methods.initializeController().accounts({
+        payer,
+        store,
+    }).instruction();
+}
+
+export const invokeInitializeController = makeInvoke2(makeInitializeControllerInstruction, ["payer"]);
 
 export const createControllerPDA = (store: PublicKey) => PublicKey.findProgramAddressSync([
     utils.bytes.utf8.encode("controller"),

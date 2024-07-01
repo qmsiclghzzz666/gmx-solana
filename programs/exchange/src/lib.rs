@@ -12,6 +12,9 @@ pub mod constants;
 /// Events.
 pub mod events;
 
+/// States.
+pub mod states;
+
 use data_store::utils::Authenticate;
 use instructions::*;
 
@@ -20,6 +23,11 @@ declare_id!("hnxiNKTc515NHvuq5fEUAc62dWkEu3m623FbwemWNJd");
 #[program]
 pub mod exchange {
     use super::*;
+
+    // Controller.
+    pub fn initialize_controller(ctx: Context<InitializeController>) -> Result<()> {
+        instructions::initialize_controller(ctx)
+    }
 
     // Market.
     #[access_control(Authenticate::only_market_keeper(&ctx))]
