@@ -107,39 +107,13 @@ pub fn execute_order<'info>(
 ) -> Result<()> {
     let store = ctx.accounts.store.key();
     let controller = ControllerSeeds::find(&store);
-    let order = &ctx.accounts.order;
     // TODO: validate the pre-condition of transferring out before execution.
     let (should_remove_position, transfer_out, final_output_market, final_secondary_output_market) =
-        ctx.accounts.with_oracle_prices(
-            order.prices.tokens.clone(),
+        ctx.accounts.execute(
+            recent_timestamp,
+            cancel_on_execution_error,
+            &controller,
             ctx.remaining_accounts,
-            &controller.as_seeds(),
-            |accounts, remaining_accounts| {
-                let store = accounts.store.key;
-                let swap = &accounts.order.swap;
-                let final_output_market = swap
-                    .find_last_market(store, true, remaining_accounts)
-                    .unwrap_or(accounts.market.to_account_info());
-                let final_secondary_output_market = swap
-                    .find_last_market(store, false, remaining_accounts)
-                    .unwrap_or(accounts.market.to_account_info());
-                let (should_remove_position, transfer_out) = data_store::cpi::execute_order(
-                    accounts
-                        .execute_order_ctx()
-                        .with_signer(&[&controller.as_seeds()])
-                        .with_remaining_accounts(remaining_accounts.to_vec()),
-                    recent_timestamp,
-                    !cancel_on_execution_error,
-                )?
-                .get();
-                accounts.order.reload()?;
-                Ok((
-                    should_remove_position,
-                    transfer_out,
-                    final_output_market,
-                    final_secondary_output_market,
-                ))
-            },
         )?;
     ctx.accounts.process_transfer_out(
         &controller,
@@ -207,6 +181,56 @@ impl<'info> WithOracle<'info> for ExecuteOrder<'info> {
 }
 
 impl<'info> ExecuteOrder<'info> {
+    /// Execute the order and return the result.
+    ///
+    /// Return `(should_remove_position, transfer_out, final_output_market, final_secondary_output_market)`.
+    // We use `#[inline(never)]` here to force the compiler to create a new stack frame for us.
+    #[inline(never)]
+    fn execute(
+        &mut self,
+        recent_timestamp: i64,
+        cancel_on_execution_error: bool,
+        controller: &ControllerSeeds,
+        remaining_accounts: &'info [AccountInfo<'info>],
+    ) -> Result<(
+        bool,
+        Box<TransferOut>,
+        AccountInfo<'info>,
+        AccountInfo<'info>,
+    )> {
+        self.with_oracle_prices(
+            self.order.prices.tokens.clone(),
+            remaining_accounts,
+            &controller.as_seeds(),
+            |accounts, remaining_accounts| {
+                let store = accounts.store.key;
+                let swap = &accounts.order.swap;
+                let final_output_market = swap
+                    .find_last_market(store, true, remaining_accounts)
+                    .unwrap_or(accounts.market.to_account_info());
+                let final_secondary_output_market = swap
+                    .find_last_market(store, false, remaining_accounts)
+                    .unwrap_or(accounts.market.to_account_info());
+                let (should_remove_position, transfer_out) = data_store::cpi::execute_order(
+                    accounts
+                        .execute_order_ctx()
+                        .with_signer(&[&controller.as_seeds()])
+                        .with_remaining_accounts(remaining_accounts.to_vec()),
+                    recent_timestamp,
+                    !cancel_on_execution_error,
+                )?
+                .get();
+                accounts.order.reload()?;
+                Ok((
+                    should_remove_position,
+                    transfer_out,
+                    final_output_market,
+                    final_secondary_output_market,
+                ))
+            },
+        )
+    }
+
     fn cancel_util<'a>(&'a self, reason: &'a str) -> CancelOrderUtil<'a, 'info> {
         CancelOrderUtil {
             event_authority: self.event_authority.to_account_info(),
