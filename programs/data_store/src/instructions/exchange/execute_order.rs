@@ -19,7 +19,7 @@ use crate::{
         HasMarketMeta, Market, Oracle, Seed, Store, ValidateOracleTime,
     },
     utils::internal,
-    DataStoreError, GmxCoreError,
+    DataStoreError, GmxCoreError, StoreResult,
 };
 
 type ShouldRemovePosition = bool;
@@ -172,7 +172,23 @@ pub fn execute_order<'info>(
     _recent_timestamp: i64,
     throw_on_execution_error: bool,
 ) -> Result<(ShouldRemovePosition, Box<TransferOut>)> {
-    ctx.accounts.validate_oracle()?;
+    match ctx.accounts.validate_oracle() {
+        Ok(()) => {}
+        Err(DataStoreError::OracleTimestampsAreLargerThanRequired) if !throw_on_execution_error => {
+            msg!(
+                "Order expired at {}",
+                ctx.accounts
+                    .oracle_updated_before()
+                    .ok()
+                    .flatten()
+                    .expect("must have an expiration time"),
+            );
+            return Ok((false, Box::new(TransferOut::new_failed())));
+        }
+        Err(err) => {
+            return Err(error!(err));
+        }
+    }
     let prices = ctx.accounts.prices()?;
     // TODO: validate non-empty order.
     // TODO: validate order trigger price.
@@ -200,7 +216,7 @@ impl<'info> internal::Authentication<'info> for ExecuteOrder<'info> {
 }
 
 impl<'info> ValidateOracleTime for ExecuteOrder<'info> {
-    fn oracle_updated_after(&self) -> Result<Option<i64>> {
+    fn oracle_updated_after(&self) -> StoreResult<Option<i64>> {
         let ts = match self.order.fixed.params.kind {
             OrderKind::MarketSwap | OrderKind::MarketIncrease | OrderKind::MarketDecrease => {
                 self.order.fixed.updated_at
@@ -209,32 +225,38 @@ impl<'info> ValidateOracleTime for ExecuteOrder<'info> {
                 let position = self
                     .position
                     .as_ref()
-                    .ok_or(error!(DataStoreError::PositionNotProvided))?
-                    .load()?;
+                    .ok_or(DataStoreError::PositionNotProvided)?
+                    .load()
+                    .map_err(|_| DataStoreError::LoadAccountError)?;
                 position.state.increased_at.max(position.state.decreased_at)
             }
         };
         Ok(Some(ts))
     }
 
-    fn oracle_updated_before(&self) -> Result<Option<i64>> {
+    fn oracle_updated_before(&self) -> StoreResult<Option<i64>> {
         let ts = match self.order.fixed.params.kind {
             OrderKind::MarketIncrease | OrderKind::MarketDecrease => {
                 Some(self.order.fixed.updated_at)
             }
             _ => None,
         };
-        ts.map(|ts| self.store.load()?.request_expiration_at(ts))
-            .transpose()
+        ts.map(|ts| {
+            self.store
+                .load()
+                .map_err(|_| DataStoreError::LoadAccountError)?
+                .request_expiration_at(ts)
+        })
+        .transpose()
     }
 
-    fn oracle_updated_after_slot(&self) -> Result<Option<u64>> {
+    fn oracle_updated_after_slot(&self) -> StoreResult<Option<u64>> {
         Ok(Some(self.order.fixed.updated_at_slot))
     }
 }
 
 impl<'info> ExecuteOrder<'info> {
-    fn validate_oracle(&self) -> Result<()> {
+    fn validate_oracle(&self) -> StoreResult<()> {
         self.oracle.validate_time(self)
     }
 

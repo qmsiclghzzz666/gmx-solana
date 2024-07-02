@@ -537,6 +537,8 @@ pub enum DataStoreError {
     CannotBeZero,
     #[msg("Missing Market Account")]
     MissingMarketAccount,
+    #[msg("Load Account Error")]
+    LoadAccountError,
     // Roles.
     #[msg("Too many admins")]
     TooManyAdmins,
@@ -700,3 +702,6 @@ impl DataStoreError {
         Self::InvalidPositionKind
     }
 }
+
+/// Data Store Resut.
+pub type StoreResult<T> = std::result::Result<T, DataStoreError>;

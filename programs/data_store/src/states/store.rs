@@ -4,7 +4,7 @@ use anchor_lang::prelude::*;
 use bytemuck::Zeroable;
 use gmx_solana_utils::to_seed;
 
-use crate::{constants, DataStoreError};
+use crate::{constants, DataStoreError, StoreResult};
 
 use super::{Amount, Factor, InitSpace, RoleStore, Seed};
 
@@ -189,10 +189,10 @@ impl Store {
     }
 
     /// Calculate the request expiration time.
-    pub fn request_expiration_at(&self, start: i64) -> Result<i64> {
+    pub fn request_expiration_at(&self, start: i64) -> StoreResult<i64> {
         start
             .checked_add_unsigned(self.amount.request_expiration)
-            .ok_or(error!(DataStoreError::AmountOverflow))
+            .ok_or(DataStoreError::AmountOverflow)
     }
 
     /// Get claimable time window size.

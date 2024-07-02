@@ -15,7 +15,7 @@ pub mod time;
 
 use core::fmt;
 
-use crate::{states::TokenMapAccess, DataStoreError};
+use crate::{states::TokenMapAccess, DataStoreError, StoreResult};
 use anchor_lang::{prelude::*, Ids};
 use num_enum::TryFromPrimitive;
 
@@ -146,12 +146,11 @@ impl Oracle {
     }
 
     /// Validate oracle time.
-    pub(crate) fn validate_time(&self, target: &impl ValidateOracleTime) -> Result<()> {
-        require_gte!(
-            self.max_oracle_ts,
-            self.min_oracle_ts,
-            DataStoreError::InvalidOracleTsTrange
-        );
+    pub(crate) fn validate_time(&self, target: &impl ValidateOracleTime) -> StoreResult<()> {
+        if self.max_oracle_ts < self.min_oracle_ts {
+            msg!("min = {}, max = {}", self.min_oracle_ts, self.max_oracle_ts);
+            return Err(DataStoreError::InvalidOracleTsTrange);
+        }
         target.validate_min_oracle_slot(self)?;
         target.validate_min_oracle_ts(self)?;
         target.validate_max_oracle_ts(self)?;

@@ -13,7 +13,7 @@ use crate::{
         HasMarketMeta, Market, Oracle, Seed, Store, ValidateOracleTime, Withdrawal,
     },
     utils::internal,
-    DataStoreError, GmxCoreError,
+    DataStoreError, GmxCoreError, StoreResult,
 };
 
 #[derive(Accounts)]
@@ -90,7 +90,23 @@ pub fn execute_withdrawal<'info>(
     ctx: Context<'_, '_, 'info, 'info, ExecuteWithdrawal<'info>>,
     throw_on_execution_error: bool,
 ) -> Result<(u64, u64)> {
-    ctx.accounts.validate_oracle()?;
+    match ctx.accounts.validate_oracle() {
+        Ok(()) => {}
+        Err(DataStoreError::OracleTimestampsAreLargerThanRequired) if !throw_on_execution_error => {
+            msg!(
+                "Withdrawal expired at {}",
+                ctx.accounts
+                    .oracle_updated_before()
+                    .ok()
+                    .flatten()
+                    .expect("must have an expiration time"),
+            );
+            return Ok((0, 0));
+        }
+        Err(err) => {
+            return Err(error!(err));
+        }
+    }
     match ctx.accounts.execute2(ctx.remaining_accounts) {
         Ok(res) => Ok(res),
         Err(err) if !throw_on_execution_error => {
@@ -113,25 +129,26 @@ impl<'info> internal::Authentication<'info> for ExecuteWithdrawal<'info> {
 }
 
 impl<'info> ValidateOracleTime for ExecuteWithdrawal<'info> {
-    fn oracle_updated_after(&self) -> Result<Option<i64>> {
+    fn oracle_updated_after(&self) -> StoreResult<Option<i64>> {
         Ok(Some(self.withdrawal.fixed.updated_at))
     }
 
-    fn oracle_updated_before(&self) -> Result<Option<i64>> {
+    fn oracle_updated_before(&self) -> StoreResult<Option<i64>> {
         let ts = self
             .store
-            .load()?
+            .load()
+            .map_err(|_| DataStoreError::LoadAccountError)?
             .request_expiration_at(self.withdrawal.fixed.updated_at)?;
         Ok(Some(ts))
     }
 
-    fn oracle_updated_after_slot(&self) -> Result<Option<u64>> {
+    fn oracle_updated_after_slot(&self) -> StoreResult<Option<u64>> {
         Ok(Some(self.withdrawal.fixed.updated_at_slot))
     }
 }
 
 impl<'info> ExecuteWithdrawal<'info> {
-    fn validate_oracle(&self) -> Result<()> {
+    fn validate_oracle(&self) -> StoreResult<()> {
         self.oracle.validate_time(self)
     }
 

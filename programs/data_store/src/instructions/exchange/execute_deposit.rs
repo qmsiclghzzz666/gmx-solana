@@ -12,7 +12,7 @@ use crate::{
         Deposit, HasMarketMeta, Market, Oracle, Seed, Store, ValidateOracleTime,
     },
     utils::internal,
-    GmxCoreError,
+    DataStoreError, GmxCoreError, StoreResult,
 };
 
 #[derive(Accounts)]
@@ -53,7 +53,23 @@ pub fn execute_deposit<'info>(
     ctx: Context<'_, '_, 'info, 'info, ExecuteDeposit<'info>>,
     throw_on_execution_error: bool,
 ) -> Result<bool> {
-    ctx.accounts.validate_oracle()?;
+    match ctx.accounts.validate_oracle() {
+        Ok(()) => {}
+        Err(DataStoreError::OracleTimestampsAreLargerThanRequired) if !throw_on_execution_error => {
+            msg!(
+                "Deposit expired at {}",
+                ctx.accounts
+                    .oracle_updated_before()
+                    .ok()
+                    .flatten()
+                    .expect("must have an expiration time"),
+            );
+            return Ok(false);
+        }
+        Err(err) => {
+            return Err(error!(err));
+        }
+    }
     match ctx.accounts.execute2(ctx.remaining_accounts) {
         Ok(()) => Ok(true),
         Err(err) if !throw_on_execution_error => {
@@ -76,25 +92,26 @@ impl<'info> internal::Authentication<'info> for ExecuteDeposit<'info> {
 }
 
 impl<'info> ValidateOracleTime for ExecuteDeposit<'info> {
-    fn oracle_updated_after(&self) -> Result<Option<i64>> {
+    fn oracle_updated_after(&self) -> StoreResult<Option<i64>> {
         Ok(Some(self.deposit.fixed.updated_at))
     }
 
-    fn oracle_updated_before(&self) -> Result<Option<i64>> {
+    fn oracle_updated_before(&self) -> StoreResult<Option<i64>> {
         let ts = self
             .store
-            .load()?
+            .load()
+            .map_err(|_| DataStoreError::LoadAccountError)?
             .request_expiration_at(self.deposit.fixed.updated_at)?;
         Ok(Some(ts))
     }
 
-    fn oracle_updated_after_slot(&self) -> Result<Option<u64>> {
+    fn oracle_updated_after_slot(&self) -> StoreResult<Option<u64>> {
         Ok(Some(self.deposit.fixed.updated_at_slot))
     }
 }
 
 impl<'info> ExecuteDeposit<'info> {
-    fn validate_oracle(&self) -> Result<()> {
+    fn validate_oracle(&self) -> StoreResult<()> {
         self.oracle.validate_time(self)
     }
 

@@ -257,6 +257,13 @@ pub enum CollateralReceiver {
 }
 
 impl TransferOut {
+    pub(crate) fn new_failed() -> Self {
+        Self {
+            executed: false,
+            ..Default::default()
+        }
+    }
+
     pub(crate) fn total_long_token_amount(&self) -> Result<u64> {
         self.long_token
             .checked_add(self.long_token_for_claimable_account_of_user)
