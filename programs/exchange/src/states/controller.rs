@@ -7,6 +7,7 @@ use super::ReferralRoot;
 
 /// Controller.
 #[account(zero_copy)]
+#[cfg_attr(feature = "debug", derive(Debug))]
 pub struct Controller {
     /// Bump Seed.
     bump: u8,
