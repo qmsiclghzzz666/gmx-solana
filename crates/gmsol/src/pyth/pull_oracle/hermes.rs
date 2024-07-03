@@ -102,6 +102,14 @@ impl PriceUpdate {
     pub fn parsed(&self) -> &[ParsedPriceUpdate] {
         &self.parsed
     }
+
+    /// Min timestamp.
+    pub fn min_timestamp(&self) -> Option<i64> {
+        self.parsed
+            .iter()
+            .map(|update| update.price.publish_time)
+            .min()
+    }
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
