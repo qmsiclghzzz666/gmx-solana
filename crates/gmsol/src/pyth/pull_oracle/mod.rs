@@ -49,6 +49,7 @@ where
     pub async fn send_all(
         self,
         compute_unit_price_micro_lamports: Option<u64>,
+        skip_preflight: bool,
     ) -> Result<Vec<Signature>, (Vec<Signature>, crate::Error)> {
         let mut error = None;
 
@@ -76,7 +77,7 @@ where
             .send_all_with_opts(
                 compute_unit_price_micro_lamports,
                 RpcSendTransactionConfig {
-                    skip_preflight: true,
+                    skip_preflight,
                     ..Default::default()
                 },
                 false,

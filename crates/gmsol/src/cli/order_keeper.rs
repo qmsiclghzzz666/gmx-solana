@@ -141,7 +141,10 @@ impl KeeperArgs {
                             Ok(Some(rpc))
                         })
                         .await?;
-                    match with_prices.send_all(Some(self.compute_unit_price)).await {
+                    match with_prices
+                        .send_all(Some(self.compute_unit_price), true)
+                        .await
+                    {
                         Ok(signatures) => {
                             tracing::info!(%deposit, "executed deposit with txs {signatures:#?}");
                         }
@@ -195,7 +198,10 @@ impl KeeperArgs {
                             Ok(Some(rpc))
                         })
                         .await?;
-                    match with_prices.send_all(Some(self.compute_unit_price)).await {
+                    match with_prices
+                        .send_all(Some(self.compute_unit_price), true)
+                        .await
+                    {
                         Ok(signatures) => {
                             tracing::info!(%withdrawal, "executed withdrawal with txs {signatures:#?}");
                         }
@@ -260,7 +266,10 @@ impl KeeperArgs {
                             Ok(builder)
                         })
                         .await?;
-                    match with_prices.send_all(Some(self.compute_unit_price)).await {
+                    match with_prices
+                        .send_all(Some(self.compute_unit_price), true)
+                        .await
+                    {
                         Ok(signatures) => {
                             tracing::info!(%order, %execution_fee, "executed order with txs {signatures:#?}");
                         }
