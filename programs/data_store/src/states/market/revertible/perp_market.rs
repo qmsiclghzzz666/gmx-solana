@@ -355,7 +355,7 @@ impl<'a> gmx_core::SwapMarket<{ constants::MARKET_DECIMALS }> for RevertiblePerp
     }
 
     fn swap_impact_pool_mut(&mut self) -> gmx_core::Result<&mut Self::Pool> {
-        Ok(&mut self.pools.position_impact)
+        Ok(&mut self.pools.swap_impact)
     }
 }
 
