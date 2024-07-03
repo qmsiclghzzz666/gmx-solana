@@ -103,9 +103,10 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> TransactionBuilder<'a, C> {
     pub fn try_push_many(
         &mut self,
         rpcs: impl IntoIterator<Item = RpcBuilder<'a, C>>,
+        new_transaction: bool,
     ) -> crate::Result<&mut Self> {
-        for rpc in rpcs {
-            self.try_push(rpc)?;
+        for (idx, rpc) in rpcs.into_iter().enumerate() {
+            self.try_push_with_opts(rpc, (idx == 0) && new_transaction)?;
         }
         Ok(self)
     }

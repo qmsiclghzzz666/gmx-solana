@@ -361,7 +361,7 @@ impl InspectArgs {
                             async { Ok(None) }
                         })
                         .await?;
-                    match prices.send_all(None).await {
+                    match prices.send_all(None, true).await {
                         Ok(signatures) => {
                             tracing::info!("successfully sent all txs: {signatures:#?}");
                         }

@@ -210,7 +210,7 @@ pub trait PythPullOracleOps<C> {
                 }
             }
             let consume = (consume)(prices).await?;
-            post.try_push_many(consume)?;
+            post.try_push_many(consume, true)?;
             Ok(WithPythPrices { post, close })
         }
     }
