@@ -58,7 +58,7 @@ where
             .send_all_with_opts(
                 compute_unit_price_micro_lamports,
                 RpcSendTransactionConfig {
-                    skip_preflight: true,
+                    skip_preflight,
                     ..Default::default()
                 },
                 false,
