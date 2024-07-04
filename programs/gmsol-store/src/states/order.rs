@@ -251,7 +251,7 @@ pub struct TransferOut {
 
 /// Recevier Kind.
 pub enum CollateralReceiver {
-    Funding,
+    Collateral,
     ClaimableForHolding,
     ClaimableForUser,
 }
@@ -303,14 +303,14 @@ impl TransferOut {
     ) -> Result<()> {
         self.transfer_out_collateral(
             true,
-            CollateralReceiver::Funding,
+            CollateralReceiver::Collateral,
             (*long_amount)
                 .try_into()
                 .map_err(|_| error!(StoreError::AmountOverflow))?,
         )?;
         self.transfer_out_collateral(
             false,
-            CollateralReceiver::Funding,
+            CollateralReceiver::Collateral,
             (*short_amount)
                 .try_into()
                 .map_err(|_| error!(StoreError::AmountOverflow))?,
@@ -368,7 +368,7 @@ impl TransferOut {
             return Ok(());
         }
         match to {
-            CollateralReceiver::Funding => {
+            CollateralReceiver::Collateral => {
                 if is_long {
                     self.long_token = self
                         .long_token

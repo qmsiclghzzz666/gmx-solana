@@ -4,11 +4,17 @@ use gmsol_store::{
     constants::EVENT_AUTHORITY_SEED,
     cpi::accounts::{MarketTransferOut, RemovePosition},
     program::GmsolStore,
-    states::{order::TransferOut, Oracle, Order, PriceProvider},
+    states::{
+        order::{OrderKind, TransferOut},
+        Oracle, Order, PriceProvider,
+    },
     utils::{Authentication, WithOracle, WithOracleExt},
 };
 
-use crate::{utils::ControllerSeeds, ExchangeError};
+use crate::{
+    utils::{must_be_uninitialized, ControllerSeeds},
+    ExchangeError,
+};
 
 use super::utils::CancelOrderUtil;
 
@@ -107,31 +113,43 @@ pub fn execute_order<'info>(
 ) -> Result<()> {
     let store = ctx.accounts.store.key();
     let controller = ControllerSeeds::find(&store);
-    // TODO: validate the pre-condition of transferring out before execution.
-    let (should_remove_position, transfer_out, final_output_market, final_secondary_output_market) =
-        ctx.accounts.execute(
+    let is_executable = ctx.accounts.is_executable()?;
+
+    let is_executed = if is_executable {
+        // TODO: validate the pre-condition of transferring out before execution.
+        let (
+            should_remove_position,
+            transfer_out,
+            final_output_market,
+            final_secondary_output_market,
+        ) = ctx.accounts.execute(
             recent_timestamp,
             cancel_on_execution_error,
             &controller,
             ctx.remaining_accounts,
         )?;
-    ctx.accounts.process_transfer_out(
-        &controller,
-        &transfer_out,
-        final_output_market,
-        final_secondary_output_market,
-    )?;
-    if should_remove_position {
-        // Refund all lamports.
-        let refund = ctx.accounts.position()?.get_lamports();
-        gmsol_store::cpi::remove_position(
-            ctx.accounts
-                .remove_position_ctx()?
-                .with_signer(&[&controller.as_seeds()]),
-            refund,
+        ctx.accounts.process_transfer_out(
+            &controller,
+            &transfer_out,
+            final_output_market,
+            final_secondary_output_market,
         )?;
-    }
-    let reason = if transfer_out.executed {
+        if should_remove_position {
+            // Refund all lamports.
+            let refund = ctx.accounts.position()?.get_lamports();
+            gmsol_store::cpi::remove_position(
+                ctx.accounts
+                    .remove_position_ctx()?
+                    .with_signer(&[&controller.as_seeds()]),
+                refund,
+            )?;
+        }
+        transfer_out.executed
+    } else {
+        false
+    };
+
+    let reason = if is_executed {
         "executed"
     } else {
         "execution failed"
@@ -181,6 +199,23 @@ impl<'info> WithOracle<'info> for ExecuteOrder<'info> {
 }
 
 impl<'info> ExecuteOrder<'info> {
+    fn is_executable(&self) -> Result<bool> {
+        match self.order.fixed.params.kind {
+            OrderKind::MarketIncrease | OrderKind::MarketDecrease | OrderKind::Liquidation => {
+                let position = self
+                    .position
+                    .as_ref()
+                    .ok_or(error!(ExchangeError::PositionNotProvided))?;
+                // The order is not executable if the position have not been initialized.
+                Ok(!must_be_uninitialized(position))
+            }
+            OrderKind::MarketSwap => Ok(true),
+            _ => {
+                err!(ExchangeError::UnsupportedOrderKind)
+            }
+        }
+    }
+
     /// Execute the order and return the result.
     ///
     /// Return `(should_remove_position, transfer_out, final_output_market, final_secondary_output_market)`.

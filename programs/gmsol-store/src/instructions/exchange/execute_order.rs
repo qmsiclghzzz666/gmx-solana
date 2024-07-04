@@ -8,7 +8,7 @@ use crate::{
     constants,
     states::{
         ops::ValidateMarketBalances,
-        order::{Order, OrderKind, TransferOut},
+        order::{CollateralReceiver, Order, OrderKind, TransferOut},
         position::Position,
         revertible::{
             perp_market::RevertiblePerpMarket,
@@ -19,7 +19,7 @@ use crate::{
         HasMarketMeta, Market, Oracle, Seed, Store, ValidateOracleTime,
     },
     utils::internal,
-    StoreError, ModelError, StoreResult,
+    ModelError, StoreError, StoreResult,
 };
 
 type ShouldRemovePosition = bool;
@@ -296,8 +296,13 @@ impl<'info> ExecuteOrder<'info> {
         let kind = self.order.fixed.params.kind;
         let should_remove_position = match &kind {
             OrderKind::MarketSwap => {
-                execute_swap(&mut market)?;
-                // TODO: emit order executed event.
+                execute_swap(
+                    &self.oracle,
+                    &mut market,
+                    &mut swap_markets,
+                    &mut transfer_out,
+                    &mut self.order,
+                )?;
                 market.commit();
                 false
             }
@@ -375,8 +380,39 @@ impl<'info> ExecuteOrder<'info> {
     }
 }
 
-fn execute_swap(_market: &mut RevertiblePerpMarket<'_>) -> Result<Box<TransferOut>> {
-    unimplemented!()
+fn execute_swap(
+    oracle: &Oracle,
+    market: &mut RevertiblePerpMarket<'_>,
+    swap_markets: &mut SwapMarkets<'_>,
+    transfer_out: &mut TransferOut,
+    order: &mut Order,
+) -> Result<()> {
+    let swap_out_token = order.fixed.tokens.output_token;
+    // Perform swap.
+    let swap_out_amount = {
+        let swap = &order.swap;
+        require!(
+            swap.short_token_swap_path.is_empty(),
+            StoreError::InvalidSwapPath
+        );
+        let (swap_out_amount, _) = swap_markets.revertible_swap(
+            SwapDirection::Into(market),
+            oracle,
+            swap,
+            (swap_out_token, swap_out_token),
+            (Some(order.fixed.tokens.initial_collateral_token), None),
+            (order.fixed.params.initial_collateral_delta_amount, 0),
+        )?;
+        swap_out_amount
+    };
+    let is_long = market.market_meta().to_token_side(&swap_out_token)?;
+    transfer_out.transfer_out_collateral(
+        is_long,
+        CollateralReceiver::Collateral,
+        swap_out_amount,
+    )?;
+    order.fixed.params.initial_collateral_delta_amount = 0;
+    Ok(())
 }
 
 fn execute_increase_position(
