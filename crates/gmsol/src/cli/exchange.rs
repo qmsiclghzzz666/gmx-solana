@@ -1,5 +1,5 @@
 use anchor_client::solana_sdk::pubkey::Pubkey;
-use data_store::states::Position;
+use gmsol_store::states::Position;
 use gmsol::{exchange::ExchangeOps, store::utils::read_market, utils};
 
 use crate::GMSOLClient;

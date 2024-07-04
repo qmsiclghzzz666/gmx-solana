@@ -17,7 +17,7 @@ import { filterBalances } from "@/onchain/token";
 import { fitlerMarkets } from "@/onchain/market";
 import { fitlerPositions } from "@/onchain/position";
 import { MakeCreateDecreaseOrderParams, invokeCreateDecreaseOrder } from "gmsol";
-import { useDataStore, useExchange, useOpenConnectModal } from "@/contexts/anchor";
+import { useStoreProgram, useExchangeProgram, useOpenConnectModal } from "@/contexts/anchor";
 import { GMSOL_DEPLOYMENT } from "@/config/deployment";
 import { withInitializeTokenAccountGuard } from "../InitializeTokenAccountGuard";
 
@@ -71,8 +71,8 @@ function ConfirmationModalInner({ isVisible, onClose }: { isVisible: boolean, on
     void mutate(fitlerPositions);
   }, [mutate]);
 
-  const exchange = useExchange();
-  const dataStore = useDataStore();
+  const exchange = useExchangeProgram();
+  const dataStore = useStoreProgram();
   const payer = exchange.provider.publicKey;
   const openConnectModal = useOpenConnectModal();
 

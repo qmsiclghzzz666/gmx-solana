@@ -5,7 +5,7 @@ use anchor_client::{
     solana_sdk::{pubkey::Pubkey, signer::Signer},
 };
 use anchor_spl::token::Token;
-use data_store::{accounts, instruction};
+use gmsol_store::{accounts, instruction};
 
 use crate::utils::RpcBuilder;
 /// Token accounts management for GMSOL.

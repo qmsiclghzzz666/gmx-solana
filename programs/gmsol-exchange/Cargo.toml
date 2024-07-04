@@ -1,0 +1,32 @@
+[package]
+name = "gmsol-exchange"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "gmsol_exchange"
+
+[features]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+default = []
+idl-build = [
+    "anchor-lang/idl-build",
+    "gmsol-store/idl-build",
+    "anchor-spl/idl-build",
+]
+debug = ["gmsol-store/debug"]
+devnet = ["gmsol-store/devnet"]
+
+[dependencies]
+anchor-lang = { workspace = true }
+anchor-spl = { workspace = true, default-features = false, features = [
+    "token",
+    "token_2022",
+] }
+gmx-core = { path = "../../crates/gmx-core", features = ["u128", "solana"] }
+gmsol-store = { workspace = true, features = ["cpi"] }
+bytemuck = { workspace = true }

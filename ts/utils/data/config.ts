@@ -1,6 +1,6 @@
 import { Address, translateAddress } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
-import { DataStoreProgram, makeInvoke, toBN } from "gmsol";
+import { StoreProgram, makeInvoke, toBN } from "gmsol";
 
 export { findConfigPDA } from "gmsol";
 
@@ -10,7 +10,7 @@ export type MakeInitializeConfigParams = {
 }
 
 export const makeInsertAmountInstruction = async (
-    program: DataStoreProgram,
+    program: StoreProgram,
     { authority, store, key, amount }: {
         authority: PublicKey,
         store: PublicKey,
@@ -27,7 +27,7 @@ export const makeInsertAmountInstruction = async (
 export const invokeInsertAmount = makeInvoke(makeInsertAmountInstruction, ["authority"]);
 
 export const makeInsertFactorInstruction = async (
-    program: DataStoreProgram,
+    program: StoreProgram,
     { authority, store, key, factor }: {
         authority: PublicKey,
         store: PublicKey,
@@ -44,7 +44,7 @@ export const makeInsertFactorInstruction = async (
 export const invokeInsertFactor = makeInvoke(makeInsertFactorInstruction, ["authority"]);
 
 export const makeInsertAddressInstruction = async (
-    program: DataStoreProgram,
+    program: StoreProgram,
     { authority, store, key, address }: {
         authority: PublicKey,
         store: PublicKey,

@@ -5,7 +5,7 @@ use anchor_client::{
     Cluster, Program,
 };
 
-use data_store::states::{position::PositionKind, NonceBytes};
+use gmsol_store::states::{position::PositionKind, NonceBytes};
 use typed_builder::TypedBuilder;
 
 use crate::utils::RpcBuilder;
@@ -50,8 +50,8 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         let anchor = anchor_client::Client::new_with_options(cluster, payer.clone(), commitment);
         Ok(Self {
             wallet: payer,
-            data_store: anchor.program(data_store_program_id.unwrap_or(data_store::id()))?,
-            exchange: anchor.program(exchange_program_id.unwrap_or(exchange::id()))?,
+            data_store: anchor.program(data_store_program_id.unwrap_or(gmsol_store::id()))?,
+            exchange: anchor.program(exchange_program_id.unwrap_or(gmsol_exchange::id()))?,
             anchor,
         })
     }
@@ -121,7 +121,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         crate::pda::find_event_authority_address(&self.exchange_program_id()).0
     }
 
-    /// Find PDA for [`Store`](data_store::states::Store) account.
+    /// Find PDA for [`Store`](gmsol_store::states::Store) account.
     pub fn find_store_address(&self, key: &str) -> Pubkey {
         crate::pda::find_store_address(key, &self.data_store_program_id()).0
     }
@@ -136,7 +136,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         crate::pda::find_event_authority_address(&self.data_store_program_id()).0
     }
 
-    /// Find PDA for [`Oracle`](data_store::states::Oracle) account.
+    /// Find PDA for [`Oracle`](gmsol_store::states::Oracle) account.
     pub fn find_oracle_address(&self, store: &Pubkey, index: u8) -> Pubkey {
         crate::pda::find_oracle_address(store, index, &self.data_store_program_id()).0
     }

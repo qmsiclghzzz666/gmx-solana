@@ -10,7 +10,7 @@ use anchor_client::{
     solana_sdk::{instruction::AccountMeta, pubkey::Pubkey, signer::Signer},
     Program,
 };
-use data_store::states::{common::TokensWithFeed, Market, PriceProviderKind, Store};
+use gmsol_store::states::{common::TokensWithFeed, Market, PriceProviderKind, Store};
 
 use crate::pyth::find_pyth_feed_account;
 

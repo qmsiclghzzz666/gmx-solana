@@ -1,11 +1,11 @@
 import { expect, getAddresses, getTokenMints, getUsers } from "../../utils/fixtures";
 import { Keypair, PublicKey } from "@solana/web3.js";
-import { createMarketTokenMintPDA, createRolesPDA, dataStore, invokePushToTokenMapSynthetic } from "../../utils/data";
+import { createMarketTokenMintPDA, createRolesPDA, storeProgram, invokePushToTokenMapSynthetic } from "../../utils/data";
 import { createMarket } from "../../utils/exchange";
 import { AnchorError } from "@coral-xyz/anchor";
 import { findMarketPDA } from "gmsol";
 
-describe("exchange: market", () => {
+describe("exchange: Market", () => {
     const { signer0, user0 } = getUsers();
     const { BTC_TOKEN_MINT, SOL_TOKEN_MINT } = getTokenMints();
 
@@ -18,8 +18,8 @@ describe("exchange: market", () => {
     before(async () => {
         ({ dataStoreAddress } = await getAddresses());
         [roles] = createRolesPDA(dataStoreAddress, signer0.publicKey);
-        const tokenMap = (await dataStore.account.store.fetch(dataStoreAddress)).tokenMap;
-        await invokePushToTokenMapSynthetic(dataStore, {
+        const tokenMap = (await storeProgram.account.store.fetch(dataStoreAddress)).tokenMap;
+        await invokePushToTokenMapSynthetic(storeProgram, {
             authority: signer0,
             store: dataStoreAddress,
             tokenMap,
@@ -38,18 +38,18 @@ describe("exchange: market", () => {
         await createMarket(signer0, "test", dataStoreAddress, indexTokenMint, longTokenMint, shortTokenMint);
         // Only MARKET_KEEPER can toggle market.
         {
-            await expect(dataStore.methods.toggleMarket(false).accounts({
+            await expect(storeProgram.methods.toggleMarket(false).accounts({
                 authority: user0.publicKey,
                 market,
             }).signers([user0]).rpc()).rejectedWith(Error, "Permission denied");
         }
         {
-            const beforeFlag = (await dataStore.account.market.fetch(market)).flag;
-            await dataStore.methods.toggleMarket(false).accounts({
+            const beforeFlag = (await storeProgram.account.market.fetch(market)).flag;
+            await storeProgram.methods.toggleMarket(false).accounts({
                 authority: signer0.publicKey,
                 market,
             }).signers([signer0]).rpc();
-            const afterFlag = (await dataStore.account.market.fetch(market)).flag;
+            const afterFlag = (await storeProgram.account.market.fetch(market)).flag;
             expect(beforeFlag).not.eql(afterFlag);
         }
     });

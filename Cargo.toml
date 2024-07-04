@@ -50,6 +50,12 @@ tracing-subscriber = "0.3.18"
 typed-builder = "0.18.2"
 url = "2.5.0"
 
+[workspace.dependencies.gmsol-store]
+path = "programs/gmsol-store"
+
+[workspace.dependencies.gmsol-exchange]
+path = "programs/gmsol-exchange"
+
 # FIXME: use the crates.io version when it can compile with `anchor v0.30`.
 # See https://github.com/pyth-network/pyth-crosschain/issues/1522 for more information.
 [workspace.dependencies.pyth-solana-receiver-sdk]

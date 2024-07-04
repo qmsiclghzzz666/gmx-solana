@@ -6,11 +6,11 @@ use anchor_client::{
     RequestBuilder,
 };
 use anchor_spl::associated_token::get_associated_token_address;
-use data_store::states::{
+use gmsol_exchange::{accounts, instruction, instructions::CreateDepositParams};
+use gmsol_store::states::{
     common::{SwapParams, TokensWithFeed},
     Deposit, NonceBytes, Pyth,
 };
-use exchange::{accounts, instruction, instructions::CreateDepositParams};
 
 use crate::{
     store::utils::{read_market, FeedsParser},
@@ -265,7 +265,7 @@ where
                     initial_short_token_vault: short_token
                         .map(|token| client.find_market_vault_address(store, &token)),
                 },
-                &exchange::id(),
+                &gmsol_exchange::id(),
                 &client.exchange_program_id(),
             ))
             .args(instruction::CreateDeposit {
@@ -433,7 +433,7 @@ where
                     token_program: anchor_spl::token::ID,
                     system_program: system_program::ID,
                 },
-                &exchange::id(),
+                &gmsol_exchange::id(),
                 &client.exchange_program_id(),
             ))
             .args(instruction::CancelDeposit {}))
@@ -637,7 +637,7 @@ where
                         )
                     }),
                 },
-                &exchange::ID,
+                &gmsol_exchange::ID,
                 &self.client.exchange_program_id(),
             ))
             .args(instruction::ExecuteDeposit {

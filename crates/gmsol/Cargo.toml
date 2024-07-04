@@ -23,8 +23,8 @@ cli = [
     "indexmap",
 ]
 ui = ["cli", "poem/embed", "rust-embed"]
-clap = ["dep:clap", "data_store/clap"]
-devnet = ["data_store/devnet", "exchange/devnet"]
+clap = ["dep:clap", "gmsol-store/clap"]
+devnet = ["gmsol-store/devnet", "gmsol-exchange/devnet"]
 pyth-pull-oracle = [
     "reqwest/stream",
     "url",
@@ -64,7 +64,7 @@ byteorder = { workspace = true, optional = true }
 
 # Other deps
 gmx-solana-utils = { path = "../gmx-solana-utils" }
-data_store = { path = "../../programs/data_store", features = [
+gmsol-store = { workspace = true, features = [
     "no-entrypoint",
     "debug",
     "display",
@@ -72,10 +72,7 @@ data_store = { path = "../../programs/data_store", features = [
     "serde",
     "enum-iter",
 ] }
-exchange = { path = "../../programs/exchange", features = [
-    "no-entrypoint",
-    "debug",
-] }
+gmsol-exchange = { workspace = true, features = ["no-entrypoint", "debug"] }
 gmx-core = { path = "../gmx-core" }
 
 pyth-sdk = { workspace = true }

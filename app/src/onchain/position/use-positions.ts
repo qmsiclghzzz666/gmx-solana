@@ -1,4 +1,4 @@
-import { useAnchor, useDataStore } from "@/contexts/anchor";
+import { useAnchor, useStoreProgram } from "@/contexts/anchor";
 import { Address, translateAddress } from "@coral-xyz/anchor";
 import { useMemo } from "react";
 import { findPositionPDA, findPositionPDAWithKind } from "gmsol";
@@ -11,7 +11,7 @@ import { isObject } from "lodash";
 const POSITIONS_KEY = "data_store/positions";
 
 export const usePositions = (params?: { store: Address, markets: Market[] }) => {
-  const dataStore = useDataStore();
+  const dataStore = useStoreProgram();
   const { owner } = useAnchor();
   const request = useMemo(() => {
     const storeAddress = params ? translateAddress(params.store) : undefined;

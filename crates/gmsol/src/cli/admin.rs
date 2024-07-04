@@ -1,5 +1,5 @@
 use anchor_client::solana_sdk::pubkey::Pubkey;
-use data_store::states::RoleKey;
+use gmsol_store::states::RoleKey;
 use gmsol::{
     client::SystemProgramOps,
     exchange::ExchangeOps,

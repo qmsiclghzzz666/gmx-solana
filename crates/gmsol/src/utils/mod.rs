@@ -172,4 +172,4 @@ impl TokenAccountParams {
     }
 }
 
-pub use data_store::constants::EVENT_AUTHORITY_SEED;
+pub use gmsol_store::constants::EVENT_AUTHORITY_SEED;

@@ -1,5 +1,5 @@
 use anchor_client::solana_sdk::pubkey::Pubkey;
-use data_store::states::{AddressKey, Amount, AmountKey, Factor, FactorKey};
+use gmsol_store::states::{AddressKey, Amount, AmountKey, Factor, FactorKey};
 use gmsol::store::config::ConfigOps;
 
 use crate::GMSOLClient;

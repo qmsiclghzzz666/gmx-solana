@@ -1,5 +1,5 @@
 import { PublicKey, Signer } from "@solana/web3.js";
-import { dataStore } from "./program";
+import { storeProgram } from "./program";
 import { anchor } from "../endpoint";
 
 // Roles seed.
@@ -9,5 +9,5 @@ export const createRolesPDA = (store: PublicKey, authority: PublicKey) => Public
     ROLES_SEED,
     store.toBytes(),
     authority.toBytes(),
-], dataStore.programId);
+], storeProgram.programId);
 

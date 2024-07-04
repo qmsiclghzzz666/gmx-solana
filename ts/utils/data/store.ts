@@ -1,8 +1,8 @@
 import { PublicKey } from "@solana/web3.js";
-import { DataStoreProgram, makeInvoke } from "gmsol";
+import { StoreProgram, makeInvoke } from "gmsol";
 
 export const makeSetTokenMapInstruction = async (
-    program: DataStoreProgram,
+    program: StoreProgram,
     { authority, store, tokenMap }: {
         authority: PublicKey,
         store: PublicKey,

@@ -4,13 +4,13 @@ use anchor_client::{
     anchor_lang::system_program,
     solana_sdk::{pubkey::Pubkey, signer::Signer},
 };
-use data_store::{accounts, instruction};
+use gmsol_store::{accounts, instruction};
 
 use crate::utils::RpcBuilder;
 
 /// Oracle management for GMSOL.
 pub trait OracleOps<C> {
-    /// Initialize [`Oracle`](data_store::states::Oracle) account.
+    /// Initialize [`Oracle`](gmsol_store::states::Oracle) account.
     fn initialize_oracle(&self, store: &Pubkey, index: u8) -> (RpcBuilder<C>, Pubkey);
 }
 

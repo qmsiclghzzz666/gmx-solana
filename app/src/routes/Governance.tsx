@@ -8,7 +8,7 @@ import { CardRow } from "@/components/CardRow/CardRow";
 import Tab from "@/components/Tab/Tab";
 import Button from "@/components/Button/Button";
 import { ChangeEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { useDataStore, useExchange } from "@/contexts/anchor";
+import { useStoreProgram, useExchangeProgram } from "@/contexts/anchor";
 import { BN, BorshInstructionCoder, utils } from "@coral-xyz/anchor";
 import { getInstructionDataFromBase64 } from "@solana/spl-governance";
 import { PublicKey } from "@solana/web3.js";
@@ -38,8 +38,8 @@ export function Governance() {
   const [format, setFormat] = useState(Format.Governance);
   const [data, setData] = useState("");
   const [instruction, setInstruction] = useState<Instruction | undefined>(undefined);
-  const dataStore = useDataStore();
-  const exchange = useExchange();
+  const dataStore = useStoreProgram();
+  const exchange = useExchangeProgram();
 
   const dataStoreCoder = useMemo(() => {
     return new BorshInstructionCoder(dataStore.idl);

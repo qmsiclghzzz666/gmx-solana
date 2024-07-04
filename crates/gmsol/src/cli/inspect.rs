@@ -1,5 +1,5 @@
 use anchor_client::solana_sdk::{native_token::lamports_to_sol, pubkey::Pubkey};
-use data_store::states::{
+use gmsol_store::states::{
     self, AddressKey, AmountKey, FactorKey, MarketConfigKey, PriceProviderKind,
 };
 use gmsol::{

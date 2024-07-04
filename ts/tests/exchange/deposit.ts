@@ -1,12 +1,12 @@
 import { PublicKey } from "@solana/web3.js";
 import { createMarketPDA } from "../../utils/data";
 import { getAddresses, getMarkets, getPrograms, getProvider, getUsers, expect } from "../../utils/fixtures";
-import { invokeCancelDeposit, invokeCancelWithdrawal, executeWithdrawal, exchange, executeDeposit } from "../../utils/exchange";
+import { invokeCancelDeposit, invokeCancelWithdrawal, executeWithdrawal, exchangeProgram, executeDeposit } from "../../utils/exchange";
 import { AnchorError } from "@coral-xyz/anchor";
 import { invokeCreateDepositWithPayerAsSigner, invokeCreateWithdrawalWithPayerAsSigner } from "gmsol";
 import { SOL_TOKEN_MINT } from "../../utils/token";
 
-describe("exchange: deposit", () => {
+describe("exchange: Deposit", () => {
     const provider = getProvider();
     const { dataStore } = getPrograms();
     const { signer0, user0 } = getUsers();
@@ -43,7 +43,7 @@ describe("exchange: deposit", () => {
     it("create and execute deposit and then withdraw", async () => {
         let deposit: PublicKey;
         try {
-            const [signature, address] = await invokeCreateDepositWithPayerAsSigner(exchange, {
+            const [signature, address] = await invokeCreateDepositWithPayerAsSigner(exchangeProgram, {
                 store: dataStoreAddress,
                 payer: user0,
                 marketToken: GMFakeFakeUsdG,
@@ -88,7 +88,7 @@ describe("exchange: deposit", () => {
         let withdrawal: PublicKey;
         try {
             const [signature, withdrawalAddress] = await invokeCreateWithdrawalWithPayerAsSigner(
-                exchange,
+                exchangeProgram,
                 {
                     store: dataStoreAddress,
                     payer: user0,
@@ -138,7 +138,7 @@ describe("exchange: deposit", () => {
         // Create again.
         try {
             const [signature, address] = await invokeCreateWithdrawalWithPayerAsSigner(
-                exchange,
+                exchangeProgram,
                 {
                     store: dataStoreAddress,
                     payer: user0,
@@ -193,7 +193,7 @@ describe("exchange: deposit", () => {
 
     it("create and cancel deposit", async () => {
         const [signature, deposit] = await invokeCreateDepositWithPayerAsSigner(
-            exchange,
+            exchangeProgram,
             {
                 store: dataStoreAddress,
                 payer: user0,
@@ -240,7 +240,7 @@ describe("exchange: deposit", () => {
 
     it("create deposit with invalid swap path", async () => {
         await expect(invokeCreateDepositWithPayerAsSigner(
-            exchange,
+            exchangeProgram,
             {
                 store: dataStoreAddress,
                 payer: user0,
@@ -262,7 +262,7 @@ describe("exchange: deposit", () => {
 
     it("create withdrawal with invalid swap path", async () => {
         await expect(invokeCreateWithdrawalWithPayerAsSigner(
-            exchange,
+            exchangeProgram,
             {
                 store: dataStoreAddress,
                 payer: user0,
@@ -282,7 +282,7 @@ describe("exchange: deposit", () => {
         let withdrawal: PublicKey;
         {
             const [signature, withdrawAddress] = await invokeCreateWithdrawalWithPayerAsSigner(
-                exchange,
+                exchangeProgram,
                 {
                     store: dataStoreAddress,
                     payer: user0,
@@ -314,7 +314,7 @@ describe("exchange: deposit", () => {
         let deposit: PublicKey;
         {
             const [signature, depositAddress] = await invokeCreateDepositWithPayerAsSigner(
-                exchange,
+                exchangeProgram,
                 {
                     store: dataStoreAddress,
                     payer: user0,
@@ -356,7 +356,7 @@ describe("exchange: deposit", () => {
             const pool2 = (await dataStore.account.market.fetch(market2)).pools.primary;
             console.log(`${pool2.longTokenAmount}:${pool2.shortTokenAmount}`);
             const [signature, depositAddress] = await invokeCreateDepositWithPayerAsSigner(
-                exchange,
+                exchangeProgram,
                 {
                     store: dataStoreAddress,
                     payer: user0,
@@ -415,7 +415,7 @@ describe("exchange: deposit", () => {
         let withdrawal: PublicKey;
         {
             const [signature, withdrawAddress] = await invokeCreateWithdrawalWithPayerAsSigner(
-                exchange,
+                exchangeProgram,
                 {
                     store: dataStoreAddress,
                     payer: user0,

@@ -1,4 +1,4 @@
-import { DataStore } from "../../../target/types/data_store";
+import { GmsolStore } from "../../../target/types/gmsol_store";
 import { anchor } from "../endpoint";
 
-export const dataStore = anchor.workspace.DataStore as anchor.Program<DataStore>;
+export const storeProgram = anchor.workspace.GmsolStore as anchor.Program<GmsolStore>;

@@ -1,10 +1,10 @@
 use anchor_client::solana_sdk::pubkey::Pubkey;
-use data_store::states::{
+use gmsol_store::states::{
     position::PositionKind, Deposit, NonceBytes, Oracle, Order, Position, Seed, Store, Withdrawal,
 };
 use gmx_solana_utils::to_seed;
 
-pub use data_store::states::market::find_market_address;
+pub use gmsol_store::states::market::find_market_address;
 
 use crate::utils::EVENT_AUTHORITY_SEED;
 
@@ -21,7 +21,7 @@ pub fn find_store_address(key: &str, store_program_id: &Pubkey) -> (Pubkey, u8) 
 /// Find PDA for the controller address of exchange program.
 pub fn find_controller_address(store: &Pubkey, exchange_program_id: &Pubkey) -> (Pubkey, u8) {
     Pubkey::find_program_address(
-        &[exchange::constants::CONTROLLER_SEED, store.as_ref()],
+        &[gmsol_exchange::constants::CONTROLLER_SEED, store.as_ref()],
         exchange_program_id,
     )
 }
@@ -39,7 +39,7 @@ pub fn find_market_vault_address(
 ) -> (Pubkey, u8) {
     Pubkey::find_program_address(
         &[
-            data_store::constants::MARKET_VAULT_SEED,
+            gmsol_store::constants::MARKET_VAULT_SEED,
             store.as_ref(),
             token.as_ref(),
             &[],
@@ -58,7 +58,7 @@ pub fn find_market_token_address(
 ) -> (Pubkey, u8) {
     Pubkey::find_program_address(
         &[
-            data_store::constants::MAREKT_TOKEN_MINT_SEED,
+            gmsol_store::constants::MAREKT_TOKEN_MINT_SEED,
             store.as_ref(),
             index_token.as_ref(),
             long_token.as_ref(),
@@ -144,7 +144,7 @@ pub fn find_claimable_account_pda(
 ) -> (Pubkey, u8) {
     Pubkey::find_program_address(
         &[
-            data_store::constants::CLAIMABLE_ACCOUNT_SEED,
+            gmsol_store::constants::CLAIMABLE_ACCOUNT_SEED,
             store.as_ref(),
             mint.as_ref(),
             user.as_ref(),
