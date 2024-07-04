@@ -1,5 +1,5 @@
 [package]
-name = "gmx-core"
+name = "gmsol-model"
 version.workspace = true
 edition.workspace = true
 

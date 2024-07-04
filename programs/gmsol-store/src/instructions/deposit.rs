@@ -9,7 +9,7 @@ use crate::{
         Deposit, Market, NonceBytes, Seed, Store,
     },
     utils::internal,
-    DataStoreError,
+    StoreError,
 };
 
 #[derive(Accounts)]
@@ -50,7 +50,7 @@ pub fn initialize_deposit(
 ) -> Result<()> {
     require!(
         token_params.initial_long_token_amount != 0 || token_params.initial_short_token_amount != 0,
-        DataStoreError::EmptyDeposit
+        StoreError::EmptyDeposit
     );
 
     ctx.accounts.deposit.init(
@@ -92,9 +92,9 @@ pub struct RemoveDeposit<'info> {
     #[account(
         mut,
         close = payer,
-        constraint = deposit.to_account_info().lamports() >= refund @ DataStoreError::LamportsNotEnough,
-        constraint = deposit.fixed.store == store.key() @ DataStoreError::InvalidDepositToRemove,
-        constraint = deposit.fixed.senders.user == user.key() @ DataStoreError::UserMismatch,
+        constraint = deposit.to_account_info().lamports() >= refund @ StoreError::LamportsNotEnough,
+        constraint = deposit.fixed.store == store.key() @ StoreError::InvalidDepositToRemove,
+        constraint = deposit.fixed.senders.user == user.key() @ StoreError::UserMismatch,
         seeds = [
             Deposit::SEED,
             store.key().as_ref(),

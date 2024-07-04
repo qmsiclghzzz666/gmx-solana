@@ -2,7 +2,7 @@ use anchor_lang::{prelude::*, Bumps};
 
 use crate::{
     states::{RoleKey, Store},
-    DataStoreError,
+    StoreError,
 };
 
 /// Accounts that can be used for authentication.
@@ -29,7 +29,7 @@ pub(crate) trait Authenticate<'info>: Authentication<'info> + Bumps + Sized {
                 .store()
                 .load()?
                 .has_role(ctx.accounts.authority().key, role)?,
-            DataStoreError::PermissionDenied
+            StoreError::PermissionDenied
         );
         Ok(())
     }
@@ -42,7 +42,7 @@ pub(crate) trait Authenticate<'info>: Authentication<'info> + Bumps + Sized {
                 .store()
                 .load()?
                 .is_authority(ctx.accounts.authority().key),
-            DataStoreError::NotAnAdmin
+            StoreError::NotAnAdmin
         );
         Ok(())
     }

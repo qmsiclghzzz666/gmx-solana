@@ -170,7 +170,7 @@ pub mod gmsol_store {
             ctx,
             &token,
             &PriceProviderKind::try_from(provider)
-                .map_err(|_| DataStoreError::InvalidProviderKindIndex)?,
+                .map_err(|_| StoreError::InvalidProviderKindIndex)?,
         )
     }
 
@@ -183,7 +183,7 @@ pub mod gmsol_store {
             ctx,
             &token,
             &PriceProviderKind::try_from(provider)
-                .map_err(|_| DataStoreError::InvalidProviderKindIndex)?,
+                .map_err(|_| StoreError::InvalidProviderKindIndex)?,
         )
     }
 
@@ -218,7 +218,7 @@ pub mod gmsol_store {
             ctx,
             token,
             PriceProviderKind::try_from(provider)
-                .map_err(|_| DataStoreError::InvalidProviderKindIndex)?,
+                .map_err(|_| StoreError::InvalidProviderKindIndex)?,
         )
     }
 
@@ -234,7 +234,7 @@ pub mod gmsol_store {
             ctx,
             token,
             &PriceProviderKind::try_from(provider)
-                .map_err(|_| DataStoreError::InvalidProviderKindIndex)?,
+                .map_err(|_| StoreError::InvalidProviderKindIndex)?,
             feed,
             timestamp_adjustment,
         )
@@ -503,7 +503,7 @@ pub mod gmsol_store {
 }
 
 #[error_code]
-pub enum DataStoreError {
+pub enum StoreError {
     // Common.
     #[msg("Invalid pda")]
     InvalidPDA,
@@ -528,7 +528,7 @@ pub enum DataStoreError {
     #[msg("Unknown error")]
     Unknown,
     #[msg("Gmx Core Error")]
-    Core,
+    Model,
     #[msg("Missing amount")]
     MissingAmount,
     #[msg("Missing factor")]
@@ -696,7 +696,7 @@ pub enum DataStoreError {
     InvalidProviderKindIndex,
 }
 
-impl DataStoreError {
+impl StoreError {
     #[inline]
     pub(crate) const fn invalid_position_kind(_kind: u8) -> Self {
         Self::InvalidPositionKind
@@ -704,4 +704,4 @@ impl DataStoreError {
 }
 
 /// Data Store Resut.
-pub type StoreResult<T> = std::result::Result<T, DataStoreError>;
+pub type StoreResult<T> = std::result::Result<T, StoreError>;

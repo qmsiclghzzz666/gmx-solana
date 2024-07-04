@@ -3,7 +3,7 @@
 // FIXME: enable this when we are ready.
 // #![warn(clippy::arithmetic_side_effects)]
 
-//! The core concepts of GMX.
+//! A Rust implementation of GMX V2 Model.
 
 /// Pool.
 pub mod pool;

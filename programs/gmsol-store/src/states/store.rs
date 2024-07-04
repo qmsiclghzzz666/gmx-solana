@@ -4,7 +4,7 @@ use anchor_lang::prelude::*;
 use bytemuck::Zeroable;
 use gmx_solana_utils::to_seed;
 
-use crate::{constants, DataStoreError, StoreResult};
+use crate::{constants, StoreError, StoreResult};
 
 use super::{Amount, Factor, InitSpace, RoleStore, Seed};
 
@@ -136,7 +136,7 @@ impl Store {
 
     /// Get amount.
     pub fn get_amount(&self, key: &str) -> Result<&Amount> {
-        let key = AmountKey::from_str(key).map_err(|_| error!(DataStoreError::InvalidKey))?;
+        let key = AmountKey::from_str(key).map_err(|_| error!(StoreError::InvalidKey))?;
         Ok(self.get_amount_by_key(key))
     }
 
@@ -148,13 +148,13 @@ impl Store {
 
     /// Get amount mutably
     pub fn get_amount_mut(&mut self, key: &str) -> Result<&mut Amount> {
-        let key = AmountKey::from_str(key).map_err(|_| error!(DataStoreError::InvalidKey))?;
+        let key = AmountKey::from_str(key).map_err(|_| error!(StoreError::InvalidKey))?;
         Ok(self.amount.get_mut(&key))
     }
 
     /// Get factor.
     pub fn get_factor(&self, key: &str) -> Result<&Factor> {
-        let key = FactorKey::from_str(key).map_err(|_| error!(DataStoreError::InvalidKey))?;
+        let key = FactorKey::from_str(key).map_err(|_| error!(StoreError::InvalidKey))?;
         Ok(self.get_factor_by_key(key))
     }
 
@@ -166,13 +166,13 @@ impl Store {
 
     /// Get factor mutably
     pub fn get_factor_mut(&mut self, key: &str) -> Result<&mut Factor> {
-        let key = FactorKey::from_str(key).map_err(|_| error!(DataStoreError::InvalidKey))?;
+        let key = FactorKey::from_str(key).map_err(|_| error!(StoreError::InvalidKey))?;
         Ok(self.factor.get_mut(&key))
     }
 
     /// Get address.
     pub fn get_address(&self, key: &str) -> Result<&Pubkey> {
-        let key = AddressKey::from_str(key).map_err(|_| error!(DataStoreError::InvalidKey))?;
+        let key = AddressKey::from_str(key).map_err(|_| error!(StoreError::InvalidKey))?;
         Ok(self.get_address_by_key(key))
     }
 
@@ -184,7 +184,7 @@ impl Store {
 
     /// Get address mutably
     pub fn get_address_mut(&mut self, key: &str) -> Result<&mut Pubkey> {
-        let key = AddressKey::from_str(key).map_err(|_| error!(DataStoreError::InvalidKey))?;
+        let key = AddressKey::from_str(key).map_err(|_| error!(StoreError::InvalidKey))?;
         Ok(self.address.get_mut(&key))
     }
 
@@ -192,13 +192,13 @@ impl Store {
     pub fn request_expiration_at(&self, start: i64) -> StoreResult<i64> {
         start
             .checked_add_unsigned(self.amount.request_expiration)
-            .ok_or(DataStoreError::AmountOverflow)
+            .ok_or(StoreError::AmountOverflow)
     }
 
     /// Get claimable time window size.
     pub fn claimable_time_window(&self) -> Result<NonZeroU64> {
         NonZeroU64::new(self.amount.claimable_time_window)
-            .ok_or(error!(DataStoreError::CannotBeZero))
+            .ok_or(error!(StoreError::CannotBeZero))
     }
 
     /// Get claimable time window index for the given timestamp.
@@ -207,7 +207,7 @@ impl Store {
             .claimable_time_window()?
             .get()
             .try_into()
-            .map_err(|_| error!(DataStoreError::AmountOverflow))?;
+            .map_err(|_| error!(StoreError::AmountOverflow))?;
         Ok(timestamp / window)
     }
 

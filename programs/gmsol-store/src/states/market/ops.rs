@@ -1,15 +1,15 @@
 use anchor_lang::prelude::*;
 
-use gmx_core::BaseMarketExt;
+use gmsol_model::BaseMarketExt;
 
-use crate::{constants, DataStoreError, GmxCoreError};
+use crate::{constants, StoreError, ModelError};
 
 use super::HasMarketMeta;
 
 /// Extension trait for validating market balances.
 pub trait ValidateMarketBalances:
-    gmx_core::BaseMarket<{ constants::MARKET_DECIMALS }, Num = u128>
-    + gmx_core::Bank<Pubkey, Num = u64>
+    gmsol_model::BaseMarket<{ constants::MARKET_DECIMALS }, Num = u128>
+    + gmsol_model::Bank<Pubkey, Num = u64>
     + HasMarketMeta
 {
     /// Validate market balances.
@@ -21,22 +21,22 @@ pub trait ValidateMarketBalances:
         if self.is_pure() {
             let total = long_excluding_amount
                 .checked_add(short_excluding_amount)
-                .ok_or(error!(DataStoreError::AmountOverflow))?;
+                .ok_or(error!(StoreError::AmountOverflow))?;
             (long_excluding_amount, short_excluding_amount) = (total / 2, total / 2);
         }
         let meta = self.market_meta();
         let long_token_balance = self
             .balance_excluding(&meta.long_token_mint, &long_excluding_amount)
-            .map_err(GmxCoreError::from)?
+            .map_err(ModelError::from)?
             .into();
         self.validate_token_balance_for_one_side(&long_token_balance, true)
-            .map_err(GmxCoreError::from)?;
+            .map_err(ModelError::from)?;
         let short_token_balance = self
             .balance_excluding(&meta.short_token_mint, &short_excluding_amount)
-            .map_err(GmxCoreError::from)?
+            .map_err(ModelError::from)?
             .into();
         self.validate_token_balance_for_one_side(&short_token_balance, false)
-            .map_err(GmxCoreError::from)?;
+            .map_err(ModelError::from)?;
         Ok(())
     }
 
@@ -62,11 +62,11 @@ pub trait ValidateMarketBalances:
             if is_long {
                 long_excluding_amount = long_excluding_amount
                     .checked_add(amount)
-                    .ok_or(error!(DataStoreError::AmountOverflow))?;
+                    .ok_or(error!(StoreError::AmountOverflow))?;
             } else {
                 short_excluding_amount = short_excluding_amount
                     .checked_add(amount)
-                    .ok_or(error!(DataStoreError::AmountOverflow))?;
+                    .ok_or(error!(StoreError::AmountOverflow))?;
             }
         }
         self.validate_market_balances(long_excluding_amount, short_excluding_amount)
@@ -81,17 +81,17 @@ pub trait ValidateMarketBalances:
         let side = self.market_meta().to_token_side(token)?;
         let balance = self
             .balance_excluding(token, &amount)
-            .map_err(GmxCoreError::from)?
+            .map_err(ModelError::from)?
             .into();
         self.validate_token_balance_for_one_side(&balance, side)
-            .map_err(GmxCoreError::from)?;
+            .map_err(ModelError::from)?;
         Ok(())
     }
 }
 
 impl<
-        M: gmx_core::BaseMarket<{ constants::MARKET_DECIMALS }, Num = u128>
-            + gmx_core::Bank<Pubkey, Num = u64>
+        M: gmsol_model::BaseMarket<{ constants::MARKET_DECIMALS }, Num = u128>
+            + gmsol_model::Bank<Pubkey, Num = u64>
             + HasMarketMeta,
     > ValidateMarketBalances for M
 {

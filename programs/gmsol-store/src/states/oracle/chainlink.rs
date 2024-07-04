@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use gmx_solana_utils::price::{Decimal, Price};
 
-use crate::{states::TokenConfig, DataStoreError};
+use crate::{states::TokenConfig, StoreError};
 
 /// The Chainlink Program.
 pub struct Chainlink;
@@ -36,11 +36,11 @@ impl Chainlink {
         let chainlink_solana::Round {
             answer, timestamp, ..
         } = round;
-        require_gt!(*answer, 0, DataStoreError::InvalidPriceFeedPrice);
+        require_gt!(*answer, 0, StoreError::InvalidPriceFeedPrice);
         let timestamp = *timestamp as i64;
         let current = clock.unix_timestamp;
         if current > timestamp && current - timestamp > token_config.heartbeat_duration().into() {
-            return Err(DataStoreError::PriceFeedNotUpdated.into());
+            return Err(StoreError::PriceFeedNotUpdated.into());
         }
         let price = Decimal::try_from_price(
             *answer as u128,
@@ -48,7 +48,7 @@ impl Chainlink {
             token_config.token_decimals(),
             token_config.precision(),
         )
-        .map_err(|_| DataStoreError::InvalidPriceFeedPrice)?;
+        .map_err(|_| StoreError::InvalidPriceFeedPrice)?;
         Ok((
             round.slot,
             timestamp,

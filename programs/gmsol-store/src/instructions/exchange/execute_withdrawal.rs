@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token, TokenAccount};
-use gmx_core::{LiquidityMarketExt, PositionImpactMarketExt};
+use gmsol_model::{LiquidityMarketExt, PositionImpactMarketExt};
 
 use crate::{
     constants,
@@ -13,7 +13,7 @@ use crate::{
         HasMarketMeta, Market, Oracle, Seed, Store, ValidateOracleTime, Withdrawal,
     },
     utils::internal,
-    DataStoreError, GmxCoreError, StoreResult,
+    StoreError, ModelError, StoreResult,
 };
 
 #[derive(Accounts)]
@@ -92,7 +92,7 @@ pub fn execute_withdrawal<'info>(
 ) -> Result<(u64, u64)> {
     match ctx.accounts.validate_oracle() {
         Ok(()) => {}
-        Err(DataStoreError::OracleTimestampsAreLargerThanRequired) if !throw_on_execution_error => {
+        Err(StoreError::OracleTimestampsAreLargerThanRequired) if !throw_on_execution_error => {
             msg!(
                 "Withdrawal expired at {}",
                 ctx.accounts
@@ -137,7 +137,7 @@ impl<'info> ValidateOracleTime for ExecuteWithdrawal<'info> {
         let ts = self
             .store
             .load()
-            .map_err(|_| DataStoreError::LoadAccountError)?
+            .map_err(|_| StoreError::LoadAccountError)?
             .request_expiration_at(self.withdrawal.fixed.updated_at)?;
         Ok(Some(ts))
     }
@@ -180,9 +180,9 @@ impl<'info> ExecuteWithdrawal<'info> {
         {
             let report = market
                 .distribute_position_impact()
-                .map_err(GmxCoreError::from)?
+                .map_err(ModelError::from)?
                 .execute()
-                .map_err(GmxCoreError::from)?;
+                .map_err(ModelError::from)?;
             msg!("[Withdrawal] pre-execute: {:?}", report);
         }
 
@@ -195,14 +195,14 @@ impl<'info> ExecuteWithdrawal<'info> {
                     prices,
                 )
                 .and_then(|w| w.execute())
-                .map_err(GmxCoreError::from)?;
+                .map_err(ModelError::from)?;
             let (long_amount, short_amount) = (
                 (*report.long_token_output())
                     .try_into()
-                    .map_err(|_| DataStoreError::AmountOverflow)?,
+                    .map_err(|_| StoreError::AmountOverflow)?,
                 (*report.short_token_output())
                     .try_into()
-                    .map_err(|_| DataStoreError::AmountOverflow)?,
+                    .map_err(|_| StoreError::AmountOverflow)?,
             );
             // Validate current market.
             market.validate_market_balances(long_amount, short_amount)?;

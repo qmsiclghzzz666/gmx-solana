@@ -8,7 +8,7 @@ use crate::{
         TokenMapAccess, TokenMapHeader, TokenMapLoader,
     },
     utils::internal,
-    DataStoreError,
+    StoreError,
 };
 
 /// Number of pools.
@@ -59,23 +59,23 @@ pub fn unchecked_initialize_market(
         require!(
             token_map
                 .get(&index_token_mint)
-                .ok_or(error!(DataStoreError::RequiredResourceNotFound))?
+                .ok_or(error!(StoreError::RequiredResourceNotFound))?
                 .is_enabled(),
-            DataStoreError::InvalidArgument
+            StoreError::InvalidArgument
         );
         require!(
             token_map
                 .get(&long_token_mint)
-                .ok_or(error!(DataStoreError::RequiredResourceNotFound))?
+                .ok_or(error!(StoreError::RequiredResourceNotFound))?
                 .is_enabled(),
-            DataStoreError::InvalidArgument
+            StoreError::InvalidArgument
         );
         require!(
             token_map
                 .get(&short_token_mint)
-                .ok_or(error!(DataStoreError::RequiredResourceNotFound))?
+                .ok_or(error!(StoreError::RequiredResourceNotFound))?
                 .is_enabled(),
-            DataStoreError::InvalidArgument
+            StoreError::InvalidArgument
         );
     }
     let market = &ctx.accounts.market;

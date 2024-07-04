@@ -65,7 +65,7 @@ pub trait Data: Bump + Seed {
             &[Self::SEED, store.as_ref(), &to_seed(key), &[self.seed()]],
             &crate::ID,
         )
-        .map_err(|_| crate::DataStoreError::InvalidPDA)?;
+        .map_err(|_| crate::StoreError::InvalidPDA)?;
         Ok(pda)
     }
 }

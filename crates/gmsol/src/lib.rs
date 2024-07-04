@@ -24,6 +24,6 @@ pub mod types;
 
 pub use client::{Client, ClientOptions};
 pub use error::Error;
-pub use gmx_core as core;
+pub use gmsol_model as model;
 
 pub type Result<T> = std::result::Result<T, Error>;

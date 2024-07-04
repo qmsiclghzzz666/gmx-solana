@@ -4,7 +4,7 @@ use anchor_lang::prelude::*;
 
 use crate::{
     states::{find_market_address, Market},
-    DataStoreError,
+    StoreError,
 };
 
 /// Swap params.
@@ -139,7 +139,7 @@ impl SwapParams {
             self.long_token_swap_path
                 .iter()
                 .all(move |token| seen.insert(token)),
-            DataStoreError::InvalidSwapPath
+            StoreError::InvalidSwapPath
         );
         Ok(&self.long_token_swap_path)
     }
@@ -151,7 +151,7 @@ impl SwapParams {
             self.short_token_swap_path
                 .iter()
                 .all(move |token| seen.insert(token)),
-            DataStoreError::InvalidSwapPath
+            StoreError::InvalidSwapPath
         );
         Ok(&self.short_token_swap_path)
     }

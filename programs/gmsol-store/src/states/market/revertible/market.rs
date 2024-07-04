@@ -1,7 +1,7 @@
 use std::{borrow::Borrow, cell::RefMut, ops::Deref};
 
 use anchor_lang::prelude::*;
-use gmx_core::{
+use gmsol_model::{
     params::{
         fee::{BorrowingFeeParams, FundingFeeParams},
         position::PositionImpactDistributionParams,
@@ -13,7 +13,7 @@ use gmx_core::{
 use crate::{
     constants,
     states::{Factor, HasMarketMeta, Market, MarketConfig, MarketMeta, MarketState, Pool},
-    DataStoreError, GmxCoreError,
+    StoreError, ModelError,
 };
 
 use super::{swap_market::RevertibleSwapMarket, Revertible, RevertibleBalance};
@@ -47,13 +47,13 @@ impl SmallPool {
     }
 }
 
-impl gmx_core::Balance for SmallPool {
+impl gmsol_model::Balance for SmallPool {
     type Num = u128;
 
     type Signed = i128;
 
     /// Get the long token amount.
-    fn long_amount(&self) -> gmx_core::Result<Self::Num> {
+    fn long_amount(&self) -> gmsol_model::Result<Self::Num> {
         if self.is_pure {
             debug_assert_eq!(self.short_amount, 0, "short token amount must be zero");
             Ok(self.long_amount / 2)
@@ -63,7 +63,7 @@ impl gmx_core::Balance for SmallPool {
     }
 
     /// Get the short token amount.
-    fn short_amount(&self) -> gmx_core::Result<Self::Num> {
+    fn short_amount(&self) -> gmsol_model::Result<Self::Num> {
         if self.is_pure {
             debug_assert_eq!(self.short_amount, 0, "short token amount must be zero");
             Ok(self.long_amount / 2)
@@ -73,16 +73,16 @@ impl gmx_core::Balance for SmallPool {
     }
 }
 
-impl gmx_core::Pool for SmallPool {
-    fn apply_delta_to_long_amount(&mut self, delta: &Self::Signed) -> gmx_core::Result<()> {
+impl gmsol_model::Pool for SmallPool {
+    fn apply_delta_to_long_amount(&mut self, delta: &Self::Signed) -> gmsol_model::Result<()> {
         self.long_amount = self
             .long_amount
             .checked_add_signed(*delta)
-            .ok_or(gmx_core::Error::Computation("apply delta to long amount"))?;
+            .ok_or(gmsol_model::Error::Computation("apply delta to long amount"))?;
         Ok(())
     }
 
-    fn apply_delta_to_short_amount(&mut self, delta: &Self::Signed) -> gmx_core::Result<()> {
+    fn apply_delta_to_short_amount(&mut self, delta: &Self::Signed) -> gmsol_model::Result<()> {
         let amount = if self.is_pure {
             &mut self.long_amount
         } else {
@@ -90,7 +90,7 @@ impl gmx_core::Pool for SmallPool {
         };
         *amount = amount
             .checked_add_signed(*delta)
-            .ok_or(gmx_core::Error::Computation("apply delta to short amount"))?;
+            .ok_or(gmsol_model::Error::Computation("apply delta to short amount"))?;
         Ok(())
     }
 }
@@ -103,19 +103,19 @@ pub enum RevertiblePool {
     Storage(u128, u128),
 }
 
-impl gmx_core::Balance for RevertiblePool {
+impl gmsol_model::Balance for RevertiblePool {
     type Num = u128;
 
     type Signed = i128;
 
-    fn long_amount(&self) -> gmx_core::Result<Self::Num> {
+    fn long_amount(&self) -> gmsol_model::Result<Self::Num> {
         match self {
             Self::SmallPool(pool) => pool.long_amount(),
             Self::Storage(long_amount, _) => Ok(*long_amount),
         }
     }
 
-    fn short_amount(&self) -> gmx_core::Result<Self::Num> {
+    fn short_amount(&self) -> gmsol_model::Result<Self::Num> {
         match self {
             Self::SmallPool(pool) => pool.short_amount(),
             Self::Storage(_, short_amount) => Ok(*short_amount),
@@ -123,19 +123,19 @@ impl gmx_core::Balance for RevertiblePool {
     }
 }
 
-impl gmx_core::Pool for RevertiblePool {
-    fn apply_delta_to_long_amount(&mut self, delta: &Self::Signed) -> gmx_core::Result<()> {
+impl gmsol_model::Pool for RevertiblePool {
+    fn apply_delta_to_long_amount(&mut self, delta: &Self::Signed) -> gmsol_model::Result<()> {
         let Self::SmallPool(pool) = self else {
-            return Err(gmx_core::Error::invalid_argument(
+            return Err(gmsol_model::Error::invalid_argument(
                 "Cannot modify pool from the storage",
             ));
         };
         pool.apply_delta_to_long_amount(delta)
     }
 
-    fn apply_delta_to_short_amount(&mut self, delta: &Self::Signed) -> gmx_core::Result<()> {
+    fn apply_delta_to_short_amount(&mut self, delta: &Self::Signed) -> gmsol_model::Result<()> {
         let Self::SmallPool(pool) = self else {
-            return Err(gmx_core::Error::invalid_argument(
+            return Err(gmsol_model::Error::invalid_argument(
                 "Cannot modify pool from the storage",
             ));
         };
@@ -180,17 +180,17 @@ impl<'a, 'info> TryFrom<&'a AccountLoader<'info, Market>> for RevertibleMarket<'
         let liquidity = storage
             .pools
             .get(PoolKind::Primary)
-            .ok_or(error!(DataStoreError::RequiredResourceNotFound))?
+            .ok_or(error!(StoreError::RequiredResourceNotFound))?
             .into();
         let claimable_fee = storage
             .pools
             .get(PoolKind::ClaimableFee)
-            .ok_or(error!(DataStoreError::RequiredResourceNotFound))?
+            .ok_or(error!(StoreError::RequiredResourceNotFound))?
             .into();
         let swap_impact = storage
             .pools
             .get(PoolKind::SwapImpact)
-            .ok_or(error!(DataStoreError::RequiredResourceNotFound))?
+            .ok_or(error!(StoreError::RequiredResourceNotFound))?
             .into();
         let balance = RevertibleBalance::from(storage.deref());
         Ok(Self {
@@ -248,10 +248,10 @@ impl<'a> RevertibleMarket<'a> {
             .storage
             .pools
             .get(kind)
-            .ok_or(error!(DataStoreError::RequiredResourceNotFound))?;
+            .ok_or(error!(StoreError::RequiredResourceNotFound))?;
         Ok(RevertiblePool::Storage(
-            pool.long_amount().map_err(GmxCoreError::from)?,
-            pool.short_amount().map_err(GmxCoreError::from)?,
+            pool.long_amount().map_err(ModelError::from)?,
+            pool.short_amount().map_err(ModelError::from)?,
         ))
     }
 
@@ -261,11 +261,11 @@ impl<'a> RevertibleMarket<'a> {
             .storage
             .pools
             .get(kind)
-            .ok_or(error!(DataStoreError::RequiredResourceNotFound))?;
+            .ok_or(error!(StoreError::RequiredResourceNotFound))?;
         Ok(RevertiblePool::SmallPool(SmallPool::from(pool)))
     }
 
-    /// As a [`SwapMarket`](gmx_core::SwapMarket).
+    /// As a [`SwapMarket`](gmsol_model::SwapMarket).
     pub fn into_swap_market(self) -> Result<RevertibleSwapMarket<'a>> {
         RevertibleSwapMarket::from_market(self)
     }
@@ -290,7 +290,7 @@ impl<'a> RevertibleMarket<'a> {
             .storage
             .clocks
             .get(kind)
-            .ok_or(error!(DataStoreError::RequiredResourceNotFound))?;
+            .ok_or(error!(StoreError::RequiredResourceNotFound))?;
         Ok(*clock)
     }
 
@@ -300,12 +300,12 @@ impl<'a> RevertibleMarket<'a> {
             .storage
             .clocks
             .get_mut(kind)
-            .ok_or(error!(DataStoreError::RequiredResourceNotFound))?;
+            .ok_or(error!(StoreError::RequiredResourceNotFound))?;
         *clock = last;
         Ok(())
     }
 
-    pub(super) fn swap_impact_params(&self) -> gmx_core::Result<PriceImpactParams<Factor>> {
+    pub(super) fn swap_impact_params(&self) -> gmsol_model::Result<PriceImpactParams<Factor>> {
         PriceImpactParams::builder()
             .with_exponent(self.config().swap_impact_exponent)
             .with_positive_factor(self.config().swap_impact_positive_factor)
@@ -313,7 +313,7 @@ impl<'a> RevertibleMarket<'a> {
             .build()
     }
 
-    pub(super) fn swap_fee_params(&self) -> gmx_core::Result<FeeParams<Factor>> {
+    pub(super) fn swap_fee_params(&self) -> gmsol_model::Result<FeeParams<Factor>> {
         Ok(FeeParams::builder()
             .with_fee_receiver_factor(self.config().swap_fee_receiver_factor)
             .with_positive_impact_fee_factor(self.config().swap_fee_factor_for_positive_impact)
@@ -321,7 +321,7 @@ impl<'a> RevertibleMarket<'a> {
             .build())
     }
 
-    pub(super) fn position_impact_params(&self) -> gmx_core::Result<PriceImpactParams<Factor>> {
+    pub(super) fn position_impact_params(&self) -> gmsol_model::Result<PriceImpactParams<Factor>> {
         let config = self.config();
         PriceImpactParams::builder()
             .with_exponent(config.position_impact_exponent)
@@ -332,7 +332,7 @@ impl<'a> RevertibleMarket<'a> {
 
     pub(super) fn position_impact_distribution_params(
         &self,
-    ) -> gmx_core::Result<PositionImpactDistributionParams<Factor>> {
+    ) -> gmsol_model::Result<PositionImpactDistributionParams<Factor>> {
         let config = self.config();
         Ok(PositionImpactDistributionParams::builder()
             .distribute_factor(config.position_impact_distribute_factor)
@@ -340,7 +340,7 @@ impl<'a> RevertibleMarket<'a> {
             .build())
     }
 
-    pub(super) fn borrowing_fee_params(&self) -> gmx_core::Result<BorrowingFeeParams<Factor>> {
+    pub(super) fn borrowing_fee_params(&self) -> gmsol_model::Result<BorrowingFeeParams<Factor>> {
         Ok(BorrowingFeeParams::builder()
             .receiver_factor(self.config().borrowing_fee_receiver_factor)
             .factor_for_long(self.config().borrowing_fee_factor_for_long)
@@ -350,7 +350,7 @@ impl<'a> RevertibleMarket<'a> {
             .build())
     }
 
-    pub(super) fn funding_fee_params(&self) -> gmx_core::Result<FundingFeeParams<Factor>> {
+    pub(super) fn funding_fee_params(&self) -> gmsol_model::Result<FundingFeeParams<Factor>> {
         Ok(FundingFeeParams::builder()
             .exponent(self.config().funding_fee_exponent)
             .funding_factor(self.config().funding_fee_factor)
@@ -365,7 +365,7 @@ impl<'a> RevertibleMarket<'a> {
             .build())
     }
 
-    pub(super) fn position_params(&self) -> gmx_core::Result<PositionParams<Factor>> {
+    pub(super) fn position_params(&self) -> gmsol_model::Result<PositionParams<Factor>> {
         // TODO: use min collateral factors for OI.
         Ok(PositionParams::new(
             self.config().min_position_size_usd,
@@ -377,7 +377,7 @@ impl<'a> RevertibleMarket<'a> {
         ))
     }
 
-    pub(super) fn order_fee_params(&self) -> gmx_core::Result<FeeParams<Factor>> {
+    pub(super) fn order_fee_params(&self) -> gmsol_model::Result<FeeParams<Factor>> {
         Ok(FeeParams::builder()
             .with_fee_receiver_factor(self.config().order_fee_receiver_factor)
             .with_positive_impact_fee_factor(self.config().order_fee_factor_for_positive_impact)
@@ -396,14 +396,14 @@ impl<'a> HasMarketMeta for RevertibleMarket<'a> {
     }
 }
 
-impl<'a> gmx_core::Bank<Pubkey> for RevertibleMarket<'a> {
+impl<'a> gmsol_model::Bank<Pubkey> for RevertibleMarket<'a> {
     type Num = u64;
 
     fn record_transferred_in_by_token<Q: ?Sized + Borrow<Pubkey>>(
         &mut self,
         token: &Q,
         amount: &Self::Num,
-    ) -> gmx_core::Result<()> {
+    ) -> gmsol_model::Result<()> {
         // TODO: use event
         msg!(
             "[Not committed] {}: {},{}(+{} {})",
@@ -418,7 +418,7 @@ impl<'a> gmx_core::Bank<Pubkey> for RevertibleMarket<'a> {
         } else if self.storage.meta.short_token_mint == *token.borrow() {
             self.balance.record_transferred_in(false, *amount)?;
         } else {
-            return Err(gmx_core::Error::invalid_argument("invalid token"));
+            return Err(gmsol_model::Error::invalid_argument("invalid token"));
         }
         Ok(())
     }
@@ -427,7 +427,7 @@ impl<'a> gmx_core::Bank<Pubkey> for RevertibleMarket<'a> {
         &mut self,
         token: &Q,
         amount: &Self::Num,
-    ) -> gmx_core::Result<()> {
+    ) -> gmsol_model::Result<()> {
         // TODO: use event
         msg!(
             "[Not committed] {}: {},{}(-{} {})",
@@ -442,57 +442,57 @@ impl<'a> gmx_core::Bank<Pubkey> for RevertibleMarket<'a> {
         } else if self.storage.meta.short_token_mint == *token.borrow() {
             self.balance.record_transferred_out(false, *amount)?;
         } else {
-            return Err(gmx_core::Error::invalid_argument("invalid token"));
+            return Err(gmsol_model::Error::invalid_argument("invalid token"));
         }
         Ok(())
     }
 
-    fn balance<Q: Borrow<Pubkey> + ?Sized>(&self, token: &Q) -> gmx_core::Result<Self::Num> {
+    fn balance<Q: Borrow<Pubkey> + ?Sized>(&self, token: &Q) -> gmsol_model::Result<Self::Num> {
         let side = self.market_meta().to_token_side(token.borrow())?;
         Ok(self.revertible_balance().balance_for_one_side(side))
     }
 }
 
-impl<'a> gmx_core::BaseMarket<{ constants::MARKET_DECIMALS }> for RevertibleMarket<'a> {
+impl<'a> gmsol_model::BaseMarket<{ constants::MARKET_DECIMALS }> for RevertibleMarket<'a> {
     type Num = u128;
 
     type Signed = i128;
 
     type Pool = RevertiblePool;
 
-    fn liquidity_pool(&self) -> gmx_core::Result<&Self::Pool> {
+    fn liquidity_pool(&self) -> gmsol_model::Result<&Self::Pool> {
         Ok(&self.liquidity)
     }
 
-    fn liquidity_pool_mut(&mut self) -> gmx_core::Result<&mut Self::Pool> {
+    fn liquidity_pool_mut(&mut self) -> gmsol_model::Result<&mut Self::Pool> {
         Ok(&mut self.liquidity)
     }
 
-    fn claimable_fee_pool(&self) -> gmx_core::Result<&Self::Pool> {
+    fn claimable_fee_pool(&self) -> gmsol_model::Result<&Self::Pool> {
         Ok(&self.claimable_fee)
     }
 
-    fn claimable_fee_pool_mut(&mut self) -> gmx_core::Result<&mut Self::Pool> {
+    fn claimable_fee_pool_mut(&mut self) -> gmsol_model::Result<&mut Self::Pool> {
         Ok(&mut self.claimable_fee)
     }
 
-    fn swap_impact_pool(&self) -> gmx_core::Result<&Self::Pool> {
+    fn swap_impact_pool(&self) -> gmsol_model::Result<&Self::Pool> {
         Ok(&self.swap_impact)
     }
 
-    fn open_interest_pool(&self, _is_long: bool) -> gmx_core::Result<&Self::Pool> {
-        Err(gmx_core::Error::Unimplemented)
+    fn open_interest_pool(&self, _is_long: bool) -> gmsol_model::Result<&Self::Pool> {
+        Err(gmsol_model::Error::Unimplemented)
     }
 
-    fn open_interest_in_tokens_pool(&self, _is_long: bool) -> gmx_core::Result<&Self::Pool> {
-        Err(gmx_core::Error::Unimplemented)
+    fn open_interest_in_tokens_pool(&self, _is_long: bool) -> gmsol_model::Result<&Self::Pool> {
+        Err(gmsol_model::Error::Unimplemented)
     }
 
     fn usd_to_amount_divisor(&self) -> Self::Num {
         constants::MARKET_USD_TO_AMOUNT_DIVISOR
     }
 
-    fn max_pool_amount(&self, is_long_token: bool) -> gmx_core::Result<Self::Num> {
+    fn max_pool_amount(&self, is_long_token: bool) -> gmsol_model::Result<Self::Num> {
         if is_long_token {
             Ok(self.config().max_pool_amount_for_long_token)
         } else {
@@ -502,10 +502,10 @@ impl<'a> gmx_core::BaseMarket<{ constants::MARKET_DECIMALS }> for RevertibleMark
 
     fn max_pnl_factor(
         &self,
-        kind: gmx_core::PnlFactorKind,
+        kind: gmsol_model::PnlFactorKind,
         is_long: bool,
-    ) -> gmx_core::Result<Self::Num> {
-        use gmx_core::PnlFactorKind;
+    ) -> gmsol_model::Result<Self::Num> {
+        use gmsol_model::PnlFactorKind;
 
         match (kind, is_long) {
             (PnlFactorKind::Deposit, true) => Ok(self.config().max_pnl_factor_for_long_deposit),
@@ -516,11 +516,11 @@ impl<'a> gmx_core::BaseMarket<{ constants::MARKET_DECIMALS }> for RevertibleMark
             (PnlFactorKind::Withdrawal, false) => {
                 Ok(self.config().max_pnl_factor_for_short_withdrawal)
             }
-            _ => Err(error!(DataStoreError::RequiredResourceNotFound).into()),
+            _ => Err(error!(StoreError::RequiredResourceNotFound).into()),
         }
     }
 
-    fn reserve_factor(&self) -> gmx_core::Result<Self::Num> {
+    fn reserve_factor(&self) -> gmsol_model::Result<Self::Num> {
         Ok(self.config().reserve_factor)
     }
 }

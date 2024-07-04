@@ -11,24 +11,24 @@ pub use execute_deposit::*;
 pub use execute_order::*;
 pub use execute_withdrawal::*;
 
-use crate::DataStoreError;
+use crate::StoreError;
 
-pub(crate) struct GmxCoreError(gmx_core::Error);
+pub(crate) struct ModelError(gmsol_model::Error);
 
-impl From<gmx_core::Error> for GmxCoreError {
-    fn from(err: gmx_core::Error) -> Self {
+impl From<gmsol_model::Error> for ModelError {
+    fn from(err: gmsol_model::Error) -> Self {
         Self(err)
     }
 }
 
-impl From<GmxCoreError> for anchor_lang::prelude::Error {
-    fn from(err: GmxCoreError) -> Self {
+impl From<ModelError> for anchor_lang::prelude::Error {
+    fn from(err: ModelError) -> Self {
         match err.0 {
-            gmx_core::Error::EmptyDeposit => DataStoreError::EmptyDeposit.into(),
-            gmx_core::Error::Solana(err) => err,
+            gmsol_model::Error::EmptyDeposit => StoreError::EmptyDeposit.into(),
+            gmsol_model::Error::Solana(err) => err,
             core_error => {
-                crate::msg!("GmxCoreError occurred. Error Message: {}", core_error);
-                DataStoreError::Core.into()
+                crate::msg!("A model error occurred. Error Message: {}", core_error);
+                StoreError::Model.into()
             }
         }
     }

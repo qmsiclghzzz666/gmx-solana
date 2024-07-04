@@ -97,7 +97,7 @@ macro_rules! fixed_map {
                     match self.binanry_search(&key) {
                         Ok(index) => {
                             if new {
-                                anchor_lang::err!($crate::DataStoreError::AlreadyExist)
+                                anchor_lang::err!($crate::StoreError::AlreadyExist)
                             } else {
                                 let previous = std::mem::replace(&mut self.data[index].value, value);
                                 Ok(Some(previous))
@@ -105,7 +105,7 @@ macro_rules! fixed_map {
                         }
                         Err(index) => {
                             if self.len() >= $len {
-                                anchor_lang::err!($crate::DataStoreError::ExceedMaxLengthLimit)
+                                anchor_lang::err!($crate::StoreError::ExceedMaxLengthLimit)
                             } else {
                                 for i in (index..self.len()).rev() {
                                     self.data[i + 1] = self.data[i];

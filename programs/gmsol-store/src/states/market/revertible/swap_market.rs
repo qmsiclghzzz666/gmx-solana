@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use gmx_core::{
+use gmsol_model::{
     params::{FeeParams, PriceImpactParams},
     Bank, PoolKind, SwapMarketExt,
 };
@@ -10,7 +10,7 @@ use crate::{
     states::{
         common::SwapParams, ops::ValidateMarketBalances, HasMarketMeta, Market, MarketMeta, Oracle,
     },
-    DataStoreError, GmxCoreError,
+    StoreError, ModelError,
 };
 
 use super::{Revertible, RevertibleMarket, RevertiblePool};
@@ -29,11 +29,11 @@ impl<'a> SwapMarkets<'a> {
         for loader in loaders {
             let key = loader.load()?.meta().market_token_mint;
             if let Some(market_token) = current_market_token {
-                require!(key != *market_token, DataStoreError::InvalidSwapPath);
+                require!(key != *market_token, StoreError::InvalidSwapPath);
             }
             match map.entry(key) {
                 // Cannot have duplicated markets.
-                Entry::Occupied(_) => return err!(DataStoreError::InvalidSwapPath),
+                Entry::Occupied(_) => return err!(StoreError::InvalidSwapPath),
                 Entry::Vacant(e) => {
                     loader.load()?.validate(store)?;
                     let market =
@@ -68,8 +68,8 @@ impl<'a> SwapMarkets<'a> {
     where
         M: Key
             + HasMarketMeta
-            + gmx_core::Bank<Pubkey, Num = u64>
-            + gmx_core::SwapMarket<{ constants::MARKET_DECIMALS }, Num = u128>,
+            + gmsol_model::Bank<Pubkey, Num = u64>
+            + gmsol_model::SwapMarket<{ constants::MARKET_DECIMALS }, Num = u128>,
     {
         let long_path = params.validated_long_path()?;
         let long_output_amount = token_ins
@@ -195,30 +195,30 @@ impl<'a> SwapMarkets<'a> {
         for (idx, market_token) in path.iter().enumerate() {
             let market = self.get_mut(market_token).ok_or_else(|| {
                 msg!("Swap Error: missing market account for {}", market_token);
-                error!(DataStoreError::MissingMarketAccount)
+                error!(StoreError::MissingMarketAccount)
             })?;
             if idx != 0 {
                 market
                     .record_transferred_in_by_token(token_in, token_in_amount)
-                    .map_err(GmxCoreError::from)?;
+                    .map_err(ModelError::from)?;
             }
             let side = market.market_meta().to_token_side(token_in)?;
             let prices = oracle.market_prices(market)?;
             let report = market
                 .swap(side, (*token_in_amount).into(), prices)
-                .map_err(GmxCoreError::from)?
+                .map_err(ModelError::from)?
                 .execute()
-                .map_err(GmxCoreError::from)?;
+                .map_err(ModelError::from)?;
             msg!("[Swap] swap along the path: {:?}", report);
             *token_in = *market.market_meta().opposite_token(token_in)?;
             *token_in_amount = (*report.token_out_amount())
                 .try_into()
-                .map_err(|_| error!(DataStoreError::AmountOverflow))?;
+                .map_err(|_| error!(StoreError::AmountOverflow))?;
             // Only validate the market without extra balances.
             if idx != last_idx {
                 market
                     .record_transferred_out_by_token(token_in, token_in_amount)
-                    .map_err(GmxCoreError::from)?;
+                    .map_err(ModelError::from)?;
                 market.validate_market_balances(0, 0)?;
             }
         }
@@ -240,13 +240,13 @@ impl<'a> SwapMarkets<'a> {
     ) -> Result<u64>
     where
         M: Key
-            + gmx_core::Bank<Pubkey, Num = u64>
-            + gmx_core::SwapMarket<{ constants::MARKET_DECIMALS }, Num = u128>
+            + gmsol_model::Bank<Pubkey, Num = u64>
+            + gmsol_model::SwapMarket<{ constants::MARKET_DECIMALS }, Num = u128>
             + HasMarketMeta,
     {
         require!(
             self.get_mut(&direction.current()).is_none(),
-            DataStoreError::InvalidSwapPath
+            StoreError::InvalidSwapPath
         );
         if !path.is_empty() {
             let current = direction.current();
@@ -259,17 +259,17 @@ impl<'a> SwapMarkets<'a> {
                             "Swap Error: missing market account for {}",
                             first_market_token
                         );
-                        error!(DataStoreError::MissingMarketAccount)
+                        error!(StoreError::MissingMarketAccount)
                     })?;
                     // We are assuming that they are sharing the same vault of `token_in`.
                     from_market
                         .record_transferred_out_by_token(&token_in, &token_in_amount)
-                        .map_err(GmxCoreError::from)?;
+                        .map_err(ModelError::from)?;
                     // FIXME: is this validation needed?
                     from_market.validate_market_balance_for_the_given_token(&token_in, 0)?;
                     first_market
                         .record_transferred_in_by_token(&token_in, &token_in_amount)
-                        .map_err(GmxCoreError::from)?;
+                        .map_err(ModelError::from)?;
                 }
             }
 
@@ -285,17 +285,17 @@ impl<'a> SwapMarkets<'a> {
                                 "Swap Error: missing market account for {}",
                                 first_market_token
                             );
-                            error!(DataStoreError::MissingMarketAccount)
+                            error!(StoreError::MissingMarketAccount)
                         })?;
                     // We are assuming that they are sharing the same vault of `token_in`.
                     direction
                         .current_market_mut()
                         .record_transferred_out_by_token(&token_in, &token_in_amount)
-                        .map_err(GmxCoreError::from)?;
+                        .map_err(ModelError::from)?;
                     // The validation of current market is delayed.
                     first_market
                         .record_transferred_in_by_token(&token_in, &token_in_amount)
-                        .map_err(GmxCoreError::from)?;
+                        .map_err(ModelError::from)?;
                 }
             }
 
@@ -318,12 +318,12 @@ impl<'a> SwapMarkets<'a> {
                         // We are assuming that they are sharing the same vault of `token_in`.
                         last_market
                             .record_transferred_out_by_token(&token_in, &token_in_amount)
-                            .map_err(GmxCoreError::from)?;
+                            .map_err(ModelError::from)?;
                         last_market.validate_market_balances(0, 0)?;
                         direction
                             .current_market_mut()
                             .record_transferred_in_by_token(&token_in, &token_in_amount)
-                            .map_err(GmxCoreError::from)?;
+                            .map_err(ModelError::from)?;
                     }
                     // The validation of current market is delayed.
                     direction.swap_with_current(oracle, &mut token_in, &mut token_in_amount)?;
@@ -335,11 +335,11 @@ impl<'a> SwapMarkets<'a> {
                         // We are assuming that they are sharing the same vault of `token_in`.
                         last_market
                             .record_transferred_out_by_token(&token_in, &token_in_amount)
-                            .map_err(GmxCoreError::from)?;
+                            .map_err(ModelError::from)?;
                         last_market.validate_market_balances(0, 0)?;
                         into_market
                             .record_transferred_in_by_token(&token_in, &token_in_amount)
-                            .map_err(GmxCoreError::from)?;
+                            .map_err(ModelError::from)?;
                     }
                 }
             }
@@ -347,7 +347,7 @@ impl<'a> SwapMarkets<'a> {
         require_eq!(
             token_in,
             expected_token_out,
-            DataStoreError::InvalidSwapPath
+            StoreError::InvalidSwapPath
         );
         Ok(token_in_amount)
     }
@@ -398,7 +398,7 @@ where
 
 impl<'a, M> SwapDirection<'a, M>
 where
-    M: HasMarketMeta + gmx_core::SwapMarket<{ constants::MARKET_DECIMALS }, Num = u128>,
+    M: HasMarketMeta + gmsol_model::SwapMarket<{ constants::MARKET_DECIMALS }, Num = u128>,
 {
     fn swap_with_current(
         &mut self,
@@ -413,19 +413,19 @@ where
         let prices = oracle.market_prices(*current)?;
         let report = current
             .swap(side, (*token_in_amount).into(), prices)
-            .map_err(GmxCoreError::from)?
+            .map_err(ModelError::from)?
             .execute()
-            .map_err(GmxCoreError::from)?;
+            .map_err(ModelError::from)?;
         msg!("[Swap] in current market: {:?}", report);
         *token_in_amount = (*report.token_out_amount())
             .try_into()
-            .map_err(|_| error!(DataStoreError::AmountOverflow))?;
+            .map_err(|_| error!(StoreError::AmountOverflow))?;
         *token_in = *current.market_meta().opposite_token(token_in)?;
         Ok(())
     }
 }
 
-/// Convert a [`RevertibleMarket`] to a [`SwapMarket`](gmx_core::SwapMarket).
+/// Convert a [`RevertibleMarket`] to a [`SwapMarket`](gmsol_model::SwapMarket).
 pub struct RevertibleSwapMarket<'a> {
     pub(super) market: RevertibleMarket<'a>,
     open_interest: (RevertiblePool, RevertiblePool),
@@ -476,34 +476,34 @@ impl<'a> RevertibleSwapMarket<'a> {
     }
 }
 
-impl<'a> gmx_core::BaseMarket<{ constants::MARKET_DECIMALS }> for RevertibleSwapMarket<'a> {
+impl<'a> gmsol_model::BaseMarket<{ constants::MARKET_DECIMALS }> for RevertibleSwapMarket<'a> {
     type Num = u128;
 
     type Signed = i128;
 
     type Pool = RevertiblePool;
 
-    fn liquidity_pool(&self) -> gmx_core::Result<&Self::Pool> {
+    fn liquidity_pool(&self) -> gmsol_model::Result<&Self::Pool> {
         self.market.liquidity_pool()
     }
 
-    fn liquidity_pool_mut(&mut self) -> gmx_core::Result<&mut Self::Pool> {
+    fn liquidity_pool_mut(&mut self) -> gmsol_model::Result<&mut Self::Pool> {
         self.market.liquidity_pool_mut()
     }
 
-    fn claimable_fee_pool(&self) -> gmx_core::Result<&Self::Pool> {
+    fn claimable_fee_pool(&self) -> gmsol_model::Result<&Self::Pool> {
         self.market.claimable_fee_pool()
     }
 
-    fn claimable_fee_pool_mut(&mut self) -> gmx_core::Result<&mut Self::Pool> {
+    fn claimable_fee_pool_mut(&mut self) -> gmsol_model::Result<&mut Self::Pool> {
         self.market.claimable_fee_pool_mut()
     }
 
-    fn swap_impact_pool(&self) -> gmx_core::Result<&Self::Pool> {
+    fn swap_impact_pool(&self) -> gmsol_model::Result<&Self::Pool> {
         self.market.swap_impact_pool()
     }
 
-    fn open_interest_pool(&self, is_long: bool) -> gmx_core::Result<&Self::Pool> {
+    fn open_interest_pool(&self, is_long: bool) -> gmsol_model::Result<&Self::Pool> {
         Ok(if is_long {
             &self.open_interest.0
         } else {
@@ -511,7 +511,7 @@ impl<'a> gmx_core::BaseMarket<{ constants::MARKET_DECIMALS }> for RevertibleSwap
         })
     }
 
-    fn open_interest_in_tokens_pool(&self, is_long: bool) -> gmx_core::Result<&Self::Pool> {
+    fn open_interest_in_tokens_pool(&self, is_long: bool) -> gmsol_model::Result<&Self::Pool> {
         Ok(if is_long {
             &self.open_interest_in_tokens.0
         } else {
@@ -523,45 +523,45 @@ impl<'a> gmx_core::BaseMarket<{ constants::MARKET_DECIMALS }> for RevertibleSwap
         self.market.usd_to_amount_divisor()
     }
 
-    fn max_pool_amount(&self, is_long_token: bool) -> gmx_core::Result<Self::Num> {
+    fn max_pool_amount(&self, is_long_token: bool) -> gmsol_model::Result<Self::Num> {
         self.market.max_pool_amount(is_long_token)
     }
 
     fn max_pnl_factor(
         &self,
-        kind: gmx_core::PnlFactorKind,
+        kind: gmsol_model::PnlFactorKind,
         is_long: bool,
-    ) -> gmx_core::Result<Self::Num> {
+    ) -> gmsol_model::Result<Self::Num> {
         self.market.max_pnl_factor(kind, is_long)
     }
 
-    fn reserve_factor(&self) -> gmx_core::Result<Self::Num> {
+    fn reserve_factor(&self) -> gmsol_model::Result<Self::Num> {
         self.market.reserve_factor()
     }
 }
 
-impl<'a> gmx_core::SwapMarket<{ constants::MARKET_DECIMALS }> for RevertibleSwapMarket<'a> {
-    fn swap_impact_params(&self) -> gmx_core::Result<PriceImpactParams<Self::Num>> {
+impl<'a> gmsol_model::SwapMarket<{ constants::MARKET_DECIMALS }> for RevertibleSwapMarket<'a> {
+    fn swap_impact_params(&self) -> gmsol_model::Result<PriceImpactParams<Self::Num>> {
         self.market.swap_impact_params()
     }
 
-    fn swap_fee_params(&self) -> gmx_core::Result<FeeParams<Self::Num>> {
+    fn swap_fee_params(&self) -> gmsol_model::Result<FeeParams<Self::Num>> {
         self.market.swap_fee_params()
     }
 
-    fn swap_impact_pool_mut(&mut self) -> gmx_core::Result<&mut Self::Pool> {
+    fn swap_impact_pool_mut(&mut self) -> gmsol_model::Result<&mut Self::Pool> {
         Ok(&mut self.market.swap_impact)
     }
 }
 
-impl<'a> gmx_core::Bank<Pubkey> for RevertibleSwapMarket<'a> {
+impl<'a> gmsol_model::Bank<Pubkey> for RevertibleSwapMarket<'a> {
     type Num = u64;
 
     fn record_transferred_in_by_token<Q: std::borrow::Borrow<Pubkey> + ?Sized>(
         &mut self,
         token: &Q,
         amount: &Self::Num,
-    ) -> gmx_core::Result<()> {
+    ) -> gmsol_model::Result<()> {
         self.market
             .record_transferred_in_by_token(token.borrow(), amount)
     }
@@ -570,7 +570,7 @@ impl<'a> gmx_core::Bank<Pubkey> for RevertibleSwapMarket<'a> {
         &mut self,
         token: &Q,
         amount: &Self::Num,
-    ) -> gmx_core::Result<()> {
+    ) -> gmsol_model::Result<()> {
         self.market
             .record_transferred_out_by_token(token.borrow(), amount)
     }
@@ -578,7 +578,7 @@ impl<'a> gmx_core::Bank<Pubkey> for RevertibleSwapMarket<'a> {
     fn balance<Q: std::borrow::Borrow<Pubkey> + ?Sized>(
         &self,
         token: &Q,
-    ) -> gmx_core::Result<Self::Num> {
+    ) -> gmsol_model::Result<Self::Num> {
         self.market.balance(token)
     }
 }

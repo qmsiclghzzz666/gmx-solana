@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::Mint;
-use gmx_core::{
+use gmsol_model::{
     params::{position::PositionImpactDistributionParams, PriceImpactParams},
     ClockKind, PoolKind,
 };
@@ -13,7 +13,7 @@ use crate::{
 
 use super::{swap_market::RevertibleSwapMarket, Revertible, RevertibleMarket, RevertiblePool};
 
-/// Convert a [`RevertibleMarket`] to a [`LiquidityMarket`](gmx_core::LiquidityMarket).
+/// Convert a [`RevertibleMarket`] to a [`LiquidityMarket`](gmsol_model::LiquidityMarket).
 pub struct RevertibleLiquidityMarket<'a, 'info> {
     market: RevertibleSwapMarket<'a>,
     market_token: &'a mut Account<'info, Mint>,
@@ -42,14 +42,14 @@ impl<'a, 'info> HasMarketMeta for RevertibleLiquidityMarket<'a, 'info> {
     }
 }
 
-impl<'a, 'info> gmx_core::Bank<Pubkey> for RevertibleLiquidityMarket<'a, 'info> {
+impl<'a, 'info> gmsol_model::Bank<Pubkey> for RevertibleLiquidityMarket<'a, 'info> {
     type Num = u64;
 
     fn record_transferred_in_by_token<Q: std::borrow::Borrow<Pubkey> + ?Sized>(
         &mut self,
         token: &Q,
         amount: &Self::Num,
-    ) -> gmx_core::Result<()> {
+    ) -> gmsol_model::Result<()> {
         self.market.record_transferred_in_by_token(token, amount)
     }
 
@@ -57,14 +57,14 @@ impl<'a, 'info> gmx_core::Bank<Pubkey> for RevertibleLiquidityMarket<'a, 'info> 
         &mut self,
         token: &Q,
         amount: &Self::Num,
-    ) -> gmx_core::Result<()> {
+    ) -> gmsol_model::Result<()> {
         self.market.record_transferred_out_by_token(token, amount)
     }
 
     fn balance<Q: std::borrow::Borrow<Pubkey> + ?Sized>(
         &self,
         token: &Q,
-    ) -> gmx_core::Result<Self::Num> {
+    ) -> gmsol_model::Result<Self::Num> {
         self.market.balance(token)
     }
 }
@@ -117,7 +117,7 @@ impl<'a, 'info> RevertibleLiquidityMarket<'a, 'info> {
     }
 }
 
-impl<'a, 'info> gmx_core::BaseMarket<{ constants::MARKET_DECIMALS }>
+impl<'a, 'info> gmsol_model::BaseMarket<{ constants::MARKET_DECIMALS }>
     for RevertibleLiquidityMarket<'a, 'info>
 {
     type Num = u128;
@@ -126,31 +126,31 @@ impl<'a, 'info> gmx_core::BaseMarket<{ constants::MARKET_DECIMALS }>
 
     type Pool = RevertiblePool;
 
-    fn liquidity_pool(&self) -> gmx_core::Result<&Self::Pool> {
+    fn liquidity_pool(&self) -> gmsol_model::Result<&Self::Pool> {
         self.market.liquidity_pool()
     }
 
-    fn liquidity_pool_mut(&mut self) -> gmx_core::Result<&mut Self::Pool> {
+    fn liquidity_pool_mut(&mut self) -> gmsol_model::Result<&mut Self::Pool> {
         self.market.liquidity_pool_mut()
     }
 
-    fn claimable_fee_pool(&self) -> gmx_core::Result<&Self::Pool> {
+    fn claimable_fee_pool(&self) -> gmsol_model::Result<&Self::Pool> {
         self.market.claimable_fee_pool()
     }
 
-    fn claimable_fee_pool_mut(&mut self) -> gmx_core::Result<&mut Self::Pool> {
+    fn claimable_fee_pool_mut(&mut self) -> gmsol_model::Result<&mut Self::Pool> {
         self.market.claimable_fee_pool_mut()
     }
 
-    fn swap_impact_pool(&self) -> gmx_core::Result<&Self::Pool> {
+    fn swap_impact_pool(&self) -> gmsol_model::Result<&Self::Pool> {
         self.market.swap_impact_pool()
     }
 
-    fn open_interest_pool(&self, is_long: bool) -> gmx_core::Result<&Self::Pool> {
+    fn open_interest_pool(&self, is_long: bool) -> gmsol_model::Result<&Self::Pool> {
         self.market.open_interest_pool(is_long)
     }
 
-    fn open_interest_in_tokens_pool(&self, is_long: bool) -> gmx_core::Result<&Self::Pool> {
+    fn open_interest_in_tokens_pool(&self, is_long: bool) -> gmsol_model::Result<&Self::Pool> {
         self.market.open_interest_in_tokens_pool(is_long)
     }
 
@@ -158,49 +158,49 @@ impl<'a, 'info> gmx_core::BaseMarket<{ constants::MARKET_DECIMALS }>
         self.market.usd_to_amount_divisor()
     }
 
-    fn max_pool_amount(&self, is_long_token: bool) -> gmx_core::Result<Self::Num> {
+    fn max_pool_amount(&self, is_long_token: bool) -> gmsol_model::Result<Self::Num> {
         self.market.max_pool_amount(is_long_token)
     }
 
     fn max_pnl_factor(
         &self,
-        kind: gmx_core::PnlFactorKind,
+        kind: gmsol_model::PnlFactorKind,
         is_long: bool,
-    ) -> gmx_core::Result<Self::Num> {
+    ) -> gmsol_model::Result<Self::Num> {
         self.market.max_pnl_factor(kind, is_long)
     }
 
-    fn reserve_factor(&self) -> gmx_core::Result<Self::Num> {
+    fn reserve_factor(&self) -> gmsol_model::Result<Self::Num> {
         self.market.reserve_factor()
     }
 }
 
-impl<'a, 'info> gmx_core::SwapMarket<{ constants::MARKET_DECIMALS }>
+impl<'a, 'info> gmsol_model::SwapMarket<{ constants::MARKET_DECIMALS }>
     for RevertibleLiquidityMarket<'a, 'info>
 {
     fn swap_impact_params(
         &self,
-    ) -> gmx_core::Result<gmx_core::params::PriceImpactParams<Self::Num>> {
+    ) -> gmsol_model::Result<gmsol_model::params::PriceImpactParams<Self::Num>> {
         self.market.swap_impact_params()
     }
 
-    fn swap_fee_params(&self) -> gmx_core::Result<gmx_core::params::FeeParams<Self::Num>> {
+    fn swap_fee_params(&self) -> gmsol_model::Result<gmsol_model::params::FeeParams<Self::Num>> {
         self.market.swap_fee_params()
     }
 
-    fn swap_impact_pool_mut(&mut self) -> gmx_core::Result<&mut Self::Pool> {
+    fn swap_impact_pool_mut(&mut self) -> gmsol_model::Result<&mut Self::Pool> {
         self.market.swap_impact_pool_mut()
     }
 }
 
-impl<'a, 'info> gmx_core::LiquidityMarket<{ constants::MARKET_DECIMALS }>
+impl<'a, 'info> gmsol_model::LiquidityMarket<{ constants::MARKET_DECIMALS }>
     for RevertibleLiquidityMarket<'a, 'info>
 {
     fn total_supply(&self) -> Self::Num {
         self.market_token.supply.into()
     }
 
-    fn max_pool_value_for_deposit(&self, is_long_token: bool) -> gmx_core::Result<Self::Num> {
+    fn max_pool_value_for_deposit(&self, is_long_token: bool) -> gmsol_model::Result<Self::Num> {
         if is_long_token {
             Ok(self
                 .market
@@ -216,63 +216,63 @@ impl<'a, 'info> gmx_core::LiquidityMarket<{ constants::MARKET_DECIMALS }>
         }
     }
 
-    fn mint(&mut self, amount: &Self::Num) -> gmx_core::Result<()> {
+    fn mint(&mut self, amount: &Self::Num) -> gmsol_model::Result<()> {
         let new_mint: u64 = (*amount)
             .try_into()
-            .map_err(|_| gmx_core::Error::Overflow)?;
+            .map_err(|_| gmsol_model::Error::Overflow)?;
         let to_mint = self
             .to_mint
             .checked_add(new_mint)
-            .ok_or(gmx_core::Error::Overflow)?;
+            .ok_or(gmsol_model::Error::Overflow)?;
         // CHECK for overflow.
         self.market_token
             .supply
             .checked_add(to_mint)
-            .ok_or(gmx_core::Error::Overflow)?;
+            .ok_or(gmsol_model::Error::Overflow)?;
         self.to_mint = to_mint;
         Ok(())
     }
 
-    fn burn(&mut self, amount: &Self::Num) -> gmx_core::Result<()> {
+    fn burn(&mut self, amount: &Self::Num) -> gmsol_model::Result<()> {
         let new_burn: u64 = (*amount)
             .try_into()
-            .map_err(|_| gmx_core::Error::Overflow)?;
+            .map_err(|_| gmsol_model::Error::Overflow)?;
         let to_burn = self
             .to_burn
             .checked_add(new_burn)
-            .ok_or(gmx_core::Error::Overflow)?;
+            .ok_or(gmsol_model::Error::Overflow)?;
         // CHECK for underflow.
         self.market_token
             .supply
             .checked_sub(to_burn)
-            .ok_or(gmx_core::Error::Underflow)?;
+            .ok_or(gmsol_model::Error::Underflow)?;
         self.to_burn = to_burn;
         Ok(())
     }
 }
 
-impl<'a, 'info> gmx_core::PositionImpactMarket<{ constants::MARKET_DECIMALS }>
+impl<'a, 'info> gmsol_model::PositionImpactMarket<{ constants::MARKET_DECIMALS }>
     for RevertibleLiquidityMarket<'a, 'info>
 {
-    fn position_impact_pool(&self) -> gmx_core::Result<&Self::Pool> {
+    fn position_impact_pool(&self) -> gmsol_model::Result<&Self::Pool> {
         Ok(&self.position_impact)
     }
 
-    fn position_impact_pool_mut(&mut self) -> gmx_core::Result<&mut Self::Pool> {
+    fn position_impact_pool_mut(&mut self) -> gmsol_model::Result<&mut Self::Pool> {
         Ok(&mut self.position_impact)
     }
 
-    fn just_passed_in_seconds_for_position_impact_distribution(&mut self) -> gmx_core::Result<u64> {
+    fn just_passed_in_seconds_for_position_impact_distribution(&mut self) -> gmsol_model::Result<u64> {
         AsClock::from(&mut self.position_impact_distribution_clock).just_passed_in_seconds()
     }
 
-    fn position_impact_params(&self) -> gmx_core::Result<PriceImpactParams<Self::Num>> {
+    fn position_impact_params(&self) -> gmsol_model::Result<PriceImpactParams<Self::Num>> {
         self.market.market.position_impact_params()
     }
 
     fn position_impact_distribution_params(
         &self,
-    ) -> gmx_core::Result<PositionImpactDistributionParams<Self::Num>> {
+    ) -> gmsol_model::Result<PositionImpactDistributionParams<Self::Num>> {
         self.market.market.position_impact_distribution_params()
     }
 }

@@ -8,7 +8,7 @@ use bitmaps::Bitmap;
 
 use crate::{
     utils::fixed_str::{bytes_to_fixed_str, fixed_str_to_bytes},
-    DataStoreError,
+    StoreError,
 };
 
 use super::{InitSpace, PriceProviderKind};
@@ -68,12 +68,9 @@ impl TokenConfig {
     /// Get the corresponding price feed config.
     pub fn get_feed_config(&self, kind: &PriceProviderKind) -> Result<&FeedConfig> {
         let index = *kind as usize;
-        let config = self
-            .feeds
-            .get(index)
-            .ok_or(DataStoreError::PriceFeedNotSet)?;
+        let config = self.feeds.get(index).ok_or(StoreError::PriceFeedNotSet)?;
         if config.feed == Pubkey::default() {
-            err!(DataStoreError::PriceFeedNotSet)
+            err!(StoreError::PriceFeedNotSet)
         } else {
             Ok(config)
         }
@@ -89,7 +86,7 @@ impl TokenConfig {
         let config = self
             .feeds
             .get_mut(index)
-            .ok_or(DataStoreError::InvalidProviderKindIndex)?;
+            .ok_or(StoreError::InvalidProviderKindIndex)?;
         *config = new_config;
         Ok(())
     }
@@ -107,7 +104,7 @@ impl TokenConfig {
     /// Get expected price provider kind.
     pub fn expected_provider(&self) -> Result<PriceProviderKind> {
         let kind = PriceProviderKind::try_from(self.expected_provider)
-            .map_err(|_| DataStoreError::InvalidProviderKindIndex)?;
+            .map_err(|_| StoreError::InvalidProviderKindIndex)?;
         Ok(kind)
     }
 
@@ -162,16 +159,10 @@ impl TokenConfig {
         init: bool,
     ) -> Result<()> {
         if init {
-            require!(
-                !self.flag(Flag::Initialized),
-                DataStoreError::InvalidArgument
-            );
+            require!(!self.flag(Flag::Initialized), StoreError::InvalidArgument);
             self.set_flag(Flag::Initialized, true);
         } else {
-            require!(
-                self.flag(Flag::Initialized),
-                DataStoreError::InvalidArgument
-            );
+            require!(self.flag(Flag::Initialized), StoreError::InvalidArgument);
         }
         let TokenConfigBuilder {
             heartbeat_duration,
@@ -189,7 +180,7 @@ impl TokenConfig {
             .map(FeedConfig::new)
             .collect::<Vec<_>>()
             .try_into()
-            .map_err(|_| error!(DataStoreError::InvalidArgument))?;
+            .map_err(|_| error!(StoreError::InvalidArgument))?;
         self.expected_provider = expected_provider.unwrap_or(PriceProviderKind::default() as u8);
         self.heartbeat_duration = heartbeat_duration;
         Ok(())
@@ -280,7 +271,7 @@ impl TokenConfigBuilder {
         let feed = self
             .feeds
             .get_mut(index)
-            .ok_or(DataStoreError::PriceFeedNotSet)?;
+            .ok_or(StoreError::PriceFeedNotSet)?;
         *feed = new_feed;
         Ok(self)
     }
@@ -351,9 +342,9 @@ impl TokenMapHeader {
             .tokens
             .len()
             .checked_add(1)
-            .ok_or(error!(DataStoreError::ExceedMaxLengthLimit))?
+            .ok_or(error!(StoreError::ExceedMaxLengthLimit))?
             .try_into()
-            .map_err(|_| error!(DataStoreError::AmountOverflow))?;
+            .map_err(|_| error!(StoreError::AmountOverflow))?;
         Ok(Self::space(num_configs))
     }
 
@@ -456,13 +447,10 @@ impl<'a> TokenMapMutAccess for TokenMapMut<'a> {
     ) -> Result<()> {
         let index = if new {
             let next_index = self.header.tokens.len();
-            require!(
-                next_index < MAX_TOKENS,
-                DataStoreError::ExceedMaxLengthLimit
-            );
+            require!(next_index < MAX_TOKENS, StoreError::ExceedMaxLengthLimit);
             let index = next_index
                 .try_into()
-                .map_err(|_| error!(DataStoreError::AmountOverflow))?;
+                .map_err(|_| error!(StoreError::AmountOverflow))?;
             self.header.tokens.insert_with_options(token, index, true)?;
             index
         } else {
@@ -470,13 +458,13 @@ impl<'a> TokenMapMutAccess for TokenMapMut<'a> {
                 .header
                 .tokens
                 .get(token)
-                .ok_or(error!(DataStoreError::RequiredResourceNotFound))?
+                .ok_or(error!(StoreError::RequiredResourceNotFound))?
         };
         let Some(dst) = crate::utils::dynamic_access::get_mut::<TokenConfig>(
             &mut self.configs,
             usize::from(index),
         ) else {
-            return err!(DataStoreError::NoSpaceForNewData);
+            return err!(StoreError::NoSpaceForNewData);
         };
         (f)(dst)
     }

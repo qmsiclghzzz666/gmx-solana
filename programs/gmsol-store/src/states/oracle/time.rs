@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{DataStoreError, StoreResult};
+use crate::{StoreError, StoreResult};
 
 use super::Oracle;
 
@@ -25,7 +25,7 @@ pub trait ValidateOracleTimeExt: ValidateOracleTime {
         };
         if oracle.min_oracle_ts < after {
             msg!("oracle = {}, require >= {}", oracle.min_oracle_ts, after);
-            return Err(DataStoreError::OracleTimestampsAreSmallerThanRequired);
+            return Err(StoreError::OracleTimestampsAreSmallerThanRequired);
         }
         Ok(())
     }
@@ -37,7 +37,7 @@ pub trait ValidateOracleTimeExt: ValidateOracleTime {
         };
         if before < oracle.max_oracle_ts {
             msg!("oracle = {}, require <= {}", oracle.max_oracle_ts, before);
-            return Err(DataStoreError::OracleTimestampsAreLargerThanRequired);
+            return Err(StoreError::OracleTimestampsAreLargerThanRequired);
         }
         Ok(())
     }
@@ -45,14 +45,14 @@ pub trait ValidateOracleTimeExt: ValidateOracleTime {
     /// Validate min oracle updated slot.
     fn validate_min_oracle_slot(&self, oracle: &Oracle) -> StoreResult<()> {
         let Some(min_slot) = oracle.min_oracle_slot else {
-            return Err(DataStoreError::OracleNotUpdated);
+            return Err(StoreError::OracleNotUpdated);
         };
         let Some(after) = self.oracle_updated_after_slot()? else {
             return Ok(());
         };
         if min_slot < after {
             msg!("oracle = {}, require >= {}", min_slot, after);
-            return Err(DataStoreError::InvalidOracleSlot);
+            return Err(StoreError::InvalidOracleSlot);
         }
         Ok(())
     }

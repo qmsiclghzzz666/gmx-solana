@@ -73,7 +73,7 @@ gmsol-store = { workspace = true, features = [
     "enum-iter",
 ] }
 gmsol-exchange = { workspace = true, features = ["no-entrypoint", "debug"] }
-gmx-core = { path = "../gmx-core" }
+gmsol-model = { workspace = true }
 
 pyth-sdk = { workspace = true }
 typed-builder = { workspace = true }

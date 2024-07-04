@@ -2,7 +2,7 @@ use std::ops::Deref;
 
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token, TokenAccount};
-use gmx_core::{action::Prices, Position as _, PositionExt, PositionImpactMarketExt};
+use gmsol_model::{action::Prices, Position as _, PositionExt, PositionImpactMarketExt};
 
 use crate::{
     constants,
@@ -19,7 +19,7 @@ use crate::{
         HasMarketMeta, Market, Oracle, Seed, Store, ValidateOracleTime,
     },
     utils::internal,
-    DataStoreError, GmxCoreError, StoreResult,
+    StoreError, ModelError, StoreResult,
 };
 
 type ShouldRemovePosition = bool;
@@ -174,7 +174,7 @@ pub fn execute_order<'info>(
 ) -> Result<(ShouldRemovePosition, Box<TransferOut>)> {
     match ctx.accounts.validate_oracle() {
         Ok(()) => {}
-        Err(DataStoreError::OracleTimestampsAreLargerThanRequired) if !throw_on_execution_error => {
+        Err(StoreError::OracleTimestampsAreLargerThanRequired) if !throw_on_execution_error => {
             msg!(
                 "Order expired at {}",
                 ctx.accounts
@@ -225,9 +225,9 @@ impl<'info> ValidateOracleTime for ExecuteOrder<'info> {
                 let position = self
                     .position
                     .as_ref()
-                    .ok_or(DataStoreError::PositionNotProvided)?
+                    .ok_or(StoreError::PositionNotProvided)?
                     .load()
-                    .map_err(|_| DataStoreError::LoadAccountError)?;
+                    .map_err(|_| StoreError::LoadAccountError)?;
                 position.state.increased_at.max(position.state.decreased_at)
             }
         };
@@ -244,7 +244,7 @@ impl<'info> ValidateOracleTime for ExecuteOrder<'info> {
         ts.map(|ts| {
             self.store
                 .load()
-                .map_err(|_| DataStoreError::LoadAccountError)?
+                .map_err(|_| StoreError::LoadAccountError)?
                 .request_expiration_at(ts)
         })
         .transpose()
@@ -287,9 +287,9 @@ impl<'info> ExecuteOrder<'info> {
         {
             let report = market
                 .distribute_position_impact()
-                .map_err(GmxCoreError::from)?
+                .map_err(ModelError::from)?
                 .execute()
-                .map_err(GmxCoreError::from)?;
+                .map_err(ModelError::from)?;
             msg!("[Order] pre-execute: {:?}", report);
         }
 
@@ -306,7 +306,7 @@ impl<'info> ExecuteOrder<'info> {
                     market,
                     self.position
                         .as_ref()
-                        .ok_or(error!(DataStoreError::PositionIsNotProvided))?,
+                        .ok_or(error!(StoreError::PositionIsNotProvided))?,
                 )?;
 
                 let should_remove_position = match kind {
@@ -358,17 +358,17 @@ impl<'info> ExecuteOrder<'info> {
         Ok(Prices {
             index_token_price: oracle
                 .get(&meta.index_token_mint)
-                .ok_or(DataStoreError::MissingOracelPrice)?
+                .ok_or(StoreError::MissingOracelPrice)?
                 .max
                 .to_unit_price(),
             long_token_price: oracle
                 .get(&meta.long_token_mint)
-                .ok_or(DataStoreError::MissingOracelPrice)?
+                .ok_or(StoreError::MissingOracelPrice)?
                 .max
                 .to_unit_price(),
             short_token_price: oracle
                 .get(&meta.short_token_mint)
-                .ok_or(DataStoreError::MissingOracelPrice)?
+                .ok_or(StoreError::MissingOracelPrice)?
                 .max
                 .to_unit_price(),
         })
@@ -394,7 +394,7 @@ fn execute_increase_position(
         let swap = &order.swap;
         require!(
             swap.short_token_swap_path.is_empty(),
-            DataStoreError::InvalidSwapPath
+            StoreError::InvalidSwapPath
         );
         let collateral_token = *position.collateral_token();
         let (collateral_increment_amount, _) = swap_markets.revertible_swap(
@@ -420,7 +420,7 @@ fn execute_increase_position(
                 acceptable_price,
             )
             .and_then(|a| a.execute())
-            .map_err(GmxCoreError::from)?;
+            .map_err(ModelError::from)?;
         msg!("[Position] increased: {:?}", report);
         let (long_amount, short_amount) = report.claimable_funding_amounts();
         (*long_amount, *short_amount)
@@ -432,10 +432,10 @@ fn execute_increase_position(
     position.market().validate_market_balances(
         long_amount
             .try_into()
-            .map_err(|_| error!(DataStoreError::AmountOverflow))?,
+            .map_err(|_| error!(StoreError::AmountOverflow))?,
         short_amount
             .try_into()
-            .map_err(|_| error!(DataStoreError::AmountOverflow))?,
+            .map_err(|_| error!(StoreError::AmountOverflow))?,
     )?;
 
     order.fixed.params.initial_collateral_delta_amount = 0;
@@ -469,7 +469,7 @@ fn execute_decrease_position(
                 is_liquidation_order,
             )
             .and_then(|a| a.execute())
-            .map_err(GmxCoreError::from)?;
+            .map_err(ModelError::from)?;
         msg!("[Position] decreased: {:?}", report);
         report
     };
@@ -480,16 +480,16 @@ fn execute_decrease_position(
         require!(
             *report.secondary_output_amount() == 0
                 || (report.is_output_token_long() != report.is_secondary_output_token_long()),
-            DataStoreError::SameSecondaryTokensNotMerged,
+            StoreError::SameSecondaryTokensNotMerged,
         );
         let (is_output_token_long, output_amount, secondary_output_amount) = (
             report.is_output_token_long(),
             (*report.output_amount())
                 .try_into()
-                .map_err(|_| error!(DataStoreError::AmountOverflow))?,
+                .map_err(|_| error!(StoreError::AmountOverflow))?,
             (*report.secondary_output_amount())
                 .try_into()
-                .map_err(|_| error!(DataStoreError::AmountOverflow))?,
+                .map_err(|_| error!(StoreError::AmountOverflow))?,
         );
 
         // Swap output token to the expected output token.
@@ -512,7 +512,7 @@ fn execute_decrease_position(
                     .fixed
                     .tokens
                     .final_output_token
-                    .ok_or(error!(DataStoreError::MissingTokenMint))?,
+                    .ok_or(error!(StoreError::MissingTokenMint))?,
                 order.fixed.tokens.secondary_output_token,
             ),
             token_ins,
@@ -540,7 +540,7 @@ fn execute_decrease_position(
         };
         *acc = acc
             .checked_add(amount)
-            .ok_or(error!(DataStoreError::AmountOverflow))?;
+            .ok_or(error!(StoreError::AmountOverflow))?;
         Result::Ok(())
     };
     let current_market_token = position.market().key();
@@ -560,7 +560,7 @@ fn execute_decrease_position(
                 tokens
                     .final_output_token
                     .as_ref()
-                    .ok_or(error!(DataStoreError::InvalidArgument))?,
+                    .ok_or(error!(StoreError::InvalidArgument))?,
             )?,
             transfer_out.final_output_token,
         )?;
@@ -586,7 +586,7 @@ fn get_pnl_token(
 ) -> Result<Pubkey> {
     let is_long = position
         .as_ref()
-        .ok_or(error!(DataStoreError::MissingPosition))?
+        .ok_or(error!(StoreError::MissingPosition))?
         .load()?
         .is_long()?;
     if is_long {
@@ -600,7 +600,7 @@ fn check_delegation(account: &TokenAccount, target: Pubkey) -> Result<bool> {
     let is_matched = account
         .delegate
         .map(|delegate| delegate == target)
-        .ok_or(error!(DataStoreError::NoDelegatedAuthorityIsSet))?;
+        .ok_or(error!(StoreError::NoDelegatedAuthorityIsSet))?;
     Ok(is_matched)
 }
 
@@ -611,6 +611,6 @@ fn validated_recent_timestamp(config: &Store, timestamp: i64) -> Result<i64> {
     if timestamp <= clock.unix_timestamp && clock.unix_timestamp <= expiration_time {
         Ok(timestamp)
     } else {
-        err!(DataStoreError::InvalidArgument)
+        err!(StoreError::InvalidArgument)
     }
 }

@@ -10,7 +10,7 @@ use crate::{
         Market, NonceBytes, Seed, Store, Withdrawal,
     },
     utils::internal,
-    DataStoreError,
+    StoreError,
 };
 
 #[derive(Accounts)]
@@ -62,7 +62,7 @@ pub fn initialize_withdrawal(
     market_token_amount: u64,
     ui_fee_receiver: Pubkey,
 ) -> Result<()> {
-    require!(market_token_amount != 0, DataStoreError::EmptyWithdrawal);
+    require!(market_token_amount != 0, StoreError::EmptyWithdrawal);
 
     token::transfer(
         CpiContext::new(
@@ -113,9 +113,9 @@ pub struct RemoveWithdrawal<'info> {
     #[account(
         mut,
         close = payer,
-        constraint = withdrawal.fixed.store == store.key() @ DataStoreError::InvalidWithdrawalToRemove,
-        constraint = withdrawal.to_account_info().lamports() >= refund @ DataStoreError::LamportsNotEnough,
-        constraint = withdrawal.fixed.user == user.key() @ DataStoreError::UserMismatch,
+        constraint = withdrawal.fixed.store == store.key() @ StoreError::InvalidWithdrawalToRemove,
+        constraint = withdrawal.to_account_info().lamports() >= refund @ StoreError::LamportsNotEnough,
+        constraint = withdrawal.fixed.user == user.key() @ StoreError::UserMismatch,
         seeds = [
             Withdrawal::SEED,
             store.key().as_ref(),
@@ -133,14 +133,14 @@ pub struct RemoveWithdrawal<'info> {
     #[account(
         mut,
         token::authority = user,
-        constraint = withdrawal.fixed.market_token_account == market_token.key() @ DataStoreError::InvalidWithdrawalToRemove,
+        constraint = withdrawal.fixed.market_token_account == market_token.key() @ StoreError::InvalidWithdrawalToRemove,
     )]
     pub market_token: Option<Account<'info, TokenAccount>>,
     /// The vault saving the market tokens for withdrawal.
     #[account(
         mut,
         token::mint = market_token.as_ref().expect("must provided").mint,
-        constraint = withdrawal.fixed.tokens.market_token == market_token.as_ref().expect("must provided").mint @ DataStoreError::InvalidWithdrawalToRemove,
+        constraint = withdrawal.fixed.tokens.market_token == market_token.as_ref().expect("must provided").mint @ StoreError::InvalidWithdrawalToRemove,
         seeds = [
             constants::MARKET_VAULT_SEED,
             store.key().as_ref(),
@@ -171,14 +171,14 @@ pub fn remove_withdrawal(ctx: Context<RemoveWithdrawal>, refund: u64, reason: &s
                 .market_token_withdrawal_vault
                 .as_ref()
                 .ok_or(error!(
-                    DataStoreError::UnableToTransferOutRemainingWithdrawalAmount
+                    StoreError::UnableToTransferOutRemainingWithdrawalAmount
                 ))?
                 .to_account_info(),
             ctx.accounts
                 .market_token
                 .as_ref()
                 .ok_or(error!(
-                    DataStoreError::UnableToTransferOutRemainingWithdrawalAmount
+                    StoreError::UnableToTransferOutRemainingWithdrawalAmount
                 ))?
                 .to_account_info(),
             amount,

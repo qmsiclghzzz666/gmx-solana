@@ -4,7 +4,7 @@ use gmx_solana_utils::to_seed;
 use crate::{
     states::{DataStoreInitEvent, InitSpace, Seed, Store, TokenMapHeader},
     utils::internal,
-    DataStoreError,
+    StoreError,
 };
 
 #[derive(Accounts)]
@@ -54,7 +54,7 @@ pub fn unchecked_transfer_store_authority(
 ) -> Result<()> {
     require!(
         ctx.accounts.authority.key() != new_authority,
-        DataStoreError::InvalidArgument
+        StoreError::InvalidArgument
     );
     ctx.accounts.store.load_mut()?.authority = new_authority;
     Ok(())

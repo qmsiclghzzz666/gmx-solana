@@ -1,7 +1,7 @@
 use anchor_lang::{prelude::*, solana_program::hash::hashv};
 use dual_vec_map::DualVecMap;
 
-use crate::{states::InitSpace, DataStoreError};
+use crate::{states::InitSpace, StoreError};
 
 /// Store for a dual vec map with a max length.
 #[derive(AnchorDeserialize, AnchorSerialize, Clone)]
@@ -83,7 +83,7 @@ impl<V, const MAX_LEN: usize> MapStore<[u8; 32], V, MAX_LEN> {
         let hash = Self::hash(namespace, key);
         self.as_map_mut()
             .try_insert(hash, value)
-            .map_err(|_| DataStoreError::InvalidArgument)?;
+            .map_err(|_| StoreError::InvalidArgument)?;
         Ok(())
     }
 

@@ -7,7 +7,7 @@ use crate::{
         TokenMapLoader, TokenMapMutAccess,
     },
     utils::internal,
-    DataStoreError,
+    StoreError,
 };
 
 #[derive(Accounts)]
@@ -152,7 +152,7 @@ pub fn unchecked_toggle_token_config(
         .token_map
         .load_token_map_mut()?
         .get_mut(&token)
-        .ok_or(error!(DataStoreError::RequiredResourceNotFound))?
+        .ok_or(error!(StoreError::RequiredResourceNotFound))?
         .set_enabled(enable);
     Ok(())
 }
@@ -188,7 +188,7 @@ pub fn unchecked_set_expected_provider(
         .token_map
         .load_token_map_mut()?
         .get_mut(&token)
-        .ok_or(error!(DataStoreError::RequiredResourceNotFound))?
+        .ok_or(error!(StoreError::RequiredResourceNotFound))?
         .set_expected_provider(provider);
     Ok(())
 }
@@ -226,7 +226,7 @@ pub fn unchecked_set_feed_config(
         .token_map
         .load_token_map_mut()?
         .get_mut(&token)
-        .ok_or(error!(DataStoreError::RequiredResourceNotFound))?
+        .ok_or(error!(StoreError::RequiredResourceNotFound))?
         .set_feed_config(
             provider,
             FeedConfig::new(feed).with_timestamp_adjustment(timestamp_adjustment),
@@ -255,7 +255,7 @@ pub fn is_token_config_enabled(ctx: Context<ReadTokenMap>, token: &Pubkey) -> Re
         .load_token_map()?
         .get(token)
         .map(|config| config.is_enabled())
-        .ok_or(error!(DataStoreError::RequiredResourceNotFound))
+        .ok_or(error!(StoreError::RequiredResourceNotFound))
 }
 
 /// Get expected provider for the given token.
@@ -267,7 +267,7 @@ pub fn token_expected_provider(
         .token_map
         .load_token_map()?
         .get(token)
-        .ok_or(error!(DataStoreError::RequiredResourceNotFound))?
+        .ok_or(error!(StoreError::RequiredResourceNotFound))?
         .expected_provider()
 }
 
@@ -281,7 +281,7 @@ pub fn token_feed(
         .token_map
         .load_token_map()?
         .get(token)
-        .ok_or(error!(DataStoreError::RequiredResourceNotFound))?
+        .ok_or(error!(StoreError::RequiredResourceNotFound))?
         .get_feed(provider)
 }
 
@@ -295,7 +295,7 @@ pub fn token_timestamp_adjustment(
         .token_map
         .load_token_map()?
         .get(token)
-        .ok_or(error!(DataStoreError::RequiredResourceNotFound))?
+        .ok_or(error!(StoreError::RequiredResourceNotFound))?
         .timestamp_adjustment(provider)
 }
 
@@ -305,7 +305,7 @@ pub fn token_name(ctx: Context<ReadTokenMap>, token: &Pubkey) -> Result<String> 
         .token_map
         .load_token_map()?
         .get(token)
-        .ok_or(error!(DataStoreError::RequiredResourceNotFound))?
+        .ok_or(error!(StoreError::RequiredResourceNotFound))?
         .name()
         .map(|s| s.to_owned())
 }
@@ -317,7 +317,7 @@ pub fn token_decimals(ctx: Context<ReadTokenMap>, token: &Pubkey) -> Result<u8> 
         .token_map
         .load_token_map()?
         .get(token)
-        .ok_or(error!(DataStoreError::RequiredResourceNotFound))?
+        .ok_or(error!(StoreError::RequiredResourceNotFound))?
         .token_decimals())
 }
 
@@ -328,7 +328,7 @@ pub fn token_precision(ctx: Context<ReadTokenMap>, token: &Pubkey) -> Result<u8>
         .token_map
         .load_token_map()?
         .get(token)
-        .ok_or(error!(DataStoreError::RequiredResourceNotFound))?
+        .ok_or(error!(StoreError::RequiredResourceNotFound))?
         .precision())
 }
 

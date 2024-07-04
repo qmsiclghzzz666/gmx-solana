@@ -11,7 +11,7 @@ use crate::{
         Market, NonceBytes, Seed, Store,
     },
     utils::internal,
-    DataStoreError,
+    StoreError,
 };
 
 #[derive(Accounts)]
@@ -203,7 +203,7 @@ impl<'info> InitializeOrder<'info> {
         let account = self
             .initial_collateral_token_account
             .as_ref()
-            .ok_or(DataStoreError::MissingSender)?;
+            .ok_or(StoreError::MissingSender)?;
         Ok(account)
     }
 
@@ -211,7 +211,7 @@ impl<'info> InitializeOrder<'info> {
         let account = self
             .final_output_token_account
             .as_ref()
-            .ok_or(DataStoreError::MissingReceivers)?;
+            .ok_or(StoreError::MissingReceivers)?;
         Ok(account)
     }
 
@@ -219,7 +219,7 @@ impl<'info> InitializeOrder<'info> {
         let account = self
             .secondary_output_token_account
             .as_ref()
-            .ok_or(DataStoreError::MissingReceivers)?;
+            .ok_or(StoreError::MissingReceivers)?;
         Ok(account)
     }
 
@@ -234,7 +234,7 @@ impl<'info> InitializeOrder<'info> {
             .meta()
             .validate_collateral_token(output_token)?;
         let (Some(position), Some(bump)) = (self.position.as_ref(), bump) else {
-            return err!(DataStoreError::PositionIsNotProvided);
+            return err!(StoreError::PositionIsNotProvided);
         };
         let maybe_initialized = match position.load_init() {
             Ok(mut position) => {
@@ -273,10 +273,10 @@ impl<'info> InitializeOrder<'info> {
             .meta()
             .validate_collateral_token(output_token)?;
         let (Some(position), Some(bump)) = (self.position.as_ref(), bump) else {
-            return err!(DataStoreError::PositionIsNotProvided);
+            return err!(StoreError::PositionIsNotProvided);
         };
         let position = position.load()?;
-        require_eq!(position.bump, bump, DataStoreError::InvalidPosition);
+        require_eq!(position.bump, bump, StoreError::InvalidPosition);
         Ok(())
     }
 }
@@ -292,9 +292,9 @@ pub struct RemoveOrder<'info> {
     #[account(
         mut,
         close = payer,
-        constraint = order.fixed.store == store.key() @ DataStoreError::InvalidOrderToRemove,
-        constraint = order.to_account_info().lamports() >= refund @ DataStoreError::LamportsNotEnough,
-        constraint = order.fixed.user == user.key() @ DataStoreError::UserMismatch,
+        constraint = order.fixed.store == store.key() @ StoreError::InvalidOrderToRemove,
+        constraint = order.to_account_info().lamports() >= refund @ StoreError::LamportsNotEnough,
+        constraint = order.fixed.user == user.key() @ StoreError::UserMismatch,
         seeds = [
             Order::SEED,
             store.key().as_ref(),

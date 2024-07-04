@@ -27,6 +27,6 @@ anchor-spl = { workspace = true, default-features = false, features = [
     "token",
     "token_2022",
 ] }
-gmx-core = { path = "../../crates/gmx-core", features = ["u128", "solana"] }
+gmsol-model = { workspace = true, features = ["u128", "solana"] }
 gmsol-store = { workspace = true, features = ["cpi"] }
 bytemuck = { workspace = true }

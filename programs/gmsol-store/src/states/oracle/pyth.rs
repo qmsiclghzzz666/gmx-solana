@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use gmx_solana_utils::price::{Decimal, Price};
 use pyth_solana_receiver_sdk::price_update::PriceUpdateV2;
 
-use crate::{states::TokenConfig, DataStoreError};
+use crate::{states::TokenConfig, StoreError};
 
 /// The Pyth receiver program.
 pub struct Pyth;
@@ -33,14 +33,14 @@ impl Pyth {
         let mid_price: u64 = price
             .price
             .try_into()
-            .map_err(|_| DataStoreError::NegativePrice)?;
+            .map_err(|_| StoreError::NegativePrice)?;
         // FIXME: use min and max price when ready.
         let _min_price = mid_price
             .checked_sub(price.conf)
-            .ok_or(DataStoreError::NegativePrice)?;
+            .ok_or(StoreError::NegativePrice)?;
         let _max_price = mid_price
             .checked_add(price.conf)
-            .ok_or(DataStoreError::PriceOverflow)?;
+            .ok_or(StoreError::PriceOverflow)?;
         let parsed_price = Price {
             min: Self::price_value_to_decimal(mid_price, price.exponent, token_config)?,
             max: Self::price_value_to_decimal(mid_price, price.exponent, token_config)?,
@@ -59,14 +59,14 @@ impl Pyth {
         let decimals: u8 = if exponent <= 0 {
             (-exponent)
                 .try_into()
-                .map_err(|_| DataStoreError::InvalidPriceFeedPrice)?
+                .map_err(|_| StoreError::InvalidPriceFeedPrice)?
         } else {
             let factor = 10u64
                 .checked_pow(exponent as u32)
-                .ok_or(DataStoreError::InvalidPriceFeedPrice)?;
+                .ok_or(StoreError::InvalidPriceFeedPrice)?;
             value = value
                 .checked_mul(factor)
-                .ok_or(DataStoreError::PriceOverflow)?;
+                .ok_or(StoreError::PriceOverflow)?;
             0
         };
         let price = Decimal::try_from_price(
@@ -75,7 +75,7 @@ impl Pyth {
             token_config.token_decimals(),
             token_config.precision(),
         )
-        .map_err(|_| DataStoreError::InvalidPriceFeedPrice)?;
+        .map_err(|_| StoreError::InvalidPriceFeedPrice)?;
         Ok(price)
     }
 }
@@ -92,18 +92,18 @@ impl PythLegacy {
         use pyth_sdk_solana::state::SolanaPriceAccount;
         let feed = SolanaPriceAccount::account_info_to_feed(feed).map_err(|err| {
             msg!("Pyth Error: {}", err);
-            DataStoreError::Unknown
+            StoreError::Unknown
         })?;
         let Some(price) = feed.get_price_no_older_than(
             clock.unix_timestamp,
             token_config.heartbeat_duration().into(),
         ) else {
-            return err!(DataStoreError::PriceFeedNotUpdated);
+            return err!(StoreError::PriceFeedNotUpdated);
         };
         let mid_price: u64 = price
             .price
             .try_into()
-            .map_err(|_| DataStoreError::NegativePrice)?;
+            .map_err(|_| StoreError::NegativePrice)?;
         let parsed_price = Price {
             min: Pyth::price_value_to_decimal(mid_price, price.expo, token_config)?,
             max: Pyth::price_value_to_decimal(mid_price, price.expo, token_config)?,

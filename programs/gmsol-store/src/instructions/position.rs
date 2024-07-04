@@ -3,7 +3,7 @@ use anchor_lang::{prelude::*, system_program};
 use crate::{
     states::{Position, Seed, Store},
     utils::internal,
-    DataStoreError,
+    StoreError,
 };
 
 #[derive(Accounts)]
@@ -15,9 +15,9 @@ pub struct RemovePosition<'info> {
     pub store: AccountLoader<'info, Store>,
     #[account(
         mut,
-        constraint = position.to_account_info().lamports() >= refund @ DataStoreError::LamportsNotEnough,
+        constraint = position.to_account_info().lamports() >= refund @ StoreError::LamportsNotEnough,
         close = payer,
-        constraint = position.load()?.owner == user.key() @ DataStoreError::UserMismatch,
+        constraint = position.load()?.owner == user.key() @ StoreError::UserMismatch,
         seeds = [
             Position::SEED,
             store.key().as_ref(),

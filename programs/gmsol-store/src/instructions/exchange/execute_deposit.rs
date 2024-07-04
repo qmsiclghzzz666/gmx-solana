@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token, TokenAccount};
-use gmx_core::{LiquidityMarketExt, PositionImpactMarketExt};
+use gmsol_model::{LiquidityMarketExt, PositionImpactMarketExt};
 
 use crate::{
     states::{
@@ -12,7 +12,7 @@ use crate::{
         Deposit, HasMarketMeta, Market, Oracle, Seed, Store, ValidateOracleTime,
     },
     utils::internal,
-    DataStoreError, GmxCoreError, StoreResult,
+    ModelError, StoreError, StoreResult,
 };
 
 #[derive(Accounts)]
@@ -55,7 +55,7 @@ pub fn execute_deposit<'info>(
 ) -> Result<bool> {
     match ctx.accounts.validate_oracle() {
         Ok(()) => {}
-        Err(DataStoreError::OracleTimestampsAreLargerThanRequired) if !throw_on_execution_error => {
+        Err(StoreError::OracleTimestampsAreLargerThanRequired) if !throw_on_execution_error => {
             msg!(
                 "Deposit expired at {}",
                 ctx.accounts
@@ -100,7 +100,7 @@ impl<'info> ValidateOracleTime for ExecuteDeposit<'info> {
         let ts = self
             .store
             .load()
-            .map_err(|_| DataStoreError::LoadAccountError)?
+            .map_err(|_| StoreError::LoadAccountError)?
             .request_expiration_at(self.deposit.fixed.updated_at)?;
         Ok(Some(ts))
     }
@@ -143,9 +143,9 @@ impl<'info> ExecuteDeposit<'info> {
         {
             let report = market
                 .distribute_position_impact()
-                .map_err(GmxCoreError::from)?
+                .map_err(ModelError::from)?
                 .execute()
-                .map_err(GmxCoreError::from)?;
+                .map_err(ModelError::from)?;
             msg!("[Deposit] pre-execute: {:?}", report);
         }
 
@@ -175,7 +175,7 @@ impl<'info> ExecuteDeposit<'info> {
             let report = market
                 .deposit(long_token_amount.into(), short_token_amount.into(), prices)
                 .and_then(|d| d.execute())
-                .map_err(GmxCoreError::from)?;
+                .map_err(ModelError::from)?;
             market.validate_market_balances(0, 0)?;
             msg!("[Deposit] executed: {:?}", report);
         }

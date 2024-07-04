@@ -1888,8 +1888,8 @@ dependencies = [
  "eyre",
  "futures-util",
  "gmsol-exchange",
+ "gmsol-model",
  "gmsol-store",
- "gmx-core",
  "gmx-solana-utils",
  "heck 0.5.0",
  "hex",
@@ -1923,8 +1923,21 @@ dependencies = [
  "anchor-lang",
  "anchor-spl",
  "bytemuck",
+ "gmsol-model",
  "gmsol-store",
- "gmx-core",
+]
+
+[[package]]
+name = "gmsol-model"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+ "num-traits",
+ "num_enum 0.7.2",
+ "ruint",
+ "rust_decimal",
+ "thiserror",
+ "typed-builder",
 ]
 
 [[package]]
@@ -1938,7 +1951,7 @@ dependencies = [
  "chainlink_solana",
  "clap 4.5.7",
  "dual-vec-map",
- "gmx-core",
+ "gmsol-model",
  "gmx-solana-utils",
  "indexmap 2.2.6",
  "num_enum 0.7.2",
@@ -1948,19 +1961,6 @@ dependencies = [
  "serde",
  "static_assertions",
  "strum",
-]
-
-[[package]]
-name = "gmx-core"
-version = "0.1.0"
-dependencies = [
- "anchor-lang",
- "num-traits",
- "num_enum 0.7.2",
- "ruint",
- "rust_decimal",
- "thiserror",
- "typed-builder",
 ]
 
 [[package]]

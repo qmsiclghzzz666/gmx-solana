@@ -10,7 +10,7 @@ pub struct AsClock<'a> {
 
 impl<'a> AsClock<'a> {
     /// Just passed in seconds.
-    pub fn just_passed_in_seconds(&mut self) -> gmx_core::Result<u64> {
+    pub fn just_passed_in_seconds(&mut self) -> gmsol_model::Result<u64> {
         let current = Clock::get().map_err(Error::from)?.unix_timestamp;
         let duration = current.saturating_sub(*self.last);
         if duration > 0 {

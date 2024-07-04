@@ -15,7 +15,7 @@ pub mod time;
 
 use core::fmt;
 
-use crate::{states::TokenMapAccess, DataStoreError, StoreResult};
+use crate::{states::TokenMapAccess, StoreError, StoreResult};
 use anchor_lang::{prelude::*, Ids};
 use num_enum::TryFromPrimitive;
 
@@ -65,10 +65,10 @@ impl Oracle {
         tokens: &[Pubkey],
         remaining_accounts: &'info [AccountInfo<'info>],
     ) -> Result<()> {
-        require!(self.primary.is_empty(), DataStoreError::PricesAlreadySet);
+        require!(self.primary.is_empty(), StoreError::PricesAlreadySet);
         require!(
             tokens.len() <= PriceMap::MAX_TOKENS,
-            DataStoreError::ExceedMaxLengthLimit
+            StoreError::ExceedMaxLengthLimit
         );
         require!(
             tokens.len() <= remaining_accounts.len(),
@@ -81,10 +81,10 @@ impl Oracle {
             let feed = &remaining_accounts[idx];
             let token_config = map
                 .get(token)
-                .ok_or(DataStoreError::RequiredResourceNotFound)?;
+                .ok_or(StoreError::RequiredResourceNotFound)?;
             require!(
                 token_config.is_enabled(),
-                DataStoreError::TokenConfigDisabled
+                StoreError::TokenConfigDisabled
             );
             require_eq!(token_config.expected_provider()?, *program.kind());
             let (oracle_slot, oracle_ts, price, kind) = match &program {
@@ -92,7 +92,7 @@ impl Oracle {
                     require_eq!(
                         token_config.get_feed(kind)?,
                         feed.key(),
-                        DataStoreError::InvalidPriceFeedAccount
+                        StoreError::InvalidPriceFeedAccount
                     );
                     let (oracle_slot, oracle_ts, price) = Chainlink::check_and_get_chainlink_price(
                         validator.clock(),
@@ -112,7 +112,7 @@ impl Oracle {
                     require_eq!(
                         token_config.get_feed(kind)?,
                         feed.key(),
-                        DataStoreError::InvalidPriceFeedAccount
+                        StoreError::InvalidPriceFeedAccount
                     );
                     // We don't have to check the `feed_id` because the `feed` account is set by the token config keeper.
                     let (oracle_slot, oracle_ts, price) =
@@ -149,7 +149,7 @@ impl Oracle {
     pub(crate) fn validate_time(&self, target: &impl ValidateOracleTime) -> StoreResult<()> {
         if self.max_oracle_ts < self.min_oracle_ts {
             msg!("min = {}, max = {}", self.min_oracle_ts, self.max_oracle_ts);
-            return Err(DataStoreError::InvalidOracleTsTrange);
+            return Err(StoreError::InvalidOracleTsTrange);
         }
         target.validate_min_oracle_slot(self)?;
         target.validate_min_oracle_ts(self)?;
@@ -161,25 +161,25 @@ impl Oracle {
     pub(crate) fn market_prices(
         &self,
         market: &impl HasMarketMeta,
-    ) -> Result<gmx_core::action::Prices<u128>> {
+    ) -> Result<gmsol_model::action::Prices<u128>> {
         let meta = market.market_meta();
-        let prices = gmx_core::action::Prices {
+        let prices = gmsol_model::action::Prices {
             index_token_price: self
                 .primary
                 .get(&meta.index_token_mint)
-                .ok_or(DataStoreError::MissingOracelPrice)?
+                .ok_or(StoreError::MissingOracelPrice)?
                 .max
                 .to_unit_price(),
             long_token_price: self
                 .primary
                 .get(&meta.long_token_mint)
-                .ok_or(DataStoreError::MissingOracelPrice)?
+                .ok_or(StoreError::MissingOracelPrice)?
                 .max
                 .to_unit_price(),
             short_token_price: self
                 .primary
                 .get(&meta.short_token_mint)
-                .ok_or(DataStoreError::MissingOracelPrice)?
+                .ok_or(StoreError::MissingOracelPrice)?
                 .max
                 .to_unit_price(),
         };

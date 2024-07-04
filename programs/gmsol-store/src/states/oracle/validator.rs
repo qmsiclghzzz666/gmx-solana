@@ -3,7 +3,7 @@ use gmx_solana_utils::price::Price;
 
 use crate::{
     states::{Amount, Store, TokenConfig},
-    DataStoreError,
+    StoreError,
 };
 
 use super::PriceProviderKind;
@@ -38,13 +38,13 @@ impl PriceValidator {
         let timestamp_adjustment = token_config.timestamp_adjustment(provider)?.into();
         let ts = oracle_ts
             .checked_sub_unsigned(timestamp_adjustment)
-            .ok_or(DataStoreError::AmountOverflow)?;
+            .ok_or(StoreError::AmountOverflow)?;
 
         let expiration_ts = ts
             .checked_add_unsigned(self.max_age)
-            .ok_or(DataStoreError::AmountOverflow)?;
+            .ok_or(StoreError::AmountOverflow)?;
         if expiration_ts < self.clock.unix_timestamp {
-            return err!(DataStoreError::MaxPriceAgeExceeded);
+            return err!(StoreError::MaxPriceAgeExceeded);
         }
 
         // TODO: validate price with ref price.
@@ -73,13 +73,13 @@ impl PriceValidator {
         let range: u64 = self
             .max_oracle_ts
             .checked_sub(self.min_oracle_ts)
-            .ok_or(error!(DataStoreError::AmountOverflow))?
+            .ok_or(error!(StoreError::AmountOverflow))?
             .try_into()
-            .map_err(|_| error!(DataStoreError::InvalidOracleTsTrange))?;
+            .map_err(|_| error!(StoreError::InvalidOracleTsTrange))?;
         require_gte!(
             self.max_oracle_timestamp_range,
             range,
-            DataStoreError::MaxOracleTimeStampRangeExceeded
+            StoreError::MaxOracleTimeStampRangeExceeded
         );
         Ok(self
             .min_oracle_slot

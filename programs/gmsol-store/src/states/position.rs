@@ -1,4 +1,4 @@
-use crate::DataStoreError;
+use crate::StoreError;
 use anchor_lang::prelude::*;
 use num_enum::TryFromPrimitive;
 
@@ -79,7 +79,7 @@ impl Position {
     /// Get **initialized** position kind.
     pub fn kind(&self) -> Result<PositionKind> {
         match self.kind_unchecked()? {
-            PositionKind::Uninitialized => Err(DataStoreError::PositionNotInitalized.into()),
+            PositionKind::Uninitialized => Err(StoreError::PositionNotInitalized.into()),
             kind => Ok(kind),
         }
     }
@@ -102,10 +102,10 @@ impl Position {
         collateral_token: &Pubkey,
     ) -> Result<()> {
         let PositionKind::Uninitialized = self.kind_unchecked()? else {
-            return err!(DataStoreError::PositionHasBeenInitialized);
+            return err!(StoreError::PositionHasBeenInitialized);
         };
         if matches!(kind, PositionKind::Uninitialized) {
-            return err!(DataStoreError::InvalidPositionInitailziationParams);
+            return err!(StoreError::InvalidPositionInitailziationParams);
         }
         self.kind = kind as u8;
         self.bump = bump;
@@ -138,7 +138,7 @@ impl Position {
 #[non_exhaustive]
 #[repr(u8)]
 #[derive(Clone, Copy, num_enum::IntoPrimitive, num_enum::TryFromPrimitive, PartialEq, Eq)]
-#[num_enum(error_type(name = DataStoreError, constructor = DataStoreError::invalid_position_kind))]
+#[num_enum(error_type(name = StoreError, constructor = StoreError::invalid_position_kind))]
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub enum PositionKind {
     /// Uninitialized.

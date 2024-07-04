@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{states::TokenConfig, utils::chunk_by::chunk_by, DataStoreError};
+use crate::{states::TokenConfig, utils::chunk_by::chunk_by, StoreError};
 
 use super::PriceProviderKind;
 
@@ -63,7 +63,7 @@ impl TokensWithFeed {
         chunks.try_for_each(|chunk| {
             providers.push(chunk[0].provider);
             nums.push(
-                u16::try_from(chunk.len()).map_err(|_| DataStoreError::ExceedMaxLengthLimit)?,
+                u16::try_from(chunk.len()).map_err(|_| StoreError::ExceedMaxLengthLimit)?,
             );
             Result::Ok(())
         })?;

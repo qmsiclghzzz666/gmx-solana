@@ -5,7 +5,7 @@ use anchor_lang::prelude::*;
 use crate::{
     constants,
     states::{position::PositionState, HasMarketMeta, Position},
-    DataStoreError,
+    StoreError,
 };
 
 use super::{perp_market::RevertiblePerpMarket, Revertible};
@@ -30,7 +30,7 @@ impl<'a> RevertiblePosition<'a> {
         require_eq!(
             storage.market_token,
             meta.market_token_mint,
-            DataStoreError::InvalidPositionMarket
+            StoreError::InvalidPositionMarket
         );
 
         let is_long = storage.is_long()?;
@@ -57,7 +57,7 @@ impl<'a> Revertible for RevertiblePosition<'a> {
     }
 }
 
-impl<'a> gmx_core::Position<{ constants::MARKET_DECIMALS }> for RevertiblePosition<'a> {
+impl<'a> gmsol_model::Position<{ constants::MARKET_DECIMALS }> for RevertiblePosition<'a> {
     type Num = u128;
 
     type Signed = i128;
@@ -139,14 +139,14 @@ impl<'a> gmx_core::Position<{ constants::MARKET_DECIMALS }> for RevertiblePositi
         }
     }
 
-    fn increased(&mut self) -> gmx_core::Result<()> {
+    fn increased(&mut self) -> gmsol_model::Result<()> {
         let clock = Clock::get().map_err(Error::from)?;
         self.state.increased_at_slot = clock.slot;
         self.state.increased_at = clock.unix_timestamp;
         Ok(())
     }
 
-    fn decreased(&mut self) -> gmx_core::Result<()> {
+    fn decreased(&mut self) -> gmsol_model::Result<()> {
         let clock = Clock::get().map_err(Error::from)?;
         self.state.decreased_at_slot = clock.slot;
         self.state.decreased_at = clock.unix_timestamp;

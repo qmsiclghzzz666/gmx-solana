@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{states::Market, DataStoreError};
+use crate::{states::Market, StoreError};
 
 /// Balance.
 pub struct RevertibleBalance {
@@ -16,12 +16,12 @@ impl RevertibleBalance {
             self.long_token_balance = self
                 .long_token_balance
                 .checked_add(amount)
-                .ok_or(error!(DataStoreError::AmountOverflow))?;
+                .ok_or(error!(StoreError::AmountOverflow))?;
         } else {
             self.short_token_balance = self
                 .short_token_balance
                 .checked_add(amount)
-                .ok_or(error!(DataStoreError::AmountOverflow))?;
+                .ok_or(error!(StoreError::AmountOverflow))?;
         }
         Ok(())
     }
@@ -32,12 +32,12 @@ impl RevertibleBalance {
             self.long_token_balance = self
                 .long_token_balance
                 .checked_sub(amount)
-                .ok_or(error!(DataStoreError::AmountOverflow))?;
+                .ok_or(error!(StoreError::AmountOverflow))?;
         } else {
             self.short_token_balance = self
                 .short_token_balance
                 .checked_sub(amount)
-                .ok_or(error!(DataStoreError::AmountOverflow))?;
+                .ok_or(error!(StoreError::AmountOverflow))?;
         }
         Ok(())
     }

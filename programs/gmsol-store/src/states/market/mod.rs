@@ -3,11 +3,11 @@ use std::str::FromStr;
 use anchor_lang::{prelude::*, Bump};
 use bitmaps::Bitmap;
 use borsh::{BorshDeserialize, BorshSerialize};
-use gmx_core::{ClockKind, PoolKind};
+use gmsol_model::{ClockKind, PoolKind};
 
 use crate::{
     utils::fixed_str::{bytes_to_fixed_str, fixed_str_to_bytes},
-    DataStoreError,
+    StoreError,
 };
 
 use super::{Factor, InitSpace, Seed};
@@ -130,7 +130,7 @@ impl Market {
         } else if self.meta.short_token_mint == *token {
             self.record_transferred_in(false, amount)
         } else {
-            Err(error!(DataStoreError::InvalidCollateralToken))
+            Err(error!(StoreError::InvalidCollateralToken))
         }
     }
 
@@ -141,7 +141,7 @@ impl Market {
         } else if self.meta.short_token_mint == *token {
             self.record_transferred_out(false, amount)
         } else {
-            Err(error!(DataStoreError::InvalidCollateralToken))
+            Err(error!(StoreError::InvalidCollateralToken))
         }
     }
 
@@ -189,13 +189,13 @@ impl Market {
                 .state
                 .long_token_balance
                 .checked_add(amount)
-                .ok_or(error!(DataStoreError::AmountOverflow))?;
+                .ok_or(error!(StoreError::AmountOverflow))?;
         } else {
             self.state.short_token_balance = self
                 .state
                 .short_token_balance
                 .checked_add(amount)
-                .ok_or(error!(DataStoreError::AmountOverflow))?;
+                .ok_or(error!(StoreError::AmountOverflow))?;
         }
         msg!(
             "{}: {},{}",
@@ -222,13 +222,13 @@ impl Market {
                 .state
                 .long_token_balance
                 .checked_sub(amount)
-                .ok_or(error!(DataStoreError::AmountOverflow))?;
+                .ok_or(error!(StoreError::AmountOverflow))?;
         } else {
             self.state.short_token_balance = self
                 .state
                 .short_token_balance
                 .checked_sub(amount)
-                .ok_or(error!(DataStoreError::AmountOverflow))?;
+                .ok_or(error!(StoreError::AmountOverflow))?;
         }
         msg!(
             "{}: {},{}",
@@ -247,14 +247,14 @@ impl Market {
 
     /// Validate the market.
     pub fn validate(&self, store: &Pubkey) -> Result<()> {
-        require_eq!(*store, self.store, DataStoreError::InvalidMarket);
-        require!(self.is_enabled(), DataStoreError::DisabledMarket);
+        require_eq!(*store, self.store, StoreError::InvalidMarket);
+        require!(self.is_enabled(), StoreError::DisabledMarket);
         Ok(())
     }
 
     /// Get config.
     pub fn get_config(&self, key: &str) -> Result<&Factor> {
-        let key = MarketConfigKey::from_str(key).map_err(|_| error!(DataStoreError::InvalidKey))?;
+        let key = MarketConfigKey::from_str(key).map_err(|_| error!(StoreError::InvalidKey))?;
         Ok(self.get_config_by_key(key))
     }
 
@@ -266,7 +266,7 @@ impl Market {
 
     /// Get config mutably by key
     pub fn get_config_mut(&mut self, key: &str) -> Result<&mut Factor> {
-        let key = MarketConfigKey::from_str(key).map_err(|_| error!(DataStoreError::InvalidKey))?;
+        let key = MarketConfigKey::from_str(key).map_err(|_| error!(StoreError::InvalidKey))?;
         Ok(self.config.get_mut(key))
     }
 
@@ -351,7 +351,7 @@ impl MarketMeta {
         } else if *token == self.short_token_mint {
             Ok(false)
         } else {
-            err!(DataStoreError::InvalidArgument)
+            err!(StoreError::InvalidArgument)
         }
     }
 
@@ -362,7 +362,7 @@ impl MarketMeta {
         } else if *token == self.short_token_mint {
             Ok(&self.long_token_mint)
         } else {
-            err!(DataStoreError::InvalidArgument)
+            err!(StoreError::InvalidArgument)
         }
     }
 
@@ -372,7 +372,7 @@ impl MarketMeta {
         if self.is_collateral_token(token) {
             Ok(())
         } else {
-            Err(DataStoreError::InvalidCollateralToken.into())
+            Err(StoreError::InvalidCollateralToken.into())
         }
     }
 }
@@ -569,13 +569,13 @@ impl Pool {
     }
 }
 
-impl gmx_core::Balance for Pool {
+impl gmsol_model::Balance for Pool {
     type Num = u128;
 
     type Signed = i128;
 
     /// Get the long token amount.
-    fn long_amount(&self) -> gmx_core::Result<Self::Num> {
+    fn long_amount(&self) -> gmsol_model::Result<Self::Num> {
         if self.is_pure() {
             debug_assert_eq!(
                 self.short_token_amount, 0,
@@ -588,7 +588,7 @@ impl gmx_core::Balance for Pool {
     }
 
     /// Get the short token amount.
-    fn short_amount(&self) -> gmx_core::Result<Self::Num> {
+    fn short_amount(&self) -> gmsol_model::Result<Self::Num> {
         if self.is_pure() {
             debug_assert_eq!(
                 self.short_token_amount, 0,
@@ -601,16 +601,15 @@ impl gmx_core::Balance for Pool {
     }
 }
 
-impl gmx_core::Pool for Pool {
-    fn apply_delta_to_long_amount(&mut self, delta: &Self::Signed) -> gmx_core::Result<()> {
-        self.long_token_amount = self
-            .long_token_amount
-            .checked_add_signed(*delta)
-            .ok_or(gmx_core::Error::Computation("apply delta to long amount"))?;
+impl gmsol_model::Pool for Pool {
+    fn apply_delta_to_long_amount(&mut self, delta: &Self::Signed) -> gmsol_model::Result<()> {
+        self.long_token_amount = self.long_token_amount.checked_add_signed(*delta).ok_or(
+            gmsol_model::Error::Computation("apply delta to long amount"),
+        )?;
         Ok(())
     }
 
-    fn apply_delta_to_short_amount(&mut self, delta: &Self::Signed) -> gmx_core::Result<()> {
+    fn apply_delta_to_short_amount(&mut self, delta: &Self::Signed) -> gmsol_model::Result<()> {
         let amount = if self.is_pure() {
             &mut self.long_token_amount
         } else {
@@ -618,7 +617,9 @@ impl gmx_core::Pool for Pool {
         };
         *amount = amount
             .checked_add_signed(*delta)
-            .ok_or(gmx_core::Error::Computation("apply delta to short amount"))?;
+            .ok_or(gmsol_model::Error::Computation(
+                "apply delta to short amount",
+            ))?;
         Ok(())
     }
 }
