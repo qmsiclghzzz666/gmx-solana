@@ -14,7 +14,7 @@ import { initializeMarkets, exchangeProgram, invokeInitializeController } from "
 import { IDL as chainlinkIDL } from "../../external-programs/chainlink-store";
 import { BTC_TOKEN_MINT, SOL_TOKEN_MINT, createSignedToken } from "./token";
 import { PublicKey, Transaction } from "@solana/web3.js";
-import { createAssociatedTokenAccount, createWrappedNativeAccount } from "@solana/spl-token";
+import { closeAccount, createAssociatedTokenAccount, createWrappedNativeAccount, getAccount, getOrCreateAssociatedTokenAccount } from "@solana/spl-token";
 import { CHAINLINK_ID } from "./external";
 
 export const expect = chai.expect;
@@ -85,8 +85,8 @@ export const getMarkets = async () => {
 
 export const getPrograms = () => {
     return {
-        dataStore: storeProgram,
-        exchange: exchangeProgram,
+        storeProgram,
+        exchangeProgram,
     }
 };
 
@@ -137,6 +137,14 @@ const deinitializeUsers = async (provider: anchor.AnchorProvider, users: anchor.
     const tx = new Transaction();
     for (let index = 0; index < users.length; index++) {
         const user = users[index];
+        try {
+            const account = await getOrCreateAssociatedTokenAccount(provider.connection, user, SOL_TOKEN_MINT, user.publicKey);
+            // Unwrap the SOL of user.
+            const signature = await closeAccount(provider.connection, user, account.address, user.publicKey, user);
+            console.log(`Unwrapped ${account.amount} lamports of WSOL at ${signature}`);
+        } catch (error) {
+            console.error(`Unable to unwrap WSOL for ${user.publicKey.toBase58()}`, error);
+        }
         const balance = await provider.connection.getBalance(user.publicKey);
         console.log(`The balance of ${user.publicKey} is ${balance / anchor.web3.LAMPORTS_PER_SOL}`);
         tx.add(anchor.web3.SystemProgram.transfer({
@@ -159,7 +167,7 @@ export const mochaGlobalSetup = async () => {
     try {
         console.log("[Setting up everything...]");
         anchor.setProvider(provider);
-        await initializeUsers(provider, [signer0, user0], 2);
+        await initializeUsers(provider, [signer0, user0], 4);
 
         // Init fakeToken and usdG.
         const fakeToken = await createSignedToken(signer0, 9);
@@ -169,8 +177,8 @@ export const mochaGlobalSetup = async () => {
         user0FakeTokenAccount = await fakeToken.createTokenAccount(user0.publicKey);
         user0UsdGTokenAccount = await usdG.createTokenAccount(user0.publicKey);
         user0WsolTokenAccount = await createWrappedNativeAccount(provider.connection, user0, user0.publicKey, 10_000_000);
-        fakeToken.mintTo(user0FakeTokenAccount, 1_000 * 1_000_000_000);
-        usdG.mintTo(user0UsdGTokenAccount, 1_000_000 * 100_000_000);
+        fakeToken.mintTo(user0FakeTokenAccount, 1_000_000 * 1_000_000_000);
+        usdG.mintTo(user0UsdGTokenAccount, 1_000_000_000 * 100_000_000);
 
         await initializeDataStore(provider, eventManager, signer0, user0, dataStoreKey, oracleIndex, fakeTokenMint, usdGTokenMint);
         await invokeInitializeController(exchangeProgram, { payer: signer0, store: dataStoreAddress });

@@ -7,7 +7,7 @@ import { createAssociatedTokenAccountInstruction, createTransferInstruction, get
 import { createMarket, invokeUpdateMarketConfig } from '../../utils/exchange';
 
 describe("store: Market", () => {
-    const { dataStore } = getPrograms();
+    const { storeProgram: dataStore } = getPrograms();
     const { signer0, user0 } = getUsers();
 
     const provider = getProvider();

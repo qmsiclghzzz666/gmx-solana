@@ -8,7 +8,7 @@ import { SOL_TOKEN_MINT } from "../../utils/token";
 
 describe("exchange: Deposit", () => {
     const provider = getProvider();
-    const { dataStore } = getPrograms();
+    const { storeProgram: dataStore } = getPrograms();
     const { signer0, user0 } = getUsers();
 
     let dataStoreAddress: PublicKey;

@@ -409,13 +409,13 @@ export type MakeCreateSwapOrderParams = {
     store: PublicKey,
     payer: PublicKey,
     marketToken: PublicKey,
-    initialSwapInToken: PublicKey,
     swapOutToken: PublicKey,
+    initialSwapInToken: PublicKey,
     initialSwapInTokenAmount: number | bigint,
+    swapPath: PublicKey[],
     options: {
         nonce?: Buffer,
         executionFee?: number | bigint,
-        swapPath?: PublicKey[],
         minOutputAmount?: number | bigint,
         acceptablePrice?: number | bigint,
         initialSwapInTokenAccount?: PublicKey,
@@ -436,13 +436,14 @@ export const makeCreateSwapOrderInstruction = async (
         store,
         payer,
         marketToken,
-        initialSwapInToken,
         swapOutToken,
+        initialSwapInToken,
         initialSwapInTokenAmount,
+        swapPath,
         options,
     }: MakeCreateSwapOrderParams
 ) => {
-    const swapPath = options?.swapPath ?? [];
+    if (swapPath.length === 0) throw Error("`swapPath` cannot be empty");
     const nonce = options?.nonce ?? Keypair.generate().publicKey.toBuffer();
     const [order] = findOrderPDA(store, payer, nonce);
     const acceptablePrice = options?.acceptablePrice;

@@ -1,18 +1,18 @@
 import { workspace, Program, utils, Wallet, translateAddress } from "@coral-xyz/anchor";
-import { GmsolExchange } from "../../target/types/gmsol_exchange";
+import { GmsolExchange } from "../../../target/types/gmsol_exchange";
 import { AccountMeta, Connection, Keypair, PublicKey } from "@solana/web3.js";
-import { createMarketPDA, createMarketTokenMintPDA, createMarketVault, createMarketVaultPDA, createRolesPDA, storeProgram } from "./data";
+import { createMarketPDA, createMarketTokenMintPDA, createMarketVault, createMarketVaultPDA, createRolesPDA, storeProgram } from "../data";
 import { getAccount } from "@solana/spl-token";
-import { BTC_TOKEN_MINT, SOL_TOKEN_MINT } from "./token";
-import { IxWithOutput, makeInvoke } from "./invoke";
+import { BTC_TOKEN_MINT, SOL_TOKEN_MINT } from "../token";
+import { IxWithOutput, makeInvoke } from "../invoke";
 import { StoreProgram, ExchangeProgram, PriceProvider, findConfigPDA, findControllerPDA, findMarketPDA, findMarketVaultPDA, findRolesPDA, toBN } from "gmsol";
-import { PYTH_ID } from "./external";
+import { PYTH_ID } from "../external";
 import { findKey, first, last, toInteger } from "lodash";
 import { findPythPriceFeedPDA } from "gmsol";
 import { PriceServiceConnection } from "@pythnetwork/price-service-client";
 import { PythSolanaReceiver } from "@pythnetwork/pyth-solana-receiver";
-import { findClaimableAccountPDA, getTimeKey, invokeCloseEmptyClaimableAccount, invokeUseClaimableAccount } from "./data/token";
-import { TIME_WINDOW } from "./data/constants";
+import { findClaimableAccountPDA, getTimeKey, invokeCloseEmptyClaimableAccount, invokeUseClaimableAccount } from "../data/token";
+import { TIME_WINDOW } from "../data/constants";
 import { makeInvoke as makeInvoke2 } from "gmsol";
 
 export const exchangeProgram = workspace.GmsolExchange as Program<GmsolExchange>;

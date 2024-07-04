@@ -6,7 +6,7 @@ import { PublicKey } from "@solana/web3.js";
 describe("store: Roles", () => {
     const provider = getProvider();
     const { signer0 } = getUsers();
-    const { dataStore } = getPrograms();
+    const { storeProgram: dataStore } = getPrograms();
 
     const otherRole = "OTHER";
 

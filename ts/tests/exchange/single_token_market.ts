@@ -5,11 +5,12 @@ import { SOL_TOKEN_MINT } from "../../utils/token";
 import { closeAccount, createAssociatedTokenAccount, createSyncNativeInstruction, getAccount, getAssociatedTokenAddress, getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { findPositionPDA, invokeCreateDecreaseOrderWithPayerAsSigner, invokeCreateDepositWithPayerAsSigner, invokeCreateIncreaseOrderWithPayerAsSigner, invokeCreateWithdrawalWithPayerAsSigner } from "gmsol";
 import { toInteger } from "lodash";
+import { deposit, withdraw, wrap } from "../../utils/exchange/action";
 
 describe("exchange: Single Token Market", () => {
     const provider = getProvider();
     const { signer0, user0 } = getUsers();
-    const { dataStore, exchange } = getPrograms();
+    const { storeProgram: dataStore, exchangeProgram: exchange } = getPrograms();
 
     let store: PublicKey;
     let tokenMap: PublicKey;
@@ -33,60 +34,24 @@ describe("exchange: Single Token Market", () => {
         console.log(`Initialized WOL single token GM account: ${user0GMWsolAccount}`);
 
         // Wrap some SOL for user0.
-        const tx = new Transaction().add(
-            SystemProgram.transfer({
-                fromPubkey: user0.publicKey,
-                toPubkey: user0WsolTokenAccount,
-                lamports: 1.5 * LAMPORTS_PER_SOL,
-            }),
-            createSyncNativeInstruction(user0WsolTokenAccount),
-        );
-        const signature = await provider.sendAndConfirm(tx, [user0]);
-        console.log(`wrapped SOL at ${signature}`);
+        await wrap(provider, user0, 1.5 * LAMPORTS_PER_SOL);
     });
 
     it("deposit into the single WSOL market", async () => {
-        let deposit: PublicKey;
-        try {
-            const [signature, address] = await invokeCreateDepositWithPayerAsSigner(exchange, {
-                store,
-                payer: user0,
-                marketToken: GMWsolWsolWsol,
-                initialLongToken: SOL_TOKEN_MINT,
-                initialShortToken: SOL_TOKEN_MINT,
-                initialLongTokenAmount: 500_000_000,
-                initialShortTokenAmount: 500_000_000,
-                options: {
-                    tokenMap,
-                }
-            }, {
-                computeUnits: 400_000,
-            });
-            console.log(`deposit created at ${signature}`);
-            deposit = address;
-        } catch (error) {
-            console.log(error);
-        }
-        try {
-            const [signature] = await executeDeposit(false, provider.connection, {
-                authority: signer0,
-                store,
-                oracle: oracleAddress,
-                deposit,
-                options: {
-                    executionFee: 5_001,
-                }
-            }, {
-                computeUnits: 800_000,
-            });
-            console.log(`deposit executed at ${signature}`);
-        } catch (error) {
-            console.log(error);
-            throw error;
-        } finally {
-            const afterExecution = await dataStore.account.oracle.fetch(oracleAddress);
-            expect(afterExecution.primary.prices.length).equals(0);
-        }
+        await deposit(
+            exchange,
+            user0,
+            signer0,
+            store,
+            tokenMap,
+            oracleAddress,
+            GMWsolWsolWsol,
+            SOL_TOKEN_MINT,
+            SOL_TOKEN_MINT,
+            500_000_000,
+            500_000_000,
+            {}
+        );
     });
 
     it("increase and decrease position", async () => {
@@ -192,67 +157,22 @@ describe("exchange: Single Token Market", () => {
     });
 
     it("withdraw from single WSOL market", async () => {
-        let withdrawal: PublicKey;
         let amount = (await getAccount(provider.connection, user0GMWsolAccount)).amount;
-        // Create again.
-        try {
-            const [signature, address] = await invokeCreateWithdrawalWithPayerAsSigner(
-                exchange,
-                {
-                    store,
-                    payer: user0,
-                    marketToken: GMWsolWsolWsol,
-                    amount,
-                    finalLongToken: SOL_TOKEN_MINT,
-                    finalShortToken: SOL_TOKEN_MINT,
-                    options: {
-                        tokenMap,
-                    }
-                }
-            );
-            console.log(`withdrawal of amount ${amount} created at ${signature}`);
-            withdrawal = address;
-        } catch (error) {
-            console.log(error);
-            throw error;
-        } finally {
-            const afterExecution = await dataStore.account.oracle.fetch(oracleAddress);
-            expect(afterExecution.primary.prices.length).equals(0);
-            // const market = await dataStore.account.market.fetch(marketFakeFakeUsdG);
-            // console.log("pools", market.pools);
-        }
-        try {
-            const signature = await executeWithdrawal(
-                false,
-                provider.connection,
-                {
-                    authority: signer0,
-                    store,
-                    oracle: oracleAddress,
-                    withdrawal,
-                    options: {
-                        executionFee: 5001,
-                    }
-                },
-                {
-                    computeUnits: 400_000,
-                },
-            );
-            console.log(`withdrawal executed at ${signature}`);
-        } catch (error) {
-            console.log(error);
-            throw error;
-        } finally {
-            const afterExecution = await dataStore.account.oracle.fetch(oracleAddress);
-            expect(afterExecution.primary.prices.length).equals(0);
-            // const market = await dataStore.account.market.fetch(marketFakeFakeUsdG);
-            // console.log("pools", market.pools);
-        }
-    });
 
-    after(async () => {
-        // Unwrap the SOL of user0.
-        const signature = await closeAccount(provider.connection, user0, user0WsolTokenAccount, user0.publicKey, user0);
-        console.log(`unwrapped SOL at ${signature}`);
+        await withdraw(
+            exchange,
+            user0,
+            signer0,
+            store,
+            tokenMap,
+            oracleAddress,
+            GMWsolWsolWsol,
+            amount,
+            SOL_TOKEN_MINT,
+            SOL_TOKEN_MINT,
+            {
+                storeProgram: dataStore,
+            }
+        );
     });
 });
