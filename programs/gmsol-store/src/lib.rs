@@ -1,4 +1,4 @@
-use anchor_lang::prelude::*;
+//! # The GMSOL Store Program
 
 /// Instructions.
 pub mod instructions;
@@ -30,6 +30,7 @@ use self::{
     },
     utils::internal,
 };
+use anchor_lang::prelude::*;
 use gmsol_utils::price::Price;
 
 #[cfg_attr(test, macro_use)]
@@ -38,10 +39,12 @@ extern crate static_assertions;
 declare_id!("hndKzPMrB9Xzs3mwarnPdkSWpZPZN3gLeeNzHDcHotT");
 
 #[program]
+/// Instructions definitions of the GMSOL Store Program.
 pub mod gmsol_store {
     use super::*;
 
     // Data Store.
+    /// Initialize a new [`Store`](crate::states::Store) account.
     pub fn initialize(
         ctx: Context<Initialize>,
         key: String,
