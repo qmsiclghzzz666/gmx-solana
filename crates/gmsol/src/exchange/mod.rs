@@ -160,6 +160,35 @@ pub trait ExchangeOps<C> {
         };
         self.create_order(store, market_token, is_collateral_token_long, params)
     }
+
+    /// Create a market swap order.
+    fn market_swap<'a, S>(
+        &self,
+        store: &Pubkey,
+        market_token: &Pubkey,
+        is_output_token_long: bool,
+        initial_swap_in_token: &Pubkey,
+        initial_swap_in_token_amount: u64,
+        swap_path: impl IntoIterator<Item = &'a Pubkey>,
+    ) -> CreateOrderBuilder<C>
+    where
+        C: Deref<Target = S> + Clone,
+        S: Signer,
+    {
+        let params = OrderParams {
+            kind: OrderKind::MarketSwap,
+            min_output_amount: 0,
+            size_delta_usd: 0,
+            initial_collateral_delta_amount: initial_swap_in_token_amount,
+            acceptable_price: None,
+            is_long: true,
+        };
+        let mut builder = self.create_order(store, market_token, is_output_token_long, params);
+        builder
+            .initial_collateral_token(initial_swap_in_token, None)
+            .swap_path(swap_path.into_iter().copied().collect());
+        builder
+    }
 }
 
 impl<S, C> ExchangeOps<C> for crate::Client<C>

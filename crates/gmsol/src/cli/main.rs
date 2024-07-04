@@ -176,7 +176,12 @@ impl Cli {
             }
             Command::Admin(args) => args.run(&client, &store_key, self.serialize_only).await?,
             Command::Inspect(args) => args.run(&client, &store).await?,
-            Command::Exchange(args) => args.run(&client, &store).await?,
+            Command::Exchange(args) => {
+                if self.serialize_only {
+                    eyre::bail!("serialize-only mode not supported");
+                }
+                args.run(&client, &store).await?
+            }
             Command::Order(args) => args.run(&client, &store, self.serialize_only).await?,
             Command::Market(args) => args.run(&client, &store, self.serialize_only).await?,
             Command::Controller(args) => args.run(&client, &store, self.serialize_only).await?,

@@ -120,7 +120,7 @@ where
         self
     }
 
-    /// Set final output token (or swap-out token) params.
+    /// Set final output token params (position order only).
     pub fn final_output_token(
         &mut self,
         token: &Pubkey,
@@ -246,7 +246,7 @@ where
 
     async fn final_output_token_account(&mut self) -> crate::Result<Option<Pubkey>> {
         match &self.params.kind {
-            OrderKind::MarketSwap | OrderKind::MarketDecrease | OrderKind::Liquidation => {
+            OrderKind::MarketDecrease | OrderKind::Liquidation => {
                 if self.final_token.is_empty() {
                     let output_token = self.output_token().await?;
                     self.final_token.set_token(output_token);
@@ -261,7 +261,7 @@ where
                 };
                 Ok(Some(account))
             }
-            OrderKind::MarketIncrease => Ok(None),
+            OrderKind::MarketIncrease | OrderKind::MarketSwap => Ok(None),
             kind => Err(crate::Error::invalid_argument(format!(
                 "unsupported order kind: {kind:?}"
             ))),

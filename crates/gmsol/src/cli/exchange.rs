@@ -1,6 +1,6 @@
 use anchor_client::solana_sdk::pubkey::Pubkey;
-use gmsol_store::states::Position;
 use gmsol::{exchange::ExchangeOps, store::utils::read_market, utils};
+use gmsol_store::states::Position;
 
 use crate::GMSOLClient;
 
@@ -170,6 +170,27 @@ enum Command {
         #[arg(long)]
         secondary_output_token_account: Option<Pubkey>,
         /// Swap paths for output token (collateral token).
+        #[arg(long, short, action = clap::ArgAction::Append)]
+        swap: Vec<Pubkey>,
+    },
+    /// Create swap order.
+    MarketSwap {
+        /// The address of the market token of the position's market.
+        market_token: Pubkey,
+        /// Output side.
+        #[arg(long)]
+        output_side: Side,
+        /// Initial swap in token.
+        #[arg(long, short = 'i')]
+        initial_swap_in_token: Pubkey,
+        /// Initial swap in token account.
+        #[arg(long)]
+        initial_swap_in_token_account: Option<Pubkey>,
+        /// Collateral amount.
+        #[arg(long, short = 'a')]
+        initial_swap_in_token_amount: u64,
+        /// Extra swap path. No need to provide the target market token;
+        /// it will be automatically added to the end of the swap path.
         #[arg(long, short, action = clap::ArgAction::Append)]
         swap: Vec<Pubkey>,
     },
@@ -385,6 +406,30 @@ impl ExchangeArgs {
                 let (request, order) = builder.swap_path(swap.clone()).build_with_address().await?;
                 let signature = request.send().await?;
                 println!("created liquidation order {order} at tx {signature}");
+            }
+            Command::MarketSwap {
+                market_token,
+                output_side,
+                initial_swap_in_token,
+                initial_swap_in_token_account,
+                initial_swap_in_token_amount,
+                swap,
+            } => {
+                let mut builder = client.market_swap(
+                    store,
+                    market_token,
+                    output_side.is_long(),
+                    initial_swap_in_token,
+                    *initial_swap_in_token_amount,
+                    swap.iter().chain(Some(market_token)),
+                );
+                if let Some(account) = initial_swap_in_token_account {
+                    builder.initial_collateral_token(initial_swap_in_token, Some(account));
+                }
+
+                let (request, order) = builder.swap_path(swap.clone()).build_with_address().await?;
+                let signature = request.send().await?;
+                println!("created market increase order {order} at tx {signature}");
             }
         }
         Ok(())
