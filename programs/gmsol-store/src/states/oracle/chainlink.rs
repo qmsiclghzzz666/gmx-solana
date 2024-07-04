@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use gmx_solana_utils::price::{Decimal, Price};
+use gmsol_utils::price::{Decimal, Price};
 
 use crate::{states::TokenConfig, StoreError};
 

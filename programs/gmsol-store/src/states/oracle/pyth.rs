@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use gmx_solana_utils::price::{Decimal, Price};
+use gmsol_utils::price::{Decimal, Price};
 use pyth_solana_receiver_sdk::price_update::PriceUpdateV2;
 
 use crate::{states::TokenConfig, StoreError};
@@ -64,9 +64,7 @@ impl Pyth {
             let factor = 10u64
                 .checked_pow(exponent as u32)
                 .ok_or(StoreError::InvalidPriceFeedPrice)?;
-            value = value
-                .checked_mul(factor)
-                .ok_or(StoreError::PriceOverflow)?;
+            value = value.checked_mul(factor).ok_or(StoreError::PriceOverflow)?;
             0
         };
         let price = Decimal::try_from_price(

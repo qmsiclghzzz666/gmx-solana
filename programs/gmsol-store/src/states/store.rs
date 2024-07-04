@@ -2,7 +2,7 @@ use std::{num::NonZeroU64, str::FromStr};
 
 use anchor_lang::prelude::*;
 use bytemuck::Zeroable;
-use gmx_solana_utils::to_seed;
+use gmsol_utils::to_seed;
 
 use crate::{constants, StoreError, StoreResult};
 
@@ -197,8 +197,7 @@ impl Store {
 
     /// Get claimable time window size.
     pub fn claimable_time_window(&self) -> Result<NonZeroU64> {
-        NonZeroU64::new(self.amount.claimable_time_window)
-            .ok_or(error!(StoreError::CannotBeZero))
+        NonZeroU64::new(self.amount.claimable_time_window).ok_or(error!(StoreError::CannotBeZero))
     }
 
     /// Get claimable time window index for the given timestamp.

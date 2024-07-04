@@ -1890,7 +1890,7 @@ dependencies = [
  "gmsol-exchange",
  "gmsol-model",
  "gmsol-store",
- "gmx-solana-utils",
+ "gmsol-utils",
  "heck 0.5.0",
  "hex",
  "indexmap 2.2.6",
@@ -1952,7 +1952,7 @@ dependencies = [
  "clap 4.5.7",
  "dual-vec-map",
  "gmsol-model",
- "gmx-solana-utils",
+ "gmsol-utils",
  "indexmap 2.2.6",
  "num_enum 0.7.2",
  "paste",
@@ -1964,7 +1964,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "gmx-solana-utils"
+name = "gmsol-utils"
 version = "0.1.0"
 dependencies = [
  "anchor-lang",

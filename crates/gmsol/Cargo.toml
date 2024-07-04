@@ -63,7 +63,7 @@ heck = { workspace = true, optional = true }
 byteorder = { workspace = true, optional = true }
 
 # Other deps
-gmx-solana-utils = { path = "../gmx-solana-utils" }
+gmsol-utils = { workspace = true }
 gmsol-store = { workspace = true, features = [
     "no-entrypoint",
     "debug",

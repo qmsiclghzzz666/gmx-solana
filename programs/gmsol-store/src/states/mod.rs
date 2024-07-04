@@ -42,7 +42,7 @@ use anchor_lang::{
     prelude::{borsh, AnchorDeserialize, AnchorSerialize, Pubkey, Result},
     Bump,
 };
-use gmx_solana_utils::to_seed;
+use gmsol_utils::to_seed;
 
 /// Data type that has [`SEED`](Seed::SEED).
 pub trait Seed {

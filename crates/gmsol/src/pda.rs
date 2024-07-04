@@ -2,7 +2,7 @@ use anchor_client::solana_sdk::pubkey::Pubkey;
 use gmsol_store::states::{
     position::PositionKind, Deposit, NonceBytes, Oracle, Order, Position, Seed, Store, Withdrawal,
 };
-use gmx_solana_utils::to_seed;
+use gmsol_utils::to_seed;
 
 pub use gmsol_store::states::market::find_market_address;
 

@@ -2,7 +2,7 @@
 pub mod price_feeds;
 
 use anchor_lang::prelude::*;
-use gmx_solana_utils::price::Price;
+use gmsol_utils::price::Price;
 
 use crate::{
     states::{Oracle, Seed, Store},

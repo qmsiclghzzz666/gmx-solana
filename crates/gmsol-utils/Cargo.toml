@@ -1,5 +1,5 @@
 [package]
-name = "gmx-solana-utils"
+name = "gmsol-utils"
 version.workspace = true
 edition.workspace = true
 

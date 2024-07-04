@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 use dual_vec_map::DualVecMap;
-use gmx_solana_utils::price::Price;
+use gmsol_utils::price::Price;
 
 use crate::StoreError;
 

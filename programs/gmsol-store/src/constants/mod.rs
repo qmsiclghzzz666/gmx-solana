@@ -6,7 +6,7 @@ pub mod market;
 
 pub use self::market::*;
 
-use gmx_solana_utils::price::Decimal;
+use gmsol_utils::price::Decimal;
 
 use crate::states::{Amount, Factor};
 

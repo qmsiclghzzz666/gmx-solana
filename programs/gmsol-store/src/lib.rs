@@ -30,7 +30,7 @@ use self::{
     },
     utils::internal,
 };
-use gmx_solana_utils::price::Price;
+use gmsol_utils::price::Price;
 
 #[cfg_attr(test, macro_use)]
 extern crate static_assertions;

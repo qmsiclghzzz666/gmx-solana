@@ -53,6 +53,12 @@ url = "2.5.0"
 [workspace.dependencies.gmsol-model]
 path = "crates/gmsol-model"
 
+[workspace.dependencies.dual-vec-map]
+path = "crates/dual-vec-map"
+
+[workspace.dependencies.gmsol-utils]
+path = "crates/gmsol-utils"
+
 [workspace.dependencies.gmsol-store]
 path = "programs/gmsol-store"
 

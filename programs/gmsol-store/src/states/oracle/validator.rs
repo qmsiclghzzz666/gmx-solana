@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use gmx_solana_utils::price::Price;
+use gmsol_utils::price::Price;
 
 use crate::{
     states::{Amount, Store, TokenConfig},

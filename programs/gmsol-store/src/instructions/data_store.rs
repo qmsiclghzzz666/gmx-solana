@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use gmx_solana_utils::to_seed;
+use gmsol_utils::to_seed;
 
 use crate::{
     states::{DataStoreInitEvent, InitSpace, Seed, Store, TokenMapHeader},
