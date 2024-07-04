@@ -44,7 +44,7 @@ use anchor_lang::{
 };
 use gmx_solana_utils::to_seed;
 
-/// Data type that has [`SEED`].
+/// Data type that has [`SEED`](Seed::SEED).
 pub trait Seed {
     /// Prefix seed for program derived addresses.
     const SEED: &'static [u8];

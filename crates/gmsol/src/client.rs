@@ -121,7 +121,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         crate::pda::find_event_authority_address(&self.exchange_program_id()).0
     }
 
-    /// Find PDA for [`DataStore`](data_store::states::DataStore) account.
+    /// Find PDA for [`Store`](data_store::states::Store) account.
     pub fn find_store_address(&self, key: &str) -> Pubkey {
         crate::pda::find_store_address(key, &self.data_store_program_id()).0
     }

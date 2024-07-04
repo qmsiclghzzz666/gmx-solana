@@ -13,7 +13,7 @@ pub fn find_event_authority_address(program_id: &Pubkey) -> (Pubkey, u8) {
     Pubkey::find_program_address(&[EVENT_AUTHORITY_SEED], program_id)
 }
 
-/// Find PDA for [`DataStore`] account.
+/// Find PDA for [`Store`] account.
 pub fn find_store_address(key: &str, store_program_id: &Pubkey) -> (Pubkey, u8) {
     Pubkey::find_program_address(&[Store::SEED, &to_seed(key)], store_program_id)
 }

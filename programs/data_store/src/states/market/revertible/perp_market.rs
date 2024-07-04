@@ -15,7 +15,7 @@ use crate::{
 
 use super::{Revertible, RevertibleMarket, RevertiblePool};
 
-/// Convert a [`RevetibleMarket`] to a [`PerpMarket`](gmx_core::PerpMarket).
+/// Convert a [`RevertibleMarket`] to a [`PerpMarket`](gmx_core::PerpMarket).
 pub struct RevertiblePerpMarket<'a> {
     market: RevertibleMarket<'a>,
     clocks: Clocks,

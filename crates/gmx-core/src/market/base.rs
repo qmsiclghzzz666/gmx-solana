@@ -108,7 +108,7 @@ impl<'a, M: BaseMarket<DECIMALS>, const DECIMALS: u8> BaseMarket<DECIMALS> for &
     }
 }
 
-/// Extension trait for [`Market`].
+/// Extension trait for [`BaseMarket`].
 pub trait BaseMarketExt<const DECIMALS: u8>: BaseMarket<DECIMALS> {
     /// Apply delta to the primary pool.
     fn apply_delta(&mut self, is_long_token: bool, delta: &Self::Signed) -> crate::Result<()> {

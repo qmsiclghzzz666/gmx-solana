@@ -288,7 +288,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone, T> RpcBuilder<'a, C, T> {
 
     /// Estimated the size of the result transaction.
     ///
-    /// See [`transaction_size`] for more information.
+    /// See [`transaction_size()`] for more information.
     pub fn transaction_size(&self, is_versioned_transaction: bool) -> usize {
         transaction_size(&self.instructions(), is_versioned_transaction)
     }

@@ -58,8 +58,7 @@ pub struct CreateWithdrawal<'info> {
     ///
     /// ## Notes
     /// - The mint of this account is checked to be the same as the vault,
-    /// but whether to be matched the market token mint of the `market` should be checked by
-    /// [`get_market_token_mint`](data_store::instructions::get_market_token_mint) through CPI.
+    /// but whether to be matched the market token mint of the `market` is checked at #1.
     #[account(mut)]
     pub market_token_account: Account<'info, TokenAccount>,
     /// CHECK: check by CPI.
@@ -89,6 +88,7 @@ pub fn create_withdrawal<'info>(
     // The market token mint used to withdraw must match the `market`'s.
     let market_meta =
         cpi::get_validated_market_meta(ctx.accounts.get_validated_market_meta_ctx())?.get();
+    // #1: Check if the market token mint matches.
     require_eq!(
         ctx.accounts.market_token_account.mint,
         market_meta.market_token_mint,

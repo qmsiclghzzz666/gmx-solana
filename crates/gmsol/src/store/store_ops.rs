@@ -10,7 +10,7 @@ use crate::utils::RpcBuilder;
 
 /// Data Store management for GMSOL.
 pub trait StoreOps<C> {
-    /// Initialize [`Store`] account.
+    /// Initialize [`Store`](data_store::states::Store) account.
     fn initialize_store(&self, key: &str, authority: Option<&Pubkey>) -> RpcBuilder<C>;
 
     /// Transfer Store authority.
