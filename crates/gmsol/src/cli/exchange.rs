@@ -427,7 +427,7 @@ impl ExchangeArgs {
                     builder.initial_collateral_token(initial_swap_in_token, Some(account));
                 }
 
-                let (request, order) = builder.swap_path(swap.clone()).build_with_address().await?;
+                let (request, order) = builder.build_with_address().await?;
                 let signature = request.send().await?;
                 println!("created market increase order {order} at tx {signature}");
             }
