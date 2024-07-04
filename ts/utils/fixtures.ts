@@ -8,8 +8,8 @@ chai.use(chaiAsPromised);
 
 import { setInitialized, waitForSetup } from "./setup";
 import { EventManager } from "./event";
-import { createDataStorePDA, createMarketTokenMintPDA, createMarketVault, createOraclePDA, dataStore, initializeDataStore } from "./data";
-import { initializeMarkets, exchange, invokeInitializeController } from "./exchange";
+import { createDataStorePDA, createMarketTokenMintPDA, createMarketVault, createOraclePDA, storeProgram, initializeDataStore } from "./data";
+import { initializeMarkets, exchangeProgram, invokeInitializeController } from "./exchange";
 
 import { IDL as chainlinkIDL } from "../../external-programs/chainlink-store";
 import { BTC_TOKEN_MINT, SOL_TOKEN_MINT, createSignedToken } from "./token";
@@ -85,8 +85,8 @@ export const getMarkets = async () => {
 
 export const getPrograms = () => {
     return {
-        dataStore,
-        exchange,
+        dataStore: storeProgram,
+        exchange: exchangeProgram,
     }
 };
 
@@ -173,7 +173,7 @@ export const mochaGlobalSetup = async () => {
         usdG.mintTo(user0UsdGTokenAccount, 1_000_000 * 100_000_000);
 
         await initializeDataStore(provider, eventManager, signer0, user0, dataStoreKey, oracleIndex, fakeTokenMint, usdGTokenMint);
-        await invokeInitializeController(exchange, { payer: signer0, store: dataStoreAddress });
+        await invokeInitializeController(exchangeProgram, { payer: signer0, store: dataStoreAddress });
 
         // fakeTokenVault = await createMarketVault(provider, signer0, dataStoreAddress, fakeTokenMint);
         // usdGVault = await createMarketVault(provider, signer0, dataStoreAddress, usdGTokenMint);
@@ -183,7 +183,7 @@ export const mochaGlobalSetup = async () => {
         user0FakeFakeUsdGTokenAccount = await createAssociatedTokenAccount(provider.connection, user0, markets.GMFakeFakeUsdG, user0.publicKey);
         user0WsolWsolUsdGTokenAccount = await createAssociatedTokenAccount(provider.connection, user0, markets.GMWsolWsolUsdG, user0.publicKey);
 
-        eventManager.subscribe(exchange, "DepositCreatedEvent");
+        eventManager.subscribe(exchangeProgram, "DepositCreatedEvent");
 
         console.log("[Done.]");
     } catch (error) {

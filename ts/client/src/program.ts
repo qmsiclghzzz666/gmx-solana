@@ -1,32 +1,32 @@
 import { Program, Provider } from "@coral-xyz/anchor";
 
-import { DataStore } from "./idl/data_store";
-import { Exchange } from "./idl/exchange";
+import { GmsolStore } from "./idl/gmsol_store";
+import { GmsolExchange } from "./idl/gmsol_exchange";
 
-import DataStoreIDL from "./idl/data_store.json";
-import ExchangeIDL from "./idl/exchange.json";
+import GmsolStoreIDL from "./idl/gmsol_store.json";
+import GmsolExchangeIDL from "./idl/gmsol_exchange.json";
 import { PublicKey } from "@solana/web3.js";
 
-export type DataStoreProgram = Program<DataStore>;
-export type ExchangeProgram = Program<Exchange>;
+export type StoreProgram = Program<GmsolStore>;
+export type ExchangeProgram = Program<GmsolExchange>;
 
 /**
- * Creates an instance of the Program with the provided IDL schema for the DataStore program.
+ * Creates an instance of the Program with the provided IDL schema for the GmsolStore program.
  * 
  * @param provider Optional. The Anchor provider to be used for interacting with the program.
  *                 If no provider is specified, a default provider (if available) will be used.
- * @returns An instance of the Program configured with the DataStore's IDL.
+ * @returns An instance of the Program configured with the GmsolStore's IDL.
  */
-export const makeDataStoreProgram = (provider?: Provider) => new Program(DataStoreIDL as DataStore, provider);
+export const makeStoreProgram = (provider?: Provider) => new Program(GmsolStoreIDL as GmsolStore, provider);
 
 /**
- * Creates an instance of the Program with the provided IDL schema for the Exchange program.
+ * Creates an instance of the Program with the provided IDL schema for the GmsolExchange program.
  * 
  * @param provider Optional. The Anchor provider to be used for interacting with the program.
  *                 If no provider is specified, a default provider (if available) will be used.
- * @returns An instance of the Program configured with the Exchange's IDL.
+ * @returns An instance of the Program configured with the GmsolExchange's IDL.
  */
-export const makeExchangeProgram = (provider?: Provider) => new Program(ExchangeIDL as Exchange, provider);
+export const makeExchangeProgram = (provider?: Provider) => new Program(GmsolExchangeIDL as GmsolExchange, provider);
 
-export const DATA_STORE_ID: PublicKey = new PublicKey(DataStoreIDL.address);
-export const EXCHANGE_ID: PublicKey = new PublicKey(ExchangeIDL.address);
+export const STORE_PROGRAM_ID: PublicKey = new PublicKey(GmsolStoreIDL.address);
+export const EXCHANGE_PROGRAM_ID: PublicKey = new PublicKey(GmsolExchangeIDL.address);

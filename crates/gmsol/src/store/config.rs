@@ -1,7 +1,7 @@
 use std::ops::Deref;
 
 use anchor_client::solana_sdk::{pubkey::Pubkey, signer::Signer};
-use data_store::{
+use gmsol_store::{
     accounts, instruction,
     states::{AddressKey, Amount, AmountKey, Factor, FactorKey},
 };

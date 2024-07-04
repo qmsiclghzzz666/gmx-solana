@@ -1,11 +1,11 @@
 import { workspace, Program, utils, Wallet, translateAddress } from "@coral-xyz/anchor";
-import { Exchange } from "../../target/types/exchange";
+import { GmsolExchange } from "../../target/types/gmsol_exchange";
 import { AccountMeta, Connection, Keypair, PublicKey } from "@solana/web3.js";
-import { createMarketPDA, createMarketTokenMintPDA, createMarketVault, createMarketVaultPDA, createRolesPDA, dataStore } from "./data";
+import { createMarketPDA, createMarketTokenMintPDA, createMarketVault, createMarketVaultPDA, createRolesPDA, storeProgram } from "./data";
 import { getAccount } from "@solana/spl-token";
 import { BTC_TOKEN_MINT, SOL_TOKEN_MINT } from "./token";
 import { IxWithOutput, makeInvoke } from "./invoke";
-import { DataStoreProgram, ExchangeProgram, PriceProvider, findConfigPDA, findControllerPDA, findMarketPDA, findMarketVaultPDA, findRolesPDA, toBN } from "gmsol";
+import { StoreProgram, ExchangeProgram, PriceProvider, findConfigPDA, findControllerPDA, findMarketPDA, findMarketVaultPDA, findRolesPDA, toBN } from "gmsol";
 import { PYTH_ID } from "./external";
 import { findKey, first, last, toInteger } from "lodash";
 import { findPythPriceFeedPDA } from "gmsol";
@@ -15,10 +15,10 @@ import { findClaimableAccountPDA, getTimeKey, invokeCloseEmptyClaimableAccount, 
 import { TIME_WINDOW } from "./data/constants";
 import { makeInvoke as makeInvoke2 } from "gmsol";
 
-export const exchange = workspace.Exchange as Program<Exchange>;
+export const exchangeProgram = workspace.GmsolExchange as Program<GmsolExchange>;
 
 export const makeInitializeControllerInstruction = async (program: ExchangeProgram, { payer, store }: { payer: PublicKey, store: PublicKey }) => {
-    return await exchange.methods.initializeController().accounts({
+    return await exchangeProgram.methods.initializeController().accounts({
         payer,
         store,
     }).instruction();
@@ -29,7 +29,7 @@ export const invokeInitializeController = makeInvoke2(makeInitializeControllerIn
 export const createControllerPDA = (store: PublicKey) => PublicKey.findProgramAddressSync([
     utils.bytes.utf8.encode("controller"),
     store.toBuffer(),
-], exchange.programId);
+], exchangeProgram.programId);
 
 export const createMarket = async (
     signer: Keypair,
@@ -45,9 +45,9 @@ export const createMarket = async (
     const [marketTokenVault] = createMarketVaultPDA(dataStoreAddress, marketTokenMint);
     const [longTokenVault] = createMarketVaultPDA(dataStoreAddress, longTokenMint);
     const [shortTokenVault] = createMarketVaultPDA(dataStoreAddress, shortTokenMint);
-    const tokenMap = (await dataStore.account.store.fetch(dataStoreAddress)).tokenMap;
+    const tokenMap = (await storeProgram.account.store.fetch(dataStoreAddress)).tokenMap;
 
-    await exchange.methods.createMarket(name, indexTokenMint, enable).accounts({
+    await exchangeProgram.methods.createMarket(name, indexTokenMint, enable).accounts({
         authority: signer.publicKey,
         dataStore: dataStoreAddress,
         tokenMap,
@@ -84,7 +84,7 @@ export type MakeCancelDepositParams = {
 };
 
 export const makeUpdateMarketConfigInstruction = async (
-    program: DataStoreProgram,
+    program: StoreProgram,
     {
         authority,
         store,
@@ -122,7 +122,7 @@ export const makeCancelDepositInstruction = async ({
         initialShortToken,
         initialLongMarket,
         initialShortMarket,
-    } = options?.hints?.deposit ?? await dataStore.account.deposit.fetch(deposit).then(deposit => {
+    } = options?.hints?.deposit ?? await storeProgram.account.deposit.fetch(deposit).then(deposit => {
         const marketToken = deposit.fixed.tokens.marketToken;
         const initialLongToken = deposit.fixed.tokens.initialLongToken ?? null;
         const initialShortToken = deposit.fixed.tokens.initialShortToken ?? null;
@@ -137,7 +137,7 @@ export const makeCancelDepositInstruction = async ({
         }
     });
     if (!user.equals(authority)) throw Error("invalid authority, expecting the creator of the deposit");
-    return await exchange.methods.cancelDeposit().accounts({
+    return await exchangeProgram.methods.cancelDeposit().accounts({
         user: authority,
         store,
         deposit,
@@ -210,7 +210,7 @@ const makeProviderMapper = (providers: number[], lenghts: number[]) => {
     }
 };
 
-const fetchDepositHint = async (dataStore: DataStoreProgram, deposit: PublicKey) => {
+const fetchDepositHint = async (dataStore: StoreProgram, deposit: PublicKey) => {
     return await dataStore.account.deposit.fetch(deposit).then(deposit => {
         return {
             user: deposit.fixed.senders.user,
@@ -252,7 +252,7 @@ export const makeExecuteDepositInstruction = async ({
         initialShortToken,
         initialLongTokenAccount,
         initialShortTokenAccount,
-    } = options?.hints?.deposit ?? await fetchDepositHint(dataStore, deposit);
+    } = options?.hints?.deposit ?? await fetchDepositHint(storeProgram, deposit);
     const feedAccounts = feeds.map((feed, idx) => {
         const provider = providerMapper(idx);
         return getFeedAccountMeta(provider, feed);
@@ -264,8 +264,8 @@ export const makeExecuteDepositInstruction = async ({
             isWritable: true,
         };
     });
-    const tokenMap = (await dataStore.account.store.fetch(store)).tokenMap;
-    return await exchange.methods.executeDeposit(toBN(options?.executionFee ?? 0), options?.cancelOnExecutionError ?? false).accounts({
+    const tokenMap = (await storeProgram.account.store.fetch(store)).tokenMap;
+    return await exchangeProgram.methods.executeDeposit(toBN(options?.executionFee ?? 0), options?.cancelOnExecutionError ?? false).accounts({
         authority,
         store,
         oracle,
@@ -321,7 +321,7 @@ export const executeDeposit = async (simulate: boolean, ...args: Parameters<type
         if (!(authority instanceof Keypair)) {
             throw Error("Currently only support to call with `Keypair`");
         }
-        const { feeds, providerMapper } = options?.hints?.deposit ?? await fetchDepositHint(dataStore, deposit);
+        const { feeds, providerMapper } = options?.hints?.deposit ?? await fetchDepositHint(storeProgram, deposit);
         await postPriceFeeds(connection, authority as Keypair, feeds, providerMapper);
     }
     return await invokeExecuteDeposit(...args);
@@ -349,7 +349,7 @@ export const makeCancelWithdrawalInstruction = async ({
     withdrawal,
     options,
 }: MakeCancelWithdrawalParams) => {
-    const { marketToken, user, toMarketTokenAccount } = options?.hints?.withdrawal ?? await dataStore.account.withdrawal.fetch(withdrawal).then(withdrawal => {
+    const { marketToken, user, toMarketTokenAccount } = options?.hints?.withdrawal ?? await storeProgram.account.withdrawal.fetch(withdrawal).then(withdrawal => {
         return {
             user: withdrawal.fixed.user,
             marketToken: withdrawal.fixed.tokens.marketToken,
@@ -357,7 +357,7 @@ export const makeCancelWithdrawalInstruction = async ({
         }
     });
     if (!authority.equals(user)) throw Error("invalid authority, expecting the creator of the withdrawal");
-    return await exchange.methods.cancelWithdrawal().accounts({
+    return await exchangeProgram.methods.cancelWithdrawal().accounts({
         store,
         withdrawal,
         user,
@@ -397,7 +397,7 @@ export type MakeExecuteWithdrawalParams = {
     },
 };
 
-const fetchWithdrawalHint = async (dataStore: DataStoreProgram, withdrawal: PublicKey) => {
+const fetchWithdrawalHint = async (dataStore: StoreProgram, withdrawal: PublicKey) => {
     return await dataStore.account.withdrawal.fetch(withdrawal).then(withdrawal => {
         return {
             user: withdrawal.fixed.user,
@@ -437,7 +437,7 @@ export const makeExecuteWithdrawalInstruction = async ({
         longSwapPath,
         shortSwapPath,
         providerMapper,
-    } = options?.hints?.withdrawal ?? await fetchWithdrawalHint(dataStore, withdrawal);
+    } = options?.hints?.withdrawal ?? await fetchWithdrawalHint(storeProgram, withdrawal);
     const feedAccounts = feeds.map((feed, idx) => {
         return getFeedAccountMeta(providerMapper(idx), feed);
     });
@@ -448,8 +448,8 @@ export const makeExecuteWithdrawalInstruction = async ({
             isWritable: true,
         };
     });
-    const tokenMap = (await dataStore.account.store.fetch(store)).tokenMap;
-    return await exchange.methods.executeWithdrawal(toBN(options?.executionFee ?? 0), options?.cancelOnExecutionError ?? false).accounts({
+    const tokenMap = (await storeProgram.account.store.fetch(store)).tokenMap;
+    return await exchangeProgram.methods.executeWithdrawal(toBN(options?.executionFee ?? 0), options?.cancelOnExecutionError ?? false).accounts({
         authority,
         store,
         oracle,
@@ -479,7 +479,7 @@ export const executeWithdrawal = async (simulate: boolean, ...args: Parameters<t
         if (!(authority instanceof Keypair)) {
             throw Error("Currently only support to call with `Keypair`");
         }
-        const { feeds, providerMapper } = options?.hints?.withdrawal ?? await fetchWithdrawalHint(dataStore, withdrawal);
+        const { feeds, providerMapper } = options?.hints?.withdrawal ?? await fetchWithdrawalHint(storeProgram, withdrawal);
         await postPriceFeeds(connection, authority as Keypair, feeds, providerMapper);
     }
     return await invokeExecuteWithdrawal(...args);
@@ -523,7 +523,7 @@ export type MakeExecuteOrderParams = {
     },
 };
 
-const fetchOrderHint = async (dataStore: DataStoreProgram, orderAddress: PublicKey, store: PublicKey) => {
+const fetchOrderHint = async (dataStore: StoreProgram, orderAddress: PublicKey, store: PublicKey) => {
     const order = await dataStore.account.order.fetch(orderAddress);
     const market = await dataStore.account.market.fetch(order.fixed.market);
     return {
@@ -576,7 +576,7 @@ export const makeExecuteOrderInstruction = async ({
         initialCollateralToken,
         initialCollateralTokenAccount,
         providerMapper,
-    } = options?.hints?.order ?? await fetchOrderHint(dataStore, order, store);
+    } = options?.hints?.order ?? await fetchOrderHint(storeProgram, order, store);
     const feedAccounts = feeds.map((pubkey, idx) => {
         return getFeedAccountMeta(providerMapper(idx), pubkey);
     });
@@ -588,8 +588,8 @@ export const makeExecuteOrderInstruction = async ({
         }
     });
     const pnlTokenMint = isLong ? longTokenMint : shortTokenMint;
-    const tokenMap = (await dataStore.account.store.fetch(store)).tokenMap;
-    return await exchange.methods.executeOrder(toBN(recentTimestamp), toBN(options?.executionFee ?? 0), options?.cancelOnExecutionError ?? false).accounts({
+    const tokenMap = (await storeProgram.account.store.fetch(store)).tokenMap;
+    return await exchangeProgram.methods.executeOrder(toBN(recentTimestamp), toBN(options?.executionFee ?? 0), options?.cancelOnExecutionError ?? false).accounts({
         authority,
         store,
         oracle,
@@ -624,7 +624,7 @@ export const executeOrder = async (simulate: boolean, ...args: Parameters<typeof
         return ["not executed because this is just a simulation"];
     }
     const [connection, { authority, order, store, recentTimestamp, holding, options }] = args;
-    const { user, longTokenMint, shortTokenMint, isLong, isDecrease, feeds, providerMapper } = options?.hints?.order ?? await fetchOrderHint(dataStore, order, store);
+    const { user, longTokenMint, shortTokenMint, isLong, isDecrease, feeds, providerMapper } = options?.hints?.order ?? await fetchOrderHint(storeProgram, order, store);
     if (options?.priceProvider?.toBase58() ?? PYTH_ID === PYTH_ID) {
         if (!(authority instanceof Keypair)) {
             throw Error("Currently only support to call with `Keypair`");
@@ -632,21 +632,21 @@ export const executeOrder = async (simulate: boolean, ...args: Parameters<typeof
         await postPriceFeeds(connection, authority as Keypair, feeds, providerMapper);
     }
     if (isDecrease) {
-        await invokeUseClaimableAccount(dataStore, {
+        await invokeUseClaimableAccount(storeProgram, {
             authority,
             store,
             user,
             mint: longTokenMint,
             timestamp: recentTimestamp,
         });
-        await invokeUseClaimableAccount(dataStore, {
+        await invokeUseClaimableAccount(storeProgram, {
             authority,
             store,
             user,
             mint: shortTokenMint,
             timestamp: recentTimestamp,
         });
-        await invokeUseClaimableAccount(dataStore, {
+        await invokeUseClaimableAccount(storeProgram, {
             authority,
             store,
             user: holding,
@@ -654,7 +654,7 @@ export const executeOrder = async (simulate: boolean, ...args: Parameters<typeof
             timestamp: recentTimestamp,
         });
         const signature = await invokeExecuteOrder(...args);
-        await invokeCloseEmptyClaimableAccount(dataStore, {
+        await invokeCloseEmptyClaimableAccount(storeProgram, {
             authority,
             store,
             user,
@@ -662,7 +662,7 @@ export const executeOrder = async (simulate: boolean, ...args: Parameters<typeof
             timestamp: recentTimestamp,
         });
         if (!longTokenMint.equals(shortTokenMint)) {
-            await invokeCloseEmptyClaimableAccount(dataStore, {
+            await invokeCloseEmptyClaimableAccount(storeProgram, {
                 authority,
                 store,
                 user,
@@ -670,7 +670,7 @@ export const executeOrder = async (simulate: boolean, ...args: Parameters<typeof
                 timestamp: recentTimestamp,
             });
         }
-        await invokeCloseEmptyClaimableAccount(dataStore, {
+        await invokeCloseEmptyClaimableAccount(storeProgram, {
             authority,
             store,
             user: holding,

@@ -1,0 +1,20 @@
+[package]
+name = "gmsol-model"
+version.workspace = true
+edition.workspace = true
+
+[features]
+test = []
+u128 = ["ruint"]
+solana = ["anchor-lang"]
+
+[dependencies]
+num-traits = { workspace = true }
+thiserror = { workspace = true }
+ruint = { workspace = true, optional = true, default-features = false }
+rust_decimal = { workspace = true, default-features = false, features = [
+    "maths",
+] }
+anchor-lang = { workspace = true, optional = true }
+num_enum = { workspace = true }
+typed-builder = { workspace = true }

@@ -7,7 +7,7 @@ import { Trans, t } from "@lingui/macro";
 import { useTradeStage, useSetTradeStage } from "@/contexts/shared/hooks";
 import Button from "../Button/Button";
 import LoadingDots from "../Common/LoadingDots/LoadingDots";
-import { useDataStore, useExchange } from "@/contexts/anchor";
+import { useStoreProgram, useExchangeProgram } from "@/contexts/anchor";
 import { useTriggerInvocation } from "@/onchain/transaction";
 import { invokeCreateIncreaseOrder } from "gmsol";
 import { GMSOL_DEPLOYMENT } from "@/config/deployment";
@@ -261,8 +261,8 @@ function useTriggerCreateOrder() {
   const collateralTokenAddress = useSharedStatesSelector(selectTradeBoxCollateralTokenAddress);
   const increaseSwapParams = useSharedStatesSelector(selectIncreaseSwapParams);
   const isSwapfulfilled = increaseSwapParams?.isSwapfulfilled;
-  const exchange = useExchange();
-  const store = useDataStore();
+  const exchange = useExchangeProgram();
+  const store = useStoreProgram();
 
   const { mutate } = useSWRConfig();
   const mutateStates = useCallback(() => {

@@ -1,12 +1,12 @@
 import { useCallback, useContext, useMemo } from "react";
-import { makeDataStoreProgram, makeExchangeProgram } from "gmsol";
+import { makeStoreProgram, makeExchangeProgram } from "gmsol";
 import { AnchorStateContext } from ".";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 
-export const useDataStore = () => {
+export const useStoreProgram = () => {
   const { provider, connection } = useAnchor();
   const program = useMemo(() => {
-    return provider ? makeDataStoreProgram(provider) : makeDataStoreProgram({
+    return provider ? makeStoreProgram(provider) : makeStoreProgram({
       connection
     });
   }, [provider, connection]);
@@ -14,7 +14,7 @@ export const useDataStore = () => {
   return program;
 }
 
-export const useExchange = () => {
+export const useExchangeProgram = () => {
   const { provider, connection } = useAnchor();
 
   const program = useMemo(() => {

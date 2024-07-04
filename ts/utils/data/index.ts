@@ -5,7 +5,7 @@ import { Keypair, PublicKey } from "@solana/web3.js";
 import { BTC_FEED, BTC_FEED_ID, BTC_FEED_PYTH, BTC_TOKEN_MINT, SOL_FEED, SOL_FEED_ID, SOL_FEED_PYTH, SOL_TOKEN_MINT, USDC_FEED, USDC_FEED_ID, USDC_FEED_PYTH } from "../token";
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 
-import { dataStore } from "./program";
+import { storeProgram } from "./program";
 import { invokeInitializeTokenMap, invokePushToTokenMap } from "./token_config";
 import { createRolesPDA } from "./roles";
 import { createControllerPDA } from "../exchange";
@@ -43,13 +43,13 @@ export const ORDER_KEEPER = "ORDER_KEEPER";
 export const createDataStorePDA = (key: string) => anchor.web3.PublicKey.findProgramAddressSync([
     DATA_STORE_SEED,
     keyToSeed(key),
-], dataStore.programId);
+], storeProgram.programId);
 
 export const createMarketPDA = (store: PublicKey, marketToken: PublicKey) => PublicKey.findProgramAddressSync([
     MARKET_SEED,
     store.toBytes(),
     marketToken.toBytes(),
-], dataStore.programId);
+], storeProgram.programId);
 
 export const createMarketTokenMintPDA = (
     store: PublicKey,
@@ -62,46 +62,46 @@ export const createMarketTokenMintPDA = (
     indexTokenMint.toBytes(),
     longTokenMint.toBytes(),
     shortTokenMint.toBytes(),
-], dataStore.programId);
+], storeProgram.programId);
 
 export const createMarketVaultPDA = (store: PublicKey, tokenMint: PublicKey, marketTokenMint?: PublicKey) => PublicKey.findProgramAddressSync([
     MARKET_VAULT_SEED,
     store.toBytes(),
     tokenMint.toBytes(),
     marketTokenMint?.toBytes() ?? new Uint8Array(),
-], dataStore.programId);
+], storeProgram.programId);
 
 export const createOraclePDA = (store: PublicKey, index: number) => PublicKey.findProgramAddressSync([
     ORACLE_SEED,
     store.toBytes(),
     new Uint8Array([index]),
-], dataStore.programId);
+], storeProgram.programId);
 
 export const createNoncePDA = (store: PublicKey) => PublicKey.findProgramAddressSync([
     NONCE_SEED,
     store.toBytes(),
-], dataStore.programId);
+], storeProgram.programId);
 
 export const createDepositPDA = (store: PublicKey, user: PublicKey, nonce: Uint8Array) => PublicKey.findProgramAddressSync([
     DEPOSIT_SEED,
     store.toBytes(),
     user.toBytes(),
     nonce,
-], dataStore.programId);
+], storeProgram.programId);
 
 export const createWithdrawalPDA = (store: PublicKey, user: PublicKey, nonce: Uint8Array) => PublicKey.findProgramAddressSync([
     WITHDRAWAL_SEED,
     store.toBytes(),
     user.toBytes(),
     nonce,
-], dataStore.programId);
+], storeProgram.programId);
 
 export const createOrderPDA = (store: PublicKey, user: PublicKey, nonce: Uint8Array) => PublicKey.findProgramAddressSync([
     ORDER_SEED,
     store.toBytes(),
     user.toBytes(),
     nonce,
-], dataStore.programId);
+], storeProgram.programId);
 
 export const createPositionPDA = (store: PublicKey, user: PublicKey, marketToken: PublicKey, collateralToken: PublicKey, isLong: boolean) => PublicKey.findProgramAddressSync([
     POSITION_SEED,
@@ -110,13 +110,13 @@ export const createPositionPDA = (store: PublicKey, user: PublicKey, marketToken
     marketToken.toBytes(),
     collateralToken.toBytes(),
     new Uint8Array([isLong ? 1 : 2]),
-], dataStore.programId);
+], storeProgram.programId);
 
 export const createMarketVault = async (provider: anchor.AnchorProvider, signer: Keypair, dataStoreAddress: PublicKey, mint: PublicKey) => {
     const [vault] = createMarketVaultPDA(dataStoreAddress, mint);
     const [roles] = createRolesPDA(dataStoreAddress, signer.publicKey);
 
-    await dataStore.methods.initializeMarketVault(null).accountsPartial({
+    await storeProgram.methods.initializeMarketVault(null).accountsPartial({
         authority: signer.publicKey,
         store: dataStoreAddress,
         mint,
@@ -140,12 +140,12 @@ export const initializeDataStore = async (
     const [rolesPDA] = createRolesPDA(dataStorePDA, provider.publicKey);
     const [signerRoles] = createRolesPDA(dataStorePDA, signer.publicKey);
 
-    eventManager.subscribe(dataStore, "DataStoreInitEvent");
-    eventManager.subscribe(dataStore, "MarketChangeEvent");
+    eventManager.subscribe(storeProgram, "DataStoreInitEvent");
+    eventManager.subscribe(storeProgram, "MarketChangeEvent");
 
     // Initialize a DataStore with the given key.
     try {
-        const tx = await dataStore.methods.initialize(dataStoreKey, null).accountsPartial({
+        const tx = await storeProgram.methods.initialize(dataStoreKey, null).accountsPartial({
             payer: provider.publicKey,
             store: dataStorePDA,
         }).rpc();
@@ -162,21 +162,21 @@ export const initializeDataStore = async (
     for (let index = 0; index < enabled_roles.length; index++) {
         const role = enabled_roles[index];
         {
-            const tx = await dataStore.methods.enableRole(role).accounts({
+            const tx = await storeProgram.methods.enableRole(role).accounts({
                 authority: provider.publicKey,
                 store: dataStorePDA,
             }).rpc();
             console.log(`Enabled ${role} in tx: ${tx}`);
         }
         {
-            const tx = await dataStore.methods.grantRole(signer.publicKey, role).accountsPartial({
+            const tx = await storeProgram.methods.grantRole(signer.publicKey, role).accountsPartial({
                 authority: provider.publicKey,
                 store: dataStorePDA,
             }).rpc();
             console.log(`Grant ${role} to signer in tx: ${tx}`);
         }
         if (role == CONTROLLER) {
-            const tx = await dataStore.methods.grantRole(controller, role).accountsPartial({
+            const tx = await storeProgram.methods.grantRole(controller, role).accountsPartial({
                 authority: provider.publicKey,
                 store: dataStorePDA,
             }).rpc();
@@ -188,9 +188,9 @@ export const initializeDataStore = async (
     const tokenMapKeypair = Keypair.generate();
     const tokenMap = tokenMapKeypair.publicKey;
     try {
-        await invokeInitializeTokenMap(dataStore, { payer: signer, tokenMap: tokenMapKeypair, store: dataStorePDA });
+        await invokeInitializeTokenMap(storeProgram, { payer: signer, tokenMap: tokenMapKeypair, store: dataStorePDA });
         console.log(`Intialized token map: ${tokenMap}`);
-        const [tx] = await invokeSetTokenMap(dataStore, { authority: signer, tokenMap, store: dataStorePDA });
+        const [tx] = await invokeSetTokenMap(storeProgram, { authority: signer, tokenMap, store: dataStorePDA });
         console.log(`The new token map has been set to the store, tx: ${tx}`);
     } catch (error) {
         console.log("Failed to initialize token map", error);
@@ -200,7 +200,7 @@ export const initializeDataStore = async (
 
     // Insert BTC token config.
     try {
-        await invokePushToTokenMap(dataStore, {
+        await invokePushToTokenMap(storeProgram, {
             authority: signer,
             store: dataStorePDA,
             name: "WBTC",
@@ -219,7 +219,7 @@ export const initializeDataStore = async (
 
     // Insert SOL token config.
     try {
-        await invokePushToTokenMap(dataStore, {
+        await invokePushToTokenMap(storeProgram, {
             authority: signer,
             store: dataStorePDA,
             name: "WSOL",
@@ -238,7 +238,7 @@ export const initializeDataStore = async (
 
     // Insert FakeToken token config.
     try {
-        await invokePushToTokenMap(dataStore, {
+        await invokePushToTokenMap(storeProgram, {
             authority: signer,
             store: dataStorePDA,
             name: "FAKE",
@@ -257,7 +257,7 @@ export const initializeDataStore = async (
 
     // Insert UsdG token config.
     try {
-        await invokePushToTokenMap(dataStore, {
+        await invokePushToTokenMap(storeProgram, {
             authority: signer,
             store: dataStorePDA,
             name: "USDG",
@@ -277,7 +277,7 @@ export const initializeDataStore = async (
     // Init an oracle.
     try {
         const [oraclePDA] = createOraclePDA(dataStorePDA, oracleIndex);
-        const tx = await dataStore.methods.initializeOracle(oracleIndex).accounts({
+        const tx = await storeProgram.methods.initializeOracle(oracleIndex).accounts({
             authority: signer.publicKey,
             store: dataStorePDA,
             oracle: oraclePDA,
@@ -289,13 +289,13 @@ export const initializeDataStore = async (
 
     // Init the config.
     try {
-        invokeInsertAmount(dataStore, { authority: signer, store: dataStorePDA, key: "oracle_max_age", amount: 3600 });
-        invokeInsertAmount(dataStore, { authority: signer, store: dataStorePDA, key: "request_expiration", amount: 3600 });
-        invokeInsertAmount(dataStore, { authority: signer, store: dataStorePDA, key: "oracle_max_timestamp_range", amount: 300 });
-        invokeInsertAmount(dataStore, { authority: signer, store: dataStorePDA, key: "claimable_time_window", amount: TIME_WINDOW });
-        invokeInsertAmount(dataStore, { authority: signer, store: dataStorePDA, key: "recent_time_window", amount: 120 });
-        invokeInsertFactor(dataStore, { authority: signer, store: dataStorePDA, key: "oracle_ref_price_deviation", factor: 1_000_000_000_000_000 });
-        invokeInsertAddress(dataStore, { authority: signer, store: dataStorePDA, key: "holding", address: dataStore.provider.publicKey });
+        invokeInsertAmount(storeProgram, { authority: signer, store: dataStorePDA, key: "oracle_max_age", amount: 3600 });
+        invokeInsertAmount(storeProgram, { authority: signer, store: dataStorePDA, key: "request_expiration", amount: 3600 });
+        invokeInsertAmount(storeProgram, { authority: signer, store: dataStorePDA, key: "oracle_max_timestamp_range", amount: 300 });
+        invokeInsertAmount(storeProgram, { authority: signer, store: dataStorePDA, key: "claimable_time_window", amount: TIME_WINDOW });
+        invokeInsertAmount(storeProgram, { authority: signer, store: dataStorePDA, key: "recent_time_window", amount: 120 });
+        invokeInsertFactor(storeProgram, { authority: signer, store: dataStorePDA, key: "oracle_ref_price_deviation", factor: 1_000_000_000_000_000 });
+        invokeInsertAddress(storeProgram, { authority: signer, store: dataStorePDA, key: "holding", address: storeProgram.provider.publicKey });
     } catch (error) {
         console.warn("Failed to init config account", error);
     }

@@ -1,5 +1,5 @@
 use anchor_client::anchor_lang::solana_program::pubkey::Pubkey;
-use data_store::states::Pyth;
+use gmsol_store::states::Pyth;
 
 /// Find Pyth Feed Account PDA.
 pub fn find_pyth_feed_account(shard_id: u16, feed_id: [u8; 32]) -> (Pubkey, u8) {

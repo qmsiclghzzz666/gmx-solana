@@ -2,7 +2,7 @@ use std::ops::Deref;
 
 use anchor_client::solana_sdk::{pubkey::Pubkey, signer::Signer};
 
-use data_store::{accounts, instruction};
+use gmsol_store::{accounts, instruction};
 
 use crate::utils::RpcBuilder;
 

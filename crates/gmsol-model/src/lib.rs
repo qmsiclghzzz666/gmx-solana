@@ -1,0 +1,56 @@
+#![deny(missing_docs)]
+#![deny(unreachable_pub)]
+// FIXME: enable this when we are ready.
+// #![warn(clippy::arithmetic_side_effects)]
+
+//! A Rust implementation of GMX V2 Model.
+
+/// Pool.
+pub mod pool;
+
+/// Market.
+pub mod market;
+
+/// Bank.
+pub mod bank;
+
+/// Clock.
+pub mod clock;
+
+/// Position.
+pub mod position;
+
+/// Market params.
+pub mod params;
+
+/// Actions.
+pub mod action;
+
+/// Error type.
+pub mod error;
+
+/// Number utils.
+pub mod num;
+
+/// Fixed-point decimal type.
+pub mod fixed;
+
+/// Utils.
+pub mod utils;
+
+/// Utils for testing.
+#[cfg(any(test, feature = "test"))]
+pub mod test;
+
+pub use bank::Bank;
+pub use clock::ClockKind;
+pub use error::Error;
+pub use market::{
+    BaseMarket, BaseMarketExt, LiquidityMarket, LiquidityMarketExt, PerpMarket, PerpMarketExt,
+    PnlFactorKind, PositionImpactMarket, PositionImpactMarketExt, SwapMarket, SwapMarketExt,
+};
+pub use pool::{Balance, BalanceExt, Pool, PoolExt, PoolKind};
+pub use position::{Position, PositionExt};
+
+/// Alias for result.
+pub type Result<T> = std::result::Result<T, Error>;

@@ -6,7 +6,7 @@ import { closeAccount, createAssociatedTokenAccount, createSyncNativeInstruction
 import { findPositionPDA, invokeCreateDecreaseOrderWithPayerAsSigner, invokeCreateDepositWithPayerAsSigner, invokeCreateIncreaseOrderWithPayerAsSigner, invokeCreateWithdrawalWithPayerAsSigner } from "gmsol";
 import { toInteger } from "lodash";
 
-describe("exchange: single token market", () => {
+describe("exchange: Single Token Market", () => {
     const provider = getProvider();
     const { signer0, user0 } = getUsers();
     const { dataStore, exchange } = getPrograms();

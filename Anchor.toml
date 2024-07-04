@@ -5,8 +5,8 @@ seeds = false
 skip-lint = false
 
 [programs.localnet]
-data_store = "hndKzPMrB9Xzs3mwarnPdkSWpZPZN3gLeeNzHDcHotT"
-exchange = "hnxiNKTc515NHvuq5fEUAc62dWkEu3m623FbwemWNJd"
+gmsol_store = "hndKzPMrB9Xzs3mwarnPdkSWpZPZN3gLeeNzHDcHotT"
+gmsol_exchange = "hnxiNKTc515NHvuq5fEUAc62dWkEu3m623FbwemWNJd"
 
 [registry]
 url = "https://api.apr.dev"

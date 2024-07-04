@@ -21,7 +21,7 @@ use anchor_client::{
     },
     Client, Program,
 };
-use data_store::states::common::TokensWithFeed;
+use gmsol_store::states::common::TokensWithFeed;
 use pyth_sdk::Identifier;
 
 use crate::utils::{RpcBuilder, TransactionBuilder};

@@ -1383,29 +1383,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e8566979429cf69b49a5c740c60791108e86440e8be149bbea4fe54d2c32d6e2"
 
 [[package]]
-name = "data_store"
-version = "0.1.0"
-dependencies = [
- "anchor-lang",
- "anchor-spl",
- "bitmaps 3.2.1",
- "bytemuck",
- "chainlink_solana",
- "clap 4.5.7",
- "dual-vec-map",
- "gmx-core",
- "gmx-solana-utils",
- "indexmap 2.2.6",
- "num_enum 0.7.2",
- "paste",
- "pyth-sdk-solana",
- "pyth-solana-receiver-sdk",
- "serde",
- "static_assertions",
- "strum",
-]
-
-[[package]]
 name = "der"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1684,17 +1661,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "exchange"
-version = "0.1.0"
-dependencies = [
- "anchor-lang",
- "anchor-spl",
- "bytemuck",
- "data_store",
- "gmx-core",
-]
-
-[[package]]
 name = "eyre"
 version = "0.6.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1918,13 +1884,13 @@ dependencies = [
  "bytemuck",
  "byteorder",
  "clap 4.5.7",
- "data_store",
  "eventsource-stream",
- "exchange",
  "eyre",
  "futures-util",
- "gmx-core",
- "gmx-solana-utils",
+ "gmsol-exchange",
+ "gmsol-model",
+ "gmsol-store",
+ "gmsol-utils",
  "heck 0.5.0",
  "hex",
  "indexmap 2.2.6",
@@ -1951,7 +1917,18 @@ dependencies = [
 ]
 
 [[package]]
-name = "gmx-core"
+name = "gmsol-exchange"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "bytemuck",
+ "gmsol-model",
+ "gmsol-store",
+]
+
+[[package]]
+name = "gmsol-model"
 version = "0.1.0"
 dependencies = [
  "anchor-lang",
@@ -1964,7 +1941,30 @@ dependencies = [
 ]
 
 [[package]]
-name = "gmx-solana-utils"
+name = "gmsol-store"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "bitmaps 3.2.1",
+ "bytemuck",
+ "chainlink_solana",
+ "clap 4.5.7",
+ "dual-vec-map",
+ "gmsol-model",
+ "gmsol-utils",
+ "indexmap 2.2.6",
+ "num_enum 0.7.2",
+ "paste",
+ "pyth-sdk-solana",
+ "pyth-solana-receiver-sdk",
+ "serde",
+ "static_assertions",
+ "strum",
+]
+
+[[package]]
+name = "gmsol-utils"
 version = "0.1.0"
 dependencies = [
  "anchor-lang",

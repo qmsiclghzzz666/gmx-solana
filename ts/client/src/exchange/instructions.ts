@@ -3,7 +3,7 @@ import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { toBN } from "../utils/number";
 import { findDepositPDA, findMarketPDA, findMarketVaultPDA, findOrderPDA, findPositionPDA, findWithdrawalPDA } from "../store";
 import { IxWithOutput, makeInvoke } from "../utils/invoke";
-import { DataStoreProgram, ExchangeProgram } from "../program";
+import { StoreProgram, ExchangeProgram } from "../program";
 import { BN } from "@coral-xyz/anchor";
 import { getPositionSide } from "./utils";
 
@@ -26,7 +26,7 @@ export type MakeCreateDepositParams = {
         fromInitialShortTokenAccount?: PublicKey,
         toMarketTokenAccount?: PublicKey,
         tokenMap?: PublicKey,
-        dataStore?: DataStoreProgram,
+        dataStore?: StoreProgram,
     },
 }
 
@@ -34,9 +34,9 @@ const getTokenAccount = (payer: PublicKey, token: PublicKey, account?: PublicKey
     return account ? account : getAssociatedTokenAddressSync(token, payer);
 }
 
-const getTokenMap = async (dataStoreProgram: DataStoreProgram | undefined, store: PublicKey) => {
-    if (!dataStoreProgram) throw Error("dataStoreProgram is not provided");
-    const tokenMap = (await dataStoreProgram.account.store.fetch(store)).tokenMap;
+const getTokenMap = async (GmsolStoreProgram: StoreProgram | undefined, store: PublicKey) => {
+    if (!GmsolStoreProgram) throw Error("GmsolStoreProgram is not provided");
+    const tokenMap = (await GmsolStoreProgram.account.store.fetch(store)).tokenMap;
     if (tokenMap.equals(PublicKey.default)) throw Error("token_map is not set for the store");
     return tokenMap;
 };
@@ -123,7 +123,7 @@ export type MakeCreateWithdrawalParams = {
         shortTokenSwapPath?: PublicKey[],
         shouldUnwrapNativeToken?: boolean,
         tokenMap?: PublicKey,
-        dataStore?: DataStoreProgram,
+        dataStore?: StoreProgram,
     }
 };
 
@@ -208,7 +208,7 @@ export type MakeCreateDecreaseOrderParams = {
             collateralToken: PublicKey,
             isLong: boolean,
         },
-        dataStore?: DataStoreProgram,
+        dataStore?: StoreProgram,
         tokenMap?: PublicKey,
     }
 };
@@ -325,7 +325,7 @@ export type MakeCreateIncreaseOrderParams = {
             longToken: PublicKey,
             shortToken: PublicKey,
         },
-        dataStore?: DataStoreProgram,
+        dataStore?: StoreProgram,
         tokenMap?: PublicKey,
     }
 };
@@ -358,7 +358,7 @@ export const makeCreateIncreaseOrderInstruction = async (
         };
     })) : undefined;
 
-    if (!collateralTokens) throw Error("Neither `hint` nor `dataStoreProgram` provided");
+    if (!collateralTokens) throw Error("Neither `hint` nor `GmsolStoreProgram` provided");
     const { longToken, shortToken } = collateralTokens;
     const longTokenAccount = getTokenAccount(payer, longToken, options?.longTokenAccount);
     const shortTokenAccount = getTokenAccount(payer, shortToken, options?.shortTokenAccount);

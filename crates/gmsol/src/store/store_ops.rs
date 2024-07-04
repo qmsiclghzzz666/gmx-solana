@@ -4,13 +4,13 @@ use anchor_client::{
     anchor_lang::system_program,
     solana_sdk::{pubkey::Pubkey, signer::Signer},
 };
-use data_store::{accounts, instruction};
+use gmsol_store::{accounts, instruction};
 
 use crate::utils::RpcBuilder;
 
 /// Data Store management for GMSOL.
 pub trait StoreOps<C> {
-    /// Initialize [`Store`](data_store::states::Store) account.
+    /// Initialize [`Store`](gmsol_store::states::Store) account.
     fn initialize_store(&self, key: &str, authority: Option<&Pubkey>) -> RpcBuilder<C>;
 
     /// Transfer Store authority.

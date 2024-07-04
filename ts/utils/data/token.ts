@@ -1,6 +1,6 @@
 import { utils } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
-import { DATA_STORE_ID, DataStoreProgram, IxWithOutput, makeInvoke, toBN } from "gmsol";
+import { STORE_PROGRAM_ID, StoreProgram, IxWithOutput, makeInvoke, toBN } from "gmsol";
 import { TIME_WINDOW } from "./constants";
 import { toInteger } from "lodash";
 
@@ -20,13 +20,13 @@ export const findClaimableAccountPDA = (
         mint.toBuffer(),
         user.toBuffer(),
         buf,
-    ], DATA_STORE_ID)
+    ], STORE_PROGRAM_ID)
 };
 
 export const getTimeKey = (timestamp: bigint | number, window: number) => BigInt(timestamp) / BigInt(window);
 
 export const makeUseClaimableAccountInstruction = async (
-    program: DataStoreProgram,
+    program: StoreProgram,
     { authority, store, user, mint, amount, timestamp }: {
         authority: PublicKey,
         store: PublicKey,
@@ -57,7 +57,7 @@ export const makeUseClaimableAccountInstruction = async (
 export const invokeUseClaimableAccount = makeInvoke(makeUseClaimableAccountInstruction, ["authority"]);
 
 export const makeCloseEmptyClaimableAccountInstruction = async (
-    program: DataStoreProgram,
+    program: StoreProgram,
     { authority, store, user, mint, timestamp }: {
         authority: PublicKey,
         store: PublicKey,

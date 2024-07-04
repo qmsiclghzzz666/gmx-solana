@@ -1,4 +1,4 @@
-import { useDataStore } from "@/contexts/anchor";
+import { useStoreProgram } from "@/contexts/anchor";
 import { MarketData, Markets } from "./types";
 import useSWR from "swr";
 import { findMarketPDA } from "gmsol";
@@ -12,7 +12,7 @@ const MARKETS_KEY = "data_store/markets";
 const BN_TWO = new BN(2);
 
 export const useMarkets = (params?: { store: PublicKey, marketTokens: PublicKey[] }) => {
-  const dataStore = useDataStore();
+  const dataStore = useStoreProgram();
 
   const request = useMemo(() => {
     return params ? {

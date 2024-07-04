@@ -6,7 +6,7 @@ use std::{
 };
 
 use anchor_client::solana_sdk::{pubkey::Pubkey, signature::Keypair};
-use data_store::states::{
+use gmsol_store::states::{
     Factor, MarketConfigKey, PriceProviderKind, TokenConfigBuilder, DEFAULT_HEARTBEAT_DURATION,
     DEFAULT_PRECISION,
 };

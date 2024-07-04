@@ -1,7 +1,7 @@
 import { Keypair, PublicKey, Signer } from "@solana/web3.js";
-import { dataStore } from "./program";
+import { storeProgram } from "./program";
 import { utils } from "@coral-xyz/anchor";
-import { DataStoreProgram, PriceProvider, makeInvoke, toBN } from "gmsol";
+import { StoreProgram, PriceProvider, makeInvoke, toBN } from "gmsol";
 import { update } from "lodash";
 
 // Token Config map seed.
@@ -26,7 +26,7 @@ export const toggleTokenConfig = async (
     token: PublicKey,
     enable: boolean,
 ) => {
-    await dataStore.methods.toggleTokenConfig(token, enable).accountsPartial({
+    await storeProgram.methods.toggleTokenConfig(token, enable).accountsPartial({
         authority: authority.publicKey,
         store,
         tokenMap,
@@ -40,7 +40,7 @@ export const setExpectedProvider = async (
     token: PublicKey,
     provider: PriceProvider,
 ) => {
-    await dataStore.methods.setExpectedProvider(token, provider).accountsPartial({
+    await storeProgram.methods.setExpectedProvider(token, provider).accountsPartial({
         authority: authority.publicKey,
         store,
         tokenMap,
@@ -57,7 +57,7 @@ export interface TokenConfig {
 }
 
 export const makeInitializeTokenMapInstruction = async (
-    program: DataStoreProgram,
+    program: StoreProgram,
     { payer, store, tokenMap }: {
         payer: PublicKey,
         store: PublicKey,
@@ -74,7 +74,7 @@ export const makeInitializeTokenMapInstruction = async (
 export const invokeInitializeTokenMap = makeInvoke(makeInitializeTokenMapInstruction, ["payer", "tokenMap"]);
 
 export const makePushToTokenMapInstruction = async (
-    program: DataStoreProgram,
+    program: StoreProgram,
     {
         authority,
         store,
@@ -127,7 +127,7 @@ export const makePushToTokenMapInstruction = async (
 export const invokePushToTokenMap = makeInvoke(makePushToTokenMapInstruction, ["authority"]);
 
 export const makePushToTokenMapSyntheticInstruction = async (
-    program: DataStoreProgram,
+    program: StoreProgram,
     {
         authority,
         store,
@@ -183,7 +183,7 @@ export const makePushToTokenMapSyntheticInstruction = async (
 export const invokePushToTokenMapSynthetic = makeInvoke(makePushToTokenMapSyntheticInstruction, ["authority"]);
 
 export const makeSetFeedConfigInstruction = async (
-    program: DataStoreProgram,
+    program: StoreProgram,
     { authority, store, tokenMap, token, provider, feed, timestampAdjustment }: {
         authority: PublicKey,
         store: PublicKey,

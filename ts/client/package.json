@@ -9,9 +9,9 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "build-data-store-idl": "anchor idl build -p data_store -t src/idl/data_store.ts -o src/idl/data_store.json",
-    "build-exchange-idl": "anchor idl build -p exchange -t src/idl/exchange.ts -o src/idl/exchange.json",
-    "build-idls": "pnpm build-data-store-idl && pnpm build-exchange-idl",
+    "build-gmsol-store-idl": "anchor idl build -p gmsol_store -t src/idl/gmsol_store.ts -o src/idl/gmsol_store.json",
+    "build-gmsol-exchange-idl": "anchor idl build -p gmsol_exchange -t src/idl/gmsol_exchange.ts -o src/idl/gmsol_exchange.json",
+    "build-idls": "pnpm build-gmsol-store-idl && pnpm build-gmsol-exchange-idl",
     "build-all": "pnpm build-idls && pnpm build",
     "build-all:node": "BUILD_TARGET=node pnpm build-all"
   },

@@ -1,11 +1,11 @@
 import { PublicKey } from "@solana/web3.js";
 import { getAddresses, getMarkets, getProvider, getUsers } from "../../utils/fixtures";
-import { exchange, executeOrder } from "../../utils/exchange";
+import { exchangeProgram, executeOrder } from "../../utils/exchange";
 import { findPositionPDA, invokeCreateDecreaseOrderWithPayerAsSigner, invokeCreateIncreaseOrderWithPayerAsSigner } from "gmsol";
 import { toInteger } from "lodash";
-import { dataStore } from "../../utils/data";
+import { storeProgram } from "../../utils/data";
 
-describe("exchange: order", () => {
+describe("exchange: Order", () => {
     const provider = getProvider();
     const { signer0, user0 } = getUsers();
 
@@ -28,7 +28,7 @@ describe("exchange: order", () => {
             fakeTokenMint,
         } = await getAddresses());
         ({ GMFakeFakeUsdG } = await getMarkets());
-        tokenMap = (await dataStore.account.store.fetch(dataStoreAddress)).tokenMap;
+        tokenMap = (await storeProgram.account.store.fetch(dataStoreAddress)).tokenMap;
     });
 
     it("increase and decrease position", async () => {
@@ -36,7 +36,7 @@ describe("exchange: order", () => {
         // Increase position.
         let increaseOrder: PublicKey;
         try {
-            const [signature, address] = await invokeCreateIncreaseOrderWithPayerAsSigner(exchange, {
+            const [signature, address] = await invokeCreateIncreaseOrderWithPayerAsSigner(exchangeProgram, {
                 store: dataStoreAddress,
                 payer: user0,
                 marketToken: GMFakeFakeUsdG,
@@ -71,7 +71,7 @@ describe("exchange: order", () => {
                 oracle: oracleAddress,
                 order: increaseOrder,
                 recentTimestamp,
-                holding: dataStore.provider.publicKey,
+                holding: storeProgram.provider.publicKey,
                 options: {
                     executionFee: 5001,
                 }
@@ -88,7 +88,7 @@ describe("exchange: order", () => {
         let decreaseOrder: PublicKey;
         try {
             const [position] = findPositionPDA(dataStoreAddress, user0.publicKey, GMFakeFakeUsdG, usdGTokenMint, true);
-            const [signature, address] = await invokeCreateDecreaseOrderWithPayerAsSigner(exchange, {
+            const [signature, address] = await invokeCreateDecreaseOrderWithPayerAsSigner(exchangeProgram, {
                 store: dataStoreAddress,
                 payer: user0,
                 position,
@@ -124,7 +124,7 @@ describe("exchange: order", () => {
                 oracle: oracleAddress,
                 order: decreaseOrder,
                 recentTimestamp,
-                holding: dataStore.provider.publicKey,
+                holding: storeProgram.provider.publicKey,
                 options: {
                     executionFee: 5001,
                 }
@@ -143,7 +143,7 @@ describe("exchange: order", () => {
         // Increase position.
         let increaseOrder: PublicKey;
         try {
-            const [signature, address] = await invokeCreateIncreaseOrderWithPayerAsSigner(exchange, {
+            const [signature, address] = await invokeCreateIncreaseOrderWithPayerAsSigner(exchangeProgram, {
                 store: dataStoreAddress,
                 payer: user0,
                 marketToken: GMFakeFakeUsdG,
@@ -178,7 +178,7 @@ describe("exchange: order", () => {
                 oracle: oracleAddress,
                 order: increaseOrder,
                 recentTimestamp,
-                holding: dataStore.provider.publicKey,
+                holding: storeProgram.provider.publicKey,
                 options: {
                     executionFee: 5001,
                 }
@@ -195,7 +195,7 @@ describe("exchange: order", () => {
         let decreaseOrder: PublicKey;
         try {
             const [position] = findPositionPDA(dataStoreAddress, user0.publicKey, GMFakeFakeUsdG, fakeTokenMint, true);
-            const [signature, address] = await invokeCreateDecreaseOrderWithPayerAsSigner(exchange, {
+            const [signature, address] = await invokeCreateDecreaseOrderWithPayerAsSigner(exchangeProgram, {
                 store: dataStoreAddress,
                 payer: user0,
                 position,
@@ -229,7 +229,7 @@ describe("exchange: order", () => {
                 oracle: oracleAddress,
                 order: decreaseOrder,
                 recentTimestamp,
-                holding: dataStore.provider.publicKey,
+                holding: storeProgram.provider.publicKey,
                 options: {
                     executionFee: 5001,
                 }

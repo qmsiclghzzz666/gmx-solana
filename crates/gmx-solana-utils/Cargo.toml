@@ -1,8 +1,0 @@
-[package]
-name = "gmx-solana-utils"
-version.workspace = true
-edition.workspace = true
-
-[dependencies]
-anchor-lang = { workspace = true }
-thiserror = { workspace = true }

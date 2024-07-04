@@ -1,4 +1,4 @@
-use data_store::states::{common::TokensWithFeed, PriceProviderKind};
+use gmsol_store::states::{common::TokensWithFeed, PriceProviderKind};
 use pyth_sdk::Identifier;
 use pythnet_sdk::{
     messages::PriceFeedMessage,
