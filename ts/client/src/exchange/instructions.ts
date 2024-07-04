@@ -395,6 +395,7 @@ export const makeCreateIncreaseOrderInstruction = async (
             return {
                 pubkey: findMarketPDA(store, mint)[0],
                 isSigner: false,
+                // We need to record transferred in amounts in the first market.
                 isWritable: idx == 0,
             }
         })).instruction();
@@ -403,3 +404,103 @@ export const makeCreateIncreaseOrderInstruction = async (
 
 export const invokeCreateIncreaseOrderWithPayerAsSigner = makeInvoke(makeCreateIncreaseOrderInstruction, ["payer"]);
 export const invokeCreateIncreaseOrder = makeInvoke(makeCreateIncreaseOrderInstruction, [], true);
+
+export type MakeCreateSwapOrderParams = {
+    store: PublicKey,
+    payer: PublicKey,
+    marketToken: PublicKey,
+    initialSwapInToken: PublicKey,
+    swapOutToken: PublicKey,
+    initialSwapInTokenAmount: number | bigint,
+    options: {
+        nonce?: Buffer,
+        executionFee?: number | bigint,
+        swapPath?: PublicKey[],
+        minOutputAmount?: number | bigint,
+        acceptablePrice?: number | bigint,
+        initialSwapInTokenAccount?: PublicKey,
+        longTokenAccount?: PublicKey,
+        shortTokenAccount?: PublicKey,
+        hint?: {
+            longToken: PublicKey,
+            shortToken: PublicKey,
+        },
+        storeProgram?: StoreProgram,
+        tokenMap?: PublicKey,
+    }
+};
+
+export const makeCreateSwapOrderInstruction = async (
+    exchange: ExchangeProgram,
+    {
+        store,
+        payer,
+        marketToken,
+        initialSwapInToken,
+        swapOutToken,
+        initialSwapInTokenAmount,
+        options,
+    }: MakeCreateSwapOrderParams
+) => {
+    const swapPath = options?.swapPath ?? [];
+    const nonce = options?.nonce ?? Keypair.generate().publicKey.toBuffer();
+    const [order] = findOrderPDA(store, payer, nonce);
+    const acceptablePrice = options?.acceptablePrice;
+    const tokenMap = options?.tokenMap ?? (await getTokenMap(options?.storeProgram, store));
+    const initialCollateralToken = initialSwapInToken;
+    const initialCollateralTokenAccount = getTokenAccount(payer, initialCollateralToken, options?.initialSwapInTokenAccount);
+    const [market] = findMarketPDA(store, marketToken);
+    const collateralTokens = options?.hint ? options.hint : options?.storeProgram ? (await options.storeProgram.account.market.fetch(market).then(market => {
+        return {
+            longToken: market.meta.longTokenMint,
+            shortToken: market.meta.shortTokenMint,
+        };
+    })) : undefined;
+
+    if (!collateralTokens) throw Error("Neither `hint` nor `storeProgram` provided");
+    const { longToken, shortToken } = collateralTokens;
+    const longTokenAccount = getTokenAccount(payer, longToken, options?.longTokenAccount);
+    const shortTokenAccount = getTokenAccount(payer, shortToken, options?.shortTokenAccount);
+
+    const instruction = await exchange.methods.createOrder(
+        [...nonce],
+        {
+            order: {
+                kind: { "marketSwap": {} },
+                minOutputAmount: toBN(options?.minOutputAmount ?? 0),
+                sizeDeltaUsd: toBN(0),
+                initialCollateralDeltaAmount: toBN(initialSwapInTokenAmount ?? 0),
+                acceptablePrice: acceptablePrice ? toBN(acceptablePrice) : null,
+                isLong: true,
+            },
+            outputToken: swapOutToken,
+            uiFeeReceiver: PublicKey.default,
+            executionFee: toBN(options?.executionFee ?? 0),
+            swapLength: swapPath.length,
+        }).accountsPartial({
+            store,
+            tokenMap,
+            payer,
+            order,
+            position: null,
+            market: findMarketPDA(store, marketToken)[0],
+            initialCollateralTokenAccount,
+            initialCollateralTokenVault: findMarketVaultPDA(store, initialCollateralToken)[0],
+            finalOutputTokenAccount: null,
+            secondaryOutputTokenAccount: null,
+            longTokenAccount,
+            shortTokenAccount,
+        }).remainingAccounts(swapPath.map((mint, idx) => {
+            return {
+                pubkey: findMarketPDA(store, mint)[0],
+                isSigner: false,
+                // We need to record transferred in amounts in the first market.
+                isWritable: idx == 0,
+            }
+        })).instruction();
+
+    return [instruction, order] as IxWithOutput<PublicKey>;
+}
+
+export const invokeCreateSwapOrderWithPayerAsSigner = makeInvoke(makeCreateSwapOrderInstruction, ["payer"]);
+export const invokeCreateSwapOrder = makeInvoke(makeCreateSwapOrderInstruction, [], true);

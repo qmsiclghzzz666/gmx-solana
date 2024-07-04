@@ -93,14 +93,24 @@ pub fn initialize_order(
     let meta = *ctx.accounts.market.load()?.meta();
     // Validate and create `Tokens`.
     let tokens = match &params.kind {
-        OrderKind::MarketSwap => Tokens {
-            market_token: meta.market_token_mint,
-            initial_collateral_token: ctx.accounts.initial_collateral_token_account()?.mint,
-            output_token: ctx.accounts.final_output_token_account()?.mint,
-            secondary_output_token: ctx.accounts.final_output_token_account()?.mint,
-            final_output_token: None,
-        },
+        OrderKind::MarketSwap => {
+            // Validate that the `output_token` is one of the collateral tokens.
+            ctx.accounts
+                .market
+                .load()?
+                .meta()
+                .validate_collateral_token(&output_token)?;
+            Tokens {
+                market_token: meta.market_token_mint,
+                initial_collateral_token: ctx.accounts.initial_collateral_token_account()?.mint,
+                output_token,
+                // `secondary_output_token` is unused for swap, so just set it to `output_token` here.
+                secondary_output_token: output_token,
+                final_output_token: None,
+            }
+        }
         OrderKind::MarketIncrease => {
+            // The validation of `output_token` is also performed by the method below.
             ctx.accounts.initialize_position_if_needed(
                 &params,
                 ctx.bumps.position,
@@ -115,6 +125,7 @@ pub fn initialize_order(
             }
         }
         OrderKind::MarketDecrease | OrderKind::Liquidation => {
+            // The validation of `output_token` is also performed by the method below.
             ctx.accounts
                 .validate_position(ctx.bumps.position, &output_token)?;
             Tokens {
@@ -133,9 +144,10 @@ pub fn initialize_order(
                     ctx.accounts.initial_collateral_token_account()?.key(),
                 ),
             },
+            // The output of a swap is directly trasferred to `long_token_account` or `short_token_account`.
             Receivers {
                 ui_fee: ui_fee_receiver,
-                final_output_token_account: Some(ctx.accounts.final_output_token_account()?.key()),
+                final_output_token_account: None,
                 secondary_output_token_account: None,
                 long_token_account: ctx.accounts.long_token_account.key(),
                 short_token_account: ctx.accounts.short_token_account.key(),
