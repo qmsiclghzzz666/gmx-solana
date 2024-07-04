@@ -13,7 +13,7 @@ use gmsol_model::{
 use crate::{
     constants,
     states::{Factor, HasMarketMeta, Market, MarketConfig, MarketMeta, MarketState, Pool},
-    StoreError, ModelError,
+    ModelError, StoreError,
 };
 
 use super::{swap_market::RevertibleSwapMarket, Revertible, RevertibleBalance};
@@ -75,10 +75,12 @@ impl gmsol_model::Balance for SmallPool {
 
 impl gmsol_model::Pool for SmallPool {
     fn apply_delta_to_long_amount(&mut self, delta: &Self::Signed) -> gmsol_model::Result<()> {
-        self.long_amount = self
-            .long_amount
-            .checked_add_signed(*delta)
-            .ok_or(gmsol_model::Error::Computation("apply delta to long amount"))?;
+        self.long_amount =
+            self.long_amount
+                .checked_add_signed(*delta)
+                .ok_or(gmsol_model::Error::Computation(
+                    "apply delta to long amount",
+                ))?;
         Ok(())
     }
 
@@ -90,7 +92,9 @@ impl gmsol_model::Pool for SmallPool {
         };
         *amount = amount
             .checked_add_signed(*delta)
-            .ok_or(gmsol_model::Error::Computation("apply delta to short amount"))?;
+            .ok_or(gmsol_model::Error::Computation(
+                "apply delta to short amount",
+            ))?;
         Ok(())
     }
 }
@@ -404,22 +408,16 @@ impl<'a> gmsol_model::Bank<Pubkey> for RevertibleMarket<'a> {
         token: &Q,
         amount: &Self::Num,
     ) -> gmsol_model::Result<()> {
+        let is_long_token = self.storage.meta.to_token_side(token.borrow())?;
         // TODO: use event
         msg!(
-            "[Not committed] {}: {},{}(+{} {})",
+            "[Balance Not committed] {}: {},{}(+{} {is_long_token})",
             self.storage.meta.market_token_mint,
             self.balance.long_token_balance,
             self.balance.short_token_balance,
             amount,
-            token.borrow(),
         );
-        if self.storage.meta.long_token_mint == *token.borrow() {
-            self.balance.record_transferred_in(true, *amount)?;
-        } else if self.storage.meta.short_token_mint == *token.borrow() {
-            self.balance.record_transferred_in(false, *amount)?;
-        } else {
-            return Err(gmsol_model::Error::invalid_argument("invalid token"));
-        }
+        self.balance.record_transferred_in(is_long_token, *amount)?;
         Ok(())
     }
 
@@ -428,22 +426,17 @@ impl<'a> gmsol_model::Bank<Pubkey> for RevertibleMarket<'a> {
         token: &Q,
         amount: &Self::Num,
     ) -> gmsol_model::Result<()> {
+        let is_long_token = self.storage.meta.to_token_side(token.borrow())?;
         // TODO: use event
         msg!(
-            "[Not committed] {}: {},{}(-{} {})",
+            "[Balance Not committed] {}: {},{}(-{} {is_long_token})",
             self.storage.meta.market_token_mint,
             self.balance.long_token_balance,
             self.balance.short_token_balance,
             amount,
-            token.borrow(),
         );
-        if self.storage.meta.long_token_mint == *token.borrow() {
-            self.balance.record_transferred_out(true, *amount)?;
-        } else if self.storage.meta.short_token_mint == *token.borrow() {
-            self.balance.record_transferred_out(false, *amount)?;
-        } else {
-            return Err(gmsol_model::Error::invalid_argument("invalid token"));
-        }
+        self.balance
+            .record_transferred_out(is_long_token, *amount)?;
         Ok(())
     }
 

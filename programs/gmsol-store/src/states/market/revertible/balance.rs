@@ -72,7 +72,7 @@ impl RevertibleBalance {
         market.state.long_token_balance = self.long_token_balance;
         market.state.short_token_balance = self.short_token_balance;
         msg!(
-            "[Committed] {}: {},{}",
+            "[Balance Committed] {}: {},{}",
             market.meta.market_token_mint,
             market.state.long_token_balance,
             market.state.short_token_balance
