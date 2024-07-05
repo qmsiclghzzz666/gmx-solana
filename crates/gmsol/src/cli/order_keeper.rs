@@ -63,6 +63,8 @@ enum Command {
         verbose: bool,
         #[arg(long)]
         execute: bool,
+        #[arg(long)]
+        ignore_store: bool,
     },
 }
 
@@ -130,74 +132,84 @@ impl KeeperArgs {
                 action,
                 verbose,
                 execute,
-            } => match action {
-                Action::Deposit => {
-                    let actions = self.fetch_pendings::<Deposit>(client, store).await?;
-                    if actions.is_empty() {
-                        println!("No pending deposits");
-                    }
-                    for (pubkey, action) in actions {
-                        if *verbose {
-                            println!("{pubkey}: {action:?}");
-                        } else {
-                            println!("{pubkey}");
-                        }
-                        if *execute {
-                            Box::pin(
-                                self.with_command(Command::ExecuteDeposit { deposit: pubkey })
-                                    .run(client, store, serialize_only),
-                            )
+                ignore_store,
+            } => {
+                let filter_store = !*ignore_store;
+                match action {
+                    Action::Deposit => {
+                        let actions = self
+                            .fetch_pendings::<Deposit>(client, store, 8, filter_store)
                             .await?;
+                        if actions.is_empty() {
+                            println!("No pending deposits");
+                        }
+                        for (pubkey, action) in actions {
+                            if *verbose {
+                                println!("{pubkey}: {action:?}");
+                            } else {
+                                println!("{pubkey}");
+                            }
+                            if *execute {
+                                Box::pin(
+                                    self.with_command(Command::ExecuteDeposit { deposit: pubkey })
+                                        .run(client, store, serialize_only),
+                                )
+                                .await?;
+                            }
+                        }
+                    }
+                    Action::Withdrawal => {
+                        let actions = self
+                            .fetch_pendings::<Withdrawal>(client, store, 8, filter_store)
+                            .await?;
+                        if actions.is_empty() {
+                            println!("No pending withdrawals");
+                        }
+                        for (pubkey, action) in actions {
+                            if *verbose {
+                                println!("{pubkey}: {action:?}");
+                            } else {
+                                println!("{pubkey}");
+                            }
+                            if *execute {
+                                Box::pin(
+                                    self.with_command(Command::ExecuteWithdrawal {
+                                        withdrawal: pubkey,
+                                    })
+                                    .run(
+                                        client,
+                                        store,
+                                        serialize_only,
+                                    ),
+                                )
+                                .await?;
+                            }
+                        }
+                    }
+                    Action::Order => {
+                        let actions = self
+                            .fetch_pendings::<Order>(client, store, 9, filter_store)
+                            .await?;
+                        if actions.is_empty() {
+                            println!("No pending orders");
+                        }
+                        for (pubkey, action) in actions {
+                            if *verbose {
+                                println!("{pubkey}: {action:?}");
+                            } else {
+                                println!("{pubkey}");
+                            }
+                            if *execute {
+                                Box::pin(
+                                    self.with_command(Command::ExecuteOrder { order: pubkey })
+                                        .run(client, store, serialize_only),
+                                )
+                                .await?;
+                            }
                         }
                     }
                 }
-                Action::Withdrawal => {
-                    let actions = self.fetch_pendings::<Withdrawal>(client, store).await?;
-                    if actions.is_empty() {
-                        println!("No pending withdrawals");
-                    }
-                    for (pubkey, action) in actions {
-                        if *verbose {
-                            println!("{pubkey}: {action:?}");
-                        } else {
-                            println!("{pubkey}");
-                        }
-                        if *execute {
-                            Box::pin(
-                                self.with_command(Command::ExecuteWithdrawal {
-                                    withdrawal: pubkey,
-                                })
-                                .run(
-                                    client,
-                                    store,
-                                    serialize_only,
-                                ),
-                            )
-                            .await?;
-                        }
-                    }
-                }
-                Action::Order => {
-                    let actions = self.fetch_pendings::<Order>(client, store).await?;
-                    if actions.is_empty() {
-                        println!("No pending orders");
-                    }
-                    for (pubkey, action) in actions {
-                        if *verbose {
-                            println!("{pubkey}: {action:?}");
-                        } else {
-                            println!("{pubkey}");
-                        }
-                        if *execute {
-                            Box::pin(
-                                self.with_command(Command::ExecuteOrder { order: pubkey })
-                                    .run(client, store, serialize_only),
-                            )
-                            .await?;
-                        }
-                    }
-                }
-            },
+            }
             Command::ExecuteDeposit { deposit } => {
                 let mut builder = client.execute_deposit(
                     store,
@@ -398,16 +410,22 @@ impl KeeperArgs {
         &self,
         client: &GMSOLClient,
         store: &Pubkey,
+        store_offset: usize,
+        filter_store: bool,
     ) -> gmsol::Result<Vec<(Pubkey, T)>>
     where
         T: AccountDeserialize + Discriminator,
     {
-        tracing::debug!(%store, "store bytes to filter: {}", hex::encode(store));
-        let store_filter =
-            RpcFilterType::Memcmp(Memcmp::new_raw_bytes(9, store.as_ref().to_owned()));
+        let filters = std::iter::empty().chain(filter_store.then(|| {
+            tracing::debug!(%store, "store bytes to filter: {}", hex::encode(store));
+            RpcFilterType::Memcmp(Memcmp::new_raw_bytes(
+                store_offset,
+                store.as_ref().to_owned(),
+            ))
+        }));
         client
             .data_store()
-            .accounts_lazy::<T>(vec![store_filter])
+            .accounts_lazy::<T>(filters.collect())
             .await?
             .map(|res| res.map_err(gmsol::Error::from))
             .collect()
