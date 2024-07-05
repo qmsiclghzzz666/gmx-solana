@@ -37,6 +37,7 @@ impl Order {
     pub fn init(
         &mut self,
         bump: u8,
+        id: u64,
         store: Pubkey,
         nonce: &NonceBytes,
         market: &Pubkey,
@@ -50,7 +51,7 @@ impl Order {
         swap: SwapParams,
     ) -> Result<()> {
         self.fixed.init(
-            bump, store, nonce, market, user, position, params, tokens, senders, receivers,
+            bump, id, store, nonce, market, user, position, params, tokens, senders, receivers,
         )?;
         self.prices = TokensWithFeed::try_from_vec(tokens_with_feed)?;
         self.swap = swap;
@@ -66,18 +67,22 @@ impl Seed for Order {
 #[derive(AnchorSerialize, AnchorDeserialize, InitSpace, Clone)]
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub struct Fixed {
-    /// The bump seed.
-    pub bump: u8,
+    /// Order Kind.
+    pub kind: OrderKind,
     /// Store.
     pub store: Pubkey,
-    /// The nonce bytes for this order.
-    pub nonce: [u8; 32],
+    /// The order market.
+    pub market: Pubkey,
+    /// Action id.
+    pub id: u64,
     /// The slot that the order was last updated at.
     pub updated_at_slot: u64,
     /// The time that the order was last updated at.
     pub updated_at: i64,
-    /// The order market.
-    pub market: Pubkey,
+    /// The bump seed.
+    pub bump: u8,
+    /// The nonce bytes for this order.
+    pub nonce: [u8; 32],
     /// The creator of the order.
     pub user: Pubkey,
     /// Position.
@@ -90,6 +95,7 @@ pub struct Fixed {
     pub senders: Senders,
     /// Receivers.
     pub receivers: Receivers,
+    reserved: [u8; 128],
 }
 
 impl Fixed {
@@ -97,6 +103,7 @@ impl Fixed {
     fn init(
         &mut self,
         bump: u8,
+        id: u64,
         store: Pubkey,
         nonce: &NonceBytes,
         market: &Pubkey,
@@ -109,6 +116,8 @@ impl Fixed {
     ) -> Result<()> {
         let clock = Clock::get()?;
         self.bump = bump;
+        self.id = id;
+        self.kind = params.kind;
         self.store = store;
         self.nonce = *nonce;
         self.updated_at_slot = clock.slot;
@@ -209,6 +218,7 @@ impl OrderParams {
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, InitSpace, Copy)]
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[non_exhaustive]
+#[repr(u8)]
 pub enum OrderKind {
     /// Swap token A to token B at the current market price.
     ///

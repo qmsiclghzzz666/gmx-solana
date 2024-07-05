@@ -1,9 +1,10 @@
 import { PublicKey } from "@solana/web3.js";
-import { getAddresses, getMarkets, getProvider, getUsers } from "../../utils/fixtures";
+import { expect, getAddresses, getMarkets, getProvider, getUsers } from "../../utils/fixtures";
 import { exchangeProgram, executeOrder } from "../../utils/exchange";
 import { findPositionPDA, invokeCreateDecreaseOrderWithPayerAsSigner, invokeCreateIncreaseOrderWithPayerAsSigner } from "gmsol";
 import { toInteger } from "lodash";
 import { storeProgram } from "../../utils/data";
+import { utils } from "@coral-xyz/anchor";
 
 describe("exchange: Order", () => {
     const provider = getProvider();
@@ -64,6 +65,11 @@ describe("exchange: Order", () => {
             console.log(error);
             throw error;
         }
+        const orderBuffer = (await storeProgram.account.order.getAccountInfo(increaseOrder)).data;
+        const kindBytes = Array.from(orderBuffer.subarray(8, 9));
+        expect(kindBytes).to.eql([1]);
+        const orderId = (await storeProgram.account.order.fetch(increaseOrder)).fixed.id;
+        expect(orderId.eqn(0)).false;
         try {
             const signature = await executeOrder(false, provider.connection, {
                 authority: signer0,

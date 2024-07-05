@@ -274,6 +274,11 @@ impl Market {
     pub fn state(&self) -> &MarketState {
         &self.state
     }
+
+    /// Get market state mutably.
+    pub fn state_mut(&mut self) -> &mut MarketState {
+        &mut self.state
+    }
 }
 
 /// Market Flags.

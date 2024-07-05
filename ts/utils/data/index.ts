@@ -12,6 +12,7 @@ import { createControllerPDA } from "../exchange";
 import { invokeInsertAddress, invokeInsertAmount, invokeInsertFactor } from "./config";
 import { TIME_WINDOW } from "./constants";
 import { invokeSetTokenMap } from "./store";
+import { utils } from "@coral-xyz/anchor";
 
 export const encodeUtf8 = anchor.utils.bytes.utf8.encode;
 
@@ -150,6 +151,7 @@ export const initializeDataStore = async (
             store: dataStorePDA,
         }).rpc();
         console.log(`Initialized a new data store account ${dataStorePDA.toBase58()} in tx: ${tx}`);
+        console.log(`The hex string for the store address is ${utils.bytes.hex.encode(dataStorePDA.toBuffer())}`)
     } catch (error) {
         console.warn("Failed to initialize a data store with the given key:", error);
     }

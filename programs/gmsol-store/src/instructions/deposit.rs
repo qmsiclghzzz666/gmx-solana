@@ -31,7 +31,7 @@ pub struct InitializeDeposit<'info> {
     pub initial_long_token_account: Option<Box<Account<'info, TokenAccount>>>,
     #[account(token::authority = payer)]
     pub initial_short_token_account: Option<Box<Account<'info, TokenAccount>>>,
-    #[account(has_one = store)]
+    #[account(mut, has_one = store)]
     pub(crate) market: AccountLoader<'info, Market>,
     #[account(token::authority = payer, token::mint = market.load()?.meta().market_token_mint)]
     pub receiver: Box<Account<'info, TokenAccount>>,
@@ -52,9 +52,15 @@ pub fn initialize_deposit(
         token_params.initial_long_token_amount != 0 || token_params.initial_short_token_amount != 0,
         StoreError::EmptyDeposit
     );
-
+    let id = ctx
+        .accounts
+        .market
+        .load_mut()?
+        .state_mut()
+        .next_deposit_id()?;
     ctx.accounts.deposit.init(
         ctx.bumps.deposit,
+        id,
         ctx.accounts.store.key(),
         &ctx.accounts.market,
         nonce,

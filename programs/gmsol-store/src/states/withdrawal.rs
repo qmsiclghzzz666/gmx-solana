@@ -26,26 +26,29 @@ impl Withdrawal {
 #[derive(AnchorSerialize, AnchorDeserialize, InitSpace, Clone)]
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub struct Fixed {
-    /// The bump seed.
-    pub bump: u8,
     /// Store.
     pub store: Pubkey,
-    /// The nonce bytes for this withdrawal.
-    pub nonce: [u8; 32],
+    /// The market on which the withdrawal will be executed.
+    pub market: Pubkey,
+    /// Action id.
+    pub id: u64,
     /// The slot that the withdrawal was last updated at.
     pub updated_at_slot: u64,
     /// The time that the withdrawal was last updated at.
     pub updated_at: i64,
+    /// The bump seed.
+    pub bump: u8,
+    /// The nonce bytes for this withdrawal.
+    pub nonce: [u8; 32],
     /// The user to withdraw for.
     pub user: Pubkey,
     /// The market token account.
     pub market_token_account: Pubkey,
-    /// The market on which the withdrawal will be executed.
-    pub market: Pubkey,
     /// Receivers.
     pub receivers: Receivers,
     /// Tokens config.
     pub tokens: Tokens,
+    reserved: [u8; 128],
 }
 
 /// Dynamic part of [`Withdrawal`].
@@ -117,6 +120,7 @@ impl Withdrawal {
     pub(crate) fn init(
         &mut self,
         bump: u8,
+        id: u64,
         store: Pubkey,
         nonce: NonceBytes,
         user: Pubkey,
@@ -133,6 +137,7 @@ impl Withdrawal {
         let clock = Clock::get()?;
         *self = Self {
             fixed: Box::new(Fixed {
+                id,
                 bump,
                 store,
                 nonce,
@@ -153,6 +158,7 @@ impl Withdrawal {
                     final_short_token: final_short_token_receiver.mint,
                     market_token_amount,
                 },
+                reserved: [0; 128],
             }),
             dynamic: Dynamic {
                 tokens_with_feed: TokensWithFeed::try_from_vec(tokens_with_feed)?,

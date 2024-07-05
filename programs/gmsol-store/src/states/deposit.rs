@@ -26,24 +26,27 @@ impl Deposit {
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, InitSpace)]
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub struct Fixed {
-    /// The bump seed.
-    pub bump: u8,
     /// Store.
     pub store: Pubkey,
-    /// The nonce bytes for this deposit.
-    pub nonce: [u8; 32],
+    /// Market.
+    pub market: Pubkey,
+    /// Action id.
+    pub id: u64,
     /// The slot that the deposit was last updated at.
     pub updated_at_slot: u64,
     /// The time that the deposit was last updated at.
     pub updated_at: i64,
-    /// Market.
-    pub market: Pubkey,
+    /// The bump seed.
+    pub bump: u8,
+    /// The nonce bytes for this deposit.
+    pub nonce: [u8; 32],
     /// Senders.
     pub senders: Senders,
     /// The receivers of the deposit.
     pub receivers: Receivers,
     /// Tokens config.
     pub tokens: Tokens,
+    reserved: [u8; 128],
 }
 
 /// Senders of [`Deposit`].
@@ -101,6 +104,7 @@ impl Deposit {
     pub(crate) fn init(
         &mut self,
         bump: u8,
+        id: u64,
         store: Pubkey,
         market: &AccountLoader<Market>,
         nonce: NonceBytes,
@@ -115,6 +119,7 @@ impl Deposit {
         let clock = Clock::get()?;
         *self = Self {
             fixed: Fixed {
+                id,
                 bump,
                 store,
                 nonce,
@@ -137,6 +142,7 @@ impl Deposit {
                     initial_short_token: initial_short_token_account.as_ref().map(|a| a.mint),
                     params: token_params,
                 },
+                reserved: [0; 128],
             },
             dynamic: Dynamic {
                 tokens_with_feed: TokensWithFeed::try_from_vec(tokens_with_feed)?,
