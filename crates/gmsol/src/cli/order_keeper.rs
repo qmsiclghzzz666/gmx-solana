@@ -1,6 +1,8 @@
 use std::{ops::Deref, time::Duration};
 
 use anchor_client::{
+    anchor_lang::{AccountDeserialize, Discriminator},
+    solana_client::rpc_filter::{Memcmp, RpcFilterType},
     solana_sdk::{pubkey::Pubkey, signer::Signer},
     Program,
 };
@@ -8,6 +10,7 @@ use futures_util::{FutureExt, TryFutureExt};
 use gmsol::{
     exchange::ExchangeOps,
     pyth::{EncodingType, Hermes, PythPullOracle, PythPullOracleContext, PythPullOracleOps},
+    types::{Deposit, Order, Withdrawal},
     utils::{ComputeBudget, RpcBuilder},
 };
 use gmsol_exchange::events::{DepositCreatedEvent, OrderCreatedEvent, WithdrawalCreatedEvent};
@@ -53,6 +56,24 @@ enum Command {
     ExecuteWithdrawal { withdrawal: Pubkey },
     /// Execute Order.
     ExecuteOrder { order: Pubkey },
+    /// Fetch pending actions.
+    Pending {
+        action: Action,
+        #[arg(long, short)]
+        verbose: bool,
+        #[arg(long)]
+        execute: bool,
+    },
+}
+
+#[derive(Debug, clap::ValueEnum, Clone, Copy)]
+enum Action {
+    /// Deposit.
+    Deposit,
+    /// Withdrawal.
+    Withdrawal,
+    /// Order.
+    Order,
 }
 
 impl KeeperArgs {
@@ -105,6 +126,78 @@ impl KeeperArgs {
                 let task = Box::pin(self.start_watching(client, store, *wait));
                 task.await?;
             }
+            Command::Pending {
+                action,
+                verbose,
+                execute,
+            } => match action {
+                Action::Deposit => {
+                    let actions = self.fetch_pendings::<Deposit>(client, store).await?;
+                    if actions.is_empty() {
+                        println!("No pending deposits");
+                    }
+                    for (pubkey, action) in actions {
+                        if *verbose {
+                            println!("{pubkey}: {action:?}");
+                        } else {
+                            println!("{pubkey}");
+                        }
+                        if *execute {
+                            Box::pin(
+                                self.with_command(Command::ExecuteDeposit { deposit: pubkey })
+                                    .run(client, store, serialize_only),
+                            )
+                            .await?;
+                        }
+                    }
+                }
+                Action::Withdrawal => {
+                    let actions = self.fetch_pendings::<Withdrawal>(client, store).await?;
+                    if actions.is_empty() {
+                        println!("No pending withdrawals");
+                    }
+                    for (pubkey, action) in actions {
+                        if *verbose {
+                            println!("{pubkey}: {action:?}");
+                        } else {
+                            println!("{pubkey}");
+                        }
+                        if *execute {
+                            Box::pin(
+                                self.with_command(Command::ExecuteWithdrawal {
+                                    withdrawal: pubkey,
+                                })
+                                .run(
+                                    client,
+                                    store,
+                                    serialize_only,
+                                ),
+                            )
+                            .await?;
+                        }
+                    }
+                }
+                Action::Order => {
+                    let actions = self.fetch_pendings::<Order>(client, store).await?;
+                    if actions.is_empty() {
+                        println!("No pending orders");
+                    }
+                    for (pubkey, action) in actions {
+                        if *verbose {
+                            println!("{pubkey}: {action:?}");
+                        } else {
+                            println!("{pubkey}");
+                        }
+                        if *execute {
+                            Box::pin(
+                                self.with_command(Command::ExecuteOrder { order: pubkey })
+                                    .run(client, store, serialize_only),
+                            )
+                            .await?;
+                        }
+                    }
+                }
+            },
             Command::ExecuteDeposit { deposit } => {
                 let mut builder = client.execute_deposit(
                     store,
@@ -299,6 +392,25 @@ impl KeeperArgs {
         let mut args = self.clone();
         args.command = command;
         args
+    }
+
+    async fn fetch_pendings<T>(
+        &self,
+        client: &GMSOLClient,
+        store: &Pubkey,
+    ) -> gmsol::Result<Vec<(Pubkey, T)>>
+    where
+        T: AccountDeserialize + Discriminator,
+    {
+        tracing::debug!(%store, "store bytes to filter: {}", hex::encode(store));
+        let store_filter =
+            RpcFilterType::Memcmp(Memcmp::new_raw_bytes(9, store.as_ref().to_owned()));
+        client
+            .data_store()
+            .accounts_lazy::<T>(vec![store_filter])
+            .await?
+            .map(|res| res.map_err(gmsol::Error::from))
+            .collect()
     }
 
     async fn start_watching(
