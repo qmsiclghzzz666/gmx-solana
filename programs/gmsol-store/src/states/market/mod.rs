@@ -293,7 +293,10 @@ pub struct MarketState {
     long_token_balance: u64,
     short_token_balance: u64,
     funding_factor_per_second: i128,
-    reserved: [u8; 32],
+    counters_updated_at_slot: u64,
+    deposit_count: u64,
+    withdrawal_count: u64,
+    order_count: u64,
 }
 
 impl MarketState {
@@ -310,6 +313,64 @@ impl MarketState {
     /// Get funding factor per second.
     pub fn funding_factor_per_second(&self) -> i128 {
         self.funding_factor_per_second
+    }
+
+    /// Get updated slot for counters.
+    pub fn counters_updated_at_slot(&self) -> u64 {
+        self.counters_updated_at_slot
+    }
+
+    /// Get current deposit count.
+    pub fn deposit_count(&self) -> u64 {
+        self.deposit_count
+    }
+
+    /// Get current withdrawal count.
+    pub fn withdrawal_count(&self) -> u64 {
+        self.withdrawal_count
+    }
+
+    /// Get current order count.
+    pub fn order_count(&self) -> u64 {
+        self.order_count
+    }
+
+    fn post_update(&mut self) -> Result<()> {
+        self.counters_updated_at_slot = Clock::get()?.slot;
+        Ok(())
+    }
+
+    /// Next deposit id.
+    pub fn next_deposit_id(&mut self) -> Result<u64> {
+        let next_id = self
+            .deposit_count
+            .checked_add(1)
+            .ok_or(error!(StoreError::AmountOverflow))?;
+        self.deposit_count = next_id;
+        self.post_update()?;
+        Ok(next_id)
+    }
+
+    /// Next withdrawal id.
+    pub fn next_withdrawal_id(&mut self) -> Result<u64> {
+        let next_id = self
+            .withdrawal_count
+            .checked_add(1)
+            .ok_or(error!(StoreError::AmountOverflow))?;
+        self.withdrawal_count = next_id;
+        self.post_update()?;
+        Ok(next_id)
+    }
+
+    /// Next order id.
+    pub fn next_order_id(&mut self) -> Result<u64> {
+        let next_id = self
+            .order_count
+            .checked_add(1)
+            .ok_or(error!(StoreError::AmountOverflow))?;
+        self.order_count = next_id;
+        self.post_update()?;
+        Ok(next_id)
     }
 }
 
