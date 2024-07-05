@@ -8,6 +8,7 @@ crate-type = ["cdylib", "lib"]
 name = "gmsol_store"
 
 [features]
+docs = ["cpi", "debug", "display", "utils", "serde", "enum-iter"]
 no-entrypoint = []
 no-idl = []
 no-log-ix-name = []
