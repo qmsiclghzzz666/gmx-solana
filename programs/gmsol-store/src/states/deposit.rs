@@ -44,6 +44,7 @@ pub struct Fixed {
     pub receivers: Receivers,
     /// Tokens config.
     pub tokens: Tokens,
+    reserved: [u8; 128],
 }
 
 /// Senders of [`Deposit`].
@@ -137,6 +138,7 @@ impl Deposit {
                     initial_short_token: initial_short_token_account.as_ref().map(|a| a.mint),
                     params: token_params,
                 },
+                reserved: [0; 128],
             },
             dynamic: Dynamic {
                 tokens_with_feed: TokensWithFeed::try_from_vec(tokens_with_feed)?,

@@ -90,6 +90,7 @@ pub struct Fixed {
     pub senders: Senders,
     /// Receivers.
     pub receivers: Receivers,
+    reserved: [u8; 128],
 }
 
 impl Fixed {

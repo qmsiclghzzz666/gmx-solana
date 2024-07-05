@@ -46,6 +46,7 @@ pub struct Fixed {
     pub receivers: Receivers,
     /// Tokens config.
     pub tokens: Tokens,
+    reserved: [u8; 128],
 }
 
 /// Dynamic part of [`Withdrawal`].
@@ -153,6 +154,7 @@ impl Withdrawal {
                     final_short_token: final_short_token_receiver.mint,
                     market_token_amount,
                 },
+                reserved: [0; 128],
             }),
             dynamic: Dynamic {
                 tokens_with_feed: TokensWithFeed::try_from_vec(tokens_with_feed)?,
