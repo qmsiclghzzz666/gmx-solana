@@ -28,7 +28,7 @@ pub struct InitializeWithdrawal<'info> {
         bump,
     )]
     pub withdrawal: Account<'info, Withdrawal>,
-    #[account(has_one = store)]
+    #[account(mut, has_one = store)]
     pub(crate) market: AccountLoader<'info, Market>,
     #[account(mut, token::authority = payer, token::mint = market.load()?.meta().market_token_mint)]
     pub market_token_account: Account<'info, TokenAccount>,
@@ -75,8 +75,17 @@ pub fn initialize_withdrawal(
         ),
         market_token_amount,
     )?;
+
+    let id = ctx
+        .accounts
+        .market
+        .load_mut()?
+        .state_mut()
+        .next_withdrawal_id()?;
+
     ctx.accounts.withdrawal.init(
         ctx.bumps.withdrawal,
+        id,
         ctx.accounts.store.key(),
         nonce,
         ctx.accounts.payer.key(),

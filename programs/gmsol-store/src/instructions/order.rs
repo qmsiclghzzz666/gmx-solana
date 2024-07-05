@@ -52,7 +52,7 @@ pub struct InitializeOrder<'info> {
         // constraint = position.load()?.store == store.key(),
     )]
     pub position: Option<AccountLoader<'info, Position>>,
-    #[account(has_one = store)]
+    #[account(mut, has_one = store)]
     pub market: AccountLoader<'info, Market>,
     #[account(mut, token::authority = payer)]
     pub initial_collateral_token_account: Option<Box<Account<'info, TokenAccount>>>,
@@ -183,8 +183,16 @@ pub fn initialize_order(
         ),
     };
 
+    let id = ctx
+        .accounts
+        .market
+        .load_mut()?
+        .state_mut()
+        .next_order_id()?;
+
     ctx.accounts.order.init(
         ctx.bumps.order,
+        id,
         ctx.accounts.store.key(),
         &nonce,
         &ctx.accounts.market.key(),

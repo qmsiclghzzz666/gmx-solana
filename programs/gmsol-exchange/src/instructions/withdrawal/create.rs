@@ -48,6 +48,7 @@ pub struct CreateWithdrawal<'info> {
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
     /// CHECK: only used to invoke CPI and should be checked by it.
+    #[account(mut)]
     pub market: UncheckedAccount<'info>,
     /// CHECK: only used to invoke CPI which will then initalize the account.
     #[account(mut)]
