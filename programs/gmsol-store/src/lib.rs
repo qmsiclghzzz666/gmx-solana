@@ -8,7 +8,7 @@
 //! - Core data strcutures defined in the [`states`] module.
 //! - Actual implementation of instructions defined in the [`instructions`] module.
 //! - Events generated during the execution of instructions defined in [`events`] module.
-//! - Constatns such as default market parameters found in the [`constants`] module.
+//! - Constants such as default market parameters found in the [`constants`] module.
 //! - Various helper functions and implementations defined in the [`utils`] module.
 //!   Notably, if external Programs wish to use the permission management feature provided by the Store Program,
 //!   the relevant trait definitions (like [`Authentication`](utils::Authentication)) can be found in the [`utils`] module.
