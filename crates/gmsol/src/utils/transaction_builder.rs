@@ -70,8 +70,15 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> TransactionBuilder<'a, C> {
         } else {
             let packet_size = self.packet_size();
             let last = self.builders.last_mut().unwrap();
+            let mut ix = rpc.instructions_with_options(true, None);
+            if transaction_size(&ix, true) > packet_size {
+                return Err((
+                    rpc,
+                    crate::Error::invalid_argument("the size of this instruction is too big"),
+                ));
+            }
             let mut ixs_after_merge = last.instructions_with_options(false, None);
-            ixs_after_merge.append(&mut rpc.instructions_with_options(true, None));
+            ixs_after_merge.append(&mut ix);
             let size_after_merge = transaction_size(&ixs_after_merge, true);
             if size_after_merge <= packet_size {
                 tracing::debug!(size_after_merge, "adding to the last tx");

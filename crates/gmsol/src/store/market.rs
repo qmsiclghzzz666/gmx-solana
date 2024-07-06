@@ -7,7 +7,7 @@ use anchor_client::{
 };
 use gmsol_store::{
     accounts, instruction,
-    states::{Factor, MarketConfigKey},
+    states::{config::EntryArgs, Factor, MarketConfigKey},
 };
 
 use crate::utils::RpcBuilder;
@@ -106,6 +106,44 @@ pub trait MarketOps<C> {
 
     /// Toggle market.
     fn toggle_market(&self, store: &Pubkey, market_token: &Pubkey, enable: bool) -> RpcBuilder<C>;
+
+    /// Initialize Market Config Buffer.
+    fn initialize_market_config_buffer<'a>(
+        &'a self,
+        store: &Pubkey,
+        buffer: &'a dyn Signer,
+        expire_after_secs: u32,
+    ) -> RpcBuilder<'a, C>;
+
+    /// Close Market Config Buffer.
+    fn close_marekt_config_buffer(
+        &self,
+        buffer: &Pubkey,
+        receiver: Option<&Pubkey>,
+    ) -> RpcBuilder<C>;
+
+    /// Push to Market Config Buffer.
+    fn push_to_market_config_buffer<S: ToString>(
+        &self,
+        buffer: &Pubkey,
+        new_configs: impl IntoIterator<Item = (S, Factor)>,
+    ) -> RpcBuilder<C>;
+
+    /// Set the authority of the Market Config Buffer.
+    fn set_market_config_buffer_authority(
+        &self,
+        buffer: &Pubkey,
+        new_authority: &Pubkey,
+    ) -> RpcBuilder<C>;
+
+    /// Update Market Config with the buffer.
+    fn update_market_config_with_buffer(
+        &self,
+        store: &Pubkey,
+        market_token: &Pubkey,
+        buffer: &Pubkey,
+        receiver: Option<&Pubkey>,
+    ) -> RpcBuilder<C>;
 }
 
 impl<C, S> MarketOps<C> for crate::Client<C>
@@ -141,6 +179,92 @@ where
                 authority: self.payer(),
                 store: *store,
                 market: self.find_market_address(store, market_token),
+            })
+    }
+
+    fn initialize_market_config_buffer<'a>(
+        &'a self,
+        store: &Pubkey,
+        buffer: &'a dyn Signer,
+        expire_after_secs: u32,
+    ) -> RpcBuilder<'a, C> {
+        self.data_store_rpc()
+            .args(instruction::InitializeMarketConfigBuffer { expire_after_secs })
+            .accounts(accounts::InitializeMarketConfigBuffer {
+                authority: self.payer(),
+                store: *store,
+                buffer: buffer.pubkey(),
+                system_program: system_program::ID,
+            })
+            .signer(buffer)
+    }
+
+    fn close_marekt_config_buffer(
+        &self,
+        buffer: &Pubkey,
+        receiver: Option<&Pubkey>,
+    ) -> RpcBuilder<C> {
+        self.data_store_rpc()
+            .args(instruction::CloseMarketConfigBuffer {})
+            .accounts(accounts::CloseMarketConfigBuffer {
+                authority: self.payer(),
+                buffer: *buffer,
+                receiver: receiver.copied().unwrap_or(self.payer()),
+            })
+    }
+
+    fn push_to_market_config_buffer<K: ToString>(
+        &self,
+        buffer: &Pubkey,
+        new_configs: impl IntoIterator<Item = (K, Factor)>,
+    ) -> RpcBuilder<C> {
+        self.data_store_rpc()
+            .args(instruction::PushToMarketConfigBuffer {
+                new_configs: new_configs
+                    .into_iter()
+                    .map(|(key, value)| EntryArgs {
+                        key: key.to_string(),
+                        value,
+                    })
+                    .collect(),
+            })
+            .accounts(accounts::PushToMarketConfigBuffer {
+                authority: self.payer(),
+                buffer: *buffer,
+                system_program: system_program::ID,
+            })
+    }
+
+    fn set_market_config_buffer_authority(
+        &self,
+        buffer: &Pubkey,
+        new_authority: &Pubkey,
+    ) -> RpcBuilder<C> {
+        self.data_store_rpc()
+            .args(instruction::SetMarketConfigBufferAuthority {
+                new_authority: *new_authority,
+            })
+            .accounts(accounts::SetMarketConfigBufferAuthority {
+                authority: self.payer(),
+                buffer: *buffer,
+            })
+    }
+
+    fn update_market_config_with_buffer(
+        &self,
+        store: &Pubkey,
+        market_token: &Pubkey,
+        buffer: &Pubkey,
+        receiver: Option<&Pubkey>,
+    ) -> RpcBuilder<C> {
+        self.data_store_rpc()
+            .args(instruction::UpdateMarketConfigWithBuffer {})
+            .accounts(accounts::UpdateMarketConfigWithBuffer {
+                authority: self.payer(),
+                store: *store,
+                market: self.find_market_address(store, market_token),
+                buffer: *buffer,
+                receiver: receiver.copied().unwrap_or(self.payer()),
             })
     }
 }

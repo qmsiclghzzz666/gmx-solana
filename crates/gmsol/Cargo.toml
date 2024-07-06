@@ -20,7 +20,7 @@ cli = [
     "toml",
     "serde_with",
     "hex",
-    "indexmap",
+    "humantime",
 ]
 ui = ["cli", "poem/embed", "rust-embed"]
 clap = ["dep:clap", "gmsol-store/clap"]
@@ -48,7 +48,7 @@ shellexpand = { workspace = true, optional = true }
 toml = { workspace = true, optional = true }
 serde_with = { workspace = true, optional = true, features = ["indexmap_2"] }
 hex = { workspace = true, optional = true }
-indexmap = { workspace = true, optional = true, features = ["serde"] }
+humantime = { workspace = true, optional = true }
 
 # Dependencies for pyth support
 reqwest = { workspace = true, optional = true, features = ["json"] }
@@ -95,3 +95,4 @@ spl-governance = { workspace = true, features = ["no-entrypoint"] }
 strum = { workspace = true }
 rust-embed = { workspace = true, optional = true }
 poem = { workspace = true, optional = true }
+indexmap = { workspace = true, features = ["serde"] }

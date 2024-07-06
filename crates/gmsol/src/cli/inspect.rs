@@ -1,13 +1,13 @@
 use anchor_client::solana_sdk::{native_token::lamports_to_sol, pubkey::Pubkey};
-use gmsol_store::states::{
-    self, AddressKey, AmountKey, FactorKey, MarketConfigKey, PriceProviderKind,
-};
 use gmsol::{
     store::{
         token_config::TokenConfigOps,
         utils::{read_market, read_store, token_map, token_map_optional},
     },
     utils::{self, try_deserailize_account, view},
+};
+use gmsol_store::states::{
+    self, AddressKey, AmountKey, FactorKey, MarketConfigKey, PriceProviderKind,
 };
 use pyth_sdk::Identifier;
 
@@ -80,6 +80,8 @@ enum Command {
         #[arg(long, group = "get")]
         get_config: Option<MarketConfigKey>,
     },
+    /// `MarketConfigBuffer` account.
+    MarketConfigBuffer { address: Pubkey, debug: bool },
     /// `Deposit` account.
     Deposit { address: Pubkey },
     /// `Withdrawal` account.
@@ -272,6 +274,21 @@ impl InspectArgs {
                 }
                 if *show_address {
                     println!("Market address: {address}");
+                }
+            }
+            Command::MarketConfigBuffer { address, debug } => {
+                let buffer = program
+                    .account::<states::MarketConfigBuffer>(*address)
+                    .await?;
+                if *debug {
+                    println!("{buffer:#?}");
+                } else {
+                    println!("Authority: {}", buffer.authority);
+                    println!("Store: {}", buffer.store);
+                    println!("Expiry timestamp: {}", buffer.expiry);
+                    for entry in buffer.iter() {
+                        println!("{} = {}", entry.key()?, entry.value());
+                    }
                 }
             }
             Command::Deposit { address } => {

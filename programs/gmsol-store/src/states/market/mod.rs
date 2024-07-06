@@ -3,7 +3,6 @@ use std::str::FromStr;
 use anchor_lang::{prelude::*, Bump};
 use bitmaps::Bitmap;
 use borsh::{BorshDeserialize, BorshSerialize};
-use config::MarketConfigBuffer;
 use gmsol_model::{ClockKind, PoolKind};
 
 use crate::{
@@ -14,7 +13,7 @@ use crate::{
 use super::{Factor, InitSpace, Seed};
 
 pub use self::{
-    config::{MarketConfig, MarketConfigKey},
+    config::{MarketConfig, MarketConfigBuffer, MarketConfigKey},
     ops::ValidateMarketBalances,
 };
 

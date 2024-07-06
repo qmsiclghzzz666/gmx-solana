@@ -1,15 +1,12 @@
 use core::fmt;
 use std::{
     io::Read,
+    num::NonZeroUsize,
     path::{Path, PathBuf},
     str::FromStr,
 };
 
-use anchor_client::solana_sdk::{pubkey::Pubkey, signature::Keypair};
-use gmsol_store::states::{
-    Factor, MarketConfigKey, PriceProviderKind, TokenConfigBuilder, DEFAULT_HEARTBEAT_DURATION,
-    DEFAULT_PRECISION,
-};
+use anchor_client::solana_sdk::{pubkey::Pubkey, signature::Keypair, signer::Signer};
 use gmsol::{
     exchange::ExchangeOps,
     store::{
@@ -20,6 +17,10 @@ use gmsol::{
         utils::{token_map as get_token_map, token_map_optional},
     },
     utils::TransactionBuilder,
+};
+use gmsol_store::states::{
+    Factor, MarketConfigKey, PriceProviderKind, TokenConfigBuilder, DEFAULT_HEARTBEAT_DURATION,
+    DEFAULT_PRECISION,
 };
 use indexmap::IndexMap;
 use serde::de::DeserializeOwned;
@@ -40,6 +41,49 @@ enum Command {
     CreateOracle { index: u8 },
     /// Create a `TokenMap` account.
     CreateTokenMap,
+    /// Create a `MarketConfigBuffer` account.
+    CreateBuffer {
+        /// The buffer will expire after this duration.
+        #[arg(long, default_value = "1d")]
+        expire_after: humantime::Duration,
+    },
+    /// Close a `MarketConfigBuffer` account.
+    CloseBuffer {
+        /// Buffer account to close.
+        buffer: Pubkey,
+        /// Address to receive the lamports.
+        #[arg(long)]
+        receiver: Option<Pubkey>,
+    },
+    /// Push to `MarketConfigBuffer` account with configs read from file.
+    PushToBuffer {
+        /// Buffer account to push to.
+        buffer: Pubkey,
+        /// Config file to read from.
+        #[arg(long, short)]
+        source: PathBuf,
+        /// Select config with this market token.
+        /// Pass this option to allow reading from multi-markets config format.
+        #[arg(long, short)]
+        market_token: Option<Pubkey>,
+        /// Skip prefligh test.
+        #[arg(long)]
+        skip_preflight: bool,
+        /// Max transaction size.
+        #[arg(long)]
+        max_transaction_size: Option<usize>,
+        /// The number of keys to push in single instruction.
+        #[arg(long, default_value = "10")]
+        batch: NonZeroUsize,
+    },
+    /// Set the authority of the `MarketConfigBuffer` account.
+    SetBufferAuthority {
+        /// Buffer account of which to set the authority.
+        buffer: Pubkey,
+        /// New authority.
+        #[arg(long)]
+        new_authority: Pubkey,
+    },
     /// Set token map.
     SetTokenMap { token_map: Pubkey },
     /// Read and insert token configs from file.
@@ -113,11 +157,20 @@ enum Command {
     },
     /// Update Market Config.
     UpdateConfig {
+        /// The market token of the market to update.
         market_token: Pubkey,
+        /// The config key to udpate.
+        #[arg(long, short, group = "config", requires = "value")]
+        key: Option<MarketConfigKey>,
+        /// The value that the config to update to.
         #[arg(long, short)]
-        key: MarketConfigKey,
-        #[arg(long, short)]
-        value: Factor,
+        value: Option<Factor>,
+        /// Update market config with this buffer.
+        #[arg(long, group = "config")]
+        buffer: Option<Pubkey>,
+        /// Recevier for the buffer's lamports.
+        #[arg(long)]
+        receiver: Option<Pubkey>,
     },
     /// Update Market Configs from file.
     UpdateConfigs {
@@ -398,18 +451,44 @@ impl Args {
                 market_token,
                 key,
                 value,
+                buffer,
+                receiver,
             } => {
-                crate::utils::send_or_serialize(
-                    client
-                        .update_market_config_by_key(store, market_token, *key, value)?
-                        .build_without_compute_budget(),
-                    serialize_only,
-                    |signature| {
-                        tracing::info!("market config updated at tx {signature}");
-                        Ok(())
-                    },
-                )
-                .await?;
+                if let Some(buffer) = buffer {
+                    crate::utils::send_or_serialize(
+                        client
+                            .update_market_config_with_buffer(
+                                store,
+                                market_token,
+                                buffer,
+                                receiver.as_ref(),
+                            )
+                            .build_without_compute_budget(),
+                        serialize_only,
+                        |signature| {
+                            tracing::info!(%buffer, "market config updated at tx {signature}");
+                            Ok(())
+                        },
+                    )
+                    .await?;
+                } else {
+                    crate::utils::send_or_serialize(
+                        client
+                            .update_market_config_by_key(
+                                store,
+                                market_token,
+                                key.expect("missing key"),
+                                &value.expect("missing value"),
+                            )?
+                            .build_without_compute_budget(),
+                        serialize_only,
+                        |signature| {
+                            tracing::info!("market config updated at tx {signature}");
+                            Ok(())
+                        },
+                    )
+                    .await?;
+                }
             }
             Command::UpdateConfigs {
                 path,
@@ -445,6 +524,90 @@ impl Args {
                                 "disabled"
                             }
                         );
+                        Ok(())
+                    },
+                )
+                .await?;
+            }
+            Command::CreateBuffer { expire_after } => {
+                if serialize_only {
+                    return Err(gmsol::Error::invalid_argument(
+                        "serialize-only mode is not supported for this command",
+                    ));
+                }
+                let buffer_keypair = Keypair::new();
+                let rpc = client.initialize_market_config_buffer(
+                    store,
+                    &buffer_keypair,
+                    expire_after.as_secs().try_into().unwrap_or(u32::MAX),
+                );
+                crate::utils::send_or_serialize(
+                    rpc.build_without_compute_budget(),
+                    false,
+                    |signature| {
+                        let pubkey = buffer_keypair.pubkey();
+                        tracing::info!("created market config buffer `{pubkey}` at tx {signature}");
+                        println!("{pubkey}");
+                        Ok(())
+                    },
+                )
+                .await?;
+            }
+            Command::CloseBuffer { buffer, receiver } => {
+                crate::utils::send_or_serialize(
+                    client
+                        .close_marekt_config_buffer(buffer, receiver.as_ref())
+                        .build_without_compute_budget(),
+                    serialize_only,
+                    |signature| {
+                        tracing::info!("market config buffer `{buffer}` closed at tx {signature}");
+                        Ok(())
+                    },
+                )
+                .await?;
+            }
+            Command::PushToBuffer {
+                buffer,
+                source,
+                market_token,
+                skip_preflight,
+                max_transaction_size,
+                batch,
+            } => {
+                let config = if let Some(market_token) = market_token {
+                    let configs: MarketConfigs = toml_from_file(source)?;
+                    let Some(config) = configs.configs.get(market_token) else {
+                        return Err(gmsol::Error::invalid_argument(format!(
+                            "the config for `{market_token}` not found"
+                        )));
+                    };
+                    config.clone().config
+                } else {
+                    let config: MarketConfigMap = toml_from_file(source)?;
+                    config
+                };
+                config
+                    .update(
+                        buffer,
+                        client,
+                        serialize_only,
+                        *skip_preflight,
+                        *max_transaction_size,
+                        *batch,
+                    )
+                    .await?;
+            }
+            Command::SetBufferAuthority {
+                buffer,
+                new_authority,
+            } => {
+                crate::utils::send_or_serialize(
+                    client
+                        .set_market_config_buffer_authority(buffer, new_authority)
+                        .build_without_compute_budget(),
+                    serialize_only,
+                    |signature| {
+                        tracing::info!("set the authority of buffer `{buffer}` to `{new_authority}` at tx {signature}");
                         Ok(())
                     },
                 )
@@ -651,7 +814,7 @@ pub struct MarketConfigs {
     configs: IndexMap<Pubkey, MarketConfig>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct SerdeFactor(Factor);
 
 impl fmt::Display for SerdeFactor {
@@ -670,14 +833,62 @@ impl FromStr for SerdeFactor {
     }
 }
 
-#[serde_with::serde_as]
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+/// Market Config with enable option.
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub struct MarketConfig {
     #[serde(default)]
     enable: Option<bool>,
-    #[serde_as(as = "IndexMap<_, serde_with::DisplayFromStr>")]
     #[serde(flatten)]
-    config: IndexMap<MarketConfigKey, SerdeFactor>,
+    config: MarketConfigMap,
+}
+
+/// Market Config.
+#[serde_with::serde_as]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
+pub struct MarketConfigMap(
+    #[serde_as(as = "IndexMap<_, serde_with::DisplayFromStr>")]
+    IndexMap<MarketConfigKey, SerdeFactor>,
+);
+
+impl MarketConfigMap {
+    async fn update(
+        &self,
+        buffer: &Pubkey,
+        client: &GMSOLClient,
+        serialize_only: bool,
+        skip_preflight: bool,
+        max_transaction_size: Option<usize>,
+        batch: NonZeroUsize,
+    ) -> gmsol::Result<()> {
+        let mut builder = TransactionBuilder::new_with_options(
+            client.data_store().async_rpc(),
+            false,
+            max_transaction_size,
+        );
+
+        let configs = self.0.iter().collect::<Vec<_>>();
+        for batch in configs.chunks(batch.get()) {
+            builder.try_push(client.push_to_market_config_buffer(
+                buffer,
+                batch.iter().map(|(key, value)| (key, value.0)),
+            ))?;
+        }
+
+        crate::utils::send_or_serialize_transactions(
+            builder,
+            serialize_only,
+            skip_preflight,
+            |signatures, error| {
+                println!("{signatures:#?}");
+                match error {
+                    None => Ok(()),
+                    Some(err) => Err(err),
+                }
+            },
+        )
+        .await?;
+        Ok(())
+    }
 }
 
 impl MarketConfigs {
@@ -696,7 +907,7 @@ impl MarketConfigs {
         );
 
         for (market_token, config) in &self.configs {
-            for (key, value) in &config.config {
+            for (key, value) in &config.config.0 {
                 tracing::info!(%market_token, "Add instruction to update `{key}` to `{value}`");
                 builder.try_push(client.update_market_config_by_key(
                     store,
