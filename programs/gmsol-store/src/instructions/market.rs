@@ -4,6 +4,7 @@ use anchor_spl::token::{Token, TokenAccount};
 use crate::{
     constants,
     states::{
+        config::{EntryArgs, MarketConfigBuffer},
         Action, Factor, InitSpace, Market, MarketChangeEvent, MarketMeta, Seed, Store,
         TokenMapAccess, TokenMapHeader, TokenMapLoader,
     },
@@ -344,6 +345,139 @@ impl<'info> internal::Authentication<'info> for UpdateMarketConfig<'info> {
     fn store(&self) -> &AccountLoader<'info, Store> {
         &self.store
     }
+}
+
+/// Update Market Config with buffer.
+#[derive(Accounts)]
+pub struct UpdateMarketConfigWithBuffer<'info> {
+    authority: Signer<'info>,
+    store: AccountLoader<'info, Store>,
+    #[account(mut, has_one = store)]
+    market: AccountLoader<'info, Market>,
+    #[account(mut, close = receiver, has_one = store, has_one = authority @ StoreError::PermissionDenied)]
+    buffer: Account<'info, MarketConfigBuffer>,
+    /// CHECK: Only used to receive funds after closing the buffer account.
+    #[account(mut)]
+    receiver: UncheckedAccount<'info>,
+}
+
+/// Update market config with buffer.
+///
+/// ## CHECK
+/// - Only MARKET_KEEPER can udpate the config of market.
+pub fn unchecked_update_market_config_with_buffer(
+    ctx: Context<UpdateMarketConfigWithBuffer>,
+) -> Result<()> {
+    let buffer = &ctx.accounts.buffer;
+    require_gt!(
+        buffer.expiry,
+        Clock::get()?.unix_timestamp,
+        StoreError::InvalidArgument
+    );
+    ctx.accounts
+        .market
+        .load_mut()?
+        .update_config_with_buffer(buffer)?;
+    Ok(())
+}
+
+impl<'info> internal::Authentication<'info> for UpdateMarketConfigWithBuffer<'info> {
+    fn authority(&self) -> &Signer<'info> {
+        &self.authority
+    }
+
+    fn store(&self) -> &AccountLoader<'info, Store> {
+        &self.store
+    }
+}
+
+/// Initialize a market config buffer.
+#[derive(Accounts)]
+pub struct InitializeMarketConfigBuffer<'info> {
+    #[account(mut)]
+    authority: Signer<'info>,
+    store: AccountLoader<'info, Store>,
+    #[account(init, payer = authority, space = 8 + MarketConfigBuffer::init_space(0))]
+    buffer: Account<'info, MarketConfigBuffer>,
+    system_program: Program<'info, System>,
+}
+
+/// Initialize a market config buffer account.
+pub fn initialize_market_config_buffer(
+    ctx: Context<InitializeMarketConfigBuffer>,
+    expire_after_secs: u32,
+) -> Result<()> {
+    let buffer = &mut ctx.accounts.buffer;
+    buffer.authority = ctx.accounts.authority.key();
+    buffer.store = ctx.accounts.store.key();
+    buffer.expiry = Clock::get()?
+        .unix_timestamp
+        .saturating_add_unsigned(expire_after_secs as u64);
+    Ok(())
+}
+
+/// Set the authority of the buffer account.
+#[derive(Accounts)]
+pub struct SetMarketConfigBufferAuthority<'info> {
+    #[account(mut)]
+    authority: Signer<'info>,
+    #[account(mut, has_one = authority @ StoreError::PermissionDenied)]
+    buffer: Account<'info, MarketConfigBuffer>,
+}
+
+/// Set the authority of the buffer account.
+pub fn set_market_config_buffer_authority(
+    ctx: Context<SetMarketConfigBufferAuthority>,
+    new_authority: Pubkey,
+) -> Result<()> {
+    ctx.accounts.buffer.authority = new_authority;
+    Ok(())
+}
+
+/// Close the buffer account.
+#[derive(Accounts)]
+pub struct CloseMarketConfigBuffer<'info> {
+    #[account(mut)]
+    authority: Signer<'info>,
+    #[account(mut, close = receiver, has_one = authority @ StoreError::PermissionDenied)]
+    buffer: Account<'info, MarketConfigBuffer>,
+    /// CHECK: Only used to receive funds after closing the buffer account.
+    #[account(mut)]
+    receiver: UncheckedAccount<'info>,
+}
+
+/// Close the buffer account.
+pub fn close_market_config_buffer(_ctx: Context<CloseMarketConfigBuffer>) -> Result<()> {
+    Ok(())
+}
+
+/// Push to the buffer account.
+#[derive(Accounts)]
+#[instruction(new_configs: Vec<(String, Factor)>)]
+pub struct PushToMarketConfigBuffer<'info> {
+    #[account(mut)]
+    authority: Signer<'info>,
+    #[account(
+        mut,
+        has_one = authority @ StoreError::PermissionDenied,
+        realloc = 8 + buffer.space_after_push(new_configs.len()),
+        realloc::payer = authority,
+        realloc::zero = false,
+    )]
+    buffer: Account<'info, MarketConfigBuffer>,
+    system_program: Program<'info, System>,
+}
+
+/// Push to the buffer account.
+pub fn push_to_market_config_buffer(
+    ctx: Context<PushToMarketConfigBuffer>,
+    new_configs: Vec<EntryArgs>,
+) -> Result<()> {
+    let buffer = &mut ctx.accounts.buffer;
+    for entry in new_configs {
+        buffer.push(entry.try_into()?);
+    }
+    Ok(())
 }
 
 /// Toggle Market.

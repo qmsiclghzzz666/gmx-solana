@@ -36,7 +36,7 @@ use self::{
     states::{
         common::{SwapParams, TokenRecord},
         deposit::TokenParams as DepositTokenParams,
-        market::MarketMeta,
+        market::{config::EntryArgs, MarketMeta},
         order::{OrderParams, TransferOut},
         token_config::TokenConfigBuilder,
         withdrawal::TokenParams as WithdrawalTokenParams,
@@ -313,6 +313,43 @@ pub mod gmsol_store {
         value: u128,
     ) -> Result<()> {
         instructions::unchecked_update_market_config(ctx, &key, value)
+    }
+
+    /// Update market config with the given buffer.
+    #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
+    pub fn update_market_config_with_buffer(
+        ctx: Context<UpdateMarketConfigWithBuffer>,
+    ) -> Result<()> {
+        instructions::unchecked_update_market_config_with_buffer(ctx)
+    }
+
+    /// Initialize a market config buffer account.
+    pub fn initialize_market_config_buffer(
+        ctx: Context<InitializeMarketConfigBuffer>,
+        expire_after_secs: u32,
+    ) -> Result<()> {
+        instructions::initialize_market_config_buffer(ctx, expire_after_secs)
+    }
+
+    /// Set the authority of the buffer account.
+    pub fn set_market_config_buffer_authority(
+        ctx: Context<SetMarketConfigBufferAuthority>,
+        new_authority: Pubkey,
+    ) -> Result<()> {
+        instructions::set_market_config_buffer_authority(ctx, new_authority)
+    }
+
+    /// Close the buffer account.
+    pub fn close_market_config_buffer(ctx: Context<CloseMarketConfigBuffer>) -> Result<()> {
+        instructions::close_market_config_buffer(ctx)
+    }
+
+    /// Push to the buffer account.
+    pub fn push_to_market_config_buffer(
+        ctx: Context<PushToMarketConfigBuffer>,
+        new_configs: Vec<EntryArgs>,
+    ) -> Result<()> {
+        instructions::push_to_market_config_buffer(ctx, new_configs)
     }
 
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]

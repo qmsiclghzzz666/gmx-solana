@@ -3,6 +3,7 @@ use std::str::FromStr;
 use anchor_lang::{prelude::*, Bump};
 use bitmaps::Bitmap;
 use borsh::{BorshDeserialize, BorshSerialize};
+use config::MarketConfigBuffer;
 use gmsol_model::{ClockKind, PoolKind};
 
 use crate::{
@@ -278,6 +279,24 @@ impl Market {
     /// Get market state mutably.
     pub fn state_mut(&mut self) -> &mut MarketState {
         &mut self.state
+    }
+
+    /// Update config with buffer.
+    pub fn update_config_with_buffer(&mut self, buffer: &MarketConfigBuffer) -> Result<()> {
+        for entry in buffer.iter() {
+            let key = entry.key()?;
+            let current_value = self.config.get_mut(key);
+            let new_value = entry.value();
+            msg!(
+                "{}: update config `{}` from {} to {}",
+                self.meta.market_token_mint,
+                key,
+                current_value,
+                new_value
+            );
+            *current_value = new_value;
+        }
+        Ok(())
     }
 }
 

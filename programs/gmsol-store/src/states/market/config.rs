@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{constants, states::Factor};
+use crate::{constants, states::Factor, StoreError};
 
 /// Market Config.
 #[zero_copy]
@@ -353,15 +353,28 @@ impl MarketConfig {
 }
 
 /// Market config keys.
-#[derive(strum::EnumString, strum::Display, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(
+    strum::EnumString,
+    strum::Display,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    num_enum::TryFromPrimitive,
+    num_enum::IntoPrimitive,
+)]
 #[strum(serialize_all = "snake_case")]
-#[non_exhaustive]
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[cfg_attr(feature = "enum-iter", derive(strum::EnumIter))]
 #[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
 #[cfg_attr(feature = "clap", clap(rename_all = "snake_case"))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
+#[non_exhaustive]
+#[repr(u16)]
 pub enum MarketConfigKey {
     /// Swap impact exponent.
     SwapImpactExponent,
@@ -457,4 +470,89 @@ pub enum MarketConfigKey {
     MaxOpenInterestForLong,
     /// Max open interest for short.
     MaxOpenInterestForShort,
+}
+
+/// An entry of the config buffer.
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, InitSpace)]
+#[cfg_attr(feature = "debug", derive(Debug))]
+pub struct Entry {
+    /// Key.
+    key: u16,
+    /// Value.
+    value: u128,
+}
+
+impl Entry {
+    pub(crate) fn new(key: MarketConfigKey, value: Factor) -> Self {
+        Self {
+            key: key.into(),
+            value,
+        }
+    }
+
+    /// Get key.
+    pub fn key(&self) -> Result<MarketConfigKey> {
+        self.key
+            .try_into()
+            .map_err(|_| error!(StoreError::InvalidKey))
+    }
+
+    /// Get value.
+    pub fn value(&self) -> Factor {
+        self.value
+    }
+}
+
+/// An entry of the config buffer.
+#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+#[cfg_attr(feature = "debug", derive(Debug))]
+pub struct EntryArgs {
+    /// Key.
+    pub key: String,
+    /// Value.
+    pub value: u128,
+}
+
+impl TryFrom<EntryArgs> for Entry {
+    type Error = Error;
+
+    fn try_from(EntryArgs { key, value }: EntryArgs) -> Result<Self> {
+        Ok(Self::new(
+            key.parse().map_err(|_| error!(StoreError::InvalidKey))?,
+            value,
+        ))
+    }
+}
+
+/// Market Config Buffer.
+#[account]
+#[cfg_attr(feature = "debug", derive(Debug))]
+pub struct MarketConfigBuffer {
+    /// Store.
+    pub store: Pubkey,
+    /// Authority.
+    pub authority: Pubkey,
+    /// Expiration time.
+    pub expiry: i64,
+    entries: Vec<Entry>,
+}
+
+impl MarketConfigBuffer {
+    pub(crate) fn init_space(len: usize) -> usize {
+        32 + 32 + 8 + 4 + Entry::INIT_SPACE * len
+    }
+
+    pub(crate) fn space_after_push(&self, pushed: usize) -> usize {
+        let total = self.entries.len() + pushed;
+        Self::init_space(total)
+    }
+
+    pub(crate) fn push(&mut self, entry: Entry) {
+        self.entries.push(entry);
+    }
+
+    /// Create an iterator of entries.
+    pub fn iter(&self) -> impl Iterator<Item = &Entry> {
+        self.entries.iter()
+    }
 }

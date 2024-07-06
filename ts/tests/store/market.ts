@@ -5,6 +5,7 @@ import { expect, getAddresses, getPrograms, getProvider, getUsers } from "../../
 import { createMarketPDA, createMarketTokenMintPDA, createMarketVaultPDA, createRolesPDA, invokePushToTokenMapSynthetic } from "../../utils/data";
 import { createAssociatedTokenAccountInstruction, createTransferInstruction, getAssociatedTokenAddress } from "@solana/spl-token";
 import { createMarket, invokeUpdateMarketConfig } from '../../utils/exchange';
+import { toBN } from 'gmsol';
 
 describe("store: Market", () => {
     const { storeProgram: dataStore } = getPrograms();
@@ -28,7 +29,7 @@ describe("store: Market", () => {
         tokenMap = (await dataStore.account.store.fetch(dataStoreAddress)).tokenMap;
     });
 
-    it("create, update and remove a market", async () => {
+    it("create and update a market", async () => {
         for (const token of [indexToken, longToken, shortToken]) {
             await invokePushToTokenMapSynthetic(dataStore, {
                 authority: signer0,
@@ -76,6 +77,118 @@ describe("store: Market", () => {
             const value = await dataStore.methods.getMarketConfig("swap_fee_receiver_factor").accounts({ market: marketPDA }).view();
             expect((new BN("37000000000000000001")).eq(value));
         }
+    });
+
+    it("use buffer account to update market", async () => {
+        const bufferKeypair = Keypair.generate();
+        const buffer = bufferKeypair.publicKey;
+
+        // Anyone can create a buffer account.
+        {
+            const tx = await dataStore.methods.initializeMarketConfigBuffer(3600).accounts({
+                authority: user0.publicKey,
+                store: dataStoreAddress,
+                buffer,
+            }).signers([user0, bufferKeypair]).rpc();
+            console.log(`market config buffer ${buffer} is created at ${tx}`);
+        }
+
+        // Only the authority can close a buffer account.
+        {
+            await expect(dataStore.methods.closeMarketConfigBuffer().accountsPartial({
+                authority: signer0.publicKey,
+                buffer,
+                receiver: user0.publicKey,
+            }).signers([signer0]).rpc()).rejectedWith(Error, "Permission denied");
+        }
+
+        // Only the authority can push to a buffer account.
+        {
+            await expect(dataStore.methods.pushToMarketConfigBuffer([]).accountsPartial({
+                authority: signer0.publicKey,
+                buffer,
+            }).signers([signer0]).rpc()).rejectedWith(Error, "Permission denied");
+        }
+
+        // Only the authority can set the authority of a buffer account.
+        {
+            await expect(dataStore.methods.setMarketConfigBufferAuthority(signer0.publicKey).accountsPartial({
+                authority: signer0.publicKey,
+                buffer,
+            }).signers([signer0]).rpc()).rejectedWith(Error, "Permission denied");
+        }
+
+        // Close the buffer account.
+        {
+            await dataStore.methods.closeMarketConfigBuffer().accountsPartial({
+                authority: user0.publicKey,
+                buffer,
+                receiver: user0.publicKey,
+            }).signers([user0]).rpc();
+            const afterClose = await dataStore.account.marketConfigBuffer.fetchNullable(buffer);
+            expect(afterClose).to.be.null;
+        }
+
+        // Create again.
+        {
+            const tx = await dataStore.methods.initializeMarketConfigBuffer(3600).accounts({
+                authority: user0.publicKey,
+                store: dataStoreAddress,
+                buffer,
+            }).signers([user0, bufferKeypair]).rpc();
+            console.log(`market config buffer ${buffer} is created at ${tx}`);
+        }
+
+        // Push some configs.
+        {
+            const tx = await dataStore.methods.pushToMarketConfigBuffer([
+                {
+                    key: "swap_fee_receiver_factor",
+                    value: toBN(88000000000000000001n),
+                },
+                {
+                    key: "order_fee_receiver_factor",
+                    value: toBN(78000000000000000001n),
+                }
+            ]).accountsPartial({
+                authority: user0.publicKey,
+                buffer,
+            }).signers([user0]).rpc();
+            console.log(`buffer updated at ${tx}`);
+        }
+
+        // Only MARKET_KEEPER can update market configs with buffer.
+        {
+            await expect(dataStore.methods.updateMarketConfigWithBuffer().accountsPartial({
+                authority: user0.publicKey,
+                market: marketPDA,
+                buffer,
+                receiver: user0.publicKey,
+            }).signers([user0]).rpc()).rejectedWith(Error, "Permission denied");
+        }
+
+        // Transfer the authority to the MARKET_KEEPER.
+        {
+            const tx = await dataStore.methods.setMarketConfigBufferAuthority(signer0.publicKey).accountsPartial({
+                authority: user0.publicKey,
+                buffer,
+            }).signers([user0]).rpc();
+            console.log(`buffer authority updated at ${tx}`);
+        }
+
+        // Update market configs with the buffer.
+        {
+            const tx = await dataStore.methods.updateMarketConfigWithBuffer().accountsPartial({
+                authority: signer0.publicKey,
+                market: marketPDA,
+                buffer,
+                receiver: user0.publicKey,
+            }).signers([signer0]).rpc();
+            console.log(`market updated with buffer at ${tx}`);
+        }
+    });
+
+    it("remove a market", async () => {
         await dataStore.methods.removeMarket().accountsPartial({
             authority: signer0.publicKey,
             store: dataStoreAddress,
