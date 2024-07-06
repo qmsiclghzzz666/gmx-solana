@@ -69,7 +69,7 @@ pub trait Unsigned: num_traits::Unsigned {
         let value = self.to_signed()?;
         Self::Signed::zero()
             .checked_sub(&value)
-            .ok_or(crate::Error::Underflow)
+            .ok_or(crate::Error::Computation("to opposite signed"))
     }
 
     /// Compute the absolute difference of two values.

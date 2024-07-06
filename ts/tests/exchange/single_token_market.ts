@@ -1,6 +1,6 @@
 import { LAMPORTS_PER_SOL, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
 import { expect, getAddresses, getPrograms, getProvider, getUsers } from "../../utils/fixtures";
-import { createMarket, executeDeposit, executeOrder, executeWithdrawal } from "../../utils/exchange";
+import { createMarket, executeDeposit, executeOrder, executeWithdrawal, invokeUpdateMarketConfig } from "../../utils/exchange";
 import { SOL_TOKEN_MINT } from "../../utils/token";
 import { closeAccount, createAssociatedTokenAccount, createSyncNativeInstruction, getAccount, getAssociatedTokenAddress, getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { findPositionPDA, invokeCreateDecreaseOrderWithPayerAsSigner, invokeCreateDepositWithPayerAsSigner, invokeCreateIncreaseOrderWithPayerAsSigner, invokeCreateWithdrawalWithPayerAsSigner } from "gmsol";
@@ -28,6 +28,20 @@ describe("exchange: Single Token Market", () => {
 
         // Initialize WSOL single token market.
         GMWsolWsolWsol = await createMarket(signer0, "WSOL", store, SOL_TOKEN_MINT, SOL_TOKEN_MINT, SOL_TOKEN_MINT, true);
+        await invokeUpdateMarketConfig(dataStore, {
+            authority: signer0,
+            store,
+            marketToken: GMWsolWsolWsol,
+            key: "reserve_factor",
+            value: 100_000_000_000_000_000_000n,
+        });
+        await invokeUpdateMarketConfig(dataStore, {
+            authority: signer0,
+            store,
+            marketToken: GMWsolWsolWsol,
+            key: "open_interest_reserve_factor",
+            value: 95_000_000_000_000_000_000n,
+        });
 
         // Inititalize GM account.
         user0GMWsolAccount = await createAssociatedTokenAccount(provider.connection, user0, GMWsolWsolWsol, user0.publicKey);

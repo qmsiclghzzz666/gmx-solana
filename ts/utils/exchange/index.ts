@@ -708,6 +708,234 @@ export const initializeMarkets = async (signer: Keypair, dataStoreAddress: Publi
         console.warn("Failed to initialize market", error);
     }
 
+    // Initialize Market Configs.
+    try {
+        // WSOL[WSOL-BTC]
+        await invokeUpdateMarketConfig(storeProgram, {
+            authority: signer,
+            store: dataStoreAddress,
+            marketToken: GMWsolWsolBtc,
+            key: "swap_impact_exponent",
+            value: 200_000_000_000_000_000_000n,
+        });
+        await invokeUpdateMarketConfig(storeProgram, {
+            authority: signer,
+            store: dataStoreAddress,
+            marketToken: GMWsolWsolBtc,
+            key: "swap_impact_positive_factor",
+            value: 50_000_000_000_000n,
+        });
+        await invokeUpdateMarketConfig(storeProgram, {
+            authority: signer,
+            store: dataStoreAddress,
+            marketToken: GMWsolWsolBtc,
+            key: "swap_impact_negative_factor",
+            value: 100_000_000_000_000n,
+        });
+        await invokeUpdateMarketConfig(storeProgram, {
+            authority: signer,
+            store: dataStoreAddress,
+            marketToken: GMWsolWsolBtc,
+            key: "swap_fee_factor_for_positive_impact",
+            value: 50_000_000_000_000_000n,
+        });
+        await invokeUpdateMarketConfig(storeProgram, {
+            authority: signer,
+            store: dataStoreAddress,
+            marketToken: GMWsolWsolBtc,
+            key: "swap_fee_factor_for_negative_impact",
+            value: 70_000_000_000_000_000n,
+        });
+        await invokeUpdateMarketConfig(storeProgram, {
+            authority: signer,
+            store: dataStoreAddress,
+            marketToken: GMWsolWsolBtc,
+            key: "max_pool_amount_for_long_token",
+            value: 1_000_000_000_000_000_000n,
+        });
+        await invokeUpdateMarketConfig(storeProgram, {
+            authority: signer,
+            store: dataStoreAddress,
+            marketToken: GMWsolWsolBtc,
+            key: "max_pool_amount_for_short_token",
+            value: 100_000_000_000_000_000n,
+        });
+        await invokeUpdateMarketConfig(storeProgram, {
+            authority: signer,
+            store: dataStoreAddress,
+            marketToken: GMWsolWsolBtc,
+            key: "reserve_factor",
+            value: 100_000_000_000_000_000_000n,
+        });
+        await invokeUpdateMarketConfig(storeProgram, {
+            authority: signer,
+            store: dataStoreAddress,
+            marketToken: GMWsolWsolBtc,
+            key: "open_interest_reserve_factor",
+            value: 95_000_000_000_000_000_000n,
+        });
+
+        // WSOL[WSOL-USDG]
+        await invokeUpdateMarketConfig(storeProgram, {
+            authority: signer,
+            store: dataStoreAddress,
+            marketToken: GMWsolWsolUsdG,
+            key: "swap_impact_exponent",
+            value: 200_000_000_000_000_000_000n,
+        });
+        await invokeUpdateMarketConfig(storeProgram, {
+            authority: signer,
+            store: dataStoreAddress,
+            marketToken: GMWsolWsolUsdG,
+            key: "swap_impact_positive_factor",
+            value: 500_000_000n,
+        });
+        await invokeUpdateMarketConfig(storeProgram, {
+            authority: signer,
+            store: dataStoreAddress,
+            marketToken: GMWsolWsolUsdG,
+            key: "swap_impact_negative_factor",
+            value: 1_000_000_000n,
+        });
+        await invokeUpdateMarketConfig(storeProgram, {
+            authority: signer,
+            store: dataStoreAddress,
+            marketToken: GMWsolWsolUsdG,
+            key: "swap_fee_factor_for_positive_impact",
+            value: 50_000_000_000_000_000n,
+        });
+        await invokeUpdateMarketConfig(storeProgram, {
+            authority: signer,
+            store: dataStoreAddress,
+            marketToken: GMWsolWsolUsdG,
+            key: "swap_fee_factor_for_negative_impact",
+            value: 70_000_000_000_000_000n,
+        });
+        await invokeUpdateMarketConfig(storeProgram, {
+            authority: signer,
+            store: dataStoreAddress,
+            marketToken: GMWsolWsolUsdG,
+            key: "max_pool_amount_for_long_token",
+            value: 1_000_000_000_000_000_000n,
+        });
+        await invokeUpdateMarketConfig(storeProgram, {
+            authority: signer,
+            store: dataStoreAddress,
+            marketToken: GMWsolWsolUsdG,
+            key: "max_pool_amount_for_short_token",
+            value: 100_000_000_000_000_000_000n,
+        });
+        await invokeUpdateMarketConfig(storeProgram, {
+            authority: signer,
+            store: dataStoreAddress,
+            marketToken: GMWsolWsolUsdG,
+            key: "max_pool_value_for_deposit_for_long_token",
+            value: 1_000_000_000_000n * 100_000_000_000_000_000_000n,
+        });
+        await invokeUpdateMarketConfig(storeProgram, {
+            authority: signer,
+            store: dataStoreAddress,
+            marketToken: GMWsolWsolUsdG,
+            key: "max_pool_value_for_deposit_for_short_token",
+            value: 1_000_000_000_000n * 100_000_000_000_000_000_000n,
+        });
+        await invokeUpdateMarketConfig(storeProgram, {
+            authority: signer,
+            store: dataStoreAddress,
+            marketToken: GMWsolWsolBtc,
+            key: "reserve_factor",
+            value: 100_000_000_000_000_000_000n,
+        });
+        await invokeUpdateMarketConfig(storeProgram, {
+            authority: signer,
+            store: dataStoreAddress,
+            marketToken: GMWsolWsolBtc,
+            key: "open_interest_reserve_factor",
+            value: 95_000_000_000_000_000_000n,
+        });
+
+        // FAKE[FAKE-USDG]
+        await invokeUpdateMarketConfig(storeProgram, {
+            authority: signer,
+            store: dataStoreAddress,
+            marketToken: GMFakeFakeUsdG,
+            key: "swap_impact_exponent",
+            value: 200_000_000_000_000_000_000n,
+        });
+        await invokeUpdateMarketConfig(storeProgram, {
+            authority: signer,
+            store: dataStoreAddress,
+            marketToken: GMFakeFakeUsdG,
+            key: "swap_impact_positive_factor",
+            value: 50_000_000_000_000n,
+        });
+        await invokeUpdateMarketConfig(storeProgram, {
+            authority: signer,
+            store: dataStoreAddress,
+            marketToken: GMFakeFakeUsdG,
+            key: "swap_impact_negative_factor",
+            value: 100_000_000_000_000n,
+        });
+        await invokeUpdateMarketConfig(storeProgram, {
+            authority: signer,
+            store: dataStoreAddress,
+            marketToken: GMFakeFakeUsdG,
+            key: "swap_fee_factor_for_positive_impact",
+            value: 50_000_000_000_000_000n,
+        });
+        await invokeUpdateMarketConfig(storeProgram, {
+            authority: signer,
+            store: dataStoreAddress,
+            marketToken: GMFakeFakeUsdG,
+            key: "swap_fee_factor_for_negative_impact",
+            value: 70_000_000_000_000_000n,
+        });
+        await invokeUpdateMarketConfig(storeProgram, {
+            authority: signer,
+            store: dataStoreAddress,
+            marketToken: GMFakeFakeUsdG,
+            key: "max_pool_amount_for_long_token",
+            value: 1_000_000_000_000_000_000n,
+        });
+        await invokeUpdateMarketConfig(storeProgram, {
+            authority: signer,
+            store: dataStoreAddress,
+            marketToken: GMFakeFakeUsdG,
+            key: "max_pool_amount_for_short_token",
+            value: 100_000_000_000_000_000_000n,
+        });
+        await invokeUpdateMarketConfig(storeProgram, {
+            authority: signer,
+            store: dataStoreAddress,
+            marketToken: GMFakeFakeUsdG,
+            key: "max_pool_value_for_deposit_for_long_token",
+            value: 1_000_000_000_000n * 100_000_000_000_000_000_000n,
+        });
+        await invokeUpdateMarketConfig(storeProgram, {
+            authority: signer,
+            store: dataStoreAddress,
+            marketToken: GMFakeFakeUsdG,
+            key: "max_pool_value_for_deposit_for_short_token",
+            value: 1_000_000_000_000n * 100_000_000_000_000_000_000n,
+        });
+        await invokeUpdateMarketConfig(storeProgram, {
+            authority: signer,
+            store: dataStoreAddress,
+            marketToken: GMWsolWsolBtc,
+            key: "reserve_factor",
+            value: 100_000_000_000_000_000_000n,
+        });
+        await invokeUpdateMarketConfig(storeProgram, {
+            authority: signer,
+            store: dataStoreAddress,
+            marketToken: GMWsolWsolBtc,
+            key: "open_interest_reserve_factor",
+            value: 95_000_000_000_000_000_000n,
+        });
+    } catch (error) {
+        console.warn("Failed to update configs", error);
+    }
+
     return {
         GMWsolWsolBtc,
         GMWsolWsolUsdG,

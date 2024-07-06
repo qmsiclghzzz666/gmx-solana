@@ -239,9 +239,12 @@ impl<const DECIMALS: u8, M: LiquidityMarket<DECIMALS>> Deposit<M, DECIMALS> {
                 price,
                 &price_impact,
             )?;
-            amount = amount
-                .checked_sub(&negative_impact_amount)
-                .ok_or(crate::Error::Underflow)?;
+            amount =
+                amount
+                    .checked_sub(&negative_impact_amount)
+                    .ok_or(crate::Error::Computation(
+                        "deposit: not enough fund to pay negative impact amount",
+                    ))?;
         }
         mint_amount = mint_amount
             .checked_add(

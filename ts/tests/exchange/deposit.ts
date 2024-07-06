@@ -49,8 +49,8 @@ describe("exchange: Deposit", () => {
                 marketToken: GMFakeFakeUsdG,
                 initialLongToken: fakeTokenMint,
                 initialShortToken: usdGTokenMint,
-                initialLongTokenAmount: 1_000_000_000,
-                initialShortTokenAmount: 70_000 * 100_000_000,
+                initialLongTokenAmount: 1_000_000_000n,
+                initialShortTokenAmount: 70_000n * 100_000_000n,
                 options: {
                     tokenMap,
                 }

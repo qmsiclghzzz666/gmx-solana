@@ -30,9 +30,6 @@ pub enum Error {
     /// Overflow.
     #[error("overflow")]
     Overflow,
-    /// Underflow.
-    #[error("underflow")]
-    Underflow,
     /// Divided by zero.
     #[error("divided by zero")]
     DividedByZero,

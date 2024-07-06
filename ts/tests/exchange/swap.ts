@@ -40,8 +40,8 @@ describe("exchange: Swap", () => {
             GMFakeFakeUsdG,
             fakeTokenMint,
             usdGTokenMint,
-            1_000 * 1_000_000_000,
-            1_000_000 * 1_000_000_000,
+            1_000n * 1_000_000_000n,
+            50_000_000n * 100_000_000n,
             {
                 storeProgram,
             }
@@ -57,7 +57,7 @@ describe("exchange: Swap", () => {
             SOL_TOKEN_MINT,
             usdGTokenMint,
             0,
-            1_000_000 * 1_000_000_000,
+            2_000_000n * 1_000_000_000n,
             {
                 storeProgram,
             }
@@ -76,7 +76,7 @@ describe("exchange: Swap", () => {
             GMFakeFakeUsdG,
             fakeTokenMint,
             usdGTokenMint,
-            1_000_000 * 1_000_000_000,
+            1_000n * 1_000_000_000n,
             [GMFakeFakeUsdG],
             {}
         );

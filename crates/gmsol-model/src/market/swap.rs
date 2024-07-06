@@ -83,7 +83,9 @@ pub trait SwapMarketExt<const DECIMALS: u8>: SwapMarket<DECIMALS> {
             // Round up div.
             let amount = (usd_impact
                 .checked_sub(&price)
-                .ok_or(crate::Error::Underflow)?
+                .ok_or(crate::Error::Computation(
+                    "calculating round up swap impact amount",
+                ))?
                 + One::one())
                 / price;
             Ok(amount)

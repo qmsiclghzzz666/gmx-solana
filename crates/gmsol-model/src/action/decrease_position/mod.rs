@@ -227,10 +227,10 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
             let estimated_realized_pnl = self
                 .size_delta_usd
                 .checked_mul_div_with_signed_numberator(&estimated_pnl, self.position.size_in_usd())
-                .ok_or(crate::Error::Computation("estiamting realized pnl"))?;
+                .ok_or(crate::Error::Computation("estimating realized pnl"))?;
             let estimated_remaining_pnl = estimated_pnl
                 .checked_sub(&estimated_realized_pnl)
-                .ok_or(crate::Error::Underflow)?;
+                .ok_or(crate::Error::Computation("estimating remaining pnl"))?;
 
             let delta = CollateralDelta::new(
                 self.position

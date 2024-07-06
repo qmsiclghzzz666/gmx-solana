@@ -245,7 +245,9 @@ impl<'a, 'info> gmsol_model::LiquidityMarket<{ constants::MARKET_DECIMALS }>
         self.market_token
             .supply
             .checked_sub(to_burn)
-            .ok_or(gmsol_model::Error::Underflow)?;
+            .ok_or(gmsol_model::Error::Computation(
+                "not enough market tokens to burn",
+            ))?;
         self.to_burn = to_burn;
         Ok(())
     }
@@ -262,7 +264,9 @@ impl<'a, 'info> gmsol_model::PositionImpactMarket<{ constants::MARKET_DECIMALS }
         Ok(&mut self.position_impact)
     }
 
-    fn just_passed_in_seconds_for_position_impact_distribution(&mut self) -> gmsol_model::Result<u64> {
+    fn just_passed_in_seconds_for_position_impact_distribution(
+        &mut self,
+    ) -> gmsol_model::Result<u64> {
         AsClock::from(&mut self.position_impact_distribution_clock).just_passed_in_seconds()
     }
 

@@ -55,7 +55,7 @@ where
             self.long_amount = self
                 .long_amount
                 .checked_sub(&delta.unsigned_abs())
-                .ok_or(crate::Error::Underflow)?;
+                .ok_or(crate::Error::Computation("decreasing long amount"))?;
         }
         Ok(())
     }
@@ -70,7 +70,7 @@ where
             self.short_amount = self
                 .short_amount
                 .checked_sub(&delta.unsigned_abs())
-                .ok_or(crate::Error::Underflow)?;
+                .ok_or(crate::Error::Computation("decreasing short amount"))?;
         }
         Ok(())
     }
@@ -403,7 +403,7 @@ where
         self.total_supply = self
             .total_supply
             .checked_sub(amount)
-            .ok_or(crate::Error::Underflow)?;
+            .ok_or(crate::Error::Computation("burning market tokens"))?;
         Ok(())
     }
 }
