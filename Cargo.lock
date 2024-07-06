@@ -1939,6 +1939,7 @@ dependencies = [
  "num_enum 0.7.2",
  "ruint",
  "rust_decimal",
+ "strum",
  "thiserror",
  "typed-builder",
 ]

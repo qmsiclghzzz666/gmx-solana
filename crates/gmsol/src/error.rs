@@ -7,6 +7,9 @@ pub enum Error {
     /// Client Error.
     #[error("{0:#?}")]
     Client(#[from] anchor_client::ClientError),
+    /// Model error.
+    #[error("model: {0}")]
+    Model(#[from] gmsol_model::Error),
     /// Number out of range.
     #[error("numer out of range")]
     NumberOutOfRange,
@@ -22,9 +25,9 @@ pub enum Error {
     /// Base64 Decode Error.
     #[error("base64: {0}")]
     Base64(#[from] base64::DecodeError),
-    /// Borsh Error.
-    #[error("borsh: {0}")]
-    Borsh(#[from] anchor_client::anchor_lang::prelude::borsh::maybestd::io::Error),
+    /// IO Error.
+    #[error("io: {0}")]
+    Io(#[from] std::io::Error),
     /// Not found.
     #[error("not found")]
     NotFound,
@@ -34,15 +37,22 @@ pub enum Error {
     /// Invalid Arguments.
     #[error("invalid argument: {0}")]
     InvalidArgument(String),
+    /// Format error.
+    #[error("fmt: {0}")]
+    Fmt(#[from] std::fmt::Error),
+    /// Reqwest error.
     #[cfg(feature = "reqwest")]
     #[error(transparent)]
     Reqwest(#[from] reqwest::Error),
+    /// Parse url error.
     #[cfg(feature = "url")]
     #[error("parse url: {0}")]
     ParseUrl(#[from] url::ParseError),
+    /// SSE error.
     #[cfg(all(feature = "eventsource-stream", feature = "reqwest"))]
     #[error("sse: {0}")]
     Sse(#[from] eventsource_stream::EventStreamError<reqwest::Error>),
+    /// JSON error.
     #[cfg(feature = "serde_json")]
     #[error("json: {0}")]
     Json(#[from] serde_json::Error),

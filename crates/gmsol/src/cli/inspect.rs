@@ -4,14 +4,17 @@ use gmsol::{
         token_config::TokenConfigOps,
         utils::{read_market, read_store, token_map, token_map_optional},
     },
+    types::Market,
     utils::{self, try_deserailize_account, view},
 };
+use gmsol_model::{Balance, ClockKind, PoolKind};
 use gmsol_store::states::{
     self, AddressKey, AmountKey, FactorKey, MarketConfigKey, PriceProviderKind,
 };
 use indexmap::IndexMap;
 use num_format::{Locale, ToFormattedString};
 use pyth_sdk::Identifier;
+use strum::IntoEnumIterator;
 
 use crate::{utils::Oracle, GMSOLClient};
 
@@ -276,7 +279,7 @@ impl InspectArgs {
                 } else if *debug {
                     println!("{:?}", market);
                 } else {
-                    println!("{:#?}", market);
+                    println!("{}", format_market(&address, &market)?);
                 }
                 if *show_address {
                     println!("Market address: {address}");
@@ -444,4 +447,121 @@ fn parse_feed_ids(feed_ids: &[String]) -> gmsol::Result<Vec<Identifier>> {
         })
         .collect::<gmsol::Result<Vec<_>>>()?;
     Ok(feed_ids)
+}
+
+fn format_market(address: &Pubkey, market: &Market) -> gmsol::Result<String> {
+    use std::fmt::Write;
+
+    let mut buf = String::new();
+
+    let f = &mut buf;
+
+    writeln!(f, "Name: {}", market.name()?)?;
+
+    writeln!(f, "\nEnabled: {}", market.is_enabled())?;
+
+    writeln!(f, "\nAddress: {address}")?;
+
+    writeln!(f, "\nMeta:")?;
+    let meta = market.meta();
+    writeln!(f, "market_token: {}", meta.market_token_mint)?;
+    writeln!(f, "index_token: {}", meta.index_token_mint)?;
+    if meta.long_token_mint == meta.short_token_mint {
+        writeln!(f, "single_token: {}", meta.long_token_mint)?;
+    } else {
+        writeln!(f, "long_token: {}", meta.long_token_mint)?;
+        writeln!(f, "short_token: {}", meta.short_token_mint)?;
+    }
+
+    writeln!(f, "\nState:")?;
+    let state = market.state();
+    if market.is_pure() {
+        writeln!(
+            f,
+            "token_balance: {}",
+            state
+                .long_token_balance_raw()
+                .to_formatted_string(&Locale::en)
+        )?;
+    } else {
+        writeln!(
+            f,
+            "long_token_balance: {}",
+            state
+                .long_token_balance_raw()
+                .to_formatted_string(&Locale::en)
+        )?;
+        writeln!(
+            f,
+            "short_token_balance: {}",
+            state
+                .short_token_balance_raw()
+                .to_formatted_string(&Locale::en)
+        )?;
+    }
+    writeln!(
+        f,
+        "funding_factor_per_second: {}",
+        state
+            .funding_factor_per_second()
+            .to_formatted_string(&Locale::en)
+    )?;
+    writeln!(
+        f,
+        "deposit_count: {}",
+        state.deposit_count().to_formatted_string(&Locale::en)
+    )?;
+    writeln!(
+        f,
+        "withdrawal_count: {}",
+        state.withdrawal_count().to_formatted_string(&Locale::en)
+    )?;
+    writeln!(
+        f,
+        "order_count: {}",
+        state.order_count().to_formatted_string(&Locale::en)
+    )?;
+
+    writeln!(f, "\nClocks:")?;
+    let now = time::OffsetDateTime::now_utc();
+    for kind in ClockKind::iter() {
+        if let Some(clock) = market.clock(kind) {
+            let ts =
+                time::OffsetDateTime::from_unix_timestamp(clock).map_err(gmsol::Error::unknown)?;
+            let msg = if now >= ts {
+                let dur = now - ts;
+                format!(
+                    " ({} ago)",
+                    humantime::format_duration(dur.try_into().map_err(gmsol::Error::unknown)?)
+                )
+            } else {
+                String::new()
+            };
+            writeln!(f, "{kind}: {}{msg}", humantime::format_rfc3339(ts.into()))?;
+        } else {
+            writeln!(f, "{kind}: not enabled")?;
+        }
+    }
+
+    writeln!(f, "\nPools (LONG - SHORT):")?;
+    for kind in PoolKind::iter() {
+        if let Some(pool) = market.pool(kind) {
+            writeln!(
+                f,
+                "{kind}: {} - {}",
+                pool.long_amount()?.to_formatted_string(&Locale::en),
+                pool.short_amount()?.to_formatted_string(&Locale::en),
+            )?;
+        } else {
+            writeln!(f, "{kind}: not enabled")?;
+        }
+    }
+
+    writeln!(f, "\nParameters:")?;
+    for key in MarketConfigKey::iter() {
+        let value = market.get_config_by_key(key);
+        writeln!(f, "{key} = {}", value.to_formatted_string(&Locale::en))?;
+    }
+
+    Ok(buf)
 }

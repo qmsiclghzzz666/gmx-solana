@@ -245,6 +245,11 @@ impl Market {
         self.pools.get(kind).copied()
     }
 
+    /// Get clock of the given kind.
+    pub fn clock(&self, kind: ClockKind) -> Option<i64> {
+        self.clocks.get(kind).copied()
+    }
+
     /// Validate the market.
     pub fn validate(&self, store: &Pubkey) -> Result<()> {
         require_eq!(*store, self.store, StoreError::InvalidMarket);

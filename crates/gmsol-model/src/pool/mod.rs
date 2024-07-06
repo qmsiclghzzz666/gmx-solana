@@ -45,6 +45,11 @@ impl<P: Pool + ?Sized> PoolExt for P {}
     PartialOrd,
     Ord,
 )]
+#[cfg_attr(
+    feature = "strum",
+    derive(strum::EnumIter, strum::EnumString, strum::Display)
+)]
+#[cfg_attr(feature = "strum", strum(serialize_all = "snake_case"))]
 #[repr(u8)]
 #[non_exhaustive]
 pub enum PoolKind {

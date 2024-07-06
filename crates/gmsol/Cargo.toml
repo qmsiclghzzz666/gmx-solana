@@ -75,7 +75,7 @@ gmsol-store = { workspace = true, features = [
     "enum-iter",
 ] }
 gmsol-exchange = { workspace = true, features = ["no-entrypoint", "debug"] }
-gmsol-model = { workspace = true }
+gmsol-model = { workspace = true, features = ["strum"] }
 
 pyth-sdk = { workspace = true }
 typed-builder = { workspace = true }

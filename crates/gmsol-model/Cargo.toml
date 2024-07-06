@@ -7,6 +7,7 @@ edition.workspace = true
 test = []
 u128 = ["ruint"]
 solana = ["anchor-lang"]
+strum = ["dep:strum"]
 
 [dependencies]
 num-traits = { workspace = true }
@@ -18,3 +19,4 @@ rust_decimal = { workspace = true, default-features = false, features = [
 anchor-lang = { workspace = true, optional = true }
 num_enum = { workspace = true }
 typed-builder = { workspace = true }
+strum = { workspace = true, optional = true }
