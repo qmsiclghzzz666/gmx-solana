@@ -9,6 +9,8 @@ use gmsol::{
 use gmsol_store::states::{
     self, AddressKey, AmountKey, FactorKey, MarketConfigKey, PriceProviderKind,
 };
+use indexmap::IndexMap;
+use num_format::{Locale, ToFormattedString};
 use pyth_sdk::Identifier;
 
 use crate::{utils::Oracle, GMSOLClient};
@@ -81,7 +83,11 @@ enum Command {
         get_config: Option<MarketConfigKey>,
     },
     /// `MarketConfigBuffer` account.
-    MarketConfigBuffer { address: Pubkey, debug: bool },
+    MarketConfigBuffer {
+        address: Pubkey,
+        #[arg(long)]
+        debug: bool,
+    },
     /// `Deposit` account.
     Deposit { address: Pubkey },
     /// `Withdrawal` account.
@@ -285,9 +291,18 @@ impl InspectArgs {
                 } else {
                     println!("Authority: {}", buffer.authority);
                     println!("Store: {}", buffer.store);
-                    println!("Expiry timestamp: {}", buffer.expiry);
-                    for entry in buffer.iter() {
-                        println!("{} = {}", entry.key()?, entry.value());
+                    println!("Expiry: {}", buffer.expiry);
+                    if buffer.is_empty() {
+                        println!("*buffer is empty*");
+                    } else {
+                        println!("Len: {}", buffer.len());
+                    }
+                    let map = buffer
+                        .iter()
+                        .map(|entry| Ok((entry.key()?, entry.value())))
+                        .collect::<Result<IndexMap<_, _>, gmsol::Error>>()?;
+                    for (key, value) in map.iter() {
+                        println!("{key} = {}", value.to_formatted_string(&Locale::en));
                     }
                 }
             }

@@ -21,6 +21,7 @@ cli = [
     "serde_with",
     "hex",
     "humantime",
+    "num-format",
 ]
 ui = ["cli", "poem/embed", "rust-embed"]
 clap = ["dep:clap", "gmsol-store/clap"]
@@ -49,6 +50,7 @@ toml = { workspace = true, optional = true }
 serde_with = { workspace = true, optional = true, features = ["indexmap_2"] }
 hex = { workspace = true, optional = true }
 humantime = { workspace = true, optional = true }
+num-format = { workspace = true, optional = true }
 
 # Dependencies for pyth support
 reqwest = { workspace = true, optional = true, features = ["json"] }

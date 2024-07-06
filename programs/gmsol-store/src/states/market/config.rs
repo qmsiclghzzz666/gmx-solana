@@ -555,4 +555,14 @@ impl MarketConfigBuffer {
     pub fn iter(&self) -> impl Iterator<Item = &Entry> {
         self.entries.iter()
     }
+
+    /// Return whether the buffer is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Return the number of entries.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
 }

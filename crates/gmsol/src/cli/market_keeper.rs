@@ -73,7 +73,7 @@ enum Command {
         #[arg(long)]
         max_transaction_size: Option<usize>,
         /// The number of keys to push in single instruction.
-        #[arg(long, default_value = "10")]
+        #[arg(long, default_value = "16")]
         batch: NonZeroUsize,
     },
     /// Set the authority of the `MarketConfigBuffer` account.
@@ -158,6 +158,7 @@ enum Command {
     /// Update Market Config.
     UpdateConfig {
         /// The market token of the market to update.
+        #[arg(requires = "config")]
         market_token: Pubkey,
         /// The config key to udpate.
         #[arg(long, short, group = "config", requires = "value")]

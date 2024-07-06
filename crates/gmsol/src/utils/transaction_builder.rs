@@ -61,6 +61,14 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> TransactionBuilder<'a, C> {
         mut rpc: RpcBuilder<'a, C>,
         new_transaction: bool,
     ) -> Result<&mut Self, (RpcBuilder<'a, C>, crate::Error)> {
+        let packet_size = self.packet_size();
+        let mut ix = rpc.instructions_with_options(true, None);
+        if transaction_size(&ix, true) > packet_size {
+            return Err((
+                rpc,
+                crate::Error::invalid_argument("the size of this instruction is too big"),
+            ));
+        }
         if self.builders.is_empty() || new_transaction {
             tracing::debug!("adding to a new tx");
             if !self.builders.is_empty() && self.force_one_transaction {
@@ -68,15 +76,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> TransactionBuilder<'a, C> {
             }
             self.builders.push(rpc);
         } else {
-            let packet_size = self.packet_size();
             let last = self.builders.last_mut().unwrap();
-            let mut ix = rpc.instructions_with_options(true, None);
-            if transaction_size(&ix, true) > packet_size {
-                return Err((
-                    rpc,
-                    crate::Error::invalid_argument("the size of this instruction is too big"),
-                ));
-            }
             let mut ixs_after_merge = last.instructions_with_options(false, None);
             ixs_after_merge.append(&mut ix);
             let size_after_merge = transaction_size(&ixs_after_merge, true);
