@@ -1,7 +1,3 @@
-[ADVTTETv4Nbg7a2jPZWCxJ7uoQsPoewi4sJhK9DqpSpe]
-enable = false
-# # Market Config Buffer Account to be used if provided.
-# buffer = ""
 swap_impact_exponent = "100_000_000_000_000_000_000"                              # `1`, for single pool
 swap_impact_positive_factor = "0"
 swap_impact_negative_factor = "0"

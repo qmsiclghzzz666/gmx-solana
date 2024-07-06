@@ -16,6 +16,7 @@ use gmsol::{
         token_config::TokenConfigOps,
         utils::{token_map as get_token_map, token_map_optional},
     },
+    types::MarketConfigBuffer,
     utils::TransactionBuilder,
 };
 use gmsol_store::states::{
@@ -57,11 +58,15 @@ enum Command {
     },
     /// Push to `MarketConfigBuffer` account with configs read from file.
     PushToBuffer {
-        /// Buffer account to push to.
-        buffer: Pubkey,
-        /// Config file to read from.
-        #[arg(long, short)]
-        source: PathBuf,
+        /// Path to the config file to read from.
+        #[arg(requires = "buffer-input")]
+        path: PathBuf,
+        /// Buffer account to be pushed to.
+        #[arg(long, group = "buffer-input")]
+        buffer: Option<Pubkey>,
+        /// Whether to create a new buffer account.
+        #[arg(long, group = "buffer-input")]
+        init: bool,
         /// Select config with this market token.
         /// Pass this option to allow reading from multi-markets config format.
         #[arg(long, short)]
@@ -75,6 +80,10 @@ enum Command {
         /// The number of keys to push in single instruction.
         #[arg(long, default_value = "16")]
         batch: NonZeroUsize,
+        /// The buffer will expire after this duration.
+        /// Only effective when used with `--init`.
+        #[arg(long, default_value = "1d")]
+        expire_after: humantime::Duration,
     },
     /// Set the authority of the `MarketConfigBuffer` account.
     SetBufferAuthority {
@@ -180,6 +189,9 @@ enum Command {
         skip_preflight: bool,
         #[arg(long)]
         max_transaction_size: Option<usize>,
+        /// Recevier for the buffer's lamports.
+        #[arg(long)]
+        receiver: Option<Pubkey>,
     },
     /// Toggle market.
     ToggleMarket {
@@ -495,6 +507,7 @@ impl Args {
                 path,
                 skip_preflight,
                 max_transaction_size,
+                receiver,
             } => {
                 let configs: MarketConfigs = toml_from_file(path)?;
                 configs
@@ -504,6 +517,7 @@ impl Args {
                         serialize_only,
                         *skip_preflight,
                         *max_transaction_size,
+                        receiver.as_ref(),
                     )
                     .await?;
             }
@@ -568,15 +582,17 @@ impl Args {
                 .await?;
             }
             Command::PushToBuffer {
+                path,
                 buffer,
-                source,
+                init,
                 market_token,
                 skip_preflight,
                 max_transaction_size,
                 batch,
+                expire_after,
             } => {
                 let config = if let Some(market_token) = market_token {
-                    let configs: MarketConfigs = toml_from_file(source)?;
+                    let configs: MarketConfigs = toml_from_file(path)?;
                     let Some(config) = configs.configs.get(market_token) else {
                         return Err(gmsol::Error::invalid_argument(format!(
                             "the config for `{market_token}` not found"
@@ -584,13 +600,16 @@ impl Args {
                     };
                     config.clone().config
                 } else {
-                    let config: MarketConfigMap = toml_from_file(source)?;
+                    let config: MarketConfigMap = toml_from_file(path)?;
                     config
                 };
+                assert!(buffer.is_none() == *init, "must hold");
                 config
                     .update(
-                        buffer,
                         client,
+                        store,
+                        buffer.as_ref(),
+                        expire_after,
                         serialize_only,
                         *skip_preflight,
                         *max_transaction_size,
@@ -835,10 +854,14 @@ impl FromStr for SerdeFactor {
 }
 
 /// Market Config with enable option.
+#[serde_with::serde_as]
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub struct MarketConfig {
     #[serde(default)]
     enable: Option<bool>,
+    #[serde(default)]
+    #[serde_as(as = "Option<serde_with::DisplayFromStr>")]
+    buffer: Option<Pubkey>,
     #[serde(flatten)]
     config: MarketConfigMap,
 }
@@ -852,10 +875,13 @@ pub struct MarketConfigMap(
 );
 
 impl MarketConfigMap {
+    #[allow(clippy::too_many_arguments)]
     async fn update(
         &self,
-        buffer: &Pubkey,
         client: &GMSOLClient,
+        store: &Pubkey,
+        buffer: Option<&Pubkey>,
+        expire_after: &humantime::Duration,
         serialize_only: bool,
         skip_preflight: bool,
         max_transaction_size: Option<usize>,
@@ -867,10 +893,24 @@ impl MarketConfigMap {
             max_transaction_size,
         );
 
+        let buffer_keypair = Keypair::new();
+        let buffer = if let Some(buffer) = buffer {
+            *buffer
+        } else {
+            builder.try_push(client.initialize_market_config_buffer(
+                store,
+                &buffer_keypair,
+                expire_after.as_secs().try_into().unwrap_or(u32::MAX),
+            ))?;
+            buffer_keypair.pubkey()
+        };
+
+        tracing::info!("Buffer account to be pushed to: {buffer}");
+
         let configs = self.0.iter().collect::<Vec<_>>();
         for batch in configs.chunks(batch.get()) {
             builder.try_push(client.push_to_market_config_buffer(
-                buffer,
+                &buffer,
                 batch.iter().map(|(key, value)| (key, value.0)),
             ))?;
         }
@@ -900,6 +940,7 @@ impl MarketConfigs {
         serialize_only: bool,
         skip_preflight: bool,
         max_transaction_size: Option<usize>,
+        receiver: Option<&Pubkey>,
     ) -> gmsol::Result<()> {
         let mut builder = TransactionBuilder::new_with_options(
             client.data_store().async_rpc(),
@@ -907,7 +948,28 @@ impl MarketConfigs {
             max_transaction_size,
         );
 
+        let program = client.data_store();
         for (market_token, config) in &self.configs {
+            if let Some(buffer) = &config.buffer {
+                let buffer_account = program.account::<MarketConfigBuffer>(*buffer).await?;
+                if buffer_account.store != *store {
+                    return Err(gmsol::Error::invalid_argument(
+                        "The provided buffer account is owned by different store",
+                    ));
+                }
+                if buffer_account.authority != client.payer() {
+                    return Err(gmsol::Error::invalid_argument(
+                        "The authority of the provided buffer account is not the payer",
+                    ));
+                }
+                tracing::info!("A buffer account is provided, it will be used first to update the market config. Add instruction to update `{market_token}` with it");
+                builder.try_push(client.update_market_config_with_buffer(
+                    store,
+                    market_token,
+                    buffer,
+                    receiver,
+                ))?;
+            }
             for (key, value) in &config.config.0 {
                 tracing::info!(%market_token, "Add instruction to update `{key}` to `{value}`");
                 builder.try_push(client.update_market_config_by_key(

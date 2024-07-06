@@ -291,11 +291,38 @@ impl InspectArgs {
                 } else {
                     println!("Authority: {}", buffer.authority);
                     println!("Store: {}", buffer.store);
-                    println!("Expiry: {}", buffer.expiry);
+
+                    // Format expiry.
+                    let expiry = time::OffsetDateTime::from_unix_timestamp(buffer.expiry)
+                        .map_err(gmsol::Error::unknown)?;
+                    let now = time::OffsetDateTime::now_utc();
+                    let msg = if expiry > now {
+                        let dur = expiry - now;
+                        format!(
+                            "will expire in {}",
+                            humantime::format_duration(
+                                dur.try_into().map_err(gmsol::Error::unknown)?
+                            )
+                        )
+                    } else {
+                        let dur = now - expiry;
+                        format!(
+                            "expired {} ago",
+                            humantime::format_duration(
+                                dur.try_into().map_err(gmsol::Error::unknown)?
+                            )
+                        )
+                    };
+                    println!(
+                        "Expiry: {} ({msg})",
+                        humantime::format_rfc3339(expiry.into())
+                    );
+
+                    // Print configs.
                     if buffer.is_empty() {
                         println!("*buffer is empty*");
                     } else {
-                        println!("Len: {}", buffer.len());
+                        println!("Parameter count: {}", buffer.len());
                     }
                     let map = buffer
                         .iter()
