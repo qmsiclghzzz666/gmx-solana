@@ -13,8 +13,6 @@ pub mod validator;
 /// Oracle time validation.
 pub mod time;
 
-use core::fmt;
-
 use crate::{states::TokenMapAccess, StoreError, StoreResult};
 use anchor_lang::{prelude::*, Ids};
 use num_enum::TryFromPrimitive;
@@ -79,13 +77,8 @@ impl Oracle {
         // [token_config, feed; tokens.len()] [..remaining]
         for (idx, token) in tokens.iter().enumerate() {
             let feed = &remaining_accounts[idx];
-            let token_config = map
-                .get(token)
-                .ok_or(StoreError::RequiredResourceNotFound)?;
-            require!(
-                token_config.is_enabled(),
-                StoreError::TokenConfigDisabled
-            );
+            let token_config = map.get(token).ok_or(StoreError::RequiredResourceNotFound)?;
+            require!(token_config.is_enabled(), StoreError::TokenConfigDisabled);
             require_eq!(token_config.expected_provider()?, *program.kind());
             let (oracle_slot, oracle_ts, price, kind) = match &program {
                 PriceProviderProgram::Chainlink(program, kind) => {
@@ -204,9 +197,15 @@ impl Ids for PriceProvider {
 
 /// Supported Price Provider Kind.
 #[repr(u8)]
-#[derive(Clone, Copy, Default, TryFromPrimitive, PartialEq, Eq, Hash)]
+#[derive(
+    Clone, Copy, Default, TryFromPrimitive, PartialEq, Eq, Hash, strum::EnumString, strum::Display,
+)]
+#[strum(serialize_all = "snake_case")]
+#[cfg_attr(feature = "enum-iter", derive(strum::EnumIter))]
 #[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
+#[cfg_attr(feature = "clap", clap(rename_all = "snake_case"))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[non_exhaustive]
 pub enum PriceProviderKind {
@@ -217,16 +216,6 @@ pub enum PriceProviderKind {
     Chainlink = 1,
     /// Legacy Pyth Push Oracle.
     PythLegacy = 2,
-}
-
-impl fmt::Display for PriceProviderKind {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Pyth => write!(f, "Pyth"),
-            Self::Chainlink => write!(f, "Chainlink"),
-            Self::PythLegacy => write!(f, "PythLegacy"),
-        }
-    }
 }
 
 #[cfg(feature = "utils")]

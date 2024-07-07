@@ -22,6 +22,9 @@ pub const DEFAULT_PRECISION: u8 = 4;
 /// Default timestamp adjustment.
 pub const DEFAULT_TIMESTAMP_ADJUSTMENT: u32 = 0;
 
+#[cfg(feature = "utils")]
+pub use self::utils::TokenMap;
+
 const MAX_FEEDS: usize = 4;
 const MAX_FLAGS: usize = 8;
 const MAX_TOKENS: usize = 256;
@@ -62,6 +65,26 @@ pub struct TokenConfig {
     /// Heartbeat duration.
     heartbeat_duration: u32,
     reserved: [u8; 32],
+}
+
+#[cfg(feature = "display")]
+impl std::fmt::Display for TokenConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "Name: {}", self.name().unwrap_or("*unknown*"))?;
+        writeln!(f, "Enabled: {}", self.is_enabled())?;
+        writeln!(f, "Synthetic: {}", self.is_synthetic())?;
+        writeln!(f, "Decimals: {}", self.token_decimals)?;
+        writeln!(f, "Precision: {}", self.precision)?;
+        writeln!(f, "Heartbeat: {}", self.heartbeat_duration)?;
+        writeln!(
+            f,
+            "Expected Provider: {}",
+            self.expected_provider()
+                .map(|kind| kind.to_string())
+                .unwrap_or("*unknown*".to_string())
+        )?;
+        Ok(())
+    }
 }
 
 impl TokenConfig {
@@ -226,6 +249,17 @@ pub struct FeedConfig {
     reserved: [u8; 28],
 }
 
+#[cfg(feature = "display")]
+impl std::fmt::Display for FeedConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "feed = {}, timestamp_adjustment = {}",
+            self.feed, self.timestamp_adjustment
+        )
+    }
+}
+
 impl FeedConfig {
     /// Create a new feed config.
     pub fn new(feed: Pubkey) -> Self {
@@ -354,6 +388,24 @@ impl TokenMapHeader {
             .entries()
             .map(|(k, _)| Pubkey::new_from_array(*k))
     }
+
+    fn get_token_config_unchecked<'a>(
+        &self,
+        token: &Pubkey,
+        configs: &'a [u8],
+    ) -> Option<&'a TokenConfig> {
+        let index = usize::from(*self.tokens.get(token)?);
+        crate::utils::dynamic_access::get(configs, index)
+    }
+
+    fn get_token_config_mut_unchecked<'a>(
+        &self,
+        token: &Pubkey,
+        configs: &'a mut [u8],
+    ) -> Option<&'a mut TokenConfig> {
+        let index = usize::from(*self.tokens.get(token)?);
+        crate::utils::dynamic_access::get_mut(configs, index)
+    }
 }
 
 /// Reference to Token Map.
@@ -412,8 +464,7 @@ pub trait TokenMapAccess {
 
 impl<'a> TokenMapAccess for TokenMapRef<'a> {
     fn get(&self, token: &Pubkey) -> Option<&TokenConfig> {
-        let index = usize::from(*self.header.tokens.get(token)?);
-        crate::utils::dynamic_access::get(&self.configs, index)
+        self.header.get_token_config_unchecked(token, &self.configs)
     }
 }
 
@@ -435,8 +486,8 @@ pub trait TokenMapMutAccess {
 
 impl<'a> TokenMapMutAccess for TokenMapMut<'a> {
     fn get_mut(&mut self, token: &Pubkey) -> Option<&mut TokenConfig> {
-        let index = usize::from(*self.header.tokens.get(token)?);
-        crate::utils::dynamic_access::get_mut(&mut self.configs, index)
+        self.header
+            .get_token_config_mut_unchecked(token, &mut self.configs)
     }
 
     fn push_with(
@@ -467,5 +518,63 @@ impl<'a> TokenMapMutAccess for TokenMapMut<'a> {
             return err!(StoreError::NoSpaceForNewData);
         };
         (f)(dst)
+    }
+}
+
+/// Utils for using token map.
+#[cfg(feature = "utils")]
+pub mod utils {
+    use std::{fmt, sync::Arc};
+
+    use anchor_lang::{prelude::Pubkey, AccountDeserialize};
+    use bytes::Bytes;
+
+    use crate::utils::de;
+
+    use super::{TokenConfig, TokenMapAccess, TokenMapHeader};
+
+    /// Token Map.
+    pub struct TokenMap {
+        header: Arc<TokenMapHeader>,
+        configs: Bytes,
+    }
+
+    impl fmt::Debug for TokenMap {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.debug_struct("TokenMap")
+                .field("header", &self.header)
+                .field("configs", &self.configs)
+                .finish()
+        }
+    }
+
+    impl TokenMapAccess for TokenMap {
+        fn get(&self, token: &Pubkey) -> Option<&TokenConfig> {
+            self.header.get_token_config_unchecked(token, &self.configs)
+        }
+    }
+
+    impl TokenMap {
+        /// Get header.
+        pub fn header(&self) -> &TokenMapHeader {
+            &self.header
+        }
+    }
+
+    impl AccountDeserialize for TokenMap {
+        fn try_deserialize(buf: &mut &[u8]) -> anchor_lang::Result<Self> {
+            de::check_discriminator::<TokenMapHeader>(buf)?;
+            Self::try_deserialize_unchecked(buf)
+        }
+
+        fn try_deserialize_unchecked(buf: &mut &[u8]) -> anchor_lang::Result<Self> {
+            let header = Arc::new(de::try_deserailize_unchecked::<TokenMapHeader>(buf)?);
+            let (_disc, data) = buf.split_at(8);
+            let (_header, configs) = data.split_at(std::mem::size_of::<TokenMapHeader>());
+            Ok(Self {
+                header,
+                configs: Bytes::copy_from_slice(configs),
+            })
+        }
     }
 }

@@ -3,7 +3,7 @@ address = "11111111111111111111111111111111"
 synthetic = 9
 enable = true
 update = false
-expected_provider = "Pyth"
+expected_provider = "pyth"
 precision = 4
 heartbeat_duration = 30
 
@@ -14,7 +14,7 @@ pyth_feed_id = "0xef0d8b6fda2ceba41da15d4095d1da392a0d2f8ed0c6c7bc0f4cfac8c280b5
 address = "So11111111111111111111111111111111111111112"
 enable = true
 update = false
-expected_provider = "Pyth"
+expected_provider = "pyth"
 precision = 4
 heartbeat_duration = 30
 

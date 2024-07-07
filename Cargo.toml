@@ -52,6 +52,7 @@ url = "2.5.0"
 humantime = "2.1.0"
 num-format = "0.4.4"
 time = "0.3.36"
+bytes = "1.6.0"
 
 [workspace.dependencies.gmsol-model]
 path = "crates/gmsol-model"

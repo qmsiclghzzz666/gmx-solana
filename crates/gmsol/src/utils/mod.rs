@@ -73,29 +73,12 @@ pub async fn try_deserailize_account<T>(client: &RpcClient, pubkey: &Pubkey) -> 
 where
     T: anchor_client::anchor_lang::ZeroCopy,
 {
-    use anchor_client::{
-        anchor_lang::error::{Error, ErrorCode},
-        ClientError,
-    };
-
     let data = client
         .get_account_data(pubkey)
         .await
         .map_err(anchor_client::ClientError::from)?;
-    let disc = T::discriminator();
-    if data.len() < disc.len() {
-        return Err(ClientError::from(Error::from(ErrorCode::AccountDiscriminatorNotFound)).into());
-    }
-    let given_disc = &data[..8];
-    if disc != given_disc {
-        return Err(ClientError::from(Error::from(ErrorCode::AccountDiscriminatorMismatch)).into());
-    }
-    let end = std::mem::size_of::<T>() + 8;
-    if data.len() < end {
-        return Err(ClientError::from(Error::from(ErrorCode::AccountDidNotDeserialize)).into());
-    }
-    let data_without_discriminator = data[8..end].to_vec();
-    Ok(*bytemuck::try_from_bytes(&data_without_discriminator).map_err(crate::Error::Bytemuck)?)
+
+    Ok(gmsol_store::utils::de::try_deserailize(&data)?)
 }
 
 /// Token Account Params.

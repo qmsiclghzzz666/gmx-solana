@@ -1,11 +1,8 @@
 use anchor_client::solana_sdk::{native_token::lamports_to_sol, pubkey::Pubkey};
 use gmsol::{
-    store::{
-        token_config::TokenConfigOps,
-        utils::{read_market, read_store, token_map, token_map_optional},
-    },
-    types::Market,
-    utils::{self, try_deserailize_account, view},
+    store::utils::{read_market, read_store, token_map, token_map_optional},
+    types::{Market, TokenConfig, TokenMap, TokenMapAccess},
+    utils,
 };
 use gmsol_model::{Balance, ClockKind, PoolKind};
 use gmsol_store::states::{
@@ -218,47 +215,31 @@ impl InspectArgs {
                 } else {
                     token_map(program, store).await?
                 };
+                let token_map = program.account::<TokenMap>(address).await?;
                 if let Some(token) = get_token {
-                    if let Some(provider) = feed {
-                        let transaction = client
-                            .token_feed(&address, token, *provider)
-                            .signed_transaction()
-                            .await?;
-                        let feed: Pubkey =
-                            view(&client.data_store().async_rpc(), &transaction).await?;
-                        match provider {
-                            PriceProviderKind::Pyth => {
-                                println!("0x{}", hex::encode(feed));
-                            }
-                            _ => {
-                                println!("{feed}");
-                            }
-                        }
+                    let config = token_map
+                        .get(token)
+                        .ok_or(gmsol::Error::invalid_argument("token not found"))?;
+                    if let Some(kind) = feed {
+                        println!("{}", config.get_feed(kind)?);
                     } else {
-                        let config = client.token_config(&address, token).await?;
-                        println!("{config:#?}");
+                        println!("{}", format_token_config(config)?);
+                    }
+                } else if *debug {
+                    println!("{token_map:#?}");
+                } else if *get_all_tokens {
+                    let mut is_empty = true;
+                    for token in token_map.header().tokens() {
+                        println!("{token}");
+                        is_empty = false;
+                    }
+                    if is_empty {
+                        println!("*no tokens*");
                     }
                 } else {
-                    let token_map = try_deserailize_account::<states::TokenMapHeader>(
-                        &program.async_rpc(),
-                        &address,
-                    )
-                    .await?;
-                    if *debug {
-                        println!("{token_map:#?}");
-                    } else if *get_all_tokens {
-                        let mut is_empty = true;
-                        for token in token_map.tokens() {
-                            println!("{token}");
-                            is_empty = false;
-                        }
-                        if is_empty {
-                            println!("*no tokens*");
-                        }
-                    } else {
-                        println!("{token_map}");
-                    }
+                    println!("{}", token_map.header());
                 }
+
                 if *show_address {
                     println!("Address: {address}");
                 }
@@ -561,6 +542,28 @@ fn format_market(address: &Pubkey, market: &Market) -> gmsol::Result<String> {
     for key in MarketConfigKey::iter() {
         let value = market.get_config_by_key(key);
         writeln!(f, "{key} = {}", value.to_formatted_string(&Locale::en))?;
+    }
+
+    Ok(buf)
+}
+
+fn format_token_config(token_config: &TokenConfig) -> gmsol::Result<String> {
+    use std::fmt::Write;
+
+    let mut buf = String::new();
+
+    let f = &mut buf;
+
+    writeln!(f, "{token_config}")?;
+
+    let expected_provider = token_config.expected_provider()?;
+    writeln!(f, "Feeds:")?;
+    for kind in PriceProviderKind::iter() {
+        let Ok(feed) = token_config.get_feed_config(&kind) else {
+            continue;
+        };
+        let expected = if expected_provider == kind { "*" } else { "" };
+        writeln!(f, "{kind}{expected} = {{ {feed} }}")?;
     }
 
     Ok(buf)

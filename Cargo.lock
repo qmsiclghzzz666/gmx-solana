@@ -1953,6 +1953,7 @@ dependencies = [
  "anchor-spl",
  "bitmaps 3.2.1",
  "bytemuck",
+ "bytes",
  "chainlink_solana",
  "clap 4.5.7",
  "dual-vec-map",
