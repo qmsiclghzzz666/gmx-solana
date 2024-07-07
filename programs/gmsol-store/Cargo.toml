@@ -26,7 +26,7 @@ no-bug-fix = []
 [dependencies]
 bytemuck = { workspace = true }
 anchor-lang = { workspace = true, features = ["init-if-needed", "event-cpi"] }
-gmsol-model = { workspace = true, features = ["u128", "solana"] }
+gmsol-model = { workspace = true, features = ["u128", "solana", "strum"] }
 gmsol-utils = { workspace = true }
 dual-vec-map = { workspace = true }
 anchor-spl = { workspace = true, default-features = false, features = [
