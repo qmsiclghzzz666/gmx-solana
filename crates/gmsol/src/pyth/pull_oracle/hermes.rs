@@ -232,6 +232,7 @@ fn get_query<'a>(
     feed_ids: impl IntoIterator<Item = &'a Identifier>,
     encoding: Option<EncodingType>,
 ) -> Vec<(&'static str, String)> {
+    let encoding = encoding.or(Some(EncodingType::Base64));
     feed_ids
         .into_iter()
         .map(|id| ("ids[]", id.to_hex()))
