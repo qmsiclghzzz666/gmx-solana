@@ -245,6 +245,10 @@ impl Market {
         self.pools.get(kind).copied()
     }
 
+    pub(crate) fn pool_mut(&mut self, kind: PoolKind) -> Option<&mut Pool> {
+        self.pools.get_mut(kind)
+    }
+
     /// Get clock of the given kind.
     pub fn clock(&self, kind: ClockKind) -> Option<i64> {
         self.clocks.get(kind).copied()
@@ -640,13 +644,24 @@ const PURE_VALUE: u8 = 1;
 
 impl Pool {
     /// Set the pure flag.
-    fn set_is_pure(&mut self, is_pure: bool) {
+    pub(crate) fn set_is_pure(&mut self, is_pure: bool) {
         self.is_pure = if is_pure { PURE_VALUE } else { 0 };
     }
 
     /// Is this a pure pool.
-    fn is_pure(&self) -> bool {
+    pub(crate) fn is_pure(&self) -> bool {
         !matches!(self.is_pure, 0)
+    }
+
+    /// Merge pool amount if it is pure.
+    /// Will return error if the pool is not pure.
+    pub(crate) fn merge_if_pure(&mut self) -> Result<()> {
+        require!(self.is_pure(), StoreError::InvalidArgument);
+        self.long_token_amount = self
+            .long_token_amount
+            .checked_add(self.short_token_amount)
+            .ok_or(error!(StoreError::AmountOverflow))?;
+        Ok(())
     }
 }
 

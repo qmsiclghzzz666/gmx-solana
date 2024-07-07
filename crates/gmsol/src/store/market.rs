@@ -5,6 +5,7 @@ use anchor_client::{
     solana_sdk::{pubkey::Pubkey, signer::Signer},
     RequestBuilder,
 };
+use gmsol_model::PoolKind;
 use gmsol_store::{
     accounts, instruction,
     states::{config::EntryArgs, Factor, MarketConfigKey},
@@ -144,6 +145,14 @@ pub trait MarketOps<C> {
         buffer: &Pubkey,
         receiver: Option<&Pubkey>,
     ) -> RpcBuilder<C>;
+
+    /// Turn a non-pure pool into a pure pool.
+    fn turn_into_pure_pool(
+        &self,
+        store: &Pubkey,
+        market_token: &Pubkey,
+        kind: PoolKind,
+    ) -> RpcBuilder<C>;
 }
 
 impl<C, S> MarketOps<C> for crate::Client<C>
@@ -265,6 +274,21 @@ where
                 market: self.find_market_address(store, market_token),
                 buffer: *buffer,
                 receiver: receiver.copied().unwrap_or(self.payer()),
+            })
+    }
+
+    fn turn_into_pure_pool(
+        &self,
+        store: &Pubkey,
+        market_token: &Pubkey,
+        kind: PoolKind,
+    ) -> RpcBuilder<C> {
+        self.data_store_rpc()
+            .args(instruction::TurnIntoPurePool { kind: kind.into() })
+            .accounts(accounts::TurnIntoPurePool {
+                authority: self.payer(),
+                store: *store,
+                market: self.find_market_address(store, market_token),
             })
     }
 }

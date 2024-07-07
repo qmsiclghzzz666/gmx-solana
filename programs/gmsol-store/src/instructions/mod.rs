@@ -34,6 +34,9 @@ pub mod position;
 /// Instructions for Exchange.
 pub mod exchange;
 
+#[cfg(not(feature = "no-bug-fix"))]
+pub mod bug_fix;
+
 pub use config::*;
 pub use data_store::*;
 pub use deposit::*;
@@ -46,3 +49,6 @@ pub use roles::*;
 pub use token::*;
 pub use token_config::*;
 pub use withdrawal::*;
+
+#[cfg(not(feature = "no-bug-fix"))]
+pub use bug_fix::*;

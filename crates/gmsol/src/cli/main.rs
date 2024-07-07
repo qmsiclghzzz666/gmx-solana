@@ -15,6 +15,7 @@ use tracing::level_filters::LevelFilter;
 use tracing_subscriber::EnvFilter;
 
 mod admin;
+mod bug_fix;
 mod controller;
 mod exchange;
 mod inspect;
@@ -92,6 +93,8 @@ enum Command {
     Market(market_keeper::Args),
     /// Commands for controllers.
     Controller(controller::ControllerArgs),
+    /// Bug fix commands.
+    BugFix(bug_fix::Args),
 }
 
 #[tokio::main]
@@ -185,6 +188,7 @@ impl Cli {
             Command::Order(args) => args.run(&client, &store, self.serialize_only).await?,
             Command::Market(args) => args.run(&client, &store, self.serialize_only).await?,
             Command::Controller(args) => args.run(&client, &store, self.serialize_only).await?,
+            Command::BugFix(args) => args.run(&client, &store, self.serialize_only).await?,
         }
         Ok(())
     }

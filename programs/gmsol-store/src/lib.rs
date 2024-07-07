@@ -554,6 +554,16 @@ pub mod gmsol_store {
     pub fn remove_position(ctx: Context<RemovePosition>, refund: u64) -> Result<()> {
         instructions::remove_position(ctx, refund)
     }
+
+    #[cfg(not(feature = "no-bug-fix"))]
+    #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
+    pub fn turn_into_pure_pool(ctx: Context<TurnIntoPurePool>, kind: u8) -> Result<()> {
+        instructions::unchecked_turn_into_pure_pool(
+            ctx,
+            kind.try_into()
+                .map_err(|_| error!(StoreError::InvalidArgument))?,
+        )
+    }
 }
 
 #[error_code]

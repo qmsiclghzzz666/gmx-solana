@@ -21,6 +21,7 @@ utils = []
 devnet = []
 serde = ["dep:serde"]
 enum-iter = []
+no-bug-fix = []
 
 [dependencies]
 bytemuck = { workspace = true }
