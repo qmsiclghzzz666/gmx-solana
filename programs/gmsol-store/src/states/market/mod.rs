@@ -517,8 +517,7 @@ impl Pools {
         self.open_interest_for_long.set_is_pure(is_pure);
         self.open_interest_for_short.set_is_pure(is_pure);
         self.open_interest_in_tokens_for_long.set_is_pure(is_pure);
-        self.claimable_funding_amount_per_size_for_short
-            .set_is_pure(is_pure);
+        self.open_interest_in_tokens_for_short.set_is_pure(is_pure);
         self.position_impact.set_is_pure(is_pure);
         // Borrowing factor must be not pure.
         self.borrowing_factor.set_is_pure(false);
