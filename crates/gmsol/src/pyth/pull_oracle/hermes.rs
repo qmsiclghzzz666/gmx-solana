@@ -146,14 +146,62 @@ pub struct ParsedPriceUpdate {
     metadata: Metadata,
 }
 
+impl ParsedPriceUpdate {
+    /// Get the feed id.
+    pub fn id(&self) -> &str {
+        self.id.as_str()
+    }
+
+    /// Get price.
+    pub fn price(&self) -> &Price {
+        &self.price
+    }
+
+    /// Get EMA Price.
+    pub fn ema_price(&self) -> &Price {
+        &self.ema_price
+    }
+
+    /// Get metadata.
+    pub fn metadata(&self) -> &Metadata {
+        &self.metadata
+    }
+}
+
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct Price {
+    /// Price.
     #[serde(with = "pyth_sdk::utils::as_string")]
     price: i64,
+    /// Confidence.
     #[serde(with = "pyth_sdk::utils::as_string")]
     conf: u64,
+    /// Exponent of the price.
     expo: i32,
+    /// Publish unix timestamp (secs) of the price.
     publish_time: i64,
+}
+
+impl Price {
+    /// Get (raw) price.
+    pub fn price(&self) -> i64 {
+        self.price
+    }
+
+    /// Get the confidence of the price.
+    pub fn conf(&self) -> u64 {
+        self.conf
+    }
+
+    /// Get the exponent of the price.
+    pub fn expo(&self) -> i32 {
+        self.expo
+    }
+
+    /// Get the publish time (unix timestamp in secs).
+    pub fn publish_time(&self) -> i64 {
+        self.publish_time
+    }
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -161,6 +209,23 @@ pub struct Metadata {
     slot: Option<u64>,
     proof_available_time: Option<i64>,
     prev_publish_time: Option<i64>,
+}
+
+impl Metadata {
+    /// Get slot.
+    pub fn slot(&self) -> Option<u64> {
+        self.slot
+    }
+
+    /// Get proof available time.
+    pub fn proof_available_time(&self) -> Option<i64> {
+        self.proof_available_time
+    }
+
+    /// Get previous publish time.
+    pub fn prev_publish_time(&self) -> Option<i64> {
+        self.prev_publish_time
+    }
 }
 
 fn get_query<'a>(
