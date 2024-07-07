@@ -45,6 +45,23 @@ where
     C: Deref<Target = S> + Clone,
     S: Signer,
 {
+    /// Estimate execution fee.
+    pub async fn estimated_execution_fee(
+        &self,
+        compute_unit_price_micro_lamports: Option<u64>,
+    ) -> crate::Result<u64> {
+        let mut execution_fee = self
+            .post
+            .estimated_execution_fee(compute_unit_price_micro_lamports)
+            .await?;
+        execution_fee = execution_fee.saturating_add(
+            self.close
+                .estimated_execution_fee(compute_unit_price_micro_lamports)
+                .await?,
+        );
+        Ok(execution_fee)
+    }
+
     /// Send all transactions.
     pub async fn send_all(
         self,
