@@ -30,6 +30,8 @@ pub fn initialize_token_map(ctx: Context<InitializeTokenMap>) -> Result<()> {
     Ok(())
 }
 
+/// Push a new token config to the token map.
+/// See [`unchecked_push_to_token_map`] for more information.
 #[derive(Accounts)]
 pub struct PushToTokenMap<'info> {
     #[account(mut)]
@@ -81,6 +83,7 @@ impl<'info> internal::Authentication<'info> for PushToTokenMap<'info> {
     }
 }
 
+/// Push a new synthetic token config to the token map.
 #[derive(Accounts)]
 pub struct PushToTokenMapSynthetic<'info> {
     #[account(mut)]
