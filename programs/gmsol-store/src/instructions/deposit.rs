@@ -122,6 +122,7 @@ pub struct RemoveDeposit<'info> {
 pub fn remove_deposit(ctx: Context<RemoveDeposit>, refund: u64, reason: &str) -> Result<()> {
     system_program::transfer(ctx.accounts.transfer_ctx(), refund)?;
     emit_cpi!(RemoveDepositEvent::new(
+        ctx.accounts.deposit.fixed.id,
         ctx.accounts.store.key(),
         ctx.accounts.deposit.key(),
         ctx.accounts.deposit.fixed.tokens.market_token,

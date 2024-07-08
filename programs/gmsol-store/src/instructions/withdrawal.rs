@@ -197,6 +197,7 @@ pub fn remove_withdrawal(ctx: Context<RemoveWithdrawal>, refund: u64, reason: &s
     system_program::transfer(ctx.accounts.transfer_ctx(), refund)?;
 
     emit_cpi!(RemoveWithdrawalEvent::new(
+        ctx.accounts.withdrawal.fixed.id,
         ctx.accounts.store.key(),
         ctx.accounts.withdrawal.key(),
         ctx.accounts.withdrawal.fixed.tokens.market_token,

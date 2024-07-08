@@ -6,6 +6,8 @@ use crate::states::order::OrderKind;
 #[event]
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub struct RemoveDepositEvent {
+    /// Action id.
+    pub id: u64,
     /// Timestamp.
     pub ts: i64,
     /// Slot.
@@ -24,6 +26,7 @@ pub struct RemoveDepositEvent {
 
 impl RemoveDepositEvent {
     pub(crate) fn new(
+        id: u64,
         store: Pubkey,
         deposit: Pubkey,
         market_token: Pubkey,
@@ -32,6 +35,7 @@ impl RemoveDepositEvent {
     ) -> Result<Self> {
         let clock = Clock::get()?;
         Ok(Self {
+            id,
             ts: clock.unix_timestamp,
             slot: clock.slot,
             store,
@@ -47,6 +51,8 @@ impl RemoveDepositEvent {
 #[event]
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub struct RemoveOrderEvent {
+    /// Action id.
+    pub id: u64,
     /// Timestamp.
     pub ts: i64,
     /// Slot.
@@ -67,6 +73,7 @@ pub struct RemoveOrderEvent {
 
 impl RemoveOrderEvent {
     pub(crate) fn new(
+        id: u64,
         store: Pubkey,
         order: Pubkey,
         kind: OrderKind,
@@ -76,6 +83,7 @@ impl RemoveOrderEvent {
     ) -> Result<Self> {
         let clock = Clock::get()?;
         Ok(Self {
+            id,
             ts: clock.unix_timestamp,
             slot: clock.slot,
             store,
@@ -92,6 +100,8 @@ impl RemoveOrderEvent {
 #[event]
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub struct RemoveWithdrawalEvent {
+    /// Action id.
+    pub id: u64,
     /// Timestamp.
     pub ts: i64,
     /// Slot.
@@ -110,6 +120,7 @@ pub struct RemoveWithdrawalEvent {
 
 impl RemoveWithdrawalEvent {
     pub(crate) fn new(
+        id: u64,
         store: Pubkey,
         withdrawal: Pubkey,
         market_token: Pubkey,
@@ -118,6 +129,7 @@ impl RemoveWithdrawalEvent {
     ) -> Result<Self> {
         let clock = Clock::get()?;
         Ok(Self {
+            id,
             ts: clock.unix_timestamp,
             slot: clock.slot,
             store,

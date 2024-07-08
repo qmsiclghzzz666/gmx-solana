@@ -335,6 +335,7 @@ pub struct RemoveOrder<'info> {
 pub fn remove_order(ctx: Context<RemoveOrder>, refund: u64, reason: &str) -> Result<()> {
     system_program::transfer(ctx.accounts.transfer_ctx(), refund)?;
     emit_cpi!(RemoveOrderEvent::new(
+        ctx.accounts.order.fixed.id,
         ctx.accounts.store.key(),
         ctx.accounts.order.key(),
         ctx.accounts.order.fixed.params.kind,
