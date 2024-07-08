@@ -14,11 +14,12 @@ use indexmap::IndexMap;
 use num_format::{Locale, ToFormattedString};
 use prettytable::{row, Table};
 use pyth_sdk::Identifier;
+use rust_decimal_macros::dec;
 use strum::IntoEnumIterator;
 
 use crate::{
     ser::SerializeMarket,
-    utils::{table_format, unsigned_value_to_decimal, Oracle, Output},
+    utils::{signed_value_to_decimal, table_format, unsigned_value_to_decimal, Oracle, Output},
     GMSOLClient,
 };
 
@@ -313,8 +314,14 @@ impl InspectArgs {
                         for (market, oi) in markets {
                             let (oi_long, oi_short) = if let Some(oi) = oi {
                                 (
-                                    format!("{}", unsigned_value_to_decimal(oi.long_amount()?)),
-                                    format!("{}", unsigned_value_to_decimal(oi.short_amount()?)),
+                                    format!(
+                                        "{}",
+                                        unsigned_value_to_decimal(oi.long_amount()?).normalize()
+                                    ),
+                                    format!(
+                                        "{}",
+                                        unsigned_value_to_decimal(oi.short_amount()?).normalize()
+                                    ),
                                 )
                             } else {
                                 ("*missing*".to_string(), "*missing*".to_string())
@@ -322,7 +329,18 @@ impl InspectArgs {
                             let name = &market.name;
                             let token = market.meta.market_token;
                             let enabled = market.enabled;
-                            table.add_row(row![name, token, enabled, oi_long, oi_short]);
+                            let funding_per_hour =
+                                signed_value_to_decimal(market.state.funding_factor_per_second)
+                                    * dec!(3600)
+                                    * dec!(100);
+                            table.add_row(row![
+                                name,
+                                token,
+                                enabled,
+                                oi_long,
+                                oi_short,
+                                funding_per_hour.normalize(),
+                            ]);
                         }
 
                         table.set_titles(row![
@@ -330,7 +348,8 @@ impl InspectArgs {
                             "Token",
                             "Enabled",
                             "OI Long ($)",
-                            "OI Short ($)"
+                            "OI Short ($)",
+                            "Funding Rate (% / hour)",
                         ]);
                         table.set_format(table_format());
                         Ok(table.to_string())

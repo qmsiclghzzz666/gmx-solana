@@ -35,7 +35,6 @@ pyth-pull-oracle = [
     "pythnet-sdk",
     "pyth-solana-receiver-sdk",
     "byteorder",
-    "rust_decimal",
 ]
 rust-embed = ["dep:rust-embed"]
 poem = ["dep:poem"]
@@ -65,7 +64,6 @@ pyth-solana-receiver-sdk = { workspace = true, optional = true }
 anchor-syn = { workspace = true, optional = true }
 heck = { workspace = true, optional = true }
 byteorder = { workspace = true, optional = true }
-rust_decimal = { workspace = true, optional = true }
 
 # Other deps
 gmsol-utils = { workspace = true }
@@ -80,6 +78,8 @@ gmsol-store = { workspace = true, features = [
 gmsol-exchange = { workspace = true, features = ["no-entrypoint", "debug"] }
 gmsol-model = { workspace = true, features = ["strum", "serde"] }
 
+rust_decimal = { workspace = true }
+rust_decimal_macros = { workspace = true }
 hex = { workspace = true }
 pyth-sdk = { workspace = true }
 typed-builder = { workspace = true }

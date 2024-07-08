@@ -148,7 +148,6 @@ pub(crate) fn table_format() -> TableFormat {
         .build()
 }
 
-#[allow(dead_code)]
 pub fn signed_value_to_decimal(num: i128) -> Decimal {
     let is_negative = num.is_negative();
     let d = unsigned_value_to_decimal(num.unsigned_abs());
@@ -180,7 +179,6 @@ pub fn unsigned_value_to_decimal(num: u128) -> Decimal {
     } else {
         Decimal::from_i128_with_scale(num as i128, SCALE)
     }
-    .normalize()
 }
 
 #[cfg(test)]
