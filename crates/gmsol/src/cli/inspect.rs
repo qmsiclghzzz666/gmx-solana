@@ -1,8 +1,10 @@
 use anchor_client::solana_sdk::{native_token::lamports_to_sol, pubkey::Pubkey};
+use bytemuck::offset_of;
 use gmsol::{
+    client::StoreFilter,
     store::utils::{read_market, read_store, token_map, token_map_optional},
     types::{Market, TokenConfig, TokenMap, TokenMapAccess},
-    utils,
+    utils::{self, zero_copy::ZeroCopy},
 };
 use gmsol_model::{Balance, ClockKind, PoolKind};
 use gmsol_store::states::{
@@ -13,7 +15,11 @@ use num_format::{Locale, ToFormattedString};
 use pyth_sdk::Identifier;
 use strum::IntoEnumIterator;
 
-use crate::{utils::Oracle, GMSOLClient};
+use crate::{
+    ser::SerializeMarket,
+    utils::{Oracle, Output},
+    GMSOLClient,
+};
 
 #[derive(clap::Args)]
 pub(super) struct InspectArgs {
@@ -70,7 +76,7 @@ enum Command {
     },
     /// `Market` account.
     Market {
-        address: Pubkey,
+        address: Option<Pubkey>,
         /// Consider the address as market address rather than the address of its market token.
         #[arg(long)]
         as_market_address: bool,
@@ -81,6 +87,9 @@ enum Command {
         debug: bool,
         #[arg(long, group = "get")]
         get_config: Option<MarketConfigKey>,
+        /// Output format.
+        #[arg(long, short)]
+        output: Option<Output>,
     },
     /// `MarketConfigBuffer` account.
     MarketConfigBuffer {
@@ -245,25 +254,79 @@ impl InspectArgs {
                 }
             }
             Command::Market {
-                mut address,
+                address,
                 as_market_address,
                 show_market_address: show_address,
                 debug,
                 get_config,
+                output,
             } => {
-                if !as_market_address {
-                    address = client.find_market_address(store, &address);
-                }
-                let market = read_market(&program.async_rpc(), &address).await?;
-                if let Some(key) = get_config {
-                    println!("{}", market.get_config_by_key(*key));
-                } else if *debug {
-                    println!("{:?}", market);
+                if let Some(mut address) = address {
+                    if !as_market_address {
+                        address = client.find_market_address(store, &address);
+                    }
+                    let market = read_market(&program.async_rpc(), &address).await?;
+                    if let Some(key) = get_config {
+                        println!("{}", market.get_config_by_key(*key));
+                    } else if *debug {
+                        println!("{:?}", market);
+                    } else {
+                        println!("{}", format_market(&address, &market)?);
+                    }
+                    if *show_address {
+                        println!("Market address: {address}");
+                    }
                 } else {
-                    println!("{}", format_market(&address, &market)?);
-                }
-                if *show_address {
-                    println!("Market address: {address}");
+                    let markets = client
+                        .store_accounts::<ZeroCopy<Market>>(
+                            Some(&StoreFilter::new(store, offset_of!(Market, store))),
+                            false,
+                        )
+                        .await?
+                        .into_iter()
+                        .filter_map(|(pubkey, market)| {
+                            SerializeMarket::from_market(&pubkey, &market.0)
+                                .inspect_err(
+                                    |err| tracing::error!(%pubkey, %err, "parse market error"),
+                                )
+                                .ok()
+                        })
+                        .collect::<Vec<_>>();
+                    output.unwrap_or_default().print(&markets, |markets| {
+                        use std::fmt::Write;
+
+                        let mut buf = String::new();
+                        let f = &mut buf;
+                        for market in markets {
+                            let balances = if market.is_pure {
+                                format!(
+                                    "balance = {}",
+                                    market
+                                        .state
+                                        .long_token_balance
+                                        .to_formatted_string(&Locale::en)
+                                )
+                            } else {
+                                format!(
+                                    "long_balance = {}, short_balance = {}",
+                                    market
+                                        .state
+                                        .long_token_balance
+                                        .to_formatted_string(&Locale::en),
+                                    market
+                                        .state
+                                        .short_token_balance
+                                        .to_formatted_string(&Locale::en)
+                                )
+                            };
+                            writeln!(
+                                f,
+                                "{}: {{ token = {}, enabled = {}, {balances} }}",
+                                market.name, market.meta.market_token, market.enabled,
+                            )?;
+                        }
+                        Ok(buf)
+                    })?;
                 }
             }
             Command::MarketConfigBuffer { address, debug } => {
@@ -360,7 +423,7 @@ impl InspectArgs {
             Command::Position { address } => {
                 println!(
                     "{:#?}",
-                    utils::try_deserailize_account::<states::Position>(
+                    utils::try_deserailize_zero_copy_account::<states::Position>(
                         &program.async_rpc(),
                         address
                     )
@@ -442,6 +505,8 @@ fn format_market(address: &Pubkey, market: &Market) -> gmsol::Result<String> {
     writeln!(f, "\nEnabled: {}", market.is_enabled())?;
 
     writeln!(f, "\nAddress: {address}")?;
+
+    writeln!(f, "\nStore: {}", market.store)?;
 
     writeln!(f, "\nMeta:")?;
     let meta = market.meta();

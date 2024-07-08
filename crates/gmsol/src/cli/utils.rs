@@ -35,6 +35,39 @@ impl Oracle {
     }
 }
 
+#[derive(clap::ValueEnum, Clone, Copy, Default)]
+#[clap(rename_all = "kebab-case")]
+pub(crate) enum Output {
+    /// Text.
+    #[default]
+    Text,
+    /// Json.
+    Json,
+    /// Json Compact.
+    JsonCompact,
+}
+
+impl Output {
+    pub(crate) fn print<T: serde::Serialize>(
+        &self,
+        value: &T,
+        text: impl FnOnce(&T) -> gmsol::Result<String>,
+    ) -> gmsol::Result<()> {
+        match self {
+            Self::Text => {
+                println!("{}", text(value)?);
+            }
+            Self::Json => {
+                println!("{}", serde_json::to_string_pretty(value)?);
+            }
+            Self::JsonCompact => {
+                println!("{}", serde_json::to_string(value)?);
+            }
+        }
+        Ok(())
+    }
+}
+
 pub(crate) fn generate_discriminator(name: &str) -> [u8; 8] {
     use anchor_syn::codegen::program::common::{sighash, SIGHASH_GLOBAL_NAMESPACE};
     use heck::AsSnakeCase;

@@ -8,6 +8,7 @@ test = []
 u128 = ["ruint"]
 solana = ["anchor-lang"]
 strum = ["dep:strum"]
+serde = ["dep:serde"]
 
 [dependencies]
 num-traits = { workspace = true }
@@ -20,3 +21,4 @@ anchor-lang = { workspace = true, optional = true }
 num_enum = { workspace = true }
 typed-builder = { workspace = true }
 strum = { workspace = true, optional = true }
+serde = { workspace = true, optional = true, features = ["derive"] }

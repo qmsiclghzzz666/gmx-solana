@@ -1,13 +1,12 @@
 use std::{ops::Deref, time::Duration};
 
 use anchor_client::{
-    anchor_lang::{AccountDeserialize, Discriminator},
-    solana_client::rpc_filter::{Memcmp, RpcFilterType},
     solana_sdk::{pubkey::Pubkey, signer::Signer},
     Program,
 };
 use futures_util::{FutureExt, TryFutureExt};
 use gmsol::{
+    client::StoreFilter,
     exchange::ExchangeOps,
     pyth::{EncodingType, Hermes, PythPullOracle, PythPullOracleContext, PythPullOracleOps},
     types::{Deposit, Order, Withdrawal},
@@ -137,8 +136,11 @@ impl KeeperArgs {
                 let filter_store = !*ignore_store;
                 match action {
                     Action::Deposit => {
-                        let actions = self
-                            .fetch_pendings::<Deposit>(client, store, 8, filter_store)
+                        let actions = client
+                            .store_accounts::<Deposit>(
+                                filter_store.then(|| StoreFilter::new(store, 8)).as_ref(),
+                                true,
+                            )
                             .await?;
                         if actions.is_empty() {
                             println!("No pending deposits");
@@ -159,8 +161,11 @@ impl KeeperArgs {
                         }
                     }
                     Action::Withdrawal => {
-                        let actions = self
-                            .fetch_pendings::<Withdrawal>(client, store, 8, filter_store)
+                        let actions = client
+                            .store_accounts::<Withdrawal>(
+                                filter_store.then(|| StoreFilter::new(store, 8)).as_ref(),
+                                true,
+                            )
                             .await?;
                         if actions.is_empty() {
                             println!("No pending withdrawals");
@@ -187,8 +192,11 @@ impl KeeperArgs {
                         }
                     }
                     Action::Order => {
-                        let actions = self
-                            .fetch_pendings::<Order>(client, store, 9, filter_store)
+                        let actions = client
+                            .store_accounts::<Order>(
+                                filter_store.then(|| StoreFilter::new(store, 9)).as_ref(),
+                                true,
+                            )
                             .await?;
                         if actions.is_empty() {
                             println!("No pending orders");
@@ -404,31 +412,6 @@ impl KeeperArgs {
         let mut args = self.clone();
         args.command = command;
         args
-    }
-
-    async fn fetch_pendings<T>(
-        &self,
-        client: &GMSOLClient,
-        store: &Pubkey,
-        store_offset: usize,
-        filter_store: bool,
-    ) -> gmsol::Result<Vec<(Pubkey, T)>>
-    where
-        T: AccountDeserialize + Discriminator,
-    {
-        let filters = std::iter::empty().chain(filter_store.then(|| {
-            tracing::debug!(%store, "store bytes to filter: {}", hex::encode(store));
-            RpcFilterType::Memcmp(Memcmp::new_raw_bytes(
-                store_offset,
-                store.as_ref().to_owned(),
-            ))
-        }));
-        client
-            .data_store()
-            .accounts_lazy::<T>(filters.collect())
-            .await?
-            .map(|res| res.map_err(gmsol::Error::from))
-            .collect()
     }
 
     async fn start_watching(

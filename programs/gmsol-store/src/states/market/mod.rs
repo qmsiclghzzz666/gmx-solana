@@ -62,7 +62,8 @@ pub struct Market {
     padding: [u8; 14],
     name: [u8; MAX_NAME_LEN],
     pub(crate) meta: MarketMeta,
-    pub(crate) store: Pubkey,
+    /// Store.
+    pub store: Pubkey,
     pools: Pools,
     clocks: Clocks,
     state: MarketState,
@@ -81,6 +82,13 @@ impl Seed for Market {
 
 impl InitSpace for Market {
     const INIT_SPACE: usize = std::mem::size_of::<Self>();
+}
+
+impl Default for Market {
+    fn default() -> Self {
+        use bytemuck::Zeroable;
+        Self::zeroed()
+    }
 }
 
 impl Market {
@@ -628,11 +636,13 @@ impl Clocks {
 /// A pool for market.
 #[zero_copy]
 #[cfg_attr(feature = "debug", derive(Debug))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Pool {
     /// Whether the pool only contains one kind of token,
     /// i.e. a pure pool.
     /// For a pure pool, only the `long_token_amount` field is used.
     is_pure: u8,
+    #[cfg_attr(feature = "serde", serde(skip))]
     padding: [u8; 15],
     /// Long token amount.
     long_token_amount: u128,

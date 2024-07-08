@@ -21,6 +21,7 @@ mod exchange;
 mod inspect;
 mod market_keeper;
 mod order_keeper;
+mod ser;
 mod utils;
 
 #[cfg(feature = "ui")]

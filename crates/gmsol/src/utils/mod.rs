@@ -31,6 +31,9 @@ pub mod signer;
 /// Workaround for optional accounts.
 pub mod optional;
 
+/// Zero-copy account workaround.
+pub mod zero_copy;
+
 pub use self::{
     compute_budget::ComputeBudget,
     instruction::serialize_instruction,
@@ -39,6 +42,7 @@ pub use self::{
     signer::{shared_signer, SignerRef},
     transaction_builder::TransactionBuilder,
     transaction_size::transaction_size,
+    zero_copy::try_deserailize_zero_copy_account,
 };
 
 /// View the return data by simulating the transaction.
@@ -64,21 +68,6 @@ pub async fn view<T: BorshDeserialize>(
     let decoded = BASE64_STANDARD.decode(data)?;
     let output = T::deserialize_reader(&mut decoded.as_slice())?;
     Ok(output)
-}
-
-/// A workaround to deserialize "zero-copy" account data.
-///
-/// See [anchort#2689](https://github.com/coral-xyz/anchor/issues/2689) for more information.
-pub async fn try_deserailize_account<T>(client: &RpcClient, pubkey: &Pubkey) -> crate::Result<T>
-where
-    T: anchor_client::anchor_lang::ZeroCopy,
-{
-    let data = client
-        .get_account_data(pubkey)
-        .await
-        .map_err(anchor_client::ClientError::from)?;
-
-    Ok(gmsol_store::utils::de::try_deserailize(&data)?)
 }
 
 /// Token Account Params.

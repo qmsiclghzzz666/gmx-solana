@@ -1,6 +1,7 @@
 use std::ops::Deref;
 
 use anchor_client::{
+    anchor_lang::{AccountDeserialize, Discriminator},
     solana_sdk::{commitment_config::CommitmentConfig, pubkey::Pubkey, signer::Signer},
     Cluster, Program,
 };
@@ -231,6 +232,34 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         )
         .0
     }
+
+    /// Fetch accounts owned by the Store Program.
+    pub async fn store_accounts<T>(
+        &self,
+        filter_by_store: Option<&StoreFilter>,
+        ignore_disc_offset: bool,
+    ) -> crate::Result<Vec<(Pubkey, T)>>
+    where
+        T: AccountDeserialize + Discriminator,
+    {
+        use anchor_client::solana_client::rpc_filter::{Memcmp, RpcFilterType};
+        const DISC_OFFSET: usize = 8;
+
+        let filters = std::iter::empty().chain(filter_by_store.map(|filter| {
+            let store = filter.store;
+            let store_offset = if ignore_disc_offset { filter.store_offset} else { filter.store_offset + DISC_OFFSET };
+            tracing::debug!(%store, offset=%store_offset, "store bytes to filter: {}", hex::encode(store));
+            RpcFilterType::Memcmp(Memcmp::new_raw_bytes(
+                store_offset,
+                store.as_ref().to_owned(),
+            ))
+        }));
+        self.data_store()
+            .accounts_lazy::<T>(filters.collect())
+            .await?
+            .map(|res| res.map_err(crate::Error::from))
+            .collect()
+    }
 }
 
 /// System Program Ops.
@@ -251,5 +280,24 @@ impl<C: Clone + Deref<Target = impl Signer>> SystemProgramOps<C> for Client<C> {
         Ok(self
             .data_store_rpc()
             .pre_instruction(transfer(&self.payer(), to, lamports)))
+    }
+}
+
+/// Store Filter.
+#[derive(Debug)]
+pub struct StoreFilter {
+    /// Store.
+    pub store: Pubkey,
+    /// Store offset.
+    pub store_offset: usize,
+}
+
+impl StoreFilter {
+    /// Create a new store filter.
+    pub fn new(store: &Pubkey, store_offset: usize) -> Self {
+        Self {
+            store: *store,
+            store_offset,
+        }
     }
 }

@@ -1,9 +1,7 @@
-use core::fmt;
 use std::{
     io::Read,
     num::NonZeroUsize,
     path::{Path, PathBuf},
-    str::FromStr,
 };
 
 use anchor_client::solana_sdk::{pubkey::Pubkey, signature::Keypair, signer::Signer};
@@ -26,7 +24,7 @@ use gmsol_store::states::{
 use indexmap::IndexMap;
 use serde::de::DeserializeOwned;
 
-use crate::GMSOLClient;
+use crate::{ser::MarketConfigMap, GMSOLClient};
 
 #[derive(clap::Args)]
 pub(super) struct Args {
@@ -834,46 +832,6 @@ pub struct MarketConfigs {
     configs: IndexMap<Pubkey, MarketConfig>,
 }
 
-#[derive(Debug, Clone)]
-struct SerdeFactor(Factor);
-
-impl fmt::Display for SerdeFactor {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-impl FromStr for SerdeFactor {
-    type Err = gmsol::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let s = s.replace('_', "");
-        let inner = s.parse::<u128>().map_err(gmsol::Error::unknown)?;
-        Ok(Self(inner))
-    }
-}
-
-/// Market Config with enable option.
-#[serde_with::serde_as]
-#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
-pub struct MarketConfig {
-    #[serde(default)]
-    enable: Option<bool>,
-    #[serde(default)]
-    #[serde_as(as = "Option<serde_with::DisplayFromStr>")]
-    buffer: Option<Pubkey>,
-    #[serde(flatten)]
-    config: MarketConfigMap,
-}
-
-/// Market Config.
-#[serde_with::serde_as]
-#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
-pub struct MarketConfigMap(
-    #[serde_as(as = "IndexMap<_, serde_with::DisplayFromStr>")]
-    IndexMap<MarketConfigKey, SerdeFactor>,
-);
-
 impl MarketConfigMap {
     #[allow(clippy::too_many_arguments)]
     async fn update(
@@ -930,6 +888,19 @@ impl MarketConfigMap {
         .await?;
         Ok(())
     }
+}
+
+/// Market Config with enable option.
+#[serde_with::serde_as]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
+pub struct MarketConfig {
+    #[serde(default)]
+    enable: Option<bool>,
+    #[serde(default)]
+    #[serde_as(as = "Option<serde_with::DisplayFromStr>")]
+    buffer: Option<Pubkey>,
+    #[serde(flatten)]
+    config: MarketConfigMap,
 }
 
 impl MarketConfigs {

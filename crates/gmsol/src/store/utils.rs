@@ -177,10 +177,10 @@ where
 
 /// Read store account.
 pub async fn read_store(client: &RpcClient, store: &Pubkey) -> crate::Result<Store> {
-    crate::utils::try_deserailize_account(client, store).await
+    crate::utils::try_deserailize_zero_copy_account(client, store).await
 }
 
 /// Read marekt account.
 pub async fn read_market(client: &RpcClient, market: &Pubkey) -> crate::Result<Market> {
-    crate::utils::try_deserailize_account(client, market).await
+    crate::utils::try_deserailize_zero_copy_account(client, market).await
 }

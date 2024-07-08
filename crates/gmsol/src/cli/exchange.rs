@@ -371,7 +371,7 @@ impl ExchangeArgs {
                 secondary_output_token_account,
                 swap,
             } => {
-                let position = utils::try_deserailize_account::<Position>(
+                let position = utils::try_deserailize_zero_copy_account::<Position>(
                     &client.data_store().async_rpc(),
                     position,
                 )
