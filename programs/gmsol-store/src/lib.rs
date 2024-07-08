@@ -80,7 +80,7 @@
 //! Since the Store Account is involved in almost all Store Program instructions, it is very suitable for
 //! storing global configrations. Currently, we store the following configurations in the Store Account:
 //! 1. The authority (admin) of the store and the permissions table for other addresses.
-//! 2. THe address of the token map used in this deployment.
+//! 2. The address of the token map used in this deployment.
 //! 3. Treasury configuration.
 //! 4. Verification configuration for oracles.
 //! 5. Other global configurations.
@@ -90,9 +90,9 @@
 //! the following [seeds]:
 //! 1. A constant [`Store::SEED`](states::Store).
 //! 2. A hashed key string, hashed to 32 bytes.
-//! This means that we can generate a Store Account address from any key string (with a lenght not
+//! This means that we can generate a Store Account address from any key string (with a length not
 //! exceeding [`MAX_LEN`](states::Store::MAX_LEN)). However, this is not unique, as multiple key strings
-//! may derive the same Store Account address. The store derived from an empty key string is referred to
+//! may generate the same Store Account address. The store derived from an empty key string is referred to
 //! as the default store, which si typically controlled by the GMSOL Program deployer.
 //!
 //! Given the possibility of multiple key strings deriving the same Store Account address, to ensure that
