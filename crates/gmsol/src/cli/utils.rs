@@ -7,6 +7,8 @@ use anchor_client::{
 };
 use eyre::ContextCompat;
 use gmsol::utils::TransactionBuilder;
+use prettytable::format::{FormatBuilder, TableFormat};
+use rust_decimal::Decimal;
 
 #[derive(clap::Args, Clone)]
 #[group(required = false, multiple = false, id = "oracle_address")]
@@ -135,4 +137,82 @@ where
         }
     }
     Ok(())
+}
+
+pub(crate) fn table_format() -> TableFormat {
+    use prettytable::format::{LinePosition, LineSeparator};
+
+    FormatBuilder::new()
+        .padding(0, 2)
+        .separator(LinePosition::Title, LineSeparator::new('-', '+', '+', '+'))
+        .build()
+}
+
+#[allow(dead_code)]
+pub fn signed_value_to_decimal(num: i128) -> Decimal {
+    let is_negative = num.is_negative();
+    let d = unsigned_value_to_decimal(num.unsigned_abs());
+    if is_negative {
+        -d
+    } else {
+        d
+    }
+}
+
+pub fn unsigned_value_to_decimal(num: u128) -> Decimal {
+    use gmsol_store::constants::MARKET_DECIMALS;
+
+    const SCALE: u32 = MARKET_DECIMALS as u32;
+    const MAX_REPR: u128 = 0x0000_0000_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF;
+    const TARGET_SCALE: u32 = MAX_REPR.ilog10() - 1;
+
+    fn convert_by_change_the_scale(mut num: u128) -> Decimal {
+        let digits = num.ilog10();
+        debug_assert!(digits >= TARGET_SCALE);
+        let scale_diff = digits - TARGET_SCALE;
+        debug_assert!(SCALE >= scale_diff);
+        num /= 10u128.pow(scale_diff);
+        Decimal::from_i128_with_scale(num as i128, SCALE - scale_diff)
+    }
+
+    if num > MAX_REPR {
+        convert_by_change_the_scale(num)
+    } else {
+        Decimal::from_i128_with_scale(num as i128, SCALE)
+    }
+    .normalize()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_convert_value_to_decimal() {
+        assert_eq!(
+            signed_value_to_decimal(2_268_944_690_310_400_000_000_000).to_string(),
+            "22689.446903104"
+        );
+        assert_eq!(
+            signed_value_to_decimal(i128::MAX).to_string(),
+            "1701411834604692317.316873037"
+        );
+        assert_eq!(
+            signed_value_to_decimal(i128::MIN).to_string(),
+            "-1701411834604692317.316873037"
+        );
+        assert_eq!(
+            signed_value_to_decimal(0x0000_0000_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF).to_string(),
+            "792281625.14264337593543950335",
+        );
+
+        assert_eq!(
+            unsigned_value_to_decimal(u128::MAX).to_string(),
+            "3402823669209384634.633746074"
+        );
+        assert_eq!(
+            unsigned_value_to_decimal(0x0000_0000_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF).to_string(),
+            "792281625.14264337593543950335",
+        );
+    }
 }

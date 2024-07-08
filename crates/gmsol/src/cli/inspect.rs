@@ -6,18 +6,19 @@ use gmsol::{
     types::{Market, TokenConfig, TokenMap, TokenMapAccess},
     utils::{self, zero_copy::ZeroCopy},
 };
-use gmsol_model::{Balance, ClockKind, PoolKind};
+use gmsol_model::{Balance, BalanceExt, ClockKind, PoolKind};
 use gmsol_store::states::{
     self, AddressKey, AmountKey, FactorKey, MarketConfigKey, PriceProviderKind,
 };
 use indexmap::IndexMap;
 use num_format::{Locale, ToFormattedString};
+use prettytable::{row, Table};
 use pyth_sdk::Identifier;
 use strum::IntoEnumIterator;
 
 use crate::{
     ser::SerializeMarket,
-    utils::{Oracle, Output},
+    utils::{table_format, unsigned_value_to_decimal, Oracle, Output},
     GMSOLClient,
 };
 
@@ -284,39 +285,55 @@ impl InspectArgs {
                         })
                         .collect::<Vec<_>>();
                     output.print(&markets, |markets| {
-                        use std::fmt::Write;
+                        use std::cmp::Reverse;
 
-                        let mut buf = String::new();
-                        let f = &mut buf;
-                        for market in markets {
-                            let balances = if market.is_pure {
-                                format!(
-                                    "balance = {}",
-                                    market
-                                        .state
-                                        .long_token_balance
-                                        .to_formatted_string(&Locale::en)
+                        let mut table = Table::new();
+                        let mut markets = markets
+                            .iter()
+                            .map(|market| {
+                                let pools = &market.pools.0;
+                                let oi =
+                                    pools.get(&PoolKind::OpenInterestForLong).and_then(|long| {
+                                        pools
+                                            .get(&PoolKind::OpenInterestForShort)
+                                            .map(|short| long.merge(short))
+                                    });
+                                (market, oi)
+                            })
+                            .collect::<Vec<_>>();
+                        markets.sort_by_key(|(m, oi)| {
+                            let oi = oi
+                                .as_ref()
+                                .map(|oi| {
+                                    oi.long_amount().unwrap_or(0) + oi.short_amount().unwrap_or(0)
+                                })
+                                .unwrap_or_default();
+                            (Reverse(m.enabled), Reverse(oi), &m.name)
+                        });
+                        for (market, oi) in markets {
+                            let (oi_long, oi_short) = if let Some(oi) = oi {
+                                (
+                                    format!("{}", unsigned_value_to_decimal(oi.long_amount()?)),
+                                    format!("{}", unsigned_value_to_decimal(oi.short_amount()?)),
                                 )
                             } else {
-                                format!(
-                                    "long_balance = {}, short_balance = {}",
-                                    market
-                                        .state
-                                        .long_token_balance
-                                        .to_formatted_string(&Locale::en),
-                                    market
-                                        .state
-                                        .short_token_balance
-                                        .to_formatted_string(&Locale::en)
-                                )
+                                ("*missing*".to_string(), "*missing*".to_string())
                             };
-                            writeln!(
-                                f,
-                                "{}: {{ token = {}, enabled = {}, {balances} }}",
-                                market.name, market.meta.market_token, market.enabled,
-                            )?;
+                            let name = &market.name;
+                            let token = market.meta.market_token;
+                            let enabled = market.enabled;
+                            table.add_row(row![name, token, enabled, oi_long, oi_short]);
                         }
-                        Ok(buf)
+
+                        table.set_titles(row![
+                            "Name",
+                            "Token",
+                            "Enabled",
+                            "OI Long ($)",
+                            "OI Short ($)"
+                        ]);
+                        table.set_format(table_format());
+                        Ok(table.to_string())
                     })?;
                 }
             }
