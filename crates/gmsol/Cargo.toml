@@ -19,7 +19,6 @@ cli = [
     "heck",
     "toml",
     "serde_with",
-    "hex",
     "humantime",
     "num-format",
 ]
@@ -50,7 +49,6 @@ tracing-subscriber = { workspace = true, optional = true, features = [
 shellexpand = { workspace = true, optional = true }
 toml = { workspace = true, optional = true }
 serde_with = { workspace = true, optional = true, features = ["indexmap_2"] }
-hex = { workspace = true, optional = true }
 humantime = { workspace = true, optional = true }
 num-format = { workspace = true, optional = true }
 
@@ -80,6 +78,7 @@ gmsol-store = { workspace = true, features = [
 gmsol-exchange = { workspace = true, features = ["no-entrypoint", "debug"] }
 gmsol-model = { workspace = true, features = ["strum", "serde"] }
 
+hex = { workspace = true }
 pyth-sdk = { workspace = true }
 typed-builder = { workspace = true }
 eyre = { workspace = true }

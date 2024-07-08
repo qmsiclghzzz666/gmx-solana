@@ -126,7 +126,7 @@ pub struct SerializeMarketState {
 
 /// Serializable Market Clocks.
 #[derive(Debug, Serialize)]
-pub struct SerializeMarketClocks(IndexMap<ClockKind, i64>);
+pub struct SerializeMarketClocks(pub IndexMap<ClockKind, i64>);
 
 impl<'a> TryFrom<&'a Market> for SerializeMarketClocks {
     type Error = gmsol::Error;
@@ -141,7 +141,7 @@ impl<'a> TryFrom<&'a Market> for SerializeMarketClocks {
 
 /// Serializable Market Pools.
 #[derive(Debug, Serialize)]
-pub struct SerializeMarketPools(IndexMap<PoolKind, Pool>);
+pub struct SerializeMarketPools(pub IndexMap<PoolKind, Pool>);
 
 impl<'a> TryFrom<&'a Market> for SerializeMarketPools {
     type Error = gmsol::Error;

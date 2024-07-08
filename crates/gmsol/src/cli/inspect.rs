@@ -80,12 +80,7 @@ enum Command {
         /// Consider the address as market address rather than the address of its market token.
         #[arg(long)]
         as_market_address: bool,
-        /// Whether to display the market address.
         #[arg(long)]
-        show_market_address: bool,
-        #[arg(long, group = "get")]
-        debug: bool,
-        #[arg(long, group = "get")]
         get_config: Option<MarketConfigKey>,
         /// Output format.
         #[arg(long, short)]
@@ -256,25 +251,21 @@ impl InspectArgs {
             Command::Market {
                 address,
                 as_market_address,
-                show_market_address: show_address,
-                debug,
                 get_config,
                 output,
             } => {
+                let output = output.unwrap_or_default();
                 if let Some(mut address) = address {
                     if !as_market_address {
                         address = client.find_market_address(store, &address);
                     }
                     let market = read_market(&program.async_rpc(), &address).await?;
+                    let serialized = SerializeMarket::from_market(&address, &market)?;
                     if let Some(key) = get_config {
-                        println!("{}", market.get_config_by_key(*key));
-                    } else if *debug {
-                        println!("{:?}", market);
+                        let value = market.get_config_by_key(*key);
+                        output.print(value, |value| Ok(value.to_string()))?;
                     } else {
-                        println!("{}", format_market(&address, &market)?);
-                    }
-                    if *show_address {
-                        println!("Market address: {address}");
+                        output.print(&serialized, format_market)?;
                     }
                 } else {
                     let markets = client
@@ -292,7 +283,7 @@ impl InspectArgs {
                                 .ok()
                         })
                         .collect::<Vec<_>>();
-                    output.unwrap_or_default().print(&markets, |markets| {
+                    output.print(&markets, |markets| {
                         use std::fmt::Write;
 
                         let mut buf = String::new();
@@ -493,87 +484,81 @@ fn parse_feed_ids(feed_ids: &[String]) -> gmsol::Result<Vec<Identifier>> {
     Ok(feed_ids)
 }
 
-fn format_market(address: &Pubkey, market: &Market) -> gmsol::Result<String> {
+fn format_market(market: &SerializeMarket) -> gmsol::Result<String> {
     use std::fmt::Write;
 
     let mut buf = String::new();
 
     let f = &mut buf;
 
-    writeln!(f, "Name: {}", market.name()?)?;
+    writeln!(f, "Name: {}", market.name)?;
 
-    writeln!(f, "\nEnabled: {}", market.is_enabled())?;
+    writeln!(f, "\nEnabled: {}", market.enabled)?;
 
-    writeln!(f, "\nAddress: {address}")?;
+    writeln!(f, "\nAddress: {}", market.address)?;
 
     writeln!(f, "\nStore: {}", market.store)?;
 
     writeln!(f, "\nMeta:")?;
-    let meta = market.meta();
-    writeln!(f, "market_token: {}", meta.market_token_mint)?;
-    writeln!(f, "index_token: {}", meta.index_token_mint)?;
-    if meta.long_token_mint == meta.short_token_mint {
-        writeln!(f, "single_token: {}", meta.long_token_mint)?;
+    let meta = &market.meta;
+    writeln!(f, "market_token: {}", meta.market_token)?;
+    writeln!(f, "index_token: {}", meta.index_token)?;
+    if meta.long_token == meta.short_token {
+        writeln!(f, "single_token: {}", meta.long_token)?;
     } else {
-        writeln!(f, "long_token: {}", meta.long_token_mint)?;
-        writeln!(f, "short_token: {}", meta.short_token_mint)?;
+        writeln!(f, "long_token: {}", meta.long_token)?;
+        writeln!(f, "short_token: {}", meta.short_token)?;
     }
 
     writeln!(f, "\nState:")?;
-    let state = market.state();
-    if market.is_pure() {
+    let state = &market.state;
+    if market.is_pure {
         writeln!(
             f,
             "token_balance: {}",
-            state
-                .long_token_balance_raw()
-                .to_formatted_string(&Locale::en)
+            state.long_token_balance.to_formatted_string(&Locale::en)
         )?;
     } else {
         writeln!(
             f,
             "long_token_balance: {}",
-            state
-                .long_token_balance_raw()
-                .to_formatted_string(&Locale::en)
+            state.long_token_balance.to_formatted_string(&Locale::en)
         )?;
         writeln!(
             f,
             "short_token_balance: {}",
-            state
-                .short_token_balance_raw()
-                .to_formatted_string(&Locale::en)
+            state.short_token_balance.to_formatted_string(&Locale::en)
         )?;
     }
     writeln!(
         f,
         "funding_factor_per_second: {}",
         state
-            .funding_factor_per_second()
+            .funding_factor_per_second
             .to_formatted_string(&Locale::en)
     )?;
     writeln!(
         f,
         "deposit_count: {}",
-        state.deposit_count().to_formatted_string(&Locale::en)
+        state.deposit_count.to_formatted_string(&Locale::en)
     )?;
     writeln!(
         f,
         "withdrawal_count: {}",
-        state.withdrawal_count().to_formatted_string(&Locale::en)
+        state.withdrawal_count.to_formatted_string(&Locale::en)
     )?;
     writeln!(
         f,
         "order_count: {}",
-        state.order_count().to_formatted_string(&Locale::en)
+        state.order_count.to_formatted_string(&Locale::en)
     )?;
 
     writeln!(f, "\nClocks:")?;
     let now = time::OffsetDateTime::now_utc();
     for kind in ClockKind::iter() {
-        if let Some(clock) = market.clock(kind) {
+        if let Some(clock) = market.clocks.0.get(&kind) {
             let ts =
-                time::OffsetDateTime::from_unix_timestamp(clock).map_err(gmsol::Error::unknown)?;
+                time::OffsetDateTime::from_unix_timestamp(*clock).map_err(gmsol::Error::unknown)?;
             let msg = if now >= ts {
                 let dur = now - ts;
                 format!(
@@ -591,7 +576,7 @@ fn format_market(address: &Pubkey, market: &Market) -> gmsol::Result<String> {
 
     writeln!(f, "\nPools (LONG - SHORT):")?;
     for kind in PoolKind::iter() {
-        if let Some(pool) = market.pool(kind) {
+        if let Some(pool) = market.pools.0.get(&kind) {
             writeln!(
                 f,
                 "{kind}: {} - {}",
@@ -604,9 +589,8 @@ fn format_market(address: &Pubkey, market: &Market) -> gmsol::Result<String> {
     }
 
     writeln!(f, "\nParameters:")?;
-    for key in MarketConfigKey::iter() {
-        let value = market.get_config_by_key(key);
-        writeln!(f, "{key} = {}", value.to_formatted_string(&Locale::en))?;
+    for (key, value) in market.params.0.iter() {
+        writeln!(f, "{key} = {}", value.0.to_formatted_string(&Locale::en))?;
     }
 
     Ok(buf)
