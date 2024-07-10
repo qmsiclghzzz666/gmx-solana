@@ -22,6 +22,9 @@ pub mod utils;
 /// GMSOL types.
 pub mod types;
 
+/// Program IDs.
+pub mod program_ids;
+
 pub use client::{Client, ClientOptions};
 pub use error::Error;
 pub use gmsol_model as model;
