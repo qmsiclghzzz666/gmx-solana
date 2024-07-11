@@ -20,6 +20,9 @@ pub mod clock;
 /// Position.
 pub mod position;
 
+/// Price.
+pub mod price;
+
 /// Market params.
 pub mod params;
 
