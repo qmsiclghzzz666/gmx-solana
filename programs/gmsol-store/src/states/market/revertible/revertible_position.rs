@@ -141,15 +141,17 @@ impl<'a> gmsol_model::Position<{ constants::MARKET_DECIMALS }> for RevertiblePos
 
     fn increased(&mut self) -> gmsol_model::Result<()> {
         let clock = Clock::get().map_err(Error::from)?;
-        self.state.increased_at_slot = clock.slot;
+        self.state.updated_at_slot = clock.slot;
         self.state.increased_at = clock.unix_timestamp;
+        self.state.trade_id = self.market.next_trade_id()?;
         Ok(())
     }
 
     fn decreased(&mut self) -> gmsol_model::Result<()> {
         let clock = Clock::get().map_err(Error::from)?;
-        self.state.decreased_at_slot = clock.slot;
+        self.state.updated_at_slot = clock.slot;
         self.state.decreased_at = clock.unix_timestamp;
+        self.state.trade_id = self.market.next_trade_id()?;
         Ok(())
     }
 }

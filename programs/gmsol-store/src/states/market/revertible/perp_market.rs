@@ -11,6 +11,7 @@ use gmsol_model::{
 use crate::{
     constants,
     states::{clock::AsClock, HasMarketMeta, Market},
+    StoreError,
 };
 
 use super::{Revertible, RevertibleMarket, RevertiblePool};
@@ -21,6 +22,22 @@ pub struct RevertiblePerpMarket<'a> {
     clocks: Clocks,
     pools: Pools,
     state: State,
+}
+
+impl<'a> RevertiblePerpMarket<'a> {
+    /// Next trade id.
+    ///
+    /// This method is idempotent, meaning that multiple calls to it
+    /// result in the same state changes as a single call.
+    pub fn next_trade_id(&mut self) -> Result<u64> {
+        let next_trade_id = self
+            .state
+            .trade_id
+            .checked_add(1)
+            .ok_or(error!(StoreError::AmountOverflow))?;
+        self.state.next_trade_id = Some(next_trade_id);
+        Ok(next_trade_id)
+    }
 }
 
 struct Clocks {
@@ -193,20 +210,31 @@ impl Pools {
 }
 
 struct State {
+    trade_id: u64,
+    next_trade_id: Option<u64>,
     funding_factor_per_second: i128,
 }
 
-impl<'a, 'market> From<&'a RevertibleMarket<'market>> for State {
-    fn from(market: &'a RevertibleMarket<'market>) -> Self {
-        Self {
+impl<'a, 'market> TryFrom<&'a RevertibleMarket<'market>> for State {
+    type Error = Error;
+
+    fn try_from(market: &'a RevertibleMarket<'market>) -> Result<Self> {
+        let trade_id = market.state().trade_count();
+        Ok(Self {
+            trade_id,
+            next_trade_id: None,
             funding_factor_per_second: market.state().funding_factor_per_second,
-        }
+        })
     }
 }
 
 impl State {
     fn write_to_market(&self, market: &mut Market) {
         market.state.funding_factor_per_second = self.funding_factor_per_second;
+        if let Some(next_trade_id) = self.next_trade_id {
+            let trade_id = market.state.next_trade_id().expect("must success");
+            assert_eq!(trade_id, next_trade_id);
+        }
     }
 }
 
@@ -263,7 +291,7 @@ impl<'a> RevertiblePerpMarket<'a> {
         Ok(Self {
             clocks: (&market).try_into()?,
             pools: (&market).try_into()?,
-            state: (&market).into(),
+            state: (&market).try_into()?,
             market,
         })
     }
@@ -370,7 +398,9 @@ impl<'a> gmsol_model::PositionImpactMarket<{ constants::MARKET_DECIMALS }>
         Ok(&mut self.pools.position_impact)
     }
 
-    fn just_passed_in_seconds_for_position_impact_distribution(&mut self) -> gmsol_model::Result<u64> {
+    fn just_passed_in_seconds_for_position_impact_distribution(
+        &mut self,
+    ) -> gmsol_model::Result<u64> {
         AsClock::from(&mut self.clocks.position_impact_distribution_clock).just_passed_in_seconds()
     }
 

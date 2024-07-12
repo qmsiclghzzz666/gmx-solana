@@ -326,7 +326,7 @@ pub struct MarketState {
     long_token_balance: u64,
     short_token_balance: u64,
     funding_factor_per_second: i128,
-    counters_updated_at_slot: u64,
+    trade_count: u64,
     deposit_count: u64,
     withdrawal_count: u64,
     order_count: u64,
@@ -348,9 +348,9 @@ impl MarketState {
         self.funding_factor_per_second
     }
 
-    /// Get updated slot for counters.
-    pub fn counters_updated_at_slot(&self) -> u64 {
-        self.counters_updated_at_slot
+    /// Get current trade count.
+    pub fn trade_count(&self) -> u64 {
+        self.trade_count
     }
 
     /// Get current deposit count.
@@ -368,11 +368,6 @@ impl MarketState {
         self.order_count
     }
 
-    fn post_update(&mut self) -> Result<()> {
-        self.counters_updated_at_slot = Clock::get()?.slot;
-        Ok(())
-    }
-
     /// Next deposit id.
     pub fn next_deposit_id(&mut self) -> Result<u64> {
         let next_id = self
@@ -380,7 +375,6 @@ impl MarketState {
             .checked_add(1)
             .ok_or(error!(StoreError::AmountOverflow))?;
         self.deposit_count = next_id;
-        self.post_update()?;
         Ok(next_id)
     }
 
@@ -391,7 +385,6 @@ impl MarketState {
             .checked_add(1)
             .ok_or(error!(StoreError::AmountOverflow))?;
         self.withdrawal_count = next_id;
-        self.post_update()?;
         Ok(next_id)
     }
 
@@ -402,7 +395,16 @@ impl MarketState {
             .checked_add(1)
             .ok_or(error!(StoreError::AmountOverflow))?;
         self.order_count = next_id;
-        self.post_update()?;
+        Ok(next_id)
+    }
+
+    /// Next trade id.
+    pub fn next_trade_id(&mut self) -> Result<u64> {
+        let next_id = self
+            .trade_count
+            .checked_add(1)
+            .ok_or(error!(StoreError::AmountOverflow))?;
+        self.trade_count = next_id;
         Ok(next_id)
     }
 }

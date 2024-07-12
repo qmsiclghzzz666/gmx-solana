@@ -350,6 +350,16 @@ impl<'info> ExecuteOrder<'info> {
                 };
 
                 position.commit();
+                msg!(
+                    "[Position] executed with trade_id={}",
+                    self.position
+                        .as_ref()
+                        .unwrap()
+                        .load()
+                        .unwrap()
+                        .state
+                        .trade_id
+                );
                 should_remove_position
             }
         };

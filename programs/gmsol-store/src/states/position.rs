@@ -30,12 +30,12 @@ pub struct Position {
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[account(zero_copy)]
 pub struct PositionState {
-    /// Increased at slot.
-    pub increased_at_slot: u64,
+    /// Trade id.
+    pub trade_id: u64,
     /// The time that the position last increased at.
     pub increased_at: i64,
-    /// Decreased at slot.
-    pub decreased_at_slot: u64,
+    /// Updated at slot.
+    pub updated_at_slot: u64,
     /// The time that the position last decreased at.
     pub decreased_at: i64,
     /// Size in tokens.
@@ -52,6 +52,7 @@ pub struct PositionState {
     pub long_token_claimable_funding_amount_per_size: u128,
     /// Short token claimable funding amount per size.
     pub short_token_claimable_funding_amount_per_size: u128,
+    // TODO: add reserved field.
 }
 
 impl Space for Position {
@@ -114,22 +115,6 @@ impl Position {
         self.owner = *owner;
         self.market_token = *market_token;
         self.collateral_token = *collateral_token;
-        Ok(())
-    }
-
-    /// Update state after increased.
-    pub fn increased(&mut self) -> Result<()> {
-        let clock = Clock::get()?;
-        self.state.increased_at_slot = clock.slot;
-        self.state.increased_at = clock.unix_timestamp;
-        Ok(())
-    }
-
-    /// Update state after decreased.
-    pub fn decreased(&mut self) -> Result<()> {
-        let clock = Clock::get()?;
-        self.state.decreased_at_slot = clock.slot;
-        self.state.decreased_at = clock.unix_timestamp;
         Ok(())
     }
 }
