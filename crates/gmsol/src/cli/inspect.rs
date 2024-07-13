@@ -1,10 +1,8 @@
 use anchor_client::solana_sdk::{native_token::lamports_to_sol, pubkey::Pubkey};
-use bytemuck::offset_of;
 use gmsol::{
-    client::StoreFilter,
     store::utils::{read_market, read_store, token_map, token_map_optional},
-    types::{Market, TokenConfig, TokenMap, TokenMapAccess},
-    utils::{self, zero_copy::ZeroCopy},
+    types::{TokenConfig, TokenMap, TokenMapAccess},
+    utils::{self},
 };
 use gmsol_model::{Balance, BalanceExt, ClockKind, PoolKind};
 use gmsol_store::states::{
@@ -271,14 +269,11 @@ impl InspectArgs {
                     }
                 } else {
                     let markets = client
-                        .store_accounts::<ZeroCopy<Market>>(
-                            Some(&StoreFilter::new(store, offset_of!(Market, store))),
-                            false,
-                        )
+                        .markets(store)
                         .await?
                         .into_iter()
                         .filter_map(|(pubkey, market)| {
-                            SerializeMarket::from_market(&pubkey, &market.0)
+                            SerializeMarket::from_market(&pubkey, &market)
                                 .inspect_err(
                                     |err| tracing::error!(%pubkey, %err, "parse market error"),
                                 )

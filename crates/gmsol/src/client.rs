@@ -1,4 +1,4 @@
-use std::ops::Deref;
+use std::{collections::BTreeMap, ops::Deref};
 
 use anchor_client::{
     anchor_lang::{AccountDeserialize, Discriminator},
@@ -9,7 +9,10 @@ use anchor_client::{
 use gmsol_store::states::{position::PositionKind, NonceBytes};
 use typed_builder::TypedBuilder;
 
-use crate::utils::RpcBuilder;
+use crate::{
+    types,
+    utils::{zero_copy::ZeroCopy, RpcBuilder},
+};
 
 /// Options for [`Client`].
 #[derive(Debug, Clone, TypedBuilder)]
@@ -259,6 +262,23 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
             .await?
             .map(|res| res.map_err(crate::Error::from))
             .collect()
+    }
+
+    /// Fetch all markets of the given store.
+    pub async fn markets(&self, store: &Pubkey) -> crate::Result<BTreeMap<Pubkey, types::Market>> {
+        let markets = self
+            .store_accounts::<ZeroCopy<types::Market>>(
+                Some(&StoreFilter::new(
+                    store,
+                    bytemuck::offset_of!(types::Market, store),
+                )),
+                false,
+            )
+            .await?
+            .into_iter()
+            .map(|(pubkey, m)| (pubkey, m.0))
+            .collect::<BTreeMap<_, _>>();
+        Ok(markets)
     }
 }
 
