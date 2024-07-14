@@ -2,6 +2,7 @@ use std::{collections::BTreeMap, ops::Deref};
 
 use anchor_client::{
     anchor_lang::{AccountDeserialize, Discriminator},
+    solana_client::rpc_filter::RpcFilterType,
     solana_sdk::{commitment_config::CommitmentConfig, pubkey::Pubkey, signer::Signer},
     Cluster, Program,
 };
@@ -239,8 +240,9 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
     /// Fetch accounts owned by the Store Program.
     pub async fn store_accounts<T>(
         &self,
-        filter_by_store: Option<&StoreFilter>,
         ignore_disc_offset: bool,
+        filter_by_store: Option<&StoreFilter>,
+        other_filters: impl IntoIterator<Item = RpcFilterType>,
     ) -> crate::Result<Vec<(Pubkey, T)>>
     where
         T: AccountDeserialize + Discriminator,
@@ -256,7 +258,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
                 store_offset,
                 store.as_ref().to_owned(),
             ))
-        }));
+        })).chain(other_filters);
         self.data_store()
             .accounts_lazy::<T>(filters.collect())
             .await?
@@ -268,11 +270,12 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
     pub async fn markets(&self, store: &Pubkey) -> crate::Result<BTreeMap<Pubkey, types::Market>> {
         let markets = self
             .store_accounts::<ZeroCopy<types::Market>>(
+                false,
                 Some(&StoreFilter::new(
                     store,
                     bytemuck::offset_of!(types::Market, store),
                 )),
-                false,
+                None,
             )
             .await?
             .into_iter()

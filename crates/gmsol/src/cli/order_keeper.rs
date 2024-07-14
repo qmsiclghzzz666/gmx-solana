@@ -138,8 +138,9 @@ impl KeeperArgs {
                     Action::Deposit => {
                         let actions = client
                             .store_accounts::<Deposit>(
-                                filter_store.then(|| StoreFilter::new(store, 8)).as_ref(),
                                 true,
+                                filter_store.then(|| StoreFilter::new(store, 8)).as_ref(),
+                                None,
                             )
                             .await?;
                         if actions.is_empty() {
@@ -163,8 +164,9 @@ impl KeeperArgs {
                     Action::Withdrawal => {
                         let actions = client
                             .store_accounts::<Withdrawal>(
-                                filter_store.then(|| StoreFilter::new(store, 8)).as_ref(),
                                 true,
+                                filter_store.then(|| StoreFilter::new(store, 8)).as_ref(),
+                                None,
                             )
                             .await?;
                         if actions.is_empty() {
@@ -194,8 +196,9 @@ impl KeeperArgs {
                     Action::Order => {
                         let actions = client
                             .store_accounts::<Order>(
-                                filter_store.then(|| StoreFilter::new(store, 9)).as_ref(),
                                 true,
+                                filter_store.then(|| StoreFilter::new(store, 9)).as_ref(),
+                                None,
                             )
                             .await?;
                         if actions.is_empty() {
