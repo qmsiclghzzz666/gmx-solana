@@ -274,7 +274,6 @@ impl InspectArgs {
                             "Enabled",
                             "Token Decimals",
                             "Price Precision",
-                            "Heartbeat",
                             "Expected Provider",
                         ]);
                         for (token, config) in map.iter() {
@@ -285,7 +284,6 @@ impl InspectArgs {
                                 config.enabled,
                                 config.token_decimals,
                                 config.price_precision,
-                                config.heartbeat_duration,
                                 config.expected_provider,
                             ]);
                         }
