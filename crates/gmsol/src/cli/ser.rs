@@ -2,10 +2,12 @@ use std::{fmt, str::FromStr};
 
 use anchor_client::solana_sdk::pubkey::Pubkey;
 use gmsol::types::{
-    Factor, FeedConfig, Market, MarketConfigKey, Pool, PriceProviderKind, TokenConfig,
+    position::PositionState, Factor, FeedConfig, Market, MarketConfigKey, Pool, Position,
+    PriceProviderKind, TokenConfig,
 };
 use gmsol_model::{ClockKind, PoolKind};
 use indexmap::IndexMap;
+use num_format::{Locale, ToFormattedString};
 use serde::Serialize;
 use serde_with::{serde_as, DisplayFromStr};
 use strum::IntoEnumIterator;
@@ -277,4 +279,126 @@ impl<'a> From<&'a FeedConfig> for SerializeFeedConfig {
             timestamp_adjustment: config.timestamp_adjustment(),
         }
     }
+}
+
+/// Serializable Position.
+#[serde_with::serde_as]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
+pub struct SerializePosition {
+    /// Store.
+    #[serde_as(as = "DisplayFromStr")]
+    pub store: Pubkey,
+    /// Position Side.
+    pub is_long: bool,
+    /// Owner.
+    #[serde_as(as = "DisplayFromStr")]
+    pub owner: Pubkey,
+    /// Market Token.
+    #[serde_as(as = "DisplayFromStr")]
+    pub market_token: Pubkey,
+    /// Collateral Token.
+    #[serde_as(as = "DisplayFromStr")]
+    pub collateral_token: Pubkey,
+    /// Position State.
+    pub state: PositionState,
+}
+
+impl<'a> TryFrom<&'a Position> for SerializePosition {
+    type Error = gmsol::Error;
+
+    fn try_from(position: &'a Position) -> Result<Self, Self::Error> {
+        Ok(Self {
+            store: position.store,
+            is_long: position.is_long()?,
+            owner: position.owner,
+            market_token: position.market_token,
+            collateral_token: position.collateral_token,
+            state: position.state,
+        })
+    }
+}
+
+impl fmt::Display for SerializePosition {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "Owner: {}\n", self.owner)?;
+        writeln!(f, "Store: {}\n", self.store)?;
+        writeln!(f, "Market Token: {}\n", self.market_token)?;
+        writeln!(f, "Collateral Token: {}\n", self.collateral_token)?;
+        writeln!(f, "Side: {}\n", if self.is_long { "long" } else { "short" })?;
+        writeln!(f, "State:")?;
+        let state = &self.state;
+        writeln!(f, "updated_at_slot = {}", state.updated_at_slot)?;
+        writeln!(
+            f,
+            "increased_at = {}",
+            pretty_timestamp(state.increased_at, true).map_err(|_| fmt::Error)?,
+        )?;
+        writeln!(
+            f,
+            "decreased_at = {}",
+            pretty_timestamp(state.decreased_at, true).map_err(|_| fmt::Error)?,
+        )?;
+        writeln!(
+            f,
+            "size_in_usd = {}",
+            state.size_in_usd.to_formatted_string(&Locale::en),
+        )?;
+        writeln!(
+            f,
+            "size_in_tokens = {}",
+            state.size_in_tokens.to_formatted_string(&Locale::en),
+        )?;
+        writeln!(
+            f,
+            "collateral_amount = {}",
+            state.collateral_amount.to_formatted_string(&Locale::en),
+        )?;
+        writeln!(
+            f,
+            "borrowing_factor = {}",
+            state.borrowing_factor.to_formatted_string(&Locale::en),
+        )?;
+        writeln!(
+            f,
+            "funding_fee_amount_per_size = {}",
+            state
+                .funding_fee_amount_per_size
+                .to_formatted_string(&Locale::en),
+        )?;
+        writeln!(
+            f,
+            "long_token_claimable_funding_amount_per_size = {}",
+            state
+                .long_token_claimable_funding_amount_per_size
+                .to_formatted_string(&Locale::en),
+        )?;
+        writeln!(
+            f,
+            "short_token_claimable_funding_amount_per_size = {}",
+            state
+                .short_token_claimable_funding_amount_per_size
+                .to_formatted_string(&Locale::en),
+        )?;
+        writeln!(f, "trade_id = {}", state.trade_id)?;
+        Ok(())
+    }
+}
+
+/// Format unix timestamp and duration.
+pub fn pretty_timestamp(ts: i64, ignore_zero: bool) -> gmsol::Result<String> {
+    if ignore_zero && ts == 0 {
+        return Ok("-".to_string());
+    }
+    let now = time::OffsetDateTime::now_utc();
+    let ts = time::OffsetDateTime::from_unix_timestamp(ts).map_err(gmsol::Error::unknown)?;
+    let msg = if now >= ts {
+        let dur = now - ts;
+        format!(
+            " ({} ago)",
+            humantime::format_duration(dur.try_into().map_err(gmsol::Error::unknown)?)
+        )
+    } else {
+        String::new()
+    };
+    Ok(format!("{}{msg}", humantime::format_rfc3339(ts.into())))
 }

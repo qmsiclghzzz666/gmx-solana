@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 use gmsol_model::BaseMarketExt;
 
-use crate::{constants, StoreError, ModelError};
+use crate::{constants, ModelError, StoreError};
 
 use super::HasMarketMeta;
 

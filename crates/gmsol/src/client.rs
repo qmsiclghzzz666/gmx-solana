@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, ops::Deref};
 
 use anchor_client::{
     anchor_lang::{AccountDeserialize, Discriminator},
-    solana_client::rpc_filter::RpcFilterType,
+    solana_client::rpc_filter::{Memcmp, RpcFilterType},
     solana_sdk::{commitment_config::CommitmentConfig, pubkey::Pubkey, signer::Signer},
     Cluster, Program,
 };
@@ -14,6 +14,8 @@ use crate::{
     types,
     utils::{zero_copy::ZeroCopy, RpcBuilder},
 };
+
+const DISC_OFFSET: usize = 8;
 
 /// Options for [`Client`].
 #[derive(Debug, Clone, TypedBuilder)]
@@ -248,7 +250,6 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         T: AccountDeserialize + Discriminator,
     {
         use anchor_client::solana_client::rpc_filter::{Memcmp, RpcFilterType};
-        const DISC_OFFSET: usize = 8;
 
         let filters = std::iter::empty().chain(filter_by_store.map(|filter| {
             let store = filter.store;
@@ -282,6 +283,33 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
             .map(|(pubkey, m)| (pubkey, m.0))
             .collect::<BTreeMap<_, _>>();
         Ok(markets)
+    }
+
+    /// Fetch all positions of the given owner of the given store.
+    pub async fn positions(
+        &self,
+        store: &Pubkey,
+        owner: &Pubkey,
+        market_token: Option<&Pubkey>,
+    ) -> crate::Result<BTreeMap<Pubkey, types::Position>> {
+        let mut bytes = owner.as_ref().to_owned();
+        if let Some(market_token) = market_token {
+            bytes.extend_from_slice(market_token.as_ref());
+        }
+        let filter = RpcFilterType::Memcmp(Memcmp::new_raw_bytes(
+            bytemuck::offset_of!(types::Position, owner) + DISC_OFFSET,
+            bytes,
+        ));
+        let store_filter = StoreFilter::new(store, bytemuck::offset_of!(types::Position, store));
+
+        let positions = self
+            .store_accounts::<ZeroCopy<types::Position>>(false, Some(&store_filter), Some(filter))
+            .await?
+            .into_iter()
+            .map(|(pubkey, p)| (pubkey, p.0))
+            .collect();
+
+        Ok(positions)
     }
 }
 

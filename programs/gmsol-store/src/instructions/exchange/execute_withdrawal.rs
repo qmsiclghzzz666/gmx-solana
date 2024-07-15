@@ -13,7 +13,7 @@ use crate::{
         HasMarketMeta, Market, Oracle, Seed, Store, ValidateOracleTime, Withdrawal,
     },
     utils::internal,
-    StoreError, ModelError, StoreResult,
+    ModelError, StoreError, StoreResult,
 };
 
 #[derive(Accounts)]

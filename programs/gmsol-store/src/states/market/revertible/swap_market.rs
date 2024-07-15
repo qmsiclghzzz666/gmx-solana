@@ -10,7 +10,7 @@ use crate::{
     states::{
         common::SwapParams, ops::ValidateMarketBalances, HasMarketMeta, Market, MarketMeta, Oracle,
     },
-    StoreError, ModelError,
+    ModelError, StoreError,
 };
 
 use super::{Revertible, RevertibleMarket, RevertiblePool};
@@ -344,11 +344,7 @@ impl<'a> SwapMarkets<'a> {
                 }
             }
         }
-        require_eq!(
-            token_in,
-            expected_token_out,
-            StoreError::InvalidSwapPath
-        );
+        require_eq!(token_in, expected_token_out, StoreError::InvalidSwapPath);
         Ok(token_in_amount)
     }
 }

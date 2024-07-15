@@ -26,8 +26,17 @@ pub struct Position {
     pub state: PositionState,
 }
 
+impl Default for Position {
+    fn default() -> Self {
+        use bytemuck::Zeroable;
+
+        Self::zeroed()
+    }
+}
+
 /// Position State.
 #[cfg_attr(feature = "debug", derive(Debug))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[account(zero_copy)]
 pub struct PositionState {
     /// Trade id.
@@ -122,9 +131,21 @@ impl Position {
 /// Position Kind.
 #[non_exhaustive]
 #[repr(u8)]
-#[derive(Clone, Copy, num_enum::IntoPrimitive, num_enum::TryFromPrimitive, PartialEq, Eq)]
+#[derive(
+    Clone,
+    Copy,
+    num_enum::IntoPrimitive,
+    num_enum::TryFromPrimitive,
+    PartialEq,
+    Eq,
+    strum::EnumString,
+    strum::Display,
+)]
+#[strum(serialize_all = "snake_case")]
 #[num_enum(error_type(name = StoreError, constructor = StoreError::invalid_position_kind))]
 #[cfg_attr(feature = "debug", derive(Debug))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
 pub enum PositionKind {
     /// Uninitialized.
     Uninitialized,

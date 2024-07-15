@@ -1,8 +1,10 @@
+use std::collections::BTreeMap;
+
 use anchor_client::solana_sdk::{native_token::lamports_to_sol, pubkey::Pubkey};
 use gmsol::{
     store::utils::{read_market, read_store, token_map, token_map_optional},
-    types::{TokenMap, TokenMapAccess},
-    utils::{self},
+    types::{self, TokenMap, TokenMapAccess},
+    utils,
 };
 use gmsol_model::{Balance, BalanceExt, ClockKind, PoolKind};
 use gmsol_store::states::{
@@ -72,6 +74,8 @@ enum Command {
         /// Output format.
         #[arg(long, short)]
         output: Option<Output>,
+        #[arg(long)]
+        debug: bool,
     },
     /// `Market` account.
     Market {
@@ -103,7 +107,18 @@ enum Command {
     /// `Order` account.
     Order { address: Pubkey },
     /// `Position` account.
-    Position { address: Pubkey },
+    Position {
+        address: Option<Pubkey>,
+        #[arg(long, short)]
+        market_token: Option<Pubkey>,
+        /// Owner of the positions. Default to the connected wallet.
+        #[arg(long)]
+        owner: Option<Pubkey>,
+        #[arg(long)]
+        debug: bool,
+        #[arg(long, short)]
+        output: Option<Output>,
+    },
     /// Watch Pyth Price Updates.
     WatchPyth {
         #[arg(required = true)]
@@ -207,6 +222,7 @@ impl InspectArgs {
                 feed,
                 meta,
                 output,
+                debug,
             } => {
                 let mut authorized = true;
                 let address = if let Some(address) = address {
@@ -226,16 +242,23 @@ impl InspectArgs {
                         .get(token)
                         .ok_or(gmsol::Error::invalid_argument("token not found"))?;
                     if let Some(kind) = feed {
-                        let serialized = ser::SerializeFeedConfig::with_hint(
-                            kind,
-                            config.get_feed_config(kind)?,
-                        );
-                        output
-                            .print(&serialized, |serialized| Ok(serialized.formatted_feed_id()))?;
+                        let config = config.get_feed_config(kind)?;
+                        let serialized = ser::SerializeFeedConfig::with_hint(kind, config);
+                        output.print(&serialized, |serialized| {
+                            if *debug {
+                                Ok(format!("{config:#?}"))
+                            } else {
+                                Ok(serialized.formatted_feed_id())
+                            }
+                        })?;
                     } else {
                         let serialized = config.try_into()?;
-                        output.print::<ser::SerializeTokenConfig>(&serialized, |config| {
-                            format_token_config(config)
+                        output.print::<ser::SerializeTokenConfig>(&serialized, |serialized| {
+                            if *debug {
+                                Ok(format!("{config:#?}"))
+                            } else {
+                                format_token_config(serialized)
+                            }
                         })?;
                     }
                 } else if *meta {
@@ -247,11 +270,15 @@ impl InspectArgs {
                             "authorized": authorized,
                         }),
                         |_| {
-                            Ok(format!(
-                                "Address: {address}\nStore: {}\nTokens: {}\nAuthorized: {authorized}",
-                                token_map.header().store,
-                                token_map.header().len()
-                            ))
+                            if *debug {
+                                Ok(format!("{:#?}", token_map.header()))
+                            } else {
+                                Ok(format!(
+                                    "Address: {address}\nStore: {}\nTokens: {}\nAuthorized: {authorized}",
+                                    token_map.header().store,
+                                    token_map.header().len()
+                                ))
+                            }
                         },
                     )?;
                 } else {
@@ -266,6 +293,9 @@ impl InspectArgs {
                         })
                         .collect::<IndexMap<_, _>>();
                     output.print(&map, |map| {
+                        if *debug {
+                            return Ok(format!("{token_map:#?}"));
+                        }
                         let mut table = Table::new();
                         table.set_titles(row![
                             "Name",
@@ -486,15 +516,81 @@ impl InspectArgs {
             Command::Order { address } => {
                 println!("{:#?}", program.account::<states::Order>(*address).await?);
             }
-            Command::Position { address } => {
-                println!(
-                    "{:#?}",
-                    utils::try_deserailize_zero_copy_account::<states::Position>(
+            Command::Position {
+                address,
+                market_token,
+                owner,
+                debug,
+                output,
+            } => {
+                let output = output.unwrap_or_default();
+                if let Some(address) = address {
+                    let position = utils::try_deserailize_zero_copy_account::<types::Position>(
                         &program.async_rpc(),
-                        address
+                        address,
                     )
-                    .await?
-                );
+                    .await?;
+                    let serialized = ser::SerializePosition::try_from(&position)?;
+                    output.print(&serialized, |serialized| {
+                        if *debug {
+                            return Ok(format!("{position:#?}"));
+                        }
+                        Ok(serialized.to_string())
+                    })?;
+                } else {
+                    let owner = owner.unwrap_or(client.payer());
+                    let positions = client
+                        .positions(store, &owner, market_token.as_ref())
+                        .await?;
+                    let serialized = positions
+                        .iter()
+                        .filter_map(|(pubkey, p)| {
+                            let p = ser::SerializePosition::try_from(p)
+                                .inspect_err(|err| {
+                                    tracing::error!(%pubkey, %err, "serialize position error");
+                                })
+                                .ok()?;
+                            Some((pubkey.to_string(), p))
+                        })
+                        .collect::<BTreeMap<_, _>>();
+                    output.print(&serialized, |serialized| {
+                        use std::cmp::Reverse;
+
+                        if *debug {
+                            return Ok(format!("{positions:#?}"));
+                        }
+                        let mut table = Table::new();
+                        table.set_titles(row![
+                            "Pubkey",
+                            "Market",
+                            "Collateral",
+                            "Size ($)",
+                            "Collateral Amount",
+                            "Trade ID",
+                        ]);
+                        table.set_format(table_format());
+
+                        let mut rows = serialized.iter().collect::<Vec<_>>();
+                        rows.sort_by_key(|(_, p)| Reverse(p.state.size_in_usd));
+                        rows.sort_by_key(|(_, p)| (p.market_token, p.collateral_token));
+
+                        for (pubkey, p) in rows {
+                            let mut size =
+                                unsigned_value_to_decimal(p.state.size_in_usd).normalize();
+                            size.set_sign_positive(p.is_long);
+                            table.add_row(row![
+                                pubkey,
+                                truncate_pubkey(&p.market_token),
+                                truncate_pubkey(&p.collateral_token),
+                                size,
+                                p.state.collateral_amount.to_formatted_string(&Locale::en),
+                                p.state.trade_id,
+                            ]);
+                        }
+
+                        Ok(table.to_string())
+                    })?;
+                }
             }
             Command::WatchPyth { feed_ids } => {
                 use futures_util::TryStreamExt;
@@ -702,4 +798,18 @@ fn format_token_config(config: &ser::SerializeTokenConfig) -> gmsol::Result<Stri
     }
 
     Ok(buf)
+}
+
+fn truncate_pubkey(pubkey: &Pubkey) -> String {
+    let s = pubkey.to_string();
+    let len = s.len();
+
+    if len <= 10 {
+        return s.to_string();
+    }
+
+    let start = &s[0..6];
+    let end = &s[len - 4..];
+
+    format!("{}...{}", start, end)
 }
