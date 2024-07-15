@@ -1,7 +1,9 @@
 use std::{fmt, str::FromStr};
 
 use anchor_client::solana_sdk::pubkey::Pubkey;
-use gmsol::types::{Factor, Market, MarketConfigKey, Pool};
+use gmsol::types::{
+    Factor, FeedConfig, Market, MarketConfigKey, Pool, PriceProviderKind, TokenConfig,
+};
 use gmsol_model::{ClockKind, PoolKind};
 use indexmap::IndexMap;
 use serde::Serialize;
@@ -154,7 +156,7 @@ impl<'a> TryFrom<&'a Market> for SerializeMarketPools {
     }
 }
 
-/// Market Config.
+/// Market Config Map.
 #[serde_with::serde_as]
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub struct MarketConfigMap(
@@ -173,5 +175,106 @@ impl<'a> TryFrom<&'a Market> for MarketConfigMap {
             })
             .collect();
         Ok(Self(map))
+    }
+}
+
+/// Serializable Token Config.
+#[serde_with::serde_as]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
+pub struct SerializeTokenConfig {
+    /// Name.
+    pub name: String,
+    /// Is enabled.
+    pub enabled: bool,
+    /// Is synthetic.
+    pub synthetic: bool,
+    /// Token decimals.
+    pub token_decimals: u8,
+    /// Price precision.
+    pub price_precision: u8,
+    /// Expected provider.
+    pub expected_provider: PriceProviderKind,
+    /// Feeds.
+    pub feeds: IndexMap<PriceProviderKind, SerializeFeedConfig>,
+    /// Heartbeat duration.
+    pub heartbeat_duration: u32,
+}
+
+impl<'a> TryFrom<&'a TokenConfig> for SerializeTokenConfig {
+    type Error = gmsol::Error;
+
+    fn try_from(config: &'a TokenConfig) -> Result<Self, Self::Error> {
+        let feeds = PriceProviderKind::iter()
+            .filter_map(|kind| {
+                config
+                    .get_feed_config(&kind)
+                    .ok()
+                    .map(|config| (kind, SerializeFeedConfig::with_hint(&kind, config)))
+            })
+            .collect();
+        Ok(Self {
+            name: config.name()?.to_string(),
+            enabled: config.is_enabled(),
+            synthetic: config.is_synthetic(),
+            token_decimals: config.token_decimals(),
+            price_precision: config.precision(),
+            expected_provider: config.expected_provider()?,
+            feeds,
+            heartbeat_duration: config.heartbeat_duration(),
+        })
+    }
+}
+
+/// Encoding.
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, Copy)]
+#[serde(rename_all = "snake_case")]
+pub enum Encoding {
+    /// Hex.
+    Hex,
+    /// Base58,
+    Base58,
+}
+
+/// Serializable Feed Config.
+#[serde_with::serde_as]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
+pub struct SerializeFeedConfig {
+    /// Feed ID
+    pub feed_id: String,
+    /// The encoding type of Feed ID.
+    pub feed_id_encoding: Encoding,
+    /// Timestamp adjustment.
+    pub timestamp_adjustment: u32,
+}
+
+impl SerializeFeedConfig {
+    /// Create with provider hint.
+    pub fn with_hint(kind: &PriceProviderKind, config: &FeedConfig) -> Self {
+        match kind {
+            PriceProviderKind::Pyth => Self {
+                feed_id_encoding: Encoding::Hex,
+                feed_id: hex::encode(config.feed()),
+                timestamp_adjustment: config.timestamp_adjustment(),
+            },
+            _ => config.into(),
+        }
+    }
+
+    /// Get formatted feed id.
+    pub fn formatted_feed_id(&self) -> String {
+        match self.feed_id_encoding {
+            Encoding::Hex => format!("0x{}", self.feed_id),
+            Encoding::Base58 => self.feed_id.clone(),
+        }
+    }
+}
+
+impl<'a> From<&'a FeedConfig> for SerializeFeedConfig {
+    fn from(config: &'a FeedConfig) -> Self {
+        Self {
+            feed_id_encoding: Encoding::Base58,
+            feed_id: config.feed().to_string(),
+            timestamp_adjustment: config.timestamp_adjustment(),
+        }
     }
 }

@@ -19,7 +19,7 @@ debug = []
 display = []
 utils = ["bytes"]
 devnet = []
-serde = ["dep:serde"]
+serde = ["dep:serde", "serde_with"]
 enum-iter = []
 no-bug-fix = []
 
@@ -44,5 +44,6 @@ pyth-solana-receiver-sdk = { workspace = true }
 paste = { workspace = true }
 strum = { workspace = true, features = ["derive"] }
 serde = { workspace = true, features = ["derive"], optional = true }
+serde_with = { workspace = true, optional = true }
 indexmap = { workspace = true }
 bytes = { workspace = true, optional = true }

@@ -243,9 +243,15 @@ impl InitSpace for TokenConfig {
 #[zero_copy]
 #[derive(PartialEq, Eq)]
 #[cfg_attr(feature = "debug", derive(Debug))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FeedConfig {
+    #[cfg_attr(
+        feature = "serde",
+        serde(with = "serde_with::As::<serde_with::DisplayFromStr>")
+    )]
     feed: Pubkey,
     timestamp_adjustment: u32,
+    #[cfg_attr(feature = "serde", serde(skip))]
     reserved: [u8; 28],
 }
 
@@ -274,6 +280,16 @@ impl FeedConfig {
     pub fn with_timestamp_adjustment(mut self, timestamp_adjustment: u32) -> Self {
         self.timestamp_adjustment = timestamp_adjustment;
         self
+    }
+
+    /// Get feed.
+    pub fn feed(&self) -> &Pubkey {
+        &self.feed
+    }
+
+    /// Get timestamp adjustment.
+    pub fn timestamp_adjustment(&self) -> u32 {
+        self.timestamp_adjustment
     }
 }
 
@@ -387,6 +403,16 @@ impl TokenMapHeader {
         self.tokens
             .entries()
             .map(|(k, _)| Pubkey::new_from_array(*k))
+    }
+
+    /// Get the number of tokens.
+    pub fn len(&self) -> usize {
+        self.tokens.len()
+    }
+
+    /// Whether this token map is empty.
+    pub fn is_empty(&self) -> bool {
+        self.tokens.is_empty()
     }
 
     fn get_token_config_unchecked<'a>(

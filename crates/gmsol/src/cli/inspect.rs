@@ -1,7 +1,7 @@
 use anchor_client::solana_sdk::{native_token::lamports_to_sol, pubkey::Pubkey};
 use gmsol::{
     store::utils::{read_market, read_store, token_map, token_map_optional},
-    types::{TokenConfig, TokenMap, TokenMapAccess},
+    types::{TokenMap, TokenMapAccess},
     utils::{self},
 };
 use gmsol_model::{Balance, BalanceExt, ClockKind, PoolKind};
@@ -16,7 +16,7 @@ use rust_decimal_macros::dec;
 use strum::IntoEnumIterator;
 
 use crate::{
-    ser::SerializeMarket,
+    ser::{self, SerializeMarket},
     utils::{signed_value_to_decimal, table_format, unsigned_value_to_decimal, Oracle, Output},
     GMSOLClient,
 };
@@ -61,18 +61,17 @@ enum Command {
     /// `TokenMap` account.
     TokenMap {
         address: Option<Pubkey>,
-        #[arg(long, value_name = "TOKEN", group = "get")]
-        get_token: Option<Pubkey>,
+        #[arg(long, value_name = "TOKEN", group = "get-input")]
+        get: Option<Pubkey>,
         /// Modify the get command to get the feed of the given provider.
         #[arg(long, value_name = "PROVIDER")]
         feed: Option<PriceProviderKind>,
-        #[arg(long, group = "get")]
-        debug: bool,
-        /// List all tokens.
-        #[arg(long, group = "get")]
-        get_all_tokens: bool,
-        #[arg(long)]
-        show_address: bool,
+        /// Get metadata
+        #[arg(long, group = "get-input")]
+        meta: bool,
+        /// Output format.
+        #[arg(long, short)]
+        output: Option<Output>,
     },
     /// `Market` account.
     Market {
@@ -204,48 +203,95 @@ impl InspectArgs {
             }
             Command::TokenMap {
                 address,
-                get_token,
+                get,
                 feed,
-                debug,
-                get_all_tokens,
-                show_address,
+                meta,
+                output,
             } => {
+                let mut authorized = true;
                 let address = if let Some(address) = address {
                     let authorized_token_map = token_map_optional(program, store).await?;
                     if authorized_token_map != Some(*address) {
+                        authorized = false;
                         tracing::warn!("this token map is not authorized by the store");
                     }
                     *address
                 } else {
                     token_map(program, store).await?
                 };
+                let output = output.unwrap_or_default();
                 let token_map = program.account::<TokenMap>(address).await?;
-                if let Some(token) = get_token {
+                if let Some(token) = get {
                     let config = token_map
                         .get(token)
                         .ok_or(gmsol::Error::invalid_argument("token not found"))?;
                     if let Some(kind) = feed {
-                        println!("{}", config.get_feed(kind)?);
+                        let serialized = ser::SerializeFeedConfig::with_hint(
+                            kind,
+                            config.get_feed_config(kind)?,
+                        );
+                        output
+                            .print(&serialized, |serialized| Ok(serialized.formatted_feed_id()))?;
                     } else {
-                        println!("{}", format_token_config(config)?);
+                        let serialized = config.try_into()?;
+                        output.print::<ser::SerializeTokenConfig>(&serialized, |config| {
+                            format_token_config(config)
+                        })?;
                     }
-                } else if *debug {
-                    println!("{token_map:#?}");
-                } else if *get_all_tokens {
-                    let mut is_empty = true;
-                    for token in token_map.header().tokens() {
-                        println!("{token}");
-                        is_empty = false;
-                    }
-                    if is_empty {
-                        println!("*no tokens*");
-                    }
+                } else if *meta {
+                    output.print(
+                        &serde_json::json!({
+                            "address": address.to_string(),
+                            "store": token_map.header().store.to_string(),
+                            "tokens": token_map.header().len(),
+                            "authorized": authorized,
+                        }),
+                        |_| {
+                            Ok(format!(
+                                "Address: {address}\nStore: {}\nTokens: {}\nAuthorized: {authorized}",
+                                token_map.header().store,
+                                token_map.header().len()
+                            ))
+                        },
+                    )?;
                 } else {
-                    println!("{}", token_map.header());
-                }
-
-                if *show_address {
-                    println!("Address: {address}");
+                    let map = token_map
+                        .header()
+                        .tokens()
+                        .filter_map(|token| {
+                            token_map
+                                .get(&token)
+                                .and_then(|config| ser::SerializeTokenConfig::try_from(config).ok())
+                                .map(|config| (token.to_string(), config))
+                        })
+                        .collect::<IndexMap<_, _>>();
+                    output.print(&map, |map| {
+                        let mut table = Table::new();
+                        table.set_titles(row![
+                            "Name",
+                            "Token",
+                            "",
+                            "Enabled",
+                            "Token Decimals",
+                            "Price Precision",
+                            "Heartbeat",
+                            "Expected Provider",
+                        ]);
+                        for (token, config) in map.iter() {
+                            table.add_row(row![
+                                &config.name,
+                                token,
+                                if config.synthetic { "(Synthetic*)" } else { "" },
+                                config.enabled,
+                                config.token_decimals,
+                                config.price_precision,
+                                config.heartbeat_duration,
+                                config.expected_provider,
+                            ]);
+                        }
+                        table.set_format(table_format());
+                        Ok(table.to_string())
+                    })?;
                 }
             }
             Command::Market {
@@ -627,23 +673,34 @@ fn format_market(market: &SerializeMarket) -> gmsol::Result<String> {
     Ok(buf)
 }
 
-fn format_token_config(token_config: &TokenConfig) -> gmsol::Result<String> {
+fn format_token_config(config: &ser::SerializeTokenConfig) -> gmsol::Result<String> {
     use std::fmt::Write;
 
     let mut buf = String::new();
 
     let f = &mut buf;
 
-    writeln!(f, "{token_config}")?;
+    writeln!(f, "Name: {}", config.name)?;
+    writeln!(f, "Enabled: {}", config.enabled)?;
+    writeln!(f, "Synthetic: {}", config.synthetic)?;
+    writeln!(f, "Decimals: {}", config.token_decimals)?;
+    writeln!(f, "Precision: {}", config.price_precision)?;
+    writeln!(f, "Heartbeat: {}", config.heartbeat_duration)?;
+    writeln!(f, "Expected Provider: {}", config.expected_provider)?;
 
-    let expected_provider = token_config.expected_provider()?;
-    writeln!(f, "Feeds:")?;
-    for kind in PriceProviderKind::iter() {
-        let Ok(feed) = token_config.get_feed_config(&kind) else {
-            continue;
+    writeln!(f, "\nFeeds:")?;
+    for (kind, feed) in config.feeds.iter() {
+        let expected = if config.expected_provider == *kind {
+            "*"
+        } else {
+            ""
         };
-        let expected = if expected_provider == kind { "*" } else { "" };
-        writeln!(f, "{kind}{expected} = {{ {feed} }}")?;
+        writeln!(
+            f,
+            "{kind}{expected} = {{ feed = {}, timestamp_adjustment = {} }}",
+            feed.formatted_feed_id(),
+            feed.timestamp_adjustment,
+        )?;
     }
 
     Ok(buf)

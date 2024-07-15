@@ -2016,6 +2016,7 @@ dependencies = [
  "pyth-sdk-solana",
  "pyth-solana-receiver-sdk",
  "serde",
+ "serde_with 3.8.1",
  "static_assertions",
  "strum",
 ]
