@@ -44,8 +44,8 @@
 //! The address of a Store Account is a PDA (Program Derived Address), which can be used to sign
 //! instructions during CPI calls (see [cpi-with-pda-signer] for details). This allows the Store
 //! Account to be used as an authority for extenral resources. For example, the Store Account is
-//! the owner of the Market Vault (an SPL Token Account) and the mint authority for the Market Token
-//! (an SPL Mint Account). When executing transfers in and out of the Market Vault, the Store Account
+//! the owner of Market Vaults (SPL Token Accounts) and the mint authority of Market Tokens
+//! (SPL Mint Accounts). When executing transfers in and out of the Market Vault, the Store Account
 //! is used as the Signer for the corresponding CPI to authorize the opeartion.
 //!
 //! Besides serving as an authority for external resources, the Store Account is also the authority
@@ -89,7 +89,7 @@
 //! The address of the Store Account is a PDA. Sepecifically, the Store Account address is derived using
 //! the following [seeds]:
 //! 1. A constant [`Store::SEED`](states::Store).
-//! 2. A hashed key string, hashed to 32 bytes.
+//! 2. A sha256 hashed key string.
 //! This means that we can generate a Store Account address from any key string (with a length not
 //! exceeding [`MAX_LEN`](states::Store::MAX_LEN)). However, this is not unique, as multiple key strings
 //! may generate the same Store Account address. The store derived from an empty key string is referred to
@@ -103,6 +103,68 @@
 //!
 //! [cpi-with-pda-signer]: https://solana.com/docs/core/cpi#cpi-with-pda-signer
 //! [seeds]: https://solana.com/docs/core/pda#how-to-derive-a-pda
+//!
+//! ### Role-based Permission Management
+//!
+//! The complete role-based permission table for each GMSOL deployment is directly stored in the
+//! [`Store`](states::Store) Account of that deployment. The current permission structure in GMSOL includes:
+//! - (Unique) Administrator: The administrator's address is directly stored in the `authority` field
+//! of the [`Store`](states::Store) Account. Only this address can modify the permission table.
+//! - Custom Roles: The custom role table and member table are stored in the `role` field of the
+//! [`Store`](states::Store) account as a [`RoleStore`](states::RoleStore) structure.
+//!
+//! All instructions in GMSOL are either permissionless or require the caller to have an admin role
+//! or a role defined in [`RoleStore`](states::RoleStore). For instructions that require permissions,
+//! the checks are performed using the `access_control` macro provied by [`anchor`](anchor_lang).
+//! The following example illustrates the permission structure in GMSOL:
+//!
+//! User `GMsoQfjzWE8ogYJPew3zX8fCTF8vedbgFV4qjUCZGTtm` calls the `initialize` instruction of
+//! the Store Program, creating a Store Account (this instruction is permissionless). The authority
+//! of the Store is automatically set to GMsoQfjzWE8ogYJPew3zX8fCTF8vedbgFV4qjUCZGTtm.
+//! At this point, the permission structure of the Store is as follows:
+//!
+//! - Admin: `GMsoQfjzWE8ogYJPew3zX8fCTF8vedbgFV4qjUCZGTtm`
+//! - Role Table: Empty
+//! - Member Table: Empty
+//!
+//! Subsequently, the user calls the enable_role instruction to create the roles ROLE_A and MARKET_KEEPER.
+//! The permission structure of the Store then becomes:
+//!
+//! - Admin: `GMsoQfjzWE8ogYJPew3zX8fCTF8vedbgFV4qjUCZGTtm`
+//! - Role Table: `ROLE_A`, `MARKET_KEEPER`
+//! - Member Table: Empty
+//!
+//! Next, the user uses the grant_role instruction to grant the `ROLE_A` role to
+//! `FoMW5qtiTMcR3Y5zFF7ZmsG3maGac8rPaveHvKiWWpaJ` and the `MARKET_KEEPER` role to
+//! `KeCJTnq7u6xE1nwiou2RD4yj6hNTZnb8xYcavqSSgRe`. The permission structure of the Store then becomes:
+//!
+//! - Admin: `GMsoQfjzWE8ogYJPew3zX8fCTF8vedbgFV4qjUCZGTtm`
+//! - Role Table: `ROLE_A`, `MARKET_KEEPER`
+//! - Member Table: `FoMW5qtiTMcR3Y5zFF7ZmsG3maGac8rPaveHvKiWWpaJ` with `ROLE_A`;
+//! `KeCJTnq7u6xE1nwiou2RD4yj6hNTZnb8xYcavqSSgRe` with `MARKET_KEEPER`
+//!
+//! Since GMSOL's permission table supports granting multiple roles to the same address, the user can also
+//! grant the `ROLE_A` role to `KeCJTnq7u6xE1nwiou2RD4yj6hNTZnb8xYcavqSSgRe`. The permission structure of
+//! the Store then becomes:
+//!
+//! - Admin: `GMsoQfjzWE8ogYJPew3zX8fCTF8vedbgFV4qjUCZGTtm`
+//! - Role Table: `ROLE_A`, `MARKET_KEEPER`
+//! - Member Table: `FoMW5qtiTMcR3Y5zFF7ZmsG3maGac8rPaveHvKiWWpaJ` with `ROLE_A`;
+//! `KeCJTnq7u6xE1nwiou2RD4yj6hNTZnb8xYcavqSSgRe` with `MARKET_KEEPER` and `ROLE_A`
+//!
+//! Since `KeCJTnq7u6xE1nwiou2RD4yj6hNTZnb8xYcavqSSgRe` has the `MARKET_KEEPER` role, this address can
+//! sign instructions related to market management, such as `toggle_market`. However, this address cannot
+//! sign the `market_transfer_out` instruction, which requires the `CONTROLLER` role.
+//!
+//! Meanwhile, `FoMW5qtiTMcR3Y5zFF7ZmsG3maGac8rPaveHvKiWWpaJ` cannot sign any built-in instructions of
+//! the Store Program that require permissions, as it only has the `ROLE_A` role, which is not sufficient
+//! for any permission-required built-in instructions. Although custom roles like `ROLE_A` are not directly
+//! supported by the Store Program, other programs can use the Store Program's `check_role` instruction to
+//! verify if an address has the `ROLE_A` role, thereby providing support for that role.
+//!
+//! The roles supported by the Store Program are defined in [`RoleKey`](states::RoleKey) and include all
+//! roles needed for built-in instructions. However, no roles are added by default when the Store is initialized,
+//! so the Store's administrator must manually enable them using `enable_role`.
 
 pub mod instructions;
 

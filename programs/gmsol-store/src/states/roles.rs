@@ -124,7 +124,7 @@ crate::fixed_map!(
     0
 );
 
-/// Role Store.
+/// Roles Store.
 #[zero_copy]
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub struct RoleStore {
