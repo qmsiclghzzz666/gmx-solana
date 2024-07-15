@@ -572,7 +572,7 @@ impl InspectArgs {
 
                         let mut rows = serialized.iter().collect::<Vec<_>>();
                         rows.sort_by_key(|(_, p)| Reverse(p.state.size_in_usd));
-                        rows.sort_by_key(|(_, p)| (p.market_token, p.collateral_token));
+                        rows.sort_by_key(|(_, p)| (p.market_token, p.collateral_token, !p.is_long));
 
                         for (pubkey, p) in rows {
                             let mut size =
