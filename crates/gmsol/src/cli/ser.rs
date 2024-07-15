@@ -327,6 +327,7 @@ impl fmt::Display for SerializePosition {
         writeln!(f, "Side: {}\n", if self.is_long { "long" } else { "short" })?;
         writeln!(f, "State:")?;
         let state = &self.state;
+        writeln!(f, "trade_id = {}", state.trade_id)?;
         writeln!(f, "updated_at_slot = {}", state.updated_at_slot)?;
         writeln!(
             f,
@@ -379,7 +380,6 @@ impl fmt::Display for SerializePosition {
                 .short_token_claimable_funding_amount_per_size
                 .to_formatted_string(&Locale::en),
         )?;
-        writeln!(f, "trade_id = {}", state.trade_id)?;
         Ok(())
     }
 }
