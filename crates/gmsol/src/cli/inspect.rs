@@ -1,11 +1,7 @@
 use std::collections::BTreeMap;
 
 use anchor_client::solana_sdk::{native_token::lamports_to_sol, pubkey::Pubkey};
-use gmsol::{
-    store::utils::{read_market, read_store, token_map, token_map_optional},
-    types::{self, TokenMap, TokenMapAccess},
-    utils,
-};
+use gmsol::types::TokenMapAccess;
 use gmsol_model::{Balance, BalanceExt, ClockKind, PoolKind};
 use gmsol_store::states::{
     self, AddressKey, AmountKey, FactorKey, MarketConfigKey, PriceProviderKind,
@@ -166,7 +162,7 @@ impl InspectArgs {
                 } else {
                     *store
                 };
-                let store = read_store(&client.data_store().async_rpc(), &address).await?;
+                let store = client.store(&address).await?;
                 if let Some(key) = get_amount {
                     println!("{}", store.get_amount_by_key(*key));
                 } else if let Some(key) = get_factor {
@@ -225,18 +221,20 @@ impl InspectArgs {
                 debug,
             } => {
                 let mut authorized = true;
+                let authorized_token_map = client.authorized_token_map(store).await?;
                 let address = if let Some(address) = address {
-                    let authorized_token_map = token_map_optional(program, store).await?;
                     if authorized_token_map != Some(*address) {
                         authorized = false;
                         tracing::warn!("this token map is not authorized by the store");
                     }
                     *address
                 } else {
-                    token_map(program, store).await?
+                    authorized_token_map.ok_or_else(|| {
+                        gmsol::Error::invalid_argument("the token map of the store is not set")
+                    })?
                 };
                 let output = output.unwrap_or_default();
-                let token_map = program.account::<TokenMap>(address).await?;
+                let token_map = client.token_map(&address).await?;
                 if let Some(token) = get {
                     let config = token_map
                         .get(token)
@@ -333,7 +331,7 @@ impl InspectArgs {
                     if !as_market_address {
                         address = client.find_market_address(store, &address);
                     }
-                    let market = read_market(&program.async_rpc(), &address).await?;
+                    let market = client.market(&address).await?;
                     let serialized = SerializeMarket::from_market(&address, &market)?;
                     if let Some(key) = get_config {
                         let value = market.get_config_by_key(*key);
@@ -477,13 +475,10 @@ impl InspectArgs {
                 }
             }
             Command::Deposit { address } => {
-                println!("{:#?}", program.account::<states::Deposit>(*address).await?);
+                println!("{:#?}", client.deposit(address).await?);
             }
             Command::Withdrawal { address } => {
-                println!(
-                    "{:#?}",
-                    program.account::<states::Withdrawal>(*address).await?
-                );
+                println!("{:#?}", client.withdrawal(address).await?);
             }
             Command::Controller => {
                 let controller = client.controller_address(store);
@@ -514,7 +509,7 @@ impl InspectArgs {
                 println!("{:#?}", program.account::<states::Oracle>(address).await?);
             }
             Command::Order { address } => {
-                println!("{:#?}", program.account::<states::Order>(*address).await?);
+                println!("{:#?}", client.order(address).await?);
             }
             Command::Position {
                 address,
@@ -525,11 +520,7 @@ impl InspectArgs {
             } => {
                 let output = output.unwrap_or_default();
                 if let Some(address) = address {
-                    let position = utils::try_deserailize_zero_copy_account::<types::Position>(
-                        &program.async_rpc(),
-                        address,
-                    )
-                    .await?;
+                    let position = client.position(address).await?;
                     let serialized = ser::SerializePosition::try_from(&position)?;
                     output.print(&serialized, |serialized| {
                         if *debug {

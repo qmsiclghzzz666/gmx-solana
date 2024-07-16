@@ -289,7 +289,32 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         Ok(res.into_value())
     }
 
-    /// Fetch all markets of the given store.
+    /// Fetch [`Store`](types::Store) account with its address.
+    pub async fn store(&self, address: &Pubkey) -> crate::Result<types::Store> {
+        Ok(self
+            .data_store()
+            .account::<ZeroCopy<types::Store>>(*address)
+            .await?
+            .0)
+    }
+
+    /// Fetch the [`TokenMap`](types::TokenMap) address of the given store.
+    pub async fn authorized_token_map(&self, store: &Pubkey) -> crate::Result<Option<Pubkey>> {
+        let store = self.store(store).await?;
+        let token_map = store.token_map;
+        if token_map == Pubkey::default() {
+            Ok(None)
+        } else {
+            Ok(Some(token_map))
+        }
+    }
+
+    /// Fetch [`TokenMap`](types::TokenMap) account with its address.
+    pub async fn token_map(&self, address: &Pubkey) -> crate::Result<types::TokenMap> {
+        Ok(self.data_store().account(*address).await?)
+    }
+
+    /// Fetch all [`Market`](types::Market) accounts of the given store.
     pub async fn markets(&self, store: &Pubkey) -> crate::Result<BTreeMap<Pubkey, types::Market>> {
         let markets = self
             .store_accounts::<ZeroCopy<types::Market>>(
@@ -306,7 +331,16 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         Ok(markets)
     }
 
-    /// Fetch all positions of the given owner of the given store.
+    /// Fetch [`Market`](types::Market) account with its address.
+    pub async fn market(&self, address: &Pubkey) -> crate::Result<types::Market> {
+        Ok(self
+            .data_store()
+            .account::<ZeroCopy<types::Market>>(*address)
+            .await?
+            .0)
+    }
+
+    /// Fetch all [`Position`](types::Position) accounts of the given owner of the given store.
     pub async fn positions(
         &self,
         store: &Pubkey,
@@ -331,6 +365,30 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
             .collect();
 
         Ok(positions)
+    }
+
+    /// Fetch [`Position`](types::Position) account with its address.
+    pub async fn position(&self, address: &Pubkey) -> crate::Result<types::Position> {
+        let position = self
+            .data_store()
+            .account::<ZeroCopy<types::Position>>(*address)
+            .await?;
+        Ok(position.0)
+    }
+
+    /// Fetch [`Order`](types::Order) account with its address.
+    pub async fn order(&self, address: &Pubkey) -> crate::Result<types::Order> {
+        Ok(self.data_store().account(*address).await?)
+    }
+
+    /// Fetch [`Depsoit`](types::Deposit) account with its address.
+    pub async fn deposit(&self, address: &Pubkey) -> crate::Result<types::Order> {
+        Ok(self.data_store().account(*address).await?)
+    }
+
+    /// Fetch [`Withdrawal`](types::Withdrawal) account with its address.
+    pub async fn withdrawal(&self, address: &Pubkey) -> crate::Result<types::Order> {
+        Ok(self.data_store().account(*address).await?)
     }
 }
 
