@@ -138,8 +138,8 @@ impl KeeperArgs {
                     Action::Deposit => {
                         let actions = client
                             .store_accounts::<Deposit>(
-                                true,
-                                filter_store.then(|| StoreFilter::new(store, 8)).as_ref(),
+                                filter_store
+                                    .then(|| StoreFilter::new(store, 8).ignore_disc_offset(true)),
                                 None,
                             )
                             .await?;
@@ -164,8 +164,8 @@ impl KeeperArgs {
                     Action::Withdrawal => {
                         let actions = client
                             .store_accounts::<Withdrawal>(
-                                true,
-                                filter_store.then(|| StoreFilter::new(store, 8)).as_ref(),
+                                filter_store
+                                    .then(|| StoreFilter::new(store, 8).ignore_disc_offset(true)),
                                 None,
                             )
                             .await?;
@@ -196,8 +196,8 @@ impl KeeperArgs {
                     Action::Order => {
                         let actions = client
                             .store_accounts::<Order>(
-                                true,
-                                filter_store.then(|| StoreFilter::new(store, 9)).as_ref(),
+                                filter_store
+                                    .then(|| StoreFilter::new(store, 9).ignore_disc_offset(true)),
                                 None,
                             )
                             .await?;

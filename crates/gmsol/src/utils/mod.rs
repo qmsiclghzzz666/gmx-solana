@@ -34,6 +34,9 @@ pub mod optional;
 /// Zero-copy account workaround.
 pub mod zero_copy;
 
+/// Program accounts.
+pub mod accounts;
+
 pub use self::{
     compute_budget::ComputeBudget,
     instruction::serialize_instruction,

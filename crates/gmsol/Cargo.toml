@@ -41,31 +41,6 @@ poem = ["dep:poem"]
 docs = ["gmsol-store/docs", "cli"]
 
 [dependencies]
-# Dependencies for cli
-clap = { workspace = true, optional = true, features = ["derive", "env"] }
-tracing-subscriber = { workspace = true, optional = true, features = [
-    "env-filter",
-] }
-shellexpand = { workspace = true, optional = true }
-toml = { workspace = true, optional = true }
-serde_with = { workspace = true, optional = true, features = ["indexmap_2"] }
-humantime = { workspace = true, optional = true }
-num-format = { workspace = true, optional = true }
-prettytable = { workspace = true, optional = true }
-
-# Dependencies for pyth support
-reqwest = { workspace = true, optional = true, features = ["json"] }
-url = { workspace = true, optional = true }
-serde_json = { workspace = true, optional = true }
-serde = { workspace = true, optional = true, features = ["derive"] }
-eventsource-stream = { workspace = true, optional = true }
-pythnet-sdk = { workspace = true, optional = true }
-pyth-solana-receiver-sdk = { workspace = true, optional = true }
-anchor-syn = { workspace = true, optional = true }
-heck = { workspace = true, optional = true }
-byteorder = { workspace = true, optional = true }
-
-# Other deps
 gmsol-utils = { workspace = true }
 gmsol-store = { workspace = true, features = [
     "no-entrypoint",
@@ -103,6 +78,31 @@ rust-embed = { workspace = true, optional = true }
 poem = { workspace = true, optional = true }
 indexmap = { workspace = true, features = ["serde"] }
 time = { workspace = true }
+solana-account-decoder = { workspace = true }
+
+# Dependencies for cli
+clap = { workspace = true, optional = true, features = ["derive", "env"] }
+tracing-subscriber = { workspace = true, optional = true, features = [
+    "env-filter",
+] }
+shellexpand = { workspace = true, optional = true }
+toml = { workspace = true, optional = true }
+serde_with = { workspace = true, optional = true, features = ["indexmap_2"] }
+humantime = { workspace = true, optional = true }
+num-format = { workspace = true, optional = true }
+prettytable = { workspace = true, optional = true }
+
+# Dependencies for pyth support
+reqwest = { workspace = true, optional = true, features = ["json"] }
+url = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
+serde = { workspace = true, optional = true, features = ["derive"] }
+eventsource-stream = { workspace = true, optional = true }
+pythnet-sdk = { workspace = true, optional = true }
+pyth-solana-receiver-sdk = { workspace = true, optional = true }
+anchor-syn = { workspace = true, optional = true }
+heck = { workspace = true, optional = true }
+byteorder = { workspace = true, optional = true }
 
 [[example]]
 name = "hermes"

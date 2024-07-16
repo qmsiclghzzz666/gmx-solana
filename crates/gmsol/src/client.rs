@@ -12,7 +12,11 @@ use typed_builder::TypedBuilder;
 
 use crate::{
     types,
-    utils::{zero_copy::ZeroCopy, RpcBuilder},
+    utils::{
+        accounts::{accounts_lazy_with_context, ProgramAccountsConfig, WithContext},
+        zero_copy::ZeroCopy,
+        RpcBuilder,
+    },
 };
 
 const DISC_OFFSET: usize = 8;
@@ -240,39 +244,56 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
     }
 
     /// Fetch accounts owned by the Store Program.
+    pub async fn store_accounts_with_config<T>(
+        &self,
+        filter_by_store: Option<StoreFilter>,
+        other_filters: impl IntoIterator<Item = RpcFilterType>,
+        config: ProgramAccountsConfig,
+    ) -> crate::Result<WithContext<Vec<(Pubkey, T)>>>
+    where
+        T: AccountDeserialize + Discriminator,
+    {
+        let filters = std::iter::empty()
+            .chain(
+                filter_by_store
+                    .inspect(|filter| {
+                        let store = &filter.store;
+                        tracing::debug!(%store, offset=%filter.store_offset(), "store bytes to filter: {}", hex::encode(store));
+                    })
+                    .map(RpcFilterType::from),
+            )
+            .chain(other_filters);
+        accounts_lazy_with_context(self.data_store(), filters, config)
+            .await?
+            .map(|iter| iter.collect())
+            .transpose()
+    }
+
+    /// Fetch accounts owned by the Store Program.
     pub async fn store_accounts<T>(
         &self,
-        ignore_disc_offset: bool,
-        filter_by_store: Option<&StoreFilter>,
+        filter_by_store: Option<StoreFilter>,
         other_filters: impl IntoIterator<Item = RpcFilterType>,
     ) -> crate::Result<Vec<(Pubkey, T)>>
     where
         T: AccountDeserialize + Discriminator,
     {
-        use anchor_client::solana_client::rpc_filter::{Memcmp, RpcFilterType};
-
-        let filters = std::iter::empty().chain(filter_by_store.map(|filter| {
-            let store = filter.store;
-            let store_offset = if ignore_disc_offset { filter.store_offset} else { filter.store_offset + DISC_OFFSET };
-            tracing::debug!(%store, offset=%store_offset, "store bytes to filter: {}", hex::encode(store));
-            RpcFilterType::Memcmp(Memcmp::new_raw_bytes(
-                store_offset,
-                store.as_ref().to_owned(),
-            ))
-        })).chain(other_filters);
-        self.data_store()
-            .accounts_lazy::<T>(filters.collect())
-            .await?
-            .map(|res| res.map_err(crate::Error::from))
-            .collect()
+        let res = self
+            .store_accounts_with_config(
+                filter_by_store,
+                other_filters,
+                ProgramAccountsConfig::default(),
+            )
+            .await?;
+        tracing::debug!(slot=%res.slot(), "accounts fetched");
+        Ok(res.into_value())
     }
 
     /// Fetch all markets of the given store.
     pub async fn markets(&self, store: &Pubkey) -> crate::Result<BTreeMap<Pubkey, types::Market>> {
         let markets = self
             .store_accounts::<ZeroCopy<types::Market>>(
-                false,
-                Some(&StoreFilter::new(
+                Some(StoreFilter::new(
                     store,
                     bytemuck::offset_of!(types::Market, store),
                 )),
@@ -303,7 +324,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         let store_filter = StoreFilter::new(store, bytemuck::offset_of!(types::Position, store));
 
         let positions = self
-            .store_accounts::<ZeroCopy<types::Position>>(false, Some(&store_filter), Some(filter))
+            .store_accounts::<ZeroCopy<types::Position>>(Some(store_filter), Some(filter))
             .await?
             .into_iter()
             .map(|(pubkey, p)| (pubkey, p.0))
@@ -338,9 +359,11 @@ impl<C: Clone + Deref<Target = impl Signer>> SystemProgramOps<C> for Client<C> {
 #[derive(Debug)]
 pub struct StoreFilter {
     /// Store.
-    pub store: Pubkey,
+    store: Pubkey,
     /// Store offset.
-    pub store_offset: usize,
+    store_offset: usize,
+    /// Ignore disc bytes.
+    ignore_disc_offset: bool,
 }
 
 impl StoreFilter {
@@ -349,6 +372,33 @@ impl StoreFilter {
         Self {
             store: *store,
             store_offset,
+            ignore_disc_offset: false,
         }
+    }
+
+    /// Ignore disc offset.
+    pub fn ignore_disc_offset(mut self, ignore: bool) -> Self {
+        self.ignore_disc_offset = ignore;
+        self
+    }
+
+    /// Store offset.
+    pub fn store_offset(&self) -> usize {
+        if self.ignore_disc_offset {
+            self.store_offset
+        } else {
+            self.store_offset + DISC_OFFSET
+        }
+    }
+}
+
+impl From<StoreFilter> for RpcFilterType {
+    fn from(filter: StoreFilter) -> Self {
+        let store = filter.store;
+        let store_offset = filter.store_offset();
+        RpcFilterType::Memcmp(Memcmp::new_raw_bytes(
+            store_offset,
+            store.as_ref().to_owned(),
+        ))
     }
 }
