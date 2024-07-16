@@ -93,7 +93,7 @@ pub async fn get_program_accounts_with_context(
         account_config: config.account_config,
         with_context: Some(true),
     };
-
+    tracing::debug!(%program, ?config, "fetching program accounts");
     let res = client
         .send::<Response<Vec<RpcKeyedAccount>>>(
             RpcRequest::GetProgramAccounts,
