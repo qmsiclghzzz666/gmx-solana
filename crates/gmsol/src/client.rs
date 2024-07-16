@@ -315,19 +315,36 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
     }
 
     /// Fetch all [`Market`](types::Market) accounts of the given store.
-    pub async fn markets(&self, store: &Pubkey) -> crate::Result<BTreeMap<Pubkey, types::Market>> {
+    pub async fn markets_with_config(
+        &self,
+        store: &Pubkey,
+        config: ProgramAccountsConfig,
+    ) -> crate::Result<WithContext<BTreeMap<Pubkey, types::Market>>> {
         let markets = self
-            .store_accounts::<ZeroCopy<types::Market>>(
+            .store_accounts_with_config::<ZeroCopy<types::Market>>(
                 Some(StoreFilter::new(
                     store,
                     bytemuck::offset_of!(types::Market, store),
                 )),
                 None,
+                config,
             )
             .await?
-            .into_iter()
-            .map(|(pubkey, m)| (pubkey, m.0))
-            .collect::<BTreeMap<_, _>>();
+            .map(|accounts| {
+                accounts
+                    .into_iter()
+                    .map(|(pubkey, m)| (pubkey, m.0))
+                    .collect::<BTreeMap<_, _>>()
+            });
+        Ok(markets)
+    }
+
+    /// Fetch all [`Market`](types::Market) accounts of the given store.
+    pub async fn markets(&self, store: &Pubkey) -> crate::Result<BTreeMap<Pubkey, types::Market>> {
+        let markets = self
+            .markets_with_config(store, ProgramAccountsConfig::default())
+            .await?
+            .into_value();
         Ok(markets)
     }
 
