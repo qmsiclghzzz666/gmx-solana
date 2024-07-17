@@ -6,7 +6,7 @@ use gmsol_utils::to_seed;
 
 use crate::{constants, StoreError, StoreResult};
 
-use super::{Amount, Factor, InitSpace, RoleStore, Seed};
+use super::{Amount, Factor, InitSpace, RoleStore};
 
 const MAX_LEN: usize = 32;
 
@@ -37,10 +37,6 @@ impl InitSpace for Store {
     const INIT_SPACE: usize = std::mem::size_of::<Self>();
 }
 
-impl Seed for Store {
-    const SEED: &'static [u8] = b"data_store";
-}
-
 #[cfg(feature = "display")]
 impl std::fmt::Display for Store {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -62,6 +58,9 @@ impl std::fmt::Display for Store {
 }
 
 impl Store {
+    /// The value of the seed is `b"data_store"`
+    pub const SEED: &'static [u8] = b"data_store";
+
     /// Maximum length of key.
     pub const MAX_LEN: usize = MAX_LEN;
 

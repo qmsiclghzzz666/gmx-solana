@@ -232,6 +232,19 @@ pub mod gmsol_store {
     // Data Store.
     /// Create a new [`Store`](states::Store) account.
     ///
+    /// # Arguments
+    /// - `key`: The name of the store, also used as seed to derive
+    /// the address of the store account. The length of the `key`
+    /// cannot exceed [`MAX_LEN`](states::Store::MAX_LEN).
+    /// - `authority`: The authority (admin) address that will be set
+    /// after the Store is created. If not provided,
+    /// [`payer`](Initialize::payer) will be used as the default
+    /// authority address.
+    ///
+    /// # Checks
+    /// - The [`payer`](Initialize::payer) is a signer.
+    /// - The [`store`](Initialize::store) is not initialized.
+    ///
     /// *[See also the documentation for the accounts.](Initialize).*
     pub fn initialize(
         ctx: Context<Initialize>,

@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use gmsol_utils::to_seed;
 
 use crate::{
-    states::{DataStoreInitEvent, InitSpace, Seed, Store, TokenMapHeader},
+    states::{DataStoreInitEvent, InitSpace, Store, TokenMapHeader},
     utils::internal,
     StoreError,
 };
@@ -19,6 +19,8 @@ pub struct Initialize<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
     /// The Account to be used for creating the [`Store`] Account.
+    /// Its address is a PDA derived from a constant [`SEED`](Store::SEED)
+    /// and a hashed key as the seeds.
     #[account(
         init,
         payer = payer,
@@ -27,7 +29,7 @@ pub struct Initialize<'info> {
         bump,
     )]
     pub store: AccountLoader<'info, Store>,
-    /// System Program.
+    /// The System Program.
     pub system_program: Program<'info, System>,
 }
 
