@@ -1,7 +1,10 @@
 use std::collections::BTreeMap;
 
 use anchor_client::solana_sdk::{native_token::lamports_to_sol, pubkey::Pubkey};
-use gmsol::types::TokenMapAccess;
+use gmsol::{
+    types::TokenMapAccess,
+    utils::{signed_value_to_decimal, unsigned_value_to_decimal},
+};
 use gmsol_model::{Balance, BalanceExt, ClockKind, PoolKind};
 use gmsol_store::states::{
     self, AddressKey, AmountKey, FactorKey, MarketConfigKey, PriceProviderKind,
@@ -15,7 +18,7 @@ use strum::IntoEnumIterator;
 
 use crate::{
     ser::{self, SerializeMarket},
-    utils::{signed_value_to_decimal, table_format, unsigned_value_to_decimal, Oracle, Output},
+    utils::{table_format, Oracle, Output},
     GMSOLClient,
 };
 

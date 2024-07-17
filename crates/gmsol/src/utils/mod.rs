@@ -37,8 +37,16 @@ pub mod zero_copy;
 /// Program accounts.
 pub mod accounts;
 
+/// Utils for fixed-point numbers.
+pub mod fixed;
+
 pub use self::{
+    accounts::{accounts_lazy_with_context, ProgramAccountsConfig},
     compute_budget::ComputeBudget,
+    fixed::{
+        signed_amount_to_decimal, signed_fixed_to_decimal, signed_value_to_decimal,
+        unsigned_amount_to_decimal, unsigned_fixed_to_decimal, unsigned_value_to_decimal,
+    },
     instruction::serialize_instruction,
     optional::fix_optional_account_metas,
     rpc_builder::RpcBuilder,

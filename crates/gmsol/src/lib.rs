@@ -25,6 +25,12 @@ pub mod types;
 /// Program IDs.
 pub mod program_ids;
 
+/// GMSOL constants.
+pub mod constants {
+    pub use gmsol_exchange::constants::*;
+    pub use gmsol_store::constants::*;
+}
+
 pub use client::{Client, ClientOptions};
 pub use error::Error;
 pub use gmsol_model as model;
