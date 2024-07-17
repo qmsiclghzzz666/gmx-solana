@@ -38,7 +38,7 @@ pyth-pull-oracle = [
 ]
 rust-embed = ["dep:rust-embed"]
 poem = ["dep:poem"]
-docs = ["gmsol-store/docs", "cli"]
+doc = ["gmsol-store/doc", "cli"]
 
 [dependencies]
 gmsol-utils = { workspace = true }
