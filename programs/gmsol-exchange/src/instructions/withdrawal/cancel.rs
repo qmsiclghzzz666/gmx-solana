@@ -25,7 +25,7 @@ pub struct CancelWithdrawal<'info> {
     ///
     /// ## Notes
     /// - Only the user who created the withdrawal can receive the funds,
-    /// which is checked by [`remove_withdrawal`](gmsol_store::instructions::remove_withdrawal)
+    /// which is checked by [`remove_withdrawal`](gmsol_store::gmsol_store::remove_withdrawal)
     /// through CPI.
     #[account(mut)]
     pub withdrawal: Account<'info, Withdrawal>,

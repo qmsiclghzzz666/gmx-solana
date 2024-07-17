@@ -7,11 +7,18 @@ use crate::{
     StoreError,
 };
 
+/// The accounts definition for [`initialize`](crate::gmsol_store::initialize)
+/// instruction.
+///
+/// *[See also the documentation for the instruction.](crate::gmsol_store::initialize).*
 #[derive(Accounts)]
 #[instruction(key: String)]
 pub struct Initialize<'info> {
+    /// The payer for the rent-exempt fee of the [`Store`] Account.
+    /// If `authority` is not specified, it will be set as the authority of this Store Account.
     #[account(mut)]
     pub payer: Signer<'info>,
+    /// The Account to be used for creating the [`Store`] Account.
     #[account(
         init,
         payer = payer,
@@ -20,10 +27,15 @@ pub struct Initialize<'info> {
         bump,
     )]
     pub store: AccountLoader<'info, Store>,
+    /// System Program.
     pub system_program: Program<'info, System>,
 }
 
-pub fn initialize(ctx: Context<Initialize>, key: String, authority: Option<Pubkey>) -> Result<()> {
+pub(crate) fn initialize(
+    ctx: Context<Initialize>,
+    key: String,
+    authority: Option<Pubkey>,
+) -> Result<()> {
     let mut store = ctx.accounts.store.load_init()?;
     store.init(
         authority.unwrap_or(ctx.accounts.payer.key()),
@@ -48,7 +60,7 @@ pub struct TransferStoreAuthority<'info> {
 ///
 /// ## CHECK
 /// - Only ADMIN can execute this instruction.
-pub fn unchecked_transfer_store_authority(
+pub(crate) fn unchecked_transfer_store_authority(
     ctx: Context<TransferStoreAuthority>,
     new_authority: Pubkey,
 ) -> Result<()> {
@@ -83,7 +95,7 @@ pub struct SetTokenMap<'info> {
 ///
 /// ## Check
 /// - Only MARKET_KEEPER can perform this action.
-pub fn unchecked_set_token_map(ctx: Context<SetTokenMap>) -> Result<()> {
+pub(crate) fn unchecked_set_token_map(ctx: Context<SetTokenMap>) -> Result<()> {
     ctx.accounts.store.load_mut()?.token_map = ctx.accounts.token_map.key();
     Ok(())
 }
@@ -104,6 +116,6 @@ pub struct ReadStore<'info> {
 }
 
 /// Get the token map address of the store.
-pub fn get_token_map(ctx: Context<ReadStore>) -> Result<Option<Pubkey>> {
+pub(crate) fn get_token_map(ctx: Context<ReadStore>) -> Result<Option<Pubkey>> {
     Ok(ctx.accounts.store.load()?.token_map().copied())
 }

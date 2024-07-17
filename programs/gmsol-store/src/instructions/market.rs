@@ -12,12 +12,6 @@ use crate::{
     StoreError,
 };
 
-/// Number of pools.
-pub const NUM_POOLS: u8 = 13;
-
-/// Number of clocks.
-pub const NUM_CLOCKS: u8 = 3;
-
 #[derive(Accounts)]
 #[instruction(market_token: Pubkey)]
 pub struct InitializeMarket<'info> {
