@@ -104,6 +104,9 @@
 //! [cpi-with-pda-signer]: https://solana.com/docs/core/cpi#cpi-with-pda-signer
 //! [seeds]: https://solana.com/docs/core/pda#how-to-derive-a-pda
 //!
+//! ### Instructions for Store Accounts
+//! - [`initialize`](gmsol_store::initialize): Create a new [`Store`](states::Store) account.
+//!
 //! ### Role-based Permission Management
 //!
 //! The complete role-based permission table for each GMSOL deployment is directly stored in the
@@ -165,6 +168,25 @@
 //! The roles supported by the Store Program are defined in [`RoleKey`](states::RoleKey) and include all
 //! roles needed for built-in instructions. However, no roles are added by default when the Store is initialized,
 //! so the Store's administrator must manually enable them using `enable_role`.
+//!
+//! #### Authentication
+//! This crate also provide helper trait [`Authenticate`](utils::Authenticate) to simpify the permission validations,
+//! which provides methods that can be used together with [#\[access_control\]](macro@access_control) macro for
+//! [`Accounts`] types that implement [`Authentication`](utils::Authentication).
+//!
+//! ### Instructions for Permission Management
+//! - [`enable_role`](gmsol_store::enable_role): Insert or enable a role for the given store.
+//! - [`disable_role`](gmsol_store::disable_role): Disable an existing role for the given store.
+//! - [`grant_role`](gmsol_store::grant_role): Grant a role to the given user in the given store.
+//! - [`revoke_role`](gmsol_store::revoke_role): Revoke a role from the given user in the given store.
+//! - [`check_admin`](gmsol_store::check_admin): Check that the signer is the admin of the given store,
+//! throw error if the check fails.
+//! - [`check_role`](gmsol_store::check_role): Check that the signer has the given role in the given store,
+//! throw error if the check fails.
+//! - [`has_admin`](gmsol_store::has_admin): Return whether the given address is the admin of the given store,
+//! or not.
+//! - [`has_role`](gmsol_store::has_role): Return whether the given address has the given role in the given store,
+//! or not.
 
 pub mod instructions;
 
@@ -209,7 +231,7 @@ pub mod gmsol_store {
     use super::*;
 
     // Data Store.
-    /// Initialize a new [`Store`](crate::states::Store) account.
+    /// Create a new [`Store`](states::Store) account.
     pub fn initialize(
         ctx: Context<Initialize>,
         key: String,
@@ -236,37 +258,47 @@ pub mod gmsol_store {
     }
 
     // Roles.
+    /// Check that the signer is the admin of the given store, throw error if
+    /// the check fails.
     pub fn check_admin(ctx: Context<CheckRole>) -> Result<bool> {
         instructions::check_admin(ctx)
     }
 
+    /// Check that the signer has the given role in the given store, throw
+    /// error if the check fails.
     pub fn check_role(ctx: Context<CheckRole>, role: String) -> Result<bool> {
         instructions::check_role(ctx, role)
     }
 
+    /// Return whether the given address is the admin of the given store, or not.
     pub fn has_admin(ctx: Context<HasRole>, authority: Pubkey) -> Result<bool> {
         instructions::has_admin(ctx, authority)
     }
 
+    /// Return whether the given address has the given role in the given store, or not.
     pub fn has_role(ctx: Context<HasRole>, authority: Pubkey, role: String) -> Result<bool> {
         instructions::has_role(ctx, authority, role)
     }
 
+    /// Insert or enable a role for the given store.
     #[access_control(internal::Authenticate::only_admin(&ctx))]
     pub fn enable_role(ctx: Context<EnableRole>, role: String) -> Result<()> {
         instructions::enable_role(ctx, role)
     }
 
+    /// Disable an existing role for the given store.
     #[access_control(internal::Authenticate::only_admin(&ctx))]
     pub fn disable_role(ctx: Context<DisableRole>, role: String) -> Result<()> {
         instructions::disable_role(ctx, role)
     }
 
+    /// Grant a role to the given user in the given store.
     #[access_control(internal::Authenticate::only_admin(&ctx))]
     pub fn grant_role(ctx: Context<GrantRole>, user: Pubkey, role: String) -> Result<()> {
         instructions::grant_role(ctx, user, role)
     }
 
+    /// Revoke a role from the given user in the given store.
     #[access_control(internal::Authenticate::only_admin(&ctx))]
     pub fn revoke_role(ctx: Context<RevokeRole>, user: Pubkey, role: String) -> Result<()> {
         instructions::revoke_role(ctx, user, role)
