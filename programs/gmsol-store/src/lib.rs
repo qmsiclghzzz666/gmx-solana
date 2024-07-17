@@ -173,10 +173,10 @@
 //! [`Accounts`] types that implement [`Authentication`](utils::Authentication).
 //!
 //! ### Instructions for Permission Management
-//! - [`enable_role`](gmsol_store::enable_role): Insert or enable a role for the given store.
-//! - [`disable_role`](gmsol_store::disable_role): Disable an existing role for the given store.
-//! - [`grant_role`](gmsol_store::grant_role): Grant a role to the given user in the given store.
-//! - [`revoke_role`](gmsol_store::revoke_role): Revoke a role from the given user in the given store.
+//! - [`enable_role`]: Insert or enable a role for the given store.
+//! - [`disable_role`]: Disable an existing role for the given store.
+//! - [`grant_role`]: Grant a role to the given user in the given store.
+//! - [`revoke_role`]: Revoke a role from the given user in the given store.
 //! - [`check_admin`](gmsol_store::check_admin): Check that the signer is the admin of the given store,
 //! throw error if the check fails.
 //! - [`check_role`](gmsol_store::check_role): Check that the signer has the given role in the given store,
@@ -295,27 +295,70 @@ pub mod gmsol_store {
     }
 
     /// Insert or enable a role for the given store.
+    ///
+    /// # Arguments
+    /// - `role`: The name of the role to be added/enabled. The length cannot exceed
+    /// [`MAX_ROLE_NAME_LEN`](states::roles::MAX_ROLE_NAME_LEN).
+    ///
+    /// # Checks
+    /// - The [`authority`](EnableRole::authority) must be the `ADMIN` of the store.
+    /// - The [`store`](EnableRole::store) must have been initialized.
+    ///
+    /// *[See also the documentation for the accounts.](EnableRole).*
     #[access_control(internal::Authenticate::only_admin(&ctx))]
     pub fn enable_role(ctx: Context<EnableRole>, role: String) -> Result<()> {
-        instructions::enable_role(ctx, role)
+        instructions::unchecked_enable_role(ctx, role)
     }
 
     /// Disable an existing role for the given store.
+    /// It has no effect if this role does not exist in the store.
+    ///
+    /// # Arguments
+    /// - `role`: The name of the role to be disabled.
+    ///
+    /// # Checks
+    /// - The [`authority`](DisableRole::authority) must be the `ADMIN` of the store.
+    /// - The [`store`](DisableRole::store) must have been initialized.
+    ///
+    /// *[See also the documentation for the accounts.](DisableRole).*
     #[access_control(internal::Authenticate::only_admin(&ctx))]
     pub fn disable_role(ctx: Context<DisableRole>, role: String) -> Result<()> {
-        instructions::disable_role(ctx, role)
+        instructions::unchecked_disable_role(ctx, role)
     }
 
     /// Grant a role to the given user in the given store.
+    ///
+    /// # Arguments
+    /// - `user`: The user to whom the role is to be granted.
+    /// - `role`: The role to be granted to the user.
+    ///
+    /// # Checks
+    /// - The [`authority`](GrantRole::authority) must be the `ADMIN` of the store.
+    /// - The [`store`](GrantRole::store) must have been initialized.
+    /// - The `role` must exist and be enabled in the store.
+    ///
+    /// *[See also the documentation for the accounts.](GrantRole).*
     #[access_control(internal::Authenticate::only_admin(&ctx))]
     pub fn grant_role(ctx: Context<GrantRole>, user: Pubkey, role: String) -> Result<()> {
-        instructions::grant_role(ctx, user, role)
+        instructions::unchecked_grant_role(ctx, user, role)
     }
 
     /// Revoke a role from the given user in the given store.
+    ///
+    /// # Arguments
+    /// - `user`: The user to whom the role is to be revoked.
+    /// - `role`: The role to be revoked from the user.
+    ///
+    /// # Checks
+    /// - The [`authority`](RevokeRole::authority) must be the `ADMIN` of the store.
+    /// - The [`store`](RevokeRole::store) must have been initialized.
+    /// - The `user` must exist in the member table.
+    /// - The `role` must exist and be enabled in the store.
+    ///
+    /// *[See also the documentation for the accounts.](RevokeRole).*
     #[access_control(internal::Authenticate::only_admin(&ctx))]
     pub fn revoke_role(ctx: Context<RevokeRole>, user: Pubkey, role: String) -> Result<()> {
-        instructions::revoke_role(ctx, user, role)
+        instructions::unchecked_revoke_role(ctx, user, role)
     }
 
     // Config.

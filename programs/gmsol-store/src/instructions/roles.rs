@@ -40,15 +40,23 @@ pub fn has_admin(ctx: Context<HasRole>, authority: Pubkey) -> Result<bool> {
     Ok(ctx.accounts.store.load()?.is_authority(&authority))
 }
 
+/// The accounts definition for [`enable_role`](crate::gmsol_store::enable_role).
+///
+/// *[See also the documentation for the instruction.](crate::gmsol_store::enable_role).*
 #[derive(Accounts)]
 pub struct EnableRole<'info> {
+    /// The caller of this instruction.
     pub authority: Signer<'info>,
+    /// The Store Account for which the role is to be added/enabled.
     #[account(mut)]
     pub store: AccountLoader<'info, Store>,
 }
 
 /// Enable the given role in the data store.
-pub fn enable_role(ctx: Context<EnableRole>, role: String) -> Result<()> {
+///
+/// # CHECK
+/// - This instruction can only be called by the `ADMIN`.
+pub(crate) fn unchecked_enable_role(ctx: Context<EnableRole>, role: String) -> Result<()> {
     ctx.accounts.store.load_mut()?.enable_role(&role)
 }
 
@@ -62,15 +70,23 @@ impl<'info> internal::Authentication<'info> for EnableRole<'info> {
     }
 }
 
+/// The accounts definition for [`disable_role`](crate::gmsol_store::disable_role).
+///
+/// *[See also the documentation for the instruction.](crate::gmsol_store::disable_role).*
 #[derive(Accounts)]
 pub struct DisableRole<'info> {
+    /// The caller of this instruction.
     pub authority: Signer<'info>,
+    /// The Store Account for which the role is to be disabled.
     #[account(mut)]
     pub store: AccountLoader<'info, Store>,
 }
 
 /// Disable the given role in the data store.
-pub fn disable_role(ctx: Context<DisableRole>, role: String) -> Result<()> {
+///
+/// # CHECK
+/// - This instruction can only be called by the `ADMIN`.
+pub fn unchecked_disable_role(ctx: Context<DisableRole>, role: String) -> Result<()> {
     ctx.accounts.store.load_mut()?.disable_role(&role)
 }
 
@@ -84,15 +100,27 @@ impl<'info> internal::Authentication<'info> for DisableRole<'info> {
     }
 }
 
+/// The accounts definition for [`grant_role`](crate::gmsol_store::grant_role).
+///
+/// *[See also the documentation for the instruction.](crate::gmsol_store::grant_role).*
 #[derive(Accounts)]
 pub struct GrantRole<'info> {
+    /// The caller of this instruction.
     pub authority: Signer<'info>,
     #[account(mut)]
+    /// The Store Account to which the new role is to be granted.
     pub store: AccountLoader<'info, Store>,
 }
 
 /// Grant a role to the user.
-pub fn grant_role(ctx: Context<GrantRole>, user: Pubkey, role: String) -> Result<()> {
+///
+/// # CHECK
+/// - This instruction can only be called by the `ADMIN`.
+pub(crate) fn unchecked_grant_role(
+    ctx: Context<GrantRole>,
+    user: Pubkey,
+    role: String,
+) -> Result<()> {
     ctx.accounts.store.load_mut()?.grant(&user, &role)
 }
 
@@ -106,15 +134,27 @@ impl<'info> internal::Authentication<'info> for GrantRole<'info> {
     }
 }
 
+/// The accounts definition for [`revoke_role`](crate::gmsol_store::revoke_role).
+///
+/// *[See also the documentation for the instruction.](crate::gmsol_store::revoke_role).*
 #[derive(Accounts)]
 pub struct RevokeRole<'info> {
+    /// The caller of this instruction.
     pub authority: Signer<'info>,
+    /// The Store Account from which the new role is to be revoked.
     #[account(mut)]
     pub store: AccountLoader<'info, Store>,
 }
 
 /// Revoke a role to the user.
-pub fn revoke_role(ctx: Context<RevokeRole>, user: Pubkey, role: String) -> Result<()> {
+///
+/// # CHECK
+/// - This instruction can only be called by the `ADMIN`.
+pub(crate) fn unchecked_revoke_role(
+    ctx: Context<RevokeRole>,
+    user: Pubkey,
+    role: String,
+) -> Result<()> {
     ctx.accounts.store.load_mut()?.revoke(&user, &role)
 }
 

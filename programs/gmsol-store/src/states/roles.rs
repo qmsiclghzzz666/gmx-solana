@@ -7,7 +7,8 @@ use crate::StoreError;
 
 use super::InitSpace;
 
-const MAX_LEN: usize = 32;
+/// Max length of the role anme.
+pub const MAX_ROLE_NAME_LEN: usize = 32;
 
 /// Max number of roles.
 pub const MAX_ROLES: usize = 32;
@@ -19,7 +20,7 @@ pub const MAX_MEMBERS: usize = 16;
 #[derive(Clone, AnchorSerialize, AnchorDeserialize, InitSpace, PartialEq, Eq, PartialOrd, Ord)]
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub struct RoleKey {
-    #[max_len(MAX_LEN)]
+    #[max_len(MAX_ROLE_NAME_LEN)]
     name: String,
 }
 
@@ -56,7 +57,7 @@ type RoleBitmapValue = u32;
 #[derive(Default)]
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub struct RoleMetadata {
-    name: [u8; MAX_LEN],
+    name: [u8; MAX_ROLE_NAME_LEN],
     enabled: u8,
     index: u8,
 }
@@ -75,7 +76,7 @@ impl RoleMetadata {
     /// A `u8` value indicates that this role is enabled.
     pub const ROLE_ENABLED: u8 = u8::MAX;
 
-    fn name_to_bytes(name: &str) -> Result<[u8; MAX_LEN]> {
+    fn name_to_bytes(name: &str) -> Result<[u8; MAX_ROLE_NAME_LEN]> {
         crate::utils::fixed_str::fixed_str_to_bytes(name)
     }
 
