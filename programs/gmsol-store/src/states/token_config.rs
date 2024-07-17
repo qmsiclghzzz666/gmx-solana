@@ -581,9 +581,30 @@ pub mod utils {
     }
 
     impl TokenMap {
-        /// Get header.
+        /// Get the header.
         pub fn header(&self) -> &TokenMapHeader {
             &self.header
+        }
+
+        /// Is empty.
+        pub fn is_empty(&self) -> bool {
+            self.header.is_empty()
+        }
+
+        /// Get the number of tokens in the map.
+        pub fn len(&self) -> usize {
+            self.header.len()
+        }
+
+        /// Get all tokens.
+        pub fn tokens(&self) -> impl Iterator<Item = Pubkey> + '_ {
+            self.header.tokens()
+        }
+
+        /// Create an iterator over the entires of the map.
+        pub fn iter(&self) -> impl Iterator<Item = (Pubkey, &TokenConfig)> + '_ {
+            self.tokens()
+                .filter_map(|token| self.get(&token).map(|config| (token, config)))
         }
     }
 
