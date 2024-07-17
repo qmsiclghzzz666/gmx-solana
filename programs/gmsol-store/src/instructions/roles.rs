@@ -47,7 +47,7 @@ pub fn has_admin(ctx: Context<HasRole>, authority: Pubkey) -> Result<bool> {
 pub struct EnableRole<'info> {
     /// The caller of this instruction.
     pub authority: Signer<'info>,
-    /// The Store Account for which the role is to be added/enabled.
+    /// The store account for which the role is to be added/enabled.
     #[account(mut)]
     pub store: AccountLoader<'info, Store>,
 }
@@ -77,7 +77,7 @@ impl<'info> internal::Authentication<'info> for EnableRole<'info> {
 pub struct DisableRole<'info> {
     /// The caller of this instruction.
     pub authority: Signer<'info>,
-    /// The Store Account for which the role is to be disabled.
+    /// The store account for which the role is to be disabled.
     #[account(mut)]
     pub store: AccountLoader<'info, Store>,
 }
@@ -108,7 +108,7 @@ pub struct GrantRole<'info> {
     /// The caller of this instruction.
     pub authority: Signer<'info>,
     #[account(mut)]
-    /// The Store Account to which the new role is to be granted.
+    /// The store account to which the new role is to be granted.
     pub store: AccountLoader<'info, Store>,
 }
 
@@ -141,7 +141,7 @@ impl<'info> internal::Authentication<'info> for GrantRole<'info> {
 pub struct RevokeRole<'info> {
     /// The caller of this instruction.
     pub authority: Signer<'info>,
-    /// The Store Account from which the new role is to be revoked.
+    /// The store account from which the new role is to be revoked.
     #[account(mut)]
     pub store: AccountLoader<'info, Store>,
 }

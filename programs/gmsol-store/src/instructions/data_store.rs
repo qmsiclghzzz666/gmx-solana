@@ -7,8 +7,7 @@ use crate::{
     StoreError,
 };
 
-/// The accounts definition for [`initialize`](crate::gmsol_store::initialize)
-/// instruction.
+/// The accounts definition for [`initialize`](crate::gmsol_store::initialize).
 ///
 /// *[See also the documentation for the instruction.](crate::gmsol_store::initialize).*
 #[derive(Accounts)]
@@ -18,7 +17,7 @@ pub struct Initialize<'info> {
     /// If `authority` is not specified, it will be set as the authority of this Store Account.
     #[account(mut)]
     pub payer: Signer<'info>,
-    /// The Account to be used for creating the [`Store`] Account.
+    /// The account to be used for creating the [`Store`] Account.
     /// Its address is a PDA derived from a constant [`SEED`](Store::SEED)
     /// and a hashed key as the seeds.
     #[account(
@@ -29,7 +28,7 @@ pub struct Initialize<'info> {
         bump,
     )]
     pub store: AccountLoader<'info, Store>,
-    /// The System Program.
+    /// The [`System`] program.
     pub system_program: Program<'info, System>,
 }
 
@@ -51,9 +50,15 @@ pub(crate) fn initialize(
     Ok(())
 }
 
+/// The accounts definition for
+/// [`transfer_store_authority`](crate::gmsol_store::transfer_store_authority).
+///
+/// *[See also the documentation for the instruction.](crate::gmsol_store::transfer_store_authority).*
 #[derive(Accounts)]
 pub struct TransferStoreAuthority<'info> {
+    /// The caller of this instruction.
     pub authority: Signer<'info>,
+    /// The store account whose authority is to be transferred.
     #[account(mut)]
     pub store: AccountLoader<'info, Store>,
 }

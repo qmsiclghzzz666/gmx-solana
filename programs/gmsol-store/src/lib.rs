@@ -104,6 +104,7 @@
 //!
 //! ### Instructions for Store Accounts
 //! - [`initialize`](gmsol_store::initialize): Create a new [`Store`](states::Store) account.
+//! - [`transfer_store_authority`]: Transfer the authority of the given store to a new authority.
 //!
 //! ### Role-based Permission Management
 //!
@@ -232,6 +233,9 @@ pub mod gmsol_store {
     // Data Store.
     /// Create a new [`Store`](states::Store) account.
     ///
+    /// # Accounts
+    /// *[See the documentation for the accounts.](Initialize).*
+    ///
     /// # Arguments
     /// - `key`: The name of the store, also used as seed to derive
     /// the address of the store account. The length of the `key`
@@ -244,8 +248,9 @@ pub mod gmsol_store {
     /// # Checks
     /// - The [`payer`](Initialize::payer) is a signer.
     /// - The [`store`](Initialize::store) is not initialized.
-    ///
-    /// *[See also the documentation for the accounts.](Initialize).*
+    /// - The address of the [`store`](Initialize::store) must be the PDA
+    ///   derived from the store account seed [`SEED`](states::Store::SEED)
+    ///   and the SHA-256 encoded `key` parameter.
     pub fn initialize(
         ctx: Context<Initialize>,
         key: String,
@@ -254,6 +259,18 @@ pub mod gmsol_store {
         instructions::initialize(ctx, key, authority)
     }
 
+    /// Transfer the authority of the given store to a new authority.
+    ///
+    /// # Accounts
+    /// *[See the documentation for the accounts.](TransferStoreAuthority).*
+    ///
+    /// # Arguments
+    /// - `new_authority`: The new authority to be set for the store account.
+    ///
+    /// # Checks
+    /// - The [`authority`](TransferStoreAuthority::authority) must be a signer
+    /// and be the `ADMIN` of the store.
+    /// - The [`store`](TransferStoreAuthority::store) must have been initialized.
     #[access_control(internal::Authenticate::only_admin(&ctx))]
     pub fn transfer_store_authority(
         ctx: Context<TransferStoreAuthority>,
@@ -296,15 +313,17 @@ pub mod gmsol_store {
 
     /// Insert or enable a role for the given store.
     ///
+    /// # Accounts
+    /// *[See the documentation for the accounts.](EnableRole).*
+    ///
     /// # Arguments
     /// - `role`: The name of the role to be added/enabled. The length cannot exceed
     /// [`MAX_ROLE_NAME_LEN`](states::roles::MAX_ROLE_NAME_LEN).
     ///
     /// # Checks
-    /// - The [`authority`](EnableRole::authority) must be the `ADMIN` of the store.
+    /// - The [`authority`](EnableRole::authority) must be a signer and be
+    /// the `ADMIN` of the store.
     /// - The [`store`](EnableRole::store) must have been initialized.
-    ///
-    /// *[See also the documentation for the accounts.](EnableRole).*
     #[access_control(internal::Authenticate::only_admin(&ctx))]
     pub fn enable_role(ctx: Context<EnableRole>, role: String) -> Result<()> {
         instructions::unchecked_enable_role(ctx, role)
@@ -313,14 +332,16 @@ pub mod gmsol_store {
     /// Disable an existing role for the given store.
     /// It has no effect if this role does not exist in the store.
     ///
+    /// # Accounts
+    /// *[See the documentation for the accounts.](DisableRole).*
+    ///
     /// # Arguments
     /// - `role`: The name of the role to be disabled.
     ///
     /// # Checks
-    /// - The [`authority`](DisableRole::authority) must be the `ADMIN` of the store.
+    /// - The [`authority`](DisableRole::authority) must be a signer and be
+    /// the `ADMIN` of the store.
     /// - The [`store`](DisableRole::store) must have been initialized.
-    ///
-    /// *[See also the documentation for the accounts.](DisableRole).*
     #[access_control(internal::Authenticate::only_admin(&ctx))]
     pub fn disable_role(ctx: Context<DisableRole>, role: String) -> Result<()> {
         instructions::unchecked_disable_role(ctx, role)
@@ -328,16 +349,18 @@ pub mod gmsol_store {
 
     /// Grant a role to the given user in the given store.
     ///
+    /// # Accounts
+    /// *[See the documentation for the accounts.](GrantRole).*
+    ///
     /// # Arguments
     /// - `user`: The user to whom the role is to be granted.
     /// - `role`: The role to be granted to the user.
     ///
     /// # Checks
-    /// - The [`authority`](GrantRole::authority) must be the `ADMIN` of the store.
+    /// - The [`authority`](GrantRole::authority) must be a signer and
+    /// be the `ADMIN` of the store.
     /// - The [`store`](GrantRole::store) must have been initialized.
     /// - The `role` must exist and be enabled in the store.
-    ///
-    /// *[See also the documentation for the accounts.](GrantRole).*
     #[access_control(internal::Authenticate::only_admin(&ctx))]
     pub fn grant_role(ctx: Context<GrantRole>, user: Pubkey, role: String) -> Result<()> {
         instructions::unchecked_grant_role(ctx, user, role)
@@ -345,17 +368,19 @@ pub mod gmsol_store {
 
     /// Revoke a role from the given user in the given store.
     ///
+    /// # Accounts
+    /// *[See the documentation for the accounts.](RevokeRole).*
+    ///
     /// # Arguments
     /// - `user`: The user to whom the role is to be revoked.
     /// - `role`: The role to be revoked from the user.
     ///
     /// # Checks
-    /// - The [`authority`](RevokeRole::authority) must be the `ADMIN` of the store.
+    /// - The [`authority`](RevokeRole::authority) must be a signer and be
+    /// the `ADMIN` of the store.
     /// - The [`store`](RevokeRole::store) must have been initialized.
     /// - The `user` must exist in the member table.
     /// - The `role` must exist and be enabled in the store.
-    ///
-    /// *[See also the documentation for the accounts.](RevokeRole).*
     #[access_control(internal::Authenticate::only_admin(&ctx))]
     pub fn revoke_role(ctx: Context<RevokeRole>, user: Pubkey, role: String) -> Result<()> {
         instructions::unchecked_revoke_role(ctx, user, role)
