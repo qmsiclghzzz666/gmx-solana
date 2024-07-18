@@ -4,6 +4,10 @@ pub mod pda;
 /// GMSOL Client.
 pub mod client;
 
+/// GMSOL resource discovery.
+#[cfg(feature = "discover")]
+pub mod discover;
+
 /// Error type for `gmsol`.
 pub mod error;
 
@@ -30,6 +34,10 @@ pub mod constants {
     pub use gmsol_exchange::constants::*;
     pub use gmsol_store::constants::*;
 }
+
+/// Test Utils.
+#[cfg(test)]
+mod test;
 
 pub use client::{Client, ClientOptions};
 pub use error::Error;

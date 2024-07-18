@@ -39,6 +39,13 @@ pyth-pull-oracle = [
 rust-embed = ["dep:rust-embed"]
 poem = ["dep:poem"]
 doc = ["gmsol-store/doc", "cli"]
+discover = [
+    "tower/discover",
+    "tokio/sync",
+    "tokio/time",
+    "tokio-stream/sync",
+    "pin-project-lite",
+]
 
 [dependencies]
 gmsol-utils = { workspace = true }
@@ -103,6 +110,11 @@ pyth-solana-receiver-sdk = { workspace = true, optional = true }
 anchor-syn = { workspace = true, optional = true }
 heck = { workspace = true, optional = true }
 byteorder = { workspace = true, optional = true }
+
+# Dependencies for `discorver` feature
+tower = { workspace = true, optional = true }
+tokio-stream = { workspace = true, optional = true }
+pin-project-lite = { workspace = true, optional = true }
 
 [[example]]
 name = "hermes"

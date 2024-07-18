@@ -1944,6 +1944,7 @@ dependencies = [
  "humantime",
  "indexmap 2.2.6",
  "num-format",
+ "pin-project-lite",
  "poem",
  "prettytable",
  "pyth-sdk",
@@ -1964,7 +1965,9 @@ dependencies = [
  "thiserror",
  "time",
  "tokio",
+ "tokio-stream",
  "toml 0.8.14",
+ "tower",
  "tracing",
  "tracing-subscriber",
  "typed-builder",
@@ -5995,6 +5998,7 @@ dependencies = [
  "futures-core",
  "pin-project-lite",
  "tokio",
+ "tokio-util",
 ]
 
 [[package]]
@@ -6103,6 +6107,7 @@ dependencies = [
  "tokio",
  "tower-layer",
  "tower-service",
+ "tracing",
 ]
 
 [[package]]

@@ -8,6 +8,11 @@ pub use gmsol_store::states::market::find_market_address;
 
 use crate::utils::EVENT_AUTHORITY_SEED;
 
+/// Default store.
+pub fn find_default_store() -> (Pubkey, u8) {
+    find_store_address("", &gmsol_store::ID)
+}
+
 /// Find PDA for `event_authority` account.
 pub fn find_event_authority_address(program_id: &Pubkey) -> (Pubkey, u8) {
     Pubkey::find_program_address(&[EVENT_AUTHORITY_SEED], program_id)
