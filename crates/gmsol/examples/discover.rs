@@ -1,6 +1,9 @@
 use anchor_client::Cluster;
 use futures_util::future::poll_fn;
-use gmsol::discover::{market::MarketDiscovery, token::TokenDiscovery};
+use gmsol::{
+    discover::{market::MarketDiscovery, token::TokenDiscovery},
+    pda::find_default_store,
+};
 use tower::discover::Discover;
 
 #[tokio::main]
@@ -13,7 +16,13 @@ async fn main() -> eyre::Result<()> {
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .init();
 
-    let markets = MarketDiscovery::new(Cluster::Devnet)?;
+    let store = std::env::var("STORE")
+        .ok()
+        .map(|store| store.parse())
+        .transpose()?
+        .unwrap_or(find_default_store().0);
+
+    let markets = MarketDiscovery::new_with_store(Cluster::Devnet, store)?;
     let tokens = TokenDiscovery::new(markets);
 
     futures_util::pin_mut!(tokens);
