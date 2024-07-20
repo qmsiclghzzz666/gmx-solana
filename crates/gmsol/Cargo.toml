@@ -8,6 +8,14 @@ name = "gmsol"
 path = "src/cli/main.rs"
 required-features = ["cli"]
 
+[[example]]
+name = "hermes"
+required-features = ["pyth-pull-oracle", "cli"]
+
+[[example]]
+name = "discover"
+required-features = ["discover", "cli"]
+
 [features]
 cli = [
     "pyth-pull-oracle",
@@ -113,7 +121,3 @@ byteorder = { workspace = true, optional = true }
 tower = { workspace = true, optional = true }
 tokio-stream = { workspace = true, optional = true }
 pin-project-lite = { workspace = true, optional = true }
-
-[[example]]
-name = "hermes"
-required-features = ["pyth-pull-oracle", "cli"]

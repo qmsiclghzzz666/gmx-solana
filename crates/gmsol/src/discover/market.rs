@@ -140,7 +140,7 @@ impl Stream for MarketDiscovery {
                     changes.push(Change::Remove(*pubkey));
                 }
             }
-            tracing::info!(len = %changes.len(), "updated");
+            tracing::debug!(len = %changes.len(), "updated");
             *this.cache = markets;
             *this.changes = changes.into_iter();
         }
