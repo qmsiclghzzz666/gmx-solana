@@ -50,6 +50,16 @@ impl<T> WithContext<T> {
         self.value
     }
 
+    /// Get a refercne to the value.
+    pub fn value(&self) -> &T {
+        &self.value
+    }
+
+    /// Get a mutable reference to the value.
+    pub fn value_mut(&mut self) -> &mut T {
+        &mut self.value
+    }
+
     /// Get response slot.
     pub fn slot(&self) -> u64 {
         self.context.slot

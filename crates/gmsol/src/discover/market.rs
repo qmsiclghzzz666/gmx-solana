@@ -22,6 +22,7 @@ use crate::{
     Client, ClientOptions,
 };
 
+pub(crate) type MarketSvc = types::MarketMeta;
 type SharedMarket = Arc<types::Market>;
 type Cache = HashMap<Pubkey, SharedMarket>;
 
@@ -32,7 +33,7 @@ pin_project_lite::pin_project! {
         stream: WatchStream<Cache>,
         sender: watch::Sender<Cache>,
         cache: Cache,
-        changes: std::vec::IntoIter<Change<Pubkey, types::MarketMeta>>,
+        changes: std::vec::IntoIter<Change<Pubkey, MarketSvc>>,
     }
 }
 
@@ -54,7 +55,7 @@ impl Clone for MarketDiscovery {
 }
 
 impl MarketDiscovery {
-    /// Create a new marekt discovery service for the default store.
+    /// Create a new market discovery service for the default store.
     pub fn new(cluster: Cluster) -> crate::Result<Self> {
         Self::new_with_store(cluster, find_default_store().0)
     }
@@ -108,13 +109,13 @@ impl MarketDiscovery {
             sender,
             stream: WatchStream::new(receiver),
             cache: Cache::default(),
-            changes: Vec::new().into_iter(),
+            changes: Default::default(),
         })
     }
 }
 
 impl Stream for MarketDiscovery {
-    type Item = crate::Result<Change<Pubkey, types::MarketMeta>>;
+    type Item = crate::Result<Change<Pubkey, MarketSvc>>;
 
     fn poll_next(
         self: std::pin::Pin<&mut Self>,
@@ -175,7 +176,8 @@ impl Watcher {
     async fn fetch_once(
         &self,
     ) -> crate::Result<WithContext<BTreeMap<Pubkey, gmsol_store::states::Market>>> {
-        self.client
+        let mut markets = self
+            .client
             .markets_with_config(
                 &self.store,
                 ProgramAccountsConfig {
@@ -183,7 +185,9 @@ impl Watcher {
                     ..Default::default()
                 },
             )
-            .await
+            .await?;
+        markets.value_mut().retain(|_pubkey, m| m.is_enabled());
+        Ok(markets)
     }
 }
 
