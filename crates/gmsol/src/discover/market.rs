@@ -30,8 +30,26 @@ pin_project_lite::pin_project! {
     pub struct MarketDiscovery {
         #[pin]
         stream: WatchStream<Cache>,
+        sender: watch::Sender<Cache>,
         cache: Cache,
         changes: std::vec::IntoIter<Change<Pubkey, types::MarketMeta>>,
+    }
+}
+
+impl Clone for MarketDiscovery {
+    fn clone(&self) -> Self {
+        let mut receiver = self.sender.subscribe();
+        let changes = receiver
+            .borrow_and_update()
+            .iter()
+            .map(|(pubkey, m)| Change::Insert(*pubkey, *m.meta()))
+            .collect::<Vec<_>>();
+        Self {
+            stream: WatchStream::new(receiver),
+            sender: self.sender.clone(),
+            cache: HashMap::default(),
+            changes: changes.into_iter(),
+        }
     }
 }
 
@@ -65,7 +83,7 @@ impl MarketDiscovery {
             store,
             interval,
             client,
-            sender,
+            sender: sender.clone(),
         };
 
         let worker = watcher
@@ -87,6 +105,7 @@ impl MarketDiscovery {
         );
 
         Ok(Self {
+            sender,
             stream: WatchStream::new(receiver),
             cache: Cache::default(),
             changes: Vec::new().into_iter(),
@@ -171,25 +190,32 @@ impl Watcher {
 #[cfg(test)]
 mod tests {
     use futures_util::{future::poll_fn, pin_mut};
+    use tokio::time::timeout;
     use tower::discover::Discover;
-    use tracing::level_filters::LevelFilter;
-    use tracing_subscriber::EnvFilter;
 
     use super::*;
 
+    const TIMEOUT: Duration = Duration::from_secs(10);
+
     #[tokio::test]
     async fn test_market_discover() -> eyre::Result<()> {
-        tracing_subscriber::fmt()
-            .with_env_filter(
-                EnvFilter::builder()
-                    .with_default_directive(LevelFilter::DEBUG.into())
-                    .from_env_lossy(),
-            )
-            .init();
+        let _guard = crate::test::setup_fmt_tracing("info,gmsol::discover=debug");
         let markets = MarketDiscovery::new(crate::test::default_cluster())?;
 
         pin_mut!(markets);
-        if let Some(Ok(change)) = poll_fn(|cx| markets.as_mut().poll_discover(cx)).await {
+        if let Some(Ok(change)) =
+            timeout(TIMEOUT, poll_fn(|cx| markets.as_mut().poll_discover(cx))).await?
+        {
+            tracing::info!("{change:?}");
+        }
+        let cloned_markets = markets.clone();
+        pin_mut!(cloned_markets);
+        if let Some(Ok(change)) = timeout(
+            TIMEOUT,
+            poll_fn(|cx| cloned_markets.as_mut().poll_discover(cx)),
+        )
+        .await?
+        {
             tracing::info!("{change:?}");
         }
         Ok(())
