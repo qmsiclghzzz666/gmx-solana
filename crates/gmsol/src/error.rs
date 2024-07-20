@@ -53,7 +53,6 @@ pub enum Error {
     #[error("sse: {0}")]
     Sse(#[from] eventsource_stream::EventStreamError<reqwest::Error>),
     /// JSON error.
-    #[cfg(feature = "serde_json")]
     #[error("json: {0}")]
     Json(#[from] serde_json::Error),
 }

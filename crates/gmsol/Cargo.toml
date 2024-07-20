@@ -29,8 +29,6 @@ devnet = ["gmsol-store/devnet", "gmsol-exchange/devnet"]
 pyth-pull-oracle = [
     "reqwest/stream",
     "url",
-    "serde",
-    "serde_json",
     "eventsource-stream",
     "pythnet-sdk",
     "pyth-solana-receiver-sdk",
@@ -86,6 +84,8 @@ poem = { workspace = true, optional = true }
 indexmap = { workspace = true, features = ["serde"] }
 time = { workspace = true }
 solana-account-decoder = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
 
 # Dependencies for cli
 clap = { workspace = true, optional = true, features = ["derive", "env"] }
@@ -102,8 +102,6 @@ prettytable = { workspace = true, optional = true }
 # Dependencies for pyth support
 reqwest = { workspace = true, optional = true, features = ["json"] }
 url = { workspace = true, optional = true }
-serde_json = { workspace = true, optional = true }
-serde = { workspace = true, optional = true, features = ["derive"] }
 eventsource-stream = { workspace = true, optional = true }
 pythnet-sdk = { workspace = true, optional = true }
 pyth-solana-receiver-sdk = { workspace = true, optional = true }
