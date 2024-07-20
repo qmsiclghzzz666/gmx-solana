@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, ops::Deref};
+use std::{collections::BTreeMap, ops::Deref, sync::Arc};
 
 use anchor_client::{
     anchor_lang::{AccountDeserialize, Discriminator},
@@ -41,7 +41,7 @@ impl Default for ClientOptions {
 /// GMSOL Client.
 pub struct Client<C> {
     wallet: C,
-    anchor: anchor_client::Client<C>,
+    anchor: Arc<anchor_client::Client<C>>,
     data_store: Program<C>,
     exchange: Program<C>,
 }
@@ -63,13 +63,23 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
             wallet: payer,
             data_store: anchor.program(data_store_program_id.unwrap_or(gmsol_store::id()))?,
             exchange: anchor.program(exchange_program_id.unwrap_or(gmsol_exchange::id()))?,
-            anchor,
+            anchor: Arc::new(anchor),
         })
     }
 
     /// Create a new [`Client`] with default options.
     pub fn new(cluster: Cluster, payer: C) -> crate::Result<Self> {
         Self::new_with_options(cluster, payer, ClientOptions::default())
+    }
+
+    /// Try to clone the client.
+    pub fn try_clone(&self) -> crate::Result<Self> {
+        Ok(Self {
+            wallet: self.wallet.clone(),
+            anchor: self.anchor.clone(),
+            data_store: self.anchor.program(self.data_store_program_id())?,
+            exchange: self.anchor.program(self.exchange_program_id())?,
+        })
     }
 
     /// Get anchor client.

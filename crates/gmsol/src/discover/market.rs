@@ -60,25 +60,22 @@ impl MarketDiscovery {
         Self::new_with_store(cluster, find_default_store().0)
     }
 
-    /// Create a new market discovery service for the given store with default options.
+    /// Create a new market discovery service for the given store with default [`Client`] and options.
     pub fn new_with_store(cluster: Cluster, store: Pubkey) -> crate::Result<Self> {
-        Self::new_with_options(
+        let client = Client::new_with_options(
             cluster,
-            store,
-            Duration::from_secs(30),
+            shared_signer(Keypair::new()),
             ClientOptions::default(),
-        )
+        )?;
+        Self::new_with_options(client, store, Duration::from_secs(30))
     }
 
-    /// Create a new market discovery service with [`ClientOptions`].
+    /// Create a new market discovery service with options.
     pub fn new_with_options(
-        cluster: Cluster,
+        client: Client<SignerRef>,
         store: Pubkey,
         interval: Duration,
-        client_options: ClientOptions,
     ) -> crate::Result<Self> {
-        let client =
-            Client::new_with_options(cluster, shared_signer(Keypair::new()), client_options)?;
         let (sender, receiver) = watch::channel(Cache::default());
         let watcher = Watcher {
             store,
