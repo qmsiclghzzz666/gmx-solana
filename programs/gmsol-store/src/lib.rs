@@ -34,7 +34,7 @@
 //! Next we will introduce the data accounts defined in the Store Program and the instrucionts for
 //! operating them one by one.
 //!
-//! ### Store Account
+//! ## Store Account
 //! A [`Store`](states::Store) Account serves as both an authority and a global configuration
 //! storage.
 //!
@@ -106,7 +106,7 @@
 //! - [`initialize`](gmsol_store::initialize): Create a new [`Store`](states::Store) account.
 //! - [`transfer_store_authority`]: Transfer the authority of the given store to a new authority.
 //!
-//! ### Role-based Permission Management
+//! ## Role-based Permission Management
 //!
 //! The complete role-based permission table for each GMSOL deployment is directly stored in the
 //! [`Store`](states::Store) Account of that deployment. The current permission structure in GMSOL includes:
@@ -186,6 +186,44 @@
 //! or not.
 //! - [`has_role`](gmsol_store::has_role): Return whether the given address has the given role in the given store,
 //! or not.
+//!
+//! ## Oracle Price Management
+//! In GMSOL, market-related actions such as deposit and order require the latest prices from the oracle to be executed.
+//! The process of providing oracle prices is primarily defined and implemented in the Exchange Program.
+//! However, for the sake of completeness, we will briefly outline the process here:
+//!
+//! 1. When executing an action creation instruction, the Exchange Program analyzes the required token prices and writes
+//! the list of tokens needing prices, along with relevant information, into the action's account for Order Keepers to use.
+//!
+//! 2. Order Keepers prepare Feed Accounts that store the required price information for these tokens based on the
+//! requirements in the action account. These accounts are generally owned by the selected Price Oracle Program,
+//! ensuring their correctness. These Feed Accounts are then added to the accounts list of the action execution instruction.
+//!
+//! 3. When executing the action execution instruction, the Exchange Program parses and verifies the price information
+//! provided in the Feed Accounts using instructions provided by the Store Program. This verified information is then
+//! written into the [`Oracle`](states::Oracle) Account of the Store Program for subsequent operations.
+//! The Oracle Account must be empty before the action execution and needs to be cleared after the action is completed.
+//!
+//! The token price-related information mentioned in step one (such as the expected price provider and feed ID) is stored
+//! in the [`TokenMap`](states::TokenMap) account of the Store Program. The [`TokenMap`](states::TokenMap),
+//! the [`Oracle`](states::Oracle) account mentioned in step three, and their related instructions are the main contents
+//! introduced in this section.
+//!
+//! #### Defining token configs in [`TokenMap`](states::TokenMap) accounts
+//!
+//! *TODO*
+//!
+//! #### Saving prices to [`Oracle`](states::Oracle) accounts
+//!
+//! *TODO*
+//!
+//! ### Instructions for [`TokenMap`](states::TokenMap) accounts
+//!
+//! *TODO*
+//!
+//! ### Instructions for [`Oracle`](states::Oracle) accounts
+//!
+//! *TODO*
 
 /// Instructions.
 pub mod instructions;
