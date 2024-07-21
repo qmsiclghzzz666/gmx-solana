@@ -270,7 +270,8 @@ pub mod gmsol_store {
     /// # Checks
     /// - The [`authority`](TransferStoreAuthority::authority) must be a signer
     /// and be the `ADMIN` of the store.
-    /// - The [`store`](TransferStoreAuthority::store) must have been initialized.
+    /// - The [`store`](TransferStoreAuthority::store) must have been initialized
+    /// and owned by the store program.
     #[access_control(internal::Authenticate::only_admin(&ctx))]
     pub fn transfer_store_authority(
         ctx: Context<TransferStoreAuthority>,
@@ -291,22 +292,66 @@ pub mod gmsol_store {
     // Roles.
     /// Check that the signer is the admin of the given store, throw error if
     /// the check fails.
+    ///
+    /// # Accounts
+    /// *[See the documentation for the accounts.](CheckRole).*
+    ///
+    /// # Checks
+    /// - The [`authority`](CheckRole::authority) must be a signer and be
+    /// the `ADMIN` of the store.
+    /// - The [`store`](CheckRole::store) must have been initialized
+    /// and owned by the store program.
     pub fn check_admin(ctx: Context<CheckRole>) -> Result<bool> {
         instructions::check_admin(ctx)
     }
 
     /// Check that the signer has the given role in the given store, throw
     /// error if the check fails.
+    ///
+    /// # Accounts
+    /// *[See the documentation for the accounts.](CheckRole).*
+    ///
+    /// # Arguments
+    /// - `role`: The name of the role to be checked.
+    ///
+    /// # Checks
+    /// - The [`authority`](CheckRole::authority) must be a signer and
+    /// must be a member with the `role` role in the store.
+    /// - The [`store`](CheckRole::store) must have been initialized
+    /// and owned by the store program.
+    /// - The `role` must exist and be enabled in the store.
     pub fn check_role(ctx: Context<CheckRole>, role: String) -> Result<bool> {
         instructions::check_role(ctx, role)
     }
 
     /// Return whether the given address is the admin of the given store, or not.
+    ///
+    /// # Accounts
+    /// *[See the documentation for the accounts.](HasRole).*
+    ///
+    /// # Arguments
+    /// - `authority`: The address to check for admin privileges.
+    ///
+    /// # Checks
+    /// - The [`store`](HasRole::store) must have been initialized
+    /// and owned by the store program.
     pub fn has_admin(ctx: Context<HasRole>, authority: Pubkey) -> Result<bool> {
         instructions::has_admin(ctx, authority)
     }
 
     /// Return whether the given address has the given role in the given store, or not.
+    ///
+    /// # Accounts
+    /// *[See the documentation for the accounts.](HasRole).*
+    ///
+    /// # Arguments
+    /// - `authority`: The address to check for the role.
+    /// - `role`: The role to be checked.
+    ///
+    /// # Checks
+    /// - The [`store`](HasRole::store) must have been initialized
+    /// and owned by the store program.
+    /// - The `role` must exist and be enabled in the store.
     pub fn has_role(ctx: Context<HasRole>, authority: Pubkey, role: String) -> Result<bool> {
         instructions::has_role(ctx, authority, role)
     }
@@ -323,7 +368,8 @@ pub mod gmsol_store {
     /// # Checks
     /// - The [`authority`](EnableRole::authority) must be a signer and be
     /// the `ADMIN` of the store.
-    /// - The [`store`](EnableRole::store) must have been initialized.
+    /// - The [`store`](EnableRole::store) must have been initialized
+    /// and owned by the store program.
     #[access_control(internal::Authenticate::only_admin(&ctx))]
     pub fn enable_role(ctx: Context<EnableRole>, role: String) -> Result<()> {
         instructions::unchecked_enable_role(ctx, role)
@@ -341,7 +387,8 @@ pub mod gmsol_store {
     /// # Checks
     /// - The [`authority`](DisableRole::authority) must be a signer and be
     /// the `ADMIN` of the store.
-    /// - The [`store`](DisableRole::store) must have been initialized.
+    /// - The [`store`](DisableRole::store) must have been initialized
+    /// and owned by the store program.
     #[access_control(internal::Authenticate::only_admin(&ctx))]
     pub fn disable_role(ctx: Context<DisableRole>, role: String) -> Result<()> {
         instructions::unchecked_disable_role(ctx, role)
@@ -359,7 +406,8 @@ pub mod gmsol_store {
     /// # Checks
     /// - The [`authority`](GrantRole::authority) must be a signer and
     /// be the `ADMIN` of the store.
-    /// - The [`store`](GrantRole::store) must have been initialized.
+    /// - The [`store`](GrantRole::store) must have been initialized
+    /// and owned by the store program.
     /// - The `role` must exist and be enabled in the store.
     #[access_control(internal::Authenticate::only_admin(&ctx))]
     pub fn grant_role(ctx: Context<GrantRole>, user: Pubkey, role: String) -> Result<()> {
@@ -378,7 +426,8 @@ pub mod gmsol_store {
     /// # Checks
     /// - The [`authority`](RevokeRole::authority) must be a signer and be
     /// the `ADMIN` of the store.
-    /// - The [`store`](RevokeRole::store) must have been initialized.
+    /// - The [`store`](RevokeRole::store) must have been initialized
+    /// and owned by the store program.
     /// - The `user` must exist in the member table.
     /// - The `role` must exist and be enabled in the store.
     #[access_control(internal::Authenticate::only_admin(&ctx))]

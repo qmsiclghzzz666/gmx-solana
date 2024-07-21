@@ -2,14 +2,18 @@ use anchor_lang::prelude::*;
 
 use crate::{states::Store, utils::internal};
 
+/// The accounts definition for [`check_admin`](crate::gmsol_store::check_admin)
+/// and [`check_role`](crate::gmsol_store::check_role).
 #[derive(Accounts)]
 pub struct CheckRole<'info> {
+    /// The address to check for the role.
     pub authority: Signer<'info>,
+    /// The store account in which the role is defined.
     pub store: AccountLoader<'info, Store>,
 }
 
 /// Verify that the `authority` has the given role in the given `store`.
-pub fn check_role(ctx: Context<CheckRole>, role: String) -> Result<bool> {
+pub(crate) fn check_role(ctx: Context<CheckRole>, role: String) -> Result<bool> {
     ctx.accounts
         .store
         .load()?
@@ -17,7 +21,7 @@ pub fn check_role(ctx: Context<CheckRole>, role: String) -> Result<bool> {
 }
 
 /// Verify that the `user` is an admin of the given `store`.
-pub fn check_admin(ctx: Context<CheckRole>) -> Result<bool> {
+pub(crate) fn check_admin(ctx: Context<CheckRole>) -> Result<bool> {
     Ok(ctx
         .accounts
         .store
@@ -25,8 +29,11 @@ pub fn check_admin(ctx: Context<CheckRole>) -> Result<bool> {
         .is_authority(ctx.accounts.authority.key))
 }
 
+/// The accounts definition for [`has_admin`](crate::gmsol_store::has_admin)
+/// and [`has_role`](crate::gmsol_store::has_role).
 #[derive(Accounts)]
 pub struct HasRole<'info> {
+    /// The store account in which the role is defined.
     pub store: AccountLoader<'info, Store>,
 }
 
