@@ -121,3 +121,6 @@ byteorder = { workspace = true, optional = true }
 tower = { workspace = true, optional = true }
 tokio-stream = { workspace = true, optional = true }
 pin-project-lite = { workspace = true, optional = true }
+
+[dev-dependencies]
+tracing-subscriber = { workspace = true, features = ["env-filter"] }

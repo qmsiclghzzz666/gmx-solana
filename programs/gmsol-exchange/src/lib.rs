@@ -108,6 +108,21 @@ pub mod gmsol_exchange {
             cancel_on_execution_error,
         )
     }
+
+    /// Cancel an order.
+    ///
+    /// # Accounts
+    /// *[See the documentation for the accounts.](CancelOrder)*
+    ///
+    /// # Checks
+    /// - The [`user`](CancelOrder::user) must be a signer and the owner of the
+    /// order.
+    /// - The [`controller`](CancelOrder::controller) must be derived for the
+    /// `store`.
+    /// - *[See also the checks done by the `remove_order` instruction.](gmsol_store::gmsol_store::remove_order)*
+    pub fn cancel_order(ctx: Context<CancelOrder>) -> Result<()> {
+        instructions::cancel_order(ctx)
+    }
 }
 
 /// Errors of market program.

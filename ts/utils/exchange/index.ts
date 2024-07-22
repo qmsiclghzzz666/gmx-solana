@@ -860,21 +860,21 @@ export const initializeMarkets = async (signer: Keypair, dataStoreAddress: Publi
             store: dataStoreAddress,
             marketToken: GMFakeFakeUsdG,
             key: "swap_impact_exponent",
-            value: 200_000_000_000_000_000_000n,
+            value: 100_000_000_000_000_000_000n,
         });
         await invokeUpdateMarketConfig(storeProgram, {
             authority: signer,
             store: dataStoreAddress,
             marketToken: GMFakeFakeUsdG,
             key: "swap_impact_positive_factor",
-            value: 50_000_000_000_000n,
+            value: 25_000_000_000_000n,
         });
         await invokeUpdateMarketConfig(storeProgram, {
             authority: signer,
             store: dataStoreAddress,
             marketToken: GMFakeFakeUsdG,
             key: "swap_impact_negative_factor",
-            value: 100_000_000_000_000n,
+            value: 50_000_000_000_000n,
         });
         await invokeUpdateMarketConfig(storeProgram, {
             authority: signer,
