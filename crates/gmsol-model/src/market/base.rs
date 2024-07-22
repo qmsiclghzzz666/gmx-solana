@@ -1,7 +1,7 @@
 use crate::{
     action::Prices,
     fixed::FixedPointOps,
-    num::{MulDiv, Num, UnsignedAbs},
+    num::{MulDiv, Num, Unsigned, UnsignedAbs},
     pool::{balance::Merged, Balance, BalanceExt, Pool},
     PoolExt,
 };
@@ -188,7 +188,6 @@ pub trait BaseMarketExt<const DECIMALS: u8>: BaseMarket<DECIMALS> {
         is_long: bool,
         _maximize: bool,
     ) -> crate::Result<Self::Signed> {
-        use crate::num::Unsigned;
         use num_traits::CheckedMul;
 
         let open_interest = self.open_interest()?.amount(is_long)?;
@@ -214,6 +213,30 @@ pub trait BaseMarketExt<const DECIMALS: u8>: BaseMarket<DECIMALS> {
                 .to_signed()?
                 .checked_sub(&open_interest_value.to_signed()?)
                 .ok_or(crate::Error::Computation("calculating pnl for short"))
+        }
+    }
+
+    /// Cap pnl with max pnl factor.
+    fn cap_pnl(
+        &self,
+        prices: &Prices<Self::Num>,
+        is_long: bool,
+        pnl: &Self::Signed,
+        kind: PnlFactorKind,
+    ) -> crate::Result<Self::Signed> {
+        if pnl.is_positive() {
+            let max_pnl_factor = self.max_pnl_factor(kind, is_long)?;
+            let pool_value = self.pool_value_for_one_side(prices, is_long, false)?;
+            let max_pnl = crate::utils::apply_factor(&pool_value, &max_pnl_factor)
+                .ok_or(crate::Error::Computation("calculating max pnl"))?
+                .to_signed()?;
+            if *pnl > max_pnl {
+                Ok(max_pnl)
+            } else {
+                Ok(pnl.clone())
+            }
+        } else {
+            Ok(pnl.clone())
         }
     }
 
@@ -367,4 +390,8 @@ pub enum PnlFactorKind {
     Deposit,
     /// For withdrawal.
     Withdrawal,
+    /// For trader.
+    Trader,
+    /// For ADL.
+    ADL,
 }
