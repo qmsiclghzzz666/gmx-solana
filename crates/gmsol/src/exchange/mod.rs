@@ -18,6 +18,7 @@ use gmsol_store::states::{
     order::{OrderKind, OrderParams},
     NonceBytes,
 };
+use order::CancelOrderBuilder;
 use rand::{distributions::Standard, Rng};
 
 use crate::utils::RpcBuilder;
@@ -98,6 +99,9 @@ pub trait ExchangeOps<C> {
         order: &Pubkey,
         cancel_on_execution_error: bool,
     ) -> crate::Result<ExecuteOrderBuilder<C>>;
+
+    /// Cancel an order.
+    fn cancel_order(&self, order: &Pubkey) -> crate::Result<CancelOrderBuilder<C>>;
 
     /// Create a market increase position order.
     fn market_increase(
@@ -308,6 +312,10 @@ where
         cancel_on_execution_error: bool,
     ) -> crate::Result<ExecuteOrderBuilder<C>> {
         ExecuteOrderBuilder::try_new(self, store, oracle, order, cancel_on_execution_error)
+    }
+
+    fn cancel_order(&self, order: &Pubkey) -> crate::Result<CancelOrderBuilder<C>> {
+        Ok(CancelOrderBuilder::new(self, order))
     }
 }
 

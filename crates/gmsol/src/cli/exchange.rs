@@ -101,6 +101,11 @@ enum Command {
         /// The address of the withdrawal to cancel.
         withdrawal: Pubkey,
     },
+    /// Cancel an order.
+    CancelOrder {
+        /// The address of the order to cancel.
+        order: Pubkey,
+    },
     /// Create a market increase order.
     MarketIncrease {
         /// The address of the market token of the position's market.
@@ -306,6 +311,17 @@ impl ExchangeArgs {
                     .send()
                     .await?;
                 tracing::info!(%withdrawal, "cancelled withdrawal at tx {signature}");
+                println!("{signature}");
+            }
+            Command::CancelOrder { order } => {
+                let signature = client
+                    .cancel_order(order)?
+                    .build()
+                    .await?
+                    .build()
+                    .send()
+                    .await?;
+                tracing::info!(%order, "cancelled order at tx {signature}");
                 println!("{signature}");
             }
             Command::MarketIncrease {

@@ -15,7 +15,7 @@ use gmsol_store::states::{
 
 use crate::{
     store::utils::{read_market, read_store, FeedsParser},
-    utils::{ComputeBudget, TokenAccountParams, TransactionBuilder},
+    utils::{ComputeBudget, RpcBuilder, TokenAccountParams, TransactionBuilder},
 };
 
 use super::generate_nonce;
@@ -806,5 +806,102 @@ where
             .try_push(execute_order)?
             .try_push(post_builder)?;
         Ok(transaction_builder)
+    }
+}
+
+/// Cancel Order Builder.
+pub struct CancelOrderBuilder<'a, C> {
+    client: &'a crate::Client<C>,
+    order: Pubkey,
+    hint: Option<CancelOrderHint>,
+}
+
+#[derive(Clone, Copy)]
+struct CancelOrderHint {
+    store: Pubkey,
+    initial_collateral_token: Option<Pubkey>,
+    initial_collateral_token_account: Option<Pubkey>,
+    initial_market_token: Option<Pubkey>,
+}
+
+impl<'a> From<&'a Order> for CancelOrderHint {
+    fn from(order: &'a Order) -> Self {
+        let initial_collateral_token_account = order.fixed.senders.initial_collateral_token_account;
+        Self {
+            store: order.fixed.store,
+            initial_market_token: Some(
+                order
+                    .swap
+                    .first_market_token(true)
+                    .copied()
+                    .unwrap_or(order.fixed.tokens.market_token),
+            ),
+            initial_collateral_token_account,
+            initial_collateral_token: initial_collateral_token_account
+                .map(|_| order.fixed.tokens.initial_collateral_token),
+        }
+    }
+}
+
+impl<'a, S, C> CancelOrderBuilder<'a, C>
+where
+    C: Deref<Target = S> + Clone,
+    S: Signer,
+{
+    pub(super) fn new(client: &'a crate::Client<C>, order: &Pubkey) -> Self {
+        Self {
+            client,
+            order: *order,
+            hint: None,
+        }
+    }
+
+    /// Set hint with the given order.
+    pub fn hint(&mut self, order: &Order) -> &mut Self {
+        self.hint = Some(CancelOrderHint::from(order));
+        self
+    }
+
+    async fn prepare_hint(&mut self) -> crate::Result<CancelOrderHint> {
+        match &self.hint {
+            Some(hint) => Ok(*hint),
+            None => {
+                let order = self.client.order(&self.order).await?;
+                let hint: CancelOrderHint = (&order).into();
+                self.hint = Some(hint);
+                Ok(hint)
+            }
+        }
+    }
+
+    /// Build [`RpcBuilder`] for cancelling the order.
+    pub async fn build(&mut self) -> crate::Result<RpcBuilder<'a, C>> {
+        let hint = self.prepare_hint().await?;
+        Ok(self
+            .client
+            .exchange_rpc()
+            .accounts(crate::utils::fix_optional_account_metas(
+                accounts::CancelOrder {
+                    user: self.client.payer(),
+                    controller: self.client.controller_address(&hint.store),
+                    store: hint.store,
+                    event_authority: self.client.data_store_event_authority(),
+                    order: self.order,
+                    initial_market: hint
+                        .initial_market_token
+                        .as_ref()
+                        .map(|token| self.client.find_market_address(&hint.store, token)),
+                    initial_collateral_token_account: hint.initial_collateral_token_account,
+                    initial_collateral_token_vault: hint
+                        .initial_collateral_token
+                        .as_ref()
+                        .map(|token| self.client.find_market_vault_address(&hint.store, token)),
+                    store_program: self.client.data_store_program_id(),
+                    token_program: anchor_spl::token::ID,
+                    system_program: system_program::ID,
+                },
+                &gmsol_exchange::ID,
+                &self.client.exchange_program_id(),
+            )))
     }
 }
