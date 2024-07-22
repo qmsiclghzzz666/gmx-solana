@@ -321,6 +321,7 @@ impl<'info> ExecuteOrder<'info> {
                     matches!(kind, OrderKind::MarketIncrease),
                     position_loader.key(),
                     &*position_loader.load()?,
+                    self.order.key(),
                 )?;
                 let mut position = RevertiblePosition::new(market, position_loader)?;
 

@@ -171,6 +171,7 @@ impl std::fmt::Display for TradeEvent {
             .field("market_token", &self.market_token.to_string())
             .field("user", &self.user.to_string())
             .field("position", &self.position.to_string())
+            .field("order", &self.order.to_string())
             .field("ts", &self.ts)
             .field("slot", &self.slot)
             .field("is_long", &self.is_long)
@@ -215,6 +216,12 @@ pub struct TradeEventData {
         serde(with = "serde_with::As::<serde_with::DisplayFromStr>")
     )]
     pub position: Pubkey,
+    /// Order address.
+    #[cfg_attr(
+        feature = "serde",
+        serde(with = "serde_with::As::<serde_with::DisplayFromStr>")
+    )]
+    pub order: Pubkey,
     /// Trade ts.
     pub ts: i64,
     /// Trade slot.
@@ -314,6 +321,7 @@ impl TradeEvent {
         is_increase: bool,
         pubkey: Pubkey,
         position: &Position,
+        order: Pubkey,
     ) -> Result<Self> {
         let clock = Clock::get()?;
         Ok(Self(Box::new(TradeEventData {
@@ -322,6 +330,7 @@ impl TradeEvent {
             market_token: position.market_token,
             user: position.owner,
             position: pubkey,
+            order,
             ts: clock.unix_timestamp,
             slot: clock.slot,
             is_long: position.is_long()?,
