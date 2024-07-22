@@ -332,6 +332,7 @@ impl<'info> ExecuteOrder<'info> {
                             &mut position,
                             &mut swap_markets,
                             &mut transfer_out,
+                            &mut event,
                             &mut self.order,
                         )?;
                         false
@@ -342,6 +343,7 @@ impl<'info> ExecuteOrder<'info> {
                         &mut position,
                         &mut swap_markets,
                         &mut transfer_out,
+                        &mut event,
                         &mut self.order,
                         true,
                         true,
@@ -352,6 +354,7 @@ impl<'info> ExecuteOrder<'info> {
                         &mut position,
                         &mut swap_markets,
                         &mut transfer_out,
+                        &mut event,
                         &mut self.order,
                         false,
                         false,
@@ -359,6 +362,7 @@ impl<'info> ExecuteOrder<'info> {
                     _ => unreachable!(),
                 };
                 position.write_to_event(&mut event)?;
+                event.update_with_transfer_out(&transfer_out)?;
                 trade_event = Some(event);
                 position.commit();
                 msg!(
@@ -442,6 +446,7 @@ fn execute_increase_position(
     position: &mut RevertiblePosition<'_>,
     swap_markets: &mut SwapMarkets<'_>,
     transfer_out: &mut TransferOut,
+    event: &mut TradeEvent,
     order: &mut Order,
 ) -> Result<()> {
     let params = &order.fixed.params;
@@ -480,6 +485,7 @@ fn execute_increase_position(
             .map_err(ModelError::from)?;
         msg!("[Position] increased: {:?}", report);
         let (long_amount, short_amount) = report.claimable_funding_amounts();
+        event.update_with_increase_report(&report)?;
         (*long_amount, *short_amount)
     };
 
@@ -506,6 +512,7 @@ fn execute_decrease_position(
     position: &mut RevertiblePosition<'_>,
     swap_markets: &mut SwapMarkets<'_>,
     transfer_out: &mut TransferOut,
+    event: &mut TradeEvent,
     order: &mut Order,
     is_insolvent_close_allowed: bool,
     is_liquidation_order: bool,
@@ -528,6 +535,7 @@ fn execute_decrease_position(
             .and_then(|a| a.execute())
             .map_err(ModelError::from)?;
         msg!("[Position] decreased: {:?}", report);
+        event.update_with_decrease_report(&report)?;
         report
     };
     let should_remove_position = report.should_remove();

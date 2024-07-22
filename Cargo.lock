@@ -1990,6 +1990,7 @@ name = "gmsol-model"
 version = "0.1.0"
 dependencies = [
  "anchor-lang",
+ "borsh 0.10.3",
  "num-traits",
  "num_enum 0.7.2",
  "ruint",

@@ -1,9 +1,19 @@
 use std::ops::{Deref, DerefMut};
 
 use anchor_lang::prelude::*;
+use gmsol_model::{
+    action::{
+        decrease_position::DecreasePositionReport, increase_position::IncreasePositionReport,
+    },
+    params::fee::PositionFees,
+};
 
 use crate::{
-    states::{order::OrderKind, position::PositionState, Position},
+    states::{
+        order::{OrderKind, TransferOut},
+        position::PositionState,
+        Position,
+    },
     StoreError,
 };
 
@@ -168,16 +178,8 @@ impl std::fmt::Display for TradeEvent {
             .field("delta_collateral_amount", &self.delta_collateral_amount())
             .field("delta_size_in_usd", &self.delta_size_in_usd())
             .field("trade_cost", &self.trade_cost())
-            .field("borrowing_fee", &self.borrowing_fee())
-            .field("funding_fee", &self.funding_fee())
-            .field(
-                "claimable_funding_amount_for_long_token",
-                &self.claimable_funding_amount(true),
-            )
-            .field(
-                "claimable_funding_amount_for_short_token",
-                &self.claimable_funding_amount(false),
-            )
+            .field("transfer_out", &self.transfer_out)
+            .field("fees", &self.fees)
             .finish_non_exhaustive()
     }
 }
@@ -225,6 +227,10 @@ pub struct TradeEventData {
     pub before: PositionState,
     /// After state.
     pub after: PositionState,
+    /// Transfer out.
+    pub transfer_out: TransferOut,
+    /// Fees.
+    pub fees: PositionFees<u128>,
     /// Reserved.
     #[cfg_attr(feature = "serde", serde(skip, default = "default_reserved"))]
     reserved: [u8; 128],
@@ -322,15 +328,42 @@ impl TradeEvent {
             is_increase,
             before: position.state,
             after: position.state,
+            transfer_out: Default::default(),
+            fees: Default::default(),
             reserved: default_reserved(),
         })))
     }
 
-    /// Update.
-    pub(crate) fn update(&mut self, new_state: &PositionState) -> Result<()> {
+    /// Update with new position state.
+    pub(crate) fn update_with_state(&mut self, new_state: &PositionState) -> Result<()> {
         self.trade_id = new_state.trade_id;
         self.after = *new_state;
         self.validate()?;
+        Ok(())
+    }
+
+    /// Update with transfer out.
+    pub(crate) fn update_with_transfer_out(&mut self, transfer_out: &TransferOut) -> Result<()> {
+        self.transfer_out = transfer_out.clone();
+        self.transfer_out.executed = true;
+        Ok(())
+    }
+
+    /// Update with increase report.
+    pub(crate) fn update_with_increase_report(
+        &mut self,
+        report: &IncreasePositionReport<u128>,
+    ) -> Result<()> {
+        self.fees = *report.fees();
+        Ok(())
+    }
+
+    /// Update with decrease report.
+    pub(crate) fn update_with_decrease_report(
+        &mut self,
+        report: &DecreasePositionReport<u128>,
+    ) -> Result<()> {
+        self.fees = *report.fees();
         Ok(())
     }
 }
@@ -374,12 +407,6 @@ impl TradeEvent {
             .abs_diff(self.before.borrowing_factor)
     }
 
-    /// Borrowing fee.
-    pub fn borrowing_fee(&self) -> u128 {
-        self.delta_borrowing_factor()
-            .saturating_mul(self.before.size_in_usd)
-    }
-
     /// Delta funding fee amount per size.
     pub fn delta_funding_fee_amount_per_size(&self) -> u128 {
         self.after
@@ -404,11 +431,5 @@ impl TradeEvent {
                 .short_token_claimable_funding_amount_per_size
                 .abs_diff(self.before.short_token_claimable_funding_amount_per_size)
         }
-    }
-
-    /// Claimable funding amount.
-    pub fn claimable_funding_amount(&self, is_long_token: bool) -> u128 {
-        self.delta_claimable_funding_amount_per_size(is_long_token)
-            .saturating_mul(self.before.size_in_usd)
     }
 }

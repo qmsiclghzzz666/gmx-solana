@@ -167,6 +167,11 @@ pub enum FundingRateChangeType {
 
 /// Fees.
 #[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "anchor-lang",
+    derive(anchor_lang::AnchorDeserialize, anchor_lang::AnchorSerialize)
+)]
 pub struct Fees<T> {
     fee_receiver_amount: T,
     fee_amount_for_pool: T,
@@ -312,6 +317,11 @@ pub struct OrderFees<T> {
 }
 
 /// Borrowing Fee.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "anchor-lang",
+    derive(anchor_lang::AnchorDeserialize, anchor_lang::AnchorSerialize)
+)]
 #[derive(Debug, Clone, Copy)]
 pub struct BorrowingFee<T> {
     amount: T,
@@ -340,6 +350,11 @@ impl<T: Zero> Default for BorrowingFee<T> {
 }
 
 /// Funding Fees.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "anchor-lang",
+    derive(anchor_lang::AnchorDeserialize, anchor_lang::AnchorSerialize)
+)]
 #[derive(Debug, Clone, Copy, TypedBuilder)]
 pub struct FundingFees<T> {
     amount: T,
@@ -375,6 +390,11 @@ impl<T: Zero> Default for FundingFees<T> {
 }
 
 /// Position Fees.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "anchor-lang",
+    derive(anchor_lang::AnchorDeserialize, anchor_lang::AnchorSerialize)
+)]
 #[derive(Debug, Clone, Copy)]
 pub struct PositionFees<T> {
     base: Fees<T>,

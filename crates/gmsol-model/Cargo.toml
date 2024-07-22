@@ -6,7 +6,7 @@ edition.workspace = true
 [features]
 test = []
 u128 = ["ruint"]
-solana = ["anchor-lang"]
+solana = ["anchor-lang", "borsh"]
 strum = ["dep:strum"]
 serde = ["dep:serde"]
 
@@ -22,3 +22,4 @@ num_enum = { workspace = true }
 typed-builder = { workspace = true }
 strum = { workspace = true, optional = true }
 serde = { workspace = true, optional = true, features = ["derive"] }
+borsh = { workspace = true, optional = true }

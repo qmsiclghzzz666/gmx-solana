@@ -51,7 +51,7 @@ impl<'a> RevertiblePosition<'a> {
     }
 
     pub(crate) fn write_to_event(&self, event: &mut TradeEvent) -> Result<()> {
-        event.update(&self.state)
+        event.update_with_state(&self.state)
     }
 }
 
