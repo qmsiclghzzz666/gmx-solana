@@ -1,8 +1,11 @@
 use std::collections::BTreeMap;
 
-use anchor_client::solana_sdk::{native_token::lamports_to_sol, pubkey::Pubkey};
+use anchor_client::{
+    anchor_lang::{AnchorDeserialize, Discriminator},
+    solana_sdk::{native_token::lamports_to_sol, pubkey::Pubkey},
+};
 use gmsol::{
-    types::TokenMapAccess,
+    types::{self, TokenMapAccess},
     utils::{signed_value_to_decimal, unsigned_value_to_decimal},
 };
 use gmsol_model::{Balance, BalanceExt, ClockKind, PoolKind};
@@ -136,6 +139,13 @@ enum Command {
     EventAuthority,
     /// Generate Anchor Discriminator with the given name.
     Discriminator { name: String },
+    /// Event.
+    CpiEvent {
+        data: String,
+        /// Output format.
+        #[arg(long, short)]
+        output: Option<Output>,
+    },
 }
 
 impl InspectArgs {
@@ -631,6 +641,30 @@ impl InspectArgs {
                             tracing::error!(%err, "sent txs error, successful list: {signatures:#?}");
                         }
                     }
+                }
+            }
+            Command::CpiEvent { data, output } => {
+                use anchor_client::anchor_lang::event::EVENT_IX_TAG_LE;
+
+                let data = data.strip_prefix("0x").unwrap_or(data);
+                let data = hex::decode(data).map_err(gmsol::Error::invalid_argument)?;
+                let Some(data) = data.strip_prefix(&EVENT_IX_TAG_LE) else {
+                    return Err(gmsol::Error::invalid_argument("Not a valid CPI event data"));
+                };
+                if data.len() < 8 {
+                    return Err(gmsol::Error::invalid_argument("Not a valid CPI event data"));
+                }
+
+                let output = output.unwrap_or_default();
+
+                let disc: &[u8; 8] = data[..8].try_into().unwrap();
+                let data = &data[8..];
+                match *disc {
+                    types::TradeEvent::DISCRIMINATOR => {
+                        let event = types::TradeEvent::try_from_slice(data)?;
+                        output.print(&event, |event| Ok(format!("{event:#}")))?;
+                    }
+                    _ => return Err(gmsol::Error::invalid_argument("Unknown event type")),
                 }
             }
         }

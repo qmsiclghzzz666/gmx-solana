@@ -149,21 +149,69 @@ impl RemoveWithdrawalEvent {
 /// Trade event.
 #[event]
 #[cfg_attr(feature = "debug", derive(Debug))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TradeEvent(Box<TradeEventData>);
 
+#[cfg(feature = "display")]
+impl std::fmt::Display for TradeEvent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TradeEvent")
+            .field("trade_id", &self.trade_id)
+            .field("store", &self.store.to_string())
+            .field("market_token", &self.market_token.to_string())
+            .field("user", &self.user.to_string())
+            .field("position", &self.position.to_string())
+            .field("ts", &self.ts)
+            .field("slot", &self.slot)
+            .field("is_long", &self.is_long)
+            .field("is_increase", &self.is_increase)
+            .field("delta_collateral_amount", &self.delta_collateral_amount())
+            .field("delta_size_in_usd", &self.delta_size_in_usd())
+            .field("trade_cost", &self.trade_cost())
+            .field("borrowing_fee", &self.borrowing_fee())
+            .field("funding_fee", &self.funding_fee())
+            .field(
+                "claimable_funding_amount_for_long_token",
+                &self.claimable_funding_amount(true),
+            )
+            .field(
+                "claimable_funding_amount_for_short_token",
+                &self.claimable_funding_amount(false),
+            )
+            .finish_non_exhaustive()
+    }
+}
+
 /// Trade event data.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[derive(Clone, AnchorDeserialize, AnchorSerialize)]
 pub struct TradeEventData {
     /// Trade id.
     pub trade_id: u64,
     /// Store address.
+    #[cfg_attr(
+        feature = "serde",
+        serde(with = "serde_with::As::<serde_with::DisplayFromStr>")
+    )]
     pub store: Pubkey,
     /// Market token.
+    #[cfg_attr(
+        feature = "serde",
+        serde(with = "serde_with::As::<serde_with::DisplayFromStr>")
+    )]
     pub market_token: Pubkey,
     /// User.
+    #[cfg_attr(
+        feature = "serde",
+        serde(with = "serde_with::As::<serde_with::DisplayFromStr>")
+    )]
     pub user: Pubkey,
     /// Position address.
+    #[cfg_attr(
+        feature = "serde",
+        serde(with = "serde_with::As::<serde_with::DisplayFromStr>")
+    )]
     pub position: Pubkey,
     /// Trade ts.
     pub ts: i64,
@@ -178,6 +226,7 @@ pub struct TradeEventData {
     /// After state.
     pub after: PositionState,
     /// Reserved.
+    #[cfg_attr(feature = "serde", serde(skip, default = "default_reserved"))]
     reserved: [u8; 128],
 }
 
@@ -249,6 +298,10 @@ impl DerefMut for TradeEvent {
     }
 }
 
+fn default_reserved() -> [u8; 128] {
+    [0; 128]
+}
+
 impl TradeEvent {
     /// Create a new unchanged trade event.
     pub(crate) fn new_unchanged(
@@ -269,7 +322,7 @@ impl TradeEvent {
             is_increase,
             before: position.state,
             after: position.state,
-            reserved: [0; 128],
+            reserved: default_reserved(),
         })))
     }
 
@@ -299,6 +352,12 @@ impl TradeEvent {
         self.after
             .size_in_tokens
             .abs_diff(self.before.size_in_tokens)
+    }
+
+    /// Trade cost.
+    pub fn trade_cost(&self) -> Option<u128> {
+        self.delta_size_in_usd()
+            .checked_div(self.delta_size_in_tokens())
     }
 
     /// Delta collateral amount.
