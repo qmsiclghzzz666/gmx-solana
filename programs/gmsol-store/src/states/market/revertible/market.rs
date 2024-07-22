@@ -509,6 +509,10 @@ impl<'a> gmsol_model::BaseMarket<{ constants::MARKET_DECIMALS }> for RevertibleM
             (PnlFactorKind::Withdrawal, false) => {
                 Ok(self.config().max_pnl_factor_for_short_withdrawal)
             }
+            (PnlFactorKind::Trader, true) => Ok(self.config().max_pnl_factor_for_long_trader),
+            (PnlFactorKind::Trader, false) => Ok(self.config().max_pnl_factor_for_short_trader),
+            (PnlFactorKind::ADL, true) => Ok(self.config().max_pnl_factor_for_long_adl),
+            (PnlFactorKind::ADL, false) => Ok(self.config().max_pnl_factor_for_short_adl),
             _ => Err(error!(StoreError::RequiredResourceNotFound).into()),
         }
     }

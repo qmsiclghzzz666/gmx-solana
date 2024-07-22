@@ -80,6 +80,8 @@ where
 struct MaxPnlFactors<T> {
     deposit: T,
     withdrawal: T,
+    trader: T,
+    adl: T,
 }
 
 /// Test Market.
@@ -176,6 +178,8 @@ impl Default for TestMarket<u64, 9> {
             max_pnl_factors: MaxPnlFactors {
                 deposit: 600_000_000,
                 withdrawal: 300_000_000,
+                trader: 500_000_000,
+                adl: 500_000_000,
             },
             open_interest_reserve_factor: 1_000_000_000,
             max_pool_amount: 1_000_000_000 * 1_000_000_000,
@@ -259,6 +263,8 @@ impl Default for TestMarket<u128, 20> {
             max_pnl_factors: MaxPnlFactors {
                 deposit: 60_000_000_000_000_000_000,
                 withdrawal: 30_000_000_000_000_000_000,
+                trader: 50_000_000_000_000_000_000,
+                adl: 50_000_000_000_000_000_000,
             },
             max_pool_amount: 1_000_000_000 * 10u128.pow(20),
             max_pool_value_for_deposit: 1_000_000_000_000_000 * 10u128.pow(20),
@@ -351,6 +357,8 @@ where
         let factor = match kind {
             PnlFactorKind::Deposit => self.max_pnl_factors.deposit.clone(),
             PnlFactorKind::Withdrawal => self.max_pnl_factors.withdrawal.clone(),
+            PnlFactorKind::Trader => self.max_pnl_factors.trader.clone(),
+            PnlFactorKind::ADL => self.max_pnl_factors.adl.clone(),
         };
         Ok(factor)
     }

@@ -53,7 +53,7 @@ pub struct MarketConfig {
     // Reserve factor.
     pub(super) reserve_factor: Factor,
     pub(super) open_interest_reserve_factor: Factor,
-    // Max pnl factor.
+    // Max pnl factors.
     pub(super) max_pnl_factor_for_long_deposit: Factor,
     pub(super) max_pnl_factor_for_short_deposit: Factor,
     pub(super) max_pnl_factor_for_long_withdrawal: Factor,
@@ -65,7 +65,12 @@ pub struct MarketConfig {
     pub(super) max_pool_value_for_deposit_for_short_token: Factor,
     pub(super) max_open_interest_for_long: Factor,
     pub(super) max_open_interest_for_short: Factor,
-    reserved: [Factor; 19],
+    // Other max pnl factors.
+    pub(super) max_pnl_factor_for_long_trader: Factor,
+    pub(super) max_pnl_factor_for_short_trader: Factor,
+    pub(super) max_pnl_factor_for_long_adl: Factor,
+    pub(super) max_pnl_factor_for_short_adl: Factor,
+    reserved: [Factor; 15],
 }
 
 impl MarketConfig {
@@ -138,6 +143,10 @@ impl MarketConfig {
             constants::DEFAULT_MAX_PNL_FACTOR_FOR_LONG_WITHDRAWAL;
         self.max_pnl_factor_for_short_withdrawal =
             constants::DEFAULT_MAX_PNL_FACTOR_FOR_SHORT_WITHDRAWAL;
+        self.max_pnl_factor_for_long_trader = constants::DEFAULT_MAX_PNL_FACTOR_FOR_LONG_TRADER;
+        self.max_pnl_factor_for_short_trader = constants::DEFAULT_MAX_PNL_FACTOR_FOR_SHORT_TRADER;
+        self.max_pnl_factor_for_long_adl = constants::DEFAULT_MAX_PNL_FACTOR_FOR_LONG_ADL;
+        self.max_pnl_factor_for_short_adl = constants::DEFAULT_MAX_PNL_FACTOR_FOR_SHORT_ADL;
 
         self.max_pool_amount_for_long_token = constants::DEFAULT_MAX_POOL_AMOUNT_FOR_LONG_TOKEN;
         self.max_pool_amount_for_short_token = constants::DEFAULT_MAX_POOL_AMOUNT_FOR_SHORT_TOKEN;
@@ -230,6 +239,10 @@ impl MarketConfig {
             MarketConfigKey::MaxPnlFactorForShortWithdrawal => {
                 &self.max_pnl_factor_for_short_withdrawal
             }
+            MarketConfigKey::MaxPnlFactorForLongTrader => &self.max_pnl_factor_for_long_trader,
+            MarketConfigKey::MaxPnlFactorForShortTrader => &self.max_pnl_factor_for_short_trader,
+            MarketConfigKey::MaxPnlFactorForLongAdl => &self.max_pnl_factor_for_long_adl,
+            MarketConfigKey::MaxPnlFactorForShortAdl => &self.max_pnl_factor_for_short_adl,
             MarketConfigKey::MaxPoolAmountForLongToken => &self.max_pool_amount_for_long_token,
             MarketConfigKey::MaxPoolAmountForShortToken => &self.max_pool_amount_for_short_token,
             MarketConfigKey::MaxPoolValueForDepositForLongToken => {
@@ -336,6 +349,12 @@ impl MarketConfig {
             MarketConfigKey::MaxPnlFactorForShortWithdrawal => {
                 &mut self.max_pnl_factor_for_short_withdrawal
             }
+            MarketConfigKey::MaxPnlFactorForLongTrader => &mut self.max_pnl_factor_for_long_trader,
+            MarketConfigKey::MaxPnlFactorForShortTrader => {
+                &mut self.max_pnl_factor_for_short_trader
+            }
+            MarketConfigKey::MaxPnlFactorForLongAdl => &mut self.max_pnl_factor_for_long_adl,
+            MarketConfigKey::MaxPnlFactorForShortAdl => &mut self.max_pnl_factor_for_short_adl,
             MarketConfigKey::MaxPoolAmountForLongToken => &mut self.max_pool_amount_for_long_token,
             MarketConfigKey::MaxPoolAmountForShortToken => {
                 &mut self.max_pool_amount_for_short_token
@@ -458,6 +477,14 @@ pub enum MarketConfigKey {
     MaxPnlFactorForLongWithdrawal,
     /// Max PNL factor for short withdrawal.
     MaxPnlFactorForShortWithdrawal,
+    /// Max PNL factor for long trader.
+    MaxPnlFactorForLongTrader,
+    /// Max PNL factor for short trader.
+    MaxPnlFactorForShortTrader,
+    /// Max PNL factor for long ADL.
+    MaxPnlFactorForLongAdl,
+    /// Max PNL factor for short ADL.
+    MaxPnlFactorForShortAdl,
     /// Max pool amount for long token.
     MaxPoolAmountForLongToken,
     /// Max pool amount for short token.

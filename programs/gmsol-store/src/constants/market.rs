@@ -88,6 +88,14 @@ pub const DEFAULT_MAX_PNL_FACTOR_FOR_SHORT_DEPOSIT: Factor = 60_000_000_000_000_
 pub const DEFAULT_MAX_PNL_FACTOR_FOR_LONG_WITHDRAWAL: Factor = 60_000_000_000_000_000_000;
 /// Default max pnl factor for short withdrawal.
 pub const DEFAULT_MAX_PNL_FACTOR_FOR_SHORT_WITHDRAWAL: Factor = 60_000_000_000_000_000_000;
+/// Default max pnl factor for long trader.
+pub const DEFAULT_MAX_PNL_FACTOR_FOR_LONG_TRADER: Factor = 60_000_000_000_000_000_000;
+/// Default max pnl factor for short trader.
+pub const DEFAULT_MAX_PNL_FACTOR_FOR_SHORT_TRADER: Factor = 60_000_000_000_000_000_000;
+/// Default max pnl factor for long adl.
+pub const DEFAULT_MAX_PNL_FACTOR_FOR_LONG_ADL: Factor = 60_000_000_000_000_000_000;
+/// Default max pnl factor for short adl.
+pub const DEFAULT_MAX_PNL_FACTOR_FOR_SHORT_ADL: Factor = 60_000_000_000_000_000_000;
 
 /// Default max pool amount for long token.
 pub const DEFAULT_MAX_POOL_AMOUNT_FOR_LONG_TOKEN: Factor = 900_000_000_000;

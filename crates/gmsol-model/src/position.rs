@@ -13,7 +13,7 @@ use crate::{
     },
     num::{MulDiv, Num, Unsigned, UnsignedAbs},
     params::fee::{FundingFees, PositionFees},
-    Balance, BalanceExt, Pool,
+    Balance, BalanceExt, PnlFactorKind, Pool,
 };
 
 /// A position.
@@ -240,7 +240,7 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
             .clone()
             .try_into()
             .map_err(|_| crate::Error::Convert)?;
-        let total_pnl = if self.is_long() {
+        let mut total_pnl = if self.is_long() {
             position_value.checked_sub(&size_in_usd)
         } else {
             size_in_usd.checked_sub(&position_value)
@@ -249,7 +249,21 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
         let uncapped_total_pnl = total_pnl.clone();
 
         if total_pnl.is_positive() {
-            // TODO: cap `total_pnl`.
+            let pool_pnl = self
+                .market()
+                .pnl(&prices.index_token_price, self.is_long(), true)?;
+            let capped_pool_pnl =
+                self.market()
+                    .cap_pnl(prices, self.is_long(), &pool_pnl, PnlFactorKind::Trader)?;
+            if capped_pool_pnl != pool_pnl
+                && capped_pool_pnl.is_positive()
+                && pool_pnl.is_positive()
+            {
+                total_pnl = capped_pool_pnl
+                    .unsigned_abs()
+                    .checked_mul_div_with_signed_numberator(&total_pnl, &pool_pnl.unsigned_abs())
+                    .ok_or(crate::Error::Computation("calculating capped total pnl"))?;
+            }
         }
 
         let size_delta_in_tokens = if *self.size_in_usd() == *size_delta_usd {
