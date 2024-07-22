@@ -3,6 +3,7 @@ import { getAddresses, getMarkets, getPrograms, getUsers } from "../../utils/fix
 import { deposit, swap, withdraw, wrap } from "../../utils/exchange/action";
 import { SOL_TOKEN_MINT } from "../../utils/token";
 import { getAccount, getOrCreateAssociatedTokenAccount } from "@solana/spl-token";
+import { invokeCancelOrderWithUserAsSigner, invokeCreateSwapOrderWithPayerAsSigner } from "gmsol";
 
 describe("exchange: Swap", () => {
     const { storeProgram, exchangeProgram } = getPrograms();
@@ -62,6 +63,48 @@ describe("exchange: Swap", () => {
                 storeProgram,
             }
         );
+    });
+
+    it("create and cancel swap order", async () => {
+        let order: PublicKey;
+        try {
+            const [signature, address] = await invokeCreateSwapOrderWithPayerAsSigner(exchangeProgram, {
+                store: dataStoreAddress,
+                payer: user0,
+                marketToken: GMFakeFakeUsdG,
+                swapOutToken: fakeTokenMint,
+                initialSwapInToken: usdGTokenMint,
+                initialSwapInTokenAmount: 1_000n * 1_000_000_000n,
+                swapPath: [GMFakeFakeUsdG],
+                options: {
+                    tokenMap,
+                    storeProgram,
+                }
+            }, {
+                computeUnits: 400_000,
+            });
+            order = address;
+            console.log(`swap order ${order} created at ${signature}`);
+        } catch (error) {
+            console.log(error);
+            throw error;
+        }
+
+        try {
+            const signature = await invokeCancelOrderWithUserAsSigner(exchangeProgram, {
+                user: user0,
+                order,
+                options: {
+                    storeProgram,
+                }
+            }, {
+                computeUnits: 400_000,
+            });
+            console.log(`order ${order} cancelled at ${signature}`);
+        } catch (error) {
+            console.log(error);
+            throw error;
+        }
     });
 
     it("swap for fake token with more USDG", async () => {

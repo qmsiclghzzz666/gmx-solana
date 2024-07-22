@@ -505,3 +505,55 @@ export const makeCreateSwapOrderInstruction = async (
 
 export const invokeCreateSwapOrderWithPayerAsSigner = makeInvoke(makeCreateSwapOrderInstruction, ["payer"]);
 export const invokeCreateSwapOrder = makeInvoke(makeCreateSwapOrderInstruction, [], true);
+
+export type MakeCancelOrderParams = {
+    user: PublicKey,
+    order: PublicKey,
+    options: {
+        hint?: {
+            store: PublicKey,
+            initialCollateralToken: PublicKey | null,
+            initialCollateralTokenAccount: PublicKey | null,
+            initialMarketToken: PublicKey | null,
+        },
+        storeProgram?: StoreProgram,
+    }
+};
+
+export const makeCancelOrderInstruction = async (
+    exchange: ExchangeProgram,
+    {
+        user,
+        order,
+        options,
+    }: MakeCancelOrderParams
+) => {
+    const hint = options?.hint ?? await options?.storeProgram?.account.order.fetch(order).then(order => {
+        const initialCollateralTokenAccount = order.fixed.senders.initialCollateralTokenAccount;
+        const initialMarketToken = order.swap.longTokenSwapPath[0] ?? order.fixed.tokens.marketToken;
+        return {
+            store: order.fixed.store,
+            initialCollateralTokenAccount,
+            initialCollateralToken: initialCollateralTokenAccount ? order.fixed.tokens.initialCollateralToken : null,
+            initialMarketToken,
+        }
+    });
+    if (!hint) throw Error("Neither `hint` nor `storeProgram` provided");
+    const {
+        store,
+        initialCollateralToken,
+        initialCollateralTokenAccount,
+        initialMarketToken,
+    } = hint;
+    return await exchange.methods.cancelOrder().accounts({
+        user,
+        store,
+        order,
+        initialCollateralTokenAccount,
+        initialCollateralTokenVault: initialCollateralToken ? findMarketVaultPDA(store, initialCollateralToken)[0] : null,
+        initialMarket: initialMarketToken ? findMarketPDA(store, initialMarketToken)[0] : null,
+    }).instruction();
+}
+
+export const invokeCancelOrderWithUserAsSigner = makeInvoke(makeCancelOrderInstruction, ["user"]);
+export const invokeCancelOrder = makeInvoke(makeCancelOrderInstruction, [], true);

@@ -1,7 +1,7 @@
 import { PublicKey } from "@solana/web3.js";
 import { expect, getAddresses, getMarkets, getProvider, getUsers } from "../../utils/fixtures";
 import { exchangeProgram, executeOrder } from "../../utils/exchange";
-import { findPositionPDA, invokeCreateDecreaseOrderWithPayerAsSigner, invokeCreateIncreaseOrderWithPayerAsSigner } from "gmsol";
+import { findPositionPDA, invokeCreateDecreaseOrderWithPayerAsSigner, invokeCreateIncreaseOrderWithPayerAsSigner, invokeCancelOrderWithUserAsSigner } from "gmsol";
 import { toInteger } from "lodash";
 import { storeProgram } from "../../utils/data";
 import { utils } from "@coral-xyz/anchor";
@@ -32,7 +32,57 @@ describe("exchange: Order", () => {
         tokenMap = (await storeProgram.account.store.fetch(dataStoreAddress)).tokenMap;
     });
 
-    it("increase and decrease position", async () => {
+    it("create and cancel increate position order", async () => {
+        // Increase position.
+        let increaseOrder: PublicKey;
+        try {
+            const [signature, address] = await invokeCreateIncreaseOrderWithPayerAsSigner(exchangeProgram, {
+                store: dataStoreAddress,
+                payer: user0,
+                marketToken: GMFakeFakeUsdG,
+                collateralToken: usdGTokenMint,
+                initialCollateralDeltaAmount: 2_000_000,
+                isLong: true,
+                sizeDeltaUsd: 200_000_000_000_000_000_000n,
+                options: {
+                    initialCollateralToken: fakeTokenMint,
+                    swapPath: [
+                        GMFakeFakeUsdG
+                    ],
+                    hint: {
+                        longToken: fakeTokenMint,
+                        shortToken: usdGTokenMint,
+                    },
+                    tokenMap,
+                }
+            }, {
+                computeUnits: 400_000,
+            });
+            increaseOrder = address;
+            console.log(`order ${increaseOrder} created at ${signature}`);
+        } catch (error) {
+            console.log(error);
+            throw error;
+        }
+
+        try {
+            const signature = await invokeCancelOrderWithUserAsSigner(exchangeProgram, {
+                user: user0,
+                order: increaseOrder,
+                options: {
+                    storeProgram,
+                }
+            }, {
+                computeUnits: 400_000,
+            });
+            console.log(`order ${increaseOrder} cancelled at ${signature}`);
+        } catch (error) {
+            console.log(error);
+            throw error;
+        }
+    });
+
+    it("increate position", async () => {
         const recentTimestamp = toInteger(Date.now() / 1000);
         // Increase position.
         let increaseOrder: PublicKey;
@@ -90,6 +140,62 @@ describe("exchange: Order", () => {
             throw error;
         }
 
+    });
+
+    it("create and cancel decrease position order", async () => {
+        // Decrease position.
+        let decreaseOrder: PublicKey;
+        try {
+            const [position] = findPositionPDA(dataStoreAddress, user0.publicKey, GMFakeFakeUsdG, usdGTokenMint, true);
+            const [signature, address] = await invokeCreateDecreaseOrderWithPayerAsSigner(exchangeProgram, {
+                store: dataStoreAddress,
+                payer: user0,
+                position,
+                initialCollateralDeltaAmount: 0,
+                sizeDeltaUsd: 200_000_000_000_000_000_000n,
+                options: {
+                    finalOutputToken: fakeTokenMint,
+                    swapPath: [
+                        GMFakeFakeUsdG
+                    ],
+                    hint: {
+                        market: {
+                            marketToken: GMFakeFakeUsdG,
+                            longToken: fakeTokenMint,
+                            shortToken: usdGTokenMint,
+                        },
+                        collateralToken: usdGTokenMint,
+                        isLong: true,
+                    },
+                    tokenMap,
+                }
+            });
+            decreaseOrder = address;
+            console.log(`order ${decreaseOrder} created at ${signature}`);
+        } catch (error) {
+            console.log(error);
+            throw error;
+        }
+
+        try {
+            const signature = await invokeCancelOrderWithUserAsSigner(exchangeProgram, {
+                user: user0,
+                order: decreaseOrder,
+                options: {
+                    storeProgram,
+                }
+            }, {
+                computeUnits: 400_000,
+            });
+            console.log(`order ${decreaseOrder} cancelled at ${signature}`);
+        } catch (error) {
+            console.log(error);
+            throw error;
+        }
+    });
+
+    it("decrease position", async () => {
+        const recentTimestamp = toInteger(Date.now() / 1000);
         // Decrease position.
         let decreaseOrder: PublicKey;
         try {
