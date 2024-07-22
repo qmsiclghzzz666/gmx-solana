@@ -1,7 +1,7 @@
 use std::fmt;
 
 use num_traits::{
-    CheckedAdd, CheckedMul, CheckedNeg, CheckedSub, FromPrimitive, One, Signed, Zero,
+    CheckedAdd, CheckedDiv, CheckedMul, CheckedNeg, CheckedSub, FromPrimitive, One, Signed, Zero,
 };
 
 /// Num trait used in GMX.
@@ -11,6 +11,7 @@ pub trait Num:
     + CheckedMul
     + CheckedSub
     + CheckedNeg
+    + CheckedDiv
     + Clone
     + Ord
     + FromPrimitive
@@ -25,6 +26,7 @@ impl<
             + CheckedMul
             + CheckedSub
             + CheckedNeg
+            + CheckedDiv
             + Clone
             + Ord
             + FromPrimitive
