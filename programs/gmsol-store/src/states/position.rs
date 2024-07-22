@@ -1,5 +1,6 @@
 use crate::StoreError;
 use anchor_lang::prelude::*;
+use borsh::{BorshDeserialize, BorshSerialize};
 use num_enum::TryFromPrimitive;
 
 use super::Seed;
@@ -38,6 +39,7 @@ impl Default for Position {
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[account(zero_copy)]
+#[derive(BorshDeserialize, BorshSerialize)]
 pub struct PositionState {
     /// Trade id.
     pub trade_id: u64,

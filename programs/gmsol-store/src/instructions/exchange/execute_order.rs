@@ -6,6 +6,7 @@ use gmsol_model::{action::Prices, Position as _, PositionExt, PositionImpactMark
 
 use crate::{
     constants,
+    events::TradeEvent,
     states::{
         ops::ValidateMarketBalances,
         order::{CollateralReceiver, Order, OrderKind, TransferOut},
@@ -24,6 +25,7 @@ use crate::{
 
 type ShouldRemovePosition = bool;
 
+#[event_cpi]
 #[derive(Accounts)]
 #[instruction(recent_timestamp: i64)]
 pub struct ExecuteOrder<'info> {
@@ -192,8 +194,11 @@ pub fn execute_order<'info>(
     let prices = ctx.accounts.prices()?;
     // TODO: validate non-empty order.
     // TODO: validate order trigger price.
-    match ctx.accounts.execute2(prices, ctx.remaining_accounts) {
-        Ok((should_remove_position, mut transfer_out)) => {
+    match ctx.accounts.execute(prices, ctx.remaining_accounts) {
+        Ok((should_remove_position, mut transfer_out, trade_event)) => {
+            if let Some(event) = trade_event {
+                emit_cpi!(event);
+            }
             transfer_out.executed = true;
             Ok((should_remove_position, transfer_out))
         }
@@ -265,11 +270,11 @@ impl<'info> ExecuteOrder<'info> {
         Ok(())
     }
 
-    fn execute2(
+    fn execute(
         &mut self,
         prices: Prices<u128>,
         remaining_accounts: &'info [AccountInfo<'info>],
-    ) -> Result<(ShouldRemovePosition, Box<TransferOut>)> {
+    ) -> Result<(ShouldRemovePosition, Box<TransferOut>, Option<TradeEvent>)> {
         self.validate_market()?;
 
         // Prepare execution context.
@@ -294,6 +299,7 @@ impl<'info> ExecuteOrder<'info> {
         }
 
         let kind = self.order.fixed.params.kind;
+        let mut trade_event = None;
         let should_remove_position = match &kind {
             OrderKind::MarketSwap => {
                 execute_swap(
@@ -307,12 +313,16 @@ impl<'info> ExecuteOrder<'info> {
                 false
             }
             OrderKind::MarketIncrease | OrderKind::MarketDecrease | OrderKind::Liquidation => {
-                let mut position = RevertiblePosition::new(
-                    market,
-                    self.position
-                        .as_ref()
-                        .ok_or(error!(StoreError::PositionIsNotProvided))?,
+                let position_loader = self
+                    .position
+                    .as_ref()
+                    .ok_or(error!(StoreError::PositionIsNotProvided))?;
+                let mut event = TradeEvent::new_unchanged(
+                    matches!(kind, OrderKind::MarketIncrease),
+                    position_loader.key(),
+                    &*position_loader.load()?,
                 )?;
+                let mut position = RevertiblePosition::new(market, position_loader)?;
 
                 let should_remove_position = match kind {
                     OrderKind::MarketIncrease => {
@@ -348,7 +358,8 @@ impl<'info> ExecuteOrder<'info> {
                     )?,
                     _ => unreachable!(),
                 };
-
+                position.write_to_event(&mut event)?;
+                trade_event = Some(event);
                 position.commit();
                 msg!(
                     "[Position] executed with trade_id={}",
@@ -364,7 +375,7 @@ impl<'info> ExecuteOrder<'info> {
             }
         };
         swap_markets.commit();
-        Ok((should_remove_position, transfer_out))
+        Ok((should_remove_position, transfer_out, trade_event))
     }
 
     fn prices(&self) -> Result<Prices<u128>> {

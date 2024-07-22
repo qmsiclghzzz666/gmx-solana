@@ -13,6 +13,7 @@ anchor-spl = { version = "0.30.1", default-features = false }
 anchor-syn = "0.30.1"
 base64 = "0.22.0"
 bitmaps = "3.2.1"
+borsh = "0.10"
 bytemuck = "1.15.0"
 byteorder = "1.5.0"
 chainlink_solana = "1.0.0"

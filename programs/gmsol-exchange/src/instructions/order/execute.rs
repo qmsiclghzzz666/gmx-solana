@@ -335,6 +335,8 @@ impl<'info> ExecuteOrder<'info> {
                     .claimable_pnl_token_account_for_holding
                     .as_ref()
                     .map(|a| a.to_account_info()),
+                event_authority: self.event_authority.to_account_info(),
+                program: self.data_store_program.to_account_info(),
             },
         )
     }

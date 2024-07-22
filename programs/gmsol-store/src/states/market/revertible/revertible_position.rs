@@ -4,6 +4,7 @@ use anchor_lang::prelude::*;
 
 use crate::{
     constants,
+    events::TradeEvent,
     states::{position::PositionState, HasMarketMeta, Position},
     StoreError,
 };
@@ -47,6 +48,10 @@ impl<'a> RevertiblePosition<'a> {
 
     pub(crate) fn collateral_token(&self) -> &Pubkey {
         &self.storage.collateral_token
+    }
+
+    pub(crate) fn write_to_event(&self, event: &mut TradeEvent) -> Result<()> {
+        event.update(&self.state)
     }
 }
 

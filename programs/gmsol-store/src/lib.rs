@@ -1080,6 +1080,14 @@ pub enum StoreError {
     InvalidPositionInitailziationParams,
     #[msg("invalid position")]
     InvalidPosition,
+    #[msg("invalid trade id")]
+    InvalidTradeID,
+    #[msg("invalid trade delta size")]
+    InvalidTradeDeltaSize,
+    #[msg("invalid borrowing factor")]
+    InvalidBorrowingFactor,
+    #[msg("invalid funding factors")]
+    InvalidFundingFactors,
     // Order.
     #[msg("missing initialial token account for order")]
     MissingInitializeTokenAccountForOrder,
