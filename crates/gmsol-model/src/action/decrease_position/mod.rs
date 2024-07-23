@@ -110,8 +110,6 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
 
         // TODO: handle NoSwap.
 
-        // TODO: distribute position impact pool.
-
         let borrowing = self
             .position
             .market_mut()

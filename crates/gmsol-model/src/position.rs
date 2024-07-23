@@ -413,7 +413,7 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
         let size_delta_usd = self.size_in_usd().to_opposite_signed()?;
         let mut price_impact_value = self.position_price_impact(&size_delta_usd)?;
 
-        let _has_positive_impact = price_impact_value.is_positive();
+        let has_positive_impact = price_impact_value.is_positive();
 
         if price_impact_value.is_negative() {
             self.cap_negative_position_price_impact(
@@ -425,8 +425,11 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
             price_impact_value = Zero::zero();
         }
 
-        // TODO: get position fees.
-        let fees = PositionFees::<Self::Num>::default();
+        let fees = self.position_fees(
+            self.collateral_price(prices),
+            self.size_in_usd(),
+            has_positive_impact,
+        )?;
 
         let collateral_cost_value = fees
             .total_cost_amount()?
