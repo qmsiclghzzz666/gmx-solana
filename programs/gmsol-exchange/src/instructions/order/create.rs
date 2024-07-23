@@ -104,6 +104,7 @@ pub fn create_order<'info>(
         ctx.accounts
             .initialize_order_ctx()
             .with_signer(&[&controller.as_seeds()]),
+        ctx.accounts.payer.key(),
         nonce,
         ctx.accounts.to_tokens_with_feed(tokens)?,
         swap,
@@ -333,14 +334,21 @@ impl<'info> CreateOrder<'info> {
         tokens: impl IntoIterator<Item = Pubkey>,
     ) -> Result<Vec<TokenRecord>> {
         let token_map = self.token_map.load_token_map()?;
-        tokens
-            .into_iter()
-            .map(|token| {
-                let config = token_map
-                    .get(&token)
-                    .ok_or(error!(ExchangeError::ResourceNotFound))?;
-                TokenRecord::from_config(token, config)
-            })
-            .collect::<Result<Vec<_>>>()
+        token_records(&token_map, tokens)
     }
+}
+
+pub(crate) fn token_records<A: TokenMapAccess>(
+    token_map: &A,
+    tokens: impl IntoIterator<Item = Pubkey>,
+) -> Result<Vec<TokenRecord>> {
+    tokens
+        .into_iter()
+        .map(|token| {
+            let config = token_map
+                .get(&token)
+                .ok_or(error!(ExchangeError::ResourceNotFound))?;
+            TokenRecord::from_config(token, config)
+        })
+        .collect::<Result<Vec<_>>>()
 }

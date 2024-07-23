@@ -16,6 +16,7 @@ use crate::{
 
 #[derive(Accounts)]
 #[instruction(
+    owner: Pubkey,
     nonce: [u8; 32],
     tokens_with_feed: Vec<TokenRecord>,
     swap: SwapParams,
@@ -31,7 +32,7 @@ pub struct InitializeOrder<'info> {
         init,
         space = 8 + Order::init_space(&tokens_with_feed, &swap),
         payer = payer,
-        seeds = [Order::SEED, store.key().as_ref(), payer.key().as_ref(), &nonce],
+        seeds = [Order::SEED, store.key().as_ref(), owner.as_ref(), &nonce],
         bump,
     )]
     pub order: Box<Account<'info, Order>>,
@@ -42,7 +43,7 @@ pub struct InitializeOrder<'info> {
         seeds = [
             Position::SEED,
             store.key().as_ref(),
-            payer.key().as_ref(),
+            owner.as_ref(),
             market.load()?.meta().market_token_mint.as_ref(),
             output_token.as_ref(),
             &[params.to_position_kind()? as u8],
@@ -54,7 +55,7 @@ pub struct InitializeOrder<'info> {
     pub position: Option<AccountLoader<'info, Position>>,
     #[account(mut, has_one = store)]
     pub market: AccountLoader<'info, Market>,
-    #[account(mut, token::authority = payer)]
+    #[account(mut, token::authority = owner)]
     pub initial_collateral_token_account: Option<Box<Account<'info, TokenAccount>>>,
     #[account(
         mut,
@@ -68,21 +69,23 @@ pub struct InitializeOrder<'info> {
         bump,
     )]
     pub initial_collateral_token_vault: Option<Box<Account<'info, TokenAccount>>>,
-    #[account(token::authority = payer)]
+    #[account(token::authority = owner)]
     pub final_output_token_account: Option<Box<Account<'info, TokenAccount>>>,
-    #[account(token::authority = payer)]
+    #[account(token::authority = owner)]
     pub secondary_output_token_account: Option<Box<Account<'info, TokenAccount>>>,
-    #[account(token::authority = payer, token::mint = market.load()?.meta().long_token_mint)]
+    #[account(token::authority = owner, token::mint = market.load()?.meta().long_token_mint)]
     pub long_token_account: Box<Account<'info, TokenAccount>>,
-    #[account(token::authority = payer, token::mint = market.load()?.meta().short_token_mint)]
+    #[account(token::authority = owner, token::mint = market.load()?.meta().short_token_mint)]
     pub short_token_account: Box<Account<'info, TokenAccount>>,
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,
 }
 
 /// Initialize a new [`Order`] account.
+#[allow(clippy::too_many_arguments)]
 pub fn initialize_order(
     ctx: Context<InitializeOrder>,
+    owner: Pubkey,
     nonce: NonceBytes,
     tokens_with_feed: Vec<TokenRecord>,
     swap: SwapParams,
@@ -112,6 +115,7 @@ pub fn initialize_order(
         OrderKind::MarketIncrease => {
             // The validation of `output_token` is also performed by the method below.
             ctx.accounts.initialize_position_if_needed(
+                &owner,
                 &params,
                 ctx.bumps.position,
                 &output_token,
@@ -196,7 +200,7 @@ pub fn initialize_order(
         ctx.accounts.store.key(),
         &nonce,
         &ctx.accounts.market.key(),
-        ctx.accounts.payer.key,
+        &owner,
         ctx.accounts.position.as_ref().map(|a| a.key()).as_ref(),
         &params,
         &tokens,
@@ -245,6 +249,7 @@ impl<'info> InitializeOrder<'info> {
 
     fn initialize_position_if_needed(
         &self,
+        owner: &Pubkey,
         params: &OrderParams,
         bump: Option<u8>,
         output_token: &Pubkey,
@@ -262,7 +267,7 @@ impl<'info> InitializeOrder<'info> {
                     params.to_position_kind()?,
                     bump,
                     self.store.key(),
-                    self.payer.key,
+                    owner,
                     &self.market.load()?.meta().market_token_mint,
                     output_token,
                 )?;

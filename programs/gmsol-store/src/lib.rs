@@ -879,8 +879,10 @@ pub mod gmsol_store {
     }
 
     #[access_control(internal::Authenticate::only_controller(&ctx))]
+    #[allow(clippy::too_many_arguments)]
     pub fn initialize_order(
         ctx: Context<InitializeOrder>,
+        owner: Pubkey,
         nonce: [u8; 32],
         tokens_with_feed: Vec<TokenRecord>,
         swap: SwapParams,
@@ -890,6 +892,7 @@ pub mod gmsol_store {
     ) -> Result<()> {
         instructions::initialize_order(
             ctx,
+            owner,
             nonce,
             tokens_with_feed,
             swap,

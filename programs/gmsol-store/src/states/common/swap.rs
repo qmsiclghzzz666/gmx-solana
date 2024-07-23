@@ -8,7 +8,7 @@ use crate::{
 };
 
 /// Swap params.
-#[derive(AnchorDeserialize, AnchorSerialize, Clone)]
+#[derive(AnchorDeserialize, AnchorSerialize, Clone, Default)]
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub struct SwapParams {
     /// The addresses of token mints for markets along the swap path for long token or primary token.

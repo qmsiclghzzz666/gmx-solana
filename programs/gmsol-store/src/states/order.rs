@@ -269,6 +269,16 @@ pub enum CollateralReceiver {
 }
 
 impl TransferOut {
+    /// Return whether the output for user is empty.
+    pub fn is_user_output_empty(&self) -> bool {
+        self.final_output_token == 0
+            && self.final_secondary_output_token == 0
+            && self.long_token == 0
+            && self.short_token == 0
+            && self.long_token_for_claimable_account_of_user == 0
+            && self.short_token_for_claimable_account_of_user == 0
+    }
+
     pub(crate) fn new_failed() -> Self {
         Self {
             executed: false,
