@@ -772,6 +772,23 @@ pub mod gmsol_store {
         instructions::unchecked_close_empty_claimable_account(ctx, user, timestamp)
     }
 
+    /// Prepare an associated token account.
+    ///
+    /// # Accounts
+    /// *[See the documentation for the accounts.](PrepareAssociatedTokenAccount).*
+    ///
+    /// # Checks
+    /// - The [`payer`](PrepareAssociatedTokenAccount::payer) must be a signer.
+    /// - The [`mint`](PrepareAssociatedTokenAccount::mint) must be a
+    /// [`Mint`](anchor_spl::token::Mint) account.
+    /// - The [`account`] must be an associated token account with mint = `mint`
+    /// and owner = `owner`. It can be uninitialized.
+    pub fn prepare_associated_token_account(
+        ctx: Context<PrepareAssociatedTokenAccount>,
+    ) -> Result<()> {
+        instructions::prepare_associated_token_account(ctx)
+    }
+
     // Oracle.
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn initialize_oracle(ctx: Context<InitializeOracle>, index: u8) -> Result<()> {
@@ -879,7 +896,6 @@ pub mod gmsol_store {
     }
 
     #[access_control(internal::Authenticate::only_controller(&ctx))]
-    #[allow(clippy::too_many_arguments)]
     pub fn initialize_order(
         ctx: Context<InitializeOrder>,
         owner: Pubkey,

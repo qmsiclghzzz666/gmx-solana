@@ -33,6 +33,7 @@ anchor-spl = { workspace = true, default-features = false, features = [
     "token",
     "token_2022",
     "token_2022_extensions",
+    "associated_token",
 ] }
 bitmaps = { workspace = true }
 chainlink_solana = { workspace = true }

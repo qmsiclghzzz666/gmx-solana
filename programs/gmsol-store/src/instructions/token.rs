@@ -1,5 +1,8 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{Burn, Mint, MintTo, Token, TokenAccount, Transfer};
+use anchor_spl::{
+    associated_token::AssociatedToken,
+    token::{Burn, Mint, MintTo, Token, TokenAccount, Transfer},
+};
 
 use crate::{constants, states::Store, utils::internal};
 
@@ -376,4 +379,38 @@ impl<'info> internal::Authentication<'info> for CloseEmptyClaimableAccount<'info
     fn store(&self) -> &AccountLoader<'info, Store> {
         &self.store
     }
+}
+
+/// The accounts definition for [`prepare_associated_token_account`](crate::gmsol_store::prepare_associated_token_account).
+///
+/// *[See also the documentation for the instruction.](crate::gmsol_store::prepare_associated_token_account).*
+#[derive(Accounts)]
+pub struct PrepareAssociatedTokenAccount<'info> {
+    /// The payer.
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: only use as the owner of the token account.
+    pub owner: UncheckedAccount<'info>,
+    /// The mint account for the token account.
+    pub mint: Account<'info, Mint>,
+    /// The token account to prepare.
+    #[account(
+        init_if_needed,
+        payer = payer,
+        associated_token::mint = mint,
+        associated_token::authority = owner,
+    )]
+    pub account: Account<'info, TokenAccount>,
+    /// The [`System`] program.
+    pub system_program: Program<'info, System>,
+    /// The [`Token`] program.
+    pub token_program: Program<'info, Token>,
+    /// The [`AssociatedToken`] program.
+    pub associated_token_program: Program<'info, AssociatedToken>,
+}
+
+pub(crate) fn prepare_associated_token_account(
+    _ctx: Context<PrepareAssociatedTokenAccount>,
+) -> Result<()> {
+    Ok(())
 }
