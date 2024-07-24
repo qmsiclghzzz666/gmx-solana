@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token};
 use gmsol_store::{
     constants::EVENT_AUTHORITY_SEED,
-    cpi::accounts::{MarketTransferOut, RemovePosition},
+    cpi::accounts::RemovePosition,
     program::GmsolStore,
     states::{
         order::{OrderKind, TransferOut},

@@ -404,7 +404,7 @@ impl ExchangeArgs {
                             "the collateral token is not valid in the market",
                         ));
                     };
-                let mut builder = client.liquidate(
+                let mut builder = client.liquidate_by_owner(
                     store,
                     &position.market_token,
                     is_collateral_token_long,

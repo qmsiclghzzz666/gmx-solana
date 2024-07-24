@@ -514,14 +514,6 @@ where
         order: &Pubkey,
         cancel_on_execution_error: bool,
     ) -> crate::Result<Self> {
-        use std::time::SystemTime;
-
-        let recent_timestamp = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .map_err(crate::Error::unknown)?
-            .as_secs()
-            .try_into()
-            .map_err(|_| crate::Error::unknown("failed to convert timestamp"))?;
         Ok(Self {
             client,
             store: *store,
@@ -530,7 +522,7 @@ where
             execution_fee: 0,
             price_provider: Pyth::id(),
             feeds_parser: Default::default(),
-            recent_timestamp,
+            recent_timestamp: recent_timestamp()?,
             hint: None,
             token_map: None,
             cancel_on_execution_error,
@@ -650,8 +642,6 @@ where
 
     /// Build [`TransactionBuilder`] for `execute_order` instructions.
     pub async fn build(&mut self) -> crate::Result<TransactionBuilder<'a, C>> {
-        use crate::store::token::TokenAccountOps;
-
         let hint = self.prepare_hint().await?;
         let [claimable_long_token_account_for_user, claimable_short_token_account_for_user, claimable_pnl_token_account_for_holding] =
             self.claimable_accounts().await?;
@@ -737,69 +727,25 @@ where
             .accounts(feeds.into_iter().chain(swap_markets).collect::<Vec<_>>())
             .compute_budget(ComputeBudget::default().with_limit(EXECUTE_ORDER_COMPUTE_BUDGET));
 
-        let mut pre_builder = self.client.exchange_rpc();
-        let mut post_builder = self.client.exchange_rpc();
+        let mut builder = ClaimableAccountsBuilder::new(
+            self.recent_timestamp,
+            self.store,
+            hint.user,
+            *hint.store.holding(),
+        );
 
-        // Merge claimable accounts.
-        let mut accounts: HashSet<&Pubkey> = Default::default();
-        if let Some(account) = claimable_long_token_account_for_user.as_ref() {
-            pre_builder = pre_builder.merge(self.client.use_claimable_account(
-                &self.store,
-                &hint.long_token_mint,
-                &hint.user,
-                self.recent_timestamp,
-                account,
-                0,
-            ));
-            post_builder = post_builder.merge(self.client.close_empty_claimable_account(
-                &self.store,
-                &hint.long_token_mint,
-                &hint.user,
-                self.recent_timestamp,
-                account,
-            ));
-            accounts.insert(account);
+        if let Some(account) = claimable_long_token_account_for_user {
+            builder.claimable_long_token_account_for_user(&hint.long_token_mint, &account);
         }
-        if let Some(account) = claimable_short_token_account_for_user.as_ref() {
-            if !accounts.contains(account) {
-                pre_builder = pre_builder.merge(self.client.use_claimable_account(
-                    &self.store,
-                    &hint.short_token_mint,
-                    &hint.user,
-                    self.recent_timestamp,
-                    account,
-                    0,
-                ));
-                post_builder = post_builder.merge(self.client.close_empty_claimable_account(
-                    &self.store,
-                    &hint.short_token_mint,
-                    &hint.user,
-                    self.recent_timestamp,
-                    account,
-                ));
-                accounts.insert(account);
-            }
+        if let Some(account) = claimable_short_token_account_for_user {
+            builder.claimable_short_token_account_for_user(&hint.short_token_mint, &account);
         }
-        if let Some(account) = claimable_pnl_token_account_for_holding.as_ref() {
-            if !accounts.contains(account) {
-                let holding = hint.store.holding();
-                pre_builder = pre_builder.merge(self.client.use_claimable_account(
-                    &self.store,
-                    &hint.pnl_token_mint,
-                    holding,
-                    self.recent_timestamp,
-                    account,
-                    0,
-                ));
-                post_builder = post_builder.merge(self.client.close_empty_claimable_account(
-                    &self.store,
-                    &hint.pnl_token_mint,
-                    holding,
-                    self.recent_timestamp,
-                    account,
-                ));
-            }
+        if let Some(account) = claimable_pnl_token_account_for_holding {
+            builder.claimable_pnl_token_account_for_holding(&hint.pnl_token_mint, &account);
         }
+
+        let (pre_builder, post_builder) = builder.build(self.client);
+
         let mut transaction_builder = TransactionBuilder::new(self.client.exchange().async_rpc());
         transaction_builder
             .try_push(pre_builder)?
@@ -902,6 +848,145 @@ where
                 },
                 &gmsol_exchange::ID,
                 &self.client.exchange_program_id(),
-            )))
+            ))
+            .args(instruction::CancelOrder {}))
+    }
+}
+
+pub(super) fn recent_timestamp() -> crate::Result<i64> {
+    use std::time::SystemTime;
+
+    SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .map_err(crate::Error::unknown)?
+        .as_secs()
+        .try_into()
+        .map_err(|_| crate::Error::unknown("failed to convert timestamp"))
+}
+
+pub(super) struct ClaimableAccountsBuilder {
+    recent_timestamp: i64,
+    store: Pubkey,
+    user: Pubkey,
+    holding: Pubkey,
+    claimable_long_token_account_for_user: Option<(Pubkey, Pubkey)>,
+    claimable_short_token_account_for_user: Option<(Pubkey, Pubkey)>,
+    claimable_pnl_token_account_for_holding: Option<(Pubkey, Pubkey)>,
+}
+
+impl ClaimableAccountsBuilder {
+    pub(super) fn new(recent_timestamp: i64, store: Pubkey, user: Pubkey, holding: Pubkey) -> Self {
+        Self {
+            recent_timestamp,
+            store,
+            user,
+            holding,
+            claimable_long_token_account_for_user: None,
+            claimable_short_token_account_for_user: None,
+            claimable_pnl_token_account_for_holding: None,
+        }
+    }
+
+    pub(super) fn claimable_long_token_account_for_user(
+        &mut self,
+        long_token_mint: &Pubkey,
+        account: &Pubkey,
+    ) -> &mut Self {
+        self.claimable_long_token_account_for_user = Some((*long_token_mint, *account));
+        self
+    }
+
+    pub(super) fn claimable_short_token_account_for_user(
+        &mut self,
+        short_token_mint: &Pubkey,
+        account: &Pubkey,
+    ) -> &mut Self {
+        self.claimable_short_token_account_for_user = Some((*short_token_mint, *account));
+        self
+    }
+
+    pub(super) fn claimable_pnl_token_account_for_holding(
+        &mut self,
+        pnl_token_mint: &Pubkey,
+        account: &Pubkey,
+    ) -> &mut Self {
+        self.claimable_pnl_token_account_for_holding = Some((*pnl_token_mint, *account));
+        self
+    }
+
+    pub(super) fn build<'a, C: Deref<Target = impl Signer> + Clone>(
+        &self,
+        client: &'a crate::Client<C>,
+    ) -> (RpcBuilder<'a, C>, RpcBuilder<'a, C>) {
+        use crate::store::token::TokenAccountOps;
+
+        let mut pre_builder = client.exchange_rpc();
+        let mut post_builder = client.exchange_rpc();
+        let mut accounts: HashSet<&Pubkey> = Default::default();
+        if let Some((long_token_mint, account)) =
+            self.claimable_long_token_account_for_user.as_ref()
+        {
+            pre_builder = pre_builder.merge(client.use_claimable_account(
+                &self.store,
+                long_token_mint,
+                &self.user,
+                self.recent_timestamp,
+                account,
+                0,
+            ));
+            post_builder = post_builder.merge(client.close_empty_claimable_account(
+                &self.store,
+                long_token_mint,
+                &self.user,
+                self.recent_timestamp,
+                account,
+            ));
+            accounts.insert(account);
+        }
+        if let Some((short_token_mint, account)) =
+            self.claimable_short_token_account_for_user.as_ref()
+        {
+            if !accounts.contains(account) {
+                pre_builder = pre_builder.merge(client.use_claimable_account(
+                    &self.store,
+                    short_token_mint,
+                    &self.user,
+                    self.recent_timestamp,
+                    account,
+                    0,
+                ));
+                post_builder = post_builder.merge(client.close_empty_claimable_account(
+                    &self.store,
+                    short_token_mint,
+                    &self.user,
+                    self.recent_timestamp,
+                    account,
+                ));
+                accounts.insert(account);
+            }
+        }
+        if let Some((pnl_token_mint, account)) =
+            self.claimable_pnl_token_account_for_holding.as_ref()
+        {
+            if !accounts.contains(account) {
+                let holding = &self.holding;
+                pre_builder = pre_builder.merge(client.use_claimable_account(
+                    &self.store,
+                    pnl_token_mint,
+                    holding,
+                    self.recent_timestamp,
+                    account,
+                    0,
+                ));
+                post_builder = post_builder.merge(client.close_empty_claimable_account(
+                    &self.store,
+                    pnl_token_mint,
+                    holding,
+                    self.recent_timestamp,
+                    account,
+                ));
+            }
+        }
+        (pre_builder, post_builder)
     }
 }

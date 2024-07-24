@@ -47,7 +47,7 @@ impl<'a, 'info> CancelOrderUtil<'a, 'info> {
         let refund = self
             .order
             .get_lamports()
-            .checked_sub(execution_fee.min(crate::MAX_DEPOSIT_EXECUTION_FEE))
+            .checked_sub(execution_fee.min(crate::MAX_ORDER_EXECUTION_FEE))
             .ok_or(ExchangeError::NotEnoughExecutionFee)?;
         gmsol_store::cpi::remove_order(
             self.remove_order_ctx(payer)

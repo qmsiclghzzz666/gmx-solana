@@ -256,7 +256,12 @@ impl<'info> ValidateOracleTime for ExecuteOrder<'info> {
     }
 
     fn oracle_updated_after_slot(&self) -> StoreResult<Option<u64>> {
-        Ok(Some(self.order.fixed.updated_at_slot))
+        // FIXME: should we validate the slot for liquidation?
+        let after = match self.order.fixed.params.kind {
+            OrderKind::Liquidation => None,
+            _ => Some(self.order.fixed.updated_at_slot),
+        };
+        Ok(after)
     }
 }
 

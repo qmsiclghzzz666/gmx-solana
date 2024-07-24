@@ -55,6 +55,8 @@ enum Command {
     ExecuteWithdrawal { withdrawal: Pubkey },
     /// Execute Order.
     ExecuteOrder { order: Pubkey },
+    /// Liquidate a position.
+    Liquidate { position: Pubkey },
     /// Fetch pending actions.
     Pending {
         action: Action,
@@ -405,6 +407,76 @@ impl KeeperArgs {
                         )
                         .await?;
                     tracing::info!(%order, %execution_fee, "executed order with txs: {signatures:#?}");
+                }
+            }
+            Command::Liquidate { position } => {
+                let mut builder = client.liquidate(
+                    &self
+                        .oracle
+                        .address(Some(store), &client.data_store_program_id())?,
+                    position,
+                )?;
+                let execution_fee = self
+                    .execution_fee
+                    .map(|fee| futures_util::future::ready(Ok(fee)).left_future())
+                    .unwrap_or_else(|| {
+                        builder
+                            .build()
+                            .and_then(|builder| async move {
+                                builder
+                                    .estimated_execution_fee(Some(self.compute_unit_price))
+                                    .await
+                            })
+                            .right_future()
+                    })
+                    .await?;
+                builder
+                    .execution_fee(execution_fee)
+                    .price_provider(&self.provider.program());
+                if self.use_pyth_pull_oracle() {
+                    let hint = builder.prepare_hint().await?;
+                    let ctx = PythPullOracleContext::try_from_feeds(hint.feeds())?;
+                    let feed_ids = ctx.feed_ids();
+                    if feed_ids.is_empty() {
+                        tracing::error!(%position, "empty feed ids");
+                    }
+                    let oracle = PythPullOracle::try_new(client.anchor())?;
+                    let hermes = Hermes::default();
+                    let update = hermes
+                        .latest_price_updates(feed_ids, Some(EncodingType::Base64))
+                        .await?;
+                    let with_prices = oracle
+                        .with_pyth_prices(&ctx, &update, |prices| async {
+                            let builder = builder
+                                .parse_with_pyth_price_updates(prices)
+                                .build()
+                                .await?;
+                            Ok(builder)
+                        })
+                        .await?;
+                    match with_prices
+                        .send_all(Some(self.compute_unit_price), true)
+                        .await
+                    {
+                        Ok(signatures) => {
+                            tracing::info!(%position, %execution_fee, "liquidated position with txs {signatures:#?}");
+                        }
+                        Err((signatures, err)) => {
+                            tracing::error!(%err, %position, "failed to liquidate position, successful txs: {signatures:#?}");
+                        }
+                    }
+                } else {
+                    let builder = builder.build().await?;
+                    let compute_unit_price_micro_lamports =
+                        self.get_compute_budget().map(|budget| budget.price());
+                    let signatures = builder
+                        .send_all_with_opts(
+                            compute_unit_price_micro_lamports,
+                            Default::default(),
+                            false,
+                        )
+                        .await?;
+                    tracing::info!(%position, %execution_fee, "executed order with txs: {signatures:#?}");
                 }
             }
         }

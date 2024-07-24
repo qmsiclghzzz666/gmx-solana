@@ -8,13 +8,13 @@ use gmsol_store::{
     states::{
         common::{SwapParams, TokenRecord},
         order::{OrderKind, OrderParams},
-        NonceBytes, Store, TokenMapAccess, TokenMapHeader, TokenMapLoader,
+        NonceBytes, Store, TokenMapHeader, TokenMapLoader,
     },
 };
 
 use crate::{
     events::OrderCreatedEvent,
-    utils::{market::get_and_validate_swap_path, ControllerSeeds},
+    utils::{market::get_and_validate_swap_path, token_records, ControllerSeeds},
     ExchangeError,
 };
 
@@ -329,26 +329,8 @@ impl<'info> CreateOrder<'info> {
         ))
     }
 
-    fn to_tokens_with_feed(
-        &self,
-        tokens: impl IntoIterator<Item = Pubkey>,
-    ) -> Result<Vec<TokenRecord>> {
+    fn to_tokens_with_feed(&self, tokens: BTreeSet<Pubkey>) -> Result<Vec<TokenRecord>> {
         let token_map = self.token_map.load_token_map()?;
-        token_records(&token_map, tokens)
+        token_records(&token_map, &tokens)
     }
-}
-
-pub(crate) fn token_records<A: TokenMapAccess>(
-    token_map: &A,
-    tokens: impl IntoIterator<Item = Pubkey>,
-) -> Result<Vec<TokenRecord>> {
-    tokens
-        .into_iter()
-        .map(|token| {
-            let config = token_map
-                .get(&token)
-                .ok_or(error!(ExchangeError::ResourceNotFound))?;
-            TokenRecord::from_config(token, config)
-        })
-        .collect::<Result<Vec<_>>>()
 }

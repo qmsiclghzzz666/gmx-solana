@@ -7,6 +7,9 @@ pub mod withdrawal;
 /// Order.
 pub mod order;
 
+/// Liquidation.
+pub mod liquidation;
+
 use std::{future::Future, ops::Deref};
 
 use anchor_client::{
@@ -18,6 +21,7 @@ use gmsol_store::states::{
     order::{OrderKind, OrderParams},
     NonceBytes,
 };
+use liquidation::LiquidateBuilder;
 use order::CancelOrderBuilder;
 use rand::{distributions::Standard, Rng};
 
@@ -146,7 +150,7 @@ pub trait ExchangeOps<C> {
     }
 
     /// Create a liquidation order.
-    fn liquidate(
+    fn liquidate_by_owner(
         &self,
         store: &Pubkey,
         market_token: &Pubkey,
@@ -193,6 +197,9 @@ pub trait ExchangeOps<C> {
             .swap_path(swap_path.into_iter().copied().collect());
         builder
     }
+
+    /// Liquidate a position.
+    fn liquidate(&self, oracle: &Pubkey, position: &Pubkey) -> crate::Result<LiquidateBuilder<C>>;
 }
 
 impl<S, C> ExchangeOps<C> for crate::Client<C>
@@ -316,6 +323,10 @@ where
 
     fn cancel_order(&self, order: &Pubkey) -> crate::Result<CancelOrderBuilder<C>> {
         Ok(CancelOrderBuilder::new(self, order))
+    }
+
+    fn liquidate(&self, oracle: &Pubkey, position: &Pubkey) -> crate::Result<LiquidateBuilder<C>> {
+        LiquidateBuilder::try_new(self, oracle, position)
     }
 }
 
