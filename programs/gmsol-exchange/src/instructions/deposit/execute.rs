@@ -5,7 +5,7 @@ use gmsol_store::{
     cpi,
     program::GmsolStore,
     states::{Deposit, PriceProvider},
-    utils::{Authentication, WithOracle, WithOracleExt},
+    utils::{Authentication, WithOracle, WithOracleExt, WithStore},
 };
 
 use crate::{utils::ControllerSeeds, ExchangeError};
@@ -202,6 +202,16 @@ impl<'info> ExecuteDeposit<'info> {
     }
 }
 
+impl<'info> WithStore<'info> for ExecuteDeposit<'info> {
+    fn store_program(&self) -> AccountInfo<'info> {
+        self.data_store_program.to_account_info()
+    }
+
+    fn store(&self) -> AccountInfo<'info> {
+        self.store.to_account_info()
+    }
+}
+
 impl<'info> Authentication<'info> for ExecuteDeposit<'info> {
     fn authority(&self) -> AccountInfo<'info> {
         self.authority.to_account_info()
@@ -209,14 +219,6 @@ impl<'info> Authentication<'info> for ExecuteDeposit<'info> {
 
     fn on_error(&self) -> Result<()> {
         Err(error!(ExchangeError::PermissionDenied))
-    }
-
-    fn data_store_program(&self) -> AccountInfo<'info> {
-        self.data_store_program.to_account_info()
-    }
-
-    fn store(&self) -> AccountInfo<'info> {
-        self.store.to_account_info()
     }
 }
 

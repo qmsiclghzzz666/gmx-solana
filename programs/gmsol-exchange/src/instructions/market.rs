@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token};
 use gmsol_store::cpi::accounts::{InitializeMarket, InitializeMarketToken, InitializeMarketVault};
 use gmsol_store::program::GmsolStore;
-use gmsol_store::utils::Authentication;
+use gmsol_store::utils::{Authentication, WithStore};
 
 use crate::ExchangeError;
 
@@ -149,8 +149,10 @@ impl<'info> Authentication<'info> for CreateMarket<'info> {
     fn on_error(&self) -> Result<()> {
         Err(error!(ExchangeError::PermissionDenied))
     }
+}
 
-    fn data_store_program(&self) -> AccountInfo<'info> {
+impl<'info> WithStore<'info> for CreateMarket<'info> {
+    fn store_program(&self) -> AccountInfo<'info> {
         self.data_store_program.to_account_info()
     }
 

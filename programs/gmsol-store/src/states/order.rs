@@ -198,7 +198,10 @@ impl OrderParams {
     pub fn to_position_kind(&self) -> Result<PositionKind> {
         match &self.kind {
             OrderKind::MarketSwap => Err(StoreError::PositionIsNotRequried.into()),
-            OrderKind::Liquidation | OrderKind::MarketDecrease | OrderKind::MarketIncrease => {
+            OrderKind::AutoDeleveraging
+            | OrderKind::Liquidation
+            | OrderKind::MarketDecrease
+            | OrderKind::MarketIncrease => {
                 if self.is_long {
                     Ok(PositionKind::Long)
                 } else {
@@ -234,6 +237,8 @@ pub enum OrderKind {
     MarketDecrease,
     /// Liquidation: allows liquidation of positions if the criteria for liquidation are met.
     Liquidation,
+    /// Auto-deleveraging Order.
+    AutoDeleveraging,
 }
 
 /// Transfer Out.

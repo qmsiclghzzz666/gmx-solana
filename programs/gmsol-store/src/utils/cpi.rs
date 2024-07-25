@@ -5,24 +5,27 @@ use crate::{
     states::RoleKey,
 };
 
+/// With Store.
+pub trait WithStore<'info> {
+    /// Get data store program.
+    fn store_program(&self) -> AccountInfo<'info>;
+
+    /// Get data store.
+    fn store(&self) -> AccountInfo<'info>;
+}
+
 /// Accounts that can be used for authentication.
-pub trait Authentication<'info>: Bumps + Sized {
+pub trait Authentication<'info>: Bumps + Sized + WithStore<'info> {
     /// Get the authority to check.
     ///
     /// ## Notes
     /// - `authority` should be a signer.
     fn authority(&self) -> AccountInfo<'info>;
 
-    /// Get data store program.
-    fn data_store_program(&self) -> AccountInfo<'info>;
-
-    /// Get data store.
-    fn store(&self) -> AccountInfo<'info>;
-
     /// Get the cpi context for checking role or admin permission.
     fn check_role_ctx(&self) -> CpiContext<'_, '_, '_, 'info, CheckRole<'info>> {
         CpiContext::new(
-            self.data_store_program(),
+            self.store_program(),
             CheckRole {
                 authority: self.authority(),
                 store: self.store(),
@@ -76,7 +79,7 @@ pub trait Authenticate<'info>: Authentication<'info> {
 impl<'info, T> Authenticate<'info> for T where T: Authentication<'info> {}
 
 /// Accounts that with oracle context.
-pub trait WithOracle<'info>: Authentication<'info> {
+pub trait WithOracle<'info>: WithStore<'info> {
     /// Get the price provider.
     fn price_provider(&self) -> AccountInfo<'info>;
 
@@ -98,7 +101,7 @@ pub trait WithOracleExt<'info>: WithOracle<'info> {
         feeds: Vec<AccountInfo<'info>>,
     ) -> CpiContext<'_, '_, '_, 'info, SetPricesFromPriceFeed<'info>> {
         CpiContext::new(
-            self.data_store_program().to_account_info(),
+            self.store_program().to_account_info(),
             SetPricesFromPriceFeed {
                 authority: self.controller(),
                 store: self.store(),
@@ -113,7 +116,7 @@ pub trait WithOracleExt<'info>: WithOracle<'info> {
     /// Get the CPI context for clear all prices.
     fn clear_all_prices_ctx(&self) -> CpiContext<'_, '_, '_, 'info, ClearAllPrices<'info>> {
         CpiContext::new(
-            self.data_store_program().to_account_info(),
+            self.store_program().to_account_info(),
             ClearAllPrices {
                 authority: self.controller(),
                 store: self.store(),

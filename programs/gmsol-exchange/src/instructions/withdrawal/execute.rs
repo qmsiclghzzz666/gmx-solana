@@ -5,7 +5,7 @@ use gmsol_store::{
     cpi::accounts::MarketTransferOut,
     program::GmsolStore,
     states::{PriceProvider, Withdrawal},
-    utils::{Authentication, WithOracle, WithOracleExt},
+    utils::{Authentication, WithOracle, WithOracleExt, WithStore},
 };
 
 use crate::{utils::ControllerSeeds, ExchangeError};
@@ -148,6 +148,16 @@ pub fn execute_withdrawal<'info>(
     Ok(())
 }
 
+impl<'info> WithStore<'info> for ExecuteWithdrawal<'info> {
+    fn store_program(&self) -> AccountInfo<'info> {
+        self.data_store_program.to_account_info()
+    }
+
+    fn store(&self) -> AccountInfo<'info> {
+        self.store.to_account_info()
+    }
+}
+
 impl<'info> Authentication<'info> for ExecuteWithdrawal<'info> {
     fn authority(&self) -> AccountInfo<'info> {
         self.authority.to_account_info()
@@ -155,14 +165,6 @@ impl<'info> Authentication<'info> for ExecuteWithdrawal<'info> {
 
     fn on_error(&self) -> Result<()> {
         Err(error!(ExchangeError::PermissionDenied))
-    }
-
-    fn data_store_program(&self) -> AccountInfo<'info> {
-        self.data_store_program.to_account_info()
-    }
-
-    fn store(&self) -> AccountInfo<'info> {
-        self.store.to_account_info()
     }
 }
 

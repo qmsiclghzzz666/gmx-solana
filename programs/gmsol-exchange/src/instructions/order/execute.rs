@@ -8,7 +8,7 @@ use gmsol_store::{
         order::{OrderKind, TransferOut},
         Oracle, Order, PriceProvider,
     },
-    utils::{Authentication, WithOracle, WithOracleExt},
+    utils::{Authentication, WithOracle, WithOracleExt, WithStore},
 };
 
 use crate::{
@@ -162,6 +162,16 @@ pub fn execute_order<'info>(
     Ok(())
 }
 
+impl<'info> WithStore<'info> for ExecuteOrder<'info> {
+    fn store_program(&self) -> AccountInfo<'info> {
+        self.data_store_program.to_account_info()
+    }
+
+    fn store(&self) -> AccountInfo<'info> {
+        self.store.to_account_info()
+    }
+}
+
 impl<'info> Authentication<'info> for ExecuteOrder<'info> {
     fn authority(&self) -> AccountInfo<'info> {
         self.authority.to_account_info()
@@ -169,14 +179,6 @@ impl<'info> Authentication<'info> for ExecuteOrder<'info> {
 
     fn on_error(&self) -> Result<()> {
         Err(error!(ExchangeError::PermissionDenied))
-    }
-
-    fn data_store_program(&self) -> AccountInfo<'info> {
-        self.data_store_program.to_account_info()
-    }
-
-    fn store(&self) -> AccountInfo<'info> {
-        self.store.to_account_info()
     }
 }
 

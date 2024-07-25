@@ -128,7 +128,7 @@ pub fn initialize_order(
                 final_output_token: None,
             }
         }
-        OrderKind::MarketDecrease | OrderKind::Liquidation => {
+        OrderKind::MarketDecrease | OrderKind::Liquidation | OrderKind::AutoDeleveraging => {
             // The validation of `output_token` is also performed by the method below.
             ctx.accounts
                 .validate_position(ctx.bumps.position, &output_token)?;
@@ -171,7 +171,7 @@ pub fn initialize_order(
                 short_token_account: ctx.accounts.short_token_account.key(),
             },
         ),
-        OrderKind::MarketDecrease | OrderKind::Liquidation => (
+        OrderKind::MarketDecrease | OrderKind::Liquidation | OrderKind::AutoDeleveraging => (
             Senders {
                 initial_collateral_token_account: None,
             },

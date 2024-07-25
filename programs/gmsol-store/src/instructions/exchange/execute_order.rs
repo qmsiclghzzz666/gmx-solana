@@ -222,9 +222,9 @@ impl<'info> internal::Authentication<'info> for ExecuteOrder<'info> {
 
 impl<'info> ValidateOracleTime for ExecuteOrder<'info> {
     fn oracle_updated_after(&self) -> StoreResult<Option<i64>> {
-        let ts = match self.order.fixed.params.kind {
+        match self.order.fixed.params.kind {
             OrderKind::MarketSwap | OrderKind::MarketIncrease | OrderKind::MarketDecrease => {
-                self.order.fixed.updated_at
+                Ok(Some(self.order.fixed.updated_at))
             }
             OrderKind::Liquidation => {
                 let position = self
@@ -233,10 +233,13 @@ impl<'info> ValidateOracleTime for ExecuteOrder<'info> {
                     .ok_or(StoreError::PositionNotProvided)?
                     .load()
                     .map_err(|_| StoreError::LoadAccountError)?;
-                position.state.increased_at.max(position.state.decreased_at)
+                Ok(Some(
+                    position.state.increased_at.max(position.state.decreased_at),
+                ))
             }
-        };
-        Ok(Some(ts))
+            // Ignore the check of oracle ts for ADL orders.
+            OrderKind::AutoDeleveraging => Ok(None),
+        }
     }
 
     fn oracle_updated_before(&self) -> StoreResult<Option<i64>> {
@@ -256,9 +259,9 @@ impl<'info> ValidateOracleTime for ExecuteOrder<'info> {
     }
 
     fn oracle_updated_after_slot(&self) -> StoreResult<Option<u64>> {
-        // FIXME: should we validate the slot for liquidation?
+        // FIXME: should we validate the slot for liquidation and ADL?
         let after = match self.order.fixed.params.kind {
-            OrderKind::Liquidation => None,
+            OrderKind::Liquidation | OrderKind::AutoDeleveraging => None,
             _ => Some(self.order.fixed.updated_at_slot),
         };
         Ok(after)
@@ -317,7 +320,10 @@ impl<'info> ExecuteOrder<'info> {
                 market.commit();
                 false
             }
-            OrderKind::MarketIncrease | OrderKind::MarketDecrease | OrderKind::Liquidation => {
+            OrderKind::MarketIncrease
+            | OrderKind::MarketDecrease
+            | OrderKind::Liquidation
+            | OrderKind::AutoDeleveraging => {
                 let position_loader = self
                     .position
                     .as_ref()
@@ -353,6 +359,17 @@ impl<'info> ExecuteOrder<'info> {
                         &mut self.order,
                         true,
                         true,
+                    )?,
+                    OrderKind::AutoDeleveraging => execute_decrease_position(
+                        &self.oracle,
+                        prices,
+                        &mut position,
+                        &mut swap_markets,
+                        &mut transfer_out,
+                        &mut event,
+                        &mut self.order,
+                        true,
+                        false,
                     )?,
                     OrderKind::MarketDecrease => execute_decrease_position(
                         &self.oracle,

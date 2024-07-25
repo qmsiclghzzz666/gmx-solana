@@ -76,7 +76,7 @@ pub fn create_order<'info>(
                 params.swap_length as usize,
             )?
         }
-        OrderKind::MarketDecrease | OrderKind::Liquidation => {
+        OrderKind::MarketDecrease => {
             let (tokens, swap) = ctx.accounts.handle_tokens_for_decrease_order(
                 &params.output_token,
                 ctx.remaining_accounts,
