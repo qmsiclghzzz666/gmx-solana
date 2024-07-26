@@ -926,7 +926,7 @@ pub mod gmsol_store {
     /// - The [`authority`](InitializeOracle::authority) must be a signer and a MARKET_KEEPER of the store.
     /// - The [`store`](InitializeOracle::store) must be an initialized [`Store`](states::Store)
     /// account owned by the store program. And it must be the owner of the token map.
-    /// - The address of the [`store`](Initialize::store) must be the PDA
+    /// - The [`store`](Initialize::store) account must be uninitialized and its address must be the PDA
     /// derived from the oracle account seed [`SEED`](states::Oracle::SEED), the `store` address and
     /// the `index`.
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
