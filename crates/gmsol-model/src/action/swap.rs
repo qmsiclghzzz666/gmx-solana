@@ -264,9 +264,15 @@ impl<const DECIMALS: u8, M: SwapMarket<DECIMALS>> Swap<M, DECIMALS> {
             .validate_reserve(&self.params.prices, !self.params.is_token_in_long)?;
 
         let (long_kind, short_kind) = if self.params.is_token_in_long {
-            (PnlFactorKind::Deposit, PnlFactorKind::Withdrawal)
+            (
+                PnlFactorKind::MaxAfterDeposit,
+                PnlFactorKind::MaxAfterWithdrawal,
+            )
         } else {
-            (PnlFactorKind::Withdrawal, PnlFactorKind::Deposit)
+            (
+                PnlFactorKind::MaxAfterWithdrawal,
+                PnlFactorKind::MaxAfterDeposit,
+            )
         };
         self.market
             .validate_max_pnl(&self.params.prices, long_kind, short_kind)?;

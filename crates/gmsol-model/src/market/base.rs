@@ -49,8 +49,8 @@ pub trait BaseMarket<const DECIMALS: u8> {
     /// Get max pool amount.
     fn max_pool_amount(&self, is_long_token: bool) -> crate::Result<Self::Num>;
 
-    /// Get max pnl factor.
-    fn max_pnl_factor(&self, kind: PnlFactorKind, is_long: bool) -> crate::Result<Self::Num>;
+    /// Get pnl factor config.
+    fn pnl_factor_config(&self, kind: PnlFactorKind, is_long: bool) -> crate::Result<Self::Num>;
 
     /// Get reserve factor.
     fn reserve_factor(&self) -> crate::Result<Self::Num>;
@@ -99,8 +99,8 @@ impl<'a, M: BaseMarket<DECIMALS>, const DECIMALS: u8> BaseMarket<DECIMALS> for &
         (**self).max_pool_amount(is_long_token)
     }
 
-    fn max_pnl_factor(&self, kind: PnlFactorKind, is_long: bool) -> crate::Result<Self::Num> {
-        (**self).max_pnl_factor(kind, is_long)
+    fn pnl_factor_config(&self, kind: PnlFactorKind, is_long: bool) -> crate::Result<Self::Num> {
+        (**self).pnl_factor_config(kind, is_long)
     }
 
     fn reserve_factor(&self) -> crate::Result<Self::Num> {
@@ -225,7 +225,7 @@ pub trait BaseMarketExt<const DECIMALS: u8>: BaseMarket<DECIMALS> {
         kind: PnlFactorKind,
     ) -> crate::Result<Self::Signed> {
         if pnl.is_positive() {
-            let max_pnl_factor = self.max_pnl_factor(kind, is_long)?;
+            let max_pnl_factor = self.pnl_factor_config(kind, is_long)?;
             let pool_value = self.pool_value_for_one_side(prices, is_long, false)?;
             let max_pnl = crate::utils::apply_factor(&pool_value, &max_pnl_factor)
                 .ok_or(crate::Error::Computation("calculating max pnl"))?
@@ -266,6 +266,23 @@ pub trait BaseMarketExt<const DECIMALS: u8>: BaseMarket<DECIMALS> {
         }
     }
 
+    /// Get the excess of pending pnl.
+    ///
+    /// Return `Some` if the pnl factor is exceeded the given kind of pnl factor.
+    fn pnl_factor_exceeded(
+        &self,
+        prices: &Prices<Self::Num>,
+        kind: PnlFactorKind,
+        is_long: bool,
+    ) -> crate::Result<Option<(Self::Signed, Self::Num)>> {
+        let pnl_factor = self.pnl_factor(prices, is_long, true)?;
+        let max_pnl_factor = self.pnl_factor_config(kind, is_long)?;
+
+        let is_exceeded = pnl_factor.is_positive() && pnl_factor.unsigned_abs() > max_pnl_factor;
+
+        Ok(is_exceeded.then_some((pnl_factor, max_pnl_factor)))
+    }
+
     /// Validate pnl factor.
     fn validate_pnl_factor(
         &self,
@@ -273,10 +290,7 @@ pub trait BaseMarketExt<const DECIMALS: u8>: BaseMarket<DECIMALS> {
         kind: PnlFactorKind,
         is_long: bool,
     ) -> crate::Result<()> {
-        let pnl_factor = self.pnl_factor(prices, is_long, true)?;
-        let max_pnl_factor = self.max_pnl_factor(kind, is_long)?;
-
-        if pnl_factor.is_positive() && pnl_factor.unsigned_abs() > max_pnl_factor {
+        if self.pnl_factor_exceeded(prices, kind, is_long)?.is_some() {
             Err(crate::Error::PnlFactorExceeded(
                 kind,
                 get_msg_by_side(is_long),
@@ -387,11 +401,13 @@ impl<M: BaseMarket<DECIMALS> + ?Sized, const DECIMALS: u8> BaseMarketExt<DECIMAL
 #[non_exhaustive]
 pub enum PnlFactorKind {
     /// For deposit.
-    Deposit,
+    MaxAfterDeposit,
     /// For withdrawal.
-    Withdrawal,
+    MaxAfterWithdrawal,
     /// For trader.
-    Trader,
-    /// For ADL.
-    ADL,
+    MaxForTrader,
+    /// For auto-deleveraging.
+    ForAdl,
+    /// Min factor after auto-deleveraing.
+    MinAfterAdl,
 }

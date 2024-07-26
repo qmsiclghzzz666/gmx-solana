@@ -493,7 +493,7 @@ impl<'a> gmsol_model::BaseMarket<{ constants::MARKET_DECIMALS }> for RevertibleM
         }
     }
 
-    fn max_pnl_factor(
+    fn pnl_factor_config(
         &self,
         kind: gmsol_model::PnlFactorKind,
         is_long: bool,
@@ -501,18 +501,24 @@ impl<'a> gmsol_model::BaseMarket<{ constants::MARKET_DECIMALS }> for RevertibleM
         use gmsol_model::PnlFactorKind;
 
         match (kind, is_long) {
-            (PnlFactorKind::Deposit, true) => Ok(self.config().max_pnl_factor_for_long_deposit),
-            (PnlFactorKind::Deposit, false) => Ok(self.config().max_pnl_factor_for_short_deposit),
-            (PnlFactorKind::Withdrawal, true) => {
+            (PnlFactorKind::MaxAfterDeposit, true) => {
+                Ok(self.config().max_pnl_factor_for_long_deposit)
+            }
+            (PnlFactorKind::MaxAfterDeposit, false) => {
+                Ok(self.config().max_pnl_factor_for_short_deposit)
+            }
+            (PnlFactorKind::MaxAfterWithdrawal, true) => {
                 Ok(self.config().max_pnl_factor_for_long_withdrawal)
             }
-            (PnlFactorKind::Withdrawal, false) => {
+            (PnlFactorKind::MaxAfterWithdrawal, false) => {
                 Ok(self.config().max_pnl_factor_for_short_withdrawal)
             }
-            (PnlFactorKind::Trader, true) => Ok(self.config().max_pnl_factor_for_long_trader),
-            (PnlFactorKind::Trader, false) => Ok(self.config().max_pnl_factor_for_short_trader),
-            (PnlFactorKind::ADL, true) => Ok(self.config().max_pnl_factor_for_long_adl),
-            (PnlFactorKind::ADL, false) => Ok(self.config().max_pnl_factor_for_short_adl),
+            (PnlFactorKind::MaxForTrader, true) => Ok(self.config().max_pnl_factor_for_long_trader),
+            (PnlFactorKind::MaxForTrader, false) => {
+                Ok(self.config().max_pnl_factor_for_short_trader)
+            }
+            (PnlFactorKind::ForAdl, true) => Ok(self.config().max_pnl_factor_for_long_adl),
+            (PnlFactorKind::ForAdl, false) => Ok(self.config().max_pnl_factor_for_short_adl),
             _ => Err(error!(StoreError::RequiredResourceNotFound).into()),
         }
     }

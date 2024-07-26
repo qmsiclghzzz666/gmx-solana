@@ -101,6 +101,7 @@ pub struct TestMarket<T: Unsigned, const DECIMALS: u8> {
     reserve_factor: T,
     open_interest_reserve_factor: T,
     max_pnl_factors: MaxPnlFactors<T>,
+    min_pnl_factor_after_adl: T,
     max_pool_amount: T,
     max_pool_value_for_deposit: T,
     max_open_interest: T,
@@ -181,6 +182,7 @@ impl Default for TestMarket<u64, 9> {
                 trader: 500_000_000,
                 adl: 500_000_000,
             },
+            min_pnl_factor_after_adl: 0,
             open_interest_reserve_factor: 1_000_000_000,
             max_pool_amount: 1_000_000_000 * 1_000_000_000,
             max_pool_value_for_deposit: u64::MAX,
@@ -266,6 +268,7 @@ impl Default for TestMarket<u128, 20> {
                 trader: 50_000_000_000_000_000_000,
                 adl: 50_000_000_000_000_000_000,
             },
+            min_pnl_factor_after_adl: 0,
             max_pool_amount: 1_000_000_000 * 10u128.pow(20),
             max_pool_value_for_deposit: 1_000_000_000_000_000 * 10u128.pow(20),
             max_open_interest: 1_000_000_000 * 10u128.pow(20),
@@ -353,12 +356,13 @@ where
         Ok(self.max_pool_amount.clone())
     }
 
-    fn max_pnl_factor(&self, kind: PnlFactorKind, _is_long: bool) -> crate::Result<Self::Num> {
+    fn pnl_factor_config(&self, kind: PnlFactorKind, _is_long: bool) -> crate::Result<Self::Num> {
         let factor = match kind {
-            PnlFactorKind::Deposit => self.max_pnl_factors.deposit.clone(),
-            PnlFactorKind::Withdrawal => self.max_pnl_factors.withdrawal.clone(),
-            PnlFactorKind::Trader => self.max_pnl_factors.trader.clone(),
-            PnlFactorKind::ADL => self.max_pnl_factors.adl.clone(),
+            PnlFactorKind::MaxAfterDeposit => self.max_pnl_factors.deposit.clone(),
+            PnlFactorKind::MaxAfterWithdrawal => self.max_pnl_factors.withdrawal.clone(),
+            PnlFactorKind::MaxForTrader => self.max_pnl_factors.trader.clone(),
+            PnlFactorKind::ForAdl => self.max_pnl_factors.adl.clone(),
+            PnlFactorKind::MinAfterAdl => self.min_pnl_factor_after_adl.clone(),
         };
         Ok(factor)
     }

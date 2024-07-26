@@ -523,12 +523,12 @@ impl<'a> gmsol_model::BaseMarket<{ constants::MARKET_DECIMALS }> for RevertibleS
         self.market.max_pool_amount(is_long_token)
     }
 
-    fn max_pnl_factor(
+    fn pnl_factor_config(
         &self,
         kind: gmsol_model::PnlFactorKind,
         is_long: bool,
     ) -> gmsol_model::Result<Self::Num> {
-        self.market.max_pnl_factor(kind, is_long)
+        self.market.pnl_factor_config(kind, is_long)
     }
 
     fn reserve_factor(&self) -> gmsol_model::Result<Self::Num> {

@@ -284,8 +284,8 @@ impl<const DECIMALS: u8, M: LiquidityMarket<DECIMALS>> Deposit<M, DECIMALS> {
         // TODO: add comment for the reason.
         self.market.validate_max_pnl(
             &self.params.prices,
-            PnlFactorKind::Deposit,
-            PnlFactorKind::Deposit,
+            PnlFactorKind::MaxAfterDeposit,
+            PnlFactorKind::MaxAfterDeposit,
         )?;
 
         let report = {

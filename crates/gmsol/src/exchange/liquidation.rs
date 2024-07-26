@@ -208,7 +208,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> LiquidateBuilder<'a, C> {
                 price_provider: self.price_provider,
                 system_program: system_program::ID,
             })
-            .args(instruction::Liqudiate {
+            .args(instruction::Liquidate {
                 recent_timestamp: self.recent_timestamp,
                 nonce,
                 execution_fee: self.execution_fee,

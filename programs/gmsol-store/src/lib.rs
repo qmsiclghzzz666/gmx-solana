@@ -1132,6 +1132,12 @@ pub enum StoreError {
     NoDelegatedAuthorityIsSet,
     #[msg("invalid order to remove")]
     InvalidOrderToRemove,
+    #[msg("ADL not enabled")]
+    AdlNotEnabled,
+    #[msg("ADL not required")]
+    AdlNotRequired,
+    #[msg("Invalid ADL")]
+    InvalidAdl,
     // Token Config.
     #[msg("synthetic flag does not match")]
     InvalidSynthetic,

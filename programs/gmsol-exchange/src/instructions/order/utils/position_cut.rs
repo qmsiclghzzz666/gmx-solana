@@ -104,6 +104,32 @@ impl<'a, 'info> PositionCutUtils<'a, 'info> {
     }
 
     #[inline(never)]
+    fn execute_order(
+        &mut self,
+        meta: &MarketMeta,
+        controller: &ControllerSeeds,
+        recent_timestamp: i64,
+        tokens: Vec<Pubkey>,
+    ) -> Result<(bool, Box<TransferOut>)> {
+        let (should_remove_position, transfer_out) = self.with_oracle_prices(
+            tokens,
+            self.remaining_accounts,
+            &controller.as_seeds(),
+            |this, _| {
+                Ok(execute_order(
+                    this.execute_order_ctx(meta)?
+                        .with_signer(&[&controller.as_seeds()]),
+                    recent_timestamp,
+                    true,
+                )?
+                .get())
+            },
+        )?;
+        require!(transfer_out.executed, ExchangeError::InvalidArgument);
+        Ok((should_remove_position, transfer_out))
+    }
+
+    #[inline(never)]
     fn initialize_order(
         &self,
         kind: &PositionCut,
@@ -273,32 +299,6 @@ impl<'a, 'info> PositionCutUtils<'a, 'info> {
             ExchangeError::InvalidArgument
         );
         Ok(())
-    }
-
-    #[inline(never)]
-    fn execute_order(
-        &mut self,
-        meta: &MarketMeta,
-        controller: &ControllerSeeds,
-        recent_timestamp: i64,
-        tokens: Vec<Pubkey>,
-    ) -> Result<(bool, Box<TransferOut>)> {
-        let (should_remove_position, transfer_out) = self.with_oracle_prices(
-            tokens,
-            self.remaining_accounts,
-            &controller.as_seeds(),
-            |this, _| {
-                Ok(execute_order(
-                    this.execute_order_ctx(meta)?
-                        .with_signer(&[&controller.as_seeds()]),
-                    recent_timestamp,
-                    true,
-                )?
-                .get())
-            },
-        )?;
-        require!(transfer_out.executed, ExchangeError::InvalidArgument);
-        Ok((should_remove_position, transfer_out))
     }
 
     fn execute_order_ctx(

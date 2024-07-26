@@ -3,18 +3,18 @@ use std::str::FromStr;
 use anchor_lang::{prelude::*, Bump};
 use bitmaps::Bitmap;
 use borsh::{BorshDeserialize, BorshSerialize};
-use gmsol_model::{ClockKind, PoolKind};
+use gmsol_model::{action::Prices, ClockKind, PoolKind};
 
 use crate::{
     utils::fixed_str::{bytes_to_fixed_str, fixed_str_to_bytes},
     StoreError,
 };
 
-use super::{Factor, InitSpace, Seed};
+use super::{Factor, InitSpace, Oracle, Seed};
 
 pub use self::{
     config::{MarketConfig, MarketConfigBuffer, MarketConfigKey},
-    ops::ValidateMarketBalances,
+    ops::{AdlOps, ValidateMarketBalances},
 };
 
 /// Market Operations.
@@ -181,6 +181,24 @@ impl Market {
         self.set_flag(MarketFlag::Enabled, enabled);
     }
 
+    /// Is ADL enabled.
+    pub fn is_adl_enabled(&self, is_long: bool) -> bool {
+        if is_long {
+            self.flag(MarketFlag::AutoDeleveragingEnabledForLong)
+        } else {
+            self.flag(MarketFlag::AutoDeleveragingEnabledForShort)
+        }
+    }
+
+    /// Set ADL enabled.
+    pub fn set_adl_enabled(&mut self, is_long: bool, enabled: bool) {
+        if is_long {
+            self.set_flag(MarketFlag::AutoDeleveragingEnabledForLong, enabled)
+        } else {
+            self.set_flag(MarketFlag::AutoDeleveragingEnabledForShort, enabled)
+        }
+    }
+
     /// Record transferred in.
     fn record_transferred_in(&mut self, is_long_token: bool, amount: u64) -> Result<()> {
         // TODO: use event
@@ -307,6 +325,11 @@ impl Market {
         }
         Ok(())
     }
+
+    /// Get prices from oracle.
+    pub fn prices(&self, oracle: &Oracle) -> Result<Prices<u128>> {
+        oracle.market_prices(self)
+    }
 }
 
 /// Market Flags.
@@ -316,6 +339,10 @@ pub enum MarketFlag {
     Enabled,
     /// Is Pure.
     Pure,
+    /// Is auto-deleveraging enabled for long.
+    AutoDeleveragingEnabledForLong,
+    /// Is auto-deleveraging enabled for short.
+    AutoDeleveragingEnabledForShort,
     // CHECK: cannot have more than `MAX_FLAGS` flags.
 }
 
@@ -602,7 +629,11 @@ pub struct Clocks {
     borrowing: i64,
     /// Funding clock.
     funding: i64,
-    reserved: [i64; 5],
+    /// ADL updated clock for long.
+    adl_for_long: i64,
+    /// ADL updated clock for short.
+    adl_for_short: i64,
+    reserved: [i64; 3],
 }
 
 impl Clocks {
@@ -619,6 +650,8 @@ impl Clocks {
             ClockKind::PriceImpactDistribution => &self.price_impact_distribution,
             ClockKind::Borrowing => &self.borrowing,
             ClockKind::Funding => &self.funding,
+            ClockKind::AdlForLong => &self.adl_for_long,
+            ClockKind::AdlForShort => &self.adl_for_short,
             _ => return None,
         };
         Some(clock)
@@ -629,6 +662,8 @@ impl Clocks {
             ClockKind::PriceImpactDistribution => &mut self.price_impact_distribution,
             ClockKind::Borrowing => &mut self.borrowing,
             ClockKind::Funding => &mut self.funding,
+            ClockKind::AdlForLong => &mut self.adl_for_long,
+            ClockKind::AdlForShort => &mut self.adl_for_short,
             _ => return None,
         };
         Some(clock)

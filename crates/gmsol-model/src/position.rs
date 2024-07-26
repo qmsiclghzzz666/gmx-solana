@@ -252,9 +252,12 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
             let pool_pnl = self
                 .market()
                 .pnl(&prices.index_token_price, self.is_long(), true)?;
-            let capped_pool_pnl =
-                self.market()
-                    .cap_pnl(prices, self.is_long(), &pool_pnl, PnlFactorKind::Trader)?;
+            let capped_pool_pnl = self.market().cap_pnl(
+                prices,
+                self.is_long(),
+                &pool_pnl,
+                PnlFactorKind::MaxForTrader,
+            )?;
             if capped_pool_pnl != pool_pnl
                 && capped_pool_pnl.is_positive()
                 && pool_pnl.is_positive()

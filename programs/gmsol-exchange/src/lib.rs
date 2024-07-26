@@ -135,16 +135,47 @@ pub mod gmsol_exchange {
     /// - `execution_fee`: Execution fee claimed by Keeper for its usage.
     ///
     /// # Checks
-    /// - The [`authority`](Liqudiate::authority) must be a signer and has the `ORDER_KEEPER` role.
+    /// - The [`authority`](Liquidate::authority) must be a signer and has the `ORDER_KEEPER` role.
     /// - *TODO*
     #[access_control(Authenticate::only_order_keeper(&ctx))]
-    pub fn liqudiate<'info>(
+    pub fn liquidate<'info>(
         ctx: Context<'_, '_, 'info, 'info, Liquidate<'info>>,
         recent_timestamp: i64,
         nonce: [u8; 32],
         execution_fee: u64,
     ) -> Result<()> {
         instructions::unchecked_liquidate(ctx, recent_timestamp, nonce, execution_fee)
+    }
+
+    /// Auto-deleverage a position.
+    ///
+    /// # Accounts
+    /// *[See the documentation for the accounts.](AutoDeleverage)*
+    ///
+    /// # Arguments
+    /// - `size_delta_usd`: The amount by which the size will be decreased.
+    /// - `recent_timestmap`: The timestamp used to derive the claimable collateral accounts.
+    /// - `nonce`: Nonce bytes used to derive the order account.
+    /// - `execution_fee`: Execution fee claimed by Keeper for its usage.
+    ///
+    /// # Checks
+    /// - The [`authority`](AutoDeleverage::authority) must be a signer and has the `ORDER_KEEPER` role.
+    /// - *TODO*
+    #[access_control(Authenticate::only_order_keeper(&ctx))]
+    pub fn auto_deleverage<'info>(
+        ctx: Context<'_, '_, 'info, 'info, AutoDeleverage<'info>>,
+        size_delta_usd: u128,
+        recent_timestamp: i64,
+        nonce: [u8; 32],
+        execution_fee: u64,
+    ) -> Result<()> {
+        instructions::unchecked_auto_deleverage(
+            ctx,
+            size_delta_usd,
+            recent_timestamp,
+            nonce,
+            execution_fee,
+        )
     }
 }
 

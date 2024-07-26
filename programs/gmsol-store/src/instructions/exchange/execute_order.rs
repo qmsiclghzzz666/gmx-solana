@@ -2,13 +2,16 @@ use std::ops::Deref;
 
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token, TokenAccount};
-use gmsol_model::{action::Prices, Position as _, PositionExt, PositionImpactMarketExt};
+use gmsol_model::{
+    action::Prices, num::Unsigned, BaseMarket, BaseMarketExt, PnlFactorKind, Position as _,
+    PositionExt, PositionImpactMarketExt,
+};
 
 use crate::{
     constants,
     events::TradeEvent,
     states::{
-        ops::ValidateMarketBalances,
+        ops::{AdlOps, ValidateMarketBalances},
         order::{CollateralReceiver, Order, OrderKind, TransferOut},
         position::Position,
         revertible::{
@@ -270,7 +273,18 @@ impl<'info> ValidateOracleTime for ExecuteOrder<'info> {
 
 impl<'info> ExecuteOrder<'info> {
     fn validate_oracle(&self) -> StoreResult<()> {
-        self.oracle.validate_time(self)
+        self.oracle.validate_time(self)?;
+        #[allow(clippy::single_match)]
+        match &self.order.fixed.kind {
+            OrderKind::AutoDeleveraging => {
+                self.market
+                    .load()
+                    .map_err(|_| StoreError::InvalidMarket)?
+                    .validate_adl(&self.oracle, self.order.fixed.params.is_long)?;
+            }
+            _ => {}
+        }
+        Ok(())
     }
 
     fn validate_market(&self) -> Result<()> {
@@ -358,7 +372,7 @@ impl<'info> ExecuteOrder<'info> {
                         &mut event,
                         &mut self.order,
                         true,
-                        true,
+                        Some(SecondaryOrderType::Liquidation),
                     )?,
                     OrderKind::AutoDeleveraging => execute_decrease_position(
                         &self.oracle,
@@ -369,7 +383,7 @@ impl<'info> ExecuteOrder<'info> {
                         &mut event,
                         &mut self.order,
                         true,
-                        false,
+                        Some(SecondaryOrderType::AutoDeleveraging),
                     )?,
                     OrderKind::MarketDecrease => execute_decrease_position(
                         &self.oracle,
@@ -380,7 +394,7 @@ impl<'info> ExecuteOrder<'info> {
                         &mut event,
                         &mut self.order,
                         false,
-                        false,
+                        None,
                     )?,
                     _ => unreachable!(),
                 };
@@ -406,25 +420,7 @@ impl<'info> ExecuteOrder<'info> {
     }
 
     fn prices(&self) -> Result<Prices<u128>> {
-        let meta = *self.market.load()?.meta();
-        let oracle = &self.oracle.primary;
-        Ok(Prices {
-            index_token_price: oracle
-                .get(&meta.index_token_mint)
-                .ok_or(StoreError::MissingOracelPrice)?
-                .max
-                .to_unit_price(),
-            long_token_price: oracle
-                .get(&meta.long_token_mint)
-                .ok_or(StoreError::MissingOracelPrice)?
-                .max
-                .to_unit_price(),
-            short_token_price: oracle
-                .get(&meta.short_token_mint)
-                .ok_or(StoreError::MissingOracelPrice)?
-                .max
-                .to_unit_price(),
-        })
+        self.market.load()?.prices(&self.oracle)
     }
 }
 
@@ -528,7 +524,13 @@ fn execute_increase_position(
     Ok(())
 }
 
+enum SecondaryOrderType {
+    Liquidation,
+    AutoDeleveraging,
+}
+
 #[allow(clippy::too_many_arguments)]
+#[inline(never)]
 fn execute_decrease_position(
     oracle: &Oracle,
     prices: Prices<u128>,
@@ -538,7 +540,7 @@ fn execute_decrease_position(
     event: &mut TradeEvent,
     order: &mut Order,
     is_insolvent_close_allowed: bool,
-    is_liquidation_order: bool,
+    secondary_order_type: Option<SecondaryOrderType>,
 ) -> Result<ShouldRemovePosition> {
     // Decrease position.
     let report = {
@@ -546,6 +548,27 @@ fn execute_decrease_position(
         let collateral_withdrawal_amount = params.initial_collateral_delta_amount as u128;
         let size_delta_usd = params.size_delta_usd;
         let acceptable_price = params.acceptable_price;
+        let is_liquidation_order =
+            matches!(secondary_order_type, Some(SecondaryOrderType::Liquidation));
+        let is_adl_order = matches!(
+            secondary_order_type,
+            Some(SecondaryOrderType::AutoDeleveraging)
+        );
+        // Only required when the order is an ADL order.
+        let mut pnl_factor_before_execution = None;
+
+        // Validate that ADL is required.
+        if is_adl_order {
+            let Some((pnl_factor, _)) = position
+                .market()
+                .pnl_factor_exceeded(&prices, PnlFactorKind::ForAdl, params.is_long)
+                .map_err(ModelError::from)?
+            else {
+                return err!(StoreError::AdlNotRequired);
+            };
+            pnl_factor_before_execution = Some(pnl_factor);
+        }
+
         let report = position
             .decrease(
                 prices,
@@ -557,6 +580,30 @@ fn execute_decrease_position(
             )
             .and_then(|a| a.execute())
             .map_err(ModelError::from)?;
+
+        // Validate that ADL is valid.
+        if is_adl_order {
+            let pnl_factor_after_execution = position
+                .market()
+                .pnl_factor(&prices, params.is_long, true)
+                .map_err(ModelError::from)?;
+            require_gt!(
+                pnl_factor_before_execution.expect("must be some"),
+                pnl_factor_after_execution,
+                StoreError::InvalidAdl
+            );
+            let min_pnl_factor = position
+                .market()
+                .pnl_factor_config(PnlFactorKind::MinAfterAdl, params.is_long)
+                .and_then(|factor| factor.to_signed())
+                .map_err(ModelError::from)?;
+            require_gt!(
+                pnl_factor_after_execution,
+                min_pnl_factor,
+                StoreError::InvalidAdl
+            );
+        }
+
         msg!("[Position] decreased: {:?}", report);
         event.update_with_decrease_report(&report)?;
         report

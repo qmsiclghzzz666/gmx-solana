@@ -16,4 +16,8 @@ pub enum ClockKind {
     Borrowing,
     /// Funding.
     Funding,
+    /// ADL updated clock for long.
+    AdlForLong,
+    /// ADL updated clock for short.
+    AdlForShort,
 }

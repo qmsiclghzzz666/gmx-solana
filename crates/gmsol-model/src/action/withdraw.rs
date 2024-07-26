@@ -143,8 +143,8 @@ impl<const DECIMALS: u8, M: LiquidityMarket<DECIMALS>> Withdrawal<M, DECIMALS> {
         self.market.validate_reserve(&self.params.prices, false)?;
         self.market.validate_max_pnl(
             &self.params.prices,
-            PnlFactorKind::Deposit,
-            PnlFactorKind::Deposit,
+            PnlFactorKind::MaxAfterDeposit,
+            PnlFactorKind::MaxAfterDeposit,
         )?;
 
         self.market.burn(&self.params.market_token_amount)?;

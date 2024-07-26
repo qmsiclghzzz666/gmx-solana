@@ -1,10 +1,10 @@
 use anchor_lang::prelude::*;
 
-use gmsol_model::BaseMarketExt;
+use gmsol_model::{BaseMarketExt, ClockKind};
 
-use crate::{constants, ModelError, StoreError};
+use crate::{constants, states::Oracle, ModelError, StoreError, StoreResult};
 
-use super::HasMarketMeta;
+use super::{HasMarketMeta, Market};
 
 /// Extension trait for validating market balances.
 pub trait ValidateMarketBalances:
@@ -95,4 +95,35 @@ impl<
             + HasMarketMeta,
     > ValidateMarketBalances for M
 {
+}
+
+/// Trait for auto-deleveraging utils.
+pub trait AdlOps {
+    /// Validate if the ADL can be executed.
+    fn validate_adl(&self, oracle: &Oracle, is_long: bool) -> StoreResult<()>;
+
+    /// Latest ADL time.
+    fn latest_adl_time(&self, is_long: bool) -> StoreResult<i64>;
+}
+
+impl AdlOps for Market {
+    fn latest_adl_time(&self, is_long: bool) -> StoreResult<i64> {
+        let clock = if is_long {
+            ClockKind::AdlForLong
+        } else {
+            ClockKind::AdlForShort
+        };
+        self.clock(clock)
+            .ok_or(StoreError::RequiredResourceNotFound)
+    }
+
+    fn validate_adl(&self, oracle: &Oracle, is_long: bool) -> StoreResult<()> {
+        if !self.is_adl_enabled(is_long) {
+            return Err(StoreError::AdlNotEnabled);
+        }
+        if oracle.max_oracle_ts < self.latest_adl_time(is_long)? {
+            return Err(StoreError::OracleTimestampsAreSmallerThanRequired);
+        }
+        Ok(())
+    }
 }

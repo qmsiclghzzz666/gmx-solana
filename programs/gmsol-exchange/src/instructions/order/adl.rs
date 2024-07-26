@@ -15,11 +15,11 @@ use crate::{order::utils::PositionCut, utils::ControllerSeeds, ExchangeError};
 
 use super::utils::PositionCutUtils;
 
-/// The accounts definitions for [`liquidate`](crate::gmsol_exchange::liquidate).
+/// The accounts definitions for [`auto_deleverage`](crate::gmsol_exchange::auto_deleverage).
 ///
-/// *[See also the documentation for the instruction.](crate::gmsol_exchange::liquidate).*
+/// *[See also the documentation for the instruction.](crate::gmsol_exchange::auto_deleverage).*
 #[derive(Accounts)]
-pub struct Liquidate<'info> {
+pub struct AutoDeleverage<'info> {
     /// The authority of this instruction.
     #[account(mut)]
     pub authority: Signer<'info>,
@@ -44,7 +44,7 @@ pub struct Liquidate<'info> {
     /// Buffer for oracle prices.
     #[account(mut)]
     pub oracle: Account<'info, Oracle>,
-    /// CHECK: only used to invoke CPI and should be checked by it.
+    /// CHECK: check by CPI.
     #[account(mut)]
     pub market: UncheckedAccount<'info>,
     pub market_token_mint: Account<'info, Mint>,
@@ -53,7 +53,7 @@ pub struct Liquidate<'info> {
     /// CHECK: only used to invoke CPI and then checked and initilized by it.
     #[account(mut)]
     pub order: UncheckedAccount<'info>,
-    /// Position to be liquidated.
+    /// Position to be auto-deleveraged.
     #[account(
         mut,
         constraint = position.load()?.store == store.key() @ ExchangeError::InvalidArgument,
@@ -91,12 +91,13 @@ pub struct Liquidate<'info> {
     pub system_program: Program<'info, System>,
 }
 
-/// Liquidate the given position.
+/// Auto-deleverage the given position.
 ///
 /// # CHECK
-/// - This instruction can only be called by the `ORDER_KEEPER` (maybe `LIQUIDATE_KEEPER` in the future).
-pub(crate) fn unchecked_liquidate<'info>(
-    ctx: Context<'_, '_, 'info, 'info, Liquidate<'info>>,
+/// - This instruction can only be called by the `ORDER_KEEPER` (maybe `ADL_KEEPER` in the future).
+pub(crate) fn unchecked_auto_deleverage<'info>(
+    ctx: Context<'_, '_, 'info, 'info, AutoDeleverage<'info>>,
+    size_delta_usd: u128,
     recent_timestamp: i64,
     nonce: NonceBytes,
     execution_fee: u64,
@@ -108,16 +109,22 @@ pub(crate) fn unchecked_liquidate<'info>(
     let (cost, should_remove_position) = ctx
         .accounts
         .position_cut_utils(ctx.remaining_accounts)
-        .unchecked_execute(PositionCut::Liquidate, recent_timestamp, nonce, &controller)?;
+        .unchecked_execute(
+            PositionCut::AutoDeleverage(size_delta_usd),
+            recent_timestamp,
+            nonce,
+            &controller,
+        )?;
 
     // Remove position.
-    require!(should_remove_position, ExchangeError::InvalidArgument);
-    ctx.accounts
-        .remove_position(&controller, cost, execution_fee)?;
+    if should_remove_position {
+        ctx.accounts
+            .remove_position(&controller, cost, execution_fee)?;
+    }
     Ok(())
 }
 
-impl<'info> WithStore<'info> for Liquidate<'info> {
+impl<'info> WithStore<'info> for AutoDeleverage<'info> {
     fn store_program(&self) -> AccountInfo<'info> {
         self.data_store_program.to_account_info()
     }
@@ -127,7 +134,7 @@ impl<'info> WithStore<'info> for Liquidate<'info> {
     }
 }
 
-impl<'info> Authentication<'info> for Liquidate<'info> {
+impl<'info> Authentication<'info> for AutoDeleverage<'info> {
     fn authority(&self) -> AccountInfo<'info> {
         self.authority.to_account_info()
     }
@@ -137,7 +144,7 @@ impl<'info> Authentication<'info> for Liquidate<'info> {
     }
 }
 
-impl<'info> Liquidate<'info> {
+impl<'info> AutoDeleverage<'info> {
     fn position_cut_utils(
         &self,
         remaining_accounts: &'info [AccountInfo<'info>],
