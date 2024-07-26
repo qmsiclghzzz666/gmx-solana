@@ -209,21 +209,31 @@
 //! the [`Oracle`](states::Oracle) account mentioned in step three, and their related instructions are the main contents
 //! introduced in this section.
 //!
-//! #### Defining token configs in [`TokenMap`](states::TokenMap) accounts
-//!
-//! *TODO*
-//!
-//! #### Saving prices to [`Oracle`](states::Oracle) accounts
-//!
-//! *TODO*
-//!
-//! ### Instructions for [`TokenMap`](states::TokenMap) accounts
-//!
-//! *TODO*
+//! ### Instructions for [`TokenConfig`](states::TokenConfig) and token maps.
+//! - [`initialize_token_map`](gmsol_store::initialize_token_map): Initialize a new token map account.
+//! This is a permissionless instruction.
+//! - [`set_token_map`]: Set the token map address used in the given store.
+//! - [`push_to_token_map`]: Push a new token config for an existing token to the given token map.
+//! - [`push_to_token_map_synthetic`]: Push a new token config for a "synthetic"
+//! token to the given token map.
+//! - [`toggle_token_config`]: Enable or disable a token config of the given token map.
+//! - [`set_expected_provider`]: Set the expected provider for the given token.
+//! - [`set_feed_config`]: Set the feed config of the given provider for the given token.
+//! - [`is_token_config_enabled`](gmsol_store::is_token_config_enabled): Check if the config for the given token is enabled.
+//! - [`token_expected_provider`](gmsol_store::token_expected_provider): Get the expected provider set for the given token.
+//! - [`token_feed`](gmsol_store::token_feed): Get the feed address of the given provider set for the given token.
+//! - [`token_timestamp_adjustment`](gmsol_store::token_timestamp_adjustment): Get the timestamp adjustment of the given
+//! provider for the give token.
+//! - [`token_name`](gmsol_store::token_name): Get the name of the given token.
+//! - [`token_decimals`](gmsol_store::token_decimals): Get the token decimals of the given token.
+//! - [`token_precision`](gmsol_store::token_precision): Get the price precision of the given token.
 //!
 //! ### Instructions for [`Oracle`](states::Oracle) accounts
-//!
-//! *TODO*
+//! - [`initialize_oracle`]: Initialize a new [`Oracle`](states::Oracle) account.
+//! - [`clear_all_prices`](gmsol_store::clear_all_prices): Clear the prices of the given oracle account.
+//! - [`set_price`](gmsol_store::set_price): Set a price for the given token in the given oracle account.
+//! - [`set_prices_from_price_feed`](gmsol_store::set_prices_from_price_feed): Validate and set prices parsed from the
+//! provided price feed accounts.
 
 /// Instructions.
 pub mod instructions;
@@ -490,12 +500,47 @@ pub mod gmsol_store {
     }
 
     // Token Config.
-    /// Initialize a token map.
+    /// Initialize a new token map account with its store set to [`store`](InitializeTokenMap::store).
+    ///
+    /// Anyone can initialize a token map account without any permissions, but after initialization, only
+    /// addresses authorized by the store can modify this token map.
+    ///
+    /// # Accounts
+    /// [*See the documentation for the accounts*](InitializeTokenMap).
+    ///
+    /// # Checks
+    /// - The [`payer`](InitializeTokenMap::payer) must be a signer.
+    /// - The [`store`](InitializeTokenMap::store) must be an initialized [`Store`](states::Store)
+    /// account owned by the store program.
+    /// - The [`token_map`](InitializeTokenMap::token_map) must be a uninitialized account.
     pub fn initialize_token_map(ctx: Context<InitializeTokenMap>) -> Result<()> {
         instructions::initialize_token_map(ctx)
     }
 
     /// Push a new token config to the given token map.
+    ///
+    /// This instruction is used to add or update the token config for an existing token,
+    /// where its `token_decimals` will naturally be set to the decimals of this token.
+    ///
+    /// # Accounts
+    /// [*See the documentation for the accounts*](PushToTokenMap).
+    ///
+    /// # Arguments
+    /// - `name`: The name of token.
+    /// - `builder`: Builder for the token config.
+    /// - `enable`: Whether the token config should be enabled/disabled after the push.
+    /// - `new`: Enforce insert if new = true, and an error will be returned if the config
+    /// for the given token already exists.
+    ///
+    /// # Checks
+    /// - The [`authority`](PushToTokenMap::authority) must be a signer and a MARKET_KEEPER
+    /// of the given store.
+    /// - The [`store`](PushToTokenMap::store) must be an initialized [`Store`](states::Store)
+    /// account owned by the store program. And it must be the owner of the token map.
+    /// - The [`token_map`](PushToTokenMap::token_map) must be an initialized token map account
+    /// owned by the store program.
+    /// - The [`token`](PushToTokenMap::token) must be an initialized token mint account owned
+    /// by the SPL token program.
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn push_to_token_map(
         ctx: Context<PushToTokenMap>,
@@ -508,6 +553,29 @@ pub mod gmsol_store {
     }
 
     /// Push a new synthetic token config to the given token map.
+    ///
+    /// This instruction can set or update the token config for a non-existent token.
+    /// Its token decimals are determined by the corresponding argument.
+    ///
+    /// # Accounts
+    /// [*See the documentation for the accounts*](PushToTokenMapSynthetic).
+    ///
+    /// # Arguments
+    /// - `name`: The name of synthetic token.
+    /// - `token`: The address of the synthetic token.
+    /// - `token_decimals`: The token decimals to use for the synthetic token.
+    /// - `builder`: Builder for the token config.
+    /// - `enable`: Whether the token config should be enabled/disabled after the push.
+    /// - `new`: Enforce insert if new = true, and an error will be returned if the config
+    /// for the given token already exists.
+    ///
+    /// # Checks
+    /// - The [`authority`](PushToTokenMapSynthetic::authority) must be a signer and a MARKET_KEEPER
+    /// of the given store.
+    /// - The [`store`](PushToTokenMapSynthetic::store) must be an initialized [`Store`](states::Store)
+    /// account owned by the store program. And it must be the owner of the token map.
+    /// - The [`token_map`](PushToTokenMapSynthetic::token_map) must be an initialized token map account
+    /// owned by the store program.
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn push_to_token_map_synthetic(
         ctx: Context<PushToTokenMapSynthetic>,
@@ -571,6 +639,23 @@ pub mod gmsol_store {
         instructions::token_precision(ctx, &token)
     }
 
+    /// Enable of disable the config for the given token.
+    ///
+    /// # Accounts
+    /// [*See the documentation for the accounts*](ToggleTokenConfig).
+    ///
+    /// # Arguments
+    /// - `token`: The token whose config will be updated.
+    /// - `enable`: Enable or diable the config.
+    ///
+    /// # Checks
+    /// - The [`authority`](ToggleTokenConfig::authority) must be a signer
+    /// and a MARKET_KEEPER of the give store.
+    /// - The [`store`](ToggleTokenConfig::store) must be an initialized [`Store`](states::Store)
+    /// account owned by the store program. And it must be the owner of the token map.
+    /// - The [`token_map`](ToggleTokenConfig::token_map) must be an initialized token map account
+    /// owned by the store program.
+    /// - The given `token` must exist in the token map.
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn toggle_token_config(
         ctx: Context<ToggleTokenConfig>,
@@ -580,6 +665,25 @@ pub mod gmsol_store {
         instructions::unchecked_toggle_token_config(ctx, token, enable)
     }
 
+    /// Set the expected provider for the given token.
+    ///
+    /// # Accounts
+    /// [*See the documentation for the accounts*](SetExpectedProvider).
+    ///
+    /// # Arguments
+    /// - `token`: The token whose config will be updated.
+    /// - `provider`: The provider index to be set as the expected provider
+    /// for the token. See also [`PriceProviderKind`].
+    ///
+    /// # Checks
+    /// - The [`authority`](SetExpectedProvider::authority) must be a signer
+    /// and a MARKET_KEEPER of the give store.
+    /// - The [`store`](SetExpectedProvider::store) must be an initialized [`Store`](states::Store)
+    /// account owned by the store program. And it must be the owner of the token map.
+    /// - The [`token_map`](SetExpectedProvider::token_map) must be an initialized token map account
+    /// owned by the store program.
+    /// - The given `token` must exist in the token map.
+    /// - The index of the provider must be valid.
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn set_expected_provider(
         ctx: Context<SetExpectedProvider>,
@@ -594,6 +698,26 @@ pub mod gmsol_store {
         )
     }
 
+    /// Set the feed config of the given provider for the given token.
+    ///
+    /// # Accounts
+    /// [*See the documentation for the accounts*](SetFeedConfig).
+    ///
+    /// # Arguments
+    /// - `token`: The token whose config will be updated.
+    /// - `provider`: The index of the provider whose feed config will be updated.
+    /// - `feed`: The new feed address.
+    /// - `timestamp_adjustment`: The new timestamp adjustment seconds.
+    ///
+    /// # Checks
+    /// - The [`authority`](SetFeedConfig::authority) must be a signer
+    /// and a MARKET_KEEPER of the give store.
+    /// - The [`store`](SetFeedConfig::store) must be an initialized [`Store`](states::Store)
+    /// account owned by the store program. And it must be the owner of the token map.
+    /// - The [`token_map`](SetFeedConfig::token_map) must be an initialized token map account
+    /// owned by the store program.
+    /// - The given `token` must exist in the token map.
+    /// - The index of the provider must be valid.
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn set_feed_config(
         ctx: Context<SetFeedConfig>,
@@ -790,6 +914,21 @@ pub mod gmsol_store {
     }
 
     // Oracle.
+    /// Initailize a new oracle account for the given store with the given index.
+    ///
+    /// # Accounts
+    /// *[See the documentation for the accounts.](InitializeOracle).*
+    ///
+    /// # Arguments
+    /// - `index`: The oracle index to use.
+    ///
+    /// # Checks
+    /// - The [`authority`](InitializeOracle::authority) must be a signer and a MARKET_KEEPER of the store.
+    /// - The [`store`](InitializeOracle::store) must be an initialized [`Store`](states::Store)
+    /// account owned by the store program. And it must be the owner of the token map.
+    /// - The address of the [`store`](Initialize::store) must be the PDA
+    /// derived from the oracle account seed [`SEED`](states::Oracle::SEED), the `store` address and
+    /// the `index`.
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn initialize_oracle(ctx: Context<InitializeOracle>, index: u8) -> Result<()> {
         instructions::unchecked_initialize_oracle(ctx, index)

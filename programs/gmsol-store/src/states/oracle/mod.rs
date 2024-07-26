@@ -17,7 +17,7 @@ use crate::{states::TokenMapAccess, StoreError, StoreResult};
 use anchor_lang::{prelude::*, Ids};
 use num_enum::TryFromPrimitive;
 
-use super::{HasMarketMeta, Seed, TokenMapRef};
+use super::{HasMarketMeta, TokenMapRef};
 
 pub use self::{
     chainlink::Chainlink,
@@ -41,11 +41,10 @@ pub struct Oracle {
     pub min_oracle_slot: Option<u64>,
 }
 
-impl Seed for Oracle {
-    const SEED: &'static [u8] = b"oracle";
-}
-
 impl Oracle {
+    /// The seed for the oracle account's address.
+    pub const SEED: &'static [u8] = b"oracle";
+
     /// Initialize the [`Oracle`].
     pub(crate) fn init(&mut self, bump: u8, store: Pubkey, index: u8) {
         self.clear_all_prices();

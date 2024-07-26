@@ -3,7 +3,7 @@ use std::ops::Deref;
 use anchor_lang::prelude::*;
 
 use crate::{
-    states::{Oracle, PriceProvider, PriceValidator, Seed, Store, TokenMapHeader, TokenMapLoader},
+    states::{Oracle, PriceProvider, PriceValidator, Store, TokenMapHeader, TokenMapLoader},
     utils::internal,
 };
 
@@ -25,7 +25,7 @@ pub struct SetPricesFromPriceFeed<'info> {
 }
 
 /// Set the oracle prices from price feeds.
-pub fn set_prices_from_price_feed<'info>(
+pub(crate) fn set_prices_from_price_feed<'info>(
     ctx: Context<'_, '_, 'info, 'info, SetPricesFromPriceFeed<'info>>,
     tokens: Vec<Pubkey>,
 ) -> Result<()> {

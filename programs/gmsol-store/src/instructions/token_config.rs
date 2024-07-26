@@ -10,39 +10,52 @@ use crate::{
     StoreError,
 };
 
+/// The accounts definition for [`initialize_token_map`](crate::gmsol_store::initialize_token_map).
+///
+/// [*See also the documentation for the instruction.*](crate::gmsol_store::initialize_token_map)
 #[derive(Accounts)]
 pub struct InitializeTokenMap<'info> {
+    /// The payer.
     #[account(mut)]
     pub payer: Signer<'info>,
+    /// The store account for the token map.
     pub store: AccountLoader<'info, Store>,
+    /// The token map account to be initialized.
     #[account(
         init,
         payer = payer,
         space = 8 + TokenMapHeader::space(0),
     )]
     pub token_map: AccountLoader<'info, TokenMapHeader>,
+    /// The system program.
     pub system_program: Program<'info, System>,
 }
 
 /// Initialize a new token map.
-pub fn initialize_token_map(ctx: Context<InitializeTokenMap>) -> Result<()> {
+pub(crate) fn initialize_token_map(ctx: Context<InitializeTokenMap>) -> Result<()> {
     ctx.accounts.token_map.load_init()?.store = ctx.accounts.store.key();
     Ok(())
 }
 
-/// Push a new token config to the token map.
-/// See [`unchecked_push_to_token_map`] for more information.
+/// The accounts definition for [`push_to_token_map`](crate::gmsol_store::push_to_token_map).
+///
+/// [*See also the documentation for the instruction.*](crate::gmsol_store::push_to_token_map)
 #[derive(Accounts)]
 pub struct PushToTokenMap<'info> {
+    /// The authority of the instruction.
     #[account(mut)]
     pub authority: Signer<'info>,
+    /// The store that owns the token map.
     pub store: AccountLoader<'info, Store>,
+    /// The token map to push config to.
     #[account(
         mut,
         has_one = store,
     )]
     pub token_map: AccountLoader<'info, TokenMapHeader>,
+    /// The token to push config for.
     pub token: Account<'info, Mint>,
+    /// The system program.
     pub system_program: Program<'info, System>,
 }
 
@@ -50,7 +63,7 @@ pub struct PushToTokenMap<'info> {
 ///
 /// ## CHECK
 /// - Only [`MARKET_KEEPER`](crate::states::RoleKey::MARKET_KEEPER) can perform this action.
-pub fn unchecked_push_to_token_map(
+pub(crate) fn unchecked_push_to_token_map(
     ctx: Context<PushToTokenMap>,
     name: &str,
     builder: TokenConfigBuilder,
@@ -83,14 +96,21 @@ impl<'info> internal::Authentication<'info> for PushToTokenMap<'info> {
     }
 }
 
-/// Push a new synthetic token config to the token map.
+/// The accounts definition for
+/// [`push_to_token_map_synthetic`](crate::gmsol_store::push_to_token_map_synthetic).
+///
+/// [*See also the documentation for the instruction.*](crate::gmsol_store::push_to_token_map_synthetic)
 #[derive(Accounts)]
 pub struct PushToTokenMapSynthetic<'info> {
+    /// The authority of the instruction.
     #[account(mut)]
     pub authority: Signer<'info>,
+    /// The store that owns the token map.
     pub store: AccountLoader<'info, Store>,
+    /// The token map to push config to.
     #[account(mut, has_one = store)]
     pub token_map: AccountLoader<'info, TokenMapHeader>,
+    /// The system program.
     pub system_program: Program<'info, System>,
 }
 
@@ -98,7 +118,7 @@ pub struct PushToTokenMapSynthetic<'info> {
 ///
 /// ## CHECK
 /// - Only [`MARKET_KEEPER`](crate::states::RoleKey::MARKET_KEEPER) can perform this action.
-pub fn unchecked_push_to_token_map_synthetic(
+pub(crate) fn unchecked_push_to_token_map_synthetic(
     ctx: Context<PushToTokenMapSynthetic>,
     name: &str,
     token: Pubkey,
@@ -131,10 +151,16 @@ impl<'info> internal::Authentication<'info> for PushToTokenMapSynthetic<'info> {
     }
 }
 
+/// The accounts definition for [`toggle_token_config`](crate::gmsol_store::toggle_token_config).
+///
+/// [*See also the documentation for the instruction.*](crate::gmsol_store::toggle_token_config)
 #[derive(Accounts)]
 pub struct ToggleTokenConfig<'info> {
+    /// The authority of the instruction.
     pub authority: Signer<'info>,
+    /// The store that owns the token map.
     pub store: AccountLoader<'info, Store>,
+    /// The token map to update.
     #[account(
         mut,
         has_one = store,
@@ -146,7 +172,7 @@ pub struct ToggleTokenConfig<'info> {
 ///
 /// ## CHECK
 /// - Only [`MARKET_KEEPER`](crate::states::RoleKey::MARKET_KEEPER) can perform this action.
-pub fn unchecked_toggle_token_config(
+pub(crate) fn unchecked_toggle_token_config(
     ctx: Context<ToggleTokenConfig>,
     token: Pubkey,
     enable: bool,
@@ -170,10 +196,16 @@ impl<'info> internal::Authentication<'info> for ToggleTokenConfig<'info> {
     }
 }
 
+/// The accounts definition for [`set_expected_provider`](crate::gmsol_store::set_expected_provider).
+///
+/// [*See also the documentation for the instruction.*](crate::gmsol_store::set_expected_provider)
 #[derive(Accounts)]
 pub struct SetExpectedProvider<'info> {
+    /// The authority of the instruction.
     pub authority: Signer<'info>,
+    /// The store that owns the token map.
     pub store: AccountLoader<'info, Store>,
+    /// The token map to update.
     #[account(mut, has_one = store)]
     pub token_map: AccountLoader<'info, TokenMapHeader>,
 }
@@ -182,7 +214,7 @@ pub struct SetExpectedProvider<'info> {
 ///
 /// ## CHECK
 /// - Only [`MARKET_KEEPER`](crate::states::RoleKey::MARKET_KEEPER) can perform this action.
-pub fn unchecked_set_expected_provider(
+pub(crate) fn unchecked_set_expected_provider(
     ctx: Context<SetExpectedProvider>,
     token: Pubkey,
     provider: PriceProviderKind,
@@ -206,10 +238,16 @@ impl<'info> internal::Authentication<'info> for SetExpectedProvider<'info> {
     }
 }
 
+/// The accounts definition for [`set_feed_config`](crate::gmsol_store::set_feed_config).
+///
+/// [*See also the documentation for the instruction.*](crate::gmsol_store::set_feed_config)
 #[derive(Accounts)]
 pub struct SetFeedConfig<'info> {
+    /// The authority of the instruction.
     pub authority: Signer<'info>,
+    /// The store that owns the token map.
     pub store: AccountLoader<'info, Store>,
+    /// The token map to update.
     #[account(mut, has_one = store)]
     pub token_map: AccountLoader<'info, TokenMapHeader>,
 }
@@ -218,7 +256,7 @@ pub struct SetFeedConfig<'info> {
 ///
 /// ## CHECK
 /// - Only [`MARKET_KEEPER`](crate::states::RoleKey::MARKET_KEEPER) can perform this action.
-pub fn unchecked_set_feed_config(
+pub(crate) fn unchecked_set_feed_config(
     ctx: Context<SetFeedConfig>,
     token: Pubkey,
     provider: &PriceProviderKind,
@@ -252,7 +290,7 @@ pub struct ReadTokenMap<'info> {
 }
 
 /// Check if the config of the given token is enabled.
-pub fn is_token_config_enabled(ctx: Context<ReadTokenMap>, token: &Pubkey) -> Result<bool> {
+pub(crate) fn is_token_config_enabled(ctx: Context<ReadTokenMap>, token: &Pubkey) -> Result<bool> {
     ctx.accounts
         .token_map
         .load_token_map()?
@@ -262,7 +300,7 @@ pub fn is_token_config_enabled(ctx: Context<ReadTokenMap>, token: &Pubkey) -> Re
 }
 
 /// Get expected provider for the given token.
-pub fn token_expected_provider(
+pub(crate) fn token_expected_provider(
     ctx: Context<ReadTokenMap>,
     token: &Pubkey,
 ) -> Result<PriceProviderKind> {
@@ -275,7 +313,7 @@ pub fn token_expected_provider(
 }
 
 /// Get feed address of the price provider of the given token.
-pub fn token_feed(
+pub(crate) fn token_feed(
     ctx: Context<ReadTokenMap>,
     token: &Pubkey,
     provider: &PriceProviderKind,
@@ -289,7 +327,7 @@ pub fn token_feed(
 }
 
 /// Get timestamp adjustemnt of the given token.
-pub fn token_timestamp_adjustment(
+pub(crate) fn token_timestamp_adjustment(
     ctx: Context<ReadTokenMap>,
     token: &Pubkey,
     provider: &PriceProviderKind,
@@ -303,7 +341,7 @@ pub fn token_timestamp_adjustment(
 }
 
 /// Get the name of the given token.
-pub fn token_name(ctx: Context<ReadTokenMap>, token: &Pubkey) -> Result<String> {
+pub(crate) fn token_name(ctx: Context<ReadTokenMap>, token: &Pubkey) -> Result<String> {
     ctx.accounts
         .token_map
         .load_token_map()?
@@ -314,7 +352,7 @@ pub fn token_name(ctx: Context<ReadTokenMap>, token: &Pubkey) -> Result<String> 
 }
 
 /// Get the decimals of the given token.
-pub fn token_decimals(ctx: Context<ReadTokenMap>, token: &Pubkey) -> Result<u8> {
+pub(crate) fn token_decimals(ctx: Context<ReadTokenMap>, token: &Pubkey) -> Result<u8> {
     Ok(ctx
         .accounts
         .token_map
@@ -325,7 +363,7 @@ pub fn token_decimals(ctx: Context<ReadTokenMap>, token: &Pubkey) -> Result<u8> 
 }
 
 /// Get the price precision of the given token.
-pub fn token_precision(ctx: Context<ReadTokenMap>, token: &Pubkey) -> Result<u8> {
+pub(crate) fn token_precision(ctx: Context<ReadTokenMap>, token: &Pubkey) -> Result<u8> {
     Ok(ctx
         .accounts
         .token_map
