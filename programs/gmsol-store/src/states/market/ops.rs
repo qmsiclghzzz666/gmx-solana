@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use gmsol_model::{BaseMarketExt, ClockKind};
+use gmsol_model::{BaseMarketExt, ClockKind, PnlFactorKind};
 
 use crate::{constants, states::Oracle, ModelError, StoreError, StoreResult};
 
@@ -104,6 +104,8 @@ pub trait AdlOps {
 
     /// Latest ADL time.
     fn latest_adl_time(&self, is_long: bool) -> StoreResult<i64>;
+
+    fn update_adl_state(&mut self, oracle: &Oracle, is_long: bool) -> Result<()>;
 }
 
 impl AdlOps for Market {
@@ -124,6 +126,30 @@ impl AdlOps for Market {
         if oracle.max_oracle_ts < self.latest_adl_time(is_long)? {
             return Err(StoreError::OracleTimestampsAreSmallerThanRequired);
         }
+        Ok(())
+    }
+
+    fn update_adl_state(&mut self, oracle: &Oracle, is_long: bool) -> Result<()> {
+        if oracle.max_oracle_ts < self.latest_adl_time(is_long)? {
+            return err!(StoreError::OracleTimestampsAreSmallerThanRequired);
+        }
+        require!(self.is_enabled(), StoreError::DisabledMarket);
+        let prices = self.prices(oracle)?;
+        let is_exceeded = self
+            .pnl_factor_exceeded(&prices, PnlFactorKind::ForAdl, is_long)
+            .map_err(ModelError::from)?
+            .is_some();
+        self.set_adl_enabled(is_long, is_exceeded);
+        let kind = if is_long {
+            ClockKind::AdlForLong
+        } else {
+            ClockKind::AdlForShort
+        };
+        let clock = self
+            .clocks
+            .get_mut(kind)
+            .ok_or(error!(StoreError::RequiredResourceNotFound))?;
+        *clock = Clock::get()?.unix_timestamp;
         Ok(())
     }
 }

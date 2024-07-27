@@ -130,16 +130,8 @@ impl<'a, 'info> gmsol_model::BaseMarket<{ constants::MARKET_DECIMALS }>
         self.market.liquidity_pool()
     }
 
-    fn liquidity_pool_mut(&mut self) -> gmsol_model::Result<&mut Self::Pool> {
-        self.market.liquidity_pool_mut()
-    }
-
     fn claimable_fee_pool(&self) -> gmsol_model::Result<&Self::Pool> {
         self.market.claimable_fee_pool()
-    }
-
-    fn claimable_fee_pool_mut(&mut self) -> gmsol_model::Result<&mut Self::Pool> {
-        self.market.claimable_fee_pool_mut()
     }
 
     fn swap_impact_pool(&self) -> gmsol_model::Result<&Self::Pool> {
@@ -172,6 +164,18 @@ impl<'a, 'info> gmsol_model::BaseMarket<{ constants::MARKET_DECIMALS }>
 
     fn reserve_factor(&self) -> gmsol_model::Result<Self::Num> {
         self.market.reserve_factor()
+    }
+}
+
+impl<'a, 'info> gmsol_model::BaseMarketMut<{ constants::MARKET_DECIMALS }>
+    for RevertibleLiquidityMarket<'a, 'info>
+{
+    fn liquidity_pool_mut(&mut self) -> gmsol_model::Result<&mut Self::Pool> {
+        self.market.liquidity_pool_mut()
+    }
+
+    fn claimable_fee_pool_mut(&mut self) -> gmsol_model::Result<&mut Self::Pool> {
+        self.market.claimable_fee_pool_mut()
     }
 }
 

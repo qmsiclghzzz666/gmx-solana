@@ -14,7 +14,7 @@ pub mod position_impact;
 pub mod perp;
 
 pub use self::{
-    base::{BaseMarket, BaseMarketExt, PnlFactorKind},
+    base::{BaseMarket, BaseMarketExt, BaseMarketMut, BaseMarketMutExt, PnlFactorKind},
     liquidity::{LiquidityMarket, LiquidityMarketExt},
     perp::{PerpMarket, PerpMarketExt},
     position_impact::{PositionImpactMarket, PositionImpactMarketExt},

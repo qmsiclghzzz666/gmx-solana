@@ -7,9 +7,13 @@ pub mod execute_withdrawal;
 /// Execute Order.
 pub mod execute_order;
 
+/// Update ADL state.
+pub mod update_adl;
+
 pub use execute_deposit::*;
 pub use execute_order::*;
 pub use execute_withdrawal::*;
+pub use update_adl::*;
 
 use crate::StoreError;
 

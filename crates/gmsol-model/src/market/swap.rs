@@ -7,10 +7,10 @@ use crate::{
     Balance, Pool,
 };
 
-use super::BaseMarket;
+use super::BaseMarketMut;
 
 /// A market for swapping tokens.
-pub trait SwapMarket<const DECIMALS: u8>: BaseMarket<DECIMALS> {
+pub trait SwapMarket<const DECIMALS: u8>: BaseMarketMut<DECIMALS> {
     /// Get swap impact params.
     fn swap_impact_params(&self) -> crate::Result<PriceImpactParams<Self::Num>>;
 

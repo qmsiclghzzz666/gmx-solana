@@ -177,6 +177,24 @@ pub mod gmsol_exchange {
             execution_fee,
         )
     }
+
+    /// Update the ADL state for the given market.
+    ///
+    /// # Accounts
+    /// *[See the documentation for the accounts.](UpdateAdlState)*
+    ///
+    /// # Arguments
+    /// - `is_long`: The market side to update for.
+    ///
+    /// # Checks
+    /// *TODO*
+    #[access_control(Authenticate::only_order_keeper(&ctx))]
+    pub fn update_adl_state<'info>(
+        ctx: Context<'_, '_, 'info, 'info, UpdateAdlState<'info>>,
+        is_long: bool,
+    ) -> Result<()> {
+        instructions::unchecked_update_adl_state(ctx, is_long)
+    }
 }
 
 /// Errors of market program.

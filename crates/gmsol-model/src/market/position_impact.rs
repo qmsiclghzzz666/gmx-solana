@@ -1,11 +1,11 @@
 use crate::{
     action::distribute_position_impact::DistributePositionImpact,
     params::{position::PositionImpactDistributionParams, PriceImpactParams},
-    Balance, BaseMarket, Pool,
+    Balance, BaseMarketMut, Pool,
 };
 
 /// A market with position impact pool.
-pub trait PositionImpactMarket<const DECIMALS: u8>: BaseMarket<DECIMALS> {
+pub trait PositionImpactMarket<const DECIMALS: u8>: BaseMarketMut<DECIMALS> {
     /// Get position impact pool.
     fn position_impact_pool(&self) -> crate::Result<&Self::Pool>;
 

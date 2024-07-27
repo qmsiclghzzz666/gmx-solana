@@ -457,16 +457,8 @@ impl<'a> gmsol_model::BaseMarket<{ constants::MARKET_DECIMALS }> for RevertibleM
         Ok(&self.liquidity)
     }
 
-    fn liquidity_pool_mut(&mut self) -> gmsol_model::Result<&mut Self::Pool> {
-        Ok(&mut self.liquidity)
-    }
-
     fn claimable_fee_pool(&self) -> gmsol_model::Result<&Self::Pool> {
         Ok(&self.claimable_fee)
-    }
-
-    fn claimable_fee_pool_mut(&mut self) -> gmsol_model::Result<&mut Self::Pool> {
-        Ok(&mut self.claimable_fee)
     }
 
     fn swap_impact_pool(&self) -> gmsol_model::Result<&Self::Pool> {
@@ -482,15 +474,11 @@ impl<'a> gmsol_model::BaseMarket<{ constants::MARKET_DECIMALS }> for RevertibleM
     }
 
     fn usd_to_amount_divisor(&self) -> Self::Num {
-        constants::MARKET_USD_TO_AMOUNT_DIVISOR
+        self.storage.usd_to_amount_divisor()
     }
 
     fn max_pool_amount(&self, is_long_token: bool) -> gmsol_model::Result<Self::Num> {
-        if is_long_token {
-            Ok(self.config().max_pool_amount_for_long_token)
-        } else {
-            Ok(self.config().max_pool_amount_for_short_token)
-        }
+        self.storage.max_pool_amount(is_long_token)
     }
 
     fn pnl_factor_config(
@@ -498,33 +486,21 @@ impl<'a> gmsol_model::BaseMarket<{ constants::MARKET_DECIMALS }> for RevertibleM
         kind: gmsol_model::PnlFactorKind,
         is_long: bool,
     ) -> gmsol_model::Result<Self::Num> {
-        use gmsol_model::PnlFactorKind;
-
-        match (kind, is_long) {
-            (PnlFactorKind::MaxAfterDeposit, true) => {
-                Ok(self.config().max_pnl_factor_for_long_deposit)
-            }
-            (PnlFactorKind::MaxAfterDeposit, false) => {
-                Ok(self.config().max_pnl_factor_for_short_deposit)
-            }
-            (PnlFactorKind::MaxAfterWithdrawal, true) => {
-                Ok(self.config().max_pnl_factor_for_long_withdrawal)
-            }
-            (PnlFactorKind::MaxAfterWithdrawal, false) => {
-                Ok(self.config().max_pnl_factor_for_short_withdrawal)
-            }
-            (PnlFactorKind::MaxForTrader, true) => Ok(self.config().max_pnl_factor_for_long_trader),
-            (PnlFactorKind::MaxForTrader, false) => {
-                Ok(self.config().max_pnl_factor_for_short_trader)
-            }
-            (PnlFactorKind::ForAdl, true) => Ok(self.config().max_pnl_factor_for_long_adl),
-            (PnlFactorKind::ForAdl, false) => Ok(self.config().max_pnl_factor_for_short_adl),
-            _ => Err(error!(StoreError::RequiredResourceNotFound).into()),
-        }
+        self.storage.pnl_factor_config(kind, is_long)
     }
 
     fn reserve_factor(&self) -> gmsol_model::Result<Self::Num> {
-        Ok(self.config().reserve_factor)
+        self.storage.reserve_factor()
+    }
+}
+
+impl<'a> gmsol_model::BaseMarketMut<{ constants::MARKET_DECIMALS }> for RevertibleMarket<'a> {
+    fn liquidity_pool_mut(&mut self) -> gmsol_model::Result<&mut Self::Pool> {
+        Ok(&mut self.liquidity)
+    }
+
+    fn claimable_fee_pool_mut(&mut self) -> gmsol_model::Result<&mut Self::Pool> {
+        Ok(&mut self.claimable_fee)
     }
 }
 

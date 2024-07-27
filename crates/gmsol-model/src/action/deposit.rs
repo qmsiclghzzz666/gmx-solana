@@ -1,7 +1,10 @@
 use num_traits::{CheckedAdd, CheckedMul, CheckedSub, Signed, Zero};
 
 use crate::{
-    market::{BaseMarket, BaseMarketExt, LiquidityMarket, LiquidityMarketExt, SwapMarketExt},
+    market::{
+        BaseMarket, BaseMarketExt, BaseMarketMutExt, LiquidityMarket, LiquidityMarketExt,
+        SwapMarketExt,
+    },
     num::{MulDiv, UnsignedAbs},
     params::Fees,
     utils, BalanceExt, PnlFactorKind, PoolExt,

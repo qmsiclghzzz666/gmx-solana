@@ -2,7 +2,7 @@ use std::ops::{Deref, DerefMut};
 
 use crate::{
     action::Prices,
-    market::{BaseMarket, BaseMarketExt, PerpMarket, PositionImpactMarketExt},
+    market::{BaseMarket, BaseMarketMutExt, PerpMarket, PositionImpactMarketExt},
     num::{MulDiv, Num, Unsigned, UnsignedAbs},
     params::fee::{FundingFees, PositionFees},
 };

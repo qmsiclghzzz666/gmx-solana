@@ -23,14 +23,8 @@ pub trait BaseMarket<const DECIMALS: u8> {
     /// Get the liquidity pool.
     fn liquidity_pool(&self) -> crate::Result<&Self::Pool>;
 
-    /// Get the liquidity pool mutably.
-    fn liquidity_pool_mut(&mut self) -> crate::Result<&mut Self::Pool>;
-
     /// Get the claimable fee pool.
     fn claimable_fee_pool(&self) -> crate::Result<&Self::Pool>;
-
-    /// Get the mutable reference of the claimable fee pool.
-    fn claimable_fee_pool_mut(&mut self) -> crate::Result<&mut Self::Pool>;
 
     /// Get the swap impact pool.
     fn swap_impact_pool(&self) -> crate::Result<&Self::Pool>;
@@ -56,6 +50,15 @@ pub trait BaseMarket<const DECIMALS: u8> {
     fn reserve_factor(&self) -> crate::Result<Self::Num>;
 }
 
+/// Base Market trait for mutable access.
+pub trait BaseMarketMut<const DECIMALS: u8>: BaseMarket<DECIMALS> {
+    /// Get the liquidity pool mutably.
+    fn liquidity_pool_mut(&mut self) -> crate::Result<&mut Self::Pool>;
+
+    /// Get the mutable reference of the claimable fee pool.
+    fn claimable_fee_pool_mut(&mut self) -> crate::Result<&mut Self::Pool>;
+}
+
 impl<'a, M: BaseMarket<DECIMALS>, const DECIMALS: u8> BaseMarket<DECIMALS> for &'a mut M {
     type Num = M::Num;
 
@@ -67,20 +70,12 @@ impl<'a, M: BaseMarket<DECIMALS>, const DECIMALS: u8> BaseMarket<DECIMALS> for &
         (**self).liquidity_pool()
     }
 
-    fn liquidity_pool_mut(&mut self) -> crate::Result<&mut Self::Pool> {
-        (**self).liquidity_pool_mut()
-    }
-
     fn swap_impact_pool(&self) -> crate::Result<&Self::Pool> {
         (**self).swap_impact_pool()
     }
 
     fn claimable_fee_pool(&self) -> crate::Result<&Self::Pool> {
         (**self).claimable_fee_pool()
-    }
-
-    fn claimable_fee_pool_mut(&mut self) -> crate::Result<&mut Self::Pool> {
-        (**self).claimable_fee_pool_mut()
     }
 
     fn open_interest_pool(&self, is_long: bool) -> crate::Result<&Self::Pool> {
@@ -108,31 +103,18 @@ impl<'a, M: BaseMarket<DECIMALS>, const DECIMALS: u8> BaseMarket<DECIMALS> for &
     }
 }
 
+impl<'a, M: BaseMarketMut<DECIMALS>, const DECIMALS: u8> BaseMarketMut<DECIMALS> for &'a mut M {
+    fn liquidity_pool_mut(&mut self) -> crate::Result<&mut Self::Pool> {
+        (**self).liquidity_pool_mut()
+    }
+
+    fn claimable_fee_pool_mut(&mut self) -> crate::Result<&mut Self::Pool> {
+        (**self).claimable_fee_pool_mut()
+    }
+}
+
 /// Extension trait for [`BaseMarket`].
 pub trait BaseMarketExt<const DECIMALS: u8>: BaseMarket<DECIMALS> {
-    /// Apply delta to the primary pool.
-    fn apply_delta(&mut self, is_long_token: bool, delta: &Self::Signed) -> crate::Result<()> {
-        if is_long_token {
-            self.liquidity_pool_mut()?
-                .apply_delta_to_long_amount(delta)?;
-        } else {
-            self.liquidity_pool_mut()?
-                .apply_delta_to_short_amount(delta)?;
-        }
-        Ok(())
-    }
-
-    /// Apply delta to claimable fee pool.
-    fn apply_delta_to_claimable_fee_pool(
-        &mut self,
-        is_long_token: bool,
-        delta: &Self::Signed,
-    ) -> crate::Result<()> {
-        self.claimable_fee_pool_mut()?
-            .apply_delta_amount(is_long_token, delta)?;
-        Ok(())
-    }
-
     /// Get the usd value of primary pool for one side.
     #[inline]
     fn pool_value_for_one_side(
@@ -395,6 +377,34 @@ pub trait BaseMarketExt<const DECIMALS: u8>: BaseMarket<DECIMALS> {
 }
 
 impl<M: BaseMarket<DECIMALS> + ?Sized, const DECIMALS: u8> BaseMarketExt<DECIMALS> for M {}
+
+/// Extension trait for [`BaseMarket`].
+pub trait BaseMarketMutExt<const DECIMALS: u8>: BaseMarketMut<DECIMALS> {
+    /// Apply delta to the primary pool.
+    fn apply_delta(&mut self, is_long_token: bool, delta: &Self::Signed) -> crate::Result<()> {
+        if is_long_token {
+            self.liquidity_pool_mut()?
+                .apply_delta_to_long_amount(delta)?;
+        } else {
+            self.liquidity_pool_mut()?
+                .apply_delta_to_short_amount(delta)?;
+        }
+        Ok(())
+    }
+
+    /// Apply delta to claimable fee pool.
+    fn apply_delta_to_claimable_fee_pool(
+        &mut self,
+        is_long_token: bool,
+        delta: &Self::Signed,
+    ) -> crate::Result<()> {
+        self.claimable_fee_pool_mut()?
+            .apply_delta_amount(is_long_token, delta)?;
+        Ok(())
+    }
+}
+
+impl<M: BaseMarketMut<DECIMALS> + ?Sized, const DECIMALS: u8> BaseMarketMutExt<DECIMALS> for M {}
 
 /// Pnl Factor Kind.
 #[derive(Debug, Clone, Copy)]

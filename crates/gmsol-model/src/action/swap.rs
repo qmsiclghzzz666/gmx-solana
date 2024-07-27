@@ -1,5 +1,5 @@
 use crate::{
-    market::{BaseMarket, BaseMarketExt, SwapMarket, SwapMarketExt},
+    market::{BaseMarket, BaseMarketExt, BaseMarketMutExt, SwapMarket, SwapMarketExt},
     num::{MulDiv, Unsigned},
     params::Fees,
     BalanceExt, PnlFactorKind, PoolExt,

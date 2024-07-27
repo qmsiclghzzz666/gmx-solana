@@ -85,12 +85,8 @@ impl<'a, 'info> PositionCutUtils<'a, 'info> {
         controller: &ControllerSeeds,
     ) -> Result<(u64, bool)> {
         let meta = self.get_validated_market_meta()?;
+        let tokens = meta.ordered_tokens();
         let cost = self.prepare_token_accounts()?;
-        let tokens = BTreeSet::from([
-            meta.index_token_mint,
-            meta.long_token_mint,
-            meta.short_token_mint,
-        ]);
         self.initialize_order(&kind, &meta, &tokens, nonce, controller)?;
         let (should_remove_position, transfer_out) = self.execute_order(
             &meta,

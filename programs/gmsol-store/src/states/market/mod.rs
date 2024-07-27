@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::{collections::BTreeSet, str::FromStr};
 
 use anchor_lang::{prelude::*, Bump};
 use bitmaps::Bitmap;
@@ -28,6 +28,8 @@ pub mod config;
 
 /// Revertible Market Operations.
 pub mod revertible;
+
+mod model;
 
 /// Max number of flags.
 pub const MAX_FLAGS: usize = 8;
@@ -271,6 +273,13 @@ impl Market {
         self.pools.get(kind).copied()
     }
 
+    /// Try to get pool of the given kind.
+    pub fn try_pool(&self, kind: PoolKind) -> gmsol_model::Result<&Pool> {
+        self.pools
+            .get(kind)
+            .ok_or(gmsol_model::Error::MissingPoolKind(kind))
+    }
+
     pub(crate) fn pool_mut(&mut self, kind: PoolKind) -> Option<&mut Pool> {
         self.pools.get_mut(kind)
     }
@@ -497,6 +506,15 @@ impl MarketMeta {
         } else {
             Err(StoreError::InvalidCollateralToken.into())
         }
+    }
+
+    /// Get ordered token set.
+    pub fn ordered_tokens(&self) -> BTreeSet<Pubkey> {
+        BTreeSet::from([
+            self.index_token_mint,
+            self.long_token_mint,
+            self.short_token_mint,
+        ])
     }
 }
 

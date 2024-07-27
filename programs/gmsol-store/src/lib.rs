@@ -1034,6 +1034,27 @@ pub mod gmsol_store {
         instructions::execute_order(ctx, recent_timestamp, throw_on_execution_error)
     }
 
+    /// Update the ADL state for the market.
+    ///
+    /// # Accounts.
+    /// *[See the documentation for the accounts.](UpdateAdlState).*
+    ///
+    /// # Arguments
+    /// - `is_long`: The market side to update for.
+    ///
+    /// # Checks
+    /// - The [`authority`](UpdateAdlState::authority) must be a signer and a
+    /// CONTROLLER of the store.
+    /// - The [`store`](UpdateAdlState::store) must be an initialized [`Store`](states::Store)
+    /// account owned by the store program.
+    /// - The [`oracle`](UpdateAdlState::oracle) must be an initialized [`Oracle`](states::Oracle)
+    /// account owned by the store program, and it must be owned by the store.
+    /// - The [`market`](UpdateAdlState::market) must be enabled and owned by the store.
+    #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
+    pub fn update_adl_state(ctx: Context<UpdateAdlState>, is_long: bool) -> Result<()> {
+        instructions::unchecked_update_adl_state(ctx, is_long)
+    }
+
     #[access_control(internal::Authenticate::only_controller(&ctx))]
     pub fn initialize_order(
         ctx: Context<InitializeOrder>,
