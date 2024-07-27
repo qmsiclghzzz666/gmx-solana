@@ -227,10 +227,11 @@ impl OrderParams {
             | OrderKind::AutoDeleveraging => {
                 require!(self.trigger_price.is_none(), StoreError::InvalidArgument);
             }
-            OrderKind::LimitSwap
-            | OrderKind::LimitIncrease
-            | OrderKind::LimitDecrease
-            | OrderKind::StopLossDecrease => {
+            OrderKind::LimitSwap => {
+                // NOTE: The "trigger price" is replaced by the min output amount for limit swap orders.
+                require!(self.trigger_price.is_none(), StoreError::InvalidArgument);
+            }
+            OrderKind::LimitIncrease | OrderKind::LimitDecrease | OrderKind::StopLossDecrease => {
                 require!(self.trigger_price.is_some(), StoreError::InvalidArgument);
             }
         }

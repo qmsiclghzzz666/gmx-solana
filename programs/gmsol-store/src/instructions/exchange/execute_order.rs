@@ -361,7 +361,9 @@ impl<'info> ExecuteOrder<'info> {
                 }
             }
             (OrderKind::LimitSwap, _) => {
-                // NOTE: we leave the check of the trigger price for limit swap to the execution part.
+                // NOTE: For limit swap orders, the trigger price can be substituted by the min output amount,
+                // so validatoin is not required. In fact, we should prohibit the creation of limit swap orders
+                // with a trigger price.
             }
             (
                 OrderKind::MarketSwap
