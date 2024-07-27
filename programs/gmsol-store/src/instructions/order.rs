@@ -93,10 +93,11 @@ pub fn initialize_order(
     output_token: Pubkey,
     ui_fee_receiver: Pubkey,
 ) -> Result<()> {
+    params.validate()?;
     let meta = *ctx.accounts.market.load()?.meta();
     // Validate and create `Tokens`.
     let tokens = match &params.kind {
-        OrderKind::MarketSwap => {
+        OrderKind::MarketSwap | OrderKind::LimitSwap => {
             // Validate that the `output_token` is one of the collateral tokens.
             ctx.accounts
                 .market
@@ -112,7 +113,7 @@ pub fn initialize_order(
                 final_output_token: None,
             }
         }
-        OrderKind::MarketIncrease => {
+        OrderKind::MarketIncrease | OrderKind::LimitIncrease => {
             // The validation of `output_token` is also performed by the method below.
             ctx.accounts.initialize_position_if_needed(
                 &owner,
@@ -128,7 +129,11 @@ pub fn initialize_order(
                 final_output_token: None,
             }
         }
-        OrderKind::MarketDecrease | OrderKind::Liquidation | OrderKind::AutoDeleveraging => {
+        OrderKind::MarketDecrease
+        | OrderKind::Liquidation
+        | OrderKind::AutoDeleveraging
+        | OrderKind::LimitDecrease
+        | OrderKind::StopLossDecrease => {
             // The validation of `output_token` is also performed by the method below.
             ctx.accounts
                 .validate_position(ctx.bumps.position, &output_token)?;
@@ -142,7 +147,7 @@ pub fn initialize_order(
         }
     };
     let (senders, receivers) = match &params.kind {
-        OrderKind::MarketSwap => (
+        OrderKind::MarketSwap | OrderKind::LimitSwap => (
             Senders {
                 initial_collateral_token_account: Some(
                     ctx.accounts.initial_collateral_token_account()?.key(),
@@ -157,7 +162,7 @@ pub fn initialize_order(
                 short_token_account: ctx.accounts.short_token_account.key(),
             },
         ),
-        OrderKind::MarketIncrease => (
+        OrderKind::MarketIncrease | OrderKind::LimitIncrease => (
             Senders {
                 initial_collateral_token_account: Some(
                     ctx.accounts.initial_collateral_token_account()?.key(),
@@ -171,7 +176,11 @@ pub fn initialize_order(
                 short_token_account: ctx.accounts.short_token_account.key(),
             },
         ),
-        OrderKind::MarketDecrease | OrderKind::Liquidation | OrderKind::AutoDeleveraging => (
+        OrderKind::MarketDecrease
+        | OrderKind::Liquidation
+        | OrderKind::AutoDeleveraging
+        | OrderKind::LimitDecrease
+        | OrderKind::StopLossDecrease => (
             Senders {
                 initial_collateral_token_account: None,
             },

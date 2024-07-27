@@ -195,8 +195,6 @@ pub fn execute_order<'info>(
         }
     }
     let prices = ctx.accounts.prices()?;
-    // TODO: validate non-empty order.
-    // TODO: validate order trigger price.
     match ctx.accounts.execute(prices, ctx.remaining_accounts) {
         Ok((should_remove_position, mut transfer_out, trade_event)) => {
             if let Some(event) = trade_event {
@@ -226,8 +224,20 @@ impl<'info> internal::Authentication<'info> for ExecuteOrder<'info> {
 impl<'info> ValidateOracleTime for ExecuteOrder<'info> {
     fn oracle_updated_after(&self) -> StoreResult<Option<i64>> {
         match self.order.fixed.params.kind {
-            OrderKind::MarketSwap | OrderKind::MarketIncrease | OrderKind::MarketDecrease => {
-                Ok(Some(self.order.fixed.updated_at))
+            OrderKind::MarketSwap
+            | OrderKind::LimitSwap
+            | OrderKind::MarketIncrease
+            | OrderKind::MarketDecrease
+            | OrderKind::LimitIncrease => Ok(Some(self.order.fixed.updated_at)),
+            OrderKind::LimitDecrease | OrderKind::StopLossDecrease => {
+                let position = self
+                    .position
+                    .as_ref()
+                    .ok_or(StoreError::PositionNotProvided)?
+                    .load()
+                    .map_err(|_| StoreError::LoadAccountError)?;
+                let last_updated = self.order.fixed.updated_at.max(position.state.increased_at);
+                Ok(Some(last_updated))
             }
             OrderKind::Liquidation => {
                 let position = self
@@ -247,7 +257,7 @@ impl<'info> ValidateOracleTime for ExecuteOrder<'info> {
 
     fn oracle_updated_before(&self) -> StoreResult<Option<i64>> {
         let ts = match self.order.fixed.params.kind {
-            OrderKind::MarketIncrease | OrderKind::MarketDecrease => {
+            OrderKind::MarketSwap | OrderKind::MarketIncrease | OrderKind::MarketDecrease => {
                 Some(self.order.fixed.updated_at)
             }
             _ => None,
@@ -292,12 +302,91 @@ impl<'info> ExecuteOrder<'info> {
         Ok(())
     }
 
+    fn validate_order(&self, prices: &Prices<u128>) -> Result<()> {
+        self.validate_non_empty_order()?;
+        self.validate_trigger_price(prices)?;
+        Ok(())
+    }
+
+    fn validate_non_empty_order(&self) -> Result<()> {
+        let order = &self.order;
+        let kind = &order.fixed.kind;
+        let params = &order.fixed.params;
+
+        // NOTE: we currently allow the delta size for decrease position order to be empty.
+        if kind.is_increase_position() {
+            require!(params.size_delta_usd != 0, StoreError::InvalidArgument);
+        }
+
+        if kind.is_swap() {
+            require!(
+                params.initial_collateral_delta_amount != 0,
+                StoreError::InvalidArgument
+            );
+        }
+        Ok(())
+    }
+
+    fn validate_trigger_price(&self, prices: &Prices<u128>) -> Result<()> {
+        let order = &self.order;
+        let kind = &order.fixed.kind;
+        let params = &order.fixed.params;
+        let index_price = &prices.index_token_price;
+        match (kind, params.trigger_price.as_ref()) {
+            (OrderKind::LimitIncrease, Some(trigger_price)) => {
+                if params.is_long {
+                    // TODO: Pick max price.
+                    require_gte!(trigger_price, index_price, StoreError::InvalidTriggerPrice);
+                } else {
+                    // TODO: Pick min price.
+                    require_gte!(index_price, trigger_price, StoreError::InvalidTriggerPrice);
+                }
+            }
+            (OrderKind::LimitDecrease, Some(trigger_price)) => {
+                if params.is_long {
+                    // TODO: Pick min price.
+                    require_gte!(index_price, trigger_price, StoreError::InvalidTriggerPrice);
+                } else {
+                    // TODO: Pick max price.
+                    require_gte!(trigger_price, index_price, StoreError::InvalidTriggerPrice);
+                }
+            }
+            (OrderKind::StopLossDecrease, Some(trigger_price)) => {
+                if params.is_long {
+                    // TODO: Pick min price.
+                    require_gte!(trigger_price, index_price, StoreError::InvalidTriggerPrice);
+                } else {
+                    // TODO: Pick max price.
+                    require_gte!(index_price, trigger_price, StoreError::InvalidTriggerPrice);
+                }
+            }
+            (OrderKind::LimitSwap, _) => {
+                // NOTE: we leave the check of the trigger price for limit swap to the execution part.
+            }
+            (
+                OrderKind::MarketSwap
+                | OrderKind::MarketIncrease
+                | OrderKind::MarketDecrease
+                | OrderKind::Liquidation
+                | OrderKind::AutoDeleveraging,
+                _,
+            ) => {}
+            _ => {
+                return err!(StoreError::InvalidTriggerPrice);
+            }
+        }
+
+        Ok(())
+    }
+
+    #[inline(never)]
     fn execute(
         &mut self,
         prices: Prices<u128>,
         remaining_accounts: &'info [AccountInfo<'info>],
     ) -> Result<(ShouldRemovePosition, Box<TransferOut>, Option<TradeEvent>)> {
         self.validate_market()?;
+        self.validate_order(&prices)?;
 
         // Prepare execution context.
         let mut market = RevertiblePerpMarket::new(&self.market)?;
@@ -323,7 +412,7 @@ impl<'info> ExecuteOrder<'info> {
         let kind = self.order.fixed.params.kind;
         let mut trade_event = None;
         let should_remove_position = match &kind {
-            OrderKind::MarketSwap => {
+            OrderKind::MarketSwap | OrderKind::LimitSwap => {
                 execute_swap(
                     &self.oracle,
                     &mut market,
@@ -337,7 +426,10 @@ impl<'info> ExecuteOrder<'info> {
             OrderKind::MarketIncrease
             | OrderKind::MarketDecrease
             | OrderKind::Liquidation
-            | OrderKind::AutoDeleveraging => {
+            | OrderKind::AutoDeleveraging
+            | OrderKind::LimitIncrease
+            | OrderKind::LimitDecrease
+            | OrderKind::StopLossDecrease => {
                 let position_loader = self
                     .position
                     .as_ref()
@@ -351,7 +443,7 @@ impl<'info> ExecuteOrder<'info> {
                 let mut position = RevertiblePosition::new(market, position_loader)?;
 
                 let should_remove_position = match kind {
-                    OrderKind::MarketIncrease => {
+                    OrderKind::MarketIncrease | OrderKind::LimitIncrease => {
                         execute_increase_position(
                             &self.oracle,
                             prices,
@@ -385,7 +477,9 @@ impl<'info> ExecuteOrder<'info> {
                         true,
                         Some(SecondaryOrderType::AutoDeleveraging),
                     )?,
-                    OrderKind::MarketDecrease => execute_decrease_position(
+                    OrderKind::MarketDecrease
+                    | OrderKind::LimitDecrease
+                    | OrderKind::StopLossDecrease => execute_decrease_position(
                         &self.oracle,
                         prices,
                         &mut position,
@@ -449,6 +543,11 @@ fn execute_swap(
         )?;
         swap_out_amount
     };
+    require_gte!(
+        u128::from(swap_out_amount),
+        order.fixed.params.min_output_amount,
+        StoreError::InsufficientOutputAmount
+    );
     let is_long = market.market_meta().to_token_side(&swap_out_token)?;
     transfer_out.transfer_out_collateral(
         is_long,
@@ -557,6 +656,15 @@ fn execute_decrease_position(
         // Only required when the order is an ADL order.
         let mut pnl_factor_before_execution = None;
 
+        // Validate the liqudiation is a fully close.
+        if is_liquidation_order {
+            require_gte!(
+                size_delta_usd,
+                *position.size_in_usd(),
+                StoreError::InvalidArgument
+            );
+        }
+
         // Validate that ADL is required.
         if is_adl_order {
             let Some((pnl_factor, _)) = position
@@ -638,20 +746,27 @@ fn execute_decrease_position(
         // Since we have checked that secondary_amount must be zero if output_token == secondary_output_token,
         // the swap should still be correct.
 
+        let final_output_token = order
+            .fixed
+            .tokens
+            .final_output_token
+            .ok_or(error!(StoreError::MissingTokenMint))?;
+        let secondary_output_token = order.fixed.tokens.secondary_output_token;
         let (output_amount, secondary_output_amount) = swap_markets.revertible_swap(
             SwapDirection::From(position.market_mut()),
             oracle,
             &order.swap,
-            (
-                order
-                    .fixed
-                    .tokens
-                    .final_output_token
-                    .ok_or(error!(StoreError::MissingTokenMint))?,
-                order.fixed.tokens.secondary_output_token,
-            ),
+            (final_output_token, secondary_output_token),
             token_ins,
             (output_amount, secondary_output_amount),
+        )?;
+        validate_output_amount(
+            oracle,
+            &final_output_token,
+            output_amount,
+            &secondary_output_token,
+            secondary_output_amount,
+            order.fixed.params.min_output_amount,
         )?;
         transfer_out.transfer_out(false, output_amount)?;
         transfer_out.transfer_out(true, secondary_output_amount)?;
@@ -748,4 +863,43 @@ fn validated_recent_timestamp(config: &Store, timestamp: i64) -> Result<i64> {
     } else {
         err!(StoreError::InvalidArgument)
     }
+}
+
+#[inline(never)]
+fn validate_output_amount(
+    oracle: &Oracle,
+    output_token: &Pubkey,
+    output_amount: u64,
+    secondary_output_token: &Pubkey,
+    secondary_output_amount: u64,
+    min_output_value: u128,
+) -> Result<()> {
+    let mut total = 0u128;
+    {
+        let price = oracle
+            .primary
+            .get(output_token)
+            .ok_or(error!(StoreError::MissingOracelPrice))?
+            .min
+            .to_unit_price();
+        let output_value = u128::from(output_amount).saturating_mul(price);
+        total = total.saturating_add(output_value);
+    }
+    {
+        let price = oracle
+            .primary
+            .get(secondary_output_token)
+            .ok_or(error!(StoreError::MissingOracelPrice))?
+            .min
+            .to_unit_price();
+        let output_value = u128::from(secondary_output_amount).saturating_mul(price);
+        total = total.saturating_add(output_value);
+    }
+
+    require_gte!(
+        total,
+        min_output_value,
+        StoreError::InsufficientOutputAmount
+    );
+    Ok(())
 }

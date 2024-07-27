@@ -123,6 +123,7 @@ pub trait ExchangeOps<C> {
             size_delta_usd: increment_size_in_usd,
             initial_collateral_delta_amount: initial_collateral_amount,
             acceptable_price: None,
+            trigger_price: None,
             is_long,
         };
         self.create_order(store, market_token, is_collateral_token_long, params)
@@ -144,6 +145,7 @@ pub trait ExchangeOps<C> {
             size_delta_usd: decrement_size_in_usd,
             initial_collateral_delta_amount: collateral_withdrawal_amount,
             acceptable_price: None,
+            trigger_price: None,
             is_long,
         };
         self.create_order(store, market_token, is_collateral_token_long, params)
@@ -164,6 +166,7 @@ pub trait ExchangeOps<C> {
             size_delta_usd: size_in_usd.unwrap_or(u128::MAX),
             initial_collateral_delta_amount: 0,
             acceptable_price: None,
+            trigger_price: None,
             is_long,
         };
         self.create_order(store, market_token, is_collateral_token_long, params)
@@ -189,6 +192,7 @@ pub trait ExchangeOps<C> {
             size_delta_usd: 0,
             initial_collateral_delta_amount: initial_swap_in_token_amount,
             acceptable_price: None,
+            trigger_price: None,
             is_long: true,
         };
         let mut builder = self.create_order(store, market_token, is_output_token_long, params);

@@ -184,6 +184,7 @@ impl<'a, 'info> PositionCutUtils<'a, 'info> {
             size_delta_usd,
             initial_collateral_delta_amount: 0,
             acceptable_price: None,
+            trigger_price: None,
             is_long: position.is_long()?,
         };
 

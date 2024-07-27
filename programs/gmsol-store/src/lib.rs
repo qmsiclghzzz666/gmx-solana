@@ -1298,6 +1298,10 @@ pub enum StoreError {
     AdlNotRequired,
     #[msg("Invalid ADL")]
     InvalidAdl,
+    #[msg("Invalid Trigger Price")]
+    InvalidTriggerPrice,
+    #[msg("Insufficient output amount or value")]
+    InsufficientOutputAmount,
     // Token Config.
     #[msg("synthetic flag does not match")]
     InvalidSynthetic,

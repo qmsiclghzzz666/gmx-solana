@@ -152,7 +152,7 @@ where
     }
 
     /// Set min output amount.
-    pub fn min_output_amount(&mut self, amount: u64) -> &mut Self {
+    pub fn min_output_amount(&mut self, amount: u128) -> &mut Self {
         self.params.min_output_amount = amount;
         self
     }
@@ -191,7 +191,12 @@ where
     async fn output_token_and_position(&mut self) -> crate::Result<(Pubkey, Option<Pubkey>)> {
         let output_token = self.output_token().await?;
         match &self.params.kind {
-            OrderKind::MarketIncrease | OrderKind::MarketDecrease | OrderKind::Liquidation => {
+            OrderKind::MarketIncrease
+            | OrderKind::MarketDecrease
+            | OrderKind::Liquidation
+            | OrderKind::LimitIncrease
+            | OrderKind::LimitDecrease
+            | OrderKind::StopLossDecrease => {
                 let position = self.client.find_position_address(
                     &self.store,
                     &self.client.payer(),
@@ -203,7 +208,7 @@ where
                 )?;
                 Ok((output_token, Some(position)))
             }
-            OrderKind::MarketSwap => Ok((output_token, None)),
+            OrderKind::MarketSwap | OrderKind::LimitSwap => Ok((output_token, None)),
             kind => Err(crate::Error::invalid_argument(format!(
                 "unsupported order kind: {kind:?}"
             ))),
@@ -215,7 +220,10 @@ where
     /// Returns `(initial_collateral_token_account, initial_collateral_token_vault)`.
     async fn initial_collateral_accounts(&mut self) -> crate::Result<Option<(Pubkey, Pubkey)>> {
         match &self.params.kind {
-            OrderKind::MarketIncrease | OrderKind::MarketSwap => {
+            OrderKind::MarketIncrease
+            | OrderKind::MarketSwap
+            | OrderKind::LimitIncrease
+            | OrderKind::LimitSwap => {
                 if self.initial_token.is_empty() {
                     let output_token = self.output_token().await?;
                     self.initial_token.set_token(output_token);
@@ -237,7 +245,10 @@ where
                     self.client.find_market_vault_address(&self.store, &token),
                 )))
             }
-            OrderKind::MarketDecrease | OrderKind::Liquidation => Ok(None),
+            OrderKind::MarketDecrease
+            | OrderKind::Liquidation
+            | OrderKind::LimitDecrease
+            | OrderKind::StopLossDecrease => Ok(None),
             kind => Err(crate::Error::invalid_argument(format!(
                 "unsupported order kind: {kind:?}"
             ))),
@@ -246,7 +257,10 @@ where
 
     async fn final_output_token_account(&mut self) -> crate::Result<Option<Pubkey>> {
         match &self.params.kind {
-            OrderKind::MarketDecrease | OrderKind::Liquidation => {
+            OrderKind::MarketDecrease
+            | OrderKind::Liquidation
+            | OrderKind::LimitDecrease
+            | OrderKind::StopLossDecrease => {
                 if self.final_token.is_empty() {
                     let output_token = self.output_token().await?;
                     self.final_token.set_token(output_token);
@@ -261,7 +275,10 @@ where
                 };
                 Ok(Some(account))
             }
-            OrderKind::MarketIncrease | OrderKind::MarketSwap => Ok(None),
+            OrderKind::MarketIncrease
+            | OrderKind::MarketSwap
+            | OrderKind::LimitIncrease
+            | OrderKind::LimitSwap => Ok(None),
             kind => Err(crate::Error::invalid_argument(format!(
                 "unsupported order kind: {kind:?}"
             ))),
@@ -279,8 +296,14 @@ where
 
     async fn get_secondary_output_token_account(&mut self) -> crate::Result<Option<Pubkey>> {
         match &self.params.kind {
-            OrderKind::MarketIncrease | OrderKind::MarketSwap => Ok(None),
-            OrderKind::MarketDecrease | OrderKind::Liquidation => {
+            OrderKind::MarketIncrease
+            | OrderKind::MarketSwap
+            | OrderKind::LimitIncrease
+            | OrderKind::LimitSwap => Ok(None),
+            OrderKind::MarketDecrease
+            | OrderKind::Liquidation
+            | OrderKind::LimitDecrease
+            | OrderKind::StopLossDecrease => {
                 if let Some(account) = self.secondary_token_account {
                     return Ok(Some(account));
                 }
@@ -549,7 +572,10 @@ where
         let secondary_output_token_account = order.fixed.receivers.secondary_output_token_account;
         self.hint = Some(ExecuteOrderHint {
             store_program_id: self.client.data_store_program_id(),
-            has_claimable: matches!(order.fixed.params.kind, OrderKind::MarketDecrease),
+            has_claimable: matches!(
+                order.fixed.params.kind,
+                OrderKind::MarketDecrease | OrderKind::LimitDecrease | OrderKind::StopLossDecrease
+            ),
             store: *store,
             market_token,
             position: order.fixed.position,

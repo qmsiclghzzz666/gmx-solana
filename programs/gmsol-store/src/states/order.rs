@@ -181,12 +181,17 @@ pub struct Tokens {
 pub struct OrderParams {
     /// Order kind.
     pub kind: OrderKind,
-    /// Min amount for output tokens.
-    pub min_output_amount: u64,
+    /// Minimum amount or value for output tokens.
+    ///
+    /// - Amount for swap orders.
+    /// - Value for decrease position orders.
+    pub min_output_amount: u128,
     /// Size delta usd.
     pub size_delta_usd: u128,
     /// Initial collateral delta amount.
     pub initial_collateral_delta_amount: u64,
+    /// Trigger price (unit price).
+    pub trigger_price: Option<u128>,
     /// Acceptable price (unit price).
     pub acceptable_price: Option<u128>,
     /// Whether the order is for a long or short position.
@@ -196,24 +201,40 @@ pub struct OrderParams {
 impl OrderParams {
     /// Get position kind.
     pub fn to_position_kind(&self) -> Result<PositionKind> {
-        match &self.kind {
-            OrderKind::MarketSwap => Err(StoreError::PositionIsNotRequried.into()),
-            OrderKind::AutoDeleveraging
-            | OrderKind::Liquidation
-            | OrderKind::MarketDecrease
-            | OrderKind::MarketIncrease => {
-                if self.is_long {
-                    Ok(PositionKind::Long)
-                } else {
-                    Ok(PositionKind::Short)
-                }
-            }
+        if self.kind.is_swap() {
+            Err(StoreError::PositionIsNotRequried.into())
+        } else {
+            Ok(if self.is_long {
+                PositionKind::Long
+            } else {
+                PositionKind::Short
+            })
         }
     }
 
     /// Need to transfer in.
     pub fn need_to_transfer_in(&self) -> bool {
-        matches!(self.kind, OrderKind::MarketIncrease | OrderKind::MarketSwap)
+        self.kind.is_increase_position() || self.kind.is_swap()
+    }
+
+    /// Validate.
+    pub fn validate(&self) -> Result<()> {
+        match self.kind {
+            OrderKind::MarketSwap
+            | OrderKind::MarketIncrease
+            | OrderKind::MarketDecrease
+            | OrderKind::Liquidation
+            | OrderKind::AutoDeleveraging => {
+                require!(self.trigger_price.is_none(), StoreError::InvalidArgument);
+            }
+            OrderKind::LimitSwap
+            | OrderKind::LimitIncrease
+            | OrderKind::LimitDecrease
+            | OrderKind::StopLossDecrease => {
+                require!(self.trigger_price.is_some(), StoreError::InvalidArgument);
+            }
+        }
+        Ok(())
     }
 }
 
@@ -239,6 +260,46 @@ pub enum OrderKind {
     Liquidation,
     /// Auto-deleveraging Order.
     AutoDeleveraging,
+    /// Limit Swap.
+    LimitSwap,
+    /// Limit Increase.
+    LimitIncrease,
+    /// Limit Decrease.
+    LimitDecrease,
+    /// Stop-Loss Decrease.
+    StopLossDecrease,
+}
+
+impl OrderKind {
+    /// Is market order.
+    pub fn is_market(&self) -> bool {
+        matches!(
+            self,
+            Self::MarketSwap | Self::MarketIncrease | Self::MarketDecrease
+        )
+    }
+
+    /// Is swap order.
+    pub fn is_swap(&self) -> bool {
+        matches!(self, Self::MarketSwap | Self::LimitSwap)
+    }
+
+    /// Is increase position order.
+    pub fn is_increase_position(&self) -> bool {
+        matches!(self, Self::LimitIncrease | Self::MarketIncrease)
+    }
+
+    /// Is decrease position order.
+    pub fn is_decrease_position(&self) -> bool {
+        matches!(
+            self,
+            Self::LimitDecrease
+                | Self::MarketDecrease
+                | Self::Liquidation
+                | Self::AutoDeleveraging
+                | Self::StopLossDecrease
+        )
+    }
 }
 
 /// Transfer Out.

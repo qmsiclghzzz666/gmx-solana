@@ -4,10 +4,7 @@ use gmsol_store::{
     constants::EVENT_AUTHORITY_SEED,
     cpi::accounts::RemovePosition,
     program::GmsolStore,
-    states::{
-        order::{OrderKind, TransferOut},
-        Oracle, Order, PriceProvider,
-    },
+    states::{order::TransferOut, Oracle, Order, PriceProvider},
     utils::{Authentication, WithOracle, WithOracleExt, WithStore},
 };
 
@@ -202,19 +199,15 @@ impl<'info> WithOracle<'info> for ExecuteOrder<'info> {
 
 impl<'info> ExecuteOrder<'info> {
     fn is_executable(&self) -> Result<bool> {
-        match self.order.fixed.params.kind {
-            OrderKind::MarketIncrease | OrderKind::MarketDecrease | OrderKind::Liquidation => {
-                let position = self
-                    .position
-                    .as_ref()
-                    .ok_or(error!(ExchangeError::PositionNotProvided))?;
-                // The order is not executable if the position have not been initialized.
-                Ok(!must_be_uninitialized(position))
-            }
-            OrderKind::MarketSwap => Ok(true),
-            _ => {
-                err!(ExchangeError::UnsupportedOrderKind)
-            }
+        if self.order.fixed.params.kind.is_swap() {
+            Ok(true)
+        } else {
+            let position = self
+                .position
+                .as_ref()
+                .ok_or(error!(ExchangeError::PositionNotProvided))?;
+            // The order is not executable if the position have not been initialized.
+            Ok(!must_be_uninitialized(position))
         }
     }
 
