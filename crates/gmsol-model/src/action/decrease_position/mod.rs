@@ -18,7 +18,7 @@ mod utils;
 
 pub use self::{
     claimable::ClaimableCollateral,
-    report::{DecreasePositionReport, ProcessedPnl},
+    report::{DecreasePositionReport, OutputAmounts, ProcessedPnl},
 };
 
 /// Decrease the position.
@@ -448,8 +448,7 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
             report.is_secondary_output_token_long(),
             report.params().prices.clone(),
         );
-        let output_amount = &mut report.output_amount;
-        let secondary_output_amount = &mut report.secondary_output_amount;
+        let (output_amount, secondary_output_amount) = report.output_amounts_mut();
         if !secondary_output_amount.is_zero() {
             if is_output_token_long == is_secondary_output_token_long {
                 *output_amount = output_amount

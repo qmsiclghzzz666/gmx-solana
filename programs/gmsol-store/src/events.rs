@@ -3,7 +3,7 @@ use std::ops::{Deref, DerefMut};
 use anchor_lang::prelude::*;
 use gmsol_model::{
     action::{
-        decrease_position::{DecreasePositionReport, ProcessedPnl},
+        decrease_position::{DecreasePositionReport, OutputAmounts, ProcessedPnl},
         increase_position::IncreasePositionReport,
         Prices,
     },
@@ -174,19 +174,26 @@ impl std::fmt::Display for TradeEvent {
             .field("user", &self.user.to_string())
             .field("position", &self.position.to_string())
             .field("order", &self.order.to_string())
+            .field(
+                "final_output_token",
+                &self.final_output_token.as_ref().map(|p| p.to_string()),
+            )
             .field("ts", &self.ts)
             .field("slot", &self.slot)
             .field("is_long", &self.is_long)
+            .field("is_collateral_long", &self.is_collateral_long)
             .field("is_increase", &self.is_increase)
             .field("delta_collateral_amount", &self.delta_collateral_amount())
             .field("delta_size_in_usd", &self.delta_size_in_usd())
-            .field("transfer_out", &self.transfer_out)
+            .field("delta_size_in_tokens", &self.delta_size_in_tokens())
             .field("prices", &self.prices)
             .field("execution_price", &self.execution_price)
             .field("price_impact_value", &self.price_impact_value)
             .field("price_impact_diff", &self.price_impact_diff)
             .field("pnl", &self.pnl)
             .field("fees", &self.fees)
+            .field("output_amounts", &self.output_amounts)
+            .field("transfer_out", &self.transfer_out)
             .finish_non_exhaustive()
     }
 }
@@ -228,12 +235,20 @@ pub struct TradeEventData {
         serde(with = "serde_with::As::<serde_with::DisplayFromStr>")
     )]
     pub order: Pubkey,
+    /// Final output token.
+    #[cfg_attr(
+        feature = "serde",
+        serde(with = "serde_with::As::<Option<serde_with::DisplayFromStr>>")
+    )]
+    pub final_output_token: Option<Pubkey>,
     /// Trade ts.
     pub ts: i64,
     /// Trade slot.
     pub slot: u64,
     /// Trade side.
     pub is_long: bool,
+    /// Collateral side.
+    pub is_collateral_long: bool,
     /// Trade direction.
     pub is_increase: bool,
     /// Before state.
@@ -254,6 +269,9 @@ pub struct TradeEventData {
     pub pnl: ProcessedPnl<i128>,
     /// Fees.
     pub fees: PositionFees<u128>,
+    /// Output amounts.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub output_amounts: Option<OutputAmounts<u128>>,
 }
 
 impl TradeEventData {
@@ -328,6 +346,7 @@ impl TradeEvent {
     /// Create a new unchanged trade event.
     pub(crate) fn new_unchanged(
         is_increase: bool,
+        is_collateral_long: bool,
         pubkey: Pubkey,
         position: &Position,
         order: Pubkey,
@@ -340,9 +359,11 @@ impl TradeEvent {
             user: position.owner,
             position: pubkey,
             order,
+            final_output_token: None,
             ts: clock.unix_timestamp,
             slot: clock.slot,
             is_long: position.is_long()?,
+            is_collateral_long,
             is_increase,
             before: position.state,
             after: position.state,
@@ -353,6 +374,7 @@ impl TradeEvent {
             price_impact_diff: 0,
             pnl: Default::default(),
             fees: Default::default(),
+            output_amounts: None,
         })))
     }
 
@@ -370,6 +392,10 @@ impl TradeEvent {
         self.transfer_out = transfer_out.clone();
         self.transfer_out.executed = true;
         Ok(())
+    }
+
+    pub(crate) fn set_final_output_token(&mut self, token: &Pubkey) {
+        self.final_output_token = Some(*token);
     }
 
     /// Update with increase report.
@@ -396,6 +422,7 @@ impl TradeEvent {
         self.price_impact_diff = *report.price_impact_diff();
         self.pnl = *report.pnl();
         self.fees = *report.fees();
+        self.output_amounts = Some(*report.output_amounts());
         Ok(())
     }
 }

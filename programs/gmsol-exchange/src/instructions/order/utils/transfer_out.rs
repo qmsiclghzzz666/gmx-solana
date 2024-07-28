@@ -75,7 +75,7 @@ impl<'info> TransferOutUtils<'info> {
     ) -> Result<()> {
         let TransferOut {
             final_output_token,
-            final_secondary_output_token,
+            secondary_output_token: final_secondary_output_token,
             long_token,
             short_token,
             long_token_for_claimable_account_of_user,

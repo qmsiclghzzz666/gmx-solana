@@ -312,8 +312,8 @@ pub struct TransferOut {
     pub executed: bool,
     /// Final output token.
     pub final_output_token: u64,
-    /// Final secondary output token.
-    pub final_secondary_output_token: u64,
+    /// Secondary output token.
+    pub secondary_output_token: u64,
     /// Long token.
     pub long_token: u64,
     /// Short token.
@@ -339,7 +339,7 @@ impl TransferOut {
     /// Return whether the output for user is empty.
     pub fn is_user_output_empty(&self) -> bool {
         self.final_output_token == 0
-            && self.final_secondary_output_token == 0
+            && self.secondary_output_token == 0
             && self.long_token == 0
             && self.short_token == 0
             && self.long_token_for_claimable_account_of_user == 0
@@ -372,8 +372,8 @@ impl TransferOut {
             return Ok(());
         }
         if is_secondary {
-            self.final_secondary_output_token = self
-                .final_secondary_output_token
+            self.secondary_output_token = self
+                .secondary_output_token
                 .checked_add(amount)
                 .ok_or(error!(StoreError::AmountOverflow))?;
         } else {

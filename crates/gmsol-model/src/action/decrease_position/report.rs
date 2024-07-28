@@ -29,8 +29,7 @@ pub struct DecreasePositionReport<T: Unsigned> {
     should_remove: bool,
     is_output_token_long: bool,
     is_secondary_output_token_long: bool,
-    pub(super) output_amount: T,
-    pub(super) secondary_output_amount: T,
+    output_amounts: OutputAmounts<T>,
     claimable_funding_long_token_amount: T,
     claimable_funding_short_token_amount: T,
     for_holding: ClaimableCollateral<T>,
@@ -62,8 +61,7 @@ where
                 "is_secondary_output_token_long",
                 &self.is_secondary_output_token_long,
             )
-            .field("output_amount", &self.output_amount)
-            .field("secondary_output_amount", &self.secondary_output_amount)
+            .field("output_amounts", &self.output_amounts)
             .field(
                 "claimable_funding_long_token_amount",
                 &self.claimable_funding_long_token_amount,
@@ -98,8 +96,10 @@ impl<T: Unsigned + Clone> DecreasePositionReport<T> {
             funding,
             is_output_token_long: execution.is_output_token_long,
             is_secondary_output_token_long: execution.is_secondary_output_token_long,
-            output_amount: execution.collateral.output_amount,
-            secondary_output_amount: execution.collateral.secondary_output_amount,
+            output_amounts: OutputAmounts {
+                output_amount: execution.collateral.output_amount,
+                secondary_output_amount: execution.collateral.secondary_output_amount,
+            },
             withdrawable_collateral_amount,
             size_delta_usd,
             price_impact_diff: execution.price_impact_diff,
@@ -171,7 +171,7 @@ impl<T: Unsigned + Clone> DecreasePositionReport<T> {
     /// ## Must Use
     /// Must be used by the caller.
     pub fn output_amount(&self) -> &T {
-        &self.output_amount
+        &self.output_amounts.output_amount
     }
 
     /// Get secondary output amount.
@@ -179,7 +179,19 @@ impl<T: Unsigned + Clone> DecreasePositionReport<T> {
     /// ## Must Use
     /// Must be used by the caller.
     pub fn secondary_output_amount(&self) -> &T {
-        &self.secondary_output_amount
+        &self.output_amounts.secondary_output_amount
+    }
+
+    /// Get output amounts.
+    pub fn output_amounts(&self) -> &OutputAmounts<T> {
+        &self.output_amounts
+    }
+
+    pub(super) fn output_amounts_mut(&mut self) -> (&mut T, &mut T) {
+        (
+            &mut self.output_amounts.output_amount,
+            &mut self.output_amounts.secondary_output_amount,
+        )
     }
 
     /// Get should remove.
@@ -269,5 +281,29 @@ impl<T> ProcessedPnl<T> {
     /// Get uncapped pnl value.
     pub fn uncapped_pnl(&self) -> &T {
         &self.uncapped_pnl
+    }
+}
+
+/// Output amounts.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "anchor-lang",
+    derive(anchor_lang::AnchorDeserialize, anchor_lang::AnchorSerialize)
+)]
+#[derive(Debug, Clone, Copy, Default)]
+pub struct OutputAmounts<T> {
+    pub(super) output_amount: T,
+    pub(super) secondary_output_amount: T,
+}
+
+impl<T> OutputAmounts<T> {
+    /// Get output amount.
+    pub fn output_amount(&self) -> &T {
+        &self.output_amount
+    }
+
+    /// Get secondary output amount.
+    pub fn secondary_output_amount(&self) -> &T {
+        &self.secondary_output_amount
     }
 }

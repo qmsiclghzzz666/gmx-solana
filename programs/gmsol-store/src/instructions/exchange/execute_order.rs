@@ -436,12 +436,19 @@ impl<'info> ExecuteOrder<'info> {
                     .position
                     .as_ref()
                     .ok_or(error!(StoreError::PositionIsNotProvided))?;
-                let mut event = TradeEvent::new_unchanged(
-                    matches!(kind, OrderKind::MarketIncrease),
-                    position_loader.key(),
-                    &*position_loader.load()?,
-                    self.order.key(),
-                )?;
+                let mut event = {
+                    let position = position_loader.load()?;
+                    let is_collateral_long = market
+                        .market_meta()
+                        .to_token_side(&position.collateral_token)?;
+                    TradeEvent::new_unchanged(
+                        kind.is_increase_position(),
+                        is_collateral_long,
+                        position_loader.key(),
+                        &position,
+                        self.order.key(),
+                    )?
+                };
                 let mut position = RevertiblePosition::new(market, position_loader)?;
 
                 let should_remove_position = match kind {
@@ -772,6 +779,7 @@ fn execute_decrease_position(
         )?;
         transfer_out.transfer_out(false, output_amount)?;
         transfer_out.transfer_out(true, secondary_output_amount)?;
+        event.set_final_output_token(&final_output_token);
     }
 
     // Process other output amounts.
@@ -817,12 +825,10 @@ fn execute_decrease_position(
             transfer_out.final_output_token,
         )?;
     }
-    if transfer_out.final_secondary_output_token != 0
-        && *secondary_token_market == current_market_token
-    {
+    if transfer_out.secondary_output_token != 0 && *secondary_token_market == current_market_token {
         (add_to_amount)(
             meta.to_token_side(&tokens.secondary_output_token)?,
-            transfer_out.final_secondary_output_token,
+            transfer_out.secondary_output_token,
         )?;
     }
     position
