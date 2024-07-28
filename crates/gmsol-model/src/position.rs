@@ -258,8 +258,9 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
                 &pool_pnl,
                 PnlFactorKind::MaxForTrader,
             )?;
+            // TODO: add test for zero factor.
             if capped_pool_pnl != pool_pnl
-                && capped_pool_pnl.is_positive()
+                && !capped_pool_pnl.is_negative()
                 && pool_pnl.is_positive()
             {
                 total_pnl = capped_pool_pnl
