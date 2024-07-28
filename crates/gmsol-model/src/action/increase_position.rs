@@ -29,6 +29,13 @@ pub struct IncreasePositionParams<T> {
     prices: Prices<T>,
 }
 
+impl<T> IncreasePositionParams<T> {
+    /// Get prices.
+    pub fn prices(&self) -> &Prices<T> {
+        &self.prices
+    }
+}
+
 /// Report of the execution of position increasing.
 #[must_use]
 pub struct IncreasePositionReport<T: Unsigned> {
@@ -154,6 +161,11 @@ impl<T: Unsigned> ExecutionParams<T> {
     /// Get price impact amount.
     pub fn price_impact_amount(&self) -> &T::Signed {
         &self.price_impact_amount
+    }
+
+    /// Get price impact value.
+    pub fn price_impact_value(&self) -> &T::Signed {
+        &self.price_impact_value
     }
 }
 

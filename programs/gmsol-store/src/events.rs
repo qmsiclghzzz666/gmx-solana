@@ -3,7 +3,9 @@ use std::ops::{Deref, DerefMut};
 use anchor_lang::prelude::*;
 use gmsol_model::{
     action::{
-        decrease_position::DecreasePositionReport, increase_position::IncreasePositionReport,
+        decrease_position::{DecreasePositionReport, ProcessedPnl},
+        increase_position::IncreasePositionReport,
+        Prices,
     },
     params::fee::PositionFees,
 };
@@ -178,8 +180,12 @@ impl std::fmt::Display for TradeEvent {
             .field("is_increase", &self.is_increase)
             .field("delta_collateral_amount", &self.delta_collateral_amount())
             .field("delta_size_in_usd", &self.delta_size_in_usd())
-            .field("trade_cost", &self.trade_cost())
             .field("transfer_out", &self.transfer_out)
+            .field("prices", &self.prices)
+            .field("execution_price", &self.execution_price)
+            .field("price_impact_value", &self.price_impact_value)
+            .field("price_impact_diff", &self.price_impact_diff)
+            .field("pnl", &self.pnl)
             .field("fees", &self.fees)
             .finish_non_exhaustive()
     }
@@ -236,11 +242,18 @@ pub struct TradeEventData {
     pub after: PositionState,
     /// Transfer out.
     pub transfer_out: TransferOut,
+    /// Prices.
+    pub prices: Prices<u128>,
+    /// Execution price.
+    pub execution_price: u128,
+    /// Price impact value.
+    pub price_impact_value: i128,
+    /// Price impact diff.
+    pub price_impact_diff: u128,
+    /// Processed pnl.
+    pub pnl: ProcessedPnl<i128>,
     /// Fees.
     pub fees: PositionFees<u128>,
-    /// Reserved.
-    #[cfg_attr(feature = "serde", serde(skip, default = "default_reserved"))]
-    reserved: [u8; 128],
 }
 
 impl TradeEventData {
@@ -311,10 +324,6 @@ impl DerefMut for TradeEvent {
     }
 }
 
-fn default_reserved() -> [u8; 128] {
-    [0; 128]
-}
-
 impl TradeEvent {
     /// Create a new unchanged trade event.
     pub(crate) fn new_unchanged(
@@ -338,8 +347,12 @@ impl TradeEvent {
             before: position.state,
             after: position.state,
             transfer_out: Default::default(),
+            prices: Default::default(),
+            execution_price: 0,
+            price_impact_value: 0,
+            price_impact_diff: 0,
+            pnl: Default::default(),
             fees: Default::default(),
-            reserved: default_reserved(),
         })))
     }
 
@@ -352,6 +365,7 @@ impl TradeEvent {
     }
 
     /// Update with transfer out.
+    #[inline(never)]
     pub(crate) fn update_with_transfer_out(&mut self, transfer_out: &TransferOut) -> Result<()> {
         self.transfer_out = transfer_out.clone();
         self.transfer_out.executed = true;
@@ -359,10 +373,14 @@ impl TradeEvent {
     }
 
     /// Update with increase report.
+    #[inline(never)]
     pub(crate) fn update_with_increase_report(
         &mut self,
         report: &IncreasePositionReport<u128>,
     ) -> Result<()> {
+        self.prices = *report.params().prices();
+        self.execution_price = *report.execution().execution_price();
+        self.price_impact_value = *report.execution().price_impact_value();
         self.fees = *report.fees();
         Ok(())
     }
@@ -372,6 +390,11 @@ impl TradeEvent {
         &mut self,
         report: &DecreasePositionReport<u128>,
     ) -> Result<()> {
+        self.prices = *report.params().prices();
+        self.execution_price = *report.execution_price();
+        self.price_impact_value = *report.price_impact_value();
+        self.price_impact_diff = *report.price_impact_diff();
+        self.pnl = *report.pnl();
         self.fees = *report.fees();
         Ok(())
     }
@@ -394,12 +417,6 @@ impl TradeEvent {
         self.after
             .size_in_tokens
             .abs_diff(self.before.size_in_tokens)
-    }
-
-    /// Trade cost.
-    pub fn trade_cost(&self) -> Option<u128> {
-        self.delta_size_in_usd()
-            .checked_div(self.delta_size_in_tokens())
     }
 
     /// Delta collateral amount.

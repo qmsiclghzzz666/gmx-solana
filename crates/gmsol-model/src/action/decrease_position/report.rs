@@ -23,6 +23,7 @@ pub struct DecreasePositionReport<T: Unsigned> {
     size_delta_usd: T,
     borrowing: UpdateBorrowingReport<T>,
     funding: UpdateFundingReport<T>,
+    pnl: ProcessedPnl<T::Signed>,
 
     // Output.
     should_remove: bool,
@@ -115,6 +116,7 @@ impl<T: Unsigned + Clone> DecreasePositionReport<T> {
             for_holding: execution.collateral.for_holding,
             for_user: execution.collateral.for_user,
             fees: execution.fees,
+            pnl: execution.pnl,
         }
     }
 
@@ -136,6 +138,11 @@ impl<T: Unsigned + Clone> DecreasePositionReport<T> {
     /// Get price impact value.
     pub fn price_impact_value(&self) -> &T::Signed {
         &self.price_impact_value
+    }
+
+    /// Get price impact diff.
+    pub fn price_impact_diff(&self) -> &T {
+        &self.price_impact_diff
     }
 
     /// Get execution fees.
@@ -226,5 +233,41 @@ impl<T: Unsigned + Clone> DecreasePositionReport<T> {
     /// Get funding report.
     pub fn funding(&self) -> &UpdateFundingReport<T> {
         &self.funding
+    }
+
+    /// Get processed pnl.
+    pub fn pnl(&self) -> &ProcessedPnl<T::Signed> {
+        &self.pnl
+    }
+}
+
+/// Processed PnL.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "anchor-lang",
+    derive(anchor_lang::AnchorDeserialize, anchor_lang::AnchorSerialize)
+)]
+#[derive(Debug, Clone, Copy, Default)]
+pub struct ProcessedPnl<T> {
+    /// Final PnL value.
+    pnl: T,
+    /// Uncapped PnL value.
+    uncapped_pnl: T,
+}
+
+impl<T> ProcessedPnl<T> {
+    /// Create a new [`ProcessedPnl`].
+    pub fn new(pnl: T, uncapped_pnl: T) -> Self {
+        Self { pnl, uncapped_pnl }
+    }
+
+    /// Get final pnl value.
+    pub fn pnl(&self) -> &T {
+        &self.pnl
+    }
+
+    /// Get uncapped pnl value.
+    pub fn uncapped_pnl(&self) -> &T {
+        &self.uncapped_pnl
     }
 }

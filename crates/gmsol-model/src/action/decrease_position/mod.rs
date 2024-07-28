@@ -16,7 +16,10 @@ mod collateral_processor;
 mod report;
 mod utils;
 
-pub use self::{claimable::ClaimableCollateral, report::DecreasePositionReport};
+pub use self::{
+    claimable::ClaimableCollateral,
+    report::{DecreasePositionReport, ProcessedPnl},
+};
 
 /// Decrease the position.
 #[must_use]
@@ -48,6 +51,11 @@ impl<T> DecreasePositionParams<T> {
     pub fn initial_size_delta_usd(&self) -> &T {
         &self.initial_size_delta_usd
     }
+
+    /// Get prices.
+    pub fn prices(&self) -> &Prices<T> {
+        &self.prices
+    }
 }
 
 struct ProcessCollateralResult<T: Unsigned> {
@@ -59,6 +67,7 @@ struct ProcessCollateralResult<T: Unsigned> {
     is_secondary_output_token_long: bool,
     collateral: ProcessReport<T>,
     fees: PositionFees<T>,
+    pnl: ProcessedPnl<T::Signed>,
 }
 
 impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
@@ -333,7 +342,7 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
             self.get_execution_params()?;
 
         // TODO: calculate position pnl usd.
-        let (base_pnl_usd, _uncapped_base_pnl_usd, size_delta_in_tokens) = self
+        let (base_pnl_usd, uncapped_base_pnl_usd, size_delta_in_tokens) = self
             .position
             .pnl_value(&self.params.prices, &self.size_delta_usd)?;
 
@@ -397,6 +406,7 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
             is_secondary_output_token_long: is_pnl_token_long,
             collateral: report,
             fees,
+            pnl: ProcessedPnl::new(base_pnl_usd, uncapped_base_pnl_usd),
         })
     }
 

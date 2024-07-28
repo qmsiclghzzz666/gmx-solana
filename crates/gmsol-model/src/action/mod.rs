@@ -23,7 +23,12 @@ pub mod update_borrowing_state;
 pub mod update_funding_state;
 
 /// Prices of a market.
-#[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "anchor-lang",
+    derive(anchor_lang::AnchorDeserialize, anchor_lang::AnchorSerialize)
+)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct Prices<T> {
     /// Index token price.
     pub index_token_price: T,
