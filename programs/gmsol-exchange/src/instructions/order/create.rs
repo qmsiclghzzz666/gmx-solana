@@ -69,14 +69,15 @@ pub fn create_order<'info>(
     let controller = ControllerSeeds::new(&store, ctx.bumps.authority);
 
     let (tokens, swap, need_to_transfer_in) = match &order.kind {
-        OrderKind::MarketIncrease | OrderKind::MarketSwap => {
-            ctx.accounts.handle_tokens_for_increase_or_swap_order(
-                &params.output_token,
-                ctx.remaining_accounts,
-                params.swap_length as usize,
-            )?
-        }
-        OrderKind::MarketDecrease => {
+        OrderKind::MarketIncrease
+        | OrderKind::MarketSwap
+        | OrderKind::LimitIncrease
+        | OrderKind::LimitSwap => ctx.accounts.handle_tokens_for_increase_or_swap_order(
+            &params.output_token,
+            ctx.remaining_accounts,
+            params.swap_length as usize,
+        )?,
+        OrderKind::MarketDecrease | OrderKind::LimitDecrease | OrderKind::StopLossDecrease => {
             let (tokens, swap) = ctx.accounts.handle_tokens_for_decrease_order(
                 &params.output_token,
                 ctx.remaining_accounts,
