@@ -15,8 +15,11 @@ use crate::{
 
 use super::{
     generate_nonce,
-    order::{recent_timestamp, ClaimableAccountsBuilder, EXECUTE_ORDER_COMPUTE_BUDGET},
+    order::{recent_timestamp, ClaimableAccountsBuilder},
 };
+
+/// The compute budget for `liquidate`.
+pub const LIQUIDATE_COMPUTE_BUDGET: u32 = 500_000;
 
 #[cfg(feature = "pyth-pull-oracle")]
 use crate::pyth::pull_oracle::Prices;
@@ -214,7 +217,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> LiquidateBuilder<'a, C> {
                 execution_fee: self.execution_fee,
             })
             .accounts(feeds)
-            .compute_budget(ComputeBudget::default().with_limit(EXECUTE_ORDER_COMPUTE_BUDGET));
+            .compute_budget(ComputeBudget::default().with_limit(LIQUIDATE_COMPUTE_BUDGET));
 
         let (pre_builder, post_builder) = ClaimableAccountsBuilder::new(
             self.recent_timestamp,
