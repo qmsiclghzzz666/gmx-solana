@@ -40,6 +40,7 @@ impl Default for ClientOptions {
 
 /// GMSOL Client.
 pub struct Client<C> {
+    cluster: Cluster,
     wallet: C,
     anchor: Arc<anchor_client::Client<C>>,
     data_store: Program<C>,
@@ -58,8 +59,10 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
             exchange_program_id,
             commitment,
         } = options;
-        let anchor = anchor_client::Client::new_with_options(cluster, payer.clone(), commitment);
+        let anchor =
+            anchor_client::Client::new_with_options(cluster.clone(), payer.clone(), commitment);
         Ok(Self {
+            cluster,
             wallet: payer,
             data_store: anchor.program(data_store_program_id.unwrap_or(gmsol_store::id()))?,
             exchange: anchor.program(exchange_program_id.unwrap_or(gmsol_exchange::id()))?,
@@ -75,6 +78,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
     /// Try to clone the client.
     pub fn try_clone(&self) -> crate::Result<Self> {
         Ok(Self {
+            cluster: self.cluster.clone(),
             wallet: self.wallet.clone(),
             anchor: self.anchor.clone(),
             data_store: self.anchor.program(self.data_store_program_id())?,
@@ -87,7 +91,12 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         &self.anchor
     }
 
-    /// Get payer.
+    /// Get the cluster.
+    pub fn cluster(&self) -> &Cluster {
+        &self.cluster
+    }
+
+    /// Get the payer.
     pub fn payer(&self) -> Pubkey {
         self.wallet.pubkey()
     }

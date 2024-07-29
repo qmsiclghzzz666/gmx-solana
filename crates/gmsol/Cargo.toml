@@ -92,6 +92,7 @@ poem = { workspace = true, optional = true }
 indexmap = { workspace = true, features = ["serde"] }
 time = { workspace = true }
 solana-account-decoder = { workspace = true }
+solana-transaction-status = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 

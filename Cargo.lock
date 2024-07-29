@@ -1960,6 +1960,7 @@ dependencies = [
  "serde_with 3.8.1",
  "shellexpand",
  "solana-account-decoder",
+ "solana-transaction-status",
  "spl-governance",
  "strum",
  "thiserror",
