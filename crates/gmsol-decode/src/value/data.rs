@@ -22,7 +22,7 @@ impl<T> OwnedData<T> {
         &self.data
     }
 
-    /// Consume [`DecodedOwnedData`] and get the inner data.
+    /// Consume the [`OwnedData`] and get the inner data.
     pub fn into_data(self) -> T {
         self.data
     }

@@ -5,7 +5,7 @@ use crate::{
     error::DecodeError,
 };
 
-/// Type that walks through a [`Decoder`].
+/// Type that walks through a [`Decoder`](crate::Decoder).
 pub trait Visitor: Sized {
     /// Value Type.
     type Value;
