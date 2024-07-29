@@ -146,6 +146,26 @@ enum Command {
         #[arg(long, short)]
         output: Option<Output>,
     },
+    /// Inspect instruction data.
+    IxData {
+        /// Data.
+        data: String,
+        /// Program.
+        #[arg(long, short, default_value = "store")]
+        program: Program,
+        // /// Output format.
+        // #[arg(long, short)]
+        // output: Option<Output>,
+    },
+}
+
+#[derive(clap::ValueEnum, Clone, Default)]
+pub enum Program {
+    #[default]
+    /// Store.
+    Store,
+    /// Exchange.
+    Exchange,
 }
 
 impl InspectArgs {
@@ -666,6 +686,20 @@ impl InspectArgs {
                     }
                     _ => return Err(gmsol::Error::invalid_argument("Unknown event type")),
                 }
+            }
+            Command::IxData { data, program } => {
+                use gmsol::decode::{value::OwnedDataDecoder, Decode, GMSOLCPIEvent};
+
+                let data = data.strip_prefix("0x").unwrap_or(data);
+                let data = hex::decode(data).map_err(gmsol::Error::invalid_argument)?;
+                let program_id = match program {
+                    Program::Store => client.data_store_program_id(),
+                    Program::Exchange => client.exchange_program_id(),
+                };
+
+                let decoder = OwnedDataDecoder::new(&program_id, &data);
+                let data = GMSOLCPIEvent::decode(decoder)?;
+                println!("{data:#?}");
             }
         }
         Ok(())

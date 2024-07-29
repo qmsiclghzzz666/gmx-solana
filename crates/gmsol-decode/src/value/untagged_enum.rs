@@ -1,8 +1,8 @@
-/// Implement [`Decod`](crate::Decode) for enum.
+/// Implement [`Decode`](crate::Decode) for a list of types.
 #[macro_export]
 macro_rules! untagged {
     ($name:ident, [$($decoded:ty),+]) => {
-        paste::paste! {
+        $crate::paste::paste! {
             #[doc = "A untagged decodable enum `" $name "`."]
             #[allow(clippy::large_enum_variant)]
             #[derive(Debug)]

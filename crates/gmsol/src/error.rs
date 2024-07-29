@@ -55,6 +55,10 @@ pub enum Error {
     /// JSON error.
     #[error("json: {0}")]
     Json(#[from] serde_json::Error),
+    /// Decode error.
+    #[cfg(feature = "decode")]
+    #[error("decode: {0}")]
+    Decode(#[from] gmsol_decode::DecodeError),
 }
 
 impl Error {

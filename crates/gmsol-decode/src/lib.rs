@@ -26,5 +26,7 @@ pub use self::{
 #[cfg(feature = "gmsol")]
 pub use self::gmsol::{GMSOLAccountData, GMSOLCPIEvent, GMSOLData};
 
+pub use paste;
+
 #[cfg(feature = "tracing")]
 pub use tracing;

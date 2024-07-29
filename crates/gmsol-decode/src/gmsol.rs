@@ -41,6 +41,7 @@ untagged!(
         RemoveDepositEvent,
         RemoveOrderEvent,
         RemoveWithdrawalEvent,
+        TradeEvent,
         UnknownOwnedData
     ]
 );
