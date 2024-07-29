@@ -43,4 +43,7 @@ pub use client::{Client, ClientOptions};
 pub use error::Error;
 pub use gmsol_model as model;
 
+#[cfg(feature = "decode")]
+pub use gmsol_decode as decode;
+
 pub type Result<T> = std::result::Result<T, Error>;

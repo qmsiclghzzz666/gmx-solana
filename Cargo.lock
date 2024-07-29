@@ -1935,6 +1935,7 @@ dependencies = [
  "eventsource-stream",
  "eyre",
  "futures-util",
+ "gmsol-decode",
  "gmsol-exchange",
  "gmsol-model",
  "gmsol-store",
@@ -1973,6 +1974,21 @@ dependencies = [
  "tracing-subscriber",
  "typed-builder",
  "url",
+]
+
+[[package]]
+name = "gmsol-decode"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+ "base64 0.22.1",
+ "bytemuck",
+ "gmsol-exchange",
+ "gmsol-store",
+ "paste",
+ "solana-sdk",
+ "thiserror",
+ "tracing",
 ]
 
 [[package]]

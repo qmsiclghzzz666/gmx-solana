@@ -30,6 +30,7 @@ cli = [
     "humantime",
     "num-format",
     "prettytable",
+    "decode",
 ]
 ui = ["cli", "poem/embed", "rust-embed"]
 clap = ["dep:clap", "gmsol-store/clap"]
@@ -52,6 +53,7 @@ discover = [
     "tokio-stream/sync",
     "pin-project-lite",
 ]
+decode = ["gmsol-decode"]
 
 [dependencies]
 gmsol-utils = { workspace = true }
@@ -65,6 +67,10 @@ gmsol-store = { workspace = true, features = [
 ] }
 gmsol-exchange = { workspace = true, features = ["no-entrypoint", "debug"] }
 gmsol-model = { workspace = true, features = ["strum", "serde"] }
+gmsol-decode = { workspace = true, optional = true, features = [
+    "tracing",
+    "gmsol",
+] }
 
 rust_decimal = { workspace = true }
 rust_decimal_macros = { workspace = true }
