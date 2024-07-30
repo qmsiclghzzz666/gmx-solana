@@ -1929,6 +1929,7 @@ dependencies = [
  "anchor-spl",
  "anchor-syn",
  "base64 0.22.1",
+ "bs58 0.4.0",
  "bytemuck",
  "byteorder",
  "clap 4.5.7",

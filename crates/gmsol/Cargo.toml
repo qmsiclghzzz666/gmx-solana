@@ -16,6 +16,10 @@ required-features = ["pyth-pull-oracle", "cli"]
 name = "discover"
 required-features = ["discover", "cli"]
 
+[[example]]
+name = "trade_event"
+required-features = ["decode"]
+
 [features]
 cli = [
     "pyth-pull-oracle",
@@ -46,13 +50,7 @@ pyth-pull-oracle = [
 rust-embed = ["dep:rust-embed"]
 poem = ["dep:poem"]
 doc = ["gmsol-store/doc", "cli"]
-discover = [
-    "tower/discover",
-    "tokio/sync",
-    "tokio/time",
-    "tokio-stream/sync",
-    "pin-project-lite",
-]
+discover = ["tower/discover", "tokio/time", "pin-project-lite"]
 decode = ["gmsol-decode"]
 
 [dependencies]
@@ -78,7 +76,7 @@ hex = { workspace = true }
 pyth-sdk = { workspace = true }
 typed-builder = { workspace = true }
 eyre = { workspace = true }
-tokio = { workspace = true }
+tokio = { workspace = true, features = ["sync"] }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 base64 = { workspace = true }
@@ -101,6 +99,8 @@ solana-account-decoder = { workspace = true }
 solana-transaction-status = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
+tokio-stream = { workspace = true, features = ["sync"] }
+bs58 = { workspace = true }
 
 # Dependencies for cli
 clap = { workspace = true, optional = true, features = ["derive", "env"] }
@@ -124,9 +124,8 @@ anchor-syn = { workspace = true, optional = true }
 heck = { workspace = true, optional = true }
 byteorder = { workspace = true, optional = true }
 
-# Dependencies for `discorver` feature
+# Dependencies for `discover` feature
 tower = { workspace = true, optional = true }
-tokio-stream = { workspace = true, optional = true }
 pin-project-lite = { workspace = true, optional = true }
 
 [dev-dependencies]

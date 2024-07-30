@@ -1,3 +1,5 @@
+use tokio_stream::wrappers::errors::BroadcastStreamRecvError;
+
 /// Error type for `gmsol`.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -59,6 +61,9 @@ pub enum Error {
     #[cfg(feature = "decode")]
     #[error("decode: {0}")]
     Decode(#[from] gmsol_decode::DecodeError),
+    /// Lagged.
+    #[error("lagged: {0}")]
+    Lagged(#[from] BroadcastStreamRecvError),
 }
 
 impl Error {

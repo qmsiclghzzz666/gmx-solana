@@ -2,18 +2,25 @@ use std::{collections::BTreeMap, ops::Deref, sync::Arc};
 
 use anchor_client::{
     anchor_lang::{AccountDeserialize, Discriminator},
-    solana_client::rpc_filter::{Memcmp, RpcFilterType},
+    solana_client::{
+        rpc_config::RpcAccountInfoConfig,
+        rpc_filter::{Memcmp, RpcFilterType},
+    },
     solana_sdk::{commitment_config::CommitmentConfig, pubkey::Pubkey, signer::Signer},
     Cluster, Program,
 };
 
 use gmsol_store::states::{position::PositionKind, NonceBytes};
+use tokio::sync::OnceCell;
 use typed_builder::TypedBuilder;
 
 use crate::{
     types,
     utils::{
-        accounts::{accounts_lazy_with_context, ProgramAccountsConfig, WithContext},
+        accounts::{
+            account_with_context, accounts_lazy_with_context, ProgramAccountsConfig, WithContext,
+        },
+        pubsub::{PubsubClient, SubscriptionConfig},
         zero_copy::ZeroCopy,
         RpcBuilder,
     },
@@ -30,6 +37,8 @@ pub struct ClientOptions {
     exchange_program_id: Option<Pubkey>,
     #[builder(default)]
     commitment: CommitmentConfig,
+    #[builder(default)]
+    subscription: SubscriptionConfig,
 }
 
 impl Default for ClientOptions {
@@ -45,6 +54,8 @@ pub struct Client<C> {
     anchor: Arc<anchor_client::Client<C>>,
     data_store: Program<C>,
     exchange: Program<C>,
+    pub_sub: OnceCell<PubsubClient>,
+    subscription_config: SubscriptionConfig,
 }
 
 impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
@@ -58,6 +69,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
             data_store_program_id,
             exchange_program_id,
             commitment,
+            subscription,
         } = options;
         let anchor =
             anchor_client::Client::new_with_options(cluster.clone(), payer.clone(), commitment);
@@ -67,6 +79,8 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
             data_store: anchor.program(data_store_program_id.unwrap_or(gmsol_store::id()))?,
             exchange: anchor.program(exchange_program_id.unwrap_or(gmsol_exchange::id()))?,
             anchor: Arc::new(anchor),
+            pub_sub: OnceCell::default(),
+            subscription_config: subscription,
         })
     }
 
@@ -83,7 +97,15 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
             anchor: self.anchor.clone(),
             data_store: self.anchor.program(self.data_store_program_id())?,
             exchange: self.anchor.program(self.exchange_program_id())?,
+            pub_sub: OnceCell::default(),
+            subscription_config: self.subscription_config.clone(),
         })
+    }
+
+    /// Replace the subscription config.
+    pub fn set_subscription_config(&mut self, config: SubscriptionConfig) -> &mut Self {
+        self.subscription_config = config;
+        self
     }
 
     /// Get anchor client.
@@ -288,6 +310,21 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
             .transpose()
     }
 
+    /// Fetch account at the given address with config.
+    ///
+    /// The value inside the returned context will be `None` if the account does not exist.
+    pub async fn account_with_config<T>(
+        &self,
+        address: &Pubkey,
+        config: RpcAccountInfoConfig,
+    ) -> crate::Result<WithContext<Option<T>>>
+    where
+        T: AccountDeserialize,
+    {
+        let client = self.data_store().async_rpc();
+        account_with_context(&client, address, config).await
+    }
+
     /// Fetch accounts owned by the Store Program.
     pub async fn store_accounts<T>(
         &self,
@@ -417,6 +454,17 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         Ok(self.data_store().account(*address).await?)
     }
 
+    /// Fetch [`Order`](types::Order) account at the the given address with config.
+    ///
+    /// The value inside the returned context will be `None` if the account does not exist.
+    pub async fn order_with_config(
+        &self,
+        address: &Pubkey,
+        config: RpcAccountInfoConfig,
+    ) -> crate::Result<WithContext<Option<types::Order>>> {
+        self.account_with_config(address, config).await
+    }
+
     /// Fetch [`Depsoit`](types::Deposit) account with its address.
     pub async fn deposit(&self, address: &Pubkey) -> crate::Result<types::Order> {
         Ok(self.data_store().account(*address).await?)
@@ -425,6 +473,17 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
     /// Fetch [`Withdrawal`](types::Withdrawal) account with its address.
     pub async fn withdrawal(&self, address: &Pubkey) -> crate::Result<types::Order> {
         Ok(self.data_store().account(*address).await?)
+    }
+
+    /// Get the [`PubsubClient`].
+    pub async fn pub_sub(&self) -> crate::Result<&PubsubClient> {
+        let client = self
+            .pub_sub
+            .get_or_try_init(|| {
+                PubsubClient::new(self.cluster.clone(), self.subscription_config.clone())
+            })
+            .await?;
+        Ok(client)
     }
 }
 

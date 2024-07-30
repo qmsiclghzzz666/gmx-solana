@@ -1,16 +1,13 @@
 use std::sync::Arc;
 
-use anchor_client::{
-    solana_client::{
-        nonblocking::pubsub_client::PubsubClient,
-        rpc_config::{RpcTransactionLogsConfig, RpcTransactionLogsFilter},
-    },
-    solana_sdk::signature::Keypair,
-    Cluster,
-};
+use anchor_client::{solana_sdk::signature::Keypair, Cluster};
 use futures_util::StreamExt;
-use gmsol::{pda::find_default_store, Client};
-use solana_transaction_status::UiTransactionEncoding;
+use gmsol::{
+    decode::{value::OwnedDataDecoder, Decode, GMSOLCPIEvent},
+    pda::find_default_store,
+    Client,
+};
+use solana_transaction_status::{UiInstruction, UiTransactionEncoding};
 
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
@@ -29,32 +26,55 @@ async fn main() -> eyre::Result<()> {
         .unwrap_or(find_default_store().0);
 
     let client = Client::new(Cluster::Devnet, Arc::new(Keypair::new()))?;
-    let pub_sub = PubsubClient::new(client.cluster().ws_url()).await?;
+    let event_authority = client.data_store_event_authority();
+    let program_id = client.data_store_program_id();
+
+    let mut stream = client
+        .pub_sub()
+        .await?
+        .logs_subscribe(&event_authority, None)?;
+
     let query = client.data_store().async_rpc();
-    let (mut stream, _unsubscribe) = pub_sub
-        .logs_subscribe(
-            RpcTransactionLogsFilter::Mentions(vec![client
-                .data_store_event_authority()
-                .to_string()]),
-            RpcTransactionLogsConfig { commitment: None },
-        )
-        .await?;
     while let Some(res) = stream.next().await {
-        let update = res.value;
+        let Ok(res) = res else {
+            continue;
+        };
+        let update = res.value();
         let signature = update.signature.parse()?;
-        tracing::info!(%signature, "received");
+        tracing::info!(%signature, "[0] received");
         let res = query
             .get_transaction(&signature, UiTransactionEncoding::Base58)
             .await?;
         let slot = res.slot;
-        let Some(iix) = res
+        let Some(event_authority_idx) = res.transaction.transaction.decode().and_then(|tx| {
+            tx.message
+                .static_account_keys()
+                .iter()
+                .enumerate()
+                .find_map(|(idx, pk)| (*pk == event_authority).then_some(idx))
+        }) else {
+            continue;
+        };
+        let Some(iixs) = res
             .transaction
             .meta
             .and_then(|meta| Option::<Vec<_>>::from(meta.inner_instructions))
         else {
             eyre::bail!("invalid encoding");
         };
-        tracing::info!(%slot, "{iix:#?}");
+        for ix in iixs.into_iter().flat_map(|ixs| ixs.instructions) {
+            let UiInstruction::Compiled(ix) = ix else {
+                continue;
+            };
+            if ix.accounts == [event_authority_idx as u8] {
+                let data = ix.data;
+                let data = bs58::decode(&data).into_vec()?;
+                let decoder = OwnedDataDecoder::new(&program_id, &data);
+                let event = GMSOLCPIEvent::decode(decoder)?;
+                tracing::info!(%slot, "{event:?}");
+            }
+        }
     }
+    tracing::info!("finished");
     Ok(())
 }

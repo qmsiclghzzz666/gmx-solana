@@ -40,6 +40,9 @@ pub mod accounts;
 /// Utils for fixed-point numbers.
 pub mod fixed;
 
+/// Pubsub client.
+pub mod pubsub;
+
 pub use self::{
     accounts::{accounts_lazy_with_context, ProgramAccountsConfig},
     compute_budget::ComputeBudget,

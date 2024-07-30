@@ -16,7 +16,7 @@ use anchor_client::{
     Program,
 };
 use serde_json::json;
-use solana_account_decoder::UiAccountEncoding;
+use solana_account_decoder::{UiAccount, UiAccountEncoding};
 
 /// Program Accounts Config.
 #[derive(Debug, Default)]
@@ -28,7 +28,7 @@ pub struct ProgramAccountsConfigForRpc {
 }
 
 /// With Context.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct WithContext<T> {
     /// Context.
     context: RpcResponseContext,
@@ -84,9 +84,18 @@ impl<T, E> WithContext<Result<T, E>> {
     }
 }
 
+impl<T> From<Response<T>> for WithContext<T> {
+    fn from(res: Response<T>) -> Self {
+        Self {
+            context: res.context,
+            value: res.value,
+        }
+    }
+}
+
 /// Get program accounts with context.
 ///
-/// ## Note
+/// # Note
 /// This function only supports RPC Node versions `>= 1.17`.
 pub async fn get_program_accounts_with_context(
     client: &RpcClient,
@@ -111,12 +120,30 @@ pub async fn get_program_accounts_with_context(
         )
         .await
         .map_err(anchor_client::ClientError::from)?;
-    let accounts = parse_keyed_accounts(res.value, RpcRequest::GetProgramAccounts)?;
-    let context = res.context;
-    Ok(WithContext {
-        context,
-        value: accounts,
-    })
+    WithContext::from(res)
+        .map(|accounts| parse_keyed_accounts(accounts, RpcRequest::GetProgramAccounts))
+        .transpose()
+}
+
+/// Get account with context.
+///
+/// The value inside the context will be `None` if the account does not exist.
+pub async fn get_account_with_context(
+    client: &RpcClient,
+    address: &Pubkey,
+    mut config: RpcAccountInfoConfig,
+) -> crate::Result<WithContext<Option<Account>>> {
+    let commitment = config.commitment.unwrap_or_else(|| client.commitment());
+    config.commitment = Some(commitment);
+    tracing::debug!(%address, ?config, "fetching account");
+    let res = client
+        .send::<Response<Option<UiAccount>>>(
+            RpcRequest::GetAccountInfo,
+            json!([address.to_string(), config]),
+        )
+        .await
+        .map_err(anchor_client::ClientError::from)?;
+    Ok(WithContext::from(res).map(|value| value.and_then(|a| a.decode())))
 }
 
 /// Program Accounts Config.
@@ -166,6 +193,23 @@ pub async fn accounts_lazy_with_context<
             .into_iter()
             .map(|(key, account)| Ok((key, T::try_deserialize(&mut (&account.data as &[u8]))?)))
     }))
+}
+
+/// Return the decoded account at the given address, along with context.
+///
+/// The value inside the context will be `None` if the account does not exist.
+pub async fn account_with_context<T: AccountDeserialize>(
+    client: &RpcClient,
+    address: &Pubkey,
+    config: RpcAccountInfoConfig,
+) -> crate::Result<WithContext<Option<T>>> {
+    let res = get_account_with_context(client, address, config).await?;
+    Ok(res
+        .map(|a| {
+            a.map(|account| T::try_deserialize(&mut (&account.data as &[u8])))
+                .transpose()
+        })
+        .transpose()?)
 }
 
 fn parse_keyed_accounts(
