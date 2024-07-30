@@ -9,7 +9,7 @@ use crate::{
 
 /// The accounts definition for [`initialize`](crate::gmsol_store::initialize).
 ///
-/// *[See also the documentation for the instruction.](crate::gmsol_store::initialize).*
+/// *[See also the documentation for the instruction.](crate::gmsol_store::initialize)*
 #[derive(Accounts)]
 #[instruction(key: String)]
 pub struct Initialize<'info> {

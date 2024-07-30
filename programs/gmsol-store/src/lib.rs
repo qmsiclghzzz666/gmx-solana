@@ -234,6 +234,42 @@
 //! - [`set_price`](gmsol_store::set_price): Set a price for the given token in the given oracle account.
 //! - [`set_prices_from_price_feed`](gmsol_store::set_prices_from_price_feed): Validate and set prices parsed from the
 //! provided price feed accounts.
+//!
+//! ## Market Management
+//! The instructions related to market management are as follows:
+//!
+//! ### Instructions for [`Market`](states::Market) management
+//! - [`initialize_market`]: Initialize a [`Market`](states::Market) account.
+//! - [`remove_market`]: Close the given [`Market`](states::Market) account.
+//! - [`toggle_market`]: Enable or diable the given market.
+//! - [`market_transfer_in`]: Transfer tokens into the market and record in its balance.
+//! - [`market_transfer_out`]: Transfer tokens out from the market and record in its balance.
+//! - [`update_market_config`]: Update an item in the market config.
+//! - [`update_market_config_with_buffer`]: Update the market config with the given
+//! [`MarketConfigBuffer`](states::MarketConfigBuffer) account.
+//! - [`get_validated_market_meta`](gmsol_store::get_validated_market_meta): Validate the market and
+//! return its [meta](states::MarketMeta).
+//! - [`get_market_config`](gmsol_store::get_market_config): Read an item from the market config by the key.
+//! - [`get_market_meta`](gmsol_store::get_market_meta): Get the [meta](states::MarketMeta) of the market
+//! without validation.
+//!
+//! ### Instructions for [`MarketConfigBuffer`](states::MarketConfigBuffer) accounts
+//! - [`initialize_market_config_buffer`](gmsol_store::initialize_market_config_buffer): Initialize a market config buffer account.
+//! - [`set_market_config_buffer_authority`](gmsol_store::set_market_config_buffer_authority): Replace the authority of the market config buffer account
+//! with the new one.
+//! - [`close_market_config_buffer`](gmsol_store::close_market_config_buffer): Close the given market config buffer account.
+//! - [`push_to_market_config_buffer`](gmsol_store::push_to_market_config_buffer): Push config items to the given market config buffer account.
+//!
+//! ### Instructions for market tokens
+//! - [`initialize_market_token`]: Initialize a new market token.
+//! - [`mint_market_token_to`]: Mint the given amount of market tokens to the destination
+//! account.
+//! - [`burn_market_token_from`]: Burn the given amount of market tokens from the given account.
+//!
+//! ### Instructions for market vaults
+//! - [`initialize_market_vault`]: Initialize the market vault for the given token.
+//! - [`market_vault_transfer_out`]: Transfer the given amount of tokens out to the destination
+//! account.
 
 /// Instructions.
 pub mod instructions;
@@ -737,6 +773,21 @@ pub mod gmsol_store {
     }
 
     // Market.
+    /// Initialize a [`Market`](states::Market) account.
+    ///
+    /// # Accounts
+    /// [*See the documentation for the accounts.*](InitializeMarket)
+    ///
+    /// # Arguments
+    /// - `market_token_mint`: The address of the corresponding market token.
+    /// - `index_token_mint`: The address of the index token.
+    /// - `long_token_mint`: The address of the long token.
+    /// - `short_token_mint`: The address of the short token.
+    /// - `name`: The name of the market.
+    /// - `enable`: Whether to enable the market after initialization.
+    ///
+    /// # Checks
+    /// - *TODO*
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn initialize_market(
         ctx: Context<InitializeMarket>,
@@ -758,33 +809,90 @@ pub mod gmsol_store {
         )
     }
 
+    /// Close a [`Market`](states::Market) account.
+    ///
+    /// # Accounts
+    /// [*See the documentation for the accounts.*](RemoveMarket)
+    ///
+    /// # Checks
+    /// - *TODO*
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn remove_market(ctx: Context<RemoveMarket>) -> Result<()> {
         instructions::unchecked_remove_market(ctx)
     }
 
+    /// Validate the market and returns its [meta](states::MarketMeta).
+    ///
+    /// # Accounts
+    /// [*See the documentation for the accounts.*](GetValidatedMarketMeta)
+    ///
+    /// # Checks
+    /// - *TODO*
     pub fn get_validated_market_meta(ctx: Context<GetValidatedMarketMeta>) -> Result<MarketMeta> {
         instructions::get_validated_market_meta(ctx)
     }
 
+    /// Transfer tokens into the market and record in its balance.
+    ///
+    /// # Accounts
+    /// [*See the documentation for the accounts.*](MarketTransferIn)
+    ///
+    /// # Arguments
+    /// - `amount`: The amount to transfer in.
+    ///
+    /// # Checks
+    /// - *TODO*
     #[access_control(internal::Authenticate::only_controller(&ctx))]
     pub fn market_transfer_in(ctx: Context<MarketTransferIn>, amount: u64) -> Result<()> {
         instructions::unchecked_market_transfer_in(ctx, amount)
     }
 
+    /// Transfer tokens out from the market and record in its balance.
+    ///
+    /// # Accounts
+    /// [*See the documentation for the accounts.*](MarketTransferOut)
+    ///
+    /// # Arguments
+    /// - `amount`: The amount to transfer out.
+    ///
+    /// # Checks
+    /// - *TODO*
     #[access_control(internal::Authenticate::only_controller(&ctx))]
     pub fn market_transfer_out(ctx: Context<MarketTransferOut>, amount: u64) -> Result<()> {
         instructions::unchecked_market_transfer_out(ctx, amount)
     }
 
+    /// Get the [meta](states::MarketMeta) of the market without validation.
+    ///
+    /// # Accounts
+    /// [*See the documentation for the accounts.*](ReadMarket)
+    ///
     pub fn get_market_meta(ctx: Context<ReadMarket>) -> Result<MarketMeta> {
         instructions::get_market_meta(ctx)
     }
 
+    /// Read an item from the market config by the key.
+    ///
+    /// # Accounts
+    /// [*See the documentation for the accounts.*](ReadMarket)
+    ///
+    /// # Arguments
+    /// - `key`: The key of the config item.
     pub fn get_market_config(ctx: Context<ReadMarket>, key: String) -> Result<u128> {
         instructions::get_market_config(ctx, &key)
     }
 
+    /// Update an item in the market config.
+    ///
+    /// # Accounts
+    /// [*See the documentation for the accounts.*](UpdateMarketConfig)
+    ///
+    /// # Arguments
+    /// - `key`: The key of the config item.
+    /// - `value`: The value to update the config item to.
+    ///
+    /// # Checks
+    /// - *TODO*
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn update_market_config(
         ctx: Context<UpdateMarketConfig>,
@@ -794,7 +902,14 @@ pub mod gmsol_store {
         instructions::unchecked_update_market_config(ctx, &key, value)
     }
 
-    /// Update market config with the given buffer.
+    /// Update the market config with the given
+    /// [`MarketConfigBuffer`](states::MarketConfigBuffer) account.
+    ///
+    /// # Accounts
+    /// [*See the documentation for the accounts.*](UpdateMarketConfigWithBuffer)
+    ///
+    /// # Checks
+    /// - *TODO*
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn update_market_config_with_buffer(
         ctx: Context<UpdateMarketConfigWithBuffer>,
@@ -803,6 +918,15 @@ pub mod gmsol_store {
     }
 
     /// Initialize a market config buffer account.
+    ///
+    /// # Accounts
+    /// [*See the documentation for the accounts.*](InitializeMarketConfigBuffer)
+    ///
+    /// # Arguments
+    /// - `expire_after_secs`: The expiration time of the buffer in seconds.
+    ///
+    /// # Checks
+    /// - *TODO*
     pub fn initialize_market_config_buffer(
         ctx: Context<InitializeMarketConfigBuffer>,
         expire_after_secs: u32,
@@ -810,7 +934,17 @@ pub mod gmsol_store {
         instructions::initialize_market_config_buffer(ctx, expire_after_secs)
     }
 
-    /// Set the authority of the buffer account.
+    /// Replace the authority of the market config buffer account
+    /// with the new one.
+    ///
+    /// # Accounts
+    /// [*See the documentation for the accounts.*](SetMarketConfigBufferAuthority)
+    ///
+    /// # Arguments
+    /// - `new_authority`: The new authority.
+    ///
+    /// # Checks
+    /// - *TODO*
     pub fn set_market_config_buffer_authority(
         ctx: Context<SetMarketConfigBufferAuthority>,
         new_authority: Pubkey,
@@ -818,12 +952,27 @@ pub mod gmsol_store {
         instructions::set_market_config_buffer_authority(ctx, new_authority)
     }
 
-    /// Close the buffer account.
+    /// Close the given market config buffer account.
+    ///
+    /// # Accounts
+    /// [*See the documentation for the accounts.*](CloseMarketConfigBuffer)
+    ///
+    /// # Checks
+    /// - *TODO*
     pub fn close_market_config_buffer(ctx: Context<CloseMarketConfigBuffer>) -> Result<()> {
         instructions::close_market_config_buffer(ctx)
     }
 
-    /// Push to the buffer account.
+    /// Push config items to the given market config buffer account.
+    ///
+    /// # Accounts
+    /// [*See the documentation for the accounts.*](PushToMarketConfigBuffer)
+    ///
+    /// # Arguments
+    /// - `new_configs`: The list of new config items.
+    ///
+    /// # Checks
+    /// - *TODO*
     pub fn push_to_market_config_buffer(
         ctx: Context<PushToMarketConfigBuffer>,
         new_configs: Vec<EntryArgs>,
@@ -831,12 +980,34 @@ pub mod gmsol_store {
         instructions::push_to_market_config_buffer(ctx, new_configs)
     }
 
+    /// Enable or diable the given market.
+    ///
+    /// # Accounts
+    /// [*See the documentation for the accounts.*](ToggleMarket)
+    ///
+    /// # Arguments
+    /// - `enable`: Whether to enable or disable the market.
+    ///
+    /// # Checks
+    /// - *TODO*
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn toggle_market(ctx: Context<ToggleMarket>, enable: bool) -> Result<()> {
         instructions::unchecked_toggle_market(ctx, enable)
     }
 
     // Token.
+    /// Initialize a new market token.
+    ///
+    /// # Accounts
+    /// [*See the documentation for the accounts.*](InitializeMarketToken)
+    ///
+    /// # Arguments
+    /// - `index_token_mint`: The address of the index token.
+    /// - `long_token_mint`: The address of the long token.
+    /// - `short_token_mint`: The address of the short token.
+    ///
+    /// # Checks
+    /// - *TODO*
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn initialize_market_token(
         ctx: Context<InitializeMarketToken>,
@@ -852,16 +1023,46 @@ pub mod gmsol_store {
         )
     }
 
+    /// Mint the given amount of market tokens to the destination account.
+    ///
+    /// # Accounts
+    /// [*See the documentation for the accounts.*](MintMarketTokenTo)
+    ///
+    /// # Arguments
+    /// - `amount`: The amount to mint.
+    ///
+    /// # Checks
+    /// - *TODO*
     #[access_control(internal::Authenticate::only_controller(&ctx))]
     pub fn mint_market_token_to(ctx: Context<MintMarketTokenTo>, amount: u64) -> Result<()> {
         instructions::unchecked_mint_market_token_to(ctx, amount)
     }
 
+    /// Burn the given amount of market tokens from the given account.
+    ///
+    /// # Accounts
+    /// [*See the documentation for the accounts.*](BurnMarketTokenFrom)
+    ///
+    /// # Arguments
+    /// - `amount`: The amount to burn.
+    ///
+    /// # Checks
+    /// - *TODO*
     #[access_control(internal::Authenticate::only_controller(&ctx))]
     pub fn burn_market_token_from(ctx: Context<BurnMarketTokenFrom>, amount: u64) -> Result<()> {
         instructions::unchecked_burn_market_token_from(ctx, amount)
     }
 
+    /// Initialize the market vault for the given token.
+    ///
+    /// # Accounts
+    /// [*See the documentation for the accounts.*](InitializeMarketVault)
+    ///
+    /// # Arguments
+    /// - `market_token_mint`: (*deprecated*) The market that owns this vault.
+    ///
+    /// # Checks
+    /// - *TODO*
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn initialize_market_vault(
         ctx: Context<InitializeMarketVault>,
@@ -870,6 +1071,16 @@ pub mod gmsol_store {
         instructions::unchecked_initialize_market_vault(ctx, market_token_mint)
     }
 
+    /// Transfer the given amount of tokens out to the destination account.
+    ///
+    /// # Accounts
+    /// [*See the documentation for the accounts.*](MarketVaultTransferOut)
+    ///
+    /// # Arguments
+    /// - `amount`: The amount to transfer.
+    ///
+    /// # Checks
+    /// - *TODO*
     #[access_control(internal::Authenticate::only_controller(&ctx))]
     pub fn market_vault_transfer_out(
         ctx: Context<MarketVaultTransferOut>,

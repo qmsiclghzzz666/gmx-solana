@@ -6,6 +6,9 @@ use anchor_spl::{
 
 use crate::{constants, states::Store, utils::internal};
 
+/// The accounts definition for [`initialize_market_token`](crate::gmsol_store::initialize_market_token).
+///
+/// *[See also the documentation for the instruction.](crate::gmsol_store::initialize_market_token)*
 #[derive(Accounts)]
 #[instruction(index_token_mint: Pubkey, long_token_mint: Pubkey, short_token_mint: Pubkey)]
 pub struct InitializeMarketToken<'info> {
@@ -37,7 +40,7 @@ pub struct InitializeMarketToken<'info> {
 /// ## CHECK
 /// - Only MARKET_KEEPER can initialize market token.
 #[allow(unused_variables)]
-pub fn unchecked_initialize_market_token(
+pub(crate) fn unchecked_initialize_market_token(
     ctx: Context<InitializeMarketToken>,
     index_token_mint: Pubkey,
     long_token_mint: Pubkey,
@@ -56,6 +59,9 @@ impl<'info> internal::Authentication<'info> for InitializeMarketToken<'info> {
     }
 }
 
+/// The accounts definition for [`mint_market_token_to`](crate::gmsol_store::mint_market_token_to).
+///
+/// *[See also the documentation for the instruction.](crate::gmsol_store::mint_market_token_to)*
 #[derive(Accounts)]
 pub struct MintMarketTokenTo<'info> {
     pub authority: Signer<'info>,
@@ -71,7 +77,10 @@ pub struct MintMarketTokenTo<'info> {
 ///
 /// ## CHECK
 /// - Only CONTROLLER can mint market token.
-pub fn unchecked_mint_market_token_to(ctx: Context<MintMarketTokenTo>, amount: u64) -> Result<()> {
+pub(crate) fn unchecked_mint_market_token_to(
+    ctx: Context<MintMarketTokenTo>,
+    amount: u64,
+) -> Result<()> {
     anchor_spl::token::mint_to(
         ctx.accounts
             .mint_to_ctx()
@@ -103,6 +112,9 @@ impl<'info> MintMarketTokenTo<'info> {
     }
 }
 
+/// The accounts definition for [`burn_market_token_from`](crate::gmsol_store::burn_market_token_from).
+///
+/// *[See also the documentation for the instruction.](crate::gmsol_store::burn_market_token_from)*
 #[derive(Accounts)]
 pub struct BurnMarketTokenFrom<'info> {
     pub authority: Signer<'info>,
@@ -121,7 +133,7 @@ pub struct BurnMarketTokenFrom<'info> {
 ///
 /// ## Notes
 /// - The `from` account is expected to be owned by `store`.
-pub fn unchecked_burn_market_token_from(
+pub(crate) fn unchecked_burn_market_token_from(
     ctx: Context<BurnMarketTokenFrom>,
     amount: u64,
 ) -> Result<()> {
@@ -156,6 +168,9 @@ impl<'info> BurnMarketTokenFrom<'info> {
     }
 }
 
+/// The accounts definition for [`initialize_market_vault`](crate::gmsol_store::initialize_market_vault).
+///
+/// *[See also the documentation for the instruction.](crate::gmsol_store::initialize_market_vault)*
 #[derive(Accounts)]
 #[instruction(market_token_mint: Option<Pubkey>)]
 pub struct InitializeMarketVault<'info> {
@@ -188,7 +203,7 @@ pub struct InitializeMarketVault<'info> {
 /// ## CHECK
 /// - Only MARKET_KEEPER can initialize market vault.
 #[allow(unused_variables)]
-pub fn unchecked_initialize_market_vault(
+pub(crate) fn unchecked_initialize_market_vault(
     ctx: Context<InitializeMarketVault>,
     market_token_mint: Option<Pubkey>,
 ) -> Result<()> {
@@ -205,6 +220,9 @@ impl<'info> internal::Authentication<'info> for InitializeMarketVault<'info> {
     }
 }
 
+/// The accounts definition for [`market_vault_transfer_out`](crate::gmsol_store::market_vault_transfer_out).
+///
+/// *[See also the documentation for the instruction.](crate::gmsol_store::market_vault_transfer_out)*
 #[derive(Accounts)]
 pub struct MarketVaultTransferOut<'info> {
     #[account(mut)]
@@ -222,7 +240,7 @@ pub struct MarketVaultTransferOut<'info> {
 ///
 /// ## CHECK
 /// - Only CONTROLLER can transfer out from market vault.
-pub fn unchecked_market_vault_transfer_out(
+pub(crate) fn unchecked_market_vault_transfer_out(
     ctx: Context<MarketVaultTransferOut>,
     amount: u64,
 ) -> Result<()> {
@@ -257,6 +275,9 @@ impl<'info> MarketVaultTransferOut<'info> {
     }
 }
 
+/// The accounts definition for [`use_claimable_account`](crate::gmsol_store::use_claimable_account).
+///
+/// *[See also the documentation for the instruction.](crate::gmsol_store::use_claimable_account)*
 #[derive(Accounts)]
 #[instruction(timestamp: i64)]
 pub struct UseClaimableAccount<'info> {
@@ -290,7 +311,7 @@ pub struct UseClaimableAccount<'info> {
 ///
 /// ## CHECK
 /// - Only ORDER_KEEPER can use claimable account.
-pub fn unchecked_use_claimable_account(
+pub(crate) fn unchecked_use_claimable_account(
     ctx: Context<UseClaimableAccount>,
     _timestamp: i64,
     amount: u64,
@@ -322,6 +343,9 @@ impl<'info> internal::Authentication<'info> for UseClaimableAccount<'info> {
     }
 }
 
+/// The accounts definition for [`close_empty_claimable_account`](crate::gmsol_store::close_empty_claimable_account).
+///
+/// *[See also the documentation for the instruction.](crate::gmsol_store::close_empty_claimable_account)*
 #[derive(Accounts)]
 #[instruction(user: Pubkey, timestamp: i64)]
 pub struct CloseEmptyClaimableAccount<'info> {
@@ -352,7 +376,7 @@ pub struct CloseEmptyClaimableAccount<'info> {
 ///
 /// ## CHECK
 /// - Only ORDER_KEEPER can close claimable account.
-pub fn unchecked_close_empty_claimable_account(
+pub(crate) fn unchecked_close_empty_claimable_account(
     ctx: Context<CloseEmptyClaimableAccount>,
     _user: Pubkey,
     _timestamp: i64,
@@ -383,7 +407,7 @@ impl<'info> internal::Authentication<'info> for CloseEmptyClaimableAccount<'info
 
 /// The accounts definition for [`prepare_associated_token_account`](crate::gmsol_store::prepare_associated_token_account).
 ///
-/// *[See also the documentation for the instruction.](crate::gmsol_store::prepare_associated_token_account).*
+/// *[See also the documentation for the instruction.](crate::gmsol_store::prepare_associated_token_account)*
 #[derive(Accounts)]
 pub struct PrepareAssociatedTokenAccount<'info> {
     /// The payer.
