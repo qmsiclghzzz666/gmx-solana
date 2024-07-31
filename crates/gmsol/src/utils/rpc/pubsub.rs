@@ -22,7 +22,7 @@ use tokio::{
 use tokio_stream::wrappers::BroadcastStream;
 use tracing::Instrument;
 
-use super::accounts::WithContext;
+use crate::utils::WithContext;
 
 /// A wrapper of [the solana version of pubsub client](SolanaPubsubClient)
 /// with shared subscription support.

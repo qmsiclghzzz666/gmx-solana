@@ -15,7 +15,18 @@ use anchor_client::{
 use futures_util::{stream::FuturesOrdered, TryStreamExt};
 use tokio::time::sleep;
 
-use super::{transaction_size, RpcBuilder};
+use super::RpcBuilder;
+
+use self::transaction_size::transaction_size;
+
+/// Compute Budget.
+pub mod compute_budget;
+
+/// RPC Builder.
+pub mod rpc_builder;
+
+/// Transaction size.
+pub mod transaction_size;
 
 /// Build transactions from [`RpcBuilder`].
 pub struct TransactionBuilder<'a, C> {

@@ -12,7 +12,7 @@ use anchor_client::{
     Program,
 };
 
-use super::{compute_budget::ComputeBudget, transaction_size};
+use super::{compute_budget::ComputeBudget, transaction_size::transaction_size};
 
 /// A wrapper of [`RequestBuilder`](anchor_client::RequestBuilder).
 #[must_use]
