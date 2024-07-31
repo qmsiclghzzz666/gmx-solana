@@ -101,7 +101,7 @@ impl Inner {
         config: &SubscriptionConfig,
     ) -> crate::Result<impl Stream<Item = crate::Result<WithContext<RpcLogsResponse>>>> {
         let config = SubscriptionConfig {
-            commitment: commitment.or(config.commitment),
+            commitment: commitment.unwrap_or(config.commitment),
             ..*config
         };
         let receiver = self
@@ -121,7 +121,7 @@ impl Inner {
 #[derive(Debug, Clone)]
 pub struct SubscriptionConfig {
     /// Commitment.
-    pub commitment: Option<CommitmentConfig>,
+    pub commitment: CommitmentConfig,
     /// Cleanup interval.
     pub cleanup_interval: Duration,
     /// Capacity for the broadcast channel.
@@ -131,7 +131,7 @@ pub struct SubscriptionConfig {
 impl Default for SubscriptionConfig {
     fn default() -> Self {
         Self {
-            commitment: Default::default(),
+            commitment: CommitmentConfig::finalized(),
             cleanup_interval: Duration::from_secs(10),
             capacity: NonZeroUsize::new(256).unwrap(),
         }
@@ -237,13 +237,11 @@ impl LogsSubscriptions {
                     if subscription.abort.is_finished() {
                         entry.remove();
                     } else {
-                        if let Some(commitment) = config.commitment {
-                            if commitment != subscription.commitment {
-                                return Err(crate::Error::invalid_argument(format!(
-                                    "commitment mismatched, current: {}",
-                                    subscription.commitment.commitment
-                                )));
-                            }
+                        if config.commitment != subscription.commitment {
+                            return Err(crate::Error::invalid_argument(format!(
+                                "commitment mismatched, current: {}",
+                                subscription.commitment.commitment
+                            )));
                         }
                         if let Some(receiver) = subscription.sender.subscribe() {
                             return Ok(receiver);
@@ -259,7 +257,7 @@ impl LogsSubscriptions {
                         sender.into(),
                         client,
                         mention,
-                        config.commitment.unwrap_or(CommitmentConfig::finalized()),
+                        config.commitment,
                         config.cleanup_interval,
                     )
                     .await?;

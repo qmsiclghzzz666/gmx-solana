@@ -52,6 +52,7 @@ pub struct Client<C> {
     exchange: Program<C>,
     pub_sub: OnceCell<PubsubClient>,
     subscription_config: SubscriptionConfig,
+    commitment: CommitmentConfig,
 }
 
 impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
@@ -77,6 +78,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
             anchor: Arc::new(anchor),
             pub_sub: OnceCell::default(),
             subscription_config: subscription,
+            commitment,
         })
     }
 
@@ -95,6 +97,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
             exchange: self.anchor.program(self.exchange_program_id())?,
             pub_sub: OnceCell::default(),
             subscription_config: self.subscription_config.clone(),
+            commitment: self.commitment,
         })
     }
 
@@ -112,6 +115,11 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
     /// Get the cluster.
     pub fn cluster(&self) -> &Cluster {
         &self.cluster
+    }
+
+    /// Get the commitment config.
+    pub fn commitment(&self) -> CommitmentConfig {
+        self.commitment
     }
 
     /// Get the payer.
@@ -505,10 +513,11 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         let program_id = self.data_store_program_id();
         let event_authority = self.data_store_event_authority();
         let query = Arc::new(self.data_store().async_rpc());
+        let commitment = commitment.unwrap_or(self.subscription_config.commitment);
         let logs =
             self.pub_sub()
                 .await?
-                .logs_subscribe(&event_authority, commitment)
+                .logs_subscribe(&event_authority, Some(commitment))
                 .await?
                 .try_filter_map(move |log| {
                     let query = query.clone();
@@ -523,7 +532,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
                                 &signature,
                                 RpcTransactionConfig {
                                     encoding: Some(UiTransactionEncoding::Base58),
-                                    commitment,
+                                    commitment: Some(commitment),
                                     ..Default::default()
                                 },
                             )
