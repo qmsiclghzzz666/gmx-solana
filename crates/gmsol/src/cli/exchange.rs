@@ -131,6 +131,9 @@ enum Command {
         /// Swap paths for collateral token.
         #[arg(long, short, action = clap::ArgAction::Append)]
         swap: Vec<Pubkey>,
+        /// Whether to wait for the action to be completed.
+        #[arg(long, short)]
+        wait: bool,
     },
     /// Create a market decrese order.
     MarketDecrease {
@@ -160,6 +163,9 @@ enum Command {
         /// Swap paths for output token (collateral token).
         #[arg(long, short, action = clap::ArgAction::Append)]
         swap: Vec<Pubkey>,
+        /// Whether to wait for the action to be completed.
+        #[arg(long, short)]
+        wait: bool,
     },
     /// Liquidate the given position.
     Liquidate {
@@ -333,6 +339,7 @@ impl ExchangeArgs {
                 side,
                 size,
                 swap,
+                wait,
             } => {
                 let mut builder = client.market_increase(
                     store,
@@ -349,7 +356,10 @@ impl ExchangeArgs {
 
                 let (request, order) = builder.swap_path(swap.clone()).build_with_address().await?;
                 let signature = request.send().await?;
-                println!("created market increase order {order} at tx {signature}");
+                tracing::info!("created market increase order {order} at tx {signature}");
+                if *wait {
+                    self.wait_for_order(client, &order).await?;
+                }
             }
             Command::MarketDecrease {
                 market_token,
@@ -361,6 +371,7 @@ impl ExchangeArgs {
                 final_output_token_account,
                 secondary_output_token_account,
                 swap,
+                wait,
             } => {
                 let mut builder = client.market_decrease(
                     store,
@@ -379,6 +390,9 @@ impl ExchangeArgs {
                 let (request, order) = builder.swap_path(swap.clone()).build_with_address().await?;
                 let signature = request.send().await?;
                 println!("created market decrease order {order} at tx {signature}");
+                if *wait {
+                    self.wait_for_order(client, &order).await?;
+                }
             }
             Command::Liquidate {
                 position,
@@ -446,6 +460,19 @@ impl ExchangeArgs {
                 let (request, order) = builder.build_with_address().await?;
                 let signature = request.send().await?;
                 println!("created market increase order {order} at tx {signature}");
+            }
+        }
+        Ok(())
+    }
+
+    async fn wait_for_order(&self, client: &GMSOLClient, order: &Pubkey) -> gmsol::Result<()> {
+        let trade = client.complete_order(order).await?;
+        match trade {
+            Some(trade) => {
+                tracing::info!(%order, "order completed with trade event: {trade:#}");
+            }
+            None => {
+                tracing::warn!(%order, "order completed without trade event");
             }
         }
         Ok(())

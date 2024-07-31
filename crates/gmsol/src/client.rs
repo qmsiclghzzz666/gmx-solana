@@ -288,6 +288,17 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         .0
     }
 
+    /// Get slot.
+    pub async fn get_slot(&self, commitment: Option<CommitmentConfig>) -> crate::Result<u64> {
+        let slot = self
+            .data_store()
+            .async_rpc()
+            .get_slot_with_commitment(commitment.unwrap_or(self.commitment))
+            .await
+            .map_err(anchor_client::ClientError::from)?;
+        Ok(slot)
+    }
+
     /// Fetch accounts owned by the Store Program.
     pub async fn store_accounts_with_config<T>(
         &self,
@@ -592,14 +603,111 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         Ok(logs)
     }
 
-    // /// Wait for an order to be complete.
-    // pub async fn complete_order(
-    //     &self,
-    //     min_context_slot: Option<u64>,
-    //     commitment: Option<CommitmentConfig>,
-    // ) -> crate::Result<()> {
-    //     Ok(())
-    // }
+    /// Wait for an order to be completed using current slot as min context slot.
+    #[cfg(feature = "decode")]
+    pub async fn complete_order(
+        &self,
+        address: &Pubkey,
+    ) -> crate::Result<Option<crate::types::TradeEvent>> {
+        let slot = self.get_slot(None).await?;
+        self.complete_order_with_config(address, slot, std::time::Duration::from_secs(5), None)
+            .await
+    }
+
+    /// Wait for an order to be completed with the given config.
+    #[cfg(feature = "decode")]
+    pub async fn complete_order_with_config(
+        &self,
+        address: &Pubkey,
+        mut slot: u64,
+        polling: std::time::Duration,
+        commitment: Option<CommitmentConfig>,
+    ) -> crate::Result<Option<crate::types::TradeEvent>> {
+        use crate::store::events::StoreCPIEvent;
+        use futures_util::{StreamExt, TryStreamExt};
+        use solana_account_decoder::UiAccountEncoding;
+
+        let mut trade = None;
+        let commitment = commitment.unwrap_or(self.subscription_config.commitment);
+
+        let events = self.store_cpi_events(Some(commitment)).await?;
+
+        let config = RpcAccountInfoConfig {
+            encoding: Some(UiAccountEncoding::Base64),
+            commitment: Some(commitment),
+            min_context_slot: Some(slot),
+            ..Default::default()
+        };
+        let current = self.get_slot(Some(commitment)).await?;
+        let mut slot_reached = current >= slot;
+        if slot_reached {
+            let order = self.order_with_config(address, config.clone()).await?;
+            slot = order.slot();
+            let order = order.into_value();
+            if order.is_none() {
+                return Ok(trade);
+            }
+        }
+        let address = *address;
+        let stream = events.try_filter_map(|event| async {
+            if event.slot() < slot {
+                return Ok(None);
+            }
+            let event = event.into_value();
+            match &event {
+                StoreCPIEvent::RemoveOrderEvent(remove) => {
+                    if remove.order == address {
+                        Ok(Some(event))
+                    } else {
+                        Ok(None)
+                    }
+                }
+                StoreCPIEvent::TradeEvent(trade) => {
+                    if trade.order == address {
+                        Ok(Some(event))
+                    } else {
+                        Ok(None)
+                    }
+                }
+                _ => Ok(None),
+            }
+        });
+        let stream =
+            tokio_stream::StreamExt::timeout_repeating(stream, tokio::time::interval(polling));
+        futures_util::pin_mut!(stream);
+        while let Some(res) = stream.next().await {
+            match res {
+                Ok(Ok(event)) => match event {
+                    StoreCPIEvent::TradeEvent(event) => {
+                        trade = Some(event);
+                    }
+                    StoreCPIEvent::RemoveOrderEvent(_remove) => {
+                        return Ok(trade);
+                    }
+                    _ => unreachable!(),
+                },
+                Ok(Err(err)) => {
+                    return Err(err);
+                }
+                Err(_elapsed) => {
+                    if slot_reached {
+                        if self
+                            .order_with_config(&address, config.clone())
+                            .await?
+                            .value()
+                            .is_none()
+                        {
+                            return Ok(trade);
+                        }
+                    } else {
+                        let current = self.get_slot(Some(commitment)).await?;
+                        slot_reached = current >= slot;
+                    }
+                }
+            }
+        }
+        Err(crate::Error::unknown("the watch stream end"))
+    }
 }
 
 /// System Program Ops.

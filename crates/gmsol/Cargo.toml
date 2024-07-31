@@ -99,7 +99,7 @@ solana-account-decoder = { workspace = true }
 solana-transaction-status = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
-tokio-stream = { workspace = true, features = ["sync"] }
+tokio-stream = { workspace = true, features = ["sync", "time"] }
 bs58 = { workspace = true }
 
 # Dependencies for cli
