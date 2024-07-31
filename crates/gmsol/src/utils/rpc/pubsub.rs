@@ -29,7 +29,7 @@ use crate::utils::WithContext;
 /// with shared subscription support.
 #[derive(Debug)]
 pub struct PubsubClient {
-    inner: RwLock<Inner>,
+    inner: RwLock<Option<Inner>>,
     cluster: Cluster,
     config: SubscriptionConfig,
 }
@@ -37,14 +37,18 @@ pub struct PubsubClient {
 impl PubsubClient {
     /// Create a new [`PubsubClient`] with the given config.
     pub async fn new(cluster: Cluster, config: SubscriptionConfig) -> crate::Result<Self> {
-        let client = SolanaPubsubClient::new(cluster.ws_url())
-            .await
-            .map_err(anchor_client::ClientError::from)?;
         Ok(Self {
-            inner: RwLock::new(Inner::new(client)),
+            inner: RwLock::new(None),
             cluster,
             config,
         })
+    }
+
+    async fn prepare(&self) -> crate::Result<()> {
+        if self.inner.read().await.is_some() {
+            return Ok(());
+        }
+        self.reset().await
     }
 
     /// Subscribe to transaction logs.
@@ -53,10 +57,13 @@ impl PubsubClient {
         mention: &Pubkey,
         commitment: Option<CommitmentConfig>,
     ) -> crate::Result<impl Stream<Item = crate::Result<WithContext<RpcLogsResponse>>>> {
+        self.prepare().await?;
         let res = self
             .inner
             .read()
             .await
+            .as_ref()
+            .ok_or_else(|| crate::Error::invalid_argument("the pubsub client has been closed"))?
             .logs_subscribe(mention, commitment, &self.config)
             .await;
         match res {
@@ -69,11 +76,24 @@ impl PubsubClient {
         }
     }
 
-    async fn reset(&self) -> crate::Result<()> {
+    /// Reset the client.
+    pub async fn reset(&self) -> crate::Result<()> {
         let client = SolanaPubsubClient::new(self.cluster.ws_url())
             .await
             .map_err(anchor_client::ClientError::from)?;
-        *self.inner.write().await = Inner::new(client);
+        let mut inner = self.inner.write().await;
+        if let Some(previous) = inner.take() {
+            _ = previous.shutdown().await;
+        }
+        *inner = Some(Inner::new(client));
+        Ok(())
+    }
+
+    /// Shutdown gracefully.
+    pub async fn shutdown(&self) -> crate::Result<()> {
+        if let Some(inner) = self.inner.write().await.take() {
+            inner.shutdown().await?;
+        }
         Ok(())
     }
 }
@@ -114,6 +134,18 @@ impl Inner {
             )
             .await?;
         Ok(BroadcastStream::new(receiver).map_err(crate::Error::from))
+    }
+
+    async fn shutdown(self) -> crate::Result<()> {
+        self.tasks.lock().await.shutdown().await;
+        Arc::into_inner(self.client)
+            .ok_or_else(|| {
+                crate::Error::unknown("the client should be unique here, but it is not")
+            })?
+            .shutdown()
+            .await
+            .map_err(anchor_client::ClientError::from)?;
+        Ok(())
     }
 }
 

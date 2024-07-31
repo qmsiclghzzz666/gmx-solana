@@ -191,6 +191,7 @@ impl Cli {
             Command::Controller(args) => args.run(&client, &store, self.serialize_only).await?,
             Command::BugFix(args) => args.run(&client, &store, self.serialize_only).await?,
         }
+        client.shutdown().await?;
         Ok(())
     }
 }

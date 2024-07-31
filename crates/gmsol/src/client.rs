@@ -708,6 +708,11 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         }
         Err(crate::Error::unknown("the watch stream end"))
     }
+
+    /// Shutdown the client gracefully.
+    pub async fn shutdown(&self) -> crate::Result<()> {
+        self.pub_sub().await?.shutdown().await
+    }
 }
 
 /// System Program Ops.
