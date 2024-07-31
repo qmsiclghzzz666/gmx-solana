@@ -1,7 +1,8 @@
 use std::{
     collections::{hash_map::Entry, HashMap},
     num::NonZeroUsize,
-    sync::{Arc, Mutex, RwLock},
+    ops::DerefMut,
+    sync::Arc,
     time::Duration,
 };
 
@@ -16,7 +17,7 @@ use anchor_client::{
 };
 use futures_util::{Stream, StreamExt, TryStreamExt};
 use tokio::{
-    sync::broadcast,
+    sync::{broadcast, oneshot, Mutex, RwLock},
     task::{AbortHandle, JoinSet},
 };
 use tokio_stream::wrappers::BroadcastStream;
@@ -26,8 +27,12 @@ use crate::utils::WithContext;
 
 /// A wrapper of [the solana version of pubsub client](SolanaPubsubClient)
 /// with shared subscription support.
-#[derive(Debug, Clone)]
-pub struct PubsubClient(Arc<Inner>);
+#[derive(Debug)]
+pub struct PubsubClient {
+    inner: RwLock<Inner>,
+    cluster: Cluster,
+    config: SubscriptionConfig,
+}
 
 impl PubsubClient {
     /// Create a new [`PubsubClient`] with the given config.
@@ -35,48 +40,79 @@ impl PubsubClient {
         let client = SolanaPubsubClient::new(cluster.ws_url())
             .await
             .map_err(anchor_client::ClientError::from)?;
-        Ok(Self(Arc::new(Inner {
-            tasks: Default::default(),
+        Ok(Self {
+            inner: RwLock::new(Inner::new(client)),
+            cluster,
             config,
-            client: Arc::new(client),
-            logs: Default::default(),
-        })))
+        })
     }
 
     /// Subscribe to transaction logs.
-    pub fn logs_subscribe(
+    pub async fn logs_subscribe(
         &self,
         mention: &Pubkey,
         commitment: Option<CommitmentConfig>,
     ) -> crate::Result<impl Stream<Item = crate::Result<WithContext<RpcLogsResponse>>>> {
-        self.0.logs_subscribe(mention, commitment)
+        let res = self
+            .inner
+            .read()
+            .await
+            .logs_subscribe(mention, commitment, &self.config)
+            .await;
+        match res {
+            Ok(stream) => Ok(stream),
+            Err(crate::Error::PubsubClosed) => {
+                self.reset().await?;
+                Err(crate::Error::PubsubClosed)
+            }
+            Err(err) => Err(err),
+        }
+    }
+
+    async fn reset(&self) -> crate::Result<()> {
+        let client = SolanaPubsubClient::new(self.cluster.ws_url())
+            .await
+            .map_err(anchor_client::ClientError::from)?;
+        *self.inner.write().await = Inner::new(client);
+        Ok(())
     }
 }
 
 #[derive(Debug)]
 struct Inner {
     tasks: Mutex<JoinSet<()>>,
-    config: SubscriptionConfig,
     client: Arc<SolanaPubsubClient>,
     logs: LogsSubscriptions,
 }
 
 impl Inner {
-    fn logs_subscribe(
+    fn new(client: SolanaPubsubClient) -> Self {
+        Self {
+            tasks: Default::default(),
+            client: Arc::new(client),
+            logs: Default::default(),
+        }
+    }
+
+    async fn logs_subscribe(
         &self,
         mention: &Pubkey,
         commitment: Option<CommitmentConfig>,
+        config: &SubscriptionConfig,
     ) -> crate::Result<impl Stream<Item = crate::Result<WithContext<RpcLogsResponse>>>> {
         let config = SubscriptionConfig {
-            commitment: commitment.or(self.config.commitment),
-            ..self.config
+            commitment: commitment.or(config.commitment),
+            ..*config
         };
-        let receiver = self.logs.subscribe(
-            &mut self.tasks.lock().unwrap(),
-            &self.client,
-            mention,
-            config,
-        )?;
+        let receiver = self
+            .logs
+            .subscribe(
+                self.tasks.lock().await.deref_mut(),
+                &self.client,
+                mention,
+                config,
+            )
+            .await?;
         Ok(BroadcastStream::new(receiver).map_err(crate::Error::from))
     }
 }
@@ -105,7 +141,7 @@ impl Default for SubscriptionConfig {
 #[derive(Debug)]
 struct LogsSubscription {
     commitment: CommitmentConfig,
-    sender: broadcast::Sender<WithContext<RpcLogsResponse>>,
+    sender: ClosableSender<WithContext<RpcLogsResponse>>,
     abort: AbortHandle,
 }
 
@@ -116,14 +152,15 @@ impl Drop for LogsSubscription {
 }
 
 impl LogsSubscription {
-    fn init(
+    async fn init(
         join_set: &mut JoinSet<()>,
-        sender: broadcast::Sender<WithContext<RpcLogsResponse>>,
+        sender: ClosableSender<WithContext<RpcLogsResponse>>,
         client: &Arc<SolanaPubsubClient>,
         mention: &Pubkey,
         commitment: CommitmentConfig,
         cleanup_interval: Duration,
-    ) -> Self {
+    ) -> crate::Result<Self> {
+        let (tx, rx) = oneshot::channel::<crate::Result<_>>();
         let abort = join_set.spawn({
             let client = client.clone();
             let mention = *mention;
@@ -138,40 +175,46 @@ impl LogsSubscription {
                     .inspect_err(
                         |err| tracing::error!(%err, %mention, "failed to subscribe transaction logs"),
                     );
-                let Ok((mut stream, unsubscribe)) = res else {
-                    return;
-                };
-                let mut interval = tokio::time::interval(cleanup_interval);
-                loop {
-                    tokio::select! {
-                        _ = interval.tick() => {
-                            if sender.receiver_count() == 0 {
-                                break;
-                            }
-                        }
-                        res = stream.next() => {
-                            match res {
-                                Some(res) => {
-                                    if sender.send(res.into()).unwrap_or(0) == 0 {
+                match res {
+                    Ok((mut stream, unsubscribe)) => {
+                        _ = tx.send(Ok(()));
+                        let mut interval = tokio::time::interval(cleanup_interval);
+                        loop {
+                            tokio::select! {
+                                _ = interval.tick() => {
+                                    if sender.receiver_count().unwrap_or(0) == 0 {
                                         break;
                                     }
                                 }
-                                None => break,
+                                res = stream.next() => {
+                                    match res {
+                                        Some(res) => {
+                                            if sender.send(res.into()).unwrap_or(0) == 0 {
+                                                break;
+                                            }
+                                        }
+                                        None => break,
+                                    }
+                                }
                             }
                         }
+                        (unsubscribe)().await;
+                    },
+                    Err(err) => {
+                        _ = tx.send(Err(err.into()));
                     }
                 }
-                (unsubscribe)().await;
                 tracing::info!(%mention, "logs subscription end");
             }
             .in_current_span()
         });
-
-        Self {
+        rx.await
+            .map_err(|_| crate::Error::unknown("worker is dead"))??;
+        Ok(Self {
             commitment,
             abort,
             sender,
-        }
+        })
     }
 }
 
@@ -179,14 +222,14 @@ impl LogsSubscription {
 struct LogsSubscriptions(RwLock<HashMap<Pubkey, LogsSubscription>>);
 
 impl LogsSubscriptions {
-    fn subscribe(
+    async fn subscribe(
         &self,
         join_set: &mut JoinSet<()>,
         client: &Arc<SolanaPubsubClient>,
         mention: &Pubkey,
         config: SubscriptionConfig,
     ) -> crate::Result<broadcast::Receiver<WithContext<RpcLogsResponse>>> {
-        let mut map = self.0.write().unwrap();
+        let mut map = self.0.write().await;
         loop {
             match map.entry(*mention) {
                 Entry::Occupied(entry) => {
@@ -202,23 +245,70 @@ impl LogsSubscriptions {
                                 )));
                             }
                         }
-                        return Ok(subscription.sender.subscribe());
+                        if let Some(receiver) = subscription.sender.subscribe() {
+                            return Ok(receiver);
+                        } else {
+                            entry.remove();
+                        }
                     }
                 }
                 Entry::Vacant(entry) => {
                     let (sender, receiver) = broadcast::channel(config.capacity.get());
                     let subscription = LogsSubscription::init(
                         join_set,
-                        sender,
+                        sender.into(),
                         client,
                         mention,
                         config.commitment.unwrap_or(CommitmentConfig::finalized()),
                         config.cleanup_interval,
-                    );
+                    )
+                    .await?;
                     entry.insert(subscription);
                     return Ok(receiver);
                 }
             }
         }
+    }
+}
+
+#[derive(Debug)]
+struct ClosableSender<T>(Arc<std::sync::RwLock<Option<broadcast::Sender<T>>>>);
+
+impl<T> From<broadcast::Sender<T>> for ClosableSender<T> {
+    fn from(sender: broadcast::Sender<T>) -> Self {
+        Self(Arc::new(std::sync::RwLock::new(Some(sender))))
+    }
+}
+
+impl<T> Clone for ClosableSender<T> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
+impl<T> ClosableSender<T> {
+    fn send(&self, value: T) -> Result<usize, broadcast::error::SendError<T>> {
+        match self.0.read().unwrap().as_ref() {
+            Some(sender) => sender.send(value),
+            None => Err(broadcast::error::SendError(value)),
+        }
+    }
+
+    fn receiver_count(&self) -> Option<usize> {
+        Some(self.0.read().unwrap().as_ref()?.receiver_count())
+    }
+
+    fn subscribe(&self) -> Option<broadcast::Receiver<T>> {
+        Some(self.0.read().unwrap().as_ref()?.subscribe())
+    }
+
+    fn close(&self) -> bool {
+        self.0.write().unwrap().take().is_some()
+    }
+}
+
+impl<T> Drop for ClosableSender<T> {
+    fn drop(&mut self) {
+        self.close();
     }
 }

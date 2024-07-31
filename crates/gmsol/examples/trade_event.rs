@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use anchor_client::{solana_sdk::signature::Keypair, Cluster};
 use futures_util::StreamExt;
@@ -22,14 +22,26 @@ async fn main() -> eyre::Result<()> {
 
     let client = Client::new(Cluster::Devnet, Arc::new(Keypair::new()))?;
 
-    let stream = client.store_cpi_events(None).await?;
-    futures_util::pin_mut!(stream);
-    while let Some(res) = stream.next().await {
-        let Ok(event) = res.inspect_err(|err| tracing::error!(%err, "stream error")) else {
+    let mut idx = 0;
+    let mut interval = tokio::time::interval(Duration::from_secs(5));
+    loop {
+        interval.tick().await;
+        let Ok(stream) = client
+            .store_cpi_events(None)
+            .await
+            .inspect_err(|err| tracing::error!(%err, "[{idx}] subscription error"))
+        else {
             continue;
         };
-        tracing::info!(slot=%event.slot(), "{:?}", event.value());
+        futures_util::pin_mut!(stream);
+        while let Some(res) = stream.next().await {
+            let Ok(event) = res.inspect_err(|err| tracing::error!(%err, "[{idx}] stream error"))
+            else {
+                continue;
+            };
+            tracing::info!(slot=%event.slot(), "[{idx}] {:?}", event.value());
+        }
+        tracing::info!("[{idx}] stream end");
+        idx += 1;
     }
-    tracing::info!("finished");
-    Ok(())
 }

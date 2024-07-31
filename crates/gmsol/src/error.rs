@@ -1,3 +1,4 @@
+use anchor_client::solana_client::pubsub_client::PubsubClientError;
 use tokio_stream::wrappers::errors::BroadcastStreamRecvError;
 
 /// Error type for `gmsol`.
@@ -64,6 +65,9 @@ pub enum Error {
     /// Lagged.
     #[error("lagged: {0}")]
     Lagged(#[from] BroadcastStreamRecvError),
+    /// Pubsub client closed.
+    #[error("pubsub: closed")]
+    PubsubClosed,
 }
 
 impl Error {
@@ -81,5 +85,14 @@ impl Error {
 impl From<anchor_client::anchor_lang::prelude::Error> for Error {
     fn from(value: anchor_client::anchor_lang::prelude::Error) -> Self {
         Self::from(anchor_client::ClientError::from(value))
+    }
+}
+
+impl From<PubsubClientError> for Error {
+    fn from(err: PubsubClientError) -> Self {
+        match err {
+            PubsubClientError::ConnectionClosed(_) => Self::PubsubClosed,
+            err => anchor_client::ClientError::from(err).into(),
+        }
     }
 }

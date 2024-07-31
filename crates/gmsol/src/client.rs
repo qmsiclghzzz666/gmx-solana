@@ -508,7 +508,8 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         let logs =
             self.pub_sub()
                 .await?
-                .logs_subscribe(&event_authority, commitment)?
+                .logs_subscribe(&event_authority, commitment)
+                .await?
                 .try_filter_map(move |log| {
                     let query = query.clone();
                     async move {
