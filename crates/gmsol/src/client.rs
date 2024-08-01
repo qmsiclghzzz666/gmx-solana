@@ -511,86 +511,46 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
             Item = crate::Result<crate::utils::WithSlot<Vec<crate::store::events::StoreCPIEvent>>>,
         >,
     > {
-        use anchor_client::solana_client::rpc_config::RpcTransactionConfig;
         use futures_util::TryStreamExt;
-        use solana_transaction_status::{UiInstruction, UiTransactionEncoding};
 
         use crate::{
-            decode::{value::OwnedDataDecoder, Decode},
             store::events::StoreCPIEvent,
-            utils::WithSlot,
+            utils::{extract_cpi_events, WithSlot},
         };
 
         let program_id = self.data_store_program_id();
         let event_authority = self.data_store_event_authority();
         let query = Arc::new(self.data_store().async_rpc());
         let commitment = commitment.unwrap_or(self.subscription_config.commitment);
-        let events = self
+        let signatures = self
             .pub_sub()
             .await?
             .logs_subscribe(&event_authority, Some(commitment))
             .await?
-            .try_filter_map(move |log| {
-                let query = query.clone();
-                async move {
-                    let signature = log
-                        .value()
-                        .signature
-                        .parse()
-                        .map_err(crate::Error::invalid_argument)?;
-                    let tx = query
-                        .get_transaction_with_config(
-                            &signature,
-                            RpcTransactionConfig {
-                                encoding: Some(UiTransactionEncoding::Base58),
-                                commitment: Some(commitment),
-                                ..Default::default()
-                            },
-                        )
-                        .await
-                        .map_err(anchor_client::ClientError::from)?;
-                    let Some(event_authority_idx) =
-                        tx.transaction.transaction.decode().and_then(|tx| {
-                            tx.message
-                                .static_account_keys()
-                                .iter()
-                                .enumerate()
-                                .find_map(|(idx, pk)| (*pk == event_authority).then_some(idx))
-                        })
-                    else {
-                        return Ok(None);
-                    };
-                    let event_authority_idx = event_authority_idx as u8;
-                    let Some(ixs) = tx
-                        .transaction
-                        .meta
-                        .and_then(|meta| Option::<Vec<_>>::from(meta.inner_instructions))
-                    else {
-                        return Err(crate::Error::invalid_argument("invalid encoding"));
-                    };
-                    let datas = ixs
-                        .into_iter()
-                        .flat_map(|ixs| ixs.instructions)
-                        .filter_map(move |ix| match ix {
-                            UiInstruction::Compiled(ix) => {
-                                (ix.accounts == [event_authority_idx]).then_some(ix.data)
-                            }
-                            UiInstruction::Parsed(_) => None,
-                        })
-                        .map(|data| bs58::decode(data).into_vec())
-                        .filter_map(|data| {
-                            let data = data
-                                .inspect_err(|err| tracing::error!(%err, "base58 decode error"))
-                                .ok()?;
-                            let decoder = OwnedDataDecoder::new(&program_id, &data);
-                            StoreCPIEvent::decode(decoder)
-                                .inspect_err(|err| tracing::debug!(%err, "decode error"))
-                                .ok()
-                        })
-                        .collect();
-                    Ok(Some(WithSlot::from(log).map(|_| datas)))
-                }
+            .and_then(|txn| {
+                let signature = WithSlot::from(txn)
+                    .map(|txn| {
+                        txn.signature
+                            .parse()
+                            .map_err(crate::Error::invalid_argument)
+                    })
+                    .transpose();
+                async move { signature }
             });
+        let events =
+            extract_cpi_events(signatures, query, &program_id, &event_authority, commitment)
+                .try_filter_map(|event| {
+                    let decoded = event
+                        .map(|event| {
+                            event
+                                .decode::<StoreCPIEvent>()
+                                .collect::<crate::Result<Vec<_>>>()
+                        })
+                        .transpose()
+                        .inspect_err(|err| tracing::error!(%err, "decode error"))
+                        .ok();
+                    async move { Ok(decoded) }
+                });
         Ok(events)
     }
 
@@ -599,10 +559,16 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
     pub async fn complete_order(
         &self,
         address: &Pubkey,
+        commitment: Option<CommitmentConfig>,
     ) -> crate::Result<Option<crate::types::TradeEvent>> {
         let slot = self.get_slot(None).await?;
-        self.complete_order_with_config(address, slot, std::time::Duration::from_secs(5), None)
-            .await
+        self.complete_order_with_config(
+            address,
+            slot,
+            std::time::Duration::from_secs(5),
+            commitment,
+        )
+        .await
     }
 
     /// Wait for an order to be completed with the given config.

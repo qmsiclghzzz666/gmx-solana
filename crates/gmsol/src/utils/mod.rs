@@ -38,6 +38,9 @@ pub use self::{
         accounts::{account_with_context, accounts_lazy_with_context, ProgramAccountsConfig},
         context::{WithContext, WithSlot},
         pubsub::{PubsubClient, SubscriptionConfig},
+        transaction_history::{
+            extract_cpi_events, fetch_transaction_history_with_config, EncodedCPIEvents,
+        },
     },
     signer::{shared_signer, SignerRef},
     transaction_builder::{
