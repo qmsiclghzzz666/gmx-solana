@@ -30,7 +30,7 @@ async fn main() -> eyre::Result<()> {
             loop {
                 interval.tick().await;
                 let Ok(stream) = client
-                    .store_cpi_events(None)
+                    .subscribe_store_cpi_events(None)
                     .await
                     .inspect_err(|err| tracing::error!(%err, "[{idx}] subscription error"))
                 else {

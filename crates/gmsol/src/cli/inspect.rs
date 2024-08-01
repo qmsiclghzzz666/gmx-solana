@@ -548,7 +548,7 @@ impl InspectArgs {
             }
             Command::Order { address, event } => {
                 if *event {
-                    let stream = client.order_events(address, None).await?;
+                    let stream = client.historical_store_cpi_events(address, None).await?;
                     pin_mut!(stream);
                     while let Some(res) = stream.next().await {
                         match res {

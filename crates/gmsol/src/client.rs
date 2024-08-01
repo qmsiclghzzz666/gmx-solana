@@ -501,9 +501,9 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         Ok(client)
     }
 
-    /// Subscribe to CPI events from the store program.
+    /// Subscribe to [`StoreCPIEvent`](crate::store::events::StoreCPIEvent)s from the store program.
     #[cfg(feature = "decode")]
-    pub async fn store_cpi_events(
+    pub async fn subscribe_store_cpi_events(
         &self,
         commitment: Option<CommitmentConfig>,
     ) -> crate::Result<
@@ -554,11 +554,11 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         Ok(events)
     }
 
-    /// Fetch historical events for the given order.
+    /// Fetch historical [`StoreCPIEvent`](crate::store::events::StoreCPIEvent)s for the given account.
     #[cfg(feature = "decode")]
-    pub async fn order_events(
+    pub async fn historical_store_cpi_events(
         &self,
-        order: &Pubkey,
+        address: &Pubkey,
         commitment: Option<CommitmentConfig>,
     ) -> crate::Result<
         impl futures_util::Stream<
@@ -576,7 +576,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         let client = Arc::new(self.data_store().async_rpc());
         let signatures = fetch_transaction_history_with_config(
             client.clone(),
-            order,
+            address,
             commitment,
             None,
             None,
@@ -630,7 +630,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         use futures_util::{StreamExt, TryStreamExt};
 
         let events = self
-            .order_events(order, Some(commitment))
+            .historical_store_cpi_events(order, Some(commitment))
             .await?
             .try_filter(|events| {
                 let pass = events.slot() <= before_slot;
@@ -660,7 +660,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         let mut trade = None;
         let commitment = commitment.unwrap_or(self.subscription_config.commitment);
 
-        let events = self.store_cpi_events(Some(commitment)).await?;
+        let events = self.subscribe_store_cpi_events(Some(commitment)).await?;
 
         let config = RpcAccountInfoConfig {
             encoding: Some(UiAccountEncoding::Base64),
