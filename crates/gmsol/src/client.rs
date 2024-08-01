@@ -508,11 +508,11 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         commitment: Option<CommitmentConfig>,
     ) -> crate::Result<
         impl futures_util::Stream<
-            Item = crate::Result<crate::utils::WithSlot<crate::store::events::StoreCPIEvent>>,
+            Item = crate::Result<crate::utils::WithSlot<Vec<crate::store::events::StoreCPIEvent>>>,
         >,
     > {
         use anchor_client::solana_client::rpc_config::RpcTransactionConfig;
-        use futures_util::{StreamExt, TryStreamExt};
+        use futures_util::TryStreamExt;
         use solana_transaction_status::{UiInstruction, UiTransactionEncoding};
 
         use crate::{
@@ -525,82 +525,73 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         let event_authority = self.data_store_event_authority();
         let query = Arc::new(self.data_store().async_rpc());
         let commitment = commitment.unwrap_or(self.subscription_config.commitment);
-        let logs =
-            self.pub_sub()
-                .await?
-                .logs_subscribe(&event_authority, Some(commitment))
-                .await?
-                .try_filter_map(move |log| {
-                    let query = query.clone();
-                    async move {
-                        let signature = log
-                            .value()
-                            .signature
-                            .parse()
-                            .map_err(crate::Error::invalid_argument)?;
-                        let tx = query
-                            .get_transaction_with_config(
-                                &signature,
-                                RpcTransactionConfig {
-                                    encoding: Some(UiTransactionEncoding::Base58),
-                                    commitment: Some(commitment),
-                                    ..Default::default()
-                                },
-                            )
-                            .await
-                            .map_err(anchor_client::ClientError::from)?;
-                        let Some(event_authority_idx) =
-                            tx.transaction.transaction.decode().and_then(|tx| {
-                                tx.message
-                                    .static_account_keys()
-                                    .iter()
-                                    .enumerate()
-                                    .find_map(|(idx, pk)| (*pk == event_authority).then_some(idx))
-                            })
-                        else {
-                            return Ok(None);
-                        };
-                        let event_authority_idx = event_authority_idx as u8;
-                        let Some(ixs) = tx
-                            .transaction
-                            .meta
-                            .and_then(|meta| Option::<Vec<_>>::from(meta.inner_instructions))
-                        else {
-                            return Err(crate::Error::invalid_argument("invalid encoding"));
-                        };
-                        let datas = ixs.into_iter().flat_map(|ixs| ixs.instructions).filter_map(
-                            move |ix| match ix {
-                                UiInstruction::Compiled(ix) => {
-                                    (ix.accounts == [event_authority_idx]).then_some(ix.data)
-                                }
-                                UiInstruction::Parsed(_) => None,
+        let events = self
+            .pub_sub()
+            .await?
+            .logs_subscribe(&event_authority, Some(commitment))
+            .await?
+            .try_filter_map(move |log| {
+                let query = query.clone();
+                async move {
+                    let signature = log
+                        .value()
+                        .signature
+                        .parse()
+                        .map_err(crate::Error::invalid_argument)?;
+                    let tx = query
+                        .get_transaction_with_config(
+                            &signature,
+                            RpcTransactionConfig {
+                                encoding: Some(UiTransactionEncoding::Base58),
+                                commitment: Some(commitment),
+                                ..Default::default()
                             },
-                        );
-                        Ok(Some(WithSlot::from(log).map(|_| datas)))
-                    }
-                })
-                .flat_map(|res| match res {
-                    Ok(datas) => {
-                        let slot = datas.slot();
-                        let datas = datas.into_value();
-                        let datas = datas.map(move |data| {
-                            bs58::decode(data)
-                                .into_vec()
-                                .map_err(crate::Error::invalid_argument)
-                                .map(|data| WithSlot::new(slot, data))
-                        });
-                        futures_util::stream::iter(datas).left_stream()
-                    }
-                    Err(err) => futures_util::stream::iter(Some(Err(err))).right_stream(),
-                })
-                .try_filter_map(move |data| async move {
-                    let decoder = OwnedDataDecoder::new(&program_id, data.value());
-                    let event = StoreCPIEvent::decode(decoder)
-                        .inspect_err(|err| tracing::debug!(%err, "decode error"))
-                        .ok();
-                    Ok(event.map(|event| WithSlot::new(data.slot(), event)))
-                });
-        Ok(logs)
+                        )
+                        .await
+                        .map_err(anchor_client::ClientError::from)?;
+                    let Some(event_authority_idx) =
+                        tx.transaction.transaction.decode().and_then(|tx| {
+                            tx.message
+                                .static_account_keys()
+                                .iter()
+                                .enumerate()
+                                .find_map(|(idx, pk)| (*pk == event_authority).then_some(idx))
+                        })
+                    else {
+                        return Ok(None);
+                    };
+                    let event_authority_idx = event_authority_idx as u8;
+                    let Some(ixs) = tx
+                        .transaction
+                        .meta
+                        .and_then(|meta| Option::<Vec<_>>::from(meta.inner_instructions))
+                    else {
+                        return Err(crate::Error::invalid_argument("invalid encoding"));
+                    };
+                    let datas = ixs
+                        .into_iter()
+                        .flat_map(|ixs| ixs.instructions)
+                        .filter_map(move |ix| match ix {
+                            UiInstruction::Compiled(ix) => {
+                                (ix.accounts == [event_authority_idx]).then_some(ix.data)
+                            }
+                            UiInstruction::Parsed(_) => None,
+                        })
+                        .map(|data| bs58::decode(data).into_vec())
+                        .filter_map(|data| {
+                            let data = data
+                                .inspect_err(|err| tracing::error!(%err, "base58 decode error"))
+                                .ok()?;
+                            let decoder = OwnedDataDecoder::new(&program_id, &data);
+                            StoreCPIEvent::decode(decoder)
+                                .inspect_err(|err| tracing::debug!(%err, "decode error"))
+                                .ok()
+                        })
+                        .collect();
+                    Ok(Some(WithSlot::from(log).map(|_| datas)))
+                }
+            });
+        Ok(events)
     }
 
     /// Wait for an order to be completed using current slot as min context slot.
@@ -649,29 +640,24 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
             }
         }
         let address = *address;
-        let stream = events.try_filter_map(|event| async {
-            if event.slot() < slot {
-                return Ok(None);
-            }
-            let event = event.into_value();
-            match &event {
-                StoreCPIEvent::RemoveOrderEvent(remove) => {
-                    if remove.order == address {
-                        Ok(Some(event))
-                    } else {
-                        Ok(None)
-                    }
+        let stream = events
+            .try_filter_map(|events| async {
+                if events.slot() < slot {
+                    return Ok(None);
                 }
-                StoreCPIEvent::TradeEvent(trade) => {
-                    if trade.order == address {
-                        Ok(Some(event))
-                    } else {
-                        Ok(None)
-                    }
-                }
-                _ => Ok(None),
-            }
-        });
+                let events = events
+                    .into_value()
+                    .into_iter()
+                    .filter(|event| {
+                        matches!(
+                            event,
+                            StoreCPIEvent::TradeEvent(_) | StoreCPIEvent::RemoveOrderEvent(_)
+                        )
+                    })
+                    .map(Ok);
+                Ok(Some(futures_util::stream::iter(events)))
+            })
+            .try_flatten();
         let stream =
             tokio_stream::StreamExt::timeout_repeating(stream, tokio::time::interval(polling));
         futures_util::pin_mut!(stream);
