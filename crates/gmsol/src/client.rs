@@ -554,6 +554,55 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         Ok(events)
     }
 
+    /// Fetch historical events for the given order.
+    #[cfg(feature = "decode")]
+    pub async fn order_events(
+        &self,
+        order: &Pubkey,
+        commitment: Option<CommitmentConfig>,
+    ) -> crate::Result<
+        impl futures_util::Stream<
+            Item = crate::Result<crate::utils::WithSlot<Vec<crate::store::events::StoreCPIEvent>>>,
+        >,
+    > {
+        use futures_util::TryStreamExt;
+
+        use crate::{
+            store::events::StoreCPIEvent,
+            utils::{extract_cpi_events, fetch_transaction_history_with_config},
+        };
+
+        let commitment = commitment.unwrap_or(self.commitment);
+        let client = Arc::new(self.data_store().async_rpc());
+        let signatures = fetch_transaction_history_with_config(
+            client.clone(),
+            order,
+            commitment,
+            None,
+            None,
+            None,
+        )
+        .await?;
+        let events = extract_cpi_events(
+            signatures,
+            client,
+            &self.data_store_program_id(),
+            &self.data_store_event_authority(),
+            commitment,
+        )
+        .and_then(|encoded| {
+            let decoded = encoded
+                .map(|event| {
+                    event
+                        .decode::<StoreCPIEvent>()
+                        .collect::<crate::Result<Vec<_>>>()
+                })
+                .transpose();
+            async move { decoded }
+        });
+        Ok(events)
+    }
+
     /// Wait for an order to be completed using current slot as min context slot.
     #[cfg(feature = "decode")]
     pub async fn complete_order(
