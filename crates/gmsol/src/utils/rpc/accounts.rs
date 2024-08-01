@@ -8,7 +8,7 @@ use anchor_client::{
         rpc_config::{RpcAccountInfoConfig, RpcProgramAccountsConfig},
         rpc_filter::{Memcmp, RpcFilterType},
         rpc_request::{RpcError, RpcRequest},
-        rpc_response::{Response, RpcApiVersion, RpcKeyedAccount, RpcResponseContext},
+        rpc_response::{Response, RpcKeyedAccount},
     },
     solana_sdk::{
         account::Account, commitment_config::CommitmentConfig, pubkey::Pubkey, signer::Signer,
@@ -18,6 +18,8 @@ use anchor_client::{
 use serde_json::json;
 use solana_account_decoder::{UiAccount, UiAccountEncoding};
 
+use crate::utils::WithContext;
+
 /// Program Accounts Config.
 #[derive(Debug, Default)]
 pub struct ProgramAccountsConfigForRpc {
@@ -25,72 +27,6 @@ pub struct ProgramAccountsConfigForRpc {
     pub filters: Option<Vec<RpcFilterType>>,
     /// Account Config.
     pub account_config: RpcAccountInfoConfig,
-}
-
-/// With Context.
-#[derive(Debug, Clone)]
-pub struct WithContext<T> {
-    /// Context.
-    context: RpcResponseContext,
-    /// Value.
-    value: T,
-}
-
-impl<T> WithContext<T> {
-    /// Apply a function on the value.
-    pub fn map<U>(self, f: impl FnOnce(T) -> U) -> WithContext<U> {
-        WithContext {
-            context: self.context,
-            value: (f)(self.value),
-        }
-    }
-
-    /// Into value.
-    pub fn into_value(self) -> T {
-        self.value
-    }
-
-    /// Get a refercne to the value.
-    pub fn value(&self) -> &T {
-        &self.value
-    }
-
-    /// Get a mutable reference to the value.
-    pub fn value_mut(&mut self) -> &mut T {
-        &mut self.value
-    }
-
-    /// Get response slot.
-    pub fn slot(&self) -> u64 {
-        self.context.slot
-    }
-
-    /// Get API version.
-    pub fn api_version(&self) -> Option<&RpcApiVersion> {
-        self.context.api_version.as_ref()
-    }
-}
-
-impl<T, E> WithContext<Result<T, E>> {
-    /// Transpose.
-    pub fn transpose(self) -> Result<WithContext<T>, E> {
-        match self.value {
-            Ok(value) => Ok(WithContext {
-                context: self.context,
-                value,
-            }),
-            Err(err) => Err(err),
-        }
-    }
-}
-
-impl<T> From<Response<T>> for WithContext<T> {
-    fn from(res: Response<T>) -> Self {
-        Self {
-            context: res.context,
-            value: res.value,
-        }
-    }
 }
 
 /// Get program accounts with context.

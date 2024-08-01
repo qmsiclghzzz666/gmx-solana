@@ -18,7 +18,7 @@ use tracing::Instrument;
 use crate::{
     pda::find_default_store,
     types,
-    utils::{accounts::WithContext, shared_signer, ProgramAccountsConfig, SignerRef},
+    utils::{shared_signer, ProgramAccountsConfig, SignerRef, WithContext},
     Client, ClientOptions,
 };
 

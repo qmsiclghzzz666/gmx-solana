@@ -1,6 +1,5 @@
-use anchor_client::solana_sdk::pubkey::Pubkey;
-use gmsol::{exchange::ExchangeOps, store::utils::read_market, utils};
-use gmsol_store::states::Position;
+use anchor_client::solana_sdk::{commitment_config::CommitmentConfig, pubkey::Pubkey};
+use gmsol::exchange::ExchangeOps;
 
 use crate::GMSOLClient;
 
@@ -131,6 +130,9 @@ enum Command {
         /// Swap paths for collateral token.
         #[arg(long, short, action = clap::ArgAction::Append)]
         swap: Vec<Pubkey>,
+        /// Whether to wait for the action to be completed.
+        #[arg(long, short)]
+        wait: bool,
     },
     /// Create a market decrese order.
     MarketDecrease {
@@ -160,23 +162,9 @@ enum Command {
         /// Swap paths for output token (collateral token).
         #[arg(long, short, action = clap::ArgAction::Append)]
         swap: Vec<Pubkey>,
-    },
-    /// Liquidate the given position.
-    Liquidate {
-        /// The address of the position to liquidate.
-        position: Pubkey,
-        /// Final output token.
-        #[arg(long, short = 'o')]
-        final_output_token: Option<Pubkey>,
-        /// Final output token account.
-        #[arg(long, requires = "final_output_token")]
-        final_output_token_account: Option<Pubkey>,
-        /// Secondary output token account.
-        #[arg(long)]
-        secondary_output_token_account: Option<Pubkey>,
-        /// Swap paths for output token (collateral token).
-        #[arg(long, short, action = clap::ArgAction::Append)]
-        swap: Vec<Pubkey>,
+        /// Whether to wait for the action to be completed.
+        #[arg(long, short)]
+        wait: bool,
     },
     /// Create swap order.
     MarketSwap {
@@ -333,6 +321,7 @@ impl ExchangeArgs {
                 side,
                 size,
                 swap,
+                wait,
             } => {
                 let mut builder = client.market_increase(
                     store,
@@ -349,7 +338,11 @@ impl ExchangeArgs {
 
                 let (request, order) = builder.swap_path(swap.clone()).build_with_address().await?;
                 let signature = request.send().await?;
-                println!("created market increase order {order} at tx {signature}");
+                tracing::info!("created market increase order {order} at tx {signature}");
+                if *wait {
+                    self.wait_for_order(client, &order).await?;
+                }
+                println!("{order}");
             }
             Command::MarketDecrease {
                 market_token,
@@ -361,6 +354,7 @@ impl ExchangeArgs {
                 final_output_token_account,
                 secondary_output_token_account,
                 swap,
+                wait,
             } => {
                 let mut builder = client.market_decrease(
                     store,
@@ -378,50 +372,11 @@ impl ExchangeArgs {
                 }
                 let (request, order) = builder.swap_path(swap.clone()).build_with_address().await?;
                 let signature = request.send().await?;
-                println!("created market decrease order {order} at tx {signature}");
-            }
-            Command::Liquidate {
-                position,
-                final_output_token,
-                final_output_token_account,
-                secondary_output_token_account,
-                swap,
-            } => {
-                let position = utils::try_deserailize_zero_copy_account::<Position>(
-                    &client.data_store().async_rpc(),
-                    position,
-                )
-                .await?;
-                let market = client.find_market_address(store, &position.market_token);
-                let market = read_market(&client.data_store().async_rpc(), &market).await?;
-                let is_collateral_token_long =
-                    if market.meta().long_token_mint == position.collateral_token {
-                        true
-                    } else if market.meta().short_token_mint == position.collateral_token {
-                        false
-                    } else {
-                        return Err(gmsol::Error::invalid_argument(
-                            "the collateral token is not valid in the market",
-                        ));
-                    };
-                let mut builder = client.liquidate_by_owner(
-                    store,
-                    &position.market_token,
-                    is_collateral_token_long,
-                    position
-                        .is_long()
-                        .map_err(anchor_client::ClientError::from)?,
-                    Some(position.state.size_in_usd),
-                );
-                if let Some(token) = final_output_token {
-                    builder.final_output_token(token, final_output_token_account.as_ref());
+                tracing::info!("created market decrease order {order} at tx {signature}");
+                if *wait {
+                    self.wait_for_order(client, &order).await?;
                 }
-                if let Some(account) = secondary_output_token_account {
-                    builder.secondary_output_token_account(account);
-                }
-                let (request, order) = builder.swap_path(swap.clone()).build_with_address().await?;
-                let signature = request.send().await?;
-                println!("created liquidation order {order} at tx {signature}");
+                println!("{order}");
             }
             Command::MarketSwap {
                 market_token,
@@ -445,7 +400,23 @@ impl ExchangeArgs {
 
                 let (request, order) = builder.build_with_address().await?;
                 let signature = request.send().await?;
-                println!("created market increase order {order} at tx {signature}");
+                tracing::info!("created market swap order {order} at tx {signature}");
+                println!("{order}");
+            }
+        }
+        Ok(())
+    }
+
+    async fn wait_for_order(&self, client: &GMSOLClient, order: &Pubkey) -> gmsol::Result<()> {
+        let trade = client
+            .complete_order(order, Some(CommitmentConfig::confirmed()))
+            .await?;
+        match trade {
+            Some(trade) => {
+                tracing::info!(%order, "order completed with trade event: {trade:#}");
+            }
+            None => {
+                tracing::warn!(%order, "order completed without trade event");
             }
         }
         Ok(())

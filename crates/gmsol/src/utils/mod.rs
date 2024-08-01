@@ -10,53 +10,47 @@ use anchor_client::{
 use anchor_spl::associated_token::get_associated_token_address;
 use base64::{prelude::BASE64_STANDARD, Engine};
 
-/// Compute Budget.
-pub mod compute_budget;
-
-/// RPC Builder.
-pub mod rpc_builder;
-
 /// Transaction Builder.
 pub mod transaction_builder;
 
-/// Transaction size.
-pub mod transaction_size;
+/// Workarounds
+pub mod workarounds;
 
 /// Instruction utils.
 pub mod instruction;
 
+/// Solana RPC utils.
+pub mod rpc;
+
 /// Signer.
 pub mod signer;
-
-/// Workaround for optional accounts.
-pub mod optional;
-
-/// Zero-copy account workaround.
-pub mod zero_copy;
-
-/// Program accounts.
-pub mod accounts;
 
 /// Utils for fixed-point numbers.
 pub mod fixed;
 
-/// Pubsub client.
-pub mod pubsub;
-
 pub use self::{
-    accounts::{accounts_lazy_with_context, ProgramAccountsConfig},
-    compute_budget::ComputeBudget,
     fixed::{
         signed_amount_to_decimal, signed_fixed_to_decimal, signed_value_to_decimal,
         unsigned_amount_to_decimal, unsigned_fixed_to_decimal, unsigned_value_to_decimal,
     },
     instruction::serialize_instruction,
-    optional::fix_optional_account_metas,
-    rpc_builder::RpcBuilder,
+    rpc::{
+        accounts::{account_with_context, accounts_lazy_with_context, ProgramAccountsConfig},
+        context::{WithContext, WithSlot},
+        pubsub::{PubsubClient, SubscriptionConfig},
+        transaction_history::{
+            extract_cpi_events, fetch_transaction_history_with_config, EncodedCPIEvents,
+        },
+    },
     signer::{shared_signer, SignerRef},
-    transaction_builder::TransactionBuilder,
-    transaction_size::transaction_size,
-    zero_copy::try_deserailize_zero_copy_account,
+    transaction_builder::{
+        compute_budget::ComputeBudget, rpc_builder::RpcBuilder, transaction_size::transaction_size,
+        TransactionBuilder,
+    },
+    workarounds::{
+        optional::fix_optional_account_metas,
+        zero_copy::{try_deserailize_zero_copy_account, ZeroCopy},
+    },
 };
 
 /// View the return data by simulating the transaction.

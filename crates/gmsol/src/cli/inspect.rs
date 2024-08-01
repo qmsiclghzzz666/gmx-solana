@@ -4,6 +4,7 @@ use anchor_client::{
     anchor_lang::{AnchorDeserialize, Discriminator},
     solana_sdk::{native_token::lamports_to_sol, pubkey::Pubkey},
 };
+use futures_util::{pin_mut, StreamExt};
 use gmsol::{
     types::{self, TokenMapAccess},
     utils::{signed_value_to_decimal, unsigned_value_to_decimal},
@@ -107,7 +108,11 @@ enum Command {
         oracle: Oracle,
     },
     /// `Order` account.
-    Order { address: Pubkey },
+    Order {
+        address: Pubkey,
+        #[arg(long)]
+        event: bool,
+    },
     /// `Position` account.
     Position {
         address: Option<Pubkey>,
@@ -541,8 +546,23 @@ impl InspectArgs {
                 println!("{address}");
                 println!("{:#?}", program.account::<states::Oracle>(address).await?);
             }
-            Command::Order { address } => {
-                println!("{:#?}", client.order(address).await?);
+            Command::Order { address, event } => {
+                if *event {
+                    let stream = client.order_events(address, None).await?;
+                    pin_mut!(stream);
+                    while let Some(res) = stream.next().await {
+                        match res {
+                            Ok(events) => {
+                                println!("{events:#?}");
+                            }
+                            Err(err) => {
+                                tracing::error!(%err, "stream error");
+                            }
+                        }
+                    }
+                } else {
+                    println!("{:#?}", client.order(address).await?);
+                }
             }
             Command::Position {
                 address,

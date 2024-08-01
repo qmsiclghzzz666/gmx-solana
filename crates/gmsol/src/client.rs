@@ -17,12 +17,8 @@ use typed_builder::TypedBuilder;
 use crate::{
     types,
     utils::{
-        accounts::{
-            account_with_context, accounts_lazy_with_context, ProgramAccountsConfig, WithContext,
-        },
-        pubsub::{PubsubClient, SubscriptionConfig},
-        zero_copy::ZeroCopy,
-        RpcBuilder,
+        account_with_context, accounts_lazy_with_context, ProgramAccountsConfig, PubsubClient,
+        RpcBuilder, SubscriptionConfig, WithContext, ZeroCopy,
     },
 };
 
@@ -56,6 +52,7 @@ pub struct Client<C> {
     exchange: Program<C>,
     pub_sub: OnceCell<PubsubClient>,
     subscription_config: SubscriptionConfig,
+    commitment: CommitmentConfig,
 }
 
 impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
@@ -81,6 +78,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
             anchor: Arc::new(anchor),
             pub_sub: OnceCell::default(),
             subscription_config: subscription,
+            commitment,
         })
     }
 
@@ -99,6 +97,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
             exchange: self.anchor.program(self.exchange_program_id())?,
             pub_sub: OnceCell::default(),
             subscription_config: self.subscription_config.clone(),
+            commitment: self.commitment,
         })
     }
 
@@ -116,6 +115,11 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
     /// Get the cluster.
     pub fn cluster(&self) -> &Cluster {
         &self.cluster
+    }
+
+    /// Get the commitment config.
+    pub fn commitment(&self) -> CommitmentConfig {
+        self.commitment
     }
 
     /// Get the payer.
@@ -282,6 +286,17 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
             &self.data_store_program_id(),
         )
         .0
+    }
+
+    /// Get slot.
+    pub async fn get_slot(&self, commitment: Option<CommitmentConfig>) -> crate::Result<u64> {
+        let slot = self
+            .data_store()
+            .async_rpc()
+            .get_slot_with_commitment(commitment.unwrap_or(self.commitment))
+            .await
+            .map_err(anchor_client::ClientError::from)?;
+        Ok(slot)
     }
 
     /// Fetch accounts owned by the Store Program.
@@ -484,6 +499,266 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
             })
             .await?;
         Ok(client)
+    }
+
+    /// Subscribe to CPI events from the store program.
+    #[cfg(feature = "decode")]
+    pub async fn store_cpi_events(
+        &self,
+        commitment: Option<CommitmentConfig>,
+    ) -> crate::Result<
+        impl futures_util::Stream<
+            Item = crate::Result<crate::utils::WithSlot<Vec<crate::store::events::StoreCPIEvent>>>,
+        >,
+    > {
+        use futures_util::TryStreamExt;
+
+        use crate::{
+            store::events::StoreCPIEvent,
+            utils::{extract_cpi_events, WithSlot},
+        };
+
+        let program_id = self.data_store_program_id();
+        let event_authority = self.data_store_event_authority();
+        let query = Arc::new(self.data_store().async_rpc());
+        let commitment = commitment.unwrap_or(self.subscription_config.commitment);
+        let signatures = self
+            .pub_sub()
+            .await?
+            .logs_subscribe(&event_authority, Some(commitment))
+            .await?
+            .and_then(|txn| {
+                let signature = WithSlot::from(txn)
+                    .map(|txn| {
+                        txn.signature
+                            .parse()
+                            .map_err(crate::Error::invalid_argument)
+                    })
+                    .transpose();
+                async move { signature }
+            });
+        let events =
+            extract_cpi_events(signatures, query, &program_id, &event_authority, commitment)
+                .try_filter_map(|event| {
+                    let decoded = event
+                        .map(|event| {
+                            event
+                                .decode::<StoreCPIEvent>()
+                                .collect::<crate::Result<Vec<_>>>()
+                        })
+                        .transpose()
+                        .inspect_err(|err| tracing::error!(%err, "decode error"))
+                        .ok();
+                    async move { Ok(decoded) }
+                });
+        Ok(events)
+    }
+
+    /// Fetch historical events for the given order.
+    #[cfg(feature = "decode")]
+    pub async fn order_events(
+        &self,
+        order: &Pubkey,
+        commitment: Option<CommitmentConfig>,
+    ) -> crate::Result<
+        impl futures_util::Stream<
+            Item = crate::Result<crate::utils::WithSlot<Vec<crate::store::events::StoreCPIEvent>>>,
+        >,
+    > {
+        use futures_util::TryStreamExt;
+
+        use crate::{
+            store::events::StoreCPIEvent,
+            utils::{extract_cpi_events, fetch_transaction_history_with_config},
+        };
+
+        let commitment = commitment.unwrap_or(self.commitment);
+        let client = Arc::new(self.data_store().async_rpc());
+        let signatures = fetch_transaction_history_with_config(
+            client.clone(),
+            order,
+            commitment,
+            None,
+            None,
+            None,
+        )
+        .await?;
+        let events = extract_cpi_events(
+            signatures,
+            client,
+            &self.data_store_program_id(),
+            &self.data_store_event_authority(),
+            commitment,
+        )
+        .and_then(|encoded| {
+            let decoded = encoded
+                .map(|event| {
+                    event
+                        .decode::<StoreCPIEvent>()
+                        .collect::<crate::Result<Vec<_>>>()
+                })
+                .transpose();
+            async move { decoded }
+        });
+        Ok(events)
+    }
+
+    /// Wait for an order to be completed using current slot as min context slot.
+    #[cfg(feature = "decode")]
+    pub async fn complete_order(
+        &self,
+        address: &Pubkey,
+        commitment: Option<CommitmentConfig>,
+    ) -> crate::Result<Option<crate::types::TradeEvent>> {
+        let slot = self.get_slot(None).await?;
+        self.complete_order_with_config(
+            address,
+            slot,
+            std::time::Duration::from_secs(5),
+            commitment,
+        )
+        .await
+    }
+
+    #[cfg(feature = "decode")]
+    async fn last_order_events(
+        &self,
+        order: &Pubkey,
+        before_slot: u64,
+        commitment: CommitmentConfig,
+    ) -> crate::Result<Vec<crate::store::events::StoreCPIEvent>> {
+        use futures_util::{StreamExt, TryStreamExt};
+
+        let events = self
+            .order_events(order, Some(commitment))
+            .await?
+            .try_filter(|events| {
+                let pass = events.slot() <= before_slot;
+                async move { pass }
+            })
+            .take(1);
+        futures_util::pin_mut!(events);
+        match events.next().await.transpose()? {
+            Some(events) => Ok(events.into_value()),
+            None => Err(crate::Error::unknown("events not found")),
+        }
+    }
+
+    /// Wait for an order to be completed with the given config.
+    #[cfg(feature = "decode")]
+    pub async fn complete_order_with_config(
+        &self,
+        address: &Pubkey,
+        mut slot: u64,
+        polling: std::time::Duration,
+        commitment: Option<CommitmentConfig>,
+    ) -> crate::Result<Option<crate::types::TradeEvent>> {
+        use crate::store::events::StoreCPIEvent;
+        use futures_util::{StreamExt, TryStreamExt};
+        use solana_account_decoder::UiAccountEncoding;
+
+        let mut trade = None;
+        let commitment = commitment.unwrap_or(self.subscription_config.commitment);
+
+        let events = self.store_cpi_events(Some(commitment)).await?;
+
+        let config = RpcAccountInfoConfig {
+            encoding: Some(UiAccountEncoding::Base64),
+            commitment: Some(commitment),
+            min_context_slot: Some(slot),
+            ..Default::default()
+        };
+        let current = self.get_slot(Some(commitment)).await?;
+        let mut slot_reached = current >= slot;
+        if slot_reached {
+            let order = self.order_with_config(address, config.clone()).await?;
+            slot = order.slot();
+            let order = order.into_value();
+            if order.is_none() {
+                let events = self.last_order_events(address, current, commitment).await?;
+                return Ok(events
+                    .into_iter()
+                    .filter_map(|event| {
+                        if let StoreCPIEvent::TradeEvent(event) = event {
+                            Some(event)
+                        } else {
+                            None
+                        }
+                    })
+                    .next());
+            }
+        }
+        let address = *address;
+        let stream = events
+            .try_filter_map(|events| async {
+                if events.slot() < slot {
+                    return Ok(None);
+                }
+                let events = events
+                    .into_value()
+                    .into_iter()
+                    .filter(|event| {
+                        matches!(
+                            event,
+                            StoreCPIEvent::TradeEvent(_) | StoreCPIEvent::RemoveOrderEvent(_)
+                        )
+                    })
+                    .map(Ok);
+                Ok(Some(futures_util::stream::iter(events)))
+            })
+            .try_flatten();
+        let stream =
+            tokio_stream::StreamExt::timeout_repeating(stream, tokio::time::interval(polling));
+        futures_util::pin_mut!(stream);
+        while let Some(res) = stream.next().await {
+            match res {
+                Ok(Ok(event)) => match event {
+                    StoreCPIEvent::TradeEvent(event) => {
+                        trade = Some(event);
+                    }
+                    StoreCPIEvent::RemoveOrderEvent(_remove) => {
+                        return Ok(trade);
+                    }
+                    _ => unreachable!(),
+                },
+                Ok(Err(err)) => {
+                    return Err(err);
+                }
+                Err(_elapsed) => {
+                    if slot_reached {
+                        if self
+                            .order_with_config(&address, config.clone())
+                            .await?
+                            .value()
+                            .is_none()
+                        {
+                            let events = self
+                                .last_order_events(&address, current, commitment)
+                                .await?;
+                            return Ok(events
+                                .into_iter()
+                                .filter_map(|event| {
+                                    if let StoreCPIEvent::TradeEvent(event) = event {
+                                        Some(event)
+                                    } else {
+                                        None
+                                    }
+                                })
+                                .next());
+                        }
+                    } else {
+                        let current = self.get_slot(Some(commitment)).await?;
+                        slot_reached = current >= slot;
+                    }
+                }
+            }
+        }
+        Err(crate::Error::unknown("the watch stream end"))
+    }
+
+    /// Shutdown the client gracefully.
+    pub async fn shutdown(&self) -> crate::Result<()> {
+        self.pub_sub().await?.shutdown().await
     }
 }
 
