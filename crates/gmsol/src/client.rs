@@ -620,6 +620,30 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         .await
     }
 
+    #[cfg(feature = "decode")]
+    async fn last_order_events(
+        &self,
+        order: &Pubkey,
+        before_slot: u64,
+        commitment: CommitmentConfig,
+    ) -> crate::Result<Vec<crate::store::events::StoreCPIEvent>> {
+        use futures_util::{StreamExt, TryStreamExt};
+
+        let events = self
+            .order_events(order, Some(commitment))
+            .await?
+            .try_filter(|events| {
+                let pass = events.slot() <= before_slot;
+                async move { pass }
+            })
+            .take(1);
+        futures_util::pin_mut!(events);
+        match events.next().await.transpose()? {
+            Some(events) => Ok(events.into_value()),
+            None => Err(crate::Error::unknown("events not found")),
+        }
+    }
+
     /// Wait for an order to be completed with the given config.
     #[cfg(feature = "decode")]
     pub async fn complete_order_with_config(
@@ -651,7 +675,17 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
             slot = order.slot();
             let order = order.into_value();
             if order.is_none() {
-                return Ok(trade);
+                let events = self.last_order_events(address, current, commitment).await?;
+                return Ok(events
+                    .into_iter()
+                    .filter_map(|event| {
+                        if let StoreCPIEvent::TradeEvent(event) = event {
+                            Some(event)
+                        } else {
+                            None
+                        }
+                    })
+                    .next());
             }
         }
         let address = *address;
@@ -698,7 +732,19 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
                             .value()
                             .is_none()
                         {
-                            return Ok(trade);
+                            let events = self
+                                .last_order_events(&address, current, commitment)
+                                .await?;
+                            return Ok(events
+                                .into_iter()
+                                .filter_map(|event| {
+                                    if let StoreCPIEvent::TradeEvent(event) = event {
+                                        Some(event)
+                                    } else {
+                                        None
+                                    }
+                                })
+                                .next());
                         }
                     } else {
                         let current = self.get_slot(Some(commitment)).await?;
