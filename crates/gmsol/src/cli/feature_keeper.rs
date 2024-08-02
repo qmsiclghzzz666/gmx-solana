@@ -18,7 +18,7 @@ enum Command {
         #[clap(requires = "toggle")]
         domain: DomainDisabledFlag,
         /// Feature action.
-        action: Option<ActionDisabledFlag>,
+        action: ActionDisabledFlag,
         /// Enable the given feature.
         #[arg(long, group = "toggle")]
         enable: bool,
@@ -45,7 +45,6 @@ impl Args {
                 if enable == disable {
                     return Err(gmsol::Error::invalid_argument("invalid toggle flags"));
                 }
-                let action = action.unwrap_or_default();
                 let req = client
                     .toggle_feature(store, domain, action, enable)
                     .build_without_compute_budget();
