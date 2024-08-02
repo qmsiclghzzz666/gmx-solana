@@ -9,6 +9,7 @@ use gmsol_store::{
 };
 
 use crate::{
+    states::{ActionDisabledFlag, Controller},
     utils::{must_be_uninitialized, ControllerSeeds},
     ExchangeError,
 };
@@ -19,15 +20,16 @@ use super::utils::{CancelOrderUtil, TransferOutUtils};
 pub struct ExecuteOrder<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
-    /// CHECK: only used as signing PDA.
+    /// Controller.
     #[account(
+        has_one = store,
         seeds = [
             crate::constants::CONTROLLER_SEED,
             store.key().as_ref(),
         ],
-        bump,
+        bump = controller.load()?.bump,
     )]
-    pub controller: UncheckedAccount<'info>,
+    pub controller: AccountLoader<'info, Controller>,
     /// CHECK: used and checked by CPI.
     pub store: UncheckedAccount<'info>,
     /// CHECK: check by CPI.
@@ -199,7 +201,13 @@ impl<'info> WithOracle<'info> for ExecuteOrder<'info> {
 
 impl<'info> ExecuteOrder<'info> {
     fn is_executable(&self) -> Result<bool> {
-        if self.order.fixed.params.kind.is_swap() {
+        let kind = self.order.fixed.params.kind;
+
+        self.controller
+            .load()?
+            .validate_feature_enabled(kind.try_into()?, ActionDisabledFlag::ExecuteOrder)?;
+
+        if kind.is_swap() {
             Ok(true)
         } else {
             let position = self

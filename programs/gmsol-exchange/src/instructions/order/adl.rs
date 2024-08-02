@@ -14,7 +14,12 @@ use gmsol_store::{
     utils::{Authentication, WithOracle, WithOracleExt, WithStore},
 };
 
-use crate::{order::utils::PositionCut, utils::ControllerSeeds, ExchangeError};
+use crate::{
+    order::utils::PositionCut,
+    states::{ActionDisabledFlag, Controller, DomainDisabledFlag},
+    utils::ControllerSeeds,
+    ExchangeError,
+};
 
 use super::utils::PositionCutUtils;
 
@@ -31,15 +36,16 @@ pub struct AutoDeleverage<'info> {
     /// and receive fund.
     #[account(mut)]
     pub owner: UncheckedAccount<'info>,
-    /// CHECK: only used as signing PDA.
+    /// Controller.
     #[account(
+        has_one = store,
         seeds = [
             crate::constants::CONTROLLER_SEED,
             store.key().as_ref(),
         ],
-        bump,
+        bump = controller.load()?.bump,
     )]
-    pub controller: UncheckedAccount<'info>,
+    pub controller: AccountLoader<'info, Controller>,
     #[account(has_one = token_map)]
     pub store: AccountLoader<'info, Store>,
     #[account(has_one = store)]
@@ -105,6 +111,11 @@ pub(crate) fn unchecked_auto_deleverage<'info>(
     nonce: NonceBytes,
     execution_fee: u64,
 ) -> Result<()> {
+    ctx.accounts.controller.load()?.validate_feature_enabled(
+        DomainDisabledFlag::AutoDeleveraging,
+        ActionDisabledFlag::ExecuteOrder,
+    )?;
+
     let store = ctx.accounts.store.key();
     let controller = ControllerSeeds::find(&store);
 

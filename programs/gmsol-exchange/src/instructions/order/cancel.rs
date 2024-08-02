@@ -2,7 +2,10 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::Token;
 use gmsol_store::{constants::EVENT_AUTHORITY_SEED, program::GmsolStore, states::Order};
 
-use crate::utils::ControllerSeeds;
+use crate::{
+    states::{ActionDisabledFlag, Controller},
+    utils::ControllerSeeds,
+};
 
 use super::utils::CancelOrderUtil;
 
@@ -14,15 +17,16 @@ pub struct CancelOrder<'info> {
     /// The owner of the order.
     #[account(mut)]
     pub user: Signer<'info>,
-    /// CHECK: only used as signing PDA.
+    /// Controller.
     #[account(
+        has_one = store,
         seeds = [
             crate::constants::CONTROLLER_SEED,
             store.key().as_ref(),
         ],
-        bump,
+        bump = controller.load()?.bump,
     )]
-    pub controller: UncheckedAccount<'info>,
+    pub controller: AccountLoader<'info, Controller>,
     /// CHECK: used and checked by CPI.
     pub store: UncheckedAccount<'info>,
     /// CHECK: Only the event authority can invoke self-CPI
@@ -53,6 +57,11 @@ pub struct CancelOrder<'info> {
 }
 
 pub(crate) fn cancel_order(ctx: Context<CancelOrder>) -> Result<()> {
+    ctx.accounts.controller.load()?.validate_feature_enabled(
+        ctx.accounts.order.fixed.params.kind.try_into()?,
+        ActionDisabledFlag::CancelOrder,
+    )?;
+
     let controller = ControllerSeeds::find(ctx.accounts.store.key);
     ctx.accounts
         .cancel_utils()

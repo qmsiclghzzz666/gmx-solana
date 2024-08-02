@@ -8,7 +8,7 @@ use gmsol_store::{
     utils::{Authentication, WithOracle, WithOracleExt, WithStore},
 };
 
-use crate::{utils::ControllerSeeds, ExchangeError};
+use crate::{states::Controller, utils::ControllerSeeds, ExchangeError};
 
 use super::utils::{CancelDepositUtils, TransferIn};
 
@@ -16,15 +16,16 @@ use super::utils::{CancelDepositUtils, TransferIn};
 pub struct ExecuteDeposit<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
-    /// CHECK: only used as signing PDA.
+    /// Controller.
     #[account(
+        has_one = store,
         seeds = [
             crate::constants::CONTROLLER_SEED,
             store.key().as_ref(),
         ],
-        bump,
+        bump = controller.load()?.bump,
     )]
-    pub controller: UncheckedAccount<'info>,
+    pub controller: AccountLoader<'info, Controller>,
     /// CHECK: used and checked by CPI.
     pub store: UncheckedAccount<'info>,
     /// CHECK: check by CPI.

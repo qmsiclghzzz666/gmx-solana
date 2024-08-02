@@ -7,8 +7,9 @@ use anchor_client::{
 use futures_util::{pin_mut, StreamExt};
 use gmsol::{
     types::{self, TokenMapAccess},
-    utils::{signed_value_to_decimal, unsigned_value_to_decimal},
+    utils::{signed_value_to_decimal, unsigned_value_to_decimal, ZeroCopy},
 };
+use gmsol_exchange::states::{display_feature, ActionDisabledFlag, Controller, DomainDisabledFlag};
 use gmsol_model::{Balance, BalanceExt, ClockKind, PoolKind};
 use gmsol_store::states::{
     self, AddressKey, AmountKey, FactorKey, MarketConfigKey, PriceProviderKind,
@@ -138,7 +139,7 @@ enum Command {
         #[arg(long)]
         post: bool,
     },
-    /// Get the CONTROLLER address.
+    /// Insepct controller.
     Controller,
     /// Get the event authority address.
     EventAuthority,
@@ -535,6 +536,23 @@ impl InspectArgs {
                         println!("Balance: *failed to get balance*");
                         tracing::info!(%err, "failed to get balance");
                     }
+                }
+                if let Some(ZeroCopy(controller)) = client
+                    .account_with_config::<ZeroCopy<Controller>>(&controller, Default::default())
+                    .await?
+                    .into_value()
+                {
+                    println!("Store: {}", controller.store);
+                    println!("Disabled features:");
+                    for domain in DomainDisabledFlag::iter() {
+                        for action in ActionDisabledFlag::iter() {
+                            if let Some(true) = controller.get_feature_disabled(domain, action) {
+                                println!("{}: disabled", display_feature(domain, action));
+                            }
+                        }
+                    }
+                } else {
+                    println!("*not initialized*");
                 }
             }
             Command::EventAuthority => {

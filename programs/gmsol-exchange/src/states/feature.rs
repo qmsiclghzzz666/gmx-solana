@@ -1,4 +1,7 @@
 use anchor_lang::prelude::*;
+use gmsol_store::states::order::OrderKind;
+
+use crate::ExchangeError;
 
 type DisabledKey = (DomainDisabledFlag, ActionDisabledFlag);
 
@@ -78,6 +81,25 @@ pub enum DomainDisabledFlag {
     LimitDecrease = 7,
     /// Stop-loss Decrease Order.
     StopLossDecrease = 8,
+}
+
+impl TryFrom<OrderKind> for DomainDisabledFlag {
+    type Error = anchor_lang::prelude::Error;
+
+    fn try_from(kind: OrderKind) -> Result<Self> {
+        match kind {
+            OrderKind::MarketSwap => Ok(Self::MarketSwap),
+            OrderKind::MarketIncrease => Ok(Self::MarketIncrease),
+            OrderKind::MarketDecrease => Ok(Self::MarketDecrease),
+            OrderKind::Liquidation => Ok(Self::Liquidation),
+            OrderKind::AutoDeleveraging => Ok(Self::AutoDeleveraging),
+            OrderKind::LimitSwap => Ok(Self::LimitSwap),
+            OrderKind::LimitIncrease => Ok(Self::LimitIncrease),
+            OrderKind::LimitDecrease => Ok(Self::LimitDecrease),
+            OrderKind::StopLossDecrease => Ok(Self::StopLossDecrease),
+            _ => err!(ExchangeError::UnsupportedOrderKind),
+        }
+    }
 }
 
 /// Action Disabled Flag.

@@ -14,6 +14,7 @@ use gmsol_store::{
 
 use crate::{
     events::DepositCreatedEvent,
+    states::Controller,
     utils::{market::get_and_validate_swap_path, ControllerSeeds},
     ExchangeError,
 };
@@ -44,6 +45,16 @@ pub struct CreateDeposit<'info> {
     pub authority: UncheckedAccount<'info>,
     #[account(has_one = token_map)]
     pub store: AccountLoader<'info, Store>,
+    /// Controller.
+    #[account(
+        has_one = store,
+        seeds = [
+            crate::constants::CONTROLLER_SEED,
+            store.key().as_ref(),
+        ],
+        bump = controller.load()?.bump,
+    )]
+    pub controller: AccountLoader<'info, Controller>,
     #[account(has_one = store)]
     pub token_map: AccountLoader<'info, TokenMapHeader>,
     /// CHECK: only used to invoke CPI which will then initialize the account.

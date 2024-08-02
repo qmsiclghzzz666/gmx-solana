@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::{Token, TokenAccount};
 use gmsol_store::{constants::EVENT_AUTHORITY_SEED, program::GmsolStore, states::Deposit};
 
-use crate::utils::ControllerSeeds;
+use crate::{states::Controller, utils::ControllerSeeds};
 
 use super::utils::CancelDepositUtils;
 
@@ -10,15 +10,16 @@ use super::utils::CancelDepositUtils;
 pub struct CancelDeposit<'info> {
     #[account(mut)]
     pub user: Signer<'info>,
-    /// CHECK: only used as signing PDA.
+    /// Controller.
     #[account(
+        has_one = store,
         seeds = [
             crate::constants::CONTROLLER_SEED,
             store.key().as_ref(),
         ],
-        bump,
+        bump = controller.load()?.bump,
     )]
-    pub controller: UncheckedAccount<'info>,
+    pub controller: AccountLoader<'info, Controller>,
     /// CHECK: only used to invoke CPI.
     pub store: UncheckedAccount<'info>,
     /// The deposit to cancel.

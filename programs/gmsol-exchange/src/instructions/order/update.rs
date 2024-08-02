@@ -4,7 +4,10 @@ use gmsol_store::{
     states::{order::UpdateOrderParams, Market, Order},
 };
 
-use crate::ExchangeError;
+use crate::{
+    states::{ActionDisabledFlag, Controller},
+    ExchangeError,
+};
 
 /// The accounts definition for [`update_order`](crate::gmsol_exchange::update_order)
 ///
@@ -13,15 +16,16 @@ use crate::ExchangeError;
 pub struct UpdateOrder<'info> {
     /// The owner of the order.
     pub user: Signer<'info>,
-    /// CHECK: only used as signing PDA.
+    /// Controller.
     #[account(
+        has_one = store,
         seeds = [
             crate::constants::CONTROLLER_SEED,
             store.key().as_ref(),
         ],
-        bump,
+        bump = controller.load()?.bump,
     )]
-    pub controller: UncheckedAccount<'info>,
+    pub controller: AccountLoader<'info, Controller>,
     /// CHECK: only used as an identifier.
     pub store: UncheckedAccount<'info>,
     #[account(mut, has_one = store)]
@@ -39,6 +43,11 @@ pub struct UpdateOrder<'info> {
 }
 
 pub(crate) fn update_order(ctx: Context<UpdateOrder>, params: &UpdateOrderParams) -> Result<()> {
+    ctx.accounts.controller.load()?.validate_feature_enabled(
+        ctx.accounts.order.fixed.params.kind.try_into()?,
+        ActionDisabledFlag::UpdateOrder,
+    )?;
+
     let id = ctx
         .accounts
         .market

@@ -363,6 +363,7 @@ where
                 accounts::CreateOrder {
                     authority,
                     store: self.store,
+                    controller: self.client.controller_address(&self.store),
                     payer: *payer,
                     order,
                     position,

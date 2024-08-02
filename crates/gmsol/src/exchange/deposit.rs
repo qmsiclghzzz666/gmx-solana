@@ -250,6 +250,7 @@ where
                 accounts::CreateDeposit {
                     authority,
                     store: *store,
+                    controller: client.controller_address(store),
                     data_store_program: client.store_program_id(),
                     system_program: system_program::ID,
                     token_program: anchor_spl::token::ID,

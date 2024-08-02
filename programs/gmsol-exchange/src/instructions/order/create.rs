@@ -14,6 +14,7 @@ use gmsol_store::{
 
 use crate::{
     events::OrderCreatedEvent,
+    states::{ActionDisabledFlag, Controller},
     utils::{market::get_and_validate_swap_path, token_records, ControllerSeeds},
     ExchangeError,
 };
@@ -31,6 +32,16 @@ pub struct CreateOrder<'info> {
     pub authority: UncheckedAccount<'info>,
     #[account(has_one = token_map)]
     pub store: AccountLoader<'info, Store>,
+    /// Controller.
+    #[account(
+        has_one = store,
+        seeds = [
+            crate::constants::CONTROLLER_SEED,
+            store.key().as_ref(),
+        ],
+        bump = controller.load()?.bump,
+    )]
+    pub controller: AccountLoader<'info, Controller>,
     #[account(has_one = store)]
     pub token_map: AccountLoader<'info, TokenMapHeader>,
     #[account(mut)]
@@ -65,6 +76,12 @@ pub fn create_order<'info>(
     params: CreateOrderParams,
 ) -> Result<()> {
     let order = &params.order;
+
+    ctx.accounts
+        .controller
+        .load()?
+        .validate_feature_enabled(order.kind.try_into()?, ActionDisabledFlag::CreateOrder)?;
+
     let store = ctx.accounts.store.key();
     let controller = ControllerSeeds::new(&store, ctx.bumps.authority);
 

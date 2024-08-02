@@ -6,6 +6,7 @@ import { IxWithOutput, makeInvoke } from "../utils/invoke";
 import { StoreProgram, ExchangeProgram } from "../program";
 import { BN } from "@coral-xyz/anchor";
 import { getPositionSide } from "./utils";
+import { findControllerPDA } from ".";
 
 export type MakeCreateDepositParams = {
     store: PublicKey,
@@ -548,9 +549,11 @@ export const makeCancelOrderInstruction = async (
         initialCollateralTokenAccount,
         initialMarketToken,
     } = hint;
-    return await exchange.methods.cancelOrder().accounts({
+    const controller = findControllerPDA(store)[0];
+    return await exchange.methods.cancelOrder().accountsPartial({
         user,
         store,
+        controller,
         order,
         initialCollateralTokenAccount,
         initialCollateralTokenVault: initialCollateralToken ? findMarketVaultPDA(store, initialCollateralToken)[0] : null,

@@ -11,6 +11,7 @@ use anchor_client::{
 };
 
 use gmsol_store::states::{position::PositionKind, NonceBytes};
+use solana_account_decoder::UiAccountEncoding;
 use tokio::sync::OnceCell;
 use typed_builder::TypedBuilder;
 
@@ -331,11 +332,12 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
     pub async fn account_with_config<T>(
         &self,
         address: &Pubkey,
-        config: RpcAccountInfoConfig,
+        mut config: RpcAccountInfoConfig,
     ) -> crate::Result<WithContext<Option<T>>>
     where
         T: AccountDeserialize,
     {
+        config.encoding = Some(config.encoding.unwrap_or(UiAccountEncoding::Base64));
         let client = self.data_store().async_rpc();
         account_with_context(&client, address, config).await
     }

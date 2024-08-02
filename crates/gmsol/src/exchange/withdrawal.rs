@@ -213,6 +213,7 @@ where
             .accounts(accounts::CreateWithdrawal {
                 authority,
                 store: self.store,
+                controller: self.client.controller_address(&self.store),
                 data_store_program: self.client.store_program_id(),
                 token_program: anchor_spl::token::ID,
                 system_program: system_program::ID,
