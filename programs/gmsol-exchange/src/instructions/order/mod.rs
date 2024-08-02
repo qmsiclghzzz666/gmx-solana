@@ -3,6 +3,7 @@ mod cancel;
 mod create;
 mod execute;
 mod liquidate;
+mod update;
 mod utils;
 
 /// Max Execution Fee (lamports) for orders.
@@ -14,3 +15,4 @@ pub use cancel::*;
 pub use create::*;
 pub use execute::*;
 pub use liquidate::*;
+pub use update::*;

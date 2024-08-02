@@ -15,7 +15,7 @@ pub mod events;
 /// States.
 pub mod states;
 
-use gmsol_store::utils::Authenticate;
+use gmsol_store::{states::UpdateOrderParams, utils::Authenticate};
 use instructions::*;
 
 declare_id!("hnxiNKTc515NHvuq5fEUAc62dWkEu3m623FbwemWNJd");
@@ -94,6 +94,29 @@ pub mod gmsol_exchange {
         instructions::create_order(ctx, nonce, params)
     }
 
+    /// Update order.
+    ///
+    /// # Accounts
+    /// *[See the documentation for the accounts.](UpdateOrder)*
+    ///
+    /// # Arguments
+    /// - `params`: Parameters for updating the order.
+    ///
+    /// # Errors
+    /// - The [`user`](UpdateOrder::user) must be a signer and the owner of the order.
+    /// - The [`controller`](UpdateOrder::controller) must be derived for the
+    /// `store`.
+    /// - The [`market`](UpdateOrder::market) must be the market of the order,
+    /// and it must be an initialized [`Market`](gmsol_store::states::Market) account
+    /// owned by the store program.
+    /// - The [`order`](UpdateOrder::order) must be an initialized
+    /// [`Order`](gmsol_store::states::Order) account owned by the store program,
+    /// and it must be updatable.
+    /// - It will also return error if the order parameters is not valid.
+    pub fn update_order(ctx: Context<UpdateOrder>, params: UpdateOrderParams) -> Result<()> {
+        instructions::update_order(ctx, &params)
+    }
+
     #[access_control(Authenticate::only_order_keeper(&ctx))]
     pub fn execute_order<'info>(
         ctx: Context<'_, '_, 'info, 'info, ExecuteOrder<'info>>,
@@ -134,7 +157,7 @@ pub mod gmsol_exchange {
     /// - `nonce`: Nonce bytes used to derive the order account.
     /// - `execution_fee`: Execution fee claimed by Keeper for its usage.
     ///
-    /// # Checks
+    /// # Errors
     /// - The [`authority`](Liquidate::authority) must be a signer and has the `ORDER_KEEPER` role.
     /// - *TODO*
     #[access_control(Authenticate::only_order_keeper(&ctx))]
@@ -158,7 +181,7 @@ pub mod gmsol_exchange {
     /// - `nonce`: Nonce bytes used to derive the order account.
     /// - `execution_fee`: Execution fee claimed by Keeper for its usage.
     ///
-    /// # Checks
+    /// # Errors
     /// - The [`authority`](AutoDeleverage::authority) must be a signer and has the `ORDER_KEEPER` role.
     /// - *TODO*
     #[access_control(Authenticate::only_order_keeper(&ctx))]
@@ -186,7 +209,7 @@ pub mod gmsol_exchange {
     /// # Arguments
     /// - `is_long`: The market side to update for.
     ///
-    /// # Checks
+    /// # Errors
     /// *TODO*
     #[access_control(Authenticate::only_order_keeper(&ctx))]
     pub fn update_adl_state<'info>(

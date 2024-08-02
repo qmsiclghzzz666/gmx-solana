@@ -31,7 +31,7 @@ pub mod position;
 pub use deposit::Deposit;
 pub use market::*;
 pub use oracle::*;
-pub use order::Order;
+pub use order::{Order, UpdateOrderParams};
 pub use position::Position;
 pub use roles::*;
 pub use store::*;

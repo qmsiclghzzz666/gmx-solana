@@ -19,7 +19,7 @@ use anchor_client::{
 use gmsol_exchange::{accounts, instruction};
 use gmsol_store::states::{
     order::{OrderKind, OrderParams},
-    NonceBytes,
+    NonceBytes, UpdateOrderParams,
 };
 use liquidation::LiquidateBuilder;
 use order::CancelOrderBuilder;
@@ -94,6 +94,15 @@ pub trait ExchangeOps<C> {
         is_output_token_long: bool,
         params: OrderParams,
     ) -> CreateOrderBuilder<C>;
+
+    /// Update an order.
+    fn update_order(
+        &self,
+        store: &Pubkey,
+        market_token: &Pubkey,
+        order: &Pubkey,
+        params: UpdateOrderParams,
+    ) -> crate::Result<RpcBuilder<C>>;
 
     /// Execute an order.
     fn execute_order(
@@ -313,6 +322,26 @@ where
         params: OrderParams,
     ) -> CreateOrderBuilder<C> {
         CreateOrderBuilder::new(self, store, market_token, params, is_output_token_long)
+    }
+
+    fn update_order(
+        &self,
+        store: &Pubkey,
+        market_token: &Pubkey,
+        order: &Pubkey,
+        params: UpdateOrderParams,
+    ) -> crate::Result<RpcBuilder<C>> {
+        Ok(self
+            .exchange_rpc()
+            .accounts(accounts::UpdateOrder {
+                user: self.payer(),
+                controller: self.controller_address(store),
+                store: *store,
+                market: self.find_market_address(store, market_token),
+                order: *order,
+                store_program: self.data_store_program_id(),
+            })
+            .args(instruction::UpdateOrder { params }))
     }
 
     fn execute_order(

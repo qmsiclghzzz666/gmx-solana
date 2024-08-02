@@ -8,7 +8,7 @@ use super::utils::CancelOrderUtil;
 
 /// The accounts definition for [`cancel_order`](crate::gmsol_exchange::cancel_order).
 ///
-/// *[See also the documentation for the instruction.](crate::gmsol_exchange::cancel_order).*
+/// *[See also the documentation for the instruction.](crate::gmsol_exchange::cancel_order)*
 #[derive(Accounts)]
 pub struct CancelOrder<'info> {
     /// The owner of the order.

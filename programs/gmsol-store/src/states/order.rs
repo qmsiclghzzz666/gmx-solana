@@ -57,6 +57,19 @@ impl Order {
         self.swap = swap;
         Ok(())
     }
+
+    /// Update order.
+    pub fn update(&mut self, id: u64, update_params: &UpdateOrderParams) -> crate::Result<()> {
+        let params = &mut self.fixed.params;
+        params.validate_updatable()?;
+        self.fixed.id = id;
+        params.size_delta_usd = update_params.size_delta_usd;
+        params.acceptable_price = update_params.acceptable_price;
+        params.trigger_price = update_params.trigger_price;
+        params.min_output_amount = update_params.min_output_amount;
+        params.validate()?;
+        Ok(())
+    }
 }
 
 impl Seed for Order {
@@ -217,6 +230,21 @@ impl OrderParams {
         self.kind.is_increase_position() || self.kind.is_swap()
     }
 
+    /// Validate updatable.
+    pub fn validate_updatable(&self) -> Result<()> {
+        if matches!(
+            self.kind,
+            OrderKind::LimitIncrease
+                | OrderKind::LimitDecrease
+                | OrderKind::StopLossDecrease
+                | OrderKind::LimitSwap
+        ) {
+            Ok(())
+        } else {
+            Err(error!(StoreError::InvalidArgument))
+        }
+    }
+
     /// Validate.
     pub fn validate(&self) -> Result<()> {
         match self.kind {
@@ -235,8 +263,23 @@ impl OrderParams {
                 require!(self.trigger_price.is_some(), StoreError::InvalidArgument);
             }
         }
+        // FIXME: should we validate for empty orders?
         Ok(())
     }
+}
+
+/// Update Order Params.
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, InitSpace, Copy)]
+#[cfg_attr(feature = "debug", derive(Debug))]
+pub struct UpdateOrderParams {
+    /// Size delta in USD.
+    pub size_delta_usd: u128,
+    /// Acceptable price.
+    pub acceptable_price: Option<u128>,
+    /// Trigger price.
+    pub trigger_price: Option<u128>,
+    /// Min output amount.
+    pub min_output_amount: u128,
 }
 
 /// Order Kind.
