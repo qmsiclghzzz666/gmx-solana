@@ -6,8 +6,8 @@ pub mod token_with_feeds;
 /// Dual Vec Map.
 pub mod map;
 
-/// Fixed-size map.
-pub mod fixed_map;
+// /// Fixed-size map.
+// pub mod fixed_map;
 
 /// Swap Params.
 pub mod swap;

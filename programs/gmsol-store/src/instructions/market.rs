@@ -1,12 +1,15 @@
+use crate::states::Factor;
+
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Token, TokenAccount};
+use gmsol_utils::InitSpace;
 
 use crate::{
     constants,
     states::{
         config::{EntryArgs, MarketConfigBuffer},
-        Action, Factor, InitSpace, Market, MarketChangeEvent, MarketMeta, Seed, Store,
-        TokenMapAccess, TokenMapHeader, TokenMapLoader,
+        Action, Market, MarketChangeEvent, MarketMeta, Seed, Store, TokenMapAccess, TokenMapHeader,
+        TokenMapLoader,
     },
     utils::internal,
     StoreError,

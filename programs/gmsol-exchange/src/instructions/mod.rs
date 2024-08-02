@@ -1,20 +1,24 @@
 /// Controller instructions.
-pub mod controller;
+pub(crate) mod controller;
 
 /// Market Management.
-pub mod market;
+pub(crate) mod market;
 
 /// Instructions for deposit.
-pub mod deposit;
+pub(crate) mod deposit;
 
 /// Instructions for withdrawal.
-pub mod withdrawal;
+pub(crate) mod withdrawal;
 
 /// Instructions for order.
-pub mod order;
+pub(crate) mod order;
+
+/// Instrcutions for features.
+pub(crate) mod feature;
 
 pub use controller::*;
 pub use deposit::*;
+pub use feature::*;
 pub use market::*;
 pub use order::*;
 pub use withdrawal::*;

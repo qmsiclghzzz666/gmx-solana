@@ -1,8 +1,8 @@
 use anchor_lang::prelude::*;
-use gmsol_utils::to_seed;
+use gmsol_utils::{to_seed, InitSpace};
 
 use crate::{
-    states::{DataStoreInitEvent, InitSpace, Store, TokenMapHeader},
+    states::{DataStoreInitEvent, Store, TokenMapHeader},
     utils::internal,
     StoreError,
 };

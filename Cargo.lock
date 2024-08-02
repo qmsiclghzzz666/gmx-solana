@@ -2021,9 +2021,15 @@ version = "0.1.0"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
+ "bitmaps 3.2.1",
  "bytemuck",
+ "clap 4.5.7",
  "gmsol-model",
  "gmsol-store",
+ "gmsol-utils",
+ "serde",
+ "serde_with 3.8.1",
+ "strum",
 ]
 
 [[package]]
@@ -2072,6 +2078,9 @@ name = "gmsol-utils"
 version = "0.1.0"
 dependencies = [
  "anchor-lang",
+ "bytemuck",
+ "paste",
+ "static_assertions",
  "thiserror",
 ]
 

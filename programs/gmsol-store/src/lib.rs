@@ -1318,7 +1318,7 @@ pub enum StoreError {
     InvalidPDA,
     #[msg("Invalid key")]
     InvalidKey,
-    #[msg("Aready exist")]
+    #[msg("Already exist")]
     AlreadyExist,
     #[msg("Exceed max length limit")]
     ExceedMaxLengthLimit,

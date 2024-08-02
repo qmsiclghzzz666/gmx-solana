@@ -345,7 +345,7 @@ impl TokenConfigBuilder {
     }
 }
 
-crate::fixed_map!(
+gmsol_utils::fixed_map!(
     Tokens,
     Pubkey,
     crate::utils::pubkey::to_bytes,

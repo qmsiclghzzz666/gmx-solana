@@ -20,6 +20,8 @@ idl-build = [
 ]
 debug = ["gmsol-store/debug"]
 devnet = ["gmsol-store/devnet"]
+serde = ["dep:serde", "serde_with"]
+enum-iter = []
 
 [dependencies]
 anchor-lang = { workspace = true }
@@ -27,6 +29,12 @@ anchor-spl = { workspace = true, default-features = false, features = [
     "token",
     "token_2022",
 ] }
+gmsol-utils = { workspace = true }
 gmsol-model = { workspace = true, features = ["u128", "solana"] }
 gmsol-store = { workspace = true, features = ["cpi"] }
 bytemuck = { workspace = true }
+bitmaps = { workspace = true }
+strum = { workspace = true, features = ["derive"] }
+serde = { workspace = true, features = ["derive"], optional = true }
+serde_with = { workspace = true, optional = true }
+clap = { workspace = true, optional = true }

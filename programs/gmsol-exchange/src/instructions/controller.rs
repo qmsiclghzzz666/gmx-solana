@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
-use gmsol_store::states::{InitSpace, Store};
+use gmsol_store::states::Store;
+use gmsol_utils::InitSpace;
 
 use crate::states::Controller;
 

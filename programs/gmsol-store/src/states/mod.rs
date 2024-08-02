@@ -38,6 +38,11 @@ pub use store::*;
 pub use token_config::*;
 pub use withdrawal::Withdrawal;
 
+pub type Amount = u64;
+pub type Factor = u128;
+
+use gmsol_utils::InitSpace;
+
 use anchor_lang::{
     prelude::{borsh, AnchorDeserialize, AnchorSerialize, Pubkey, Result},
     Bump,
@@ -82,50 +87,4 @@ pub enum Action {
     Change,
     /// Remove.
     Remove,
-}
-
-/// Factor.
-pub type Factor = u128;
-
-/// Amount.
-pub type Amount = u64;
-
-/// Alias of [`Space`](anchor_lang::Space).
-pub trait InitSpace {
-    /// Init Space.
-    const INIT_SPACE: usize;
-}
-
-impl InitSpace for u8 {
-    const INIT_SPACE: usize = 1;
-}
-
-impl InitSpace for i64 {
-    const INIT_SPACE: usize = 8;
-}
-
-impl InitSpace for Factor {
-    const INIT_SPACE: usize = 16;
-}
-
-impl InitSpace for Amount {
-    const INIT_SPACE: usize = 8;
-}
-
-impl InitSpace for Pubkey {
-    const INIT_SPACE: usize = 32;
-}
-
-impl<T, const LEN: usize> InitSpace for [T; LEN]
-where
-    T: InitSpace,
-{
-    const INIT_SPACE: usize = T::INIT_SPACE * LEN;
-}
-
-impl<T> InitSpace for Option<T>
-where
-    T: InitSpace,
-{
-    const INIT_SPACE: usize = 1 + T::INIT_SPACE;
 }

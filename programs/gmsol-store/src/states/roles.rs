@@ -114,13 +114,13 @@ impl RoleMetadata {
     }
 }
 
-crate::fixed_map!(RoleMap, RoleMetadata, MAX_ROLES, 0);
+gmsol_utils::fixed_map!(RoleMap, RoleMetadata, MAX_ROLES, 0);
 
-crate::fixed_map!(
+gmsol_utils::fixed_map!(
     Members,
     Pubkey,
     crate::utils::pubkey::to_bytes,
-    RoleBitmapValue,
+    u32,
     MAX_MEMBERS,
     0
 );

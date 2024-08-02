@@ -256,7 +256,7 @@ describe("store: TokenConfig", () => {
                 }
             }, {
                 skipPreflight: false,
-            })).rejectedWith(Error, "Aready exist");
+            })).rejectedWith(Error, "Already exist");
         }
 
         {

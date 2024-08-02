@@ -29,6 +29,24 @@ pub mod gmsol_exchange {
         instructions::initialize_controller(ctx)
     }
 
+    // Feature.
+    /// Enable or disable the given feature.
+    #[access_control(Authenticate::only(&ctx, constants::FEATURE_KEEPER))]
+    pub fn toggle_feature(
+        ctx: Context<ToggleFeature>,
+        domain: String,
+        action: String,
+        enable: bool,
+    ) -> Result<()> {
+        let domain = domain
+            .parse()
+            .map_err(|_| error!(ExchangeError::InvalidArgument))?;
+        let action = action
+            .parse()
+            .map_err(|_| error!(ExchangeError::InvalidArgument))?;
+        instructions::unchecked_toggle_feature(ctx, domain, action, enable)
+    }
+
     // Market.
     #[access_control(Authenticate::only_market_keeper(&ctx))]
     pub fn create_market(
@@ -239,6 +257,8 @@ pub enum ExchangeError {
     AmountOverflow,
     #[msg("Invalid Argument")]
     InvalidArgument,
+    #[msg("Feature disabled")]
+    FeatureDisabled,
     // Deposit.
     #[msg("Empty deposit amounts")]
     EmptyDepositAmounts,

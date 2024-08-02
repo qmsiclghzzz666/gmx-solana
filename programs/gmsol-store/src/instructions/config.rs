@@ -1,9 +1,7 @@
+use crate::states::{Amount, Factor};
 use anchor_lang::prelude::*;
 
-use crate::{
-    states::{Amount, Factor, Store},
-    utils::internal,
-};
+use crate::{states::Store, utils::internal};
 
 #[derive(Accounts)]
 pub struct InsertAmount<'info> {
