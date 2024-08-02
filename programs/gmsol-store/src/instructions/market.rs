@@ -377,11 +377,8 @@ pub struct UpdateMarketConfigWithBuffer<'info> {
     store: AccountLoader<'info, Store>,
     #[account(mut, has_one = store)]
     market: AccountLoader<'info, Market>,
-    #[account(mut, close = receiver, has_one = store, has_one = authority @ StoreError::PermissionDenied)]
+    #[account(mut, has_one = store, has_one = authority @ StoreError::PermissionDenied)]
     buffer: Account<'info, MarketConfigBuffer>,
-    /// CHECK: Only used to receive funds after closing the buffer account.
-    #[account(mut)]
-    receiver: UncheckedAccount<'info>,
 }
 
 /// Update market config with buffer.
@@ -401,6 +398,11 @@ pub(crate) fn unchecked_update_market_config_with_buffer(
         .market
         .load_mut()?
         .update_config_with_buffer(buffer)?;
+    msg!(
+        "{} updated with buffer {}",
+        ctx.accounts.market.load()?.description()?,
+        buffer.key()
+    );
     Ok(())
 }
 

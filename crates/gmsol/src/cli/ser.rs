@@ -32,6 +32,12 @@ impl FromStr for SerdeFactor {
     }
 }
 
+impl From<Factor> for SerdeFactor {
+    fn from(value: Factor) -> Self {
+        Self(value)
+    }
+}
+
 /// Serializable Market.
 #[serde_as]
 #[derive(Debug, Serialize)]

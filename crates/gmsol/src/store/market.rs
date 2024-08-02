@@ -143,7 +143,6 @@ pub trait MarketOps<C> {
         store: &Pubkey,
         market_token: &Pubkey,
         buffer: &Pubkey,
-        receiver: Option<&Pubkey>,
     ) -> RpcBuilder<C>;
 
     /// Turn a non-pure pool into a pure pool.
@@ -264,7 +263,6 @@ where
         store: &Pubkey,
         market_token: &Pubkey,
         buffer: &Pubkey,
-        receiver: Option<&Pubkey>,
     ) -> RpcBuilder<C> {
         self.data_store_rpc()
             .args(instruction::UpdateMarketConfigWithBuffer {})
@@ -273,7 +271,6 @@ where
                 store: *store,
                 market: self.find_market_address(store, market_token),
                 buffer: *buffer,
-                receiver: receiver.copied().unwrap_or(self.payer()),
             })
     }
 

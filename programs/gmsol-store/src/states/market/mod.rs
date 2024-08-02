@@ -133,6 +133,15 @@ impl Market {
         bytes_to_fixed_str(&self.name)
     }
 
+    /// Description.
+    pub fn description(&self) -> Result<String> {
+        let name = self.name()?;
+        Ok(format!(
+            "Market {{ name = {name}, token = {}}}",
+            self.meta.market_token_mint
+        ))
+    }
+
     /// Record transferred in by the given token.
     pub fn record_transferred_in_by_token(&mut self, token: &Pubkey, amount: u64) -> Result<()> {
         if self.meta.long_token_mint == *token {

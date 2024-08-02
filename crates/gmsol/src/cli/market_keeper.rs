@@ -1,4 +1,5 @@
 use std::{
+    collections::HashSet,
     io::Read,
     num::NonZeroUsize,
     path::{Path, PathBuf},
@@ -179,6 +180,9 @@ enum Command {
         /// Recevier for the buffer's lamports.
         #[arg(long)]
         receiver: Option<Pubkey>,
+        /// Whether to keep the used market config buffer account.
+        #[arg(long)]
+        keep_buffer: bool,
     },
     /// Update Market Configs from file.
     UpdateConfigs {
@@ -190,6 +194,9 @@ enum Command {
         /// Recevier for the buffer's lamports.
         #[arg(long)]
         receiver: Option<Pubkey>,
+        /// Whether to keep the used market config buffer accounts.
+        #[arg(long)]
+        keep_buffers: bool,
     },
     /// Toggle market.
     ToggleMarket {
@@ -464,48 +471,40 @@ impl Args {
                 value,
                 buffer,
                 receiver,
+                keep_buffer,
             } => {
-                if let Some(buffer) = buffer {
-                    crate::utils::send_or_serialize(
-                        client
-                            .update_market_config_with_buffer(
-                                store,
-                                market_token,
-                                buffer,
-                                receiver.as_ref(),
-                            )
-                            .build_without_compute_budget(),
+                let config = MarketConfig {
+                    enable: None,
+                    buffer: *buffer,
+                    config: MarketConfigMap(
+                        [(
+                            key.expect("missing key"),
+                            value.expect("missing value").into(),
+                        )]
+                        .into(),
+                    ),
+                };
+                let configs = MarketConfigs {
+                    configs: [(*market_token, config)].into(),
+                };
+                configs
+                    .update(
+                        client,
+                        store,
                         serialize_only,
-                        |signature| {
-                            tracing::info!(%buffer, "market config updated at tx {signature}");
-                            Ok(())
-                        },
+                        false,
+                        None,
+                        receiver.as_ref(),
+                        !*keep_buffer,
                     )
                     .await?;
-                } else {
-                    crate::utils::send_or_serialize(
-                        client
-                            .update_market_config_by_key(
-                                store,
-                                market_token,
-                                key.expect("missing key"),
-                                &value.expect("missing value"),
-                            )?
-                            .build_without_compute_budget(),
-                        serialize_only,
-                        |signature| {
-                            tracing::info!("market config updated at tx {signature}");
-                            Ok(())
-                        },
-                    )
-                    .await?;
-                }
             }
             Command::UpdateConfigs {
                 path,
                 skip_preflight,
                 max_transaction_size,
                 receiver,
+                keep_buffers,
             } => {
                 let configs: MarketConfigs = toml_from_file(path)?;
                 configs
@@ -516,6 +515,7 @@ impl Args {
                         *skip_preflight,
                         *max_transaction_size,
                         receiver.as_ref(),
+                        !*keep_buffers,
                     )
                     .await?;
             }
@@ -904,6 +904,7 @@ pub struct MarketConfig {
 }
 
 impl MarketConfigs {
+    #[allow(clippy::too_many_arguments)]
     async fn update(
         &self,
         client: &GMSOLClient,
@@ -912,6 +913,7 @@ impl MarketConfigs {
         skip_preflight: bool,
         max_transaction_size: Option<usize>,
         receiver: Option<&Pubkey>,
+        close_buffers: bool,
     ) -> gmsol::Result<()> {
         let mut builder = TransactionBuilder::new_with_options(
             client.data_store().async_rpc(),
@@ -920,6 +922,7 @@ impl MarketConfigs {
         );
 
         let program = client.data_store();
+        let mut buffers_to_close = HashSet::<Pubkey>::default();
         for (market_token, config) in &self.configs {
             if let Some(buffer) = &config.buffer {
                 let buffer_account = program.account::<MarketConfigBuffer>(*buffer).await?;
@@ -938,8 +941,10 @@ impl MarketConfigs {
                     store,
                     market_token,
                     buffer,
-                    receiver,
                 ))?;
+                if close_buffers {
+                    buffers_to_close.insert(*buffer);
+                }
             }
             for (key, value) in &config.config.0 {
                 tracing::info!(%market_token, "Add instruction to update `{key}` to `{value}`");
@@ -957,6 +962,11 @@ impl MarketConfigs {
                 );
                 builder.try_push(client.toggle_market(store, market_token, enable))?;
             }
+        }
+
+        // Push close buffer instructions.
+        for buffer in buffers_to_close.iter() {
+            builder.try_push(client.close_marekt_config_buffer(buffer, receiver))?;
         }
 
         crate::utils::send_or_serialize_transactions(
