@@ -374,7 +374,7 @@ where
                         .get_secondary_output_token_account()
                         .await?,
                     initial_collateral_token_vault,
-                    data_store_program: self.client.data_store_program_id(),
+                    data_store_program: self.client.store_program_id(),
                     long_token_account,
                     short_token_account,
                     system_program: system_program::ID,
@@ -571,7 +571,7 @@ where
         let final_output_token_account = order.fixed.receivers.final_output_token_account;
         let secondary_output_token_account = order.fixed.receivers.secondary_output_token_account;
         self.hint = Some(ExecuteOrderHint {
-            store_program_id: self.client.data_store_program_id(),
+            store_program_id: self.client.store_program_id(),
             has_claimable: matches!(
                 order.fixed.params.kind,
                 OrderKind::MarketDecrease | OrderKind::LimitDecrease | OrderKind::StopLossDecrease
@@ -725,7 +725,7 @@ where
                     claimable_short_token_account_for_user,
                     claimable_pnl_token_account_for_holding,
                     event_authority: self.client.data_store_event_authority(),
-                    data_store_program: self.client.data_store_program_id(),
+                    data_store_program: self.client.store_program_id(),
                     token_program: anchor_spl::token::ID,
                     price_provider: self.price_provider,
                     system_program: system_program::ID,
@@ -868,7 +868,7 @@ where
                         .initial_collateral_token
                         .as_ref()
                         .map(|token| self.client.find_market_vault_address(&hint.store, token)),
-                    store_program: self.client.data_store_program_id(),
+                    store_program: self.client.store_program_id(),
                     token_program: anchor_spl::token::ID,
                     system_program: system_program::ID,
                 },

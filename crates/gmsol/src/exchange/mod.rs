@@ -16,7 +16,10 @@ use anchor_client::{
     anchor_lang::system_program,
     solana_sdk::{pubkey::Pubkey, signer::Signer},
 };
-use gmsol_exchange::{accounts, instruction};
+use gmsol_exchange::{
+    accounts, instruction,
+    states::{ActionDisabledFlag, DomainDisabledFlag},
+};
 use gmsol_store::states::{
     order::{OrderKind, OrderParams},
     NonceBytes, UpdateOrderParams,
@@ -37,6 +40,15 @@ use self::{
 pub trait ExchangeOps<C> {
     /// Initialize Controller Account.
     fn initialize_controller(&self, store: &Pubkey) -> RpcBuilder<C>;
+
+    /// Toggle feature.
+    fn toggle_feature(
+        &self,
+        store: &Pubkey,
+        domian: DomainDisabledFlag,
+        action: ActionDisabledFlag,
+        enable: bool,
+    ) -> RpcBuilder<C>;
 
     /// Create a new market and return its token mint address.
     #[allow(clippy::too_many_arguments)]
@@ -231,6 +243,27 @@ where
             })
     }
 
+    fn toggle_feature(
+        &self,
+        store: &Pubkey,
+        domian: DomainDisabledFlag,
+        action: ActionDisabledFlag,
+        enable: bool,
+    ) -> RpcBuilder<C> {
+        self.exchange_rpc()
+            .args(instruction::ToggleFeature {
+                domain: domian.to_string(),
+                action: action.to_string(),
+                enable,
+            })
+            .accounts(accounts::ToggleFeature {
+                authority: self.payer(),
+                store: *store,
+                controller: self.controller_address(store),
+                store_program: self.store_program_id(),
+            })
+    }
+
     fn create_deposit(&self, store: &Pubkey, market_token: &Pubkey) -> CreateDepositBuilder<C> {
         CreateDepositBuilder::new(self, *store, *market_token)
     }
@@ -302,7 +335,7 @@ where
                 market_token_vault: self.find_market_vault_address(store, &market_token),
                 long_token_vault: self.find_market_vault_address(store, long_token),
                 short_token_vault: self.find_market_vault_address(store, short_token),
-                data_store_program: self.data_store_program_id(),
+                data_store_program: self.store_program_id(),
                 system_program: system_program::ID,
                 token_program: anchor_spl::token::ID,
             })
@@ -339,7 +372,7 @@ where
                 store: *store,
                 market: self.find_market_address(store, market_token),
                 order: *order,
-                store_program: self.data_store_program_id(),
+                store_program: self.store_program_id(),
             })
             .args(instruction::UpdateOrder { params }))
     }

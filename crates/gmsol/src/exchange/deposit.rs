@@ -250,7 +250,7 @@ where
                 accounts::CreateDeposit {
                     authority,
                     store: *store,
-                    data_store_program: client.data_store_program_id(),
+                    data_store_program: client.store_program_id(),
                     system_program: system_program::ID,
                     token_program: anchor_spl::token::ID,
                     deposit,
@@ -380,7 +380,7 @@ where
     pub fn hint(&mut self, deposit: &Deposit) -> &mut Self {
         self.hint = Some(CancelDepositHint::new(
             deposit,
-            &self.client.data_store_program_id(),
+            &self.client.store_program_id(),
         ));
         self
     }
@@ -392,7 +392,7 @@ where
                 let deposit: Deposit = self.client.data_store().account(self.deposit).await?;
                 Ok(CancelDepositHint::new(
                     &deposit,
-                    &self.client.data_store_program_id(),
+                    &self.client.store_program_id(),
                 ))
             }
         }
@@ -429,7 +429,7 @@ where
                     initial_long_market: hint.initial_long_market,
                     initial_short_market: hint.initial_short_market,
                     event_authority: client.data_store_event_authority(),
-                    data_store_program: client.data_store_program_id(),
+                    data_store_program: client.store_program_id(),
                     token_program: anchor_spl::token::ID,
                     system_program: system_program::ID,
                 },
@@ -599,7 +599,7 @@ where
                     controller: client.controller_address(store),
                     store: *store,
                     event_authority: client.data_store_event_authority(),
-                    data_store_program: client.data_store_program_id(),
+                    data_store_program: client.store_program_id(),
                     price_provider: *price_provider,
                     token_program: anchor_spl::token::ID,
                     oracle: *oracle,

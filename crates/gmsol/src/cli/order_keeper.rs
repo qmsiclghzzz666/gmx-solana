@@ -228,7 +228,7 @@ impl KeeperArgs {
                     store,
                     &self
                         .oracle
-                        .address(Some(store), &client.data_store_program_id())?,
+                        .address(Some(store), &client.store_program_id())?,
                     deposit,
                     true,
                 );
@@ -285,7 +285,7 @@ impl KeeperArgs {
                     store,
                     &self
                         .oracle
-                        .address(Some(store), &client.data_store_program_id())?,
+                        .address(Some(store), &client.store_program_id())?,
                     withdrawal,
                     true,
                 );
@@ -342,7 +342,7 @@ impl KeeperArgs {
                     store,
                     &self
                         .oracle
-                        .address(Some(store), &client.data_store_program_id())?,
+                        .address(Some(store), &client.store_program_id())?,
                     order,
                     true,
                 )?;
@@ -413,7 +413,7 @@ impl KeeperArgs {
                 let mut builder = client.liquidate(
                     &self
                         .oracle
-                        .address(Some(store), &client.data_store_program_id())?,
+                        .address(Some(store), &client.store_program_id())?,
                     position,
                 )?;
                 let execution_fee = self

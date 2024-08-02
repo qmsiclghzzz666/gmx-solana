@@ -205,7 +205,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> LiquidateBuilder<'a, C> {
                 claimable_short_token_account_for_user,
                 claimable_pnl_token_account_for_holding,
                 event_authority: self.client.data_store_event_authority(),
-                data_store_program: self.client.data_store_program_id(),
+                data_store_program: self.client.store_program_id(),
                 token_program: anchor_spl::token::ID,
                 associated_token_program: anchor_spl::associated_token::ID,
                 price_provider: self.price_provider,

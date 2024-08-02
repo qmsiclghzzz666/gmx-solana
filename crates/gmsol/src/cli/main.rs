@@ -18,6 +18,7 @@ mod admin;
 mod bug_fix;
 mod controller;
 mod exchange;
+mod feature_keeper;
 mod inspect;
 mod market_keeper;
 mod order_keeper;
@@ -92,8 +93,10 @@ enum Command {
     Order(order_keeper::KeeperArgs),
     /// Commands for MARKET_KEEPER.
     Market(market_keeper::Args),
-    /// Commands for controllers.
+    /// Commands for CONTROLLER.
     Controller(controller::ControllerArgs),
+    /// Commands for FEATURE_KEEPER.
+    Feature(feature_keeper::Args),
     /// Bug fix commands.
     BugFix(bug_fix::Args),
 }
@@ -189,6 +192,7 @@ impl Cli {
             Command::Order(args) => args.run(&client, &store, self.serialize_only).await?,
             Command::Market(args) => args.run(&client, &store, self.serialize_only).await?,
             Command::Controller(args) => args.run(&client, &store, self.serialize_only).await?,
+            Command::Feature(args) => args.run(&client, &store, self.serialize_only).await?,
             Command::BugFix(args) => args.run(&client, &store, self.serialize_only).await?,
         }
         client.shutdown().await?;

@@ -37,7 +37,7 @@ cli = [
     "decode",
 ]
 ui = ["cli", "poem/embed", "rust-embed"]
-clap = ["dep:clap", "gmsol-store/clap"]
+clap = ["dep:clap", "gmsol-store/clap", "gmsol-exchange/clap"]
 devnet = ["gmsol-store/devnet", "gmsol-exchange/devnet"]
 pyth-pull-oracle = [
     "reqwest/stream",

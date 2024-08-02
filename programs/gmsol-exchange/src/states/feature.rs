@@ -52,13 +52,13 @@ gmsol_utils::fixed_map!(
 #[derive(Clone, Copy, strum::EnumString, strum::Display)]
 #[repr(u8)]
 #[non_exhaustive]
-#[strum(serialize_all = "snake_case")]
+#[strum(serialize_all = "kebab-case")]
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[cfg_attr(feature = "enum-iter", derive(strum::EnumIter))]
 #[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
-#[cfg_attr(feature = "clap", clap(rename_all = "snake_case"))]
+#[cfg_attr(feature = "clap", clap(rename_all = "kebab-case"))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
+#[cfg_attr(feature = "serde", serde(rename_all = "kebab-case"))]
 pub enum DomainDisabledFlag {
     /// Market Swap Order.
     MarketSwap = 0,
@@ -84,13 +84,13 @@ pub enum DomainDisabledFlag {
 #[derive(Clone, Copy, Default, strum::EnumString, strum::Display)]
 #[repr(u8)]
 #[non_exhaustive]
-#[strum(serialize_all = "snake_case")]
+#[strum(serialize_all = "kebab-case")]
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[cfg_attr(feature = "enum-iter", derive(strum::EnumIter))]
 #[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
-#[cfg_attr(feature = "clap", clap(rename_all = "snake_case"))]
+#[cfg_attr(feature = "clap", clap(rename_all = "kebab-case"))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
+#[cfg_attr(feature = "serde", serde(rename_all = "kebab-case"))]
 pub enum ActionDisabledFlag {
     /// Default Action.
     #[default]
@@ -105,7 +105,8 @@ pub enum ActionDisabledFlag {
     CancelOrder = 4,
 }
 
-pub(crate) fn display_feature(domain: DomainDisabledFlag, action: ActionDisabledFlag) -> String {
+/// Display feature.
+pub fn display_feature(domain: DomainDisabledFlag, action: ActionDisabledFlag) -> String {
     let action = match action {
         ActionDisabledFlag::Default => String::new(),
         action => format!(":{action}"),

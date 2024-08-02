@@ -213,7 +213,7 @@ where
             .accounts(accounts::CreateWithdrawal {
                 authority,
                 store: self.store,
-                data_store_program: self.client.data_store_program_id(),
+                data_store_program: self.client.store_program_id(),
                 token_program: anchor_spl::token::ID,
                 system_program: system_program::ID,
                 token_map: self.get_token_map().await?,
@@ -340,7 +340,7 @@ where
                 token_program: anchor_spl::token::ID,
                 system_program: system_program::ID,
                 event_authority: self.client.data_store_event_authority(),
-                data_store_program: self.client.data_store_program_id(),
+                data_store_program: self.client.store_program_id(),
             })
             .args(instruction::CancelWithdrawal {}))
     }
@@ -494,7 +494,7 @@ where
                 store: self.store,
                 controller: self.client.controller_address(&self.store),
                 event_authority: self.client.data_store_event_authority(),
-                data_store_program: self.client.data_store_program_id(),
+                data_store_program: self.client.store_program_id(),
                 price_provider: self.price_provider,
                 token_program: anchor_spl::token::ID,
                 system_program: system_program::ID,

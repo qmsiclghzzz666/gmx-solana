@@ -538,11 +538,11 @@ impl InspectArgs {
                 }
             }
             Command::EventAuthority => {
-                println!("DataStore: {}", client.data_store_program_id());
+                println!("DataStore: {}", client.store_program_id());
                 println!("Event Authority: {}", client.data_store_event_authority());
             }
             Command::Oracle { oracle } => {
-                let address = oracle.address(Some(store), &client.data_store_program_id())?;
+                let address = oracle.address(Some(store), &client.store_program_id())?;
                 println!("{address}");
                 println!("{:#?}", program.account::<states::Oracle>(address).await?);
             }
@@ -713,7 +713,7 @@ impl InspectArgs {
                 let data = data.strip_prefix("0x").unwrap_or(data);
                 let data = hex::decode(data).map_err(gmsol::Error::invalid_argument)?;
                 let program_id = match program {
-                    Program::Store => client.data_store_program_id(),
+                    Program::Store => client.store_program_id(),
                     Program::Exchange => client.exchange_program_id(),
                 };
 
