@@ -63,6 +63,11 @@ pub struct EncodedCPIEvents {
 }
 
 impl EncodedCPIEvents {
+    /// Get the program id.
+    pub fn program_id(&self) -> &Pubkey {
+        &self.program_id
+    }
+
     /// Get the transaction signature.
     pub fn signature(&self) -> &Signature {
         &self.signature
