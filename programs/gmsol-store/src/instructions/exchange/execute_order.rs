@@ -4,7 +4,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token, TokenAccount};
 use gmsol_model::{
     action::Prices, num::Unsigned, BaseMarket, BaseMarketExt, PnlFactorKind, Position as _,
-    PositionExt, PositionImpactMarketExt,
+    PositionImpactMarketExt, PositionMut, PositionMutExt, PositionState, PositionStateExt,
 };
 
 use crate::{
@@ -205,7 +205,14 @@ pub fn execute_order<'info>(
         }
         Err(err) if !throw_on_execution_error => {
             msg!("Execute order error: {}", err);
-            Ok((false, Default::default()))
+            let should_remove_position = ctx
+                .accounts
+                .position
+                .as_ref()
+                .map(|a| Result::Ok(a.load()?.state.is_empty()))
+                .transpose()?
+                .unwrap_or(false);
+            Ok((should_remove_position, Default::default()))
         }
         Err(err) => Err(err),
     }
@@ -846,7 +853,7 @@ fn get_pnl_token(
         .as_ref()
         .ok_or(error!(StoreError::MissingPosition))?
         .load()?
-        .is_long()?;
+        .try_is_long()?;
     if is_long {
         Ok(market.meta().long_token_mint)
     } else {

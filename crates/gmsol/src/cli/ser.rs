@@ -309,7 +309,7 @@ impl<'a> TryFrom<&'a Position> for SerializePosition {
     fn try_from(position: &'a Position) -> Result<Self, Self::Error> {
         Ok(Self {
             store: position.store,
-            is_long: position.is_long()?,
+            is_long: position.try_is_long()?,
             owner: position.owner,
             market_token: position.market_token,
             collateral_token: position.collateral_token,

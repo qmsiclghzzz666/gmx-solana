@@ -437,7 +437,7 @@ mod tests {
     use crate::{
         market::LiquidityMarketExt,
         test::{TestMarket, TestPosition},
-        PositionExt,
+        PositionMutExt,
     };
 
     use super::*;

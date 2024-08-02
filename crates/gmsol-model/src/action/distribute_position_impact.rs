@@ -109,7 +109,7 @@ mod tests {
         action::Prices,
         market::LiquidityMarketExt,
         test::{TestMarket, TestPosition},
-        PositionExt,
+        PositionMutExt,
     };
 
     use super::*;

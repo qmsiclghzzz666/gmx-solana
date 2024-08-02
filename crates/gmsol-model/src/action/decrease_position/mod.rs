@@ -4,7 +4,10 @@ use crate::{
     market::{PerpMarket, PerpMarketExt, SwapMarketExt},
     num::{MulDiv, Unsigned},
     params::fee::PositionFees,
-    position::{CollateralDelta, Position, PositionExt, WillCollateralBeSufficient},
+    position::{
+        CollateralDelta, Position, PositionExt, PositionMut, PositionMutExt,
+        WillCollateralBeSufficient,
+    },
 };
 
 use self::collateral_processor::{CollateralProcessor, ProcessReport};
@@ -70,7 +73,7 @@ struct ProcessCollateralResult<T: Unsigned> {
     pnl: ProcessedPnl<T::Signed>,
 }
 
-impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
+impl<const DECIMALS: u8, P: PositionMut<DECIMALS>> DecreasePosition<P, DECIMALS> {
     /// Create a new action to decrease the given position.
     pub fn try_new(
         position: P,
@@ -479,7 +482,6 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
 mod tests {
     use crate::{
         market::LiquidityMarketExt,
-        position::PositionExt,
         test::{TestMarket, TestPosition},
     };
 

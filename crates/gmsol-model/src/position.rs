@@ -16,31 +16,16 @@ use crate::{
     Balance, BalanceExt, PnlFactorKind, Pool,
 };
 
-/// A position.
-pub trait Position<const DECIMALS: u8> {
+/// Read-only access to the position state.
+pub trait PositionState<const DECIMALS: u8> {
     /// Unsigned number type.
     type Num: MulDiv<Signed = Self::Signed> + FixedPointOps<DECIMALS>;
 
     /// Signed number type.
     type Signed: UnsignedAbs<Unsigned = Self::Num> + TryFrom<Self::Num> + Num;
 
-    /// Market type.
-    type Market: PerpMarket<DECIMALS, Num = Self::Num, Signed = Self::Signed>;
-
-    /// Get a reference to the market.
-    fn market(&self) -> &Self::Market;
-
-    /// Get a mutable reference to the market.
-    fn market_mut(&mut self) -> &mut Self::Market;
-
-    /// Returns whether the collateral token is the long token of the market.
-    fn is_collateral_token_long(&self) -> bool;
-
     /// Get the collateral amount.
     fn collateral_amount(&self) -> &Self::Num;
-
-    /// Get a mutable reference to the collateral amount.
-    fn collateral_amount_mut(&mut self) -> &mut Self::Num;
 
     /// Get a reference to the size (in USD) of the position.
     fn size_in_usd(&self) -> &Self::Num;
@@ -48,35 +33,59 @@ pub trait Position<const DECIMALS: u8> {
     /// Get a reference to the size (in tokens) of the position.
     fn size_in_tokens(&self) -> &Self::Num;
 
+    /// Get a reference to last borrowing factor applied by the position.
+    fn borrowing_factor(&self) -> &Self::Num;
+
+    /// Get a reference to the funding fee amount per size.
+    fn funding_fee_amount_per_size(&self) -> &Self::Num;
+
+    /// Get a reference to claimable funding fee amount per size of the given collateral.
+    fn claimable_funding_fee_amount_per_size(&self, is_long_collateral: bool) -> &Self::Num;
+}
+
+/// Mutable access to the position state.
+pub trait PositionStateMut<const DECIMALS: u8>: PositionState<DECIMALS> {
+    /// Get a mutable reference to the collateral amount.
+    fn collateral_amount_mut(&mut self) -> &mut Self::Num;
+
     /// Get a mutable reference to the size (in USD) of the position.
     fn size_in_usd_mut(&mut self) -> &mut Self::Num;
 
     /// Get a mutable reference to the size (in tokens) of the position.
     fn size_in_tokens_mut(&mut self) -> &mut Self::Num;
 
-    /// Returns whether the position is a long position.
-    fn is_long(&self) -> bool;
-
-    /// Get a reference to last borrowing factor applied by the position.
-    fn borrowing_factor(&self) -> &Self::Num;
-
     /// Get a mutable reference to last borrowing factor applied by the position.
     fn borrowing_factor_mut(&mut self) -> &mut Self::Num;
 
-    /// Get a reference to the funding fee amount per size.
-    fn funding_fee_amount_per_size(&self) -> &Self::Num;
-
     /// Get a mutable reference to the funding fee amount per size.
     fn funding_fee_amount_per_size_mut(&mut self) -> &mut Self::Num;
-
-    /// Get a reference to claimable funding fee amount per size of the given collateral.
-    fn claimable_funding_fee_amount_per_size(&self, is_long_collateral: bool) -> &Self::Num;
 
     /// Get a mutable reference to claimable funding fee amount per size of the given collateral.
     fn claimable_funding_fee_amount_per_size_mut(
         &mut self,
         is_long_collateral: bool,
     ) -> &mut Self::Num;
+}
+
+/// Position with access to its market.
+pub trait Position<const DECIMALS: u8>: PositionState<DECIMALS> {
+    /// Market type.
+    type Market: PerpMarket<DECIMALS, Num = Self::Num, Signed = Self::Signed>;
+
+    /// Get a reference to the market.
+    fn market(&self) -> &Self::Market;
+
+    /// Returns whether the position is a long position.
+    fn is_long(&self) -> bool;
+
+    /// Returns whether the collateral token is the long token of the market.
+    fn is_collateral_token_long(&self) -> bool;
+}
+
+/// Position with mutable access.
+pub trait PositionMut<const DECIMALS: u8>: Position<DECIMALS> + PositionStateMut<DECIMALS> {
+    /// Get a mutable reference to the market.
+    fn market_mut(&mut self) -> &mut Self::Market;
 
     /// Increased callback.
     fn increased(&mut self) -> crate::Result<()>;
@@ -85,31 +94,13 @@ pub trait Position<const DECIMALS: u8> {
     fn decreased(&mut self) -> crate::Result<()>;
 }
 
-impl<'a, const DECIMALS: u8, P: Position<DECIMALS>> Position<DECIMALS> for &'a mut P {
+impl<'a, const DECIMALS: u8, P: PositionState<DECIMALS>> PositionState<DECIMALS> for &'a mut P {
     type Num = P::Num;
 
     type Signed = P::Signed;
 
-    type Market = P::Market;
-
-    fn market(&self) -> &Self::Market {
-        (**self).market()
-    }
-
-    fn market_mut(&mut self) -> &mut Self::Market {
-        (**self).market_mut()
-    }
-
-    fn is_collateral_token_long(&self) -> bool {
-        (**self).is_collateral_token_long()
-    }
-
     fn collateral_amount(&self) -> &Self::Num {
         (**self).collateral_amount()
-    }
-
-    fn collateral_amount_mut(&mut self) -> &mut Self::Num {
-        (**self).collateral_amount_mut()
     }
 
     fn size_in_usd(&self) -> &Self::Num {
@@ -120,6 +111,42 @@ impl<'a, const DECIMALS: u8, P: Position<DECIMALS>> Position<DECIMALS> for &'a m
         (**self).size_in_tokens()
     }
 
+    fn borrowing_factor(&self) -> &Self::Num {
+        (**self).borrowing_factor()
+    }
+
+    fn funding_fee_amount_per_size(&self) -> &Self::Num {
+        (**self).funding_fee_amount_per_size()
+    }
+
+    fn claimable_funding_fee_amount_per_size(&self, is_long_collateral: bool) -> &Self::Num {
+        (**self).claimable_funding_fee_amount_per_size(is_long_collateral)
+    }
+}
+
+impl<'a, const DECIMALS: u8, P: Position<DECIMALS>> Position<DECIMALS> for &'a mut P {
+    type Market = P::Market;
+
+    fn market(&self) -> &Self::Market {
+        (**self).market()
+    }
+
+    fn is_long(&self) -> bool {
+        (**self).is_long()
+    }
+
+    fn is_collateral_token_long(&self) -> bool {
+        (**self).is_collateral_token_long()
+    }
+}
+
+impl<'a, const DECIMALS: u8, P: PositionStateMut<DECIMALS>> PositionStateMut<DECIMALS>
+    for &'a mut P
+{
+    fn collateral_amount_mut(&mut self) -> &mut Self::Num {
+        (**self).collateral_amount_mut()
+    }
+
     fn size_in_usd_mut(&mut self) -> &mut Self::Num {
         (**self).size_in_usd_mut()
     }
@@ -128,28 +155,12 @@ impl<'a, const DECIMALS: u8, P: Position<DECIMALS>> Position<DECIMALS> for &'a m
         (**self).size_in_tokens_mut()
     }
 
-    fn is_long(&self) -> bool {
-        (**self).is_long()
-    }
-
-    fn borrowing_factor(&self) -> &Self::Num {
-        (**self).borrowing_factor()
-    }
-
     fn borrowing_factor_mut(&mut self) -> &mut Self::Num {
         (**self).borrowing_factor_mut()
     }
 
-    fn funding_fee_amount_per_size(&self) -> &Self::Num {
-        (**self).funding_fee_amount_per_size()
-    }
-
     fn funding_fee_amount_per_size_mut(&mut self) -> &mut Self::Num {
         (**self).funding_fee_amount_per_size_mut()
-    }
-
-    fn claimable_funding_fee_amount_per_size(&self, is_long_collateral: bool) -> &Self::Num {
-        (**self).claimable_funding_fee_amount_per_size(is_long_collateral)
     }
 
     fn claimable_funding_fee_amount_per_size_mut(
@@ -157,6 +168,12 @@ impl<'a, const DECIMALS: u8, P: Position<DECIMALS>> Position<DECIMALS> for &'a m
         is_long_collateral: bool,
     ) -> &mut Self::Num {
         (**self).claimable_funding_fee_amount_per_size_mut(is_long_collateral)
+    }
+}
+
+impl<'a, const DECIMALS: u8, P: PositionMut<DECIMALS>> PositionMut<DECIMALS> for &'a mut P {
+    fn market_mut(&mut self) -> &mut Self::Market {
+        (**self).market_mut()
     }
 
     fn increased(&mut self) -> crate::Result<()> {
@@ -168,50 +185,91 @@ impl<'a, const DECIMALS: u8, P: Position<DECIMALS>> Position<DECIMALS> for &'a m
     }
 }
 
+/// Extension trait for [`PositionState`].
+pub trait PositionStateExt<const DECIMALS: u8>: PositionState<DECIMALS> {
+    /// Return whether the position is considered to be empty.
+    fn is_empty(&self) -> bool {
+        self.size_in_usd().is_zero()
+    }
+}
+
+impl<const DECIMALS: u8, P: PositionState<DECIMALS> + ?Sized> PositionStateExt<DECIMALS> for P {}
+
 /// Extension trait for [`Position`] with utils.
 pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
-    /// Create an action to increase the position.
-    fn increase(
-        &mut self,
-        prices: Prices<Self::Num>,
-        collateral_increment_amount: Self::Num,
-        size_delta_usd: Self::Num,
-        acceptable_price: Option<Self::Num>,
-    ) -> crate::Result<IncreasePosition<&mut Self, DECIMALS>>
-    where
-        Self: Sized,
-    {
-        IncreasePosition::try_new(
-            self,
-            prices,
-            collateral_increment_amount,
-            size_delta_usd,
-            acceptable_price,
-        )
+    /// Check that whether the collateral will be sufficient after paying the given `realized_pnl` and applying `delta_size`.
+    ///
+    /// - Returns the remaining collateral value if sufficient, `None` otherwise.
+    /// - Returns `Err` if failed to finish the calculation.
+    fn will_collateral_be_sufficient(
+        &self,
+        prices: &Prices<Self::Num>,
+        delta: &CollateralDelta<Self::Num>,
+    ) -> crate::Result<WillCollateralBeSufficient<Self::Signed>> {
+        use num_traits::{CheckedAdd, CheckedMul, Signed};
+
+        let collateral_token_price = if self.is_collateral_token_long() {
+            &prices.long_token_price
+        } else {
+            &prices.short_token_price
+        };
+
+        // TODO: pick min value of the price.
+        let mut remaining_collateral_value = delta
+            .next_collateral_amount
+            .checked_mul(collateral_token_price)
+            .ok_or(crate::Error::Computation(
+                "overflow calculating collateral value",
+            ))?
+            .to_signed()?;
+
+        if delta.realized_pnl_value.is_negative() {
+            remaining_collateral_value = remaining_collateral_value
+                .checked_add(&delta.realized_pnl_value)
+                .ok_or(crate::Error::Computation("adding realized pnl"))?;
+        }
+
+        if remaining_collateral_value.is_negative() {
+            return Ok(WillCollateralBeSufficient::Insufficient(
+                remaining_collateral_value,
+            ));
+        }
+
+        // TODO: check leverage.
+        if remaining_collateral_value.is_positive() {
+            Ok(WillCollateralBeSufficient::Sufficient(
+                remaining_collateral_value,
+            ))
+        } else {
+            Ok(WillCollateralBeSufficient::Insufficient(
+                remaining_collateral_value,
+            ))
+        }
     }
 
-    /// Create an action to decrease the position.
-    fn decrease(
-        &mut self,
-        prices: Prices<Self::Num>,
-        size_delta_usd: Self::Num,
-        acceptable_price: Option<Self::Num>,
-        collateral_withdrawal_amount: Self::Num,
-        is_insolvent_close_allowed: bool,
-        is_liquidation_order: bool,
-    ) -> crate::Result<DecreasePosition<&mut Self, DECIMALS>>
-    where
-        Self: Sized,
-    {
-        DecreasePosition::try_new(
-            self,
-            prices,
-            size_delta_usd,
-            acceptable_price,
-            collateral_withdrawal_amount,
-            is_insolvent_close_allowed,
-            is_liquidation_order,
-        )
+    /// Get collateral price.
+    fn collateral_price<'a>(&self, prices: &'a Prices<Self::Num>) -> &'a Self::Num {
+        if self.is_collateral_token_long() {
+            &prices.long_token_price
+        } else {
+            &prices.short_token_price
+        }
+    }
+
+    /// Get collateral value.
+    fn collateral_value(&self, prices: &Prices<Self::Num>) -> crate::Result<Self::Num> {
+        use num_traits::CheckedMul;
+
+        let collateral_token_price = self.collateral_price(prices);
+
+        let collateral_value = self
+            .collateral_amount()
+            .checked_mul(collateral_token_price)
+            .ok_or(crate::Error::Computation(
+                "overflow calculating collateral value",
+            ))?;
+
+        Ok(collateral_value)
     }
 
     /// Calculate the pnl value when decreased by the given delta size.
@@ -297,56 +355,6 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
         Ok((pnl_usd, uncapped_pnl_usd, size_delta_in_tokens))
     }
 
-    /// Check that whether the collateral will be sufficient after paying the given `realized_pnl` and applying `delta_size`.
-    ///
-    /// - Returns the remaining collateral value if sufficient, `None` otherwise.
-    /// - Returns `Err` if failed to finish the calculation.
-    fn will_collateral_be_sufficient(
-        &self,
-        prices: &Prices<Self::Num>,
-        delta: &CollateralDelta<Self::Num>,
-    ) -> crate::Result<WillCollateralBeSufficient<Self::Signed>> {
-        use num_traits::{CheckedAdd, CheckedMul, Signed};
-
-        let collateral_token_price = if self.is_collateral_token_long() {
-            &prices.long_token_price
-        } else {
-            &prices.short_token_price
-        };
-
-        // TODO: pick min value of the price.
-        let mut remaining_collateral_value = delta
-            .next_collateral_amount
-            .checked_mul(collateral_token_price)
-            .ok_or(crate::Error::Computation(
-                "overflow calculating collateral value",
-            ))?
-            .to_signed()?;
-
-        if delta.realized_pnl_value.is_negative() {
-            remaining_collateral_value = remaining_collateral_value
-                .checked_add(&delta.realized_pnl_value)
-                .ok_or(crate::Error::Computation("adding realized pnl"))?;
-        }
-
-        if remaining_collateral_value.is_negative() {
-            return Ok(WillCollateralBeSufficient::Insufficient(
-                remaining_collateral_value,
-            ));
-        }
-
-        // TODO: check leverage.
-        if remaining_collateral_value.is_positive() {
-            Ok(WillCollateralBeSufficient::Sufficient(
-                remaining_collateral_value,
-            ))
-        } else {
-            Ok(WillCollateralBeSufficient::Insufficient(
-                remaining_collateral_value,
-            ))
-        }
-    }
-
     /// Validate the position state.
     fn validate_position(
         &self,
@@ -373,31 +381,6 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
         }
 
         Ok(())
-    }
-
-    /// Get collateral price.
-    fn collateral_price<'a>(&self, prices: &'a Prices<Self::Num>) -> &'a Self::Num {
-        if self.is_collateral_token_long() {
-            &prices.long_token_price
-        } else {
-            &prices.short_token_price
-        }
-    }
-
-    /// Get collateral value.
-    fn collateral_value(&self, prices: &Prices<Self::Num>) -> crate::Result<Self::Num> {
-        use num_traits::CheckedMul;
-
-        let collateral_token_price = self.collateral_price(prices);
-
-        let collateral_value = self
-            .collateral_amount()
-            .checked_mul(collateral_token_price)
-            .ok_or(crate::Error::Computation(
-                "overflow calculating collateral value",
-            ))?;
-
-        Ok(collateral_value)
     }
 
     /// Check if the position is liquidatable.
@@ -477,48 +460,6 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
         }
 
         Ok(None)
-    }
-
-    /// Apply delta to open interest.
-    fn apply_delta_to_open_interest(
-        &mut self,
-        size_delta_usd: &Self::Signed,
-        size_delta_in_tokens: &Self::Signed,
-    ) -> crate::Result<()> {
-        use num_traits::CheckedAdd;
-
-        if size_delta_usd.is_zero() {
-            return Ok(());
-        }
-        let is_long_collateral = self.is_collateral_token_long();
-        let is_long = self.is_long();
-        let max_open_interest = self.market().max_open_interest(is_long)?;
-        let open_interest = self.market_mut().open_interest_pool_mut(is_long)?;
-        if is_long_collateral {
-            open_interest.apply_delta_to_long_amount(size_delta_usd)?;
-        } else {
-            open_interest.apply_delta_to_short_amount(size_delta_usd)?;
-        }
-
-        let is_exceeded = open_interest
-            .long_amount()?
-            .checked_add(&open_interest.short_amount()?)
-            .map(|total| total > max_open_interest)
-            .unwrap_or(true);
-        if is_exceeded {
-            return Err(crate::Error::MaxOpenInterestExceeded);
-        }
-
-        let open_interest_in_tokens = self
-            .market_mut()
-            .open_interest_in_tokens_pool_mut(is_long)?;
-        if is_long_collateral {
-            open_interest_in_tokens.apply_delta_to_long_amount(size_delta_in_tokens)?;
-        } else {
-            open_interest_in_tokens.apply_delta_to_short_amount(size_delta_in_tokens)?;
-        }
-
-        Ok(())
     }
 
     /// Get position price impact.
@@ -732,6 +673,97 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
 }
 
 impl<const DECIMALS: u8, P: Position<DECIMALS>> PositionExt<DECIMALS> for P {}
+
+/// Extension trait for [`PositionMut`] with utils.
+pub trait PositionMutExt<const DECIMALS: u8>: PositionMut<DECIMALS> {
+    /// Create an action to increase the position.
+    fn increase(
+        &mut self,
+        prices: Prices<Self::Num>,
+        collateral_increment_amount: Self::Num,
+        size_delta_usd: Self::Num,
+        acceptable_price: Option<Self::Num>,
+    ) -> crate::Result<IncreasePosition<&mut Self, DECIMALS>>
+    where
+        Self: Sized,
+    {
+        IncreasePosition::try_new(
+            self,
+            prices,
+            collateral_increment_amount,
+            size_delta_usd,
+            acceptable_price,
+        )
+    }
+
+    /// Create an action to decrease the position.
+    fn decrease(
+        &mut self,
+        prices: Prices<Self::Num>,
+        size_delta_usd: Self::Num,
+        acceptable_price: Option<Self::Num>,
+        collateral_withdrawal_amount: Self::Num,
+        is_insolvent_close_allowed: bool,
+        is_liquidation_order: bool,
+    ) -> crate::Result<DecreasePosition<&mut Self, DECIMALS>>
+    where
+        Self: Sized,
+    {
+        DecreasePosition::try_new(
+            self,
+            prices,
+            size_delta_usd,
+            acceptable_price,
+            collateral_withdrawal_amount,
+            is_insolvent_close_allowed,
+            is_liquidation_order,
+        )
+    }
+
+    /// Apply delta to open interest.
+    fn apply_delta_to_open_interest(
+        &mut self,
+        size_delta_usd: &Self::Signed,
+        size_delta_in_tokens: &Self::Signed,
+    ) -> crate::Result<()> {
+        use num_traits::CheckedAdd;
+
+        if size_delta_usd.is_zero() {
+            return Ok(());
+        }
+        let is_long_collateral = self.is_collateral_token_long();
+        let is_long = self.is_long();
+        let max_open_interest = self.market().max_open_interest(is_long)?;
+        let open_interest = self.market_mut().open_interest_pool_mut(is_long)?;
+        if is_long_collateral {
+            open_interest.apply_delta_to_long_amount(size_delta_usd)?;
+        } else {
+            open_interest.apply_delta_to_short_amount(size_delta_usd)?;
+        }
+
+        let is_exceeded = open_interest
+            .long_amount()?
+            .checked_add(&open_interest.short_amount()?)
+            .map(|total| total > max_open_interest)
+            .unwrap_or(true);
+        if is_exceeded {
+            return Err(crate::Error::MaxOpenInterestExceeded);
+        }
+
+        let open_interest_in_tokens = self
+            .market_mut()
+            .open_interest_in_tokens_pool_mut(is_long)?;
+        if is_long_collateral {
+            open_interest_in_tokens.apply_delta_to_long_amount(size_delta_in_tokens)?;
+        } else {
+            open_interest_in_tokens.apply_delta_to_short_amount(size_delta_in_tokens)?;
+        }
+
+        Ok(())
+    }
+}
+
+impl<const DECIMALS: u8, P: PositionMut<DECIMALS>> PositionMutExt<DECIMALS> for P {}
 
 /// Collateral Delta Values.
 #[allow(unused)]

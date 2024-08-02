@@ -14,7 +14,7 @@ use crate::{
     },
     pool::{Balance, Pool},
     position::Position,
-    BaseMarketMut,
+    BaseMarketMut, PositionMut, PositionState, PositionStateMut,
 };
 use num_traits::{CheckedSub, Signed};
 
@@ -633,7 +633,7 @@ where
     position: &'a mut TestPosition<T, DECIMALS>,
 }
 
-impl<'a, T, const DECIMALS: u8> Position<DECIMALS> for TestPositionOps<'a, T, DECIMALS>
+impl<'a, T, const DECIMALS: u8> PositionState<DECIMALS> for TestPositionOps<'a, T, DECIMALS>
 where
     T: CheckedSub + fmt::Display + FixedPointOps<DECIMALS>,
     T::Signed: Num + std::fmt::Debug,
@@ -642,26 +642,8 @@ where
 
     type Signed = T::Signed;
 
-    type Market = TestMarket<T, DECIMALS>;
-
-    fn market(&self) -> &Self::Market {
-        self.market
-    }
-
-    fn market_mut(&mut self) -> &mut Self::Market {
-        self.market
-    }
-
-    fn is_collateral_token_long(&self) -> bool {
-        self.position.is_collateral_token_long
-    }
-
     fn collateral_amount(&self) -> &Self::Num {
         &self.position.collateral_token_amount
-    }
-
-    fn collateral_amount_mut(&mut self) -> &mut Self::Num {
-        &mut self.position.collateral_token_amount
     }
 
     fn size_in_usd(&self) -> &Self::Num {
@@ -672,16 +654,50 @@ where
         &self.position.size_in_tokens
     }
 
-    fn size_in_usd_mut(&mut self) -> &mut Self::Num {
-        &mut self.position.size_in_usd
+    fn borrowing_factor(&self) -> &Self::Num {
+        &self.position.borrowing_factor
     }
 
-    fn size_in_tokens_mut(&mut self) -> &mut Self::Num {
-        &mut self.position.size_in_tokens
+    fn funding_fee_amount_per_size(&self) -> &Self::Num {
+        &self.position.funding_fee_amount_per_size
+    }
+
+    fn claimable_funding_fee_amount_per_size(&self, is_long_collateral: bool) -> &Self::Num {
+        if is_long_collateral {
+            &self.position.claimable_funding_fee_amount_per_size.0
+        } else {
+            &self.position.claimable_funding_fee_amount_per_size.1
+        }
+    }
+}
+
+impl<'a, T, const DECIMALS: u8> Position<DECIMALS> for TestPositionOps<'a, T, DECIMALS>
+where
+    T: CheckedSub + fmt::Display + FixedPointOps<DECIMALS>,
+    T::Signed: Num + std::fmt::Debug,
+{
+    type Market = TestMarket<T, DECIMALS>;
+
+    fn market(&self) -> &Self::Market {
+        self.market
     }
 
     fn is_long(&self) -> bool {
         self.position.is_long
+    }
+
+    fn is_collateral_token_long(&self) -> bool {
+        self.position.is_collateral_token_long
+    }
+}
+
+impl<'a, T, const DECIMALS: u8> PositionMut<DECIMALS> for TestPositionOps<'a, T, DECIMALS>
+where
+    T: CheckedSub + fmt::Display + FixedPointOps<DECIMALS>,
+    T::Signed: Num + std::fmt::Debug,
+{
+    fn market_mut(&mut self) -> &mut Self::Market {
+        self.market
     }
 
     fn increased(&mut self) -> crate::Result<()> {
@@ -691,29 +707,31 @@ where
     fn decreased(&mut self) -> crate::Result<()> {
         Ok(())
     }
+}
 
-    fn borrowing_factor(&self) -> &Self::Num {
-        &self.position.borrowing_factor
+impl<'a, T, const DECIMALS: u8> PositionStateMut<DECIMALS> for TestPositionOps<'a, T, DECIMALS>
+where
+    T: CheckedSub + fmt::Display + FixedPointOps<DECIMALS>,
+    T::Signed: Num + std::fmt::Debug,
+{
+    fn collateral_amount_mut(&mut self) -> &mut Self::Num {
+        &mut self.position.collateral_token_amount
+    }
+
+    fn size_in_usd_mut(&mut self) -> &mut Self::Num {
+        &mut self.position.size_in_usd
+    }
+
+    fn size_in_tokens_mut(&mut self) -> &mut Self::Num {
+        &mut self.position.size_in_tokens
     }
 
     fn borrowing_factor_mut(&mut self) -> &mut Self::Num {
         &mut self.position.borrowing_factor
     }
 
-    fn funding_fee_amount_per_size(&self) -> &Self::Num {
-        &self.position.funding_fee_amount_per_size
-    }
-
     fn funding_fee_amount_per_size_mut(&mut self) -> &mut Self::Num {
         &mut self.position.funding_fee_amount_per_size
-    }
-
-    fn claimable_funding_fee_amount_per_size(&self, is_long_collateral: bool) -> &Self::Num {
-        if is_long_collateral {
-            &self.position.claimable_funding_fee_amount_per_size.0
-        } else {
-            &self.position.claimable_funding_fee_amount_per_size.1
-        }
     }
 
     fn claimable_funding_fee_amount_per_size_mut(

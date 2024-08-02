@@ -185,7 +185,7 @@ impl<'a, 'info> PositionCutUtils<'a, 'info> {
             initial_collateral_delta_amount: 0,
             acceptable_price: None,
             trigger_price: None,
-            is_long: position.is_long()?,
+            is_long: position.try_is_long()?,
         };
 
         Ok((position.owner, params, position.collateral_token))
@@ -198,7 +198,7 @@ impl<'a, 'info> PositionCutUtils<'a, 'info> {
 
     fn is_pnl_token_long(&self) -> Result<bool> {
         let position = self.position.load()?;
-        position.is_long()
+        position.try_is_long()
     }
 
     fn output_token_accounts(

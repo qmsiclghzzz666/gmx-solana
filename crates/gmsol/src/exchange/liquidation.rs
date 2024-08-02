@@ -81,7 +81,7 @@ impl LiquidateHint {
             store_address,
             owner: position.owner,
             token_map: token_map_address,
-            pnl_token: meta.pnl_token(position.is_long()?),
+            pnl_token: meta.pnl_token(position.try_is_long()?),
             market,
             store,
             meta,

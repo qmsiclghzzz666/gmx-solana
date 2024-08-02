@@ -362,7 +362,7 @@ impl TradeEvent {
             final_output_token: None,
             ts: clock.unix_timestamp,
             slot: clock.slot,
-            is_long: position.is_long()?,
+            is_long: position.try_is_long()?,
             is_collateral_long,
             is_increase,
             before: position.state,

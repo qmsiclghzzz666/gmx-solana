@@ -1,4 +1,4 @@
-use crate::StoreError;
+use crate::{constants, StoreError};
 use anchor_lang::prelude::*;
 use borsh::{BorshDeserialize, BorshSerialize};
 use num_enum::TryFromPrimitive;
@@ -35,37 +35,6 @@ impl Default for Position {
     }
 }
 
-/// Position State.
-#[cfg_attr(feature = "debug", derive(Debug))]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[account(zero_copy)]
-#[derive(BorshDeserialize, BorshSerialize)]
-pub struct PositionState {
-    /// Trade id.
-    pub trade_id: u64,
-    /// The time that the position last increased at.
-    pub increased_at: i64,
-    /// Updated at slot.
-    pub updated_at_slot: u64,
-    /// The time that the position last decreased at.
-    pub decreased_at: i64,
-    /// Size in tokens.
-    pub size_in_tokens: u128,
-    /// Collateral amount.
-    pub collateral_amount: u128,
-    /// Size in usd.
-    pub size_in_usd: u128,
-    /// Borrowing factor.
-    pub borrowing_factor: u128,
-    /// Funding fee amount per size.
-    pub funding_fee_amount_per_size: u128,
-    /// Long token claimable funding amount per size.
-    pub long_token_claimable_funding_amount_per_size: u128,
-    /// Short token claimable funding amount per size.
-    pub short_token_claimable_funding_amount_per_size: u128,
-    // TODO: add reserved field.
-}
-
 impl Space for Position {
     #[allow(clippy::identity_op)]
     const INIT_SPACE: usize = (1 * 2) + 32 + (1 * 14) + (32 * 3) + (8 * 4) + (16 * 7);
@@ -97,7 +66,7 @@ impl Position {
     }
 
     /// Returns whether the position side is long.
-    pub fn is_long(&self) -> Result<bool> {
+    pub fn try_is_long(&self) -> Result<bool> {
         Ok(matches!(self.kind()?, PositionKind::Long))
     }
 
@@ -127,6 +96,104 @@ impl Position {
         self.market_token = *market_token;
         self.collateral_token = *collateral_token;
         Ok(())
+    }
+}
+
+/// Position State.
+#[cfg_attr(feature = "debug", derive(Debug))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[account(zero_copy)]
+#[derive(BorshDeserialize, BorshSerialize)]
+pub struct PositionState {
+    /// Trade id.
+    pub trade_id: u64,
+    /// The time that the position last increased at.
+    pub increased_at: i64,
+    /// Updated at slot.
+    pub updated_at_slot: u64,
+    /// The time that the position last decreased at.
+    pub decreased_at: i64,
+    /// Size in tokens.
+    pub size_in_tokens: u128,
+    /// Collateral amount.
+    pub collateral_amount: u128,
+    /// Size in usd.
+    pub size_in_usd: u128,
+    /// Borrowing factor.
+    pub borrowing_factor: u128,
+    /// Funding fee amount per size.
+    pub funding_fee_amount_per_size: u128,
+    /// Long token claimable funding amount per size.
+    pub long_token_claimable_funding_amount_per_size: u128,
+    /// Short token claimable funding amount per size.
+    pub short_token_claimable_funding_amount_per_size: u128,
+    // TODO: add reserved field.
+}
+
+impl gmsol_model::PositionState<{ constants::MARKET_DECIMALS }> for PositionState {
+    type Num = u128;
+
+    type Signed = i128;
+
+    fn collateral_amount(&self) -> &Self::Num {
+        &self.collateral_amount
+    }
+
+    fn size_in_usd(&self) -> &Self::Num {
+        &self.size_in_usd
+    }
+
+    fn size_in_tokens(&self) -> &Self::Num {
+        &self.size_in_tokens
+    }
+
+    fn borrowing_factor(&self) -> &Self::Num {
+        &self.borrowing_factor
+    }
+
+    fn funding_fee_amount_per_size(&self) -> &Self::Num {
+        &self.funding_fee_amount_per_size
+    }
+
+    fn claimable_funding_fee_amount_per_size(&self, is_long_collateral: bool) -> &Self::Num {
+        if is_long_collateral {
+            &self.long_token_claimable_funding_amount_per_size
+        } else {
+            &self.short_token_claimable_funding_amount_per_size
+        }
+    }
+}
+
+impl gmsol_model::PositionStateMut<{ constants::MARKET_DECIMALS }> for PositionState {
+    fn collateral_amount_mut(&mut self) -> &mut Self::Num {
+        &mut self.collateral_amount
+    }
+
+    fn size_in_usd_mut(&mut self) -> &mut Self::Num {
+        &mut self.size_in_usd
+    }
+
+    fn size_in_tokens_mut(&mut self) -> &mut Self::Num {
+        &mut self.size_in_tokens
+    }
+
+    fn borrowing_factor_mut(&mut self) -> &mut Self::Num {
+        &mut self.borrowing_factor
+    }
+
+    fn funding_fee_amount_per_size_mut(&mut self) -> &mut Self::Num {
+        &mut self.funding_fee_amount_per_size
+    }
+
+    fn claimable_funding_fee_amount_per_size_mut(
+        &mut self,
+        is_long_collateral: bool,
+    ) -> &mut Self::Num {
+        if is_long_collateral {
+            &mut self.long_token_claimable_funding_amount_per_size
+        } else {
+            &mut self.short_token_claimable_funding_amount_per_size
+        }
     }
 }
 

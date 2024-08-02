@@ -54,7 +54,10 @@ pub use market::{
     PositionImpactMarketExt, SwapMarket, SwapMarketExt,
 };
 pub use pool::{Balance, BalanceExt, Pool, PoolExt, PoolKind};
-pub use position::{Position, PositionExt};
+pub use position::{
+    Position, PositionExt, PositionMut, PositionMutExt, PositionState, PositionStateExt,
+    PositionStateMut,
+};
 
 /// Alias for result.
 pub type Result<T> = std::result::Result<T, Error>;

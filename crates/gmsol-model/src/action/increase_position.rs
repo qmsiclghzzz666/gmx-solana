@@ -6,6 +6,7 @@ use crate::{
     num::Unsigned,
     params::fee::PositionFees,
     position::{CollateralDelta, Position, PositionExt},
+    PositionMut, PositionMutExt,
 };
 
 use super::{
@@ -169,7 +170,7 @@ impl<T: Unsigned> ExecutionParams<T> {
     }
 }
 
-impl<const DECIMALS: u8, P: Position<DECIMALS>> IncreasePosition<P, DECIMALS> {
+impl<const DECIMALS: u8, P: PositionMut<DECIMALS>> IncreasePosition<P, DECIMALS> {
     /// Create a new action to increase the given position.
     pub fn try_new(
         position: P,
@@ -310,6 +311,8 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> IncreasePosition<P, DECIMALS> {
 
     fn initialize_position_if_empty(&mut self) -> crate::Result<()> {
         if self.position.size_in_usd().is_zero() {
+            // Ensure that the size in tokens is initialized to zero.
+            *self.position.size_in_tokens_mut() = P::Num::zero();
             let funding_fee_amount_per_size = self.position.market().funding_fee_amount_per_size(
                 self.position.is_long(),
                 self.position.is_collateral_token_long(),
@@ -499,7 +502,6 @@ where
 mod tests {
     use crate::{
         market::LiquidityMarketExt,
-        position::PositionExt,
         test::{TestMarket, TestPosition},
     };
 
