@@ -159,6 +159,8 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
             should_remove =
                 next_position_size_in_usd.is_zero() || next_position_size_in_tokens.is_zero();
 
+            let is_long = self.position.is_long();
+
             if should_remove {
                 *self.position.size_in_usd_mut() = Zero::zero();
                 *self.position.size_in_tokens_mut() = Zero::zero();
@@ -169,26 +171,26 @@ impl<const DECIMALS: u8, P: Position<DECIMALS>> DecreasePosition<P, DECIMALS> {
                     .checked_add(&next_position_collateral_amount)
                     .ok_or(crate::Error::Computation("calculating output amount"))?;
             } else {
-                let is_long = self.position.is_long();
                 *self.position.size_in_usd_mut() = next_position_size_in_usd;
                 *self.position.size_in_tokens_mut() = next_position_size_in_tokens;
                 *self.position.collateral_amount_mut() = next_position_collateral_amount;
-                *self.position.borrowing_factor_mut() =
-                    self.position.market().borrowing_factor(is_long)?;
-                *self.position.funding_fee_amount_per_size_mut() =
-                    self.position.market().funding_fee_amount_per_size(
-                        is_long,
-                        self.position.is_collateral_token_long(),
-                    )?;
-                for is_long_collateral in [true, false] {
-                    *self
-                        .position
-                        .claimable_funding_fee_amount_per_size_mut(is_long_collateral) = self
-                        .position
-                        .market()
-                        .claimable_funding_fee_amount_per_size(is_long, is_long_collateral)?;
-                }
             };
+
+            // The state of the position must be up-to-date, even if it is going to be removed.
+            *self.position.borrowing_factor_mut() =
+                self.position.market().borrowing_factor(is_long)?;
+            *self.position.funding_fee_amount_per_size_mut() = self
+                .position
+                .market()
+                .funding_fee_amount_per_size(is_long, self.position.is_collateral_token_long())?;
+            for is_long_collateral in [true, false] {
+                *self
+                    .position
+                    .claimable_funding_fee_amount_per_size_mut(is_long_collateral) = self
+                    .position
+                    .market()
+                    .claimable_funding_fee_amount_per_size(is_long, is_long_collateral)?;
+            }
         }
 
         // TODO: update global states.
