@@ -83,8 +83,10 @@ pub enum PoolKind {
     ClaimableFundingAmountPerSizeForLong,
     /// Claimable funding amount per size for short.
     ClaimableFundingAmountPerSizeForShort,
-    /// Collateral sum.
-    CollateralSum,
+    /// Collateral sum for long.
+    CollateralSumForLong,
+    /// Collateral sum for short.
+    CollateralSumForShort,
     /// Total borrowing.
     TotalBorrowing,
     /// Point (used for general-purpose rewards).
