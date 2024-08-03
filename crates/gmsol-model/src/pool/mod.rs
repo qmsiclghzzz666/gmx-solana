@@ -56,7 +56,7 @@ impl<P: Pool + ?Sized> PoolExt for P {}
 #[repr(u8)]
 #[non_exhaustive]
 pub enum PoolKind {
-    /// Primary.
+    /// Primary liquidity pool.
     #[default]
     Primary,
     /// Swap impact.
@@ -73,14 +73,20 @@ pub enum PoolKind {
     OpenInterestInTokensForShort,
     /// Position impact.
     PositionImpact,
-    /// Borrowing Factor.
+    /// Borrowing factor.
     BorrowingFactor,
-    /// Funding Amount Per Size for long.
+    /// Funding amount per size for long.
     FundingAmountPerSizeForLong,
-    /// Funding Amount Per Size for short.
+    /// Funding mmount per size for short.
     FundingAmountPerSizeForShort,
-    /// Claimable Funding Amount Per Size for long.
+    /// Claimable funding amount per size for long.
     ClaimableFundingAmountPerSizeForLong,
-    /// Claimable Funding Amount Per Size for short.
+    /// Claimable funding amount per size for short.
     ClaimableFundingAmountPerSizeForShort,
+    /// Collateral sum.
+    CollateralSum,
+    /// Total borrowing.
+    TotalBorrowing,
+    /// Point (used for general-purpose rewards).
+    Point,
 }
