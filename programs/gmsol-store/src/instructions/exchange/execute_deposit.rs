@@ -70,7 +70,7 @@ pub fn execute_deposit<'info>(
             return Err(error!(err));
         }
     }
-    match ctx.accounts.execute2(ctx.remaining_accounts) {
+    match ctx.accounts.execute(ctx.remaining_accounts) {
         Ok(()) => Ok(true),
         Err(err) if !throw_on_execution_error => {
             // TODO: catch and throw missing oracle price error.
@@ -119,7 +119,7 @@ impl<'info> ExecuteDeposit<'info> {
         self.market.load()?.validate(&self.store.key())
     }
 
-    fn execute2(&mut self, remaining_accounts: &'info [AccountInfo<'info>]) -> Result<()> {
+    fn execute(&mut self, remaining_accounts: &'info [AccountInfo<'info>]) -> Result<()> {
         self.validate_market()?;
 
         // Prepare the execution context.
@@ -177,6 +177,13 @@ impl<'info> ExecuteDeposit<'info> {
                 .and_then(|d| d.execute())
                 .map_err(ModelError::from)?;
             market.validate_market_balances(0, 0)?;
+
+            self.deposit.validate_min_market_tokens(
+                (*report.minted())
+                    .try_into()
+                    .map_err(|_| error!(StoreError::AmountOverflow))?,
+            )?;
+
             msg!("[Deposit] executed: {:?}", report);
         }
 

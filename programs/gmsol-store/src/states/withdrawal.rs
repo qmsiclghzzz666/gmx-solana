@@ -1,6 +1,8 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::TokenAccount;
 
+use crate::StoreError;
+
 use super::{
     common::{SwapParams, TokenRecord, TokensWithFeed},
     Market, NonceBytes, Seed,
@@ -19,6 +21,25 @@ pub struct Withdrawal {
 impl Withdrawal {
     pub(crate) fn init_space(tokens_with_feed: &[TokenRecord], swap: &SwapParams) -> usize {
         Fixed::INIT_SPACE + Dynamic::init_space(tokens_with_feed, swap)
+    }
+
+    pub(crate) fn validate_output_amounts(
+        &self,
+        long_amount: u64,
+        short_amount: u64,
+    ) -> Result<()> {
+        let params = &self.fixed.tokens.params;
+        require_gte!(
+            long_amount,
+            params.min_long_token_amount,
+            StoreError::InsufficientOutputAmount
+        );
+        require_gte!(
+            short_amount,
+            params.min_short_token_amount,
+            StoreError::InsufficientOutputAmount
+        );
+        Ok(())
     }
 }
 

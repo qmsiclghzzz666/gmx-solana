@@ -534,6 +534,7 @@ impl<'info> ExecuteOrder<'info> {
     }
 }
 
+#[inline(never)]
 fn execute_swap(
     oracle: &Oracle,
     market: &mut RevertiblePerpMarket<'_>,
@@ -559,11 +560,7 @@ fn execute_swap(
         )?;
         swap_out_amount
     };
-    require_gte!(
-        u128::from(swap_out_amount),
-        order.fixed.params.min_output_amount,
-        StoreError::InsufficientOutputAmount
-    );
+    order.validate_output_amount(swap_out_amount.into())?;
     let is_long = market.market_meta().to_token_side(&swap_out_token)?;
     transfer_out.transfer_out_collateral(
         is_long,
@@ -574,6 +571,7 @@ fn execute_swap(
     Ok(())
 }
 
+#[inline(never)]
 fn execute_increase_position(
     oracle: &Oracle,
     prices: Prices<u128>,
@@ -603,6 +601,9 @@ fn execute_increase_position(
         )?;
         collateral_increment_amount
     };
+
+    // Validate that the collateral amount is sufficient.
+    order.validate_output_amount(collateral_increment_amount.into())?;
 
     // Increase position.
     let (long_amount, short_amount) = {
@@ -776,13 +777,12 @@ fn execute_decrease_position(
             token_ins,
             (output_amount, secondary_output_amount),
         )?;
-        validate_output_amount(
+        order.validate_decrease_output_amounts(
             oracle,
             &final_output_token,
             output_amount,
             &secondary_output_token,
             secondary_output_amount,
-            order.fixed.params.min_output_amount,
         )?;
         transfer_out.transfer_out(false, output_amount)?;
         transfer_out.transfer_out(true, secondary_output_amount)?;
@@ -878,43 +878,4 @@ fn validated_recent_timestamp(config: &Store, timestamp: i64) -> Result<i64> {
     } else {
         err!(StoreError::InvalidArgument)
     }
-}
-
-#[inline(never)]
-fn validate_output_amount(
-    oracle: &Oracle,
-    output_token: &Pubkey,
-    output_amount: u64,
-    secondary_output_token: &Pubkey,
-    secondary_output_amount: u64,
-    min_output_value: u128,
-) -> Result<()> {
-    let mut total = 0u128;
-    {
-        let price = oracle
-            .primary
-            .get(output_token)
-            .ok_or(error!(StoreError::MissingOracelPrice))?
-            .min
-            .to_unit_price();
-        let output_value = u128::from(output_amount).saturating_mul(price);
-        total = total.saturating_add(output_value);
-    }
-    {
-        let price = oracle
-            .primary
-            .get(secondary_output_token)
-            .ok_or(error!(StoreError::MissingOracelPrice))?
-            .min
-            .to_unit_price();
-        let output_value = u128::from(secondary_output_amount).saturating_mul(price);
-        total = total.saturating_add(output_value);
-    }
-
-    require_gte!(
-        total,
-        min_output_value,
-        StoreError::InsufficientOutputAmount
-    );
-    Ok(())
 }

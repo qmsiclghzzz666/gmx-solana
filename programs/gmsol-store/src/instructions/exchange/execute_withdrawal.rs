@@ -107,7 +107,7 @@ pub fn execute_withdrawal<'info>(
             return Err(error!(err));
         }
     }
-    match ctx.accounts.execute2(ctx.remaining_accounts) {
+    match ctx.accounts.execute(ctx.remaining_accounts) {
         Ok(res) => Ok(res),
         Err(err) if !throw_on_execution_error => {
             // TODO: catch and throw missing oracle price error.
@@ -156,7 +156,7 @@ impl<'info> ExecuteWithdrawal<'info> {
         self.market.load()?.validate(&self.store.key())
     }
 
-    fn execute2(&mut self, remaining_accounts: &'info [AccountInfo<'info>]) -> Result<(u64, u64)> {
+    fn execute(&mut self, remaining_accounts: &'info [AccountInfo<'info>]) -> Result<(u64, u64)> {
         self.validate_market()?;
 
         // Prepare the execution context.
@@ -225,6 +225,9 @@ impl<'info> ExecuteWithdrawal<'info> {
                 (long_amount, short_amount),
             )?
         };
+
+        self.withdrawal
+            .validate_output_amounts(final_long_amount, final_short_amount)?;
 
         // Commit the changes.
         market.commit();

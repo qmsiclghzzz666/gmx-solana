@@ -6,7 +6,7 @@ use crate::StoreError;
 use super::{
     common::{SwapParams, TokenRecord, TokensWithFeed},
     position::PositionKind,
-    NonceBytes, Seed,
+    NonceBytes, Oracle, Seed,
 };
 
 /// Order.
@@ -68,6 +68,51 @@ impl Order {
         params.trigger_price = update_params.trigger_price;
         params.min_output_amount = update_params.min_output_amount;
         params.validate()?;
+        Ok(())
+    }
+
+    pub(crate) fn validate_output_amount(&self, output_amount: u128) -> Result<()> {
+        require_gte!(
+            output_amount,
+            self.fixed.params.min_output_amount,
+            StoreError::InsufficientOutputAmount
+        );
+        Ok(())
+    }
+
+    #[inline(never)]
+    pub(crate) fn validate_decrease_output_amounts(
+        &self,
+        oracle: &Oracle,
+        output_token: &Pubkey,
+        output_amount: u64,
+        secondary_output_token: &Pubkey,
+        secondary_output_amount: u64,
+    ) -> Result<()> {
+        let mut total = 0u128;
+        {
+            let price = oracle
+                .primary
+                .get(output_token)
+                .ok_or(error!(StoreError::MissingOracelPrice))?
+                .min
+                .to_unit_price();
+            let output_value = u128::from(output_amount).saturating_mul(price);
+            total = total.saturating_add(output_value);
+        }
+        {
+            let price = oracle
+                .primary
+                .get(secondary_output_token)
+                .ok_or(error!(StoreError::MissingOracelPrice))?
+                .min
+                .to_unit_price();
+            let output_value = u128::from(secondary_output_amount).saturating_mul(price);
+            total = total.saturating_add(output_value);
+        }
+
+        // We use the `min_output_amount` as min output value.
+        self.validate_output_amount(total)?;
         Ok(())
     }
 }

@@ -19,7 +19,7 @@ wallet = "~/.config/solana/id.json"
 test = "cargo test --features u128,utils && pnpm test"
 
 [test]
-startup_wait = 5000
+startup_wait = 10000
 shutdown_wait = 2000
 upgradeable = false
 

@@ -20,7 +20,7 @@ use super::{Revertible, RevertibleMarket, RevertiblePool};
 pub struct RevertiblePerpMarket<'a> {
     market: RevertibleMarket<'a>,
     clocks: Clocks,
-    pools: Pools,
+    pools: Box<Pools>,
     state: State,
 }
 
@@ -316,8 +316,8 @@ impl<'a> RevertiblePerpMarket<'a> {
 
     pub(crate) fn from_market(market: RevertibleMarket<'a>) -> Result<Self> {
         Ok(Self {
+            pools: Box::new((&market).try_into()?),
             clocks: (&market).try_into()?,
-            pools: (&market).try_into()?,
             state: (&market).try_into()?,
             market,
         })

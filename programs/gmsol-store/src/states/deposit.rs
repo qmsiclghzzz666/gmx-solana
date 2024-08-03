@@ -1,6 +1,8 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::TokenAccount;
 
+use crate::StoreError;
+
 use super::{
     common::{SwapParams, TokenRecord, TokensWithFeed},
     Market, NonceBytes, Seed,
@@ -19,6 +21,20 @@ pub struct Deposit {
 impl Deposit {
     pub(crate) fn init_space(tokens_with_feed: &[TokenRecord], swap_params: &SwapParams) -> usize {
         Fixed::INIT_SPACE + Dynamic::init_space(tokens_with_feed, swap_params)
+    }
+
+    /// Get min market tokens.
+    pub fn min_market_tokens(&self) -> u64 {
+        self.fixed.tokens.params.min_market_tokens
+    }
+
+    pub(crate) fn validate_min_market_tokens(&self, minted: u64) -> Result<()> {
+        require_gte!(
+            minted,
+            self.min_market_tokens(),
+            StoreError::InsufficientOutputAmount
+        );
+        Ok(())
     }
 }
 
