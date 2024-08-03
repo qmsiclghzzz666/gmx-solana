@@ -23,6 +23,7 @@ mod inspect;
 mod market_keeper;
 mod order_keeper;
 mod ser;
+mod treasury;
 mod utils;
 
 #[cfg(feature = "ui")]
@@ -85,6 +86,8 @@ enum Command {
     Whoami,
     /// Commands for admin.
     Admin(AdminArgs),
+    /// Commands for treasury.
+    Treasury(treasury::Args),
     /// Inspect the accounts defined by `DataStore` program.
     Inspect(inspect::InspectArgs),
     /// Commands for `Exchange` program.
@@ -182,6 +185,7 @@ impl Cli {
                 println!("{}", client.payer());
             }
             Command::Admin(args) => args.run(&client, &store_key, self.serialize_only).await?,
+            Command::Treasury(args) => args.run(&client, &store, self.serialize_only).await?,
             Command::Inspect(args) => args.run(&client, &store).await?,
             Command::Exchange(args) => {
                 if self.serialize_only {

@@ -10,6 +10,9 @@ pub mod order;
 /// Liquidation.
 pub mod liquidation;
 
+/// Treasury.
+pub mod treasury;
+
 use std::{future::Future, ops::Deref};
 
 use anchor_client::{
@@ -27,6 +30,7 @@ use gmsol_store::states::{
 use liquidation::LiquidateBuilder;
 use order::CancelOrderBuilder;
 use rand::{distributions::Standard, Rng};
+use treasury::ClaimFeesBuilder;
 
 use crate::utils::RpcBuilder;
 
@@ -49,6 +53,14 @@ pub trait ExchangeOps<C> {
         action: ActionDisabledFlag,
         enable: bool,
     ) -> RpcBuilder<C>;
+
+    /// Claim fees.
+    fn claim_fees(
+        &self,
+        store: &Pubkey,
+        market_token: &Pubkey,
+        is_long_token: bool,
+    ) -> ClaimFeesBuilder<C>;
 
     /// Create a new market and return its token mint address.
     #[allow(clippy::too_many_arguments)]
@@ -262,6 +274,15 @@ where
                 controller: self.controller_address(store),
                 store_program: self.store_program_id(),
             })
+    }
+
+    fn claim_fees(
+        &self,
+        store: &Pubkey,
+        market_token: &Pubkey,
+        is_long_token: bool,
+    ) -> ClaimFeesBuilder<C> {
+        ClaimFeesBuilder::new(self, store, market_token, is_long_token)
     }
 
     fn create_deposit(&self, store: &Pubkey, market_token: &Pubkey) -> CreateDepositBuilder<C> {
