@@ -120,8 +120,11 @@ enum Command {
         #[arg(long, short)]
         market_token: Option<Pubkey>,
         /// Owner of the positions. Default to the connected wallet.
-        #[arg(long)]
+        #[arg(long, group = "owners")]
         owner: Option<Pubkey>,
+        /// All user.
+        #[arg(long, group = "owners")]
+        all: bool,
         #[arg(long)]
         debug: bool,
         #[arg(long, short)]
@@ -586,6 +589,7 @@ impl InspectArgs {
                 address,
                 market_token,
                 owner,
+                all,
                 debug,
                 output,
             } => {
@@ -600,9 +604,13 @@ impl InspectArgs {
                         Ok(serialized.to_string())
                     })?;
                 } else {
-                    let owner = owner.unwrap_or(client.payer());
+                    let owner = if *all {
+                        None
+                    } else {
+                        Some(owner.unwrap_or(client.payer()))
+                    };
                     let positions = client
-                        .positions(store, &owner, market_token.as_ref())
+                        .positions(store, owner.as_ref(), market_token.as_ref())
                         .await?;
                     let serialized = positions
                         .iter()
