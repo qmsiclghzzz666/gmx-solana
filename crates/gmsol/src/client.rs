@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, ops::Deref, sync::Arc};
 
 use anchor_client::{
-    anchor_lang::{AccountDeserialize, Discriminator},
+    anchor_lang::{AccountDeserialize, AnchorSerialize, Discriminator},
     solana_client::{
         rpc_config::RpcAccountInfoConfig,
         rpc_filter::{Memcmp, RpcFilterType},
@@ -434,21 +434,33 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
     pub async fn positions(
         &self,
         store: &Pubkey,
-        owner: &Pubkey,
+        owner: Option<&Pubkey>,
         market_token: Option<&Pubkey>,
     ) -> crate::Result<BTreeMap<Pubkey, types::Position>> {
-        let mut bytes = owner.as_ref().to_owned();
-        if let Some(market_token) = market_token {
-            bytes.extend_from_slice(market_token.as_ref());
-        }
-        let filter = RpcFilterType::Memcmp(Memcmp::new_raw_bytes(
-            bytemuck::offset_of!(types::Position, owner) + DISC_OFFSET,
-            bytes,
-        ));
+        let filter = match owner {
+            Some(owner) => {
+                let mut bytes = owner.as_ref().to_owned();
+                if let Some(market_token) = market_token {
+                    bytes.extend_from_slice(market_token.as_ref());
+                }
+                let filter = RpcFilterType::Memcmp(Memcmp::new_raw_bytes(
+                    bytemuck::offset_of!(types::Position, owner) + DISC_OFFSET,
+                    bytes,
+                ));
+                Some(filter)
+            }
+            None => market_token.and_then(|token| {
+                Some(RpcFilterType::Memcmp(Memcmp::new_raw_bytes(
+                    bytemuck::offset_of!(types::Position, market_token) + DISC_OFFSET,
+                    token.try_to_vec().ok()?,
+                )))
+            }),
+        };
+
         let store_filter = StoreFilter::new(store, bytemuck::offset_of!(types::Position, store));
 
         let positions = self
-            .store_accounts::<ZeroCopy<types::Position>>(Some(store_filter), Some(filter))
+            .store_accounts::<ZeroCopy<types::Position>>(Some(store_filter), filter)
             .await?
             .into_iter()
             .map(|(pubkey, p)| (pubkey, p.0))
