@@ -25,6 +25,8 @@ pub struct Position {
     pub collateral_token: Pubkey,
     /// Position State.
     pub state: PositionState,
+    /// Reserved.
+    reserved: [u8; 128],
 }
 
 impl Default for Position {
@@ -37,15 +39,12 @@ impl Default for Position {
 
 impl Space for Position {
     #[allow(clippy::identity_op)]
-    const INIT_SPACE: usize = (1 * 2) + 32 + (1 * 14) + (32 * 3) + (8 * 4) + (16 * 7);
+    const INIT_SPACE: usize = std::mem::size_of::<Position>();
 }
 
 impl Seed for Position {
     const SEED: &'static [u8] = b"position";
 }
-
-#[cfg(test)]
-const_assert_eq!(std::mem::size_of::<Position>(), Position::INIT_SPACE);
 
 impl Position {
     /// Get position kind.
@@ -127,7 +126,14 @@ pub struct PositionState {
     pub long_token_claimable_funding_amount_per_size: u128,
     /// Short token claimable funding amount per size.
     pub short_token_claimable_funding_amount_per_size: u128,
-    // TODO: add reserved field.
+    /// Reserved.
+    #[cfg_attr(feature = "serde", serde(skip, default = "default_reserved_state"))]
+    reserved: [u8; 128],
+}
+
+#[cfg(feature = "serde")]
+fn default_reserved_state() -> [u8; 128] {
+    [0; 128]
 }
 
 impl gmsol_model::PositionState<{ constants::MARKET_DECIMALS }> for PositionState {
