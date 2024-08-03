@@ -1302,8 +1302,18 @@ pub mod gmsol_store {
 
     #[cfg(not(feature = "no-bug-fix"))]
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
-    pub fn turn_into_pure_pool(ctx: Context<TurnIntoPurePool>, kind: u8) -> Result<()> {
+    pub fn turn_into_pure_pool(ctx: Context<TurnPureFlag>, kind: u8) -> Result<()> {
         instructions::unchecked_turn_into_pure_pool(
+            ctx,
+            kind.try_into()
+                .map_err(|_| error!(StoreError::InvalidArgument))?,
+        )
+    }
+
+    #[cfg(not(feature = "no-bug-fix"))]
+    #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
+    pub fn turn_into_impure_pool(ctx: Context<TurnPureFlag>, kind: u8) -> Result<()> {
+        instructions::unchecked_turn_into_impure_pool(
             ctx,
             kind.try_into()
                 .map_err(|_| error!(StoreError::InvalidArgument))?,

@@ -282,7 +282,7 @@ where
     ) -> RpcBuilder<C> {
         self.data_store_rpc()
             .args(instruction::TurnIntoPurePool { kind: kind.into() })
-            .accounts(accounts::TurnIntoPurePool {
+            .accounts(accounts::TurnPureFlag {
                 authority: self.payer(),
                 store: *store,
                 market: self.find_market_address(store, market_token),
