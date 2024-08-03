@@ -426,6 +426,7 @@ pub struct RevertibleSwapMarket<'a> {
     pub(super) market: RevertibleMarket<'a>,
     open_interest: (RevertiblePool, RevertiblePool),
     open_interest_in_tokens: (RevertiblePool, RevertiblePool),
+    collateral_sum: (RevertiblePool, RevertiblePool),
 }
 
 impl<'a> RevertibleSwapMarket<'a> {
@@ -438,10 +439,15 @@ impl<'a> RevertibleSwapMarket<'a> {
             market.get_pool_from_storage(PoolKind::OpenInterestInTokensForLong)?,
             market.get_pool_from_storage(PoolKind::OpenInterestInTokensForShort)?,
         );
+        let collateral_sum = (
+            market.get_pool_from_storage(PoolKind::CollateralSumForLong)?,
+            market.get_pool_from_storage(PoolKind::CollateralSumForShort)?,
+        );
         Ok(Self {
             market,
             open_interest,
             open_interest_in_tokens,
+            collateral_sum,
         })
     }
 }
@@ -504,6 +510,14 @@ impl<'a> gmsol_model::BaseMarket<{ constants::MARKET_DECIMALS }> for RevertibleS
             &self.open_interest_in_tokens.0
         } else {
             &self.open_interest_in_tokens.1
+        })
+    }
+
+    fn collateral_sum_pool(&self, is_long: bool) -> gmsol_model::Result<&Self::Pool> {
+        Ok(if is_long {
+            &self.collateral_sum.0
+        } else {
+            &self.collateral_sum.1
         })
     }
 

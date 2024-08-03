@@ -35,6 +35,9 @@ pub trait BaseMarket<const DECIMALS: u8> {
     /// Get the reference of open interest pool.
     fn open_interest_in_tokens_pool(&self, is_long: bool) -> crate::Result<&Self::Pool>;
 
+    /// Get collateral sum pool.
+    fn collateral_sum_pool(&self, is_long: bool) -> crate::Result<&Self::Pool>;
+
     /// USD value to market token amount divisor.
     ///
     /// One should make sure it is non-zero.
@@ -84,6 +87,10 @@ impl<'a, M: BaseMarket<DECIMALS>, const DECIMALS: u8> BaseMarket<DECIMALS> for &
 
     fn open_interest_in_tokens_pool(&self, is_long: bool) -> crate::Result<&Self::Pool> {
         (**self).open_interest_in_tokens_pool(is_long)
+    }
+
+    fn collateral_sum_pool(&self, is_long: bool) -> crate::Result<&Self::Pool> {
+        (**self).collateral_sum_pool(is_long)
     }
 
     fn usd_to_amount_divisor(&self) -> Self::Num {
@@ -350,7 +357,7 @@ pub trait BaseMarketExt<const DECIMALS: u8>: BaseMarket<DECIMALS> {
             ))?;
 
         // TODO: Claimable UI Fee Amount.
-        // TODO: Affiliate  Reward Amount.
+        // TODO: Affiliate Reward Amount.
         Ok(balance)
     }
 
@@ -370,7 +377,21 @@ pub trait BaseMarketExt<const DECIMALS: u8>: BaseMarket<DECIMALS> {
             ));
         }
 
-        // TODO: validate collateral amount.
+        let mut collateral_amount = self.collateral_sum_pool(true)?.amount(is_long_token)?;
+        collateral_amount = collateral_amount
+            .checked_add(&self.collateral_sum_pool(false)?.amount(is_long_token)?)
+            .ok_or(crate::Error::Computation(
+                "calculating total collateral sum for one side",
+            ))?;
+        if *balance < collateral_amount {
+            return Err(crate::Error::InvalidTokenBalance(
+                "Less than total collateral amount",
+                collateral_amount.to_string(),
+                balance.to_string(),
+            ));
+        }
+
+        // We don't have to validate the claimable funding amount since they are claimed immediately.
 
         Ok(())
     }

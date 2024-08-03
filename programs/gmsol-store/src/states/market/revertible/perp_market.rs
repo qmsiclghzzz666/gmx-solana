@@ -84,6 +84,8 @@ struct Pools {
     borrowing_factor: RevertiblePool,
     funding_amount_per_size: (RevertiblePool, RevertiblePool),
     claimable_funding_amount_per_size: (RevertiblePool, RevertiblePool),
+    collateral_sum: (RevertiblePool, RevertiblePool),
+    total_borrowing: RevertiblePool,
 }
 
 impl<'a, 'market> TryFrom<&'a RevertibleMarket<'market>> for Pools {
@@ -110,6 +112,11 @@ impl<'a, 'market> TryFrom<&'a RevertibleMarket<'market>> for Pools {
                 market.create_revertible_pool(PoolKind::ClaimableFundingAmountPerSizeForLong)?,
                 market.create_revertible_pool(PoolKind::ClaimableFundingAmountPerSizeForShort)?,
             ),
+            collateral_sum: (
+                market.create_revertible_pool(PoolKind::CollateralSumForLong)?,
+                market.create_revertible_pool(PoolKind::CollateralSumForShort)?,
+            ),
+            total_borrowing: market.create_revertible_pool(PoolKind::TotalBorrowing)?,
         })
     }
 }
@@ -206,6 +213,26 @@ impl Pools {
                     .get_mut(PoolKind::ClaimableFundingAmountPerSizeForShort)
                     .expect("must exist"),
             );
+
+        self.collateral_sum.0.as_small_pool().write_to_pool(
+            market
+                .pools
+                .get_mut(PoolKind::CollateralSumForLong)
+                .expect("must exist"),
+        );
+        self.collateral_sum.1.as_small_pool().write_to_pool(
+            market
+                .pools
+                .get_mut(PoolKind::CollateralSumForShort)
+                .expect("must exist"),
+        );
+
+        self.total_borrowing.as_small_pool().write_to_pool(
+            market
+                .pools
+                .get_mut(PoolKind::TotalBorrowing)
+                .expect("must exist"),
+        );
     }
 }
 
@@ -342,6 +369,14 @@ impl<'a> gmsol_model::BaseMarket<{ constants::MARKET_DECIMALS }> for RevertibleP
         }
     }
 
+    fn collateral_sum_pool(&self, is_long: bool) -> gmsol_model::Result<&Self::Pool> {
+        if is_long {
+            Ok(&self.pools.collateral_sum.0)
+        } else {
+            Ok(&self.pools.collateral_sum.1)
+        }
+    }
+
     fn usd_to_amount_divisor(&self) -> Self::Num {
         self.market.usd_to_amount_divisor()
     }
@@ -451,6 +486,10 @@ impl<'a> gmsol_model::PerpMarket<{ constants::MARKET_DECIMALS }> for RevertibleP
         }
     }
 
+    fn total_borrowing_pool(&self) -> gmsol_model::Result<&Self::Pool> {
+        Ok(&self.pools.total_borrowing)
+    }
+
     fn borrowing_fee_params(&self) -> gmsol_model::Result<BorrowingFeeParams<Self::Num>> {
         self.market.borrowing_fee_params()
     }
@@ -536,5 +575,17 @@ impl<'a> gmsol_model::PerpMarketMut<{ constants::MARKET_DECIMALS }> for Revertib
         } else {
             Ok(&mut self.pools.claimable_funding_amount_per_size.1)
         }
+    }
+
+    fn collateral_sum_pool_mut(&mut self, is_long: bool) -> gmsol_model::Result<&mut Self::Pool> {
+        if is_long {
+            Ok(&mut self.pools.collateral_sum.0)
+        } else {
+            Ok(&mut self.pools.collateral_sum.1)
+        }
+    }
+
+    fn total_borrowing_pool_mut(&mut self) -> gmsol_model::Result<&mut Self::Pool> {
+        Ok(&mut self.pools.total_borrowing)
     }
 }

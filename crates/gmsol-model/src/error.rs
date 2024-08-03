@@ -24,6 +24,9 @@ pub enum Error {
     /// Unknown computation error.
     #[error("unknown computation error: {0}")]
     Computation(&'static str),
+    ///  Computation error in pool
+    #[error("computation in `{0}` pool error: {1}")]
+    PoolComputation(PoolKind, &'static str),
     /// Power computation error.
     #[error("pow computation error")]
     PowComputation,

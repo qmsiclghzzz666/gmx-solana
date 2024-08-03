@@ -3,6 +3,8 @@ use gmsol_model::PoolKind;
 
 use crate::StoreError;
 
+use super::revertible::market::SmallPool;
+
 /// A pool for market.
 #[zero_copy]
 #[cfg_attr(feature = "debug", derive(Debug))]
@@ -42,6 +44,10 @@ impl Pool {
             .checked_add(self.short_token_amount)
             .ok_or(error!(StoreError::AmountOverflow))?;
         Ok(())
+    }
+
+    pub(crate) fn create_small(&self, kind: PoolKind) -> SmallPool {
+        SmallPool::new(kind, self)
     }
 }
 

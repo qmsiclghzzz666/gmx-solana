@@ -45,7 +45,7 @@ describe("exchange: Single Token Market", () => {
 
         // Inititalize GM account.
         user0GMWsolAccount = await createAssociatedTokenAccount(provider.connection, user0, GMWsolWsolWsol, user0.publicKey);
-        console.log(`Initialized WOL single token GM account: ${user0GMWsolAccount}`);
+        console.log(`Initialized WSOL single token GM account: ${user0GMWsolAccount}`);
 
         // Wrap some SOL for user0.
         await wrap(provider, user0, 1.5 * LAMPORTS_PER_SOL);

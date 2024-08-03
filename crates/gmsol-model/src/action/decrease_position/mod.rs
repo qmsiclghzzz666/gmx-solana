@@ -8,7 +8,7 @@ use crate::{
         CollateralDelta, Position, PositionExt, PositionMut, PositionMutExt,
         WillCollateralBeSufficient,
     },
-    PerpMarketMut, PerpMarketMutExt,
+    PerpMarketMut, PerpMarketMutExt, PoolExt,
 };
 
 use self::collateral_processor::{CollateralProcessor, ProcessReport};
@@ -139,12 +139,15 @@ where
 
         self.check_liquiation()?;
 
-        // let initial_collateral_amount = self.position.collateral_amount_mut().clone();
+        let initial_collateral_amount = self.position.collateral_amount_mut().clone();
 
         let mut execution = self.process_collateral()?;
 
         let should_remove;
         {
+            let is_long = self.position.is_long();
+            let is_collateral_long = self.position.is_collateral_token_long();
+
             let next_position_size_in_usd = self
                 .position
                 .size_in_usd_mut()
@@ -152,8 +155,14 @@ where
                 .ok_or(crate::Error::Computation(
                     "calculating next position size in usd",
                 ))?;
+            let next_position_borrowing_factor =
+                self.position.market().borrowing_factor(is_long)?;
 
-            // TODO: update total borrowing state.
+            // Update total borrowing before updating position size.
+            self.position.update_total_borrowing(
+                &next_position_size_in_usd,
+                &next_position_borrowing_factor,
+            )?;
 
             let next_position_size_in_tokens = self
                 .position
@@ -165,8 +174,6 @@ where
 
             should_remove =
                 next_position_size_in_usd.is_zero() || next_position_size_in_tokens.is_zero();
-
-            let is_long = self.position.is_long();
 
             if should_remove {
                 *self.position.size_in_usd_mut() = Zero::zero();
@@ -183,13 +190,27 @@ where
                 *self.position.collateral_amount_mut() = next_position_collateral_amount;
             };
 
+            // Update collateral sum.
+            {
+                let collateral_delta_amount = initial_collateral_amount
+                    .checked_sub(self.position.collateral_amount_mut())
+                    .ok_or(crate::Error::Computation("collateral amount increased"))?;
+
+                self.position
+                    .market_mut()
+                    .collateral_sum_pool_mut(is_long)?
+                    .apply_delta_amount(
+                        is_collateral_long,
+                        &collateral_delta_amount.to_opposite_signed()?,
+                    )?;
+            }
+
             // The state of the position must be up-to-date, even if it is going to be removed.
-            *self.position.borrowing_factor_mut() =
-                self.position.market().borrowing_factor(is_long)?;
+            *self.position.borrowing_factor_mut() = next_position_borrowing_factor;
             *self.position.funding_fee_amount_per_size_mut() = self
                 .position
                 .market()
-                .funding_fee_amount_per_size(is_long, self.position.is_collateral_token_long())?;
+                .funding_fee_amount_per_size(is_long, is_collateral_long)?;
             for is_long_collateral in [true, false] {
                 *self
                     .position
@@ -200,10 +221,8 @@ where
             }
         }
 
-        // TODO: update global states.
-
         // Update open interest.
-        self.position.apply_delta_to_open_interest(
+        self.position.update_open_interest(
             &self.size_delta_usd.to_opposite_signed()?,
             &execution.size_delta_in_tokens.to_opposite_signed()?,
         )?;

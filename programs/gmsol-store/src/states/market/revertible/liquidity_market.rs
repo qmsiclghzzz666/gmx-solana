@@ -146,6 +146,10 @@ impl<'a, 'info> gmsol_model::BaseMarket<{ constants::MARKET_DECIMALS }>
         self.market.open_interest_in_tokens_pool(is_long)
     }
 
+    fn collateral_sum_pool(&self, is_long: bool) -> gmsol_model::Result<&Self::Pool> {
+        self.market.collateral_sum_pool(is_long)
+    }
+
     fn usd_to_amount_divisor(&self) -> Self::Num {
         self.market.usd_to_amount_divisor()
     }

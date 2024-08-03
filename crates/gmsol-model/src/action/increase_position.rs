@@ -9,7 +9,7 @@ use crate::{
     num::Unsigned,
     params::fee::PositionFees,
     position::{CollateralDelta, Position, PositionExt},
-    PerpMarketMut, PositionMut, PositionMutExt,
+    PerpMarketMut, PoolExt, PositionMut, PositionMutExt,
 };
 
 use super::{
@@ -236,13 +236,17 @@ where
                     ))?,
             )?;
 
+        let is_long = self.position.is_long();
         let next_position_size_in_usd = self
             .position
             .size_in_usd_mut()
             .checked_add(&self.params.size_delta_usd)
             .ok_or(crate::Error::Computation("size in usd overflow"))?;
+        let next_position_borrowing_factor = self.position.market().borrowing_factor(is_long)?;
 
-        // TODO: update total borrowing
+        // Update total borrowing before updating position size.
+        self.position
+            .update_total_borrowing(&next_position_size_in_usd, &next_position_borrowing_factor)?;
 
         // Update sizes.
         *self.position.size_in_usd_mut() = next_position_size_in_usd;
@@ -251,8 +255,6 @@ where
             .size_in_tokens_mut()
             .checked_add(&execution.size_delta_in_tokens)
             .ok_or(crate::Error::Computation("size in tokens overflow"))?;
-
-        let is_long = self.position.is_long();
 
         // Update funding fees state.
         *self.position.funding_fee_amount_per_size_mut() = self
@@ -269,9 +271,9 @@ where
         }
 
         // Update borrowing fee state.
-        *self.position.borrowing_factor_mut() = self.position.market().borrowing_factor(is_long)?;
+        *self.position.borrowing_factor_mut() = next_position_borrowing_factor;
 
-        self.position.apply_delta_to_open_interest(
+        self.position.update_open_interest(
             &self.params.size_delta_usd.to_signed()?,
             &execution.size_delta_in_tokens.to_signed()?,
         )?;
@@ -468,7 +470,14 @@ where
 
         // TODO: apply claimable ui fee amount.
 
-        // TODO: apply delta to collateral sum.
+        let is_long = self.position.is_long();
+        self.position
+            .market_mut()
+            .collateral_sum_pool_mut(is_long)?
+            .apply_delta_amount(
+                is_collateral_token_long,
+                &collateral_delta_amount.to_signed()?,
+            )?;
 
         Ok((collateral_delta_amount, fees))
     }

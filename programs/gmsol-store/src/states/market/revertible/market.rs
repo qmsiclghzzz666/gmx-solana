@@ -20,19 +20,10 @@ use super::{swap_market::RevertibleSwapMarket, Revertible, RevertibleBalance};
 
 /// Small Pool.
 pub struct SmallPool {
+    kind: PoolKind,
     is_pure: bool,
     long_amount: u128,
     short_amount: u128,
-}
-
-impl<'a> From<&'a Pool> for SmallPool {
-    fn from(pool: &'a Pool) -> Self {
-        Self {
-            is_pure: pool.is_pure(),
-            long_amount: pool.long_token_amount,
-            short_amount: pool.short_token_amount,
-        }
-    }
 }
 
 impl SmallPool {
@@ -44,6 +35,16 @@ impl SmallPool {
         assert_eq!(self.is_pure, pool.is_pure());
         pool.long_token_amount = self.long_amount;
         pool.short_token_amount = self.short_amount;
+    }
+
+    /// Create a new small pool from [`Pool`]
+    pub fn new(kind: PoolKind, pool: &Pool) -> Self {
+        Self {
+            kind,
+            is_pure: pool.is_pure(),
+            long_amount: pool.long_token_amount,
+            short_amount: pool.short_token_amount,
+        }
     }
 }
 
@@ -75,12 +76,9 @@ impl gmsol_model::Balance for SmallPool {
 
 impl gmsol_model::Pool for SmallPool {
     fn apply_delta_to_long_amount(&mut self, delta: &Self::Signed) -> gmsol_model::Result<()> {
-        self.long_amount =
-            self.long_amount
-                .checked_add_signed(*delta)
-                .ok_or(gmsol_model::Error::Computation(
-                    "apply delta to long amount",
-                ))?;
+        self.long_amount = self.long_amount.checked_add_signed(*delta).ok_or(
+            gmsol_model::Error::PoolComputation(self.kind, "apply delta to long amount"),
+        )?;
         Ok(())
     }
 
@@ -92,7 +90,8 @@ impl gmsol_model::Pool for SmallPool {
         };
         *amount = amount
             .checked_add_signed(*delta)
-            .ok_or(gmsol_model::Error::Computation(
+            .ok_or(gmsol_model::Error::PoolComputation(
+                self.kind,
                 "apply delta to short amount",
             ))?;
         Ok(())
@@ -185,17 +184,17 @@ impl<'a, 'info> TryFrom<&'a AccountLoader<'info, Market>> for RevertibleMarket<'
             .pools
             .get(PoolKind::Primary)
             .ok_or(error!(StoreError::RequiredResourceNotFound))?
-            .into();
+            .create_small(PoolKind::Primary);
         let claimable_fee = storage
             .pools
             .get(PoolKind::ClaimableFee)
             .ok_or(error!(StoreError::RequiredResourceNotFound))?
-            .into();
+            .create_small(PoolKind::ClaimableFee);
         let swap_impact = storage
             .pools
             .get(PoolKind::SwapImpact)
             .ok_or(error!(StoreError::RequiredResourceNotFound))?
-            .into();
+            .create_small(PoolKind::SwapImpact);
         let balance = RevertibleBalance::from(storage.deref());
         Ok(Self {
             storage,
@@ -268,7 +267,7 @@ impl<'a> RevertibleMarket<'a> {
             .pools
             .get(kind)
             .ok_or(error!(StoreError::RequiredResourceNotFound))?;
-        Ok(RevertiblePool::SmallPool(SmallPool::from(pool)))
+        Ok(RevertiblePool::SmallPool(pool.create_small(kind)))
     }
 
     /// As a [`SwapMarket`](gmsol_model::SwapMarket).
@@ -426,6 +425,10 @@ impl<'a> gmsol_model::BaseMarket<{ constants::MARKET_DECIMALS }> for RevertibleM
     }
 
     fn open_interest_in_tokens_pool(&self, _is_long: bool) -> gmsol_model::Result<&Self::Pool> {
+        Err(gmsol_model::Error::Unimplemented)
+    }
+
+    fn collateral_sum_pool(&self, _is_long: bool) -> gmsol_model::Result<&Self::Pool> {
         Err(gmsol_model::Error::Unimplemented)
     }
 

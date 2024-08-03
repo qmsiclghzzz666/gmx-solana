@@ -46,6 +46,15 @@ impl gmsol_model::BaseMarket<{ constants::MARKET_DECIMALS }> for Market {
         })
     }
 
+    fn collateral_sum_pool(&self, is_long: bool) -> gmsol_model::Result<&Self::Pool> {
+        let kind = if is_long {
+            PoolKind::CollateralSumForLong
+        } else {
+            PoolKind::CollateralSumForShort
+        };
+        self.try_pool(kind)
+    }
+
     fn usd_to_amount_divisor(&self) -> Self::Num {
         constants::MARKET_USD_TO_AMOUNT_DIVISOR
     }
@@ -162,6 +171,10 @@ impl gmsol_model::PerpMarket<{ constants::MARKET_DECIMALS }> for Market {
             PoolKind::ClaimableFundingAmountPerSizeForShort
         };
         self.try_pool(kind)
+    }
+
+    fn total_borrowing_pool(&self) -> gmsol_model::Result<&Self::Pool> {
+        self.try_pool(PoolKind::TotalBorrowing)
     }
 
     fn borrowing_fee_params(&self) -> gmsol_model::Result<BorrowingFeeParams<Self::Num>> {

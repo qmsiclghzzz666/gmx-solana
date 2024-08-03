@@ -13,7 +13,7 @@ use crate::{
     },
     num::{MulDiv, Num, Unsigned, UnsignedAbs},
     params::fee::{FundingFees, PositionFees},
-    Balance, BalanceExt, PerpMarketMut, PnlFactorKind, Pool,
+    Balance, BalanceExt, PerpMarketMut, PnlFactorKind, Pool, PoolExt,
 };
 
 /// Read-only access to the position state.
@@ -723,8 +723,8 @@ where
         )
     }
 
-    /// Apply delta to open interest.
-    fn apply_delta_to_open_interest(
+    /// Update global open interest.
+    fn update_open_interest(
         &mut self,
         size_delta_usd: &Self::Signed,
         size_delta_in_tokens: &Self::Signed,
@@ -761,6 +761,29 @@ where
         } else {
             open_interest_in_tokens.apply_delta_to_short_amount(size_delta_in_tokens)?;
         }
+
+        Ok(())
+    }
+
+    /// Update total borrowing.
+    fn update_total_borrowing(
+        &mut self,
+        next_size_in_usd: &Self::Num,
+        next_borrowing_factor: &Self::Num,
+    ) -> crate::Result<()> {
+        let is_long = self.is_long();
+        let previous = crate::utils::apply_factor(self.size_in_usd(), self.borrowing_factor())
+            .ok_or(crate::Error::Computation("calculating previous borrowing"))?;
+
+        let total_borrowing = self.market_mut().total_borrowing_pool_mut()?;
+
+        let delta = {
+            let next = crate::utils::apply_factor(next_size_in_usd, next_borrowing_factor)
+                .ok_or(crate::Error::Computation("calculating next borrowing"))?;
+            next.checked_signed_sub(previous)?
+        };
+
+        total_borrowing.apply_delta_amount(is_long, &delta)?;
 
         Ok(())
     }

@@ -77,6 +77,19 @@ pub trait Unsigned: num_traits::Unsigned {
     /// Compute the absolute difference of two values.
     fn diff(self, other: Self) -> Self;
 
+    /// Compute signed `self - other`.
+    fn checked_signed_sub(self, other: Self) -> crate::Result<Self::Signed>
+    where
+        Self: Ord + Clone,
+        Self::Signed: CheckedSub,
+    {
+        if self >= other {
+            self.diff(other).to_signed()
+        } else {
+            self.diff(other).to_opposite_signed()
+        }
+    }
+
     /// Checked signed add.
     fn checked_add_with_signed(&self, other: &Self::Signed) -> Option<Self>
     where

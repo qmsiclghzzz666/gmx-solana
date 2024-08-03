@@ -28,6 +28,9 @@ pub trait PerpMarket<const DECIMALS: u8>:
     /// Get claimable funding amount per size pool.
     fn claimable_funding_amount_per_size_pool(&self, is_long: bool) -> crate::Result<&Self::Pool>;
 
+    /// Get total borrowing pool.
+    fn total_borrowing_pool(&self) -> crate::Result<&Self::Pool>;
+
     /// Get borrowing fee params.
     fn borrowing_fee_params(&self) -> crate::Result<BorrowingFeeParams<Self::Num>>;
 
@@ -82,6 +85,12 @@ pub trait PerpMarketMut<const DECIMALS: u8>:
         &mut self,
         is_long: bool,
     ) -> crate::Result<&mut Self::Pool>;
+
+    /// Get collateral sum pool mutably.
+    fn collateral_sum_pool_mut(&mut self, is_long: bool) -> crate::Result<&mut Self::Pool>;
+
+    /// Get total borrowing pool mutably.
+    fn total_borrowing_pool_mut(&mut self) -> crate::Result<&mut Self::Pool>;
 }
 
 impl<'a, M: PerpMarket<DECIMALS>, const DECIMALS: u8> PerpMarket<DECIMALS> for &'a mut M {
@@ -103,6 +112,10 @@ impl<'a, M: PerpMarket<DECIMALS>, const DECIMALS: u8> PerpMarket<DECIMALS> for &
 
     fn claimable_funding_amount_per_size_pool(&self, is_long: bool) -> crate::Result<&Self::Pool> {
         (**self).claimable_funding_amount_per_size_pool(is_long)
+    }
+
+    fn total_borrowing_pool(&self) -> crate::Result<&Self::Pool> {
+        (**self).total_borrowing_pool()
     }
 
     fn funding_amount_per_size_adjustment(&self) -> Self::Num {
@@ -162,6 +175,14 @@ impl<'a, M: PerpMarketMut<DECIMALS>, const DECIMALS: u8> PerpMarketMut<DECIMALS>
         is_long: bool,
     ) -> crate::Result<&mut Self::Pool> {
         (**self).claimable_funding_amount_per_size_pool_mut(is_long)
+    }
+
+    fn collateral_sum_pool_mut(&mut self, is_long: bool) -> crate::Result<&mut Self::Pool> {
+        (**self).collateral_sum_pool_mut(is_long)
+    }
+
+    fn total_borrowing_pool_mut(&mut self) -> crate::Result<&mut Self::Pool> {
+        (**self).total_borrowing_pool_mut()
     }
 
     fn just_passed_in_seconds_for_borrowing(&mut self) -> crate::Result<u64> {

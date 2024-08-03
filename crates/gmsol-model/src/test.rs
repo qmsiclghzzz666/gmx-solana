@@ -117,6 +117,8 @@ pub struct TestMarket<T: Unsigned, const DECIMALS: u8> {
     funding_factor_per_second: T::Signed,
     funding_amount_per_size: (TestPool<T>, TestPool<T>),
     claimable_funding_amount_per_size: (TestPool<T>, TestPool<T>),
+    collateral_sum: (TestPool<T>, TestPool<T>),
+    total_borrowing: TestPool<T>,
     clocks: HashMap<ClockKind, Instant>,
 }
 
@@ -199,6 +201,8 @@ impl Default for TestMarket<u64, 9> {
             funding_factor_per_second: Default::default(),
             funding_amount_per_size: Default::default(),
             claimable_funding_amount_per_size: Default::default(),
+            collateral_sum: Default::default(),
+            total_borrowing: Default::default(),
             clocks: Default::default(),
         }
     }
@@ -284,6 +288,8 @@ impl Default for TestMarket<u128, 20> {
             funding_factor_per_second: Default::default(),
             funding_amount_per_size: Default::default(),
             claimable_funding_amount_per_size: Default::default(),
+            collateral_sum: Default::default(),
+            total_borrowing: Default::default(),
             clocks: Default::default(),
         }
     }
@@ -339,6 +345,14 @@ where
             Ok(&self.open_interest_in_tokens.0)
         } else {
             Ok(&self.open_interest_in_tokens.1)
+        }
+    }
+
+    fn collateral_sum_pool(&self, is_long: bool) -> crate::Result<&Self::Pool> {
+        if is_long {
+            Ok(&self.collateral_sum.0)
+        } else {
+            Ok(&self.collateral_sum.1)
         }
     }
 
@@ -509,6 +523,10 @@ where
         }
     }
 
+    fn total_borrowing_pool(&self) -> crate::Result<&Self::Pool> {
+        Ok(&self.total_borrowing)
+    }
+
     fn position_params(&self) -> crate::Result<PositionParams<Self::Num>> {
         Ok(self.position_params.clone())
     }
@@ -578,6 +596,18 @@ where
         } else {
             Ok(&mut self.claimable_funding_amount_per_size.1)
         }
+    }
+
+    fn collateral_sum_pool_mut(&mut self, is_long: bool) -> crate::Result<&mut Self::Pool> {
+        if is_long {
+            Ok(&mut self.collateral_sum.0)
+        } else {
+            Ok(&mut self.collateral_sum.1)
+        }
+    }
+
+    fn total_borrowing_pool_mut(&mut self) -> crate::Result<&mut Self::Pool> {
+        Ok(&mut self.total_borrowing)
     }
 
     fn just_passed_in_seconds_for_borrowing(&mut self) -> crate::Result<u64> {
