@@ -47,6 +47,18 @@ pub mod gmsol_exchange {
         instructions::unchecked_toggle_feature(ctx, domain, action, enable)
     }
 
+    // Treasury.
+    /// Claim fees from the given market.
+    ///
+    /// # Accounts
+    /// *[See the documentation for the accounts.](ClaimFees)*
+    ///
+    /// # Errors
+    /// - *TODO*
+    pub fn claim_fees(ctx: Context<ClaimFees>) -> Result<()> {
+        instructions::claim_fees(ctx)
+    }
+
     // Market.
     #[access_control(Authenticate::only_market_keeper(&ctx))]
     pub fn create_market(

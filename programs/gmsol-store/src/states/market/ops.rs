@@ -76,11 +76,11 @@ pub trait ValidateMarketBalances:
     fn validate_market_balance_for_the_given_token(
         &self,
         token: &Pubkey,
-        amount: u64,
+        excluded: u64,
     ) -> Result<()> {
         let side = self.market_meta().to_token_side(token)?;
         let balance = self
-            .balance_excluding(token, &amount)
+            .balance_excluding(token, &excluded)
             .map_err(ModelError::from)?
             .into();
         self.validate_token_balance_for_one_side(&balance, side)

@@ -219,6 +219,30 @@ impl Store {
     pub fn holding(&self) -> &Pubkey {
         &self.address.holding
     }
+
+    /// Validate whether fees can be claimed by this address.
+    pub fn validate_claim_fees_address(&self, address: &Pubkey) -> Result<()> {
+        require!(
+            self.treasury.is_receiver(address) || self.treasury.is_treasury(address),
+            StoreError::PermissionDenied
+        );
+        Ok(())
+    }
+
+    /// Get the recevier address.
+    pub fn receiver(&self) -> Pubkey {
+        self.treasury.receiver
+    }
+
+    /// Get the treasury address.
+    pub fn treasury(&self) -> Pubkey {
+        self.treasury.treasury
+    }
+
+    /// Get the treasury factor.
+    pub fn treasury_factor(&self) -> u128 {
+        self.treasury.treasury_factor
+    }
 }
 
 /// Treasury.
@@ -250,6 +274,14 @@ impl Treasury {
     fn init(&mut self, receiver: Pubkey, treasury: Pubkey) {
         self.receiver = receiver;
         self.treasury = treasury;
+    }
+
+    fn is_receiver(&self, address: &Pubkey) -> bool {
+        *address == self.receiver
+    }
+
+    fn is_treasury(&self, address: &Pubkey) -> bool {
+        *address == self.treasury
     }
 }
 

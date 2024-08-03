@@ -1,7 +1,11 @@
-use crate::states::Factor;
+use crate::states::{
+    revertible::{Revertible, RevertibleMarket},
+    Factor, HasMarketMeta, ValidateMarketBalances,
+};
 
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Token, TokenAccount};
+use gmsol_model::{num::Unsigned, BalanceExt, BaseMarketMut, PoolExt};
 use gmsol_utils::InitSpace;
 
 use crate::{
@@ -537,6 +541,61 @@ pub(crate) fn unchecked_toggle_market(ctx: Context<ToggleMarket>, enable: bool) 
 }
 
 impl<'info> internal::Authentication<'info> for ToggleMarket<'info> {
+    fn authority(&self) -> &Signer<'info> {
+        &self.authority
+    }
+
+    fn store(&self) -> &AccountLoader<'info, Store> {
+        &self.store
+    }
+}
+
+/// The accounts definition for [`claim_fees_from_market`](crate::gmsol_store::claim_fees_from_market).
+///
+/// *[See also the documentation for the instruction.](crate::gmsol_store::claim_fees_from_market)*
+#[derive(Accounts)]
+pub struct ClaimFeesFromMarket<'info> {
+    authority: Signer<'info>,
+    store: AccountLoader<'info, Store>,
+    #[account(mut, has_one = store)]
+    market: AccountLoader<'info, Market>,
+}
+
+/// Claim fees from the market.
+///
+/// ## CHECK
+/// - Only CONTROLLER can claim fees.
+pub(crate) fn unchecked_claim_fees_from_market(
+    ctx: Context<ClaimFeesFromMarket>,
+    token: &Pubkey,
+) -> gmsol_model::Result<u64> {
+    let mut market = RevertibleMarket::try_from(&ctx.accounts.market)?;
+    let is_long_token = market.market_meta().to_token_side(token)?;
+    let pool = market.claimable_fee_pool_mut()?;
+
+    // Saturating claim all fees from the pool.
+    let amount: u64 = pool
+        .amount(is_long_token)?
+        .min(u128::from(u64::MAX))
+        .try_into()
+        .expect("must success");
+
+    let delta = (u128::from(amount)).to_opposite_signed()?;
+    pool.apply_delta_amount(is_long_token, &delta)?;
+
+    market.validate_market_balance_for_the_given_token(token, amount)?;
+    market.commit();
+
+    msg!(
+        "Claimed `{}` {} from the {} market",
+        amount,
+        token,
+        ctx.accounts.market.load()?.meta.market_token_mint
+    );
+    Ok(amount)
+}
+
+impl<'info> internal::Authentication<'info> for ClaimFeesFromMarket<'info> {
     fn authority(&self) -> &Signer<'info> {
         &self.authority
     }

@@ -995,6 +995,34 @@ pub mod gmsol_store {
         instructions::unchecked_toggle_market(ctx, enable)
     }
 
+    /// Claim fees from the given market. The claimed amount remains in the market balance,
+    /// and requires a subsequent transfer.
+    ///
+    /// # Accounts
+    /// [*See the documentation for the accounts.*](ClaimFeesFromMarket)
+    ///
+    /// # Arguments
+    /// - `token`: The token to claim.
+    ///
+    /// # Return
+    /// - Returns the amount to be claimed.
+    ///
+    /// # Errors
+    /// - The [`authority`](ClaimFeesFromMarket) must be a signer and a CONTROLLER
+    /// in the given store.
+    /// - The [`store`](ClaimFeesFromMarket) must be an initialized [`Store`](crate::states::Store)
+    /// account owned by this store program.
+    /// - The [`market`](ClaimFeesFromMarket) must be an initialized [`Market`](crate::states::Market)
+    /// account owned by this store program, whose the store must be the given one.
+    /// - The `token` must be one of the collateral token.
+    /// - The market balance validation must pass after the claim.
+    #[access_control(internal::Authenticate::only_controller(&ctx))]
+    pub fn claim_fees_from_market(ctx: Context<ClaimFeesFromMarket>, token: Pubkey) -> Result<u64> {
+        let claimed = instructions::unchecked_claim_fees_from_market(ctx, &token)
+            .map_err(ModelError::from)?;
+        Ok(claimed)
+    }
+
     // Token.
     /// Initialize a new market token.
     ///
