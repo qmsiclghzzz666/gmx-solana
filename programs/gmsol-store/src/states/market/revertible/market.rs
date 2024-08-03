@@ -309,22 +309,6 @@ impl<'a> RevertibleMarket<'a> {
         Ok(())
     }
 
-    pub(super) fn swap_impact_params(&self) -> gmsol_model::Result<PriceImpactParams<Factor>> {
-        PriceImpactParams::builder()
-            .with_exponent(self.config().swap_impact_exponent)
-            .with_positive_factor(self.config().swap_impact_positive_factor)
-            .with_negative_factor(self.config().swap_impact_negative_factor)
-            .build()
-    }
-
-    pub(super) fn swap_fee_params(&self) -> gmsol_model::Result<FeeParams<Factor>> {
-        Ok(FeeParams::builder()
-            .with_fee_receiver_factor(self.config().swap_fee_receiver_factor)
-            .with_positive_impact_fee_factor(self.config().swap_fee_factor_for_positive_impact)
-            .with_negative_impact_fee_factor(self.config().swap_fee_factor_for_positive_impact)
-            .build())
-    }
-
     pub(super) fn position_impact_params(&self) -> gmsol_model::Result<PriceImpactParams<Factor>> {
         let config = self.config();
         PriceImpactParams::builder()
@@ -501,6 +485,16 @@ impl<'a> gmsol_model::BaseMarketMut<{ constants::MARKET_DECIMALS }> for Revertib
 
     fn claimable_fee_pool_mut(&mut self) -> gmsol_model::Result<&mut Self::Pool> {
         Ok(&mut self.claimable_fee)
+    }
+}
+
+impl<'a> gmsol_model::SwapMarket<{ constants::MARKET_DECIMALS }> for RevertibleMarket<'a> {
+    fn swap_impact_params(&self) -> gmsol_model::Result<PriceImpactParams<Factor>> {
+        self.storage.swap_impact_params()
+    }
+
+    fn swap_fee_params(&self) -> gmsol_model::Result<FeeParams<Factor>> {
+        self.storage.swap_fee_params()
     }
 }
 

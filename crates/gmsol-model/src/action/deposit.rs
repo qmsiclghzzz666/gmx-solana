@@ -3,7 +3,7 @@ use num_traits::{CheckedAdd, CheckedMul, CheckedSub, Signed, Zero};
 use crate::{
     market::{
         BaseMarket, BaseMarketExt, BaseMarketMutExt, LiquidityMarket, LiquidityMarketExt,
-        SwapMarketExt,
+        SwapMarketMutExt,
     },
     num::{MulDiv, UnsignedAbs},
     params::Fees,

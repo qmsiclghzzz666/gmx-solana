@@ -383,7 +383,9 @@ impl<'a> gmsol_model::SwapMarket<{ constants::MARKET_DECIMALS }> for RevertibleP
     fn swap_fee_params(&self) -> gmsol_model::Result<gmsol_model::params::FeeParams<Self::Num>> {
         self.market.swap_fee_params()
     }
+}
 
+impl<'a> gmsol_model::SwapMarketMut<{ constants::MARKET_DECIMALS }> for RevertiblePerpMarket<'a> {
     fn swap_impact_pool_mut(&mut self) -> gmsol_model::Result<&mut Self::Pool> {
         Ok(&mut self.pools.swap_impact)
     }

@@ -14,7 +14,7 @@ use crate::{
     },
     pool::{Balance, Pool},
     position::Position,
-    BaseMarketMut, PositionMut, PositionState, PositionStateMut,
+    BaseMarketMut, PositionMut, PositionState, PositionStateMut, SwapMarketMut,
 };
 use num_traits::{CheckedSub, Signed};
 
@@ -391,7 +391,13 @@ where
     fn swap_fee_params(&self) -> crate::Result<FeeParams<Self::Num>> {
         Ok(self.swap_fee_params.clone())
     }
+}
 
+impl<T, const DECIMALS: u8> SwapMarketMut<DECIMALS> for TestMarket<T, DECIMALS>
+where
+    T: CheckedSub + fmt::Display + FixedPointOps<DECIMALS>,
+    T::Signed: Num + std::fmt::Debug,
+{
     fn swap_impact_pool_mut(&mut self) -> crate::Result<&mut Self::Pool> {
         Ok(&mut self.swap_impact)
     }

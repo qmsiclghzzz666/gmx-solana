@@ -191,7 +191,11 @@ impl<'a, 'info> gmsol_model::SwapMarket<{ constants::MARKET_DECIMALS }>
     fn swap_fee_params(&self) -> gmsol_model::Result<gmsol_model::params::FeeParams<Self::Num>> {
         self.market.swap_fee_params()
     }
+}
 
+impl<'a, 'info> gmsol_model::SwapMarketMut<{ constants::MARKET_DECIMALS }>
+    for RevertibleLiquidityMarket<'a, 'info>
+{
     fn swap_impact_pool_mut(&mut self) -> gmsol_model::Result<&mut Self::Pool> {
         self.market.swap_impact_pool_mut()
     }

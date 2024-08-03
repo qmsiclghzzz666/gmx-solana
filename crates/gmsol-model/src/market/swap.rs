@@ -4,19 +4,24 @@ use crate::{
     action::{swap::Swap, Prices},
     num::UnsignedAbs,
     params::{FeeParams, PriceImpactParams},
-    Balance, Pool,
+    Balance, BaseMarket, Pool,
 };
 
 use super::BaseMarketMut;
 
 /// A market for swapping tokens.
-pub trait SwapMarket<const DECIMALS: u8>: BaseMarketMut<DECIMALS> {
+pub trait SwapMarket<const DECIMALS: u8>: BaseMarket<DECIMALS> {
     /// Get swap impact params.
     fn swap_impact_params(&self) -> crate::Result<PriceImpactParams<Self::Num>>;
 
     /// Get the swap fee params.
     fn swap_fee_params(&self) -> crate::Result<FeeParams<Self::Num>>;
+}
 
+/// A mutable market for swapping tokens.
+pub trait SwapMarketMut<const DECIMALS: u8>:
+    SwapMarket<DECIMALS> + BaseMarketMut<DECIMALS>
+{
     /// Get the swap impact pool mutably.
     fn swap_impact_pool_mut(&mut self) -> crate::Result<&mut Self::Pool>;
 }
@@ -29,27 +34,16 @@ impl<'a, M: SwapMarket<DECIMALS>, const DECIMALS: u8> SwapMarket<DECIMALS> for &
     fn swap_fee_params(&self) -> crate::Result<FeeParams<Self::Num>> {
         (**self).swap_fee_params()
     }
+}
 
+impl<'a, M: SwapMarketMut<DECIMALS>, const DECIMALS: u8> SwapMarketMut<DECIMALS> for &'a mut M {
     fn swap_impact_pool_mut(&mut self) -> crate::Result<&mut Self::Pool> {
         (**self).swap_impact_pool_mut()
     }
 }
 
-/// Extension trait of [`SwapMarket`].
+/// Extension trait for [`SwapMarket`].
 pub trait SwapMarketExt<const DECIMALS: u8>: SwapMarket<DECIMALS> {
-    /// Create a [`Swap`].
-    fn swap(
-        &mut self,
-        is_token_in_long: bool,
-        token_in_amount: Self::Num,
-        prices: Prices<Self::Num>,
-    ) -> crate::Result<Swap<&mut Self, DECIMALS>>
-    where
-        Self: Sized,
-    {
-        Swap::try_new(self, is_token_in_long, token_in_amount, prices)
-    }
-
     /// Get the swap impact amount with cap.
     fn swap_impact_amount_with_cap(
         &self,
@@ -93,6 +87,24 @@ pub trait SwapMarketExt<const DECIMALS: u8>: SwapMarket<DECIMALS> {
             Ok(Zero::zero())
         }
     }
+}
+
+impl<M: SwapMarket<DECIMALS> + ?Sized, const DECIMALS: u8> SwapMarketExt<DECIMALS> for M {}
+
+/// Extension trait for [`SwapMarketMut`].
+pub trait SwapMarketMutExt<const DECIMALS: u8>: SwapMarketMut<DECIMALS> {
+    /// Create a [`Swap`].
+    fn swap(
+        &mut self,
+        is_token_in_long: bool,
+        token_in_amount: Self::Num,
+        prices: Prices<Self::Num>,
+    ) -> crate::Result<Swap<&mut Self, DECIMALS>>
+    where
+        Self: Sized,
+    {
+        Swap::try_new(self, is_token_in_long, token_in_amount, prices)
+    }
 
     /// Apply a swap impact value to the price impact pool.
     ///
@@ -117,4 +129,4 @@ pub trait SwapMarketExt<const DECIMALS: u8>: SwapMarket<DECIMALS> {
     }
 }
 
-impl<M: SwapMarket<DECIMALS>, const DECIMALS: u8> SwapMarketExt<DECIMALS> for M {}
+impl<M: SwapMarketMut<DECIMALS>, const DECIMALS: u8> SwapMarketMutExt<DECIMALS> for M {}

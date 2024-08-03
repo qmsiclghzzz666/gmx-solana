@@ -18,7 +18,7 @@ pub use self::{
     liquidity::{LiquidityMarket, LiquidityMarketExt},
     perp::{PerpMarket, PerpMarketExt},
     position_impact::{PositionImpactMarket, PositionImpactMarketExt},
-    swap::{SwapMarket, SwapMarketExt},
+    swap::{SwapMarket, SwapMarketExt, SwapMarketMut, SwapMarketMutExt},
 };
 
 #[inline]

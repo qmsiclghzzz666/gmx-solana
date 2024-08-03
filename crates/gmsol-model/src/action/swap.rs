@@ -1,8 +1,8 @@
 use crate::{
-    market::{BaseMarket, BaseMarketExt, BaseMarketMutExt, SwapMarket, SwapMarketExt},
+    market::{BaseMarket, BaseMarketExt, BaseMarketMutExt, SwapMarketMutExt},
     num::{MulDiv, Unsigned},
     params::Fees,
-    BalanceExt, PnlFactorKind, PoolExt,
+    BalanceExt, PnlFactorKind, PoolExt, SwapMarketMut,
 };
 
 use num_traits::{CheckedAdd, CheckedMul, CheckedSub, Signed, Zero};
@@ -107,7 +107,7 @@ impl<T: Unsigned> ReassignedValues<T> {
     }
 }
 
-impl<const DECIMALS: u8, M: SwapMarket<DECIMALS>> Swap<M, DECIMALS> {
+impl<const DECIMALS: u8, M: SwapMarketMut<DECIMALS>> Swap<M, DECIMALS> {
     /// Create a new swap in the given market.
     pub fn try_new(
         market: M,
@@ -291,7 +291,7 @@ impl<const DECIMALS: u8, M: SwapMarket<DECIMALS>> Swap<M, DECIMALS> {
 mod tests {
     use crate::{
         action::Prices,
-        market::{LiquidityMarketExt, SwapMarketExt},
+        market::{LiquidityMarketExt, SwapMarketMutExt},
         pool::Balance,
         test::TestMarket,
         BaseMarket, LiquidityMarket,

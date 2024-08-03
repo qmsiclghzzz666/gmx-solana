@@ -1,4 +1,7 @@
-use gmsol_model::PoolKind;
+use gmsol_model::{
+    params::{FeeParams, PriceImpactParams},
+    PoolKind,
+};
 
 use crate::constants;
 
@@ -81,5 +84,23 @@ impl gmsol_model::BaseMarket<{ constants::MARKET_DECIMALS }> for Market {
 
     fn reserve_factor(&self) -> gmsol_model::Result<Self::Num> {
         Ok(self.config.reserve_factor)
+    }
+}
+
+impl gmsol_model::SwapMarket<{ constants::MARKET_DECIMALS }> for Market {
+    fn swap_impact_params(&self) -> gmsol_model::Result<PriceImpactParams<Self::Num>> {
+        PriceImpactParams::builder()
+            .with_exponent(self.config.swap_impact_exponent)
+            .with_positive_factor(self.config.swap_impact_positive_factor)
+            .with_negative_factor(self.config.swap_impact_negative_factor)
+            .build()
+    }
+
+    fn swap_fee_params(&self) -> gmsol_model::Result<FeeParams<Self::Num>> {
+        Ok(FeeParams::builder()
+            .with_fee_receiver_factor(self.config.swap_fee_receiver_factor)
+            .with_positive_impact_fee_factor(self.config.swap_fee_factor_for_positive_impact)
+            .with_negative_impact_fee_factor(self.config.swap_fee_factor_for_positive_impact)
+            .build())
     }
 }

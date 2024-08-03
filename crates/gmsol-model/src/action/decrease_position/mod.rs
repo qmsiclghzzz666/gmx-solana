@@ -1,7 +1,7 @@
 use num_traits::{CheckedAdd, CheckedSub, Zero};
 
 use crate::{
-    market::{PerpMarket, PerpMarketExt, SwapMarketExt},
+    market::{PerpMarket, PerpMarketExt, SwapMarketMutExt},
     num::{MulDiv, Unsigned},
     params::fee::PositionFees,
     position::{

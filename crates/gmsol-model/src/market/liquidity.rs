@@ -1,9 +1,9 @@
 use crate::action::{deposit::Deposit, withdraw::Withdrawal, Prices};
 
-use super::{get_msg_by_side, BaseMarketExt, SwapMarket};
+use super::{get_msg_by_side, BaseMarketExt, SwapMarketMut};
 
 /// A market for providing liquidity.
-pub trait LiquidityMarket<const DECIMALS: u8>: SwapMarket<DECIMALS> {
+pub trait LiquidityMarket<const DECIMALS: u8>: SwapMarketMut<DECIMALS> {
     /// Get total supply of the market token.
     fn total_supply(&self) -> Self::Num;
 

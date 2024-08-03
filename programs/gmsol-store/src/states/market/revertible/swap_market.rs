@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use gmsol_model::{
     params::{FeeParams, PriceImpactParams},
-    Bank, PoolKind, SwapMarketExt,
+    Bank, PoolKind, SwapMarketMutExt,
 };
 use indexmap::{map::Entry, IndexMap};
 
@@ -69,7 +69,7 @@ impl<'a> SwapMarkets<'a> {
         M: Key
             + HasMarketMeta
             + gmsol_model::Bank<Pubkey, Num = u64>
-            + gmsol_model::SwapMarket<{ constants::MARKET_DECIMALS }, Num = u128>,
+            + gmsol_model::SwapMarketMut<{ constants::MARKET_DECIMALS }, Num = u128>,
     {
         let long_path = params.validated_long_path()?;
         let long_output_amount = token_ins
@@ -241,7 +241,7 @@ impl<'a> SwapMarkets<'a> {
     where
         M: Key
             + gmsol_model::Bank<Pubkey, Num = u64>
-            + gmsol_model::SwapMarket<{ constants::MARKET_DECIMALS }, Num = u128>
+            + gmsol_model::SwapMarketMut<{ constants::MARKET_DECIMALS }, Num = u128>
             + HasMarketMeta,
     {
         require!(
@@ -394,7 +394,7 @@ where
 
 impl<'a, M> SwapDirection<'a, M>
 where
-    M: HasMarketMeta + gmsol_model::SwapMarket<{ constants::MARKET_DECIMALS }, Num = u128>,
+    M: HasMarketMeta + gmsol_model::SwapMarketMut<{ constants::MARKET_DECIMALS }, Num = u128>,
 {
     fn swap_with_current(
         &mut self,
@@ -546,7 +546,9 @@ impl<'a> gmsol_model::SwapMarket<{ constants::MARKET_DECIMALS }> for RevertibleS
     fn swap_fee_params(&self) -> gmsol_model::Result<FeeParams<Self::Num>> {
         self.market.swap_fee_params()
     }
+}
 
+impl<'a> gmsol_model::SwapMarketMut<{ constants::MARKET_DECIMALS }> for RevertibleSwapMarket<'a> {
     fn swap_impact_pool_mut(&mut self) -> gmsol_model::Result<&mut Self::Pool> {
         Ok(&mut self.market.swap_impact)
     }
