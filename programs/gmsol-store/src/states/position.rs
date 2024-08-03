@@ -25,8 +25,8 @@ pub struct Position {
     pub collateral_token: Pubkey,
     /// Position State.
     pub state: PositionState,
-    /// Reserved.
-    reserved: [u8; 128],
+    // /// Reserved.
+    // reserved: [u8; 128],
 }
 
 impl Default for Position {
@@ -126,15 +126,15 @@ pub struct PositionState {
     pub long_token_claimable_funding_amount_per_size: u128,
     /// Short token claimable funding amount per size.
     pub short_token_claimable_funding_amount_per_size: u128,
-    /// Reserved.
-    #[cfg_attr(feature = "serde", serde(skip, default = "default_reserved_state"))]
-    reserved: [u8; 128],
+    // /// Reserved.
+    // #[cfg_attr(feature = "serde", serde(skip, default = "default_reserved_state"))]
+    // reserved: [u8; 128],
 }
 
-#[cfg(feature = "serde")]
-fn default_reserved_state() -> [u8; 128] {
-    [0; 128]
-}
+// #[cfg(feature = "serde")]
+// fn default_reserved_state() -> [u8; 128] {
+//     [0; 128]
+// }
 
 impl gmsol_model::PositionState<{ constants::MARKET_DECIMALS }> for PositionState {
     type Num = u128;
