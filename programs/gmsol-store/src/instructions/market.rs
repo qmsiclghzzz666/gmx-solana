@@ -1,5 +1,5 @@
 use crate::states::{
-    revertible::{Revertible, RevertibleMarket},
+    revertible::{Revertible, RevertibleSwapMarket},
     Factor, HasMarketMeta, ValidateMarketBalances,
 };
 
@@ -569,7 +569,7 @@ pub(crate) fn unchecked_claim_fees_from_market(
     ctx: Context<ClaimFeesFromMarket>,
     token: &Pubkey,
 ) -> gmsol_model::Result<u64> {
-    let mut market = RevertibleMarket::try_from(&ctx.accounts.market)?;
+    let mut market = RevertibleSwapMarket::from_market((&ctx.accounts.market).try_into()?)?;
     let is_long_token = market.market_meta().to_token_side(token)?;
     let pool = market.claimable_fee_pool_mut()?;
 
