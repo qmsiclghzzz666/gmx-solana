@@ -88,13 +88,13 @@ impl<'a, 'info> PositionCutUtils<'a, 'info> {
         let tokens = meta.ordered_tokens();
         let cost = self.prepare_token_accounts()?;
         self.initialize_order(&kind, &meta, &tokens, nonce, controller)?;
-        let (should_remove_position, transfer_out) = self.execute_order(
+        let (should_remove_position, mut transfer_out) = self.execute_order(
             &meta,
             controller,
             recent_timestamp,
             tokens.into_iter().collect(),
         )?;
-        self.process_transfer_out(&meta, controller, &transfer_out)?;
+        self.process_transfer_out(&meta, controller, &mut transfer_out)?;
         self.remove_order(controller)?;
         Ok((cost, should_remove_position))
     }
@@ -345,7 +345,7 @@ impl<'a, 'info> PositionCutUtils<'a, 'info> {
         &self,
         meta: &MarketMeta,
         controller: &ControllerSeeds,
-        transfer_out: &TransferOut,
+        transfer_out: &mut TransferOut,
     ) -> Result<()> {
         // CHECK: the transfer out amounts should have been validated during the execution.
         self.transfer_out_utils(meta)?

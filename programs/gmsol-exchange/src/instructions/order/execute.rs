@@ -118,7 +118,7 @@ pub fn execute_order<'info>(
         // TODO: validate the pre-condition of transferring out before execution.
         let (
             should_remove_position,
-            transfer_out,
+            mut transfer_out,
             final_output_market,
             final_secondary_output_market,
         ) = ctx.accounts.execute(
@@ -129,7 +129,7 @@ pub fn execute_order<'info>(
         )?;
         ctx.accounts.process_transfer_out(
             &controller,
-            &transfer_out,
+            &mut transfer_out,
             final_output_market,
             final_secondary_output_market,
         )?;
@@ -416,7 +416,7 @@ impl<'info> ExecuteOrder<'info> {
     fn process_transfer_out(
         &self,
         controller: &ControllerSeeds,
-        transfer_out: &TransferOut,
+        transfer_out: &mut TransferOut,
         final_output_market: AccountInfo<'info>,
         final_secondary_output_market: AccountInfo<'info>,
     ) -> Result<()> {
