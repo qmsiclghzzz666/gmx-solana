@@ -348,6 +348,15 @@ impl Market {
     pub fn prices(&self, oracle: &Oracle) -> Result<Prices<u128>> {
         oracle.market_prices(self)
     }
+
+    /// Get max pool value for deposit.
+    pub fn max_pool_value_for_deposit(&self, is_long_token: bool) -> gmsol_model::Result<Factor> {
+        if is_long_token {
+            Ok(self.config.max_pool_value_for_deposit_for_long_token)
+        } else {
+            Ok(self.config.max_pool_value_for_deposit_for_short_token)
+        }
+    }
 }
 
 /// Market Flags.

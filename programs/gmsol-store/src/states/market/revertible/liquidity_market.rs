@@ -209,19 +209,7 @@ impl<'a, 'info> gmsol_model::LiquidityMarket<{ constants::MARKET_DECIMALS }>
     }
 
     fn max_pool_value_for_deposit(&self, is_long_token: bool) -> gmsol_model::Result<Self::Num> {
-        if is_long_token {
-            Ok(self
-                .market
-                .market
-                .config()
-                .max_pool_value_for_deposit_for_long_token)
-        } else {
-            Ok(self
-                .market
-                .market
-                .config()
-                .max_pool_value_for_deposit_for_short_token)
-        }
+        self.market.market.max_pool_value_for_deposit(is_long_token)
     }
 
     fn mint(&mut self, amount: &Self::Num) -> gmsol_model::Result<()> {

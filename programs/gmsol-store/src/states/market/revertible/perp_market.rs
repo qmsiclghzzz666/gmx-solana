@@ -424,16 +424,69 @@ impl<'a> gmsol_model::PositionImpactMarketMut<{ constants::MARKET_DECIMALS }>
 }
 
 impl<'a> gmsol_model::PerpMarket<{ constants::MARKET_DECIMALS }> for RevertiblePerpMarket<'a> {
+    fn funding_factor_per_second(&self) -> &Self::Signed {
+        &self.state.funding_factor_per_second
+    }
+
+    fn borrowing_factor_pool(&self) -> gmsol_model::Result<&Self::Pool> {
+        Ok(&self.pools.borrowing_factor)
+    }
+
+    fn funding_amount_per_size_pool(&self, is_long: bool) -> gmsol_model::Result<&Self::Pool> {
+        if is_long {
+            Ok(&self.pools.funding_amount_per_size.0)
+        } else {
+            Ok(&self.pools.funding_amount_per_size.1)
+        }
+    }
+
+    fn claimable_funding_amount_per_size_pool(
+        &self,
+        is_long: bool,
+    ) -> gmsol_model::Result<&Self::Pool> {
+        if is_long {
+            Ok(&self.pools.claimable_funding_amount_per_size.0)
+        } else {
+            Ok(&self.pools.claimable_funding_amount_per_size.1)
+        }
+    }
+
+    fn borrowing_fee_params(&self) -> gmsol_model::Result<BorrowingFeeParams<Self::Num>> {
+        self.market.borrowing_fee_params()
+    }
+
+    fn funding_amount_per_size_adjustment(&self) -> Self::Num {
+        self.market.funding_amount_per_size_adjustment()
+    }
+
+    fn funding_fee_params(&self) -> gmsol_model::Result<FundingFeeParams<Self::Num>> {
+        self.market.funding_fee_params()
+    }
+
+    fn position_params(&self) -> gmsol_model::Result<PositionParams<Self::Num>> {
+        self.market.position_params()
+    }
+
+    fn order_fee_params(&self) -> gmsol_model::Result<FeeParams<Self::Num>> {
+        self.market.order_fee_params()
+    }
+
+    fn open_interest_reserve_factor(&self) -> gmsol_model::Result<Self::Num> {
+        self.market.open_interest_reserve_factor()
+    }
+
+    fn max_open_interest(&self, is_long: bool) -> gmsol_model::Result<Self::Num> {
+        self.market.max_open_interest(is_long)
+    }
+}
+
+impl<'a> gmsol_model::PerpMarketMut<{ constants::MARKET_DECIMALS }> for RevertiblePerpMarket<'a> {
     fn just_passed_in_seconds_for_borrowing(&mut self) -> gmsol_model::Result<u64> {
         AsClock::from(&mut self.clocks.borrowing_clock).just_passed_in_seconds()
     }
 
     fn just_passed_in_seconds_for_funding(&mut self) -> gmsol_model::Result<u64> {
         AsClock::from(&mut self.clocks.funding_clock).just_passed_in_seconds()
-    }
-
-    fn funding_factor_per_second(&self) -> &Self::Signed {
-        &self.state.funding_factor_per_second
     }
 
     fn funding_factor_per_second_mut(&mut self) -> &mut Self::Signed {
@@ -459,20 +512,8 @@ impl<'a> gmsol_model::PerpMarket<{ constants::MARKET_DECIMALS }> for RevertibleP
         }
     }
 
-    fn borrowing_factor_pool(&self) -> gmsol_model::Result<&Self::Pool> {
-        Ok(&self.pools.borrowing_factor)
-    }
-
     fn borrowing_factor_pool_mut(&mut self) -> gmsol_model::Result<&mut Self::Pool> {
         Ok(&mut self.pools.borrowing_factor)
-    }
-
-    fn funding_amount_per_size_pool(&self, is_long: bool) -> gmsol_model::Result<&Self::Pool> {
-        if is_long {
-            Ok(&self.pools.funding_amount_per_size.0)
-        } else {
-            Ok(&self.pools.funding_amount_per_size.1)
-        }
     }
 
     fn funding_amount_per_size_pool_mut(
@@ -486,17 +527,6 @@ impl<'a> gmsol_model::PerpMarket<{ constants::MARKET_DECIMALS }> for RevertibleP
         }
     }
 
-    fn claimable_funding_amount_per_size_pool(
-        &self,
-        is_long: bool,
-    ) -> gmsol_model::Result<&Self::Pool> {
-        if is_long {
-            Ok(&self.pools.claimable_funding_amount_per_size.0)
-        } else {
-            Ok(&self.pools.claimable_funding_amount_per_size.1)
-        }
-    }
-
     fn claimable_funding_amount_per_size_pool_mut(
         &mut self,
         is_long: bool,
@@ -505,38 +535,6 @@ impl<'a> gmsol_model::PerpMarket<{ constants::MARKET_DECIMALS }> for RevertibleP
             Ok(&mut self.pools.claimable_funding_amount_per_size.0)
         } else {
             Ok(&mut self.pools.claimable_funding_amount_per_size.1)
-        }
-    }
-
-    fn borrowing_fee_params(&self) -> gmsol_model::Result<BorrowingFeeParams<Self::Num>> {
-        self.market.borrowing_fee_params()
-    }
-
-    fn funding_amount_per_size_adjustment(&self) -> Self::Num {
-        self.market.funding_amount_per_size_adjustment()
-    }
-
-    fn funding_fee_params(&self) -> gmsol_model::Result<FundingFeeParams<Self::Num>> {
-        self.market.funding_fee_params()
-    }
-
-    fn position_params(&self) -> gmsol_model::Result<PositionParams<Self::Num>> {
-        self.market.position_params()
-    }
-
-    fn order_fee_params(&self) -> gmsol_model::Result<FeeParams<Self::Num>> {
-        self.market.order_fee_params()
-    }
-
-    fn open_interest_reserve_factor(&self) -> gmsol_model::Result<Self::Num> {
-        Ok(self.market.config().open_interest_reserve_factor)
-    }
-
-    fn max_open_interest(&self, is_long: bool) -> gmsol_model::Result<Self::Num> {
-        if is_long {
-            Ok(self.market.config().max_open_interest_for_long)
-        } else {
-            Ok(self.market.config().max_open_interest_for_short)
         }
     }
 }

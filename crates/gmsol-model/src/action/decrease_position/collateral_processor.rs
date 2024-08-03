@@ -2,9 +2,10 @@ use std::ops::{Deref, DerefMut};
 
 use crate::{
     action::Prices,
-    market::{BaseMarket, BaseMarketMutExt, PerpMarket, PositionImpactMarketMutExt},
+    market::{BaseMarket, BaseMarketMutExt, PositionImpactMarketMutExt},
     num::{MulDiv, Num, Unsigned, UnsignedAbs},
     params::fee::{FundingFees, PositionFees},
+    PerpMarketMut,
 };
 
 use num_traits::{CheckedAdd, Signed, Zero};
@@ -237,7 +238,7 @@ where
 
 impl<'a, M, const DECIMALS: u8> CollateralProcessor<'a, M, DECIMALS>
 where
-    M: PerpMarket<DECIMALS>,
+    M: PerpMarketMut<DECIMALS>,
 {
     pub(super) fn new(
         market: &'a mut M,
@@ -375,7 +376,7 @@ where
 
 impl<'a, 'market, M, const DECIMALS: u8> Context<'a, 'market, M, DECIMALS>
 where
-    M: PerpMarket<DECIMALS>,
+    M: PerpMarketMut<DECIMALS>,
 {
     pub(super) fn add_pnl_if_positive(&mut self, pnl: &M::Signed) -> crate::Result<&mut Self> {
         if pnl.is_positive() {

@@ -2,10 +2,10 @@ use num_traits::Zero;
 
 use crate::{
     fixed::FixedPointOps,
-    market::{BaseMarket, BaseMarketExt, PerpMarket, PerpMarketExt},
+    market::{BaseMarket, BaseMarketExt, PerpMarketMutExt},
     num::{MulDiv, Unsigned},
     params::fee::FundingRateChangeType,
-    Balance, BalanceExt,
+    Balance, BalanceExt, PerpMarketMut,
 };
 
 use super::Prices;
@@ -17,7 +17,7 @@ pub struct UpdateFundingState<M: BaseMarket<DECIMALS>, const DECIMALS: u8> {
     prices: Prices<M::Num>,
 }
 
-impl<M: PerpMarket<DECIMALS>, const DECIMALS: u8> UpdateFundingState<M, DECIMALS> {
+impl<M: PerpMarketMut<DECIMALS>, const DECIMALS: u8> UpdateFundingState<M, DECIMALS> {
     /// Create a new [`UpdateFundingState`] action.
     pub fn try_new(market: M, prices: &Prices<M::Num>) -> crate::Result<Self> {
         prices.validate()?;

@@ -1,9 +1,9 @@
 use num_traits::{CheckedAdd, Zero};
 
 use crate::{
-    market::{BaseMarket, BaseMarketExt, PerpMarket, PerpMarketExt},
+    market::{BaseMarket, BaseMarketExt, PerpMarketExt},
     num::Unsigned,
-    Balance, PoolExt,
+    Balance, PerpMarketMut, PoolExt,
 };
 
 use super::Prices;
@@ -15,7 +15,7 @@ pub struct UpdateBorrowingState<M: BaseMarket<DECIMALS>, const DECIMALS: u8> {
     prices: Prices<M::Num>,
 }
 
-impl<M: PerpMarket<DECIMALS>, const DECIMALS: u8> UpdateBorrowingState<M, DECIMALS> {
+impl<M: PerpMarketMut<DECIMALS>, const DECIMALS: u8> UpdateBorrowingState<M, DECIMALS> {
     /// Create a new [`UpdateBorrowingState`] action.
     pub fn try_new(market: M, prices: &Prices<M::Num>) -> crate::Result<Self> {
         prices.validate()?;

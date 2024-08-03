@@ -13,7 +13,7 @@ use crate::{
     },
     num::{MulDiv, Num, Unsigned, UnsignedAbs},
     params::fee::{FundingFees, PositionFees},
-    Balance, BalanceExt, PnlFactorKind, Pool,
+    Balance, BalanceExt, PerpMarketMut, PnlFactorKind, Pool,
 };
 
 /// Read-only access to the position state.
@@ -675,7 +675,10 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
 impl<const DECIMALS: u8, P: Position<DECIMALS>> PositionExt<DECIMALS> for P {}
 
 /// Extension trait for [`PositionMut`] with utils.
-pub trait PositionMutExt<const DECIMALS: u8>: PositionMut<DECIMALS> {
+pub trait PositionMutExt<const DECIMALS: u8>: PositionMut<DECIMALS>
+where
+    Self::Market: PerpMarketMut<DECIMALS, Num = Self::Num, Signed = Self::Signed>,
+{
     /// Create an action to increase the position.
     fn increase(
         &mut self,
@@ -763,7 +766,10 @@ pub trait PositionMutExt<const DECIMALS: u8>: PositionMut<DECIMALS> {
     }
 }
 
-impl<const DECIMALS: u8, P: PositionMut<DECIMALS>> PositionMutExt<DECIMALS> for P {}
+impl<const DECIMALS: u8, P: PositionMut<DECIMALS>> PositionMutExt<DECIMALS> for P where
+    P::Market: PerpMarketMut<DECIMALS, Num = Self::Num, Signed = Self::Signed>
+{
+}
 
 /// Collateral Delta Values.
 #[allow(unused)]

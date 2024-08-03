@@ -14,8 +14,8 @@ use crate::{
     },
     pool::{Balance, Pool},
     position::Position,
-    BaseMarketMut, PositionImpactMarketMut, PositionMut, PositionState, PositionStateMut,
-    SwapMarketMut,
+    BaseMarketMut, PerpMarketMut, PositionImpactMarketMut, PositionMut, PositionState,
+    PositionStateMut, SwapMarketMut,
 };
 use num_traits::{CheckedSub, Signed};
 
@@ -477,29 +477,6 @@ where
         &self.funding_factor_per_second
     }
 
-    fn funding_factor_per_second_mut(&mut self) -> &mut Self::Signed {
-        &mut self.funding_factor_per_second
-    }
-
-    fn open_interest_pool_mut(&mut self, is_long: bool) -> crate::Result<&mut Self::Pool> {
-        if is_long {
-            Ok(&mut self.open_interest.0)
-        } else {
-            Ok(&mut self.open_interest.1)
-        }
-    }
-
-    fn open_interest_in_tokens_pool_mut(
-        &mut self,
-        is_long: bool,
-    ) -> crate::Result<&mut Self::Pool> {
-        if is_long {
-            Ok(&mut self.open_interest_in_tokens.0)
-        } else {
-            Ok(&mut self.open_interest_in_tokens.1)
-        }
-    }
-
     fn borrowing_fee_params(&self) -> crate::Result<BorrowingFeeParams<Self::Num>> {
         Ok(self.borrowing_fee_params.clone())
     }
@@ -508,38 +485,12 @@ where
         Ok(&self.borrowing_factor)
     }
 
-    fn borrowing_factor_pool_mut(&mut self) -> crate::Result<&mut Self::Pool> {
-        Ok(&mut self.borrowing_factor)
-    }
-
     fn funding_amount_per_size_adjustment(&self) -> Self::Num {
         self.funding_amount_per_size_adjustment.clone()
     }
 
     fn funding_fee_params(&self) -> crate::Result<FundingFeeParams<Self::Num>> {
         Ok(self.funding_fee_params.clone())
-    }
-
-    fn funding_amount_per_size_pool_mut(
-        &mut self,
-        is_long: bool,
-    ) -> crate::Result<&mut Self::Pool> {
-        if is_long {
-            Ok(&mut self.funding_amount_per_size.0)
-        } else {
-            Ok(&mut self.funding_amount_per_size.1)
-        }
-    }
-
-    fn claimable_funding_amount_per_size_pool_mut(
-        &mut self,
-        is_long: bool,
-    ) -> crate::Result<&mut Self::Pool> {
-        if is_long {
-            Ok(&mut self.claimable_funding_amount_per_size.0)
-        } else {
-            Ok(&mut self.claimable_funding_amount_per_size.1)
-        }
     }
 
     fn funding_amount_per_size_pool(&self, is_long: bool) -> crate::Result<&Self::Pool> {
@@ -572,6 +523,61 @@ where
 
     fn max_open_interest(&self, _is_long: bool) -> crate::Result<Self::Num> {
         Ok(self.max_open_interest.clone())
+    }
+}
+
+impl<T, const DECIMALS: u8> PerpMarketMut<DECIMALS> for TestMarket<T, DECIMALS>
+where
+    T: CheckedSub + fmt::Display + FixedPointOps<DECIMALS>,
+    T::Signed: Num + std::fmt::Debug,
+{
+    fn funding_factor_per_second_mut(&mut self) -> &mut Self::Signed {
+        &mut self.funding_factor_per_second
+    }
+
+    fn open_interest_pool_mut(&mut self, is_long: bool) -> crate::Result<&mut Self::Pool> {
+        if is_long {
+            Ok(&mut self.open_interest.0)
+        } else {
+            Ok(&mut self.open_interest.1)
+        }
+    }
+
+    fn open_interest_in_tokens_pool_mut(
+        &mut self,
+        is_long: bool,
+    ) -> crate::Result<&mut Self::Pool> {
+        if is_long {
+            Ok(&mut self.open_interest_in_tokens.0)
+        } else {
+            Ok(&mut self.open_interest_in_tokens.1)
+        }
+    }
+
+    fn borrowing_factor_pool_mut(&mut self) -> crate::Result<&mut Self::Pool> {
+        Ok(&mut self.borrowing_factor)
+    }
+
+    fn funding_amount_per_size_pool_mut(
+        &mut self,
+        is_long: bool,
+    ) -> crate::Result<&mut Self::Pool> {
+        if is_long {
+            Ok(&mut self.funding_amount_per_size.0)
+        } else {
+            Ok(&mut self.funding_amount_per_size.1)
+        }
+    }
+
+    fn claimable_funding_amount_per_size_pool_mut(
+        &mut self,
+        is_long: bool,
+    ) -> crate::Result<&mut Self::Pool> {
+        if is_long {
+            Ok(&mut self.claimable_funding_amount_per_size.0)
+        } else {
+            Ok(&mut self.claimable_funding_amount_per_size.1)
+        }
     }
 
     fn just_passed_in_seconds_for_borrowing(&mut self) -> crate::Result<u64> {

@@ -8,6 +8,7 @@ use crate::{
         CollateralDelta, Position, PositionExt, PositionMut, PositionMutExt,
         WillCollateralBeSufficient,
     },
+    PerpMarketMut, PerpMarketMutExt,
 };
 
 use self::collateral_processor::{CollateralProcessor, ProcessReport};
@@ -73,7 +74,10 @@ struct ProcessCollateralResult<T: Unsigned> {
     pnl: ProcessedPnl<T::Signed>,
 }
 
-impl<const DECIMALS: u8, P: PositionMut<DECIMALS>> DecreasePosition<P, DECIMALS> {
+impl<const DECIMALS: u8, P: PositionMut<DECIMALS>> DecreasePosition<P, DECIMALS>
+where
+    P::Market: PerpMarketMut<DECIMALS, Num = P::Num, Signed = P::Signed>,
+{
     /// Create a new action to decrease the given position.
     pub fn try_new(
         position: P,

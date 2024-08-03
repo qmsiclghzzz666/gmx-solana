@@ -2,11 +2,14 @@ use num_traits::{CheckedAdd, CheckedNeg, Signed, Zero};
 use std::fmt;
 
 use crate::{
-    market::{BaseMarketExt, BaseMarketMutExt, PerpMarketExt, PositionImpactMarketMutExt},
+    market::{
+        BaseMarketExt, BaseMarketMutExt, PerpMarketExt, PerpMarketMutExt,
+        PositionImpactMarketMutExt,
+    },
     num::Unsigned,
     params::fee::PositionFees,
     position::{CollateralDelta, Position, PositionExt},
-    PositionMut, PositionMutExt,
+    PerpMarketMut, PositionMut, PositionMutExt,
 };
 
 use super::{
@@ -170,7 +173,10 @@ impl<T: Unsigned> ExecutionParams<T> {
     }
 }
 
-impl<const DECIMALS: u8, P: PositionMut<DECIMALS>> IncreasePosition<P, DECIMALS> {
+impl<const DECIMALS: u8, P: PositionMut<DECIMALS>> IncreasePosition<P, DECIMALS>
+where
+    P::Market: PerpMarketMut<DECIMALS, Num = P::Num, Signed = P::Signed>,
+{
     /// Create a new action to increase the given position.
     pub fn try_new(
         position: P,

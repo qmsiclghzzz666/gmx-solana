@@ -7,12 +7,12 @@ use gmsol_model::{
         position::PositionImpactDistributionParams,
         FeeParams, PositionParams, PriceImpactParams,
     },
-    Balance, ClockKind, PoolKind, PositionImpactMarket,
+    Balance, ClockKind, PerpMarket, PoolKind, PositionImpactMarket,
 };
 
 use crate::{
     constants,
-    states::{Factor, HasMarketMeta, Market, MarketConfig, MarketMeta, MarketState, Pool},
+    states::{Factor, HasMarketMeta, Market, MarketMeta, MarketState, Pool},
     ModelError, StoreError,
 };
 
@@ -241,9 +241,11 @@ impl<'a> RevertibleMarket<'a> {
         (f)(&mut self.storage)
     }
 
-    /// Get market config.
-    pub fn config(&self) -> &MarketConfig {
-        &self.storage.config
+    pub(super) fn max_pool_value_for_deposit(
+        &self,
+        is_long_token: bool,
+    ) -> gmsol_model::Result<Factor> {
+        self.storage.max_pool_value_for_deposit(is_long_token)
     }
 
     /// Get pool from storage.
@@ -272,10 +274,6 @@ impl<'a> RevertibleMarket<'a> {
     /// As a [`SwapMarket`](gmsol_model::SwapMarket).
     pub fn into_swap_market(self) -> Result<RevertibleSwapMarket<'a>> {
         RevertibleSwapMarket::from_market(self)
-    }
-
-    pub(super) fn funding_amount_per_size_adjustment(&self) -> Factor {
-        constants::FUNDING_AMOUNT_PER_SIZE_ADJUSTMENT
     }
 
     /// Get the balance field.
@@ -320,48 +318,31 @@ impl<'a> RevertibleMarket<'a> {
     }
 
     pub(super) fn borrowing_fee_params(&self) -> gmsol_model::Result<BorrowingFeeParams<Factor>> {
-        Ok(BorrowingFeeParams::builder()
-            .receiver_factor(self.config().borrowing_fee_receiver_factor)
-            .factor_for_long(self.config().borrowing_fee_factor_for_long)
-            .factor_for_short(self.config().borrowing_fee_factor_for_short)
-            .exponent_for_long(self.config().borrowing_fee_exponent_for_long)
-            .exponent_for_short(self.config().borrowing_fee_exponent_for_short)
-            .build())
+        self.storage.borrowing_fee_params()
     }
 
     pub(super) fn funding_fee_params(&self) -> gmsol_model::Result<FundingFeeParams<Factor>> {
-        Ok(FundingFeeParams::builder()
-            .exponent(self.config().funding_fee_exponent)
-            .funding_factor(self.config().funding_fee_factor)
-            .max_factor_per_second(self.config().funding_fee_max_factor_per_second)
-            .min_factor_per_second(self.config().funding_fee_min_factor_per_second)
-            .increase_factor_per_second(self.config().funding_fee_increase_factor_per_second)
-            .decrease_factor_per_second(self.config().funding_fee_decrease_factor_per_second)
-            .threshold_for_stable_funding(self.config().funding_fee_threshold_for_stable_funding)
-            .threshold_for_decrease_funding(
-                self.config().funding_fee_threshold_for_decrease_funding,
-            )
-            .build())
+        self.storage.funding_fee_params()
     }
 
     pub(super) fn position_params(&self) -> gmsol_model::Result<PositionParams<Factor>> {
-        // TODO: use min collateral factors for OI.
-        Ok(PositionParams::new(
-            self.config().min_position_size_usd,
-            self.config().min_collateral_value,
-            self.config().min_collateral_factor,
-            self.config().max_positive_position_impact_factor,
-            self.config().max_negative_position_impact_factor,
-            self.config().max_position_impact_factor_for_liquidations,
-        ))
+        self.storage.position_params()
     }
 
     pub(super) fn order_fee_params(&self) -> gmsol_model::Result<FeeParams<Factor>> {
-        Ok(FeeParams::builder()
-            .with_fee_receiver_factor(self.config().order_fee_receiver_factor)
-            .with_positive_impact_fee_factor(self.config().order_fee_factor_for_positive_impact)
-            .with_negative_impact_fee_factor(self.config().order_fee_factor_for_negative_impact)
-            .build())
+        self.storage.order_fee_params()
+    }
+
+    pub(super) fn funding_amount_per_size_adjustment(&self) -> Factor {
+        self.storage.funding_amount_per_size_adjustment()
+    }
+
+    pub(super) fn open_interest_reserve_factor(&self) -> gmsol_model::Result<Factor> {
+        self.storage.open_interest_reserve_factor()
+    }
+
+    pub(super) fn max_open_interest(&self, is_long: bool) -> gmsol_model::Result<Factor> {
+        self.storage.max_open_interest(is_long)
     }
 }
 

@@ -1,5 +1,9 @@
 use gmsol_model::{
-    params::{position::PositionImpactDistributionParams, FeeParams, PriceImpactParams},
+    params::{
+        fee::{BorrowingFeeParams, FundingFeeParams},
+        position::PositionImpactDistributionParams,
+        FeeParams, PositionParams, PriceImpactParams,
+    },
     PoolKind,
 };
 
@@ -127,5 +131,95 @@ impl gmsol_model::PositionImpactMarket<{ constants::MARKET_DECIMALS }> for Marke
             .distribute_factor(config.position_impact_distribute_factor)
             .min_position_impact_pool_amount(config.min_position_impact_pool_amount)
             .build())
+    }
+}
+
+impl gmsol_model::PerpMarket<{ constants::MARKET_DECIMALS }> for Market {
+    fn funding_factor_per_second(&self) -> &Self::Signed {
+        &self.state().funding_factor_per_second
+    }
+
+    fn borrowing_factor_pool(&self) -> gmsol_model::Result<&Self::Pool> {
+        self.try_pool(PoolKind::BorrowingFactor)
+    }
+
+    fn funding_amount_per_size_pool(&self, is_long: bool) -> gmsol_model::Result<&Self::Pool> {
+        let kind = if is_long {
+            PoolKind::FundingAmountPerSizeForLong
+        } else {
+            PoolKind::FundingAmountPerSizeForShort
+        };
+        self.try_pool(kind)
+    }
+
+    fn claimable_funding_amount_per_size_pool(
+        &self,
+        is_long: bool,
+    ) -> gmsol_model::Result<&Self::Pool> {
+        let kind = if is_long {
+            PoolKind::ClaimableFundingAmountPerSizeForLong
+        } else {
+            PoolKind::ClaimableFundingAmountPerSizeForShort
+        };
+        self.try_pool(kind)
+    }
+
+    fn borrowing_fee_params(&self) -> gmsol_model::Result<BorrowingFeeParams<Self::Num>> {
+        Ok(BorrowingFeeParams::builder()
+            .receiver_factor(self.config.borrowing_fee_receiver_factor)
+            .factor_for_long(self.config.borrowing_fee_factor_for_long)
+            .factor_for_short(self.config.borrowing_fee_factor_for_short)
+            .exponent_for_long(self.config.borrowing_fee_exponent_for_long)
+            .exponent_for_short(self.config.borrowing_fee_exponent_for_short)
+            .build())
+    }
+
+    fn funding_amount_per_size_adjustment(&self) -> Self::Num {
+        constants::FUNDING_AMOUNT_PER_SIZE_ADJUSTMENT
+    }
+
+    fn funding_fee_params(&self) -> gmsol_model::Result<FundingFeeParams<Self::Num>> {
+        Ok(FundingFeeParams::builder()
+            .exponent(self.config.funding_fee_exponent)
+            .funding_factor(self.config.funding_fee_factor)
+            .max_factor_per_second(self.config.funding_fee_max_factor_per_second)
+            .min_factor_per_second(self.config.funding_fee_min_factor_per_second)
+            .increase_factor_per_second(self.config.funding_fee_increase_factor_per_second)
+            .decrease_factor_per_second(self.config.funding_fee_decrease_factor_per_second)
+            .threshold_for_stable_funding(self.config.funding_fee_threshold_for_stable_funding)
+            .threshold_for_decrease_funding(self.config.funding_fee_threshold_for_decrease_funding)
+            .build())
+    }
+
+    fn position_params(&self) -> gmsol_model::Result<PositionParams<Self::Num>> {
+        // TODO: use min collateral factors for OI.
+        Ok(PositionParams::new(
+            self.config.min_position_size_usd,
+            self.config.min_collateral_value,
+            self.config.min_collateral_factor,
+            self.config.max_positive_position_impact_factor,
+            self.config.max_negative_position_impact_factor,
+            self.config.max_position_impact_factor_for_liquidations,
+        ))
+    }
+
+    fn order_fee_params(&self) -> gmsol_model::Result<FeeParams<Self::Num>> {
+        Ok(FeeParams::builder()
+            .with_fee_receiver_factor(self.config.order_fee_receiver_factor)
+            .with_positive_impact_fee_factor(self.config.order_fee_factor_for_positive_impact)
+            .with_negative_impact_fee_factor(self.config.order_fee_factor_for_negative_impact)
+            .build())
+    }
+
+    fn open_interest_reserve_factor(&self) -> gmsol_model::Result<Self::Num> {
+        Ok(self.config.open_interest_reserve_factor)
+    }
+
+    fn max_open_interest(&self, is_long: bool) -> gmsol_model::Result<Self::Num> {
+        if is_long {
+            Ok(self.config.max_open_interest_for_long)
+        } else {
+            Ok(self.config.max_open_interest_for_short)
+        }
     }
 }
