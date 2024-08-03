@@ -71,7 +71,7 @@ impl<'info> TransferOutUtils<'info> {
     pub(crate) fn unchecked_process(
         &self,
         controller: &ControllerSeeds,
-        transfer_out: &TransferOut,
+        transfer_out: &mut TransferOut,
     ) -> Result<()> {
         let TransferOut {
             final_output_token,
@@ -86,43 +86,94 @@ impl<'info> TransferOutUtils<'info> {
         } = transfer_out;
 
         if *final_output_token != 0 {
-            // Must have been validated during the execution.
-            self.market_transfer_out(
-                controller,
-                Some(self.final_output_market.clone()),
-                self.final_output_token_vault
-                    .as_ref()
-                    .map(|a| a.to_account_info()),
-                self.final_output_token_account
-                    .as_ref()
-                    .map(|a| a.to_account_info()),
-                *final_output_token,
-            )?;
+            let mut merged = false;
+            if self.final_output_market.key == self.market.key {
+                if same_account(
+                    self.final_output_token_account.as_ref(),
+                    &self.long_token_account,
+                ) {
+                    *long_token = long_token
+                        .checked_add(*final_output_token)
+                        .ok_or(error!(ExchangeError::AmountOverflow))?;
+                    merged = true;
+                } else if same_account(
+                    self.final_output_token_account.as_ref(),
+                    &self.short_token_account,
+                ) {
+                    *short_token = short_token
+                        .checked_add(*final_output_token)
+                        .ok_or(error!(ExchangeError::AmountOverflow))?;
+                    merged = true;
+                }
+            }
+            if !merged {
+                // Must have been validated during the execution.
+                self.market_transfer_out(
+                    controller,
+                    Some(self.final_output_market.clone()),
+                    self.final_output_token_vault
+                        .as_ref()
+                        .map(|a| a.to_account_info()),
+                    self.final_output_token_account
+                        .as_ref()
+                        .map(|a| a.to_account_info()),
+                    *final_output_token,
+                )?;
+            }
         }
 
         if *final_secondary_output_token != 0 {
-            // Must have been validated during the execution.
-            self.market_transfer_out(
-                controller,
-                Some(self.final_secondary_output_market.clone()),
-                self.secondary_output_token_vault
-                    .as_ref()
-                    .map(|a| a.to_account_info()),
-                self.secondary_output_token_account
-                    .as_ref()
-                    .map(|a| a.to_account_info()),
-                *final_secondary_output_token,
-            )?;
+            let mut merged = false;
+            if self.final_secondary_output_market.key == self.market.key {
+                if same_account(
+                    self.secondary_output_token_account.as_ref(),
+                    &self.long_token_account,
+                ) {
+                    *long_token = long_token
+                        .checked_add(*final_secondary_output_token)
+                        .ok_or(error!(ExchangeError::AmountOverflow))?;
+                    merged = true;
+                } else if same_account(
+                    self.secondary_output_token_account.as_ref(),
+                    &self.short_token_account,
+                ) {
+                    *short_token = short_token
+                        .checked_add(*final_secondary_output_token)
+                        .ok_or(error!(ExchangeError::AmountOverflow))?;
+                    merged = true;
+                }
+            }
+
+            if !merged {
+                // Must have been validated during the execution.
+                self.market_transfer_out(
+                    controller,
+                    Some(self.final_secondary_output_market.clone()),
+                    self.secondary_output_token_vault
+                        .as_ref()
+                        .map(|a| a.to_account_info()),
+                    self.secondary_output_token_account
+                        .as_ref()
+                        .map(|a| a.to_account_info()),
+                    *final_secondary_output_token,
+                )?;
+            }
         }
 
         if *long_token != 0 {
-            self.market_transfer_out(
-                controller,
-                Some(self.market.to_account_info()),
-                Some(self.long_token_vault.to_account_info()),
-                Some(self.long_token_account.to_account_info()),
-                *long_token,
-            )?;
+            if same_account(Some(&self.long_token_account), &self.short_token_account) {
+                *short_token = short_token
+                    .checked_add(*long_token)
+                    .ok_or(error!(ExchangeError::AmountOverflow))?;
+            } else {
+                self.market_transfer_out(
+                    controller,
+                    Some(self.market.to_account_info()),
+                    Some(self.long_token_vault.to_account_info()),
+                    Some(self.long_token_account.to_account_info()),
+                    *long_token,
+                )?;
+            }
         }
 
         if *short_token != 0 {
@@ -184,5 +235,12 @@ impl<'info> TransferOutUtils<'info> {
         }
 
         Ok(())
+    }
+}
+
+fn same_account<'info>(account: Option<&AccountInfo<'info>>, other: &AccountInfo<'info>) -> bool {
+    match account {
+        Some(account) => account.key == other.key,
+        None => false,
     }
 }
