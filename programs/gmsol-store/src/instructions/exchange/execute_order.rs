@@ -4,7 +4,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token, TokenAccount};
 use gmsol_model::{
     action::Prices, num::Unsigned, BaseMarket, BaseMarketExt, PnlFactorKind, Position as _,
-    PositionImpactMarketExt, PositionMut, PositionMutExt, PositionState, PositionStateExt,
+    PositionImpactMarketMutExt, PositionMut, PositionMutExt, PositionState, PositionStateExt,
 };
 
 use crate::{

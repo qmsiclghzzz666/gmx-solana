@@ -1,5 +1,5 @@
 use gmsol_model::{
-    params::{FeeParams, PriceImpactParams},
+    params::{position::PositionImpactDistributionParams, FeeParams, PriceImpactParams},
     PoolKind,
 };
 
@@ -101,6 +101,31 @@ impl gmsol_model::SwapMarket<{ constants::MARKET_DECIMALS }> for Market {
             .with_fee_receiver_factor(self.config.swap_fee_receiver_factor)
             .with_positive_impact_fee_factor(self.config.swap_fee_factor_for_positive_impact)
             .with_negative_impact_fee_factor(self.config.swap_fee_factor_for_positive_impact)
+            .build())
+    }
+}
+
+impl gmsol_model::PositionImpactMarket<{ constants::MARKET_DECIMALS }> for Market {
+    fn position_impact_pool(&self) -> gmsol_model::Result<&Self::Pool> {
+        self.try_pool(PoolKind::PositionImpact)
+    }
+
+    fn position_impact_params(&self) -> gmsol_model::Result<PriceImpactParams<Self::Num>> {
+        let config = &self.config;
+        PriceImpactParams::builder()
+            .with_exponent(config.position_impact_exponent)
+            .with_positive_factor(config.position_impact_positive_factor)
+            .with_negative_factor(config.position_impact_negative_factor)
+            .build()
+    }
+
+    fn position_impact_distribution_params(
+        &self,
+    ) -> gmsol_model::Result<PositionImpactDistributionParams<Self::Num>> {
+        let config = &self.config;
+        Ok(PositionImpactDistributionParams::builder()
+            .distribute_factor(config.position_impact_distribute_factor)
+            .min_position_impact_pool_amount(config.min_position_impact_pool_amount)
             .build())
     }
 }

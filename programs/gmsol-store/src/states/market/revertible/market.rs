@@ -7,7 +7,7 @@ use gmsol_model::{
         position::PositionImpactDistributionParams,
         FeeParams, PositionParams, PriceImpactParams,
     },
-    Balance, ClockKind, PoolKind,
+    Balance, ClockKind, PoolKind, PositionImpactMarket,
 };
 
 use crate::{
@@ -310,22 +310,13 @@ impl<'a> RevertibleMarket<'a> {
     }
 
     pub(super) fn position_impact_params(&self) -> gmsol_model::Result<PriceImpactParams<Factor>> {
-        let config = self.config();
-        PriceImpactParams::builder()
-            .with_exponent(config.position_impact_exponent)
-            .with_positive_factor(config.position_impact_positive_factor)
-            .with_negative_factor(config.position_impact_negative_factor)
-            .build()
+        self.storage.position_impact_params()
     }
 
     pub(super) fn position_impact_distribution_params(
         &self,
     ) -> gmsol_model::Result<PositionImpactDistributionParams<Factor>> {
-        let config = self.config();
-        Ok(PositionImpactDistributionParams::builder()
-            .distribute_factor(config.position_impact_distribute_factor)
-            .min_position_impact_pool_amount(config.min_position_impact_pool_amount)
-            .build())
+        self.storage.position_impact_distribution_params()
     }
 
     pub(super) fn borrowing_fee_params(&self) -> gmsol_model::Result<BorrowingFeeParams<Factor>> {

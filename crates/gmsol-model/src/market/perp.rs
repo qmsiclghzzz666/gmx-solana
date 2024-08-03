@@ -7,14 +7,14 @@ use crate::{
         fee::{BorrowingFeeParams, FundingFeeParams},
         FeeParams, PositionParams,
     },
-    BalanceExt, PoolExt, SwapMarketMut,
+    BalanceExt, PoolExt, PositionImpactMarketMut, SwapMarketMut,
 };
 
-use super::{BaseMarketExt, PositionImpactMarket};
+use super::BaseMarketExt;
 
 /// A perpetual market.
 pub trait PerpMarket<const DECIMALS: u8>:
-    SwapMarketMut<DECIMALS> + PositionImpactMarket<DECIMALS>
+    SwapMarketMut<DECIMALS> + PositionImpactMarketMut<DECIMALS>
 {
     /// Get the just passed time in seconds for the given kind of clock.
     fn just_passed_in_seconds_for_borrowing(&mut self) -> crate::Result<u64>;

@@ -14,7 +14,8 @@ use crate::{
     },
     pool::{Balance, Pool},
     position::Position,
-    BaseMarketMut, PositionMut, PositionState, PositionStateMut, SwapMarketMut,
+    BaseMarketMut, PositionImpactMarketMut, PositionMut, PositionState, PositionStateMut,
+    SwapMarketMut,
 };
 use num_traits::{CheckedSub, Signed};
 
@@ -442,14 +443,6 @@ where
         Ok(&self.position_impact)
     }
 
-    fn position_impact_pool_mut(&mut self) -> crate::Result<&mut Self::Pool> {
-        Ok(&mut self.position_impact)
-    }
-
-    fn just_passed_in_seconds_for_position_impact_distribution(&mut self) -> crate::Result<u64> {
-        self.just_passed_in_seconds(ClockKind::PriceImpactDistribution)
-    }
-
     fn position_impact_params(&self) -> crate::Result<PriceImpactParams<Self::Num>> {
         Ok(self.position_impact_params.clone())
     }
@@ -458,6 +451,20 @@ where
         &self,
     ) -> crate::Result<PositionImpactDistributionParams<Self::Num>> {
         Ok(self.position_impact_distribution_params.clone())
+    }
+}
+
+impl<T, const DECIMALS: u8> PositionImpactMarketMut<DECIMALS> for TestMarket<T, DECIMALS>
+where
+    T: CheckedSub + fmt::Display + FixedPointOps<DECIMALS>,
+    T::Signed: Num + std::fmt::Debug,
+{
+    fn position_impact_pool_mut(&mut self) -> crate::Result<&mut Self::Pool> {
+        Ok(&mut self.position_impact)
+    }
+
+    fn just_passed_in_seconds_for_position_impact_distribution(&mut self) -> crate::Result<u64> {
+        self.just_passed_in_seconds(ClockKind::PriceImpactDistribution)
     }
 }
 

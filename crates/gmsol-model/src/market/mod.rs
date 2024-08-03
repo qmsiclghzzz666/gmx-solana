@@ -17,7 +17,10 @@ pub use self::{
     base::{BaseMarket, BaseMarketExt, BaseMarketMut, BaseMarketMutExt, PnlFactorKind},
     liquidity::{LiquidityMarket, LiquidityMarketExt},
     perp::{PerpMarket, PerpMarketExt},
-    position_impact::{PositionImpactMarket, PositionImpactMarketExt},
+    position_impact::{
+        PositionImpactMarket, PositionImpactMarketExt, PositionImpactMarketMut,
+        PositionImpactMarketMutExt,
+    },
     swap::{SwapMarket, SwapMarketExt, SwapMarketMut, SwapMarketMutExt},
 };
 

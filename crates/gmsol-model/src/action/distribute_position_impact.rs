@@ -1,7 +1,7 @@
 use num_traits::{CheckedSub, FromPrimitive, Zero};
 
 use crate::{
-    market::{BaseMarket, PositionImpactMarket, PositionImpactMarketExt},
+    market::{BaseMarket, PositionImpactMarketMut, PositionImpactMarketMutExt},
     num::Unsigned,
 };
 
@@ -36,7 +36,9 @@ impl<T> DistributePositionImpactReport<T> {
     }
 }
 
-impl<M: PositionImpactMarket<DECIMALS>, const DECIMALS: u8> DistributePositionImpact<M, DECIMALS> {
+impl<M: PositionImpactMarketMut<DECIMALS>, const DECIMALS: u8>
+    DistributePositionImpact<M, DECIMALS>
+{
     /// Execute.
     pub fn execute(mut self) -> crate::Result<DistributePositionImpactReport<M::Num>> {
         let duration_in_seconds = self

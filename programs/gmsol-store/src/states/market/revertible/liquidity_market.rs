@@ -268,16 +268,6 @@ impl<'a, 'info> gmsol_model::PositionImpactMarket<{ constants::MARKET_DECIMALS }
         Ok(&self.position_impact)
     }
 
-    fn position_impact_pool_mut(&mut self) -> gmsol_model::Result<&mut Self::Pool> {
-        Ok(&mut self.position_impact)
-    }
-
-    fn just_passed_in_seconds_for_position_impact_distribution(
-        &mut self,
-    ) -> gmsol_model::Result<u64> {
-        AsClock::from(&mut self.position_impact_distribution_clock).just_passed_in_seconds()
-    }
-
     fn position_impact_params(&self) -> gmsol_model::Result<PriceImpactParams<Self::Num>> {
         self.market.market.position_impact_params()
     }
@@ -286,6 +276,20 @@ impl<'a, 'info> gmsol_model::PositionImpactMarket<{ constants::MARKET_DECIMALS }
         &self,
     ) -> gmsol_model::Result<PositionImpactDistributionParams<Self::Num>> {
         self.market.market.position_impact_distribution_params()
+    }
+}
+
+impl<'a, 'info> gmsol_model::PositionImpactMarketMut<{ constants::MARKET_DECIMALS }>
+    for RevertibleLiquidityMarket<'a, 'info>
+{
+    fn position_impact_pool_mut(&mut self) -> gmsol_model::Result<&mut Self::Pool> {
+        Ok(&mut self.position_impact)
+    }
+
+    fn just_passed_in_seconds_for_position_impact_distribution(
+        &mut self,
+    ) -> gmsol_model::Result<u64> {
+        AsClock::from(&mut self.position_impact_distribution_clock).just_passed_in_seconds()
     }
 }
 
