@@ -12,8 +12,13 @@ pub(super) struct Args {
 
 #[derive(clap::Subcommand)]
 enum Command {
-    /// Turn a non-pure pool into a pure pool.
+    /// Turn an impure pool into a pure pool.
     TurnIntoPurePool {
+        market_token: Pubkey,
+        kind: PoolKind,
+    },
+    /// Turn a pure pool into a impure pool.
+    TurnIntoImpurePool {
         market_token: Pubkey,
         kind: PoolKind,
     },
@@ -34,7 +39,20 @@ impl Args {
                         .build_without_compute_budget(),
                     serialize_only,
                     |signature| {
-                        tracing::info!("turn into pure pool at {signature}");
+                        tracing::info!("turned into pure pool at {signature}");
+                        Ok(())
+                    },
+                )
+                .await?;
+            }
+            Command::TurnIntoImpurePool { market_token, kind } => {
+                crate::utils::send_or_serialize(
+                    client
+                        .turn_into_impure_pool(store, market_token, *kind)
+                        .build_without_compute_budget(),
+                    serialize_only,
+                    |signature| {
+                        tracing::info!("turned into impure pool at {signature}");
                         Ok(())
                     },
                 )

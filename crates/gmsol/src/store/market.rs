@@ -145,8 +145,16 @@ pub trait MarketOps<C> {
         buffer: &Pubkey,
     ) -> RpcBuilder<C>;
 
-    /// Turn a non-pure pool into a pure pool.
+    /// Turn an impure pool into a pure pool.
     fn turn_into_pure_pool(
+        &self,
+        store: &Pubkey,
+        market_token: &Pubkey,
+        kind: PoolKind,
+    ) -> RpcBuilder<C>;
+
+    /// Turn an pure pool into a impure pool.
+    fn turn_into_impure_pool(
         &self,
         store: &Pubkey,
         market_token: &Pubkey,
@@ -282,6 +290,21 @@ where
     ) -> RpcBuilder<C> {
         self.data_store_rpc()
             .args(instruction::TurnIntoPurePool { kind: kind.into() })
+            .accounts(accounts::TurnPureFlag {
+                authority: self.payer(),
+                store: *store,
+                market: self.find_market_address(store, market_token),
+            })
+    }
+
+    fn turn_into_impure_pool(
+        &self,
+        store: &Pubkey,
+        market_token: &Pubkey,
+        kind: PoolKind,
+    ) -> RpcBuilder<C> {
+        self.data_store_rpc()
+            .args(instruction::TurnIntoImpurePool { kind: kind.into() })
             .accounts(accounts::TurnPureFlag {
                 authority: self.payer(),
                 store: *store,
