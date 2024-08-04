@@ -19,7 +19,7 @@ use super::{
 };
 
 /// The compute budget for `liquidate`.
-pub const LIQUIDATE_COMPUTE_BUDGET: u32 = 500_000;
+pub const LIQUIDATE_COMPUTE_BUDGET: u32 = 800_000;
 
 #[cfg(feature = "pyth-pull-oracle")]
 use crate::pyth::pull_oracle::Prices;
