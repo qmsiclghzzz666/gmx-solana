@@ -3,21 +3,18 @@ use std::collections::BTreeSet;
 use anchor_lang::prelude::*;
 use gmsol_store::{
     cpi::{
-        accounts::{
-            ExecuteOrder, GetValidatedMarketMeta, InitializeOrder, PrepareAssociatedTokenAccount,
-            RemoveOrder,
-        },
+        accounts::{ExecuteOrder, InitializeOrder, PrepareAssociatedTokenAccount, RemoveOrder},
         execute_order, initialize_order, prepare_associated_token_account, remove_order,
     },
     states::{
         order::{OrderKind, OrderParams, TransferOut},
-        MarketMeta, NonceBytes, Position, TokenMapHeader, TokenMapLoader,
+        Market, MarketMeta, NonceBytes, Position, TokenMapHeader, TokenMapLoader,
     },
     utils::{WithOracle, WithOracleExt, WithStore},
 };
 
 use crate::{
-    utils::{token_records, ControllerSeeds},
+    utils::{must_be_uninitialized, token_records, ControllerSeeds},
     ExchangeError,
 };
 
@@ -29,7 +26,7 @@ pub(crate) struct PositionCutUtils<'a, 'info> {
     pub(crate) store: AccountInfo<'info>,
     pub(crate) token_map: &'a AccountLoader<'info, TokenMapHeader>,
     pub(crate) oracle: AccountInfo<'info>,
-    pub(crate) market: AccountInfo<'info>,
+    pub(crate) market: &'a AccountLoader<'info, Market>,
     pub(crate) owner: AccountInfo<'info>,
     pub(crate) market_token_mint: AccountInfo<'info>,
     pub(crate) long_token_mint: AccountInfo<'info>,
@@ -234,8 +231,12 @@ impl<'a, 'info> PositionCutUtils<'a, 'info> {
 
     fn prepare_token_accounts(&self) -> Result<u64> {
         let before = self.authority.lamports();
-        prepare_associated_token_account(self.prepare_token_account_ctx(true))?;
-        prepare_associated_token_account(self.prepare_token_account_ctx(false))?;
+        if must_be_uninitialized(&self.long_token_account) {
+            prepare_associated_token_account(self.prepare_token_account_ctx(true))?;
+        }
+        if must_be_uninitialized(&self.short_token_account) {
+            prepare_associated_token_account(self.prepare_token_account_ctx(false))?;
+        }
         let after = self.authority.lamports();
         let cost = before.saturating_sub(after);
         msg!("prepared token accounts, cost = {}", cost);
@@ -272,14 +273,7 @@ impl<'a, 'info> PositionCutUtils<'a, 'info> {
     }
 
     fn get_validated_market_meta(&self) -> Result<MarketMeta> {
-        let ctx = CpiContext::new(
-            self.store_program.to_account_info(),
-            GetValidatedMarketMeta {
-                store: self.store.to_account_info(),
-                market: self.market.to_account_info(),
-            },
-        );
-        let meta = gmsol_store::cpi::get_validated_market_meta(ctx)?.get();
+        let meta = *self.market.load()?.validated_meta(self.store.key)?;
         self.validate_mints(&meta)?;
         Ok(meta)
     }

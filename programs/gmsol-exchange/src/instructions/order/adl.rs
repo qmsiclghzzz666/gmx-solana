@@ -10,7 +10,7 @@ use gmsol_store::{
         get_validated_market_meta, remove_position,
     },
     program::GmsolStore,
-    states::{NonceBytes, Oracle, Position, PriceProvider, Store, TokenMapHeader},
+    states::{Market, NonceBytes, Oracle, Position, PriceProvider, Store, TokenMapHeader},
     utils::{Authentication, WithOracle, WithOracleExt, WithStore},
 };
 
@@ -53,9 +53,8 @@ pub struct AutoDeleverage<'info> {
     /// Buffer for oracle prices.
     #[account(mut)]
     pub oracle: Account<'info, Oracle>,
-    /// CHECK: check by CPI.
     #[account(mut)]
-    pub market: UncheckedAccount<'info>,
+    pub market: AccountLoader<'info, Market>,
     pub market_token_mint: Account<'info, Mint>,
     pub long_token_mint: Account<'info, Mint>,
     pub short_token_mint: Account<'info, Mint>,
@@ -169,7 +168,7 @@ impl<'info> AutoDeleverage<'info> {
             store: self.store.to_account_info(),
             token_map: &self.token_map,
             oracle: self.oracle.to_account_info(),
-            market: self.market.to_account_info(),
+            market: &self.market,
             owner: self.owner.to_account_info(),
             market_token_mint: self.market_token_mint.to_account_info(),
             long_token_mint: self.long_token_mint.to_account_info(),

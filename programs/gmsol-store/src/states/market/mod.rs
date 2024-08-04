@@ -134,6 +134,12 @@ impl Market {
         &self.meta
     }
 
+    /// Get validated meta.
+    pub fn validated_meta(&self, store: &Pubkey) -> Result<&MarketMeta> {
+        self.validate(store)?;
+        Ok(self.meta())
+    }
+
     /// Get name.
     pub fn name(&self) -> Result<&str> {
         bytes_to_fixed_str(&self.name)
