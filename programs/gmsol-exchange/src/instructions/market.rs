@@ -1,13 +1,50 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token};
-use gmsol_store::cpi::accounts::{InitializeMarket, InitializeMarketToken, InitializeMarketVault};
+use gmsol_store::cpi::accounts::{
+    InitializeMarket, InitializeMarketToken, InitializeMarketVault, MarketTransferIn,
+};
+use gmsol_store::cpi::market_transfer_in;
 use gmsol_store::program::GmsolStore;
 use gmsol_store::utils::{Authentication, WithStore};
 
+use crate::states::Controller;
+use crate::utils::ControllerSeeds;
 use crate::ExchangeError;
 
+#[derive(Accounts)]
+#[instruction(index_token_mint: Pubkey)]
+pub struct CreateMarket<'info> {
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    /// CHECK: check by CPI.
+    pub data_store: UncheckedAccount<'info>,
+    /// CHECK: check by CPI.
+    pub token_map: UncheckedAccount<'info>,
+    /// CHECK: check and init by CPI.
+    #[account(mut)]
+    pub market: UncheckedAccount<'info>,
+    /// CHECK: check and init by CPI.
+    #[account(mut)]
+    pub market_token_mint: UncheckedAccount<'info>,
+    pub long_token_mint: Account<'info, Mint>,
+    pub short_token_mint: Account<'info, Mint>,
+    /// CHECK: check and init by CPI.
+    #[account(mut)]
+    pub market_token_vault: UncheckedAccount<'info>,
+    /// CHECK: check and init by CPI.
+    #[account(mut)]
+    pub long_token_vault: UncheckedAccount<'info>,
+    /// CHECK: check and init by CPI.
+    #[account(mut)]
+    pub short_token_vault: UncheckedAccount<'info>,
+    pub data_store_program: Program<'info, GmsolStore>,
+    pub system_program: Program<'info, System>,
+    pub token_program: Program<'info, Token>,
+}
+
 /// Create a new market.
-pub fn create_market(
+/// CHECK: only MARKET_KEEPER can create market.
+pub(crate) fn unchecked_create_market(
     ctx: Context<CreateMarket>,
     name: String,
     index_token_mint: Pubkey,
@@ -47,37 +84,6 @@ enum TokenKind {
     Market,
     Long,
     Short,
-}
-
-#[derive(Accounts)]
-#[instruction(index_token_mint: Pubkey)]
-pub struct CreateMarket<'info> {
-    #[account(mut)]
-    pub authority: Signer<'info>,
-    /// CHECK: check by CPI.
-    pub data_store: UncheckedAccount<'info>,
-    /// CHECK: check by CPI.
-    pub token_map: UncheckedAccount<'info>,
-    /// CHECK: check and init by CPI.
-    #[account(mut)]
-    pub market: UncheckedAccount<'info>,
-    /// CHECK: check and init by CPI.
-    #[account(mut)]
-    pub market_token_mint: UncheckedAccount<'info>,
-    pub long_token_mint: Account<'info, Mint>,
-    pub short_token_mint: Account<'info, Mint>,
-    /// CHECK: check and init by CPI.
-    #[account(mut)]
-    pub market_token_vault: UncheckedAccount<'info>,
-    /// CHECK: check and init by CPI.
-    #[account(mut)]
-    pub long_token_vault: UncheckedAccount<'info>,
-    /// CHECK: check and init by CPI.
-    #[account(mut)]
-    pub short_token_vault: UncheckedAccount<'info>,
-    pub data_store_program: Program<'info, GmsolStore>,
-    pub system_program: Program<'info, System>,
-    pub token_program: Program<'info, Token>,
 }
 
 impl<'info> CreateMarket<'info> {
@@ -158,5 +164,64 @@ impl<'info> WithStore<'info> for CreateMarket<'info> {
 
     fn store(&self) -> AccountInfo<'info> {
         self.data_store.to_account_info()
+    }
+}
+
+/// The accounts definition of [`fund_market`](crate::gmsol_exchange::fund_market).
+#[derive(Accounts)]
+pub struct FundMarket<'info> {
+    /// Payer.
+    pub payer: Signer<'info>,
+    /// Store.
+    /// CHECK: check by CPI.
+    pub store: UncheckedAccount<'info>,
+    /// Controller.
+    #[account(
+        mut,
+        has_one = store,
+        seeds = [
+            crate::constants::CONTROLLER_SEED,
+            store.key().as_ref(),
+        ],
+        bump = controller.load()?.bump,
+    )]
+    pub controller: AccountLoader<'info, Controller>,
+    /// CHECK: check by CPI.
+    #[account(mut)]
+    pub market: UncheckedAccount<'info>,
+    /// CHECK: check by CPI.
+    #[account(mut)]
+    pub vault: UncheckedAccount<'info>,
+    /// CHECK: check by CPI.
+    #[account(mut)]
+    pub source: UncheckedAccount<'info>,
+    /// The token program.
+    pub token_program: Program<'info, Token>,
+    /// The store program.
+    pub store_program: Program<'info, GmsolStore>,
+}
+
+pub(crate) fn fund_market(ctx: Context<FundMarket>, amount: u64) -> Result<()> {
+    let store = ctx.accounts.store.key();
+    let controller = ControllerSeeds::find(&store);
+    let ctx = ctx.accounts.market_transfer_in_ctx();
+    market_transfer_in(ctx.with_signer(&[&controller.as_seeds()]), amount)?;
+    Ok(())
+}
+
+impl<'info> FundMarket<'info> {
+    fn market_transfer_in_ctx(&self) -> CpiContext<'_, '_, '_, 'info, MarketTransferIn<'info>> {
+        CpiContext::new(
+            self.store_program.to_account_info(),
+            MarketTransferIn {
+                authority: self.controller.to_account_info(),
+                store: self.store.to_account_info(),
+                from_authority: self.payer.to_account_info(),
+                market: self.market.to_account_info(),
+                from: self.source.to_account_info(),
+                vault: self.vault.to_account_info(),
+                token_program: self.token_program.to_account_info(),
+            },
+        )
     }
 }
