@@ -397,8 +397,8 @@ where
         let mut report = processor.process(|mut ctx| {
             ctx.add_pnl_if_positive(&base_pnl_usd)?
                 .add_price_impact_if_positive(&price_impact_value)?
-                .pay_for_pnl_if_negative(&base_pnl_usd)?
                 .pay_for_funding_fees(fees.funding_fees())?
+                .pay_for_pnl_if_negative(&base_pnl_usd)?
                 .pay_for_fees_excluding_funding(&mut fees)?
                 .pay_for_price_impact_if_negative(&price_impact_value)?
                 .pay_for_price_impact_diff(&price_impact_diff)?;
