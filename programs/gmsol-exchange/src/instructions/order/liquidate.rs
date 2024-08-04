@@ -7,7 +7,7 @@ use gmsol_store::{
     constants::EVENT_AUTHORITY_SEED,
     cpi::{accounts::RemovePosition, remove_position},
     program::GmsolStore,
-    states::{NonceBytes, Oracle, Position, PriceProvider, Store, TokenMapHeader},
+    states::{Market, NonceBytes, Oracle, Position, PriceProvider, Store, TokenMapHeader},
     utils::{Authentication, WithStore},
 };
 
@@ -50,9 +50,8 @@ pub struct Liquidate<'info> {
     /// Buffer for oracle prices.
     #[account(mut)]
     pub oracle: Account<'info, Oracle>,
-    /// CHECK: only used to invoke CPI and should be checked by it.
     #[account(mut)]
-    pub market: UncheckedAccount<'info>,
+    pub market: AccountLoader<'info, Market>,
     pub market_token_mint: Account<'info, Mint>,
     pub long_token_mint: Account<'info, Mint>,
     pub short_token_mint: Account<'info, Mint>,
@@ -159,7 +158,7 @@ impl<'info> Liquidate<'info> {
             store: self.store.to_account_info(),
             token_map: &self.token_map,
             oracle: self.oracle.to_account_info(),
-            market: self.market.to_account_info(),
+            market: &self.market,
             owner: self.owner.to_account_info(),
             market_token_mint: self.market_token_mint.to_account_info(),
             long_token_mint: self.long_token_mint.to_account_info(),
