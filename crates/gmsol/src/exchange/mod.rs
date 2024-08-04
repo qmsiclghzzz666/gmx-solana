@@ -75,6 +75,16 @@ pub trait ExchangeOps<C> {
         token_map: Option<&Pubkey>,
     ) -> impl Future<Output = crate::Result<(RpcBuilder<C>, Pubkey)>>;
 
+    /// Fund the given market.
+    fn fund_market(
+        &self,
+        store: &Pubkey,
+        market_token: &Pubkey,
+        source_account: &Pubkey,
+        amount: u64,
+        token: Option<&Pubkey>,
+    ) -> impl Future<Output = crate::Result<RpcBuilder<C>>>;
+
     /// Create a deposit.
     fn create_deposit(&self, store: &Pubkey, market_token: &Pubkey) -> CreateDepositBuilder<C>;
 
@@ -366,6 +376,43 @@ where
                 enable,
             });
         Ok((builder, market_token))
+    }
+
+    async fn fund_market(
+        &self,
+        store: &Pubkey,
+        market_token: &Pubkey,
+        source_account: &Pubkey,
+        amount: u64,
+        token: Option<&Pubkey>,
+    ) -> crate::Result<RpcBuilder<C>> {
+        use anchor_spl::token::TokenAccount;
+
+        let token = match token {
+            Some(token) => *token,
+            None => {
+                let account = self
+                    .exchange()
+                    .account::<TokenAccount>(*source_account)
+                    .await?;
+                account.mint
+            }
+        };
+        let vault = self.find_market_vault_address(store, &token);
+        let market = self.find_market_address(store, market_token);
+        Ok(self
+            .exchange_rpc()
+            .args(instruction::FundMarket { amount })
+            .accounts(accounts::FundMarket {
+                payer: self.payer(),
+                store: *store,
+                controller: self.controller_address(store),
+                market,
+                vault,
+                source: *source_account,
+                token_program: anchor_spl::token::ID,
+                store_program: self.store_program_id(),
+            }))
     }
 
     fn create_order(

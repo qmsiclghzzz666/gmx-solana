@@ -67,7 +67,12 @@ pub mod gmsol_exchange {
         index_token_mint: Pubkey,
         enable: bool,
     ) -> Result<()> {
-        instructions::create_market(ctx, name, index_token_mint, enable)
+        instructions::unchecked_create_market(ctx, name, index_token_mint, enable)
+    }
+
+    /// Fund the given market.
+    pub fn fund_market(ctx: Context<FundMarket>, amount: u64) -> Result<()> {
+        instructions::fund_market(ctx, amount)
     }
 
     // Deposit.

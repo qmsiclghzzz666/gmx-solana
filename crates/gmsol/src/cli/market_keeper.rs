@@ -6,6 +6,7 @@ use std::{
 };
 
 use anchor_client::solana_sdk::{pubkey::Pubkey, signature::Keypair, signer::Signer};
+use anchor_spl::associated_token::get_associated_token_address;
 use gmsol::{
     exchange::ExchangeOps,
     store::{
@@ -204,6 +205,17 @@ enum Command {
         #[command(flatten)]
         toggle: Toggle,
     },
+    /// Fund Market.
+    FundMarket {
+        /// The address of the market token of the Market to fund
+        market_token: Pubkey,
+        /// The funding side.
+        #[arg(long)]
+        side: Side,
+        /// The funding amount.
+        #[arg(long, short)]
+        amount: u64,
+    },
 }
 
 #[serde_with::serde_as]
@@ -249,6 +261,12 @@ impl Toggle {
         debug_assert!(self.enable != self.disable);
         self.enable
     }
+}
+
+#[derive(clap::ValueEnum, Clone)]
+enum Side {
+    Long,
+    Short,
 }
 
 impl Args {
@@ -626,6 +644,32 @@ impl Args {
                     serialize_only,
                     |signature| {
                         tracing::info!("set the authority of buffer `{buffer}` to `{new_authority}` at tx {signature}");
+                        Ok(())
+                    },
+                )
+                .await?;
+            }
+            Command::FundMarket {
+                market_token,
+                side,
+                amount,
+            } => {
+                let market = client
+                    .market(&client.find_market_address(store, market_token))
+                    .await?;
+                let token = match side {
+                    Side::Long => market.meta().long_token_mint,
+                    Side::Short => market.meta().short_token_mint,
+                };
+                let source_account = get_associated_token_address(&client.payer(), &token);
+                crate::utils::send_or_serialize(
+                    client
+                        .fund_market(store, market_token, &source_account, *amount, Some(&token))
+                        .await?
+                        .build_without_compute_budget(),
+                    serialize_only,
+                    |signature| {
+                        tracing::info!("funded at tx {signature}");
                         Ok(())
                     },
                 )
