@@ -115,6 +115,11 @@ impl Order {
         self.validate_output_amount(total)?;
         Ok(())
     }
+
+    /// Get the params.
+    pub fn params(&self) -> &OrderParams {
+        &self.fixed.params
+    }
 }
 
 impl Seed for Order {

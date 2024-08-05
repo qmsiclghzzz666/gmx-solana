@@ -194,8 +194,16 @@ pub fn execute_order<'info>(
             return Err(error!(err));
         }
     }
+
+    // Note: Default to `throw_on_execution_error`, and the following code
+    // should never set it to `false`.
+    let mut should_throw_error = throw_on_execution_error;
+
     let prices = ctx.accounts.prices()?;
-    match ctx.accounts.execute(prices, ctx.remaining_accounts) {
+    match ctx
+        .accounts
+        .execute(&mut should_throw_error, prices, ctx.remaining_accounts)
+    {
         Ok((should_remove_position, mut transfer_out, trade_event)) => {
             if let Some(event) = trade_event {
                 emit_cpi!(event);
@@ -203,7 +211,7 @@ pub fn execute_order<'info>(
             transfer_out.executed = true;
             Ok((should_remove_position, transfer_out))
         }
-        Err(err) if !throw_on_execution_error => {
+        Err(err) if !should_throw_error => {
             msg!("Execute order error: {}", err);
             let should_remove_position = ctx
                 .accounts
@@ -309,10 +317,17 @@ impl<'info> ExecuteOrder<'info> {
         Ok(())
     }
 
-    fn validate_order(&self, prices: &Prices<u128>) -> Result<()> {
+    fn validate_order(&self, should_throw_error: &mut bool, prices: &Prices<u128>) -> Result<()> {
         self.validate_non_empty_order()?;
-        self.validate_trigger_price(prices)?;
-        Ok(())
+        match self.validate_trigger_price(prices) {
+            Ok(()) => Ok(()),
+            Err(err) => {
+                if !self.order.params().kind.is_market() {
+                    *should_throw_error = true;
+                }
+                Err(err)
+            }
+        }
     }
 
     fn validate_non_empty_order(&self) -> Result<()> {
@@ -391,11 +406,12 @@ impl<'info> ExecuteOrder<'info> {
     #[inline(never)]
     fn execute(
         &mut self,
+        should_throw_error: &mut bool,
         prices: Prices<u128>,
         remaining_accounts: &'info [AccountInfo<'info>],
     ) -> Result<(ShouldRemovePosition, Box<TransferOut>, Option<TradeEvent>)> {
         self.validate_market()?;
-        self.validate_order(&prices)?;
+        self.validate_order(should_throw_error, &prices)?;
 
         // Prepare execution context.
         let mut market = RevertiblePerpMarket::new(&self.market)?;
@@ -423,6 +439,7 @@ impl<'info> ExecuteOrder<'info> {
         let should_remove_position = match &kind {
             OrderKind::MarketSwap | OrderKind::LimitSwap => {
                 execute_swap(
+                    should_throw_error,
                     &self.oracle,
                     &mut market,
                     &mut swap_markets,
@@ -536,6 +553,7 @@ impl<'info> ExecuteOrder<'info> {
 
 #[inline(never)]
 fn execute_swap(
+    should_throw_error: &mut bool,
     oracle: &Oracle,
     market: &mut RevertiblePerpMarket<'_>,
     swap_markets: &mut SwapMarkets<'_>,
@@ -560,7 +578,12 @@ fn execute_swap(
         )?;
         swap_out_amount
     };
-    order.validate_output_amount(swap_out_amount.into())?;
+    if let Err(err) = order.validate_output_amount(swap_out_amount.into()) {
+        if !order.params().kind.is_market() {
+            *should_throw_error = true;
+        }
+        return Err(err);
+    }
     let is_long = market.market_meta().to_token_side(&swap_out_token)?;
     transfer_out.transfer_out_collateral(
         is_long,
