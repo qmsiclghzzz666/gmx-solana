@@ -134,6 +134,38 @@ enum Command {
         #[arg(long, short)]
         wait: bool,
     },
+    /// Create a limit increase order.
+    LimitIncrease {
+        /// The address of the market token of the position's market.
+        market_token: Pubkey,
+        /// Whether the collateral is long token.
+        #[arg(long)]
+        collateral_side: Side,
+        /// Initial collateral token.
+        #[arg(long, short = 'c')]
+        initial_collateral_token: Option<Pubkey>,
+        /// Initial collateral token account.
+        #[arg(long, requires = "initial_collateral_token")]
+        initial_collateral_token_account: Option<Pubkey>,
+        /// Collateral amount.
+        #[arg(long, short = 'a')]
+        initial_collateral_token_amount: u64,
+        /// Position side.
+        #[arg(long)]
+        side: Side,
+        /// Trigger price (unit price).
+        #[arg(long)]
+        price: u128,
+        /// Position increment size in usd.
+        #[arg(long)]
+        size: u128,
+        /// Swap paths for collateral token.
+        #[arg(long, short, action = clap::ArgAction::Append)]
+        swap: Vec<Pubkey>,
+        /// Whether to wait for the action to be completed.
+        #[arg(long, short)]
+        wait: bool,
+    },
     /// Create a market decrese order.
     MarketDecrease {
         /// The address of the market token of the position's market.
@@ -401,6 +433,40 @@ impl ExchangeArgs {
                 let (request, order) = builder.build_with_address().await?;
                 let signature = request.send().await?;
                 tracing::info!("created market swap order {order} at tx {signature}");
+                println!("{order}");
+            }
+            Command::LimitIncrease {
+                market_token,
+                collateral_side,
+                initial_collateral_token,
+                initial_collateral_token_account,
+                initial_collateral_token_amount,
+                side,
+                price,
+                size,
+                swap,
+                wait,
+            } => {
+                let mut builder = client.limit_increase(
+                    store,
+                    market_token,
+                    side.is_long(),
+                    *size,
+                    *price,
+                    collateral_side.is_long(),
+                    *initial_collateral_token_amount,
+                );
+                if let Some(token) = initial_collateral_token {
+                    builder
+                        .initial_collateral_token(token, initial_collateral_token_account.as_ref());
+                }
+
+                let (request, order) = builder.swap_path(swap.clone()).build_with_address().await?;
+                let signature = request.send().await?;
+                tracing::info!("created a limit increase order {order} at tx {signature}");
+                if *wait {
+                    self.wait_for_order(client, &order).await?;
+                }
                 println!("{order}");
             }
         }

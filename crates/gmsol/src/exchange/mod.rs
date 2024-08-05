@@ -245,6 +245,30 @@ pub trait ExchangeOps<C> {
         builder
     }
 
+    /// Create a limit increase order.
+    #[allow(clippy::too_many_arguments)]
+    fn limit_increase(
+        &self,
+        store: &Pubkey,
+        market_token: &Pubkey,
+        is_long: bool,
+        increment_size_in_usd: u128,
+        price: u128,
+        is_collateral_token_long: bool,
+        initial_collateral_amount: u64,
+    ) -> CreateOrderBuilder<C> {
+        let params = OrderParams {
+            kind: OrderKind::LimitIncrease,
+            min_output_amount: 0,
+            size_delta_usd: increment_size_in_usd,
+            initial_collateral_delta_amount: initial_collateral_amount,
+            acceptable_price: None,
+            trigger_price: Some(price),
+            is_long,
+        };
+        self.create_order(store, market_token, is_collateral_token_long, params)
+    }
+
     /// Liquidate a position.
     fn liquidate(&self, oracle: &Pubkey, position: &Pubkey) -> crate::Result<LiquidateBuilder<C>>;
 }
