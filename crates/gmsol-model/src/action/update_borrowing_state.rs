@@ -56,7 +56,7 @@ impl<M: PerpMarketMut<DECIMALS>, const DECIMALS: u8> UpdateBorrowingState<M, DEC
 
         let pool_value = self
             .market
-            .pool_value(&prices.long_token_price, &prices.short_token_price)?;
+            .pool_value_without_pnl_for_one_side(prices, is_long, false)?;
 
         if pool_value.is_zero() {
             return Err(crate::Error::UnableToGetBorrowingFactorEmptyPoolValue);

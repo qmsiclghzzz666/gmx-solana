@@ -230,7 +230,7 @@ pub trait PerpMarketExt<const DECIMALS: u8>: PerpMarket<DECIMALS> {
         prices: &Prices<Self::Num>,
         is_long: bool,
     ) -> crate::Result<()> {
-        let pool_value = self.pool_value_for_one_side(prices, is_long, false)?;
+        let pool_value = self.pool_value_without_pnl_for_one_side(prices, is_long, false)?;
 
         let max_reserved_value =
             crate::utils::apply_factor(&pool_value, &self.open_interest_reserve_factor()?)

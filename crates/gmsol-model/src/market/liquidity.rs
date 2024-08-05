@@ -68,7 +68,7 @@ pub trait LiquidityMarketExt<const DECIMALS: u8>: LiquidityMarket<DECIMALS> {
         prices: &Prices<Self::Num>,
         is_long_token: bool,
     ) -> crate::Result<()> {
-        let pool_value = self.pool_value_for_one_side(prices, is_long_token, true)?;
+        let pool_value = self.pool_value_without_pnl_for_one_side(prices, is_long_token, true)?;
         let max_pool_value = self.max_pool_value_for_deposit(is_long_token)?;
         if pool_value > max_pool_value {
             Err(crate::Error::MaxPoolValueExceeded(get_msg_by_side(

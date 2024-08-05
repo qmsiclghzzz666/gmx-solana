@@ -122,9 +122,9 @@ impl<'a, M: BaseMarketMut<DECIMALS>, const DECIMALS: u8> BaseMarketMut<DECIMALS>
 
 /// Extension trait for [`BaseMarket`].
 pub trait BaseMarketExt<const DECIMALS: u8>: BaseMarket<DECIMALS> {
-    /// Get the usd value of primary pool for one side.
+    /// Get the usd value of primary pool without pnl for one side.
     #[inline]
-    fn pool_value_for_one_side(
+    fn pool_value_without_pnl_for_one_side(
         &self,
         prices: &Prices<Self::Num>,
         is_long: bool,
@@ -146,6 +146,7 @@ pub trait BaseMarketExt<const DECIMALS: u8>: BaseMarket<DECIMALS> {
         long_token_price: &Self::Num,
         short_token_price: &Self::Num,
     ) -> crate::Result<Self::Num> {
+        // TODO: All pending values should be taken into consideration.
         let long_value = self.liquidity_pool()?.long_usd_value(long_token_price)?;
         let short_value = self.liquidity_pool()?.short_usd_value(short_token_price)?;
         long_value
@@ -215,7 +216,7 @@ pub trait BaseMarketExt<const DECIMALS: u8>: BaseMarket<DECIMALS> {
     ) -> crate::Result<Self::Signed> {
         if pnl.is_positive() {
             let max_pnl_factor = self.pnl_factor_config(kind, is_long)?;
-            let pool_value = self.pool_value_for_one_side(prices, is_long, false)?;
+            let pool_value = self.pool_value_without_pnl_for_one_side(prices, is_long, false)?;
             let max_pnl = crate::utils::apply_factor(&pool_value, &max_pnl_factor)
                 .ok_or(crate::Error::Computation("calculating max pnl"))?
                 .to_signed()?;
@@ -236,7 +237,7 @@ pub trait BaseMarketExt<const DECIMALS: u8>: BaseMarket<DECIMALS> {
         is_long: bool,
         maximize: bool,
     ) -> crate::Result<Self::Signed> {
-        let pool_value = self.pool_value_for_one_side(prices, is_long, !maximize)?;
+        let pool_value = self.pool_value_without_pnl_for_one_side(prices, is_long, !maximize)?;
         let pnl = self.pnl(&prices.index_token_price, is_long, maximize)?;
         crate::utils::div_to_factor_signed(&pnl, &pool_value)
             .ok_or(crate::Error::Computation("calculating pnl factor"))
@@ -319,7 +320,7 @@ pub trait BaseMarketExt<const DECIMALS: u8>: BaseMarket<DECIMALS> {
 
     /// Validate reserve.
     fn validate_reserve(&self, prices: &Prices<Self::Num>, is_long: bool) -> crate::Result<()> {
-        let pool_value = self.pool_value_for_one_side(prices, is_long, false)?;
+        let pool_value = self.pool_value_without_pnl_for_one_side(prices, is_long, false)?;
 
         let max_reserved_value =
             crate::utils::apply_factor(&pool_value, &self.reserve_factor()?)
