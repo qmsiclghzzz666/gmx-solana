@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, num::NonZeroUsize};
 
 use anchor_client::{
     anchor_lang::{AnchorDeserialize, Discriminator},
@@ -111,8 +111,8 @@ enum Command {
     /// `Order` account.
     Order {
         address: Pubkey,
-        #[arg(long)]
-        event: bool,
+        #[arg(long, value_name = "LIMIT")]
+        event: Option<Option<NonZeroUsize>>,
     },
     /// `Position` account.
     Position {
@@ -568,8 +568,18 @@ impl InspectArgs {
                 println!("{:#?}", program.account::<states::Oracle>(address).await?);
             }
             Command::Order { address, event } => {
-                if *event {
-                    let stream = client.historical_store_cpi_events(address, None).await?;
+                if let Some(limit) = *event {
+                    let stream = match limit {
+                        Some(limit) => client
+                            .historical_store_cpi_events(address, None)
+                            .await?
+                            .take(limit.get())
+                            .left_stream(),
+                        None => client
+                            .historical_store_cpi_events(address, None)
+                            .await?
+                            .right_stream(),
+                    };
                     pin_mut!(stream);
                     while let Some(res) = stream.next().await {
                         match res {
