@@ -275,6 +275,30 @@ pub trait ExchangeOps<C> {
         self.create_order(store, market_token, is_collateral_token_long, params)
     }
 
+    /// Create a stop-loss decrease order.
+    #[allow(clippy::too_many_arguments)]
+    fn stop_loss(
+        &self,
+        store: &Pubkey,
+        market_token: &Pubkey,
+        is_long: bool,
+        decrement_size_in_usd: u128,
+        price: u128,
+        is_collateral_token_long: bool,
+        collateral_withdrawal_amount: u64,
+    ) -> CreateOrderBuilder<C> {
+        let params = OrderParams {
+            kind: OrderKind::StopLossDecrease,
+            min_output_amount: 0,
+            size_delta_usd: decrement_size_in_usd,
+            initial_collateral_delta_amount: collateral_withdrawal_amount,
+            acceptable_price: None,
+            trigger_price: Some(price),
+            is_long,
+        };
+        self.create_order(store, market_token, is_collateral_token_long, params)
+    }
+
     /// Create a limit swap order.
     #[allow(clippy::too_many_arguments)]
     fn limit_swap<'a, S>(

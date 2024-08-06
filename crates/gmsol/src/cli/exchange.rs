@@ -1,6 +1,6 @@
 use anchor_client::solana_sdk::{commitment_config::CommitmentConfig, pubkey::Pubkey};
 use eyre::OptionExt;
-use gmsol::{exchange::ExchangeOps, utils::price_to_min_output_amount};
+use gmsol::{exchange::ExchangeOps, types::UpdateOrderParams, utils::price_to_min_output_amount};
 use rust_decimal::Decimal;
 
 use crate::GMSOLClient;
@@ -235,6 +235,41 @@ enum Command {
         #[arg(long, short)]
         wait: bool,
     },
+    /// Create a stop-loss decrese order.
+    StopLoss {
+        /// The address of the market token of the position's market.
+        market_token: Pubkey,
+        /// Whether the collateral is long token.
+        #[arg(long)]
+        collateral_side: Side,
+        /// Collateral withdrawal amount.
+        #[arg(long, short = 'a', default_value_t = 0)]
+        collateral_withdrawal_amount: u64,
+        /// Position side.
+        #[arg(long)]
+        side: Side,
+        /// Trigger price (unit price).
+        #[arg(long)]
+        price: u128,
+        /// Position decrement size in usd.
+        #[arg(long, default_value_t = 0)]
+        size: u128,
+        /// Final output token.
+        #[arg(long, short = 'o')]
+        final_output_token: Option<Pubkey>,
+        /// Final output token account.
+        #[arg(long, requires = "final_output_token")]
+        final_output_token_account: Option<Pubkey>,
+        /// Secondary output token account.
+        #[arg(long)]
+        secondary_output_token_account: Option<Pubkey>,
+        /// Swap paths for output token (collateral token).
+        #[arg(long, short, action = clap::ArgAction::Append)]
+        swap: Vec<Pubkey>,
+        /// Whether to wait for the action to be completed.
+        #[arg(long, short)]
+        wait: bool,
+    },
     /// Create a market swap order.
     MarketSwap {
         /// The address of the market token of the position's market.
@@ -279,6 +314,14 @@ enum Command {
         /// it will be automatically added to the end of the swap path.
         #[arg(long, short, action = clap::ArgAction::Append)]
         swap: Vec<Pubkey>,
+    },
+    /// Update a limit swap order.
+    UpdateSwap {
+        /// The address of the swap order to udpate.
+        address: Pubkey,
+        /// New limit price (`token_in` to `token_out` price).
+        #[arg(long, value_parser = parse_decimal)]
+        price: Decimal,
     },
 }
 
@@ -572,6 +615,42 @@ impl ExchangeArgs {
                 }
                 println!("{order}");
             }
+            Command::StopLoss {
+                market_token,
+                collateral_side,
+                collateral_withdrawal_amount,
+                side,
+                price,
+                size,
+                final_output_token,
+                final_output_token_account,
+                secondary_output_token_account,
+                swap,
+                wait,
+            } => {
+                let mut builder = client.stop_loss(
+                    store,
+                    market_token,
+                    side.is_long(),
+                    *size,
+                    *price,
+                    collateral_side.is_long(),
+                    *collateral_withdrawal_amount,
+                );
+                if let Some(token) = final_output_token {
+                    builder.final_output_token(token, final_output_token_account.as_ref());
+                }
+                if let Some(account) = secondary_output_token_account {
+                    builder.secondary_output_token_account(account);
+                }
+                let (request, order) = builder.swap_path(swap.clone()).build_with_address().await?;
+                let signature = request.send().await?;
+                tracing::info!("created a stop-loss decrease order {order} at tx {signature}");
+                if *wait {
+                    self.wait_for_order(client, &order).await?;
+                }
+                println!("{order}");
+            }
             Command::LimitSwap {
                 market_token,
                 output_side,
@@ -618,6 +697,41 @@ impl ExchangeArgs {
                 let signature = request.send().await?;
                 tracing::info!("created a market swap order {order} at tx {signature}");
                 println!("{order}");
+            }
+            Command::UpdateSwap { address, price } => {
+                let order = client.order(address).await?;
+                let token_map = client
+                    .token_map(
+                        &client
+                            .authorized_token_map(store)
+                            .await?
+                            .ok_or_eyre("token map is not set")?,
+                    )
+                    .await?;
+                let min_output_amount = price_to_min_output_amount(
+                    &token_map,
+                    &order.fixed.tokens.initial_collateral_token,
+                    order.params().initial_collateral_delta_amount,
+                    &order.fixed.tokens.output_token,
+                    *price,
+                )
+                .ok_or_eyre("invalid price")?;
+                let params = UpdateOrderParams {
+                    size_delta_usd: order.params().size_delta_usd,
+                    acceptable_price: order.params().acceptable_price,
+                    trigger_price: order.params().trigger_price,
+                    min_output_amount: min_output_amount.into(),
+                };
+
+                let builder = client.update_order(
+                    store,
+                    &order.fixed.tokens.market_token,
+                    address,
+                    params,
+                )?;
+
+                let signature = builder.build().send().await?;
+                tracing::info!("updated a limit swap order {address} at tx {signature}");
             }
         }
         Ok(())
