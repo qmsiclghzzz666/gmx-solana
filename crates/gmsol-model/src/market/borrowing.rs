@@ -1,4 +1,4 @@
-use num_traits::{CheckedAdd, Zero};
+use num_traits::{CheckedAdd, CheckedSub, Zero};
 
 use crate::{
     action::Prices, params::fee::BorrowingFeeParams, Balance, BalanceExt, BaseMarket, BaseMarketExt,
@@ -122,6 +122,30 @@ pub trait BorrowingFeeMarketExt<const DECIMALS: u8>: BorrowingFeeMarket<DECIMALS
                 ))?;
         Ok((next_cumulative_borrowing_factor, delta))
     }
+
+    /// Get total pending borrowing fees.
+    fn total_pending_borrowing_fees(
+        &self,
+        prices: &Prices<Self::Num>,
+        is_long: bool,
+    ) -> crate::Result<Self::Num> {
+        let open_interest = self.open_interest()?.amount(is_long)?;
+
+        let duration_in_second = self.passed_in_seconds_for_borrowing()?;
+        let next_cumulative_borrowing_factor = self
+            .next_cumulative_borrowing_factor(is_long, prices, duration_in_second)?
+            .0;
+        let total_borrowing = self.total_borrowing_pool()?.amount(is_long)?;
+
+        crate::utils::apply_factor(&open_interest, &next_cumulative_borrowing_factor)
+            .and_then(|total| total.checked_sub(&total_borrowing))
+            .ok_or(crate::Error::Computation(
+                "calculating total pending borrowing fees",
+            ))
+    }
 }
 
-impl<M: BorrowingFeeMarket<DECIMALS>, const DECIMALS: u8> BorrowingFeeMarketExt<DECIMALS> for M {}
+impl<M: BorrowingFeeMarket<DECIMALS> + ?Sized, const DECIMALS: u8> BorrowingFeeMarketExt<DECIMALS>
+    for M
+{
+}

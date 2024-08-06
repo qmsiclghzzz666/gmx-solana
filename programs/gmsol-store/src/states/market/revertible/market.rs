@@ -323,6 +323,10 @@ impl<'a> RevertibleMarket<'a> {
         self.storage.position_impact_distribution_params()
     }
 
+    pub(super) fn passed_in_seconds_for_borrowing(&self) -> gmsol_model::Result<u64> {
+        self.storage.passed_in_seconds_for_borrowing()
+    }
+
     pub(super) fn borrowing_fee_params(&self) -> gmsol_model::Result<BorrowingFeeParams<Factor>> {
         self.storage.borrowing_fee_params()
     }

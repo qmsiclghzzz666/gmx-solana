@@ -2,15 +2,18 @@ use num_traits::{CheckedAdd, CheckedSub};
 
 use crate::{
     action::{deposit::Deposit, withdraw::Withdrawal, Prices},
+    fixed::FixedPointOps,
     num::Unsigned,
-    PnlFactorKind, PositionImpactMarket,
+    BorrowingFeeMarket, PnlFactorKind, PositionImpactMarket,
 };
 
-use super::{get_msg_by_side, BaseMarketExt, PositionImpactMarketExt, SwapMarketMut};
+use super::{
+    get_msg_by_side, BaseMarketExt, BorrowingFeeMarketExt, PositionImpactMarketExt, SwapMarketMut,
+};
 
 /// A market for providing liquidity.
 pub trait LiquidityMarket<const DECIMALS: u8>:
-    SwapMarketMut<DECIMALS> + PositionImpactMarket<DECIMALS>
+    SwapMarketMut<DECIMALS> + PositionImpactMarket<DECIMALS> + BorrowingFeeMarket<DECIMALS>
 {
     /// Get total supply of the market token.
     fn total_supply(&self) -> Self::Num;
@@ -103,7 +106,27 @@ pub trait LiquidityMarketExt<const DECIMALS: u8>: LiquidityMarket<DECIMALS> {
                 .ok_or(crate::Error::Overflow)?
         };
 
-        // TODO: add total pending borrowing fees.
+        // Add total pending borrowing fees.
+        let total_borrowing_fees = {
+            let for_long = self.total_pending_borrowing_fees(prices, true)?;
+            let for_short = self.total_pending_borrowing_fees(prices, false)?;
+            for_long
+                .checked_add(&for_short)
+                .ok_or(crate::Error::Computation(
+                    "calculating total pending borrowing fees for pool value",
+                ))?
+        };
+        let total_borrowing_fees_for_pool = <Self::Num>::UNIT
+            .checked_sub(self.borrowing_fee_params()?.receiver_factor())
+            .and_then(|factor| crate::utils::apply_factor(&total_borrowing_fees, &factor))
+            .ok_or(crate::Error::Computation(
+                "calculating total borrowing fees for pool",
+            ))?;
+        pool_value = pool_value
+            .checked_add(&total_borrowing_fees_for_pool)
+            .ok_or(crate::Error::Computation(
+                "adding total borrowing fees for pool",
+            ))?;
 
         // Deduct net pnl.
         let long_pnl = {

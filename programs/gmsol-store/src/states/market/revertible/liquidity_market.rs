@@ -19,6 +19,8 @@ use super::{swap_market::RevertibleSwapMarket, Revertible, RevertibleMarket, Rev
 /// Convert a [`RevertibleMarket`] to a [`LiquidityMarket`](gmsol_model::LiquidityMarket).
 pub struct RevertibleLiquidityMarket<'a, 'info> {
     market: RevertibleSwapMarket<'a>,
+    immutable_borrowing_factor_pool: RevertiblePool,
+    immutable_total_borrowing_pool: RevertiblePool,
     market_token: &'a mut Account<'info, Mint>,
     transfer: TransferUtils<'a, 'info>,
     receiver: Option<AccountInfo<'info>>,
@@ -93,6 +95,10 @@ impl<'a, 'info> RevertibleLiquidityMarket<'a, 'info> {
         let position_impact_distribution_clock =
             market.get_clock(ClockKind::PriceImpactDistribution)?;
         Ok(Self {
+            immutable_borrowing_factor_pool: market
+                .get_pool_from_storage(PoolKind::BorrowingFactor)?,
+            immutable_total_borrowing_pool: market
+                .get_pool_from_storage(PoolKind::TotalBorrowing)?,
             market: RevertibleSwapMarket::from_market(market)?,
             transfer: TransferUtils::new(
                 token_program,
@@ -205,6 +211,28 @@ impl<'a, 'info> gmsol_model::SwapMarketMut<{ constants::MARKET_DECIMALS }>
 {
     fn swap_impact_pool_mut(&mut self) -> gmsol_model::Result<&mut Self::Pool> {
         self.market.swap_impact_pool_mut()
+    }
+}
+
+impl<'a, 'info> gmsol_model::BorrowingFeeMarket<{ constants::MARKET_DECIMALS }>
+    for RevertibleLiquidityMarket<'a, 'info>
+{
+    fn borrowing_factor_pool(&self) -> gmsol_model::Result<&Self::Pool> {
+        Ok(&self.immutable_borrowing_factor_pool)
+    }
+
+    fn total_borrowing_pool(&self) -> gmsol_model::Result<&Self::Pool> {
+        Ok(&self.immutable_total_borrowing_pool)
+    }
+
+    fn borrowing_fee_params(
+        &self,
+    ) -> gmsol_model::Result<gmsol_model::params::fee::BorrowingFeeParams<Self::Num>> {
+        self.market.market.borrowing_fee_params()
+    }
+
+    fn passed_in_seconds_for_borrowing(&self) -> gmsol_model::Result<u64> {
+        self.market.market.passed_in_seconds_for_borrowing()
     }
 }
 
