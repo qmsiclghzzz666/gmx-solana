@@ -150,6 +150,9 @@ pub trait ExchangeOps<C> {
     /// Cancel an order.
     fn cancel_order(&self, order: &Pubkey) -> crate::Result<CancelOrderBuilder<C>>;
 
+    /// Liquidate a position.
+    fn liquidate(&self, oracle: &Pubkey, position: &Pubkey) -> crate::Result<LiquidateBuilder<C>>;
+
     /// Create a market increase position order.
     fn market_increase(
         &self,
@@ -272,8 +275,37 @@ pub trait ExchangeOps<C> {
         self.create_order(store, market_token, is_collateral_token_long, params)
     }
 
-    /// Liquidate a position.
-    fn liquidate(&self, oracle: &Pubkey, position: &Pubkey) -> crate::Result<LiquidateBuilder<C>>;
+    /// Create a limit swap order.
+    #[allow(clippy::too_many_arguments)]
+    fn limit_swap<'a, S>(
+        &self,
+        store: &Pubkey,
+        market_token: &Pubkey,
+        is_output_token_long: bool,
+        min_output_amount: u64,
+        initial_swap_in_token: &Pubkey,
+        initial_swap_in_token_amount: u64,
+        swap_path: impl IntoIterator<Item = &'a Pubkey>,
+    ) -> CreateOrderBuilder<C>
+    where
+        C: Deref<Target = S> + Clone,
+        S: Signer,
+    {
+        let params = OrderParams {
+            kind: OrderKind::LimitSwap,
+            min_output_amount: u128::from(min_output_amount),
+            size_delta_usd: 0,
+            initial_collateral_delta_amount: initial_swap_in_token_amount,
+            acceptable_price: None,
+            trigger_price: None,
+            is_long: true,
+        };
+        let mut builder = self.create_order(store, market_token, is_output_token_long, params);
+        builder
+            .initial_collateral_token(initial_swap_in_token, None)
+            .swap_path(swap_path.into_iter().copied().collect());
+        builder
+    }
 }
 
 impl<S, C> ExchangeOps<C> for crate::Client<C>

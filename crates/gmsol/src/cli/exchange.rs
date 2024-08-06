@@ -1,5 +1,7 @@
 use anchor_client::solana_sdk::{commitment_config::CommitmentConfig, pubkey::Pubkey};
-use gmsol::exchange::ExchangeOps;
+use eyre::OptionExt;
+use gmsol::{exchange::ExchangeOps, utils::price_to_min_output_amount};
+use rust_decimal::Decimal;
 
 use crate::GMSOLClient;
 
@@ -233,7 +235,7 @@ enum Command {
         #[arg(long, short)]
         wait: bool,
     },
-    /// Create swap order.
+    /// Create a market swap order.
     MarketSwap {
         /// The address of the market token of the position's market.
         market_token: Pubkey,
@@ -254,6 +256,36 @@ enum Command {
         #[arg(long, short, action = clap::ArgAction::Append)]
         swap: Vec<Pubkey>,
     },
+    /// Create a limit swap order.
+    LimitSwap {
+        /// The address of the market token of the position's market.
+        market_token: Pubkey,
+        /// Output side.
+        #[arg(long)]
+        output_side: Side,
+        /// Limit price (`token_in` to `token_out` price)
+        #[arg(long, value_parser = parse_decimal)]
+        price: Decimal,
+        /// Initial swap in token.
+        #[arg(long, short = 'i')]
+        initial_swap_in_token: Pubkey,
+        /// Initial swap in token account.
+        #[arg(long)]
+        initial_swap_in_token_account: Option<Pubkey>,
+        /// Collateral amount.
+        #[arg(long, short = 'a')]
+        initial_swap_in_token_amount: u64,
+        /// Extra swap path. No need to provide the target market token;
+        /// it will be automatically added to the end of the swap path.
+        #[arg(long, short, action = clap::ArgAction::Append)]
+        swap: Vec<Pubkey>,
+    },
+}
+
+fn parse_decimal(value: &str) -> Result<Decimal, clap::Error> {
+    value
+        .parse::<Decimal>()
+        .map_err(|_| clap::Error::new(clap::error::ErrorKind::InvalidValue))
 }
 
 #[derive(clap::ValueEnum, Clone)]
@@ -538,6 +570,53 @@ impl ExchangeArgs {
                 if *wait {
                     self.wait_for_order(client, &order).await?;
                 }
+                println!("{order}");
+            }
+            Command::LimitSwap {
+                market_token,
+                output_side,
+                price,
+                initial_swap_in_token,
+                initial_swap_in_token_account,
+                initial_swap_in_token_amount,
+                swap,
+            } => {
+                let token_map = client
+                    .token_map(
+                        &client
+                            .authorized_token_map(store)
+                            .await?
+                            .ok_or_eyre("token map is not set")?,
+                    )
+                    .await?;
+                let market = client
+                    .market(&client.find_market_address(store, market_token))
+                    .await?;
+                let token_out = market.meta().pnl_token(output_side.is_long());
+                let min_output_amount = price_to_min_output_amount(
+                    &token_map,
+                    initial_swap_in_token,
+                    *initial_swap_in_token_amount,
+                    &token_out,
+                    *price,
+                )
+                .ok_or_eyre("invalid price")?;
+                let mut builder = client.limit_swap(
+                    store,
+                    market_token,
+                    output_side.is_long(),
+                    min_output_amount,
+                    initial_swap_in_token,
+                    *initial_swap_in_token_amount,
+                    swap.iter().chain(Some(market_token)),
+                );
+                if let Some(account) = initial_swap_in_token_account {
+                    builder.initial_collateral_token(initial_swap_in_token, Some(account));
+                }
+
+                let (request, order) = builder.build_with_address().await?;
+                let signature = request.send().await?;
+                tracing::info!("created a market swap order {order} at tx {signature}");
                 println!("{order}");
             }
         }

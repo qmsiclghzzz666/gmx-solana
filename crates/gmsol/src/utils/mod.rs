@@ -28,6 +28,9 @@ pub mod signer;
 /// Utils for fixed-point numbers.
 pub mod fixed;
 
+/// Utils for token calculation.
+pub mod token;
+
 pub use self::{
     fixed::{
         signed_amount_to_decimal, signed_fixed_to_decimal, signed_value_to_decimal,
@@ -43,6 +46,7 @@ pub use self::{
         },
     },
     signer::{shared_signer, SignerRef},
+    token::price_to_min_output_amount,
     transaction_builder::{
         compute_budget::ComputeBudget, rpc_builder::RpcBuilder, transaction_size::transaction_size,
         TransactionBuilder,
