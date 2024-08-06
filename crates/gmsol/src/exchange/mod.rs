@@ -194,27 +194,6 @@ pub trait ExchangeOps<C> {
         self.create_order(store, market_token, is_collateral_token_long, params)
     }
 
-    /// Create a liquidation order.
-    fn liquidate_by_owner(
-        &self,
-        store: &Pubkey,
-        market_token: &Pubkey,
-        is_collateral_token_long: bool,
-        is_long: bool,
-        size_in_usd: Option<u128>,
-    ) -> CreateOrderBuilder<C> {
-        let params = OrderParams {
-            kind: OrderKind::Liquidation,
-            min_output_amount: 0,
-            size_delta_usd: size_in_usd.unwrap_or(u128::MAX),
-            initial_collateral_delta_amount: 0,
-            acceptable_price: None,
-            trigger_price: None,
-            is_long,
-        };
-        self.create_order(store, market_token, is_collateral_token_long, params)
-    }
-
     /// Create a market swap order.
     fn market_swap<'a, S>(
         &self,
@@ -262,6 +241,30 @@ pub trait ExchangeOps<C> {
             min_output_amount: 0,
             size_delta_usd: increment_size_in_usd,
             initial_collateral_delta_amount: initial_collateral_amount,
+            acceptable_price: None,
+            trigger_price: Some(price),
+            is_long,
+        };
+        self.create_order(store, market_token, is_collateral_token_long, params)
+    }
+
+    /// Create a limit decrease order.
+    #[allow(clippy::too_many_arguments)]
+    fn limit_decrease(
+        &self,
+        store: &Pubkey,
+        market_token: &Pubkey,
+        is_long: bool,
+        decrement_size_in_usd: u128,
+        price: u128,
+        is_collateral_token_long: bool,
+        collateral_withdrawal_amount: u64,
+    ) -> CreateOrderBuilder<C> {
+        let params = OrderParams {
+            kind: OrderKind::LimitDecrease,
+            min_output_amount: 0,
+            size_delta_usd: decrement_size_in_usd,
+            initial_collateral_delta_amount: collateral_withdrawal_amount,
             acceptable_price: None,
             trigger_price: Some(price),
             is_long,
