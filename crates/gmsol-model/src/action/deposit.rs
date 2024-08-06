@@ -296,8 +296,9 @@ impl<const DECIMALS: u8, M: LiquidityMarket<DECIMALS>> Deposit<M, DECIMALS> {
                 self.price_impact()?;
             let mut market_token_to_mint: M::Num = Zero::zero();
             let pool_value = self.market.pool_value(
-                self.params.long_token_price(),
-                self.params.short_token_price(),
+                &self.params.prices,
+                PnlFactorKind::MaxAfterDeposit,
+                true,
             )?;
             let mut all_fees = [Default::default(), Default::default()];
             if !self.params.long_token_amount.is_zero() {

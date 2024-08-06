@@ -140,20 +140,6 @@ pub trait BaseMarketExt<const DECIMALS: u8>: BaseMarket<DECIMALS> {
         }
     }
 
-    /// Get the usd value of primary pool.
-    fn pool_value(
-        &self,
-        long_token_price: &Self::Num,
-        short_token_price: &Self::Num,
-    ) -> crate::Result<Self::Num> {
-        // TODO: All pending values should be taken into consideration.
-        let long_value = self.liquidity_pool()?.long_usd_value(long_token_price)?;
-        let short_value = self.liquidity_pool()?.short_usd_value(short_token_price)?;
-        long_value
-            .checked_add(&short_value)
-            .ok_or(crate::Error::Overflow)
-    }
-
     /// Get total open interest as a [`Balance`].
     fn open_interest(&self) -> crate::Result<Merged<&Self::Pool, &Self::Pool>> {
         Ok(self

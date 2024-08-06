@@ -7,7 +7,10 @@ use gmsol_model::{
 
 use crate::{
     constants,
-    states::{clock::AsClock, HasMarketMeta, Market, Store},
+    states::{
+        clock::{AsClock, AsClockMut},
+        HasMarketMeta, Market, Store,
+    },
     utils::internal::TransferUtils,
 };
 
@@ -269,6 +272,10 @@ impl<'a, 'info> gmsol_model::PositionImpactMarket<{ constants::MARKET_DECIMALS }
     ) -> gmsol_model::Result<PositionImpactDistributionParams<Self::Num>> {
         self.market.market.position_impact_distribution_params()
     }
+
+    fn passed_in_seconds_for_position_impact_distribution(&self) -> gmsol_model::Result<u64> {
+        AsClock::from(&self.position_impact_distribution_clock).passed_in_seconds()
+    }
 }
 
 impl<'a, 'info> gmsol_model::PositionImpactMarketMut<{ constants::MARKET_DECIMALS }>
@@ -281,7 +288,7 @@ impl<'a, 'info> gmsol_model::PositionImpactMarketMut<{ constants::MARKET_DECIMAL
     fn just_passed_in_seconds_for_position_impact_distribution(
         &mut self,
     ) -> gmsol_model::Result<u64> {
-        AsClock::from(&mut self.position_impact_distribution_clock).just_passed_in_seconds()
+        AsClockMut::from(&mut self.position_impact_distribution_clock).just_passed_in_seconds()
     }
 }
 

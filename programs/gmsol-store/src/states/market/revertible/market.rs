@@ -310,6 +310,13 @@ impl<'a> RevertibleMarket<'a> {
         self.storage.position_impact_params()
     }
 
+    pub(super) fn passed_in_seconds_for_position_impact_distribution(
+        &self,
+    ) -> gmsol_model::Result<u64> {
+        self.storage
+            .passed_in_seconds_for_position_impact_distribution()
+    }
+
     pub(super) fn position_impact_distribution_params(
         &self,
     ) -> gmsol_model::Result<PositionImpactDistributionParams<Factor>> {

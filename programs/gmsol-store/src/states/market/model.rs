@@ -9,7 +9,7 @@ use gmsol_model::{
 
 use crate::constants;
 
-use super::{Market, Pool};
+use super::{clock::AsClock, Market, Pool};
 
 impl gmsol_model::BaseMarket<{ constants::MARKET_DECIMALS }> for Market {
     type Num = u128;
@@ -140,6 +140,10 @@ impl gmsol_model::PositionImpactMarket<{ constants::MARKET_DECIMALS }> for Marke
             .distribute_factor(config.position_impact_distribute_factor)
             .min_position_impact_pool_amount(config.min_position_impact_pool_amount)
             .build())
+    }
+
+    fn passed_in_seconds_for_position_impact_distribution(&self) -> gmsol_model::Result<u64> {
+        AsClock::from(&self.clocks.price_impact_distribution).passed_in_seconds()
     }
 }
 

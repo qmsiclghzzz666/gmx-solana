@@ -4,24 +4,50 @@ use anchor_lang::{
 };
 
 /// Clock-related operations.
-pub struct AsClock<'a> {
+pub struct AsClockMut<'a> {
     last: &'a mut i64,
 }
 
-impl<'a> AsClock<'a> {
+impl<'a> AsClockMut<'a> {
     /// Just passed in seconds.
     pub fn just_passed_in_seconds(&mut self) -> gmsol_model::Result<u64> {
         let current = Clock::get().map_err(Error::from)?.unix_timestamp;
         let duration = current.saturating_sub(*self.last);
         if duration > 0 {
             *self.last = current;
+            Ok(duration as u64)
+        } else {
+            Ok(0)
         }
-        Ok(duration as u64)
     }
 }
 
-impl<'a> From<&'a mut i64> for AsClock<'a> {
+impl<'a> From<&'a mut i64> for AsClockMut<'a> {
     fn from(last: &'a mut i64) -> Self {
+        Self { last }
+    }
+}
+
+/// Clock-related operations.
+pub struct AsClock<'a> {
+    last: &'a i64,
+}
+
+impl<'a> AsClock<'a> {
+    /// Passed in seconds.
+    pub fn passed_in_seconds(&mut self) -> gmsol_model::Result<u64> {
+        let current = Clock::get().map_err(Error::from)?.unix_timestamp;
+        let duration = current.saturating_sub(*self.last);
+        if duration > 0 {
+            Ok(duration as u64)
+        } else {
+            Ok(0)
+        }
+    }
+}
+
+impl<'a> From<&'a i64> for AsClock<'a> {
+    fn from(last: &'a i64) -> Self {
         Self { last }
     }
 }

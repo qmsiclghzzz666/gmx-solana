@@ -10,7 +10,7 @@ use gmsol_model::{
 
 use crate::{
     constants,
-    states::{clock::AsClock, HasMarketMeta, Market},
+    states::{clock::AsClockMut, HasMarketMeta, Market},
     StoreError,
 };
 
@@ -442,6 +442,11 @@ impl<'a> gmsol_model::PositionImpactMarket<{ constants::MARKET_DECIMALS }>
     ) -> gmsol_model::Result<PositionImpactDistributionParams<Self::Num>> {
         self.market.position_impact_distribution_params()
     }
+
+    fn passed_in_seconds_for_position_impact_distribution(&self) -> gmsol_model::Result<u64> {
+        self.market
+            .passed_in_seconds_for_position_impact_distribution()
+    }
 }
 
 impl<'a> gmsol_model::PositionImpactMarketMut<{ constants::MARKET_DECIMALS }>
@@ -454,7 +459,8 @@ impl<'a> gmsol_model::PositionImpactMarketMut<{ constants::MARKET_DECIMALS }>
     fn just_passed_in_seconds_for_position_impact_distribution(
         &mut self,
     ) -> gmsol_model::Result<u64> {
-        AsClock::from(&mut self.clocks.position_impact_distribution_clock).just_passed_in_seconds()
+        AsClockMut::from(&mut self.clocks.position_impact_distribution_clock)
+            .just_passed_in_seconds()
     }
 }
 
@@ -521,11 +527,11 @@ impl<'a> gmsol_model::PerpMarket<{ constants::MARKET_DECIMALS }> for RevertibleP
 
 impl<'a> gmsol_model::PerpMarketMut<{ constants::MARKET_DECIMALS }> for RevertiblePerpMarket<'a> {
     fn just_passed_in_seconds_for_borrowing(&mut self) -> gmsol_model::Result<u64> {
-        AsClock::from(&mut self.clocks.borrowing_clock).just_passed_in_seconds()
+        AsClockMut::from(&mut self.clocks.borrowing_clock).just_passed_in_seconds()
     }
 
     fn just_passed_in_seconds_for_funding(&mut self) -> gmsol_model::Result<u64> {
-        AsClock::from(&mut self.clocks.funding_clock).just_passed_in_seconds()
+        AsClockMut::from(&mut self.clocks.funding_clock).just_passed_in_seconds()
     }
 
     fn funding_factor_per_second_mut(&mut self) -> &mut Self::Signed {

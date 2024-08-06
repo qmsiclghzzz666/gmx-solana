@@ -1,5 +1,5 @@
 use crate::{
-    market::{BaseMarket, BaseMarketExt, LiquidityMarket},
+    market::{BaseMarket, BaseMarketExt, LiquidityMarket, LiquidityMarketExt},
     num::MulDiv,
     params::Fees,
     utils, BalanceExt, PnlFactorKind, PoolExt,
@@ -160,8 +160,9 @@ impl<const DECIMALS: u8, M: LiquidityMarket<DECIMALS>> Withdrawal<M, DECIMALS> {
 
     fn output_amounts(&self) -> crate::Result<(M::Num, M::Num)> {
         let pool_value = self.market.pool_value(
-            self.params.long_token_price(),
-            self.params.short_token_price(),
+            &self.params.prices,
+            PnlFactorKind::MaxAfterWithdrawal,
+            false,
         )?;
         if pool_value.is_zero() {
             return Err(crate::Error::invalid_pool_value("withdrawal"));

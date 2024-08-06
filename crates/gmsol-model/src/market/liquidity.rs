@@ -1,9 +1,17 @@
-use crate::action::{deposit::Deposit, withdraw::Withdrawal, Prices};
+use num_traits::{CheckedAdd, CheckedSub};
 
-use super::{get_msg_by_side, BaseMarketExt, SwapMarketMut};
+use crate::{
+    action::{deposit::Deposit, withdraw::Withdrawal, Prices},
+    num::Unsigned,
+    PnlFactorKind, PositionImpactMarket,
+};
+
+use super::{get_msg_by_side, BaseMarketExt, PositionImpactMarketExt, SwapMarketMut};
 
 /// A market for providing liquidity.
-pub trait LiquidityMarket<const DECIMALS: u8>: SwapMarketMut<DECIMALS> {
+pub trait LiquidityMarket<const DECIMALS: u8>:
+    SwapMarketMut<DECIMALS> + PositionImpactMarket<DECIMALS>
+{
     /// Get total supply of the market token.
     fn total_supply(&self) -> Self::Num;
 
@@ -77,6 +85,53 @@ pub trait LiquidityMarketExt<const DECIMALS: u8>: LiquidityMarket<DECIMALS> {
         } else {
             Ok(())
         }
+    }
+
+    /// Get the usd value of primary pool.
+    fn pool_value(
+        &self,
+        prices: &Prices<Self::Num>,
+        pnl_factor: PnlFactorKind,
+        maximize: bool,
+    ) -> crate::Result<Self::Num> {
+        // TODO: All pending values should be taken into consideration.
+        let mut pool_value = {
+            let long_value = self.pool_value_without_pnl_for_one_side(prices, true, maximize)?;
+            let short_value = self.pool_value_without_pnl_for_one_side(prices, false, maximize)?;
+            long_value
+                .checked_add(&short_value)
+                .ok_or(crate::Error::Overflow)?
+        };
+
+        // TODO: add total pending borrowing fees.
+
+        // Deduct net pnl.
+        let long_pnl = {
+            let pnl = self.pnl(&prices.index_token_price, true, !maximize)?;
+            self.cap_pnl(prices, true, &pnl, pnl_factor)?
+        };
+        let short_pnl = {
+            let pnl = self.pnl(&prices.index_token_price, false, !maximize)?;
+            self.cap_pnl(prices, false, &pnl, pnl_factor)?
+        };
+        let net_pnl = long_pnl
+            .checked_add(&short_pnl)
+            .ok_or(crate::Error::Computation("calculating net pnl"))?;
+        pool_value = pool_value
+            .checked_sub_with_signed(&net_pnl)
+            .ok_or(crate::Error::Computation("deducting net pnl"))?;
+
+        // Deduct impact pool value.
+        let impact_pool_value = {
+            let duration = self.passed_in_seconds_for_position_impact_distribution()?;
+            self.pending_position_impact_pool_distribution_amount(duration)?
+                .1
+        };
+        pool_value = pool_value
+            .checked_sub(&impact_pool_value)
+            .ok_or(crate::Error::Computation("deducting impact pool value"))?;
+
+        Ok(pool_value)
     }
 }
 

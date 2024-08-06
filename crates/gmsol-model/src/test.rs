@@ -307,6 +307,13 @@ where
         *clock = now;
         Ok(duration.as_secs())
     }
+
+    fn passed_in_seconds(&self, clock: ClockKind) -> crate::Result<u64> {
+        let now = Instant::now();
+        let clock = self.clocks.get(&clock).unwrap_or(&now);
+        let duration = now.saturating_duration_since(*clock);
+        Ok(duration.as_secs())
+    }
 }
 
 impl<T, const DECIMALS: u8> BaseMarket<DECIMALS> for TestMarket<T, DECIMALS>
@@ -465,6 +472,10 @@ where
         &self,
     ) -> crate::Result<PositionImpactDistributionParams<Self::Num>> {
         Ok(self.position_impact_distribution_params.clone())
+    }
+
+    fn passed_in_seconds_for_position_impact_distribution(&self) -> crate::Result<u64> {
+        self.passed_in_seconds(ClockKind::PriceImpactDistribution)
     }
 }
 
