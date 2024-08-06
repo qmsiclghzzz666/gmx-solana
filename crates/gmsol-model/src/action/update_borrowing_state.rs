@@ -1,9 +1,7 @@
-use num_traits::{CheckedAdd, Zero};
-
 use crate::{
-    market::{BaseMarket, BaseMarketExt, PerpMarketExt},
+    market::{BaseMarket, BorrowingFeeMarketExt},
     num::Unsigned,
-    Balance, PerpMarketMut, PoolExt,
+    PerpMarketMut, PoolExt,
 };
 
 use super::Prices;
@@ -25,92 +23,14 @@ impl<M: PerpMarketMut<DECIMALS>, const DECIMALS: u8> UpdateBorrowingState<M, DEC
         })
     }
 
-    /// Get borrowing factor per second.
-    fn calc_borrowing_factor_per_second(
-        &self,
-        is_long: bool,
-        prices: &Prices<M::Num>,
-    ) -> crate::Result<M::Num> {
-        use crate::utils;
-
-        let reserved_value = self
-            .market
-            .reserved_value(&prices.index_token_price, is_long)?;
-
-        if reserved_value.is_zero() {
-            return Ok(Zero::zero());
-        }
-
-        let params = self.market.borrowing_fee_params()?;
-
-        if params.skip_borrowing_fee_for_smaller_side() {
-            let open_interest = self.market.open_interest()?;
-            let long_interest = open_interest.long_amount()?;
-            let short_interest = open_interest.short_amount()?;
-            if (is_long && long_interest < short_interest)
-                || (!is_long && short_interest < long_interest)
-            {
-                return Ok(Zero::zero());
-            }
-        }
-
-        let pool_value = self
-            .market
-            .pool_value_without_pnl_for_one_side(prices, is_long, false)?;
-
-        if pool_value.is_zero() {
-            return Err(crate::Error::UnableToGetBorrowingFactorEmptyPoolValue);
-        }
-
-        // TODO: apply optimal usage factor.
-
-        let reserved_value_after_exponent =
-            utils::apply_exponent_factor(reserved_value, params.exponent(is_long).clone()).ok_or(
-                crate::Error::Computation("calculating reserved value after exponent"),
-            )?;
-        let reversed_value_to_pool_factor =
-            utils::div_to_factor(&reserved_value_after_exponent, &pool_value, false).ok_or(
-                crate::Error::Computation("calculating reserved value to pool factor"),
-            )?;
-        utils::apply_factor(&reversed_value_to_pool_factor, params.factor(is_long)).ok_or(
-            crate::Error::Computation("calculating borrowing factort per second"),
-        )
-    }
-
-    /// Get next cumulative borrowing factor of the given side.
-    fn calc_next_cumulative_borrowing_factor(
-        &self,
-        is_long: bool,
-        prices: &Prices<M::Num>,
-        duration_in_second: u64,
-    ) -> crate::Result<(M::Num, M::Num)> {
-        use num_traits::{CheckedMul, FromPrimitive};
-
-        let borrowing_factor_per_second = self.calc_borrowing_factor_per_second(is_long, prices)?;
-        let current_factor = self.market.borrowing_factor(is_long)?;
-
-        let duration_value = M::Num::from_u64(duration_in_second).ok_or(crate::Error::Convert)?;
-        let delta = borrowing_factor_per_second
-            .checked_mul(&duration_value)
-            .ok_or(crate::Error::Computation(
-                "calculating borrowing factor delta",
-            ))?;
-        let next_cumulative_borrowing_factor =
-            current_factor
-                .checked_add(&delta)
-                .ok_or(crate::Error::Computation(
-                    "calculating next borrowing factor",
-                ))?;
-        Ok((next_cumulative_borrowing_factor, delta))
-    }
-
     fn execute_one_side(
         &mut self,
         is_long: bool,
         duration_in_seconds: u64,
     ) -> crate::Result<M::Num> {
-        let (next_cumulative_borrowing_factor, delta) =
-            self.calc_next_cumulative_borrowing_factor(is_long, &self.prices, duration_in_seconds)?;
+        let (next_cumulative_borrowing_factor, delta) = self
+            .market
+            .next_cumulative_borrowing_factor(is_long, &self.prices, duration_in_seconds)?;
         self.market
             .borrowing_factor_pool_mut()?
             .apply_delta_amount(is_long, &delta.to_signed()?)?;

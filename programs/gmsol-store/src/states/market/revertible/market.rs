@@ -7,7 +7,7 @@ use gmsol_model::{
         position::PositionImpactDistributionParams,
         FeeParams, PositionParams, PriceImpactParams,
     },
-    Balance, ClockKind, PerpMarket, PoolKind, PositionImpactMarket,
+    Balance, BorrowingFeeMarket, ClockKind, PerpMarket, PoolKind, PositionImpactMarket,
 };
 
 use crate::{

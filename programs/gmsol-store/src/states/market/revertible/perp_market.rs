@@ -10,7 +10,10 @@ use gmsol_model::{
 
 use crate::{
     constants,
-    states::{clock::AsClockMut, HasMarketMeta, Market},
+    states::{
+        clock::{AsClock, AsClockMut},
+        HasMarketMeta, Market,
+    },
     StoreError,
 };
 
@@ -464,13 +467,29 @@ impl<'a> gmsol_model::PositionImpactMarketMut<{ constants::MARKET_DECIMALS }>
     }
 }
 
+impl<'a> gmsol_model::BorrowingFeeMarket<{ constants::MARKET_DECIMALS }>
+    for RevertiblePerpMarket<'a>
+{
+    fn borrowing_factor_pool(&self) -> gmsol_model::Result<&Self::Pool> {
+        Ok(&self.pools.borrowing_factor)
+    }
+
+    fn total_borrowing_pool(&self) -> gmsol_model::Result<&Self::Pool> {
+        Ok(&self.pools.total_borrowing)
+    }
+
+    fn borrowing_fee_params(&self) -> gmsol_model::Result<BorrowingFeeParams<Self::Num>> {
+        self.market.borrowing_fee_params()
+    }
+
+    fn passed_in_seconds_for_borrowing(&self) -> gmsol_model::Result<u64> {
+        AsClock::from(&self.clocks.borrowing_clock).passed_in_seconds()
+    }
+}
+
 impl<'a> gmsol_model::PerpMarket<{ constants::MARKET_DECIMALS }> for RevertiblePerpMarket<'a> {
     fn funding_factor_per_second(&self) -> &Self::Signed {
         &self.state.funding_factor_per_second
-    }
-
-    fn borrowing_factor_pool(&self) -> gmsol_model::Result<&Self::Pool> {
-        Ok(&self.pools.borrowing_factor)
     }
 
     fn funding_amount_per_size_pool(&self, is_long: bool) -> gmsol_model::Result<&Self::Pool> {
@@ -490,14 +509,6 @@ impl<'a> gmsol_model::PerpMarket<{ constants::MARKET_DECIMALS }> for RevertibleP
         } else {
             Ok(&self.pools.claimable_funding_amount_per_size.1)
         }
-    }
-
-    fn total_borrowing_pool(&self) -> gmsol_model::Result<&Self::Pool> {
-        Ok(&self.pools.total_borrowing)
-    }
-
-    fn borrowing_fee_params(&self) -> gmsol_model::Result<BorrowingFeeParams<Self::Num>> {
-        self.market.borrowing_fee_params()
     }
 
     fn funding_amount_per_size_adjustment(&self) -> Self::Num {

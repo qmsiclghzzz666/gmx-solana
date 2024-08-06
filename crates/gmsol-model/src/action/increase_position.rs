@@ -9,7 +9,7 @@ use crate::{
     num::Unsigned,
     params::fee::PositionFees,
     position::{CollateralDelta, Position, PositionExt},
-    PerpMarketMut, PoolExt, PositionMut, PositionMutExt,
+    BorrowingFeeMarketExt, PerpMarketMut, PoolExt, PositionMut, PositionMutExt,
 };
 
 use super::{
@@ -242,7 +242,10 @@ where
             .size_in_usd_mut()
             .checked_add(&self.params.size_delta_usd)
             .ok_or(crate::Error::Computation("size in usd overflow"))?;
-        let next_position_borrowing_factor = self.position.market().borrowing_factor(is_long)?;
+        let next_position_borrowing_factor = self
+            .position
+            .market()
+            .cumulative_borrowing_factor(is_long)?;
 
         // Update total borrowing before updating position size.
         self.position

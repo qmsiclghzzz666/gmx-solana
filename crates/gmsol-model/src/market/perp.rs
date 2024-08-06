@@ -3,36 +3,25 @@ use crate::{
         update_borrowing_state::UpdateBorrowingState, update_funding_state::UpdateFundingState,
         Prices,
     },
-    params::{
-        fee::{BorrowingFeeParams, FundingFeeParams},
-        FeeParams, PositionParams,
-    },
-    BalanceExt, PoolExt, PositionImpactMarket, PositionImpactMarketMut, SwapMarket, SwapMarketMut,
+    params::{fee::FundingFeeParams, FeeParams, PositionParams},
+    BalanceExt, BorrowingFeeMarket, PoolExt, PositionImpactMarket, PositionImpactMarketMut,
+    SwapMarket, SwapMarketMut,
 };
 
 use super::BaseMarketExt;
 
 /// A perpetual market.
 pub trait PerpMarket<const DECIMALS: u8>:
-    SwapMarket<DECIMALS> + PositionImpactMarket<DECIMALS>
+    SwapMarket<DECIMALS> + PositionImpactMarket<DECIMALS> + BorrowingFeeMarket<DECIMALS>
 {
     /// Get funding factor per second.
     fn funding_factor_per_second(&self) -> &Self::Signed;
-
-    /// Get borrowing factor pool.
-    fn borrowing_factor_pool(&self) -> crate::Result<&Self::Pool>;
 
     /// Get funding amount per size pool.
     fn funding_amount_per_size_pool(&self, is_long: bool) -> crate::Result<&Self::Pool>;
 
     /// Get claimable funding amount per size pool.
     fn claimable_funding_amount_per_size_pool(&self, is_long: bool) -> crate::Result<&Self::Pool>;
-
-    /// Get total borrowing pool.
-    fn total_borrowing_pool(&self) -> crate::Result<&Self::Pool>;
-
-    /// Get borrowing fee params.
-    fn borrowing_fee_params(&self) -> crate::Result<BorrowingFeeParams<Self::Num>>;
 
     /// Adjustment factor for packing funding amount per size.
     fn funding_amount_per_size_adjustment(&self) -> Self::Num;
@@ -98,24 +87,12 @@ impl<'a, M: PerpMarket<DECIMALS>, const DECIMALS: u8> PerpMarket<DECIMALS> for &
         (**self).funding_factor_per_second()
     }
 
-    fn borrowing_fee_params(&self) -> crate::Result<BorrowingFeeParams<Self::Num>> {
-        (**self).borrowing_fee_params()
-    }
-
-    fn borrowing_factor_pool(&self) -> crate::Result<&Self::Pool> {
-        (**self).borrowing_factor_pool()
-    }
-
     fn funding_amount_per_size_pool(&self, is_long: bool) -> crate::Result<&Self::Pool> {
         (**self).funding_amount_per_size_pool(is_long)
     }
 
     fn claimable_funding_amount_per_size_pool(&self, is_long: bool) -> crate::Result<&Self::Pool> {
         (**self).claimable_funding_amount_per_size_pool(is_long)
-    }
-
-    fn total_borrowing_pool(&self) -> crate::Result<&Self::Pool> {
-        (**self).total_borrowing_pool()
     }
 
     fn funding_amount_per_size_adjustment(&self) -> Self::Num {
@@ -196,12 +173,6 @@ impl<'a, M: PerpMarketMut<DECIMALS>, const DECIMALS: u8> PerpMarketMut<DECIMALS>
 
 /// Extension trait for [`PerpMarket`].
 pub trait PerpMarketExt<const DECIMALS: u8>: PerpMarket<DECIMALS> {
-    /// Get current borrowing factor.
-    #[inline]
-    fn borrowing_factor(&self, is_long: bool) -> crate::Result<Self::Num> {
-        self.borrowing_factor_pool()?.amount(is_long)
-    }
-
     /// Get current funding fee amount per size.
     #[inline]
     fn funding_fee_amount_per_size(

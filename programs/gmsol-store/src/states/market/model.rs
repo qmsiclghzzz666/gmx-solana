@@ -147,13 +147,33 @@ impl gmsol_model::PositionImpactMarket<{ constants::MARKET_DECIMALS }> for Marke
     }
 }
 
+impl gmsol_model::BorrowingFeeMarket<{ constants::MARKET_DECIMALS }> for Market {
+    fn borrowing_factor_pool(&self) -> gmsol_model::Result<&Self::Pool> {
+        self.try_pool(PoolKind::BorrowingFactor)
+    }
+
+    fn total_borrowing_pool(&self) -> gmsol_model::Result<&Self::Pool> {
+        self.try_pool(PoolKind::TotalBorrowing)
+    }
+
+    fn borrowing_fee_params(&self) -> gmsol_model::Result<BorrowingFeeParams<Self::Num>> {
+        Ok(BorrowingFeeParams::builder()
+            .receiver_factor(self.config.borrowing_fee_receiver_factor)
+            .factor_for_long(self.config.borrowing_fee_factor_for_long)
+            .factor_for_short(self.config.borrowing_fee_factor_for_short)
+            .exponent_for_long(self.config.borrowing_fee_exponent_for_long)
+            .exponent_for_short(self.config.borrowing_fee_exponent_for_short)
+            .build())
+    }
+
+    fn passed_in_seconds_for_borrowing(&self) -> gmsol_model::Result<u64> {
+        AsClock::from(&self.clocks.borrowing).passed_in_seconds()
+    }
+}
+
 impl gmsol_model::PerpMarket<{ constants::MARKET_DECIMALS }> for Market {
     fn funding_factor_per_second(&self) -> &Self::Signed {
         &self.state().funding_factor_per_second
-    }
-
-    fn borrowing_factor_pool(&self) -> gmsol_model::Result<&Self::Pool> {
-        self.try_pool(PoolKind::BorrowingFactor)
     }
 
     fn funding_amount_per_size_pool(&self, is_long: bool) -> gmsol_model::Result<&Self::Pool> {
@@ -175,20 +195,6 @@ impl gmsol_model::PerpMarket<{ constants::MARKET_DECIMALS }> for Market {
             PoolKind::ClaimableFundingAmountPerSizeForShort
         };
         self.try_pool(kind)
-    }
-
-    fn total_borrowing_pool(&self) -> gmsol_model::Result<&Self::Pool> {
-        self.try_pool(PoolKind::TotalBorrowing)
-    }
-
-    fn borrowing_fee_params(&self) -> gmsol_model::Result<BorrowingFeeParams<Self::Num>> {
-        Ok(BorrowingFeeParams::builder()
-            .receiver_factor(self.config.borrowing_fee_receiver_factor)
-            .factor_for_long(self.config.borrowing_fee_factor_for_long)
-            .factor_for_short(self.config.borrowing_fee_factor_for_short)
-            .exponent_for_long(self.config.borrowing_fee_exponent_for_long)
-            .exponent_for_short(self.config.borrowing_fee_exponent_for_short)
-            .build())
     }
 
     fn funding_amount_per_size_adjustment(&self) -> Self::Num {

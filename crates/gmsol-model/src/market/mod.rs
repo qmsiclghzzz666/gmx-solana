@@ -7,14 +7,18 @@ pub mod liquidity;
 /// Swap Market.
 pub mod swap;
 
-/// Position Impact Market.
+/// Position impact utils.
 pub mod position_impact;
+
+/// Borrowing fees utils.
+pub mod borrowing;
 
 /// Perpetual Market.
 pub mod perp;
 
 pub use self::{
     base::{BaseMarket, BaseMarketExt, BaseMarketMut, BaseMarketMutExt, PnlFactorKind},
+    borrowing::{BorrowingFeeMarket, BorrowingFeeMarketExt},
     liquidity::{LiquidityMarket, LiquidityMarketExt},
     perp::{PerpMarket, PerpMarketExt, PerpMarketMut, PerpMarketMutExt},
     position_impact::{

@@ -8,7 +8,7 @@ use crate::{
         CollateralDelta, Position, PositionExt, PositionMut, PositionMutExt,
         WillCollateralBeSufficient,
     },
-    PerpMarketMut, PerpMarketMutExt, PoolExt,
+    BorrowingFeeMarketExt, PerpMarketMut, PerpMarketMutExt, PoolExt,
 };
 
 use self::collateral_processor::{CollateralProcessor, ProcessReport};
@@ -155,8 +155,10 @@ where
                 .ok_or(crate::Error::Computation(
                     "calculating next position size in usd",
                 ))?;
-            let next_position_borrowing_factor =
-                self.position.market().borrowing_factor(is_long)?;
+            let next_position_borrowing_factor = self
+                .position
+                .market()
+                .cumulative_borrowing_factor(is_long)?;
 
             // Update total borrowing before updating position size.
             self.position.update_total_borrowing(

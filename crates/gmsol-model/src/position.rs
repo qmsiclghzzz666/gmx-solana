@@ -9,7 +9,8 @@ use crate::{
     },
     fixed::FixedPointOps,
     market::{
-        BaseMarketExt, PerpMarket, PerpMarketExt, PositionImpactMarket, PositionImpactMarketExt,
+        BaseMarketExt, BorrowingFeeMarket, BorrowingFeeMarketExt, PerpMarket, PerpMarketExt,
+        PositionImpactMarket, PositionImpactMarketExt,
     },
     num::{MulDiv, Num, Unsigned, UnsignedAbs},
     params::fee::{FundingFees, PositionFees},
@@ -593,7 +594,7 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
         use crate::utils;
         use num_traits::CheckedSub;
 
-        let latest_factor = self.market().borrowing_factor(self.is_long())?;
+        let latest_factor = self.market().cumulative_borrowing_factor(self.is_long())?;
         let diff_factor = latest_factor
             .checked_sub(self.borrowing_factor())
             .ok_or(crate::Error::Computation("invalid latest borrowing factor"))?;

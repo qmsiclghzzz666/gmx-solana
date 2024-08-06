@@ -14,8 +14,8 @@ use crate::{
     },
     pool::{Balance, Pool},
     position::Position,
-    BaseMarketMut, PerpMarketMut, PositionImpactMarketMut, PositionMut, PositionState,
-    PositionStateMut, SwapMarketMut,
+    BaseMarketMut, BorrowingFeeMarket, PerpMarketMut, PositionImpactMarketMut, PositionMut,
+    PositionState, PositionStateMut, SwapMarketMut,
 };
 use num_traits::{CheckedSub, Signed};
 
@@ -493,6 +493,28 @@ where
     }
 }
 
+impl<T, const DECIMALS: u8> BorrowingFeeMarket<DECIMALS> for TestMarket<T, DECIMALS>
+where
+    T: CheckedSub + fmt::Display + FixedPointOps<DECIMALS>,
+    T::Signed: Num + std::fmt::Debug,
+{
+    fn borrowing_fee_params(&self) -> crate::Result<BorrowingFeeParams<Self::Num>> {
+        Ok(self.borrowing_fee_params.clone())
+    }
+
+    fn borrowing_factor_pool(&self) -> crate::Result<&Self::Pool> {
+        Ok(&self.borrowing_factor)
+    }
+
+    fn total_borrowing_pool(&self) -> crate::Result<&Self::Pool> {
+        Ok(&self.total_borrowing)
+    }
+
+    fn passed_in_seconds_for_borrowing(&self) -> crate::Result<u64> {
+        self.passed_in_seconds(ClockKind::Borrowing)
+    }
+}
+
 impl<T, const DECIMALS: u8> PerpMarket<DECIMALS> for TestMarket<T, DECIMALS>
 where
     T: CheckedSub + fmt::Display + FixedPointOps<DECIMALS>,
@@ -500,14 +522,6 @@ where
 {
     fn funding_factor_per_second(&self) -> &Self::Signed {
         &self.funding_factor_per_second
-    }
-
-    fn borrowing_fee_params(&self) -> crate::Result<BorrowingFeeParams<Self::Num>> {
-        Ok(self.borrowing_fee_params.clone())
-    }
-
-    fn borrowing_factor_pool(&self) -> crate::Result<&Self::Pool> {
-        Ok(&self.borrowing_factor)
     }
 
     fn funding_amount_per_size_adjustment(&self) -> Self::Num {
@@ -532,10 +546,6 @@ where
         } else {
             Ok(&self.claimable_funding_amount_per_size.1)
         }
-    }
-
-    fn total_borrowing_pool(&self) -> crate::Result<&Self::Pool> {
-        Ok(&self.total_borrowing)
     }
 
     fn position_params(&self) -> crate::Result<PositionParams<Self::Num>> {
