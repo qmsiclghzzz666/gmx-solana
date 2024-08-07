@@ -91,7 +91,9 @@ impl gmsol_model::BaseMarket<{ constants::MARKET_DECIMALS }> for Market {
             (PnlFactorKind::MaxForTrader, false) => Ok(self.config.max_pnl_factor_for_short_trader),
             (PnlFactorKind::ForAdl, true) => Ok(self.config.max_pnl_factor_for_long_adl),
             (PnlFactorKind::ForAdl, false) => Ok(self.config.max_pnl_factor_for_short_adl),
-            _ => Err(gmsol_model::Error::invalid_argument("missing pool kind")),
+            (PnlFactorKind::MinAfterAdl, true) => Ok(self.config.min_pnl_factor_after_long_adl),
+            (PnlFactorKind::MinAfterAdl, false) => Ok(self.config.min_pnl_factor_after_short_adl),
+            _ => Err(gmsol_model::Error::invalid_argument("missing pnl factor")),
         }
     }
 
