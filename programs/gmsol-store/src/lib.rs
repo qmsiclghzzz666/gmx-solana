@@ -1289,7 +1289,7 @@ pub mod gmsol_store {
     /// - The [`oracle`](UpdateAdlState::oracle) must be an initialized [`Oracle`](states::Oracle)
     /// account owned by the store program, and it must be owned by the store.
     /// - The [`market`](UpdateAdlState::market) must be enabled and owned by the store.
-    #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
+    #[access_control(internal::Authenticate::only_controller(&ctx))]
     pub fn update_adl_state(ctx: Context<UpdateAdlState>, is_long: bool) -> Result<()> {
         instructions::unchecked_update_adl_state(ctx, is_long)
     }
