@@ -285,19 +285,21 @@ impl OrderParams {
         self.kind.is_increase_position() || self.kind.is_swap()
     }
 
-    /// Validate updatable.
-    pub fn validate_updatable(&self) -> Result<()> {
-        if matches!(
+    /// Return whether the order is updatable.
+    pub fn is_updatable(&self) -> bool {
+        matches!(
             self.kind,
             OrderKind::LimitIncrease
                 | OrderKind::LimitDecrease
                 | OrderKind::StopLossDecrease
                 | OrderKind::LimitSwap
-        ) {
-            Ok(())
-        } else {
-            Err(error!(StoreError::InvalidArgument))
-        }
+        )
+    }
+
+    /// Validate updatable.
+    pub fn validate_updatable(&self) -> Result<()> {
+        require!(self.is_updatable(), StoreError::InvalidArgument);
+        Ok(())
     }
 
     /// Validate.

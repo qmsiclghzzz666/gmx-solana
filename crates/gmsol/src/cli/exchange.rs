@@ -270,6 +270,23 @@ enum Command {
         #[arg(long, short)]
         wait: bool,
     },
+    /// Update a limit/stop-loss order.
+    UpdateOrder {
+        /// The address of the swap order to udpate.
+        address: Pubkey,
+        /// New Tigger price (unit price).
+        #[arg(long)]
+        price: Option<u128>,
+        /// Accetable price (unit price).
+        #[arg(long)]
+        acceptable_price: Option<u128>,
+        /// Min output amount or value.
+        #[arg(long)]
+        min_output_amount: Option<u128>,
+        /// New size.
+        #[arg(long)]
+        size: Option<u128>,
+    },
     /// Create a market swap order.
     MarketSwap {
         /// The address of the market token of the position's market.
@@ -732,6 +749,44 @@ impl ExchangeArgs {
 
                 let signature = builder.build().send().await?;
                 tracing::info!("updated a limit swap order {address} at tx {signature}");
+            }
+            Command::UpdateOrder {
+                address,
+                price,
+                acceptable_price,
+                min_output_amount,
+                size,
+            } => {
+                let order = client.order(address).await?;
+                let params = order.params();
+                if params.is_updatable() {
+                    if params.kind.is_swap() {
+                        return Err(gmsol::Error::invalid_argument(
+                            "cannot update swap order with this command, use `update-swap` instead",
+                        ));
+                    }
+                    let params = UpdateOrderParams {
+                        size_delta_usd: size.unwrap_or(params.size_delta_usd),
+                        acceptable_price: acceptable_price.or(params.acceptable_price),
+                        trigger_price: price.or(params.trigger_price),
+                        min_output_amount: min_output_amount.unwrap_or(params.min_output_amount),
+                    };
+
+                    let builder = client.update_order(
+                        store,
+                        &order.fixed.tokens.market_token,
+                        address,
+                        params,
+                    )?;
+
+                    let signature = builder.build().send().await?;
+                    tracing::info!("updated an order {address} at tx {signature}");
+                } else {
+                    return Err(gmsol::Error::invalid_argument(format!(
+                        "{:?} is not updatable",
+                        params.kind
+                    )));
+                }
             }
         }
         Ok(())
