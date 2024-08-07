@@ -10,6 +10,9 @@ pub mod order;
 /// Liquidation.
 pub mod liquidation;
 
+/// Auto-deleveraging.
+pub mod auto_deleveraging;
+
 /// Treasury.
 pub mod treasury;
 
@@ -19,6 +22,7 @@ use anchor_client::{
     anchor_lang::system_program,
     solana_sdk::{pubkey::Pubkey, signer::Signer},
 };
+use auto_deleveraging::AutoDeleverageBuilder;
 use gmsol_exchange::{
     accounts, instruction,
     states::{ActionDisabledFlag, DomainDisabledFlag},
@@ -152,6 +156,14 @@ pub trait ExchangeOps<C> {
 
     /// Liquidate a position.
     fn liquidate(&self, oracle: &Pubkey, position: &Pubkey) -> crate::Result<LiquidateBuilder<C>>;
+
+    /// Auto-deleverage a position.
+    fn auto_deleverage(
+        &self,
+        oracle: &Pubkey,
+        position: &Pubkey,
+        size_delta_usd: u128,
+    ) -> crate::Result<AutoDeleverageBuilder<C>>;
 
     /// Create a market increase position order.
     fn market_increase(
@@ -544,6 +556,15 @@ where
 
     fn liquidate(&self, oracle: &Pubkey, position: &Pubkey) -> crate::Result<LiquidateBuilder<C>> {
         LiquidateBuilder::try_new(self, oracle, position)
+    }
+
+    fn auto_deleverage(
+        &self,
+        oracle: &Pubkey,
+        position: &Pubkey,
+        size_delta_usd: u128,
+    ) -> crate::Result<AutoDeleverageBuilder<C>> {
+        AutoDeleverageBuilder::try_new(self, oracle, position, size_delta_usd)
     }
 }
 
