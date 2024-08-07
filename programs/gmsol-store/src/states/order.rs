@@ -68,7 +68,8 @@ impl Order {
         params.trigger_price = update_params.trigger_price;
         params.min_output_amount = update_params.min_output_amount;
         params.validate()?;
-        Ok(())
+
+        self.fixed.updated()
     }
 
     pub(crate) fn validate_output_amount(&self, output_amount: u128) -> Result<()> {
@@ -177,14 +178,11 @@ impl Fixed {
         senders: &Senders,
         receivers: &Receivers,
     ) -> Result<()> {
-        let clock = Clock::get()?;
         self.bump = bump;
         self.id = id;
         self.kind = params.kind;
         self.store = store;
         self.nonce = *nonce;
-        self.updated_at_slot = clock.slot;
-        self.updated_at = clock.unix_timestamp;
         self.market = *market;
         self.user = *user;
         self.position = position.copied();
@@ -192,6 +190,13 @@ impl Fixed {
         self.tokens = tokens.clone();
         self.senders = senders.clone();
         self.receivers = receivers.clone();
+        self.updated()
+    }
+
+    fn updated(&mut self) -> Result<()> {
+        let clock = Clock::get()?;
+        self.updated_at_slot = clock.slot;
+        self.updated_at = clock.unix_timestamp;
         Ok(())
     }
 }
