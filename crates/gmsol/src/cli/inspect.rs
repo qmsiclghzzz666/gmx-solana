@@ -841,6 +841,16 @@ fn format_market(market: &SerializeMarket) -> gmsol::Result<String> {
         "order_count: {}",
         state.order_count.to_formatted_string(&Locale::en)
     )?;
+    let msg = match (
+        market.is_adl_enabled_for_long,
+        market.is_adl_enabled_for_short,
+    ) {
+        (true, true) => "enabled for both sides",
+        (true, false) => "enabled for long",
+        (false, true) => "enabled for short",
+        (false, false) => "disabled for both sides",
+    };
+    writeln!(f, "adl state: {msg}")?;
 
     writeln!(f, "\nClocks:")?;
     let now = time::OffsetDateTime::now_utc();

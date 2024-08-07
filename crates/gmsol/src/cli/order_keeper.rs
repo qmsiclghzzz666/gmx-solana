@@ -17,7 +17,10 @@ use gmsol_model::PositionState;
 use gmsol_store::states::PriceProviderKind;
 use tokio::{sync::mpsc::UnboundedSender, time::Instant};
 
-use crate::{utils::Oracle, GMSOLClient};
+use crate::{
+    utils::{Oracle, Side},
+    GMSOLClient,
+};
 
 #[derive(clap::Args, Clone)]
 pub(super) struct KeeperArgs {
@@ -67,6 +70,12 @@ enum Command {
         size: Option<u128>,
         #[arg(long, group = "close_size")]
         close_all: bool,
+    },
+    /// Update ADL state.
+    UpdateAdl {
+        market_token: Pubkey,
+        #[arg(long, short)]
+        side: Side,
     },
     /// Fetch pending actions.
     Pending {
@@ -571,6 +580,62 @@ impl KeeperArgs {
                         )
                         .await?;
                     tracing::info!(%position, %execution_fee, "auto-deleveraged position with txs: {signatures:#?}");
+                }
+            }
+            Command::UpdateAdl { market_token, side } => {
+                let mut builder = client.update_adl(
+                    store,
+                    &self
+                        .oracle
+                        .address(Some(store), &client.store_program_id())?,
+                    market_token,
+                    side.is_long(),
+                )?;
+                builder.price_provider(&self.provider.program());
+
+                if self.use_pyth_pull_oracle() {
+                    let hint = builder.prepare_hint().await?;
+                    let ctx = PythPullOracleContext::try_from_feeds(hint.feeds())?;
+                    let feed_ids = ctx.feed_ids();
+                    if feed_ids.is_empty() {
+                        tracing::error!(%market_token, "empty feed ids");
+                    }
+                    let oracle = PythPullOracle::try_new(client.anchor())?;
+                    let hermes = Hermes::default();
+                    let update = hermes
+                        .latest_price_updates(feed_ids, Some(EncodingType::Base64))
+                        .await?;
+                    let with_prices = oracle
+                        .with_pyth_prices(&ctx, &update, |prices| async {
+                            let builder = builder
+                                .parse_with_pyth_price_updates(prices)
+                                .build()
+                                .await?;
+                            Ok(Some(builder))
+                        })
+                        .await?;
+                    match with_prices
+                        .send_all(Some(self.compute_unit_price), true)
+                        .await
+                    {
+                        Ok(signatures) => {
+                            tracing::info!(%market_token, ?side, "updated ADL state with txs {signatures:#?}");
+                        }
+                        Err((signatures, err)) => {
+                            tracing::error!(%err, %market_token, ?side, "failed to update ADL state, successful txs: {signatures:#?}");
+                        }
+                    }
+                } else {
+                    let compute_unit_price_micro_lamports =
+                        self.get_compute_budget().map(|budget| budget.price());
+                    let signatures = builder
+                        .build()
+                        .await?
+                        .build_with_options(false, compute_unit_price_micro_lamports)
+                        .0
+                        .send()
+                        .await?;
+                    tracing::info!(%market_token, ?side, "updated ADL state with txs: {signatures:#?}");
                 }
             }
         }

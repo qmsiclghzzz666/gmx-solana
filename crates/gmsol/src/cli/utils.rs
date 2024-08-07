@@ -146,3 +146,19 @@ pub(crate) fn table_format() -> TableFormat {
         .separator(LinePosition::Title, LineSeparator::new('-', '+', '+', '+'))
         .build()
 }
+
+/// Side.
+#[derive(clap::ValueEnum, Clone, Copy, Debug)]
+pub enum Side {
+    /// Long.
+    Long,
+    /// Short.
+    Short,
+}
+
+impl Side {
+    /// Is long side.
+    pub fn is_long(&self) -> bool {
+        matches!(self, Self::Long)
+    }
+}

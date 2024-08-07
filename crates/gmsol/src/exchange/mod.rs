@@ -22,7 +22,7 @@ use anchor_client::{
     anchor_lang::system_program,
     solana_sdk::{pubkey::Pubkey, signer::Signer},
 };
-use auto_deleveraging::AutoDeleverageBuilder;
+use auto_deleveraging::{AutoDeleverageBuilder, UpdateAdlBuilder};
 use gmsol_exchange::{
     accounts, instruction,
     states::{ActionDisabledFlag, DomainDisabledFlag},
@@ -164,6 +164,15 @@ pub trait ExchangeOps<C> {
         position: &Pubkey,
         size_delta_usd: u128,
     ) -> crate::Result<AutoDeleverageBuilder<C>>;
+
+    /// Update ADL state.
+    fn update_adl(
+        &self,
+        store: &Pubkey,
+        oracle: &Pubkey,
+        market_token: &Pubkey,
+        is_long: bool,
+    ) -> crate::Result<UpdateAdlBuilder<C>>;
 
     /// Create a market increase position order.
     fn market_increase(
@@ -565,6 +574,16 @@ where
         size_delta_usd: u128,
     ) -> crate::Result<AutoDeleverageBuilder<C>> {
         AutoDeleverageBuilder::try_new(self, oracle, position, size_delta_usd)
+    }
+
+    fn update_adl(
+        &self,
+        store: &Pubkey,
+        oracle: &Pubkey,
+        market_token: &Pubkey,
+        is_long: bool,
+    ) -> crate::Result<UpdateAdlBuilder<C>> {
+        UpdateAdlBuilder::try_new(self, store, oracle, market_token, is_long)
     }
 }
 

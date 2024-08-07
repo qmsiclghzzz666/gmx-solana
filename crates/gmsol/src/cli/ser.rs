@@ -48,6 +48,10 @@ pub struct SerializeMarket {
     pub enabled: bool,
     /// Is pure.
     pub is_pure: bool,
+    /// Is ADL enabled for long.
+    pub is_adl_enabled_for_long: bool,
+    /// Is ADL enabled for short.
+    pub is_adl_enabled_for_short: bool,
     /// Address.
     #[serde_as(as = "DisplayFromStr")]
     pub address: Pubkey,
@@ -77,6 +81,8 @@ impl SerializeMarket {
             address: *pubkey,
             store: market.store,
             is_pure: market.is_pure(),
+            is_adl_enabled_for_long: market.is_adl_enabled(true),
+            is_adl_enabled_for_short: market.is_adl_enabled(false),
             meta: SerializeMarketMeta {
                 market_token: meta.market_token_mint,
                 index_token: meta.index_token_mint,

@@ -1,7 +1,7 @@
 use anchor_client::solana_sdk::pubkey::Pubkey;
 use gmsol::exchange::ExchangeOps;
 
-use crate::GMSOLClient;
+use crate::{utils::Side, GMSOLClient};
 
 #[derive(clap::Args)]
 pub(super) struct Args {
@@ -19,12 +19,6 @@ enum Command {
     },
 }
 
-#[derive(clap::ValueEnum, Clone, Copy)]
-enum Side {
-    Long,
-    Short,
-}
-
 impl Args {
     pub(super) async fn run(
         &self,
@@ -35,7 +29,7 @@ impl Args {
         match self.command {
             Command::ClaimFees { market_token, side } => {
                 let req = client
-                    .claim_fees(store, &market_token, matches!(side, Side::Long))
+                    .claim_fees(store, &market_token, side.is_long())
                     .build()
                     .await?
                     .build_without_compute_budget();

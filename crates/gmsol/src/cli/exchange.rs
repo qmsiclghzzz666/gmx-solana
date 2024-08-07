@@ -3,7 +3,7 @@ use eyre::OptionExt;
 use gmsol::{exchange::ExchangeOps, types::UpdateOrderParams, utils::price_to_min_output_amount};
 use rust_decimal::Decimal;
 
-use crate::GMSOLClient;
+use crate::{utils::Side, GMSOLClient};
 
 #[derive(clap::Args)]
 pub(super) struct ExchangeArgs {
@@ -346,18 +346,6 @@ fn parse_decimal(value: &str) -> Result<Decimal, clap::Error> {
     value
         .parse::<Decimal>()
         .map_err(|_| clap::Error::new(clap::error::ErrorKind::InvalidValue))
-}
-
-#[derive(clap::ValueEnum, Clone)]
-enum Side {
-    Long,
-    Short,
-}
-
-impl Side {
-    fn is_long(&self) -> bool {
-        matches!(self, Self::Long)
-    }
 }
 
 impl ExchangeArgs {
