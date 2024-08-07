@@ -1,12 +1,13 @@
 use anchor_lang::prelude::*;
 use gmsol_store::{
+    cpi,
     program::GmsolStore,
-    states::{order::UpdateOrderParams, Market, Order},
+    states::{order::UpdateOrderParams, Order},
 };
 
 use crate::{
     states::{ActionDisabledFlag, Controller},
-    ExchangeError,
+    utils::ControllerSeeds,
 };
 
 /// The accounts definition for [`update_order`](crate::gmsol_exchange::update_order)
@@ -26,34 +27,37 @@ pub struct UpdateOrder<'info> {
         bump = controller.load()?.bump,
     )]
     pub controller: AccountLoader<'info, Controller>,
-    /// CHECK: only used as an identifier.
+    /// CHECK: check by CPI.
     pub store: UncheckedAccount<'info>,
-    #[account(mut, has_one = store)]
-    pub market: AccountLoader<'info, Market>,
+    /// CHECK: check by CPI.
+    #[account(mut)]
+    pub market: UncheckedAccount<'info>,
     /// The order to update.
-    #[account(
-        mut,
-        constraint = order.fixed.store == store.key() @ ExchangeError::InvalidArgument,
-        constraint = order.fixed.market == market.key() @ ExchangeError::InvalidArgument,
-        constraint = order.fixed.user == user.key() @ ExchangeError::PermissionDenied,
-    )]
+    #[account(mut)]
     pub order: Account<'info, Order>,
     /// The store program.
     pub store_program: Program<'info, GmsolStore>,
 }
 
-pub(crate) fn update_order(ctx: Context<UpdateOrder>, params: &UpdateOrderParams) -> Result<()> {
+pub(crate) fn update_order(ctx: Context<UpdateOrder>, params: UpdateOrderParams) -> Result<()> {
     ctx.accounts.controller.load()?.validate_feature_enabled(
         ctx.accounts.order.fixed.params.kind.try_into()?,
         ActionDisabledFlag::UpdateOrder,
     )?;
 
-    let id = ctx
-        .accounts
-        .market
-        .load_mut()?
-        .state_mut()
-        .next_order_id()?;
-    ctx.accounts.order.update(id, params)?;
+    let store = ctx.accounts.store.key();
+    let controller = ControllerSeeds::find(&store);
+
+    let ctx = CpiContext::new(
+        ctx.accounts.store_program.to_account_info(),
+        cpi::accounts::UpdateOrder {
+            authority: ctx.accounts.controller.to_account_info(),
+            user: ctx.accounts.user.to_account_info(),
+            store: ctx.accounts.store.to_account_info(),
+            market: ctx.accounts.market.to_account_info(),
+            order: ctx.accounts.order.to_account_info(),
+        },
+    );
+    cpi::update_order(ctx.with_signer(&[&controller.as_seeds()]), params)?;
     Ok(())
 }

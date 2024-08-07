@@ -8,7 +8,7 @@ use crate::{
         common::{SwapParams, TokenRecord},
         order::{Order, OrderKind, OrderParams, Receivers, Senders, Tokens},
         position::Position,
-        Market, NonceBytes, Seed, Store,
+        Market, NonceBytes, Seed, Store, UpdateOrderParams,
     },
     utils::internal,
     StoreError,
@@ -381,5 +381,52 @@ impl<'info> RemoveOrder<'info> {
                 to: self.user.to_account_info(),
             },
         )
+    }
+}
+
+/// The accounts definition for [`update_order`](crate::gmsol_exchange::update_order)
+///
+/// *[See also the documentation for the instruction.](crate::gmsol_exchange::update_order)*
+#[derive(Accounts)]
+pub struct UpdateOrder<'info> {
+    /// Authority.
+    pub authority: Signer<'info>,
+    /// CHECK: only used as an identifier.
+    pub user: UncheckedAccount<'info>,
+    pub store: AccountLoader<'info, Store>,
+    #[account(mut, has_one = store)]
+    pub market: AccountLoader<'info, Market>,
+    /// The order to update.
+    #[account(
+        mut,
+        constraint = order.fixed.store == store.key() @ StoreError::InvalidArgument,
+        constraint = order.fixed.market == market.key() @ StoreError::InvalidArgument,
+        constraint = order.fixed.user == user.key() @ StoreError::PermissionDenied,
+    )]
+    pub order: Account<'info, Order>,
+}
+
+/// CHECK: only CONTROLLER can use this function.
+pub(crate) fn unchecked_update_order(
+    ctx: Context<UpdateOrder>,
+    params: &UpdateOrderParams,
+) -> Result<()> {
+    let id = ctx
+        .accounts
+        .market
+        .load_mut()?
+        .state_mut()
+        .next_order_id()?;
+    ctx.accounts.order.update(id, params)?;
+    Ok(())
+}
+
+impl<'info> internal::Authentication<'info> for UpdateOrder<'info> {
+    fn authority(&self) -> &Signer<'info> {
+        &self.authority
+    }
+
+    fn store(&self) -> &AccountLoader<'info, Store> {
+        &self.store
     }
 }

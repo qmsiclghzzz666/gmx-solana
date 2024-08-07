@@ -294,7 +294,7 @@ use self::{
         common::{SwapParams, TokenRecord},
         deposit::TokenParams as DepositTokenParams,
         market::{config::EntryArgs, MarketMeta},
-        order::{OrderParams, TransferOut},
+        order::{OrderParams, TransferOut, UpdateOrderParams},
         token_config::TokenConfigBuilder,
         withdrawal::TokenParams as WithdrawalTokenParams,
         PriceProviderKind,
@@ -1294,6 +1294,7 @@ pub mod gmsol_store {
         instructions::unchecked_update_adl_state(ctx, is_long)
     }
 
+    // Order.
     #[access_control(internal::Authenticate::only_controller(&ctx))]
     pub fn initialize_order(
         ctx: Context<InitializeOrder>,
@@ -1320,6 +1321,11 @@ pub mod gmsol_store {
     #[access_control(internal::Authenticate::only_controller(&ctx))]
     pub fn remove_order(ctx: Context<RemoveOrder>, refund: u64, reason: String) -> Result<()> {
         instructions::remove_order(ctx, refund, &reason)
+    }
+
+    #[access_control(internal::Authenticate::only_controller(&ctx))]
+    pub fn update_order(ctx: Context<UpdateOrder>, params: UpdateOrderParams) -> Result<()> {
+        instructions::unchecked_update_order(ctx, &params)
     }
 
     // Position.

@@ -149,7 +149,7 @@ pub mod gmsol_exchange {
     /// and it must be updatable.
     /// - It will also return error if the order parameters is not valid.
     pub fn update_order(ctx: Context<UpdateOrder>, params: UpdateOrderParams) -> Result<()> {
-        instructions::update_order(ctx, &params)
+        instructions::update_order(ctx, params)
     }
 
     #[access_control(Authenticate::only_order_keeper(&ctx))]
