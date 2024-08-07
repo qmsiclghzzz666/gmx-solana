@@ -495,11 +495,9 @@ impl Args {
                     enable: None,
                     buffer: *buffer,
                     config: MarketConfigMap(
-                        [(
-                            key.expect("missing key"),
-                            value.expect("missing value").into(),
-                        )]
-                        .into(),
+                        key.map(|key| (key, value.expect("missing value").into()))
+                            .into_iter()
+                            .collect(),
                     ),
                 };
                 let configs = MarketConfigs {
