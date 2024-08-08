@@ -78,35 +78,26 @@ where
     }
 }
 
+/// Max PnL Factors.
 #[derive(Debug, Clone)]
-struct MaxPnlFactors<T> {
-    deposit: T,
-    withdrawal: T,
-    trader: T,
-    adl: T,
+pub struct MaxPnlFactors<T> {
+    /// For deposit.
+    pub deposit: T,
+    /// For withdrawal.
+    pub withdrawal: T,
+    /// For trader.
+    pub trader: T,
+    /// For ADL.
+    pub adl: T,
 }
 
 /// Test Market.
 #[derive(Debug, Clone)]
 pub struct TestMarket<T: Unsigned, const DECIMALS: u8> {
+    config: TestMarketConfig<T, DECIMALS>,
     total_supply: T,
     value_to_amount_divisor: T,
     funding_amount_per_size_adjustment: T,
-    swap_impact_params: PriceImpactParams<T>,
-    swap_fee_params: FeeParams<T>,
-    position_params: PositionParams<T>,
-    position_impact_params: PriceImpactParams<T>,
-    order_fee_params: FeeParams<T>,
-    position_impact_distribution_params: PositionImpactDistributionParams<T>,
-    borrowing_fee_params: BorrowingFeeParams<T>,
-    funding_fee_params: FundingFeeParams<T>,
-    reserve_factor: T,
-    open_interest_reserve_factor: T,
-    max_pnl_factors: MaxPnlFactors<T>,
-    min_pnl_factor_after_adl: T,
-    max_pool_amount: T,
-    max_pool_value_for_deposit: T,
-    max_open_interest: T,
     primary: TestPool<T>,
     swap_impact: TestPool<T>,
     fee: TestPool<T>,
@@ -122,12 +113,104 @@ pub struct TestMarket<T: Unsigned, const DECIMALS: u8> {
     clocks: HashMap<ClockKind, Instant>,
 }
 
+impl<T: Unsigned, const DECIMALS: u8> TestMarket<T, DECIMALS> {
+    /// Create a new test market.
+    fn new(
+        value_to_amount_divisor: T,
+        funding_amount_per_size_adjustment: T,
+        config: TestMarketConfig<T, DECIMALS>,
+    ) -> Self
+    where
+        T: Default,
+        T::Signed: Default,
+    {
+        Self {
+            config,
+            total_supply: Default::default(),
+            value_to_amount_divisor,
+            funding_amount_per_size_adjustment,
+            primary: Default::default(),
+            swap_impact: Default::default(),
+            fee: Default::default(),
+            open_interest: Default::default(),
+            open_interest_in_tokens: Default::default(),
+            position_impact: Default::default(),
+            borrowing_factor: Default::default(),
+            funding_factor_per_second: Default::default(),
+            funding_amount_per_size: Default::default(),
+            claimable_funding_amount_per_size: Default::default(),
+            collateral_sum: Default::default(),
+            total_borrowing: Default::default(),
+            clocks: Default::default(),
+        }
+    }
+}
+
+impl TestMarket<u64, 9> {
+    /// Create a new [`TestMarket`] with config.
+    pub fn with_config(config: TestMarketConfig<u64, 9>) -> Self {
+        Self::new(1, 10_000, config)
+    }
+}
+
+impl TestMarket<u128, 20> {
+    /// Create a new [`TestMarket`] with config.
+    pub fn with_config(config: TestMarketConfig<u128, 20>) -> Self {
+        Self::new(10u128.pow(20 - 9), 10u128.pow(10), config)
+    }
+}
+
 impl Default for TestMarket<u64, 9> {
     fn default() -> Self {
+        Self::with_config(Default::default())
+    }
+}
+
+#[cfg(feature = "u128")]
+impl Default for TestMarket<u128, 20> {
+    fn default() -> Self {
+        Self::with_config(Default::default())
+    }
+}
+
+/// Test Market Config.
+#[derive(Debug, Clone)]
+pub struct TestMarketConfig<T, const DECIMALS: u8> {
+    /// Swap impact params.
+    pub swap_impact_params: PriceImpactParams<T>,
+    /// Swap fee params.
+    pub swap_fee_params: FeeParams<T>,
+    /// Position params.
+    pub position_params: PositionParams<T>,
+    /// Position impact params.
+    pub position_impact_params: PriceImpactParams<T>,
+    /// Order fee params.
+    pub order_fee_params: FeeParams<T>,
+    /// Position impact distribution params.
+    pub position_impact_distribution_params: PositionImpactDistributionParams<T>,
+    /// Borrowing fee params.
+    pub borrowing_fee_params: BorrowingFeeParams<T>,
+    /// Funding fee params.
+    pub funding_fee_params: FundingFeeParams<T>,
+    /// Reserve factor.
+    pub reserve_factor: T,
+    /// Open interest reserve factor.
+    pub open_interest_reserve_factor: T,
+    /// Max PnL factors.
+    pub max_pnl_factors: MaxPnlFactors<T>,
+    /// Min PnL factors after ADL.
+    pub min_pnl_factor_after_adl: T,
+    /// Max pool amount.
+    pub max_pool_amount: T,
+    /// Max pool value for deposit.
+    pub max_pool_value_for_deposit: T,
+    /// Max open interest.
+    pub max_open_interest: T,
+}
+
+impl Default for TestMarketConfig<u64, 9> {
+    fn default() -> Self {
         Self {
-            total_supply: Default::default(),
-            value_to_amount_divisor: 1,
-            funding_amount_per_size_adjustment: 10_000,
             swap_impact_params: PriceImpactParams::builder()
                 .with_exponent(2_000_000_000)
                 .with_positive_factor(4)
@@ -191,30 +274,14 @@ impl Default for TestMarket<u64, 9> {
             max_pool_amount: 1_000_000_000 * 1_000_000_000,
             max_pool_value_for_deposit: u64::MAX,
             max_open_interest: u64::MAX,
-            primary: Default::default(),
-            swap_impact: Default::default(),
-            fee: Default::default(),
-            open_interest: Default::default(),
-            open_interest_in_tokens: Default::default(),
-            position_impact: Default::default(),
-            borrowing_factor: Default::default(),
-            funding_factor_per_second: Default::default(),
-            funding_amount_per_size: Default::default(),
-            claimable_funding_amount_per_size: Default::default(),
-            collateral_sum: Default::default(),
-            total_borrowing: Default::default(),
-            clocks: Default::default(),
         }
     }
 }
 
 #[cfg(feature = "u128")]
-impl Default for TestMarket<u128, 20> {
+impl Default for TestMarketConfig<u128, 20> {
     fn default() -> Self {
         Self {
-            total_supply: Default::default(),
-            value_to_amount_divisor: 10u128.pow(20 - 9),
-            funding_amount_per_size_adjustment: 10u128.pow(10),
             swap_impact_params: PriceImpactParams::builder()
                 .with_exponent(200_000_000_000_000_000_000)
                 .with_positive_factor(400_000_000_000)
@@ -278,19 +345,6 @@ impl Default for TestMarket<u128, 20> {
             max_pool_amount: 1_000_000_000 * 10u128.pow(20),
             max_pool_value_for_deposit: 1_000_000_000_000_000 * 10u128.pow(20),
             max_open_interest: 1_000_000_000 * 10u128.pow(20),
-            primary: Default::default(),
-            swap_impact: Default::default(),
-            fee: Default::default(),
-            open_interest: Default::default(),
-            open_interest_in_tokens: Default::default(),
-            position_impact: Default::default(),
-            borrowing_factor: Default::default(),
-            funding_factor_per_second: Default::default(),
-            funding_amount_per_size: Default::default(),
-            claimable_funding_amount_per_size: Default::default(),
-            collateral_sum: Default::default(),
-            total_borrowing: Default::default(),
-            clocks: Default::default(),
         }
     }
 }
@@ -368,22 +422,22 @@ where
     }
 
     fn max_pool_amount(&self, _is_long_token: bool) -> crate::Result<Self::Num> {
-        Ok(self.max_pool_amount.clone())
+        Ok(self.config.max_pool_amount.clone())
     }
 
     fn pnl_factor_config(&self, kind: PnlFactorKind, _is_long: bool) -> crate::Result<Self::Num> {
         let factor = match kind {
-            PnlFactorKind::MaxAfterDeposit => self.max_pnl_factors.deposit.clone(),
-            PnlFactorKind::MaxAfterWithdrawal => self.max_pnl_factors.withdrawal.clone(),
-            PnlFactorKind::MaxForTrader => self.max_pnl_factors.trader.clone(),
-            PnlFactorKind::ForAdl => self.max_pnl_factors.adl.clone(),
-            PnlFactorKind::MinAfterAdl => self.min_pnl_factor_after_adl.clone(),
+            PnlFactorKind::MaxAfterDeposit => self.config.max_pnl_factors.deposit.clone(),
+            PnlFactorKind::MaxAfterWithdrawal => self.config.max_pnl_factors.withdrawal.clone(),
+            PnlFactorKind::MaxForTrader => self.config.max_pnl_factors.trader.clone(),
+            PnlFactorKind::ForAdl => self.config.max_pnl_factors.adl.clone(),
+            PnlFactorKind::MinAfterAdl => self.config.min_pnl_factor_after_adl.clone(),
         };
         Ok(factor)
     }
 
     fn reserve_factor(&self) -> crate::Result<Self::Num> {
-        Ok(self.reserve_factor.clone())
+        Ok(self.config.reserve_factor.clone())
     }
 }
 
@@ -407,11 +461,11 @@ where
     T::Signed: Num + std::fmt::Debug,
 {
     fn swap_impact_params(&self) -> crate::Result<PriceImpactParams<Self::Num>> {
-        Ok(self.swap_impact_params.clone())
+        Ok(self.config.swap_impact_params.clone())
     }
 
     fn swap_fee_params(&self) -> crate::Result<FeeParams<Self::Num>> {
-        Ok(self.swap_fee_params.clone())
+        Ok(self.config.swap_fee_params.clone())
     }
 }
 
@@ -435,7 +489,7 @@ where
     }
 
     fn max_pool_value_for_deposit(&self, _is_long_token: bool) -> crate::Result<Self::Num> {
-        Ok(self.max_pool_value_for_deposit.clone())
+        Ok(self.config.max_pool_value_for_deposit.clone())
     }
 
     fn mint(&mut self, amount: &Self::Num) -> Result<(), crate::Error> {
@@ -465,13 +519,13 @@ where
     }
 
     fn position_impact_params(&self) -> crate::Result<PriceImpactParams<Self::Num>> {
-        Ok(self.position_impact_params.clone())
+        Ok(self.config.position_impact_params.clone())
     }
 
     fn position_impact_distribution_params(
         &self,
     ) -> crate::Result<PositionImpactDistributionParams<Self::Num>> {
-        Ok(self.position_impact_distribution_params.clone())
+        Ok(self.config.position_impact_distribution_params.clone())
     }
 
     fn passed_in_seconds_for_position_impact_distribution(&self) -> crate::Result<u64> {
@@ -499,7 +553,7 @@ where
     T::Signed: Num + std::fmt::Debug,
 {
     fn borrowing_fee_params(&self) -> crate::Result<BorrowingFeeParams<Self::Num>> {
-        Ok(self.borrowing_fee_params.clone())
+        Ok(self.config.borrowing_fee_params.clone())
     }
 
     fn borrowing_factor_pool(&self) -> crate::Result<&Self::Pool> {
@@ -529,7 +583,7 @@ where
     }
 
     fn funding_fee_params(&self) -> crate::Result<FundingFeeParams<Self::Num>> {
-        Ok(self.funding_fee_params.clone())
+        Ok(self.config.funding_fee_params.clone())
     }
 
     fn funding_amount_per_size_pool(&self, is_long: bool) -> crate::Result<&Self::Pool> {
@@ -549,19 +603,19 @@ where
     }
 
     fn position_params(&self) -> crate::Result<PositionParams<Self::Num>> {
-        Ok(self.position_params.clone())
+        Ok(self.config.position_params.clone())
     }
 
     fn order_fee_params(&self) -> crate::Result<FeeParams<Self::Num>> {
-        Ok(self.order_fee_params.clone())
+        Ok(self.config.order_fee_params.clone())
     }
 
     fn open_interest_reserve_factor(&self) -> crate::Result<Self::Num> {
-        Ok(self.open_interest_reserve_factor.clone())
+        Ok(self.config.open_interest_reserve_factor.clone())
     }
 
     fn max_open_interest(&self, _is_long: bool) -> crate::Result<Self::Num> {
-        Ok(self.max_open_interest.clone())
+        Ok(self.config.max_open_interest.clone())
     }
 }
 

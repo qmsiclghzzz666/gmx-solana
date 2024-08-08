@@ -343,11 +343,18 @@ impl<const DECIMALS: u8, M: LiquidityMarket<DECIMALS>> Deposit<M, DECIMALS> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{action::Prices, market::LiquidityMarketExt, test::TestMarket};
+    use crate::{
+        action::Prices,
+        market::LiquidityMarketExt,
+        test::{TestMarket, TestMarketConfig},
+    };
 
     #[test]
     fn basic() -> Result<(), crate::Error> {
-        let mut market = TestMarket::<u64, 9>::default();
+        let mut market = TestMarket::<u64, 9>::with_config(TestMarketConfig {
+            reserve_factor: 1_050_000_000,
+            ..Default::default()
+        });
         let prices = Prices {
             index_token_price: 120,
             long_token_price: 120,
