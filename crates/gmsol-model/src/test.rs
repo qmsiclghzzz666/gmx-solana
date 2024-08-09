@@ -153,6 +153,7 @@ impl TestMarket<u64, 9> {
     }
 }
 
+#[cfg(feature = "u128")]
 impl TestMarket<u128, 20> {
     /// Create a new [`TestMarket`] with config.
     pub fn with_config(config: TestMarketConfig<u128, 20>) -> Self {
