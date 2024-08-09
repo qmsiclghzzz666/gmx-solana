@@ -36,7 +36,7 @@ impl Hermes {
         &self,
         feed_ids: impl IntoIterator<Item = &Identifier>,
         encoding: Option<EncodingType>,
-    ) -> crate::Result<impl Stream<Item = crate::Result<PriceUpdate>>> {
+    ) -> crate::Result<impl Stream<Item = crate::Result<PriceUpdate>> + 'static> {
         let params = get_query(feed_ids, encoding);
         let stream = self
             .client
