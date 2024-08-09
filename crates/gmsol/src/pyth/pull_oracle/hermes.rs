@@ -2,8 +2,9 @@ use std::fmt;
 
 use eventsource_stream::Eventsource;
 use futures_util::{Stream, TryStreamExt};
-use pyth_sdk::Identifier;
 use reqwest::{Client, IntoUrl, Url};
+
+pub use pyth_sdk::Identifier;
 
 /// Default base URL for Hermes.
 pub const DEFAULT_HERMES_BASE: &str = "https://hermes.pyth.network";
