@@ -246,7 +246,11 @@ impl<'a, 'info> gmsol_model::LiquidityMarket<{ constants::MARKET_DECIMALS }>
     fn max_pool_value_for_deposit(&self, is_long_token: bool) -> gmsol_model::Result<Self::Num> {
         self.market.market.max_pool_value_for_deposit(is_long_token)
     }
+}
 
+impl<'a, 'info> gmsol_model::LiquidityMarketMut<{ constants::MARKET_DECIMALS }>
+    for RevertibleLiquidityMarket<'a, 'info>
+{
     fn mint(&mut self, amount: &Self::Num) -> gmsol_model::Result<()> {
         let new_mint: u64 = (*amount)
             .try_into()

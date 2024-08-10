@@ -2,7 +2,7 @@ use num_traits::{CheckedAdd, CheckedMul, CheckedSub, Signed, Zero};
 
 use crate::{
     market::{
-        BaseMarket, BaseMarketExt, BaseMarketMutExt, LiquidityMarket, LiquidityMarketExt,
+        BaseMarket, BaseMarketExt, BaseMarketMutExt, LiquidityMarketExt, LiquidityMarketMut,
         SwapMarketMutExt,
     },
     num::{MulDiv, UnsignedAbs},
@@ -105,7 +105,7 @@ where
     }
 }
 
-impl<const DECIMALS: u8, M: LiquidityMarket<DECIMALS>> Deposit<M, DECIMALS> {
+impl<const DECIMALS: u8, M: LiquidityMarketMut<DECIMALS>> Deposit<M, DECIMALS> {
     /// Create a new deposit to the given market.
     pub fn try_new(
         market: M,
@@ -345,7 +345,7 @@ impl<const DECIMALS: u8, M: LiquidityMarket<DECIMALS>> Deposit<M, DECIMALS> {
 mod tests {
     use crate::{
         action::Prices,
-        market::LiquidityMarketExt,
+        market::LiquidityMarketMutExt,
         test::{TestMarket, TestMarketConfig},
     };
 

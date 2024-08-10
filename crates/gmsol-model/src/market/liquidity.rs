@@ -13,14 +13,19 @@ use super::{
 
 /// A market for providing liquidity.
 pub trait LiquidityMarket<const DECIMALS: u8>:
-    SwapMarketMut<DECIMALS> + PositionImpactMarket<DECIMALS> + BorrowingFeeMarket<DECIMALS>
+    PositionImpactMarket<DECIMALS> + BorrowingFeeMarket<DECIMALS>
 {
     /// Get total supply of the market token.
     fn total_supply(&self) -> Self::Num;
 
     /// Get max pool value for deposit.
     fn max_pool_value_for_deposit(&self, is_long_token: bool) -> crate::Result<Self::Num>;
+}
 
+/// A market for providing liquidity.
+pub trait LiquidityMarketMut<const DECIMALS: u8>:
+    SwapMarketMut<DECIMALS> + LiquidityMarket<DECIMALS>
+{
     /// Perform mint.
     fn mint(&mut self, amount: &Self::Num) -> Result<(), crate::Error>;
 
@@ -36,7 +41,11 @@ impl<'a, M: LiquidityMarket<DECIMALS>, const DECIMALS: u8> LiquidityMarket<DECIM
     fn max_pool_value_for_deposit(&self, is_long_token: bool) -> crate::Result<Self::Num> {
         (**self).max_pool_value_for_deposit(is_long_token)
     }
+}
 
+impl<'a, M: LiquidityMarketMut<DECIMALS>, const DECIMALS: u8> LiquidityMarketMut<DECIMALS>
+    for &'a mut M
+{
     fn mint(&mut self, amount: &Self::Num) -> Result<(), crate::Error> {
         (**self).mint(amount)
     }
@@ -48,31 +57,6 @@ impl<'a, M: LiquidityMarket<DECIMALS>, const DECIMALS: u8> LiquidityMarket<DECIM
 
 /// Extension trait of [`LiquidityMarket`].
 pub trait LiquidityMarketExt<const DECIMALS: u8>: LiquidityMarket<DECIMALS> {
-    /// Create a [`Deposit`] action.
-    fn deposit(
-        &mut self,
-        long_token_amount: Self::Num,
-        short_token_amount: Self::Num,
-        prices: Prices<Self::Num>,
-    ) -> Result<Deposit<&mut Self, DECIMALS>, crate::Error>
-    where
-        Self: Sized,
-    {
-        Deposit::try_new(self, long_token_amount, short_token_amount, prices)
-    }
-
-    /// Create a [`Withdrawal`].
-    fn withdraw(
-        &mut self,
-        market_token_amount: Self::Num,
-        prices: Prices<Self::Num>,
-    ) -> crate::Result<Withdrawal<&mut Self, DECIMALS>>
-    where
-        Self: Sized,
-    {
-        Withdrawal::try_new(self, market_token_amount, prices)
-    }
-
     /// Validate (primary) pool value for deposit.
     fn validate_pool_value_for_deposit(
         &self,
@@ -97,7 +81,6 @@ pub trait LiquidityMarketExt<const DECIMALS: u8>: LiquidityMarket<DECIMALS> {
         pnl_factor: PnlFactorKind,
         maximize: bool,
     ) -> crate::Result<Self::Num> {
-        // TODO: All pending values should be taken into consideration.
         let mut pool_value = {
             let long_value = self.pool_value_without_pnl_for_one_side(prices, true, maximize)?;
             let short_value = self.pool_value_without_pnl_for_one_side(prices, false, maximize)?;
@@ -156,6 +139,50 @@ pub trait LiquidityMarketExt<const DECIMALS: u8>: LiquidityMarket<DECIMALS> {
 
         Ok(pool_value)
     }
+
+    /// Get market token price.
+    fn market_token_price(
+        &self,
+        prices: &Prices<Self::Num>,
+        pnl_factor: PnlFactorKind,
+        maximize: bool,
+    ) -> crate::Result<Self::Num> {
+        let supply = self.total_supply();
+        let pool_value = self.pool_value(prices, pnl_factor, maximize)?;
+        let one = Self::Num::UNIT / self.usd_to_amount_divisor();
+        crate::utils::market_token_amount_to_usd(&one, &pool_value, &supply)
+            .ok_or(crate::Error::Computation("calculating market token price"))
+    }
 }
 
 impl<M: LiquidityMarket<DECIMALS>, const DECIMALS: u8> LiquidityMarketExt<DECIMALS> for M {}
+
+/// Extension trait of [`LiquidityMarket`].
+pub trait LiquidityMarketMutExt<const DECIMALS: u8>: LiquidityMarketMut<DECIMALS> {
+    /// Create a [`Deposit`] action.
+    fn deposit(
+        &mut self,
+        long_token_amount: Self::Num,
+        short_token_amount: Self::Num,
+        prices: Prices<Self::Num>,
+    ) -> Result<Deposit<&mut Self, DECIMALS>, crate::Error>
+    where
+        Self: Sized,
+    {
+        Deposit::try_new(self, long_token_amount, short_token_amount, prices)
+    }
+
+    /// Create a [`Withdrawal`].
+    fn withdraw(
+        &mut self,
+        market_token_amount: Self::Num,
+        prices: Prices<Self::Num>,
+    ) -> crate::Result<Withdrawal<&mut Self, DECIMALS>>
+    where
+        Self: Sized,
+    {
+        Withdrawal::try_new(self, market_token_amount, prices)
+    }
+}
+
+impl<M: LiquidityMarketMut<DECIMALS>, const DECIMALS: u8> LiquidityMarketMutExt<DECIMALS> for M {}

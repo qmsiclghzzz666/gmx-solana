@@ -74,7 +74,7 @@ mod tests {
 
     use crate::{
         action::Prices,
-        market::LiquidityMarketExt,
+        market::LiquidityMarketMutExt,
         test::{TestMarket, TestPosition},
         PositionMutExt,
     };

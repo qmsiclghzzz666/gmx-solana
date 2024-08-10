@@ -506,7 +506,7 @@ where
 #[cfg(test)]
 mod tests {
     use crate::{
-        market::LiquidityMarketExt,
+        market::LiquidityMarketMutExt,
         test::{TestMarket, TestPosition},
     };
 

@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token, TokenAccount};
-use gmsol_model::{LiquidityMarketExt, PositionImpactMarketMutExt};
+use gmsol_model::{LiquidityMarketMutExt, PositionImpactMarketMutExt};
 
 use crate::{
     states::{

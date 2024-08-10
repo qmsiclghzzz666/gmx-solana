@@ -291,7 +291,7 @@ impl<const DECIMALS: u8, M: SwapMarketMut<DECIMALS>> Swap<M, DECIMALS> {
 mod tests {
     use crate::{
         action::Prices,
-        market::{LiquidityMarketExt, SwapMarketMutExt},
+        market::{LiquidityMarketMutExt, SwapMarketMutExt},
         pool::Balance,
         test::TestMarket,
         BaseMarket, LiquidityMarket,

@@ -4,7 +4,8 @@ use crate::{
     clock::ClockKind,
     fixed::FixedPointOps,
     market::{
-        BaseMarket, LiquidityMarket, PerpMarket, PnlFactorKind, PositionImpactMarket, SwapMarket,
+        BaseMarket, LiquidityMarket, LiquidityMarketMut, PerpMarket, PnlFactorKind,
+        PositionImpactMarket, SwapMarket,
     },
     num::{MulDiv, Num, Unsigned, UnsignedAbs},
     params::{
@@ -492,7 +493,13 @@ where
     fn max_pool_value_for_deposit(&self, _is_long_token: bool) -> crate::Result<Self::Num> {
         Ok(self.config.max_pool_value_for_deposit.clone())
     }
+}
 
+impl<T, const DECIMALS: u8> LiquidityMarketMut<DECIMALS> for TestMarket<T, DECIMALS>
+where
+    T: CheckedSub + fmt::Display + FixedPointOps<DECIMALS>,
+    T::Signed: Num + std::fmt::Debug,
+{
     fn mint(&mut self, amount: &Self::Num) -> Result<(), crate::Error> {
         self.total_supply = self
             .total_supply

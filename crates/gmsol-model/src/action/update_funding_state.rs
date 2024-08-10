@@ -435,7 +435,7 @@ mod tests {
     use std::{thread::sleep, time::Duration};
 
     use crate::{
-        market::LiquidityMarketExt,
+        market::LiquidityMarketMutExt,
         test::{TestMarket, TestPosition},
         PositionMutExt,
     };

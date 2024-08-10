@@ -1,5 +1,5 @@
 use crate::{
-    market::{BaseMarket, BaseMarketExt, LiquidityMarket, LiquidityMarketExt},
+    market::{BaseMarket, BaseMarketExt, LiquidityMarketExt, LiquidityMarketMut},
     num::MulDiv,
     params::Fees,
     utils, BalanceExt, PnlFactorKind, PoolExt,
@@ -77,7 +77,7 @@ impl<T> WithdrawReport<T> {
     }
 }
 
-impl<const DECIMALS: u8, M: LiquidityMarket<DECIMALS>> Withdrawal<M, DECIMALS> {
+impl<const DECIMALS: u8, M: LiquidityMarketMut<DECIMALS>> Withdrawal<M, DECIMALS> {
     /// Create a new withdrawal from the given market.
     pub fn try_new(
         market: M,
@@ -213,7 +213,7 @@ impl<const DECIMALS: u8, M: LiquidityMarket<DECIMALS>> Withdrawal<M, DECIMALS> {
 #[cfg(test)]
 mod tests {
     use crate::{
-        action::Prices, market::LiquidityMarketExt, pool::Balance, test::TestMarket, BaseMarket,
+        action::Prices, market::LiquidityMarketMutExt, pool::Balance, test::TestMarket, BaseMarket,
         LiquidityMarket,
     };
 

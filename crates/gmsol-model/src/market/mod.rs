@@ -19,7 +19,7 @@ pub mod perp;
 pub use self::{
     base::{BaseMarket, BaseMarketExt, BaseMarketMut, BaseMarketMutExt, PnlFactorKind},
     borrowing::{BorrowingFeeMarket, BorrowingFeeMarketExt},
-    liquidity::{LiquidityMarket, LiquidityMarketExt},
+    liquidity::{LiquidityMarket, LiquidityMarketExt, LiquidityMarketMut, LiquidityMarketMutExt},
     perp::{PerpMarket, PerpMarketExt, PerpMarketMut, PerpMarketMutExt},
     position_impact::{
         PositionImpactMarket, PositionImpactMarketExt, PositionImpactMarketMut,
