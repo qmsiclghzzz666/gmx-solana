@@ -293,7 +293,7 @@ use self::{
     states::{
         common::{SwapParams, TokenRecord},
         deposit::TokenParams as DepositTokenParams,
-        market::{config::EntryArgs, MarketMeta},
+        market::{config::EntryArgs, status::MarketStatus, MarketMeta},
         order::{OrderParams, TransferOut, UpdateOrderParams},
         token_config::TokenConfigBuilder,
         withdrawal::TokenParams as WithdrawalTokenParams,
@@ -302,6 +302,7 @@ use self::{
     utils::internal,
 };
 use anchor_lang::prelude::*;
+use gmsol_model::action::Prices;
 use gmsol_utils::price::Price;
 
 #[cfg_attr(test, macro_use)]
@@ -880,6 +881,21 @@ pub mod gmsol_store {
     /// - `key`: The key of the config item.
     pub fn get_market_config(ctx: Context<ReadMarket>, key: String) -> Result<u128> {
         instructions::get_market_config(ctx, &key)
+    }
+
+    /// Read current market status.
+    ///
+    /// # Accounts
+    /// [*See the documentation for the accounts.*](ReadMarketWithToken)
+    ///
+    /// # Arguments
+    /// - `key`: The key of the config item.
+    pub fn get_market_status(
+        ctx: Context<ReadMarketWithToken>,
+        prices: Prices<u128>,
+        maximize: bool,
+    ) -> Result<MarketStatus> {
+        instructions::get_market_status(ctx, &prices, maximize)
     }
 
     /// Update an item in the market config.

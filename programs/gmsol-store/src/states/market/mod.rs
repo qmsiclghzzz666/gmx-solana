@@ -35,6 +35,9 @@ pub mod revertible;
 /// Pool.
 pub mod pool;
 
+/// Market Status.
+pub mod status;
+
 mod model;
 
 /// Max number of flags.

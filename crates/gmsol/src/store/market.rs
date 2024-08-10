@@ -5,7 +5,7 @@ use anchor_client::{
     solana_sdk::{pubkey::Pubkey, signer::Signer},
     RequestBuilder,
 };
-use gmsol_model::PoolKind;
+use gmsol_model::{action::Prices, PoolKind};
 use gmsol_store::{
     accounts, instruction,
     states::{config::EntryArgs, Factor, MarketConfigKey},
@@ -84,6 +84,15 @@ where
 
 /// Market Ops.
 pub trait MarketOps<C> {
+    /// Get market status.
+    fn get_market_status(
+        &self,
+        store: &Pubkey,
+        market_token: &Pubkey,
+        prices: Prices<u128>,
+        maximize: bool,
+    ) -> RequestBuilder<C>;
+
     /// Update market config.
     fn update_market_config(
         &self,
@@ -167,6 +176,22 @@ where
     C: Deref<Target = S> + Clone,
     S: Signer,
 {
+    fn get_market_status(
+        &self,
+        store: &Pubkey,
+        market_token: &Pubkey,
+        prices: Prices<u128>,
+        maximize: bool,
+    ) -> RequestBuilder<C> {
+        self.data_store()
+            .request()
+            .args(instruction::GetMarketStatus { prices, maximize })
+            .accounts(accounts::ReadMarketWithToken {
+                market: self.find_market_address(store, market_token),
+                market_token: *market_token,
+            })
+    }
+
     fn update_market_config(
         &self,
         store: &Pubkey,

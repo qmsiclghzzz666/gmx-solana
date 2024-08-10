@@ -1,11 +1,15 @@
-use crate::states::{
-    revertible::{Revertible, RevertibleSwapMarket},
-    Factor, HasMarketMeta, ValidateMarketBalances,
+use crate::{
+    states::{
+        revertible::{Revertible, RevertibleSwapMarket},
+        status::MarketStatus,
+        Factor, HasMarketMeta, ValidateMarketBalances,
+    },
+    ModelError,
 };
 
 use anchor_lang::prelude::*;
-use anchor_spl::token::{Token, TokenAccount};
-use gmsol_model::{num::Unsigned, BalanceExt, BaseMarketMut, PoolExt};
+use anchor_spl::token::{Mint, Token, TokenAccount};
+use gmsol_model::{action::Prices, num::Unsigned, BalanceExt, BaseMarketMut, PoolExt};
 use gmsol_utils::InitSpace;
 
 use crate::{
@@ -333,6 +337,27 @@ pub(crate) fn get_market_config(ctx: Context<ReadMarket>, key: &str) -> Result<F
 pub(crate) fn get_market_meta(ctx: Context<ReadMarket>) -> Result<MarketMeta> {
     let market = ctx.accounts.market.load()?;
     Ok(*market.meta())
+}
+
+/// The accounts definition for read-only instructions for market.
+#[derive(Accounts)]
+pub struct ReadMarketWithToken<'info> {
+    #[account(
+        constraint = market.load()?.meta.market_token_mint == market_token.key() @ StoreError::InvalidArgument,
+    )]
+    market: AccountLoader<'info, Market>,
+    market_token: Account<'info, Mint>,
+}
+
+/// Get market status.
+pub(crate) fn get_market_status(
+    ctx: Context<ReadMarketWithToken>,
+    prices: &Prices<u128>,
+    maximize: bool,
+) -> Result<MarketStatus> {
+    let market = ctx.accounts.market.load()?;
+    let status = MarketStatus::from_market(&market, prices, maximize).map_err(ModelError::from)?;
+    Ok(status)
 }
 
 /// The accounts definition for [`update_market_config`](crate::gmsol_store::update_market_config).

@@ -10,12 +10,14 @@ use anchor_client::{
     Cluster, Program,
 };
 
-use gmsol_store::states::{position::PositionKind, NonceBytes};
+use gmsol_model::action::Prices;
+use gmsol_store::states::{position::PositionKind, status::MarketStatus, NonceBytes};
 use solana_account_decoder::UiAccountEncoding;
 use tokio::sync::OnceCell;
 use typed_builder::TypedBuilder;
 
 use crate::{
+    store::market::MarketOps,
     types,
     utils::{
         account_with_context, accounts_lazy_with_context, ProgramAccountsConfig, PubsubClient,
@@ -428,6 +430,23 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
             .account::<ZeroCopy<types::Market>>(*address)
             .await?
             .0)
+    }
+
+    /// Fetch [`MarketStatus`] with the market token address.
+    pub async fn market_status(
+        &self,
+        store: &Pubkey,
+        market_token: &Pubkey,
+        prices: Prices<u128>,
+        maximize: bool,
+    ) -> crate::Result<MarketStatus> {
+        let req = self.get_market_status(store, market_token, prices, maximize);
+        let status = crate::utils::view::<MarketStatus>(
+            &self.data_store().async_rpc(),
+            &req.signed_transaction().await?,
+        )
+        .await?;
+        Ok(status)
     }
 
     /// Fetch all [`Position`](types::Position) accounts of the given owner of the given store.
