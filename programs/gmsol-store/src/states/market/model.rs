@@ -1,3 +1,4 @@
+use anchor_spl::token::Mint;
 use gmsol_model::{
     params::{
         fee::{BorrowingFeeParams, FundingFeeParams},
@@ -246,5 +247,124 @@ impl gmsol_model::PerpMarket<{ constants::MARKET_DECIMALS }> for Market {
         } else {
             Ok(self.config.max_open_interest_for_short)
         }
+    }
+}
+
+/// As a liquidity market.
+pub struct AsLiquidityMarket<'a> {
+    market: &'a Market,
+    mint: &'a Mint,
+}
+
+impl<'a> AsLiquidityMarket<'a> {
+    /// Create a new [`AsLiquidityMarket`].
+    pub fn new(market: &'a Market, market_token: &'a Mint) -> Self {
+        Self {
+            market,
+            mint: market_token,
+        }
+    }
+}
+
+impl<'a> gmsol_model::BaseMarket<{ constants::MARKET_DECIMALS }> for AsLiquidityMarket<'a> {
+    type Num = u128;
+
+    type Signed = i128;
+
+    type Pool = Pool;
+
+    fn liquidity_pool(&self) -> gmsol_model::Result<&Self::Pool> {
+        self.market.liquidity_pool()
+    }
+
+    fn claimable_fee_pool(&self) -> gmsol_model::Result<&Self::Pool> {
+        self.market.claimable_fee_pool()
+    }
+
+    fn swap_impact_pool(&self) -> gmsol_model::Result<&Self::Pool> {
+        self.market.swap_impact_pool()
+    }
+
+    fn open_interest_pool(&self, is_long: bool) -> gmsol_model::Result<&Self::Pool> {
+        self.market.open_interest_pool(is_long)
+    }
+
+    fn open_interest_in_tokens_pool(&self, is_long: bool) -> gmsol_model::Result<&Self::Pool> {
+        self.market.open_interest_in_tokens_pool(is_long)
+    }
+
+    fn collateral_sum_pool(&self, is_long: bool) -> gmsol_model::Result<&Self::Pool> {
+        self.market.collateral_sum_pool(is_long)
+    }
+
+    fn usd_to_amount_divisor(&self) -> Self::Num {
+        self.market.usd_to_amount_divisor()
+    }
+
+    fn max_pool_amount(&self, is_long_token: bool) -> gmsol_model::Result<Self::Num> {
+        self.market.max_pool_amount(is_long_token)
+    }
+
+    fn pnl_factor_config(
+        &self,
+        kind: gmsol_model::PnlFactorKind,
+        is_long: bool,
+    ) -> gmsol_model::Result<Self::Num> {
+        self.market.pnl_factor_config(kind, is_long)
+    }
+
+    fn reserve_factor(&self) -> gmsol_model::Result<Self::Num> {
+        self.market.reserve_factor()
+    }
+}
+
+impl<'a> gmsol_model::PositionImpactMarket<{ constants::MARKET_DECIMALS }>
+    for AsLiquidityMarket<'a>
+{
+    fn position_impact_pool(&self) -> gmsol_model::Result<&Self::Pool> {
+        self.market.position_impact_pool()
+    }
+
+    fn position_impact_params(&self) -> gmsol_model::Result<PriceImpactParams<Self::Num>> {
+        self.market.position_impact_params()
+    }
+
+    fn position_impact_distribution_params(
+        &self,
+    ) -> gmsol_model::Result<PositionImpactDistributionParams<Self::Num>> {
+        self.market.position_impact_distribution_params()
+    }
+
+    fn passed_in_seconds_for_position_impact_distribution(&self) -> gmsol_model::Result<u64> {
+        self.market
+            .passed_in_seconds_for_position_impact_distribution()
+    }
+}
+
+impl<'a> gmsol_model::BorrowingFeeMarket<{ constants::MARKET_DECIMALS }> for AsLiquidityMarket<'a> {
+    fn borrowing_factor_pool(&self) -> gmsol_model::Result<&Self::Pool> {
+        self.market.borrowing_factor_pool()
+    }
+
+    fn total_borrowing_pool(&self) -> gmsol_model::Result<&Self::Pool> {
+        self.market.total_borrowing_pool()
+    }
+
+    fn borrowing_fee_params(&self) -> gmsol_model::Result<BorrowingFeeParams<Self::Num>> {
+        self.market.borrowing_fee_params()
+    }
+
+    fn passed_in_seconds_for_borrowing(&self) -> gmsol_model::Result<u64> {
+        self.market.passed_in_seconds_for_borrowing()
+    }
+}
+
+impl<'a> gmsol_model::LiquidityMarket<{ constants::MARKET_DECIMALS }> for AsLiquidityMarket<'a> {
+    fn total_supply(&self) -> Self::Num {
+        self.mint.supply.into()
+    }
+
+    fn max_pool_value_for_deposit(&self, is_long_token: bool) -> gmsol_model::Result<Self::Num> {
+        self.market.max_pool_value_for_deposit(is_long_token)
     }
 }

@@ -33,7 +33,8 @@ impl MarketStatus {
     pub fn from_market(
         market: &Market,
         prices: &Prices<u128>,
-        maximize: bool,
+        maximize_pnl: bool,
+        maximize_pool_value: bool,
     ) -> gmsol_model::Result<Self> {
         Ok(Self {
             funding_factor_per_second: *market.funding_factor_per_second(),
@@ -41,14 +42,20 @@ impl MarketStatus {
                 .borrowing_factor_per_second(true, prices)?,
             borrowing_factor_per_second_for_short: market
                 .borrowing_factor_per_second(false, prices)?,
-            pending_pnl_for_long: market.pnl(&prices.index_token_price, true, maximize)?,
-            pending_pnl_for_short: market.pnl(&prices.index_token_price, false, maximize)?,
+            pending_pnl_for_long: market.pnl(&prices.index_token_price, true, maximize_pnl)?,
+            pending_pnl_for_short: market.pnl(&prices.index_token_price, false, maximize_pnl)?,
             reserve_value_for_long: market.reserved_value(&prices.index_token_price, true)?,
             reserve_value_for_short: market.reserved_value(&prices.index_token_price, false)?,
-            pool_value_without_pnl_for_long: market
-                .pool_value_without_pnl_for_one_side(prices, true, false)?,
-            pool_value_without_pnl_for_short: market
-                .pool_value_without_pnl_for_one_side(prices, false, false)?,
+            pool_value_without_pnl_for_long: market.pool_value_without_pnl_for_one_side(
+                prices,
+                true,
+                maximize_pool_value,
+            )?,
+            pool_value_without_pnl_for_short: market.pool_value_without_pnl_for_one_side(
+                prices,
+                false,
+                maximize_pool_value,
+            )?,
         })
     }
 }

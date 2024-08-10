@@ -1,4 +1,4 @@
-use num_traits::{CheckedAdd, CheckedSub};
+use num_traits::{CheckedAdd, CheckedSub, Zero};
 
 use crate::{
     action::{deposit::Deposit, withdraw::Withdrawal, Prices},
@@ -148,6 +148,9 @@ pub trait LiquidityMarketExt<const DECIMALS: u8>: LiquidityMarket<DECIMALS> {
         maximize: bool,
     ) -> crate::Result<Self::Num> {
         let supply = self.total_supply();
+        if supply.is_zero() {
+            return Err(crate::Error::invalid_argument("empty market token supply"));
+        }
         let pool_value = self.pool_value(prices, pnl_factor, maximize)?;
         let one = Self::Num::UNIT / self.usd_to_amount_divisor();
         crate::utils::market_token_amount_to_usd(&one, &pool_value, &supply)

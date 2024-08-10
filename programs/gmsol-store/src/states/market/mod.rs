@@ -1,9 +1,11 @@
 use std::{collections::BTreeSet, str::FromStr};
 
 use anchor_lang::{prelude::*, Bump};
+use anchor_spl::token::Mint;
 use bitmaps::Bitmap;
 use borsh::{BorshDeserialize, BorshSerialize};
 use gmsol_model::{action::Prices, ClockKind, PoolKind};
+use model::AsLiquidityMarket;
 
 use crate::{
     utils::fixed_str::{bytes_to_fixed_str, fixed_str_to_bytes},
@@ -371,6 +373,11 @@ impl Market {
         } else {
             Ok(self.config.max_pool_value_for_deposit_for_short_token)
         }
+    }
+
+    /// As a liquidity market.
+    pub fn as_liquidity_market<'a>(&'a self, market_token: &'a Mint) -> AsLiquidityMarket<'a> {
+        AsLiquidityMarket::new(self, market_token)
     }
 }
 

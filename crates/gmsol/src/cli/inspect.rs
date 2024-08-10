@@ -4,13 +4,14 @@ use anchor_client::{
     anchor_lang::{AnchorDeserialize, Discriminator},
     solana_sdk::{native_token::lamports_to_sol, pubkey::Pubkey},
 };
+use eyre::OptionExt;
 use futures_util::{pin_mut, StreamExt};
 use gmsol::{
     types::{self, TokenMapAccess},
     utils::{signed_value_to_decimal, unsigned_value_to_decimal, ZeroCopy},
 };
 use gmsol_exchange::states::{display_feature, ActionDisabledFlag, Controller, DomainDisabledFlag};
-use gmsol_model::{Balance, BalanceExt, ClockKind, PoolKind};
+use gmsol_model::{action::Prices, Balance, BalanceExt, ClockKind, PnlFactorKind, PoolKind};
 use gmsol_store::states::{
     self, AddressKey, AmountKey, FactorKey, MarketConfigKey, PriceProviderKind,
 };
@@ -83,6 +84,7 @@ enum Command {
     },
     /// `Market` account.
     Market {
+        /// Market token address.
         address: Option<Pubkey>,
         /// Consider the address as market address rather than the address of its market token.
         #[arg(long)]
@@ -92,6 +94,14 @@ enum Command {
         /// Output format.
         #[arg(long, short)]
         output: Option<Output>,
+    },
+    /// Market status.
+    MarketStatus {
+        /// Market token address.
+        market_token: Pubkey,
+        /// Prices.
+        #[command(flatten)]
+        prices: Option<MarketPrices>,
     },
     /// `MarketConfigBuffer` account.
     MarketConfigBuffer {
@@ -175,6 +185,30 @@ pub enum Program {
     Store,
     /// Exchange.
     Exchange,
+}
+
+/// Market prices.
+#[derive(clap::Args)]
+pub struct MarketPrices {
+    /// Index token price (unit price).
+    #[arg(long, short)]
+    pub index_price: u128,
+    /// Long token price (unit price).
+    #[arg(long, short)]
+    pub long_price: u128,
+    /// Short token price (unit price).
+    #[arg(long, short)]
+    pub short_price: u128,
+}
+
+impl MarketPrices {
+    fn to_prices(&self) -> Prices<u128> {
+        Prices {
+            index_token_price: self.index_price,
+            long_token_price: self.long_price,
+            short_token_price: self.short_price,
+        }
+    }
 }
 
 impl InspectArgs {
@@ -361,6 +395,32 @@ impl InspectArgs {
                         Ok(table.to_string())
                     })?;
                 }
+            }
+            Command::MarketStatus {
+                market_token,
+                prices,
+            } => {
+                let prices = prices
+                    .as_ref()
+                    .ok_or_eyre("currently prices must be provided")?
+                    .to_prices();
+                let status = client
+                    .market_status(store, market_token, prices, true, false)
+                    .await?;
+                println!("{status:#?}");
+                let market_token_price = client
+                    .market_token_price(
+                        store,
+                        market_token,
+                        prices,
+                        PnlFactorKind::MaxAfterDeposit,
+                        true,
+                    )
+                    .await?;
+                println!(
+                    "Market token price: {}",
+                    gmsol::utils::unsigned_value_to_decimal(market_token_price)
+                );
             }
             Command::Market {
                 address,

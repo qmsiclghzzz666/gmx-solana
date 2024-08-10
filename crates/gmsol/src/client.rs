@@ -10,7 +10,7 @@ use anchor_client::{
     Cluster, Program,
 };
 
-use gmsol_model::action::Prices;
+use gmsol_model::{action::Prices, PnlFactorKind};
 use gmsol_store::states::{position::PositionKind, status::MarketStatus, NonceBytes};
 use solana_account_decoder::UiAccountEncoding;
 use tokio::sync::OnceCell;
@@ -438,15 +438,40 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         store: &Pubkey,
         market_token: &Pubkey,
         prices: Prices<u128>,
-        maximize: bool,
+        maximize_pnl: bool,
+        maximize_pool_value: bool,
     ) -> crate::Result<MarketStatus> {
-        let req = self.get_market_status(store, market_token, prices, maximize);
+        let req = self.get_market_status(
+            store,
+            market_token,
+            prices,
+            maximize_pnl,
+            maximize_pool_value,
+        );
         let status = crate::utils::view::<MarketStatus>(
             &self.data_store().async_rpc(),
             &req.signed_transaction().await?,
         )
         .await?;
         Ok(status)
+    }
+
+    /// Fetch current market token price with the market token address.
+    pub async fn market_token_price(
+        &self,
+        store: &Pubkey,
+        market_token: &Pubkey,
+        prices: Prices<u128>,
+        pnl_factor: PnlFactorKind,
+        maximize: bool,
+    ) -> crate::Result<u128> {
+        let req = self.get_market_token_price(store, market_token, prices, pnl_factor, maximize);
+        let price = crate::utils::view::<u128>(
+            &self.data_store().async_rpc(),
+            &req.signed_transaction().await?,
+        )
+        .await?;
+        Ok(price)
     }
 
     /// Fetch all [`Position`](types::Position) accounts of the given owner of the given store.

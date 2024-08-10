@@ -415,7 +415,26 @@ pub trait BaseMarketMutExt<const DECIMALS: u8>: BaseMarketMut<DECIMALS> {
 impl<M: BaseMarketMut<DECIMALS> + ?Sized, const DECIMALS: u8> BaseMarketMutExt<DECIMALS> for M {}
 
 /// Pnl Factor Kind.
-#[derive(Debug, Clone, Copy)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    num_enum::TryFromPrimitive,
+    num_enum::IntoPrimitive,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+)]
+#[cfg_attr(
+    feature = "strum",
+    derive(strum::EnumIter, strum::EnumString, strum::Display)
+)]
+#[cfg_attr(feature = "strum", strum(serialize_all = "snake_case"))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
+#[repr(u8)]
 #[non_exhaustive]
 pub enum PnlFactorKind {
     /// For deposit.

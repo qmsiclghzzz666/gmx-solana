@@ -886,16 +886,44 @@ pub mod gmsol_store {
     /// Read current market status.
     ///
     /// # Accounts
-    /// [*See the documentation for the accounts.*](ReadMarketWithToken)
+    /// [*See the documentation for the accounts.*](ReadMarket)
     ///
     /// # Arguments
-    /// - `key`: The key of the config item.
+    /// - `prices`: The unit prices of tokens.
+    /// - `maximize_pnl`: Whether to maximize the PnL.
+    /// - `maximize_pool_value`: Whether to maximize the pool value.
     pub fn get_market_status(
+        ctx: Context<ReadMarket>,
+        prices: Prices<u128>,
+        maximize_pnl: bool,
+        maximize_pool_value: bool,
+    ) -> Result<MarketStatus> {
+        instructions::get_market_status(ctx, &prices, maximize_pnl, maximize_pool_value)
+    }
+
+    /// Get current market token price.
+    ///
+    /// # Accounts
+    /// [*See the documentation for the accounts.*](ReadMarket)
+    ///
+    /// # Arguments
+    /// - `prices`: The unit prices of tokens.
+    /// - `maximize_pnl`: Whether to maximize the PnL.
+    /// - `maximize_pool_value`: Whether to maximize the pool value.
+    pub fn get_market_token_price(
         ctx: Context<ReadMarketWithToken>,
         prices: Prices<u128>,
+        pnl_factor: String,
         maximize: bool,
-    ) -> Result<MarketStatus> {
-        instructions::get_market_status(ctx, &prices, maximize)
+    ) -> Result<u128> {
+        instructions::get_market_token_price(
+            ctx,
+            &prices,
+            pnl_factor
+                .parse()
+                .map_err(|_| error!(StoreError::InvalidArgument))?,
+            maximize,
+        )
     }
 
     /// Update an item in the market config.

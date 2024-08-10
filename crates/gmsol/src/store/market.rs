@@ -5,7 +5,7 @@ use anchor_client::{
     solana_sdk::{pubkey::Pubkey, signer::Signer},
     RequestBuilder,
 };
-use gmsol_model::{action::Prices, PoolKind};
+use gmsol_model::{action::Prices, PnlFactorKind, PoolKind};
 use gmsol_store::{
     accounts, instruction,
     states::{config::EntryArgs, Factor, MarketConfigKey},
@@ -90,6 +90,17 @@ pub trait MarketOps<C> {
         store: &Pubkey,
         market_token: &Pubkey,
         prices: Prices<u128>,
+        maximize_pnl: bool,
+        maximize_pool_value: bool,
+    ) -> RequestBuilder<C>;
+
+    /// Get market token price.
+    fn get_market_token_price(
+        &self,
+        store: &Pubkey,
+        market_token: &Pubkey,
+        prices: Prices<u128>,
+        pnl_factor: PnlFactorKind,
         maximize: bool,
     ) -> RequestBuilder<C>;
 
@@ -181,11 +192,36 @@ where
         store: &Pubkey,
         market_token: &Pubkey,
         prices: Prices<u128>,
+        maximize_pnl: bool,
+        maximize_pool_value: bool,
+    ) -> RequestBuilder<C> {
+        self.data_store()
+            .request()
+            .args(instruction::GetMarketStatus {
+                prices,
+                maximize_pnl,
+                maximize_pool_value,
+            })
+            .accounts(accounts::ReadMarket {
+                market: self.find_market_address(store, market_token),
+            })
+    }
+
+    fn get_market_token_price(
+        &self,
+        store: &Pubkey,
+        market_token: &Pubkey,
+        prices: Prices<u128>,
+        pnl_factor: PnlFactorKind,
         maximize: bool,
     ) -> RequestBuilder<C> {
         self.data_store()
             .request()
-            .args(instruction::GetMarketStatus { prices, maximize })
+            .args(instruction::GetMarketTokenPrice {
+                prices,
+                pnl_factor: pnl_factor.to_string(),
+                maximize,
+            })
             .accounts(accounts::ReadMarketWithToken {
                 market: self.find_market_address(store, market_token),
                 market_token: *market_token,

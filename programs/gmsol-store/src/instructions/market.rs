@@ -9,7 +9,10 @@ use crate::{
 
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token, TokenAccount};
-use gmsol_model::{action::Prices, num::Unsigned, BalanceExt, BaseMarketMut, PoolExt};
+use gmsol_model::{
+    action::Prices, num::Unsigned, BalanceExt, BaseMarketMut, LiquidityMarketExt, PnlFactorKind,
+    PoolExt,
+};
 use gmsol_utils::InitSpace;
 
 use crate::{
@@ -339,6 +342,19 @@ pub(crate) fn get_market_meta(ctx: Context<ReadMarket>) -> Result<MarketMeta> {
     Ok(*market.meta())
 }
 
+/// Get market status.
+pub(crate) fn get_market_status(
+    ctx: Context<ReadMarket>,
+    prices: &Prices<u128>,
+    maximize_pnl: bool,
+    maximize_pool_value: bool,
+) -> Result<MarketStatus> {
+    let market = ctx.accounts.market.load()?;
+    let status = MarketStatus::from_market(&market, prices, maximize_pnl, maximize_pool_value)
+        .map_err(ModelError::from)?;
+    Ok(status)
+}
+
 /// The accounts definition for read-only instructions for market.
 #[derive(Accounts)]
 pub struct ReadMarketWithToken<'info> {
@@ -349,15 +365,19 @@ pub struct ReadMarketWithToken<'info> {
     market_token: Account<'info, Mint>,
 }
 
-/// Get market status.
-pub(crate) fn get_market_status(
+/// Get market token price.
+pub(crate) fn get_market_token_price(
     ctx: Context<ReadMarketWithToken>,
     prices: &Prices<u128>,
+    pnl_factor: PnlFactorKind,
     maximize: bool,
-) -> Result<MarketStatus> {
+) -> Result<u128> {
     let market = ctx.accounts.market.load()?;
-    let status = MarketStatus::from_market(&market, prices, maximize).map_err(ModelError::from)?;
-    Ok(status)
+    let liquidity_market = market.as_liquidity_market(&ctx.accounts.market_token);
+    let price = liquidity_market
+        .market_token_price(prices, pnl_factor, maximize)
+        .map_err(ModelError::from)?;
+    Ok(price)
 }
 
 /// The accounts definition for [`update_market_config`](crate::gmsol_store::update_market_config).
