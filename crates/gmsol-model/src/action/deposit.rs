@@ -364,10 +364,12 @@ mod tests {
             "{:#?}",
             market.deposit(1_000_000_000, 0, prices)?.execute()?
         );
+        println!("{market:#?}");
         println!(
             "{:#?}",
             market.deposit(1_000_000_000, 0, prices)?.execute()?
         );
+        println!("{market:#?}");
         println!(
             "{:#?}",
             market.deposit(0, 1_000_000_000, prices)?.execute()?
@@ -392,11 +394,14 @@ mod tests {
             "{:#?}",
             market_1.deposit(1_000_000_000, 0, prices)?.execute()?
         );
+        println!("{market_1:#?}");
         let mut market_2 = TestMarket::<u64, 9>::default();
         println!(
             "{:#?}",
             market_2.deposit(2_000_000_000, 0, prices)?.execute()?
         );
+        println!("{market_1:#?}");
+        println!("{market_2:#?}");
         Ok(())
     }
 
@@ -424,4 +429,131 @@ mod tests {
         println!("{market:#?}");
         Ok(())
     }
+    
+
+    //test for zero deposit
+    #[test]
+    fn zero_amount_deposit() -> Result<(), crate::Error> {
+        let mut market = TestMarket::<u64, 9>::default();
+        let prices = Prices {
+            index_token_price: 120,
+            long_token_price: 120,
+            short_token_price: 1,
+        };
+        let result = market.deposit(0, 0, prices)?.execute();
+        assert!(result.is_err());
+
+        Ok(())
+    }
+    
+    //test for large and small deposit
+    #[test]
+    fn extreme_amount_deposit() -> Result<(), crate::Error> {
+        let mut market = TestMarket::<u64, 9>::default();
+        let prices = Prices {
+            index_token_price: 120,
+            long_token_price: 120,
+            short_token_price: 1,
+        };
+        let small_amount = 1;
+        let large_amount = u64::MAX;
+        let max_pool_amount = 1000000000000000000;
+        println!(
+            "{:#?}",
+            market.deposit(small_amount, 0, prices)?.execute()?
+        );
+        println!("{market:#?}");
+        
+        let result = market.deposit(large_amount, 0, prices)?.execute();
+        assert!(result.is_err());
+        println!("{market:#?}");
+
+        let result = market.deposit(max_pool_amount, 0, prices)?.execute();
+        assert!(result.is_err());
+        println!("{market:#?}");
+        
+        Ok(())
+    }
+    
+    //test for round attack
+    #[test]
+    fn round_attack_deposit() -> Result<(), crate::Error> {
+        let mut market = TestMarket::<u64, 9>::default();
+        let prices = Prices {
+            index_token_price: 120,
+            long_token_price: 120,
+            short_token_price: 1,
+        };
+        let mut i = 1;
+        while i < 10000000 {
+            i += 1;
+            market.deposit(1, 0, prices)?.execute()?;
+        }
+        println!("{market:#?}");
+        
+        //compare
+        let mut market_compare = TestMarket::<u64, 9>::default();
+        market_compare.deposit(10000000-1, 0, prices)?.execute()?;
+        println!("{market_compare:#?}");
+        Ok(())
+    }
+
+    #[test]
+    fn concurrent_deposits() -> Result<(), crate::Error> {
+        use std::sync::{Arc, Mutex};
+        use std::thread;
+    
+        let market = Arc::new(Mutex::new(TestMarket::<u64, 9>::default()));
+        let prices = Prices {
+            index_token_price: 120,
+            long_token_price: 120,
+            short_token_price: 1,
+        };
+    
+        let handles: Vec<_> = (0..10).map(|_| {
+            let market = Arc::clone(&market);
+            let prices = prices.clone();
+            thread::spawn(move || {
+                let mut market = market.lock().unwrap();
+                market.deposit(1_000_000_000, 0, prices).unwrap().execute().unwrap();
+            })
+        }).collect();
+    
+        for handle in handles {
+            handle.join().unwrap();
+        }
+    
+        let market = market.lock().unwrap();
+        println!("{:#?}", *market);
+        Ok(())
+    }
+    
+    
+    #[test]
+    fn deposit_with_price_fluctuations() -> Result<(), crate::Error> {
+        let mut market = TestMarket::<u64, 9>::default();
+        let initial_prices = Prices {
+            index_token_price: 120,
+            long_token_price: 120,
+            short_token_price: 1,
+        };
+        let fluctuated_prices = Prices {
+            index_token_price: 240,
+            long_token_price: 240,
+            short_token_price: 1,
+        };
+        println!(
+            "{:#?}",
+            market.deposit(1_000_000_000, 0, initial_prices)?.execute()?
+        );
+        println!("{market:#?}");
+        
+        println!(
+            "{:#?}",
+            market.deposit(1_000_000_000, 0, fluctuated_prices)?.execute()?
+        );
+        println!("{market:#?}");
+        Ok(())
+    }
+    
 }
