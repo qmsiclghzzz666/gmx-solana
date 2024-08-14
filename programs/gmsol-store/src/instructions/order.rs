@@ -384,9 +384,9 @@ impl<'info> RemoveOrder<'info> {
     }
 }
 
-/// The accounts definition for [`update_order`](crate::gmsol_exchange::update_order)
+/// The accounts definition for [`update_order`](crate::gmsol_store::update_order)
 ///
-/// *[See also the documentation for the instruction.](crate::gmsol_exchange::update_order)*
+/// *[See also the documentation for the instruction.](crate::gmsol_store::update_order)*
 #[derive(Accounts)]
 pub struct UpdateOrder<'info> {
     /// Authority.
