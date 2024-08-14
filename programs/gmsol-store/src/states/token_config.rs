@@ -11,7 +11,7 @@ use crate::{
     StoreError,
 };
 
-use super::{InitSpace, PriceProviderKind};
+use super::{HasMarketMeta, InitSpace, PriceProviderKind};
 
 /// Default heartbeat duration for price updates.
 pub const DEFAULT_HEARTBEAT_DURATION: u32 = 30;
@@ -486,6 +486,17 @@ impl<'info> TokenMapLoader<'info> for AccountLoader<'info, TokenMapHeader> {
 pub trait TokenMapAccess {
     /// Get the config of the given token.
     fn get(&self, token: &Pubkey) -> Option<&TokenConfig>;
+
+    /// Get token configs for the given market.
+    ///
+    /// Returns the token configs for `index_token`, `long_token` and `short_token`.
+    fn token_configs_for_market(&self, market: &impl HasMarketMeta) -> Option<[&TokenConfig; 3]> {
+        let meta = market.market_meta();
+        let index_token = self.get(&meta.index_token_mint)?;
+        let long_token = self.get(&meta.long_token_mint)?;
+        let short_token = self.get(&meta.short_token_mint)?;
+        Some([index_token, long_token, short_token])
+    }
 }
 
 impl<'a> TokenMapAccess for TokenMapRef<'a> {

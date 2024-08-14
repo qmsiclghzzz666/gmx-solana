@@ -1,10 +1,18 @@
-use std::fmt;
+use std::{
+    collections::{HashMap, HashSet},
+    fmt,
+};
 
 use eventsource_stream::Eventsource;
 use futures_util::{Stream, TryStreamExt};
+use gmsol_store::states::{
+    pyth::pyth_price_value_to_decimal, HasMarketMeta, PriceProviderKind, TokenMapAccess,
+};
 use reqwest::{Client, IntoUrl, Url};
 
 pub use pyth_sdk::Identifier;
+
+use crate::pyth::pubkey_to_identifier;
 
 /// Default base URL for Hermes.
 pub const DEFAULT_HERMES_BASE: &str = "https://hermes.pyth.network";
@@ -74,6 +82,62 @@ impl Hermes {
             .json()
             .await?;
         Ok(update)
+    }
+
+    /// Get unit prices for the given market.
+    pub async fn unit_prices_for_market(
+        &self,
+        token_map: &impl TokenMapAccess,
+        market: &impl HasMarketMeta,
+    ) -> crate::Result<gmsol_model::action::Prices<u128>> {
+        let token_configs =
+            token_map
+                .token_configs_for_market(market)
+                .ok_or(crate::Error::invalid_argument(
+                    "missing configs for the tokens of the market",
+                ))?;
+        let feeds = token_configs
+            .iter()
+            .map(|config| {
+                config
+                    .get_feed(&PriceProviderKind::Pyth)
+                    .map(|feed| pubkey_to_identifier(&feed))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let update = self
+            .latest_price_updates(feeds.iter().collect::<HashSet<_>>(), None)
+            .await?;
+        let prices = update
+            .parsed
+            .iter()
+            .map(|price| {
+                Ok((
+                    Identifier::from_hex(price.id()).map_err(crate::Error::unknown)?,
+                    &price.price,
+                ))
+            })
+            .collect::<crate::Result<HashMap<Identifier, _>>>()?;
+        let [index_token_price, long_token_price, short_token_price] = feeds
+            .iter()
+            .enumerate()
+            .map(|(idx, feed)| {
+                let config = token_configs[idx];
+                let price = prices
+                    .get(feed)
+                    .ok_or(crate::Error::unknown(format!("missing price for {}", feed)))?;
+                Ok(
+                    pyth_price_value_to_decimal(price.price as u64, price.expo, config)?
+                        .to_unit_price(),
+                )
+            })
+            .collect::<crate::Result<Vec<_>>>()?
+            .try_into()
+            .expect("must success");
+        Ok(gmsol_model::action::Prices {
+            index_token_price,
+            long_token_price,
+            short_token_price,
+        })
     }
 }
 

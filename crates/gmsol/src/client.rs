@@ -374,7 +374,10 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
     }
 
     /// Fetch the [`TokenMap`](types::TokenMap) address of the given store.
-    pub async fn authorized_token_map(&self, store: &Pubkey) -> crate::Result<Option<Pubkey>> {
+    pub async fn authorized_token_map_address(
+        &self,
+        store: &Pubkey,
+    ) -> crate::Result<Option<Pubkey>> {
         let store = self.store(store).await?;
         let token_map = store.token_map;
         if token_map == Pubkey::default() {
@@ -387,6 +390,15 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
     /// Fetch [`TokenMap`](types::TokenMap) account with its address.
     pub async fn token_map(&self, address: &Pubkey) -> crate::Result<types::TokenMap> {
         Ok(self.data_store().account(*address).await?)
+    }
+
+    /// Fetch the authorized token map of the given store.
+    pub async fn authorized_token_map(&self, store: &Pubkey) -> crate::Result<types::TokenMap> {
+        let address = self
+            .authorized_token_map_address(store)
+            .await?
+            .ok_or(crate::Error::invalid_argument("token map is not set"))?;
+        self.token_map(&address).await
     }
 
     /// Fetch all [`Market`](types::Market) accounts of the given store.

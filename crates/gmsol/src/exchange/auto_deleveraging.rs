@@ -62,9 +62,12 @@ impl AutoDeleverageHint {
 
         let store_address = position.store;
         let store = client.store(&store_address).await?;
-        let token_map_address = client.authorized_token_map(&store_address).await?.ok_or(
-            crate::Error::invalid_argument("token map is not configurated for the store"),
-        )?;
+        let token_map_address = client
+            .authorized_token_map_address(&store_address)
+            .await?
+            .ok_or(crate::Error::invalid_argument(
+                "token map is not configurated for the store",
+            ))?;
         let token_map = client.token_map(&token_map_address).await?;
         let market = client.find_market_address(&store_address, &position.market_token);
         let meta = *client.market(&market).await?.meta();
@@ -361,9 +364,12 @@ impl UpdateAdlHint {
         use gmsol_exchange::utils::token_records;
 
         let store_address = market.store;
-        let token_map_address = client.authorized_token_map(&store_address).await?.ok_or(
-            crate::Error::invalid_argument("token map is not configurated for the store"),
-        )?;
+        let token_map_address = client
+            .authorized_token_map_address(&store_address)
+            .await?
+            .ok_or(crate::Error::invalid_argument(
+                "token map is not configurated for the store",
+            ))?;
         let token_map = client.token_map(&token_map_address).await?;
         let meta = market.meta();
 

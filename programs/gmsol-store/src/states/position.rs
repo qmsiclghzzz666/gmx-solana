@@ -3,7 +3,7 @@ use anchor_lang::prelude::*;
 use borsh::{BorshDeserialize, BorshSerialize};
 use num_enum::TryFromPrimitive;
 
-use super::Seed;
+use super::{Market, Seed};
 
 /// Position.
 #[account(zero_copy)]
@@ -95,6 +95,11 @@ impl Position {
         self.market_token = *market_token;
         self.collateral_token = *collateral_token;
         Ok(())
+    }
+
+    /// Convert to a type that implements [`Position`](gmsol_model::Position).
+    pub fn as_position<'a>(&'a self, market: &'a Market) -> Result<AsPosition<'a>> {
+        AsPosition::try_new(self, market)
     }
 }
 
@@ -228,4 +233,72 @@ pub enum PositionKind {
     Long,
     /// Short position.
     Short,
+}
+
+/// A helper type that implements the [`Position`](gmsol_model::Position) trait.
+pub struct AsPosition<'a> {
+    is_long: bool,
+    is_collateral_long: bool,
+    market: &'a Market,
+    position: &'a Position,
+}
+
+impl<'a> AsPosition<'a> {
+    /// Create from the position and market.
+    pub fn try_new(position: &'a Position, market: &'a Market) -> Result<Self> {
+        Ok(Self {
+            is_long: position.try_is_long()?,
+            is_collateral_long: market.meta().to_token_side(&position.collateral_token)?,
+            market,
+            position,
+        })
+    }
+}
+
+impl<'a> gmsol_model::PositionState<{ constants::MARKET_DECIMALS }> for AsPosition<'a> {
+    type Num = u128;
+
+    type Signed = i128;
+
+    fn collateral_amount(&self) -> &Self::Num {
+        self.position.state.collateral_amount()
+    }
+
+    fn size_in_usd(&self) -> &Self::Num {
+        self.position.state.size_in_usd()
+    }
+
+    fn size_in_tokens(&self) -> &Self::Num {
+        self.position.state.size_in_tokens()
+    }
+
+    fn borrowing_factor(&self) -> &Self::Num {
+        self.position.state.borrowing_factor()
+    }
+
+    fn funding_fee_amount_per_size(&self) -> &Self::Num {
+        self.position.state.funding_fee_amount_per_size()
+    }
+
+    fn claimable_funding_fee_amount_per_size(&self, is_long_collateral: bool) -> &Self::Num {
+        self.position
+            .state
+            .claimable_funding_fee_amount_per_size(is_long_collateral)
+    }
+}
+
+impl<'a> gmsol_model::Position<{ constants::MARKET_DECIMALS }> for AsPosition<'a> {
+    type Market = Market;
+
+    fn market(&self) -> &Self::Market {
+        self.market
+    }
+
+    fn is_long(&self) -> bool {
+        self.is_long
+    }
+
+    fn is_collateral_token_long(&self) -> bool {
+        self.is_collateral_long
+    }
 }

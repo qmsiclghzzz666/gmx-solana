@@ -7,11 +7,15 @@ use anchor_client::{
 use eyre::OptionExt;
 use futures_util::{pin_mut, StreamExt};
 use gmsol::{
+    pyth::Hermes,
     types::{self, TokenMapAccess},
     utils::{signed_value_to_decimal, unsigned_value_to_decimal, ZeroCopy},
 };
 use gmsol_exchange::states::{display_feature, ActionDisabledFlag, Controller, DomainDisabledFlag};
-use gmsol_model::{action::Prices, Balance, BalanceExt, ClockKind, PnlFactorKind, PoolKind};
+use gmsol_model::{
+    action::Prices, Balance, BalanceExt, ClockKind, PnlFactorKind, PoolKind, PositionExt,
+    PositionStateExt,
+};
 use gmsol_store::states::{
     self, AddressKey, AmountKey, FactorKey, MarketConfigKey, PriceProviderKind,
 };
@@ -135,6 +139,9 @@ enum Command {
         /// All user.
         #[arg(long, group = "owners")]
         all: bool,
+        /// Whether to show the liquidatble positions only.
+        #[arg(long, short, requires = "market_token")]
+        liquidatable: bool,
         #[arg(long)]
         debug: bool,
         #[arg(long, short)]
@@ -297,7 +304,7 @@ impl InspectArgs {
                 debug,
             } => {
                 let mut authorized = true;
-                let authorized_token_map = client.authorized_token_map(store).await?;
+                let authorized_token_map = client.authorized_token_map_address(store).await?;
                 let address = if let Some(address) = address {
                     if authorized_token_map != Some(*address) {
                         authorized = false;
@@ -661,6 +668,7 @@ impl InspectArgs {
                 owner,
                 all,
                 debug,
+                liquidatable,
                 output,
             } => {
                 let output = output.unwrap_or_default();
@@ -679,11 +687,51 @@ impl InspectArgs {
                     } else {
                         Some(owner.unwrap_or(client.payer()))
                     };
+
                     let positions = client
                         .positions(store, owner.as_ref(), market_token.as_ref())
                         .await?;
+
+                    let check_liquidatable = if let Some(market_token) =
+                        (*liquidatable).then_some(()).and(market_token.as_ref())
+                    {
+                        let token_map = client.authorized_token_map(store).await?;
+                        let market = client.find_market_address(store, market_token);
+                        let market = client.market(&market).await?;
+                        let hermes = Hermes::default();
+                        let prices = hermes.unit_prices_for_market(&token_map, &market).await?;
+                        Some((market, prices))
+                    } else {
+                        None
+                    };
+
                     let serialized = positions
                         .iter()
+                        .filter(|(pubkey, p)| {
+                            let Some((market, prices)) = check_liquidatable.as_ref() else {
+                                return true;
+                            };
+                            // Filter the liquidatable positions.
+                            if p.state.is_empty() {
+                                return false;
+                            }
+                            let res = p
+                                .as_position(market)
+                                .map_err(gmsol::Error::from)
+                                .and_then(|p| {
+                                    tracing::debug!(?prices, "checking liquidatability");
+                                    p.check_liquidatable(prices, true)
+                                        .map_err(gmsol::Error::from)
+                                })
+                                .inspect_err(
+                                    |err| tracing::error!(%err, %pubkey, "failed to check liquidatable"),
+                                );
+                            if let Ok(reason) = res {
+                                reason.inspect(|reason| tracing::info!(%reason, %pubkey, "found liquidatable")).is_some()
+                            } else {
+                                false
+                            }
+                        })
                         .filter_map(|(pubkey, p)| {
                             let p = ser::SerializePosition::try_from(p)
                                 .inspect_err(|err| {

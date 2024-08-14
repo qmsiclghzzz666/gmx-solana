@@ -668,7 +668,7 @@ impl ExchangeArgs {
                 let token_map = client
                     .token_map(
                         &client
-                            .authorized_token_map(store)
+                            .authorized_token_map_address(store)
                             .await?
                             .ok_or_eyre("token map is not set")?,
                     )
@@ -708,7 +708,7 @@ impl ExchangeArgs {
                 let token_map = client
                     .token_map(
                         &client
-                            .authorized_token_map(store)
+                            .authorized_token_map_address(store)
                             .await?
                             .ok_or_eyre("token map is not set")?,
                     )

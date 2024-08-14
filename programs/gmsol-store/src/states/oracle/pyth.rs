@@ -42,39 +42,10 @@ impl Pyth {
             .checked_add(price.conf)
             .ok_or(StoreError::PriceOverflow)?;
         let parsed_price = Price {
-            min: Self::price_value_to_decimal(mid_price, price.exponent, token_config)?,
-            max: Self::price_value_to_decimal(mid_price, price.exponent, token_config)?,
+            min: pyth_price_value_to_decimal(mid_price, price.exponent, token_config)?,
+            max: pyth_price_value_to_decimal(mid_price, price.exponent, token_config)?,
         };
         Ok((feed.posted_slot, price.publish_time, parsed_price))
-    }
-
-    fn price_value_to_decimal(
-        mut value: u64,
-        exponent: i32,
-        token_config: &TokenConfig,
-    ) -> Result<Decimal> {
-        // actual price == value * 10^exponent
-        // - If `exponent` is not positive, then the `decimals` is set to `-exponent`.
-        // - Otherwise, we should use `value * 10^exponent` as `price` argument, and let `decimals` be `0`.
-        let decimals: u8 = if exponent <= 0 {
-            (-exponent)
-                .try_into()
-                .map_err(|_| StoreError::InvalidPriceFeedPrice)?
-        } else {
-            let factor = 10u64
-                .checked_pow(exponent as u32)
-                .ok_or(StoreError::InvalidPriceFeedPrice)?;
-            value = value.checked_mul(factor).ok_or(StoreError::PriceOverflow)?;
-            0
-        };
-        let price = Decimal::try_from_price(
-            value as u128,
-            decimals,
-            token_config.token_decimals(),
-            token_config.precision(),
-        )
-        .map_err(|_| StoreError::InvalidPriceFeedPrice)?;
-        Ok(price)
     }
 }
 
@@ -103,13 +74,43 @@ impl PythLegacy {
             .try_into()
             .map_err(|_| StoreError::NegativePrice)?;
         let parsed_price = Price {
-            min: Pyth::price_value_to_decimal(mid_price, price.expo, token_config)?,
-            max: Pyth::price_value_to_decimal(mid_price, price.expo, token_config)?,
+            min: pyth_price_value_to_decimal(mid_price, price.expo, token_config)?,
+            max: pyth_price_value_to_decimal(mid_price, price.expo, token_config)?,
         };
         // Pyth legacy price feed does not provide `posted_slot`,
         // so we use current slot to ignore the slot check.
         Ok((clock.slot, price.publish_time, parsed_price))
     }
+}
+
+/// Pyth price value to decimal.
+pub fn pyth_price_value_to_decimal(
+    mut value: u64,
+    exponent: i32,
+    token_config: &TokenConfig,
+) -> Result<Decimal> {
+    // actual price == value * 10^exponent
+    // - If `exponent` is not positive, then the `decimals` is set to `-exponent`.
+    // - Otherwise, we should use `value * 10^exponent` as `price` argument, and let `decimals` be `0`.
+    let decimals: u8 = if exponent <= 0 {
+        (-exponent)
+            .try_into()
+            .map_err(|_| StoreError::InvalidPriceFeedPrice)?
+    } else {
+        let factor = 10u64
+            .checked_pow(exponent as u32)
+            .ok_or(StoreError::InvalidPriceFeedPrice)?;
+        value = value.checked_mul(factor).ok_or(StoreError::PriceOverflow)?;
+        0
+    };
+    let price = Decimal::try_from_price(
+        value as u128,
+        decimals,
+        token_config.token_decimals(),
+        token_config.precision(),
+    )
+    .map_err(|_| StoreError::InvalidPriceFeedPrice)?;
+    Ok(price)
 }
 
 /// The address of legacy Pyth program.
