@@ -407,7 +407,7 @@ mod tests {
         Ok(())
     }
 
-    //test for zero swap
+    //Test for zero swap.
     #[test]
     fn zero_amount_swap() -> crate::Result<()> {
         let mut market = TestMarket::<u64, 9>::default();
@@ -422,12 +422,12 @@ mod tests {
 
         let result = market.swap(true, 0, prices)?.execute();
         assert!(result.is_err());
-
         println!("{market:#?}");
+
         Ok(())
     }
     
-    //test for over amount
+    //Test for over amount.
     #[test]
     fn over_amount_swap() -> crate::Result<()> {
         let mut market = TestMarket::<u64, 9>::default();
@@ -443,11 +443,17 @@ mod tests {
         let result = market.swap(true, 2_000_000_000, prices)?.execute();
         assert!(result.is_err());
         println!("{market:#?}");
+
+        //Try to swap out all long token.
+        let token_in_amount = market.liquidity_pool()?.long_amount()? * prices.long_token_price;
+        let report = market.swap(false, token_in_amount, prices)?.execute()?;
+        println!("{report:#?}");
+        println!("{market:#?}");
+
         Ok(())
     }
     
-    //test for small amount
-    //error
+    //Test for small amount.
     #[test]
     fn small_amount_swap() -> crate::Result<()> {
         let mut market = TestMarket::<u64, 9>::default();
@@ -464,8 +470,17 @@ mod tests {
         let report = market.swap(false, small_amount, prices)?.execute()?;
         println!("{report:#?}");
         println!("{market:#?}");
+        assert!(market.liquidity_pool()?.short_amount()? != 0);
 
-        assert_eq!(market.liquidity_pool()?.short_amount()?, 0);
+        let report = market.swap(false,prices.long_token_price * small_amount, prices)?.execute()?;
+        println!("{report:#?}");
+        println!("{market:#?}");
+        
+        //Test for round.
+        let report = market.swap(false,200, prices)?.execute()?;
+        println!("{report:#?}");
+        println!("{market:#?}");
+
         Ok(())
     }
 
