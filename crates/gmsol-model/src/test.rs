@@ -836,7 +836,7 @@ where
     }
 
     fn are_pnl_and_collateral_tokens_the_same(&self) -> bool {
-        false
+        self.position.is_long == self.position.is_collateral_token_long
     }
 }
 

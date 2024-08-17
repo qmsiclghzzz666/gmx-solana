@@ -419,6 +419,8 @@ where
 
         let is_output_token_long = self.position.is_collateral_token_long();
         let is_pnl_token_long = self.position.is_long();
+        let are_pnl_and_collateral_tokens_the_same =
+            self.position.are_pnl_and_collateral_tokens_the_same();
 
         let mut fees = self.position.position_fees(
             self.params
@@ -434,6 +436,7 @@ where
             remaining_collateral_amount,
             is_output_token_long,
             is_pnl_token_long,
+            are_pnl_and_collateral_tokens_the_same,
             &self.params.prices,
             is_insolvent_close_allowed,
         );

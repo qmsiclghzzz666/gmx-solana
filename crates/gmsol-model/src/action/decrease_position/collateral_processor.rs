@@ -36,6 +36,7 @@ struct State<T> {
     index_token_price: T,
     is_pnl_token_long: bool,
     is_output_token_long: bool,
+    are_pnl_and_collateral_tokens_the_same: bool,
     report: ProcessReport<T>,
 }
 
@@ -55,8 +56,8 @@ impl<T> DerefMut for State<T> {
 
 impl<T> State<T> {
     #[inline]
-    fn output_token_is_pnl_token(&self) -> bool {
-        self.is_output_token_long == self.is_pnl_token_long
+    fn are_pnl_and_output_tokens_the_same(&self) -> bool {
+        self.are_pnl_and_collateral_tokens_the_same
     }
 
     #[inline]
@@ -228,6 +229,7 @@ where
         remaining_collateral_amount: M::Num,
         is_output_token_long: bool,
         is_pnl_token_long: bool,
+        are_pnl_and_collateral_tokens_the_same: bool,
         prices: &Prices<M::Num>,
         is_insolvent_close_allowed: bool,
     ) -> Self {
@@ -239,6 +241,7 @@ where
                 index_token_price: prices.index_token_price.clone(),
                 is_pnl_token_long,
                 is_output_token_long,
+                are_pnl_and_collateral_tokens_the_same,
                 report: ProcessReport {
                     remaining_collateral_amount,
                     output_amount: Zero::zero(),
@@ -252,7 +255,7 @@ where
     }
 
     fn add_pnl_token_amount(&mut self, deduction_amount_for_pool: M::Num) -> crate::Result<()> {
-        if self.state.output_token_is_pnl_token() {
+        if self.state.are_pnl_and_output_tokens_the_same() {
             self.state.output_amount = self
                 .state
                 .output_amount
