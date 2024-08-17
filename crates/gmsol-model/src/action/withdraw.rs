@@ -259,7 +259,7 @@ mod tests {
         Ok(())
     }
     
-    //Test for zero amount withdrawal.
+    /// A test for zero amount withdrawal.
     #[test]
     fn zero_amount_withdrawal() -> crate::Result<()> {
         let mut market = TestMarket::<u64, 9>::default();
@@ -270,12 +270,12 @@ mod tests {
         };
         market.deposit(1_000_000_000, 0, prices)?.execute()?;
         market.deposit(0, 1_000_000_000, prices)?.execute()?;
-        let result = market.withdraw(0, prices)?.execute();
+        let result = market.withdraw(0, prices);
         assert!(result.is_err());
         Ok(())
     }
     
-    //Test for over amount withdrawal.
+    /// A test for over amount withdrawal.
     #[test]
     fn over_amount_withdrawal() -> crate::Result<()> {
         let mut market = TestMarket::<u64, 9>::default();
@@ -294,7 +294,7 @@ mod tests {
         Ok(())
     }
     
-    //Test for small amount withdrawal.
+    /// A test for small amount withdrawal.
     #[test]
     fn small_amount_withdrawal() -> crate::Result<()> {
         let mut market = TestMarket::<u64, 9>::default();

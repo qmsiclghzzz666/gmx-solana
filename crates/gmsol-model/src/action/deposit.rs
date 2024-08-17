@@ -431,7 +431,7 @@ mod tests {
     }
     
 
-    //test for zero deposit
+    /// A test for zero amount deposit.
     #[test]
     fn zero_amount_deposit() -> Result<(), crate::Error> {
         let mut market = TestMarket::<u64, 9>::default();
@@ -440,13 +440,13 @@ mod tests {
             long_token_price: 120,
             short_token_price: 1,
         };
-        let result = market.deposit(0, 0, prices)?.execute();
+        let result = market.deposit(0, 0, prices);
         assert!(result.is_err());
 
         Ok(())
     }
     
-    //test for large and small deposit
+    /// A test for large and small deposit.
     #[test]
     fn extreme_amount_deposit() -> Result<(), crate::Error> {
         let mut market = TestMarket::<u64, 9>::default();
@@ -475,7 +475,7 @@ mod tests {
         Ok(())
     }
     
-    //test for round attack
+    /// A test for round attack.
     #[test]
     fn round_attack_deposit() -> Result<(), crate::Error> {
         let mut market = TestMarket::<u64, 9>::default();
@@ -491,7 +491,6 @@ mod tests {
         }
         println!("{market:#?}");
         
-        //compare
         let mut market_compare = TestMarket::<u64, 9>::default();
         market_compare.deposit(10000000-1, 0, prices)?.execute()?;
         println!("{market_compare:#?}");
