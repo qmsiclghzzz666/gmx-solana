@@ -243,8 +243,27 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
             ));
         }
 
-        // TODO: check leverage.
-        if remaining_collateral_value.is_positive() {
+        // Check leverage.
+        let min_collateral_factor = self
+            .market()
+            .min_collateral_factor_for_open_interest(&delta.open_interest_delta, self.is_long())?
+            .max(
+                self.market()
+                    .position_params()?
+                    .min_collateral_factor()
+                    .clone(),
+            );
+
+        let Some(min_collateral_value_for_leverage) =
+            crate::utils::apply_factor(&delta.next_size_in_usd, &min_collateral_factor)
+        else {
+            return Ok(WillCollateralBeSufficient::Insufficient(
+                remaining_collateral_value,
+            ));
+        };
+
+        debug_assert!(!remaining_collateral_value.is_negative());
+        if remaining_collateral_value.unsigned_abs() >= min_collateral_value_for_leverage {
             Ok(WillCollateralBeSufficient::Sufficient(
                 remaining_collateral_value,
             ))

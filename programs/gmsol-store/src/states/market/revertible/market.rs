@@ -354,6 +354,14 @@ impl<'a> RevertibleMarket<'a> {
     pub(super) fn max_open_interest(&self, is_long: bool) -> gmsol_model::Result<Factor> {
         self.storage.max_open_interest(is_long)
     }
+
+    pub(super) fn min_collateral_factor_for_open_interest_multiplier(
+        &self,
+        is_long: bool,
+    ) -> gmsol_model::Result<Factor> {
+        self.storage
+            .min_collateral_factor_for_open_interest_multiplier(is_long)
+    }
 }
 
 impl<'a> HasMarketMeta for RevertibleMarket<'a> {

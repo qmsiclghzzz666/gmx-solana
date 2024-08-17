@@ -208,6 +208,8 @@ pub struct TestMarketConfig<T, const DECIMALS: u8> {
     pub max_pool_value_for_deposit: T,
     /// Max open interest.
     pub max_open_interest: T,
+    /// Min collateral factor for OI.
+    pub min_collateral_factor_for_oi: T,
 }
 
 impl Default for TestMarketConfig<u64, 9> {
@@ -276,6 +278,8 @@ impl Default for TestMarketConfig<u64, 9> {
             max_pool_amount: 1_000_000_000 * 1_000_000_000,
             max_pool_value_for_deposit: u64::MAX,
             max_open_interest: u64::MAX,
+            // min collateral factor of 0.005 when open interest is $83,000,000
+            min_collateral_factor_for_oi: 5 * 10u64.pow(6) / 83_000_000,
         }
     }
 }
@@ -347,6 +351,8 @@ impl Default for TestMarketConfig<u128, 20> {
             max_pool_amount: 1_000_000_000 * 10u128.pow(20),
             max_pool_value_for_deposit: 1_000_000_000_000_000 * 10u128.pow(20),
             max_open_interest: 1_000_000_000 * 10u128.pow(20),
+            // min collateral factor of 0.005 when open interest is $83,000,000
+            min_collateral_factor_for_oi: 5 * 10u128.pow(17) / 83_000_000,
         }
     }
 }
@@ -624,6 +630,13 @@ where
 
     fn max_open_interest(&self, _is_long: bool) -> crate::Result<Self::Num> {
         Ok(self.config.max_open_interest.clone())
+    }
+
+    fn min_collateral_factor_for_open_interest_multiplier(
+        &self,
+        _is_long: bool,
+    ) -> crate::Result<Self::Num> {
+        Ok(self.config.min_collateral_factor_for_oi.clone())
     }
 }
 

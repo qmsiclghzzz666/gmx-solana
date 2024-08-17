@@ -3,6 +3,7 @@ use crate::{
         update_borrowing_state::UpdateBorrowingState, update_funding_state::UpdateFundingState,
         Prices,
     },
+    num::Unsigned,
     params::{fee::FundingFeeParams, FeeParams, PositionParams},
     BalanceExt, BorrowingFeeMarket, PoolExt, PositionImpactMarket, PositionImpactMarketMut,
     SwapMarket, SwapMarketMut,
@@ -40,6 +41,12 @@ pub trait PerpMarket<const DECIMALS: u8>:
 
     /// Get max open interest.
     fn max_open_interest(&self, is_long: bool) -> crate::Result<Self::Num>;
+
+    /// Get min collateral factor for open interest multiplier.
+    fn min_collateral_factor_for_open_interest_multiplier(
+        &self,
+        is_long: bool,
+    ) -> crate::Result<Self::Num>;
 }
 
 /// A mutable perpetual market.
@@ -117,6 +124,13 @@ impl<'a, M: PerpMarket<DECIMALS>, const DECIMALS: u8> PerpMarket<DECIMALS> for &
 
     fn max_open_interest(&self, is_long: bool) -> crate::Result<Self::Num> {
         (**self).max_open_interest(is_long)
+    }
+
+    fn min_collateral_factor_for_open_interest_multiplier(
+        &self,
+        is_long: bool,
+    ) -> crate::Result<Self::Num> {
+        (**self).min_collateral_factor_for_open_interest_multiplier(is_long)
     }
 }
 
@@ -214,6 +228,25 @@ pub trait PerpMarketExt<const DECIMALS: u8>: PerpMarket<DECIMALS> {
         } else {
             Ok(())
         }
+    }
+
+    /// Get min collateral factor for open interest.
+    fn min_collateral_factor_for_open_interest(
+        &self,
+        delta: &Self::Signed,
+        is_long: bool,
+    ) -> crate::Result<Self::Num> {
+        let next_open_interest = self
+            .open_interest()?
+            .amount(is_long)?
+            .checked_add_with_signed(delta)
+            .ok_or(crate::Error::Computation(
+                "calculating next OI for min collateral factor",
+            ))?;
+        let factor = self.min_collateral_factor_for_open_interest_multiplier(is_long)?;
+        crate::utils::apply_factor(&next_open_interest, &factor).ok_or(crate::Error::Computation(
+            "calculating min collateral factor for OI",
+        ))
     }
 }
 

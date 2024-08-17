@@ -534,6 +534,14 @@ impl<'a> gmsol_model::PerpMarket<{ constants::MARKET_DECIMALS }> for RevertibleP
     fn max_open_interest(&self, is_long: bool) -> gmsol_model::Result<Self::Num> {
         self.market.max_open_interest(is_long)
     }
+
+    fn min_collateral_factor_for_open_interest_multiplier(
+        &self,
+        is_long: bool,
+    ) -> gmsol_model::Result<Self::Num> {
+        self.market
+            .min_collateral_factor_for_open_interest_multiplier(is_long)
+    }
 }
 
 impl<'a> gmsol_model::PerpMarketMut<{ constants::MARKET_DECIMALS }> for RevertiblePerpMarket<'a> {

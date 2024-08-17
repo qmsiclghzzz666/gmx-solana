@@ -248,6 +248,21 @@ impl gmsol_model::PerpMarket<{ constants::MARKET_DECIMALS }> for Market {
             Ok(self.config.max_open_interest_for_short)
         }
     }
+
+    fn min_collateral_factor_for_open_interest_multiplier(
+        &self,
+        is_long: bool,
+    ) -> gmsol_model::Result<Self::Num> {
+        if is_long {
+            Ok(self
+                .config
+                .min_collateral_factor_for_open_interest_multiplier_for_long)
+        } else {
+            Ok(self
+                .config
+                .min_collateral_factor_for_open_interest_multiplier_for_short)
+        }
+    }
 }
 
 /// As a liquidity market.
