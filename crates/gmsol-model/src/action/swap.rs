@@ -406,4 +406,83 @@ mod tests {
         );
         Ok(())
     }
+
+    /// A test for zero swap.
+    #[test]
+    fn zero_amount_swap() -> crate::Result<()> {
+        let mut market = TestMarket::<u64, 9>::default();
+        let prices = Prices {
+            index_token_price: 120,
+            long_token_price: 120,
+            short_token_price: 1,
+        };
+        market.deposit(1_000_000_000, 0, prices)?.execute()?;
+        market.deposit(0, 1_000_000_000, prices)?.execute()?;
+        println!("{market:#?}");
+
+        let result = market.swap(true, 0, prices);
+        assert!(result.is_err());
+        println!("{market:#?}");
+
+        Ok(())
+    }
+
+    /// A test for over amount.
+    #[test]
+    fn over_amount_swap() -> crate::Result<()> {
+        let mut market = TestMarket::<u64, 9>::default();
+        let prices = Prices {
+            index_token_price: 120,
+            long_token_price: 120,
+            short_token_price: 1,
+        };
+        market.deposit(1_000_000_000, 0, prices)?.execute()?;
+        market.deposit(0, 1_000_000_000, prices)?.execute()?;
+        println!("{market:#?}");
+
+        let result = market.swap(true, 2_000_000_000, prices)?.execute();
+        assert!(result.is_err());
+        println!("{market:#?}");
+
+        // Try to swap out all long token.
+        let token_in_amount = market.liquidity_pool()?.long_amount()? * prices.long_token_price;
+        let report = market.swap(false, token_in_amount, prices)?.execute()?;
+        println!("{report:#?}");
+        println!("{market:#?}");
+
+        Ok(())
+    }
+
+    /// A test for small amount.
+    #[test]
+    fn small_amount_swap() -> crate::Result<()> {
+        let mut market = TestMarket::<u64, 9>::default();
+        let prices = Prices {
+            index_token_price: 120,
+            long_token_price: 120,
+            short_token_price: 1,
+        };
+        market.deposit(1_000_000_000, 0, prices)?.execute()?;
+        println!("{market:#?}");
+
+        let small_amount = 1;
+
+        let report = market.swap(false, small_amount, prices)?.execute()?;
+        println!("{report:#?}");
+        println!("{market:#?}");
+        assert!(market.liquidity_pool()?.short_amount()? != 0);
+
+        let report = market
+            .swap(false, prices.long_token_price * small_amount, prices)?
+            .execute()?;
+        println!("{report:#?}");
+        println!("{market:#?}");
+
+        // Test for round.
+        let report = market.swap(false, 200, prices)?.execute()?;
+        println!("{report:#?}");
+        println!("{market:#?}");
+
+        Ok(())
+    }
 }

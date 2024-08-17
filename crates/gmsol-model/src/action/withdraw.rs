@@ -258,4 +258,85 @@ mod tests {
         );
         Ok(())
     }
+
+    /// A test for zero amount withdrawal.
+    #[test]
+    fn zero_amount_withdrawal() -> crate::Result<()> {
+        let mut market = TestMarket::<u64, 9>::default();
+        let prices = Prices {
+            index_token_price: 120,
+            long_token_price: 120,
+            short_token_price: 1,
+        };
+        market.deposit(1_000_000_000, 0, prices)?.execute()?;
+        market.deposit(0, 1_000_000_000, prices)?.execute()?;
+        let result = market.withdraw(0, prices);
+        assert!(result.is_err());
+        Ok(())
+    }
+
+    /// A test for over amount withdrawal.
+    #[test]
+    fn over_amount_withdrawal() -> crate::Result<()> {
+        let mut market = TestMarket::<u64, 9>::default();
+        let prices = Prices {
+            index_token_price: 120,
+            long_token_price: 120,
+            short_token_price: 1,
+        };
+        market.deposit(1_000_000, 0, prices)?.execute()?;
+        market.deposit(0, 1_000_000, prices)?.execute()?;
+        println!("{market:#?}");
+
+        let result = market.withdraw(1_000_000_000, prices)?.execute();
+        assert!(result.is_err());
+        println!("{market:#?}");
+        Ok(())
+    }
+
+    /// A test for small amount withdrawal.
+    #[test]
+    fn small_amount_withdrawal() -> crate::Result<()> {
+        let mut market = TestMarket::<u64, 9>::default();
+        let prices = Prices {
+            index_token_price: 120,
+            long_token_price: 120,
+            short_token_price: 1,
+        };
+        market.deposit(1_000_000_000, 0, prices)?.execute()?;
+        market.deposit(1_000_000_000, 0, prices)?.execute()?;
+        market.deposit(0, 1_000_000_000, prices)?.execute()?;
+        println!("{market:#?}");
+        let before_supply = market.total_supply();
+        let before_long_amount = market.liquidity_pool()?.long_amount()?;
+        let before_short_amount = market.liquidity_pool()?.short_amount()?;
+        let prices = Prices {
+            index_token_price: 120,
+            long_token_price: 120,
+            short_token_price: 1,
+        };
+
+        let small_amount = 1;
+        let report = market.withdraw(small_amount, prices)?.execute()?;
+        println!("{report:#?}");
+        println!("{market:#?}");
+        assert_eq!(
+            market.total_supply() + report.params.market_token_amount,
+            before_supply
+        );
+        assert_eq!(
+            market.liquidity_pool()?.long_amount()?
+                + report.long_token_fees.fee_receiver_amount()
+                + report.long_token_output,
+            before_long_amount
+        );
+        assert_eq!(
+            market.liquidity_pool()?.short_amount()?
+                + report.short_token_fees.fee_receiver_amount()
+                + report.short_token_output,
+            before_short_amount
+        );
+
+        Ok(())
+    }
 }
