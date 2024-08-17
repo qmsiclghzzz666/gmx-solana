@@ -272,7 +272,13 @@ where
             funding,
         ));
 
-        Self::swap_output_tokens_if_needed(self.position.market_mut(), &mut report)?;
+        let are_pnl_and_collateral_tokens_the_same =
+            self.position.are_pnl_and_collateral_tokens_the_same();
+        Self::swap_output_tokens_if_needed(
+            self.position.market_mut(),
+            &mut report,
+            are_pnl_and_collateral_tokens_the_same,
+        )?;
 
         Ok(report)
     }
@@ -532,15 +538,15 @@ where
     fn swap_output_tokens_if_needed(
         market: &mut P::Market,
         report: &mut DecreasePositionReport<P::Num>,
+        are_pnl_and_collateral_tokens_the_same: bool,
     ) -> crate::Result<()> {
-        let (is_output_token_long, is_secondary_output_token_long, prices) = (
-            report.is_output_token_long(),
+        let (is_secondary_output_token_long, prices) = (
             report.is_secondary_output_token_long(),
             report.params().prices.clone(),
         );
         let (output_amount, secondary_output_amount) = report.output_amounts_mut();
         if !secondary_output_amount.is_zero() {
-            if is_output_token_long == is_secondary_output_token_long {
+            if are_pnl_and_collateral_tokens_the_same {
                 *output_amount = output_amount
                     .checked_add(secondary_output_amount)
                     .ok_or(crate::Error::Computation("merging output tokens"))?;
