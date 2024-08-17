@@ -87,6 +87,15 @@ pub trait PerpMarketMut<const DECIMALS: u8>:
 
     /// Get total borrowing pool mutably.
     fn total_borrowing_pool_mut(&mut self) -> crate::Result<&mut Self::Pool>;
+
+    /// Insufficient funding fee payment callback.
+    fn insufficient_funding_fee_payment(
+        &mut self,
+        _paid_in_collateral_amount: &Self::Num,
+        _cost_amount: &Self::Num,
+    ) -> crate::Result<()> {
+        Ok(())
+    }
 }
 
 impl<'a, M: PerpMarket<DECIMALS>, const DECIMALS: u8> PerpMarket<DECIMALS> for &'a mut M {
@@ -182,6 +191,14 @@ impl<'a, M: PerpMarketMut<DECIMALS>, const DECIMALS: u8> PerpMarketMut<DECIMALS>
 
     fn just_passed_in_seconds_for_funding(&mut self) -> crate::Result<u64> {
         (**self).just_passed_in_seconds_for_funding()
+    }
+
+    fn insufficient_funding_fee_payment(
+        &mut self,
+        paid_in_collateral_amount: &Self::Num,
+        cost_amount: &Self::Num,
+    ) -> crate::Result<()> {
+        (**self).insufficient_funding_fee_payment(paid_in_collateral_amount, cost_amount)
     }
 }
 

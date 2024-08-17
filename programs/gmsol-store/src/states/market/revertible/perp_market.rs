@@ -613,4 +613,17 @@ impl<'a> gmsol_model::PerpMarketMut<{ constants::MARKET_DECIMALS }> for Revertib
     fn total_borrowing_pool_mut(&mut self) -> gmsol_model::Result<&mut Self::Pool> {
         Ok(&mut self.pools.total_borrowing)
     }
+
+    fn insufficient_funding_fee_payment(
+        &mut self,
+        paid_in_collateral_amount: &Self::Num,
+        cost_amount: &Self::Num,
+    ) -> gmsol_model::Result<()> {
+        msg!(
+            "insufficient funding fee payment: paid={}, cost={}",
+            paid_in_collateral_amount,
+            cost_amount
+        );
+        Ok(())
+    }
 }
