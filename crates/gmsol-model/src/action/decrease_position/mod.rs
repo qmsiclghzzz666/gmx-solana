@@ -281,7 +281,7 @@ where
     fn check_partial_close(&mut self) -> crate::Result<()> {
         use num_traits::CheckedMul;
 
-        if self.size_delta_usd < *self.position.size_in_usd() {
+        if self.is_partial_close() {
             let (estimated_pnl, _, _) = self
                 .position
                 .pnl_value(&self.params.prices, self.position.size_in_usd())?;
@@ -373,7 +373,6 @@ where
 
     fn check_liquiation(&self) -> crate::Result<()> {
         if self.params.is_liquidation_order {
-            // FIXME: should we check that whether this is a close all order?
             let Some(_reason) = self
                 .position
                 .check_liquidatable(&self.params.prices, true)?
@@ -386,11 +385,29 @@ where
         }
     }
 
+    fn is_partial_close(&self) -> bool {
+        self.size_delta_usd < *self.position.size_in_usd()
+    }
+
+    fn is_fully_close(&self) -> bool {
+        self.size_delta_usd == *self.position.size_in_usd()
+    }
+
+    fn collateral_token_price(&self) -> &P::Num {
+        let prices = self.params.prices();
+        if self.position.is_collateral_token_long() {
+            &prices.long_token_price
+        } else {
+            &prices.short_token_price
+        }
+    }
+
     #[allow(clippy::type_complexity)]
     fn process_collateral(&mut self) -> crate::Result<ProcessCollateralResult<P::Num>> {
         use num_traits::Signed;
 
-        // TODO: handle insolvent close.
+        let is_insolvent_close_allowed =
+            self.params.is_insolvent_close_allowed && self.is_fully_close();
 
         let (price_impact_value, price_impact_diff, execution_price) =
             self.get_execution_params()?;
@@ -418,7 +435,7 @@ where
             is_output_token_long,
             is_pnl_token_long,
             &self.params.prices,
-            self.params.is_insolvent_close_allowed,
+            is_insolvent_close_allowed,
         );
         let mut report = processor.process(|mut ctx| {
             ctx.add_pnl_if_positive(&base_pnl_usd)?
@@ -431,7 +448,23 @@ where
             Ok(())
         })?;
 
-        // TODO: handle initial collateral delta amount with price impact diff.
+        // Handle initial collateral delta amount with price impact diff.
+        // TODO: Comment on the reason.
+        if !self.withdrawable_collateral_amount.is_zero() && !price_impact_diff.is_zero() {
+            // The prices should have been validated to be non-zero.
+            debug_assert!(!self.collateral_token_price().is_zero());
+            let diff_amount = price_impact_diff.clone() / self.collateral_token_price().clone();
+            if self.withdrawable_collateral_amount > diff_amount {
+                self.withdrawable_collateral_amount = self
+                    .withdrawable_collateral_amount
+                    .checked_sub(&diff_amount)
+                    .ok_or(crate::Error::Computation(
+                        "calculating new withdrawable amount",
+                    ))?;
+            } else {
+                self.withdrawable_collateral_amount = P::Num::zero();
+            }
+        }
 
         // Cap the withdrawal amount to the remaining collateral amount.
         if self.withdrawable_collateral_amount > report.remaining_collateral_amount {

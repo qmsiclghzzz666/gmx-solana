@@ -281,7 +281,6 @@ impl<const DECIMALS: u8, M: LiquidityMarketMut<DECIMALS>> Deposit<M, DECIMALS> {
             !self.params.long_token_amount.is_zero() || !self.params.short_token_amount.is_zero(),
             "shouldn't be empty deposit"
         );
-        // TODO: validate first deposit.
 
         // Validate max pnl first.
         // TODO: add comment for the reason.

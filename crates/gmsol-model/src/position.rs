@@ -395,8 +395,6 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
             ));
         }
 
-        // TODO: validate market is enabled.
-
         if should_validate_min_position_size
             && self.size_in_usd() < self.market().position_params()?.min_position_size_usd()
         {

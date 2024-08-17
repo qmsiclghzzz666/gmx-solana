@@ -122,6 +122,8 @@ impl<'info> ExecuteDeposit<'info> {
     fn execute(&mut self, remaining_accounts: &'info [AccountInfo<'info>]) -> Result<()> {
         self.validate_market()?;
 
+        // TODO: validate first deposit.
+
         // Prepare the execution context.
         let current_market_token = self.market_token_mint.key();
         let mut market = RevertibleLiquidityMarket::new(
