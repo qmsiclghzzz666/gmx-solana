@@ -92,17 +92,12 @@ where
     T: MulDiv + Num,
 {
     /// Pay for cost with `output_amount`, `collateral_amount` and `pnl_amount` in order.
-    fn do_pay_for_cost(&mut self, cost: &mut T) -> crate::Result<(T, T, T)> {
-        let mut paid_in_output_amount = Zero::zero();
+    fn do_pay_for_cost(&mut self, cost: &mut T) -> crate::Result<(T, T)> {
         let mut paid_in_collateral_amount = Zero::zero();
         let mut paid_in_secondary_output_amount = Zero::zero();
 
         if cost.is_zero() {
-            return Ok((
-                paid_in_output_amount,
-                paid_in_collateral_amount,
-                paid_in_secondary_output_amount,
-            ));
+            return Ok((paid_in_collateral_amount, paid_in_secondary_output_amount));
         }
 
         let mut remaining_cost_in_output_token =
@@ -112,7 +107,7 @@ where
 
         if !self.output_amount.is_zero() {
             if self.output_amount > remaining_cost_in_output_token {
-                paid_in_output_amount = paid_in_output_amount
+                paid_in_collateral_amount = paid_in_collateral_amount
                     .checked_add(&remaining_cost_in_output_token)
                     .ok_or(crate::Error::Computation(
                         "overflow increasing paid amount for output token [1]",
@@ -125,7 +120,7 @@ where
                     ))?;
                 remaining_cost_in_output_token = Zero::zero();
             } else {
-                paid_in_output_amount = paid_in_output_amount
+                paid_in_collateral_amount = paid_in_collateral_amount
                     .checked_add(&self.output_amount)
                     .ok_or(crate::Error::Computation(
                         "overflow increasing paid amount for output token [2]",
@@ -141,11 +136,7 @@ where
 
         if remaining_cost_in_output_token.is_zero() {
             *cost = Zero::zero();
-            return Ok((
-                paid_in_output_amount,
-                paid_in_collateral_amount,
-                paid_in_secondary_output_amount,
-            ));
+            return Ok((paid_in_collateral_amount, paid_in_secondary_output_amount));
         }
 
         if !self.remaining_collateral_amount.is_zero() {
@@ -179,11 +170,7 @@ where
 
         if remaining_cost_in_output_token.is_zero() {
             *cost = Zero::zero();
-            return Ok((
-                paid_in_output_amount,
-                paid_in_collateral_amount,
-                paid_in_secondary_output_amount,
-            ));
+            return Ok((paid_in_collateral_amount, paid_in_secondary_output_amount));
         }
 
         let mut remaining_cost_in_secondary_output_token = remaining_cost_in_output_token
@@ -228,11 +215,7 @@ where
             .checked_mul(self.secondary_output_token_price())
             .ok_or(crate::Error::Computation("calculating remaing cost"))?;
 
-        Ok((
-            paid_in_output_amount,
-            paid_in_collateral_amount,
-            paid_in_secondary_output_amount,
-        ))
+        Ok((paid_in_collateral_amount, paid_in_secondary_output_amount))
     }
 }
 
@@ -316,7 +299,7 @@ where
         mut cost: M::Num,
         receive: impl FnOnce(&mut Self, &M::Num, &M::Num, &M::Num) -> crate::Result<()>,
     ) -> crate::Result<()> {
-        let (_paid_in_output_amount, paid_in_collateral_amount, paid_in_secondary_amount) =
+        let (paid_in_collateral_amount, paid_in_secondary_amount) =
             self.state.do_pay_for_cost(&mut cost)?;
         (receive)(
             self,
