@@ -258,7 +258,7 @@ mod tests {
         );
         Ok(())
     }
-    
+
     /// A test for zero amount withdrawal.
     #[test]
     fn zero_amount_withdrawal() -> crate::Result<()> {
@@ -274,7 +274,7 @@ mod tests {
         assert!(result.is_err());
         Ok(())
     }
-    
+
     /// A test for over amount withdrawal.
     #[test]
     fn over_amount_withdrawal() -> crate::Result<()> {
@@ -293,7 +293,7 @@ mod tests {
         println!("{market:#?}");
         Ok(())
     }
-    
+
     /// A test for small amount withdrawal.
     #[test]
     fn small_amount_withdrawal() -> crate::Result<()> {
@@ -316,7 +316,7 @@ mod tests {
             short_token_price: 1,
         };
 
-        let small_amount = 1;    
+        let small_amount = 1;
         let report = market.withdraw(small_amount, prices)?.execute()?;
         println!("{report:#?}");
         println!("{market:#?}");
@@ -336,8 +336,7 @@ mod tests {
                 + report.short_token_output,
             before_short_amount
         );
-        
+
         Ok(())
     }
-    
 }

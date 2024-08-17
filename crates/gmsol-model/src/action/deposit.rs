@@ -429,7 +429,6 @@ mod tests {
         println!("{market:#?}");
         Ok(())
     }
-    
 
     /// A test for zero amount deposit.
     #[test]
@@ -445,7 +444,7 @@ mod tests {
 
         Ok(())
     }
-    
+
     /// A test for large and small deposit.
     #[test]
     fn extreme_amount_deposit() -> Result<(), crate::Error> {
@@ -458,12 +457,9 @@ mod tests {
         let small_amount = 1;
         let large_amount = u64::MAX;
         let max_pool_amount = 1000000000000000000;
-        println!(
-            "{:#?}",
-            market.deposit(small_amount, 0, prices)?.execute()?
-        );
+        println!("{:#?}", market.deposit(small_amount, 0, prices)?.execute()?);
         println!("{market:#?}");
-        
+
         let result = market.deposit(large_amount, 0, prices)?.execute();
         assert!(result.is_err());
         println!("{market:#?}");
@@ -471,10 +467,10 @@ mod tests {
         let result = market.deposit(max_pool_amount, 0, prices)?.execute();
         assert!(result.is_err());
         println!("{market:#?}");
-        
+
         Ok(())
     }
-    
+
     /// A test for round attack.
     #[test]
     fn round_attack_deposit() -> Result<(), crate::Error> {
@@ -490,9 +486,9 @@ mod tests {
             market.deposit(1, 0, prices)?.execute()?;
         }
         println!("{market:#?}");
-        
+
         let mut market_compare = TestMarket::<u64, 9>::default();
-        market_compare.deposit(10000000-1, 0, prices)?.execute()?;
+        market_compare.deposit(10000000 - 1, 0, prices)?.execute()?;
         println!("{market_compare:#?}");
         Ok(())
     }
@@ -501,33 +497,37 @@ mod tests {
     fn concurrent_deposits() -> Result<(), crate::Error> {
         use std::sync::{Arc, Mutex};
         use std::thread;
-    
+
         let market = Arc::new(Mutex::new(TestMarket::<u64, 9>::default()));
         let prices = Prices {
             index_token_price: 120,
             long_token_price: 120,
             short_token_price: 1,
         };
-    
-        let handles: Vec<_> = (0..10).map(|_| {
-            let market = Arc::clone(&market);
-            let prices = prices.clone();
-            thread::spawn(move || {
-                let mut market = market.lock().unwrap();
-                market.deposit(1_000_000_000, 0, prices).unwrap().execute().unwrap();
+
+        let handles: Vec<_> = (0..10)
+            .map(|_| {
+                let market = Arc::clone(&market);
+                thread::spawn(move || {
+                    let mut market = market.lock().unwrap();
+                    market
+                        .deposit(1_000_000_000, 0, prices)
+                        .unwrap()
+                        .execute()
+                        .unwrap();
+                })
             })
-        }).collect();
-    
+            .collect();
+
         for handle in handles {
             handle.join().unwrap();
         }
-    
+
         let market = market.lock().unwrap();
         println!("{:#?}", *market);
         Ok(())
     }
-    
-    
+
     #[test]
     fn deposit_with_price_fluctuations() -> Result<(), crate::Error> {
         let mut market = TestMarket::<u64, 9>::default();
@@ -543,16 +543,19 @@ mod tests {
         };
         println!(
             "{:#?}",
-            market.deposit(1_000_000_000, 0, initial_prices)?.execute()?
+            market
+                .deposit(1_000_000_000, 0, initial_prices)?
+                .execute()?
         );
         println!("{market:#?}");
-        
+
         println!(
             "{:#?}",
-            market.deposit(1_000_000_000, 0, fluctuated_prices)?.execute()?
+            market
+                .deposit(1_000_000_000, 0, fluctuated_prices)?
+                .execute()?
         );
         println!("{market:#?}");
         Ok(())
     }
-    
 }

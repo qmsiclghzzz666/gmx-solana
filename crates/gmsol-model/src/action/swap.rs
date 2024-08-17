@@ -426,7 +426,7 @@ mod tests {
 
         Ok(())
     }
-    
+
     /// A test for over amount.
     #[test]
     fn over_amount_swap() -> crate::Result<()> {
@@ -452,7 +452,7 @@ mod tests {
 
         Ok(())
     }
-    
+
     /// A test for small amount.
     #[test]
     fn small_amount_swap() -> crate::Result<()> {
@@ -464,24 +464,25 @@ mod tests {
         };
         market.deposit(1_000_000_000, 0, prices)?.execute()?;
         println!("{market:#?}");
-        
+
         let small_amount = 1;
-    
+
         let report = market.swap(false, small_amount, prices)?.execute()?;
         println!("{report:#?}");
         println!("{market:#?}");
         assert!(market.liquidity_pool()?.short_amount()? != 0);
 
-        let report = market.swap(false,prices.long_token_price * small_amount, prices)?.execute()?;
+        let report = market
+            .swap(false, prices.long_token_price * small_amount, prices)?
+            .execute()?;
         println!("{report:#?}");
         println!("{market:#?}");
-        
+
         // Test for round.
-        let report = market.swap(false,200, prices)?.execute()?;
+        let report = market.swap(false, 200, prices)?.execute()?;
         println!("{report:#?}");
         println!("{market:#?}");
 
         Ok(())
     }
-
 }
