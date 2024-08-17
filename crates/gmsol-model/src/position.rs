@@ -81,6 +81,9 @@ pub trait Position<const DECIMALS: u8>: PositionState<DECIMALS> {
 
     /// Returns whether the collateral token is the long token of the market.
     fn is_collateral_token_long(&self) -> bool;
+
+    /// Returns whether the pnl and collateral tokens are the same.
+    fn are_pnl_and_collateral_tokens_the_same(&self) -> bool;
 }
 
 /// Position with mutable access.
@@ -138,6 +141,10 @@ impl<'a, const DECIMALS: u8, P: Position<DECIMALS>> Position<DECIMALS> for &'a m
 
     fn is_collateral_token_long(&self) -> bool {
         (**self).is_collateral_token_long()
+    }
+
+    fn are_pnl_and_collateral_tokens_the_same(&self) -> bool {
+        (**self).are_pnl_and_collateral_tokens_the_same()
     }
 }
 

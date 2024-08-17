@@ -32,8 +32,18 @@ pub struct DecreasePosition<P: Position<DECIMALS>, const DECIMALS: u8> {
     params: DecreasePositionParams<P::Num>,
     withdrawable_collateral_amount: P::Num,
     size_delta_usd: P::Num,
-    is_insolvent_close_allowed: bool,
-    is_liquidation_order: bool,
+}
+
+/// Swap Type for the decrese position action.
+#[derive(Debug, Clone, Copy, Default)]
+pub enum DecreasePositionSwapType {
+    /// No swap.
+    #[default]
+    NoSwap,
+    /// Swap PnL token to collateral token.
+    PnlTokenToCollateralToken,
+    /// Swap collateral token to PnL token.
+    CollateralToPnlToken,
 }
 
 /// Decrease Position Params.
@@ -43,6 +53,9 @@ pub struct DecreasePositionParams<T> {
     initial_size_delta_usd: T,
     acceptable_price: Option<T>,
     prices: Prices<T>,
+    is_insolvent_close_allowed: bool,
+    is_liquidation_order: bool,
+    swap: DecreasePositionSwapType,
 }
 
 impl<T> DecreasePositionParams<T> {
@@ -98,16 +111,23 @@ where
                 acceptable_price,
                 prices,
                 initial_collateral_withdrawal_amount: collateral_withdrawal_amount.clone(),
+                is_insolvent_close_allowed: is_insolvent_close_allowed
+                    && (size_delta_usd == *position.size_in_usd())
+                    && is_liquidation_order,
+                is_liquidation_order,
+                swap: DecreasePositionSwapType::NoSwap,
             },
             withdrawable_collateral_amount: collateral_withdrawal_amount
                 .min(position.collateral_amount().clone()),
-            is_insolvent_close_allowed: is_insolvent_close_allowed
-                && (size_delta_usd == *position.size_in_usd())
-                && is_liquidation_order,
             size_delta_usd,
             position,
-            is_liquidation_order,
         })
+    }
+
+    /// Set the swap type.
+    pub fn swap(mut self, kind: DecreasePositionSwapType) -> Self {
+        self.params.swap = kind;
+        self
     }
 
     /// Execute.
@@ -124,7 +144,11 @@ where
         self.check_partial_close()?;
         self.check_close()?;
 
-        // TODO: handle NoSwap.
+        if !matches!(self.params.swap, DecreasePositionSwapType::NoSwap)
+            && self.position.are_pnl_and_collateral_tokens_the_same()
+        {
+            self.params.swap = DecreasePositionSwapType::NoSwap;
+        }
 
         let borrowing = self
             .position
@@ -348,7 +372,7 @@ where
     }
 
     fn check_liquiation(&self) -> crate::Result<()> {
-        if self.is_liquidation_order {
+        if self.params.is_liquidation_order {
             // FIXME: should we check that whether this is a close all order?
             let Some(_reason) = self
                 .position
@@ -371,7 +395,7 @@ where
         let (price_impact_value, price_impact_diff, execution_price) =
             self.get_execution_params()?;
 
-        // TODO: calculate position pnl usd.
+        // Calculate position pnl usd.
         let (base_pnl_usd, uncapped_base_pnl_usd, size_delta_in_tokens) = self
             .position
             .pnl_value(&self.params.prices, &self.size_delta_usd)?;
@@ -394,7 +418,7 @@ where
             is_output_token_long,
             is_pnl_token_long,
             &self.params.prices,
-            self.is_insolvent_close_allowed,
+            self.params.is_insolvent_close_allowed,
         );
         let mut report = processor.process(|mut ctx| {
             ctx.add_pnl_if_positive(&base_pnl_usd)?

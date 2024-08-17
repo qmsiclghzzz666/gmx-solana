@@ -301,4 +301,8 @@ impl<'a> gmsol_model::Position<{ constants::MARKET_DECIMALS }> for AsPosition<'a
     fn is_collateral_token_long(&self) -> bool {
         self.is_collateral_long
     }
+
+    fn are_pnl_and_collateral_tokens_the_same(&self) -> bool {
+        self.is_long == self.is_collateral_long || self.market.is_pure()
+    }
 }
