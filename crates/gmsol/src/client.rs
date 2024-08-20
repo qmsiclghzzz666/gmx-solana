@@ -435,6 +435,20 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         Ok(markets)
     }
 
+    /// Fetch [`Market`](types::Market) at the given address with config.
+    ///
+    /// The value inside the returned context will be `None` if the account does not exist.
+    pub async fn market_with_config<T>(
+        &self,
+        address: &Pubkey,
+        config: RpcAccountInfoConfig,
+    ) -> crate::Result<WithContext<Option<types::Market>>> {
+        let market = self
+            .account_with_config::<ZeroCopy<types::Market>>(address, config)
+            .await?;
+        Ok(market.map(|m| m.map(|m| m.0)))
+    }
+
     /// Fetch [`Market`](types::Market) account with its address.
     pub async fn market(&self, address: &Pubkey) -> crate::Result<types::Market> {
         Ok(self
