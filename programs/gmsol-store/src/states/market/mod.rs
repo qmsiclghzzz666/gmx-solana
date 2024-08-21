@@ -560,9 +560,12 @@ impl MarketMeta {
 
 /// Type that has market meta.
 pub trait HasMarketMeta {
-    fn is_pure(&self) -> bool;
-
     fn market_meta(&self) -> &MarketMeta;
+
+    fn is_pure(&self) -> bool {
+        let meta = self.market_meta();
+        meta.long_token_mint == meta.short_token_mint
+    }
 }
 
 impl HasMarketMeta for Market {
@@ -572,6 +575,12 @@ impl HasMarketMeta for Market {
 
     fn market_meta(&self) -> &MarketMeta {
         &self.meta
+    }
+}
+
+impl HasMarketMeta for MarketMeta {
+    fn market_meta(&self) -> &MarketMeta {
+        self
     }
 }
 
