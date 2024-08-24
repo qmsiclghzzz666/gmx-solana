@@ -11,9 +11,6 @@ required-features = ["cli"]
 [[example]]
 name = "hermes"
 required-features = ["pyth-pull-oracle", "cli"]
-[[example]]
-name = "hermes-merge-updates"
-required-features = ["pyth-pull-oracle", "cli"]
 
 [[example]]
 name = "discover"
