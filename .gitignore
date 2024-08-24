@@ -10,3 +10,4 @@ test-ledger
 /dist
 .vscode
 docker-target
+.helix
