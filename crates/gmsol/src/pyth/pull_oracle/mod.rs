@@ -268,6 +268,7 @@ pub trait PythPullOracleOps<C> {
                 let close_encoded_vaa = wormhole.close_encoded_vaa(&draft_vaa);
                 close.try_push(close_encoded_vaa)?;
             }
+
             // Post price updates.
             for (feed_id, (proof, update)) in updates {
                 let Some(price_update) = ctx.feeds.get(&feed_id) else {
@@ -289,6 +290,53 @@ pub trait PythPullOracleOps<C> {
             let consume = (consume)(prices).await?;
             post.try_push_many(consume, true)?;
             Ok(WithPythPrices { post, close })
+        }
+    }
+
+    /// Execute with pyth price updates.
+    fn execute_with_pyth_price_updates<'a, T, S>(
+        &'a self,
+        updates: impl IntoIterator<Item = &'a PriceUpdate>,
+        execute: &mut T,
+        estimate_execution_fee: bool,
+        compute_unit_price_micro_lamports: Option<u64>,
+        skip_preflight: bool,
+    ) -> impl Future<Output = crate::Result<()>>
+    where
+        C: Deref<Target = S> + Clone + 'a,
+        S: Signer,
+        T: ExecuteWithPythPrices<'a, C>,
+    {
+        async move {
+            let mut execution_fee_estiamted = estimate_execution_fee;
+            let updates = updates.into_iter().collect::<Vec<_>>();
+            let mut ctx = execute.context().await?;
+            let mut with_prices;
+            loop {
+                with_prices = self
+                    .with_pyth_price_updates(&mut ctx, updates.clone(), |prices| async {
+                        let rpcs = execute.build_rpc_with_price_updates(prices).await?;
+                        Ok(rpcs)
+                    })
+                    .await?;
+                if execution_fee_estiamted {
+                    break;
+                } else {
+                    let execution_fee = with_prices
+                        .estimated_execution_fee(compute_unit_price_micro_lamports)
+                        .await?;
+                    execute.set_execution_fee(execution_fee);
+                    execution_fee_estiamted = true;
+                }
+            }
+            execute
+                .execute(
+                    with_prices,
+                    compute_unit_price_micro_lamports,
+                    skip_preflight,
+                )
+                .await?;
+            Ok(())
         }
     }
 }
@@ -324,5 +372,48 @@ where
 
     fn wormhole(&self) -> &Program<C> {
         &self.wormhole
+    }
+}
+
+/// Execute with pyth prices.
+pub trait ExecuteWithPythPrices<'a, C> {
+    /// Set execution fee.
+    fn set_execution_fee(&mut self, lamports: u64);
+
+    /// Get the oracle context.
+    fn context(&mut self) -> impl Future<Output = crate::Result<PythPullOracleContext>>;
+
+    /// Build RPC requests with price updates.
+    fn build_rpc_with_price_updates(
+        &mut self,
+        price_updates: Prices,
+    ) -> impl Future<Output = crate::Result<Vec<RpcBuilder<'a, C, ()>>>>;
+
+    /// Execute.
+    fn execute<S>(
+        &mut self,
+        txns: WithPythPrices<C>,
+        compute_unit_price_micro_lamports: Option<u64>,
+        skip_preflight: bool,
+    ) -> impl Future<Output = crate::Result<()>>
+    where
+        C: Deref<Target = S> + Clone,
+        S: Signer,
+    {
+        async move {
+            match txns
+                .send_all(compute_unit_price_micro_lamports, skip_preflight)
+                .await
+            {
+                Ok(signatures) => {
+                    tracing::info!("executed with txns {signatures:#?}");
+                    Ok(())
+                }
+                Err((signatures, err)) => {
+                    tracing::error!(%err, "failed to execute, successful txns: {signatures:#?}");
+                    Err(err)
+                }
+            }
+        }
     }
 }
