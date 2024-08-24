@@ -260,7 +260,7 @@ impl KeeperArgs {
                     .price_provider(self.provider.program());
                 if self.use_pyth_pull_oracle() {
                     let hint = builder.prepare_hint().await?;
-                    let ctx = PythPullOracleContext::try_from_feeds(&hint.feeds)?;
+                    let mut ctx = PythPullOracleContext::try_from_feeds(&hint.feeds)?;
                     let feed_ids = ctx.feed_ids();
                     if feed_ids.is_empty() {
                         tracing::error!(%deposit, "empty feed ids");
@@ -271,7 +271,7 @@ impl KeeperArgs {
                         .latest_price_updates(feed_ids, Some(EncodingType::Base64))
                         .await?;
                     let with_prices = oracle
-                        .with_pyth_prices(&ctx, &update, |prices| async {
+                        .with_pyth_prices(&mut ctx, &update, |prices| async {
                             let rpc = builder
                                 .parse_with_pyth_price_updates(prices)
                                 .build()
@@ -317,7 +317,7 @@ impl KeeperArgs {
                     .price_provider(self.provider.program());
                 if self.use_pyth_pull_oracle() {
                     let hint = builder.prepare_hint().await?;
-                    let ctx = PythPullOracleContext::try_from_feeds(&hint.feeds)?;
+                    let mut ctx = PythPullOracleContext::try_from_feeds(&hint.feeds)?;
                     let feed_ids = ctx.feed_ids();
                     if feed_ids.is_empty() {
                         tracing::error!(%withdrawal, "empty feed ids");
@@ -328,7 +328,7 @@ impl KeeperArgs {
                         .latest_price_updates(feed_ids, Some(EncodingType::Base64))
                         .await?;
                     let with_prices = oracle
-                        .with_pyth_prices(&ctx, &update, |prices| async {
+                        .with_pyth_prices(&mut ctx, &update, |prices| async {
                             let rpc = builder
                                 .parse_with_pyth_price_updates(prices)
                                 .build()
@@ -385,7 +385,7 @@ impl KeeperArgs {
                     .price_provider(self.provider.program());
                 if self.use_pyth_pull_oracle() {
                     let hint = builder.prepare_hint().await?;
-                    let ctx = PythPullOracleContext::try_from_feeds(&hint.feeds)?;
+                    let mut ctx = PythPullOracleContext::try_from_feeds(&hint.feeds)?;
                     let feed_ids = ctx.feed_ids();
                     if feed_ids.is_empty() {
                         tracing::error!(%order, "empty feed ids");
@@ -396,7 +396,7 @@ impl KeeperArgs {
                         .latest_price_updates(feed_ids, Some(EncodingType::Base64))
                         .await?;
                     let with_prices = oracle
-                        .with_pyth_prices(&ctx, &update, |prices| async {
+                        .with_pyth_prices(&mut ctx, &update, |prices| async {
                             let builder = builder
                                 .parse_with_pyth_price_updates(prices)
                                 .build()
@@ -455,7 +455,7 @@ impl KeeperArgs {
                     .price_provider(&self.provider.program());
                 if self.use_pyth_pull_oracle() {
                     let hint = builder.prepare_hint().await?;
-                    let ctx = PythPullOracleContext::try_from_feeds(hint.feeds())?;
+                    let mut ctx = PythPullOracleContext::try_from_feeds(hint.feeds())?;
                     let feed_ids = ctx.feed_ids();
                     if feed_ids.is_empty() {
                         tracing::error!(%position, "empty feed ids");
@@ -466,7 +466,7 @@ impl KeeperArgs {
                         .latest_price_updates(feed_ids, Some(EncodingType::Base64))
                         .await?;
                     let with_prices = oracle
-                        .with_pyth_prices(&ctx, &update, |prices| async {
+                        .with_pyth_prices(&mut ctx, &update, |prices| async {
                             let builder = builder
                                 .parse_with_pyth_price_updates(prices)
                                 .build()
@@ -538,7 +538,7 @@ impl KeeperArgs {
                     .price_provider(&self.provider.program());
                 if self.use_pyth_pull_oracle() {
                     let hint = builder.prepare_hint().await?;
-                    let ctx = PythPullOracleContext::try_from_feeds(hint.feeds())?;
+                    let mut ctx = PythPullOracleContext::try_from_feeds(hint.feeds())?;
                     let feed_ids = ctx.feed_ids();
                     if feed_ids.is_empty() {
                         tracing::error!(%position, "empty feed ids");
@@ -549,7 +549,7 @@ impl KeeperArgs {
                         .latest_price_updates(feed_ids, Some(EncodingType::Base64))
                         .await?;
                     let with_prices = oracle
-                        .with_pyth_prices(&ctx, &update, |prices| async {
+                        .with_pyth_prices(&mut ctx, &update, |prices| async {
                             let builder = builder
                                 .parse_with_pyth_price_updates(prices)
                                 .build()
@@ -595,7 +595,7 @@ impl KeeperArgs {
 
                 if self.use_pyth_pull_oracle() {
                     let hint = builder.prepare_hint().await?;
-                    let ctx = PythPullOracleContext::try_from_feeds(hint.feeds())?;
+                    let mut ctx = PythPullOracleContext::try_from_feeds(hint.feeds())?;
                     let feed_ids = ctx.feed_ids();
                     if feed_ids.is_empty() {
                         tracing::error!(%market_token, "empty feed ids");
@@ -606,7 +606,7 @@ impl KeeperArgs {
                         .latest_price_updates(feed_ids, Some(EncodingType::Base64))
                         .await?;
                     let with_prices = oracle
-                        .with_pyth_prices(&ctx, &update, |prices| async {
+                        .with_pyth_prices(&mut ctx, &update, |prices| async {
                             let builder = builder
                                 .parse_with_pyth_price_updates(prices)
                                 .build()

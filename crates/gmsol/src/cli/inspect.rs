@@ -808,9 +808,9 @@ impl InspectArgs {
 
                 if *post {
                     let oracle = PythPullOracle::try_new(client.anchor())?;
-                    let ctx = PythPullOracleContext::new(feed_ids);
+                    let mut ctx = PythPullOracleContext::new(feed_ids);
                     let prices = oracle
-                        .with_pyth_prices(&ctx, &update, |prices| {
+                        .with_pyth_prices(&mut ctx, &update, |prices| {
                             for (feed_id, price_update) in prices {
                                 tracing::info!(%feed_id, %price_update, "posting price update");
                             }

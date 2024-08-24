@@ -21,8 +21,10 @@ use anchor_client::{
     },
     Client, Program,
 };
+use either::Either;
 use gmsol_store::states::common::TokensWithFeed;
 use pyth_sdk::Identifier;
+use pythnet_sdk::wire::v1::AccumulatorUpdateData;
 
 use crate::utils::{RpcBuilder, TransactionBuilder};
 
@@ -129,7 +131,7 @@ pub type Prices = HashMap<Identifier, Pubkey>;
 
 /// Pyth Pull Oracle Context.
 pub struct PythPullOracleContext {
-    encoded_vaa: Keypair,
+    encoded_vaas: Vec<Keypair>,
     feeds: HashMap<Identifier, Keypair>,
     feed_ids: Vec<Identifier>,
 }
@@ -139,7 +141,7 @@ impl PythPullOracleContext {
     pub fn new(feed_ids: Vec<Identifier>) -> Self {
         let feeds = feed_ids.iter().map(|id| (*id, Keypair::new())).collect();
         Self {
-            encoded_vaa: Keypair::new(),
+            encoded_vaas: Vec::with_capacity(1),
             feeds,
             feed_ids,
         }
@@ -155,6 +157,19 @@ impl PythPullOracleContext {
     pub fn feed_ids(&self) -> &[Identifier] {
         &self.feed_ids
     }
+
+    /// Create a new keypair for encoded vaa account.
+    ///
+    /// Return its index.
+    pub fn add_encoded_vaa(&mut self) -> usize {
+        self.encoded_vaas.push(Keypair::new());
+        self.encoded_vaas.len() - 1
+    }
+
+    /// Get encoded vaas.
+    pub fn encoded_vaas(&self) -> &[Keypair] {
+        &self.encoded_vaas
+    }
 }
 
 /// Pyth Pull Oracle Ops.
@@ -168,8 +183,8 @@ pub trait PythPullOracleOps<C> {
     /// Create transactions to post price updates and consume the prices.
     fn with_pyth_prices<'a, S, It, Fut>(
         &'a self,
-        ctx: &'a PythPullOracleContext,
-        update: &PriceUpdate,
+        ctx: &'a mut PythPullOracleContext,
+        update: &'a PriceUpdate,
         consume: impl FnOnce(Prices) -> Fut,
     ) -> impl Future<Output = crate::Result<WithPythPrices<'a, C>>>
     where
@@ -178,6 +193,24 @@ pub trait PythPullOracleOps<C> {
         It: IntoIterator<Item = RpcBuilder<'a, C>>,
         Fut: Future<Output = crate::Result<It>>,
     {
+        self.with_pyth_price_updates(ctx, [update], consume)
+    }
+
+    /// Create transactions to post price updates and consume the prices.
+    fn with_pyth_price_updates<'a, S, It, Fut>(
+        &'a self,
+        ctx: &'a mut PythPullOracleContext,
+        updates: impl IntoIterator<Item = &'a PriceUpdate>,
+        consume: impl FnOnce(Prices) -> Fut,
+    ) -> impl Future<Output = crate::Result<WithPythPrices<'a, C>>>
+    where
+        C: Deref<Target = S> + Clone + 'a,
+        S: Signer,
+        It: IntoIterator<Item = RpcBuilder<'a, C>>,
+        Fut: Future<Output = crate::Result<It>>,
+    {
+        use std::collections::hash_map::Entry;
+
         async {
             let wormhole = self.wormhole();
             let pyth = self.pyth();
@@ -185,47 +218,74 @@ pub trait PythPullOracleOps<C> {
             let mut post = TransactionBuilder::new(pyth.async_rpc());
             let mut close = TransactionBuilder::new(pyth.async_rpc());
 
-            for data in utils::parse_accumulator_update_datas(update)? {
-                let proof = &data.proof;
-                let guardian_set_index = utils::get_guardian_set_index(proof)?;
-                let draft_vaa = ctx.encoded_vaa.pubkey();
-                let vaa = utils::get_vaa_buffer(proof);
+            let datas = updates
+                .into_iter()
+                .flat_map(
+                    |update| match utils::parse_accumulator_update_datas(update) {
+                        Ok(datas) => Either::Left(datas.into_iter().map(Ok)),
+                        Err(err) => Either::Right(std::iter::once(Err(err))),
+                    },
+                )
+                .collect::<crate::Result<Vec<AccumulatorUpdateData>>>()?;
 
+            // Merge by ids.
+            let mut updates = HashMap::<_, _>::default();
+            for data in datas.iter() {
+                let proof = &data.proof;
+                for update in utils::get_merkle_price_updates(proof) {
+                    let feed_id = utils::parse_feed_id(update)?;
+                    updates.insert(feed_id, (proof, update));
+                }
+            }
+
+            // Write vaas.
+            let mut vaas = HashMap::<_, _>::default();
+            for (proof, _) in updates.values() {
+                let vaa = utils::get_vaa_buffer(proof);
+                if let Entry::Vacant(entry) = vaas.entry(vaa) {
+                    let guardian_set_index = utils::get_guardian_set_index(proof)?;
+                    let id = ctx.add_encoded_vaa();
+                    entry.insert((id, guardian_set_index));
+                }
+            }
+            for (vaa, (id, guardian_set_index)) in vaas.iter() {
+                let draft_vaa = &ctx.encoded_vaas[*id];
                 let create = wormhole
-                    .create_encoded_vaa(&ctx.encoded_vaa, vaa.len() as u64)
+                    .create_encoded_vaa(draft_vaa, vaa.len() as u64)
                     .await?;
+                let draft_vaa = draft_vaa.pubkey();
                 let write_1 = wormhole.write_encoded_vaa(&draft_vaa, 0, &vaa[0..VAA_SPLIT_INDEX]);
                 let write_2 = wormhole.write_encoded_vaa(
                     &draft_vaa,
                     VAA_SPLIT_INDEX as u32,
                     &vaa[VAA_SPLIT_INDEX..],
                 );
-                let verify = wormhole.verify_encoded_vaa_v1(&draft_vaa, guardian_set_index);
-                let close_encoded_vaa = wormhole.close_encoded_vaa(&draft_vaa);
-
+                let verify = wormhole.verify_encoded_vaa_v1(&draft_vaa, *guardian_set_index);
                 post.try_push(create.clear_output())?
                     .try_push(write_1)?
                     .try_push(write_2)?
                     .try_push(verify)?;
+                let close_encoded_vaa = wormhole.close_encoded_vaa(&draft_vaa);
                 close.try_push(close_encoded_vaa)?;
-
-                let mut price_updates = HashMap::<Pubkey, _>::default();
-                for update in utils::get_merkle_price_updates(proof) {
-                    let feed_id = utils::parse_feed_id(update)?;
-                    let Some(price_update) = ctx.feeds.get(&feed_id) else {
-                        continue;
-                    };
-                    let (post_price_update, price_update) = pyth
-                        .post_price_update(price_update, update, &draft_vaa)?
-                        .swap_output(());
-                    prices.insert(feed_id, price_update);
-                    price_updates.insert(price_update, post_price_update);
-                }
-                for (price_update, post_rpc) in price_updates {
-                    post.try_push(post_rpc)?;
-                    close.try_push(pyth.reclaim_rent(&price_update))?;
-                }
             }
+            // Post price updates.
+            for (feed_id, (proof, update)) in updates {
+                let Some(price_update) = ctx.feeds.get(&feed_id) else {
+                    continue;
+                };
+                let vaa = utils::get_vaa_buffer(proof);
+                let Some((id, _)) = vaas.get(vaa) else {
+                    continue;
+                };
+                let encoded_vaa = ctx.encoded_vaas[*id].pubkey();
+                let (post_price_update, price_update) = pyth
+                    .post_price_update(price_update, update, &encoded_vaa)?
+                    .swap_output(());
+                prices.insert(feed_id, price_update);
+                post.try_push(post_price_update)?;
+                close.try_push(pyth.reclaim_rent(&price_update))?;
+            }
+
             let consume = (consume)(prices).await?;
             post.try_push_many(consume, true)?;
             Ok(WithPythPrices { post, close })

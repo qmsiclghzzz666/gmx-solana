@@ -11,6 +11,9 @@ required-features = ["cli"]
 [[example]]
 name = "hermes"
 required-features = ["pyth-pull-oracle", "cli"]
+[[example]]
+name = "hermes-merge-updates"
+required-features = ["pyth-pull-oracle", "cli"]
 
 [[example]]
 name = "discover"
@@ -107,6 +110,7 @@ serde_json = { workspace = true }
 tokio-stream = { workspace = true, features = ["sync", "time"] }
 bs58 = { workspace = true }
 async-stream = { workspace = true }
+either = { workspace = true }
 
 # Dependencies for cli
 clap = { workspace = true, optional = true, features = ["derive", "env"] }
