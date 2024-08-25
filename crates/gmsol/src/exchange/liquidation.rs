@@ -22,7 +22,7 @@ use super::{
 pub const LIQUIDATE_COMPUTE_BUDGET: u32 = 800_000;
 
 #[cfg(feature = "pyth-pull-oracle")]
-use crate::pyth::pull_oracle::Prices;
+use crate::pyth::pull_oracle::{ExecuteWithPythPrices, Prices, PythPullOracleContext};
 
 /// Liquidate Instruction Builder.
 pub struct LiquidateBuilder<'a, C> {
@@ -248,5 +248,31 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> LiquidateBuilder<'a, C> {
             .try_push(exec_builder)?
             .try_push(post_builder)?;
         Ok(builder)
+    }
+}
+
+#[cfg(feature = "pyth-pull-oracle")]
+impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteWithPythPrices<'a, C>
+    for LiquidateBuilder<'a, C>
+{
+    fn set_execution_fee(&mut self, lamports: u64) {
+        self.execution_fee(lamports);
+    }
+
+    async fn context(&mut self) -> crate::Result<PythPullOracleContext> {
+        let hint = self.prepare_hint().await?;
+        let ctx = PythPullOracleContext::try_from_feeds(hint.feeds())?;
+        Ok(ctx)
+    }
+
+    async fn build_rpc_with_price_updates(
+        &mut self,
+        price_updates: Prices,
+    ) -> crate::Result<Vec<crate::utils::RpcBuilder<'a, C, ()>>> {
+        let tx = self
+            .parse_with_pyth_price_updates(price_updates)
+            .build()
+            .await?;
+        Ok(tx.into_builders())
     }
 }

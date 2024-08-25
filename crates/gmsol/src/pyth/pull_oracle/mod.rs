@@ -298,7 +298,6 @@ pub trait PythPullOracleOps<C> {
         &'a self,
         updates: impl IntoIterator<Item = &'a PriceUpdate>,
         execute: &mut T,
-        estimate_execution_fee: bool,
         compute_unit_price_micro_lamports: Option<u64>,
         skip_preflight: bool,
     ) -> impl Future<Output = crate::Result<()>>
@@ -308,7 +307,7 @@ pub trait PythPullOracleOps<C> {
         T: ExecuteWithPythPrices<'a, C>,
     {
         async move {
-            let mut execution_fee_estiamted = estimate_execution_fee;
+            let mut execution_fee_estiamted = execute.should_estiamte_execution_fee();
             let updates = updates.into_iter().collect::<Vec<_>>();
             let mut ctx = execute.context().await?;
             let mut with_prices;
@@ -377,6 +376,11 @@ where
 
 /// Execute with pyth prices.
 pub trait ExecuteWithPythPrices<'a, C> {
+    /// Whether to estimate the execution fee.
+    fn should_estiamte_execution_fee(&self) -> bool {
+        true
+    }
+
     /// Set execution fee.
     fn set_execution_fee(&mut self, lamports: u64);
 
