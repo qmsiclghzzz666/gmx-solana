@@ -1,4 +1,4 @@
-use std::ops::Deref;
+use std::{ops::Deref, sync::Arc};
 
 use anchor_client::{
     anchor_lang::{system_program, Id},
@@ -6,7 +6,9 @@ use anchor_client::{
 };
 use anchor_spl::associated_token::get_associated_token_address;
 use gmsol_exchange::{accounts, instruction};
-use gmsol_store::states::{common::TokensWithFeed, MarketMeta, NonceBytes, Position, Pyth, Store};
+use gmsol_store::states::{
+    common::TokensWithFeed, MarketMeta, NonceBytes, Position, Pyth, Store, TokenMap,
+};
 
 use crate::{
     store::utils::FeedsParser,
@@ -45,18 +47,17 @@ pub struct LiquidateHint {
     token_map: Pubkey,
     market: Pubkey,
     pnl_token: Pubkey,
-    store: Store,
+    store: Arc<Store>,
     meta: MarketMeta,
     tokens_with_feed: TokensWithFeed,
 }
 
 impl LiquidateHint {
-    async fn from_position<C: Deref<Target = impl Signer> + Clone>(
+    /// Create from position.
+    pub async fn from_position<C: Deref<Target = impl Signer> + Clone>(
         client: &crate::Client<C>,
         position: &Position,
     ) -> crate::Result<Self> {
-        use gmsol_exchange::utils::token_records;
-
         let store_address = position.store;
         let store = client.store(&store_address).await?;
         let token_map_address = client
@@ -69,26 +70,41 @@ impl LiquidateHint {
         let market = client.find_market_address(&store_address, &position.market_token);
         let meta = *client.market(&market).await?.meta();
 
+        Self::try_new(position, Arc::new(store), &token_map, market, meta)
+    }
+
+    /// Create a new hint.
+    pub fn try_new(
+        position: &Position,
+        store: Arc<Store>,
+        token_map: &TokenMap,
+        market: Pubkey,
+        market_meta: MarketMeta,
+    ) -> crate::Result<Self> {
+        use gmsol_exchange::utils::token_records;
+
         let records = token_records(
-            &token_map,
+            token_map,
             &[
-                meta.index_token_mint,
-                meta.long_token_mint,
-                meta.short_token_mint,
+                market_meta.index_token_mint,
+                market_meta.long_token_mint,
+                market_meta.short_token_mint,
             ]
             .into(),
         )?;
         let tokens_with_feed = TokensWithFeed::try_from_vec(records)?;
 
         Ok(Self {
-            store_address,
+            store_address: position.store,
             owner: position.owner,
-            token_map: token_map_address,
-            pnl_token: meta.pnl_token(position.try_is_long()?),
+            token_map: *store.token_map().ok_or(crate::Error::invalid_argument(
+                "missing token map for the store",
+            ))?,
             market,
             store,
-            meta,
             tokens_with_feed,
+            pnl_token: market_meta.pnl_token(position.try_is_long()?),
+            meta: market_meta,
         })
     }
 
@@ -128,6 +144,12 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> LiquidateBuilder<'a, C> {
                 Ok(hint)
             }
         }
+    }
+
+    /// Set hint with the given position for the liquidation.
+    pub fn hint(&mut self, hint: LiquidateHint) -> &mut Self {
+        self.hint = Some(hint);
+        self
     }
 
     /// Set price provider to the given.
