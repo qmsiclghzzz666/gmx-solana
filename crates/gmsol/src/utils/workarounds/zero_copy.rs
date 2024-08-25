@@ -95,5 +95,40 @@ where
     const DISCRIMINATOR: [u8; 8] = T::DISCRIMINATOR;
 }
 
-/// Shared ZeroCopy wrapper.
-pub type SharedZeroCopy<T> = ZeroCopy<Shared<T>>;
+/// Workaround for deserializing zero-copy accounts and wrapping the result into Arc.
+pub struct SharedZeroCopy<T>(pub Arc<T>);
+
+impl<T> Clone for SharedZeroCopy<T> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
+impl<T> SharedZeroCopy<T> {
+    /// Conver into inner value.
+    pub fn into_inner(self) -> Arc<T> {
+        self.0
+    }
+}
+
+impl<T> AccountDeserialize for SharedZeroCopy<T>
+where
+    T: anchor_client::anchor_lang::ZeroCopy,
+{
+    fn try_deserialize(buf: &mut &[u8]) -> anchor_client::anchor_lang::Result<Self> {
+        let account = gmsol_store::utils::de::try_deserailize(buf)?;
+        Ok(Self(Arc::new(account)))
+    }
+
+    fn try_deserialize_unchecked(buf: &mut &[u8]) -> anchor_client::anchor_lang::Result<Self> {
+        let account = gmsol_store::utils::de::try_deserailize_unchecked(buf)?;
+        Ok(Self(Arc::new(account)))
+    }
+}
+
+impl<T> Discriminator for SharedZeroCopy<T>
+where
+    T: Discriminator,
+{
+    const DISCRIMINATOR: [u8; 8] = T::DISCRIMINATOR;
+}
