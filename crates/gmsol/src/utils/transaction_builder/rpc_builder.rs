@@ -60,7 +60,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> RpcBuilder<'a, C> {
     /// Return if there are any errors.
     /// ## Notes
     /// - All options including `cluster`, `commiment` and `program_id` will still be
-    /// the same of `self` after merging.
+    ///   the same of `self` after merging.
     #[inline]
     pub fn merge(mut self, mut other: Self) -> Self {
         self.try_merge(&mut other)
@@ -75,7 +75,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> RpcBuilder<'a, C> {
     /// ## Notes
     /// - When success, the `other` will become a empty [`RpcBuilder`].
     /// - All options including `cluster`, `commiment` and `program_id` will still be
-    /// the same of `self` after merging.
+    ///   the same of `self` after merging.
     pub fn try_merge(&mut self, other: &mut Self) -> crate::Result<()> {
         if self.payer != other.payer {
             return Err(crate::Error::invalid_argument("payer mismatched"));

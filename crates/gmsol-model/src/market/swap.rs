@@ -109,7 +109,7 @@ pub trait SwapMarketMutExt<const DECIMALS: u8>: SwapMarketMut<DECIMALS> {
     /// Apply a swap impact value to the price impact pool.
     ///
     /// - If it is a positive impact amount, cap the impact amount to the amount available in the price impact pool,
-    /// and the price impact pool will be decreased by this amount and return.
+    ///   and the price impact pool will be decreased by this amount and return.
     /// - If it is a negative impact amount, the price impact pool will be increased by this amount and return.
     fn apply_swap_impact_value_with_cap(
         &mut self,

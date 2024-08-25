@@ -59,7 +59,7 @@
 //! addition to the Data Account being operated on. Before executing the operation, the instruction
 //! verifies:
 //! 1. The Data Account is managed by the Store (by checking if the `store` field of the Data Account
-//! matches the address of the Store Account).
+//!    matches the address of the Store Account).
 //! 2. The Signer has the required permissions in the given Store.
 //!
 //! For example, there is an instruction ([`push_to_token_map`]) in the Store Program to add a new token
@@ -88,6 +88,7 @@
 //! the following [seeds]:
 //! 1. A constant [`Store::SEED`](states::Store).
 //! 2. A sha256 hashed key string.
+//!
 //! This means that we can generate a Store Account address from any key string (with a length not
 //! exceeding [`MAX_LEN`](states::Store::MAX_LEN)). However, this is not unique, as multiple key strings
 //! may generate the same Store Account address. The store derived from an empty key string is referred to
@@ -111,9 +112,9 @@
 //! The complete role-based permission table for each GMSOL deployment is directly stored in the
 //! [`Store`](states::Store) Account of that deployment. The current permission structure in GMSOL includes:
 //! - (Unique) Administrator: The administrator's address is directly stored in the `authority` field
-//! of the [`Store`](states::Store) Account. Only this address can modify the permission table.
+//!   of the [`Store`](states::Store) Account. Only this address can modify the permission table.
 //! - Custom Roles: The custom role table and member table are stored in the `role` field of the
-//! [`Store`](states::Store) account as a [`RoleStore`](states::RoleStore) structure.
+//!   [`Store`](states::Store) account as a [`RoleStore`](states::RoleStore) structure.
 //!
 //! All instructions in GMSOL are either permissionless or require the caller to have an admin role
 //! or a role defined in [`RoleStore`](states::RoleStore). For instructions that require permissions,
@@ -143,7 +144,7 @@
 //! - Admin: `GMsoQfjzWE8ogYJPew3zX8fCTF8vedbgFV4qjUCZGTtm`
 //! - Role Table: `ROLE_A`, `MARKET_KEEPER`
 //! - Member Table: `FoMW5qtiTMcR3Y5zFF7ZmsG3maGac8rPaveHvKiWWpaJ` with `ROLE_A`;
-//! `KeCJTnq7u6xE1nwiou2RD4yj6hNTZnb8xYcavqSSgRe` with `MARKET_KEEPER`
+//!   `KeCJTnq7u6xE1nwiou2RD4yj6hNTZnb8xYcavqSSgRe` with `MARKET_KEEPER`
 //!
 //! Since GMSOL's permission table supports granting multiple roles to the same address, the user can also
 //! grant the `ROLE_A` role to `KeCJTnq7u6xE1nwiou2RD4yj6hNTZnb8xYcavqSSgRe`. The permission structure of
@@ -152,7 +153,7 @@
 //! - Admin: `GMsoQfjzWE8ogYJPew3zX8fCTF8vedbgFV4qjUCZGTtm`
 //! - Role Table: `ROLE_A`, `MARKET_KEEPER`
 //! - Member Table: `FoMW5qtiTMcR3Y5zFF7ZmsG3maGac8rPaveHvKiWWpaJ` with `ROLE_A`;
-//! `KeCJTnq7u6xE1nwiou2RD4yj6hNTZnb8xYcavqSSgRe` with `MARKET_KEEPER` and `ROLE_A`
+//!   `KeCJTnq7u6xE1nwiou2RD4yj6hNTZnb8xYcavqSSgRe` with `MARKET_KEEPER` and `ROLE_A`
 //!
 //! Since `KeCJTnq7u6xE1nwiou2RD4yj6hNTZnb8xYcavqSSgRe` has the `MARKET_KEEPER` role, this address can
 //! sign instructions related to market management, such as `toggle_market`. However, this address cannot
@@ -179,13 +180,13 @@
 //! - [`grant_role`]: Grant a role to the given user in the given store.
 //! - [`revoke_role`]: Revoke a role from the given user in the given store.
 //! - [`check_admin`](gmsol_store::check_admin): Check that the signer is the admin of the given store,
-//! throw error if the check fails.
+//!   throw error if the check fails.
 //! - [`check_role`](gmsol_store::check_role): Check that the signer has the given role in the given store,
-//! throw error if the check fails.
+//!   throw error if the check fails.
 //! - [`has_admin`](gmsol_store::has_admin): Return whether the given address is the admin of the given store,
-//! or not.
+//!   or not.
 //! - [`has_role`](gmsol_store::has_role): Return whether the given address has the given role in the given store,
-//! or not.
+//!   or not.
 //!
 //! ## Oracle Price Management
 //! In GMSOL, market-related actions such as deposit and order require the latest prices from the oracle to be executed.
@@ -193,16 +194,16 @@
 //! However, for the sake of completeness, we will briefly outline the process here:
 //!
 //! 1. When executing an action creation instruction, the Exchange Program analyzes the required token prices and writes
-//! the list of tokens needing prices, along with relevant information, into the action's account for Order Keepers to use.
+//!    the list of tokens needing prices, along with relevant information, into the action's account for Order Keepers to use.
 //!
 //! 2. Order Keepers prepare Feed Accounts that store the required price information for these tokens based on the
-//! requirements in the action account. These accounts are generally owned by the selected Price Oracle Program,
-//! ensuring their correctness. These Feed Accounts are then added to the accounts list of the action execution instruction.
+//!    requirements in the action account. These accounts are generally owned by the selected Price Oracle Program,
+//!    ensuring their correctness. These Feed Accounts are then added to the accounts list of the action execution instruction.
 //!
 //! 3. When executing the action execution instruction, the Exchange Program parses and verifies the price information
-//! provided in the Feed Accounts using instructions provided by the Store Program. This verified information is then
-//! written into the [`Oracle`](states::Oracle) Account of the Store Program for subsequent operations.
-//! The Oracle Account must be empty before the action execution and needs to be cleared after the action is completed.
+//!    provided in the Feed Accounts using instructions provided by the Store Program. This verified information is then
+//!    written into the [`Oracle`](states::Oracle) Account of the Store Program for subsequent operations.
+//!    The Oracle Account must be empty before the action execution and needs to be cleared after the action is completed.
 //!
 //! The token price-related information mentioned in step one (such as the expected price provider and feed ID) is stored
 //! in the [`TokenMap`](states::TokenMap) account of the Store Program. The [`TokenMap`](states::TokenMap),
@@ -211,11 +212,11 @@
 //!
 //! ### Instructions for [`TokenConfig`](states::TokenConfig) and token maps.
 //! - [`initialize_token_map`](gmsol_store::initialize_token_map): Initialize a new token map account.
-//! This is a permissionless instruction.
+//!   This is a permissionless instruction.
 //! - [`set_token_map`]: Set the token map address used in the given store.
 //! - [`push_to_token_map`]: Push a new token config for an existing token to the given token map.
 //! - [`push_to_token_map_synthetic`]: Push a new token config for a "synthetic"
-//! token to the given token map.
+//!   token to the given token map.
 //! - [`toggle_token_config`]: Enable or disable a token config of the given token map.
 //! - [`set_expected_provider`]: Set the expected provider for the given token.
 //! - [`set_feed_config`]: Set the feed config of the given provider for the given token.
@@ -223,7 +224,7 @@
 //! - [`token_expected_provider`](gmsol_store::token_expected_provider): Get the expected provider set for the given token.
 //! - [`token_feed`](gmsol_store::token_feed): Get the feed address of the given provider set for the given token.
 //! - [`token_timestamp_adjustment`](gmsol_store::token_timestamp_adjustment): Get the timestamp adjustment of the given
-//! provider for the give token.
+//!   provider for the give token.
 //! - [`token_name`](gmsol_store::token_name): Get the name of the given token.
 //! - [`token_decimals`](gmsol_store::token_decimals): Get the token decimals of the given token.
 //! - [`token_precision`](gmsol_store::token_precision): Get the price precision of the given token.
@@ -233,7 +234,7 @@
 //! - [`clear_all_prices`](gmsol_store::clear_all_prices): Clear the prices of the given oracle account.
 //! - [`set_price`](gmsol_store::set_price): Set a price for the given token in the given oracle account.
 //! - [`set_prices_from_price_feed`](gmsol_store::set_prices_from_price_feed): Validate and set prices parsed from the
-//! provided price feed accounts.
+//!   provided price feed accounts.
 //!
 //! ## Market Management
 //! The instructions related to market management are as follows:
@@ -246,30 +247,31 @@
 //! - [`market_transfer_out`]: Transfer tokens out from the market and record in its balance.
 //! - [`update_market_config`]: Update an item in the market config.
 //! - [`update_market_config_with_buffer`]: Update the market config with the given
-//! [`MarketConfigBuffer`](states::MarketConfigBuffer) account.
+//!   [`MarketConfigBuffer`](states::MarketConfigBuffer) account.
 //! - [`get_validated_market_meta`](gmsol_store::get_validated_market_meta): Validate the market and
-//! return its [meta](states::MarketMeta).
+//!   return its [meta](states::MarketMeta).
 //! - [`get_market_config`](gmsol_store::get_market_config): Read an item from the market config by the key.
 //! - [`get_market_meta`](gmsol_store::get_market_meta): Get the [meta](states::MarketMeta) of the market
-//! without validation.
+//!   without validation.
 //!
 //! ### Instructions for [`MarketConfigBuffer`](states::MarketConfigBuffer) accounts
 //! - [`initialize_market_config_buffer`](gmsol_store::initialize_market_config_buffer): Initialize a market config buffer account.
-//! - [`set_market_config_buffer_authority`](gmsol_store::set_market_config_buffer_authority): Replace the authority of the market config buffer account
-//! with the new one.
+//! - [`set_market_config_buffer_authority`](gmsol_store::set_market_config_buffer_authority): Replace the authority of the market
+//!   config buffer account with the new one.
 //! - [`close_market_config_buffer`](gmsol_store::close_market_config_buffer): Close the given market config buffer account.
-//! - [`push_to_market_config_buffer`](gmsol_store::push_to_market_config_buffer): Push config items to the given market config buffer account.
+//! - [`push_to_market_config_buffer`](gmsol_store::push_to_market_config_buffer): Push config items to the given market config
+//!   buffer account.
 //!
 //! ### Instructions for market tokens
 //! - [`initialize_market_token`]: Initialize a new market token.
 //! - [`mint_market_token_to`]: Mint the given amount of market tokens to the destination
-//! account.
+//!   account.
 //! - [`burn_market_token_from`]: Burn the given amount of market tokens from the given account.
 //!
 //! ### Instructions for market vaults
 //! - [`initialize_market_vault`]: Initialize the market vault for the given token.
 //! - [`market_vault_transfer_out`]: Transfer the given amount of tokens out to the destination
-//! account.
+//!   account.
 
 /// Instructions.
 pub mod instructions;

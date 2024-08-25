@@ -26,8 +26,8 @@ pub struct CancelDeposit<'info> {
     ///
     /// ## Notes
     /// - Only the user who created the deposit can receive the funds,
-    /// which is checked by [`remove_deposit`](gmsol_store::gmsol_store::remove_deposit)
-    /// through CPI, who also checks whether the `store` matches.
+    ///   which is checked by [`remove_deposit`](gmsol_store::gmsol_store::remove_deposit)
+    ///   through CPI, who also checks whether the `store` matches.
     #[account(
         mut,
         constraint = deposit.fixed.senders.user == user.key(),

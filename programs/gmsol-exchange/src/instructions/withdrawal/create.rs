@@ -70,7 +70,7 @@ pub struct CreateWithdrawal<'info> {
     ///
     /// ## Notes
     /// - The mint of this account is checked to be the same as the vault,
-    /// but whether to be matched the market token mint of the `market` is checked at #1.
+    ///   but whether to be matched the market token mint of the `market` is checked at #1.
     #[account(mut)]
     pub market_token_account: Account<'info, TokenAccount>,
     /// CHECK: check by CPI.

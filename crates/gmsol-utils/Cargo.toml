@@ -3,6 +3,9 @@ name = "gmsol-utils"
 version.workspace = true
 edition.workspace = true
 
+[features]
+debug = []
+
 [dependencies]
 anchor-lang = { workspace = true }
 thiserror = { workspace = true }
