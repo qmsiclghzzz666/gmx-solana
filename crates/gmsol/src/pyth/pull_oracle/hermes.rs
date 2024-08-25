@@ -175,6 +175,11 @@ impl PriceUpdate {
             .map(|update| update.price.publish_time)
             .min()
     }
+
+    /// Get the binary price update.
+    pub fn binary(&self) -> &BinaryPriceUpdate {
+        &self.binary
+    }
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
