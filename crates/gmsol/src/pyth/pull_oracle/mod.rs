@@ -23,6 +23,7 @@ use anchor_client::{
 };
 use either::Either;
 use gmsol_store::states::common::TokensWithFeed;
+use hermes::BinaryPriceUpdate;
 use pyth_sdk::Identifier;
 use pythnet_sdk::wire::v1::AccumulatorUpdateData;
 
@@ -193,14 +194,14 @@ pub trait PythPullOracleOps<C> {
         It: IntoIterator<Item = RpcBuilder<'a, C>>,
         Fut: Future<Output = crate::Result<It>>,
     {
-        self.with_pyth_price_updates(ctx, [update], consume)
+        self.with_pyth_price_updates(ctx, [&update.binary], consume)
     }
 
     /// Create transactions to post price updates and consume the prices.
     fn with_pyth_price_updates<'a, S, It, Fut>(
         &'a self,
         ctx: &'a mut PythPullOracleContext,
-        updates: impl IntoIterator<Item = &'a PriceUpdate>,
+        updates: impl IntoIterator<Item = &'a BinaryPriceUpdate>,
         consume: impl FnOnce(Prices) -> Fut,
     ) -> impl Future<Output = crate::Result<WithPythPrices<'a, C>>>
     where
@@ -296,7 +297,7 @@ pub trait PythPullOracleOps<C> {
     /// Execute with pyth price updates.
     fn execute_with_pyth_price_updates<'a, T, S>(
         &'a self,
-        updates: impl IntoIterator<Item = &'a PriceUpdate>,
+        updates: impl IntoIterator<Item = &'a BinaryPriceUpdate>,
         execute: &mut T,
         compute_unit_price_micro_lamports: Option<u64>,
         skip_preflight: bool,

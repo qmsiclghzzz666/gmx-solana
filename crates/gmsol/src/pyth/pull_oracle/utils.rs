@@ -10,13 +10,12 @@ use pythnet_sdk::{
 
 use crate::store::utils::Feeds;
 
-use super::hermes::{EncodingType, PriceUpdate};
+use super::hermes::{BinaryPriceUpdate, EncodingType};
 
 /// Parse [`AccumulatorUpdateData`] from price update.
 pub fn parse_accumulator_update_datas(
-    update: &PriceUpdate,
+    update: &BinaryPriceUpdate,
 ) -> crate::Result<Vec<AccumulatorUpdateData>> {
-    let update = &update.binary;
     let datas = match update.encoding {
         EncodingType::Base64 => {
             use base64::{engine::general_purpose::STANDARD, Engine};
