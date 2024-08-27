@@ -162,6 +162,7 @@ impl RemoveWithdrawalEvent {
 #[event]
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Clone)]
 pub struct TradeEvent(Box<TradeEventData>);
 
 #[cfg(feature = "display")]
