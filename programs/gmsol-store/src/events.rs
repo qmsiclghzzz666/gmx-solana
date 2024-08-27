@@ -486,4 +486,38 @@ impl TradeEvent {
                 .abs_diff(self.before.short_token_claimable_funding_amount_per_size)
         }
     }
+
+    #[cfg(feature = "utils")]
+    /// Create position from this event.
+    pub fn to_position(&self, meta: &impl crate::states::HasMarketMeta) -> Position {
+        use crate::states::position::PositionKind;
+
+        let mut position = Position::default();
+
+        let kind = if self.is_long {
+            PositionKind::Long
+        } else {
+            PositionKind::Short
+        };
+
+        let collateral_token = if self.is_collateral_long {
+            meta.market_meta().long_token_mint
+        } else {
+            meta.market_meta().short_token_mint
+        };
+
+        // TODO: find the correct bump.
+        position
+            .try_init(
+                kind,
+                0,
+                self.store,
+                &self.user,
+                &self.market_token,
+                &collateral_token,
+            )
+            .unwrap();
+        position.state = self.after;
+        position
+    }
 }
