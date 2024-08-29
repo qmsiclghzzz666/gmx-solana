@@ -949,6 +949,11 @@ fn format_market(market: &SerializeMarket) -> gmsol::Result<String> {
         "order_count: {}",
         state.order_count.to_formatted_string(&Locale::en)
     )?;
+    writeln!(
+        f,
+        "trade_count: {}",
+        state.trade_count.to_formatted_string(&Locale::en)
+    )?;
     let msg = match (
         market.is_adl_enabled_for_long,
         market.is_adl_enabled_for_short,

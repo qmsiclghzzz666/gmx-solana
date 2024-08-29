@@ -96,6 +96,7 @@ impl SerializeMarket {
                 deposit_count: state.deposit_count(),
                 withdrawal_count: state.withdrawal_count(),
                 order_count: state.order_count(),
+                trade_count: state.trade_count(),
             },
             clocks: market.try_into()?,
             pools: market.try_into()?,
@@ -134,10 +135,12 @@ pub struct SerializeMarketState {
     pub funding_factor_per_second: i128,
     /// Deposit count.
     pub deposit_count: u64,
-    /// Deposit count.
+    /// Withdrawal count.
     pub withdrawal_count: u64,
-    /// Deposit count.
+    /// Order count.
     pub order_count: u64,
+    /// Trade count.
+    pub trade_count: u64,
 }
 
 /// Serializable Market Clocks.
