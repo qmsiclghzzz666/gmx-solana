@@ -103,6 +103,12 @@ impl Position {
     }
 }
 
+impl AsRef<Position> for Position {
+    fn as_ref(&self) -> &Position {
+        self
+    }
+}
+
 /// Position State.
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

@@ -57,6 +57,12 @@ where
     const DISCRIMINATOR: [u8; 8] = T::DISCRIMINATOR;
 }
 
+impl<T> AsRef<T> for ZeroCopy<T> {
+    fn as_ref(&self) -> &T {
+        &self.0
+    }
+}
+
 /// Wrapper for deserializing account into arced type.
 pub struct Shared<T>(pub Arc<T>);
 
@@ -95,6 +101,12 @@ where
     const DISCRIMINATOR: [u8; 8] = T::DISCRIMINATOR;
 }
 
+impl<T> AsRef<T> for Shared<T> {
+    fn as_ref(&self) -> &T {
+        &self.0
+    }
+}
+
 /// Workaround for deserializing zero-copy accounts and wrapping the result into Arc.
 pub struct SharedZeroCopy<T>(pub Arc<T>);
 
@@ -131,4 +143,10 @@ where
     T: Discriminator,
 {
     const DISCRIMINATOR: [u8; 8] = T::DISCRIMINATOR;
+}
+
+impl<T> AsRef<T> for SharedZeroCopy<T> {
+    fn as_ref(&self) -> &T {
+        &self.0
+    }
 }
