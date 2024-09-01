@@ -3,15 +3,16 @@ use std::{sync::Arc, time::Duration};
 use anchor_client::{solana_sdk::signature::Keypair, Cluster};
 use futures_util::StreamExt;
 use gmsol::{pda::find_default_store, Client};
+use tracing::level_filters::LevelFilter;
 
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
-    if std::env::var("RUST_LOG").is_err() {
-        std::env::set_var("RUST_LOG", "info");
-    }
-
     tracing_subscriber::fmt::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::builder()
+                .with_default_directive(LevelFilter::INFO.into())
+                .from_env_lossy(),
+        )
         .init();
 
     let _store = std::env::var("STORE")
