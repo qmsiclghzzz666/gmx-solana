@@ -22,6 +22,7 @@ use crate::{
 /// Deposit removed event.
 #[event]
 #[cfg_attr(feature = "debug", derive(Debug))]
+#[derive(Clone)]
 pub struct RemoveDepositEvent {
     /// Action id.
     pub id: u64,
@@ -67,6 +68,7 @@ impl RemoveDepositEvent {
 /// Order removed event.
 #[event]
 #[cfg_attr(feature = "debug", derive(Debug))]
+#[derive(Clone)]
 pub struct RemoveOrderEvent {
     /// Action id.
     pub id: u64,
@@ -116,6 +118,7 @@ impl RemoveOrderEvent {
 /// Withdrawal removed event.
 #[event]
 #[cfg_attr(feature = "debug", derive(Debug))]
+#[derive(Clone)]
 pub struct RemoveWithdrawalEvent {
     /// Action id.
     pub id: u64,
