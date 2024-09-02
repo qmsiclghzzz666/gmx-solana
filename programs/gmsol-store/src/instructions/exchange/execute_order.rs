@@ -350,57 +350,7 @@ impl<'info> ExecuteOrder<'info> {
     }
 
     fn validate_trigger_price(&self, prices: &Prices<u128>) -> Result<()> {
-        let order = &self.order;
-        let kind = &order.fixed.kind;
-        let params = &order.fixed.params;
-        let index_price = &prices.index_token_price;
-        match (kind, params.trigger_price.as_ref()) {
-            (OrderKind::LimitIncrease, Some(trigger_price)) => {
-                if params.is_long {
-                    // TODO: Pick max price.
-                    require_gte!(trigger_price, index_price, StoreError::InvalidTriggerPrice);
-                } else {
-                    // TODO: Pick min price.
-                    require_gte!(index_price, trigger_price, StoreError::InvalidTriggerPrice);
-                }
-            }
-            (OrderKind::LimitDecrease, Some(trigger_price)) => {
-                if params.is_long {
-                    // TODO: Pick min price.
-                    require_gte!(index_price, trigger_price, StoreError::InvalidTriggerPrice);
-                } else {
-                    // TODO: Pick max price.
-                    require_gte!(trigger_price, index_price, StoreError::InvalidTriggerPrice);
-                }
-            }
-            (OrderKind::StopLossDecrease, Some(trigger_price)) => {
-                if params.is_long {
-                    // TODO: Pick min price.
-                    require_gte!(trigger_price, index_price, StoreError::InvalidTriggerPrice);
-                } else {
-                    // TODO: Pick max price.
-                    require_gte!(index_price, trigger_price, StoreError::InvalidTriggerPrice);
-                }
-            }
-            (OrderKind::LimitSwap, _) => {
-                // NOTE: For limit swap orders, the trigger price can be substituted by the min output amount,
-                // so validatoin is not required. In fact, we should prohibit the creation of limit swap orders
-                // with a trigger price.
-            }
-            (
-                OrderKind::MarketSwap
-                | OrderKind::MarketIncrease
-                | OrderKind::MarketDecrease
-                | OrderKind::Liquidation
-                | OrderKind::AutoDeleveraging,
-                _,
-            ) => {}
-            _ => {
-                return err!(StoreError::InvalidTriggerPrice);
-            }
-        }
-
-        Ok(())
+        self.order.validate_trigger_price(prices.index_token_price)
     }
 
     #[inline(never)]
