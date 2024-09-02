@@ -1,6 +1,8 @@
 use anchor_client::solana_client::pubsub_client::PubsubClientError;
 use tokio_stream::wrappers::errors::BroadcastStreamRecvError;
 
+pub use gmsol_store::StoreError;
+
 /// Error type for `gmsol`.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
