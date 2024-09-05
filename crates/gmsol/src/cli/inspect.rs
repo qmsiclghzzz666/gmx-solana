@@ -124,7 +124,7 @@ enum Command {
     },
     /// `Order` account.
     Order {
-        address: Pubkey,
+        address: Option<Pubkey>,
         #[arg(long, value_name = "LIMIT")]
         event: Option<Option<NonZeroUsize>>,
     },
@@ -635,31 +635,55 @@ impl InspectArgs {
                 println!("{:#?}", program.account::<states::Oracle>(address).await?);
             }
             Command::Order { address, event } => {
-                if let Some(limit) = *event {
-                    let stream = match limit {
-                        Some(limit) => client
-                            .historical_store_cpi_events(address, None)
-                            .await?
-                            .take(limit.get())
-                            .left_stream(),
-                        None => client
-                            .historical_store_cpi_events(address, None)
-                            .await?
-                            .right_stream(),
-                    };
-                    pin_mut!(stream);
-                    while let Some(res) = stream.next().await {
-                        match res {
-                            Ok(events) => {
-                                println!("{events:#?}");
-                            }
-                            Err(err) => {
-                                tracing::error!(%err, "stream error");
+                if let Some(address) = address {
+                    if let Some(limit) = *event {
+                        let stream = match limit {
+                            Some(limit) => client
+                                .historical_store_cpi_events(address, None)
+                                .await?
+                                .take(limit.get())
+                                .left_stream(),
+                            None => client
+                                .historical_store_cpi_events(address, None)
+                                .await?
+                                .right_stream(),
+                        };
+                        pin_mut!(stream);
+                        while let Some(res) = stream.next().await {
+                            match res {
+                                Ok(events) => {
+                                    println!("{events:#?}");
+                                }
+                                Err(err) => {
+                                    tracing::error!(%err, "stream error");
+                                }
                             }
                         }
+                    } else {
+                        println!("{:#?}", client.order(address).await?);
                     }
                 } else {
-                    println!("{:#?}", client.order(address).await?);
+                    let orders = client.orders(store, Some(&client.payer()), None).await?;
+                    let mut table = Table::new();
+                    table.set_titles(row!["Pubkey", "Market", "Order ID", "Order Kind", "Side"]);
+                    table.set_format(table_format());
+                    for (pubkey, order) in orders {
+                        let is_long = if order.fixed.kind.is_swap() {
+                            None
+                        } else {
+                            Some(order.fixed.params.is_long)
+                        };
+                        table.add_row(row![
+                            pubkey,
+                            truncate_pubkey(&order.fixed.tokens.market_token),
+                            order.fixed.id,
+                            order.fixed.kind,
+                            is_long
+                                .map(|is_long| if is_long { "long" } else { "short" })
+                                .unwrap_or("-"),
+                        ]);
+                    }
+                    println!("{table}");
                 }
             }
             Command::Position {

@@ -394,7 +394,10 @@ pub struct UpdateOrderParams {
 }
 
 /// Order Kind.
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, InitSpace, Copy)]
+#[derive(
+    AnchorSerialize, AnchorDeserialize, Clone, InitSpace, Copy, strum::EnumString, strum::Display,
+)]
+#[strum(serialize_all = "snake_case")]
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[non_exhaustive]
 #[repr(u8)]

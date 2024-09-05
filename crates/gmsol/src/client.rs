@@ -564,6 +564,38 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         self.account_with_config(address, config).await
     }
 
+    /// Fetch all [`Order`](types::Order) accounts of the given owner of the given store.
+    pub async fn orders(
+        &self,
+        store: &Pubkey,
+        owner: Option<&Pubkey>,
+        market_token: Option<&Pubkey>,
+    ) -> crate::Result<BTreeMap<Pubkey, types::Order>> {
+        let mut filters = Vec::default();
+        if let Some(owner) = owner {
+            filters.push(RpcFilterType::Memcmp(Memcmp::new_raw_bytes(
+                8 + 1 + 32 + 32 + 8 + 8 + 8 + 1 + 32,
+                owner.as_ref().to_owned(),
+            )));
+        }
+        if let Some(market_token) = market_token {
+            let market = self.find_market_address(store, market_token);
+            filters.push(RpcFilterType::Memcmp(Memcmp::new_raw_bytes(
+                8 + 1 + 32,
+                market.as_ref().to_owned(),
+            )));
+        }
+        let store_filter = StoreFilter::new(store, 1);
+
+        let orders = self
+            .store_accounts::<types::Order>(Some(store_filter), filters)
+            .await?
+            .into_iter()
+            .collect();
+
+        Ok(orders)
+    }
+
     /// Fetch [`Depsoit`](types::Deposit) account with its address.
     pub async fn deposit(&self, address: &Pubkey) -> crate::Result<types::Order> {
         Ok(self.data_store().account(*address).await?)
