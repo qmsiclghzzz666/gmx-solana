@@ -21,7 +21,7 @@ anchor test
 
 To install the `gmsol` CLI:
 ```bash
-pnpm install-cli
+cargo install-gmsol
 ```
 Use the following command to verify it is installed properly:
 ```bash

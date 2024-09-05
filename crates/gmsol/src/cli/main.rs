@@ -26,9 +26,6 @@ mod ser;
 mod treasury;
 mod utils;
 
-#[cfg(feature = "ui")]
-mod ui;
-
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
 struct Cli {
@@ -75,13 +72,6 @@ struct Cli {
 #[derive(clap::Subcommand)]
 #[allow(clippy::large_enum_variant)]
 enum Command {
-    #[cfg(feature = "ui")]
-    Ui {
-        #[arg(long, default_value = "0.0.0.0")]
-        host: String,
-        #[arg(long, short, default_value = "3000")]
-        port: u16,
-    },
     /// Show current wallet pubkey.
     Whoami,
     /// Commands for admin.
@@ -176,11 +166,6 @@ impl Cli {
         let client = self.gmsol_client()?;
         let (store, store_key) = self.store(&client).await?;
         match &self.command {
-            #[cfg(feature = "ui")]
-            Command::Ui { host, port } => {
-                use poem::listener::TcpListener;
-                ui::start(TcpListener::bind(format!("{host}:{port}"))).await?;
-            }
             Command::Whoami => {
                 println!("{}", client.payer());
             }
