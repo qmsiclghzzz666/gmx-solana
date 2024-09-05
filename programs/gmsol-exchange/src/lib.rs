@@ -18,7 +18,7 @@ pub mod states;
 use gmsol_store::{states::UpdateOrderParams, utils::Authenticate};
 use instructions::*;
 
-declare_id!("hnxiNKTc515NHvuq5fEUAc62dWkEu3m623FbwemWNJd");
+declare_id!("exYLDKzzpXkp8FBghLxJkM4xvuGViAvGUTkQ7UTzFt1");
 
 #[program]
 pub mod gmsol_exchange {
