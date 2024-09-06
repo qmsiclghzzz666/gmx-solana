@@ -4,7 +4,7 @@ use anchor_spl::token::TokenAccount;
 use crate::StoreError;
 
 use super::{
-    common::{SwapParams, TokenRecord, TokensWithFeed},
+    common::{swap::SwapParamsV2, token::TokenAndAccount, SwapParams, TokenRecord, TokensWithFeed},
     Market, NonceBytes, Seed,
 };
 
@@ -190,4 +190,78 @@ pub struct TokenParams {
     pub min_market_tokens: u64,
     /// Whether to unwrap the native token.
     pub should_unwrap_native_token: bool,
+}
+
+/// Deposit V2.
+#[account(zero_copy)]
+pub struct DepositV2 {
+    /// Action id.
+    pub(crate) id: u64,
+    /// Store.
+    pub(crate) store: Pubkey,
+    /// Market.
+    pub(crate) market: Pubkey,
+    /// Owner.
+    pub(crate) owner: Pubkey,
+    /// Nonce bytes.
+    pub(crate) nonce: [u8; 32],
+    /// The bump seed.
+    pub(crate) bump: u8,
+    padding_0: [u8; 7],
+    /// Token accounts.
+    pub(crate) tokens: TokenAccounts,
+    /// Deposit params.
+    pub(crate) params: DepositParams,
+    /// Swap params.
+    pub(crate) swap: SwapParamsV2,
+    padding_1: [u8; 4],
+    reserve: [u8; 128],
+}
+
+/// Token Accounts.
+#[account(zero_copy)]
+pub struct TokenAccounts {
+    /// Initial long token accounts.
+    pub(crate) initial_long_token: TokenAndAccount,
+    /// Initial short token accounts.
+    pub(crate) initial_short_token: TokenAndAccount,
+    /// Market token account.
+    pub(crate) market_token: TokenAndAccount,
+}
+
+/// Deposit Params.
+#[account(zero_copy)]
+pub struct DepositParams {
+    /// The amount of initial long tokens to deposit.
+    pub(crate) initial_long_token_amount: u64,
+    /// The amount of initial short tokens to deposit.
+    pub(crate) initial_short_token_amount: u64,
+    /// The minimum acceptable amount of market tokens to receive.
+    pub(crate) min_market_token_amount: u64,
+    /// Max execution fee.
+    pub(crate) max_execution_lamports: u64,
+    reserved: [u8; 64],
+}
+
+impl Default for DepositParams {
+    fn default() -> Self {
+        Self {
+            initial_long_token_amount: 0,
+            initial_short_token_amount: 0,
+            min_market_token_amount: 0,
+            max_execution_lamports: DepositV2::MIN_EXECUTION_LAMPORTS,
+            reserved: [0; 64],
+        }
+    }
+}
+
+impl DepositV2 {
+    /// Seed.
+    pub const SEED: &'static [u8] = b"deposit";
+
+    /// Max execution lamports.
+    pub const MIN_EXECUTION_LAMPORTS: u64 = 200_000;
+
+    /// Init Space.
+    pub const INIT_SPACE: usize = core::mem::size_of::<Self>();
 }

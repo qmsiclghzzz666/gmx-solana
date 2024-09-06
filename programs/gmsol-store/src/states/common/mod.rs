@@ -12,6 +12,9 @@ pub mod map;
 /// Swap Params.
 pub mod swap;
 
+/// Token accounts.
+pub mod token;
+
 pub use map::MapStore;
 pub use swap::SwapParams;
 pub use token_with_feeds::{TokenRecord, TokensWithFeed};

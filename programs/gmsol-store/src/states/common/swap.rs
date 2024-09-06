@@ -4,7 +4,7 @@ use anchor_lang::prelude::*;
 
 use crate::{
     states::{find_market_address, Market},
-    StoreError,
+    CoreError, StoreError,
 };
 
 /// Swap params.
@@ -155,4 +155,124 @@ impl SwapParams {
         );
         Ok(&self.short_token_swap_path)
     }
+}
+
+/// Swap params.
+#[account(zero_copy)]
+#[derive(Default)]
+pub struct SwapParamsV2 {
+    /// The length of primary swap path.
+    primary_length: u8,
+    /// The length of secondary swap path.
+    secondary_length: u8,
+    padding_0: [u8; 2],
+    /// Swap paths.
+    paths: [Pubkey; 12],
+}
+
+impl SwapParamsV2 {
+    /// Max total length of swap paths.
+    pub const MAX_TOTAL_LENGTH: usize = 12;
+
+    /// Get the length of primary swap path.
+    pub fn primary_length(&self) -> usize {
+        usize::from(self.primary_length)
+    }
+
+    /// Get the length of secondary swap path.
+    pub fn secondary_length(&self) -> usize {
+        usize::from(self.secondary_length)
+    }
+
+    /// Get primary swap path.
+    pub fn primary_swap_path(&self) -> &[Pubkey] {
+        let end = self.primary_length();
+        &self.paths[0..end]
+    }
+
+    /// Get secondary swap path.
+    pub fn secondary_swap_path(&self) -> &[Pubkey] {
+        let start = self.primary_length();
+        let end = start.saturating_add(self.secondary_length());
+        &self.paths[start..end]
+    }
+
+    pub(crate) fn validate_and_init<'info>(
+        &mut self,
+        primary_length: u8,
+        secondary_length: u8,
+        paths: &'info [AccountInfo<'info>],
+        store: &Pubkey,
+        token_ins: (&Pubkey, &Pubkey),
+        token_outs: (&Pubkey, &Pubkey),
+    ) -> Result<()> {
+        let primary_end = usize::from(primary_length);
+        let end = primary_end.saturating_add(usize::from(secondary_length));
+        require_gte!(
+            Self::MAX_TOTAL_LENGTH,
+            end,
+            CoreError::InvalidSwapPathLength
+        );
+
+        require_gte!(paths.len(), end, CoreError::NotEnoughSwapMarkets);
+        let primary_markets = &paths[..primary_end];
+        let secondary_markets = &paths[primary_end..end];
+
+        let (primary_token_in, secondary_token_in) = token_ins;
+        let (primary_token_out, secondary_token_out) = token_outs;
+
+        validate_path(primary_markets, store, primary_token_in, primary_token_out)?;
+        validate_path(
+            secondary_markets,
+            store,
+            secondary_token_in,
+            secondary_token_out,
+        )?;
+
+        self.primary_length = primary_length;
+        self.secondary_length = secondary_length;
+
+        for (idx, market) in paths[0..end].iter().enumerate() {
+            self.paths[idx] = market.key();
+        }
+        Ok(())
+    }
+}
+
+fn unpack_markets<'info>(
+    path: &'info [AccountInfo<'info>],
+) -> impl Iterator<Item = Result<AccountLoader<'info, Market>>> {
+    path.iter().map(AccountLoader::try_from)
+}
+
+fn validate_path<'info>(
+    path: &'info [AccountInfo<'info>],
+    store: &Pubkey,
+    token_in: &Pubkey,
+    token_out: &Pubkey,
+) -> Result<()> {
+    let mut current = *token_in;
+    let mut seen = HashSet::<_>::default();
+
+    for market in unpack_markets(path) {
+        let market = market?;
+
+        if !seen.insert(market.key()) {
+            return err!(CoreError::InvalidSwapPath);
+        }
+
+        let market = market.load()?;
+        let meta = market.validated_meta(store)?;
+        if current == meta.long_token_mint {
+            current = meta.short_token_mint;
+        } else if current == meta.short_token_mint {
+            current = meta.long_token_mint
+        } else {
+            return err!(CoreError::InvalidSwapPath);
+        }
+    }
+
+    require_eq!(current, *token_out, CoreError::InvalidSwapPath);
+
+    Ok(())
 }

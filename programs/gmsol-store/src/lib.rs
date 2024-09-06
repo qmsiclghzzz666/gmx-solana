@@ -279,6 +279,9 @@ pub mod instructions;
 /// States.
 pub mod states;
 
+/// Operations.
+pub mod ops;
+
 /// Constants.
 pub mod constants;
 
@@ -292,6 +295,7 @@ pub use self::states::Data;
 
 use self::{
     instructions::*,
+    ops::deposit::CreateDepositParams,
     states::{
         common::{SwapParams, TokenRecord},
         deposit::TokenParams as DepositTokenParams,
@@ -1399,6 +1403,15 @@ pub mod gmsol_store {
                 .map_err(|_| error!(StoreError::InvalidArgument))?,
         )
     }
+
+    // Exchange.
+    pub fn create_deposit<'info>(
+        ctx: Context<'_, '_, 'info, 'info, CreateDeposit<'info>>,
+        nonce: [u8; 32],
+        params: CreateDepositParams,
+    ) -> Result<()> {
+        instructions::create_deposit(ctx, nonce, &params)
+    }
 }
 
 #[error_code]
@@ -1622,3 +1635,31 @@ impl StoreError {
 
 /// Data Store Resut.
 pub type StoreResult<T> = std::result::Result<T, StoreError>;
+
+#[error_code]
+pub enum CoreError {
+    /// Empty Deposit.
+    #[msg("empty deposit")]
+    EmptyDeposit,
+    /// Token account is not provided.
+    #[msg("token account is not provided")]
+    TokenAccountNotProvided,
+    /// Not enough token amounts.
+    #[msg("not enough token amount")]
+    NotEnoughTokenAmount,
+    /// Not enough execution fee.
+    #[msg("not enough execution fee")]
+    NotEnoughExecutionFee,
+    /// Invalid Swap Path length.
+    #[msg("invalid swap path length")]
+    InvalidSwapPathLength,
+    /// Not enough swap markets in the path.
+    #[msg("not enough swap markets in the path")]
+    NotEnoughSwapMarkets,
+    /// Invalid Swap Path.
+    #[msg("invalid swap path")]
+    InvalidSwapPath,
+    /// Market token mint mismatched.
+    #[msg("market token mint mismathed")]
+    MarketTokenMintMismatched,
+}

@@ -2072,6 +2072,7 @@ dependencies = [
  "serde_with 3.8.1",
  "static_assertions",
  "strum",
+ "typed-builder",
 ]
 
 [[package]]

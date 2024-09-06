@@ -28,7 +28,7 @@ pub mod order;
 /// Position.
 pub mod position;
 
-pub use deposit::Deposit;
+pub use deposit::{Deposit, DepositV2};
 pub use market::*;
 pub use oracle::*;
 pub use order::{Order, UpdateOrderParams};

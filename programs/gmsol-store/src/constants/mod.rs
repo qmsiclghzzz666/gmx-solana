@@ -22,6 +22,9 @@ pub const MARKET_VAULT_SEED: &[u8] = b"market_vault";
 /// Claimable Account Seed.
 pub const CLAIMABLE_ACCOUNT_SEED: &[u8] = b"claimable_account";
 
+/// Escrow Account Seed.
+pub const ESCROW_ACCOUNT_SEED: &[u8] = b"escrow_account";
+
 /// Decimals of a market token.
 pub const MARKET_TOKEN_DECIMALS: u8 = 9;
 
