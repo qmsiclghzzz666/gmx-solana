@@ -4,7 +4,10 @@ use anchor_spl::token::TokenAccount;
 use crate::StoreError;
 
 use super::{
-    common::{swap::SwapParamsV2, token::TokenAndAccount, SwapParams, TokenRecord, TokensWithFeed},
+    common::{
+        action::ActionState, swap::SwapParamsV2, token::TokenAndAccount, SwapParams, TokenRecord,
+        TokensWithFeed,
+    },
     Market, NonceBytes, Seed,
 };
 
@@ -203,11 +206,13 @@ pub struct DepositV2 {
     pub(crate) market: Pubkey,
     /// Owner.
     pub(crate) owner: Pubkey,
-    /// Nonce bytes.
-    pub(crate) nonce: [u8; 32],
+    /// Action State.
+    action_state: u8,
     /// The bump seed.
     pub(crate) bump: u8,
-    padding_0: [u8; 7],
+    padding_0: [u8; 6],
+    /// Nonce bytes.
+    pub(crate) nonce: [u8; 32],
     /// Token accounts.
     pub(crate) tokens: TokenAccounts,
     /// Deposit params.
@@ -216,6 +221,32 @@ pub struct DepositV2 {
     pub(crate) swap: SwapParamsV2,
     padding_1: [u8; 4],
     reserve: [u8; 128],
+}
+
+impl DepositV2 {
+    /// Seed.
+    pub const SEED: &'static [u8] = b"deposit";
+
+    /// Max execution lamports.
+    pub const MIN_EXECUTION_LAMPORTS: u64 = 200_000;
+
+    /// Init Space.
+    pub const INIT_SPACE: usize = core::mem::size_of::<Self>();
+
+    /// Get action state.
+    pub fn action_state(&self) -> Result<ActionState> {
+        ActionState::try_from(self.action_state).map_err(|err| error!(err))
+    }
+
+    fn set_action_state(&mut self, new_state: ActionState) {
+        self.action_state = new_state.into();
+    }
+
+    /// Transition to Completed state.
+    pub fn completed(&mut self) -> Result<()> {
+        self.set_action_state(self.action_state()?.completed()?);
+        Ok(())
+    }
 }
 
 /// Token Accounts.
@@ -253,15 +284,4 @@ impl Default for DepositParams {
             reserved: [0; 64],
         }
     }
-}
-
-impl DepositV2 {
-    /// Seed.
-    pub const SEED: &'static [u8] = b"deposit";
-
-    /// Max execution lamports.
-    pub const MIN_EXECUTION_LAMPORTS: u64 = 200_000;
-
-    /// Init Space.
-    pub const INIT_SPACE: usize = core::mem::size_of::<Self>();
 }

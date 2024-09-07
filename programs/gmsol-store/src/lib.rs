@@ -1662,4 +1662,16 @@ pub enum CoreError {
     /// Market token mint mismatched.
     #[msg("market token mint mismathed")]
     MarketTokenMintMismatched,
+    /// Unknown Action State.
+    #[msg("unknown action state")]
+    UnknownActionState,
+    /// Preconditions are not met.
+    #[msg("preconditions are not met")]
+    PreconditionsAreNotMet,
+}
+
+impl CoreError {
+    pub(crate) const fn unknown_action_state(_kind: u8) -> Self {
+        Self::UnknownActionState
+    }
 }

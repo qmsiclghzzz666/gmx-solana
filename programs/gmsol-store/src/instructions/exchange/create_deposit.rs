@@ -2,7 +2,6 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token, TokenAccount};
 
 use crate::{
-    constants::ESCROW_ACCOUNT_SEED,
     ops::{
         deposit::{CreateDepositOps, CreateDepositParams},
         execution_fee::TransferExecutionFeeOps,
@@ -44,32 +43,20 @@ pub struct CreateDeposit<'info> {
     pub initial_short_token: Box<Account<'info, Mint>>,
     /// The escrow account for receving market tokens.
     #[account(
-        init,
-        payer = owner,
-        token::mint = market_token,
-        token::authority = deposit,
-        seeds = [ESCROW_ACCOUNT_SEED, deposit.key().as_ref(), market_token.key().as_ref()],
-        bump,
+        associated_token::mint = market_token,
+        associated_token::authority = deposit,
     )]
     pub market_token_escrow: Box<Account<'info, TokenAccount>>,
     /// The escrow account for receiving initial long token for deposit.
     #[account(
-        init,
-        payer = owner,
-        token::mint = initial_long_token,
-        token::authority = deposit,
-        seeds = [ESCROW_ACCOUNT_SEED, deposit.key().as_ref(), initial_long_token.key().as_ref()],
-        bump,
+        associated_token::mint = initial_long_token,
+        associated_token::authority = deposit,
     )]
     pub initial_long_token_escrow: Option<Box<Account<'info, TokenAccount>>>,
     /// The escrow account for receiving initial short token for deposit.
     #[account(
-        init,
-        payer = owner,
-        token::mint = initial_short_token,
-        token::authority = deposit,
-        seeds = [ESCROW_ACCOUNT_SEED, deposit.key().as_ref(), initial_short_token.key().as_ref()],
-        bump,
+        associated_token::mint = initial_short_token,
+        associated_token::authority = deposit,
     )]
     pub initial_short_token_escrow: Option<Box<Account<'info, TokenAccount>>>,
     #[account(mut, token::mint = initial_long_token)]
