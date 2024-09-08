@@ -1419,6 +1419,10 @@ pub mod gmsol_store {
     ) -> Result<()> {
         instructions::create_deposit(ctx, nonce, &params)
     }
+
+    pub fn close_deposit(ctx: Context<CloseDeposit>) -> Result<()> {
+        instructions::close_deposit(ctx)
+    }
 }
 
 #[error_code]
@@ -1645,6 +1649,9 @@ pub type StoreResult<T> = std::result::Result<T, StoreError>;
 
 #[error_code]
 pub enum CoreError {
+    /// Permission denied.
+    #[msg("permission denied")]
+    PermissionDenied,
     /// Empty Deposit.
     #[msg("empty deposit")]
     EmptyDeposit,
@@ -1667,8 +1674,20 @@ pub enum CoreError {
     #[msg("invalid swap path")]
     InvalidSwapPath,
     /// Market token mint mismatched.
-    #[msg("market token mint mismathed")]
+    #[msg("market token mint mismatched")]
     MarketTokenMintMismatched,
+    /// Market token account mismatched.
+    #[msg("market token account mismatched")]
+    MarketTokenAccountMismatched,
+    /// Token mint mismatched.
+    #[msg("token mint mismatched")]
+    TokenMintMismatched,
+    /// Token account mismatched.
+    #[msg("token account mismatched")]
+    TokenAccountMismatched,
+    /// Not an ATA for the given token.
+    #[msg("not an ATA for the given token")]
+    NotAnATA,
     /// Unknown Action State.
     #[msg("unknown action state")]
     UnknownActionState,

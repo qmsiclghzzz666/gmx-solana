@@ -12,6 +12,9 @@ pub mod chunk_by;
 /// Pubkey utils.
 pub mod pubkey;
 
+/// Token utils.
+pub mod token;
+
 /// Fixed-size string.
 pub mod fixed_str;
 

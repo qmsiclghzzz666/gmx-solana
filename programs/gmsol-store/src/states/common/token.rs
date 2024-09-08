@@ -5,9 +5,9 @@ use anchor_spl::token::TokenAccount;
 #[account(zero_copy)]
 pub struct TokenAndAccount {
     /// Token.
-    pub token: Pubkey,
+    token: Pubkey,
     /// Account.
-    pub account: Pubkey,
+    account: Pubkey,
 }
 
 impl TokenAndAccount {
@@ -15,5 +15,23 @@ impl TokenAndAccount {
     pub fn init(&mut self, account: &Account<TokenAccount>) {
         self.token = account.mint;
         self.account = account.key();
+    }
+
+    /// Get token.
+    pub fn token(&self) -> Option<Pubkey> {
+        if self.token == Pubkey::default() {
+            None
+        } else {
+            Some(self.token)
+        }
+    }
+
+    /// Get account.
+    pub fn account(&self) -> Option<Pubkey> {
+        if self.account == Pubkey::default() {
+            None
+        } else {
+            Some(self.account)
+        }
     }
 }

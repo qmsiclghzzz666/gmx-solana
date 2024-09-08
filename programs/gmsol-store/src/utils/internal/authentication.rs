@@ -12,39 +12,36 @@ pub(crate) trait Authentication<'info> {
 
     /// Get the data store account.
     fn store(&self) -> &AccountLoader<'info, Store>;
-}
 
-/// Provides access control utils for [`Authentication`]s.
-pub(crate) trait Authenticate<'info>: Authentication<'info> + Bumps + Sized {
-    /// Verify that context matches.
-    fn verify(_ctx: &Context<Self>) -> Result<()> {
+    /// Check that the `authority` is an admin.
+    fn only_admin(&self) -> Result<()> {
+        require!(
+            self.store().load()?.is_authority(self.authority().key),
+            StoreError::NotAnAdmin
+        );
         Ok(())
     }
 
     /// Check that the `authority` has the given `role`.
-    fn only(ctx: &Context<Self>, role: &str) -> Result<()> {
-        Self::verify(ctx)?;
+    fn only_role(&self, role: &str) -> Result<()> {
         require!(
-            ctx.accounts
-                .store()
-                .load()?
-                .has_role(ctx.accounts.authority().key, role)?,
+            self.store().load()?.has_role(self.authority().key, role)?,
             StoreError::PermissionDenied
         );
         Ok(())
     }
+}
+
+/// Provides access control utils for [`Authentication`]s.
+pub(crate) trait Authenticate<'info>: Authentication<'info> + Bumps + Sized {
+    /// Check that the `authority` has the given `role`.
+    fn only(ctx: &Context<Self>, role: &str) -> Result<()> {
+        ctx.accounts.only_role(role)
+    }
 
     /// Check that the `authority` is an admin.
     fn only_admin(ctx: &Context<Self>) -> Result<()> {
-        Self::verify(ctx)?;
-        require!(
-            ctx.accounts
-                .store()
-                .load()?
-                .is_authority(ctx.accounts.authority().key),
-            StoreError::NotAnAdmin
-        );
-        Ok(())
+        ctx.accounts.only_admin()
     }
 
     /// Check that the `authority` has the [`CONTROLLER`](`RoleKey::CONTROLLER`) role.

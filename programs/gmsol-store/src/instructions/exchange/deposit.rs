@@ -9,7 +9,11 @@ use crate::{
         deposit::{CreateDepositOps, CreateDepositParams},
         execution_fee::TransferExecutionFeeOps,
     },
-    states::{DepositV2, Market, NonceBytes, Store},
+    states::{DepositV2, Market, NonceBytes, RoleKey, Store},
+    utils::{
+        internal::{self, Authentication},
+        token::is_associated_token_account,
+    },
     CoreError,
 };
 
@@ -221,5 +225,211 @@ impl<'info> CreateDeposit<'info> {
             .system_program(self.system_program.to_account_info())
             .build()
             .execute()
+    }
+}
+
+/// The accounts definition for `close_deposit` instruction.
+#[derive(Accounts)]
+pub struct CloseDeposit<'info> {
+    /// The executor of this instruction.
+    pub executor: Signer<'info>,
+    /// The store.
+    pub store: AccountLoader<'info, Store>,
+    /// The owner of the deposit.
+    /// CHECK: only use to validate and receive fund.
+    #[account(mut)]
+    pub owner: UncheckedAccount<'info>,
+    /// Market token.
+    #[account(
+        constraint = deposit.load()?.tokens.market_token.token().expect("must exist") == market_token.key() @ CoreError::MarketTokenMintMismatched
+    )]
+    pub market_token: Box<Account<'info, Mint>>,
+    /// Initial long token.
+    #[account(
+        constraint = deposit.load()?.tokens.initial_long_token.token().map(|token| initial_long_token.key() == token).unwrap_or(true) @ CoreError::TokenMintMismatched
+    )]
+    pub initial_long_token: Box<Account<'info, Mint>>,
+    /// initial short token.
+    #[account(
+        constraint = deposit.load()?.tokens.initial_short_token.token().map(|token| initial_short_token.key() == token).unwrap_or(true) @ CoreError::TokenMintMismatched
+    )]
+    pub initial_short_token: Box<Account<'info, Mint>>,
+    /// The deposit to close.
+    #[account(
+        mut,
+        has_one = store,
+        has_one = owner,
+        constraint = deposit.load()?.tokens.market_token.account().expect("must exist") == market_token_escrow.key() @ CoreError::MarketTokenAccountMismatched,
+        constraint = deposit.load()?.tokens.initial_long_token.account() == initial_long_token_escrow.as_ref().map(|a| a.key()) @ CoreError::TokenAccountMismatched,
+        constraint = deposit.load()?.tokens.initial_short_token.account() == initial_short_token_escrow.as_ref().map(|a| a.key()) @ CoreError::TokenAccountMismatched,
+    )]
+    pub deposit: AccountLoader<'info, DepositV2>,
+    /// The escrow account for receving market tokens.
+    #[account(
+        mut,
+        associated_token::mint = market_token,
+        associated_token::authority = deposit,
+    )]
+    pub market_token_escrow: Box<Account<'info, TokenAccount>>,
+    /// The escrow account for receiving initial long token for deposit.
+    #[account(
+        mut,
+        associated_token::mint = initial_long_token,
+        associated_token::authority = deposit,
+    )]
+    pub initial_long_token_escrow: Option<Box<Account<'info, TokenAccount>>>,
+    /// The escrow account for receiving initial short token for deposit.
+    #[account(
+        mut,
+        associated_token::mint = initial_short_token,
+        associated_token::authority = deposit,
+    )]
+    pub initial_short_token_escrow: Option<Box<Account<'info, TokenAccount>>>,
+    /// The ATA for market token of owner.
+    /// CHECK: should be checked during the execution.
+    #[account(
+        mut,
+        constraint = is_associated_token_account(market_token_ata.key, owner.key, &market_token.key()) @ CoreError::NotAnATA,
+    )]
+    pub market_token_ata: UncheckedAccount<'info>,
+    /// The ATA for inital long token of owner.
+    /// CHECK: should be checked during the execution
+    #[account(
+        mut,
+        constraint = is_associated_token_account(initial_long_token_ata.key, owner.key, &initial_long_token.key()) @ CoreError::NotAnATA,
+    )]
+    pub initial_long_token_ata: Option<UncheckedAccount<'info>>,
+    /// The ATA for inital short token of owner.
+    /// CHECK: should be checked during the execution
+    #[account(
+        mut,
+        constraint = is_associated_token_account(initial_short_token_ata.key, owner.key, &initial_short_token.key()) @ CoreError::NotAnATA,
+    )]
+    pub initial_short_token_ata: Option<UncheckedAccount<'info>>,
+    /// The system program.
+    pub system_program: Program<'info, System>,
+    /// The token program.
+    pub token_program: Program<'info, Token>,
+    /// The associated token program.
+    pub associated_token_program: Program<'info, AssociatedToken>,
+}
+
+pub(crate) fn close_deposit(ctx: Context<CloseDeposit>) -> Result<()> {
+    let accounts = &ctx.accounts;
+    let should_continue_when_atas_are_missing = accounts.preprocess()?;
+    if accounts.transfer_to_atas(should_continue_when_atas_are_missing)? {
+        accounts.close()?;
+    } else {
+        msg!("Some ATAs are not initilaized, skip the close");
+    }
+    Ok(())
+}
+
+impl<'info> internal::Authentication<'info> for CloseDeposit<'info> {
+    fn authority(&self) -> &Signer<'info> {
+        &self.executor
+    }
+
+    fn store(&self) -> &AccountLoader<'info, Store> {
+        &self.store
+    }
+}
+
+type ShouldContinueWhenATAsAreMissing = bool;
+type Success = bool;
+
+impl<'info> CloseDeposit<'info> {
+    fn preprocess(&self) -> Result<ShouldContinueWhenATAsAreMissing> {
+        if self.executor.key == self.owner.key {
+            Ok(true)
+        } else {
+            self.only_role(RoleKey::ORDER_KEEPER)?;
+            {
+                let deposit = self.deposit.load()?;
+                if deposit.action_state()?.is_completed_or_cancelled() {
+                    Ok(false)
+                } else {
+                    err!(CoreError::PermissionDenied)
+                }
+            }
+        }
+    }
+
+    fn transfer_to_atas(&self, init_if_needed: bool) -> Result<Success> {
+        use crate::utils::token::TransferAllFromEscrowToATA;
+
+        // Prepare signer seeds.
+        let store = self.store.key();
+        let owner = self.owner.key();
+        let seeds = [
+            DepositV2::SEED,
+            store.as_ref(),
+            owner.as_ref(),
+            &self.deposit.load()?.nonce,
+            &[self.deposit.load()?.bump],
+        ];
+
+        let builder = TransferAllFromEscrowToATA::builder()
+            .system_program(self.system_program.to_account_info())
+            .token_program(self.token_program.to_account_info())
+            .associated_token_program(self.associated_token_program.to_account_info())
+            .payer(self.executor.to_account_info())
+            .owner(self.owner.to_account_info())
+            .escrow_authority(self.deposit.to_account_info())
+            .seeds(&seeds)
+            .init_if_needed(init_if_needed);
+
+        // Transfer market tokens.
+        if !builder
+            .clone()
+            .mint(self.market_token.to_account_info())
+            .ata(self.market_token_ata.to_account_info())
+            .escrow(&self.market_token_escrow)
+            .build()
+            .execute()?
+        {
+            return Ok(false);
+        }
+
+        // Transfer initial long tokens.
+        if let Some(escrow) = self.initial_long_token_escrow.as_ref() {
+            let Some(ata) = self.initial_long_token_ata.as_ref() else {
+                return err!(CoreError::TokenAccountNotProvided);
+            };
+            if !builder
+                .clone()
+                .mint(self.initial_long_token.to_account_info())
+                .ata(ata.to_account_info())
+                .escrow(escrow)
+                .build()
+                .execute()?
+            {
+                return Ok(false);
+            }
+        }
+
+        // Transfer initial short tokens.
+        if let Some(escrow) = self.initial_short_token_escrow.as_ref() {
+            let Some(ata) = self.initial_short_token_ata.as_ref() else {
+                return err!(CoreError::TokenAccountNotProvided);
+            };
+            if !builder
+                .clone()
+                .mint(self.initial_short_token.to_account_info())
+                .ata(ata.to_account_info())
+                .escrow(escrow)
+                .build()
+                .execute()?
+            {
+                return Ok(false);
+            }
+        }
+
+        Ok(true)
+    }
+
+    fn close(&self) -> Result<()> {
+        AccountsClose::close(&self.deposit, self.owner.to_account_info())?;
+        Ok(())
     }
 }

@@ -25,6 +25,8 @@ pub enum ActionState {
     Pending,
     /// Completed.
     Completed,
+    /// Cancelled.
+    Cancelled,
 }
 
 impl ActionState {
@@ -34,5 +36,18 @@ impl ActionState {
             return err!(CoreError::PreconditionsAreNotMet);
         };
         Ok(Self::Completed)
+    }
+
+    /// Transition to Cancelled State.
+    pub fn cancelled(self) -> Result<Self> {
+        let Self::Pending = self else {
+            return err!(CoreError::PreconditionsAreNotMet);
+        };
+        Ok(Self::Cancelled)
+    }
+
+    /// Check if the state is completed or cancelled.
+    pub fn is_completed_or_cancelled(&self) -> bool {
+        matches!(self, Self::Completed | Self::Cancelled)
     }
 }
