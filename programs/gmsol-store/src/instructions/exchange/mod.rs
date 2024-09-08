@@ -1,5 +1,5 @@
-/// Create Deposit.
-pub mod create_deposit;
+/// Deposit creation and cancellation.
+pub mod deposit;
 
 /// Execute Deposit.
 pub mod execute_deposit;
@@ -13,7 +13,7 @@ pub mod execute_order;
 /// Update ADL state.
 pub mod update_adl;
 
-pub use create_deposit::*;
+pub use deposit::*;
 pub use execute_deposit::*;
 pub use execute_order::*;
 pub use execute_withdrawal::*;

@@ -1,5 +1,8 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{Mint, Token, TokenAccount};
+use anchor_spl::{
+    associated_token::AssociatedToken,
+    token::{Mint, Token, TokenAccount},
+};
 
 use crate::{
     ops::{
@@ -9,6 +12,67 @@ use crate::{
     states::{DepositV2, Market, NonceBytes, Store},
     CoreError,
 };
+
+/// The accounts definition for the `prepare_deposit_escrow` instruction.
+#[derive(Accounts)]
+#[instruction(nonce: [u8; 32])]
+pub struct PrepareDepositEscrow<'info> {
+    /// The owner of the deposit.
+    #[account(mut)]
+    pub owner: Signer<'info>,
+    /// Store.
+    pub store: AccountLoader<'info, Store>,
+    /// The deposit owning these escrow accounts.
+    /// CHECK: The deposit don't have to be initialized.
+    #[account(
+        seeds = [DepositV2::SEED, store.key().as_ref(), owner.key().as_ref(), &nonce],
+        bump,
+    )]
+    pub deposit: UncheckedAccount<'info>,
+    /// Market token.
+    pub market_token: Box<Account<'info, Mint>>,
+    /// Initial long token.
+    pub initial_long_token: Box<Account<'info, Mint>>,
+    /// initial short token.
+    pub initial_short_token: Box<Account<'info, Mint>>,
+    /// The escrow account for receving market tokens.
+    #[account(
+        init,
+        payer = owner,
+        associated_token::mint = market_token,
+        associated_token::authority = deposit,
+    )]
+    pub market_token_escrow: Box<Account<'info, TokenAccount>>,
+    /// The escrow account for receiving initial long token for deposit.
+    #[account(
+        init,
+        payer = owner,
+        associated_token::mint = initial_long_token,
+        associated_token::authority = deposit,
+    )]
+    pub initial_long_token_escrow: Option<Box<Account<'info, TokenAccount>>>,
+    /// The escrow account for receiving initial short token for deposit.
+    #[account(
+        init,
+        payer = owner,
+        associated_token::mint = initial_short_token,
+        associated_token::authority = deposit,
+    )]
+    pub initial_short_token_escrow: Option<Box<Account<'info, TokenAccount>>>,
+    /// The system program.
+    pub system_program: Program<'info, System>,
+    /// The token program.
+    pub token_program: Program<'info, Token>,
+    /// The associated token program.
+    pub associated_token_program: Program<'info, AssociatedToken>,
+}
+
+pub(crate) fn prepare_deposit_escrow(
+    _ctx: Context<PrepareDepositEscrow>,
+    _nonce: NonceBytes,
+) -> Result<()> {
+    Ok(())
+}
 
 /// The accounts definition for the `create_deposit` instruction.
 #[derive(Accounts)]
@@ -43,18 +107,21 @@ pub struct CreateDeposit<'info> {
     pub initial_short_token: Box<Account<'info, Mint>>,
     /// The escrow account for receving market tokens.
     #[account(
+        mut,
         associated_token::mint = market_token,
         associated_token::authority = deposit,
     )]
     pub market_token_escrow: Box<Account<'info, TokenAccount>>,
     /// The escrow account for receiving initial long token for deposit.
     #[account(
+        mut,
         associated_token::mint = initial_long_token,
         associated_token::authority = deposit,
     )]
     pub initial_long_token_escrow: Option<Box<Account<'info, TokenAccount>>>,
     /// The escrow account for receiving initial short token for deposit.
     #[account(
+        mut,
         associated_token::mint = initial_short_token,
         associated_token::authority = deposit,
     )]

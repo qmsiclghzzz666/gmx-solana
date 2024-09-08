@@ -137,6 +137,20 @@ impl<'a, 'info> CreateDepositOps<'a, 'info> {
             );
         }
 
+        // If the two token accounts are actually the same, then we should check the total sum.
+        let same_initial_token_amount = self.initial_long_token.as_ref().and_then(|long| {
+            self.initial_short_token
+                .as_ref()
+                .and_then(|short| (long.key() == short.key()).then(|| long.amount))
+        });
+        if let Some(amount) = same_initial_token_amount {
+            let total_amount = params
+                .initial_long_token_amount
+                .checked_add(params.initial_short_token_amount)
+                .ok_or(error!(CoreError::TokenAmountExceedsLimit))?;
+            require_gte!(amount, total_amount, CoreError::NotEnoughTokenAmount);
+        }
+
         require_gte!(
             params.execution_fee,
             DepositV2::MIN_EXECUTION_LAMPORTS,

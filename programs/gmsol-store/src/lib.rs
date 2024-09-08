@@ -1405,6 +1405,13 @@ pub mod gmsol_store {
     }
 
     // Exchange.
+    pub fn prepare_deposit_escrow(
+        ctx: Context<PrepareDepositEscrow>,
+        nonce: [u8; 32],
+    ) -> Result<()> {
+        instructions::prepare_deposit_escrow(ctx, nonce)
+    }
+
     pub fn create_deposit<'info>(
         ctx: Context<'_, '_, 'info, 'info, CreateDeposit<'info>>,
         nonce: [u8; 32],
@@ -1668,6 +1675,9 @@ pub enum CoreError {
     /// Preconditions are not met.
     #[msg("preconditions are not met")]
     PreconditionsAreNotMet,
+    /// Token amount exceeds limit.
+    #[msg("token amount exceeds limit")]
+    TokenAmountExceedsLimit,
 }
 
 impl CoreError {
