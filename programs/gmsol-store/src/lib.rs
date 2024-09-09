@@ -1423,6 +1423,21 @@ pub mod gmsol_store {
     pub fn close_deposit(ctx: Context<CloseDeposit>) -> Result<()> {
         instructions::close_deposit(ctx)
     }
+
+    #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
+    pub fn execute_deposit_v2<'info>(
+        ctx: Context<'_, '_, 'info, 'info, ExecuteDepositV2<'info>>,
+        tokens: Vec<Pubkey>,
+        execution_fee: u64,
+        throw_on_execution_error: bool,
+    ) -> Result<()> {
+        instructions::unchecked_execute_deposit(
+            ctx,
+            &tokens,
+            execution_fee,
+            throw_on_execution_error,
+        )
+    }
 }
 
 #[error_code]
@@ -1697,6 +1712,12 @@ pub enum CoreError {
     /// Token amount exceeds limit.
     #[msg("token amount exceeds limit")]
     TokenAmountExceedsLimit,
+    /// Not enough token feeds.
+    #[msg("not enough token feeds")]
+    NotEnoughTokenFeeds,
+    /// Insufficient output amounts.
+    #[msg("insufficient output amounts")]
+    InsufficientOutputAmount,
 }
 
 impl CoreError {

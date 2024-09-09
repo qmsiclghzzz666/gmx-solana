@@ -13,11 +13,16 @@ pub mod validator;
 /// Oracle time validation.
 pub mod time;
 
-use crate::{states::TokenMapAccess, StoreError, StoreResult};
+use std::ops::Deref;
+
+use crate::{
+    states::{TokenMapAccess, TokenMapLoader},
+    CoreError, StoreError, StoreResult,
+};
 use anchor_lang::{prelude::*, Ids};
 use num_enum::TryFromPrimitive;
 
-use super::{HasMarketMeta, TokenMapRef};
+use super::{HasMarketMeta, Store, TokenMapHeader, TokenMapRef};
 
 pub use self::{
     chainlink::Chainlink,
@@ -135,6 +140,40 @@ impl Oracle {
         self.min_oracle_ts = i64::MAX;
         self.max_oracle_ts = i64::MIN;
         self.min_oracle_slot = None;
+    }
+
+    pub(crate) fn with_prices<'info, T>(
+        &mut self,
+        store: &AccountLoader<'info, Store>,
+        provider: &Interface<'info, PriceProvider>,
+        token_map: &AccountLoader<'info, TokenMapHeader>,
+        tokens: &[Pubkey],
+        remaining_accounts: &'info [AccountInfo<'info>],
+        f: impl FnOnce(&mut Self, &'info [AccountInfo<'info>]) -> Result<T>,
+    ) -> Result<T> {
+        let validator = PriceValidator::try_from(store.load()?.deref())?;
+        require_gte!(
+            remaining_accounts.len(),
+            tokens.len(),
+            CoreError::NotEnoughTokenFeeds,
+        );
+        let feeds = &remaining_accounts[..tokens.len()];
+        let remaining_accounts = &remaining_accounts[tokens.len()..];
+        let res = {
+            let token_map = token_map.load_token_map()?;
+            self.set_prices_from_remaining_accounts(validator, provider, &token_map, tokens, feeds)
+        };
+        match res {
+            Ok(()) => {
+                let output = f(self, remaining_accounts);
+                self.clear_all_prices();
+                output
+            }
+            Err(err) => {
+                self.clear_all_prices();
+                Err(err)
+            }
+        }
     }
 
     /// Validate oracle time.

@@ -237,6 +237,49 @@ impl SwapParamsV2 {
         }
         Ok(())
     }
+
+    /// Iterate over both swap paths, primary path first then secondary path.
+    pub fn iter(&self) -> impl Iterator<Item = &Pubkey> {
+        self.primary_swap_path()
+            .iter()
+            .chain(self.secondary_swap_path().iter())
+    }
+
+    /// Get unique market tokens excluding current market token.
+    pub fn unique_market_tokens_excluding_current<'a>(
+        &'a self,
+        current_market_token: &'a Pubkey,
+    ) -> impl Iterator<Item = &Pubkey> + 'a {
+        let mut seen = HashSet::from([current_market_token]);
+        self.iter().filter(move |token| seen.insert(token))
+    }
+
+    /// Unpack markets for swap.
+    pub fn unpack_markets_for_swap<'info>(
+        &self,
+        current_market_token: &Pubkey,
+        remaining_accounts: &'info [AccountInfo<'info>],
+    ) -> Result<Vec<AccountLoader<'info, Market>>> {
+        let len = self
+            .unique_market_tokens_excluding_current(current_market_token)
+            .count();
+        require_gte!(
+            remaining_accounts.len(),
+            len,
+            ErrorCode::AccountNotEnoughKeys
+        );
+        let loaders = unpack_markets(remaining_accounts).collect::<Result<Vec<_>>>()?;
+        Ok(loaders)
+    }
+}
+
+impl From<&SwapParamsV2> for SwapParams {
+    fn from(value: &SwapParamsV2) -> Self {
+        Self {
+            long_token_swap_path: value.primary_swap_path().to_owned(),
+            short_token_swap_path: value.secondary_swap_path().to_owned(),
+        }
+    }
 }
 
 fn unpack_markets<'info>(

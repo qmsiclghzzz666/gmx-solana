@@ -5,8 +5,10 @@ use crate::StoreError;
 
 use super::{
     common::{
-        action::ActionState, swap::SwapParamsV2, token::TokenAndAccount, SwapParams, TokenRecord,
-        TokensWithFeed,
+        action::{ActionSigner, ActionState},
+        swap::SwapParamsV2,
+        token::TokenAndAccount,
+        SwapParams, TokenRecord, TokensWithFeed,
     },
     Market, NonceBytes, Seed,
 };
@@ -220,6 +222,8 @@ pub struct DepositV2 {
     /// Swap params.
     pub(crate) swap: SwapParamsV2,
     padding_1: [u8; 4],
+    pub(crate) updated_at: i64,
+    pub(crate) updated_at_slot: u64,
     reserve: [u8; 128],
 }
 
@@ -246,6 +250,23 @@ impl DepositV2 {
     pub fn completed(&mut self) -> Result<()> {
         self.set_action_state(self.action_state()?.completed()?);
         Ok(())
+    }
+
+    /// Transition to Cancelled state.
+    pub fn cancelled(&mut self) -> Result<()> {
+        self.set_action_state(self.action_state()?.cancelled()?);
+        Ok(())
+    }
+
+    /// Get action signer.
+    pub fn signer(&self) -> ActionSigner {
+        ActionSigner::new(
+            DepositV2::SEED,
+            self.store,
+            self.owner,
+            self.nonce,
+            self.bump,
+        )
     }
 }
 

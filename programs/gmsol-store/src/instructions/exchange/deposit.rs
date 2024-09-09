@@ -88,11 +88,7 @@ pub struct CreateDeposit<'info> {
     /// Store.
     pub store: AccountLoader<'info, Store>,
     /// Market.
-    #[account(
-        mut,
-        has_one = store,
-        constraint = market.load()?.meta().market_token_mint == market_token.key() @ CoreError::MarketTokenMintMismatched,
-    )]
+    #[account(mut, has_one = store)]
     pub market: AccountLoader<'info, Market>,
     /// The deposit to be created.
     #[account(
@@ -104,6 +100,7 @@ pub struct CreateDeposit<'info> {
     )]
     pub deposit: AccountLoader<'info, DepositV2>,
     /// Market token.
+    #[account(constraint = market.load()?.meta().market_token_mint == market_token.key() @ CoreError::MarketTokenMintMismatched)]
     pub market_token: Box<Account<'info, Mint>>,
     /// Initial long token.
     pub initial_long_token: Box<Account<'info, Mint>>,
@@ -249,7 +246,7 @@ pub struct CloseDeposit<'info> {
         constraint = deposit.load()?.tokens.initial_long_token.token().map(|token| initial_long_token.key() == token).unwrap_or(true) @ CoreError::TokenMintMismatched
     )]
     pub initial_long_token: Box<Account<'info, Mint>>,
-    /// initial short token.
+    /// Initial short token.
     #[account(
         constraint = deposit.load()?.tokens.initial_short_token.token().map(|token| initial_short_token.key() == token).unwrap_or(true) @ CoreError::TokenMintMismatched
     )]
@@ -262,6 +259,8 @@ pub struct CloseDeposit<'info> {
         constraint = deposit.load()?.tokens.market_token.account().expect("must exist") == market_token_escrow.key() @ CoreError::MarketTokenAccountMismatched,
         constraint = deposit.load()?.tokens.initial_long_token.account() == initial_long_token_escrow.as_ref().map(|a| a.key()) @ CoreError::TokenAccountMismatched,
         constraint = deposit.load()?.tokens.initial_short_token.account() == initial_short_token_escrow.as_ref().map(|a| a.key()) @ CoreError::TokenAccountMismatched,
+        seeds = [DepositV2::SEED, store.key().as_ref(), owner.key().as_ref(), &deposit.load()?.nonce],
+        bump = deposit.load()?.bump,
     )]
     pub deposit: AccountLoader<'info, DepositV2>,
     /// The escrow account for receving market tokens.
@@ -359,15 +358,8 @@ impl<'info> CloseDeposit<'info> {
         use crate::utils::token::TransferAllFromEscrowToATA;
 
         // Prepare signer seeds.
-        let store = self.store.key();
-        let owner = self.owner.key();
-        let seeds = [
-            DepositV2::SEED,
-            store.as_ref(),
-            owner.as_ref(),
-            &self.deposit.load()?.nonce,
-            &[self.deposit.load()?.bump],
-        ];
+        let signer = self.deposit.load()?.signer();
+        let seeds = signer.as_seeds();
 
         let builder = TransferAllFromEscrowToATA::builder()
             .system_program(self.system_program.to_account_info())
