@@ -36,7 +36,6 @@ cli = [
     "prettytable",
     "decode",
 ]
-ui = ["cli", "poem/embed", "rust-embed"]
 clap = ["dep:clap", "gmsol-store/clap", "gmsol-exchange/clap"]
 devnet = ["gmsol-store/devnet", "gmsol-exchange/devnet"]
 pyth-pull-oracle = [
@@ -52,6 +51,8 @@ poem = ["dep:poem"]
 doc = ["gmsol-store/doc", "cli"]
 discover = ["tower/discover", "tokio/time", "pin-project-lite"]
 decode = ["gmsol-decode"]
+
+anchor-test = ["devnet", "pyth-pull-oracle", "tracing-subscriber", "shellexpand"]
 
 [dependencies]
 gmsol-utils = { workspace = true }
