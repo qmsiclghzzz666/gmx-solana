@@ -20,6 +20,7 @@ use anchor_client::{
     Cluster,
 };
 use event_listener::Event;
+use eyre::OptionExt;
 use gmsol::{
     utils::{shared_signer, SignerRef, TransactionBuilder},
     Client, ClientOptions,
@@ -59,6 +60,11 @@ impl fmt::Debug for Deployment {
 }
 
 impl Deployment {
+    /// Default user.
+    pub const DEFAULT_USER: &'static str = "user_0";
+    /// Default keeper.
+    pub const DEFAULT_KEEPER: &'static str = "keeper_0";
+
     async fn connect() -> eyre::Result<Self> {
         let (client, store) = Self::get_client_and_store().await?;
         let oracle = client.find_oracle_address(&store, 255);
@@ -133,12 +139,19 @@ impl Deployment {
 
     async fn setup(&mut self) -> eyre::Result<()> {
         tracing::info!("[Setting up everything...]");
+        self.add_users();
+
         let _guard = self.use_accounts().await?;
 
         self.create_tokens([("fBTC", 9), ("USDG", 8)]).await?;
         self.create_token_accounts().await?;
 
         Ok(())
+    }
+
+    fn add_users(&mut self) {
+        self.users.add_user(Self::DEFAULT_USER);
+        self.users.add_user(Self::DEFAULT_KEEPER);
     }
 
     async fn create_tokens<T: ToString>(
@@ -239,7 +252,7 @@ impl Deployment {
         for (name, token) in self.tokens.iter() {
             for user in self.users.keypairs() {
                 let pubkey = user.pubkey();
-                tracing::info!(%name, mint=%token.address, "creating token account for {pubkey}");
+                tracing::info!(token=%name, mint=%token.address, "creating token account for {pubkey}");
                 let rpc = self.client.data_store_rpc().pre_instruction(
                     instruction::create_associated_token_account(
                         &payer,
@@ -265,7 +278,7 @@ impl Deployment {
     }
 
     async fn fund_users(&self) -> eyre::Result<()> {
-        const LAMPORTS: u64 = 4_000_000_000;
+        const LAMPORTS: u64 = 50_000_000;
 
         let client = self.client.data_store().async_rpc();
         let payer = self.client.payer();
@@ -275,7 +288,7 @@ impl Deployment {
         let mut builder = TransactionBuilder::new(client);
         builder.try_push_many(
             self.users
-                .users()
+                .pubkeys()
                 .into_iter()
                 .inspect(|user| tracing::debug!(%user, "funding user with lamports {LAMPORTS}"))
                 .map(|user| system_instruction::transfer(&payer, &user, LAMPORTS))
@@ -295,6 +308,44 @@ impl Deployment {
         Ok(())
     }
 
+    async fn close_native_token_accounts(&self) -> eyre::Result<()> {
+        use anchor_spl::token::{TokenAccount, ID};
+        use spl_associated_token_account::get_associated_token_address;
+        use spl_token::{instruction, native_mint};
+
+        let payer = self.client.payer();
+        let client = self.client.data_store().async_rpc();
+        let mut builder = TransactionBuilder::new(client);
+
+        for user in self.users.keypairs() {
+            let pubkey = user.pubkey();
+            let address = get_associated_token_address(&pubkey, &native_mint::ID);
+            let Some(_account) = self
+                .client
+                .account_with_config::<TokenAccount>(&address, Default::default())
+                .await?
+                .into_value()
+            else {
+                continue;
+            };
+            builder
+                .try_push(self.client.data_store_rpc().signer(user).pre_instruction(
+                    instruction::close_account(&ID, &address, &payer, &pubkey, &[&pubkey])?,
+                ))
+                .map_err(|(_, err)| err)?;
+        }
+
+        match builder.send_all().await {
+            Ok(signatures) => {
+                tracing::debug!("closed native token accounts with {signatures:#?}");
+            }
+            Err((signatures, err)) => {
+                tracing::error!(%err, "failed to close native token accounts, successful txns: {signatures:#?}");
+            }
+        }
+        Ok(())
+    }
+
     async fn refund_payer(&self) -> eyre::Result<()> {
         let client = self.client.data_store().async_rpc();
         let payer = self.client.payer();
@@ -302,11 +353,12 @@ impl Deployment {
         let mut builder = TransactionBuilder::new(self.client.data_store().async_rpc());
 
         for user in self.users.keypairs() {
+            let pubkey = user.pubkey();
             let lamports = client.get_balance(&user.pubkey()).await?;
             if lamports == 0 {
                 continue;
             }
-            tracing::debug!(user = %user.pubkey(), %lamports, "refund from user");
+            tracing::debug!(user = %pubkey, %lamports, "refund from user");
             let ix = system_instruction::transfer(&user.pubkey(), &payer, lamports);
             builder
                 .try_push(
@@ -353,21 +405,70 @@ impl Deployment {
         tokio::time::sleep(wait).await;
         self.users.wait_until_not_in_use().await;
         tracing::info!("[Cleanup...]");
+        _ = self
+            .close_native_token_accounts()
+            .await
+            .inspect_err(|err| tracing::error!(%err, "close native token accounts error"));
         self.refund_payer().await?;
         Ok(())
     }
 
-    pub(crate) fn token(&self, name: &str) -> Option<&Token> {
-        self.tokens.get(name)
+    pub(crate) fn token(&self, token: &str) -> Option<&Token> {
+        self.tokens.get(token)
+    }
+
+    pub(crate) fn user(&self, name: &str) -> Option<Pubkey> {
+        self.users.user(name)
+    }
+
+    pub(crate) async fn mint_or_transfer_to(
+        &self,
+        token_name: &str,
+        user: &str,
+        amount: u64,
+    ) -> eyre::Result<()> {
+        use anchor_spl::token::ID;
+        use spl_associated_token_account::get_associated_token_address;
+        use spl_token::{instruction, native_mint};
+
+        let token = self.token(token_name).ok_or_eyre("no such token")?;
+        let user = self.user(user).ok_or_eyre("no such user")?;
+        let account = get_associated_token_address(&user, &token.address);
+        let payer = self.client.payer();
+
+        let signature = if token.address == native_mint::ID {
+            self.client
+                .data_store_rpc()
+                .pre_instruction(system_instruction::transfer(&payer, &account, amount))
+                .pre_instruction(instruction::sync_native(&ID, &account)?)
+                .build()
+                .send()
+                .await?
+        } else {
+            self.client
+                .data_store_rpc()
+                .pre_instruction(instruction::mint_to_checked(
+                    &ID,
+                    &token.address,
+                    &account,
+                    &payer,
+                    &[],
+                    amount,
+                    token.decimals,
+                )?)
+                .build()
+                .send()
+                .await?
+        };
+
+        tracing::info!(%signature, token=%token_name, "minted or tranferred {amount} to {user}");
+        Ok(())
     }
 }
 
 /// Users.
 pub struct Users {
-    /// User 0.
-    pub user_0: Keypair,
-    /// Keeper 0.
-    pub keeper_0: Keypair,
+    users: HashMap<String, Keypair>,
     funded: Arc<AtomicBool>,
     used: Arc<AtomicUsize>,
     event: Arc<Event>,
@@ -375,18 +476,21 @@ pub struct Users {
 
 impl fmt::Debug for Users {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let pubkeys = self
+            .users
+            .iter()
+            .map(|(name, k)| (name, k.pubkey()))
+            .collect::<HashMap<_, _>>();
         f.debug_struct("Users")
-            .field("user_0", &self.user_0.pubkey())
-            .field("keepr_0", &self.keeper_0.pubkey())
-            .finish()
+            .field("users", &pubkeys)
+            .finish_non_exhaustive()
     }
 }
 
 impl Default for Users {
     fn default() -> Self {
         Self {
-            user_0: Keypair::new(),
-            keeper_0: Keypair::new(),
+            users: Default::default(),
             funded: Arc::new(AtomicBool::new(false)),
             used: Arc::new(AtomicUsize::new(0)),
             event: Arc::new(Event::new()),
@@ -395,6 +499,16 @@ impl Default for Users {
 }
 
 impl Users {
+    fn add_user(&mut self, name: &str) -> bool {
+        let Entry::Vacant(entry) = self.users.entry(name.to_string()) else {
+            return false;
+        };
+        let keypair = Keypair::new();
+        tracing::info!(%name, pubkey=%keypair.pubkey(), "added a new user");
+        entry.insert(keypair);
+        true
+    }
+
     fn use_accounts(&self) -> Guard {
         self.used.fetch_add(1, Ordering::SeqCst);
         self.event.notify(usize::MAX);
@@ -425,12 +539,16 @@ impl Users {
         }
     }
 
-    fn users(&self) -> impl IntoIterator<Item = Pubkey> {
-        [self.user_0.pubkey(), self.keeper_0.pubkey()]
+    fn user(&self, name: &str) -> Option<Pubkey> {
+        self.users.get(name).map(|k| k.pubkey())
+    }
+
+    fn pubkeys(&self) -> impl IntoIterator<Item = Pubkey> + '_ {
+        self.users.values().map(|k| k.pubkey())
     }
 
     fn keypairs(&self) -> impl IntoIterator<Item = &Keypair> {
-        [&self.user_0, &self.keeper_0]
+        self.users.values()
     }
 }
 
