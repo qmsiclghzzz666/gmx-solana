@@ -108,7 +108,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> TransactionBuilder<'a, C> {
         Ok(self)
     }
 
-    /// Push a [`RpcBuilder`].
+    /// Try to push a [`RpcBuilder`] to the builder.
     #[inline]
     pub fn try_push(
         &mut self,
@@ -117,8 +117,13 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> TransactionBuilder<'a, C> {
         self.try_push_with_opts(rpc, false)
     }
 
+    /// Push a [`RpcBuilder`].
+    pub fn push(&mut self, rpc: RpcBuilder<'a, C>) -> crate::Result<&mut Self> {
+        self.try_push(rpc).map_err(|(_, err)| err)
+    }
+
     /// Push [`RpcBuilder`]s.
-    pub fn try_push_many(
+    pub fn push_many(
         &mut self,
         rpcs: impl IntoIterator<Item = RpcBuilder<'a, C>>,
         new_transaction: bool,

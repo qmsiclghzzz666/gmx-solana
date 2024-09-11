@@ -22,9 +22,16 @@ use anchor_client::{
 use event_listener::Event;
 use eyre::OptionExt;
 use gmsol::{
+    client::SystemProgramOps,
+    exchange::ExchangeOps,
+    store::{
+        oracle::OracleOps, roles::RolesOps, store_ops::StoreOps, token_config::TokenConfigOps,
+    },
+    types::{PriceProviderKind, RoleKey, TokenConfigBuilder},
     utils::{shared_signer, SignerRef, TransactionBuilder},
     Client, ClientOptions,
 };
+use pyth_sdk::Identifier;
 use tokio::sync::OnceCell;
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::EnvFilter;
@@ -35,14 +42,22 @@ pub struct Deployment {
     pub client: Client<SignerRef>,
     /// Users.
     pub users: Users,
+    /// Store key.
+    pub store_key: String,
     /// Store.
     pub store: Pubkey,
     /// Token Map.
-    pub token_map: Keypair,
+    token_map: Keypair,
+    /// Oracle index.
+    pub oracle_index: u8,
     /// Oracle.
     pub oracle: Pubkey,
     /// Tokens.
     tokens: HashMap<String, Token>,
+    /// Synthetic tokens.
+    synthetic_tokens: HashMap<String, Token>,
+    /// Market tokens.
+    market_tokens: HashMap<[String; 3], Pubkey>,
 }
 
 impl fmt::Debug for Deployment {
@@ -55,6 +70,7 @@ impl fmt::Debug for Deployment {
             .field("token_map", &self.token_map.pubkey())
             .field("oracle", &self.oracle)
             .field("tokens", &self.tokens)
+            .field("synthetic_tokens", &self.synthetic_tokens)
             .finish_non_exhaustive()
     }
 }
@@ -64,17 +80,37 @@ impl Deployment {
     pub const DEFAULT_USER: &'static str = "user_0";
     /// Default keeper.
     pub const DEFAULT_KEEPER: &'static str = "keeper_0";
+    const SOL_PYTH_FEED_ID: [u8; 32] = [
+        0xef, 0x0d, 0x8b, 0x6f, 0xda, 0x2c, 0xeb, 0xa4, 0x1d, 0xa1, 0x5d, 0x40, 0x95, 0xd1, 0xda,
+        0x39, 0x2a, 0x0d, 0x2f, 0x8e, 0xd0, 0xc6, 0xc7, 0xbc, 0x0f, 0x4c, 0xfa, 0xc8, 0xc2, 0x80,
+        0xb5, 0x6d,
+    ];
+    const BTC_PYTH_FEED_ID: [u8; 32] = [
+        0xe6, 0x2d, 0xf6, 0xc8, 0xb4, 0xa8, 0x5f, 0xe1, 0xa6, 0x7d, 0xb4, 0x4d, 0xc1, 0x2d, 0xe5,
+        0xdb, 0x33, 0x0f, 0x7a, 0xc6, 0x6b, 0x72, 0xdc, 0x65, 0x8a, 0xfe, 0xdf, 0x0f, 0x4a, 0x41,
+        0x5b, 0x43,
+    ];
+    const USDC_PYTH_FEED_ID: [u8; 32] = [
+        0xea, 0xa0, 0x20, 0xc6, 0x1c, 0xc4, 0x79, 0x71, 0x28, 0x13, 0x46, 0x1c, 0xe1, 0x53, 0x89,
+        0x4a, 0x96, 0xa6, 0xc0, 0x0b, 0x21, 0xed, 0x0c, 0xfc, 0x27, 0x98, 0xd1, 0xf9, 0xa9, 0xe9,
+        0xc9, 0x4a,
+    ];
 
     async fn connect() -> eyre::Result<Self> {
-        let (client, store) = Self::get_client_and_store().await?;
-        let oracle = client.find_oracle_address(&store, 255);
+        let (client, store_key, store) = Self::get_client_and_store().await?;
+        let oracle_index = 255;
+        let oracle = client.find_oracle_address(&store, oracle_index);
         Ok(Self {
             client,
             users: Default::default(),
+            store_key,
             store,
             token_map: Keypair::new(),
+            oracle_index,
             oracle,
             tokens: Default::default(),
+            synthetic_tokens: Default::default(),
+            market_tokens: Default::default(),
         })
     }
 
@@ -88,7 +124,55 @@ impl Deployment {
         Ok(deployment)
     }
 
-    async fn get_client_and_store() -> eyre::Result<(Client<SignerRef>, Pubkey)> {
+    async fn setup(&mut self) -> eyre::Result<()> {
+        tracing::info!("[Setting up everything...]");
+        self.add_users();
+
+        let _guard = self.use_accounts().await?;
+
+        self.create_tokens([
+            (
+                "fBTC",
+                TokenConfig {
+                    decimals: 6,
+                    pyth_feed_id: Identifier::new(Self::BTC_PYTH_FEED_ID),
+                    precision: 3,
+                },
+            ),
+            (
+                "USDG",
+                TokenConfig {
+                    decimals: 8,
+                    pyth_feed_id: Identifier::new(Self::USDC_PYTH_FEED_ID),
+                    precision: 6,
+                },
+            ),
+        ])
+        .await?;
+        self.add_synthetic_tokens([(
+            "SOL",
+            Pubkey::default(),
+            TokenConfig {
+                decimals: 9,
+                pyth_feed_id: Identifier::new(Self::SOL_PYTH_FEED_ID),
+                precision: 4,
+            },
+        )]);
+        self.create_token_accounts().await?;
+        self.initialize_store().await?;
+        self.initialize_token_map().await?;
+        self.initialize_markets([
+            ["SOL", "WSOL", "USDG"],
+            ["SOL", "WSOL", "WSOL"],
+            ["fBTC", "fBTC", "USDG"],
+            ["fBTC", "WSOL", "USDG"],
+        ])
+        .await?;
+
+        Ok(())
+    }
+
+    async fn get_client_and_store() -> eyre::Result<(Client<SignerRef>, String, Pubkey)> {
         use rand::{distributions::Alphanumeric, thread_rng, Rng};
         use std::env;
 
@@ -122,7 +206,7 @@ impl Deployment {
                 .build(),
         )?;
         let store = client.find_store_address(&store_key);
-        Ok((client, store))
+        Ok((client, store_key, store))
     }
 
     fn init_tracing() -> eyre::Result<()> {
@@ -137,34 +221,36 @@ impl Deployment {
         Ok(())
     }
 
-    async fn setup(&mut self) -> eyre::Result<()> {
-        tracing::info!("[Setting up everything...]");
-        self.add_users();
-
-        let _guard = self.use_accounts().await?;
-
-        self.create_tokens([("fBTC", 9), ("USDG", 8)]).await?;
-        self.create_token_accounts().await?;
-
-        Ok(())
-    }
-
     fn add_users(&mut self) {
         self.users.add_user(Self::DEFAULT_USER);
         self.users.add_user(Self::DEFAULT_KEEPER);
     }
 
+    fn add_synthetic_tokens<T: ToString>(
+        &mut self,
+        configs: impl IntoIterator<Item = (T, Pubkey, TokenConfig)>,
+    ) {
+        for (name, address, config) in configs {
+            self.synthetic_tokens
+                .insert(name.to_string(), Token { address, config });
+        }
+    }
+
     async fn create_tokens<T: ToString>(
         &mut self,
-        decimals: impl IntoIterator<Item = (T, u8)>,
+        configs: impl IntoIterator<Item = (T, TokenConfig)>,
     ) -> eyre::Result<()> {
         use spl_token::native_mint;
 
-        self.tokens = self.do_create_tokens(decimals).await?;
+        self.tokens = self.do_create_tokens(configs).await?;
         if let Entry::Vacant(entry) = self.tokens.entry("WSOL".to_string()) {
             entry.insert(Token {
                 address: native_mint::ID,
-                decimals: native_mint::DECIMALS,
+                config: TokenConfig {
+                    decimals: native_mint::DECIMALS,
+                    pyth_feed_id: Identifier::new(Self::SOL_PYTH_FEED_ID),
+                    precision: 4,
+                },
             });
         }
         Ok(())
@@ -172,7 +258,7 @@ impl Deployment {
 
     async fn do_create_tokens<T>(
         &self,
-        decimals: impl IntoIterator<Item = (T, u8)>,
+        configs: impl IntoIterator<Item = (T, TokenConfig)>,
     ) -> eyre::Result<HashMap<String, Token>>
     where
         T: ToString,
@@ -186,14 +272,14 @@ impl Deployment {
             .await?;
         let mut builder = TransactionBuilder::new(client);
 
-        let tokens = decimals
+        let tokens = configs
             .into_iter()
-            .map(|(name, decimals)| (name.to_string(), (Keypair::new(), decimals)))
+            .map(|(name, config)| (name.to_string(), (Keypair::new(), config)))
             .collect::<HashMap<_, _>>();
 
         let payer = self.client.payer();
 
-        for (name, (token, decimals)) in tokens.iter() {
+        for (name, (token, config)) in tokens.iter() {
             let pubkey = token.pubkey();
             tracing::info!(%name, "creating mint account {pubkey}");
             let rpc = self
@@ -212,14 +298,14 @@ impl Deployment {
                     &token.pubkey(),
                     &payer,
                     None,
-                    *decimals,
+                    config.decimals,
                 )?);
             builder.try_push(rpc).map_err(|(_, err)| err)?;
         }
 
         match builder.send_all().await {
             Ok(signatures) => {
-                tracing::debug!("created tokens with {signatures:#?}");
+                tracing::info!("created tokens with {signatures:#?}");
             }
             Err((signatures, err)) => {
                 tracing::error!(%err, "failed to create tokens, successful txns: {signatures:#?}");
@@ -228,12 +314,12 @@ impl Deployment {
 
         Ok(tokens
             .into_iter()
-            .map(|(name, (keypair, decimals))| {
+            .map(|(name, (keypair, config))| {
                 (
                     name,
                     Token {
                         address: keypair.pubkey(),
-                        decimals,
+                        config,
                     },
                 )
             })
@@ -267,7 +353,7 @@ impl Deployment {
 
         match builder.send_all().await {
             Ok(signatures) => {
-                tracing::debug!("created token accounts with {signatures:#?}");
+                tracing::info!("created token accounts with {signatures:#?}");
             }
             Err((signatures, err)) => {
                 tracing::error!(%err, "failed to create token accounts, successful txns: {signatures:#?}");
@@ -277,8 +363,178 @@ impl Deployment {
         Ok(())
     }
 
+    async fn initialize_store(&self) -> eyre::Result<()> {
+        let client = &self.client;
+        let store = &self.store;
+        let controller = client.controller_address(store);
+        let keeper_keypair = self
+            .user_keypair(Self::DEFAULT_KEEPER)
+            .ok_or_eyre("the default keeper is not initialized")?;
+        let keeper = keeper_keypair.pubkey();
+
+        let mut builder = client.transaction();
+
+        builder
+            .push(client.initialize_store(&self.store_key, None))?
+            .push(client.initialize_controller(store))?
+            .push_many(
+                [
+                    RoleKey::CONTROLLER,
+                    RoleKey::MARKET_KEEPER,
+                    RoleKey::ORDER_KEEPER,
+                ]
+                .iter()
+                .map(|role| client.enable_role(store, role)),
+                false,
+            )?
+            .push(client.grant_role(store, &controller, RoleKey::CONTROLLER))?
+            .push(client.grant_role(store, &keeper, RoleKey::MARKET_KEEPER))?
+            .push(client.grant_role(store, &keeper, RoleKey::ORDER_KEEPER))?;
+
+        _ = builder
+            .send_all()
+            .await.
+            inspect(|signatures| {
+                tracing::info!("initialized store with txns: {signatures:#?}");
+            })
+            .inspect_err(|(signatures, err)| {
+                tracing::error!(%err, "failed to initialize store, successful txns: {signatures:#?}");
+            });
+
+        Ok(())
+    }
+
+    async fn initialize_token_map(&self) -> eyre::Result<()> {
+        let client = self
+            .user_client(Self::DEFAULT_KEEPER)?
+            .ok_or_eyre("missing default keeper")?;
+        let store = &self.store;
+
+        let mut builder = client.transaction();
+
+        let (rpc, address) = client.initialize_token_map(store, &self.token_map);
+        builder
+            .push(rpc)?
+            .push(client.set_token_map(store, &address))?
+            .push_many(
+                self.tokens
+                    .iter()
+                    .map(|(name, token)| (name, token, false))
+                    .chain(
+                        self.synthetic_tokens
+                            .iter()
+                            .map(|(name, token)| (name, token, true)),
+                    )
+                    .map(|(name, token, synthetic)| {
+                        let config = TokenConfigBuilder::default()
+                            .update_price_feed(
+                                &PriceProviderKind::Pyth,
+                                Pubkey::new_from_array(token.config.pyth_feed_id.to_bytes()),
+                            )?
+                            .with_expected_provider(PriceProviderKind::Pyth)
+                            .with_precision(token.config.precision);
+                        if synthetic {
+                            Ok(client.insert_synthetic_token_config(
+                                store,
+                                &address,
+                                name,
+                                &token.address,
+                                token.config.decimals,
+                                config,
+                                true,
+                                true,
+                            ))
+                        } else {
+                            Ok(client.insert_token_config(
+                                store,
+                                &address,
+                                name,
+                                &token.address,
+                                config,
+                                true,
+                                true,
+                            ))
+                        }
+                    })
+                    .collect::<eyre::Result<Vec<_>>>()?,
+                false,
+            )?
+            .push(client.initialize_oracle(store, self.oracle_index).0)?;
+
+        _ = builder
+            .send_all()
+            .await.
+            inspect(|signatures| {
+                tracing::info!("initialized token map with txns: {signatures:#?}");
+            })
+            .inspect_err(|(signatures, err)| {
+                tracing::error!(%err, "failed to initialize token map, successful txns: {signatures:#?}");
+            });
+
+        Ok(())
+    }
+
+    async fn initialize_markets<T: AsRef<str>>(
+        &mut self,
+        triples: impl IntoIterator<Item = [T; 3]>,
+    ) -> eyre::Result<()> {
+        let market_triples = triples.into_iter().filter_map(|[index, long, short]| {
+            let index_token = self
+                .synthetic_tokens
+                .get(index.as_ref())
+                .or(self.tokens.get(index.as_ref()))?;
+            let long_token = self.tokens.get(long.as_ref())?;
+            let short_token = self.tokens.get(short.as_ref())?;
+            let name = [
+                index.as_ref().to_string(),
+                long.as_ref().to_string(),
+                short.as_ref().to_string(),
+            ];
+            Some((
+                name,
+                [index_token.address, long_token.address, short_token.address],
+            ))
+        });
+
+        let client = self
+            .user_client(Self::DEFAULT_KEEPER)?
+            .ok_or_eyre("missing default keeper")?;
+        let mut builder = client.transaction();
+        let store = &self.store;
+        let token_map = self.token_map.pubkey();
+        for (name, [index, long, short]) in market_triples {
+            let market_name = format!("{}/USD[{}-{}]", name[0], name[1], name[2]);
+            let Entry::Vacant(entry) = self.market_tokens.entry(name) else {
+                continue;
+            };
+            let (rpc, market_token) = client
+                .create_market(
+                    store,
+                    &market_name,
+                    &index,
+                    &long,
+                    &short,
+                    true,
+                    Some(&token_map),
+                )
+                .await?;
+            builder.push(rpc)?;
+            entry.insert(market_token);
+        }
+        _ = builder
+            .send_all()
+            .await
+            .inspect(|signatures| {
+                tracing::info!("created markets with txns: {signatures:#?}");
+            })
+            .inspect_err(|(signatures, err)| {
+                tracing::error!(%err, "failed to create markets, successful txns: {signatures:#?}");
+            });
+        Ok(())
+    }
+
     async fn fund_users(&self) -> eyre::Result<()> {
-        const LAMPORTS: u64 = 50_000_000;
+        const LAMPORTS: u64 = 500_000_000;
 
         let client = self.client.data_store().async_rpc();
         let payer = self.client.payer();
@@ -286,19 +542,22 @@ impl Deployment {
         tracing::info!(%payer, "before funding users: {lamports}");
 
         let mut builder = TransactionBuilder::new(client);
-        builder.try_push_many(
+        builder.push_many(
             self.users
                 .pubkeys()
                 .into_iter()
-                .inspect(|user| tracing::debug!(%user, "funding user with lamports {LAMPORTS}"))
-                .map(|user| system_instruction::transfer(&payer, &user, LAMPORTS))
-                .map(|ix| self.client.data_store_rpc().pre_instruction(ix)),
+                .inspect(|user| tracing::info!(%user, "funding user with lamports {LAMPORTS}"))
+                .map(|user| {
+                    self.client
+                        .transfer(&user, LAMPORTS)
+                        .expect("amount must not be zero")
+                }),
             false,
         )?;
 
         match builder.send_all().await {
             Ok(signatures) => {
-                tracing::debug!("funded users with {signatures:#?}");
+                tracing::info!("funded users with {signatures:#?}");
             }
             Err((signatures, err)) => {
                 tracing::error!(%err, "failed to fund users, successful txns: {signatures:#?}");
@@ -307,7 +566,6 @@ impl Deployment {
 
         Ok(())
     }
-
     async fn close_native_token_accounts(&self) -> eyre::Result<()> {
         use anchor_spl::token::{TokenAccount, ID};
         use spl_associated_token_account::get_associated_token_address;
@@ -337,7 +595,7 @@ impl Deployment {
 
         match builder.send_all().await {
             Ok(signatures) => {
-                tracing::debug!("closed native token accounts with {signatures:#?}");
+                tracing::info!("closed native token accounts with {signatures:#?}");
             }
             Err((signatures, err)) => {
                 tracing::error!(%err, "failed to close native token accounts, successful txns: {signatures:#?}");
@@ -358,7 +616,7 @@ impl Deployment {
             if lamports == 0 {
                 continue;
             }
-            tracing::debug!(user = %pubkey, %lamports, "refund from user");
+            tracing::info!(user = %pubkey, %lamports, "refund from user");
             let ix = system_instruction::transfer(&user.pubkey(), &payer, lamports);
             builder
                 .try_push(
@@ -372,7 +630,7 @@ impl Deployment {
 
         match builder.send_all().await {
             Ok(signatures) => {
-                tracing::debug!("refunded the payer with {signatures:#?}");
+                tracing::info!("refunded the payer with {signatures:#?}");
             }
             Err((signatures, err)) => {
                 tracing::error!(%err, "failed to refund the payer, successful txns: {signatures:#?}");
@@ -413,12 +671,27 @@ impl Deployment {
         Ok(())
     }
 
+    pub(crate) fn token_map(&self) -> Pubkey {
+        self.token_map.pubkey()
+    }
+
     pub(crate) fn token(&self, token: &str) -> Option<&Token> {
         self.tokens.get(token)
     }
 
     pub(crate) fn user(&self, name: &str) -> Option<Pubkey> {
         self.users.user(name)
+    }
+
+    fn user_keypair(&self, name: &str) -> Option<&SignerRef> {
+        self.users.users.get(name)
+    }
+
+    pub(crate) fn user_client(&self, name: &str) -> eyre::Result<Option<Client<SignerRef>>> {
+        let Some(signer) = self.user_keypair(name) else {
+            return Ok(None);
+        };
+        Ok(Some(self.client.try_clone_with_payer(signer.clone())?))
     }
 
     pub(crate) async fn mint_or_transfer_to(
@@ -454,7 +727,7 @@ impl Deployment {
                     &payer,
                     &[],
                     amount,
-                    token.decimals,
+                    token.config.decimals,
                 )?)
                 .build()
                 .send()
@@ -468,7 +741,7 @@ impl Deployment {
 
 /// Users.
 pub struct Users {
-    users: HashMap<String, Keypair>,
+    users: HashMap<String, SignerRef>,
     funded: Arc<AtomicBool>,
     used: Arc<AtomicUsize>,
     event: Arc<Event>,
@@ -505,7 +778,7 @@ impl Users {
         };
         let keypair = Keypair::new();
         tracing::info!(%name, pubkey=%keypair.pubkey(), "added a new user");
-        entry.insert(keypair);
+        entry.insert(shared_signer(keypair));
         true
     }
 
@@ -547,7 +820,7 @@ impl Users {
         self.users.values().map(|k| k.pubkey())
     }
 
-    fn keypairs(&self) -> impl IntoIterator<Item = &Keypair> {
+    fn keypairs(&self) -> impl IntoIterator<Item = &SignerRef> {
         self.users.values()
     }
 }
@@ -568,7 +841,14 @@ impl Drop for Guard {
 #[derive(Debug)]
 pub(crate) struct Token {
     pub(crate) address: Pubkey,
+    pub(crate) config: TokenConfig,
+}
+
+#[derive(Debug)]
+pub(crate) struct TokenConfig {
     pub(crate) decimals: u8,
+    pub(crate) pyth_feed_id: Identifier,
+    pub(crate) precision: u8,
 }
 
 /// Get current deployment.

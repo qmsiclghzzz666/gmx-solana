@@ -21,7 +21,7 @@ use crate::{
     types,
     utils::{
         account_with_context, accounts_lazy_with_context, ProgramAccountsConfig, PubsubClient,
-        RpcBuilder, SubscriptionConfig, WithContext, ZeroCopy,
+        RpcBuilder, SubscriptionConfig, TransactionBuilder, WithContext, ZeroCopy,
     },
 };
 
@@ -88,6 +88,23 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
     /// Create a new [`Client`] with default options.
     pub fn new(cluster: Cluster, payer: C) -> crate::Result<Self> {
         Self::new_with_options(cluster, payer, ClientOptions::default())
+    }
+
+    /// Try to clone a new client with a new payer.
+    pub fn try_clone_with_payer<C2: Clone + Deref<Target = impl Signer>>(
+        &self,
+        payer: C2,
+    ) -> crate::Result<Client<C2>> {
+        Client::new_with_options(
+            self.cluster.clone(),
+            payer,
+            ClientOptions {
+                data_store_program_id: Some(self.store_program_id()),
+                exchange_program_id: Some(self.exchange_program_id()),
+                commitment: self.commitment,
+                subscription: self.subscription_config.clone(),
+            },
+        )
     }
 
     /// Try to clone the client.
@@ -168,6 +185,24 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
     /// Create a rpc request for `DataStore` Program.
     pub fn data_store_rpc(&self) -> RpcBuilder<'_, C> {
         RpcBuilder::new(&self.data_store)
+    }
+
+    /// Create a transaction builder with the given options.
+    pub fn transaction_with_options(
+        &self,
+        force_one_transaction: bool,
+        max_packet_size: Option<usize>,
+    ) -> TransactionBuilder<'_, C> {
+        TransactionBuilder::new_with_options(
+            self.data_store.async_rpc(),
+            force_one_transaction,
+            max_packet_size,
+        )
+    }
+
+    /// Create a transaction builder with default options.
+    pub fn transaction(&self) -> TransactionBuilder<'_, C> {
+        self.transaction_with_options(false, None)
     }
 
     /// Create a rpc request for `Exchange` Program.
