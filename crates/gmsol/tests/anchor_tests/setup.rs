@@ -1,4 +1,5 @@
 use std::{
+    collections::{hash_map::Entry, HashMap},
     fmt,
     future::Future,
     sync::{
@@ -39,6 +40,8 @@ pub struct Deployment {
     pub token_map: Keypair,
     /// Oracle.
     pub oracle: Pubkey,
+    /// Tokens.
+    tokens: HashMap<String, Token>,
 }
 
 impl fmt::Debug for Deployment {
@@ -50,6 +53,7 @@ impl fmt::Debug for Deployment {
             .field("store", &self.store)
             .field("token_map", &self.token_map.pubkey())
             .field("oracle", &self.oracle)
+            .field("tokens", &self.tokens)
             .finish_non_exhaustive()
     }
 }
@@ -64,17 +68,18 @@ impl Deployment {
             store,
             token_map: Keypair::new(),
             oracle,
+            tokens: Default::default(),
         })
     }
 
     async fn init() -> eyre::Result<Self> {
         Self::init_tracing()?;
 
-        let client = Self::connect().await?;
+        let mut deployment = Self::connect().await?;
 
-        client.setup().await?;
+        deployment.setup().await?;
 
-        Ok(client)
+        Ok(deployment)
     }
 
     async fn get_client_and_store() -> eyre::Result<(Client<SignerRef>, Pubkey)> {
@@ -126,26 +131,137 @@ impl Deployment {
         Ok(())
     }
 
-    async fn setup(&self) -> eyre::Result<()> {
+    async fn setup(&mut self) -> eyre::Result<()> {
         tracing::info!("[Setting up everything...]");
         let _guard = self.use_accounts().await?;
+
+        self.create_tokens([("fBTC", 9), ("USDG", 8)]).await?;
+        self.create_token_accounts().await?;
 
         Ok(())
     }
 
-    pub(crate) async fn use_accounts(&self) -> eyre::Result<Guard> {
-        let guard = self.users.use_accounts();
+    async fn create_tokens<T: ToString>(
+        &mut self,
+        decimals: impl IntoIterator<Item = (T, u8)>,
+    ) -> eyre::Result<()> {
+        use spl_token::native_mint;
 
-        if self
-            .users
-            .funded
-            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
-            .is_ok()
-        {
-            self.fund_users().await?;
+        self.tokens = self.do_create_tokens(decimals).await?;
+        if let Entry::Vacant(entry) = self.tokens.entry("WSOL".to_string()) {
+            entry.insert(Token {
+                address: native_mint::ID,
+                decimals: native_mint::DECIMALS,
+            });
+        }
+        Ok(())
+    }
+
+    async fn do_create_tokens<T>(
+        &self,
+        decimals: impl IntoIterator<Item = (T, u8)>,
+    ) -> eyre::Result<HashMap<String, Token>>
+    where
+        T: ToString,
+    {
+        use anchor_spl::token::{Mint, ID};
+        use spl_token::instruction;
+
+        let client = self.client.data_store().async_rpc();
+        let rent = client
+            .get_minimum_balance_for_rent_exemption(Mint::LEN)
+            .await?;
+        let mut builder = TransactionBuilder::new(client);
+
+        let tokens = decimals
+            .into_iter()
+            .map(|(name, decimals)| (name.to_string(), (Keypair::new(), decimals)))
+            .collect::<HashMap<_, _>>();
+
+        let payer = self.client.payer();
+
+        for (name, (token, decimals)) in tokens.iter() {
+            let pubkey = token.pubkey();
+            tracing::info!(%name, "creating mint account {pubkey}");
+            let rpc = self
+                .client
+                .data_store_rpc()
+                .signer(token)
+                .pre_instruction(system_instruction::create_account(
+                    &payer,
+                    &pubkey,
+                    rent,
+                    Mint::LEN as u64,
+                    &ID,
+                ))
+                .pre_instruction(instruction::initialize_mint2(
+                    &ID,
+                    &token.pubkey(),
+                    &payer,
+                    None,
+                    *decimals,
+                )?);
+            builder.try_push(rpc).map_err(|(_, err)| err)?;
         }
 
-        Ok(guard)
+        match builder.send_all().await {
+            Ok(signatures) => {
+                tracing::debug!("created tokens with {signatures:#?}");
+            }
+            Err((signatures, err)) => {
+                tracing::error!(%err, "failed to create tokens, successful txns: {signatures:#?}");
+            }
+        }
+
+        Ok(tokens
+            .into_iter()
+            .map(|(name, (keypair, decimals))| {
+                (
+                    name,
+                    Token {
+                        address: keypair.pubkey(),
+                        decimals,
+                    },
+                )
+            })
+            .collect())
+    }
+
+    async fn create_token_accounts(&self) -> eyre::Result<()> {
+        use anchor_spl::token::ID;
+        use spl_associated_token_account::instruction;
+
+        let client = self.client.data_store().async_rpc();
+        let mut builder = TransactionBuilder::new(client);
+
+        let payer = self.client.payer();
+
+        for (name, token) in self.tokens.iter() {
+            for user in self.users.keypairs() {
+                let pubkey = user.pubkey();
+                tracing::info!(%name, mint=%token.address, "creating token account for {pubkey}");
+                let rpc = self.client.data_store_rpc().pre_instruction(
+                    instruction::create_associated_token_account(
+                        &payer,
+                        &pubkey,
+                        &token.address,
+                        &ID,
+                    ),
+                );
+                builder.try_push(rpc).map_err(|(_, err)| err)?;
+            }
+        }
+
+        match builder.send_all().await {
+            Ok(signatures) => {
+                tracing::debug!("created token accounts with {signatures:#?}");
+            }
+            Err((signatures, err)) => {
+                tracing::error!(%err, "failed to create token accounts, successful txns: {signatures:#?}");
+            }
+        }
+
+        Ok(())
     }
 
     async fn fund_users(&self) -> eyre::Result<()> {
@@ -218,12 +334,31 @@ impl Deployment {
         Ok(())
     }
 
+    pub(crate) async fn use_accounts(&self) -> eyre::Result<Guard> {
+        let guard = self.users.use_accounts();
+
+        if self
+            .users
+            .funded
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .is_ok()
+        {
+            self.fund_users().await?;
+        }
+
+        Ok(guard)
+    }
+
     pub(crate) async fn refund_payer_when_not_in_use(&self, wait: Duration) -> eyre::Result<()> {
         tokio::time::sleep(wait).await;
         self.users.wait_until_not_in_use().await;
         tracing::info!("[Cleanup...]");
         self.refund_payer().await?;
         Ok(())
+    }
+
+    pub(crate) fn token(&self, name: &str) -> Option<&Token> {
+        self.tokens.get(name)
     }
 }
 
@@ -310,6 +445,12 @@ impl Drop for Guard {
         self.used.fetch_sub(1, Ordering::SeqCst);
         self.event.notify(usize::MAX);
     }
+}
+
+#[derive(Debug)]
+pub(crate) struct Token {
+    pub(crate) address: Pubkey,
+    pub(crate) decimals: u8,
 }
 
 /// Get current deployment.

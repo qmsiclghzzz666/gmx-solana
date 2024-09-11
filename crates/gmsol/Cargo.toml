@@ -139,3 +139,5 @@ pin-project-lite = { workspace = true, optional = true }
 [dev-dependencies]
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 event-listener = { workspace = true }
+spl-token = { workspace = true }
+spl-associated-token-account = { workspace = true }
