@@ -435,6 +435,7 @@ pub struct ExecuteDepositBuilder<'a, C> {
     hint: Option<ExecuteDepositHint>,
     token_map: Option<Pubkey>,
     cancel_on_execution_error: bool,
+    close: bool,
 }
 
 /// Hint for executing deposit.
@@ -492,12 +493,19 @@ where
             feeds_parser: Default::default(),
             token_map: None,
             cancel_on_execution_error,
+            close: true,
         }
     }
 
     /// Set execution fee.
     pub fn execution_fee(&mut self, fee: u64) -> &mut Self {
         self.execution_fee = fee;
+        self
+    }
+
+    /// Set whether to close the deposit after execution.
+    pub fn close(&mut self, close: bool) -> &mut Self {
+        self.close = close;
         self
     }
 
@@ -621,43 +629,47 @@ where
             .accounts(feeds.into_iter().chain(markets).collect::<Vec<_>>())
             .compute_budget(ComputeBudget::default().with_limit(EXECUTE_DEPOSIT_COMPUTE_BUDGET));
 
-        // Close.
-        let owner = &hint.owner;
-        let market_token_ata = get_associated_token_address(owner, &hint.market_token_mint);
-        let initial_long_token_ata = hint
-            .initial_long_token
-            .as_ref()
-            .map(|mint| get_associated_token_address(owner, mint));
-        let initial_short_token_ata = hint
-            .initial_short_token
-            .as_ref()
-            .map(|mint| get_associated_token_address(owner, mint));
-        let close = client
-            .data_store_rpc()
-            .accounts(crate::utils::fix_optional_account_metas(
-                accounts::CloseDeposit {
-                    executor: authority,
-                    store: *store,
-                    owner: *owner,
-                    market_token: hint.market_token_mint,
-                    initial_long_token: hint.initial_long_token,
-                    initial_short_token: hint.initial_short_token,
-                    deposit: *deposit,
-                    market_token_escrow: hint.market_token_escrow,
-                    initial_long_token_escrow: hint.initial_long_token_escrow,
-                    initial_short_token_escrow: hint.initial_short_token_escrow,
-                    market_token_ata,
-                    initial_long_token_ata,
-                    initial_short_token_ata,
-                    associated_token_program: anchor_spl::associated_token::ID,
-                    token_program: anchor_spl::token::ID,
-                    system_program: system_program::ID,
-                },
-                &gmsol_store::id(),
-                &client.store_program_id(),
-            ))
-            .args(instruction::CloseDeposit {});
+        if self.close {
+            // Close.
+            let owner = &hint.owner;
+            let market_token_ata = get_associated_token_address(owner, &hint.market_token_mint);
+            let initial_long_token_ata = hint
+                .initial_long_token
+                .as_ref()
+                .map(|mint| get_associated_token_address(owner, mint));
+            let initial_short_token_ata = hint
+                .initial_short_token
+                .as_ref()
+                .map(|mint| get_associated_token_address(owner, mint));
+            let close = client
+                .data_store_rpc()
+                .accounts(crate::utils::fix_optional_account_metas(
+                    accounts::CloseDeposit {
+                        executor: authority,
+                        store: *store,
+                        owner: *owner,
+                        market_token: hint.market_token_mint,
+                        initial_long_token: hint.initial_long_token,
+                        initial_short_token: hint.initial_short_token,
+                        deposit: *deposit,
+                        market_token_escrow: hint.market_token_escrow,
+                        initial_long_token_escrow: hint.initial_long_token_escrow,
+                        initial_short_token_escrow: hint.initial_short_token_escrow,
+                        market_token_ata,
+                        initial_long_token_ata,
+                        initial_short_token_ata,
+                        associated_token_program: anchor_spl::associated_token::ID,
+                        token_program: anchor_spl::token::ID,
+                        system_program: system_program::ID,
+                    },
+                    &gmsol_store::id(),
+                    &client.store_program_id(),
+                ))
+                .args(instruction::CloseDeposit {});
 
-        Ok(execute.merge(close))
+            Ok(execute.merge(close))
+        } else {
+            Ok(execute)
+        }
     }
 }
