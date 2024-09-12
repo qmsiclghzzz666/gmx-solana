@@ -5,7 +5,9 @@ use gmsol_model::{LiquidityMarketMutExt, PositionImpactMarketMutExt};
 use crate::{
     constants,
     ops::{
-        deposit::ExecuteDepositOps, execution_fee::PayExecutionFeeOps, market::MarketTransferIn,
+        deposit::ExecuteDepositOps,
+        execution_fee::PayExecutionFeeOps,
+        market::{MarketTransferIn, MarketTransferOut},
     },
     states::{
         common::action::ActionSigner,
@@ -15,7 +17,7 @@ use crate::{
             Revertible, RevertibleLiquidityMarket,
         },
         Deposit, DepositV2, HasMarketMeta, Market, Oracle, PriceProvider, Seed, Store,
-        TokenMapHeader, ValidateOracleTime,
+        TokenMapHeader, TokenMapLoader, ValidateOracleTime,
     },
     utils::internal,
     CoreError, ModelError, StoreError, StoreResult,
@@ -243,12 +245,12 @@ pub struct ExecuteDepositV2<'info> {
     #[account(
         constraint = deposit.load()?.tokens.initial_long_token.token().map(|token| initial_long_token.key() == token).unwrap_or(true) @ CoreError::TokenMintMismatched
     )]
-    pub initial_long_token: Box<Account<'info, Mint>>,
+    pub initial_long_token: Option<Box<Account<'info, Mint>>>,
     /// Initial short token.
     #[account(
         constraint = deposit.load()?.tokens.initial_short_token.token().map(|token| initial_short_token.key() == token).unwrap_or(true) @ CoreError::TokenMintMismatched
     )]
-    pub initial_short_token: Box<Account<'info, Mint>>,
+    pub initial_short_token: Option<Box<Account<'info, Mint>>>,
     /// The escrow account for receving market tokens.
     #[account(
         mut,
@@ -308,7 +310,6 @@ pub struct ExecuteDepositV2<'info> {
 #[inline(never)]
 pub(crate) fn unchecked_execute_deposit<'info>(
     ctx: Context<'_, '_, 'info, 'info, ExecuteDepositV2<'info>>,
-    tokens: &[Pubkey],
     execution_fee: u64,
     throw_on_execution_error: bool,
 ) -> Result<()> {
@@ -317,18 +318,19 @@ pub(crate) fn unchecked_execute_deposit<'info>(
 
     let signer = accounts.deposit.load()?.signer();
 
-    accounts.pay_execution_fee(execution_fee, &signer)?;
+    accounts.transfer_tokens_in(&signer, remaining_accounts)?;
 
-    accounts.transfer_tokens(&signer)?;
-
-    let executed =
-        accounts.perform_execution(tokens, remaining_accounts, throw_on_execution_error)?;
+    let executed = accounts.perform_execution(remaining_accounts, throw_on_execution_error)?;
 
     if executed {
         accounts.deposit.load_mut()?.completed()?;
     } else {
         accounts.deposit.load_mut()?.cancelled()?;
+        accounts.transfer_tokens_out(remaining_accounts)?;
     }
+
+    // It must be placed at the end to be executed correctly.
+    accounts.pay_execution_fee(execution_fee)?;
 
     Ok(())
 }
@@ -345,38 +347,48 @@ impl<'info> internal::Authentication<'info> for ExecuteDepositV2<'info> {
 
 impl<'info> ExecuteDepositV2<'info> {
     #[inline(never)]
-    fn pay_execution_fee(&self, execution_fee: u64, signer: &ActionSigner) -> Result<()> {
+    fn pay_execution_fee(&self, execution_fee: u64) -> Result<()> {
         let execution_lamports =
             execution_fee.min(self.deposit.load()?.params.max_execution_lamports);
         PayExecutionFeeOps::builder()
             .payer(self.deposit.to_account_info())
             .receiver(self.authority.to_account_info())
             .execution_lamports(execution_lamports)
-            .system_program(self.system_program.to_account_info())
-            .signer_seeds(&signer.as_seeds())
             .build()
             .execute()?;
         Ok(())
     }
 
     #[inline(never)]
-    fn transfer_tokens(&self, signer: &ActionSigner) -> Result<()> {
+    fn transfer_tokens_in(
+        &self,
+        signer: &ActionSigner,
+        remaining_accounts: &'info [AccountInfo<'info>],
+    ) -> Result<()> {
         let seeds = signer.as_seeds();
 
         let builder = MarketTransferIn::builder()
             .store(&self.store)
-            .market(&self.market)
             .from_authority(self.deposit.to_account_info())
             .token_program(self.token_program.to_account_info())
             .signer_seeds(&seeds);
 
+        let store = &self.store.key();
+
         if let Some(escrow) = self.initial_long_token_escrow.as_ref() {
+            let market = self
+                .deposit
+                .load()?
+                .swap
+                .find_and_unpack_first_market(store, true, remaining_accounts)?
+                .unwrap_or(self.market.clone());
             let vault = self
                 .initial_long_token_vault
                 .as_ref()
                 .ok_or(error!(CoreError::TokenAccountNotProvided))?;
             builder
                 .clone()
+                .market(&market)
                 .from(escrow.to_account_info())
                 .vault(vault)
                 .amount(self.deposit.load()?.params.initial_long_token_amount)
@@ -385,13 +397,73 @@ impl<'info> ExecuteDepositV2<'info> {
         }
 
         if let Some(escrow) = self.initial_short_token_escrow.as_ref() {
+            let market = self
+                .deposit
+                .load()?
+                .swap
+                .find_and_unpack_first_market(store, false, remaining_accounts)?
+                .unwrap_or(self.market.clone());
             let vault = self
                 .initial_short_token_vault
                 .as_ref()
                 .ok_or(error!(CoreError::TokenAccountNotProvided))?;
             builder
                 .clone()
+                .market(&market)
                 .from(escrow.to_account_info())
+                .vault(vault)
+                .amount(self.deposit.load()?.params.initial_short_token_amount)
+                .build()
+                .execute()?;
+        }
+
+        Ok(())
+    }
+
+    #[inline(never)]
+    fn transfer_tokens_out(&self, remaining_accounts: &'info [AccountInfo<'info>]) -> Result<()> {
+        let builder = MarketTransferOut::builder()
+            .store(&self.store)
+            .token_program(self.token_program.to_account_info());
+
+        let store = &self.store.key();
+
+        if let Some(escrow) = self.initial_long_token_escrow.as_ref() {
+            let market = self
+                .deposit
+                .load()?
+                .swap
+                .find_and_unpack_first_market(store, true, remaining_accounts)?
+                .unwrap_or(self.market.clone());
+            let vault = self
+                .initial_long_token_vault
+                .as_ref()
+                .ok_or(error!(CoreError::TokenAccountNotProvided))?;
+            builder
+                .clone()
+                .market(&market)
+                .to(escrow.to_account_info())
+                .vault(vault)
+                .amount(self.deposit.load()?.params.initial_long_token_amount)
+                .build()
+                .execute()?;
+        }
+
+        if let Some(escrow) = self.initial_short_token_escrow.as_ref() {
+            let market = self
+                .deposit
+                .load()?
+                .swap
+                .find_and_unpack_first_market(store, false, remaining_accounts)?
+                .unwrap_or(self.market.clone());
+            let vault = self
+                .initial_short_token_vault
+                .as_ref()
+                .ok_or(error!(CoreError::TokenAccountNotProvided))?;
+            builder
+                .clone()
+                .market(&market)
+                .to(escrow.to_account_info())
                 .vault(vault)
                 .amount(self.deposit.load()?.params.initial_short_token_amount)
                 .build()
@@ -404,10 +476,15 @@ impl<'info> ExecuteDepositV2<'info> {
     #[inline(never)]
     fn perform_execution(
         &mut self,
-        tokens: &[Pubkey],
         remaining_accounts: &'info [AccountInfo<'info>],
         throw_on_execution_error: bool,
     ) -> Result<bool> {
+        // FIXME: We only need the tokens here, the feeds are not necessary.
+        let feeds = self
+            .deposit
+            .load()?
+            .swap()
+            .to_feeds(&self.token_map.load_token_map()?)?;
         let ops = ExecuteDepositOps::builder()
             .store(&self.store)
             .market(&self.market)
@@ -421,7 +498,7 @@ impl<'info> ExecuteDepositV2<'info> {
             &self.store,
             &self.price_provider,
             &self.token_map,
-            tokens,
+            &feeds.tokens,
             remaining_accounts,
             |oracle, remaining_accounts| {
                 ops.oracle(oracle)

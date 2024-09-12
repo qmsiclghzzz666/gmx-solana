@@ -46,3 +46,34 @@ impl<'a, 'info> MarketTransferIn<'a, 'info> {
         Ok(())
     }
 }
+
+/// Market Transfer Out.
+#[derive(TypedBuilder)]
+pub(crate) struct MarketTransferOut<'a, 'info> {
+    store: &'a AccountLoader<'info, Store>,
+    market: &'a AccountLoader<'info, Market>,
+    amount: u64,
+    to: AccountInfo<'info>,
+    vault: &'a Account<'info, TokenAccount>,
+    token_program: AccountInfo<'info>,
+}
+
+impl<'a, 'info> MarketTransferOut<'a, 'info> {
+    pub(crate) fn execute(self) -> Result<()> {
+        use crate::utils::internal::TransferUtils;
+
+        self.market.load()?.validate(&self.store.key())?;
+
+        let amount = self.amount;
+        if amount != 0 {
+            TransferUtils::new(self.token_program.to_account_info(), self.store, None)
+                .transfer_out(self.vault.to_account_info(), self.to, amount)?;
+            let token = &self.vault.mint;
+            self.market
+                .load_mut()?
+                .record_transferred_out_by_token(token, amount)?;
+        }
+
+        Ok(())
+    }
+}

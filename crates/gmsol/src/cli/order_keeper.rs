@@ -260,6 +260,7 @@ impl KeeperArgs {
                     .price_provider(self.provider.program());
                 if self.use_pyth_pull_oracle() {
                     let hint = builder.prepare_hint().await?;
+                    tracing::info!("{hint:?}");
                     let mut ctx = PythPullOracleContext::try_from_feeds(&hint.feeds)?;
                     let feed_ids = ctx.feed_ids();
                     if feed_ids.is_empty() {

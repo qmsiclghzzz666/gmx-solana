@@ -1,6 +1,10 @@
 use anchor_client::solana_sdk::{commitment_config::CommitmentConfig, pubkey::Pubkey};
 use eyre::OptionExt;
-use gmsol::{exchange::ExchangeOps, types::UpdateOrderParams, utils::price_to_min_output_amount};
+use gmsol::{
+    exchange::ExchangeOps,
+    types::{DepositV2, UpdateOrderParams},
+    utils::price_to_min_output_amount,
+};
 use rust_decimal::Decimal;
 
 use crate::{utils::Side, GMSOLClient};
@@ -384,13 +388,13 @@ impl ExchangeArgs {
                     );
                 }
                 let (builder, deposit) = builder
-                    .execution_fee(*extra_execution_fee)
+                    .execution_fee(*extra_execution_fee + DepositV2::MIN_EXECUTION_LAMPORTS)
                     .min_market_token(*min_amount)
                     .long_token_swap_path(long_swap.clone())
                     .short_token_swap_path(short_swap.clone())
                     .build_with_address()
                     .await?;
-                let signature = builder.send().await?;
+                let signature = builder.build().send().await?;
                 println!("created deposit {deposit} at {signature}");
             }
             Command::CancelDeposit { deposit } => {

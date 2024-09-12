@@ -182,7 +182,7 @@ impl Withdrawal {
                 reserved: [0; 128],
             }),
             dynamic: Dynamic {
-                tokens_with_feed: TokensWithFeed::try_from_vec(tokens_with_feed)?,
+                tokens_with_feed: TokensWithFeed::try_from_records(tokens_with_feed)?,
                 swap: swap_params,
             },
         };

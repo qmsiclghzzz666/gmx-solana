@@ -2,6 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::TokenAccount;
 
 /// Token Account.
+#[cfg_attr(feature = "debug", derive(Debug))]
 #[account(zero_copy)]
 pub struct TokenAndAccount {
     /// Token.

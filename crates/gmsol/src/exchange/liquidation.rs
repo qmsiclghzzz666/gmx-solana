@@ -92,7 +92,7 @@ impl LiquidateHint {
             ]
             .into(),
         )?;
-        let tokens_with_feed = TokensWithFeed::try_from_vec(records)?;
+        let tokens_with_feed = TokensWithFeed::try_from_records(records)?;
 
         Ok(Self {
             store_address: position.store,

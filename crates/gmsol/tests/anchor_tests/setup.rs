@@ -20,7 +20,7 @@ use anchor_client::{
     Cluster,
 };
 use event_listener::Event;
-use eyre::OptionExt;
+use eyre::{eyre, OptionExt};
 use gmsol::{
     client::SystemProgramOps,
     exchange::ExchangeOps,
@@ -32,12 +32,21 @@ use gmsol::{
     Client, ClientOptions,
 };
 use pyth_sdk::Identifier;
+use rand::{rngs::StdRng, CryptoRng, RngCore, SeedableRng};
 use tokio::sync::OnceCell;
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::EnvFilter;
 
+const ENV_ANCHOR_PROVIDER: &str = "ANCHOR_PROVIDER_URL";
+const ENV_ANCHOR_WALLET: &str = "ANCHOR_WALLET";
+const ENV_GMSOL_RANDOM_STORE: &str = "GMSOL_RANDOM_STORE";
+const ENV_GMSOL_RNG: &str = "GMSOL_RNG";
+const ENV_GMSOL_KEEPER: &str = "GMSOL_KEEPER";
+const ENV_GMSOL_REFUND_WAIT: &str = "GMSOL_REFUND_WAIT";
+
 /// Deployment.
 pub struct Deployment {
+    rng: StdRng,
     /// Client.
     pub client: Client<SignerRef>,
     /// Users.
@@ -97,15 +106,18 @@ impl Deployment {
     ];
 
     async fn connect() -> eyre::Result<Self> {
+        let mut rng = Self::get_rng()?;
         let (client, store_key, store) = Self::get_client_and_store().await?;
         let oracle_index = 255;
         let oracle = client.find_oracle_address(&store, oracle_index);
+        let token_map = Keypair::generate(&mut rng);
         Ok(Self {
+            rng,
             client,
             users: Default::default(),
             store_key,
             store,
-            token_map: Keypair::new(),
+            token_map,
             oracle_index,
             oracle,
             tokens: Default::default(),
@@ -126,7 +138,7 @@ impl Deployment {
 
     async fn setup(&mut self) -> eyre::Result<()> {
         tracing::info!("[Setting up everything...]");
-        self.add_users();
+        self.add_users()?;
 
         let _guard = self.use_accounts().await?;
 
@@ -176,14 +188,14 @@ impl Deployment {
         use rand::{distributions::Alphanumeric, thread_rng, Rng};
         use std::env;
 
-        let endpoint = env::var("ANCHOR_PROVIDER_URL")
-            .map_err(|_| eyre::Error::msg("env `ANCHOR_PROVIDER_URL` is not set"))?;
-        let wallet = env::var("ANCHOR_WALLET")
-            .map_err(|_| eyre::Error::msg("env `ANCHOR_WALLET` is not set"))?;
+        let endpoint = env::var(ENV_ANCHOR_PROVIDER)
+            .map_err(|_| eyre!("env `{ENV_ANCHOR_PROVIDER}` is not set"))?;
+        let wallet = env::var(ENV_ANCHOR_WALLET)
+            .map_err(|_| eyre!("env `{ENV_ANCHOR_WALLET}` is not set"))?;
         let wallet = shellexpand::full(&wallet)?;
 
         let random_store =
-            env::var("GMSOL_RANDOM_STORE").is_ok() || endpoint == Cluster::Devnet.url();
+            env::var(ENV_GMSOL_RANDOM_STORE).is_ok() || endpoint == Cluster::Devnet.url();
         let store_key = random_store
             .then(|| {
                 let mut rng = thread_rng();
@@ -209,6 +221,16 @@ impl Deployment {
         Ok((client, store_key, store))
     }
 
+    fn get_rng() -> eyre::Result<StdRng> {
+        match std::env::var(ENV_GMSOL_RNG) {
+            Ok(value) => {
+                let seed: u64 = value.parse()?;
+                Ok(StdRng::seed_from_u64(seed))
+            }
+            Err(_) => Ok(StdRng::from_entropy()),
+        }
+    }
+
     fn init_tracing() -> eyre::Result<()> {
         tracing_subscriber::fmt()
             .with_env_filter(
@@ -221,9 +243,23 @@ impl Deployment {
         Ok(())
     }
 
-    fn add_users(&mut self) {
-        self.users.add_user(Self::DEFAULT_USER);
-        self.users.add_user(Self::DEFAULT_KEEPER);
+    fn add_users(&mut self) -> eyre::Result<()> {
+        self.users.add_user(Self::DEFAULT_USER, &mut self.rng);
+
+        match std::env::var(ENV_GMSOL_KEEPER) {
+            Ok(path) => {
+                let path = shellexpand::full(&path)?;
+                let keypair = Keypair::read_from_file(&*path)
+                    .map_err(|err| eyre::Error::msg(err.to_string()))?;
+                self.users
+                    .add_user_with_keypair(Self::DEFAULT_KEEPER, keypair);
+            }
+            Err(_) => {
+                self.users.add_user(Self::DEFAULT_KEEPER, &mut self.rng);
+            }
+        }
+
+        Ok(())
     }
 
     fn add_synthetic_tokens<T: ToString>(
@@ -257,7 +293,7 @@ impl Deployment {
     }
 
     async fn do_create_tokens<T>(
-        &self,
+        &mut self,
         configs: impl IntoIterator<Item = (T, TokenConfig)>,
     ) -> eyre::Result<HashMap<String, Token>>
     where
@@ -274,7 +310,7 @@ impl Deployment {
 
         let tokens = configs
             .into_iter()
-            .map(|(name, config)| (name.to_string(), (Keypair::new(), config)))
+            .map(|(name, config)| (name.to_string(), (Keypair::generate(&mut self.rng), config)))
             .collect::<HashMap<_, _>>();
 
         let payer = self.client.payer();
@@ -772,11 +808,18 @@ impl Default for Users {
 }
 
 impl Users {
-    fn add_user(&mut self, name: &str) -> bool {
+    fn add_user<R>(&mut self, name: &str, rng: &mut R) -> bool
+    where
+        R: CryptoRng + RngCore,
+    {
+        let keypair = Keypair::generate(rng);
+        self.add_user_with_keypair(name, keypair)
+    }
+
+    fn add_user_with_keypair(&mut self, name: &str, keypair: Keypair) -> bool {
         let Entry::Vacant(entry) = self.users.entry(name.to_string()) else {
             return false;
         };
-        let keypair = Keypair::new();
         tracing::info!(%name, pubkey=%keypair.pubkey(), "added a new user");
         entry.insert(shared_signer(keypair));
         true
@@ -859,7 +902,7 @@ pub async fn current_deployment() -> eyre::Result<&'static Deployment> {
 
 #[tokio::test]
 async fn refund_payer() -> eyre::Result<()> {
-    let wait = std::env::var("GMSOL_REFUND_WAIT")
+    let wait = std::env::var(ENV_GMSOL_REFUND_WAIT)
         .ok()
         .and_then(|wait| wait.parse().ok())
         .unwrap_or(1);

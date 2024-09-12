@@ -38,7 +38,7 @@ prettytable = "0.10.0"
 pyth-sdk = "0.8.0"
 pyth-sdk-solana = "0.10.1"
 pythnet-sdk = "2.1.0"
-rand = "0.8.5"
+rand = "0.7.3"
 reqwest = "0.12.4"
 ruint = { version = "1.12.1", default-features = false }
 rust-embed = "8.4.0"

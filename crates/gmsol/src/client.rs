@@ -631,13 +631,13 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         Ok(orders)
     }
 
-    /// Fetch [`Depsoit`](types::Deposit) account with its address.
-    pub async fn deposit(&self, address: &Pubkey) -> crate::Result<types::Order> {
-        Ok(self.data_store().account(*address).await?)
+    /// Fetch [`Depsoit`](types::DepositV2) account with its address.
+    pub async fn deposit(&self, address: &Pubkey) -> crate::Result<types::DepositV2> {
+        Ok(self.data_store().account::<ZeroCopy<_>>(*address).await?.0)
     }
 
     /// Fetch [`Withdrawal`](types::Withdrawal) account with its address.
-    pub async fn withdrawal(&self, address: &Pubkey) -> crate::Result<types::Order> {
+    pub async fn withdrawal(&self, address: &Pubkey) -> crate::Result<types::Withdrawal> {
         Ok(self.data_store().account(*address).await?)
     }
 

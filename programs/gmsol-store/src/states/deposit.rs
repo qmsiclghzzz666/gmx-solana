@@ -166,7 +166,7 @@ impl Deposit {
                 reserved: [0; 128],
             },
             dynamic: Dynamic {
-                tokens_with_feed: TokensWithFeed::try_from_vec(tokens_with_feed)?,
+                tokens_with_feed: TokensWithFeed::try_from_records(tokens_with_feed)?,
                 swap_params,
             },
         };
@@ -198,6 +198,7 @@ pub struct TokenParams {
 }
 
 /// Deposit V2.
+#[cfg_attr(feature = "debug", derive(Debug))]
 #[account(zero_copy)]
 pub struct DepositV2 {
     /// Action id.
@@ -268,20 +269,49 @@ impl DepositV2 {
             self.bump,
         )
     }
+
+    /// Get tokens.
+    pub fn tokens(&self) -> &TokenAccounts {
+        &self.tokens
+    }
+
+    /// Get swap params.
+    pub fn swap(&self) -> &SwapParamsV2 {
+        &self.swap
+    }
+
+    /// Get owner.
+    pub fn owner(&self) -> &Pubkey {
+        &self.owner
+    }
 }
 
 /// Token Accounts.
+#[cfg_attr(feature = "debug", derive(Debug))]
 #[account(zero_copy)]
 pub struct TokenAccounts {
     /// Initial long token accounts.
-    pub(crate) initial_long_token: TokenAndAccount,
+    pub initial_long_token: TokenAndAccount,
     /// Initial short token accounts.
-    pub(crate) initial_short_token: TokenAndAccount,
+    pub initial_short_token: TokenAndAccount,
     /// Market token account.
     pub(crate) market_token: TokenAndAccount,
 }
 
+impl TokenAccounts {
+    /// Get market token.
+    pub fn market_token(&self) -> Pubkey {
+        self.market_token.token().expect("must exist")
+    }
+
+    /// Get market token account.
+    pub fn market_token_account(&self) -> Pubkey {
+        self.market_token.account().expect("must exist")
+    }
+}
+
 /// Deposit Params.
+#[cfg_attr(feature = "debug", derive(Debug))]
 #[account(zero_copy)]
 pub struct DepositParams {
     /// The amount of initial long tokens to deposit.

@@ -1,11 +1,13 @@
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashSet};
 
 use anchor_lang::prelude::*;
 
 use crate::{
-    states::{find_market_address, Market},
+    states::{find_market_address, HasMarketMeta, Market, TokenMapAccess},
     CoreError, StoreError,
 };
+
+use super::{TokenRecord, TokensWithFeed};
 
 /// Swap params.
 #[derive(AnchorDeserialize, AnchorSerialize, Clone, Default)]
@@ -157,22 +159,33 @@ impl SwapParams {
     }
 }
 
+const MAX_STEPS: usize = 10;
+const MAX_TOKENS: usize = 2 * MAX_STEPS + 2 + 3;
+
 /// Swap params.
 #[account(zero_copy)]
 #[derive(Default)]
+#[cfg_attr(feature = "debug", derive(Debug))]
 pub struct SwapParamsV2 {
     /// The length of primary swap path.
     primary_length: u8,
     /// The length of secondary swap path.
     secondary_length: u8,
-    padding_0: [u8; 2],
+    /// The number of tokens.
+    num_tokens: u8,
+    padding_0: [u8; 1],
     /// Swap paths.
-    paths: [Pubkey; 12],
+    paths: [Pubkey; MAX_STEPS],
+    /// Tokens.
+    tokens: [Pubkey; MAX_TOKENS],
 }
 
 impl SwapParamsV2 {
     /// Max total length of swap paths.
-    pub const MAX_TOTAL_LENGTH: usize = 12;
+    pub const MAX_TOTAL_LENGTH: usize = MAX_STEPS;
+
+    /// Max total number of tokens of swap path.
+    pub const MAX_TOKENS: usize = MAX_TOKENS;
 
     /// Get the length of primary swap path.
     pub fn primary_length(&self) -> usize {
@@ -182,6 +195,11 @@ impl SwapParamsV2 {
     /// Get the length of secondary swap path.
     pub fn secondary_length(&self) -> usize {
         usize::from(self.secondary_length)
+    }
+
+    /// Get the number of tokens.
+    pub fn num_tokens(&self) -> usize {
+        usize::from(self.num_tokens)
     }
 
     /// Get primary swap path.
@@ -197,8 +215,34 @@ impl SwapParamsV2 {
         &self.paths[start..end]
     }
 
+    /// Get all tokens for the action.
+    pub fn tokens(&self) -> &[Pubkey] {
+        let end = self.num_tokens();
+        &self.tokens[0..end]
+    }
+
+    /// Convert to token records.
+    pub fn to_token_records<'a>(
+        &'a self,
+        map: &'a impl TokenMapAccess,
+    ) -> impl Iterator<Item = Result<TokenRecord>> + 'a {
+        self.tokens().iter().map(|token| {
+            let config = map
+                .get(token)
+                .ok_or(error!(CoreError::UnknownOrDisabledToken))?;
+            TokenRecord::from_config(*token, config)
+        })
+    }
+
+    /// Conver to tokens with feed.
+    pub fn to_feeds(&self, map: &impl TokenMapAccess) -> Result<TokensWithFeed> {
+        let records = self.to_token_records(map).collect::<Result<Vec<_>>>()?;
+        TokensWithFeed::try_from_records(records)
+    }
+
     pub(crate) fn validate_and_init<'info>(
         &mut self,
+        current_market: &impl HasMarketMeta,
         primary_length: u8,
         secondary_length: u8,
         paths: &'info [AccountInfo<'info>],
@@ -221,20 +265,41 @@ impl SwapParamsV2 {
         let (primary_token_in, secondary_token_in) = token_ins;
         let (primary_token_out, secondary_token_out) = token_outs;
 
-        validate_path(primary_markets, store, primary_token_in, primary_token_out)?;
+        let meta = current_market.market_meta();
+        let mut tokens = BTreeSet::from([
+            meta.index_token_mint,
+            meta.long_token_mint,
+            meta.short_token_mint,
+        ]);
         validate_path(
+            &mut tokens,
+            primary_markets,
+            store,
+            primary_token_in,
+            primary_token_out,
+        )?;
+        validate_path(
+            &mut tokens,
             secondary_markets,
             store,
             secondary_token_in,
             secondary_token_out,
         )?;
 
+        require_gte!(Self::MAX_TOKENS, tokens.len(), CoreError::InvalidSwapPath);
+
         self.primary_length = primary_length;
         self.secondary_length = secondary_length;
+        self.num_tokens = tokens.len() as u8;
 
         for (idx, market) in paths[0..end].iter().enumerate() {
             self.paths[idx] = market.key();
         }
+
+        for (idx, token) in tokens.into_iter().enumerate() {
+            self.tokens[idx] = token;
+        }
+
         Ok(())
     }
 
@@ -271,6 +336,66 @@ impl SwapParamsV2 {
         let loaders = unpack_markets(remaining_accounts).collect::<Result<Vec<_>>>()?;
         Ok(loaders)
     }
+
+    /// Find first market.
+    pub fn find_first_market<'info>(
+        &self,
+        store: &Pubkey,
+        is_primary: bool,
+        remaining_accounts: &'info [AccountInfo<'info>],
+    ) -> Option<&'info AccountInfo<'info>> {
+        let path = if is_primary {
+            self.primary_swap_path()
+        } else {
+            self.secondary_swap_path()
+        };
+        let target = find_market_address(store, path.first()?, &crate::ID).0;
+        let info = remaining_accounts.iter().find(|info| *info.key == target)?;
+        Some(info)
+    }
+
+    /// Find first market and unpack.
+    pub fn find_and_unpack_first_market<'info>(
+        &self,
+        store: &Pubkey,
+        is_primary: bool,
+        remaining_accounts: &'info [AccountInfo<'info>],
+    ) -> Result<Option<AccountLoader<'info, Market>>> {
+        let Some(info) = self.find_first_market(store, is_primary, remaining_accounts) else {
+            return Ok(None);
+        };
+        Ok(Some(AccountLoader::try_from(info)?))
+    }
+
+    /// Find last market.
+    pub fn find_last_market<'info>(
+        &self,
+        store: &Pubkey,
+        is_primary: bool,
+        remaining_accounts: &'info [AccountInfo<'info>],
+    ) -> Option<&'info AccountInfo<'info>> {
+        let path = if is_primary {
+            self.primary_swap_path()
+        } else {
+            self.secondary_swap_path()
+        };
+        let target = find_market_address(store, path.last()?, &crate::ID).0;
+        let info = remaining_accounts.iter().find(|info| *info.key == target)?;
+        Some(info)
+    }
+
+    /// Find last market and unpack.
+    pub fn find_and_unpack_last_market<'info>(
+        &self,
+        store: &Pubkey,
+        is_primary: bool,
+        remaining_accounts: &'info [AccountInfo<'info>],
+    ) -> Result<Option<AccountLoader<'info, Market>>> {
+        let Some(info) = self.find_last_market(store, is_primary, remaining_accounts) else {
+            return Ok(None);
+        };
+        Ok(Some(AccountLoader::try_from(info)?))
+    }
 }
 
 impl From<&SwapParamsV2> for SwapParams {
@@ -289,6 +414,7 @@ fn unpack_markets<'info>(
 }
 
 fn validate_path<'info>(
+    tokens: &mut BTreeSet<Pubkey>,
     path: &'info [AccountInfo<'info>],
     store: &Pubkey,
     token_in: &Pubkey,
@@ -313,6 +439,9 @@ fn validate_path<'info>(
         } else {
             return err!(CoreError::InvalidSwapPath);
         }
+        tokens.insert(meta.index_token_mint);
+        tokens.insert(meta.long_token_mint);
+        tokens.insert(meta.short_token_mint);
     }
 
     require_eq!(current, *token_out, CoreError::InvalidSwapPath);

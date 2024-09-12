@@ -36,9 +36,9 @@ pub struct PrepareDepositEscrow<'info> {
     /// Market token.
     pub market_token: Box<Account<'info, Mint>>,
     /// Initial long token.
-    pub initial_long_token: Box<Account<'info, Mint>>,
+    pub initial_long_token: Option<Box<Account<'info, Mint>>>,
     /// initial short token.
-    pub initial_short_token: Box<Account<'info, Mint>>,
+    pub initial_short_token: Option<Box<Account<'info, Mint>>>,
     /// The escrow account for receving market tokens.
     #[account(
         init,
@@ -103,9 +103,9 @@ pub struct CreateDeposit<'info> {
     #[account(constraint = market.load()?.meta().market_token_mint == market_token.key() @ CoreError::MarketTokenMintMismatched)]
     pub market_token: Box<Account<'info, Mint>>,
     /// Initial long token.
-    pub initial_long_token: Box<Account<'info, Mint>>,
+    pub initial_long_token: Option<Box<Account<'info, Mint>>>,
     /// initial short token.
-    pub initial_short_token: Box<Account<'info, Mint>>,
+    pub initial_short_token: Option<Box<Account<'info, Mint>>>,
     /// The escrow account for receving market tokens.
     #[account(
         mut,
@@ -144,7 +144,7 @@ pub(crate) fn create_deposit<'info>(
     nonce: NonceBytes,
     params: &CreateDepositParams,
 ) -> Result<()> {
-    let accounts = &ctx.accounts;
+    let accounts = ctx.accounts;
     accounts.transfer_execution_fee(params)?;
     accounts.transfer_tokens(params)?;
     CreateDepositOps::builder()
@@ -165,51 +165,59 @@ pub(crate) fn create_deposit<'info>(
 }
 
 impl<'info> CreateDeposit<'info> {
-    fn transfer_tokens(&self, params: &CreateDepositParams) -> Result<()> {
+    fn transfer_tokens(&mut self, params: &CreateDepositParams) -> Result<()> {
         use anchor_spl::token::{transfer_checked, TransferChecked};
 
         if params.initial_long_token_amount != 0 {
             let Some(source) = self.initial_long_token_source.as_ref() else {
                 return err!(CoreError::TokenAccountNotProvided);
             };
-            let Some(target) = self.initial_long_token_escrow.as_ref() else {
+            let Some(target) = self.initial_long_token_escrow.as_mut() else {
                 return err!(CoreError::TokenAccountNotProvided);
+            };
+            let Some(mint) = self.initial_long_token.as_ref() else {
+                return err!(CoreError::MintAccountNotProvided);
             };
             transfer_checked(
                 CpiContext::new(
                     self.token_program.to_account_info(),
                     TransferChecked {
                         from: source.to_account_info(),
-                        mint: self.initial_long_token.to_account_info(),
+                        mint: mint.to_account_info(),
                         to: target.to_account_info(),
                         authority: self.owner.to_account_info(),
                     },
                 ),
                 params.initial_long_token_amount,
-                params.initial_long_token_decimals,
+                mint.decimals,
             )?;
+            target.reload()?;
         }
 
         if params.initial_short_token_amount != 0 {
             let Some(source) = self.initial_short_token_source.as_ref() else {
                 return err!(CoreError::TokenAccountNotProvided);
             };
-            let Some(target) = self.initial_short_token_escrow.as_ref() else {
+            let Some(target) = self.initial_short_token_escrow.as_mut() else {
                 return err!(CoreError::TokenAccountNotProvided);
+            };
+            let Some(mint) = self.initial_short_token.as_ref() else {
+                return err!(CoreError::MintAccountNotProvided);
             };
             transfer_checked(
                 CpiContext::new(
                     self.token_program.to_account_info(),
                     TransferChecked {
                         from: source.to_account_info(),
-                        mint: self.initial_short_token.to_account_info(),
+                        mint: mint.to_account_info(),
                         to: target.to_account_info(),
                         authority: self.owner.to_account_info(),
                     },
                 ),
                 params.initial_short_token_amount,
-                params.initial_short_token_decimals,
+                mint.decimals,
             )?;
+            target.reload()?;
         }
         Ok(())
     }
@@ -245,12 +253,12 @@ pub struct CloseDeposit<'info> {
     #[account(
         constraint = deposit.load()?.tokens.initial_long_token.token().map(|token| initial_long_token.key() == token).unwrap_or(true) @ CoreError::TokenMintMismatched
     )]
-    pub initial_long_token: Box<Account<'info, Mint>>,
+    pub initial_long_token: Option<Box<Account<'info, Mint>>>,
     /// Initial short token.
     #[account(
         constraint = deposit.load()?.tokens.initial_short_token.token().map(|token| initial_short_token.key() == token).unwrap_or(true) @ CoreError::TokenMintMismatched
     )]
-    pub initial_short_token: Box<Account<'info, Mint>>,
+    pub initial_short_token: Option<Box<Account<'info, Mint>>>,
     /// The deposit to close.
     #[account(
         mut,
@@ -295,14 +303,14 @@ pub struct CloseDeposit<'info> {
     /// CHECK: should be checked during the execution
     #[account(
         mut,
-        constraint = is_associated_token_account(initial_long_token_ata.key, owner.key, &initial_long_token.key()) @ CoreError::NotAnATA,
+        constraint = is_associated_token_account(initial_long_token_ata.key, owner.key, &initial_long_token.as_ref().expect("must provided").key()) @ CoreError::NotAnATA,
     )]
     pub initial_long_token_ata: Option<UncheckedAccount<'info>>,
     /// The ATA for inital short token of owner.
     /// CHECK: should be checked during the execution
     #[account(
         mut,
-        constraint = is_associated_token_account(initial_short_token_ata.key, owner.key, &initial_short_token.key()) @ CoreError::NotAnATA,
+        constraint = is_associated_token_account(initial_short_token_ata.key, owner.key, &initial_short_token.as_ref().expect("must provided").key()) @ CoreError::NotAnATA,
     )]
     pub initial_short_token_ata: Option<UncheckedAccount<'info>>,
     /// The system program.
@@ -388,9 +396,12 @@ impl<'info> CloseDeposit<'info> {
             let Some(ata) = self.initial_long_token_ata.as_ref() else {
                 return err!(CoreError::TokenAccountNotProvided);
             };
+            let Some(mint) = self.initial_long_token.as_ref() else {
+                return err!(CoreError::MintAccountNotProvided);
+            };
             if !builder
                 .clone()
-                .mint(self.initial_long_token.to_account_info())
+                .mint(mint.to_account_info())
                 .ata(ata.to_account_info())
                 .escrow(escrow)
                 .build()
@@ -405,9 +416,12 @@ impl<'info> CloseDeposit<'info> {
             let Some(ata) = self.initial_short_token_ata.as_ref() else {
                 return err!(CoreError::TokenAccountNotProvided);
             };
+            let Some(mint) = self.initial_short_token.as_ref() else {
+                return err!(CoreError::MintAccountNotProvided);
+            };
             if !builder
                 .clone()
-                .mint(self.initial_short_token.to_account_info())
+                .mint(mint.to_account_info())
                 .ata(ata.to_account_info())
                 .escrow(escrow)
                 .build()

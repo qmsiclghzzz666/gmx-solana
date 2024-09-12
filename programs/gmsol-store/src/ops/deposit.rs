@@ -13,9 +13,7 @@ pub struct CreateDepositParams {
     pub execution_fee: u64,
     pub long_token_swap_length: u8,
     pub short_token_swap_length: u8,
-    pub initial_long_token_decimals: u8,
     pub initial_long_token_amount: u64,
-    pub initial_short_token_decimals: u8,
     pub initial_short_token_amount: u64,
     pub min_market_token: u64,
 }
@@ -101,6 +99,7 @@ impl<'a, 'info> CreateDepositOps<'a, 'info> {
         deposit.params.max_execution_lamports = params.execution_fee;
 
         deposit.swap.validate_and_init(
+            &*market.load()?,
             params.long_token_swap_length,
             params.short_token_swap_length,
             swap_paths,

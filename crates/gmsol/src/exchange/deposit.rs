@@ -6,15 +6,18 @@ use anchor_client::{
     RequestBuilder,
 };
 use anchor_spl::associated_token::get_associated_token_address;
-use gmsol_exchange::{accounts, instruction, instructions::CreateDepositParams};
-use gmsol_store::states::{
-    common::{SwapParams, TokensWithFeed},
-    Deposit, NonceBytes, Pyth,
+use gmsol_store::{
+    accounts, instruction,
+    ops::deposit::CreateDepositParams,
+    states::{
+        common::{swap::SwapParamsV2, TokensWithFeed},
+        DepositV2, NonceBytes, Pyth, TokenMapAccess,
+    },
 };
 
 use crate::{
     store::utils::{read_market, FeedsParser},
-    utils::{ComputeBudget, RpcBuilder},
+    utils::{ComputeBudget, RpcBuilder, ZeroCopy},
 };
 
 use super::generate_nonce;
@@ -31,7 +34,6 @@ pub struct CreateDepositBuilder<'a, C> {
     store: Pubkey,
     market_token: Pubkey,
     receiver: Option<Pubkey>,
-    ui_fee_receiver: Pubkey,
     execution_fee: u64,
     long_token_swap_path: Vec<Pubkey>,
     short_token_swap_path: Vec<Pubkey>,
@@ -42,7 +44,6 @@ pub struct CreateDepositBuilder<'a, C> {
     initial_long_token_amount: u64,
     initial_short_token_amount: u64,
     min_market_token: u64,
-    should_unwrap_native_token: bool,
     nonce: Option<NonceBytes>,
     token_map: Option<Pubkey>,
 }
@@ -59,7 +60,6 @@ where
             nonce: None,
             market_token,
             receiver: None,
-            ui_fee_receiver: Pubkey::default(),
             execution_fee: 0,
             long_token_swap_path: vec![],
             short_token_swap_path: vec![],
@@ -70,7 +70,6 @@ where
             initial_long_token_amount: 0,
             initial_short_token_amount: 0,
             min_market_token: 0,
-            should_unwrap_native_token: false,
             token_map: None,
         }
     }
@@ -191,88 +190,89 @@ where
         self
     }
 
-    fn get_receiver(&self) -> Pubkey {
-        match self.receiver {
-            Some(token_account) => token_account,
-            None => anchor_spl::associated_token::get_associated_token_address(
-                &self.client.payer(),
-                &self.market_token,
-            ),
-        }
-    }
-
-    async fn get_token_map(&self) -> crate::Result<Pubkey> {
-        if let Some(address) = self.token_map {
-            Ok(address)
-        } else {
-            crate::store::utils::token_map(self.client.data_store(), &self.store).await
-        }
-    }
-
     /// Set token map address.
     pub fn token_map(&mut self, address: Pubkey) -> &mut Self {
         self.token_map = Some(address);
         self
     }
 
-    /// Build a [`RequestBuilder`] and return deposit address.
-    pub async fn build_with_address(&self) -> crate::Result<(RequestBuilder<'a, C>, Pubkey)> {
-        let receiver = self.get_receiver();
+    /// Build a [`RpcBuilder`] and return deposit address.
+    pub async fn build_with_address(&self) -> crate::Result<(RpcBuilder<'a, C>, Pubkey)> {
         let Self {
             client,
             store,
             nonce,
             market_token,
-            ui_fee_receiver,
             execution_fee,
             long_token_swap_path,
             short_token_swap_path,
             initial_long_token_amount,
             initial_short_token_amount,
             min_market_token,
-            should_unwrap_native_token,
             ..
         } = self;
         let nonce = nonce.unwrap_or_else(generate_nonce);
         let payer = client.payer();
         let deposit = client.find_deposit_address(store, &payer, &nonce);
-        let authority = client.controller_address(store);
         let market = client.find_market_address(store, market_token);
         let (long_token, short_token) = self.get_or_fetch_initial_tokens(&market).await?;
         let initial_long_token_account =
             self.get_or_find_associated_initial_long_token_account(long_token.as_ref());
         let initial_short_token_account =
             self.get_or_find_associated_initial_short_token_account(short_token.as_ref());
-        let builder = client
-            .exchange()
-            .request()
+        let market_token_escrow = get_associated_token_address(&deposit, market_token);
+        let initial_long_token_escrow = long_token
+            .as_ref()
+            .map(|mint| get_associated_token_address(&deposit, mint));
+        let initial_short_token_escrow = short_token
+            .as_ref()
+            .map(|mint| get_associated_token_address(&deposit, mint));
+        let prepare = client
+            .data_store_rpc()
             .accounts(crate::utils::fix_optional_account_metas(
-                accounts::CreateDeposit {
-                    authority,
+                accounts::PrepareDepositEscrow {
+                    owner: payer,
                     store: *store,
-                    controller: client.controller_address(store),
-                    data_store_program: client.store_program_id(),
+                    deposit,
+                    market_token: *market_token,
+                    initial_long_token: long_token,
+                    initial_short_token: short_token,
+                    market_token_escrow,
+                    initial_long_token_escrow,
+                    initial_short_token_escrow,
                     system_program: system_program::ID,
                     token_program: anchor_spl::token::ID,
-                    deposit,
-                    payer,
-                    receiver,
-                    token_map: self.get_token_map().await?,
-                    market,
-                    initial_long_token_account,
-                    initial_short_token_account,
-                    initial_long_token_vault: long_token
-                        .map(|token| client.find_market_vault_address(store, &token)),
-                    initial_short_token_vault: short_token
-                        .map(|token| client.find_market_vault_address(store, &token)),
+                    associated_token_program: anchor_spl::associated_token::ID,
                 },
-                &gmsol_exchange::id(),
-                &client.exchange_program_id(),
+                &gmsol_store::id(),
+                &client.store_program_id(),
+            ))
+            .args(instruction::PrepareDepositEscrow { nonce });
+        let create = client
+            .data_store_rpc()
+            .accounts(crate::utils::fix_optional_account_metas(
+                accounts::CreateDeposit {
+                    owner: payer,
+                    store: *store,
+                    market,
+                    deposit,
+                    market_token: *market_token,
+                    initial_long_token: long_token,
+                    initial_short_token: short_token,
+                    market_token_escrow,
+                    initial_long_token_escrow,
+                    initial_short_token_escrow,
+                    initial_long_token_source: initial_long_token_account,
+                    initial_short_token_source: initial_short_token_account,
+                    system_program: system_program::ID,
+                    token_program: anchor_spl::token::ID,
+                },
+                &gmsol_store::id(),
+                &client.store_program_id(),
             ))
             .args(instruction::CreateDeposit {
                 nonce,
                 params: CreateDepositParams {
-                    ui_fee_receiver: *ui_fee_receiver,
                     execution_fee: *execution_fee,
                     long_token_swap_length: long_token_swap_path
                         .len()
@@ -285,7 +285,6 @@ where
                     initial_long_token_amount: *initial_long_token_amount,
                     initial_short_token_amount: *initial_short_token_amount,
                     min_market_token: *min_market_token,
-                    should_unwrap_native_token: *should_unwrap_native_token,
                 },
             })
             .accounts(
@@ -306,6 +305,7 @@ where
                     }))
                     .collect::<Vec<_>>(),
             );
+        let builder = prepare.merge(create);
         Ok((builder, deposit))
     }
 }
@@ -320,45 +320,23 @@ pub struct CancelDepositBuilder<'a, C> {
 
 #[derive(Clone, Copy)]
 struct CancelDepositHint {
+    market_token: Pubkey,
+    market_token_account: Pubkey,
     initial_long_token: Option<Pubkey>,
     initial_short_token: Option<Pubkey>,
     initial_long_token_account: Option<Pubkey>,
     initial_short_token_account: Option<Pubkey>,
-    initial_long_market: Option<Pubkey>,
-    initial_short_market: Option<Pubkey>,
 }
 
 impl<'a> CancelDepositHint {
-    fn new(deposit: &'a Deposit, store_program_id: &Pubkey) -> Self {
+    fn new(deposit: &'a DepositV2) -> Self {
         Self {
-            initial_long_token: deposit.fixed.tokens.initial_long_token,
-            initial_short_token: deposit.fixed.tokens.initial_short_token,
-            initial_long_token_account: deposit.fixed.senders.initial_long_token_account,
-            initial_short_token_account: deposit.fixed.senders.initial_short_token_account,
-            initial_long_market: deposit.fixed.tokens.initial_long_token.map(|_| {
-                crate::pda::find_market_address(
-                    &deposit.fixed.store,
-                    deposit
-                        .dynamic
-                        .swap_params
-                        .first_market_token(true)
-                        .unwrap_or(&deposit.fixed.tokens.market_token),
-                    store_program_id,
-                )
-                .0
-            }),
-            initial_short_market: deposit.fixed.tokens.initial_short_token.map(|_| {
-                crate::pda::find_market_address(
-                    &deposit.fixed.store,
-                    deposit
-                        .dynamic
-                        .swap_params
-                        .first_market_token(false)
-                        .unwrap_or(&deposit.fixed.tokens.market_token),
-                    store_program_id,
-                )
-                .0
-            }),
+            market_token: deposit.tokens().market_token(),
+            market_token_account: deposit.tokens().market_token_account(),
+            initial_long_token: deposit.tokens().initial_long_token.token(),
+            initial_short_token: deposit.tokens().initial_short_token.token(),
+            initial_long_token_account: deposit.tokens().initial_long_token.account(),
+            initial_short_token_account: deposit.tokens().initial_short_token.account(),
         }
     }
 }
@@ -378,11 +356,8 @@ where
     }
 
     /// Set hint with the given deposit.
-    pub fn hint(&mut self, deposit: &Deposit) -> &mut Self {
-        self.hint = Some(CancelDepositHint::new(
-            deposit,
-            &self.client.store_program_id(),
-        ));
+    pub fn hint(&mut self, deposit: &DepositV2) -> &mut Self {
+        self.hint = Some(CancelDepositHint::new(deposit));
         self
     }
 
@@ -390,19 +365,16 @@ where
         match &self.hint {
             Some(hint) => Ok(*hint),
             None => {
-                let deposit: Deposit = self.client.data_store().account(self.deposit).await?;
-                Ok(CancelDepositHint::new(
-                    &deposit,
-                    &self.client.store_program_id(),
-                ))
+                let deposit: ZeroCopy<DepositV2> =
+                    self.client.data_store().account(self.deposit).await?;
+                Ok(CancelDepositHint::new(&deposit.0))
             }
         }
     }
 
     /// Build a [`RequestBuilder`] for `cancel_deposit` instruction.
     pub async fn build(&self) -> crate::Result<RequestBuilder<'a, C>> {
-        let user = self.client.payer();
-        let controller = self.client.controller_address(&self.store);
+        let owner = self.client.payer();
         let hint = self.get_or_fetch_deposit_info().await?;
         let Self {
             client,
@@ -410,34 +382,41 @@ where
             deposit,
             ..
         } = self;
+        let market_token_ata = get_associated_token_address(&owner, &hint.market_token);
+        let initial_long_token_ata = hint
+            .initial_long_token
+            .as_ref()
+            .map(|mint| get_associated_token_address(&owner, mint));
+        let initial_short_token_ata = hint
+            .initial_short_token
+            .as_ref()
+            .map(|mint| get_associated_token_address(&owner, mint));
         Ok(client
-            .exchange()
+            .data_store()
             .request()
             .accounts(crate::utils::fix_optional_account_metas(
-                accounts::CancelDeposit {
-                    user,
-                    controller,
+                accounts::CloseDeposit {
+                    executor: owner,
                     store: *store,
+                    owner,
+                    market_token: hint.market_token,
+                    initial_long_token: hint.initial_long_token,
+                    initial_short_token: hint.initial_short_token,
                     deposit: *deposit,
-                    initial_long_token: hint.initial_long_token_account,
-                    initial_short_token: hint.initial_short_token_account,
-                    long_token_deposit_vault: hint
-                        .initial_long_token
-                        .map(|token| client.find_market_vault_address(store, &token)),
-                    short_token_deposit_vault: hint
-                        .initial_short_token
-                        .map(|token| client.find_market_vault_address(store, &token)),
-                    initial_long_market: hint.initial_long_market,
-                    initial_short_market: hint.initial_short_market,
-                    event_authority: client.data_store_event_authority(),
-                    data_store_program: client.store_program_id(),
+                    market_token_escrow: hint.market_token_account,
+                    initial_long_token_escrow: hint.initial_long_token_account,
+                    initial_short_token_escrow: hint.initial_short_token_account,
+                    market_token_ata,
+                    initial_long_token_ata,
+                    initial_short_token_ata,
+                    associated_token_program: anchor_spl::associated_token::ID,
                     token_program: anchor_spl::token::ID,
                     system_program: system_program::ID,
                 },
-                &gmsol_exchange::id(),
-                &client.exchange_program_id(),
+                &gmsol_store::id(),
+                &client.store_program_id(),
             ))
-            .args(instruction::CancelDeposit {}))
+            .args(instruction::CloseDeposit {}))
     }
 }
 
@@ -456,33 +435,34 @@ pub struct ExecuteDepositBuilder<'a, C> {
 }
 
 /// Hint for executing deposit.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ExecuteDepositHint {
-    user: Pubkey,
-    receiver: Pubkey,
+    owner: Pubkey,
+    market_token_escrow: Pubkey,
     market_token_mint: Pubkey,
     /// Feeds.
     pub feeds: TokensWithFeed,
-    swap: SwapParams,
-    initial_long_token_account: Option<Pubkey>,
-    initial_short_token_account: Option<Pubkey>,
+    swap: SwapParamsV2,
+    initial_long_token_escrow: Option<Pubkey>,
+    initial_short_token_escrow: Option<Pubkey>,
     initial_long_token: Option<Pubkey>,
     initial_short_token: Option<Pubkey>,
 }
 
-impl<'a> From<&'a Deposit> for ExecuteDepositHint {
-    fn from(deposit: &'a Deposit) -> Self {
-        Self {
-            user: deposit.fixed.senders.user,
-            receiver: deposit.fixed.receivers.receiver,
-            market_token_mint: deposit.fixed.tokens.market_token,
-            feeds: deposit.dynamic.tokens_with_feed.clone(),
-            swap: deposit.dynamic.swap_params.clone(),
-            initial_long_token: deposit.fixed.tokens.initial_long_token,
-            initial_short_token: deposit.fixed.tokens.initial_short_token,
-            initial_long_token_account: deposit.fixed.senders.initial_long_token_account,
-            initial_short_token_account: deposit.fixed.senders.initial_short_token_account,
-        }
+impl ExecuteDepositHint {
+    /// Create a new hint for the deposit.
+    pub fn new(deposit: &DepositV2, map: &impl TokenMapAccess) -> crate::Result<Self> {
+        Ok(Self {
+            owner: *deposit.owner(),
+            market_token_escrow: deposit.tokens().market_token_account(),
+            market_token_mint: deposit.tokens().market_token(),
+            feeds: deposit.swap().to_feeds(map)?,
+            swap: *deposit.swap(),
+            initial_long_token: deposit.tokens().initial_long_token.token(),
+            initial_short_token: deposit.tokens().initial_short_token.token(),
+            initial_long_token_escrow: deposit.tokens().initial_long_token.account(),
+            initial_short_token_escrow: deposit.tokens().initial_short_token.account(),
+        })
     }
 }
 
@@ -525,9 +505,13 @@ where
     }
 
     /// Set hint with the given deposit.
-    pub fn hint(&mut self, deposit: &Deposit) -> &mut Self {
-        self.hint = Some(deposit.into());
-        self
+    pub fn hint(
+        &mut self,
+        deposit: &DepositV2,
+        map: &impl TokenMapAccess,
+    ) -> crate::Result<&mut Self> {
+        self.hint = Some(ExecuteDepositHint::new(deposit, map)?);
+        Ok(self)
     }
 
     /// Parse feeds with the given price udpates map.
@@ -542,8 +526,10 @@ where
         match &self.hint {
             Some(hint) => Ok(hint.clone()),
             None => {
-                let deposit: Deposit = self.client.data_store().account(self.deposit).await?;
-                let hint: ExecuteDepositHint = (&deposit).into();
+                let map = self.client.authorized_token_map(&self.store).await?;
+                let deposit: ZeroCopy<DepositV2> =
+                    self.client.data_store().account(self.deposit).await?;
+                let hint = ExecuteDepositHint::new(&deposit.0, &map)?;
                 self.hint = Some(hint.clone());
                 Ok(hint)
             }
@@ -577,7 +563,7 @@ where
             price_provider,
             cancel_on_execution_error,
             ..
-        } = self;
+        } = &self;
         let authority = client.payer();
         let feeds = self
             .feeds_parser
@@ -592,27 +578,20 @@ where
                 is_writable: true,
             });
         tracing::debug!(%price_provider, "constructing `execute_deposit` ix...");
-        Ok(client
-            .exchange_rpc()
+
+        // Execution.
+        let execute = client
+            .data_store_rpc()
             .accounts(crate::utils::fix_optional_account_metas(
-                accounts::ExecuteDeposit {
+                accounts::ExecuteDepositV2 {
                     authority,
-                    controller: client.controller_address(store),
                     store: *store,
-                    event_authority: client.data_store_event_authority(),
-                    data_store_program: client.store_program_id(),
                     price_provider: *price_provider,
-                    token_program: anchor_spl::token::ID,
                     oracle: *oracle,
                     token_map,
                     deposit: *deposit,
-                    user: hint.user,
-                    receiver: hint.receiver,
                     market: client.find_market_address(store, &hint.market_token_mint),
-                    market_token_mint: hint.market_token_mint,
-                    system_program: system_program::ID,
-                    initial_long_token_account: hint.initial_long_token_account,
-                    initial_short_token_account: hint.initial_short_token_account,
+                    market_token: hint.market_token_mint,
                     initial_long_token_vault: hint
                         .initial_long_token
                         .as_ref()
@@ -621,31 +600,61 @@ where
                         .initial_short_token
                         .as_ref()
                         .map(|token| client.find_market_vault_address(store, token)),
-                    initial_long_market: hint.initial_long_token_account.as_ref().map(|_| {
-                        client.find_market_address(
-                            store,
-                            hint.swap
-                                .first_market_token(true)
-                                .unwrap_or(&hint.market_token_mint),
-                        )
-                    }),
-                    initial_short_market: hint.initial_short_token_account.as_ref().map(|_| {
-                        client.find_market_address(
-                            store,
-                            hint.swap
-                                .first_market_token(false)
-                                .unwrap_or(&hint.market_token_mint),
-                        )
-                    }),
+                    token_program: anchor_spl::token::ID,
+                    system_program: system_program::ID,
+                    initial_long_token: hint.initial_long_token,
+                    initial_short_token: hint.initial_short_token,
+                    market_token_escrow: hint.market_token_escrow,
+                    initial_long_token_escrow: hint.initial_long_token_escrow,
+                    initial_short_token_escrow: hint.initial_short_token_escrow,
                 },
-                &gmsol_exchange::ID,
-                &self.client.exchange_program_id(),
+                &gmsol_store::ID,
+                &self.client.store_program_id(),
             ))
-            .args(instruction::ExecuteDeposit {
+            .args(instruction::ExecuteDepositV2 {
                 execution_fee: *execution_fee,
-                cancel_on_execution_error: *cancel_on_execution_error,
+                throw_on_execution_error: *cancel_on_execution_error,
             })
             .accounts(feeds.into_iter().chain(markets).collect::<Vec<_>>())
-            .compute_budget(ComputeBudget::default().with_limit(EXECUTE_DEPOSIT_COMPUTE_BUDGET)))
+            .compute_budget(ComputeBudget::default().with_limit(EXECUTE_DEPOSIT_COMPUTE_BUDGET));
+
+        // Close.
+        let owner = &hint.owner;
+        let market_token_ata = get_associated_token_address(owner, &hint.market_token_mint);
+        let initial_long_token_ata = hint
+            .initial_long_token
+            .as_ref()
+            .map(|mint| get_associated_token_address(owner, mint));
+        let initial_short_token_ata = hint
+            .initial_short_token
+            .as_ref()
+            .map(|mint| get_associated_token_address(owner, mint));
+        let close = client
+            .data_store_rpc()
+            .accounts(crate::utils::fix_optional_account_metas(
+                accounts::CloseDeposit {
+                    executor: authority,
+                    store: *store,
+                    owner: *owner,
+                    market_token: hint.market_token_mint,
+                    initial_long_token: hint.initial_long_token,
+                    initial_short_token: hint.initial_short_token,
+                    deposit: *deposit,
+                    market_token_escrow: hint.market_token_escrow,
+                    initial_long_token_escrow: hint.initial_long_token_escrow,
+                    initial_short_token_escrow: hint.initial_short_token_escrow,
+                    market_token_ata,
+                    initial_long_token_ata,
+                    initial_short_token_ata,
+                    associated_token_program: anchor_spl::associated_token::ID,
+                    token_program: anchor_spl::token::ID,
+                    system_program: system_program::ID,
+                },
+                &gmsol_store::id(),
+                &client.store_program_id(),
+            ))
+            .args(instruction::CloseDeposit {});
+
+        Ok(execute.merge(close))
     }
 }

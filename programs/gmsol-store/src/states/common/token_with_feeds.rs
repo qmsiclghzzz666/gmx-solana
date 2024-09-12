@@ -55,7 +55,7 @@ impl TokensWithFeed {
     /// Create from token records.
     /// # Panic
     /// Panics if the number of tokens of the same provider exceeds `u16`.
-    pub fn try_from_vec(mut records: Vec<TokenRecord>) -> Result<Self> {
+    pub fn try_from_records(mut records: Vec<TokenRecord>) -> Result<Self> {
         records.sort_by_key(|r| r.provider);
         let mut chunks = chunk_by(&records, |a, b| a.provider == b.provider);
         let mut providers = Vec::with_capacity(chunks.size_hint().0);

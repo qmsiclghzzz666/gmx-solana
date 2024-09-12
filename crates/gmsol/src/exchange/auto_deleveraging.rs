@@ -81,7 +81,7 @@ impl AutoDeleverageHint {
             ]
             .into(),
         )?;
-        let tokens_with_feed = TokensWithFeed::try_from_vec(records)?;
+        let tokens_with_feed = TokensWithFeed::try_from_records(records)?;
 
         Ok(Self {
             store_address,
@@ -382,7 +382,7 @@ impl UpdateAdlHint {
             ]
             .into(),
         )?;
-        let tokens_with_feed = TokensWithFeed::try_from_vec(records)?;
+        let tokens_with_feed = TokensWithFeed::try_from_records(records)?;
 
         Ok(Self {
             token_map: token_map_address,

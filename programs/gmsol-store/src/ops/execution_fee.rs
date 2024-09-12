@@ -35,18 +35,14 @@ impl<'info> TransferExecutionFeeOps<'info> {
 
 /// Pay execution fee.
 #[derive(TypedBuilder)]
-pub(crate) struct PayExecutionFeeOps<'a, 'info> {
+pub(crate) struct PayExecutionFeeOps<'info> {
     payer: AccountInfo<'info>,
     receiver: AccountInfo<'info>,
     execution_lamports: u64,
-    system_program: AccountInfo<'info>,
-    signer_seeds: &'a [&'a [u8]],
 }
 
-impl<'a, 'info> PayExecutionFeeOps<'a, 'info> {
+impl<'info> PayExecutionFeeOps<'info> {
     pub(crate) fn execute(self) -> Result<()> {
-        use anchor_lang::system_program::{transfer, Transfer};
-
         let rent = Rent::get()?;
         let remaining_lamports = self
             .payer
@@ -58,18 +54,11 @@ impl<'a, 'info> PayExecutionFeeOps<'a, 'info> {
             CoreError::NotEnoughExecutionFee,
         );
 
-        if self.execution_lamports != 0 {
-            transfer(
-                CpiContext::new(
-                    self.system_program,
-                    Transfer {
-                        from: self.payer,
-                        to: self.receiver,
-                    },
-                )
-                .with_signer(&[self.signer_seeds]),
-                self.execution_lamports,
-            )?;
+        let amount = self.execution_lamports;
+        if amount != 0 {
+            msg!("paying execution fee: {}", amount);
+            self.payer.sub_lamports(amount)?;
+            self.receiver.add_lamports(amount)?;
         }
 
         Ok(())
