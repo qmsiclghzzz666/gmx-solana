@@ -624,7 +624,7 @@ where
             ))
             .args(instruction::ExecuteDepositV2 {
                 execution_fee: *execution_fee,
-                throw_on_execution_error: *cancel_on_execution_error,
+                throw_on_execution_error: !*cancel_on_execution_error,
             })
             .accounts(feeds.into_iter().chain(markets).collect::<Vec<_>>())
             .compute_budget(ComputeBudget::default().with_limit(EXECUTE_DEPOSIT_COMPUTE_BUDGET));
