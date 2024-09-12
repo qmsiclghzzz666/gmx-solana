@@ -220,6 +220,7 @@ where
             self.get_or_find_associated_initial_long_token_account(long_token.as_ref());
         let initial_short_token_account =
             self.get_or_find_associated_initial_short_token_account(short_token.as_ref());
+        let market_token_ata = get_associated_token_address(&payer, market_token);
         let market_token_escrow = get_associated_token_address(&deposit, market_token);
         let initial_long_token_escrow = long_token
             .as_ref()
@@ -259,6 +260,7 @@ where
                     market_token: *market_token,
                     initial_long_token: long_token,
                     initial_short_token: short_token,
+                    market_token_ata,
                     market_token_escrow,
                     initial_long_token_escrow,
                     initial_short_token_escrow,
@@ -266,6 +268,7 @@ where
                     initial_short_token_source: initial_short_token_account,
                     system_program: system_program::ID,
                     token_program: anchor_spl::token::ID,
+                    associated_token_program: anchor_spl::associated_token::ID,
                 },
                 &gmsol_store::id(),
                 &client.store_program_id(),

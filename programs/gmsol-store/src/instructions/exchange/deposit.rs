@@ -127,6 +127,14 @@ pub struct CreateDeposit<'info> {
         associated_token::authority = deposit,
     )]
     pub initial_short_token_escrow: Option<Box<Account<'info, TokenAccount>>>,
+    /// The ATA of the owner for receving market tokens.
+    #[account(
+        init_if_needed,
+        payer = owner,
+        associated_token::mint = market_token,
+        associated_token::authority = owner,
+    )]
+    pub market_token_ata: Box<Account<'info, TokenAccount>>,
     #[account(mut, token::mint = initial_long_token)]
     /// The source initial long token account.
     pub initial_long_token_source: Option<Box<Account<'info, TokenAccount>>>,
@@ -137,6 +145,8 @@ pub struct CreateDeposit<'info> {
     pub system_program: Program<'info, System>,
     /// The token program.
     pub token_program: Program<'info, Token>,
+    /// The associated token program.
+    pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
 pub(crate) fn create_deposit<'info>(
