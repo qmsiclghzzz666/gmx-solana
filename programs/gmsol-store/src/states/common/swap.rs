@@ -271,14 +271,14 @@ impl SwapParamsV2 {
             meta.long_token_mint,
             meta.short_token_mint,
         ]);
-        validate_path(
+        let primary_path = validate_path(
             &mut tokens,
             primary_markets,
             store,
             primary_token_in,
             primary_token_out,
         )?;
-        validate_path(
+        let secondary_path = validate_path(
             &mut tokens,
             secondary_markets,
             store,
@@ -292,8 +292,8 @@ impl SwapParamsV2 {
         self.secondary_length = secondary_length;
         self.num_tokens = tokens.len() as u8;
 
-        for (idx, market) in paths[0..end].iter().enumerate() {
-            self.paths[idx] = market.key();
+        for (idx, market_token) in primary_path.iter().chain(secondary_path.iter()).enumerate() {
+            self.paths[idx] = *market_token;
         }
 
         for (idx, token) in tokens.into_iter().enumerate() {
@@ -419,10 +419,11 @@ fn validate_path<'info>(
     store: &Pubkey,
     token_in: &Pubkey,
     token_out: &Pubkey,
-) -> Result<()> {
+) -> Result<Vec<Pubkey>> {
     let mut current = *token_in;
     let mut seen = HashSet::<_>::default();
 
+    let mut validated_market_tokens = Vec::with_capacity(path.len());
     for market in unpack_markets(path) {
         let market = market?;
 
@@ -442,9 +443,10 @@ fn validate_path<'info>(
         tokens.insert(meta.index_token_mint);
         tokens.insert(meta.long_token_mint);
         tokens.insert(meta.short_token_mint);
+        validated_market_tokens.push(meta.market_token_mint);
     }
 
     require_eq!(current, *token_out, CoreError::InvalidSwapPath);
 
-    Ok(())
+    Ok(validated_market_tokens)
 }
