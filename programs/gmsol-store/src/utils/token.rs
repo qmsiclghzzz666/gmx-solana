@@ -30,6 +30,8 @@ pub struct TransferAllFromEscrowToATA<'a, 'info> {
     escrow_authority: AccountInfo<'info>,
     seeds: &'a [&'a [u8]],
     init_if_needed: bool,
+    #[builder(default)]
+    skip_owner_check: bool,
 }
 
 impl<'a, 'info> TransferAllFromEscrowToATA<'a, 'info> {
@@ -49,6 +51,7 @@ impl<'a, 'info> TransferAllFromEscrowToATA<'a, 'info> {
             escrow_authority,
             seeds,
             init_if_needed,
+            skip_owner_check,
         } = self;
 
         let amount = escrow.amount;
@@ -62,7 +65,7 @@ impl<'a, 'info> TransferAllFromEscrowToATA<'a, 'info> {
                     Create {
                         payer,
                         associated_token: ata.clone(),
-                        authority: owner,
+                        authority: owner.clone(),
                         mint,
                         system_program,
                         token_program: token_program.clone(),
@@ -70,12 +73,22 @@ impl<'a, 'info> TransferAllFromEscrowToATA<'a, 'info> {
                 ))?;
             }
 
+            let Ok(ata_owner) = anchor_spl::token::accessor::authority(&ata) else {
+                msg!("the ATA is not a valid token account, skip the transfer");
+                return Ok(false);
+            };
+
+            if ata_owner != owner.key() && !skip_owner_check {
+                msg!("The ATA is not owned by the owner, skip the transfer");
+                return Ok(false);
+            }
+
             transfer(
                 CpiContext::new(
                     token_program,
                     Transfer {
                         from: escrow.to_account_info(),
-                        to: ata,
+                        to: ata.to_account_info(),
                         authority: escrow_authority,
                     },
                 )
