@@ -1,4 +1,9 @@
-use anchor_lang::{err, prelude::Result, solana_program::pubkey::Pubkey};
+use anchor_lang::{
+    err,
+    prelude::{borsh, Result},
+    solana_program::pubkey::Pubkey,
+    AnchorDeserialize, AnchorSerialize,
+};
 
 use crate::{states::NonceBytes, CoreError};
 
@@ -14,6 +19,8 @@ use crate::{states::NonceBytes, CoreError};
     Eq,
     strum::EnumString,
     strum::Display,
+    AnchorSerialize,
+    AnchorDeserialize,
 )]
 #[strum(serialize_all = "snake_case")]
 #[num_enum(error_type(name = CoreError, constructor = CoreError::unknown_action_state))]

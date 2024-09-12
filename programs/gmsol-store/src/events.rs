@@ -12,6 +12,7 @@ use gmsol_model::{
 
 use crate::{
     states::{
+        common::action::ActionState,
         order::{OrderKind, TransferOut},
         position::PositionState,
         Position,
@@ -38,6 +39,8 @@ pub struct RemoveDepositEvent {
     pub market_token: Pubkey,
     /// User.
     pub user: Pubkey,
+    /// Final state.
+    pub state: ActionState,
     /// Reason.
     pub reason: String,
 }
@@ -49,6 +52,7 @@ impl RemoveDepositEvent {
         deposit: Pubkey,
         market_token: Pubkey,
         user: Pubkey,
+        state: ActionState,
         reason: impl ToString,
     ) -> Result<Self> {
         let clock = Clock::get()?;
@@ -60,6 +64,7 @@ impl RemoveDepositEvent {
             deposit,
             market_token,
             user,
+            state,
             reason: reason.to_string(),
         })
     }

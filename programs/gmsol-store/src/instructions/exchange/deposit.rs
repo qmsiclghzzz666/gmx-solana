@@ -5,6 +5,7 @@ use anchor_spl::{
 };
 
 use crate::{
+    events::RemoveDepositEvent,
     ops::{
         deposit::{CreateDepositOps, CreateDepositParams},
         execution_fee::TransferExecutionFeeOps,
@@ -244,6 +245,7 @@ impl<'info> CreateDeposit<'info> {
 }
 
 /// The accounts definition for `close_deposit` instruction.
+#[event_cpi]
 #[derive(Accounts)]
 pub struct CloseDeposit<'info> {
     /// The executor of this instruction.
@@ -331,10 +333,23 @@ pub struct CloseDeposit<'info> {
     pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
-pub(crate) fn close_deposit(ctx: Context<CloseDeposit>) -> Result<()> {
+pub(crate) fn close_deposit(ctx: Context<CloseDeposit>, reason: &str) -> Result<()> {
     let accounts = &ctx.accounts;
     let should_continue_when_atas_are_missing = accounts.preprocess()?;
     if accounts.transfer_to_atas(should_continue_when_atas_are_missing)? {
+        {
+            let deposit_address = accounts.deposit.key();
+            let deposit = accounts.deposit.load()?;
+            emit_cpi!(RemoveDepositEvent::new(
+                deposit.id,
+                deposit.store,
+                deposit_address,
+                deposit.tokens.market_token(),
+                deposit.owner,
+                deposit.action_state()?,
+                reason,
+            )?);
+        }
         accounts.close()?;
     } else {
         msg!("Some ATAs are not initilaized, skip the close");

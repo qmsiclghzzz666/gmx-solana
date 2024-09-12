@@ -4,7 +4,7 @@ use anchor_spl::token::{Token, TokenAccount};
 use crate::{
     events::RemoveDepositEvent,
     states::{
-        common::{SwapParams, TokenRecord},
+        common::{action::ActionState, SwapParams, TokenRecord},
         deposit::{Receivers, TokenParams},
         Deposit, Market, NonceBytes, Seed, Store,
     },
@@ -127,6 +127,7 @@ pub fn remove_deposit(ctx: Context<RemoveDeposit>, refund: u64, reason: &str) ->
         ctx.accounts.deposit.key(),
         ctx.accounts.deposit.fixed.tokens.market_token,
         ctx.accounts.deposit.fixed.senders.user,
+        ActionState::Completed,
         reason,
     )?);
     Ok(())

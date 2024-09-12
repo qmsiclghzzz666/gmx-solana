@@ -1420,8 +1420,8 @@ pub mod gmsol_store {
         instructions::create_deposit(ctx, nonce, &params)
     }
 
-    pub fn close_deposit(ctx: Context<CloseDeposit>) -> Result<()> {
-        instructions::close_deposit(ctx)
+    pub fn close_deposit(ctx: Context<CloseDeposit>, reason: String) -> Result<()> {
+        instructions::close_deposit(ctx, &reason)
     }
 
     #[access_control(internal::Authenticate::only_order_keeper(&ctx))]

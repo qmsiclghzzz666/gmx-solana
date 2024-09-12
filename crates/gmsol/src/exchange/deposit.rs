@@ -415,11 +415,15 @@ where
                     associated_token_program: anchor_spl::associated_token::ID,
                     token_program: anchor_spl::token::ID,
                     system_program: system_program::ID,
+                    event_authority: client.data_store_event_authority(),
+                    program: client.store_program_id(),
                 },
                 &gmsol_store::id(),
                 &client.store_program_id(),
             ))
-            .args(instruction::CloseDeposit {}))
+            .args(instruction::CloseDeposit {
+                reason: "cancelled".to_string(),
+            }))
     }
 }
 
@@ -661,11 +665,15 @@ where
                         associated_token_program: anchor_spl::associated_token::ID,
                         token_program: anchor_spl::token::ID,
                         system_program: system_program::ID,
+                        event_authority: client.data_store_event_authority(),
+                        program: client.store_program_id(),
                     },
                     &gmsol_store::id(),
                     &client.store_program_id(),
                 ))
-                .args(instruction::CloseDeposit {});
+                .args(instruction::CloseDeposit {
+                    reason: "executed".to_string(),
+                });
 
             Ok(execute.merge(close))
         } else {
