@@ -12,10 +12,12 @@ async fn single_token_pool_deposit() -> eyre::Result<()> {
         .await?;
 
     let client = deployment.user_client(Deployment::DEFAULT_USER)?.unwrap();
-    let _keeper = deployment.user_client(Deployment::DEFAULT_KEEPER).unwrap();
+    let keeper = deployment.user_client(Deployment::DEFAULT_KEEPER)?.unwrap();
     let store = &deployment.store;
+    let oracle = &deployment.oracle;
     let market_token = deployment.market_token("SOL", "WSOL", "WSOL").unwrap();
 
+    // Create a both sides deposit to single token pool.
     let (rpc, deposit) = client
         .create_deposit(store, market_token)
         .long_token(1_000_000, None, None)
@@ -25,6 +27,12 @@ async fn single_token_pool_deposit() -> eyre::Result<()> {
         .await?;
     let signature = rpc.send().await?;
     tracing::info!(%deposit, %signature, "create deposit");
+
+    // Execute.
+    let mut builder = keeper.execute_deposit(store, oracle, &deposit, true);
+    deployment
+        .execute_with_pyth(&mut builder, None, true)
+        .await?;
 
     Ok(())
 }

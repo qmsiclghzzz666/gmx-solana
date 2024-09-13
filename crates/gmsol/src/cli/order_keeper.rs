@@ -8,7 +8,10 @@ use futures_util::{FutureExt, TryFutureExt};
 use gmsol::{
     client::StoreFilter,
     exchange::ExchangeOps,
-    pyth::{EncodingType, Hermes, PythPullOracle, PythPullOracleContext, PythPullOracleOps},
+    pyth::{
+        pull_oracle::utils::extract_pyth_feed_ids, EncodingType, Hermes, PythPullOracle,
+        PythPullOracleContext, PythPullOracleOps,
+    },
     types::{Deposit, Order, Withdrawal},
     utils::{ComputeBudget, RpcBuilder},
 };
@@ -260,36 +263,23 @@ impl KeeperArgs {
                     .price_provider(self.provider.program());
                 if self.use_pyth_pull_oracle() {
                     let hint = builder.prepare_hint().await?;
-                    let mut ctx = PythPullOracleContext::try_from_feeds(&hint.feeds)?;
-                    let feed_ids = ctx.feed_ids();
+                    let feed_ids = extract_pyth_feed_ids(&hint.feeds)?;
                     if feed_ids.is_empty() {
                         tracing::error!(%deposit, "empty feed ids");
                     }
                     let oracle = PythPullOracle::try_new(client.anchor())?;
                     let hermes = Hermes::default();
                     let update = hermes
-                        .latest_price_updates(feed_ids, Some(EncodingType::Base64))
+                        .latest_price_updates(&feed_ids, Some(EncodingType::Base64))
                         .await?;
-                    let with_prices = oracle
-                        .with_pyth_prices(&mut ctx, &update, |prices| async {
-                            let rpc = builder
-                                .parse_with_pyth_price_updates(prices)
-                                .build()
-                                .await?;
-                            Ok(Some(rpc))
-                        })
+                    oracle
+                        .execute_with_pyth_price_updates(
+                            Some(update.binary()),
+                            &mut builder,
+                            Some(self.compute_unit_price),
+                            true,
+                        )
                         .await?;
-                    match with_prices
-                        .send_all(Some(self.compute_unit_price), true)
-                        .await
-                    {
-                        Ok(signatures) => {
-                            tracing::info!(%deposit, "executed deposit with txs {signatures:#?}");
-                        }
-                        Err((signatures, err)) => {
-                            tracing::error!(%err, %deposit, "failed to execute deposit, successful txs: {signatures:#?}");
-                        }
-                    }
                 } else {
                     let mut rpc = builder.build().await?;
                     if let Some(budget) = self.get_compute_budget() {

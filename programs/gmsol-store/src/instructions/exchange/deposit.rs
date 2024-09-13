@@ -424,8 +424,21 @@ impl<'info> CloseDeposit<'info> {
             return Ok(false);
         }
 
+        // Prevent closing the same token accounts.
+        let (initial_long_token_escrow, initial_short_token_escrow) =
+            if self.initial_long_token_escrow.as_ref().map(|a| a.key())
+                == self.initial_short_token_escrow.as_ref().map(|a| a.key())
+            {
+                (self.initial_long_token_escrow.as_ref(), None)
+            } else {
+                (
+                    self.initial_long_token_escrow.as_ref(),
+                    self.initial_short_token_escrow.as_ref(),
+                )
+            };
+
         // Transfer initial long tokens.
-        if let Some(escrow) = self.initial_long_token_escrow.as_ref() {
+        if let Some(escrow) = initial_long_token_escrow.as_ref() {
             let Some(ata) = self.initial_long_token_ata.as_ref() else {
                 return err!(CoreError::TokenAccountNotProvided);
             };
@@ -445,7 +458,7 @@ impl<'info> CloseDeposit<'info> {
         }
 
         // Transfer initial short tokens.
-        if let Some(escrow) = self.initial_short_token_escrow.as_ref() {
+        if let Some(escrow) = initial_short_token_escrow.as_ref() {
             let Some(ata) = self.initial_short_token_ata.as_ref() else {
                 return err!(CoreError::TokenAccountNotProvided);
             };

@@ -24,6 +24,7 @@ use eyre::{eyre, OptionExt};
 use gmsol::{
     client::SystemProgramOps,
     exchange::ExchangeOps,
+    pyth::{pull_oracle::ExecuteWithPythPrices, Hermes, PythPullOracle},
     store::{
         oracle::OracleOps, roles::RolesOps, store_ops::StoreOps, token_config::TokenConfigOps,
     },
@@ -47,6 +48,10 @@ const ENV_GMSOL_REFUND_WAIT: &str = "GMSOL_REFUND_WAIT";
 /// Deployment.
 pub struct Deployment {
     rng: StdRng,
+    /// Hermes.
+    pub hermes: Hermes,
+    /// Pyth Oracle.
+    pub pyth: PythPullOracle<SignerRef>,
     /// Client.
     pub client: Client<SignerRef>,
     /// Users.
@@ -113,6 +118,8 @@ impl Deployment {
         let token_map = Keypair::generate(&mut rng);
         Ok(Self {
             rng,
+            hermes: Default::default(),
+            pyth: PythPullOracle::try_new(client.anchor())?,
             client,
             users: Default::default(),
             store_key,
@@ -707,6 +714,7 @@ impl Deployment {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub(crate) fn token_map(&self) -> Pubkey {
         self.token_map.pubkey()
     }
@@ -777,6 +785,34 @@ impl Deployment {
     pub(crate) fn market_token(&self, index: &str, long: &str, short: &str) -> Option<&Pubkey> {
         self.market_tokens
             .get(&[index.to_string(), long.to_string(), short.to_string()])
+    }
+
+    pub(crate) async fn execute_with_pyth<'a, T>(
+        &'a self,
+        execute: &mut T,
+        compute_unit_price_micro_lamports: Option<u64>,
+        skip_preflight: bool,
+    ) -> eyre::Result<()>
+    where
+        T: ExecuteWithPythPrices<'a, SignerRef>,
+    {
+        use gmsol::pyth::{pull_oracle::hermes::EncodingType, PythPullOracleOps};
+
+        let ctx = execute.context().await?;
+        let feed_ids = ctx.feed_ids();
+        let update = self
+            .hermes
+            .latest_price_updates(feed_ids, Some(EncodingType::Base64))
+            .await?;
+        self.pyth
+            .execute_with_pyth_price_updates(
+                Some(update.binary()),
+                execute,
+                compute_unit_price_micro_lamports,
+                skip_preflight,
+            )
+            .await?;
+        Ok(())
     }
 }
 

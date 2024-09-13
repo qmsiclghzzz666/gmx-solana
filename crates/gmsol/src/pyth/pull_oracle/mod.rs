@@ -295,17 +295,17 @@ pub trait PythPullOracleOps<C> {
     }
 
     /// Execute with pyth price updates.
-    fn execute_with_pyth_price_updates<'a, T, S>(
-        &'a self,
+    fn execute_with_pyth_price_updates<'a, 'exec, T, S>(
+        &'exec self,
         updates: impl IntoIterator<Item = &'a BinaryPriceUpdate>,
         execute: &mut T,
         compute_unit_price_micro_lamports: Option<u64>,
         skip_preflight: bool,
     ) -> impl Future<Output = crate::Result<()>>
     where
-        C: Deref<Target = S> + Clone + 'a,
+        C: Deref<Target = S> + Clone + 'exec,
         S: Signer,
-        T: ExecuteWithPythPrices<'a, C>,
+        T: ExecuteWithPythPrices<'exec, C>,
     {
         async move {
             let mut execution_fee_estiamted = execute.should_estiamte_execution_fee();
