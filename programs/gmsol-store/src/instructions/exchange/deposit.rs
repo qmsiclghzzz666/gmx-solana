@@ -460,7 +460,7 @@ impl<'info> CloseDeposit<'info> {
     }
 
     fn close(&self) -> Result<()> {
-        AccountsClose::close(&self.deposit, self.owner.to_account_info())?;
+        self.deposit.close(self.owner.to_account_info())?;
         Ok(())
     }
 }

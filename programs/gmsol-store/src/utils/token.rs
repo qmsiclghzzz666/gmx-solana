@@ -1,7 +1,7 @@
 use anchor_lang::{prelude::*, solana_program::system_program};
 use anchor_spl::{
     associated_token::{create, get_associated_token_address, Create},
-    token::{transfer, TokenAccount, Transfer},
+    token::{close_account, transfer, CloseAccount, TokenAccount, Transfer},
 };
 use typed_builder::TypedBuilder;
 
@@ -32,10 +32,13 @@ pub struct TransferAllFromEscrowToATA<'a, 'info> {
     init_if_needed: bool,
     #[builder(default)]
     skip_owner_check: bool,
+    #[builder(default)]
+    keep_escrow: bool,
 }
 
 impl<'a, 'info> TransferAllFromEscrowToATA<'a, 'info> {
-    /// Transfer all tokens from escrow account to ATA.
+    /// Transfer all tokens from the escrow account to ATA. Close the escrow account after
+    /// the transfer is complete if `keep_escrow` is `false`, which is the default.
     ///
     /// Return `false` if the transfer is required but the ATA is not initilaized.
     pub(crate) fn execute(self) -> Result<bool> {
@@ -52,6 +55,7 @@ impl<'a, 'info> TransferAllFromEscrowToATA<'a, 'info> {
             seeds,
             init_if_needed,
             skip_owner_check,
+            keep_escrow,
         } = self;
 
         let amount = escrow.amount;
@@ -85,15 +89,28 @@ impl<'a, 'info> TransferAllFromEscrowToATA<'a, 'info> {
 
             transfer(
                 CpiContext::new(
-                    token_program,
+                    token_program.clone(),
                     Transfer {
                         from: escrow.to_account_info(),
                         to: ata.to_account_info(),
-                        authority: escrow_authority,
+                        authority: escrow_authority.clone(),
                     },
                 )
                 .with_signer(&[seeds]),
                 amount,
+            )?;
+        }
+        if !keep_escrow {
+            close_account(
+                CpiContext::new(
+                    token_program,
+                    CloseAccount {
+                        account: escrow.to_account_info(),
+                        destination: owner.clone(),
+                        authority: escrow_authority,
+                    },
+                )
+                .with_signer(&[seeds]),
             )?;
         }
         Ok(true)
