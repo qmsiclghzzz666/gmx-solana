@@ -7,6 +7,7 @@ use anchor_client::{
         commitment_config::CommitmentConfig,
         instruction::{AccountMeta, Instruction},
         pubkey::Pubkey,
+        signature::Signature,
         signer::Signer,
     },
     Program,
@@ -251,6 +252,12 @@ impl<'a, C: Deref<Target = impl Signer> + Clone, T> RpcBuilder<'a, C, T> {
     pub fn pre_instructions(mut self, mut ixs: Vec<Instruction>) -> Self {
         self.pre_instructions.append(&mut ixs);
         self
+    }
+
+    /// Build and send the RPC request.
+    pub async fn send(self) -> crate::Result<Signature> {
+        let signature = self.build().send().await?;
+        Ok(signature)
     }
 
     /// Build [`RequestBuilder`](anchor_client::RequestBuilder).

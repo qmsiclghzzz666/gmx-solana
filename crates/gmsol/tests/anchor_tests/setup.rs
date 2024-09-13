@@ -773,6 +773,11 @@ impl Deployment {
         tracing::info!(%signature, token=%token_name, "minted or tranferred {amount} to {user}");
         Ok(())
     }
+
+    pub(crate) fn market_token(&self, index: &str, long: &str, short: &str) -> Option<&Pubkey> {
+        self.market_tokens
+            .get(&[index.to_string(), long.to_string(), short.to_string()])
+    }
 }
 
 /// Users.

@@ -42,7 +42,7 @@ pub struct PrepareDepositEscrow<'info> {
     pub initial_short_token: Option<Box<Account<'info, Mint>>>,
     /// The escrow account for receving market tokens.
     #[account(
-        init,
+        init_if_needed,
         payer = owner,
         associated_token::mint = market_token,
         associated_token::authority = deposit,
@@ -50,7 +50,7 @@ pub struct PrepareDepositEscrow<'info> {
     pub market_token_escrow: Box<Account<'info, TokenAccount>>,
     /// The escrow account for receiving initial long token for deposit.
     #[account(
-        init,
+        init_if_needed,
         payer = owner,
         associated_token::mint = initial_long_token,
         associated_token::authority = deposit,
@@ -58,7 +58,7 @@ pub struct PrepareDepositEscrow<'info> {
     pub initial_long_token_escrow: Option<Box<Account<'info, TokenAccount>>>,
     /// The escrow account for receiving initial short token for deposit.
     #[account(
-        init,
+        init_if_needed,
         payer = owner,
         associated_token::mint = initial_short_token,
         associated_token::authority = deposit,
@@ -202,7 +202,6 @@ impl<'info> CreateDeposit<'info> {
                 params.initial_long_token_amount,
                 mint.decimals,
             )?;
-            target.reload()?;
         }
 
         if params.initial_short_token_amount != 0 {
@@ -228,7 +227,16 @@ impl<'info> CreateDeposit<'info> {
                 params.initial_short_token_amount,
                 mint.decimals,
             )?;
-            target.reload()?;
+        }
+
+        // Make sure the data for escrow accounts is up-to-date.
+        for escrow in self
+            .initial_long_token_escrow
+            .as_mut()
+            .into_iter()
+            .chain(self.initial_short_token_escrow.as_mut())
+        {
+            escrow.reload()?;
         }
         Ok(())
     }
