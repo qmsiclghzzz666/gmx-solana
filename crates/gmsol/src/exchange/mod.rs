@@ -39,7 +39,7 @@ use treasury::ClaimFeesBuilder;
 use crate::utils::RpcBuilder;
 
 use self::{
-    deposit::{CancelDepositBuilder, CreateDepositBuilder, ExecuteDepositBuilder},
+    deposit::{CloseDepositBuilder, CreateDepositBuilder, ExecuteDepositBuilder},
     order::{CreateOrderBuilder, ExecuteOrderBuilder},
     withdrawal::{CancelWithdrawalBuilder, CreateWithdrawalBuilder, ExecuteWithdrawalBuilder},
 };
@@ -93,7 +93,7 @@ pub trait ExchangeOps<C> {
     fn create_deposit(&self, store: &Pubkey, market_token: &Pubkey) -> CreateDepositBuilder<C>;
 
     /// Cancel a deposit.
-    fn cancel_deposit(&self, store: &Pubkey, deposit: &Pubkey) -> CancelDepositBuilder<C>;
+    fn close_deposit(&self, store: &Pubkey, deposit: &Pubkey) -> CloseDepositBuilder<C>;
 
     /// Execute a deposit.
     fn execute_deposit(
@@ -403,8 +403,8 @@ where
         CreateDepositBuilder::new(self, *store, *market_token)
     }
 
-    fn cancel_deposit(&self, store: &Pubkey, deposit: &Pubkey) -> CancelDepositBuilder<C> {
-        CancelDepositBuilder::new(self, store, deposit)
+    fn close_deposit(&self, store: &Pubkey, deposit: &Pubkey) -> CloseDepositBuilder<C> {
+        CloseDepositBuilder::new(self, store, deposit)
     }
 
     fn execute_deposit(

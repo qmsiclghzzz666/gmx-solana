@@ -399,9 +399,10 @@ impl ExchangeArgs {
             }
             Command::CancelDeposit { deposit } => {
                 let signature = client
-                    .cancel_deposit(store, deposit)
+                    .close_deposit(store, deposit)
                     .build()
                     .await?
+                    .build()
                     .send()
                     .await?;
                 tracing::info!(%deposit, "cancelled deposit at tx {signature}");

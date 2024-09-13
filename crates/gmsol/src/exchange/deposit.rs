@@ -3,7 +3,6 @@ use std::ops::Deref;
 use anchor_client::{
     anchor_lang::{system_program, Id},
     solana_sdk::{instruction::AccountMeta, pubkey::Pubkey, signer::Signer},
-    RequestBuilder,
 };
 use anchor_spl::associated_token::get_associated_token_address;
 use gmsol_store::{
@@ -16,6 +15,7 @@ use gmsol_store::{
 };
 
 use crate::{
+    exchange::ExchangeOps,
     store::utils::{read_market, FeedsParser},
     utils::{ComputeBudget, RpcBuilder, ZeroCopy},
 };
@@ -313,16 +313,19 @@ where
     }
 }
 
-/// Cancel Deposit Builder.
-pub struct CancelDepositBuilder<'a, C> {
+/// Close Deposit Builder.
+pub struct CloseDepositBuilder<'a, C> {
     client: &'a crate::Client<C>,
     store: Pubkey,
     deposit: Pubkey,
-    hint: Option<CancelDepositHint>,
+    reason: String,
+    hint: Option<CloseDepositHint>,
 }
 
-#[derive(Clone, Copy)]
-struct CancelDepositHint {
+/// Close Deposit Hint.
+#[derive(Debug, Clone, Copy)]
+pub struct CloseDepositHint {
+    owner: Pubkey,
     market_token: Pubkey,
     market_token_account: Pubkey,
     initial_long_token: Option<Pubkey>,
@@ -331,9 +334,11 @@ struct CancelDepositHint {
     initial_short_token_account: Option<Pubkey>,
 }
 
-impl<'a> CancelDepositHint {
-    fn new(deposit: &'a DepositV2) -> Self {
+impl<'a> CloseDepositHint {
+    /// Create from deposit.
+    pub fn new(deposit: &'a DepositV2) -> Self {
         Self {
+            owner: *deposit.owner(),
             market_token: deposit.tokens().market_token(),
             market_token_account: deposit.tokens().market_token_account(),
             initial_long_token: deposit.tokens().initial_long_token.token(),
@@ -344,7 +349,7 @@ impl<'a> CancelDepositHint {
     }
 }
 
-impl<'a, S, C> CancelDepositBuilder<'a, C>
+impl<'a, S, C> CloseDepositBuilder<'a, C>
 where
     C: Deref<Target = S> + Clone,
     S: Signer,
@@ -354,30 +359,42 @@ where
             client,
             store: *store,
             deposit: *deposit,
+            reason: "cancelled".to_string(),
             hint: None,
         }
     }
 
     /// Set hint with the given deposit.
-    pub fn hint(&mut self, deposit: &DepositV2) -> &mut Self {
-        self.hint = Some(CancelDepositHint::new(deposit));
+    pub fn hint_with_deposit(&mut self, deposit: &DepositV2) -> &mut Self {
+        self.hint(CloseDepositHint::new(deposit))
+    }
+
+    /// Set hint.
+    pub fn hint(&mut self, hint: CloseDepositHint) -> &mut Self {
+        self.hint = Some(hint);
         self
     }
 
-    async fn get_or_fetch_deposit_info(&self) -> crate::Result<CancelDepositHint> {
+    /// Set the close reason.
+    pub fn reason(&mut self, reason: impl ToString) -> &mut Self {
+        self.reason = reason.to_string();
+        self
+    }
+
+    async fn get_or_fetch_deposit_info(&self) -> crate::Result<CloseDepositHint> {
         match &self.hint {
             Some(hint) => Ok(*hint),
             None => {
                 let deposit: ZeroCopy<DepositV2> =
                     self.client.data_store().account(self.deposit).await?;
-                Ok(CancelDepositHint::new(&deposit.0))
+                Ok(CloseDepositHint::new(&deposit.0))
             }
         }
     }
 
-    /// Build a [`RequestBuilder`] for `cancel_deposit` instruction.
-    pub async fn build(&self) -> crate::Result<RequestBuilder<'a, C>> {
-        let owner = self.client.payer();
+    /// Build a [`RpcBuilder`] for `cancel_deposit` instruction.
+    pub async fn build(&self) -> crate::Result<RpcBuilder<'a, C>> {
+        let executor = self.client.payer();
         let hint = self.get_or_fetch_deposit_info().await?;
         let Self {
             client,
@@ -385,6 +402,7 @@ where
             deposit,
             ..
         } = self;
+        let owner = hint.owner;
         let market_token_ata = get_associated_token_address(&owner, &hint.market_token);
         let initial_long_token_ata = hint
             .initial_long_token
@@ -395,11 +413,10 @@ where
             .as_ref()
             .map(|mint| get_associated_token_address(&owner, mint));
         Ok(client
-            .data_store()
-            .request()
+            .data_store_rpc()
             .accounts(crate::utils::fix_optional_account_metas(
                 accounts::CloseDeposit {
-                    executor: owner,
+                    executor,
                     store: *store,
                     owner,
                     market_token: hint.market_token,
@@ -634,47 +651,20 @@ where
             .compute_budget(ComputeBudget::default().with_limit(EXECUTE_DEPOSIT_COMPUTE_BUDGET));
 
         if self.close {
-            // Close.
-            let owner = &hint.owner;
-            let market_token_ata = get_associated_token_address(owner, &hint.market_token_mint);
-            let initial_long_token_ata = hint
-                .initial_long_token
-                .as_ref()
-                .map(|mint| get_associated_token_address(owner, mint));
-            let initial_short_token_ata = hint
-                .initial_short_token
-                .as_ref()
-                .map(|mint| get_associated_token_address(owner, mint));
-            let close = client
-                .data_store_rpc()
-                .accounts(crate::utils::fix_optional_account_metas(
-                    accounts::CloseDeposit {
-                        executor: authority,
-                        store: *store,
-                        owner: *owner,
-                        market_token: hint.market_token_mint,
-                        initial_long_token: hint.initial_long_token,
-                        initial_short_token: hint.initial_short_token,
-                        deposit: *deposit,
-                        market_token_escrow: hint.market_token_escrow,
-                        initial_long_token_escrow: hint.initial_long_token_escrow,
-                        initial_short_token_escrow: hint.initial_short_token_escrow,
-                        market_token_ata,
-                        initial_long_token_ata,
-                        initial_short_token_ata,
-                        associated_token_program: anchor_spl::associated_token::ID,
-                        token_program: anchor_spl::token::ID,
-                        system_program: system_program::ID,
-                        event_authority: client.data_store_event_authority(),
-                        program: client.store_program_id(),
-                    },
-                    &gmsol_store::id(),
-                    &client.store_program_id(),
-                ))
-                .args(instruction::CloseDeposit {
-                    reason: "executed".to_string(),
-                });
-
+            let close = self
+                .client
+                .close_deposit(store, deposit)
+                .hint(CloseDepositHint {
+                    owner: hint.owner,
+                    market_token: hint.market_token_mint,
+                    market_token_account: hint.market_token_escrow,
+                    initial_long_token: hint.initial_long_token,
+                    initial_short_token: hint.initial_short_token,
+                    initial_long_token_account: hint.initial_long_token_escrow,
+                    initial_short_token_account: hint.initial_short_token_escrow,
+                })
+                .build()
+                .await?;
             Ok(execute.merge(close))
         } else {
             Ok(execute)
