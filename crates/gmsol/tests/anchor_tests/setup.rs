@@ -34,7 +34,7 @@ use gmsol::{
 };
 use pyth_sdk::Identifier;
 use rand::{rngs::StdRng, CryptoRng, RngCore, SeedableRng};
-use tokio::sync::OnceCell;
+use tokio::sync::{Mutex, OnceCell, OwnedMutexGuard};
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::EnvFilter;
 
@@ -92,8 +92,10 @@ impl fmt::Debug for Deployment {
 impl Deployment {
     /// Default user.
     pub const DEFAULT_USER: &'static str = "user_0";
+
     /// Default keeper.
     pub const DEFAULT_KEEPER: &'static str = "keeper_0";
+
     const SOL_PYTH_FEED_ID: [u8; 32] = [
         0xef, 0x0d, 0x8b, 0x6f, 0xda, 0x2c, 0xeb, 0xa4, 0x1d, 0xa1, 0x5d, 0x40, 0x95, 0xd1, 0xda,
         0x39, 0x2a, 0x0d, 0x2f, 0x8e, 0xd0, 0xc6, 0xc7, 0xbc, 0x0f, 0x4c, 0xfa, 0xc8, 0xc2, 0x80,
@@ -117,11 +119,11 @@ impl Deployment {
         let oracle = client.find_oracle_address(&store, oracle_index);
         let token_map = Keypair::generate(&mut rng);
         Ok(Self {
+            users: Users::new(&mut rng),
             rng,
             hermes: Default::default(),
             pyth: PythPullOracle::try_new(client.anchor())?,
             client,
-            users: Default::default(),
             store_key,
             store,
             token_map,
@@ -379,7 +381,7 @@ impl Deployment {
         let payer = self.client.payer();
 
         for (name, token) in self.tokens.iter() {
-            for user in self.users.keypairs() {
+            for user in self.users.keypairs().await {
                 let pubkey = user.pubkey();
                 tracing::info!(token=%name, mint=%token.address, "creating token account for {pubkey}");
                 let rpc = self.client.data_store_rpc().pre_instruction(
@@ -618,7 +620,8 @@ impl Deployment {
         let client = self.client.data_store().async_rpc();
         let mut builder = TransactionBuilder::new(client);
 
-        for user in self.users.keypairs() {
+        let users = self.users.keypairs().await.into_iter().collect::<Vec<_>>();
+        for user in &users {
             let pubkey = user.pubkey();
             let address = get_associated_token_address(&pubkey, &native_mint::ID);
             let Some(_account) = self
@@ -653,7 +656,8 @@ impl Deployment {
 
         let mut builder = TransactionBuilder::new(self.client.data_store().async_rpc());
 
-        for user in self.users.keypairs() {
+        let users = self.users.keypairs().await.into_iter().collect::<Vec<_>>();
+        for user in &users {
             let pubkey = user.pubkey();
             let lamports = client.get_balance(&user.pubkey()).await?;
             if lamports == 0 {
@@ -723,8 +727,20 @@ impl Deployment {
         self.tokens.get(token)
     }
 
-    pub(crate) fn user(&self, name: &str) -> Option<Pubkey> {
-        self.users.user(name)
+    /// `None` means the locked user.
+    pub(crate) fn user(&self, name: Option<&str>) -> eyre::Result<Pubkey> {
+        let user = if let Some(user) = name {
+            self.users.user(user).ok_or_eyre("no such suer")?
+        } else {
+            self.users.locked_user_pubkey
+        };
+        Ok(user)
+    }
+
+    /// Get a mutex-protected signer to prevent concurrent transactions.
+    pub(crate) async fn locked_user_client(&self) -> eyre::Result<Client<Arc<LockedSigner>>> {
+        let signer = self.users.locked_user_signer().await;
+        Ok(self.client.try_clone_with_payer(signer)?)
     }
 
     fn user_keypair(&self, name: &str) -> Option<&SignerRef> {
@@ -738,19 +754,53 @@ impl Deployment {
         Ok(Some(self.client.try_clone_with_payer(signer.clone())?))
     }
 
+    pub(crate) fn get_user_ata(&self, token: &Pubkey, user: Option<&str>) -> eyre::Result<Pubkey> {
+        use spl_associated_token_account::get_associated_token_address;
+
+        let user = self.user(user)?;
+        let account = get_associated_token_address(&user, token);
+        Ok(account)
+    }
+
+    pub(crate) async fn get_ata_amount(
+        &self,
+        token: &Pubkey,
+        user: &Pubkey,
+    ) -> eyre::Result<Option<u64>> {
+        use anchor_spl::token::TokenAccount;
+        use spl_associated_token_account::get_associated_token_address;
+
+        let ata = get_associated_token_address(user, token);
+        let account = self
+            .client
+            .account_with_config::<TokenAccount>(&ata, Default::default())
+            .await?
+            .into_value();
+        Ok(account.map(|a| a.amount))
+    }
+
+    pub(crate) async fn get_user_ata_amount(
+        &self,
+        token: &Pubkey,
+        user: Option<&str>,
+    ) -> eyre::Result<Option<u64>> {
+        let user = self.user(user)?;
+        self.get_ata_amount(token, &user).await
+    }
+
+    /// `None` means the locked user.
     pub(crate) async fn mint_or_transfer_to(
         &self,
         token_name: &str,
-        user: &str,
+        user: Option<&str>,
         amount: u64,
     ) -> eyre::Result<()> {
         use anchor_spl::token::ID;
-        use spl_associated_token_account::get_associated_token_address;
         use spl_token::{instruction, native_mint};
 
         let token = self.token(token_name).ok_or_eyre("no such token")?;
-        let user = self.user(user).ok_or_eyre("no such user")?;
-        let account = get_associated_token_address(&user, &token.address);
+        let account = self.get_user_ata(&token.address, user)?;
+
         let payer = self.client.payer();
 
         let signature = if token.address == native_mint::ID {
@@ -778,6 +828,7 @@ impl Deployment {
                 .await?
         };
 
+        let user = user.unwrap_or("locked_user");
         tracing::info!(%signature, token=%token_name, "minted or tranferred {amount} to {user}");
         Ok(())
     }
@@ -818,6 +869,8 @@ impl Deployment {
 
 /// Users.
 pub struct Users {
+    locked_user_pubkey: Pubkey,
+    locked_user: Arc<Mutex<SignerRef>>,
     users: HashMap<String, SignerRef>,
     funded: Arc<AtomicBool>,
     used: Arc<AtomicUsize>,
@@ -832,23 +885,28 @@ impl fmt::Debug for Users {
             .map(|(name, k)| (name, k.pubkey()))
             .collect::<HashMap<_, _>>();
         f.debug_struct("Users")
+            .field("locked_user", &self.locked_user_pubkey)
             .field("users", &pubkeys)
             .finish_non_exhaustive()
     }
 }
 
-impl Default for Users {
-    fn default() -> Self {
+impl Users {
+    fn new<R>(rng: &mut R) -> Self
+    where
+        R: CryptoRng + RngCore,
+    {
+        let keypair = Keypair::generate(rng);
         Self {
+            locked_user_pubkey: keypair.pubkey(),
+            locked_user: Arc::new(Mutex::new(shared_signer(keypair))),
             users: Default::default(),
             funded: Arc::new(AtomicBool::new(false)),
             used: Arc::new(AtomicUsize::new(0)),
             event: Arc::new(Event::new()),
         }
     }
-}
 
-impl Users {
     fn add_user<R>(&mut self, name: &str, rng: &mut R) -> bool
     where
         R: CryptoRng + RngCore,
@@ -901,11 +959,55 @@ impl Users {
     }
 
     fn pubkeys(&self) -> impl IntoIterator<Item = Pubkey> + '_ {
-        self.users.values().map(|k| k.pubkey())
+        self.users
+            .values()
+            .map(|k| k.pubkey())
+            .chain(Some(self.locked_user_pubkey))
     }
 
-    fn keypairs(&self) -> impl IntoIterator<Item = &SignerRef> {
-        self.users.values()
+    async fn keypairs(&self) -> impl IntoIterator<Item = SignerRef> + '_ {
+        let locked = self.locked_user_signer().await;
+        self.users
+            .values()
+            .cloned()
+            .chain(Some(shared_signer(locked)))
+    }
+
+    async fn locked_user_signer(&self) -> Arc<LockedSigner> {
+        let locked = self.locked_user.clone().lock_owned().await;
+        Arc::new(LockedSigner { locked })
+    }
+}
+
+pub(crate) struct LockedSigner {
+    locked: OwnedMutexGuard<SignerRef>,
+}
+
+impl Signer for LockedSigner {
+    fn try_pubkey(&self) -> Result<Pubkey, anchor_client::solana_sdk::signer::SignerError> {
+        self.locked.try_pubkey()
+    }
+
+    fn try_sign_message(
+        &self,
+        message: &[u8],
+    ) -> Result<
+        anchor_client::solana_sdk::signature::Signature,
+        anchor_client::solana_sdk::signer::SignerError,
+    > {
+        self.locked.try_sign_message(message)
+    }
+
+    fn is_interactive(&self) -> bool {
+        self.locked.is_interactive()
+    }
+
+    fn pubkey(&self) -> Pubkey {
+        self.locked.pubkey()
+    }
+
+    fn sign_message(&self, message: &[u8]) -> anchor_client::solana_sdk::signature::Signature {
+        self.locked.sign_message(message)
     }
 }
 
