@@ -7,15 +7,14 @@ async fn single_token_pool_deposit() -> eyre::Result<()> {
     let deployment = setup::current_deployment().await?;
     let _guard = deployment.use_accounts().await?;
 
-    deployment
-        .mint_or_transfer_to("WSOL", None, 21_000_000)
-        .await?;
-
     {
         let span = tracing::info_span!("single_token_pool_deposit");
         let _enter = span.enter();
 
         let client = deployment.locked_user_client().await?;
+        deployment
+            .mint_or_transfer_to("WSOL", &client.payer(), 21_000_000)
+            .await?;
 
         let keeper = deployment.user_client(Deployment::DEFAULT_KEEPER)?.unwrap();
         let store = &deployment.store;
@@ -105,7 +104,12 @@ async fn create_deposit_2() -> eyre::Result<()> {
     let _guard = deployment.use_accounts().await?;
 
     deployment
-        .mint_or_transfer_to("fBTC", Some("user_0"), 1_000_000_000)
+        .mint_or_transfer_to_user("fBTC", "user_0", 1_000_000_000)
+        .await?;
+
+    let client = deployment.locked_user_client().await?;
+    deployment
+        .mint_or_transfer_to("WSOL", &client.payer(), 1_000_000_000)
         .await?;
 
     Ok(())

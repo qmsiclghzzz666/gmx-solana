@@ -13,7 +13,7 @@ use anchor_client::{
     solana_sdk::{
         commitment_config::CommitmentConfig,
         pubkey::Pubkey,
-        signature::Keypair,
+        signature::{Keypair, Signature},
         signer::{EncodableKey, Signer},
         system_instruction,
     },
@@ -728,12 +728,8 @@ impl Deployment {
     }
 
     /// `None` means the locked user.
-    pub(crate) fn user(&self, name: Option<&str>) -> eyre::Result<Pubkey> {
-        let user = if let Some(user) = name {
-            self.users.user(user).ok_or_eyre("no such suer")?
-        } else {
-            self.users.locked_user_pubkey
-        };
+    pub(crate) fn user(&self, name: &str) -> eyre::Result<Pubkey> {
+        let user = self.users.user(name).ok_or_eyre("no such suer")?;
         Ok(user)
     }
 
@@ -752,14 +748,6 @@ impl Deployment {
             return Ok(None);
         };
         Ok(Some(self.client.try_clone_with_payer(signer.clone())?))
-    }
-
-    pub(crate) fn get_user_ata(&self, token: &Pubkey, user: Option<&str>) -> eyre::Result<Pubkey> {
-        use spl_associated_token_account::get_associated_token_address;
-
-        let user = self.user(user)?;
-        let account = get_associated_token_address(&user, token);
-        Ok(account)
     }
 
     pub(crate) async fn get_ata_amount(
@@ -784,23 +772,25 @@ impl Deployment {
         token: &Pubkey,
         user: Option<&str>,
     ) -> eyre::Result<Option<u64>> {
-        let user = self.user(user)?;
+        let user = match user {
+            Some(name) => self.user(name)?,
+            None => self.users.locked_user_pubkey,
+        };
         self.get_ata_amount(token, &user).await
     }
 
-    /// `None` means the locked user.
     pub(crate) async fn mint_or_transfer_to(
         &self,
         token_name: &str,
-        user: Option<&str>,
+        user: &Pubkey,
         amount: u64,
-    ) -> eyre::Result<()> {
+    ) -> eyre::Result<Signature> {
         use anchor_spl::token::ID;
+        use spl_associated_token_account::get_associated_token_address;
         use spl_token::{instruction, native_mint};
 
         let token = self.token(token_name).ok_or_eyre("no such token")?;
-        let account = self.get_user_ata(&token.address, user)?;
-
+        let account = get_associated_token_address(user, &token.address);
         let payer = self.client.payer();
 
         let signature = if token.address == native_mint::ID {
@@ -828,7 +818,19 @@ impl Deployment {
                 .await?
         };
 
-        let user = user.unwrap_or("locked_user");
+        Ok(signature)
+    }
+
+    pub(crate) async fn mint_or_transfer_to_user(
+        &self,
+        token_name: &str,
+        user: &str,
+        amount: u64,
+    ) -> eyre::Result<()> {
+        let user = self.user(user)?;
+
+        let signature = self.mint_or_transfer_to(token_name, &user, amount).await?;
+
         tracing::info!(%signature, token=%token_name, "minted or tranferred {amount} to {user}");
         Ok(())
     }
