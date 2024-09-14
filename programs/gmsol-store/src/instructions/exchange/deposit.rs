@@ -179,7 +179,8 @@ impl<'info> CreateDeposit<'info> {
     fn transfer_tokens(&mut self, params: &CreateDepositParams) -> Result<()> {
         use anchor_spl::token::{transfer_checked, TransferChecked};
 
-        if params.initial_long_token_amount != 0 {
+        let amount = params.initial_long_token_amount;
+        if amount != 0 {
             let Some(source) = self.initial_long_token_source.as_ref() else {
                 return err!(CoreError::TokenAccountNotProvided);
             };
@@ -199,12 +200,13 @@ impl<'info> CreateDeposit<'info> {
                         authority: self.owner.to_account_info(),
                     },
                 ),
-                params.initial_long_token_amount,
+                amount,
                 mint.decimals,
             )?;
         }
 
-        if params.initial_short_token_amount != 0 {
+        let amount = params.initial_short_token_amount;
+        if amount != 0 {
             let Some(source) = self.initial_short_token_source.as_ref() else {
                 return err!(CoreError::TokenAccountNotProvided);
             };
@@ -224,7 +226,7 @@ impl<'info> CreateDeposit<'info> {
                         authority: self.owner.to_account_info(),
                     },
                 ),
-                params.initial_short_token_amount,
+                amount,
                 mint.decimals,
             )?;
         }

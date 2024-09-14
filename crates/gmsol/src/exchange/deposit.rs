@@ -60,7 +60,7 @@ where
             nonce: None,
             market_token,
             receiver: None,
-            execution_fee: 0,
+            execution_fee: DepositV2::MIN_EXECUTION_LAMPORTS,
             long_token_swap_path: vec![],
             short_token_swap_path: vec![],
             initial_long_token: None,
@@ -88,9 +88,9 @@ where
         self
     }
 
-    /// Set extra exectuion fee allowed to use.
+    /// Set exectuion fee allowed to use.
     ///
-    ///  /// Defaults to `0` means only allowed to use at most `rent-exempt` amount of fee.
+    /// Defaults to min execution fee.
     pub fn execution_fee(&mut self, fee: u64) -> &mut Self {
         self.execution_fee = fee;
         self
@@ -152,10 +152,10 @@ where
                         || (short_token.is_none() && short_amount != 0)
                 );
                 let market = read_market(&self.client.data_store().async_rpc(), market).await?;
-                if long_amount != 0 {
+                if long_amount != 0 && long_token.is_none() {
                     long_token = Some(market.meta().long_token_mint);
                 }
-                if short_amount != 0 {
+                if short_amount != 0 && short_token.is_none() {
                     short_token = Some(market.meta().short_token_mint);
                 }
                 (long_token, short_token)

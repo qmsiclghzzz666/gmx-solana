@@ -26,15 +26,19 @@ use gmsol::{
     exchange::ExchangeOps,
     pyth::{pull_oracle::ExecuteWithPythPrices, Hermes, PythPullOracle},
     store::{
-        oracle::OracleOps, roles::RolesOps, store_ops::StoreOps, token_config::TokenConfigOps,
+        market::MarketOps, oracle::OracleOps, roles::RolesOps, store_ops::StoreOps,
+        token_config::TokenConfigOps,
     },
-    types::{PriceProviderKind, RoleKey, TokenConfigBuilder},
+    types::{MarketConfigKey, PriceProviderKind, RoleKey, TokenConfigBuilder},
     utils::{shared_signer, SignerRef, TransactionBuilder},
     Client, ClientOptions,
 };
 use pyth_sdk::Identifier;
 use rand::{rngs::StdRng, CryptoRng, RngCore, SeedableRng};
-use tokio::sync::{Mutex, OnceCell, OwnedMutexGuard};
+use tokio::{
+    sync::{Mutex, OnceCell, OwnedMutexGuard},
+    time::sleep,
+};
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::EnvFilter;
 
@@ -450,9 +454,7 @@ impl Deployment {
     }
 
     async fn initialize_token_map(&self) -> eyre::Result<()> {
-        let client = self
-            .user_client(Self::DEFAULT_KEEPER)?
-            .ok_or_eyre("missing default keeper")?;
+        let client = self.user_client(Self::DEFAULT_KEEPER)?;
         let store = &self.store;
 
         let mut builder = client.transaction();
@@ -541,9 +543,7 @@ impl Deployment {
             ))
         });
 
-        let client = self
-            .user_client(Self::DEFAULT_KEEPER)?
-            .ok_or_eyre("missing default keeper")?;
+        let client = self.user_client(Self::DEFAULT_KEEPER)?;
         let mut builder = client.transaction();
         let store = &self.store;
         let token_map = self.token_map.pubkey();
@@ -565,6 +565,13 @@ impl Deployment {
                 .await?;
             builder.push(rpc)?;
             entry.insert(market_token);
+            let rpc = client.update_market_config_by_key(
+                store,
+                &market_token,
+                MarketConfigKey::MaxPoolAmountForShortToken,
+                &1_000_000_000_000_000,
+            )?;
+            builder.push(rpc)?;
         }
         _ = builder
             .send_all()
@@ -743,11 +750,11 @@ impl Deployment {
         self.users.users.get(name)
     }
 
-    pub(crate) fn user_client(&self, name: &str) -> eyre::Result<Option<Client<SignerRef>>> {
+    pub(crate) fn user_client(&self, name: &str) -> eyre::Result<Client<SignerRef>> {
         let Some(signer) = self.user_keypair(name) else {
-            return Ok(None);
+            eyre::bail!("no such user");
         };
-        Ok(Some(self.client.try_clone_with_payer(signer.clone())?))
+        Ok(self.client.try_clone_with_payer(signer.clone())?)
     }
 
     pub(crate) async fn get_ata_amount(
@@ -818,6 +825,8 @@ impl Deployment {
                 .await?
         };
 
+        tracing::info!(%signature, token=%token_name, "minted or tranferred {amount} to {user}");
+
         Ok(signature)
     }
 
@@ -829,9 +838,8 @@ impl Deployment {
     ) -> eyre::Result<()> {
         let user = self.user(user)?;
 
-        let signature = self.mint_or_transfer_to(token_name, &user, amount).await?;
+        self.mint_or_transfer_to(token_name, &user, amount).await?;
 
-        tracing::info!(%signature, token=%token_name, "minted or tranferred {amount} to {user}");
         Ok(())
     }
 
@@ -853,6 +861,8 @@ impl Deployment {
 
         let ctx = execute.context().await?;
         let feed_ids = ctx.feed_ids();
+
+        sleep(Duration::from_secs(2)).await;
         let update = self
             .hermes
             .latest_price_updates(feed_ids, Some(EncodingType::Base64))

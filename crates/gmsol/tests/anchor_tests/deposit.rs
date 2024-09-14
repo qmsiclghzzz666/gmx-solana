@@ -16,7 +16,7 @@ async fn single_token_pool_deposit() -> eyre::Result<()> {
             .mint_or_transfer_to("WSOL", &client.payer(), 21_000_000)
             .await?;
 
-        let keeper = deployment.user_client(Deployment::DEFAULT_KEEPER)?.unwrap();
+        let keeper = deployment.user_client(Deployment::DEFAULT_KEEPER)?;
         let store = &deployment.store;
         let oracle = &deployment.oracle;
         let market_token = deployment.market_token("SOL", "WSOL", "WSOL").unwrap();
@@ -38,7 +38,6 @@ async fn single_token_pool_deposit() -> eyre::Result<()> {
             .create_deposit(store, market_token)
             .long_token(amount, None, None)
             .short_token(amount, None, None)
-            .execution_fee(200_000)
             .build_with_address()
             .await?;
         let signature = rpc.send().await?;
@@ -99,18 +98,68 @@ async fn single_token_pool_deposit() -> eyre::Result<()> {
 }
 
 #[tokio::test]
-async fn create_deposit_2() -> eyre::Result<()> {
+async fn balanced_pool_deposit() -> eyre::Result<()> {
     let deployment = setup::current_deployment().await?;
     let _guard = deployment.use_accounts().await?;
+    let span = tracing::info_span!("balanced_pool_deposit");
+    let _enter = span.enter();
 
+    let keeper = deployment.user_client(Deployment::DEFAULT_KEEPER)?;
+    let client = deployment.user_client(Deployment::DEFAULT_USER)?;
+    let store = &deployment.store;
+    let oracle = &deployment.oracle;
+    let for_swap = deployment
+        .market_token("fBTC", "fBTC", "USDG")
+        .expect("must exist");
+    let long_token_amount = 1_000_000;
+    let short_token_amount = 6_000_000_000_000;
     deployment
-        .mint_or_transfer_to_user("fBTC", "user_0", 1_000_000_000)
+        .mint_or_transfer_to_user("fBTC", Deployment::DEFAULT_USER, long_token_amount)
         .await?;
 
-    let client = deployment.locked_user_client().await?;
     deployment
-        .mint_or_transfer_to("WSOL", &client.payer(), 1_000_000_000)
+        .mint_or_transfer_to_user("USDG", Deployment::DEFAULT_USER, short_token_amount)
         .await?;
 
+    let (rpc, deposit) = client
+        .create_deposit(store, for_swap)
+        .long_token(long_token_amount, None, None)
+        .short_token(short_token_amount, None, None)
+        .build_with_address()
+        .await?;
+    let signature = rpc.send().await?;
+    tracing::info!(%signature, "created deposit: {deposit}");
+
+    let mut builder = keeper.execute_deposit(store, oracle, &deposit, false);
+    deployment
+        .execute_with_pyth(&mut builder, None, true)
+        .await?;
+
+    {
+        let market_token = deployment
+            .market_token("fBTC", "fBTC", "USDG")
+            .expect("must exist");
+        let usdg = deployment.token("USDG").expect("must exist");
+        let amount = 10_000_000_000;
+        let client = deployment.locked_user_client().await?;
+
+        deployment
+            .mint_or_transfer_to("USDG", &client.payer(), 20 * amount)
+            .await?;
+
+        let (rpc, deposit) = client
+            .create_deposit(store, market_token)
+            .long_token(amount, Some(&usdg.address), None)
+            .long_token_swap_path(vec![*for_swap])
+            .short_token(amount, None, None)
+            .build_with_address()
+            .await?;
+        let signature = rpc.send().await?;
+        tracing::info!(%signature, "created deposit: {deposit}");
+        let mut builder = keeper.execute_deposit(store, oracle, &deposit, false);
+        deployment
+            .execute_with_pyth(&mut builder, None, true)
+            .await?;
+    }
     Ok(())
 }
