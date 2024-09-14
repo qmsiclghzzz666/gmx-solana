@@ -1,10 +1,19 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::TokenAccount;
+use anchor_spl::token::{Mint, TokenAccount};
+use gmsol_model::{LiquidityMarketMutExt, PositionImpactMarketMutExt};
 use typed_builder::TypedBuilder;
 
 use crate::{
-    states::{withdrawal::WithdrawalV2, Market, NonceBytes, Store},
-    CoreError,
+    states::{
+        revertible::{
+            swap_market::{SwapDirection, SwapMarkets},
+            Revertible, RevertibleLiquidityMarket,
+        },
+        withdrawal::WithdrawalV2,
+        HasMarketMeta, Market, NonceBytes, Oracle, Store, ValidateMarketBalances,
+        ValidateOracleTime,
+    },
+    CoreError, ModelError, StoreError, StoreResult,
 };
 
 /// Create Withdrawal Params.
@@ -118,5 +127,170 @@ impl<'a, 'info> CreateWithdrawalOps<'a, 'info> {
         );
 
         Ok(())
+    }
+}
+
+/// Execute Withdrawal Operation
+#[derive(TypedBuilder)]
+pub(crate) struct ExecuteWithdrawalOp<'a, 'info> {
+    store: &'a AccountLoader<'info, Store>,
+    market: &'a AccountLoader<'info, Market>,
+    market_token_mint: &'a mut Account<'info, Mint>,
+    market_token_vault: AccountInfo<'info>,
+    withdrawal: &'a AccountLoader<'info, WithdrawalV2>,
+    oracle: &'a Oracle,
+    remaining_accounts: &'info [AccountInfo<'info>],
+    throw_on_execution_error: bool,
+    token_program: AccountInfo<'info>,
+}
+
+impl<'a, 'info> ExecuteWithdrawalOp<'a, 'info> {
+    pub(crate) fn execute(mut self) -> Result<Option<(u64, u64)>> {
+        let throw_on_execution_error = self.throw_on_execution_error;
+        match self.validate_oracle() {
+            Ok(()) => {}
+            Err(StoreError::OracleTimestampsAreLargerThanRequired) if !throw_on_execution_error => {
+                msg!(
+                    "Withdrawal expired at {}",
+                    self.oracle_updated_before()
+                        .ok()
+                        .flatten()
+                        .expect("must have an expiration time"),
+                );
+                return Ok(None);
+            }
+            Err(err) => {
+                return Err(error!(err));
+            }
+        }
+        match self.do_execute() {
+            Ok(res) => Ok(Some(res)),
+            Err(err) if !throw_on_execution_error => {
+                // TODO: catch and throw missing oracle price error.
+                msg!("Execute withdrawal error: {}", err);
+                Ok(None)
+            }
+            Err(err) => Err(err),
+        }
+    }
+
+    fn validate_oracle(&self) -> StoreResult<()> {
+        self.oracle.validate_time(self)
+    }
+
+    #[inline(never)]
+    fn do_execute(&mut self) -> Result<(u64, u64)> {
+        self.market.load()?.validate(&self.store.key())?;
+
+        // Prepare the execution context.
+        let current_market_token = self.market_token_mint.key();
+        let mut market = RevertibleLiquidityMarket::new(
+            self.market,
+            self.market_token_mint,
+            self.token_program.to_account_info(),
+            self.store,
+        )?
+        .enable_burn(self.market_token_vault.to_account_info());
+        let loaders = self
+            .withdrawal
+            .load()?
+            .swap
+            .unpack_markets_for_swap(&current_market_token, self.remaining_accounts)?;
+        let mut swap_markets =
+            SwapMarkets::new(&self.store.key(), &loaders, Some(&current_market_token))?;
+
+        // Distribute position impact.
+        {
+            let report = market
+                .distribute_position_impact()
+                .map_err(ModelError::from)?
+                .execute()
+                .map_err(ModelError::from)?;
+            msg!("[Withdrawal] pre-execute: {:?}", report);
+        }
+
+        // Perform the withdrawal.
+        let (long_amount, short_amount) = {
+            let prices = self.oracle.market_prices(&market)?;
+            let report = market
+                .withdraw(
+                    self.withdrawal.load()?.params.market_token_amount.into(),
+                    prices,
+                )
+                .and_then(|w| w.execute())
+                .map_err(ModelError::from)?;
+            let (long_amount, short_amount) = (
+                (*report.long_token_output())
+                    .try_into()
+                    .map_err(|_| StoreError::AmountOverflow)?,
+                (*report.short_token_output())
+                    .try_into()
+                    .map_err(|_| StoreError::AmountOverflow)?,
+            );
+            // Validate current market.
+            market.validate_market_balances(long_amount, short_amount)?;
+            msg!("[Withdrawal] executed: {:?}", report);
+            (long_amount, short_amount)
+        };
+
+        // Perform the swap.
+        let (final_long_amount, final_short_amount) = {
+            let meta = *market.market_meta();
+            swap_markets.revertible_swap(
+                SwapDirection::From(&mut market),
+                self.oracle,
+                &(&self.withdrawal.load()?.swap).into(),
+                (
+                    self.withdrawal.load()?.tokens.final_long_token(),
+                    self.withdrawal.load()?.tokens.final_short_token(),
+                ),
+                (Some(meta.long_token_mint), Some(meta.short_token_mint)),
+                (long_amount, short_amount),
+            )?
+        };
+
+        self.withdrawal
+            .load()?
+            .validate_output_amounts(final_long_amount, final_short_amount)?;
+
+        // Commit the changes.
+        market.commit();
+        swap_markets.commit();
+
+        Ok((final_long_amount, final_short_amount))
+    }
+}
+
+impl<'a, 'info> ValidateOracleTime for ExecuteWithdrawalOp<'a, 'info> {
+    fn oracle_updated_after(&self) -> StoreResult<Option<i64>> {
+        Ok(Some(
+            self.withdrawal
+                .load()
+                .map_err(|_| StoreError::LoadAccountError)?
+                .updated_at,
+        ))
+    }
+
+    fn oracle_updated_before(&self) -> StoreResult<Option<i64>> {
+        let ts = self
+            .store
+            .load()
+            .map_err(|_| StoreError::LoadAccountError)?
+            .request_expiration_at(
+                self.withdrawal
+                    .load()
+                    .map_err(|_| StoreError::LoadAccountError)?
+                    .updated_at,
+            )?;
+        Ok(Some(ts))
+    }
+
+    fn oracle_updated_after_slot(&self) -> StoreResult<Option<u64>> {
+        Ok(Some(
+            self.withdrawal
+                .load()
+                .map_err(|_| StoreError::LoadAccountError)?
+                .updated_at_slot,
+        ))
     }
 }

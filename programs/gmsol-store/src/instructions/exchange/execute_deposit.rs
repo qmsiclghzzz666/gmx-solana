@@ -214,6 +214,7 @@ pub struct ExecuteDepositV2<'info> {
     /// Authority.
     pub authority: Signer<'info>,
     /// Store.
+    #[account(has_one = token_map)]
     pub store: AccountLoader<'info, Store>,
     /// Token Map.
     #[account(has_one = store)]
@@ -461,7 +462,6 @@ impl<'info> ExecuteDepositV2<'info> {
                 .as_ref()
                 .ok_or(error!(CoreError::TokenAccountNotProvided))?;
             builder
-                .clone()
                 .market(&market)
                 .to(escrow.to_account_info())
                 .vault(vault)

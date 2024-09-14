@@ -1451,6 +1451,15 @@ pub mod gmsol_store {
     pub fn close_withdrawal(ctx: Context<CloseWithdrawal>, reason: String) -> Result<()> {
         instructions::close_withdrawal(ctx, &reason)
     }
+
+    #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
+    pub fn execute_withdrawal_v2<'info>(
+        ctx: Context<'_, '_, 'info, 'info, ExecuteWithdrawalV2<'info>>,
+        execution_fee: u64,
+        throw_on_execution_error: bool,
+    ) -> Result<()> {
+        instructions::unchecked_execute_withdrawal(ctx, execution_fee, throw_on_execution_error)
+    }
 }
 
 #[error_code]

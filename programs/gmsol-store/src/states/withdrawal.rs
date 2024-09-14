@@ -242,6 +242,25 @@ impl WithdrawalV2 {
     pub fn swap(&self) -> &SwapParamsV2 {
         &self.swap
     }
+
+    pub(crate) fn validate_output_amounts(
+        &self,
+        long_amount: u64,
+        short_amount: u64,
+    ) -> Result<()> {
+        let params = &self.params;
+        require_gte!(
+            long_amount,
+            params.min_long_token_amount,
+            StoreError::InsufficientOutputAmount
+        );
+        require_gte!(
+            short_amount,
+            params.min_short_token_amount,
+            StoreError::InsufficientOutputAmount
+        );
+        Ok(())
+    }
 }
 
 /// Token Accounts.
