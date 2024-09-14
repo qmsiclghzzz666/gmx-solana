@@ -5,7 +5,7 @@ use crate::StoreError;
 
 use super::{
     common::{
-        action::{ActionSigner, ActionState},
+        action::{ActionHeader, ActionSigner},
         swap::SwapParamsV2,
         token::TokenAndAccount,
         SwapParams, TokenRecord, TokensWithFeed,
@@ -201,21 +201,8 @@ pub struct TokenParams {
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[account(zero_copy)]
 pub struct DepositV2 {
-    /// Action id.
-    pub(crate) id: u64,
-    /// Store.
-    pub(crate) store: Pubkey,
-    /// Market.
-    pub(crate) market: Pubkey,
-    /// Owner.
-    pub(crate) owner: Pubkey,
-    /// Action State.
-    action_state: u8,
-    /// The bump seed.
-    pub(crate) bump: u8,
-    padding_0: [u8; 6],
-    /// Nonce bytes.
-    pub(crate) nonce: [u8; 32],
+    /// Header.
+    pub(crate) header: ActionHeader,
     /// Token accounts.
     pub(crate) tokens: TokenAccounts,
     /// Deposit params.
@@ -238,36 +225,14 @@ impl DepositV2 {
     /// Init Space.
     pub const INIT_SPACE: usize = core::mem::size_of::<Self>();
 
-    /// Get action state.
-    pub fn action_state(&self) -> Result<ActionState> {
-        ActionState::try_from(self.action_state).map_err(|err| error!(err))
-    }
-
-    fn set_action_state(&mut self, new_state: ActionState) {
-        self.action_state = new_state.into();
-    }
-
-    /// Transition to Completed state.
-    pub fn completed(&mut self) -> Result<()> {
-        self.set_action_state(self.action_state()?.completed()?);
-        Ok(())
-    }
-
-    /// Transition to Cancelled state.
-    pub fn cancelled(&mut self) -> Result<()> {
-        self.set_action_state(self.action_state()?.cancelled()?);
-        Ok(())
+    /// Get the action header.
+    pub fn header(&self) -> &ActionHeader {
+        &self.header
     }
 
     /// Get action signer.
     pub fn signer(&self) -> ActionSigner {
-        ActionSigner::new(
-            DepositV2::SEED,
-            self.store,
-            self.owner,
-            self.nonce,
-            self.bump,
-        )
+        self.header.signer(Self::SEED)
     }
 
     /// Get tokens.
@@ -278,11 +243,6 @@ impl DepositV2 {
     /// Get swap params.
     pub fn swap(&self) -> &SwapParamsV2 {
         &self.swap
-    }
-
-    /// Get owner.
-    pub fn owner(&self) -> &Pubkey {
-        &self.owner
     }
 }
 

@@ -295,7 +295,7 @@ pub use self::states::Data;
 
 use self::{
     instructions::*,
-    ops::deposit::CreateDepositParams,
+    ops::{deposit::CreateDepositParams, withdrawal::CreateWithdrawalParams},
     states::{
         common::{SwapParams, TokenRecord},
         deposit::TokenParams as DepositTokenParams,
@@ -1432,6 +1432,21 @@ pub mod gmsol_store {
     ) -> Result<()> {
         instructions::unchecked_execute_deposit(ctx, execution_fee, throw_on_execution_error)
     }
+
+    pub fn prepare_withdrawal_escrow(
+        ctx: Context<PrepareWithdrawalEscrow>,
+        nonce: [u8; 32],
+    ) -> Result<()> {
+        instructions::prepare_withdrawal_escrow(ctx, nonce)
+    }
+
+    pub fn create_withdrawal<'info>(
+        ctx: Context<'_, '_, 'info, 'info, CreateWithdrawal<'info>>,
+        nonce: [u8; 32],
+        params: CreateWithdrawalParams,
+    ) -> Result<()> {
+        instructions::create_withdrawal(ctx, nonce, &params)
+    }
 }
 
 #[error_code]
@@ -1661,9 +1676,21 @@ pub enum CoreError {
     /// Permission denied.
     #[msg("permission denied")]
     PermissionDenied,
+    /// Store Mismatched.
+    #[msg("store mismatched")]
+    StoreMismatched,
+    /// Owner mismatched.
+    #[msg("owner mismatched")]
+    OwnerMismatched,
+    /// Market mismatched.
+    #[msg("market mismatched")]
+    MarketMismatched,
     /// Empty Deposit.
     #[msg("empty deposit")]
     EmptyDeposit,
+    /// Empty Withdrawal.
+    #[msg("emtpy withdrawal")]
+    EmptyWithdrawal,
     /// Token account is not provided.
     #[msg("token account is not provided")]
     TokenAccountNotProvided,

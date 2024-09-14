@@ -338,7 +338,7 @@ impl<'a> CloseDepositHint {
     /// Create from deposit.
     pub fn new(deposit: &'a DepositV2) -> Self {
         Self {
-            owner: *deposit.owner(),
+            owner: *deposit.header().owner(),
             market_token: deposit.tokens().market_token(),
             market_token_account: deposit.tokens().market_token_account(),
             initial_long_token: deposit.tokens().initial_long_token.token(),
@@ -478,7 +478,7 @@ impl ExecuteDepositHint {
     /// Create a new hint for the deposit.
     pub fn new(deposit: &DepositV2, map: &impl TokenMapAccess) -> crate::Result<Self> {
         Ok(Self {
-            owner: *deposit.owner(),
+            owner: *deposit.header().owner(),
             market_token_escrow: deposit.tokens().market_token_account(),
             market_token_mint: deposit.tokens().market_token(),
             feeds: deposit.swap().to_feeds(map)?,

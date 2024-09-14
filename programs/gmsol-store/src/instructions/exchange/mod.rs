@@ -1,6 +1,9 @@
 /// Deposit creation and cancellation.
 pub mod deposit;
 
+/// Withdrawal creation and cancellation.
+pub mod withdrawal;
+
 /// Execute Deposit.
 pub mod execute_deposit;
 
@@ -18,6 +21,7 @@ pub use execute_deposit::*;
 pub use execute_order::*;
 pub use execute_withdrawal::*;
 pub use update_adl::*;
+pub use withdrawal::*;
 
 use crate::StoreError;
 

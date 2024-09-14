@@ -10,11 +10,17 @@ use crate::{
 /// Create Deposit Params.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct CreateDepositParams {
+    /// Execution fee in lamports
     pub execution_fee: u64,
+    /// The length of the swap path for long token.
     pub long_token_swap_length: u8,
+    /// The length of the swap path for short token.
     pub short_token_swap_length: u8,
+    /// Initial long token amount to deposit.
     pub initial_long_token_amount: u64,
+    /// Initial short otken amount to deposit.
     pub initial_short_token_amount: u64,
+    /// The minimum acceptable market token to receive.
     pub min_market_token: u64,
 }
 
@@ -60,12 +66,9 @@ impl<'a, 'info> CreateDepositOps<'a, 'info> {
 
         let mut deposit = deposit.load_init()?;
 
-        deposit.id = id;
-        deposit.store = store.key();
-        deposit.market = market.key();
-        deposit.owner = owner.key();
-        deposit.nonce = *nonce;
-        deposit.bump = bump;
+        deposit
+            .header
+            .init(id, store.key(), market.key(), owner.key(), *nonce, bump);
 
         let clock = Clock::get()?;
         deposit.updated_at = clock.unix_timestamp;

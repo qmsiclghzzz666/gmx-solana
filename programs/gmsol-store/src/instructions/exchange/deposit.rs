@@ -284,13 +284,13 @@ pub struct CloseDeposit<'info> {
     /// The deposit to close.
     #[account(
         mut,
-        has_one = store,
-        has_one = owner,
+        constraint = deposit.load()?.header.owner == owner.key() @ CoreError::OwnerMismatched,
+        constraint = deposit.load()?.header.store == store.key() @ CoreError::StoreMismatched,
         constraint = deposit.load()?.tokens.market_token.account().expect("must exist") == market_token_escrow.key() @ CoreError::MarketTokenAccountMismatched,
         constraint = deposit.load()?.tokens.initial_long_token.account() == initial_long_token_escrow.as_ref().map(|a| a.key()) @ CoreError::TokenAccountMismatched,
         constraint = deposit.load()?.tokens.initial_short_token.account() == initial_short_token_escrow.as_ref().map(|a| a.key()) @ CoreError::TokenAccountMismatched,
-        seeds = [DepositV2::SEED, store.key().as_ref(), owner.key().as_ref(), &deposit.load()?.nonce],
-        bump = deposit.load()?.bump,
+        seeds = [DepositV2::SEED, store.key().as_ref(), owner.key().as_ref(), &deposit.load()?.header.nonce],
+        bump = deposit.load()?.header.bump,
     )]
     pub deposit: AccountLoader<'info, DepositV2>,
     /// The escrow account for receving market tokens.
@@ -351,12 +351,12 @@ pub(crate) fn close_deposit(ctx: Context<CloseDeposit>, reason: &str) -> Result<
             let deposit_address = accounts.deposit.key();
             let deposit = accounts.deposit.load()?;
             emit_cpi!(RemoveDepositEvent::new(
-                deposit.id,
-                deposit.store,
+                deposit.header.id,
+                deposit.header.store,
                 deposit_address,
                 deposit.tokens.market_token(),
-                deposit.owner,
-                deposit.action_state()?,
+                deposit.header.owner,
+                deposit.header.action_state()?,
                 reason,
             )?);
         }
@@ -388,7 +388,7 @@ impl<'info> CloseDeposit<'info> {
             self.only_role(RoleKey::ORDER_KEEPER)?;
             {
                 let deposit = self.deposit.load()?;
-                if deposit.action_state()?.is_completed_or_cancelled() {
+                if deposit.header.action_state()?.is_completed_or_cancelled() {
                     Ok(false)
                 } else {
                     err!(CoreError::PermissionDenied)

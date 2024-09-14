@@ -229,13 +229,13 @@ pub struct ExecuteDepositV2<'info> {
     /// The deposit to execute.
     #[account(
         mut,
-        has_one = store,
-        has_one = market,
+        constraint = deposit.load()?.header.market == market.key() @ CoreError::MarketMismatched,
+        constraint = deposit.load()?.header.store == store.key() @ CoreError::StoreMismatched,
         constraint = deposit.load()?.tokens.market_token.account().expect("must exist") == market_token_escrow.key() @ CoreError::MarketTokenAccountMismatched,
         constraint = deposit.load()?.tokens.initial_long_token.account() == initial_long_token_escrow.as_ref().map(|a| a.key()) @ CoreError::TokenAccountMismatched,
         constraint = deposit.load()?.tokens.initial_short_token.account() == initial_short_token_escrow.as_ref().map(|a| a.key()) @ CoreError::TokenAccountMismatched,
-        seeds = [DepositV2::SEED, store.key().as_ref(), deposit.load()?.owner.as_ref(), &deposit.load()?.nonce],
-        bump = deposit.load()?.bump,
+        seeds = [DepositV2::SEED, store.key().as_ref(), deposit.load()?.header.owner.as_ref(), &deposit.load()?.header.nonce],
+        bump = deposit.load()?.header.bump,
     )]
     pub deposit: AccountLoader<'info, DepositV2>,
     /// Market token mint.
@@ -323,9 +323,9 @@ pub(crate) fn unchecked_execute_deposit<'info>(
     let executed = accounts.perform_execution(remaining_accounts, throw_on_execution_error)?;
 
     if executed {
-        accounts.deposit.load_mut()?.completed()?;
+        accounts.deposit.load_mut()?.header.completed()?;
     } else {
-        accounts.deposit.load_mut()?.cancelled()?;
+        accounts.deposit.load_mut()?.header.cancelled()?;
         accounts.transfer_tokens_out(remaining_accounts)?;
     }
 
