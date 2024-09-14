@@ -1447,6 +1447,10 @@ pub mod gmsol_store {
     ) -> Result<()> {
         instructions::create_withdrawal(ctx, nonce, &params)
     }
+
+    pub fn close_withdrawal(ctx: Context<CloseWithdrawal>, reason: String) -> Result<()> {
+        instructions::close_withdrawal(ctx, &reason)
+    }
 }
 
 #[error_code]

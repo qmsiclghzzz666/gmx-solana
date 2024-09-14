@@ -5,7 +5,7 @@ use crate::{
     constants,
     events::RemoveWithdrawalEvent,
     states::{
-        common::{SwapParams, TokenRecord},
+        common::{action::ActionState, SwapParams, TokenRecord},
         withdrawal::TokenParams,
         Market, NonceBytes, Seed, Store, Withdrawal,
     },
@@ -202,6 +202,7 @@ pub fn remove_withdrawal(ctx: Context<RemoveWithdrawal>, refund: u64, reason: &s
         ctx.accounts.withdrawal.key(),
         ctx.accounts.withdrawal.fixed.tokens.market_token,
         ctx.accounts.withdrawal.fixed.user,
+        ActionState::Completed,
         reason,
     )?);
 

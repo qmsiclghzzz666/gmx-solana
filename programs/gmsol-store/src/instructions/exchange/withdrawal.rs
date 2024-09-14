@@ -5,11 +5,16 @@ use anchor_spl::{
 };
 
 use crate::{
+    events::RemoveWithdrawalEvent,
     ops::{
         execution_fee::TransferExecutionFeeOps,
         withdrawal::{CreateWithdrawalOps, CreateWithdrawalParams},
     },
-    states::{withdrawal::WithdrawalV2, Market, NonceBytes, Store},
+    states::{withdrawal::WithdrawalV2, Market, NonceBytes, RoleKey, Store},
+    utils::{
+        internal::{self, Authentication},
+        token::is_associated_token_account,
+    },
     CoreError,
 };
 
@@ -208,5 +213,208 @@ impl<'info> CreateWithdrawal<'info> {
             )?;
         }
         todo!()
+    }
+}
+
+/// The accounts definition for the `close_withdrawal` instruction.
+#[event_cpi]
+#[derive(Accounts)]
+pub struct CloseWithdrawal<'info> {
+    /// The executor of this instruction.
+    pub executor: Signer<'info>,
+    /// The store.
+    pub store: AccountLoader<'info, Store>,
+    /// The owner of the deposit.
+    /// CHECK: only use to validate and receive fund.
+    #[account(mut)]
+    pub owner: UncheckedAccount<'info>,
+    /// Market token.
+    #[account(
+        constraint = withdrawal.load()?.tokens.market_token() == market_token.key() @ CoreError::MarketTokenMintMismatched
+    )]
+    pub market_token: Box<Account<'info, Mint>>,
+    /// Final long token.
+    #[account(constraint = withdrawal.load()?.tokens.final_long_token() == final_long_token.key() @ CoreError::TokenMintMismatched)]
+    pub final_long_token: Box<Account<'info, Mint>>,
+    /// Final short token.
+    #[account(constraint = withdrawal.load()?.tokens.final_long_token() == final_long_token.key() @ CoreError::TokenMintMismatched)]
+    pub final_short_token: Box<Account<'info, Mint>>,
+    /// The withdrawal to close.
+    #[account(
+        mut,
+        constraint = withdrawal.load()?.header.owner == owner.key() @ CoreError::OwnerMismatched,
+        constraint = withdrawal.load()?.header.store == store.key() @ CoreError::StoreMismatched,
+        constraint = withdrawal.load()?.tokens.market_token_account() == market_token_escrow.key() @ CoreError::MarketTokenAccountMismatched,
+        constraint = withdrawal.load()?.tokens.final_long_token_account() == final_long_token_escrow.key() @ CoreError::MarketTokenAccountMismatched,
+        constraint = withdrawal.load()?.tokens.final_short_token_account() == final_short_token_escrow.key() @ CoreError::MarketTokenAccountMismatched,
+    )]
+    pub withdrawal: AccountLoader<'info, WithdrawalV2>,
+    /// The escrow account for receving market tokens to burn.
+    #[account(
+        mut,
+        associated_token::mint = market_token,
+        associated_token::authority = withdrawal,
+    )]
+    pub market_token_escrow: Box<Account<'info, TokenAccount>>,
+    /// The escrow account for receiving withdrawed final long tokens.
+    #[account(
+        mut,
+        associated_token::mint = final_long_token,
+        associated_token::authority = withdrawal,
+    )]
+    pub final_long_token_escrow: Box<Account<'info, TokenAccount>>,
+    /// The escrow account for receiving withdrawed final short tokens.
+    #[account(
+        mut,
+        associated_token::mint = final_short_token,
+        associated_token::authority = withdrawal,
+    )]
+    pub final_short_token_escrow: Box<Account<'info, TokenAccount>>,
+    /// The ATA for market token of owner.
+    /// CHECK: should be checked during the execution.
+    #[account(
+        mut,
+        constraint = is_associated_token_account(market_token_ata.key, owner.key, &market_token.key()) @ CoreError::NotAnATA,
+    )]
+    pub market_token_ata: UncheckedAccount<'info>,
+    /// The ATA for final long token of owner.
+    /// CHECK: should be checked during the execution
+    #[account(
+        mut,
+        constraint = is_associated_token_account(final_long_token_ata.key, owner.key, &final_long_token.key()) @ CoreError::NotAnATA,
+    )]
+    pub final_long_token_ata: UncheckedAccount<'info>,
+    /// The ATA for final short token of owner.
+    /// CHECK: should be checked during the execution
+    #[account(
+        mut,
+        constraint = is_associated_token_account(final_short_token_ata.key, owner.key, &final_short_token.key()) @ CoreError::NotAnATA,
+    )]
+    pub final_short_token_ata: UncheckedAccount<'info>,
+    /// The system program.
+    pub system_program: Program<'info, System>,
+    /// The token program.
+    pub token_program: Program<'info, Token>,
+    /// The associated token program.
+    pub associated_token_program: Program<'info, AssociatedToken>,
+}
+
+pub(crate) fn close_withdrawal(ctx: Context<CloseWithdrawal>, reason: &str) -> Result<()> {
+    let accounts = &ctx.accounts;
+    let should_continue_when_atas_are_missing = accounts.preprocess()?;
+    if accounts.transfer_to_atas(should_continue_when_atas_are_missing)? {
+        {
+            let withdrawal_address = accounts.withdrawal.key();
+            let withdrawal = accounts.withdrawal.load()?;
+            emit_cpi!(RemoveWithdrawalEvent::new(
+                withdrawal.header.id,
+                withdrawal.header.store,
+                withdrawal_address,
+                withdrawal.tokens.market_token(),
+                withdrawal.header.owner,
+                withdrawal.header.action_state()?,
+                reason,
+            )?);
+        }
+        accounts.close()?;
+    } else {
+        msg!("Some ATAs are not initilaized, skip the close");
+    }
+    Ok(())
+}
+
+impl<'info> internal::Authentication<'info> for CloseWithdrawal<'info> {
+    fn authority(&self) -> &Signer<'info> {
+        &self.executor
+    }
+
+    fn store(&self) -> &AccountLoader<'info, Store> {
+        &self.store
+    }
+}
+
+type ShouldContinueWhenATAsAreMissing = bool;
+type Success = bool;
+
+impl<'info> CloseWithdrawal<'info> {
+    fn preprocess(&self) -> Result<ShouldContinueWhenATAsAreMissing> {
+        if self.executor.key == self.owner.key {
+            Ok(true)
+        } else {
+            self.only_role(RoleKey::ORDER_KEEPER)?;
+            {
+                let withdrawal = self.withdrawal.load()?;
+                if withdrawal
+                    .header
+                    .action_state()?
+                    .is_completed_or_cancelled()
+                {
+                    Ok(false)
+                } else {
+                    err!(CoreError::PermissionDenied)
+                }
+            }
+        }
+    }
+
+    fn transfer_to_atas(&self, init_if_needed: bool) -> Result<Success> {
+        use crate::utils::token::TransferAllFromEscrowToATA;
+
+        let signer = self.withdrawal.load()?.signer();
+        let seeds = signer.as_seeds();
+
+        let builder = TransferAllFromEscrowToATA::builder()
+            .system_program(self.system_program.to_account_info())
+            .token_program(self.token_program.to_account_info())
+            .associated_token_program(self.associated_token_program.to_account_info())
+            .payer(self.executor.to_account_info())
+            .owner(self.owner.to_account_info())
+            .escrow_authority(self.withdrawal.to_account_info())
+            .seeds(&seeds)
+            .init_if_needed(init_if_needed);
+
+        // Transfer market tokens.
+        if !builder
+            .clone()
+            .mint(self.market_token.to_account_info())
+            .ata(self.market_token_ata.to_account_info())
+            .escrow(&self.market_token_escrow)
+            .build()
+            .execute()?
+        {
+            return Ok(false);
+        }
+
+        // Transfer final long tokens.
+        if !builder
+            .clone()
+            .mint(self.final_long_token.to_account_info())
+            .ata(self.final_long_token_ata.to_account_info())
+            .escrow(&self.final_long_token_escrow)
+            .build()
+            .execute()?
+        {
+            return Ok(false);
+        }
+
+        if self.final_long_token_escrow.key() != self.final_short_token_escrow.key() {
+            // Transfer final short tokens.
+            if !builder
+                .clone()
+                .mint(self.final_short_token.to_account_info())
+                .ata(self.final_short_token_ata.to_account_info())
+                .escrow(&self.final_short_token_escrow)
+                .build()
+                .execute()?
+            {
+                return Ok(false);
+            }
+        }
+        todo!()
+    }
+
+    fn close(&self) -> Result<()> {
+        self.withdrawal.close(self.owner.to_account_info())?;
+        Ok(())
     }
 }

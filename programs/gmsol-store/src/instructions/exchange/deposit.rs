@@ -321,14 +321,14 @@ pub struct CloseDeposit<'info> {
         constraint = is_associated_token_account(market_token_ata.key, owner.key, &market_token.key()) @ CoreError::NotAnATA,
     )]
     pub market_token_ata: UncheckedAccount<'info>,
-    /// The ATA for inital long token of owner.
+    /// The ATA for initial long token of owner.
     /// CHECK: should be checked during the execution
     #[account(
         mut,
         constraint = is_associated_token_account(initial_long_token_ata.key, owner.key, &initial_long_token.as_ref().expect("must provided").key()) @ CoreError::NotAnATA,
     )]
     pub initial_long_token_ata: Option<UncheckedAccount<'info>>,
-    /// The ATA for inital short token of owner.
+    /// The ATA for initial short token of owner.
     /// CHECK: should be checked during the execution
     #[account(
         mut,
