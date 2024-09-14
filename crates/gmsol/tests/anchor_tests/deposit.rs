@@ -144,8 +144,13 @@ async fn balanced_pool_deposit() -> eyre::Result<()> {
         let client = deployment.locked_user_client().await?;
 
         deployment
-            .mint_or_transfer_to("USDG", &client.payer(), 20 * amount)
+            .mint_or_transfer_to("USDG", &client.payer(), 2 * amount)
             .await?;
+
+        let usdg_before = deployment
+            .get_user_ata_amount(&usdg.address, None)
+            .await?
+            .expect("must exist");
 
         let (rpc, deposit) = client
             .create_deposit(store, market_token)
@@ -156,10 +161,47 @@ async fn balanced_pool_deposit() -> eyre::Result<()> {
             .await?;
         let signature = rpc.send().await?;
         tracing::info!(%signature, "created deposit: {deposit}");
+
+        let usdg_after_creation = deployment
+            .get_user_ata_amount(&usdg.address, None)
+            .await?
+            .expect("must exist");
+        let market_token_before_exectution = deployment
+            .get_user_ata_amount(market_token, None)
+            .await?
+            .expect("must exist");
+        let usdg_escrow_before_execution = deployment
+            .get_ata_amount(&usdg.address, &deposit)
+            .await?
+            .expect("must exist");
+        let market_token_escrow_before_exectuion = deployment
+            .get_ata_amount(market_token, &deposit)
+            .await?
+            .expect("must exist");
+
+        assert_eq!(usdg_after_creation + 2 * amount, usdg_before);
+        assert_eq!(usdg_escrow_before_execution, 2 * amount);
+        assert_eq!(market_token_escrow_before_exectuion, 0);
+
         let mut builder = keeper.execute_deposit(store, oracle, &deposit, false);
         deployment
             .execute_with_pyth(&mut builder, None, true)
             .await?;
+
+        let market_token_after_execution = deployment
+            .get_user_ata_amount(market_token, None)
+            .await?
+            .expect("must exist");
+        let usdg_escrow_after_execution =
+            deployment.get_ata_amount(&usdg.address, &deposit).await?;
+        let market_token_escrow_after_execution =
+            deployment.get_ata_amount(market_token, &deposit).await?;
+
+        assert!(market_token_after_execution >= market_token_before_exectution);
+        assert!(usdg_escrow_after_execution.is_none());
+        assert!(market_token_escrow_after_execution.is_none());
     }
     Ok(())
 }
+
+// TODO: add tests for execution failure and cancellation.
