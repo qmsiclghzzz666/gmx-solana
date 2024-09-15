@@ -41,7 +41,7 @@ use crate::utils::RpcBuilder;
 use self::{
     deposit::{CloseDepositBuilder, CreateDepositBuilder, ExecuteDepositBuilder},
     order::{CreateOrderBuilder, ExecuteOrderBuilder},
-    withdrawal::{CancelWithdrawalBuilder, CreateWithdrawalBuilder, ExecuteWithdrawalBuilder},
+    withdrawal::{CloseWithdrawalBuilder, CreateWithdrawalBuilder, ExecuteWithdrawalBuilder},
 };
 
 /// Exchange instructions for GMSOL.
@@ -112,8 +112,8 @@ pub trait ExchangeOps<C> {
         amount: u64,
     ) -> CreateWithdrawalBuilder<C>;
 
-    /// Cancel a withdrawal.
-    fn cancel_withdrawal(&self, store: &Pubkey, withdrawal: &Pubkey) -> CancelWithdrawalBuilder<C>;
+    /// Close a withdrawal.
+    fn close_withdrawal(&self, store: &Pubkey, withdrawal: &Pubkey) -> CloseWithdrawalBuilder<C>;
 
     /// Execute a withdrawal.
     fn execute_withdrawal(
@@ -426,8 +426,8 @@ where
         CreateWithdrawalBuilder::new(self, *store, *market_token, amount)
     }
 
-    fn cancel_withdrawal(&self, store: &Pubkey, withdrawal: &Pubkey) -> CancelWithdrawalBuilder<C> {
-        CancelWithdrawalBuilder::new(self, store, withdrawal)
+    fn close_withdrawal(&self, store: &Pubkey, withdrawal: &Pubkey) -> CloseWithdrawalBuilder<C> {
+        CloseWithdrawalBuilder::new(self, store, withdrawal)
     }
 
     fn execute_withdrawal(

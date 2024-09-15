@@ -2,7 +2,7 @@ use anchor_client::solana_sdk::{commitment_config::CommitmentConfig, pubkey::Pub
 use eyre::OptionExt;
 use gmsol::{
     exchange::ExchangeOps,
-    types::{DepositV2, UpdateOrderParams},
+    types::{withdrawal::WithdrawalV2, DepositV2, UpdateOrderParams},
     utils::price_to_min_output_amount,
 };
 use rust_decimal::Decimal;
@@ -433,7 +433,7 @@ impl ExchangeArgs {
                     builder.final_short_token(token, short_token_account.as_ref());
                 }
                 let (builder, withdrawal) = builder
-                    .execution_fee(*extra_execution_fee)
+                    .execution_fee(*extra_execution_fee + WithdrawalV2::MIN_EXECUTION_LAMPORTS)
                     .min_final_long_token_amount(*min_long_token_amount)
                     .min_final_short_token_amount(*min_short_token_amount)
                     .long_token_swap_path(long_swap.clone())
@@ -445,7 +445,7 @@ impl ExchangeArgs {
             }
             Command::CancelWithdrawal { withdrawal } => {
                 let signature = client
-                    .cancel_withdrawal(store, withdrawal)
+                    .close_withdrawal(store, withdrawal)
                     .build()
                     .await?
                     .send()

@@ -140,14 +140,14 @@ pub struct CreateWithdrawal<'info> {
         associated_token::mint = final_long_token,
         associated_token::authority = owner,
     )]
-    pub final_long_token_source: Box<Account<'info, TokenAccount>>,
+    pub final_long_token_ata: Box<Account<'info, TokenAccount>>,
     /// The source final short token account.
     #[account(
         mut,
         associated_token::mint = final_short_token,
         associated_token::authority = owner,
     )]
-    pub final_short_token_source: Box<Account<'info, TokenAccount>>,
+    pub final_short_token_ata: Box<Account<'info, TokenAccount>>,
     /// The system program.
     pub system_program: Program<'info, System>,
     /// The token program.
@@ -212,7 +212,7 @@ impl<'info> CreateWithdrawal<'info> {
                 mint.decimals,
             )?;
         }
-        todo!()
+        Ok(())
     }
 }
 
@@ -410,7 +410,7 @@ impl<'info> CloseWithdrawal<'info> {
                 return Ok(false);
             }
         }
-        todo!()
+        Ok(true)
     }
 
     fn close(&self) -> Result<()> {

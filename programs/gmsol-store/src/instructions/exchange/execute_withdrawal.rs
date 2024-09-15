@@ -277,6 +277,7 @@ pub struct ExecuteWithdrawalV2<'info> {
     pub withdrawal: AccountLoader<'info, WithdrawalV2>,
     /// Market token.
     #[account(
+        mut,
         constraint = withdrawal.load()?.tokens.market_token() == market_token.key() @ CoreError::MarketTokenMintMismatched
     )]
     pub market_token: Box<Account<'info, Mint>>,

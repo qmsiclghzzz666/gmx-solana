@@ -439,7 +439,7 @@ where
                 &client.store_program_id(),
             ))
             .args(instruction::CloseDeposit {
-                reason: "cancelled".to_string(),
+                reason: self.reason.clone(),
             }))
     }
 }
@@ -663,6 +663,7 @@ where
                     initial_long_token_account: hint.initial_long_token_escrow,
                     initial_short_token_account: hint.initial_short_token_escrow,
                 })
+                .reason("executed")
                 .build()
                 .await?;
             Ok(execute.merge(close))

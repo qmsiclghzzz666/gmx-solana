@@ -3,22 +3,24 @@ use std::ops::Deref;
 use anchor_client::{
     anchor_lang::{system_program, Id},
     solana_sdk::{instruction::AccountMeta, pubkey::Pubkey, signer::Signer},
-    RequestBuilder,
 };
 use anchor_spl::associated_token::get_associated_token_address;
-use gmsol_exchange::{accounts, instruction, instructions::CreateWithdrawalParams};
-use gmsol_store::states::{
-    common::{SwapParams, TokensWithFeed},
-    withdrawal::TokenParams,
-    NonceBytes, Pyth, Withdrawal,
+use gmsol_store::{
+    accounts, instruction,
+    ops::withdrawal::CreateWithdrawalParams,
+    states::{
+        common::{swap::SwapParamsV2, TokensWithFeed},
+        withdrawal::WithdrawalV2,
+        NonceBytes, Pyth, TokenMapAccess,
+    },
 };
 
 use crate::{
     store::utils::{read_market, FeedsParser},
-    utils::{ComputeBudget, RpcBuilder},
+    utils::{ComputeBudget, RpcBuilder, ZeroCopy},
 };
 
-use super::generate_nonce;
+use super::{generate_nonce, ExchangeOps};
 
 #[cfg(feature = "pyth-pull-oracle")]
 use crate::pyth::pull_oracle::Prices;
@@ -34,10 +36,8 @@ pub struct CreateWithdrawalBuilder<'a, C> {
     nonce: Option<NonceBytes>,
     execution_fee: u64,
     amount: u64,
-    ui_fee_receiver: Pubkey,
     min_long_token_amount: u64,
     min_short_token_amount: u64,
-    should_unwrap_native_token: bool,
     market_token_account: Option<Pubkey>,
     final_long_token: Option<Pubkey>,
     final_short_token: Option<Pubkey>,
@@ -64,12 +64,10 @@ where
             store,
             market_token,
             nonce: None,
-            execution_fee: 0,
+            execution_fee: WithdrawalV2::MIN_EXECUTION_LAMPORTS,
             amount,
-            ui_fee_receiver: Pubkey::new_unique(),
             min_long_token_amount: 0,
             min_short_token_amount: 0,
-            should_unwrap_native_token: false,
             market_token_account: None,
             final_long_token: None,
             final_short_token: None,
@@ -148,20 +146,6 @@ where
         }
     }
 
-    fn get_or_find_associated_final_long_token_account(&self, token: &Pubkey) -> Pubkey {
-        match self.final_long_token_receiver {
-            Some(account) => account,
-            None => get_associated_token_address(&self.client.payer(), token),
-        }
-    }
-
-    fn get_or_find_associated_final_short_token_account(&self, token: &Pubkey) -> Pubkey {
-        match self.final_short_token_receiver {
-            Some(account) => account,
-            None => get_associated_token_address(&self.client.payer(), token),
-        }
-    }
-
     async fn get_or_fetch_final_tokens(&self, market: &Pubkey) -> crate::Result<(Pubkey, Pubkey)> {
         if let (Some(long_token), Some(short_token)) =
             (self.final_long_token, self.final_short_token)
@@ -177,74 +161,106 @@ where
         ))
     }
 
-    async fn get_token_map(&self) -> crate::Result<Pubkey> {
-        if let Some(address) = self.token_map {
-            Ok(address)
-        } else {
-            crate::store::utils::token_map(self.client.data_store(), &self.store).await
-        }
-    }
-
     /// Set token map.
     pub fn token_map(&mut self, address: Pubkey) -> &mut Self {
         self.token_map = Some(address);
         self
     }
 
-    /// Create the [`RequestBuilder`] and return withdrawal address.
-    pub async fn build_with_address(&self) -> crate::Result<(RequestBuilder<'a, C>, Pubkey)> {
-        let payer = self.client.payer();
-        let authority = self.client.controller_address(&self.store);
-        let market_token_withdrawal_vault = self
-            .client
-            .find_market_vault_address(&self.store, &self.market_token);
+    /// Create the [`RpcBuilder`] and return withdrawal address.
+    pub async fn build_with_address(&self) -> crate::Result<(RpcBuilder<'a, C>, Pubkey)> {
+        let owner = self.client.payer();
         let nonce = self.nonce.unwrap_or_else(generate_nonce);
         let withdrawal = self
             .client
-            .find_withdrawal_address(&self.store, &payer, &nonce);
+            .find_withdrawal_address(&self.store, &owner, &nonce);
         let market = self
             .client
             .find_market_address(&self.store, &self.market_token);
         let (long_token, short_token) = self.get_or_fetch_final_tokens(&market).await?;
-        let builder = self
+        let market_token_escrow = get_associated_token_address(&withdrawal, &self.market_token);
+        let final_long_token_escrow = get_associated_token_address(&withdrawal, &long_token);
+        let final_short_token_escrow = get_associated_token_address(&withdrawal, &short_token);
+        let final_long_token_ata = get_associated_token_address(&owner, &long_token);
+        let final_short_token_ata = get_associated_token_address(&owner, &short_token);
+        let prepare_escrows = self
             .client
-            .exchange()
-            .request()
-            .accounts(accounts::CreateWithdrawal {
-                authority,
+            .data_store_rpc()
+            .accounts(accounts::PrepareWithdrawalEscrow {
+                owner,
                 store: self.store,
-                controller: self.client.controller_address(&self.store),
-                data_store_program: self.client.store_program_id(),
+                withdrawal,
+                market_token: self.market_token,
+                final_long_token: long_token,
+                final_short_token: short_token,
+                market_token_escrow,
+                final_long_token_escrow,
+                final_short_token_escrow,
+                system_program: system_program::ID,
+                token_program: anchor_spl::token::ID,
+                associated_token_program: anchor_spl::associated_token::ID,
+            })
+            .args(instruction::PrepareWithdrawalEscrow { nonce });
+        let prepare_final_long_token_ata = self
+            .client
+            .data_store_rpc()
+            .accounts(accounts::PrepareAssociatedTokenAccount {
+                payer: owner,
+                owner,
+                mint: long_token,
+                account: final_long_token_ata,
+                system_program: system_program::ID,
+                token_program: anchor_spl::token::ID,
+                associated_token_program: anchor_spl::associated_token::ID,
+            })
+            .args(instruction::PrepareAssociatedTokenAccount {});
+        let prepare_final_short_token_ata = self
+            .client
+            .data_store_rpc()
+            .accounts(accounts::PrepareAssociatedTokenAccount {
+                payer: owner,
+                owner,
+                mint: short_token,
+                account: final_short_token_ata,
+                system_program: system_program::ID,
+                token_program: anchor_spl::token::ID,
+                associated_token_program: anchor_spl::associated_token::ID,
+            })
+            .args(instruction::PrepareAssociatedTokenAccount {});
+        let create = self
+            .client
+            .data_store_rpc()
+            .accounts(accounts::CreateWithdrawal {
+                store: self.store,
                 token_program: anchor_spl::token::ID,
                 system_program: system_program::ID,
-                token_map: self.get_token_map().await?,
+                associated_token_program: anchor_spl::associated_token::ID,
                 market,
                 withdrawal,
-                payer,
-                market_token_account: self.get_or_find_associated_market_token_account(),
-                market_token_withdrawal_vault,
-                final_long_token_receiver: self
-                    .get_or_find_associated_final_long_token_account(&long_token),
-                final_short_token_receiver: self
-                    .get_or_find_associated_final_short_token_account(&short_token),
+                owner,
+                market_token: self.market_token,
+                final_long_token: long_token,
+                final_short_token: short_token,
+                market_token_escrow,
+                final_long_token_escrow,
+                final_short_token_escrow,
+                market_token_source: self.get_or_find_associated_market_token_account(),
+                final_long_token_ata,
+                final_short_token_ata,
             })
             .args(instruction::CreateWithdrawal {
                 nonce,
                 params: CreateWithdrawalParams {
                     market_token_amount: self.amount,
                     execution_fee: self.execution_fee,
-                    ui_fee_receiver: self.ui_fee_receiver,
-                    tokens: TokenParams {
-                        min_long_token_amount: self.min_long_token_amount,
-                        min_short_token_amount: self.min_short_token_amount,
-                        should_unwrap_native_token: self.should_unwrap_native_token,
-                    },
-                    long_token_swap_length: self
+                    min_long_token_amount: self.min_long_token_amount,
+                    min_short_token_amount: self.min_short_token_amount,
+                    long_token_swap_path_length: self
                         .long_token_swap_path
                         .len()
                         .try_into()
                         .map_err(|_| crate::Error::NumberOutOfRange)?,
-                    short_token_swap_length: self
+                    short_token_swap_path_length: self
                         .short_token_swap_path
                         .len()
                         .try_into()
@@ -263,34 +279,52 @@ where
                     .collect::<Vec<_>>(),
             );
 
-        Ok((builder, withdrawal))
+        Ok((
+            prepare_escrows
+                .merge(prepare_final_long_token_ata)
+                .merge(prepare_final_short_token_ata)
+                .merge(create),
+            withdrawal,
+        ))
     }
 }
 
-/// Cancel Withdrawal Builder.
-pub struct CancelWithdrawalBuilder<'a, C> {
+/// Close Withdrawal Builder.
+pub struct CloseWithdrawalBuilder<'a, C> {
     client: &'a crate::Client<C>,
     store: Pubkey,
     withdrawal: Pubkey,
-    hint: Option<CancelWithdrawalHint>,
+    reason: String,
+    hint: Option<CloseWithdrawalHint>,
 }
 
 #[derive(Clone, Copy)]
-struct CancelWithdrawalHint {
+pub struct CloseWithdrawalHint {
+    owner: Pubkey,
     market_token: Pubkey,
+    final_long_token: Pubkey,
+    final_short_token: Pubkey,
     market_token_account: Pubkey,
+    final_long_token_account: Pubkey,
+    final_short_token_account: Pubkey,
 }
 
-impl<'a> From<&'a Withdrawal> for CancelWithdrawalHint {
-    fn from(withdrawal: &'a Withdrawal) -> Self {
+impl<'a> From<&'a WithdrawalV2> for CloseWithdrawalHint {
+    fn from(withdrawal: &'a WithdrawalV2) -> Self {
+        let tokens = withdrawal.tokens();
         Self {
-            market_token: withdrawal.fixed.tokens.market_token,
-            market_token_account: withdrawal.fixed.market_token_account,
+            owner: *withdrawal.header().owner(),
+            market_token: tokens.market_token(),
+            final_long_token: tokens.final_long_token(),
+            final_short_token: tokens.final_short_token(),
+            market_token_account: tokens.market_token_account(),
+            final_long_token_account: tokens.final_long_token_account(),
+            final_short_token_account: tokens.final_short_token_account(),
         }
     }
 }
 
-impl<'a, S, C> CancelWithdrawalBuilder<'a, C>
+impl<'a, S, C> CloseWithdrawalBuilder<'a, C>
 where
     C: Deref<Target = S> + Clone,
     S: Signer,
@@ -300,50 +334,69 @@ where
             client,
             store: *store,
             withdrawal: *withdrawal,
+            reason: "cancelled".to_string(),
             hint: None,
         }
     }
 
-    /// Set hint with the given withdrawal.
-    pub fn hint(&mut self, withdrawal: &Withdrawal) -> &mut Self {
-        self.hint = Some(withdrawal.into());
+    /// Set hint.
+    pub fn hint(&mut self, hint: CloseWithdrawalHint) -> &mut Self {
+        self.hint = Some(hint);
         self
     }
 
-    async fn get_or_fetch_withdrawal_hint(&self) -> crate::Result<CancelWithdrawalHint> {
+    async fn get_or_fetch_withdrawal_hint(&self) -> crate::Result<CloseWithdrawalHint> {
         match &self.hint {
             Some(hint) => Ok(*hint),
             None => {
-                let withdrawal: Withdrawal =
+                let withdrawal: ZeroCopy<WithdrawalV2> =
                     self.client.data_store().account(self.withdrawal).await?;
-                Ok((&withdrawal).into())
+                Ok((&withdrawal.0).into())
             }
         }
     }
 
-    /// Build a [`RequestBuilder`] for `cancel_withdrawal` instruction.
-    pub async fn build(&self) -> crate::Result<RequestBuilder<'a, C>> {
-        let user = self.client.payer();
+    /// Set close reason.
+    pub fn reason(&mut self, reason: impl ToString) -> &mut Self {
+        self.reason = reason.to_string();
+        self
+    }
+
+    /// Build a [`RpcBuilder`] for `close_withdrawal` instruction.
+    pub async fn build(&self) -> crate::Result<RpcBuilder<'a, C>> {
+        let payer = self.client.payer();
         let hint = self.get_or_fetch_withdrawal_hint().await?;
+        let market_token_ata = get_associated_token_address(&hint.owner, &hint.market_token);
+        let final_long_token_ata =
+            get_associated_token_address(&hint.owner, &hint.final_long_token);
+        let final_short_token_ata =
+            get_associated_token_address(&hint.owner, &hint.final_short_token);
         Ok(self
             .client
-            .exchange()
-            .request()
-            .accounts(accounts::CancelWithdrawal {
-                user,
-                controller: self.client.controller_address(&self.store),
+            .data_store_rpc()
+            .accounts(accounts::CloseWithdrawal {
                 store: self.store,
                 withdrawal: self.withdrawal,
-                market_token: hint.market_token_account,
-                market_token_withdrawal_vault: self
-                    .client
-                    .find_market_vault_address(&self.store, &hint.market_token),
+                market_token: hint.market_token,
                 token_program: anchor_spl::token::ID,
                 system_program: system_program::ID,
                 event_authority: self.client.data_store_event_authority(),
-                data_store_program: self.client.store_program_id(),
+                executor: payer,
+                owner: hint.owner,
+                final_long_token: hint.final_long_token,
+                final_short_token: hint.final_short_token,
+                market_token_escrow: hint.market_token_account,
+                final_long_token_escrow: hint.final_long_token_account,
+                final_short_token_escrow: hint.final_short_token_account,
+                market_token_ata,
+                final_long_token_ata,
+                final_short_token_ata,
+                associated_token_program: anchor_spl::associated_token::ID,
+                program: self.client.store_program_id(),
             })
-            .args(instruction::CancelWithdrawal {}))
+            .args(instruction::CloseWithdrawal {
+                reason: self.reason.clone(),
+            }))
     }
 }
 
@@ -359,36 +412,40 @@ pub struct ExecuteWithdrawalBuilder<'a, C> {
     feeds_parser: FeedsParser,
     token_map: Option<Pubkey>,
     cancel_on_execution_error: bool,
+    close: bool,
 }
 
 /// Hint for withdrawal execution.
 #[derive(Clone)]
 pub struct ExecuteWithdrawalHint {
+    owner: Pubkey,
     market_token: Pubkey,
-    user: Pubkey,
-    market_token_account: Pubkey,
-    final_long_token_receiver: Pubkey,
-    final_short_token_receiver: Pubkey,
+    market_token_escrow: Pubkey,
+    final_long_token_escrow: Pubkey,
+    final_short_token_escrow: Pubkey,
     final_long_token: Pubkey,
     final_short_token: Pubkey,
     /// Feeds.
     pub feeds: TokensWithFeed,
-    swap: SwapParams,
+    swap: SwapParamsV2,
 }
 
-impl<'a> From<&'a Withdrawal> for ExecuteWithdrawalHint {
-    fn from(withdrawal: &'a Withdrawal) -> Self {
-        Self {
-            market_token: withdrawal.fixed.tokens.market_token,
-            user: withdrawal.fixed.user,
-            market_token_account: withdrawal.fixed.market_token_account,
-            final_long_token: withdrawal.fixed.tokens.final_long_token,
-            final_short_token: withdrawal.fixed.tokens.final_short_token,
-            final_long_token_receiver: withdrawal.fixed.receivers.final_long_token_receiver,
-            final_short_token_receiver: withdrawal.fixed.receivers.final_short_token_receiver,
-            swap: withdrawal.dynamic.swap.clone(),
-            feeds: withdrawal.dynamic.tokens_with_feed.clone(),
-        }
+impl ExecuteWithdrawalHint {
+    /// Create a new hint for the execution.
+    pub fn new(withdrawal: &WithdrawalV2, map: &impl TokenMapAccess) -> crate::Result<Self> {
+        let tokens = withdrawal.tokens();
+        let swap = withdrawal.swap();
+        Ok(Self {
+            owner: *withdrawal.header().owner(),
+            market_token: tokens.market_token(),
+            market_token_escrow: tokens.market_token_account(),
+            final_long_token_escrow: tokens.final_long_token_account(),
+            final_short_token_escrow: tokens.final_short_token_account(),
+            final_long_token: tokens.final_long_token(),
+            final_short_token: tokens.final_short_token(),
+            feeds: swap.to_feeds(map)?,
+            swap: *swap,
+        })
     }
 }
 
@@ -415,6 +472,7 @@ where
             feeds_parser: Default::default(),
             token_map: None,
             cancel_on_execution_error,
+            close: true,
         }
     }
 
@@ -430,10 +488,20 @@ where
         self
     }
 
-    /// Set hint with the given withdrawal.
-    pub fn hint(&mut self, withdrawal: &Withdrawal) -> &mut Self {
-        self.hint = Some(withdrawal.into());
+    /// Set whether to close the withdrawal after execution.
+    pub fn close(&mut self, close: bool) -> &mut Self {
+        self.close = close;
         self
+    }
+
+    /// Set hint with the given withdrawal.
+    pub fn hint(
+        &mut self,
+        withdrawal: &WithdrawalV2,
+        map: &impl TokenMapAccess,
+    ) -> crate::Result<&mut Self> {
+        self.hint = Some(ExecuteWithdrawalHint::new(withdrawal, map)?);
+        Ok(self)
     }
 
     /// Parse feeds with the given price udpates map.
@@ -448,9 +516,10 @@ where
         match &self.hint {
             Some(hint) => Ok(hint.clone()),
             None => {
-                let withdrawal: Withdrawal =
+                let map = self.client.authorized_token_map(&self.store).await?;
+                let withdrawal: ZeroCopy<WithdrawalV2> =
                     self.client.data_store().account(self.withdrawal).await?;
-                let hint: ExecuteWithdrawalHint = (&withdrawal).into();
+                let hint = ExecuteWithdrawalHint::new(&withdrawal.0, &map)?;
                 self.hint = Some(hint.clone());
                 Ok(hint)
             }
@@ -487,15 +556,12 @@ where
                 is_signer: false,
                 is_writable: true,
             });
-        Ok(self
+        let execute = self
             .client
-            .exchange_rpc()
-            .accounts(accounts::ExecuteWithdrawal {
+            .data_store_rpc()
+            .accounts(accounts::ExecuteWithdrawalV2 {
                 authority,
                 store: self.store,
-                controller: self.client.controller_address(&self.store),
-                event_authority: self.client.data_store_event_authority(),
-                data_store_program: self.client.store_program_id(),
                 price_provider: self.price_provider,
                 token_program: anchor_spl::token::ID,
                 system_program: system_program::ID,
@@ -505,24 +571,25 @@ where
                 market: self
                     .client
                     .find_market_address(&self.store, &hint.market_token),
-                user: hint.user,
-                market_token_mint: hint.market_token,
-                market_token_withdrawal_vault: self
-                    .client
-                    .find_market_vault_address(&self.store, &hint.market_token),
-                market_token_account: hint.market_token_account,
-                final_long_token_receiver: hint.final_long_token_receiver,
-                final_short_token_receiver: hint.final_short_token_receiver,
                 final_long_token_vault: self
                     .client
                     .find_market_vault_address(&self.store, &hint.final_long_token),
                 final_short_token_vault: self
                     .client
                     .find_market_vault_address(&self.store, &hint.final_short_token),
+                market_token: hint.market_token,
+                final_long_token: hint.final_long_token,
+                final_short_token: hint.final_short_token,
+                market_token_escrow: hint.market_token_escrow,
+                final_long_token_escrow: hint.final_long_token_escrow,
+                final_short_token_escrow: hint.final_short_token_escrow,
+                market_token_vault: self
+                    .client
+                    .find_market_vault_address(&self.store, &hint.market_token),
             })
-            .args(instruction::ExecuteWithdrawal {
+            .args(instruction::ExecuteWithdrawalV2 {
                 execution_fee: self.execution_fee,
-                cancel_on_execution_error: self.cancel_on_execution_error,
+                throw_on_execution_error: !self.cancel_on_execution_error,
             })
             .accounts(
                 feeds
@@ -530,6 +597,26 @@ where
                     .chain(swap_path_markets)
                     .collect::<Vec<_>>(),
             )
-            .compute_budget(ComputeBudget::default().with_limit(EXECUTE_WITHDRAWAL_COMPUTE_BUDGET)))
+            .compute_budget(ComputeBudget::default().with_limit(EXECUTE_WITHDRAWAL_COMPUTE_BUDGET));
+        if self.close {
+            let close = self
+                .client
+                .close_withdrawal(&self.store, &self.withdrawal)
+                .hint(CloseWithdrawalHint {
+                    owner: hint.owner,
+                    market_token: hint.market_token,
+                    final_long_token: hint.final_long_token,
+                    final_short_token: hint.final_short_token,
+                    market_token_account: hint.market_token_escrow,
+                    final_long_token_account: hint.final_long_token_escrow,
+                    final_short_token_account: hint.final_short_token_escrow,
+                })
+                .reason("executed")
+                .build()
+                .await?;
+            Ok(execute.merge(close))
+        } else {
+            Ok(execute)
+        }
     }
 }
