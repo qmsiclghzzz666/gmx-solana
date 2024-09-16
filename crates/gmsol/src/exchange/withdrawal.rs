@@ -620,3 +620,35 @@ where
         }
     }
 }
+
+#[cfg(feature = "pyth-pull-oracle")]
+mod pyth {
+    use crate::pyth::{pull_oracle::ExecuteWithPythPrices, PythPullOracleContext};
+
+    use super::*;
+
+    impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteWithPythPrices<'a, C>
+        for ExecuteWithdrawalBuilder<'a, C>
+    {
+        fn set_execution_fee(&mut self, lamports: u64) {
+            self.execution_fee(lamports);
+        }
+
+        async fn context(&mut self) -> crate::Result<PythPullOracleContext> {
+            let hint = self.prepare_hint().await?;
+            let ctx = PythPullOracleContext::try_from_feeds(&hint.feeds)?;
+            Ok(ctx)
+        }
+
+        async fn build_rpc_with_price_updates(
+            &mut self,
+            price_updates: Prices,
+        ) -> crate::Result<Vec<crate::utils::RpcBuilder<'a, C, ()>>> {
+            let rpc = self
+                .parse_with_pyth_price_updates(price_updates)
+                .build()
+                .await?;
+            Ok(vec![rpc])
+        }
+    }
+}

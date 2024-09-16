@@ -1,0 +1,68 @@
+use gmsol::exchange::ExchangeOps;
+
+use crate::anchor_tests::setup::{current_deployment, Deployment};
+
+#[tokio::test]
+async fn single_token_pool_withdarwal() -> eyre::Result<()> {
+    let deployment = current_deployment().await?;
+    let _guard = deployment.use_accounts().await?;
+    let span = tracing::info_span!("single_token_pool_withdrawal");
+    let _enter = span.enter();
+
+    {
+        let client = deployment.locked_user_client().await?;
+        let amount = 500_000_000;
+        deployment
+            .mint_or_transfer_to("WSOL", &client.payer(), 2 * amount + 1_000_000)
+            .await?;
+
+        let keeper = deployment.user_client(Deployment::DEFAULT_KEEPER)?;
+        let store = &deployment.store;
+        let oracle = &deployment.oracle;
+        let market_token = deployment
+            .market_token("SOL", "WSOL", "WSOL")
+            .expect("must exist");
+        let _wsol = deployment.token("WSOL").expect("must exist");
+
+        // Deposit to the single token pool.
+        let (rpc, deposit) = client
+            .create_deposit(store, market_token)
+            .long_token(amount, None, None)
+            .short_token(amount, None, None)
+            .build_with_address()
+            .await?;
+        let signature = rpc.send().await?;
+        tracing::info!(%deposit, %signature, "created a deposit");
+
+        let mut builder = keeper.execute_deposit(store, oracle, &deposit, true);
+        deployment
+            .execute_with_pyth(&mut builder, None, true)
+            .await?;
+
+        let market_token_before_withdrawal = deployment
+            .get_user_ata_amount(market_token, None)
+            .await?
+            .expect("must exist");
+
+        // Withdraw all from the pool.
+        let (rpc, withdrawal) = client
+            .create_withdrawal(store, market_token, market_token_before_withdrawal)
+            .build_with_address()
+            .await?;
+        let signature = rpc.send().await?;
+        tracing::info!(%withdrawal, %signature, "created a withdrawal");
+
+        let mut builder = keeper.execute_withdrawal(store, oracle, &withdrawal, true);
+        deployment
+            .execute_with_pyth(&mut builder, None, true)
+            .await?;
+
+        let market_token_after_withdrawal = deployment
+            .get_user_ata_amount(market_token, None)
+            .await?
+            .expect("must exist");
+        assert_eq!(market_token_after_withdrawal, 0);
+    }
+
+    Ok(())
+}
