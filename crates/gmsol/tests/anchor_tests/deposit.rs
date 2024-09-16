@@ -111,8 +111,8 @@ async fn balanced_pool_deposit() -> eyre::Result<()> {
     let for_swap = deployment
         .market_token("fBTC", "fBTC", "USDG")
         .expect("must exist");
-    let long_token_amount = 1_000_000;
-    let short_token_amount = 6_000_000_000_000;
+    let long_token_amount = 1_000_002;
+    let short_token_amount = 6_000_000_000_001;
     deployment
         .mint_or_transfer_to_user("fBTC", Deployment::DEFAULT_USER, long_token_amount)
         .await?;
