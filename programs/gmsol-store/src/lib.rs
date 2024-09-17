@@ -1460,6 +1460,27 @@ pub mod gmsol_store {
     ) -> Result<()> {
         instructions::unchecked_execute_withdrawal(ctx, execution_fee, throw_on_execution_error)
     }
+
+    pub fn prepare_swap_order_escrow(
+        ctx: Context<PrepareSwapOrderEscrow>,
+        nonce: [u8; 32],
+    ) -> Result<()> {
+        instructions::prepare_swap_order_escrow(ctx, nonce)
+    }
+
+    pub fn prepare_increase_order_escrow(
+        ctx: Context<PrepareIncreaseOrderEscrow>,
+        nonce: [u8; 32],
+    ) -> Result<()> {
+        instructions::prepare_increase_order_escrow(ctx, nonce)
+    }
+
+    pub fn prepare_decrease_order_escrow(
+        ctx: Context<PrepareDecreaseOrderEscrow>,
+        nonce: [u8; 32],
+    ) -> Result<()> {
+        instructions::prepare_decrease_order_escrow(ctx, nonce)
+    }
 }
 
 #[error_code]
