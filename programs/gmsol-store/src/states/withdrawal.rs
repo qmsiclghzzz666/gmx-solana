@@ -220,7 +220,7 @@ impl WithdrawalV2 {
     /// Init space.
     pub const INIT_SPACE: usize = core::mem::size_of::<Self>();
 
-    /// Max execution lamports.
+    /// Min execution lamports.
     pub const MIN_EXECUTION_LAMPORTS: u64 = 200_000;
 
     /// Get the action header.

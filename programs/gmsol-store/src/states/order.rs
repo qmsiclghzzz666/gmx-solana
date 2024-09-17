@@ -4,7 +4,7 @@ use gmsol_model::action::decrease_position::DecreasePositionReport;
 use crate::StoreError;
 
 use super::{
-    common::{SwapParams, TokenRecord, TokensWithFeed},
+    common::{action::ActionHeader, swap::SwapParamsV2, SwapParams, TokenRecord, TokensWithFeed},
     position::PositionKind,
     NonceBytes, Oracle, Seed,
 };
@@ -656,4 +656,33 @@ impl TransferOut {
         }
         Ok(())
     }
+}
+
+/// Order.
+#[account(zero_copy)]
+#[cfg_attr(feature = "debug", derive(Debug))]
+pub struct OrderV2 {
+    /// Action header.
+    pub(crate) header: ActionHeader,
+    // /// Token accounts.
+    // pub(crate) tokens: TokenAccounts,
+    // /// Withdrawal params.
+    // pub(crate) params: WithdrawalParams,
+    /// Swap params.
+    pub(crate) swap: SwapParamsV2,
+    padding_1: [u8; 4],
+    pub(crate) updated_at: i64,
+    pub(crate) updated_at_slot: u64,
+    reserve: [u8; 128],
+}
+
+impl OrderV2 {
+    /// Seed.
+    pub const SEED: &'static [u8] = b"order";
+
+    /// Init space.
+    pub const INIT_SPACE: usize = core::mem::size_of::<Self>();
+
+    /// Min execution lamports.
+    pub const MIN_EXECUTION_LAMPORTS: u64 = 200_000;
 }

@@ -4,6 +4,9 @@ pub mod deposit;
 /// Withdrawal creation and cancellation.
 pub mod withdrawal;
 
+/// Order creation and cancellation.
+pub mod order;
+
 /// Execute Deposit.
 pub mod execute_deposit;
 
@@ -20,6 +23,7 @@ pub use deposit::*;
 pub use execute_deposit::*;
 pub use execute_order::*;
 pub use execute_withdrawal::*;
+pub use order::*;
 pub use update_adl::*;
 pub use withdrawal::*;
 

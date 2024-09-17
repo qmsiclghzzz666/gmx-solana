@@ -22,7 +22,7 @@ use crate::{
 #[derive(Accounts)]
 #[instruction(nonce: [u8; 32])]
 pub struct PrepareWithdrawalEscrow<'info> {
-    /// The owner of the deposit.
+    /// The owner of the withdrawal.
     #[account(mut)]
     pub owner: Signer<'info>,
     /// Store.
