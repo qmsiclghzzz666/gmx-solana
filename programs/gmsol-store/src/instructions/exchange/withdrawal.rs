@@ -128,22 +128,20 @@ pub struct CreateWithdrawal<'info> {
         associated_token::authority = withdrawal,
     )]
     pub final_short_token_escrow: Box<Account<'info, TokenAccount>>,
-    /// The ATA of the owner for receving market tokens.
+    /// The source market token account.
     #[account(
         mut,
         token::mint = market_token,
     )]
     pub market_token_source: Box<Account<'info, TokenAccount>>,
-    /// The source final long token account.
+    /// The ATA for receiving the final long tokens.
     #[account(
-        mut,
         associated_token::mint = final_long_token,
         associated_token::authority = owner,
     )]
     pub final_long_token_ata: Box<Account<'info, TokenAccount>>,
-    /// The source final short token account.
+    /// The ATA for receiving the final short tokens.
     #[account(
-        mut,
         associated_token::mint = final_short_token,
         associated_token::authority = owner,
     )]

@@ -724,22 +724,56 @@ pub struct OrderParamsV2 {
     side: u8,
     padding_1: [u8; 6],
     /// Collateral/Output token.
-    pub(crate) collateral_token: Pubkey,
+    collateral_token: Pubkey,
     /// Position address.
-    pub(crate) position: Pubkey,
+    position: Pubkey,
     /// Initial collateral delta amount.
-    pub(crate) initial_collateral_delta_amount: u64,
+    initial_collateral_delta_amount: u64,
     /// Size delta value.
-    pub(crate) size_delta_value: u128,
+    size_delta_value: u128,
     /// Min output amount or value.
     /// - Used as amount for swap orders.
     /// - Used as value for decrease position orders.
-    pub(crate) min_output: u128,
+    min_output: u128,
     /// Trigger price (in unit price).
-    pub(crate) trigger_price: u128,
+    trigger_price: u128,
     /// Acceptable price (in unit price).
-    pub(crate) acceptable_price: u128,
+    acceptable_price: u128,
     reserve: [u8; 128],
+}
+
+impl OrderParamsV2 {
+    pub(crate) fn init_swap(
+        &mut self,
+        kind: OrderKind,
+        collateral_token: Pubkey,
+        swap_in_amount: u64,
+        min_output: Option<u128>,
+    ) -> Result<()> {
+        require!(
+            matches!(kind, OrderKind::MarketSwap | OrderKind::LimitSwap),
+            CoreError::Internal
+        );
+        self.kind = kind.into();
+        self.collateral_token = collateral_token;
+        self.initial_collateral_delta_amount = swap_in_amount;
+        match kind {
+            OrderKind::MarketSwap => {
+                self.min_output = min_output.unwrap_or(0);
+            }
+            OrderKind::LimitSwap => {
+                let Some(min_output) = min_output else {
+                    return err!(CoreError::InvalidMinOutputAmount);
+                };
+                require!(min_output != 0, CoreError::Internal);
+                self.min_output = min_output;
+            }
+            _ => {
+                return err!(CoreError::InvalidMinOutputAmount);
+            }
+        }
+        Ok(())
+    }
 }
 
 /// Order side.

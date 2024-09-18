@@ -12,3 +12,6 @@ pub mod deposit;
 
 /// Withdrawal Operations.
 pub mod withdrawal;
+
+/// Order Operations.
+pub mod order;

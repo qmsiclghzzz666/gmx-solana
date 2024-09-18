@@ -295,7 +295,9 @@ pub use self::states::Data;
 
 use self::{
     instructions::*,
-    ops::{deposit::CreateDepositParams, withdrawal::CreateWithdrawalParams},
+    ops::{
+        deposit::CreateDepositParams, order::CreateOrderParams, withdrawal::CreateWithdrawalParams,
+    },
     states::{
         common::{SwapParams, TokenRecord},
         deposit::TokenParams as DepositTokenParams,
@@ -319,6 +321,7 @@ declare_id!("gmX4GEZycT14vqJ3yDoCA5jW53vBaSQpQDYNDXtkWt1");
 #[program]
 /// Instructions definitions of the GMSOL Store Program.
 pub mod gmsol_store {
+
     use super::*;
 
     // Data Store.
@@ -1481,6 +1484,14 @@ pub mod gmsol_store {
     ) -> Result<()> {
         instructions::prepare_decrease_order_escrow(ctx, nonce)
     }
+
+    pub fn create_order<'info>(
+        ctx: Context<'_, '_, 'info, 'info, CreateOrder<'info>>,
+        nonce: [u8; 32],
+        params: CreateOrderParams,
+    ) -> Result<()> {
+        instructions::create_order(ctx, nonce, &params)
+    }
 }
 
 #[error_code]
@@ -1707,6 +1718,9 @@ pub type StoreResult<T> = std::result::Result<T, StoreError>;
 
 #[error_code]
 pub enum CoreError {
+    /// Internal error.
+    #[msg("internal error")]
+    Internal,
     /// Permission denied.
     #[msg("permission denied")]
     PermissionDenied,
@@ -1725,6 +1739,12 @@ pub enum CoreError {
     /// Empty Withdrawal.
     #[msg("emtpy withdrawal")]
     EmptyWithdrawal,
+    /// Empty Order.
+    #[msg("emtpy order")]
+    EmptyOrder,
+    /// Invalid min output amount for limit swap.
+    #[msg("invalid min output amount for limit swap order")]
+    InvalidMinOutputAmount,
     /// Token account is not provided.
     #[msg("token account is not provided")]
     TokenAccountNotProvided,
@@ -1785,6 +1805,12 @@ pub enum CoreError {
     /// Insufficient output amounts.
     #[msg("insufficient output amounts")]
     InsufficientOutputAmount,
+    /// Position is not required.
+    #[msg("position is not required")]
+    PositionItNotRequired,
+    /// Missing initial collateral token.
+    #[msg("missing initial collateral token")]
+    MissingInitialCollateralToken,
 }
 
 impl CoreError {

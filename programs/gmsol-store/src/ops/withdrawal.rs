@@ -113,6 +113,11 @@ impl<'a, 'info> CreateWithdrawalOps<'a, 'info> {
     fn validate_params_excluding_swap(&self) -> Result<()> {
         let params = &self.params;
         require!(params.market_token_amount != 0, CoreError::EmptyWithdrawal);
+        require_gte!(
+            self.market_token.amount,
+            params.market_token_amount,
+            CoreError::NotEnoughTokenAmount,
+        );
 
         require_gte!(
             params.execution_fee,
