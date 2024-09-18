@@ -1764,6 +1764,12 @@ pub enum CoreError {
     /// Unknown Action State.
     #[msg("unknown action state")]
     UnknownActionState,
+    /// Unknown Order Kind.
+    #[msg("unknown order kind")]
+    UnknownOrderKind,
+    /// Unknown Order Side.
+    #[msg("unknown order side")]
+    UnknownOrderSide,
     /// Preconditions are not met.
     #[msg("preconditions are not met")]
     PreconditionsAreNotMet,
@@ -1784,5 +1790,13 @@ pub enum CoreError {
 impl CoreError {
     pub(crate) const fn unknown_action_state(_kind: u8) -> Self {
         Self::UnknownActionState
+    }
+
+    pub(crate) const fn unknown_order_kind(_kind: u8) -> Self {
+        Self::UnknownOrderKind
+    }
+
+    pub(crate) const fn unknown_order_side(_kind: u8) -> Self {
+        Self::UnknownOrderSide
     }
 }

@@ -1,10 +1,13 @@
 use anchor_lang::prelude::*;
 use gmsol_model::action::decrease_position::DecreasePositionReport;
 
-use crate::StoreError;
+use crate::{CoreError, StoreError};
 
 use super::{
-    common::{action::ActionHeader, swap::SwapParamsV2, SwapParams, TokenRecord, TokensWithFeed},
+    common::{
+        action::ActionHeader, swap::SwapParamsV2, token::TokenAndAccount, SwapParams, TokenRecord,
+        TokensWithFeed,
+    },
     position::PositionKind,
     NonceBytes, Oracle, Seed,
 };
@@ -395,8 +398,17 @@ pub struct UpdateOrderParams {
 
 /// Order Kind.
 #[derive(
-    AnchorSerialize, AnchorDeserialize, Clone, InitSpace, Copy, strum::EnumString, strum::Display,
+    AnchorSerialize,
+    AnchorDeserialize,
+    Clone,
+    InitSpace,
+    Copy,
+    strum::EnumString,
+    strum::Display,
+    num_enum::IntoPrimitive,
+    num_enum::TryFromPrimitive,
 )]
+#[num_enum(error_type(name = CoreError, constructor = CoreError::unknown_order_kind))]
 #[strum(serialize_all = "snake_case")]
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[non_exhaustive]
@@ -664,13 +676,14 @@ impl TransferOut {
 pub struct OrderV2 {
     /// Action header.
     pub(crate) header: ActionHeader,
-    // /// Token accounts.
-    // pub(crate) tokens: TokenAccounts,
-    // /// Withdrawal params.
-    // pub(crate) params: WithdrawalParams,
+    /// Token accounts.
+    pub(crate) tokens: TokenAccounts,
+    /// Order params.
+    pub(crate) params: OrderParamsV2,
+    padding_1: [u8; 8],
     /// Swap params.
     pub(crate) swap: SwapParamsV2,
-    padding_1: [u8; 4],
+    padding_2: [u8; 4],
     pub(crate) updated_at: i64,
     pub(crate) updated_at_slot: u64,
     reserve: [u8; 128],
@@ -685,4 +698,67 @@ impl OrderV2 {
 
     /// Min execution lamports.
     pub const MIN_EXECUTION_LAMPORTS: u64 = 200_000;
+}
+
+/// Token accounts for Order.
+#[account(zero_copy)]
+#[cfg_attr(feature = "debug", derive(Debug))]
+pub struct TokenAccounts {
+    /// Initial collateral.
+    pub(crate) initial_collateral: TokenAndAccount,
+    /// Final output token.
+    pub(crate) final_output_token: TokenAndAccount,
+    /// Long token.
+    pub(crate) long_token: TokenAndAccount,
+    /// Short token.
+    pub(crate) short_token: TokenAndAccount,
+}
+
+/// Order params.
+#[account(zero_copy)]
+#[cfg_attr(feature = "debug", derive(Debug))]
+pub struct OrderParamsV2 {
+    /// Kind.
+    kind: u8,
+    /// Order side.
+    side: u8,
+    padding_1: [u8; 6],
+    /// Collateral/Output token.
+    pub(crate) collateral_token: Pubkey,
+    /// Position address.
+    pub(crate) position: Pubkey,
+    /// Initial collateral delta amount.
+    pub(crate) initial_collateral_delta_amount: u64,
+    /// Size delta value.
+    pub(crate) size_delta_value: u128,
+    /// Min output amount or value.
+    /// - Used as amount for swap orders.
+    /// - Used as value for decrease position orders.
+    pub(crate) min_output: u128,
+    /// Trigger price (in unit price).
+    pub(crate) trigger_price: u128,
+    /// Acceptable price (in unit price).
+    pub(crate) acceptable_price: u128,
+    reserve: [u8; 128],
+}
+
+/// Order side.
+#[derive(
+    Clone,
+    Copy,
+    strum::EnumString,
+    strum::Display,
+    num_enum::IntoPrimitive,
+    num_enum::TryFromPrimitive,
+)]
+#[num_enum(error_type(name = CoreError, constructor = CoreError::unknown_order_side))]
+#[strum(serialize_all = "snake_case")]
+#[cfg_attr(feature = "debug", derive(Debug))]
+#[non_exhaustive]
+#[repr(u8)]
+pub enum OrderSide {
+    /// Long.
+    Long,
+    /// Short.
+    Short,
 }
