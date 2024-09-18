@@ -356,6 +356,37 @@ pub(crate) fn create_order<'info>(
                 .build()
                 .execute()?;
         }
+        OrderKind::MarketIncrease | OrderKind::MarketDecrease => {
+            let position = accounts
+                .position
+                .as_ref()
+                .ok_or(error!(CoreError::PositionIsRequired))?;
+            let initial_collateral = accounts
+                .initial_collateral_token_escrow
+                .as_ref()
+                .ok_or(error!(CoreError::TokenAccountNotProvided))?;
+            let long_token = accounts
+                .long_token_escrow
+                .as_ref()
+                .ok_or(error!(CoreError::TokenAccountNotProvided))?;
+            let short_token = accounts
+                .short_token_escrow
+                .as_ref()
+                .ok_or(error!(CoreError::TokenAccountNotProvided))?;
+            let position_bump = ctx
+                .bumps
+                .position
+                .as_ref()
+                .ok_or(error!(CoreError::PositionIsRequired))?;
+            ops.increase()
+                .position(position.clone())
+                .position_bump(*position_bump)
+                .initial_collateral_token(initial_collateral.as_ref())
+                .long_token(long_token.as_ref())
+                .short_token(short_token.as_ref())
+                .build()
+                .execute()?;
+        }
         _ => {
             todo!()
         }

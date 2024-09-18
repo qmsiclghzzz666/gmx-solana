@@ -750,10 +750,6 @@ impl OrderParamsV2 {
         swap_in_amount: u64,
         min_output: Option<u128>,
     ) -> Result<()> {
-        require!(
-            matches!(kind, OrderKind::MarketSwap | OrderKind::LimitSwap),
-            CoreError::Internal
-        );
         self.kind = kind.into();
         self.collateral_token = collateral_token;
         self.initial_collateral_delta_amount = swap_in_amount;
@@ -769,7 +765,48 @@ impl OrderParamsV2 {
                 self.min_output = min_output;
             }
             _ => {
-                return err!(CoreError::InvalidMinOutputAmount);
+                return err!(CoreError::Internal);
+            }
+        }
+        Ok(())
+    }
+
+    pub(crate) fn init_increase(
+        &mut self,
+        is_long: bool,
+        kind: OrderKind,
+        collateral_token: Pubkey,
+        initial_collateral_delta_amount: u64,
+        trigger_price: Option<u128>,
+        acceptable_price: Option<u128>,
+    ) -> Result<()> {
+        self.kind = kind.into();
+        self.collateral_token = collateral_token;
+        self.initial_collateral_delta_amount = initial_collateral_delta_amount;
+        match acceptable_price {
+            Some(price) => {
+                self.acceptable_price = price;
+            }
+            None => {
+                if is_long {
+                    self.acceptable_price = u128::MAX;
+                } else {
+                    self.acceptable_price = u128::MIN;
+                }
+            }
+        }
+        match kind {
+            OrderKind::MarketIncrease => {
+                require!(trigger_price.is_none(), CoreError::InvalidTriggerPrice);
+            }
+            OrderKind::LimitIncrease => {
+                let Some(price) = trigger_price else {
+                    return err!(CoreError::InvalidTriggerPrice);
+                };
+                self.trigger_price = price;
+            }
+            _ => {
+                return err!(CoreError::Internal);
             }
         }
         Ok(())

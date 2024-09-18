@@ -1745,6 +1745,12 @@ pub enum CoreError {
     /// Invalid min output amount for limit swap.
     #[msg("invalid min output amount for limit swap order")]
     InvalidMinOutputAmount,
+    /// Invalid trigger price.
+    #[msg("invalid trigger price")]
+    InvalidTriggerPrice,
+    /// Invalid position.
+    #[msg("invalid position")]
+    InvalidPosition,
     /// Token account is not provided.
     #[msg("token account is not provided")]
     TokenAccountNotProvided,
@@ -1808,6 +1814,9 @@ pub enum CoreError {
     /// Position is not required.
     #[msg("position is not required")]
     PositionItNotRequired,
+    /// Position is required.
+    #[msg("position is required")]
+    PositionIsRequired,
     /// Missing initial collateral token.
     #[msg("missing initial collateral token")]
     MissingInitialCollateralToken,
