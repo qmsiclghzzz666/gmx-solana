@@ -1751,6 +1751,9 @@ pub enum CoreError {
     /// Invalid position.
     #[msg("invalid position")]
     InvalidPosition,
+    /// Order kind is not allowed.
+    #[msg("the order kind is not allowed by this instruction")]
+    OrderKindNotAllowed,
     /// Token account is not provided.
     #[msg("token account is not provided")]
     TokenAccountNotProvided,

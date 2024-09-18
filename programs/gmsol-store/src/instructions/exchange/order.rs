@@ -356,7 +356,7 @@ pub(crate) fn create_order<'info>(
                 .build()
                 .execute()?;
         }
-        OrderKind::MarketIncrease | OrderKind::MarketDecrease => {
+        OrderKind::MarketIncrease | OrderKind::LimitIncrease => {
             let position = accounts
                 .position
                 .as_ref()
@@ -387,8 +387,39 @@ pub(crate) fn create_order<'info>(
                 .build()
                 .execute()?;
         }
+        OrderKind::MarketDecrease | OrderKind::LimitDecrease | OrderKind::StopLossDecrease => {
+            let position = accounts
+                .position
+                .as_ref()
+                .ok_or(error!(CoreError::PositionIsRequired))?;
+            let final_output = accounts
+                .final_output_token_escrow
+                .as_ref()
+                .ok_or(error!(CoreError::TokenAccountNotProvided))?;
+            let long_token = accounts
+                .long_token_escrow
+                .as_ref()
+                .ok_or(error!(CoreError::TokenAccountNotProvided))?;
+            let short_token = accounts
+                .short_token_escrow
+                .as_ref()
+                .ok_or(error!(CoreError::TokenAccountNotProvided))?;
+            let position_bump = ctx
+                .bumps
+                .position
+                .as_ref()
+                .ok_or(error!(CoreError::PositionIsRequired))?;
+            ops.decrease()
+                .position(position.clone())
+                .position_bump(*position_bump)
+                .final_output_token(final_output.as_ref())
+                .long_token(long_token.as_ref())
+                .short_token(short_token.as_ref())
+                .build()
+                .execute()?;
+        }
         _ => {
-            todo!()
+            return err!(CoreError::OrderKindNotAllowed);
         }
     }
 

@@ -87,6 +87,13 @@ impl<'a, 'info> CreateOrderOps<'a, 'info> {
         CreateIncreaseOrderOp::builder().common(self)
     }
 
+    pub(crate) fn decrease(
+        self,
+    ) -> CreateDecreaseOrderOpBuilder<'a, 'info, ((CreateOrderOps<'a, 'info>,), (), (), (), (), ())>
+    {
+        CreateDecreaseOrderOp::builder().common(self)
+    }
+
     fn validate(&self) -> Result<()> {
         self.market.load()?.validate(&self.store.key())?;
         require_gte!(
@@ -316,6 +323,110 @@ fn validate_and_initialize_position_if_needed(
             return Err(err);
         }
     }
-    require_eq!(position.load()?.bump, bump, CoreError::InvalidPosition);
+    validate_position(
+        &*position.load()?,
+        bump,
+        kind,
+        owner,
+        collateral_token,
+        market_token,
+        store,
+    )?;
     Ok(())
+}
+
+fn validate_position(
+    position: &Position,
+    bump: u8,
+    kind: PositionKind,
+    owner: &Pubkey,
+    collateral_token: &Pubkey,
+    market_token: &Pubkey,
+    store: &Pubkey,
+) -> Result<()> {
+    require_eq!(position.bump, bump, CoreError::InvalidPosition);
+    require_eq!(position.kind()?, kind, CoreError::InvalidPosition);
+    require_eq!(position.owner, *owner, CoreError::InvalidPosition);
+    require_eq!(
+        position.collateral_token,
+        *collateral_token,
+        CoreError::InvalidPosition
+    );
+    require_eq!(
+        position.market_token,
+        *market_token,
+        CoreError::InvalidPosition
+    );
+    require_eq!(position.store, *store, CoreError::InvalidPosition);
+    Ok(())
+}
+
+/// Create Decrease Order.
+#[derive(TypedBuilder)]
+pub(crate) struct CreateDecreaseOrderOp<'a, 'info> {
+    common: CreateOrderOps<'a, 'info>,
+    position: AccountLoader<'info, Position>,
+    position_bump: u8,
+    final_output_token: &'a Account<'info, TokenAccount>,
+    long_token: &'a Account<'info, TokenAccount>,
+    short_token: &'a Account<'info, TokenAccount>,
+}
+
+impl<'a, 'info> CreateDecreaseOrderOp<'a, 'info> {
+    pub(crate) fn execute(self) -> Result<()> {
+        self.common.validate()?;
+        self.validate_params_excluding_swap()?;
+
+        let collateral_token = if self.common.params.is_collateral_long {
+            self.common.market.load()?.meta().long_token_mint
+        } else {
+            self.common.market.load()?.meta().short_token_mint
+        };
+
+        self.common.init_with(|create, tokens, params| {
+            tokens.final_output_token.init(self.final_output_token);
+            tokens.long_token.init(self.long_token);
+            tokens.short_token.init(self.short_token);
+            params.init_decrease(
+                create.is_long,
+                create.kind,
+                collateral_token,
+                create.initial_collateral_delta_amount,
+                create.trigger_price,
+                create.acceptable_price,
+            )?;
+            Ok((collateral_token, self.final_output_token.mint))
+        })?;
+
+        let store = self.common.store.key();
+        let market_token = self.common.market.load()?.meta().market_token_mint;
+        validate_position(
+            &*self.position.load()?,
+            self.position_bump,
+            self.common.params.to_position_kind()?,
+            self.common.owner.key,
+            &collateral_token,
+            &market_token,
+            &store,
+        )?;
+        Ok(())
+    }
+
+    fn validate_params_excluding_swap(&self) -> Result<()> {
+        require!(
+            self.common.params.kind.is_decrease_position(),
+            CoreError::Internal
+        );
+        require_eq!(
+            self.common.market.load()?.meta().long_token_mint,
+            self.long_token.mint,
+            CoreError::TokenMintMismatched
+        );
+        require_eq!(
+            self.common.market.load()?.meta().short_token_mint,
+            self.short_token.mint,
+            CoreError::TokenMintMismatched
+        );
+        Ok(())
+    }
 }

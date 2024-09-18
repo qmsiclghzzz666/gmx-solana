@@ -811,6 +811,47 @@ impl OrderParamsV2 {
         }
         Ok(())
     }
+
+    pub(crate) fn init_decrease(
+        &mut self,
+        is_long: bool,
+        kind: OrderKind,
+        collateral_token: Pubkey,
+        initial_collateral_delta_amount: u64,
+        trigger_price: Option<u128>,
+        acceptable_price: Option<u128>,
+    ) -> Result<()> {
+        self.kind = kind.into();
+        self.collateral_token = collateral_token;
+        self.initial_collateral_delta_amount = initial_collateral_delta_amount;
+        match acceptable_price {
+            Some(price) => {
+                self.acceptable_price = price;
+            }
+            None => {
+                if is_long {
+                    self.acceptable_price = u128::MIN;
+                } else {
+                    self.acceptable_price = u128::MAX;
+                }
+            }
+        }
+        match kind {
+            OrderKind::MarketDecrease | OrderKind::Liquidation | OrderKind::AutoDeleveraging => {
+                require!(trigger_price.is_none(), CoreError::InvalidTriggerPrice);
+            }
+            OrderKind::LimitDecrease | OrderKind::StopLossDecrease => {
+                let Some(price) = trigger_price else {
+                    return err!(CoreError::InvalidTriggerPrice);
+                };
+                self.trigger_price = price;
+            }
+            _ => {
+                return err!(CoreError::Internal);
+            }
+        }
+        Ok(())
+    }
 }
 
 /// Order side.
