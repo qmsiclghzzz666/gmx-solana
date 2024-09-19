@@ -1496,6 +1496,21 @@ pub mod gmsol_store {
     pub fn close_order(ctx: Context<CloseOrder>, reason: String) -> Result<()> {
         instructions::close_order(ctx, &reason)
     }
+
+    #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
+    pub fn execute_order_v2<'info>(
+        ctx: Context<'_, '_, 'info, 'info, ExecuteOrderV2<'info>>,
+        recent_timestamp: i64,
+        execution_fee: u64,
+        throw_on_execution_error: bool,
+    ) -> Result<()> {
+        instructions::unchecked_execute_order(
+            ctx,
+            recent_timestamp,
+            execution_fee,
+            throw_on_execution_error,
+        )
+    }
 }
 
 #[error_code]
@@ -1737,6 +1752,9 @@ pub enum CoreError {
     /// Market mismatched.
     #[msg("market mismatched")]
     MarketMismatched,
+    /// Position mismatched.
+    #[msg("position mismatched")]
+    PositionMismatched,
     /// Empty Deposit.
     #[msg("empty deposit")]
     EmptyDeposit,
@@ -1830,6 +1848,9 @@ pub enum CoreError {
     /// Missing initial collateral token.
     #[msg("missing initial collateral token")]
     MissingInitialCollateralToken,
+    /// Token amount overflow.
+    #[msg("token amount overflow")]
+    TokenAmountOverflow,
 }
 
 impl CoreError {

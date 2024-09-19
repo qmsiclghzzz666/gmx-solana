@@ -10,9 +10,15 @@ use gmsol_model::{
 use crate::{
     constants,
     events::TradeEvent,
+    ops::{
+        execution_fee::PayExecutionFeeOps,
+        market::{MarketTransferIn, MarketTransferOut},
+        order::ProcessTransferOut,
+    },
     states::{
+        common::action::ActionSigner,
         ops::{AdlOps, ValidateMarketBalances},
-        order::{CollateralReceiver, Order, OrderKind, TransferOut},
+        order::{CollateralReceiver, Order, OrderKind, OrderV2, TransferOut},
         position::Position,
         revertible::{
             perp_market::RevertiblePerpMarket,
@@ -20,10 +26,10 @@ use crate::{
             swap_market::{SwapDirection, SwapMarkets},
             Revertible,
         },
-        HasMarketMeta, Market, Oracle, Seed, Store, ValidateOracleTime,
+        HasMarketMeta, Market, Oracle, Seed, Store, TokenMapHeader, ValidateOracleTime,
     },
     utils::internal,
-    ModelError, StoreError, StoreResult,
+    CoreError, ModelError, StoreError, StoreResult,
 };
 
 type ShouldRemovePosition = bool;
@@ -850,5 +856,371 @@ fn validated_recent_timestamp(config: &Store, timestamp: i64) -> Result<i64> {
         Ok(timestamp)
     } else {
         err!(StoreError::InvalidArgument)
+    }
+}
+
+/// The accounts definition for `execute_order` instruction.
+#[derive(Accounts)]
+#[instruction(recent_timestamp: i64)]
+pub struct ExecuteOrderV2<'info> {
+    /// Authority.
+    pub authority: Signer<'info>,
+    /// Store.
+    #[account(has_one = token_map)]
+    pub store: AccountLoader<'info, Store>,
+    /// Token Map.
+    #[account(has_one = store)]
+    pub token_map: AccountLoader<'info, TokenMapHeader>,
+    /// Oracle buffer to use.
+    #[account(has_one = store)]
+    pub oracle: Box<Account<'info, Oracle>>,
+    /// Market.
+    #[account(mut, has_one = store)]
+    pub market: AccountLoader<'info, Market>,
+    /// Order to execute.
+    #[account(
+        mut,
+        constraint = order.load()?.header.store == store.key() @ CoreError::StoreMismatched,
+        constraint = order.load()?.header.market == market.key() @ CoreError::MarketMismatched,
+        constraint = order.load()?.params.position().copied() == position.as_ref().map(|p| p.key()) @ CoreError::PositionMismatched,
+        constraint = order.load()?.tokens.initial_collateral.account() == initial_collateral_token_escrow.as_ref().map(|a| a.key()) @ CoreError::TokenAccountMismatched,
+        constraint = order.load()?.tokens.final_output_token.account() == final_output_token_escrow.as_ref().map(|a| a.key()) @ CoreError::TokenAccountMismatched,
+        constraint = order.load()?.tokens.long_token.account() == long_token_escrow.as_ref().map(|a| a.key())@ CoreError::TokenAccountMismatched,
+        constraint = order.load()?.tokens.short_token.account() == short_token_escrow.as_ref().map(|a| a.key())@ CoreError::TokenAccountMismatched,
+    )]
+    pub order: AccountLoader<'info, OrderV2>,
+    #[account(
+        mut,
+        constraint = position.load()?.owner == order.load()?.header.owner,
+        constraint = position.load()?.store == store.key(),
+        seeds = [
+            Position::SEED,
+            store.key().as_ref(),
+            order.load()?.header.owner.as_ref(),
+            position.load()?.market_token.as_ref(),
+            position.load()?.collateral_token.as_ref(),
+            &[position.load()?.kind],
+        ],
+        bump = position.load()?.bump,
+    )]
+    pub position: Option<AccountLoader<'info, Position>>,
+    /// Initial collateral token.
+    pub initial_collateral_token: Option<Box<Account<'info, Mint>>>,
+    /// Final output token.
+    pub final_output_token: Option<Box<Account<'info, Mint>>>,
+    /// Long token.
+    pub long_token: Option<Box<Account<'info, Mint>>>,
+    /// Short token.
+    pub short_token: Option<Box<Account<'info, Mint>>>,
+    /// The escrow account for initial collateral tokens.
+    #[account(
+        mut,
+        associated_token::mint = initial_collateral_token,
+        associated_token::authority = order,
+    )]
+    pub initial_collateral_token_escrow: Option<Box<Account<'info, TokenAccount>>>,
+    /// The escrow account for final output tokens.
+    #[account(
+        mut,
+        associated_token::mint = final_output_token,
+        associated_token::authority = order,
+    )]
+    pub final_output_token_escrow: Option<Box<Account<'info, TokenAccount>>>,
+    /// The escrow account for long tokens.
+    #[account(
+        mut,
+        associated_token::mint = long_token,
+        associated_token::authority = order,
+    )]
+    pub long_token_escrow: Option<Box<Account<'info, TokenAccount>>>,
+    /// The escrow account for short tokens.
+    #[account(
+        mut,
+        associated_token::mint = short_token,
+        associated_token::authority = order,
+    )]
+    pub short_token_escrow: Option<Box<Account<'info, TokenAccount>>>,
+    /// Initial collatearl token vault.
+    #[account(
+        mut,
+        token::mint = initial_collateral_token,
+        token::authority = store,
+        seeds = [
+            constants::MARKET_VAULT_SEED,
+            store.key().as_ref(),
+            initial_collateral_token_vault.mint.as_ref(),
+            &[],
+        ],
+        bump,
+    )]
+    pub initial_collateral_token_vault: Option<Box<Account<'info, TokenAccount>>>,
+    /// Final output token vault.
+    #[account(
+        mut,
+        token::mint = final_output_token,
+        token::authority = store,
+        seeds = [
+            constants::MARKET_VAULT_SEED,
+            store.key().as_ref(),
+            final_output_token_vault.mint.as_ref(),
+            &[],
+        ],
+        bump,
+    )]
+    pub final_output_token_vault: Option<Box<Account<'info, TokenAccount>>>,
+    /// Long token vault.
+    #[account(
+        mut,
+        token::mint = long_token,
+        token::authority = store,
+        seeds = [
+            constants::MARKET_VAULT_SEED,
+            store.key().as_ref(),
+            long_token_vault.mint.as_ref(),
+            &[],
+        ],
+        bump,
+    )]
+    pub long_token_vault: Option<Box<Account<'info, TokenAccount>>>,
+    /// Short token vault.
+    #[account(
+        mut,
+        token::mint = short_token,
+        token::authority = store,
+        seeds = [
+            constants::MARKET_VAULT_SEED,
+            store.key().as_ref(),
+            short_token_vault.mint.as_ref(),
+            &[],
+        ],
+        bump,
+    )]
+    pub short_token_vault: Option<Box<Account<'info, TokenAccount>>>,
+    #[account(
+        mut,
+        token::mint = market.load()?.meta().long_token_mint,
+        token::authority = store,
+        constraint = check_delegation(claimable_long_token_account_for_user, order.load()?.header.owner)?,
+        seeds = [
+            constants::CLAIMABLE_ACCOUNT_SEED,
+            store.key().as_ref(),
+            market.load()?.meta().long_token_mint.as_ref(),
+            order.load()?.header.owner.as_ref(),
+            &store.load()?.claimable_time_key(validated_recent_timestamp(store.load()?.deref(), recent_timestamp)?)?,
+        ],
+        bump,
+    )]
+    pub claimable_long_token_account_for_user: Option<Box<Account<'info, TokenAccount>>>,
+    #[account(
+        mut,
+        token::mint = market.load()?.meta().short_token_mint,
+        token::authority = store,
+        constraint = check_delegation(claimable_short_token_account_for_user, order.load()?.header.owner)?,
+        seeds = [
+            constants::CLAIMABLE_ACCOUNT_SEED,
+            store.key().as_ref(),
+            market.load()?.meta().short_token_mint.as_ref(),
+            order.load()?.header.owner.as_ref(),
+            &store.load()?.claimable_time_key(validated_recent_timestamp(store.load()?.deref(), recent_timestamp)?)?,
+        ],
+        bump,
+    )]
+    pub claimable_short_token_account_for_user: Option<Box<Account<'info, TokenAccount>>>,
+    #[account(
+        mut,
+        token::mint = get_pnl_token(&position, market.load()?.deref())?,
+        token::authority = store,
+        constraint = check_delegation(claimable_pnl_token_account_for_holding, store.load()?.address.holding)?,
+        seeds = [
+            constants::CLAIMABLE_ACCOUNT_SEED,
+            store.key().as_ref(),
+            get_pnl_token(&position, market.load()?.deref())?.as_ref(),
+            store.load()?.address.holding.as_ref(),
+            &store.load()?.claimable_time_key(validated_recent_timestamp(store.load()?.deref(), recent_timestamp)?)?,
+        ],
+        bump,
+    )]
+    pub claimable_pnl_token_account_for_holding: Option<Box<Account<'info, TokenAccount>>>,
+    /// The token program.
+    pub token_program: Program<'info, Token>,
+    /// The system program.
+    pub system_program: Program<'info, System>,
+}
+
+pub(crate) fn unchecked_execute_order<'info>(
+    ctx: Context<'_, '_, 'info, 'info, ExecuteOrderV2<'info>>,
+    _recent_timestamp: i64,
+    execution_fee: u64,
+    throw_on_execution_error: bool,
+) -> Result<()> {
+    let accounts = ctx.accounts;
+    let remaining_accounts = ctx.remaining_accounts;
+    let signer = accounts.order.load()?.signer();
+
+    accounts.transfer_tokens_in(&signer, remaining_accounts)?;
+
+    let executed = accounts.perform_execution(remaining_accounts, throw_on_execution_error)?;
+
+    match executed {
+        Some(transfer_out) => {
+            accounts.order.load_mut()?.header.completed()?;
+            accounts.process_transfer_out(remaining_accounts, &transfer_out)?;
+        }
+        None => {
+            accounts.order.load_mut()?.header.cancelled()?;
+            accounts.transfer_tokens_out(remaining_accounts)?;
+        }
+    }
+
+    // It must be placed at the end to be executed correctly.
+    accounts.pay_execution_fee(execution_fee)?;
+
+    Ok(())
+}
+
+impl<'info> internal::Authentication<'info> for ExecuteOrderV2<'info> {
+    fn authority(&self) -> &Signer<'info> {
+        &self.authority
+    }
+
+    fn store(&self) -> &AccountLoader<'info, Store> {
+        &self.store
+    }
+}
+
+impl<'info> ExecuteOrderV2<'info> {
+    fn transfer_tokens_in(
+        &self,
+        signer: &ActionSigner,
+        remaining_accounts: &'info [AccountInfo<'info>],
+    ) -> Result<()> {
+        if let Some(escrow) = self.initial_collateral_token_escrow.as_ref() {
+            let store = &self.store.key();
+            let market = self
+                .order
+                .load()?
+                .swap
+                .find_and_unpack_first_market(store, true, remaining_accounts)?
+                .unwrap_or(self.market.clone());
+            let vault = self
+                .initial_collateral_token_vault
+                .as_ref()
+                .ok_or(error!(CoreError::TokenAccountNotProvided))?;
+            let amount = self.order.load()?.params.initial_collateral_delta_amount;
+            MarketTransferIn::builder()
+                .store(&self.store)
+                .from_authority(self.order.to_account_info())
+                .token_program(self.token_program.to_account_info())
+                .signer_seeds(&signer.as_seeds())
+                .market(&market)
+                .from(escrow.to_account_info())
+                .vault(vault)
+                .amount(amount)
+                .build()
+                .execute()?;
+        }
+        Ok(())
+    }
+
+    fn transfer_tokens_out(&self, remaining_accounts: &'info [AccountInfo<'info>]) -> Result<()> {
+        if let Some(escrow) = self.initial_collateral_token_escrow.as_ref() {
+            let store = &self.store.key();
+            let market = self
+                .order
+                .load()?
+                .swap
+                .find_and_unpack_first_market(store, true, remaining_accounts)?
+                .unwrap_or(self.market.clone());
+            let vault = self
+                .initial_collateral_token_vault
+                .as_ref()
+                .ok_or(error!(CoreError::TokenAccountNotProvided))?;
+            let amount = self.order.load()?.params.initial_collateral_delta_amount;
+            MarketTransferOut::builder()
+                .store(&self.store)
+                .token_program(self.token_program.to_account_info())
+                .market(&market)
+                .to(escrow.to_account_info())
+                .vault(vault)
+                .amount(amount)
+                .build()
+                .execute()?;
+        }
+        Ok(())
+    }
+
+    #[inline(never)]
+    fn perform_execution(
+        &mut self,
+        remaining_accounts: &'info [AccountInfo<'info>],
+        throw_on_execution_error: bool,
+    ) -> Result<Option<Box<TransferOut>>> {
+        Ok(None)
+    }
+
+    #[inline(never)]
+    fn process_transfer_out(
+        &self,
+        remaining_accounts: &'info [AccountInfo<'info>],
+        transfer_out: &TransferOut,
+    ) -> Result<()> {
+        let is_pnl_token_long_token = self.order.load()?.params.side()?.is_long();
+        let final_output_market = self
+            .order
+            .load()?
+            .swap
+            .find_and_unpack_last_market(&self.store.key(), true, remaining_accounts)?
+            .unwrap_or(self.market.clone());
+        ProcessTransferOut::builder()
+            .token_program(self.token_program.to_account_info())
+            .store(&self.store)
+            .market(&self.market)
+            .is_pnl_token_long_token(is_pnl_token_long_token)
+            .final_output_market(&final_output_market)
+            .final_output_token_account(
+                self.final_output_token_escrow
+                    .as_ref()
+                    .map(|a| a.to_account_info()),
+            )
+            .final_output_token_vault(self.final_output_token_vault.as_deref())
+            .long_token_account(self.long_token_escrow.as_ref().map(|a| a.to_account_info()))
+            .long_token_vault(self.long_token_vault.as_deref())
+            .short_token_account(
+                self.short_token_escrow
+                    .as_ref()
+                    .map(|a| a.to_account_info()),
+            )
+            .short_token_vault(self.short_token_vault.as_deref())
+            .claimable_long_token_account_for_user(
+                self.claimable_long_token_account_for_user
+                    .as_ref()
+                    .map(|a| a.to_account_info()),
+            )
+            .claimable_short_token_account_for_user(
+                self.claimable_short_token_account_for_user
+                    .as_ref()
+                    .map(|a| a.to_account_info()),
+            )
+            .claimable_pnl_token_account_for_holding(
+                self.claimable_pnl_token_account_for_holding
+                    .as_ref()
+                    .map(|a| a.to_account_info()),
+            )
+            .transfer_out(transfer_out)
+            .build()
+            .execute()?;
+        Ok(())
+    }
+
+    #[inline(never)]
+    fn pay_execution_fee(&self, execution_fee: u64) -> Result<()> {
+        let execution_lamports = execution_fee.min(self.order.load()?.max_execution_lamports);
+        PayExecutionFeeOps::builder()
+            .payer(self.order.to_account_info())
+            .receiver(self.authority.to_account_info())
+            .execution_lamports(execution_lamports)
+            .build()
+            .execute()?;
+        Ok(())
     }
 }

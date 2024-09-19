@@ -684,7 +684,8 @@ pub struct OrderV2 {
     pub(crate) tokens: TokenAccounts,
     /// Order params.
     pub(crate) params: OrderParamsV2,
-    padding_1: [u8; 8],
+    /// Max execution lamports.
+    pub(crate) max_execution_lamports: u64,
     /// Swap params.
     pub(crate) swap: SwapParamsV2,
     padding_2: [u8; 4],
@@ -737,7 +738,7 @@ pub struct OrderParamsV2 {
     /// Position address.
     position: Pubkey,
     /// Initial collateral delta amount.
-    initial_collateral_delta_amount: u64,
+    pub(crate) initial_collateral_delta_amount: u64,
     /// Size delta value.
     size_delta_value: u128,
     /// Min output amount or value.
@@ -866,6 +867,21 @@ impl OrderParamsV2 {
     pub fn kind(&self) -> Result<OrderKind> {
         Ok(self.kind.try_into()?)
     }
+
+    /// Get order side.
+    pub fn side(&self) -> Result<OrderSide> {
+        let side = self.side.try_into()?;
+        Ok(side)
+    }
+
+    /// Get position address.
+    pub fn position(&self) -> Option<&Pubkey> {
+        if self.position != Pubkey::default() {
+            Some(&self.position)
+        } else {
+            None
+        }
+    }
 }
 
 /// Order side.
@@ -887,4 +903,11 @@ pub enum OrderSide {
     Long,
     /// Short.
     Short,
+}
+
+impl OrderSide {
+    /// Return whether the side is long.
+    pub fn is_long(&self) -> bool {
+        matches!(self, Self::Long)
+    }
 }

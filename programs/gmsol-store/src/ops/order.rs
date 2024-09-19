@@ -4,12 +4,14 @@ use typed_builder::TypedBuilder;
 
 use crate::{
     states::{
-        order::{OrderKind, OrderParamsV2, OrderV2, TokenAccounts},
+        order::{OrderKind, OrderParamsV2, OrderV2, TokenAccounts, TransferOut},
         position::PositionKind,
         HasMarketMeta, Market, NonceBytes, Position, Store,
     },
     CoreError,
 };
+
+use super::market::MarketTransferOut;
 
 /// Create Order Params.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
@@ -127,6 +129,7 @@ impl<'a, 'info> CreateOrderOps<'a, 'info> {
             let OrderV2 {
                 header,
                 market_token,
+                max_execution_lamports,
                 tokens,
                 params,
                 swap,
@@ -145,6 +148,7 @@ impl<'a, 'info> CreateOrderOps<'a, 'info> {
             );
 
             *market_token = self.market.load()?.meta().market_token_mint;
+            *max_execution_lamports = self.params.execution_fee;
 
             let clock = Clock::get()?;
             *updated_at = clock.unix_timestamp;
@@ -431,5 +435,256 @@ impl<'a, 'info> CreateDecreaseOrderOp<'a, 'info> {
             CoreError::TokenMintMismatched
         );
         Ok(())
+    }
+}
+
+#[derive(TypedBuilder)]
+pub(crate) struct ProcessTransferOut<'a, 'info> {
+    token_program: AccountInfo<'info>,
+    store: &'a AccountLoader<'info, Store>,
+    market: &'a AccountLoader<'info, Market>,
+    is_pnl_token_long_token: bool,
+    #[builder(default, setter(strip_option))]
+    final_output_market: Option<&'a AccountLoader<'info, Market>>,
+    #[builder(default)]
+    final_output_token_account: Option<AccountInfo<'info>>,
+    #[builder(default)]
+    final_output_token_vault: Option<&'a Account<'info, TokenAccount>>,
+    #[builder(default)]
+    long_token_account: Option<AccountInfo<'info>>,
+    #[builder(default)]
+    long_token_vault: Option<&'a Account<'info, TokenAccount>>,
+    #[builder(default)]
+    short_token_account: Option<AccountInfo<'info>>,
+    #[builder(default)]
+    short_token_vault: Option<&'a Account<'info, TokenAccount>>,
+    pub(crate) claimable_long_token_account_for_user: Option<AccountInfo<'info>>,
+    pub(crate) claimable_short_token_account_for_user: Option<AccountInfo<'info>>,
+    pub(crate) claimable_pnl_token_account_for_holding: Option<AccountInfo<'info>>,
+    transfer_out: &'a TransferOut,
+}
+
+impl<'a, 'info> ProcessTransferOut<'a, 'info> {
+    pub(crate) fn execute(self) -> Result<()> {
+        let TransferOut {
+            final_output_token,
+            secondary_output_token,
+            long_token,
+            short_token,
+            long_token_for_claimable_account_of_user,
+            short_token_for_claimable_account_of_user,
+            long_token_for_claimable_account_of_holding,
+            short_token_for_claimable_account_of_holding,
+            ..
+        } = self.transfer_out;
+
+        if *final_output_token != 0 {
+            let (market, vault, account) = self.final_output()?;
+            MarketTransferOut::builder()
+                .store(self.store)
+                .market(market)
+                .amount(*final_output_token)
+                .to(account.clone())
+                .vault(vault)
+                .token_program(self.token_program.clone())
+                .build()
+                .execute()?;
+        }
+
+        let (long_token_amount, short_token_amount) = if self.is_pnl_token_long_token {
+            (
+                secondary_output_token
+                    .checked_add(*long_token)
+                    .ok_or(error!(CoreError::TokenAmountOverflow))?,
+                *short_token,
+            )
+        } else {
+            (
+                *long_token,
+                secondary_output_token
+                    .checked_add(*short_token)
+                    .ok_or(error!(CoreError::TokenAmountOverflow))?,
+            )
+        };
+
+        if long_token_amount != 0 {
+            let (vault, account) = self.long_token()?;
+            MarketTransferOut::builder()
+                .store(self.store)
+                .token_program(self.token_program.clone())
+                .market(self.market)
+                .amount(long_token_amount)
+                .vault(vault)
+                .to(account.clone())
+                .build()
+                .execute()?;
+        }
+
+        if short_token_amount != 0 {
+            let (vault, account) = self.short_token()?;
+            MarketTransferOut::builder()
+                .store(self.store)
+                .token_program(self.token_program.clone())
+                .market(self.market)
+                .amount(short_token_amount)
+                .vault(vault)
+                .to(account.clone())
+                .build()
+                .execute()?;
+        }
+
+        if *long_token_for_claimable_account_of_user != 0 {
+            let (vault, account) = self.claimable_long_token_account_for_user()?;
+            MarketTransferOut::builder()
+                .store(self.store)
+                .token_program(self.token_program.clone())
+                .market(self.market)
+                .amount(*long_token_for_claimable_account_of_user)
+                .vault(vault)
+                .to(account.clone())
+                .build()
+                .execute()?;
+        }
+
+        if *short_token_for_claimable_account_of_user != 0 {
+            let (vault, account) = self.claimable_short_token_account_for_user()?;
+            MarketTransferOut::builder()
+                .store(self.store)
+                .token_program(self.token_program.clone())
+                .market(self.market)
+                .amount(*short_token_for_claimable_account_of_user)
+                .vault(vault)
+                .to(account.clone())
+                .build()
+                .execute()?;
+        }
+
+        if *long_token_for_claimable_account_of_holding != 0 {
+            let (vault, account) = self.claimable_long_token_account_for_holding()?;
+            MarketTransferOut::builder()
+                .store(self.store)
+                .token_program(self.token_program.clone())
+                .market(self.market)
+                .amount(*long_token_for_claimable_account_of_holding)
+                .vault(vault)
+                .to(account.clone())
+                .build()
+                .execute()?;
+        }
+
+        if *short_token_for_claimable_account_of_holding != 0 {
+            let (vault, account) = self.claimable_short_token_account_for_holding()?;
+            MarketTransferOut::builder()
+                .store(self.store)
+                .token_program(self.token_program.clone())
+                .market(self.market)
+                .amount(*short_token_for_claimable_account_of_holding)
+                .vault(vault)
+                .to(account.clone())
+                .build()
+                .execute()?;
+        }
+        Ok(())
+    }
+
+    fn final_output(
+        &self,
+    ) -> Result<(
+        &AccountLoader<'info, Market>,
+        &Account<'info, TokenAccount>,
+        &AccountInfo<'info>,
+    )> {
+        let market = self
+            .final_output_market
+            .ok_or(error!(CoreError::MarketMismatched))?;
+        let vault = self
+            .final_output_token_vault
+            .as_ref()
+            .ok_or(error!(CoreError::TokenAccountNotProvided))?;
+        let account = self
+            .final_output_token_account
+            .as_ref()
+            .ok_or(error!(CoreError::TokenAccountNotProvided))?;
+        Ok((market, vault, account))
+    }
+
+    fn long_token(&self) -> Result<(&Account<'info, TokenAccount>, &AccountInfo<'info>)> {
+        let vault = self
+            .long_token_vault
+            .as_ref()
+            .ok_or(error!(CoreError::TokenAccountNotProvided))?;
+        let account = self
+            .long_token_account
+            .as_ref()
+            .ok_or(error!(CoreError::TokenAccountNotProvided))?;
+        Ok((vault, account))
+    }
+
+    fn short_token(&self) -> Result<(&Account<'info, TokenAccount>, &AccountInfo<'info>)> {
+        let vault = self
+            .short_token_vault
+            .as_ref()
+            .ok_or(error!(CoreError::TokenAccountNotProvided))?;
+        let account = self
+            .short_token_account
+            .as_ref()
+            .ok_or(error!(CoreError::TokenAccountNotProvided))?;
+        Ok((vault, account))
+    }
+
+    fn claimable_long_token_account_for_user(
+        &self,
+    ) -> Result<(&Account<'info, TokenAccount>, &AccountInfo<'info>)> {
+        let vault = self
+            .long_token_vault
+            .as_ref()
+            .ok_or(error!(CoreError::TokenAccountNotProvided))?;
+        let account = self
+            .claimable_long_token_account_for_user
+            .as_ref()
+            .ok_or(error!(CoreError::TokenAccountNotProvided))?;
+        Ok((vault, account))
+    }
+
+    fn claimable_short_token_account_for_user(
+        &self,
+    ) -> Result<(&Account<'info, TokenAccount>, &AccountInfo<'info>)> {
+        let vault = self
+            .short_token_vault
+            .as_ref()
+            .ok_or(error!(CoreError::TokenAccountNotProvided))?;
+        let account = self
+            .claimable_short_token_account_for_user
+            .as_ref()
+            .ok_or(error!(CoreError::TokenAccountNotProvided))?;
+        Ok((vault, account))
+    }
+
+    fn claimable_long_token_account_for_holding(
+        &self,
+    ) -> Result<(&Account<'info, TokenAccount>, &AccountInfo<'info>)> {
+        let vault = self
+            .long_token_vault
+            .as_ref()
+            .ok_or(error!(CoreError::TokenAccountNotProvided))?;
+        let account = self
+            .claimable_pnl_token_account_for_holding
+            .as_ref()
+            .ok_or(error!(CoreError::TokenAccountNotProvided))?;
+        Ok((vault, account))
+    }
+
+    fn claimable_short_token_account_for_holding(
+        &self,
+    ) -> Result<(&Account<'info, TokenAccount>, &AccountInfo<'info>)> {
+        let vault = self
+            .short_token_vault
+            .as_ref()
+            .ok_or(error!(CoreError::TokenAccountNotProvided))?;
+        let account = self
+            .claimable_pnl_token_account_for_holding
+            .as_ref()
+            .ok_or(error!(CoreError::TokenAccountNotProvided))?;
+        Ok((vault, account))
     }
 }
