@@ -1492,6 +1492,10 @@ pub mod gmsol_store {
     ) -> Result<()> {
         instructions::create_order(ctx, nonce, &params)
     }
+
+    pub fn close_order(ctx: Context<CloseOrder>, reason: String) -> Result<()> {
+        instructions::close_order(ctx, &reason)
+    }
 }
 
 #[error_code]
@@ -1755,8 +1759,11 @@ pub enum CoreError {
     #[msg("the order kind is not allowed by this instruction")]
     OrderKindNotAllowed,
     /// Token account is not provided.
-    #[msg("token account is not provided")]
+    #[msg("required token account is not provided")]
     TokenAccountNotProvided,
+    /// Token mint is not provided.
+    #[msg("required token mint is not provided")]
+    TokenMintNotProvided,
     /// Not enough token amounts.
     #[msg("not enough token amount")]
     NotEnoughTokenAmount,

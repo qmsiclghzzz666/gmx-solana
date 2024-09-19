@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use anchor_lang::prelude::*;
 use anchor_spl::{
     associated_token::AssociatedToken,
@@ -5,13 +7,18 @@ use anchor_spl::{
 };
 
 use crate::{
+    events::RemoveOrderEvent,
     ops::{
         execution_fee::TransferExecutionFeeOps,
         order::{CreateOrderOps, CreateOrderParams},
     },
     states::{
         order::{OrderKind, OrderV2},
-        Market, NonceBytes, Position, Seed, Store,
+        Market, NonceBytes, Position, RoleKey, Seed, Store,
+    },
+    utils::{
+        internal::{self, Authentication},
+        token::is_associated_token_account,
     },
     CoreError,
 };
@@ -476,6 +483,224 @@ impl<'info> CreateOrder<'info> {
                 token.decimals,
             )?;
         }
+        Ok(())
+    }
+}
+
+/// The accounts definition for the `close_order instruction.
+#[event_cpi]
+#[derive(Accounts)]
+pub struct CloseOrder<'info> {
+    /// The executor of this instruction.
+    pub executor: Signer<'info>,
+    /// The store.
+    pub store: AccountLoader<'info, Store>,
+    /// THe owner of the order.
+    /// CHECK: only used to validate and receive fund.
+    #[account(mut)]
+    pub owner: UncheckedAccount<'info>,
+    /// Order to close.
+    #[account(
+        mut,
+        constraint = order.load()?.header.owner == owner.key() @ CoreError::OwnerMismatched,
+        constraint = order.load()?.header.store == store.key() @ CoreError::StoreMismatched,
+        constraint = order.load()?.tokens.initial_collateral.account() == initial_collateral_token_escrow.as_ref().map(|a| a.key()) @ CoreError::TokenAccountMismatched,
+        constraint = order.load()?.tokens.final_output_token.account() == final_output_token_escrow.as_ref().map(|a| a.key()) @ CoreError::TokenAccountMismatched,
+        constraint = order.load()?.tokens.long_token.account() == long_token_escrow.as_ref().map(|a| a.key())@ CoreError::TokenAccountMismatched,
+        constraint = order.load()?.tokens.short_token.account() == short_token_escrow.as_ref().map(|a| a.key())@ CoreError::TokenAccountMismatched,
+    )]
+    pub order: AccountLoader<'info, OrderV2>,
+    /// Initial collateral token.
+    pub initial_collateral_token: Option<Box<Account<'info, Mint>>>,
+    /// Final output token.
+    pub final_output_token: Option<Box<Account<'info, Mint>>>,
+    /// Long token.
+    pub long_token: Option<Box<Account<'info, Mint>>>,
+    /// Short token.
+    pub short_token: Option<Box<Account<'info, Mint>>>,
+    /// The escrow account for initial collateral tokens.
+    #[account(
+        mut,
+        associated_token::mint = initial_collateral_token,
+        associated_token::authority = order,
+    )]
+    pub initial_collateral_token_escrow: Option<Box<Account<'info, TokenAccount>>>,
+    /// The escrow account for final output tokens.
+    #[account(
+        mut,
+        associated_token::mint = final_output_token,
+        associated_token::authority = order,
+    )]
+    pub final_output_token_escrow: Option<Box<Account<'info, TokenAccount>>>,
+    /// The escrow account for long tokens.
+    #[account(
+        mut,
+        associated_token::mint = long_token,
+        associated_token::authority = order,
+    )]
+    pub long_token_escrow: Option<Box<Account<'info, TokenAccount>>>,
+    /// The escrow account for short tokens.
+    #[account(
+        mut,
+        associated_token::mint = short_token,
+        associated_token::authority = order,
+    )]
+    pub short_token_escrow: Option<Box<Account<'info, TokenAccount>>>,
+    /// The ATA for initial collateral token of owner.
+    /// CHECK: should be checked during the execution.
+    #[account(
+        mut,
+        constraint = is_associated_token_account(initial_collateral_token_ata.key, owner.key, &initial_collateral_token.as_ref().map(|a| a.key()).expect("must provide")) @ CoreError::NotAnATA,
+    )]
+    pub initial_collateral_token_ata: Option<UncheckedAccount<'info>>,
+    /// The ATA for final output token of owner.
+    /// CHECK: should be checked during the execution.
+    #[account(
+        mut,
+        constraint = is_associated_token_account(final_output_token_ata.key, owner.key, &final_output_token.as_ref().map(|a| a.key()).expect("must provide")) @ CoreError::NotAnATA,
+    )]
+    pub final_output_token_ata: Option<UncheckedAccount<'info>>,
+    /// The ATA for long token of owner.
+    /// CHECK: should be checked during the execution.
+    #[account(
+        mut,
+        constraint = is_associated_token_account(long_token_ata.key, owner.key, &long_token.as_ref().map(|a| a.key()).expect("must provide")) @ CoreError::NotAnATA,
+    )]
+    pub long_token_ata: Option<UncheckedAccount<'info>>,
+    /// The ATA for initial collateral token of owner.
+    /// CHECK: should be checked during the execution.
+    #[account(
+        mut,
+        constraint = is_associated_token_account(short_token_ata.key, owner.key, &short_token.as_ref().map(|a| a.key()).expect("must provide")) @ CoreError::NotAnATA,
+    )]
+    pub short_token_ata: Option<UncheckedAccount<'info>>,
+    /// The system program.
+    pub system_program: Program<'info, System>,
+    /// The token program.
+    pub token_program: Program<'info, Token>,
+    /// The associated token program.
+    pub associated_token_program: Program<'info, AssociatedToken>,
+}
+
+pub(crate) fn close_order(ctx: Context<CloseOrder>, reason: &str) -> Result<()> {
+    let accounts = &ctx.accounts;
+    let should_continue_when_atas_are_missing = accounts.preprocess()?;
+    if accounts.transfer_to_atas(should_continue_when_atas_are_missing)? {
+        {
+            let order_address = accounts.order.key();
+            let order = accounts.order.load()?;
+            emit_cpi!(RemoveOrderEvent::new(
+                order.header.id,
+                order.header.store,
+                order_address,
+                order.params.kind()?,
+                order.market_token,
+                order.header.owner,
+                reason
+            )?);
+        }
+        accounts.close()?;
+    } else {
+        msg!("Some ATAs are not initialized, skip the close");
+    }
+    Ok(())
+}
+
+impl<'info> internal::Authentication<'info> for CloseOrder<'info> {
+    fn authority(&self) -> &Signer<'info> {
+        &self.executor
+    }
+
+    fn store(&self) -> &AccountLoader<'info, Store> {
+        &self.store
+    }
+}
+
+type ShouldContinueWhenATAsAreMissing = bool;
+type Success = bool;
+
+impl<'info> CloseOrder<'info> {
+    fn preprocess(&self) -> Result<ShouldContinueWhenATAsAreMissing> {
+        if self.executor.key == self.owner.key {
+            Ok(true)
+        } else {
+            self.only_role(RoleKey::ORDER_KEEPER)?;
+            {
+                let order = self.order.load()?;
+                if order.header.action_state()?.is_completed_or_cancelled() {
+                    Ok(false)
+                } else {
+                    err!(CoreError::PermissionDenied)
+                }
+            }
+        }
+    }
+
+    fn transfer_to_atas(&self, init_if_needed: bool) -> Result<Success> {
+        use crate::utils::token::TransferAllFromEscrowToATA;
+
+        let signer = self.order.load()?.signer();
+        let seeds = signer.as_seeds();
+
+        let mut seen = HashSet::<_>::default();
+
+        let builder = TransferAllFromEscrowToATA::builder()
+            .system_program(self.system_program.to_account_info())
+            .token_program(self.token_program.to_account_info())
+            .associated_token_program(self.associated_token_program.to_account_info())
+            .payer(self.executor.to_account_info())
+            .owner(self.owner.to_account_info())
+            .escrow_authority(self.order.to_account_info())
+            .seeds(&seeds)
+            .init_if_needed(init_if_needed);
+
+        for (escrow, ata, token) in [
+            (
+                self.initial_collateral_token_escrow.as_ref(),
+                self.initial_collateral_token_ata.as_ref(),
+                self.initial_collateral_token.as_ref(),
+            ),
+            (
+                self.final_output_token_escrow.as_ref(),
+                self.final_output_token_ata.as_ref(),
+                self.final_output_token.as_ref(),
+            ),
+            (
+                self.long_token_escrow.as_ref(),
+                self.long_token_ata.as_ref(),
+                self.long_token.as_ref(),
+            ),
+            (
+                self.short_token_escrow.as_ref(),
+                self.short_token_ata.as_ref(),
+                self.short_token.as_ref(),
+            ),
+        ] {
+            if let Some(escrow) = escrow {
+                if !seen.insert(escrow.key()) {
+                    continue;
+                }
+                let ata = ata.ok_or(error!(CoreError::TokenAccountNotProvided))?;
+                let token = token.ok_or(error!(CoreError::TokenMintNotProvided))?;
+
+                if !builder
+                    .clone()
+                    .mint(token.to_account_info())
+                    .ata(ata.to_account_info())
+                    .escrow(escrow)
+                    .build()
+                    .execute()?
+                {
+                    return Ok(false);
+                }
+            }
+        }
+
+        Ok(true)
+    }
+
+    fn close(&self) -> Result<()> {
+        self.order.close(self.owner.to_account_info())?;
         Ok(())
     }
 }

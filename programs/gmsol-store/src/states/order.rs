@@ -5,8 +5,10 @@ use crate::{CoreError, StoreError};
 
 use super::{
     common::{
-        action::ActionHeader, swap::SwapParamsV2, token::TokenAndAccount, SwapParams, TokenRecord,
-        TokensWithFeed,
+        action::{ActionHeader, ActionSigner},
+        swap::SwapParamsV2,
+        token::TokenAndAccount,
+        SwapParams, TokenRecord, TokensWithFeed,
     },
     position::PositionKind,
     NonceBytes, Oracle, Seed,
@@ -676,6 +678,8 @@ impl TransferOut {
 pub struct OrderV2 {
     /// Action header.
     pub(crate) header: ActionHeader,
+    /// Market token.
+    pub(crate) market_token: Pubkey,
     /// Token accounts.
     pub(crate) tokens: TokenAccounts,
     /// Order params.
@@ -698,6 +702,11 @@ impl OrderV2 {
 
     /// Min execution lamports.
     pub const MIN_EXECUTION_LAMPORTS: u64 = 200_000;
+
+    /// Get signer.
+    pub fn signer(&self) -> ActionSigner {
+        self.header.signer(Self::SEED)
+    }
 }
 
 /// Token accounts for Order.
@@ -851,6 +860,11 @@ impl OrderParamsV2 {
             }
         }
         Ok(())
+    }
+
+    /// Get order kind.
+    pub fn kind(&self) -> Result<OrderKind> {
+        Ok(self.kind.try_into()?)
     }
 }
 

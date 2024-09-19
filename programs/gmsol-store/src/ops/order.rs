@@ -126,6 +126,7 @@ impl<'a, 'info> CreateOrderOps<'a, 'info> {
             let mut order = self.order.load_init()?;
             let OrderV2 {
                 header,
+                market_token,
                 tokens,
                 params,
                 swap,
@@ -142,6 +143,8 @@ impl<'a, 'info> CreateOrderOps<'a, 'info> {
                 *self.nonce,
                 self.bump,
             );
+
+            *market_token = self.market.load()?.meta().market_token_mint;
 
             let clock = Clock::get()?;
             *updated_at = clock.unix_timestamp;
