@@ -13,7 +13,7 @@ use crate::{
     ops::{
         execution_fee::PayExecutionFeeOps,
         market::{MarketTransferIn, MarketTransferOut},
-        order::ProcessTransferOut,
+        order::{ExecuteOrderOps, ProcessTransferOut},
     },
     states::{
         common::action::ActionSigner,
@@ -26,7 +26,8 @@ use crate::{
             swap_market::{SwapDirection, SwapMarkets},
             Revertible,
         },
-        HasMarketMeta, Market, Oracle, Seed, Store, TokenMapHeader, ValidateOracleTime,
+        HasMarketMeta, Market, Oracle, PriceProvider, Seed, Store, TokenMapHeader, TokenMapLoader,
+        ValidateOracleTime,
     },
     utils::internal,
     CoreError, ModelError, StoreError, StoreResult,
@@ -860,6 +861,7 @@ fn validated_recent_timestamp(config: &Store, timestamp: i64) -> Result<i64> {
 }
 
 /// The accounts definition for `execute_order` instruction.
+#[event_cpi]
 #[derive(Accounts)]
 #[instruction(recent_timestamp: i64)]
 pub struct ExecuteOrderV2<'info> {
@@ -871,17 +873,24 @@ pub struct ExecuteOrderV2<'info> {
     /// Token Map.
     #[account(has_one = store)]
     pub token_map: AccountLoader<'info, TokenMapHeader>,
+    /// Price Provider.
+    pub price_provider: Interface<'info, PriceProvider>,
     /// Oracle buffer to use.
     #[account(has_one = store)]
     pub oracle: Box<Account<'info, Oracle>>,
     /// Market.
     #[account(mut, has_one = store)]
     pub market: AccountLoader<'info, Market>,
+    /// The owner of the order.
+    /// CHECK: only used to receive fund.
+    #[account(mut)]
+    pub owner: UncheckedAccount<'info>,
     /// Order to execute.
     #[account(
         mut,
         constraint = order.load()?.header.store == store.key() @ CoreError::StoreMismatched,
         constraint = order.load()?.header.market == market.key() @ CoreError::MarketMismatched,
+        constraint = order.load()?.header.owner== owner.key() @ CoreError::OwnerMismatched,
         constraint = order.load()?.params.position().copied() == position.as_ref().map(|p| p.key()) @ CoreError::PositionMismatched,
         constraint = order.load()?.tokens.initial_collateral.account() == initial_collateral_token_escrow.as_ref().map(|a| a.key()) @ CoreError::TokenAccountMismatched,
         constraint = order.load()?.tokens.final_output_token.account() == final_output_token_escrow.as_ref().map(|a| a.key()) @ CoreError::TokenAccountMismatched,
@@ -1048,32 +1057,34 @@ pub struct ExecuteOrderV2<'info> {
 }
 
 pub(crate) fn unchecked_execute_order<'info>(
-    ctx: Context<'_, '_, 'info, 'info, ExecuteOrderV2<'info>>,
+    mut ctx: Context<'_, '_, 'info, 'info, ExecuteOrderV2<'info>>,
     _recent_timestamp: i64,
     execution_fee: u64,
     throw_on_execution_error: bool,
 ) -> Result<()> {
-    let accounts = ctx.accounts;
+    let accounts = &mut ctx.accounts;
     let remaining_accounts = ctx.remaining_accounts;
     let signer = accounts.order.load()?.signer();
 
     accounts.transfer_tokens_in(&signer, remaining_accounts)?;
 
-    let executed = accounts.perform_execution(remaining_accounts, throw_on_execution_error)?;
+    let (transfer_out, event) =
+        accounts.perform_execution(remaining_accounts, throw_on_execution_error)?;
 
-    match executed {
-        Some(transfer_out) => {
-            accounts.order.load_mut()?.header.completed()?;
-            accounts.process_transfer_out(remaining_accounts, &transfer_out)?;
-        }
-        None => {
-            accounts.order.load_mut()?.header.cancelled()?;
-            accounts.transfer_tokens_out(remaining_accounts)?;
-        }
+    if transfer_out.executed {
+        accounts.order.load_mut()?.header.completed()?;
+        accounts.process_transfer_out(remaining_accounts, &transfer_out)?;
+    } else {
+        accounts.order.load_mut()?.header.cancelled()?;
+        accounts.transfer_tokens_out(remaining_accounts)?;
     }
 
     // It must be placed at the end to be executed correctly.
     accounts.pay_execution_fee(execution_fee)?;
+
+    if let Some(event) = event {
+        emit_cpi!(event);
+    }
 
     Ok(())
 }
@@ -1154,8 +1165,34 @@ impl<'info> ExecuteOrderV2<'info> {
         &mut self,
         remaining_accounts: &'info [AccountInfo<'info>],
         throw_on_execution_error: bool,
-    ) -> Result<Option<Box<TransferOut>>> {
-        Ok(None)
+    ) -> Result<(Box<TransferOut>, Option<TradeEvent>)> {
+        // FIXME: We only need the tokens here, the feeds are not necessary.
+        let feeds = self
+            .order
+            .load()?
+            .swap
+            .to_feeds(&self.token_map.load_token_map()?)?;
+        let ops = ExecuteOrderOps::builder()
+            .store(&self.store)
+            .market(&self.market)
+            .owner(self.owner.to_account_info())
+            .order(&self.order)
+            .position(self.position.as_ref())
+            .throw_on_execution_error(throw_on_execution_error);
+
+        self.oracle.with_prices(
+            &self.store,
+            &self.price_provider,
+            &self.token_map,
+            &feeds.tokens,
+            remaining_accounts,
+            |oracle, remaining_accounts| {
+                ops.oracle(oracle)
+                    .remaining_accounts(remaining_accounts)
+                    .build()
+                    .execute()
+            },
+        )
     }
 
     #[inline(never)]

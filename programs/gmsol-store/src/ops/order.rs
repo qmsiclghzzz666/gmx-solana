@@ -1,14 +1,29 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::TokenAccount;
+use gmsol_model::{
+    action::Prices, num::Unsigned, BaseMarket, BaseMarketExt, PnlFactorKind, Position as _,
+    PositionImpactMarketMutExt, PositionMut, PositionMutExt, PositionState, PositionStateExt,
+};
 use typed_builder::TypedBuilder;
 
 use crate::{
+    events::TradeEvent,
     states::{
-        order::{OrderKind, OrderParamsV2, OrderV2, TokenAccounts, TransferOut},
+        market::AdlOps,
+        order::{
+            CollateralReceiver, OrderKind, OrderParamsV2, OrderV2, TokenAccounts, TransferOut,
+        },
         position::PositionKind,
-        HasMarketMeta, Market, NonceBytes, Position, Store,
+        revertible::{
+            perp_market::RevertiblePerpMarket,
+            revertible_position::RevertiblePosition,
+            swap_market::{SwapDirection, SwapMarkets},
+            Revertible,
+        },
+        HasMarketMeta, Market, NonceBytes, Oracle, Position, Store, ValidateMarketBalances,
+        ValidateOracleTime,
     },
-    CoreError,
+    CoreError, ModelError, StoreError,
 };
 
 use super::market::MarketTransferOut;
@@ -687,4 +702,723 @@ impl<'a, 'info> ProcessTransferOut<'a, 'info> {
             .ok_or(error!(CoreError::TokenAccountNotProvided))?;
         Ok((vault, account))
     }
+}
+
+/// Execute Order Ops.
+#[derive(TypedBuilder)]
+pub(crate) struct ExecuteOrderOps<'a, 'info> {
+    store: &'a AccountLoader<'info, Store>,
+    market: &'a AccountLoader<'info, Market>,
+    order: &'a AccountLoader<'info, OrderV2>,
+    owner: AccountInfo<'info>,
+    position: Option<&'a AccountLoader<'info, Position>>,
+    oracle: &'a Oracle,
+    remaining_accounts: &'info [AccountInfo<'info>],
+    throw_on_execution_error: bool,
+}
+
+pub(crate) type ShouldRemovePosition = bool;
+
+enum SecondaryOrderType {
+    Liquidation,
+    AutoDeleveraging,
+}
+
+impl<'a, 'info> ExecuteOrderOps<'a, 'info> {
+    pub(crate) fn execute(self) -> Result<(Box<TransferOut>, Option<TradeEvent>)> {
+        let mut should_close_position = false;
+
+        match self.validate_oracle_and_adl() {
+            Ok(()) => {}
+            Err(StoreError::OracleTimestampsAreLargerThanRequired)
+                if !self.throw_on_execution_error =>
+            {
+                msg!(
+                    "Order expired at {}",
+                    self.oracle_updated_before()
+                        .ok()
+                        .flatten()
+                        .expect("must have an expiration time"),
+                );
+                return Ok((Box::new(TransferOut::new_failed()), None));
+            }
+            Err(err) => {
+                return Err(error!(err));
+            }
+        }
+
+        let mut should_throw_error = false;
+        let prices = self.market.load()?.prices(self.oracle)?;
+        let res = match self.do_execute(&mut should_throw_error, prices) {
+            Ok((should_remove_position, mut transfer_out, trade_event)) => {
+                transfer_out.executed = true;
+                should_close_position = should_remove_position;
+                Ok((transfer_out, trade_event))
+            }
+            Err(err) if !(should_throw_error || self.throw_on_execution_error) => {
+                msg!("Execute order error: {}", err);
+                should_close_position = self
+                    .position
+                    .as_ref()
+                    .map(|a| Result::Ok(a.load()?.state.is_empty()))
+                    .transpose()?
+                    .unwrap_or(false);
+                Ok((Default::default(), None))
+            }
+            Err(err) => Err(err),
+        };
+
+        let (transfer_out, event) = res?;
+
+        if should_close_position {
+            self.close_position()?;
+        }
+
+        Ok((transfer_out, event))
+    }
+
+    #[inline(never)]
+    fn do_execute(
+        &self,
+        should_throw_error: &mut bool,
+        prices: Prices<u128>,
+    ) -> Result<(ShouldRemovePosition, Box<TransferOut>, Option<TradeEvent>)> {
+        self.validate_market()?;
+        self.validate_order(should_throw_error, &prices)?;
+
+        // Prepare execution context.
+        let mut market = RevertiblePerpMarket::new(self.market)?;
+        let current_market_token = market.market_meta().market_token_mint;
+        let loaders = self
+            .order
+            .load()?
+            .swap
+            .unpack_markets_for_swap(&current_market_token, self.remaining_accounts)?;
+        let mut swap_markets =
+            SwapMarkets::new(&self.store.key(), &loaders, Some(&current_market_token))?;
+        let mut transfer_out = Box::default();
+
+        // Distribute position impact.
+        {
+            let report = market
+                .distribute_position_impact()
+                .map_err(ModelError::from)?
+                .execute()
+                .map_err(ModelError::from)?;
+            msg!("[Order] pre-execute: {:?}", report);
+        }
+
+        let kind = self.order.load()?.params.kind()?;
+        let mut trade_event = None;
+        let should_remove_position = match &kind {
+            OrderKind::MarketSwap | OrderKind::LimitSwap => {
+                execute_swap(
+                    should_throw_error,
+                    self.oracle,
+                    &mut market,
+                    &mut swap_markets,
+                    &mut transfer_out,
+                    &mut *self.order.load_mut()?,
+                )?;
+                market.commit();
+                false
+            }
+            OrderKind::MarketIncrease
+            | OrderKind::MarketDecrease
+            | OrderKind::Liquidation
+            | OrderKind::AutoDeleveraging
+            | OrderKind::LimitIncrease
+            | OrderKind::LimitDecrease
+            | OrderKind::StopLossDecrease => {
+                let position_loader = self
+                    .position
+                    .as_ref()
+                    .ok_or(error!(StoreError::PositionIsNotProvided))?;
+                let mut event = {
+                    let position = position_loader.load()?;
+                    let is_collateral_long = market
+                        .market_meta()
+                        .to_token_side(&position.collateral_token)?;
+                    TradeEvent::new_unchanged(
+                        kind.is_increase_position(),
+                        is_collateral_long,
+                        position_loader.key(),
+                        &position,
+                        self.order.key(),
+                    )?
+                };
+                let mut position = RevertiblePosition::new(market, position_loader)?;
+
+                let should_remove_position = match kind {
+                    OrderKind::MarketIncrease | OrderKind::LimitIncrease => {
+                        execute_increase_position(
+                            self.oracle,
+                            prices,
+                            &mut position,
+                            &mut swap_markets,
+                            &mut transfer_out,
+                            &mut event,
+                            &mut *self.order.load_mut()?,
+                        )?;
+                        false
+                    }
+                    OrderKind::Liquidation => execute_decrease_position(
+                        self.oracle,
+                        prices,
+                        &mut position,
+                        &mut swap_markets,
+                        &mut transfer_out,
+                        &mut event,
+                        &mut *self.order.load_mut()?,
+                        true,
+                        Some(SecondaryOrderType::Liquidation),
+                    )?,
+                    OrderKind::AutoDeleveraging => execute_decrease_position(
+                        self.oracle,
+                        prices,
+                        &mut position,
+                        &mut swap_markets,
+                        &mut transfer_out,
+                        &mut event,
+                        &mut *self.order.load_mut()?,
+                        true,
+                        Some(SecondaryOrderType::AutoDeleveraging),
+                    )?,
+                    OrderKind::MarketDecrease
+                    | OrderKind::LimitDecrease
+                    | OrderKind::StopLossDecrease => execute_decrease_position(
+                        self.oracle,
+                        prices,
+                        &mut position,
+                        &mut swap_markets,
+                        &mut transfer_out,
+                        &mut event,
+                        &mut *self.order.load_mut()?,
+                        false,
+                        None,
+                    )?,
+                    _ => unreachable!(),
+                };
+                position.write_to_event(&mut event)?;
+                event.update_with_transfer_out(&transfer_out)?;
+                trade_event = Some(event);
+                position.commit();
+                msg!(
+                    "[Position] executed with trade_id={}",
+                    self.position
+                        .as_ref()
+                        .unwrap()
+                        .load()
+                        .unwrap()
+                        .state
+                        .trade_id
+                );
+                should_remove_position
+            }
+        };
+        swap_markets.commit();
+        Ok((should_remove_position, transfer_out, trade_event))
+    }
+
+    fn close_position(&self) -> Result<()> {
+        let Some(position) = self.position else {
+            return err!(CoreError::PositionIsRequired);
+        };
+        position.close(self.owner.clone())?;
+        Ok(())
+    }
+
+    fn validate_oracle_and_adl(&self) -> crate::StoreResult<()> {
+        self.oracle.validate_time(self)?;
+        let (kind, is_long) = {
+            let order = self
+                .order
+                .load()
+                .map_err(|_| StoreError::LoadAccountError)?;
+            (
+                order
+                    .params
+                    .kind()
+                    .map_err(|_| StoreError::InvalidArgument)?,
+                order
+                    .params
+                    .side()
+                    .map_err(|_| StoreError::InvalidArgument)?
+                    .is_long(),
+            )
+        };
+        #[allow(clippy::single_match)]
+        match kind {
+            OrderKind::AutoDeleveraging => {
+                self.market
+                    .load()
+                    .map_err(|_| StoreError::InvalidMarket)?
+                    .validate_adl(self.oracle, is_long)?;
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    fn validate_market(&self) -> Result<()> {
+        self.market.load()?.validate(&self.store.key())?;
+        Ok(())
+    }
+
+    fn validate_order(&self, should_throw_error: &mut bool, prices: &Prices<u128>) -> Result<()> {
+        self.validate_non_empty_order()?;
+        match self.validate_trigger_price(prices) {
+            Ok(()) => Ok(()),
+            Err(err) => {
+                if !self.order.load()?.params.kind()?.is_market() {
+                    *should_throw_error = true;
+                }
+                Err(err)
+            }
+        }
+    }
+
+    fn validate_non_empty_order(&self) -> Result<()> {
+        let order = self.order.load()?;
+        let params = &order.params;
+        let kind = params.kind()?;
+
+        // NOTE: we currently allow the delta size for decrease position order to be empty.
+        if kind.is_increase_position() {
+            require!(params.size_delta_value != 0, StoreError::InvalidArgument);
+        }
+
+        if kind.is_swap() {
+            require!(
+                params.initial_collateral_delta_amount != 0,
+                StoreError::InvalidArgument
+            );
+        }
+        Ok(())
+    }
+
+    fn validate_trigger_price(&self, prices: &Prices<u128>) -> Result<()> {
+        self.order
+            .load()?
+            .validate_trigger_price(prices.index_token_price)
+    }
+}
+
+impl<'a, 'info> ValidateOracleTime for ExecuteOrderOps<'a, 'info> {
+    fn oracle_updated_after(&self) -> crate::StoreResult<Option<i64>> {
+        let (kind, updated_at) = {
+            let order = self
+                .order
+                .load()
+                .map_err(|_| StoreError::LoadAccountError)?;
+            (
+                order
+                    .params
+                    .kind()
+                    .map_err(|_| StoreError::InvalidArgument)?,
+                order.updated_at,
+            )
+        };
+
+        match kind {
+            OrderKind::MarketSwap
+            | OrderKind::LimitSwap
+            | OrderKind::MarketIncrease
+            | OrderKind::MarketDecrease
+            | OrderKind::LimitIncrease => Ok(Some(updated_at)),
+            OrderKind::LimitDecrease | OrderKind::StopLossDecrease => {
+                let position = self
+                    .position
+                    .as_ref()
+                    .ok_or(StoreError::PositionNotProvided)?
+                    .load()
+                    .map_err(|_| StoreError::LoadAccountError)?;
+                let last_updated = updated_at.max(position.state.increased_at);
+                Ok(Some(last_updated))
+            }
+            OrderKind::Liquidation => {
+                let position = self
+                    .position
+                    .as_ref()
+                    .ok_or(StoreError::PositionNotProvided)?
+                    .load()
+                    .map_err(|_| StoreError::LoadAccountError)?;
+                Ok(Some(
+                    position.state.increased_at.max(position.state.decreased_at),
+                ))
+            }
+            // Ignore the check of oracle ts for ADL orders.
+            OrderKind::AutoDeleveraging => Ok(None),
+        }
+    }
+
+    fn oracle_updated_before(&self) -> crate::StoreResult<Option<i64>> {
+        let (kind, updated_at) = {
+            let order = self
+                .order
+                .load()
+                .map_err(|_| StoreError::LoadAccountError)?;
+            (
+                order
+                    .params
+                    .kind()
+                    .map_err(|_| StoreError::InvalidArgument)?,
+                order.updated_at,
+            )
+        };
+        let ts = match kind {
+            OrderKind::MarketSwap | OrderKind::MarketIncrease | OrderKind::MarketDecrease => {
+                Some(updated_at)
+            }
+            _ => None,
+        };
+        ts.map(|ts| {
+            self.store
+                .load()
+                .map_err(|_| StoreError::LoadAccountError)?
+                .request_expiration_at(ts)
+        })
+        .transpose()
+    }
+
+    fn oracle_updated_after_slot(&self) -> crate::StoreResult<Option<u64>> {
+        let (kind, updated_at_slot) = {
+            let order = self
+                .order
+                .load()
+                .map_err(|_| StoreError::LoadAccountError)?;
+            (
+                order
+                    .params
+                    .kind()
+                    .map_err(|_| StoreError::InvalidArgument)?,
+                order.updated_at_slot,
+            )
+        };
+        // FIXME: should we validate the slot for liquidation and ADL?
+        let after = match kind {
+            OrderKind::Liquidation | OrderKind::AutoDeleveraging => None,
+            _ => Some(updated_at_slot),
+        };
+        Ok(after)
+    }
+}
+
+#[inline(never)]
+fn execute_swap(
+    should_throw_error: &mut bool,
+    oracle: &Oracle,
+    market: &mut RevertiblePerpMarket<'_>,
+    swap_markets: &mut SwapMarkets<'_>,
+    transfer_out: &mut TransferOut,
+    order: &mut OrderV2,
+) -> Result<()> {
+    let swap_out_token = order
+        .tokens
+        .final_output_token
+        .token()
+        .ok_or(error!(CoreError::MissingFinalOutputToken))?;
+    // Perform swap.
+    let swap_out_amount = {
+        let swap = &order.swap;
+        let initial_collateral_token = order
+            .tokens
+            .initial_collateral
+            .token()
+            .ok_or(error!(CoreError::MissingInitialCollateralToken))?;
+        let amount = order.params.initial_collateral_delta_amount;
+        let (swap_out_amount, _) = swap_markets.revertible_swap(
+            SwapDirection::Into(market),
+            oracle,
+            &swap.into(),
+            (swap_out_token, swap_out_token),
+            (Some(initial_collateral_token), None),
+            (amount, 0),
+        )?;
+        swap_out_amount
+    };
+    if let Err(err) = order.validate_output_amount(swap_out_amount.into()) {
+        if !order.params.kind()?.is_market() {
+            *should_throw_error = true;
+        }
+        return Err(err);
+    }
+    let is_long = market.market_meta().to_token_side(&swap_out_token)?;
+    transfer_out.transfer_out_collateral(
+        is_long,
+        CollateralReceiver::Collateral,
+        swap_out_amount,
+    )?;
+    Ok(())
+}
+
+#[inline(never)]
+fn execute_increase_position(
+    oracle: &Oracle,
+    prices: Prices<u128>,
+    position: &mut RevertiblePosition<'_>,
+    swap_markets: &mut SwapMarkets<'_>,
+    transfer_out: &mut TransferOut,
+    event: &mut TradeEvent,
+    order: &mut OrderV2,
+) -> Result<()> {
+    let params = &order.params;
+
+    // Perform swap.
+    let collateral_increment_amount = {
+        let initial_collateral_token = order
+            .tokens
+            .initial_collateral
+            .token()
+            .ok_or(error!(CoreError::MissingInitialCollateralToken))?;
+        let swap = &order.swap;
+        let collateral_token = *position.collateral_token();
+        let (collateral_increment_amount, _) = swap_markets.revertible_swap(
+            SwapDirection::Into(position.market_mut()),
+            oracle,
+            &swap.into(),
+            (collateral_token, collateral_token),
+            (Some(initial_collateral_token), None),
+            (params.initial_collateral_delta_amount, 0),
+        )?;
+        collateral_increment_amount
+    };
+
+    // Validate that the collateral amount is sufficient.
+    order.validate_output_amount(collateral_increment_amount.into())?;
+
+    // Increase position.
+    let (long_amount, short_amount) = {
+        let size_delta_usd = params.size_delta_value;
+        let acceptable_price = params.acceptable_price;
+        let report = position
+            .increase(
+                prices,
+                collateral_increment_amount.into(),
+                size_delta_usd,
+                Some(acceptable_price),
+            )
+            .and_then(|a| a.execute())
+            .map_err(ModelError::from)?;
+        msg!("[Position] increased: {:?}", report);
+        let (long_amount, short_amount) = report.claimable_funding_amounts();
+        event.update_with_increase_report(&report)?;
+        (*long_amount, *short_amount)
+    };
+
+    // Process output amount.
+    transfer_out.transfer_out_funding_amounts(&long_amount, &short_amount)?;
+
+    position.market().validate_market_balances(
+        long_amount
+            .try_into()
+            .map_err(|_| error!(StoreError::AmountOverflow))?,
+        short_amount
+            .try_into()
+            .map_err(|_| error!(StoreError::AmountOverflow))?,
+    )?;
+
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+#[inline(never)]
+fn execute_decrease_position(
+    oracle: &Oracle,
+    prices: Prices<u128>,
+    position: &mut RevertiblePosition<'_>,
+    swap_markets: &mut SwapMarkets<'_>,
+    transfer_out: &mut TransferOut,
+    event: &mut TradeEvent,
+    order: &mut OrderV2,
+    is_insolvent_close_allowed: bool,
+    secondary_order_type: Option<SecondaryOrderType>,
+) -> Result<ShouldRemovePosition> {
+    // Decrease position.
+    let report = {
+        let params = &order.params;
+        let collateral_withdrawal_amount = params.initial_collateral_delta_amount as u128;
+        let size_delta_usd = params.size_delta_value;
+        let acceptable_price = params.acceptable_price;
+        let is_liquidation_order =
+            matches!(secondary_order_type, Some(SecondaryOrderType::Liquidation));
+        let is_adl_order = matches!(
+            secondary_order_type,
+            Some(SecondaryOrderType::AutoDeleveraging)
+        );
+        // Only required when the order is an ADL order.
+        let mut pnl_factor_before_execution = None;
+
+        // Validate the liqudiation is a fully close.
+        if is_liquidation_order {
+            require_gte!(
+                size_delta_usd,
+                *position.size_in_usd(),
+                StoreError::InvalidArgument
+            );
+        }
+
+        // Validate that ADL is required.
+        if is_adl_order {
+            let Some((pnl_factor, _)) = position
+                .market()
+                .pnl_factor_exceeded(&prices, PnlFactorKind::ForAdl, params.side()?.is_long())
+                .map_err(ModelError::from)?
+            else {
+                return err!(StoreError::AdlNotRequired);
+            };
+            pnl_factor_before_execution = Some(pnl_factor);
+        }
+
+        let report = position
+            .decrease(
+                prices,
+                size_delta_usd,
+                Some(acceptable_price),
+                collateral_withdrawal_amount,
+                is_insolvent_close_allowed,
+                is_liquidation_order,
+            )
+            .and_then(|a| a.execute())
+            .map_err(ModelError::from)?;
+
+        // Validate that ADL is valid.
+        if is_adl_order {
+            let pnl_factor_after_execution = position
+                .market()
+                .pnl_factor(&prices, params.side()?.is_long(), true)
+                .map_err(ModelError::from)?;
+            require_gt!(
+                pnl_factor_before_execution.expect("must be some"),
+                pnl_factor_after_execution,
+                StoreError::InvalidAdl
+            );
+            let min_pnl_factor = position
+                .market()
+                .pnl_factor_config(PnlFactorKind::MinAfterAdl, params.side()?.is_long())
+                .and_then(|factor| factor.to_signed())
+                .map_err(ModelError::from)?;
+            require_gt!(
+                pnl_factor_after_execution,
+                min_pnl_factor,
+                StoreError::InvalidAdl
+            );
+        }
+
+        msg!("[Position] decreased: {:?}", report);
+        event.update_with_decrease_report(&report)?;
+        report
+    };
+    let should_remove_position = report.should_remove();
+
+    // Perform swaps.
+    {
+        require!(
+            *report.secondary_output_amount() == 0
+                || (report.is_output_token_long() != report.is_secondary_output_token_long()),
+            StoreError::SameSecondaryTokensNotMerged,
+        );
+        let (is_output_token_long, output_amount, secondary_output_amount) = (
+            report.is_output_token_long(),
+            (*report.output_amount())
+                .try_into()
+                .map_err(|_| error!(StoreError::AmountOverflow))?,
+            (*report.secondary_output_amount())
+                .try_into()
+                .map_err(|_| error!(StoreError::AmountOverflow))?,
+        );
+
+        // Swap output token to the expected output token.
+        let meta = *position.market().market_meta();
+        let token_ins = if is_output_token_long {
+            (Some(meta.long_token_mint), Some(meta.short_token_mint))
+        } else {
+            (Some(meta.short_token_mint), Some(meta.long_token_mint))
+        };
+
+        // Since we have checked that secondary_amount must be zero if output_token == secondary_output_token,
+        // the swap should still be correct.
+
+        let final_output_token = order
+            .tokens
+            .final_output_token
+            .token()
+            .ok_or(error!(CoreError::MissingFinalOutputToken))?;
+        let secondary_output_token = order.secondary_output_token()?;
+        let swap = &order.swap;
+        let (output_amount, secondary_output_amount) = swap_markets.revertible_swap(
+            SwapDirection::From(position.market_mut()),
+            oracle,
+            &swap.into(),
+            (final_output_token, secondary_output_token),
+            token_ins,
+            (output_amount, secondary_output_amount),
+        )?;
+        order.validate_decrease_output_amounts(
+            oracle,
+            &final_output_token,
+            output_amount,
+            &secondary_output_token,
+            secondary_output_amount,
+        )?;
+        transfer_out.transfer_out(false, output_amount)?;
+        transfer_out.transfer_out(true, secondary_output_amount)?;
+        event.set_final_output_token(&final_output_token);
+    }
+
+    // Process other output amounts.
+    {
+        let (long_amount, short_amount) = report.claimable_funding_amounts();
+        transfer_out.transfer_out_funding_amounts(long_amount, short_amount)?;
+        transfer_out.process_claimable_collateral_for_decrease(&report)?;
+    }
+
+    // Validate market balances.
+    let mut long_transfer_out = transfer_out.total_long_token_amount()?;
+    let mut short_transfer_out = transfer_out.total_short_token_amount()?;
+    let mut add_to_amount = |is_long_token: bool, amount: u64| {
+        let acc = if is_long_token {
+            &mut long_transfer_out
+        } else {
+            &mut short_transfer_out
+        };
+        *acc = acc
+            .checked_add(amount)
+            .ok_or(error!(StoreError::AmountOverflow))?;
+        Result::Ok(())
+    };
+    let current_market_token = position.market().key();
+    let meta = position.market().market_meta();
+    let tokens = &order.tokens;
+    let output_token_market = order
+        .swap
+        .last_market_token(true)
+        .unwrap_or(&current_market_token);
+    let secondary_token_market = order
+        .swap
+        .last_market_token(false)
+        .unwrap_or(&current_market_token);
+    if transfer_out.final_output_token != 0 && *output_token_market == current_market_token {
+        (add_to_amount)(
+            meta.to_token_side(
+                tokens
+                    .final_output_token
+                    .token()
+                    .as_ref()
+                    .ok_or(error!(CoreError::MissingFinalOutputToken))?,
+            )?,
+            transfer_out.final_output_token,
+        )?;
+    }
+    if transfer_out.secondary_output_token != 0 && *secondary_token_market == current_market_token {
+        (add_to_amount)(
+            order.params.side()?.is_long(),
+            transfer_out.secondary_output_token,
+        )?;
+    }
+    position
+        .market()
+        .validate_market_balances(long_transfer_out, short_transfer_out)?;
+
+    Ok(should_remove_position)
 }

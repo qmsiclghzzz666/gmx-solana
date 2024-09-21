@@ -708,6 +708,113 @@ impl OrderV2 {
     pub fn signer(&self) -> ActionSigner {
         self.header.signer(Self::SEED)
     }
+
+    /// Validate trigger price.
+    pub fn validate_trigger_price(&self, index_price: u128) -> Result<()> {
+        let params = &self.params;
+        let kind = params.kind()?;
+        let index_price = &index_price;
+        let is_long = params.side()?.is_long();
+        let trigger_price = &params.trigger_price;
+        match kind {
+            OrderKind::LimitIncrease => {
+                if is_long {
+                    // TODO: Pick max price.
+                    require_gte!(trigger_price, index_price, StoreError::InvalidTriggerPrice);
+                } else {
+                    // TODO: Pick min price.
+                    require_gte!(index_price, trigger_price, StoreError::InvalidTriggerPrice);
+                }
+            }
+            OrderKind::LimitDecrease => {
+                if is_long {
+                    // TODO: Pick min price.
+                    require_gte!(index_price, trigger_price, StoreError::InvalidTriggerPrice);
+                } else {
+                    // TODO: Pick max price.
+                    require_gte!(trigger_price, index_price, StoreError::InvalidTriggerPrice);
+                }
+            }
+            OrderKind::StopLossDecrease => {
+                if is_long {
+                    // TODO: Pick min price.
+                    require_gte!(trigger_price, index_price, StoreError::InvalidTriggerPrice);
+                } else {
+                    // TODO: Pick max price.
+                    require_gte!(index_price, trigger_price, StoreError::InvalidTriggerPrice);
+                }
+            }
+            OrderKind::LimitSwap => {
+                // NOTE: For limit swap orders, the trigger price can be substituted by the min output amount,
+                // so validatoin is not required. In fact, we should prohibit the creation of limit swap orders
+                // with a trigger price.
+            }
+
+            OrderKind::MarketSwap
+            | OrderKind::MarketIncrease
+            | OrderKind::MarketDecrease
+            | OrderKind::Liquidation
+            | OrderKind::AutoDeleveraging => {}
+        }
+
+        Ok(())
+    }
+
+    /// Validate output amount.
+    pub fn validate_output_amount(&self, output_amount: u128) -> Result<()> {
+        require_gte!(
+            output_amount,
+            self.params.min_output,
+            StoreError::InsufficientOutputAmount
+        );
+        Ok(())
+    }
+
+    #[inline(never)]
+    pub(crate) fn validate_decrease_output_amounts(
+        &self,
+        oracle: &Oracle,
+        output_token: &Pubkey,
+        output_amount: u64,
+        secondary_output_token: &Pubkey,
+        secondary_output_amount: u64,
+    ) -> Result<()> {
+        let mut total = 0u128;
+        {
+            let price = oracle
+                .primary
+                .get(output_token)
+                .ok_or(error!(StoreError::MissingOracelPrice))?
+                .min
+                .to_unit_price();
+            let output_value = u128::from(output_amount).saturating_mul(price);
+            total = total.saturating_add(output_value);
+        }
+        {
+            let price = oracle
+                .primary
+                .get(secondary_output_token)
+                .ok_or(error!(StoreError::MissingOracelPrice))?
+                .min
+                .to_unit_price();
+            let output_value = u128::from(secondary_output_amount).saturating_mul(price);
+            total = total.saturating_add(output_value);
+        }
+
+        // We use the `min_output_amount` as min output value.
+        self.validate_output_amount(total)?;
+        Ok(())
+    }
+
+    /// Get secondary output token (pnl token).
+    pub fn secondary_output_token(&self) -> Result<Pubkey> {
+        if self.params.side()?.is_long() {
+            self.tokens.long_token.token()
+        } else {
+            self.tokens.short_token.token()
+        }
+        .ok_or(error!(CoreError::MissingPoolTokens))
+    }
 }
 
 /// Token accounts for Order.
@@ -740,15 +847,15 @@ pub struct OrderParamsV2 {
     /// Initial collateral delta amount.
     pub(crate) initial_collateral_delta_amount: u64,
     /// Size delta value.
-    size_delta_value: u128,
+    pub(crate) size_delta_value: u128,
     /// Min output amount or value.
     /// - Used as amount for swap orders.
     /// - Used as value for decrease position orders.
     min_output: u128,
     /// Trigger price (in unit price).
-    trigger_price: u128,
+    pub(crate) trigger_price: u128,
     /// Acceptable price (in unit price).
-    acceptable_price: u128,
+    pub(crate) acceptable_price: u128,
     reserve: [u8; 128],
 }
 

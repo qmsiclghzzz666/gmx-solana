@@ -396,6 +396,24 @@ impl SwapParamsV2 {
         };
         Ok(Some(AccountLoader::try_from(info)?))
     }
+
+    /// Get the first market token in the swap path.
+    pub fn first_market_token(&self, is_primary: bool) -> Option<&Pubkey> {
+        if is_primary {
+            self.primary_swap_path().first()
+        } else {
+            self.secondary_swap_path().first()
+        }
+    }
+
+    /// Get the last market token in the swap path.
+    pub fn last_market_token(&self, is_primary: bool) -> Option<&Pubkey> {
+        if is_primary {
+            self.primary_swap_path().last()
+        } else {
+            self.secondary_swap_path().last()
+        }
+    }
 }
 
 impl From<&SwapParamsV2> for SwapParams {

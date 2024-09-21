@@ -1848,6 +1848,12 @@ pub enum CoreError {
     /// Missing initial collateral token.
     #[msg("missing initial collateral token")]
     MissingInitialCollateralToken,
+    /// Missing final output token.
+    #[msg("missing final output token")]
+    MissingFinalOutputToken,
+    /// Missing pool tokens.
+    #[msg("missing pool tokens")]
+    MissingPoolTokens,
     /// Token amount overflow.
     #[msg("token amount overflow")]
     TokenAmountOverflow,
