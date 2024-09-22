@@ -296,7 +296,9 @@ pub use self::states::Data;
 use self::{
     instructions::*,
     ops::{
-        deposit::CreateDepositParams, order::CreateOrderParams, withdrawal::CreateWithdrawalParams,
+        deposit::CreateDepositParams,
+        order::{CreateOrderParams, PositionCutKind},
+        withdrawal::CreateWithdrawalParams,
     },
     states::{
         common::{SwapParams, TokenRecord},
@@ -1509,6 +1511,35 @@ pub mod gmsol_store {
             recent_timestamp,
             execution_fee,
             throw_on_execution_error,
+        )
+    }
+
+    #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
+    pub fn liquidate<'info>(
+        ctx: Context<'_, '_, 'info, 'info, PositionCut<'info>>,
+        nonce: [u8; 32],
+        recent_timestamp: i64,
+    ) -> Result<()> {
+        instructions::unchecked_process_position_cut(
+            ctx,
+            &nonce,
+            recent_timestamp,
+            PositionCutKind::Liquidate,
+        )
+    }
+
+    #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
+    pub fn auto_deleverage<'info>(
+        ctx: Context<'_, '_, 'info, 'info, PositionCut<'info>>,
+        nonce: [u8; 32],
+        recent_timestamp: i64,
+        size_delta_in_usd: u128,
+    ) -> Result<()> {
+        instructions::unchecked_process_position_cut(
+            ctx,
+            &nonce,
+            recent_timestamp,
+            PositionCutKind::AutoDeleverage(size_delta_in_usd),
         )
     }
 }

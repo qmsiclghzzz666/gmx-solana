@@ -825,7 +825,7 @@ fn execute_decrease_position(
     Ok(should_remove_position)
 }
 
-fn get_pnl_token(
+pub(crate) fn get_pnl_token(
     position: &Option<AccountLoader<'_, Position>>,
     market: &Market,
 ) -> Result<Pubkey> {
@@ -841,7 +841,7 @@ fn get_pnl_token(
     }
 }
 
-fn check_delegation(account: &TokenAccount, target: Pubkey) -> Result<bool> {
+pub(crate) fn check_delegation(account: &TokenAccount, target: Pubkey) -> Result<bool> {
     let is_matched = account
         .delegate
         .map(|delegate| delegate == target)
@@ -849,7 +849,7 @@ fn check_delegation(account: &TokenAccount, target: Pubkey) -> Result<bool> {
     Ok(is_matched)
 }
 
-fn validated_recent_timestamp(config: &Store, timestamp: i64) -> Result<i64> {
+pub(crate) fn validated_recent_timestamp(config: &Store, timestamp: i64) -> Result<i64> {
     let recent_time_window = config.amount.recent_time_window;
     let expiration_time = timestamp.saturating_add_unsigned(recent_time_window);
     let clock = Clock::get()?;

@@ -1426,7 +1426,7 @@ fn execute_decrease_position(
 /// Position Cut Operation.
 #[derive(TypedBuilder)]
 pub struct PositionCutOp<'a, 'info> {
-    kind: PositionCut,
+    kind: PositionCutKind,
     position: &'a AccountLoader<'info, Position>,
     order: &'a AccountLoader<'info, OrderV2>,
     market: &'a AccountLoader<'info, Market>,
@@ -1447,12 +1447,12 @@ pub struct PositionCutOp<'a, 'info> {
 }
 
 #[derive(Clone)]
-pub(crate) enum PositionCut {
+pub(crate) enum PositionCutKind {
     Liquidate,
     AutoDeleverage(u128),
 }
 
-impl PositionCut {
+impl PositionCutKind {
     fn size_delta_usd(&self, size_in_usd: u128) -> u128 {
         match self {
             Self::Liquidate => size_in_usd,
