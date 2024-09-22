@@ -1422,3 +1422,166 @@ fn execute_decrease_position(
 
     Ok(should_remove_position)
 }
+
+/// Position Cut Operation.
+#[derive(TypedBuilder)]
+pub struct PositionCutOp<'a, 'info> {
+    kind: PositionCut,
+    position: &'a AccountLoader<'info, Position>,
+    order: &'a AccountLoader<'info, OrderV2>,
+    market: &'a AccountLoader<'info, Market>,
+    store: &'a AccountLoader<'info, Store>,
+    oracle: &'a Oracle,
+    owner: AccountInfo<'info>,
+    nonce: &'a NonceBytes,
+    order_bump: u8,
+    position_bump: u8,
+    long_token_account: &'a Account<'info, TokenAccount>,
+    short_token_account: &'a Account<'info, TokenAccount>,
+    long_token_vault: &'a Account<'info, TokenAccount>,
+    short_token_vault: &'a Account<'info, TokenAccount>,
+    claimable_long_token_account_for_user: AccountInfo<'info>,
+    claimable_short_token_account_for_user: AccountInfo<'info>,
+    claimable_pnl_token_account_for_holding: AccountInfo<'info>,
+    token_program: AccountInfo<'info>,
+}
+
+#[derive(Clone)]
+pub(crate) enum PositionCut {
+    Liquidate,
+    AutoDeleverage(u128),
+}
+
+impl PositionCut {
+    fn size_delta_usd(&self, size_in_usd: u128) -> u128 {
+        match self {
+            Self::Liquidate => size_in_usd,
+            Self::AutoDeleverage(delta) => size_in_usd.min(*delta),
+        }
+    }
+
+    fn to_order_kind(&self) -> OrderKind {
+        match self {
+            Self::Liquidate => OrderKind::Liquidation,
+            Self::AutoDeleverage(_) => OrderKind::AutoDeleveraging,
+        }
+    }
+}
+
+impl<'a, 'info> PositionCutOp<'a, 'info> {
+    pub(crate) fn execute(self) -> Result<Option<TradeEvent>> {
+        let (size_in_usd, is_long, is_collateral_long) = {
+            let position = self.position.load()?;
+            let market = self.market.load()?;
+            let is_collateral_token_long = market.meta.to_token_side(&position.collateral_token)?;
+            (
+                position.state.size_in_usd,
+                position.try_is_long()?,
+                is_collateral_token_long,
+            )
+        };
+        self.create_order(size_in_usd, is_long, is_collateral_long)?;
+        let (transfer_out, event) = self.execute_order()?;
+        self.process_transfer_out(&transfer_out, is_long, is_collateral_long)?;
+        Ok(event)
+    }
+
+    #[inline(never)]
+    fn create_order(
+        &self,
+        size_in_usd: u128,
+        is_long: bool,
+        is_collateral_long: bool,
+    ) -> Result<()> {
+        let params = CreateOrderParams {
+            kind: self.kind.to_order_kind(),
+            execution_fee: OrderV2::MIN_EXECUTION_LAMPORTS,
+            swap_path_length: 0,
+            initial_collateral_delta_amount: 0,
+            size_delta_value: self.kind.size_delta_usd(size_in_usd),
+            is_long,
+            is_collateral_long,
+            min_output: None,
+            trigger_price: None,
+            acceptable_price: None,
+        };
+        let output_token_account = if is_collateral_long {
+            self.long_token_account
+        } else {
+            self.short_token_account
+        };
+        CreateOrderOps::builder()
+            .order(self.order.clone())
+            .market(self.market.clone())
+            .store(self.store.clone())
+            .owner(self.owner.clone())
+            .nonce(self.nonce)
+            .bump(self.order_bump)
+            .params(&params)
+            .swap_path(&[])
+            .build()
+            .decrease()
+            .position(self.position.clone())
+            .position_bump(self.position_bump)
+            .final_output_token(output_token_account)
+            .long_token(self.long_token_account)
+            .short_token(self.short_token_account)
+            .build()
+            .execute()?;
+        Ok(())
+    }
+
+    #[inline(never)]
+    fn execute_order(&self) -> Result<(Box<TransferOut>, Option<TradeEvent>)> {
+        ExecuteOrderOps::builder()
+            .store(self.store)
+            .market(self.market)
+            .order(self.order)
+            .owner(self.owner.clone())
+            .position(Some(self.position))
+            .oracle(self.oracle)
+            .remaining_accounts(&[])
+            .throw_on_execution_error(true)
+            .build()
+            .execute()
+    }
+
+    #[inline(never)]
+    fn process_transfer_out(
+        &self,
+        transfer_out: &TransferOut,
+        is_long: bool,
+        is_collateral_long: bool,
+    ) -> Result<()> {
+        let (output_token_account, output_token_vault) = if is_collateral_long {
+            (self.long_token_account, self.long_token_vault)
+        } else {
+            (self.short_token_account, self.short_token_vault)
+        };
+        ProcessTransferOut::builder()
+            .token_program(self.token_program.clone())
+            .store(self.store)
+            .market(self.market)
+            .is_pnl_token_long_token(is_long)
+            .final_output_market(self.market)
+            .final_output_token_account(Some(output_token_account.to_account_info()))
+            .final_output_token_vault(Some(output_token_vault))
+            .long_token_account(Some(self.long_token_account.to_account_info()))
+            .long_token_vault(Some(self.long_token_vault))
+            .short_token_account(Some(self.short_token_account.to_account_info()))
+            .short_token_vault(Some(self.short_token_vault))
+            .claimable_long_token_account_for_user(Some(
+                self.claimable_long_token_account_for_user.clone(),
+            ))
+            .claimable_short_token_account_for_user(Some(
+                self.claimable_short_token_account_for_user.clone(),
+            ))
+            .claimable_pnl_token_account_for_holding(Some(
+                self.claimable_pnl_token_account_for_holding.clone(),
+            ))
+            .transfer_out(transfer_out)
+            .build()
+            .execute()?;
+        Ok(())
+    }
+}
