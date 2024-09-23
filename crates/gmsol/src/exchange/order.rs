@@ -3,22 +3,24 @@ use std::{collections::HashSet, ops::Deref};
 use anchor_client::{
     anchor_lang::{system_program, Id},
     solana_sdk::{instruction::AccountMeta, pubkey::Pubkey, signer::Signer},
-    RequestBuilder,
 };
 use anchor_spl::associated_token::get_associated_token_address;
-use gmsol_exchange::{accounts, instruction, instructions::CreateOrderParams};
-use gmsol_store::states::{
-    common::{SwapParams, TokensWithFeed},
-    order::{OrderKind, OrderParams},
-    Market, MarketMeta, NonceBytes, Order, Pyth, Store,
+use gmsol_store::{
+    accounts, instruction,
+    ops::order::CreateOrderParams,
+    states::{
+        common::{swap::SwapParamsV2, TokensWithFeed},
+        order::{OrderKind, OrderParams, OrderV2},
+        Market, MarketMeta, NonceBytes, Pyth, Store, TokenMapAccess,
+    },
 };
 
 use crate::{
     store::utils::{read_market, read_store, FeedsParser},
-    utils::{ComputeBudget, RpcBuilder, TokenAccountParams, TransactionBuilder},
+    utils::{ComputeBudget, RpcBuilder, TokenAccountParams, TransactionBuilder, ZeroCopy},
 };
 
-use super::generate_nonce;
+use super::{generate_nonce, ExchangeOps};
 
 #[cfg(feature = "pyth-pull-oracle")]
 use crate::pyth::pull_oracle::{ExecuteWithPythPrices, Prices, PythPullOracleContext};
@@ -34,16 +36,13 @@ pub struct CreateOrderBuilder<'a, C> {
     is_output_token_long: bool,
     nonce: Option<NonceBytes>,
     execution_fee: u64,
-    ui_fee_receiver: Pubkey,
     params: OrderParams,
     swap_path: Vec<Pubkey>,
     hint: Option<CreateOrderHint>,
     initial_token: TokenAccountParams,
-    final_token: TokenAccountParams,
-    secondary_token_account: Option<Pubkey>,
+    final_token: Option<Pubkey>,
     long_token_account: Option<Pubkey>,
     short_token_account: Option<Pubkey>,
-    token_map: Option<Pubkey>,
 }
 
 #[derive(Clone, Copy)]
@@ -70,17 +69,14 @@ where
             market_token: *market_token,
             nonce: None,
             execution_fee: 0,
-            ui_fee_receiver: Pubkey::new_unique(),
             params,
             swap_path: vec![],
             is_output_token_long,
             hint: None,
             initial_token: Default::default(),
             final_token: Default::default(),
-            secondary_token_account: None,
             long_token_account: None,
             short_token_account: None,
-            token_map: None,
         }
     }
 
@@ -121,21 +117,8 @@ where
     }
 
     /// Set final output token params (position order only).
-    pub fn final_output_token(
-        &mut self,
-        token: &Pubkey,
-        token_account: Option<&Pubkey>,
-    ) -> &mut Self {
-        self.final_token.set_token(*token);
-        if let Some(account) = token_account {
-            self.final_token.set_token_account(*account);
-        }
-        self
-    }
-
-    /// Set secondary output token account.
-    pub fn secondary_output_token_account(&mut self, account: &Pubkey) -> &mut Self {
-        self.secondary_token_account = Some(*account);
+    pub fn final_output_token(&mut self, token: &Pubkey) -> &mut Self {
+        self.final_token = Some(*token);
         self
     }
 
@@ -188,7 +171,7 @@ where
         Ok(output_token)
     }
 
-    async fn output_token_and_position(&mut self) -> crate::Result<(Pubkey, Option<Pubkey>)> {
+    async fn position(&mut self) -> crate::Result<Option<Pubkey>> {
         let output_token = self.output_token().await?;
         match &self.params.kind {
             OrderKind::MarketIncrease
@@ -206,9 +189,9 @@ where
                         .to_position_kind()
                         .map_err(anchor_client::ClientError::from)?,
                 )?;
-                Ok((output_token, Some(position)))
+                Ok(Some(position))
             }
-            OrderKind::MarketSwap | OrderKind::LimitSwap => Ok((output_token, None)),
+            OrderKind::MarketSwap | OrderKind::LimitSwap => Ok(None),
             kind => Err(crate::Error::invalid_argument(format!(
                 "unsupported order kind: {kind:?}"
             ))),
@@ -217,7 +200,7 @@ where
 
     /// Get initial collateral token account and vault.
     ///
-    /// Returns `(initial_collateral_token_account, initial_collateral_token_vault)`.
+    /// Returns `(initial_collateral_token, initial_collateral_token_account)`.
     async fn initial_collateral_accounts(&mut self) -> crate::Result<Option<(Pubkey, Pubkey)>> {
         match &self.params.kind {
             OrderKind::MarketIncrease
@@ -240,10 +223,7 @@ where
                         "missing initial collateral token parameters",
                     ));
                 };
-                Ok(Some((
-                    account,
-                    self.client.find_market_vault_address(&self.store, &token),
-                )))
+                Ok(Some((token, account)))
             }
             OrderKind::MarketDecrease
             | OrderKind::Liquidation
@@ -255,162 +235,316 @@ where
         }
     }
 
-    async fn final_output_token_account(&mut self) -> crate::Result<Option<Pubkey>> {
+    async fn get_final_output_token(&mut self) -> crate::Result<Pubkey> {
         match &self.params.kind {
-            OrderKind::MarketDecrease
-            | OrderKind::Liquidation
-            | OrderKind::LimitDecrease
-            | OrderKind::StopLossDecrease => {
-                if self.final_token.is_empty() {
+            OrderKind::MarketDecrease | OrderKind::LimitDecrease | OrderKind::StopLossDecrease => {
+                if self.final_token.is_none() {
                     let output_token = self.output_token().await?;
-                    self.final_token.set_token(output_token);
+                    self.final_token = Some(output_token);
                 }
-                let Some(account) = self
-                    .final_token
-                    .get_or_find_associated_token_account(Some(&self.client.payer()))
-                else {
-                    return Err(crate::Error::invalid_argument(
-                        "missing final output token parameters",
-                    ));
-                };
-                Ok(Some(account))
+                Ok(self.final_token.unwrap())
             }
             OrderKind::MarketIncrease
             | OrderKind::MarketSwap
             | OrderKind::LimitIncrease
-            | OrderKind::LimitSwap => Ok(None),
+            | OrderKind::LimitSwap => Ok(self.output_token().await?),
             kind => Err(crate::Error::invalid_argument(format!(
                 "unsupported order kind: {kind:?}"
             ))),
         }
     }
 
-    async fn secondary_output_token(&mut self) -> crate::Result<Pubkey> {
-        let hint = self.prepare_hint().await?;
-        Ok(if self.params.is_long {
-            hint.long_token
-        } else {
-            hint.short_token
-        })
-    }
-
-    async fn get_secondary_output_token_account(&mut self) -> crate::Result<Option<Pubkey>> {
-        match &self.params.kind {
-            OrderKind::MarketIncrease
-            | OrderKind::MarketSwap
-            | OrderKind::LimitIncrease
-            | OrderKind::LimitSwap => Ok(None),
-            OrderKind::MarketDecrease
-            | OrderKind::Liquidation
-            | OrderKind::LimitDecrease
-            | OrderKind::StopLossDecrease => {
-                if let Some(account) = self.secondary_token_account {
-                    return Ok(Some(account));
-                }
-                let secondary_output_token = self.secondary_output_token().await?;
-                Ok(TokenAccountParams::default()
-                    .set_token(secondary_output_token)
-                    .get_or_find_associated_token_account(Some(&self.client.payer())))
-            }
-            kind => Err(crate::Error::invalid_argument(format!(
-                "unsupported order kind: {kind:?}"
-            ))),
-        }
-    }
-
-    async fn collateral_token_accounts(&mut self) -> crate::Result<(Pubkey, Pubkey)> {
-        let hint = self.prepare_hint().await?;
-        let payer = self.client.payer();
-        let long_token_account = self
-            .long_token_account
-            .unwrap_or(get_associated_token_address(&payer, &hint.long_token));
-        let short_token_account = self
-            .short_token_account
-            .unwrap_or(get_associated_token_address(&payer, &hint.short_token));
-        Ok((long_token_account, short_token_account))
-    }
-
-    async fn get_token_map(&self) -> crate::Result<Pubkey> {
-        if let Some(address) = self.token_map {
-            Ok(address)
-        } else {
-            crate::store::utils::token_map(self.client.data_store(), &self.store).await
-        }
-    }
-
-    /// Set token map.
-    pub fn token_map(&mut self, address: Pubkey) -> &mut Self {
-        self.token_map = Some(address);
-        self
-    }
-
-    /// Create [`RequestBuilder`] and return order address.
-    pub async fn build_with_address(&mut self) -> crate::Result<(RequestBuilder<'a, C>, Pubkey)> {
-        let authority = self.client.controller_address(&self.store);
+    /// Create [`RpcBuilder`] and return order address.
+    pub async fn build_with_address(&mut self) -> crate::Result<(RpcBuilder<'a, C>, Pubkey)> {
         let nonce = self.nonce.unwrap_or_else(generate_nonce);
         let payer = &self.client.payer();
         let order = self.client.find_order_address(&self.store, payer, &nonce);
-        let (initial_collateral_token_account, initial_collateral_token_vault) =
+        let (initial_collateral_token, initial_collateral_token_account) =
             self.initial_collateral_accounts().await?.unzip();
-        let (output_token, position) = self.output_token_and_position().await?;
-        let (long_token_account, short_token_account) = self.collateral_token_accounts().await?;
-        let need_to_transfer_in = self.params.need_to_transfer_in();
-        let builder = self
+        let final_output_token = self.get_final_output_token().await?;
+        let hint = self.prepare_hint().await?;
+        let (long_token, short_token) = if self.params.kind.is_swap() {
+            (None, None)
+        } else {
+            (Some(hint.long_token), Some(hint.short_token))
+        };
+
+        let initial_collateral_token_escrow = initial_collateral_token
+            .as_ref()
+            .map(|token| get_associated_token_address(&order, token));
+        let long_token_accounts = long_token.as_ref().map(|token| {
+            let escrow = get_associated_token_address(&order, token);
+            let ata = get_associated_token_address(payer, token);
+            (escrow, ata)
+        });
+        let short_token_accounts = short_token.as_ref().map(|token| {
+            let escrow = get_associated_token_address(&order, token);
+            let ata = get_associated_token_address(payer, token);
+            (escrow, ata)
+        });
+        let final_output_token_accounts =
+            if self.params.kind.is_swap() || self.params.kind.is_decrease_position() {
+                let escrow = get_associated_token_address(&order, &final_output_token);
+                let ata = get_associated_token_address(payer, &final_output_token);
+                Some((escrow, ata))
+            } else {
+                None
+            };
+        let position = self.position().await?;
+
+        let prepare = match self.params.kind {
+            OrderKind::MarketSwap | OrderKind::LimitSwap => {
+                let swap_in_token = initial_collateral_token.ok_or(
+                    crate::Error::invalid_argument("swap in token is not provided"),
+                )?;
+                let swap_in_token_escrow = initial_collateral_token_escrow.ok_or(
+                    crate::Error::invalid_argument("swap in token escrow is not provided"),
+                )?;
+                let (swap_out_token_escrow, swap_out_token_ata) = final_output_token_accounts
+                    .ok_or(crate::Error::invalid_argument(
+                        "swap out token accounts are not provided",
+                    ))?;
+                let escrow = self
+                    .client
+                    .data_store_rpc()
+                    .accounts(accounts::PrepareSwapOrderEscrow {
+                        owner: *payer,
+                        store: self.store,
+                        order,
+                        swap_in_token,
+                        swap_out_token: final_output_token,
+                        swap_in_token_escrow,
+                        swap_out_token_escrow,
+                        system_program: system_program::ID,
+                        token_program: anchor_spl::token::ID,
+                        associated_token_program: anchor_spl::associated_token::ID,
+                    })
+                    .args(instruction::PrepareSwapOrderEscrow { nonce });
+                let ata = self
+                    .client
+                    .data_store_rpc()
+                    .accounts(accounts::PrepareAssociatedTokenAccount {
+                        payer: *payer,
+                        owner: *payer,
+                        mint: final_output_token,
+                        account: swap_out_token_ata,
+                        system_program: system_program::ID,
+                        token_program: anchor_spl::token::ID,
+                        associated_token_program: anchor_spl::associated_token::ID,
+                    })
+                    .args(instruction::PrepareAssociatedTokenAccount {});
+                escrow.merge(ata)
+            }
+            OrderKind::MarketIncrease | OrderKind::LimitIncrease => {
+                let initial_collateral_token = initial_collateral_token.ok_or(
+                    crate::Error::invalid_argument("initial collateral token is not provided"),
+                )?;
+                let initial_collateral_token_escrow =
+                    initial_collateral_token_escrow.ok_or(crate::Error::invalid_argument(
+                        "initial collateral token escrow is not provided",
+                    ))?;
+                let long_token = long_token
+                    .ok_or(crate::Error::invalid_argument("long token is not provided"))?;
+                let short_token = short_token.ok_or(crate::Error::invalid_argument(
+                    "short token is not provided",
+                ))?;
+                let (long_token_escrow, long_token_ata) = long_token_accounts.ok_or(
+                    crate::Error::invalid_argument("long token accounts are not provided"),
+                )?;
+                let (short_token_escrow, short_token_ata) = short_token_accounts.ok_or(
+                    crate::Error::invalid_argument("short token accounts are not provided"),
+                )?;
+                let escrow =
+                    self.client
+                        .data_store_rpc()
+                        .accounts(accounts::PrepareIncreaseOrderEscrow {
+                            owner: *payer,
+                            store: self.store,
+                            order,
+                            initial_collateral_token,
+                            long_token,
+                            short_token,
+                            initial_collateral_token_escrow,
+                            long_token_escrow,
+                            short_token_escrow,
+                            system_program: system_program::ID,
+                            token_program: anchor_spl::token::ID,
+                            associated_token_program: anchor_spl::associated_token::ID,
+                        });
+                let long_token_ata = self
+                    .client
+                    .data_store_rpc()
+                    .accounts(accounts::PrepareAssociatedTokenAccount {
+                        payer: *payer,
+                        owner: *payer,
+                        mint: long_token,
+                        account: long_token_ata,
+                        system_program: system_program::ID,
+                        token_program: anchor_spl::token::ID,
+                        associated_token_program: anchor_spl::associated_token::ID,
+                    })
+                    .args(instruction::PrepareAssociatedTokenAccount {});
+                let short_token_ata = self
+                    .client
+                    .data_store_rpc()
+                    .accounts(accounts::PrepareAssociatedTokenAccount {
+                        payer: *payer,
+                        owner: *payer,
+                        mint: short_token,
+                        account: short_token_ata,
+                        system_program: system_program::ID,
+                        token_program: anchor_spl::token::ID,
+                        associated_token_program: anchor_spl::associated_token::ID,
+                    })
+                    .args(instruction::PrepareAssociatedTokenAccount {});
+                escrow.merge(long_token_ata).merge(short_token_ata)
+            }
+            .args(instruction::PrepareIncreaseOrderEscrow { nonce }),
+            OrderKind::MarketDecrease | OrderKind::LimitDecrease | OrderKind::StopLossDecrease => {
+                let long_token = long_token
+                    .ok_or(crate::Error::invalid_argument("long token is not provided"))?;
+                let short_token = short_token.ok_or(crate::Error::invalid_argument(
+                    "short token is not provided",
+                ))?;
+                let (long_token_escrow, long_token_ata) = long_token_accounts.ok_or(
+                    crate::Error::invalid_argument("long token accounts are not provided"),
+                )?;
+                let (short_token_escrow, short_token_ata) = short_token_accounts.ok_or(
+                    crate::Error::invalid_argument("short token accounts are not provided"),
+                )?;
+                let (final_output_token_escrow, final_output_token_ata) =
+                    final_output_token_accounts.ok_or(crate::Error::invalid_argument(
+                        "final_output_token accounts are not provided",
+                    ))?;
+                let escrow = self
+                    .client
+                    .data_store_rpc()
+                    .accounts(accounts::PrepareDecreaseOrderEscrow {
+                        payer: *payer,
+                        owner: *payer,
+                        store: self.store,
+                        order,
+                        final_output_token,
+                        long_token,
+                        short_token,
+                        final_output_token_escrow,
+                        long_token_escrow,
+                        short_token_escrow,
+                        system_program: system_program::ID,
+                        token_program: anchor_spl::token::ID,
+                        associated_token_program: anchor_spl::associated_token::ID,
+                    })
+                    .args(instruction::PrepareDecreaseOrderEscrow { nonce });
+                let long_token_ata = self
+                    .client
+                    .data_store_rpc()
+                    .accounts(accounts::PrepareAssociatedTokenAccount {
+                        payer: *payer,
+                        owner: *payer,
+                        mint: long_token,
+                        account: long_token_ata,
+                        system_program: system_program::ID,
+                        token_program: anchor_spl::token::ID,
+                        associated_token_program: anchor_spl::associated_token::ID,
+                    })
+                    .args(instruction::PrepareAssociatedTokenAccount {});
+                let short_token_ata = self
+                    .client
+                    .data_store_rpc()
+                    .accounts(accounts::PrepareAssociatedTokenAccount {
+                        payer: *payer,
+                        owner: *payer,
+                        mint: short_token,
+                        account: short_token_ata,
+                        system_program: system_program::ID,
+                        token_program: anchor_spl::token::ID,
+                        associated_token_program: anchor_spl::associated_token::ID,
+                    })
+                    .args(instruction::PrepareAssociatedTokenAccount {});
+                let final_output_token_ata = self
+                    .client
+                    .data_store_rpc()
+                    .accounts(accounts::PrepareAssociatedTokenAccount {
+                        payer: *payer,
+                        owner: *payer,
+                        mint: final_output_token,
+                        account: final_output_token_ata,
+                        system_program: system_program::ID,
+                        token_program: anchor_spl::token::ID,
+                        associated_token_program: anchor_spl::associated_token::ID,
+                    })
+                    .args(instruction::PrepareAssociatedTokenAccount {});
+                escrow
+                    .merge(long_token_ata)
+                    .merge(short_token_ata)
+                    .merge(final_output_token_ata)
+            }
+            _ => {
+                return Err(crate::Error::invalid_argument("unsupported order kind"));
+            }
+        };
+
+        let create = self
             .client
-            .exchange()
-            .request()
+            .data_store_rpc()
             .accounts(crate::utils::fix_optional_account_metas(
                 accounts::CreateOrder {
-                    authority,
                     store: self.store,
-                    controller: self.client.controller_address(&self.store),
-                    payer: *payer,
                     order,
                     position,
-                    token_map: self.get_token_map().await?,
                     market: self.market(),
-                    initial_collateral_token_account,
-                    final_output_token_account: self.final_output_token_account().await?,
-                    secondary_output_token_account: self
-                        .get_secondary_output_token_account()
-                        .await?,
-                    initial_collateral_token_vault,
-                    data_store_program: self.client.store_program_id(),
-                    long_token_account,
-                    short_token_account,
+                    owner: *payer,
+                    initial_collateral_token,
+                    final_output_token,
+                    long_token,
+                    short_token,
+                    initial_collateral_token_escrow,
+                    final_output_token_escrow: final_output_token_accounts
+                        .map(|(escrow, _)| escrow),
+                    long_token_escrow: long_token_accounts.map(|(escrow, _)| escrow),
+                    short_token_escrow: short_token_accounts.map(|(escrow, _)| escrow),
+                    initial_collateral_token_source: initial_collateral_token_account,
+                    final_output_token_ata: final_output_token_accounts.map(|(_, ata)| ata),
+                    long_token_ata: long_token_accounts.map(|(_, ata)| ata),
+                    short_token_ata: short_token_accounts.map(|(_, ata)| ata),
                     system_program: system_program::ID,
                     token_program: anchor_spl::token::ID,
+                    associated_token_program: anchor_spl::associated_token::ID,
                 },
-                &gmsol_exchange::id(),
-                &self.client.exchange_program_id(),
+                &gmsol_store::id(),
+                &self.client.store_program_id(),
             ))
             .args(instruction::CreateOrder {
                 nonce,
                 params: CreateOrderParams {
-                    order: self.params.clone(),
-                    output_token,
-                    ui_fee_receiver: self.ui_fee_receiver,
                     execution_fee: self.execution_fee,
-                    swap_length: self
+                    swap_path_length: self
                         .swap_path
                         .len()
                         .try_into()
                         .map_err(|_| crate::Error::NumberOutOfRange)?,
+                    kind: self.params.kind,
+                    initial_collateral_delta_amount: self.params.initial_collateral_delta_amount,
+                    size_delta_value: self.params.size_delta_usd,
+                    is_long: self.params.is_long,
+                    is_collateral_long: self.is_output_token_long,
+                    min_output: Some(self.params.min_output_amount),
+                    trigger_price: self.params.trigger_price,
+                    acceptable_price: self.params.acceptable_price,
                 },
             })
             .accounts(
                 self.swap_path
                     .iter()
-                    .enumerate()
-                    .map(|(idx, mint)| AccountMeta {
+                    .map(|mint| AccountMeta {
                         pubkey: self.client.find_market_address(&self.store, mint),
                         is_signer: false,
-                        is_writable: need_to_transfer_in && idx == 0,
+                        is_writable: false,
                     })
                     .collect::<Vec<_>>(),
             );
 
-        Ok((builder, order))
+        Ok((prepare.merge(create), order))
     }
 }
 
@@ -427,6 +561,7 @@ pub struct ExecuteOrderBuilder<'a, C> {
     hint: Option<ExecuteOrderHint>,
     token_map: Option<Pubkey>,
     cancel_on_execution_error: bool,
+    close: bool,
 }
 
 /// Hint for executing order.
@@ -438,31 +573,27 @@ pub struct ExecuteOrderHint {
     market_token: Pubkey,
     position: Option<Pubkey>,
     user: Pubkey,
-    final_output_token: Option<Pubkey>,
-    secondary_output_token: Pubkey,
-    final_output_token_account: Option<Pubkey>,
-    secondary_output_token_account: Option<Pubkey>,
-    long_token_account: Pubkey,
-    short_token_account: Pubkey,
+    initial_collateral_token_and_account: Option<(Pubkey, Pubkey)>,
+    final_output_token_and_account: Option<(Pubkey, Pubkey)>,
+    long_token_and_account: Option<(Pubkey, Pubkey)>,
+    short_token_and_account: Option<(Pubkey, Pubkey)>,
     long_token_mint: Pubkey,
     short_token_mint: Pubkey,
-    pnl_token_mint: Pubkey,
+    pnl_token: Pubkey,
     /// Feeds.
     pub feeds: TokensWithFeed,
-    swap: SwapParams,
-    initial_collateral_token: Option<Pubkey>,
-    initial_collateral_token_account: Option<Pubkey>,
+    swap: SwapParamsV2,
 }
 
 impl ExecuteOrderHint {
-    fn long_token_vault(&self, store: &Pubkey) -> Pubkey {
-        crate::pda::find_market_vault_address(store, &self.long_token_mint, &self.store_program_id)
-            .0
+    fn long_token_vault(&self, store: &Pubkey) -> Option<Pubkey> {
+        let token = self.long_token_and_account.as_ref()?.0;
+        Some(crate::pda::find_market_vault_address(store, &token, &self.store_program_id).0)
     }
 
-    fn short_token_vault(&self, store: &Pubkey) -> Pubkey {
-        crate::pda::find_market_vault_address(store, &self.short_token_mint, &self.store_program_id)
-            .0
+    fn short_token_vault(&self, store: &Pubkey) -> Option<Pubkey> {
+        let token = self.short_token_and_account.as_ref()?.0;
+        Some(crate::pda::find_market_vault_address(store, &token, &self.store_program_id).0)
     }
 
     fn claimable_long_token_account(
@@ -516,7 +647,7 @@ impl ExecuteOrderHint {
         Ok(Some(
             crate::pda::find_claimable_account_pda(
                 store,
-                &self.pnl_token_mint,
+                &self.pnl_token,
                 self.store.holding(),
                 &self.store.claimable_time_key(timestamp)?,
                 &self.store_program_id,
@@ -550,6 +681,7 @@ where
             hint: None,
             token_map: None,
             cancel_on_execution_error,
+            close: true,
         })
     }
 
@@ -565,45 +697,50 @@ where
         self
     }
 
+    /// Set whether to close order after execution.
+    pub fn close(&mut self, close: bool) -> &mut Self {
+        self.close = close;
+        self
+    }
+
     /// Set hint with the given order.
-    pub fn hint(&mut self, order: &Order, market: &Market, store: &Store) -> &mut Self {
-        let swap = order.swap.clone();
-        let market_token = order.fixed.tokens.market_token;
-        let final_output_token_account = order.fixed.receivers.final_output_token_account;
-        let secondary_output_token_account = order.fixed.receivers.secondary_output_token_account;
+    pub fn hint(
+        &mut self,
+        order: &OrderV2,
+        market: &Market,
+        store: &Store,
+        map: &impl TokenMapAccess,
+    ) -> crate::Result<&mut Self> {
+        let params = order.params();
+        let swap = order.swap();
+        let market_token = *order.market_token();
+        let kind = params.kind()?;
+        let tokens = order.tokens();
         self.hint = Some(ExecuteOrderHint {
             store_program_id: self.client.store_program_id(),
             has_claimable: matches!(
-                order.fixed.params.kind,
+                kind,
                 OrderKind::MarketDecrease | OrderKind::LimitDecrease | OrderKind::StopLossDecrease
             ),
             store: *store,
             market_token,
-            position: order.fixed.position,
-            user: order.fixed.user,
-            final_output_token: order.fixed.tokens.final_output_token,
-            secondary_output_token: order.fixed.tokens.secondary_output_token,
-            final_output_token_account,
-            secondary_output_token_account,
-            long_token_account: order.fixed.receivers.long_token_account,
-            short_token_account: order.fixed.receivers.short_token_account,
+            position: params.position().copied(),
+            user: *order.header().owner(),
             long_token_mint: market.meta().long_token_mint,
             short_token_mint: market.meta().short_token_mint,
-            pnl_token_mint: if order.fixed.params.is_long {
+            pnl_token: if params.side()?.is_long() {
                 market.meta().long_token_mint
             } else {
                 market.meta().short_token_mint
             },
-            feeds: order.prices.clone(),
-            swap,
-            initial_collateral_token: order
-                .fixed
-                .senders
-                .initial_collateral_token_account
-                .map(|_| order.fixed.tokens.initial_collateral_token),
-            initial_collateral_token_account: order.fixed.senders.initial_collateral_token_account,
+            feeds: swap.to_feeds(map)?,
+            swap: *swap,
+            initial_collateral_token_and_account: tokens.initial_collateral().token_and_account(),
+            final_output_token_and_account: tokens.final_output_token().token_and_account(),
+            long_token_and_account: tokens.long_token().token_and_account(),
+            short_token_and_account: tokens.short_token().token_and_account(),
         });
-        self
+        Ok(self)
     }
 
     /// Parse feeds with the given price udpates map.
@@ -619,13 +756,18 @@ where
             match &self.hint {
                 Some(hint) => return Ok(hint.clone()),
                 None => {
-                    let order: Order = self.client.data_store().account(self.order).await?;
-                    let market =
-                        read_market(&self.client.data_store().async_rpc(), &order.fixed.market)
-                            .await?;
+                    let order: ZeroCopy<OrderV2> =
+                        self.client.data_store().account(self.order).await?;
+                    let market = read_market(
+                        &self.client.data_store().async_rpc(),
+                        order.0.header().market(),
+                    )
+                    .await?;
                     let store =
                         read_store(&self.client.data_store().async_rpc(), &self.store).await?;
-                    self.hint(&order, &market, &store);
+                    let token_map_address = self.get_token_map().await?;
+                    let token_map = self.client.token_map(&token_map_address).await?;
+                    self.hint(&order.0, &market, &store, &token_map)?;
                 }
             }
         }
@@ -653,11 +795,19 @@ where
         Ok([long_for_user, short_for_user, pnl_for_holding])
     }
 
-    async fn get_token_map(&self) -> crate::Result<Pubkey> {
+    async fn get_token_map(&mut self) -> crate::Result<Pubkey> {
         if let Some(address) = self.token_map {
             Ok(address)
         } else {
-            crate::store::utils::token_map(self.client.data_store(), &self.store).await
+            let address = self
+                .client
+                .authorized_token_map_address(&self.store)
+                .await?
+                .ok_or(crate::Error::invalid_argument(
+                    "token map is not set for this store",
+                ))?;
+            self.token_map = Some(address);
+            Ok(address)
         }
     }
 
@@ -677,6 +827,7 @@ where
             .feeds_parser
             .parse(&hint.feeds)
             .collect::<Result<Vec<_>, _>>()?;
+        let token_map = self.get_token_map().await?;
         let swap_markets = hint
             .swap
             .unique_market_tokens_excluding_current(&hint.market_token)
@@ -686,73 +837,79 @@ where
                 is_writable: true,
             });
 
-        let execute_order = self
+        let mut execute_order = self
             .client
-            .exchange_rpc()
+            .data_store_rpc()
             .accounts(crate::utils::fix_optional_account_metas(
-                accounts::ExecuteOrder {
+                accounts::ExecuteOrderV2 {
                     authority,
-                    controller: self.client.controller_address(&self.store),
+                    owner: hint.user,
                     store: self.store,
                     oracle: self.oracle,
-                    token_map: self.get_token_map().await?,
+                    token_map,
                     market: self
                         .client
                         .find_market_address(&self.store, &hint.market_token),
-                    market_token_mint: hint.market_token,
                     order: self.order,
                     position: hint.position,
-                    user: hint.user,
-                    final_output_token_vault: hint
-                        .final_output_token_account
-                        .as_ref()
-                        .and(hint.final_output_token.as_ref())
-                        .map(|token| self.client.find_market_vault_address(&self.store, token)),
-                    secondary_output_token_vault: hint.secondary_output_token_account.as_ref().map(
-                        |_| {
-                            self.client.find_market_vault_address(
-                                &self.store,
-                                &hint.secondary_output_token,
-                            )
-                        },
+                    final_output_token_vault: hint.final_output_token_and_account.as_ref().map(
+                        |(token, _)| self.client.find_market_vault_address(&self.store, token),
                     ),
-                    final_output_token_account: hint.final_output_token_account,
-                    secondary_output_token_account: hint.secondary_output_token_account,
                     long_token_vault: hint.long_token_vault(&self.store),
                     short_token_vault: hint.short_token_vault(&self.store),
-                    long_token_account: hint.long_token_account,
-                    short_token_account: hint.short_token_account,
                     claimable_long_token_account_for_user,
                     claimable_short_token_account_for_user,
                     claimable_pnl_token_account_for_holding,
                     event_authority: self.client.data_store_event_authority(),
-                    data_store_program: self.client.store_program_id(),
                     token_program: anchor_spl::token::ID,
                     price_provider: self.price_provider,
                     system_program: system_program::ID,
-                    initial_collateral_token_account: hint.initial_collateral_token_account,
-                    initial_collateral_token_vault: hint
-                        .initial_collateral_token
-                        .map(|token| self.client.find_market_vault_address(&self.store, &token)),
-                    initial_market: hint.initial_collateral_token_account.map(|_| {
-                        self.client.find_market_address(
-                            &self.store,
-                            hint.swap
-                                .first_market_token(true)
-                                .unwrap_or(&hint.market_token),
-                        )
-                    }),
+                    initial_collateral_token: hint
+                        .initial_collateral_token_and_account
+                        .map(|(token, _)| token),
+                    initial_collateral_token_vault: hint.initial_collateral_token_and_account.map(
+                        |(token, _)| self.client.find_market_vault_address(&self.store, &token),
+                    ),
+                    initial_collateral_token_escrow: hint
+                        .initial_collateral_token_and_account
+                        .map(|(_, account)| account),
+                    long_token: hint.long_token_and_account.map(|(token, _)| token),
+                    short_token: hint.short_token_and_account.map(|(token, _)| token),
+                    final_output_token: hint.final_output_token_and_account.map(|(token, _)| token),
+                    final_output_token_escrow: hint
+                        .final_output_token_and_account
+                        .map(|(_, account)| account),
+                    long_token_escrow: hint.long_token_and_account.map(|(_, account)| account),
+                    short_token_escrow: hint.short_token_and_account.map(|(_, account)| account),
+                    program: self.client.store_program_id(),
                 },
-                &gmsol_exchange::id(),
-                &self.client.exchange_program_id(),
+                &gmsol_store::id(),
+                &self.client.store_program_id(),
             ))
-            .args(instruction::ExecuteOrder {
+            .args(instruction::ExecuteOrderV2 {
                 recent_timestamp: self.recent_timestamp,
                 execution_fee: self.execution_fee,
-                cancel_on_execution_error: self.cancel_on_execution_error,
+                throw_on_execution_error: !self.cancel_on_execution_error,
             })
             .accounts(feeds.into_iter().chain(swap_markets).collect::<Vec<_>>())
             .compute_budget(ComputeBudget::default().with_limit(EXECUTE_ORDER_COMPUTE_BUDGET));
+
+        if self.close {
+            let close = self
+                .client
+                .cancel_order(&self.order)?
+                .hint(CloseOrderHint {
+                    owner: hint.user,
+                    store: self.store,
+                    initial_collateral_token_and_account: hint.initial_collateral_token_and_account,
+                    final_output_token_and_account: hint.final_output_token_and_account,
+                    long_token_and_account: hint.long_token_and_account,
+                    short_token_and_account: hint.short_token_and_account,
+                })
+                .build()
+                .await?;
+            execute_order = execute_order.merge(close);
+        }
 
         let mut builder = ClaimableAccountsBuilder::new(
             self.recent_timestamp,
@@ -768,7 +925,7 @@ where
             builder.claimable_short_token_account_for_user(&hint.short_token_mint, &account);
         }
         if let Some(account) = claimable_pnl_token_account_for_holding {
-            builder.claimable_pnl_token_account_for_holding(&hint.pnl_token_mint, &account);
+            builder.claimable_pnl_token_account_for_holding(&hint.pnl_token, &account);
         }
 
         let (pre_builder, post_builder) = builder.build(self.client);
@@ -782,41 +939,40 @@ where
     }
 }
 
-/// Cancel Order Builder.
-pub struct CancelOrderBuilder<'a, C> {
+/// Close Order Builder.
+pub struct CloseOrderBuilder<'a, C> {
     client: &'a crate::Client<C>,
     order: Pubkey,
-    hint: Option<CancelOrderHint>,
+    hint: Option<CloseOrderHint>,
+    reason: String,
 }
 
+/// Close Order Hint.
 #[derive(Clone, Copy)]
-struct CancelOrderHint {
+pub struct CloseOrderHint {
+    owner: Pubkey,
     store: Pubkey,
-    initial_collateral_token: Option<Pubkey>,
-    initial_collateral_token_account: Option<Pubkey>,
-    initial_market_token: Option<Pubkey>,
+    initial_collateral_token_and_account: Option<(Pubkey, Pubkey)>,
+    final_output_token_and_account: Option<(Pubkey, Pubkey)>,
+    long_token_and_account: Option<(Pubkey, Pubkey)>,
+    short_token_and_account: Option<(Pubkey, Pubkey)>,
 }
 
-impl<'a> From<&'a Order> for CancelOrderHint {
-    fn from(order: &'a Order) -> Self {
-        let initial_collateral_token_account = order.fixed.senders.initial_collateral_token_account;
+impl<'a> From<&'a OrderV2> for CloseOrderHint {
+    fn from(order: &'a OrderV2) -> Self {
+        let tokens = order.tokens();
         Self {
-            store: order.fixed.store,
-            initial_market_token: Some(
-                order
-                    .swap
-                    .first_market_token(true)
-                    .copied()
-                    .unwrap_or(order.fixed.tokens.market_token),
-            ),
-            initial_collateral_token_account,
-            initial_collateral_token: initial_collateral_token_account
-                .map(|_| order.fixed.tokens.initial_collateral_token),
+            owner: *order.header().owner(),
+            store: *order.header().store(),
+            initial_collateral_token_and_account: tokens.initial_collateral().token_and_account(),
+            final_output_token_and_account: tokens.final_output_token().token_and_account(),
+            long_token_and_account: tokens.long_token().token_and_account(),
+            short_token_and_account: tokens.short_token().token_and_account(),
         }
     }
 }
 
-impl<'a, S, C> CancelOrderBuilder<'a, C>
+impl<'a, S, C> CloseOrderBuilder<'a, C>
 where
     C: Deref<Target = S> + Clone,
     S: Signer,
@@ -826,21 +982,38 @@ where
             client,
             order: *order,
             hint: None,
+            reason: "cancelled".into(),
         }
     }
 
     /// Set hint with the given order.
-    pub fn hint(&mut self, order: &Order) -> &mut Self {
-        self.hint = Some(CancelOrderHint::from(order));
+    pub fn hint_with_order(&mut self, order: &OrderV2) -> &mut Self {
+        self.hint(CloseOrderHint::from(order))
+    }
+
+    /// Set hint.
+    pub fn hint(&mut self, hint: CloseOrderHint) -> &mut Self {
+        self.hint = Some(hint);
         self
     }
 
-    async fn prepare_hint(&mut self) -> crate::Result<CancelOrderHint> {
+    /// Set reason.
+    pub fn reason(&mut self, reason: impl ToString) -> &mut Self {
+        self.reason = reason.to_string();
+        self
+    }
+
+    async fn prepare_hint(&mut self) -> crate::Result<CloseOrderHint> {
         match &self.hint {
             Some(hint) => Ok(*hint),
             None => {
-                let order = self.client.order(&self.order).await?;
-                let hint: CancelOrderHint = (&order).into();
+                let order: ZeroCopy<OrderV2> = self
+                    .client
+                    .account_with_config(&self.order, Default::default())
+                    .await?
+                    .into_value()
+                    .ok_or(crate::Error::invalid_argument("order not found"))?;
+                let hint: CloseOrderHint = (&order.0).into();
                 self.hint = Some(hint);
                 Ok(hint)
             }
@@ -850,33 +1023,59 @@ where
     /// Build [`RpcBuilder`] for cancelling the order.
     pub async fn build(&mut self) -> crate::Result<RpcBuilder<'a, C>> {
         let hint = self.prepare_hint().await?;
+        let payer = self.client.payer();
+        let owner = hint.owner;
         Ok(self
             .client
             .exchange_rpc()
             .accounts(crate::utils::fix_optional_account_metas(
-                accounts::CancelOrder {
-                    user: self.client.payer(),
-                    controller: self.client.controller_address(&hint.store),
+                accounts::CloseOrder {
                     store: hint.store,
                     event_authority: self.client.data_store_event_authority(),
                     order: self.order,
-                    initial_market: hint
-                        .initial_market_token
+                    executor: payer,
+                    owner,
+                    initial_collateral_token: hint
+                        .initial_collateral_token_and_account
+                        .map(|(token, _)| token),
+                    initial_collateral_token_escrow: hint
+                        .initial_collateral_token_and_account
+                        .map(|(_, account)| account),
+                    long_token: hint.long_token_and_account.map(|(token, _)| token),
+                    short_token: hint.short_token_and_account.map(|(token, _)| token),
+                    final_output_token: hint.final_output_token_and_account.map(|(token, _)| token),
+                    final_output_token_escrow: hint
+                        .final_output_token_and_account
+                        .map(|(_, account)| account),
+                    long_token_escrow: hint.long_token_and_account.map(|(_, account)| account),
+                    short_token_escrow: hint.short_token_and_account.map(|(_, account)| account),
+                    initial_collateral_token_ata: hint
+                        .initial_collateral_token_and_account
                         .as_ref()
-                        .map(|token| self.client.find_market_address(&hint.store, token)),
-                    initial_collateral_token_account: hint.initial_collateral_token_account,
-                    initial_collateral_token_vault: hint
-                        .initial_collateral_token
+                        .map(|(token, _)| get_associated_token_address(&owner, token)),
+                    final_output_token_ata: hint
+                        .final_output_token_and_account
                         .as_ref()
-                        .map(|token| self.client.find_market_vault_address(&hint.store, token)),
-                    store_program: self.client.store_program_id(),
+                        .map(|(token, _)| get_associated_token_address(&owner, token)),
+                    long_token_ata: hint
+                        .long_token_and_account
+                        .as_ref()
+                        .map(|(token, _)| get_associated_token_address(&owner, token)),
+                    short_token_ata: hint
+                        .short_token_and_account
+                        .as_ref()
+                        .map(|(token, _)| get_associated_token_address(&owner, token)),
+                    associated_token_program: anchor_spl::associated_token::ID,
                     token_program: anchor_spl::token::ID,
                     system_program: system_program::ID,
+                    program: self.client.store_program_id(),
                 },
                 &gmsol_exchange::ID,
                 &self.client.exchange_program_id(),
             ))
-            .args(instruction::CancelOrder {}))
+            .args(instruction::CloseOrder {
+                reason: self.reason.clone(),
+            }))
     }
 }
 

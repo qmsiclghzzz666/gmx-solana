@@ -35,4 +35,11 @@ impl TokenAndAccount {
             Some(self.account)
         }
     }
+
+    /// Get token and account.
+    pub fn token_and_account(&self) -> Option<(Pubkey, Pubkey)> {
+        let token = self.token()?;
+        let account = self.account()?;
+        Some((token, account))
+    }
 }

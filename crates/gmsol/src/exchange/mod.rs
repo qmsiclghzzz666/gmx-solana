@@ -32,7 +32,7 @@ use gmsol_store::states::{
     NonceBytes, UpdateOrderParams,
 };
 use liquidation::LiquidateBuilder;
-use order::CancelOrderBuilder;
+use order::CloseOrderBuilder;
 use rand::{distributions::Standard, Rng};
 use treasury::ClaimFeesBuilder;
 
@@ -152,7 +152,7 @@ pub trait ExchangeOps<C> {
     ) -> crate::Result<ExecuteOrderBuilder<C>>;
 
     /// Cancel an order.
-    fn cancel_order(&self, order: &Pubkey) -> crate::Result<CancelOrderBuilder<C>>;
+    fn cancel_order(&self, order: &Pubkey) -> crate::Result<CloseOrderBuilder<C>>;
 
     /// Liquidate a position.
     fn liquidate(&self, oracle: &Pubkey, position: &Pubkey) -> crate::Result<LiquidateBuilder<C>>;
@@ -559,8 +559,8 @@ where
         ExecuteOrderBuilder::try_new(self, store, oracle, order, cancel_on_execution_error)
     }
 
-    fn cancel_order(&self, order: &Pubkey) -> crate::Result<CancelOrderBuilder<C>> {
-        Ok(CancelOrderBuilder::new(self, order))
+    fn cancel_order(&self, order: &Pubkey) -> crate::Result<CloseOrderBuilder<C>> {
+        Ok(CloseOrderBuilder::new(self, order))
     }
 
     fn liquidate(&self, oracle: &Pubkey, position: &Pubkey) -> crate::Result<LiquidateBuilder<C>> {

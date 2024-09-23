@@ -815,6 +815,31 @@ impl OrderV2 {
         }
         .ok_or(error!(CoreError::MissingPoolTokens))
     }
+
+    /// Get header.
+    pub fn header(&self) -> &ActionHeader {
+        &self.header
+    }
+
+    /// Get order params.
+    pub fn params(&self) -> &OrderParamsV2 {
+        &self.params
+    }
+
+    /// Get swap params.
+    pub fn swap(&self) -> &SwapParamsV2 {
+        &self.swap
+    }
+
+    /// Get market token.
+    pub fn market_token(&self) -> &Pubkey {
+        &self.market_token
+    }
+
+    /// Get token accounts.
+    pub fn tokens(&self) -> &TokenAccounts {
+        &self.tokens
+    }
 }
 
 /// Token accounts for Order.
@@ -829,6 +854,36 @@ pub struct TokenAccounts {
     pub(crate) long_token: TokenAndAccount,
     /// Short token.
     pub(crate) short_token: TokenAndAccount,
+}
+
+impl TokenAccounts {
+    /// Get initial collateral token info.
+    ///
+    /// Only available for increase and swap orders.
+    pub fn initial_collateral(&self) -> &TokenAndAccount {
+        &self.initial_collateral
+    }
+
+    /// Get final output token info.
+    ///
+    /// Only available for decrease and swap orders.
+    pub fn final_output_token(&self) -> &TokenAndAccount {
+        &self.final_output_token
+    }
+
+    /// Get long token info.
+    ///
+    /// Only available for increase and decrease orders.
+    pub fn long_token(&self) -> &TokenAndAccount {
+        &self.long_token
+    }
+
+    /// Get short token info.
+    ///
+    //// Only available for increase and decrease orders.
+    pub fn short_token(&self) -> &TokenAndAccount {
+        &self.short_token
+    }
 }
 
 /// Order params.

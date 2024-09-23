@@ -173,7 +173,7 @@ pub struct PrepareDecreaseOrderEscrow<'info> {
         associated_token::mint = final_output_token,
         associated_token::authority = order,
     )]
-    pub initial_collateral_token_escrow: Box<Account<'info, TokenAccount>>,
+    pub final_output_token_escrow: Box<Account<'info, TokenAccount>>,
     /// The escrow account for receving the funding rebate in long tokens or pnl tokens after decreasing position.
     /// It will be stored as long token account.
     #[account(
