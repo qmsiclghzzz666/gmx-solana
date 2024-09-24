@@ -193,7 +193,7 @@ impl<'info> CreateWithdrawal<'info> {
     fn transfer_tokens(&mut self, params: &CreateWithdrawalParams) -> Result<()> {
         let amount = params.market_token_amount;
         let source = &self.market_token_source;
-        let target = &self.market_token_escrow;
+        let target = &mut self.market_token_escrow;
         let mint = &self.market_token;
         if amount != 0 {
             transfer_checked(
@@ -209,6 +209,7 @@ impl<'info> CreateWithdrawal<'info> {
                 amount,
                 mint.decimals,
             )?;
+            target.reload()?;
         }
         Ok(())
     }
