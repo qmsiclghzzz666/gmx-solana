@@ -10,10 +10,11 @@ use crate::{
     events::RemoveOrderEvent,
     ops::{
         execution_fee::TransferExecutionFeeOps,
-        order::{CreateOrderOps, CreateOrderParams},
+        order::{CreateOrderArgs, CreateOrderOps},
     },
     states::{
         order::{OrderKind, OrderV2},
+        position::PositionKind,
         Market, NonceBytes, Position, RoleKey, Seed, Store,
     },
     utils::{
@@ -207,9 +208,123 @@ pub(crate) fn prepare_decrease_order_escrow(
     Ok(())
 }
 
+/// Prepare position.
+#[derive(Accounts)]
+#[instruction(params: CreateOrderArgs)]
+pub struct PreparePosition<'info> {
+    /// The owner of the order to be created.
+    #[account(mut)]
+    pub owner: Signer<'info>,
+    /// Store.
+    pub store: AccountLoader<'info, Store>,
+    /// Market.
+    #[account(has_one = store)]
+    pub market: AccountLoader<'info, Market>,
+    /// The position.
+    #[account(
+        init_if_needed,
+        payer = owner,
+        space = 8 + Position::INIT_SPACE,
+        seeds = [
+            Position::SEED,
+            store.key().as_ref(),
+            owner.key().as_ref(),
+            market.load()?.meta().market_token_mint.as_ref(),
+            params.collateral_token(market.load()?.meta()).as_ref(),
+            &[params.to_position_kind()? as u8],
+        ],
+        bump,
+    )]
+    pub position: AccountLoader<'info, Position>,
+    /// The system program.
+    pub system_program: Program<'info, System>,
+}
+
+pub(crate) fn prepare_position(
+    ctx: Context<PreparePosition>,
+    params: &CreateOrderArgs,
+) -> Result<()> {
+    let store = ctx.accounts.store.key();
+    let owner = ctx.accounts.owner.key();
+    let meta = *ctx.accounts.market.load()?.meta();
+    let market_token = meta.market_token_mint;
+    let collateral_token = params.collateral_token(&meta);
+    validate_and_initialize_position_if_needed(
+        &ctx.accounts.position,
+        ctx.bumps.position,
+        params.to_position_kind()?,
+        &owner,
+        collateral_token,
+        &market_token,
+        &store,
+    )?;
+    Ok(())
+}
+
+fn validate_and_initialize_position_if_needed(
+    position: &AccountLoader<'_, Position>,
+    bump: u8,
+    kind: PositionKind,
+    owner: &Pubkey,
+    collateral_token: &Pubkey,
+    market_token: &Pubkey,
+    store: &Pubkey,
+) -> Result<()> {
+    match position.load_init() {
+        Ok(mut position) => {
+            position.try_init(kind, bump, *store, owner, market_token, collateral_token)?;
+        }
+        Err(Error::AnchorError(err)) => {
+            if err.error_code_number != ErrorCode::AccountDiscriminatorAlreadySet as u32 {
+                return Err(Error::AnchorError(err));
+            }
+        }
+        Err(err) => {
+            return Err(err);
+        }
+    }
+    position.exit(&crate::ID)?;
+    validate_position(
+        &*position.load()?,
+        bump,
+        kind,
+        owner,
+        collateral_token,
+        market_token,
+        store,
+    )?;
+    Ok(())
+}
+
+fn validate_position(
+    position: &Position,
+    bump: u8,
+    kind: PositionKind,
+    owner: &Pubkey,
+    collateral_token: &Pubkey,
+    market_token: &Pubkey,
+    store: &Pubkey,
+) -> Result<()> {
+    require_eq!(position.bump, bump, CoreError::InvalidPosition);
+    require_eq!(position.kind()?, kind, CoreError::InvalidPosition);
+    require_eq!(position.owner, *owner, CoreError::InvalidPosition);
+    require_eq!(
+        position.collateral_token,
+        *collateral_token,
+        CoreError::InvalidPosition
+    );
+    require_eq!(
+        position.market_token,
+        *market_token,
+        CoreError::InvalidPosition
+    );
+    require_eq!(position.store, *store, CoreError::InvalidPosition);
+    Ok(())
+}
+
 /// The accounts definitions for `create_order` instruction.
 #[derive(Accounts)]
-#[instruction(nonce: [u8; 32], params: CreateOrderParams)]
+#[instruction(nonce: [u8; 32], params: CreateOrderArgs)]
 pub struct CreateOrder<'info> {
     /// The owner of the order to be created.
     #[account(mut)]
@@ -230,17 +345,21 @@ pub struct CreateOrder<'info> {
     pub order: AccountLoader<'info, OrderV2>,
     /// The related position.
     #[account(
-        init_if_needed,
-        payer = owner,
-        space = 8 + Position::INIT_SPACE,
+        mut,
+        has_one = store,
+        has_one = owner,
+        constraint = position.load()?.market_token == market.load()?.meta().market_token_mint @ CoreError::MarketTokenMintMismatched,
+        constraint = position.load()?.collateral_token == *params.collateral_token(&*market.load()?) @ CoreError::InvalidPosition,
+        constraint = position.load()?.kind()? == params.to_position_kind()? @ CoreError::InvalidPosition,
         seeds = [
             Position::SEED,
             store.key().as_ref(),
+            owner.key().as_ref(),
             market.load()?.meta().market_token_mint.as_ref(),
             params.collateral_token(market.load()?.meta()).as_ref(),
             &[params.to_position_kind()? as u8],
         ],
-        bump,
+        bump = position.load()?.bump,
     )]
     pub position: Option<AccountLoader<'info, Position>>,
     /// Initial collateral token / swap in token.
@@ -327,10 +446,11 @@ pub struct CreateOrder<'info> {
     pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
+#[inline(never)]
 pub(crate) fn create_order<'info>(
     ctx: Context<'_, '_, 'info, 'info, CreateOrder<'info>>,
-    nonce: NonceBytes,
-    params: &CreateOrderParams,
+    nonce: &NonceBytes,
+    params: &CreateOrderArgs,
 ) -> Result<()> {
     let accounts = ctx.accounts;
     accounts.transfer_execution_fee(params)?;
@@ -341,13 +461,14 @@ pub(crate) fn create_order<'info>(
         .market(accounts.market.clone())
         .store(accounts.store.clone())
         .owner(accounts.owner.to_account_info())
-        .nonce(&nonce)
+        .nonce(nonce)
         .bump(ctx.bumps.order)
         .params(params)
         .swap_path(ctx.remaining_accounts)
         .build();
 
-    match params.kind {
+    let kind = params.kind;
+    match kind {
         OrderKind::MarketSwap | OrderKind::LimitSwap => {
             let swap_in = accounts
                 .initial_collateral_token_escrow
@@ -364,10 +485,6 @@ pub(crate) fn create_order<'info>(
                 .execute()?;
         }
         OrderKind::MarketIncrease | OrderKind::LimitIncrease => {
-            let position = accounts
-                .position
-                .as_ref()
-                .ok_or(error!(CoreError::PositionIsRequired))?;
             let initial_collateral = accounts
                 .initial_collateral_token_escrow
                 .as_ref()
@@ -380,14 +497,7 @@ pub(crate) fn create_order<'info>(
                 .short_token_escrow
                 .as_ref()
                 .ok_or(error!(CoreError::TokenAccountNotProvided))?;
-            let position_bump = ctx
-                .bumps
-                .position
-                .as_ref()
-                .ok_or(error!(CoreError::PositionIsRequired))?;
             ops.increase()
-                .position(position.clone())
-                .position_bump(*position_bump)
                 .initial_collateral_token(initial_collateral.as_ref())
                 .long_token(long_token.as_ref())
                 .short_token(short_token.as_ref())
@@ -395,10 +505,6 @@ pub(crate) fn create_order<'info>(
                 .execute()?;
         }
         OrderKind::MarketDecrease | OrderKind::LimitDecrease | OrderKind::StopLossDecrease => {
-            let position = accounts
-                .position
-                .as_ref()
-                .ok_or(error!(CoreError::PositionIsRequired))?;
             let final_output = accounts
                 .final_output_token_escrow
                 .as_ref()
@@ -411,14 +517,7 @@ pub(crate) fn create_order<'info>(
                 .short_token_escrow
                 .as_ref()
                 .ok_or(error!(CoreError::TokenAccountNotProvided))?;
-            let position_bump = ctx
-                .bumps
-                .position
-                .as_ref()
-                .ok_or(error!(CoreError::PositionIsRequired))?;
             ops.decrease()
-                .position(position.clone())
-                .position_bump(*position_bump)
                 .final_output_token(final_output.as_ref())
                 .long_token(long_token.as_ref())
                 .short_token(short_token.as_ref())
@@ -434,7 +533,7 @@ pub(crate) fn create_order<'info>(
 }
 
 impl<'info> CreateOrder<'info> {
-    fn transfer_execution_fee(&self, params: &CreateOrderParams) -> Result<()> {
+    fn transfer_execution_fee(&self, params: &CreateOrderArgs) -> Result<()> {
         TransferExecutionFeeOps::builder()
             .payment(self.order.to_account_info())
             .payer(self.owner.to_account_info())
@@ -444,9 +543,10 @@ impl<'info> CreateOrder<'info> {
             .execute()
     }
 
-    fn transfer_tokens(&self, params: &CreateOrderParams) -> Result<()> {
+    fn transfer_tokens(&mut self, params: &CreateOrderArgs) -> Result<()> {
+        let kind = params.kind;
         if !matches!(
-            params.kind,
+            kind,
             OrderKind::MarketSwap
                 | OrderKind::LimitSwap
                 | OrderKind::MarketIncrease
@@ -466,7 +566,7 @@ impl<'info> CreateOrder<'info> {
                 .ok_or(error!(CoreError::TokenAccountNotProvided))?;
             let to = self
                 .initial_collateral_token_escrow
-                .as_ref()
+                .as_mut()
                 .ok_or(error!(CoreError::TokenAccountNotProvided))?;
 
             transfer_checked(
@@ -482,6 +582,8 @@ impl<'info> CreateOrder<'info> {
                 amount,
                 token.decimals,
             )?;
+
+            to.reload()?;
         }
         Ok(())
     }

@@ -142,7 +142,8 @@ impl<'a, C: Deref<Target = impl Signer> + Clone, T> RpcBuilder<'a, C, T> {
 
     /// Set arguments for the rpc method.
     pub fn args(mut self, args: impl InstructionData) -> Self {
-        self.instruction_data = Some(args.data());
+        let data = args.data();
+        self.instruction_data = Some(data);
         self
     }
 

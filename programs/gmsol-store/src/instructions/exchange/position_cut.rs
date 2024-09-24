@@ -199,7 +199,6 @@ pub(crate) fn unchecked_process_position_cut<'info>(
         .owner(accounts.owner.to_account_info())
         .nonce(nonce)
         .order_bump(ctx.bumps.order)
-        .position_bump(accounts.position.load()?.bump)
         .long_token_account(&accounts.long_token_escrow)
         .long_token_vault(&accounts.long_token_vault)
         .short_token_account(&accounts.short_token_escrow)

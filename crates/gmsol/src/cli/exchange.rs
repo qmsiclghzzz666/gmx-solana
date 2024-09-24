@@ -1,4 +1,7 @@
-use anchor_client::solana_sdk::{commitment_config::CommitmentConfig, pubkey::Pubkey};
+use anchor_client::{
+    solana_client::rpc_config::RpcSendTransactionConfig,
+    solana_sdk::{commitment_config::CommitmentConfig, pubkey::Pubkey},
+};
 use eyre::OptionExt;
 use gmsol::{
     exchange::ExchangeOps,
@@ -470,8 +473,14 @@ impl ExchangeArgs {
                         .initial_collateral_token(token, initial_collateral_token_account.as_ref());
                 }
 
-                let (request, order) = builder.swap_path(swap.clone()).build_with_address().await?;
-                let signature = request.send().await?;
+                let (rpc, order) = builder.swap_path(swap.clone()).build_with_address().await?;
+                let request = rpc.build();
+                let signature = request
+                    .send_with_spinner_and_config(RpcSendTransactionConfig {
+                        skip_preflight: true,
+                        ..Default::default()
+                    })
+                    .await?;
                 tracing::info!("created a market increase order {order} at tx {signature}");
                 if *wait {
                     self.wait_for_order(client, &order).await?;

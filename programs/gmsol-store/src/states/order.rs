@@ -409,13 +409,18 @@ pub struct UpdateOrderParams {
     strum::Display,
     num_enum::IntoPrimitive,
     num_enum::TryFromPrimitive,
+    Debug,
 )]
 #[num_enum(error_type(name = CoreError, constructor = CoreError::unknown_order_kind))]
 #[strum(serialize_all = "snake_case")]
-#[cfg_attr(feature = "debug", derive(Debug))]
+// #[cfg_attr(feature = "debug", derive(Debug))]
 #[non_exhaustive]
 #[repr(u8)]
 pub enum OrderKind {
+    /// Liquidation: allows liquidation of positions if the criteria for liquidation are met.
+    Liquidation,
+    /// Auto-deleveraging Order.
+    AutoDeleveraging,
     /// Swap token A to token B at the current market price.
     ///
     /// The order will be cancelled if the `min_output_amount` cannot be fulfilled.
@@ -428,10 +433,6 @@ pub enum OrderKind {
     ///
     /// The order will be cancelled if the position cannot be decreased at the acceptable price.
     MarketDecrease,
-    /// Liquidation: allows liquidation of positions if the criteria for liquidation are met.
-    Liquidation,
-    /// Auto-deleveraging Order.
-    AutoDeleveraging,
     /// Limit Swap.
     LimitSwap,
     /// Limit Increase.

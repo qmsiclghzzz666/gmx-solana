@@ -28,9 +28,10 @@ use crate::{
 
 use super::market::MarketTransferOut;
 
-/// Create Order Params.
-#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
-pub struct CreateOrderParams {
+/// Create Order Arguments.
+// #[cfg_attr(feature = "debug", derive(Debug))]
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
+pub struct CreateOrderArgs {
     /// Order Kind.
     pub kind: OrderKind,
     /// Execution fee in lamports.
@@ -53,7 +54,7 @@ pub struct CreateOrderParams {
     pub acceptable_price: Option<u128>,
 }
 
-impl CreateOrderParams {
+impl CreateOrderArgs {
     /// Get the related position kind.
     pub fn to_position_kind(&self) -> Result<PositionKind> {
         if self.kind.is_swap() {
@@ -69,7 +70,7 @@ impl CreateOrderParams {
     /// Get the collateral token or swap out token address.
     pub fn collateral_token<'a>(&'a self, meta: &'a impl HasMarketMeta) -> &'a Pubkey {
         let meta = meta.market_meta();
-        if self.is_long {
+        if self.is_collateral_long {
             &meta.long_token_mint
         } else {
             &meta.short_token_mint
@@ -86,7 +87,7 @@ pub(crate) struct CreateOrderOps<'a, 'info> {
     owner: AccountInfo<'info>,
     nonce: &'a NonceBytes,
     bump: u8,
-    params: &'a CreateOrderParams,
+    params: &'a CreateOrderArgs,
     swap_path: &'info [AccountInfo<'info>],
 }
 
@@ -99,15 +100,13 @@ impl<'a, 'info> CreateOrderOps<'a, 'info> {
 
     pub(crate) fn increase(
         self,
-    ) -> CreateIncreaseOrderOpBuilder<'a, 'info, ((CreateOrderOps<'a, 'info>,), (), (), (), (), ())>
-    {
+    ) -> CreateIncreaseOrderOpBuilder<'a, 'info, ((CreateOrderOps<'a, 'info>,), (), (), ())> {
         CreateIncreaseOrderOp::builder().common(self)
     }
 
     pub(crate) fn decrease(
         self,
-    ) -> CreateDecreaseOrderOpBuilder<'a, 'info, ((CreateOrderOps<'a, 'info>,), (), (), (), (), ())>
-    {
+    ) -> CreateDecreaseOrderOpBuilder<'a, 'info, ((CreateOrderOps<'a, 'info>,), (), (), ())> {
         CreateDecreaseOrderOp::builder().common(self)
     }
 
@@ -133,7 +132,7 @@ impl<'a, 'info> CreateOrderOps<'a, 'info> {
     fn init_with(
         &self,
         f: impl FnOnce(
-            &CreateOrderParams,
+            &CreateOrderArgs,
             &mut TokenAccounts,
             &mut OrderParamsV2,
         ) -> Result<(Pubkey, Pubkey)>,
@@ -242,8 +241,6 @@ impl<'a, 'info> CreateSwapOrderOp<'a, 'info> {
 #[derive(TypedBuilder)]
 pub(crate) struct CreateIncreaseOrderOp<'a, 'info> {
     common: CreateOrderOps<'a, 'info>,
-    position: AccountLoader<'info, Position>,
-    position_bump: u8,
     initial_collateral_token: &'a Account<'info, TokenAccount>,
     long_token: &'a Account<'info, TokenAccount>,
     short_token: &'a Account<'info, TokenAccount>,
@@ -277,17 +274,6 @@ impl<'a, 'info> CreateIncreaseOrderOp<'a, 'info> {
             Ok((self.initial_collateral_token.mint, collateral_token))
         })?;
 
-        let store = self.common.store.key();
-        let market_token = self.common.market.load()?.meta().market_token_mint;
-        validate_and_initialize_position_if_needed(
-            &self.position,
-            self.position_bump,
-            self.common.params.to_position_kind()?,
-            self.common.owner.key,
-            &collateral_token,
-            &market_token,
-            &store,
-        )?;
         Ok(())
     }
 
@@ -323,72 +309,10 @@ impl<'a, 'info> CreateIncreaseOrderOp<'a, 'info> {
     }
 }
 
-fn validate_and_initialize_position_if_needed(
-    position: &AccountLoader<'_, Position>,
-    bump: u8,
-    kind: PositionKind,
-    owner: &Pubkey,
-    collateral_token: &Pubkey,
-    market_token: &Pubkey,
-    store: &Pubkey,
-) -> Result<()> {
-    match position.load_init() {
-        Ok(mut position) => {
-            position.try_init(kind, bump, *store, owner, market_token, collateral_token)?;
-        }
-        Err(Error::AnchorError(err)) => {
-            if err.error_code_number != ErrorCode::AccountDiscriminatorAlreadySet as u32 {
-                return Err(Error::AnchorError(err));
-            }
-        }
-        Err(err) => {
-            return Err(err);
-        }
-    }
-    validate_position(
-        &*position.load()?,
-        bump,
-        kind,
-        owner,
-        collateral_token,
-        market_token,
-        store,
-    )?;
-    Ok(())
-}
-
-fn validate_position(
-    position: &Position,
-    bump: u8,
-    kind: PositionKind,
-    owner: &Pubkey,
-    collateral_token: &Pubkey,
-    market_token: &Pubkey,
-    store: &Pubkey,
-) -> Result<()> {
-    require_eq!(position.bump, bump, CoreError::InvalidPosition);
-    require_eq!(position.kind()?, kind, CoreError::InvalidPosition);
-    require_eq!(position.owner, *owner, CoreError::InvalidPosition);
-    require_eq!(
-        position.collateral_token,
-        *collateral_token,
-        CoreError::InvalidPosition
-    );
-    require_eq!(
-        position.market_token,
-        *market_token,
-        CoreError::InvalidPosition
-    );
-    require_eq!(position.store, *store, CoreError::InvalidPosition);
-    Ok(())
-}
-
 /// Create Decrease Order.
 #[derive(TypedBuilder)]
 pub(crate) struct CreateDecreaseOrderOp<'a, 'info> {
     common: CreateOrderOps<'a, 'info>,
-    position: AccountLoader<'info, Position>,
-    position_bump: u8,
     final_output_token: &'a Account<'info, TokenAccount>,
     long_token: &'a Account<'info, TokenAccount>,
     short_token: &'a Account<'info, TokenAccount>,
@@ -419,18 +343,6 @@ impl<'a, 'info> CreateDecreaseOrderOp<'a, 'info> {
             )?;
             Ok((collateral_token, self.final_output_token.mint))
         })?;
-
-        let store = self.common.store.key();
-        let market_token = self.common.market.load()?.meta().market_token_mint;
-        validate_position(
-            &*self.position.load()?,
-            self.position_bump,
-            self.common.params.to_position_kind()?,
-            self.common.owner.key,
-            &collateral_token,
-            &market_token,
-            &store,
-        )?;
         Ok(())
     }
 
@@ -1457,7 +1369,6 @@ pub struct PositionCutOp<'a, 'info> {
     owner: AccountInfo<'info>,
     nonce: &'a NonceBytes,
     order_bump: u8,
-    position_bump: u8,
     long_token_account: &'a Account<'info, TokenAccount>,
     short_token_account: &'a Account<'info, TokenAccount>,
     long_token_vault: &'a Account<'info, TokenAccount>,
@@ -1520,7 +1431,7 @@ impl<'a, 'info> PositionCutOp<'a, 'info> {
         is_long: bool,
         is_collateral_long: bool,
     ) -> Result<()> {
-        let params = CreateOrderParams {
+        let params = CreateOrderArgs {
             kind: self.kind.to_order_kind(),
             execution_fee: OrderV2::MIN_EXECUTION_LAMPORTS,
             swap_path_length: 0,
@@ -1548,8 +1459,6 @@ impl<'a, 'info> PositionCutOp<'a, 'info> {
             .swap_path(&[])
             .build()
             .decrease()
-            .position(self.position.clone())
-            .position_bump(self.position_bump)
             .final_output_token(output_token_account)
             .long_token(self.long_token_account)
             .short_token(self.short_token_account)

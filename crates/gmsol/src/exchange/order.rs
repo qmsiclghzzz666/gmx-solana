@@ -1,13 +1,13 @@
 use std::{collections::HashSet, ops::Deref};
 
 use anchor_client::{
-    anchor_lang::{system_program, Id},
+    anchor_lang::{system_program, AnchorSerialize, Id},
     solana_sdk::{instruction::AccountMeta, pubkey::Pubkey, signer::Signer},
 };
 use anchor_spl::associated_token::get_associated_token_address;
 use gmsol_store::{
     accounts, instruction,
-    ops::order::CreateOrderParams,
+    ops::order::CreateOrderArgs,
     states::{
         common::{swap::SwapParamsV2, TokensWithFeed},
         order::{OrderKind, OrderParams, OrderV2},
@@ -68,7 +68,7 @@ where
             store: *store,
             market_token: *market_token,
             nonce: None,
-            execution_fee: 0,
+            execution_fee: OrderV2::MIN_EXECUTION_LAMPORTS,
             params,
             swap_path: vec![],
             is_output_token_long,
@@ -292,7 +292,28 @@ where
             };
         let position = self.position().await?;
 
-        let prepare = match self.params.kind {
+        let kind = self.params.kind;
+        let params = CreateOrderArgs {
+            execution_fee: self.execution_fee,
+            swap_path_length: self
+                .swap_path
+                .len()
+                .try_into()
+                .map_err(|_| crate::Error::NumberOutOfRange)?,
+            kind,
+            initial_collateral_delta_amount: self.params.initial_collateral_delta_amount,
+            size_delta_value: self.params.size_delta_usd,
+            is_long: self.params.is_long,
+            is_collateral_long: self.is_output_token_long,
+            min_output: Some(self.params.min_output_amount),
+            trigger_price: self.params.trigger_price,
+            acceptable_price: self.params.acceptable_price,
+        };
+
+        println!("{params:?}");
+        println!("{:?}", params.try_to_vec()?);
+
+        let prepare = match kind {
             OrderKind::MarketSwap | OrderKind::LimitSwap => {
                 let swap_in_token = initial_collateral_token.ok_or(
                     crate::Error::invalid_argument("swap in token is not provided"),
@@ -397,7 +418,23 @@ where
                         associated_token_program: anchor_spl::associated_token::ID,
                     })
                     .args(instruction::PrepareAssociatedTokenAccount {});
-                escrow.merge(long_token_ata).merge(short_token_ata)
+                let prepare_position = self
+                    .client
+                    .data_store_rpc()
+                    .accounts(accounts::PreparePosition {
+                        owner: *payer,
+                        store: self.store,
+                        market: self.market(),
+                        position: position.expect("must provided"),
+                        system_program: system_program::ID,
+                    })
+                    .args(instruction::PreparePosition {
+                        params: params.clone(),
+                    });
+                escrow
+                    .merge(long_token_ata)
+                    .merge(short_token_ata)
+                    .merge(prepare_position)
             }
             .args(instruction::PrepareIncreaseOrderEscrow { nonce }),
             OrderKind::MarketDecrease | OrderKind::LimitDecrease | OrderKind::StopLossDecrease => {
@@ -514,25 +551,7 @@ where
                 &gmsol_store::id(),
                 &self.client.store_program_id(),
             ))
-            .args(instruction::CreateOrder {
-                nonce,
-                params: CreateOrderParams {
-                    execution_fee: self.execution_fee,
-                    swap_path_length: self
-                        .swap_path
-                        .len()
-                        .try_into()
-                        .map_err(|_| crate::Error::NumberOutOfRange)?,
-                    kind: self.params.kind,
-                    initial_collateral_delta_amount: self.params.initial_collateral_delta_amount,
-                    size_delta_value: self.params.size_delta_usd,
-                    is_long: self.params.is_long,
-                    is_collateral_long: self.is_output_token_long,
-                    min_output: Some(self.params.min_output_amount),
-                    trigger_price: self.params.trigger_price,
-                    acceptable_price: self.params.acceptable_price,
-                },
-            })
+            .args(instruction::CreateOrder { nonce, params })
             .accounts(
                 self.swap_path
                     .iter()
@@ -1027,7 +1046,7 @@ where
         let owner = hint.owner;
         Ok(self
             .client
-            .exchange_rpc()
+            .data_store_rpc()
             .accounts(crate::utils::fix_optional_account_metas(
                 accounts::CloseOrder {
                     store: hint.store,
@@ -1070,8 +1089,8 @@ where
                     system_program: system_program::ID,
                     program: self.client.store_program_id(),
                 },
-                &gmsol_exchange::ID,
-                &self.client.exchange_program_id(),
+                &gmsol_store::ID,
+                &self.client.store_program_id(),
             ))
             .args(instruction::CloseOrder {
                 reason: self.reason.clone(),
