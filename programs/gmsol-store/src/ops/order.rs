@@ -1,4 +1,4 @@
-use anchor_lang::prelude::*;
+use anchor_lang::{prelude::*, system_program};
 use anchor_spl::token::TokenAccount;
 use gmsol_model::{
     action::Prices, num::Unsigned, BaseMarket, BaseMarketExt, PnlFactorKind, Position as _,
@@ -707,6 +707,7 @@ impl<'a, 'info> ProcessTransferOut<'a, 'info> {
 /// Execute Order Ops.
 #[derive(TypedBuilder)]
 pub(crate) struct ExecuteOrderOps<'a, 'info> {
+    executor: AccountInfo<'info>,
     store: &'a AccountLoader<'info, Store>,
     market: &'a AccountLoader<'info, Market>,
     order: &'a AccountLoader<'info, OrderV2>,
@@ -715,6 +716,9 @@ pub(crate) struct ExecuteOrderOps<'a, 'info> {
     oracle: &'a Oracle,
     remaining_accounts: &'info [AccountInfo<'info>],
     throw_on_execution_error: bool,
+    #[builder(default)]
+    refund: u64,
+    system_program: AccountInfo<'info>,
 }
 
 pub(crate) type ShouldRemovePosition = bool;
@@ -924,7 +928,24 @@ impl<'a, 'info> ExecuteOrderOps<'a, 'info> {
         let Some(position) = self.position else {
             return err!(CoreError::PositionIsRequired);
         };
-        position.close(self.owner.clone())?;
+
+        let balance = position.to_account_info().lamports();
+        let refund = balance.saturating_sub(self.refund);
+        position.close(self.executor.clone())?;
+
+        if refund != 0 {
+            system_program::transfer(
+                CpiContext::new(
+                    self.system_program.clone(),
+                    system_program::Transfer {
+                        from: self.executor.clone(),
+                        to: self.owner.clone(),
+                    },
+                ),
+                refund,
+            )?;
+        }
+
         Ok(())
     }
 
@@ -1427,6 +1448,7 @@ fn execute_decrease_position(
 #[derive(TypedBuilder)]
 pub struct PositionCutOp<'a, 'info> {
     kind: PositionCutKind,
+    executor: AccountInfo<'info>,
     position: &'a AccountLoader<'info, Position>,
     order: &'a AccountLoader<'info, OrderV2>,
     market: &'a AccountLoader<'info, Market>,
@@ -1444,11 +1466,16 @@ pub struct PositionCutOp<'a, 'info> {
     claimable_short_token_account_for_user: AccountInfo<'info>,
     claimable_pnl_token_account_for_holding: AccountInfo<'info>,
     token_program: AccountInfo<'info>,
+    system_program: AccountInfo<'info>,
+    refund: u64,
 }
 
+/// Position Cut Kind.
 #[derive(Clone)]
-pub(crate) enum PositionCutKind {
+pub enum PositionCutKind {
+    /// Liquidate.
     Liquidate,
+    /// AutoDeleverage.
     AutoDeleverage(u128),
 }
 
@@ -1542,6 +1569,9 @@ impl<'a, 'info> PositionCutOp<'a, 'info> {
             .oracle(self.oracle)
             .remaining_accounts(&[])
             .throw_on_execution_error(true)
+            .refund(self.refund)
+            .system_program(self.system_program.clone())
+            .executor(self.executor.clone())
             .build()
             .execute()
     }

@@ -13,6 +13,9 @@ pub mod liquidation;
 /// Auto-deleveraging.
 pub mod auto_deleveraging;
 
+/// Position cut.
+pub mod position_cut;
+
 /// Treasury.
 pub mod treasury;
 
@@ -22,17 +25,20 @@ use anchor_client::{
     anchor_lang::system_program,
     solana_sdk::{pubkey::Pubkey, signer::Signer},
 };
-use auto_deleveraging::{AutoDeleverageBuilder, UpdateAdlBuilder};
+use auto_deleveraging::UpdateAdlBuilder;
 use gmsol_exchange::{
     accounts, instruction,
     states::{ActionDisabledFlag, DomainDisabledFlag},
 };
-use gmsol_store::states::{
-    order::{OrderKind, OrderParams},
-    NonceBytes, UpdateOrderParams,
+use gmsol_store::{
+    ops::order::PositionCutKind,
+    states::{
+        order::{OrderKind, OrderParams},
+        NonceBytes, UpdateOrderParams,
+    },
 };
-use liquidation::LiquidateBuilder;
 use order::CloseOrderBuilder;
+use position_cut::PositionCutBuilder;
 use rand::{distributions::Standard, Rng};
 use treasury::ClaimFeesBuilder;
 
@@ -151,11 +157,12 @@ pub trait ExchangeOps<C> {
         cancel_on_execution_error: bool,
     ) -> crate::Result<ExecuteOrderBuilder<C>>;
 
-    /// Cancel an order.
-    fn cancel_order(&self, order: &Pubkey) -> crate::Result<CloseOrderBuilder<C>>;
+    /// Close an order.
+    fn close_order(&self, order: &Pubkey) -> crate::Result<CloseOrderBuilder<C>>;
 
     /// Liquidate a position.
-    fn liquidate(&self, oracle: &Pubkey, position: &Pubkey) -> crate::Result<LiquidateBuilder<C>>;
+    fn liquidate(&self, oracle: &Pubkey, position: &Pubkey)
+        -> crate::Result<PositionCutBuilder<C>>;
 
     /// Auto-deleverage a position.
     fn auto_deleverage(
@@ -163,7 +170,7 @@ pub trait ExchangeOps<C> {
         oracle: &Pubkey,
         position: &Pubkey,
         size_delta_usd: u128,
-    ) -> crate::Result<AutoDeleverageBuilder<C>>;
+    ) -> crate::Result<PositionCutBuilder<C>>;
 
     /// Update ADL state.
     fn update_adl(
@@ -559,12 +566,16 @@ where
         ExecuteOrderBuilder::try_new(self, store, oracle, order, cancel_on_execution_error)
     }
 
-    fn cancel_order(&self, order: &Pubkey) -> crate::Result<CloseOrderBuilder<C>> {
+    fn close_order(&self, order: &Pubkey) -> crate::Result<CloseOrderBuilder<C>> {
         Ok(CloseOrderBuilder::new(self, order))
     }
 
-    fn liquidate(&self, oracle: &Pubkey, position: &Pubkey) -> crate::Result<LiquidateBuilder<C>> {
-        LiquidateBuilder::try_new(self, oracle, position)
+    fn liquidate(
+        &self,
+        oracle: &Pubkey,
+        position: &Pubkey,
+    ) -> crate::Result<PositionCutBuilder<C>> {
+        PositionCutBuilder::try_new(self, PositionCutKind::Liquidate, oracle, position)
     }
 
     fn auto_deleverage(
@@ -572,8 +583,13 @@ where
         oracle: &Pubkey,
         position: &Pubkey,
         size_delta_usd: u128,
-    ) -> crate::Result<AutoDeleverageBuilder<C>> {
-        AutoDeleverageBuilder::try_new(self, oracle, position, size_delta_usd)
+    ) -> crate::Result<PositionCutBuilder<C>> {
+        PositionCutBuilder::try_new(
+            self,
+            PositionCutKind::AutoDeleverage(size_delta_usd),
+            oracle,
+            position,
+        )
     }
 
     fn update_adl(

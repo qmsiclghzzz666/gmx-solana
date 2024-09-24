@@ -47,7 +47,7 @@ pub struct PositionCut<'info> {
     #[account(
         init,
         space = 8 + OrderV2::INIT_SPACE,
-        payer = owner,
+        payer = authority,
         seeds = [OrderV2::SEED, store.key().as_ref(), owner.key().as_ref(), &nonce],
         bump,
     )]
@@ -185,6 +185,11 @@ pub(crate) fn unchecked_process_position_cut<'info>(
         .into_iter()
         .collect::<Vec<_>>();
 
+    let rent = Rent::get()?;
+    let refund = rent.minimum_balance(accounts.order.to_account_info().data_len())
+        + rent.minimum_balance(accounts.long_token_escrow.to_account_info().data_len())
+        + rent.minimum_balance(accounts.short_token_escrow.to_account_info().data_len());
+
     let ops = PositionCutOp::builder()
         .kind(kind)
         .position(&accounts.position)
@@ -214,7 +219,10 @@ pub(crate) fn unchecked_process_position_cut<'info>(
                 .claimable_pnl_token_account_for_holding
                 .to_account_info(),
         )
-        .token_program(accounts.token_program.to_account_info());
+        .token_program(accounts.token_program.to_account_info())
+        .system_program(accounts.system_program.to_account_info())
+        .executor(accounts.authority.to_account_info())
+        .refund(refund);
 
     let event = accounts.oracle.with_prices(
         &accounts.store,

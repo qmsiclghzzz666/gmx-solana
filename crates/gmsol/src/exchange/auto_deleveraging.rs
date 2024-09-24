@@ -102,7 +102,7 @@ impl AutoDeleverageHint {
 }
 
 impl<'a, C: Deref<Target = impl Signer> + Clone> AutoDeleverageBuilder<'a, C> {
-    pub(super) fn try_new(
+    pub(super) fn _try_new(
         client: &'a crate::Client<C>,
         oracle: &Pubkey,
         position: &Pubkey,

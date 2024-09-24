@@ -5,54 +5,62 @@ use anchor_client::{
     solana_sdk::{pubkey::Pubkey, signer::Signer},
 };
 use anchor_spl::associated_token::get_associated_token_address;
-use gmsol_exchange::{accounts, instruction};
-use gmsol_store::states::{
-    common::TokensWithFeed, MarketMeta, NonceBytes, Position, Pyth, Store, TokenMap,
+use gmsol_store::{
+    accounts, instruction,
+    ops::order::PositionCutKind,
+    states::{
+        common::TokensWithFeed, order::OrderV2, MarketMeta, NonceBytes, Position, Pyth, Store,
+        TokenMap,
+    },
 };
 
 use crate::{
+    exchange::generate_nonce,
     store::utils::FeedsParser,
     utils::{ComputeBudget, TransactionBuilder},
 };
 
 use super::{
-    generate_nonce,
-    order::{recent_timestamp, ClaimableAccountsBuilder},
+    order::{recent_timestamp, ClaimableAccountsBuilder, CloseOrderHint},
+    ExchangeOps,
 };
-
-/// The compute budget for `liquidate`.
-pub const LIQUIDATE_COMPUTE_BUDGET: u32 = 800_000;
 
 #[cfg(feature = "pyth-pull-oracle")]
 use crate::pyth::pull_oracle::{ExecuteWithPythPrices, Prices, PythPullOracleContext};
 
-/// Liquidate Instruction Builder.
-pub struct LiquidateBuilder<'a, C> {
+/// The compute budget for `position_cut` instruction.
+pub const POSITION_CUT_COMPUTE_BUDGET: u32 = 800_000;
+
+/// `PositionCut` instruction builder.
+pub struct PositionCutBuilder<'a, C> {
     client: &'a crate::Client<C>,
+    kind: PositionCutKind,
     nonce: Option<NonceBytes>,
     recent_timestamp: i64,
     execution_fee: u64,
     oracle: Pubkey,
     position: Pubkey,
     price_provider: Pubkey,
-    hint: Option<LiquidateHint>,
+    hint: Option<PositionCutHint>,
     feeds_parser: FeedsParser,
+    close: bool,
 }
 
-/// Hint for liquidation.
+/// Hint for `PositionCut`.
 #[derive(Clone)]
-pub struct LiquidateHint {
+pub struct PositionCutHint {
+    tokens_with_feed: TokensWithFeed,
+    meta: MarketMeta,
     store_address: Pubkey,
     owner: Pubkey,
+    store: Arc<Store>,
+    collateral_token: Pubkey,
+    pnl_token: Pubkey,
     token_map: Pubkey,
     market: Pubkey,
-    pnl_token: Pubkey,
-    store: Arc<Store>,
-    meta: MarketMeta,
-    tokens_with_feed: TokensWithFeed,
 }
 
-impl LiquidateHint {
+impl PositionCutHint {
     /// Create from position.
     pub async fn from_position<C: Deref<Target = impl Signer> + Clone>(
         client: &crate::Client<C>,
@@ -103,6 +111,7 @@ impl LiquidateHint {
             market,
             store,
             tokens_with_feed,
+            collateral_token: position.collateral_token,
             pnl_token: market_meta.pnl_token(position.try_is_long()?),
             meta: market_meta,
         })
@@ -114,40 +123,49 @@ impl LiquidateHint {
     }
 }
 
-impl<'a, C: Deref<Target = impl Signer> + Clone> LiquidateBuilder<'a, C> {
-    pub(super) fn _try_new(
+impl<'a, C: Deref<Target = impl Signer> + Clone> PositionCutBuilder<'a, C> {
+    pub(super) fn try_new(
         client: &'a crate::Client<C>,
+        kind: PositionCutKind,
         oracle: &Pubkey,
         position: &Pubkey,
     ) -> crate::Result<Self> {
         Ok(Self {
             client,
+            kind,
             oracle: *oracle,
+            nonce: None,
             recent_timestamp: recent_timestamp()?,
+            execution_fee: OrderV2::MIN_EXECUTION_LAMPORTS,
             position: *position,
             price_provider: Pyth::id(),
-            execution_fee: 0,
-            nonce: None,
             hint: None,
             feeds_parser: Default::default(),
+            close: true,
         })
     }
 
-    /// Prepare hint for liquidation.
-    pub async fn prepare_hint(&mut self) -> crate::Result<LiquidateHint> {
+    /// Prepare hint for position cut.
+    pub async fn prepare_hint(&mut self) -> crate::Result<PositionCutHint> {
         match &self.hint {
             Some(hint) => Ok(hint.clone()),
             None => {
                 let position = self.client.position(&self.position).await?;
-                let hint = LiquidateHint::from_position(self.client, &position).await?;
+                let hint = PositionCutHint::from_position(self.client, &position).await?;
                 self.hint = Some(hint.clone());
                 Ok(hint)
             }
         }
     }
 
-    /// Set hint with the given position for the liquidation.
-    pub fn hint(&mut self, hint: LiquidateHint) -> &mut Self {
+    /// Set whether to close the order after the execution.
+    pub fn close(&mut self, close: bool) -> &mut Self {
+        self.close = close;
+        self
+    }
+
+    /// Set hint with the given position for position cut.
+    pub fn hint(&mut self, hint: PositionCutHint) -> &mut Self {
         self.hint = Some(hint);
         self
     }
@@ -171,8 +189,9 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> LiquidateBuilder<'a, C> {
         self
     }
 
-    /// Build [`TransactionBuilder`] for liquidating the position.
+    /// Build [`TransactionBuilder`] for position cut.
     pub async fn build(&mut self) -> crate::Result<TransactionBuilder<'a, C>> {
+        let payer = self.client.payer();
         let nonce = self.nonce.unwrap_or_else(generate_nonce);
         let hint = self.prepare_hint().await?;
         let owner = hint.owner;
@@ -201,48 +220,104 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> LiquidateBuilder<'a, C> {
             .feeds_parser
             .parse(hint.feeds())
             .collect::<Result<Vec<_>, _>>()?;
+        let order = self.client.find_order_address(&store, &owner, &nonce);
 
-        let exec_builder = self
+        let long_token_escrow = get_associated_token_address(&order, &long_token_mint);
+        let short_token_escrow = get_associated_token_address(&order, &short_token_mint);
+        let output_token_escrow = get_associated_token_address(&order, &hint.collateral_token);
+        let long_token_vault = self
             .client
-            .exchange_rpc()
-            .accounts(accounts::Liquidate {
-                authority: self.client.payer(),
+            .find_market_vault_address(&store, &long_token_mint);
+        let short_token_vault = self
+            .client
+            .find_market_vault_address(&store, &short_token_mint);
+
+        let prepare = self
+            .client
+            .data_store_rpc()
+            .accounts(accounts::PrepareDecreaseOrderEscrow {
+                payer,
                 owner,
-                controller: self.client.controller_address(&store),
+                store,
+                order,
+                final_output_token: hint.collateral_token,
+                long_token: long_token_mint,
+                short_token: short_token_mint,
+                final_output_token_escrow: output_token_escrow,
+                long_token_escrow,
+                short_token_escrow,
+                system_program: system_program::ID,
+                token_program: anchor_spl::token::ID,
+                associated_token_program: anchor_spl::associated_token::ID,
+            })
+            .args(instruction::PrepareDecreaseOrderEscrow { nonce });
+        let mut exec_builder = self
+            .client
+            .data_store_rpc()
+            .accounts(accounts::PositionCut {
+                authority: payer,
+                owner,
                 store,
                 token_map: hint.token_map,
+                price_provider: self.price_provider,
                 oracle: self.oracle,
                 market: hint.market,
-                market_token_mint: meta.market_token_mint,
-                long_token_mint,
-                short_token_mint,
-                order: self.client.find_order_address(&store, &owner, &nonce),
+                order,
                 position: self.position,
-                long_token_vault: self
-                    .client
-                    .find_market_vault_address(&store, &long_token_mint),
-                short_token_vault: self
-                    .client
-                    .find_market_vault_address(&store, &short_token_mint),
-                long_token_account: get_associated_token_address(&owner, &long_token_mint),
-                short_token_account: get_associated_token_address(&owner, &short_token_mint),
+                long_token: long_token_mint,
+                short_token: short_token_mint,
+                long_token_escrow,
+                short_token_escrow,
+                long_token_vault,
+                short_token_vault,
                 claimable_long_token_account_for_user,
                 claimable_short_token_account_for_user,
                 claimable_pnl_token_account_for_holding,
-                event_authority: self.client.data_store_event_authority(),
-                data_store_program: self.client.store_program_id(),
+                system_program: system_program::ID,
                 token_program: anchor_spl::token::ID,
                 associated_token_program: anchor_spl::associated_token::ID,
-                price_provider: self.price_provider,
-                system_program: system_program::ID,
-            })
-            .args(instruction::Liquidate {
-                recent_timestamp: self.recent_timestamp,
-                nonce,
-                execution_fee: self.execution_fee,
+                event_authority: self.client.data_store_event_authority(),
+                program: self.client.store_program_id(),
             })
             .accounts(feeds)
-            .compute_budget(ComputeBudget::default().with_limit(LIQUIDATE_COMPUTE_BUDGET));
+            .compute_budget(ComputeBudget::default().with_limit(POSITION_CUT_COMPUTE_BUDGET));
+
+        match self.kind {
+            PositionCutKind::Liquidate => {
+                exec_builder = exec_builder.args(instruction::Liquidate {
+                    nonce,
+                    recent_timestamp: self.recent_timestamp,
+                });
+            }
+            PositionCutKind::AutoDeleverage(size_delta_in_usd) => {
+                exec_builder = exec_builder.args(instruction::AutoDeleverage {
+                    nonce,
+                    recent_timestamp: self.recent_timestamp,
+                    size_delta_in_usd,
+                })
+            }
+        }
+
+        if self.close {
+            let close = self
+                .client
+                .close_order(&order)?
+                .hint(CloseOrderHint {
+                    owner,
+                    store,
+                    initial_collateral_token_and_account: None,
+                    final_output_token_and_account: Some((
+                        hint.collateral_token,
+                        output_token_escrow,
+                    )),
+                    long_token_and_account: Some((long_token_mint, long_token_escrow)),
+                    short_token_and_account: Some((short_token_mint, short_token_escrow)),
+                })
+                .reason("position cut")
+                .build()
+                .await?;
+            exec_builder = exec_builder.merge(close);
+        }
 
         let (pre_builder, post_builder) = ClaimableAccountsBuilder::new(
             self.recent_timestamp,
@@ -267,7 +342,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> LiquidateBuilder<'a, C> {
         let mut builder = TransactionBuilder::new(self.client.exchange().async_rpc());
         builder
             .try_push(pre_builder)?
-            .try_push(exec_builder)?
+            .try_push(prepare.merge(exec_builder))?
             .try_push(post_builder)?;
         Ok(builder)
     }
@@ -275,7 +350,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> LiquidateBuilder<'a, C> {
 
 #[cfg(feature = "pyth-pull-oracle")]
 impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteWithPythPrices<'a, C>
-    for LiquidateBuilder<'a, C>
+    for PositionCutBuilder<'a, C>
 {
     fn set_execution_fee(&mut self, lamports: u64) {
         self.execution_fee(lamports);

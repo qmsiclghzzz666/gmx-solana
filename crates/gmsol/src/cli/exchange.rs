@@ -437,7 +437,7 @@ impl ExchangeArgs {
             }
             Command::CancelOrder { order } => {
                 let signature = client
-                    .cancel_order(order)?
+                    .close_order(order)?
                     .build()
                     .await?
                     .build()

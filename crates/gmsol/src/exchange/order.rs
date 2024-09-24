@@ -897,7 +897,7 @@ where
         if self.close {
             let close = self
                 .client
-                .cancel_order(&self.order)?
+                .close_order(&self.order)?
                 .hint(CloseOrderHint {
                     owner: hint.user,
                     store: self.store,
@@ -950,12 +950,12 @@ pub struct CloseOrderBuilder<'a, C> {
 /// Close Order Hint.
 #[derive(Clone, Copy)]
 pub struct CloseOrderHint {
-    owner: Pubkey,
-    store: Pubkey,
-    initial_collateral_token_and_account: Option<(Pubkey, Pubkey)>,
-    final_output_token_and_account: Option<(Pubkey, Pubkey)>,
-    long_token_and_account: Option<(Pubkey, Pubkey)>,
-    short_token_and_account: Option<(Pubkey, Pubkey)>,
+    pub(super) owner: Pubkey,
+    pub(super) store: Pubkey,
+    pub(super) initial_collateral_token_and_account: Option<(Pubkey, Pubkey)>,
+    pub(super) final_output_token_and_account: Option<(Pubkey, Pubkey)>,
+    pub(super) long_token_and_account: Option<(Pubkey, Pubkey)>,
+    pub(super) short_token_and_account: Option<(Pubkey, Pubkey)>,
 }
 
 impl<'a> From<&'a OrderV2> for CloseOrderHint {

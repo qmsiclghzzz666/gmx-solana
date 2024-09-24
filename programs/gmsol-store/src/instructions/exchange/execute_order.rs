@@ -1178,7 +1178,9 @@ impl<'info> ExecuteOrderV2<'info> {
             .owner(self.owner.to_account_info())
             .order(&self.order)
             .position(self.position.as_ref())
-            .throw_on_execution_error(throw_on_execution_error);
+            .throw_on_execution_error(throw_on_execution_error)
+            .executor(self.authority.to_account_info())
+            .system_program(self.system_program.to_account_info());
 
         self.oracle.with_prices(
             &self.store,
