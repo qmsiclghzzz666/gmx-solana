@@ -1,4 +1,3 @@
-use anchor_client::solana_client::rpc_config::RpcSendTransactionConfig;
 use gmsol::exchange::ExchangeOps;
 
 use crate::anchor_tests::setup::{current_deployment, Deployment};
@@ -14,49 +13,32 @@ async fn balanced_market_order() -> eyre::Result<()> {
     let client = deployment.user_client(Deployment::DEFAULT_USER)?;
     let store = &deployment.store;
     let oracle = &deployment.oracle;
-    let market_token = deployment
-        .market_token("fBTC", "fBTC", "USDG")
-        .expect("must exist");
     let usdg = deployment.token("USDG").expect("must exist");
 
     let long_token_amount = 1_000_005;
     let short_token_amount = 6_000_000_000_003;
+
+    let market_token = deployment
+        .prepare_market(
+            ("fBTC", "fBTC", "USDG"),
+            long_token_amount,
+            short_token_amount,
+            true,
+        )
+        .await?;
+
     let long_collateral_amount = 100_000;
     let short_collateral_amount = 100 * 100_000_000;
 
     deployment
-        .mint_or_transfer_to_user(
-            "fBTC",
-            Deployment::DEFAULT_USER,
-            long_token_amount + long_collateral_amount * 4,
-        )
+        .mint_or_transfer_to_user("fBTC", Deployment::DEFAULT_USER, long_collateral_amount * 4)
         .await?;
     deployment
         .mint_or_transfer_to_user(
             "USDG",
             Deployment::DEFAULT_USER,
-            short_token_amount + short_collateral_amount * 4,
+            short_collateral_amount * 4,
         )
-        .await?;
-
-    // Deposit.
-    let (rpc, deposit) = client
-        .create_deposit(store, market_token)
-        .long_token(long_token_amount, None, None)
-        .short_token(short_token_amount, None, None)
-        .build_with_address()
-        .await?;
-    let signature = rpc
-        .build()
-        .send_with_spinner_and_config(RpcSendTransactionConfig {
-            skip_preflight: true,
-            ..Default::default()
-        })
-        .await?;
-    tracing::info!(%deposit, %signature, "created a deposit");
-    let mut builder = keeper.execute_deposit(store, oracle, &deposit, false);
-    deployment
-        .execute_with_pyth(&mut builder, None, true)
         .await?;
 
     // Increase position.

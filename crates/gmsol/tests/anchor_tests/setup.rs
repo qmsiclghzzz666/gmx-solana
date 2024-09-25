@@ -10,6 +10,7 @@ use std::{
 };
 
 use anchor_client::{
+    solana_client::rpc_config::RpcSendTransactionConfig,
     solana_sdk::{
         commitment_config::CommitmentConfig,
         pubkey::Pubkey,
@@ -883,6 +884,48 @@ impl Deployment {
             )
             .await?;
         Ok(())
+    }
+
+    pub(crate) async fn prepare_market(
+        &self,
+        selector: (&str, &str, &str),
+        mut long_token_amount: u64,
+        mut short_token_amount: u64,
+        skip_preflight: bool,
+    ) -> eyre::Result<&Pubkey> {
+        long_token_amount += rand::random::<u8>() as u64;
+        short_token_amount += rand::random::<u8>() as u64;
+
+        let (index, long_token, short_token) = selector;
+        let market_token = self
+            .market_token(index, long_token, short_token)
+            .ok_or_eyre("market not found")?;
+        self.mint_or_transfer_to_user(long_token, Deployment::DEFAULT_USER, long_token_amount)
+            .await?;
+        self.mint_or_transfer_to_user(short_token, Deployment::DEFAULT_USER, short_token_amount)
+            .await?;
+
+        let client = self.user_client(Self::DEFAULT_USER)?;
+        let keeper = self.user_client(Self::DEFAULT_KEEPER)?;
+
+        let (rpc, deposit) = client
+            .create_deposit(&self.store, market_token)
+            .long_token(long_token_amount, None, None)
+            .short_token(short_token_amount, None, None)
+            .build_with_address()
+            .await?;
+        let signature = rpc
+            .build()
+            .send_with_spinner_and_config(RpcSendTransactionConfig {
+                skip_preflight,
+                ..Default::default()
+            })
+            .await?;
+        tracing::info!(%deposit, %signature, "created a deposit");
+        let mut builder = keeper.execute_deposit(&self.store, &self.oracle, &deposit, false);
+        self.execute_with_pyth(&mut builder, None, skip_preflight)
+            .await?;
+        Ok(market_token)
     }
 }
 
