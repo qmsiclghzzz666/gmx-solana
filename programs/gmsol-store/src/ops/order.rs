@@ -175,6 +175,7 @@ impl<'a, 'info> CreateOrderOps<'a, 'info> {
             let market = self.market.load()?;
             let meta = market.meta();
             let swap_path = self.swap_path;
+            // The secondary path is ignored.
             swap.validate_and_init(
                 meta,
                 self.params.swap_path_length,
@@ -182,7 +183,7 @@ impl<'a, 'info> CreateOrderOps<'a, 'info> {
                 swap_path,
                 &self.store.key(),
                 (&from, &from),
-                (&to, &to),
+                (&to, &from),
             )?;
         }
         Ok(())

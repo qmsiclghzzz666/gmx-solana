@@ -17,6 +17,7 @@ async fn balanced_market_order() -> eyre::Result<()> {
     let market_token = deployment
         .market_token("fBTC", "fBTC", "USDG")
         .expect("must exist");
+    let usdg = deployment.token("USDG").expect("must exist");
 
     let long_token_amount = 1_000_005;
     let short_token_amount = 6_000_000_000_003;
@@ -102,26 +103,76 @@ async fn balanced_market_order() -> eyre::Result<()> {
         }
     }
 
+    let side = true;
+    let collateral_side = true;
+    let collateral_amount = short_collateral_amount;
+
     // Increase position with swap path.
-    // let size = 10_000_000_000_000_000_000_000;
-    // let (rpc, order) = client
-    //     .market_increase(
-    //         store,
-    //         market_token,
-    //         true,
-    //         long_collateral_amount,
-    //         true,
-    //         size,
-    //     )
-    //     .build_with_address()
-    //     .await?;
-    // let signature = rpc.send().await?;
-    // tracing::info!(%order, %signature, %size, "created an increase position order");
+    let size = 10_000_000_000_000_000_000_000;
+    let (rpc, order) = client
+        .market_increase(
+            store,
+            market_token,
+            collateral_side,
+            collateral_amount,
+            side,
+            size,
+        )
+        .initial_collateral_token(&usdg.address, None)
+        .swap_path(vec![*market_token])
+        .build_with_address()
+        .await?;
+    let signature = rpc.send().await?;
+    tracing::info!(%order, %signature, %size, "created an increase position order");
 
-    // let mut builder = keeper.execute_order(store, oracle, &order, false)?;
-    // deployment
-    //     .execute_with_pyth(&mut builder, None, true)
-    //     .await?;
+    let mut builder = keeper.execute_order(store, oracle, &order, false)?;
+    deployment
+        .execute_with_pyth(&mut builder, None, true)
+        .await?;
 
+    // Extract collateral.
+    let amount = 1_00;
+    let (rpc, order) = client
+        .market_decrease(store, market_token, true, amount, side, 0)
+        .build_with_address()
+        .await?;
+    let signature = rpc.send().await?;
+    tracing::info!(%order, %signature, "created an order to extract collateral");
+
+    let mut builder = keeper.execute_order(store, oracle, &order, false)?;
+    deployment
+        .execute_with_pyth(&mut builder, None, true)
+        .await?;
+
+    // Extract collateral and swap.
+    let amount = 1_00;
+    let (rpc, order) = client
+        .market_decrease(store, market_token, true, amount, side, 0)
+        .final_output_token(&usdg.address)
+        .swap_path(vec![*market_token])
+        .build_with_address()
+        .await?;
+    let signature = rpc.send().await?;
+    tracing::info!(%order, %signature, "created an order to extract collateral and swap");
+
+    let mut builder = keeper.execute_order(store, oracle, &order, false)?;
+    deployment
+        .execute_with_pyth(&mut builder, None, true)
+        .await?;
+
+    // Fully decrease and swap.
+    let (rpc, order) = client
+        .market_decrease(store, market_token, true, 0, side, size)
+        .final_output_token(&usdg.address)
+        .swap_path(vec![*market_token])
+        .build_with_address()
+        .await?;
+    let signature = rpc.send().await?;
+    tracing::info!(%order, %signature, %size, "created an order to fully decrease the position and swap");
+
+    let mut builder = keeper.execute_order(store, oracle, &order, false)?;
+    deployment
+        .execute_with_pyth(&mut builder, None, true)
+        .await?;
     Ok(())
 }
