@@ -568,8 +568,15 @@ impl Deployment {
             let rpc = client.update_market_config_by_key(
                 store,
                 &market_token,
+                MarketConfigKey::MaxPoolAmountForLongToken,
+                &1_000_000_000_000_000_000,
+            )?;
+            builder.push(rpc)?;
+            let rpc = client.update_market_config_by_key(
+                store,
+                &market_token,
                 MarketConfigKey::MaxPoolAmountForShortToken,
-                &1_000_000_000_000_000,
+                &1_000_000_000_000_000_000,
             )?;
             builder.push(rpc)?;
         }
