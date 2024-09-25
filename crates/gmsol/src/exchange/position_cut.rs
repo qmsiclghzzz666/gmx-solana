@@ -44,6 +44,7 @@ pub struct PositionCutBuilder<'a, C> {
     hint: Option<PositionCutHint>,
     feeds_parser: FeedsParser,
     close: bool,
+    event_buffer_index: u8,
 }
 
 /// Hint for `PositionCut`.
@@ -142,6 +143,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> PositionCutBuilder<'a, C> {
             hint: None,
             feeds_parser: Default::default(),
             close: true,
+            event_buffer_index: 0,
         })
     }
 
@@ -161,6 +163,12 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> PositionCutBuilder<'a, C> {
     /// Set whether to close the order after the execution.
     pub fn close(&mut self, close: bool) -> &mut Self {
         self.close = close;
+        self
+    }
+
+    /// Set event buffer index.
+    pub fn event_buffer_index(&mut self, index: u8) -> &mut Self {
+        self.event_buffer_index = index;
         self
     }
 
@@ -231,8 +239,11 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> PositionCutBuilder<'a, C> {
         let short_token_vault = self
             .client
             .find_market_vault_address(&store, &short_token_mint);
+        let event =
+            self.client
+                .find_trade_event_buffer_address(&store, &payer, self.event_buffer_index);
 
-        let prepare = self
+        let mut prepare = self
             .client
             .data_store_rpc()
             .accounts(accounts::PrepareDecreaseOrderEscrow {
@@ -251,6 +262,19 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> PositionCutBuilder<'a, C> {
                 associated_token_program: anchor_spl::associated_token::ID,
             })
             .args(instruction::PrepareDecreaseOrderEscrow { nonce });
+        let prepare_event_buffer = self
+            .client
+            .data_store_rpc()
+            .accounts(accounts::PrepareTradeEventBuffer {
+                authority: payer,
+                store,
+                event,
+                system_program: system_program::ID,
+            })
+            .args(instruction::PrepareTradeEventBuffer {
+                index: self.event_buffer_index,
+            });
+        prepare = prepare.merge(prepare_event_buffer);
         let mut exec_builder = self
             .client
             .data_store_rpc()
@@ -264,6 +288,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> PositionCutBuilder<'a, C> {
                 market: hint.market,
                 order,
                 position: self.position,
+                event,
                 long_token: long_token_mint,
                 short_token: short_token_mint,
                 long_token_escrow,

@@ -18,7 +18,7 @@ impl_decode_for_account_deserialize!(Order);
 impl_decode_for_cpi_event!(RemoveDepositEvent);
 impl_decode_for_cpi_event!(RemoveWithdrawalEvent);
 impl_decode_for_cpi_event!(RemoveOrderEvent);
-impl_decode_for_cpi_event!(TradeEvent);
+impl_decode_for_cpi_event!(TradeEvent<'static>);
 
 untagged!(
     GMSOLAccountData,
@@ -41,7 +41,7 @@ untagged!(
         RemoveDepositEvent,
         RemoveOrderEvent,
         RemoveWithdrawalEvent,
-        TradeEvent,
+        // TradeEvent,
         UnknownOwnedData
     ]
 );

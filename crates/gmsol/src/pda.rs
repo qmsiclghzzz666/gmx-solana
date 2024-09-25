@@ -1,6 +1,10 @@
 use anchor_client::solana_sdk::pubkey::Pubkey;
-use gmsol_store::states::{
-    position::PositionKind, Deposit, NonceBytes, Oracle, Order, Position, Seed, Store, Withdrawal,
+use gmsol_store::{
+    events::TradeEventData,
+    states::{
+        position::PositionKind, Deposit, NonceBytes, Oracle, Order, Position, Seed, Store,
+        Withdrawal,
+    },
 };
 use gmsol_utils::to_seed;
 
@@ -154,6 +158,24 @@ pub fn find_claimable_account_pda(
             mint.as_ref(),
             user.as_ref(),
             time_key,
+        ],
+        store_program_id,
+    )
+}
+
+/// Find PDA for trade event buffer.
+pub fn find_trade_event_buffer_pda(
+    store: &Pubkey,
+    authority: &Pubkey,
+    index: u8,
+    store_program_id: &Pubkey,
+) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[
+            TradeEventData::SEED,
+            store.as_ref(),
+            authority.as_ref(),
+            &[index],
         ],
         store_program_id,
     )

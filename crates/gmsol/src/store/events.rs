@@ -1,7 +1,9 @@
 use crate::{
     decode::untagged,
-    types::{RemoveDepositEvent, RemoveOrderEvent, RemoveWithdrawalEvent, TradeEvent},
+    types::{self, RemoveDepositEvent, RemoveOrderEvent, RemoveWithdrawalEvent},
 };
+
+type TradeEvent = types::TradeEvent<'static>;
 
 untagged!(
     StoreCPIEvent,

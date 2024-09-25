@@ -152,21 +152,6 @@ pub mod gmsol_exchange {
         instructions::update_order(ctx, params)
     }
 
-    #[access_control(Authenticate::only_order_keeper(&ctx))]
-    pub fn execute_order<'info>(
-        ctx: Context<'_, '_, 'info, 'info, ExecuteOrder<'info>>,
-        recent_timestamp: i64,
-        execution_fee: u64,
-        cancel_on_execution_error: bool,
-    ) -> Result<()> {
-        instructions::execute_order(
-            ctx,
-            recent_timestamp,
-            execution_fee,
-            cancel_on_execution_error,
-        )
-    }
-
     /// Cancel an order.
     ///
     /// # Accounts
@@ -180,60 +165,6 @@ pub mod gmsol_exchange {
     /// - *[See also the checks done by the `remove_order` instruction.](gmsol_store::gmsol_store::remove_order)*
     pub fn cancel_order(ctx: Context<CancelOrder>) -> Result<()> {
         instructions::cancel_order(ctx)
-    }
-
-    /// Liquidate a position.
-    ///
-    /// # Accounts
-    /// *[See the documentation for the accounts.](Liquidate)*
-    ///
-    /// # Arguments
-    /// - `recent_timestmap`: The timestamp used to derive the claimable collateral accounts.
-    /// - `nonce`: Nonce bytes used to derive the order account.
-    /// - `execution_fee`: Execution fee claimed by Keeper for its usage.
-    ///
-    /// # Errors
-    /// - The [`authority`](Liquidate::authority) must be a signer and has the `ORDER_KEEPER` role.
-    /// - *TODO*
-    #[access_control(Authenticate::only_order_keeper(&ctx))]
-    pub fn liquidate<'info>(
-        ctx: Context<'_, '_, 'info, 'info, Liquidate<'info>>,
-        recent_timestamp: i64,
-        nonce: [u8; 32],
-        execution_fee: u64,
-    ) -> Result<()> {
-        instructions::unchecked_liquidate(ctx, recent_timestamp, nonce, execution_fee)
-    }
-
-    /// Auto-deleverage a position.
-    ///
-    /// # Accounts
-    /// *[See the documentation for the accounts.](AutoDeleverage)*
-    ///
-    /// # Arguments
-    /// - `size_delta_usd`: The amount by which the size will be decreased.
-    /// - `recent_timestmap`: The timestamp used to derive the claimable collateral accounts.
-    /// - `nonce`: Nonce bytes used to derive the order account.
-    /// - `execution_fee`: Execution fee claimed by Keeper for its usage.
-    ///
-    /// # Errors
-    /// - The [`authority`](AutoDeleverage::authority) must be a signer and has the `ORDER_KEEPER` role.
-    /// - *TODO*
-    #[access_control(Authenticate::only_order_keeper(&ctx))]
-    pub fn auto_deleverage<'info>(
-        ctx: Context<'_, '_, 'info, 'info, AutoDeleverage<'info>>,
-        size_delta_usd: u128,
-        recent_timestamp: i64,
-        nonce: [u8; 32],
-        execution_fee: u64,
-    ) -> Result<()> {
-        instructions::unchecked_auto_deleverage(
-            ctx,
-            size_delta_usd,
-            recent_timestamp,
-            nonce,
-            execution_fee,
-        )
     }
 
     /// Update the ADL state for the given market.

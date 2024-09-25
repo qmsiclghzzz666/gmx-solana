@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use borsh::{BorshDeserialize, BorshSerialize};
 use gmsol_model::action::decrease_position::DecreasePositionReport;
 
 use crate::{CoreError, StoreError};
@@ -75,51 +76,6 @@ impl Order {
         params.validate()?;
 
         self.fixed.updated()
-    }
-
-    pub(crate) fn validate_output_amount(&self, output_amount: u128) -> Result<()> {
-        require_gte!(
-            output_amount,
-            self.fixed.params.min_output_amount,
-            StoreError::InsufficientOutputAmount
-        );
-        Ok(())
-    }
-
-    #[inline(never)]
-    pub(crate) fn validate_decrease_output_amounts(
-        &self,
-        oracle: &Oracle,
-        output_token: &Pubkey,
-        output_amount: u64,
-        secondary_output_token: &Pubkey,
-        secondary_output_amount: u64,
-    ) -> Result<()> {
-        let mut total = 0u128;
-        {
-            let price = oracle
-                .primary
-                .get(output_token)
-                .ok_or(error!(StoreError::MissingOracelPrice))?
-                .min
-                .to_unit_price();
-            let output_value = u128::from(output_amount).saturating_mul(price);
-            total = total.saturating_add(output_value);
-        }
-        {
-            let price = oracle
-                .primary
-                .get(secondary_output_token)
-                .ok_or(error!(StoreError::MissingOracelPrice))?
-                .min
-                .to_unit_price();
-            let output_value = u128::from(secondary_output_amount).saturating_mul(price);
-            total = total.saturating_add(output_value);
-        }
-
-        // We use the `min_output_amount` as min output value.
-        self.validate_output_amount(total)?;
-        Ok(())
     }
 
     /// Get the params.
@@ -476,12 +432,14 @@ impl OrderKind {
 }
 
 /// Transfer Out.
+#[zero_copy]
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
+#[derive(BorshSerialize, BorshDeserialize, Default)]
 pub struct TransferOut {
     /// Executed.
-    pub executed: bool,
+    executed: u8,
+    padding_0: [u8; 7],
     /// Final output token.
     pub final_output_token: u64,
     /// Secondary output token.
@@ -508,6 +466,14 @@ pub enum CollateralReceiver {
 }
 
 impl TransferOut {
+    const EXECUTED: u8 = u8::MAX;
+    const NOT_EXECUTED: u8 = 0;
+
+    /// Return whether the order is executed.
+    pub fn executed(&self) -> bool {
+        !self.executed == Self::NOT_EXECUTED
+    }
+
     /// Return whether the output for user is empty.
     pub fn is_user_output_empty(&self) -> bool {
         self.final_output_token == 0
@@ -518,9 +484,18 @@ impl TransferOut {
             && self.short_token_for_claimable_account_of_user == 0
     }
 
+    pub(crate) fn set_executed(&mut self, executed: bool) -> &mut Self {
+        self.executed = if executed {
+            Self::EXECUTED
+        } else {
+            Self::NOT_EXECUTED
+        };
+        self
+    }
+
     pub(crate) fn new_failed() -> Self {
         Self {
-            executed: false,
+            executed: Self::NOT_EXECUTED,
             ..Default::default()
         }
     }

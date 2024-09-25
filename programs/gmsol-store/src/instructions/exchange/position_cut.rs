@@ -7,7 +7,9 @@ use anchor_spl::{
 };
 
 use crate::{
-    check_delegation, constants, get_pnl_token,
+    check_delegation, constants,
+    events::{TradeEvent, TradeEventData},
+    get_pnl_token,
     ops::order::{PositionCutKind, PositionCutOp},
     states::{
         order::OrderV2, Market, NonceBytes, Oracle, Position, PriceProvider, Seed, Store,
@@ -67,6 +69,9 @@ pub struct PositionCut<'info> {
         bump = position.load()?.bump,
     )]
     pub position: AccountLoader<'info, Position>,
+    /// Trade event buffer.
+    #[account(mut, has_one = store, has_one = authority)]
+    pub event: AccountLoader<'info, TradeEventData>,
     /// Long token.
     pub long_token: Box<Account<'info, Mint>>,
     /// Short token.
@@ -194,6 +199,7 @@ pub(crate) fn unchecked_process_position_cut<'info>(
         .kind(kind)
         .position(&accounts.position)
         .order(&accounts.order)
+        .event(&accounts.event)
         .market(&accounts.market)
         .store(&accounts.store)
         .owner(accounts.owner.to_account_info())
@@ -223,7 +229,7 @@ pub(crate) fn unchecked_process_position_cut<'info>(
         .executor(accounts.authority.to_account_info())
         .refund(refund);
 
-    let event = accounts.oracle.with_prices(
+    let should_send_trade_event = accounts.oracle.with_prices(
         &accounts.store,
         &accounts.price_provider,
         &accounts.token_map,
@@ -232,10 +238,12 @@ pub(crate) fn unchecked_process_position_cut<'info>(
         |oracle, _remaining_accounts| ops.oracle(oracle).build().execute(),
     )?;
 
-    if let Some(event) = event {
-        emit_cpi!(event);
+    if should_send_trade_event {
+        let event_loader = accounts.event.clone();
+        let event = event_loader.load()?;
+        let event = TradeEvent::from(&*event);
+        event.emit(&accounts.event_authority, ctx.bumps.event_authority)?;
     }
-
     Ok(())
 }
 

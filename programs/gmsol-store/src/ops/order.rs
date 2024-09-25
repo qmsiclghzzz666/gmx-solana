@@ -7,7 +7,7 @@ use gmsol_model::{
 use typed_builder::TypedBuilder;
 
 use crate::{
-    events::TradeEvent,
+    events::TradeEventData,
     states::{
         market::AdlOps,
         order::{
@@ -635,6 +635,7 @@ pub(crate) struct ExecuteOrderOps<'a, 'info> {
     order: &'a AccountLoader<'info, OrderV2>,
     owner: AccountInfo<'info>,
     position: Option<&'a AccountLoader<'info, Position>>,
+    event: Option<&'a AccountLoader<'info, TradeEventData>>,
     oracle: &'a Oracle,
     remaining_accounts: &'info [AccountInfo<'info>],
     throw_on_execution_error: bool,
@@ -644,6 +645,7 @@ pub(crate) struct ExecuteOrderOps<'a, 'info> {
 }
 
 pub(crate) type ShouldRemovePosition = bool;
+pub(crate) type ShouldSendTradeEvent = bool;
 
 enum SecondaryOrderType {
     Liquidation,
@@ -651,7 +653,7 @@ enum SecondaryOrderType {
 }
 
 impl<'a, 'info> ExecuteOrderOps<'a, 'info> {
-    pub(crate) fn execute(self) -> Result<(Box<TransferOut>, Option<TradeEvent>)> {
+    pub(crate) fn execute(self) -> Result<(Box<TransferOut>, ShouldSendTradeEvent)> {
         let mut should_close_position = false;
 
         match self.validate_oracle_and_adl() {
@@ -666,7 +668,7 @@ impl<'a, 'info> ExecuteOrderOps<'a, 'info> {
                         .flatten()
                         .expect("must have an expiration time"),
                 );
-                return Ok((Box::new(TransferOut::new_failed()), None));
+                return Ok((Box::new(TransferOut::new_failed()), false));
             }
             Err(err) => {
                 return Err(error!(err));
@@ -676,10 +678,10 @@ impl<'a, 'info> ExecuteOrderOps<'a, 'info> {
         let mut should_throw_error = false;
         let prices = self.market.load()?.prices(self.oracle)?;
         let res = match self.do_execute(&mut should_throw_error, prices) {
-            Ok((should_remove_position, mut transfer_out, trade_event)) => {
-                transfer_out.executed = true;
+            Ok((should_remove_position, mut transfer_out, should_send_trade_event)) => {
+                transfer_out.set_executed(true);
                 should_close_position = should_remove_position;
-                Ok((transfer_out, trade_event))
+                Ok((transfer_out, should_send_trade_event))
             }
             Err(err) if !(should_throw_error || self.throw_on_execution_error) => {
                 msg!("Execute order error: {}", err);
@@ -689,18 +691,18 @@ impl<'a, 'info> ExecuteOrderOps<'a, 'info> {
                     .map(|a| Result::Ok(a.load()?.state.is_empty()))
                     .transpose()?
                     .unwrap_or(false);
-                Ok((Default::default(), None))
+                Ok((Default::default(), false))
             }
             Err(err) => Err(err),
         };
 
-        let (transfer_out, event) = res?;
+        let (transfer_out, should_send_trade_event) = res?;
 
         if should_close_position {
             self.close_position()?;
         }
 
-        Ok((transfer_out, event))
+        Ok((transfer_out, should_send_trade_event))
     }
 
     #[inline(never)]
@@ -708,7 +710,7 @@ impl<'a, 'info> ExecuteOrderOps<'a, 'info> {
         &self,
         should_throw_error: &mut bool,
         prices: Prices<u128>,
-    ) -> Result<(ShouldRemovePosition, Box<TransferOut>, Option<TradeEvent>)> {
+    ) -> Result<(ShouldRemovePosition, Box<TransferOut>, ShouldSendTradeEvent)> {
         self.validate_market()?;
         self.validate_order(should_throw_error, &prices)?;
 
@@ -735,7 +737,7 @@ impl<'a, 'info> ExecuteOrderOps<'a, 'info> {
         }
 
         let kind = self.order.load()?.params.kind()?;
-        let mut trade_event = None;
+        let mut should_send_trade_event = false;
         let should_remove_position = match &kind {
             OrderKind::MarketSwap | OrderKind::LimitSwap => {
                 execute_swap(
@@ -760,19 +762,25 @@ impl<'a, 'info> ExecuteOrderOps<'a, 'info> {
                     .position
                     .as_ref()
                     .ok_or(error!(StoreError::PositionIsNotProvided))?;
-                let mut event = {
+                let event_loader = self
+                    .event
+                    .as_ref()
+                    .ok_or(error!(CoreError::PositionIsRequired))?;
+                {
                     let position = position_loader.load()?;
+                    let mut event = event_loader.load_mut()?;
                     let is_collateral_long = market
                         .market_meta()
                         .to_token_side(&position.collateral_token)?;
-                    TradeEvent::new_unchanged(
+                    event.init(
                         kind.is_increase_position(),
                         is_collateral_long,
                         position_loader.key(),
                         &position,
                         self.order.key(),
-                    )?
-                };
+                    )?;
+                    should_send_trade_event = true;
+                }
                 let mut position = RevertiblePosition::new(market, position_loader)?;
 
                 let should_remove_position = match kind {
@@ -783,7 +791,7 @@ impl<'a, 'info> ExecuteOrderOps<'a, 'info> {
                             &mut position,
                             &mut swap_markets,
                             &mut transfer_out,
-                            &mut event,
+                            &mut *event_loader.load_mut()?,
                             &mut *self.order.load_mut()?,
                         )?;
                         false
@@ -794,7 +802,7 @@ impl<'a, 'info> ExecuteOrderOps<'a, 'info> {
                         &mut position,
                         &mut swap_markets,
                         &mut transfer_out,
-                        &mut event,
+                        &mut *event_loader.load_mut()?,
                         &mut *self.order.load_mut()?,
                         true,
                         Some(SecondaryOrderType::Liquidation),
@@ -805,7 +813,7 @@ impl<'a, 'info> ExecuteOrderOps<'a, 'info> {
                         &mut position,
                         &mut swap_markets,
                         &mut transfer_out,
-                        &mut event,
+                        &mut *event_loader.load_mut()?,
                         &mut *self.order.load_mut()?,
                         true,
                         Some(SecondaryOrderType::AutoDeleveraging),
@@ -818,16 +826,17 @@ impl<'a, 'info> ExecuteOrderOps<'a, 'info> {
                         &mut position,
                         &mut swap_markets,
                         &mut transfer_out,
-                        &mut event,
+                        &mut *event_loader.load_mut()?,
                         &mut *self.order.load_mut()?,
                         false,
                         None,
                     )?,
                     _ => unreachable!(),
                 };
-                position.write_to_event(&mut event)?;
-                event.update_with_transfer_out(&transfer_out)?;
-                trade_event = Some(event);
+                position.write_to_event(&mut *event_loader.load_mut()?)?;
+                event_loader
+                    .load_mut()?
+                    .update_with_transfer_out(&transfer_out)?;
                 position.commit();
                 msg!(
                     "[Position] executed with trade_id={}",
@@ -843,7 +852,11 @@ impl<'a, 'info> ExecuteOrderOps<'a, 'info> {
             }
         };
         swap_markets.commit();
-        Ok((should_remove_position, transfer_out, trade_event))
+        Ok((
+            should_remove_position,
+            transfer_out,
+            should_send_trade_event,
+        ))
     }
 
     fn close_position(&self) -> Result<()> {
@@ -1103,7 +1116,7 @@ fn execute_increase_position(
     position: &mut RevertiblePosition<'_>,
     swap_markets: &mut SwapMarkets<'_>,
     transfer_out: &mut TransferOut,
-    event: &mut TradeEvent,
+    event: &mut TradeEventData,
     order: &mut OrderV2,
 ) -> Result<()> {
     let params = &order.params;
@@ -1173,7 +1186,7 @@ fn execute_decrease_position(
     position: &mut RevertiblePosition<'_>,
     swap_markets: &mut SwapMarkets<'_>,
     transfer_out: &mut TransferOut,
-    event: &mut TradeEvent,
+    event: &mut TradeEventData,
     order: &mut OrderV2,
     is_insolvent_close_allowed: bool,
     secondary_order_type: Option<SecondaryOrderType>,
@@ -1373,6 +1386,7 @@ pub struct PositionCutOp<'a, 'info> {
     kind: PositionCutKind,
     executor: AccountInfo<'info>,
     position: &'a AccountLoader<'info, Position>,
+    event: &'a AccountLoader<'info, TradeEventData>,
     order: &'a AccountLoader<'info, OrderV2>,
     market: &'a AccountLoader<'info, Market>,
     store: &'a AccountLoader<'info, Store>,
@@ -1418,7 +1432,7 @@ impl PositionCutKind {
 }
 
 impl<'a, 'info> PositionCutOp<'a, 'info> {
-    pub(crate) fn execute(self) -> Result<Option<TradeEvent>> {
+    pub(crate) fn execute(self) -> Result<ShouldSendTradeEvent> {
         let (size_in_usd, is_long, is_collateral_long) = {
             let position = self.position.load()?;
             let market = self.market.load()?;
@@ -1430,9 +1444,9 @@ impl<'a, 'info> PositionCutOp<'a, 'info> {
             )
         };
         self.create_order(size_in_usd, is_long, is_collateral_long)?;
-        let (transfer_out, event) = self.execute_order()?;
+        let (transfer_out, should_send_trade_event) = self.execute_order()?;
         self.process_transfer_out(&transfer_out, is_long, is_collateral_long)?;
-        Ok(event)
+        Ok(should_send_trade_event)
     }
 
     #[inline(never)]
@@ -1480,13 +1494,14 @@ impl<'a, 'info> PositionCutOp<'a, 'info> {
     }
 
     #[inline(never)]
-    fn execute_order(&self) -> Result<(Box<TransferOut>, Option<TradeEvent>)> {
+    fn execute_order(&self) -> Result<(Box<TransferOut>, ShouldSendTradeEvent)> {
         ExecuteOrderOps::builder()
             .store(self.store)
             .market(self.market)
             .order(self.order)
             .owner(self.owner.clone())
             .position(Some(self.position))
+            .event(Some(self.event))
             .oracle(self.oracle)
             .remaining_accounts(&[])
             .throw_on_execution_error(true)

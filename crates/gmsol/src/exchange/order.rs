@@ -578,13 +578,14 @@ pub struct ExecuteOrderBuilder<'a, C> {
     token_map: Option<Pubkey>,
     cancel_on_execution_error: bool,
     close: bool,
+    event_buffer_index: u8,
 }
 
 /// Hint for executing order.
 #[derive(Clone)]
 pub struct ExecuteOrderHint {
+    kind: OrderKind,
     store_program_id: Pubkey,
-    has_claimable: bool,
     store: Store,
     market_token: Pubkey,
     position: Option<Pubkey>,
@@ -616,60 +617,45 @@ impl ExecuteOrderHint {
         &self,
         store: &Pubkey,
         timestamp: i64,
-    ) -> crate::Result<Option<Pubkey>> {
-        if !self.has_claimable {
-            return Ok(None);
-        }
-        Ok(Some(
-            crate::pda::find_claimable_account_pda(
-                store,
-                &self.long_token_mint,
-                &self.user,
-                &self.store.claimable_time_key(timestamp)?,
-                &self.store_program_id,
-            )
-            .0,
-        ))
+    ) -> crate::Result<Pubkey> {
+        Ok(crate::pda::find_claimable_account_pda(
+            store,
+            &self.long_token_mint,
+            &self.user,
+            &self.store.claimable_time_key(timestamp)?,
+            &self.store_program_id,
+        )
+        .0)
     }
 
     fn claimable_short_token_account(
         &self,
         store: &Pubkey,
         timestamp: i64,
-    ) -> crate::Result<Option<Pubkey>> {
-        if !self.has_claimable {
-            return Ok(None);
-        }
-        Ok(Some(
-            crate::pda::find_claimable_account_pda(
-                store,
-                &self.short_token_mint,
-                &self.user,
-                &self.store.claimable_time_key(timestamp)?,
-                &self.store_program_id,
-            )
-            .0,
-        ))
+    ) -> crate::Result<Pubkey> {
+        Ok(crate::pda::find_claimable_account_pda(
+            store,
+            &self.short_token_mint,
+            &self.user,
+            &self.store.claimable_time_key(timestamp)?,
+            &self.store_program_id,
+        )
+        .0)
     }
 
     fn claimable_pnl_token_account_for_holding(
         &self,
         store: &Pubkey,
         timestamp: i64,
-    ) -> crate::Result<Option<Pubkey>> {
-        if !self.has_claimable {
-            return Ok(None);
-        }
-        Ok(Some(
-            crate::pda::find_claimable_account_pda(
-                store,
-                &self.pnl_token,
-                self.store.holding(),
-                &self.store.claimable_time_key(timestamp)?,
-                &self.store_program_id,
-            )
-            .0,
-        ))
+    ) -> crate::Result<Pubkey> {
+        Ok(crate::pda::find_claimable_account_pda(
+            store,
+            &self.pnl_token,
+            self.store.holding(),
+            &self.store.claimable_time_key(timestamp)?,
+            &self.store_program_id,
+        )
+        .0)
     }
 }
 
@@ -698,6 +684,7 @@ where
             token_map: None,
             cancel_on_execution_error,
             close: true,
+            event_buffer_index: 0,
         })
     }
 
@@ -719,6 +706,12 @@ where
         self
     }
 
+    /// Set event buffer index.
+    pub fn event_buffer_index(&mut self, index: u8) -> &mut Self {
+        self.event_buffer_index = index;
+        self
+    }
+
     /// Set hint with the given order.
     pub fn hint(
         &mut self,
@@ -733,11 +726,8 @@ where
         let kind = params.kind()?;
         let tokens = order.tokens();
         self.hint = Some(ExecuteOrderHint {
+            kind,
             store_program_id: self.client.store_program_id(),
-            has_claimable: matches!(
-                kind,
-                OrderKind::MarketDecrease | OrderKind::LimitDecrease | OrderKind::StopLossDecrease
-            ),
             store: *store,
             market_token,
             position: params.position().copied(),
@@ -800,7 +790,7 @@ where
     /// Get claimable accounts.
     ///
     /// The returned values are of the form `[long_for_user, short_for_user, pnl_for_holding]`.
-    pub async fn claimable_accounts(&mut self) -> crate::Result<[Option<Pubkey>; 3]> {
+    pub async fn claimable_accounts(&mut self) -> crate::Result<[Pubkey; 3]> {
         let hint = self.prepare_hint().await?;
         let long_for_user =
             hint.claimable_long_token_account(&self.store, self.recent_timestamp)?;
@@ -838,6 +828,7 @@ where
         let hint = self.prepare_hint().await?;
         let [claimable_long_token_account_for_user, claimable_short_token_account_for_user, claimable_pnl_token_account_for_holding] =
             self.claimable_accounts().await?;
+
         let authority = self.client.payer();
         let feeds = self
             .feeds_parser
@@ -852,63 +843,169 @@ where
                 is_signer: false,
                 is_writable: true,
             });
+        let event = self.client.find_trade_event_buffer_address(
+            &self.store,
+            &authority,
+            self.event_buffer_index,
+        );
 
-        let mut execute_order = self
-            .client
-            .data_store_rpc()
-            .accounts(crate::utils::fix_optional_account_metas(
-                accounts::ExecuteOrderV2 {
-                    authority,
-                    owner: hint.user,
-                    store: self.store,
-                    oracle: self.oracle,
-                    token_map,
-                    market: self
-                        .client
-                        .find_market_address(&self.store, &hint.market_token),
-                    order: self.order,
-                    position: hint.position,
-                    final_output_token_vault: hint.final_output_token_and_account.as_ref().map(
-                        |(token, _)| self.client.find_market_vault_address(&self.store, token),
-                    ),
-                    long_token_vault: hint.long_token_vault(&self.store),
-                    short_token_vault: hint.short_token_vault(&self.store),
-                    claimable_long_token_account_for_user,
-                    claimable_short_token_account_for_user,
-                    claimable_pnl_token_account_for_holding,
-                    event_authority: self.client.data_store_event_authority(),
-                    token_program: anchor_spl::token::ID,
-                    price_provider: self.price_provider,
-                    system_program: system_program::ID,
-                    initial_collateral_token: hint
-                        .initial_collateral_token_and_account
-                        .map(|(token, _)| token),
-                    initial_collateral_token_vault: hint.initial_collateral_token_and_account.map(
-                        |(token, _)| self.client.find_market_vault_address(&self.store, &token),
-                    ),
-                    initial_collateral_token_escrow: hint
-                        .initial_collateral_token_and_account
-                        .map(|(_, account)| account),
-                    long_token: hint.long_token_and_account.map(|(token, _)| token),
-                    short_token: hint.short_token_and_account.map(|(token, _)| token),
-                    final_output_token: hint.final_output_token_and_account.map(|(token, _)| token),
-                    final_output_token_escrow: hint
-                        .final_output_token_and_account
-                        .map(|(_, account)| account),
-                    long_token_escrow: hint.long_token_and_account.map(|(_, account)| account),
-                    short_token_escrow: hint.short_token_and_account.map(|(_, account)| account),
-                    program: self.client.store_program_id(),
-                },
-                &gmsol_store::id(),
-                &self.client.store_program_id(),
-            ))
-            .args(instruction::ExecuteOrderV2 {
-                recent_timestamp: self.recent_timestamp,
-                execution_fee: self.execution_fee,
-                throw_on_execution_error: !self.cancel_on_execution_error,
-            })
+        let kind = hint.kind;
+        let mut require_claimable_accounts = false;
+
+        let mut execute_order = match kind {
+            OrderKind::MarketDecrease | OrderKind::LimitDecrease | OrderKind::StopLossDecrease => {
+                require_claimable_accounts = true;
+
+                self.client
+                    .data_store_rpc()
+                    .accounts(accounts::ExecuteDecreaseOrder {
+                        authority,
+                        owner: hint.user,
+                        store: self.store,
+                        oracle: self.oracle,
+                        token_map,
+                        market: self
+                            .client
+                            .find_market_address(&self.store, &hint.market_token),
+                        order: self.order,
+                        position: hint
+                            .position
+                            .ok_or(crate::Error::invalid_argument("missing position"))?,
+                        event,
+                        final_output_token_vault: hint
+                            .final_output_token_and_account
+                            .as_ref()
+                            .map(|(token, _)| {
+                                self.client.find_market_vault_address(&self.store, token)
+                            })
+                            .ok_or(crate::Error::invalid_argument("missing final output token"))?,
+                        long_token_vault: hint
+                            .long_token_vault(&self.store)
+                            .ok_or(crate::Error::invalid_argument("missing long token"))?,
+                        short_token_vault: hint
+                            .short_token_vault(&self.store)
+                            .ok_or(crate::Error::invalid_argument("missing short token"))?,
+                        claimable_long_token_account_for_user,
+                        claimable_short_token_account_for_user,
+                        claimable_pnl_token_account_for_holding,
+                        event_authority: self.client.data_store_event_authority(),
+                        token_program: anchor_spl::token::ID,
+                        price_provider: self.price_provider,
+                        system_program: system_program::ID,
+                        long_token: hint
+                            .long_token_and_account
+                            .map(|(token, _)| token)
+                            .ok_or(crate::Error::invalid_argument("missing long token"))?,
+                        short_token: hint
+                            .short_token_and_account
+                            .map(|(token, _)| token)
+                            .ok_or(crate::Error::invalid_argument("missing short token"))?,
+                        final_output_token: hint
+                            .final_output_token_and_account
+                            .map(|(token, _)| token)
+                            .ok_or(crate::Error::invalid_argument("missing final output token"))?,
+                        final_output_token_escrow: hint
+                            .final_output_token_and_account
+                            .map(|(_, account)| account)
+                            .ok_or(crate::Error::invalid_argument("missing final output token"))?,
+                        long_token_escrow: hint
+                            .long_token_and_account
+                            .map(|(_, account)| account)
+                            .ok_or(crate::Error::invalid_argument("missing long token"))?,
+                        short_token_escrow: hint
+                            .short_token_and_account
+                            .map(|(_, account)| account)
+                            .ok_or(crate::Error::invalid_argument("missing short token"))?,
+                        program: self.client.store_program_id(),
+                    })
+                    .args(instruction::ExecuteDecreaseOrder {
+                        recent_timestamp: self.recent_timestamp,
+                        execution_fee: self.execution_fee,
+                        throw_on_execution_error: !self.cancel_on_execution_error,
+                    })
+            }
+            _ => self
+                .client
+                .data_store_rpc()
+                .accounts(crate::utils::fix_optional_account_metas(
+                    accounts::ExecuteOrderV2 {
+                        authority,
+                        owner: hint.user,
+                        store: self.store,
+                        oracle: self.oracle,
+                        token_map,
+                        market: self
+                            .client
+                            .find_market_address(&self.store, &hint.market_token),
+                        order: self.order,
+                        position: hint.position,
+                        event: (!kind.is_swap()).then_some(event),
+                        final_output_token_vault: hint.final_output_token_and_account.as_ref().map(
+                            |(token, _)| self.client.find_market_vault_address(&self.store, token),
+                        ),
+                        long_token_vault: hint.long_token_vault(&self.store),
+                        short_token_vault: hint.short_token_vault(&self.store),
+                        claimable_long_token_account_for_user: None,
+                        claimable_short_token_account_for_user: None,
+                        claimable_pnl_token_account_for_holding: None,
+                        event_authority: self.client.data_store_event_authority(),
+                        token_program: anchor_spl::token::ID,
+                        price_provider: self.price_provider,
+                        system_program: system_program::ID,
+                        initial_collateral_token: hint
+                            .initial_collateral_token_and_account
+                            .map(|(token, _)| token),
+                        initial_collateral_token_vault: hint
+                            .initial_collateral_token_and_account
+                            .map(|(token, _)| {
+                                self.client.find_market_vault_address(&self.store, &token)
+                            }),
+                        initial_collateral_token_escrow: hint
+                            .initial_collateral_token_and_account
+                            .map(|(_, account)| account),
+                        long_token: hint.long_token_and_account.map(|(token, _)| token),
+                        short_token: hint.short_token_and_account.map(|(token, _)| token),
+                        final_output_token: hint
+                            .final_output_token_and_account
+                            .map(|(token, _)| token),
+                        final_output_token_escrow: hint
+                            .final_output_token_and_account
+                            .map(|(_, account)| account),
+                        long_token_escrow: hint.long_token_and_account.map(|(_, account)| account),
+                        short_token_escrow: hint
+                            .short_token_and_account
+                            .map(|(_, account)| account),
+                        program: self.client.store_program_id(),
+                    },
+                    &gmsol_store::id(),
+                    &self.client.store_program_id(),
+                ))
+                .args(instruction::ExecuteOrderV2 {
+                    recent_timestamp: self.recent_timestamp,
+                    execution_fee: self.execution_fee,
+                    throw_on_execution_error: !self.cancel_on_execution_error,
+                }),
+        };
+
+        execute_order = execute_order
             .accounts(feeds.into_iter().chain(swap_markets).collect::<Vec<_>>())
             .compute_budget(ComputeBudget::default().with_limit(EXECUTE_ORDER_COMPUTE_BUDGET));
+
+        if !kind.is_swap() {
+            let prepare_event_buffer = self
+                .client
+                .data_store_rpc()
+                .accounts(accounts::PrepareTradeEventBuffer {
+                    authority,
+                    store: self.store,
+                    event,
+                    system_program: system_program::ID,
+                })
+                .args(instruction::PrepareTradeEventBuffer {
+                    index: self.event_buffer_index,
+                });
+            execute_order = prepare_event_buffer.merge(execute_order);
+        }
 
         if self.close {
             let close = self
@@ -935,14 +1032,19 @@ where
             *hint.store.holding(),
         );
 
-        if let Some(account) = claimable_long_token_account_for_user {
-            builder.claimable_long_token_account_for_user(&hint.long_token_mint, &account);
-        }
-        if let Some(account) = claimable_short_token_account_for_user {
-            builder.claimable_short_token_account_for_user(&hint.short_token_mint, &account);
-        }
-        if let Some(account) = claimable_pnl_token_account_for_holding {
-            builder.claimable_pnl_token_account_for_holding(&hint.pnl_token, &account);
+        if require_claimable_accounts {
+            builder.claimable_long_token_account_for_user(
+                &hint.long_token_mint,
+                &claimable_long_token_account_for_user,
+            );
+            builder.claimable_short_token_account_for_user(
+                &hint.short_token_mint,
+                &claimable_short_token_account_for_user,
+            );
+            builder.claimable_pnl_token_account_for_holding(
+                &hint.pnl_token,
+                &claimable_pnl_token_account_for_holding,
+            );
         }
 
         let (pre_builder, post_builder) = builder.build(self.client);

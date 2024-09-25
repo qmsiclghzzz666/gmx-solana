@@ -304,7 +304,7 @@ use self::{
         common::{SwapParams, TokenRecord},
         deposit::TokenParams as DepositTokenParams,
         market::{config::EntryArgs, status::MarketStatus, MarketMeta},
-        order::{OrderParams, TransferOut, UpdateOrderParams},
+        order::{OrderParams, UpdateOrderParams},
         token_config::TokenConfigBuilder,
         withdrawal::TokenParams as WithdrawalTokenParams,
         PriceProviderKind,
@@ -1319,15 +1319,6 @@ pub mod gmsol_store {
         instructions::execute_withdrawal(ctx, throw_on_execution_error)
     }
 
-    #[access_control(internal::Authenticate::only_controller(&ctx))]
-    pub fn execute_order<'info>(
-        ctx: Context<'_, '_, 'info, 'info, ExecuteOrder<'info>>,
-        recent_timestamp: i64,
-        throw_on_execution_error: bool,
-    ) -> Result<(bool, Box<TransferOut>)> {
-        instructions::execute_order(ctx, recent_timestamp, throw_on_execution_error)
-    }
-
     /// Update the ADL state for the market.
     ///
     /// # Accounts.
@@ -1503,6 +1494,13 @@ pub mod gmsol_store {
         instructions::close_order(ctx, &reason)
     }
 
+    pub fn prepare_trade_event_buffer(
+        ctx: Context<PrepareTradeEventBuffer>,
+        index: u8,
+    ) -> Result<()> {
+        instructions::prepare_trade_event_buffer(ctx, index)
+    }
+
     #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
     pub fn execute_order_v2<'info>(
         ctx: Context<'_, '_, 'info, 'info, ExecuteOrderV2<'info>>,
@@ -1511,6 +1509,21 @@ pub mod gmsol_store {
         throw_on_execution_error: bool,
     ) -> Result<()> {
         instructions::unchecked_execute_order(
+            ctx,
+            recent_timestamp,
+            execution_fee,
+            throw_on_execution_error,
+        )
+    }
+
+    #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
+    pub fn execute_decrease_order<'info>(
+        ctx: Context<'_, '_, 'info, 'info, ExecuteDecreaseOrder<'info>>,
+        recent_timestamp: i64,
+        execution_fee: u64,
+        throw_on_execution_error: bool,
+    ) -> Result<()> {
+        instructions::unchecked_execute_decrease_order(
             ctx,
             recent_timestamp,
             execution_fee,

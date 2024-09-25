@@ -428,6 +428,11 @@ impl<T> PositionFees<T> {
         Ok(amount)
     }
 
+    /// Get order fee.
+    pub fn order_fee(&self) -> &Fees<T> {
+        &self.base
+    }
+
     /// Get borrowing fee.
     pub fn borrowing(&self) -> &BorrowingFee<T> {
         &self.borrowing

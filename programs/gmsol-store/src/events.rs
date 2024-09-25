@@ -1,23 +1,26 @@
-use std::ops::{Deref, DerefMut};
+use std::{borrow::Cow, ops::Deref};
 
 use anchor_lang::prelude::*;
+use bitmaps::Bitmap;
+use borsh::{BorshDeserialize, BorshSerialize};
+use bytemuck::Zeroable;
 use gmsol_model::{
     action::{
-        decrease_position::{DecreasePositionReport, OutputAmounts, ProcessedPnl},
-        increase_position::IncreasePositionReport,
+        decrease_position::DecreasePositionReport, increase_position::IncreasePositionReport,
         Prices,
     },
     params::fee::PositionFees,
 };
 
 use crate::{
+    constants,
     states::{
         common::action::ActionState,
         order::{OrderKind, TransferOut},
         position::PositionState,
         Position,
     },
-    StoreError,
+    CoreError, StoreError,
 };
 
 /// Deposit removed event.
@@ -171,14 +174,58 @@ impl RemoveWithdrawalEvent {
 }
 
 /// Trade event.
-#[event]
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Clone)]
-pub struct TradeEvent(Box<TradeEventData>);
+#[derive(Clone, BorshSerialize, BorshDeserialize)]
+pub struct TradeEvent<'a>(Cow<'a, TradeEventData>);
+
+impl<'a> From<&'a TradeEventData> for TradeEvent<'a> {
+    fn from(value: &'a TradeEventData) -> Self {
+        Self(Cow::Borrowed(value))
+    }
+}
+
+impl<'a> anchor_lang::Event for TradeEvent<'a> {
+    fn data(&self) -> Vec<u8> {
+        let mut data = Vec::with_capacity(256);
+        data.extend_from_slice(&[189, 219, 127, 211, 78, 230, 97, 238]);
+        self.serialize(&mut data).unwrap();
+        data
+    }
+}
+
+impl<'a> anchor_lang::Discriminator for TradeEvent<'a> {
+    const DISCRIMINATOR: [u8; 8] = [189, 219, 127, 211, 78, 230, 97, 238];
+}
+
+impl<'a> TradeEvent<'a> {
+    /// Emit this event through CPI. This is a manual implementation of `emit_cpi!`.
+    pub(crate) fn emit(&self, event_authority: &AccountInfo, bump: u8) -> Result<()> {
+        use anchor_lang::{solana_program::instruction::Instruction, Discriminator};
+
+        let authority_info = event_authority.to_account_info();
+        let authority_bump = bump;
+        let disc = anchor_lang::event::EVENT_IX_TAG_LE;
+        let mut ix_data = Vec::with_capacity(16 + TradeEventData::INIT_SPACE);
+        ix_data.extend_from_slice(&disc);
+        ix_data.extend_from_slice(&Self::DISCRIMINATOR);
+        self.serialize(&mut ix_data)?;
+        let ix = Instruction {
+            program_id: crate::ID,
+            accounts: vec![AccountMeta::new_readonly(*authority_info.key, true)],
+            data: ix_data,
+        };
+        anchor_lang::solana_program::program::invoke_signed(
+            &ix,
+            &[authority_info],
+            &[&[constants::EVENT_AUTHORITY_SEED, &[authority_bump]]],
+        )?;
+        Ok(())
+    }
+}
 
 #[cfg(feature = "display")]
-impl std::fmt::Display for TradeEvent {
+impl<'a> std::fmt::Display for TradeEvent<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("TradeEvent")
             .field("trade_id", &self.trade_id)
@@ -189,13 +236,13 @@ impl std::fmt::Display for TradeEvent {
             .field("order", &self.order.to_string())
             .field(
                 "final_output_token",
-                &self.final_output_token.as_ref().map(|p| p.to_string()),
+                &(self.final_output_token == Pubkey::default()).then_some(self.final_output_token),
             )
             .field("ts", &self.ts)
             .field("slot", &self.slot)
-            .field("is_long", &self.is_long)
-            .field("is_collateral_long", &self.is_collateral_long)
-            .field("is_increase", &self.is_increase)
+            .field("is_long", &self.is_long())
+            .field("is_collateral_long", &self.is_collateral_long())
+            .field("is_increase", &self.is_increase())
             .field("delta_collateral_amount", &self.delta_collateral_amount())
             .field("delta_size_in_usd", &self.delta_size_in_usd())
             .field("delta_size_in_tokens", &self.delta_size_in_tokens())
@@ -212,12 +259,22 @@ impl std::fmt::Display for TradeEvent {
 }
 
 /// Trade event data.
+#[account(zero_copy)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "debug", derive(Debug))]
-#[derive(Clone, AnchorDeserialize, AnchorSerialize)]
+#[derive(BorshSerialize, BorshDeserialize)]
 pub struct TradeEventData {
+    /// Trade flag.
+    flags: u8,
+    padding_0: [u8; 7],
     /// Trade id.
     pub trade_id: u64,
+    /// Authority.
+    #[cfg_attr(
+        feature = "serde",
+        serde(with = "serde_with::As::<serde_with::DisplayFromStr>")
+    )]
+    pub authority: Pubkey,
     /// Store address.
     #[cfg_attr(
         feature = "serde",
@@ -251,27 +308,22 @@ pub struct TradeEventData {
     /// Final output token.
     #[cfg_attr(
         feature = "serde",
-        serde(with = "serde_with::As::<Option<serde_with::DisplayFromStr>>")
+        serde(with = "serde_with::As::<serde_with::DisplayFromStr>")
     )]
-    pub final_output_token: Option<Pubkey>,
+    pub final_output_token: Pubkey,
     /// Trade ts.
     pub ts: i64,
     /// Trade slot.
     pub slot: u64,
-    /// Trade side.
-    pub is_long: bool,
-    /// Collateral side.
-    pub is_collateral_long: bool,
-    /// Trade direction.
-    pub is_increase: bool,
     /// Before state.
     pub before: PositionState,
     /// After state.
     pub after: PositionState,
     /// Transfer out.
     pub transfer_out: TransferOut,
+    padding_1: [u8; 8],
     /// Prices.
-    pub prices: Prices<u128>,
+    pub prices: TradePrices,
     /// Execution price.
     pub execution_price: u128,
     /// Price impact value.
@@ -279,22 +331,191 @@ pub struct TradeEventData {
     /// Price impact diff.
     pub price_impact_diff: u128,
     /// Processed pnl.
-    pub pnl: ProcessedPnl<i128>,
+    pub pnl: TradePnL,
     /// Fees.
-    pub fees: PositionFees<u128>,
+    pub fees: TradeFees,
     /// Output amounts.
     #[cfg_attr(feature = "serde", serde(default))]
-    pub output_amounts: Option<OutputAmounts<u128>>,
+    pub output_amounts: TradeOutputAmounts,
 }
 
 impl TradeEventData {
+    /// Init space.
+    pub const INIT_SPACE: usize = core::mem::size_of::<Self>();
+
+    /// Seed.
+    pub const SEED: &'static [u8] = b"trade_event_data";
+}
+
+/// Prices.
+#[zero_copy]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "debug", derive(Debug))]
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct TradePrices {
+    /// Index token price.
+    pub index: u128,
+    /// Long token price.
+    pub long: u128,
+    /// Short token price.
+    pub short: u128,
+}
+
+impl TradePrices {
+    fn set_with_prices(&mut self, prices: &Prices<u128>) {
+        self.index = prices.index_token_price;
+        self.long = prices.long_token_price;
+        self.short = prices.short_token_price;
+    }
+}
+
+/// Trade PnL.
+#[zero_copy]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "debug", derive(Debug))]
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct TradePnL {
+    /// Final PnL value.
+    pub pnl: i128,
+    /// Uncapped PnL value.
+    pub uncapped_pnl: i128,
+}
+
+/// Trade Fees.
+#[zero_copy]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "debug", derive(Debug))]
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct TradeFees {
+    /// Order fee for receiver amount.
+    pub order_fee_for_receiver_amount: u128,
+    /// Order fee for pool amount.
+    pub order_fee_for_pool_amount: u128,
+    /// Total borrowing fee amount.
+    pub total_borrowing_fee_amount: u128,
+    /// Borrowing fee for receiver amount.
+    pub borrowing_fee_for_receiver_amount: u128,
+    /// Funding fee amount.
+    pub funding_fee_amount: u128,
+    /// Claimable funding fee long token amount.
+    pub claimable_funding_fee_long_token_amount: u128,
+    /// Claimable funding fee short token amount.
+    pub claimable_funding_fee_short_token_amount: u128,
+}
+
+impl TradeFees {
+    fn set_with_position_fees(&mut self, fees: &PositionFees<u128>) {
+        self.order_fee_for_receiver_amount = *fees.order_fee().fee_receiver_amount();
+        self.order_fee_for_pool_amount = *fees.order_fee().fee_amount_for_pool();
+        self.total_borrowing_fee_amount = *fees.borrowing().amount();
+        self.borrowing_fee_for_receiver_amount = *fees.borrowing().amount_for_receiver();
+        self.funding_fee_amount = *fees.funding_fees().amount();
+        self.claimable_funding_fee_long_token_amount =
+            *fees.funding_fees().claimable_long_token_amount();
+        self.claimable_funding_fee_short_token_amount =
+            *fees.funding_fees().claimable_short_token_amount();
+    }
+}
+
+/// Output amounts.
+#[zero_copy]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "debug", derive(Debug))]
+#[derive(BorshSerialize, BorshDeserialize, Default)]
+pub struct TradeOutputAmounts {
+    /// Output amount.
+    pub output_amount: u128,
+    /// Secondary output amount.
+    pub secondary_output_amount: u128,
+}
+
+type TradeFlagMap = Bitmap<8>;
+
+#[allow(clippy::enum_variant_names)]
+#[repr(u8)]
+enum TradeFlag {
+    /// Is long.
+    IsLong,
+    /// Is collateral long.
+    IsCollateralLong,
+    /// Is increase.
+    IsIncrease,
+}
+
+impl TradeEventData {
+    pub(crate) fn init(
+        &mut self,
+        is_increase: bool,
+        is_collateral_long: bool,
+        pubkey: Pubkey,
+        position: &Position,
+        order: Pubkey,
+    ) -> Result<&mut Self> {
+        let clock = Clock::get()?;
+        self.set_flags(position.try_is_long()?, is_collateral_long, is_increase);
+        self.trade_id = 0;
+        require_eq!(self.store, position.store, CoreError::PermissionDenied);
+        self.market_token = position.market_token;
+        self.user = position.owner;
+        self.position = pubkey;
+        self.order = order;
+        self.final_output_token = Pubkey::default();
+        self.ts = clock.unix_timestamp;
+        self.slot = clock.slot;
+        self.before = position.state;
+        self.after = position.state;
+        self.transfer_out = TransferOut::zeroed();
+        self.prices = TradePrices::zeroed();
+        self.execution_price = 0;
+        self.price_impact_value = 0;
+        self.price_impact_diff = 0;
+        self.pnl = TradePnL::zeroed();
+        self.fees = TradeFees::zeroed();
+        self.output_amounts = TradeOutputAmounts::zeroed();
+        Ok(self)
+    }
+
+    fn set_flags(
+        &mut self,
+        is_long: bool,
+        is_collateral_long: bool,
+        is_increase: bool,
+    ) -> &mut Self {
+        let mut flags = TradeFlagMap::new();
+        flags.set(TradeFlag::IsLong as usize, is_long);
+        flags.set(TradeFlag::IsCollateralLong as usize, is_collateral_long);
+        flags.set(TradeFlag::IsIncrease as usize, is_increase);
+        self.flags = flags.into_value();
+        self
+    }
+
+    fn get_flag(&self, flag: TradeFlag) -> bool {
+        let map = TradeFlagMap::from_value(self.flags);
+        map.get(flag as usize)
+    }
+
+    /// Return whether the position side is long.
+    pub fn is_long(&self) -> bool {
+        self.get_flag(TradeFlag::IsLong)
+    }
+
+    /// Return whether the collateral side is long.
+    pub fn is_collateral_long(&self) -> bool {
+        self.get_flag(TradeFlag::IsCollateralLong)
+    }
+
+    /// Return whether the trade is caused by an increase order.
+    pub fn is_increase(&self) -> bool {
+        self.get_flag(TradeFlag::IsIncrease)
+    }
+
     fn validate(&self) -> Result<()> {
         require_gt!(
             self.trade_id,
             self.before.trade_id,
             StoreError::InvalidTradeID
         );
-        if self.is_increase {
+        if self.is_increase() {
             require_gte!(
                 self.after.size_in_usd,
                 self.before.size_in_usd,
@@ -339,57 +560,6 @@ impl TradeEventData {
         );
         Ok(())
     }
-}
-
-impl Deref for TradeEvent {
-    type Target = TradeEventData;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for TradeEvent {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-impl TradeEvent {
-    /// Create a new unchanged trade event.
-    pub(crate) fn new_unchanged(
-        is_increase: bool,
-        is_collateral_long: bool,
-        pubkey: Pubkey,
-        position: &Position,
-        order: Pubkey,
-    ) -> Result<Self> {
-        let clock = Clock::get()?;
-        Ok(Self(Box::new(TradeEventData {
-            trade_id: 0,
-            store: position.store,
-            market_token: position.market_token,
-            user: position.owner,
-            position: pubkey,
-            order,
-            final_output_token: None,
-            ts: clock.unix_timestamp,
-            slot: clock.slot,
-            is_long: position.try_is_long()?,
-            is_collateral_long,
-            is_increase,
-            before: position.state,
-            after: position.state,
-            transfer_out: Default::default(),
-            prices: Default::default(),
-            execution_price: 0,
-            price_impact_value: 0,
-            price_impact_diff: 0,
-            pnl: Default::default(),
-            fees: Default::default(),
-            output_amounts: None,
-        })))
-    }
 
     /// Update with new position state.
     pub(crate) fn update_with_state(&mut self, new_state: &PositionState) -> Result<()> {
@@ -402,13 +572,13 @@ impl TradeEvent {
     /// Update with transfer out.
     #[inline(never)]
     pub(crate) fn update_with_transfer_out(&mut self, transfer_out: &TransferOut) -> Result<()> {
-        self.transfer_out = transfer_out.clone();
-        self.transfer_out.executed = true;
+        self.transfer_out = *transfer_out;
+        self.transfer_out.set_executed(true);
         Ok(())
     }
 
     pub(crate) fn set_final_output_token(&mut self, token: &Pubkey) {
-        self.final_output_token = Some(*token);
+        self.final_output_token = *token;
     }
 
     /// Update with increase report.
@@ -417,10 +587,10 @@ impl TradeEvent {
         &mut self,
         report: &IncreasePositionReport<u128>,
     ) -> Result<()> {
-        self.prices = *report.params().prices();
+        self.prices.set_with_prices(report.params().prices());
         self.execution_price = *report.execution().execution_price();
         self.price_impact_value = *report.execution().price_impact_value();
-        self.fees = *report.fees();
+        self.fees.set_with_position_fees(report.fees());
         Ok(())
     }
 
@@ -429,19 +599,30 @@ impl TradeEvent {
         &mut self,
         report: &DecreasePositionReport<u128>,
     ) -> Result<()> {
-        self.prices = *report.params().prices();
+        self.prices.set_with_prices(report.params().prices());
         self.execution_price = *report.execution_price();
         self.price_impact_value = *report.price_impact_value();
         self.price_impact_diff = *report.price_impact_diff();
-        self.pnl = *report.pnl();
-        self.fees = *report.fees();
-        self.output_amounts = Some(*report.output_amounts());
+        self.pnl.pnl = *report.pnl().pnl();
+        self.pnl.uncapped_pnl = *report.pnl().uncapped_pnl();
+        self.fees.set_with_position_fees(report.fees());
+        self.output_amounts.output_amount = *report.output_amounts().output_amount();
+        self.output_amounts.secondary_output_amount =
+            *report.output_amounts().secondary_output_amount();
         Ok(())
     }
 }
 
+impl<'a> Deref for TradeEvent<'a> {
+    type Target = TradeEventData;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 #[cfg(feature = "utils")]
-impl TradeEvent {
+impl<'a> TradeEvent<'a> {
     /// Updated at.
     pub fn updated_at(&self) -> i64 {
         self.after.increased_at.max(self.after.decreased_at)
@@ -506,13 +687,13 @@ impl TradeEvent {
 
         let mut position = Position::default();
 
-        let kind = if self.is_long {
+        let kind = if self.is_long() {
             PositionKind::Long
         } else {
             PositionKind::Short
         };
 
-        let collateral_token = if self.is_collateral_long {
+        let collateral_token = if self.is_collateral_long() {
             meta.market_meta().long_token_mint
         } else {
             meta.market_meta().short_token_mint

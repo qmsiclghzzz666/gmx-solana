@@ -326,6 +326,16 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         .0
     }
 
+    /// Find trade event buffer address.
+    pub fn find_trade_event_buffer_address(
+        &self,
+        store: &Pubkey,
+        authority: &Pubkey,
+        index: u8,
+    ) -> Pubkey {
+        crate::pda::find_trade_event_buffer_pda(store, authority, index, &self.store_program_id()).0
+    }
+
     /// Get slot.
     pub async fn get_slot(&self, commitment: Option<CommitmentConfig>) -> crate::Result<u64> {
         let slot = self

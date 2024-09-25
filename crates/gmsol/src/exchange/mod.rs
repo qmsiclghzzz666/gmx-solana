@@ -7,8 +7,8 @@ pub mod withdrawal;
 /// Order.
 pub mod order;
 
-/// Liquidation.
-pub mod liquidation;
+// /// Liquidation.
+// pub mod liquidation;
 
 /// Auto-deleveraging.
 pub mod auto_deleveraging;
