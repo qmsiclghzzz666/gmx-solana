@@ -944,18 +944,23 @@ impl OrderParamsV2 {
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn init_increase(
         &mut self,
         is_long: bool,
         kind: OrderKind,
+        position: Pubkey,
         collateral_token: Pubkey,
         initial_collateral_delta_amount: u64,
+        size_delta_value: u128,
         trigger_price: Option<u128>,
         acceptable_price: Option<u128>,
     ) -> Result<()> {
         self.kind = kind.into();
         self.collateral_token = collateral_token;
         self.initial_collateral_delta_amount = initial_collateral_delta_amount;
+        self.size_delta_value = size_delta_value;
+        self.position = position;
         match acceptable_price {
             Some(price) => {
                 self.acceptable_price = price;
@@ -985,18 +990,25 @@ impl OrderParamsV2 {
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn init_decrease(
         &mut self,
         is_long: bool,
         kind: OrderKind,
+        position: Pubkey,
         collateral_token: Pubkey,
         initial_collateral_delta_amount: u64,
+        size_delta_value: u128,
         trigger_price: Option<u128>,
         acceptable_price: Option<u128>,
+        min_output: Option<u128>,
     ) -> Result<()> {
         self.kind = kind.into();
+        self.position = position;
         self.collateral_token = collateral_token;
         self.initial_collateral_delta_amount = initial_collateral_delta_amount;
+        self.size_delta_value = size_delta_value;
+        self.min_output = min_output.unwrap_or(0);
         match acceptable_price {
             Some(price) => {
                 self.acceptable_price = price;
@@ -1031,6 +1043,18 @@ impl OrderParamsV2 {
         Ok(self.kind.try_into()?)
     }
 
+    /// Return whether the order is updatable.
+    pub fn is_updatable(&self) -> Result<bool> {
+        let kind = self.kind()?;
+        Ok(matches!(
+            kind,
+            OrderKind::LimitSwap
+                | OrderKind::LimitIncrease
+                | OrderKind::LimitDecrease
+                | OrderKind::StopLossDecrease
+        ))
+    }
+
     /// Get order side.
     pub fn side(&self) -> Result<OrderSide> {
         let side = self.side.try_into()?;
@@ -1044,6 +1068,31 @@ impl OrderParamsV2 {
         } else {
             None
         }
+    }
+
+    /// Get initial collateral delta amount.
+    pub fn amount(&self) -> u64 {
+        self.initial_collateral_delta_amount
+    }
+
+    /// Get size delta in value.
+    pub fn size(&self) -> u128 {
+        self.size_delta_value
+    }
+
+    /// Get accetable price (unit price).
+    pub fn acceptable_price(&self) -> u128 {
+        self.acceptable_price
+    }
+
+    /// Get trigger price (unit price).
+    pub fn trigger_price(&self) -> u128 {
+        self.trigger_price
+    }
+
+    /// Get min output.
+    pub fn min_output(&self) -> u128 {
+        self.min_output
     }
 }
 

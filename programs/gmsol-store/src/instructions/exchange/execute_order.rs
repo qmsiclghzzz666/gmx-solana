@@ -1079,12 +1079,12 @@ pub(crate) fn unchecked_execute_order<'info>(
         accounts.transfer_tokens_out(remaining_accounts)?;
     }
 
-    // It must be placed at the end to be executed correctly.
-    accounts.pay_execution_fee(execution_fee)?;
-
     if let Some(event) = event {
         emit_cpi!(event);
     }
+
+    // It must be placed at the end to be executed correctly.
+    ctx.accounts.pay_execution_fee(execution_fee)?;
 
     Ok(())
 }

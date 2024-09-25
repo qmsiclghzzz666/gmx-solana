@@ -1,7 +1,7 @@
 use std::{collections::HashSet, ops::Deref};
 
 use anchor_client::{
-    anchor_lang::{system_program, AnchorSerialize, Id},
+    anchor_lang::{system_program, Id},
     solana_sdk::{instruction::AccountMeta, pubkey::Pubkey, signer::Signer},
 };
 use anchor_spl::associated_token::get_associated_token_address;
@@ -309,9 +309,6 @@ where
             trigger_price: self.params.trigger_price,
             acceptable_price: self.params.acceptable_price,
         };
-
-        println!("{params:?}");
-        println!("{:?}", params.try_to_vec()?);
 
         let prepare = match kind {
             OrderKind::MarketSwap | OrderKind::LimitSwap => {
@@ -917,6 +914,7 @@ where
             let close = self
                 .client
                 .close_order(&self.order)?
+                .reason("executed")
                 .hint(CloseOrderHint {
                     owner: hint.user,
                     store: self.store,

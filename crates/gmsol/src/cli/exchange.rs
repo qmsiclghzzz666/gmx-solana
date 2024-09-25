@@ -696,25 +696,28 @@ impl ExchangeArgs {
                     .await?;
                 let min_output_amount = price_to_min_output_amount(
                     &token_map,
-                    &order.fixed.tokens.initial_collateral_token,
-                    order.params().initial_collateral_delta_amount,
-                    &order.fixed.tokens.output_token,
+                    &order
+                        .tokens()
+                        .initial_collateral()
+                        .token()
+                        .ok_or_eyre("missing swap in token")?,
+                    order.params().amount(),
+                    &order
+                        .tokens()
+                        .final_output_token()
+                        .token()
+                        .ok_or_eyre("missing swap out token")?,
                     *price,
                 )
                 .ok_or_eyre("invalid price")?;
                 let params = UpdateOrderParams {
-                    size_delta_usd: order.params().size_delta_usd,
-                    acceptable_price: order.params().acceptable_price,
-                    trigger_price: order.params().trigger_price,
+                    size_delta_usd: order.params().size(),
+                    acceptable_price: Some(order.params().acceptable_price()),
+                    trigger_price: Some(order.params().trigger_price()),
                     min_output_amount: min_output_amount.into(),
                 };
 
-                let builder = client.update_order(
-                    store,
-                    &order.fixed.tokens.market_token,
-                    address,
-                    params,
-                )?;
+                let builder = client.update_order(store, order.market_token(), address, params)?;
 
                 let signature = builder.build().send().await?;
                 tracing::info!("updated a limit swap order {address} at tx {signature}");
@@ -728,32 +731,30 @@ impl ExchangeArgs {
             } => {
                 let order = client.order(address).await?;
                 let params = order.params();
-                if params.is_updatable() {
-                    if params.kind.is_swap() {
+                if params.is_updatable()? {
+                    if params.kind()?.is_swap() {
                         return Err(gmsol::Error::invalid_argument(
                             "cannot update swap order with this command, use `update-swap` instead",
                         ));
                     }
                     let params = UpdateOrderParams {
-                        size_delta_usd: size.unwrap_or(params.size_delta_usd),
-                        acceptable_price: acceptable_price.or(params.acceptable_price),
-                        trigger_price: price.or(params.trigger_price),
-                        min_output_amount: min_output_amount.unwrap_or(params.min_output_amount),
+                        size_delta_usd: size.unwrap_or(params.size()),
+                        acceptable_price: Some(
+                            acceptable_price.unwrap_or(params.acceptable_price()),
+                        ),
+                        trigger_price: Some(price.unwrap_or(params.trigger_price())),
+                        min_output_amount: min_output_amount.unwrap_or(params.min_output()),
                     };
 
-                    let builder = client.update_order(
-                        store,
-                        &order.fixed.tokens.market_token,
-                        address,
-                        params,
-                    )?;
+                    let builder =
+                        client.update_order(store, order.market_token(), address, params)?;
 
                     let signature = builder.build().send().await?;
                     tracing::info!("updated an order {address} at tx {signature}");
                 } else {
                     return Err(gmsol::Error::invalid_argument(format!(
                         "{:?} is not updatable",
-                        params.kind
+                        params.kind()?
                     )));
                 }
             }

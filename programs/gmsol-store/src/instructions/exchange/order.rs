@@ -498,6 +498,12 @@ pub(crate) fn create_order<'info>(
                 .as_ref()
                 .ok_or(error!(CoreError::TokenAccountNotProvided))?;
             ops.increase()
+                .position(
+                    accounts
+                        .position
+                        .as_ref()
+                        .ok_or(error!(CoreError::PositionIsRequired))?,
+                )
                 .initial_collateral_token(initial_collateral.as_ref())
                 .long_token(long_token.as_ref())
                 .short_token(short_token.as_ref())
@@ -518,6 +524,12 @@ pub(crate) fn create_order<'info>(
                 .as_ref()
                 .ok_or(error!(CoreError::TokenAccountNotProvided))?;
             ops.decrease()
+                .position(
+                    accounts
+                        .position
+                        .as_ref()
+                        .ok_or(error!(CoreError::PositionIsRequired))?,
+                )
                 .final_output_token(final_output.as_ref())
                 .long_token(long_token.as_ref())
                 .short_token(short_token.as_ref())

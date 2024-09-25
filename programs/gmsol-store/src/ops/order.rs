@@ -100,13 +100,15 @@ impl<'a, 'info> CreateOrderOps<'a, 'info> {
 
     pub(crate) fn increase(
         self,
-    ) -> CreateIncreaseOrderOpBuilder<'a, 'info, ((CreateOrderOps<'a, 'info>,), (), (), ())> {
+    ) -> CreateIncreaseOrderOpBuilder<'a, 'info, ((CreateOrderOps<'a, 'info>,), (), (), (), ())>
+    {
         CreateIncreaseOrderOp::builder().common(self)
     }
 
     pub(crate) fn decrease(
         self,
-    ) -> CreateDecreaseOrderOpBuilder<'a, 'info, ((CreateOrderOps<'a, 'info>,), (), (), ())> {
+    ) -> CreateDecreaseOrderOpBuilder<'a, 'info, ((CreateOrderOps<'a, 'info>,), (), (), (), ())>
+    {
         CreateDecreaseOrderOp::builder().common(self)
     }
 
@@ -241,6 +243,7 @@ impl<'a, 'info> CreateSwapOrderOp<'a, 'info> {
 #[derive(TypedBuilder)]
 pub(crate) struct CreateIncreaseOrderOp<'a, 'info> {
     common: CreateOrderOps<'a, 'info>,
+    position: &'a AccountLoader<'info, Position>,
     initial_collateral_token: &'a Account<'info, TokenAccount>,
     long_token: &'a Account<'info, TokenAccount>,
     short_token: &'a Account<'info, TokenAccount>,
@@ -266,8 +269,10 @@ impl<'a, 'info> CreateIncreaseOrderOp<'a, 'info> {
             params.init_increase(
                 create.is_long,
                 create.kind,
+                self.position.key(),
                 collateral_token,
                 create.initial_collateral_delta_amount,
+                create.size_delta_value,
                 create.trigger_price,
                 create.acceptable_price,
             )?;
@@ -313,6 +318,7 @@ impl<'a, 'info> CreateIncreaseOrderOp<'a, 'info> {
 #[derive(TypedBuilder)]
 pub(crate) struct CreateDecreaseOrderOp<'a, 'info> {
     common: CreateOrderOps<'a, 'info>,
+    position: &'a AccountLoader<'info, Position>,
     final_output_token: &'a Account<'info, TokenAccount>,
     long_token: &'a Account<'info, TokenAccount>,
     short_token: &'a Account<'info, TokenAccount>,
@@ -336,10 +342,13 @@ impl<'a, 'info> CreateDecreaseOrderOp<'a, 'info> {
             params.init_decrease(
                 create.is_long,
                 create.kind,
+                self.position.key(),
                 collateral_token,
                 create.initial_collateral_delta_amount,
+                create.size_delta_value,
                 create.trigger_price,
                 create.acceptable_price,
+                create.min_output,
             )?;
             Ok((collateral_token, self.final_output_token.mint))
         })?;
@@ -843,7 +852,6 @@ impl<'a, 'info> ExecuteOrderOps<'a, 'info> {
 
         let balance = position.to_account_info().lamports();
         let refund = balance.saturating_sub(self.refund);
-        position.close(self.executor.clone())?;
 
         if refund != 0 {
             system_program::transfer(
@@ -857,6 +865,8 @@ impl<'a, 'info> ExecuteOrderOps<'a, 'info> {
                 refund,
             )?;
         }
+
+        position.close(self.executor.clone())?;
 
         Ok(())
     }
@@ -1459,6 +1469,7 @@ impl<'a, 'info> PositionCutOp<'a, 'info> {
             .swap_path(&[])
             .build()
             .decrease()
+            .position(self.position)
             .final_output_token(output_token_account)
             .long_token(self.long_token_account)
             .short_token(self.short_token_account)

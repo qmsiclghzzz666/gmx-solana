@@ -31,12 +31,12 @@ pub mod position;
 pub use deposit::{Deposit, DepositV2};
 pub use market::*;
 pub use oracle::*;
-pub use order::{Order, UpdateOrderParams};
+pub use order::{Order, OrderParamsV2, OrderV2, UpdateOrderParams};
 pub use position::Position;
 pub use roles::*;
 pub use store::*;
 pub use token_config::*;
-pub use withdrawal::Withdrawal;
+pub use withdrawal::{Withdrawal, WithdrawalV2};
 
 pub type Amount = u64;
 pub type Factor = u128;

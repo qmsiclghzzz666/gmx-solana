@@ -584,8 +584,12 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
     }
 
     /// Fetch [`Order`](types::Order) account with its address.
-    pub async fn order(&self, address: &Pubkey) -> crate::Result<types::Order> {
-        Ok(self.data_store().account(*address).await?)
+    pub async fn order(&self, address: &Pubkey) -> crate::Result<types::OrderV2> {
+        Ok(self
+            .data_store()
+            .account::<ZeroCopy<types::OrderV2>>(*address)
+            .await?
+            .0)
     }
 
     /// Fetch [`Order`](types::Order) account at the the given address with config.
@@ -595,8 +599,11 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         &self,
         address: &Pubkey,
         config: RpcAccountInfoConfig,
-    ) -> crate::Result<WithContext<Option<types::Order>>> {
-        self.account_with_config(address, config).await
+    ) -> crate::Result<WithContext<Option<types::OrderV2>>> {
+        Ok(self
+            .account_with_config::<ZeroCopy<types::OrderV2>>(address, config)
+            .await?
+            .map(|a| a.map(|a| a.0)))
     }
 
     /// Fetch all [`Order`](types::Order) accounts of the given owner of the given store.
