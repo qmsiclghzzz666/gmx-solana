@@ -957,6 +957,12 @@ impl OrderParamsV2 {
         acceptable_price: Option<u128>,
     ) -> Result<()> {
         self.kind = kind.into();
+        self.side = if is_long {
+            OrderSide::Long
+        } else {
+            OrderSide::Short
+        }
+        .into();
         self.collateral_token = collateral_token;
         self.initial_collateral_delta_amount = initial_collateral_delta_amount;
         self.size_delta_value = size_delta_value;
@@ -1004,6 +1010,12 @@ impl OrderParamsV2 {
         min_output: Option<u128>,
     ) -> Result<()> {
         self.kind = kind.into();
+        self.side = if is_long {
+            OrderSide::Long
+        } else {
+            OrderSide::Short
+        }
+        .into();
         self.position = position;
         self.collateral_token = collateral_token;
         self.initial_collateral_delta_amount = initial_collateral_delta_amount;

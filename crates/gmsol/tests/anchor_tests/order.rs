@@ -21,16 +21,21 @@ async fn balanced_market_order() -> eyre::Result<()> {
     let long_token_amount = 1_000_005;
     let short_token_amount = 6_000_000_000_003;
     let long_collateral_amount = 100_000;
+    let short_collateral_amount = 100 * 100_000_000;
 
     deployment
         .mint_or_transfer_to_user(
             "fBTC",
             Deployment::DEFAULT_USER,
-            long_token_amount + long_collateral_amount,
+            long_token_amount + long_collateral_amount * 4,
         )
         .await?;
     deployment
-        .mint_or_transfer_to_user("USDG", Deployment::DEFAULT_USER, short_token_amount)
+        .mint_or_transfer_to_user(
+            "USDG",
+            Deployment::DEFAULT_USER,
+            short_token_amount + short_collateral_amount * 4,
+        )
         .await?;
 
     // Deposit.
@@ -55,45 +60,68 @@ async fn balanced_market_order() -> eyre::Result<()> {
 
     // Increase position.
     let size = 10_000_000_000_000_000_000_000;
-    let (rpc, order) = client
-        .market_increase(
-            store,
-            market_token,
-            true,
-            long_collateral_amount,
-            true,
-            size,
-        )
-        .build_with_address()
-        .await?;
-    let signature = rpc.send().await?;
-    tracing::info!(%order, %signature, %size, "created an increase position order");
 
-    let mut builder = keeper.execute_order(store, oracle, &order, false)?;
-    deployment
-        .execute_with_pyth(&mut builder, None, true)
-        .await?;
+    for side in [true, false] {
+        for collateral_side in [true, false] {
+            let collateral_amount = if collateral_side {
+                long_collateral_amount
+            } else {
+                short_collateral_amount
+            };
+            let (rpc, order) = client
+                .market_increase(
+                    store,
+                    market_token,
+                    collateral_side,
+                    collateral_amount,
+                    side,
+                    size,
+                )
+                .build_with_address()
+                .await?;
+            let signature = rpc.send().await?;
+            tracing::info!(%order, %signature, %size, "created an increase position order");
 
-    // Decrease position.
-    let size = 10_000_000_000_000_000_000_000;
-    let (rpc, order) = client
-        .market_decrease(
-            store,
-            market_token,
-            true,
-            long_collateral_amount,
-            true,
-            size,
-        )
-        .build_with_address()
-        .await?;
-    let signature = rpc.send().await?;
-    tracing::info!(%order, %signature, %size, "created a decrease position order");
+            let mut builder = keeper.execute_order(store, oracle, &order, false)?;
+            deployment
+                .execute_with_pyth(&mut builder, None, true)
+                .await?;
 
-    let mut builder = keeper.execute_order(store, oracle, &order, false)?;
-    deployment
-        .execute_with_pyth(&mut builder, None, true)
-        .await?;
+            // Decrease position.
+            let (rpc, order) = client
+                .market_decrease(store, market_token, collateral_side, 0, side, size)
+                .build_with_address()
+                .await?;
+            let signature = rpc.send().await?;
+            tracing::info!(%order, %signature, %size, "created a decrease position order");
+
+            let mut builder = keeper.execute_order(store, oracle, &order, false)?;
+            deployment
+                .execute_with_pyth(&mut builder, None, true)
+                .await?;
+        }
+    }
+
+    // Increase position with swap path.
+    // let size = 10_000_000_000_000_000_000_000;
+    // let (rpc, order) = client
+    //     .market_increase(
+    //         store,
+    //         market_token,
+    //         true,
+    //         long_collateral_amount,
+    //         true,
+    //         size,
+    //     )
+    //     .build_with_address()
+    //     .await?;
+    // let signature = rpc.send().await?;
+    // tracing::info!(%order, %signature, %size, "created an increase position order");
+
+    // let mut builder = keeper.execute_order(store, oracle, &order, false)?;
+    // deployment
+    //     .execute_with_pyth(&mut builder, None, true)
+    //     .await?;
 
     Ok(())
 }
