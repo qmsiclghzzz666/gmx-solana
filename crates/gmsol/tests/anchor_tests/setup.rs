@@ -192,6 +192,7 @@ impl Deployment {
             ["SOL", "WSOL", "WSOL"],
             ["fBTC", "fBTC", "USDG"],
             ["fBTC", "WSOL", "USDG"],
+            ["SOL", "fBTC", "fBTC"],
         ])
         .await?;
 
