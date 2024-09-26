@@ -194,11 +194,7 @@ pub(crate) fn unchecked_process_position_cut<'info>(
         .into_iter()
         .collect::<Vec<_>>();
 
-    let rent = Rent::get()?;
-    let refund = rent.minimum_balance(accounts.order.to_account_info().data_len())
-        + rent.minimum_balance(accounts.long_token_escrow.to_account_info().data_len())
-        + rent.minimum_balance(accounts.short_token_escrow.to_account_info().data_len())
-        + OrderV2::MIN_EXECUTION_LAMPORTS;
+    let refund = OrderV2::position_cut_rent()?;
 
     let ops = PositionCutOp::builder()
         .kind(kind)

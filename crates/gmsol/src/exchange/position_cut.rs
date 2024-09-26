@@ -308,7 +308,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> PositionCutBuilder<'a, C> {
                 exec_builder = exec_builder.args(instruction::Liquidate {
                     nonce,
                     recent_timestamp: self.recent_timestamp,
-                    execution_fee: self.execution_fee,
+                    // execution_fee: self.execution_fee,
                 });
             }
             PositionCutKind::AutoDeleverage(size_delta_in_usd) => {

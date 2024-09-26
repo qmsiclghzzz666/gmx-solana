@@ -865,6 +865,13 @@ impl<'a, 'info> ExecuteOrderOps<'a, 'info> {
         };
 
         let balance = position.to_account_info().lamports();
+        if balance < self.refund {
+            msg!(
+                "Warn: not enough balance to pay the executor, balance = {}, refund = {}",
+                balance,
+                self.refund,
+            );
+        }
         let refund = balance.saturating_sub(self.refund);
 
         if refund != 0 {

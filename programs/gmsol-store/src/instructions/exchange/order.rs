@@ -245,7 +245,6 @@ pub(crate) fn prepare_position(
     params: &CreateOrderArgs,
 ) -> Result<()> {
     let store = ctx.accounts.store.key();
-    let owner = ctx.accounts.owner.key();
     let meta = *ctx.accounts.market.load()?.meta();
     let market_token = meta.market_token_mint;
     let collateral_token = params.collateral_token(&meta);
@@ -253,26 +252,39 @@ pub(crate) fn prepare_position(
         &ctx.accounts.position,
         ctx.bumps.position,
         params.to_position_kind()?,
-        &owner,
+        &ctx.accounts.owner,
         collateral_token,
         &market_token,
         &store,
+        ctx.accounts.system_program.to_account_info(),
     )?;
     Ok(())
 }
 
-fn validate_and_initialize_position_if_needed(
-    position: &AccountLoader<'_, Position>,
+fn validate_and_initialize_position_if_needed<'info>(
+    position: &AccountLoader<'info, Position>,
     bump: u8,
     kind: PositionKind,
-    owner: &Pubkey,
+    owner: &AccountInfo<'info>,
     collateral_token: &Pubkey,
     market_token: &Pubkey,
     store: &Pubkey,
+    system_program: AccountInfo<'info>,
 ) -> Result<()> {
+    let mut should_transfer_in = false;
+
+    let owner_key = owner.key;
     match position.load_init() {
         Ok(mut position) => {
-            position.try_init(kind, bump, *store, owner, market_token, collateral_token)?;
+            position.try_init(
+                kind,
+                bump,
+                *store,
+                owner_key,
+                market_token,
+                collateral_token,
+            )?;
+            should_transfer_in = true;
         }
         Err(Error::AnchorError(err)) => {
             if err.error_code_number != ErrorCode::AccountDiscriminatorAlreadySet as u32 {
@@ -288,11 +300,21 @@ fn validate_and_initialize_position_if_needed(
         &*position.load()?,
         bump,
         kind,
-        owner,
+        owner_key,
         collateral_token,
         market_token,
         store,
     )?;
+
+    if should_transfer_in {
+        TransferExecutionFeeOps::builder()
+            .payment(position.to_account_info())
+            .payer(owner.clone())
+            .execution_lamports(OrderV2::position_cut_rent()?)
+            .system_program(system_program)
+            .build()
+            .execute()?;
+    }
     Ok(())
 }
 

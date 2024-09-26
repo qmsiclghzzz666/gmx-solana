@@ -680,6 +680,18 @@ impl OrderV2 {
     /// Min execution lamports.
     pub const MIN_EXECUTION_LAMPORTS: u64 = 200_000;
 
+    /// Get rent for position cut.
+    pub fn position_cut_rent() -> Result<u64> {
+        use anchor_spl::token::TokenAccount;
+
+        let rent = Rent::get()?;
+        let amount = rent.minimum_balance(Self::INIT_SPACE + 8)
+            + rent.minimum_balance(TokenAccount::LEN) * 2
+            + Self::MIN_EXECUTION_LAMPORTS;
+
+        Ok(amount)
+    }
+
     /// Get signer.
     pub fn signer(&self) -> ActionSigner {
         self.header.signer(Self::SEED)
