@@ -10,7 +10,10 @@ use crate::{
     check_delegation, constants,
     events::{TradeEvent, TradeEventData},
     get_pnl_token,
-    ops::order::{PositionCutKind, PositionCutOp},
+    ops::{
+        execution_fee::PayExecutionFeeOps,
+        order::{PositionCutKind, PositionCutOp},
+    },
     states::{
         order::OrderV2, Market, NonceBytes, Oracle, Position, PriceProvider, Seed, Store,
         TokenMapHeader,
@@ -122,12 +125,12 @@ pub struct PositionCut<'info> {
         mut,
         token::mint = market.load()?.meta().long_token_mint,
         token::authority = store,
-        constraint = check_delegation(&claimable_long_token_account_for_user, order.load()?.header.owner)?,
+        constraint = check_delegation(&claimable_long_token_account_for_user, position.load()?.owner)?,
         seeds = [
             constants::CLAIMABLE_ACCOUNT_SEED,
             store.key().as_ref(),
             market.load()?.meta().long_token_mint.as_ref(),
-            order.load()?.header.owner.as_ref(),
+            position.load()?.owner.as_ref(),
             &store.load()?.claimable_time_key(validated_recent_timestamp(store.load()?.deref(), recent_timestamp)?)?,
         ],
         bump,
@@ -137,12 +140,12 @@ pub struct PositionCut<'info> {
         mut,
         token::mint = market.load()?.meta().short_token_mint,
         token::authority = store,
-        constraint = check_delegation(&claimable_short_token_account_for_user, order.load()?.header.owner)?,
+        constraint = check_delegation(&claimable_short_token_account_for_user, position.load()?.owner)?,
         seeds = [
             constants::CLAIMABLE_ACCOUNT_SEED,
             store.key().as_ref(),
             market.load()?.meta().short_token_mint.as_ref(),
-            order.load()?.header.owner.as_ref(),
+            position.load()?.owner.as_ref(),
             &store.load()?.claimable_time_key(validated_recent_timestamp(store.load()?.deref(), recent_timestamp)?)?,
         ],
         bump,
@@ -178,6 +181,7 @@ pub(crate) fn unchecked_process_position_cut<'info>(
     nonce: &NonceBytes,
     _recent_timestamp: i64,
     kind: PositionCutKind,
+    execution_fee: u64,
 ) -> Result<()> {
     let accounts = &mut ctx.accounts;
     let remaining_accounts = ctx.remaining_accounts;
@@ -193,7 +197,8 @@ pub(crate) fn unchecked_process_position_cut<'info>(
     let rent = Rent::get()?;
     let refund = rent.minimum_balance(accounts.order.to_account_info().data_len())
         + rent.minimum_balance(accounts.long_token_escrow.to_account_info().data_len())
-        + rent.minimum_balance(accounts.short_token_escrow.to_account_info().data_len());
+        + rent.minimum_balance(accounts.short_token_escrow.to_account_info().data_len())
+        + OrderV2::MIN_EXECUTION_LAMPORTS;
 
     let ops = PositionCutOp::builder()
         .kind(kind)
@@ -244,6 +249,8 @@ pub(crate) fn unchecked_process_position_cut<'info>(
         let event = TradeEvent::from(&*event);
         event.emit(&accounts.event_authority, ctx.bumps.event_authority)?;
     }
+
+    accounts.pay_execution_fee(execution_fee)?;
     Ok(())
 }
 
@@ -254,5 +261,19 @@ impl<'info> internal::Authentication<'info> for PositionCut<'info> {
 
     fn store(&self) -> &AccountLoader<'info, Store> {
         &self.store
+    }
+}
+
+impl<'info> PositionCut<'info> {
+    #[inline(never)]
+    fn pay_execution_fee(&self, execution_fee: u64) -> Result<()> {
+        let execution_lamports = execution_fee.min(self.order.load()?.max_execution_lamports);
+        PayExecutionFeeOps::builder()
+            .payer(self.order.to_account_info())
+            .receiver(self.authority.to_account_info())
+            .execution_lamports(execution_lamports)
+            .build()
+            .execute()?;
+        Ok(())
     }
 }

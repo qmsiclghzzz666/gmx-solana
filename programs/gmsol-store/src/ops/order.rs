@@ -26,7 +26,7 @@ use crate::{
     CoreError, ModelError, StoreError,
 };
 
-use super::market::MarketTransferOut;
+use super::{execution_fee::TransferExecutionFeeOps, market::MarketTransferOut};
 
 /// Create Order Arguments.
 // #[cfg_attr(feature = "debug", derive(Debug))]
@@ -1456,6 +1456,13 @@ impl<'a, 'info> PositionCutOp<'a, 'info> {
         is_long: bool,
         is_collateral_long: bool,
     ) -> Result<()> {
+        TransferExecutionFeeOps::builder()
+            .payment(self.order.to_account_info())
+            .payer(self.executor.to_account_info())
+            .execution_lamports(OrderV2::MIN_EXECUTION_LAMPORTS)
+            .system_program(self.system_program.to_account_info())
+            .build()
+            .execute()?;
         let params = CreateOrderArgs {
             kind: self.kind.to_order_kind(),
             execution_fee: OrderV2::MIN_EXECUTION_LAMPORTS,
@@ -1490,6 +1497,8 @@ impl<'a, 'info> PositionCutOp<'a, 'info> {
             .short_token(self.short_token_account)
             .build()
             .execute()?;
+        // Make sure the discrimator is written to the account data.
+        self.order.exit(&crate::ID)?;
         Ok(())
     }
 

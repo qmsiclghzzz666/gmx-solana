@@ -8,10 +8,7 @@ use anchor_spl::associated_token::get_associated_token_address;
 use gmsol_store::{
     accounts, instruction,
     ops::order::PositionCutKind,
-    states::{
-        common::TokensWithFeed, order::OrderV2, MarketMeta, NonceBytes, Position, Pyth, Store,
-        TokenMap,
-    },
+    states::{common::TokensWithFeed, MarketMeta, NonceBytes, Position, Pyth, Store, TokenMap},
 };
 
 use crate::{
@@ -137,7 +134,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> PositionCutBuilder<'a, C> {
             oracle: *oracle,
             nonce: None,
             recent_timestamp: recent_timestamp()?,
-            execution_fee: OrderV2::MIN_EXECUTION_LAMPORTS,
+            execution_fee: 0,
             position: *position,
             price_provider: Pyth::id(),
             hint: None,
@@ -243,7 +240,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> PositionCutBuilder<'a, C> {
             self.client
                 .find_trade_event_buffer_address(&store, &payer, self.event_buffer_index);
 
-        let mut prepare = self
+        let prepare = self
             .client
             .data_store_rpc()
             .accounts(accounts::PrepareDecreaseOrderEscrow {
@@ -274,7 +271,6 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> PositionCutBuilder<'a, C> {
             .args(instruction::PrepareTradeEventBuffer {
                 index: self.event_buffer_index,
             });
-        prepare = prepare.merge(prepare_event_buffer);
         let mut exec_builder = self
             .client
             .data_store_rpc()
@@ -312,6 +308,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> PositionCutBuilder<'a, C> {
                 exec_builder = exec_builder.args(instruction::Liquidate {
                     nonce,
                     recent_timestamp: self.recent_timestamp,
+                    execution_fee: self.execution_fee,
                 });
             }
             PositionCutKind::AutoDeleverage(size_delta_in_usd) => {
@@ -319,6 +316,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> PositionCutBuilder<'a, C> {
                     nonce,
                     recent_timestamp: self.recent_timestamp,
                     size_delta_in_usd,
+                    execution_fee: self.execution_fee,
                 })
             }
         }
@@ -366,7 +364,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> PositionCutBuilder<'a, C> {
 
         let mut builder = TransactionBuilder::new(self.client.exchange().async_rpc());
         builder
-            .try_push(pre_builder)?
+            .try_push(pre_builder.merge(prepare_event_buffer))?
             .try_push(prepare.merge(exec_builder))?
             .try_push(post_builder)?;
         Ok(builder)

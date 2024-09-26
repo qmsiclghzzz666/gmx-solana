@@ -16,7 +16,7 @@ cluster = "Localnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]
-test = "cargo test --test anchor --features anchor-test"
+test = "cargo test --test anchor --features anchor-test -- $GMSOL_TEST"
 
 [test]
 startup_wait = 10000

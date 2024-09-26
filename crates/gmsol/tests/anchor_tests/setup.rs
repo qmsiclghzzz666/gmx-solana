@@ -101,6 +101,12 @@ impl Deployment {
     /// Default keeper.
     pub const DEFAULT_KEEPER: &'static str = "keeper_0";
 
+    /// Market selector for liquidation test.
+    pub const SELECT_LIQUIDATION_MARKET: [&'static str; 3] = ["fBTC", "USDG", "fBTC"];
+
+    /// Market selector for ADL test.
+    pub const SELECT_ADL_MARKET: [&'static str; 3] = ["SOL", "USDG", "fBTC"];
+
     const SOL_PYTH_FEED_ID: [u8; 32] = [
         0xef, 0x0d, 0x8b, 0x6f, 0xda, 0x2c, 0xeb, 0xa4, 0x1d, 0xa1, 0x5d, 0x40, 0x95, 0xd1, 0xda,
         0x39, 0x2a, 0x0d, 0x2f, 0x8e, 0xd0, 0xc6, 0xc7, 0xbc, 0x0f, 0x4c, 0xfa, 0xc8, 0xc2, 0x80,
@@ -193,6 +199,10 @@ impl Deployment {
             ["fBTC", "fBTC", "USDG"],
             ["fBTC", "WSOL", "USDG"],
             ["SOL", "fBTC", "fBTC"],
+            // For liquidation test
+            Self::SELECT_LIQUIDATION_MARKET,
+            // For ADL test
+            Self::SELECT_ADL_MARKET,
         ])
         .await?;
 
@@ -889,7 +899,7 @@ impl Deployment {
 
     pub(crate) async fn prepare_market(
         &self,
-        selector: (&str, &str, &str),
+        selector: [&str; 3],
         mut long_token_amount: u64,
         mut short_token_amount: u64,
         skip_preflight: bool,
@@ -897,7 +907,7 @@ impl Deployment {
         long_token_amount += rand::random::<u8>() as u64;
         short_token_amount += rand::random::<u8>() as u64;
 
-        let (index, long_token, short_token) = selector;
+        let [index, long_token, short_token] = selector;
         let market_token = self
             .market_token(index, long_token, short_token)
             .ok_or_eyre("market not found")?;

@@ -256,6 +256,14 @@ where
 
     /// Create [`RpcBuilder`] and return order address.
     pub async fn build_with_address(&mut self) -> crate::Result<(RpcBuilder<'a, C>, Pubkey)> {
+        let (rpc, order, _) = self.build_with_addresses().await?;
+        Ok((rpc, order))
+    }
+
+    /// Create [`RpcBuilder`] and return order address and optional position address.
+    pub async fn build_with_addresses(
+        &mut self,
+    ) -> crate::Result<(RpcBuilder<'a, C>, Pubkey, Option<Pubkey>)> {
         let nonce = self.nonce.unwrap_or_else(generate_nonce);
         let payer = &self.client.payer();
         let order = self.client.find_order_address(&self.store, payer, &nonce);
@@ -560,7 +568,7 @@ where
                     .collect::<Vec<_>>(),
             );
 
-        Ok((prepare.merge(create), order))
+        Ok((prepare.merge(create), order, position))
     }
 }
 
