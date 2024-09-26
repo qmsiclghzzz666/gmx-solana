@@ -1445,6 +1445,8 @@ impl<'a, 'info> PositionCutOp<'a, 'info> {
         };
         self.create_order(size_in_usd, is_long, is_collateral_long)?;
         let (transfer_out, should_send_trade_event) = self.execute_order()?;
+        require!(transfer_out.executed(), CoreError::Internal);
+        self.order.load_mut()?.header.completed()?;
         self.process_transfer_out(&transfer_out, is_long, is_collateral_long)?;
         Ok(should_send_trade_event)
     }

@@ -386,6 +386,17 @@ async fn liquidation() -> eyre::Result<()> {
             .execute_with_pyth(&mut builder, None, true)
             .instrument(tracing::info_span!("liquidate", position=%position))
             .await?;
+
+        let signature = keeper
+            .update_market_config_by_key(
+                store,
+                market_token,
+                MarketConfigKey::MinCollateralFactor,
+                &(MARKET_USD_UNIT / 100),
+            )?
+            .send()
+            .await?;
+        tracing::info!(%signature, %market_token, "restore min collateral factor");
     }
 
     Ok(())
