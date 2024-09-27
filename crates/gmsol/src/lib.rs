@@ -20,6 +20,9 @@ pub mod exchange;
 /// Pyth integration.
 pub mod pyth;
 
+/// Address Lookup Table operations.
+pub mod alt;
+
 /// Utils.
 pub mod utils;
 
