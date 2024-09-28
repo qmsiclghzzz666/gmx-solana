@@ -15,8 +15,8 @@ use crate::{
         order::{PositionCutKind, PositionCutOp},
     },
     states::{
-        order::OrderV2, Market, NonceBytes, Oracle, Position, PriceProvider, Seed, Store,
-        TokenMapHeader,
+        common::action::ActionExt, order::OrderV2, Market, NonceBytes, Oracle, Position,
+        PriceProvider, Seed, Store, TokenMapHeader,
     },
     utils::internal,
     validated_recent_timestamp,
@@ -263,7 +263,7 @@ impl<'info> internal::Authentication<'info> for PositionCut<'info> {
 impl<'info> PositionCut<'info> {
     #[inline(never)]
     fn pay_execution_fee(&self, execution_fee: u64) -> Result<()> {
-        let execution_lamports = execution_fee.min(self.order.load()?.max_execution_lamports);
+        let execution_lamports = self.order.load()?.execution_lamports(execution_fee);
         PayExecutionFeeOps::builder()
             .payer(self.order.to_account_info())
             .receiver(self.authority.to_account_info())

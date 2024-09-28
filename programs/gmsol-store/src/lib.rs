@@ -297,7 +297,7 @@ use self::{
     instructions::*,
     ops::{
         deposit::CreateDepositParams,
-        order::{CreateOrderArgs, PositionCutKind},
+        order::{CreateOrderParams, PositionCutKind},
         withdrawal::CreateWithdrawalParams,
     },
     states::{
@@ -1478,14 +1478,17 @@ pub mod gmsol_store {
         instructions::prepare_decrease_order_escrow(ctx, nonce)
     }
 
-    pub fn prepare_position(ctx: Context<PreparePosition>, params: CreateOrderArgs) -> Result<()> {
+    pub fn prepare_position(
+        ctx: Context<PreparePosition>,
+        params: CreateOrderParams,
+    ) -> Result<()> {
         instructions::prepare_position(ctx, &params)
     }
 
     pub fn create_order<'info>(
         ctx: Context<'_, '_, 'info, 'info, CreateOrder<'info>>,
         nonce: [u8; 32],
-        params: CreateOrderArgs,
+        params: CreateOrderParams,
     ) -> Result<()> {
         instructions::create_order(ctx, &nonce, &params)
     }

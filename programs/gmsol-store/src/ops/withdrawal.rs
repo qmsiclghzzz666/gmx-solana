@@ -5,6 +5,7 @@ use typed_builder::TypedBuilder;
 
 use crate::{
     states::{
+        common::action::Action,
         revertible::{
             swap_market::{SwapDirection, SwapMarkets},
             Revertible, RevertibleLiquidityMarket,
@@ -74,14 +75,15 @@ impl<'a, 'info> CreateWithdrawalOps<'a, 'info> {
         let mut withdrawal = withdrawal.load_init()?;
 
         // Initialize header.
-        withdrawal
-            .header
-            .init(id, store.key(), market.key(), owner.key(), *nonce, bump);
-
-        // Initialize time info.
-        let clock = Clock::get()?;
-        withdrawal.updated_at = clock.unix_timestamp;
-        withdrawal.updated_at_slot = clock.slot;
+        withdrawal.header.init(
+            id,
+            store.key(),
+            market.key(),
+            owner.key(),
+            *nonce,
+            bump,
+            params.execution_fee,
+        )?;
 
         // Initialize tokens.
         withdrawal.tokens.market_token.init(market_token);
@@ -92,7 +94,6 @@ impl<'a, 'info> CreateWithdrawalOps<'a, 'info> {
         withdrawal.params.market_token_amount = params.market_token_amount;
         withdrawal.params.min_long_token_amount = params.min_long_token_amount;
         withdrawal.params.min_short_token_amount = params.min_short_token_amount;
-        withdrawal.params.max_execution_lamports = params.execution_fee;
 
         // Initialize swap paths.
         let market = market.load()?;
@@ -272,6 +273,7 @@ impl<'a, 'info> ValidateOracleTime for ExecuteWithdrawalOp<'a, 'info> {
             self.withdrawal
                 .load()
                 .map_err(|_| StoreError::LoadAccountError)?
+                .header()
                 .updated_at,
         ))
     }
@@ -285,6 +287,7 @@ impl<'a, 'info> ValidateOracleTime for ExecuteWithdrawalOp<'a, 'info> {
                 self.withdrawal
                     .load()
                     .map_err(|_| StoreError::LoadAccountError)?
+                    .header()
                     .updated_at,
             )?;
         Ok(Some(ts))
@@ -295,6 +298,7 @@ impl<'a, 'info> ValidateOracleTime for ExecuteWithdrawalOp<'a, 'info> {
             self.withdrawal
                 .load()
                 .map_err(|_| StoreError::LoadAccountError)?
+                .header()
                 .updated_at_slot,
         ))
     }

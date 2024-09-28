@@ -9,6 +9,7 @@ use typed_builder::TypedBuilder;
 use crate::{
     events::TradeEventData,
     states::{
+        common::action::Action,
         market::AdlOps,
         order::{
             CollateralReceiver, OrderKind, OrderParamsV2, OrderV2, TokenAccounts, TransferOut,
@@ -31,7 +32,7 @@ use super::{execution_fee::TransferExecutionFeeOps, market::MarketTransferOut};
 /// Create Order Arguments.
 // #[cfg_attr(feature = "debug", derive(Debug))]
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
-pub struct CreateOrderArgs {
+pub struct CreateOrderParams {
     /// Order Kind.
     pub kind: OrderKind,
     /// Execution fee in lamports.
@@ -54,7 +55,7 @@ pub struct CreateOrderArgs {
     pub acceptable_price: Option<u128>,
 }
 
-impl CreateOrderArgs {
+impl CreateOrderParams {
     /// Get the related position kind.
     pub fn to_position_kind(&self) -> Result<PositionKind> {
         if self.kind.is_swap() {
@@ -87,7 +88,7 @@ pub(crate) struct CreateOrderOps<'a, 'info> {
     owner: AccountInfo<'info>,
     nonce: &'a NonceBytes,
     bump: u8,
-    params: &'a CreateOrderArgs,
+    params: &'a CreateOrderParams,
     swap_path: &'info [AccountInfo<'info>],
 }
 
@@ -134,7 +135,7 @@ impl<'a, 'info> CreateOrderOps<'a, 'info> {
     fn init_with(
         &self,
         f: impl FnOnce(
-            &CreateOrderArgs,
+            &CreateOrderParams,
             &mut TokenAccounts,
             &mut OrderParamsV2,
         ) -> Result<(Pubkey, Pubkey)>,
@@ -145,12 +146,9 @@ impl<'a, 'info> CreateOrderOps<'a, 'info> {
             let OrderV2 {
                 header,
                 market_token,
-                max_execution_lamports,
                 tokens,
                 params,
                 swap,
-                updated_at,
-                updated_at_slot,
                 ..
             } = &mut *order;
 
@@ -161,14 +159,10 @@ impl<'a, 'info> CreateOrderOps<'a, 'info> {
                 self.owner.key(),
                 *self.nonce,
                 self.bump,
-            );
+                self.params.execution_fee,
+            )?;
 
             *market_token = self.market.load()?.meta().market_token_mint;
-            *max_execution_lamports = self.params.execution_fee;
-
-            let clock = Clock::get()?;
-            *updated_at = clock.unix_timestamp;
-            *updated_at_slot = clock.slot;
 
             let (from, to) = (f)(self.params, tokens, params)?;
 
@@ -980,7 +974,7 @@ impl<'a, 'info> ValidateOracleTime for ExecuteOrderOps<'a, 'info> {
                     .params
                     .kind()
                     .map_err(|_| StoreError::InvalidArgument)?,
-                order.updated_at,
+                order.header.updated_at,
             )
         };
 
@@ -1027,7 +1021,7 @@ impl<'a, 'info> ValidateOracleTime for ExecuteOrderOps<'a, 'info> {
                     .params
                     .kind()
                     .map_err(|_| StoreError::InvalidArgument)?,
-                order.updated_at,
+                order.header().updated_at,
             )
         };
         let ts = match kind {
@@ -1056,7 +1050,7 @@ impl<'a, 'info> ValidateOracleTime for ExecuteOrderOps<'a, 'info> {
                     .params
                     .kind()
                     .map_err(|_| StoreError::InvalidArgument)?,
-                order.updated_at_slot,
+                order.header().updated_at_slot,
             )
         };
         // FIXME: should we validate the slot for liquidation and ADL?
@@ -1472,7 +1466,7 @@ impl<'a, 'info> PositionCutOp<'a, 'info> {
             .system_program(self.system_program.to_account_info())
             .build()
             .execute()?;
-        let params = CreateOrderArgs {
+        let params = CreateOrderParams {
             kind: self.kind.to_order_kind(),
             execution_fee: OrderV2::MIN_EXECUTION_LAMPORTS,
             swap_path_length: 0,

@@ -1,6 +1,9 @@
 use anchor_lang::prelude::*;
 
-use crate::{states::NonceBytes, CoreError};
+use crate::{
+    states::{NonceBytes, Seed},
+    CoreError,
+};
 
 /// Action State.
 #[non_exhaustive]
@@ -68,6 +71,12 @@ pub struct ActionHeader {
     pub(crate) owner: Pubkey,
     /// Nonce bytes.
     pub(crate) nonce: [u8; 32],
+    /// Max execution lamports.
+    pub(crate) max_execution_lamports: u64,
+    /// Last updated timestamp.
+    pub(crate) updated_at: i64,
+    /// Last updated slot.
+    pub(crate) updated_at_slot: u64,
     /// Action State.
     action_state: u8,
     /// The bump seed.
@@ -132,6 +141,22 @@ impl ActionHeader {
         self.bump
     }
 
+    /// Get max execution lamports.
+    pub fn max_execution_lamports(&self) -> u64 {
+        self.max_execution_lamports
+    }
+
+    /// Get last updated timestamp.
+    pub fn updated_at(&self) -> i64 {
+        self.updated_at
+    }
+
+    /// Get last updated slot.
+    pub fn updated_at_slot(&self) -> u64 {
+        self.updated_at_slot
+    }
+
+    #[inline(never)]
     pub(crate) fn init(
         &mut self,
         id: u64,
@@ -140,13 +165,30 @@ impl ActionHeader {
         owner: Pubkey,
         nonce: [u8; 32],
         bump: u8,
-    ) {
+        execution_lamports: u64,
+    ) -> Result<()> {
+        let clock = Clock::get()?;
         self.id = id;
         self.store = store;
         self.market = market;
         self.owner = owner;
         self.nonce = nonce;
         self.bump = bump;
+        self.max_execution_lamports = execution_lamports;
+        self.updated_at = clock.unix_timestamp;
+        self.updated_at_slot = clock.slot;
+
+        Ok(())
+    }
+
+    // TODO: use it.
+    #[allow(dead_code)]
+    pub(crate) fn updated(&mut self) -> Result<()> {
+        let clock = Clock::get()?;
+        self.updated_at = clock.unix_timestamp;
+        self.updated_at_slot = clock.slot;
+
+        Ok(())
     }
 }
 
@@ -188,3 +230,27 @@ impl ActionSigner {
         ]
     }
 }
+
+/// Action.
+pub trait Action {
+    /// Get the header.
+    fn header(&self) -> &ActionHeader;
+}
+
+/// Extentsion trait for [`Action`].
+pub trait ActionExt: Action {
+    /// Action signer.
+    fn signer(&self) -> ActionSigner
+    where
+        Self: Seed,
+    {
+        self.header().signer(Self::SEED)
+    }
+
+    /// Execution lamports.
+    fn execution_lamports(&self, execution_lamports: u64) -> u64 {
+        execution_lamports.min(self.header().max_execution_lamports)
+    }
+}
+
+impl<T: Action> ActionExt for T {}

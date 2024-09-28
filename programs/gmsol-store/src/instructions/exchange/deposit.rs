@@ -10,7 +10,7 @@ use crate::{
         deposit::{CreateDepositOps, CreateDepositParams},
         execution_fee::TransferExecutionFeeOps,
     },
-    states::{DepositV2, Market, NonceBytes, RoleKey, Store},
+    states::{common::action::ActionExt, DepositV2, Market, NonceBytes, RoleKey, Seed, Store},
     utils::{
         internal::{self, Authentication},
         token::is_associated_token_account,

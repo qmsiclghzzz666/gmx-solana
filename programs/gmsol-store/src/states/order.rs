@@ -6,7 +6,7 @@ use crate::{CoreError, StoreError};
 
 use super::{
     common::{
-        action::{ActionHeader, ActionSigner},
+        action::{Action, ActionHeader, ActionSigner},
         swap::SwapParamsV2,
         token::TokenAndAccount,
         SwapParams, TokenRecord, TokensWithFeed,
@@ -658,22 +658,26 @@ pub struct OrderV2 {
     pub(crate) market_token: Pubkey,
     /// Token accounts.
     pub(crate) tokens: TokenAccounts,
-    /// Order params.
-    pub(crate) params: OrderParamsV2,
-    /// Max execution lamports.
-    pub(crate) max_execution_lamports: u64,
     /// Swap params.
     pub(crate) swap: SwapParamsV2,
-    padding_2: [u8; 4],
-    pub(crate) updated_at: i64,
-    pub(crate) updated_at_slot: u64,
+    padding_0: [u8; 4],
+    /// Order params.
+    pub(crate) params: OrderParamsV2,
     reserve: [u8; 128],
 }
 
-impl OrderV2 {
+impl Seed for OrderV2 {
     /// Seed.
-    pub const SEED: &'static [u8] = b"order";
+    const SEED: &'static [u8] = b"order";
+}
 
+impl Action for OrderV2 {
+    fn header(&self) -> &ActionHeader {
+        &self.header
+    }
+}
+
+impl OrderV2 {
     /// Init space.
     pub const INIT_SPACE: usize = core::mem::size_of::<Self>();
 
@@ -804,11 +808,6 @@ impl OrderV2 {
         .ok_or(error!(CoreError::MissingPoolTokens))
     }
 
-    /// Get header.
-    pub fn header(&self) -> &ActionHeader {
-        &self.header
-    }
-
     /// Get order params.
     pub fn params(&self) -> &OrderParamsV2 {
         &self.params
@@ -899,7 +898,7 @@ pub struct OrderParamsV2 {
     pub(crate) trigger_price: u128,
     /// Acceptable price (in unit price).
     pub(crate) acceptable_price: u128,
-    reserve: [u8; 128],
+    reserve: [u8; 64],
 }
 
 impl OrderParamsV2 {

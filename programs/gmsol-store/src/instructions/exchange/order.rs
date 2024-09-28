@@ -10,7 +10,7 @@ use crate::{
     events::RemoveOrderEvent,
     ops::{
         execution_fee::TransferExecutionFeeOps,
-        order::{CreateOrderArgs, CreateOrderOps},
+        order::{CreateOrderOps, CreateOrderParams},
     },
     states::{
         order::{OrderKind, OrderV2},
@@ -210,7 +210,7 @@ pub(crate) fn prepare_decrease_order_escrow(
 
 /// Prepare position.
 #[derive(Accounts)]
-#[instruction(params: CreateOrderArgs)]
+#[instruction(params: CreateOrderParams)]
 pub struct PreparePosition<'info> {
     /// The owner of the order to be created.
     #[account(mut)]
@@ -242,7 +242,7 @@ pub struct PreparePosition<'info> {
 
 pub(crate) fn prepare_position(
     ctx: Context<PreparePosition>,
-    params: &CreateOrderArgs,
+    params: &CreateOrderParams,
 ) -> Result<()> {
     let store = ctx.accounts.store.key();
     let meta = *ctx.accounts.market.load()?.meta();
@@ -346,7 +346,7 @@ fn validate_position(
 
 /// The accounts definitions for `create_order` instruction.
 #[derive(Accounts)]
-#[instruction(nonce: [u8; 32], params: CreateOrderArgs)]
+#[instruction(nonce: [u8; 32], params: CreateOrderParams)]
 pub struct CreateOrder<'info> {
     /// The owner of the order to be created.
     #[account(mut)]
@@ -472,7 +472,7 @@ pub struct CreateOrder<'info> {
 pub(crate) fn create_order<'info>(
     ctx: Context<'_, '_, 'info, 'info, CreateOrder<'info>>,
     nonce: &NonceBytes,
-    params: &CreateOrderArgs,
+    params: &CreateOrderParams,
 ) -> Result<()> {
     let accounts = ctx.accounts;
     accounts.transfer_execution_fee(params)?;
@@ -567,7 +567,7 @@ pub(crate) fn create_order<'info>(
 }
 
 impl<'info> CreateOrder<'info> {
-    fn transfer_execution_fee(&self, params: &CreateOrderArgs) -> Result<()> {
+    fn transfer_execution_fee(&self, params: &CreateOrderParams) -> Result<()> {
         TransferExecutionFeeOps::builder()
             .payment(self.order.to_account_info())
             .payer(self.owner.to_account_info())
@@ -577,7 +577,7 @@ impl<'info> CreateOrder<'info> {
             .execute()
     }
 
-    fn transfer_tokens(&mut self, params: &CreateOrderArgs) -> Result<()> {
+    fn transfer_tokens(&mut self, params: &CreateOrderParams) -> Result<()> {
         let kind = params.kind;
         if !matches!(
             kind,

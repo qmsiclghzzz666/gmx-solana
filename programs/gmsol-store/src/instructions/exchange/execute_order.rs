@@ -12,7 +12,7 @@ use crate::{
         order::{ExecuteOrderOps, ProcessTransferOut, ShouldSendTradeEvent},
     },
     states::{
-        common::action::ActionSigner,
+        common::action::{ActionExt, ActionSigner},
         order::{OrderV2, TransferOut},
         position::Position,
         Market, Oracle, PriceProvider, Seed, Store, TokenMapHeader, TokenMapLoader,
@@ -514,7 +514,7 @@ impl<'info> ExecuteOrderV2<'info> {
 
     #[inline(never)]
     fn pay_execution_fee(&self, execution_fee: u64) -> Result<()> {
-        let execution_lamports = execution_fee.min(self.order.load()?.max_execution_lamports);
+        let execution_lamports = self.order.load()?.execution_lamports(execution_fee);
         PayExecutionFeeOps::builder()
             .payer(self.order.to_account_info())
             .receiver(self.authority.to_account_info())
@@ -825,7 +825,7 @@ impl<'info> ExecuteDecreaseOrder<'info> {
 
     #[inline(never)]
     fn pay_execution_fee(&self, execution_fee: u64) -> Result<()> {
-        let execution_lamports = execution_fee.min(self.order.load()?.max_execution_lamports);
+        let execution_lamports = self.order.load()?.execution_lamports(execution_fee);
         PayExecutionFeeOps::builder()
             .payer(self.order.to_account_info())
             .receiver(self.authority.to_account_info())

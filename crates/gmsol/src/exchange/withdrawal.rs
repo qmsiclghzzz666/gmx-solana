@@ -9,7 +9,7 @@ use gmsol_store::{
     accounts, instruction,
     ops::withdrawal::CreateWithdrawalParams,
     states::{
-        common::{swap::SwapParamsV2, TokensWithFeed},
+        common::{action::Action, swap::SwapParamsV2, TokensWithFeed},
         withdrawal::WithdrawalV2,
         NonceBytes, Pyth, TokenMapAccess,
     },

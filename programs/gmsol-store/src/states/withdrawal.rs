@@ -5,7 +5,7 @@ use crate::StoreError;
 
 use super::{
     common::{
-        action::{ActionHeader, ActionSigner},
+        action::{Action, ActionHeader},
         swap::SwapParamsV2,
         token::TokenAndAccount,
         SwapParams, TokenRecord, TokensWithFeed,
@@ -208,34 +208,19 @@ pub struct WithdrawalV2 {
     /// Swap params.
     pub(crate) swap: SwapParamsV2,
     padding_1: [u8; 4],
-    pub(crate) updated_at: i64,
-    pub(crate) updated_at_slot: u64,
     reserve: [u8; 128],
 }
 
 impl WithdrawalV2 {
-    /// Seed.
-    pub const SEED: &'static [u8] = b"withdrawal";
-
     /// Init space.
     pub const INIT_SPACE: usize = core::mem::size_of::<Self>();
 
     /// Min execution lamports.
     pub const MIN_EXECUTION_LAMPORTS: u64 = 200_000;
 
-    /// Get the action header.
-    pub fn header(&self) -> &ActionHeader {
-        &self.header
-    }
-
     /// Get tokens and accounts.
     pub fn tokens(&self) -> &TokenAccounts {
         &self.tokens
-    }
-
-    /// Get action signer.
-    pub fn signer(&self) -> ActionSigner {
-        self.header.signer(Self::SEED)
     }
 
     /// Get the swap params.
@@ -260,6 +245,17 @@ impl WithdrawalV2 {
             StoreError::InsufficientOutputAmount
         );
         Ok(())
+    }
+}
+
+impl Seed for WithdrawalV2 {
+    /// Seed.
+    const SEED: &'static [u8] = b"withdrawal";
+}
+
+impl Action for WithdrawalV2 {
+    fn header(&self) -> &ActionHeader {
+        &self.header
     }
 }
 
@@ -317,15 +313,12 @@ pub struct WithdrawalParams {
     pub min_long_token_amount: u64,
     /// The minimum acceptable amount of final short tokens to receive.
     pub min_short_token_amount: u64,
-    /// Max execution fee.
-    pub max_execution_lamports: u64,
     reserved: [u8; 64],
 }
 
 impl Default for WithdrawalParams {
     fn default() -> Self {
         Self {
-            max_execution_lamports: WithdrawalV2::MIN_EXECUTION_LAMPORTS,
             reserved: [0; 64],
             market_token_amount: 0,
             min_long_token_amount: 0,

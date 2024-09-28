@@ -10,7 +10,7 @@ use crate::{
         market::{MarketTransferIn, MarketTransferOut},
     },
     states::{
-        common::action::ActionSigner,
+        common::action::{ActionExt, ActionSigner},
         ops::ValidateMarketBalances,
         revertible::{
             swap_market::{SwapDirection, SwapMarkets},
@@ -349,8 +349,7 @@ impl<'info> internal::Authentication<'info> for ExecuteDepositV2<'info> {
 impl<'info> ExecuteDepositV2<'info> {
     #[inline(never)]
     fn pay_execution_fee(&self, execution_fee: u64) -> Result<()> {
-        let execution_lamports =
-            execution_fee.min(self.deposit.load()?.params.max_execution_lamports);
+        let execution_lamports = self.deposit.load()?.execution_lamports(execution_fee);
         PayExecutionFeeOps::builder()
             .payer(self.deposit.to_account_info())
             .receiver(self.authority.to_account_info())

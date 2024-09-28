@@ -7,9 +7,9 @@ use anchor_client::{
 use anchor_spl::associated_token::get_associated_token_address;
 use gmsol_store::{
     accounts, instruction,
-    ops::order::CreateOrderArgs,
+    ops::order::CreateOrderParams,
     states::{
-        common::{swap::SwapParamsV2, TokensWithFeed},
+        common::{action::Action, swap::SwapParamsV2, TokensWithFeed},
         order::{OrderKind, OrderParams, OrderV2},
         Market, MarketMeta, NonceBytes, Pyth, Store, TokenMapAccess,
     },
@@ -299,7 +299,7 @@ where
         let position = self.position().await?;
 
         let kind = self.params.kind;
-        let params = CreateOrderArgs {
+        let params = CreateOrderParams {
             execution_fee: self.execution_fee,
             swap_path_length: self
                 .swap_path

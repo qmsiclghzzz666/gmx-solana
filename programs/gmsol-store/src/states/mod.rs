@@ -28,12 +28,16 @@ pub mod order;
 /// Position.
 pub mod position;
 
+/// Shift.
+pub mod shift;
+
 pub use deposit::{Deposit, DepositV2};
 pub use market::*;
 pub use oracle::*;
 pub use order::{Order, OrderParamsV2, OrderV2, UpdateOrderParams};
 pub use position::Position;
 pub use roles::*;
+pub use shift::*;
 pub use store::*;
 pub use token_config::*;
 pub use withdrawal::{Withdrawal, WithdrawalV2};

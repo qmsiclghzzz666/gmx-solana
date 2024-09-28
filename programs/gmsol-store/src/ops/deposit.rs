@@ -3,7 +3,9 @@ use anchor_spl::token::{Mint, TokenAccount};
 use typed_builder::TypedBuilder;
 
 use crate::{
-    states::{DepositV2, Market, NonceBytes, Oracle, Store, ValidateOracleTime},
+    states::{
+        common::action::Action, DepositV2, Market, NonceBytes, Oracle, Store, ValidateOracleTime,
+    },
     CoreError, StoreError, StoreResult,
 };
 
@@ -66,13 +68,15 @@ impl<'a, 'info> CreateDepositOps<'a, 'info> {
 
         let mut deposit = deposit.load_init()?;
 
-        deposit
-            .header
-            .init(id, store.key(), market.key(), owner.key(), *nonce, bump);
-
-        let clock = Clock::get()?;
-        deposit.updated_at = clock.unix_timestamp;
-        deposit.updated_at_slot = clock.slot;
+        deposit.header.init(
+            id,
+            store.key(),
+            market.key(),
+            owner.key(),
+            *nonce,
+            bump,
+            params.execution_fee,
+        )?;
 
         let (long_token, short_token) = {
             let market = market.load()?;
@@ -99,7 +103,6 @@ impl<'a, 'info> CreateDepositOps<'a, 'info> {
         deposit.params.initial_long_token_amount = params.initial_long_token_amount;
         deposit.params.initial_short_token_amount = params.initial_short_token_amount;
         deposit.params.min_market_token_amount = params.min_market_token;
-        deposit.params.max_execution_lamports = params.execution_fee;
 
         deposit.swap.validate_and_init(
             &*market.load()?,
@@ -326,6 +329,7 @@ impl<'a, 'info> ValidateOracleTime for ExecuteDepositOps<'a, 'info> {
             self.deposit
                 .load()
                 .map_err(|_| StoreError::LoadAccountError)?
+                .header()
                 .updated_at,
         ))
     }
@@ -339,6 +343,7 @@ impl<'a, 'info> ValidateOracleTime for ExecuteDepositOps<'a, 'info> {
                 self.deposit
                     .load()
                     .map_err(|_| StoreError::LoadAccountError)?
+                    .header()
                     .updated_at,
             )?;
         Ok(Some(ts))
@@ -349,6 +354,7 @@ impl<'a, 'info> ValidateOracleTime for ExecuteDepositOps<'a, 'info> {
             self.deposit
                 .load()
                 .map_err(|_| StoreError::LoadAccountError)?
+                .header()
                 .updated_at_slot,
         ))
     }

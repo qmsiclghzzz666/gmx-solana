@@ -5,7 +5,7 @@ use crate::StoreError;
 
 use super::{
     common::{
-        action::{ActionHeader, ActionSigner},
+        action::{Action, ActionHeader},
         swap::SwapParamsV2,
         token::TokenAndAccount,
         SwapParams, TokenRecord, TokensWithFeed,
@@ -210,30 +210,15 @@ pub struct DepositV2 {
     /// Swap params.
     pub(crate) swap: SwapParamsV2,
     padding_1: [u8; 4],
-    pub(crate) updated_at: i64,
-    pub(crate) updated_at_slot: u64,
     reserve: [u8; 128],
 }
 
 impl DepositV2 {
-    /// Seed.
-    pub const SEED: &'static [u8] = b"deposit";
-
     /// Max execution lamports.
     pub const MIN_EXECUTION_LAMPORTS: u64 = 200_000;
 
     /// Init Space.
     pub const INIT_SPACE: usize = core::mem::size_of::<Self>();
-
-    /// Get the action header.
-    pub fn header(&self) -> &ActionHeader {
-        &self.header
-    }
-
-    /// Get action signer.
-    pub fn signer(&self) -> ActionSigner {
-        self.header.signer(Self::SEED)
-    }
 
     /// Get tokens.
     pub fn tokens(&self) -> &TokenAccounts {
@@ -243,6 +228,17 @@ impl DepositV2 {
     /// Get swap params.
     pub fn swap(&self) -> &SwapParamsV2 {
         &self.swap
+    }
+}
+
+impl Seed for DepositV2 {
+    /// Seed.
+    const SEED: &'static [u8] = b"deposit";
+}
+
+impl Action for DepositV2 {
+    fn header(&self) -> &ActionHeader {
+        &self.header
     }
 }
 
@@ -280,8 +276,6 @@ pub struct DepositParams {
     pub(crate) initial_short_token_amount: u64,
     /// The minimum acceptable amount of market tokens to receive.
     pub(crate) min_market_token_amount: u64,
-    /// Max execution fee.
-    pub(crate) max_execution_lamports: u64,
     reserved: [u8; 64],
 }
 
@@ -291,7 +285,6 @@ impl Default for DepositParams {
             initial_long_token_amount: 0,
             initial_short_token_amount: 0,
             min_market_token_amount: 0,
-            max_execution_lamports: DepositV2::MIN_EXECUTION_LAMPORTS,
             reserved: [0; 64],
         }
     }
