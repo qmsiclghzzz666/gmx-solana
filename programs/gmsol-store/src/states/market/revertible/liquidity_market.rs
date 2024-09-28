@@ -124,6 +124,10 @@ impl<'a, 'info> RevertibleLiquidityMarket<'a, 'info> {
         self.vault = Some(vault);
         self
     }
+
+    pub(crate) fn boxed(self) -> Box<Self> {
+        Box::new(self)
+    }
 }
 
 impl<'a, 'info> gmsol_model::BaseMarket<{ constants::MARKET_DECIMALS }>

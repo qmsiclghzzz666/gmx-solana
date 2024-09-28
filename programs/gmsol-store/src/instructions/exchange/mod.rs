@@ -22,9 +22,13 @@ pub mod update_adl;
 /// Position cut.
 pub mod position_cut;
 
+/// Execute shift.
+pub mod execute_shift;
+
 pub use deposit::*;
 pub use execute_deposit::*;
 pub use execute_order::*;
+pub use execute_shift::*;
 pub use execute_withdrawal::*;
 pub use order::*;
 pub use position_cut::*;

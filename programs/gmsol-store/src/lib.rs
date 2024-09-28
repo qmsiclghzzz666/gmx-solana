@@ -1566,6 +1566,16 @@ pub mod gmsol_store {
             execution_fee,
         )
     }
+
+    /// Shift.
+    #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
+    pub fn execute_shift<'info>(
+        ctx: Context<'_, '_, 'info, 'info, ExecuteShift<'info>>,
+        execution_lamports: u64,
+        throw_on_execution_error: bool,
+    ) -> Result<()> {
+        instructions::unchecked_execute_shift(ctx, execution_lamports, throw_on_execution_error)
+    }
 }
 
 #[error_code]
