@@ -47,7 +47,7 @@ impl Args {
                 }
                 let req = client
                     .toggle_feature(store, domain, action, enable)
-                    .build_without_compute_budget();
+                    .into_anchor_request_without_compute_budget();
                 crate::utils::send_or_serialize(req, serialize_only, |signature| {
                     let msg = if enable { "enabled" } else { "disabled" };
                     tracing::info!("{msg} feature: {}", display_feature(domain, action));

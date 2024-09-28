@@ -36,7 +36,7 @@ impl Args {
                 crate::utils::send_or_serialize(
                     client
                         .turn_into_pure_pool(store, market_token, *kind)
-                        .build_without_compute_budget(),
+                        .into_anchor_request_without_compute_budget(),
                     serialize_only,
                     |signature| {
                         tracing::info!("turned into pure pool at {signature}");
@@ -49,7 +49,7 @@ impl Args {
                 crate::utils::send_or_serialize(
                     client
                         .turn_into_impure_pool(store, market_token, *kind)
-                        .build_without_compute_budget(),
+                        .into_anchor_request_without_compute_budget(),
                     serialize_only,
                     |signature| {
                         tracing::info!("turned into impure pool at {signature}");

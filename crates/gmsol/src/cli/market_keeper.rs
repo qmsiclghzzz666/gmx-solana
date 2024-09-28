@@ -279,7 +279,7 @@ impl Args {
             Command::CreateOracle { index } => {
                 let (request, oracle) = client.initialize_oracle(store, *index);
                 crate::utils::send_or_serialize(
-                    request.build_without_compute_budget(),
+                    request.into_anchor_request_without_compute_budget(),
                     serialize_only,
                     |signature| {
                         tracing::info!("created oracle {oracle} at tx {signature}");
@@ -298,7 +298,7 @@ impl Args {
                 let token_map = Keypair::new();
                 let (rpc, map) = client.initialize_token_map(store, &token_map);
                 crate::utils::send_or_serialize(
-                    rpc.build_without_compute_budget(),
+                    rpc.into_anchor_request_without_compute_budget(),
                     false,
                     |signature| {
                         tracing::info!("created token config map {map} at tx {signature}");
@@ -312,7 +312,7 @@ impl Args {
                 crate::utils::send_or_serialize(
                     client
                         .set_token_map(store, token_map)
-                        .build_without_compute_budget(),
+                        .into_anchor_request_without_compute_budget(),
                     serialize_only,
                     |signature| {
                         tracing::info!("set new token map at {signature}");
@@ -399,7 +399,7 @@ impl Args {
                     )
                 };
                 crate::utils::send_or_serialize(
-                    req.build_without_compute_budget(),
+                    req.into_anchor_request_without_compute_budget(),
                     serialize_only,
                     |signature| {
                         println!("{signature}");
@@ -413,7 +413,7 @@ impl Args {
                 crate::utils::send_or_serialize(
                     client
                         .toggle_token_config(store, &token_map, token, toggle.is_enable())
-                        .build(),
+                        .into_anchor_request(),
                     serialize_only,
                     |signature| {
                         println!("{signature}");
@@ -427,7 +427,7 @@ impl Args {
                 crate::utils::send_or_serialize(
                     client
                         .set_expected_provider(store, &token_map, token, *provider)
-                        .build(),
+                        .into_anchor_request(),
                     serialize_only,
                     |signature| {
                         println!("{signature}");
@@ -438,11 +438,15 @@ impl Args {
             }
             Command::CreateVault { token } => {
                 let (rpc, vault) = client.initialize_market_vault(store, token);
-                crate::utils::send_or_serialize(rpc.build(), serialize_only, |signature| {
-                    tracing::info!("created a new vault {vault} at tx {signature}");
-                    println!("{vault}");
-                    Ok(())
-                })
+                crate::utils::send_or_serialize(
+                    rpc.into_anchor_request(),
+                    serialize_only,
+                    |signature| {
+                        tracing::info!("created a new vault {vault} at tx {signature}");
+                        println!("{vault}");
+                        Ok(())
+                    },
+                )
                 .await?;
             }
             Command::CreateMarket {
@@ -463,7 +467,7 @@ impl Args {
                         None,
                     )
                     .await?;
-                crate::utils::send_or_serialize(request.build_without_compute_budget(), serialize_only, |signature| {
+                crate::utils::send_or_serialize(request.into_anchor_request_without_compute_budget(), serialize_only, |signature| {
                     tracing::info!(
                         "created a new market with {market_token} as its token address at tx {signature}"
                     );
@@ -548,7 +552,7 @@ impl Args {
                 crate::utils::send_or_serialize(
                     client
                         .toggle_market(store, market_token, toggle.is_enable())
-                        .build_without_compute_budget(),
+                        .into_anchor_request_without_compute_budget(),
                     serialize_only,
                     |signature| {
                         tracing::info!(
@@ -577,7 +581,7 @@ impl Args {
                     expire_after.as_secs().try_into().unwrap_or(u32::MAX),
                 );
                 crate::utils::send_or_serialize(
-                    rpc.build_without_compute_budget(),
+                    rpc.into_anchor_request_without_compute_budget(),
                     false,
                     |signature| {
                         let pubkey = buffer_keypair.pubkey();
@@ -592,7 +596,7 @@ impl Args {
                 crate::utils::send_or_serialize(
                     client
                         .close_marekt_config_buffer(buffer, receiver.as_ref())
-                        .build_without_compute_budget(),
+                        .into_anchor_request_without_compute_budget(),
                     serialize_only,
                     |signature| {
                         tracing::info!("market config buffer `{buffer}` closed at tx {signature}");
@@ -644,7 +648,7 @@ impl Args {
                 crate::utils::send_or_serialize(
                     client
                         .set_market_config_buffer_authority(buffer, new_authority)
-                        .build_without_compute_budget(),
+                        .into_anchor_request_without_compute_budget(),
                     serialize_only,
                     |signature| {
                         tracing::info!("set the authority of buffer `{buffer}` to `{new_authority}` at tx {signature}");
@@ -670,7 +674,7 @@ impl Args {
                     client
                         .fund_market(store, market_token, &source_account, *amount, Some(&token))
                         .await?
-                        .build_without_compute_budget(),
+                        .into_anchor_request_without_compute_budget(),
                     serialize_only,
                     |signature| {
                         tracing::info!("funded at tx {signature}");

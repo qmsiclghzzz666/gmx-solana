@@ -32,7 +32,7 @@ impl Args {
                     .claim_fees(store, &market_token, side.is_long())
                     .build()
                     .await?
-                    .build_without_compute_budget();
+                    .into_anchor_request_without_compute_budget();
                 crate::utils::send_or_serialize(req, serialize_only, |signature| {
                     println!("{signature}");
                     Ok(())

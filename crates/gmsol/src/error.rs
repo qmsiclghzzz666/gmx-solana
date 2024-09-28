@@ -1,4 +1,4 @@
-use anchor_client::solana_client::pubsub_client::PubsubClientError;
+use anchor_client::{solana_client::pubsub_client::PubsubClientError, solana_sdk};
 use tokio_stream::wrappers::errors::BroadcastStreamRecvError;
 
 pub use gmsol_store::StoreError;
@@ -70,6 +70,12 @@ pub enum Error {
     /// Pubsub client closed.
     #[error("pubsub: closed")]
     PubsubClosed,
+    /// Complie Solana Message Error.
+    #[error("compile message: {0}")]
+    CompileMessage(#[from] solana_sdk::message::CompileError),
+    /// Signer Error.
+    #[error("signer: {0}")]
+    SignerError(#[from] solana_sdk::signer::SignerError),
 }
 
 impl Error {

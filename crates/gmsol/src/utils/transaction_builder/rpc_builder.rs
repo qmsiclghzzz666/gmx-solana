@@ -2,18 +2,21 @@ use std::ops::Deref;
 
 use anchor_client::{
     anchor_lang::{InstructionData, ToAccountMetas},
-    solana_client::nonblocking::rpc_client::RpcClient,
+    solana_client::{nonblocking::rpc_client::RpcClient, rpc_config::RpcSendTransactionConfig},
     solana_sdk::{
         commitment_config::CommitmentConfig,
+        hash::Hash,
         instruction::{AccountMeta, Instruction},
+        message::VersionedMessage,
         pubkey::Pubkey,
         signature::Signature,
         signer::Signer,
+        transaction::VersionedTransaction,
     },
-    Cluster,
+    Cluster, RequestBuilder,
 };
 
-use super::{compute_budget::ComputeBudget, transaction_size::transaction_size};
+use super::{compute_budget::ComputeBudget, transaction_size::transaction_size, SendAndConfirm};
 
 /// A wrapper of [`RequestBuilder`](anchor_client::RequestBuilder).
 #[must_use]
@@ -327,28 +330,141 @@ impl<'a, C: Deref<Target = impl Signer> + Clone, T> RpcBuilder<'a, C, T> {
         self
     }
 
-    /// Build and send the RPC request.
-    pub async fn send(self) -> crate::Result<Signature> {
-        let signature = self.build().send().await?;
+    fn message_with_blockhash_and_options(
+        &self,
+        latest_hash: Hash,
+        without_compute_budget: bool,
+        compute_unit_price_micro_lamports: Option<u64>,
+    ) -> crate::Result<VersionedMessage> {
+        use anchor_client::solana_sdk::message::v0::Message;
+
+        let instructions = self
+            .instructions_with_options(without_compute_budget, compute_unit_price_micro_lamports);
+        let message = Message::try_compile(&self.cfg.payer(), &instructions, &[], latest_hash)?;
+
+        Ok(VersionedMessage::V0(message))
+    }
+
+    /// Get compiled message with options.
+    pub async fn message_with_options(
+        &self,
+        without_compute_budget: bool,
+        compute_unit_price_micro_lamports: Option<u64>,
+    ) -> crate::Result<VersionedMessage> {
+        let client = self.cfg.rpc();
+        let latest_hash = client
+            .get_latest_blockhash()
+            .await
+            .map_err(anchor_client::ClientError::from)?;
+
+        self.message_with_blockhash_and_options(
+            latest_hash,
+            without_compute_budget,
+            compute_unit_price_micro_lamports,
+        )
+    }
+
+    fn signed_transaction_with_blockhash_and_options(
+        &self,
+        latest_hash: Hash,
+        without_compute_budget: bool,
+        compute_unit_price_micro_lamports: Option<u64>,
+    ) -> crate::Result<VersionedTransaction> {
+        let message = self.message_with_blockhash_and_options(
+            latest_hash,
+            without_compute_budget,
+            compute_unit_price_micro_lamports,
+        )?;
+
+        let mut signers = self.signers.clone();
+        signers.push(&*self.cfg.payer);
+
+        let tx = VersionedTransaction::try_new(message, &signers)?;
+
+        Ok(tx)
+    }
+
+    /// Get signed transactoin with options.
+    pub async fn signed_transaction_with_options(
+        &self,
+        without_compute_budget: bool,
+        compute_unit_price_micro_lamports: Option<u64>,
+    ) -> crate::Result<VersionedTransaction> {
+        let client = self.cfg.rpc();
+        let latest_hash = client
+            .get_latest_blockhash()
+            .await
+            .map_err(anchor_client::ClientError::from)?;
+
+        self.signed_transaction_with_blockhash_and_options(
+            latest_hash,
+            without_compute_budget,
+            compute_unit_price_micro_lamports,
+        )
+    }
+
+    /// Sign and send the transaction with options.
+    pub async fn send_with_options(
+        &self,
+        without_compute_budget: bool,
+        compute_unit_price_micro_lamports: Option<u64>,
+        config: RpcSendTransactionConfig,
+    ) -> crate::Result<Signature> {
+        let client = self.cfg.rpc();
+        let latest_hash = client
+            .get_latest_blockhash()
+            .await
+            .map_err(anchor_client::ClientError::from)?;
+
+        let tx = self.signed_transaction_with_blockhash_and_options(
+            latest_hash,
+            without_compute_budget,
+            compute_unit_price_micro_lamports,
+        )?;
+
+        let signature = client
+            .send_and_confirm_transaction_with_config(&tx, config)
+            .await
+            .map_err(anchor_client::ClientError::from)?;
+
         Ok(signature)
     }
 
+    /// Build and send the transaction without preflight.
+    pub async fn send_without_preflight(self) -> crate::Result<Signature> {
+        self.send_with_options(
+            false,
+            None,
+            RpcSendTransactionConfig {
+                skip_preflight: true,
+                ..Default::default()
+            },
+        )
+        .await
+    }
+
+    /// Build and send the transaction with default options.
+    pub async fn send(self) -> crate::Result<Signature> {
+        self.send_with_options(false, None, Default::default())
+            .await
+    }
+
     /// Build [`RequestBuilder`](anchor_client::RequestBuilder).
-    pub fn build(self) -> anchor_client::RequestBuilder<'a, C> {
-        self.build_with_options(false, None).0
+    pub fn into_anchor_request(self) -> RequestBuilder<'a, C> {
+        self.into_anchor_request_with_options(false, None).0
     }
 
     /// Build [`RequestBuilder`](anchor_client::RequestBuilder) without compute budget.
-    pub fn build_without_compute_budget(self) -> anchor_client::RequestBuilder<'a, C> {
-        self.build_with_options(true, None).0
+    pub fn into_anchor_request_without_compute_budget(self) -> RequestBuilder<'a, C> {
+        self.into_anchor_request_with_options(true, None).0
     }
 
-    /// Build and output.
-    pub fn build_with_options(
+    /// Build [`RqeustBuilder`] and output.
+    pub fn into_anchor_request_with_options(
         self,
         without_compute_budget: bool,
         compute_unit_price_micro_lamports: Option<u64>,
-    ) -> (anchor_client::RequestBuilder<'a, C>, T) {
+    ) -> (RequestBuilder<'a, C>, T) {
         let request = anchor_client::RequestBuilder::from(
             self.program_id,
             self.cfg.cluster.url(),

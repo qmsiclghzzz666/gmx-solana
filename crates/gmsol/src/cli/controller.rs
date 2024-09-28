@@ -45,7 +45,7 @@ impl ControllerArgs {
                 crate::utils::send_or_serialize(
                     client
                         .insert_global_amount_by_key(store, *key, amount)
-                        .build_without_compute_budget(),
+                        .into_anchor_request_without_compute_budget(),
                     serialize_only,
                     |signature| {
                         println!("{signature}");
@@ -58,7 +58,7 @@ impl ControllerArgs {
                 crate::utils::send_or_serialize(
                     client
                         .insert_global_factor_by_key(store, *key, factor)
-                        .build_without_compute_budget(),
+                        .into_anchor_request_without_compute_budget(),
                     serialize_only,
                     |signature| {
                         println!("{signature}");
@@ -71,7 +71,7 @@ impl ControllerArgs {
                 crate::utils::send_or_serialize(
                     client
                         .insert_global_address_by_key(store, *key, address)
-                        .build_without_compute_budget(),
+                        .into_anchor_request_without_compute_budget(),
                     serialize_only,
                     |signature| {
                         println!("{signature}");

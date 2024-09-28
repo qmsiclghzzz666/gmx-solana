@@ -74,7 +74,7 @@ impl AdminArgs {
                 crate::utils::send_or_serialize(
                     client
                         .initialize_store(store_key, admin.as_ref())
-                        .build_without_compute_budget(),
+                        .into_anchor_request_without_compute_budget(),
                     serialize_only,
                     |signature| {
                         tracing::info!("initialized a new data store at tx {signature}");
@@ -91,7 +91,7 @@ impl AdminArgs {
                 let rpc = client.transfer_store_authority(&store, new_authority);
                 if *send || serialize_only {
                     crate::utils::send_or_serialize(
-                        rpc.build_without_compute_budget(),
+                        rpc.into_anchor_request_without_compute_budget(),
                         serialize_only,
                         |signature| {
                             tracing::info!(
@@ -102,7 +102,7 @@ impl AdminArgs {
                     )
                     .await?;
                 } else {
-                    let transaction = rpc.build().signed_transaction().await?;
+                    let transaction = rpc.into_anchor_request().signed_transaction().await?;
                     let response = client
                         .data_store()
                         .solana_rpc()
@@ -119,7 +119,7 @@ impl AdminArgs {
                 crate::utils::send_or_serialize(
                     client
                         .enable_role(&store, role)
-                        .build_without_compute_budget(),
+                        .into_anchor_request_without_compute_budget(),
                     serialize_only,
                     |signature| {
                         tracing::info!("enabled role `{role}` at tx {signature}");
@@ -132,7 +132,7 @@ impl AdminArgs {
                 crate::utils::send_or_serialize(
                     client
                         .disable_role(&store, role)
-                        .build_without_compute_budget(),
+                        .into_anchor_request_without_compute_budget(),
                     serialize_only,
                     |signature| {
                         tracing::info!("disabled role `{role}` at tx {signature}");
@@ -145,7 +145,7 @@ impl AdminArgs {
                 crate::utils::send_or_serialize(
                     client
                         .grant_role(&store, authority, role)
-                        .build_without_compute_budget(),
+                        .into_anchor_request_without_compute_budget(),
                     serialize_only,
                     |signature| {
                         tracing::info!("granted a role for user {authority} at tx {signature}");
@@ -158,7 +158,7 @@ impl AdminArgs {
                 crate::utils::send_or_serialize(
                     client
                         .revoke_role(&store, authority, role)
-                        .build_without_compute_budget(),
+                        .into_anchor_request_without_compute_budget(),
                     serialize_only,
                     |signature| {
                         tracing::info!("revoked a role for user {authority} at tx {signature}");
@@ -169,7 +169,7 @@ impl AdminArgs {
             }
             Command::InitController => {
                 crate::utils::send_or_serialize(
-                    client.initialize_controller(&store).build(),
+                    client.initialize_controller(&store).into_anchor_request(),
                     serialize_only,
                     |signature| {
                         tracing::info!("initialized the controller account at tx {signature}");

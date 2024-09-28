@@ -110,7 +110,7 @@ where
         for (idx, rpc) in builder.into_builders().into_iter().enumerate() {
             println!("Transaction {idx}:");
             for (idx, ix) in rpc
-                .build_without_compute_budget()
+                .into_anchor_request_without_compute_budget()
                 .instructions()?
                 .into_iter()
                 .enumerate()

@@ -162,7 +162,10 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> TransactionBuilder<'a, C> {
                     "signing transaction {idx}"
                 );
                 builder
-                    .build_with_options(without_compute_budget, compute_unit_price_micro_lamports)
+                    .into_anchor_request_with_options(
+                        without_compute_budget,
+                        compute_unit_price_micro_lamports,
+                    )
                     .0
                     .signed_transaction()
                     .await

@@ -824,7 +824,7 @@ impl Deployment {
                 .data_store_rpc()
                 .pre_instruction(system_instruction::transfer(&payer, &account, amount))
                 .pre_instruction(instruction::sync_native(&ID, &account)?)
-                .build()
+                .into_anchor_request()
                 .send()
                 .await?
         } else {
@@ -839,7 +839,7 @@ impl Deployment {
                     amount,
                     token.config.decimals,
                 )?)
-                .build()
+                .into_anchor_request()
                 .send()
                 .await?
         };
@@ -926,7 +926,7 @@ impl Deployment {
             .build_with_address()
             .await?;
         let signature = rpc
-            .build()
+            .into_anchor_request()
             .send_with_spinner_and_config(RpcSendTransactionConfig {
                 skip_preflight,
                 ..Default::default()

@@ -337,27 +337,27 @@ where
         let client = self.data_store().solana_rpc();
         let name = self
             .token_name(token_map, token)
-            .build()
+            .into_anchor_request()
             .signed_transaction()
             .await?;
         let token_decimals = self
             .token_decimals(token_map, token)
-            .build()
+            .into_anchor_request()
             .signed_transaction()
             .await?;
         let precision = self
             .token_precision(token_map, token)
-            .build()
+            .into_anchor_request()
             .signed_transaction()
             .await?;
         let expected_provider = self
             .token_expected_provider(token_map, token)
-            .build()
+            .into_anchor_request()
             .signed_transaction()
             .await?;
         let is_enabled = self
             .is_token_config_enabled(token_map, token)
-            .build()
+            .into_anchor_request()
             .signed_transaction()
             .await?;
 

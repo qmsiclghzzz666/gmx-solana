@@ -379,7 +379,7 @@ impl ExchangeArgs {
                     .short_token_swap_path(short_swap.clone())
                     .build_with_address()
                     .await?;
-                let signature = builder.build().send().await?;
+                let signature = builder.into_anchor_request().send().await?;
                 println!("created deposit {deposit} at {signature}");
             }
             Command::CancelDeposit { deposit } => {
@@ -387,7 +387,7 @@ impl ExchangeArgs {
                     .close_deposit(store, deposit)
                     .build()
                     .await?
-                    .build()
+                    .into_anchor_request()
                     .send()
                     .await?;
                 tracing::info!(%deposit, "cancelled deposit at tx {signature}");
@@ -443,7 +443,7 @@ impl ExchangeArgs {
                     .close_order(order)?
                     .build()
                     .await?
-                    .build()
+                    .into_anchor_request()
                     .send()
                     .await?;
                 tracing::info!(%order, "cancelled order at tx {signature}");
@@ -474,7 +474,7 @@ impl ExchangeArgs {
                 }
 
                 let (rpc, order) = builder.swap_path(swap.clone()).build_with_address().await?;
-                let request = rpc.build();
+                let request = rpc.into_anchor_request();
                 let signature = request
                     .send_with_spinner_and_config(RpcSendTransactionConfig {
                         skip_preflight: true,
@@ -719,7 +719,7 @@ impl ExchangeArgs {
 
                 let builder = client.update_order(store, order.market_token(), address, params)?;
 
-                let signature = builder.build().send().await?;
+                let signature = builder.into_anchor_request().send().await?;
                 tracing::info!("updated a limit swap order {address} at tx {signature}");
             }
             Command::UpdateOrder {
@@ -749,7 +749,7 @@ impl ExchangeArgs {
                     let builder =
                         client.update_order(store, order.market_token(), address, params)?;
 
-                    let signature = builder.build().send().await?;
+                    let signature = builder.into_anchor_request().send().await?;
                     tracing::info!("updated an order {address} at tx {signature}");
                 } else {
                     return Err(gmsol::Error::invalid_argument(format!(

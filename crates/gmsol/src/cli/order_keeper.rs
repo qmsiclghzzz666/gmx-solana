@@ -288,7 +288,7 @@ impl KeeperArgs {
                     if let Some(budget) = self.get_compute_budget() {
                         rpc = rpc.compute_budget(budget)
                     }
-                    let signature = rpc.build().send().await?;
+                    let signature = rpc.into_anchor_request().send().await?;
                     tracing::info!(%deposit, "executed deposit at tx {signature}");
                     println!("{signature}");
                 }
@@ -348,7 +348,7 @@ impl KeeperArgs {
                     if let Some(budget) = self.get_compute_budget() {
                         rpc = rpc.compute_budget(budget)
                     }
-                    let signature = rpc.build().send().await?;
+                    let signature = rpc.into_anchor_request().send().await?;
                     tracing::info!(%withdrawal, "executed withdrawal at tx {signature}");
                     println!("{signature}");
                 }
@@ -627,7 +627,7 @@ impl KeeperArgs {
                     let signatures = builder
                         .build()
                         .await?
-                        .build_with_options(false, compute_unit_price_micro_lamports)
+                        .into_anchor_request_with_options(false, compute_unit_price_micro_lamports)
                         .0
                         .send()
                         .await?;

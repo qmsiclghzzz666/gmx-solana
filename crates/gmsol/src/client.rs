@@ -536,7 +536,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         );
         let status = crate::utils::view::<MarketStatus>(
             &self.data_store().solana_rpc(),
-            &req.build().signed_transaction().await?,
+            &req.into_anchor_request().signed_transaction().await?,
         )
         .await?;
         Ok(status)
@@ -554,7 +554,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         let req = self.get_market_token_price(store, market_token, prices, pnl_factor, maximize);
         let price = crate::utils::view::<u128>(
             &self.data_store().solana_rpc(),
-            &req.build().signed_transaction().await?,
+            &req.into_anchor_request().signed_transaction().await?,
         )
         .await?;
         Ok(price)
