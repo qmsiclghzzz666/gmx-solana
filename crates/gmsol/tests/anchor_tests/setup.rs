@@ -12,6 +12,7 @@ use std::{
 use anchor_client::{
     solana_client::rpc_config::RpcSendTransactionConfig,
     solana_sdk::{
+        address_lookup_table::AddressLookupTableAccount,
         commitment_config::CommitmentConfig,
         pubkey::Pubkey,
         signature::{Keypair, Signature},
@@ -23,6 +24,7 @@ use anchor_client::{
 use event_listener::Event;
 use eyre::{eyre, OptionExt};
 use gmsol::{
+    alt::AddressLookupTableOps,
     client::SystemProgramOps,
     exchange::ExchangeOps,
     pyth::{pull_oracle::ExecuteWithPythPrices, Hermes, PythPullOracle},
@@ -77,6 +79,7 @@ pub struct Deployment {
     synthetic_tokens: HashMap<String, Token>,
     /// Market tokens.
     market_tokens: HashMap<[String; 3], Pubkey>,
+    alt: AddressLookupTableAccount,
 }
 
 impl fmt::Debug for Deployment {
@@ -129,6 +132,11 @@ impl Deployment {
         let oracle_index = 255;
         let oracle = client.find_oracle_address(&store, oracle_index);
         let token_map = Keypair::generate(&mut rng);
+
+        let (rpc, alt) = client.create_alt().await?;
+        let signature = rpc.send_without_preflight().await?;
+        tracing::info!(%alt, %signature, "created an ALT for this deployment");
+
         Ok(Self {
             users: Users::new(&mut rng),
             rng,
@@ -143,6 +151,10 @@ impl Deployment {
             tokens: Default::default(),
             synthetic_tokens: Default::default(),
             market_tokens: Default::default(),
+            alt: AddressLookupTableAccount {
+                key: alt,
+                addresses: vec![],
+            },
         })
     }
 
@@ -205,6 +217,8 @@ impl Deployment {
             Self::SELECT_ADL_MARKET,
         ])
         .await?;
+
+        self.initialize_alt().await?;
 
         Ok(())
     }
@@ -604,6 +618,53 @@ impl Deployment {
         Ok(())
     }
 
+    async fn initialize_alt(&mut self) -> eyre::Result<()> {
+        debug_assert!(self.alt.addresses.is_empty());
+
+        let event_authority = self.client.data_store_event_authority();
+        let mut addresses = vec![self.store, self.token_map(), self.oracle, event_authority];
+
+        for token in self.tokens.values() {
+            addresses.push(token.address);
+            addresses.push(
+                self.client
+                    .find_market_vault_address(&self.store, &token.address),
+            );
+        }
+
+        let signature = self
+            .client
+            .extend_alt(&self.alt.key, addresses.clone())
+            .send_without_preflight()
+            .await?;
+
+        tracing::info!(len=%addresses.len(), %signature, "ALT extended");
+
+        let mut addresses_2 = vec![];
+        for market_token in self.market_tokens.values() {
+            let market = self.client.find_market_address(&self.store, market_token);
+            addresses_2.push(market);
+            addresses_2.push(*market_token);
+            addresses_2.push(
+                self.client
+                    .find_market_vault_address(&self.store, market_token),
+            );
+        }
+
+        let signature = self
+            .client
+            .extend_alt(&self.alt.key, addresses_2.clone())
+            .send_without_preflight()
+            .await?;
+
+        tracing::info!(len=%addresses.len(), %signature, "ALT extended");
+
+        addresses.append(&mut addresses_2);
+        self.alt.addresses = addresses;
+
+        Ok(())
+    }
+
     async fn fund_users(&self) -> eyre::Result<()> {
         const LAMPORTS: u64 = 500_000_000;
 
@@ -937,6 +998,10 @@ impl Deployment {
         self.execute_with_pyth(&mut builder, None, skip_preflight)
             .await?;
         Ok(market_token)
+    }
+
+    pub(crate) fn alt(&self) -> &AddressLookupTableAccount {
+        &self.alt
     }
 }
 

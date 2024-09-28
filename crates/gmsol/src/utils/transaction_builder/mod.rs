@@ -8,7 +8,7 @@ use anchor_client::{
     },
     solana_sdk::{
         commitment_config::CommitmentConfig, packet::PACKET_DATA_SIZE, signature::Signature,
-        signer::Signer, transaction::Transaction,
+        signer::Signer, transaction::VersionedTransaction,
     },
     ClientError,
 };
@@ -162,18 +162,16 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> TransactionBuilder<'a, C> {
                     "signing transaction {idx}"
                 );
                 builder
-                    .into_anchor_request_with_options(
+                    .signed_transaction_with_options(
                         without_compute_budget,
                         compute_unit_price_micro_lamports,
                     )
-                    .0
-                    .signed_transaction()
                     .await
             },
         ))
         .try_collect::<Vec<_>>()
         .await
-        .map_err(|err| (vec![], err.into()))?;
+        .map_err(|err| (vec![], err))?;
         send_all_txs(&self.client, txs, config).await
     }
 
@@ -209,7 +207,7 @@ impl<T> From<(T, crate::Error)> for crate::Error {
 
 async fn send_all_txs(
     client: &RpcClient,
-    txs: impl IntoIterator<Item = Transaction>,
+    txs: impl IntoIterator<Item = VersionedTransaction>,
     config: RpcSendTransactionConfig,
 ) -> Result<Vec<Signature>, (Vec<Signature>, crate::Error)> {
     let txs = txs.into_iter();

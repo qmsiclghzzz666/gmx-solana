@@ -215,7 +215,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
     }
 
     /// Find Event Authority Address.
-    pub fn find_event_authority_address(&self) -> Pubkey {
+    pub fn exchange_event_authority_address(&self) -> Pubkey {
         crate::pda::find_event_authority_address(&self.exchange_program_id()).0
     }
 

@@ -1,13 +1,14 @@
-use std::ops::Deref;
+use std::{collections::HashMap, ops::Deref};
 
 use anchor_client::{
     anchor_lang::{InstructionData, ToAccountMetas},
     solana_client::{nonblocking::rpc_client::RpcClient, rpc_config::RpcSendTransactionConfig},
     solana_sdk::{
+        address_lookup_table::AddressLookupTableAccount,
         commitment_config::CommitmentConfig,
         hash::Hash,
         instruction::{AccountMeta, Instruction},
-        message::VersionedMessage,
+        message::{v0, VersionedMessage},
         pubkey::Pubkey,
         signature::Signature,
         signer::Signer,
@@ -25,11 +26,11 @@ pub struct RpcBuilder<'a, C, T = ()> {
     program_id: Pubkey,
     cfg: Config<C>,
     signers: Vec<&'a dyn Signer>,
-    // builder: anchor_client::RequestBuilder<'a, C>,
     pre_instructions: Vec<Instruction>,
     accounts: Vec<AccountMeta>,
     instruction_data: Option<Vec<u8>>,
     compute_budget: ComputeBudget,
+    alts: HashMap<Pubkey, Vec<Pubkey>>,
 }
 
 /// Wallet Config.
@@ -120,6 +121,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> RpcBuilder<'a, C> {
             accounts: Default::default(),
             instruction_data: None,
             compute_budget: ComputeBudget::default(),
+            alts: Default::default(),
         }
     }
 
@@ -153,7 +155,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> RpcBuilder<'a, C> {
     /// Return error if the `payer`s are not the same.
     /// ## Notes
     /// - When success, the `other` will become a empty [`RpcBuilder`].
-    /// - All options including `cluster`, `commiment` and `program_id` will still be
+    /// - All options including `cluster`, `commiment`, and `program_id` will still be
     ///   the same of `self` after merging.
     pub fn try_merge(&mut self, other: &mut Self) -> crate::Result<()> {
         if self.cfg.payer.pubkey() != other.cfg.payer.pubkey() {
@@ -176,6 +178,9 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> RpcBuilder<'a, C> {
 
         // Merge compute budget.
         self.compute_budget += std::mem::take(&mut other.compute_budget);
+
+        // Merge ALTs.
+        self.alts.extend(other.alts.drain());
         Ok(())
     }
 }
@@ -291,6 +296,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone, T> RpcBuilder<'a, C, T> {
             accounts,
             instruction_data,
             compute_budget,
+            alts,
         } = self;
 
         (
@@ -303,6 +309,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone, T> RpcBuilder<'a, C, T> {
                 accounts,
                 instruction_data,
                 compute_budget,
+                alts,
             },
             previous,
         )
@@ -330,19 +337,56 @@ impl<'a, C: Deref<Target = impl Signer> + Clone, T> RpcBuilder<'a, C, T> {
         self
     }
 
+    /// Insert an address lookup table account.
+    pub fn lookup_table(mut self, account: AddressLookupTableAccount) -> Self {
+        self.alts.insert(account.key, account.addresses);
+        self
+    }
+
+    /// Insert many address lookup tables.
+    pub fn lookup_tables(
+        mut self,
+        tables: impl IntoIterator<Item = (Pubkey, Vec<Pubkey>)>,
+    ) -> Self {
+        self.alts.extend(tables);
+        self
+    }
+
+    fn v0_message_with_blockhash_and_options(
+        &self,
+        latest_hash: Hash,
+        without_compute_budget: bool,
+        compute_unit_price_micro_lamports: Option<u64>,
+    ) -> crate::Result<v0::Message> {
+        let instructions = self
+            .instructions_with_options(without_compute_budget, compute_unit_price_micro_lamports);
+        let alts = self
+            .alts
+            .iter()
+            .map(|(key, addresses)| AddressLookupTableAccount {
+                key: *key,
+                addresses: addresses.clone(),
+            })
+            .collect::<Vec<_>>();
+        let message =
+            v0::Message::try_compile(&self.cfg.payer(), &instructions, &alts, latest_hash)?;
+
+        Ok(message)
+    }
+
     fn message_with_blockhash_and_options(
         &self,
         latest_hash: Hash,
         without_compute_budget: bool,
         compute_unit_price_micro_lamports: Option<u64>,
     ) -> crate::Result<VersionedMessage> {
-        use anchor_client::solana_sdk::message::v0::Message;
-
-        let instructions = self
-            .instructions_with_options(without_compute_budget, compute_unit_price_micro_lamports);
-        let message = Message::try_compile(&self.cfg.payer(), &instructions, &[], latest_hash)?;
-
-        Ok(VersionedMessage::V0(message))
+        Ok(VersionedMessage::V0(
+            self.v0_message_with_blockhash_and_options(
+                latest_hash,
+                without_compute_budget,
+                compute_unit_price_micro_lamports,
+            )?,
+        ))
     }
 
     /// Get compiled message with options.
@@ -408,7 +452,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone, T> RpcBuilder<'a, C, T> {
         &self,
         without_compute_budget: bool,
         compute_unit_price_micro_lamports: Option<u64>,
-        config: RpcSendTransactionConfig,
+        mut config: RpcSendTransactionConfig,
     ) -> crate::Result<Signature> {
         let client = self.cfg.rpc();
         let latest_hash = client
@@ -421,6 +465,10 @@ impl<'a, C: Deref<Target = impl Signer> + Clone, T> RpcBuilder<'a, C, T> {
             without_compute_budget,
             compute_unit_price_micro_lamports,
         )?;
+
+        config.preflight_commitment = config
+            .preflight_commitment
+            .or(Some(client.commitment().commitment));
 
         let signature = client
             .send_and_confirm_transaction_with_config(&tx, config)
@@ -495,14 +543,15 @@ impl<'a, C: Deref<Target = impl Signer> + Clone, T> RpcBuilder<'a, C, T> {
         client: &RpcClient,
         compute_unit_price_micro_lamports: Option<u64>,
     ) -> crate::Result<u64> {
-        use anchor_client::solana_sdk::message::Message;
-
-        let ixs = self.instructions_with_options(false, compute_unit_price_micro_lamports);
         let blockhash = client
             .get_latest_blockhash()
             .await
             .map_err(anchor_client::ClientError::from)?;
-        let message = Message::new_with_blockhash(&ixs, Some(&self.cfg.payer.pubkey()), &blockhash);
+        let message = self.v0_message_with_blockhash_and_options(
+            blockhash,
+            false,
+            compute_unit_price_micro_lamports,
+        )?;
         let fee = client
             .get_fee_for_message(&message)
             .await

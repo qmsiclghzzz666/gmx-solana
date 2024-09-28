@@ -382,8 +382,9 @@ async fn liquidation() -> eyre::Result<()> {
 
         // Liquidate.
         let mut builder = keeper.liquidate(oracle, &position)?;
+
         deployment
-            .execute_with_pyth(&mut builder, None, true)
+            .execute_with_pyth(builder.add_alt(deployment.alt().clone()), None, true)
             .instrument(tracing::info_span!("liquidate", position=%position))
             .await?;
 

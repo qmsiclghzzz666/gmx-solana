@@ -1,8 +1,8 @@
-use std::{ops::Deref, sync::Arc};
+use std::{collections::HashMap, ops::Deref, sync::Arc};
 
 use anchor_client::{
     anchor_lang::{system_program, Id},
-    solana_sdk::{pubkey::Pubkey, signer::Signer},
+    solana_sdk::{address_lookup_table::AddressLookupTableAccount, pubkey::Pubkey, signer::Signer},
 };
 use anchor_spl::associated_token::get_associated_token_address;
 use gmsol_store::{
@@ -42,6 +42,7 @@ pub struct PositionCutBuilder<'a, C> {
     feeds_parser: FeedsParser,
     close: bool,
     event_buffer_index: u8,
+    alts: HashMap<Pubkey, Vec<Pubkey>>,
 }
 
 /// Hint for `PositionCut`.
@@ -141,6 +142,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> PositionCutBuilder<'a, C> {
             feeds_parser: Default::default(),
             close: true,
             event_buffer_index: 0,
+            alts: Default::default(),
         })
     }
 
@@ -184,6 +186,12 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> PositionCutBuilder<'a, C> {
     /// Set execution fee.
     pub fn execution_fee(&mut self, lamports: u64) -> &mut Self {
         self.execution_fee = lamports;
+        self
+    }
+
+    /// Insert an Address Lookup Table.
+    pub fn add_alt(&mut self, account: AddressLookupTableAccount) -> &mut Self {
+        self.alts.insert(account.key, account.addresses);
         self
     }
 
@@ -301,7 +309,8 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> PositionCutBuilder<'a, C> {
                 program: self.client.store_program_id(),
             })
             .accounts(feeds)
-            .compute_budget(ComputeBudget::default().with_limit(POSITION_CUT_COMPUTE_BUDGET));
+            .compute_budget(ComputeBudget::default().with_limit(POSITION_CUT_COMPUTE_BUDGET))
+            .lookup_tables(self.alts.clone());
 
         match self.kind {
             PositionCutKind::Liquidate => {
