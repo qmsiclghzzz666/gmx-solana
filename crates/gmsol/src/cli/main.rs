@@ -134,7 +134,7 @@ impl Cli {
 
     async fn store(&self, client: &GMSOLClient) -> eyre::Result<(Pubkey, String)> {
         if let Some(address) = self.store_address {
-            let store = read_store(&client.data_store().async_rpc(), &address).await?;
+            let store = read_store(&client.data_store().solana_rpc(), &address).await?;
             Ok((address, store.key()?.to_owned()))
         } else {
             let store = client.find_store_address(&self.store);

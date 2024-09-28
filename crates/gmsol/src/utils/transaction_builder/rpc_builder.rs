@@ -10,7 +10,7 @@ use anchor_client::{
         signature::Signature,
         signer::Signer,
     },
-    Program,
+    Cluster,
 };
 
 use super::{compute_budget::ComputeBudget, transaction_size::transaction_size};
@@ -20,24 +20,99 @@ use super::{compute_budget::ComputeBudget, transaction_size::transaction_size};
 pub struct RpcBuilder<'a, C, T = ()> {
     output: T,
     program_id: Pubkey,
-    payer: Pubkey,
+    cfg: Config<C>,
     signers: Vec<&'a dyn Signer>,
-    builder: anchor_client::RequestBuilder<'a, C>,
+    // builder: anchor_client::RequestBuilder<'a, C>,
     pre_instructions: Vec<Instruction>,
     accounts: Vec<AccountMeta>,
     instruction_data: Option<Vec<u8>>,
     compute_budget: ComputeBudget,
 }
 
+/// Wallet Config.
+#[derive(Clone)]
+pub struct Config<C> {
+    cluster: Cluster,
+    payer: C,
+    options: CommitmentConfig,
+}
+
+impl<C> Config<C> {
+    pub(crate) fn new(cluster: Cluster, payer: C, options: CommitmentConfig) -> Self {
+        Self {
+            cluster,
+            payer,
+            options,
+        }
+    }
+
+    /// Get cluster.
+    pub fn cluster(&self) -> &Cluster {
+        &self.cluster
+    }
+
+    /// Get commitment config.
+    pub fn commitment(&self) -> &CommitmentConfig {
+        &self.options
+    }
+
+    /// Create a Solana RPC Client.
+    pub fn rpc(&self) -> RpcClient {
+        RpcClient::new_with_commitment(self.cluster.url().to_string(), self.options)
+    }
+}
+
+impl<C: Deref<Target = impl Signer>> Config<C> {
+    /// Get payer pubkey.
+    pub fn payer(&self) -> Pubkey {
+        self.payer.pubkey()
+    }
+}
+
+/// Program.
+pub struct Program<C> {
+    program_id: Pubkey,
+    cfg: Config<C>,
+}
+
+impl<C> Program<C> {
+    pub fn new(program_id: Pubkey, cfg: Config<C>) -> Self {
+        Self { program_id, cfg }
+    }
+
+    /// Create a Solana RPC Client.
+    pub fn solana_rpc(&self) -> RpcClient {
+        self.cfg.rpc()
+    }
+
+    /// Get the program id.
+    pub fn id(&self) -> &Pubkey {
+        &self.program_id
+    }
+}
+
+impl<C: Deref<Target = impl Signer> + Clone> Program<C> {
+    /// Create a [`RpcBuilder`].
+    pub fn rpc(&self) -> RpcBuilder<C> {
+        RpcBuilder::new(self.program_id, &self.cfg)
+    }
+}
+
+impl<C: Deref<Target = impl Signer>> Program<C> {
+    /// Get the pubkey of the payer.
+    pub fn payer(&self) -> Pubkey {
+        self.cfg.payer()
+    }
+}
+
 impl<'a, C: Deref<Target = impl Signer> + Clone> RpcBuilder<'a, C> {
     /// Create a new [`RpcBuilder`] from [`Program`].
-    pub fn new(program: &'a Program<C>) -> Self {
+    pub fn new(program_id: Pubkey, cfg: &'a Config<C>) -> Self {
         Self {
             output: (),
-            payer: program.payer(),
+            program_id,
+            cfg: cfg.clone(),
             signers: Default::default(),
-            program_id: program.id(),
-            builder: program.request(),
             pre_instructions: Default::default(),
             accounts: Default::default(),
             instruction_data: None,
@@ -78,7 +153,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> RpcBuilder<'a, C> {
     /// - All options including `cluster`, `commiment` and `program_id` will still be
     ///   the same of `self` after merging.
     pub fn try_merge(&mut self, other: &mut Self) -> crate::Result<()> {
-        if self.payer != other.payer {
+        if self.cfg.payer.pubkey() != other.cfg.payer.pubkey() {
             return Err(crate::Error::invalid_argument("payer mismatched"));
         }
 
@@ -104,20 +179,19 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> RpcBuilder<'a, C> {
 
 impl<'a, C: Deref<Target = impl Signer> + Clone, T> RpcBuilder<'a, C, T> {
     pub fn payer(mut self, payer: C) -> Self {
-        self.payer = payer.pubkey();
-        self.builder = self.builder.payer(payer);
+        self.cfg.payer = payer;
         self
     }
 
     /// Set cluster.
-    pub fn cluster(mut self, url: &str) -> Self {
-        self.builder = self.builder.cluster(url);
-        self
+    pub fn cluster(mut self, url: &str) -> crate::Result<Self> {
+        self.cfg.cluster = url.parse().map_err(crate::Error::invalid_argument)?;
+        Ok(self)
     }
 
     /// Set commiment options.
     pub fn options(mut self, options: CommitmentConfig) -> Self {
-        self.builder = self.builder.options(options);
+        self.cfg.options = options;
         self
     }
 
@@ -206,11 +280,10 @@ impl<'a, C: Deref<Target = impl Signer> + Clone, T> RpcBuilder<'a, C, T> {
     /// Set the output and return the previous.
     pub fn swap_output<U>(self, output: U) -> (RpcBuilder<'a, C, U>, T) {
         let Self {
-            payer,
+            cfg,
             signers,
             output: previous,
             program_id,
-            builder,
             pre_instructions,
             accounts,
             instruction_data,
@@ -219,11 +292,10 @@ impl<'a, C: Deref<Target = impl Signer> + Clone, T> RpcBuilder<'a, C, T> {
 
         (
             RpcBuilder {
-                payer,
                 signers,
                 output,
+                cfg,
                 program_id,
-                builder,
                 pre_instructions,
                 accounts,
                 instruction_data,
@@ -277,16 +349,16 @@ impl<'a, C: Deref<Target = impl Signer> + Clone, T> RpcBuilder<'a, C, T> {
         without_compute_budget: bool,
         compute_unit_price_micro_lamports: Option<u64>,
     ) -> (anchor_client::RequestBuilder<'a, C>, T) {
-        debug_assert!(
-            self.builder.instructions().unwrap().is_empty(),
-            "non-empty builder"
+        let request = anchor_client::RequestBuilder::from(
+            self.program_id,
+            self.cfg.cluster.url(),
+            self.cfg.payer.clone(),
+            Some(self.cfg.options),
         );
         let request = self
             .instructions_with_options(without_compute_budget, compute_unit_price_micro_lamports)
             .into_iter()
-            .fold(self.builder.program(self.program_id), |acc, ix| {
-                acc.instruction(ix)
-            });
+            .fold(request, |acc, ix| acc.instruction(ix));
         let request = self
             .signers
             .into_iter()
@@ -314,7 +386,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone, T> RpcBuilder<'a, C, T> {
             .get_latest_blockhash()
             .await
             .map_err(anchor_client::ClientError::from)?;
-        let message = Message::new_with_blockhash(&ixs, Some(&self.payer), &blockhash);
+        let message = Message::new_with_blockhash(&ixs, Some(&self.cfg.payer.pubkey()), &blockhash);
         let fee = client
             .get_fee_for_message(&message)
             .await

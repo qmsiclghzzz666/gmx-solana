@@ -17,7 +17,7 @@ use gmsol_store::{
 use crate::{
     exchange::ExchangeOps,
     store::utils::{read_market, FeedsParser},
-    utils::{ComputeBudget, RpcBuilder, ZeroCopy},
+    utils::{ComputeBudget, RpcBuilder},
 };
 
 use super::generate_nonce;
@@ -151,7 +151,7 @@ where
                     (long_token.is_none() && long_amount != 0)
                         || (short_token.is_none() && short_amount != 0)
                 );
-                let market = read_market(&self.client.data_store().async_rpc(), market).await?;
+                let market = read_market(&self.client.data_store().solana_rpc(), market).await?;
                 if long_amount != 0 && long_token.is_none() {
                     long_token = Some(market.meta().long_token_mint);
                 }
@@ -385,9 +385,8 @@ where
         match &self.hint {
             Some(hint) => Ok(*hint),
             None => {
-                let deposit: ZeroCopy<DepositV2> =
-                    self.client.data_store().account(self.deposit).await?;
-                Ok(CloseDepositHint::new(&deposit.0))
+                let deposit = self.client.deposit(&self.deposit).await?;
+                Ok(CloseDepositHint::new(&deposit))
             }
         }
     }
@@ -559,9 +558,8 @@ where
             Some(hint) => Ok(hint.clone()),
             None => {
                 let map = self.client.authorized_token_map(&self.store).await?;
-                let deposit: ZeroCopy<DepositV2> =
-                    self.client.data_store().account(self.deposit).await?;
-                let hint = ExecuteDepositHint::new(&deposit.0, &map)?;
+                let deposit = self.client.deposit(&self.deposit).await?;
+                let hint = ExecuteDepositHint::new(&deposit, &map)?;
                 self.hint = Some(hint.clone());
                 Ok(hint)
             }
@@ -572,7 +570,11 @@ where
         if let Some(address) = self.token_map {
             Ok(address)
         } else {
-            crate::store::utils::token_map(self.client.data_store(), &self.store).await
+            Ok(self
+                .client
+                .authorized_token_map_address(&self.store)
+                .await?
+                .ok_or(crate::Error::NotFound)?)
         }
     }
 

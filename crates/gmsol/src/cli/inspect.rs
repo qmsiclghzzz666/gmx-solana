@@ -220,7 +220,6 @@ impl MarketPrices {
 
 impl InspectArgs {
     pub(super) async fn run(&self, client: &GMSOLClient, store: &Pubkey) -> gmsol::Result<()> {
-        let program = client.data_store();
         match &self.command {
             Command::Discriminator { name } => {
                 println!("{:?}", crate::utils::generate_discriminator(name));
@@ -533,9 +532,10 @@ impl InspectArgs {
                 }
             }
             Command::MarketConfigBuffer { address, debug } => {
-                let buffer = program
-                    .account::<states::MarketConfigBuffer>(*address)
-                    .await?;
+                let buffer = client
+                    .account::<states::MarketConfigBuffer>(address)
+                    .await?
+                    .ok_or(gmsol::Error::NotFound)?;
                 if *debug {
                     println!("{buffer:#?}");
                 } else {
@@ -595,7 +595,7 @@ impl InspectArgs {
                 println!("Controller: {controller}");
                 match client
                     .data_store()
-                    .async_rpc()
+                    .solana_rpc()
                     .get_balance(&controller)
                     .await
                 {
@@ -632,7 +632,13 @@ impl InspectArgs {
             Command::Oracle { oracle } => {
                 let address = oracle.address(Some(store), &client.store_program_id())?;
                 println!("{address}");
-                println!("{:#?}", program.account::<states::Oracle>(address).await?);
+                println!(
+                    "{:#?}",
+                    client
+                        .account::<states::Oracle>(&address)
+                        .await?
+                        .ok_or(gmsol::Error::NotFound)
+                );
             }
             Command::Order { address, event } => {
                 if let Some(address) = address {
@@ -831,7 +837,7 @@ impl InspectArgs {
                 tracing::info!("{:#?}", update.parsed());
 
                 if *post {
-                    let oracle = PythPullOracle::try_new(client.anchor())?;
+                    let oracle = PythPullOracle::try_new(client)?;
                     let mut ctx = PythPullOracleContext::new(feed_ids);
                     let prices = oracle
                         .with_pyth_prices(&mut ctx, &update, |prices| {

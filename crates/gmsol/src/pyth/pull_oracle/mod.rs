@@ -19,7 +19,6 @@ use anchor_client::{
         signature::{Keypair, Signature},
         signer::Signer,
     },
-    Client, Program,
 };
 use either::Either;
 use gmsol_store::states::common::TokensWithFeed;
@@ -27,7 +26,7 @@ use hermes::BinaryPriceUpdate;
 use pyth_sdk::Identifier;
 use pythnet_sdk::wire::v1::AccumulatorUpdateData;
 
-use crate::utils::{RpcBuilder, TransactionBuilder};
+use crate::utils::{transaction_builder::rpc_builder::Program, RpcBuilder, TransactionBuilder};
 
 use self::wormhole::WORMHOLE_PROGRAM_ID;
 
@@ -216,8 +215,8 @@ pub trait PythPullOracleOps<C> {
             let wormhole = self.wormhole();
             let pyth = self.pyth();
             let mut prices = HashMap::with_capacity(ctx.feeds.len());
-            let mut post = TransactionBuilder::new(pyth.async_rpc());
-            let mut close = TransactionBuilder::new(pyth.async_rpc());
+            let mut post = TransactionBuilder::new(pyth.solana_rpc());
+            let mut close = TransactionBuilder::new(pyth.solana_rpc());
 
             let datas = updates
                 .into_iter()
@@ -353,10 +352,10 @@ where
     S: Signer,
 {
     /// Create a new [`PythPullOracle`] client from [`Client`].
-    pub fn try_new(client: &Client<C>) -> crate::Result<Self> {
+    pub fn try_new(client: &crate::Client<C>) -> crate::Result<Self> {
         Ok(Self {
-            wormhole: client.program(WORMHOLE_PROGRAM_ID)?,
-            pyth: client.program(pyth_solana_receiver_sdk::ID)?,
+            wormhole: client.program(WORMHOLE_PROGRAM_ID),
+            pyth: client.program(pyth_solana_receiver_sdk::ID),
         })
     }
 }

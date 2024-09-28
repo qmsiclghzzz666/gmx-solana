@@ -3,7 +3,6 @@ use std::{future::Future, ops::Deref};
 use anchor_client::{
     anchor_lang::system_program,
     solana_sdk::{pubkey::Pubkey, signer::Signer},
-    RequestBuilder,
 };
 use gmsol_store::{
     accounts, instruction,
@@ -93,7 +92,7 @@ pub trait TokenConfigOps<C> {
         token_map: &Pubkey,
         token: &Pubkey,
         enable: bool,
-    ) -> RequestBuilder<C>;
+    ) -> RpcBuilder<C>;
 
     /// Set expected provider.
     fn set_expected_provider(
@@ -102,22 +101,22 @@ pub trait TokenConfigOps<C> {
         token_map: &Pubkey,
         token: &Pubkey,
         provider: PriceProviderKind,
-    ) -> RequestBuilder<C>;
+    ) -> RpcBuilder<C>;
 
     /// Get the name for the given token.
-    fn token_name(&self, token_map: &Pubkey, token: &Pubkey) -> RequestBuilder<C>;
+    fn token_name(&self, token_map: &Pubkey, token: &Pubkey) -> RpcBuilder<C>;
 
     /// Get the token decimals for the given token.
-    fn token_decimals(&self, token_map: &Pubkey, token: &Pubkey) -> RequestBuilder<C>;
+    fn token_decimals(&self, token_map: &Pubkey, token: &Pubkey) -> RpcBuilder<C>;
 
     /// Get the price precision for the given token.
-    fn token_precision(&self, token_map: &Pubkey, token: &Pubkey) -> RequestBuilder<C>;
+    fn token_precision(&self, token_map: &Pubkey, token: &Pubkey) -> RpcBuilder<C>;
 
     /// Check if the config of the given token is enbaled.
-    fn is_token_config_enabled(&self, token_map: &Pubkey, token: &Pubkey) -> RequestBuilder<C>;
+    fn is_token_config_enabled(&self, token_map: &Pubkey, token: &Pubkey) -> RpcBuilder<C>;
 
     /// Get expected provider for the given token.
-    fn token_expected_provider(&self, token_map: &Pubkey, token: &Pubkey) -> RequestBuilder<C>;
+    fn token_expected_provider(&self, token_map: &Pubkey, token: &Pubkey) -> RpcBuilder<C>;
 
     /// Get feed address of the provider of the given token.
     fn token_feed(
@@ -125,7 +124,7 @@ pub trait TokenConfigOps<C> {
         token_map: &Pubkey,
         token: &Pubkey,
         provider: PriceProviderKind,
-    ) -> RequestBuilder<C>;
+    ) -> RpcBuilder<C>;
 
     /// Get timestamp adjustment of the given token and provider.
     fn token_timestamp_adjustment(
@@ -133,7 +132,7 @@ pub trait TokenConfigOps<C> {
         token_map: &Pubkey,
         token: &Pubkey,
         provider: PriceProviderKind,
-    ) -> RequestBuilder<C>;
+    ) -> RpcBuilder<C>;
 
     /// Get basic token config.
     fn token_config(
@@ -228,10 +227,9 @@ where
         token_map: &Pubkey,
         token: &Pubkey,
         enable: bool,
-    ) -> RequestBuilder<C> {
+    ) -> RpcBuilder<C> {
         let authority = self.payer();
-        self.data_store()
-            .request()
+        self.data_store_rpc()
             .accounts(accounts::ToggleTokenConfig {
                 authority,
                 store: *store,
@@ -249,10 +247,9 @@ where
         token_map: &Pubkey,
         token: &Pubkey,
         provider: PriceProviderKind,
-    ) -> RequestBuilder<C> {
+    ) -> RpcBuilder<C> {
         let authority = self.payer();
-        self.data_store()
-            .request()
+        self.data_store_rpc()
             .accounts(accounts::SetExpectedProvider {
                 authority,
                 store: *store,
@@ -264,45 +261,40 @@ where
             })
     }
 
-    fn token_name(&self, token_map: &Pubkey, token: &Pubkey) -> RequestBuilder<C> {
-        self.data_store()
-            .request()
+    fn token_name(&self, token_map: &Pubkey, token: &Pubkey) -> RpcBuilder<C> {
+        self.data_store_rpc()
             .args(instruction::TokenName { token: *token })
             .accounts(accounts::ReadTokenMap {
                 token_map: *token_map,
             })
     }
 
-    fn token_decimals(&self, token_map: &Pubkey, token: &Pubkey) -> RequestBuilder<C> {
-        self.data_store()
-            .request()
+    fn token_decimals(&self, token_map: &Pubkey, token: &Pubkey) -> RpcBuilder<C> {
+        self.data_store_rpc()
             .args(instruction::TokenDecimals { token: *token })
             .accounts(accounts::ReadTokenMap {
                 token_map: *token_map,
             })
     }
 
-    fn token_precision(&self, token_map: &Pubkey, token: &Pubkey) -> RequestBuilder<C> {
-        self.data_store()
-            .request()
+    fn token_precision(&self, token_map: &Pubkey, token: &Pubkey) -> RpcBuilder<C> {
+        self.data_store_rpc()
             .args(instruction::TokenPrecision { token: *token })
             .accounts(accounts::ReadTokenMap {
                 token_map: *token_map,
             })
     }
 
-    fn is_token_config_enabled(&self, token_map: &Pubkey, token: &Pubkey) -> RequestBuilder<C> {
-        self.data_store()
-            .request()
+    fn is_token_config_enabled(&self, token_map: &Pubkey, token: &Pubkey) -> RpcBuilder<C> {
+        self.data_store_rpc()
             .args(instruction::IsTokenConfigEnabled { token: *token })
             .accounts(accounts::ReadTokenMap {
                 token_map: *token_map,
             })
     }
 
-    fn token_expected_provider(&self, token_map: &Pubkey, token: &Pubkey) -> RequestBuilder<C> {
-        self.data_store()
-            .request()
+    fn token_expected_provider(&self, token_map: &Pubkey, token: &Pubkey) -> RpcBuilder<C> {
+        self.data_store_rpc()
             .args(instruction::TokenExpectedProvider { token: *token })
             .accounts(accounts::ReadTokenMap {
                 token_map: *token_map,
@@ -314,9 +306,8 @@ where
         token_map: &Pubkey,
         token: &Pubkey,
         provider: PriceProviderKind,
-    ) -> RequestBuilder<C> {
-        self.data_store()
-            .request()
+    ) -> RpcBuilder<C> {
+        self.data_store_rpc()
             .args(instruction::TokenFeed {
                 token: *token,
                 provider: provider as u8,
@@ -331,9 +322,8 @@ where
         token_map: &Pubkey,
         token: &Pubkey,
         provider: PriceProviderKind,
-    ) -> RequestBuilder<C> {
-        self.data_store()
-            .request()
+    ) -> RpcBuilder<C> {
+        self.data_store_rpc()
             .args(instruction::TokenTimestampAdjustment {
                 token: *token,
                 provider: provider as u8,
@@ -344,25 +334,30 @@ where
     }
 
     async fn token_config(&self, token_map: &Pubkey, token: &Pubkey) -> crate::Result<TokenConfig> {
-        let client = self.data_store().async_rpc();
+        let client = self.data_store().solana_rpc();
         let name = self
             .token_name(token_map, token)
+            .build()
             .signed_transaction()
             .await?;
         let token_decimals = self
             .token_decimals(token_map, token)
+            .build()
             .signed_transaction()
             .await?;
         let precision = self
             .token_precision(token_map, token)
+            .build()
             .signed_transaction()
             .await?;
         let expected_provider = self
             .token_expected_provider(token_map, token)
+            .build()
             .signed_transaction()
             .await?;
         let is_enabled = self
             .is_token_config_enabled(token_map, token)
+            .build()
             .signed_transaction()
             .await?;
 

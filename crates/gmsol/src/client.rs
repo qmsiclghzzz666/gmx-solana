@@ -7,7 +7,7 @@ use anchor_client::{
         rpc_filter::{Memcmp, RpcFilterType},
     },
     solana_sdk::{commitment_config::CommitmentConfig, pubkey::Pubkey, signer::Signer},
-    Cluster, Program,
+    Cluster,
 };
 
 use gmsol_model::{action::Prices, PnlFactorKind};
@@ -20,8 +20,10 @@ use crate::{
     store::market::MarketOps,
     types,
     utils::{
-        account_with_context, accounts_lazy_with_context, ProgramAccountsConfig, PubsubClient,
-        RpcBuilder, SubscriptionConfig, TransactionBuilder, WithContext, ZeroCopy,
+        account_with_context, accounts_lazy_with_context,
+        transaction_builder::rpc_builder::{Config, Program},
+        ProgramAccountsConfig, PubsubClient, RpcBuilder, SubscriptionConfig, TransactionBuilder,
+        WithContext, ZeroCopy,
     },
 };
 
@@ -48,14 +50,12 @@ impl Default for ClientOptions {
 
 /// GMSOL Client.
 pub struct Client<C> {
-    cluster: Cluster,
-    wallet: C,
+    cfg: Config<C>,
     anchor: Arc<anchor_client::Client<C>>,
     data_store: Program<C>,
     exchange: Program<C>,
     pub_sub: OnceCell<PubsubClient>,
     subscription_config: SubscriptionConfig,
-    commitment: CommitmentConfig,
 }
 
 impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
@@ -73,15 +73,21 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         } = options;
         let anchor =
             anchor_client::Client::new_with_options(cluster.clone(), payer.clone(), commitment);
+        let cfg = Config::new(cluster, payer, commitment);
         Ok(Self {
-            cluster,
-            wallet: payer,
-            data_store: anchor.program(data_store_program_id.unwrap_or(gmsol_store::id()))?,
-            exchange: anchor.program(exchange_program_id.unwrap_or(gmsol_exchange::id()))?,
+            data_store: Program::new(
+                data_store_program_id.unwrap_or(gmsol_store::id()),
+                cfg.clone(),
+            ),
+            exchange: Program::new(
+                exchange_program_id.unwrap_or(gmsol_exchange::id()),
+                cfg.clone(),
+            ),
+            cfg,
+
             anchor: Arc::new(anchor),
             pub_sub: OnceCell::default(),
             subscription_config: subscription,
-            commitment,
         })
     }
 
@@ -96,12 +102,12 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         payer: C2,
     ) -> crate::Result<Client<C2>> {
         Client::new_with_options(
-            self.cluster.clone(),
+            self.cluster().clone(),
             payer,
             ClientOptions {
                 data_store_program_id: Some(self.store_program_id()),
                 exchange_program_id: Some(self.exchange_program_id()),
-                commitment: self.commitment,
+                commitment: self.commitment(),
                 subscription: self.subscription_config.clone(),
             },
         )
@@ -110,14 +116,12 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
     /// Try to clone the client.
     pub fn try_clone(&self) -> crate::Result<Self> {
         Ok(Self {
-            cluster: self.cluster.clone(),
-            wallet: self.wallet.clone(),
+            cfg: self.cfg.clone(),
             anchor: self.anchor.clone(),
-            data_store: self.anchor.program(self.store_program_id())?,
-            exchange: self.anchor.program(self.exchange_program_id())?,
+            data_store: self.program(self.store_program_id()),
+            exchange: self.program(self.exchange_program_id()),
             pub_sub: OnceCell::default(),
             subscription_config: self.subscription_config.clone(),
-            commitment: self.commitment,
         })
     }
 
@@ -132,24 +136,24 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         &self.anchor
     }
 
+    /// Create a new [`Program`] with the given program id.
+    pub fn program(&self, program_id: Pubkey) -> Program<C> {
+        Program::new(program_id, self.cfg.clone())
+    }
+
     /// Get the cluster.
     pub fn cluster(&self) -> &Cluster {
-        &self.cluster
+        self.cfg.cluster()
     }
 
     /// Get the commitment config.
     pub fn commitment(&self) -> CommitmentConfig {
-        self.commitment
+        *self.cfg.commitment()
     }
 
     /// Get the payer.
     pub fn payer(&self) -> Pubkey {
-        self.wallet.pubkey()
-    }
-
-    /// Create other program using client's wallet.
-    pub fn program(&self, program_id: Pubkey) -> crate::Result<Program<C>> {
-        Ok(self.anchor.program(program_id)?)
+        self.cfg.payer()
     }
 
     /// Get `DataStore` Program.
@@ -164,27 +168,27 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
 
     /// Create a new `DataStore` Program.
     pub fn new_data_store(&self) -> crate::Result<Program<C>> {
-        self.program(self.store_program_id())
+        Ok(self.program(self.store_program_id()))
     }
 
     /// Create a new `Exchange` Program.
     pub fn new_exchange(&self) -> crate::Result<Program<C>> {
-        self.program(self.exchange_program_id())
+        Ok(self.program(self.exchange_program_id()))
     }
 
     /// Get the program id of `Store` program.
     pub fn store_program_id(&self) -> Pubkey {
-        self.data_store().id()
+        *self.data_store().id()
     }
 
     /// Get the program id of `Exchange` program.
     pub fn exchange_program_id(&self) -> Pubkey {
-        self.exchange().id()
+        *self.exchange().id()
     }
 
     /// Create a rpc request for `DataStore` Program.
     pub fn data_store_rpc(&self) -> RpcBuilder<'_, C> {
-        RpcBuilder::new(&self.data_store)
+        RpcBuilder::new(self.store_program_id(), &self.cfg)
     }
 
     /// Create a transaction builder with the given options.
@@ -194,7 +198,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         max_packet_size: Option<usize>,
     ) -> TransactionBuilder<'_, C> {
         TransactionBuilder::new_with_options(
-            self.data_store.async_rpc(),
+            self.data_store.solana_rpc(),
             force_one_transaction,
             max_packet_size,
         )
@@ -207,7 +211,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
 
     /// Create a rpc request for `Exchange` Program.
     pub fn exchange_rpc(&self) -> RpcBuilder<'_, C> {
-        RpcBuilder::new(&self.exchange)
+        RpcBuilder::new(self.exchange_program_id(), &self.cfg)
     }
 
     /// Find Event Authority Address.
@@ -340,8 +344,8 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
     pub async fn get_slot(&self, commitment: Option<CommitmentConfig>) -> crate::Result<u64> {
         let slot = self
             .data_store()
-            .async_rpc()
-            .get_slot_with_commitment(commitment.unwrap_or(self.commitment))
+            .solana_rpc()
+            .get_slot_with_commitment(commitment.unwrap_or(self.commitment()))
             .await
             .map_err(anchor_client::ClientError::from)?;
         Ok(slot)
@@ -385,8 +389,19 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         T: AccountDeserialize,
     {
         config.encoding = Some(config.encoding.unwrap_or(UiAccountEncoding::Base64));
-        let client = self.data_store().async_rpc();
+        let client = self.data_store().solana_rpc();
         account_with_context(&client, address, config).await
+    }
+
+    /// Fetch account at the given address.
+    pub async fn account<T: AccountDeserialize>(
+        &self,
+        address: &Pubkey,
+    ) -> crate::Result<Option<T>> {
+        Ok(self
+            .account_with_config(address, Default::default())
+            .await?
+            .into_value())
     }
 
     /// Fetch accounts owned by the Store Program.
@@ -412,9 +427,9 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
     /// Fetch [`Store`](types::Store) account with its address.
     pub async fn store(&self, address: &Pubkey) -> crate::Result<types::Store> {
         Ok(self
-            .data_store()
-            .account::<ZeroCopy<types::Store>>(*address)
+            .account::<ZeroCopy<types::Store>>(address)
             .await?
+            .ok_or(crate::Error::NotFound)?
             .0)
     }
 
@@ -434,7 +449,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
 
     /// Fetch [`TokenMap`](types::TokenMap) account with its address.
     pub async fn token_map(&self, address: &Pubkey) -> crate::Result<types::TokenMap> {
-        Ok(self.data_store().account(*address).await?)
+        self.account(address).await?.ok_or(crate::Error::NotFound)
     }
 
     /// Fetch the authorized token map of the given store.
@@ -497,9 +512,9 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
     /// Fetch [`Market`](types::Market) account with its address.
     pub async fn market(&self, address: &Pubkey) -> crate::Result<types::Market> {
         Ok(self
-            .data_store()
-            .account::<ZeroCopy<types::Market>>(*address)
+            .account::<ZeroCopy<types::Market>>(address)
             .await?
+            .ok_or(crate::Error::NotFound)?
             .0)
     }
 
@@ -520,8 +535,8 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
             maximize_pool_value,
         );
         let status = crate::utils::view::<MarketStatus>(
-            &self.data_store().async_rpc(),
-            &req.signed_transaction().await?,
+            &self.data_store().solana_rpc(),
+            &req.build().signed_transaction().await?,
         )
         .await?;
         Ok(status)
@@ -538,8 +553,8 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
     ) -> crate::Result<u128> {
         let req = self.get_market_token_price(store, market_token, prices, pnl_factor, maximize);
         let price = crate::utils::view::<u128>(
-            &self.data_store().async_rpc(),
-            &req.signed_transaction().await?,
+            &self.data_store().solana_rpc(),
+            &req.build().signed_transaction().await?,
         )
         .await?;
         Ok(price)
@@ -587,18 +602,18 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
     /// Fetch [`Position`](types::Position) account with its address.
     pub async fn position(&self, address: &Pubkey) -> crate::Result<types::Position> {
         let position = self
-            .data_store()
-            .account::<ZeroCopy<types::Position>>(*address)
-            .await?;
+            .account::<ZeroCopy<types::Position>>(address)
+            .await?
+            .ok_or(crate::Error::NotFound)?;
         Ok(position.0)
     }
 
     /// Fetch [`Order`](types::Order) account with its address.
     pub async fn order(&self, address: &Pubkey) -> crate::Result<types::OrderV2> {
         Ok(self
-            .data_store()
-            .account::<ZeroCopy<types::OrderV2>>(*address)
+            .account::<ZeroCopy<types::OrderV2>>(address)
             .await?
+            .ok_or(crate::Error::NotFound)?
             .0)
     }
 
@@ -650,12 +665,16 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
 
     /// Fetch [`Depsoit`](types::DepositV2) account with its address.
     pub async fn deposit(&self, address: &Pubkey) -> crate::Result<types::DepositV2> {
-        Ok(self.data_store().account::<ZeroCopy<_>>(*address).await?.0)
+        Ok(self
+            .account::<ZeroCopy<_>>(address)
+            .await?
+            .ok_or(crate::Error::NotFound)?
+            .0)
     }
 
     /// Fetch [`Withdrawal`](types::Withdrawal) account with its address.
     pub async fn withdrawal(&self, address: &Pubkey) -> crate::Result<types::Withdrawal> {
-        Ok(self.data_store().account(*address).await?)
+        self.account(address).await?.ok_or(crate::Error::NotFound)
     }
 
     /// Get the [`PubsubClient`].
@@ -663,7 +682,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         let client = self
             .pub_sub
             .get_or_try_init(|| {
-                PubsubClient::new(self.cluster.clone(), self.subscription_config.clone())
+                PubsubClient::new(self.cluster().clone(), self.subscription_config.clone())
             })
             .await?;
         Ok(client)
@@ -688,7 +707,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
 
         let program_id = self.store_program_id();
         let event_authority = self.data_store_event_authority();
-        let query = Arc::new(self.data_store().async_rpc());
+        let query = Arc::new(self.data_store().solana_rpc());
         let commitment = commitment.unwrap_or(self.subscription_config.commitment);
         let signatures = self
             .pub_sub()
@@ -740,8 +759,8 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
             utils::{extract_cpi_events, fetch_transaction_history_with_config},
         };
 
-        let commitment = commitment.unwrap_or(self.commitment);
-        let client = Arc::new(self.data_store().async_rpc());
+        let commitment = commitment.unwrap_or(self.commitment());
+        let client = Arc::new(self.data_store().solana_rpc());
         let signatures = fetch_transaction_history_with_config(
             client.clone(),
             address,

@@ -2,10 +2,10 @@ use std::{future::Future, ops::Deref};
 
 use anchor_client::{
     solana_sdk::{pubkey::Pubkey, signature::Keypair, signer::Signer, system_instruction},
-    ClientError, Program,
+    ClientError,
 };
 
-use crate::utils::{ComputeBudget, RpcBuilder};
+use crate::utils::{transaction_builder::rpc_builder::Program, ComputeBudget, RpcBuilder};
 
 mod accounts;
 mod instruction;
@@ -73,17 +73,18 @@ where
     ) -> crate::Result<RpcBuilder<'a, C, Pubkey>> {
         let space = vaa_buffer_len + VAA_START;
         let lamports = self
-            .async_rpc()
+            .solana_rpc()
             .get_minimum_balance_for_rent_exemption(space as usize)
             .await
             .map_err(ClientError::from)?;
-        let request = RpcBuilder::new(self)
+        let request = self
+            .rpc()
             .pre_instruction(system_instruction::create_account(
                 &self.payer(),
                 &encoded_vaa.pubkey(),
                 lamports,
                 space,
-                &self.id(),
+                self.id(),
             ))
             .args(instruction::InitEncodedVaa {})
             .accounts(accounts::InitEncodedVaa {
@@ -97,7 +98,7 @@ where
     }
 
     fn write_encoded_vaa(&self, draft_vaa: &Pubkey, index: u32, data: &[u8]) -> RpcBuilder<C> {
-        RpcBuilder::new(self)
+        self.rpc()
             .args(instruction::WriteEncodedVaa {
                 index,
                 data: data.to_owned(),
@@ -110,7 +111,7 @@ where
     }
 
     fn verify_encoded_vaa_v1(&self, draft_vaa: &Pubkey, guardian_set_index: i32) -> RpcBuilder<C> {
-        RpcBuilder::new(self)
+        self.rpc()
             .args(instruction::VerifyEncodedVaaV1 {})
             .accounts(accounts::VerifyEncodedVaaV1 {
                 write_authority: self.payer(),
@@ -123,7 +124,7 @@ where
     }
 
     fn close_encoded_vaa(&self, encoded_vaa: &Pubkey) -> RpcBuilder<C> {
-        RpcBuilder::new(self)
+        self.rpc()
             .args(instruction::CloseEncodedVaa {})
             .accounts(accounts::CloseEncodedVaa {
                 write_authority: self.payer(),

@@ -156,7 +156,8 @@ where
             if let Some(hint) = self.hint {
                 return Ok(hint);
             }
-            let market = read_market(&self.client.data_store().async_rpc(), &self.market()).await?;
+            let market =
+                read_market(&self.client.data_store().solana_rpc(), &self.market()).await?;
             self.hint(market.meta());
         }
     }
@@ -213,10 +214,7 @@ where
                 }
                 let Some((token, account)) = self
                     .initial_token
-                    .get_or_fetch_token_and_token_account(
-                        self.client.exchange(),
-                        Some(&self.client.payer()),
-                    )
+                    .get_or_fetch_token_and_token_account(self.client, Some(&self.client.payer()))
                     .await?
                 else {
                     return Err(crate::Error::invalid_argument(
@@ -770,18 +768,17 @@ where
             match &self.hint {
                 Some(hint) => return Ok(hint.clone()),
                 None => {
-                    let order: ZeroCopy<OrderV2> =
-                        self.client.data_store().account(self.order).await?;
+                    let order = self.client.order(&self.order).await?;
                     let market = read_market(
-                        &self.client.data_store().async_rpc(),
-                        order.0.header().market(),
+                        &self.client.data_store().solana_rpc(),
+                        order.header().market(),
                     )
                     .await?;
                     let store =
-                        read_store(&self.client.data_store().async_rpc(), &self.store).await?;
+                        read_store(&self.client.data_store().solana_rpc(), &self.store).await?;
                     let token_map_address = self.get_token_map().await?;
                     let token_map = self.client.token_map(&token_map_address).await?;
-                    self.hint(&order.0, &market, &store, &token_map)?;
+                    self.hint(&order, &market, &store, &token_map)?;
                 }
             }
         }
@@ -1057,7 +1054,8 @@ where
 
         let (pre_builder, post_builder) = builder.build(self.client);
 
-        let mut transaction_builder = TransactionBuilder::new(self.client.exchange().async_rpc());
+        let mut transaction_builder =
+            TransactionBuilder::new(self.client.data_store().solana_rpc());
         transaction_builder
             .try_push(pre_builder)?
             .try_push(execute_order)?

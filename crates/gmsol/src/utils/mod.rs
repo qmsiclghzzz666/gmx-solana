@@ -4,7 +4,6 @@ use anchor_client::{
     anchor_lang::prelude::borsh::BorshDeserialize,
     solana_client::{nonblocking::rpc_client::RpcClient, rpc_client::SerializableTransaction},
     solana_sdk::{pubkey::Pubkey, signer::Signer},
-    Program,
 };
 
 use anchor_spl::associated_token::get_associated_token_address;
@@ -124,7 +123,7 @@ impl TokenAccountParams {
     /// Returns `(token, token_account)` if success.
     pub async fn get_or_fetch_token_and_token_account<S, C>(
         &self,
-        program: &Program<C>,
+        client: &crate::Client<C>,
         owner: Option<&Pubkey>,
     ) -> crate::Result<Option<(Pubkey, Pubkey)>>
     where
@@ -135,7 +134,11 @@ impl TokenAccountParams {
         match (self.token, self.token_account) {
             (Some(token), Some(account)) => Ok(Some((token, account))),
             (None, Some(account)) => {
-                let mint = program.account::<TokenAccount>(account).await?.mint;
+                let mint = client
+                    .account::<TokenAccount>(&account)
+                    .await?
+                    .ok_or(crate::Error::NotFound)?
+                    .mint;
                 Ok(Some((mint, account)))
             }
             (Some(token), None) => {

@@ -459,7 +459,10 @@ where
     ) -> crate::Result<(RpcBuilder<C>, Pubkey)> {
         let token_map = match token_map {
             Some(token_map) => *token_map,
-            None => crate::store::utils::token_map(self.data_store(), store).await?,
+            None => self
+                .authorized_token_map_address(store)
+                .await?
+                .ok_or(crate::Error::NotFound)?,
         };
         let authority = self.payer();
         let market_token =
@@ -503,9 +506,9 @@ where
             Some(token) => *token,
             None => {
                 let account = self
-                    .exchange()
-                    .account::<TokenAccount>(*source_account)
-                    .await?;
+                    .account::<TokenAccount>(source_account)
+                    .await?
+                    .ok_or(crate::Error::NotFound)?;
                 account.mint
             }
         };

@@ -1,12 +1,11 @@
 use std::ops::Deref;
 
-use anchor_client::{
-    solana_sdk::{pubkey::Pubkey, signature::Keypair, signer::Signer, system_program},
-    Program,
+use anchor_client::solana_sdk::{
+    pubkey::Pubkey, signature::Keypair, signer::Signer, system_program,
 };
 use pythnet_sdk::wire::v1::MerklePriceUpdate;
 
-use crate::utils::{ComputeBudget, RpcBuilder};
+use crate::utils::{transaction_builder::rpc_builder::Program, ComputeBudget, RpcBuilder};
 
 mod accounts;
 mod instruction;
@@ -62,7 +61,8 @@ where
         encoded_vaa: &Pubkey,
     ) -> crate::Result<RpcBuilder<'a, C, Pubkey>> {
         let treasury_id = rand::random();
-        Ok(RpcBuilder::new(self)
+        Ok(self
+            .rpc()
             .with_output(price_update.pubkey())
             .args(instruction::PostUpdate {
                 merkle_price_update: update.clone(),
@@ -82,7 +82,7 @@ where
     }
 
     fn reclaim_rent(&self, price_update: &Pubkey) -> RpcBuilder<C> {
-        RpcBuilder::new(self)
+        self.rpc()
             .args(instruction::ReclaimRent {})
             .accounts(accounts::ReclaimRent {
                 payer: self.payer(),

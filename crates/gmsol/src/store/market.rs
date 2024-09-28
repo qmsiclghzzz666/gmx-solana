@@ -3,7 +3,6 @@ use std::ops::Deref;
 use anchor_client::{
     anchor_lang::system_program,
     solana_sdk::{pubkey::Pubkey, signer::Signer},
-    RequestBuilder,
 };
 use gmsol_model::{action::Prices, PnlFactorKind, PoolKind};
 use gmsol_store::{
@@ -16,11 +15,7 @@ use crate::utils::RpcBuilder;
 /// Vault Operations.
 pub trait VaultOps<C> {
     /// Initialize a market vault for the given token.
-    fn initialize_market_vault(
-        &self,
-        store: &Pubkey,
-        token: &Pubkey,
-    ) -> (RequestBuilder<C>, Pubkey);
+    fn initialize_market_vault(&self, store: &Pubkey, token: &Pubkey) -> (RpcBuilder<C>, Pubkey);
 
     /// Transfer tokens out from the given market vault.
     fn market_vault_transfer_out(
@@ -29,7 +24,7 @@ pub trait VaultOps<C> {
         token: &Pubkey,
         to: &Pubkey,
         amount: u64,
-    ) -> RequestBuilder<C>;
+    ) -> RpcBuilder<C>;
 }
 
 impl<C, S> VaultOps<C> for crate::Client<C>
@@ -37,16 +32,11 @@ where
     C: Deref<Target = S> + Clone,
     S: Signer,
 {
-    fn initialize_market_vault(
-        &self,
-        store: &Pubkey,
-        token: &Pubkey,
-    ) -> (RequestBuilder<C>, Pubkey) {
+    fn initialize_market_vault(&self, store: &Pubkey, token: &Pubkey) -> (RpcBuilder<C>, Pubkey) {
         let authority = self.payer();
         let vault = self.find_market_vault_address(store, token);
         let builder = self
-            .data_store()
-            .request()
+            .data_store_rpc()
             .accounts(accounts::InitializeMarketVault {
                 authority,
                 store: *store,
@@ -67,10 +57,9 @@ where
         token: &Pubkey,
         to: &Pubkey,
         amount: u64,
-    ) -> RequestBuilder<C> {
+    ) -> RpcBuilder<C> {
         let authority = self.payer();
-        self.data_store()
-            .request()
+        self.data_store_rpc()
             .accounts(accounts::MarketVaultTransferOut {
                 authority,
                 store: *store,
@@ -92,7 +81,7 @@ pub trait MarketOps<C> {
         prices: Prices<u128>,
         maximize_pnl: bool,
         maximize_pool_value: bool,
-    ) -> RequestBuilder<C>;
+    ) -> RpcBuilder<C>;
 
     /// Get market token price.
     fn get_market_token_price(
@@ -102,7 +91,7 @@ pub trait MarketOps<C> {
         prices: Prices<u128>,
         pnl_factor: PnlFactorKind,
         maximize: bool,
-    ) -> RequestBuilder<C>;
+    ) -> RpcBuilder<C>;
 
     /// Update market config.
     fn update_market_config(
@@ -194,9 +183,8 @@ where
         prices: Prices<u128>,
         maximize_pnl: bool,
         maximize_pool_value: bool,
-    ) -> RequestBuilder<C> {
-        self.data_store()
-            .request()
+    ) -> RpcBuilder<C> {
+        self.data_store_rpc()
             .args(instruction::GetMarketStatus {
                 prices,
                 maximize_pnl,
@@ -214,9 +202,8 @@ where
         prices: Prices<u128>,
         pnl_factor: PnlFactorKind,
         maximize: bool,
-    ) -> RequestBuilder<C> {
-        self.data_store()
-            .request()
+    ) -> RpcBuilder<C> {
+        self.data_store_rpc()
             .args(instruction::GetMarketTokenPrice {
                 prices,
                 pnl_factor: pnl_factor.to_string(),

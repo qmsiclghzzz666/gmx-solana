@@ -105,7 +105,7 @@ impl AdminArgs {
                     let transaction = rpc.build().signed_transaction().await?;
                     let response = client
                         .data_store()
-                        .async_rpc()
+                        .solana_rpc()
                         .simulate_transaction(&transaction)
                         .await
                         .map_err(anchor_client::ClientError::from)?;
@@ -214,7 +214,7 @@ impl InitializeRolesAndController {
         let controller = client.controller_address(&store);
 
         let mut builder = TransactionBuilder::new_with_options(
-            client.data_store().async_rpc(),
+            client.data_store().solana_rpc(),
             !self.allow_multiple_transactions,
             self.max_transaction_size,
         );

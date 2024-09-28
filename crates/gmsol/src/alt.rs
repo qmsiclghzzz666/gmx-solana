@@ -53,7 +53,7 @@ impl<C: Deref<Target = impl Signer> + Clone> AddressLookupTableOps<C> for crate:
         address: &Pubkey,
         config: RpcAccountInfoConfig,
     ) -> crate::Result<WithSlot<Option<AddressLookupTableAccount>>> {
-        let client = self.data_store().async_rpc();
+        let client = self.data_store().solana_rpc();
         let account: WithSlot<_> = get_account_with_context(&client, address, config)
             .await?
             .into();

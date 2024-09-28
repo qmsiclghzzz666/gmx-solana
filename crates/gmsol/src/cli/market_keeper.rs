@@ -14,7 +14,6 @@ use gmsol::{
         oracle::OracleOps,
         store_ops::StoreOps,
         token_config::TokenConfigOps,
-        utils::{token_map as get_token_map, token_map_optional},
     },
     types::MarketConfigBuffer,
     utils::TransactionBuilder,
@@ -335,14 +334,17 @@ impl Args {
                     Some(token_map) => {
                         if *set_token_map {
                             let authorized_token_map =
-                                token_map_optional(client.data_store(), store).await?;
+                                client.authorized_token_map_address(store).await?;
                             if authorized_token_map == Some(*token_map) {
                                 return Err(gmsol::Error::invalid_argument("the token map has been authorized, please remove `--set-token-map` and try again"));
                             }
                         }
                         *token_map
                     }
-                    None => get_token_map(client.data_store(), store).await?,
+                    None => client
+                        .authorized_token_map_address(store)
+                        .await?
+                        .ok_or(gmsol::Error::NotFound)?,
                 };
                 insert_token_configs(
                     client,
@@ -409,7 +411,9 @@ impl Args {
             Command::ToggleTokenConfig { token, toggle } => {
                 let token_map = self.token_map(client, store).await?;
                 crate::utils::send_or_serialize(
-                    client.toggle_token_config(store, &token_map, token, toggle.is_enable()),
+                    client
+                        .toggle_token_config(store, &token_map, token, toggle.is_enable())
+                        .build(),
                     serialize_only,
                     |signature| {
                         println!("{signature}");
@@ -421,7 +425,9 @@ impl Args {
             Command::SetExpectedProvider { token, provider } => {
                 let token_map = self.token_map(client, store).await?;
                 crate::utils::send_or_serialize(
-                    client.set_expected_provider(store, &token_map, token, *provider),
+                    client
+                        .set_expected_provider(store, &token_map, token, *provider)
+                        .build(),
                     serialize_only,
                     |signature| {
                         println!("{signature}");
@@ -431,8 +437,8 @@ impl Args {
                 .await?;
             }
             Command::CreateVault { token } => {
-                let (request, vault) = client.initialize_market_vault(store, token);
-                crate::utils::send_or_serialize(request, serialize_only, |signature| {
+                let (rpc, vault) = client.initialize_market_vault(store, token);
+                crate::utils::send_or_serialize(rpc.build(), serialize_only, |signature| {
                     tracing::info!("created a new vault {vault} at tx {signature}");
                     println!("{vault}");
                     Ok(())
@@ -681,7 +687,10 @@ impl Args {
         if let Some(token_map) = self.token_map {
             Ok(token_map)
         } else {
-            gmsol::store::utils::token_map(client.data_store(), store).await
+            Ok(client
+                .authorized_token_map_address(store)
+                .await?
+                .ok_or(gmsol::Error::NotFound)?)
         }
     }
 }
@@ -748,7 +757,7 @@ async fn insert_token_configs(
     configs: &IndexMap<String, TokenConfig>,
 ) -> gmsol::Result<()> {
     let mut builder = TransactionBuilder::new_with_options(
-        client.data_store().async_rpc(),
+        client.data_store().solana_rpc(),
         false,
         max_transaction_size,
     );
@@ -828,11 +837,14 @@ async fn create_markets(
     markets: &IndexMap<String, Market>,
 ) -> gmsol::Result<()> {
     let mut builder = TransactionBuilder::new_with_options(
-        client.data_store().async_rpc(),
+        client.data_store().solana_rpc(),
         false,
         max_transaction_size,
     );
-    let token_map = get_token_map(client.data_store(), store).await?;
+    let token_map = client
+        .authorized_token_map_address(store)
+        .await?
+        .ok_or(gmsol::Error::NotFound)?;
     for (name, market) in markets {
         let (rpc, token) = client
             .create_market(
@@ -888,7 +900,7 @@ impl MarketConfigMap {
         batch: NonZeroUsize,
     ) -> gmsol::Result<()> {
         let mut builder = TransactionBuilder::new_with_options(
-            client.data_store().async_rpc(),
+            client.data_store().solana_rpc(),
             false,
             max_transaction_size,
         );
@@ -958,16 +970,18 @@ impl MarketConfigs {
         close_buffers: bool,
     ) -> gmsol::Result<()> {
         let mut builder = TransactionBuilder::new_with_options(
-            client.data_store().async_rpc(),
+            client.data_store().solana_rpc(),
             false,
             max_transaction_size,
         );
 
-        let program = client.data_store();
         let mut buffers_to_close = HashSet::<Pubkey>::default();
         for (market_token, config) in &self.configs {
             if let Some(buffer) = &config.buffer {
-                let buffer_account = program.account::<MarketConfigBuffer>(*buffer).await?;
+                let buffer_account = client
+                    .account::<MarketConfigBuffer>(buffer)
+                    .await?
+                    .ok_or(gmsol::Error::NotFound)?;
                 if buffer_account.store != *store {
                     return Err(gmsol::Error::invalid_argument(
                         "The provided buffer account is owned by different store",

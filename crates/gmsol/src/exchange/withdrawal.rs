@@ -152,7 +152,7 @@ where
         {
             return Ok((long_token, short_token));
         }
-        let market = read_market(&self.client.data_store().async_rpc(), market).await?;
+        let market = read_market(&self.client.data_store().solana_rpc(), market).await?;
         Ok((
             self.final_long_token
                 .unwrap_or_else(|| market.meta().long_token_mint),
@@ -349,8 +349,11 @@ where
         match &self.hint {
             Some(hint) => Ok(*hint),
             None => {
-                let withdrawal: ZeroCopy<WithdrawalV2> =
-                    self.client.data_store().account(self.withdrawal).await?;
+                let withdrawal: ZeroCopy<WithdrawalV2> = self
+                    .client
+                    .account(&self.withdrawal)
+                    .await?
+                    .ok_or(crate::Error::NotFound)?;
                 Ok((&withdrawal.0).into())
             }
         }
@@ -517,8 +520,11 @@ where
             Some(hint) => Ok(hint.clone()),
             None => {
                 let map = self.client.authorized_token_map(&self.store).await?;
-                let withdrawal: ZeroCopy<WithdrawalV2> =
-                    self.client.data_store().account(self.withdrawal).await?;
+                let withdrawal: ZeroCopy<WithdrawalV2> = self
+                    .client
+                    .account(&self.withdrawal)
+                    .await?
+                    .ok_or(crate::Error::NotFound)?;
                 let hint = ExecuteWithdrawalHint::new(&withdrawal.0, &map)?;
                 self.hint = Some(hint.clone());
                 Ok(hint)
@@ -530,7 +536,11 @@ where
         if let Some(address) = self.token_map {
             Ok(address)
         } else {
-            crate::store::utils::token_map(self.client.data_store(), &self.store).await
+            Ok(self
+                .client
+                .authorized_token_map_address(&self.store)
+                .await?
+                .ok_or(crate::Error::NotFound)?)
         }
     }
 

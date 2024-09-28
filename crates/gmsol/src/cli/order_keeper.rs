@@ -1,8 +1,8 @@
 use std::{ops::Deref, time::Duration};
 
 use anchor_client::{
+    solana_client::nonblocking::rpc_client::RpcClient,
     solana_sdk::{pubkey::Pubkey, signer::Signer},
-    Program,
 };
 use futures_util::{FutureExt, TryFutureExt};
 use gmsol::{
@@ -114,7 +114,7 @@ impl KeeperArgs {
 
     async fn get_or_estimate_execution_fee<S, C>(
         &self,
-        program: &Program<C>,
+        client: &RpcClient,
         mut rpc: RpcBuilder<'_, C>,
     ) -> gmsol::Result<u64>
     where
@@ -129,7 +129,7 @@ impl KeeperArgs {
         } else {
             rpc.compute_budget_mut().set_price(self.compute_unit_price);
         }
-        rpc.estimate_execution_fee(&program.async_rpc(), None).await
+        rpc.estimate_execution_fee(client, None).await
     }
 
     fn use_pyth_pull_oracle(&self) -> bool {
@@ -256,7 +256,10 @@ impl KeeperArgs {
                     true,
                 );
                 let execution_fee = self
-                    .get_or_estimate_execution_fee(client.data_store(), builder.build().await?)
+                    .get_or_estimate_execution_fee(
+                        &client.data_store().solana_rpc(),
+                        builder.build().await?,
+                    )
                     .await?;
                 builder
                     .execution_fee(execution_fee)
@@ -267,7 +270,7 @@ impl KeeperArgs {
                     if feed_ids.is_empty() {
                         tracing::error!(%deposit, "empty feed ids");
                     }
-                    let oracle = PythPullOracle::try_new(client.anchor())?;
+                    let oracle = PythPullOracle::try_new(client)?;
                     let hermes = Hermes::default();
                     let update = hermes
                         .latest_price_updates(&feed_ids, Some(EncodingType::Base64))
@@ -300,7 +303,10 @@ impl KeeperArgs {
                     true,
                 );
                 let execution_fee = self
-                    .get_or_estimate_execution_fee(client.data_store(), builder.build().await?)
+                    .get_or_estimate_execution_fee(
+                        &client.data_store().solana_rpc(),
+                        builder.build().await?,
+                    )
                     .await?;
                 builder
                     .execution_fee(execution_fee)
@@ -312,7 +318,7 @@ impl KeeperArgs {
                     if feed_ids.is_empty() {
                         tracing::error!(%withdrawal, "empty feed ids");
                     }
-                    let oracle = PythPullOracle::try_new(client.anchor())?;
+                    let oracle = PythPullOracle::try_new(client)?;
                     let hermes = Hermes::default();
                     let update = hermes
                         .latest_price_updates(feed_ids, Some(EncodingType::Base64))
@@ -380,7 +386,7 @@ impl KeeperArgs {
                     if feed_ids.is_empty() {
                         tracing::error!(%order, "empty feed ids");
                     }
-                    let oracle = PythPullOracle::try_new(client.anchor())?;
+                    let oracle = PythPullOracle::try_new(client)?;
                     let hermes = Hermes::default();
                     let update = hermes
                         .latest_price_updates(feed_ids, Some(EncodingType::Base64))
@@ -450,7 +456,7 @@ impl KeeperArgs {
                     if feed_ids.is_empty() {
                         tracing::error!(%position, "empty feed ids");
                     }
-                    let oracle = PythPullOracle::try_new(client.anchor())?;
+                    let oracle = PythPullOracle::try_new(client)?;
                     let hermes = Hermes::default();
                     let update = hermes
                         .latest_price_updates(feed_ids, Some(EncodingType::Base64))
@@ -533,7 +539,7 @@ impl KeeperArgs {
                     if feed_ids.is_empty() {
                         tracing::error!(%position, "empty feed ids");
                     }
-                    let oracle = PythPullOracle::try_new(client.anchor())?;
+                    let oracle = PythPullOracle::try_new(client)?;
                     let hermes = Hermes::default();
                     let update = hermes
                         .latest_price_updates(feed_ids, Some(EncodingType::Base64))
@@ -590,7 +596,7 @@ impl KeeperArgs {
                     if feed_ids.is_empty() {
                         tracing::error!(%market_token, "empty feed ids");
                     }
-                    let oracle = PythPullOracle::try_new(client.anchor())?;
+                    let oracle = PythPullOracle::try_new(client)?;
                     let hermes = Hermes::default();
                     let update = hermes
                         .latest_price_updates(feed_ids, Some(EncodingType::Base64))
@@ -652,7 +658,7 @@ impl KeeperArgs {
 
         let after = Duration::from_secs(wait);
         // Subscribe deposit creation event.
-        let deposit_program = client.new_exchange()?;
+        let deposit_program = client.anchor().program(client.exchange_program_id())?;
         let unsubscriber =
             deposit_program
             .on::<DepositCreatedEvent>({
@@ -673,7 +679,7 @@ impl KeeperArgs {
         tracing::info!("deposit creation subscribed");
 
         // Subscribe withdrawal creation event.
-        let withdrawal_program = client.new_exchange()?;
+        let withdrawal_program = client.anchor().program(client.exchange_program_id())?;
         let unsubscriber = withdrawal_program
             .on::<WithdrawalCreatedEvent>({
                 let tx = tx.clone();
@@ -693,7 +699,7 @@ impl KeeperArgs {
         tracing::info!("withdrawal creation subscribed");
 
         // Subscribe order creation event.
-        let order_program = client.new_exchange()?;
+        let order_program = client.anchor().program(client.exchange_program_id())?;
         let unsubscriber = order_program
             .on::<OrderCreatedEvent>({
                 let tx = tx.clone();

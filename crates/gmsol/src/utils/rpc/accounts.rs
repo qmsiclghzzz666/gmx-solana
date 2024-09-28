@@ -13,12 +13,11 @@ use anchor_client::{
     solana_sdk::{
         account::Account, commitment_config::CommitmentConfig, pubkey::Pubkey, signer::Signer,
     },
-    Program,
 };
 use serde_json::json;
 use solana_account_decoder::{UiAccount, UiAccountEncoding};
 
-use crate::utils::WithContext;
+use crate::utils::{transaction_builder::rpc_builder::Program, WithContext};
 
 /// Program Accounts Config.
 #[derive(Debug, Default)]
@@ -122,8 +121,8 @@ pub async fn accounts_lazy_with_context<
             ..Default::default()
         },
     };
-    let client = program.async_rpc();
-    let res = get_program_accounts_with_context(&client, &program.id(), config).await?;
+    let client = program.solana_rpc();
+    let res = get_program_accounts_with_context(&client, program.id(), config).await?;
     Ok(res.map(|accounts| {
         accounts
             .into_iter()
