@@ -357,17 +357,21 @@ impl<'a, C: Deref<Target = impl Signer> + Clone, T> RpcBuilder<'a, C, T> {
         latest_hash: Hash,
         without_compute_budget: bool,
         compute_unit_price_micro_lamports: Option<u64>,
+        with_alts: bool,
     ) -> crate::Result<v0::Message> {
         let instructions = self
             .instructions_with_options(without_compute_budget, compute_unit_price_micro_lamports);
-        let alts = self
-            .alts
-            .iter()
-            .map(|(key, addresses)| AddressLookupTableAccount {
-                key: *key,
-                addresses: addresses.clone(),
-            })
-            .collect::<Vec<_>>();
+        let alts = if with_alts {
+            self.alts
+                .iter()
+                .map(|(key, addresses)| AddressLookupTableAccount {
+                    key: *key,
+                    addresses: addresses.clone(),
+                })
+                .collect::<Vec<_>>()
+        } else {
+            vec![]
+        };
         let message =
             v0::Message::try_compile(&self.cfg.payer(), &instructions, &alts, latest_hash)?;
 
@@ -385,6 +389,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone, T> RpcBuilder<'a, C, T> {
                 latest_hash,
                 without_compute_budget,
                 compute_unit_price_micro_lamports,
+                true,
             )?,
         ))
     }
@@ -547,10 +552,13 @@ impl<'a, C: Deref<Target = impl Signer> + Clone, T> RpcBuilder<'a, C, T> {
             .get_latest_blockhash()
             .await
             .map_err(anchor_client::ClientError::from)?;
+        // FIXME: we currently ignore the ALTs when estimating execution fee to avoid the
+        // "index out of bound" error returned by the RPC with ALTs provided.
         let message = self.v0_message_with_blockhash_and_options(
             blockhash,
             false,
             compute_unit_price_micro_lamports,
+            false,
         )?;
         let fee = client
             .get_fee_for_message(&message)

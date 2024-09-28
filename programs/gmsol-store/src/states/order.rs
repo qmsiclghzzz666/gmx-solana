@@ -678,7 +678,7 @@ impl OrderV2 {
     pub const INIT_SPACE: usize = core::mem::size_of::<Self>();
 
     /// Min execution lamports.
-    pub const MIN_EXECUTION_LAMPORTS: u64 = 200_000;
+    pub const MIN_EXECUTION_LAMPORTS: u64 = 300_000;
 
     /// Get rent for position cut.
     pub fn position_cut_rent() -> Result<u64> {

@@ -1536,15 +1536,14 @@ pub mod gmsol_store {
         ctx: Context<'_, '_, 'info, 'info, PositionCut<'info>>,
         nonce: [u8; 32],
         recent_timestamp: i64,
-        // execution_fee: u64,
+        execution_fee: u64,
     ) -> Result<()> {
         instructions::unchecked_process_position_cut(
             ctx,
             &nonce,
             recent_timestamp,
             PositionCutKind::Liquidate,
-            // execution_fee,
-            0,
+            execution_fee,
         )
     }
 

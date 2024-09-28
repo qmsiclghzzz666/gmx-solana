@@ -307,7 +307,7 @@ pub trait PythPullOracleOps<C> {
         T: ExecuteWithPythPrices<'exec, C>,
     {
         async move {
-            let mut execution_fee_estiamted = execute.should_estiamte_execution_fee();
+            let mut execution_fee_estiamted = !execute.should_estiamte_execution_fee();
             let updates = updates.into_iter().collect::<Vec<_>>();
             let mut ctx = execute.context().await?;
             let mut with_prices;
@@ -325,6 +325,7 @@ pub trait PythPullOracleOps<C> {
                         .estimated_execution_fee(compute_unit_price_micro_lamports)
                         .await?;
                     execute.set_execution_fee(execution_fee);
+                    tracing::info!(%execution_fee, "execution fee estimated");
                     execution_fee_estiamted = true;
                 }
             }

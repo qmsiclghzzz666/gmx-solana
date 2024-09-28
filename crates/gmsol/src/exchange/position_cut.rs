@@ -26,7 +26,7 @@ use super::{
 use crate::pyth::pull_oracle::{ExecuteWithPythPrices, Prices, PythPullOracleContext};
 
 /// The compute budget for `position_cut` instruction.
-pub const POSITION_CUT_COMPUTE_BUDGET: u32 = 800_000;
+pub const POSITION_CUT_COMPUTE_BUDGET: u32 = 400_000;
 
 /// `PositionCut` instruction builder.
 pub struct PositionCutBuilder<'a, C> {
@@ -317,7 +317,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> PositionCutBuilder<'a, C> {
                 exec_builder = exec_builder.args(instruction::Liquidate {
                     nonce,
                     recent_timestamp: self.recent_timestamp,
-                    // execution_fee: self.execution_fee,
+                    execution_fee: self.execution_fee,
                 });
             }
             PositionCutKind::AutoDeleverage(size_delta_in_usd) => {
