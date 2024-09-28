@@ -79,7 +79,8 @@ pub struct Deployment {
     synthetic_tokens: HashMap<String, Token>,
     /// Market tokens.
     market_tokens: HashMap<[String; 3], Pubkey>,
-    alt: AddressLookupTableAccount,
+    common_alt: AddressLookupTableAccount,
+    market_alt: AddressLookupTableAccount,
 }
 
 impl fmt::Debug for Deployment {
@@ -133,9 +134,13 @@ impl Deployment {
         let oracle = client.find_oracle_address(&store, oracle_index);
         let token_map = Keypair::generate(&mut rng);
 
-        let (rpc, alt) = client.create_alt().await?;
+        let (rpc, common_alt) = client.create_alt().await?;
         let signature = rpc.send_without_preflight().await?;
-        tracing::info!(%alt, %signature, "created an ALT for this deployment");
+        tracing::info!(%common_alt, %signature, "created an ALT for common addresses");
+
+        let (rpc, market_alt) = client.create_alt().await?;
+        let signature = rpc.send_without_preflight().await?;
+        tracing::info!(%market_alt, %signature, "created an ALT for market addresses");
 
         Ok(Self {
             users: Users::new(&mut rng),
@@ -151,8 +156,12 @@ impl Deployment {
             tokens: Default::default(),
             synthetic_tokens: Default::default(),
             market_tokens: Default::default(),
-            alt: AddressLookupTableAccount {
-                key: alt,
+            common_alt: AddressLookupTableAccount {
+                key: common_alt,
+                addresses: vec![],
+            },
+            market_alt: AddressLookupTableAccount {
+                key: market_alt,
                 addresses: vec![],
             },
         })
@@ -218,7 +227,7 @@ impl Deployment {
         ])
         .await?;
 
-        self.initialize_alt().await?;
+        self.initialize_alts().await?;
 
         Ok(())
     }
@@ -618,11 +627,22 @@ impl Deployment {
         Ok(())
     }
 
-    async fn initialize_alt(&mut self) -> eyre::Result<()> {
-        debug_assert!(self.alt.addresses.is_empty());
+    async fn initialize_alts(&mut self) -> eyre::Result<()> {
+        debug_assert!(self.common_alt.addresses.is_empty());
+        debug_assert!(self.market_alt.addresses.is_empty());
 
+        // Init common ALT.
         let event_authority = self.client.data_store_event_authority();
-        let mut addresses = vec![self.store, self.token_map(), self.oracle, event_authority];
+        let mut addresses = vec![
+            self.store,
+            self.token_map(),
+            self.oracle,
+            event_authority,
+            anchor_spl::token::ID,
+            anchor_spl::token_2022::ID,
+            anchor_spl::associated_token::ID,
+            anchor_client::anchor_lang::system_program::ID,
+        ];
 
         for token in self.tokens.values() {
             addresses.push(token.address);
@@ -634,18 +654,20 @@ impl Deployment {
 
         let signature = self
             .client
-            .extend_alt(&self.alt.key, addresses.clone())
+            .extend_alt(&self.common_alt.key, addresses.clone())
             .send_without_preflight()
             .await?;
 
-        tracing::info!(len=%addresses.len(), %signature, "ALT extended");
+        tracing::info!(len=%addresses.len(), %signature, "common ALT extended");
+        self.common_alt.addresses = addresses;
 
-        let mut addresses_2 = vec![];
+        // Init market ALT.
+        let mut addresses = vec![];
         for market_token in self.market_tokens.values() {
             let market = self.client.find_market_address(&self.store, market_token);
-            addresses_2.push(market);
-            addresses_2.push(*market_token);
-            addresses_2.push(
+            addresses.push(market);
+            addresses.push(*market_token);
+            addresses.push(
                 self.client
                     .find_market_vault_address(&self.store, market_token),
             );
@@ -653,14 +675,12 @@ impl Deployment {
 
         let signature = self
             .client
-            .extend_alt(&self.alt.key, addresses_2.clone())
+            .extend_alt(&self.market_alt.key, addresses.clone())
             .send_without_preflight()
             .await?;
 
-        tracing::info!(len=%addresses.len(), %signature, "ALT extended");
-
-        addresses.append(&mut addresses_2);
-        self.alt.addresses = addresses;
+        tracing::info!(len=%addresses.len(), %signature, "market ALT extended");
+        self.market_alt.addresses = addresses;
 
         Ok(())
     }
@@ -1000,8 +1020,12 @@ impl Deployment {
         Ok(market_token)
     }
 
-    pub(crate) fn alt(&self) -> &AddressLookupTableAccount {
-        &self.alt
+    pub(crate) fn common_alt(&self) -> &AddressLookupTableAccount {
+        &self.common_alt
+    }
+
+    pub(crate) fn market_alt(&self) -> &AddressLookupTableAccount {
+        &self.market_alt
     }
 }
 
