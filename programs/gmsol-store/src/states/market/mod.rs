@@ -9,7 +9,7 @@ use model::AsLiquidityMarket;
 
 use crate::{
     utils::fixed_str::{bytes_to_fixed_str, fixed_str_to_bytes},
-    StoreError,
+    CoreError, StoreError,
 };
 
 use super::{Factor, InitSpace, Oracle, Seed};
@@ -379,6 +379,29 @@ impl Market {
     pub fn as_liquidity_market<'a>(&'a self, market_token: &'a Mint) -> AsLiquidityMarket<'a> {
         AsLiquidityMarket::new(self, market_token)
     }
+
+    /// Validate that this market is shiftable to the target market.
+    pub fn validate_shiftable(&self, target: &Self) -> Result<()> {
+        // Currently we only support the shift between markets with
+        // with the same long tokens and short tokens.
+        //
+        // It should be possible to allow shift between markets with the compatible tokens in the future,
+        // for example, allowing shifting from BTC[WSOL-USDC] to SOL[USDC-WSOL].
+
+        require_eq!(
+            self.meta().long_token_mint,
+            target.meta().long_token_mint,
+            CoreError::TokenMintMismatched,
+        );
+
+        require_eq!(
+            self.meta().short_token_mint,
+            target.meta().short_token_mint,
+            CoreError::TokenMintMismatched,
+        );
+
+        Ok(())
+    }
 }
 
 /// Market Flags.
@@ -406,6 +429,9 @@ pub struct MarketState {
     deposit_count: u64,
     withdrawal_count: u64,
     order_count: u64,
+    shift_count: u64,
+    padding_0: [u8; 8],
+    reserve: [u8; 256],
 }
 
 impl MarketState {
@@ -442,6 +468,11 @@ impl MarketState {
     /// Get current order count.
     pub fn order_count(&self) -> u64 {
         self.order_count
+    }
+
+    /// Get current shift count.
+    pub fn shift_count(&self) -> u64 {
+        self.shift_count
     }
 
     /// Next deposit id.
@@ -481,6 +512,16 @@ impl MarketState {
             .checked_add(1)
             .ok_or(error!(StoreError::AmountOverflow))?;
         self.trade_count = next_id;
+        Ok(next_id)
+    }
+
+    /// Next shift id.
+    pub fn next_shift_id(&mut self) -> Result<u64> {
+        let next_id = self
+            .shift_count
+            .checked_add(1)
+            .ok_or(error!(StoreError::AmountOverflow))?;
+        self.shift_count = next_id;
         Ok(next_id)
     }
 }

@@ -82,8 +82,8 @@ impl TokenAccounts {
 #[account(zero_copy)]
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub struct ShiftParams {
-    from_market_token_amount: u64,
-    min_to_market_token_amount: u64,
+    pub(crate) from_market_token_amount: u64,
+    pub(crate) min_to_market_token_amount: u64,
 }
 
 impl ShiftParams {

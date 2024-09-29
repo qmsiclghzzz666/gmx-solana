@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::Mint;
+use anchor_spl::token::{Mint, TokenAccount};
 use gmsol_model::{Bank, LiquidityMarketMutExt, PositionImpactMarketMutExt};
 use typed_builder::TypedBuilder;
 
@@ -7,10 +7,133 @@ use crate::{
     states::{
         common::action::Action,
         revertible::{Revertible, RevertibleLiquidityMarket},
-        HasMarketMeta, Market, Oracle, Shift, Store, ValidateMarketBalances, ValidateOracleTime,
+        HasMarketMeta, Market, NonceBytes, Oracle, Shift, Store, ValidateMarketBalances,
+        ValidateOracleTime,
     },
     CoreError, ModelError, StoreError, StoreResult,
 };
+
+/// Create Shift Params.
+#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+pub struct CreateShiftParams {
+    /// Execution fee in lamports.
+    pub execution_lamports: u64,
+    /// From market token amount.
+    pub from_market_token_amount: u64,
+    /// The minimum acceptable to market token amount to receive.
+    pub min_to_market_token_amount: u64,
+}
+
+/// Create a shift.
+#[derive(TypedBuilder)]
+pub struct CreateShiftOp<'a, 'info> {
+    store: &'a AccountLoader<'info, Store>,
+    owner: AccountInfo<'info>,
+    shift: &'a AccountLoader<'info, Shift>,
+    from_market: &'a AccountLoader<'info, Market>,
+    from_market_token_account: &'a Account<'info, TokenAccount>,
+    to_market: &'a AccountLoader<'info, Market>,
+    to_market_token_account: &'a Account<'info, TokenAccount>,
+    nonce: &'a NonceBytes,
+    bump: u8,
+    params: &'a CreateShiftParams,
+}
+
+impl<'a, 'info> CreateShiftOp<'a, 'info> {
+    pub(crate) fn execute(self) -> Result<()> {
+        self.validate_markets()?;
+        self.validate_params()?;
+
+        let id = self.from_market.load_mut()?.state_mut().next_shift_id()?;
+
+        let mut shift = self.shift.load_init()?;
+
+        // Initialize the header.
+        shift.header.init(
+            id,
+            self.store.key(),
+            self.from_market.key(),
+            self.owner.key(),
+            *self.nonce,
+            self.bump,
+            self.params.execution_lamports,
+        )?;
+
+        // Initialize tokens.
+        shift
+            .tokens
+            .from_market_token
+            .init(self.from_market_token_account);
+        shift
+            .tokens
+            .to_market_token
+            .init(self.to_market_token_account);
+        {
+            let market = self.from_market.load()?;
+            shift.tokens.long_token = market.meta().long_token_mint;
+            shift.tokens.short_token = market.meta().short_token_mint;
+        }
+
+        // Initialize params.
+        shift.params.from_market_token_amount = self.params.from_market_token_amount;
+        shift.params.min_to_market_token_amount = self.params.min_to_market_token_amount;
+
+        Ok(())
+    }
+
+    fn validate_markets(&self) -> Result<()> {
+        require!(
+            self.from_market.key() != self.to_market.key(),
+            CoreError::InvalidShiftMarkets,
+        );
+
+        let from_market = self.from_market.load()?;
+        let to_market = self.to_market.load()?;
+
+        let store = &self.store.key();
+        from_market.validate(store)?;
+        to_market.validate(store)?;
+
+        from_market.validate_shiftable(&to_market)?;
+
+        require_eq!(
+            from_market.meta().market_token_mint,
+            self.from_market_token_account.mint,
+            CoreError::MarketTokenMintMismatched,
+        );
+
+        require_eq!(
+            to_market.meta().market_token_mint,
+            self.to_market_token_account.mint,
+            CoreError::MarketTokenMintMismatched,
+        );
+        Ok(())
+    }
+
+    fn validate_params(&self) -> Result<()> {
+        let params = &self.params;
+
+        require!(params.from_market_token_amount != 0, CoreError::EmptyShift);
+        require_gte!(
+            self.from_market_token_account.amount,
+            params.from_market_token_amount,
+            CoreError::NotEnoughTokenAmount
+        );
+
+        require_gte!(
+            params.execution_lamports,
+            Shift::MIN_EXECUTION_LAMPORTS,
+            CoreError::NotEnoughExecutionFee
+        );
+
+        require_gte!(
+            self.shift.get_lamports(),
+            params.execution_lamports,
+            CoreError::NotEnoughExecutionFee
+        );
+        Ok(())
+    }
+}
 
 /// Execute a shift.
 #[derive(TypedBuilder)]
@@ -72,23 +195,7 @@ impl<'a, 'info> ExecuteShiftOp<'a, 'info> {
         from_market.validate(&self.store.key())?;
         to_market.validate(&self.store.key())?;
 
-        // Currently we only support the shift between markets with
-        // with the same long tokens and short tokens.
-        //
-        // It should be possible to allow shift between markets with the compatible tokens in the future,
-        // for example, allowing shifting from BTC[WSOL-USDC] to SOL[USDC-WSOL].
-
-        require_eq!(
-            from_market.meta().long_token_mint,
-            to_market.meta().long_token_mint,
-            CoreError::TokenMintMismatched,
-        );
-
-        require_eq!(
-            from_market.meta().short_token_mint,
-            to_market.meta().short_token_mint,
-            CoreError::TokenMintMismatched,
-        );
+        from_market.validate_shiftable(&to_market)?;
 
         Ok(())
     }

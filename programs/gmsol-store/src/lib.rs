@@ -298,6 +298,7 @@ use self::{
     ops::{
         deposit::CreateDepositParams,
         order::{CreateOrderParams, PositionCutKind},
+        shift::CreateShiftParams,
         withdrawal::CreateWithdrawalParams,
     },
     states::{
@@ -1567,6 +1568,14 @@ pub mod gmsol_store {
         )
     }
 
+    pub fn create_shift<'info>(
+        ctx: Context<'_, '_, 'info, 'info, CreateShift<'info>>,
+        nonce: [u8; 32],
+        params: CreateShiftParams,
+    ) -> Result<()> {
+        instructions::create_shift(ctx, &nonce, &params)
+    }
+
     /// Shift.
     #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
     pub fn execute_shift<'info>(
@@ -1829,6 +1838,9 @@ pub enum CoreError {
     /// Empty Order.
     #[msg("emtpy order")]
     EmptyOrder,
+    /// Empty Shift.
+    #[msg("emtpy shift")]
+    EmptyShift,
     /// Invalid min output amount for limit swap.
     #[msg("invalid min output amount for limit swap order")]
     InvalidMinOutputAmount,
@@ -1922,6 +1934,9 @@ pub enum CoreError {
     /// Token amount overflow.
     #[msg("token amount overflow")]
     TokenAmountOverflow,
+    /// Invalid Shift Markets
+    #[msg("invalid shift markets")]
+    InvalidShiftMarkets,
 }
 
 impl CoreError {
