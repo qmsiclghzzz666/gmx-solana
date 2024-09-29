@@ -226,7 +226,7 @@ pub struct CloseWithdrawal<'info> {
     pub executor: Signer<'info>,
     /// The store.
     pub store: AccountLoader<'info, Store>,
-    /// The owner of the deposit.
+    /// The owner of the withdrawal.
     /// CHECK: only use to validate and receive fund.
     #[account(mut)]
     pub owner: UncheckedAccount<'info>,

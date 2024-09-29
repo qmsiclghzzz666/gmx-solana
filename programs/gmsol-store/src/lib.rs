@@ -1568,6 +1568,10 @@ pub mod gmsol_store {
         )
     }
 
+    pub fn prepare_shift_escrow(ctx: Context<PrepareShiftEscorw>, nonce: [u8; 32]) -> Result<()> {
+        instructions::prepare_shift_escrow(ctx, nonce)
+    }
+
     pub fn create_shift<'info>(
         ctx: Context<'_, '_, 'info, 'info, CreateShift<'info>>,
         nonce: [u8; 32],
@@ -1576,7 +1580,7 @@ pub mod gmsol_store {
         instructions::create_shift(ctx, &nonce, &params)
     }
 
-    /// Shift.
+    /// Execute Shift.
     #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
     pub fn execute_shift<'info>(
         ctx: Context<'_, '_, 'info, 'info, ExecuteShift<'info>>,
@@ -1584,6 +1588,10 @@ pub mod gmsol_store {
         throw_on_execution_error: bool,
     ) -> Result<()> {
         instructions::unchecked_execute_shift(ctx, execution_lamports, throw_on_execution_error)
+    }
+
+    pub fn close_shift(ctx: Context<CloseShift>, reason: String) -> Result<()> {
+        instructions::close_shift(ctx, &reason)
     }
 }
 
