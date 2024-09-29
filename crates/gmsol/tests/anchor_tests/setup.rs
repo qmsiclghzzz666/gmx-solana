@@ -29,7 +29,7 @@ use gmsol::{
     exchange::ExchangeOps,
     pyth::{pull_oracle::ExecuteWithPythPrices, Hermes, PythPullOracle},
     store::{
-        market::MarketOps, oracle::OracleOps, roles::RolesOps, store_ops::StoreOps,
+        gt::GTOps, market::MarketOps, oracle::OracleOps, roles::RolesOps, store_ops::StoreOps,
         token_config::TokenConfigOps,
     },
     types::{MarketConfigKey, PriceProviderKind, RoleKey, TokenConfigBuilder},
@@ -228,6 +228,8 @@ impl Deployment {
         .await?;
 
         self.initialize_alts().await?;
+
+        self.initialize_gt().await?;
 
         Ok(())
     }
@@ -681,6 +683,14 @@ impl Deployment {
 
         tracing::info!(len=%addresses.len(), %signature, "market ALT extended");
         self.market_alt.addresses = addresses;
+
+        Ok(())
+    }
+
+    async fn initialize_gt(&self) -> eyre::Result<()> {
+        let gt = self.client.find_gt_mint_address(&self.store);
+        let signature = self.client.initialize_gt(&self.store).send().await?;
+        tracing::info!(%gt, %signature, "GT Mint initialized");
 
         Ok(())
     }

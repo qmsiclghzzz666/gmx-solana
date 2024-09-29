@@ -1593,6 +1593,11 @@ pub mod gmsol_store {
     pub fn close_shift(ctx: Context<CloseShift>, reason: String) -> Result<()> {
         instructions::close_shift(ctx, &reason)
     }
+
+    /// Initialize GT Mint.
+    pub fn initialize_gt(ctx: Context<InitializeGT>) -> Result<()> {
+        instructions::initialize_gt(ctx)
+    }
 }
 
 #[error_code]

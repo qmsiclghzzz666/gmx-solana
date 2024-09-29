@@ -58,6 +58,9 @@ pub mod position;
 /// Instructions for the exchange funtionality.
 pub mod exchange;
 
+/// Instructiosn for GT.
+pub mod gt;
+
 /// Instructions for bug fixes.
 #[cfg(not(feature = "no-bug-fix"))]
 pub mod bug_fix;
@@ -66,6 +69,7 @@ pub use config::*;
 pub use data_store::*;
 pub use deposit::*;
 pub use exchange::*;
+pub use gt::*;
 pub use market::*;
 pub use oracle::*;
 pub use order::*;

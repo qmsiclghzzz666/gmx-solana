@@ -19,6 +19,9 @@ pub const MAREKT_TOKEN_MINT_SEED: &[u8] = b"market_token_mint";
 /// Market Vault Seed.
 pub const MARKET_VAULT_SEED: &[u8] = b"market_vault";
 
+/// GT Mint Seed.
+pub const GT_MINT_SEED: &[u8] = b"gt";
+
 /// Claimable Account Seed.
 pub const CLAIMABLE_ACCOUNT_SEED: &[u8] = b"claimable_account";
 

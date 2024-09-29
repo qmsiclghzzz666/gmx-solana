@@ -351,6 +351,11 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         Ok(slot)
     }
 
+    /// Find GT Mint address.
+    pub fn find_gt_mint_address(&self, store: &Pubkey) -> Pubkey {
+        crate::pda::find_gt_mint_pda(store, &self.store_program_id()).0
+    }
+
     /// Fetch accounts owned by the Store Program.
     pub async fn store_accounts_with_config<T>(
         &self,

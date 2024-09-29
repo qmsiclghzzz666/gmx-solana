@@ -22,6 +22,9 @@ pub mod market;
 /// Data store related utils.
 pub mod utils;
 
+/// GT instructions.
+pub mod gt;
+
 /// Events.
 #[cfg(feature = "decode")]
 pub mod events;

@@ -180,3 +180,11 @@ pub fn find_trade_event_buffer_pda(
         store_program_id,
     )
 }
+
+/// Find PDA for GT Mint.
+pub fn find_gt_mint_pda(store: &Pubkey, store_program_id: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[gmsol_store::constants::GT_MINT_SEED, store.as_ref()],
+        store_program_id,
+    )
+}
