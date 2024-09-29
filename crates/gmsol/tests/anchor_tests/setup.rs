@@ -26,6 +26,7 @@ use eyre::{eyre, OptionExt};
 use gmsol::{
     alt::AddressLookupTableOps,
     client::SystemProgramOps,
+    constants::MARKET_USD_UNIT,
     exchange::ExchangeOps,
     pyth::{pull_oracle::ExecuteWithPythPrices, Hermes, PythPullOracle},
     store::{
@@ -688,8 +689,19 @@ impl Deployment {
     }
 
     async fn initialize_gt(&self) -> eyre::Result<()> {
-        let gt = self.client.find_gt_mint_address(&self.store);
-        let signature = self.client.initialize_gt(&self.store).send().await?;
+        let client = self.user_client(Self::DEFAULT_KEEPER)?;
+        let gt = client.find_gt_mint_address(&self.store);
+        let signature = client
+            .initialize_gt(
+                &self.store,
+                7,
+                100 * MARKET_USD_UNIT,
+                MARKET_USD_UNIT * 10u128.pow(7) / 100 / MARKET_USD_UNIT,
+                99 * MARKET_USD_UNIT / 100,
+                100 * 1_000 * 10u64.pow(7),
+            )
+            .send()
+            .await?;
         tracing::info!(%gt, %signature, "GT Mint initialized");
 
         Ok(())

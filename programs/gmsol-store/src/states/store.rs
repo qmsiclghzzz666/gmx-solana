@@ -4,7 +4,7 @@ use anchor_lang::prelude::*;
 use bytemuck::Zeroable;
 use gmsol_utils::to_seed;
 
-use crate::{constants, StoreError, StoreResult};
+use crate::{constants, CoreError, StoreError, StoreResult};
 
 use super::{Amount, Factor, InitSpace, RoleStore};
 
@@ -31,6 +31,9 @@ pub struct Store {
     pub(crate) factor: Factors,
     /// Addresses.
     pub(crate) address: Addresses,
+    /// GT State.
+    gt: GTState,
+    reserve: [u8; 1024],
 }
 
 impl InitSpace for Store {
@@ -243,6 +246,16 @@ impl Store {
     pub fn treasury_factor(&self) -> u128 {
         self.treasury.treasury_factor
     }
+
+    /// Get GT State.
+    pub fn gt(&self) -> &GTState {
+        &self.gt
+    }
+
+    /// Get GT State mutably.
+    pub(crate) fn gt_mut(&mut self) -> &mut GTState {
+        &mut self.gt
+    }
 }
 
 /// Treasury.
@@ -431,6 +444,43 @@ impl Addresses {
         match key {
             AddressKey::Holding => &mut self.holding,
         }
+    }
+}
+
+#[account(zero_copy)]
+#[cfg_attr(feature = "debug", derive(Debug))]
+pub struct GTState {
+    minted: u64,
+    last_minted_at: i64,
+    decay_step_amount: u64,
+    decay_steps: u64,
+    mint_base_value: u128,
+    mint_rate_decay_factor: u128,
+    mint_rate_factor: u128,
+    reserve: [u8; 256],
+}
+
+impl GTState {
+    pub(crate) fn init(
+        &mut self,
+        mint_base_value: u128,
+        initial_mint_rate_factor: u128,
+        decay_factor: u128,
+        decay_step: u64,
+    ) -> Result<()> {
+        require_eq!(self.minted, 0, CoreError::GTStateHasBeenInitialized);
+        require_eq!(self.last_minted_at, 0, CoreError::GTStateHasBeenInitialized);
+        require_eq!(self.decay_steps, 0, CoreError::GTStateHasBeenInitialized);
+
+        let clock = Clock::get()?;
+
+        self.last_minted_at = clock.unix_timestamp;
+        self.decay_step_amount = decay_step;
+        self.mint_base_value = mint_base_value;
+        self.mint_rate_decay_factor = decay_factor;
+        self.mint_rate_factor = initial_mint_rate_factor;
+
+        Ok(())
     }
 }
 

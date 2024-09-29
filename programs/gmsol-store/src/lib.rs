@@ -1595,8 +1595,23 @@ pub mod gmsol_store {
     }
 
     /// Initialize GT Mint.
-    pub fn initialize_gt(ctx: Context<InitializeGT>) -> Result<()> {
-        instructions::initialize_gt(ctx)
+    #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
+    pub fn initialize_gt(
+        ctx: Context<InitializeGT>,
+        decimals: u8,
+        mint_base_value: u128,
+        initial_mint_rate_factor: u128,
+        decay_factor: u128,
+        decay_step: u64,
+    ) -> Result<()> {
+        instructions::unchecked_initialize_gt(
+            ctx,
+            decimals,
+            mint_base_value,
+            initial_mint_rate_factor,
+            decay_factor,
+            decay_step,
+        )
     }
 }
 
@@ -1950,6 +1965,9 @@ pub enum CoreError {
     /// Invalid Shift Markets
     #[msg("invalid shift markets")]
     InvalidShiftMarkets,
+    /// GT State has been initialized.
+    #[msg("GT State has been initialized")]
+    GTStateHasBeenInitialized,
 }
 
 impl CoreError {
