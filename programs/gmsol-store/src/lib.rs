@@ -1968,6 +1968,9 @@ pub enum CoreError {
     /// GT State has been initialized.
     #[msg("GT State has been initialized")]
     GTStateHasBeenInitialized,
+    /// Invalid GT config.
+    #[msg("invalid GT config")]
+    InvalidGTConfig,
 }
 
 impl CoreError {

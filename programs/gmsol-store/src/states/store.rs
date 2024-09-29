@@ -472,6 +472,9 @@ impl GTState {
         require_eq!(self.last_minted_at, 0, CoreError::GTStateHasBeenInitialized);
         require_eq!(self.decay_steps, 0, CoreError::GTStateHasBeenInitialized);
 
+        require!(mint_base_value != 0, CoreError::InvalidGTConfig);
+        require!(decay_step != 0, CoreError::InvalidGTConfig);
+
         let clock = Clock::get()?;
 
         self.last_minted_at = clock.unix_timestamp;
@@ -481,6 +484,37 @@ impl GTState {
         self.mint_rate_factor = initial_mint_rate_factor;
 
         Ok(())
+    }
+
+    pub(crate) fn mint(&mut self, size_in_value: u128) -> Result<u64> {
+        use gmsol_model::utils::apply_factor;
+
+        require!(self.mint_base_value != 0, CoreError::InvalidGTConfig);
+        require!(self.decay_step_amount != 0, CoreError::InvalidGTConfig);
+
+        let amount: u64 = apply_factor::<_, { constants::MARKET_DECIMALS }>(
+            &size_in_value,
+            &self.mint_rate_factor,
+        )
+        .ok_or(error!(CoreError::TokenAmountOverflow))?
+        .try_into()
+        .map_err(|_| error!(CoreError::TokenAmountOverflow))?;
+
+        self.minted = self.minted.saturating_add(amount);
+        let new_steps = self.minted % self.decay_step_amount;
+
+        if new_steps != self.decay_steps {
+            for _ in self.decay_steps..new_steps {
+                self.mint_rate_factor = apply_factor::<_, { constants::MARKET_DECIMALS }>(
+                    &self.mint_rate_factor,
+                    &self.mint_rate_decay_factor,
+                )
+                .ok_or(error!(CoreError::Internal))?;
+            }
+            self.decay_steps = new_steps;
+        }
+
+        Ok(amount)
     }
 }
 
