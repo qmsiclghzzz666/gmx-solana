@@ -14,10 +14,9 @@ pub trait GTOps<C> {
         &self,
         store: &Pubkey,
         decimals: u8,
-        mint_base_value: u128,
-        initial_mint_rate_factor: u128,
-        decay_factor: u128,
-        decay_step: u64,
+        initial_mint_cost: u128,
+        grow_factor: u128,
+        grow_step: u64,
     ) -> RpcBuilder<C>;
 }
 
@@ -26,10 +25,9 @@ impl<C: Deref<Target = impl Signer> + Clone> GTOps<C> for crate::Client<C> {
         &self,
         store: &Pubkey,
         decimals: u8,
-        mint_base_value: u128,
-        initial_mint_rate_factor: u128,
-        decay_factor: u128,
-        decay_step: u64,
+        initial_mint_cost: u128,
+        grow_factor: u128,
+        grow_step: u64,
     ) -> RpcBuilder<C> {
         self.data_store_rpc()
             .accounts(accounts::InitializeGT {
@@ -41,10 +39,9 @@ impl<C: Deref<Target = impl Signer> + Clone> GTOps<C> for crate::Client<C> {
             })
             .args(instruction::InitializeGt {
                 decimals,
-                mint_base_value,
-                initial_mint_rate_factor,
-                decay_factor,
-                decay_step,
+                initial_mint_cost,
+                grow_factor,
+                grow_step,
             })
     }
 }

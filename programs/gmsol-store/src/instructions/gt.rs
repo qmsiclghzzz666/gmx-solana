@@ -42,17 +42,12 @@ pub struct InitializeGT<'info> {
 pub(crate) fn unchecked_initialize_gt(
     ctx: Context<InitializeGT>,
     decimals: u8,
-    mint_base_value: u128,
-    initial_mint_rate_factor: u128,
-    decay_factor: u128,
-    decay_step: u64,
+    initial_mint_cost: u128,
+    grow_factor: u128,
+    grow_step: u64,
 ) -> Result<()> {
-    ctx.accounts.initialize_gt_state(
-        mint_base_value,
-        initial_mint_rate_factor,
-        decay_factor,
-        decay_step,
-    )?;
+    ctx.accounts
+        .initialize_gt_state(initial_mint_cost, grow_factor, grow_step)?;
     ctx.accounts.enable_non_transferable_mint()?;
     ctx.accounts.initialize_mint(decimals)?;
     Ok(())
@@ -71,18 +66,14 @@ impl<'info> internal::Authentication<'info> for InitializeGT<'info> {
 impl<'info> InitializeGT<'info> {
     fn initialize_gt_state(
         &self,
-        mint_base_value: u128,
-        initial_mint_rate_factor: u128,
-        decay_factor: u128,
-        decay_step: u64,
+        initial_mint_cost: u128,
+        grow_factor: u128,
+        grow_step: u64,
     ) -> Result<()> {
         let mut store = self.store.load_mut()?;
-        store.gt_mut().init(
-            mint_base_value,
-            initial_mint_rate_factor,
-            decay_factor,
-            decay_step,
-        )?;
+        store
+            .gt_mut()
+            .init(initial_mint_cost, grow_factor, grow_step)?;
         Ok(())
     }
     fn enable_non_transferable_mint(&self) -> Result<()> {

@@ -230,7 +230,7 @@ impl Deployment {
 
         self.initialize_alts().await?;
 
-        self.initialize_gt().await?;
+        self.initialize_gt(7).await?;
 
         Ok(())
     }
@@ -688,17 +688,16 @@ impl Deployment {
         Ok(())
     }
 
-    async fn initialize_gt(&self) -> eyre::Result<()> {
+    async fn initialize_gt(&self, decimals: u8) -> eyre::Result<()> {
         let client = self.user_client(Self::DEFAULT_KEEPER)?;
         let gt = client.find_gt_mint_address(&self.store);
         let signature = client
             .initialize_gt(
                 &self.store,
-                7,
-                100 * MARKET_USD_UNIT,
-                MARKET_USD_UNIT * 10u128.pow(7) / 100 / MARKET_USD_UNIT,
-                99 * MARKET_USD_UNIT / 100,
-                100 * 1_000 * 10u64.pow(7),
+                decimals,
+                100 * MARKET_USD_UNIT / MARKET_USD_UNIT * 10u128.pow(decimals as u32),
+                101 * MARKET_USD_UNIT / 100,
+                100 * 1_000 * 10u64.pow(decimals as u32),
             )
             .send()
             .await?;

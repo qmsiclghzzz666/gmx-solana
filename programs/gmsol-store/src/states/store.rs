@@ -452,69 +452,89 @@ impl Addresses {
 pub struct GTState {
     minted: u64,
     last_minted_at: i64,
-    decay_step_amount: u64,
-    decay_steps: u64,
-    mint_base_value: u128,
-    mint_rate_decay_factor: u128,
-    mint_rate_factor: u128,
+    grow_step_amount: u64,
+    grow_steps: u64,
+    mint_cost_grow_factor: u128,
+    mint_cost: u128,
     reserve: [u8; 256],
 }
 
 impl GTState {
     pub(crate) fn init(
         &mut self,
-        mint_base_value: u128,
-        initial_mint_rate_factor: u128,
-        decay_factor: u128,
-        decay_step: u64,
+        initial_mint_cost: u128,
+        grow_factor: u128,
+        grow_step: u64,
     ) -> Result<()> {
         require_eq!(self.minted, 0, CoreError::GTStateHasBeenInitialized);
         require_eq!(self.last_minted_at, 0, CoreError::GTStateHasBeenInitialized);
-        require_eq!(self.decay_steps, 0, CoreError::GTStateHasBeenInitialized);
+        require_eq!(self.grow_steps, 0, CoreError::GTStateHasBeenInitialized);
 
-        require!(mint_base_value != 0, CoreError::InvalidGTConfig);
-        require!(decay_step != 0, CoreError::InvalidGTConfig);
+        require!(grow_step != 0, CoreError::InvalidGTConfig);
 
         let clock = Clock::get()?;
 
         self.last_minted_at = clock.unix_timestamp;
-        self.decay_step_amount = decay_step;
-        self.mint_base_value = mint_base_value;
-        self.mint_rate_decay_factor = decay_factor;
-        self.mint_rate_factor = initial_mint_rate_factor;
+        self.grow_step_amount = grow_step;
+        self.mint_cost_grow_factor = grow_factor;
+        self.mint_cost = initial_mint_cost;
 
         Ok(())
     }
 
-    pub(crate) fn mint(&mut self, size_in_value: u128) -> Result<u64> {
+    fn updated_mint_cost(&mut self) -> Result<()> {
         use gmsol_model::utils::apply_factor;
 
-        require!(self.mint_base_value != 0, CoreError::InvalidGTConfig);
-        require!(self.decay_step_amount != 0, CoreError::InvalidGTConfig);
+        require!(self.grow_step_amount != 0, CoreError::InvalidGTConfig);
+        let new_steps = self.minted % self.grow_step_amount;
 
-        let amount: u64 = apply_factor::<_, { constants::MARKET_DECIMALS }>(
-            &size_in_value,
-            &self.mint_rate_factor,
-        )
-        .ok_or(error!(CoreError::TokenAmountOverflow))?
-        .try_into()
-        .map_err(|_| error!(CoreError::TokenAmountOverflow))?;
-
-        self.minted = self.minted.saturating_add(amount);
-        let new_steps = self.minted % self.decay_step_amount;
-
-        if new_steps != self.decay_steps {
-            for _ in self.decay_steps..new_steps {
-                self.mint_rate_factor = apply_factor::<_, { constants::MARKET_DECIMALS }>(
-                    &self.mint_rate_factor,
-                    &self.mint_rate_decay_factor,
+        if new_steps != self.grow_steps {
+            for _ in self.grow_steps..new_steps {
+                self.mint_cost = apply_factor::<_, { constants::MARKET_DECIMALS }>(
+                    &self.mint_cost,
+                    &self.mint_cost_grow_factor,
                 )
                 .ok_or(error!(CoreError::Internal))?;
             }
-            self.decay_steps = new_steps;
+            self.grow_steps = new_steps;
         }
 
-        Ok(amount)
+        Ok(())
+    }
+
+    pub(crate) fn record_minted(&mut self, amount: u64) -> Result<()> {
+        if amount != 0 {
+            self.minted = self
+                .minted
+                .checked_add(amount)
+                .ok_or(error!(CoreError::TokenAmountOverflow))?;
+
+            self.updated_mint_cost()?;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn get_mint_amount(
+        &self,
+        size_in_value: u128,
+        discount: u128,
+    ) -> Result<(u64, u128)> {
+        use gmsol_model::utils::apply_factor;
+
+        let mint_cost =
+            apply_factor::<_, { constants::MARKET_DECIMALS }>(&self.mint_cost, &discount)
+                .ok_or(error!(CoreError::InvalidGTDiscount))?;
+
+        require!(mint_cost != 0, CoreError::InvalidGTConfig);
+
+        let remainder = size_in_value % mint_cost;
+        let minted = (size_in_value / mint_cost)
+            .try_into()
+            .map_err(|_| error!(CoreError::TokenAmountOverflow))?;
+
+        let minted_value = size_in_value - remainder;
+
+        Ok((minted, minted_value))
     }
 }
 

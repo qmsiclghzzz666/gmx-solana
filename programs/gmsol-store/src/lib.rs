@@ -1599,18 +1599,16 @@ pub mod gmsol_store {
     pub fn initialize_gt(
         ctx: Context<InitializeGT>,
         decimals: u8,
-        mint_base_value: u128,
-        initial_mint_rate_factor: u128,
-        decay_factor: u128,
-        decay_step: u64,
+        initial_mint_cost: u128,
+        grow_factor: u128,
+        grow_step: u64,
     ) -> Result<()> {
         instructions::unchecked_initialize_gt(
             ctx,
             decimals,
-            mint_base_value,
-            initial_mint_rate_factor,
-            decay_factor,
-            decay_step,
+            initial_mint_cost,
+            grow_factor,
+            grow_step,
         )
     }
 }
@@ -1971,6 +1969,9 @@ pub enum CoreError {
     /// Invalid GT config.
     #[msg("invalid GT config")]
     InvalidGTConfig,
+    /// Invalid GT discount.
+    #[msg("invalid GT discount")]
+    InvalidGTDiscount,
 }
 
 impl CoreError {
