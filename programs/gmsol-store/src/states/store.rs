@@ -454,15 +454,15 @@ pub struct GTState {
     last_minted_at: i64,
     grow_step_amount: u64,
     grow_steps: u64,
-    mint_cost_grow_factor: u128,
-    mint_cost: u128,
+    minting_cost_grow_factor: u128,
+    minting_cost: u128,
     reserve: [u8; 256],
 }
 
 impl GTState {
     pub(crate) fn init(
         &mut self,
-        initial_mint_cost: u128,
+        initial_minting_cost: u128,
         grow_factor: u128,
         grow_step: u64,
     ) -> Result<()> {
@@ -476,23 +476,23 @@ impl GTState {
 
         self.last_minted_at = clock.unix_timestamp;
         self.grow_step_amount = grow_step;
-        self.mint_cost_grow_factor = grow_factor;
-        self.mint_cost = initial_mint_cost;
+        self.minting_cost_grow_factor = grow_factor;
+        self.minting_cost = initial_minting_cost;
 
         Ok(())
     }
 
-    fn updated_mint_cost(&mut self) -> Result<()> {
+    fn updated_minting_cost(&mut self) -> Result<()> {
         use gmsol_model::utils::apply_factor;
 
         require!(self.grow_step_amount != 0, CoreError::InvalidGTConfig);
-        let new_steps = self.minted % self.grow_step_amount;
+        let new_steps = self.minted / self.grow_step_amount;
 
         if new_steps != self.grow_steps {
             for _ in self.grow_steps..new_steps {
-                self.mint_cost = apply_factor::<_, { constants::MARKET_DECIMALS }>(
-                    &self.mint_cost,
-                    &self.mint_cost_grow_factor,
+                self.minting_cost = apply_factor::<_, { constants::MARKET_DECIMALS }>(
+                    &self.minting_cost,
+                    &self.minting_cost_grow_factor,
                 )
                 .ok_or(error!(CoreError::Internal))?;
             }
@@ -504,12 +504,13 @@ impl GTState {
 
     pub(crate) fn record_minted(&mut self, amount: u64) -> Result<()> {
         if amount != 0 {
+            let clock = Clock::get()?;
             self.minted = self
                 .minted
                 .checked_add(amount)
                 .ok_or(error!(CoreError::TokenAmountOverflow))?;
-
-            self.updated_mint_cost()?;
+            self.last_minted_at = clock.unix_timestamp;
+            self.updated_minting_cost()?;
         }
         Ok(())
     }
@@ -521,14 +522,28 @@ impl GTState {
     ) -> Result<(u64, u128)> {
         use gmsol_model::utils::apply_factor;
 
-        let mint_cost =
-            apply_factor::<_, { constants::MARKET_DECIMALS }>(&self.mint_cost, &discount)
-                .ok_or(error!(CoreError::InvalidGTDiscount))?;
+        // Calculate the minting cost to apply.
+        let minting_cost = if discount == 0 {
+            self.minting_cost
+        } else {
+            require_gt!(
+                constants::MARKET_USD_UNIT,
+                discount,
+                CoreError::InvalidGTDiscount
+            );
+            let discounted_factor = constants::MARKET_USD_UNIT - discount;
 
-        require!(mint_cost != 0, CoreError::InvalidGTConfig);
+            apply_factor::<_, { constants::MARKET_DECIMALS }>(
+                &self.minting_cost,
+                &discounted_factor,
+            )
+            .ok_or(error!(CoreError::InvalidGTDiscount))?
+        };
 
-        let remainder = size_in_value % mint_cost;
-        let minted = (size_in_value / mint_cost)
+        require!(minting_cost != 0, CoreError::InvalidGTConfig);
+
+        let remainder = size_in_value % minting_cost;
+        let minted = (size_in_value / minting_cost)
             .try_into()
             .map_err(|_| error!(CoreError::TokenAmountOverflow))?;
 

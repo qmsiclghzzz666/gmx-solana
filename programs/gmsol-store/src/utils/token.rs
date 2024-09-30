@@ -1,6 +1,8 @@
 use anchor_lang::{prelude::*, solana_program::system_program};
 use anchor_spl::{
-    associated_token::{create, get_associated_token_address, Create},
+    associated_token::{
+        create, get_associated_token_address, get_associated_token_address_with_program_id, Create,
+    },
     token::{close_account, transfer, CloseAccount, TokenAccount, Transfer},
 };
 use typed_builder::TypedBuilder;
@@ -8,6 +10,17 @@ use typed_builder::TypedBuilder;
 /// Check if the given address is an ATA address.
 pub fn is_associated_token_account(pubkey: &Pubkey, owner: &Pubkey, mint: &Pubkey) -> bool {
     let expected = get_associated_token_address(owner, mint);
+    expected == *pubkey
+}
+
+/// Check if the given address is an ATA address.
+pub fn is_associated_token_account_with_program_id(
+    pubkey: &Pubkey,
+    owner: &Pubkey,
+    mint: &Pubkey,
+    program_id: &Pubkey,
+) -> bool {
+    let expected = get_associated_token_address_with_program_id(owner, mint, program_id);
     expected == *pubkey
 }
 

@@ -4,9 +4,11 @@ use anchor_lang::prelude::*;
 use anchor_spl::{
     associated_token::AssociatedToken,
     token::{transfer_checked, Mint, Token, TokenAccount, TransferChecked},
+    token_interface,
 };
 
 use crate::{
+    constants,
     events::RemoveOrderEvent,
     ops::{
         execution_fee::TransferExecutionFeeOps,
@@ -19,7 +21,10 @@ use crate::{
     },
     utils::{
         internal::{self, Authentication},
-        token::is_associated_token_account,
+        token::{
+            is_associated_token_account, is_associated_token_account_with_program_id,
+            must_be_uninitialized,
+        },
     },
     CoreError,
 };
@@ -654,6 +659,18 @@ pub struct CloseOrder<'info> {
     pub long_token: Option<Box<Account<'info, Mint>>>,
     /// Short token.
     pub short_token: Option<Box<Account<'info, Mint>>>,
+    /// GT mint.
+    #[account(
+        mut,
+        mint::authority = store,
+        seeds = [
+            constants::GT_MINT_SEED,
+            store.key().as_ref(),
+        ],
+        bump,
+        owner = gt_token_program.key(),
+    )]
+    pub gt_mint: InterfaceAccount<'info, token_interface::Mint>,
     /// The escrow account for initial collateral tokens.
     #[account(
         mut,
@@ -710,10 +727,19 @@ pub struct CloseOrder<'info> {
         constraint = is_associated_token_account(short_token_ata.key, owner.key, &short_token.as_ref().map(|a| a.key()).expect("must provide")) @ CoreError::NotAnATA,
     )]
     pub short_token_ata: Option<UncheckedAccount<'info>>,
+    /// The ATA for GT.
+    /// CHECK: should be checked during the execution.
+    #[account(
+        mut,
+        constraint = is_associated_token_account_with_program_id(gt_ata.key, owner.key, &gt_mint.key(), &gt_token_program.key()) @ CoreError::NotAnATA,
+    )]
+    pub gt_ata: UncheckedAccount<'info>,
     /// The system program.
     pub system_program: Program<'info, System>,
     /// The token program.
     pub token_program: Program<'info, Token>,
+    /// The token program for GT.
+    pub gt_token_program: Interface<'info, token_interface::TokenInterface>,
     /// The associated token program.
     pub associated_token_program: Program<'info, AssociatedToken>,
 }
@@ -721,7 +747,9 @@ pub struct CloseOrder<'info> {
 pub(crate) fn close_order(ctx: Context<CloseOrder>, reason: &str) -> Result<()> {
     let accounts = &ctx.accounts;
     let should_continue_when_atas_are_missing = accounts.preprocess()?;
-    if accounts.transfer_to_atas(should_continue_when_atas_are_missing)? {
+    let transfer_success = accounts.transfer_to_atas(should_continue_when_atas_are_missing)?;
+    let mint_success = accounts.mint_gt_reward(should_continue_when_atas_are_missing)?;
+    if transfer_success && mint_success {
         {
             let order_address = accounts.order.key();
             let order = accounts.order.load()?;
@@ -830,6 +858,51 @@ impl<'info> CloseOrder<'info> {
                     return Ok(false);
                 }
             }
+        }
+
+        Ok(true)
+    }
+
+    fn mint_gt_reward(&self, init_if_needed: bool) -> Result<Success> {
+        use anchor_spl::{
+            associated_token::{create, Create},
+            token_2022::{mint_to, MintTo},
+        };
+
+        let amount = self.order.load()?.gt_reward;
+        if amount != 0 {
+            let ata = &self.gt_ata;
+            let mint = &self.gt_mint;
+
+            if must_be_uninitialized(ata) {
+                if !init_if_needed {
+                    return Ok(false);
+                }
+                create(CpiContext::new(
+                    self.associated_token_program.to_account_info(),
+                    Create {
+                        payer: self.executor.to_account_info(),
+                        associated_token: ata.to_account_info(),
+                        authority: self.owner.to_account_info(),
+                        mint: mint.to_account_info(),
+                        system_program: self.system_program.to_account_info(),
+                        token_program: self.gt_token_program.to_account_info(),
+                    },
+                ))?;
+            }
+
+            let ctx = CpiContext::new(
+                self.gt_token_program.to_account_info(),
+                MintTo {
+                    mint: mint.to_account_info(),
+                    to: ata.to_account_info(),
+                    authority: self.store.to_account_info(),
+                },
+            );
+            mint_to(ctx.with_signer(&[&self.store.load()?.pda_seeds()]), amount)?;
+
+            // Make sure the mint can only be done once.
+            self.order.load_mut()?.gt_reward = 0;
         }
 
         Ok(true)

@@ -35,7 +35,7 @@ pub struct PositionCut<'info> {
     #[account(mut)]
     pub owner: UncheckedAccount<'info>,
     /// Store.
-    #[account(has_one = token_map)]
+    #[account(mut, has_one = token_map)]
     pub store: AccountLoader<'info, Store>,
     /// Token map.
     #[account(has_one = store)]

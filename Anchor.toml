@@ -19,7 +19,7 @@ wallet = "~/.config/solana/id.json"
 test = "cargo test --test anchor --features anchor-test -- $GMSOL_TEST"
 
 [test]
-startup_wait = 10000
+startup_wait = 15000
 shutdown_wait = 2000
 upgradeable = false
 

@@ -636,11 +636,13 @@ impl Deployment {
 
         // Init common ALT.
         let event_authority = self.client.data_store_event_authority();
+        let gt_mint = self.client.find_gt_mint_address(&self.store);
         let mut addresses = vec![
             self.store,
             self.token_map(),
             self.oracle,
             event_authority,
+            gt_mint,
             anchor_spl::token::ID,
             anchor_spl::token_2022::ID,
             anchor_spl::associated_token::ID,
@@ -695,7 +697,7 @@ impl Deployment {
             .initialize_gt(
                 &self.store,
                 decimals,
-                100 * MARKET_USD_UNIT / MARKET_USD_UNIT * 10u128.pow(decimals as u32),
+                100 * MARKET_USD_UNIT / 10u128.pow(decimals as u32),
                 101 * MARKET_USD_UNIT / 100,
                 100 * 1_000 * 10u64.pow(decimals as u32),
             )

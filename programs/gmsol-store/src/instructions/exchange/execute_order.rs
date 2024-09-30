@@ -119,7 +119,7 @@ pub struct ExecuteOrderV2<'info> {
     /// Authority.
     pub authority: Signer<'info>,
     /// Store.
-    #[account(has_one = token_map)]
+    #[account(mut, has_one = token_map)]
     pub store: AccountLoader<'info, Store>,
     /// Token Map.
     #[account(has_one = store)]
@@ -533,7 +533,7 @@ pub struct ExecuteDecreaseOrder<'info> {
     /// Authority.
     pub authority: Signer<'info>,
     /// Store.
-    #[account(has_one = token_map)]
+    #[account(mut, has_one = token_map)]
     pub store: AccountLoader<'info, Store>,
     /// Token Map.
     #[account(has_one = store)]

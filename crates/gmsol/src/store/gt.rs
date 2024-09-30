@@ -14,7 +14,7 @@ pub trait GTOps<C> {
         &self,
         store: &Pubkey,
         decimals: u8,
-        initial_mint_cost: u128,
+        initial_minting_cost: u128,
         grow_factor: u128,
         grow_step: u64,
     ) -> RpcBuilder<C>;
@@ -25,7 +25,7 @@ impl<C: Deref<Target = impl Signer> + Clone> GTOps<C> for crate::Client<C> {
         &self,
         store: &Pubkey,
         decimals: u8,
-        initial_mint_cost: u128,
+        initial_minting_cost: u128,
         grow_factor: u128,
         grow_step: u64,
     ) -> RpcBuilder<C> {
@@ -39,7 +39,7 @@ impl<C: Deref<Target = impl Signer> + Clone> GTOps<C> for crate::Client<C> {
             })
             .args(instruction::InitializeGt {
                 decimals,
-                initial_mint_cost,
+                initial_minting_cost,
                 grow_factor,
                 grow_step,
             })

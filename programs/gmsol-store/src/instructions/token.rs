@@ -2,6 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::{
     associated_token::AssociatedToken,
     token::{Burn, Mint, MintTo, Token, TokenAccount, Transfer},
+    token_interface,
 };
 
 use crate::{constants, states::Store, utils::internal};
@@ -416,7 +417,7 @@ pub struct PrepareAssociatedTokenAccount<'info> {
     /// CHECK: only use as the owner of the token account.
     pub owner: UncheckedAccount<'info>,
     /// The mint account for the token account.
-    pub mint: Account<'info, Mint>,
+    pub mint: InterfaceAccount<'info, token_interface::Mint>,
     /// The token account to prepare.
     #[account(
         init_if_needed,
@@ -424,11 +425,11 @@ pub struct PrepareAssociatedTokenAccount<'info> {
         associated_token::mint = mint,
         associated_token::authority = owner,
     )]
-    pub account: Account<'info, TokenAccount>,
+    pub account: InterfaceAccount<'info, token_interface::TokenAccount>,
     /// The [`System`] program.
     pub system_program: Program<'info, System>,
     /// The [`Token`] program.
-    pub token_program: Program<'info, Token>,
+    pub token_program: Interface<'info, token_interface::TokenInterface>,
     /// The [`AssociatedToken`] program.
     pub associated_token_program: Program<'info, AssociatedToken>,
 }

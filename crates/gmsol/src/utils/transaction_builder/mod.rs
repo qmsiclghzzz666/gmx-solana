@@ -1,4 +1,4 @@
-use std::{ops::Deref, time::Duration};
+use std::{collections::HashSet, ops::Deref, time::Duration};
 
 use anchor_client::{
     solana_client::{
@@ -74,7 +74,14 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> TransactionBuilder<'a, C> {
     ) -> Result<&mut Self, (RpcBuilder<'a, C>, crate::Error)> {
         let packet_size = self.packet_size();
         let mut ix = rpc.instructions_with_options(true, None);
-        if transaction_size(&ix, true) > packet_size {
+        let incoming_lookup_table = rpc.get_complete_lookup_table();
+        if transaction_size(
+            &ix,
+            true,
+            Some(&incoming_lookup_table),
+            rpc.get_alts().len(),
+        ) > packet_size
+        {
             return Err((
                 rpc,
                 crate::Error::invalid_argument("the size of this instruction is too big"),
@@ -88,9 +95,21 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> TransactionBuilder<'a, C> {
             self.builders.push(rpc);
         } else {
             let last = self.builders.last_mut().unwrap();
+
             let mut ixs_after_merge = last.instructions_with_options(false, None);
             ixs_after_merge.append(&mut ix);
-            let size_after_merge = transaction_size(&ixs_after_merge, true);
+
+            let mut lookup_table = last.get_complete_lookup_table();
+            lookup_table.extend(incoming_lookup_table);
+            let mut lookup_table_addresses = last.get_alts().keys().collect::<HashSet<_>>();
+            lookup_table_addresses.extend(rpc.get_alts().keys());
+
+            let size_after_merge = transaction_size(
+                &ixs_after_merge,
+                true,
+                Some(&lookup_table),
+                lookup_table_addresses.len(),
+            );
             if size_after_merge <= packet_size {
                 tracing::debug!(size_after_merge, "adding to the last tx");
                 last.try_merge(&mut rpc).map_err(|err| (rpc, err))?;

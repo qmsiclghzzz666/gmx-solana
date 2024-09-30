@@ -1,10 +1,17 @@
+use std::collections::HashSet;
+
 use anchor_client::solana_sdk::{instruction::Instruction, pubkey::Pubkey};
 
 /// Estimated the size of the result transaction.
 ///
 /// Based on the docs of [Solana Transactions](https://solana.com/docs/core/transactions),
 /// and referring to the implementation of `@pythnetwork/solana-utils`.
-pub fn transaction_size(ixs: &[Instruction], is_versioned_transaction: bool) -> usize {
+pub fn transaction_size(
+    ixs: &[Instruction],
+    is_versioned_transaction: bool,
+    lookup_table: Option<&HashSet<Pubkey>>,
+    lookup_table_addresses: usize,
+) -> usize {
     use std::collections::HashSet;
 
     fn get_size_of_compressed_u16(size: usize) -> usize {
@@ -35,7 +42,20 @@ pub fn transaction_size(ixs: &[Instruction], is_versioned_transaction: bool) -> 
             + ix.data.len()
     });
 
-    get_size_of_compressed_u16(signers.len())
+    let num_of_address_lookups = if let Some(lookup_table) = lookup_table {
+        let total_accounts = accounts.len();
+        accounts = accounts.difference(lookup_table).copied().collect();
+        accounts = accounts
+            .union(&signers)
+            .chain(programs.iter())
+            .copied()
+            .collect();
+        total_accounts - accounts.len()
+    } else {
+        0
+    };
+
+    let size = get_size_of_compressed_u16(signers.len())
         + signers.len() * 64
         + 3
         + get_size_of_compressed_u16(accounts.len())
@@ -43,9 +63,10 @@ pub fn transaction_size(ixs: &[Instruction], is_versioned_transaction: bool) -> 
         + 32
         + get_size_of_compressed_u16(ixs.len())
         + ixs_size
-        + (if is_versioned_transaction {
-            1 + get_size_of_compressed_u16(0)
-        } else {
-            0
-        })
+        + num_of_address_lookups;
+    if is_versioned_transaction {
+        size + 1 + get_size_of_compressed_u16(0) + lookup_table_addresses * (32 + 2)
+    } else {
+        size
+    }
 }

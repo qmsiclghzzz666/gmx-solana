@@ -12,7 +12,7 @@ use super::{
         SwapParams, TokenRecord, TokensWithFeed,
     },
     position::PositionKind,
-    NonceBytes, Oracle, Seed,
+    NonceBytes, Oracle, Seed, Store,
 };
 
 /// Order.
@@ -663,6 +663,8 @@ pub struct OrderV2 {
     padding_0: [u8; 4],
     /// Order params.
     pub(crate) params: OrderParamsV2,
+    pub(crate) gt_reward: u64,
+    padding_1: [u8; 8],
     reserve: [u8; 128],
 }
 
@@ -826,6 +828,17 @@ impl OrderV2 {
     /// Get token accounts.
     pub fn tokens(&self) -> &TokenAccounts {
         &self.tokens
+    }
+
+    /// Process GT.
+    /// CHECK: the order must have been successfully executed.
+    #[inline(never)]
+    pub(crate) fn unchecked_process_gt(&mut self, store: &mut Store) -> Result<()> {
+        let size_in_value = self.params.size_delta_value;
+        let (minted, _minted_value) = store.gt_mut().get_mint_amount(size_in_value, 0)?;
+        store.gt_mut().record_minted(minted)?;
+        self.gt_reward = minted;
+        Ok(())
     }
 }
 

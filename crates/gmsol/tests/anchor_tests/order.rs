@@ -71,7 +71,13 @@ async fn balanced_market_order() -> eyre::Result<()> {
 
             let mut builder = keeper.execute_order(store, oracle, &order, false)?;
             deployment
-                .execute_with_pyth(&mut builder, None, true)
+                .execute_with_pyth(
+                    builder
+                        .add_alt(deployment.common_alt().clone())
+                        .add_alt(deployment.market_alt().clone()),
+                    None,
+                    true,
+                )
                 .await?;
 
             // Decrease position.
@@ -84,7 +90,13 @@ async fn balanced_market_order() -> eyre::Result<()> {
 
             let mut builder = keeper.execute_order(store, oracle, &order, false)?;
             deployment
-                .execute_with_pyth(&mut builder, None, true)
+                .execute_with_pyth(
+                    builder
+                        .add_alt(deployment.common_alt().clone())
+                        .add_alt(deployment.market_alt().clone()),
+                    None,
+                    true,
+                )
                 .await?;
         }
     }
@@ -113,7 +125,13 @@ async fn balanced_market_order() -> eyre::Result<()> {
 
     let mut builder = keeper.execute_order(store, oracle, &order, false)?;
     deployment
-        .execute_with_pyth(&mut builder, None, true)
+        .execute_with_pyth(
+            builder
+                .add_alt(deployment.common_alt().clone())
+                .add_alt(deployment.market_alt().clone()),
+            None,
+            true,
+        )
         .await?;
 
     // Extract collateral.
@@ -127,7 +145,13 @@ async fn balanced_market_order() -> eyre::Result<()> {
 
     let mut builder = keeper.execute_order(store, oracle, &order, false)?;
     deployment
-        .execute_with_pyth(&mut builder, None, true)
+        .execute_with_pyth(
+            builder
+                .add_alt(deployment.common_alt().clone())
+                .add_alt(deployment.market_alt().clone()),
+            None,
+            true,
+        )
         .await?;
 
     // Extract collateral and swap.
@@ -143,7 +167,13 @@ async fn balanced_market_order() -> eyre::Result<()> {
 
     let mut builder = keeper.execute_order(store, oracle, &order, false)?;
     deployment
-        .execute_with_pyth(&mut builder, None, true)
+        .execute_with_pyth(
+            builder
+                .add_alt(deployment.common_alt().clone())
+                .add_alt(deployment.market_alt().clone()),
+            None,
+            true,
+        )
         .await?;
 
     // Fully decrease and swap.
@@ -158,7 +188,13 @@ async fn balanced_market_order() -> eyre::Result<()> {
 
     let mut builder = keeper.execute_order(store, oracle, &order, false)?;
     deployment
-        .execute_with_pyth(&mut builder, None, true)
+        .execute_with_pyth(
+            builder
+                .add_alt(deployment.common_alt().clone())
+                .add_alt(deployment.market_alt().clone()),
+            None,
+            true,
+        )
         .await?;
     Ok(())
 }
@@ -228,7 +264,13 @@ async fn single_token_market_order() -> eyre::Result<()> {
 
             let mut builder = keeper.execute_order(store, oracle, &order, false)?;
             deployment
-                .execute_with_pyth(&mut builder, None, true)
+                .execute_with_pyth(
+                    builder
+                        .add_alt(deployment.common_alt().clone())
+                        .add_alt(deployment.market_alt().clone()),
+                    None,
+                    true,
+                )
                 .await?;
 
             // Decrease position.
@@ -241,7 +283,13 @@ async fn single_token_market_order() -> eyre::Result<()> {
 
             let mut builder = keeper.execute_order(store, oracle, &order, false)?;
             deployment
-                .execute_with_pyth(&mut builder, None, true)
+                .execute_with_pyth(
+                    builder
+                        .add_alt(deployment.common_alt().clone())
+                        .add_alt(deployment.market_alt().clone()),
+                    None,
+                    true,
+                )
                 .await?;
         }
     }
@@ -270,7 +318,13 @@ async fn single_token_market_order() -> eyre::Result<()> {
 
     let mut builder = keeper.execute_order(store, oracle, &order, false)?;
     deployment
-        .execute_with_pyth(&mut builder, None, true)
+        .execute_with_pyth(
+            builder
+                .add_alt(deployment.common_alt().clone())
+                .add_alt(deployment.market_alt().clone()),
+            None,
+            true,
+        )
         .await?;
 
     // Extract collateral.
@@ -284,7 +338,13 @@ async fn single_token_market_order() -> eyre::Result<()> {
 
     let mut builder = keeper.execute_order(store, oracle, &order, false)?;
     deployment
-        .execute_with_pyth(&mut builder, None, true)
+        .execute_with_pyth(
+            builder
+                .add_alt(deployment.common_alt().clone())
+                .add_alt(deployment.market_alt().clone()),
+            None,
+            true,
+        )
         .await?;
 
     // Extract collateral and swap.
@@ -300,7 +360,13 @@ async fn single_token_market_order() -> eyre::Result<()> {
 
     let mut builder = keeper.execute_order(store, oracle, &order, false)?;
     deployment
-        .execute_with_pyth(&mut builder, None, true)
+        .execute_with_pyth(
+            builder
+                .add_alt(deployment.common_alt().clone())
+                .add_alt(deployment.market_alt().clone()),
+            None,
+            true,
+        )
         .await?;
 
     // Fully decrease and swap.
@@ -315,7 +381,13 @@ async fn single_token_market_order() -> eyre::Result<()> {
 
     let mut builder = keeper.execute_order(store, oracle, &order, false)?;
     deployment
-        .execute_with_pyth(&mut builder, None, true)
+        .execute_with_pyth(
+            builder
+                .add_alt(deployment.common_alt().clone())
+                .add_alt(deployment.market_alt().clone()),
+            None,
+            true,
+        )
         .await?;
     Ok(())
 }

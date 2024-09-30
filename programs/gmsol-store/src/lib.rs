@@ -1599,14 +1599,14 @@ pub mod gmsol_store {
     pub fn initialize_gt(
         ctx: Context<InitializeGT>,
         decimals: u8,
-        initial_mint_cost: u128,
+        initial_minting_cost: u128,
         grow_factor: u128,
         grow_step: u64,
     ) -> Result<()> {
         instructions::unchecked_initialize_gt(
             ctx,
             decimals,
-            initial_mint_cost,
+            initial_minting_cost,
             grow_factor,
             grow_step,
         )

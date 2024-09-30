@@ -1,10 +1,18 @@
-use std::{collections::HashSet, ops::Deref};
+use std::{
+    collections::{HashMap, HashSet},
+    ops::Deref,
+};
 
 use anchor_client::{
     anchor_lang::{system_program, Id},
-    solana_sdk::{instruction::AccountMeta, pubkey::Pubkey, signer::Signer},
+    solana_sdk::{
+        address_lookup_table::AddressLookupTableAccount, instruction::AccountMeta, pubkey::Pubkey,
+        signer::Signer,
+    },
 };
-use anchor_spl::associated_token::get_associated_token_address;
+use anchor_spl::associated_token::{
+    get_associated_token_address, get_associated_token_address_with_program_id,
+};
 use gmsol_store::{
     accounts, instruction,
     ops::order::CreateOrderParams,
@@ -297,6 +305,12 @@ where
                 None
             };
         let position = self.position().await?;
+        let gt_mint = self.client.find_gt_mint_address(&self.store);
+        let gt_ata = get_associated_token_address_with_program_id(
+            payer,
+            &gt_mint,
+            &anchor_spl::token_2022::ID,
+        );
 
         let kind = self.params.kind;
         let params = CreateOrderParams {
@@ -421,6 +435,19 @@ where
                         associated_token_program: anchor_spl::associated_token::ID,
                     })
                     .args(instruction::PrepareAssociatedTokenAccount {});
+                let gt_ata = self
+                    .client
+                    .data_store_rpc()
+                    .accounts(accounts::PrepareAssociatedTokenAccount {
+                        payer: *payer,
+                        owner: *payer,
+                        mint: gt_mint,
+                        account: gt_ata,
+                        system_program: system_program::ID,
+                        token_program: anchor_spl::token_2022::ID,
+                        associated_token_program: anchor_spl::associated_token::ID,
+                    })
+                    .args(instruction::PrepareAssociatedTokenAccount {});
                 let prepare_position = self
                     .client
                     .data_store_rpc()
@@ -437,6 +464,7 @@ where
                 escrow
                     .merge(long_token_ata)
                     .merge(short_token_ata)
+                    .merge(gt_ata)
                     .merge(prepare_position)
             }
             .args(instruction::PrepareIncreaseOrderEscrow { nonce }),
@@ -514,10 +542,24 @@ where
                         associated_token_program: anchor_spl::associated_token::ID,
                     })
                     .args(instruction::PrepareAssociatedTokenAccount {});
+                let gt_ata = self
+                    .client
+                    .data_store_rpc()
+                    .accounts(accounts::PrepareAssociatedTokenAccount {
+                        payer: *payer,
+                        owner: *payer,
+                        mint: gt_mint,
+                        account: gt_ata,
+                        system_program: system_program::ID,
+                        token_program: anchor_spl::token_2022::ID,
+                        associated_token_program: anchor_spl::associated_token::ID,
+                    })
+                    .args(instruction::PrepareAssociatedTokenAccount {});
                 escrow
                     .merge(long_token_ata)
                     .merge(short_token_ata)
                     .merge(final_output_token_ata)
+                    .merge(gt_ata)
             }
             _ => {
                 return Err(crate::Error::invalid_argument("unsupported order kind"));
@@ -585,6 +627,7 @@ pub struct ExecuteOrderBuilder<'a, C> {
     cancel_on_execution_error: bool,
     close: bool,
     event_buffer_index: u8,
+    alts: HashMap<Pubkey, Vec<Pubkey>>,
 }
 
 /// Hint for executing order.
@@ -691,6 +734,7 @@ where
             cancel_on_execution_error,
             close: true,
             event_buffer_index: 0,
+            alts: Default::default(),
         })
     }
 
@@ -715,6 +759,12 @@ where
     /// Set event buffer index.
     pub fn event_buffer_index(&mut self, index: u8) -> &mut Self {
         self.event_buffer_index = index;
+        self
+    }
+
+    /// Insert an Address Lookup Table.
+    pub fn add_alt(&mut self, account: AddressLookupTableAccount) -> &mut Self {
+        self.alts.insert(account.key, account.addresses);
         self
     }
 
@@ -994,7 +1044,8 @@ where
 
         execute_order = execute_order
             .accounts(feeds.into_iter().chain(swap_markets).collect::<Vec<_>>())
-            .compute_budget(ComputeBudget::default().with_limit(EXECUTE_ORDER_COMPUTE_BUDGET));
+            .compute_budget(ComputeBudget::default().with_limit(EXECUTE_ORDER_COMPUTE_BUDGET))
+            .lookup_tables(self.alts.clone());
 
         if !kind.is_swap() {
             let prepare_event_buffer = self
@@ -1150,6 +1201,12 @@ where
         let hint = self.prepare_hint().await?;
         let payer = self.client.payer();
         let owner = hint.owner;
+        let gt_mint = self.client.find_gt_mint_address(&hint.store);
+        let gt_ata = get_associated_token_address_with_program_id(
+            &owner,
+            &gt_mint,
+            &anchor_spl::token_2022::ID,
+        );
         Ok(self
             .client
             .data_store_rpc()
@@ -1168,6 +1225,7 @@ where
                         .map(|(_, account)| account),
                     long_token: hint.long_token_and_account.map(|(token, _)| token),
                     short_token: hint.short_token_and_account.map(|(token, _)| token),
+                    gt_mint,
                     final_output_token: hint.final_output_token_and_account.map(|(token, _)| token),
                     final_output_token_escrow: hint
                         .final_output_token_and_account
@@ -1190,8 +1248,10 @@ where
                         .short_token_and_account
                         .as_ref()
                         .map(|(token, _)| get_associated_token_address(&owner, token)),
+                    gt_ata,
                     associated_token_program: anchor_spl::associated_token::ID,
                     token_program: anchor_spl::token::ID,
+                    gt_token_program: anchor_spl::token_2022::ID,
                     system_program: system_program::ID,
                     program: self.client.store_program_id(),
                 },

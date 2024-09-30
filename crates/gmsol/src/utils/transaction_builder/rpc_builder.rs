@@ -1,4 +1,7 @@
-use std::{collections::HashMap, ops::Deref};
+use std::{
+    collections::{HashMap, HashSet},
+    ops::Deref,
+};
 
 use anchor_client::{
     anchor_lang::{InstructionData, ToAccountMetas},
@@ -535,35 +538,66 @@ impl<'a, C: Deref<Target = impl Signer> + Clone, T> RpcBuilder<'a, C, T> {
         (request, self.output)
     }
 
+    /// Get complete lookup table.
+    pub fn get_complete_lookup_table(&self) -> HashSet<Pubkey> {
+        self.alts
+            .values()
+            .flatten()
+            .copied()
+            .collect::<HashSet<_>>()
+    }
+
+    /// Get alts.
+    pub fn get_alts(&self) -> &HashMap<Pubkey, Vec<Pubkey>> {
+        &self.alts
+    }
+
     /// Estimated the size of the result transaction.
     ///
     /// See [`transaction_size()`] for more information.
     pub fn transaction_size(&self, is_versioned_transaction: bool) -> usize {
-        transaction_size(&self.instructions(), is_versioned_transaction)
+        let lookup_table = self.get_complete_lookup_table();
+        transaction_size(
+            &self.instructions(),
+            is_versioned_transaction,
+            Some(&lookup_table),
+            self.get_alts().len(),
+        )
     }
 
     /// Estimated the execution fee of the result transaction.
     pub async fn estimate_execution_fee(
         &self,
-        client: &RpcClient,
+        _client: &RpcClient,
         compute_unit_price_micro_lamports: Option<u64>,
     ) -> crate::Result<u64> {
-        let blockhash = client
-            .get_latest_blockhash()
-            .await
-            .map_err(anchor_client::ClientError::from)?;
-        // FIXME: we currently ignore the ALTs when estimating execution fee to avoid the
-        // "index out of bound" error returned by the RPC with ALTs provided.
-        let message = self.v0_message_with_blockhash_and_options(
-            blockhash,
-            false,
-            compute_unit_price_micro_lamports,
-            false,
-        )?;
-        let fee = client
-            .get_fee_for_message(&message)
-            .await
-            .map_err(anchor_client::ClientError::from)?;
+        // let blockhash = client
+        //     .get_latest_blockhash()
+        //     .await
+        //     .map_err(anchor_client::ClientError::from)?;
+        // // FIXME: we currently ignore the ALTs when estimating execution fee to avoid the
+        // // "index out of bound" error returned by the RPC with ALTs provided.
+        // let message = self.v0_message_with_blockhash_and_options(
+        //     blockhash,
+        //     false,
+        //     compute_unit_price_micro_lamports,
+        //     true,
+        // )?;
+        // let fee = client
+        //     .get_fee_for_message(&message)
+        //     .await
+        //     .map_err(anchor_client::ClientError::from)?;
+        let ixs = self.instructions_with_options(true, None);
+        let mut compute_budget = self.compute_budget;
+        if let Some(price) = compute_unit_price_micro_lamports {
+            compute_budget = compute_budget.with_price(price);
+        }
+        let num_signers = ixs
+            .iter()
+            .flat_map(|ix| ix.accounts.iter())
+            .filter(|meta| meta.is_signer)
+            .count() as u64;
+        let fee = num_signers * 5_000 + compute_budget.fee();
         Ok(fee)
     }
 }

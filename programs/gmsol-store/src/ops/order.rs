@@ -827,10 +827,16 @@ impl<'a, 'info> ExecuteOrderOps<'a, 'info> {
                     )?,
                     _ => unreachable!(),
                 };
+
                 position.write_to_event(&mut *event_loader.load_mut()?)?;
                 event_loader
                     .load_mut()?
                     .update_with_transfer_out(&transfer_out)?;
+
+                self.order
+                    .load_mut()?
+                    .unchecked_process_gt(&mut *self.store.load_mut()?)?;
+
                 position.commit();
                 msg!(
                     "[Position] executed with trade_id={}",

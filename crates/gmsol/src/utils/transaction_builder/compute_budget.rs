@@ -69,6 +69,11 @@ impl ComputeBudget {
     pub fn price(&self) -> u64 {
         self.price_micro_lamports
     }
+
+    /// Estimate priority fee.
+    pub fn fee(&self) -> u64 {
+        self.limit_units as u64 * self.price_micro_lamports / 1_000_000
+    }
 }
 
 impl AddAssign for ComputeBudget {
