@@ -58,8 +58,11 @@ pub mod position;
 /// Instructions for the exchange funtionality.
 pub mod exchange;
 
-/// Instructiosn for GT.
+/// Instructions for GT.
 pub mod gt;
+
+/// Instructions for User accounts.
+pub mod user;
 
 /// Instructions for bug fixes.
 #[cfg(not(feature = "no-bug-fix"))]
@@ -77,6 +80,7 @@ pub use position::*;
 pub use roles::*;
 pub use token::*;
 pub use token_config::*;
+pub use user::*;
 pub use withdrawal::*;
 
 #[cfg(not(feature = "no-bug-fix"))]

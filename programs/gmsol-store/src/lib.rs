@@ -1611,6 +1611,24 @@ pub mod gmsol_store {
             grow_step,
         )
     }
+
+    /// Prepare User Account.
+    pub fn prepare_user(ctx: Context<PrepareUser>) -> Result<()> {
+        instructions::prepare_user(ctx)
+    }
+
+    /// Initialize referral code.
+    pub fn initialize_referral_code(
+        ctx: Context<InitializeReferralCode>,
+        code: [u8; 4],
+    ) -> Result<()> {
+        instructions::initialize_referral_code(ctx, code)
+    }
+
+    /// Set referrer.
+    pub fn set_referrer(ctx: Context<SetReferrer>, code: [u8; 4]) -> Result<()> {
+        instructions::set_referrer(ctx, code)
+    }
 }
 
 #[error_code]
@@ -1972,6 +1990,21 @@ pub enum CoreError {
     /// Invalid GT discount.
     #[msg("invalid GT discount")]
     InvalidGTDiscount,
+    /// User account has been initialized.
+    #[msg("user account has been initialized")]
+    UserAccountHasBeenInitialized,
+    /// Referral Code has been set.
+    #[msg("referral code has been set")]
+    ReferralCodeHasBeenSet,
+    /// Referrer has been set.
+    #[msg("referrer has been set")]
+    ReferrerHasBeenSet,
+    /// Invalid User Account.
+    #[msg("invalid user account")]
+    InvalidUserAccount,
+    /// Referral Code Mismatched.
+    #[msg("referral code mismatched")]
+    ReferralCodeMismatched,
 }
 
 impl CoreError {

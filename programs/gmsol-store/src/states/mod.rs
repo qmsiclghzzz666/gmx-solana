@@ -31,6 +31,9 @@ pub mod position;
 /// Shift.
 pub mod shift;
 
+/// User.
+pub mod user;
+
 pub use deposit::{Deposit, DepositV2};
 pub use market::*;
 pub use oracle::*;

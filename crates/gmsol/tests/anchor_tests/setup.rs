@@ -699,7 +699,7 @@ impl Deployment {
                 decimals,
                 100 * MARKET_USD_UNIT / 10u128.pow(decimals as u32),
                 101 * MARKET_USD_UNIT / 100,
-                100 * 1_000 * 10u64.pow(decimals as u32),
+                10 * 10u64.pow(decimals as u32),
             )
             .send()
             .await?;
