@@ -311,6 +311,7 @@ where
             &gt_mint,
             &anchor_spl::token_2022::ID,
         );
+        let user = self.client.find_user_address(&self.store, payer);
 
         let kind = self.params.kind;
         let params = CreateOrderParams {
@@ -566,6 +567,17 @@ where
             }
         };
 
+        let prepare_user = self
+            .client
+            .data_store_rpc()
+            .accounts(accounts::PrepareUser {
+                owner: *payer,
+                store: self.store,
+                user,
+                system_program: system_program::ID,
+            })
+            .args(instruction::PrepareUser {});
+
         let create = self
             .client
             .data_store_rpc()
@@ -576,6 +588,7 @@ where
                     position,
                     market: self.market(),
                     owner: *payer,
+                    user,
                     initial_collateral_token,
                     final_output_token,
                     long_token,
@@ -608,7 +621,7 @@ where
                     .collect::<Vec<_>>(),
             );
 
-        Ok((prepare.merge(create), order, position))
+        Ok((prepare.merge(prepare_user).merge(create), order, position))
     }
 }
 
@@ -916,6 +929,7 @@ where
                     .accounts(accounts::ExecuteDecreaseOrder {
                         authority,
                         owner: hint.user,
+                        user: self.client.find_user_address(&self.store, &hint.user),
                         store: self.store,
                         oracle: self.oracle,
                         token_map,
@@ -986,6 +1000,7 @@ where
                     accounts::ExecuteOrderV2 {
                         authority,
                         owner: hint.user,
+                        user: self.client.find_user_address(&self.store, &hint.user),
                         store: self.store,
                         oracle: self.oracle,
                         token_map,

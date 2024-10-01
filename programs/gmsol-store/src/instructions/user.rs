@@ -20,7 +20,7 @@ pub struct PrepareUser<'info> {
     #[account(
         init_if_needed,
         payer = owner,
-        space = UserHeader::space(0),
+        space = 8 + UserHeader::space(0),
         seeds = [UserHeader::SEED, store.key().as_ref(), owner.key().as_ref()],
         bump,
     )]

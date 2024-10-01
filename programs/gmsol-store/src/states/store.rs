@@ -451,7 +451,7 @@ impl Addresses {
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub struct GTState {
     minted: u64,
-    last_minted_at: i64,
+    pub(crate) last_minted_at: i64,
     grow_step_amount: u64,
     grow_steps: u64,
     minting_cost_grow_factor: u128,
@@ -482,39 +482,49 @@ impl GTState {
         Ok(())
     }
 
-    fn updated_minting_cost(&mut self) -> Result<()> {
+    fn next_minting_cost(&self, next_minted: u64) -> Result<Option<(u64, u128)>> {
         use gmsol_model::utils::apply_factor;
 
         require!(self.grow_step_amount != 0, CoreError::InvalidGTConfig);
-        let new_steps = self.minted / self.grow_step_amount;
+        let new_steps = next_minted / self.grow_step_amount;
 
         if new_steps != self.grow_steps {
+            let mut minting_cost = self.minting_cost;
             for _ in self.grow_steps..new_steps {
-                self.minting_cost = apply_factor::<_, { constants::MARKET_DECIMALS }>(
-                    &self.minting_cost,
+                minting_cost = apply_factor::<_, { constants::MARKET_DECIMALS }>(
+                    &minting_cost,
                     &self.minting_cost_grow_factor,
                 )
                 .ok_or(error!(CoreError::Internal))?;
             }
-            self.grow_steps = new_steps;
+            Ok(Some((new_steps, minting_cost)))
+        } else {
+            Ok(None)
         }
-
-        Ok(())
     }
 
+    #[inline(never)]
     pub(crate) fn record_minted(&mut self, amount: u64) -> Result<()> {
         if amount != 0 {
             let clock = Clock::get()?;
-            self.minted = self
+            let next_minted = self
                 .minted
                 .checked_add(amount)
                 .ok_or(error!(CoreError::TokenAmountOverflow))?;
+            let next_minting_cost = self.next_minting_cost(next_minted)?;
+
+            // The following steps should be infallible.
+            if let Some((new_steps, new_minting_cost)) = next_minting_cost {
+                self.minting_cost = new_minting_cost;
+                self.grow_steps = new_steps;
+            }
+            self.minted = next_minted;
             self.last_minted_at = clock.unix_timestamp;
-            self.updated_minting_cost()?;
         }
         Ok(())
     }
 
+    #[inline(never)]
     pub(crate) fn get_mint_amount(
         &self,
         size_in_value: u128,

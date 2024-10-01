@@ -12,6 +12,7 @@ use super::{
         SwapParams, TokenRecord, TokensWithFeed,
     },
     position::PositionKind,
+    user::UserHeader,
     NonceBytes, Oracle, Seed, Store,
 };
 
@@ -833,11 +834,41 @@ impl OrderV2 {
     /// Process GT.
     /// CHECK: the order must have been successfully executed.
     #[inline(never)]
-    pub(crate) fn unchecked_process_gt(&mut self, store: &mut Store) -> Result<()> {
+    pub(crate) fn unchecked_process_gt(
+        &mut self,
+        store: &mut Store,
+        user: &mut UserHeader,
+    ) -> Result<()> {
         let size_in_value = self.params.size_delta_value;
-        let (minted, _minted_value) = store.gt_mut().get_mint_amount(size_in_value, 0)?;
+        // Ignore the overflowed value.
+        let next_traded_value = user.gt.traded_value().saturating_add(size_in_value);
+        let minted_value = user.gt.minted_value();
+        require_gte!(
+            next_traded_value,
+            minted_value,
+            CoreError::InvalidUserAccount
+        );
+        let value_to_mint_for = next_traded_value.saturating_sub(minted_value);
+
+        let (minted, delta_minted_value) = store.gt_mut().get_mint_amount(value_to_mint_for, 0)?;
+
+        let next_minted = user
+            .gt
+            .minted
+            .checked_add(minted)
+            .ok_or(error!(CoreError::TokenAmountOverflow))?;
+        let next_minted_value = minted_value
+            .checked_add(delta_minted_value)
+            .ok_or(error!(CoreError::ValueOverflow))?;
+
         store.gt_mut().record_minted(minted)?;
+
         self.gt_reward = minted;
+        user.gt.minted = next_minted;
+        user.gt.last_minted_at = store.gt().last_minted_at;
+        user.gt.traded_value = next_traded_value;
+        user.gt.minted_value = next_minted_value;
+
         Ok(())
     }
 }

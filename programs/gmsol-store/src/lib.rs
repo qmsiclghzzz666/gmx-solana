@@ -1978,6 +1978,9 @@ pub enum CoreError {
     /// Token amount overflow.
     #[msg("token amount overflow")]
     TokenAmountOverflow,
+    /// Value overflow.
+    #[msg("value overflow")]
+    ValueOverflow,
     /// Invalid Shift Markets
     #[msg("invalid shift markets")]
     InvalidShiftMarkets,

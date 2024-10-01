@@ -17,6 +17,7 @@ use crate::{
     states::{
         order::{OrderKind, OrderV2},
         position::PositionKind,
+        user::UserHeader,
         Market, NonceBytes, Position, RoleKey, Seed, Store,
     },
     utils::{
@@ -361,6 +362,16 @@ pub struct CreateOrder<'info> {
     /// Market.
     #[account(mut, has_one = store)]
     pub market: AccountLoader<'info, Market>,
+    /// User Account.
+    #[account(
+        mut,
+        constraint = user.load()?.is_initialized() @ CoreError::InvalidUserAccount,
+        has_one = owner,
+        has_one = store,
+        seeds = [UserHeader::SEED, store.key().as_ref(), owner.key().as_ref()],
+        bump = user.load()?.bump,
+    )]
+    pub user: AccountLoader<'info, UserHeader>,
     /// The order to be created.
     #[account(
         init,

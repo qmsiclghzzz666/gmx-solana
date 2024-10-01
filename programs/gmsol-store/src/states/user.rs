@@ -176,9 +176,21 @@ impl Seed for ReferralCode {
 #[zero_copy]
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub struct GTState {
-    minted: u64,
-    last_minted_at: i64,
-    traded_value: u128,
-    minted_value: u128,
+    pub(crate) minted: u64,
+    pub(crate) last_minted_at: i64,
+    pub(crate) traded_value: u128,
+    pub(crate) minted_value: u128,
     reserved: [u8; 64],
+}
+
+impl GTState {
+    /// Get traded value.
+    pub fn traded_value(&self) -> u128 {
+        self.traded_value
+    }
+
+    /// Get minted value.
+    pub fn minted_value(&self) -> u128 {
+        self.minted_value
+    }
 }

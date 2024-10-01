@@ -285,6 +285,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> PositionCutBuilder<'a, C> {
             .accounts(accounts::PositionCut {
                 authority: payer,
                 owner,
+                user: self.client.find_user_address(&store, &owner),
                 store,
                 token_map: hint.token_map,
                 price_provider: self.price_provider,

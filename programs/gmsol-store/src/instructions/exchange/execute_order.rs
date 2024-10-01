@@ -15,6 +15,7 @@ use crate::{
         common::action::{ActionExt, ActionSigner},
         order::{OrderV2, TransferOut},
         position::Position,
+        user::UserHeader,
         Market, Oracle, PriceProvider, Seed, Store, TokenMapHeader, TokenMapLoader,
     },
     utils::internal,
@@ -136,6 +137,16 @@ pub struct ExecuteOrderV2<'info> {
     /// CHECK: only used to receive fund.
     #[account(mut)]
     pub owner: UncheckedAccount<'info>,
+    /// User Account.
+    #[account(
+        mut,
+        constraint = user.load()?.is_initialized() @ CoreError::InvalidUserAccount,
+        has_one = owner,
+        has_one = store,
+        seeds = [UserHeader::SEED, store.key().as_ref(), owner.key().as_ref()],
+        bump = user.load()?.bump,
+    )]
+    pub user: AccountLoader<'info, UserHeader>,
     /// Order to execute.
     #[account(
         mut,
@@ -436,6 +447,7 @@ impl<'info> ExecuteOrderV2<'info> {
             .store(&self.store)
             .market(&self.market)
             .owner(self.owner.to_account_info())
+            .user(&self.user)
             .order(&self.order)
             .position(self.position.as_ref())
             .event(self.event.as_ref())
@@ -550,6 +562,16 @@ pub struct ExecuteDecreaseOrder<'info> {
     /// CHECK: only used to receive fund.
     #[account(mut)]
     pub owner: UncheckedAccount<'info>,
+    /// User Account.
+    #[account(
+        mut,
+        constraint = user.load()?.is_initialized() @ CoreError::InvalidUserAccount,
+        has_one = owner,
+        has_one = store,
+        seeds = [UserHeader::SEED, store.key().as_ref(), owner.key().as_ref()],
+        bump = user.load()?.bump,
+    )]
+    pub user: AccountLoader<'info, UserHeader>,
     /// Order to execute.
     #[account(
         mut,
@@ -663,7 +685,7 @@ pub struct ExecuteDecreaseOrder<'info> {
         ],
         bump,
     )]
-    pub claimable_long_token_account_for_user: Account<'info, TokenAccount>,
+    pub claimable_long_token_account_for_user: Box<Account<'info, TokenAccount>>,
     #[account(
         mut,
         token::mint = market.load()?.meta().short_token_mint,
@@ -678,7 +700,7 @@ pub struct ExecuteDecreaseOrder<'info> {
         ],
         bump,
     )]
-    pub claimable_short_token_account_for_user: Account<'info, TokenAccount>,
+    pub claimable_short_token_account_for_user: Box<Account<'info, TokenAccount>>,
     #[account(
         mut,
         token::mint = get_pnl_token(&Some(position.clone()), market.load()?.deref())?,
@@ -693,7 +715,7 @@ pub struct ExecuteDecreaseOrder<'info> {
         ],
         bump,
     )]
-    pub claimable_pnl_token_account_for_holding: Account<'info, TokenAccount>,
+    pub claimable_pnl_token_account_for_holding: Box<Account<'info, TokenAccount>>,
     /// The token program.
     pub token_program: Program<'info, Token>,
     /// The system program.
@@ -759,6 +781,7 @@ impl<'info> ExecuteDecreaseOrder<'info> {
             .store(&self.store)
             .market(&self.market)
             .owner(self.owner.to_account_info())
+            .user(&self.user)
             .order(&self.order)
             .position(Some(&self.position))
             .event(Some(&self.event))
@@ -772,6 +795,7 @@ impl<'info> ExecuteDecreaseOrder<'info> {
             &self.token_map,
             &feeds.tokens,
             remaining_accounts,
+            #[inline(never)]
             |oracle, remaining_accounts| {
                 ops.oracle(oracle)
                     .remaining_accounts(remaining_accounts)

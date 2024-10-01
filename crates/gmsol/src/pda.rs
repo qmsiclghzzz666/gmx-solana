@@ -2,8 +2,9 @@ use anchor_client::solana_sdk::pubkey::Pubkey;
 use gmsol_store::{
     events::TradeEventData,
     states::{
-        position::PositionKind, Deposit, NonceBytes, Oracle, Order, Position, Seed, Store,
-        Withdrawal,
+        position::PositionKind,
+        user::{ReferralCode, ReferralCodeBytes, UserHeader},
+        Deposit, NonceBytes, Oracle, Order, Position, Seed, Store, Withdrawal,
     },
 };
 use gmsol_utils::to_seed;
@@ -185,6 +186,26 @@ pub fn find_trade_event_buffer_pda(
 pub fn find_gt_mint_pda(store: &Pubkey, store_program_id: &Pubkey) -> (Pubkey, u8) {
     Pubkey::find_program_address(
         &[gmsol_store::constants::GT_MINT_SEED, store.as_ref()],
+        store_program_id,
+    )
+}
+
+/// Find PDA for user account.
+pub fn find_user_pda(store: &Pubkey, owner: &Pubkey, store_program_id: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[UserHeader::SEED, store.as_ref(), owner.as_ref()],
+        store_program_id,
+    )
+}
+
+/// Find PDA for referral code account.
+pub fn find_referral_code_pda(
+    store: &Pubkey,
+    code: ReferralCodeBytes,
+    store_program_id: &Pubkey,
+) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[ReferralCode::SEED, store.as_ref(), &code],
         store_program_id,
     )
 }

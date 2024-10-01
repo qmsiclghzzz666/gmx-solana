@@ -11,7 +11,9 @@ use anchor_client::{
 };
 
 use gmsol_model::{action::Prices, PnlFactorKind};
-use gmsol_store::states::{position::PositionKind, status::MarketStatus, NonceBytes};
+use gmsol_store::states::{
+    position::PositionKind, status::MarketStatus, user::ReferralCodeBytes, NonceBytes,
+};
 use solana_account_decoder::UiAccountEncoding;
 use tokio::sync::OnceCell;
 use typed_builder::TypedBuilder;
@@ -354,6 +356,16 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
     /// Find GT Mint address.
     pub fn find_gt_mint_address(&self, store: &Pubkey) -> Pubkey {
         crate::pda::find_gt_mint_pda(store, &self.store_program_id()).0
+    }
+
+    /// Find User account address.
+    pub fn find_user_address(&self, store: &Pubkey, owner: &Pubkey) -> Pubkey {
+        crate::pda::find_user_pda(store, owner, &self.store_program_id()).0
+    }
+
+    /// Find referral code address.
+    pub fn find_referral_code_address(&self, store: &Pubkey, code: ReferralCodeBytes) -> Pubkey {
+        crate::pda::find_referral_code_pda(store, code, &self.store_program_id()).0
     }
 
     /// Fetch accounts owned by the Store Program.

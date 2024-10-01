@@ -15,11 +15,11 @@ use crate::{
         order::{PositionCutKind, PositionCutOp},
     },
     states::{
-        common::action::ActionExt, order::OrderV2, Market, NonceBytes, Oracle, Position,
-        PriceProvider, Seed, Store, TokenMapHeader,
+        common::action::ActionExt, order::OrderV2, user::UserHeader, Market, NonceBytes, Oracle,
+        Position, PriceProvider, Seed, Store, TokenMapHeader,
     },
     utils::internal,
-    validated_recent_timestamp,
+    validated_recent_timestamp, CoreError,
 };
 
 /// The accounts definitions for the `liquidate` and `auto_deleverage` instructions.
@@ -34,6 +34,16 @@ pub struct PositionCut<'info> {
     /// CHECK: only used to receive fund.
     #[account(mut)]
     pub owner: UncheckedAccount<'info>,
+    /// User Account.
+    #[account(
+        mut,
+        constraint = user.load()?.is_initialized() @ CoreError::InvalidUserAccount,
+        has_one = owner,
+        has_one = store,
+        seeds = [UserHeader::SEED, store.key().as_ref(), owner.key().as_ref()],
+        bump = user.load()?.bump,
+    )]
+    pub user: AccountLoader<'info, UserHeader>,
     /// Store.
     #[account(mut, has_one = token_map)]
     pub store: AccountLoader<'info, Store>,
@@ -204,6 +214,7 @@ pub(crate) fn unchecked_process_position_cut<'info>(
         .market(&accounts.market)
         .store(&accounts.store)
         .owner(accounts.owner.to_account_info())
+        .user(&accounts.user)
         .nonce(nonce)
         .order_bump(ctx.bumps.order)
         .long_token_account(&accounts.long_token_escrow)

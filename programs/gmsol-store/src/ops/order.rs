@@ -21,6 +21,7 @@ use crate::{
             swap_market::{SwapDirection, SwapMarkets},
             Revertible,
         },
+        user::UserHeader,
         HasMarketMeta, Market, NonceBytes, Oracle, Position, Store, ValidateMarketBalances,
         ValidateOracleTime,
     },
@@ -624,6 +625,7 @@ impl<'a, 'info> ProcessTransferOut<'a, 'info> {
 #[derive(TypedBuilder)]
 pub(crate) struct ExecuteOrderOps<'a, 'info> {
     executor: AccountInfo<'info>,
+    user: &'a AccountLoader<'info, UserHeader>,
     store: &'a AccountLoader<'info, Store>,
     market: &'a AccountLoader<'info, Market>,
     order: &'a AccountLoader<'info, OrderV2>,
@@ -833,9 +835,11 @@ impl<'a, 'info> ExecuteOrderOps<'a, 'info> {
                     .load_mut()?
                     .update_with_transfer_out(&transfer_out)?;
 
-                self.order
-                    .load_mut()?
-                    .unchecked_process_gt(&mut *self.store.load_mut()?)?;
+                // FIXME: should we ignore the error to prevent the order being cancelled?
+                self.order.load_mut()?.unchecked_process_gt(
+                    &mut *self.store.load_mut()?,
+                    &mut *self.user.load_mut()?,
+                )?;
 
                 position.commit();
                 msg!(
@@ -1399,6 +1403,7 @@ pub struct PositionCutOp<'a, 'info> {
     store: &'a AccountLoader<'info, Store>,
     oracle: &'a Oracle,
     owner: AccountInfo<'info>,
+    user: &'a AccountLoader<'info, UserHeader>,
     nonce: &'a NonceBytes,
     order_bump: u8,
     long_token_account: &'a Account<'info, TokenAccount>,
@@ -1518,6 +1523,7 @@ impl<'a, 'info> PositionCutOp<'a, 'info> {
             .market(self.market)
             .order(self.order)
             .owner(self.owner.clone())
+            .user(self.user)
             .position(Some(self.position))
             .event(Some(self.event))
             .oracle(self.oracle)
