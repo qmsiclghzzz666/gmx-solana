@@ -1185,10 +1185,9 @@ pub mod gmsol_store {
     #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
     pub fn close_empty_claimable_account(
         ctx: Context<CloseEmptyClaimableAccount>,
-        user: Pubkey,
         timestamp: i64,
     ) -> Result<()> {
-        instructions::unchecked_close_empty_claimable_account(ctx, user, timestamp)
+        instructions::unchecked_close_empty_claimable_account(ctx, timestamp)
     }
 
     /// Prepare an associated token account.

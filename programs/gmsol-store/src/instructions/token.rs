@@ -5,7 +5,11 @@ use anchor_spl::{
     token_interface,
 };
 
-use crate::{constants, states::Store, utils::internal};
+use crate::{
+    constants,
+    states::Store,
+    utils::{internal, token::must_be_uninitialized},
+};
 
 /// The accounts definition for [`initialize_market_token`](crate::gmsol_store::initialize_market_token).
 ///
@@ -287,7 +291,7 @@ pub struct UseClaimableAccount<'info> {
     pub store: AccountLoader<'info, Store>,
     pub mint: Account<'info, Mint>,
     /// CHECK: check by CPI.
-    pub user: UncheckedAccount<'info>,
+    pub owner: UncheckedAccount<'info>,
     #[account(
         init_if_needed,
         payer = authority,
@@ -298,7 +302,7 @@ pub struct UseClaimableAccount<'info> {
             constants::CLAIMABLE_ACCOUNT_SEED,
             store.key().as_ref(),
             mint.key().as_ref(),
-            user.key().as_ref(),
+            owner.key().as_ref(),
             &store.load()?.claimable_time_key(timestamp)?,
         ],
         bump,
@@ -323,7 +327,7 @@ pub(crate) fn unchecked_use_claimable_account(
                 ctx.accounts.token_program.to_account_info(),
                 anchor_spl::token::Approve {
                     to: ctx.accounts.account.to_account_info(),
-                    delegate: ctx.accounts.user.to_account_info(),
+                    delegate: ctx.accounts.owner.to_account_info(),
                     authority: ctx.accounts.store.to_account_info(),
                 },
                 &[&ctx.accounts.store.load()?.pda_seeds()],
@@ -348,27 +352,27 @@ impl<'info> internal::Authentication<'info> for UseClaimableAccount<'info> {
 ///
 /// *[See also the documentation for the instruction.](crate::gmsol_store::close_empty_claimable_account)*
 #[derive(Accounts)]
-#[instruction(user: Pubkey, timestamp: i64)]
+#[instruction(timestamp: i64)]
 pub struct CloseEmptyClaimableAccount<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
     pub store: AccountLoader<'info, Store>,
     pub mint: Account<'info, Mint>,
+    /// CHECK: only use to reference the owner.
+    pub owner: UncheckedAccount<'info>,
+    /// CHECK: will be checked during the execution.
     #[account(
         mut,
-        token::mint = mint,
-        // We use the store as the authority of the token account.
-        token::authority = store,
         seeds = [
             constants::CLAIMABLE_ACCOUNT_SEED,
             store.key().as_ref(),
             mint.key().as_ref(),
-            user.key().as_ref(),
+            owner.key().as_ref(),
             &store.load()?.claimable_time_key(timestamp)?,
         ],
         bump,
     )]
-    pub account: Account<'info, TokenAccount>,
+    pub account: UncheckedAccount<'info>,
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,
 }
@@ -379,10 +383,14 @@ pub struct CloseEmptyClaimableAccount<'info> {
 /// - Only ORDER_KEEPER can close claimable account.
 pub(crate) fn unchecked_close_empty_claimable_account(
     ctx: Context<CloseEmptyClaimableAccount>,
-    _user: Pubkey,
     _timestamp: i64,
 ) -> Result<()> {
-    if ctx.accounts.account.amount == 0 {
+    if must_be_uninitialized(&ctx.accounts.account) {
+        return Ok(());
+    }
+    let account = ctx.accounts.account.to_account_info();
+    let amount = anchor_spl::token::accessor::amount(&account)?;
+    if amount == 0 {
         anchor_spl::token::close_account(CpiContext::new_with_signer(
             ctx.accounts.token_program.to_account_info(),
             anchor_spl::token::CloseAccount {

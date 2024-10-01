@@ -41,7 +41,7 @@ where
         &self,
         store: &Pubkey,
         mint: &Pubkey,
-        user: &Pubkey,
+        owner: &Pubkey,
         timestamp: i64,
         account: &Pubkey,
         amount: u64,
@@ -53,7 +53,7 @@ where
                 authority,
                 store: *store,
                 mint: *mint,
-                user: *user,
+                owner: *owner,
                 account: *account,
                 system_program: System::id(),
                 token_program: Token::id(),
@@ -64,20 +64,18 @@ where
         &self,
         store: &Pubkey,
         mint: &Pubkey,
-        user: &Pubkey,
+        owner: &Pubkey,
         timestamp: i64,
         account: &Pubkey,
     ) -> RpcBuilder<C> {
         let authority = self.payer();
         self.data_store_rpc()
-            .args(instruction::CloseEmptyClaimableAccount {
-                user: *user,
-                timestamp,
-            })
+            .args(instruction::CloseEmptyClaimableAccount { timestamp })
             .accounts(accounts::CloseEmptyClaimableAccount {
                 authority,
                 store: *store,
                 mint: *mint,
+                owner: *owner,
                 account: *account,
                 system_program: System::id(),
                 token_program: Token::id(),

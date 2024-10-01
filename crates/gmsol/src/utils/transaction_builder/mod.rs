@@ -177,7 +177,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> TransactionBuilder<'a, C> {
         let txs = FuturesOrdered::from_iter(self.builders.into_iter().enumerate().map(
             |(idx, builder)| async move {
                 tracing::debug!(
-                    size = builder.transaction_size(false),
+                    size = builder.transaction_size(true),
                     "signing transaction {idx}"
                 );
                 builder
