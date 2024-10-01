@@ -912,6 +912,8 @@ impl<'info> CloseOrder<'info> {
             );
             mint_to(ctx.with_signer(&[&self.store.load()?.pda_seeds()]), amount)?;
 
+            msg!("[GT] minted {} units of GT", amount);
+
             // Make sure the mint can only be done once.
             self.order.load_mut()?.gt_reward = 0;
         }

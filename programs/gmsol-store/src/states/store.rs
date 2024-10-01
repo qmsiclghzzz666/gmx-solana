@@ -559,6 +559,12 @@ impl GTState {
 
         let minted_value = size_in_value - remainder;
 
+        msg!(
+            "[GT] will mint {} units of GT with a minting cost of {}",
+            minted,
+            minting_cost
+        );
+
         Ok((minted, minted_value))
     }
 }
