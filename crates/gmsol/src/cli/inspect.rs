@@ -8,7 +8,7 @@ use eyre::OptionExt;
 use futures_util::{pin_mut, StreamExt};
 use gmsol::{
     pyth::Hermes,
-    types::{self, TokenMapAccess},
+    types::{self, user::UserHeader, TokenMapAccess},
     utils::{signed_value_to_decimal, unsigned_value_to_decimal, ZeroCopy},
 };
 use gmsol_exchange::states::{display_feature, ActionDisabledFlag, Controller, DomainDisabledFlag};
@@ -40,6 +40,13 @@ pub(super) struct InspectArgs {
 
 #[derive(clap::Subcommand)]
 enum Command {
+    /// `User` account
+    User {
+        #[arg(long, short, group = "select-user")]
+        address: Option<Pubkey>,
+        #[arg(long, short, group = "select-user")]
+        owner: Option<Pubkey>,
+    },
     /// `Store` account.
     Store {
         #[arg(long, short, group = "other-store")]
@@ -223,6 +230,18 @@ impl InspectArgs {
         match &self.command {
             Command::Discriminator { name } => {
                 println!("{:?}", crate::utils::generate_discriminator(name));
+            }
+            Command::User { address, owner } => {
+                let address = address.unwrap_or_else(|| {
+                    let owner = owner.unwrap_or_else(|| client.payer());
+                    client.find_user_address(store, &owner)
+                });
+                let user = client
+                    .account::<ZeroCopy<UserHeader>>(&address)
+                    .await?
+                    .ok_or(gmsol::Error::NotFound)?
+                    .0;
+                println!("{user:#?}");
             }
             Command::Store {
                 address,
