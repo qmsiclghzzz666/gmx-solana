@@ -9,9 +9,12 @@ pub enum Error {
     /// Empty deposit.
     #[error("empty deposit")]
     EmptyDeposit,
+    /// Anchor Error.
+    #[error("anchor: {0:?}")]
+    Anchor(AnchorError),
     /// Client Error.
     #[error("{0:#?}")]
-    Client(#[from] anchor_client::ClientError),
+    Client(anchor_client::ClientError),
     /// Model error.
     #[error("model: {0}")]
     Model(#[from] gmsol_model::Error),
@@ -88,11 +91,35 @@ impl Error {
     pub fn invalid_argument(msg: impl ToString) -> Self {
         Self::InvalidArgument(msg.to_string())
     }
+
+    /// Anchor Error Code.
+    pub fn anchor_error_code(&self) -> Option<u32> {
+        let Self::Anchor(error) = self else {
+            return None;
+        };
+        Some(error.error_code_number)
+    }
 }
 
-impl From<anchor_client::anchor_lang::prelude::Error> for Error {
-    fn from(value: anchor_client::anchor_lang::prelude::Error) -> Self {
-        Self::from(anchor_client::ClientError::from(value))
+impl From<anchor_client::ClientError> for Error {
+    fn from(error: anchor_client::ClientError) -> Self {
+        use anchor_client::ClientError;
+
+        match error {
+            ClientError::AccountNotFound => Self::NotFound,
+            ClientError::SolanaClientError(error) => match handle_solana_client_error(&error) {
+                Some(err) => err,
+                None => Self::Client(ClientError::SolanaClientError(error)),
+            },
+            ClientError::SolanaClientPubsubError(err) => Self::from(err),
+            err => Self::Client(err),
+        }
+    }
+}
+
+impl From<anchor_client::anchor_lang::error::Error> for Error {
+    fn from(value: anchor_client::anchor_lang::error::Error) -> Self {
+        Self::Client(value.into())
     }
 }
 
@@ -103,4 +130,100 @@ impl From<PubsubClientError> for Error {
             err => anchor_client::ClientError::from(err).into(),
         }
     }
+}
+
+/// Anchor Error with owned source.
+#[derive(Debug)]
+pub struct AnchorError {
+    /// Error name.
+    pub error_name: String,
+    /// Error code.
+    pub error_code_number: u32,
+    /// Error message.
+    pub error_msg: String,
+    /// Error origin.
+    pub error_origin: Option<ErrorOrigin>,
+}
+
+/// Error origin with owned source.
+#[derive(Debug)]
+pub enum ErrorOrigin {
+    /// Source.
+    Source(String, u32),
+    /// Account.
+    AccountName(String),
+}
+
+fn handle_solana_client_error(
+    error: &anchor_client::solana_client::client_error::ClientError,
+) -> Option<Error> {
+    use anchor_client::solana_client::{
+        client_error::ClientErrorKind,
+        rpc_request::{RpcError, RpcResponseErrorData},
+    };
+
+    let ClientErrorKind::RpcError(rpc_error) = error.kind() else {
+        return None;
+    };
+
+    let RpcError::RpcResponseError { data, .. } = rpc_error else {
+        return None;
+    };
+
+    let RpcResponseErrorData::SendTransactionPreflightFailure(simulation) = data else {
+        return None;
+    };
+
+    let Some(logs) = &simulation.logs else {
+        return None;
+    };
+
+    for log in logs {
+        if log.starts_with("Program log: AnchorError") {
+            let log = log.trim_start_matches("Program log: AnchorError ");
+            let Some((origin, rest)) = log.split_once("Error Code:") else {
+                break;
+            };
+            let Some((name, rest)) = rest.split_once("Error Number:") else {
+                break;
+            };
+            let Some((number, message)) = rest.split_once("Error Message:") else {
+                break;
+            };
+            let number = number.trim().trim_end_matches('.');
+            let Ok(number) = number.parse() else {
+                break;
+            };
+
+            let origin = origin.trim().trim_end_matches('.');
+
+            let origin = if origin.starts_with("thrown in") {
+                let source = origin.trim_start_matches("thrown in ");
+                if let Some((filename, line)) = source.split_once(':') {
+                    Some(ErrorOrigin::Source(
+                        filename.to_string(),
+                        line.parse().ok().unwrap_or(0),
+                    ))
+                } else {
+                    None
+                }
+            } else if origin.starts_with("caused by account:") {
+                let account = origin.trim_start_matches("caused by account: ");
+                Some(ErrorOrigin::AccountName(account.to_string()))
+            } else {
+                None
+            };
+
+            let error = AnchorError {
+                error_name: name.trim().trim_end_matches('.').to_string(),
+                error_code_number: number,
+                error_msg: message.trim().to_string(),
+                error_origin: origin,
+            };
+
+            return Some(Error::Anchor(error));
+        }
+    }
+
+    None
 }

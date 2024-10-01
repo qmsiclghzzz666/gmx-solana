@@ -6,3 +6,5 @@ mod deposit;
 mod withdrawal;
 
 mod order;
+
+mod user;

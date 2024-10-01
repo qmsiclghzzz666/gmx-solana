@@ -70,7 +70,7 @@ pub struct InitializeReferralCode<'info> {
     #[account(
         init,
         payer = owner,
-        space = ReferralCode::INIT_SPACE,
+        space = 8 + ReferralCode::INIT_SPACE,
         seeds = [ReferralCode::SEED, store.key().as_ref(), &code],
         bump,
     )]
@@ -117,9 +117,9 @@ pub struct SetReferrer<'info> {
     /// User Account.
     #[account(
         mut,
-        constraint = user.load()?.is_initialized() @ CoreError::InvalidUserAccount,
         has_one = owner,
         has_one = store,
+        constraint = user.load()?.is_initialized() @ CoreError::InvalidUserAccount,
         seeds = [UserHeader::SEED, store.key().as_ref(), owner.key().as_ref()],
         bump = user.load()?.bump,
     )]
@@ -135,10 +135,11 @@ pub struct SetReferrer<'info> {
     /// Referrer.
     #[account(
         mut,
+        has_one = store,
         constraint = referrer.load()?.is_initialized() @ CoreError::InvalidUserAccount,
         constraint = referrer.load()?.owner == referral_code.load()?.owner @ CoreError::OwnerMismatched,
-        has_one = store,
         constraint = referrer.load()?.referral.code == referral_code.key() @ CoreError::ReferralCodeMismatched,
+        constraint = referrer.key() != user.key() @ CoreError::SelfReferral,
         seeds = [UserHeader::SEED, store.key().as_ref(), referrer.load()?.owner.as_ref()],
         bump = referrer.load()?.bump,
     )]
@@ -146,6 +147,10 @@ pub struct SetReferrer<'info> {
 }
 
 pub(crate) fn set_referrer(ctx: Context<SetReferrer>, _code: ReferralCodeBytes) -> Result<()> {
+    require!(
+        ctx.accounts.referrer.load()?.referral.referrer != ctx.accounts.user.key(),
+        CoreError::MutualReferral
+    );
     ctx.accounts
         .user
         .load_mut()?

@@ -25,6 +25,9 @@ pub mod utils;
 /// GT instructions.
 pub mod gt;
 
+/// User account instructions.
+pub mod user;
+
 /// Events.
 #[cfg(feature = "decode")]
 pub mod events;

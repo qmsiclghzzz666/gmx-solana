@@ -102,7 +102,7 @@ pub struct Referral {
     /// The User account address of the referrer.
     ///
     /// `Pubkey::default()` means no referrer.
-    referrer: Pubkey,
+    pub(crate) referrer: Pubkey,
     /// Referral Code Address.
     pub(crate) code: Pubkey,
     /// Number of referee.

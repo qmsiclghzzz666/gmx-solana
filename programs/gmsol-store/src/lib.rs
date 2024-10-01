@@ -2007,6 +2007,12 @@ pub enum CoreError {
     /// Referral Code Mismatched.
     #[msg("referral code mismatched")]
     ReferralCodeMismatched,
+    /// Self-referral is not allowed.
+    #[msg("self-referral is not allowed")]
+    SelfReferral,
+    /// Mutual-referral is not allowed.
+    #[msg("mutual-referral is not allowed")]
+    MutualReferral,
 }
 
 impl CoreError {

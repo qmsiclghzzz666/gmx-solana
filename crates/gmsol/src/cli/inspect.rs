@@ -8,7 +8,11 @@ use eyre::OptionExt;
 use futures_util::{pin_mut, StreamExt};
 use gmsol::{
     pyth::Hermes,
-    types::{self, user::UserHeader, TokenMapAccess},
+    types::{
+        self,
+        user::{ReferralCode, UserHeader},
+        TokenMapAccess,
+    },
     utils::{signed_value_to_decimal, unsigned_value_to_decimal, ZeroCopy},
 };
 use gmsol_exchange::states::{display_feature, ActionDisabledFlag, Controller, DomainDisabledFlag};
@@ -40,12 +44,19 @@ pub(super) struct InspectArgs {
 
 #[derive(clap::Subcommand)]
 enum Command {
-    /// `User` account
+    /// `User` account.
     User {
-        #[arg(long, short, group = "select-user")]
+        #[arg(group = "select-user")]
         address: Option<Pubkey>,
         #[arg(long, short, group = "select-user")]
         owner: Option<Pubkey>,
+    },
+    /// `ReferralCode` account.
+    ReferralCode {
+        #[arg(group = "select-code")]
+        address: Option<Pubkey>,
+        #[arg(long, short, group = "select-code")]
+        code: Option<String>,
     },
     /// `Store` account.
     Store {
@@ -242,6 +253,31 @@ impl InspectArgs {
                     .ok_or(gmsol::Error::NotFound)?
                     .0;
                 println!("{user:#?}");
+            }
+            Command::ReferralCode { address, code } => {
+                let address = if let Some(address) = address {
+                    *address
+                } else if let Some(code) = code {
+                    let code = bs58::decode(code)
+                        .into_vec()
+                        .map_err(gmsol::Error::invalid_argument)?;
+                    client.find_referral_code_address(
+                        store,
+                        code.try_into()
+                            .map_err(|_err| gmsol::Error::invalid_argument("invalid code"))?,
+                    )
+                } else {
+                    return Err(gmsol::Error::invalid_argument(
+                        "must provide either `address` or `code`",
+                    ));
+                };
+                let code = client
+                    .account::<ZeroCopy<ReferralCode>>(&address)
+                    .await?
+                    .ok_or(gmsol::Error::NotFound)?
+                    .0;
+                println!("Code: {}", bs58::encode(code.code).into_string());
+                println!("Owner: {}", code.owner);
             }
             Command::Store {
                 address,
