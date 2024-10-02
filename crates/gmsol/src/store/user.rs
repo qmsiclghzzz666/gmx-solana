@@ -27,7 +27,7 @@ pub trait UserOps<C> {
     fn set_referrer(
         &self,
         store: &Pubkey,
-        code: [u8; 4],
+        code: ReferralCodeBytes,
         hint_referrer: Option<Pubkey>,
     ) -> impl Future<Output = crate::Result<RpcBuilder<C>>>;
 }
@@ -72,7 +72,7 @@ impl<C: Deref<Target = impl Signer> + Clone> UserOps<C> for crate::Client<C> {
     async fn set_referrer(
         &self,
         store: &Pubkey,
-        code: [u8; 4],
+        code: ReferralCodeBytes,
         hint_referrer: Option<Pubkey>,
     ) -> crate::Result<RpcBuilder<C>> {
         let owner = self.payer();

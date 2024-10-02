@@ -10,7 +10,7 @@ pub enum Error {
     #[error("empty deposit")]
     EmptyDeposit,
     /// Anchor Error.
-    #[error("anchor: {0:?}")]
+    #[error("anchor: {0:#?}")]
     Anchor(AnchorError),
     /// Client Error.
     #[error("{0:#?}")]
@@ -143,6 +143,8 @@ pub struct AnchorError {
     pub error_msg: String,
     /// Error origin.
     pub error_origin: Option<ErrorOrigin>,
+    /// Logs.
+    pub logs: Vec<String>,
 }
 
 /// Error origin with owned source.
@@ -219,6 +221,7 @@ fn handle_solana_client_error(
                 error_code_number: number,
                 error_msg: message.trim().to_string(),
                 error_origin: origin,
+                logs: logs.clone(),
             };
 
             return Some(Error::Anchor(error));

@@ -93,7 +93,7 @@ type UserFlagMap = bitmaps::Bitmap<{ UserFlag::MAX_FLAGS }>;
 type UserFlagValue = u8;
 
 /// Referral Code Bytes.
-pub type ReferralCodeBytes = [u8; 4];
+pub type ReferralCodeBytes = [u8; 8];
 
 /// Referral.
 #[zero_copy]
@@ -166,6 +166,35 @@ pub struct ReferralCode {
 impl ReferralCode {
     /// Init Space.
     pub const INIT_SPACE: usize = core::mem::size_of::<Self>();
+
+    /// The length of referral code.
+    pub const LEN: usize = core::mem::size_of::<ReferralCodeBytes>();
+
+    #[cfg(feature = "utils")]
+    /// Decode the given code string to code bytes.
+    pub fn decode(code: &str) -> Result<ReferralCodeBytes> {
+        require!(!code.is_empty(), CoreError::InvalidArgument);
+        let code = bs58::decode(code)
+            .into_vec()
+            .map_err(|_| error!(CoreError::InvalidArgument))?;
+        require_gte!(Self::LEN, code.len(), CoreError::InvalidArgument);
+        let padding = Self::LEN - code.len();
+        let mut code_bytes = ReferralCodeBytes::default();
+        code_bytes[padding..].copy_from_slice(&code);
+
+        Ok(code_bytes)
+    }
+
+    #[cfg(feature = "utils")]
+    /// Encode the given code to code string.
+    pub fn encode(code: &ReferralCodeBytes, skip_leading_ones: bool) -> String {
+        let code = bs58::encode(code).into_string();
+        if skip_leading_ones {
+            code.trim_start_matches('1').to_owned()
+        } else {
+            code
+        }
+    }
 }
 
 impl Seed for ReferralCode {

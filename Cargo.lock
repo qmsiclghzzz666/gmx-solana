@@ -2070,6 +2070,7 @@ dependencies = [
  "anchor-lang",
  "anchor-spl",
  "bitmaps 3.2.1",
+ "bs58 0.4.0",
  "bytemuck",
  "bytes",
  "chainlink_solana",

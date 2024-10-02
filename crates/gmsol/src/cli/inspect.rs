@@ -258,14 +258,8 @@ impl InspectArgs {
                 let address = if let Some(address) = address {
                     *address
                 } else if let Some(code) = code {
-                    let code = bs58::decode(code)
-                        .into_vec()
-                        .map_err(gmsol::Error::invalid_argument)?;
-                    client.find_referral_code_address(
-                        store,
-                        code.try_into()
-                            .map_err(|_err| gmsol::Error::invalid_argument("invalid code"))?,
-                    )
+                    let code = ReferralCode::decode(code)?;
+                    client.find_referral_code_address(store, code)
                 } else {
                     return Err(gmsol::Error::invalid_argument(
                         "must provide either `address` or `code`",
@@ -276,7 +270,7 @@ impl InspectArgs {
                     .await?
                     .ok_or(gmsol::Error::NotFound)?
                     .0;
-                println!("Code: {}", bs58::encode(code.code).into_string());
+                println!("Code: {}", ReferralCode::encode(&code.code, true));
                 println!("Owner: {}", code.owner);
             }
             Command::Store {

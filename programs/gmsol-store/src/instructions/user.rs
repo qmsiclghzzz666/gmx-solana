@@ -59,7 +59,7 @@ pub(crate) fn prepare_user(ctx: Context<PrepareUser>) -> Result<()> {
 
 /// The accounts definition for `initialize_referral_code` instruction.
 #[derive(Accounts)]
-#[instruction(code: [u8; 4])]
+#[instruction(code: [u8; 8])]
 pub struct InitializeReferralCode<'info> {
     /// Owner.
     #[account(mut)]
@@ -92,6 +92,11 @@ pub(crate) fn initialize_referral_code(
     ctx: Context<InitializeReferralCode>,
     code: ReferralCodeBytes,
 ) -> Result<()> {
+    require!(
+        code != ReferralCodeBytes::default(),
+        CoreError::InvalidArgument
+    );
+
     // Initialize Referral Code Account.
     let mut referral_code = ctx.accounts.referral_code.load_init()?;
     referral_code.bump = ctx.bumps.referral_code;
@@ -110,7 +115,7 @@ pub(crate) fn initialize_referral_code(
 
 /// The accounts definitions for `set_referrer` instruction.
 #[derive(Accounts)]
-#[instruction(code: [u8; 4])]
+#[instruction(code: [u8; 8])]
 pub struct SetReferrer<'info> {
     owner: Signer<'info>,
     store: AccountLoader<'info, Store>,

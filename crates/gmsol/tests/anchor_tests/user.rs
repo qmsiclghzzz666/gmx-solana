@@ -1,4 +1,4 @@
-use gmsol::store::user::UserOps;
+use gmsol::{store::user::UserOps, types::user::ReferralCode};
 use gmsol_store::CoreError;
 use rand::random;
 
@@ -24,7 +24,7 @@ async fn referral() -> eyre::Result<()> {
         .await?;
     tracing::info!(%signature, "prepared user account for user 2");
 
-    let code = random();
+    let code = ReferralCode::decode("gmso1")?;
     let signature = client
         .initialize_referral_code(store, code)?
         .send_without_preflight()

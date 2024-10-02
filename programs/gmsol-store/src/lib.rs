@@ -1619,13 +1619,13 @@ pub mod gmsol_store {
     /// Initialize referral code.
     pub fn initialize_referral_code(
         ctx: Context<InitializeReferralCode>,
-        code: [u8; 4],
+        code: [u8; 8],
     ) -> Result<()> {
         instructions::initialize_referral_code(ctx, code)
     }
 
     /// Set referrer.
-    pub fn set_referrer(ctx: Context<SetReferrer>, code: [u8; 4]) -> Result<()> {
+    pub fn set_referrer(ctx: Context<SetReferrer>, code: [u8; 8]) -> Result<()> {
         instructions::set_referrer(ctx, code)
     }
 }
@@ -1857,6 +1857,9 @@ pub enum CoreError {
     /// Internal error.
     #[msg("internal error")]
     Internal,
+    /// Invalid Argument.
+    #[msg("invalid argument")]
+    InvalidArgument,
     /// Permission denied.
     #[msg("permission denied")]
     PermissionDenied,
