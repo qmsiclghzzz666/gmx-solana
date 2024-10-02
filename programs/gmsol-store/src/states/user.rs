@@ -99,7 +99,7 @@ pub type ReferralCodeBytes = [u8; 8];
 #[zero_copy]
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub struct Referral {
-    /// The User account address of the referrer.
+    /// The (owner) address of the referrer.
     ///
     /// `Pubkey::default()` means no referrer.
     pub(crate) referrer: Pubkey,
@@ -123,19 +123,22 @@ impl Referral {
         Ok(())
     }
 
-    pub(crate) fn set_referrer(&mut self, referrer: &AccountLoader<UserHeader>) -> Result<()> {
+    pub(crate) fn set_referrer(&mut self, referrer_user: &mut UserHeader) -> Result<()> {
         require_eq!(
             self.referrer,
             Pubkey::default(),
             CoreError::ReferrerHasBeenSet,
         );
 
-        self.referrer = referrer.key();
+        require!(
+            referrer_user.owner != Pubkey::default(),
+            CoreError::InvalidArgument
+        );
 
-        {
-            let mut referrer = referrer.load_mut()?;
-            referrer.referral.referee_count = referrer.referral.referee_count.saturating_add(1);
-        }
+        self.referrer = referrer_user.owner;
+        referrer_user.referral.referee_count =
+            referrer_user.referral.referee_count.saturating_add(1);
+
         Ok(())
     }
 

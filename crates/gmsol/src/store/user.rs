@@ -73,14 +73,14 @@ impl<C: Deref<Target = impl Signer> + Clone> UserOps<C> for crate::Client<C> {
         &self,
         store: &Pubkey,
         code: ReferralCodeBytes,
-        hint_referrer: Option<Pubkey>,
+        hint_referrer_user: Option<Pubkey>,
     ) -> crate::Result<RpcBuilder<C>> {
         let owner = self.payer();
         let user = self.find_user_address(store, &owner);
 
         let referral_code = self.find_referral_code_address(store, code);
 
-        let referrer = match hint_referrer {
+        let referrer_user = match hint_referrer_user {
             Some(referrer) => referrer,
             None => {
                 let code = self
@@ -100,7 +100,7 @@ impl<C: Deref<Target = impl Signer> + Clone> UserOps<C> for crate::Client<C> {
                 store: *store,
                 user,
                 referral_code,
-                referrer,
+                referrer_user,
             })
             .args(instruction::SetReferrer { code });
 

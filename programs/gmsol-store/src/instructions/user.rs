@@ -141,25 +141,25 @@ pub struct SetReferrer<'info> {
     #[account(
         mut,
         has_one = store,
-        constraint = referrer.load()?.is_initialized() @ CoreError::InvalidUserAccount,
-        constraint = referrer.load()?.owner == referral_code.load()?.owner @ CoreError::OwnerMismatched,
-        constraint = referrer.load()?.referral.code == referral_code.key() @ CoreError::ReferralCodeMismatched,
-        constraint = referrer.key() != user.key() @ CoreError::SelfReferral,
-        seeds = [UserHeader::SEED, store.key().as_ref(), referrer.load()?.owner.as_ref()],
-        bump = referrer.load()?.bump,
+        constraint = referrer_user.load()?.is_initialized() @ CoreError::InvalidUserAccount,
+        constraint = referrer_user.load()?.owner == referral_code.load()?.owner @ CoreError::OwnerMismatched,
+        constraint = referrer_user.load()?.referral.code == referral_code.key() @ CoreError::ReferralCodeMismatched,
+        constraint = referrer_user.key() != user.key() @ CoreError::SelfReferral,
+        seeds = [UserHeader::SEED, store.key().as_ref(), referrer_user.load()?.owner.as_ref()],
+        bump = referrer_user.load()?.bump,
     )]
-    pub referrer: AccountLoader<'info, UserHeader>,
+    pub referrer_user: AccountLoader<'info, UserHeader>,
 }
 
 pub(crate) fn set_referrer(ctx: Context<SetReferrer>, _code: ReferralCodeBytes) -> Result<()> {
     require!(
-        ctx.accounts.referrer.load()?.referral.referrer != ctx.accounts.user.key(),
+        ctx.accounts.referrer_user.load()?.referral.referrer != ctx.accounts.user.load()?.owner,
         CoreError::MutualReferral
     );
     ctx.accounts
         .user
         .load_mut()?
         .referral
-        .set_referrer(&ctx.accounts.referrer)?;
+        .set_referrer(&mut *ctx.accounts.referrer_user.load_mut()?)?;
     Ok(())
 }
