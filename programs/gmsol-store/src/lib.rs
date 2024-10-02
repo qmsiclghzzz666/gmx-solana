@@ -1051,6 +1051,21 @@ pub mod gmsol_store {
         instructions::unchecked_toggle_market(ctx, enable)
     }
 
+    /// Enable or diable GT minting for the given market.
+    ///
+    /// # Accounts
+    /// [*See the documentation for the accounts.*](ToggleGTMinting)
+    ///
+    /// # Arguments
+    /// - `enable`: Whether to enable or disable GT minting for the given market.
+    ///
+    /// # Checks
+    /// - *TODO*
+    #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
+    pub fn toggle_gt_minting(ctx: Context<ToggleGTMinting>, enable: bool) -> Result<()> {
+        instructions::unchecked_toggle_gt_minting(ctx, enable)
+    }
+
     /// Claim fees from the given market. The claimed amount remains in the market balance,
     /// and requires a subsequent transfer.
     ///

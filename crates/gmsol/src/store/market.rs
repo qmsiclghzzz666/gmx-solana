@@ -117,6 +117,14 @@ pub trait MarketOps<C> {
     /// Toggle market.
     fn toggle_market(&self, store: &Pubkey, market_token: &Pubkey, enable: bool) -> RpcBuilder<C>;
 
+    /// Toggle GT minting.
+    fn toggle_gt_minting(
+        &self,
+        store: &Pubkey,
+        market_token: &Pubkey,
+        enable: bool,
+    ) -> RpcBuilder<C>;
+
     /// Initialize Market Config Buffer.
     fn initialize_market_config_buffer<'a>(
         &'a self,
@@ -240,6 +248,21 @@ where
         self.data_store_rpc()
             .args(instruction::ToggleMarket { enable })
             .accounts(accounts::ToggleMarket {
+                authority: self.payer(),
+                store: *store,
+                market: self.find_market_address(store, market_token),
+            })
+    }
+
+    fn toggle_gt_minting(
+        &self,
+        store: &Pubkey,
+        market_token: &Pubkey,
+        enable: bool,
+    ) -> RpcBuilder<C> {
+        self.data_store_rpc()
+            .args(instruction::ToggleGtMinting { enable })
+            .accounts(accounts::ToggleGTMinting {
                 authority: self.payer(),
                 store: *store,
                 market: self.find_market_address(store, market_token),

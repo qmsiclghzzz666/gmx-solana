@@ -188,10 +188,13 @@ impl Market {
     }
 
     /// Set flag.
-    pub fn set_flag(&mut self, flag: MarketFlag, value: bool) {
+    ///
+    /// Return the previous value.
+    pub fn set_flag(&mut self, flag: MarketFlag, value: bool) -> bool {
         let mut bitmap = MarketFlagBitmap::from_value(self.flag);
-        bitmap.set(usize::from(flag as u8), value);
+        let previous = bitmap.set(usize::from(flag as u8), value);
         self.flag = bitmap.into_value();
+        previous
     }
 
     /// Is this market a pure market, i.e., a single token market.
@@ -205,8 +208,10 @@ impl Market {
     }
 
     /// Set enabled.
-    pub fn set_enabled(&mut self, enabled: bool) {
-        self.set_flag(MarketFlag::Enabled, enabled);
+    ///
+    /// Return previous value.
+    pub fn set_enabled(&mut self, enabled: bool) -> bool {
+        self.set_flag(MarketFlag::Enabled, enabled)
     }
 
     /// Is ADL enabled.
@@ -219,12 +224,26 @@ impl Market {
     }
 
     /// Set ADL enabled.
-    pub fn set_adl_enabled(&mut self, is_long: bool, enabled: bool) {
+    ///
+    /// Return previous value.
+    pub fn set_adl_enabled(&mut self, is_long: bool, enabled: bool) -> bool {
         if is_long {
             self.set_flag(MarketFlag::AutoDeleveragingEnabledForLong, enabled)
         } else {
             self.set_flag(MarketFlag::AutoDeleveragingEnabledForShort, enabled)
         }
+    }
+
+    /// Is GT Minting enabled.
+    pub fn is_gt_minting_enabled(&self) -> bool {
+        self.flag(MarketFlag::GTEnabled)
+    }
+
+    /// Set whether the GT minting is enabled.
+    ///
+    /// Return the previous value.
+    pub fn set_is_gt_minting_enbaled(&mut self, enabled: bool) -> bool {
+        self.set_flag(MarketFlag::GTEnabled, enabled)
     }
 
     /// Record transferred in.
@@ -415,6 +434,8 @@ pub enum MarketFlag {
     AutoDeleveragingEnabledForLong,
     /// Is auto-deleveraging enabled for short.
     AutoDeleveragingEnabledForShort,
+    /// Is GT minting enabled.
+    GTEnabled,
     // CHECK: cannot have more than `MAX_FLAGS` flags.
 }
 

@@ -711,6 +711,7 @@ impl<'a, 'info> ExecuteOrderOps<'a, 'info> {
         self.validate_order(should_throw_error, &prices)?;
 
         // Prepare execution context.
+        let gt_minting_enabled = self.market.load()?.is_gt_minting_enabled();
         let mut market = RevertiblePerpMarket::new(self.market)?;
         let current_market_token = market.market_meta().market_token_mint;
         let loaders = self
@@ -835,11 +836,15 @@ impl<'a, 'info> ExecuteOrderOps<'a, 'info> {
                     .load_mut()?
                     .update_with_transfer_out(&transfer_out)?;
 
-                // FIXME: should we ignore the error to prevent the order being cancelled?
-                self.order.load_mut()?.unchecked_process_gt(
-                    &mut *self.store.load_mut()?,
-                    &mut *self.user.load_mut()?,
-                )?;
+                if gt_minting_enabled {
+                    // FIXME: should we ignore the error to prevent the order being cancelled?
+                    self.order.load_mut()?.unchecked_process_gt(
+                        &mut *self.store.load_mut()?,
+                        &mut *self.user.load_mut()?,
+                    )?;
+                } else {
+                    msg!("[GT] GT minting is disabled for this market");
+                }
 
                 position.commit();
                 msg!(

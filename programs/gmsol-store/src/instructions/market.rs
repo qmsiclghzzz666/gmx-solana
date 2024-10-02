@@ -595,6 +595,42 @@ impl<'info> internal::Authentication<'info> for ToggleMarket<'info> {
     }
 }
 
+/// The accounts definition for [`toggle_gt_minting`](crate::gmsol_store::toggle_gt_minting).
+///
+/// *[See also the documentation for the instruction.](crate::gmsol_store::toggle_gt_minting)*
+#[derive(Accounts)]
+pub struct ToggleGTMinting<'info> {
+    authority: Signer<'info>,
+    store: AccountLoader<'info, Store>,
+    #[account(mut, has_one = store)]
+    market: AccountLoader<'info, Market>,
+}
+
+/// Toggle GT Minting.
+///
+/// ## CHECK
+/// - Only MARKET_KEEPER can use this instruction.
+pub(crate) fn unchecked_toggle_gt_minting(
+    ctx: Context<ToggleGTMinting>,
+    enable: bool,
+) -> Result<()> {
+    ctx.accounts
+        .market
+        .load_mut()?
+        .set_is_gt_minting_enbaled(enable);
+    Ok(())
+}
+
+impl<'info> internal::Authentication<'info> for ToggleGTMinting<'info> {
+    fn authority(&self) -> &Signer<'info> {
+        &self.authority
+    }
+
+    fn store(&self) -> &AccountLoader<'info, Store> {
+        &self.store
+    }
+}
+
 /// The accounts definition for [`claim_fees_from_market`](crate::gmsol_store::claim_fees_from_market).
 ///
 /// *[See also the documentation for the instruction.](crate::gmsol_store::claim_fees_from_market)*

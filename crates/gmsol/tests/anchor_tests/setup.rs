@@ -617,6 +617,8 @@ impl Deployment {
                 &1_000_000_000_000_000_000,
             )?;
             builder.push(rpc)?;
+            let rpc = client.toggle_gt_minting(store, &market_token, true);
+            builder.push(rpc)?;
         }
         _ = builder
             .send_all()
