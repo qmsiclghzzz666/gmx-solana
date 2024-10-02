@@ -369,7 +369,8 @@ impl Amounts {
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub struct Factors {
     pub(crate) oracle_ref_price_deviation: Factor,
-    reserved_1: [Factor; 31],
+    pub(crate) gt_minting_cost_referred_discount: Factor,
+    reserved_1: [Factor; 30],
     reserved_2: [Factor; 32],
 }
 
@@ -384,6 +385,8 @@ pub struct Factors {
 pub enum FactorKey {
     /// Oracle Ref Price Deviation.
     OracleRefPriceDeviation,
+    /// GT Minting Cost Referred Discount.
+    GtMintingCostReferredDiscount,
 }
 
 impl Factors {
@@ -395,6 +398,7 @@ impl Factors {
     fn get(&self, key: &FactorKey) -> &Factor {
         match key {
             FactorKey::OracleRefPriceDeviation => &self.oracle_ref_price_deviation,
+            FactorKey::GtMintingCostReferredDiscount => &self.gt_minting_cost_referred_discount,
         }
     }
 
@@ -402,6 +406,7 @@ impl Factors {
     fn get_mut(&mut self, key: &FactorKey) -> &mut Factor {
         match key {
             FactorKey::OracleRefPriceDeviation => &mut self.oracle_ref_price_deviation,
+            FactorKey::GtMintingCostReferredDiscount => &mut self.gt_minting_cost_referred_discount,
         }
     }
 }
@@ -560,9 +565,10 @@ impl GTState {
         let minted_value = size_in_value - remainder;
 
         msg!(
-            "[GT] will mint {} units of GT with a minting cost of {} per unit GT (in terms of trade volume)",
+            "[GT] will mint {} units of GT with a minting cost of {} per unit GT (in terms of trade volume), discount = {}",
             minted,
-            minting_cost
+            minting_cost,
+            discount,
         );
 
         Ok((minted, minted_value))

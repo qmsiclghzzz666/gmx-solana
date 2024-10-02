@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use borsh::{BorshDeserialize, BorshSerialize};
 use gmsol_model::action::decrease_position::DecreasePositionReport;
 
-use crate::{CoreError, StoreError};
+use crate::{states::FactorKey, CoreError, StoreError};
 
 use super::{
     common::{
@@ -850,7 +850,17 @@ impl OrderV2 {
         );
         let value_to_mint_for = next_traded_value.saturating_sub(minted_value);
 
-        let (minted, delta_minted_value) = store.gt_mut().get_mint_amount(value_to_mint_for, 0)?;
+        // Apply minting cost discount for referred user.
+        let is_referred = user.referral.referrer().is_some();
+        let discount = if is_referred {
+            *store.get_factor_by_key(FactorKey::GtMintingCostReferredDiscount)
+        } else {
+            0
+        };
+
+        let (minted, delta_minted_value) = store
+            .gt_mut()
+            .get_mint_amount(value_to_mint_for, discount)?;
 
         let next_minted = user
             .gt

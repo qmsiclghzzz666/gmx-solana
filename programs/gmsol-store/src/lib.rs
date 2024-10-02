@@ -308,7 +308,7 @@ use self::{
         order::{OrderParams, UpdateOrderParams},
         token_config::TokenConfigBuilder,
         withdrawal::TokenParams as WithdrawalTokenParams,
-        PriceProviderKind,
+        FactorKey, PriceProviderKind,
     },
     utils::internal,
 };
@@ -546,6 +546,15 @@ pub mod gmsol_store {
     #[access_control(internal::Authenticate::only_controller(&ctx))]
     pub fn insert_address(ctx: Context<InsertAddress>, key: String, address: Pubkey) -> Result<()> {
         instructions::insert_address(ctx, &key, address)
+    }
+
+    #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
+    pub fn insert_gt_minting_cost_referred_discount(
+        ctx: Context<InsertFactor>,
+        factor: u128,
+    ) -> Result<()> {
+        let key = FactorKey::GtMintingCostReferredDiscount;
+        instructions::insert_factor(ctx, &key.to_string(), factor)
     }
 
     // Token Config.

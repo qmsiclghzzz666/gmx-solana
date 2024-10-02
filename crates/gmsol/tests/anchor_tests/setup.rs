@@ -33,7 +33,7 @@ use gmsol::{
         gt::GTOps, market::MarketOps, oracle::OracleOps, roles::RolesOps, store_ops::StoreOps,
         token_config::TokenConfigOps,
     },
-    types::{MarketConfigKey, PriceProviderKind, RoleKey, TokenConfigBuilder},
+    types::{FactorKey, MarketConfigKey, PriceProviderKind, RoleKey, TokenConfigBuilder},
     utils::{shared_signer, SignerRef, TransactionBuilder},
     Client, ClientOptions,
 };
@@ -43,7 +43,7 @@ use tokio::{
     sync::{Mutex, OnceCell, OwnedMutexGuard},
     time::sleep,
 };
-use tracing::level_filters::LevelFilter;
+use tracing::{level_filters::LevelFilter, Instrument};
 use tracing_subscriber::EnvFilter;
 
 const ENV_ANCHOR_PROVIDER: &str = "ANCHOR_PROVIDER_URL";
@@ -694,18 +694,34 @@ impl Deployment {
 
     async fn initialize_gt(&self, decimals: u8) -> eyre::Result<()> {
         let client = self.user_client(Self::DEFAULT_KEEPER)?;
-        let gt = client.find_gt_mint_address(&self.store);
-        let signature = client
-            .initialize_gt(
-                &self.store,
-                decimals,
-                100 * MARKET_USD_UNIT / 10u128.pow(decimals as u32),
-                101 * MARKET_USD_UNIT / 100,
-                10 * 10u64.pow(decimals as u32),
-            )
-            .send()
-            .await?;
-        tracing::info!(%gt, %signature, "GT Mint initialized");
+        let store = &self.store;
+        let gt = client.find_gt_mint_address(store);
+
+        let mut tx = client.transaction();
+
+        tx.push(client.initialize_gt(
+            store,
+            decimals,
+            100 * MARKET_USD_UNIT / 10u128.pow(decimals as u32),
+            101 * MARKET_USD_UNIT / 100,
+            10 * 10u64.pow(decimals as u32),
+        ))?
+        .push(client.insert_factor(
+            store,
+            FactorKey::GtMintingCostReferredDiscount,
+            10 * MARKET_USD_UNIT / 100,
+        ))?;
+
+        tx.send_all()
+            .instrument(tracing::info_span!("initalize GT", gt=%gt))
+            .await
+            .inspect(|signatures| {
+                tracing::info!("initialized GT with txns: {signatures:#?}");
+            })
+            .inspect_err(|(signatures, err)| {
+                tracing::error!(%err, "failed to initialize GT, successful txns: {signatures:#?}");
+            })
+            .ok();
 
         Ok(())
     }

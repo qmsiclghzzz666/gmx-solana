@@ -4,7 +4,10 @@ use anchor_client::{
     anchor_lang::system_program,
     solana_sdk::{pubkey::Pubkey, signer::Signer},
 };
-use gmsol_store::{accounts, instruction};
+use gmsol_store::{
+    accounts, instruction,
+    states::{Factor, FactorKey},
+};
 
 use crate::utils::RpcBuilder;
 
@@ -18,6 +21,9 @@ pub trait StoreOps<C> {
 
     /// Set new token map.
     fn set_token_map(&self, store: &Pubkey, token_map: &Pubkey) -> RpcBuilder<C>;
+
+    /// Insert factor.
+    fn insert_factor(&self, store: &Pubkey, key: FactorKey, factor: Factor) -> RpcBuilder<C>;
 }
 
 impl<C, S> StoreOps<C> for crate::Client<C>
@@ -58,5 +64,21 @@ where
                 store: *store,
                 token_map: *token_map,
             })
+    }
+
+    fn insert_factor(&self, store: &Pubkey, key: FactorKey, factor: Factor) -> RpcBuilder<C> {
+        let rpc = self.data_store_rpc().accounts(accounts::InsertFactor {
+            authority: self.payer(),
+            store: *store,
+        });
+        match key {
+            FactorKey::GtMintingCostReferredDiscount => {
+                rpc.args(instruction::InsertGtMintingCostReferredDiscount { factor })
+            }
+            _ => rpc.args(instruction::InsertFactor {
+                key: key.to_string(),
+                factor,
+            }),
+        }
     }
 }
