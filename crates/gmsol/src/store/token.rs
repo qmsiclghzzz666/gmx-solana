@@ -1,10 +1,13 @@
 use std::ops::Deref;
 
 use anchor_client::{
-    anchor_lang::{system_program::System, Id},
+    anchor_lang::{
+        system_program::{self, System},
+        Id,
+    },
     solana_sdk::{pubkey::Pubkey, signer::Signer},
 };
-use anchor_spl::token::Token;
+use anchor_spl::{associated_token::get_associated_token_address_with_program_id, token::Token};
 use gmsol_store::{accounts, instruction};
 
 use crate::utils::RpcBuilder;
@@ -29,6 +32,13 @@ pub trait TokenAccountOps<C> {
         user: &Pubkey,
         timestamp: i64,
         account: &Pubkey,
+    ) -> RpcBuilder<C>;
+
+    /// Prepare associated token account.
+    fn prepare_associated_token_account(
+        &self,
+        mint: &Pubkey,
+        token_program_id: &Pubkey,
     ) -> RpcBuilder<C>;
 }
 
@@ -80,5 +90,25 @@ where
                 system_program: System::id(),
                 token_program: Token::id(),
             })
+    }
+
+    fn prepare_associated_token_account(
+        &self,
+        mint: &Pubkey,
+        token_program_id: &Pubkey,
+    ) -> RpcBuilder<C> {
+        let account =
+            get_associated_token_address_with_program_id(&self.payer(), mint, token_program_id);
+        self.data_store_rpc()
+            .accounts(accounts::PrepareAssociatedTokenAccount {
+                payer: self.payer(),
+                owner: self.payer(),
+                mint: *mint,
+                account,
+                system_program: system_program::ID,
+                token_program: *token_program_id,
+                associated_token_program: anchor_spl::associated_token::ID,
+            })
+            .args(instruction::PrepareAssociatedTokenAccount {})
     }
 }

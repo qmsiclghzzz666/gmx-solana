@@ -75,6 +75,7 @@ where
             FactorKey::GtMintingCostReferredDiscount => {
                 rpc.args(instruction::InsertGtMintingCostReferredDiscount { factor })
             }
+            FactorKey::GTReferralReward => rpc.args(instruction::InsertGtReferralReward { factor }),
             _ => rpc.args(instruction::InsertFactor {
                 key: key.to_string(),
                 factor,

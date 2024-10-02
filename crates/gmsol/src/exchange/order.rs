@@ -19,6 +19,7 @@ use gmsol_store::{
     states::{
         common::{action::Action, swap::SwapParamsV2, TokensWithFeed},
         order::{OrderKind, OrderParams, OrderV2},
+        user::UserHeader,
         Market, MarketMeta, NonceBytes, Pyth, Store, TokenMapAccess,
     },
 };
@@ -651,7 +652,9 @@ pub struct ExecuteOrderHint {
     store: Store,
     market_token: Pubkey,
     position: Option<Pubkey>,
+    owner: Pubkey,
     user: Pubkey,
+    referrer: Option<Pubkey>,
     initial_collateral_token_and_account: Option<(Pubkey, Pubkey)>,
     final_output_token_and_account: Option<(Pubkey, Pubkey)>,
     long_token_and_account: Option<(Pubkey, Pubkey)>,
@@ -683,7 +686,7 @@ impl ExecuteOrderHint {
         Ok(crate::pda::find_claimable_account_pda(
             store,
             &self.long_token_mint,
-            &self.user,
+            &self.owner,
             &self.store.claimable_time_key(timestamp)?,
             &self.store_program_id,
         )
@@ -698,7 +701,7 @@ impl ExecuteOrderHint {
         Ok(crate::pda::find_claimable_account_pda(
             store,
             &self.short_token_mint,
-            &self.user,
+            &self.owner,
             &self.store.claimable_time_key(timestamp)?,
             &self.store_program_id,
         )
@@ -788,19 +791,25 @@ where
         market: &Market,
         store: &Store,
         map: &impl TokenMapAccess,
+        user: Option<&UserHeader>,
     ) -> crate::Result<&mut Self> {
         let params = order.params();
         let swap = order.swap();
         let market_token = *order.market_token();
         let kind = params.kind()?;
         let tokens = order.tokens();
+        let owner = *order.header().owner();
+        let user_address = self.client.find_user_address(&self.store, &owner);
+        let referrer = user.and_then(|user| user.referral().referrer().copied());
         self.hint = Some(ExecuteOrderHint {
             kind,
             store_program_id: self.client.store_program_id(),
             store: *store,
             market_token,
             position: params.position().copied(),
-            user: *order.header().owner(),
+            owner,
+            user: user_address,
+            referrer,
             long_token_mint: market.meta().long_token_mint,
             short_token_mint: market.meta().short_token_mint,
             pnl_token: if params.side()?.is_long() {
@@ -841,7 +850,14 @@ where
                         read_store(&self.client.data_store().solana_rpc(), &self.store).await?;
                     let token_map_address = self.get_token_map().await?;
                     let token_map = self.client.token_map(&token_map_address).await?;
-                    self.hint(&order, &market, &store, &token_map)?;
+                    let owner = order.header().owner();
+                    let user = self.client.find_user_address(&self.store, owner);
+                    let user = self
+                        .client
+                        .account::<ZeroCopy<UserHeader>>(&user)
+                        .await?
+                        .map(|user| user.0);
+                    self.hint(&order, &market, &store, &token_map, user.as_ref())?;
                 }
             }
         }
@@ -928,8 +944,8 @@ where
                     .data_store_rpc()
                     .accounts(accounts::ExecuteDecreaseOrder {
                         authority,
-                        owner: hint.user,
-                        user: self.client.find_user_address(&self.store, &hint.user),
+                        owner: hint.owner,
+                        user: hint.user,
                         store: self.store,
                         oracle: self.oracle,
                         token_map,
@@ -999,8 +1015,8 @@ where
                 .accounts(crate::utils::fix_optional_account_metas(
                     accounts::ExecuteOrderV2 {
                         authority,
-                        owner: hint.user,
-                        user: self.client.find_user_address(&self.store, &hint.user),
+                        owner: hint.owner,
+                        user: hint.user,
                         store: self.store,
                         oracle: self.oracle,
                         token_map,
@@ -1084,12 +1100,14 @@ where
                 .close_order(&self.order)?
                 .reason("executed")
                 .hint(CloseOrderHint {
-                    owner: hint.user,
+                    owner: hint.owner,
                     store: self.store,
                     initial_collateral_token_and_account: hint.initial_collateral_token_and_account,
                     final_output_token_and_account: hint.final_output_token_and_account,
                     long_token_and_account: hint.long_token_and_account,
                     short_token_and_account: hint.short_token_and_account,
+                    user: hint.user,
+                    referrer: hint.referrer,
                 })
                 .build()
                 .await?;
@@ -1099,7 +1117,7 @@ where
         let mut builder = ClaimableAccountsBuilder::new(
             self.recent_timestamp,
             self.store,
-            hint.user,
+            hint.owner,
             *hint.store.holding(),
         );
 
@@ -1147,19 +1165,32 @@ pub struct CloseOrderHint {
     pub(super) final_output_token_and_account: Option<(Pubkey, Pubkey)>,
     pub(super) long_token_and_account: Option<(Pubkey, Pubkey)>,
     pub(super) short_token_and_account: Option<(Pubkey, Pubkey)>,
+    pub(super) user: Pubkey,
+    pub(super) referrer: Option<Pubkey>,
 }
 
-impl<'a> From<&'a OrderV2> for CloseOrderHint {
-    fn from(order: &'a OrderV2) -> Self {
+impl CloseOrderHint {
+    /// Create hint from order and user account.
+    pub fn new(
+        order: &OrderV2,
+        user: Option<&UserHeader>,
+        program_id: &Pubkey,
+    ) -> crate::Result<Self> {
         let tokens = order.tokens();
-        Self {
-            owner: *order.header().owner(),
-            store: *order.header().store(),
+        let owner = order.header().owner();
+        let store = order.header().store();
+        let user_address = crate::pda::find_user_pda(store, owner, program_id).0;
+        let referrer = user.and_then(|user| user.referral().referrer().copied());
+        Ok(Self {
+            owner: *owner,
+            store: *store,
+            user: user_address,
+            referrer,
             initial_collateral_token_and_account: tokens.initial_collateral().token_and_account(),
             final_output_token_and_account: tokens.final_output_token().token_and_account(),
             long_token_and_account: tokens.long_token().token_and_account(),
             short_token_and_account: tokens.short_token().token_and_account(),
-        }
+        })
     }
 }
 
@@ -1178,8 +1209,13 @@ where
     }
 
     /// Set hint with the given order.
-    pub fn hint_with_order(&mut self, order: &OrderV2) -> &mut Self {
-        self.hint(CloseOrderHint::from(order))
+    pub fn hint_with_order(
+        &mut self,
+        order: &OrderV2,
+        user: Option<&UserHeader>,
+        program_id: &Pubkey,
+    ) -> crate::Result<&mut Self> {
+        Ok(self.hint(CloseOrderHint::new(order, user, program_id)?))
     }
 
     /// Set hint.
@@ -1204,7 +1240,12 @@ where
                     .await?
                     .into_value()
                     .ok_or(crate::Error::invalid_argument("order not found"))?;
-                let hint: CloseOrderHint = (&order.0).into();
+                let user = self
+                    .client
+                    .find_user_address(order.0.header().store(), order.0.header().owner());
+                let user = self.client.account(&user).await?;
+                let hint =
+                    CloseOrderHint::new(&order.0, user.as_ref(), &self.client.store_program_id())?;
                 self.hint = Some(hint);
                 Ok(hint)
             }
@@ -1222,6 +1263,16 @@ where
             &gt_mint,
             &anchor_spl::token_2022::ID,
         );
+        let referrer_user = hint
+            .referrer
+            .map(|owner| self.client.find_user_address(&hint.store, &owner));
+        let gt_ata_for_referrer = hint.referrer.map(|owner| {
+            get_associated_token_address_with_program_id(
+                &owner,
+                &gt_mint,
+                &anchor_spl::token_2022::ID,
+            )
+        });
         Ok(self
             .client
             .data_store_rpc()
@@ -1232,6 +1283,8 @@ where
                     order: self.order,
                     executor: payer,
                     owner,
+                    user: hint.user,
+                    referrer_user,
                     initial_collateral_token: hint
                         .initial_collateral_token_and_account
                         .map(|(token, _)| token),
@@ -1264,6 +1317,7 @@ where
                         .as_ref()
                         .map(|(token, _)| get_associated_token_address(&owner, token)),
                     gt_ata,
+                    gt_ata_for_referrer,
                     associated_token_program: anchor_spl::associated_token::ID,
                     token_program: anchor_spl::token::ID,
                     gt_token_program: anchor_spl::token_2022::ID,

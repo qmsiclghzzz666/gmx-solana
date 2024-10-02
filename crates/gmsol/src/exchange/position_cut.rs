@@ -8,13 +8,16 @@ use anchor_spl::associated_token::get_associated_token_address;
 use gmsol_store::{
     accounts, instruction,
     ops::order::PositionCutKind,
-    states::{common::TokensWithFeed, MarketMeta, NonceBytes, Position, Pyth, Store, TokenMap},
+    states::{
+        common::TokensWithFeed, user::UserHeader, MarketMeta, NonceBytes, Position, Pyth, Store,
+        TokenMap,
+    },
 };
 
 use crate::{
     exchange::generate_nonce,
     store::utils::FeedsParser,
-    utils::{ComputeBudget, TransactionBuilder},
+    utils::{ComputeBudget, TransactionBuilder, ZeroCopy},
 };
 
 use super::{
@@ -52,6 +55,8 @@ pub struct PositionCutHint {
     meta: MarketMeta,
     store_address: Pubkey,
     owner: Pubkey,
+    user: Pubkey,
+    referrer: Option<Pubkey>,
     store: Arc<Store>,
     collateral_token: Pubkey,
     pnl_token: Pubkey,
@@ -76,8 +81,21 @@ impl PositionCutHint {
         let token_map = client.token_map(&token_map_address).await?;
         let market = client.find_market_address(&store_address, &position.market_token);
         let meta = *client.market(&market).await?.meta();
+        let user = client.find_user_address(&store_address, &position.owner);
+        let user = client
+            .account::<ZeroCopy<UserHeader>>(&user)
+            .await?
+            .map(|user| user.0);
 
-        Self::try_new(position, Arc::new(store), &token_map, market, meta)
+        Self::try_new(
+            position,
+            Arc::new(store),
+            &token_map,
+            market,
+            meta,
+            user.as_ref(),
+            &client.store_program_id(),
+        )
     }
 
     /// Create a new hint.
@@ -87,6 +105,8 @@ impl PositionCutHint {
         token_map: &TokenMap,
         market: Pubkey,
         market_meta: MarketMeta,
+        user: Option<&UserHeader>,
+        program_id: &Pubkey,
     ) -> crate::Result<Self> {
         use gmsol_exchange::utils::token_records;
 
@@ -100,10 +120,15 @@ impl PositionCutHint {
             .into(),
         )?;
         let tokens_with_feed = TokensWithFeed::try_from_records(records)?;
+        let user_address =
+            crate::pda::find_user_pda(&position.store, &position.owner, program_id).0;
+        let referrer = user.and_then(|user| user.referral().referrer().copied());
 
         Ok(Self {
             store_address: position.store,
             owner: position.owner,
+            user: user_address,
+            referrer,
             token_map: *store.token_map().ok_or(crate::Error::invalid_argument(
                 "missing token map for the store",
             ))?,
@@ -285,7 +310,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> PositionCutBuilder<'a, C> {
             .accounts(accounts::PositionCut {
                 authority: payer,
                 owner,
-                user: self.client.find_user_address(&store, &owner),
+                user: hint.user,
                 store,
                 token_map: hint.token_map,
                 price_provider: self.price_provider,
@@ -345,6 +370,8 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> PositionCutBuilder<'a, C> {
                     )),
                     long_token_and_account: Some((long_token_mint, long_token_escrow)),
                     short_token_and_account: Some((short_token_mint, short_token_escrow)),
+                    user: hint.user,
+                    referrer: hint.referrer,
                 })
                 .reason("position cut")
                 .build()

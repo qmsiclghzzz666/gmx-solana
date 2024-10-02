@@ -370,7 +370,8 @@ impl Amounts {
 pub struct Factors {
     pub(crate) oracle_ref_price_deviation: Factor,
     pub(crate) gt_minting_cost_referred_discount: Factor,
-    reserved_1: [Factor; 30],
+    pub(crate) gt_referral_reward: Factor,
+    reserved_1: [Factor; 29],
     reserved_2: [Factor; 32],
 }
 
@@ -387,6 +388,8 @@ pub enum FactorKey {
     OracleRefPriceDeviation,
     /// GT Minting Cost Referred Discount.
     GtMintingCostReferredDiscount,
+    /// GT Referral Reward.
+    GTReferralReward,
 }
 
 impl Factors {
@@ -399,6 +402,7 @@ impl Factors {
         match key {
             FactorKey::OracleRefPriceDeviation => &self.oracle_ref_price_deviation,
             FactorKey::GtMintingCostReferredDiscount => &self.gt_minting_cost_referred_discount,
+            FactorKey::GTReferralReward => &self.gt_referral_reward,
         }
     }
 
@@ -407,6 +411,7 @@ impl Factors {
         match key {
             FactorKey::OracleRefPriceDeviation => &mut self.oracle_ref_price_deviation,
             FactorKey::GtMintingCostReferredDiscount => &mut self.gt_minting_cost_referred_discount,
+            FactorKey::GTReferralReward => &mut self.gt_referral_reward,
         }
     }
 }

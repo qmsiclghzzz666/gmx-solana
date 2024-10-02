@@ -74,6 +74,8 @@ pub struct Deployment {
     pub oracle_index: u8,
     /// Oracle.
     pub oracle: Pubkey,
+    /// GT mint.
+    pub gt: Pubkey,
     /// Tokens.
     tokens: HashMap<String, Token>,
     /// Synthetic tokens.
@@ -154,6 +156,7 @@ impl Deployment {
             token_map,
             oracle_index,
             oracle,
+            gt: Default::default(),
             tokens: Default::default(),
             synthetic_tokens: Default::default(),
             market_tokens: Default::default(),
@@ -692,10 +695,11 @@ impl Deployment {
         Ok(())
     }
 
-    async fn initialize_gt(&self, decimals: u8) -> eyre::Result<()> {
+    async fn initialize_gt(&mut self, decimals: u8) -> eyre::Result<()> {
         let client = self.user_client(Self::DEFAULT_KEEPER)?;
         let store = &self.store;
         let gt = client.find_gt_mint_address(store);
+        self.gt = gt;
 
         let mut tx = client.transaction();
 
@@ -709,6 +713,11 @@ impl Deployment {
         .push(client.insert_factor(
             store,
             FactorKey::GtMintingCostReferredDiscount,
+            10 * MARKET_USD_UNIT / 100,
+        ))?
+        .push(client.insert_factor(
+            store,
+            FactorKey::GTReferralReward,
             10 * MARKET_USD_UNIT / 100,
         ))?;
 

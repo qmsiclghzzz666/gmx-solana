@@ -1,4 +1,7 @@
-use gmsol::{store::user::UserOps, types::user::ReferralCode};
+use gmsol::{
+    store::{token::TokenAccountOps, user::UserOps},
+    types::user::ReferralCode,
+};
 use gmsol_store::CoreError;
 use rand::random;
 
@@ -17,6 +20,12 @@ async fn referral() -> eyre::Result<()> {
 
     let signature = client.prepare_user(store)?.send_without_preflight().await?;
     tracing::info!(%signature, "prepared user account for user 1");
+
+    let signature = client
+        .prepare_associated_token_account(&deployment.gt, &anchor_spl::token_2022::ID)
+        .send_without_preflight()
+        .await?;
+    tracing::info!(%signature, "prepared GT ATA account for user 1");
 
     let signature = client2
         .prepare_user(store)?

@@ -557,6 +557,12 @@ pub mod gmsol_store {
         instructions::insert_factor(ctx, &key.to_string(), factor)
     }
 
+    #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
+    pub fn insert_gt_referral_reward(ctx: Context<InsertFactor>, factor: u128) -> Result<()> {
+        let key = FactorKey::GTReferralReward;
+        instructions::insert_factor(ctx, &key.to_string(), factor)
+    }
+
     // Token Config.
     /// Initialize a new token map account with its store set to [`store`](InitializeTokenMap::store).
     ///
