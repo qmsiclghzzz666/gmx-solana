@@ -995,15 +995,17 @@ impl<'info> CloseOrder<'info> {
                 return Ok(());
             }
 
-            self.store.load_mut()?.gt_mut().record_minted(reward)?;
-
             {
+                let mut store = self.store.load_mut()?;
                 let mut referrer_user = referrer_user.load_mut()?;
+
+                store.gt_mut().record_minted(reward)?;
                 referrer_user.gt.minted = referrer_user
                     .gt
                     .minted
                     .checked_add(reward)
                     .ok_or(error!(CoreError::TokenAmountOverflow))?;
+                referrer_user.gt.last_minted_at = store.gt().last_minted_at;
             }
 
             let ctx = CpiContext::new(
