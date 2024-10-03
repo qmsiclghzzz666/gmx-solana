@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 use crate::CoreError;
 
-use super::Seed;
+use super::{Seed, Store};
 
 /// Header of `User` Account.
 #[account(zero_copy)]
@@ -208,6 +208,8 @@ impl Seed for ReferralCode {
 #[zero_copy]
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub struct GTState {
+    rank: u8,
+    padding_0: [u8; 15],
     pub(crate) minted: u64,
     pub(crate) last_minted_at: i64,
     pub(crate) traded_value: u128,
@@ -224,5 +226,20 @@ impl GTState {
     /// Get minted value.
     pub fn minted_value(&self) -> u128 {
         self.minted_value
+    }
+
+    /// Get current rank.
+    pub fn rank(&self) -> u8 {
+        self.rank
+    }
+
+    pub(crate) fn update_rank(&mut self, store: &Store, gt_amount: u64) {
+        debug_assert!(store.gt().ranks().len() < u8::MAX as usize);
+        let rank = match store.gt().ranks().binary_search(&gt_amount) {
+            Ok(rank) => rank + 1,
+            Err(rank) => rank,
+        };
+        self.rank = rank as u8;
+        msg!("[GT] new rank = {}", rank);
     }
 }

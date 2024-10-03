@@ -655,6 +655,7 @@ pub struct CloseOrder<'info> {
     pub owner: UncheckedAccount<'info>,
     /// User Account.
     #[account(
+        mut,
         constraint = user.load()?.is_initialized() @ CoreError::InvalidUserAccount,
         has_one = owner,
         has_one = store,
@@ -906,6 +907,7 @@ impl<'info> CloseOrder<'info> {
     fn mint_gt_reward(&self, init_if_needed: bool) -> Result<Success> {
         use anchor_spl::{
             associated_token::{create, Create},
+            token::accessor::amount as access_amount,
             token_2022::{mint_to, MintTo},
         };
 
@@ -932,6 +934,8 @@ impl<'info> CloseOrder<'info> {
                     ))?;
                 }
 
+                // TODO: unpack the ATA to ensure it is a valid token account.
+
                 let ctx = CpiContext::new(
                     self.gt_token_program.to_account_info(),
                     MintTo {
@@ -944,6 +948,16 @@ impl<'info> CloseOrder<'info> {
 
                 msg!("[GT] minted {} units of GT", amount);
 
+                // Update the rank of the user.
+                {
+                    let total_amount = access_amount(ata)?;
+                    msg!("[GT] updating rank with total amount: {}", total_amount);
+                    self.user
+                        .load_mut()?
+                        .gt
+                        .update_rank(&*self.store.load()?, total_amount);
+                }
+
                 // Make sure the mint can only be done once.
                 self.order.load_mut()?.gt_reward = 0;
             }
@@ -954,7 +968,10 @@ impl<'info> CloseOrder<'info> {
     }
 
     fn mint_gt_reward_for_referrer(&self, amount: u64) -> Result<()> {
-        use anchor_spl::token_2022::{mint_to, MintTo};
+        use anchor_spl::{
+            token::accessor::amount as access_amount,
+            token_2022::{mint_to, MintTo},
+        };
 
         // Mint referral reward for the referrer.
         let Some(referrer) = self.user.load()?.referral().referrer().copied() else {
@@ -995,6 +1012,8 @@ impl<'info> CloseOrder<'info> {
                 return Ok(());
             }
 
+            // TODO: unpack the ATA to ensure it is a valid token account.
+
             {
                 let mut store = self.store.load_mut()?;
                 let mut referrer_user = referrer_user.load_mut()?;
@@ -1019,6 +1038,16 @@ impl<'info> CloseOrder<'info> {
             mint_to(ctx.with_signer(&[&self.store.load()?.pda_seeds()]), reward)?;
 
             msg!("[GT] minted {} units of GT to the referrer", reward);
+
+            // Update the rank of the referrer.
+            {
+                let total_amount = access_amount(ata)?;
+                msg!("[GT] updating rank with total amount: {}", total_amount);
+                referrer_user
+                    .load_mut()?
+                    .gt
+                    .update_rank(&*self.store.load()?, total_amount);
+            }
         }
 
         Ok(())

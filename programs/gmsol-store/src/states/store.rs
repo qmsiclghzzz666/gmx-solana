@@ -511,6 +511,7 @@ impl GTState {
 
         let target = &mut self.ranks[0..max_rank];
         target.copy_from_slice(ranks);
+        self.max_rank = max_rank as u64;
 
         Ok(())
     }
@@ -600,6 +601,10 @@ impl GTState {
         );
 
         Ok((minted, minted_value))
+    }
+
+    pub(crate) fn ranks(&self) -> &[u64] {
+        &self.ranks[0..(self.max_rank as usize)]
     }
 }
 
