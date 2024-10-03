@@ -1631,6 +1631,7 @@ pub mod gmsol_store {
         initial_minting_cost: u128,
         grow_factor: u128,
         grow_step: u64,
+        ranks: Vec<u64>,
     ) -> Result<()> {
         instructions::unchecked_initialize_gt(
             ctx,
@@ -1638,6 +1639,7 @@ pub mod gmsol_store {
             initial_minting_cost,
             grow_factor,
             grow_step,
+            &ranks,
         )
     }
 

@@ -457,6 +457,8 @@ impl Addresses {
     }
 }
 
+const MAX_RANK: usize = 15;
+
 #[account(zero_copy)]
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub struct GTState {
@@ -466,6 +468,8 @@ pub struct GTState {
     grow_steps: u64,
     minting_cost_grow_factor: u128,
     minting_cost: u128,
+    max_rank: u64,
+    ranks: [u64; MAX_RANK],
     reserve: [u8; 256],
 }
 
@@ -475,6 +479,7 @@ impl GTState {
         initial_minting_cost: u128,
         grow_factor: u128,
         grow_step: u64,
+        ranks: &[u64],
     ) -> Result<()> {
         require_eq!(self.minted, 0, CoreError::GTStateHasBeenInitialized);
         require_eq!(self.last_minted_at, 0, CoreError::GTStateHasBeenInitialized);
@@ -482,12 +487,30 @@ impl GTState {
 
         require!(grow_step != 0, CoreError::InvalidGTConfig);
 
+        let max_rank = ranks.len().min(MAX_RANK);
+        let ranks = &ranks[0..max_rank];
+
+        // Ranks must be storted.
+        require!(
+            ranks.windows(2).all(|ab| {
+                if let [a, b] = &ab {
+                    a < b
+                } else {
+                    false
+                }
+            }),
+            CoreError::InvalidGTConfig
+        );
+
         let clock = Clock::get()?;
 
         self.last_minted_at = clock.unix_timestamp;
         self.grow_step_amount = grow_step;
         self.minting_cost_grow_factor = grow_factor;
         self.minting_cost = initial_minting_cost;
+
+        let target = &mut self.ranks[0..max_rank];
+        target.copy_from_slice(ranks);
 
         Ok(())
     }

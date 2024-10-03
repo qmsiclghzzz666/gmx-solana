@@ -703,12 +703,25 @@ impl Deployment {
 
         let mut tx = client.transaction();
 
+        let gt_unit = 10u64.pow(decimals as u32);
+
         tx.push(client.initialize_gt(
             store,
             decimals,
             100 * MARKET_USD_UNIT / 10u128.pow(decimals as u32),
             101 * MARKET_USD_UNIT / 100,
-            10 * 10u64.pow(decimals as u32),
+            10 * gt_unit,
+            vec![
+                300 * gt_unit,
+                1_000 * gt_unit,
+                3_000 * gt_unit,
+                10_000 * gt_unit,
+                30_000 * gt_unit,
+                100_000 * gt_unit,
+                300_000 * gt_unit,
+                1_000_000 * gt_unit,
+                3_000_000 * gt_unit,
+            ],
         ))?
         .push(client.insert_factor(
             store,

@@ -45,9 +45,10 @@ pub(crate) fn unchecked_initialize_gt(
     initial_minting_cost: u128,
     grow_factor: u128,
     grow_step: u64,
+    ranks: &[u64],
 ) -> Result<()> {
     ctx.accounts
-        .initialize_gt_state(initial_minting_cost, grow_factor, grow_step)?;
+        .initialize_gt_state(initial_minting_cost, grow_factor, grow_step, ranks)?;
     ctx.accounts.enable_non_transferable_mint()?;
     ctx.accounts.initialize_mint(decimals)?;
     Ok(())
@@ -69,11 +70,12 @@ impl<'info> InitializeGT<'info> {
         initial_minting_cost: u128,
         grow_factor: u128,
         grow_step: u64,
+        ranks: &[u64],
     ) -> Result<()> {
         let mut store = self.store.load_mut()?;
         store
             .gt_mut()
-            .init(initial_minting_cost, grow_factor, grow_step)?;
+            .init(initial_minting_cost, grow_factor, grow_step, ranks)?;
         Ok(())
     }
     fn enable_non_transferable_mint(&self) -> Result<()> {

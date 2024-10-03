@@ -17,6 +17,7 @@ pub trait GTOps<C> {
         initial_minting_cost: u128,
         grow_factor: u128,
         grow_step: u64,
+        ranks: Vec<u64>,
     ) -> RpcBuilder<C>;
 }
 
@@ -28,6 +29,7 @@ impl<C: Deref<Target = impl Signer> + Clone> GTOps<C> for crate::Client<C> {
         initial_minting_cost: u128,
         grow_factor: u128,
         grow_step: u64,
+        ranks: Vec<u64>,
     ) -> RpcBuilder<C> {
         self.data_store_rpc()
             .accounts(accounts::InitializeGT {
@@ -42,6 +44,7 @@ impl<C: Deref<Target = impl Signer> + Clone> GTOps<C> for crate::Client<C> {
                 initial_minting_cost,
                 grow_factor,
                 grow_step,
+                ranks,
             })
     }
 }
