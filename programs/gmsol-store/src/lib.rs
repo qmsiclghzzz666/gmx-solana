@@ -557,12 +557,6 @@ pub mod gmsol_store {
         instructions::insert_factor(ctx, &key.to_string(), factor)
     }
 
-    #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
-    pub fn insert_gt_referral_reward(ctx: Context<InsertFactor>, factor: u128) -> Result<()> {
-        let key = FactorKey::GTReferralReward;
-        instructions::insert_factor(ctx, &key.to_string(), factor)
-    }
-
     // Token Config.
     /// Initialize a new token map account with its store set to [`store`](InitializeTokenMap::store).
     ///
@@ -1641,6 +1635,24 @@ pub mod gmsol_store {
             grow_step,
             &ranks,
         )
+    }
+
+    /// Set order fee discount factors.
+    #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
+    pub fn gt_set_order_fee_discount_factors(
+        ctx: Context<ConfigurateGT>,
+        factors: Vec<u128>,
+    ) -> Result<()> {
+        instructions::unchecked_gt_set_order_fee_discount_factors(ctx, &factors)
+    }
+
+    /// Set referral reward factors.
+    #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
+    pub fn gt_set_referral_reward_factors(
+        ctx: Context<ConfigurateGT>,
+        factors: Vec<u128>,
+    ) -> Result<()> {
+        instructions::unchecked_gt_set_referral_reward_factors(ctx, &factors)
     }
 
     /// Prepare User Account.

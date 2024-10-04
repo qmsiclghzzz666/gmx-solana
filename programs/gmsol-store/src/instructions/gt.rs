@@ -104,3 +104,48 @@ impl<'info> InitializeGT<'info> {
         )
     }
 }
+
+/// The accounts defintions for GT configuration instructions.
+#[derive(Accounts)]
+pub struct ConfigurateGT<'info> {
+    /// Authority
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    /// Store.
+    #[account(mut)]
+    pub store: AccountLoader<'info, Store>,
+}
+
+impl<'info> internal::Authentication<'info> for ConfigurateGT<'info> {
+    fn authority(&self) -> &Signer<'info> {
+        &self.authority
+    }
+
+    fn store(&self) -> &AccountLoader<'info, Store> {
+        &self.store
+    }
+}
+
+/// CHECK: only MARKET_KEEPER is authorized to use this instruction.
+pub(crate) fn unchecked_gt_set_order_fee_discount_factors(
+    ctx: Context<ConfigurateGT>,
+    factors: &[u128],
+) -> Result<()> {
+    ctx.accounts
+        .store
+        .load_mut()?
+        .gt_mut()
+        .set_order_fee_discount_factors(factors)
+}
+
+/// CHECK: only MARKET_KEEPER is authorized to use this instruction.
+pub(crate) fn unchecked_gt_set_referral_reward_factors(
+    ctx: Context<ConfigurateGT>,
+    factors: &[u128],
+) -> Result<()> {
+    ctx.accounts
+        .store
+        .load_mut()?
+        .gt_mut()
+        .set_referral_reward_factors(factors)
+}

@@ -9,6 +9,7 @@ pub struct FeeParams<T> {
     positive_impact_fee_factor: T,
     negative_impact_fee_factor: T,
     fee_receiver_factor: T,
+    discount_factor: T,
 }
 
 impl<T> FeeParams<T> {
@@ -21,7 +22,119 @@ impl<T> FeeParams<T> {
             positive_impact_factor: Zero::zero(),
             negative_impact_factor: Zero::zero(),
             fee_receiver_factor: Zero::zero(),
+            discount_factor: Zero::zero(),
         }
+    }
+
+    /// Set discount factor.
+    pub fn with_discount_factor(self, factor: T) -> Self {
+        Self {
+            discount_factor: factor,
+            ..self
+        }
+    }
+
+    #[inline]
+    fn factor(&self, is_positive_impact: bool) -> &T {
+        if is_positive_impact {
+            &self.positive_impact_fee_factor
+        } else {
+            &self.negative_impact_fee_factor
+        }
+    }
+
+    /// Get basic fee.
+    #[inline]
+    pub fn fee<const DECIMALS: u8>(&self, is_positive_impact: bool, amount: &T) -> Option<T>
+    where
+        T: FixedPointOps<DECIMALS>,
+    {
+        let factor = self.factor(is_positive_impact);
+        let fee = utils::apply_factor(amount, factor)?;
+        let discount = utils::apply_factor(&fee, &self.discount_factor)?;
+        fee.checked_sub(&discount)
+    }
+
+    /// Get receiver fee.
+    #[inline]
+    pub fn receiver_fee<const DECIMALS: u8>(&self, fee_amount: &T) -> Option<T>
+    where
+        T: FixedPointOps<DECIMALS>,
+    {
+        utils::apply_factor(fee_amount, &self.fee_receiver_factor)
+    }
+
+    /// Apply fees to `amount`.
+    /// - `DECIMALS` is the decimals of the parameters.
+    ///
+    /// Returns `None` if the computation fails, otherwise `amount` after fees and the fees are returned.
+    pub fn apply_fees<const DECIMALS: u8>(
+        &self,
+        is_positive_impact: bool,
+        amount: &T,
+    ) -> Option<(T, Fees<T>)>
+    where
+        T: FixedPointOps<DECIMALS>,
+    {
+        let fee_amount = self.fee(is_positive_impact, amount)?;
+        let fee_receiver_amount = self.receiver_fee(&fee_amount)?;
+        let fees = Fees {
+            fee_amount_for_pool: fee_amount.checked_sub(&fee_receiver_amount)?,
+            fee_receiver_amount,
+        };
+        Some((amount.checked_sub(&fee_amount)?, fees))
+    }
+
+    /// Get order fees.
+    fn order_fees<const DECIMALS: u8>(
+        &self,
+        collateral_token_price: &T,
+        size_delta_usd: &T,
+        is_positive_impact: bool,
+    ) -> crate::Result<OrderFees<T>>
+    where
+        T: FixedPointOps<DECIMALS>,
+    {
+        if collateral_token_price.is_zero() {
+            return Err(crate::Error::InvalidPrices);
+        }
+
+        // TODO: use min price.
+        let fee_amount = self
+            .fee(is_positive_impact, size_delta_usd)
+            .ok_or(crate::Error::Computation("calculating order fee usd"))?
+            / collateral_token_price.clone();
+
+        let receiver_fee_amount = self
+            .receiver_fee(&fee_amount)
+            .ok_or(crate::Error::Computation("calculating order receiver fee"))?;
+        Ok(OrderFees {
+            base: Fees::new(
+                fee_amount
+                    .checked_sub(&receiver_fee_amount)
+                    .ok_or(crate::Error::Computation("calculating order fee for pool"))?,
+                receiver_fee_amount,
+            ),
+        })
+    }
+
+    /// Get base position fees.
+    pub fn base_position_fees<const DECIMALS: u8>(
+        &self,
+        collateral_token_price: &T,
+        size_delta_usd: &T,
+        is_positive_impact: bool,
+    ) -> crate::Result<PositionFees<T>>
+    where
+        T: FixedPointOps<DECIMALS>,
+    {
+        let OrderFees { base } =
+            self.order_fees(collateral_token_price, size_delta_usd, is_positive_impact)?;
+        Ok(PositionFees {
+            base,
+            borrowing: Default::default(),
+            funding: Default::default(),
+        })
     }
 }
 
@@ -203,111 +316,6 @@ impl<T> Fees<T> {
     /// Get fee amount for pool.
     pub fn fee_amount_for_pool(&self) -> &T {
         &self.fee_amount_for_pool
-    }
-}
-
-impl<T> FeeParams<T> {
-    #[inline]
-    fn factor(&self, is_positive_impact: bool) -> &T {
-        if is_positive_impact {
-            &self.positive_impact_fee_factor
-        } else {
-            &self.negative_impact_fee_factor
-        }
-    }
-
-    /// Get basic fee.
-    #[inline]
-    pub fn fee<const DECIMALS: u8>(&self, is_positive_impact: bool, amount: &T) -> Option<T>
-    where
-        T: FixedPointOps<DECIMALS>,
-    {
-        let factor = self.factor(is_positive_impact);
-        utils::apply_factor(amount, factor)
-    }
-
-    /// Get receiver fee.
-    #[inline]
-    pub fn receiver_fee<const DECIMALS: u8>(&self, fee_amount: &T) -> Option<T>
-    where
-        T: FixedPointOps<DECIMALS>,
-    {
-        utils::apply_factor(fee_amount, &self.fee_receiver_factor)
-    }
-
-    /// Apply fees to `amount`.
-    /// - `DECIMALS` is the decimals of the parameters.
-    ///
-    /// Returns `None` if the computation fails, otherwise `amount` after fees and the fees are returned.
-    pub fn apply_fees<const DECIMALS: u8>(
-        &self,
-        is_positive_impact: bool,
-        amount: &T,
-    ) -> Option<(T, Fees<T>)>
-    where
-        T: FixedPointOps<DECIMALS>,
-    {
-        let fee_amount = self.fee(is_positive_impact, amount)?;
-        let fee_receiver_amount = self.receiver_fee(&fee_amount)?;
-        let fees = Fees {
-            fee_amount_for_pool: fee_amount.checked_sub(&fee_receiver_amount)?,
-            fee_receiver_amount,
-        };
-        Some((amount.checked_sub(&fee_amount)?, fees))
-    }
-
-    /// Get order fees.
-    fn order_fees<const DECIMALS: u8>(
-        &self,
-        collateral_token_price: &T,
-        size_delta_usd: &T,
-        is_positive_impact: bool,
-    ) -> crate::Result<OrderFees<T>>
-    where
-        T: FixedPointOps<DECIMALS>,
-    {
-        if collateral_token_price.is_zero() {
-            return Err(crate::Error::InvalidPrices);
-        }
-
-        // TODO: use min price.
-        let fee_amount = self
-            .fee(is_positive_impact, size_delta_usd)
-            .ok_or(crate::Error::Computation("calculating order fee usd"))?
-            / collateral_token_price.clone();
-
-        // TODO: apply rebase.
-
-        let receiver_fee_amount = self
-            .receiver_fee(&fee_amount)
-            .ok_or(crate::Error::Computation("calculating order receiver fee"))?;
-        Ok(OrderFees {
-            base: Fees::new(
-                fee_amount
-                    .checked_sub(&receiver_fee_amount)
-                    .ok_or(crate::Error::Computation("calculating order fee for pool"))?,
-                receiver_fee_amount,
-            ),
-        })
-    }
-
-    /// Get base position fees.
-    pub fn base_position_fees<const DECIMALS: u8>(
-        &self,
-        collateral_token_price: &T,
-        size_delta_usd: &T,
-        is_positive_impact: bool,
-    ) -> crate::Result<PositionFees<T>>
-    where
-        T: FixedPointOps<DECIMALS>,
-    {
-        let OrderFees { base } =
-            self.order_fees(collateral_token_price, size_delta_usd, is_positive_impact)?;
-        Ok(PositionFees {
-            base,
-            borrowing: Default::default(),
-            funding: Default::default(),
-        })
     }
 }
 
@@ -516,6 +524,7 @@ pub struct Builder<T> {
     positive_impact_factor: T,
     negative_impact_factor: T,
     fee_receiver_factor: T,
+    discount_factor: T,
 }
 
 impl<T> Builder<T> {
@@ -537,12 +546,19 @@ impl<T> Builder<T> {
         self
     }
 
+    /// Set discount factor.
+    pub fn with_discount_factor(mut self, factor: T) -> Self {
+        self.discount_factor = factor;
+        self
+    }
+
     /// Build [`FeeParams`].
     pub fn build(self) -> FeeParams<T> {
         FeeParams {
             positive_impact_fee_factor: self.positive_impact_factor,
             negative_impact_fee_factor: self.negative_impact_factor,
             fee_receiver_factor: self.fee_receiver_factor,
+            discount_factor: self.discount_factor,
         }
     }
 }

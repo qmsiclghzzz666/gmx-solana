@@ -25,6 +25,7 @@ pub struct RevertiblePerpMarket<'a> {
     clocks: Clocks,
     pools: Box<Pools>,
     state: State,
+    order_fee_discount_factor: u128,
 }
 
 impl<'a> RevertiblePerpMarket<'a> {
@@ -312,17 +313,24 @@ impl<'a> gmsol_model::Bank<Pubkey> for RevertiblePerpMarket<'a> {
 }
 
 impl<'a> RevertiblePerpMarket<'a> {
-    pub(crate) fn new<'info>(loader: &'a AccountLoader<'info, Market>) -> Result<Self> {
+    pub(crate) fn new<'info>(
+        loader: &'a AccountLoader<'info, Market>,
+        order_fee_discount_factor: u128,
+    ) -> Result<Self> {
         let market = loader.try_into()?;
-        Self::from_market(market)
+        Self::from_market(market, order_fee_discount_factor)
     }
 
-    pub(crate) fn from_market(market: RevertibleMarket<'a>) -> Result<Self> {
+    pub(crate) fn from_market(
+        market: RevertibleMarket<'a>,
+        order_fee_discount_factor: u128,
+    ) -> Result<Self> {
         Ok(Self {
             pools: Box::new((&market).try_into()?),
             clocks: (&market).try_into()?,
             state: (&market).try_into()?,
             market,
+            order_fee_discount_factor,
         })
     }
 }
@@ -524,7 +532,10 @@ impl<'a> gmsol_model::PerpMarket<{ constants::MARKET_DECIMALS }> for RevertibleP
     }
 
     fn order_fee_params(&self) -> gmsol_model::Result<FeeParams<Self::Num>> {
-        self.market.order_fee_params()
+        Ok(self
+            .market
+            .order_fee_params()?
+            .with_discount_factor(self.order_fee_discount_factor))
     }
 
     fn open_interest_reserve_factor(&self) -> gmsol_model::Result<Self::Num> {

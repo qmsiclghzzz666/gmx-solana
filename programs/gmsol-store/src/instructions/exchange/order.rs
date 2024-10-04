@@ -19,7 +19,7 @@ use crate::{
         order::{OrderKind, OrderV2},
         position::PositionKind,
         user::UserHeader,
-        FactorKey, Market, NonceBytes, Position, RoleKey, Seed, Store,
+        Market, NonceBytes, Position, RoleKey, Seed, Store,
     },
     utils::{
         internal::{self, Authentication},
@@ -988,10 +988,11 @@ impl<'info> CloseOrder<'info> {
             CoreError::InvalidArgument
         );
 
-        let factor = *self
+        let factor = self
             .store
             .load()?
-            .get_factor_by_key(FactorKey::GTReferralReward);
+            .gt()
+            .referral_reward_factor(referrer_user.load()?.gt.rank())?;
         let reward: u64 =
             apply_factor::<_, { constants::MARKET_DECIMALS }>(&(amount as u128), &factor)
                 .ok_or(error!(CoreError::InvalidGTConfig))?

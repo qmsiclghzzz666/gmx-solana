@@ -673,7 +673,8 @@ impl<'a, 'info> ExecuteOrderOps<'a, 'info> {
 
         let mut should_throw_error = false;
         let prices = self.market.load()?.prices(self.oracle)?;
-        let res = match self.do_execute(&mut should_throw_error, prices) {
+        let discount = self.validate_and_get_order_fee_discount()?;
+        let res = match self.do_execute(&mut should_throw_error, prices, discount) {
             Ok((should_remove_position, mut transfer_out, should_send_trade_event)) => {
                 transfer_out.set_executed(true);
                 should_close_position = should_remove_position;
@@ -702,17 +703,34 @@ impl<'a, 'info> ExecuteOrderOps<'a, 'info> {
     }
 
     #[inline(never)]
+    fn validate_and_get_order_fee_discount(&self) -> Result<u128> {
+        require!(
+            self.user.load()?.is_initialized(),
+            CoreError::InvalidUserAccount
+        );
+        let rank = self.user.load()?.gt.rank();
+        let discount_factor = self.store.load()?.gt().order_fee_discount_factor(rank)?;
+        msg!(
+            "[GT] apply a {} order fee discount (factor) for this rank {} user",
+            discount_factor,
+            rank,
+        );
+        Ok(discount_factor)
+    }
+
+    #[inline(never)]
     fn do_execute(
         &self,
         should_throw_error: &mut bool,
         prices: Prices<u128>,
+        order_fee_discount_factor: u128,
     ) -> Result<(ShouldRemovePosition, Box<TransferOut>, ShouldSendTradeEvent)> {
         self.validate_market()?;
         self.validate_order(should_throw_error, &prices)?;
 
         // Prepare execution context.
         let gt_minting_enabled = self.market.load()?.is_gt_minting_enabled();
-        let mut market = RevertiblePerpMarket::new(self.market)?;
+        let mut market = RevertiblePerpMarket::new(self.market, order_fee_discount_factor)?;
         let current_market_token = market.market_meta().market_token_mint;
         let loaders = self
             .order

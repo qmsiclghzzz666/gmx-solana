@@ -728,11 +728,24 @@ impl Deployment {
             FactorKey::GtMintingCostReferredDiscount,
             10 * MARKET_USD_UNIT / 100,
         ))?
-        .push(client.insert_factor(
-            store,
-            FactorKey::GTReferralReward,
-            10 * MARKET_USD_UNIT / 100,
-        ))?;
+        .push(
+            client.gt_set_order_fee_discount_factors(
+                store,
+                [0, 25, 50, 75, 100, 125, 150, 175, 200, 225]
+                    .iter()
+                    .map(|base| *base * MARKET_USD_UNIT / 1_000)
+                    .collect(),
+            ),
+        )?
+        .push(
+            client.gt_set_referral_reward_factors(
+                store,
+                [5, 10, 11, 12, 13, 15, 18, 23, 31, 44]
+                    .iter()
+                    .map(|base| *base * MARKET_USD_UNIT / 100)
+                    .collect(),
+            ),
+        )?;
 
         tx.send_all()
             .instrument(tracing::info_span!("initalize GT", gt=%gt))

@@ -370,8 +370,7 @@ impl Amounts {
 pub struct Factors {
     pub(crate) oracle_ref_price_deviation: Factor,
     pub(crate) gt_minting_cost_referred_discount: Factor,
-    pub(crate) gt_referral_reward: Factor,
-    reserved_1: [Factor; 29],
+    reserved_1: [Factor; 30],
     reserved_2: [Factor; 32],
 }
 
@@ -388,8 +387,6 @@ pub enum FactorKey {
     OracleRefPriceDeviation,
     /// GT Minting Cost Referred Discount.
     GtMintingCostReferredDiscount,
-    /// GT Referral Reward.
-    GTReferralReward,
 }
 
 impl Factors {
@@ -402,7 +399,6 @@ impl Factors {
         match key {
             FactorKey::OracleRefPriceDeviation => &self.oracle_ref_price_deviation,
             FactorKey::GtMintingCostReferredDiscount => &self.gt_minting_cost_referred_discount,
-            FactorKey::GTReferralReward => &self.gt_referral_reward,
         }
     }
 
@@ -411,7 +407,6 @@ impl Factors {
         match key {
             FactorKey::OracleRefPriceDeviation => &mut self.oracle_ref_price_deviation,
             FactorKey::GtMintingCostReferredDiscount => &mut self.gt_minting_cost_referred_discount,
-            FactorKey::GTReferralReward => &mut self.gt_referral_reward,
         }
     }
 }
@@ -470,6 +465,8 @@ pub struct GTState {
     minting_cost: u128,
     max_rank: u64,
     ranks: [u64; MAX_RANK],
+    order_fee_discount_factors: [u128; MAX_RANK + 1],
+    referral_reward_factors: [u128; MAX_RANK + 1],
     reserve: [u8; 256],
 }
 
@@ -514,6 +511,49 @@ impl GTState {
         self.max_rank = max_rank as u64;
 
         Ok(())
+    }
+
+    pub(crate) fn set_order_fee_discount_factors(&mut self, factors: &[u128]) -> Result<()> {
+        require_eq!(
+            factors.len(),
+            (self.max_rank + 1) as usize,
+            CoreError::InvalidArgument
+        );
+
+        require!(
+            factors
+                .iter()
+                .all(|factor| *factor <= constants::MARKET_USD_UNIT),
+            CoreError::InvalidArgument
+        );
+
+        let target = &mut self.order_fee_discount_factors[0..factors.len()];
+        target.copy_from_slice(factors);
+
+        Ok(())
+    }
+
+    pub(crate) fn set_referral_reward_factors(&mut self, factors: &[u128]) -> Result<()> {
+        require_eq!(
+            factors.len(),
+            (self.max_rank + 1) as usize,
+            CoreError::InvalidArgument
+        );
+
+        let target = &mut self.referral_reward_factors[0..factors.len()];
+        target.copy_from_slice(factors);
+
+        Ok(())
+    }
+
+    pub(crate) fn order_fee_discount_factor(&self, rank: u8) -> Result<u128> {
+        require_gte!(self.max_rank, rank as u64, CoreError::InvalidArgument);
+        Ok(self.order_fee_discount_factors[rank as usize])
+    }
+
+    pub(crate) fn referral_reward_factor(&self, rank: u8) -> Result<u128> {
+        require_gte!(self.max_rank, rank as u64, CoreError::InvalidArgument);
+        Ok(self.referral_reward_factors[rank as usize])
     }
 
     fn next_minting_cost(&self, next_minted: u64) -> Result<Option<(u64, u128)>> {
