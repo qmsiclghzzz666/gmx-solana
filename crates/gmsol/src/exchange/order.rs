@@ -346,7 +346,7 @@ where
                     ))?;
                 let escrow = self
                     .client
-                    .data_store_rpc()
+                    .store_rpc()
                     .accounts(accounts::PrepareSwapOrderEscrow {
                         owner: *payer,
                         store: self.store,
@@ -362,7 +362,7 @@ where
                     .args(instruction::PrepareSwapOrderEscrow { nonce });
                 let ata = self
                     .client
-                    .data_store_rpc()
+                    .store_rpc()
                     .accounts(accounts::PrepareAssociatedTokenAccount {
                         payer: *payer,
                         owner: *payer,
@@ -396,7 +396,7 @@ where
                 )?;
                 let escrow =
                     self.client
-                        .data_store_rpc()
+                        .store_rpc()
                         .accounts(accounts::PrepareIncreaseOrderEscrow {
                             owner: *payer,
                             store: self.store,
@@ -413,7 +413,7 @@ where
                         });
                 let long_token_ata = self
                     .client
-                    .data_store_rpc()
+                    .store_rpc()
                     .accounts(accounts::PrepareAssociatedTokenAccount {
                         payer: *payer,
                         owner: *payer,
@@ -426,7 +426,7 @@ where
                     .args(instruction::PrepareAssociatedTokenAccount {});
                 let short_token_ata = self
                     .client
-                    .data_store_rpc()
+                    .store_rpc()
                     .accounts(accounts::PrepareAssociatedTokenAccount {
                         payer: *payer,
                         owner: *payer,
@@ -439,7 +439,7 @@ where
                     .args(instruction::PrepareAssociatedTokenAccount {});
                 let gt_ata = self
                     .client
-                    .data_store_rpc()
+                    .store_rpc()
                     .accounts(accounts::PrepareAssociatedTokenAccount {
                         payer: *payer,
                         owner: *payer,
@@ -452,7 +452,7 @@ where
                     .args(instruction::PrepareAssociatedTokenAccount {});
                 let prepare_position = self
                     .client
-                    .data_store_rpc()
+                    .store_rpc()
                     .accounts(accounts::PreparePosition {
                         owner: *payer,
                         store: self.store,
@@ -488,7 +488,7 @@ where
                     ))?;
                 let escrow = self
                     .client
-                    .data_store_rpc()
+                    .store_rpc()
                     .accounts(accounts::PrepareDecreaseOrderEscrow {
                         payer: *payer,
                         owner: *payer,
@@ -507,7 +507,7 @@ where
                     .args(instruction::PrepareDecreaseOrderEscrow { nonce });
                 let long_token_ata = self
                     .client
-                    .data_store_rpc()
+                    .store_rpc()
                     .accounts(accounts::PrepareAssociatedTokenAccount {
                         payer: *payer,
                         owner: *payer,
@@ -520,7 +520,7 @@ where
                     .args(instruction::PrepareAssociatedTokenAccount {});
                 let short_token_ata = self
                     .client
-                    .data_store_rpc()
+                    .store_rpc()
                     .accounts(accounts::PrepareAssociatedTokenAccount {
                         payer: *payer,
                         owner: *payer,
@@ -533,7 +533,7 @@ where
                     .args(instruction::PrepareAssociatedTokenAccount {});
                 let final_output_token_ata = self
                     .client
-                    .data_store_rpc()
+                    .store_rpc()
                     .accounts(accounts::PrepareAssociatedTokenAccount {
                         payer: *payer,
                         owner: *payer,
@@ -546,7 +546,7 @@ where
                     .args(instruction::PrepareAssociatedTokenAccount {});
                 let gt_ata = self
                     .client
-                    .data_store_rpc()
+                    .store_rpc()
                     .accounts(accounts::PrepareAssociatedTokenAccount {
                         payer: *payer,
                         owner: *payer,
@@ -570,7 +570,7 @@ where
 
         let prepare_user = self
             .client
-            .data_store_rpc()
+            .store_rpc()
             .accounts(accounts::PrepareUser {
                 owner: *payer,
                 store: self.store,
@@ -581,7 +581,7 @@ where
 
         let create = self
             .client
-            .data_store_rpc()
+            .store_rpc()
             .accounts(crate::utils::fix_optional_account_metas(
                 accounts::CreateOrder {
                     store: self.store,
@@ -941,7 +941,7 @@ where
                 require_claimable_accounts = true;
 
                 self.client
-                    .data_store_rpc()
+                    .store_rpc()
                     .accounts(accounts::ExecuteDecreaseOrder {
                         authority,
                         owner: hint.owner,
@@ -973,7 +973,7 @@ where
                         claimable_long_token_account_for_user,
                         claimable_short_token_account_for_user,
                         claimable_pnl_token_account_for_holding,
-                        event_authority: self.client.data_store_event_authority(),
+                        event_authority: self.client.store_event_authority(),
                         token_program: anchor_spl::token::ID,
                         price_provider: self.price_provider,
                         system_program: system_program::ID,
@@ -1011,7 +1011,7 @@ where
             }
             _ => self
                 .client
-                .data_store_rpc()
+                .store_rpc()
                 .accounts(crate::utils::fix_optional_account_metas(
                     accounts::ExecuteOrderV2 {
                         authority,
@@ -1034,7 +1034,7 @@ where
                         claimable_long_token_account_for_user: None,
                         claimable_short_token_account_for_user: None,
                         claimable_pnl_token_account_for_holding: None,
-                        event_authority: self.client.data_store_event_authority(),
+                        event_authority: self.client.store_event_authority(),
                         token_program: anchor_spl::token::ID,
                         price_provider: self.price_provider,
                         system_program: system_program::ID,
@@ -1081,7 +1081,7 @@ where
         if !kind.is_swap() {
             let prepare_event_buffer = self
                 .client
-                .data_store_rpc()
+                .store_rpc()
                 .accounts(accounts::PrepareTradeEventBuffer {
                     authority,
                     store: self.store,
@@ -1275,11 +1275,11 @@ where
         });
         Ok(self
             .client
-            .data_store_rpc()
+            .store_rpc()
             .accounts(crate::utils::fix_optional_account_metas(
                 accounts::CloseOrder {
                     store: hint.store,
-                    event_authority: self.client.data_store_event_authority(),
+                    event_authority: self.client.store_event_authority(),
                     order: self.order,
                     executor: payer,
                     owner,

@@ -37,7 +37,7 @@ impl<C: Deref<Target = impl Signer> + Clone> UserOps<C> for crate::Client<C> {
         let owner = self.payer();
         let user = self.find_user_address(store, &owner);
         let rpc = self
-            .data_store_rpc()
+            .store_rpc()
             .accounts(accounts::PrepareUser {
                 owner,
                 store: *store,
@@ -57,7 +57,7 @@ impl<C: Deref<Target = impl Signer> + Clone> UserOps<C> for crate::Client<C> {
         let referral_code = self.find_referral_code_address(store, code);
         let user = self.find_user_address(store, &owner);
         let rpc = self
-            .data_store_rpc()
+            .store_rpc()
             .accounts(accounts::InitializeReferralCode {
                 owner,
                 store: *store,
@@ -94,7 +94,7 @@ impl<C: Deref<Target = impl Signer> + Clone> UserOps<C> for crate::Client<C> {
         };
 
         let rpc = self
-            .data_store_rpc()
+            .store_rpc()
             .accounts(accounts::SetReferrer {
                 owner,
                 store: *store,

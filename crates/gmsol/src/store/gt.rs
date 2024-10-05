@@ -41,7 +41,7 @@ impl<C: Deref<Target = impl Signer> + Clone> GTOps<C> for crate::Client<C> {
         grow_step: u64,
         ranks: Vec<u64>,
     ) -> RpcBuilder<C> {
-        self.data_store_rpc()
+        self.store_rpc()
             .accounts(accounts::InitializeGT {
                 authority: self.payer(),
                 store: *store,
@@ -63,7 +63,7 @@ impl<C: Deref<Target = impl Signer> + Clone> GTOps<C> for crate::Client<C> {
         store: &Pubkey,
         factors: Vec<u128>,
     ) -> RpcBuilder<C> {
-        self.data_store_rpc()
+        self.store_rpc()
             .accounts(accounts::ConfigurateGT {
                 authority: self.payer(),
                 store: *store,
@@ -72,7 +72,7 @@ impl<C: Deref<Target = impl Signer> + Clone> GTOps<C> for crate::Client<C> {
     }
 
     fn gt_set_referral_reward_factors(&self, store: &Pubkey, factors: Vec<u128>) -> RpcBuilder<C> {
-        self.data_store_rpc()
+        self.store_rpc()
             .accounts(accounts::ConfigurateGT {
                 authority: self.payer(),
                 store: *store,

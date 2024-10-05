@@ -676,7 +676,7 @@ impl InspectArgs {
             }
             Command::EventAuthority => {
                 println!("DataStore: {}", client.store_program_id());
-                println!("Event Authority: {}", client.data_store_event_authority());
+                println!("Event Authority: {}", client.store_event_authority());
             }
             Command::Oracle { oracle } => {
                 let address = oracle.address(Some(store), &client.store_program_id())?;

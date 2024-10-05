@@ -275,7 +275,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> PositionCutBuilder<'a, C> {
 
         let prepare = self
             .client
-            .data_store_rpc()
+            .store_rpc()
             .accounts(accounts::PrepareDecreaseOrderEscrow {
                 payer,
                 owner,
@@ -294,7 +294,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> PositionCutBuilder<'a, C> {
             .args(instruction::PrepareDecreaseOrderEscrow { nonce });
         let prepare_event_buffer = self
             .client
-            .data_store_rpc()
+            .store_rpc()
             .accounts(accounts::PrepareTradeEventBuffer {
                 authority: payer,
                 store,
@@ -306,7 +306,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> PositionCutBuilder<'a, C> {
             });
         let mut exec_builder = self
             .client
-            .data_store_rpc()
+            .store_rpc()
             .accounts(accounts::PositionCut {
                 authority: payer,
                 owner,
@@ -331,7 +331,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> PositionCutBuilder<'a, C> {
                 system_program: system_program::ID,
                 token_program: anchor_spl::token::ID,
                 associated_token_program: anchor_spl::associated_token::ID,
-                event_authority: self.client.data_store_event_authority(),
+                event_authority: self.client.store_event_authority(),
                 program: self.client.store_program_id(),
             })
             .accounts(feeds)

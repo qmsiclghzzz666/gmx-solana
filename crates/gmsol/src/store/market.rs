@@ -36,7 +36,7 @@ where
         let authority = self.payer();
         let vault = self.find_market_vault_address(store, token);
         let builder = self
-            .data_store_rpc()
+            .store_rpc()
             .accounts(accounts::InitializeMarketVault {
                 authority,
                 store: *store,
@@ -59,7 +59,7 @@ where
         amount: u64,
     ) -> RpcBuilder<C> {
         let authority = self.payer();
-        self.data_store_rpc()
+        self.store_rpc()
             .accounts(accounts::MarketVaultTransferOut {
                 authority,
                 store: *store,
@@ -192,7 +192,7 @@ where
         maximize_pnl: bool,
         maximize_pool_value: bool,
     ) -> RpcBuilder<C> {
-        self.data_store_rpc()
+        self.store_rpc()
             .args(instruction::GetMarketStatus {
                 prices,
                 maximize_pnl,
@@ -211,7 +211,7 @@ where
         pnl_factor: PnlFactorKind,
         maximize: bool,
     ) -> RpcBuilder<C> {
-        self.data_store_rpc()
+        self.store_rpc()
             .args(instruction::GetMarketTokenPrice {
                 prices,
                 pnl_factor: pnl_factor.to_string(),
@@ -231,7 +231,7 @@ where
         value: &Factor,
     ) -> crate::Result<RpcBuilder<C>> {
         let req = self
-            .data_store_rpc()
+            .store_rpc()
             .args(instruction::UpdateMarketConfig {
                 key: key.to_string(),
                 value: *value,
@@ -245,7 +245,7 @@ where
     }
 
     fn toggle_market(&self, store: &Pubkey, market_token: &Pubkey, enable: bool) -> RpcBuilder<C> {
-        self.data_store_rpc()
+        self.store_rpc()
             .args(instruction::ToggleMarket { enable })
             .accounts(accounts::ToggleMarket {
                 authority: self.payer(),
@@ -260,7 +260,7 @@ where
         market_token: &Pubkey,
         enable: bool,
     ) -> RpcBuilder<C> {
-        self.data_store_rpc()
+        self.store_rpc()
             .args(instruction::ToggleGtMinting { enable })
             .accounts(accounts::ToggleGTMinting {
                 authority: self.payer(),
@@ -275,7 +275,7 @@ where
         buffer: &'a dyn Signer,
         expire_after_secs: u32,
     ) -> RpcBuilder<'a, C> {
-        self.data_store_rpc()
+        self.store_rpc()
             .args(instruction::InitializeMarketConfigBuffer { expire_after_secs })
             .accounts(accounts::InitializeMarketConfigBuffer {
                 authority: self.payer(),
@@ -291,7 +291,7 @@ where
         buffer: &Pubkey,
         receiver: Option<&Pubkey>,
     ) -> RpcBuilder<C> {
-        self.data_store_rpc()
+        self.store_rpc()
             .args(instruction::CloseMarketConfigBuffer {})
             .accounts(accounts::CloseMarketConfigBuffer {
                 authority: self.payer(),
@@ -305,7 +305,7 @@ where
         buffer: &Pubkey,
         new_configs: impl IntoIterator<Item = (K, Factor)>,
     ) -> RpcBuilder<C> {
-        self.data_store_rpc()
+        self.store_rpc()
             .args(instruction::PushToMarketConfigBuffer {
                 new_configs: new_configs
                     .into_iter()
@@ -327,7 +327,7 @@ where
         buffer: &Pubkey,
         new_authority: &Pubkey,
     ) -> RpcBuilder<C> {
-        self.data_store_rpc()
+        self.store_rpc()
             .args(instruction::SetMarketConfigBufferAuthority {
                 new_authority: *new_authority,
             })
@@ -343,7 +343,7 @@ where
         market_token: &Pubkey,
         buffer: &Pubkey,
     ) -> RpcBuilder<C> {
-        self.data_store_rpc()
+        self.store_rpc()
             .args(instruction::UpdateMarketConfigWithBuffer {})
             .accounts(accounts::UpdateMarketConfigWithBuffer {
                 authority: self.payer(),
@@ -359,7 +359,7 @@ where
         market_token: &Pubkey,
         kind: PoolKind,
     ) -> RpcBuilder<C> {
-        self.data_store_rpc()
+        self.store_rpc()
             .args(instruction::TurnIntoPurePool { kind: kind.into() })
             .accounts(accounts::TurnPureFlag {
                 authority: self.payer(),
@@ -374,7 +374,7 @@ where
         market_token: &Pubkey,
         kind: PoolKind,
     ) -> RpcBuilder<C> {
-        self.data_store_rpc()
+        self.store_rpc()
             .args(instruction::TurnIntoImpurePool { kind: kind.into() })
             .accounts(accounts::TurnPureFlag {
                 authority: self.payer(),

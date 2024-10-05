@@ -23,7 +23,7 @@ where
         let authority = self.payer();
         let oracle = self.find_oracle_address(store, index);
         let builder = self
-            .data_store_rpc()
+            .store_rpc()
             .accounts(accounts::InitializeOracle {
                 authority,
                 store: *store,

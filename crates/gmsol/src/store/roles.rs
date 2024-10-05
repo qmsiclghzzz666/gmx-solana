@@ -28,7 +28,7 @@ where
 {
     fn enable_role(&self, store: &Pubkey, role: &str) -> RpcBuilder<C> {
         let authority = self.payer();
-        self.data_store_rpc()
+        self.store_rpc()
             .accounts(accounts::EnableRole {
                 authority,
                 store: *store,
@@ -39,7 +39,7 @@ where
     }
 
     fn disable_role(&self, store: &Pubkey, role: &str) -> RpcBuilder<C> {
-        self.data_store_rpc()
+        self.store_rpc()
             .accounts(accounts::DisableRole {
                 authority: self.payer(),
                 store: *store,
@@ -51,7 +51,7 @@ where
 
     fn grant_role(&self, store: &Pubkey, user: &Pubkey, role: &str) -> RpcBuilder<C> {
         let authority = self.payer();
-        self.data_store_rpc()
+        self.store_rpc()
             .accounts(accounts::GrantRole {
                 authority,
                 store: *store,
@@ -63,7 +63,7 @@ where
     }
 
     fn revoke_role(&self, store: &Pubkey, user: &Pubkey, role: &str) -> RpcBuilder<C> {
-        self.data_store_rpc()
+        self.store_rpc()
             .args(instruction::RevokeRole {
                 user: *user,
                 role: role.to_string(),

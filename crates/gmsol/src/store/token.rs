@@ -57,7 +57,7 @@ where
         amount: u64,
     ) -> RpcBuilder<C> {
         let authority = self.payer();
-        self.data_store_rpc()
+        self.store_rpc()
             .args(instruction::UseClaimableAccount { timestamp, amount })
             .accounts(accounts::UseClaimableAccount {
                 authority,
@@ -79,7 +79,7 @@ where
         account: &Pubkey,
     ) -> RpcBuilder<C> {
         let authority = self.payer();
-        self.data_store_rpc()
+        self.store_rpc()
             .args(instruction::CloseEmptyClaimableAccount { timestamp })
             .accounts(accounts::CloseEmptyClaimableAccount {
                 authority,
@@ -99,7 +99,7 @@ where
     ) -> RpcBuilder<C> {
         let account =
             get_associated_token_address_with_program_id(&self.payer(), mint, token_program_id);
-        self.data_store_rpc()
+        self.store_rpc()
             .accounts(accounts::PrepareAssociatedTokenAccount {
                 payer: self.payer(),
                 owner: self.payer(),

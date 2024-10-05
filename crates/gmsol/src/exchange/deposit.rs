@@ -229,7 +229,7 @@ where
             .as_ref()
             .map(|mint| get_associated_token_address(&deposit, mint));
         let prepare = client
-            .data_store_rpc()
+            .store_rpc()
             .accounts(crate::utils::fix_optional_account_metas(
                 accounts::PrepareDepositEscrow {
                     owner: payer,
@@ -250,7 +250,7 @@ where
             ))
             .args(instruction::PrepareDepositEscrow { nonce });
         let create = client
-            .data_store_rpc()
+            .store_rpc()
             .accounts(crate::utils::fix_optional_account_metas(
                 accounts::CreateDeposit {
                     owner: payer,
@@ -412,7 +412,7 @@ where
             .as_ref()
             .map(|mint| get_associated_token_address(&owner, mint));
         Ok(client
-            .data_store_rpc()
+            .store_rpc()
             .accounts(crate::utils::fix_optional_account_metas(
                 accounts::CloseDeposit {
                     executor,
@@ -431,7 +431,7 @@ where
                     associated_token_program: anchor_spl::associated_token::ID,
                     token_program: anchor_spl::token::ID,
                     system_program: system_program::ID,
-                    event_authority: client.data_store_event_authority(),
+                    event_authority: client.store_event_authority(),
                     program: client.store_program_id(),
                 },
                 &gmsol_store::id(),
@@ -615,7 +615,7 @@ where
 
         // Execution.
         let execute = client
-            .data_store_rpc()
+            .store_rpc()
             .accounts(crate::utils::fix_optional_account_metas(
                 accounts::ExecuteDepositV2 {
                     authority,

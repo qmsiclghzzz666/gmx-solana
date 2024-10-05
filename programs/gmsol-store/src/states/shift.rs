@@ -36,6 +36,11 @@ impl Shift {
 
     /// Min execution lamports.
     pub const MIN_EXECUTION_LAMPORTS: u64 = 200_000;
+
+    /// Get token infos.
+    pub fn tokens(&self) -> &TokenAccounts {
+        &self.tokens
+    }
 }
 
 #[account(zero_copy)]

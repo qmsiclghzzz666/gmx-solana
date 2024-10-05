@@ -33,7 +33,7 @@ where
 {
     fn initialize_store(&self, key: &str, authority: Option<&Pubkey>) -> RpcBuilder<C> {
         let store = self.find_store_address(key);
-        self.data_store_rpc()
+        self.store_rpc()
             .accounts(accounts::Initialize {
                 payer: self.payer(),
                 store,
@@ -46,7 +46,7 @@ where
     }
 
     fn transfer_store_authority(&self, store: &Pubkey, new_authority: &Pubkey) -> RpcBuilder<C> {
-        self.data_store_rpc()
+        self.store_rpc()
             .args(instruction::TransferStoreAuthority {
                 new_authority: *new_authority,
             })
@@ -57,7 +57,7 @@ where
     }
 
     fn set_token_map(&self, store: &Pubkey, token_map: &Pubkey) -> RpcBuilder<C> {
-        self.data_store_rpc()
+        self.store_rpc()
             .args(instruction::SetTokenMap {})
             .accounts(accounts::SetTokenMap {
                 authority: self.payer(),
@@ -67,7 +67,7 @@ where
     }
 
     fn insert_factor(&self, store: &Pubkey, key: FactorKey, factor: Factor) -> RpcBuilder<C> {
-        let rpc = self.data_store_rpc().accounts(accounts::InsertFactor {
+        let rpc = self.store_rpc().accounts(accounts::InsertFactor {
             authority: self.payer(),
             store: *store,
         });

@@ -185,7 +185,7 @@ where
         let final_short_token_ata = get_associated_token_address(&owner, &short_token);
         let prepare_escrows = self
             .client
-            .data_store_rpc()
+            .store_rpc()
             .accounts(accounts::PrepareWithdrawalEscrow {
                 owner,
                 store: self.store,
@@ -203,7 +203,7 @@ where
             .args(instruction::PrepareWithdrawalEscrow { nonce });
         let prepare_final_long_token_ata = self
             .client
-            .data_store_rpc()
+            .store_rpc()
             .accounts(accounts::PrepareAssociatedTokenAccount {
                 payer: owner,
                 owner,
@@ -216,7 +216,7 @@ where
             .args(instruction::PrepareAssociatedTokenAccount {});
         let prepare_final_short_token_ata = self
             .client
-            .data_store_rpc()
+            .store_rpc()
             .accounts(accounts::PrepareAssociatedTokenAccount {
                 payer: owner,
                 owner,
@@ -229,7 +229,7 @@ where
             .args(instruction::PrepareAssociatedTokenAccount {});
         let create = self
             .client
-            .data_store_rpc()
+            .store_rpc()
             .accounts(accounts::CreateWithdrawal {
                 store: self.store,
                 token_program: anchor_spl::token::ID,
@@ -376,14 +376,14 @@ where
             get_associated_token_address(&hint.owner, &hint.final_short_token);
         Ok(self
             .client
-            .data_store_rpc()
+            .store_rpc()
             .accounts(accounts::CloseWithdrawal {
                 store: self.store,
                 withdrawal: self.withdrawal,
                 market_token: hint.market_token,
                 token_program: anchor_spl::token::ID,
                 system_program: system_program::ID,
-                event_authority: self.client.data_store_event_authority(),
+                event_authority: self.client.store_event_authority(),
                 executor: payer,
                 owner: hint.owner,
                 final_long_token: hint.final_long_token,
@@ -568,7 +568,7 @@ where
             });
         let execute = self
             .client
-            .data_store_rpc()
+            .store_rpc()
             .accounts(accounts::ExecuteWithdrawalV2 {
                 authority,
                 store: self.store,

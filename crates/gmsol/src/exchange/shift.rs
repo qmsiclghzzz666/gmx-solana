@@ -8,10 +8,13 @@ use anchor_spl::associated_token::get_associated_token_address;
 use gmsol_store::{
     accounts, instruction,
     ops::shift::CreateShiftParams,
-    states::{NonceBytes, Shift},
+    states::{common::action::Action, NonceBytes, Shift},
 };
 
-use crate::{exchange::generate_nonce, utils::RpcBuilder};
+use crate::{
+    exchange::generate_nonce,
+    utils::{RpcBuilder, ZeroCopy},
+};
 
 /// Create Shift Builder.
 pub struct CreateShiftBuilder<'a, C> {
@@ -87,7 +90,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateShiftBuilder<'a, C> {
     }
 
     /// Build a [`RpcBuilder`] to create shift account and return the address of the shift account to create.
-    pub async fn build_with_address(&self) -> crate::Result<(RpcBuilder<'a, C>, Pubkey)> {
+    pub fn build_with_address(&self) -> crate::Result<(RpcBuilder<'a, C>, Pubkey)> {
         let owner = self.client.payer();
         let nonce = self.nonce.unwrap_or_else(generate_nonce);
         let shift = self.client.find_shift_address(&self.store, &owner, &nonce);
@@ -106,7 +109,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateShiftBuilder<'a, C> {
 
         let prepare = self
             .client
-            .data_store_rpc()
+            .store_rpc()
             .accounts(accounts::PrepareShiftEscorw {
                 owner,
                 store: self.store,
@@ -123,7 +126,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateShiftBuilder<'a, C> {
 
         let rpc = self
             .client
-            .data_store_rpc()
+            .store_rpc()
             .accounts(accounts::CreateShift {
                 owner,
                 store: self.store,
@@ -146,5 +149,121 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateShiftBuilder<'a, C> {
             });
 
         Ok((prepare.merge(rpc), shift))
+    }
+}
+
+/// Close Shift Builder.
+pub struct CloseShiftBuilder<'a, C> {
+    client: &'a crate::Client<C>,
+    shift: Pubkey,
+    reason: String,
+    hint: Option<CloseShiftHint>,
+}
+
+/// Hint for `close_shift` instruction.
+#[derive(Clone)]
+pub struct CloseShiftHint {
+    store: Pubkey,
+    owner: Pubkey,
+    from_market_token: Pubkey,
+    to_market_token: Pubkey,
+    from_market_token_escrow: Pubkey,
+    to_market_token_escrow: Pubkey,
+}
+
+impl CloseShiftHint {
+    /// Create hint for `close_shift` instruction.
+    pub fn new(shift: &Shift) -> crate::Result<Self> {
+        let tokens = shift.tokens();
+        Ok(Self {
+            store: *shift.header().store(),
+            owner: *shift.header().owner(),
+            from_market_token: tokens.from_market_token(),
+            from_market_token_escrow: tokens.from_market_token_account(),
+            to_market_token: tokens.to_market_token(),
+            to_market_token_escrow: tokens.to_market_token_account(),
+        })
+    }
+
+    #[allow(clippy::wrong_self_convention)]
+    fn from_market_token_ata(&self) -> Pubkey {
+        get_associated_token_address(&self.owner, &self.from_market_token)
+    }
+
+    fn to_market_token_ata(&self) -> Pubkey {
+        get_associated_token_address(&self.owner, &self.to_market_token)
+    }
+}
+
+impl<'a, C: Deref<Target = impl Signer> + Clone> CloseShiftBuilder<'a, C> {
+    pub(super) fn new(client: &'a crate::Client<C>, shift: &Pubkey) -> Self {
+        Self {
+            client,
+            shift: *shift,
+            hint: None,
+            reason: String::from("cancelled"),
+        }
+    }
+
+    /// Set hint.
+    pub fn hint(&mut self, hint: CloseShiftHint) -> &mut Self {
+        self.hint = Some(hint);
+        self
+    }
+
+    /// Set reason.
+    pub fn reason(&mut self, reason: impl ToString) -> &mut Self {
+        self.reason = reason.to_string();
+        self
+    }
+
+    /// Prepare hint if needed
+    pub async fn prepare_hint(&mut self) -> crate::Result<CloseShiftHint> {
+        let hint = match &self.hint {
+            Some(hint) => hint.clone(),
+            None => {
+                let shift = self
+                    .client
+                    .account::<ZeroCopy<_>>(&self.shift)
+                    .await?
+                    .ok_or(crate::Error::NotFound)?;
+                let hint = CloseShiftHint::new(&shift.0)?;
+                self.hint = Some(hint.clone());
+                hint
+            }
+        };
+
+        Ok(hint)
+    }
+
+    /// Build a [`RpcBuilder`] to close shift account.
+    pub async fn build(&mut self) -> crate::Result<RpcBuilder<'a, C>> {
+        let hint = self.prepare_hint().await?;
+        let executor = self.client.payer();
+        let rpc = self
+            .client
+            .store_rpc()
+            .accounts(accounts::CloseShift {
+                executor,
+                store: hint.store,
+                owner: hint.owner,
+                shift: self.shift,
+                from_market_token: hint.from_market_token,
+                to_market_token: hint.to_market_token,
+                from_market_token_escrow: hint.from_market_token_escrow,
+                to_market_token_escrow: hint.to_market_token_escrow,
+                from_market_token_ata: hint.from_market_token_ata(),
+                to_market_token_ata: hint.to_market_token_ata(),
+                system_program: system_program::ID,
+                token_program: anchor_spl::token::ID,
+                associated_token_program: anchor_spl::associated_token::ID,
+                event_authority: self.client.store_event_authority(),
+                program: self.client.store_program_id(),
+            })
+            .args(instruction::CloseShift {
+                reason: self.reason.clone(),
+            });
+
+        Ok(rpc)
     }
 }

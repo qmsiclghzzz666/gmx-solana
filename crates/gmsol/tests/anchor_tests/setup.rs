@@ -374,7 +374,7 @@ impl Deployment {
             tracing::info!(%name, "creating mint account {pubkey}");
             let rpc = self
                 .client
-                .data_store_rpc()
+                .store_rpc()
                 .signer(token)
                 .pre_instruction(system_instruction::create_account(
                     &payer,
@@ -429,7 +429,7 @@ impl Deployment {
             for user in self.users.keypairs().await {
                 let pubkey = user.pubkey();
                 tracing::info!(token=%name, mint=%token.address, "creating token account for {pubkey}");
-                let rpc = self.client.data_store_rpc().pre_instruction(
+                let rpc = self.client.store_rpc().pre_instruction(
                     instruction::create_associated_token_account(
                         &payer,
                         &pubkey,
@@ -640,7 +640,7 @@ impl Deployment {
         debug_assert!(self.market_alt.addresses.is_empty());
 
         // Init common ALT.
-        let event_authority = self.client.data_store_event_authority();
+        let event_authority = self.client.store_event_authority();
         let gt_mint = self.client.find_gt_mint_address(&self.store);
         let mut addresses = vec![
             self.store,
@@ -816,7 +816,7 @@ impl Deployment {
                 continue;
             };
             builder
-                .try_push(self.client.data_store_rpc().signer(user).pre_instruction(
+                .try_push(self.client.store_rpc().signer(user).pre_instruction(
                     instruction::close_account(&ID, &address, &payer, &pubkey, &[&pubkey])?,
                 ))
                 .map_err(|(_, err)| err)?;
@@ -849,12 +849,7 @@ impl Deployment {
             tracing::info!(user = %pubkey, %lamports, "refund from user");
             let ix = system_instruction::transfer(&user.pubkey(), &payer, lamports);
             builder
-                .try_push(
-                    self.client
-                        .data_store_rpc()
-                        .signer(user)
-                        .pre_instruction(ix),
-                )
+                .try_push(self.client.store_rpc().signer(user).pre_instruction(ix))
                 .map_err(|(_, err)| err)?;
         }
 
@@ -978,7 +973,7 @@ impl Deployment {
 
         let signature = if token.address == native_mint::ID {
             self.client
-                .data_store_rpc()
+                .store_rpc()
                 .pre_instruction(system_instruction::transfer(&payer, &account, amount))
                 .pre_instruction(instruction::sync_native(&ID, &account)?)
                 .into_anchor_request()
@@ -986,7 +981,7 @@ impl Deployment {
                 .await?
         } else {
             self.client
-                .data_store_rpc()
+                .store_rpc()
                 .pre_instruction(instruction::mint_to_checked(
                     &ID,
                     &token.address,

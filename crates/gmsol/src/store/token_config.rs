@@ -153,7 +153,7 @@ where
         token_map: &'a dyn Signer,
     ) -> (RpcBuilder<'a, C>, Pubkey) {
         let builder = self
-            .data_store_rpc()
+            .store_rpc()
             .accounts(accounts::InitializeTokenMap {
                 payer: self.payer(),
                 store: *store,
@@ -176,7 +176,7 @@ where
         new: bool,
     ) -> RpcBuilder<C> {
         let authority = self.payer();
-        self.data_store_rpc()
+        self.store_rpc()
             .accounts(accounts::PushToTokenMap {
                 authority,
                 store: *store,
@@ -204,7 +204,7 @@ where
         new: bool,
     ) -> RpcBuilder<C> {
         let authority = self.payer();
-        self.data_store_rpc()
+        self.store_rpc()
             .accounts(accounts::PushToTokenMapSynthetic {
                 authority,
                 store: *store,
@@ -229,7 +229,7 @@ where
         enable: bool,
     ) -> RpcBuilder<C> {
         let authority = self.payer();
-        self.data_store_rpc()
+        self.store_rpc()
             .accounts(accounts::ToggleTokenConfig {
                 authority,
                 store: *store,
@@ -249,7 +249,7 @@ where
         provider: PriceProviderKind,
     ) -> RpcBuilder<C> {
         let authority = self.payer();
-        self.data_store_rpc()
+        self.store_rpc()
             .accounts(accounts::SetExpectedProvider {
                 authority,
                 store: *store,
@@ -262,7 +262,7 @@ where
     }
 
     fn token_name(&self, token_map: &Pubkey, token: &Pubkey) -> RpcBuilder<C> {
-        self.data_store_rpc()
+        self.store_rpc()
             .args(instruction::TokenName { token: *token })
             .accounts(accounts::ReadTokenMap {
                 token_map: *token_map,
@@ -270,7 +270,7 @@ where
     }
 
     fn token_decimals(&self, token_map: &Pubkey, token: &Pubkey) -> RpcBuilder<C> {
-        self.data_store_rpc()
+        self.store_rpc()
             .args(instruction::TokenDecimals { token: *token })
             .accounts(accounts::ReadTokenMap {
                 token_map: *token_map,
@@ -278,7 +278,7 @@ where
     }
 
     fn token_precision(&self, token_map: &Pubkey, token: &Pubkey) -> RpcBuilder<C> {
-        self.data_store_rpc()
+        self.store_rpc()
             .args(instruction::TokenPrecision { token: *token })
             .accounts(accounts::ReadTokenMap {
                 token_map: *token_map,
@@ -286,7 +286,7 @@ where
     }
 
     fn is_token_config_enabled(&self, token_map: &Pubkey, token: &Pubkey) -> RpcBuilder<C> {
-        self.data_store_rpc()
+        self.store_rpc()
             .args(instruction::IsTokenConfigEnabled { token: *token })
             .accounts(accounts::ReadTokenMap {
                 token_map: *token_map,
@@ -294,7 +294,7 @@ where
     }
 
     fn token_expected_provider(&self, token_map: &Pubkey, token: &Pubkey) -> RpcBuilder<C> {
-        self.data_store_rpc()
+        self.store_rpc()
             .args(instruction::TokenExpectedProvider { token: *token })
             .accounts(accounts::ReadTokenMap {
                 token_map: *token_map,
@@ -307,7 +307,7 @@ where
         token: &Pubkey,
         provider: PriceProviderKind,
     ) -> RpcBuilder<C> {
-        self.data_store_rpc()
+        self.store_rpc()
             .args(instruction::TokenFeed {
                 token: *token,
                 provider: provider as u8,
@@ -323,7 +323,7 @@ where
         token: &Pubkey,
         provider: PriceProviderKind,
     ) -> RpcBuilder<C> {
-        self.data_store_rpc()
+        self.store_rpc()
             .args(instruction::TokenTimestampAdjustment {
                 token: *token,
                 provider: provider as u8,

@@ -78,7 +78,7 @@ impl<C: Deref<Target = impl Signer> + Clone> AddressLookupTableOps<C> for crate:
         let (ix, address) =
             address_lookup_table::instruction::create_lookup_table(payer, payer, slot);
         let rpc = self
-            .data_store_rpc()
+            .store_rpc()
             .program(address_lookup_table::program::ID)
             .pre_instruction(ix);
 
@@ -93,7 +93,7 @@ impl<C: Deref<Target = impl Signer> + Clone> AddressLookupTableOps<C> for crate:
             Some(payer),
             new_addresses,
         );
-        self.data_store_rpc()
+        self.store_rpc()
             .program(address_lookup_table::program::ID)
             .pre_instruction(ix)
     }
@@ -101,7 +101,7 @@ impl<C: Deref<Target = impl Signer> + Clone> AddressLookupTableOps<C> for crate:
     fn deactivate_alt(&self, alt: &Pubkey) -> RpcBuilder<C> {
         let payer = self.payer();
         let ix = address_lookup_table::instruction::deactivate_lookup_table(*alt, payer);
-        self.data_store_rpc()
+        self.store_rpc()
             .program(address_lookup_table::program::ID)
             .pre_instruction(ix)
     }
@@ -109,7 +109,7 @@ impl<C: Deref<Target = impl Signer> + Clone> AddressLookupTableOps<C> for crate:
     fn close_alt(&self, alt: &Pubkey) -> RpcBuilder<C> {
         let payer = self.payer();
         let ix = address_lookup_table::instruction::close_lookup_table(*alt, payer, payer);
-        self.data_store_rpc()
+        self.store_rpc()
             .program(address_lookup_table::program::ID)
             .pre_instruction(ix)
     }

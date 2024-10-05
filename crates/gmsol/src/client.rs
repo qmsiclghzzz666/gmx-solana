@@ -188,8 +188,8 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         *self.exchange().id()
     }
 
-    /// Create a rpc request for `DataStore` Program.
-    pub fn data_store_rpc(&self) -> RpcBuilder<'_, C> {
+    /// Create a rpc builder for `Store` Program.
+    pub fn store_rpc(&self) -> RpcBuilder<'_, C> {
         RpcBuilder::new(self.store_program_id(), &self.cfg)
     }
 
@@ -231,8 +231,8 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         crate::pda::find_controller_address(store, &self.exchange_program_id()).0
     }
 
-    /// Get the event authority address for the data store program.
-    pub fn data_store_event_authority(&self) -> Pubkey {
+    /// Get the event authority address for the `Store` program.
+    pub fn store_event_authority(&self) -> Pubkey {
         crate::pda::find_event_authority_address(&self.store_program_id()).0
     }
 
@@ -728,7 +728,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         };
 
         let program_id = self.store_program_id();
-        let event_authority = self.data_store_event_authority();
+        let event_authority = self.store_event_authority();
         let query = Arc::new(self.data_store().solana_rpc());
         let commitment = commitment.unwrap_or(self.subscription_config.commitment);
         let signatures = self
@@ -796,7 +796,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
             signatures,
             client,
             &self.store_program_id(),
-            &self.data_store_event_authority(),
+            &self.store_event_authority(),
             commitment,
         )
         .and_then(|encoded| {
@@ -987,7 +987,7 @@ impl<C: Clone + Deref<Target = impl Signer>> SystemProgramOps<C> for Client<C> {
             ));
         }
         Ok(self
-            .data_store_rpc()
+            .store_rpc()
             .pre_instruction(transfer(&self.payer(), to, lamports)))
     }
 }
