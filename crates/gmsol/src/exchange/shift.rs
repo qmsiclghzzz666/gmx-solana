@@ -1,20 +1,22 @@
 use std::ops::Deref;
 
 use anchor_client::{
-    anchor_lang::system_program,
+    anchor_lang::{system_program, Id},
     solana_sdk::{pubkey::Pubkey, signer::Signer},
 };
 use anchor_spl::associated_token::get_associated_token_address;
 use gmsol_store::{
     accounts, instruction,
     ops::shift::CreateShiftParams,
-    states::{common::action::Action, NonceBytes, Shift},
+    states::{common::action::Action, NonceBytes, Pyth, Shift, Store},
 };
 
 use crate::{
     exchange::generate_nonce,
     utils::{RpcBuilder, ZeroCopy},
 };
+
+use super::ExchangeOps;
 
 /// Create Shift Builder.
 pub struct CreateShiftBuilder<'a, C> {
@@ -263,6 +265,164 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CloseShiftBuilder<'a, C> {
             .args(instruction::CloseShift {
                 reason: self.reason.clone(),
             });
+
+        Ok(rpc)
+    }
+}
+
+/// Execute Shift Instruction Builder.
+pub struct ExecuteShiftBuilder<'a, C> {
+    client: &'a crate::Client<C>,
+    shift: Pubkey,
+    execution_fee: u64,
+    cancel_on_execution_error: bool,
+    price_provider: Pubkey,
+    oracle: Pubkey,
+    hint: Option<ExecuteShiftHint>,
+    close: bool,
+}
+
+/// Hint for `execute_shift` instruction.
+#[derive(Clone)]
+pub struct ExecuteShiftHint {
+    store: Pubkey,
+    token_map: Pubkey,
+    owner: Pubkey,
+    from_market_token: Pubkey,
+    to_market_token: Pubkey,
+    from_market_token_escrow: Pubkey,
+    to_market_token_escrow: Pubkey,
+}
+
+impl ExecuteShiftHint {
+    /// Create hint for `execute_shift` instruction.
+    pub fn new(shift: &Shift, store: &Store) -> crate::Result<Self> {
+        let tokens = shift.tokens();
+        Ok(Self {
+            store: *shift.header().store(),
+            owner: *shift.header().owner(),
+            from_market_token: tokens.from_market_token(),
+            from_market_token_escrow: tokens.from_market_token_account(),
+            to_market_token: tokens.to_market_token(),
+            to_market_token_escrow: tokens.to_market_token_account(),
+            token_map: *store.token_map().ok_or(crate::Error::NotFound)?,
+        })
+    }
+}
+
+impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteShiftBuilder<'a, C> {
+    pub(super) fn new(client: &'a crate::Client<C>, oracle: &Pubkey, shift: &Pubkey) -> Self {
+        Self {
+            client,
+            shift: *shift,
+            hint: None,
+            execution_fee: 0,
+            cancel_on_execution_error: true,
+            price_provider: Pyth::id(),
+            oracle: *oracle,
+            close: true,
+        }
+    }
+
+    /// Set hint.
+    pub fn hint(&mut self, hint: ExecuteShiftHint) -> &mut Self {
+        self.hint = Some(hint);
+        self
+    }
+
+    /// Set execution fee.
+    pub fn execution_fee(&mut self, lamports: u64) -> &mut Self {
+        self.execution_fee = lamports;
+        self
+    }
+
+    /// Set whether to cancel the shift account on execution error.
+    pub fn cancel_on_execution_error(&mut self, cancel: bool) -> &mut Self {
+        self.cancel_on_execution_error = cancel;
+        self
+    }
+
+    /// Set whether to close shift account after execution.
+    pub fn close(&mut self, close: bool) -> &mut Self {
+        self.close = close;
+        self
+    }
+
+    async fn prepare_hint(&mut self) -> crate::Result<ExecuteShiftHint> {
+        let hint = match &self.hint {
+            Some(hint) => hint.clone(),
+            None => {
+                let shift = self
+                    .client
+                    .account::<ZeroCopy<Shift>>(&self.shift)
+                    .await?
+                    .ok_or(crate::Error::NotFound)?;
+                let store = self.client.store(shift.0.header().store()).await?;
+                let hint = ExecuteShiftHint::new(&shift.0, &store)?;
+                self.hint = Some(hint.clone());
+                hint
+            }
+        };
+
+        Ok(hint)
+    }
+
+    /// Build a [`RpcBuilder`] for `execute_shift` instruction.
+    pub async fn build(&mut self) -> crate::Result<RpcBuilder<'a, C>> {
+        let hint = self.prepare_hint().await?;
+        let authority = self.client.payer();
+
+        let from_market = self
+            .client
+            .find_market_address(&hint.store, &hint.from_market_token);
+        let to_market = self
+            .client
+            .find_market_address(&hint.store, &hint.to_market_token);
+        let from_market_token_vault = self
+            .client
+            .find_market_vault_address(&hint.store, &hint.from_market_token);
+
+        let mut rpc = self
+            .client
+            .store_rpc()
+            .accounts(accounts::ExecuteShift {
+                authority,
+                store: hint.store,
+                token_map: hint.token_map,
+                price_provider: self.price_provider,
+                oracle: self.oracle,
+                from_market,
+                to_market,
+                shift: self.shift,
+                from_market_token: hint.from_market_token,
+                to_market_token: hint.to_market_token,
+                from_market_token_escrow: hint.from_market_token_escrow,
+                to_market_token_escrow: hint.to_market_token_escrow,
+                from_market_token_vault,
+                token_program: anchor_spl::token::ID,
+            })
+            .args(instruction::ExecuteShift {
+                execution_lamports: self.execution_fee,
+                throw_on_execution_error: !self.cancel_on_execution_error,
+            });
+
+        if self.close {
+            let close = self
+                .client
+                .close_shift(&self.shift)
+                .hint(CloseShiftHint {
+                    store: hint.store,
+                    owner: hint.owner,
+                    from_market_token: hint.from_market_token,
+                    to_market_token: hint.to_market_token,
+                    from_market_token_escrow: hint.from_market_token_escrow,
+                    to_market_token_escrow: hint.to_market_token_escrow,
+                })
+                .reason("executed")
+                .build()
+                .await?;
+            rpc = rpc.merge(close);
+        }
 
         Ok(rpc)
     }

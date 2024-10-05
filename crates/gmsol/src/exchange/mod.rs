@@ -40,7 +40,7 @@ use gmsol_store::{
 use order::CloseOrderBuilder;
 use position_cut::PositionCutBuilder;
 use rand::{distributions::Standard, Rng};
-use shift::{CloseShiftBuilder, CreateShiftBuilder};
+use shift::{CloseShiftBuilder, CreateShiftBuilder, ExecuteShiftBuilder};
 use treasury::ClaimFeesBuilder;
 
 use crate::utils::RpcBuilder;
@@ -371,6 +371,9 @@ pub trait ExchangeOps<C> {
 
     /// Close shift.
     fn close_shift(&self, shift: &Pubkey) -> CloseShiftBuilder<C>;
+
+    /// Execute shift.
+    fn execute_shift(&self, oracle: &Pubkey, shift: &Pubkey) -> ExecuteShiftBuilder<C>;
 }
 
 impl<S, C> ExchangeOps<C> for crate::Client<C>
@@ -630,6 +633,10 @@ where
 
     fn close_shift(&self, shift: &Pubkey) -> CloseShiftBuilder<C> {
         CloseShiftBuilder::new(self, shift)
+    }
+
+    fn execute_shift(&self, oracle: &Pubkey, shift: &Pubkey) -> ExecuteShiftBuilder<C> {
+        ExecuteShiftBuilder::new(self, oracle, shift)
     }
 }
 
