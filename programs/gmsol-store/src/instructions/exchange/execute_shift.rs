@@ -8,7 +8,7 @@ use crate::{
     ops::{execution_fee::PayExecutionFeeOps, shift::ExecuteShiftOp},
     states::{
         common::action::{ActionExt, ActionSigner},
-        Market, Oracle, PriceProvider, Shift, Store, TokenMapHeader,
+        HasMarketMeta, Market, Oracle, PriceProvider, Shift, Store, TokenMapHeader,
     },
     utils::internal,
     CoreError,
@@ -176,23 +176,8 @@ impl<'info> ExecuteShift<'info> {
     fn ordered_tokens(&self) -> Result<Vec<Pubkey>> {
         let from = *self.from_market.load()?.meta();
         let to = *self.to_market.load()?.meta();
-        let mut tokens = BTreeSet::default();
 
-        for mint in [
-            &from.index_token_mint,
-            &from.long_token_mint,
-            &from.short_token_mint,
-        ]
-        .iter()
-        .chain(&[
-            &to.index_token_mint,
-            &to.long_token_mint,
-            &to.short_token_mint,
-        ]) {
-            tokens.insert(**mint);
-        }
-
-        Ok(tokens.into_iter().collect())
+        Ok(ordered_tokens(&from, &to).into_iter().collect())
     }
 
     #[inline(never)]
@@ -237,4 +222,27 @@ impl<'info> ExecuteShift<'info> {
             .execute()?;
         Ok(())
     }
+}
+
+/// Get related tokens from markets in order.
+pub fn ordered_tokens(from: &impl HasMarketMeta, to: &impl HasMarketMeta) -> BTreeSet<Pubkey> {
+    let mut tokens = BTreeSet::default();
+
+    let from = from.market_meta();
+    let to = to.market_meta();
+
+    for mint in [
+        &from.index_token_mint,
+        &from.long_token_mint,
+        &from.short_token_mint,
+    ]
+    .iter()
+    .chain(&[
+        &to.index_token_mint,
+        &to.long_token_mint,
+        &to.short_token_mint,
+    ]) {
+        tokens.insert(**mint);
+    }
+    tokens
 }

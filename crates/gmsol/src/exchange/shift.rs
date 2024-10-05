@@ -5,18 +5,27 @@ use anchor_client::{
     solana_sdk::{pubkey::Pubkey, signer::Signer},
 };
 use anchor_spl::associated_token::get_associated_token_address;
+use gmsol_exchange::utils::token_records;
 use gmsol_store::{
     accounts, instruction,
+    instructions::ordered_tokens,
     ops::shift::CreateShiftParams,
-    states::{common::action::Action, NonceBytes, Pyth, Shift, Store},
+    states::{
+        common::{action::Action, TokensWithFeed},
+        HasMarketMeta, NonceBytes, Pyth, Shift, Store, TokenMapAccess,
+    },
 };
 
 use crate::{
     exchange::generate_nonce,
+    store::{token::TokenAccountOps, utils::FeedsParser},
     utils::{RpcBuilder, ZeroCopy},
 };
 
 use super::ExchangeOps;
+
+#[cfg(feature = "pyth-pull-oracle")]
+use crate::pyth::pull_oracle::Prices;
 
 /// Create Shift Builder.
 pub struct CreateShiftBuilder<'a, C> {
@@ -109,7 +118,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateShiftBuilder<'a, C> {
         let to_market_token_escrow = get_associated_token_address(&shift, &self.to_market_token);
         let to_market_token_ata = get_associated_token_address(&owner, &self.to_market_token);
 
-        let prepare = self
+        let prepare_escrow = self
             .client
             .store_rpc()
             .accounts(accounts::PrepareShiftEscorw {
@@ -125,6 +134,10 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateShiftBuilder<'a, C> {
                 associated_token_program: anchor_spl::associated_token::ID,
             })
             .args(instruction::PrepareShiftEscrow { nonce });
+
+        let prepare_ata = self
+            .client
+            .prepare_associated_token_account(&self.to_market_token, &anchor_spl::token::ID);
 
         let rpc = self
             .client
@@ -150,7 +163,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateShiftBuilder<'a, C> {
                 params: self.get_create_shift_params(),
             });
 
-        Ok((prepare.merge(rpc), shift))
+        Ok((prepare_escrow.merge(prepare_ata).merge(rpc), shift))
     }
 }
 
@@ -280,6 +293,7 @@ pub struct ExecuteShiftBuilder<'a, C> {
     oracle: Pubkey,
     hint: Option<ExecuteShiftHint>,
     close: bool,
+    feeds_parser: FeedsParser,
 }
 
 /// Hint for `execute_shift` instruction.
@@ -292,20 +306,34 @@ pub struct ExecuteShiftHint {
     to_market_token: Pubkey,
     from_market_token_escrow: Pubkey,
     to_market_token_escrow: Pubkey,
+    /// Feeds.
+    pub feeds: TokensWithFeed,
 }
 
 impl ExecuteShiftHint {
     /// Create hint for `execute_shift` instruction.
-    pub fn new(shift: &Shift, store: &Store) -> crate::Result<Self> {
-        let tokens = shift.tokens();
+    pub fn new(
+        shift: &Shift,
+        store: &Store,
+        map: &impl TokenMapAccess,
+        from_market: &impl HasMarketMeta,
+        to_market: &impl HasMarketMeta,
+    ) -> crate::Result<Self> {
+        let token_infos = shift.tokens();
+
+        let ordered_tokens = ordered_tokens(from_market, to_market);
+        let token_records = token_records(map, &ordered_tokens)?;
+        let feeds = TokensWithFeed::try_from_records(token_records)?;
+
         Ok(Self {
             store: *shift.header().store(),
             owner: *shift.header().owner(),
-            from_market_token: tokens.from_market_token(),
-            from_market_token_escrow: tokens.from_market_token_account(),
-            to_market_token: tokens.to_market_token(),
-            to_market_token_escrow: tokens.to_market_token_account(),
+            from_market_token: token_infos.from_market_token(),
+            from_market_token_escrow: token_infos.from_market_token_account(),
+            to_market_token: token_infos.to_market_token(),
+            to_market_token_escrow: token_infos.to_market_token_account(),
             token_map: *store.token_map().ok_or(crate::Error::NotFound)?,
+            feeds,
         })
     }
 }
@@ -321,6 +349,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteShiftBuilder<'a, C> {
             price_provider: Pyth::id(),
             oracle: *oracle,
             close: true,
+            feeds_parser: Default::default(),
         }
     }
 
@@ -348,6 +377,13 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteShiftBuilder<'a, C> {
         self
     }
 
+    /// Parse feeds with the given price udpates map.
+    #[cfg(feature = "pyth-pull-oracle")]
+    pub fn parse_with_pyth_price_updates(&mut self, price_updates: Prices) -> &mut Self {
+        self.feeds_parser.with_pyth_price_updates(price_updates);
+        self
+    }
+
     async fn prepare_hint(&mut self) -> crate::Result<ExecuteShiftHint> {
         let hint = match &self.hint {
             Some(hint) => hint.clone(),
@@ -358,7 +394,22 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteShiftBuilder<'a, C> {
                     .await?
                     .ok_or(crate::Error::NotFound)?;
                 let store = self.client.store(shift.0.header().store()).await?;
-                let hint = ExecuteShiftHint::new(&shift.0, &store)?;
+                let token_map_address = store
+                    .token_map()
+                    .ok_or(crate::Error::invalid_argument("token map is not set"))?;
+                let token_map = self.client.token_map(token_map_address).await?;
+                let from_market_token = shift.0.tokens().from_market_token();
+                let to_market_token = shift.0.tokens().to_market_token();
+                let from_market = self
+                    .client
+                    .find_market_address(shift.0.header().store(), &from_market_token);
+                let from_market = self.client.market(&from_market).await?;
+                let to_market = self
+                    .client
+                    .find_market_address(shift.0.header().store(), &to_market_token);
+                let to_market = self.client.market(&to_market).await?;
+                let hint =
+                    ExecuteShiftHint::new(&shift.0, &store, &token_map, &from_market, &to_market)?;
                 self.hint = Some(hint.clone());
                 hint
             }
@@ -382,6 +433,11 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteShiftBuilder<'a, C> {
             .client
             .find_market_vault_address(&hint.store, &hint.from_market_token);
 
+        let feeds = self
+            .feeds_parser
+            .parse(&hint.feeds)
+            .collect::<Result<Vec<_>, _>>()?;
+
         let mut rpc = self
             .client
             .store_rpc()
@@ -404,7 +460,8 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteShiftBuilder<'a, C> {
             .args(instruction::ExecuteShift {
                 execution_lamports: self.execution_fee,
                 throw_on_execution_error: !self.cancel_on_execution_error,
-            });
+            })
+            .accounts(feeds);
 
         if self.close {
             let close = self
@@ -425,5 +482,37 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteShiftBuilder<'a, C> {
         }
 
         Ok(rpc)
+    }
+}
+
+#[cfg(feature = "pyth-pull-oracle")]
+mod pyth {
+    use crate::pyth::{pull_oracle::ExecuteWithPythPrices, PythPullOracleContext};
+
+    use super::*;
+
+    impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteWithPythPrices<'a, C>
+        for ExecuteShiftBuilder<'a, C>
+    {
+        fn set_execution_fee(&mut self, lamports: u64) {
+            self.execution_fee(lamports);
+        }
+
+        async fn context(&mut self) -> crate::Result<PythPullOracleContext> {
+            let hint = self.prepare_hint().await?;
+            let ctx = PythPullOracleContext::try_from_feeds(&hint.feeds)?;
+            Ok(ctx)
+        }
+
+        async fn build_rpc_with_price_updates(
+            &mut self,
+            price_updates: Prices,
+        ) -> crate::Result<Vec<crate::utils::RpcBuilder<'a, C, ()>>> {
+            let rpc = self
+                .parse_with_pyth_price_updates(price_updates)
+                .build()
+                .await?;
+            Ok(vec![rpc])
+        }
     }
 }

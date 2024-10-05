@@ -224,6 +224,7 @@ impl Deployment {
             ["fBTC", "fBTC", "USDG"],
             ["fBTC", "WSOL", "USDG"],
             ["SOL", "fBTC", "fBTC"],
+            ["SOL", "fBTC", "USDG"],
             // For liquidation test
             Self::SELECT_LIQUIDATION_MARKET,
             // For ADL test
