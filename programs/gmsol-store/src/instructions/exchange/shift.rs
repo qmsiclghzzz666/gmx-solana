@@ -126,7 +126,7 @@ pub struct CreateShift<'info> {
         associated_token::mint = to_market_token,
         associated_token::authority = owner,
     )]
-    pub to_market_tokne_ata: Box<Account<'info, TokenAccount>>,
+    pub to_market_token_ata: Box<Account<'info, TokenAccount>>,
     /// The system program.
     pub system_program: Program<'info, System>,
     /// The token program.

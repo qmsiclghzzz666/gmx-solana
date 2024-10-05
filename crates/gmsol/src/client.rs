@@ -294,6 +294,11 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         crate::pda::find_order_address(store, user, nonce, &self.store_program_id()).0
     }
 
+    /// Find PDA for shift.
+    pub fn find_shift_address(&self, store: &Pubkey, owner: &Pubkey, nonce: &NonceBytes) -> Pubkey {
+        crate::pda::find_shift_address(store, owner, nonce, &self.store_program_id()).0
+    }
+
     /// Find PDA for position.
     pub fn find_position_address(
         &self,

@@ -7,8 +7,8 @@ pub mod withdrawal;
 /// Order.
 pub mod order;
 
-// /// Liquidation.
-// pub mod liquidation;
+/// Shift.
+pub mod shift;
 
 /// Auto-deleveraging.
 pub mod auto_deleveraging;
@@ -40,6 +40,7 @@ use gmsol_store::{
 use order::CloseOrderBuilder;
 use position_cut::PositionCutBuilder;
 use rand::{distributions::Standard, Rng};
+use shift::CreateShiftBuilder;
 use treasury::ClaimFeesBuilder;
 
 use crate::utils::RpcBuilder;
@@ -358,6 +359,15 @@ pub trait ExchangeOps<C> {
             .swap_path(swap_path.into_iter().copied().collect());
         builder
     }
+
+    /// Create shift.
+    fn create_shift(
+        &self,
+        store: &Pubkey,
+        from_market_token: &Pubkey,
+        to_market_token: &Pubkey,
+        amount: u64,
+    ) -> CreateShiftBuilder<C>;
 }
 
 impl<S, C> ExchangeOps<C> for crate::Client<C>
@@ -603,6 +613,16 @@ where
         is_long: bool,
     ) -> crate::Result<UpdateAdlBuilder<C>> {
         UpdateAdlBuilder::try_new(self, store, oracle, market_token, is_long)
+    }
+
+    fn create_shift(
+        &self,
+        store: &Pubkey,
+        from_market_token: &Pubkey,
+        to_market_token: &Pubkey,
+        amount: u64,
+    ) -> CreateShiftBuilder<C> {
+        CreateShiftBuilder::new(self, store, from_market_token, to_market_token, amount)
     }
 }
 

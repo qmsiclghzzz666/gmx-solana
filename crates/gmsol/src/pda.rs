@@ -4,7 +4,7 @@ use gmsol_store::{
     states::{
         position::PositionKind,
         user::{ReferralCode, ReferralCodeBytes, UserHeader},
-        Deposit, NonceBytes, Oracle, Order, Position, Seed, Store, Withdrawal,
+        Deposit, NonceBytes, Oracle, Order, Position, Seed, Shift, Store, Withdrawal,
     },
 };
 use gmsol_utils::to_seed;
@@ -113,6 +113,19 @@ pub fn find_order_address(
 ) -> (Pubkey, u8) {
     Pubkey::find_program_address(
         &[Order::SEED, store.as_ref(), user.as_ref(), nonce],
+        store_program_id,
+    )
+}
+
+/// Create PDA for shift.
+pub fn find_shift_address(
+    store: &Pubkey,
+    owner: &Pubkey,
+    nonce: &NonceBytes,
+    store_program_id: &Pubkey,
+) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[Shift::SEED, store.as_ref(), owner.as_ref(), nonce],
         store_program_id,
     )
 }
