@@ -254,7 +254,7 @@ pub struct MarketTransferIn<'info> {
 /// Transfer some tokens into the market.
 ///
 /// ## CHECK
-/// - Only CONTROLLER can transfer in tokens with this method.
+/// - Only MARKET_KEEPER can transfer in tokens with this method.
 pub(crate) fn unchecked_market_transfer_in(
     ctx: Context<MarketTransferIn>,
     amount: u64,

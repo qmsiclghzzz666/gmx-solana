@@ -37,8 +37,6 @@ pub struct ClientOptions {
     #[builder(default)]
     data_store_program_id: Option<Pubkey>,
     #[builder(default)]
-    exchange_program_id: Option<Pubkey>,
-    #[builder(default)]
     commitment: CommitmentConfig,
     #[builder(default)]
     subscription: SubscriptionConfig,
@@ -55,7 +53,6 @@ pub struct Client<C> {
     cfg: Config<C>,
     anchor: Arc<anchor_client::Client<C>>,
     data_store: Program<C>,
-    exchange: Program<C>,
     pub_sub: OnceCell<PubsubClient>,
     subscription_config: SubscriptionConfig,
 }
@@ -69,7 +66,6 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
     ) -> crate::Result<Self> {
         let ClientOptions {
             data_store_program_id,
-            exchange_program_id,
             commitment,
             subscription,
         } = options;
@@ -81,12 +77,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
                 data_store_program_id.unwrap_or(gmsol_store::id()),
                 cfg.clone(),
             ),
-            exchange: Program::new(
-                exchange_program_id.unwrap_or(gmsol_exchange::id()),
-                cfg.clone(),
-            ),
             cfg,
-
             anchor: Arc::new(anchor),
             pub_sub: OnceCell::default(),
             subscription_config: subscription,
@@ -108,7 +99,6 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
             payer,
             ClientOptions {
                 data_store_program_id: Some(self.store_program_id()),
-                exchange_program_id: Some(self.exchange_program_id()),
                 commitment: self.commitment(),
                 subscription: self.subscription_config.clone(),
             },
@@ -121,7 +111,6 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
             cfg: self.cfg.clone(),
             anchor: self.anchor.clone(),
             data_store: self.program(self.store_program_id()),
-            exchange: self.program(self.exchange_program_id()),
             pub_sub: OnceCell::default(),
             subscription_config: self.subscription_config.clone(),
         })
@@ -163,29 +152,14 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         &self.data_store
     }
 
-    /// Get `Exchange` Program
-    pub fn exchange(&self) -> &Program<C> {
-        &self.exchange
-    }
-
     /// Create a new `DataStore` Program.
     pub fn new_data_store(&self) -> crate::Result<Program<C>> {
         Ok(self.program(self.store_program_id()))
     }
 
-    /// Create a new `Exchange` Program.
-    pub fn new_exchange(&self) -> crate::Result<Program<C>> {
-        Ok(self.program(self.exchange_program_id()))
-    }
-
     /// Get the program id of `Store` program.
     pub fn store_program_id(&self) -> Pubkey {
         *self.data_store().id()
-    }
-
-    /// Get the program id of `Exchange` program.
-    pub fn exchange_program_id(&self) -> Pubkey {
-        *self.exchange().id()
     }
 
     /// Create a rpc builder for `Store` Program.
@@ -211,24 +185,9 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         self.transaction_with_options(false, None)
     }
 
-    /// Create a rpc request for `Exchange` Program.
-    pub fn exchange_rpc(&self) -> RpcBuilder<'_, C> {
-        RpcBuilder::new(self.exchange_program_id(), &self.cfg)
-    }
-
-    /// Find Event Authority Address.
-    pub fn exchange_event_authority_address(&self) -> Pubkey {
-        crate::pda::find_event_authority_address(&self.exchange_program_id()).0
-    }
-
     /// Find PDA for [`Store`](gmsol_store::states::Store) account.
     pub fn find_store_address(&self, key: &str) -> Pubkey {
         crate::pda::find_store_address(key, &self.store_program_id()).0
-    }
-
-    /// Get the controller address for the exchange program.
-    pub fn controller_address(&self, store: &Pubkey) -> Pubkey {
-        crate::pda::find_controller_address(store, &self.exchange_program_id()).0
     }
 
     /// Get the event authority address for the `Store` program.

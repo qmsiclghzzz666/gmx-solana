@@ -1,8 +1,5 @@
 use anchor_lang::prelude::*;
 
-/// Instructions.
-pub mod instructions;
-
 /// Utils.
 pub mod utils;
 
@@ -15,19 +12,10 @@ pub mod events;
 /// States.
 pub mod states;
 
-use instructions::*;
-
 declare_id!("exYLDKzzpXkp8FBghLxJkM4xvuGViAvGUTkQ7UTzFt1");
 
 #[program]
-pub mod gmsol_exchange {
-    use super::*;
-
-    /// Fund the given market.
-    pub fn fund_market(ctx: Context<FundMarket>, amount: u64) -> Result<()> {
-        instructions::fund_market(ctx, amount)
-    }
-}
+pub mod gmsol_exchange {}
 
 /// Errors of market program.
 #[error_code]

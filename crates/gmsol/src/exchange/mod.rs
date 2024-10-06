@@ -26,7 +26,6 @@ use anchor_client::{
     solana_sdk::{pubkey::Pubkey, signer::Signer},
 };
 use auto_deleveraging::UpdateAdlBuilder;
-use gmsol_exchange::{accounts, instruction};
 use gmsol_store::{
     ops::order::PositionCutKind,
     states::{
@@ -520,17 +519,16 @@ where
         let vault = self.find_market_vault_address(store, &token);
         let market = self.find_market_address(store, market_token);
         Ok(self
-            .exchange_rpc()
-            .args(instruction::FundMarket { amount })
-            .accounts(accounts::FundMarket {
-                payer: self.payer(),
+            .store_rpc()
+            .args(gmsol_store::instruction::MarketTransferIn { amount })
+            .accounts(gmsol_store::accounts::MarketTransferIn {
+                authority: self.payer(),
+                from_authority: self.payer(),
                 store: *store,
-                controller: self.controller_address(store),
                 market,
                 vault,
-                source: *source_account,
+                from: *source_account,
                 token_program: anchor_spl::token::ID,
-                store_program: self.store_program_id(),
             }))
     }
 

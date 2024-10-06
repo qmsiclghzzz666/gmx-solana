@@ -208,8 +208,6 @@ pub enum Program {
     #[default]
     /// Store.
     Store,
-    /// Exchange.
-    Exchange,
 }
 
 /// Market prices.
@@ -914,7 +912,6 @@ impl InspectArgs {
                 let data = hex::decode(data).map_err(gmsol::Error::invalid_argument)?;
                 let program_id = match program {
                     Program::Store => client.store_program_id(),
-                    Program::Exchange => client.exchange_program_id(),
                 };
 
                 let decoder = OwnedDataDecoder::new(&program_id, &data);

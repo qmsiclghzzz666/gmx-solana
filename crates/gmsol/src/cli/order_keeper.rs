@@ -12,10 +12,11 @@ use gmsol::{
         pull_oracle::utils::extract_pyth_feed_ids, EncodingType, Hermes, PythPullOracle,
         PythPullOracleContext, PythPullOracleOps,
     },
-    types::{Deposit, Order, Withdrawal},
+    types::{
+        Deposit, DepositCreatedEvent, Order, OrderCreatedEvent, Withdrawal, WithdrawalCreatedEvent,
+    },
     utils::{ComputeBudget, RpcBuilder},
 };
-use gmsol_exchange::events::{DepositCreatedEvent, OrderCreatedEvent, WithdrawalCreatedEvent};
 use gmsol_model::PositionState;
 use gmsol_store::states::PriceProviderKind;
 use tokio::{sync::mpsc::UnboundedSender, time::Instant};
@@ -658,7 +659,7 @@ impl KeeperArgs {
 
         let after = Duration::from_secs(wait);
         // Subscribe deposit creation event.
-        let deposit_program = client.anchor().program(client.exchange_program_id())?;
+        let deposit_program = client.anchor().program(client.store_program_id())?;
         let unsubscriber =
             deposit_program
             .on::<DepositCreatedEvent>({
@@ -679,7 +680,7 @@ impl KeeperArgs {
         tracing::info!("deposit creation subscribed");
 
         // Subscribe withdrawal creation event.
-        let withdrawal_program = client.anchor().program(client.exchange_program_id())?;
+        let withdrawal_program = client.anchor().program(client.store_program_id())?;
         let unsubscriber = withdrawal_program
             .on::<WithdrawalCreatedEvent>({
                 let tx = tx.clone();
@@ -699,7 +700,7 @@ impl KeeperArgs {
         tracing::info!("withdrawal creation subscribed");
 
         // Subscribe order creation event.
-        let order_program = client.anchor().program(client.exchange_program_id())?;
+        let order_program = client.anchor().program(client.store_program_id())?;
         let unsubscriber = order_program
             .on::<OrderCreatedEvent>({
                 let tx = tx.clone();

@@ -457,7 +457,6 @@ impl Deployment {
     async fn initialize_store(&self) -> eyre::Result<()> {
         let client = &self.client;
         let store = &self.store;
-        let controller = client.controller_address(store);
         let keeper_keypair = self
             .user_keypair(Self::DEFAULT_KEEPER)
             .ok_or_eyre("the default keeper is not initialized")?;
@@ -477,7 +476,6 @@ impl Deployment {
                 .map(|role| client.enable_role(store, role)),
                 false,
             )?
-            .push(client.grant_role(store, &controller, RoleKey::CONTROLLER))?
             .push(client.grant_role(store, &keeper, RoleKey::MARKET_KEEPER))?
             .push(client.grant_role(store, &keeper, RoleKey::ORDER_KEEPER))?;
 

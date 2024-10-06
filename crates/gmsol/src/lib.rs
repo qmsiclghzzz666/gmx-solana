@@ -34,7 +34,6 @@ pub mod program_ids;
 
 /// GMSOL constants.
 pub mod constants {
-    pub use gmsol_exchange::constants::*;
     pub use gmsol_store::constants::*;
 }
 

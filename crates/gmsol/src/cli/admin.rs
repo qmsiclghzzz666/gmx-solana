@@ -1,6 +1,5 @@
 use anchor_client::solana_sdk::pubkey::Pubkey;
 use gmsol::{
-    client::SystemProgramOps,
     store::{roles::RolesOps, store_ops::StoreOps},
     utils::TransactionBuilder,
 };
@@ -179,8 +178,6 @@ struct InitializeRoles {
     allow_multiple_transactions: bool,
     #[arg(long)]
     skip_preflight: bool,
-    #[arg(long, value_name = "LAMPORTS")]
-    fund_the_controller: Option<u64>,
     #[arg(long)]
     max_transaction_size: Option<usize>,
 }
@@ -193,7 +190,6 @@ impl InitializeRoles {
         serialize_only: bool,
     ) -> gmsol::Result<()> {
         let store = client.find_store_address(store_key);
-        let controller = client.controller_address(&store);
 
         let mut builder = TransactionBuilder::new_with_options(
             client.data_store().solana_rpc(),
@@ -210,15 +206,10 @@ impl InitializeRoles {
             .try_push(client.enable_role(&store, RoleKey::CONTROLLER))?
             .try_push(client.enable_role(&store, RoleKey::MARKET_KEEPER))?
             .try_push(client.enable_role(&store, RoleKey::ORDER_KEEPER))?
-            .try_push(client.grant_role(&store, &controller, RoleKey::CONTROLLER))?
             .try_push(client.grant_role(&store, &self.market_keeper, RoleKey::MARKET_KEEPER))?;
 
         for keeper in self.unique_order_keepers() {
             builder.try_push(client.grant_role(&store, keeper, RoleKey::ORDER_KEEPER))?;
-        }
-
-        if let Some(lamports) = self.fund_the_controller {
-            builder.try_push(client.transfer(&controller, lamports)?)?;
         }
 
         crate::utils::send_or_serialize_transactions(

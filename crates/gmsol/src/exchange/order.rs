@@ -1400,8 +1400,8 @@ impl ClaimableAccountsBuilder {
     ) -> (RpcBuilder<'a, C>, RpcBuilder<'a, C>) {
         use crate::store::token::TokenAccountOps;
 
-        let mut pre_builder = client.exchange_rpc();
-        let mut post_builder = client.exchange_rpc();
+        let mut pre_builder = client.store_rpc();
+        let mut post_builder = client.store_rpc();
         let mut accounts: HashSet<&Pubkey> = Default::default();
         if let Some((long_token_mint, account)) =
             self.claimable_long_token_account_for_user.as_ref()

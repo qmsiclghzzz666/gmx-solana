@@ -1973,7 +1973,6 @@ dependencies = [
  "eyre",
  "futures-util",
  "gmsol-decode",
- "gmsol-exchange",
  "gmsol-model",
  "gmsol-store",
  "gmsol-utils",

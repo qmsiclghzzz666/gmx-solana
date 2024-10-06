@@ -870,7 +870,7 @@ pub mod gmsol_store {
     ///
     /// # Checks
     /// - *TODO*
-    #[access_control(internal::Authenticate::only_controller(&ctx))]
+    #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn market_transfer_in(ctx: Context<MarketTransferIn>, amount: u64) -> Result<()> {
         instructions::unchecked_market_transfer_in(ctx, amount)
     }

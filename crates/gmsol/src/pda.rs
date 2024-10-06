@@ -28,14 +28,6 @@ pub fn find_store_address(key: &str, store_program_id: &Pubkey) -> (Pubkey, u8) 
     Pubkey::find_program_address(&[Store::SEED, &to_seed(key)], store_program_id)
 }
 
-/// Find PDA for the controller address of exchange program.
-pub fn find_controller_address(store: &Pubkey, exchange_program_id: &Pubkey) -> (Pubkey, u8) {
-    Pubkey::find_program_address(
-        &[gmsol_exchange::constants::CONTROLLER_SEED, store.as_ref()],
-        exchange_program_id,
-    )
-}
-
 /// Find PDA for [`Oracle`] account.
 pub fn find_oracle_address(store: &Pubkey, index: u8, store_program_id: &Pubkey) -> (Pubkey, u8) {
     Pubkey::find_program_address(&[Oracle::SEED, store.as_ref(), &[index]], store_program_id)

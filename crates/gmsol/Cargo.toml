@@ -36,8 +36,8 @@ cli = [
     "prettytable",
     "decode",
 ]
-clap = ["dep:clap", "gmsol-store/clap", "gmsol-exchange/clap"]
-devnet = ["gmsol-store/devnet", "gmsol-exchange/devnet"]
+clap = ["dep:clap", "gmsol-store/clap"]
+devnet = ["gmsol-store/devnet"]
 pyth-pull-oracle = [
     "reqwest/stream",
     "url",
@@ -63,12 +63,6 @@ gmsol-store = { workspace = true, features = [
     "utils",
     "serde",
     "enum-iter",
-] }
-gmsol-exchange = { workspace = true, features = [
-    "no-entrypoint",
-    "debug",
-    "enum-iter",
-    "serde",
 ] }
 gmsol-model = { workspace = true, features = ["strum", "serde"] }
 gmsol-decode = { workspace = true, optional = true, features = [

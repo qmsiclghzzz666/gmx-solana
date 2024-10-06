@@ -146,7 +146,6 @@ impl Cli {
         gmsol::ClientOptions::builder()
             .commitment(self.commitment)
             .data_store_program_id(self.store_program)
-            .exchange_program_id(self.exchange_program)
             .build()
     }
 
