@@ -2021,29 +2021,11 @@ dependencies = [
  "anchor-lang",
  "base64 0.22.1",
  "bytemuck",
- "gmsol-exchange",
  "gmsol-store",
  "paste",
  "solana-sdk",
  "thiserror",
  "tracing",
-]
-
-[[package]]
-name = "gmsol-exchange"
-version = "0.2.0"
-dependencies = [
- "anchor-lang",
- "anchor-spl",
- "bitmaps 3.2.1",
- "bytemuck",
- "clap 4.5.7",
- "gmsol-model",
- "gmsol-store",
- "gmsol-utils",
- "serde",
- "serde_with 3.8.1",
- "strum",
 ]
 
 [[package]]

@@ -81,9 +81,6 @@ path = "crates/gmsol-utils"
 [workspace.dependencies.gmsol-store]
 path = "programs/gmsol-store"
 
-[workspace.dependencies.gmsol-exchange]
-path = "programs/gmsol-exchange"
-
 [workspace.dependencies.gmsol-decode]
 path = "crates/gmsol-decode"
 

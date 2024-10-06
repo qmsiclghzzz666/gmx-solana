@@ -6,7 +6,7 @@ edition.workspace = true
 [features]
 default = []
 tracing = ["dep:tracing"]
-gmsol = ["gmsol-store", "gmsol-exchange"]
+gmsol = ["gmsol-store"]
 
 [dependencies]
 tracing = { workspace = true, optional = true }
@@ -17,4 +17,3 @@ base64 = { workspace = true }
 bytemuck = { workspace = true }
 paste = { workspace = true }
 gmsol-store = { workspace = true, optional = true }
-gmsol-exchange = { workspace = true, optional = true }
