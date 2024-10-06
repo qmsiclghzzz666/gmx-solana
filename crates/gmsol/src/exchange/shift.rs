@@ -5,7 +5,6 @@ use anchor_client::{
     solana_sdk::{pubkey::Pubkey, signer::Signer},
 };
 use anchor_spl::associated_token::get_associated_token_address;
-use gmsol_exchange::utils::token_records;
 use gmsol_store::{
     accounts, instruction,
     instructions::ordered_tokens,
@@ -319,6 +318,8 @@ impl ExecuteShiftHint {
         from_market: &impl HasMarketMeta,
         to_market: &impl HasMarketMeta,
     ) -> crate::Result<Self> {
+        use gmsol_store::states::common::token_with_feeds::token_records;
+
         let token_infos = shift.tokens();
 
         let ordered_tokens = ordered_tokens(from_market, to_market);

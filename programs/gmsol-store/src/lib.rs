@@ -1923,6 +1923,9 @@ pub enum CoreError {
     /// Invalid Argument.
     #[msg("invalid argument")]
     InvalidArgument,
+    /// Not found.
+    #[msg("not found")]
+    NotFound,
     /// Permission denied.
     #[msg("permission denied")]
     PermissionDenied,

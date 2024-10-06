@@ -108,7 +108,7 @@ impl PositionCutHint {
         user: Option<&UserHeader>,
         program_id: &Pubkey,
     ) -> crate::Result<Self> {
-        use gmsol_exchange::utils::token_records;
+        use gmsol_store::states::common::token_with_feeds::token_records;
 
         let records = token_records(
             token_map,

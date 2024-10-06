@@ -1,6 +1,12 @@
+use std::collections::BTreeSet;
+
 use anchor_lang::prelude::*;
 
-use crate::{states::TokenConfig, utils::chunk_by::chunk_by, StoreError};
+use crate::{
+    states::{TokenConfig, TokenMapAccess},
+    utils::chunk_by::chunk_by,
+    CoreError, StoreError,
+};
 
 use super::PriceProviderKind;
 
@@ -78,4 +84,18 @@ impl TokensWithFeed {
         let len = tokens_with_feed.len();
         (4 + 32 * len) * 2 + (4 + len) + (4 + 2 * len)
     }
+}
+
+/// Collect token records for the give tokens.
+pub fn token_records<A: TokenMapAccess>(
+    token_map: &A,
+    tokens: &BTreeSet<Pubkey>,
+) -> Result<Vec<TokenRecord>> {
+    tokens
+        .iter()
+        .map(|token| {
+            let config = token_map.get(token).ok_or(error!(CoreError::NotFound))?;
+            TokenRecord::from_config(*token, config)
+        })
+        .collect::<Result<Vec<_>>>()
 }

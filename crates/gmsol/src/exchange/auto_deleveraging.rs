@@ -115,7 +115,7 @@ impl UpdateAdlHint {
         client: &crate::Client<C>,
         market: &Market,
     ) -> crate::Result<Self> {
-        use gmsol_exchange::utils::token_records;
+        use gmsol_store::states::common::token_with_feeds::token_records;
 
         let store_address = market.store;
         let token_map_address = client
