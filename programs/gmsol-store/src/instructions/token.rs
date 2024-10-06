@@ -11,59 +11,6 @@ use crate::{
     utils::{internal, token::must_be_uninitialized},
 };
 
-/// The accounts definition for [`initialize_market_token`](crate::gmsol_store::initialize_market_token).
-///
-/// *[See also the documentation for the instruction.](crate::gmsol_store::initialize_market_token)*
-#[derive(Accounts)]
-#[instruction(index_token_mint: Pubkey, long_token_mint: Pubkey, short_token_mint: Pubkey)]
-pub struct InitializeMarketToken<'info> {
-    #[account(mut)]
-    pub authority: Signer<'info>,
-    pub store: AccountLoader<'info, Store>,
-    #[account(
-        init,
-        payer = authority,
-        mint::decimals = constants::MARKET_TOKEN_DECIMALS,
-        // We directly use the store as the authority.
-        mint::authority = store.key(),
-        seeds = [
-            constants::MAREKT_TOKEN_MINT_SEED,
-            store.key().as_ref(),
-            index_token_mint.as_ref(),
-            long_token_mint.key().as_ref(),
-            short_token_mint.key().as_ref(),
-        ],
-        bump,
-    )]
-    pub market_token_mint: Account<'info, Mint>,
-    pub system_program: Program<'info, System>,
-    pub token_program: Program<'info, Token>,
-}
-
-/// Initialize a new market token.
-///
-/// ## CHECK
-/// - Only MARKET_KEEPER can initialize market token.
-#[allow(unused_variables)]
-pub(crate) fn unchecked_initialize_market_token(
-    ctx: Context<InitializeMarketToken>,
-    index_token_mint: Pubkey,
-    long_token_mint: Pubkey,
-    short_token_mint: Pubkey,
-) -> Result<()> {
-    Ok(())
-}
-
-impl<'info> internal::Authentication<'info> for InitializeMarketToken<'info> {
-    fn authority(&self) -> &Signer<'info> {
-        &self.authority
-    }
-
-    fn store(&self) -> &AccountLoader<'info, Store> {
-        &self.store
-    }
-}
-
 /// The accounts definition for [`mint_market_token_to`](crate::gmsol_store::mint_market_token_to).
 ///
 /// *[See also the documentation for the instruction.](crate::gmsol_store::mint_market_token_to)*

@@ -1,16 +1,13 @@
 use std::ops::Deref;
 
-use anchor_client::{
-    anchor_lang::system_program,
-    solana_sdk::{pubkey::Pubkey, signer::Signer},
-};
-use anchor_spl::associated_token::get_associated_token_address;
-use gmsol_exchange::{accounts, instruction};
+use anchor_client::solana_sdk::{pubkey::Pubkey, signer::Signer};
 use gmsol_store::states::Store;
 
 use crate::utils::RpcBuilder;
 
 /// Claim fees builder.
+// TODO: implement this.
+#[allow(dead_code)]
 pub struct ClaimFeesBuilder<'a, C> {
     client: &'a crate::Client<C>,
     store: Pubkey,
@@ -47,46 +44,6 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> ClaimFeesBuilder<'a, C> {
 
     /// Build.
     pub async fn build(&self) -> crate::Result<RpcBuilder<'a, C>> {
-        let store = if let Some(hint) = self.store_hint {
-            hint
-        } else {
-            self.client.store(&self.store).await?
-        };
-        let market = self
-            .client
-            .find_market_address(&self.store, &self.market_token);
-        let token = if let Some(token) = self.token {
-            token
-        } else {
-            self.client
-                .market(&market)
-                .await?
-                .meta()
-                .pnl_token(self.is_long_token)
-        };
-
-        let receiver = store.receiver();
-        let treasury = store.treasury();
-
-        Ok(self
-            .client
-            .exchange_rpc()
-            .args(instruction::ClaimFees {})
-            .accounts(accounts::ClaimFees {
-                authority: self.client.payer(),
-                store: self.store,
-                controller: self.client.controller_address(&self.store),
-                token,
-                market,
-                vault: self.client.find_market_vault_address(&self.store, &token),
-                receiver,
-                treasury,
-                receiver_token_account: get_associated_token_address(&receiver, &token),
-                treasury_token_account: get_associated_token_address(&treasury, &token),
-                store_program: self.client.store_program_id(),
-                system_program: system_program::ID,
-                token_program: anchor_spl::token::ID,
-                associated_token_program: anchor_spl::associated_token::ID,
-            }))
+        todo!()
     }
 }

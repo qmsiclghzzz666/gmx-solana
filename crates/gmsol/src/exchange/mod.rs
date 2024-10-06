@@ -41,7 +41,7 @@ use rand::{distributions::Standard, Rng};
 use shift::{CloseShiftBuilder, CreateShiftBuilder, ExecuteShiftBuilder};
 use treasury::ClaimFeesBuilder;
 
-use crate::utils::RpcBuilder;
+use crate::{store::market::VaultOps, utils::RpcBuilder};
 
 use self::{
     deposit::{CloseDepositBuilder, CreateDepositBuilder, ExecuteDepositBuilder},
@@ -465,29 +465,36 @@ where
         let authority = self.payer();
         let market_token =
             self.find_market_token_address(store, index_token, long_token, short_token);
+        let prepare_long_token_vault = self.initialize_market_vault(store, long_token).0;
+        let prepare_short_token_vault = self.initialize_market_vault(store, short_token).0;
+        let prepare_market_token_vault = self.initialize_market_vault(store, &market_token).0;
         let builder = self
-            .exchange_rpc()
-            .accounts(accounts::CreateMarket {
+            .store_rpc()
+            .accounts(gmsol_store::accounts::InitializeMarket {
                 authority,
-                data_store: *store,
+                store: *store,
                 token_map,
                 market: self.find_market_address(store, &market_token),
                 market_token_mint: market_token,
                 long_token_mint: *long_token,
                 short_token_mint: *short_token,
-                market_token_vault: self.find_market_vault_address(store, &market_token),
                 long_token_vault: self.find_market_vault_address(store, long_token),
                 short_token_vault: self.find_market_vault_address(store, short_token),
-                data_store_program: self.store_program_id(),
                 system_program: system_program::ID,
                 token_program: anchor_spl::token::ID,
             })
-            .args(instruction::CreateMarket {
+            .args(gmsol_store::instruction::InitializeMarket {
                 name: name.to_string(),
                 index_token_mint: *index_token,
                 enable,
             });
-        Ok((builder, market_token))
+        Ok((
+            prepare_long_token_vault
+                .merge(prepare_short_token_vault)
+                .merge(builder)
+                .merge(prepare_market_token_vault),
+            market_token,
+        ))
     }
 
     async fn fund_market(

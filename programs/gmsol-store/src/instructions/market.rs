@@ -30,7 +30,7 @@ use crate::{
 ///
 /// *[See also the documentation for the instruction.](crate::gmsol_store::initialize_market)*
 #[derive(Accounts)]
-#[instruction(market_token: Pubkey)]
+#[instruction(index_token_mint: Pubkey)]
 pub struct InitializeMarket<'info> {
     /// The address authorized to execute this instruction.
     #[account(mut)]
@@ -38,6 +38,25 @@ pub struct InitializeMarket<'info> {
     /// The store account.
     #[account(has_one = token_map)]
     pub store: AccountLoader<'info, Store>,
+    /// Market token mint.
+    #[account(
+        init,
+        payer = authority,
+        mint::decimals = constants::MARKET_TOKEN_DECIMALS,
+        // We directly use the store as the authority.
+        mint::authority = store.key(),
+        seeds = [
+            constants::MAREKT_TOKEN_MINT_SEED,
+            store.key().as_ref(),
+            index_token_mint.as_ref(),
+            long_token_mint.key().as_ref(),
+            short_token_mint.key().as_ref(),
+        ],
+        bump,
+    )]
+    pub market_token_mint: Account<'info, Mint>,
+    pub long_token_mint: Account<'info, Mint>,
+    pub short_token_mint: Account<'info, Mint>,
     /// The market account.
     #[account(
         init,
@@ -46,7 +65,7 @@ pub struct InitializeMarket<'info> {
         seeds = [
             Market::SEED,
             store.key().as_ref(),
-            market_token.as_ref(),
+            market_token_mint.key().as_ref(),
         ],
         bump,
     )]
@@ -54,8 +73,37 @@ pub struct InitializeMarket<'info> {
     /// The token map account.
     #[account(has_one = store)]
     pub token_map: AccountLoader<'info, TokenMapHeader>,
+    /// Long token vault must be exist.
+    #[account(
+        token::mint = long_token_mint,
+        // We use the store as the authority of the token account.
+        token::authority = store,
+        seeds = [
+            constants::MARKET_VAULT_SEED,
+            store.key().as_ref(),
+            long_token_mint.key().as_ref(),
+            &[],
+        ],
+        bump,
+    )]
+    pub long_token_vault: Account<'info, TokenAccount>,
+    /// Short token vault must be exist.
+    #[account(
+        token::mint = short_token_mint,
+        // We use the store as the authority of the token account.
+        token::authority = store,
+        seeds = [
+            constants::MARKET_VAULT_SEED,
+            store.key().as_ref(),
+            short_token_mint.key().as_ref(),
+            &[],
+        ],
+        bump,
+    )]
+    pub short_token_vault: Account<'info, TokenAccount>,
     /// The system program.
     pub system_program: Program<'info, System>,
+    pub token_program: Program<'info, Token>,
 }
 
 /// Initialize the account for [`Market`].
@@ -64,10 +112,7 @@ pub struct InitializeMarket<'info> {
 /// - Only MARKET_KEEPER can create new market.
 pub(crate) fn unchecked_initialize_market(
     ctx: Context<InitializeMarket>,
-    market_token_mint: Pubkey,
     index_token_mint: Pubkey,
-    long_token_mint: Pubkey,
-    short_token_mint: Pubkey,
     name: &str,
     enable: bool,
 ) -> Result<()> {
@@ -82,14 +127,14 @@ pub(crate) fn unchecked_initialize_market(
         );
         require!(
             token_map
-                .get(&long_token_mint)
+                .get(&ctx.accounts.long_token_mint.key())
                 .ok_or(error!(StoreError::RequiredResourceNotFound))?
                 .is_enabled(),
             StoreError::InvalidArgument
         );
         require!(
             token_map
-                .get(&short_token_mint)
+                .get(&ctx.accounts.short_token_mint.key())
                 .ok_or(error!(StoreError::RequiredResourceNotFound))?
                 .is_enabled(),
             StoreError::InvalidArgument
@@ -100,10 +145,10 @@ pub(crate) fn unchecked_initialize_market(
         ctx.bumps.market,
         ctx.accounts.store.key(),
         name,
-        market_token_mint,
+        ctx.accounts.market_token_mint.key(),
         index_token_mint,
-        long_token_mint,
-        short_token_mint,
+        ctx.accounts.long_token_mint.key(),
+        ctx.accounts.short_token_mint.key(),
         enable,
     )?;
     emit!(MarketChangeEvent {

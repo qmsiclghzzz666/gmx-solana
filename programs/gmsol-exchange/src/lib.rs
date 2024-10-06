@@ -15,7 +15,6 @@ pub mod events;
 /// States.
 pub mod states;
 
-use gmsol_store::utils::Authenticate;
 use instructions::*;
 
 declare_id!("exYLDKzzpXkp8FBghLxJkM4xvuGViAvGUTkQ7UTzFt1");
@@ -23,29 +22,6 @@ declare_id!("exYLDKzzpXkp8FBghLxJkM4xvuGViAvGUTkQ7UTzFt1");
 #[program]
 pub mod gmsol_exchange {
     use super::*;
-
-    // Treasury.
-    /// Claim fees from the given market.
-    ///
-    /// # Accounts
-    /// *[See the documentation for the accounts.](ClaimFees)*
-    ///
-    /// # Errors
-    /// - *TODO*
-    pub fn claim_fees(ctx: Context<ClaimFees>) -> Result<()> {
-        instructions::claim_fees(ctx)
-    }
-
-    // Market.
-    #[access_control(Authenticate::only_market_keeper(&ctx))]
-    pub fn create_market(
-        ctx: Context<CreateMarket>,
-        name: String,
-        index_token_mint: Pubkey,
-        enable: bool,
-    ) -> Result<()> {
-        instructions::unchecked_create_market(ctx, name, index_token_mint, enable)
-    }
 
     /// Fund the given market.
     pub fn fund_market(ctx: Context<FundMarket>, amount: u64) -> Result<()> {

@@ -830,22 +830,11 @@ pub mod gmsol_store {
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn initialize_market(
         ctx: Context<InitializeMarket>,
-        market_token_mint: Pubkey,
         index_token_mint: Pubkey,
-        long_token_mint: Pubkey,
-        short_token_mint: Pubkey,
         name: String,
         enable: bool,
     ) -> Result<()> {
-        instructions::unchecked_initialize_market(
-            ctx,
-            market_token_mint,
-            index_token_mint,
-            long_token_mint,
-            short_token_mint,
-            &name,
-            enable,
-        )
+        instructions::unchecked_initialize_market(ctx, index_token_mint, &name, enable)
     }
 
     /// Close a [`Market`](states::Market) account.
@@ -1118,34 +1107,6 @@ pub mod gmsol_store {
         let claimed = instructions::unchecked_claim_fees_from_market(ctx, &token)
             .map_err(ModelError::from)?;
         Ok(claimed)
-    }
-
-    // Token.
-    /// Initialize a new market token.
-    ///
-    /// # Accounts
-    /// [*See the documentation for the accounts.*](InitializeMarketToken)
-    ///
-    /// # Arguments
-    /// - `index_token_mint`: The address of the index token.
-    /// - `long_token_mint`: The address of the long token.
-    /// - `short_token_mint`: The address of the short token.
-    ///
-    /// # Checks
-    /// - *TODO*
-    #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
-    pub fn initialize_market_token(
-        ctx: Context<InitializeMarketToken>,
-        index_token_mint: Pubkey,
-        long_token_mint: Pubkey,
-        short_token_mint: Pubkey,
-    ) -> Result<()> {
-        instructions::unchecked_initialize_market_token(
-            ctx,
-            index_token_mint,
-            long_token_mint,
-            short_token_mint,
-        )
     }
 
     /// Mint the given amount of market tokens to the destination account.
