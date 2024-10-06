@@ -563,16 +563,14 @@ where
         params: UpdateOrderParams,
     ) -> crate::Result<RpcBuilder<C>> {
         Ok(self
-            .exchange_rpc()
-            .accounts(accounts::UpdateOrder {
-                user: self.payer(),
-                controller: self.controller_address(store),
+            .store_rpc()
+            .accounts(gmsol_store::accounts::UpdateOrder {
+                owner: self.payer(),
                 store: *store,
                 market: self.find_market_address(store, market_token),
                 order: *order,
-                store_program: self.store_program_id(),
             })
-            .args(instruction::UpdateOrder { params }))
+            .args(gmsol_store::instruction::UpdateOrder { params }))
     }
 
     fn execute_order(

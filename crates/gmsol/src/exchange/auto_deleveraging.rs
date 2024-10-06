@@ -4,16 +4,9 @@ use anchor_client::{
     anchor_lang::Id,
     solana_sdk::{pubkey::Pubkey, signer::Signer},
 };
-use gmsol_exchange::{accounts, instruction};
-use gmsol_store::states::{
-    common::TokensWithFeed, Market, Pyth,
-};
+use gmsol_store::states::{common::TokensWithFeed, Market, Pyth};
 
-use crate::{
-    store::utils::FeedsParser,
-    utils::RpcBuilder,
-};
-
+use crate::{store::utils::FeedsParser, utils::RpcBuilder};
 
 /// The compute budget for `auto_deleverage`.
 pub const ADL_COMPUTE_BUDGET: u32 = 800_000;
@@ -91,20 +84,18 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> UpdateAdlBuilder<'a, C> {
             .collect::<Result<Vec<_>, _>>()?;
         let rpc = self
             .client
-            .exchange_rpc()
-            .accounts(accounts::UpdateAdlState {
+            .store_rpc()
+            .accounts(gmsol_store::accounts::UpdateAdlState {
                 authority: self.client.payer(),
-                controller: self.client.controller_address(&self.store),
                 store: self.store,
                 token_map: hint.token_map,
                 oracle: self.oracle,
                 market: self
                     .client
                     .find_market_address(&self.store, &self.market_token),
-                store_program: self.client.store_program_id(),
                 price_provider: self.price_provider,
             })
-            .args(instruction::UpdateAdlState {
+            .args(gmsol_store::instruction::UpdateAdlState {
                 is_long: self.is_long,
             })
             .accounts(feeds);

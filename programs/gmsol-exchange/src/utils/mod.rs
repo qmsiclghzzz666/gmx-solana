@@ -1,6 +1,3 @@
-/// Utils for market.
-pub mod market;
-
 /// Controller.
 pub mod controller;
 

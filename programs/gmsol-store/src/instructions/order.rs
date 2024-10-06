@@ -8,7 +8,7 @@ use crate::{
         common::{SwapParams, TokenRecord},
         order::{Order, OrderKind, OrderParams, Receivers, Senders, Tokens},
         position::Position,
-        Market, NonceBytes, Seed, Store, UpdateOrderParams,
+        Market, NonceBytes, Seed, Store,
     },
     utils::internal,
     StoreError,

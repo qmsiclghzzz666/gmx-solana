@@ -15,7 +15,7 @@ pub mod events;
 /// States.
 pub mod states;
 
-use gmsol_store::{states::UpdateOrderParams, utils::Authenticate};
+use gmsol_store::utils::Authenticate;
 use instructions::*;
 
 declare_id!("exYLDKzzpXkp8FBghLxJkM4xvuGViAvGUTkQ7UTzFt1");
@@ -73,116 +73,6 @@ pub mod gmsol_exchange {
     /// Fund the given market.
     pub fn fund_market(ctx: Context<FundMarket>, amount: u64) -> Result<()> {
         instructions::fund_market(ctx, amount)
-    }
-
-    // Deposit.
-    // #[access_control(Authenticate::only_controller(&ctx))]
-    pub fn create_deposit<'info>(
-        ctx: Context<'_, '_, 'info, 'info, CreateDeposit<'info>>,
-        nonce: [u8; 32],
-        params: CreateDepositParams,
-    ) -> Result<()> {
-        instructions::create_deposit(ctx, nonce, params)
-    }
-
-    #[access_control(Authenticate::only_order_keeper(&ctx))]
-    pub fn execute_deposit<'info>(
-        ctx: Context<'_, '_, 'info, 'info, ExecuteDeposit<'info>>,
-        execution_fee: u64,
-        cancel_on_execution_error: bool,
-    ) -> Result<()> {
-        instructions::execute_deposit(ctx, execution_fee, cancel_on_execution_error)
-    }
-
-    pub fn cancel_deposit(ctx: Context<CancelDeposit>) -> Result<()> {
-        instructions::cancel_deposit(ctx)
-    }
-
-    // Withdrawal.
-    pub fn create_withdrawal<'info>(
-        ctx: Context<'_, '_, 'info, 'info, CreateWithdrawal<'info>>,
-        nonce: [u8; 32],
-        params: CreateWithdrawalParams,
-    ) -> Result<()> {
-        instructions::create_withdrawal(ctx, nonce, params)
-    }
-
-    pub fn cancel_withdrawal(ctx: Context<CancelWithdrawal>) -> Result<()> {
-        instructions::cancel_withdrawal(ctx)
-    }
-
-    #[access_control(Authenticate::only_order_keeper(&ctx))]
-    pub fn execute_withdrawal<'info>(
-        ctx: Context<'_, '_, 'info, 'info, ExecuteWithdrawal<'info>>,
-        execution_fee: u64,
-        cancel_on_execution_error: bool,
-    ) -> Result<()> {
-        instructions::execute_withdrawal(ctx, execution_fee, cancel_on_execution_error)
-    }
-
-    // Order.
-    pub fn create_order<'info>(
-        ctx: Context<'_, '_, 'info, 'info, CreateOrder<'info>>,
-        nonce: [u8; 32],
-        params: CreateOrderParams,
-    ) -> Result<()> {
-        instructions::create_order(ctx, nonce, params)
-    }
-
-    /// Update order.
-    ///
-    /// # Accounts
-    /// *[See the documentation for the accounts.](UpdateOrder)*
-    ///
-    /// # Arguments
-    /// - `params`: Parameters for updating the order.
-    ///
-    /// # Errors
-    /// - The [`user`](UpdateOrder::user) must be a signer and the owner of the order.
-    /// - The [`controller`](UpdateOrder::controller) must be derived for the
-    /// `store`.
-    /// - The [`market`](UpdateOrder::market) must be the market of the order,
-    /// and it must be an initialized [`Market`](gmsol_store::states::Market) account
-    /// owned by the store program.
-    /// - The [`order`](UpdateOrder::order) must be an initialized
-    /// [`Order`](gmsol_store::states::Order) account owned by the store program,
-    /// and it must be updatable.
-    /// - It will also return error if the order parameters is not valid.
-    pub fn update_order(ctx: Context<UpdateOrder>, params: UpdateOrderParams) -> Result<()> {
-        instructions::update_order(ctx, params)
-    }
-
-    /// Cancel an order.
-    ///
-    /// # Accounts
-    /// *[See the documentation for the accounts.](CancelOrder)*
-    ///
-    /// # Checks
-    /// - The [`user`](CancelOrder::user) must be a signer and the owner of the
-    /// order.
-    /// - The [`controller`](CancelOrder::controller) must be derived for the
-    /// `store`.
-    /// - *[See also the checks done by the `remove_order` instruction.](gmsol_store::gmsol_store::remove_order)*
-    pub fn cancel_order(ctx: Context<CancelOrder>) -> Result<()> {
-        instructions::cancel_order(ctx)
-    }
-
-    /// Update the ADL state for the given market.
-    ///
-    /// # Accounts
-    /// *[See the documentation for the accounts.](UpdateAdlState)*
-    ///
-    /// # Arguments
-    /// - `is_long`: The market side to update for.
-    ///
-    /// # Errors
-    /// *TODO*
-    #[access_control(Authenticate::only_order_keeper(&ctx))]
-    pub fn update_adl_state<'info>(
-        ctx: Context<'_, '_, 'info, 'info, UpdateAdlState<'info>>,
-        is_long: bool,
-    ) -> Result<()> {
-        instructions::unchecked_update_adl_state(ctx, is_long)
     }
 }
 
