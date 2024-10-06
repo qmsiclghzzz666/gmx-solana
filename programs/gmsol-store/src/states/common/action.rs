@@ -55,6 +55,11 @@ impl ActionState {
     pub fn is_completed_or_cancelled(&self) -> bool {
         matches!(self, Self::Completed | Self::Cancelled)
     }
+
+    /// Check if the state is pending.
+    pub fn is_pending(&self) -> bool {
+        matches!(self, Self::Pending)
+    }
 }
 
 /// Action Header.

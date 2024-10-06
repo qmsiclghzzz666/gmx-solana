@@ -15,8 +15,11 @@ use crate::{
         order::{PositionCutKind, PositionCutOp},
     },
     states::{
-        common::action::ActionExt, order::OrderV2, user::UserHeader, Market, NonceBytes, Oracle,
-        Position, PriceProvider, Seed, Store, TokenMapHeader,
+        common::action::ActionExt,
+        feature::{ActionDisabledFlag, DomainDisabledFlag},
+        order::OrderV2,
+        user::UserHeader,
+        Market, NonceBytes, Oracle, Position, PriceProvider, Seed, Store, TokenMapHeader,
     },
     utils::internal,
     validated_recent_timestamp, CoreError,
@@ -194,6 +197,18 @@ pub(crate) fn unchecked_process_position_cut<'info>(
     execution_fee: u64,
 ) -> Result<()> {
     let accounts = &mut ctx.accounts;
+
+    // Validate feature enabled.
+    {
+        let store = accounts.store.load()?;
+        let domain = match kind {
+            PositionCutKind::Liquidate => DomainDisabledFlag::Liquidation,
+            PositionCutKind::AutoDeleverage(_) => DomainDisabledFlag::AutoDeleveraging,
+        };
+        store.validate_feature_enabled(domain, ActionDisabledFlag::CreateOrder)?;
+        store.validate_feature_enabled(domain, ActionDisabledFlag::ExecuteOrder)?;
+    }
+
     let remaining_accounts = ctx.remaining_accounts;
 
     let tokens = accounts

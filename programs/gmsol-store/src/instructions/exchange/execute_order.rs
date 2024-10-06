@@ -13,6 +13,7 @@ use crate::{
     },
     states::{
         common::action::{ActionExt, ActionSigner},
+        feature::ActionDisabledFlag,
         order::{OrderV2, TransferOut},
         position::Position,
         user::UserHeader,
@@ -328,6 +329,16 @@ pub(crate) fn unchecked_execute_order<'info>(
     throw_on_execution_error: bool,
 ) -> Result<()> {
     let accounts = &mut ctx.accounts;
+
+    // Validate feature enabled.
+    {
+        let order = accounts.order.load()?;
+        accounts.store.load()?.validate_feature_enabled(
+            order.params().kind()?.try_into()?,
+            ActionDisabledFlag::ExecuteOrder,
+        )?;
+    }
+
     let remaining_accounts = ctx.remaining_accounts;
     let signer = accounts.order.load()?.signer();
 

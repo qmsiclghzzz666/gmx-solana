@@ -16,6 +16,7 @@ use crate::{
         order::{CreateOrderOps, CreateOrderParams},
     },
     states::{
+        feature::ActionDisabledFlag,
         order::{OrderKind, OrderV2},
         position::PositionKind,
         user::UserHeader,
@@ -492,6 +493,12 @@ pub(crate) fn create_order<'info>(
     params: &CreateOrderParams,
 ) -> Result<()> {
     let accounts = ctx.accounts;
+
+    accounts
+        .store
+        .load()?
+        .validate_feature_enabled(params.kind.try_into()?, ActionDisabledFlag::CreateOrder)?;
+
     accounts.transfer_execution_fee(params)?;
     accounts.transfer_tokens(params)?;
 
@@ -787,6 +794,18 @@ pub struct CloseOrder<'info> {
 
 pub(crate) fn close_order(ctx: Context<CloseOrder>, reason: &str) -> Result<()> {
     let accounts = &ctx.accounts;
+
+    // Validate feature enabled.
+    {
+        let order = accounts.order.load()?;
+        if order.header.action_state()?.is_pending() {
+            accounts.store.load()?.validate_feature_enabled(
+                order.params().kind()?.try_into()?,
+                ActionDisabledFlag::CancelOrder,
+            )?;
+        }
+    }
+
     let should_continue_when_atas_are_missing = accounts.preprocess()?;
     let transfer_success = accounts.transfer_to_atas(should_continue_when_atas_are_missing)?;
     let mint_success = accounts.mint_gt_reward(should_continue_when_atas_are_missing)?;
@@ -1081,6 +1100,15 @@ pub struct UpdateOrder<'info> {
 }
 
 pub(crate) fn update_order(ctx: Context<UpdateOrder>, params: &UpdateOrderParams) -> Result<()> {
+    // Validate feature enabled.
+    {
+        let order = ctx.accounts.order.load()?;
+        ctx.accounts.store.load()?.validate_feature_enabled(
+            order.params().kind()?.try_into()?,
+            ActionDisabledFlag::UpdateOrder,
+        )?;
+    }
+
     let id = ctx
         .accounts
         .market
