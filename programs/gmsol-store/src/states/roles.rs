@@ -33,6 +33,9 @@ impl RoleKey {
 
     /// ORDER KEEPER.
     pub const ORDER_KEEPER: &'static str = "ORDER_KEEPER";
+
+    /// FEATURE KEEPER.
+    pub const FEATURE_KEEPER: &'static str = "FEATURE_KEEPER";
 }
 
 impl Borrow<str> for RoleKey {

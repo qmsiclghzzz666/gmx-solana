@@ -1,6 +1,9 @@
 /// Data Store.
 pub mod store;
 
+/// Feature.
+pub mod feature;
+
 /// Roles.
 pub mod roles;
 

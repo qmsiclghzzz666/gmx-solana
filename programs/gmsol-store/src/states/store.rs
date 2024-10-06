@@ -4,9 +4,12 @@ use anchor_lang::prelude::*;
 use bytemuck::Zeroable;
 use gmsol_utils::to_seed;
 
-use crate::{constants, CoreError, StoreError, StoreResult};
+use crate::{constants, states::feature::display_feature, CoreError, StoreError, StoreResult};
 
-use super::{Amount, Factor, InitSpace, RoleStore};
+use super::{
+    feature::{ActionDisabledFlag, DisabledFeatures, DomainDisabledFlag},
+    Amount, Factor, InitSpace, RoleStore,
+};
 
 const MAX_LEN: usize = 32;
 
@@ -17,12 +20,15 @@ pub struct Store {
     bump: [u8; 1],
     key_seed: [u8; 32],
     key: [u8; MAX_LEN],
-    padding: [u8; 7],
+    padding_0: [u8; 7],
     role: RoleStore,
     /// Store authority.
     pub authority: Pubkey,
     /// The token map to used.
     pub token_map: Pubkey,
+    /// Disabled features.
+    disabled_features: DisabledFeatures,
+    padding_1: [u8; 12],
     /// Treasury Config.
     treasury: Treasury,
     /// Amounts.
@@ -255,6 +261,49 @@ impl Store {
     /// Get GT State mutably.
     pub(crate) fn gt_mut(&mut self) -> &mut GTState {
         &mut self.gt
+    }
+
+    /// Get feature disabled.
+    pub fn get_feature_disabled(
+        &self,
+        domain: DomainDisabledFlag,
+        action: ActionDisabledFlag,
+    ) -> Option<bool> {
+        self.disabled_features.get_disabled(domain, action)
+    }
+
+    /// Is the given feature disabled.
+    pub fn is_feature_disabled(
+        &self,
+        domain: DomainDisabledFlag,
+        action: ActionDisabledFlag,
+    ) -> bool {
+        self.get_feature_disabled(domain, action).unwrap_or(false)
+    }
+
+    /// Validate whether the given features is enabled.
+    pub fn validate_feature_enabled(
+        &self,
+        domain: DomainDisabledFlag,
+        action: ActionDisabledFlag,
+    ) -> Result<()> {
+        if self.is_feature_disabled(domain, action) {
+            msg!("Feature `{}` is disabled", display_feature(domain, action));
+            err!(CoreError::FeatureDisabled)
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Set features disabled.
+    pub(crate) fn set_feature_disabled(
+        &mut self,
+        domain: DomainDisabledFlag,
+        action: ActionDisabledFlag,
+        disabled: bool,
+    ) {
+        self.disabled_features
+            .set_disabled(domain, action, disabled)
     }
 }
 

@@ -557,6 +557,23 @@ pub mod gmsol_store {
         instructions::insert_factor(ctx, &key.to_string(), factor)
     }
 
+    /// Enable or diable the given feature.
+    #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
+    pub fn toggle_feature(
+        ctx: Context<ToggleFeature>,
+        domain: String,
+        action: String,
+        enable: bool,
+    ) -> Result<()> {
+        let domain = domain
+            .parse()
+            .map_err(|_| error!(CoreError::InvalidArgument))?;
+        let action = action
+            .parse()
+            .map_err(|_| error!(CoreError::InvalidArgument))?;
+        instructions::unchecked_toggle_feature(ctx, domain, action, enable)
+    }
+
     // Token Config.
     /// Initialize a new token map account with its store set to [`store`](InitializeTokenMap::store).
     ///
@@ -1909,6 +1926,9 @@ pub enum CoreError {
     /// Permission denied.
     #[msg("permission denied")]
     PermissionDenied,
+    /// Feature disabled.
+    #[msg("feature disabled")]
+    FeatureDisabled,
     /// Store Mismatched.
     #[msg("store mismatched")]
     StoreMismatched,

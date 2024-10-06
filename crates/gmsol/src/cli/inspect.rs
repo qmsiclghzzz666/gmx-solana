@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, num::NonZeroUsize};
 
 use anchor_client::{
     anchor_lang::{AnchorDeserialize, Discriminator},
-    solana_sdk::{native_token::lamports_to_sol, pubkey::Pubkey},
+    solana_sdk::pubkey::Pubkey,
 };
 use eyre::OptionExt;
 use futures_util::{pin_mut, StreamExt};
@@ -10,12 +10,12 @@ use gmsol::{
     pyth::Hermes,
     types::{
         self,
+        feature::{display_feature, ActionDisabledFlag, DomainDisabledFlag},
         user::{ReferralCode, UserHeader},
         TokenMapAccess,
     },
     utils::{signed_value_to_decimal, unsigned_value_to_decimal, ZeroCopy},
 };
-use gmsol_exchange::states::{display_feature, ActionDisabledFlag, Controller, DomainDisabledFlag};
 use gmsol_model::{
     action::Prices, Balance, BalanceExt, ClockKind, PnlFactorKind, PoolKind, PositionExt,
     PositionStateExt,
@@ -178,7 +178,7 @@ enum Command {
         post: bool,
     },
     /// Insepct controller.
-    Controller,
+    Features,
     /// Get the event authority address.
     EventAuthority,
     /// Generate Anchor Discriminator with the given name.
@@ -638,40 +638,17 @@ impl InspectArgs {
             Command::Withdrawal { address } => {
                 println!("{:#?}", client.withdrawal(address).await?);
             }
-            Command::Controller => {
-                let controller = client.controller_address(store);
-                println!("Exchange: {}", client.exchange_program_id());
-                println!("Controller: {controller}");
-                match client
-                    .data_store()
-                    .solana_rpc()
-                    .get_balance(&controller)
-                    .await
-                {
-                    Ok(lamports) => {
-                        println!("Balance: {} SOL", lamports_to_sol(lamports));
-                    }
-                    Err(err) => {
-                        println!("Balance: *failed to get balance*");
-                        tracing::info!(%err, "failed to get balance");
-                    }
-                }
-                if let Some(ZeroCopy(controller)) = client
-                    .account_with_config::<ZeroCopy<Controller>>(&controller, Default::default())
-                    .await?
-                    .into_value()
-                {
-                    println!("Store: {}", controller.store);
-                    println!("Disabled features:");
-                    for domain in DomainDisabledFlag::iter() {
-                        for action in ActionDisabledFlag::iter() {
-                            if let Some(true) = controller.get_feature_disabled(domain, action) {
-                                println!("{}: disabled", display_feature(domain, action));
-                            }
+            Command::Features => {
+                let store_address = store;
+                let store = client.store(store_address).await?;
+                println!("Store: {}", store_address);
+                println!("Disabled features:");
+                for domain in DomainDisabledFlag::iter() {
+                    for action in ActionDisabledFlag::iter() {
+                        if let Some(true) = store.get_feature_disabled(domain, action) {
+                            println!("{}: disabled", display_feature(domain, action));
                         }
                     }
-                } else {
-                    println!("*not initialized*");
                 }
             }
             Command::EventAuthority => {

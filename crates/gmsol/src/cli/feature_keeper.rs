@@ -1,6 +1,8 @@
 use anchor_client::solana_sdk::pubkey::Pubkey;
-use gmsol::exchange::ExchangeOps;
-use gmsol_exchange::states::{display_feature, ActionDisabledFlag, DomainDisabledFlag};
+use gmsol::{
+    exchange::ExchangeOps,
+    types::feature::{display_feature, ActionDisabledFlag, DomainDisabledFlag},
+};
 
 use crate::GMSOLClient;
 

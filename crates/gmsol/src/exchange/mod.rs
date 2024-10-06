@@ -26,13 +26,11 @@ use anchor_client::{
     solana_sdk::{pubkey::Pubkey, signer::Signer},
 };
 use auto_deleveraging::UpdateAdlBuilder;
-use gmsol_exchange::{
-    accounts, instruction,
-    states::{ActionDisabledFlag, DomainDisabledFlag},
-};
+use gmsol_exchange::{accounts, instruction};
 use gmsol_store::{
     ops::order::PositionCutKind,
     states::{
+        feature::{ActionDisabledFlag, DomainDisabledFlag},
         order::{OrderKind, OrderParams},
         NonceBytes, UpdateOrderParams,
     },
@@ -53,9 +51,6 @@ use self::{
 
 /// Exchange instructions for GMSOL.
 pub trait ExchangeOps<C> {
-    /// Initialize Controller Account.
-    fn initialize_controller(&self, store: &Pubkey) -> RpcBuilder<C>;
-
     /// Toggle feature.
     fn toggle_feature(
         &self,
@@ -381,17 +376,6 @@ where
     C: Deref<Target = S> + Clone,
     S: Signer,
 {
-    fn initialize_controller(&self, store: &Pubkey) -> RpcBuilder<C> {
-        self.exchange_rpc()
-            .args(instruction::InitializeController {})
-            .accounts(accounts::InitializeController {
-                payer: self.payer(),
-                store: *store,
-                controller: self.controller_address(store),
-                system_program: system_program::ID,
-            })
-    }
-
     fn toggle_feature(
         &self,
         store: &Pubkey,
@@ -399,17 +383,15 @@ where
         action: ActionDisabledFlag,
         enable: bool,
     ) -> RpcBuilder<C> {
-        self.exchange_rpc()
-            .args(instruction::ToggleFeature {
+        self.store_rpc()
+            .args(gmsol_store::instruction::ToggleFeature {
                 domain: domian.to_string(),
                 action: action.to_string(),
                 enable,
             })
-            .accounts(accounts::ToggleFeature {
+            .accounts(gmsol_store::accounts::ToggleFeature {
                 authority: self.payer(),
                 store: *store,
-                controller: self.controller_address(store),
-                store_program: self.store_program_id(),
             })
     }
 

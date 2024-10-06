@@ -467,7 +467,6 @@ impl Deployment {
 
         builder
             .push(client.initialize_store(&self.store_key, None))?
-            .push(client.initialize_controller(store))?
             .push_many(
                 [
                     RoleKey::CONTROLLER,
