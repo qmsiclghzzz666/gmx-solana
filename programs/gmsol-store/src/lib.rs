@@ -1393,11 +1393,6 @@ pub mod gmsol_store {
         instructions::remove_order(ctx, refund, &reason)
     }
 
-    #[access_control(internal::Authenticate::only_controller(&ctx))]
-    pub fn update_order(ctx: Context<UpdateOrder>, params: UpdateOrderParams) -> Result<()> {
-        instructions::unchecked_update_order(ctx, &params)
-    }
-
     // Position.
     #[access_control(internal::Authenticate::only_controller(&ctx))]
     pub fn remove_position(ctx: Context<RemovePosition>, refund: u64) -> Result<()> {
@@ -1526,6 +1521,10 @@ pub mod gmsol_store {
         index: u8,
     ) -> Result<()> {
         instructions::prepare_trade_event_buffer(ctx, index)
+    }
+
+    pub fn update_order(ctx: Context<UpdateOrder>, params: UpdateOrderParams) -> Result<()> {
+        instructions::update_order(ctx, &params)
     }
 
     #[access_control(internal::Authenticate::only_order_keeper(&ctx))]

@@ -881,6 +881,23 @@ impl OrderV2 {
 
         Ok(())
     }
+
+    pub(crate) fn update(&mut self, id: u64, params: &UpdateOrderParams) -> Result<()> {
+        let current = &mut self.params;
+        require!(current.is_updatable()?, CoreError::InvalidArgument);
+
+        self.header.id = id;
+        current.size_delta_value = params.size_delta_usd;
+        if let Some(acceptable_price) = params.acceptable_price {
+            current.acceptable_price = acceptable_price;
+        }
+        if let Some(trigger_price) = params.trigger_price {
+            current.trigger_price = trigger_price;
+        }
+        current.min_output = params.min_output_amount;
+
+        Ok(())
+    }
 }
 
 /// Token accounts for Order.

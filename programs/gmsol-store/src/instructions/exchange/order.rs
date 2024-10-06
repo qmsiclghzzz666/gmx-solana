@@ -19,7 +19,7 @@ use crate::{
         order::{OrderKind, OrderV2},
         position::PositionKind,
         user::UserHeader,
-        Market, NonceBytes, Position, RoleKey, Seed, Store,
+        Market, NonceBytes, Position, RoleKey, Seed, Store, UpdateOrderParams,
     },
     utils::{
         internal::{self, Authentication},
@@ -1058,4 +1058,35 @@ impl<'info> CloseOrder<'info> {
         self.order.close(self.owner.to_account_info())?;
         Ok(())
     }
+}
+
+/// The accounts definitions for [`update_order`](crate::gmsol_store::update_order).
+#[derive(Accounts)]
+pub struct UpdateOrder<'info> {
+    /// Owner.
+    pub owner: Signer<'info>,
+    /// Store.
+    pub store: AccountLoader<'info, Store>,
+    /// Market.
+    #[account(mut, has_one = store)]
+    pub market: AccountLoader<'info, Market>,
+    /// Order to update.
+    #[account(
+        mut,
+        constraint = order.load()?.header.store == store.key() @ CoreError::StoreMismatched,
+        constraint = order.load()?.header.market == market.key() @ CoreError::MarketMismatched,
+        constraint = order.load()?.header.owner== owner.key() @ CoreError::OwnerMismatched,
+    )]
+    pub order: AccountLoader<'info, OrderV2>,
+}
+
+pub(crate) fn update_order(ctx: Context<UpdateOrder>, params: &UpdateOrderParams) -> Result<()> {
+    let id = ctx
+        .accounts
+        .market
+        .load_mut()?
+        .state_mut()
+        .next_order_id()?;
+    ctx.accounts.order.load_mut()?.update(id, params)?;
+    Ok(())
 }
