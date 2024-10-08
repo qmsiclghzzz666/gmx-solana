@@ -618,7 +618,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         store: &Pubkey,
         owner: Option<&Pubkey>,
         market_token: Option<&Pubkey>,
-    ) -> crate::Result<BTreeMap<Pubkey, types::Order>> {
+    ) -> crate::Result<BTreeMap<Pubkey, types::OrderV2>> {
         let mut filters = Vec::default();
         if let Some(owner) = owner {
             filters.push(RpcFilterType::Memcmp(Memcmp::new_raw_bytes(
@@ -636,9 +636,10 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         let store_filter = StoreFilter::new(store, 1);
 
         let orders = self
-            .store_accounts::<types::Order>(Some(store_filter), filters)
+            .store_accounts::<ZeroCopy<types::OrderV2>>(Some(store_filter), filters)
             .await?
             .into_iter()
+            .map(|(addr, order)| (addr, order.0))
             .collect();
 
         Ok(orders)
@@ -654,8 +655,12 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
     }
 
     /// Fetch [`Withdrawal`](types::Withdrawal) account with its address.
-    pub async fn withdrawal(&self, address: &Pubkey) -> crate::Result<types::Withdrawal> {
-        self.account(address).await?.ok_or(crate::Error::NotFound)
+    pub async fn withdrawal(&self, address: &Pubkey) -> crate::Result<types::WithdrawalV2> {
+        Ok(self
+            .account::<ZeroCopy<types::WithdrawalV2>>(address)
+            .await?
+            .ok_or(crate::Error::NotFound)?
+            .0)
     }
 
     /// Get the [`PubsubClient`].

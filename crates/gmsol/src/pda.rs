@@ -4,7 +4,7 @@ use gmsol_store::{
     states::{
         position::PositionKind,
         user::{ReferralCode, ReferralCodeBytes, UserHeader},
-        Deposit, NonceBytes, Oracle, Order, Position, Seed, Shift, Store, Withdrawal,
+        DepositV2, NonceBytes, Oracle, OrderV2, Position, Seed, Shift, Store, WithdrawalV2,
     },
 };
 use gmsol_utils::to_seed;
@@ -78,7 +78,7 @@ pub fn find_deposit_address(
     store_program_id: &Pubkey,
 ) -> (Pubkey, u8) {
     Pubkey::find_program_address(
-        &[Deposit::SEED, store.as_ref(), user.as_ref(), nonce],
+        &[DepositV2::SEED, store.as_ref(), user.as_ref(), nonce],
         store_program_id,
     )
 }
@@ -91,7 +91,7 @@ pub fn find_withdrawal_address(
     store_program_id: &Pubkey,
 ) -> (Pubkey, u8) {
     Pubkey::find_program_address(
-        &[Withdrawal::SEED, store.as_ref(), user.as_ref(), nonce],
+        &[WithdrawalV2::SEED, store.as_ref(), user.as_ref(), nonce],
         store_program_id,
     )
 }
@@ -104,7 +104,7 @@ pub fn find_order_address(
     store_program_id: &Pubkey,
 ) -> (Pubkey, u8) {
     Pubkey::find_program_address(
-        &[Order::SEED, store.as_ref(), user.as_ref(), nonce],
+        &[OrderV2::SEED, store.as_ref(), user.as_ref(), nonce],
         store_program_id,
     )
 }

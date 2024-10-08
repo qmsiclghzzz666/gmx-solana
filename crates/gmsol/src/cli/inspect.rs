@@ -10,6 +10,7 @@ use gmsol::{
     pyth::Hermes,
     types::{
         self,
+        common::action::Action,
         feature::{display_feature, ActionDisabledFlag, DomainDisabledFlag},
         user::{ReferralCode, UserHeader},
         TokenMapAccess,
@@ -707,16 +708,16 @@ impl InspectArgs {
                     table.set_titles(row!["Pubkey", "Market", "Order ID", "Order Kind", "Side"]);
                     table.set_format(table_format());
                     for (pubkey, order) in orders {
-                        let is_long = if order.fixed.kind.is_swap() {
+                        let is_long = if order.params().kind()?.is_swap() {
                             None
                         } else {
-                            Some(order.fixed.params.is_long)
+                            Some(order.params().side()?.is_long())
                         };
                         table.add_row(row![
                             pubkey,
-                            truncate_pubkey(&order.fixed.tokens.market_token),
-                            order.fixed.id,
-                            order.fixed.kind,
+                            truncate_pubkey(order.market_token()),
+                            order.header().id(),
+                            order.params().kind()?,
                             is_long
                                 .map(|is_long| if is_long { "long" } else { "short" })
                                 .unwrap_or("-"),

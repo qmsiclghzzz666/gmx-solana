@@ -43,15 +43,6 @@ pub mod token;
 /// Instructions for [`Oracle`](crate::states::Oracle) account.
 pub mod oracle;
 
-/// Instructions for [`Deposit`](crate::states::Deposit) account.
-pub mod deposit;
-
-/// Instructions for [`Withdrawal`](crate::states::Withdrawal) account.
-pub mod withdrawal;
-
-/// Instructions for [`Order`](crate::states::Order) account.
-pub mod order;
-
 /// Instructions for [`Position`](crate::states::Position) account.
 pub mod position;
 
@@ -73,19 +64,16 @@ pub mod bug_fix;
 
 pub use config::*;
 pub use data_store::*;
-pub use deposit::*;
 pub use exchange::*;
 pub use feature::*;
 pub use gt::*;
 pub use market::*;
 pub use oracle::*;
-pub use order::*;
 pub use position::*;
 pub use roles::*;
 pub use token::*;
 pub use token_config::*;
 pub use user::*;
-pub use withdrawal::*;
 
 #[cfg(not(feature = "no-bug-fix"))]
 pub use bug_fix::*;

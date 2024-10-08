@@ -302,12 +302,9 @@ use self::{
         withdrawal::CreateWithdrawalParams,
     },
     states::{
-        common::{SwapParams, TokenRecord},
-        deposit::TokenParams as DepositTokenParams,
         market::{config::EntryArgs, status::MarketStatus, MarketMeta},
-        order::{OrderParams, UpdateOrderParams},
+        order::UpdateOrderParams,
         token_config::TokenConfigBuilder,
-        withdrawal::TokenParams as WithdrawalTokenParams,
         FactorKey, PriceProviderKind,
     },
     utils::internal,
@@ -1246,108 +1243,6 @@ pub mod gmsol_store {
         tokens: Vec<Pubkey>,
     ) -> Result<()> {
         instructions::set_prices_from_price_feed(ctx, tokens)
-    }
-
-    // Deposit.
-    #[access_control(internal::Authenticate::only_controller(&ctx))]
-    pub fn initialize_deposit(
-        ctx: Context<InitializeDeposit>,
-        nonce: [u8; 32],
-        tokens_with_feed: Vec<TokenRecord>,
-        swap_params: SwapParams,
-        token_params: DepositTokenParams,
-        ui_fee_receiver: Pubkey,
-    ) -> Result<()> {
-        instructions::initialize_deposit(
-            ctx,
-            nonce,
-            tokens_with_feed,
-            swap_params,
-            token_params,
-            ui_fee_receiver,
-        )
-    }
-
-    #[access_control(internal::Authenticate::only_controller(&ctx))]
-    pub fn remove_deposit(ctx: Context<RemoveDeposit>, refund: u64, reason: String) -> Result<()> {
-        instructions::remove_deposit(ctx, refund, &reason)
-    }
-
-    // Withdrawal.
-    #[access_control(internal::Authenticate::only_controller(&ctx))]
-    pub fn initialize_withdrawal(
-        ctx: Context<InitializeWithdrawal>,
-        nonce: [u8; 32],
-        swap_params: SwapParams,
-        tokens_with_feed: Vec<TokenRecord>,
-        token_params: WithdrawalTokenParams,
-        market_token_amount: u64,
-        ui_fee_receiver: Pubkey,
-    ) -> Result<()> {
-        instructions::initialize_withdrawal(
-            ctx,
-            nonce,
-            swap_params,
-            tokens_with_feed,
-            token_params,
-            market_token_amount,
-            ui_fee_receiver,
-        )
-    }
-
-    #[access_control(internal::Authenticate::only_controller(&ctx))]
-    pub fn remove_withdrawal(
-        ctx: Context<RemoveWithdrawal>,
-        refund: u64,
-        reason: String,
-    ) -> Result<()> {
-        instructions::remove_withdrawal(ctx, refund, &reason)
-    }
-
-    // Exchange.
-    #[access_control(internal::Authenticate::only_controller(&ctx))]
-    pub fn execute_deposit<'info>(
-        ctx: Context<'_, '_, 'info, 'info, ExecuteDeposit<'info>>,
-        throw_on_execution_error: bool,
-    ) -> Result<bool> {
-        instructions::execute_deposit(ctx, throw_on_execution_error)
-    }
-
-    #[access_control(internal::Authenticate::only_controller(&ctx))]
-    pub fn execute_withdrawal<'info>(
-        ctx: Context<'_, '_, 'info, 'info, ExecuteWithdrawal<'info>>,
-        throw_on_execution_error: bool,
-    ) -> Result<(u64, u64)> {
-        instructions::execute_withdrawal(ctx, throw_on_execution_error)
-    }
-
-    // Order.
-    #[access_control(internal::Authenticate::only_controller(&ctx))]
-    pub fn initialize_order(
-        ctx: Context<InitializeOrder>,
-        owner: Pubkey,
-        nonce: [u8; 32],
-        tokens_with_feed: Vec<TokenRecord>,
-        swap: SwapParams,
-        params: OrderParams,
-        output_token: Pubkey,
-        ui_fee_receiver: Pubkey,
-    ) -> Result<()> {
-        instructions::initialize_order(
-            ctx,
-            owner,
-            nonce,
-            tokens_with_feed,
-            swap,
-            params,
-            output_token,
-            ui_fee_receiver,
-        )
-    }
-
-    #[access_control(internal::Authenticate::only_controller(&ctx))]
-    pub fn remove_order(ctx: Context<RemoveOrder>, refund: u64, reason: String) -> Result<()> {
-        instructions::remove_order(ctx, refund, &reason)
     }
 
     // Position.

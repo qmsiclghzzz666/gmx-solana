@@ -18,7 +18,8 @@ use gmsol_store::{
     ops::order::CreateOrderParams,
     states::{
         common::{action::Action, swap::SwapParamsV2, TokensWithFeed},
-        order::{OrderKind, OrderParams, OrderV2},
+        order::{OrderKind, OrderV2},
+        position::PositionKind,
         user::UserHeader,
         Market, MarketMeta, NonceBytes, Pyth, Store, TokenMapAccess,
     },
@@ -36,6 +37,42 @@ use crate::pyth::pull_oracle::{ExecuteWithPythPrices, Prices, PythPullOracleCont
 
 /// `execute_order` compute budget.
 pub const EXECUTE_ORDER_COMPUTE_BUDGET: u32 = 400_000;
+
+/// Order Params.
+pub struct OrderParams {
+    /// Order kind.
+    pub kind: OrderKind,
+    /// Minimum amount or value for output tokens.
+    ///
+    /// - Amount for swap orders.
+    /// - Value for decrease position orders.
+    pub min_output_amount: u128,
+    /// Size delta usd.
+    pub size_delta_usd: u128,
+    /// Initial collateral delta amount.
+    pub initial_collateral_delta_amount: u64,
+    /// Trigger price (unit price).
+    pub trigger_price: Option<u128>,
+    /// Acceptable price (unit price).
+    pub acceptable_price: Option<u128>,
+    /// Whether the order is for a long or short position.
+    pub is_long: bool,
+}
+
+impl OrderParams {
+    /// Get position kind.
+    pub fn to_position_kind(&self) -> crate::Result<PositionKind> {
+        if self.kind.is_swap() {
+            Err(crate::Error::invalid_argument("position is not required"))
+        } else {
+            Ok(if self.is_long {
+                PositionKind::Long
+            } else {
+                PositionKind::Short
+            })
+        }
+    }
+}
 
 /// Create Order Builder.
 pub struct CreateOrderBuilder<'a, C> {
@@ -195,9 +232,7 @@ where
                     &self.client.payer(),
                     &self.market_token,
                     &output_token,
-                    self.params
-                        .to_position_kind()
-                        .map_err(anchor_client::ClientError::from)?,
+                    self.params.to_position_kind()?,
                 )?;
                 Ok(Some(position))
             }

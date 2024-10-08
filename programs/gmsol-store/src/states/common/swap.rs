@@ -26,10 +26,6 @@ pub struct SwapParams {
 }
 
 impl SwapParams {
-    pub(crate) fn init_space(long_path_len: usize, short_path_len: usize) -> usize {
-        (4 + 32 * long_path_len) + (4 + 32 * short_path_len)
-    }
-
     /// Get the first market token in the swap path.
     pub fn first_market_token(&self, is_long: bool) -> Option<&Pubkey> {
         if is_long {

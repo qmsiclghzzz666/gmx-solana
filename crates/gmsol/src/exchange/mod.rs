@@ -30,11 +30,11 @@ use gmsol_store::{
     ops::order::PositionCutKind,
     states::{
         feature::{ActionDisabledFlag, DomainDisabledFlag},
-        order::{OrderKind, OrderParams},
+        order::OrderKind,
         NonceBytes, UpdateOrderParams,
     },
 };
-use order::CloseOrderBuilder;
+use order::{CloseOrderBuilder, OrderParams};
 use position_cut::PositionCutBuilder;
 use rand::{distributions::Standard, Rng};
 use shift::{CloseShiftBuilder, CreateShiftBuilder, ExecuteShiftBuilder};

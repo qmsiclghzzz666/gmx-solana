@@ -13,9 +13,10 @@ use gmsol::{
         PythPullOracleContext, PythPullOracleOps,
     },
     types::{
-        Deposit, DepositCreatedEvent, Order, OrderCreatedEvent, Withdrawal, WithdrawalCreatedEvent,
+        DepositCreatedEvent, DepositV2, OrderCreatedEvent, OrderV2, WithdrawalCreatedEvent,
+        WithdrawalV2,
     },
-    utils::{ComputeBudget, RpcBuilder},
+    utils::{ComputeBudget, RpcBuilder, ZeroCopy},
 };
 use gmsol_model::PositionState;
 use gmsol_store::states::PriceProviderKind;
@@ -163,7 +164,7 @@ impl KeeperArgs {
                 match action {
                     Action::Deposit => {
                         let actions = client
-                            .store_accounts::<Deposit>(
+                            .store_accounts::<ZeroCopy<DepositV2>>(
                                 filter_store
                                     .then(|| StoreFilter::new(store, 8).ignore_disc_offset(true)),
                                 None,
@@ -189,7 +190,7 @@ impl KeeperArgs {
                     }
                     Action::Withdrawal => {
                         let actions = client
-                            .store_accounts::<Withdrawal>(
+                            .store_accounts::<ZeroCopy<WithdrawalV2>>(
                                 filter_store
                                     .then(|| StoreFilter::new(store, 8).ignore_disc_offset(true)),
                                 None,
@@ -221,7 +222,7 @@ impl KeeperArgs {
                     }
                     Action::Order => {
                         let actions = client
-                            .store_accounts::<Order>(
+                            .store_accounts::<ZeroCopy<OrderV2>>(
                                 filter_store
                                     .then(|| StoreFilter::new(store, 9).ignore_disc_offset(true)),
                                 None,

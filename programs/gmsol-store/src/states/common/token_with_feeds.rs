@@ -78,12 +78,6 @@ impl TokensWithFeed {
             nums,
         })
     }
-
-    // TODO: add test.
-    pub(crate) fn init_space(tokens_with_feed: &[TokenRecord]) -> usize {
-        let len = tokens_with_feed.len();
-        (4 + 32 * len) * 2 + (4 + len) + (4 + 2 * len)
-    }
 }
 
 /// Collect token records for the give tokens.
