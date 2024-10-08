@@ -263,7 +263,7 @@ where
 
         let mut report = Box::new(DecreasePositionReport::new(
             should_remove,
-            self.params,
+            // self.params,
             execution,
             self.withdrawable_collateral_amount,
             self.size_delta_usd,
@@ -276,6 +276,7 @@ where
         Self::swap_output_tokens_if_needed(
             self.position.market_mut(),
             &mut report,
+            self.params.prices(),
             are_pnl_and_collateral_tokens_the_same,
         )?;
 
@@ -538,12 +539,11 @@ where
     fn swap_output_tokens_if_needed(
         market: &mut P::Market,
         report: &mut DecreasePositionReport<P::Num>,
+        prices: &Prices<P::Num>,
         are_pnl_and_collateral_tokens_the_same: bool,
     ) -> crate::Result<()> {
-        let (is_secondary_output_token_long, prices) = (
-            report.is_secondary_output_token_long(),
-            report.params().prices.clone(),
-        );
+        let (is_secondary_output_token_long, prices) =
+            (report.is_secondary_output_token_long(), prices.clone());
         let (output_amount, secondary_output_amount) = report.output_amounts_mut();
         if !secondary_output_amount.is_zero() {
             if are_pnl_and_collateral_tokens_the_same {

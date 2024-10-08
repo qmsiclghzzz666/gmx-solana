@@ -648,8 +648,9 @@ impl TradeEventData {
     pub(crate) fn update_with_decrease_report(
         &mut self,
         report: &DecreasePositionReport<u128>,
+        prices: &Prices<u128>,
     ) -> Result<()> {
-        self.prices.set_with_prices(report.params().prices());
+        self.prices.set_with_prices(prices);
         self.execution_price = *report.execution_price();
         self.price_impact_value = *report.price_impact_value();
         self.price_impact_diff = *report.price_impact_diff();

@@ -8,12 +8,12 @@ use crate::{
     params::fee::PositionFees,
 };
 
-use super::{ClaimableCollateral, DecreasePositionParams, ProcessCollateralResult};
+use super::{ClaimableCollateral, ProcessCollateralResult};
 
 /// Report of the execution of posiiton decreasing.
 #[must_use]
 pub struct DecreasePositionReport<T: Unsigned> {
-    params: DecreasePositionParams<T>,
+    // params: DecreasePositionParams<T>,
     price_impact_value: T::Signed,
     price_impact_diff: T,
     execution_price: T,
@@ -42,7 +42,7 @@ where
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("DecreasePositionReport")
-            .field("params", &self.params)
+            // .field("params", &self.params)
             .field("price_impact_value", &self.price_impact_value)
             .field("price_impact_diff", &self.price_impact_diff)
             .field("execution_price", &self.execution_price)
@@ -79,7 +79,7 @@ where
 impl<T: Unsigned + Clone> DecreasePositionReport<T> {
     pub(super) fn new(
         should_remove: bool,
-        params: DecreasePositionParams<T>,
+        // _params: DecreasePositionParams<T>,
         execution: ProcessCollateralResult<T>,
         withdrawable_collateral_amount: T,
         size_delta_usd: T,
@@ -88,7 +88,7 @@ impl<T: Unsigned + Clone> DecreasePositionReport<T> {
     ) -> Self {
         Self {
             should_remove,
-            params,
+            // params,
             price_impact_value: execution.price_impact_value,
             execution_price: execution.execution_price,
             size_delta_in_tokens: execution.size_delta_in_tokens,
@@ -120,10 +120,10 @@ impl<T: Unsigned + Clone> DecreasePositionReport<T> {
         }
     }
 
-    /// Get params.
-    pub fn params(&self) -> &DecreasePositionParams<T> {
-        &self.params
-    }
+    // /// Get params.
+    // pub fn params(&self) -> &DecreasePositionParams<T> {
+    //     &self.params
+    // }
 
     /// Get size delta in tokens.
     pub fn size_delta_in_tokens(&self) -> &T {

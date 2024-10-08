@@ -1297,7 +1297,7 @@ fn execute_decrease_position(
         }
 
         msg!("[Position] decreased: {:?}", report);
-        event.update_with_decrease_report(&report)?;
+        event.update_with_decrease_report(&report, &prices)?;
         report
     };
     let should_remove_position = report.should_remove();
