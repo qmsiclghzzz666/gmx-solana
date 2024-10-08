@@ -1076,11 +1076,14 @@ impl Deployment {
             .build_with_address()
             .await?;
         let signature = rpc
-            .into_anchor_request()
-            .send_with_spinner_and_config(RpcSendTransactionConfig {
-                skip_preflight,
-                ..Default::default()
-            })
+            .send_with_options(
+                false,
+                None,
+                RpcSendTransactionConfig {
+                    skip_preflight,
+                    ..Default::default()
+                },
+            )
             .await?;
         tracing::info!(%deposit, %signature, "created a deposit");
         let mut builder = keeper.execute_deposit(&self.store, &self.oracle, &deposit, false);
