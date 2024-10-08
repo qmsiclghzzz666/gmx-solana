@@ -6,6 +6,7 @@ skip-lint = false
 
 [programs.localnet]
 gmsol_store = "gmX4GEZycT14vqJ3yDoCA5jW53vBaSQpQDYNDXtkWt1"
+gmsol-treasury = "trekjLtMLpfJHVxBVhng99koG3LPAxzTBLMYco9vfJQ"
 
 [registry]
 url = "https://api.apr.dev"
