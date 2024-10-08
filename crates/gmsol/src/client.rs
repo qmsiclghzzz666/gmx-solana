@@ -10,7 +10,7 @@ use anchor_client::{
     Cluster,
 };
 
-use gmsol_model::{action::Prices, PnlFactorKind};
+use gmsol_model::{price::Prices, PnlFactorKind};
 use gmsol_store::states::{
     position::PositionKind, status::MarketStatus, user::ReferralCodeBytes, NonceBytes,
 };

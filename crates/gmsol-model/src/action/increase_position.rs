@@ -9,12 +9,12 @@ use crate::{
     num::Unsigned,
     params::fee::PositionFees,
     position::{CollateralDelta, Position, PositionExt},
+    price::{Price, Prices},
     BorrowingFeeMarketExt, PerpMarketMut, PoolExt, PositionMut, PositionMutExt,
 };
 
 use super::{
     update_borrowing_state::UpdateBorrowingReport, update_funding_state::UpdateFundingReport,
-    Prices,
 };
 
 /// Increase the position.
@@ -353,8 +353,9 @@ where
                 price_impact_value: Zero::zero(),
                 price_impact_amount: Zero::zero(),
                 size_delta_in_tokens: Zero::zero(),
-                // TODO: pick price by position side
-                execution_price: index_token_price.clone(),
+                execution_price: index_token_price
+                    .pick_price(self.position.is_long())
+                    .clone(),
             });
         }
 
@@ -368,6 +369,7 @@ where
                 .params
                 .prices
                 .index_token_price
+                .pick_price(true)
                 .clone()
                 .try_into()
                 .map_err(|_| crate::Error::Convert)?;
@@ -380,22 +382,21 @@ where
             self.params
                 .prices
                 .index_token_price
+                .pick_price(false)
                 .as_divisor_to_round_up_magnitude_div(&price_impact_value)
                 .ok_or(crate::Error::Computation("calculating price impact amount"))?
         };
 
         // Base size delta in tokens.
         let mut size_delta_in_tokens = if self.position.is_long() {
-            // TODO: select max price.
-            let price = &self.params.prices.index_token_price;
+            let price = self.params.prices.index_token_price.pick_price(true);
             debug_assert!(
                 !price.is_zero(),
                 "price must have been checked to be non-zero"
             );
             self.params.size_delta_usd.clone() / price.clone()
         } else {
-            // TODO: select min price.
-            let price = &self.params.prices.index_token_price;
+            let price = self.params.prices.index_token_price.pick_price(false);
             self.params
                 .size_delta_usd
                 .checked_round_up_div(price)
@@ -430,12 +431,8 @@ where
     }
 
     #[inline]
-    fn collateral_price(&self) -> &P::Num {
-        if self.position.is_collateral_token_long() {
-            &self.params.prices.long_token_price
-        } else {
-            &self.params.prices.short_token_price
-        }
+    fn collateral_price(&self) -> &Price<P::Num> {
+        self.position.collateral_price(&self.params.prices)
     }
 
     fn process_collateral(
@@ -528,11 +525,7 @@ mod tests {
     #[test]
     fn basic() -> crate::Result<()> {
         let mut market = TestMarket::<u64, 9>::default();
-        let prices = Prices {
-            index_token_price: 120,
-            long_token_price: 120,
-            short_token_price: 1,
-        };
+        let prices = Prices::new_for_test(120, 120, 1);
         market.deposit(1_000_000_000, 0, prices)?.execute()?;
         market.deposit(0, 1_000_000_000, prices)?.execute()?;
         println!("{market:#?}");
@@ -540,11 +533,7 @@ mod tests {
         let report = position
             .ops(&mut market)
             .increase(
-                Prices {
-                    index_token_price: 123,
-                    long_token_price: 123,
-                    short_token_price: 1,
-                },
+                Prices::new_for_test(123, 123, 1),
                 100_000_000,
                 8_000_000_000,
                 None,

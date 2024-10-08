@@ -313,7 +313,7 @@ use self::{
     utils::internal,
 };
 use anchor_lang::prelude::*;
-use gmsol_model::action::Prices;
+use gmsol_model::price::Prices;
 use gmsol_utils::price::Price;
 
 #[cfg_attr(test, macro_use)]

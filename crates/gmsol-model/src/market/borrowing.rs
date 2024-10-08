@@ -1,7 +1,7 @@
 use num_traits::{CheckedAdd, CheckedSub, Zero};
 
 use crate::{
-    action::Prices, params::fee::BorrowingFeeParams, Balance, BalanceExt, BaseMarket, BaseMarketExt,
+    params::fee::BorrowingFeeParams, price::Prices, Balance, BalanceExt, BaseMarket, BaseMarketExt,
 };
 
 /// A market with borrowing fees.

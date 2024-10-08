@@ -5,10 +5,9 @@ use crate::{
     market::{BaseMarket, BaseMarketExt, PerpMarketMutExt},
     num::{MulDiv, Unsigned},
     params::fee::FundingRateChangeType,
+    price::Prices,
     Balance, BalanceExt, PerpMarketMut,
 };
-
-use super::Prices;
 
 /// Update Funding State Action.
 #[must_use]
@@ -144,11 +143,16 @@ impl<M: PerpMarketMut<DECIMALS>, const DECIMALS: u8> UpdateFundingState<M, DECIM
     ) -> crate::Result<()> {
         let adjustment = &self.market.funding_amount_per_size_adjustment();
         for is_long_collateral in [true, false] {
-            // TODO: use max price.
             let (funding_value, price) = if is_long_collateral {
-                (for_long_collateral, &self.prices.long_token_price)
+                (
+                    for_long_collateral,
+                    self.prices.long_token_price.pick_price(true),
+                )
             } else {
-                (for_short_collateral, &self.prices.short_token_price)
+                (
+                    for_short_collateral,
+                    self.prices.short_token_price.pick_price(true),
+                )
             };
 
             let payer = flags_to_index(longs_pay_shorts, is_long_collateral);
@@ -445,22 +449,14 @@ mod tests {
     #[test]
     fn test_update_funding_state() -> crate::Result<()> {
         let mut market = TestMarket::<u64, 9>::default();
-        let prices = Prices {
-            index_token_price: 120,
-            long_token_price: 120,
-            short_token_price: 1,
-        };
+        let prices = Prices::new_for_test(120, 120, 1);
         market
             .deposit(1_000_000_000_000, 100_000_000_000_000, prices)?
             .execute()?;
         println!("{market:#?}");
         let mut long = TestPosition::long(true);
         let mut short = TestPosition::short(false);
-        let prices = Prices {
-            index_token_price: 123,
-            long_token_price: 123,
-            short_token_price: 1,
-        };
+        let prices = Prices::new_for_test(123, 123, 1);
         let report = long
             .ops(&mut market)
             .increase(prices, 1_000_000_000_000, 50_000_000_000_000, None)?

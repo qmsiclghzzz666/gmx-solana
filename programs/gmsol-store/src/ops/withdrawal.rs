@@ -172,7 +172,6 @@ impl<'a, 'info> ExecuteWithdrawalOp<'a, 'info> {
         match self.do_execute() {
             Ok(res) => Ok(Some(res)),
             Err(err) if !throw_on_execution_error => {
-                // TODO: catch and throw missing oracle price error.
                 msg!("Execute withdrawal error: {}", err);
                 Ok(None)
             }

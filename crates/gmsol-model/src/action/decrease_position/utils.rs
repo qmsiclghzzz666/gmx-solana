@@ -1,9 +1,12 @@
 use num_traits::{CheckedAdd, CheckedSub, Signed, Zero};
 
-use crate::num::{MulDiv, UnsignedAbs};
+use crate::{
+    num::{MulDiv, UnsignedAbs},
+    price::Price,
+};
 
 pub(super) fn get_execution_price_for_decrease<T>(
-    index_price: &T,
+    index_price: &Price<T>,
     size_in_usd: &T,
     size_in_tokens: &T,
     size_delta_usd: &T,
@@ -15,8 +18,7 @@ where
     T: Clone + MulDiv + Ord + CheckedAdd + CheckedSub,
     T::Signed: CheckedSub + Clone + Ord + UnsignedAbs,
 {
-    // TODO: pick index price by position side.
-    let mut execution_price = index_price.clone();
+    let mut execution_price = index_price.pick_price(is_long).clone();
     if !size_delta_usd.is_zero() && !size_in_tokens.is_zero() {
         let adjusted_price_impact_value = if is_long {
             price_impact_value.clone()

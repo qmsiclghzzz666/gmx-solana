@@ -2,11 +2,10 @@ use crate::{
     market::{BaseMarket, BaseMarketExt, LiquidityMarketExt, LiquidityMarketMut},
     num::MulDiv,
     params::Fees,
+    price::{Price, Prices},
     utils, BalanceExt, PnlFactorKind, PoolExt,
 };
 use num_traits::{CheckedAdd, Zero};
-
-use super::Prices;
 
 /// A withdrawal.
 #[must_use]
@@ -29,12 +28,12 @@ impl<T> WithdrawParams<T> {
     }
 
     /// Get long token price.
-    pub fn long_token_price(&self) -> &T {
+    pub fn long_token_price(&self) -> &Price<T> {
         &self.prices.long_token_price
     }
 
     /// Get short token price.
-    pub fn short_token_price(&self) -> &T {
+    pub fn short_token_price(&self) -> &Price<T> {
         &self.prices.short_token_price
     }
 }
@@ -172,8 +171,10 @@ impl<const DECIMALS: u8, M: LiquidityMarketMut<DECIMALS>> Withdrawal<M, DECIMALS
         // We use the liquidity pool value instead of the pool value with pending values to calculate the fraction of
         // long token and short token.
         let pool = self.market.liquidity_pool()?;
-        let long_token_value = pool.long_usd_value(self.params.long_token_price())?;
-        let short_token_value = pool.short_usd_value(self.params.short_token_price())?;
+        let long_token_value =
+            pool.long_usd_value(self.params.long_token_price().pick_price(true))?;
+        let short_token_value =
+            pool.short_usd_value(self.params.short_token_price().pick_price(true))?;
         let total_pool_value =
             long_token_value
                 .checked_add(&short_token_value)
@@ -188,14 +189,16 @@ impl<const DECIMALS: u8, M: LiquidityMarketMut<DECIMALS>> Withdrawal<M, DECIMALS
         )
         .ok_or(crate::Error::Computation("amount to usd"))?;
 
+        debug_assert!(!self.params.long_token_price().has_zero());
+        debug_assert!(!self.params.short_token_price().has_zero());
         let long_token_amount = market_token_value
             .checked_mul_div(&long_token_value, &total_pool_value)
             .ok_or(crate::Error::Computation("long token amount"))?
-            / self.params.long_token_price().clone();
+            / self.params.long_token_price().pick_price(true).clone();
         let short_token_amount = market_token_value
             .checked_mul_div(&short_token_value, &total_pool_value)
             .ok_or(crate::Error::Computation("short token amount"))?
-            / self.params.short_token_price().clone();
+            / self.params.short_token_price().pick_price(true).clone();
         Ok((long_token_amount, short_token_amount))
     }
 
@@ -213,18 +216,14 @@ impl<const DECIMALS: u8, M: LiquidityMarketMut<DECIMALS>> Withdrawal<M, DECIMALS
 #[cfg(test)]
 mod tests {
     use crate::{
-        action::Prices, market::LiquidityMarketMutExt, pool::Balance, test::TestMarket, BaseMarket,
+        market::LiquidityMarketMutExt, pool::Balance, price::Prices, test::TestMarket, BaseMarket,
         LiquidityMarket,
     };
 
     #[test]
     fn basic() -> crate::Result<()> {
         let mut market = TestMarket::<u64, 9>::default();
-        let prices = Prices {
-            index_token_price: 120,
-            long_token_price: 120,
-            short_token_price: 1,
-        };
+        let prices = Prices::new_for_test(120, 120, 1);
         market.deposit(1_000_000_000, 0, prices)?.execute()?;
         market.deposit(1_000_000_000, 0, prices)?.execute()?;
         market.deposit(0, 1_000_000_000, prices)?.execute()?;
@@ -232,11 +231,7 @@ mod tests {
         let before_supply = market.total_supply();
         let before_long_amount = market.liquidity_pool()?.long_amount()?;
         let before_short_amount = market.liquidity_pool()?.short_amount()?;
-        let prices = Prices {
-            index_token_price: 120,
-            long_token_price: 120,
-            short_token_price: 1,
-        };
+        let prices = Prices::new_for_test(120, 120, 1);
         let report = market.withdraw(1_000_000_000, prices)?.execute()?;
         println!("{report:#?}");
         println!("{market:#?}");
@@ -263,11 +258,7 @@ mod tests {
     #[test]
     fn zero_amount_withdrawal() -> crate::Result<()> {
         let mut market = TestMarket::<u64, 9>::default();
-        let prices = Prices {
-            index_token_price: 120,
-            long_token_price: 120,
-            short_token_price: 1,
-        };
+        let prices = Prices::new_for_test(120, 120, 1);
         market.deposit(1_000_000_000, 0, prices)?.execute()?;
         market.deposit(0, 1_000_000_000, prices)?.execute()?;
         let result = market.withdraw(0, prices);
@@ -279,11 +270,7 @@ mod tests {
     #[test]
     fn over_amount_withdrawal() -> crate::Result<()> {
         let mut market = TestMarket::<u64, 9>::default();
-        let prices = Prices {
-            index_token_price: 120,
-            long_token_price: 120,
-            short_token_price: 1,
-        };
+        let prices = Prices::new_for_test(120, 120, 1);
         market.deposit(1_000_000, 0, prices)?.execute()?;
         market.deposit(0, 1_000_000, prices)?.execute()?;
         println!("{market:#?}");
@@ -298,11 +285,7 @@ mod tests {
     #[test]
     fn small_amount_withdrawal() -> crate::Result<()> {
         let mut market = TestMarket::<u64, 9>::default();
-        let prices = Prices {
-            index_token_price: 120,
-            long_token_price: 120,
-            short_token_price: 1,
-        };
+        let prices = Prices::new_for_test(120, 120, 1);
         market.deposit(1_000_000_000, 0, prices)?.execute()?;
         market.deposit(1_000_000_000, 0, prices)?.execute()?;
         market.deposit(0, 1_000_000_000, prices)?.execute()?;
@@ -310,11 +293,7 @@ mod tests {
         let before_supply = market.total_supply();
         let before_long_amount = market.liquidity_pool()?.long_amount()?;
         let before_short_amount = market.liquidity_pool()?.short_amount()?;
-        let prices = Prices {
-            index_token_price: 120,
-            long_token_price: 120,
-            short_token_price: 1,
-        };
+        let prices = Prices::new_for_test(120, 120, 1);
 
         let small_amount = 1;
         let report = market.withdraw(small_amount, prices)?.execute()?;

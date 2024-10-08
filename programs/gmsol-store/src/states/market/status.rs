@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use gmsol_model::{action::Prices, BaseMarketExt, BorrowingFeeMarketExt, PerpMarket};
+use gmsol_model::{price::Prices, BaseMarketExt, BorrowingFeeMarketExt, PerpMarket};
 
 use super::Market;
 

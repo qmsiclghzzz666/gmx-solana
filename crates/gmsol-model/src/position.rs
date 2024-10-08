@@ -5,7 +5,7 @@ use num_traits::{One, Zero};
 use crate::{
     action::{
         decrease_position::DecreasePosition, increase_position::IncreasePosition,
-        update_funding_state::unpack_to_funding_amount, Prices,
+        update_funding_state::unpack_to_funding_amount,
     },
     fixed::FixedPointOps,
     market::{
@@ -14,6 +14,7 @@ use crate::{
     },
     num::{MulDiv, Num, Unsigned, UnsignedAbs},
     params::fee::{FundingFees, PositionFees},
+    price::{Price, Prices},
     Balance, BalanceExt, PerpMarketMut, PnlFactorKind, Pool, PoolExt,
 };
 
@@ -222,10 +223,9 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
             &prices.short_token_price
         };
 
-        // TODO: pick min value of the price.
         let mut remaining_collateral_value = delta
             .next_collateral_amount
-            .checked_mul(collateral_token_price)
+            .checked_mul(collateral_token_price.pick_price(false))
             .ok_or(crate::Error::Computation(
                 "overflow calculating collateral value",
             ))?
@@ -275,7 +275,7 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
     }
 
     /// Get collateral price.
-    fn collateral_price<'a>(&self, prices: &'a Prices<Self::Num>) -> &'a Self::Num {
+    fn collateral_price<'a>(&self, prices: &'a Prices<Self::Num>) -> &'a Price<Self::Num> {
         if self.is_collateral_token_long() {
             &prices.long_token_price
         } else {
@@ -287,7 +287,7 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
     fn collateral_value(&self, prices: &Prices<Self::Num>) -> crate::Result<Self::Num> {
         use num_traits::CheckedMul;
 
-        let collateral_token_price = self.collateral_price(prices);
+        let collateral_token_price = self.collateral_price(prices).pick_price(false);
 
         let collateral_value = self
             .collateral_amount()
@@ -309,8 +309,9 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
     ) -> crate::Result<(Self::Signed, Self::Signed, Self::Num)> {
         use num_traits::{CheckedMul, CheckedSub, Signed};
 
-        // TODO: pick by position side.
-        let execution_price = &prices.index_token_price;
+        let execution_price = &prices
+            .index_token_price
+            .pick_price_for_pnl(self.is_long(), false);
 
         let position_value: Self::Signed = self
             .size_in_tokens()
@@ -445,7 +446,7 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
 
         let collateral_cost_value = fees
             .total_cost_amount()?
-            .checked_mul(self.collateral_price(prices))
+            .checked_mul(self.collateral_price(prices).pick_price(false))
             .ok_or(crate::Error::Computation(
                 "overflow calculating collateral cost value",
             ))?;
@@ -513,7 +514,7 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
     /// Cap positive position price impact.
     fn cap_positive_position_price_impact(
         &self,
-        index_token_price: &Self::Num,
+        index_token_price: &Price<Self::Num>,
         size_delta_usd: &Self::Signed,
         impact: &mut Self::Signed,
     ) -> crate::Result<()> {
@@ -522,9 +523,8 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
         if impact.is_positive() {
             let impact_pool_amount = self.market().position_impact_pool_amount()?;
             // Cap price impact based on pool amount.
-            // TODO: use min price.
             let max_impact = impact_pool_amount
-                .checked_mul(index_token_price)
+                .checked_mul(index_token_price.pick_price(false))
                 .ok_or(crate::Error::Computation(
                     "overflow calculating max positive position impact based on pool amount",
                 ))?
@@ -588,7 +588,7 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
     #[inline]
     fn capped_positive_position_price_impact(
         &self,
-        index_token_price: &Self::Num,
+        index_token_price: &Price<Self::Num>,
         size_delta_usd: &Self::Signed,
     ) -> crate::Result<Self::Signed> {
         let mut impact = self.position_price_impact(size_delta_usd)?;
@@ -603,7 +603,7 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
     #[inline]
     fn capped_position_price_impact(
         &self,
-        index_token_price: &Self::Num,
+        index_token_price: &Price<Self::Num>,
         size_delta_usd: &Self::Signed,
     ) -> crate::Result<(Self::Signed, Self::Num)> {
         let mut impact =
@@ -678,11 +678,11 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
     /// Get position fees.
     fn position_fees(
         &self,
-        collateral_token_price: &Self::Num,
+        collateral_token_price: &Price<Self::Num>,
         size_delta_usd: &Self::Num,
         is_positive_impact: bool,
     ) -> crate::Result<PositionFees<Self::Num>> {
-        debug_assert!(!collateral_token_price.is_zero(), "must be non-zero");
+        debug_assert!(!collateral_token_price.has_zero(), "must be non-zero");
         let fees = self
             .market()
             .order_fee_params()?

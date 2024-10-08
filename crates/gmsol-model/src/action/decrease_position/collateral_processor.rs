@@ -1,10 +1,11 @@
 use std::ops::{Deref, DerefMut};
 
 use crate::{
-    action::Prices,
     market::{BaseMarket, BaseMarketMutExt, PositionImpactMarketMutExt},
     num::{MulDiv, Num, Unsigned, UnsignedAbs},
     params::fee::{FundingFees, PositionFees},
+    price::Price,
+    price::Prices,
     PerpMarketMut,
 };
 
@@ -31,9 +32,7 @@ pub(super) struct ProcessReport<T> {
 }
 
 struct State<T> {
-    long_token_price: T,
-    short_token_price: T,
-    index_token_price: T,
+    prices: Prices<T>,
     is_pnl_token_long: bool,
     is_output_token_long: bool,
     are_pnl_and_collateral_tokens_the_same: bool,
@@ -61,29 +60,29 @@ impl<T> State<T> {
     }
 
     #[inline]
-    fn pnl_token_price(&self) -> &T {
+    fn pnl_token_price(&self) -> &Price<T> {
         if self.is_pnl_token_long {
-            &self.long_token_price
+            &self.prices.long_token_price
         } else {
-            &self.short_token_price
+            &self.prices.short_token_price
         }
     }
 
     #[inline]
-    fn output_token_price(&self) -> &T {
+    fn output_token_price(&self) -> &Price<T> {
         if self.is_output_token_long {
-            &self.long_token_price
+            &self.prices.long_token_price
         } else {
-            &self.short_token_price
+            &self.prices.short_token_price
         }
     }
 
     #[inline]
-    fn secondary_output_token_price(&self) -> &T {
+    fn secondary_output_token_price(&self) -> &Price<T> {
         if self.is_pnl_token_long {
-            &self.long_token_price
+            &self.prices.long_token_price
         } else {
-            &self.short_token_price
+            &self.prices.short_token_price
         }
     }
 }
@@ -101,10 +100,11 @@ where
             return Ok((paid_in_collateral_amount, paid_in_secondary_output_amount));
         }
 
-        let mut remaining_cost_in_output_token =
-            cost.checked_round_up_div(self.output_token_price()).ok_or(
-                crate::Error::Computation("initializing cost in output tokens"),
-            )?;
+        let mut remaining_cost_in_output_token = cost
+            .checked_round_up_div(self.output_token_price().pick_price(false))
+            .ok_or(crate::Error::Computation(
+                "initializing cost in output tokens",
+            ))?;
 
         if !self.output_amount.is_zero() {
             if self.output_amount > remaining_cost_in_output_token {
@@ -176,8 +176,8 @@ where
 
         let mut remaining_cost_in_secondary_output_token = remaining_cost_in_output_token
             .checked_mul_div(
-                self.output_token_price(),
-                self.secondary_output_token_price(),
+                self.output_token_price().pick_price(false),
+                self.secondary_output_token_price().pick_price(false),
             )
             .ok_or(crate::Error::Computation(
                 "initalizing remaing cost in secondary output token",
@@ -213,7 +213,7 @@ where
         }
 
         *cost = remaining_cost_in_secondary_output_token
-            .checked_mul(self.secondary_output_token_price())
+            .checked_mul(self.secondary_output_token_price().pick_price(false))
             .ok_or(crate::Error::Computation("calculating remaing cost"))?;
 
         Ok((paid_in_collateral_amount, paid_in_secondary_output_amount))
@@ -236,9 +236,7 @@ where
         Self {
             market,
             state: State {
-                long_token_price: prices.long_token_price.clone(),
-                short_token_price: prices.short_token_price.clone(),
-                index_token_price: prices.index_token_price.clone(),
+                prices: prices.clone(),
                 is_pnl_token_long,
                 is_output_token_long,
                 are_pnl_and_collateral_tokens_the_same,
@@ -366,9 +364,9 @@ where
 {
     pub(super) fn add_pnl_if_positive(&mut self, pnl: &M::Signed) -> crate::Result<&mut Self> {
         if pnl.is_positive() {
-            // TODO: pick max pnl token price.
+            debug_assert!(!self.state.pnl_token_price().has_zero());
             let deduction_amount_for_pool =
-                pnl.unsigned_abs() / self.state.pnl_token_price().clone();
+                pnl.unsigned_abs() / self.state.pnl_token_price().pick_price(true).clone();
 
             let is_pnl_token_long = self.state.is_pnl_token_long;
             self.market.apply_delta(
@@ -401,20 +399,18 @@ where
         price_impact: &M::Signed,
     ) -> crate::Result<&mut Self> {
         if price_impact.is_positive() {
-            // TODO: use min price to maximize the amount to reduce.
             let min_amount = price_impact
                 .unsigned_abs()
-                .checked_round_up_div(&self.state.index_token_price)
+                .checked_round_up_div(self.state.prices.index_token_price.pick_price(false))
                 .ok_or(crate::Error::Computation(
                     "calculating positive price impact amount",
                 ))?;
             self.market
                 .apply_delta_to_position_impact_pool(&min_amount.to_opposite_signed()?)?;
 
-            // TODO: use max price to minimize the amount to pay.
-            // The price has been validated to be non-zero.
+            debug_assert!(!self.state.pnl_token_price().has_zero());
             let deduction_amount_for_pool =
-                price_impact.unsigned_abs() / self.state.pnl_token_price().clone();
+                price_impact.unsigned_abs() / self.state.pnl_token_price().pick_price(true).clone();
             let is_pnl_token_long = self.state.is_pnl_token_long;
             self.market.apply_delta(
                 is_pnl_token_long,
@@ -440,8 +436,8 @@ where
                     if !paid_in_collateral_amount.is_zero() {
                         let delta = paid_in_collateral_amount
                             .checked_mul_div(
-                                processor.state.output_token_price(),
-                                &processor.state.index_token_price,
+                                processor.state.output_token_price().pick_price(false),
+                                processor.state.prices.index_token_price.pick_price(true),
                             )
                             .ok_or(crate::Error::Computation(
                                 "calculating price impact paied in collateral (output) token",
@@ -454,8 +450,11 @@ where
                     if !paid_in_secondary_output_amount.is_zero() {
                         let delta = paid_in_secondary_output_amount
                             .checked_mul_div(
-                                processor.state.secondary_output_token_price(),
-                                &processor.state.index_token_price,
+                                processor
+                                    .state
+                                    .secondary_output_token_price()
+                                    .pick_price(false),
+                                processor.state.prices.index_token_price.pick_price(true),
                             )
                             .ok_or(crate::Error::Computation(
                                 "calculating price impact paied in secondary output token",
@@ -480,8 +479,7 @@ where
 
         let cost_amount = fees.amount();
         if !cost_amount.is_zero() {
-            // TODO: use min price.
-            let min_price = self.state.output_token_price();
+            let min_price = self.state.output_token_price().pick_price(false);
             let cost = cost_amount
                 .checked_mul(min_price)
                 .ok_or(crate::Error::Computation("calculating funding fee cost"))?;
@@ -516,8 +514,7 @@ where
 
         let cost_amount = fees.total_cost_excluding_funding()?;
         if !cost_amount.is_zero() {
-            // TODO: use min price.
-            let min_price = self.state.output_token_price();
+            let min_price = self.state.output_token_price().pick_price(false);
             let cost = cost_amount
                 .checked_mul(min_price)
                 .ok_or(crate::Error::Computation("calculating total fee cost"))?;

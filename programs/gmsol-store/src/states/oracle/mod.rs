@@ -192,27 +192,41 @@ impl Oracle {
     pub(crate) fn market_prices(
         &self,
         market: &impl HasMarketMeta,
-    ) -> Result<gmsol_model::action::Prices<u128>> {
+    ) -> Result<gmsol_model::price::Prices<u128>> {
+        use gmsol_model::price::Price;
+
         let meta = market.market_meta();
-        let prices = gmsol_model::action::Prices {
-            index_token_price: self
-                .primary
-                .get(&meta.index_token_mint)
-                .ok_or(StoreError::MissingOracelPrice)?
-                .max
-                .to_unit_price(),
-            long_token_price: self
-                .primary
-                .get(&meta.long_token_mint)
-                .ok_or(StoreError::MissingOracelPrice)?
-                .max
-                .to_unit_price(),
-            short_token_price: self
-                .primary
-                .get(&meta.short_token_mint)
-                .ok_or(StoreError::MissingOracelPrice)?
-                .max
-                .to_unit_price(),
+        let prices = gmsol_model::price::Prices {
+            index_token_price: {
+                let price = self
+                    .primary
+                    .get(&meta.index_token_mint)
+                    .ok_or(StoreError::MissingOracelPrice)?;
+                Price {
+                    min: price.min.to_unit_price(),
+                    max: price.max.to_unit_price(),
+                }
+            },
+            long_token_price: {
+                let price = self
+                    .primary
+                    .get(&meta.long_token_mint)
+                    .ok_or(StoreError::MissingOracelPrice)?;
+                Price {
+                    min: price.min.to_unit_price(),
+                    max: price.max.to_unit_price(),
+                }
+            },
+            short_token_price: {
+                let price = self
+                    .primary
+                    .get(&meta.short_token_mint)
+                    .ok_or(StoreError::MissingOracelPrice)?;
+                Price {
+                    min: price.min.to_unit_price(),
+                    max: price.max.to_unit_price(),
+                }
+            },
         };
         Ok(prices)
     }

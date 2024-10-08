@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 use borsh::{BorshDeserialize, BorshSerialize};
-use gmsol_model::action::decrease_position::DecreasePositionReport;
+use gmsol_model::{action::decrease_position::DecreasePositionReport, price::Price};
 
 use crate::{states::FactorKey, CoreError, StoreError};
 
@@ -705,38 +705,55 @@ impl OrderV2 {
     }
 
     /// Validate trigger price.
-    pub fn validate_trigger_price(&self, index_price: u128) -> Result<()> {
+    pub fn validate_trigger_price(&self, index_price: &Price<u128>) -> Result<()> {
         let params = &self.params;
         let kind = params.kind()?;
-        let index_price = &index_price;
         let is_long = params.side()?.is_long();
         let trigger_price = &params.trigger_price;
         match kind {
             OrderKind::LimitIncrease => {
                 if is_long {
-                    // TODO: Pick max price.
-                    require_gte!(trigger_price, index_price, StoreError::InvalidTriggerPrice);
+                    require_gte!(
+                        trigger_price,
+                        index_price.pick_price(true),
+                        StoreError::InvalidTriggerPrice
+                    );
                 } else {
-                    // TODO: Pick min price.
-                    require_gte!(index_price, trigger_price, StoreError::InvalidTriggerPrice);
+                    require_gte!(
+                        index_price.pick_price(false),
+                        trigger_price,
+                        StoreError::InvalidTriggerPrice
+                    );
                 }
             }
             OrderKind::LimitDecrease => {
                 if is_long {
-                    // TODO: Pick min price.
-                    require_gte!(index_price, trigger_price, StoreError::InvalidTriggerPrice);
+                    require_gte!(
+                        index_price.pick_price(false),
+                        trigger_price,
+                        StoreError::InvalidTriggerPrice
+                    );
                 } else {
-                    // TODO: Pick max price.
-                    require_gte!(trigger_price, index_price, StoreError::InvalidTriggerPrice);
+                    require_gte!(
+                        trigger_price,
+                        index_price.pick_price(true),
+                        StoreError::InvalidTriggerPrice
+                    );
                 }
             }
             OrderKind::StopLossDecrease => {
                 if is_long {
-                    // TODO: Pick min price.
-                    require_gte!(trigger_price, index_price, StoreError::InvalidTriggerPrice);
+                    require_gte!(
+                        trigger_price,
+                        index_price.pick_price(false),
+                        StoreError::InvalidTriggerPrice
+                    );
                 } else {
-                    // TODO: Pick max price.
-                    require_gte!(index_price, trigger_price, StoreError::InvalidTriggerPrice);
+                    require_gte!(
+                        index_price.pick_price(true),
+                        trigger_price,
+                        StoreError::InvalidTriggerPrice
+                    );
                 }
             }
             OrderKind::LimitSwap => {

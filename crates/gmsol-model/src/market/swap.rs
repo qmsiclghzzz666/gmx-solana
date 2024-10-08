@@ -1,9 +1,10 @@
 use num_traits::{CheckedSub, One, Signed, Zero};
 
 use crate::{
-    action::{swap::Swap, Prices},
+    action::swap::Swap,
     num::UnsignedAbs,
     params::{FeeParams, PriceImpactParams},
+    price::{Price, Prices},
     Balance, BaseMarket, Pool,
 };
 
@@ -48,15 +49,16 @@ pub trait SwapMarketExt<const DECIMALS: u8>: SwapMarket<DECIMALS> {
     fn swap_impact_amount_with_cap(
         &self,
         is_long_token: bool,
-        price: &Self::Num,
+        price: &Price<Self::Num>,
         usd_impact: &Self::Signed,
     ) -> crate::Result<Self::Signed> {
-        if price.is_zero() {
+        if price.has_zero() {
             return Err(crate::Error::DividedByZero);
         }
         if usd_impact.is_positive() {
             let mut amount = usd_impact.clone()
                 / price
+                    .pick_price(true)
                     .clone()
                     .try_into()
                     .map_err(|_| crate::Error::Convert)?;
@@ -71,6 +73,7 @@ pub trait SwapMarketExt<const DECIMALS: u8>: SwapMarket<DECIMALS> {
             Ok(amount)
         } else if usd_impact.is_negative() {
             let price: Self::Signed = price
+                .pick_price(false)
                 .clone()
                 .try_into()
                 .map_err(|_| crate::Error::Convert)?;
@@ -114,7 +117,7 @@ pub trait SwapMarketMutExt<const DECIMALS: u8>: SwapMarketMut<DECIMALS> {
     fn apply_swap_impact_value_with_cap(
         &mut self,
         is_long_token: bool,
-        price: &Self::Num,
+        price: &Price<Self::Num>,
         usd_impact: &Self::Signed,
     ) -> crate::Result<Self::Num> {
         let delta = self.swap_impact_amount_with_cap(is_long_token, price, usd_impact)?;

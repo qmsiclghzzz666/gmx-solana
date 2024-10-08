@@ -1,10 +1,9 @@
 use crate::{
     market::{BaseMarket, BorrowingFeeMarketExt},
     num::Unsigned,
+    price::Prices,
     PerpMarketMut, PoolExt,
 };
-
-use super::Prices;
 
 /// Update Borrowing State Action.
 #[must_use]
@@ -91,21 +90,13 @@ mod tests {
     #[test]
     fn test_update_borrowing_state() -> crate::Result<()> {
         let mut market = TestMarket::<u64, 9>::default();
-        let prices = Prices {
-            index_token_price: 120,
-            long_token_price: 120,
-            short_token_price: 1,
-        };
+        let prices = Prices::new_for_test(120, 120, 1);
         market
             .deposit(1_000_000_000_000, 100_000_000_000_000, prices)?
             .execute()?;
         println!("{market:#?}");
         let mut position = TestPosition::long(true);
-        let prices = Prices {
-            index_token_price: 123,
-            long_token_price: 123,
-            short_token_price: 1,
-        };
+        let prices = Prices::new_for_test(123, 123, 1);
         let report = position
             .ops(&mut market)
             .increase(prices, 1_000_000_000_000, 50_000_000_000_000, None)?

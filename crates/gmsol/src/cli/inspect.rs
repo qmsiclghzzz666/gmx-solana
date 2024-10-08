@@ -17,8 +17,8 @@ use gmsol::{
     utils::{signed_value_to_decimal, unsigned_value_to_decimal, ZeroCopy},
 };
 use gmsol_model::{
-    action::Prices, Balance, BalanceExt, ClockKind, PnlFactorKind, PoolKind, PositionExt,
-    PositionStateExt,
+    price::{Price, Prices},
+    Balance, BalanceExt, ClockKind, PnlFactorKind, PoolKind, PositionExt, PositionStateExt,
 };
 use gmsol_store::states::{
     self, AddressKey, AmountKey, FactorKey, MarketConfigKey, PriceProviderKind,
@@ -227,9 +227,18 @@ pub struct MarketPrices {
 impl MarketPrices {
     fn to_prices(&self) -> Prices<u128> {
         Prices {
-            index_token_price: self.index_price,
-            long_token_price: self.long_price,
-            short_token_price: self.short_price,
+            index_token_price: Price {
+                min: self.index_price,
+                max: self.index_price,
+            },
+            long_token_price: Price {
+                min: self.long_price,
+                max: self.long_price,
+            },
+            short_token_price: Price {
+                min: self.short_price,
+                max: self.short_price,
+            },
         }
     }
 }

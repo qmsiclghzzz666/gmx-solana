@@ -7,10 +7,9 @@ use crate::{
     },
     num::{MulDiv, UnsignedAbs},
     params::Fees,
+    price::{Price, Prices},
     utils, BalanceExt, PnlFactorKind, PoolExt,
 };
-
-use super::Prices;
 
 /// A deposit.
 #[must_use]
@@ -39,12 +38,12 @@ impl<T> DepositParams<T> {
     }
 
     /// Get long token price.
-    pub fn long_token_price(&self) -> &T {
+    pub fn long_token_price(&self) -> &Price<T> {
         &self.prices.long_token_price
     }
 
     /// Get short token price.
-    pub fn short_token_price(&self) -> &T {
+    pub fn short_token_price(&self) -> &Price<T> {
         &self.prices.short_token_price
     }
 }
@@ -141,8 +140,8 @@ impl<const DECIMALS: u8, M: LiquidityMarketMut<DECIMALS>> Deposit<M, DECIMALS> {
                 .clone()
                 .try_into()
                 .map_err(|_| crate::Error::Convert)?,
-            self.params.long_token_price(),
-            self.params.short_token_price(),
+            &self.params.long_token_price().mid(),
+            &self.params.short_token_price().mid(),
         )?;
         let price_impact = delta.price_impact(&self.market.swap_impact_params()?)?;
         let delta = delta.delta();
@@ -220,7 +219,7 @@ impl<const DECIMALS: u8, M: LiquidityMarketMut<DECIMALS>> Deposit<M, DECIMALS> {
                 .checked_add(
                     &utils::usd_to_market_token_amount(
                         positive_impact_amount
-                            .checked_mul(opposite_price)
+                            .checked_mul(opposite_price.pick_price(true))
                             .ok_or(crate::Error::Overflow)?,
                         pool_value.clone(),
                         supply.clone(),
@@ -252,7 +251,9 @@ impl<const DECIMALS: u8, M: LiquidityMarketMut<DECIMALS>> Deposit<M, DECIMALS> {
         mint_amount = mint_amount
             .checked_add(
                 &utils::usd_to_market_token_amount(
-                    amount.checked_mul(price).ok_or(crate::Error::Overflow)?,
+                    amount
+                        .checked_mul(price.pick_price(false))
+                        .ok_or(crate::Error::Overflow)?,
                     pool_value,
                     supply.clone(),
                     self.market.usd_to_amount_divisor(),
@@ -343,8 +344,8 @@ impl<const DECIMALS: u8, M: LiquidityMarketMut<DECIMALS>> Deposit<M, DECIMALS> {
 #[cfg(test)]
 mod tests {
     use crate::{
-        action::Prices,
         market::LiquidityMarketMutExt,
+        price::Prices,
         test::{TestMarket, TestMarketConfig},
     };
 
@@ -354,11 +355,7 @@ mod tests {
             reserve_factor: 1_050_000_000,
             ..Default::default()
         });
-        let prices = Prices {
-            index_token_price: 120,
-            long_token_price: 120,
-            short_token_price: 1,
-        };
+        let prices = Prices::new_for_test(120, 120, 1);
         println!(
             "{:#?}",
             market.deposit(1_000_000_000, 0, prices)?.execute()?
@@ -380,11 +377,7 @@ mod tests {
     #[test]
     fn sequence() -> crate::Result<()> {
         let mut market_1 = TestMarket::<u64, 9>::default();
-        let prices = Prices {
-            index_token_price: 120,
-            long_token_price: 120,
-            short_token_price: 1,
-        };
+        let prices = Prices::new_for_test(120, 120, 1);
         println!(
             "{:#?}",
             market_1.deposit(1_000_000_000, 0, prices)?.execute()?
@@ -408,11 +401,7 @@ mod tests {
     #[test]
     fn basic_u128() -> Result<(), crate::Error> {
         let mut market = TestMarket::<u128, 20>::default();
-        let prices = Prices {
-            index_token_price: 12_000_000_000_000,
-            long_token_price: 12_000_000_000_000,
-            short_token_price: 100_000_000_000,
-        };
+        let prices = Prices::new_for_test(12_000_000_000_000, 12_000_000_000_000, 100_000_000_000);
         println!(
             "{:#?}",
             market.deposit(1_000_000_000, 0, prices)?.execute()?
@@ -433,11 +422,7 @@ mod tests {
     #[test]
     fn zero_amount_deposit() -> Result<(), crate::Error> {
         let mut market = TestMarket::<u64, 9>::default();
-        let prices = Prices {
-            index_token_price: 120,
-            long_token_price: 120,
-            short_token_price: 1,
-        };
+        let prices = Prices::new_for_test(120, 120, 1);
         let result = market.deposit(0, 0, prices);
         assert!(result.is_err());
 
@@ -448,11 +433,7 @@ mod tests {
     #[test]
     fn extreme_amount_deposit() -> Result<(), crate::Error> {
         let mut market = TestMarket::<u64, 9>::default();
-        let prices = Prices {
-            index_token_price: 120,
-            long_token_price: 120,
-            short_token_price: 1,
-        };
+        let prices = Prices::new_for_test(120, 120, 1);
         let small_amount = 1;
         let large_amount = u64::MAX;
         let max_pool_amount = 1000000000000000000;
@@ -474,11 +455,7 @@ mod tests {
     #[test]
     fn round_attack_deposit() -> Result<(), crate::Error> {
         let mut market = TestMarket::<u64, 9>::default();
-        let prices = Prices {
-            index_token_price: 120,
-            long_token_price: 120,
-            short_token_price: 1,
-        };
+        let prices = Prices::new_for_test(120, 120, 1);
         let mut i = 1;
         while i < 10000000 {
             i += 1;
@@ -498,11 +475,7 @@ mod tests {
         use std::thread;
 
         let market = Arc::new(Mutex::new(TestMarket::<u64, 9>::default()));
-        let prices = Prices {
-            index_token_price: 120,
-            long_token_price: 120,
-            short_token_price: 1,
-        };
+        let prices = Prices::new_for_test(120, 120, 1);
 
         let handles: Vec<_> = (0..10)
             .map(|_| {
@@ -530,16 +503,8 @@ mod tests {
     #[test]
     fn deposit_with_price_fluctuations() -> Result<(), crate::Error> {
         let mut market = TestMarket::<u64, 9>::default();
-        let initial_prices = Prices {
-            index_token_price: 120,
-            long_token_price: 120,
-            short_token_price: 1,
-        };
-        let fluctuated_prices = Prices {
-            index_token_price: 240,
-            long_token_price: 240,
-            short_token_price: 1,
-        };
+        let initial_prices = Prices::new_for_test(120, 120, 1);
+        let fluctuated_prices = Prices::new_for_test(240, 240, 1);
         println!(
             "{:#?}",
             market

@@ -1,10 +1,10 @@
 use crate::{
     action::{
         update_borrowing_state::UpdateBorrowingState, update_funding_state::UpdateFundingState,
-        Prices,
     },
     num::Unsigned,
     params::{fee::FundingFeeParams, FeeParams, PositionParams},
+    price::Prices,
     BalanceExt, BorrowingFeeMarket, PoolExt, PositionImpactMarket, PositionImpactMarketMut,
     SwapMarket, SwapMarketMut,
 };

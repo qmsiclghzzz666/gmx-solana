@@ -8,12 +8,11 @@ use crate::{
         CollateralDelta, Position, PositionExt, PositionMut, PositionMutExt,
         WillCollateralBeSufficient,
     },
+    price::{Price, Prices},
     BorrowingFeeMarketExt, PerpMarketMut, PerpMarketMutExt, PoolExt,
 };
 
 use self::collateral_processor::{CollateralProcessor, ProcessReport};
-
-use super::Prices;
 
 mod claimable;
 mod collateral_processor;
@@ -333,7 +332,7 @@ where
                 // Add back to the estimated remaining collateral value && set withdrawable collateral amount to zero.
                 let add_back = self
                     .withdrawable_collateral_amount
-                    .checked_mul(collateral_token_price)
+                    .checked_mul(collateral_token_price.pick_price(false))
                     .ok_or(crate::Error::Computation("overflow calculating add back"))?
                     .to_signed()?;
                 *remaining_collateral_value = remaining_collateral_value
@@ -399,13 +398,8 @@ where
         self.size_delta_usd == *self.position.size_in_usd()
     }
 
-    fn collateral_token_price(&self) -> &P::Num {
-        let prices = self.params.prices();
-        if self.position.is_collateral_token_long() {
-            &prices.long_token_price
-        } else {
-            &prices.short_token_price
-        }
+    fn collateral_token_price(&self) -> &Price<P::Num> {
+        self.position.collateral_price(self.params.prices())
     }
 
     #[allow(clippy::type_complexity)]
@@ -461,8 +455,9 @@ where
         // TODO: Comment on the reason.
         if !self.withdrawable_collateral_amount.is_zero() && !price_impact_diff.is_zero() {
             // The prices should have been validated to be non-zero.
-            debug_assert!(!self.collateral_token_price().is_zero());
-            let diff_amount = price_impact_diff.clone() / self.collateral_token_price().clone();
+            debug_assert!(!self.collateral_token_price().has_zero());
+            let diff_amount =
+                price_impact_diff.clone() / self.collateral_token_price().pick_price(false).clone();
             if self.withdrawable_collateral_amount > diff_amount {
                 self.withdrawable_collateral_amount = self
                     .withdrawable_collateral_amount
@@ -511,8 +506,13 @@ where
         let size_delta_usd = &self.size_delta_usd;
 
         if size_delta_usd.is_zero() {
-            // TODO: pick price by position side.
-            return Ok((Zero::zero(), Zero::zero(), index_token_price.clone()));
+            return Ok((
+                Zero::zero(),
+                Zero::zero(),
+                index_token_price
+                    .pick_price(self.position.is_long())
+                    .clone(),
+            ));
         }
 
         let (price_impact_value, price_impact_diff_usd) =
@@ -581,11 +581,7 @@ mod tests {
     #[test]
     fn basic() -> crate::Result<()> {
         let mut market = TestMarket::<u64, 9>::default();
-        let prices = Prices {
-            index_token_price: 120,
-            long_token_price: 120,
-            short_token_price: 1,
-        };
+        let prices = Prices::new_for_test(120, 120, 1);
         market.deposit(1_000_000_000, 0, prices)?.execute()?;
         market.deposit(0, 1_000_000_000, prices)?.execute()?;
         println!("{market:#?}");
@@ -593,11 +589,7 @@ mod tests {
         let report = position
             .ops(&mut market)
             .increase(
-                Prices {
-                    index_token_price: 123,
-                    long_token_price: 123,
-                    short_token_price: 1,
-                },
+                Prices::new_for_test(123, 123, 1),
                 100_000_000,
                 80_000_000_000,
                 None,
@@ -609,11 +601,7 @@ mod tests {
         let report = position
             .ops(&mut market)
             .decrease(
-                Prices {
-                    index_token_price: 125,
-                    long_token_price: 125,
-                    short_token_price: 1,
-                },
+                Prices::new_for_test(125, 125, 1),
                 40_000_000_000,
                 None,
                 100_000_000,
@@ -628,11 +616,7 @@ mod tests {
         let report = position
             .ops(&mut market)
             .decrease(
-                Prices {
-                    index_token_price: 118,
-                    long_token_price: 118,
-                    short_token_price: 1,
-                },
+                Prices::new_for_test(118, 118, 1),
                 40_000_000_000,
                 None,
                 0,

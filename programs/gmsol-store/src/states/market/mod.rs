@@ -4,7 +4,7 @@ use anchor_lang::{prelude::*, Bump};
 use anchor_spl::token::Mint;
 use bitmaps::Bitmap;
 use borsh::{BorshDeserialize, BorshSerialize};
-use gmsol_model::{action::Prices, ClockKind, PoolKind};
+use gmsol_model::{price::Prices, ClockKind, PoolKind};
 use model::AsLiquidityMarket;
 
 use crate::{

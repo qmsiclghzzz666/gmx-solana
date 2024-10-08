@@ -73,8 +73,8 @@ mod tests {
     use std::{thread::sleep, time::Duration};
 
     use crate::{
-        action::Prices,
         market::LiquidityMarketMutExt,
+        price::Prices,
         test::{TestMarket, TestPosition},
         PositionMutExt,
     };
@@ -85,11 +85,7 @@ mod tests {
     fn test_distribute_position_impact() -> crate::Result<()> {
         let mut market = TestMarket::<u64, 9>::default();
         market.distribute_position_impact()?.execute()?;
-        let prices = Prices {
-            index_token_price: 120,
-            long_token_price: 120,
-            short_token_price: 1,
-        };
+        let prices = Prices::new_for_test(120, 120, 1);
         market
             .deposit(1_000_000_000_000, 100_000_000_000_000, prices)?
             .execute()?;
@@ -100,11 +96,7 @@ mod tests {
             _ = position
                 .ops(&mut market)
                 .increase(
-                    Prices {
-                        index_token_price: 123,
-                        long_token_price: 123,
-                        short_token_price: 1,
-                    },
+                    Prices::new_for_test(123, 123, 1),
                     1_000_000_000_000,
                     50_000_000_000_000,
                     None,
@@ -114,11 +106,7 @@ mod tests {
             _ = position
                 .ops(&mut market)
                 .decrease(
-                    Prices {
-                        index_token_price: 123,
-                        long_token_price: 123,
-                        short_token_price: 1,
-                    },
+                    Prices::new_for_test(123, 123, 1),
                     50_000_000_000_000,
                     None,
                     0,

@@ -1,8 +1,9 @@
 use crate::{
-    action::Prices,
     fixed::FixedPointOps,
     num::{MulDiv, Num, Unsigned, UnsignedAbs},
     pool::{balance::Merged, Balance, BalanceExt, Pool},
+    price::Price,
+    price::Prices,
     PoolExt,
 };
 use num_traits::{CheckedAdd, CheckedSub, Signed, Zero};
@@ -128,15 +129,14 @@ pub trait BaseMarketExt<const DECIMALS: u8>: BaseMarket<DECIMALS> {
         &self,
         prices: &Prices<Self::Num>,
         is_long: bool,
-        _maximize: bool,
+        maximize: bool,
     ) -> crate::Result<Self::Num> {
-        // TODO: apply maximize by choosing price.
         if is_long {
             self.liquidity_pool()?
-                .long_usd_value(&prices.long_token_price)
+                .long_usd_value(prices.long_token_price.pick_price(maximize))
         } else {
             self.liquidity_pool()?
-                .short_usd_value(&prices.short_token_price)
+                .short_usd_value(prices.short_token_price.pick_price(maximize))
         }
     }
 
@@ -160,9 +160,9 @@ pub trait BaseMarketExt<const DECIMALS: u8>: BaseMarket<DECIMALS> {
     /// Get total pnl of the market for one side.
     fn pnl(
         &self,
-        index_token_price: &Self::Num,
+        index_token_price: &Price<Self::Num>,
         is_long: bool,
-        _maximize: bool,
+        maximize: bool,
     ) -> crate::Result<Self::Signed> {
         use num_traits::CheckedMul;
 
@@ -172,8 +172,7 @@ pub trait BaseMarketExt<const DECIMALS: u8>: BaseMarket<DECIMALS> {
             return Ok(Zero::zero());
         }
 
-        // TODO: pick price according to the `maximize` flag.
-        let price = index_token_price;
+        let price = index_token_price.pick_price_for_pnl(is_long, maximize);
 
         let open_interest_value = open_interest_in_tokens
             .checked_mul(price)
@@ -291,14 +290,13 @@ pub trait BaseMarketExt<const DECIMALS: u8>: BaseMarket<DECIMALS> {
     /// Get reserved value.
     fn reserved_value(
         &self,
-        index_token_price: &Self::Num,
+        index_token_price: &Price<Self::Num>,
         is_long: bool,
     ) -> crate::Result<Self::Num> {
         // TODO: add comment to explain the difference.
         if is_long {
-            // TODO: use max price.
             self.open_interest_in_tokens()?
-                .long_usd_value(index_token_price)
+                .long_usd_value(index_token_price.pick_price(true))
         } else {
             self.open_interest()?.short_amount()
         }

@@ -10,7 +10,7 @@ use crate::{
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token, TokenAccount};
 use gmsol_model::{
-    action::Prices, num::Unsigned, BalanceExt, BaseMarketMut, LiquidityMarketExt, PnlFactorKind,
+    num::Unsigned, price::Prices, BalanceExt, BaseMarketMut, LiquidityMarketExt, PnlFactorKind,
     PoolExt,
 };
 use gmsol_utils::InitSpace;

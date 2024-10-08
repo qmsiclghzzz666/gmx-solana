@@ -6,7 +6,7 @@ use std::{
 use eventsource_stream::Eventsource;
 use futures_util::{Stream, TryStreamExt};
 use gmsol_store::states::{
-    pyth::pyth_price_value_to_decimal, HasMarketMeta, PriceProviderKind, TokenMapAccess,
+    pyth::pyth_price_with_confidence_to_price, HasMarketMeta, PriceProviderKind, TokenMapAccess,
 };
 use reqwest::{Client, IntoUrl, Url};
 
@@ -89,7 +89,7 @@ impl Hermes {
         &self,
         token_map: &impl TokenMapAccess,
         market: &impl HasMarketMeta,
-    ) -> crate::Result<gmsol_model::action::Prices<u128>> {
+    ) -> crate::Result<gmsol_model::price::Prices<u128>> {
         let token_configs =
             token_map
                 .token_configs_for_market(market)
@@ -125,15 +125,21 @@ impl Hermes {
                 let price = prices
                     .get(feed)
                     .ok_or(crate::Error::unknown(format!("missing price for {}", feed)))?;
-                Ok(
-                    pyth_price_value_to_decimal(price.price as u64, price.expo, config)?
-                        .to_unit_price(),
-                )
+                let price = pyth_price_with_confidence_to_price(
+                    price.price,
+                    price.conf,
+                    price.expo,
+                    config,
+                )?;
+                Ok(gmsol_model::price::Price {
+                    min: price.min.to_unit_price(),
+                    max: price.max.to_unit_price(),
+                })
             })
             .collect::<crate::Result<Vec<_>>>()?
             .try_into()
             .expect("must success");
-        Ok(gmsol_model::action::Prices {
+        Ok(gmsol_model::price::Prices {
             index_token_price,
             long_token_price,
             short_token_price,

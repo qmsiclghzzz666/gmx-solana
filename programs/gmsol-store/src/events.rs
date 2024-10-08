@@ -7,9 +7,9 @@ use bytemuck::Zeroable;
 use gmsol_model::{
     action::{
         decrease_position::DecreasePositionReport, increase_position::IncreasePositionReport,
-        Prices,
     },
     params::fee::PositionFees,
+    price::Prices,
 };
 
 use crate::{
@@ -382,6 +382,18 @@ impl TradeEventData {
     pub const SEED: &'static [u8] = b"trade_event_data";
 }
 
+/// Price.
+#[zero_copy]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "debug", derive(Debug))]
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct TradePrice {
+    /// Min price.
+    pub min: u128,
+    /// Max price.
+    pub max: u128,
+}
+
 /// Prices.
 #[zero_copy]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -389,18 +401,21 @@ impl TradeEventData {
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct TradePrices {
     /// Index token price.
-    pub index: u128,
+    pub index: TradePrice,
     /// Long token price.
-    pub long: u128,
+    pub long: TradePrice,
     /// Short token price.
-    pub short: u128,
+    pub short: TradePrice,
 }
 
 impl TradePrices {
     fn set_with_prices(&mut self, prices: &Prices<u128>) {
-        self.index = prices.index_token_price;
-        self.long = prices.long_token_price;
-        self.short = prices.short_token_price;
+        self.index.min = prices.index_token_price.min;
+        self.index.max = prices.index_token_price.max;
+        self.long.min = prices.long_token_price.min;
+        self.long.max = prices.long_token_price.max;
+        self.short.min = prices.short_token_price.min;
+        self.short.max = prices.short_token_price.max;
     }
 }
 

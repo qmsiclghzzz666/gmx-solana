@@ -4,7 +4,7 @@ use anchor_client::{
     anchor_lang::system_program,
     solana_sdk::{pubkey::Pubkey, signer::Signer},
 };
-use gmsol_model::{action::Prices, PnlFactorKind, PoolKind};
+use gmsol_model::{price::Prices, PnlFactorKind, PoolKind};
 use gmsol_store::{
     accounts, instruction,
     states::{config::EntryArgs, Factor, MarketConfigKey},

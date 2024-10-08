@@ -30,21 +30,12 @@ impl Pyth {
             token_config.heartbeat_duration().into(),
             &feed_id,
         )?;
-        let mid_price: u64 = price
-            .price
-            .try_into()
-            .map_err(|_| StoreError::NegativePrice)?;
-        // FIXME: use min and max price when ready.
-        let _min_price = mid_price
-            .checked_sub(price.conf)
-            .ok_or(StoreError::NegativePrice)?;
-        let _max_price = mid_price
-            .checked_add(price.conf)
-            .ok_or(StoreError::PriceOverflow)?;
-        let parsed_price = Price {
-            min: pyth_price_value_to_decimal(mid_price, price.exponent, token_config)?,
-            max: pyth_price_value_to_decimal(mid_price, price.exponent, token_config)?,
-        };
+        let parsed_price = pyth_price_with_confidence_to_price(
+            price.price,
+            price.conf,
+            price.exponent,
+            token_config,
+        )?;
         Ok((feed.posted_slot, price.publish_time, parsed_price))
     }
 }
@@ -63,24 +54,43 @@ impl PythLegacy {
             msg!("Pyth Error: {}", err);
             StoreError::Unknown
         })?;
+
         let Some(price) = feed.get_price_no_older_than(
             clock.unix_timestamp,
             token_config.heartbeat_duration().into(),
         ) else {
             return err!(StoreError::PriceFeedNotUpdated);
         };
-        let mid_price: u64 = price
-            .price
-            .try_into()
-            .map_err(|_| StoreError::NegativePrice)?;
-        let parsed_price = Price {
-            min: pyth_price_value_to_decimal(mid_price, price.expo, token_config)?,
-            max: pyth_price_value_to_decimal(mid_price, price.expo, token_config)?,
-        };
+
+        let parsed_price =
+            pyth_price_with_confidence_to_price(price.price, price.conf, price.expo, token_config)?;
+
         // Pyth legacy price feed does not provide `posted_slot`,
         // so we use current slot to ignore the slot check.
         Ok((clock.slot, price.publish_time, parsed_price))
     }
+}
+
+/// Convert pyth price value with confidence to [`Price`].
+pub fn pyth_price_with_confidence_to_price(
+    price: i64,
+    confidence: u64,
+    exponent: i32,
+    token_config: &TokenConfig,
+) -> Result<Price> {
+    let mid_price: u64 = price
+        .try_into()
+        .map_err(|_| error!(StoreError::NegativePrice))?;
+    let min_price = mid_price
+        .checked_sub(confidence)
+        .ok_or(error!(StoreError::NegativePrice))?;
+    let max_price = mid_price
+        .checked_add(confidence)
+        .ok_or(StoreError::PriceOverflow)?;
+    Ok(Price {
+        min: pyth_price_value_to_decimal(min_price, exponent, token_config)?,
+        max: pyth_price_value_to_decimal(max_price, exponent, token_config)?,
+    })
 }
 
 /// Pyth price value to decimal.

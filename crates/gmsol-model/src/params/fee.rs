@@ -1,7 +1,7 @@
 use num_traits::{CheckedAdd, Zero};
 use typed_builder::TypedBuilder;
 
-use crate::{fixed::FixedPointOps, num::Unsigned, utils};
+use crate::{fixed::FixedPointOps, num::Unsigned, price::Price, utils};
 
 /// Fee Parameters.
 #[derive(Debug, Clone, Copy)]
@@ -88,22 +88,21 @@ impl<T> FeeParams<T> {
     /// Get order fees.
     fn order_fees<const DECIMALS: u8>(
         &self,
-        collateral_token_price: &T,
+        collateral_token_price: &Price<T>,
         size_delta_usd: &T,
         is_positive_impact: bool,
     ) -> crate::Result<OrderFees<T>>
     where
         T: FixedPointOps<DECIMALS>,
     {
-        if collateral_token_price.is_zero() {
+        if collateral_token_price.has_zero() {
             return Err(crate::Error::InvalidPrices);
         }
 
-        // TODO: use min price.
         let fee_amount = self
             .fee(is_positive_impact, size_delta_usd)
             .ok_or(crate::Error::Computation("calculating order fee usd"))?
-            / collateral_token_price.clone();
+            / collateral_token_price.pick_price(false).clone();
 
         let receiver_fee_amount = self
             .receiver_fee(&fee_amount)
@@ -121,7 +120,7 @@ impl<T> FeeParams<T> {
     /// Get base position fees.
     pub fn base_position_fees<const DECIMALS: u8>(
         &self,
-        collateral_token_price: &T,
+        collateral_token_price: &Price<T>,
         size_delta_usd: &T,
         is_positive_impact: bool,
     ) -> crate::Result<PositionFees<T>>
@@ -486,12 +485,13 @@ impl<T> PositionFees<T> {
     pub fn apply_borrowing_fee<const DECIMALS: u8>(
         mut self,
         receiver_factor: &T,
-        price: &T,
+        price: &Price<T>,
         value: T,
     ) -> crate::Result<Self>
     where
         T: FixedPointOps<DECIMALS>,
     {
+        let price = price.pick_price(false);
         debug_assert!(!price.is_zero(), "must be non-zero");
         let amount = value / price.clone();
         self.borrowing.amount_for_receiver = crate::utils::apply_factor(&amount, receiver_factor)

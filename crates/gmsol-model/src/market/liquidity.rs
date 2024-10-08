@@ -1,9 +1,10 @@
 use num_traits::{CheckedAdd, CheckedSub, Zero};
 
 use crate::{
-    action::{deposit::Deposit, withdraw::Withdrawal, Prices},
+    action::{deposit::Deposit, withdraw::Withdrawal},
     fixed::FixedPointOps,
     num::Unsigned,
+    price::Prices,
     BorrowingFeeMarket, PnlFactorKind, PositionImpactMarket,
 };
 

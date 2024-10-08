@@ -1,7 +1,7 @@
 use anchor_lang::{prelude::*, system_program};
 use anchor_spl::token::TokenAccount;
 use gmsol_model::{
-    action::Prices, num::Unsigned, BaseMarket, BaseMarketExt, PnlFactorKind, Position as _,
+    num::Unsigned, price::Prices, BaseMarket, BaseMarketExt, PnlFactorKind, Position as _,
     PositionImpactMarketMutExt, PositionMut, PositionMutExt, PositionState, PositionStateExt,
 };
 use typed_builder::TypedBuilder;
@@ -991,7 +991,7 @@ impl<'a, 'info> ExecuteOrderOps<'a, 'info> {
     fn validate_trigger_price(&self, prices: &Prices<u128>) -> Result<()> {
         self.order
             .load()?
-            .validate_trigger_price(prices.index_token_price)
+            .validate_trigger_price(&prices.index_token_price)
     }
 }
 
