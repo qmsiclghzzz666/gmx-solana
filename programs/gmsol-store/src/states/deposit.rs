@@ -12,7 +12,7 @@ use super::{
 /// Deposit V2.
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[account(zero_copy)]
-pub struct DepositV2 {
+pub struct Deposit {
     /// Header.
     pub(crate) header: ActionHeader,
     /// Token accounts.
@@ -25,7 +25,7 @@ pub struct DepositV2 {
     reserve: [u8; 128],
 }
 
-impl DepositV2 {
+impl Deposit {
     /// Max execution lamports.
     pub const MIN_EXECUTION_LAMPORTS: u64 = 200_000;
 
@@ -43,12 +43,12 @@ impl DepositV2 {
     }
 }
 
-impl Seed for DepositV2 {
+impl Seed for Deposit {
     /// Seed.
     const SEED: &'static [u8] = b"deposit";
 }
 
-impl Action for DepositV2 {
+impl Action for Deposit {
     fn header(&self) -> &ActionHeader {
         &self.header
     }

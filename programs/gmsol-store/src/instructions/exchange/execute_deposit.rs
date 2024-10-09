@@ -10,7 +10,7 @@ use crate::{
     },
     states::{
         common::action::{ActionExt, ActionSigner},
-        DepositV2, Market, Oracle, PriceProvider, Seed, Store, TokenMapHeader, TokenMapLoader,
+        Deposit, Market, Oracle, PriceProvider, Seed, Store, TokenMapHeader, TokenMapLoader,
     },
     utils::internal,
     CoreError,
@@ -43,10 +43,10 @@ pub struct ExecuteDepositV2<'info> {
         constraint = deposit.load()?.tokens.market_token.account().expect("must exist") == market_token_escrow.key() @ CoreError::MarketTokenAccountMismatched,
         constraint = deposit.load()?.tokens.initial_long_token.account() == initial_long_token_escrow.as_ref().map(|a| a.key()) @ CoreError::TokenAccountMismatched,
         constraint = deposit.load()?.tokens.initial_short_token.account() == initial_short_token_escrow.as_ref().map(|a| a.key()) @ CoreError::TokenAccountMismatched,
-        seeds = [DepositV2::SEED, store.key().as_ref(), deposit.load()?.header.owner.as_ref(), &deposit.load()?.header.nonce],
+        seeds = [Deposit::SEED, store.key().as_ref(), deposit.load()?.header.owner.as_ref(), &deposit.load()?.header.nonce],
         bump = deposit.load()?.header.bump,
     )]
-    pub deposit: AccountLoader<'info, DepositV2>,
+    pub deposit: AccountLoader<'info, Deposit>,
     /// Market token mint.
     #[account(mut, constraint = market.load()?.meta().market_token_mint == market_token.key() @ CoreError::MarketTokenMintMismatched)]
     pub market_token: Box<Account<'info, Mint>>,

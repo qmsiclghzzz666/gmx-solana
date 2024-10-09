@@ -37,16 +37,16 @@ pub mod shift;
 /// User.
 pub mod user;
 
-pub use deposit::DepositV2;
+pub use deposit::Deposit;
 pub use market::*;
 pub use oracle::*;
-pub use order::{OrderParamsV2, OrderV2, UpdateOrderParams};
+pub use order::{Order, OrderParamsV2, UpdateOrderParams};
 pub use position::Position;
 pub use roles::*;
 pub use shift::*;
 pub use store::*;
 pub use token_config::*;
-pub use withdrawal::WithdrawalV2;
+pub use withdrawal::Withdrawal;
 
 pub type Amount = u64;
 pub type Factor = u128;

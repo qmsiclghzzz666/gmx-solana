@@ -17,7 +17,7 @@ use crate::{
     },
     states::{
         feature::ActionDisabledFlag,
-        order::{OrderKind, OrderV2},
+        order::{OrderKind, Order},
         position::PositionKind,
         user::UserHeader,
         Market, NonceBytes, Position, RoleKey, Seed, Store, UpdateOrderParams,
@@ -44,7 +44,7 @@ pub struct PrepareSwapOrderEscrow<'info> {
     /// The order owning these escrow accounts.
     /// CHECK: The order account don't have to be initialized.
     #[account(
-        seeds = [OrderV2::SEED, store.key().as_ref(), owner.key().as_ref(), &nonce],
+        seeds = [Order::SEED, store.key().as_ref(), owner.key().as_ref(), &nonce],
         bump,
     )]
     pub order: UncheckedAccount<'info>,
@@ -97,7 +97,7 @@ pub struct PrepareIncreaseOrderEscrow<'info> {
     /// The order owning these escrow accounts.
     /// CHECK: The order account don't have to be initialized.
     #[account(
-        seeds = [OrderV2::SEED, store.key().as_ref(), owner.key().as_ref(), &nonce],
+        seeds = [Order::SEED, store.key().as_ref(), owner.key().as_ref(), &nonce],
         bump,
     )]
     pub order: UncheckedAccount<'info>,
@@ -164,7 +164,7 @@ pub struct PrepareDecreaseOrderEscrow<'info> {
     /// The order owning these escrow accounts.
     /// CHECK: The order account don't have to be initialized.
     #[account(
-        seeds = [OrderV2::SEED, store.key().as_ref(), owner.key().as_ref(), &nonce],
+        seeds = [Order::SEED, store.key().as_ref(), owner.key().as_ref(), &nonce],
         bump,
     )]
     pub order: UncheckedAccount<'info>,
@@ -318,7 +318,7 @@ fn validate_and_initialize_position_if_needed<'info>(
         TransferExecutionFeeOps::builder()
             .payment(position.to_account_info())
             .payer(owner.clone())
-            .execution_lamports(OrderV2::position_cut_rent()?)
+            .execution_lamports(Order::position_cut_rent()?)
             .system_program(system_program)
             .build()
             .execute()?;
@@ -377,12 +377,12 @@ pub struct CreateOrder<'info> {
     /// The order to be created.
     #[account(
         init,
-        space = 8 + OrderV2::INIT_SPACE,
+        space = 8 + Order::INIT_SPACE,
         payer = owner,
-        seeds = [OrderV2::SEED, store.key().as_ref(), owner.key().as_ref(), &nonce],
+        seeds = [Order::SEED, store.key().as_ref(), owner.key().as_ref(), &nonce],
         bump,
     )]
-    pub order: AccountLoader<'info, OrderV2>,
+    pub order: AccountLoader<'info, Order>,
     /// The related position.
     #[account(
         mut,
@@ -691,7 +691,7 @@ pub struct CloseOrder<'info> {
         constraint = order.load()?.tokens.long_token.account() == long_token_escrow.as_ref().map(|a| a.key())@ CoreError::TokenAccountMismatched,
         constraint = order.load()?.tokens.short_token.account() == short_token_escrow.as_ref().map(|a| a.key())@ CoreError::TokenAccountMismatched,
     )]
-    pub order: AccountLoader<'info, OrderV2>,
+    pub order: AccountLoader<'info, Order>,
     /// Initial collateral token.
     pub initial_collateral_token: Option<Box<Account<'info, Mint>>>,
     /// Final output token.
@@ -1096,7 +1096,7 @@ pub struct UpdateOrder<'info> {
         constraint = order.load()?.header.market == market.key() @ CoreError::MarketMismatched,
         constraint = order.load()?.header.owner== owner.key() @ CoreError::OwnerMismatched,
     )]
-    pub order: AccountLoader<'info, OrderV2>,
+    pub order: AccountLoader<'info, Order>,
 }
 
 pub(crate) fn update_order(ctx: Context<UpdateOrder>, params: &UpdateOrderParams) -> Result<()> {

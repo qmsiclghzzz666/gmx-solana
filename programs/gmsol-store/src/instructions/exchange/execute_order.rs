@@ -14,7 +14,7 @@ use crate::{
     states::{
         common::action::{ActionExt, ActionSigner},
         feature::ActionDisabledFlag,
-        order::{OrderV2, TransferOut},
+        order::{Order, TransferOut},
         position::Position,
         user::UserHeader,
         Market, Oracle, PriceProvider, Seed, Store, TokenMapHeader, TokenMapLoader,
@@ -160,7 +160,7 @@ pub struct ExecuteOrderV2<'info> {
         constraint = order.load()?.tokens.long_token.account() == long_token_escrow.as_ref().map(|a| a.key())@ CoreError::TokenAccountMismatched,
         constraint = order.load()?.tokens.short_token.account() == short_token_escrow.as_ref().map(|a| a.key())@ CoreError::TokenAccountMismatched,
     )]
-    pub order: AccountLoader<'info, OrderV2>,
+    pub order: AccountLoader<'info, Order>,
     #[account(
         mut,
         constraint = position.load()?.owner == order.load()?.header.owner,
@@ -594,7 +594,7 @@ pub struct ExecuteDecreaseOrder<'info> {
         constraint = order.load()?.tokens.long_token.account() == Some(long_token_escrow.key()) @ CoreError::TokenAccountMismatched,
         constraint = order.load()?.tokens.short_token.account() == Some(short_token_escrow.key()) @ CoreError::TokenAccountMismatched,
     )]
-    pub order: AccountLoader<'info, OrderV2>,
+    pub order: AccountLoader<'info, Order>,
     #[account(
         mut,
         constraint = position.load()?.owner == order.load()?.header.owner,

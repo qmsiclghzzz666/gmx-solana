@@ -4,7 +4,7 @@ use typed_builder::TypedBuilder;
 
 use crate::{
     states::{
-        common::action::Action, DepositV2, Market, NonceBytes, Oracle, Store, ValidateOracleTime,
+        common::action::Action, Deposit, Market, NonceBytes, Oracle, Store, ValidateOracleTime,
     },
     CoreError, StoreError, StoreResult,
 };
@@ -29,7 +29,7 @@ pub struct CreateDepositParams {
 /// Create Deposit Ops.
 #[derive(TypedBuilder)]
 pub(crate) struct CreateDepositOps<'a, 'info> {
-    deposit: AccountLoader<'info, DepositV2>,
+    deposit: AccountLoader<'info, Deposit>,
     market: AccountLoader<'info, Market>,
     store: AccountLoader<'info, Store>,
     owner: &'a AccountInfo<'info>,
@@ -162,7 +162,7 @@ impl<'a, 'info> CreateDepositOps<'a, 'info> {
 
         require_gte!(
             params.execution_fee,
-            DepositV2::MIN_EXECUTION_LAMPORTS,
+            Deposit::MIN_EXECUTION_LAMPORTS,
             CoreError::NotEnoughExecutionFee
         );
 
@@ -183,7 +183,7 @@ pub(crate) struct ExecuteDepositOps<'a, 'info> {
     market: &'a AccountLoader<'info, Market>,
     market_token_mint: &'a mut Account<'info, Mint>,
     market_token_receiver: AccountInfo<'info>,
-    deposit: &'a AccountLoader<'info, DepositV2>,
+    deposit: &'a AccountLoader<'info, Deposit>,
     oracle: &'a Oracle,
     remaining_accounts: &'info [AccountInfo<'info>],
     throw_on_execution_error: bool,

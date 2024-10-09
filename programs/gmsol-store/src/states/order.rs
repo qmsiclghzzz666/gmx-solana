@@ -325,7 +325,7 @@ impl TransferOut {
 /// Order.
 #[account(zero_copy)]
 #[cfg_attr(feature = "debug", derive(Debug))]
-pub struct OrderV2 {
+pub struct Order {
     /// Action header.
     pub(crate) header: ActionHeader,
     /// Market token.
@@ -342,18 +342,18 @@ pub struct OrderV2 {
     reserve: [u8; 128],
 }
 
-impl Seed for OrderV2 {
+impl Seed for Order {
     /// Seed.
     const SEED: &'static [u8] = b"order";
 }
 
-impl Action for OrderV2 {
+impl Action for Order {
     fn header(&self) -> &ActionHeader {
         &self.header
     }
 }
 
-impl OrderV2 {
+impl Order {
     /// Init space.
     pub const INIT_SPACE: usize = core::mem::size_of::<Self>();
 

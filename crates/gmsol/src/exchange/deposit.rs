@@ -10,7 +10,7 @@ use gmsol_store::{
     ops::deposit::CreateDepositParams,
     states::{
         common::{action::Action, swap::SwapParamsV2, TokensWithFeed},
-        DepositV2, NonceBytes, Pyth, TokenMapAccess,
+        Deposit, NonceBytes, Pyth, TokenMapAccess,
     },
 };
 
@@ -60,7 +60,7 @@ where
             nonce: None,
             market_token,
             receiver: None,
-            execution_fee: DepositV2::MIN_EXECUTION_LAMPORTS,
+            execution_fee: Deposit::MIN_EXECUTION_LAMPORTS,
             long_token_swap_path: vec![],
             short_token_swap_path: vec![],
             initial_long_token: None,
@@ -336,7 +336,7 @@ pub struct CloseDepositHint {
 
 impl<'a> CloseDepositHint {
     /// Create from deposit.
-    pub fn new(deposit: &'a DepositV2) -> Self {
+    pub fn new(deposit: &'a Deposit) -> Self {
         Self {
             owner: *deposit.header().owner(),
             market_token: deposit.tokens().market_token(),
@@ -365,7 +365,7 @@ where
     }
 
     /// Set hint with the given deposit.
-    pub fn hint_with_deposit(&mut self, deposit: &DepositV2) -> &mut Self {
+    pub fn hint_with_deposit(&mut self, deposit: &Deposit) -> &mut Self {
         self.hint(CloseDepositHint::new(deposit))
     }
 
@@ -475,7 +475,7 @@ pub struct ExecuteDepositHint {
 
 impl ExecuteDepositHint {
     /// Create a new hint for the deposit.
-    pub fn new(deposit: &DepositV2, map: &impl TokenMapAccess) -> crate::Result<Self> {
+    pub fn new(deposit: &Deposit, map: &impl TokenMapAccess) -> crate::Result<Self> {
         Ok(Self {
             owner: *deposit.header().owner(),
             market_token_escrow: deposit.tokens().market_token_account(),
@@ -538,7 +538,7 @@ where
     /// Set hint with the given deposit.
     pub fn hint(
         &mut self,
-        deposit: &DepositV2,
+        deposit: &Deposit,
         map: &impl TokenMapAccess,
     ) -> crate::Result<&mut Self> {
         self.hint = Some(ExecuteDepositHint::new(deposit, map)?);

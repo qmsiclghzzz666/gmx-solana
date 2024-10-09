@@ -590,9 +590,9 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
     }
 
     /// Fetch [`Order`](types::Order) account with its address.
-    pub async fn order(&self, address: &Pubkey) -> crate::Result<types::OrderV2> {
+    pub async fn order(&self, address: &Pubkey) -> crate::Result<types::Order> {
         Ok(self
-            .account::<ZeroCopy<types::OrderV2>>(address)
+            .account::<ZeroCopy<types::Order>>(address)
             .await?
             .ok_or(crate::Error::NotFound)?
             .0)
@@ -605,9 +605,9 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         &self,
         address: &Pubkey,
         config: RpcAccountInfoConfig,
-    ) -> crate::Result<WithContext<Option<types::OrderV2>>> {
+    ) -> crate::Result<WithContext<Option<types::Order>>> {
         Ok(self
-            .account_with_config::<ZeroCopy<types::OrderV2>>(address, config)
+            .account_with_config::<ZeroCopy<types::Order>>(address, config)
             .await?
             .map(|a| a.map(|a| a.0)))
     }
@@ -618,7 +618,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         store: &Pubkey,
         owner: Option<&Pubkey>,
         market_token: Option<&Pubkey>,
-    ) -> crate::Result<BTreeMap<Pubkey, types::OrderV2>> {
+    ) -> crate::Result<BTreeMap<Pubkey, types::Order>> {
         let mut filters = Vec::default();
         if let Some(owner) = owner {
             filters.push(RpcFilterType::Memcmp(Memcmp::new_raw_bytes(
@@ -636,7 +636,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         let store_filter = StoreFilter::new(store, 1);
 
         let orders = self
-            .store_accounts::<ZeroCopy<types::OrderV2>>(Some(store_filter), filters)
+            .store_accounts::<ZeroCopy<types::Order>>(Some(store_filter), filters)
             .await?
             .into_iter()
             .map(|(addr, order)| (addr, order.0))
@@ -645,8 +645,8 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         Ok(orders)
     }
 
-    /// Fetch [`Depsoit`](types::DepositV2) account with its address.
-    pub async fn deposit(&self, address: &Pubkey) -> crate::Result<types::DepositV2> {
+    /// Fetch [`Depsoit`](types::Deposit) account with its address.
+    pub async fn deposit(&self, address: &Pubkey) -> crate::Result<types::Deposit> {
         Ok(self
             .account::<ZeroCopy<_>>(address)
             .await?
@@ -655,9 +655,9 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
     }
 
     /// Fetch [`Withdrawal`](types::Withdrawal) account with its address.
-    pub async fn withdrawal(&self, address: &Pubkey) -> crate::Result<types::WithdrawalV2> {
+    pub async fn withdrawal(&self, address: &Pubkey) -> crate::Result<types::Withdrawal> {
         Ok(self
-            .account::<ZeroCopy<types::WithdrawalV2>>(address)
+            .account::<ZeroCopy<types::Withdrawal>>(address)
             .await?
             .ok_or(crate::Error::NotFound)?
             .0)

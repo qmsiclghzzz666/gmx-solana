@@ -75,7 +75,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> UpdateAdlBuilder<'a, C> {
         self
     }
 
-    /// Build [`TransactionBuilder`] for auto-delevearaging the position.
+    /// Build [`RpcBuilder`] for auto-delevearaging the position.
     pub async fn build(&mut self) -> crate::Result<RpcBuilder<'a, C>> {
         let hint = self.prepare_hint().await?;
         let feeds = self

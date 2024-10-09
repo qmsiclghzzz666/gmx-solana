@@ -12,7 +12,7 @@ use crate::{
         common::action::Action,
         market::AdlOps,
         order::{
-            CollateralReceiver, OrderKind, OrderParamsV2, OrderV2, TokenAccounts, TransferOut,
+            CollateralReceiver, OrderKind, OrderParamsV2, Order, TokenAccounts, TransferOut,
         },
         position::PositionKind,
         revertible::{
@@ -83,7 +83,7 @@ impl CreateOrderParams {
 /// Create Order Ops
 #[derive(TypedBuilder)]
 pub(crate) struct CreateOrderOps<'a, 'info> {
-    order: AccountLoader<'info, OrderV2>,
+    order: AccountLoader<'info, Order>,
     market: AccountLoader<'info, Market>,
     store: AccountLoader<'info, Store>,
     owner: AccountInfo<'info>,
@@ -118,7 +118,7 @@ impl<'a, 'info> CreateOrderOps<'a, 'info> {
         self.market.load()?.validate(&self.store.key())?;
         require_gte!(
             self.params.execution_fee,
-            OrderV2::MIN_EXECUTION_LAMPORTS,
+            Order::MIN_EXECUTION_LAMPORTS,
             CoreError::NotEnoughExecutionFee
         );
         let balance = self
@@ -127,7 +127,7 @@ impl<'a, 'info> CreateOrderOps<'a, 'info> {
             .saturating_sub(self.params.execution_fee);
         let rent = Rent::get()?;
         require!(
-            rent.is_exempt(balance, OrderV2::INIT_SPACE),
+            rent.is_exempt(balance, Order::INIT_SPACE),
             CoreError::NotEnoughExecutionFee
         );
         Ok(())
@@ -144,7 +144,7 @@ impl<'a, 'info> CreateOrderOps<'a, 'info> {
         let id = self.market.load_mut()?.state_mut().next_order_id()?;
         {
             let mut order = self.order.load_init()?;
-            let OrderV2 {
+            let Order {
                 header,
                 market_token,
                 tokens,
@@ -628,7 +628,7 @@ pub(crate) struct ExecuteOrderOps<'a, 'info> {
     user: &'a AccountLoader<'info, UserHeader>,
     store: &'a AccountLoader<'info, Store>,
     market: &'a AccountLoader<'info, Market>,
-    order: &'a AccountLoader<'info, OrderV2>,
+    order: &'a AccountLoader<'info, Order>,
     owner: AccountInfo<'info>,
     position: Option<&'a AccountLoader<'info, Position>>,
     event: Option<&'a AccountLoader<'info, TradeEventData>>,
@@ -1102,7 +1102,7 @@ fn execute_swap(
     market: &mut RevertiblePerpMarket<'_>,
     swap_markets: &mut SwapMarkets<'_>,
     transfer_out: &mut TransferOut,
-    order: &mut OrderV2,
+    order: &mut Order,
 ) -> Result<()> {
     let swap_out_token = order
         .tokens
@@ -1151,7 +1151,7 @@ fn execute_increase_position(
     swap_markets: &mut SwapMarkets<'_>,
     transfer_out: &mut TransferOut,
     event: &mut TradeEventData,
-    order: &mut OrderV2,
+    order: &mut Order,
 ) -> Result<()> {
     let params = &order.params;
 
@@ -1221,7 +1221,7 @@ fn execute_decrease_position(
     swap_markets: &mut SwapMarkets<'_>,
     transfer_out: &mut TransferOut,
     event: &mut TradeEventData,
-    order: &mut OrderV2,
+    order: &mut Order,
     is_insolvent_close_allowed: bool,
     secondary_order_type: Option<SecondaryOrderType>,
 ) -> Result<ShouldRemovePosition> {
@@ -1421,7 +1421,7 @@ pub struct PositionCutOp<'a, 'info> {
     executor: AccountInfo<'info>,
     position: &'a AccountLoader<'info, Position>,
     event: &'a AccountLoader<'info, TradeEventData>,
-    order: &'a AccountLoader<'info, OrderV2>,
+    order: &'a AccountLoader<'info, Order>,
     market: &'a AccountLoader<'info, Market>,
     store: &'a AccountLoader<'info, Store>,
     oracle: &'a Oracle,
@@ -1496,13 +1496,13 @@ impl<'a, 'info> PositionCutOp<'a, 'info> {
         TransferExecutionFeeOps::builder()
             .payment(self.order.to_account_info())
             .payer(self.executor.to_account_info())
-            .execution_lamports(OrderV2::MIN_EXECUTION_LAMPORTS)
+            .execution_lamports(Order::MIN_EXECUTION_LAMPORTS)
             .system_program(self.system_program.to_account_info())
             .build()
             .execute()?;
         let params = CreateOrderParams {
             kind: self.kind.to_order_kind(),
-            execution_fee: OrderV2::MIN_EXECUTION_LAMPORTS,
+            execution_fee: Order::MIN_EXECUTION_LAMPORTS,
             swap_path_length: 0,
             initial_collateral_delta_amount: 0,
             size_delta_value: self.kind.size_delta_usd(size_in_usd),

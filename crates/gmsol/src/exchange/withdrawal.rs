@@ -10,7 +10,7 @@ use gmsol_store::{
     ops::withdrawal::CreateWithdrawalParams,
     states::{
         common::{action::Action, swap::SwapParamsV2, TokensWithFeed},
-        withdrawal::WithdrawalV2,
+        withdrawal::Withdrawal,
         NonceBytes, Pyth, TokenMapAccess,
     },
 };
@@ -64,7 +64,7 @@ where
             store,
             market_token,
             nonce: None,
-            execution_fee: WithdrawalV2::MIN_EXECUTION_LAMPORTS,
+            execution_fee: Withdrawal::MIN_EXECUTION_LAMPORTS,
             amount,
             min_long_token_amount: 0,
             min_short_token_amount: 0,
@@ -309,8 +309,8 @@ pub struct CloseWithdrawalHint {
     final_short_token_account: Pubkey,
 }
 
-impl<'a> From<&'a WithdrawalV2> for CloseWithdrawalHint {
-    fn from(withdrawal: &'a WithdrawalV2) -> Self {
+impl<'a> From<&'a Withdrawal> for CloseWithdrawalHint {
+    fn from(withdrawal: &'a Withdrawal) -> Self {
         let tokens = withdrawal.tokens();
         Self {
             owner: *withdrawal.header().owner(),
@@ -349,7 +349,7 @@ where
         match &self.hint {
             Some(hint) => Ok(*hint),
             None => {
-                let withdrawal: ZeroCopy<WithdrawalV2> = self
+                let withdrawal: ZeroCopy<Withdrawal> = self
                     .client
                     .account(&self.withdrawal)
                     .await?
@@ -435,7 +435,7 @@ pub struct ExecuteWithdrawalHint {
 
 impl ExecuteWithdrawalHint {
     /// Create a new hint for the execution.
-    pub fn new(withdrawal: &WithdrawalV2, map: &impl TokenMapAccess) -> crate::Result<Self> {
+    pub fn new(withdrawal: &Withdrawal, map: &impl TokenMapAccess) -> crate::Result<Self> {
         let tokens = withdrawal.tokens();
         let swap = withdrawal.swap();
         Ok(Self {
@@ -500,7 +500,7 @@ where
     /// Set hint with the given withdrawal.
     pub fn hint(
         &mut self,
-        withdrawal: &WithdrawalV2,
+        withdrawal: &Withdrawal,
         map: &impl TokenMapAccess,
     ) -> crate::Result<&mut Self> {
         self.hint = Some(ExecuteWithdrawalHint::new(withdrawal, map)?);
@@ -520,7 +520,7 @@ where
             Some(hint) => Ok(hint.clone()),
             None => {
                 let map = self.client.authorized_token_map(&self.store).await?;
-                let withdrawal: ZeroCopy<WithdrawalV2> = self
+                let withdrawal: ZeroCopy<Withdrawal> = self
                     .client
                     .account(&self.withdrawal)
                     .await?

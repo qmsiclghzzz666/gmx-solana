@@ -11,7 +11,7 @@ use crate::{
         withdrawal::{CreateWithdrawalOps, CreateWithdrawalParams},
     },
     states::{
-        common::action::ActionExt, withdrawal::WithdrawalV2, Market, NonceBytes, RoleKey, Seed,
+        common::action::ActionExt, withdrawal::Withdrawal, Market, NonceBytes, RoleKey, Seed,
         Store,
     },
     utils::{
@@ -33,7 +33,7 @@ pub struct PrepareWithdrawalEscrow<'info> {
     /// The withdrawal owning these escrow accounts.
     /// CHECK: The withdrawal don't have to be initialized.
     #[account(
-        seeds = [WithdrawalV2::SEED, store.key().as_ref(), owner.key().as_ref(), &nonce],
+        seeds = [Withdrawal::SEED, store.key().as_ref(), owner.key().as_ref(), &nonce],
         bump,
     )]
     pub withdrawal: UncheckedAccount<'info>,
@@ -97,12 +97,12 @@ pub struct CreateWithdrawal<'info> {
     /// The withdrawal to be created.
     #[account(
         init,
-        space = 8 + WithdrawalV2::INIT_SPACE,
+        space = 8 + Withdrawal::INIT_SPACE,
         payer = owner,
-        seeds = [WithdrawalV2::SEED, store.key().as_ref(), owner.key().as_ref(), &nonce],
+        seeds = [Withdrawal::SEED, store.key().as_ref(), owner.key().as_ref(), &nonce],
         bump,
     )]
-    pub withdrawal: AccountLoader<'info, WithdrawalV2>,
+    pub withdrawal: AccountLoader<'info, Withdrawal>,
     /// Market token.
     #[account(constraint = market.load()?.meta().market_token_mint == market_token.key() @ CoreError::MarketTokenMintMismatched)]
     pub market_token: Box<Account<'info, Mint>>,
@@ -250,7 +250,7 @@ pub struct CloseWithdrawal<'info> {
         constraint = withdrawal.load()?.tokens.final_long_token_account() == final_long_token_escrow.key() @ CoreError::MarketTokenAccountMismatched,
         constraint = withdrawal.load()?.tokens.final_short_token_account() == final_short_token_escrow.key() @ CoreError::MarketTokenAccountMismatched,
     )]
-    pub withdrawal: AccountLoader<'info, WithdrawalV2>,
+    pub withdrawal: AccountLoader<'info, Withdrawal>,
     /// The escrow account for receving market tokens to burn.
     #[account(
         mut,

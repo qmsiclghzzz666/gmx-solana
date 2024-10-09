@@ -9,7 +9,7 @@ use crate::{
     },
     states::{
         common::action::{ActionExt, ActionSigner},
-        withdrawal::WithdrawalV2,
+        withdrawal::Withdrawal,
         Market, Oracle, PriceProvider, Store, TokenMapHeader, TokenMapLoader,
     },
     utils::internal,
@@ -44,7 +44,7 @@ pub struct ExecuteWithdrawalV2<'info> {
         constraint = withdrawal.load()?.tokens.final_long_token_account() == final_long_token_escrow.key() @ CoreError::MarketTokenAccountMismatched,
         constraint = withdrawal.load()?.tokens.final_short_token_account() == final_short_token_escrow.key() @ CoreError::MarketTokenAccountMismatched,
     )]
-    pub withdrawal: AccountLoader<'info, WithdrawalV2>,
+    pub withdrawal: AccountLoader<'info, Withdrawal>,
     /// Market token.
     #[account(
         mut,

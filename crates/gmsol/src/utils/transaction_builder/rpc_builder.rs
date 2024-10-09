@@ -22,7 +22,7 @@ use anchor_client::{
 
 use super::{compute_budget::ComputeBudget, transaction_size::transaction_size, SendAndConfirm};
 
-/// A wrapper of [`RequestBuilder`](anchor_client::RequestBuilder).
+/// A builder of RPC request to Solana.
 #[must_use]
 pub struct RpcBuilder<'a, C, T = ()> {
     output: T,
@@ -505,17 +505,17 @@ impl<'a, C: Deref<Target = impl Signer> + Clone, T> RpcBuilder<'a, C, T> {
             .await
     }
 
-    /// Build [`RequestBuilder`](anchor_client::RequestBuilder).
+    /// Build [`RequestBuilder`].
     pub fn into_anchor_request(self) -> RequestBuilder<'a, C> {
         self.into_anchor_request_with_options(false, None).0
     }
 
-    /// Build [`RequestBuilder`](anchor_client::RequestBuilder) without compute budget.
+    /// Build [`RequestBuilder`] without compute budget.
     pub fn into_anchor_request_without_compute_budget(self) -> RequestBuilder<'a, C> {
         self.into_anchor_request_with_options(true, None).0
     }
 
-    /// Build [`RqeustBuilder`] and output.
+    /// Build [`RequestBuilder`] and output.
     pub fn into_anchor_request_with_options(
         self,
         without_compute_budget: bool,

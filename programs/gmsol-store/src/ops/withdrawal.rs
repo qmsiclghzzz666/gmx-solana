@@ -10,7 +10,7 @@ use crate::{
             swap_market::{SwapDirection, SwapMarkets},
             Revertible, RevertibleLiquidityMarket,
         },
-        withdrawal::WithdrawalV2,
+        withdrawal::Withdrawal,
         HasMarketMeta, Market, NonceBytes, Oracle, Store, ValidateMarketBalances,
         ValidateOracleTime,
     },
@@ -37,7 +37,7 @@ pub struct CreateWithdrawalParams {
 /// Create Withdrawal Ops.
 #[derive(TypedBuilder)]
 pub(crate) struct CreateWithdrawalOps<'a, 'info> {
-    withdrawal: AccountLoader<'info, WithdrawalV2>,
+    withdrawal: AccountLoader<'info, Withdrawal>,
     market: AccountLoader<'info, Market>,
     store: AccountLoader<'info, Store>,
     owner: &'a AccountInfo<'info>,
@@ -122,7 +122,7 @@ impl<'a, 'info> CreateWithdrawalOps<'a, 'info> {
 
         require_gte!(
             params.execution_fee,
-            WithdrawalV2::MIN_EXECUTION_LAMPORTS,
+            Withdrawal::MIN_EXECUTION_LAMPORTS,
             CoreError::NotEnoughExecutionFee
         );
 
@@ -143,7 +143,7 @@ pub(crate) struct ExecuteWithdrawalOp<'a, 'info> {
     market: &'a AccountLoader<'info, Market>,
     market_token_mint: &'a mut Account<'info, Mint>,
     market_token_vault: AccountInfo<'info>,
-    withdrawal: &'a AccountLoader<'info, WithdrawalV2>,
+    withdrawal: &'a AccountLoader<'info, Withdrawal>,
     oracle: &'a Oracle,
     remaining_accounts: &'info [AccountInfo<'info>],
     throw_on_execution_error: bool,

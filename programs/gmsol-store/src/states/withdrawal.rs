@@ -14,7 +14,7 @@ use super::{
 /// Withdrawal.
 #[account(zero_copy)]
 #[cfg_attr(feature = "debug", derive(Debug))]
-pub struct WithdrawalV2 {
+pub struct Withdrawal {
     /// Action header.
     pub(crate) header: ActionHeader,
     /// Token accounts.
@@ -27,7 +27,7 @@ pub struct WithdrawalV2 {
     reserve: [u8; 128],
 }
 
-impl WithdrawalV2 {
+impl Withdrawal {
     /// Init space.
     pub const INIT_SPACE: usize = core::mem::size_of::<Self>();
 
@@ -64,12 +64,12 @@ impl WithdrawalV2 {
     }
 }
 
-impl Seed for WithdrawalV2 {
+impl Seed for Withdrawal {
     /// Seed.
     const SEED: &'static [u8] = b"withdrawal";
 }
 
-impl Action for WithdrawalV2 {
+impl Action for Withdrawal {
     fn header(&self) -> &ActionHeader {
         &self.header
     }

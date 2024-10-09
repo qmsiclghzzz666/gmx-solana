@@ -10,7 +10,7 @@ use crate::{
         deposit::{CreateDepositOps, CreateDepositParams},
         execution_fee::TransferExecutionFeeOps,
     },
-    states::{common::action::ActionExt, DepositV2, Market, NonceBytes, RoleKey, Seed, Store},
+    states::{common::action::ActionExt, Deposit, Market, NonceBytes, RoleKey, Seed, Store},
     utils::{
         internal::{self, Authentication},
         token::is_associated_token_account,
@@ -30,7 +30,7 @@ pub struct PrepareDepositEscrow<'info> {
     /// The deposit owning these escrow accounts.
     /// CHECK: The deposit don't have to be initialized.
     #[account(
-        seeds = [DepositV2::SEED, store.key().as_ref(), owner.key().as_ref(), &nonce],
+        seeds = [Deposit::SEED, store.key().as_ref(), owner.key().as_ref(), &nonce],
         bump,
     )]
     pub deposit: UncheckedAccount<'info>,
@@ -94,12 +94,12 @@ pub struct CreateDeposit<'info> {
     /// The deposit to be created.
     #[account(
         init,
-        space = 8 + DepositV2::INIT_SPACE,
+        space = 8 + Deposit::INIT_SPACE,
         payer = owner,
-        seeds = [DepositV2::SEED, store.key().as_ref(), owner.key().as_ref(), &nonce],
+        seeds = [Deposit::SEED, store.key().as_ref(), owner.key().as_ref(), &nonce],
         bump,
     )]
-    pub deposit: AccountLoader<'info, DepositV2>,
+    pub deposit: AccountLoader<'info, Deposit>,
     /// Market token.
     #[account(constraint = market.load()?.meta().market_token_mint == market_token.key() @ CoreError::MarketTokenMintMismatched)]
     pub market_token: Box<Account<'info, Mint>>,
@@ -290,10 +290,10 @@ pub struct CloseDeposit<'info> {
         constraint = deposit.load()?.tokens.market_token.account().expect("must exist") == market_token_escrow.key() @ CoreError::MarketTokenAccountMismatched,
         constraint = deposit.load()?.tokens.initial_long_token.account() == initial_long_token_escrow.as_ref().map(|a| a.key()) @ CoreError::TokenAccountMismatched,
         constraint = deposit.load()?.tokens.initial_short_token.account() == initial_short_token_escrow.as_ref().map(|a| a.key()) @ CoreError::TokenAccountMismatched,
-        seeds = [DepositV2::SEED, store.key().as_ref(), owner.key().as_ref(), &deposit.load()?.header.nonce],
+        seeds = [Deposit::SEED, store.key().as_ref(), owner.key().as_ref(), &deposit.load()?.header.nonce],
         bump = deposit.load()?.header.bump,
     )]
-    pub deposit: AccountLoader<'info, DepositV2>,
+    pub deposit: AccountLoader<'info, Deposit>,
     /// The escrow account for receving market tokens.
     #[account(
         mut,

@@ -17,7 +17,7 @@ use crate::{
     states::{
         common::action::ActionExt,
         feature::{ActionDisabledFlag, DomainDisabledFlag},
-        order::OrderV2,
+        order::Order,
         user::UserHeader,
         Market, NonceBytes, Oracle, Position, PriceProvider, Seed, Store, TokenMapHeader,
     },
@@ -64,12 +64,12 @@ pub struct PositionCut<'info> {
     /// The order to be created.
     #[account(
         init,
-        space = 8 + OrderV2::INIT_SPACE,
+        space = 8 + Order::INIT_SPACE,
         payer = authority,
-        seeds = [OrderV2::SEED, store.key().as_ref(), owner.key().as_ref(), &nonce],
+        seeds = [Order::SEED, store.key().as_ref(), owner.key().as_ref(), &nonce],
         bump,
     )]
-    pub order: AccountLoader<'info, OrderV2>,
+    pub order: AccountLoader<'info, Order>,
     #[account(
         mut,
         constraint = position.load()?.owner == owner.key(),
@@ -219,7 +219,7 @@ pub(crate) fn unchecked_process_position_cut<'info>(
         .into_iter()
         .collect::<Vec<_>>();
 
-    let refund = OrderV2::position_cut_rent()?;
+    let refund = Order::position_cut_rent()?;
 
     let ops = PositionCutOp::builder()
         .kind(kind)

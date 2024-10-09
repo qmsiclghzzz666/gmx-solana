@@ -13,8 +13,7 @@ use gmsol::{
         PythPullOracleContext, PythPullOracleOps,
     },
     types::{
-        DepositCreatedEvent, DepositV2, OrderCreatedEvent, OrderV2, WithdrawalCreatedEvent,
-        WithdrawalV2,
+        Deposit, DepositCreatedEvent, Order, OrderCreatedEvent, Withdrawal, WithdrawalCreatedEvent,
     },
     utils::{ComputeBudget, RpcBuilder, ZeroCopy},
 };
@@ -164,7 +163,7 @@ impl KeeperArgs {
                 match action {
                     Action::Deposit => {
                         let actions = client
-                            .store_accounts::<ZeroCopy<DepositV2>>(
+                            .store_accounts::<ZeroCopy<Deposit>>(
                                 filter_store
                                     .then(|| StoreFilter::new(store, 8).ignore_disc_offset(true)),
                                 None,
@@ -190,7 +189,7 @@ impl KeeperArgs {
                     }
                     Action::Withdrawal => {
                         let actions = client
-                            .store_accounts::<ZeroCopy<WithdrawalV2>>(
+                            .store_accounts::<ZeroCopy<Withdrawal>>(
                                 filter_store
                                     .then(|| StoreFilter::new(store, 8).ignore_disc_offset(true)),
                                 None,
@@ -222,7 +221,7 @@ impl KeeperArgs {
                     }
                     Action::Order => {
                         let actions = client
-                            .store_accounts::<ZeroCopy<OrderV2>>(
+                            .store_accounts::<ZeroCopy<Order>>(
                                 filter_store
                                     .then(|| StoreFilter::new(store, 9).ignore_disc_offset(true)),
                                 None,

@@ -352,7 +352,7 @@ where
     C: Deref<Target = S> + Clone,
     S: Signer,
 {
-    /// Create a new [`PythPullOracle`] client from [`Client`].
+    /// Create a new [`PythPullOracle`] client from [`Client`](crate::Client).
     pub fn try_new(client: &crate::Client<C>) -> crate::Result<Self> {
         Ok(Self {
             wormhole: client.program(WORMHOLE_PROGRAM_ID),

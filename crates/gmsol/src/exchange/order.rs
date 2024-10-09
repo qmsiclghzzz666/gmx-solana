@@ -18,7 +18,7 @@ use gmsol_store::{
     ops::order::CreateOrderParams,
     states::{
         common::{action::Action, swap::SwapParamsV2, TokensWithFeed},
-        order::{OrderKind, OrderV2},
+        order::{OrderKind, Order},
         position::PositionKind,
         user::UserHeader,
         Market, MarketMeta, NonceBytes, Pyth, Store, TokenMapAccess,
@@ -114,7 +114,7 @@ where
             store: *store,
             market_token: *market_token,
             nonce: None,
-            execution_fee: OrderV2::MIN_EXECUTION_LAMPORTS,
+            execution_fee: Order::MIN_EXECUTION_LAMPORTS,
             params,
             swap_path: vec![],
             is_output_token_long,
@@ -822,7 +822,7 @@ where
     /// Set hint with the given order.
     pub fn hint(
         &mut self,
-        order: &OrderV2,
+        order: &Order,
         market: &Market,
         store: &Store,
         map: &impl TokenMapAccess,
@@ -1207,7 +1207,7 @@ pub struct CloseOrderHint {
 impl CloseOrderHint {
     /// Create hint from order and user account.
     pub fn new(
-        order: &OrderV2,
+        order: &Order,
         user: Option<&UserHeader>,
         program_id: &Pubkey,
     ) -> crate::Result<Self> {
@@ -1246,7 +1246,7 @@ where
     /// Set hint with the given order.
     pub fn hint_with_order(
         &mut self,
-        order: &OrderV2,
+        order: &Order,
         user: Option<&UserHeader>,
         program_id: &Pubkey,
     ) -> crate::Result<&mut Self> {
@@ -1269,7 +1269,7 @@ where
         match &self.hint {
             Some(hint) => Ok(*hint),
             None => {
-                let order: ZeroCopy<OrderV2> = self
+                let order: ZeroCopy<Order> = self
                     .client
                     .account_with_config(&self.order, Default::default())
                     .await?
