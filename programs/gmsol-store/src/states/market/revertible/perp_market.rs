@@ -14,7 +14,7 @@ use crate::{
         clock::{AsClock, AsClockMut},
         HasMarketMeta, Market,
     },
-    StoreError,
+    CoreError,
 };
 
 use super::{Revertible, RevertibleMarket, RevertiblePool};
@@ -38,7 +38,7 @@ impl<'a> RevertiblePerpMarket<'a> {
             .state
             .trade_id
             .checked_add(1)
-            .ok_or(error!(StoreError::AmountOverflow))?;
+            .ok_or(error!(CoreError::TokenAmountOverflow))?;
         self.state.next_trade_id = Some(next_trade_id);
         Ok(next_trade_id)
     }

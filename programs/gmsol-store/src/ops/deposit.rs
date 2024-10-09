@@ -6,7 +6,7 @@ use crate::{
     states::{
         common::action::Action, Deposit, Market, NonceBytes, Oracle, Store, ValidateOracleTime,
     },
-    CoreError, StoreError, StoreResult,
+    CoreError, CoreResult,
 };
 
 /// Create Deposit Params.
@@ -195,7 +195,7 @@ impl<'a, 'info> ExecuteDepositOps<'a, 'info> {
         let throw_on_execution_error = self.throw_on_execution_error;
         match self.validate_oracle() {
             Ok(()) => {}
-            Err(StoreError::OracleTimestampsAreLargerThanRequired) if !throw_on_execution_error => {
+            Err(CoreError::OracleTimestampsAreLargerThanRequired) if !throw_on_execution_error => {
                 msg!(
                     "Deposit expired at {}",
                     self.oracle_updated_before()
@@ -220,7 +220,7 @@ impl<'a, 'info> ExecuteDepositOps<'a, 'info> {
         }
     }
 
-    fn validate_oracle(&self) -> StoreResult<()> {
+    fn validate_oracle(&self) -> CoreResult<()> {
         self.oracle.validate_time(self)
     }
 
@@ -304,7 +304,7 @@ impl<'a, 'info> ExecuteDepositOps<'a, 'info> {
 
             let minted: u64 = (*report.minted())
                 .try_into()
-                .map_err(|_| error!(StoreError::AmountOverflow))?;
+                .map_err(|_| error!(CoreError::TokenAmountOverflow))?;
 
             require_gte!(
                 minted,
@@ -324,36 +324,36 @@ impl<'a, 'info> ExecuteDepositOps<'a, 'info> {
 }
 
 impl<'a, 'info> ValidateOracleTime for ExecuteDepositOps<'a, 'info> {
-    fn oracle_updated_after(&self) -> StoreResult<Option<i64>> {
+    fn oracle_updated_after(&self) -> CoreResult<Option<i64>> {
         Ok(Some(
             self.deposit
                 .load()
-                .map_err(|_| StoreError::LoadAccountError)?
+                .map_err(|_| CoreError::LoadAccountError)?
                 .header()
                 .updated_at,
         ))
     }
 
-    fn oracle_updated_before(&self) -> StoreResult<Option<i64>> {
+    fn oracle_updated_before(&self) -> CoreResult<Option<i64>> {
         let ts = self
             .store
             .load()
-            .map_err(|_| StoreError::LoadAccountError)?
+            .map_err(|_| CoreError::LoadAccountError)?
             .request_expiration_at(
                 self.deposit
                     .load()
-                    .map_err(|_| StoreError::LoadAccountError)?
+                    .map_err(|_| CoreError::LoadAccountError)?
                     .header()
                     .updated_at,
             )?;
         Ok(Some(ts))
     }
 
-    fn oracle_updated_after_slot(&self) -> StoreResult<Option<u64>> {
+    fn oracle_updated_after_slot(&self) -> CoreResult<Option<u64>> {
         Ok(Some(
             self.deposit
                 .load()
-                .map_err(|_| StoreError::LoadAccountError)?
+                .map_err(|_| CoreError::LoadAccountError)?
                 .header()
                 .updated_at_slot,
         ))

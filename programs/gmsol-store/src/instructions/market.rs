@@ -23,7 +23,7 @@ use crate::{
         TokenMapLoader,
     },
     utils::internal,
-    StoreError,
+    CoreError,
 };
 
 /// The accounts definition for [`initialize_market`](crate::gmsol_store::initialize_market).
@@ -121,23 +121,23 @@ pub(crate) fn unchecked_initialize_market(
         require!(
             token_map
                 .get(&index_token_mint)
-                .ok_or(error!(StoreError::RequiredResourceNotFound))?
+                .ok_or(error!(CoreError::NotFound))?
                 .is_enabled(),
-            StoreError::InvalidArgument
+            CoreError::InvalidArgument
         );
         require!(
             token_map
                 .get(&ctx.accounts.long_token_mint.key())
-                .ok_or(error!(StoreError::RequiredResourceNotFound))?
+                .ok_or(error!(CoreError::NotFound))?
                 .is_enabled(),
-            StoreError::InvalidArgument
+            CoreError::InvalidArgument
         );
         require!(
             token_map
                 .get(&ctx.accounts.short_token_mint.key())
-                .ok_or(error!(StoreError::RequiredResourceNotFound))?
+                .ok_or(error!(CoreError::NotFound))?
                 .is_enabled(),
-            StoreError::InvalidArgument
+            CoreError::InvalidArgument
         );
     }
     let market = &ctx.accounts.market;
@@ -404,7 +404,7 @@ pub(crate) fn get_market_status(
 #[derive(Accounts)]
 pub struct ReadMarketWithToken<'info> {
     #[account(
-        constraint = market.load()?.meta.market_token_mint == market_token.key() @ StoreError::InvalidArgument,
+        constraint = market.load()?.meta.market_token_mint == market_token.key() @ CoreError::InvalidArgument,
     )]
     market: AccountLoader<'info, Market>,
     market_token: Account<'info, Mint>,
@@ -474,7 +474,7 @@ pub struct UpdateMarketConfigWithBuffer<'info> {
     store: AccountLoader<'info, Store>,
     #[account(mut, has_one = store)]
     market: AccountLoader<'info, Market>,
-    #[account(mut, has_one = store, has_one = authority @ StoreError::PermissionDenied)]
+    #[account(mut, has_one = store, has_one = authority @ CoreError::PermissionDenied)]
     buffer: Account<'info, MarketConfigBuffer>,
 }
 
@@ -489,7 +489,7 @@ pub(crate) fn unchecked_update_market_config_with_buffer(
     require_gt!(
         buffer.expiry,
         Clock::get()?.unix_timestamp,
-        StoreError::InvalidArgument
+        CoreError::InvalidArgument
     );
     ctx.accounts
         .market
@@ -547,7 +547,7 @@ pub(crate) fn initialize_market_config_buffer(
 pub struct SetMarketConfigBufferAuthority<'info> {
     #[account(mut)]
     authority: Signer<'info>,
-    #[account(mut, has_one = authority @ StoreError::PermissionDenied)]
+    #[account(mut, has_one = authority @ CoreError::PermissionDenied)]
     buffer: Account<'info, MarketConfigBuffer>,
 }
 
@@ -567,7 +567,7 @@ pub(crate) fn set_market_config_buffer_authority(
 pub struct CloseMarketConfigBuffer<'info> {
     #[account(mut)]
     authority: Signer<'info>,
-    #[account(mut, close = receiver, has_one = authority @ StoreError::PermissionDenied)]
+    #[account(mut, close = receiver, has_one = authority @ CoreError::PermissionDenied)]
     buffer: Account<'info, MarketConfigBuffer>,
     /// CHECK: Only used to receive funds after closing the buffer account.
     #[account(mut)]
@@ -589,7 +589,7 @@ pub struct PushToMarketConfigBuffer<'info> {
     authority: Signer<'info>,
     #[account(
         mut,
-        has_one = authority @ StoreError::PermissionDenied,
+        has_one = authority @ CoreError::PermissionDenied,
         realloc = 8 + buffer.space_after_push(new_configs.len()),
         realloc::payer = authority,
         realloc::zero = false,

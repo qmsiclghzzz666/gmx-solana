@@ -43,9 +43,6 @@ pub mod token;
 /// Instructions for [`Oracle`](crate::states::Oracle) account.
 pub mod oracle;
 
-/// Instructions for [`Position`](crate::states::Position) account.
-pub mod position;
-
 /// Instructions for the exchange funtionality.
 pub mod exchange;
 
@@ -69,7 +66,6 @@ pub use feature::*;
 pub use gt::*;
 pub use market::*;
 pub use oracle::*;
-pub use position::*;
 pub use roles::*;
 pub use token::*;
 pub use token_config::*;

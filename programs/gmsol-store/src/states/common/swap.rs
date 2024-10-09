@@ -4,7 +4,7 @@ use anchor_lang::prelude::*;
 
 use crate::{
     states::{find_market_address, HasMarketMeta, Market, TokenMapAccess},
-    CoreError, StoreError,
+    CoreError,
 };
 
 use super::{TokenRecord, TokensWithFeed};
@@ -137,7 +137,7 @@ impl SwapParams {
             self.long_token_swap_path
                 .iter()
                 .all(move |token| seen.insert(token)),
-            StoreError::InvalidSwapPath
+            CoreError::InvalidSwapPath
         );
         Ok(&self.long_token_swap_path)
     }
@@ -149,7 +149,7 @@ impl SwapParams {
             self.short_token_swap_path
                 .iter()
                 .all(move |token| seen.insert(token)),
-            StoreError::InvalidSwapPath
+            CoreError::InvalidSwapPath
         );
         Ok(&self.short_token_swap_path)
     }

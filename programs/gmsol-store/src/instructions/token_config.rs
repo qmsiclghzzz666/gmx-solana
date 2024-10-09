@@ -7,7 +7,7 @@ use crate::{
         TokenMapLoader, TokenMapMutAccess,
     },
     utils::internal,
-    StoreError,
+    CoreError,
 };
 
 /// The accounts definition for [`initialize_token_map`](crate::gmsol_store::initialize_token_map).
@@ -181,7 +181,7 @@ pub(crate) fn unchecked_toggle_token_config(
         .token_map
         .load_token_map_mut()?
         .get_mut(&token)
-        .ok_or(error!(StoreError::RequiredResourceNotFound))?
+        .ok_or(error!(CoreError::NotFound))?
         .set_enabled(enable);
     Ok(())
 }
@@ -223,7 +223,7 @@ pub(crate) fn unchecked_set_expected_provider(
         .token_map
         .load_token_map_mut()?
         .get_mut(&token)
-        .ok_or(error!(StoreError::RequiredResourceNotFound))?
+        .ok_or(error!(CoreError::NotFound))?
         .set_expected_provider(provider);
     Ok(())
 }
@@ -267,7 +267,7 @@ pub(crate) fn unchecked_set_feed_config(
         .token_map
         .load_token_map_mut()?
         .get_mut(&token)
-        .ok_or(error!(StoreError::RequiredResourceNotFound))?
+        .ok_or(error!(CoreError::NotFound))?
         .set_feed_config(
             provider,
             FeedConfig::new(feed).with_timestamp_adjustment(timestamp_adjustment),
@@ -296,7 +296,7 @@ pub(crate) fn is_token_config_enabled(ctx: Context<ReadTokenMap>, token: &Pubkey
         .load_token_map()?
         .get(token)
         .map(|config| config.is_enabled())
-        .ok_or(error!(StoreError::RequiredResourceNotFound))
+        .ok_or(error!(CoreError::NotFound))
 }
 
 /// Get expected provider for the given token.
@@ -308,7 +308,7 @@ pub(crate) fn token_expected_provider(
         .token_map
         .load_token_map()?
         .get(token)
-        .ok_or(error!(StoreError::RequiredResourceNotFound))?
+        .ok_or(error!(CoreError::NotFound))?
         .expected_provider()
 }
 
@@ -322,7 +322,7 @@ pub(crate) fn token_feed(
         .token_map
         .load_token_map()?
         .get(token)
-        .ok_or(error!(StoreError::RequiredResourceNotFound))?
+        .ok_or(error!(CoreError::NotFound))?
         .get_feed(provider)
 }
 
@@ -336,7 +336,7 @@ pub(crate) fn token_timestamp_adjustment(
         .token_map
         .load_token_map()?
         .get(token)
-        .ok_or(error!(StoreError::RequiredResourceNotFound))?
+        .ok_or(error!(CoreError::NotFound))?
         .timestamp_adjustment(provider)
 }
 
@@ -346,7 +346,7 @@ pub(crate) fn token_name(ctx: Context<ReadTokenMap>, token: &Pubkey) -> Result<S
         .token_map
         .load_token_map()?
         .get(token)
-        .ok_or(error!(StoreError::RequiredResourceNotFound))?
+        .ok_or(error!(CoreError::NotFound))?
         .name()
         .map(|s| s.to_owned())
 }
@@ -358,7 +358,7 @@ pub(crate) fn token_decimals(ctx: Context<ReadTokenMap>, token: &Pubkey) -> Resu
         .token_map
         .load_token_map()?
         .get(token)
-        .ok_or(error!(StoreError::RequiredResourceNotFound))?
+        .ok_or(error!(CoreError::NotFound))?
         .token_decimals())
 }
 
@@ -369,7 +369,7 @@ pub(crate) fn token_precision(ctx: Context<ReadTokenMap>, token: &Pubkey) -> Res
         .token_map
         .load_token_map()?
         .get(token)
-        .ok_or(error!(StoreError::RequiredResourceNotFound))?
+        .ok_or(error!(CoreError::NotFound))?
         .precision())
 }
 

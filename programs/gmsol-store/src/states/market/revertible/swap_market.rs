@@ -10,7 +10,7 @@ use crate::{
     states::{
         common::SwapParams, ops::ValidateMarketBalances, HasMarketMeta, Market, MarketMeta, Oracle,
     },
-    ModelError, StoreError,
+    CoreError, ModelError,
 };
 
 use super::{Revertible, RevertibleMarket, RevertiblePool};
@@ -29,11 +29,11 @@ impl<'a> SwapMarkets<'a> {
         for loader in loaders {
             let key = loader.load()?.meta().market_token_mint;
             if let Some(market_token) = current_market_token {
-                require!(key != *market_token, StoreError::InvalidSwapPath);
+                require!(key != *market_token, CoreError::InvalidSwapPath);
             }
             match map.entry(key) {
                 // Cannot have duplicated markets.
-                Entry::Occupied(_) => return err!(StoreError::InvalidSwapPath),
+                Entry::Occupied(_) => return err!(CoreError::InvalidSwapPath),
                 Entry::Vacant(e) => {
                     loader.load()?.validate(store)?;
                     let market =
@@ -195,7 +195,7 @@ impl<'a> SwapMarkets<'a> {
         for (idx, market_token) in path.iter().enumerate() {
             let market = self.get_mut(market_token).ok_or_else(|| {
                 msg!("Swap Error: missing market account for {}", market_token);
-                error!(StoreError::MissingMarketAccount)
+                error!(CoreError::MarketAccountIsNotProvided)
             })?;
             if idx != 0 {
                 market
@@ -213,7 +213,7 @@ impl<'a> SwapMarkets<'a> {
             *token_in = *market.market_meta().opposite_token(token_in)?;
             *token_in_amount = (*report.token_out_amount())
                 .try_into()
-                .map_err(|_| error!(StoreError::AmountOverflow))?;
+                .map_err(|_| error!(CoreError::TokenAmountOverflow))?;
             // Only validate the market without extra balances.
             if idx != last_idx {
                 market
@@ -246,7 +246,7 @@ impl<'a> SwapMarkets<'a> {
     {
         require!(
             self.get_mut(&direction.current()).is_none(),
-            StoreError::InvalidSwapPath
+            CoreError::InvalidSwapPath
         );
         if !path.is_empty() {
             let current = direction.current();
@@ -259,7 +259,7 @@ impl<'a> SwapMarkets<'a> {
                             "Swap Error: missing market account for {}",
                             first_market_token
                         );
-                        error!(StoreError::MissingMarketAccount)
+                        error!(CoreError::MarketAccountIsNotProvided)
                     })?;
                     // We are assuming that they are sharing the same vault of `token_in`.
                     from_market
@@ -285,7 +285,7 @@ impl<'a> SwapMarkets<'a> {
                                 "Swap Error: missing market account for {}",
                                 first_market_token
                             );
-                            error!(StoreError::MissingMarketAccount)
+                            error!(CoreError::MarketAccountIsNotProvided)
                         })?;
                     // We are assuming that they are sharing the same vault of `token_in`.
                     direction
@@ -344,7 +344,7 @@ impl<'a> SwapMarkets<'a> {
                 }
             }
         }
-        require_eq!(token_in, expected_token_out, StoreError::InvalidSwapPath);
+        require_eq!(token_in, expected_token_out, CoreError::InvalidSwapPath);
         Ok(token_in_amount)
     }
 }
@@ -415,7 +415,7 @@ where
         msg!("[Swap] in current market: {:?}", report);
         *token_in_amount = (*report.token_out_amount())
             .try_into()
-            .map_err(|_| error!(StoreError::AmountOverflow))?;
+            .map_err(|_| error!(CoreError::TokenAmountOverflow))?;
         *token_in = *current.market_meta().opposite_token(token_in)?;
         Ok(())
     }

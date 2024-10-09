@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 use gmsol_model::{BaseMarketExt, ClockKind, PnlFactorKind};
 
-use crate::{constants, states::Oracle, ModelError, StoreError, StoreResult};
+use crate::{constants, states::Oracle, CoreError, CoreResult, ModelError};
 
 use super::{HasMarketMeta, Market};
 
@@ -21,7 +21,7 @@ pub trait ValidateMarketBalances:
         if self.is_pure() {
             let total = long_excluding_amount
                 .checked_add(short_excluding_amount)
-                .ok_or(error!(StoreError::AmountOverflow))?;
+                .ok_or(error!(CoreError::TokenAmountOverflow))?;
             (long_excluding_amount, short_excluding_amount) = (total / 2, total / 2);
         }
         let meta = self.market_meta();
@@ -62,11 +62,11 @@ pub trait ValidateMarketBalances:
             if is_long {
                 long_excluding_amount = long_excluding_amount
                     .checked_add(amount)
-                    .ok_or(error!(StoreError::AmountOverflow))?;
+                    .ok_or(error!(CoreError::TokenAmountOverflow))?;
             } else {
                 short_excluding_amount = short_excluding_amount
                     .checked_add(amount)
-                    .ok_or(error!(StoreError::AmountOverflow))?;
+                    .ok_or(error!(CoreError::TokenAmountOverflow))?;
             }
         }
         self.validate_market_balances(long_excluding_amount, short_excluding_amount)
@@ -100,40 +100,39 @@ impl<
 /// Trait for auto-deleveraging utils.
 pub trait AdlOps {
     /// Validate if the ADL can be executed.
-    fn validate_adl(&self, oracle: &Oracle, is_long: bool) -> StoreResult<()>;
+    fn validate_adl(&self, oracle: &Oracle, is_long: bool) -> CoreResult<()>;
 
     /// Latest ADL time.
-    fn latest_adl_time(&self, is_long: bool) -> StoreResult<i64>;
+    fn latest_adl_time(&self, is_long: bool) -> CoreResult<i64>;
 
     fn update_adl_state(&mut self, oracle: &Oracle, is_long: bool) -> Result<()>;
 }
 
 impl AdlOps for Market {
-    fn latest_adl_time(&self, is_long: bool) -> StoreResult<i64> {
+    fn latest_adl_time(&self, is_long: bool) -> CoreResult<i64> {
         let clock = if is_long {
             ClockKind::AdlForLong
         } else {
             ClockKind::AdlForShort
         };
-        self.clock(clock)
-            .ok_or(StoreError::RequiredResourceNotFound)
+        self.clock(clock).ok_or(CoreError::NotFound)
     }
 
-    fn validate_adl(&self, oracle: &Oracle, is_long: bool) -> StoreResult<()> {
+    fn validate_adl(&self, oracle: &Oracle, is_long: bool) -> CoreResult<()> {
         if !self.is_adl_enabled(is_long) {
-            return Err(StoreError::AdlNotEnabled);
+            return Err(CoreError::AdlNotEnabled);
         }
         if oracle.max_oracle_ts < self.latest_adl_time(is_long)? {
-            return Err(StoreError::OracleTimestampsAreSmallerThanRequired);
+            return Err(CoreError::OracleTimestampsAreSmallerThanRequired);
         }
         Ok(())
     }
 
     fn update_adl_state(&mut self, oracle: &Oracle, is_long: bool) -> Result<()> {
         if oracle.max_oracle_ts < self.latest_adl_time(is_long)? {
-            return err!(StoreError::OracleTimestampsAreSmallerThanRequired);
+            return err!(CoreError::OracleTimestampsAreSmallerThanRequired);
         }
-        require!(self.is_enabled(), StoreError::DisabledMarket);
+        require!(self.is_enabled(), CoreError::DisabledMarket);
         let prices = self.prices(oracle)?;
         let is_exceeded = self
             .pnl_factor_exceeded(&prices, PnlFactorKind::ForAdl, is_long)
@@ -148,7 +147,7 @@ impl AdlOps for Market {
         let clock = self
             .clocks
             .get_mut(kind)
-            .ok_or(error!(StoreError::RequiredResourceNotFound))?;
+            .ok_or(error!(CoreError::NotFound))?;
         *clock = Clock::get()?.unix_timestamp;
         Ok(())
     }

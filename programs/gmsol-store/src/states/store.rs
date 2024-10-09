@@ -4,7 +4,7 @@ use anchor_lang::prelude::*;
 use bytemuck::Zeroable;
 use gmsol_utils::to_seed;
 
-use crate::{constants, states::feature::display_feature, CoreError, StoreError, StoreResult};
+use crate::{constants, states::feature::display_feature, CoreError, CoreResult};
 
 use super::{
     feature::{ActionDisabledFlag, DisabledFeatures, DomainDisabledFlag},
@@ -144,7 +144,7 @@ impl Store {
 
     /// Get amount.
     pub fn get_amount(&self, key: &str) -> Result<&Amount> {
-        let key = AmountKey::from_str(key).map_err(|_| error!(StoreError::InvalidKey))?;
+        let key = AmountKey::from_str(key).map_err(|_| error!(CoreError::InvalidStoreConfigKey))?;
         Ok(self.get_amount_by_key(key))
     }
 
@@ -156,13 +156,13 @@ impl Store {
 
     /// Get amount mutably
     pub fn get_amount_mut(&mut self, key: &str) -> Result<&mut Amount> {
-        let key = AmountKey::from_str(key).map_err(|_| error!(StoreError::InvalidKey))?;
+        let key = AmountKey::from_str(key).map_err(|_| error!(CoreError::InvalidStoreConfigKey))?;
         Ok(self.amount.get_mut(&key))
     }
 
     /// Get factor.
     pub fn get_factor(&self, key: &str) -> Result<&Factor> {
-        let key = FactorKey::from_str(key).map_err(|_| error!(StoreError::InvalidKey))?;
+        let key = FactorKey::from_str(key).map_err(|_| error!(CoreError::InvalidStoreConfigKey))?;
         Ok(self.get_factor_by_key(key))
     }
 
@@ -174,13 +174,14 @@ impl Store {
 
     /// Get factor mutably
     pub fn get_factor_mut(&mut self, key: &str) -> Result<&mut Factor> {
-        let key = FactorKey::from_str(key).map_err(|_| error!(StoreError::InvalidKey))?;
+        let key = FactorKey::from_str(key).map_err(|_| error!(CoreError::InvalidStoreConfigKey))?;
         Ok(self.factor.get_mut(&key))
     }
 
     /// Get address.
     pub fn get_address(&self, key: &str) -> Result<&Pubkey> {
-        let key = AddressKey::from_str(key).map_err(|_| error!(StoreError::InvalidKey))?;
+        let key =
+            AddressKey::from_str(key).map_err(|_| error!(CoreError::InvalidStoreConfigKey))?;
         Ok(self.get_address_by_key(key))
     }
 
@@ -192,20 +193,21 @@ impl Store {
 
     /// Get address mutably
     pub fn get_address_mut(&mut self, key: &str) -> Result<&mut Pubkey> {
-        let key = AddressKey::from_str(key).map_err(|_| error!(StoreError::InvalidKey))?;
+        let key =
+            AddressKey::from_str(key).map_err(|_| error!(CoreError::InvalidStoreConfigKey))?;
         Ok(self.address.get_mut(&key))
     }
 
     /// Calculate the request expiration time.
-    pub fn request_expiration_at(&self, start: i64) -> StoreResult<i64> {
+    pub fn request_expiration_at(&self, start: i64) -> CoreResult<i64> {
         start
             .checked_add_unsigned(self.amount.request_expiration)
-            .ok_or(StoreError::AmountOverflow)
+            .ok_or(CoreError::InvalidArgument)
     }
 
     /// Get claimable time window size.
     pub fn claimable_time_window(&self) -> Result<NonZeroU64> {
-        NonZeroU64::new(self.amount.claimable_time_window).ok_or(error!(StoreError::CannotBeZero))
+        NonZeroU64::new(self.amount.claimable_time_window).ok_or(error!(CoreError::InvalidArgument))
     }
 
     /// Get claimable time window index for the given timestamp.
@@ -214,7 +216,7 @@ impl Store {
             .claimable_time_window()?
             .get()
             .try_into()
-            .map_err(|_| error!(StoreError::AmountOverflow))?;
+            .map_err(|_| error!(CoreError::InvalidArgument))?;
         Ok(timestamp / window)
     }
 
@@ -233,7 +235,7 @@ impl Store {
     pub fn validate_claim_fees_address(&self, address: &Pubkey) -> Result<()> {
         require!(
             self.treasury.is_receiver(address) || self.treasury.is_treasury(address),
-            StoreError::PermissionDenied
+            CoreError::PermissionDenied
         );
         Ok(())
     }

@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use gmsol_utils::price::{Decimal, Price};
 use pyth_solana_receiver_sdk::price_update::PriceUpdateV2;
 
-use crate::{states::TokenConfig, StoreError};
+use crate::{states::TokenConfig, CoreError};
 
 /// The Pyth receiver program.
 pub struct Pyth;
@@ -52,14 +52,14 @@ impl PythLegacy {
         use pyth_sdk_solana::state::SolanaPriceAccount;
         let feed = SolanaPriceAccount::account_info_to_feed(feed).map_err(|err| {
             msg!("Pyth Error: {}", err);
-            StoreError::Unknown
+            CoreError::Internal
         })?;
 
         let Some(price) = feed.get_price_no_older_than(
             clock.unix_timestamp,
             token_config.heartbeat_duration().into(),
         ) else {
-            return err!(StoreError::PriceFeedNotUpdated);
+            return err!(CoreError::PriceFeedNotUpdated);
         };
 
         let parsed_price =
@@ -80,13 +80,13 @@ pub fn pyth_price_with_confidence_to_price(
 ) -> Result<Price> {
     let mid_price: u64 = price
         .try_into()
-        .map_err(|_| error!(StoreError::NegativePrice))?;
+        .map_err(|_| error!(CoreError::InvalidPriceFeedPrice))?;
     let min_price = mid_price
         .checked_sub(confidence)
-        .ok_or(error!(StoreError::NegativePrice))?;
+        .ok_or(error!(CoreError::InvalidPriceFeedPrice))?;
     let max_price = mid_price
         .checked_add(confidence)
-        .ok_or(StoreError::PriceOverflow)?;
+        .ok_or(CoreError::InvalidPriceFeedPrice)?;
     Ok(Price {
         min: pyth_price_value_to_decimal(min_price, exponent, token_config)?,
         max: pyth_price_value_to_decimal(max_price, exponent, token_config)?,
@@ -105,12 +105,14 @@ pub fn pyth_price_value_to_decimal(
     let decimals: u8 = if exponent <= 0 {
         (-exponent)
             .try_into()
-            .map_err(|_| StoreError::InvalidPriceFeedPrice)?
+            .map_err(|_| CoreError::InvalidPriceFeedPrice)?
     } else {
         let factor = 10u64
             .checked_pow(exponent as u32)
-            .ok_or(StoreError::InvalidPriceFeedPrice)?;
-        value = value.checked_mul(factor).ok_or(StoreError::PriceOverflow)?;
+            .ok_or(CoreError::InvalidPriceFeedPrice)?;
+        value = value
+            .checked_mul(factor)
+            .ok_or(CoreError::InvalidPriceFeedPrice)?;
         0
     };
     let price = Decimal::try_from_price(
@@ -119,7 +121,7 @@ pub fn pyth_price_value_to_decimal(
         token_config.token_decimals(),
         token_config.precision(),
     )
-    .map_err(|_| StoreError::InvalidPriceFeedPrice)?;
+    .map_err(|_| CoreError::InvalidPriceFeedPrice)?;
     Ok(price)
 }
 

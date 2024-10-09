@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{constants, states::Factor, StoreError};
+use crate::{constants, states::Factor, CoreError};
 
 /// Market Config.
 #[zero_copy]
@@ -533,7 +533,7 @@ impl Entry {
     pub fn key(&self) -> Result<MarketConfigKey> {
         self.key
             .try_into()
-            .map_err(|_| error!(StoreError::InvalidKey))
+            .map_err(|_| error!(CoreError::InvalidMarketConfigKey))
     }
 
     /// Get value.
@@ -557,7 +557,8 @@ impl TryFrom<EntryArgs> for Entry {
 
     fn try_from(EntryArgs { key, value }: EntryArgs) -> Result<Self> {
         Ok(Self::new(
-            key.parse().map_err(|_| error!(StoreError::InvalidKey))?,
+            key.parse()
+                .map_err(|_| error!(CoreError::InvalidMarketConfigKey))?,
             value,
         ))
     }

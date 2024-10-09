@@ -4,7 +4,7 @@ use gmsol_model::PoolKind;
 use crate::{
     states::{Market, Store},
     utils::internal,
-    StoreError,
+    CoreError,
 };
 
 /// The accounts definition for pure flag turning instructions.
@@ -36,10 +36,8 @@ pub(crate) fn unchecked_turn_into_pure_pool(
 ) -> Result<()> {
     let mut market = ctx.accounts.market.load_mut()?;
     let mint = market.meta.market_token_mint;
-    let pool = market
-        .pool_mut(kind)
-        .ok_or(error!(StoreError::RequiredResourceNotFound))?;
-    require!(!pool.is_pure(), StoreError::InvalidArgument);
+    let pool = market.pool_mut(kind).ok_or(error!(CoreError::NotFound))?;
+    require!(!pool.is_pure(), CoreError::PreconditionsAreNotMet);
     msg!("{}: turning pool `{}` to pure", mint, kind);
     pool.set_is_pure(true);
     pool.merge_if_pure()?;
@@ -56,10 +54,8 @@ pub(crate) fn unchecked_turn_into_impure_pool(
 ) -> Result<()> {
     let mut market = ctx.accounts.market.load_mut()?;
     let mint = market.meta.market_token_mint;
-    let pool = market
-        .pool_mut(kind)
-        .ok_or(error!(StoreError::RequiredResourceNotFound))?;
-    require!(pool.is_pure(), StoreError::InvalidArgument);
+    let pool = market.pool_mut(kind).ok_or(error!(CoreError::NotFound))?;
+    require!(pool.is_pure(), CoreError::PreconditionsAreNotMet);
     msg!("{}: turning pool `{}` to impure", mint, kind);
     pool.set_is_pure(false);
     Ok(())

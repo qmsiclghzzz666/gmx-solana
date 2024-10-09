@@ -8,7 +8,7 @@ use bitmaps::Bitmap;
 
 use crate::{
     utils::fixed_str::{bytes_to_fixed_str, fixed_str_to_bytes},
-    StoreError,
+    CoreError,
 };
 
 use super::{HasMarketMeta, InitSpace, PriceProviderKind};
@@ -91,9 +91,9 @@ impl TokenConfig {
     /// Get the corresponding price feed config.
     pub fn get_feed_config(&self, kind: &PriceProviderKind) -> Result<&FeedConfig> {
         let index = *kind as usize;
-        let config = self.feeds.get(index).ok_or(StoreError::PriceFeedNotSet)?;
+        let config = self.feeds.get(index).ok_or(error!(CoreError::NotFound))?;
         if config.feed == Pubkey::default() {
-            err!(StoreError::PriceFeedNotSet)
+            err!(CoreError::NotFound)
         } else {
             Ok(config)
         }
@@ -109,7 +109,7 @@ impl TokenConfig {
         let config = self
             .feeds
             .get_mut(index)
-            .ok_or(StoreError::InvalidProviderKindIndex)?;
+            .ok_or(CoreError::InvalidProviderKindIndex)?;
         *config = new_config;
         Ok(())
     }
@@ -127,7 +127,7 @@ impl TokenConfig {
     /// Get expected price provider kind.
     pub fn expected_provider(&self) -> Result<PriceProviderKind> {
         let kind = PriceProviderKind::try_from(self.expected_provider)
-            .map_err(|_| StoreError::InvalidProviderKindIndex)?;
+            .map_err(|_| CoreError::InvalidProviderKindIndex)?;
         Ok(kind)
     }
 
@@ -182,10 +182,10 @@ impl TokenConfig {
         init: bool,
     ) -> Result<()> {
         if init {
-            require!(!self.flag(Flag::Initialized), StoreError::InvalidArgument);
+            require!(!self.flag(Flag::Initialized), CoreError::InvalidArgument);
             self.set_flag(Flag::Initialized, true);
         } else {
-            require!(self.flag(Flag::Initialized), StoreError::InvalidArgument);
+            require!(self.flag(Flag::Initialized), CoreError::InvalidArgument);
         }
         let TokenConfigBuilder {
             heartbeat_duration,
@@ -203,7 +203,7 @@ impl TokenConfig {
             .map(FeedConfig::new)
             .collect::<Vec<_>>()
             .try_into()
-            .map_err(|_| error!(StoreError::InvalidArgument))?;
+            .map_err(|_| error!(CoreError::InvalidArgument))?;
         self.expected_provider = expected_provider.unwrap_or(PriceProviderKind::default() as u8);
         self.heartbeat_duration = heartbeat_duration;
         Ok(())
@@ -318,10 +318,7 @@ impl TokenConfigBuilder {
     /// Return error when the feed was not set before.
     pub fn update_price_feed(mut self, kind: &PriceProviderKind, new_feed: Pubkey) -> Result<Self> {
         let index = *kind as usize;
-        let feed = self
-            .feeds
-            .get_mut(index)
-            .ok_or(StoreError::PriceFeedNotSet)?;
+        let feed = self.feeds.get_mut(index).ok_or(CoreError::NotFound)?;
         *feed = new_feed;
         Ok(self)
     }
@@ -392,9 +389,9 @@ impl TokenMapHeader {
             .tokens
             .len()
             .checked_add(1)
-            .ok_or(error!(StoreError::ExceedMaxLengthLimit))?
+            .ok_or(error!(CoreError::ExceedMaxLengthLimit))?
             .try_into()
-            .map_err(|_| error!(StoreError::AmountOverflow))?;
+            .map_err(|_| error!(CoreError::InvalidArgument))?;
         Ok(Self::space(num_configs))
     }
 
@@ -535,10 +532,10 @@ impl<'a> TokenMapMutAccess for TokenMapMut<'a> {
     ) -> Result<()> {
         let index = if new {
             let next_index = self.header.tokens.len();
-            require!(next_index < MAX_TOKENS, StoreError::ExceedMaxLengthLimit);
+            require!(next_index < MAX_TOKENS, CoreError::ExceedMaxLengthLimit);
             let index = next_index
                 .try_into()
-                .map_err(|_| error!(StoreError::AmountOverflow))?;
+                .map_err(|_| error!(CoreError::InvalidArgument))?;
             self.header.tokens.insert_with_options(token, index, true)?;
             index
         } else {
@@ -546,13 +543,13 @@ impl<'a> TokenMapMutAccess for TokenMapMut<'a> {
                 .header
                 .tokens
                 .get(token)
-                .ok_or(error!(StoreError::RequiredResourceNotFound))?
+                .ok_or(error!(CoreError::NotFound))?
         };
         let Some(dst) = crate::utils::dynamic_access::get_mut::<TokenConfig>(
             &mut self.configs,
             usize::from(index),
         ) else {
-            return err!(StoreError::NoSpaceForNewData);
+            return err!(CoreError::NotEnoughSpace);
         };
         (f)(dst)
     }

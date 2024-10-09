@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use gmsol_model::PoolKind;
 
-use crate::StoreError;
+use crate::CoreError;
 
 use super::revertible::market::SmallPool;
 
@@ -38,11 +38,11 @@ impl Pool {
     /// Merge pool amount if it is pure.
     /// Will return error if the pool is not pure.
     pub(crate) fn merge_if_pure(&mut self) -> Result<()> {
-        require!(self.is_pure(), StoreError::InvalidArgument);
+        require!(self.is_pure(), CoreError::InvalidArgument);
         self.long_token_amount = self
             .long_token_amount
             .checked_add(self.short_token_amount)
-            .ok_or(error!(StoreError::AmountOverflow))?;
+            .ok_or(error!(CoreError::TokenAmountOverflow))?;
         Ok(())
     }
 

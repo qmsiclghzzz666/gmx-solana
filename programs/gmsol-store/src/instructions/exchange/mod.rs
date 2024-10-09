@@ -39,7 +39,7 @@ pub use shift::*;
 pub use update_adl::*;
 pub use withdrawal::*;
 
-use crate::StoreError;
+use crate::CoreError;
 
 pub(crate) struct ModelError(gmsol_model::Error);
 
@@ -52,11 +52,11 @@ impl From<gmsol_model::Error> for ModelError {
 impl From<ModelError> for anchor_lang::prelude::Error {
     fn from(err: ModelError) -> Self {
         match err.0 {
-            gmsol_model::Error::EmptyDeposit => StoreError::EmptyDeposit.into(),
+            gmsol_model::Error::EmptyDeposit => CoreError::EmptyDeposit.into(),
             gmsol_model::Error::Solana(err) => err,
             core_error => {
                 crate::msg!("A model error occurred. Error Message: {}", core_error);
-                StoreError::Model.into()
+                CoreError::Model.into()
             }
         }
     }

@@ -20,7 +20,7 @@ use crate::{
         position::PositionState,
         Position,
     },
-    CoreError, StoreError,
+    CoreError,
 };
 
 #[event]
@@ -563,50 +563,50 @@ impl TradeEventData {
         require_gt!(
             self.trade_id,
             self.before.trade_id,
-            StoreError::InvalidTradeID
+            CoreError::InvalidTradeID
         );
         if self.is_increase() {
             require_gte!(
                 self.after.size_in_usd,
                 self.before.size_in_usd,
-                StoreError::InvalidTradeDeltaSize
+                CoreError::InvalidTradeDeltaSize
             );
             require_gte!(
                 self.after.size_in_tokens,
                 self.before.size_in_tokens,
-                StoreError::InvalidTradeDeltaSize
+                CoreError::InvalidTradeDeltaTokens
             );
         } else {
             require_gte!(
                 self.before.size_in_usd,
                 self.after.size_in_usd,
-                StoreError::InvalidTradeDeltaSize
+                CoreError::InvalidTradeDeltaSize
             );
             require_gte!(
                 self.before.size_in_tokens,
                 self.after.size_in_tokens,
-                StoreError::InvalidTradeDeltaSize
+                CoreError::InvalidTradeDeltaTokens
             );
         }
         require_gte!(
             self.after.borrowing_factor,
             self.before.borrowing_factor,
-            StoreError::InvalidBorrowingFactor
+            CoreError::InvalidBorrowingFactor
         );
         require_gte!(
             self.after.funding_fee_amount_per_size,
             self.before.funding_fee_amount_per_size,
-            StoreError::InvalidFundingFactors
+            CoreError::InvalidFundingFactors
         );
         require_gte!(
             self.after.long_token_claimable_funding_amount_per_size,
             self.before.long_token_claimable_funding_amount_per_size,
-            StoreError::InvalidFundingFactors
+            CoreError::InvalidFundingFactors
         );
         require_gte!(
             self.after.short_token_claimable_funding_amount_per_size,
             self.before.short_token_claimable_funding_amount_per_size,
-            StoreError::InvalidFundingFactors
+            CoreError::InvalidFundingFactors
         );
         Ok(())
     }

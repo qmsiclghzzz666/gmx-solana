@@ -5,7 +5,7 @@ use anchor_lang::prelude::*;
 use crate::{
     states::{TokenConfig, TokenMapAccess},
     utils::chunk_by::chunk_by,
-    CoreError, StoreError,
+    CoreError,
 };
 
 use super::PriceProviderKind;
@@ -68,7 +68,7 @@ impl TokensWithFeed {
         let mut nums = Vec::with_capacity(chunks.size_hint().0);
         chunks.try_for_each(|chunk| {
             providers.push(chunk[0].provider);
-            nums.push(u16::try_from(chunk.len()).map_err(|_| StoreError::ExceedMaxLengthLimit)?);
+            nums.push(u16::try_from(chunk.len()).map_err(|_| CoreError::ExceedMaxLengthLimit)?);
             Result::Ok(())
         })?;
         Ok(Self {

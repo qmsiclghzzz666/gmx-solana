@@ -17,7 +17,7 @@ use std::ops::Deref;
 
 use crate::{
     states::{TokenMapAccess, TokenMapLoader},
-    CoreError, StoreError, StoreResult,
+    CoreError, CoreResult,
 };
 use anchor_lang::{prelude::*, Ids};
 use num_enum::TryFromPrimitive;
@@ -67,10 +67,10 @@ impl Oracle {
         tokens: &[Pubkey],
         remaining_accounts: &'info [AccountInfo<'info>],
     ) -> Result<()> {
-        require!(self.primary.is_empty(), StoreError::PricesAlreadySet);
+        require!(self.primary.is_empty(), CoreError::PricesAreAlreadySet);
         require!(
             tokens.len() <= PriceMap::MAX_TOKENS,
-            StoreError::ExceedMaxLengthLimit
+            CoreError::ExceedMaxLengthLimit
         );
         require!(
             tokens.len() <= remaining_accounts.len(),
@@ -81,15 +81,15 @@ impl Oracle {
         // [token_config, feed; tokens.len()] [..remaining]
         for (idx, token) in tokens.iter().enumerate() {
             let feed = &remaining_accounts[idx];
-            let token_config = map.get(token).ok_or(StoreError::RequiredResourceNotFound)?;
-            require!(token_config.is_enabled(), StoreError::TokenConfigDisabled);
+            let token_config = map.get(token).ok_or(CoreError::NotFound)?;
+            require!(token_config.is_enabled(), CoreError::TokenConfigDisabled);
             require_eq!(token_config.expected_provider()?, *program.kind());
             let (oracle_slot, oracle_ts, price, kind) = match &program {
                 PriceProviderProgram::Chainlink(program, kind) => {
                     require_eq!(
                         token_config.get_feed(kind)?,
                         feed.key(),
-                        StoreError::InvalidPriceFeedAccount
+                        CoreError::InvalidPriceFeedAccount
                     );
                     let (oracle_slot, oracle_ts, price) = Chainlink::check_and_get_chainlink_price(
                         validator.clock(),
@@ -109,7 +109,7 @@ impl Oracle {
                     require_eq!(
                         token_config.get_feed(kind)?,
                         feed.key(),
-                        StoreError::InvalidPriceFeedAccount
+                        CoreError::InvalidPriceFeedAccount
                     );
                     // We don't have to check the `feed_id` because the `feed` account is set by the token config keeper.
                     let (oracle_slot, oracle_ts, price) =
@@ -177,10 +177,10 @@ impl Oracle {
     }
 
     /// Validate oracle time.
-    pub(crate) fn validate_time(&self, target: &impl ValidateOracleTime) -> StoreResult<()> {
+    pub(crate) fn validate_time(&self, target: &impl ValidateOracleTime) -> CoreResult<()> {
         if self.max_oracle_ts < self.min_oracle_ts {
             msg!("min = {}, max = {}", self.min_oracle_ts, self.max_oracle_ts);
-            return Err(StoreError::InvalidOracleTsTrange);
+            return Err(CoreError::InvalidOracleTimestampsRange);
         }
         target.validate_min_oracle_slot(self)?;
         target.validate_min_oracle_ts(self)?;
@@ -201,7 +201,7 @@ impl Oracle {
                 let price = self
                     .primary
                     .get(&meta.index_token_mint)
-                    .ok_or(StoreError::MissingOracelPrice)?;
+                    .ok_or(CoreError::MissingOraclePrice)?;
                 Price {
                     min: price.min.to_unit_price(),
                     max: price.max.to_unit_price(),
@@ -211,7 +211,7 @@ impl Oracle {
                 let price = self
                     .primary
                     .get(&meta.long_token_mint)
-                    .ok_or(StoreError::MissingOracelPrice)?;
+                    .ok_or(CoreError::MissingOraclePrice)?;
                 Price {
                     min: price.min.to_unit_price(),
                     max: price.max.to_unit_price(),
@@ -221,7 +221,7 @@ impl Oracle {
                 let price = self
                     .primary
                     .get(&meta.short_token_mint)
-                    .ok_or(StoreError::MissingOracelPrice)?;
+                    .ok_or(CoreError::MissingOraclePrice)?;
                 Price {
                     min: price.min.to_unit_price(),
                     max: price.max.to_unit_price(),

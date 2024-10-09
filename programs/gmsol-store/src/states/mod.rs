@@ -53,36 +53,12 @@ pub type Factor = u128;
 
 use gmsol_utils::InitSpace;
 
-use anchor_lang::{
-    prelude::{borsh, AnchorDeserialize, AnchorSerialize, Pubkey, Result},
-    Bump,
-};
-use gmsol_utils::to_seed;
+use anchor_lang::prelude::{borsh, AnchorDeserialize, AnchorSerialize};
 
 /// Data type that has [`SEED`](Seed::SEED).
 pub trait Seed {
     /// Prefix seed for program derived addresses.
     const SEED: &'static [u8];
-}
-
-/// Data type stored in data store.
-pub trait Data: Bump + Seed {
-    /// Verify the key.
-    #[allow(unused_variables)]
-    fn verify(&self, key: &str) -> Result<()> {
-        Ok(())
-    }
-
-    /// Recreate the Program Derived Address.
-    fn pda(&self, store: &Pubkey, key: &str) -> Result<Pubkey> {
-        self.verify(key)?;
-        let pda = Pubkey::create_program_address(
-            &[Self::SEED, store.as_ref(), &to_seed(key), &[self.seed()]],
-            &crate::ID,
-        )
-        .map_err(|_| crate::StoreError::InvalidPDA)?;
-        Ok(pda)
-    }
 }
 
 /// Nonce Bytes.

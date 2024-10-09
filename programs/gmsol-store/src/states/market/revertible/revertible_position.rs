@@ -6,7 +6,7 @@ use crate::{
     constants,
     events::TradeEventData,
     states::{position::PositionState, HasMarketMeta, Position},
-    StoreError,
+    CoreError,
 };
 
 use super::{perp_market::RevertiblePerpMarket, Revertible};
@@ -31,7 +31,7 @@ impl<'a> RevertiblePosition<'a> {
         require_eq!(
             storage.market_token,
             meta.market_token_mint,
-            StoreError::InvalidPositionMarket
+            CoreError::MarketTokenMintMismatched
         );
 
         let is_long = storage.try_is_long()?;

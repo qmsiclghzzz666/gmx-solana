@@ -3,7 +3,7 @@ use gmsol_utils::price::Price;
 
 use crate::{
     states::{Amount, Store, TokenConfig},
-    StoreError,
+    CoreError,
 };
 
 use super::PriceProviderKind;
@@ -38,13 +38,13 @@ impl PriceValidator {
         let timestamp_adjustment = token_config.timestamp_adjustment(provider)?.into();
         let ts = oracle_ts
             .checked_sub_unsigned(timestamp_adjustment)
-            .ok_or(StoreError::AmountOverflow)?;
+            .ok_or(CoreError::TokenAmountOverflow)?;
 
         let expiration_ts = ts
             .checked_add_unsigned(self.max_age)
-            .ok_or(StoreError::AmountOverflow)?;
+            .ok_or(CoreError::TokenAmountOverflow)?;
         if expiration_ts < self.clock.unix_timestamp {
-            return err!(StoreError::MaxPriceAgeExceeded);
+            return err!(CoreError::MaxPriceAgeExceeded);
         }
 
         // TODO: validate price with ref price.
@@ -73,13 +73,13 @@ impl PriceValidator {
         let range: u64 = self
             .max_oracle_ts
             .checked_sub(self.min_oracle_ts)
-            .ok_or(error!(StoreError::AmountOverflow))?
+            .ok_or(error!(CoreError::TokenAmountOverflow))?
             .try_into()
-            .map_err(|_| error!(StoreError::InvalidOracleTsTrange))?;
+            .map_err(|_| error!(CoreError::InvalidOracleTimestampsRange))?;
         require_gte!(
             self.max_oracle_timestamp_range,
             range,
-            StoreError::MaxOracleTimeStampRangeExceeded
+            CoreError::MaxOracleTimestampsRangeExceeded
         );
         Ok(self
             .min_oracle_slot

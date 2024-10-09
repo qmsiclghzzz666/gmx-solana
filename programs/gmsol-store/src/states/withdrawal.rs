@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::StoreError;
+use crate::CoreError;
 
 use super::{
     common::{
@@ -53,12 +53,12 @@ impl Withdrawal {
         require_gte!(
             long_amount,
             params.min_long_token_amount,
-            StoreError::InsufficientOutputAmount
+            CoreError::InsufficientOutputAmount
         );
         require_gte!(
             short_amount,
             params.min_short_token_amount,
-            StoreError::InsufficientOutputAmount
+            CoreError::InsufficientOutputAmount
         );
         Ok(())
     }

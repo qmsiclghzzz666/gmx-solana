@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use dual_vec_map::DualVecMap;
 use gmsol_utils::price::Price;
 
-use crate::StoreError;
+use crate::CoreError;
 
 /// Maximum number of tokens for a single `Price Map` to store.
 const MAX_TOKENS: usize = 32;
@@ -41,7 +41,7 @@ impl PriceMap {
     pub(crate) fn set(&mut self, token: &Pubkey, price: Price) -> Result<()> {
         self.as_map_mut()
             .try_insert(*token, price)
-            .map_err(|_| StoreError::PriceAlreadySet)?;
+            .map_err(|_| CoreError::PriceIsAlreadySet)?;
         Ok(())
     }
 

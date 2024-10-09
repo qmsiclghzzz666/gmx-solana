@@ -11,9 +11,7 @@ use crate::{
     states::{
         common::action::Action,
         market::AdlOps,
-        order::{
-            CollateralReceiver, OrderKind, OrderParamsV2, Order, TokenAccounts, TransferOut,
-        },
+        order::{CollateralReceiver, Order, OrderKind, OrderParamsV2, TokenAccounts, TransferOut},
         position::PositionKind,
         revertible::{
             perp_market::RevertiblePerpMarket,
@@ -25,7 +23,7 @@ use crate::{
         HasMarketMeta, Market, NonceBytes, Oracle, Position, Store, ValidateMarketBalances,
         ValidateOracleTime,
     },
-    CoreError, ModelError, StoreError,
+    CoreError, ModelError,
 };
 
 use super::{execution_fee::TransferExecutionFeeOps, market::MarketTransferOut};
@@ -654,7 +652,7 @@ impl<'a, 'info> ExecuteOrderOps<'a, 'info> {
 
         match self.validate_oracle_and_adl() {
             Ok(()) => {}
-            Err(StoreError::OracleTimestampsAreLargerThanRequired)
+            Err(CoreError::OracleTimestampsAreLargerThanRequired)
                 if !self.throw_on_execution_error =>
             {
                 msg!(
@@ -776,7 +774,7 @@ impl<'a, 'info> ExecuteOrderOps<'a, 'info> {
                 let position_loader = self
                     .position
                     .as_ref()
-                    .ok_or(error!(StoreError::PositionIsNotProvided))?;
+                    .ok_or(error!(CoreError::PositionIsRequired))?;
                 let event_loader = self
                     .event
                     .as_ref()
@@ -919,22 +917,19 @@ impl<'a, 'info> ExecuteOrderOps<'a, 'info> {
         Ok(())
     }
 
-    fn validate_oracle_and_adl(&self) -> crate::StoreResult<()> {
+    fn validate_oracle_and_adl(&self) -> crate::CoreResult<()> {
         self.oracle.validate_time(self)?;
         let (kind, is_long) = {
-            let order = self
-                .order
-                .load()
-                .map_err(|_| StoreError::LoadAccountError)?;
+            let order = self.order.load().map_err(|_| CoreError::LoadAccountError)?;
             (
                 order
                     .params
                     .kind()
-                    .map_err(|_| StoreError::InvalidArgument)?,
+                    .map_err(|_| CoreError::InvalidArgument)?,
                 order
                     .params
                     .side()
-                    .map_err(|_| StoreError::InvalidArgument)?
+                    .map_err(|_| CoreError::InvalidArgument)?
                     .is_long(),
             )
         };
@@ -943,7 +938,7 @@ impl<'a, 'info> ExecuteOrderOps<'a, 'info> {
             OrderKind::AutoDeleveraging => {
                 self.market
                     .load()
-                    .map_err(|_| StoreError::InvalidMarket)?
+                    .map_err(|_| CoreError::LoadAccountError)?
                     .validate_adl(self.oracle, is_long)?;
             }
             _ => {}
@@ -976,13 +971,13 @@ impl<'a, 'info> ExecuteOrderOps<'a, 'info> {
 
         // NOTE: we currently allow the delta size for decrease position order to be empty.
         if kind.is_increase_position() {
-            require!(params.size_delta_value != 0, StoreError::InvalidArgument);
+            require!(params.size_delta_value != 0, CoreError::InvalidArgument);
         }
 
         if kind.is_swap() {
             require!(
                 params.initial_collateral_delta_amount != 0,
-                StoreError::InvalidArgument
+                CoreError::InvalidArgument
             );
         }
         Ok(())
@@ -996,17 +991,14 @@ impl<'a, 'info> ExecuteOrderOps<'a, 'info> {
 }
 
 impl<'a, 'info> ValidateOracleTime for ExecuteOrderOps<'a, 'info> {
-    fn oracle_updated_after(&self) -> crate::StoreResult<Option<i64>> {
+    fn oracle_updated_after(&self) -> crate::CoreResult<Option<i64>> {
         let (kind, updated_at) = {
-            let order = self
-                .order
-                .load()
-                .map_err(|_| StoreError::LoadAccountError)?;
+            let order = self.order.load().map_err(|_| CoreError::LoadAccountError)?;
             (
                 order
                     .params
                     .kind()
-                    .map_err(|_| StoreError::InvalidArgument)?,
+                    .map_err(|_| CoreError::InvalidArgument)?,
                 order.header.updated_at,
             )
         };
@@ -1021,9 +1013,9 @@ impl<'a, 'info> ValidateOracleTime for ExecuteOrderOps<'a, 'info> {
                 let position = self
                     .position
                     .as_ref()
-                    .ok_or(StoreError::PositionNotProvided)?
+                    .ok_or(CoreError::PositionIsRequired)?
                     .load()
-                    .map_err(|_| StoreError::LoadAccountError)?;
+                    .map_err(|_| CoreError::LoadAccountError)?;
                 let last_updated = updated_at.max(position.state.increased_at);
                 Ok(Some(last_updated))
             }
@@ -1031,9 +1023,9 @@ impl<'a, 'info> ValidateOracleTime for ExecuteOrderOps<'a, 'info> {
                 let position = self
                     .position
                     .as_ref()
-                    .ok_or(StoreError::PositionNotProvided)?
+                    .ok_or(CoreError::PositionIsRequired)?
                     .load()
-                    .map_err(|_| StoreError::LoadAccountError)?;
+                    .map_err(|_| CoreError::LoadAccountError)?;
                 Ok(Some(
                     position.state.increased_at.max(position.state.decreased_at),
                 ))
@@ -1043,17 +1035,14 @@ impl<'a, 'info> ValidateOracleTime for ExecuteOrderOps<'a, 'info> {
         }
     }
 
-    fn oracle_updated_before(&self) -> crate::StoreResult<Option<i64>> {
+    fn oracle_updated_before(&self) -> crate::CoreResult<Option<i64>> {
         let (kind, updated_at) = {
-            let order = self
-                .order
-                .load()
-                .map_err(|_| StoreError::LoadAccountError)?;
+            let order = self.order.load().map_err(|_| CoreError::LoadAccountError)?;
             (
                 order
                     .params
                     .kind()
-                    .map_err(|_| StoreError::InvalidArgument)?,
+                    .map_err(|_| CoreError::InvalidArgument)?,
                 order.header().updated_at,
             )
         };
@@ -1066,23 +1055,20 @@ impl<'a, 'info> ValidateOracleTime for ExecuteOrderOps<'a, 'info> {
         ts.map(|ts| {
             self.store
                 .load()
-                .map_err(|_| StoreError::LoadAccountError)?
+                .map_err(|_| CoreError::LoadAccountError)?
                 .request_expiration_at(ts)
         })
         .transpose()
     }
 
-    fn oracle_updated_after_slot(&self) -> crate::StoreResult<Option<u64>> {
+    fn oracle_updated_after_slot(&self) -> crate::CoreResult<Option<u64>> {
         let (kind, updated_at_slot) = {
-            let order = self
-                .order
-                .load()
-                .map_err(|_| StoreError::LoadAccountError)?;
+            let order = self.order.load().map_err(|_| CoreError::LoadAccountError)?;
             (
                 order
                     .params
                     .kind()
-                    .map_err(|_| StoreError::InvalidArgument)?,
+                    .map_err(|_| CoreError::InvalidArgument)?,
                 order.header().updated_at_slot,
             )
         };
@@ -1203,10 +1189,10 @@ fn execute_increase_position(
     position.market().validate_market_balances(
         long_amount
             .try_into()
-            .map_err(|_| error!(StoreError::AmountOverflow))?,
+            .map_err(|_| error!(CoreError::TokenAmountOverflow))?,
         short_amount
             .try_into()
-            .map_err(|_| error!(StoreError::AmountOverflow))?,
+            .map_err(|_| error!(CoreError::TokenAmountOverflow))?,
     )?;
 
     Ok(())
@@ -1245,7 +1231,7 @@ fn execute_decrease_position(
             require_gte!(
                 size_delta_usd,
                 *position.size_in_usd(),
-                StoreError::InvalidArgument
+                CoreError::InvalidArgument
             );
         }
 
@@ -1256,7 +1242,7 @@ fn execute_decrease_position(
                 .pnl_factor_exceeded(&prices, PnlFactorKind::ForAdl, params.side()?.is_long())
                 .map_err(ModelError::from)?
             else {
-                return err!(StoreError::AdlNotRequired);
+                return err!(CoreError::AdlNotRequired);
             };
             pnl_factor_before_execution = Some(pnl_factor);
         }
@@ -1282,7 +1268,7 @@ fn execute_decrease_position(
             require_gt!(
                 pnl_factor_before_execution.expect("must be some"),
                 pnl_factor_after_execution,
-                StoreError::InvalidAdl
+                CoreError::InvalidAdl
             );
             let min_pnl_factor = position
                 .market()
@@ -1292,7 +1278,7 @@ fn execute_decrease_position(
             require_gt!(
                 pnl_factor_after_execution,
                 min_pnl_factor,
-                StoreError::InvalidAdl
+                CoreError::InvalidAdl
             );
         }
 
@@ -1307,16 +1293,16 @@ fn execute_decrease_position(
         require!(
             *report.secondary_output_amount() == 0
                 || (report.is_output_token_long() != report.is_secondary_output_token_long()),
-            StoreError::SameSecondaryTokensNotMerged,
+            CoreError::SameOutputTokensNotMerged,
         );
         let (is_output_token_long, output_amount, secondary_output_amount) = (
             report.is_output_token_long(),
             (*report.output_amount())
                 .try_into()
-                .map_err(|_| error!(StoreError::AmountOverflow))?,
+                .map_err(|_| error!(CoreError::TokenAmountOverflow))?,
             (*report.secondary_output_amount())
                 .try_into()
-                .map_err(|_| error!(StoreError::AmountOverflow))?,
+                .map_err(|_| error!(CoreError::TokenAmountOverflow))?,
         );
 
         // Swap output token to the expected output token.
@@ -1375,7 +1361,7 @@ fn execute_decrease_position(
         };
         *acc = acc
             .checked_add(amount)
-            .ok_or(error!(StoreError::AmountOverflow))?;
+            .ok_or(error!(CoreError::TokenAmountOverflow))?;
         Result::Ok(())
     };
     let current_market_token = position.market().key();

@@ -1,4 +1,4 @@
-use crate::{constants, StoreError};
+use crate::{constants, CoreError};
 use anchor_lang::prelude::*;
 use borsh::{BorshDeserialize, BorshSerialize};
 use num_enum::TryFromPrimitive;
@@ -59,7 +59,7 @@ impl Position {
     /// Get **initialized** position kind.
     pub fn kind(&self) -> Result<PositionKind> {
         match self.kind_unchecked()? {
-            PositionKind::Uninitialized => Err(StoreError::PositionNotInitalized.into()),
+            PositionKind::Uninitialized => Err(CoreError::InvalidPosition.into()),
             kind => Ok(kind),
         }
     }
@@ -82,10 +82,10 @@ impl Position {
         collateral_token: &Pubkey,
     ) -> Result<()> {
         let PositionKind::Uninitialized = self.kind_unchecked()? else {
-            return err!(StoreError::PositionHasBeenInitialized);
+            return err!(CoreError::InvalidPosition);
         };
         if matches!(kind, PositionKind::Uninitialized) {
-            return err!(StoreError::InvalidPositionInitailziationParams);
+            return err!(CoreError::InvalidPosition);
         }
         self.kind = kind as u8;
         self.bump = bump;
@@ -228,7 +228,7 @@ impl gmsol_model::PositionStateMut<{ constants::MARKET_DECIMALS }> for PositionS
     strum::Display,
 )]
 #[strum(serialize_all = "snake_case")]
-#[num_enum(error_type(name = StoreError, constructor = StoreError::invalid_position_kind))]
+#[num_enum(error_type(name = CoreError, constructor = CoreError::invalid_position_kind))]
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]

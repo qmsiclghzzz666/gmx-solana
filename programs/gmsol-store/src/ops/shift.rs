@@ -10,7 +10,7 @@ use crate::{
         HasMarketMeta, Market, NonceBytes, Oracle, Shift, Store, ValidateMarketBalances,
         ValidateOracleTime,
     },
-    CoreError, ModelError, StoreError, StoreResult,
+    CoreError, CoreResult, ModelError,
 };
 
 /// Create Shift Params.
@@ -157,7 +157,7 @@ impl<'a, 'info> ExecuteShiftOp<'a, 'info> {
 
         match self.validate_oracle() {
             Ok(()) => {}
-            Err(StoreError::OracleTimestampsAreLargerThanRequired) if !throw_on_execution_error => {
+            Err(CoreError::OracleTimestampsAreLargerThanRequired) if !throw_on_execution_error => {
                 msg!(
                     "shift expired at {}",
                     self.oracle_updated_before()
@@ -181,7 +181,7 @@ impl<'a, 'info> ExecuteShiftOp<'a, 'info> {
         }
     }
 
-    fn validate_oracle(&self) -> StoreResult<()> {
+    fn validate_oracle(&self) -> CoreResult<()> {
         self.oracle.validate_time(self)
     }
 
@@ -248,10 +248,10 @@ impl<'a, 'info> ExecuteShiftOp<'a, 'info> {
             let (long_amount, short_amount) = (
                 (*report.long_token_output())
                     .try_into()
-                    .map_err(|_| StoreError::AmountOverflow)?,
+                    .map_err(|_| CoreError::TokenAmountOverflow)?,
                 (*report.short_token_output())
                     .try_into()
-                    .map_err(|_| StoreError::AmountOverflow)?,
+                    .map_err(|_| CoreError::TokenAmountOverflow)?,
             );
             // Validate current market.
             from_market.validate_market_balances(long_amount, short_amount)?;
@@ -306,7 +306,7 @@ impl<'a, 'info> ExecuteShiftOp<'a, 'info> {
 
             let minted: u64 = (*report.minted())
                 .try_into()
-                .map_err(|_| error!(StoreError::AmountOverflow))?;
+                .map_err(|_| error!(CoreError::TokenAmountOverflow))?;
 
             require_gte!(
                 minted,
@@ -326,36 +326,36 @@ impl<'a, 'info> ExecuteShiftOp<'a, 'info> {
 }
 
 impl<'a, 'info> ValidateOracleTime for ExecuteShiftOp<'a, 'info> {
-    fn oracle_updated_after(&self) -> StoreResult<Option<i64>> {
+    fn oracle_updated_after(&self) -> CoreResult<Option<i64>> {
         Ok(Some(
             self.shift
                 .load()
-                .map_err(|_| StoreError::LoadAccountError)?
+                .map_err(|_| CoreError::LoadAccountError)?
                 .header()
                 .updated_at,
         ))
     }
 
-    fn oracle_updated_before(&self) -> StoreResult<Option<i64>> {
+    fn oracle_updated_before(&self) -> CoreResult<Option<i64>> {
         let ts = self
             .store
             .load()
-            .map_err(|_| StoreError::LoadAccountError)?
+            .map_err(|_| CoreError::LoadAccountError)?
             .request_expiration_at(
                 self.shift
                     .load()
-                    .map_err(|_| StoreError::LoadAccountError)?
+                    .map_err(|_| CoreError::LoadAccountError)?
                     .header()
                     .updated_at,
             )?;
         Ok(Some(ts))
     }
 
-    fn oracle_updated_after_slot(&self) -> StoreResult<Option<u64>> {
+    fn oracle_updated_after_slot(&self) -> CoreResult<Option<u64>> {
         Ok(Some(
             self.shift
                 .load()
-                .map_err(|_| StoreError::LoadAccountError)?
+                .map_err(|_| CoreError::LoadAccountError)?
                 .header()
                 .updated_at_slot,
         ))

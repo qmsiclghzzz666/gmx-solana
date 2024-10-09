@@ -1,7 +1,7 @@
 use anchor_client::{solana_client::pubsub_client::PubsubClientError, solana_sdk};
 use tokio_stream::wrappers::errors::BroadcastStreamRecvError;
 
-pub use gmsol_store::StoreError;
+pub use gmsol_store::CoreError;
 
 /// Error type for `gmsol`.
 #[derive(Debug, thiserror::Error)]

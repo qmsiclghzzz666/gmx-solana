@@ -3,7 +3,7 @@ use std::borrow::Borrow;
 use anchor_lang::prelude::*;
 use bitmaps::Bitmap;
 
-use crate::StoreError;
+use crate::CoreError;
 
 use super::InitSpace;
 
@@ -145,7 +145,7 @@ impl RoleStore {
     pub fn enable_role(&mut self, role: &str) -> Result<()> {
         match self.roles.get_mut(role) {
             Some(metadata) => {
-                require_eq!(metadata.name()?, role, StoreError::InvalidArgument);
+                require_eq!(metadata.name()?, role, CoreError::InvalidArgument);
                 metadata.enable();
             }
             None => {
@@ -153,7 +153,7 @@ impl RoleStore {
                     .roles
                     .len()
                     .try_into()
-                    .map_err(|_| error!(StoreError::ExceedMaxLengthLimit))?;
+                    .map_err(|_| error!(CoreError::ExceedMaxLengthLimit))?;
                 self.roles
                     .insert_with_options(role, RoleMetadata::new(role, index)?, true)?;
             }
@@ -164,7 +164,7 @@ impl RoleStore {
     /// Disable a role.
     pub fn disable_role(&mut self, role: &str) -> Result<()> {
         if let Some(metadata) = self.roles.get_mut(role) {
-            require_eq!(metadata.name()?, role, StoreError::InvalidArgument);
+            require_eq!(metadata.name()?, role, CoreError::InvalidArgument);
             metadata.disable();
         }
         Ok(())
@@ -173,8 +173,8 @@ impl RoleStore {
     /// Get the index of a enabled role.
     pub fn enabled_role_index(&self, role: &str) -> Result<Option<u8>> {
         if let Some(metadata) = self.roles.get(role) {
-            require_eq!(metadata.name()?, role, StoreError::InvalidArgument);
-            require!(metadata.is_enabled(), StoreError::DisabledRole);
+            require_eq!(metadata.name()?, role, CoreError::InvalidArgument);
+            require!(metadata.is_enabled(), CoreError::PreconditionsAreNotMet);
             Ok(Some(metadata.index))
         } else {
             Ok(None)
@@ -184,10 +184,10 @@ impl RoleStore {
     /// Check if the given role is granted to the pubkey.
     pub fn has_role(&self, authority: &Pubkey, role: &str) -> Result<bool> {
         let Some(value) = self.members.get(authority) else {
-            return err!(StoreError::PermissionDenied);
+            return err!(CoreError::PermissionDenied);
         };
         let Some(index) = self.enabled_role_index(role)? else {
-            return err!(StoreError::NoSuchRole);
+            return err!(CoreError::NotFound);
         };
         let bitmap = RoleBitmap::from_value(*value);
         Ok(bitmap.get(index as usize))
@@ -196,7 +196,7 @@ impl RoleStore {
     /// Grant a role to the pubkey.
     pub fn grant(&mut self, authority: &Pubkey, role: &str) -> Result<()> {
         let Some(index) = self.enabled_role_index(role)? else {
-            return err!(StoreError::NoSuchRole);
+            return err!(CoreError::NotFound);
         };
         match self.members.get_mut(authority) {
             Some(value) => {
@@ -217,10 +217,10 @@ impl RoleStore {
     /// Revoke a role from the pubkey.
     pub fn revoke(&mut self, authority: &Pubkey, role: &str) -> Result<()> {
         let Some(index) = self.enabled_role_index(role)? else {
-            return err!(StoreError::NoSuchRole);
+            return err!(CoreError::NotFound);
         };
         let Some(value) = self.members.get_mut(authority) else {
-            return err!(StoreError::PermissionDenied);
+            return err!(CoreError::PermissionDenied);
         };
         let mut bitmap = RoleBitmap::from_value(*value);
         bitmap.set(index as usize, false);

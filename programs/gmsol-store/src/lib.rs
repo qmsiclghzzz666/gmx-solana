@@ -114,8 +114,6 @@ pub mod utils;
 /// Events.
 pub mod events;
 
-pub use self::states::Data;
-
 use self::{
     instructions::*,
     ops::{
@@ -505,7 +503,7 @@ pub mod gmsol_store {
             ctx,
             &token,
             &PriceProviderKind::try_from(provider)
-                .map_err(|_| StoreError::InvalidProviderKindIndex)?,
+                .map_err(|_| CoreError::InvalidProviderKindIndex)?,
         )
     }
 
@@ -518,7 +516,7 @@ pub mod gmsol_store {
             ctx,
             &token,
             &PriceProviderKind::try_from(provider)
-                .map_err(|_| StoreError::InvalidProviderKindIndex)?,
+                .map_err(|_| CoreError::InvalidProviderKindIndex)?,
         )
     }
 
@@ -589,7 +587,7 @@ pub mod gmsol_store {
             ctx,
             token,
             PriceProviderKind::try_from(provider)
-                .map_err(|_| StoreError::InvalidProviderKindIndex)?,
+                .map_err(|_| CoreError::InvalidProviderKindIndex)?,
         )
     }
 
@@ -625,7 +623,7 @@ pub mod gmsol_store {
             ctx,
             token,
             &PriceProviderKind::try_from(provider)
-                .map_err(|_| StoreError::InvalidProviderKindIndex)?,
+                .map_err(|_| CoreError::InvalidProviderKindIndex)?,
             feed,
             timestamp_adjustment,
         )
@@ -768,7 +766,7 @@ pub mod gmsol_store {
             &prices,
             pnl_factor
                 .parse()
-                .map_err(|_| error!(StoreError::InvalidArgument))?,
+                .map_err(|_| error!(CoreError::InvalidArgument))?,
             maximize,
         )
     }
@@ -1069,18 +1067,13 @@ pub mod gmsol_store {
     }
 
     // Position.
-    #[access_control(internal::Authenticate::only_controller(&ctx))]
-    pub fn remove_position(ctx: Context<RemovePosition>, refund: u64) -> Result<()> {
-        instructions::remove_position(ctx, refund)
-    }
-
     #[cfg(not(feature = "no-bug-fix"))]
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn turn_into_pure_pool(ctx: Context<TurnPureFlag>, kind: u8) -> Result<()> {
         instructions::unchecked_turn_into_pure_pool(
             ctx,
             kind.try_into()
-                .map_err(|_| error!(StoreError::InvalidArgument))?,
+                .map_err(|_| error!(CoreError::InvalidArgument))?,
         )
     }
 
@@ -1090,7 +1083,7 @@ pub mod gmsol_store {
         instructions::unchecked_turn_into_impure_pool(
             ctx,
             kind.try_into()
-                .map_err(|_| error!(StoreError::InvalidArgument))?,
+                .map_err(|_| error!(CoreError::InvalidArgument))?,
         )
     }
 
@@ -1372,245 +1365,62 @@ pub mod gmsol_store {
     }
 }
 
-#[error_code]
-pub enum StoreError {
-    // Common.
-    #[msg("Invalid pda")]
-    InvalidPDA,
-    #[msg("Invalid key")]
-    InvalidKey,
-    #[msg("Already exist")]
-    AlreadyExist,
-    #[msg("Exceed max length limit")]
-    ExceedMaxLengthLimit,
-    #[msg("Exceed max string length limit")]
-    ExceedMaxStringLengthLimit,
-    #[msg("No space for new data")]
-    NoSpaceForNewData,
-    #[msg("Invalid argument")]
-    InvalidArgument,
-    #[msg("Lamports not enough")]
-    LamportsNotEnough,
-    #[msg("Required resource not found")]
-    RequiredResourceNotFound,
-    #[msg("Amount overflow")]
-    AmountOverflow,
-    #[msg("Unknown error")]
-    Unknown,
-    #[msg("Gmx Core Error")]
-    Model,
-    #[msg("Missing amount")]
-    MissingAmount,
-    #[msg("Missing factor")]
-    MissingFactor,
-    #[msg("Cannot be zero")]
-    CannotBeZero,
-    #[msg("Missing Market Account")]
-    MissingMarketAccount,
-    #[msg("Load Account Error")]
-    LoadAccountError,
-    // Roles.
-    #[msg("Too many admins")]
-    TooManyAdmins,
-    #[msg("At least one admin")]
-    AtLeastOneAdmin,
-    #[msg("Invalid data store")]
-    InvalidDataStore,
-    #[msg("Already be an admin")]
-    AlreadyBeAnAdmin,
-    #[msg("Not an admin")]
-    NotAnAdmin,
-    #[msg("Invalid role")]
-    InvalidRole,
-    #[msg("Invalid roles account")]
-    InvalidRoles,
-    #[msg("Permission denied")]
-    PermissionDenied,
-    #[msg("No such role")]
-    NoSuchRole,
-    #[msg("The role is disabled")]
-    DisabledRole,
-    // Oracle.
-    #[msg("Oracle is not empty")]
-    PricesAlreadySet,
-    #[msg("Price of the given token already set")]
-    PriceAlreadySet,
-    #[msg("Invalid price feed account")]
-    InvalidPriceFeedAccount,
-    #[msg("Invalid price feed price")]
-    InvalidPriceFeedPrice,
-    #[msg("Price feed not updated")]
-    PriceFeedNotUpdated,
-    #[msg("Token config disabled")]
-    TokenConfigDisabled,
-    #[msg("Negative price is not allowed")]
-    NegativePrice,
-    #[msg("Price overflow")]
-    PriceOverflow,
-    #[msg("Price feed is not set for the given provider")]
-    PriceFeedNotSet,
-    #[msg("Not enough feeds")]
-    NotEnoughFeeds,
-    #[msg("Max price age exceeded")]
-    MaxPriceAgeExceeded,
-    #[msg("Invalid oracle timestamp range")]
-    InvalidOracleTsTrange,
-    #[msg("Max oracle timestamp range exceeded")]
-    MaxOracleTimeStampRangeExceeded,
-    #[msg("Oracle timestamps are smaller than required")]
-    OracleTimestampsAreSmallerThanRequired,
-    #[msg("Oracle timestamps are larger than requried")]
-    OracleTimestampsAreLargerThanRequired,
-    #[msg("Oracle not updated")]
-    OracleNotUpdated,
-    #[msg("Invalid oracle slot")]
-    InvalidOracleSlot,
-    // Market.
-    #[msg("Computation error")]
-    Computation,
-    #[msg("Unsupported pool kind")]
-    UnsupportedPoolKind,
-    #[msg("Invalid collateral token")]
-    InvalidCollateralToken,
-    #[msg("Invalid market")]
-    InvalidMarket,
-    #[msg("Disabled market")]
-    DisabledMarket,
-    #[msg("Unknown swap out market")]
-    UnknownSwapOutMarket,
-    // Exchange Common.
-    #[msg("Invalid swap path")]
-    InvalidSwapPath,
-    #[msg("Output amount too small")]
-    OutputAmountTooSmall,
-    #[msg("Amount is not zero but swap in token not provided")]
-    AmountNonZeroMissingToken,
-    #[msg("Missing token mint")]
-    MissingTokenMint,
-    #[msg("Missing oracle price")]
-    MissingOracelPrice,
-    // Withdrawal.
-    #[msg("User mismach")]
-    UserMismatch,
-    #[msg("Empty withdrawal")]
-    EmptyWithdrawal,
-    #[msg("Invalid withdrawal to remove")]
-    InvalidWithdrawalToRemove,
-    #[msg("Unable to transfer out remaining withdrawal amount")]
-    UnableToTransferOutRemainingWithdrawalAmount,
-    // Deposit.
-    #[msg("Empty deposit")]
-    EmptyDeposit,
-    #[msg("Missing deposit token account")]
-    MissingDepositTokenAccount,
-    #[msg("Invalid deposit to remove")]
-    InvalidDepositToRemove,
-    // Exchange.
-    #[msg("Invalid position kind")]
-    InvalidPositionKind,
-    #[msg("Invalid position collateral token")]
-    InvalidPositionCollateralToken,
-    #[msg("Invalid position market")]
-    InvalidPositionMarket,
-    #[msg("Position account not provided")]
-    PositionNotProvided,
-    #[msg("Same secondary tokens not merged")]
-    SameSecondaryTokensNotMerged,
-    #[msg("Missing receivers")]
-    MissingReceivers,
-    // Position.
-    #[msg("position is not initialized")]
-    PositionNotInitalized,
-    #[msg("position has been initialized")]
-    PositionHasBeenInitialized,
-    #[msg("position is not required")]
-    PositionIsNotRequried,
-    #[msg("position is not provided")]
-    PositionIsNotProvided,
-    #[msg("invalid position initialization params")]
-    InvalidPositionInitailziationParams,
-    #[msg("invalid position")]
-    InvalidPosition,
-    #[msg("invalid trade id")]
-    InvalidTradeID,
-    #[msg("invalid trade delta size")]
-    InvalidTradeDeltaSize,
-    #[msg("invalid borrowing factor")]
-    InvalidBorrowingFactor,
-    #[msg("invalid funding factors")]
-    InvalidFundingFactors,
-    // Order.
-    #[msg("missing initialial token account for order")]
-    MissingInitializeTokenAccountForOrder,
-    #[msg("missing claimable time window")]
-    MissingClaimableTimeWindow,
-    #[msg("missing recent time window")]
-    MissingRecentTimeWindow,
-    #[msg("missing holding address")]
-    MissingHoldingAddress,
-    #[msg("missing sender")]
-    MissingSender,
-    #[msg("missing position")]
-    MissingPosition,
-    #[msg("missing claimable long collateral account for user")]
-    MissingClaimableLongCollateralAccountForUser,
-    #[msg("missing claimable short collateral account for user")]
-    MissingClaimableShortCollateralAccountForUser,
-    #[msg("missing claimable pnl token account for holding")]
-    MissingClaimablePnlTokenAccountForHolding,
-    #[msg("claimable collateral in output token for holding is not supported")]
-    ClaimbleCollateralInOutputTokenForHolding,
-    #[msg("no delegated authority is set")]
-    NoDelegatedAuthorityIsSet,
-    #[msg("invalid order to remove")]
-    InvalidOrderToRemove,
-    #[msg("ADL not enabled")]
-    AdlNotEnabled,
-    #[msg("ADL not required")]
-    AdlNotRequired,
-    #[msg("Invalid ADL")]
-    InvalidAdl,
-    #[msg("Invalid Trigger Price")]
-    InvalidTriggerPrice,
-    #[msg("Insufficient output amount or value")]
-    InsufficientOutputAmount,
-    // Token Config.
-    #[msg("synthetic flag does not match")]
-    InvalidSynthetic,
-    #[msg("invalid token map")]
-    InvalidTokenMap,
-    // Invalid Provider Kind.
-    #[msg("invalid provider kind index")]
-    InvalidProviderKindIndex,
-}
-
-impl StoreError {
-    #[inline]
-    pub(crate) const fn invalid_position_kind(_kind: u8) -> Self {
-        Self::InvalidPositionKind
-    }
-}
-
-/// Data Store Resut.
-pub type StoreResult<T> = std::result::Result<T, StoreError>;
+/// Result type with [`CoreError`] as error type.
+pub type CoreResult<T> = std::result::Result<T, CoreError>;
 
 #[error_code]
 pub enum CoreError {
     /// Internal error.
     #[msg("internal error")]
     Internal,
-    /// Invalid Argument.
-    #[msg("invalid argument")]
-    InvalidArgument,
-    /// Not found.
-    #[msg("not found")]
-    NotFound,
+    /// Not an Admin.
+    #[msg("not an admin")]
+    NotAnAdmin,
     /// Permission denied.
     #[msg("permission denied")]
     PermissionDenied,
     /// Feature disabled.
     #[msg("feature disabled")]
     FeatureDisabled,
+    /// Model Error.
+    #[msg("model")]
+    Model,
+    /// Invalid Argument.
+    #[msg("invalid argument")]
+    InvalidArgument,
+    /// Preconditions are not met.
+    #[msg("preconditions are not met")]
+    PreconditionsAreNotMet,
+    /// Not found.
+    #[msg("not found")]
+    NotFound,
+    /// Exceed max length limit.
+    #[msg("exceed max length limit")]
+    ExceedMaxLengthLimit,
+    /// Not enough space.
+    #[msg("not enough space")]
+    NotEnoughSpace,
+    /// Token amount overflow.
+    #[msg("token amount overflow")]
+    TokenAmountOverflow,
+    /// Value overflow.
+    #[msg("value overflow")]
+    ValueOverflow,
+    /// Unknown Action State.
+    #[msg("unknown action state")]
+    UnknownActionState,
+    /// Load account error.
+    #[msg("load zero-copy account error")]
+    LoadAccountError,
+    /// Token account is not provided.
+    #[msg("required token account is not provided")]
+    TokenAccountNotProvided,
+    /// Token mint is not provided.
+    #[msg("required token mint is not provided")]
+    TokenMintNotProvided,
+    /// Market account is not provided.
+    #[msg("market account is not provided")]
+    MarketAccountIsNotProvided,
     /// Store Mismatched.
     #[msg("store mismatched")]
     StoreMismatched,
@@ -1620,54 +1430,6 @@ pub enum CoreError {
     /// Market mismatched.
     #[msg("market mismatched")]
     MarketMismatched,
-    /// Position mismatched.
-    #[msg("position mismatched")]
-    PositionMismatched,
-    /// Empty Deposit.
-    #[msg("empty deposit")]
-    EmptyDeposit,
-    /// Empty Withdrawal.
-    #[msg("emtpy withdrawal")]
-    EmptyWithdrawal,
-    /// Empty Order.
-    #[msg("emtpy order")]
-    EmptyOrder,
-    /// Empty Shift.
-    #[msg("emtpy shift")]
-    EmptyShift,
-    /// Invalid min output amount for limit swap.
-    #[msg("invalid min output amount for limit swap order")]
-    InvalidMinOutputAmount,
-    /// Invalid trigger price.
-    #[msg("invalid trigger price")]
-    InvalidTriggerPrice,
-    /// Invalid position.
-    #[msg("invalid position")]
-    InvalidPosition,
-    /// Order kind is not allowed.
-    #[msg("the order kind is not allowed by this instruction")]
-    OrderKindNotAllowed,
-    /// Token account is not provided.
-    #[msg("required token account is not provided")]
-    TokenAccountNotProvided,
-    /// Token mint is not provided.
-    #[msg("required token mint is not provided")]
-    TokenMintNotProvided,
-    /// Not enough token amounts.
-    #[msg("not enough token amount")]
-    NotEnoughTokenAmount,
-    /// Not enough execution fee.
-    #[msg("not enough execution fee")]
-    NotEnoughExecutionFee,
-    /// Invalid Swap Path length.
-    #[msg("invalid swap path length")]
-    InvalidSwapPathLength,
-    /// Not enough swap markets in the path.
-    #[msg("not enough swap markets in the path")]
-    NotEnoughSwapMarkets,
-    /// Invalid Swap Path.
-    #[msg("invalid swap path")]
-    InvalidSwapPath,
     /// Market token mint mismatched.
     #[msg("market token mint mismatched")]
     MarketTokenMintMismatched,
@@ -1686,36 +1448,123 @@ pub enum CoreError {
     /// Not an ATA for the given token.
     #[msg("not an ATA for the given token")]
     NotAnATA,
-    /// Unknown Action State.
-    #[msg("unknown action state")]
-    UnknownActionState,
-    /// Unknown Order Kind.
-    #[msg("unknown order kind")]
-    UnknownOrderKind,
-    /// Unknown Order Side.
-    #[msg("unknown order side")]
-    UnknownOrderSide,
-    /// Preconditions are not met.
-    #[msg("preconditions are not met")]
-    PreconditionsAreNotMet,
+    /// Not enough token amounts.
+    #[msg("not enough token amount")]
+    NotEnoughTokenAmount,
     /// Token amount exceeds limit.
     #[msg("token amount exceeds limit")]
     TokenAmountExceedsLimit,
-    /// Not enough token feeds.
-    #[msg("not enough token feeds")]
-    NotEnoughTokenFeeds,
     /// Unknown or disabled token.
     #[msg("unknown or disabled token")]
     UnknownOrDisabledToken,
+    /// Not enough execution fee.
+    #[msg("not enough execution fee")]
+    NotEnoughExecutionFee,
+    /// Invalid Swap Path length.
+    #[msg("invalid swap path length")]
+    InvalidSwapPathLength,
+    /// Not enough swap markets in the path.
+    #[msg("not enough swap markets in the path")]
+    NotEnoughSwapMarkets,
+    /// Invalid Swap Path.
+    #[msg("invalid swap path")]
+    InvalidSwapPath,
     /// Insufficient output amounts.
     #[msg("insufficient output amounts")]
     InsufficientOutputAmount,
+    /* Errors for Store */
+    /// Invalid Store Config Key.
+    #[msg("invalid store config key")]
+    InvalidStoreConfigKey,
+    /* Errors for Oracle */
+    /// Invalid Provider Kind Index.
+    #[msg("invalid provider kind index")]
+    InvalidProviderKindIndex,
+    /// Not enough token feeds.
+    #[msg("not enough token feeds")]
+    NotEnoughTokenFeeds,
+    /// Oracle timestamps are larger than required.
+    #[msg("oracle timestamps are larger than required")]
+    OracleTimestampsAreLargerThanRequired,
+    /// Oracle timestamps are smaller than required.
+    #[msg("oracle timestamps are smaller than required")]
+    OracleTimestampsAreSmallerThanRequired,
+    /// Invalid Oracle timestamps range.
+    #[msg("invalid oracle timestamps range")]
+    InvalidOracleTimestampsRange,
+    /// Max oracle timestamps range exceeded.
+    #[msg("max oracle timestamps range exceeded")]
+    MaxOracleTimestampsRangeExceeded,
+    /// Oracle not updated.
+    #[msg("oracle not updated")]
+    OracleNotUpdated,
+    /// Max price age exceeded.
+    #[msg("max price age exceeded")]
+    MaxPriceAgeExceeded,
+    /// Invalid Oracle slot.
+    #[msg("invalid oracle slot")]
+    InvalidOracleSlot,
+    /// Missing oracle price.
+    #[msg("missing oracle price")]
+    MissingOraclePrice,
+    /// Invalid Price feed price.
+    #[msg("invalid price feed price")]
+    InvalidPriceFeedPrice,
+    /// Invalid price feed account.
+    #[msg("invalid price feed account")]
+    InvalidPriceFeedAccount,
+    /// Price feed is not updated.
+    #[msg("price feed is not updated")]
+    PriceFeedNotUpdated,
+    /// Prices are already set.
+    #[msg("prices are already set")]
+    PricesAreAlreadySet,
+    /// Price is already set.
+    #[msg("price is already set")]
+    PriceIsAlreadySet,
+    /// Token config is diabled.
+    #[msg("token config is disabled")]
+    TokenConfigDisabled,
+    /// Empty Deposit.
+    #[msg("empty deposit")]
+    EmptyDeposit,
+    /// Empty Withdrawal.
+    #[msg("emtpy withdrawal")]
+    EmptyWithdrawal,
+    /* Errors for Orders */
+    /// Empty Order.
+    #[msg("emtpy order")]
+    EmptyOrder,
+    /// Invalid min output amount for limit swap.
+    #[msg("invalid min output amount for limit swap order")]
+    InvalidMinOutputAmount,
+    /// Invalid trigger price.
+    #[msg("invalid trigger price")]
+    InvalidTriggerPrice,
+    /// Invalid position.
+    #[msg("invalid position")]
+    InvalidPosition,
+    /// Invalid position kind.
+    #[msg("invalid position kind")]
+    InvalidPositionKind,
+    /// Position mismatched.
+    #[msg("position mismatched")]
+    PositionMismatched,
     /// Position is not required.
     #[msg("position is not required")]
     PositionItNotRequired,
     /// Position is required.
     #[msg("position is required")]
     PositionIsRequired,
+    /// Order kind is not allowed.
+    #[msg("the order kind is not allowed by this instruction")]
+    OrderKindNotAllowed,
+    /// Unknown Order Kind.
+    #[msg("unknown order kind")]
+    UnknownOrderKind,
+    /// Unknown Order Side.
+    #[msg("unknown order side")]
+    UnknownOrderSide,
     /// Missing initial collateral token.
     #[msg("missing initial collateral token")]
     MissingInitialCollateralToken,
@@ -1725,15 +1574,48 @@ pub enum CoreError {
     /// Missing pool tokens.
     #[msg("missing pool tokens")]
     MissingPoolTokens,
-    /// Token amount overflow.
-    #[msg("token amount overflow")]
-    TokenAmountOverflow,
-    /// Value overflow.
-    #[msg("value overflow")]
-    ValueOverflow,
+    /// Invalid Trade ID.
+    #[msg("invalid trade ID")]
+    InvalidTradeID,
+    /// Invalid Trade delta size.
+    #[msg("invalid trade delta size")]
+    InvalidTradeDeltaSize,
+    /// Invalid Trade delta tokens.
+    #[msg("invalid trade delta tokens")]
+    InvalidTradeDeltaTokens,
+    /// Invalid Borrowing Factor.
+    #[msg("invalid borrowing factor")]
+    InvalidBorrowingFactor,
+    /// Invalid funding factors.
+    #[msg("invalid funding factors")]
+    InvalidFundingFactors,
+    /// No delegated authority is set.
+    #[msg("no delegated authority is set")]
+    NoDelegatedAuthorityIsSet,
+    /// Claimable collateral for holding cannot be in output tokens.
+    #[msg("claimable collateral for holding cannot be in output tokens")]
+    ClaimableCollateralForHoldingCannotBeInOutputTokens,
+    /// ADL is not enabled.
+    #[msg("ADL is not enabled")]
+    AdlNotEnabled,
+    /// ADL is not required.
+    #[msg("ADL is not required")]
+    AdlNotRequired,
+    /// Invalid ADL.
+    #[msg("invalid ADL")]
+    InvalidAdl,
+    /// The output token and the secondary output token are the same,
+    /// but the token amounts are not merged togather.
+    #[msg("same output tokens not merged")]
+    SameOutputTokensNotMerged,
+    /* Errors for Shift */
+    /// Empty Shift.
+    #[msg("emtpy shift")]
+    EmptyShift,
     /// Invalid Shift Markets
     #[msg("invalid shift markets")]
     InvalidShiftMarkets,
+    /* Errors for GT and User accounts */
     /// GT State has been initialized.
     #[msg("GT State has been initialized")]
     GTStateHasBeenInitialized,
@@ -1746,6 +1628,7 @@ pub enum CoreError {
     /// User account has been initialized.
     #[msg("user account has been initialized")]
     UserAccountHasBeenInitialized,
+    /* Errors for referral */
     /// Referral Code has been set.
     #[msg("referral code has been set")]
     ReferralCodeHasBeenSet,
@@ -1764,6 +1647,16 @@ pub enum CoreError {
     /// Mutual-referral is not allowed.
     #[msg("mutual-referral is not allowed")]
     MutualReferral,
+    /* Errors for market */
+    /// Invalid market config key.
+    #[msg("invalid market config key")]
+    InvalidMarketConfigKey,
+    /// Invalid collateral token.
+    #[msg("invalid collateral token")]
+    InvalidCollateralToken,
+    /// Disabled market.
+    #[msg("disabled market")]
+    DisabledMarket,
 }
 
 impl CoreError {
@@ -1777,5 +1670,9 @@ impl CoreError {
 
     pub(crate) const fn unknown_order_side(_kind: u8) -> Self {
         Self::UnknownOrderSide
+    }
+
+    pub(crate) const fn invalid_position_kind(_kind: u8) -> Self {
+        Self::InvalidPositionKind
     }
 }

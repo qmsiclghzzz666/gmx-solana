@@ -13,7 +13,7 @@ use gmsol_model::{
 use crate::{
     constants,
     states::{Factor, HasMarketMeta, Market, MarketMeta, MarketState, Pool},
-    ModelError, StoreError,
+    CoreError, ModelError,
 };
 
 use super::{swap_market::RevertibleSwapMarket, Revertible, RevertibleBalance};
@@ -183,17 +183,17 @@ impl<'a, 'info> TryFrom<&'a AccountLoader<'info, Market>> for RevertibleMarket<'
         let liquidity = storage
             .pools
             .get(PoolKind::Primary)
-            .ok_or(error!(StoreError::RequiredResourceNotFound))?
+            .ok_or(error!(CoreError::NotFound))?
             .create_small(PoolKind::Primary);
         let claimable_fee = storage
             .pools
             .get(PoolKind::ClaimableFee)
-            .ok_or(error!(StoreError::RequiredResourceNotFound))?
+            .ok_or(error!(CoreError::NotFound))?
             .create_small(PoolKind::ClaimableFee);
         let swap_impact = storage
             .pools
             .get(PoolKind::SwapImpact)
-            .ok_or(error!(StoreError::RequiredResourceNotFound))?
+            .ok_or(error!(CoreError::NotFound))?
             .create_small(PoolKind::SwapImpact);
         let balance = RevertibleBalance::from(storage.deref());
         Ok(Self {
@@ -253,7 +253,7 @@ impl<'a> RevertibleMarket<'a> {
             .storage
             .pools
             .get(kind)
-            .ok_or(error!(StoreError::RequiredResourceNotFound))?;
+            .ok_or(error!(CoreError::NotFound))?;
         Ok(RevertiblePool::Storage(
             pool.long_amount().map_err(ModelError::from)?,
             pool.short_amount().map_err(ModelError::from)?,
@@ -266,7 +266,7 @@ impl<'a> RevertibleMarket<'a> {
             .storage
             .pools
             .get(kind)
-            .ok_or(error!(StoreError::RequiredResourceNotFound))?;
+            .ok_or(error!(CoreError::NotFound))?;
         Ok(RevertiblePool::SmallPool(pool.create_small(kind)))
     }
 
@@ -291,7 +291,7 @@ impl<'a> RevertibleMarket<'a> {
             .storage
             .clocks
             .get(kind)
-            .ok_or(error!(StoreError::RequiredResourceNotFound))?;
+            .ok_or(error!(CoreError::NotFound))?;
         Ok(*clock)
     }
 
@@ -301,7 +301,7 @@ impl<'a> RevertibleMarket<'a> {
             .storage
             .clocks
             .get_mut(kind)
-            .ok_or(error!(StoreError::RequiredResourceNotFound))?;
+            .ok_or(error!(CoreError::NotFound))?;
         *clock = last;
         Ok(())
     }

@@ -2,7 +2,7 @@ use anchor_lang::{prelude::*, Bumps};
 
 use crate::{
     states::{RoleKey, Store},
-    StoreError,
+    CoreError,
 };
 
 /// Accounts that can be used for authentication.
@@ -17,7 +17,7 @@ pub(crate) trait Authentication<'info> {
     fn only_admin(&self) -> Result<()> {
         require!(
             self.store().load()?.is_authority(self.authority().key),
-            StoreError::NotAnAdmin
+            CoreError::NotAnAdmin
         );
         Ok(())
     }
@@ -26,7 +26,7 @@ pub(crate) trait Authentication<'info> {
     fn only_role(&self, role: &str) -> Result<()> {
         require!(
             self.store().load()?.has_role(self.authority().key, role)?,
-            StoreError::PermissionDenied
+            CoreError::PermissionDenied
         );
         Ok(())
     }

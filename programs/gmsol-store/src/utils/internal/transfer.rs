@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Burn, MintTo, Transfer};
 
-use crate::{states::Store, StoreError};
+use crate::{states::Store, CoreError};
 
 pub(crate) struct TransferUtils<'a, 'info> {
     store: &'a AccountLoader<'info, Store>,
@@ -76,7 +76,7 @@ impl<'a, 'info> TransferUtils<'a, 'info> {
                 mint: self
                     .mint
                     .as_ref()
-                    .ok_or(StoreError::MissingTokenMint)?
+                    .ok_or(CoreError::TokenMintNotProvided)?
                     .to_account_info(),
                 to: receiver.clone(),
                 authority: self.store.to_account_info(),
@@ -94,7 +94,7 @@ impl<'a, 'info> TransferUtils<'a, 'info> {
                 mint: self
                     .mint
                     .as_ref()
-                    .ok_or(StoreError::MissingTokenMint)?
+                    .ok_or(CoreError::TokenMintNotProvided)?
                     .to_account_info(),
                 from: vault.clone(),
                 authority: self.store.to_account_info(),

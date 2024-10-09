@@ -4,7 +4,7 @@ use gmsol_utils::{to_seed, InitSpace};
 use crate::{
     states::{DataStoreInitEvent, Store, TokenMapHeader},
     utils::internal,
-    StoreError,
+    CoreError,
 };
 
 /// The accounts definition for [`initialize`](crate::gmsol_store::initialize).
@@ -73,7 +73,7 @@ pub(crate) fn unchecked_transfer_store_authority(
 ) -> Result<()> {
     require!(
         ctx.accounts.authority.key() != new_authority,
-        StoreError::InvalidArgument
+        CoreError::InvalidArgument
     );
     ctx.accounts.store.load_mut()?.authority = new_authority;
     Ok(())

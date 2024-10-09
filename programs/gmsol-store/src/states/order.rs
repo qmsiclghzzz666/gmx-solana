@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use borsh::{BorshDeserialize, BorshSerialize};
 use gmsol_model::{action::decrease_position::DecreasePositionReport, price::Price};
 
-use crate::{states::FactorKey, CoreError, StoreError};
+use crate::{states::FactorKey, CoreError};
 
 use super::{
     common::{
@@ -178,14 +178,14 @@ impl TransferOut {
         self.long_token
             .checked_add(self.long_token_for_claimable_account_of_user)
             .and_then(|a| a.checked_add(self.long_token_for_claimable_account_of_holding))
-            .ok_or(error!(StoreError::AmountOverflow))
+            .ok_or(error!(CoreError::TokenAmountOverflow))
     }
 
     pub(crate) fn total_short_token_amount(&self) -> Result<u64> {
         self.short_token
             .checked_add(self.short_token_for_claimable_account_of_user)
             .and_then(|a| a.checked_add(self.short_token_for_claimable_account_of_holding))
-            .ok_or(error!(StoreError::AmountOverflow))
+            .ok_or(error!(CoreError::TokenAmountOverflow))
     }
 
     pub(crate) fn transfer_out(&mut self, is_secondary: bool, amount: u64) -> Result<()> {
@@ -196,12 +196,12 @@ impl TransferOut {
             self.secondary_output_token = self
                 .secondary_output_token
                 .checked_add(amount)
-                .ok_or(error!(StoreError::AmountOverflow))?;
+                .ok_or(error!(CoreError::TokenAmountOverflow))?;
         } else {
             self.final_output_token = self
                 .final_output_token
                 .checked_add(amount)
-                .ok_or(error!(StoreError::AmountOverflow))?;
+                .ok_or(error!(CoreError::TokenAmountOverflow))?;
         }
         Ok(())
     }
@@ -216,14 +216,14 @@ impl TransferOut {
             CollateralReceiver::Collateral,
             (*long_amount)
                 .try_into()
-                .map_err(|_| error!(StoreError::AmountOverflow))?,
+                .map_err(|_| error!(CoreError::TokenAmountOverflow))?,
         )?;
         self.transfer_out_collateral(
             false,
             CollateralReceiver::Collateral,
             (*short_amount)
                 .try_into()
-                .map_err(|_| error!(StoreError::AmountOverflow))?,
+                .map_err(|_| error!(CoreError::TokenAmountOverflow))?,
         )?;
         Ok(())
     }
@@ -235,7 +235,7 @@ impl TransferOut {
         let for_holding = report.claimable_collateral_for_holding();
         require!(
             *for_holding.output_token_amount() == 0,
-            StoreError::ClaimbleCollateralInOutputTokenForHolding
+            CoreError::ClaimableCollateralForHoldingCannotBeInOutputTokens,
         );
 
         let is_output_token_long = report.is_output_token_long();
@@ -243,7 +243,7 @@ impl TransferOut {
 
         let secondary_amount = (*for_holding.secondary_output_token_amount())
             .try_into()
-            .map_err(|_| error!(StoreError::AmountOverflow))?;
+            .map_err(|_| error!(CoreError::TokenAmountOverflow))?;
         self.transfer_out_collateral(
             is_secondary_token_long,
             CollateralReceiver::ClaimableForHolding,
@@ -256,14 +256,14 @@ impl TransferOut {
             CollateralReceiver::ClaimableForUser,
             (*for_user.output_token_amount())
                 .try_into()
-                .map_err(|_| error!(StoreError::AmountOverflow))?,
+                .map_err(|_| error!(CoreError::TokenAmountOverflow))?,
         )?;
         self.transfer_out_collateral(
             is_secondary_token_long,
             CollateralReceiver::ClaimableForUser,
             (*for_user.secondary_output_token_amount())
                 .try_into()
-                .map_err(|_| error!(StoreError::AmountOverflow))?,
+                .map_err(|_| error!(CoreError::TokenAmountOverflow))?,
         )?;
         Ok(())
     }
@@ -283,12 +283,12 @@ impl TransferOut {
                     self.long_token = self
                         .long_token
                         .checked_add(amount)
-                        .ok_or(error!(StoreError::AmountOverflow))?;
+                        .ok_or(error!(CoreError::TokenAmountOverflow))?;
                 } else {
                     self.short_token = self
                         .short_token
                         .checked_add(amount)
-                        .ok_or(error!(StoreError::AmountOverflow))?;
+                        .ok_or(error!(CoreError::TokenAmountOverflow))?;
                 }
             }
             CollateralReceiver::ClaimableForHolding => {
@@ -296,12 +296,12 @@ impl TransferOut {
                     self.long_token_for_claimable_account_of_holding = self
                         .long_token_for_claimable_account_of_holding
                         .checked_add(amount)
-                        .ok_or(error!(StoreError::AmountOverflow))?;
+                        .ok_or(error!(CoreError::TokenAmountOverflow))?;
                 } else {
                     self.short_token_for_claimable_account_of_holding = self
                         .short_token_for_claimable_account_of_holding
                         .checked_add(amount)
-                        .ok_or(error!(StoreError::AmountOverflow))?;
+                        .ok_or(error!(CoreError::TokenAmountOverflow))?;
                 }
             }
             CollateralReceiver::ClaimableForUser => {
@@ -309,12 +309,12 @@ impl TransferOut {
                     self.long_token_for_claimable_account_of_user = self
                         .long_token_for_claimable_account_of_user
                         .checked_add(amount)
-                        .ok_or(error!(StoreError::AmountOverflow))?;
+                        .ok_or(error!(CoreError::TokenAmountOverflow))?;
                 } else {
                     self.short_token_for_claimable_account_of_user = self
                         .short_token_for_claimable_account_of_user
                         .checked_add(amount)
-                        .ok_or(error!(StoreError::AmountOverflow))?;
+                        .ok_or(error!(CoreError::TokenAmountOverflow))?;
                 }
             }
         }
@@ -389,13 +389,13 @@ impl Order {
                     require_gte!(
                         trigger_price,
                         index_price.pick_price(true),
-                        StoreError::InvalidTriggerPrice
+                        CoreError::InvalidTriggerPrice
                     );
                 } else {
                     require_gte!(
                         index_price.pick_price(false),
                         trigger_price,
-                        StoreError::InvalidTriggerPrice
+                        CoreError::InvalidTriggerPrice
                     );
                 }
             }
@@ -404,13 +404,13 @@ impl Order {
                     require_gte!(
                         index_price.pick_price(false),
                         trigger_price,
-                        StoreError::InvalidTriggerPrice
+                        CoreError::InvalidTriggerPrice
                     );
                 } else {
                     require_gte!(
                         trigger_price,
                         index_price.pick_price(true),
-                        StoreError::InvalidTriggerPrice
+                        CoreError::InvalidTriggerPrice
                     );
                 }
             }
@@ -419,13 +419,13 @@ impl Order {
                     require_gte!(
                         trigger_price,
                         index_price.pick_price(false),
-                        StoreError::InvalidTriggerPrice
+                        CoreError::InvalidTriggerPrice
                     );
                 } else {
                     require_gte!(
                         index_price.pick_price(true),
                         trigger_price,
-                        StoreError::InvalidTriggerPrice
+                        CoreError::InvalidTriggerPrice
                     );
                 }
             }
@@ -450,7 +450,7 @@ impl Order {
         require_gte!(
             output_amount,
             self.params.min_output,
-            StoreError::InsufficientOutputAmount
+            CoreError::InsufficientOutputAmount
         );
         Ok(())
     }
@@ -469,7 +469,7 @@ impl Order {
             let price = oracle
                 .primary
                 .get(output_token)
-                .ok_or(error!(StoreError::MissingOracelPrice))?
+                .ok_or(error!(CoreError::MissingOraclePrice))?
                 .min
                 .to_unit_price();
             let output_value = u128::from(output_amount).saturating_mul(price);
@@ -479,7 +479,7 @@ impl Order {
             let price = oracle
                 .primary
                 .get(secondary_output_token)
-                .ok_or(error!(StoreError::MissingOracelPrice))?
+                .ok_or(error!(CoreError::MissingOraclePrice))?
                 .min
                 .to_unit_price();
             let output_value = u128::from(secondary_output_amount).saturating_mul(price);

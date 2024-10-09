@@ -20,7 +20,7 @@ use crate::{
         Market, Oracle, PriceProvider, Seed, Store, TokenMapHeader, TokenMapLoader,
     },
     utils::internal,
-    CoreError, StoreError,
+    CoreError,
 };
 
 /// Prepare Trade Event Buffer.
@@ -84,7 +84,7 @@ pub(crate) fn get_pnl_token(
 ) -> Result<Pubkey> {
     let is_long = position
         .as_ref()
-        .ok_or(error!(StoreError::MissingPosition))?
+        .ok_or(error!(CoreError::PositionIsRequired))?
         .load()?
         .try_is_long()?;
     if is_long {
@@ -98,7 +98,7 @@ pub(crate) fn check_delegation(account: &TokenAccount, target: Pubkey) -> Result
     let is_matched = account
         .delegate
         .map(|delegate| delegate == target)
-        .ok_or(error!(StoreError::NoDelegatedAuthorityIsSet))?;
+        .ok_or(error!(CoreError::NoDelegatedAuthorityIsSet))?;
     Ok(is_matched)
 }
 
@@ -109,7 +109,7 @@ pub(crate) fn validated_recent_timestamp(config: &Store, timestamp: i64) -> Resu
     if timestamp <= clock.unix_timestamp && clock.unix_timestamp <= expiration_time {
         Ok(timestamp)
     } else {
-        err!(StoreError::InvalidArgument)
+        err!(CoreError::InvalidArgument)
     }
 }
 

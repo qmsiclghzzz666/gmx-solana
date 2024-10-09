@@ -9,7 +9,7 @@ use model::AsLiquidityMarket;
 
 use crate::{
     utils::fixed_str::{bytes_to_fixed_str, fixed_str_to_bytes},
-    CoreError, StoreError,
+    CoreError,
 };
 
 use super::{Factor, InitSpace, Oracle, Seed};
@@ -166,7 +166,7 @@ impl Market {
         } else if self.meta.short_token_mint == *token {
             self.record_transferred_in(false, amount)
         } else {
-            Err(error!(StoreError::InvalidCollateralToken))
+            Err(error!(CoreError::InvalidCollateralToken))
         }
     }
 
@@ -177,7 +177,7 @@ impl Market {
         } else if self.meta.short_token_mint == *token {
             self.record_transferred_out(false, amount)
         } else {
-            Err(error!(StoreError::InvalidCollateralToken))
+            Err(error!(CoreError::InvalidCollateralToken))
         }
     }
 
@@ -262,13 +262,13 @@ impl Market {
                 .state
                 .long_token_balance
                 .checked_add(amount)
-                .ok_or(error!(StoreError::AmountOverflow))?;
+                .ok_or(error!(CoreError::TokenAmountOverflow))?;
         } else {
             self.state.short_token_balance = self
                 .state
                 .short_token_balance
                 .checked_add(amount)
-                .ok_or(error!(StoreError::AmountOverflow))?;
+                .ok_or(error!(CoreError::TokenAmountOverflow))?;
         }
         msg!(
             "{}: {},{}",
@@ -295,13 +295,13 @@ impl Market {
                 .state
                 .long_token_balance
                 .checked_sub(amount)
-                .ok_or(error!(StoreError::AmountOverflow))?;
+                .ok_or(error!(CoreError::TokenAmountOverflow))?;
         } else {
             self.state.short_token_balance = self
                 .state
                 .short_token_balance
                 .checked_sub(amount)
-                .ok_or(error!(StoreError::AmountOverflow))?;
+                .ok_or(error!(CoreError::TokenAmountOverflow))?;
         }
         msg!(
             "{}: {},{}",
@@ -336,14 +336,15 @@ impl Market {
 
     /// Validate the market.
     pub fn validate(&self, store: &Pubkey) -> Result<()> {
-        require_eq!(*store, self.store, StoreError::InvalidMarket);
-        require!(self.is_enabled(), StoreError::DisabledMarket);
+        require_eq!(*store, self.store, CoreError::StoreMismatched);
+        require!(self.is_enabled(), CoreError::DisabledMarket);
         Ok(())
     }
 
     /// Get config.
     pub fn get_config(&self, key: &str) -> Result<&Factor> {
-        let key = MarketConfigKey::from_str(key).map_err(|_| error!(StoreError::InvalidKey))?;
+        let key = MarketConfigKey::from_str(key)
+            .map_err(|_| error!(CoreError::InvalidMarketConfigKey))?;
         Ok(self.get_config_by_key(key))
     }
 
@@ -355,7 +356,8 @@ impl Market {
 
     /// Get config mutably by key
     pub fn get_config_mut(&mut self, key: &str) -> Result<&mut Factor> {
-        let key = MarketConfigKey::from_str(key).map_err(|_| error!(StoreError::InvalidKey))?;
+        let key = MarketConfigKey::from_str(key)
+            .map_err(|_| error!(CoreError::InvalidMarketConfigKey))?;
         Ok(self.config.get_mut(key))
     }
 
@@ -501,7 +503,7 @@ impl MarketState {
         let next_id = self
             .deposit_count
             .checked_add(1)
-            .ok_or(error!(StoreError::AmountOverflow))?;
+            .ok_or(error!(CoreError::TokenAmountOverflow))?;
         self.deposit_count = next_id;
         Ok(next_id)
     }
@@ -511,7 +513,7 @@ impl MarketState {
         let next_id = self
             .withdrawal_count
             .checked_add(1)
-            .ok_or(error!(StoreError::AmountOverflow))?;
+            .ok_or(error!(CoreError::TokenAmountOverflow))?;
         self.withdrawal_count = next_id;
         Ok(next_id)
     }
@@ -521,7 +523,7 @@ impl MarketState {
         let next_id = self
             .order_count
             .checked_add(1)
-            .ok_or(error!(StoreError::AmountOverflow))?;
+            .ok_or(error!(CoreError::TokenAmountOverflow))?;
         self.order_count = next_id;
         Ok(next_id)
     }
@@ -531,7 +533,7 @@ impl MarketState {
         let next_id = self
             .trade_count
             .checked_add(1)
-            .ok_or(error!(StoreError::AmountOverflow))?;
+            .ok_or(error!(CoreError::TokenAmountOverflow))?;
         self.trade_count = next_id;
         Ok(next_id)
     }
@@ -541,7 +543,7 @@ impl MarketState {
         let next_id = self
             .shift_count
             .checked_add(1)
-            .ok_or(error!(StoreError::AmountOverflow))?;
+            .ok_or(error!(CoreError::TokenAmountOverflow))?;
         self.shift_count = next_id;
         Ok(next_id)
     }
@@ -585,7 +587,7 @@ impl MarketMeta {
         } else if *token == self.short_token_mint {
             Ok(false)
         } else {
-            err!(StoreError::InvalidArgument)
+            err!(CoreError::InvalidArgument)
         }
     }
 
@@ -596,7 +598,7 @@ impl MarketMeta {
         } else if *token == self.short_token_mint {
             Ok(&self.long_token_mint)
         } else {
-            err!(StoreError::InvalidArgument)
+            err!(CoreError::InvalidArgument)
         }
     }
 
@@ -606,7 +608,7 @@ impl MarketMeta {
         if self.is_collateral_token(token) {
             Ok(())
         } else {
-            Err(StoreError::InvalidCollateralToken.into())
+            Err(CoreError::InvalidCollateralToken.into())
         }
     }
 
