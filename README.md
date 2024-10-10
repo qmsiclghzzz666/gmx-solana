@@ -1,4 +1,4 @@
-# GMSOL
+# GMX-Solana
 ## Development
 ### Prerequisites
 - Rust
