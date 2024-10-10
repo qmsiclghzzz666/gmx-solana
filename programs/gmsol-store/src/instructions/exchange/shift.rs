@@ -5,6 +5,7 @@ use anchor_spl::{
 };
 
 use crate::{
+    events::RemoveShiftEvent,
     ops::{
         execution_fee::TransferExecutionFeeOps,
         shift::{CreateShiftOp, CreateShiftParams},
@@ -258,14 +259,22 @@ pub struct CloseShift<'info> {
     pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
-pub(crate) fn close_shift(ctx: Context<CloseShift>, _reason: &str) -> Result<()> {
+pub(crate) fn close_shift(ctx: Context<CloseShift>, reason: &str) -> Result<()> {
     let accounts = &ctx.accounts;
     let should_continue_when_atas_are_missing = accounts.preprocess()?;
     if accounts.transfer_to_atas(should_continue_when_atas_are_missing)? {
         {
-            // let shift_address = accounts.shift.key();
-            // let shift = accounts.shift.load()?;
-            // TODO: emit remove shift event.
+            let shift_address = accounts.shift.key();
+            let shift = accounts.shift.load()?;
+            emit_cpi!(RemoveShiftEvent::new(
+                shift.header.id,
+                shift.header.store,
+                shift_address,
+                shift.tokens().from_market_token(),
+                shift.header.owner,
+                shift.header.action_state()?,
+                reason,
+            )?)
         }
         accounts.close()?;
     } else {

@@ -156,7 +156,6 @@ pub(crate) fn create_deposit<'info>(
     params: &CreateDepositParams,
 ) -> Result<()> {
     let accounts = ctx.accounts;
-    // TODO: validate feature enabled.
     accounts.transfer_execution_fee(params)?;
     accounts.transfer_tokens(params)?;
     CreateDepositOps::builder()

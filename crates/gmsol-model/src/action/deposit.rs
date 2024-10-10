@@ -284,7 +284,7 @@ impl<const DECIMALS: u8, M: LiquidityMarketMut<DECIMALS>> Deposit<M, DECIMALS> {
         );
 
         // Validate max pnl first.
-        // TODO: add comment for the reason.
+        // FIXME: add comment for the reason.
         self.market.validate_max_pnl(
             &self.params.prices,
             PnlFactorKind::MaxAfterDeposit,

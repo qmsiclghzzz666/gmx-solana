@@ -186,8 +186,6 @@ impl ActionHeader {
         Ok(())
     }
 
-    // TODO: use it.
-    #[allow(dead_code)]
     pub(crate) fn updated(&mut self) -> Result<()> {
         let clock = Clock::get()?;
         self.updated_at = clock.unix_timestamp;

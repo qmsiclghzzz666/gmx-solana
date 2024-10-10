@@ -252,8 +252,6 @@ where
             &execution.size_delta_in_tokens.to_opposite_signed()?,
         )?;
 
-        // TODO: handle referral.
-
         if !should_remove {
             self.position
                 .validate_position(&self.params.prices, false, false)?;
@@ -453,7 +451,7 @@ where
         })?;
 
         // Handle initial collateral delta amount with price impact diff.
-        // TODO: Comment on the reason.
+        // FIXME: Comment on the reason.
         if !self.withdrawable_collateral_amount.is_zero() && !price_impact_diff.is_zero() {
             // The prices should have been validated to be non-zero.
             debug_assert!(!self.collateral_token_price().has_zero());

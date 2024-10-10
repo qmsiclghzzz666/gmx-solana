@@ -293,7 +293,7 @@ pub trait BaseMarketExt<const DECIMALS: u8>: BaseMarket<DECIMALS> {
         index_token_price: &Price<Self::Num>,
         is_long: bool,
     ) -> crate::Result<Self::Num> {
-        // TODO: add comment to explain the difference.
+        // FIXME: add comment to explain the difference.
         if is_long {
             self.open_interest_in_tokens()?
                 .long_usd_value(index_token_price.pick_price(true))
@@ -341,8 +341,6 @@ pub trait BaseMarketExt<const DECIMALS: u8>: BaseMarket<DECIMALS> {
                 "overflow adding claimable fee amount",
             ))?;
 
-        // TODO: Claimable UI Fee Amount.
-        // TODO: Affiliate Reward Amount.
         Ok(balance)
     }
 

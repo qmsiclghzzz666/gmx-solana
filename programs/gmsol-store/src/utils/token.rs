@@ -30,6 +30,30 @@ pub fn must_be_uninitialized<'info>(account: &impl AsRef<AccountInfo<'info>>) ->
     *info.owner == system_program::ID
 }
 
+/// Validate token account.
+pub fn validate_token_account<'info>(
+    account: &impl AsRef<AccountInfo<'info>>,
+    token_program_id: &Pubkey,
+) -> Result<()> {
+    let info = account.as_ref();
+
+    require!(
+        !(info.owner == &system_program::ID && info.lamports() == 0),
+        ErrorCode::AccountNotInitialized
+    );
+
+    require_eq!(
+        info.owner,
+        token_program_id,
+        ErrorCode::AccountOwnedByWrongProgram,
+    );
+
+    let mut data: &[u8] = &info.try_borrow_data()?;
+    anchor_spl::token_interface::TokenAccount::try_deserialize(&mut data)?;
+
+    Ok(())
+}
+
 #[derive(TypedBuilder)]
 pub struct TransferAllFromEscrowToATA<'a, 'info> {
     system_program: AccountInfo<'info>,

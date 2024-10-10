@@ -383,7 +383,6 @@ impl<'a> gmsol_model::Bank<Pubkey> for RevertibleMarket<'a> {
         amount: &Self::Num,
     ) -> gmsol_model::Result<()> {
         let is_long_token = self.storage.meta.to_token_side(token.borrow())?;
-        // TODO: use event
         msg!(
             "[Balance Not committed] {}: {},{}(+{} {is_long_token})",
             self.storage.meta.market_token_mint,
@@ -401,7 +400,6 @@ impl<'a> gmsol_model::Bank<Pubkey> for RevertibleMarket<'a> {
         amount: &Self::Num,
     ) -> gmsol_model::Result<()> {
         let is_long_token = self.storage.meta.to_token_side(token.borrow())?;
-        // TODO: use event
         msg!(
             "[Balance Not committed] {}: {},{}(-{} {is_long_token})",
             self.storage.meta.market_token_mint,

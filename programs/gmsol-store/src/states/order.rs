@@ -586,6 +586,8 @@ impl Order {
         }
         current.min_output = params.min_output_amount;
 
+        self.header.updated()?;
+
         Ok(())
     }
 }

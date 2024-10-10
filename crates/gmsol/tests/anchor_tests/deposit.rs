@@ -203,5 +203,3 @@ async fn balanced_pool_deposit() -> eyre::Result<()> {
     }
     Ok(())
 }
-
-// TODO: add tests for execution failure and cancellation.

@@ -17,7 +17,7 @@ use crate::{
     },
     states::{
         feature::ActionDisabledFlag,
-        order::{OrderKind, Order},
+        order::{Order, OrderKind},
         position::PositionKind,
         user::UserHeader,
         Market, NonceBytes, Position, RoleKey, Seed, Store, UpdateOrderParams,
@@ -26,7 +26,7 @@ use crate::{
         internal::{self, Authentication},
         token::{
             is_associated_token_account, is_associated_token_account_with_program_id,
-            must_be_uninitialized,
+            must_be_uninitialized, validate_token_account,
         },
     },
     CoreError,
@@ -820,6 +820,7 @@ pub(crate) fn close_order(ctx: Context<CloseOrder>, reason: &str) -> Result<()> 
                 order.params.kind()?,
                 order.market_token,
                 order.header.owner,
+                order.header.action_state()?,
                 reason
             )?);
         }
@@ -953,7 +954,11 @@ impl<'info> CloseOrder<'info> {
                     ))?;
                 }
 
-                // TODO: unpack the ATA to ensure it is a valid token account.
+                // Skip the minting if the token account is not valid.
+                if validate_token_account(ata, self.gt_token_program.key).is_err() {
+                    msg!("[GT] minting has been cancelled because the ATA is not valid.");
+                    return Ok(true);
+                }
 
                 let ctx = CpiContext::new(
                     self.gt_token_program.to_account_info(),
@@ -1026,13 +1031,15 @@ impl<'info> CloseOrder<'info> {
             let mint = &self.gt_mint;
 
             if must_be_uninitialized(ata) {
-                msg!(
-                    "[GT] referrer reward has been cancelled because the ATA account is not found."
-                );
+                msg!("[GT] referrer reward has been cancelled because the ATA is not found.");
                 return Ok(());
             }
 
-            // TODO: unpack the ATA to ensure it is a valid token account.
+            // Skip the minting if the token account is not valid.
+            if validate_token_account(ata, self.gt_token_program.key).is_err() {
+                msg!("[GT] referrer reward has been cancelled because the ATA is not valid.");
+                return Ok(());
+            }
 
             {
                 let mut store = self.store.load_mut()?;

@@ -75,8 +75,8 @@ pub struct RemoveDepositEvent {
     pub deposit: Pubkey,
     /// Market token.
     pub market_token: Pubkey,
-    /// User.
-    pub user: Pubkey,
+    /// Owner.
+    pub owner: Pubkey,
     /// Final state.
     pub state: ActionState,
     /// Reason.
@@ -89,7 +89,7 @@ impl RemoveDepositEvent {
         store: Pubkey,
         deposit: Pubkey,
         market_token: Pubkey,
-        user: Pubkey,
+        owner: Pubkey,
         state: ActionState,
         reason: impl ToString,
     ) -> Result<Self> {
@@ -101,7 +101,7 @@ impl RemoveDepositEvent {
             store,
             deposit,
             market_token,
-            user,
+            owner,
             state,
             reason: reason.to_string(),
         })
@@ -127,8 +127,10 @@ pub struct RemoveOrderEvent {
     pub kind: OrderKind,
     /// Market token.
     pub market_token: Pubkey,
-    /// User.
-    pub user: Pubkey,
+    /// Owner.
+    pub owner: Pubkey,
+    /// Final state.
+    pub state: ActionState,
     /// Reason.
     pub reason: String,
 }
@@ -140,7 +142,8 @@ impl RemoveOrderEvent {
         order: Pubkey,
         kind: OrderKind,
         market_token: Pubkey,
-        user: Pubkey,
+        owner: Pubkey,
+        state: ActionState,
         reason: impl ToString,
     ) -> Result<Self> {
         let clock = Clock::get()?;
@@ -152,7 +155,8 @@ impl RemoveOrderEvent {
             kind,
             order,
             market_token,
-            user,
+            owner,
+            state,
             reason: reason.to_string(),
         })
     }
@@ -175,8 +179,8 @@ pub struct RemoveWithdrawalEvent {
     pub withdrawal: Pubkey,
     /// Market token.
     pub market_token: Pubkey,
-    /// User.
-    pub user: Pubkey,
+    /// Owner.
+    pub owner: Pubkey,
     /// Final state.
     pub state: ActionState,
     /// Reason.
@@ -189,7 +193,7 @@ impl RemoveWithdrawalEvent {
         store: Pubkey,
         withdrawal: Pubkey,
         market_token: Pubkey,
-        user: Pubkey,
+        owner: Pubkey,
         state: ActionState,
         reason: impl ToString,
     ) -> Result<Self> {
@@ -201,7 +205,57 @@ impl RemoveWithdrawalEvent {
             store,
             withdrawal,
             market_token,
-            user,
+            owner,
+            state,
+            reason: reason.to_string(),
+        })
+    }
+}
+
+/// Shift removed event.
+#[event]
+#[cfg_attr(feature = "debug", derive(Debug))]
+#[derive(Clone)]
+pub struct RemoveShiftEvent {
+    /// Action id.
+    pub id: u64,
+    /// Timestamp.
+    pub ts: i64,
+    /// Slot.
+    pub slot: u64,
+    /// Store.
+    pub store: Pubkey,
+    /// Shift.
+    pub shift: Pubkey,
+    /// Market token.
+    pub market_token: Pubkey,
+    /// Owner.
+    pub owner: Pubkey,
+    /// Final state.
+    pub state: ActionState,
+    /// Reason.
+    pub reason: String,
+}
+
+impl RemoveShiftEvent {
+    pub(crate) fn new(
+        id: u64,
+        store: Pubkey,
+        shift: Pubkey,
+        market_token: Pubkey,
+        owner: Pubkey,
+        state: ActionState,
+        reason: impl ToString,
+    ) -> Result<Self> {
+        let clock = Clock::get()?;
+        Ok(Self {
+            id,
+            ts: clock.unix_timestamp,
+            slot: clock.slot,
+            store,
+            shift,
+            market_token,
+            owner,
             state,
             reason: reason.to_string(),
         })
@@ -750,7 +804,7 @@ impl<'a> TradeEvent<'a> {
             meta.market_meta().short_token_mint
         };
 
-        // TODO: find the correct bump.
+        // FIXME: should we provide a correct bump here?
         position
             .try_init(
                 kind,

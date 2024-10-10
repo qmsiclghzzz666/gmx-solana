@@ -303,8 +303,6 @@ where
             }
         }
 
-        // TODO: handle referral
-
         self.position
             .validate_position(&self.params.prices, true, true)?;
 
@@ -467,8 +465,6 @@ where
         self.position
             .market_mut()
             .apply_delta(is_collateral_token_long, &fees.for_pool()?.to_signed()?)?;
-
-        // TODO: apply claimable ui fee amount.
 
         let is_long = self.position.is_long();
         self.position

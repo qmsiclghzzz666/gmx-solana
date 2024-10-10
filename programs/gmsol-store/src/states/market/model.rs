@@ -218,7 +218,6 @@ impl gmsol_model::PerpMarket<{ constants::MARKET_DECIMALS }> for Market {
     }
 
     fn position_params(&self) -> gmsol_model::Result<PositionParams<Self::Num>> {
-        // TODO: use min collateral factors for OI.
         Ok(PositionParams::new(
             self.config.min_position_size_usd,
             self.config.min_collateral_value,

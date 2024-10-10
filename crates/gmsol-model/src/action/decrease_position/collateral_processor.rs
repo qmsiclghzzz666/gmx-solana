@@ -534,7 +534,6 @@ where
                             is_collateral_token_long,
                             &fees.for_receiver()?.to_signed()?,
                         )?;
-                        // TODO: apply ui fee.
                     } else {
                         processor.pay_with_primary_pool(
                             &paid_in_collateral_amount.to_signed()?,

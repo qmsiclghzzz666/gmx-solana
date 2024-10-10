@@ -248,7 +248,6 @@ impl Market {
 
     /// Record transferred in.
     fn record_transferred_in(&mut self, is_long_token: bool, amount: u64) -> Result<()> {
-        // TODO: use event
         msg!(
             "{}: {},{}(+{},{})",
             self.meta.market_token_mint,
@@ -281,7 +280,6 @@ impl Market {
 
     /// Record transferred out.
     fn record_transferred_out(&mut self, is_long_token: bool, amount: u64) -> Result<()> {
-        // TODO: use event
         msg!(
             "{}: {},{}(-{},{})",
             self.meta.market_token_mint,

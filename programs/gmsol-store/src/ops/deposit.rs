@@ -212,7 +212,6 @@ impl<'a, 'info> ExecuteDepositOps<'a, 'info> {
         match self.do_execute() {
             Ok(()) => Ok(true),
             Err(err) if !throw_on_execution_error => {
-                // TODO: catch and throw missing oracle price error.
                 msg!("Execute deposit error: {}", err);
                 Ok(false)
             }
