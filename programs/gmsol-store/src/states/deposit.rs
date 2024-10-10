@@ -1,12 +1,14 @@
 use anchor_lang::prelude::*;
 
+use crate::{states::MarketConfigKey, CoreError};
+
 use super::{
     common::{
         action::{Action, ActionHeader},
         swap::SwapParamsV2,
         token::TokenAndAccount,
     },
-    Seed,
+    Market, Seed,
 };
 
 /// Deposit V2.
@@ -25,12 +27,25 @@ pub struct Deposit {
     reserve: [u8; 128],
 }
 
+/// PDA for first deposit owner.
+pub fn find_first_deposit_owner_pda(store_program_id: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(&[Deposit::FIRST_DEPOSIT_OWNER_SEED], store_program_id)
+}
+
 impl Deposit {
     /// Max execution lamports.
     pub const MIN_EXECUTION_LAMPORTS: u64 = 200_000;
 
     /// Init Space.
     pub const INIT_SPACE: usize = core::mem::size_of::<Self>();
+
+    /// Fisrt Deposit Owner Seed.
+    pub const FIRST_DEPOSIT_OWNER_SEED: &'static [u8] = b"first_deposit_owner";
+
+    /// Get first deposit owner.
+    pub fn first_deposit_owner() -> Pubkey {
+        find_first_deposit_owner_pda(&crate::ID).0
+    }
 
     /// Get tokens.
     pub fn tokens(&self) -> &TokenAccounts {
@@ -40,6 +55,61 @@ impl Deposit {
     /// Get swap params.
     pub fn swap(&self) -> &SwapParamsV2 {
         &self.swap
+    }
+
+    /// Validate the deposit params for execution.
+    pub(crate) fn validate_for_execution(
+        &self,
+        market_token: &AccountInfo,
+        market: &Market,
+    ) -> Result<()> {
+        use anchor_spl::token::accessor::amount;
+
+        require_eq!(
+            *market_token.key,
+            self.tokens().market_token(),
+            CoreError::MarketTokenMintMismatched
+        );
+
+        let supply = amount(market_token)?;
+
+        if supply == 0 {
+            Self::validate_first_deposit(
+                &self.header.owner,
+                self.params.min_market_token_amount,
+                market,
+            )?;
+        }
+
+        Ok(())
+    }
+
+    pub(crate) fn validate_first_deposit(
+        owner: &Pubkey,
+        min_amount: u64,
+        market: &Market,
+    ) -> Result<()> {
+        let min_tokens_for_first_deposit =
+            market.get_config_by_key(MarketConfigKey::MinTokensForFirstDeposit);
+
+        // Skip first deposit if the min tokens is zero.
+        if *min_tokens_for_first_deposit == 0 {
+            return Ok(());
+        }
+
+        require_eq!(
+            *owner,
+            Self::first_deposit_owner(),
+            CoreError::InvalidOwnerForFirstDeposit
+        );
+
+        require_gte!(
+            min_amount as u128,
+            *min_tokens_for_first_deposit,
+            CoreError::NotEnoughMarketTokenAmountForFirstDeposit
+        );
+
+        Ok(())
     }
 }
 

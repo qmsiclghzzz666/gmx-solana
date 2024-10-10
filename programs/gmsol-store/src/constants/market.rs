@@ -115,3 +115,6 @@ pub const DEFAULT_MAX_POOL_VALUE_FOR_DEPOSIT_SHORT_TOKEN: Factor = 750_000 * sup
 pub const DEFAULT_MAX_OPEN_INTEREST_FOR_LONG: Factor = 450_000 * super::MARKET_USD_UNIT;
 /// Default max open interest for short.
 pub const DEFAULT_MAX_OPEN_INTEREST_FOR_SHORT: Factor = 450_000 * super::MARKET_USD_UNIT;
+
+/// Default min tokens for first deposit.
+pub const DEFAULT_MIN_TOKENS_FOR_FIRST_DEPOSIT: Factor = 0;

@@ -185,24 +185,30 @@ impl<'a, 'info> ExecuteShiftOp<'a, 'info> {
         self.oracle.validate_time(self)
     }
 
-    fn validate_markets(&self) -> Result<()> {
+    fn validate_markets_and_shift(&self) -> Result<()> {
         require!(
             self.from_market.key() != self.to_market.key(),
             CoreError::Internal
         );
+
         let from_market = self.from_market.load()?;
         let to_market = self.to_market.load()?;
+
         from_market.validate(&self.store.key())?;
         to_market.validate(&self.store.key())?;
 
         from_market.validate_shiftable(&to_market)?;
+
+        self.shift
+            .load()?
+            .validate_for_execution(&self.to_market_token_mint.to_account_info(), &to_market)?;
 
         Ok(())
     }
 
     #[inline(never)]
     fn do_execute(&mut self) -> Result<()> {
-        self.validate_markets()?;
+        self.validate_markets_and_shift()?;
 
         let mut from_market = RevertibleLiquidityMarket::new(
             self.from_market,
@@ -279,8 +285,6 @@ impl<'a, 'info> ExecuteShiftOp<'a, 'info> {
                 .record_transferred_in_by_token(&short_token, &short_amount)
                 .map_err(ModelError::from)?;
         }
-
-        // TODO: validate first deposit.
 
         // Distribute position impact for the to market.
         {

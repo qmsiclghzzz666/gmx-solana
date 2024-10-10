@@ -1525,9 +1525,17 @@ pub enum CoreError {
     /// Token config is diabled.
     #[msg("token config is disabled")]
     TokenConfigDisabled,
+    /* Errors for Deposit */
     /// Empty Deposit.
     #[msg("empty deposit")]
     EmptyDeposit,
+    /// Invalid owner for the first deposit.
+    #[msg("invalid owner for the first deposit")]
+    InvalidOwnerForFirstDeposit,
+    /// Not enough market token amount for the first deposit.
+    #[msg("not enough market token amount for the first deposit")]
+    NotEnoughMarketTokenAmountForFirstDeposit,
+    /* Errors for Withdrawal */
     /// Empty Withdrawal.
     #[msg("emtpy withdrawal")]
     EmptyWithdrawal,

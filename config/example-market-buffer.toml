@@ -51,3 +51,4 @@ max_pool_value_for_deposit_for_long_token = "75_000_000_000_000_000_000_000_000"
 max_pool_value_for_deposit_for_short_token = "75_000_000_000_000_000_000_000_000"
 max_open_interest_for_long = "45_000_000_000_000_000_000_000_000"                 # `450,000` for most indexs on [USDC-USDC]
 max_open_interest_for_short = "45_000_000_000_000_000_000_000_000"
+min_tokens_for_first_deposit = "0"

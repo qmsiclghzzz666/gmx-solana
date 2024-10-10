@@ -58,6 +58,12 @@ pub struct MarketConfig {
     pub(super) max_pnl_factor_for_short_deposit: Factor,
     pub(super) max_pnl_factor_for_long_withdrawal: Factor,
     pub(super) max_pnl_factor_for_short_withdrawal: Factor,
+    pub(super) max_pnl_factor_for_long_trader: Factor,
+    pub(super) max_pnl_factor_for_short_trader: Factor,
+    pub(super) max_pnl_factor_for_long_adl: Factor,
+    pub(super) max_pnl_factor_for_short_adl: Factor,
+    pub(super) min_pnl_factor_after_long_adl: Factor,
+    pub(super) min_pnl_factor_after_short_adl: Factor,
     // Other boundary.
     pub(super) max_pool_amount_for_long_token: Factor,
     pub(super) max_pool_amount_for_short_token: Factor,
@@ -65,14 +71,8 @@ pub struct MarketConfig {
     pub(super) max_pool_value_for_deposit_for_short_token: Factor,
     pub(super) max_open_interest_for_long: Factor,
     pub(super) max_open_interest_for_short: Factor,
-    // Other pnl factors.
-    pub(super) max_pnl_factor_for_long_trader: Factor,
-    pub(super) max_pnl_factor_for_short_trader: Factor,
-    pub(super) max_pnl_factor_for_long_adl: Factor,
-    pub(super) max_pnl_factor_for_short_adl: Factor,
-    pub(super) min_pnl_factor_after_long_adl: Factor,
-    pub(super) min_pnl_factor_after_short_adl: Factor,
-    reserved: [Factor; 13],
+    pub(super) min_tokens_for_first_deposit: Factor,
+    reserved: [Factor; 32],
 }
 
 impl MarketConfig {
@@ -162,6 +162,8 @@ impl MarketConfig {
 
         self.max_open_interest_for_long = constants::DEFAULT_MAX_OPEN_INTEREST_FOR_LONG;
         self.max_open_interest_for_short = constants::DEFAULT_MAX_OPEN_INTEREST_FOR_SHORT;
+
+        self.min_tokens_for_first_deposit = constants::DEFAULT_MIN_TOKENS_FOR_FIRST_DEPOSIT;
     }
 
     pub(super) fn get(&self, key: MarketConfigKey) -> &Factor {
@@ -259,6 +261,7 @@ impl MarketConfig {
             }
             MarketConfigKey::MaxOpenInterestForLong => &self.max_open_interest_for_long,
             MarketConfigKey::MaxOpenInterestForShort => &self.max_open_interest_for_short,
+            MarketConfigKey::MinTokensForFirstDeposit => &self.min_tokens_for_first_deposit,
         }
     }
 
@@ -375,6 +378,7 @@ impl MarketConfig {
             }
             MarketConfigKey::MaxOpenInterestForLong => &mut self.max_open_interest_for_long,
             MarketConfigKey::MaxOpenInterestForShort => &mut self.max_open_interest_for_short,
+            MarketConfigKey::MinTokensForFirstDeposit => &mut self.min_tokens_for_first_deposit,
         }
     }
 }
@@ -509,6 +513,8 @@ pub enum MarketConfigKey {
     MaxOpenInterestForLong,
     /// Max open interest for short.
     MaxOpenInterestForShort,
+    /// Min tokens for first deposit.
+    MinTokensForFirstDeposit,
 }
 
 /// An entry of the config buffer.

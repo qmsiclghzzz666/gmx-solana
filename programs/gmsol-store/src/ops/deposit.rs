@@ -223,8 +223,15 @@ impl<'a, 'info> ExecuteDepositOps<'a, 'info> {
         self.oracle.validate_time(self)
     }
 
-    fn validate_market(&self) -> Result<()> {
-        self.market.load()?.validate(&self.store.key())
+    fn validate_market_and_deposit(&self) -> Result<()> {
+        let market = self.market.load()?;
+        market.validate(&self.store.key())?;
+
+        self.deposit
+            .load()?
+            .validate_for_execution(&self.market_token_mint.to_account_info(), &market)?;
+
+        Ok(())
     }
 
     #[inline(never)]
@@ -241,9 +248,7 @@ impl<'a, 'info> ExecuteDepositOps<'a, 'info> {
         };
         use gmsol_model::{LiquidityMarketMutExt, PositionImpactMarketMutExt};
 
-        self.validate_market()?;
-
-        // TODO: validate first deposit.
+        self.validate_market_and_deposit()?;
 
         // Prepare the execution context.
         let current_market_token = self.market_token_mint.key();
