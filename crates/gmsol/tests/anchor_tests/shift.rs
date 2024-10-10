@@ -55,7 +55,7 @@ async fn shift() -> eyre::Result<()> {
 
     let mut builder = keeper.execute_shift(oracle, &shift);
     deployment
-        .execute_with_pyth(&mut builder, None, true)
+        .execute_with_pyth(&mut builder, None, true, true)
         .instrument(tracing::info_span!("execute shift", %shift))
         .await?;
 

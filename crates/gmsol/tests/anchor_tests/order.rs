@@ -77,6 +77,7 @@ async fn balanced_market_order() -> eyre::Result<()> {
                         .add_alt(deployment.market_alt().clone()),
                     None,
                     true,
+                    true,
                 )
                 .await?;
 
@@ -95,6 +96,7 @@ async fn balanced_market_order() -> eyre::Result<()> {
                         .add_alt(deployment.common_alt().clone())
                         .add_alt(deployment.market_alt().clone()),
                     None,
+                    true,
                     true,
                 )
                 .await?;
@@ -131,6 +133,7 @@ async fn balanced_market_order() -> eyre::Result<()> {
                 .add_alt(deployment.market_alt().clone()),
             None,
             true,
+            true,
         )
         .await?;
 
@@ -150,6 +153,7 @@ async fn balanced_market_order() -> eyre::Result<()> {
                 .add_alt(deployment.common_alt().clone())
                 .add_alt(deployment.market_alt().clone()),
             None,
+            true,
             true,
         )
         .await?;
@@ -173,6 +177,7 @@ async fn balanced_market_order() -> eyre::Result<()> {
                 .add_alt(deployment.market_alt().clone()),
             None,
             true,
+            true,
         )
         .await?;
 
@@ -193,6 +198,7 @@ async fn balanced_market_order() -> eyre::Result<()> {
                 .add_alt(deployment.common_alt().clone())
                 .add_alt(deployment.market_alt().clone()),
             None,
+            true,
             true,
         )
         .await?;
@@ -270,6 +276,7 @@ async fn single_token_market_order() -> eyre::Result<()> {
                         .add_alt(deployment.market_alt().clone()),
                     None,
                     true,
+                    true,
                 )
                 .await?;
 
@@ -288,6 +295,7 @@ async fn single_token_market_order() -> eyre::Result<()> {
                         .add_alt(deployment.common_alt().clone())
                         .add_alt(deployment.market_alt().clone()),
                     None,
+                    true,
                     true,
                 )
                 .await?;
@@ -324,6 +332,7 @@ async fn single_token_market_order() -> eyre::Result<()> {
                 .add_alt(deployment.market_alt().clone()),
             None,
             true,
+            true,
         )
         .await?;
 
@@ -343,6 +352,7 @@ async fn single_token_market_order() -> eyre::Result<()> {
                 .add_alt(deployment.common_alt().clone())
                 .add_alt(deployment.market_alt().clone()),
             None,
+            true,
             true,
         )
         .await?;
@@ -366,6 +376,7 @@ async fn single_token_market_order() -> eyre::Result<()> {
                 .add_alt(deployment.market_alt().clone()),
             None,
             true,
+            true,
         )
         .await?;
 
@@ -386,6 +397,7 @@ async fn single_token_market_order() -> eyre::Result<()> {
                 .add_alt(deployment.common_alt().clone())
                 .add_alt(deployment.market_alt().clone()),
             None,
+            true,
             true,
         )
         .await?;
@@ -437,7 +449,7 @@ async fn liquidation() -> eyre::Result<()> {
 
         let mut builder = keeper.execute_order(store, oracle, &order, false)?;
         deployment
-            .execute_with_pyth(&mut builder, None, true)
+            .execute_with_pyth(&mut builder, None, true, true)
             .instrument(tracing::info_span!("execute", order=%order))
             .await?;
 
@@ -461,6 +473,7 @@ async fn liquidation() -> eyre::Result<()> {
                     .add_alt(deployment.common_alt().clone())
                     .add_alt(deployment.market_alt().clone()),
                 None,
+                true,
                 true,
             )
             .instrument(tracing::info_span!("liquidate", position=%position))

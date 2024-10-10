@@ -114,6 +114,9 @@ impl Deployment {
     /// Market selector for ADL test.
     pub const SELECT_ADL_MARKET: [&'static str; 3] = ["SOL", "USDG", "fBTC"];
 
+    /// Market selector for first deposit test.
+    pub const SELECT_FIRST_DEPOSIT_MARKET: [&'static str; 3] = ["fBTC", "USDG", "WSOL"];
+
     const SOL_PYTH_FEED_ID: [u8; 32] = [
         0xef, 0x0d, 0x8b, 0x6f, 0xda, 0x2c, 0xeb, 0xa4, 0x1d, 0xa1, 0x5d, 0x40, 0x95, 0xd1, 0xda,
         0x39, 0x2a, 0x0d, 0x2f, 0x8e, 0xd0, 0xc6, 0xc7, 0xbc, 0x0f, 0x4c, 0xfa, 0xc8, 0xc2, 0x80,
@@ -225,10 +228,12 @@ impl Deployment {
             ["fBTC", "WSOL", "USDG"],
             ["SOL", "fBTC", "fBTC"],
             ["SOL", "fBTC", "USDG"],
-            // For liquidation test
+            // For liquidation test only
             Self::SELECT_LIQUIDATION_MARKET,
-            // For ADL test
+            // For ADL test only
             Self::SELECT_ADL_MARKET,
+            // For first deposit test only
+            Self::SELECT_FIRST_DEPOSIT_MARKET,
         ])
         .await?;
 
@@ -1022,7 +1027,8 @@ impl Deployment {
         execute: &mut T,
         compute_unit_price_micro_lamports: Option<u64>,
         skip_preflight: bool,
-    ) -> eyre::Result<()>
+        enable_tracing: bool,
+    ) -> gmsol::Result<()>
     where
         T: ExecuteWithPythPrices<'a, SignerRef>,
     {
@@ -1042,6 +1048,7 @@ impl Deployment {
                 execute,
                 compute_unit_price_micro_lamports,
                 skip_preflight,
+                enable_tracing,
             )
             .await?;
         Ok(())
@@ -1087,7 +1094,7 @@ impl Deployment {
             .await?;
         tracing::info!(%deposit, %signature, "created a deposit");
         let mut builder = keeper.execute_deposit(&self.store, &self.oracle, &deposit, false);
-        self.execute_with_pyth(&mut builder, None, skip_preflight)
+        self.execute_with_pyth(&mut builder, None, skip_preflight, true)
             .await?;
         Ok(market_token)
     }

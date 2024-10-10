@@ -300,6 +300,7 @@ pub trait PythPullOracleOps<C> {
         execute: &mut T,
         compute_unit_price_micro_lamports: Option<u64>,
         skip_preflight: bool,
+        enable_tracing: bool,
     ) -> impl Future<Output = crate::Result<()>>
     where
         C: Deref<Target = S> + Clone + 'exec,
@@ -330,10 +331,11 @@ pub trait PythPullOracleOps<C> {
                 }
             }
             execute
-                .execute(
+                .execute_with_options(
                     with_prices,
                     compute_unit_price_micro_lamports,
                     skip_preflight,
+                    enable_tracing,
                 )
                 .await?;
             Ok(())
@@ -394,12 +396,13 @@ pub trait ExecuteWithPythPrices<'a, C> {
         price_updates: Prices,
     ) -> impl Future<Output = crate::Result<Vec<RpcBuilder<'a, C, ()>>>>;
 
-    /// Execute.
-    fn execute<S>(
+    /// Execute with options
+    fn execute_with_options<S>(
         &mut self,
         txns: WithPythPrices<C>,
         compute_unit_price_micro_lamports: Option<u64>,
         skip_preflight: bool,
+        enable_tracing: bool,
     ) -> impl Future<Output = crate::Result<()>>
     where
         C: Deref<Target = S> + Clone,
@@ -411,14 +414,31 @@ pub trait ExecuteWithPythPrices<'a, C> {
                 .await
             {
                 Ok(signatures) => {
-                    tracing::info!("executed with txns {signatures:#?}");
+                    if enable_tracing {
+                        tracing::info!("executed with txns {signatures:#?}");
+                    }
                     Ok(())
                 }
                 Err((signatures, err)) => {
-                    tracing::error!(%err, "failed to execute, successful txns: {signatures:#?}");
+                    if enable_tracing {
+                        tracing::error!(%err, "failed to execute, successful txns: {signatures:#?}");
+                    }
                     Err(err)
                 }
             }
         }
+    }
+
+    /// Execute.
+    fn execute<S>(
+        &mut self,
+        txns: WithPythPrices<C>,
+        skip_preflight: bool,
+    ) -> impl Future<Output = crate::Result<()>>
+    where
+        C: Deref<Target = S> + Clone,
+        S: Signer,
+    {
+        self.execute_with_options(txns, None, skip_preflight, true)
     }
 }

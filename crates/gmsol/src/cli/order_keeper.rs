@@ -282,6 +282,7 @@ impl KeeperArgs {
                             &mut builder,
                             Some(self.compute_unit_price),
                             true,
+                            true,
                         )
                         .await?;
                 } else {

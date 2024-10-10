@@ -36,7 +36,7 @@ async fn single_token_pool_withdarwal() -> eyre::Result<()> {
 
         let mut builder = keeper.execute_deposit(store, oracle, &deposit, true);
         deployment
-            .execute_with_pyth(&mut builder, None, true)
+            .execute_with_pyth(&mut builder, None, true, true)
             .await?;
 
         let market_token_before_withdrawal = deployment
@@ -54,7 +54,7 @@ async fn single_token_pool_withdarwal() -> eyre::Result<()> {
 
         let mut builder = keeper.execute_withdrawal(store, oracle, &withdrawal, true);
         deployment
-            .execute_with_pyth(&mut builder, None, true)
+            .execute_with_pyth(&mut builder, None, true, true)
             .await?;
 
         let market_token_after_withdrawal = deployment
@@ -103,7 +103,7 @@ async fn balanced_pool_withdrawal() -> eyre::Result<()> {
 
     let mut builder = keeper.execute_deposit(store, oracle, &deposit, false);
     deployment
-        .execute_with_pyth(&mut builder, None, true)
+        .execute_with_pyth(&mut builder, None, true, true)
         .await?;
 
     {
@@ -131,7 +131,7 @@ async fn balanced_pool_withdrawal() -> eyre::Result<()> {
 
         let mut builder = keeper.execute_deposit(store, oracle, &deposit, false);
         deployment
-            .execute_with_pyth(&mut builder, None, true)
+            .execute_with_pyth(&mut builder, None, true, true)
             .await?;
 
         let market_token_before_withdarwal = deployment
@@ -149,7 +149,7 @@ async fn balanced_pool_withdrawal() -> eyre::Result<()> {
 
         let mut builder = keeper.execute_withdrawal(store, oracle, &withdrawal, false);
         deployment
-            .execute_with_pyth(&mut builder, None, false)
+            .execute_with_pyth(&mut builder, None, false, true)
             .await?;
 
         let market_token_after_withdarwal = deployment

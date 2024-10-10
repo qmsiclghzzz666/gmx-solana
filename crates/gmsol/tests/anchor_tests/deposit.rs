@@ -1,4 +1,5 @@
-use gmsol::exchange::ExchangeOps;
+use gmsol::{exchange::ExchangeOps, store::market::MarketOps, types::MarketConfigKey};
+use gmsol_store::CoreError;
 
 use crate::anchor_tests::setup::{self, Deployment};
 
@@ -68,7 +69,7 @@ async fn single_token_pool_deposit() -> eyre::Result<()> {
         // Execute.
         let mut builder = keeper.execute_deposit(store, oracle, &deposit, true);
         deployment
-            .execute_with_pyth(&mut builder, None, true)
+            .execute_with_pyth(&mut builder, None, true, true)
             .await?;
 
         let wsol_after_execution = deployment
@@ -132,7 +133,7 @@ async fn balanced_pool_deposit() -> eyre::Result<()> {
 
     let mut builder = keeper.execute_deposit(store, oracle, &deposit, false);
     deployment
-        .execute_with_pyth(&mut builder, None, true)
+        .execute_with_pyth(&mut builder, None, true, true)
         .await?;
 
     {
@@ -185,7 +186,7 @@ async fn balanced_pool_deposit() -> eyre::Result<()> {
 
         let mut builder = keeper.execute_deposit(store, oracle, &deposit, false);
         deployment
-            .execute_with_pyth(&mut builder, None, true)
+            .execute_with_pyth(&mut builder, None, true, true)
             .await?;
 
         let market_token_after_execution = deployment
@@ -201,5 +202,62 @@ async fn balanced_pool_deposit() -> eyre::Result<()> {
         assert!(usdg_escrow_after_execution.is_none());
         assert!(market_token_escrow_after_execution.is_none());
     }
+    Ok(())
+}
+
+#[tokio::test]
+async fn first_deposit() -> eyre::Result<()> {
+    let deployment = setup::current_deployment().await?;
+    let _guard = deployment.use_accounts().await?;
+    let span = tracing::info_span!("first_deposit");
+    let _enter = span.enter();
+
+    let client = deployment.user_client(Deployment::DEFAULT_USER)?;
+    let keeper = deployment.user_client(Deployment::DEFAULT_KEEPER)?;
+
+    let store = &deployment.store;
+    let oracle = &deployment.oracle;
+    let [index_token, long_token, short_token] = Deployment::SELECT_FIRST_DEPOSIT_MARKET;
+    let market_token = deployment
+        .market_token(index_token, long_token, short_token)
+        .expect("must exist");
+
+    let amount = 1_000_013;
+    let min_amount = 1;
+
+    deployment
+        .mint_or_transfer_to_user(long_token, Deployment::DEFAULT_USER, amount)
+        .await?;
+
+    let signature = keeper
+        .update_market_config_by_key(
+            store,
+            market_token,
+            MarketConfigKey::MinTokensForFirstDeposit,
+            &min_amount,
+        )?
+        .send_without_preflight()
+        .await?;
+    tracing::info!(%signature, "enabled first deposit check");
+
+    let (rpc, deposit) = client
+        .create_deposit(store, market_token)
+        .long_token(amount, None, None)
+        .build_with_address()
+        .await?;
+    let signature = rpc.send_without_preflight().await?;
+    tracing::info!(%signature, %deposit, "created first deposit");
+
+    // Invalid first deposit.
+    let mut builder = keeper.execute_deposit(store, oracle, &deposit, false);
+    let err = deployment
+        .execute_with_pyth(&mut builder, None, false, false)
+        .await
+        .expect_err("should throw an error on first deposit with unexpected owner");
+    assert_eq!(
+        err.anchor_error_code(),
+        Some(CoreError::InvalidOwnerForFirstDeposit.into())
+    );
+
     Ok(())
 }
