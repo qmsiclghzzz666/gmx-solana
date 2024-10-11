@@ -1,6 +1,3 @@
-/// Keys.
-pub mod keys;
-
 /// Default market configs.
 pub mod market;
 
