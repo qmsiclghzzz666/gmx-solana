@@ -3,7 +3,6 @@ use gmsol::{
     types::user::ReferralCode,
 };
 use gmsol_store::CoreError;
-use rand::random;
 
 use crate::anchor_tests::setup::{current_deployment, Deployment};
 
@@ -68,16 +67,16 @@ async fn referral() -> eyre::Result<()> {
             "should throw an error when the referral code has already been set by someone else",
         );
 
-    let code2 = random();
-    let signature = client2
-        .initialize_referral_code(store, code2)?
+    let signature = client
+        .transfer_referral_code(store, &client2.payer(), None)
+        .await?
         .send_without_preflight()
         .await?;
-    tracing::info!(%signature, "initialized referral code for user 2");
+    tracing::info!(%signature, "transferred referral code to user 2");
 
     // Mutual-referral.
     let err = client
-        .set_referrer(store, code2, None)
+        .set_referrer(store, code, None)
         .await?
         .send()
         .await

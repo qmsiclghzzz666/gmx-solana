@@ -1363,6 +1363,11 @@ pub mod gmsol_store {
     pub fn set_referrer(ctx: Context<SetReferrer>, code: [u8; 8]) -> Result<()> {
         instructions::set_referrer(ctx, code)
     }
+
+    /// Transfer referral code.
+    pub fn transfer_referral_code(ctx: Context<TransferReferralCode>) -> Result<()> {
+        instructions::transfer_referral_code(ctx)
+    }
 }
 
 /// Result type with [`CoreError`] as error type.

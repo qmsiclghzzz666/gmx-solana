@@ -6,7 +6,7 @@ use anchor_client::{
 };
 use gmsol_store::{
     accounts, instruction,
-    states::user::{ReferralCode, ReferralCodeBytes},
+    states::user::{ReferralCode, ReferralCodeBytes, UserHeader},
 };
 
 use crate::utils::{RpcBuilder, ZeroCopy};
@@ -29,6 +29,14 @@ pub trait UserOps<C> {
         store: &Pubkey,
         code: ReferralCodeBytes,
         hint_referrer: Option<Pubkey>,
+    ) -> impl Future<Output = crate::Result<RpcBuilder<C>>>;
+
+    /// Transfer referral code.
+    fn transfer_referral_code(
+        &self,
+        store: &Pubkey,
+        receiver: &Pubkey,
+        hint_code: Option<ReferralCodeBytes>,
     ) -> impl Future<Output = crate::Result<RpcBuilder<C>>>;
 }
 
@@ -103,6 +111,45 @@ impl<C: Deref<Target = impl Signer> + Clone> UserOps<C> for crate::Client<C> {
                 referrer_user,
             })
             .args(instruction::SetReferrer { code });
+
+        Ok(rpc)
+    }
+
+    async fn transfer_referral_code(
+        &self,
+        store: &Pubkey,
+        receiver: &Pubkey,
+        hint_code: Option<ReferralCodeBytes>,
+    ) -> crate::Result<RpcBuilder<C>> {
+        let owner = self.payer();
+        let user = self.find_user_address(store, &owner);
+        let receiver_user = self.find_user_address(store, receiver);
+
+        let referral_code = match hint_code {
+            Some(code) => self.find_referral_code_address(store, code),
+            None => {
+                let user = self
+                    .account::<ZeroCopy<UserHeader>>(&user)
+                    .await?
+                    .ok_or(crate::Error::NotFound)?;
+                *user
+                    .0
+                    .referral()
+                    .code()
+                    .ok_or(crate::Error::invalid_argument("referral code is not set"))?
+            }
+        };
+
+        let rpc = self
+            .store_rpc()
+            .accounts(accounts::TransferReferralCode {
+                owner,
+                store: *store,
+                user,
+                referral_code,
+                receiver_user,
+            })
+            .args(instruction::TransferReferralCode {});
 
         Ok(rpc)
     }

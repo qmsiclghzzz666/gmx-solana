@@ -70,6 +70,42 @@ impl UserHeader {
     pub fn referral(&self) -> &Referral {
         &self.referral
     }
+
+    /// Transfer the ownership of the given code from this user to the receiver.
+    /// # CHECK
+    /// - `code` must be owned by current user.
+    /// - the store of `code` must be the same as current user and `receiver`.
+    /// # Errors
+    /// - `code` must be initialized.
+    /// - current user must be initialized.
+    /// - `receiver` must be initialized.
+    /// - the code of `receiver` must not have been set.
+    pub(crate) fn unchecked_transfer_code(
+        &mut self,
+        code: &mut ReferralCode,
+        receiver_user: &mut Self,
+    ) -> Result<()> {
+        require!(
+            code.code != ReferralCodeBytes::default(),
+            CoreError::PreconditionsAreNotMet
+        );
+        require!(self.is_initialized(), CoreError::InvalidUserAccount);
+        require!(
+            receiver_user.is_initialized(),
+            CoreError::InvalidUserAccount
+        );
+        require_eq!(
+            receiver_user.referral.code,
+            Pubkey::default(),
+            CoreError::PreconditionsAreNotMet
+        );
+
+        // Transfer the ownership.
+        receiver_user.referral.code = self.referral.code;
+        code.owner = receiver_user.owner;
+        self.referral.code = Pubkey::default();
+        Ok(())
+    }
 }
 
 impl Seed for UserHeader {
@@ -148,6 +184,15 @@ impl Referral {
             None
         } else {
             Some(&self.referrer)
+        }
+    }
+
+    /// Get the referral code account address.
+    pub fn code(&self) -> Option<&Pubkey> {
+        if self.code == Pubkey::default() {
+            None
+        } else {
+            Some(&self.code)
         }
     }
 }
