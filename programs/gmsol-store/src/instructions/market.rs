@@ -1,4 +1,5 @@
 use crate::{
+    ops::market::MarketTransferOut,
     states::{
         revertible::{Revertible, RevertibleSwapMarket},
         status::MarketStatus,
@@ -8,7 +9,10 @@ use crate::{
 };
 
 use anchor_lang::prelude::*;
-use anchor_spl::token::{Mint, Token, TokenAccount};
+use anchor_spl::{
+    associated_token::AssociatedToken,
+    token::{Mint, Token, TokenAccount},
+};
 use gmsol_model::{
     num::Unsigned, price::Prices, BalanceExt, BaseMarketMut, LiquidityMarketExt, PnlFactorKind,
     PoolExt,
@@ -289,78 +293,6 @@ pub(crate) fn unchecked_market_transfer_in(
 }
 
 impl<'info> internal::Authentication<'info> for MarketTransferIn<'info> {
-    fn authority(&self) -> &Signer<'info> {
-        &self.authority
-    }
-
-    fn store(&self) -> &AccountLoader<'info, Store> {
-        &self.store
-    }
-}
-
-/// The accounts definition for [`market_transfer_out`](crate::gmsol_store::market_transfer_out).
-///
-/// *[See also the documentation for the instruction.](crate::gmsol_store::market_transfer_out)*
-#[derive(Accounts)]
-pub struct MarketTransferOut<'info> {
-    pub authority: Signer<'info>,
-    pub store: AccountLoader<'info, Store>,
-    #[account(mut, has_one = store)]
-    pub market: AccountLoader<'info, Market>,
-    #[account(mut, token::mint = vault.mint, constraint = to.key() != vault.key())]
-    pub to: Account<'info, TokenAccount>,
-    #[account(
-        mut,
-        token::authority = store,
-        seeds = [
-            constants::MARKET_VAULT_SEED,
-            store.key().as_ref(),
-            vault.mint.as_ref(),
-            &[],
-        ],
-        bump,
-    )]
-    pub vault: Account<'info, TokenAccount>,
-    pub token_program: Program<'info, Token>,
-}
-
-/// Transfer some tokens out of the market.
-///
-/// ## CHECK
-/// - Only CONTROLLER can transfer out from the market.
-pub(crate) fn unchecked_market_transfer_out(
-    ctx: Context<MarketTransferOut>,
-    amount: u64,
-) -> Result<()> {
-    use crate::utils::internal::TransferUtils;
-
-    ctx.accounts
-        .market
-        .load()?
-        .validate(&ctx.accounts.store.key())?;
-
-    if amount != 0 {
-        TransferUtils::new(
-            ctx.accounts.token_program.to_account_info(),
-            &ctx.accounts.store,
-            None,
-        )
-        .transfer_out(
-            ctx.accounts.vault.to_account_info(),
-            ctx.accounts.to.to_account_info(),
-            amount,
-        )?;
-        let token = &ctx.accounts.vault.mint;
-        ctx.accounts
-            .market
-            .load_mut()?
-            .record_transferred_out_by_token(token, amount)?;
-    }
-
-    Ok(())
-}
-
-impl<'info> internal::Authentication<'info> for MarketTransferOut<'info> {
     fn authority(&self) -> &Signer<'info> {
         &self.authority
     }
@@ -685,48 +617,88 @@ pub struct ClaimFeesFromMarket<'info> {
     store: AccountLoader<'info, Store>,
     #[account(mut, has_one = store)]
     market: AccountLoader<'info, Market>,
+    token_mint: InterfaceAccount<'info, anchor_spl::token_interface::Mint>,
+    #[account(
+        mut,
+        token::mint = token_mint,
+        token::authority = store,
+        token::token_program = token_program,
+        seeds = [
+            constants::MARKET_VAULT_SEED,
+            store.key().as_ref(),
+            token_mint.key().as_ref(),
+            &[],
+        ],
+        bump,
+    )]
+    vault: InterfaceAccount<'info, anchor_spl::token_interface::TokenAccount>,
+    #[account(
+        mut,
+        associated_token::authority = authority,
+        associated_token::mint = token_mint,
+        associated_token::token_program = token_program,
+    )]
+    target: InterfaceAccount<'info, anchor_spl::token_interface::TokenAccount>,
+    token_program: Interface<'info, anchor_spl::token_interface::TokenInterface>,
+    associated_token_program: Program<'info, AssociatedToken>,
 }
 
 /// Claim fees from the market.
 ///
-/// ## CHECK
-/// - Only CONTROLLER can claim fees.
-pub(crate) fn unchecked_claim_fees_from_market(
-    ctx: Context<ClaimFeesFromMarket>,
-    token: &Pubkey,
-) -> gmsol_model::Result<u64> {
-    let mut market = RevertibleSwapMarket::from_market((&ctx.accounts.market).try_into()?)?;
-    let is_long_token = market.market_meta().to_token_side(token)?;
-    let pool = market.claimable_fee_pool_mut()?;
+/// # Errors
+/// - Only the receiver of treasury can claim fees.
+pub(crate) fn claim_fees_from_market(ctx: Context<ClaimFeesFromMarket>) -> Result<u64> {
+    // Validate the authority to be the receiver for the treasury.
+    ctx.accounts
+        .store
+        .load()?
+        .validate_claim_fees_address(ctx.accounts.authority.key)?;
 
-    // Saturating claim all fees from the pool.
-    let amount: u64 = pool
-        .amount(is_long_token)?
-        .min(u128::from(u64::MAX))
-        .try_into()
-        .expect("must success");
+    let amount = {
+        let token = ctx.accounts.token_mint.key();
+        let mut market = RevertibleSwapMarket::from_market((&ctx.accounts.market).try_into()?)?;
+        let is_long_token = market.market_meta().to_token_side(&token)?;
+        let pool = market.claimable_fee_pool_mut().map_err(ModelError::from)?;
 
-    let delta = (u128::from(amount)).to_opposite_signed()?;
-    pool.apply_delta_amount(is_long_token, &delta)?;
+        // Saturating claim all fees from the pool.
+        let amount: u64 = pool
+            .amount(is_long_token)
+            .map_err(ModelError::from)?
+            .min(u128::from(u64::MAX))
+            .try_into()
+            .expect("must success");
 
-    market.validate_market_balance_for_the_given_token(token, amount)?;
-    market.commit();
+        let delta = (u128::from(amount))
+            .to_opposite_signed()
+            .map_err(ModelError::from)?;
+        pool.apply_delta_amount(is_long_token, &delta)
+            .map_err(ModelError::from)?;
+
+        market.validate_market_balance_for_the_given_token(&token, amount)?;
+        market.commit();
+
+        amount
+    };
+
+    // Transfer out the tokens.
+    let token = &ctx.accounts.token_mint;
+    MarketTransferOut::builder()
+        .store(&ctx.accounts.store)
+        .market(&ctx.accounts.market)
+        .amount(amount)
+        .decimals(token.decimals)
+        .to(ctx.accounts.target.to_account_info())
+        .token_mint(token.to_account_info())
+        .vault(ctx.accounts.vault.to_account_info())
+        .token_program(ctx.accounts.token_program.to_account_info())
+        .build()
+        .execute()?;
 
     msg!(
         "Claimed `{}` {} from the {} market",
         amount,
-        token,
+        token.key(),
         ctx.accounts.market.load()?.meta.market_token_mint
     );
     Ok(amount)
-}
-
-impl<'info> internal::Authentication<'info> for ClaimFeesFromMarket<'info> {
-    fn authority(&self) -> &Signer<'info> {
-        &self.authority
-    }
-
-    fn store(&self) -> &AccountLoader<'info, Store> {
-        &self.store
-    }
 }

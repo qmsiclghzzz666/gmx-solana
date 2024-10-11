@@ -1,9 +1,10 @@
 use std::ops::Deref;
 
 use anchor_client::solana_sdk::{pubkey::Pubkey, signer::Signer};
-use gmsol_store::states::Store;
+use anchor_spl::associated_token::get_associated_token_address_with_program_id;
+use gmsol_store::{accounts, instruction};
 
-use crate::utils::RpcBuilder;
+use crate::{store::token::TokenAccountOps, utils::RpcBuilder};
 
 /// Claim fees builder.
 // TODO: implement this.
@@ -13,8 +14,7 @@ pub struct ClaimFeesBuilder<'a, C> {
     store: Pubkey,
     market_token: Pubkey,
     is_long_token: bool,
-    store_hint: Option<Store>,
-    token: Option<Pubkey>,
+    hint_token: Option<Pubkey>,
 }
 
 impl<'a, C: Deref<Target = impl Signer> + Clone> ClaimFeesBuilder<'a, C> {
@@ -30,20 +30,55 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> ClaimFeesBuilder<'a, C> {
             store: *store,
             market_token: *market_token,
             is_long_token,
-            store_hint: None,
-            token: None,
+            hint_token: None,
         }
     }
 
     /// Set hint.
-    pub fn set_hint(&mut self, store: Store, token: Pubkey) -> &mut Self {
-        self.store_hint = Some(store);
-        self.token = Some(token);
+    pub fn set_hint(&mut self, token: Pubkey) -> &mut Self {
+        self.hint_token = Some(token);
         self
     }
 
     /// Build.
     pub async fn build(&self) -> crate::Result<RpcBuilder<'a, C>> {
-        todo!()
+        let market = self
+            .client
+            .find_market_address(&self.store, &self.market_token);
+        let token = match self.hint_token {
+            Some(token) => token,
+            None => {
+                let market = self.client.market(&market).await?;
+                market.meta().pnl_token(self.is_long_token)
+            }
+        };
+
+        let authority = self.client.payer();
+        let vault = self.client.find_market_vault_address(&self.store, &token);
+        // FIXME: read program id from the market.
+        let token_program = anchor_spl::token::ID;
+        let target =
+            get_associated_token_address_with_program_id(&authority, &token, &token_program);
+
+        let prepare = self
+            .client
+            .prepare_associated_token_account(&token, &token_program);
+
+        let rpc = self
+            .client
+            .store_rpc()
+            .accounts(accounts::ClaimFeesFromMarket {
+                authority,
+                store: self.store,
+                market,
+                token_mint: token,
+                vault,
+                target,
+                token_program,
+                associated_token_program: anchor_spl::associated_token::ID,
+            })
+            .args(instruction::ClaimFeesFromMarket {});
+
+        Ok(prepare.merge(rpc))
     }
 }

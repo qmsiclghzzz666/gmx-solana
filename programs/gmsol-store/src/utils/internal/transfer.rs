@@ -1,19 +1,19 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{Burn, MintTo, Transfer};
+use anchor_spl::token_interface::{burn, mint_to, transfer_checked, Burn, MintTo, TransferChecked};
 
-use crate::{states::Store, CoreError};
+use crate::states::Store;
 
 pub(crate) struct TransferUtils<'a, 'info> {
     store: &'a AccountLoader<'info, Store>,
     token_program: AccountInfo<'info>,
-    mint: Option<AccountInfo<'info>>,
+    mint: AccountInfo<'info>,
 }
 
 impl<'a, 'info> TransferUtils<'a, 'info> {
     pub(crate) fn new(
         token_program: AccountInfo<'info>,
         store: &'a AccountLoader<'info, Store>,
-        mint: Option<AccountInfo<'info>>,
+        mint: AccountInfo<'info>,
     ) -> Self {
         Self {
             token_program,
@@ -23,7 +23,7 @@ impl<'a, 'info> TransferUtils<'a, 'info> {
     }
 
     pub(crate) fn mint_to(&self, to: &AccountInfo<'info>, amount: u64) -> Result<()> {
-        anchor_spl::token::mint_to(
+        mint_to(
             self.mint_to_ctx(to)?
                 .with_signer(&[&self.store.load()?.pda_seeds()]),
             amount,
@@ -31,7 +31,7 @@ impl<'a, 'info> TransferUtils<'a, 'info> {
     }
 
     pub(crate) fn burn_from(&self, from: &AccountInfo<'info>, amount: u64) -> Result<()> {
-        anchor_spl::token::burn(
+        burn(
             self.burn_ctx(from)?
                 .with_signer(&[&self.store.load()?.pda_seeds()]),
             amount,
@@ -43,11 +43,13 @@ impl<'a, 'info> TransferUtils<'a, 'info> {
         from: AccountInfo<'info>,
         to: AccountInfo<'info>,
         amount: u64,
+        decimals: u8,
     ) -> Result<()> {
-        anchor_spl::token::transfer(
+        transfer_checked(
             self.transfer_ctx(from, to)
                 .with_signer(&[&self.store.load()?.pda_seeds()]),
             amount,
+            decimals,
         )
     }
 
@@ -55,13 +57,14 @@ impl<'a, 'info> TransferUtils<'a, 'info> {
         &self,
         from: AccountInfo<'info>,
         to: AccountInfo<'info>,
-    ) -> CpiContext<'_, '_, '_, 'info, Transfer<'info>> {
+    ) -> CpiContext<'_, '_, '_, 'info, TransferChecked<'info>> {
         CpiContext::new(
             self.token_program.clone(),
-            Transfer {
+            TransferChecked {
                 from,
                 to,
                 authority: self.store.to_account_info(),
+                mint: self.mint.to_account_info(),
             },
         )
     }
@@ -73,11 +76,7 @@ impl<'a, 'info> TransferUtils<'a, 'info> {
         Ok(CpiContext::new(
             self.token_program.clone(),
             MintTo {
-                mint: self
-                    .mint
-                    .as_ref()
-                    .ok_or(CoreError::TokenMintNotProvided)?
-                    .to_account_info(),
+                mint: self.mint.to_account_info(),
                 to: receiver.clone(),
                 authority: self.store.to_account_info(),
             },
@@ -91,11 +90,7 @@ impl<'a, 'info> TransferUtils<'a, 'info> {
         Ok(CpiContext::new(
             self.token_program.clone(),
             Burn {
-                mint: self
-                    .mint
-                    .as_ref()
-                    .ok_or(CoreError::TokenMintNotProvided)?
-                    .to_account_info(),
+                mint: self.mint.to_account_info(),
                 from: vault.clone(),
                 authority: self.store.to_account_info(),
             },

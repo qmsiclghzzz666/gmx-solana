@@ -232,6 +232,8 @@ pub(crate) fn unchecked_process_position_cut<'info>(
         .user(&accounts.user)
         .nonce(nonce)
         .order_bump(ctx.bumps.order)
+        .long_token_mint(&accounts.long_token)
+        .short_token_mint(&accounts.short_token)
         .long_token_account(&accounts.long_token_escrow)
         .long_token_vault(&accounts.long_token_vault)
         .short_token_account(&accounts.short_token_escrow)

@@ -81,7 +81,7 @@ impl Store {
         self.key_seed = to_seed(key);
         self.bump = [bump];
         self.authority = authority;
-        self.treasury.init(authority, authority);
+        self.treasury.init(authority);
         self.amount.init();
         self.factor.init();
         self.address.init(authority);
@@ -231,10 +231,18 @@ impl Store {
         &self.address.holding
     }
 
+    /// Set the receiver address of the treasury.
+    /// # CHECK
+    /// - Must be called by current receiver.
+    pub(crate) fn unchecked_set_receiver(&mut self, address: &Pubkey) -> Result<()> {
+        self.treasury.receiver = *address;
+        Ok(())
+    }
+
     /// Validate whether fees can be claimed by this address.
     pub fn validate_claim_fees_address(&self, address: &Pubkey) -> Result<()> {
         require!(
-            self.treasury.is_receiver(address) || self.treasury.is_treasury(address),
+            self.treasury.is_receiver(address),
             CoreError::PermissionDenied
         );
         Ok(())
@@ -243,16 +251,6 @@ impl Store {
     /// Get the recevier address.
     pub fn receiver(&self) -> Pubkey {
         self.treasury.receiver
-    }
-
-    /// Get the treasury address.
-    pub fn treasury(&self) -> Pubkey {
-        self.treasury.treasury
-    }
-
-    /// Get the treasury factor.
-    pub fn treasury_factor(&self) -> u128 {
-        self.treasury.treasury_factor
     }
 
     /// Get GT State.
@@ -315,37 +313,23 @@ impl Store {
 pub struct Treasury {
     /// Receiver.
     receiver: Pubkey,
-    /// Treasury.
-    treasury: Pubkey,
-    /// Treasury claim factor.
-    treasury_factor: u128,
-    /// Next treasury claim factor.
-    next_treasury_factor: u128,
+    reserved: [u8; 128],
 }
 
 #[cfg(feature = "display")]
 impl std::fmt::Display for Treasury {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{{ receiver={}, treasury={}, treasury_factor={} }}",
-            self.receiver, self.treasury, self.treasury_factor
-        )
+        write!(f, "{{ receiver={} }}", self.receiver,)
     }
 }
 
 impl Treasury {
-    fn init(&mut self, receiver: Pubkey, treasury: Pubkey) {
+    fn init(&mut self, receiver: Pubkey) {
         self.receiver = receiver;
-        self.treasury = treasury;
     }
 
     fn is_receiver(&self, address: &Pubkey) -> bool {
-        *address == self.receiver
-    }
-
-    fn is_treasury(&self, address: &Pubkey) -> bool {
-        *address == self.treasury
+        self.receiver == *address
     }
 }
 

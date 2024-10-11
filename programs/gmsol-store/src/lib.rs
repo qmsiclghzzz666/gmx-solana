@@ -195,6 +195,11 @@ pub mod gmsol_store {
         instructions::unchecked_transfer_store_authority(ctx, new_authority)
     }
 
+    /// Set the receiver address.
+    pub fn set_receiver(ctx: Context<SetReceiver>) -> Result<()> {
+        instructions::set_receiver(ctx)
+    }
+
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn set_token_map(ctx: Context<SetTokenMap>) -> Result<()> {
         instructions::unchecked_set_token_map(ctx)
@@ -693,21 +698,6 @@ pub mod gmsol_store {
         instructions::unchecked_market_transfer_in(ctx, amount)
     }
 
-    /// Transfer tokens out from the market and record in its balance.
-    ///
-    /// # Accounts
-    /// [*See the documentation for the accounts.*](MarketTransferOut)
-    ///
-    /// # Arguments
-    /// - `amount`: The amount to transfer out.
-    ///
-    /// # Errors
-    /// - *TODO*
-    #[access_control(internal::Authenticate::only_controller(&ctx))]
-    pub fn market_transfer_out(ctx: Context<MarketTransferOut>, amount: u64) -> Result<()> {
-        instructions::unchecked_market_transfer_out(ctx, amount)
-    }
-
     /// Get the [meta](states::MarketMeta) of the market without validation.
     ///
     /// # Errors
@@ -905,25 +895,21 @@ pub mod gmsol_store {
     /// # Accounts
     /// [*See the documentation for the accounts.*](ClaimFeesFromMarket)
     ///
-    /// # Arguments
-    /// - `token`: The token to claim.
-    ///
     /// # Return
-    /// - Returns the amount to be claimed.
+    /// - Returns the claimed amount.
     ///
     /// # Errors
-    /// - The [`authority`](ClaimFeesFromMarket) must be a signer and a CONTROLLER
+    /// - The [`authority`](ClaimFeesFromMarket) must be a signer and be the receiver
     /// in the given store.
     /// - The [`store`](ClaimFeesFromMarket) must be an initialized [`Store`](crate::states::Store)
     /// account owned by this store program.
     /// - The [`market`](ClaimFeesFromMarket) must be an initialized [`Market`](crate::states::Market)
     /// account owned by this store program, whose the store must be the given one.
     /// - The `token` must be one of the collateral token.
+    /// - Token accounts must be matched.
     /// - The market balance validation must pass after the claim.
-    #[access_control(internal::Authenticate::only_controller(&ctx))]
-    pub fn claim_fees_from_market(ctx: Context<ClaimFeesFromMarket>, token: Pubkey) -> Result<u64> {
-        let claimed = instructions::unchecked_claim_fees_from_market(ctx, &token)
-            .map_err(ModelError::from)?;
+    pub fn claim_fees_from_market(ctx: Context<ClaimFeesFromMarket>) -> Result<u64> {
+        let claimed = instructions::claim_fees_from_market(ctx)?;
         Ok(claimed)
     }
 

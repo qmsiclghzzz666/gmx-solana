@@ -2,7 +2,10 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::TokenAccount;
 use typed_builder::TypedBuilder;
 
-use crate::states::{Market, Store};
+use crate::{
+    states::{Market, Store},
+    CoreError,
+};
 
 /// Market Transfer In.
 #[derive(TypedBuilder)]
@@ -53,8 +56,10 @@ pub(crate) struct MarketTransferOut<'a, 'info> {
     store: &'a AccountLoader<'info, Store>,
     market: &'a AccountLoader<'info, Market>,
     amount: u64,
+    decimals: u8,
     to: AccountInfo<'info>,
-    vault: &'a Account<'info, TokenAccount>,
+    token_mint: AccountInfo<'info>,
+    vault: AccountInfo<'info>,
     token_program: AccountInfo<'info>,
 }
 
@@ -62,13 +67,25 @@ impl<'a, 'info> MarketTransferOut<'a, 'info> {
     pub(crate) fn execute(self) -> Result<()> {
         use crate::utils::internal::TransferUtils;
 
-        self.market.load()?.validate(&self.store.key())?;
+        {
+            let market = self.market.load()?;
+            let meta = market.validated_meta(&self.store.key())?;
+            require!(
+                meta.is_collateral_token(&self.token_mint.key()),
+                CoreError::InvalidCollateralToken
+            );
+        }
 
         let amount = self.amount;
         if amount != 0 {
-            TransferUtils::new(self.token_program.to_account_info(), self.store, None)
-                .transfer_out(self.vault.to_account_info(), self.to, amount)?;
-            let token = &self.vault.mint;
+            let decimals = self.decimals;
+            TransferUtils::new(
+                self.token_program.to_account_info(),
+                self.store,
+                self.token_mint.to_account_info(),
+            )
+            .transfer_out(self.vault.to_account_info(), self.to, amount, decimals)?;
+            let token = &self.token_mint.key();
             self.market
                 .load_mut()?
                 .record_transferred_out_by_token(token, amount)?;

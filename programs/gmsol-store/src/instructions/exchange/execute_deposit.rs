@@ -247,12 +247,18 @@ impl<'info> ExecuteDepositV2<'info> {
                 .initial_long_token_vault
                 .as_ref()
                 .ok_or(error!(CoreError::TokenAccountNotProvided))?;
+            let token = self
+                .initial_long_token
+                .as_ref()
+                .ok_or(error!(CoreError::TokenMintNotProvided))?;
             builder
                 .clone()
                 .market(&market)
                 .to(escrow.to_account_info())
-                .vault(vault)
+                .vault(vault.to_account_info())
                 .amount(self.deposit.load()?.params.initial_long_token_amount)
+                .decimals(token.decimals)
+                .token_mint(token.to_account_info())
                 .build()
                 .execute()?;
         }
@@ -268,11 +274,17 @@ impl<'info> ExecuteDepositV2<'info> {
                 .initial_short_token_vault
                 .as_ref()
                 .ok_or(error!(CoreError::TokenAccountNotProvided))?;
+            let token = self
+                .initial_short_token
+                .as_ref()
+                .ok_or(error!(CoreError::TokenMintNotProvided))?;
             builder
                 .market(&market)
                 .to(escrow.to_account_info())
-                .vault(vault)
+                .vault(vault.to_account_info())
                 .amount(self.deposit.load()?.params.initial_short_token_amount)
+                .decimals(token.decimals)
+                .token_mint(token.to_account_info())
                 .build()
                 .execute()?;
         }

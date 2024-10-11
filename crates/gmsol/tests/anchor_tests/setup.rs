@@ -2,11 +2,12 @@ use std::{
     collections::{hash_map::Entry, HashMap},
     fmt,
     future::Future,
+    pin::Pin,
     sync::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
         Arc,
     },
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use anchor_client::{
@@ -52,6 +53,7 @@ const ENV_GMSOL_RANDOM_STORE: &str = "GMSOL_RANDOM_STORE";
 const ENV_GMSOL_RNG: &str = "GMSOL_RNG";
 const ENV_GMSOL_KEEPER: &str = "GMSOL_KEEPER";
 const ENV_GMSOL_REFUND_WAIT: &str = "GMSOL_REFUND_WAIT";
+const ENV_GMSOL_CLAIM_FEES_WAIT: &str = "GMSOL_CLAIM_FEES_WAIT";
 
 /// Deployment.
 pub struct Deployment {
@@ -84,6 +86,7 @@ pub struct Deployment {
     market_tokens: HashMap<[String; 3], Pubkey>,
     common_alt: AddressLookupTableAccount,
     market_alt: AddressLookupTableAccount,
+    claim_fees_enabled_at: Instant,
 }
 
 impl fmt::Debug for Deployment {
@@ -171,6 +174,7 @@ impl Deployment {
                 key: market_alt,
                 addresses: vec![],
             },
+            claim_fees_enabled_at: Instant::now(),
         })
     }
 
@@ -240,6 +244,8 @@ impl Deployment {
         self.initialize_alts().await?;
 
         self.initialize_gt(7).await?;
+
+        self.initialize_claim_fees_sleep().await?;
 
         Ok(())
     }
@@ -764,6 +770,16 @@ impl Deployment {
         Ok(())
     }
 
+    async fn initialize_claim_fees_sleep(&mut self) -> eyre::Result<()> {
+        let wait = match std::env::var(ENV_GMSOL_CLAIM_FEES_WAIT) {
+            Ok(wait) => Duration::from_secs(wait.parse()?),
+            _ => Duration::from_secs(60),
+        };
+        self.claim_fees_enabled_at = Instant::now() + wait;
+
+        Ok(())
+    }
+
     async fn fund_users(&self) -> eyre::Result<()> {
         const LAMPORTS: u64 = 500_000_000;
 
@@ -1105,6 +1121,10 @@ impl Deployment {
 
     pub(crate) fn market_alt(&self) -> &AddressLookupTableAccount {
         &self.market_alt
+    }
+
+    pub(crate) async fn wait_until_claim_fees_enabled(&self) {
+        tokio::time::sleep_until(self.claim_fees_enabled_at.into()).await
     }
 }
 

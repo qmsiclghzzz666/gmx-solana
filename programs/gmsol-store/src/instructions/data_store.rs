@@ -126,3 +126,34 @@ pub struct ReadStore<'info> {
 pub(crate) fn get_token_map(ctx: Context<ReadStore>) -> Result<Option<Pubkey>> {
     Ok(ctx.accounts.store.load()?.token_map().copied())
 }
+
+/// Set the receiver for treasury.
+#[derive(Accounts)]
+pub struct SetReceiver<'info> {
+    /// The caller of this instruction.
+    #[account(
+        constraint = authority.key() == store.load()?.receiver() @ CoreError::PermissionDenied,
+    )]
+    pub authority: Signer<'info>,
+    /// The store account whose authority is to be transferred.
+    #[account(mut)]
+    pub store: AccountLoader<'info, Store>,
+    /// New receiver.
+    /// CHECK: only the address is used.
+    #[account(
+        constraint = receiver.key() != authority.key() @ CoreError::PreconditionsAreNotMet,
+    )]
+    pub receiver: UncheckedAccount<'info>,
+}
+
+pub(crate) fn set_receiver(ctx: Context<SetReceiver>) -> Result<()> {
+    ctx.accounts
+        .store
+        .load_mut()?
+        .unchecked_set_receiver(ctx.accounts.receiver.key)?;
+    msg!(
+        "[Treasury] the receiver is now {}",
+        ctx.accounts.receiver.key
+    );
+    Ok(())
+}

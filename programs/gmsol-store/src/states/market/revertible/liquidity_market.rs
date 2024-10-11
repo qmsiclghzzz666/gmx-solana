@@ -100,11 +100,7 @@ impl<'a, 'info> RevertibleLiquidityMarket<'a, 'info> {
             immutable_total_borrowing_pool: market
                 .get_pool_from_storage(PoolKind::TotalBorrowing)?,
             market: RevertibleSwapMarket::from_market(market)?,
-            transfer: TransferUtils::new(
-                token_program,
-                store,
-                Some(market_token.to_account_info()),
-            ),
+            transfer: TransferUtils::new(token_program, store, market_token.to_account_info()),
             market_token,
             receiver: None,
             vault: None,

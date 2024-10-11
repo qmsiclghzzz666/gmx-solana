@@ -428,14 +428,20 @@ impl<'info> ExecuteOrderV2<'info> {
                 .initial_collateral_token_vault
                 .as_ref()
                 .ok_or(error!(CoreError::TokenAccountNotProvided))?;
+            let token = self
+                .initial_collateral_token
+                .as_ref()
+                .ok_or(error!(CoreError::TokenMintNotProvided))?;
             let amount = self.order.load()?.params.initial_collateral_delta_amount;
             MarketTransferOut::builder()
                 .store(&self.store)
                 .token_program(self.token_program.to_account_info())
                 .market(&market)
                 .to(escrow.to_account_info())
-                .vault(vault)
+                .vault(vault.to_account_info())
                 .amount(amount)
+                .decimals(token.decimals)
+                .token_mint(token.to_account_info())
                 .build()
                 .execute()?;
         }
@@ -499,6 +505,7 @@ impl<'info> ExecuteOrderV2<'info> {
             .store(&self.store)
             .market(&self.market)
             .is_pnl_token_long_token(is_pnl_token_long_token)
+            .final_output_token(self.final_output_token.as_deref())
             .final_output_market(&final_output_market)
             .final_output_token_account(
                 self.final_output_token_escrow
@@ -506,8 +513,10 @@ impl<'info> ExecuteOrderV2<'info> {
                     .map(|a| a.to_account_info()),
             )
             .final_output_token_vault(self.final_output_token_vault.as_deref())
+            .long_token(self.long_token.as_deref())
             .long_token_account(self.long_token_escrow.as_ref().map(|a| a.to_account_info()))
             .long_token_vault(self.long_token_vault.as_deref())
+            .short_token(self.short_token.as_deref())
             .short_token_account(
                 self.short_token_escrow
                     .as_ref()
@@ -835,10 +844,13 @@ impl<'info> ExecuteDecreaseOrder<'info> {
             .market(&self.market)
             .is_pnl_token_long_token(is_pnl_token_long_token)
             .final_output_market(&final_output_market)
+            .final_output_token(Some(&self.final_output_token))
             .final_output_token_account(Some(self.final_output_token_escrow.to_account_info()))
             .final_output_token_vault(Some(&*self.final_output_token_vault))
+            .long_token(Some(&self.long_token))
             .long_token_account(Some(self.long_token_escrow.to_account_info()))
             .long_token_vault(Some(&*self.long_token_vault))
+            .short_token(Some(&self.short_token))
             .short_token_account(Some(self.short_token_escrow.to_account_info()))
             .short_token_vault(Some(&*self.short_token_vault))
             .claimable_long_token_account_for_user(Some(

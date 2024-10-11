@@ -163,10 +163,16 @@ impl<'info> ExecuteShift<'info> {
         use crate::internal::TransferUtils;
 
         let amount = self.shift.load()?.params.from_market_token_amount();
-        TransferUtils::new(self.token_program.to_account_info(), &self.store, None).transfer_out(
+        TransferUtils::new(
+            self.token_program.to_account_info(),
+            &self.store,
+            self.from_market_token.to_account_info(),
+        )
+        .transfer_out(
             self.from_market_token_vault.to_account_info(),
             self.from_market_token_escrow.to_account_info(),
             amount,
+            self.from_market_token.decimals,
         )?;
 
         Ok(())

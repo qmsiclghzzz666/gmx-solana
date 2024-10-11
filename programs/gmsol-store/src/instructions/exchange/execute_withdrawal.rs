@@ -234,10 +234,16 @@ impl<'info> ExecuteWithdrawalV2<'info> {
         use crate::internal::TransferUtils;
 
         let amount = self.withdrawal.load()?.params.market_token_amount;
-        TransferUtils::new(self.token_program.to_account_info(), &self.store, None).transfer_out(
+        TransferUtils::new(
+            self.token_program.to_account_info(),
+            &self.store,
+            self.market_token.to_account_info(),
+        )
+        .transfer_out(
             self.market_token_vault.to_account_info(),
             self.market_token_escrow.to_account_info(),
             amount,
+            self.market_token.decimals,
         )?;
 
         Ok(())
@@ -263,12 +269,15 @@ impl<'info> ExecuteWithdrawalV2<'info> {
                 .unwrap_or(self.market.clone());
             let vault = &self.final_long_token_vault;
             let escrow = &self.final_long_token_escrow;
+            let token = &self.final_long_token;
             builder
                 .clone()
                 .market(&market)
                 .to(escrow.to_account_info())
-                .vault(vault)
+                .vault(vault.to_account_info())
                 .amount(final_long_token_amount)
+                .decimals(token.decimals)
+                .token_mint(token.to_account_info())
                 .build()
                 .execute()?;
         }
@@ -282,11 +291,14 @@ impl<'info> ExecuteWithdrawalV2<'info> {
                 .unwrap_or(self.market.clone());
             let vault = &self.final_short_token_vault;
             let escrow = &self.final_short_token_escrow;
+            let token = &self.final_short_token;
             builder
                 .market(&market)
                 .to(escrow.to_account_info())
-                .vault(vault)
+                .vault(vault.to_account_info())
                 .amount(final_short_token_amount)
+                .decimals(token.decimals)
+                .token_mint(token.to_account_info())
                 .build()
                 .execute()?;
         }

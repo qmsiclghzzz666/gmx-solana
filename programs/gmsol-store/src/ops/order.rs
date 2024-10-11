@@ -1,5 +1,5 @@
 use anchor_lang::{prelude::*, system_program};
-use anchor_spl::token::TokenAccount;
+use anchor_spl::token::{Mint, TokenAccount};
 use gmsol_model::{
     num::Unsigned, price::Prices, BaseMarket, BaseMarketExt, PnlFactorKind, Position as _,
     PositionImpactMarketMutExt, PositionMut, PositionMutExt, PositionState, PositionStateExt,
@@ -376,17 +376,14 @@ pub(crate) struct ProcessTransferOut<'a, 'info> {
     is_pnl_token_long_token: bool,
     #[builder(default, setter(strip_option))]
     final_output_market: Option<&'a AccountLoader<'info, Market>>,
-    #[builder(default)]
+    final_output_token: Option<&'a Account<'info, Mint>>,
     final_output_token_account: Option<AccountInfo<'info>>,
-    #[builder(default)]
     final_output_token_vault: Option<&'a Account<'info, TokenAccount>>,
-    #[builder(default)]
+    long_token: Option<&'a Account<'info, Mint>>,
     long_token_account: Option<AccountInfo<'info>>,
-    #[builder(default)]
     long_token_vault: Option<&'a Account<'info, TokenAccount>>,
-    #[builder(default)]
+    short_token: Option<&'a Account<'info, Mint>>,
     short_token_account: Option<AccountInfo<'info>>,
-    #[builder(default)]
     short_token_vault: Option<&'a Account<'info, TokenAccount>>,
     pub(crate) claimable_long_token_account_for_user: Option<AccountInfo<'info>>,
     pub(crate) claimable_short_token_account_for_user: Option<AccountInfo<'info>>,
@@ -409,13 +406,15 @@ impl<'a, 'info> ProcessTransferOut<'a, 'info> {
         } = self.transfer_out;
 
         if *final_output_token != 0 {
-            let (market, vault, account) = self.final_output()?;
+            let (token, market, vault, account) = self.final_output()?;
             MarketTransferOut::builder()
                 .store(self.store)
                 .market(market)
                 .amount(*final_output_token)
                 .to(account.clone())
-                .vault(vault)
+                .vault(vault.to_account_info())
+                .decimals(token.decimals)
+                .token_mint(token.to_account_info())
                 .token_program(self.token_program.clone())
                 .build()
                 .execute()?;
@@ -438,78 +437,90 @@ impl<'a, 'info> ProcessTransferOut<'a, 'info> {
         };
 
         if long_token_amount != 0 {
-            let (vault, account) = self.long_token()?;
+            let (token, vault, account) = self.long_token()?;
             MarketTransferOut::builder()
                 .store(self.store)
                 .token_program(self.token_program.clone())
                 .market(self.market)
                 .amount(long_token_amount)
-                .vault(vault)
+                .vault(vault.to_account_info())
+                .decimals(token.decimals)
+                .token_mint(token.to_account_info())
                 .to(account.clone())
                 .build()
                 .execute()?;
         }
 
         if short_token_amount != 0 {
-            let (vault, account) = self.short_token()?;
+            let (token, vault, account) = self.short_token()?;
             MarketTransferOut::builder()
                 .store(self.store)
                 .token_program(self.token_program.clone())
                 .market(self.market)
                 .amount(short_token_amount)
-                .vault(vault)
+                .vault(vault.to_account_info())
+                .decimals(token.decimals)
+                .token_mint(token.to_account_info())
                 .to(account.clone())
                 .build()
                 .execute()?;
         }
 
         if *long_token_for_claimable_account_of_user != 0 {
-            let (vault, account) = self.claimable_long_token_account_for_user()?;
+            let (token, vault, account) = self.claimable_long_token_account_for_user()?;
             MarketTransferOut::builder()
                 .store(self.store)
                 .token_program(self.token_program.clone())
                 .market(self.market)
                 .amount(*long_token_for_claimable_account_of_user)
-                .vault(vault)
+                .vault(vault.to_account_info())
+                .decimals(token.decimals)
+                .token_mint(token.to_account_info())
                 .to(account.clone())
                 .build()
                 .execute()?;
         }
 
         if *short_token_for_claimable_account_of_user != 0 {
-            let (vault, account) = self.claimable_short_token_account_for_user()?;
+            let (token, vault, account) = self.claimable_short_token_account_for_user()?;
             MarketTransferOut::builder()
                 .store(self.store)
                 .token_program(self.token_program.clone())
                 .market(self.market)
                 .amount(*short_token_for_claimable_account_of_user)
-                .vault(vault)
+                .vault(vault.to_account_info())
+                .decimals(token.decimals)
+                .token_mint(token.to_account_info())
                 .to(account.clone())
                 .build()
                 .execute()?;
         }
 
         if *long_token_for_claimable_account_of_holding != 0 {
-            let (vault, account) = self.claimable_long_token_account_for_holding()?;
+            let (token, vault, account) = self.claimable_long_token_account_for_holding()?;
             MarketTransferOut::builder()
                 .store(self.store)
                 .token_program(self.token_program.clone())
                 .market(self.market)
                 .amount(*long_token_for_claimable_account_of_holding)
-                .vault(vault)
+                .vault(vault.to_account_info())
+                .decimals(token.decimals)
+                .token_mint(token.to_account_info())
                 .to(account.clone())
                 .build()
                 .execute()?;
         }
 
         if *short_token_for_claimable_account_of_holding != 0 {
-            let (vault, account) = self.claimable_short_token_account_for_holding()?;
+            let (token, vault, account) = self.claimable_short_token_account_for_holding()?;
             MarketTransferOut::builder()
                 .store(self.store)
                 .token_program(self.token_program.clone())
                 .market(self.market)
                 .amount(*short_token_for_claimable_account_of_holding)
-                .vault(vault)
+                .vault(vault.to_account_info())
+                .decimals(token.decimals)
+                .token_mint(token.to_account_info())
                 .to(account.clone())
                 .build()
                 .execute()?;
@@ -517,13 +528,18 @@ impl<'a, 'info> ProcessTransferOut<'a, 'info> {
         Ok(())
     }
 
+    #[allow(clippy::type_complexity)]
     fn final_output(
         &self,
     ) -> Result<(
+        &Account<'info, Mint>,
         &AccountLoader<'info, Market>,
         &Account<'info, TokenAccount>,
         &AccountInfo<'info>,
     )> {
+        let token = self
+            .final_output_token
+            .ok_or(error!(CoreError::TokenMintNotProvided))?;
         let market = self
             .final_output_market
             .ok_or(error!(CoreError::MarketMismatched))?;
@@ -535,10 +551,19 @@ impl<'a, 'info> ProcessTransferOut<'a, 'info> {
             .final_output_token_account
             .as_ref()
             .ok_or(error!(CoreError::TokenAccountNotProvided))?;
-        Ok((market, vault, account))
+        Ok((token, market, vault, account))
     }
 
-    fn long_token(&self) -> Result<(&Account<'info, TokenAccount>, &AccountInfo<'info>)> {
+    fn long_token(
+        &self,
+    ) -> Result<(
+        &Account<'info, Mint>,
+        &Account<'info, TokenAccount>,
+        &AccountInfo<'info>,
+    )> {
+        let token = self
+            .long_token
+            .ok_or(error!(CoreError::TokenMintNotProvided))?;
         let vault = self
             .long_token_vault
             .as_ref()
@@ -547,10 +572,19 @@ impl<'a, 'info> ProcessTransferOut<'a, 'info> {
             .long_token_account
             .as_ref()
             .ok_or(error!(CoreError::TokenAccountNotProvided))?;
-        Ok((vault, account))
+        Ok((token, vault, account))
     }
 
-    fn short_token(&self) -> Result<(&Account<'info, TokenAccount>, &AccountInfo<'info>)> {
+    fn short_token(
+        &self,
+    ) -> Result<(
+        &Account<'info, Mint>,
+        &Account<'info, TokenAccount>,
+        &AccountInfo<'info>,
+    )> {
+        let token = self
+            .short_token
+            .ok_or(error!(CoreError::TokenMintNotProvided))?;
         let vault = self
             .short_token_vault
             .as_ref()
@@ -559,12 +593,19 @@ impl<'a, 'info> ProcessTransferOut<'a, 'info> {
             .short_token_account
             .as_ref()
             .ok_or(error!(CoreError::TokenAccountNotProvided))?;
-        Ok((vault, account))
+        Ok((token, vault, account))
     }
 
     fn claimable_long_token_account_for_user(
         &self,
-    ) -> Result<(&Account<'info, TokenAccount>, &AccountInfo<'info>)> {
+    ) -> Result<(
+        &Account<'info, Mint>,
+        &Account<'info, TokenAccount>,
+        &AccountInfo<'info>,
+    )> {
+        let token = self
+            .long_token
+            .ok_or(error!(CoreError::TokenMintNotProvided))?;
         let vault = self
             .long_token_vault
             .as_ref()
@@ -573,12 +614,19 @@ impl<'a, 'info> ProcessTransferOut<'a, 'info> {
             .claimable_long_token_account_for_user
             .as_ref()
             .ok_or(error!(CoreError::TokenAccountNotProvided))?;
-        Ok((vault, account))
+        Ok((token, vault, account))
     }
 
     fn claimable_short_token_account_for_user(
         &self,
-    ) -> Result<(&Account<'info, TokenAccount>, &AccountInfo<'info>)> {
+    ) -> Result<(
+        &Account<'info, Mint>,
+        &Account<'info, TokenAccount>,
+        &AccountInfo<'info>,
+    )> {
+        let token = self
+            .short_token
+            .ok_or(error!(CoreError::TokenMintNotProvided))?;
         let vault = self
             .short_token_vault
             .as_ref()
@@ -587,12 +635,19 @@ impl<'a, 'info> ProcessTransferOut<'a, 'info> {
             .claimable_short_token_account_for_user
             .as_ref()
             .ok_or(error!(CoreError::TokenAccountNotProvided))?;
-        Ok((vault, account))
+        Ok((token, vault, account))
     }
 
     fn claimable_long_token_account_for_holding(
         &self,
-    ) -> Result<(&Account<'info, TokenAccount>, &AccountInfo<'info>)> {
+    ) -> Result<(
+        &Account<'info, Mint>,
+        &Account<'info, TokenAccount>,
+        &AccountInfo<'info>,
+    )> {
+        let token = self
+            .long_token
+            .ok_or(error!(CoreError::TokenMintNotProvided))?;
         let vault = self
             .long_token_vault
             .as_ref()
@@ -601,12 +656,19 @@ impl<'a, 'info> ProcessTransferOut<'a, 'info> {
             .claimable_pnl_token_account_for_holding
             .as_ref()
             .ok_or(error!(CoreError::TokenAccountNotProvided))?;
-        Ok((vault, account))
+        Ok((token, vault, account))
     }
 
     fn claimable_short_token_account_for_holding(
         &self,
-    ) -> Result<(&Account<'info, TokenAccount>, &AccountInfo<'info>)> {
+    ) -> Result<(
+        &Account<'info, Mint>,
+        &Account<'info, TokenAccount>,
+        &AccountInfo<'info>,
+    )> {
+        let token = self
+            .short_token
+            .ok_or(error!(CoreError::TokenMintNotProvided))?;
         let vault = self
             .short_token_vault
             .as_ref()
@@ -615,7 +677,7 @@ impl<'a, 'info> ProcessTransferOut<'a, 'info> {
             .claimable_pnl_token_account_for_holding
             .as_ref()
             .ok_or(error!(CoreError::TokenAccountNotProvided))?;
-        Ok((vault, account))
+        Ok((token, vault, account))
     }
 }
 
@@ -1415,6 +1477,8 @@ pub struct PositionCutOp<'a, 'info> {
     user: &'a AccountLoader<'info, UserHeader>,
     nonce: &'a NonceBytes,
     order_bump: u8,
+    long_token_mint: &'a Account<'info, Mint>,
+    short_token_mint: &'a Account<'info, Mint>,
     long_token_account: &'a Account<'info, TokenAccount>,
     short_token_account: &'a Account<'info, TokenAccount>,
     long_token_vault: &'a Account<'info, TokenAccount>,
@@ -1552,10 +1616,18 @@ impl<'a, 'info> PositionCutOp<'a, 'info> {
         is_long: bool,
         is_collateral_long: bool,
     ) -> Result<()> {
-        let (output_token_account, output_token_vault) = if is_collateral_long {
-            (self.long_token_account, self.long_token_vault)
+        let (output_token, output_token_account, output_token_vault) = if is_collateral_long {
+            (
+                self.long_token_mint,
+                self.long_token_account,
+                self.long_token_vault,
+            )
         } else {
-            (self.short_token_account, self.short_token_vault)
+            (
+                self.short_token_mint,
+                self.short_token_account,
+                self.short_token_vault,
+            )
         };
         ProcessTransferOut::builder()
             .token_program(self.token_program.clone())
@@ -1563,10 +1635,13 @@ impl<'a, 'info> PositionCutOp<'a, 'info> {
             .market(self.market)
             .is_pnl_token_long_token(is_long)
             .final_output_market(self.market)
+            .final_output_token(Some(output_token))
             .final_output_token_account(Some(output_token_account.to_account_info()))
             .final_output_token_vault(Some(output_token_vault))
+            .long_token(Some(self.long_token_mint))
             .long_token_account(Some(self.long_token_account.to_account_info()))
             .long_token_vault(Some(self.long_token_vault))
+            .short_token(Some(self.short_token_mint))
             .short_token_account(Some(self.short_token_account.to_account_info()))
             .short_token_vault(Some(self.short_token_vault))
             .claimable_long_token_account_for_user(Some(
