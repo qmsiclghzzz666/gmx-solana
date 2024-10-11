@@ -2,7 +2,6 @@ use std::{
     collections::{hash_map::Entry, HashMap},
     fmt,
     future::Future,
-    pin::Pin,
     sync::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
         Arc,
