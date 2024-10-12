@@ -1962,6 +1962,7 @@ dependencies = [
  "gmsol-decode",
  "gmsol-model",
  "gmsol-store",
+ "gmsol-timelock",
  "gmsol-treasury",
  "gmsol-utils",
  "heck 0.5.0",
@@ -2056,6 +2057,14 @@ dependencies = [
  "static_assertions",
  "strum",
  "typed-builder",
+]
+
+[[package]]
+name = "gmsol-timelock"
+version = "0.2.0"
+dependencies = [
+ "anchor-lang",
+ "gmsol-store",
 ]
 
 [[package]]

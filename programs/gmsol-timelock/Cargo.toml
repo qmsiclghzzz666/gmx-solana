@@ -1,0 +1,21 @@
+[package]
+name = "gmsol-timelock"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "gmsol_timelock"
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+idl-build = ["anchor-lang/idl-build", "gmsol-store/idl-build"]
+debug = ["gmsol-store/debug"]
+
+[dependencies]
+anchor-lang = { workspace = true }
+gmsol-store = { workspace = true, features = ["cpi"] }

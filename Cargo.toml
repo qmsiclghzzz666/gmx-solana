@@ -81,6 +81,9 @@ path = "programs/gmsol-store"
 [workspace.dependencies.gmsol-treasury]
 path = "programs/gmsol-treasury"
 
+[workspace.dependencies.gmsol-timelock]
+path = "programs/gmsol-timelock"
+
 [workspace.dependencies.gmsol-decode]
 path = "crates/gmsol-decode"
 
