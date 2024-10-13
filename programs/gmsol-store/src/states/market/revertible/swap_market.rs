@@ -8,7 +8,7 @@ use indexmap::{map::Entry, IndexMap};
 use crate::{
     constants,
     states::{
-        common::SwapParams, market::utils::ValidateMarketBalances, HasMarketMeta, Market,
+        common::swap::SwapParams, market::utils::ValidateMarketBalances, HasMarketMeta, Market,
         MarketMeta, Oracle,
     },
     CoreError, ModelError,
@@ -72,7 +72,7 @@ impl<'a> SwapMarkets<'a> {
             + gmsol_model::Bank<Pubkey, Num = u64>
             + gmsol_model::SwapMarketMut<{ constants::MARKET_DECIMALS }, Num = u128>,
     {
-        let long_path = params.validated_long_path()?;
+        let long_path = params.validated_primary_swap_path()?;
         let long_output_amount = token_ins
             .0
             .and_then(|token| (token_in_amounts.0 != 0).then_some(token))
@@ -88,7 +88,7 @@ impl<'a> SwapMarkets<'a> {
             })
             .transpose()?
             .unwrap_or_default();
-        let short_path = params.validated_short_path()?;
+        let short_path = params.validated_secondary_swap_path()?;
         let short_output_amount = token_ins
             .1
             .and_then(|token| (token_in_amounts.1 != 0).then_some(token))

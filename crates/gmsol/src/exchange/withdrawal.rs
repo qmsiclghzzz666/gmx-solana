@@ -9,7 +9,7 @@ use gmsol_store::{
     accounts, instruction,
     ops::withdrawal::CreateWithdrawalParams,
     states::{
-        common::{action::Action, swap::SwapParamsV2, TokensWithFeed},
+        common::{action::Action, swap::SwapParams, TokensWithFeed},
         withdrawal::Withdrawal,
         NonceBytes, Pyth, TokenMapAccess,
     },
@@ -430,7 +430,7 @@ pub struct ExecuteWithdrawalHint {
     final_short_token: Pubkey,
     /// Feeds.
     pub feeds: TokensWithFeed,
-    swap: SwapParamsV2,
+    swap: SwapParams,
 }
 
 impl ExecuteWithdrawalHint {

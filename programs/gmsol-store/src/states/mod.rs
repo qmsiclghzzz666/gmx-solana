@@ -42,7 +42,7 @@ pub use market::{
     config::MarketConfigKey, pool::Pool, HasMarketMeta, Market, MarketMeta, MarketState,
 };
 pub use oracle::*;
-pub use order::{Order, OrderParamsV2, UpdateOrderParams};
+pub use order::{Order, OrderParams, UpdateOrderParams};
 pub use position::Position;
 pub use roles::*;
 pub use shift::*;

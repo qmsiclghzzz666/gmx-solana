@@ -20,7 +20,7 @@ use crate::{
             },
             utils::ValidateMarketBalances,
         },
-        order::{CollateralReceiver, Order, OrderKind, OrderParamsV2, TokenAccounts, TransferOut},
+        order::{CollateralReceiver, Order, OrderKind, OrderParams, TokenAccounts, TransferOut},
         position::PositionKind,
         user::UserHeader,
         HasMarketMeta, Market, NonceBytes, Oracle, Position, Store, ValidateOracleTime,
@@ -145,7 +145,7 @@ impl<'a, 'info> CreateOrderOperation<'a, 'info> {
         f: impl FnOnce(
             &CreateOrderParams,
             &mut TokenAccounts,
-            &mut OrderParamsV2,
+            &mut OrderParams,
         ) -> Result<(Pubkey, Pubkey)>,
     ) -> Result<()> {
         let id = self.market.load_mut()?.state_mut().next_order_id()?;
@@ -1179,7 +1179,7 @@ fn execute_swap(
         let (swap_out_amount, _) = swap_markets.revertible_swap(
             SwapDirection::Into(market),
             oracle,
-            &swap.into(),
+            swap,
             (swap_out_token, swap_out_token),
             (Some(initial_collateral_token), None),
             (amount, 0),
@@ -1225,7 +1225,7 @@ fn execute_increase_position(
         let (collateral_increment_amount, _) = swap_markets.revertible_swap(
             SwapDirection::Into(position.market_mut()),
             oracle,
-            &swap.into(),
+            swap,
             (collateral_token, collateral_token),
             (Some(initial_collateral_token), None),
             (params.initial_collateral_delta_amount, 0),
@@ -1398,7 +1398,7 @@ fn execute_decrease_position(
         let (output_amount, secondary_output_amount) = swap_markets.revertible_swap(
             SwapDirection::From(position.market_mut()),
             oracle,
-            &swap.into(),
+            swap,
             (final_output_token, secondary_output_token),
             token_ins,
             (output_amount, secondary_output_amount),

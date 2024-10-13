@@ -246,7 +246,7 @@ impl<'a, 'info> ExecuteWithdrawalOperation<'a, 'info> {
             swap_markets.revertible_swap(
                 SwapDirection::From(&mut market),
                 self.oracle,
-                &(&self.withdrawal.load()?.swap).into(),
+                &self.withdrawal.load()?.swap,
                 (
                     self.withdrawal.load()?.tokens.final_long_token(),
                     self.withdrawal.load()?.tokens.final_short_token(),

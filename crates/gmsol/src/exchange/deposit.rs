@@ -9,7 +9,7 @@ use gmsol_store::{
     accounts, instruction,
     ops::deposit::CreateDepositParams,
     states::{
-        common::{action::Action, swap::SwapParamsV2, TokensWithFeed},
+        common::{action::Action, swap::SwapParams, TokensWithFeed},
         Deposit, NonceBytes, Pyth, TokenMapAccess,
     },
 };
@@ -466,7 +466,7 @@ pub struct ExecuteDepositHint {
     market_token_mint: Pubkey,
     /// Feeds.
     pub feeds: TokensWithFeed,
-    swap: SwapParamsV2,
+    swap: SwapParams,
     initial_long_token_escrow: Option<Pubkey>,
     initial_short_token_escrow: Option<Pubkey>,
     initial_long_token: Option<Pubkey>,

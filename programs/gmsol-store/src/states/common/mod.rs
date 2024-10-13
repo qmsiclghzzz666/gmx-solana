@@ -12,5 +12,4 @@ pub mod token;
 /// Common action types.
 pub mod action;
 
-pub use swap::SwapParams;
 pub use token_with_feeds::{TokenRecord, TokensWithFeed};

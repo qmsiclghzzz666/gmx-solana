@@ -17,7 +17,7 @@ use gmsol_store::{
     accounts, instruction,
     ops::order::CreateOrderParams,
     states::{
-        common::{action::Action, swap::SwapParamsV2, TokensWithFeed},
+        common::{action::Action, swap::SwapParams, TokensWithFeed},
         order::{Order, OrderKind},
         position::PositionKind,
         user::UserHeader,
@@ -699,7 +699,7 @@ pub struct ExecuteOrderHint {
     pnl_token: Pubkey,
     /// Feeds.
     pub feeds: TokensWithFeed,
-    swap: SwapParamsV2,
+    swap: SwapParams,
 }
 
 impl ExecuteOrderHint {

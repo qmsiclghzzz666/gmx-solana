@@ -7,7 +7,7 @@ use crate::{states::FactorKey, CoreError};
 use super::{
     common::{
         action::{Action, ActionHeader, ActionSigner},
-        swap::SwapParamsV2,
+        swap::SwapParams,
         token::TokenAndAccount,
     },
     user::UserHeader,
@@ -333,10 +333,10 @@ pub struct Order {
     /// Token accounts.
     pub(crate) tokens: TokenAccounts,
     /// Swap params.
-    pub(crate) swap: SwapParamsV2,
+    pub(crate) swap: SwapParams,
     padding_0: [u8; 4],
     /// Order params.
-    pub(crate) params: OrderParamsV2,
+    pub(crate) params: OrderParams,
     pub(crate) gt_reward: u64,
     padding_1: [u8; 8],
     reserve: [u8; 128],
@@ -502,12 +502,12 @@ impl Order {
     }
 
     /// Get order params.
-    pub fn params(&self) -> &OrderParamsV2 {
+    pub fn params(&self) -> &OrderParams {
         &self.params
     }
 
     /// Get swap params.
-    pub fn swap(&self) -> &SwapParamsV2 {
+    pub fn swap(&self) -> &SwapParams {
         &self.swap
     }
 
@@ -639,7 +639,7 @@ impl TokenAccounts {
 /// Order params.
 #[account(zero_copy)]
 #[cfg_attr(feature = "debug", derive(Debug))]
-pub struct OrderParamsV2 {
+pub struct OrderParams {
     /// Kind.
     kind: u8,
     /// Order side.
@@ -664,7 +664,7 @@ pub struct OrderParamsV2 {
     reserve: [u8; 64],
 }
 
-impl OrderParamsV2 {
+impl OrderParams {
     pub(crate) fn init_swap(
         &mut self,
         kind: OrderKind,

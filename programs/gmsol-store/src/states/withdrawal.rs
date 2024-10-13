@@ -5,7 +5,7 @@ use crate::CoreError;
 use super::{
     common::{
         action::{Action, ActionHeader},
-        swap::SwapParamsV2,
+        swap::SwapParams,
         token::TokenAndAccount,
     },
     Seed,
@@ -22,7 +22,7 @@ pub struct Withdrawal {
     /// Withdrawal params.
     pub(crate) params: WithdrawalParams,
     /// Swap params.
-    pub(crate) swap: SwapParamsV2,
+    pub(crate) swap: SwapParams,
     padding_1: [u8; 4],
     reserve: [u8; 128],
 }
@@ -40,7 +40,7 @@ impl Withdrawal {
     }
 
     /// Get the swap params.
-    pub fn swap(&self) -> &SwapParamsV2 {
+    pub fn swap(&self) -> &SwapParams {
         &self.swap
     }
 

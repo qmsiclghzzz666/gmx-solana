@@ -287,7 +287,7 @@ impl<'a, 'info> ExecuteDepositOperation<'a, 'info> {
             swap_markets.revertible_swap(
                 SwapDirection::Into(&mut market),
                 self.oracle,
-                &(&self.deposit.load()?.swap).into(),
+                &self.deposit.load()?.swap,
                 expected_token_outs,
                 (
                     self.deposit.load()?.tokens.initial_long_token.token(),

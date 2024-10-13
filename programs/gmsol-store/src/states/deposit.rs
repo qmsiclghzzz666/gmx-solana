@@ -5,13 +5,13 @@ use crate::{states::MarketConfigKey, CoreError};
 use super::{
     common::{
         action::{Action, ActionHeader},
-        swap::SwapParamsV2,
+        swap::SwapParams,
         token::TokenAndAccount,
     },
     Market, Seed,
 };
 
-/// Deposit V2.
+/// Deposit.
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[account(zero_copy)]
 pub struct Deposit {
@@ -22,7 +22,7 @@ pub struct Deposit {
     /// Deposit params.
     pub(crate) params: DepositParams,
     /// Swap params.
-    pub(crate) swap: SwapParamsV2,
+    pub(crate) swap: SwapParams,
     padding_1: [u8; 4],
     reserve: [u8; 128],
 }
@@ -53,7 +53,7 @@ impl Deposit {
     }
 
     /// Get swap params.
-    pub fn swap(&self) -> &SwapParamsV2 {
+    pub fn swap(&self) -> &SwapParams {
         &self.swap
     }
 
