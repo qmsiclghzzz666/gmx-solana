@@ -7,7 +7,7 @@ use anchor_client::{
 use gmsol_model::{price::Prices, PnlFactorKind, PoolKind};
 use gmsol_store::{
     accounts, instruction,
-    states::{config::EntryArgs, Factor, MarketConfigKey},
+    states::{market::config::EntryArgs, Factor, MarketConfigKey},
 };
 
 use crate::utils::RpcBuilder;

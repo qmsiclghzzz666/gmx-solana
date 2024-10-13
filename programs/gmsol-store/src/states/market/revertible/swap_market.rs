@@ -8,7 +8,8 @@ use indexmap::{map::Entry, IndexMap};
 use crate::{
     constants,
     states::{
-        common::SwapParams, ops::ValidateMarketBalances, HasMarketMeta, Market, MarketMeta, Oracle,
+        common::SwapParams, market::utils::ValidateMarketBalances, HasMarketMeta, Market,
+        MarketMeta, Oracle,
     },
     CoreError, ModelError,
 };

@@ -12,7 +12,7 @@ use anchor_client::{
 
 use gmsol_model::{price::Prices, PnlFactorKind};
 use gmsol_store::states::{
-    position::PositionKind, status::MarketStatus, user::ReferralCodeBytes, NonceBytes,
+    market::status::MarketStatus, position::PositionKind, user::ReferralCodeBytes, NonceBytes,
 };
 use solana_account_decoder::UiAccountEncoding;
 use tokio::sync::OnceCell;
@@ -225,7 +225,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
 
     /// Find PDA for market account.
     pub fn find_market_address(&self, store: &Pubkey, token: &Pubkey) -> Pubkey {
-        crate::pda::find_market_address(store, token, &self.store_program_id()).0
+        types::Market::find_market_address(store, token, &self.store_program_id()).0
     }
 
     /// Find PDA for deposit account.

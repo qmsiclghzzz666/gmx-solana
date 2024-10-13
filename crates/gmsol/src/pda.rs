@@ -9,8 +9,6 @@ use gmsol_store::{
 };
 use gmsol_utils::to_seed;
 
-pub use gmsol_store::states::market::find_market_address;
-
 use crate::utils::EVENT_AUTHORITY_SEED;
 
 /// Default store.

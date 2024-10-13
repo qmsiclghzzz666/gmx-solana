@@ -590,7 +590,7 @@ impl InspectArgs {
             }
             Command::MarketConfigBuffer { address, debug } => {
                 let buffer = client
-                    .account::<states::MarketConfigBuffer>(address)
+                    .account::<states::market::config::MarketConfigBuffer>(address)
                     .await?
                     .ok_or(gmsol::Error::NotFound)?;
                 if *debug {

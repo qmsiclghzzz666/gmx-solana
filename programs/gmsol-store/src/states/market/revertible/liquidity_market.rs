@@ -8,7 +8,7 @@ use gmsol_model::{
 use crate::{
     constants,
     states::{
-        clock::{AsClock, AsClockMut},
+        market::clock::{AsClock, AsClockMut},
         HasMarketMeta, Market, Store,
     },
     utils::internal::TransferUtils,

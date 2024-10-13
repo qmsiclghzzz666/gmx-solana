@@ -11,7 +11,7 @@ use gmsol_model::{
 use crate::{
     constants,
     states::{
-        clock::{AsClock, AsClockMut},
+        market::clock::{AsClock, AsClockMut},
         HasMarketMeta, Market,
     },
     CoreError,

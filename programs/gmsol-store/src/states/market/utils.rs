@@ -97,8 +97,8 @@ impl<
 {
 }
 
-/// Trait for auto-deleveraging utils.
-pub trait AdlOps {
+/// Trait for defining operations related to auto-deleveraging.
+pub trait Adl {
     /// Validate if the ADL can be executed.
     fn validate_adl(&self, oracle: &Oracle, is_long: bool) -> CoreResult<()>;
 
@@ -108,7 +108,7 @@ pub trait AdlOps {
     fn update_adl_state(&mut self, oracle: &Oracle, is_long: bool) -> Result<()>;
 }
 
-impl AdlOps for Market {
+impl Adl for Market {
     fn latest_adl_time(&self, is_long: bool) -> CoreResult<i64> {
         let clock = if is_long {
             ClockKind::AdlForLong

@@ -15,7 +15,7 @@ use gmsol::{
         store_ops::StoreOps,
         token_config::TokenConfigOps,
     },
-    types::MarketConfigBuffer,
+    types::market::config::MarketConfigBuffer,
     utils::TransactionBuilder,
 };
 use gmsol_store::states::{

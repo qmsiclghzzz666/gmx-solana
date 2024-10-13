@@ -1,9 +1,12 @@
 use crate::{
     ops::market::MarketTransferOut,
     states::{
-        revertible::{Revertible, RevertibleSwapMarket},
-        status::MarketStatus,
-        Factor, HasMarketMeta, ValidateMarketBalances,
+        market::status::MarketStatus,
+        market::{
+            revertible::{Revertible, RevertibleSwapMarket},
+            utils::ValidateMarketBalances,
+        },
+        Factor, HasMarketMeta,
     },
     ModelError,
 };
@@ -22,9 +25,8 @@ use gmsol_utils::InitSpace;
 use crate::{
     constants,
     states::{
-        config::{EntryArgs, MarketConfigBuffer},
-        Action, Market, MarketChangeEvent, MarketMeta, Seed, Store, TokenMapAccess, TokenMapHeader,
-        TokenMapLoader,
+        market::config::{EntryArgs, MarketConfigBuffer},
+        Market, MarketMeta, Seed, Store, TokenMapAccess, TokenMapHeader, TokenMapLoader,
     },
     utils::internal,
     CoreError,
@@ -155,10 +157,6 @@ pub(crate) fn unchecked_initialize_market(
         ctx.accounts.short_token_mint.key(),
         enable,
     )?;
-    emit!(MarketChangeEvent {
-        address: market.key(),
-        action: Action::Init,
-    });
     Ok(())
 }
 
@@ -194,11 +192,7 @@ pub struct RemoveMarket<'info> {
 ///
 /// ## CHECK
 /// - Only MARKET_KEEPER can remove market.
-pub(crate) fn unchecked_remove_market(ctx: Context<RemoveMarket>) -> Result<()> {
-    emit!(MarketChangeEvent {
-        address: ctx.accounts.market.key(),
-        action: Action::Remove,
-    });
+pub(crate) fn unchecked_remove_market(_ctx: Context<RemoveMarket>) -> Result<()> {
     Ok(())
 }
 

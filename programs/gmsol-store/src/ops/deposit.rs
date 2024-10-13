@@ -238,11 +238,14 @@ impl<'a, 'info> ExecuteDepositOps<'a, 'info> {
     fn do_execute(self) -> Result<()> {
         use crate::{
             states::{
-                revertible::{
-                    swap_market::{SwapDirection, SwapMarkets},
-                    Revertible, RevertibleLiquidityMarket,
+                market::{
+                    revertible::{
+                        swap_market::{SwapDirection, SwapMarkets},
+                        Revertible, RevertibleLiquidityMarket,
+                    },
+                    utils::ValidateMarketBalances,
                 },
-                HasMarketMeta, ValidateMarketBalances,
+                HasMarketMeta,
             },
             ModelError,
         };

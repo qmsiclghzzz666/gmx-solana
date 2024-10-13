@@ -6,13 +6,15 @@ use typed_builder::TypedBuilder;
 use crate::{
     states::{
         common::action::Action,
-        revertible::{
-            swap_market::{SwapDirection, SwapMarkets},
-            Revertible, RevertibleLiquidityMarket,
+        market::{
+            revertible::{
+                swap_market::{SwapDirection, SwapMarkets},
+                Revertible, RevertibleLiquidityMarket,
+            },
+            utils::ValidateMarketBalances,
         },
         withdrawal::Withdrawal,
-        HasMarketMeta, Market, NonceBytes, Oracle, Store, ValidateMarketBalances,
-        ValidateOracleTime,
+        HasMarketMeta, Market, NonceBytes, Oracle, Store, ValidateOracleTime,
     },
     CoreError, CoreResult, ModelError,
 };

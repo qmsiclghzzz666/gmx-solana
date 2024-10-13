@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    states::{ops::AdlOps, Market, Oracle, PriceProvider, Store, TokenMapHeader},
+    states::{market::utils::Adl, Market, Oracle, PriceProvider, Store, TokenMapHeader},
     utils::internal,
 };
 

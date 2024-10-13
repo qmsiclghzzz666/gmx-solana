@@ -5,7 +5,6 @@ use anchor_spl::token::Mint;
 use bitmaps::Bitmap;
 use borsh::{BorshDeserialize, BorshSerialize};
 use gmsol_model::{price::Prices, ClockKind, PoolKind};
-use model::AsLiquidityMarket;
 
 use crate::{
     utils::fixed_str::{bytes_to_fixed_str, fixed_str_to_bytes},
@@ -14,16 +13,14 @@ use crate::{
 
 use super::{Factor, InitSpace, Oracle, Seed};
 
-use self::pool::Pools;
-
-pub use self::{
+use self::{
     config::{MarketConfig, MarketConfigBuffer, MarketConfigKey},
-    ops::{AdlOps, ValidateMarketBalances},
-    pool::Pool,
+    model::AsLiquidityMarket,
+    pool::{Pool, Pools},
 };
 
-/// Market Operations.
-pub mod ops;
+/// Market Utils.
+pub mod utils;
 
 /// Clock ops.
 pub mod clock;
@@ -52,18 +49,6 @@ pub type MarketFlagValue = u8;
 pub type MarketFlagBitmap = Bitmap<MAX_FLAGS>;
 
 const MAX_NAME_LEN: usize = 64;
-
-/// Find PDA for [`Market`] account.
-pub fn find_market_address(
-    store: &Pubkey,
-    token: &Pubkey,
-    store_program_id: &Pubkey,
-) -> (Pubkey, u8) {
-    Pubkey::find_program_address(
-        &[Market::SEED, store.as_ref(), token.as_ref()],
-        store_program_id,
-    )
-}
 
 /// Market.
 #[account(zero_copy)]
@@ -105,6 +90,18 @@ impl Default for Market {
 }
 
 impl Market {
+    /// Find PDA for [`Market`] account.
+    pub fn find_market_address(
+        store: &Pubkey,
+        token: &Pubkey,
+        store_program_id: &Pubkey,
+    ) -> (Pubkey, u8) {
+        Pubkey::find_program_address(
+            &[Self::SEED, store.as_ref(), token.as_ref()],
+            store_program_id,
+        )
+    }
+
     /// Initialize the market.
     #[allow(clippy::too_many_arguments)]
     pub fn init(
@@ -695,10 +692,4 @@ impl Clocks {
         };
         Some(clock)
     }
-}
-
-#[event]
-pub struct MarketChangeEvent {
-    pub address: Pubkey,
-    pub action: super::Action,
 }

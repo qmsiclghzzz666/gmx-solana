@@ -10,18 +10,20 @@ use crate::{
     events::TradeEventData,
     states::{
         common::action::Action,
-        market::AdlOps,
+        market::utils::Adl,
+        market::{
+            revertible::{
+                perp_market::RevertiblePerpMarket,
+                revertible_position::RevertiblePosition,
+                swap_market::{SwapDirection, SwapMarkets},
+                Revertible,
+            },
+            utils::ValidateMarketBalances,
+        },
         order::{CollateralReceiver, Order, OrderKind, OrderParamsV2, TokenAccounts, TransferOut},
         position::PositionKind,
-        revertible::{
-            perp_market::RevertiblePerpMarket,
-            revertible_position::RevertiblePosition,
-            swap_market::{SwapDirection, SwapMarkets},
-            Revertible,
-        },
         user::UserHeader,
-        HasMarketMeta, Market, NonceBytes, Oracle, Position, Store, ValidateMarketBalances,
-        ValidateOracleTime,
+        HasMarketMeta, Market, NonceBytes, Oracle, Position, Store, ValidateOracleTime,
     },
     CoreError, ModelError,
 };

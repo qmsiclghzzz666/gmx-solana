@@ -3,7 +3,7 @@ use std::collections::{BTreeSet, HashSet};
 use anchor_lang::prelude::*;
 
 use crate::{
-    states::{find_market_address, HasMarketMeta, Market, TokenMapAccess},
+    states::{HasMarketMeta, Market, TokenMapAccess},
     CoreError,
 };
 
@@ -125,7 +125,7 @@ impl SwapParams {
         } else {
             &self.short_token_swap_path
         };
-        let target = find_market_address(store, path.last()?, &crate::ID).0;
+        let target = Market::find_market_address(store, path.last()?, &crate::ID).0;
         let info = remaining_accounts.iter().find(|info| *info.key == target)?;
         Some(info.clone())
     }
@@ -345,7 +345,7 @@ impl SwapParamsV2 {
         } else {
             self.secondary_swap_path()
         };
-        let target = find_market_address(store, path.first()?, &crate::ID).0;
+        let target = Market::find_market_address(store, path.first()?, &crate::ID).0;
         let info = remaining_accounts.iter().find(|info| *info.key == target)?;
         Some(info)
     }
@@ -375,7 +375,7 @@ impl SwapParamsV2 {
         } else {
             self.secondary_swap_path()
         };
-        let target = find_market_address(store, path.last()?, &crate::ID).0;
+        let target = Market::find_market_address(store, path.last()?, &crate::ID).0;
         let info = remaining_accounts.iter().find(|info| *info.key == target)?;
         Some(info)
     }

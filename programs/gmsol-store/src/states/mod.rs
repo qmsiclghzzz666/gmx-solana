@@ -38,7 +38,9 @@ pub mod shift;
 pub mod user;
 
 pub use deposit::Deposit;
-pub use market::*;
+pub use market::{
+    config::MarketConfigKey, pool::Pool, HasMarketMeta, Market, MarketMeta, MarketState,
+};
 pub use oracle::*;
 pub use order::{Order, OrderParamsV2, UpdateOrderParams};
 pub use position::Position;

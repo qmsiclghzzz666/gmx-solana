@@ -6,9 +6,11 @@ use typed_builder::TypedBuilder;
 use crate::{
     states::{
         common::action::Action,
-        revertible::{Revertible, RevertibleLiquidityMarket},
-        HasMarketMeta, Market, NonceBytes, Oracle, Shift, Store, ValidateMarketBalances,
-        ValidateOracleTime,
+        market::{
+            revertible::{Revertible, RevertibleLiquidityMarket},
+            utils::ValidateMarketBalances,
+        },
+        HasMarketMeta, Market, NonceBytes, Oracle, Shift, Store, ValidateOracleTime,
     },
     CoreError, CoreResult, ModelError,
 };
