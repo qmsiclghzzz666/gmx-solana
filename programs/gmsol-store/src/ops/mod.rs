@@ -1,17 +1,17 @@
 /// Execution fee operations.
 pub mod execution_fee;
 
-/// Market Operations.
+/// Market operations.
 pub mod market;
 
-/// Deposit Operations.
+/// Deposit operations.
 pub mod deposit;
 
-/// Withdrawal Operations.
+/// Withdrawal operations.
 pub mod withdrawal;
 
-/// Order Operations.
+/// Order operations.
 pub mod order;
 
-/// Shift Operations.
+/// Shift operations.
 pub mod shift;

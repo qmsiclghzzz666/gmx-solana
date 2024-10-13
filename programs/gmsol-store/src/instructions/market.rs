@@ -1,5 +1,5 @@
 use crate::{
-    ops::market::MarketTransferOut,
+    ops::market::MarketTransferOutOperation,
     states::{
         market::status::MarketStatus,
         market::{
@@ -676,7 +676,7 @@ pub(crate) fn claim_fees_from_market(ctx: Context<ClaimFeesFromMarket>) -> Resul
 
     // Transfer out the tokens.
     let token = &ctx.accounts.token_mint;
-    MarketTransferOut::builder()
+    MarketTransferOutOperation::builder()
         .store(&ctx.accounts.store)
         .market(&ctx.accounts.market)
         .amount(amount)

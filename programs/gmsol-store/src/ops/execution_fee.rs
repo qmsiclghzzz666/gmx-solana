@@ -3,16 +3,16 @@ use typed_builder::TypedBuilder;
 
 use crate::CoreError;
 
-/// Transfer execution fee.
+/// Transfer execution fee operation.
 #[derive(TypedBuilder)]
-pub(crate) struct TransferExecutionFeeOps<'info> {
+pub(crate) struct TransferExecutionFeeOperation<'info> {
     payment: AccountInfo<'info>,
     payer: AccountInfo<'info>,
     execution_lamports: u64,
     system_program: AccountInfo<'info>,
 }
 
-impl<'info> TransferExecutionFeeOps<'info> {
+impl<'info> TransferExecutionFeeOperation<'info> {
     pub(crate) fn execute(self) -> Result<()> {
         use anchor_lang::system_program::{transfer, Transfer};
 
@@ -33,15 +33,15 @@ impl<'info> TransferExecutionFeeOps<'info> {
     }
 }
 
-/// Pay execution fee.
+/// Pay execution fee operation.
 #[derive(TypedBuilder)]
-pub(crate) struct PayExecutionFeeOps<'info> {
+pub(crate) struct PayExecutionFeeOperation<'info> {
     payer: AccountInfo<'info>,
     receiver: AccountInfo<'info>,
     execution_lamports: u64,
 }
 
-impl<'info> PayExecutionFeeOps<'info> {
+impl<'info> PayExecutionFeeOperation<'info> {
     pub(crate) fn execute(self) -> Result<()> {
         let rent = Rent::get()?;
         let remaining_lamports = self

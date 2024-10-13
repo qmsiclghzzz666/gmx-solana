@@ -26,9 +26,9 @@ pub struct CreateDepositParams {
     pub min_market_token: u64,
 }
 
-/// Create Deposit Ops.
+/// Operation for creating a deposit.
 #[derive(TypedBuilder)]
-pub(crate) struct CreateDepositOps<'a, 'info> {
+pub(crate) struct CreateDepositOperation<'a, 'info> {
     deposit: AccountLoader<'info, Deposit>,
     market: AccountLoader<'info, Market>,
     store: AccountLoader<'info, Store>,
@@ -44,7 +44,7 @@ pub(crate) struct CreateDepositOps<'a, 'info> {
     swap_paths: &'info [AccountInfo<'info>],
 }
 
-impl<'a, 'info> CreateDepositOps<'a, 'info> {
+impl<'a, 'info> CreateDepositOperation<'a, 'info> {
     /// Execute.
     pub(crate) fn execute(self) -> Result<()> {
         self.market.load()?.validate(&self.store.key())?;
@@ -176,9 +176,9 @@ impl<'a, 'info> CreateDepositOps<'a, 'info> {
     }
 }
 
-/// Execute Deposit Ops.
+/// Operation for executing a deposit.
 #[derive(TypedBuilder)]
-pub(crate) struct ExecuteDepositOps<'a, 'info> {
+pub(crate) struct ExecuteDepositOperation<'a, 'info> {
     store: &'a AccountLoader<'info, Store>,
     market: &'a AccountLoader<'info, Market>,
     market_token_mint: &'a mut Account<'info, Mint>,
@@ -190,7 +190,7 @@ pub(crate) struct ExecuteDepositOps<'a, 'info> {
     token_program: AccountInfo<'info>,
 }
 
-impl<'a, 'info> ExecuteDepositOps<'a, 'info> {
+impl<'a, 'info> ExecuteDepositOperation<'a, 'info> {
     pub(crate) fn execute(self) -> Result<bool> {
         let throw_on_execution_error = self.throw_on_execution_error;
         match self.validate_oracle() {
@@ -209,7 +209,7 @@ impl<'a, 'info> ExecuteDepositOps<'a, 'info> {
                 return Err(error!(err));
             }
         }
-        match self.do_execute() {
+        match self.perfrom_deposit() {
             Ok(()) => Ok(true),
             Err(err) if !throw_on_execution_error => {
                 msg!("Execute deposit error: {}", err);
@@ -235,7 +235,7 @@ impl<'a, 'info> ExecuteDepositOps<'a, 'info> {
     }
 
     #[inline(never)]
-    fn do_execute(self) -> Result<()> {
+    fn perfrom_deposit(self) -> Result<()> {
         use crate::{
             states::{
                 market::{
@@ -330,7 +330,7 @@ impl<'a, 'info> ExecuteDepositOps<'a, 'info> {
     }
 }
 
-impl<'a, 'info> ValidateOracleTime for ExecuteDepositOps<'a, 'info> {
+impl<'a, 'info> ValidateOracleTime for ExecuteDepositOperation<'a, 'info> {
     fn oracle_updated_after(&self) -> CoreResult<Option<i64>> {
         Ok(Some(
             self.deposit

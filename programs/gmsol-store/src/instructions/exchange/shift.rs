@@ -7,8 +7,8 @@ use anchor_spl::{
 use crate::{
     events::RemoveShiftEvent,
     ops::{
-        execution_fee::TransferExecutionFeeOps,
-        shift::{CreateShiftOp, CreateShiftParams},
+        execution_fee::TransferExecutionFeeOperation,
+        shift::{CreateShiftOperation, CreateShiftParams},
     },
     states::{common::action::ActionExt, Market, NonceBytes, RoleKey, Seed, Shift, Store},
     utils::{
@@ -144,7 +144,7 @@ pub(crate) fn create_shift(
     let accounts = ctx.accounts;
     accounts.transfer_execution_fee(params)?;
     accounts.transfer_tokens(params)?;
-    CreateShiftOp::builder()
+    CreateShiftOperation::builder()
         .store(&accounts.store)
         .owner(accounts.owner.to_account_info())
         .shift(&accounts.shift)
@@ -162,7 +162,7 @@ pub(crate) fn create_shift(
 
 impl<'info> CreateShift<'info> {
     fn transfer_execution_fee(&self, params: &CreateShiftParams) -> Result<()> {
-        TransferExecutionFeeOps::builder()
+        TransferExecutionFeeOperation::builder()
             .payment(self.shift.to_account_info())
             .payer(self.owner.to_account_info())
             .execution_lamports(params.execution_lamports)

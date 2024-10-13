@@ -5,7 +5,7 @@ use anchor_spl::token::{transfer_checked, Mint, Token, TokenAccount, TransferChe
 
 use crate::{
     constants,
-    ops::{execution_fee::PayExecutionFeeOps, shift::ExecuteShiftOp},
+    ops::{execution_fee::PayExecutionFeeOperation, shift::ExecuteShiftOperation},
     states::{
         common::action::{ActionExt, ActionSigner},
         HasMarketMeta, Market, Oracle, PriceProvider, Shift, Store, TokenMapHeader,
@@ -194,7 +194,7 @@ impl<'info> ExecuteShift<'info> {
     ) -> Result<bool> {
         let tokens = self.ordered_tokens()?;
 
-        let ops = ExecuteShiftOp::builder()
+        let ops = ExecuteShiftOperation::builder()
             .store(&self.store)
             .shift(&self.shift)
             .from_market(&self.from_market)
@@ -220,7 +220,7 @@ impl<'info> ExecuteShift<'info> {
 
     fn pay_execution_fee(&self, execution_lamports: u64) -> Result<()> {
         let execution_lamports = self.shift.load()?.execution_lamports(execution_lamports);
-        PayExecutionFeeOps::builder()
+        PayExecutionFeeOperation::builder()
             .payer(self.shift.to_account_info())
             .receiver(self.authority.to_account_info())
             .execution_lamports(execution_lamports)

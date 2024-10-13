@@ -4,9 +4,9 @@ use anchor_spl::token::{Mint, Token, TokenAccount};
 use crate::{
     constants,
     ops::{
-        deposit::ExecuteDepositOps,
-        execution_fee::PayExecutionFeeOps,
-        market::{MarketTransferIn, MarketTransferOut},
+        deposit::ExecuteDepositOperation,
+        execution_fee::PayExecutionFeeOperation,
+        market::{MarketTransferInOperation, MarketTransferOutOperation},
     },
     states::{
         common::action::{ActionExt, ActionSigner},
@@ -158,7 +158,7 @@ impl<'info> ExecuteDepositV2<'info> {
     #[inline(never)]
     fn pay_execution_fee(&self, execution_fee: u64) -> Result<()> {
         let execution_lamports = self.deposit.load()?.execution_lamports(execution_fee);
-        PayExecutionFeeOps::builder()
+        PayExecutionFeeOperation::builder()
             .payer(self.deposit.to_account_info())
             .receiver(self.authority.to_account_info())
             .execution_lamports(execution_lamports)
@@ -175,7 +175,7 @@ impl<'info> ExecuteDepositV2<'info> {
     ) -> Result<()> {
         let seeds = signer.as_seeds();
 
-        let builder = MarketTransferIn::builder()
+        let builder = MarketTransferInOperation::builder()
             .store(&self.store)
             .from_authority(self.deposit.to_account_info())
             .token_program(self.token_program.to_account_info())
@@ -230,7 +230,7 @@ impl<'info> ExecuteDepositV2<'info> {
 
     #[inline(never)]
     fn transfer_tokens_out(&self, remaining_accounts: &'info [AccountInfo<'info>]) -> Result<()> {
-        let builder = MarketTransferOut::builder()
+        let builder = MarketTransferOutOperation::builder()
             .store(&self.store)
             .token_program(self.token_program.to_account_info());
 
@@ -304,7 +304,7 @@ impl<'info> ExecuteDepositV2<'info> {
             .load()?
             .swap()
             .to_feeds(&self.token_map.load_token_map()?)?;
-        let ops = ExecuteDepositOps::builder()
+        let ops = ExecuteDepositOperation::builder()
             .store(&self.store)
             .market(&self.market)
             .deposit(&self.deposit)

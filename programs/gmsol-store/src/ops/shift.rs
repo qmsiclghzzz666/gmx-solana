@@ -26,9 +26,9 @@ pub struct CreateShiftParams {
     pub min_to_market_token_amount: u64,
 }
 
-/// Create a shift.
+/// Operation for creating a shift.
 #[derive(TypedBuilder)]
-pub struct CreateShiftOp<'a, 'info> {
+pub struct CreateShiftOperation<'a, 'info> {
     store: &'a AccountLoader<'info, Store>,
     owner: AccountInfo<'info>,
     shift: &'a AccountLoader<'info, Shift>,
@@ -41,7 +41,7 @@ pub struct CreateShiftOp<'a, 'info> {
     params: &'a CreateShiftParams,
 }
 
-impl<'a, 'info> CreateShiftOp<'a, 'info> {
+impl<'a, 'info> CreateShiftOperation<'a, 'info> {
     pub(crate) fn execute(self) -> Result<()> {
         self.validate_markets()?;
         self.validate_params()?;
@@ -137,9 +137,9 @@ impl<'a, 'info> CreateShiftOp<'a, 'info> {
     }
 }
 
-/// Execute a shift.
+/// Operation for executing a shift.
 #[derive(TypedBuilder)]
-pub struct ExecuteShiftOp<'a, 'info> {
+pub struct ExecuteShiftOperation<'a, 'info> {
     store: &'a AccountLoader<'info, Store>,
     oracle: &'a Oracle,
     shift: &'a AccountLoader<'info, Shift>,
@@ -153,7 +153,7 @@ pub struct ExecuteShiftOp<'a, 'info> {
     token_program: AccountInfo<'info>,
 }
 
-impl<'a, 'info> ExecuteShiftOp<'a, 'info> {
+impl<'a, 'info> ExecuteShiftOperation<'a, 'info> {
     pub(crate) fn execute(mut self) -> Result<bool> {
         let throw_on_execution_error = self.throw_on_execution_error;
 
@@ -173,7 +173,7 @@ impl<'a, 'info> ExecuteShiftOp<'a, 'info> {
                 return Err(error!(err));
             }
         }
-        match self.do_execute() {
+        match self.perfrom_shift() {
             Ok(()) => Ok(true),
             Err(err) if !throw_on_execution_error => {
                 msg!("Execute shift error: {}", err);
@@ -209,7 +209,7 @@ impl<'a, 'info> ExecuteShiftOp<'a, 'info> {
     }
 
     #[inline(never)]
-    fn do_execute(&mut self) -> Result<()> {
+    fn perfrom_shift(&mut self) -> Result<()> {
         self.validate_markets_and_shift()?;
 
         let mut from_market = RevertibleLiquidityMarket::new(
@@ -331,7 +331,7 @@ impl<'a, 'info> ExecuteShiftOp<'a, 'info> {
     }
 }
 
-impl<'a, 'info> ValidateOracleTime for ExecuteShiftOp<'a, 'info> {
+impl<'a, 'info> ValidateOracleTime for ExecuteShiftOperation<'a, 'info> {
     fn oracle_updated_after(&self) -> CoreResult<Option<i64>> {
         Ok(Some(
             self.shift

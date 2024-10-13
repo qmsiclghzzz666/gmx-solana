@@ -36,9 +36,9 @@ pub struct CreateWithdrawalParams {
     pub min_short_token_amount: u64,
 }
 
-/// Create Withdrawal Ops.
+/// Operation for creating a withdrawal.
 #[derive(TypedBuilder)]
-pub(crate) struct CreateWithdrawalOps<'a, 'info> {
+pub(crate) struct CreateWithdrawalOperation<'a, 'info> {
     withdrawal: AccountLoader<'info, Withdrawal>,
     market: AccountLoader<'info, Market>,
     store: AccountLoader<'info, Store>,
@@ -52,7 +52,7 @@ pub(crate) struct CreateWithdrawalOps<'a, 'info> {
     swap_paths: &'info [AccountInfo<'info>],
 }
 
-impl<'a, 'info> CreateWithdrawalOps<'a, 'info> {
+impl<'a, 'info> CreateWithdrawalOperation<'a, 'info> {
     /// Execute.
     pub(crate) fn execute(self) -> Result<()> {
         self.market.load()?.validate(&self.store.key())?;
@@ -138,9 +138,9 @@ impl<'a, 'info> CreateWithdrawalOps<'a, 'info> {
     }
 }
 
-/// Execute Withdrawal Operation
+/// Operation for executing a withdrawal.
 #[derive(TypedBuilder)]
-pub(crate) struct ExecuteWithdrawalOp<'a, 'info> {
+pub(crate) struct ExecuteWithdrawalOperation<'a, 'info> {
     store: &'a AccountLoader<'info, Store>,
     market: &'a AccountLoader<'info, Market>,
     market_token_mint: &'a mut Account<'info, Mint>,
@@ -152,7 +152,7 @@ pub(crate) struct ExecuteWithdrawalOp<'a, 'info> {
     token_program: AccountInfo<'info>,
 }
 
-impl<'a, 'info> ExecuteWithdrawalOp<'a, 'info> {
+impl<'a, 'info> ExecuteWithdrawalOperation<'a, 'info> {
     pub(crate) fn execute(mut self) -> Result<Option<(u64, u64)>> {
         let throw_on_execution_error = self.throw_on_execution_error;
         match self.validate_oracle() {
@@ -171,7 +171,7 @@ impl<'a, 'info> ExecuteWithdrawalOp<'a, 'info> {
                 return Err(error!(err));
             }
         }
-        match self.do_execute() {
+        match self.perform_withdrawal() {
             Ok(res) => Ok(Some(res)),
             Err(err) if !throw_on_execution_error => {
                 msg!("Execute withdrawal error: {}", err);
@@ -186,7 +186,7 @@ impl<'a, 'info> ExecuteWithdrawalOp<'a, 'info> {
     }
 
     #[inline(never)]
-    fn do_execute(&mut self) -> Result<(u64, u64)> {
+    fn perform_withdrawal(&mut self) -> Result<(u64, u64)> {
         self.market.load()?.validate(&self.store.key())?;
 
         // Prepare the execution context.
@@ -268,7 +268,7 @@ impl<'a, 'info> ExecuteWithdrawalOp<'a, 'info> {
     }
 }
 
-impl<'a, 'info> ValidateOracleTime for ExecuteWithdrawalOp<'a, 'info> {
+impl<'a, 'info> ValidateOracleTime for ExecuteWithdrawalOperation<'a, 'info> {
     fn oracle_updated_after(&self) -> CoreResult<Option<i64>> {
         Ok(Some(
             self.withdrawal

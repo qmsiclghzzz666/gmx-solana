@@ -7,9 +7,9 @@ use crate::{
     constants,
     events::{TradeEvent, TradeEventData},
     ops::{
-        execution_fee::PayExecutionFeeOps,
-        market::{MarketTransferIn, MarketTransferOut},
-        order::{ExecuteOrderOps, ProcessTransferOut, ShouldSendTradeEvent},
+        execution_fee::PayExecutionFeeOperation,
+        market::{MarketTransferInOperation, MarketTransferOutOperation},
+        order::{ExecuteOrderOperation, ProcessTransferOutOperation, ShouldSendTradeEvent},
     },
     states::{
         common::action::{ActionExt, ActionSigner},
@@ -400,7 +400,7 @@ impl<'info> ExecuteOrderV2<'info> {
                 .as_ref()
                 .ok_or(error!(CoreError::TokenAccountNotProvided))?;
             let amount = self.order.load()?.params.initial_collateral_delta_amount;
-            MarketTransferIn::builder()
+            MarketTransferInOperation::builder()
                 .store(&self.store)
                 .from_authority(self.order.to_account_info())
                 .token_program(self.token_program.to_account_info())
@@ -433,7 +433,7 @@ impl<'info> ExecuteOrderV2<'info> {
                 .as_ref()
                 .ok_or(error!(CoreError::TokenMintNotProvided))?;
             let amount = self.order.load()?.params.initial_collateral_delta_amount;
-            MarketTransferOut::builder()
+            MarketTransferOutOperation::builder()
                 .store(&self.store)
                 .token_program(self.token_program.to_account_info())
                 .market(&market)
@@ -460,7 +460,7 @@ impl<'info> ExecuteOrderV2<'info> {
             .load()?
             .swap
             .to_feeds(&self.token_map.load_token_map()?)?;
-        let ops = ExecuteOrderOps::builder()
+        let ops = ExecuteOrderOperation::builder()
             .store(&self.store)
             .market(&self.market)
             .owner(self.owner.to_account_info())
@@ -500,7 +500,7 @@ impl<'info> ExecuteOrderV2<'info> {
             .swap
             .find_and_unpack_last_market(&self.store.key(), true, remaining_accounts)?
             .unwrap_or(self.market.clone());
-        ProcessTransferOut::builder()
+        ProcessTransferOutOperation::builder()
             .token_program(self.token_program.to_account_info())
             .store(&self.store)
             .market(&self.market)
@@ -547,7 +547,7 @@ impl<'info> ExecuteOrderV2<'info> {
     #[inline(never)]
     fn pay_execution_fee(&self, execution_fee: u64) -> Result<()> {
         let execution_lamports = self.order.load()?.execution_lamports(execution_fee);
-        PayExecutionFeeOps::builder()
+        PayExecutionFeeOperation::builder()
             .payer(self.order.to_account_info())
             .receiver(self.authority.to_account_info())
             .execution_lamports(execution_lamports)
@@ -797,7 +797,7 @@ impl<'info> ExecuteDecreaseOrder<'info> {
             .load()?
             .swap
             .to_feeds(&self.token_map.load_token_map()?)?;
-        let ops = ExecuteOrderOps::builder()
+        let ops = ExecuteOrderOperation::builder()
             .store(&self.store)
             .market(&self.market)
             .owner(self.owner.to_account_info())
@@ -838,7 +838,7 @@ impl<'info> ExecuteDecreaseOrder<'info> {
             .swap
             .find_and_unpack_last_market(&self.store.key(), true, remaining_accounts)?
             .unwrap_or(self.market.clone());
-        ProcessTransferOut::builder()
+        ProcessTransferOutOperation::builder()
             .token_program(self.token_program.to_account_info())
             .store(&self.store)
             .market(&self.market)
@@ -873,7 +873,7 @@ impl<'info> ExecuteDecreaseOrder<'info> {
     #[inline(never)]
     fn pay_execution_fee(&self, execution_fee: u64) -> Result<()> {
         let execution_lamports = self.order.load()?.execution_lamports(execution_fee);
-        PayExecutionFeeOps::builder()
+        PayExecutionFeeOperation::builder()
             .payer(self.order.to_account_info())
             .receiver(self.authority.to_account_info())
             .execution_lamports(execution_lamports)

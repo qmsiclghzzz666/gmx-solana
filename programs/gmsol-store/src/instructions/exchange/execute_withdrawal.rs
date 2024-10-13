@@ -4,8 +4,8 @@ use anchor_spl::token::{transfer_checked, Mint, Token, TokenAccount, TransferChe
 use crate::{
     constants,
     ops::{
-        execution_fee::PayExecutionFeeOps, market::MarketTransferOut,
-        withdrawal::ExecuteWithdrawalOp,
+        execution_fee::PayExecutionFeeOperation, market::MarketTransferOutOperation,
+        withdrawal::ExecuteWithdrawalOperation,
     },
     states::{
         common::action::{ActionExt, ActionSigner},
@@ -183,7 +183,7 @@ impl<'info> ExecuteWithdrawalV2<'info> {
             .swap()
             .to_feeds(&self.token_map.load_token_map()?)?;
 
-        let op = ExecuteWithdrawalOp::builder()
+        let op = ExecuteWithdrawalOperation::builder()
             .store(&self.store)
             .market(&self.market)
             .withdrawal(&self.withdrawal)
@@ -255,7 +255,7 @@ impl<'info> ExecuteWithdrawalV2<'info> {
         final_long_token_amount: u64,
         final_short_token_amount: u64,
     ) -> Result<()> {
-        let builder = MarketTransferOut::builder()
+        let builder = MarketTransferOutOperation::builder()
             .store(&self.store)
             .token_program(self.token_program.to_account_info());
         let store = &self.store.key();
@@ -307,7 +307,7 @@ impl<'info> ExecuteWithdrawalV2<'info> {
 
     fn pay_execution_fee(&self, execution_fee: u64) -> Result<()> {
         let execution_lamports = self.withdrawal.load()?.execution_lamports(execution_fee);
-        PayExecutionFeeOps::builder()
+        PayExecutionFeeOperation::builder()
             .payer(self.withdrawal.to_account_info())
             .receiver(self.authority.to_account_info())
             .execution_lamports(execution_lamports)

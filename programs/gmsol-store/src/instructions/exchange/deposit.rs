@@ -7,8 +7,8 @@ use anchor_spl::{
 use crate::{
     events::RemoveDepositEvent,
     ops::{
-        deposit::{CreateDepositOps, CreateDepositParams},
-        execution_fee::TransferExecutionFeeOps,
+        deposit::{CreateDepositOperation, CreateDepositParams},
+        execution_fee::TransferExecutionFeeOperation,
     },
     states::{common::action::ActionExt, Deposit, Market, NonceBytes, RoleKey, Seed, Store},
     utils::{
@@ -158,7 +158,7 @@ pub(crate) fn create_deposit<'info>(
     let accounts = ctx.accounts;
     accounts.transfer_execution_fee(params)?;
     accounts.transfer_tokens(params)?;
-    CreateDepositOps::builder()
+    CreateDepositOperation::builder()
         .deposit(accounts.deposit.clone())
         .market(accounts.market.clone())
         .store(accounts.store.clone())
@@ -244,7 +244,7 @@ impl<'info> CreateDeposit<'info> {
     }
 
     fn transfer_execution_fee(&self, params: &CreateDepositParams) -> Result<()> {
-        TransferExecutionFeeOps::builder()
+        TransferExecutionFeeOperation::builder()
             .payment(self.deposit.to_account_info())
             .payer(self.owner.to_account_info())
             .execution_lamports(params.execution_fee)

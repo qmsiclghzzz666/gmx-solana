@@ -7,9 +7,9 @@ use crate::{
     CoreError,
 };
 
-/// Market Transfer In.
+/// Operation for transferring funds into market valut.
 #[derive(TypedBuilder)]
-pub(crate) struct MarketTransferIn<'a, 'info> {
+pub(crate) struct MarketTransferInOperation<'a, 'info> {
     store: &'a AccountLoader<'info, Store>,
     market: &'a AccountLoader<'info, Market>,
     from: AccountInfo<'info>,
@@ -20,7 +20,7 @@ pub(crate) struct MarketTransferIn<'a, 'info> {
     signer_seeds: &'a [&'a [u8]],
 }
 
-impl<'a, 'info> MarketTransferIn<'a, 'info> {
+impl<'a, 'info> MarketTransferInOperation<'a, 'info> {
     pub(crate) fn execute(self) -> Result<()> {
         use anchor_spl::token;
 
@@ -50,9 +50,9 @@ impl<'a, 'info> MarketTransferIn<'a, 'info> {
     }
 }
 
-/// Market Transfer Out.
+/// Operation for transferring funds out of market vault.
 #[derive(TypedBuilder)]
-pub(crate) struct MarketTransferOut<'a, 'info> {
+pub(crate) struct MarketTransferOutOperation<'a, 'info> {
     store: &'a AccountLoader<'info, Store>,
     market: &'a AccountLoader<'info, Market>,
     amount: u64,
@@ -63,7 +63,7 @@ pub(crate) struct MarketTransferOut<'a, 'info> {
     token_program: AccountInfo<'info>,
 }
 
-impl<'a, 'info> MarketTransferOut<'a, 'info> {
+impl<'a, 'info> MarketTransferOutOperation<'a, 'info> {
     pub(crate) fn execute(self) -> Result<()> {
         use crate::utils::internal::TransferUtils;
 

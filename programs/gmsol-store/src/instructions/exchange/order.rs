@@ -12,8 +12,8 @@ use crate::{
     constants,
     events::RemoveOrderEvent,
     ops::{
-        execution_fee::TransferExecutionFeeOps,
-        order::{CreateOrderOps, CreateOrderParams},
+        execution_fee::TransferExecutionFeeOperation,
+        order::{CreateOrderOperation, CreateOrderParams},
     },
     states::{
         feature::ActionDisabledFlag,
@@ -315,7 +315,7 @@ fn validate_and_initialize_position_if_needed<'info>(
     )?;
 
     if should_transfer_in {
-        TransferExecutionFeeOps::builder()
+        TransferExecutionFeeOperation::builder()
             .payment(position.to_account_info())
             .payer(owner.clone())
             .execution_lamports(Order::position_cut_rent()?)
@@ -502,7 +502,7 @@ pub(crate) fn create_order<'info>(
     accounts.transfer_execution_fee(params)?;
     accounts.transfer_tokens(params)?;
 
-    let ops = CreateOrderOps::builder()
+    let ops = CreateOrderOperation::builder()
         .order(accounts.order.clone())
         .market(accounts.market.clone())
         .store(accounts.store.clone())
@@ -592,7 +592,7 @@ pub(crate) fn create_order<'info>(
 
 impl<'info> CreateOrder<'info> {
     fn transfer_execution_fee(&self, params: &CreateOrderParams) -> Result<()> {
-        TransferExecutionFeeOps::builder()
+        TransferExecutionFeeOperation::builder()
             .payment(self.order.to_account_info())
             .payer(self.owner.to_account_info())
             .execution_lamports(params.execution_fee)

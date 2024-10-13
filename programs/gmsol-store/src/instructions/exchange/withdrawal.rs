@@ -7,12 +7,11 @@ use anchor_spl::{
 use crate::{
     events::RemoveWithdrawalEvent,
     ops::{
-        execution_fee::TransferExecutionFeeOps,
-        withdrawal::{CreateWithdrawalOps, CreateWithdrawalParams},
+        execution_fee::TransferExecutionFeeOperation,
+        withdrawal::{CreateWithdrawalOperation, CreateWithdrawalParams},
     },
     states::{
-        common::action::ActionExt, withdrawal::Withdrawal, Market, NonceBytes, RoleKey, Seed,
-        Store,
+        common::action::ActionExt, withdrawal::Withdrawal, Market, NonceBytes, RoleKey, Seed, Store,
     },
     utils::{
         internal::{self, Authentication},
@@ -165,7 +164,7 @@ pub(crate) fn create_withdrawal<'info>(
     let accounts = ctx.accounts;
     accounts.transfer_execution_fee(params)?;
     accounts.transfer_tokens(params)?;
-    CreateWithdrawalOps::builder()
+    CreateWithdrawalOperation::builder()
         .withdrawal(accounts.withdrawal.clone())
         .market(accounts.market.clone())
         .store(accounts.store.clone())
@@ -184,7 +183,7 @@ pub(crate) fn create_withdrawal<'info>(
 
 impl<'info> CreateWithdrawal<'info> {
     fn transfer_execution_fee(&self, params: &CreateWithdrawalParams) -> Result<()> {
-        TransferExecutionFeeOps::builder()
+        TransferExecutionFeeOperation::builder()
             .payment(self.withdrawal.to_account_info())
             .payer(self.owner.to_account_info())
             .execution_lamports(params.execution_fee)

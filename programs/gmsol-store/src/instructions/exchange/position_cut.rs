@@ -11,7 +11,7 @@ use crate::{
     events::{TradeEvent, TradeEventData},
     get_pnl_token,
     ops::{
-        execution_fee::PayExecutionFeeOps,
+        execution_fee::PayExecutionFeeOperation,
         order::{PositionCutKind, PositionCutOp},
     },
     states::{
@@ -292,7 +292,7 @@ impl<'info> PositionCut<'info> {
     #[inline(never)]
     fn pay_execution_fee(&self, execution_fee: u64) -> Result<()> {
         let execution_lamports = self.order.load()?.execution_lamports(execution_fee);
-        PayExecutionFeeOps::builder()
+        PayExecutionFeeOperation::builder()
             .payer(self.order.to_account_info())
             .receiver(self.authority.to_account_info())
             .execution_lamports(execution_lamports)

@@ -28,7 +28,7 @@ use crate::{
     CoreError, ModelError,
 };
 
-use super::{execution_fee::TransferExecutionFeeOps, market::MarketTransferOut};
+use super::{execution_fee::TransferExecutionFeeOperation, market::MarketTransferOutOperation};
 
 /// Create Order Arguments.
 // #[cfg_attr(feature = "debug", derive(Debug))]
@@ -80,9 +80,9 @@ impl CreateOrderParams {
     }
 }
 
-/// Create Order Ops
+/// Operations for creating a new order.
 #[derive(TypedBuilder)]
-pub(crate) struct CreateOrderOps<'a, 'info> {
+pub(crate) struct CreateOrderOperation<'a, 'info> {
     order: AccountLoader<'info, Order>,
     market: AccountLoader<'info, Market>,
     store: AccountLoader<'info, Store>,
@@ -93,25 +93,32 @@ pub(crate) struct CreateOrderOps<'a, 'info> {
     swap_path: &'info [AccountInfo<'info>],
 }
 
-impl<'a, 'info> CreateOrderOps<'a, 'info> {
+impl<'a, 'info> CreateOrderOperation<'a, 'info> {
     pub(crate) fn swap(
         self,
-    ) -> CreateSwapOrderOpBuilder<'a, 'info, ((CreateOrderOps<'a, 'info>,), (), ())> {
-        CreateSwapOrderOp::builder().common(self)
+    ) -> CreateSwapOrderOperationBuilder<'a, 'info, ((CreateOrderOperation<'a, 'info>,), (), ())>
+    {
+        CreateSwapOrderOperation::builder().common(self)
     }
 
     pub(crate) fn increase(
         self,
-    ) -> CreateIncreaseOrderOpBuilder<'a, 'info, ((CreateOrderOps<'a, 'info>,), (), (), (), ())>
-    {
-        CreateIncreaseOrderOp::builder().common(self)
+    ) -> CreateIncreaseOrderOperationBuilder<
+        'a,
+        'info,
+        ((CreateOrderOperation<'a, 'info>,), (), (), (), ()),
+    > {
+        CreateIncreaseOrderOperation::builder().common(self)
     }
 
     pub(crate) fn decrease(
         self,
-    ) -> CreateDecreaseOrderOpBuilder<'a, 'info, ((CreateOrderOps<'a, 'info>,), (), (), (), ())>
-    {
-        CreateDecreaseOrderOp::builder().common(self)
+    ) -> CreateDecreaseOrderOperationBuilder<
+        'a,
+        'info,
+        ((CreateOrderOperation<'a, 'info>,), (), (), (), ()),
+    > {
+        CreateDecreaseOrderOperation::builder().common(self)
     }
 
     fn validate(&self) -> Result<()> {
@@ -185,15 +192,15 @@ impl<'a, 'info> CreateOrderOps<'a, 'info> {
     }
 }
 
-/// Create Swap Order.
+/// Operation for creating a new swap order.
 #[derive(TypedBuilder)]
-pub(crate) struct CreateSwapOrderOp<'a, 'info> {
-    common: CreateOrderOps<'a, 'info>,
+pub(crate) struct CreateSwapOrderOperation<'a, 'info> {
+    common: CreateOrderOperation<'a, 'info>,
     swap_in_token: &'a Account<'info, TokenAccount>,
     swap_out_token: &'a Account<'info, TokenAccount>,
 }
 
-impl<'a, 'info> CreateSwapOrderOp<'a, 'info> {
+impl<'a, 'info> CreateSwapOrderOperation<'a, 'info> {
     pub(crate) fn execute(self) -> Result<()> {
         self.common.validate()?;
         self.validate_params_excluding_swap()?;
@@ -235,17 +242,17 @@ impl<'a, 'info> CreateSwapOrderOp<'a, 'info> {
     }
 }
 
-/// Create Increase Order.
+/// Operation for creating a new increase position order.
 #[derive(TypedBuilder)]
-pub(crate) struct CreateIncreaseOrderOp<'a, 'info> {
-    common: CreateOrderOps<'a, 'info>,
+pub(crate) struct CreateIncreaseOrderOperation<'a, 'info> {
+    common: CreateOrderOperation<'a, 'info>,
     position: &'a AccountLoader<'info, Position>,
     initial_collateral_token: &'a Account<'info, TokenAccount>,
     long_token: &'a Account<'info, TokenAccount>,
     short_token: &'a Account<'info, TokenAccount>,
 }
 
-impl<'a, 'info> CreateIncreaseOrderOp<'a, 'info> {
+impl<'a, 'info> CreateIncreaseOrderOperation<'a, 'info> {
     pub(crate) fn execute(self) -> Result<()> {
         self.common.validate()?;
         self.validate_params_excluding_swap()?;
@@ -310,17 +317,17 @@ impl<'a, 'info> CreateIncreaseOrderOp<'a, 'info> {
     }
 }
 
-/// Create Decrease Order.
+/// Operation for creating a new decrease position order.
 #[derive(TypedBuilder)]
-pub(crate) struct CreateDecreaseOrderOp<'a, 'info> {
-    common: CreateOrderOps<'a, 'info>,
+pub(crate) struct CreateDecreaseOrderOperation<'a, 'info> {
+    common: CreateOrderOperation<'a, 'info>,
     position: &'a AccountLoader<'info, Position>,
     final_output_token: &'a Account<'info, TokenAccount>,
     long_token: &'a Account<'info, TokenAccount>,
     short_token: &'a Account<'info, TokenAccount>,
 }
 
-impl<'a, 'info> CreateDecreaseOrderOp<'a, 'info> {
+impl<'a, 'info> CreateDecreaseOrderOperation<'a, 'info> {
     pub(crate) fn execute(self) -> Result<()> {
         self.common.validate()?;
         self.validate_params_excluding_swap()?;
@@ -370,8 +377,9 @@ impl<'a, 'info> CreateDecreaseOrderOp<'a, 'info> {
     }
 }
 
+/// Operation for processing [`TransferOut`].
 #[derive(TypedBuilder)]
-pub(crate) struct ProcessTransferOut<'a, 'info> {
+pub(crate) struct ProcessTransferOutOperation<'a, 'info> {
     token_program: AccountInfo<'info>,
     store: &'a AccountLoader<'info, Store>,
     market: &'a AccountLoader<'info, Market>,
@@ -393,7 +401,7 @@ pub(crate) struct ProcessTransferOut<'a, 'info> {
     transfer_out: &'a TransferOut,
 }
 
-impl<'a, 'info> ProcessTransferOut<'a, 'info> {
+impl<'a, 'info> ProcessTransferOutOperation<'a, 'info> {
     pub(crate) fn execute(self) -> Result<()> {
         let TransferOut {
             final_output_token,
@@ -409,7 +417,7 @@ impl<'a, 'info> ProcessTransferOut<'a, 'info> {
 
         if *final_output_token != 0 {
             let (token, market, vault, account) = self.final_output()?;
-            MarketTransferOut::builder()
+            MarketTransferOutOperation::builder()
                 .store(self.store)
                 .market(market)
                 .amount(*final_output_token)
@@ -440,7 +448,7 @@ impl<'a, 'info> ProcessTransferOut<'a, 'info> {
 
         if long_token_amount != 0 {
             let (token, vault, account) = self.long_token()?;
-            MarketTransferOut::builder()
+            MarketTransferOutOperation::builder()
                 .store(self.store)
                 .token_program(self.token_program.clone())
                 .market(self.market)
@@ -455,7 +463,7 @@ impl<'a, 'info> ProcessTransferOut<'a, 'info> {
 
         if short_token_amount != 0 {
             let (token, vault, account) = self.short_token()?;
-            MarketTransferOut::builder()
+            MarketTransferOutOperation::builder()
                 .store(self.store)
                 .token_program(self.token_program.clone())
                 .market(self.market)
@@ -470,7 +478,7 @@ impl<'a, 'info> ProcessTransferOut<'a, 'info> {
 
         if *long_token_for_claimable_account_of_user != 0 {
             let (token, vault, account) = self.claimable_long_token_account_for_user()?;
-            MarketTransferOut::builder()
+            MarketTransferOutOperation::builder()
                 .store(self.store)
                 .token_program(self.token_program.clone())
                 .market(self.market)
@@ -485,7 +493,7 @@ impl<'a, 'info> ProcessTransferOut<'a, 'info> {
 
         if *short_token_for_claimable_account_of_user != 0 {
             let (token, vault, account) = self.claimable_short_token_account_for_user()?;
-            MarketTransferOut::builder()
+            MarketTransferOutOperation::builder()
                 .store(self.store)
                 .token_program(self.token_program.clone())
                 .market(self.market)
@@ -500,7 +508,7 @@ impl<'a, 'info> ProcessTransferOut<'a, 'info> {
 
         if *long_token_for_claimable_account_of_holding != 0 {
             let (token, vault, account) = self.claimable_long_token_account_for_holding()?;
-            MarketTransferOut::builder()
+            MarketTransferOutOperation::builder()
                 .store(self.store)
                 .token_program(self.token_program.clone())
                 .market(self.market)
@@ -515,7 +523,7 @@ impl<'a, 'info> ProcessTransferOut<'a, 'info> {
 
         if *short_token_for_claimable_account_of_holding != 0 {
             let (token, vault, account) = self.claimable_short_token_account_for_holding()?;
-            MarketTransferOut::builder()
+            MarketTransferOutOperation::builder()
                 .store(self.store)
                 .token_program(self.token_program.clone())
                 .market(self.market)
@@ -683,9 +691,9 @@ impl<'a, 'info> ProcessTransferOut<'a, 'info> {
     }
 }
 
-/// Execute Order Ops.
+/// Operation for executing order.
 #[derive(TypedBuilder)]
-pub(crate) struct ExecuteOrderOps<'a, 'info> {
+pub(crate) struct ExecuteOrderOperation<'a, 'info> {
     executor: AccountInfo<'info>,
     user: &'a AccountLoader<'info, UserHeader>,
     store: &'a AccountLoader<'info, Store>,
@@ -710,7 +718,7 @@ enum SecondaryOrderType {
     AutoDeleveraging,
 }
 
-impl<'a, 'info> ExecuteOrderOps<'a, 'info> {
+impl<'a, 'info> ExecuteOrderOperation<'a, 'info> {
     pub(crate) fn execute(self) -> Result<(Box<TransferOut>, ShouldSendTradeEvent)> {
         let mut should_close_position = false;
 
@@ -736,7 +744,7 @@ impl<'a, 'info> ExecuteOrderOps<'a, 'info> {
         let mut should_throw_error = false;
         let prices = self.market.load()?.prices(self.oracle)?;
         let discount = self.validate_and_get_order_fee_discount()?;
-        let res = match self.do_execute(&mut should_throw_error, prices, discount) {
+        let res = match self.perfrom_execution(&mut should_throw_error, prices, discount) {
             Ok((should_remove_position, mut transfer_out, should_send_trade_event)) => {
                 transfer_out.set_executed(true);
                 should_close_position = should_remove_position;
@@ -781,7 +789,7 @@ impl<'a, 'info> ExecuteOrderOps<'a, 'info> {
     }
 
     #[inline(never)]
-    fn do_execute(
+    fn perfrom_execution(
         &self,
         should_throw_error: &mut bool,
         prices: Prices<u128>,
@@ -1054,7 +1062,7 @@ impl<'a, 'info> ExecuteOrderOps<'a, 'info> {
     }
 }
 
-impl<'a, 'info> ValidateOracleTime for ExecuteOrderOps<'a, 'info> {
+impl<'a, 'info> ValidateOracleTime for ExecuteOrderOperation<'a, 'info> {
     fn oracle_updated_after(&self) -> crate::CoreResult<Option<i64>> {
         let (kind, updated_at) = {
             let order = self.order.load().map_err(|_| CoreError::LoadAccountError)?;
@@ -1545,7 +1553,7 @@ impl<'a, 'info> PositionCutOp<'a, 'info> {
         is_long: bool,
         is_collateral_long: bool,
     ) -> Result<()> {
-        TransferExecutionFeeOps::builder()
+        TransferExecutionFeeOperation::builder()
             .payment(self.order.to_account_info())
             .payer(self.executor.to_account_info())
             .execution_lamports(Order::MIN_EXECUTION_LAMPORTS)
@@ -1569,7 +1577,7 @@ impl<'a, 'info> PositionCutOp<'a, 'info> {
         } else {
             self.short_token_account
         };
-        CreateOrderOps::builder()
+        CreateOrderOperation::builder()
             .order(self.order.clone())
             .market(self.market.clone())
             .store(self.store.clone())
@@ -1593,7 +1601,7 @@ impl<'a, 'info> PositionCutOp<'a, 'info> {
 
     #[inline(never)]
     fn execute_order(&self) -> Result<(Box<TransferOut>, ShouldSendTradeEvent)> {
-        ExecuteOrderOps::builder()
+        ExecuteOrderOperation::builder()
             .store(self.store)
             .market(self.market)
             .order(self.order)
@@ -1631,7 +1639,7 @@ impl<'a, 'info> PositionCutOp<'a, 'info> {
                 self.short_token_vault,
             )
         };
-        ProcessTransferOut::builder()
+        ProcessTransferOutOperation::builder()
             .token_program(self.token_program.clone())
             .store(self.store)
             .market(self.market)
