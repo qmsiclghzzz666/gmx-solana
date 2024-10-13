@@ -18,7 +18,7 @@ use crate::{
 
 /// The accounts deifinition for the `execute_withdrawal` instruction.
 #[derive(Accounts)]
-pub struct ExecuteWithdrawalV2<'info> {
+pub struct ExecuteWithdrawal<'info> {
     /// Authority.
     pub authority: Signer<'info>,
     /// Store.
@@ -127,7 +127,7 @@ pub struct ExecuteWithdrawalV2<'info> {
 
 /// CHECK only ORDER_KEEPER can invoke this instruction.
 pub(crate) fn unchecked_execute_withdrawal<'info>(
-    ctx: Context<'_, '_, 'info, 'info, ExecuteWithdrawalV2<'info>>,
+    ctx: Context<'_, '_, 'info, 'info, ExecuteWithdrawal<'info>>,
     execution_fee: u64,
     throw_on_execution_error: bool,
 ) -> Result<()> {
@@ -160,7 +160,7 @@ pub(crate) fn unchecked_execute_withdrawal<'info>(
     Ok(())
 }
 
-impl<'info> internal::Authentication<'info> for ExecuteWithdrawalV2<'info> {
+impl<'info> internal::Authentication<'info> for ExecuteWithdrawal<'info> {
     fn authority(&self) -> &Signer<'info> {
         &self.authority
     }
@@ -170,7 +170,7 @@ impl<'info> internal::Authentication<'info> for ExecuteWithdrawalV2<'info> {
     }
 }
 
-impl<'info> ExecuteWithdrawalV2<'info> {
+impl<'info> ExecuteWithdrawal<'info> {
     fn perform_execution(
         &mut self,
         remaining_accounts: &'info [AccountInfo<'info>],

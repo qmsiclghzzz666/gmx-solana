@@ -1094,8 +1094,8 @@ pub mod gmsol_store {
     }
 
     #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
-    pub fn execute_deposit_v2<'info>(
-        ctx: Context<'_, '_, 'info, 'info, ExecuteDepositV2<'info>>,
+    pub fn execute_deposit<'info>(
+        ctx: Context<'_, '_, 'info, 'info, ExecuteDeposit<'info>>,
         execution_fee: u64,
         throw_on_execution_error: bool,
     ) -> Result<()> {
@@ -1122,8 +1122,8 @@ pub mod gmsol_store {
     }
 
     #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
-    pub fn execute_withdrawal_v2<'info>(
-        ctx: Context<'_, '_, 'info, 'info, ExecuteWithdrawalV2<'info>>,
+    pub fn execute_withdrawal<'info>(
+        ctx: Context<'_, '_, 'info, 'info, ExecuteWithdrawal<'info>>,
         execution_fee: u64,
         throw_on_execution_error: bool,
     ) -> Result<()> {
@@ -1182,8 +1182,8 @@ pub mod gmsol_store {
     }
 
     #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
-    pub fn execute_order_v2<'info>(
-        ctx: Context<'_, '_, 'info, 'info, ExecuteOrderV2<'info>>,
+    pub fn execute_order<'info>(
+        ctx: Context<'_, '_, 'info, 'info, ExecuteOrder<'info>>,
         recent_timestamp: i64,
         execution_fee: u64,
         throw_on_execution_error: bool,

@@ -617,7 +617,7 @@ where
         let execute = client
             .store_rpc()
             .accounts(crate::utils::fix_optional_account_metas(
-                accounts::ExecuteDepositV2 {
+                accounts::ExecuteDeposit {
                     authority,
                     store: *store,
                     price_provider: *price_provider,
@@ -645,7 +645,7 @@ where
                 &gmsol_store::ID,
                 &self.client.store_program_id(),
             ))
-            .args(instruction::ExecuteDepositV2 {
+            .args(instruction::ExecuteDeposit {
                 execution_fee: *execution_fee,
                 throw_on_execution_error: !*cancel_on_execution_error,
             })

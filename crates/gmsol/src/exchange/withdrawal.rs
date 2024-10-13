@@ -569,7 +569,7 @@ where
         let execute = self
             .client
             .store_rpc()
-            .accounts(accounts::ExecuteWithdrawalV2 {
+            .accounts(accounts::ExecuteWithdrawal {
                 authority,
                 store: self.store,
                 price_provider: self.price_provider,
@@ -597,7 +597,7 @@ where
                     .client
                     .find_market_vault_address(&self.store, &hint.market_token),
             })
-            .args(instruction::ExecuteWithdrawalV2 {
+            .args(instruction::ExecuteWithdrawal {
                 execution_fee: self.execution_fee,
                 throw_on_execution_error: !self.cancel_on_execution_error,
             })

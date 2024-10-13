@@ -18,7 +18,7 @@ use crate::{
 
 /// The accounts definition for `execute_deposit` instruction.
 #[derive(Accounts)]
-pub struct ExecuteDepositV2<'info> {
+pub struct ExecuteDeposit<'info> {
     /// Authority.
     pub authority: Signer<'info>,
     /// Store.
@@ -118,7 +118,7 @@ pub struct ExecuteDepositV2<'info> {
 /// CHECK: only ORDER_KEEPER can invoke this instruction.
 #[inline(never)]
 pub(crate) fn unchecked_execute_deposit<'info>(
-    ctx: Context<'_, '_, 'info, 'info, ExecuteDepositV2<'info>>,
+    ctx: Context<'_, '_, 'info, 'info, ExecuteDeposit<'info>>,
     execution_fee: u64,
     throw_on_execution_error: bool,
 ) -> Result<()> {
@@ -144,7 +144,7 @@ pub(crate) fn unchecked_execute_deposit<'info>(
     Ok(())
 }
 
-impl<'info> internal::Authentication<'info> for ExecuteDepositV2<'info> {
+impl<'info> internal::Authentication<'info> for ExecuteDeposit<'info> {
     fn authority(&self) -> &Signer<'info> {
         &self.authority
     }
@@ -154,7 +154,7 @@ impl<'info> internal::Authentication<'info> for ExecuteDepositV2<'info> {
     }
 }
 
-impl<'info> ExecuteDepositV2<'info> {
+impl<'info> ExecuteDeposit<'info> {
     #[inline(never)]
     fn pay_execution_fee(&self, execution_fee: u64) -> Result<()> {
         let execution_lamports = self.deposit.load()?.execution_lamports(execution_fee);

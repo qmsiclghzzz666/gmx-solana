@@ -18,7 +18,7 @@ use gmsol_store::{
     ops::order::CreateOrderParams,
     states::{
         common::{action::Action, swap::SwapParamsV2, TokensWithFeed},
-        order::{OrderKind, Order},
+        order::{Order, OrderKind},
         position::PositionKind,
         user::UserHeader,
         Market, MarketMeta, NonceBytes, Pyth, Store, TokenMapAccess,
@@ -1048,7 +1048,7 @@ where
                 .client
                 .store_rpc()
                 .accounts(crate::utils::fix_optional_account_metas(
-                    accounts::ExecuteOrderV2 {
+                    accounts::ExecuteOrder {
                         authority,
                         owner: hint.owner,
                         user: hint.user,
@@ -1101,7 +1101,7 @@ where
                     &gmsol_store::id(),
                     &self.client.store_program_id(),
                 ))
-                .args(instruction::ExecuteOrderV2 {
+                .args(instruction::ExecuteOrder {
                     recent_timestamp: self.recent_timestamp,
                     execution_fee: self.execution_fee,
                     throw_on_execution_error: !self.cancel_on_execution_error,

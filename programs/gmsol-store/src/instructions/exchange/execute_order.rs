@@ -117,7 +117,7 @@ pub(crate) fn validated_recent_timestamp(config: &Store, timestamp: i64) -> Resu
 #[event_cpi]
 #[derive(Accounts)]
 #[instruction(recent_timestamp: i64)]
-pub struct ExecuteOrderV2<'info> {
+pub struct ExecuteOrder<'info> {
     /// Authority.
     pub authority: Signer<'info>,
     /// Store.
@@ -323,7 +323,7 @@ pub struct ExecuteOrderV2<'info> {
 }
 
 pub(crate) fn unchecked_execute_order<'info>(
-    mut ctx: Context<'_, '_, 'info, 'info, ExecuteOrderV2<'info>>,
+    mut ctx: Context<'_, '_, 'info, 'info, ExecuteOrder<'info>>,
     _recent_timestamp: i64,
     execution_fee: u64,
     throw_on_execution_error: bool,
@@ -371,7 +371,7 @@ pub(crate) fn unchecked_execute_order<'info>(
     Ok(())
 }
 
-impl<'info> internal::Authentication<'info> for ExecuteOrderV2<'info> {
+impl<'info> internal::Authentication<'info> for ExecuteOrder<'info> {
     fn authority(&self) -> &Signer<'info> {
         &self.authority
     }
@@ -381,7 +381,7 @@ impl<'info> internal::Authentication<'info> for ExecuteOrderV2<'info> {
     }
 }
 
-impl<'info> ExecuteOrderV2<'info> {
+impl<'info> ExecuteOrder<'info> {
     fn transfer_tokens_in(
         &self,
         signer: &ActionSigner,
