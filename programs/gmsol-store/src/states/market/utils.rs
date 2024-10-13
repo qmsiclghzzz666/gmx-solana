@@ -152,3 +152,8 @@ impl Adl for Market {
         Ok(())
     }
 }
+
+/// Trait for defining operations related to GLV.
+pub trait Glv {}
+
+impl Glv for Market {}
