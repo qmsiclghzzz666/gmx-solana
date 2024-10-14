@@ -290,7 +290,7 @@ impl SwapParams {
     }
 }
 
-fn unpack_markets<'info>(
+pub(crate) fn unpack_markets<'info>(
     path: &'info [AccountInfo<'info>],
 ) -> impl Iterator<Item = Result<AccountLoader<'info, Market>>> {
     path.iter().map(AccountLoader::try_from)

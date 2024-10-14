@@ -4,9 +4,7 @@ use anchor_lang::prelude::*;
 
 use crate::CoreError;
 
-use super::Seed;
-
-const MAX_ALLOWED_NUMBER_OF_MARKETS: usize = 128;
+use super::{common::swap::unpack_markets, Seed};
 
 /// Glv.
 #[account(zero_copy)]
@@ -25,7 +23,7 @@ pub struct Glv {
     pub(crate) long_token: Pubkey,
     pub(crate) short_token: Pubkey,
     reserve: [u8; 256],
-    market_tokens: [Pubkey; MAX_ALLOWED_NUMBER_OF_MARKETS],
+    market_tokens: [Pubkey; Glv::MAX_ALLOWED_NUMBER_OF_MARKETS],
 }
 
 impl Seed for Glv {
@@ -39,21 +37,23 @@ impl Glv {
     /// GLV token seed.
     pub const GLV_TOKEN_SEED: &'static [u8] = b"glv_token";
 
+    /// Max allowed number of markets.
+    pub const MAX_ALLOWED_NUMBER_OF_MARKETS: usize = 128;
+
     /// Initialize the [`Glv`] account.
     ///
     /// # CHECK
     /// - The [`Glv`] account must be uninitialized.
-    /// - The `bump` must be the bump derving the address of the [`Glv`] account.
-    /// - The `glv_token` must be used to dervie the address of the [`Glv`] account.
-    /// - The market tokens must be valid, and their corresponding markets
+    /// - The `bump` must be the bump deriving the address of the [`Glv`] account.
+    /// - The `glv_token` must be used to derive the address of the [`Glv`] account.
+    /// - The market tokens must be valid and unique, and their corresponding markets
     ///   must use the given tokens as long token and short token.
-    /// - The `store` must be the address of the store owning the correspoding markets.
+    /// - The `store` must be the address of the store owning the corresponding markets.
     ///
     /// # Errors
     /// - The `glv_token` address must be derived from [`GLV_TOKEN_SEED`](Self::GLV_TOKEN_SEED), `store` and `index`.
     /// - The total number of the market tokens must not exceed the max allowed number of markets.
-    /// - The market tokens must be unique.
-    pub(crate) fn unchecked_init<'a>(
+    pub(crate) fn unchecked_init(
         &mut self,
         bump: u8,
         index: u8,
@@ -61,7 +61,7 @@ impl Glv {
         glv_token: &Pubkey,
         long_token: &Pubkey,
         short_token: &Pubkey,
-        market_tokens: impl IntoIterator<Item = &'a Pubkey>,
+        market_tokens: &HashSet<Pubkey>,
     ) -> Result<()> {
         let expected_glv_token = Pubkey::find_program_address(
             &[Self::GLV_TOKEN_SEED, store.as_ref(), &[index]],
@@ -78,18 +78,58 @@ impl Glv {
         self.long_token = *long_token;
         self.short_token = *short_token;
 
-        let mut seen = HashSet::<_>::default();
-        for (idx, market_token) in market_tokens.into_iter().enumerate() {
-            require!(seen.insert(market_token), CoreError::InvalidArgument);
+        for (idx, market_token) in market_tokens.iter().enumerate() {
             self.num_markets += 1;
             require_gte!(
-                MAX_ALLOWED_NUMBER_OF_MARKETS,
+                Self::MAX_ALLOWED_NUMBER_OF_MARKETS,
                 self.num_markets as usize,
                 CoreError::ExceedMaxLengthLimit
             );
             self.market_tokens[idx] = *market_token;
         }
         Ok(())
+    }
+
+    pub(crate) fn process_and_validate_markets_for_init<'info>(
+        markets: &'info [AccountInfo<'info>],
+        store: &Pubkey,
+    ) -> Result<(Pubkey, Pubkey, HashSet<Pubkey>)> {
+        let mut tokens = None;
+
+        let mut market_tokens = HashSet::default();
+        for market in unpack_markets(markets) {
+            let market = market?;
+            let market = market.load()?;
+            market.validate(store)?;
+            let meta = market.meta();
+            match &mut tokens {
+                Some((long_token, short_token)) => {
+                    require_eq!(
+                        *long_token,
+                        meta.long_token_mint,
+                        CoreError::TokenMintMismatched
+                    );
+                    require_eq!(
+                        *short_token,
+                        meta.short_token_mint,
+                        CoreError::TokenMintMismatched
+                    );
+                }
+                none => {
+                    *none = Some((meta.long_token_mint, meta.short_token_mint));
+                }
+            }
+            require!(
+                market_tokens.insert(meta.market_token_mint),
+                CoreError::InvalidArgument
+            );
+        }
+
+        if let Some((long_token, short_token)) = tokens {
+            Ok((long_token, short_token, market_tokens))
+        } else {
+            err!(CoreError::InvalidArgument)
+        }
     }
 
     /// Get the version of the [`Glv`] account format.

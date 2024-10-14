@@ -1354,6 +1354,14 @@ pub mod gmsol_store {
     pub fn transfer_referral_code(ctx: Context<TransferReferralCode>) -> Result<()> {
         instructions::transfer_referral_code(ctx)
     }
+
+    #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
+    pub fn initalize_glv<'info>(
+        ctx: Context<'_, '_, 'info, 'info, InitializeGlv<'info>>,
+        index: u8,
+    ) -> Result<()> {
+        instructions::unchecked_initialize_glv(ctx, index)
+    }
 }
 
 /// Result type with [`CoreError`] as error type.

@@ -55,6 +55,9 @@ pub mod user;
 /// Instructions for disabled features.
 pub mod feature;
 
+/// Instructions for GLV.
+pub mod glv;
+
 /// Instructions for bug fixes.
 #[cfg(not(feature = "no-bug-fix"))]
 pub mod bug_fix;
@@ -63,6 +66,7 @@ pub use config::*;
 pub use data_store::*;
 pub use exchange::*;
 pub use feature::*;
+pub use glv::*;
 pub use gt::*;
 pub use market::*;
 pub use oracle::*;
