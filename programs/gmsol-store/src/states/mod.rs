@@ -37,6 +37,9 @@ pub mod shift;
 /// User.
 pub mod user;
 
+/// GLV.
+pub mod glv;
+
 pub use deposit::Deposit;
 pub use market::{
     config::MarketConfigKey, pool::Pool, HasMarketMeta, Market, MarketMeta, MarketState,
