@@ -448,6 +448,8 @@ pub struct MarketState {
     withdrawal_count: u64,
     order_count: u64,
     shift_count: u64,
+    glv_deposit_count: u64,
+    glv_withdrawal_count: u64,
     padding_0: [u8; 8],
     reserve: [u8; 256],
 }
@@ -491,6 +493,16 @@ impl MarketState {
     /// Get current shift count.
     pub fn shift_count(&self) -> u64 {
         self.shift_count
+    }
+
+    /// Get current GLV deposit count.
+    pub fn glv_deposit_count(&self) -> u64 {
+        self.glv_deposit_count
+    }
+
+    /// Get current GLV withdrawal count.
+    pub fn glv_withdrawal_count(&self) -> u64 {
+        self.glv_withdrawal_count
     }
 
     /// Next deposit id.
@@ -540,6 +552,26 @@ impl MarketState {
             .checked_add(1)
             .ok_or(error!(CoreError::TokenAmountOverflow))?;
         self.shift_count = next_id;
+        Ok(next_id)
+    }
+
+    /// Next GLV deposit id.
+    pub fn next_glv_deposit_id(&mut self) -> Result<u64> {
+        let next_id = self
+            .glv_deposit_count
+            .checked_add(1)
+            .ok_or(error!(CoreError::TokenAmountOverflow))?;
+        self.glv_deposit_count = next_id;
+        Ok(next_id)
+    }
+
+    /// Next GLV withdrawal id.
+    pub fn next_glv_withdrawal_id(&mut self) -> Result<u64> {
+        let next_id = self
+            .glv_withdrawal_count
+            .checked_add(1)
+            .ok_or(error!(CoreError::TokenAmountOverflow))?;
+        self.glv_withdrawal_count = next_id;
         Ok(next_id)
     }
 }

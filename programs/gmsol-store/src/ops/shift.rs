@@ -5,7 +5,7 @@ use typed_builder::TypedBuilder;
 
 use crate::{
     states::{
-        common::action::Action,
+        common::action::{Action, ActionExt},
         market::{
             revertible::{Revertible, RevertibleLiquidityMarket},
             utils::ValidateMarketBalances,
@@ -122,17 +122,7 @@ impl<'a, 'info> CreateShiftOperation<'a, 'info> {
             CoreError::NotEnoughTokenAmount
         );
 
-        require_gte!(
-            params.execution_lamports,
-            Shift::MIN_EXECUTION_LAMPORTS,
-            CoreError::NotEnoughExecutionFee
-        );
-
-        require_gte!(
-            self.shift.get_lamports(),
-            params.execution_lamports,
-            CoreError::NotEnoughExecutionFee
-        );
+        ActionExt::validate_balance(self.shift, params.execution_lamports)?;
         Ok(())
     }
 }

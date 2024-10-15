@@ -28,12 +28,6 @@ pub struct Withdrawal {
 }
 
 impl Withdrawal {
-    /// Init space.
-    pub const INIT_SPACE: usize = core::mem::size_of::<Self>();
-
-    /// Min execution lamports.
-    pub const MIN_EXECUTION_LAMPORTS: u64 = 200_000;
-
     /// Get tokens and accounts.
     pub fn tokens(&self) -> &TokenAccounts {
         &self.tokens
@@ -69,7 +63,13 @@ impl Seed for Withdrawal {
     const SEED: &'static [u8] = b"withdrawal";
 }
 
+impl gmsol_utils::InitSpace for Withdrawal {
+    const INIT_SPACE: usize = core::mem::size_of::<Self>();
+}
+
 impl Action for Withdrawal {
+    const MIN_EXECUTION_LAMPORTS: u64 = 200_000;
+
     fn header(&self) -> &ActionHeader {
         &self.header
     }

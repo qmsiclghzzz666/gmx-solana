@@ -287,7 +287,7 @@ where
                         .map_err(|_| crate::Error::NumberOutOfRange)?,
                     initial_long_token_amount: *initial_long_token_amount,
                     initial_short_token_amount: *initial_short_token_amount,
-                    min_market_token: *min_market_token,
+                    min_market_token_amount: *min_market_token,
                 },
             })
             .accounts(

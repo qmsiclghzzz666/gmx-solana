@@ -118,6 +118,7 @@ use self::{
     instructions::*,
     ops::{
         deposit::CreateDepositParams,
+        glv::CreateGlvDepositParams,
         order::{CreateOrderParams, PositionCutKind},
         shift::CreateShiftParams,
         withdrawal::CreateWithdrawalParams,
@@ -1355,12 +1356,23 @@ pub mod gmsol_store {
         instructions::transfer_referral_code(ctx)
     }
 
+    // GLV instructions.
+    /// Initialize GLV.
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn initalize_glv<'info>(
         ctx: Context<'_, '_, 'info, 'info, InitializeGlv<'info>>,
         index: u8,
     ) -> Result<()> {
         instructions::unchecked_initialize_glv(ctx, index)
+    }
+
+    /// Create GLV deposit.
+    pub fn create_glv_deposit<'info>(
+        ctx: Context<'_, '_, 'info, 'info, CreateGlvDeposit<'info>>,
+        nonce: [u8; 32],
+        params: CreateGlvDepositParams,
+    ) -> Result<()> {
+        instructions::create_glv_deposit(ctx, &nonce, &params)
     }
 }
 

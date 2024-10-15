@@ -27,18 +27,18 @@ impl Seed for Shift {
 }
 
 impl Action for Shift {
+    const MIN_EXECUTION_LAMPORTS: u64 = 200_000;
+
     fn header(&self) -> &ActionHeader {
         &self.header
     }
 }
 
+impl gmsol_utils::InitSpace for Shift {
+    const INIT_SPACE: usize = core::mem::size_of::<Self>();
+}
+
 impl Shift {
-    /// Init Space.
-    pub const INIT_SPACE: usize = core::mem::size_of::<Self>();
-
-    /// Min execution lamports.
-    pub const MIN_EXECUTION_LAMPORTS: u64 = 200_000;
-
     /// Get token infos.
     pub fn tokens(&self) -> &TokenAccounts {
         &self.tokens

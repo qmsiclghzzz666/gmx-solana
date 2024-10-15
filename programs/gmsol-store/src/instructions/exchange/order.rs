@@ -7,6 +7,7 @@ use anchor_spl::{
     token_interface,
 };
 use gmsol_model::utils::apply_factor;
+use gmsol_utils::InitSpace;
 
 use crate::{
     constants,

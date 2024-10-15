@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 use borsh::{BorshDeserialize, BorshSerialize};
 use gmsol_model::{action::decrease_position::DecreasePositionReport, price::Price};
+use gmsol_utils::InitSpace as _;
 
 use crate::{states::FactorKey, CoreError};
 
@@ -347,19 +348,19 @@ impl Seed for Order {
     const SEED: &'static [u8] = b"order";
 }
 
+impl gmsol_utils::InitSpace for Order {
+    const INIT_SPACE: usize = core::mem::size_of::<Self>();
+}
+
 impl Action for Order {
+    const MIN_EXECUTION_LAMPORTS: u64 = 300_000;
+
     fn header(&self) -> &ActionHeader {
         &self.header
     }
 }
 
 impl Order {
-    /// Init space.
-    pub const INIT_SPACE: usize = core::mem::size_of::<Self>();
-
-    /// Min execution lamports.
-    pub const MIN_EXECUTION_LAMPORTS: u64 = 300_000;
-
     /// Get rent for position cut.
     pub fn position_cut_rent() -> Result<u64> {
         use anchor_spl::token::TokenAccount;

@@ -9,8 +9,7 @@ use typed_builder::TypedBuilder;
 use crate::{
     events::TradeEventData,
     states::{
-        common::action::Action,
-        market::utils::Adl,
+        common::action::{Action, ActionExt},
         market::{
             revertible::{
                 perp_market::RevertiblePerpMarket,
@@ -18,7 +17,7 @@ use crate::{
                 swap_market::{SwapDirection, SwapMarkets},
                 Revertible,
             },
-            utils::ValidateMarketBalances,
+            utils::{Adl, ValidateMarketBalances},
         },
         order::{CollateralReceiver, Order, OrderKind, OrderParams, TokenAccounts, TransferOut},
         position::PositionKind,
@@ -123,20 +122,7 @@ impl<'a, 'info> CreateOrderOperation<'a, 'info> {
 
     fn validate(&self) -> Result<()> {
         self.market.load()?.validate(&self.store.key())?;
-        require_gte!(
-            self.params.execution_fee,
-            Order::MIN_EXECUTION_LAMPORTS,
-            CoreError::NotEnoughExecutionFee
-        );
-        let balance = self
-            .order
-            .get_lamports()
-            .saturating_sub(self.params.execution_fee);
-        let rent = Rent::get()?;
-        require!(
-            rent.is_exempt(balance, Order::INIT_SPACE),
-            CoreError::NotEnoughExecutionFee
-        );
+        ActionExt::validate_balance(&self.order, self.params.execution_fee)?;
         Ok(())
     }
 

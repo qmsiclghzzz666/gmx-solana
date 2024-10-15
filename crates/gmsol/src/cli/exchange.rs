@@ -5,7 +5,7 @@ use anchor_client::{
 use eyre::OptionExt;
 use gmsol::{
     exchange::ExchangeOps,
-    types::{withdrawal::Withdrawal, Deposit, UpdateOrderParams},
+    types::{common::action::Action, withdrawal::Withdrawal, Deposit, UpdateOrderParams},
     utils::price_to_min_output_amount,
 };
 use rust_decimal::Decimal;

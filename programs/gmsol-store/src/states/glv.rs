@@ -4,7 +4,14 @@ use anchor_lang::prelude::*;
 
 use crate::CoreError;
 
-use super::{common::swap::unpack_markets, Seed};
+use super::{
+    common::{
+        action::{Action, ActionHeader},
+        swap::{unpack_markets, SwapParams},
+        token::TokenAndAccount,
+    },
+    Seed,
+};
 
 /// Glv.
 #[account(zero_copy)]
@@ -175,4 +182,95 @@ impl Glv {
     pub fn market_tokens(&self) -> &[Pubkey] {
         &self.market_tokens[0..(self.num_markets as usize)]
     }
+}
+
+/// Glv Deposit.
+#[cfg_attr(feature = "debug", derive(Debug))]
+#[account(zero_copy)]
+pub struct GlvDeposit {
+    /// Header.
+    pub(crate) header: ActionHeader,
+    /// Token accounts.
+    pub(crate) tokens: TokenAccounts,
+    /// Params.
+    pub(crate) params: GlvDepositParams,
+    /// Swap params.
+    pub(crate) swap: SwapParams,
+    padding_1: [u8; 4],
+    reserve: [u8; 128],
+}
+
+impl Action for GlvDeposit {
+    const MIN_EXECUTION_LAMPORTS: u64 = 200_000;
+
+    fn header(&self) -> &ActionHeader {
+        &self.header
+    }
+}
+
+impl Seed for GlvDeposit {
+    const SEED: &'static [u8] = b"glv_deposit";
+}
+
+impl gmsol_utils::InitSpace for GlvDeposit {
+    const INIT_SPACE: usize = core::mem::size_of::<Self>();
+}
+
+/// Token Accounts.
+#[cfg_attr(feature = "debug", derive(Debug))]
+#[account(zero_copy)]
+pub struct TokenAccounts {
+    /// Initial long token and account.
+    pub initial_long_token: TokenAndAccount,
+    /// Initial short token and account.
+    pub initial_short_token: TokenAndAccount,
+    /// Market token and account.
+    pub(crate) market_token: TokenAndAccount,
+    /// GLV token and account.
+    pub(crate) glv_token: TokenAndAccount,
+}
+
+impl TokenAccounts {
+    /// Get market token.
+    pub fn market_token(&self) -> Pubkey {
+        self.market_token
+            .token()
+            .expect("uninitialized GLV Deposit account")
+    }
+
+    /// Get market token account.
+    pub fn market_token_account(&self) -> Pubkey {
+        self.market_token
+            .account()
+            .expect("uninitalized GLV Deposit account")
+    }
+
+    /// Get GLV token.
+    pub fn glv_token(&self) -> Pubkey {
+        self.glv_token
+            .token()
+            .expect("uninitialized GLV Deposit account")
+    }
+
+    /// Get GLV token account.
+    pub fn glv_token_account(&self) -> Pubkey {
+        self.glv_token
+            .account()
+            .expect("uninitalized GLV Deposit account")
+    }
+}
+
+/// GLV Deposit Params.
+#[cfg_attr(feature = "debug", derive(Debug))]
+#[account(zero_copy)]
+pub struct GlvDepositParams {
+    /// The amount of initial long tokens to deposit.
+    pub(crate) initial_long_token_amount: u64,
+    /// The amount of initial short tokens to deposit.
+    pub(crate) initial_short_token_amount: u64,
+    /// The amount of market tokens to deposit.
+    pub(crate) market_token_amount: u64,
+    /// The minimum acceptable amount of glv tokens to receive.
+    pub(crate) min_glv_token_amount: u64,
+    reserved: [u8; 64],
 }

@@ -1,4 +1,5 @@
-use anchor_lang::prelude::*;
+use anchor_lang::{prelude::*, ZeroCopy};
+use gmsol_utils::InitSpace;
 
 use crate::{
     states::{NonceBytes, Seed},
@@ -236,6 +237,9 @@ impl ActionSigner {
 
 /// Action.
 pub trait Action {
+    /// Min execution lamports.
+    const MIN_EXECUTION_LAMPORTS: u64;
+
     /// Get the header.
     fn header(&self) -> &ActionHeader;
 }
@@ -253,6 +257,25 @@ pub trait ActionExt: Action {
     /// Execution lamports.
     fn execution_lamports(&self, execution_lamports: u64) -> u64 {
         execution_lamports.min(self.header().max_execution_lamports)
+    }
+
+    /// Validate balance.
+    fn validate_balance(account: &AccountLoader<Self>, execution_lamports: u64) -> Result<()>
+    where
+        Self: ZeroCopy + Owner + InitSpace,
+    {
+        require_gte!(
+            execution_lamports,
+            Self::MIN_EXECUTION_LAMPORTS,
+            CoreError::NotEnoughExecutionFee
+        );
+        let balance = account.get_lamports().saturating_sub(execution_lamports);
+        let rent = Rent::get()?;
+        require!(
+            rent.is_exempt(balance, Self::INIT_SPACE),
+            CoreError::NotEnoughExecutionFee
+        );
+        Ok(())
     }
 }
 

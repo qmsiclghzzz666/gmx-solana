@@ -4,7 +4,8 @@ use typed_builder::TypedBuilder;
 
 use crate::{
     states::{
-        common::action::Action, Deposit, Market, NonceBytes, Oracle, Store, ValidateOracleTime,
+        common::action::{Action, ActionExt},
+        Deposit, Market, NonceBytes, Oracle, Store, ValidateOracleTime,
     },
     CoreError, CoreResult,
 };
@@ -22,8 +23,8 @@ pub struct CreateDepositParams {
     pub initial_long_token_amount: u64,
     /// Initial short otken amount to deposit.
     pub initial_short_token_amount: u64,
-    /// The minimum acceptable market token to receive.
-    pub min_market_token: u64,
+    /// The minimum acceptable amount of market tokens to receive.
+    pub min_market_token_amount: u64,
 }
 
 /// Operation for creating a deposit.
@@ -102,7 +103,7 @@ impl<'a, 'info> CreateDepositOperation<'a, 'info> {
 
         deposit.params.initial_long_token_amount = params.initial_long_token_amount;
         deposit.params.initial_short_token_amount = params.initial_short_token_amount;
-        deposit.params.min_market_token_amount = params.min_market_token;
+        deposit.params.min_market_token_amount = params.min_market_token_amount;
 
         deposit.swap.validate_and_init(
             &*market.load()?,
@@ -146,7 +147,7 @@ impl<'a, 'info> CreateDepositOperation<'a, 'info> {
             );
         }
 
-        // If the two token accounts are actually the same, then we should check the total sum.
+        // If the two token accounts are actually the same, then we should check for the sum.
         let same_initial_token_amount = self.initial_long_token.as_ref().and_then(|long| {
             self.initial_short_token
                 .as_ref()
@@ -160,17 +161,7 @@ impl<'a, 'info> CreateDepositOperation<'a, 'info> {
             require_gte!(amount, total_amount, CoreError::NotEnoughTokenAmount);
         }
 
-        require_gte!(
-            params.execution_fee,
-            Deposit::MIN_EXECUTION_LAMPORTS,
-            CoreError::NotEnoughExecutionFee
-        );
-
-        require_gte!(
-            self.deposit.get_lamports(),
-            params.execution_fee,
-            CoreError::NotEnoughExecutionFee
-        );
+        ActionExt::validate_balance(&self.deposit, self.params.execution_fee)?;
 
         Ok(())
     }

@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::TokenAccount;
+use anchor_spl::{token::TokenAccount, token_interface};
 
 /// Token Account.
 #[cfg_attr(feature = "debug", derive(Debug))]
@@ -14,6 +14,15 @@ pub struct TokenAndAccount {
 impl TokenAndAccount {
     /// Initialize with token account.
     pub fn init(&mut self, account: &Account<TokenAccount>) {
+        self.token = account.mint;
+        self.account = account.key();
+    }
+
+    /// Initialize with token account interface.
+    pub fn init_with_interface(
+        &mut self,
+        account: &InterfaceAccount<token_interface::TokenAccount>,
+    ) {
         self.token = account.mint;
         self.account = account.key();
     }

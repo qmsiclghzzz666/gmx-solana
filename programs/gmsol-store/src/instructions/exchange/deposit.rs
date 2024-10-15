@@ -3,6 +3,7 @@ use anchor_spl::{
     associated_token::AssociatedToken,
     token::{Mint, Token, TokenAccount},
 };
+use gmsol_utils::InitSpace;
 
 use crate::{
     events::RemoveDepositEvent,

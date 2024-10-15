@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use gmsol_utils::InitSpace;
 
 use crate::{states::MarketConfigKey, CoreError};
 
@@ -32,13 +33,11 @@ pub fn find_first_deposit_owner_pda(store_program_id: &Pubkey) -> (Pubkey, u8) {
     Pubkey::find_program_address(&[Deposit::FIRST_DEPOSIT_OWNER_SEED], store_program_id)
 }
 
+impl InitSpace for Deposit {
+    const INIT_SPACE: usize = core::mem::size_of::<Self>();
+}
+
 impl Deposit {
-    /// Max execution lamports.
-    pub const MIN_EXECUTION_LAMPORTS: u64 = 200_000;
-
-    /// Init Space.
-    pub const INIT_SPACE: usize = core::mem::size_of::<Self>();
-
     /// Fisrt Deposit Owner Seed.
     pub const FIRST_DEPOSIT_OWNER_SEED: &'static [u8] = b"first_deposit_owner";
 
@@ -119,6 +118,8 @@ impl Seed for Deposit {
 }
 
 impl Action for Deposit {
+    const MIN_EXECUTION_LAMPORTS: u64 = 200_000;
+
     fn header(&self) -> &ActionHeader {
         &self.header
     }
