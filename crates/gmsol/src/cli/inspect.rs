@@ -202,6 +202,15 @@ enum Command {
         // #[arg(long, short)]
         // output: Option<Output>,
     },
+    /// GLV account.
+    Glv {
+        #[arg(group = "select-glv")]
+        address: Option<Pubkey>,
+        #[arg(long, short, group = "select-glv")]
+        index: Option<u8>,
+        #[arg(long, short, group = "select-glv")]
+        token: Option<Pubkey>,
+    },
 }
 
 #[derive(clap::ValueEnum, Clone, Default)]
@@ -927,6 +936,32 @@ impl InspectArgs {
                 let decoder = OwnedDataDecoder::new(&program_id, &data);
                 let data = GMSOLCPIEvent::decode(decoder)?;
                 println!("{data:#?}");
+            }
+
+            Command::Glv {
+                address,
+                index,
+                token,
+            } => {
+                let address = match (address, token, index) {
+                    (Some(address), _, _) => *address,
+                    (None, Some(token), _) => client.find_glv_address(token),
+                    (None, None, Some(index)) => {
+                        let glv_token = client.find_glv_token_address(store, *index);
+                        client.find_glv_address(&glv_token)
+                    }
+                    (None, None, None) => {
+                        return Err(gmsol::Error::invalid_argument(
+                            "one of `address`, `--token` or `--index` must be provided",
+                        ));
+                    }
+                };
+                let glv = client
+                    .account::<ZeroCopy<types::Glv>>(&address)
+                    .await?
+                    .ok_or(gmsol::Error::NotFound)?
+                    .0;
+                println!("{glv:#?}");
             }
         }
         Ok(())

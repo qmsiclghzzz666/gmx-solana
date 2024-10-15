@@ -306,17 +306,6 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         crate::pda::find_trade_event_buffer_pda(store, authority, index, &self.store_program_id()).0
     }
 
-    /// Get slot.
-    pub async fn get_slot(&self, commitment: Option<CommitmentConfig>) -> crate::Result<u64> {
-        let slot = self
-            .data_store()
-            .solana_rpc()
-            .get_slot_with_commitment(commitment.unwrap_or(self.commitment()))
-            .await
-            .map_err(anchor_client::ClientError::from)?;
-        Ok(slot)
-    }
-
     /// Find GT Mint address.
     pub fn find_gt_mint_address(&self, store: &Pubkey) -> Pubkey {
         crate::pda::find_gt_mint_pda(store, &self.store_program_id()).0
@@ -330,6 +319,27 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
     /// Find referral code address.
     pub fn find_referral_code_address(&self, store: &Pubkey, code: ReferralCodeBytes) -> Pubkey {
         crate::pda::find_referral_code_pda(store, code, &self.store_program_id()).0
+    }
+
+    /// Find Glv token address.
+    pub fn find_glv_token_address(&self, store: &Pubkey, index: u8) -> Pubkey {
+        types::Glv::find_glv_token_pda(store, index, &self.store_program_id()).0
+    }
+
+    /// Find Glv address.
+    pub fn find_glv_address(&self, glv_token: &Pubkey) -> Pubkey {
+        types::Glv::find_glv_pda(glv_token, &self.store_program_id()).0
+    }
+
+    /// Get slot.
+    pub async fn get_slot(&self, commitment: Option<CommitmentConfig>) -> crate::Result<u64> {
+        let slot = self
+            .data_store()
+            .solana_rpc()
+            .get_slot_with_commitment(commitment.unwrap_or(self.commitment()))
+            .await
+            .map_err(anchor_client::ClientError::from)?;
+        Ok(slot)
     }
 
     /// Fetch accounts owned by the Store Program.

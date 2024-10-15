@@ -40,6 +40,19 @@ impl Glv {
     /// Max allowed number of markets.
     pub const MAX_ALLOWED_NUMBER_OF_MARKETS: usize = 128;
 
+    /// Find GLV token address.
+    pub fn find_glv_token_pda(store: &Pubkey, index: u8, program_id: &Pubkey) -> (Pubkey, u8) {
+        Pubkey::find_program_address(
+            &[Self::GLV_TOKEN_SEED, store.as_ref(), &[index]],
+            program_id,
+        )
+    }
+
+    /// Find GLV address.
+    pub fn find_glv_pda(glv_token: &Pubkey, program_id: &Pubkey) -> (Pubkey, u8) {
+        Pubkey::find_program_address(&[Self::SEED, glv_token.as_ref()], program_id)
+    }
+
     /// Initialize the [`Glv`] account.
     ///
     /// # CHECK
@@ -63,11 +76,7 @@ impl Glv {
         short_token: &Pubkey,
         market_tokens: &HashSet<Pubkey>,
     ) -> Result<()> {
-        let expected_glv_token = Pubkey::find_program_address(
-            &[Self::GLV_TOKEN_SEED, store.as_ref(), &[index]],
-            &crate::ID,
-        )
-        .0;
+        let expected_glv_token = Self::find_glv_token_pda(store, index, &crate::ID).0;
         require_eq!(expected_glv_token, *glv_token, CoreError::InvalidArgument);
 
         self.version = 0;

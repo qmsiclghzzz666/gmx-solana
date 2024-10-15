@@ -40,8 +40,6 @@ pub struct InitializeGlv<'info> {
         seeds = [
             Glv::SEED,
             glv_token.key().as_ref(),
-            // Version.
-            &[0],
         ],
         bump,
     )]
