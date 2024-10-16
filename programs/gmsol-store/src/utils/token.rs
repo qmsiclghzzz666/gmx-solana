@@ -3,7 +3,7 @@ use anchor_spl::{
     associated_token::{
         create, get_associated_token_address, get_associated_token_address_with_program_id, Create,
     },
-    token::{close_account, transfer, CloseAccount, TokenAccount, Transfer},
+    token_interface::{close_account, transfer_checked, CloseAccount, TransferChecked},
 };
 use typed_builder::TypedBuilder;
 
@@ -62,8 +62,9 @@ pub struct TransferAllFromEscrowToATA<'a, 'info> {
     payer: AccountInfo<'info>,
     owner: AccountInfo<'info>,
     mint: AccountInfo<'info>,
+    decimals: u8,
     ata: AccountInfo<'info>,
-    escrow: &'a Account<'info, TokenAccount>,
+    escrow: AccountInfo<'info>,
     escrow_authority: AccountInfo<'info>,
     seeds: &'a [&'a [u8]],
     init_if_needed: bool,
@@ -86,6 +87,7 @@ impl<'a, 'info> TransferAllFromEscrowToATA<'a, 'info> {
             payer,
             owner,
             mint,
+            decimals,
             ata,
             escrow,
             escrow_authority,
@@ -95,7 +97,7 @@ impl<'a, 'info> TransferAllFromEscrowToATA<'a, 'info> {
             keep_escrow,
         } = self;
 
-        let amount = escrow.amount;
+        let amount = anchor_spl::token::accessor::amount(&escrow)?;
         if amount != 0 {
             if must_be_uninitialized(&ata) {
                 if !init_if_needed {
@@ -107,7 +109,7 @@ impl<'a, 'info> TransferAllFromEscrowToATA<'a, 'info> {
                         payer,
                         associated_token: ata.clone(),
                         authority: owner.clone(),
-                        mint,
+                        mint: mint.clone(),
                         system_program,
                         token_program: token_program.clone(),
                     },
@@ -124,17 +126,19 @@ impl<'a, 'info> TransferAllFromEscrowToATA<'a, 'info> {
                 return Ok(false);
             }
 
-            transfer(
+            transfer_checked(
                 CpiContext::new(
                     token_program.clone(),
-                    Transfer {
+                    TransferChecked {
                         from: escrow.to_account_info(),
                         to: ata.to_account_info(),
+                        mint: mint.clone(),
                         authority: escrow_authority.clone(),
                     },
                 )
                 .with_signer(&[seeds]),
                 amount,
+                decimals,
             )?;
         }
         if !keep_escrow {

@@ -334,8 +334,9 @@ impl<'info> CloseShift<'info> {
         if !builder
             .clone()
             .mint(self.from_market_token.to_account_info())
+            .decimals(self.from_market_token.decimals)
             .ata(self.from_market_token_ata.to_account_info())
-            .escrow(&self.from_market_token_escrow)
+            .escrow(self.from_market_token_escrow.to_account_info())
             .build()
             .execute()?
         {
@@ -346,8 +347,9 @@ impl<'info> CloseShift<'info> {
         if !builder
             .clone()
             .mint(self.to_market_token.to_account_info())
+            .decimals(self.to_market_token.decimals)
             .ata(self.to_market_token_ata.to_account_info())
-            .escrow(&self.to_market_token_escrow)
+            .escrow(self.to_market_token_escrow.to_account_info())
             .build()
             .execute()?
         {

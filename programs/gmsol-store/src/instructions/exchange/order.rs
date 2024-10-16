@@ -912,8 +912,9 @@ impl<'info> CloseOrder<'info> {
                 if !builder
                     .clone()
                     .mint(token.to_account_info())
+                    .decimals(token.decimals)
                     .ata(ata.to_account_info())
-                    .escrow(escrow)
+                    .escrow(escrow.to_account_info())
                     .build()
                     .execute()?
                 {

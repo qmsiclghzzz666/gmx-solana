@@ -379,8 +379,9 @@ impl<'info> CloseWithdrawal<'info> {
         if !builder
             .clone()
             .mint(self.market_token.to_account_info())
+            .decimals(self.market_token.decimals)
             .ata(self.market_token_ata.to_account_info())
-            .escrow(&self.market_token_escrow)
+            .escrow(self.market_token_escrow.to_account_info())
             .build()
             .execute()?
         {
@@ -391,8 +392,9 @@ impl<'info> CloseWithdrawal<'info> {
         if !builder
             .clone()
             .mint(self.final_long_token.to_account_info())
+            .decimals(self.final_long_token.decimals)
             .ata(self.final_long_token_ata.to_account_info())
-            .escrow(&self.final_long_token_escrow)
+            .escrow(self.final_long_token_escrow.to_account_info())
             .build()
             .execute()?
         {
@@ -404,8 +406,9 @@ impl<'info> CloseWithdrawal<'info> {
             if !builder
                 .clone()
                 .mint(self.final_short_token.to_account_info())
+                .decimals(self.final_short_token.decimals)
                 .ata(self.final_short_token_ata.to_account_info())
-                .escrow(&self.final_short_token_escrow)
+                .escrow(self.final_short_token_escrow.to_account_info())
                 .build()
                 .execute()?
             {

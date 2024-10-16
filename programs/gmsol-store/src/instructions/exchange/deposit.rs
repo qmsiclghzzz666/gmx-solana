@@ -419,8 +419,9 @@ impl<'info> CloseDeposit<'info> {
         if !builder
             .clone()
             .mint(self.market_token.to_account_info())
+            .decimals(self.market_token.decimals)
             .ata(self.market_token_ata.to_account_info())
-            .escrow(&self.market_token_escrow)
+            .escrow(self.market_token_escrow.to_account_info())
             .build()
             .execute()?
         {
@@ -451,8 +452,9 @@ impl<'info> CloseDeposit<'info> {
             if !builder
                 .clone()
                 .mint(mint.to_account_info())
+                .decimals(mint.decimals)
                 .ata(ata.to_account_info())
-                .escrow(escrow)
+                .escrow(escrow.to_account_info())
                 .build()
                 .execute()?
             {
@@ -471,8 +473,9 @@ impl<'info> CloseDeposit<'info> {
             if !builder
                 .clone()
                 .mint(mint.to_account_info())
+                .decimals(mint.decimals)
                 .ata(ata.to_account_info())
-                .escrow(escrow)
+                .escrow(escrow.to_account_info())
                 .build()
                 .execute()?
             {

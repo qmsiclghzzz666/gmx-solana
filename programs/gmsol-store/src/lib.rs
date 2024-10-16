@@ -1374,6 +1374,11 @@ pub mod gmsol_store {
     ) -> Result<()> {
         instructions::create_glv_deposit(ctx, &nonce, &params)
     }
+
+    /// Close GLV deposit.
+    pub fn close_glv_deposit(ctx: Context<CloseGlvDeposit>, reason: String) -> Result<()> {
+        instructions::close_glv_deposit(ctx, &reason)
+    }
 }
 
 /// Result type with [`CoreError`] as error type.
