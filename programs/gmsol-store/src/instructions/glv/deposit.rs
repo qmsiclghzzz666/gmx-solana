@@ -8,13 +8,16 @@ use anchor_spl::{
 use gmsol_utils::InitSpace;
 
 use crate::{
+    constants,
     events::RemoveGlvDepositEvent,
     ops::{
-        execution_fee::TransferExecutionFeeOperation,
+        execution_fee::{PayExecutionFeeOperation, TransferExecutionFeeOperation},
         glv::{CreateGlvDepositOperation, CreateGlvDepositParams},
     },
     states::{
-        common::action::ActionExt, Glv, GlvDeposit, Market, NonceBytes, RoleKey, Seed, Store,
+        common::action::{ActionExt, ActionSigner},
+        Glv, GlvDeposit, Market, NonceBytes, Oracle, PriceProvider, RoleKey, Seed, Store,
+        TokenMapHeader,
     },
     utils::{
         internal::{self, Authentication},
@@ -277,7 +280,8 @@ pub struct CloseGlvDeposit<'info> {
         mut,
         constraint = glv_deposit.load()?.header.owner == owner.key() @ CoreError::OwnerMismatched,
         constraint = glv_deposit.load()?.header.store == store.key() @ CoreError::StoreMismatched,
-        constraint = glv_deposit.load()?.tokens.market_token.account().expect("must exist") == market_token_escrow.key() @ CoreError::MarketTokenAccountMismatched,
+        constraint = glv_deposit.load()?.tokens.market_token_account() == market_token_escrow.key() @ CoreError::MarketTokenAccountMismatched,
+        constraint = glv_deposit.load()?.tokens.glv_token_account() == glv_token_escrow.key() @ CoreError::MarketTokenAccountMismatched,
         constraint = glv_deposit.load()?.tokens.initial_long_token.account() == initial_long_token_escrow.as_ref().map(|a| a.key()) @ CoreError::TokenAccountMismatched,
         constraint = glv_deposit.load()?.tokens.initial_short_token.account() == initial_short_token_escrow.as_ref().map(|a| a.key()) @ CoreError::TokenAccountMismatched,
         seeds = [GlvDeposit::SEED, store.key().as_ref(), owner.key().as_ref(), &glv_deposit.load()?.header.nonce],
@@ -517,5 +521,206 @@ impl<'info> CloseGlvDeposit<'info> {
     fn close(&self) -> Result<()> {
         self.glv_deposit.close(self.owner.to_account_info())?;
         Ok(())
+    }
+}
+
+/// The accounts definition for `execute_glv_deposit` instruction.
+#[derive(Accounts)]
+pub struct ExecuteGlvDeposit<'info> {
+    /// Authority.
+    pub authority: Signer<'info>,
+    /// Store.
+    #[account(has_one = token_map)]
+    pub store: AccountLoader<'info, Store>,
+    /// Token Map.
+    #[account(has_one = store)]
+    pub token_map: AccountLoader<'info, TokenMapHeader>,
+    /// Price Provider.
+    pub price_provider: Interface<'info, PriceProvider>,
+    /// Oracle buffer to use.
+    #[account(has_one = store)]
+    pub oracle: Box<Account<'info, Oracle>>,
+    /// GLV account.
+    #[account(
+        has_one = store,
+        constraint = glv.load()?.market_tokens().contains(&market_token.key()) @ CoreError::InvalidArgument,
+    )]
+    pub glv: AccountLoader<'info, Glv>,
+    /// Market.
+    #[account(mut, has_one = store)]
+    pub market: AccountLoader<'info, Market>,
+    /// The GLV deposit to execute.
+    #[account(
+        mut,
+        constraint = glv_deposit.load()?.header.store == store.key() @ CoreError::StoreMismatched,
+        constraint = glv_deposit.load()?.header.market == market.key() @ CoreError::MarketMismatched,
+        constraint = glv_deposit.load()?.tokens.glv_token() == glv_token.key() @ CoreError::TokenMintMismatched,
+        constraint = glv_deposit.load()?.tokens.market_token() == market_token.key() @ CoreError::MarketTokenMintMismatched,
+        constraint = glv_deposit.load()?.tokens.market_token_account() == market_token_escrow.key() @ CoreError::MarketTokenAccountMismatched,
+        constraint = glv_deposit.load()?.tokens.glv_token_account() == glv_token_escrow.key() @ CoreError::MarketTokenAccountMismatched,
+        constraint = glv_deposit.load()?.tokens.initial_long_token.account() == initial_long_token_escrow.as_ref().map(|a| a.key()) @ CoreError::TokenAccountMismatched,
+        constraint = glv_deposit.load()?.tokens.initial_short_token.account() == initial_short_token_escrow.as_ref().map(|a| a.key()) @ CoreError::TokenAccountMismatched,
+        seeds = [GlvDeposit::SEED, store.key().as_ref(), glv_deposit.load()?.header.owner.as_ref(), &glv_deposit.load()?.header.nonce],
+        bump = glv_deposit.load()?.header.bump,
+    )]
+    pub glv_deposit: AccountLoader<'info, GlvDeposit>,
+    /// GLV token mint.
+    #[account(mut, constraint = glv.load()?.glv_token == glv_token.key() @ CoreError::TokenMintMismatched)]
+    pub glv_token: Box<InterfaceAccount<'info, token_interface::Mint>>,
+    /// Market token mint.
+    #[account(mut, constraint = market.load()?.meta().market_token_mint == market_token.key() @ CoreError::MarketTokenMintMismatched)]
+    pub market_token: Box<Account<'info, Mint>>,
+    /// Initial long token.
+    #[account(
+        constraint = glv_deposit.load()?.tokens.initial_long_token.token().map(|token| initial_long_token.key() == token).unwrap_or(true) @ CoreError::TokenMintMismatched
+    )]
+    pub initial_long_token: Option<Box<Account<'info, Mint>>>,
+    /// Initial short token.
+    #[account(
+        constraint = glv_deposit.load()?.tokens.initial_short_token.token().map(|token| initial_short_token.key() == token).unwrap_or(true) @ CoreError::TokenMintMismatched
+    )]
+    pub initial_short_token: Option<Box<Account<'info, Mint>>>,
+    /// The escrow account for GLV tokens.
+    #[account(
+        mut,
+        associated_token::mint = glv_token,
+        associated_token::authority = glv_deposit,
+        associated_token::token_program = glv_token_program,
+    )]
+    pub glv_token_escrow: Box<InterfaceAccount<'info, token_interface::TokenAccount>>,
+    /// The escrow account for market tokens.
+    #[account(
+        mut,
+        associated_token::mint = market_token,
+        associated_token::authority = glv_deposit,
+    )]
+    pub market_token_escrow: Box<Account<'info, TokenAccount>>,
+    /// The escrow account for receiving initial long token for deposit.
+    #[account(
+        mut,
+        associated_token::mint = initial_long_token,
+        associated_token::authority = glv_deposit,
+    )]
+    pub initial_long_token_escrow: Option<Box<Account<'info, TokenAccount>>>,
+    /// The escrow account for receiving initial short token for deposit.
+    #[account(
+        mut,
+        associated_token::mint = initial_short_token,
+        associated_token::authority = glv_deposit,
+    )]
+    pub initial_short_token_escrow: Option<Box<Account<'info, TokenAccount>>>,
+    /// Initial long token vault.
+    #[account(
+        mut,
+        token::mint = initial_long_token,
+        token::authority = store,
+        seeds = [
+            constants::MARKET_VAULT_SEED,
+            store.key().as_ref(),
+            initial_long_token_vault.mint.as_ref(),
+            &[],
+        ],
+        bump,
+    )]
+    pub initial_long_token_vault: Option<Box<Account<'info, TokenAccount>>>,
+    /// Initial short token vault.
+    #[account(
+        mut,
+        token::mint = initial_short_token,
+        token::authority = store,
+        seeds = [
+            constants::MARKET_VAULT_SEED,
+            store.key().as_ref(),
+            initial_short_token_vault.mint.as_ref(),
+            &[],
+        ],
+        bump,
+    )]
+    pub initial_short_token_vault: Option<Box<Account<'info, TokenAccount>>>,
+    /// Market token vault for the GLV.
+    #[account(
+        mut,
+        associated_token::mint = market_token,
+        associated_token::authority = glv,
+    )]
+    pub market_token_vault: Box<Account<'info, TokenAccount>>,
+    /// The token program.
+    pub token_program: Program<'info, Token>,
+    /// The token program for GLV token.
+    pub glv_token_program: Program<'info, Token2022>,
+    /// The system program.
+    pub system_program: Program<'info, System>,
+}
+
+/// CHECK: only ORDER_KEEPER is allowed to call this function.
+pub(crate) fn unchecked_execute_glv_deposit<'info>(
+    ctx: Context<'_, '_, 'info, 'info, ExecuteGlvDeposit<'info>>,
+    execution_lamports: u64,
+    throw_on_execution_error: bool,
+) -> Result<()> {
+    let accounts = ctx.accounts;
+    let remaining_accounts = ctx.remaining_accounts;
+    let signer = accounts.glv_deposit.load()?.signer();
+
+    accounts.transfer_tokens_in(&signer, remaining_accounts)?;
+
+    let executed = accounts.perform_execution(remaining_accounts, throw_on_execution_error)?;
+
+    if executed {
+        accounts.glv_deposit.load_mut()?.header.completed()?;
+    } else {
+        accounts.glv_deposit.load_mut()?.header.cancelled()?;
+        accounts.transfer_tokens_out(remaining_accounts)?;
+    }
+
+    // It must be placed at the end to be executed correctly.
+    accounts.pay_execution_fee(execution_lamports)?;
+    Ok(())
+}
+
+impl<'info> internal::Authentication<'info> for ExecuteGlvDeposit<'info> {
+    fn authority(&self) -> &Signer<'info> {
+        &self.authority
+    }
+
+    fn store(&self) -> &AccountLoader<'info, Store> {
+        &self.store
+    }
+}
+
+impl<'info> ExecuteGlvDeposit<'info> {
+    #[inline(never)]
+    fn pay_execution_fee(&self, execution_fee: u64) -> Result<()> {
+        let execution_lamports = self.glv_deposit.load()?.execution_lamports(execution_fee);
+        PayExecutionFeeOperation::builder()
+            .payer(self.glv_deposit.to_account_info())
+            .receiver(self.authority.to_account_info())
+            .execution_lamports(execution_lamports)
+            .build()
+            .execute()?;
+        Ok(())
+    }
+
+    fn transfer_tokens_in(
+        &mut self,
+        _signer: &ActionSigner,
+        _remaining_accounts: &'info [AccountInfo<'info>],
+    ) -> Result<()> {
+        todo!()
+    }
+
+    fn transfer_tokens_out(
+        &mut self,
+        _remaining_accounts: &'info [AccountInfo<'info>],
+    ) -> Result<()> {
+        todo!()
+    }
+
+    fn perform_execution(
+        &self,
+        _remaining_accounts: &'info [AccountInfo<'info>],
+        _throw_on_execution_error: bool,
+    ) -> Result<bool> {
+        todo!()
     }
 }
