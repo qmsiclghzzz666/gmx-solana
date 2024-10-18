@@ -24,6 +24,7 @@ pub struct SwapParams {
     /// The number of tokens.
     num_tokens: u8,
     padding_0: [u8; 1],
+    current_market_token: Pubkey,
     /// Swap paths.
     paths: [Pubkey; MAX_STEPS],
     /// Tokens.
@@ -174,6 +175,8 @@ impl SwapParams {
             self.tokens[idx] = token;
         }
 
+        self.current_market_token = meta.market_token_mint;
+
         Ok(())
     }
 
@@ -212,20 +215,29 @@ impl SwapParams {
     }
 
     /// Find first market.
-    pub fn find_first_market<'info>(
+    fn find_first_market<'info>(
         &self,
         store: &Pubkey,
         is_primary: bool,
         remaining_accounts: &'info [AccountInfo<'info>],
-    ) -> Option<&'info AccountInfo<'info>> {
+    ) -> Result<Option<&'info AccountInfo<'info>>> {
         let path = if is_primary {
             self.primary_swap_path()
         } else {
             self.secondary_swap_path()
         };
-        let target = Market::find_market_address(store, path.first()?, &crate::ID).0;
-        let info = remaining_accounts.iter().find(|info| *info.key == target)?;
-        Some(info)
+        let Some(first_market_token) = path.first() else {
+            return Ok(None);
+        };
+        let is_current_market = *first_market_token == self.current_market_token;
+        let target = Market::find_market_address(store, first_market_token, &crate::ID).0;
+
+        // FIXME: Should we skip the search if the first market is current market.
+        match remaining_accounts.iter().find(|info| *info.key == target) {
+            Some(info) => Ok(Some(info)),
+            None if is_current_market => Ok(None),
+            None => err!(CoreError::NotFound),
+        }
     }
 
     /// Find first market and unpack.
@@ -235,27 +247,38 @@ impl SwapParams {
         is_primary: bool,
         remaining_accounts: &'info [AccountInfo<'info>],
     ) -> Result<Option<AccountLoader<'info, Market>>> {
-        let Some(info) = self.find_first_market(store, is_primary, remaining_accounts) else {
+        let Some(info) = self.find_first_market(store, is_primary, remaining_accounts)? else {
             return Ok(None);
         };
-        Ok(Some(AccountLoader::try_from(info)?))
+        let market = AccountLoader::<Market>::try_from(info)?;
+        require_eq!(market.load()?.store, *store, CoreError::StoreMismatched);
+        Ok(Some(market))
     }
 
     /// Find last market.
-    pub fn find_last_market<'info>(
+    fn find_last_market<'info>(
         &self,
         store: &Pubkey,
         is_primary: bool,
         remaining_accounts: &'info [AccountInfo<'info>],
-    ) -> Option<&'info AccountInfo<'info>> {
+    ) -> Result<Option<&'info AccountInfo<'info>>> {
         let path = if is_primary {
             self.primary_swap_path()
         } else {
             self.secondary_swap_path()
         };
-        let target = Market::find_market_address(store, path.last()?, &crate::ID).0;
-        let info = remaining_accounts.iter().find(|info| *info.key == target)?;
-        Some(info)
+        let Some(last_market_token) = path.last() else {
+            return Ok(None);
+        };
+        let is_current_market = *last_market_token == self.current_market_token;
+        let target = Market::find_market_address(store, last_market_token, &crate::ID).0;
+
+        // FIXME: Should we skip the search if the last market is current market.
+        match remaining_accounts.iter().find(|info| *info.key == target) {
+            Some(info) => Ok(Some(info)),
+            None if is_current_market => Ok(None),
+            None => err!(CoreError::NotFound),
+        }
     }
 
     /// Find last market and unpack.
@@ -265,10 +288,12 @@ impl SwapParams {
         is_primary: bool,
         remaining_accounts: &'info [AccountInfo<'info>],
     ) -> Result<Option<AccountLoader<'info, Market>>> {
-        let Some(info) = self.find_last_market(store, is_primary, remaining_accounts) else {
+        let Some(info) = self.find_last_market(store, is_primary, remaining_accounts)? else {
             return Ok(None);
         };
-        Ok(Some(AccountLoader::try_from(info)?))
+        let market = AccountLoader::<Market>::try_from(info)?;
+        require_eq!(market.load()?.store, *store, CoreError::StoreMismatched);
+        Ok(Some(market))
     }
 
     /// Get the first market token in the swap path.

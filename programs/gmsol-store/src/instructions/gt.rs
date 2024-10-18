@@ -86,7 +86,7 @@ impl<'info> InitializeGT<'info> {
                 mint: self.gt_mint.to_account_info(),
             },
         );
-        non_transferable_mint_initialize(ctx.with_signer(&[&self.store.load()?.pda_seeds()]))
+        non_transferable_mint_initialize(ctx.with_signer(&[&self.store.load()?.signer_seeds()]))
     }
 
     fn initialize_mint(&self, decimals: u8) -> Result<()> {
@@ -97,7 +97,7 @@ impl<'info> InitializeGT<'info> {
             },
         );
         initialize_mint2(
-            ctx.with_signer(&[&self.store.load()?.pda_seeds()]),
+            ctx.with_signer(&[&self.store.load()?.signer_seeds()]),
             decimals,
             &self.store.key(),
             None,

@@ -88,7 +88,7 @@ impl Store {
         Ok(())
     }
 
-    pub(crate) fn pda_seeds(&self) -> [&[u8]; 3] {
+    pub(crate) fn signer_seeds(&self) -> [&[u8]; 3] {
         [Self::SEED, &self.key_seed, &self.bump]
     }
 

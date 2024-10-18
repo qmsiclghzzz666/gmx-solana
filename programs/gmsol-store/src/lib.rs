@@ -1379,6 +1379,19 @@ pub mod gmsol_store {
     pub fn close_glv_deposit(ctx: Context<CloseGlvDeposit>, reason: String) -> Result<()> {
         instructions::close_glv_deposit(ctx, &reason)
     }
+
+    #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
+    pub fn execute_glv_deposit<'info>(
+        ctx: Context<'_, '_, 'info, 'info, ExecuteGlvDeposit<'info>>,
+        execution_lamports: u64,
+        throw_on_execution_error: bool,
+    ) -> Result<()> {
+        instructions::unchecked_execute_glv_deposit(
+            ctx,
+            execution_lamports,
+            throw_on_execution_error,
+        )
+    }
 }
 
 /// Result type with [`CoreError`] as error type.

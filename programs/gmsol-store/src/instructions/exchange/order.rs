@@ -970,7 +970,10 @@ impl<'info> CloseOrder<'info> {
                         authority: self.store.to_account_info(),
                     },
                 );
-                mint_to(ctx.with_signer(&[&self.store.load()?.pda_seeds()]), amount)?;
+                mint_to(
+                    ctx.with_signer(&[&self.store.load()?.signer_seeds()]),
+                    amount,
+                )?;
 
                 msg!("[GT] minted {} units of GT", amount);
 
@@ -1064,7 +1067,10 @@ impl<'info> CloseOrder<'info> {
                     authority: self.store.to_account_info(),
                 },
             );
-            mint_to(ctx.with_signer(&[&self.store.load()?.pda_seeds()]), reward)?;
+            mint_to(
+                ctx.with_signer(&[&self.store.load()?.signer_seeds()]),
+                reward,
+            )?;
 
             msg!("[GT] minted {} units of GT to the referrer", reward);
 

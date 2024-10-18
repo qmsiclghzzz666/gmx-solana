@@ -20,11 +20,12 @@ pub struct Glv {
     version: u8,
     /// Bump seed.
     pub(crate) bump: u8,
+    bump_bytes: [u8; 1],
     /// Index.
     pub(crate) index: u8,
     /// Num of markets.
     pub(crate) num_markets: u8,
-    padding: [u8; 4],
+    padding: [u8; 3],
     pub(crate) store: Pubkey,
     pub(crate) glv_token: Pubkey,
     pub(crate) long_token: Pubkey,
@@ -60,6 +61,10 @@ impl Glv {
         Pubkey::find_program_address(&[Self::SEED, glv_token.as_ref()], program_id)
     }
 
+    pub(crate) fn signer_seeds(&self) -> [&[u8]; 3] {
+        [Self::SEED, self.glv_token().as_ref(), &self.bump_bytes]
+    }
+
     /// Initialize the [`Glv`] account.
     ///
     /// # CHECK
@@ -88,6 +93,7 @@ impl Glv {
 
         self.version = 0;
         self.bump = bump;
+        self.bump_bytes = [bump];
         self.index = index;
         self.store = *store;
         self.glv_token = *glv_token;

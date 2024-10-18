@@ -36,7 +36,7 @@ pub(crate) fn unchecked_mint_market_token_to(
     anchor_spl::token::mint_to(
         ctx.accounts
             .mint_to_ctx()
-            .with_signer(&[&ctx.accounts.store.load()?.pda_seeds()]),
+            .with_signer(&[&ctx.accounts.store.load()?.signer_seeds()]),
         amount,
     )
 }
@@ -92,7 +92,7 @@ pub(crate) fn unchecked_burn_market_token_from(
     anchor_spl::token::burn(
         ctx.accounts
             .burn_ctx()
-            .with_signer(&[&ctx.accounts.store.load()?.pda_seeds()]),
+            .with_signer(&[&ctx.accounts.store.load()?.signer_seeds()]),
         amount,
     )
 }
@@ -199,7 +199,7 @@ pub(crate) fn unchecked_market_vault_transfer_out(
     anchor_spl::token::transfer(
         ctx.accounts
             .transfer_ctx()
-            .with_signer(&[&ctx.accounts.store.load()?.pda_seeds()]),
+            .with_signer(&[&ctx.accounts.store.load()?.signer_seeds()]),
         amount,
     )
 }
@@ -277,7 +277,7 @@ pub(crate) fn unchecked_use_claimable_account(
                     delegate: ctx.accounts.owner.to_account_info(),
                     authority: ctx.accounts.store.to_account_info(),
                 },
-                &[&ctx.accounts.store.load()?.pda_seeds()],
+                &[&ctx.accounts.store.load()?.signer_seeds()],
             ),
             0,
         )?;
@@ -345,7 +345,7 @@ pub(crate) fn unchecked_close_empty_claimable_account(
                 destination: ctx.accounts.authority.to_account_info(),
                 authority: ctx.accounts.store.to_account_info(),
             },
-            &[&ctx.accounts.store.load()?.pda_seeds()],
+            &[&ctx.accounts.store.load()?.signer_seeds()],
         ))?;
     }
     Ok(())

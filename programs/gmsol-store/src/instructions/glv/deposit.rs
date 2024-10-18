@@ -13,6 +13,7 @@ use crate::{
     ops::{
         execution_fee::{PayExecutionFeeOperation, TransferExecutionFeeOperation},
         glv::{CreateGlvDepositOperation, CreateGlvDepositParams},
+        market::{MarketTransferInOperation, MarketTransferOutOperation},
     },
     states::{
         common::action::{ActionExt, ActionSigner},
@@ -701,19 +702,182 @@ impl<'info> ExecuteGlvDeposit<'info> {
         Ok(())
     }
 
+    #[inline(never)]
     fn transfer_tokens_in(
-        &mut self,
-        _signer: &ActionSigner,
-        _remaining_accounts: &'info [AccountInfo<'info>],
+        &self,
+        signer: &ActionSigner,
+        remaining_accounts: &'info [AccountInfo<'info>],
     ) -> Result<()> {
-        todo!()
+        self.transfer_market_tokens_in(signer)?;
+        self.transfer_initial_tokens_in(signer, remaining_accounts)?;
+        Ok(())
     }
 
-    fn transfer_tokens_out(
-        &mut self,
-        _remaining_accounts: &'info [AccountInfo<'info>],
+    #[inline(never)]
+    fn transfer_tokens_out(&self, remaining_accounts: &'info [AccountInfo<'info>]) -> Result<()> {
+        self.transfer_market_tokens_out()?;
+        self.transfer_initial_tokens_out(remaining_accounts)?;
+        Ok(())
+    }
+
+    fn transfer_market_tokens_in(&self, signer: &ActionSigner) -> Result<()> {
+        use anchor_spl::token_interface::{transfer_checked, TransferChecked};
+
+        let amount = self.glv_deposit.load()?.params.market_token_amount;
+        if amount != 0 {
+            let token = &self.market_token;
+            let from = &self.market_token_escrow;
+            let to = &self.market_token_vault;
+            let ctx = CpiContext::new(
+                self.token_program.to_account_info(),
+                TransferChecked {
+                    from: from.to_account_info(),
+                    mint: token.to_account_info(),
+                    to: to.to_account_info(),
+                    authority: self.glv_deposit.to_account_info(),
+                },
+            );
+            transfer_checked(
+                ctx.with_signer(&[&signer.as_seeds()]),
+                amount,
+                token.decimals,
+            )?;
+        }
+        Ok(())
+    }
+
+    fn transfer_market_tokens_out(&self) -> Result<()> {
+        use anchor_spl::token_interface::{transfer_checked, TransferChecked};
+
+        let amount = self.glv_deposit.load()?.params.market_token_amount;
+        if amount != 0 {
+            let token = &self.market_token;
+            let from = &self.market_token_vault;
+            let to = &self.market_token_escrow;
+            let ctx = CpiContext::new(
+                self.token_program.to_account_info(),
+                TransferChecked {
+                    from: from.to_account_info(),
+                    mint: token.to_account_info(),
+                    to: to.to_account_info(),
+                    authority: self.glv.to_account_info(),
+                },
+            );
+            let glv = self.glv.load()?;
+            transfer_checked(
+                ctx.with_signer(&[&glv.signer_seeds()]),
+                amount,
+                token.decimals,
+            )?;
+        }
+        Ok(())
+    }
+
+    fn transfer_initial_tokens_in(
+        &self,
+        sigenr: &ActionSigner,
+        remaining_accounts: &'info [AccountInfo<'info>],
     ) -> Result<()> {
-        todo!()
+        let seeds = sigenr.as_seeds();
+        let builder = MarketTransferInOperation::builder()
+            .store(&self.store)
+            .from_authority(self.glv_deposit.to_account_info())
+            .token_program(self.token_program.to_account_info())
+            .signer_seeds(&seeds);
+        let store = &self.store.key();
+
+        for is_primary in [true, false] {
+            let (amount, escrow, vault) = if is_primary {
+                (
+                    self.glv_deposit.load()?.params.initial_long_token_amount,
+                    self.initial_long_token_escrow.as_ref(),
+                    self.initial_long_token_vault.as_ref(),
+                )
+            } else {
+                (
+                    self.glv_deposit.load()?.params.initial_short_token_amount,
+                    self.initial_short_token_escrow.as_ref(),
+                    self.initial_short_token_vault.as_ref(),
+                )
+            };
+
+            if amount == 0 {
+                continue;
+            }
+
+            let escrow = escrow.ok_or(error!(CoreError::TokenAccountNotProvided))?;
+            let market = self
+                .glv_deposit
+                .load()?
+                .swap
+                .find_and_unpack_first_market(store, is_primary, remaining_accounts)?
+                .unwrap_or(self.market.clone());
+            let vault = vault.ok_or(error!(CoreError::TokenAccountNotProvided))?;
+            builder
+                .clone()
+                .market(&market)
+                .from(escrow.to_account_info())
+                .vault(vault)
+                .amount(amount)
+                .build()
+                .execute()?;
+        }
+
+        Ok(())
+    }
+
+    fn transfer_initial_tokens_out(
+        &self,
+        remaining_accounts: &'info [AccountInfo<'info>],
+    ) -> Result<()> {
+        let builder = MarketTransferOutOperation::builder()
+            .store(&self.store)
+            .token_program(self.token_program.to_account_info());
+
+        let store = &self.store.key();
+
+        for is_primary in [true, false] {
+            let (amount, token, escrow, vault) = if is_primary {
+                (
+                    self.glv_deposit.load()?.params.initial_long_token_amount,
+                    self.initial_long_token.as_ref(),
+                    self.initial_long_token_escrow.as_ref(),
+                    self.initial_long_token_vault.as_ref(),
+                )
+            } else {
+                (
+                    self.glv_deposit.load()?.params.initial_short_token_amount,
+                    self.initial_short_token.as_ref(),
+                    self.initial_short_token_escrow.as_ref(),
+                    self.initial_short_token_vault.as_ref(),
+                )
+            };
+
+            let Some(escrow) = escrow else {
+                continue;
+            };
+
+            let market = self
+                .glv_deposit
+                .load()?
+                .swap
+                .find_and_unpack_first_market(store, is_primary, remaining_accounts)?
+                .unwrap_or(self.market.clone());
+            let token = token.ok_or(error!(CoreError::TokenMintNotProvided))?;
+            let vault = vault.ok_or(error!(CoreError::TokenAccountNotProvided))?;
+            builder
+                .clone()
+                .market(&market)
+                .to(escrow.to_account_info())
+                .vault(vault.to_account_info())
+                .amount(amount)
+                .decimals(token.decimals)
+                .token_mint(token.to_account_info())
+                .build()
+                .execute()?;
+        }
+
+        Ok(())
     }
 
     fn perform_execution(

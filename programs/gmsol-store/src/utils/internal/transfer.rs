@@ -25,7 +25,7 @@ impl<'a, 'info> TransferUtils<'a, 'info> {
     pub(crate) fn mint_to(&self, to: &AccountInfo<'info>, amount: u64) -> Result<()> {
         mint_to(
             self.mint_to_ctx(to)?
-                .with_signer(&[&self.store.load()?.pda_seeds()]),
+                .with_signer(&[&self.store.load()?.signer_seeds()]),
             amount,
         )
     }
@@ -33,7 +33,7 @@ impl<'a, 'info> TransferUtils<'a, 'info> {
     pub(crate) fn burn_from(&self, from: &AccountInfo<'info>, amount: u64) -> Result<()> {
         burn(
             self.burn_ctx(from)?
-                .with_signer(&[&self.store.load()?.pda_seeds()]),
+                .with_signer(&[&self.store.load()?.signer_seeds()]),
             amount,
         )
     }
@@ -47,7 +47,7 @@ impl<'a, 'info> TransferUtils<'a, 'info> {
     ) -> Result<()> {
         transfer_checked(
             self.transfer_ctx(from, to)
-                .with_signer(&[&self.store.load()?.pda_seeds()]),
+                .with_signer(&[&self.store.load()?.signer_seeds()]),
             amount,
             decimals,
         )
