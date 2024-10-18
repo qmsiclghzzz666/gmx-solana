@@ -1,10 +1,16 @@
 use anchor_lang::prelude::*;
-use anchor_spl::{token::TokenAccount, token_interface};
+use anchor_spl::{
+    token::{Mint, TokenAccount},
+    token_interface,
+};
 use typed_builder::TypedBuilder;
 
 use crate::{
-    states::{common::action::ActionExt, GlvDeposit, Market, NonceBytes, Store},
-    CoreError,
+    states::{
+        common::action::ActionExt, Glv, GlvDeposit, Market, NonceBytes, Oracle, Store,
+        ValidateOracleTime,
+    },
+    CoreError, CoreResult,
 };
 
 /// Create GLV Deposit Params.
@@ -22,6 +28,8 @@ pub struct CreateGlvDepositParams {
     pub initial_short_token_amount: u64,
     /// Market token amount.
     pub market_token_amount: u64,
+    /// The minimum acceptable maount of market tokens to be minted.
+    pub min_market_token_amount: u64,
     /// The minimum acceptable amount of glv tokens receive.
     pub min_glv_token_amount: u64,
 }
@@ -109,6 +117,7 @@ impl<'a, 'info> CreateGlvDepositOperation<'a, 'info> {
         glv_deposit.params.initial_long_token_amount = self.params.initial_long_token_amount;
         glv_deposit.params.initial_short_token_amount = self.params.initial_short_token_amount;
         glv_deposit.params.market_token_amount = self.params.market_token_amount;
+        glv_deposit.params.min_market_token_amount = self.params.min_market_token_amount;
         glv_deposit.params.min_glv_token_amount = self.params.min_glv_token_amount;
 
         // Init swap path.
@@ -179,5 +188,122 @@ impl<'a, 'info> CreateGlvDepositOperation<'a, 'info> {
         ActionExt::validate_balance(&self.glv_deposit, params.execution_lamports)?;
 
         Ok(())
+    }
+}
+
+/// Operation for executing a GLV deposit.
+#[derive(TypedBuilder)]
+pub(crate) struct ExecuteGlvDepositOperation<'a, 'info> {
+    glv_deposit: AccountLoader<'info, GlvDeposit>,
+    token_program: AccountInfo<'info>,
+    throw_on_execution_error: bool,
+    store: AccountLoader<'info, Store>,
+    glv: AccountLoader<'info, Glv>,
+    market: AccountLoader<'info, Market>,
+    market_token_mint: &'a mut Account<'info, Mint>,
+    market_token_vault: AccountInfo<'info>,
+    markets: &'info [AccountInfo<'info>],
+    market_tokens: &'info [AccountInfo<'info>],
+    oralce: &'a Oracle,
+    remaining_accounts: &'info [AccountInfo<'info>],
+}
+
+impl<'a, 'info> ExecuteGlvDepositOperation<'a, 'info> {
+    /// Execute.
+    ///
+    /// # CHECK
+    /// - The `glv_deposit` must be owned by the `store`.
+    /// - The `glv` must be owned by the `store`, and be the GLV account of the `glv_deposit`.
+    /// - The `market_token_mint` must be the market token of the `market`.
+    /// - The `market_token_vault` must be the vault of GLV for the `market_token`.
+    /// - The lengths of `markets` and `market_tokens` must be the same as the market tokens list of the `glv`.
+    /// - The order of `markets` and `market_tokens` must be the same of the market tokens list of the `glv`.
+    /// - The required prices of tokens must have been validated and stored in the `oracle`.
+    ///
+    /// # Errors
+    /// - The `market` must be owned by the `store` and be the current market of the `glv_deposit`.
+    /// - The swap markets provided by `remaining_accounts` must be valid.
+    pub(crate) fn unchecked_execute(self) -> Result<bool> {
+        let throw_on_execution_error = self.throw_on_execution_error;
+        match self.validate_oracle() {
+            Ok(()) => {}
+            Err(CoreError::OracleTimestampsAreLargerThanRequired) if !throw_on_execution_error => {
+                msg!(
+                    "GLV Deposit expired at {}",
+                    self.oracle_updated_before()
+                        .ok()
+                        .flatten()
+                        .expect("must have an expiration time"),
+                );
+            }
+            Err(err) => {
+                return Err(error!(err));
+            }
+        }
+        match self.perform_glv_deposit() {
+            Ok(()) => Ok(true),
+            Err(err) if !throw_on_execution_error => {
+                msg!("Execute GLV deposit error: {}", err);
+                Ok(false)
+            }
+            Err(err) => Err(err),
+        }
+    }
+
+    fn validate_oracle(&self) -> CoreResult<()> {
+        self.oralce.validate_time(self)
+    }
+
+    fn validate_market_and_glv_deposit(&self) -> Result<()> {
+        let market = self.market.load()?;
+        market.validate(&self.store.key())?;
+
+        self.glv_deposit
+            .load()?
+            .validate_for_execution(&self.market_token_mint.to_account_info(), &market)?;
+
+        Ok(())
+    }
+
+    fn perform_glv_deposit(&self) -> Result<()> {
+        self.validate_market_and_glv_deposit()?;
+        todo!()
+    }
+}
+
+impl<'a, 'info> ValidateOracleTime for ExecuteGlvDepositOperation<'a, 'info> {
+    fn oracle_updated_after(&self) -> CoreResult<Option<i64>> {
+        Ok(Some(
+            self.glv_deposit
+                .load()
+                .map_err(|_| CoreError::LoadAccountError)?
+                .header
+                .updated_at,
+        ))
+    }
+
+    fn oracle_updated_before(&self) -> CoreResult<Option<i64>> {
+        let ts = self
+            .store
+            .load()
+            .map_err(|_| CoreError::LoadAccountError)?
+            .request_expiration_at(
+                self.glv_deposit
+                    .load()
+                    .map_err(|_| CoreError::LoadAccountError)?
+                    .header
+                    .updated_at,
+            )?;
+        Ok(Some(ts))
+    }
+
+    fn oracle_updated_after_slot(&self) -> CoreResult<Option<u64>> {
+        Ok(Some(
+            self.glv_deposit
+                .load()
+                .map_err(|_| CoreError::LoadAccountError)?
+                .header
+                .updated_at_slot,
+        ))
     }
 }

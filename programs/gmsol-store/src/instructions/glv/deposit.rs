@@ -17,8 +17,9 @@ use crate::{
     },
     states::{
         common::action::{ActionExt, ActionSigner},
+        glv::SplitAccountsForGlv,
         Glv, GlvDeposit, Market, NonceBytes, Oracle, PriceProvider, RoleKey, Seed, Store,
-        TokenMapHeader,
+        TokenMapHeader, TokenMapLoader,
     },
     utils::{
         internal::{self, Authentication},
@@ -526,6 +527,16 @@ impl<'info> CloseGlvDeposit<'info> {
 }
 
 /// The accounts definition for `execute_glv_deposit` instruction.
+///
+/// Remaining accounts expected by this instruction:
+///
+///   - 0..N. `[]` N market accounts, where N represents the total number of markets managed
+///     by the given GLV.
+///   - N..2N. `[]` N market token accounts (see above for the definition of N).
+///   - 2N..2N+M. `[]` M feed accounts, where M represents the total number of tokens in the
+///     swap params.
+///   - 2N+M..2N+M+L. `[writable]` L market accounts, where L represents the total number of unique
+///     markets excluding the current market in the swap params.
 #[derive(Accounts)]
 pub struct ExecuteGlvDeposit<'info> {
     /// Authority.
@@ -661,11 +672,25 @@ pub(crate) fn unchecked_execute_glv_deposit<'info>(
 ) -> Result<()> {
     let accounts = ctx.accounts;
     let remaining_accounts = ctx.remaining_accounts;
-    let signer = accounts.glv_deposit.load()?.signer();
 
+    let SplitAccountsForGlv {
+        markets,
+        market_tokens,
+        remaining_accounts,
+    } = accounts
+        .glv
+        .load()?
+        .validate_and_split_remaining_accounts(&accounts.store.key(), remaining_accounts)?;
+
+    let signer = accounts.glv_deposit.load()?.signer();
     accounts.transfer_tokens_in(&signer, remaining_accounts)?;
 
-    let executed = accounts.perform_execution(remaining_accounts, throw_on_execution_error)?;
+    let executed = accounts.perform_execution(
+        markets,
+        market_tokens,
+        remaining_accounts,
+        throw_on_execution_error,
+    )?;
 
     if executed {
         accounts.glv_deposit.load_mut()?.header.completed()?;
@@ -881,10 +906,30 @@ impl<'info> ExecuteGlvDeposit<'info> {
     }
 
     fn perform_execution(
-        &self,
-        _remaining_accounts: &'info [AccountInfo<'info>],
-        _throw_on_execution_error: bool,
+        &mut self,
+        markets: &'info [AccountInfo<'info>],
+        market_tokens: &'info [AccountInfo<'info>],
+        remaining_accounts: &'info [AccountInfo<'info>],
+        throw_on_execution_error: bool,
     ) -> Result<bool> {
+        // FIXME: We only need the tokens here, the feeds are not necessary.
+        let feeds = self
+            .glv_deposit
+            .load()?
+            .swap
+            .to_feeds(&self.token_map.load_token_map()?)?;
+
+        let executed = self.oracle.with_prices(
+            &self.store,
+            &self.price_provider,
+            &self.token_map,
+            &feeds.tokens,
+            remaining_accounts,
+            |oracle, remaining_accounts| {
+                todo!();
+                Ok(false)
+            },
+        );
         todo!()
     }
 }

@@ -3,6 +3,7 @@ use anchor_spl::token::{Mint, TokenAccount};
 use typed_builder::TypedBuilder;
 
 use crate::{
+    ops::market::RevertibleLiquidityMarketOperation,
     states::{
         common::action::{Action, ActionExt},
         Deposit, Market, NonceBytes, Oracle, Store, ValidateOracleTime,
@@ -227,96 +228,31 @@ impl<'a, 'info> ExecuteDepositOperation<'a, 'info> {
 
     #[inline(never)]
     fn perfrom_deposit(self) -> Result<()> {
-        use crate::{
-            states::{
-                market::{
-                    revertible::{
-                        swap_market::{SwapDirection, SwapMarkets},
-                        Revertible, RevertibleLiquidityMarket,
-                    },
-                    utils::ValidateMarketBalances,
-                },
-                HasMarketMeta,
-            },
-            ModelError,
-        };
-        use gmsol_model::{LiquidityMarketMutExt, PositionImpactMarketMutExt};
-
         self.validate_market_and_deposit()?;
-
-        // Prepare the execution context.
-        let current_market_token = self.market_token_mint.key();
-        let mut market = RevertibleLiquidityMarket::new(
-            self.market,
-            self.market_token_mint,
-            self.token_program.to_account_info(),
-            self.store,
-        )?
-        .enable_mint(self.market_token_receiver.to_account_info());
-        let loaders = self
-            .deposit
-            .load()?
-            .swap
-            .unpack_markets_for_swap(&current_market_token, self.remaining_accounts)?;
-        let mut swap_markets =
-            SwapMarkets::new(&self.store.key(), &loaders, Some(&current_market_token))?;
-
-        // Distribute position impact.
         {
-            let report = market
-                .distribute_position_impact()
-                .map_err(ModelError::from)?
-                .execute()
-                .map_err(ModelError::from)?;
-            msg!("[Deposit] pre-execute: {:?}", report);
-        }
-
-        // Swap tokens into the target market.
-        let (long_token_amount, short_token_amount) = {
-            let meta = market.market_meta();
-            let expected_token_outs = (meta.long_token_mint, meta.short_token_mint);
-            swap_markets.revertible_swap(
-                SwapDirection::Into(&mut market),
+            let deposit = self.deposit.load()?;
+            RevertibleLiquidityMarketOperation::new(
+                self.store,
                 self.oracle,
-                &self.deposit.load()?.swap,
-                expected_token_outs,
-                (
-                    self.deposit.load()?.tokens.initial_long_token.token(),
-                    self.deposit.load()?.tokens.initial_short_token.token(),
-                ),
-                (
-                    self.deposit.load()?.params.initial_long_token_amount,
-                    self.deposit.load()?.params.initial_short_token_amount,
-                ),
+                self.market,
+                self.market_token_mint,
+                self.token_program.clone(),
+                deposit.swap(),
+                self.remaining_accounts,
             )?
-        };
-
-        // Perform the deposit.
-        {
-            let prices = self.oracle.market_prices(&market)?;
-            let report = market
-                .deposit(long_token_amount.into(), short_token_amount.into(), prices)
-                .and_then(|d| d.execute())
-                .map_err(ModelError::from)?;
-            market.validate_market_balances(0, 0)?;
-
-            let minted: u64 = (*report.minted())
-                .try_into()
-                .map_err(|_| error!(CoreError::TokenAmountOverflow))?;
-
-            require_gte!(
-                minted,
-                self.deposit.load()?.params.min_market_token_amount,
-                CoreError::InsufficientOutputAmount
-            );
-
-            msg!("[Deposit] executed: {:?}", report);
+            .unchecked_deposit(
+                self.market_token_receiver,
+                (
+                    deposit.tokens.initial_long_token.token(),
+                    deposit.tokens.initial_short_token.token(),
+                ),
+                (
+                    deposit.params.initial_long_token_amount,
+                    deposit.params.initial_short_token_amount,
+                ),
+                deposit.params.min_market_token_amount,
+            )?;
         }
-
-        // Commit the changes.
-        market.commit();
-        swap_markets.commit();
-
         Ok(())
     }
 }

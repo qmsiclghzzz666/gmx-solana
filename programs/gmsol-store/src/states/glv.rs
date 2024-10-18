@@ -2,7 +2,10 @@ use std::collections::HashSet;
 
 use anchor_lang::prelude::*;
 
-use crate::CoreError;
+use crate::{
+    states::{Deposit, Market},
+    CoreError,
+};
 
 use super::{
     common::{
@@ -188,6 +191,64 @@ impl Glv {
     pub fn market_tokens(&self) -> &[Pubkey] {
         &self.market_tokens[0..(self.num_markets as usize)]
     }
+
+    /// Split remaining accounts.
+    pub(crate) fn validate_and_split_remaining_accounts<'info>(
+        &self,
+        store: &Pubkey,
+        remaining_accounts: &'info [AccountInfo<'info>],
+    ) -> Result<SplitAccountsForGlv<'info>> {
+        let len = self.num_markets as usize;
+
+        require_gte!(
+            remaining_accounts.len(),
+            len + len,
+            CoreError::InvalidArgument
+        );
+
+        let markets = &remaining_accounts[0..len];
+        let market_tokens = &remaining_accounts[len..(len + len)];
+        let remaining_accounts = &remaining_accounts[(len + len)..];
+
+        for idx in 0..len {
+            let market = &markets[idx];
+            let market_token = &market_tokens[idx];
+            let expected_market_token = &self.market_tokens[idx];
+
+            require_eq!(
+                market_token.key(),
+                *expected_market_token,
+                CoreError::MarketTokenMintMismatched
+            );
+            {
+                let mint = Account::<anchor_spl::token::Mint>::try_from(market_token)?;
+                require!(
+                    mint.mint_authority == Some(*store).into(),
+                    CoreError::StoreMismatched
+                );
+            }
+            {
+                let market = AccountLoader::<Market>::try_from(market)?;
+                require_eq!(
+                    market.load()?.validated_meta(store)?.market_token_mint,
+                    *expected_market_token,
+                    CoreError::MarketTokenMintMismatched
+                );
+            }
+        }
+
+        Ok(SplitAccountsForGlv {
+            markets,
+            market_tokens,
+            remaining_accounts,
+        })
+    }
+}
+
+pub(crate) struct SplitAccountsForGlv<'info> {
+    pub(crate) markets: &'info [AccountInfo<'info>],
+    pub(crate) market_tokens: &'info [AccountInfo<'info>],
+    pub(crate) remaining_accounts: &'info [AccountInfo<'info>],
 }
 
 /// Glv Deposit.
@@ -220,6 +281,36 @@ impl Seed for GlvDeposit {
 
 impl gmsol_utils::InitSpace for GlvDeposit {
     const INIT_SPACE: usize = core::mem::size_of::<Self>();
+}
+
+impl GlvDeposit {
+    pub(crate) fn validate_for_execution(
+        &self,
+        market_token: &AccountInfo,
+        market: &Market,
+    ) -> Result<()> {
+        use anchor_spl::token::accessor::amount;
+
+        require_eq!(
+            *market_token.key,
+            self.tokens.market_token(),
+            CoreError::MarketTokenMintMismatched
+        );
+
+        let supply = amount(market_token)?;
+
+        if supply == 0 {
+            Deposit::validate_first_deposit(
+                &self.header.owner,
+                self.params.min_market_token_amount,
+                market,
+            )?;
+        }
+
+        // TODO: validate first GLV deposit.
+
+        Ok(())
+    }
 }
 
 /// Token Accounts.
@@ -276,6 +367,8 @@ pub struct GlvDepositParams {
     pub(crate) initial_short_token_amount: u64,
     /// The amount of market tokens to deposit.
     pub(crate) market_token_amount: u64,
+    /// The minimum acceptable amount of market tokens to be minted.
+    pub(crate) min_market_token_amount: u64,
     /// The minimum acceptable amount of glv tokens to receive.
     pub(crate) min_glv_token_amount: u64,
     reserved: [u8; 64],
