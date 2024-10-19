@@ -164,8 +164,7 @@ impl<'a, 'info> RevertibleLiquidityMarketOperation<'a, 'info> {
             self.token_program.clone(),
             self.store,
         )?
-        .enable_mint(market_token_receiver)
-        .boxed();
+        .enable_mint(market_token_receiver);
         let mut swap_markets = SwapMarkets::new(
             &self.store.key(),
             &self.swap_markets,
@@ -187,7 +186,7 @@ impl<'a, 'info> RevertibleLiquidityMarketOperation<'a, 'info> {
             let meta = market.market_meta();
             let expected_token_outs = (meta.long_token_mint, meta.short_token_mint);
             swap_markets.revertible_swap(
-                SwapDirection::Into(&mut *market),
+                SwapDirection::Into(&mut market),
                 self.oracle,
                 self.swap,
                 expected_token_outs,
@@ -198,7 +197,7 @@ impl<'a, 'info> RevertibleLiquidityMarketOperation<'a, 'info> {
 
         // Perform the deposit.
         {
-            let prices = self.oracle.market_prices(&*market)?;
+            let prices = self.oracle.market_prices(&market)?;
             let report = market
                 .deposit(long_token_amount.into(), short_token_amount.into(), prices)
                 .and_then(|d| d.execute())
@@ -226,8 +225,14 @@ impl<'a, 'info> RevertibleLiquidityMarketOperation<'a, 'info> {
 }
 
 pub(crate) struct ExecutedOperation<'a, 'info> {
-    market: Option<Box<RevertibleLiquidityMarket<'a, 'info>>>,
+    market: Option<RevertibleLiquidityMarket<'a, 'info>>,
     swap_markets: Option<SwapMarkets<'a>>,
+}
+
+impl<'a, 'info> ExecutedOperation<'a, 'info> {
+    pub(crate) fn boxed(self) -> Box<Self> {
+        Box::new(self)
+    }
 }
 
 impl<'a, 'info> Drop for ExecutedOperation<'a, 'info> {
