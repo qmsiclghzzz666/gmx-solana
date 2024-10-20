@@ -66,14 +66,17 @@ impl<'a, 'market> TryFrom<&'a RevertibleMarket<'market>> for Clocks {
 impl Clocks {
     fn write_to_market(&self, market: &mut Market) {
         *market
+            .state
             .clocks
             .get_mut(ClockKind::PriceImpactDistribution)
             .expect("must exist") = self.position_impact_distribution_clock;
         *market
+            .state
             .clocks
             .get_mut(ClockKind::Borrowing)
             .expect("must exist") = self.borrowing_clock;
         *market
+            .state
             .clocks
             .get_mut(ClockKind::Funding)
             .expect("must exist") = self.funding_clock;
@@ -127,30 +130,24 @@ impl<'a, 'market> TryFrom<&'a RevertibleMarket<'market>> for Pools {
 
 impl Pools {
     fn write_to_market(&self, market: &mut Market) {
-        self.swap_impact.as_small_pool().write_to_pool(
-            market
-                .pools
-                .get_mut(PoolKind::SwapImpact)
-                .expect("must exist"),
-        );
+        self.swap_impact
+            .as_small_pool()
+            .write_to_pool(market.pool_mut(PoolKind::SwapImpact).expect("must exist"));
 
         self.position_impact.as_small_pool().write_to_pool(
             market
-                .pools
-                .get_mut(PoolKind::PositionImpact)
+                .pool_mut(PoolKind::PositionImpact)
                 .expect("must exist"),
         );
 
         self.open_interest.0.as_small_pool().write_to_pool(
             market
-                .pools
-                .get_mut(PoolKind::OpenInterestForLong)
+                .pool_mut(PoolKind::OpenInterestForLong)
                 .expect("must exist"),
         );
         self.open_interest.1.as_small_pool().write_to_pool(
             market
-                .pools
-                .get_mut(PoolKind::OpenInterestForShort)
+                .pool_mut(PoolKind::OpenInterestForShort)
                 .expect("must exist"),
         );
 
@@ -159,8 +156,7 @@ impl Pools {
             .as_small_pool()
             .write_to_pool(
                 market
-                    .pools
-                    .get_mut(PoolKind::OpenInterestInTokensForLong)
+                    .pool_mut(PoolKind::OpenInterestInTokensForLong)
                     .expect("must exist"),
             );
         self.open_interest_in_tokens
@@ -168,15 +164,13 @@ impl Pools {
             .as_small_pool()
             .write_to_pool(
                 market
-                    .pools
-                    .get_mut(PoolKind::OpenInterestInTokensForShort)
+                    .pool_mut(PoolKind::OpenInterestInTokensForShort)
                     .expect("must exist"),
             );
 
         self.borrowing_factor.as_small_pool().write_to_pool(
             market
-                .pools
-                .get_mut(PoolKind::BorrowingFactor)
+                .pool_mut(PoolKind::BorrowingFactor)
                 .expect("must exist"),
         );
 
@@ -185,8 +179,7 @@ impl Pools {
             .as_small_pool()
             .write_to_pool(
                 market
-                    .pools
-                    .get_mut(PoolKind::FundingAmountPerSizeForLong)
+                    .pool_mut(PoolKind::FundingAmountPerSizeForLong)
                     .expect("must exist"),
             );
         self.funding_amount_per_size
@@ -194,8 +187,7 @@ impl Pools {
             .as_small_pool()
             .write_to_pool(
                 market
-                    .pools
-                    .get_mut(PoolKind::FundingAmountPerSizeForShort)
+                    .pool_mut(PoolKind::FundingAmountPerSizeForShort)
                     .expect("must exist"),
             );
 
@@ -204,8 +196,7 @@ impl Pools {
             .as_small_pool()
             .write_to_pool(
                 market
-                    .pools
-                    .get_mut(PoolKind::ClaimableFundingAmountPerSizeForLong)
+                    .pool_mut(PoolKind::ClaimableFundingAmountPerSizeForLong)
                     .expect("must exist"),
             );
         self.claimable_funding_amount_per_size
@@ -213,28 +204,24 @@ impl Pools {
             .as_small_pool()
             .write_to_pool(
                 market
-                    .pools
-                    .get_mut(PoolKind::ClaimableFundingAmountPerSizeForShort)
+                    .pool_mut(PoolKind::ClaimableFundingAmountPerSizeForShort)
                     .expect("must exist"),
             );
 
         self.collateral_sum.0.as_small_pool().write_to_pool(
             market
-                .pools
-                .get_mut(PoolKind::CollateralSumForLong)
+                .pool_mut(PoolKind::CollateralSumForLong)
                 .expect("must exist"),
         );
         self.collateral_sum.1.as_small_pool().write_to_pool(
             market
-                .pools
-                .get_mut(PoolKind::CollateralSumForShort)
+                .pool_mut(PoolKind::CollateralSumForShort)
                 .expect("must exist"),
         );
 
         self.total_borrowing.as_small_pool().write_to_pool(
             market
-                .pools
-                .get_mut(PoolKind::TotalBorrowing)
+                .pool_mut(PoolKind::TotalBorrowing)
                 .expect("must exist"),
         );
     }
@@ -261,9 +248,9 @@ impl<'a, 'market> TryFrom<&'a RevertibleMarket<'market>> for State {
 
 impl State {
     fn write_to_market(&self, market: &mut Market) {
-        market.state.funding_factor_per_second = self.funding_factor_per_second;
+        market.state.other.funding_factor_per_second = self.funding_factor_per_second;
         if let Some(next_trade_id) = self.next_trade_id {
-            let trade_id = market.state.next_trade_id().expect("must success");
+            let trade_id = market.state.other.next_trade_id().expect("must success");
             assert_eq!(trade_id, next_trade_id);
         }
     }

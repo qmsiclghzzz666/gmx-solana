@@ -75,6 +75,7 @@ impl SerializeMarket {
     pub fn from_market(pubkey: &Pubkey, market: &Market) -> gmsol::Result<Self> {
         let meta = market.meta();
         let state = market.state();
+        let indexer = market.indexer();
         let serialized = Self {
             name: market.name()?.to_string(),
             enabled: market.is_enabled(),
@@ -93,9 +94,9 @@ impl SerializeMarket {
                 long_token_balance: state.long_token_balance_raw(),
                 short_token_balance: state.short_token_balance_raw(),
                 funding_factor_per_second: state.funding_factor_per_second(),
-                deposit_count: state.deposit_count(),
-                withdrawal_count: state.withdrawal_count(),
-                order_count: state.order_count(),
+                deposit_count: indexer.deposit_count(),
+                withdrawal_count: indexer.withdrawal_count(),
+                order_count: indexer.order_count(),
                 trade_count: state.trade_count(),
             },
             clocks: market.try_into()?,

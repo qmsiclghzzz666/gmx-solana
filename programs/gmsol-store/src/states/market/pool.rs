@@ -14,8 +14,10 @@ pub struct Pool {
     /// i.e. a pure pool.
     /// For a pure pool, only the `long_token_amount` field is used.
     is_pure: u8,
+    pub(super) dirty: u8,
     #[cfg_attr(feature = "serde", serde(skip))]
-    padding: [u8; 15],
+    padding: [u8; 6],
+    pub(super) rev: u64,
     /// Long token amount.
     pub(super) long_token_amount: u128,
     /// Short token amount.

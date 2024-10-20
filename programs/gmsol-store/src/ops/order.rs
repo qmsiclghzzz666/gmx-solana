@@ -134,7 +134,7 @@ impl<'a, 'info> CreateOrderOperation<'a, 'info> {
             &mut OrderParams,
         ) -> Result<(Pubkey, Pubkey)>,
     ) -> Result<()> {
-        let id = self.market.load_mut()?.state_mut().next_order_id()?;
+        let id = self.market.load_mut()?.indexer_mut().next_order_id()?;
         {
             let mut order = self.order.load_init()?;
             let Order {

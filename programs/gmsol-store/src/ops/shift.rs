@@ -46,7 +46,7 @@ impl<'a, 'info> CreateShiftOperation<'a, 'info> {
         self.validate_markets()?;
         self.validate_params()?;
 
-        let id = self.from_market.load_mut()?.state_mut().next_shift_id()?;
+        let id = self.from_market.load_mut()?.indexer_mut().next_shift_id()?;
 
         let mut shift = self.shift.load_init()?;
 

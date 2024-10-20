@@ -67,7 +67,7 @@ impl<'a, 'info> CreateDepositOperation<'a, 'info> {
             swap_paths,
         } = self;
 
-        let id = market.load_mut()?.state_mut().next_deposit_id()?;
+        let id = market.load_mut()?.indexer_mut().next_deposit_id()?;
 
         let mut deposit = deposit.load_init()?;
 

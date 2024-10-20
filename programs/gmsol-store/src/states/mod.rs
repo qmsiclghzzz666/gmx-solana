@@ -43,7 +43,7 @@ pub mod glv;
 pub use deposit::Deposit;
 pub use glv::{Glv, GlvDeposit};
 pub use market::{
-    config::MarketConfigKey, pool::Pool, HasMarketMeta, Market, MarketMeta, MarketState,
+    config::MarketConfigKey, pool::Pool, HasMarketMeta, Market, MarketMeta, OtherState,
 };
 pub use oracle::*;
 pub use order::{Order, OrderParams, UpdateOrderParams};

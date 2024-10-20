@@ -81,7 +81,11 @@ impl<'a, 'info> CreateGlvDepositOperation<'a, 'info> {
 
         self.validate_params_excluding_swap()?;
 
-        let id = self.market.load_mut()?.state_mut().next_glv_deposit_id()?;
+        let id = self
+            .market
+            .load_mut()?
+            .indexer_mut()
+            .next_glv_deposit_id()?;
 
         let mut glv_deposit = self.glv_deposit.load_init()?;
 

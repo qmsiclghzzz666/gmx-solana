@@ -145,6 +145,7 @@ impl Adl for Market {
             ClockKind::AdlForShort
         };
         let clock = self
+            .state
             .clocks
             .get_mut(kind)
             .ok_or(error!(CoreError::NotFound))?;

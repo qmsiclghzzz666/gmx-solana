@@ -1,3 +1,5 @@
+use std::ops::{Deref, DerefMut};
+
 use anchor_lang::prelude::*;
 use anchor_spl::token::Mint;
 use gmsol_model::{
@@ -14,7 +16,10 @@ use crate::{
     utils::internal::TransferUtils,
 };
 
-use super::{swap_market::RevertibleSwapMarket, Revertible, RevertibleMarket, RevertiblePool};
+use super::{
+    market::RevertibleMarket2, swap_market::RevertibleSwapMarket, Revertible, RevertibleMarket,
+    RevertiblePool,
+};
 
 /// Convert a [`RevertibleMarket`] to a [`LiquidityMarket`](gmsol_model::LiquidityMarket).
 pub struct RevertibleLiquidityMarket<'a, 'info> {
@@ -340,16 +345,72 @@ impl<'a, 'info> Revertible for RevertibleLiquidityMarket<'a, 'info> {
         }
         self.market.commit_with(|market| {
             let position_impact = market
-                .pools
-                .get_mut(PoolKind::PositionImpact)
+                .pool_mut(PoolKind::PositionImpact)
                 .expect("must exist");
             self.position_impact
                 .as_small_pool()
                 .write_to_pool(position_impact);
             *market
+                .state
                 .clocks
                 .get_mut(ClockKind::PriceImpactDistribution)
                 .expect("must exist") = self.position_impact_distribution_clock;
         });
+    }
+}
+
+/// Convert a [`RevertibleMarket`] to a [`LiquidityMarketMut`](gmsol_model::LiquidityMarketMut).
+pub struct RevertibleLiquidityMarket2<'a, 'info> {
+    base: RevertibleMarket2<'a>,
+    token_program: &'a AccountInfo<'info>,
+    store: &'a AccountLoader<'info, Store>,
+    market_token: &'a mut Account<'info, Mint>,
+    receiver: Option<&'a AccountInfo<'info>>,
+    vault: Option<&'a AccountInfo<'info>>,
+    to_mint: u64,
+    to_burn: u64,
+}
+
+impl<'a, 'info> RevertibleLiquidityMarket2<'a, 'info> {
+    pub(crate) fn from_revertible_market(
+        market: RevertibleMarket2<'a>,
+        market_token: &'a mut Account<'info, Mint>,
+        token_program: &'a AccountInfo<'info>,
+        store: &'a AccountLoader<'info, Store>,
+    ) -> Result<Self> {
+        Ok(Self {
+            base: market,
+            token_program,
+            store,
+            market_token,
+            receiver: None,
+            vault: None,
+            to_mint: 0,
+            to_burn: 0,
+        })
+    }
+
+    pub(crate) fn enable_mint(mut self, receiver: &'a AccountInfo<'info>) -> Self {
+        self.receiver = Some(receiver);
+        self
+    }
+
+    pub(crate) fn enable_burn(mut self, vault: &'a AccountInfo<'info>) -> Self {
+        self.vault = Some(vault);
+        self
+    }
+}
+
+impl<'a, 'info> Deref for RevertibleLiquidityMarket2<'a, 'info> {
+    type Target = RevertibleMarket2<'a>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.base
+    }
+}
+
+impl<'a, 'info> DerefMut for RevertibleLiquidityMarket2<'a, 'info> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.base
     }
 }

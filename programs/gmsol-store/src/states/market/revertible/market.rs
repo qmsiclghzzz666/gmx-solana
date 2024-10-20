@@ -12,7 +12,13 @@ use gmsol_model::{
 
 use crate::{
     constants,
-    states::{Factor, HasMarketMeta, Market, MarketMeta, MarketState, Pool},
+    states::{
+        market::{
+            clock::{AsClock, AsClockMut},
+            Clocks,
+        },
+        Factor, HasMarketMeta, Market, MarketMeta, OtherState, Pool,
+    },
     CoreError, ModelError,
 };
 
@@ -181,18 +187,15 @@ impl<'a, 'info> TryFrom<&'a AccountLoader<'info, Market>> for RevertibleMarket<'
     ) -> std::result::Result<Self, Self::Error> {
         let storage = loader.load_mut()?;
         let liquidity = storage
-            .pools
-            .get(PoolKind::Primary)
+            .pool(PoolKind::Primary)
             .ok_or(error!(CoreError::NotFound))?
             .create_small(PoolKind::Primary);
         let claimable_fee = storage
-            .pools
-            .get(PoolKind::ClaimableFee)
+            .pool(PoolKind::ClaimableFee)
             .ok_or(error!(CoreError::NotFound))?
             .create_small(PoolKind::ClaimableFee);
         let swap_impact = storage
-            .pools
-            .get(PoolKind::SwapImpact)
+            .pool(PoolKind::SwapImpact)
             .ok_or(error!(CoreError::NotFound))?
             .create_small(PoolKind::SwapImpact);
         let balance = RevertibleBalance::from(storage.deref());
@@ -214,15 +217,13 @@ impl<'a> RevertibleMarket<'a> {
     pub fn commit_with(mut self, f: impl FnOnce(&mut Market)) {
         let liquidity = self
             .storage
-            .pools
-            .get_mut(PoolKind::Primary)
+            .pool_mut(PoolKind::Primary)
             .expect("must be exist");
         self.liquidity.as_small_pool().write_to_pool(liquidity);
 
         let claimable_fee = self
             .storage
-            .pools
-            .get_mut(PoolKind::ClaimableFee)
+            .pool_mut(PoolKind::ClaimableFee)
             .expect("must be exist");
         self.claimable_fee
             .as_small_pool()
@@ -230,8 +231,7 @@ impl<'a> RevertibleMarket<'a> {
 
         let swap_impact = self
             .storage
-            .pools
-            .get_mut(PoolKind::SwapImpact)
+            .pool_mut(PoolKind::SwapImpact)
             .expect("must be exist");
         self.swap_impact.as_small_pool().write_to_pool(swap_impact);
 
@@ -249,11 +249,7 @@ impl<'a> RevertibleMarket<'a> {
 
     /// Get pool from storage.
     pub fn get_pool_from_storage(&self, kind: PoolKind) -> Result<RevertiblePool> {
-        let pool = self
-            .storage
-            .pools
-            .get(kind)
-            .ok_or(error!(CoreError::NotFound))?;
+        let pool = self.storage.pool(kind).ok_or(error!(CoreError::NotFound))?;
         Ok(RevertiblePool::Storage(
             pool.long_amount().map_err(ModelError::from)?,
             pool.short_amount().map_err(ModelError::from)?,
@@ -262,11 +258,7 @@ impl<'a> RevertibleMarket<'a> {
 
     /// Create a revertible pool from the storage.
     pub fn create_revertible_pool(&self, kind: PoolKind) -> Result<RevertiblePool> {
-        let pool = self
-            .storage
-            .pools
-            .get(kind)
-            .ok_or(error!(CoreError::NotFound))?;
+        let pool = self.storage.pool(kind).ok_or(error!(CoreError::NotFound))?;
         Ok(RevertiblePool::SmallPool(pool.create_small(kind)))
     }
 
@@ -281,24 +273,24 @@ impl<'a> RevertibleMarket<'a> {
     }
 
     /// Get market state.
-    pub fn state(&self) -> &MarketState {
-        &self.storage.state
+    pub fn state(&self) -> &OtherState {
+        &self.storage.state.other
     }
 
     /// Get clock.
     pub fn get_clock(&self, kind: ClockKind) -> Result<i64> {
         let clock = self
             .storage
-            .clocks
-            .get(kind)
+            .clock(kind)
             .ok_or(error!(CoreError::NotFound))?;
-        Ok(*clock)
+        Ok(clock)
     }
 
     /// Set clock.
     pub fn set_clock(&mut self, kind: ClockKind, last: i64) -> Result<()> {
         let clock = self
             .storage
+            .state
             .clocks
             .get_mut(kind)
             .ok_or(error!(CoreError::NotFound))?;
@@ -496,5 +488,442 @@ impl<'a> Revertible for RevertibleMarket<'a> {
     /// - Panic if the storage doesn't have the requried pools.
     fn commit(self) {
         self.commit_with(|_| ());
+    }
+}
+
+/// Revertible Market.
+pub struct RevertibleMarket2<'a> {
+    market: RefMut<'a, Market>,
+}
+
+impl<'a, 'info> TryFrom<&'a AccountLoader<'info, Market>> for RevertibleMarket2<'a> {
+    type Error = Error;
+
+    fn try_from(value: &'a AccountLoader<'info, Market>) -> std::result::Result<Self, Self::Error> {
+        Ok(Self {
+            market: value.load_mut()?,
+        })
+    }
+}
+
+impl<'a> RevertibleMarket2<'a> {
+    fn pool(&self, kind: PoolKind) -> gmsol_model::Result<&Pool> {
+        let Market { state, buffer, .. } = &*self.market;
+        buffer
+            .pool(kind, state)
+            .ok_or_else(|| gmsol_model::Error::MissingPoolKind(kind))
+    }
+
+    fn pool_mut(&mut self, kind: PoolKind) -> gmsol_model::Result<&mut Pool> {
+        let Market { state, buffer, .. } = &mut *self.market;
+        buffer
+            .pool_mut(kind, state)
+            .ok_or_else(|| gmsol_model::Error::MissingPoolKind(kind))
+    }
+
+    fn other(&self) -> &OtherState {
+        let Market { state, buffer, .. } = &*self.market;
+        buffer.other(state)
+    }
+
+    fn other_mut(&mut self) -> &mut OtherState {
+        let Market { state, buffer, .. } = &mut *self.market;
+        buffer.other_mut(state)
+    }
+
+    fn clocks(&self) -> &Clocks {
+        let Market { state, buffer, .. } = &*self.market;
+        buffer.clocks(state)
+    }
+
+    fn clocks_mut(&mut self) -> &mut Clocks {
+        let Market { state, buffer, .. } = &mut *self.market;
+        buffer.clocks_mut(state)
+    }
+
+    fn balance_for_one_side(&self, is_long: bool) -> u64 {
+        let other = self.other();
+        if is_long || self.market.is_pure() {
+            if self.market.is_pure() {
+                other.long_token_balance / 2
+            } else {
+                other.long_token_balance
+            }
+        } else {
+            other.short_token_balance
+        }
+    }
+
+    /// Record transferred in.
+    fn record_transferred_in(&mut self, is_long_token: bool, amount: u64) -> Result<()> {
+        let mint = self.market.meta.market_token_mint;
+        let is_pure = self.market.is_pure();
+        let other = self.other_mut();
+
+        msg!(
+            "[Balance to be committed] {}: {},{}(+{} {is_long_token})",
+            mint,
+            other.long_token_balance,
+            other.short_token_balance,
+            amount,
+        );
+
+        if is_pure || is_long_token {
+            other.long_token_balance = other
+                .long_token_balance
+                .checked_add(amount)
+                .ok_or(error!(CoreError::TokenAmountOverflow))?;
+        } else {
+            other.short_token_balance = other
+                .short_token_balance
+                .checked_add(amount)
+                .ok_or(error!(CoreError::TokenAmountOverflow))?;
+        }
+        Ok(())
+    }
+
+    /// Record transferred out.
+    fn record_transferred_out(&mut self, is_long_token: bool, amount: u64) -> Result<()> {
+        let mint = self.market.meta.market_token_mint;
+        let is_pure = self.market.is_pure();
+        let other = self.other_mut();
+
+        msg!(
+            "[Balance to be committed] {}: {},{}(-{} {is_long_token})",
+            mint,
+            other.long_token_balance,
+            other.short_token_balance,
+            amount,
+        );
+
+        if is_pure || is_long_token {
+            other.long_token_balance = other
+                .long_token_balance
+                .checked_sub(amount)
+                .ok_or(error!(CoreError::TokenAmountOverflow))?;
+        } else {
+            other.short_token_balance = other
+                .short_token_balance
+                .checked_sub(amount)
+                .ok_or(error!(CoreError::TokenAmountOverflow))?;
+        }
+        Ok(())
+    }
+}
+
+impl<'a> Revertible for RevertibleMarket2<'a> {
+    fn commit(mut self) {
+        let Market { state, buffer, .. } = &mut *self.market;
+        buffer.commit_to_storage(state);
+    }
+}
+
+impl<'a> HasMarketMeta for RevertibleMarket2<'a> {
+    fn is_pure(&self) -> bool {
+        self.market.is_pure()
+    }
+    fn market_meta(&self) -> &MarketMeta {
+        self.market.market_meta()
+    }
+}
+
+impl<'a> gmsol_model::Bank<Pubkey> for RevertibleMarket2<'a> {
+    type Num = u64;
+
+    fn record_transferred_in_by_token<Q: ?Sized + Borrow<Pubkey>>(
+        &mut self,
+        token: &Q,
+        amount: &Self::Num,
+    ) -> gmsol_model::Result<()> {
+        let is_long_token = self.market.meta.to_token_side(token.borrow())?;
+        self.record_transferred_in(is_long_token, *amount)?;
+        Ok(())
+    }
+
+    fn record_transferred_out_by_token<Q: ?Sized + Borrow<Pubkey>>(
+        &mut self,
+        token: &Q,
+        amount: &Self::Num,
+    ) -> gmsol_model::Result<()> {
+        let is_long_token = self.market.meta.to_token_side(token.borrow())?;
+        self.record_transferred_out(is_long_token, *amount)?;
+        Ok(())
+    }
+
+    fn balance<Q: Borrow<Pubkey> + ?Sized>(&self, token: &Q) -> gmsol_model::Result<Self::Num> {
+        let side = self.market.meta.to_token_side(token.borrow())?;
+        Ok(self.balance_for_one_side(side))
+    }
+}
+
+impl<'a> gmsol_model::BaseMarket<{ constants::MARKET_DECIMALS }> for RevertibleMarket2<'a> {
+    type Num = u128;
+
+    type Signed = i128;
+
+    type Pool = Pool;
+
+    fn liquidity_pool(&self) -> gmsol_model::Result<&Self::Pool> {
+        self.pool(PoolKind::Primary)
+    }
+
+    fn claimable_fee_pool(&self) -> gmsol_model::Result<&Self::Pool> {
+        self.pool(PoolKind::ClaimableFee)
+    }
+
+    fn swap_impact_pool(&self) -> gmsol_model::Result<&Self::Pool> {
+        self.pool(PoolKind::SwapImpact)
+    }
+
+    fn open_interest_pool(&self, is_long: bool) -> gmsol_model::Result<&Self::Pool> {
+        self.pool(if is_long {
+            PoolKind::OpenInterestForLong
+        } else {
+            PoolKind::OpenInterestForShort
+        })
+    }
+
+    fn open_interest_in_tokens_pool(&self, is_long: bool) -> gmsol_model::Result<&Self::Pool> {
+        self.pool(if is_long {
+            PoolKind::OpenInterestInTokensForLong
+        } else {
+            PoolKind::OpenInterestInTokensForShort
+        })
+    }
+
+    fn collateral_sum_pool(&self, is_long: bool) -> gmsol_model::Result<&Self::Pool> {
+        self.pool(if is_long {
+            PoolKind::CollateralSumForLong
+        } else {
+            PoolKind::CollateralSumForShort
+        })
+    }
+
+    fn usd_to_amount_divisor(&self) -> Self::Num {
+        self.market.usd_to_amount_divisor()
+    }
+
+    fn max_pool_amount(&self, is_long_token: bool) -> gmsol_model::Result<Self::Num> {
+        self.market.max_pool_amount(is_long_token)
+    }
+
+    fn pnl_factor_config(
+        &self,
+        kind: gmsol_model::PnlFactorKind,
+        is_long: bool,
+    ) -> gmsol_model::Result<Self::Num> {
+        self.market.pnl_factor_config(kind, is_long)
+    }
+
+    fn reserve_factor(&self) -> gmsol_model::Result<Self::Num> {
+        self.market.reserve_factor()
+    }
+}
+
+impl<'a> gmsol_model::BaseMarketMut<{ constants::MARKET_DECIMALS }> for RevertibleMarket2<'a> {
+    fn liquidity_pool_mut(&mut self) -> gmsol_model::Result<&mut Self::Pool> {
+        self.pool_mut(PoolKind::Primary)
+    }
+
+    fn claimable_fee_pool_mut(&mut self) -> gmsol_model::Result<&mut Self::Pool> {
+        self.pool_mut(PoolKind::ClaimableFee)
+    }
+}
+
+impl<'a> gmsol_model::SwapMarket<{ constants::MARKET_DECIMALS }> for RevertibleMarket2<'a> {
+    fn swap_impact_params(&self) -> gmsol_model::Result<PriceImpactParams<Factor>> {
+        self.market.swap_impact_params()
+    }
+
+    fn swap_fee_params(&self) -> gmsol_model::Result<FeeParams<Factor>> {
+        self.market.swap_fee_params()
+    }
+}
+
+impl<'a> gmsol_model::SwapMarketMut<{ constants::MARKET_DECIMALS }> for RevertibleMarket2<'a> {
+    fn swap_impact_pool_mut(&mut self) -> gmsol_model::Result<&mut Self::Pool> {
+        self.pool_mut(PoolKind::SwapImpact)
+    }
+}
+
+impl<'a> gmsol_model::PositionImpactMarket<{ constants::MARKET_DECIMALS }>
+    for RevertibleMarket2<'a>
+{
+    fn position_impact_pool(&self) -> gmsol_model::Result<&Self::Pool> {
+        self.pool(PoolKind::PositionImpact)
+    }
+
+    fn position_impact_params(&self) -> gmsol_model::Result<PriceImpactParams<Self::Num>> {
+        self.market.position_impact_params()
+    }
+
+    fn position_impact_distribution_params(
+        &self,
+    ) -> gmsol_model::Result<PositionImpactDistributionParams<Self::Num>> {
+        self.market.position_impact_distribution_params()
+    }
+
+    fn passed_in_seconds_for_position_impact_distribution(&self) -> gmsol_model::Result<u64> {
+        AsClock::from(&self.clocks().price_impact_distribution).passed_in_seconds()
+    }
+}
+
+impl<'a> gmsol_model::PositionImpactMarketMut<{ constants::MARKET_DECIMALS }>
+    for RevertibleMarket2<'a>
+{
+    fn position_impact_pool_mut(&mut self) -> gmsol_model::Result<&mut Self::Pool> {
+        self.pool_mut(PoolKind::PositionImpact)
+    }
+
+    fn just_passed_in_seconds_for_position_impact_distribution(
+        &mut self,
+    ) -> gmsol_model::Result<u64> {
+        AsClockMut::from(&mut self.clocks_mut().price_impact_distribution).just_passed_in_seconds()
+    }
+}
+
+impl<'a> gmsol_model::BorrowingFeeMarket<{ constants::MARKET_DECIMALS }> for RevertibleMarket2<'a> {
+    fn borrowing_factor_pool(&self) -> gmsol_model::Result<&Self::Pool> {
+        self.pool(PoolKind::BorrowingFactor)
+    }
+
+    fn total_borrowing_pool(&self) -> gmsol_model::Result<&Self::Pool> {
+        self.pool(PoolKind::TotalBorrowing)
+    }
+
+    fn borrowing_fee_params(&self) -> gmsol_model::Result<BorrowingFeeParams<Self::Num>> {
+        self.market.borrowing_fee_params()
+    }
+
+    fn passed_in_seconds_for_borrowing(&self) -> gmsol_model::Result<u64> {
+        AsClock::from(&self.clocks().borrowing).passed_in_seconds()
+    }
+}
+
+impl<'a> gmsol_model::PerpMarket<{ constants::MARKET_DECIMALS }> for RevertibleMarket2<'a> {
+    fn funding_factor_per_second(&self) -> &Self::Signed {
+        &self.other().funding_factor_per_second
+    }
+
+    fn funding_amount_per_size_pool(&self, is_long: bool) -> gmsol_model::Result<&Self::Pool> {
+        self.pool(if is_long {
+            PoolKind::FundingAmountPerSizeForLong
+        } else {
+            PoolKind::FundingAmountPerSizeForShort
+        })
+    }
+
+    fn claimable_funding_amount_per_size_pool(
+        &self,
+        is_long: bool,
+    ) -> gmsol_model::Result<&Self::Pool> {
+        self.pool(if is_long {
+            PoolKind::ClaimableFundingAmountPerSizeForLong
+        } else {
+            PoolKind::ClaimableFundingAmountPerSizeForShort
+        })
+    }
+
+    fn funding_amount_per_size_adjustment(&self) -> Self::Num {
+        self.market.funding_amount_per_size_adjustment()
+    }
+
+    fn funding_fee_params(&self) -> gmsol_model::Result<FundingFeeParams<Self::Num>> {
+        self.market.funding_fee_params()
+    }
+
+    fn position_params(&self) -> gmsol_model::Result<PositionParams<Self::Num>> {
+        self.market.position_params()
+    }
+
+    fn order_fee_params(&self) -> gmsol_model::Result<FeeParams<Self::Num>> {
+        self.market.order_fee_params()
+    }
+
+    fn open_interest_reserve_factor(&self) -> gmsol_model::Result<Self::Num> {
+        self.market.open_interest_reserve_factor()
+    }
+
+    fn max_open_interest(&self, is_long: bool) -> gmsol_model::Result<Self::Num> {
+        self.market.max_open_interest(is_long)
+    }
+
+    fn min_collateral_factor_for_open_interest_multiplier(
+        &self,
+        is_long: bool,
+    ) -> gmsol_model::Result<Self::Num> {
+        self.market
+            .min_collateral_factor_for_open_interest_multiplier(is_long)
+    }
+}
+
+impl<'a> gmsol_model::PerpMarketMut<{ constants::MARKET_DECIMALS }> for RevertibleMarket2<'a> {
+    fn just_passed_in_seconds_for_borrowing(&mut self) -> gmsol_model::Result<u64> {
+        AsClockMut::from(&mut self.clocks_mut().borrowing).just_passed_in_seconds()
+    }
+
+    fn just_passed_in_seconds_for_funding(&mut self) -> gmsol_model::Result<u64> {
+        AsClockMut::from(&mut self.clocks_mut().funding).just_passed_in_seconds()
+    }
+
+    fn funding_factor_per_second_mut(&mut self) -> &mut Self::Signed {
+        &mut self.other_mut().funding_factor_per_second
+    }
+
+    fn open_interest_pool_mut(&mut self, is_long: bool) -> gmsol_model::Result<&mut Self::Pool> {
+        self.pool_mut(if is_long {
+            PoolKind::OpenInterestForLong
+        } else {
+            PoolKind::OpenInterestForShort
+        })
+    }
+
+    fn open_interest_in_tokens_pool_mut(
+        &mut self,
+        is_long: bool,
+    ) -> gmsol_model::Result<&mut Self::Pool> {
+        self.pool_mut(if is_long {
+            PoolKind::OpenInterestInTokensForLong
+        } else {
+            PoolKind::OpenInterestInTokensForShort
+        })
+    }
+
+    fn borrowing_factor_pool_mut(&mut self) -> gmsol_model::Result<&mut Self::Pool> {
+        self.pool_mut(PoolKind::BorrowingFactor)
+    }
+
+    fn funding_amount_per_size_pool_mut(
+        &mut self,
+        is_long: bool,
+    ) -> gmsol_model::Result<&mut Self::Pool> {
+        self.pool_mut(if is_long {
+            PoolKind::FundingAmountPerSizeForLong
+        } else {
+            PoolKind::FundingAmountPerSizeForShort
+        })
+    }
+
+    fn claimable_funding_amount_per_size_pool_mut(
+        &mut self,
+        is_long: bool,
+    ) -> gmsol_model::Result<&mut Self::Pool> {
+        self.pool_mut(if is_long {
+            PoolKind::ClaimableFundingAmountPerSizeForLong
+        } else {
+            PoolKind::ClaimableFundingAmountPerSizeForShort
+        })
+    }
+
+    fn collateral_sum_pool_mut(&mut self, is_long: bool) -> gmsol_model::Result<&mut Self::Pool> {
+        self.pool_mut(if is_long {
+            PoolKind::CollateralSumForLong
+        } else {
+            PoolKind::CollateralSumForShort
+        })
+    }
+
+    fn total_borrowing_pool_mut(&mut self) -> gmsol_model::Result<&mut Self::Pool> {
+        self.pool_mut(PoolKind::TotalBorrowing)
     }
 }

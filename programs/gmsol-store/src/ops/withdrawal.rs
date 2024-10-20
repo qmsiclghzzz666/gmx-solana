@@ -72,7 +72,7 @@ impl<'a, 'info> CreateWithdrawalOperation<'a, 'info> {
             swap_paths,
         } = self;
 
-        let id = market.load_mut()?.state_mut().next_withdrawal_id()?;
+        let id = market.load_mut()?.indexer_mut().next_withdrawal_id()?;
 
         let mut withdrawal = withdrawal.load_init()?;
 

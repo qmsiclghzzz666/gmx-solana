@@ -1,3 +1,5 @@
+mod buffer;
+
 /// Revertible Balance.
 pub mod balance;
 
@@ -22,6 +24,8 @@ pub use self::{
     market::{RevertibleMarket, RevertiblePool},
     swap_market::RevertibleSwapMarket,
 };
+
+pub(super) use self::buffer::RevertibleBuffer;
 
 /// Revertible type.
 pub trait Revertible {

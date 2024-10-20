@@ -5,6 +5,7 @@ use anchor_spl::token::Mint;
 use bitmaps::Bitmap;
 use borsh::{BorshDeserialize, BorshSerialize};
 use gmsol_model::{price::Prices, ClockKind, PoolKind};
+use revertible::RevertibleBuffer;
 
 use crate::{
     utils::fixed_str::{bytes_to_fixed_str, fixed_str_to_bytes},
@@ -63,9 +64,18 @@ pub struct Market {
     /// Store.
     pub store: Pubkey,
     config: MarketConfig,
+    indexer: Indexer,
+    state: State,
+    buffer: RevertibleBuffer,
+}
+
+#[zero_copy]
+#[cfg_attr(feature = "debug", derive(Debug))]
+struct State {
     pools: Pools,
     clocks: Clocks,
-    state: MarketState,
+    other: OtherState,
+    reserved: [u8; 1024],
 }
 
 impl Bump for Market {
@@ -125,9 +135,12 @@ impl Market {
         self.meta.short_token_mint = short_token_mint;
         let is_pure = self.meta.long_token_mint == self.meta.short_token_mint;
         self.set_flag(MarketFlag::Pure, is_pure);
-        self.pools.init(is_pure);
-        self.clocks.init_to_current()?;
+        self.state.pools.init(is_pure);
+        self.state.clocks.init_to_current()?;
         self.config.init();
+
+        // Initialize buffer.
+        self.buffer.init();
         Ok(())
     }
 
@@ -248,20 +261,22 @@ impl Market {
         msg!(
             "{}: {},{}(+{},{})",
             self.meta.market_token_mint,
-            self.state.long_token_balance,
-            self.state.short_token_balance,
+            self.state.other.long_token_balance,
+            self.state.other.short_token_balance,
             amount,
             is_long_token
         );
         if self.is_pure() || is_long_token {
-            self.state.long_token_balance = self
+            self.state.other.long_token_balance = self
                 .state
+                .other
                 .long_token_balance
                 .checked_add(amount)
                 .ok_or(error!(CoreError::TokenAmountOverflow))?;
         } else {
-            self.state.short_token_balance = self
+            self.state.other.short_token_balance = self
                 .state
+                .other
                 .short_token_balance
                 .checked_add(amount)
                 .ok_or(error!(CoreError::TokenAmountOverflow))?;
@@ -269,8 +284,8 @@ impl Market {
         msg!(
             "{}: {},{}",
             self.meta.market_token_mint,
-            self.state.long_token_balance,
-            self.state.short_token_balance
+            self.state.other.long_token_balance,
+            self.state.other.short_token_balance
         );
         Ok(())
     }
@@ -280,20 +295,22 @@ impl Market {
         msg!(
             "{}: {},{}(-{},{})",
             self.meta.market_token_mint,
-            self.state.long_token_balance,
-            self.state.short_token_balance,
+            self.state.other.long_token_balance,
+            self.state.other.short_token_balance,
             amount,
             is_long_token
         );
         if self.is_pure() || is_long_token {
-            self.state.long_token_balance = self
+            self.state.other.long_token_balance = self
                 .state
+                .other
                 .long_token_balance
                 .checked_sub(amount)
                 .ok_or(error!(CoreError::TokenAmountOverflow))?;
         } else {
-            self.state.short_token_balance = self
+            self.state.other.short_token_balance = self
                 .state
+                .other
                 .short_token_balance
                 .checked_sub(amount)
                 .ok_or(error!(CoreError::TokenAmountOverflow))?;
@@ -301,8 +318,8 @@ impl Market {
         msg!(
             "{}: {},{}",
             self.meta.market_token_mint,
-            self.state.long_token_balance,
-            self.state.short_token_balance
+            self.state.other.long_token_balance,
+            self.state.other.short_token_balance
         );
         Ok(())
     }
@@ -310,23 +327,28 @@ impl Market {
     /// Get pool of the given kind.
     #[inline]
     pub fn pool(&self, kind: PoolKind) -> Option<Pool> {
-        self.pools.get(kind).copied()
+        self.state.pools.get(kind).copied()
     }
 
     /// Try to get pool of the given kind.
     pub fn try_pool(&self, kind: PoolKind) -> gmsol_model::Result<&Pool> {
-        self.pools
+        self.state
+            .pools
             .get(kind)
             .ok_or(gmsol_model::Error::MissingPoolKind(kind))
     }
 
     pub(crate) fn pool_mut(&mut self, kind: PoolKind) -> Option<&mut Pool> {
-        self.pools.get_mut(kind)
+        self.state.pools.get_mut(kind)
     }
 
     /// Get clock of the given kind.
     pub fn clock(&self, kind: ClockKind) -> Option<i64> {
-        self.clocks.get(kind).copied()
+        self.state.clocks.get(kind).copied()
+    }
+
+    fn clocks(&self) -> &Clocks {
+        &self.state.clocks
     }
 
     /// Validate the market.
@@ -356,14 +378,19 @@ impl Market {
         Ok(self.config.get_mut(key))
     }
 
-    /// Get market state.
-    pub fn state(&self) -> &MarketState {
-        &self.state
+    /// Get other market state.
+    pub fn state(&self) -> &OtherState {
+        &self.state.other
     }
 
-    /// Get market state mutably.
-    pub fn state_mut(&mut self) -> &mut MarketState {
-        &mut self.state
+    /// Get market indexer.
+    pub fn indexer(&self) -> &Indexer {
+        &self.indexer
+    }
+
+    /// Get market indexer mutably.
+    pub fn indexer_mut(&mut self) -> &mut Indexer {
+        &mut self.indexer
     }
 
     /// Update config with buffer.
@@ -439,22 +466,18 @@ pub enum MarketFlag {
 /// Market State.
 #[zero_copy]
 #[cfg_attr(feature = "debug", derive(Debug))]
-pub struct MarketState {
+pub struct OtherState {
+    dirty: u8,
+    padding: [u8; 15],
+    rev: u64,
+    trade_count: u64,
     long_token_balance: u64,
     short_token_balance: u64,
     funding_factor_per_second: i128,
-    trade_count: u64,
-    deposit_count: u64,
-    withdrawal_count: u64,
-    order_count: u64,
-    shift_count: u64,
-    glv_deposit_count: u64,
-    glv_withdrawal_count: u64,
-    padding_0: [u8; 8],
-    reserve: [u8; 256],
+    reserved: [u8; 256],
 }
 
-impl MarketState {
+impl OtherState {
     /// Get long token balance.
     pub fn long_token_balance_raw(&self) -> u64 {
         self.long_token_balance
@@ -475,66 +498,6 @@ impl MarketState {
         self.trade_count
     }
 
-    /// Get current deposit count.
-    pub fn deposit_count(&self) -> u64 {
-        self.deposit_count
-    }
-
-    /// Get current withdrawal count.
-    pub fn withdrawal_count(&self) -> u64 {
-        self.withdrawal_count
-    }
-
-    /// Get current order count.
-    pub fn order_count(&self) -> u64 {
-        self.order_count
-    }
-
-    /// Get current shift count.
-    pub fn shift_count(&self) -> u64 {
-        self.shift_count
-    }
-
-    /// Get current GLV deposit count.
-    pub fn glv_deposit_count(&self) -> u64 {
-        self.glv_deposit_count
-    }
-
-    /// Get current GLV withdrawal count.
-    pub fn glv_withdrawal_count(&self) -> u64 {
-        self.glv_withdrawal_count
-    }
-
-    /// Next deposit id.
-    pub fn next_deposit_id(&mut self) -> Result<u64> {
-        let next_id = self
-            .deposit_count
-            .checked_add(1)
-            .ok_or(error!(CoreError::TokenAmountOverflow))?;
-        self.deposit_count = next_id;
-        Ok(next_id)
-    }
-
-    /// Next withdrawal id.
-    pub fn next_withdrawal_id(&mut self) -> Result<u64> {
-        let next_id = self
-            .withdrawal_count
-            .checked_add(1)
-            .ok_or(error!(CoreError::TokenAmountOverflow))?;
-        self.withdrawal_count = next_id;
-        Ok(next_id)
-    }
-
-    /// Next order id.
-    pub fn next_order_id(&mut self) -> Result<u64> {
-        let next_id = self
-            .order_count
-            .checked_add(1)
-            .ok_or(error!(CoreError::TokenAmountOverflow))?;
-        self.order_count = next_id;
-        Ok(next_id)
-    }
-
     /// Next trade id.
     pub fn next_trade_id(&mut self) -> Result<u64> {
         let next_id = self
@@ -542,36 +505,6 @@ impl MarketState {
             .checked_add(1)
             .ok_or(error!(CoreError::TokenAmountOverflow))?;
         self.trade_count = next_id;
-        Ok(next_id)
-    }
-
-    /// Next shift id.
-    pub fn next_shift_id(&mut self) -> Result<u64> {
-        let next_id = self
-            .shift_count
-            .checked_add(1)
-            .ok_or(error!(CoreError::TokenAmountOverflow))?;
-        self.shift_count = next_id;
-        Ok(next_id)
-    }
-
-    /// Next GLV deposit id.
-    pub fn next_glv_deposit_id(&mut self) -> Result<u64> {
-        let next_id = self
-            .glv_deposit_count
-            .checked_add(1)
-            .ok_or(error!(CoreError::TokenAmountOverflow))?;
-        self.glv_deposit_count = next_id;
-        Ok(next_id)
-    }
-
-    /// Next GLV withdrawal id.
-    pub fn next_glv_withdrawal_id(&mut self) -> Result<u64> {
-        let next_id = self
-            .glv_withdrawal_count
-            .checked_add(1)
-            .ok_or(error!(CoreError::TokenAmountOverflow))?;
-        self.glv_withdrawal_count = next_id;
         Ok(next_id)
     }
 }
@@ -679,6 +612,9 @@ impl HasMarketMeta for MarketMeta {
 #[zero_copy]
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub struct Clocks {
+    dirty: u8,
+    padding: [u8; 7],
+    rev: u64,
     /// Price impact distribution clock.
     price_impact_distribution: i64,
     /// Borrowing clock.
@@ -723,5 +659,112 @@ impl Clocks {
             _ => return None,
         };
         Some(clock)
+    }
+}
+
+/// Market indexer.
+#[zero_copy]
+#[cfg_attr(feature = "debug", derive(Debug))]
+pub struct Indexer {
+    trade_count: u64,
+    deposit_count: u64,
+    withdrawal_count: u64,
+    order_count: u64,
+    shift_count: u64,
+    glv_deposit_count: u64,
+    glv_withdrawal_count: u64,
+    padding_0: [u8; 8],
+    reserved: [u8; 128],
+}
+
+impl Indexer {
+    /// Get current deposit count.
+    pub fn deposit_count(&self) -> u64 {
+        self.deposit_count
+    }
+
+    /// Get current withdrawal count.
+    pub fn withdrawal_count(&self) -> u64 {
+        self.withdrawal_count
+    }
+
+    /// Get current order count.
+    pub fn order_count(&self) -> u64 {
+        self.order_count
+    }
+
+    /// Get current shift count.
+    pub fn shift_count(&self) -> u64 {
+        self.shift_count
+    }
+
+    /// Get current GLV deposit count.
+    pub fn glv_deposit_count(&self) -> u64 {
+        self.glv_deposit_count
+    }
+
+    /// Get current GLV withdrawal count.
+    pub fn glv_withdrawal_count(&self) -> u64 {
+        self.glv_withdrawal_count
+    }
+
+    /// Next deposit id.
+    pub fn next_deposit_id(&mut self) -> Result<u64> {
+        let next_id = self
+            .deposit_count
+            .checked_add(1)
+            .ok_or(error!(CoreError::TokenAmountOverflow))?;
+        self.deposit_count = next_id;
+        Ok(next_id)
+    }
+
+    /// Next withdrawal id.
+    pub fn next_withdrawal_id(&mut self) -> Result<u64> {
+        let next_id = self
+            .withdrawal_count
+            .checked_add(1)
+            .ok_or(error!(CoreError::TokenAmountOverflow))?;
+        self.withdrawal_count = next_id;
+        Ok(next_id)
+    }
+
+    /// Next order id.
+    pub fn next_order_id(&mut self) -> Result<u64> {
+        let next_id = self
+            .order_count
+            .checked_add(1)
+            .ok_or(error!(CoreError::TokenAmountOverflow))?;
+        self.order_count = next_id;
+        Ok(next_id)
+    }
+
+    /// Next shift id.
+    pub fn next_shift_id(&mut self) -> Result<u64> {
+        let next_id = self
+            .shift_count
+            .checked_add(1)
+            .ok_or(error!(CoreError::TokenAmountOverflow))?;
+        self.shift_count = next_id;
+        Ok(next_id)
+    }
+
+    /// Next GLV deposit id.
+    pub fn next_glv_deposit_id(&mut self) -> Result<u64> {
+        let next_id = self
+            .glv_deposit_count
+            .checked_add(1)
+            .ok_or(error!(CoreError::TokenAmountOverflow))?;
+        self.glv_deposit_count = next_id;
+        Ok(next_id)
+    }
+
+    /// Next GLV withdrawal id.
+    pub fn next_glv_withdrawal_id(&mut self) -> Result<u64> {
+        let next_id = self
+            .glv_withdrawal_count
+            .checked_add(1)
+            .ok_or(error!(CoreError::TokenAmountOverflow))?;
+        self.glv_withdrawal_count = next_id;
+        Ok(next_id)
     }
 }

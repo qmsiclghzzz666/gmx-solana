@@ -146,7 +146,7 @@ impl gmsol_model::PositionImpactMarket<{ constants::MARKET_DECIMALS }> for Marke
     }
 
     fn passed_in_seconds_for_position_impact_distribution(&self) -> gmsol_model::Result<u64> {
-        AsClock::from(&self.clocks.price_impact_distribution).passed_in_seconds()
+        AsClock::from(&self.clocks().price_impact_distribution).passed_in_seconds()
     }
 }
 
@@ -170,7 +170,7 @@ impl gmsol_model::BorrowingFeeMarket<{ constants::MARKET_DECIMALS }> for Market 
     }
 
     fn passed_in_seconds_for_borrowing(&self) -> gmsol_model::Result<u64> {
-        AsClock::from(&self.clocks.borrowing).passed_in_seconds()
+        AsClock::from(&self.clocks().borrowing).passed_in_seconds()
     }
 }
 

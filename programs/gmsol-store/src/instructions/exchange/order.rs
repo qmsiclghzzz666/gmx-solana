@@ -1128,7 +1128,7 @@ pub(crate) fn update_order(ctx: Context<UpdateOrder>, params: &UpdateOrderParams
         .accounts
         .market
         .load_mut()?
-        .state_mut()
+        .indexer_mut()
         .next_order_id()?;
     ctx.accounts.order.load_mut()?.update(id, params)?;
     Ok(())

@@ -56,8 +56,8 @@ impl RevertibleBalance {
     }
 
     fn need_to_write(&self, market: &Market) -> bool {
-        market.state.long_token_balance != self.long_token_balance
-            || market.state.short_token_balance != self.short_token_balance
+        market.state.other.long_token_balance != self.long_token_balance
+            || market.state().short_token_balance != self.short_token_balance
     }
 
     /// Write to market.
@@ -69,13 +69,13 @@ impl RevertibleBalance {
             return;
         }
         assert_eq!(market.is_pure(), self.is_pure);
-        market.state.long_token_balance = self.long_token_balance;
-        market.state.short_token_balance = self.short_token_balance;
+        market.state.other.long_token_balance = self.long_token_balance;
+        market.state.other.short_token_balance = self.short_token_balance;
         msg!(
             "[Balance Committed] {}: {},{}",
             market.meta.market_token_mint,
-            market.state.long_token_balance,
-            market.state.short_token_balance
+            market.state.other.long_token_balance,
+            market.state.other.short_token_balance
         );
     }
 }
@@ -84,8 +84,8 @@ impl<'a> From<&'a Market> for RevertibleBalance {
     fn from(market: &'a Market) -> Self {
         Self {
             is_pure: market.is_pure(),
-            long_token_balance: market.state.long_token_balance,
-            short_token_balance: market.state.short_token_balance,
+            long_token_balance: market.state().long_token_balance,
+            short_token_balance: market.state().short_token_balance,
         }
     }
 }
