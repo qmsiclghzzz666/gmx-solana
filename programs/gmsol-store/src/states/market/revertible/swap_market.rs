@@ -14,10 +14,10 @@ use crate::{
     CoreError, ModelError,
 };
 
-use super::{Revertible, RevertibleMarket, RevertiblePool};
+use super::{market::RevertibleMarket2, Revertible, RevertibleMarket, RevertiblePool};
 
 /// A map of markets used for swaps where the key is the market token mint address.
-pub struct SwapMarkets<'a>(IndexMap<Pubkey, RevertibleSwapMarket<'a>>);
+pub struct SwapMarkets<'a>(IndexMap<Pubkey, RevertibleMarket2<'a>>);
 
 impl<'a> SwapMarkets<'a> {
     /// Create a new [`SwapMarkets`] from loders.
@@ -37,8 +37,7 @@ impl<'a> SwapMarkets<'a> {
                 Entry::Occupied(_) => return err!(CoreError::InvalidSwapPath),
                 Entry::Vacant(e) => {
                     loader.load()?.validate(store)?;
-                    let market =
-                        RevertibleSwapMarket::from_market(RevertibleMarket::try_from(loader)?)?;
+                    let market = loader.try_into()?;
                     e.insert(market);
                 }
             }
@@ -47,12 +46,12 @@ impl<'a> SwapMarkets<'a> {
     }
 
     /// Get market mutably.
-    pub fn get_mut(&mut self, token: &Pubkey) -> Option<&mut RevertibleSwapMarket<'a>> {
+    pub fn get_mut(&mut self, token: &Pubkey) -> Option<&mut RevertibleMarket2<'a>> {
         self.0.get_mut(token)
     }
 
     /// Get market.
-    pub fn get(&self, token: &Pubkey) -> Option<&RevertibleSwapMarket<'a>> {
+    pub fn get(&self, token: &Pubkey) -> Option<&RevertibleMarket2<'a>> {
         self.0.get(token)
     }
 

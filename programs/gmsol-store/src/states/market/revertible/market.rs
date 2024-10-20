@@ -619,8 +619,19 @@ impl<'a> RevertibleMarket2<'a> {
 
 impl<'a> Revertible for RevertibleMarket2<'a> {
     fn commit(mut self) {
-        let Market { state, buffer, .. } = &mut *self.market;
+        let Market {
+            meta,
+            state,
+            buffer,
+            ..
+        } = &mut *self.market;
         buffer.commit_to_storage(state);
+        msg!(
+            "[Balance committed] {}: {},{}",
+            meta.market_token_mint,
+            state.other.long_token_balance,
+            state.other.short_token_balance
+        );
     }
 }
 
