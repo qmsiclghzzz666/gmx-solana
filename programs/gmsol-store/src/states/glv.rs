@@ -33,6 +33,7 @@ pub struct Glv {
     pub(crate) glv_token: Pubkey,
     pub(crate) long_token: Pubkey,
     pub(crate) short_token: Pubkey,
+    pub(crate) min_tokens_for_first_deposit: u64,
     reserve: [u8; 256],
     market_tokens: [Pubkey; Glv::MAX_ALLOWED_NUMBER_OF_MARKETS],
 }
@@ -284,10 +285,24 @@ impl gmsol_utils::InitSpace for GlvDeposit {
 }
 
 impl GlvDeposit {
-    pub(crate) fn validate_for_execution(
+    /// Validate the GLV deposit before execution.
+    ///
+    /// # CHECK
+    /// - This deposit must have been initialized.
+    /// - The `market` and `market_token` must match.
+    /// - The `glv` and `glv_token` must match.
+    /// - The `market_token` must be a valid token account.
+    /// - The `glv_token` must be a valid token account.
+    ///
+    /// # Errors
+    /// - The address of `market_token` must match the market token address of this deposit.
+    /// - The address of `glv_token` must match the glv token address of this deposit.
+    pub(crate) fn unchecked_validate_for_execution(
         &self,
         market_token: &AccountInfo,
         market: &Market,
+        glv_token: &AccountInfo,
+        glv: &Glv,
     ) -> Result<()> {
         use anchor_spl::token::accessor::amount;
 
@@ -299,7 +314,7 @@ impl GlvDeposit {
 
         let supply = amount(market_token)?;
 
-        if supply == 0 {
+        if supply == 0 && self.is_market_deposit_required() {
             Deposit::validate_first_deposit(
                 &self.header.owner,
                 self.params.min_market_token_amount,
@@ -307,7 +322,53 @@ impl GlvDeposit {
             )?;
         }
 
-        // TODO: validate first GLV deposit.
+        require_eq!(
+            *glv_token.key,
+            self.tokens.glv_token(),
+            CoreError::TokenMintMismatched,
+        );
+
+        let supply = amount(glv_token)?;
+
+        if supply == 0 {
+            Self::validate_first_deposit(
+                &self.header.owner,
+                self.params.min_glv_token_amount,
+                glv,
+            )?;
+        }
+
+        Ok(())
+    }
+
+    pub(crate) fn is_market_deposit_required(&self) -> bool {
+        self.params.initial_long_token_amount != 0 || self.params.initial_short_token_amount != 0
+    }
+
+    #[inline]
+    fn first_deposit_owner() -> Pubkey {
+        Deposit::first_deposit_owner()
+    }
+
+    fn validate_first_deposit(owner: &Pubkey, min_amount: u64, glv: &Glv) -> Result<()> {
+        let min_tokens_for_first_deposit = glv.min_tokens_for_first_deposit;
+
+        // Skip first deposit check if the amount is zero.
+        if min_tokens_for_first_deposit == 0 {
+            return Ok(());
+        }
+
+        require_eq!(
+            *owner,
+            Self::first_deposit_owner(),
+            CoreError::InvalidOwnerForFirstDeposit
+        );
+
+        require_gte!(
+            min_amount,
+            min_tokens_for_first_deposit,
+            CoreError::NotEnoughGlvTokenAmountForFirstDeposit,
+        );
 
         Ok(())
     }

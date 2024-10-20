@@ -156,7 +156,7 @@ impl<'a, 'info> RevertibleLiquidityMarketOperation<'a, 'info> {
         initial_tokens: (Option<Pubkey>, Option<Pubkey>),
         initial_amounts: (u64, u64),
         min_market_token_amount: u64,
-    ) -> Result<ExecutedOperation<'_, 'info>> {
+    ) -> Result<ExecutedDeposit<'_, 'info>> {
         let current_market_token = self.market_token_mint.key();
         let mut market = RevertibleLiquidityMarket::new(
             self.market,
@@ -196,7 +196,7 @@ impl<'a, 'info> RevertibleLiquidityMarketOperation<'a, 'info> {
         };
 
         // Perform the deposit.
-        {
+        let minted = {
             let prices = self.oracle.market_prices(&market)?;
             let report = market
                 .deposit(long_token_amount.into(), short_token_amount.into(), prices)
@@ -215,33 +215,35 @@ impl<'a, 'info> RevertibleLiquidityMarketOperation<'a, 'info> {
             );
 
             msg!("[Deposit] executed: {:?}", report);
-        }
 
-        Ok(ExecutedOperation {
-            market: Some(market),
-            swap_markets: Some(swap_markets),
+            minted
+        };
+
+        Ok(ExecutedDeposit {
+            minted_amount: minted,
+            market,
+            swap_markets,
         })
     }
 }
 
-pub(crate) struct ExecutedOperation<'a, 'info> {
-    market: Option<RevertibleLiquidityMarket<'a, 'info>>,
-    swap_markets: Option<SwapMarkets<'a>>,
+#[must_use = "Revertible operation must be committed to take effect"]
+pub(crate) struct ExecutedDeposit<'a, 'info> {
+    pub(crate) minted_amount: u64,
+    pub(crate) market: RevertibleLiquidityMarket<'a, 'info>,
+    pub(crate) swap_markets: SwapMarkets<'a>,
 }
 
-impl<'a, 'info> ExecutedOperation<'a, 'info> {
+impl<'a, 'info> ExecutedDeposit<'a, 'info> {
+    #[allow(dead_code)]
     pub(crate) fn boxed(self) -> Box<Self> {
         Box::new(self)
     }
 }
 
-impl<'a, 'info> Drop for ExecutedOperation<'a, 'info> {
-    fn drop(&mut self) {
-        if let Some(market) = self.market.take() {
-            market.commit();
-        }
-        if let Some(swap_markets) = self.swap_markets.take() {
-            swap_markets.commit();
-        }
+impl<'a, 'info> Revertible for ExecutedDeposit<'a, 'info> {
+    fn commit(self) {
+        self.market.commit();
+        self.swap_markets.commit();
     }
 }

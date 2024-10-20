@@ -6,6 +6,7 @@ use crate::{
     ops::market::RevertibleLiquidityMarketOperation,
     states::{
         common::action::{Action, ActionExt},
+        market::revertible::Revertible,
         Deposit, Market, NonceBytes, Oracle, Store, ValidateOracleTime,
     },
     CoreError, CoreResult,
@@ -251,7 +252,8 @@ impl<'a, 'info> ExecuteDepositOperation<'a, 'info> {
                     deposit.params.initial_short_token_amount,
                 ),
                 deposit.params.min_market_token_amount,
-            )?;
+            )?
+            .commit();
         }
         Ok(())
     }

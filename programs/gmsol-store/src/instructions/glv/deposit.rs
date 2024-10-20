@@ -12,7 +12,7 @@ use crate::{
     events::RemoveGlvDepositEvent,
     ops::{
         execution_fee::{PayExecutionFeeOperation, TransferExecutionFeeOperation},
-        glv::{CreateGlvDepositOperation, CreateGlvDepositParams},
+        glv::{CreateGlvDepositOperation, CreateGlvDepositParams, ExecuteGlvDepositOperation},
         market::{MarketTransferInOperation, MarketTransferOutOperation},
     },
     states::{
@@ -919,17 +919,33 @@ impl<'info> ExecuteGlvDeposit<'info> {
             .swap
             .to_feeds(&self.token_map.load_token_map()?)?;
 
-        let executed = self.oracle.with_prices(
+        let builder = ExecuteGlvDepositOperation::builder()
+            .glv_deposit(self.glv_deposit.clone())
+            .token_program(self.token_program.to_account_info())
+            .glv_token_program(self.glv_token_program.to_account_info())
+            .throw_on_execution_error(throw_on_execution_error)
+            .store(self.store.clone())
+            .glv(self.glv.clone())
+            .glv_token_mint(&mut self.glv_token)
+            .market(self.market.clone())
+            .market_token_mint(&mut self.market_token)
+            .market_token_vault(self.market_token_vault.to_account_info())
+            .markets(markets)
+            .market_tokens(market_tokens);
+
+        self.oracle.with_prices(
             &self.store,
             &self.price_provider,
             &self.token_map,
             &feeds.tokens,
             remaining_accounts,
             |oracle, remaining_accounts| {
-                todo!();
-                Ok(false)
+                builder
+                    .oralce(oracle)
+                    .remaining_accounts(remaining_accounts)
+                    .build()
+                    .unchecked_execute()
             },
-        );
-        todo!()
+        )
     }
 }

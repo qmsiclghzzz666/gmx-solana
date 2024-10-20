@@ -62,10 +62,10 @@ pub struct Market {
     pub(crate) meta: MarketMeta,
     /// Store.
     pub store: Pubkey,
+    config: MarketConfig,
     pools: Pools,
     clocks: Clocks,
     state: MarketState,
-    config: MarketConfig,
 }
 
 impl Bump for Market {

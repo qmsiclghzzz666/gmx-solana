@@ -1564,6 +1564,9 @@ pub enum CoreError {
     /// Not enough market token amount for the first deposit.
     #[msg("not enough market token amount for the first deposit")]
     NotEnoughMarketTokenAmountForFirstDeposit,
+    /// Not enough GLV token amount for the first deposit.
+    #[msg("not enough GLV token amount for the first deposit")]
+    NotEnoughGlvTokenAmountForFirstDeposit,
     /* Errors for Withdrawal */
     /// Empty Withdrawal.
     #[msg("emtpy withdrawal")]
