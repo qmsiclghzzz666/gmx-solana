@@ -494,6 +494,7 @@ impl<'a> Revertible for RevertibleMarket<'a> {
 /// Revertible Market.
 pub struct RevertibleMarket2<'a> {
     pub(super) market: RefMut<'a, Market>,
+    order_fee_discount_factor: u128,
 }
 
 impl<'a, 'info> TryFrom<&'a AccountLoader<'info, Market>> for RevertibleMarket2<'a> {
@@ -502,6 +503,7 @@ impl<'a, 'info> TryFrom<&'a AccountLoader<'info, Market>> for RevertibleMarket2<
     fn try_from(value: &'a AccountLoader<'info, Market>) -> std::result::Result<Self, Self::Error> {
         Ok(Self {
             market: value.load_mut()?,
+            order_fee_discount_factor: 0,
         })
     }
 }
@@ -513,6 +515,11 @@ impl<'a, 'info> Key for RevertibleMarket2<'a> {
 }
 
 impl<'a> RevertibleMarket2<'a> {
+    pub(crate) fn with_order_fee_discount_factor(mut self, discount: u128) -> Self {
+        self.order_fee_discount_factor = discount;
+        self
+    }
+
     fn pool(&self, kind: PoolKind) -> gmsol_model::Result<&Pool> {
         let Market { state, buffer, .. } = &*self.market;
         buffer
@@ -614,6 +621,22 @@ impl<'a> RevertibleMarket2<'a> {
                 .ok_or(error!(CoreError::TokenAmountOverflow))?;
         }
         Ok(())
+    }
+
+    /// Next trade id.
+    ///
+    /// This method is idempotent, meaning that multiple calls to it
+    /// result in the same state changes as a single call.
+    pub(crate) fn next_trade_id(&mut self) -> Result<u64> {
+        let next_trade_id = self
+            .market
+            .state
+            .other
+            .trade_count
+            .checked_add(1)
+            .ok_or(error!(CoreError::TokenAmountOverflow))?;
+        self.other_mut().trade_count = next_trade_id;
+        Ok(next_trade_id)
     }
 }
 
@@ -854,7 +877,8 @@ impl<'a> gmsol_model::PerpMarket<{ constants::MARKET_DECIMALS }> for RevertibleM
     }
 
     fn order_fee_params(&self) -> gmsol_model::Result<FeeParams<Self::Num>> {
-        self.market.order_fee_params()
+        let params = self.market.order_fee_params()?;
+        Ok(params.with_discount_factor(self.order_fee_discount_factor))
     }
 
     fn open_interest_reserve_factor(&self) -> gmsol_model::Result<Self::Num> {

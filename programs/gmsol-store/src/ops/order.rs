@@ -12,7 +12,7 @@ use crate::{
         common::action::{Action, ActionExt},
         market::{
             revertible::{
-                perp_market::RevertiblePerpMarket,
+                market::RevertibleMarket2,
                 revertible_position::RevertiblePosition,
                 swap_market::{SwapDirection, SwapMarkets},
                 Revertible,
@@ -786,7 +786,8 @@ impl<'a, 'info> ExecuteOrderOperation<'a, 'info> {
 
         // Prepare execution context.
         let gt_minting_enabled = self.market.load()?.is_gt_minting_enabled();
-        let mut market = RevertiblePerpMarket::new(self.market, order_fee_discount_factor)?;
+        let mut market = RevertibleMarket2::try_from(self.market)?
+            .with_order_fee_discount_factor(order_fee_discount_factor);
         let current_market_token = market.market_meta().market_token_mint;
         let loaders = self
             .order
@@ -1143,7 +1144,7 @@ impl<'a, 'info> ValidateOracleTime for ExecuteOrderOperation<'a, 'info> {
 fn execute_swap(
     should_throw_error: &mut bool,
     oracle: &Oracle,
-    market: &mut RevertiblePerpMarket<'_>,
+    market: &mut RevertibleMarket2<'_>,
     swap_markets: &mut SwapMarkets<'_>,
     transfer_out: &mut TransferOut,
     order: &mut Order,
