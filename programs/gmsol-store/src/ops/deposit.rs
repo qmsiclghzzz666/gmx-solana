@@ -242,7 +242,7 @@ impl<'a, 'info> ExecuteDepositOperation<'a, 'info> {
                 self.remaining_accounts,
             )?
             .unchecked_deposit(
-                self.market_token_receiver,
+                &self.market_token_receiver,
                 (
                     deposit.tokens.initial_long_token.token(),
                     deposit.tokens.initial_short_token.token(),

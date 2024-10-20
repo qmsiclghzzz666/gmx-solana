@@ -117,6 +117,8 @@ enum Command {
         /// Output format.
         #[arg(long, short)]
         output: Option<Output>,
+        #[arg(long)]
+        debug: bool,
     },
     /// Market status.
     MarketStatus {
@@ -499,6 +501,7 @@ impl InspectArgs {
                 as_market_address,
                 get_config,
                 output,
+                debug,
             } => {
                 let output = output.unwrap_or_default();
                 if let Some(mut address) = address {
@@ -510,6 +513,8 @@ impl InspectArgs {
                     if let Some(key) = get_config {
                         let value = market.get_config_by_key(*key);
                         output.print(value, |value| Ok(value.to_string()))?;
+                    } else if *debug {
+                        println!("{market:#?}");
                     } else {
                         output.print(&serialized, format_market)?;
                     }

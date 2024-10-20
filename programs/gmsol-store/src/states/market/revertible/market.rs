@@ -493,7 +493,7 @@ impl<'a> Revertible for RevertibleMarket<'a> {
 
 /// Revertible Market.
 pub struct RevertibleMarket2<'a> {
-    market: RefMut<'a, Market>,
+    pub(super) market: RefMut<'a, Market>,
 }
 
 impl<'a, 'info> TryFrom<&'a AccountLoader<'info, Market>> for RevertibleMarket2<'a> {
@@ -503,6 +503,12 @@ impl<'a, 'info> TryFrom<&'a AccountLoader<'info, Market>> for RevertibleMarket2<
         Ok(Self {
             market: value.load_mut()?,
         })
+    }
+}
+
+impl<'a, 'info> Key for RevertibleMarket2<'a> {
+    fn key(&self) -> Pubkey {
+        self.market.meta.market_token_mint
     }
 }
 

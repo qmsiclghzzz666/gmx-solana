@@ -8,8 +8,9 @@ use crate::{
         common::swap::SwapParams,
         market::{
             revertible::{
+                liquidity_market::RevertibleLiquidityMarket2,
                 swap_market::{SwapDirection, SwapMarkets},
-                Revertible, RevertibleLiquidityMarket,
+                Revertible,
             },
             utils::ValidateMarketBalances,
             HasMarketMeta,
@@ -150,18 +151,18 @@ impl<'a, 'info> RevertibleLiquidityMarketOperation<'a, 'info> {
     ///
     /// # Errors
     #[inline(never)]
-    pub(crate) fn unchecked_deposit(
-        &mut self,
-        market_token_receiver: AccountInfo<'info>,
+    pub(crate) fn unchecked_deposit<'c>(
+        &'c mut self,
+        market_token_receiver: &'c AccountInfo<'info>,
         initial_tokens: (Option<Pubkey>, Option<Pubkey>),
         initial_amounts: (u64, u64),
         min_market_token_amount: u64,
-    ) -> Result<ExecutedDeposit<'_, 'info>> {
+    ) -> Result<ExecutedDeposit<'c, 'info>> {
         let current_market_token = self.market_token_mint.key();
-        let mut market = RevertibleLiquidityMarket::new(
-            self.market,
+        let mut market = RevertibleLiquidityMarket2::from_revertible_market(
+            self.market.try_into()?,
             self.market_token_mint,
-            self.token_program.clone(),
+            &self.token_program,
             self.store,
         )?
         .enable_mint(market_token_receiver);
@@ -230,7 +231,7 @@ impl<'a, 'info> RevertibleLiquidityMarketOperation<'a, 'info> {
 #[must_use = "Revertible operation must be committed to take effect"]
 pub(crate) struct ExecutedDeposit<'a, 'info> {
     pub(crate) minted_amount: u64,
-    pub(crate) market: RevertibleLiquidityMarket<'a, 'info>,
+    pub(crate) market: RevertibleLiquidityMarket2<'a, 'info>,
     pub(crate) swap_markets: SwapMarkets<'a>,
 }
 

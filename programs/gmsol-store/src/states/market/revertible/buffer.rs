@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use gmsol_model::{ClockKind, PoolKind};
+use gmsol_model::PoolKind;
 use strum::IntoEnumIterator;
 
 use crate::states::{

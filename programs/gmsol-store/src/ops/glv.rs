@@ -297,7 +297,7 @@ impl<'a, 'info> ExecuteGlvDepositOperation<'a, 'info> {
 
             let executed_deposit = if deposit.is_market_deposit_required() {
                 let executed = op.unchecked_deposit(
-                    self.market_token_vault,
+                    &self.market_token_vault,
                     (
                         deposit.tokens.initial_long_token.token(),
                         deposit.tokens.initial_short_token.token(),

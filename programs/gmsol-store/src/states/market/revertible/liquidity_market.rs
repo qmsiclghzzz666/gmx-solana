@@ -1,5 +1,3 @@
-use std::ops::{Deref, DerefMut};
-
 use anchor_lang::prelude::*;
 use anchor_spl::token::Mint;
 use gmsol_model::{
@@ -399,18 +397,273 @@ impl<'a, 'info> RevertibleLiquidityMarket2<'a, 'info> {
         self.vault = Some(vault);
         self
     }
-}
 
-impl<'a, 'info> Deref for RevertibleLiquidityMarket2<'a, 'info> {
-    type Target = RevertibleMarket2<'a>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.base
+    fn transfer(&self) -> TransferUtils<'a, 'info> {
+        TransferUtils::new(
+            self.token_program.clone(),
+            self.store,
+            self.market_token.to_account_info(),
+        )
     }
 }
 
-impl<'a, 'info> DerefMut for RevertibleLiquidityMarket2<'a, 'info> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.base
+impl<'a, 'info> Key for RevertibleLiquidityMarket2<'a, 'info> {
+    fn key(&self) -> Pubkey {
+        self.base.key()
+    }
+}
+
+impl<'a, 'info> HasMarketMeta for RevertibleLiquidityMarket2<'a, 'info> {
+    fn market_meta(&self) -> &crate::states::MarketMeta {
+        self.base.market_meta()
+    }
+}
+
+impl<'a, 'info> Revertible for RevertibleLiquidityMarket2<'a, 'info> {
+    fn commit(self) {
+        if self.to_mint != 0 {
+            self.transfer()
+                .mint_to(self.receiver.expect("mint is not enabled"), self.to_mint)
+                .map_err(|err| panic!("mint error: {err}"))
+                .unwrap();
+        }
+        if self.to_burn != 0 {
+            self.transfer()
+                .burn_from(self.vault.expect("burn is not enabled"), self.to_burn)
+                .map_err(|err| panic!("burn error: {err}"))
+                .unwrap();
+        }
+        self.base.commit();
+    }
+}
+
+impl<'a, 'info> gmsol_model::Bank<Pubkey> for RevertibleLiquidityMarket2<'a, 'info> {
+    type Num = <RevertibleMarket2<'a> as gmsol_model::Bank<Pubkey>>::Num;
+
+    fn record_transferred_in_by_token<Q: std::borrow::Borrow<Pubkey> + ?Sized>(
+        &mut self,
+        token: &Q,
+        amount: &Self::Num,
+    ) -> gmsol_model::Result<()> {
+        self.base.record_transferred_in_by_token(token, amount)
+    }
+
+    fn record_transferred_out_by_token<Q: std::borrow::Borrow<Pubkey> + ?Sized>(
+        &mut self,
+        token: &Q,
+        amount: &Self::Num,
+    ) -> gmsol_model::Result<()> {
+        self.base.record_transferred_out_by_token(token, amount)
+    }
+
+    fn balance<Q: std::borrow::Borrow<Pubkey> + ?Sized>(
+        &self,
+        token: &Q,
+    ) -> gmsol_model::Result<Self::Num> {
+        self.base.balance(token)
+    }
+}
+
+impl<'a, 'info> gmsol_model::BaseMarket<{ constants::MARKET_DECIMALS }>
+    for RevertibleLiquidityMarket2<'a, 'info>
+{
+    type Num =
+        <RevertibleMarket2<'a> as gmsol_model::BaseMarket<{ constants::MARKET_DECIMALS }>>::Num;
+
+    type Signed =
+        <RevertibleMarket2<'a> as gmsol_model::BaseMarket<{ constants::MARKET_DECIMALS }>>::Signed;
+
+    type Pool =
+        <RevertibleMarket2<'a> as gmsol_model::BaseMarket<{ constants::MARKET_DECIMALS }>>::Pool;
+
+    fn liquidity_pool(&self) -> gmsol_model::Result<&Self::Pool> {
+        self.base.liquidity_pool()
+    }
+
+    fn claimable_fee_pool(&self) -> gmsol_model::Result<&Self::Pool> {
+        self.base.claimable_fee_pool()
+    }
+
+    fn swap_impact_pool(&self) -> gmsol_model::Result<&Self::Pool> {
+        self.base.swap_impact_pool()
+    }
+
+    fn open_interest_pool(&self, is_long: bool) -> gmsol_model::Result<&Self::Pool> {
+        self.base.open_interest_pool(is_long)
+    }
+
+    fn open_interest_in_tokens_pool(&self, is_long: bool) -> gmsol_model::Result<&Self::Pool> {
+        self.base.open_interest_in_tokens_pool(is_long)
+    }
+
+    fn collateral_sum_pool(&self, is_long: bool) -> gmsol_model::Result<&Self::Pool> {
+        self.base.collateral_sum_pool(is_long)
+    }
+
+    fn usd_to_amount_divisor(&self) -> Self::Num {
+        self.base.usd_to_amount_divisor()
+    }
+
+    fn max_pool_amount(&self, is_long_token: bool) -> gmsol_model::Result<Self::Num> {
+        self.base.max_pool_amount(is_long_token)
+    }
+
+    fn pnl_factor_config(
+        &self,
+        kind: gmsol_model::PnlFactorKind,
+        is_long: bool,
+    ) -> gmsol_model::Result<Self::Num> {
+        self.base.pnl_factor_config(kind, is_long)
+    }
+
+    fn reserve_factor(&self) -> gmsol_model::Result<Self::Num> {
+        self.base.reserve_factor()
+    }
+}
+
+impl<'a, 'info> gmsol_model::BaseMarketMut<{ constants::MARKET_DECIMALS }>
+    for RevertibleLiquidityMarket2<'a, 'info>
+{
+    fn liquidity_pool_mut(&mut self) -> gmsol_model::Result<&mut Self::Pool> {
+        self.base.liquidity_pool_mut()
+    }
+
+    fn claimable_fee_pool_mut(&mut self) -> gmsol_model::Result<&mut Self::Pool> {
+        self.base.claimable_fee_pool_mut()
+    }
+}
+
+impl<'a, 'info> gmsol_model::SwapMarket<{ constants::MARKET_DECIMALS }>
+    for RevertibleLiquidityMarket2<'a, 'info>
+{
+    fn swap_impact_params(&self) -> gmsol_model::Result<PriceImpactParams<Self::Num>> {
+        self.base.swap_impact_params()
+    }
+
+    fn swap_fee_params(&self) -> gmsol_model::Result<gmsol_model::params::FeeParams<Self::Num>> {
+        self.base.swap_fee_params()
+    }
+}
+
+impl<'a, 'info> gmsol_model::SwapMarketMut<{ constants::MARKET_DECIMALS }>
+    for RevertibleLiquidityMarket2<'a, 'info>
+{
+    fn swap_impact_pool_mut(&mut self) -> gmsol_model::Result<&mut Self::Pool> {
+        self.base.swap_impact_pool_mut()
+    }
+}
+
+impl<'a, 'info> gmsol_model::PositionImpactMarket<{ constants::MARKET_DECIMALS }>
+    for RevertibleLiquidityMarket2<'a, 'info>
+{
+    fn position_impact_pool(&self) -> gmsol_model::Result<&Self::Pool> {
+        self.base.position_impact_pool()
+    }
+
+    fn position_impact_params(&self) -> gmsol_model::Result<PriceImpactParams<Self::Num>> {
+        self.base.position_impact_params()
+    }
+
+    fn position_impact_distribution_params(
+        &self,
+    ) -> gmsol_model::Result<PositionImpactDistributionParams<Self::Num>> {
+        self.base.position_impact_distribution_params()
+    }
+
+    fn passed_in_seconds_for_position_impact_distribution(&self) -> gmsol_model::Result<u64> {
+        self.base
+            .passed_in_seconds_for_position_impact_distribution()
+    }
+}
+
+impl<'a, 'info> gmsol_model::PositionImpactMarketMut<{ constants::MARKET_DECIMALS }>
+    for RevertibleLiquidityMarket2<'a, 'info>
+{
+    fn position_impact_pool_mut(&mut self) -> gmsol_model::Result<&mut Self::Pool> {
+        self.base.position_impact_pool_mut()
+    }
+
+    fn just_passed_in_seconds_for_position_impact_distribution(
+        &mut self,
+    ) -> gmsol_model::Result<u64> {
+        self.base
+            .just_passed_in_seconds_for_position_impact_distribution()
+    }
+}
+
+impl<'a, 'info> gmsol_model::BorrowingFeeMarket<{ constants::MARKET_DECIMALS }>
+    for RevertibleLiquidityMarket2<'a, 'info>
+{
+    fn borrowing_factor_pool(&self) -> gmsol_model::Result<&Self::Pool> {
+        self.base.borrowing_factor_pool()
+    }
+
+    fn total_borrowing_pool(&self) -> gmsol_model::Result<&Self::Pool> {
+        self.base.total_borrowing_pool()
+    }
+
+    fn borrowing_fee_params(
+        &self,
+    ) -> gmsol_model::Result<gmsol_model::params::fee::BorrowingFeeParams<Self::Num>> {
+        self.base.borrowing_fee_params()
+    }
+
+    fn passed_in_seconds_for_borrowing(&self) -> gmsol_model::Result<u64> {
+        self.base.passed_in_seconds_for_borrowing()
+    }
+}
+
+impl<'a, 'info> gmsol_model::LiquidityMarket<{ constants::MARKET_DECIMALS }>
+    for RevertibleLiquidityMarket2<'a, 'info>
+{
+    fn total_supply(&self) -> Self::Num {
+        let supply = u128::from(self.market_token.supply);
+        supply
+            .saturating_add(self.to_mint.into())
+            .saturating_sub(self.to_burn.into())
+    }
+
+    fn max_pool_value_for_deposit(&self, is_long_token: bool) -> gmsol_model::Result<Self::Num> {
+        self.base.market.max_pool_value_for_deposit(is_long_token)
+    }
+}
+
+impl<'a, 'info> gmsol_model::LiquidityMarketMut<{ constants::MARKET_DECIMALS }>
+    for RevertibleLiquidityMarket2<'a, 'info>
+{
+    fn mint(&mut self, amount: &Self::Num) -> gmsol_model::Result<()> {
+        let new_mint: u64 = (*amount)
+            .try_into()
+            .map_err(|_| gmsol_model::Error::Overflow)?;
+        let to_mint = self
+            .to_mint
+            .checked_add(new_mint)
+            .ok_or(gmsol_model::Error::Overflow)?;
+        // CHECK for overflow.
+        self.market_token
+            .supply
+            .checked_add(to_mint)
+            .ok_or(gmsol_model::Error::Overflow)?;
+        self.to_mint = to_mint;
+        Ok(())
+    }
+
+    fn burn(&mut self, amount: &Self::Num) -> gmsol_model::Result<()> {
+        let new_burn: u64 = (*amount)
+            .try_into()
+            .map_err(|_| gmsol_model::Error::Overflow)?;
+        let to_burn = self
+            .to_burn
+            .checked_add(new_burn)
+            .ok_or(gmsol_model::Error::Overflow)?;
+        // CHECK for underflow.
+        self.market_token
+            .supply
+            .checked_sub(to_burn)
+            .ok_or(gmsol_model::Error::Computation(
+                "not enough market tokens to burn",
+            ))?;
+        self.to_burn = to_burn;
+        Ok(())
     }
 }
