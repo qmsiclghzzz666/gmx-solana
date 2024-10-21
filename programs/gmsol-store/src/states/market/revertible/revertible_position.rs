@@ -9,11 +9,11 @@ use crate::{
     CoreError,
 };
 
-use super::{market::RevertibleMarket2, perp_market::RevertiblePerpMarket, Revertible};
+use super::{market::RevertibleMarket, Revertible};
 
 /// Revertible Position.
 pub struct RevertiblePosition<'a> {
-    market: RevertibleMarket2<'a>,
+    market: RevertibleMarket<'a>,
     storage: RefMut<'a, Position>,
     state: PositionState,
     is_collateral_token_long: bool,
@@ -22,7 +22,7 @@ pub struct RevertiblePosition<'a> {
 
 impl<'a> RevertiblePosition<'a> {
     pub(crate) fn new<'info>(
-        market: RevertibleMarket2<'a>,
+        market: RevertibleMarket<'a>,
         loader: &'a AccountLoader<'info, Position>,
     ) -> Result<Self> {
         let storage = loader.load_mut()?;
@@ -94,7 +94,7 @@ impl<'a> gmsol_model::PositionState<{ constants::MARKET_DECIMALS }> for Revertib
 }
 
 impl<'a> gmsol_model::Position<{ constants::MARKET_DECIMALS }> for RevertiblePosition<'a> {
-    type Market = RevertibleMarket2<'a>;
+    type Market = RevertibleMarket<'a>;
 
     fn market(&self) -> &Self::Market {
         &self.market

@@ -172,3 +172,14 @@ impl Default for DepositParams {
         }
     }
 }
+
+impl DepositParams {
+    pub(crate) fn validate_market_token_amount(&self, minted: u64) -> Result<()> {
+        require_gte!(
+            minted,
+            self.min_market_token_amount,
+            CoreError::InsufficientOutputAmount
+        );
+        Ok(())
+    }
+}

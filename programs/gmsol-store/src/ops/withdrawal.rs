@@ -1,23 +1,16 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, TokenAccount};
-use gmsol_model::{LiquidityMarketMutExt, PositionImpactMarketMutExt};
 use typed_builder::TypedBuilder;
 
 use crate::{
     states::{
-        common::action::Action,
-        market::{
-            revertible::{
-                swap_market::{SwapDirection, SwapMarkets},
-                Revertible, RevertibleLiquidityMarket,
-            },
-            utils::ValidateMarketBalances,
-        },
-        withdrawal::Withdrawal,
-        HasMarketMeta, Market, NonceBytes, Oracle, Store, ValidateOracleTime,
+        common::action::Action, market::revertible::Revertible, withdrawal::Withdrawal, Market,
+        NonceBytes, Oracle, Store, ValidateOracleTime,
     },
-    CoreError, CoreResult, ModelError,
+    CoreError, CoreResult,
 };
+
+use super::market::RevertibleLiquidityMarketOperation;
 
 /// Create Withdrawal Params.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
@@ -153,7 +146,7 @@ pub(crate) struct ExecuteWithdrawalOperation<'a, 'info> {
 }
 
 impl<'a, 'info> ExecuteWithdrawalOperation<'a, 'info> {
-    pub(crate) fn execute(mut self) -> Result<Option<(u64, u64)>> {
+    pub(crate) fn execute(self) -> Result<Option<(u64, u64)>> {
         let throw_on_execution_error = self.throw_on_execution_error;
         match self.validate_oracle() {
             Ok(()) => {}
@@ -186,85 +179,35 @@ impl<'a, 'info> ExecuteWithdrawalOperation<'a, 'info> {
     }
 
     #[inline(never)]
-    fn perform_withdrawal(&mut self) -> Result<(u64, u64)> {
+    fn perform_withdrawal(self) -> Result<(u64, u64)> {
         self.market.load()?.validate(&self.store.key())?;
 
-        // Prepare the execution context.
-        let current_market_token = self.market_token_mint.key();
-        let mut market = RevertibleLiquidityMarket::new(
+        let withdrawal = self.withdrawal.load()?;
+
+        let mut market = RevertibleLiquidityMarketOperation::new(
+            self.store,
+            self.oracle,
             self.market,
             self.market_token_mint,
-            self.token_program.to_account_info(),
-            self.store,
-        )?
-        .enable_burn(self.market_token_vault.to_account_info());
-        let loaders = self
-            .withdrawal
-            .load()?
-            .swap
-            .unpack_markets_for_swap(&current_market_token, self.remaining_accounts)?;
-        let mut swap_markets =
-            SwapMarkets::new(&self.store.key(), &loaders, Some(&current_market_token))?;
+            self.token_program,
+            Some(&withdrawal.swap),
+            self.remaining_accounts,
+        )?;
 
-        // Distribute position impact.
-        {
-            let report = market
-                .distribute_position_impact()
-                .map_err(ModelError::from)?
-                .execute()
-                .map_err(ModelError::from)?;
-            msg!("[Withdrawal] pre-execute: {:?}", report);
-        }
+        let executed = market.op()?.unchekced_withdraw(
+            &self.market_token_vault,
+            &withdrawal.params,
+            (
+                withdrawal.tokens.final_long_token(),
+                withdrawal.tokens.final_short_token(),
+            ),
+        )?;
 
-        // Perform the withdrawal.
-        let (long_amount, short_amount) = {
-            let prices = self.oracle.market_prices(&market)?;
-            let report = market
-                .withdraw(
-                    self.withdrawal.load()?.params.market_token_amount.into(),
-                    prices,
-                )
-                .and_then(|w| w.execute())
-                .map_err(ModelError::from)?;
-            let (long_amount, short_amount) = (
-                (*report.long_token_output())
-                    .try_into()
-                    .map_err(|_| CoreError::TokenAmountOverflow)?,
-                (*report.short_token_output())
-                    .try_into()
-                    .map_err(|_| CoreError::TokenAmountOverflow)?,
-            );
-            // Validate current market.
-            market.validate_market_balances(long_amount, short_amount)?;
-            msg!("[Withdrawal] executed: {:?}", report);
-            (long_amount, short_amount)
-        };
+        let final_output_amounts = executed.output;
 
-        // Perform the swap.
-        let (final_long_amount, final_short_amount) = {
-            let meta = *market.market_meta();
-            swap_markets.revertible_swap(
-                SwapDirection::From(&mut market),
-                self.oracle,
-                &self.withdrawal.load()?.swap,
-                (
-                    self.withdrawal.load()?.tokens.final_long_token(),
-                    self.withdrawal.load()?.tokens.final_short_token(),
-                ),
-                (Some(meta.long_token_mint), Some(meta.short_token_mint)),
-                (long_amount, short_amount),
-            )?
-        };
+        executed.commit();
 
-        self.withdrawal
-            .load()?
-            .validate_output_amounts(final_long_amount, final_short_amount)?;
-
-        // Commit the changes.
-        market.commit();
-        swap_markets.commit();
-
-        Ok((final_long_amount, final_short_amount))
+        Ok(final_output_amounts)
     }
 }
 

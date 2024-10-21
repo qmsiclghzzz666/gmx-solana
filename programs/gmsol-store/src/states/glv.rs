@@ -13,6 +13,7 @@ use super::{
         swap::{unpack_markets, SwapParams},
         token::TokenAndAccount,
     },
+    deposit::DepositParams,
     Seed,
 };
 
@@ -317,7 +318,7 @@ impl GlvDeposit {
         if supply == 0 && self.is_market_deposit_required() {
             Deposit::validate_first_deposit(
                 &self.header.owner,
-                self.params.min_market_token_amount,
+                self.params.deposit.min_market_token_amount,
                 market,
             )?;
         }
@@ -342,7 +343,8 @@ impl GlvDeposit {
     }
 
     pub(crate) fn is_market_deposit_required(&self) -> bool {
-        self.params.initial_long_token_amount != 0 || self.params.initial_short_token_amount != 0
+        self.params.deposit.initial_long_token_amount != 0
+            || self.params.deposit.initial_short_token_amount != 0
     }
 
     #[inline]
@@ -422,14 +424,10 @@ impl TokenAccounts {
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[account(zero_copy)]
 pub struct GlvDepositParams {
-    /// The amount of initial long tokens to deposit.
-    pub(crate) initial_long_token_amount: u64,
-    /// The amount of initial short tokens to deposit.
-    pub(crate) initial_short_token_amount: u64,
+    /// Deposit params.
+    pub(crate) deposit: DepositParams,
     /// The amount of market tokens to deposit.
     pub(crate) market_token_amount: u64,
-    /// The minimum acceptable amount of market tokens to be minted.
-    pub(crate) min_market_token_amount: u64,
     /// The minimum acceptable amount of glv tokens to receive.
     pub(crate) min_glv_token_amount: u64,
     reserved: [u8; 64],

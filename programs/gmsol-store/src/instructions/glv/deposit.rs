@@ -814,13 +814,21 @@ impl<'info> ExecuteGlvDeposit<'info> {
         for is_primary in [true, false] {
             let (amount, escrow, vault) = if is_primary {
                 (
-                    self.glv_deposit.load()?.params.initial_long_token_amount,
+                    self.glv_deposit
+                        .load()?
+                        .params
+                        .deposit
+                        .initial_long_token_amount,
                     self.initial_long_token_escrow.as_ref(),
                     self.initial_long_token_vault.as_ref(),
                 )
             } else {
                 (
-                    self.glv_deposit.load()?.params.initial_short_token_amount,
+                    self.glv_deposit
+                        .load()?
+                        .params
+                        .deposit
+                        .initial_short_token_amount,
                     self.initial_short_token_escrow.as_ref(),
                     self.initial_short_token_vault.as_ref(),
                 )
@@ -864,14 +872,22 @@ impl<'info> ExecuteGlvDeposit<'info> {
         for is_primary in [true, false] {
             let (amount, token, escrow, vault) = if is_primary {
                 (
-                    self.glv_deposit.load()?.params.initial_long_token_amount,
+                    self.glv_deposit
+                        .load()?
+                        .params
+                        .deposit
+                        .initial_long_token_amount,
                     self.initial_long_token.as_ref(),
                     self.initial_long_token_escrow.as_ref(),
                     self.initial_long_token_vault.as_ref(),
                 )
             } else {
                 (
-                    self.glv_deposit.load()?.params.initial_short_token_amount,
+                    self.glv_deposit
+                        .load()?
+                        .params
+                        .deposit
+                        .initial_short_token_amount,
                     self.initial_short_token.as_ref(),
                     self.initial_short_token_escrow.as_ref(),
                     self.initial_short_token_vault.as_ref(),

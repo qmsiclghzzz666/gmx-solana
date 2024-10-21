@@ -6,15 +6,17 @@ use typed_builder::TypedBuilder;
 use crate::{
     states::{
         common::swap::SwapParams,
+        deposit::DepositParams,
         market::{
             revertible::{
-                liquidity_market::RevertibleLiquidityMarket2,
+                liquidity_market::RevertibleLiquidityMarket,
                 swap_market::{SwapDirection, SwapMarkets},
                 Revertible,
             },
             utils::ValidateMarketBalances,
             HasMarketMeta,
         },
+        withdrawal::WithdrawalParams,
         Market, Oracle, Store,
     },
     CoreError, ModelError,
@@ -115,7 +117,7 @@ pub struct RevertibleLiquidityMarketOperation<'a, 'info> {
     market: &'a AccountLoader<'info, Market>,
     market_token_mint: &'a mut Account<'info, Mint>,
     token_program: AccountInfo<'info>,
-    swap: &'a SwapParams,
+    swap: Option<&'a SwapParams>,
     swap_markets: Vec<AccountLoader<'info, Market>>,
 }
 
@@ -126,11 +128,13 @@ impl<'a, 'info> RevertibleLiquidityMarketOperation<'a, 'info> {
         market: &'a AccountLoader<'info, Market>,
         market_token_mint: &'a mut Account<'info, Mint>,
         token_program: AccountInfo<'info>,
-        swap: &'a SwapParams,
+        swap: Option<&'a SwapParams>,
         remaining_accounts: &'info [AccountInfo<'info>],
     ) -> Result<Self> {
-        let swap_markets =
-            swap.unpack_markets_for_swap(&market_token_mint.key(), remaining_accounts)?;
+        let swap_markets = swap
+            .map(|swap| swap.unpack_markets_for_swap(&market_token_mint.key(), remaining_accounts))
+            .transpose()?
+            .unwrap_or_default();
 
         Ok(Self {
             store,
@@ -145,36 +149,80 @@ impl<'a, 'info> RevertibleLiquidityMarketOperation<'a, 'info> {
 }
 
 impl<'a, 'info> RevertibleLiquidityMarketOperation<'a, 'info> {
-    /// Deposit into the market.
+    pub(crate) fn op<'ctx>(&'ctx mut self) -> Result<Execute<'ctx, 'info>> {
+        let current_market_token = self.market_token_mint.key();
+        let market = RevertibleLiquidityMarket::from_revertible_market(
+            self.market.try_into()?,
+            self.market_token_mint,
+            &self.token_program,
+            self.store,
+        )?;
+        let swap_markets = SwapMarkets::new(
+            &self.store.key(),
+            &self.swap_markets,
+            Some(&current_market_token),
+        )?;
+        Ok(Execute {
+            output: (),
+            oracle: self.oracle,
+            swap: self.swap,
+            market,
+            swap_markets,
+        })
+    }
+}
+
+#[must_use = "Revertible operation must be committed to take effect"]
+pub(crate) struct Execute<'a, 'info, T = ()> {
+    pub(crate) output: T,
+    oracle: &'a Oracle,
+    swap: Option<&'a SwapParams>,
+    market: RevertibleLiquidityMarket<'a, 'info>,
+    swap_markets: SwapMarkets<'a>,
+}
+
+impl<'a, 'info, T> Execute<'a, 'info, T> {
+    #[allow(dead_code)]
+    pub(crate) fn boxed(self) -> Box<Self> {
+        Box::new(self)
+    }
+
+    fn with_output<U>(self, output: U) -> Execute<'a, 'info, U> {
+        let Self {
+            oracle,
+            swap,
+            market,
+            swap_markets,
+            ..
+        } = self;
+
+        Execute {
+            output,
+            oracle,
+            swap,
+            market,
+            swap_markets,
+        }
+    }
+
+    /// Swap and deposit into the current market.
     ///
     /// # CHECK
     ///
     /// # Errors
     #[inline(never)]
-    pub(crate) fn unchecked_deposit<'c>(
-        &'c mut self,
-        market_token_receiver: &'c AccountInfo<'info>,
+    pub(crate) fn unchecked_deposit(
+        mut self,
+        market_token_receiver: &'a AccountInfo<'info>,
+        params: &DepositParams,
         initial_tokens: (Option<Pubkey>, Option<Pubkey>),
-        initial_amounts: (u64, u64),
-        min_market_token_amount: u64,
-    ) -> Result<ExecutedDeposit<'c, 'info>> {
-        let current_market_token = self.market_token_mint.key();
-        let mut market = RevertibleLiquidityMarket2::from_revertible_market(
-            self.market.try_into()?,
-            self.market_token_mint,
-            &self.token_program,
-            self.store,
-        )?
-        .enable_mint(market_token_receiver);
-        let mut swap_markets = SwapMarkets::new(
-            &self.store.key(),
-            &self.swap_markets,
-            Some(&current_market_token),
-        )?;
+    ) -> Result<Execute<'a, 'info, u64>> {
+        self.market = self.market.enable_mint(market_token_receiver);
 
         // Distribute position impact.
         {
-            let report = market
+            let report = self
+                .market
                 .distribute_position_impact()
                 .map_err(ModelError::from)?
                 .execute()
@@ -184,65 +232,141 @@ impl<'a, 'info> RevertibleLiquidityMarketOperation<'a, 'info> {
 
         // Swap tokens into the target market.
         let (long_token_amount, short_token_amount) = {
-            let meta = market.market_meta();
+            let meta = self.market.market_meta();
             let expected_token_outs = (meta.long_token_mint, meta.short_token_mint);
-            swap_markets.revertible_swap(
-                SwapDirection::Into(&mut market),
-                self.oracle,
-                self.swap,
-                expected_token_outs,
-                initial_tokens,
-                initial_amounts,
-            )?
+
+            match self.swap {
+                Some(swap) => self.swap_markets.revertible_swap(
+                    SwapDirection::Into(&mut self.market),
+                    self.oracle,
+                    swap,
+                    expected_token_outs,
+                    initial_tokens,
+                    (
+                        params.initial_long_token_amount,
+                        params.initial_short_token_amount,
+                    ),
+                )?,
+                None => {
+                    if params.initial_long_token_amount != 0 {
+                        require!(initial_tokens.0.is_none(), CoreError::InvalidArgument);
+                    }
+                    if params.initial_short_token_amount != 0 {
+                        require!(initial_tokens.1.is_none(), CoreError::InvalidArgument);
+                    }
+                    (
+                        params.initial_long_token_amount,
+                        params.initial_short_token_amount,
+                    )
+                }
+            }
         };
 
         // Perform the deposit.
         let minted = {
-            let prices = self.oracle.market_prices(&market)?;
-            let report = market
+            let prices = self.oracle.market_prices(&self.market)?;
+            let report = self
+                .market
                 .deposit(long_token_amount.into(), short_token_amount.into(), prices)
                 .and_then(|d| d.execute())
                 .map_err(ModelError::from)?;
-            market.validate_market_balances(0, 0)?;
+            self.market.validate_market_balances(0, 0)?;
 
             let minted: u64 = (*report.minted())
                 .try_into()
                 .map_err(|_| error!(CoreError::TokenAmountOverflow))?;
 
-            require_gte!(
-                minted,
-                min_market_token_amount,
-                CoreError::InsufficientOutputAmount
-            );
+            params.validate_market_token_amount(minted)?;
 
             msg!("[Deposit] executed: {:?}", report);
 
             minted
         };
 
-        Ok(ExecutedDeposit {
-            minted_amount: minted,
-            market,
-            swap_markets,
-        })
+        Ok(self.with_output(minted))
+    }
+
+    /// Withdraw from the current market and swap.
+    ///
+    /// # CHECK
+    ///
+    /// # Errors
+    ///
+    pub(crate) fn unchekced_withdraw(
+        mut self,
+        market_token_vault: &'a AccountInfo<'info>,
+        params: &WithdrawalParams,
+        final_tokens: (Pubkey, Pubkey),
+    ) -> Result<Execute<'a, 'info, (u64, u64)>> {
+        self.market = self.market.enable_burn(market_token_vault);
+
+        // Distribute position impact.
+        {
+            let report = self
+                .market
+                .distribute_position_impact()
+                .map_err(ModelError::from)?
+                .execute()
+                .map_err(ModelError::from)?;
+            msg!("[Withdrawal] pre-execute: {:?}", report);
+        }
+
+        // Perform the withdrawal.
+        let (long_amount, short_amount) = {
+            let prices = self.oracle.market_prices(&self.market)?;
+            let report = self
+                .market
+                .withdraw(params.market_token_amount.into(), prices)
+                .and_then(|w| w.execute())
+                .map_err(ModelError::from)?;
+            let (long_amount, short_amount) = (
+                (*report.long_token_output())
+                    .try_into()
+                    .map_err(|_| CoreError::TokenAmountOverflow)?,
+                (*report.short_token_output())
+                    .try_into()
+                    .map_err(|_| CoreError::TokenAmountOverflow)?,
+            );
+            // Validate current market.
+            self.market
+                .validate_market_balances(long_amount, short_amount)?;
+            msg!("[Withdrawal] executed: {:?}", report);
+            (long_amount, short_amount)
+        };
+
+        // Perform the swap.
+        let (final_long_amount, final_short_amount) = {
+            let meta = *self.market.market_meta();
+            match self.swap {
+                Some(swap) => self.swap_markets.revertible_swap(
+                    SwapDirection::From(&mut self.market),
+                    self.oracle,
+                    swap,
+                    final_tokens,
+                    (Some(meta.long_token_mint), Some(meta.short_token_mint)),
+                    (long_amount, short_amount),
+                )?,
+                None => {
+                    require!(
+                        final_tokens == (meta.long_token_mint, meta.short_token_mint),
+                        CoreError::InvalidSwapPath
+                    );
+                    (long_amount, short_amount)
+                }
+            }
+        };
+
+        params.validate_output_amounts(final_long_amount, final_short_amount)?;
+
+        Ok(self.with_output((final_long_amount, final_short_amount)))
+    }
+
+    pub(crate) fn market(&mut self) -> &mut RevertibleLiquidityMarket<'a, 'info> {
+        &mut self.market
     }
 }
 
-#[must_use = "Revertible operation must be committed to take effect"]
-pub(crate) struct ExecutedDeposit<'a, 'info> {
-    pub(crate) minted_amount: u64,
-    pub(crate) market: RevertibleLiquidityMarket2<'a, 'info>,
-    pub(crate) swap_markets: SwapMarkets<'a>,
-}
-
-impl<'a, 'info> ExecutedDeposit<'a, 'info> {
-    #[allow(dead_code)]
-    pub(crate) fn boxed(self) -> Box<Self> {
-        Box::new(self)
-    }
-}
-
-impl<'a, 'info> Revertible for ExecutedDeposit<'a, 'info> {
+impl<'a, 'info, T> Revertible for Execute<'a, 'info, T> {
     fn commit(self) {
         self.market.commit();
         self.swap_markets.commit();

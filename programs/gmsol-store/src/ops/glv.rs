@@ -120,10 +120,13 @@ impl<'a, 'info> CreateGlvDepositOperation<'a, 'info> {
             .init_with_interface(self.glv_token);
 
         // Init params.
-        glv_deposit.params.initial_long_token_amount = self.params.initial_long_token_amount;
-        glv_deposit.params.initial_short_token_amount = self.params.initial_short_token_amount;
+        glv_deposit.params.deposit.initial_long_token_amount =
+            self.params.initial_long_token_amount;
+        glv_deposit.params.deposit.initial_short_token_amount =
+            self.params.initial_short_token_amount;
+        glv_deposit.params.deposit.min_market_token_amount = self.params.min_market_token_amount;
+
         glv_deposit.params.market_token_amount = self.params.market_token_amount;
-        glv_deposit.params.min_market_token_amount = self.params.min_market_token_amount;
         glv_deposit.params.min_glv_token_amount = self.params.min_glv_token_amount;
 
         // Init swap path.
@@ -285,32 +288,28 @@ impl<'a, 'info> ExecuteGlvDepositOperation<'a, 'info> {
             let deposit = self.glv_deposit.load()?;
             let mut market_token_amount = deposit.params.market_token_amount;
 
-            let mut op = RevertibleLiquidityMarketOperation::new(
+            let mut market = RevertibleLiquidityMarketOperation::new(
                 &self.store,
                 self.oralce,
                 &self.market,
                 self.market_token_mint,
                 self.token_program,
-                &deposit.swap,
+                Some(&deposit.swap),
                 self.remaining_accounts,
             )?;
 
             let executed_deposit = if deposit.is_market_deposit_required() {
-                let executed = op.unchecked_deposit(
+                let executed = market.op()?.unchecked_deposit(
                     &self.market_token_vault,
+                    &deposit.params.deposit,
                     (
                         deposit.tokens.initial_long_token.token(),
                         deposit.tokens.initial_short_token.token(),
                     ),
-                    (
-                        deposit.params.initial_long_token_amount,
-                        deposit.params.initial_short_token_amount,
-                    ),
-                    deposit.params.min_market_token_amount,
                 )?;
 
                 market_token_amount = market_token_amount
-                    .checked_add(executed.minted_amount)
+                    .checked_add(executed.output)
                     .ok_or(error!(CoreError::TokenAmountOverflow))?;
 
                 Some(executed)

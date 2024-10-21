@@ -1,23 +1,20 @@
 use anchor_lang::prelude::*;
-use gmsol_model::{
-    params::{FeeParams, PriceImpactParams},
-    Bank, PoolKind, SwapMarketMutExt,
-};
+use gmsol_model::{Bank, SwapMarketMutExt};
 use indexmap::{map::Entry, IndexMap};
 
 use crate::{
     constants,
     states::{
         common::swap::SwapParams, market::utils::ValidateMarketBalances, HasMarketMeta, Market,
-        MarketMeta, Oracle,
+        Oracle,
     },
     CoreError, ModelError,
 };
 
-use super::{market::RevertibleMarket2, Revertible, RevertibleMarket, RevertiblePool};
+use super::{market::RevertibleMarket, Revertible};
 
 /// A map of markets used for swaps where the key is the market token mint address.
-pub struct SwapMarkets<'a>(IndexMap<Pubkey, RevertibleMarket2<'a>>);
+pub struct SwapMarkets<'a>(IndexMap<Pubkey, RevertibleMarket<'a>>);
 
 impl<'a> SwapMarkets<'a> {
     /// Create a new [`SwapMarkets`] from loders.
@@ -46,12 +43,12 @@ impl<'a> SwapMarkets<'a> {
     }
 
     /// Get market mutably.
-    pub fn get_mut(&mut self, token: &Pubkey) -> Option<&mut RevertibleMarket2<'a>> {
+    pub fn get_mut(&mut self, token: &Pubkey) -> Option<&mut RevertibleMarket<'a>> {
         self.0.get_mut(token)
     }
 
     /// Get market.
-    pub fn get(&self, token: &Pubkey) -> Option<&RevertibleMarket2<'a>> {
+    pub fn get(&self, token: &Pubkey) -> Option<&RevertibleMarket<'a>> {
         self.0.get(token)
     }
 
@@ -418,187 +415,5 @@ where
             .map_err(|_| error!(CoreError::TokenAmountOverflow))?;
         *token_in = *current.market_meta().opposite_token(token_in)?;
         Ok(())
-    }
-}
-
-/// Convert a [`RevertibleMarket`] to a [`SwapMarket`](gmsol_model::SwapMarket).
-pub struct RevertibleSwapMarket<'a> {
-    pub(super) market: RevertibleMarket<'a>,
-    open_interest: (RevertiblePool, RevertiblePool),
-    open_interest_in_tokens: (RevertiblePool, RevertiblePool),
-    collateral_sum: (RevertiblePool, RevertiblePool),
-}
-
-impl<'a> RevertibleSwapMarket<'a> {
-    pub(crate) fn from_market(market: RevertibleMarket<'a>) -> Result<Self> {
-        let open_interest = (
-            market.get_pool_from_storage(PoolKind::OpenInterestForLong)?,
-            market.get_pool_from_storage(PoolKind::OpenInterestForShort)?,
-        );
-        let open_interest_in_tokens = (
-            market.get_pool_from_storage(PoolKind::OpenInterestInTokensForLong)?,
-            market.get_pool_from_storage(PoolKind::OpenInterestInTokensForShort)?,
-        );
-        let collateral_sum = (
-            market.get_pool_from_storage(PoolKind::CollateralSumForLong)?,
-            market.get_pool_from_storage(PoolKind::CollateralSumForShort)?,
-        );
-        Ok(Self {
-            market,
-            open_interest,
-            open_interest_in_tokens,
-            collateral_sum,
-        })
-    }
-}
-
-impl<'a> HasMarketMeta for RevertibleSwapMarket<'a> {
-    fn is_pure(&self) -> bool {
-        self.market.is_pure()
-    }
-
-    fn market_meta(&self) -> &MarketMeta {
-        self.market.market_meta()
-    }
-}
-
-impl<'a> Revertible for RevertibleSwapMarket<'a> {
-    fn commit(self) {
-        self.market.commit();
-    }
-}
-
-impl<'a> RevertibleSwapMarket<'a> {
-    /// Commit with the given function.
-    ///
-    /// ## Panic
-    /// Panic if the commitment cannot be done.
-    pub(crate) fn commit_with(self, f: impl FnOnce(&mut Market)) {
-        self.market.commit_with(f)
-    }
-}
-
-impl<'a> gmsol_model::BaseMarket<{ constants::MARKET_DECIMALS }> for RevertibleSwapMarket<'a> {
-    type Num = u128;
-
-    type Signed = i128;
-
-    type Pool = RevertiblePool;
-
-    fn liquidity_pool(&self) -> gmsol_model::Result<&Self::Pool> {
-        self.market.liquidity_pool()
-    }
-
-    fn claimable_fee_pool(&self) -> gmsol_model::Result<&Self::Pool> {
-        self.market.claimable_fee_pool()
-    }
-
-    fn swap_impact_pool(&self) -> gmsol_model::Result<&Self::Pool> {
-        self.market.swap_impact_pool()
-    }
-
-    fn open_interest_pool(&self, is_long: bool) -> gmsol_model::Result<&Self::Pool> {
-        Ok(if is_long {
-            &self.open_interest.0
-        } else {
-            &self.open_interest.1
-        })
-    }
-
-    fn open_interest_in_tokens_pool(&self, is_long: bool) -> gmsol_model::Result<&Self::Pool> {
-        Ok(if is_long {
-            &self.open_interest_in_tokens.0
-        } else {
-            &self.open_interest_in_tokens.1
-        })
-    }
-
-    fn collateral_sum_pool(&self, is_long: bool) -> gmsol_model::Result<&Self::Pool> {
-        Ok(if is_long {
-            &self.collateral_sum.0
-        } else {
-            &self.collateral_sum.1
-        })
-    }
-
-    fn usd_to_amount_divisor(&self) -> Self::Num {
-        self.market.usd_to_amount_divisor()
-    }
-
-    fn max_pool_amount(&self, is_long_token: bool) -> gmsol_model::Result<Self::Num> {
-        self.market.max_pool_amount(is_long_token)
-    }
-
-    fn pnl_factor_config(
-        &self,
-        kind: gmsol_model::PnlFactorKind,
-        is_long: bool,
-    ) -> gmsol_model::Result<Self::Num> {
-        self.market.pnl_factor_config(kind, is_long)
-    }
-
-    fn reserve_factor(&self) -> gmsol_model::Result<Self::Num> {
-        self.market.reserve_factor()
-    }
-}
-
-impl<'a> gmsol_model::BaseMarketMut<{ constants::MARKET_DECIMALS }> for RevertibleSwapMarket<'a> {
-    fn liquidity_pool_mut(&mut self) -> gmsol_model::Result<&mut Self::Pool> {
-        self.market.liquidity_pool_mut()
-    }
-
-    fn claimable_fee_pool_mut(&mut self) -> gmsol_model::Result<&mut Self::Pool> {
-        self.market.claimable_fee_pool_mut()
-    }
-}
-
-impl<'a> gmsol_model::SwapMarket<{ constants::MARKET_DECIMALS }> for RevertibleSwapMarket<'a> {
-    fn swap_impact_params(&self) -> gmsol_model::Result<PriceImpactParams<Self::Num>> {
-        self.market.swap_impact_params()
-    }
-
-    fn swap_fee_params(&self) -> gmsol_model::Result<FeeParams<Self::Num>> {
-        self.market.swap_fee_params()
-    }
-}
-
-impl<'a> gmsol_model::SwapMarketMut<{ constants::MARKET_DECIMALS }> for RevertibleSwapMarket<'a> {
-    fn swap_impact_pool_mut(&mut self) -> gmsol_model::Result<&mut Self::Pool> {
-        Ok(&mut self.market.swap_impact)
-    }
-}
-
-impl<'a> gmsol_model::Bank<Pubkey> for RevertibleSwapMarket<'a> {
-    type Num = u64;
-
-    fn record_transferred_in_by_token<Q: std::borrow::Borrow<Pubkey> + ?Sized>(
-        &mut self,
-        token: &Q,
-        amount: &Self::Num,
-    ) -> gmsol_model::Result<()> {
-        self.market
-            .record_transferred_in_by_token(token.borrow(), amount)
-    }
-
-    fn record_transferred_out_by_token<Q: std::borrow::Borrow<Pubkey> + ?Sized>(
-        &mut self,
-        token: &Q,
-        amount: &Self::Num,
-    ) -> gmsol_model::Result<()> {
-        self.market
-            .record_transferred_out_by_token(token.borrow(), amount)
-    }
-
-    fn balance<Q: std::borrow::Borrow<Pubkey> + ?Sized>(
-        &self,
-        token: &Q,
-    ) -> gmsol_model::Result<Self::Num> {
-        self.market.balance(token)
-    }
-}
-
-impl<'a> Key for RevertibleSwapMarket<'a> {
-    fn key(&self) -> Pubkey {
-        self.market.key()
     }
 }

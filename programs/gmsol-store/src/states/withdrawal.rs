@@ -37,25 +37,6 @@ impl Withdrawal {
     pub fn swap(&self) -> &SwapParams {
         &self.swap
     }
-
-    pub(crate) fn validate_output_amounts(
-        &self,
-        long_amount: u64,
-        short_amount: u64,
-    ) -> Result<()> {
-        let params = &self.params;
-        require_gte!(
-            long_amount,
-            params.min_long_token_amount,
-            CoreError::InsufficientOutputAmount
-        );
-        require_gte!(
-            short_amount,
-            params.min_short_token_amount,
-            CoreError::InsufficientOutputAmount
-        );
-        Ok(())
-    }
 }
 
 impl Seed for Withdrawal {
@@ -140,5 +121,25 @@ impl Default for WithdrawalParams {
             min_long_token_amount: 0,
             min_short_token_amount: 0,
         }
+    }
+}
+
+impl WithdrawalParams {
+    pub(crate) fn validate_output_amounts(
+        &self,
+        long_amount: u64,
+        short_amount: u64,
+    ) -> Result<()> {
+        require_gte!(
+            long_amount,
+            self.min_long_token_amount,
+            CoreError::InsufficientOutputAmount
+        );
+        require_gte!(
+            short_amount,
+            self.min_short_token_amount,
+            CoreError::InsufficientOutputAmount
+        );
+        Ok(())
     }
 }

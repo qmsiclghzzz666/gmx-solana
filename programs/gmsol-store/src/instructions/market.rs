@@ -1,9 +1,9 @@
 use crate::{
     ops::market::MarketTransferOutOperation,
     states::{
-        market::status::MarketStatus,
         market::{
-            revertible::{Revertible, RevertibleSwapMarket},
+            revertible::{Revertible, RevertibleMarket},
+            status::MarketStatus,
             utils::ValidateMarketBalances,
         },
         Factor, HasMarketMeta,
@@ -650,7 +650,7 @@ pub(crate) fn claim_fees_from_market(ctx: Context<ClaimFeesFromMarket>) -> Resul
 
     let amount = {
         let token = ctx.accounts.token_mint.key();
-        let mut market = RevertibleSwapMarket::from_market((&ctx.accounts.market).try_into()?)?;
+        let mut market = RevertibleMarket::try_from(&ctx.accounts.market)?;
         let is_long_token = market.market_meta().to_token_side(&token)?;
         let pool = market.claimable_fee_pool_mut().map_err(ModelError::from)?;
 

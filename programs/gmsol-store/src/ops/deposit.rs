@@ -238,20 +238,17 @@ impl<'a, 'info> ExecuteDepositOperation<'a, 'info> {
                 self.market,
                 self.market_token_mint,
                 self.token_program.clone(),
-                deposit.swap(),
+                Some(deposit.swap()),
                 self.remaining_accounts,
             )?
+            .op()?
             .unchecked_deposit(
                 &self.market_token_receiver,
+                &deposit.params,
                 (
                     deposit.tokens.initial_long_token.token(),
                     deposit.tokens.initial_short_token.token(),
                 ),
-                (
-                    deposit.params.initial_long_token_amount,
-                    deposit.params.initial_short_token_amount,
-                ),
-                deposit.params.min_market_token_amount,
             )?
             .commit();
         }

@@ -1,19 +1,20 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, TokenAccount};
-use gmsol_model::{Bank, LiquidityMarketMutExt, PositionImpactMarketMutExt};
+use gmsol_model::Bank;
 use typed_builder::TypedBuilder;
 
 use crate::{
     states::{
         common::action::{Action, ActionExt},
-        market::{
-            revertible::{Revertible, RevertibleLiquidityMarket},
-            utils::ValidateMarketBalances,
-        },
-        HasMarketMeta, Market, NonceBytes, Oracle, Shift, Store, ValidateOracleTime,
+        deposit::DepositParams,
+        market::revertible::Revertible,
+        withdrawal::WithdrawalParams,
+        Market, NonceBytes, Oracle, Shift, Store, ValidateOracleTime,
     },
     CoreError, CoreResult, ModelError,
 };
+
+use super::market::RevertibleLiquidityMarketOperation;
 
 /// Create Shift Params.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
@@ -144,7 +145,7 @@ pub struct ExecuteShiftOperation<'a, 'info> {
 }
 
 impl<'a, 'info> ExecuteShiftOperation<'a, 'info> {
-    pub(crate) fn execute(mut self) -> Result<bool> {
+    pub(crate) fn execute(self) -> Result<bool> {
         let throw_on_execution_error = self.throw_on_execution_error;
 
         match self.validate_oracle() {
@@ -177,7 +178,7 @@ impl<'a, 'info> ExecuteShiftOperation<'a, 'info> {
         self.oracle.validate_time(self)
     }
 
-    fn validate_markets_and_shift(&self) -> Result<()> {
+    fn validate_markets_and_shift(&self) -> Result<(Pubkey, Pubkey)> {
         require!(
             self.from_market.key() != self.to_market.key(),
             CoreError::Internal
@@ -186,7 +187,7 @@ impl<'a, 'info> ExecuteShiftOperation<'a, 'info> {
         let from_market = self.from_market.load()?;
         let to_market = self.to_market.load()?;
 
-        from_market.validate(&self.store.key())?;
+        let meta = from_market.validated_meta(&self.store.key())?;
         to_market.validate(&self.store.key())?;
 
         from_market.validate_shiftable(&to_market)?;
@@ -195,123 +196,79 @@ impl<'a, 'info> ExecuteShiftOperation<'a, 'info> {
             .load()?
             .validate_for_execution(&self.to_market_token_mint.to_account_info(), &to_market)?;
 
-        Ok(())
+        Ok((meta.long_token_mint, meta.short_token_mint))
     }
 
     #[inline(never)]
-    fn perfrom_shift(&mut self) -> Result<()> {
-        self.validate_markets_and_shift()?;
+    fn perfrom_shift(self) -> Result<()> {
+        let (long_token, short_token) = self.validate_markets_and_shift()?;
 
-        let mut from_market = RevertibleLiquidityMarket::new(
+        let shift = self.shift.load()?;
+
+        let mut from_market = RevertibleLiquidityMarketOperation::new(
+            self.store,
+            self.oracle,
             self.from_market,
             self.from_market_token_mint,
-            self.token_program.to_account_info(),
-            self.store,
-        )?
-        .enable_burn(self.from_market_token_vault.clone())
-        .boxed();
+            self.token_program.clone(),
+            None,
+            &[],
+        )?;
 
-        let mut to_market = RevertibleLiquidityMarket::new(
+        let mut to_market = RevertibleLiquidityMarketOperation::new(
+            self.store,
+            self.oracle,
             self.to_market,
             self.to_market_token_mint,
-            self.token_program.to_account_info(),
-            self.store,
-        )?
-        .enable_mint(self.to_market_token_account.clone())
-        .boxed();
-
-        // Distribute position impact for the from market.
-        {
-            let report = from_market
-                .distribute_position_impact()
-                .map_err(ModelError::from)?
-                .execute()
-                .map_err(ModelError::from)?;
-            msg!("[Shift-Withdrawal] pre-execute: {:?}", report);
-        }
+            self.token_program,
+            None,
+            &[],
+        )?;
 
         // Perform the shift-withdrawal.
-        let (long_amount, short_amount) = {
-            let prices = self
-                .oracle
-                .market_prices(&*from_market)
-                .expect("all the required prices must have been provided");
-            let report = from_market
-                .withdraw(
-                    self.shift.load()?.params.from_market_token_amount().into(),
-                    prices,
-                )
-                .and_then(|w| w.execute())
-                .map_err(ModelError::from)?;
-            let (long_amount, short_amount) = (
-                (*report.long_token_output())
-                    .try_into()
-                    .map_err(|_| CoreError::TokenAmountOverflow)?,
-                (*report.short_token_output())
-                    .try_into()
-                    .map_err(|_| CoreError::TokenAmountOverflow)?,
-            );
-            // Validate current market.
-            from_market.validate_market_balances(long_amount, short_amount)?;
-            msg!("[Shift-Withdrawal] executed: {:?}", report);
-            (long_amount, short_amount)
+        let mut from_market = {
+            let mut params = WithdrawalParams::default();
+            params.market_token_amount = shift.params.from_market_token_amount;
+            from_market.op()?.unchekced_withdraw(
+                &self.from_market_token_vault,
+                &params,
+                (long_token, short_token),
+            )?
         };
+        let (long_amount, short_amount) = from_market.output;
+
+        let mut to_market = to_market.op()?;
 
         // Transfer tokens from the `from_market` to `to_market`.
         // The vaults are assumed to be shared.
         {
-            let long_token = from_market.market_meta().long_token_mint;
-            let short_token = to_market.market_meta().short_token_mint;
-
             from_market
+                .market()
                 .record_transferred_out_by_token(&long_token, &long_amount)
                 .map_err(ModelError::from)?;
             to_market
+                .market()
                 .record_transferred_in_by_token(&long_token, &long_amount)
                 .map_err(ModelError::from)?;
 
             from_market
+                .market()
                 .record_transferred_out_by_token(&short_token, &short_amount)
                 .map_err(ModelError::from)?;
             to_market
+                .market()
                 .record_transferred_in_by_token(&short_token, &short_amount)
                 .map_err(ModelError::from)?;
         }
 
-        // Distribute position impact for the to market.
-        {
-            let report = to_market
-                .distribute_position_impact()
-                .map_err(ModelError::from)?
-                .execute()
-                .map_err(ModelError::from)?;
-            msg!("[Shift-Deposit] pre-execute: {:?}", report);
-        }
-
         // Perform the shift-deposit.
-        {
-            let prices = self
-                .oracle
-                .market_prices(&*to_market)
-                .expect("all requried prices must have been provided");
-            let report = to_market
-                .deposit(long_amount.into(), short_amount.into(), prices)
-                .and_then(|d| d.execute())
-                .map_err(ModelError::from)?;
-            to_market.validate_market_balances(0, 0)?;
-
-            let minted: u64 = (*report.minted())
-                .try_into()
-                .map_err(|_| error!(CoreError::TokenAmountOverflow))?;
-
-            require_gte!(
-                minted,
-                self.shift.load()?.params.min_to_market_token_amount(),
-                CoreError::InsufficientOutputAmount
-            );
-
-            msg!("[Shift-Deposit] executed: {:?}", report);
-        }
+        let to_market = {
+            let mut params = DepositParams::default();
+            params.initial_long_token_amount = long_amount;
+            params.initial_short_token_amount = short_amount;
+            params.min_market_token_amount = shift.params.min_to_market_token_amount;
+            to_market.unchecked_deposit(&self.to_market_token_account, &params, (None, None))?
+        };
 
         // Commit the changes.
         from_market.commit();
