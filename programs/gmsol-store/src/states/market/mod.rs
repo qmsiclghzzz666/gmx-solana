@@ -16,9 +16,10 @@ use super::{Factor, InitSpace, Oracle, Seed};
 
 use self::{
     config::{MarketConfig, MarketConfigBuffer, MarketConfigKey},
-    model::AsLiquidityMarket,
     pool::{Pool, Pools},
 };
+
+pub(crate) use model::AsLiquidityMarket;
 
 /// Market Utils.
 pub mod utils;
@@ -96,6 +97,12 @@ impl Default for Market {
     fn default() -> Self {
         use bytemuck::Zeroable;
         Self::zeroed()
+    }
+}
+
+impl AsRef<Market> for Market {
+    fn as_ref(&self) -> &Market {
+        self
     }
 }
 

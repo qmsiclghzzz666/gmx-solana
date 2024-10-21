@@ -188,45 +188,31 @@ impl Oracle {
         Ok(())
     }
 
+    /// Get primary price for the given token.
+    pub(crate) fn get_primary_price(
+        &self,
+        token: &Pubkey,
+    ) -> Result<gmsol_model::price::Price<u128>> {
+        let price = self
+            .primary
+            .get(token)
+            .ok_or(error!(CoreError::MissingOraclePrice))?;
+        Ok(gmsol_model::price::Price {
+            min: price.min.to_unit_price(),
+            max: price.max.to_unit_price(),
+        })
+    }
+
     /// Get prices for the market
     pub(crate) fn market_prices(
         &self,
         market: &impl HasMarketMeta,
     ) -> Result<gmsol_model::price::Prices<u128>> {
-        use gmsol_model::price::Price;
-
         let meta = market.market_meta();
         let prices = gmsol_model::price::Prices {
-            index_token_price: {
-                let price = self
-                    .primary
-                    .get(&meta.index_token_mint)
-                    .ok_or(CoreError::MissingOraclePrice)?;
-                Price {
-                    min: price.min.to_unit_price(),
-                    max: price.max.to_unit_price(),
-                }
-            },
-            long_token_price: {
-                let price = self
-                    .primary
-                    .get(&meta.long_token_mint)
-                    .ok_or(CoreError::MissingOraclePrice)?;
-                Price {
-                    min: price.min.to_unit_price(),
-                    max: price.max.to_unit_price(),
-                }
-            },
-            short_token_price: {
-                let price = self
-                    .primary
-                    .get(&meta.short_token_mint)
-                    .ok_or(CoreError::MissingOraclePrice)?;
-                Price {
-                    min: price.min.to_unit_price(),
-                    max: price.max.to_unit_price(),
-                }
-            },
+            index_token_price: self.get_primary_price(&meta.index_token_mint)?,
+            long_token_price: self.get_primary_price(&meta.long_token_mint)?,
+            short_token_price: self.get_primary_price(&meta.short_token_mint)?,
         };
         Ok(prices)
     }

@@ -243,20 +243,20 @@ impl<'a, 'info> ExecuteShiftOperation<'a, 'info> {
         // The vaults are assumed to be shared.
         {
             from_market
-                .market()
+                .market_mut()
                 .record_transferred_out_by_token(&long_token, &long_amount)
                 .map_err(ModelError::from)?;
             to_market
-                .market()
+                .market_mut()
                 .record_transferred_in_by_token(&long_token, &long_amount)
                 .map_err(ModelError::from)?;
 
             from_market
-                .market()
+                .market_mut()
                 .record_transferred_out_by_token(&short_token, &short_amount)
                 .map_err(ModelError::from)?;
             to_market
-                .market()
+                .market_mut()
                 .record_transferred_in_by_token(&short_token, &short_amount)
                 .map_err(ModelError::from)?;
         }

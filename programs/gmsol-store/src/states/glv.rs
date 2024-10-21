@@ -202,15 +202,20 @@ impl Glv {
     ) -> Result<SplitAccountsForGlv<'info>> {
         let len = self.num_markets as usize;
 
+        let markets_end = len;
+        let market_tokens_end = markets_end + len;
+        let market_token_vaults_end = market_tokens_end + len;
+
         require_gte!(
             remaining_accounts.len(),
-            len + len,
+            market_token_vaults_end,
             CoreError::InvalidArgument
         );
 
-        let markets = &remaining_accounts[0..len];
-        let market_tokens = &remaining_accounts[len..(len + len)];
-        let remaining_accounts = &remaining_accounts[(len + len)..];
+        let markets = &remaining_accounts[0..markets_end];
+        let market_tokens = &remaining_accounts[markets_end..market_tokens_end];
+        let market_token_vaults = &remaining_accounts[market_tokens_end..market_token_vaults_end];
+        let remaining_accounts = &remaining_accounts[market_token_vaults_end..];
 
         for idx in 0..len {
             let market = &markets[idx];
@@ -242,6 +247,7 @@ impl Glv {
         Ok(SplitAccountsForGlv {
             markets,
             market_tokens,
+            market_token_vaults,
             remaining_accounts,
         })
     }
@@ -250,6 +256,7 @@ impl Glv {
 pub(crate) struct SplitAccountsForGlv<'info> {
     pub(crate) markets: &'info [AccountInfo<'info>],
     pub(crate) market_tokens: &'info [AccountInfo<'info>],
+    pub(crate) market_token_vaults: &'info [AccountInfo<'info>],
     pub(crate) remaining_accounts: &'info [AccountInfo<'info>],
 }
 

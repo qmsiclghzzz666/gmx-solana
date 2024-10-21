@@ -5,12 +5,12 @@ use gmsol_model::{
         position::PositionImpactDistributionParams,
         FeeParams, PositionParams, PriceImpactParams,
     },
-    BorrowingFeeMarket, PoolKind,
+    PoolKind,
 };
 
 use crate::constants;
 
-use super::{clock::AsClock, Market, Pool};
+use super::{clock::AsClock, HasMarketMeta, Market, Pool};
 
 impl gmsol_model::BaseMarket<{ constants::MARKET_DECIMALS }> for Market {
     type Num = u128;
@@ -280,13 +280,26 @@ impl<'a, M> AsLiquidityMarket<'a, M> {
     }
 }
 
+impl<'a, M> HasMarketMeta for AsLiquidityMarket<'a, M>
+where
+    M: AsRef<Market>,
+{
+    fn is_pure(&self) -> bool {
+        self.market.as_ref().is_pure()
+    }
+
+    fn market_meta(&self) -> &super::MarketMeta {
+        self.market.as_ref().market_meta()
+    }
+}
+
 impl<'a, M> gmsol_model::BaseMarket<{ constants::MARKET_DECIMALS }> for AsLiquidityMarket<'a, M>
 where
     M: gmsol_model::BaseMarket<
         { constants::MARKET_DECIMALS },
-        Num = Self::Num,
-        Signed = Self::Signed,
-        Pool = Self::Pool,
+        Num = u128,
+        Signed = i128,
+        Pool = Pool,
     >,
 {
     type Num = u128;
@@ -343,7 +356,12 @@ where
 impl<'a, M> gmsol_model::PositionImpactMarket<{ constants::MARKET_DECIMALS }>
     for AsLiquidityMarket<'a, M>
 where
-    M: gmsol_model::PositionImpactMarket<{ constants::MARKET_DECIMALS }>,
+    M: gmsol_model::PositionImpactMarket<
+        { constants::MARKET_DECIMALS },
+        Num = u128,
+        Signed = i128,
+        Pool = Pool,
+    >,
 {
     fn position_impact_pool(&self) -> gmsol_model::Result<&Self::Pool> {
         self.market.position_impact_pool()
@@ -368,7 +386,12 @@ where
 impl<'a, M> gmsol_model::BorrowingFeeMarket<{ constants::MARKET_DECIMALS }>
     for AsLiquidityMarket<'a, M>
 where
-    M: BorrowingFeeMarket<{ constants::MARKET_DECIMALS }>,
+    M: gmsol_model::BorrowingFeeMarket<
+        { constants::MARKET_DECIMALS },
+        Num = u128,
+        Signed = i128,
+        Pool = Pool,
+    >,
 {
     fn borrowing_factor_pool(&self) -> gmsol_model::Result<&Self::Pool> {
         self.market.borrowing_factor_pool()
@@ -389,12 +412,28 @@ where
 
 impl<'a, M> gmsol_model::LiquidityMarket<{ constants::MARKET_DECIMALS }>
     for AsLiquidityMarket<'a, M>
+where
+    M: gmsol_model::BorrowingFeeMarket<
+        { constants::MARKET_DECIMALS },
+        Num = u128,
+        Signed = i128,
+        Pool = Pool,
+    >,
+    M: gmsol_model::PositionImpactMarket<
+        { constants::MARKET_DECIMALS },
+        Num = u128,
+        Signed = i128,
+        Pool = Pool,
+    >,
+    M: AsRef<Market>,
 {
     fn total_supply(&self) -> Self::Num {
         self.mint.supply.into()
     }
 
     fn max_pool_value_for_deposit(&self, is_long_token: bool) -> gmsol_model::Result<Self::Num> {
-        self.market.max_pool_value_for_deposit(is_long_token)
+        self.market
+            .as_ref()
+            .max_pool_value_for_deposit(is_long_token)
     }
 }

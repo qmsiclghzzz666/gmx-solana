@@ -182,12 +182,7 @@ pub(crate) struct Execute<'a, 'info, T = ()> {
 }
 
 impl<'a, 'info, T> Execute<'a, 'info, T> {
-    #[allow(dead_code)]
-    pub(crate) fn boxed(self) -> Box<Self> {
-        Box::new(self)
-    }
-
-    fn with_output<U>(self, output: U) -> Execute<'a, 'info, U> {
+    pub(crate) fn with_output<U>(self, output: U) -> Execute<'a, 'info, U> {
         let Self {
             oracle,
             swap,
@@ -203,6 +198,18 @@ impl<'a, 'info, T> Execute<'a, 'info, T> {
             market,
             swap_markets,
         }
+    }
+
+    pub(crate) fn market(&self) -> &RevertibleLiquidityMarket<'a, 'info> {
+        &self.market
+    }
+
+    pub(crate) fn market_mut(&mut self) -> &mut RevertibleLiquidityMarket<'a, 'info> {
+        &mut self.market
+    }
+
+    pub(crate) fn swap_markets(&self) -> &SwapMarkets {
+        &self.swap_markets
     }
 
     /// Swap and deposit into the current market.
@@ -359,10 +366,6 @@ impl<'a, 'info, T> Execute<'a, 'info, T> {
         params.validate_output_amounts(final_long_amount, final_short_amount)?;
 
         Ok(self.with_output((final_long_amount, final_short_amount)))
-    }
-
-    pub(crate) fn market(&mut self) -> &mut RevertibleLiquidityMarket<'a, 'info> {
-        &mut self.market
     }
 }
 

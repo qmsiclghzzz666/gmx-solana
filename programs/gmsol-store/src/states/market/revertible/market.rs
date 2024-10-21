@@ -47,6 +47,12 @@ impl<'a> Key for RevertibleMarket<'a> {
     }
 }
 
+impl<'a> AsRef<Market> for RevertibleMarket<'a> {
+    fn as_ref(&self) -> &Market {
+        &self.market
+    }
+}
+
 impl<'a> RevertibleMarket<'a> {
     pub(crate) fn with_order_fee_discount_factor(mut self, discount: u128) -> Self {
         self.order_fee_discount_factor = discount;

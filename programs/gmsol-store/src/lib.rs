@@ -1697,6 +1697,11 @@ pub enum CoreError {
     /// Disabled market.
     #[msg("disabled market")]
     DisabledMarket,
+    /* Errors for GLV */
+    #[msg("failed to calculate glv value for this market")]
+    FailedToCalculateGlvValueForMarket,
+    #[msg("failed to calculate glv amount to mint")]
+    FailedToCalculateGlvAmountToMint,
 }
 
 impl CoreError {

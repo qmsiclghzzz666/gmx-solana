@@ -533,9 +533,10 @@ impl<'info> CloseGlvDeposit<'info> {
 ///   - 0..N. `[]` N market accounts, where N represents the total number of markets managed
 ///     by the given GLV.
 ///   - N..2N. `[]` N market token accounts (see above for the definition of N).
-///   - 2N..2N+M. `[]` M feed accounts, where M represents the total number of tokens in the
+///   - 2N..3N. `[]` N market token vault accounts (see above for the definition of N).
+///   - 3N..3N+M. `[]` M feed accounts, where M represents the total number of tokens in the
 ///     swap params.
-///   - 2N+M..2N+M+L. `[writable]` L market accounts, where L represents the total number of unique
+///   - 3N+M..3N+M+L. `[writable]` L market accounts, where L represents the total number of unique
 ///     markets excluding the current market in the swap params.
 #[derive(Accounts)]
 pub struct ExecuteGlvDeposit<'info> {
@@ -676,6 +677,7 @@ pub(crate) fn unchecked_execute_glv_deposit<'info>(
     let SplitAccountsForGlv {
         markets,
         market_tokens,
+        market_token_vaults,
         remaining_accounts,
     } = accounts
         .glv
@@ -688,6 +690,7 @@ pub(crate) fn unchecked_execute_glv_deposit<'info>(
     let executed = accounts.perform_execution(
         markets,
         market_tokens,
+        market_token_vaults,
         remaining_accounts,
         throw_on_execution_error,
     )?;
@@ -925,6 +928,7 @@ impl<'info> ExecuteGlvDeposit<'info> {
         &mut self,
         markets: &'info [AccountInfo<'info>],
         market_tokens: &'info [AccountInfo<'info>],
+        market_token_vaults: &'info [AccountInfo<'info>],
         remaining_accounts: &'info [AccountInfo<'info>],
         throw_on_execution_error: bool,
     ) -> Result<bool> {
@@ -943,11 +947,13 @@ impl<'info> ExecuteGlvDeposit<'info> {
             .store(self.store.clone())
             .glv(self.glv.clone())
             .glv_token_mint(&mut self.glv_token)
+            .glv_token_receiver(self.glv_token_escrow.to_account_info())
             .market(self.market.clone())
             .market_token_mint(&mut self.market_token)
             .market_token_vault(self.market_token_vault.to_account_info())
             .markets(markets)
-            .market_tokens(market_tokens);
+            .market_tokens(market_tokens)
+            .market_token_vaults(market_token_vaults);
 
         self.oracle.with_prices(
             &self.store,
@@ -957,7 +963,7 @@ impl<'info> ExecuteGlvDeposit<'info> {
             remaining_accounts,
             |oracle, remaining_accounts| {
                 builder
-                    .oralce(oracle)
+                    .oracle(oracle)
                     .remaining_accounts(remaining_accounts)
                     .build()
                     .unchecked_execute()
