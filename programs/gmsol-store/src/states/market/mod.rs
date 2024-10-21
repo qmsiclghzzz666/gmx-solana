@@ -259,7 +259,7 @@ impl Market {
     /// Record transferred in.
     fn record_transferred_in(&mut self, is_long_token: bool, amount: u64) -> Result<()> {
         msg!(
-            "{}: {},{}(+{},{})",
+            "[Balance updating] {}: {},{}(+{},{})",
             self.meta.market_token_mint,
             self.state.other.long_token_balance,
             self.state.other.short_token_balance,
@@ -282,7 +282,7 @@ impl Market {
                 .ok_or(error!(CoreError::TokenAmountOverflow))?;
         }
         msg!(
-            "{}: {},{}",
+            "[Balance updated] {}: {},{}",
             self.meta.market_token_mint,
             self.state.other.long_token_balance,
             self.state.other.short_token_balance
@@ -293,7 +293,7 @@ impl Market {
     /// Record transferred out.
     fn record_transferred_out(&mut self, is_long_token: bool, amount: u64) -> Result<()> {
         msg!(
-            "{}: {},{}(-{},{})",
+            "[Balance updating] {}: {},{}(-{},{})",
             self.meta.market_token_mint,
             self.state.other.long_token_balance,
             self.state.other.short_token_balance,
@@ -316,7 +316,7 @@ impl Market {
                 .ok_or(error!(CoreError::TokenAmountOverflow))?;
         }
         msg!(
-            "{}: {},{}",
+            "[Balance updated] {}: {},{}",
             self.meta.market_token_mint,
             self.state.other.long_token_balance,
             self.state.other.short_token_balance

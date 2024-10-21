@@ -107,7 +107,7 @@ impl<'a> RevertibleMarket<'a> {
         let other = self.other_mut();
 
         msg!(
-            "[Balance to be committed] {}: {},{}(+{} {is_long_token})",
+            "[Balance updating] {}: {},{}(+{},{is_long_token})",
             mint,
             other.long_token_balance,
             other.short_token_balance,
@@ -125,6 +125,13 @@ impl<'a> RevertibleMarket<'a> {
                 .checked_add(amount)
                 .ok_or(error!(CoreError::TokenAmountOverflow))?;
         }
+
+        msg!(
+            "[Balance updated (to be committed)] {}: {},{}",
+            mint,
+            other.long_token_balance,
+            other.short_token_balance
+        );
         Ok(())
     }
 
@@ -135,7 +142,7 @@ impl<'a> RevertibleMarket<'a> {
         let other = self.other_mut();
 
         msg!(
-            "[Balance to be committed] {}: {},{}(-{} {is_long_token})",
+            "[Balance updating] {}: {},{}(-{},{is_long_token})",
             mint,
             other.long_token_balance,
             other.short_token_balance,
@@ -153,6 +160,13 @@ impl<'a> RevertibleMarket<'a> {
                 .checked_sub(amount)
                 .ok_or(error!(CoreError::TokenAmountOverflow))?;
         }
+
+        msg!(
+            "[Balance updated (to be committed)] {}: {},{}",
+            mint,
+            other.long_token_balance,
+            other.short_token_balance
+        );
         Ok(())
     }
 
