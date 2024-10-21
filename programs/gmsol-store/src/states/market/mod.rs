@@ -419,7 +419,10 @@ impl Market {
     }
 
     /// As a liquidity market.
-    pub fn as_liquidity_market<'a>(&'a self, market_token: &'a Mint) -> AsLiquidityMarket<'a> {
+    pub fn as_liquidity_market<'a>(
+        &'a self,
+        market_token: &'a Mint,
+    ) -> AsLiquidityMarket<'a, Self> {
         AsLiquidityMarket::new(self, market_token)
     }
 

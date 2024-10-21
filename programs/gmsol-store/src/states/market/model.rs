@@ -5,7 +5,7 @@ use gmsol_model::{
         position::PositionImpactDistributionParams,
         FeeParams, PositionParams, PriceImpactParams,
     },
-    PoolKind,
+    BorrowingFeeMarket, PoolKind,
 };
 
 use crate::constants;
@@ -265,14 +265,14 @@ impl gmsol_model::PerpMarket<{ constants::MARKET_DECIMALS }> for Market {
 }
 
 /// As a liquidity market.
-pub struct AsLiquidityMarket<'a> {
-    market: &'a Market,
+pub struct AsLiquidityMarket<'a, M> {
+    market: &'a M,
     mint: &'a Mint,
 }
 
-impl<'a> AsLiquidityMarket<'a> {
+impl<'a, M> AsLiquidityMarket<'a, M> {
     /// Create a new [`AsLiquidityMarket`].
-    pub fn new(market: &'a Market, market_token: &'a Mint) -> Self {
+    pub fn new(market: &'a M, market_token: &'a Mint) -> Self {
         Self {
             market,
             mint: market_token,
@@ -280,7 +280,15 @@ impl<'a> AsLiquidityMarket<'a> {
     }
 }
 
-impl<'a> gmsol_model::BaseMarket<{ constants::MARKET_DECIMALS }> for AsLiquidityMarket<'a> {
+impl<'a, M> gmsol_model::BaseMarket<{ constants::MARKET_DECIMALS }> for AsLiquidityMarket<'a, M>
+where
+    M: gmsol_model::BaseMarket<
+        { constants::MARKET_DECIMALS },
+        Num = Self::Num,
+        Signed = Self::Signed,
+        Pool = Self::Pool,
+    >,
+{
     type Num = u128;
 
     type Signed = i128;
@@ -332,8 +340,10 @@ impl<'a> gmsol_model::BaseMarket<{ constants::MARKET_DECIMALS }> for AsLiquidity
     }
 }
 
-impl<'a> gmsol_model::PositionImpactMarket<{ constants::MARKET_DECIMALS }>
-    for AsLiquidityMarket<'a>
+impl<'a, M> gmsol_model::PositionImpactMarket<{ constants::MARKET_DECIMALS }>
+    for AsLiquidityMarket<'a, M>
+where
+    M: gmsol_model::PositionImpactMarket<{ constants::MARKET_DECIMALS }>,
 {
     fn position_impact_pool(&self) -> gmsol_model::Result<&Self::Pool> {
         self.market.position_impact_pool()
@@ -355,7 +365,11 @@ impl<'a> gmsol_model::PositionImpactMarket<{ constants::MARKET_DECIMALS }>
     }
 }
 
-impl<'a> gmsol_model::BorrowingFeeMarket<{ constants::MARKET_DECIMALS }> for AsLiquidityMarket<'a> {
+impl<'a, M> gmsol_model::BorrowingFeeMarket<{ constants::MARKET_DECIMALS }>
+    for AsLiquidityMarket<'a, M>
+where
+    M: BorrowingFeeMarket<{ constants::MARKET_DECIMALS }>,
+{
     fn borrowing_factor_pool(&self) -> gmsol_model::Result<&Self::Pool> {
         self.market.borrowing_factor_pool()
     }
@@ -373,7 +387,9 @@ impl<'a> gmsol_model::BorrowingFeeMarket<{ constants::MARKET_DECIMALS }> for AsL
     }
 }
 
-impl<'a> gmsol_model::LiquidityMarket<{ constants::MARKET_DECIMALS }> for AsLiquidityMarket<'a> {
+impl<'a, M> gmsol_model::LiquidityMarket<{ constants::MARKET_DECIMALS }>
+    for AsLiquidityMarket<'a, M>
+{
     fn total_supply(&self) -> Self::Num {
         self.mint.supply.into()
     }
