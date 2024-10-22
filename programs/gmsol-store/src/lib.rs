@@ -1362,8 +1362,9 @@ pub mod gmsol_store {
     pub fn initalize_glv<'info>(
         ctx: Context<'_, '_, 'info, 'info, InitializeGlv<'info>>,
         index: u8,
+        length: u16,
     ) -> Result<()> {
-        instructions::unchecked_initialize_glv(ctx, index)
+        instructions::unchecked_initialize_glv(ctx, index, length as usize)
     }
 
     /// Create GLV deposit.
@@ -1698,8 +1699,10 @@ pub enum CoreError {
     #[msg("disabled market")]
     DisabledMarket,
     /* Errors for GLV */
+    /// Failed to calculate GLV value for market.
     #[msg("failed to calculate glv value for this market")]
     FailedToCalculateGlvValueForMarket,
+    /// Failed to calculate GLV amount to mint.
     #[msg("failed to calculate glv amount to mint")]
     FailedToCalculateGlvAmountToMint,
 }

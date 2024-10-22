@@ -54,6 +54,38 @@ pub fn validate_token_account<'info>(
     Ok(())
 }
 
+/// Validate associated token account.
+pub fn validate_associated_token_account<'info>(
+    account: &impl AsRef<AccountInfo<'info>>,
+    expected_owner: &Pubkey,
+    expected_mint: &Pubkey,
+    token_program_id: &Pubkey,
+) -> Result<()> {
+    use anchor_spl::token::accessor;
+
+    validate_token_account(account, token_program_id)?;
+
+    let info = account.as_ref();
+
+    let mint = accessor::mint(info)?;
+    require_eq!(mint, *expected_mint, ErrorCode::ConstraintTokenMint);
+
+    let owner = accessor::authority(info)?;
+    require_eq!(owner, *expected_owner, ErrorCode::ConstraintTokenOwner);
+
+    require!(
+        is_associated_token_account_with_program_id(
+            info.key,
+            expected_owner,
+            expected_mint,
+            token_program_id
+        ),
+        ErrorCode::AccountNotAssociatedTokenAccount
+    );
+
+    Ok(())
+}
+
 #[derive(TypedBuilder)]
 pub struct TransferAllFromEscrowToATA<'a, 'info> {
     system_program: AccountInfo<'info>,

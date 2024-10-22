@@ -674,15 +674,18 @@ pub(crate) fn unchecked_execute_glv_deposit<'info>(
     let accounts = ctx.accounts;
     let remaining_accounts = ctx.remaining_accounts;
 
+    let glv_address = accounts.glv_deposit.key();
     let SplitAccountsForGlv {
         markets,
         market_tokens,
         market_token_vaults,
         remaining_accounts,
-    } = accounts
-        .glv
-        .load()?
-        .validate_and_split_remaining_accounts(&accounts.store.key(), remaining_accounts)?;
+    } = accounts.glv.load()?.validate_and_split_remaining_accounts(
+        &glv_address,
+        &accounts.store.key(),
+        accounts.token_program.key,
+        remaining_accounts,
+    )?;
 
     let signer = accounts.glv_deposit.load()?.signer();
     accounts.transfer_tokens_in(&signer, remaining_accounts)?;

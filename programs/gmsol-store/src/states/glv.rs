@@ -1,9 +1,10 @@
-use std::collections::HashSet;
+use std::collections::BTreeSet;
 
 use anchor_lang::prelude::*;
 
 use crate::{
     states::{Deposit, Market},
+    utils::token::validate_associated_token_account,
     CoreError,
 };
 
@@ -91,7 +92,7 @@ impl Glv {
         glv_token: &Pubkey,
         long_token: &Pubkey,
         short_token: &Pubkey,
-        market_tokens: &HashSet<Pubkey>,
+        market_tokens: &BTreeSet<Pubkey>,
     ) -> Result<()> {
         let expected_glv_token = Self::find_glv_token_pda(store, index, &crate::ID).0;
         require_eq!(expected_glv_token, *glv_token, CoreError::InvalidArgument);
@@ -120,15 +121,14 @@ impl Glv {
     pub(crate) fn process_and_validate_markets_for_init<'info>(
         markets: &'info [AccountInfo<'info>],
         store: &Pubkey,
-    ) -> Result<(Pubkey, Pubkey, HashSet<Pubkey>)> {
+    ) -> Result<(Pubkey, Pubkey, BTreeSet<Pubkey>)> {
         let mut tokens = None;
 
-        let mut market_tokens = HashSet::default();
+        let mut market_tokens = BTreeSet::default();
         for market in unpack_markets(markets) {
             let market = market?;
             let market = market.load()?;
-            market.validate(store)?;
-            let meta = market.meta();
+            let meta = market.validated_meta(store)?;
             match &mut tokens {
                 Some((long_token, short_token)) => {
                     require_eq!(
@@ -153,6 +153,7 @@ impl Glv {
         }
 
         if let Some((long_token, short_token)) = tokens {
+            require_eq!(markets.len(), market_tokens.len(), CoreError::Internal);
             Ok((long_token, short_token, market_tokens))
         } else {
             err!(CoreError::InvalidArgument)
@@ -197,7 +198,9 @@ impl Glv {
     /// Split remaining accounts.
     pub(crate) fn validate_and_split_remaining_accounts<'info>(
         &self,
+        address: &Pubkey,
         store: &Pubkey,
+        token_program_id: &Pubkey,
         remaining_accounts: &'info [AccountInfo<'info>],
     ) -> Result<SplitAccountsForGlv<'info>> {
         let len = self.num_markets as usize;
@@ -220,6 +223,7 @@ impl Glv {
         for idx in 0..len {
             let market = &markets[idx];
             let market_token = &market_tokens[idx];
+            let market_token_vault = &market_token_vaults[idx];
             let expected_market_token = &self.market_tokens[idx];
 
             require_eq!(
@@ -227,6 +231,7 @@ impl Glv {
                 *expected_market_token,
                 CoreError::MarketTokenMintMismatched
             );
+
             {
                 let mint = Account::<anchor_spl::token::Mint>::try_from(market_token)?;
                 require!(
@@ -234,6 +239,7 @@ impl Glv {
                     CoreError::StoreMismatched
                 );
             }
+
             {
                 let market = AccountLoader::<Market>::try_from(market)?;
                 require_eq!(
@@ -242,6 +248,13 @@ impl Glv {
                     CoreError::MarketTokenMintMismatched
                 );
             }
+
+            validate_associated_token_account(
+                market_token_vault,
+                address,
+                market_token.key,
+                token_program_id,
+            )?;
         }
 
         Ok(SplitAccountsForGlv {

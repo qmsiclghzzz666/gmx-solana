@@ -20,7 +20,7 @@ async fn initialize_glv() -> eyre::Result<()> {
         .expect("must exist");
 
     let index = 255;
-    let (rpc, glv_token) = keeper.initialize_glv(store, 255, [*market_token_1, *market_token_2]);
+    let (rpc, glv_token) = keeper.initialize_glv(store, 255, [*market_token_1, *market_token_2])?;
     let signature = rpc.send_without_preflight().await?;
     tracing::info!(%signature, %index, %glv_token, "initalized a new GLV token");
 
