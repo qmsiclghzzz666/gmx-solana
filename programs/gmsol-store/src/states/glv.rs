@@ -66,7 +66,7 @@ impl Glv {
         Pubkey::find_program_address(&[Self::SEED, glv_token.as_ref()], program_id)
     }
 
-    pub(crate) fn signer_seeds(&self) -> [&[u8]; 3] {
+    pub(crate) fn _signer_seeds(&self) -> [&[u8]; 3] {
         [Self::SEED, self.glv_token().as_ref(), &self.bump_bytes]
     }
 

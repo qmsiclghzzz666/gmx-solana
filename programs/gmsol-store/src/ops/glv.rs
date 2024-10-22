@@ -216,6 +216,7 @@ pub(crate) struct ExecuteGlvDepositOperation<'a, 'info> {
     glv_token_receiver: AccountInfo<'info>,
     market: AccountLoader<'info, Market>,
     market_token_mint: &'a mut Account<'info, Mint>,
+    market_token_source: AccountInfo<'info>,
     market_token_vault: AccountInfo<'info>,
     markets: &'info [AccountInfo<'info>],
     market_tokens: &'info [AccountInfo<'info>],
@@ -286,12 +287,13 @@ impl<'a, 'info> ExecuteGlvDepositOperation<'a, 'info> {
         Ok(())
     }
 
+    #[inline(never)]
     fn perform_glv_deposit(self) -> Result<()> {
         use gmsol_model::utils::usd_to_market_token_amount;
 
         self.validate_market_and_glv_deposit()?;
 
-        {
+        let glv_amount = {
             let deposit = self.glv_deposit.load()?;
             let mut market_token_amount = deposit.params.market_token_amount;
 
@@ -300,7 +302,7 @@ impl<'a, 'info> ExecuteGlvDepositOperation<'a, 'info> {
                 self.oracle,
                 &self.market,
                 self.market_token_mint,
-                self.token_program,
+                self.token_program.clone(),
                 Some(&deposit.swap),
                 self.remaining_accounts,
             )?;
@@ -354,21 +356,70 @@ impl<'a, 'info> ExecuteGlvDepositOperation<'a, 'info> {
                 u64::try_from(glv_amount).map_err(|_| error!(CoreError::TokenAmountOverflow))?
             };
 
-            // Mint GLV token to the receiver.
-            if glv_amount != 0 {
-                TransferUtils::new(
-                    self.glv_token_program,
-                    &self.store,
-                    self.glv_token_mint.to_account_info(),
-                )
-                .mint_to(&self.glv_token_receiver, glv_amount)
-                .expect("failed to mint glv tokens");
-            }
-
             op.commit();
+
+            glv_amount
+        };
+
+        // Invertible operations after the commitment.
+        {
+            // Complete the market tokens trasfer.
+            self.transfer_market_tokens_in();
+
+            // Mint GLV token to the receiver.
+            self.mint_glv_tokens(glv_amount);
         }
 
         Ok(())
+    }
+
+    /// Mint GLV tokens to target account.
+    ///
+    /// # Panic
+    /// This is an invertible operation that will panic on error.
+    fn mint_glv_tokens(&self, glv_amount: u64) {
+        if glv_amount != 0 {
+            TransferUtils::new(
+                self.glv_token_program.clone(),
+                &self.store,
+                self.glv_token_mint.to_account_info(),
+            )
+            .mint_to(&self.glv_token_receiver, glv_amount)
+            .expect("failed to mint glv tokens");
+        }
+    }
+
+    /// Transfer market tokens to vault.
+    ///
+    /// # Panic
+    /// This is an invertible operation that will panic on error.
+    fn transfer_market_tokens_in(&self) {
+        use anchor_spl::token_interface::{transfer_checked, TransferChecked};
+
+        let deposit = self.glv_deposit.load().expect("must have been checked");
+        let signer = deposit.signer();
+
+        let amount = deposit.params.market_token_amount;
+        if amount != 0 {
+            let token = &*self.market_token_mint;
+            let from = &self.market_token_source;
+            let to = &self.market_token_vault;
+            let ctx = CpiContext::new(
+                self.token_program.to_account_info(),
+                TransferChecked {
+                    from: from.to_account_info(),
+                    mint: token.to_account_info(),
+                    to: to.to_account_info(),
+                    authority: self.glv_deposit.to_account_info(),
+                },
+            );
+            transfer_checked(
+                ctx.with_signer(&[&signer.as_seeds()]),
+                amount,
+                token.decimals,
+            )
+            .expect("failed to transfer market tokens");
+        }
     }
 }
 
@@ -414,6 +465,9 @@ impl<'a, 'info> ValidateOracleTime for ExecuteGlvDepositOperation<'a, 'info> {
 /// # CHECK
 /// TODO: basically one must make sure that `glv_markets`,
 /// `glv_market_tokens` and `glv_market_token_valuts` are aligned.
+///
+/// # Errors
+///
 fn unchecked_get_glv_value<'info>(
     oracle: &Oracle,
     op: &Execute<'_, 'info>,
@@ -442,8 +496,8 @@ fn unchecked_get_glv_value<'info>(
         let balance = u128::from(accessor::amount(vault)?);
 
         let value_for_market = if key == current_market.key() {
-            // FIXME: should we deduct the amount direct trasnferred before the execution?
             let market = current_market;
+            // Note that we should use the balance prior to the operation.
             get_glv_value_for_market(oracle, &mut prices, market, balance, true)?
         } else if let Some(market) = swap_markets.get(&key) {
             let mint = Account::<Mint>::try_from(market_token)?;

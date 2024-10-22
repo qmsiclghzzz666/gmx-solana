@@ -736,68 +736,15 @@ impl<'info> ExecuteGlvDeposit<'info> {
         signer: &ActionSigner,
         remaining_accounts: &'info [AccountInfo<'info>],
     ) -> Result<()> {
-        self.transfer_market_tokens_in(signer)?;
+        // self.transfer_market_tokens_in(signer)?;
         self.transfer_initial_tokens_in(signer, remaining_accounts)?;
         Ok(())
     }
 
     #[inline(never)]
     fn transfer_tokens_out(&self, remaining_accounts: &'info [AccountInfo<'info>]) -> Result<()> {
-        self.transfer_market_tokens_out()?;
+        // self.transfer_market_tokens_out()?;
         self.transfer_initial_tokens_out(remaining_accounts)?;
-        Ok(())
-    }
-
-    fn transfer_market_tokens_in(&self, signer: &ActionSigner) -> Result<()> {
-        use anchor_spl::token_interface::{transfer_checked, TransferChecked};
-
-        let amount = self.glv_deposit.load()?.params.market_token_amount;
-        if amount != 0 {
-            let token = &self.market_token;
-            let from = &self.market_token_escrow;
-            let to = &self.market_token_vault;
-            let ctx = CpiContext::new(
-                self.token_program.to_account_info(),
-                TransferChecked {
-                    from: from.to_account_info(),
-                    mint: token.to_account_info(),
-                    to: to.to_account_info(),
-                    authority: self.glv_deposit.to_account_info(),
-                },
-            );
-            transfer_checked(
-                ctx.with_signer(&[&signer.as_seeds()]),
-                amount,
-                token.decimals,
-            )?;
-        }
-        Ok(())
-    }
-
-    fn transfer_market_tokens_out(&self) -> Result<()> {
-        use anchor_spl::token_interface::{transfer_checked, TransferChecked};
-
-        let amount = self.glv_deposit.load()?.params.market_token_amount;
-        if amount != 0 {
-            let token = &self.market_token;
-            let from = &self.market_token_vault;
-            let to = &self.market_token_escrow;
-            let ctx = CpiContext::new(
-                self.token_program.to_account_info(),
-                TransferChecked {
-                    from: from.to_account_info(),
-                    mint: token.to_account_info(),
-                    to: to.to_account_info(),
-                    authority: self.glv.to_account_info(),
-                },
-            );
-            let glv = self.glv.load()?;
-            transfer_checked(
-                ctx.with_signer(&[&glv.signer_seeds()]),
-                amount,
-                token.decimals,
-            )?;
-        }
         Ok(())
     }
 
@@ -949,6 +896,7 @@ impl<'info> ExecuteGlvDeposit<'info> {
             .glv_token_mint(&mut self.glv_token)
             .glv_token_receiver(self.glv_token_escrow.to_account_info())
             .market(self.market.clone())
+            .market_token_source(self.market_token_escrow.to_account_info())
             .market_token_mint(&mut self.market_token)
             .market_token_vault(self.market_token_vault.to_account_info())
             .markets(markets)
