@@ -4,7 +4,7 @@ use gmsol_store::{
     states::{
         position::PositionKind,
         user::{ReferralCode, ReferralCodeBytes, UserHeader},
-        Deposit, NonceBytes, Oracle, Order, Position, Seed, Shift, Store, Withdrawal,
+        Deposit, GlvDeposit, NonceBytes, Oracle, Order, Position, Seed, Shift, Store, Withdrawal,
     },
 };
 use gmsol_utils::to_seed;
@@ -209,6 +209,19 @@ pub fn find_referral_code_pda(
 ) -> (Pubkey, u8) {
     Pubkey::find_program_address(
         &[ReferralCode::SEED, store.as_ref(), &code],
+        store_program_id,
+    )
+}
+
+/// Find the PDA for a GLV deposit account.
+pub fn find_glv_deposit_pda(
+    store: &Pubkey,
+    owner: &Pubkey,
+    nonce: &NonceBytes,
+    store_program_id: &Pubkey,
+) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[GlvDeposit::SEED, store.as_ref(), owner.as_ref(), nonce],
         store_program_id,
     )
 }

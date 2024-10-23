@@ -39,6 +39,7 @@ pub trait TokenAccountOps<C> {
         &self,
         mint: &Pubkey,
         token_program_id: &Pubkey,
+        owner: Option<&Pubkey>,
     ) -> RpcBuilder<C>;
 }
 
@@ -96,13 +97,15 @@ where
         &self,
         mint: &Pubkey,
         token_program_id: &Pubkey,
+        owner: Option<&Pubkey>,
     ) -> RpcBuilder<C> {
-        let account =
-            get_associated_token_address_with_program_id(&self.payer(), mint, token_program_id);
+        let payer = self.payer();
+        let owner = owner.copied().unwrap_or(payer);
+        let account = get_associated_token_address_with_program_id(&owner, mint, token_program_id);
         self.store_rpc()
             .accounts(accounts::PrepareAssociatedTokenAccount {
-                payer: self.payer(),
-                owner: self.payer(),
+                payer,
+                owner,
                 mint: *mint,
                 account,
                 system_program: system_program::ID,

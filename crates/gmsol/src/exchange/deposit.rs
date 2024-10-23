@@ -33,7 +33,6 @@ pub struct CreateDepositBuilder<'a, C> {
     client: &'a crate::Client<C>,
     store: Pubkey,
     market_token: Pubkey,
-    receiver: Option<Pubkey>,
     execution_fee: u64,
     long_token_swap_path: Vec<Pubkey>,
     short_token_swap_path: Vec<Pubkey>,
@@ -45,7 +44,6 @@ pub struct CreateDepositBuilder<'a, C> {
     initial_short_token_amount: u64,
     min_market_token: u64,
     nonce: Option<NonceBytes>,
-    token_map: Option<Pubkey>,
 }
 
 impl<'a, C, S> CreateDepositBuilder<'a, C>
@@ -59,7 +57,6 @@ where
             store,
             nonce: None,
             market_token,
-            receiver: None,
             execution_fee: Deposit::MIN_EXECUTION_LAMPORTS,
             long_token_swap_path: vec![],
             short_token_swap_path: vec![],
@@ -70,16 +67,7 @@ where
             initial_long_token_amount: 0,
             initial_short_token_amount: 0,
             min_market_token: 0,
-            token_map: None,
         }
-    }
-
-    /// Set the token account for receiving minted market tokens.
-    ///
-    /// Defaults to use associated token account.
-    pub fn receiver(&mut self, token_account: &Pubkey) -> &mut Self {
-        self.receiver = Some(*token_account);
-        self
     }
 
     /// Set min market token to mint.
@@ -187,12 +175,6 @@ where
         self.initial_short_token = token.cloned();
         self.initial_short_token_amount = amount;
         self.initial_short_token_account = token_account.copied();
-        self
-    }
-
-    /// Set token map address.
-    pub fn token_map(&mut self, address: Pubkey) -> &mut Self {
-        self.token_map = Some(address);
         self
     }
 

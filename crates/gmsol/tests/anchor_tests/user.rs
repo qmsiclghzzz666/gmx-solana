@@ -21,7 +21,7 @@ async fn referral() -> eyre::Result<()> {
     tracing::info!(%signature, "prepared user account for user 1");
 
     let signature = client
-        .prepare_associated_token_account(&deployment.gt, &anchor_spl::token_2022::ID)
+        .prepare_associated_token_account(&deployment.gt, &anchor_spl::token_2022::ID, None)
         .send_without_preflight()
         .await?;
     tracing::info!(%signature, "prepared GT ATA account for user 1");

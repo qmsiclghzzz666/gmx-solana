@@ -321,14 +321,24 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         crate::pda::find_referral_code_pda(store, code, &self.store_program_id()).0
     }
 
-    /// Find Glv token address.
+    /// Find GLV token address.
     pub fn find_glv_token_address(&self, store: &Pubkey, index: u8) -> Pubkey {
         types::Glv::find_glv_token_pda(store, index, &self.store_program_id()).0
     }
 
-    /// Find Glv address.
+    /// Find GLV address.
     pub fn find_glv_address(&self, glv_token: &Pubkey) -> Pubkey {
         types::Glv::find_glv_pda(glv_token, &self.store_program_id()).0
+    }
+
+    /// Find GLV deposit address.
+    pub fn find_glv_deposit_address(
+        &self,
+        store: &Pubkey,
+        owner: &Pubkey,
+        nonce: &NonceBytes,
+    ) -> Pubkey {
+        crate::pda::find_glv_deposit_pda(store, owner, nonce, &self.store_program_id()).0
     }
 
     /// Get slot.

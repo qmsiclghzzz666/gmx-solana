@@ -625,7 +625,7 @@ where
     }
 }
 
-fn generate_nonce() -> NonceBytes {
+pub(crate) fn generate_nonce() -> NonceBytes {
     rand::thread_rng()
         .sample_iter(Standard)
         .take(32)

@@ -62,7 +62,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> ClaimFeesBuilder<'a, C> {
 
         let prepare = self
             .client
-            .prepare_associated_token_account(&token, &token_program);
+            .prepare_associated_token_account(&token, &token_program, None);
 
         let rpc = self
             .client

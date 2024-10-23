@@ -13,16 +13,47 @@ async fn initialize_glv() -> eyre::Result<()> {
     let keeper = deployment.user_client(Deployment::DEFAULT_KEEPER)?;
 
     let market_token_1 = deployment
-        .market_token("fBTC", "fBTC", "USDG")
+        .market_token("fBTC", "WSOL", "USDG")
         .expect("must exist");
     let market_token_2 = deployment
-        .market_token("SOL", "fBTC", "USDG")
+        .market_token("SOL", "WSOL", "USDG")
         .expect("must exist");
 
     let index = 255;
     let (rpc, glv_token) = keeper.initialize_glv(store, 255, [*market_token_1, *market_token_2])?;
     let signature = rpc.send_without_preflight().await?;
-    tracing::info!(%signature, %index, %glv_token, "initalized a new GLV token");
+    tracing::info!(%signature, %index, %glv_token, "initialized a new GLV token");
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn glv_deposit() -> eyre::Result<()> {
+    let deployment = current_deployment().await?;
+    let _guard = deployment.use_accounts().await?;
+    let span = tracing::info_span!("glv_deposit");
+    let _enter = span.enter();
+
+    let user = deployment.user_client(Deployment::DEFAULT_USER)?;
+    let _keeper = deployment.user_client(Deployment::DEFAULT_KEEPER)?;
+
+    let store = &deployment.store;
+    let glv_token = &deployment.glv_token;
+    let market_token = deployment.market_token("fBTC", "fBTC", "USDG").unwrap();
+
+    let long_token_amount = 1_000;
+
+    deployment
+        .mint_or_transfer_to_user("fBTC", Deployment::DEFAULT_USER, long_token_amount + 14)
+        .await?;
+
+    let (rpc, deposit) = user
+        .create_glv_deposit(store, glv_token, market_token)
+        .long_token_deposit(long_token_amount, None, None)
+        .build_with_address()
+        .await?;
+    let signature = rpc.send_without_preflight().await?;
+    tracing::info!(%signature, %deposit, "created a glv deposit");
 
     Ok(())
 }

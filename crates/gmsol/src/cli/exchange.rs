@@ -28,11 +28,6 @@ enum Command {
         /// Extra execution fee allowed to use.
         #[arg(long, short, default_value_t = 0)]
         extra_execution_fee: u64,
-        /// The token account to receive the minted market tokens.
-        ///
-        /// Defaults to use assciated token account.
-        #[arg(long, short)]
-        receiver: Option<Pubkey>,
         /// Minimum amount of market tokens to mint.
         #[arg(long, default_value_t = 0)]
         min_amount: u64,
@@ -343,7 +338,6 @@ impl ExchangeArgs {
             Command::CreateDeposit {
                 extra_execution_fee,
                 market_token,
-                receiver,
                 min_amount,
                 long_token,
                 short_token,
@@ -355,9 +349,6 @@ impl ExchangeArgs {
                 short_swap,
             } => {
                 let mut builder = client.create_deposit(store, market_token);
-                if let Some(receiver) = receiver {
-                    builder.receiver(receiver);
-                }
                 if *long_token_amount != 0 {
                     builder.long_token(
                         *long_token_amount,

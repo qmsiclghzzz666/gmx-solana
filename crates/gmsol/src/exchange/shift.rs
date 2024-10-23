@@ -134,9 +134,11 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateShiftBuilder<'a, C> {
             })
             .args(instruction::PrepareShiftEscrow { nonce });
 
-        let prepare_ata = self
-            .client
-            .prepare_associated_token_account(&self.to_market_token, &anchor_spl::token::ID);
+        let prepare_ata = self.client.prepare_associated_token_account(
+            &self.to_market_token,
+            &anchor_spl::token::ID,
+            None,
+        );
 
         let rpc = self
             .client

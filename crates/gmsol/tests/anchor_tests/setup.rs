@@ -30,8 +30,8 @@ use gmsol::{
     exchange::ExchangeOps,
     pyth::{pull_oracle::ExecuteWithPythPrices, Hermes, PythPullOracle},
     store::{
-        gt::GTOps, market::MarketOps, oracle::OracleOps, roles::RolesOps, store_ops::StoreOps,
-        token_config::TokenConfigOps,
+        glv::GlvOps, gt::GTOps, market::MarketOps, oracle::OracleOps, roles::RolesOps,
+        store_ops::StoreOps, token_config::TokenConfigOps,
     },
     types::{FactorKey, MarketConfigKey, PriceProviderKind, RoleKey, TokenConfigBuilder},
     utils::{shared_signer, SignerRef, TransactionBuilder},
@@ -75,6 +75,8 @@ pub struct Deployment {
     pub oracle_index: u8,
     /// Oracle.
     pub oracle: Pubkey,
+    /// GLV mint.
+    pub glv_token: Pubkey,
     /// GT mint.
     pub gt: Pubkey,
     /// Tokens.
@@ -97,6 +99,8 @@ impl fmt::Debug for Deployment {
             .field("store", &self.store)
             .field("token_map", &self.token_map.pubkey())
             .field("oracle", &self.oracle)
+            .field("glv", &self.glv_token)
+            .field("gt", &self.gt)
             .field("tokens", &self.tokens)
             .field("synthetic_tokens", &self.synthetic_tokens)
             .finish_non_exhaustive()
@@ -161,6 +165,7 @@ impl Deployment {
             token_map,
             oracle_index,
             oracle,
+            glv_token: Default::default(),
             gt: Default::default(),
             tokens: Default::default(),
             synthetic_tokens: Default::default(),
@@ -239,6 +244,7 @@ impl Deployment {
             Self::SELECT_FIRST_DEPOSIT_MARKET,
         ])
         .await?;
+        self.initialize_glv("fBTC", "USDG").await?;
 
         self.initialize_alts().await?;
 
@@ -699,6 +705,30 @@ impl Deployment {
 
         tracing::info!(len=%addresses.len(), %signature, "market ALT extended");
         self.market_alt.addresses = addresses;
+
+        Ok(())
+    }
+
+    async fn initialize_glv(&mut self, long_token: &str, short_token: &str) -> eyre::Result<()> {
+        let keeper = self.user_client(Self::DEFAULT_KEEPER)?;
+
+        let market_tokens = self
+            .market_tokens
+            .iter()
+            .filter_map(|([_, long, short], address)| {
+                if long == long_token && short == short_token {
+                    Some(*address)
+                } else {
+                    None
+                }
+            });
+
+        let (rpc, glv_token) = keeper.initialize_glv(&self.store, 0, market_tokens)?;
+
+        let signature = rpc.send_without_preflight().await?;
+        tracing::info!(%signature, %glv_token, "initialized a new GLV token");
+
+        self.glv_token = glv_token;
 
         Ok(())
     }
