@@ -399,6 +399,11 @@ impl GlvDeposit {
     pub fn tokens(&self) -> &TokenAccounts {
         &self.tokens
     }
+
+    /// Get swap params.
+    pub fn swap(&self) -> &SwapParams {
+        &self.swap
+    }
 }
 
 /// Token Accounts.

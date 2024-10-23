@@ -13,6 +13,7 @@ mod deposit;
 
 pub use self::deposit::{
     CloseGlvDepositBuilder, CloseGlvDepositHint, CreateGlvDepositBuilder, CreateGlvDepositHint,
+    ExecuteGlvDepositBuilder, ExecuteGlvDepositHint,
 };
 
 /// Glv Operations.
@@ -35,6 +36,14 @@ pub trait GlvOps<C> {
 
     /// Close a GLV deposit.
     fn close_glv_deposit(&self, glv_deposit: &Pubkey) -> CloseGlvDepositBuilder<C>;
+
+    /// Execute the given GLV deposit.
+    fn execute_glv_deposit(
+        &self,
+        oracle: &Pubkey,
+        glv_deposit: &Pubkey,
+        cancel_on_execution_error: bool,
+    ) -> ExecuteGlvDepositBuilder<C>;
 }
 
 impl<C: Deref<Target = impl Signer> + Clone> GlvOps<C> for crate::Client<C> {
@@ -90,6 +99,15 @@ impl<C: Deref<Target = impl Signer> + Clone> GlvOps<C> for crate::Client<C> {
 
     fn close_glv_deposit(&self, glv_deposit: &Pubkey) -> CloseGlvDepositBuilder<C> {
         CloseGlvDepositBuilder::new(self, *glv_deposit)
+    }
+
+    fn execute_glv_deposit(
+        &self,
+        oracle: &Pubkey,
+        glv_deposit: &Pubkey,
+        cancel_on_execution_error: bool,
+    ) -> ExecuteGlvDepositBuilder<C> {
+        ExecuteGlvDepositBuilder::new(self, *oracle, *glv_deposit, cancel_on_execution_error)
     }
 }
 

@@ -1,21 +1,28 @@
 use std::ops::Deref;
 
 use anchor_client::{
-    anchor_lang::{prelude::AccountMeta, system_program},
+    anchor_lang::{prelude::AccountMeta, system_program, Id},
     solana_sdk::{pubkey::Pubkey, signer::Signer},
 };
 use anchor_spl::associated_token::get_associated_token_address_with_program_id;
 use gmsol_store::{
     accounts, instruction,
     ops::glv::CreateGlvDepositParams,
-    states::{common::action::Action, GlvDeposit, HasMarketMeta, NonceBytes},
+    states::{
+        common::{action::Action, swap::SwapParams, TokensWithFeed},
+        GlvDeposit, HasMarketMeta, NonceBytes, Pyth, TokenMapAccess,
+    },
 };
 
 use crate::{
     exchange::generate_nonce,
-    store::token::TokenAccountOps,
-    utils::{RpcBuilder, ZeroCopy},
+    store::{token::TokenAccountOps, utils::FeedsParser},
+    utils::{ComputeBudget, RpcBuilder, ZeroCopy},
 };
+
+use super::GlvOps;
+
+pub const EXECUTE_GLV_DEPOSIT_COMPUTE_BUDGET: u32 = 400_000;
 
 /// Create GLV deposit builder.
 pub struct CreateGlvDepositBuilder<'a, C> {
@@ -473,5 +480,279 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CloseGlvDepositBuilder<'a, C> {
             });
 
         Ok(rpc)
+    }
+}
+
+/// Execute GLV deposit builder.
+pub struct ExecuteGlvDepositBuilder<'a, C> {
+    client: &'a crate::Client<C>,
+    oracle: Pubkey,
+    price_provider: Pubkey,
+    glv_deposit: Pubkey,
+    execution_lamports: u64,
+    cancel_on_execution_error: bool,
+    hint: Option<ExecuteGlvDepositHint>,
+    token_map: Option<Pubkey>,
+    feeds_parser: FeedsParser,
+    close: bool,
+}
+
+/// Hint for [`ExecuteGlvDepositBuilder`].
+#[derive(Clone)]
+pub struct ExecuteGlvDepositHint {
+    store: Pubkey,
+    token_map: Pubkey,
+    owner: Pubkey,
+    glv_token: Pubkey,
+    market_token: Pubkey,
+    initial_long_token: Option<Pubkey>,
+    initial_short_token: Option<Pubkey>,
+    market_token_escrow: Pubkey,
+    initial_long_token_escrow: Option<Pubkey>,
+    initial_short_token_escrow: Option<Pubkey>,
+    glv_token_escrow: Pubkey,
+    swap: SwapParams,
+    feeds: TokensWithFeed,
+}
+
+impl ExecuteGlvDepositHint {
+    /// Create from the GLV deposit.
+    pub fn new(
+        glv_deposit: &GlvDeposit,
+        token_map_address: &Pubkey,
+        token_map: &impl TokenMapAccess,
+    ) -> crate::Result<Self> {
+        Ok(Self {
+            store: *glv_deposit.header().store(),
+            token_map: *token_map_address,
+            owner: *glv_deposit.header().owner(),
+            glv_token: glv_deposit.tokens().glv_token(),
+            market_token: glv_deposit.tokens().market_token(),
+            initial_long_token: glv_deposit.tokens().initial_long_token.token(),
+            initial_short_token: glv_deposit.tokens().initial_short_token.token(),
+            market_token_escrow: glv_deposit.tokens().market_token_account(),
+            initial_long_token_escrow: glv_deposit.tokens().initial_long_token.account(),
+            initial_short_token_escrow: glv_deposit.tokens().initial_short_token.account(),
+            glv_token_escrow: glv_deposit.tokens().glv_token_account(),
+            swap: *glv_deposit.swap(),
+            feeds: glv_deposit.swap().to_feeds(token_map)?,
+        })
+    }
+}
+
+impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteGlvDepositBuilder<'a, C> {
+    pub(super) fn new(
+        client: &'a crate::Client<C>,
+        oracle: Pubkey,
+        glv_deposit: Pubkey,
+        cancel_on_execution_error: bool,
+    ) -> Self {
+        Self {
+            client,
+            oracle,
+            price_provider: Pyth::id(),
+            glv_deposit,
+            execution_lamports: 0,
+            cancel_on_execution_error,
+            hint: None,
+            token_map: None,
+            feeds_parser: Default::default(),
+            close: true,
+        }
+    }
+
+    /// Set execution fee.
+    pub fn execution_fee(&mut self, lamports: u64) -> &mut Self {
+        self.execution_lamports = lamports;
+        self
+    }
+
+    /// Set hint.
+    pub fn hint(&mut self, hint: ExecuteGlvDepositHint) -> &mut Self {
+        self.hint = Some(hint);
+        self
+    }
+
+    /// Set token map address.
+    pub fn token_map(&mut self, address: &Pubkey) -> &mut Self {
+        self.token_map = Some(*address);
+        self
+    }
+
+    /// Set whether to close the GLV deposit after execution.
+    pub fn close(&mut self, close: bool) -> &mut Self {
+        self.close = close;
+        self
+    }
+
+    /// Parse feeds with the given price udpates map.
+    #[cfg(feature = "pyth-pull-oracle")]
+    pub fn parse_with_pyth_price_updates(
+        &mut self,
+        price_updates: crate::pyth::pull_oracle::Prices,
+    ) -> &mut Self {
+        self.feeds_parser.with_pyth_price_updates(price_updates);
+        self
+    }
+
+    async fn prepare_hint(&mut self) -> crate::Result<ExecuteGlvDepositHint> {
+        match &self.hint {
+            Some(hint) => Ok(hint.clone()),
+            None => {
+                let glv_deposit = self
+                    .client
+                    .account::<ZeroCopy<GlvDeposit>>(&self.glv_deposit)
+                    .await?
+                    .ok_or(crate::Error::NotFound)?
+                    .0;
+                let store = glv_deposit.header().store();
+                let token_map_address = self
+                    .client
+                    .authorized_token_map_address(store)
+                    .await?
+                    .ok_or(crate::Error::NotFound)?;
+                let token_map = self.client.token_map(&token_map_address).await?;
+                let hint =
+                    ExecuteGlvDepositHint::new(&glv_deposit, &token_map_address, &token_map)?;
+                self.hint = Some(hint.clone());
+                Ok(hint)
+            }
+        }
+    }
+
+    /// Build.
+    pub async fn build(&mut self) -> crate::Result<RpcBuilder<'a, C>> {
+        let hint = self.prepare_hint().await?;
+
+        let token_program_id = anchor_spl::token::ID;
+        let glv_token_program_id = anchor_spl::token_2022::ID;
+
+        let authority = self.client.payer();
+        let glv = self.client.find_glv_address(&hint.glv_token);
+        let market = self
+            .client
+            .find_market_address(&hint.store, &hint.market_token);
+
+        let initial_long_token_vault = hint
+            .initial_long_token
+            .as_ref()
+            .map(|token| self.client.find_market_vault_address(&hint.store, token));
+        let initial_short_token_vault = hint
+            .initial_short_token
+            .as_ref()
+            .map(|token| self.client.find_market_vault_address(&hint.store, token));
+        let market_token_vault = get_associated_token_address_with_program_id(
+            &glv,
+            &hint.market_token,
+            &token_program_id,
+        );
+
+        let feeds = self
+            .feeds_parser
+            .parse(&hint.feeds)
+            .collect::<Result<Vec<_>, _>>()?;
+        let markets = hint
+            .swap
+            .unique_market_tokens_excluding_current(&hint.market_token)
+            .map(|mint| AccountMeta {
+                pubkey: self.client.find_market_address(&hint.store, mint),
+                is_signer: false,
+                is_writable: true,
+            });
+
+        let execute = self
+            .client
+            .store_rpc()
+            .accounts(accounts::ExecuteGlvDeposit {
+                authority,
+                store: hint.store,
+                token_map: hint.token_map,
+                price_provider: self.price_provider,
+                oracle: self.oracle,
+                glv,
+                market,
+                glv_deposit: self.glv_deposit,
+                glv_token: hint.glv_token,
+                market_token: hint.market_token,
+                initial_long_token: hint.initial_long_token,
+                initial_short_token: hint.initial_short_token,
+                glv_token_escrow: hint.glv_token_escrow,
+                market_token_escrow: hint.market_token_escrow,
+                initial_long_token_escrow: hint.initial_long_token_escrow,
+                initial_short_token_escrow: hint.initial_short_token_escrow,
+                initial_long_token_vault,
+                initial_short_token_vault,
+                market_token_vault,
+                token_program: token_program_id,
+                glv_token_program: glv_token_program_id,
+                system_program: system_program::ID,
+            })
+            .args(instruction::ExecuteGlvDeposit {
+                execution_lamports: self.execution_lamports,
+                throw_on_execution_error: !self.cancel_on_execution_error,
+            })
+            .accounts(feeds.into_iter().chain(markets).collect::<Vec<_>>())
+            .compute_budget(
+                ComputeBudget::default().with_limit(EXECUTE_GLV_DEPOSIT_COMPUTE_BUDGET),
+            );
+
+        if self.close {
+            let close = self
+                .client
+                .close_glv_deposit(&self.glv_deposit)
+                .reason("executed")
+                .hint(CloseGlvDepositHint {
+                    store: hint.store,
+                    owner: hint.owner,
+                    glv_token: hint.glv_token,
+                    market_token: hint.market_token,
+                    initial_long_token: hint.initial_long_token,
+                    initial_short_token: hint.initial_short_token,
+                    market_token_escrow: hint.market_token_escrow,
+                    initial_long_token_escrow: hint.initial_long_token_escrow,
+                    initial_short_token_escrow: hint.initial_short_token_escrow,
+                    glv_token_escrow: hint.glv_token_escrow,
+                })
+                .build()
+                .await?;
+            Ok(execute.merge(close))
+        } else {
+            Ok(execute)
+        }
+    }
+}
+
+#[cfg(feature = "pyth-pull-oracle")]
+mod pyth {
+    use crate::pyth::{
+        pull_oracle::{ExecuteWithPythPrices, Prices},
+        PythPullOracleContext,
+    };
+
+    use super::*;
+
+    impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteWithPythPrices<'a, C>
+        for ExecuteGlvDepositBuilder<'a, C>
+    {
+        fn set_execution_fee(&mut self, lamports: u64) {
+            self.execution_fee(lamports);
+        }
+
+        async fn context(&mut self) -> crate::Result<PythPullOracleContext> {
+            let hint = self.prepare_hint().await?;
+            let ctx = PythPullOracleContext::try_from_feeds(&hint.feeds)?;
+            Ok(ctx)
+        }
+
+        async fn build_rpc_with_price_updates(
+            &mut self,
+            price_updates: Prices,
+        ) -> crate::Result<Vec<crate::utils::RpcBuilder<'a, C, ()>>> {
+            let rpc = self
+                .parse_with_pyth_price_updates(price_updates)
+                .build()
+                .await?;
+            Ok(vec![rpc])
+        }
     }
 }

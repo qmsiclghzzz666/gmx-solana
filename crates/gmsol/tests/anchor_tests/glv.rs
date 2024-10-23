@@ -1,4 +1,5 @@
 use gmsol::store::glv::GlvOps;
+use tracing::Instrument;
 
 use crate::anchor_tests::setup::{current_deployment, Deployment};
 
@@ -35,9 +36,10 @@ async fn glv_deposit() -> eyre::Result<()> {
     let _enter = span.enter();
 
     let user = deployment.user_client(Deployment::DEFAULT_USER)?;
-    let _keeper = deployment.user_client(Deployment::DEFAULT_KEEPER)?;
+    let keeper = deployment.user_client(Deployment::DEFAULT_KEEPER)?;
 
     let store = &deployment.store;
+    let oracle = &deployment.oracle;
     let glv_token = &deployment.glv_token;
     let market_token = deployment.market_token("fBTC", "fBTC", "USDG").unwrap();
 
@@ -70,6 +72,12 @@ async fn glv_deposit() -> eyre::Result<()> {
         .await?;
     let signature = rpc.send_without_preflight().await?;
     tracing::info!(%signature, %deposit, "created a glv deposit again");
+
+    let mut rpc = keeper.execute_glv_deposit(oracle, &deposit, false);
+    deployment
+        .execute_with_pyth(&mut rpc, None, false, true)
+        .instrument(tracing::info_span!("executing glv deposit", glv_deposit=%deposit))
+        .await?;
 
     Ok(())
 }
