@@ -55,5 +55,21 @@ async fn glv_deposit() -> eyre::Result<()> {
     let signature = rpc.send_without_preflight().await?;
     tracing::info!(%signature, %deposit, "created a glv deposit");
 
+    let signature = user
+        .close_glv_deposit(&deposit)
+        .build()
+        .await?
+        .send_without_preflight()
+        .await?;
+    tracing::info!(%signature, %deposit, "cancelled a glv deposit");
+
+    let (rpc, deposit) = user
+        .create_glv_deposit(store, glv_token, market_token)
+        .long_token_deposit(long_token_amount, None, None)
+        .build_with_address()
+        .await?;
+    let signature = rpc.send_without_preflight().await?;
+    tracing::info!(%signature, %deposit, "created a glv deposit again");
+
     Ok(())
 }

@@ -23,7 +23,7 @@ use crate::{
     },
     utils::{
         internal::{self, Authentication},
-        token::is_associated_token_account,
+        token::{is_associated_token_account, is_associated_token_account_with_program_id},
     },
     CoreError,
 };
@@ -344,7 +344,7 @@ pub struct CloseGlvDeposit<'info> {
     /// CHECK: should be checked during the execution.
     #[account(
         mut,
-        constraint = is_associated_token_account(glv_token_ata.key, owner.key, &glv_token.key()) @ CoreError::NotAnATA,
+        constraint = is_associated_token_account_with_program_id(glv_token_ata.key, owner.key, &glv_token.key(), &glv_token_program.key()) @ CoreError::NotAnATA,
     )]
     pub glv_token_ata: UncheckedAccount<'info>,
     /// The system program.

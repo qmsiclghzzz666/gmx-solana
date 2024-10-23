@@ -11,7 +11,9 @@ use crate::utils::RpcBuilder;
 
 mod deposit;
 
-pub use self::deposit::{CreateGlvDepositBuilder, CreateGlvDepositHint};
+pub use self::deposit::{
+    CloseGlvDepositBuilder, CloseGlvDepositHint, CreateGlvDepositBuilder, CreateGlvDepositHint,
+};
 
 /// Glv Operations.
 pub trait GlvOps<C> {
@@ -30,6 +32,9 @@ pub trait GlvOps<C> {
         glv_token: &Pubkey,
         market_token: &Pubkey,
     ) -> CreateGlvDepositBuilder<C>;
+
+    /// Close a GLV deposit.
+    fn close_glv_deposit(&self, glv_deposit: &Pubkey) -> CloseGlvDepositBuilder<C>;
 }
 
 impl<C: Deref<Target = impl Signer> + Clone> GlvOps<C> for crate::Client<C> {
@@ -81,6 +86,10 @@ impl<C: Deref<Target = impl Signer> + Clone> GlvOps<C> for crate::Client<C> {
         market_token: &Pubkey,
     ) -> CreateGlvDepositBuilder<C> {
         CreateGlvDepositBuilder::new(self, *store, *glv_token, *market_token)
+    }
+
+    fn close_glv_deposit(&self, glv_deposit: &Pubkey) -> CloseGlvDepositBuilder<C> {
+        CloseGlvDepositBuilder::new(self, *glv_deposit)
     }
 }
 

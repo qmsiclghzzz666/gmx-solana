@@ -394,6 +394,11 @@ impl GlvDeposit {
 
         Ok(())
     }
+
+    /// Get token infos.
+    pub fn tokens(&self) -> &TokenAccounts {
+        &self.tokens
+    }
 }
 
 /// Token Accounts.
