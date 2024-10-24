@@ -1,8 +1,11 @@
-use std::ops::Deref;
+use std::{
+    collections::{BTreeSet, HashMap},
+    ops::Deref,
+};
 
 use anchor_client::{
     anchor_lang::{prelude::AccountMeta, system_program, Id},
-    solana_sdk::{pubkey::Pubkey, signer::Signer},
+    solana_sdk::{address_lookup_table::AddressLookupTableAccount, pubkey::Pubkey, signer::Signer},
 };
 use anchor_spl::associated_token::get_associated_token_address_with_program_id;
 use gmsol_store::{
@@ -10,7 +13,7 @@ use gmsol_store::{
     ops::glv::CreateGlvDepositParams,
     states::{
         common::{action::Action, swap::SwapParams, TokensWithFeed},
-        GlvDeposit, HasMarketMeta, NonceBytes, Pyth, TokenMapAccess,
+        Glv, GlvDeposit, HasMarketMeta, NonceBytes, Pyth, TokenMapAccess,
     },
 };
 
@@ -20,7 +23,7 @@ use crate::{
     utils::{ComputeBudget, RpcBuilder, ZeroCopy},
 };
 
-use super::GlvOps;
+use super::{split_to_accounts, GlvOps};
 
 pub const EXECUTE_GLV_DEPOSIT_COMPUTE_BUDGET: u32 = 400_000;
 
@@ -495,6 +498,7 @@ pub struct ExecuteGlvDepositBuilder<'a, C> {
     token_map: Option<Pubkey>,
     feeds_parser: FeedsParser,
     close: bool,
+    alts: HashMap<Pubkey, Vec<Pubkey>>,
 }
 
 /// Hint for [`ExecuteGlvDepositBuilder`].
@@ -504,6 +508,7 @@ pub struct ExecuteGlvDepositHint {
     token_map: Pubkey,
     owner: Pubkey,
     glv_token: Pubkey,
+    glv_market_tokens: BTreeSet<Pubkey>,
     market_token: Pubkey,
     initial_long_token: Option<Pubkey>,
     initial_short_token: Option<Pubkey>,
@@ -518,15 +523,18 @@ pub struct ExecuteGlvDepositHint {
 impl ExecuteGlvDepositHint {
     /// Create from the GLV deposit.
     pub fn new(
+        glv: &Glv,
         glv_deposit: &GlvDeposit,
         token_map_address: &Pubkey,
         token_map: &impl TokenMapAccess,
     ) -> crate::Result<Self> {
+        let glv_market_tokens = glv.market_tokens().iter().copied().collect();
         Ok(Self {
             store: *glv_deposit.header().store(),
             token_map: *token_map_address,
             owner: *glv_deposit.header().owner(),
             glv_token: glv_deposit.tokens().glv_token(),
+            glv_market_tokens,
             market_token: glv_deposit.tokens().market_token(),
             initial_long_token: glv_deposit.tokens().initial_long_token.token(),
             initial_short_token: glv_deposit.tokens().initial_short_token.token(),
@@ -558,6 +566,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteGlvDepositBuilder<'a, C>
             token_map: None,
             feeds_parser: Default::default(),
             close: true,
+            alts: Default::default(),
         }
     }
 
@@ -595,6 +604,12 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteGlvDepositBuilder<'a, C>
         self
     }
 
+    /// Insert an Address Lookup Table.
+    pub fn add_alt(&mut self, account: AddressLookupTableAccount) -> &mut Self {
+        self.alts.insert(account.key, account.addresses);
+        self
+    }
+
     async fn prepare_hint(&mut self) -> crate::Result<ExecuteGlvDepositHint> {
         match &self.hint {
             Some(hint) => Ok(hint.clone()),
@@ -605,6 +620,17 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteGlvDepositBuilder<'a, C>
                     .await?
                     .ok_or(crate::Error::NotFound)?
                     .0;
+
+                let glv_address = self
+                    .client
+                    .find_glv_address(&glv_deposit.tokens().glv_token());
+                let glv = self
+                    .client
+                    .account::<ZeroCopy<Glv>>(&glv_address)
+                    .await?
+                    .ok_or(crate::Error::NotFound)?
+                    .0;
+
                 let store = glv_deposit.header().store();
                 let token_map_address = self
                     .client
@@ -613,7 +639,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteGlvDepositBuilder<'a, C>
                     .ok_or(crate::Error::NotFound)?;
                 let token_map = self.client.token_map(&token_map_address).await?;
                 let hint =
-                    ExecuteGlvDepositHint::new(&glv_deposit, &token_map_address, &token_map)?;
+                    ExecuteGlvDepositHint::new(&glv, &glv_deposit, &token_map_address, &token_map)?;
                 self.hint = Some(hint.clone());
                 Ok(hint)
             }
@@ -660,6 +686,15 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteGlvDepositBuilder<'a, C>
                 is_writable: true,
             });
 
+        let glv_accounts = split_to_accounts(
+            hint.glv_market_tokens,
+            &glv,
+            &hint.store,
+            &self.client.store_program_id(),
+            &token_program_id,
+        )
+        .0;
+
         let execute = self
             .client
             .store_rpc()
@@ -691,10 +726,10 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteGlvDepositBuilder<'a, C>
                 execution_lamports: self.execution_lamports,
                 throw_on_execution_error: !self.cancel_on_execution_error,
             })
+            .accounts(glv_accounts)
             .accounts(feeds.into_iter().chain(markets).collect::<Vec<_>>())
-            .compute_budget(
-                ComputeBudget::default().with_limit(EXECUTE_GLV_DEPOSIT_COMPUTE_BUDGET),
-            );
+            .compute_budget(ComputeBudget::default().with_limit(EXECUTE_GLV_DEPOSIT_COMPUTE_BUDGET))
+            .lookup_tables(self.alts.clone());
 
         if self.close {
             let close = self

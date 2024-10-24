@@ -73,9 +73,16 @@ async fn glv_deposit() -> eyre::Result<()> {
     let signature = rpc.send_without_preflight().await?;
     tracing::info!(%signature, %deposit, "created a glv deposit again");
 
-    let mut rpc = keeper.execute_glv_deposit(oracle, &deposit, false);
+    let mut execute = keeper.execute_glv_deposit(oracle, &deposit, false);
     deployment
-        .execute_with_pyth(&mut rpc, None, false, true)
+        .execute_with_pyth(
+            execute
+                .add_alt(deployment.common_alt().clone())
+                .add_alt(deployment.market_alt().clone()),
+            None,
+            false,
+            true,
+        )
         .instrument(tracing::info_span!("executing glv deposit", glv_deposit=%deposit))
         .await?;
 

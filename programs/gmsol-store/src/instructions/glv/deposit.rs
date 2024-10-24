@@ -674,7 +674,7 @@ pub(crate) fn unchecked_execute_glv_deposit<'info>(
     let accounts = ctx.accounts;
     let remaining_accounts = ctx.remaining_accounts;
 
-    let glv_address = accounts.glv_deposit.key();
+    let glv_address = accounts.glv.key();
 
     let SplitAccountsForGlv {
         markets,
