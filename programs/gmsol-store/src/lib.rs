@@ -1412,6 +1412,11 @@ pub mod gmsol_store {
     ) -> Result<()> {
         instructions::create_glv_withdrawal(ctx, &nonce, &params)
     }
+
+    /// Close GLV withdrawal.
+    pub fn close_glv_withdrawal(ctx: Context<CloseGlvWithdrawal>, reason: String) -> Result<()> {
+        instructions::close_glv_withdrawal(ctx, &reason)
+    }
 }
 
 /// Result type with [`CoreError`] as error type.

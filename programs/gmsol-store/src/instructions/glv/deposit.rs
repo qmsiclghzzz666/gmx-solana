@@ -257,6 +257,19 @@ pub struct CloseGlvDeposit<'info> {
     /// CHECK: only use to validate and receive fund.
     #[account(mut)]
     pub owner: UncheckedAccount<'info>,
+    /// The GLV deposit to close.
+    #[account(
+        mut,
+        constraint = glv_deposit.load()?.header.owner == owner.key() @ CoreError::OwnerMismatched,
+        constraint = glv_deposit.load()?.header.store == store.key() @ CoreError::StoreMismatched,
+        constraint = glv_deposit.load()?.tokens.market_token_account() == market_token_escrow.key() @ CoreError::MarketTokenAccountMismatched,
+        constraint = glv_deposit.load()?.tokens.glv_token_account() == glv_token_escrow.key() @ CoreError::MarketTokenAccountMismatched,
+        constraint = glv_deposit.load()?.tokens.initial_long_token.account() == initial_long_token_escrow.as_ref().map(|a| a.key()) @ CoreError::TokenAccountMismatched,
+        constraint = glv_deposit.load()?.tokens.initial_short_token.account() == initial_short_token_escrow.as_ref().map(|a| a.key()) @ CoreError::TokenAccountMismatched,
+        seeds = [GlvDeposit::SEED, store.key().as_ref(), owner.key().as_ref(), &glv_deposit.load()?.header.nonce],
+        bump = glv_deposit.load()?.header.bump,
+    )]
+    pub glv_deposit: AccountLoader<'info, GlvDeposit>,
     /// Market token.
     #[account(
         constraint = glv_deposit.load()?.tokens.market_token() == market_token.key() @ CoreError::MarketTokenMintMismatched
@@ -277,19 +290,6 @@ pub struct CloseGlvDeposit<'info> {
         constraint = glv_deposit.load()?.tokens.glv_token() == glv_token.key() @ CoreError::TokenMintMismatched
     )]
     pub glv_token: Box<InterfaceAccount<'info, token_interface::Mint>>,
-    /// The GLV deposit to close.
-    #[account(
-        mut,
-        constraint = glv_deposit.load()?.header.owner == owner.key() @ CoreError::OwnerMismatched,
-        constraint = glv_deposit.load()?.header.store == store.key() @ CoreError::StoreMismatched,
-        constraint = glv_deposit.load()?.tokens.market_token_account() == market_token_escrow.key() @ CoreError::MarketTokenAccountMismatched,
-        constraint = glv_deposit.load()?.tokens.glv_token_account() == glv_token_escrow.key() @ CoreError::MarketTokenAccountMismatched,
-        constraint = glv_deposit.load()?.tokens.initial_long_token.account() == initial_long_token_escrow.as_ref().map(|a| a.key()) @ CoreError::TokenAccountMismatched,
-        constraint = glv_deposit.load()?.tokens.initial_short_token.account() == initial_short_token_escrow.as_ref().map(|a| a.key()) @ CoreError::TokenAccountMismatched,
-        seeds = [GlvDeposit::SEED, store.key().as_ref(), owner.key().as_ref(), &glv_deposit.load()?.header.nonce],
-        bump = glv_deposit.load()?.header.bump,
-    )]
-    pub glv_deposit: AccountLoader<'info, GlvDeposit>,
     /// The escrow account for market tokens.
     #[account(
         mut,
