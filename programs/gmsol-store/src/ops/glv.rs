@@ -132,7 +132,7 @@ impl<'a, 'info> CreateGlvDepositOperation<'a, 'info> {
         glv_deposit.params.market_token_amount = self.params.market_token_amount;
         glv_deposit.params.min_glv_token_amount = self.params.min_glv_token_amount;
 
-        // Init swap path.
+        // Init swap paths.
         glv_deposit.swap.validate_and_init(
             &*self.market.load()?,
             self.params.long_token_swap_length,
@@ -612,6 +612,74 @@ impl<'a, 'info> CreateGlvWithdrawalOperation<'a, 'info> {
     /// # Errors
     ///
     pub(crate) fn unchecked_execute(self) -> Result<()> {
-        todo!()
+        let (long_token, short_token) = self.validate_market_and_get_tokens()?;
+
+        self.validate_params_excluding_swap()?;
+
+        let id = self
+            .market
+            .load_mut()?
+            .indexer_mut()
+            .next_glv_withdrawal_id()?;
+
+        let mut glv_withdrawal = self.glv_withdrawal.load_init()?;
+
+        // Init header.
+        glv_withdrawal.header.init(
+            id,
+            self.store.key(),
+            self.market.key(),
+            self.owner.key(),
+            *self.nonce,
+            self.bump,
+            self.params.execution_lamports,
+        )?;
+
+        // Init tokens and token accounts.
+        let tokens = &mut glv_withdrawal.tokens;
+        tokens.glv_token.init_with_interface(self.glv_token);
+        tokens.market_token.init(self.market_token);
+        tokens.final_long_token.init(self.final_long_token);
+        tokens.final_short_token.init(self.final_short_token);
+
+        // Init params.
+        let params = &mut glv_withdrawal.params;
+        params.glv_token_amount = self.params.glv_token_amount;
+        params.min_final_long_token_amount = self.params.min_final_long_token_amount;
+        params.min_final_short_token_amount = self.params.min_final_short_token_amount;
+
+        // Init swap paths.
+        glv_withdrawal.swap.validate_and_init(
+            &*self.market.load()?,
+            self.params.long_token_swap_length,
+            self.params.short_token_swap_length,
+            self.swap_paths,
+            &self.store.key(),
+            (&long_token, &short_token),
+            (&self.final_long_token.mint, &self.final_short_token.mint),
+        )?;
+
+        Ok(())
+    }
+
+    fn validate_market_and_get_tokens(&self) -> Result<(Pubkey, Pubkey)> {
+        let market = self.market.load()?;
+        let meta = market.validated_meta(&self.store.key())?;
+        Ok((meta.long_token_mint, meta.short_token_mint))
+    }
+
+    fn validate_params_excluding_swap(&self) -> Result<()> {
+        let params = self.params;
+        let amount = params.glv_token_amount;
+        require!(amount != 0, CoreError::EmptyGlvWithdrawal);
+        require_gte!(
+            self.glv_token.amount,
+            amount,
+            CoreError::NotEnoughTokenAmount
+        );
+
+        ActionExt::validate_balance(&self.glv_withdrawal, params.execution_lamports)?;
+
+        Ok(())
     }
 }

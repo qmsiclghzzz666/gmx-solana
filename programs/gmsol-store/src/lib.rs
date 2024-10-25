@@ -1732,7 +1732,7 @@ pub enum CoreError {
     ExceedMaxGlvMarketTokenBalanceValue,
     /// Empty GLV withdrawal.
     #[msg("Empty GLV withdrawal")]
-    EmtpyGlvWithdrawal,
+    EmptyGlvWithdrawal,
 }
 
 impl CoreError {

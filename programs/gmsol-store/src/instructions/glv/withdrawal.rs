@@ -139,7 +139,7 @@ impl<'info> CreateGlvWithdrawal<'info> {
         use anchor_spl::token_interface::{transfer_checked, TransferChecked};
 
         let amount = params.glv_token_amount;
-        require!(amount != 0, CoreError::EmtpyGlvWithdrawal);
+        require!(amount != 0, CoreError::EmptyGlvWithdrawal);
 
         let source = &self.glv_token_source;
         let target = &self.glv_token_escrow;
