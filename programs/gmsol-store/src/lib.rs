@@ -1417,6 +1417,20 @@ pub mod gmsol_store {
     pub fn close_glv_withdrawal(ctx: Context<CloseGlvWithdrawal>, reason: String) -> Result<()> {
         instructions::close_glv_withdrawal(ctx, &reason)
     }
+
+    /// Execute GLV withdrawal.
+    #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
+    pub fn execute_glv_withdrawal<'info>(
+        ctx: Context<'_, '_, 'info, 'info, ExecuteGlvWithdrawal<'info>>,
+        execution_lamports: u64,
+        throw_on_execution_error: bool,
+    ) -> Result<()> {
+        instructions::unchecked_execute_glv_withdrawal(
+            ctx,
+            execution_lamports,
+            throw_on_execution_error,
+        )
+    }
 }
 
 /// Result type with [`CoreError`] as error type.
@@ -1729,6 +1743,8 @@ pub enum CoreError {
     /// Failed to calculate GLV amount to mint.
     #[msg("failed to calculate GLV amount to mint")]
     FailedToCalculateGlvAmountToMint,
+    /// Failed to calculate market token amount to burn.
+    FailedTOCalculateMarketTokenAmountToBurn,
     /// Exceed max market token balance amount of GLV.
     #[msg("GLV max market token balance amount exceeded")]
     ExceedMaxGlvMarketTokenBalanceAmount,

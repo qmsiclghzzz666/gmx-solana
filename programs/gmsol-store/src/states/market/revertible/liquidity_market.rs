@@ -15,7 +15,7 @@ pub struct RevertibleLiquidityMarket<'a, 'info> {
     base: RevertibleMarket<'a>,
     token_program: &'a AccountInfo<'info>,
     store: &'a AccountLoader<'info, Store>,
-    market_token: &'a mut Account<'info, Mint>,
+    market_token: &'a Account<'info, Mint>,
     receiver: Option<&'a AccountInfo<'info>>,
     vault: Option<&'a AccountInfo<'info>>,
     to_mint: u64,
@@ -25,7 +25,7 @@ pub struct RevertibleLiquidityMarket<'a, 'info> {
 impl<'a, 'info> RevertibleLiquidityMarket<'a, 'info> {
     pub(crate) fn from_revertible_market(
         market: RevertibleMarket<'a>,
-        market_token: &'a mut Account<'info, Mint>,
+        market_token: &'a Account<'info, Mint>,
         token_program: &'a AccountInfo<'info>,
         store: &'a AccountLoader<'info, Store>,
     ) -> Result<Self> {

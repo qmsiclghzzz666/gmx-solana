@@ -8,14 +8,20 @@ use anchor_spl::{
 use gmsol_utils::InitSpace;
 
 use crate::{
+    constants,
     events::RemoveGlvWithdrawalEvent,
     ops::{
-        execution_fee::TransferExecutionFeeOperation,
-        glv::{CreateGlvWithdrawalOperation, CreateGlvWithdrawalParams},
+        execution_fee::{PayExecutionFeeOperation, TransferExecutionFeeOperation},
+        glv::{
+            CreateGlvWithdrawalOperation, CreateGlvWithdrawalParams, ExecuteGlvWithdrawalOperation,
+        },
+        market::MarketTransferOutOperation,
     },
     states::{
-        common::action::ActionExt, glv::GlvWithdrawal, Glv, Market, NonceBytes, RoleKey, Seed,
-        Store,
+        common::action::ActionExt,
+        glv::{GlvWithdrawal, SplitAccountsForGlv},
+        Glv, Market, NonceBytes, Oracle, PriceProvider, RoleKey, Seed, Store, TokenMapHeader,
+        TokenMapLoader,
     },
     utils::{
         internal::{self, Authentication},
@@ -449,5 +455,328 @@ impl<'info> CloseGlvWithdrawal<'info> {
         }
 
         Ok(true)
+    }
+}
+
+/// The accounts definition for `execute_glv_withdrawal` instruction.
+///
+/// Remaining accounts expected by thi instruction:
+///
+///   - 0..N. `[]` N market accounts, where N represents the total number of markets managed
+///     by the given GLV.
+///   - N..2N. `[]` N market token accounts (see above for the definition of N).
+///   - 2N..3N. `[]` N market token vault accounts (see above for the definition of N).
+///   - 3N..3N+M. `[]` M feed accounts, where M represents the total number of tokens in the
+///     swap params.
+///   - 3N+M..3N+M+L. `[writable]` L market accounts, where L represents the total number of unique
+///     markets excluding the current market in the swap params.
+#[derive(Accounts)]
+pub struct ExecuteGlvWithdrawal<'info> {
+    /// Authority.
+    pub authority: Signer<'info>,
+    /// Store.
+    #[account(has_one = token_map)]
+    pub store: AccountLoader<'info, Store>,
+    /// Token Map.
+    #[account(has_one = store)]
+    pub token_map: AccountLoader<'info, TokenMapHeader>,
+    /// Price Provider.
+    pub price_provider: Interface<'info, PriceProvider>,
+    /// Oracle buffer to use.
+    #[account(has_one = store)]
+    pub oracle: Box<Account<'info, Oracle>>,
+    /// GLV account.
+    #[account(
+        has_one = store,
+        constraint = glv.load()?.contains(&market_token.key()) @ CoreError::InvalidArgument,
+    )]
+    pub glv: AccountLoader<'info, Glv>,
+    /// Market.
+    #[account(mut, has_one = store)]
+    pub market: AccountLoader<'info, Market>,
+    /// The GLV withdrawal to execute.
+    #[account(
+        mut,
+        constraint = glv_withdrawal.load()?.header.store == store.key() @ CoreError::StoreMismatched,
+        constraint = glv_withdrawal.load()?.header.market == market.key() @ CoreError::MarketMismatched,
+        constraint = glv_withdrawal.load()?.tokens.glv_token() == glv_token.key() @ CoreError::TokenMintMismatched,
+        constraint = glv_withdrawal.load()?.tokens.market_token() == market_token.key() @ CoreError::MarketTokenMintMismatched,
+        constraint = glv_withdrawal.load()?.tokens.market_token_account() == market_token_escrow.key() @ CoreError::MarketTokenAccountMismatched,
+        constraint = glv_withdrawal.load()?.tokens.glv_token_account() == glv_token_escrow.key() @ CoreError::MarketTokenAccountMismatched,
+        constraint = glv_withdrawal.load()?.tokens.final_long_token_account() == final_long_token_escrow.key() @ CoreError::TokenAccountMismatched,
+        constraint = glv_withdrawal.load()?.tokens.final_short_token_account() == final_short_token_escrow.key() @ CoreError::TokenAccountMismatched,
+        seeds = [GlvWithdrawal::SEED, store.key().as_ref(), glv_withdrawal.load()?.header.owner.as_ref(), &glv_withdrawal.load()?.header.nonce],
+        bump = glv_withdrawal.load()?.header.bump,
+    )]
+    pub glv_withdrawal: AccountLoader<'info, GlvWithdrawal>,
+    /// GLV token mint.
+    #[account(mut, constraint = glv.load()?.glv_token == glv_token.key() @ CoreError::TokenMintMismatched)]
+    pub glv_token: Box<InterfaceAccount<'info, token_interface::Mint>>,
+    /// Market token mint.
+    #[account(mut, constraint = market.load()?.meta().market_token_mint == market_token.key() @ CoreError::MarketTokenMintMismatched)]
+    pub market_token: Box<Account<'info, Mint>>,
+    /// Final long token.
+    #[account(
+        constraint = glv_withdrawal.load()?.tokens.final_long_token() == final_long_token.key() @ CoreError::TokenMintMismatched
+    )]
+    pub final_long_token: Box<Account<'info, Mint>>,
+    /// Final short token.
+    #[account(
+        constraint = glv_withdrawal.load()?.tokens.final_short_token() == final_short_token.key() @ CoreError::TokenMintMismatched
+    )]
+    pub final_short_token: Box<Account<'info, Mint>>,
+    /// The escrow account for GLV tokens.
+    #[account(
+        mut,
+        associated_token::mint = glv_token,
+        associated_token::authority = glv_withdrawal,
+        associated_token::token_program = glv_token_program,
+    )]
+    pub glv_token_escrow: Box<InterfaceAccount<'info, token_interface::TokenAccount>>,
+    /// The escrow account for market tokens.
+    #[account(
+        mut,
+        associated_token::mint = market_token,
+        associated_token::authority = glv_withdrawal,
+    )]
+    pub market_token_escrow: Box<Account<'info, TokenAccount>>,
+    /// The escrow account for receiving final long token for withdrawal.
+    #[account(
+        mut,
+        associated_token::mint = final_long_token,
+        associated_token::authority = glv_withdrawal,
+    )]
+    pub final_long_token_escrow: Box<Account<'info, TokenAccount>>,
+    /// The escrow account for receiving final short token for withdrawal.
+    #[account(
+        mut,
+        associated_token::mint = final_short_token,
+        associated_token::authority = glv_withdrawal,
+    )]
+    pub final_short_token_escrow: Box<Account<'info, TokenAccount>>,
+    /// Market token wihtdrawal vault.
+    #[account(
+        mut,
+        token::mint = market_token,
+        token::authority = store,
+        seeds = [
+            constants::MARKET_VAULT_SEED,
+            store.key().as_ref(),
+            market_token_withdrawal_vault.mint.as_ref(),
+            &[],
+        ],
+        bump,
+    )]
+    pub market_token_withdrawal_vault: Box<Account<'info, TokenAccount>>,
+    /// Final long token vault.
+    #[account(
+        mut,
+        token::mint = final_long_token,
+        token::authority = store,
+        seeds = [
+            constants::MARKET_VAULT_SEED,
+            store.key().as_ref(),
+            final_long_token_vault.mint.as_ref(),
+            &[],
+        ],
+        bump,
+    )]
+    pub final_long_token_vault: Box<Account<'info, TokenAccount>>,
+    /// Final short token vault.
+    #[account(
+        mut,
+        token::mint = final_short_token,
+        token::authority = store,
+        seeds = [
+            constants::MARKET_VAULT_SEED,
+            store.key().as_ref(),
+            final_short_token_vault.mint.as_ref(),
+            &[],
+        ],
+        bump,
+    )]
+    pub final_short_token_vault: Box<Account<'info, TokenAccount>>,
+    /// Market token vault for the GLV.
+    #[account(
+        mut,
+        associated_token::mint = market_token,
+        associated_token::authority = glv,
+    )]
+    pub market_token_vault: Box<Account<'info, TokenAccount>>,
+    /// The token program.
+    pub token_program: Program<'info, Token>,
+    /// The token program for GLV token.
+    pub glv_token_program: Program<'info, Token2022>,
+    /// The system program.
+    pub system_program: Program<'info, System>,
+}
+
+/// Execute GLV withdrawal.
+///
+/// # CHECK
+/// - Only ORDER_KEEPER is allowed to call this function.
+pub(crate) fn unchecked_execute_glv_withdrawal<'info>(
+    ctx: Context<'_, '_, 'info, 'info, ExecuteGlvWithdrawal<'info>>,
+    execution_lamports: u64,
+    throw_on_execution_error: bool,
+) -> Result<()> {
+    let accounts = ctx.accounts;
+    let remaining_accounts = ctx.remaining_accounts;
+
+    let glv_address = accounts.glv.key();
+
+    let splitted = {
+        let glv_withdrawal = accounts.glv_withdrawal.load()?;
+        let token_map = accounts.token_map.load_token_map()?;
+        accounts.glv.load()?.validate_and_split_remaining_accounts(
+            &glv_address,
+            &accounts.store.key(),
+            accounts.token_program.key,
+            remaining_accounts,
+            &*glv_withdrawal,
+            &token_map,
+        )?
+    };
+
+    let executed = accounts.perform_execution(&splitted, throw_on_execution_error)?;
+
+    match executed {
+        Some((final_long_token_amount, final_short_token_amount)) => {
+            accounts.glv_withdrawal.load_mut()?.header.completed()?;
+            accounts.transfer_tokens_out(
+                splitted.remaining_accounts,
+                final_long_token_amount,
+                final_short_token_amount,
+            )?;
+        }
+        None => {
+            accounts.glv_withdrawal.load_mut()?.header.cancelled()?;
+        }
+    }
+
+    // It must be placed at the end to be executed correctly.
+    accounts.pay_execution_fee(execution_lamports)?;
+
+    Ok(())
+}
+
+impl<'info> internal::Authentication<'info> for ExecuteGlvWithdrawal<'info> {
+    fn authority(&self) -> &Signer<'info> {
+        &self.authority
+    }
+
+    fn store(&self) -> &AccountLoader<'info, Store> {
+        &self.store
+    }
+}
+
+impl<'info> ExecuteGlvWithdrawal<'info> {
+    #[inline(never)]
+    fn pay_execution_fee(&self, execution_fee: u64) -> Result<()> {
+        let execution_lamports = self
+            .glv_withdrawal
+            .load()?
+            .execution_lamports(execution_fee);
+        PayExecutionFeeOperation::builder()
+            .payer(self.glv_withdrawal.to_account_info())
+            .receiver(self.authority.to_account_info())
+            .execution_lamports(execution_lamports)
+            .build()
+            .execute()?;
+        Ok(())
+    }
+
+    #[inline(never)]
+    fn perform_execution(
+        &mut self,
+        splitted: &SplitAccountsForGlv<'info>,
+        throw_on_execution_error: bool,
+    ) -> Result<Option<(u64, u64)>> {
+        let builder = ExecuteGlvWithdrawalOperation::builder()
+            .glv_withdrawal(self.glv_withdrawal.clone())
+            .token_program(self.token_program.to_account_info())
+            .glv_token_program(self.glv_token_program.to_account_info())
+            .throw_on_execution_error(throw_on_execution_error)
+            .store(self.store.clone())
+            .glv_token_mint(&mut self.glv_token)
+            .glv_token_account(self.glv_token_escrow.to_account_info())
+            .market(self.market.clone())
+            .market_token_mint(&mut self.market_token)
+            .market_token_glv_vault(self.market_token_vault.to_account_info())
+            .market_token_withdrawal_vault(self.market_token_withdrawal_vault.to_account_info())
+            .markets(splitted.markets)
+            .market_tokens(splitted.market_tokens)
+            .market_token_vaults(splitted.market_token_vaults);
+
+        self.oracle.with_prices(
+            &self.store,
+            &self.price_provider,
+            &self.token_map,
+            &splitted.tokens,
+            splitted.remaining_accounts,
+            |oracle, remaining_accounts| {
+                builder
+                    .oracle(oracle)
+                    .remaining_accounts(remaining_accounts)
+                    .build()
+                    .unchecked_execute()
+            },
+        )
+    }
+
+    fn transfer_tokens_out(
+        &self,
+        remaining_accounts: &'info [AccountInfo<'info>],
+        final_long_token_amount: u64,
+        final_short_token_amount: u64,
+    ) -> Result<()> {
+        let builder = MarketTransferOutOperation::builder()
+            .store(&self.store)
+            .token_program(self.token_program.to_account_info());
+        let store = &self.store.key();
+
+        if final_long_token_amount != 0 {
+            let market = self
+                .glv_withdrawal
+                .load()?
+                .swap
+                .find_and_unpack_last_market(store, true, remaining_accounts)?
+                .unwrap_or(self.market.clone());
+            let vault = &self.final_long_token_vault;
+            let escrow = &self.final_long_token_escrow;
+            let token = &self.final_long_token;
+            builder
+                .clone()
+                .market(&market)
+                .to(escrow.to_account_info())
+                .vault(vault.to_account_info())
+                .amount(final_long_token_amount)
+                .decimals(token.decimals)
+                .token_mint(token.to_account_info())
+                .build()
+                .execute()?;
+        }
+
+        if final_short_token_amount != 0 {
+            let market = self
+                .glv_withdrawal
+                .load()?
+                .swap
+                .find_and_unpack_last_market(store, true, remaining_accounts)?
+                .unwrap_or(self.market.clone());
+            let vault = &self.final_short_token_vault;
+            let escrow = &self.final_short_token_escrow;
+            let token = &self.final_short_token;
+            builder
+                .market(&market)
+                .to(escrow.to_account_info())
+                .vault(vault.to_account_info())
+                .amount(final_short_token_amount)
+                .decimals(token.decimals)
+                .token_mint(token.to_account_info())
+                .build()
+                .execute()?;
+        }
+        Ok(())
     }
 }
