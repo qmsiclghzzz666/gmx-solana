@@ -1,7 +1,7 @@
 mod deposit;
-mod initialize;
+mod management;
 mod withdrawal;
 
 pub use deposit::*;
-pub use initialize::*;
+pub use management::*;
 pub use withdrawal::*;

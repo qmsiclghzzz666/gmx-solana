@@ -179,3 +179,50 @@ impl<'info> InitializeGlv<'info> {
         Ok(())
     }
 }
+
+/// The accounts definition for [`update_glv_market_config`] instruction.
+#[derive(Accounts)]
+pub struct UpdateGlvMarketConfig<'info> {
+    /// Authority.
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    /// Store.
+    pub store: AccountLoader<'info, Store>,
+    /// GLV.
+    #[account(
+        mut,
+        has_one = store,
+        constraint = glv.load()?.contains(&market_token.key()) @ CoreError::InvalidArgument,
+    )]
+    pub glv: AccountLoader<'info, Glv>,
+    /// Market token.
+    pub market_token: Box<Account<'info, anchor_spl::token::Mint>>,
+}
+
+/// Update the config for the given market.
+///
+/// # CHECK
+/// - Only MARKET_KEEPER is allowed to call this function.
+pub fn unchecked_update_glv_market_config(
+    ctx: Context<UpdateGlvMarketConfig>,
+    max_amount: Option<u64>,
+    max_value: Option<u128>,
+) -> Result<()> {
+    require!(
+        max_amount.is_some() || max_value.is_some(),
+        CoreError::InvalidArgument
+    );
+    let mut glv = ctx.accounts.glv.load_mut()?;
+    glv.update_market_config(&ctx.accounts.market_token.key(), max_amount, max_value)?;
+    Ok(())
+}
+
+impl<'info> internal::Authentication<'info> for UpdateGlvMarketConfig<'info> {
+    fn authority(&self) -> &Signer<'info> {
+        &self.authority
+    }
+
+    fn store(&self) -> &AccountLoader<'info, Store> {
+        &self.store
+    }
+}

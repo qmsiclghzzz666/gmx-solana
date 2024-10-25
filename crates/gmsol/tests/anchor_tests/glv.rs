@@ -1,4 +1,5 @@
 use gmsol::store::glv::GlvOps;
+use gmsol_store::CoreError;
 use tracing::Instrument;
 
 use crate::anchor_tests::setup::{current_deployment, Deployment};
@@ -47,7 +48,7 @@ async fn glv_deposit() -> eyre::Result<()> {
     let long_token_amount = 1_000;
 
     deployment
-        .mint_or_transfer_to_user("fBTC", Deployment::DEFAULT_USER, 2 * long_token_amount + 14)
+        .mint_or_transfer_to_user("fBTC", Deployment::DEFAULT_USER, 3 * long_token_amount + 14)
         .await?;
 
     // Create and then cancel.
@@ -110,6 +111,47 @@ async fn glv_deposit() -> eyre::Result<()> {
         )
         .instrument(tracing::info_span!("executing glv deposit", glv_deposit=%deposit))
         .await?;
+
+    // Update max value.
+    let signature = keeper
+        .update_glv_market_config(store, glv_token, market_token, None, Some(1))
+        .send_without_preflight()
+        .await?;
+    tracing::info!(%signature, %market_token, "updated market config in the GLV");
+
+    // Deposit again.
+    let (rpc, deposit) = user
+        .create_glv_deposit(store, glv_token, market_token)
+        .long_token_deposit(long_token_amount, None, None)
+        .build_with_address()
+        .await?;
+    let signature = rpc.send_without_preflight().await?;
+    tracing::info!(%signature, %deposit, "created a glv deposit");
+
+    let mut execute = keeper.execute_glv_deposit(oracle, &deposit, false);
+    let err = deployment
+        .execute_with_pyth(
+            execute
+                .add_alt(deployment.common_alt().clone())
+                .add_alt(deployment.market_alt().clone()),
+            None,
+            false,
+            false,
+        )
+        .instrument(tracing::info_span!("executing glv deposit", glv_deposit=%deposit))
+        .await
+        .expect_err("should throw error for exceeding max value");
+    assert_eq!(
+        err.anchor_error_code(),
+        Some(CoreError::ExceedMaxGlvMarketTokenBalanceValue.into())
+    );
+
+    // Restore the max value.
+    let signature = keeper
+        .update_glv_market_config(store, glv_token, market_token, None, Some(0))
+        .send_without_preflight()
+        .await?;
+    tracing::info!(%signature, %market_token, "restored market config in the GLV");
 
     Ok(())
 }

@@ -58,6 +58,43 @@ impl Default for GlvMarketConfig {
     }
 }
 
+impl GlvMarketConfig {
+    fn validate_market_token_balance(
+        &self,
+        new_balance: u64,
+        market_pool_value: &u128,
+        market_token_supply: &u128,
+    ) -> Result<()> {
+        if self.max_amount == 0 && self.max_value == 0 {
+            return Ok(());
+        }
+
+        if self.max_amount > 0 {
+            require_gte!(
+                self.max_amount,
+                new_balance,
+                CoreError::ExceedMaxGlvMarketTokenBalanceAmount
+            );
+        }
+
+        if self.max_value > 0 {
+            let value = gmsol_model::utils::market_token_amount_to_usd(
+                &(new_balance as u128),
+                market_pool_value,
+                market_token_supply,
+            )
+            .ok_or(error!(CoreError::FailedToCalculateGlvValueForMarket))?;
+            require_gte!(
+                self.max_value,
+                value,
+                CoreError::ExceedMaxGlvMarketTokenBalanceValue
+            );
+        }
+
+        Ok(())
+    }
+}
+
 gmsol_utils::fixed_map!(
     GlvMarkets,
     Pubkey,
@@ -235,6 +272,25 @@ impl Glv {
         self.markets.get(market_token).is_some()
     }
 
+    pub(crate) fn update_market_config(
+        &mut self,
+        market_token: &Pubkey,
+        max_amount: Option<u64>,
+        max_value: Option<u128>,
+    ) -> Result<()> {
+        let config = self
+            .markets
+            .get_mut(market_token)
+            .ok_or(error!(CoreError::NotFound))?;
+        if let Some(amount) = max_amount {
+            config.max_amount = amount;
+        }
+        if let Some(value) = max_value {
+            config.max_value = value;
+        }
+        Ok(())
+    }
+
     /// Create a new [`GlvTokensCollector`].
     pub fn tokens_collector(&self, action: &impl HasSwapParams) -> TokensCollector {
         TokensCollector::new(action, self.num_markets())
@@ -322,6 +378,20 @@ impl Glv {
             remaining_accounts,
             tokens: tokens_collector.into_vec(token_map)?,
         })
+    }
+
+    pub(crate) fn validate_market_token_balance(
+        &self,
+        market_token: &Pubkey,
+        new_balance: u64,
+        market_pool_value: &u128,
+        market_token_supply: &u128,
+    ) -> Result<()> {
+        let config = self
+            .markets
+            .get(market_token)
+            .ok_or(error!(CoreError::NotFound))?;
+        config.validate_market_token_balance(new_balance, market_pool_value, market_token_supply)
     }
 }
 

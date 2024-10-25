@@ -26,6 +26,16 @@ pub trait GlvOps<C> {
         market_tokens: impl IntoIterator<Item = Pubkey>,
     ) -> crate::Result<(RpcBuilder<C>, Pubkey)>;
 
+    /// GLV Update Market Config.
+    fn update_glv_market_config(
+        &self,
+        store: &Pubkey,
+        glv: &Pubkey,
+        market_token: &Pubkey,
+        max_amount: Option<u64>,
+        max_value: Option<u128>,
+    ) -> RpcBuilder<C>;
+
     /// Create a GLV deposit.
     fn create_glv_deposit(
         &self,
@@ -86,6 +96,28 @@ impl<C: Deref<Target = impl Signer> + Clone> GlvOps<C> for crate::Client<C> {
             })
             .accounts(accounts);
         Ok((rpc, glv_token))
+    }
+
+    fn update_glv_market_config(
+        &self,
+        store: &Pubkey,
+        glv_token: &Pubkey,
+        market_token: &Pubkey,
+        max_amount: Option<u64>,
+        max_value: Option<u128>,
+    ) -> RpcBuilder<C> {
+        let glv = self.find_glv_address(glv_token);
+        self.store_rpc()
+            .accounts(accounts::UpdateGlvMarketConfig {
+                authority: self.payer(),
+                store: *store,
+                glv,
+                market_token: *market_token,
+            })
+            .args(instruction::UpdateGlvMarketConfig {
+                max_amount,
+                max_value,
+            })
     }
 
     fn create_glv_deposit(

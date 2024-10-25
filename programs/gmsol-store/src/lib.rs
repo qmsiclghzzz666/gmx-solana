@@ -1367,6 +1367,16 @@ pub mod gmsol_store {
         instructions::unchecked_initialize_glv(ctx, index, length as usize)
     }
 
+    /// GLV update market config.
+    #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
+    pub fn update_glv_market_config(
+        ctx: Context<UpdateGlvMarketConfig>,
+        max_amount: Option<u64>,
+        max_value: Option<u128>,
+    ) -> Result<()> {
+        instructions::unchecked_update_glv_market_config(ctx, max_amount, max_value)
+    }
+
     /// Create GLV deposit.
     pub fn create_glv_deposit<'info>(
         ctx: Context<'_, '_, 'info, 'info, CreateGlvDeposit<'info>>,
@@ -1700,11 +1710,17 @@ pub enum CoreError {
     DisabledMarket,
     /* Errors for GLV */
     /// Failed to calculate GLV value for market.
-    #[msg("failed to calculate glv value for this market")]
+    #[msg("failed to calculate GLV value for this market")]
     FailedToCalculateGlvValueForMarket,
     /// Failed to calculate GLV amount to mint.
-    #[msg("failed to calculate glv amount to mint")]
+    #[msg("failed to calculate GLV amount to mint")]
     FailedToCalculateGlvAmountToMint,
+    /// Exceed max market token balance amount of GLV.
+    #[msg("GLV max market token balance amount exceeded")]
+    ExceedMaxGlvMarketTokenBalanceAmount,
+    /// Exceed max market token balance value of GLV.
+    #[msg("GLV max market token balance value exceeded")]
+    ExceedMaxGlvMarketTokenBalanceValue,
 }
 
 impl CoreError {

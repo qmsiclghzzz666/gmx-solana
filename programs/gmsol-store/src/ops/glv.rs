@@ -336,7 +336,8 @@ impl<'a, 'info> ExecuteGlvDepositOperation<'a, 'info> {
                     self.market_tokens,
                     self.market_token_vaults,
                 )?;
-                let received_value = {
+
+                let (received_value, market_pool_value, market_token_supply) = {
                     let mut prices = self.oracle.market_prices(op.market())?;
                     get_glv_value_for_market(
                         self.oracle,
@@ -346,6 +347,22 @@ impl<'a, 'info> ExecuteGlvDepositOperation<'a, 'info> {
                         false,
                     )?
                 };
+
+                // Validate market token balance.
+                {
+                    let current_balance =
+                        anchor_spl::token::accessor::amount(&self.market_token_vault)?;
+                    let new_balance = current_balance
+                        .checked_add(market_token_amount)
+                        .ok_or(error!(CoreError::TokenAmountOverflow))?;
+                    self.glv.load()?.validate_market_token_balance(
+                        &op.market().market_meta().market_token_mint,
+                        new_balance,
+                        &market_pool_value,
+                        &market_token_supply,
+                    )?;
+                }
+
                 let glv_amount = usd_to_market_token_amount(
                     received_value,
                     glv_value,
@@ -498,17 +515,17 @@ fn unchecked_get_glv_value<'info>(
         let value_for_market = if key == current_market.key() {
             let market = current_market;
             // Note that we should use the balance prior to the operation.
-            get_glv_value_for_market(oracle, &mut prices, market, balance, true)?
+            get_glv_value_for_market(oracle, &mut prices, market, balance, true)?.0
         } else if let Some(market) = swap_markets.get(&key) {
             let mint = Account::<Mint>::try_from(market_token)?;
             let market = AsLiquidityMarket::new(market, &mint);
-            get_glv_value_for_market(oracle, &mut prices, &market, balance, true)?
+            get_glv_value_for_market(oracle, &mut prices, &market, balance, true)?.0
         } else {
             let market = AccountLoader::<Market>::try_from(market)?;
             let mint = Account::<Mint>::try_from(market_token)?;
             let market = market.load()?;
             let market = market.as_liquidity_market(&mint);
-            get_glv_value_for_market(oracle, &mut prices, &market, balance, true)?
+            get_glv_value_for_market(oracle, &mut prices, &market, balance, true)?.0
         };
 
         value = value
@@ -525,15 +542,21 @@ fn get_glv_value_for_market<M>(
     market: &M,
     balance: u128,
     maximize: bool,
-) -> Result<u128>
+) -> Result<(u128, u128, u128)>
 where
     M: gmsol_model::LiquidityMarket<{ constants::MARKET_DECIMALS }, Num = u128>,
     M: HasMarketMeta,
 {
     use gmsol_model::{utils, LiquidityMarketExt, PnlFactorKind};
 
+    let value = market
+        .pool_value(prices, PnlFactorKind::MaxAfterDeposit, maximize)
+        .map_err(ModelError::from)?;
+
+    let supply = market.total_supply();
+
     if balance == 0 {
-        return Ok(0);
+        return Ok((0, value, supply));
     }
 
     {
@@ -541,12 +564,8 @@ where
         prices.index_token_price = oracle.get_primary_price(&index_token_mint)?;
     }
 
-    let value = market
-        .pool_value(prices, PnlFactorKind::MaxAfterDeposit, maximize)
-        .map_err(ModelError::from)?;
-
-    let glv_value = utils::market_token_amount_to_usd(&balance, &value, &market.total_supply())
+    let glv_value = utils::market_token_amount_to_usd(&balance, &value, &supply)
         .ok_or(error!(CoreError::FailedToCalculateGlvValueForMarket))?;
 
-    Ok(glv_value)
+    Ok((glv_value, value, supply))
 }
