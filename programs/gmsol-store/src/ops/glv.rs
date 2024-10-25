@@ -9,8 +9,8 @@ use typed_builder::TypedBuilder;
 use crate::{
     constants,
     states::{
-        common::action::ActionExt, market::revertible::Revertible, Glv, GlvDeposit, HasMarketMeta,
-        Market, NonceBytes, Oracle, Store, ValidateOracleTime,
+        common::action::ActionExt, glv::GlvWithdrawal, market::revertible::Revertible, Glv,
+        GlvDeposit, HasMarketMeta, Market, NonceBytes, Oracle, Store, ValidateOracleTime,
     },
     utils::internal::TransferUtils,
     CoreError, CoreResult, ModelError,
@@ -33,9 +33,9 @@ pub struct CreateGlvDepositParams {
     pub initial_short_token_amount: u64,
     /// Market token amount.
     pub market_token_amount: u64,
-    /// The minimum acceptable maount of market tokens to be minted.
+    /// Minimum acceptable maount of market tokens to be minted.
     pub min_market_token_amount: u64,
-    /// The minimum acceptable amount of glv tokens receive.
+    /// Minimum acceptable amount of glv tokens to receive.
     pub min_glv_token_amount: u64,
 }
 
@@ -568,4 +568,50 @@ where
         .ok_or(error!(CoreError::FailedToCalculateGlvValueForMarket))?;
 
     Ok((glv_value, value, supply))
+}
+
+/// Create GLV Withdrawal Params.
+#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+pub struct CreateGlvWithdrawalParams {
+    /// Execution fee in lamports
+    pub execution_lamports: u64,
+    /// The length of the swap path for long token.
+    pub long_token_swap_length: u8,
+    /// The length of the swap path for short token.
+    pub short_token_swap_length: u8,
+    /// The amount of glv tokens to burn.
+    pub glv_token_amount: u64,
+    /// Minimum acceptable final long token to receive.
+    pub min_final_long_token_amount: u64,
+    /// Minimum acceptable final short token to receive.
+    pub min_final_short_token_amount: u64,
+}
+
+/// Operation for creating GLV withdrawal.
+#[derive(TypedBuilder)]
+pub(crate) struct CreateGlvWithdrawalOperation<'a, 'info> {
+    glv_withdrawal: AccountLoader<'info, GlvWithdrawal>,
+    market: AccountLoader<'info, Market>,
+    store: AccountLoader<'info, Store>,
+    owner: &'a AccountInfo<'info>,
+    nonce: &'a NonceBytes,
+    bump: u8,
+    final_long_token: &'a Account<'info, TokenAccount>,
+    final_short_token: &'a Account<'info, TokenAccount>,
+    market_token: &'a Account<'info, TokenAccount>,
+    glv_token: &'a InterfaceAccount<'info, token_interface::TokenAccount>,
+    params: &'a CreateGlvWithdrawalParams,
+    swap_paths: &'info [AccountInfo<'info>],
+}
+
+impl<'a, 'info> CreateGlvWithdrawalOperation<'a, 'info> {
+    /// Execute.
+    ///
+    /// # CHECK
+    ///
+    /// # Errors
+    ///
+    pub(crate) fn unchecked_execute(self) -> Result<()> {
+        todo!()
+    }
 }

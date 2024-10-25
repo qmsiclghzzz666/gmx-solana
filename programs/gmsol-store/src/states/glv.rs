@@ -410,7 +410,7 @@ pub struct GlvDeposit {
     /// Header.
     pub(crate) header: ActionHeader,
     /// Token accounts.
-    pub(crate) tokens: TokenAccounts,
+    pub(crate) tokens: GlvDepositTokenAccounts,
     /// Params.
     pub(crate) params: GlvDepositParams,
     /// Swap params.
@@ -526,7 +526,7 @@ impl GlvDeposit {
     }
 
     /// Get token infos.
-    pub fn tokens(&self) -> &TokenAccounts {
+    pub fn tokens(&self) -> &GlvDepositTokenAccounts {
         &self.tokens
     }
 }
@@ -537,10 +537,10 @@ impl HasSwapParams for GlvDeposit {
     }
 }
 
-/// Token Accounts.
+/// Token and accounts.
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[account(zero_copy)]
-pub struct TokenAccounts {
+pub struct GlvDepositTokenAccounts {
     /// Initial long token and account.
     pub initial_long_token: TokenAndAccount,
     /// Initial short token and account.
@@ -551,7 +551,7 @@ pub struct TokenAccounts {
     pub(crate) glv_token: TokenAndAccount,
 }
 
-impl TokenAccounts {
+impl GlvDepositTokenAccounts {
     /// Get market token.
     pub fn market_token(&self) -> Pubkey {
         self.market_token
@@ -591,5 +591,128 @@ pub struct GlvDepositParams {
     pub(crate) market_token_amount: u64,
     /// The minimum acceptable amount of glv tokens to receive.
     pub(crate) min_glv_token_amount: u64,
+    reserved: [u8; 64],
+}
+
+/// Glv Withdrawal.
+#[cfg_attr(feature = "debug", derive(Debug))]
+#[account(zero_copy)]
+pub struct GlvWithdrawal {
+    /// Header.
+    pub(crate) header: ActionHeader,
+    /// Token accounts.
+    pub(crate) tokens: GlvWithdrawalTokenAccounts,
+    /// Params.
+    pub(crate) params: GlvWithdrawalParams,
+    /// Swap params.
+    pub(crate) swap: SwapParams,
+    padding_1: [u8; 4],
+    reserve: [u8; 128],
+}
+
+impl Action for GlvWithdrawal {
+    const MIN_EXECUTION_LAMPORTS: u64 = 200_000;
+
+    fn header(&self) -> &ActionHeader {
+        &self.header
+    }
+}
+
+impl Seed for GlvWithdrawal {
+    const SEED: &'static [u8] = b"glv_withdrawal";
+}
+
+impl gmsol_utils::InitSpace for GlvWithdrawal {
+    const INIT_SPACE: usize = core::mem::size_of::<Self>();
+}
+
+impl HasSwapParams for GlvWithdrawal {
+    fn swap(&self) -> &SwapParams {
+        &self.swap
+    }
+}
+
+/// Token and accounts.
+#[cfg_attr(feature = "debug", derive(Debug))]
+#[account(zero_copy)]
+pub struct GlvWithdrawalTokenAccounts {
+    /// Final ong token and account.
+    pub(crate) final_long_token: TokenAndAccount,
+    /// Final short token and account.
+    pub(crate) final_short_token: TokenAndAccount,
+    /// Market token and account.
+    pub(crate) market_token: TokenAndAccount,
+    /// GLV token and account.
+    pub(crate) glv_token: TokenAndAccount,
+}
+
+impl GlvWithdrawalTokenAccounts {
+    /// Get market token.
+    pub fn market_token(&self) -> Pubkey {
+        self.market_token
+            .token()
+            .expect("uninitialized GLV Withdrawal account")
+    }
+
+    /// Get market token account.
+    pub fn market_token_account(&self) -> Pubkey {
+        self.market_token
+            .account()
+            .expect("uninitalized GLV Withdrawal account")
+    }
+
+    /// Get GLV token.
+    pub fn glv_token(&self) -> Pubkey {
+        self.glv_token
+            .token()
+            .expect("uninitialized GLV Withdrawal account")
+    }
+
+    /// Get GLV token account.
+    pub fn glv_token_account(&self) -> Pubkey {
+        self.glv_token
+            .account()
+            .expect("uninitalized GLV Withdrawal account")
+    }
+
+    /// Get final long token.
+    pub fn final_long_token(&self) -> Pubkey {
+        self.final_long_token
+            .token()
+            .expect("uninitialized GLV Withdrawal account")
+    }
+
+    /// Get final long token account.
+    pub fn final_long_token_account(&self) -> Pubkey {
+        self.final_long_token
+            .account()
+            .expect("uninitalized GLV Withdrawal account")
+    }
+
+    /// Get final short token.
+    pub fn final_short_token(&self) -> Pubkey {
+        self.final_short_token
+            .token()
+            .expect("uninitialized GLV Withdrawal account")
+    }
+
+    /// Get final short token account.
+    pub fn final_short_token_account(&self) -> Pubkey {
+        self.final_short_token
+            .account()
+            .expect("uninitalized GLV Withdrawal account")
+    }
+}
+
+/// GLV Withdrawal Params.
+#[cfg_attr(feature = "debug", derive(Debug))]
+#[account(zero_copy)]
+pub struct GlvWithdrawalParams {
+    /// The amount of GLV tokens to burn.
+    pub(crate) glv_token_amount: u64,
+    /// The minimum acceptable amount of final long tokens to receive.
+    pub min_final_long_token_amount: u64,
+    /// The minimum acceptable amount of final short tokens to receive.
+    pub min_final_short_token_amount: u64,
     reserved: [u8; 64],
 }

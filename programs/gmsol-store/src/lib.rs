@@ -118,7 +118,7 @@ use self::{
     instructions::*,
     ops::{
         deposit::CreateDepositParams,
-        glv::CreateGlvDepositParams,
+        glv::{CreateGlvDepositParams, CreateGlvWithdrawalParams},
         order::{CreateOrderParams, PositionCutKind},
         shift::CreateShiftParams,
         withdrawal::CreateWithdrawalParams,
@@ -1403,6 +1403,15 @@ pub mod gmsol_store {
             throw_on_execution_error,
         )
     }
+
+    /// Create GLV withdrawal.
+    pub fn create_glv_withdrawal<'info>(
+        ctx: Context<'_, '_, 'info, 'info, CreateGlvWithdrawal<'info>>,
+        nonce: [u8; 32],
+        params: CreateGlvWithdrawalParams,
+    ) -> Result<()> {
+        instructions::create_glv_withdrawal(ctx, &nonce, &params)
+    }
 }
 
 /// Result type with [`CoreError`] as error type.
@@ -1721,6 +1730,9 @@ pub enum CoreError {
     /// Exceed max market token balance value of GLV.
     #[msg("GLV max market token balance value exceeded")]
     ExceedMaxGlvMarketTokenBalanceValue,
+    /// Empty GLV withdrawal.
+    #[msg("Empty GLV withdrawal")]
+    EmtpyGlvWithdrawal,
 }
 
 impl CoreError {

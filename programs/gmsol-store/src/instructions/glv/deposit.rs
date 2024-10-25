@@ -28,7 +28,7 @@ use crate::{
     CoreError,
 };
 
-/// The accounts definitions for [`create_glv_deposit`] instruction.
+/// The accounts definition for [`create_glv_deposit`] instruction.
 #[derive(Accounts)]
 #[instruction(nonce: [u8; 32])]
 pub struct CreateGlvDeposit<'info> {
@@ -77,7 +77,7 @@ pub struct CreateGlvDeposit<'info> {
     /// The source initial short token account.
     #[account(mut, token::mint = initial_short_token)]
     pub initial_short_token_source: Option<Box<Account<'info, TokenAccount>>>,
-    /// The escrow account for glv tokens.
+    /// The escrow account for GLV tokens.
     #[account(
         mut,
         associated_token::mint = glv_token,
