@@ -48,7 +48,7 @@ pub struct CreateGlvDeposit<'info> {
     #[account(
         has_one = store,
         constraint = glv.load()?.glv_token == glv_token.key() @ CoreError::TokenMintMismatched,
-        constraint = glv.load()?.market_tokens().contains(&market_token.key()) @ CoreError::InvalidArgument,
+        constraint = glv.load()?.contains(&market_token.key()) @ CoreError::InvalidArgument,
     )]
     pub glv: AccountLoader<'info, Glv>,
     /// GLV deposit.
@@ -556,7 +556,7 @@ pub struct ExecuteGlvDeposit<'info> {
     /// GLV account.
     #[account(
         has_one = store,
-        constraint = glv.load()?.market_tokens().contains(&market_token.key()) @ CoreError::InvalidArgument,
+        constraint = glv.load()?.contains(&market_token.key()) @ CoreError::InvalidArgument,
     )]
     pub glv: AccountLoader<'info, Glv>,
     /// Market.
@@ -681,12 +681,19 @@ pub(crate) fn unchecked_execute_glv_deposit<'info>(
         market_tokens,
         market_token_vaults,
         remaining_accounts,
-    } = accounts.glv.load()?.validate_and_split_remaining_accounts(
-        &glv_address,
-        &accounts.store.key(),
-        accounts.token_program.key,
-        remaining_accounts,
-    )?;
+        tokens,
+    } = {
+        let glv_deposit = accounts.glv_deposit.load()?;
+        let token_map = accounts.token_map.load_token_map()?;
+        accounts.glv.load()?.validate_and_split_remaining_accounts(
+            &glv_address,
+            &accounts.store.key(),
+            accounts.token_program.key,
+            remaining_accounts,
+            &*glv_deposit,
+            &token_map,
+        )?
+    };
 
     let signer = accounts.glv_deposit.load()?.signer();
     accounts.transfer_tokens_in(&signer, remaining_accounts)?;
@@ -695,6 +702,7 @@ pub(crate) fn unchecked_execute_glv_deposit<'info>(
         markets,
         market_tokens,
         market_token_vaults,
+        &tokens,
         remaining_accounts,
         throw_on_execution_error,
     )?;
@@ -880,16 +888,10 @@ impl<'info> ExecuteGlvDeposit<'info> {
         markets: &'info [AccountInfo<'info>],
         market_tokens: &'info [AccountInfo<'info>],
         market_token_vaults: &'info [AccountInfo<'info>],
+        tokens: &[Pubkey],
         remaining_accounts: &'info [AccountInfo<'info>],
         throw_on_execution_error: bool,
     ) -> Result<bool> {
-        // FIXME: We only need the tokens here, the feeds are not necessary.
-        let feeds = self
-            .glv_deposit
-            .load()?
-            .swap
-            .to_feeds(&self.token_map.load_token_map()?)?;
-
         let builder = ExecuteGlvDepositOperation::builder()
             .glv_deposit(self.glv_deposit.clone())
             .token_program(self.token_program.to_account_info())
@@ -911,7 +913,7 @@ impl<'info> ExecuteGlvDeposit<'info> {
             &self.store,
             &self.price_provider,
             &self.token_map,
-            &feeds.tokens,
+            tokens,
             remaining_accounts,
             |oracle, remaining_accounts| {
                 builder

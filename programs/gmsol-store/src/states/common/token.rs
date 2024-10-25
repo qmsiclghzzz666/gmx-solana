@@ -1,6 +1,10 @@
 use anchor_lang::prelude::*;
 use anchor_spl::{token::TokenAccount, token_interface};
 
+use crate::{states::TokenMapAccess, CoreError};
+
+use super::{swap::HasSwapParams, TokenRecord, TokensWithFeed};
+
 /// Token Account.
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[account(zero_copy)]
@@ -50,5 +54,54 @@ impl TokenAndAccount {
         let token = self.token()?;
         let account = self.account()?;
         Some((token, account))
+    }
+}
+
+/// Tokens Collector.
+pub struct TokensCollector {
+    tokens: Vec<Pubkey>,
+}
+
+impl TokensCollector {
+    /// Create a new [`TokensCollactor`].
+    pub fn new(action: &impl HasSwapParams, extra_capacity: usize) -> Self {
+        let swap = action.swap();
+        let mut tokens = Vec::with_capacity(swap.num_tokens() + extra_capacity);
+        // The tokens in the swap params must be sorted.
+        tokens.extend_from_slice(swap.tokens());
+
+        Self { tokens }
+    }
+
+    /// Insert a new token.
+    pub fn insert_token(&mut self, token: &Pubkey) -> bool {
+        match self.tokens.binary_search(token) {
+            Ok(_) => false,
+            Err(idx) => {
+                self.tokens.insert(idx, *token);
+                true
+            }
+        }
+    }
+
+    /// Convert to a vec.
+    pub fn into_vec(mut self, token_map: &impl TokenMapAccess) -> Result<Vec<Pubkey>> {
+        token_map.sort_tokens_by_provider(&mut self.tokens)?;
+        Ok(self.tokens)
+    }
+
+    /// Convert to [`TokensWithFeed`].
+    pub fn to_feeds(&self, token_map: &impl TokenMapAccess) -> Result<TokensWithFeed> {
+        let records = self
+            .tokens
+            .iter()
+            .map(|token| {
+                let config = token_map
+                    .get(token)
+                    .ok_or(error!(CoreError::UnknownOrDisabledToken))?;
+                TokenRecord::from_config(*token, config)
+            })
+            .collect::<Result<Vec<_>>>()?;
+        TokensWithFeed::try_from_records(records)
     }
 }

@@ -191,7 +191,7 @@ impl SwapParams {
     pub fn unique_market_tokens_excluding_current<'a>(
         &'a self,
         current_market_token: &'a Pubkey,
-    ) -> impl Iterator<Item = &Pubkey> + 'a {
+    ) -> impl Iterator<Item = &'a Pubkey> + 'a {
         let mut seen = HashSet::from([current_market_token]);
         self.iter().filter(move |token| seen.insert(token))
     }
@@ -357,4 +357,10 @@ fn validate_path<'info>(
     require_eq!(current, *token_out, CoreError::InvalidSwapPath);
 
     Ok(validated_market_tokens)
+}
+
+/// Has swap parameters.
+pub trait HasSwapParams {
+    /// Get the swap params.
+    fn swap(&self) -> &SwapParams;
 }

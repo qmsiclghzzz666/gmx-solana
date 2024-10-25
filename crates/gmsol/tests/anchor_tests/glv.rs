@@ -41,14 +41,16 @@ async fn glv_deposit() -> eyre::Result<()> {
     let store = &deployment.store;
     let oracle = &deployment.oracle;
     let glv_token = &deployment.glv_token;
-    let market_token = deployment.market_token("fBTC", "fBTC", "USDG").unwrap();
+    let market_token = deployment.market_token("SOL", "fBTC", "USDG").unwrap();
+    let market_token_2 = deployment.market_token("fBTC", "fBTC", "USDG").unwrap();
 
     let long_token_amount = 1_000;
 
     deployment
-        .mint_or_transfer_to_user("fBTC", Deployment::DEFAULT_USER, long_token_amount + 14)
+        .mint_or_transfer_to_user("fBTC", Deployment::DEFAULT_USER, 2 * long_token_amount + 14)
         .await?;
 
+    // Create and then cancel.
     let (rpc, deposit) = user
         .create_glv_deposit(store, glv_token, market_token)
         .long_token_deposit(long_token_amount, None, None)
@@ -65,6 +67,7 @@ async fn glv_deposit() -> eyre::Result<()> {
         .await?;
     tracing::info!(%signature, %deposit, "cancelled a glv deposit");
 
+    // Create and then execute.
     let (rpc, deposit) = user
         .create_glv_deposit(store, glv_token, market_token)
         .long_token_deposit(long_token_amount, None, None)
@@ -72,6 +75,28 @@ async fn glv_deposit() -> eyre::Result<()> {
         .await?;
     let signature = rpc.send_without_preflight().await?;
     tracing::info!(%signature, %deposit, "created a glv deposit again");
+
+    let mut execute = keeper.execute_glv_deposit(oracle, &deposit, false);
+    deployment
+        .execute_with_pyth(
+            execute
+                .add_alt(deployment.common_alt().clone())
+                .add_alt(deployment.market_alt().clone()),
+            None,
+            false,
+            true,
+        )
+        .instrument(tracing::info_span!("executing glv deposit", glv_deposit=%deposit))
+        .await?;
+
+    // Deposit with another market token.
+    let (rpc, deposit) = user
+        .create_glv_deposit(store, glv_token, market_token_2)
+        .long_token_deposit(long_token_amount, None, None)
+        .build_with_address()
+        .await?;
+    let signature = rpc.send_without_preflight().await?;
+    tracing::info!(%signature, %deposit, "created a glv deposit");
 
     let mut execute = keeper.execute_glv_deposit(oracle, &deposit, false);
     deployment

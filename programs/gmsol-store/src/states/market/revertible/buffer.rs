@@ -30,7 +30,7 @@ impl RevertibleBuffer {
         Some(pool.cache_get_mut_with(self.rev, || *storage.pools.get(kind).expect("must exist")))
     }
 
-    pub(super) fn clocks<'a>(&'a self, storage: &'a State) -> &Clocks {
+    pub(super) fn clocks<'a>(&'a self, storage: &'a State) -> &'a Clocks {
         self.state
             .clocks
             .cache_get_with(self.rev, || &storage.clocks)
@@ -42,7 +42,7 @@ impl RevertibleBuffer {
             .cache_get_mut_with(self.rev, || storage.clocks)
     }
 
-    pub(super) fn other<'a>(&'a self, storage: &'a State) -> &OtherState {
+    pub(super) fn other<'a>(&'a self, storage: &'a State) -> &'a OtherState {
         self.state.other.cache_get_with(self.rev, || &storage.other)
     }
 

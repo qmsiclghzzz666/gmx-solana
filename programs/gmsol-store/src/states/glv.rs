@@ -11,12 +11,14 @@ use crate::{
 use super::{
     common::{
         action::{Action, ActionHeader},
-        swap::{unpack_markets, SwapParams},
-        token::TokenAndAccount,
+        swap::{unpack_markets, HasSwapParams, SwapParams},
+        token::{TokenAndAccount, TokensCollector},
     },
     deposit::DepositParams,
-    Seed,
+    Seed, TokenMapAccess,
 };
+
+const MAX_ALLOWED_NUMBER_OF_MARKETS: usize = 128;
 
 /// Glv.
 #[account(zero_copy)]
@@ -28,17 +30,42 @@ pub struct Glv {
     bump_bytes: [u8; 1],
     /// Index.
     pub(crate) index: u8,
-    /// Num of markets.
-    pub(crate) num_markets: u8,
-    padding: [u8; 3],
+    padding: [u8; 4],
     pub(crate) store: Pubkey,
     pub(crate) glv_token: Pubkey,
     pub(crate) long_token: Pubkey,
     pub(crate) short_token: Pubkey,
     pub(crate) min_tokens_for_first_deposit: u64,
     reserve: [u8; 256],
-    market_tokens: [Pubkey; Glv::MAX_ALLOWED_NUMBER_OF_MARKETS],
+    /// Market config map with market token addresses as keys.
+    markets: GlvMarkets,
 }
+
+/// Market Config for GLV.
+#[zero_copy]
+#[cfg_attr(feature = "debug", derive(Debug))]
+pub struct GlvMarketConfig {
+    max_amount: u64,
+    padding: [u8; 8],
+    max_value: u128,
+}
+
+impl Default for GlvMarketConfig {
+    fn default() -> Self {
+        use bytemuck::Zeroable;
+
+        Self::zeroed()
+    }
+}
+
+gmsol_utils::fixed_map!(
+    GlvMarkets,
+    Pubkey,
+    crate::utils::pubkey::to_bytes,
+    GlvMarketConfig,
+    MAX_ALLOWED_NUMBER_OF_MARKETS,
+    12
+);
 
 impl Seed for Glv {
     const SEED: &'static [u8] = b"glv";
@@ -52,7 +79,7 @@ impl Glv {
     pub const GLV_TOKEN_SEED: &'static [u8] = b"glv_token";
 
     /// Max allowed number of markets.
-    pub const MAX_ALLOWED_NUMBER_OF_MARKETS: usize = 128;
+    pub const MAX_ALLOWED_NUMBER_OF_MARKETS: usize = MAX_ALLOWED_NUMBER_OF_MARKETS;
 
     /// Find GLV token address.
     pub fn find_glv_token_pda(store: &Pubkey, index: u8, program_id: &Pubkey) -> (Pubkey, u8) {
@@ -106,14 +133,15 @@ impl Glv {
         self.long_token = *long_token;
         self.short_token = *short_token;
 
-        for (idx, market_token) in market_tokens.iter().enumerate() {
-            self.num_markets += 1;
-            require_gte!(
-                Self::MAX_ALLOWED_NUMBER_OF_MARKETS,
-                self.num_markets as usize,
-                CoreError::ExceedMaxLengthLimit
-            );
-            self.market_tokens[idx] = *market_token;
+        require_gte!(
+            Self::MAX_ALLOWED_NUMBER_OF_MARKETS,
+            market_tokens.len(),
+            CoreError::ExceedMaxLengthLimit
+        );
+
+        for market_token in market_tokens {
+            self.markets
+                .insert_with_options(market_token, Default::default(), true)?;
         }
         Ok(())
     }
@@ -191,8 +219,25 @@ impl Glv {
     }
 
     /// Get all market tokens.
-    pub fn market_tokens(&self) -> &[Pubkey] {
-        &self.market_tokens[0..(self.num_markets as usize)]
+    pub fn market_tokens(&self) -> impl Iterator<Item = Pubkey> + '_ {
+        self.markets
+            .entries()
+            .map(|(key, _)| Pubkey::new_from_array(*key))
+    }
+
+    /// Get the total number of markets.
+    pub fn num_markets(&self) -> usize {
+        self.markets.len()
+    }
+
+    /// Return whether the given market token is contained in this GLV.
+    pub fn contains(&self, market_token: &Pubkey) -> bool {
+        self.markets.get(market_token).is_some()
+    }
+
+    /// Create a new [`GlvTokensCollector`].
+    pub fn tokens_collector(&self, action: &impl HasSwapParams) -> TokensCollector {
+        TokensCollector::new(action, self.num_markets())
     }
 
     /// Split remaining accounts.
@@ -202,8 +247,10 @@ impl Glv {
         store: &Pubkey,
         token_program_id: &Pubkey,
         remaining_accounts: &'info [AccountInfo<'info>],
+        action: &impl HasSwapParams,
+        token_map: &impl TokenMapAccess,
     ) -> Result<SplitAccountsForGlv<'info>> {
-        let len = self.num_markets as usize;
+        let len = self.num_markets();
 
         let markets_end = len;
         let market_tokens_end = markets_end + len;
@@ -220,15 +267,23 @@ impl Glv {
         let market_token_vaults = &remaining_accounts[market_tokens_end..market_token_vaults_end];
         let remaining_accounts = &remaining_accounts[market_token_vaults_end..];
 
+        let mut tokens_collector = self.tokens_collector(action);
+
         for idx in 0..len {
             let market = &markets[idx];
             let market_token = &market_tokens[idx];
             let market_token_vault = &market_token_vaults[idx];
-            let expected_market_token = &self.market_tokens[idx];
+            let expected_market_token = Pubkey::new_from_array(
+                *self
+                    .markets
+                    .get_entry_by_index(idx)
+                    .expect("never out of range")
+                    .0,
+            );
 
             require_eq!(
                 market_token.key(),
-                *expected_market_token,
+                expected_market_token,
                 CoreError::MarketTokenMintMismatched
             );
 
@@ -242,11 +297,14 @@ impl Glv {
 
             {
                 let market = AccountLoader::<Market>::try_from(market)?;
+                let market = market.load()?;
+                let meta = market.validated_meta(store)?;
                 require_eq!(
-                    market.load()?.validated_meta(store)?.market_token_mint,
-                    *expected_market_token,
+                    meta.market_token_mint,
+                    expected_market_token,
                     CoreError::MarketTokenMintMismatched
                 );
+                tokens_collector.insert_token(&meta.index_token_mint);
             }
 
             validate_associated_token_account(
@@ -262,6 +320,7 @@ impl Glv {
             market_tokens,
             market_token_vaults,
             remaining_accounts,
+            tokens: tokens_collector.into_vec(token_map)?,
         })
     }
 }
@@ -271,6 +330,7 @@ pub(crate) struct SplitAccountsForGlv<'info> {
     pub(crate) market_tokens: &'info [AccountInfo<'info>],
     pub(crate) market_token_vaults: &'info [AccountInfo<'info>],
     pub(crate) remaining_accounts: &'info [AccountInfo<'info>],
+    pub(crate) tokens: Vec<Pubkey>,
 }
 
 /// Glv Deposit.
@@ -399,9 +459,10 @@ impl GlvDeposit {
     pub fn tokens(&self) -> &TokenAccounts {
         &self.tokens
     }
+}
 
-    /// Get swap params.
-    pub fn swap(&self) -> &SwapParams {
+impl HasSwapParams for GlvDeposit {
+    fn swap(&self) -> &SwapParams {
         &self.swap
     }
 }

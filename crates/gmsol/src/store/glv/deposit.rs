@@ -12,7 +12,11 @@ use gmsol_store::{
     accounts, instruction,
     ops::glv::CreateGlvDepositParams,
     states::{
-        common::{action::Action, swap::SwapParams, TokensWithFeed},
+        common::{
+            action::Action,
+            swap::{HasSwapParams, SwapParams},
+            TokensWithFeed,
+        },
         Glv, GlvDeposit, HasMarketMeta, NonceBytes, Pyth, TokenMapAccess,
     },
 };
@@ -527,8 +531,13 @@ impl ExecuteGlvDepositHint {
         glv_deposit: &GlvDeposit,
         token_map_address: &Pubkey,
         token_map: &impl TokenMapAccess,
+        index_tokens: impl IntoIterator<Item = Pubkey>,
     ) -> crate::Result<Self> {
-        let glv_market_tokens = glv.market_tokens().iter().copied().collect();
+        let glv_market_tokens = glv.market_tokens().collect();
+        let mut collector = glv.tokens_collector(glv_deposit);
+        for token in index_tokens {
+            collector.insert_token(&token);
+        }
         Ok(Self {
             store: *glv_deposit.header().store(),
             token_map: *token_map_address,
@@ -543,7 +552,7 @@ impl ExecuteGlvDepositHint {
             initial_short_token_escrow: glv_deposit.tokens().initial_short_token.account(),
             glv_token_escrow: glv_deposit.tokens().glv_token_account(),
             swap: *glv_deposit.swap(),
-            feeds: glv_deposit.swap().to_feeds(token_map)?,
+            feeds: collector.to_feeds(token_map)?,
         })
     }
 }
@@ -631,6 +640,13 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteGlvDepositBuilder<'a, C>
                     .ok_or(crate::Error::NotFound)?
                     .0;
 
+                let mut index_tokens = Vec::with_capacity(glv.num_markets());
+                for token in glv.market_tokens() {
+                    let market = self.client.find_market_address(glv.store(), &token);
+                    let market = self.client.market(&market).await?;
+                    index_tokens.push(market.meta().index_token_mint);
+                }
+
                 let store = glv_deposit.header().store();
                 let token_map_address = self
                     .client
@@ -638,8 +654,13 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteGlvDepositBuilder<'a, C>
                     .await?
                     .ok_or(crate::Error::NotFound)?;
                 let token_map = self.client.token_map(&token_map_address).await?;
-                let hint =
-                    ExecuteGlvDepositHint::new(&glv, &glv_deposit, &token_map_address, &token_map)?;
+                let hint = ExecuteGlvDepositHint::new(
+                    &glv,
+                    &glv_deposit,
+                    &token_map_address,
+                    &token_map,
+                    index_tokens,
+                )?;
                 self.hint = Some(hint.clone());
                 Ok(hint)
             }

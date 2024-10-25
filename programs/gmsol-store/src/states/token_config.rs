@@ -494,6 +494,16 @@ pub trait TokenMapAccess {
         let short_token = self.get(&meta.short_token_mint)?;
         Some([index_token, long_token, short_token])
     }
+
+    /// Sort tokens by provider. This sort is stable.
+    fn sort_tokens_by_provider(&self, tokens: &mut [Pubkey]) -> Result<()> {
+        // Check the existence of token configs.
+        for token in tokens.iter() {
+            require!(self.get(token).is_some(), CoreError::UnknownOrDisabledToken);
+        }
+        tokens.sort_by_key(|token| self.get(token).unwrap().expected_provider);
+        Ok(())
+    }
 }
 
 impl<'a> TokenMapAccess for TokenMapRef<'a> {
