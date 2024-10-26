@@ -5,28 +5,32 @@ use crate::CoreError;
 
 /// Transfer execution fee operation.
 #[derive(TypedBuilder)]
-pub(crate) struct TransferExecutionFeeOperation<'info> {
+pub(crate) struct TransferExecutionFeeOperation<'a, 'info> {
     payment: AccountInfo<'info>,
     payer: AccountInfo<'info>,
     execution_lamports: u64,
     system_program: AccountInfo<'info>,
+    #[builder(default)]
+    signer_seeds: Option<&'a [&'a [u8]]>,
 }
 
-impl<'info> TransferExecutionFeeOperation<'info> {
+impl<'a, 'info> TransferExecutionFeeOperation<'a, 'info> {
     pub(crate) fn execute(self) -> Result<()> {
         use anchor_lang::system_program::{transfer, Transfer};
 
         if self.execution_lamports != 0 {
-            transfer(
-                CpiContext::new(
-                    self.system_program,
-                    Transfer {
-                        from: self.payer,
-                        to: self.payment,
-                    },
-                ),
-                self.execution_lamports,
-            )?;
+            let ctx = CpiContext::new(
+                self.system_program,
+                Transfer {
+                    from: self.payer,
+                    to: self.payment,
+                },
+            );
+            if let Some(seeds) = self.signer_seeds {
+                transfer(ctx.with_signer(&[seeds]), self.execution_lamports)?;
+            } else {
+                transfer(ctx, self.execution_lamports)?;
+            }
         }
 
         Ok(())

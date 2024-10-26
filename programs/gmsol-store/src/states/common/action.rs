@@ -335,6 +335,11 @@ pub(crate) trait Create<'info, A>: Sized + anchor_lang::Bumps {
     /// Get the payer account.
     fn payer(&self) -> AccountInfo<'info>;
 
+    /// Get the seeds of the payer.
+    fn payer_seeds(&self) -> Result<Option<Vec<Vec<u8>>>> {
+        Ok(None)
+    }
+
     /// Get the system program account.
     fn system_program(&self) -> AccountInfo<'info>;
 
@@ -363,18 +368,24 @@ pub(crate) trait Create<'info, A>: Sized + anchor_lang::Bumps {
     fn transfer_execution_lamports(&self, params: &Self::CreateParams) -> Result<()> {
         use crate::ops::execution_fee::TransferExecutionFeeOperation;
 
+        let payer_seeds = self.payer_seeds()?;
+        let payer_seeds = payer_seeds
+            .as_ref()
+            .map(|seeds| seeds.iter().map(|seed| seed.as_slice()).collect::<Vec<_>>());
+
         TransferExecutionFeeOperation::builder()
             .payment(self.action())
             .payer(self.payer())
             .execution_lamports(params.execution_lamports())
             .system_program(self.system_program())
+            .signer_seeds(payer_seeds.as_deref())
             .build()
             .execute()
     }
 }
 
 type ShouldContinueWhenATAsAreMissing = bool;
-type Success = bool;
+pub(crate) type TransferSuccess = bool;
 
 /// Close Action.
 pub(crate) trait Close<'info, A>: Authenticate<'info>
@@ -388,10 +399,10 @@ where
     fn fund_receiver(&self) -> AccountInfo<'info>;
 
     /// Transfer funds to ATAs.
-    fn transfer_to_atas(&self, init_if_needed: bool) -> Result<Success>;
+    fn transfer_to_atas(&self, init_if_needed: bool) -> Result<TransferSuccess>;
 
     /// Get event authority.
-    fn event_authority(&self) -> (AccountInfo<'info>, u8);
+    fn event_authority(&self, bumps: &Self::Bumps) -> (AccountInfo<'info>, u8);
 
     /// Close Action.
     fn close(ctx: &Context<'_, '_, '_, 'info, Self>, reason: &str) -> Result<()> {
@@ -402,7 +413,7 @@ where
                 let action_address = accounts.action().key();
                 let action = accounts.action().load()?;
                 let event = action.to_closed_event(&action_address, reason)?;
-                let (event_authority, event_authority_bump) = accounts.event_authority();
+                let (event_authority, event_authority_bump) = accounts.event_authority(&ctx.bumps);
                 event.emit_cpi(event_authority, event_authority_bump)?;
             }
             accounts.close_action_account()?;

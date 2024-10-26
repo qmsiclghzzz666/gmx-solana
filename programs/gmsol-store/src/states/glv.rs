@@ -6,6 +6,7 @@ use std::{
 use anchor_lang::prelude::*;
 
 use crate::{
+    events::RemoveShiftEvent,
     states::{Deposit, Market},
     utils::token::validate_associated_token_account,
     CoreError,
@@ -13,12 +14,12 @@ use crate::{
 
 use super::{
     common::{
-        action::{Action, ActionHeader},
+        action::{Action, ActionHeader, Closable},
         swap::{unpack_markets, HasSwapParams, SwapParams},
         token::{TokenAndAccount, TokensCollector},
     },
     deposit::DepositParams,
-    Seed, Shift, TokenMapAccess,
+    shift, Seed, Shift, TokenMapAccess,
 };
 
 const MAX_ALLOWED_NUMBER_OF_MARKETS: usize = 128;
@@ -136,6 +137,14 @@ impl Glv {
 
     pub(crate) fn signer_seeds(&self) -> [&[u8]; 3] {
         [Self::SEED, self.glv_token().as_ref(), &self.bump_bytes]
+    }
+
+    pub(crate) fn vec_signer_seeds(&self) -> Vec<Vec<u8>> {
+        vec![
+            Self::SEED.to_vec(),
+            self.glv_token.to_bytes().to_vec(),
+            self.bump_bytes.to_vec(),
+        ]
     }
 
     /// Initialize the [`Glv`] account.
@@ -735,6 +744,24 @@ impl Action for GlvShift {
     }
 }
 
+impl Closable for GlvShift {
+    type ClosedEvent = RemoveShiftEvent;
+
+    fn to_closed_event(&self, address: &Pubkey, reason: &str) -> Result<Self::ClosedEvent> {
+        let header = self.header();
+        let tokens = self.tokens();
+        RemoveShiftEvent::new(
+            header.id,
+            header.store,
+            *address,
+            tokens.from_market_token(),
+            header.owner,
+            header.action_state()?,
+            reason,
+        )
+    }
+}
+
 impl Seed for GlvShift {
     const SEED: &'static [u8] = b"glv_shift";
 }
@@ -747,6 +774,11 @@ impl GlvShift {
     /// Get the GLV address.
     pub fn glv(&self) -> &Pubkey {
         &self.shift.header.owner
+    }
+
+    /// Get token infos.
+    pub fn tokens(&self) -> &shift::TokenAccounts {
+        self.shift.tokens()
     }
 }
 

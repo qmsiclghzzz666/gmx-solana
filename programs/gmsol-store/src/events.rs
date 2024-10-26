@@ -11,11 +11,12 @@ use gmsol_model::{
     params::fee::PositionFees,
     price::Prices,
 };
+use gmsol_utils::InitSpace;
 
 use crate::{
     constants,
     states::{
-        common::action::ActionState,
+        common::action::{ActionEvent, ActionState},
         order::{OrderKind, TransferOut},
         position::PositionState,
         Position,
@@ -216,7 +217,7 @@ impl RemoveWithdrawalEvent {
 /// Shift removed event.
 #[event]
 #[cfg_attr(feature = "debug", derive(Debug))]
-#[derive(Clone)]
+#[derive(Clone, InitSpace)]
 pub struct RemoveShiftEvent {
     /// Action id.
     pub id: u64,
@@ -235,6 +236,7 @@ pub struct RemoveShiftEvent {
     /// Final state.
     pub state: ActionState,
     /// Reason.
+    #[max_len(32)]
     pub reason: String,
 }
 
@@ -262,6 +264,12 @@ impl RemoveShiftEvent {
         })
     }
 }
+
+impl InitSpace for RemoveShiftEvent {
+    const INIT_SPACE: usize = <Self as Space>::INIT_SPACE;
+}
+
+impl ActionEvent for RemoveShiftEvent {}
 
 /// GLV Deposit removed event.
 #[event]

@@ -124,7 +124,7 @@ use self::{
         withdrawal::CreateWithdrawalParams,
     },
     states::{
-        common::action::Create,
+        common::action::{Close, Create},
         market::{config::EntryArgs, status::MarketStatus, MarketMeta},
         order::UpdateOrderParams,
         token_config::TokenConfigBuilder,
@@ -1441,6 +1441,15 @@ pub mod gmsol_store {
         params: CreateShiftParams,
     ) -> Result<()> {
         CreateGlvShift::create(&mut ctx, &nonce, &params)
+    }
+
+    /// Close a GLV shift.
+    #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
+    pub fn close_glv_shift<'info>(
+        ctx: Context<'_, '_, 'info, 'info, CloseGlvShift<'info>>,
+        reason: String,
+    ) -> Result<()> {
+        CloseGlvShift::close(&ctx, &reason)
     }
 }
 
