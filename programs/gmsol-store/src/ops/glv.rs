@@ -1,3 +1,5 @@
+use std::borrow::Borrow;
+
 use anchor_lang::prelude::*;
 use anchor_spl::{
     token::{transfer_checked, Mint, TokenAccount, TransferChecked},
@@ -9,9 +11,12 @@ use typed_builder::TypedBuilder;
 use crate::{
     constants,
     states::{
-        common::action::ActionExt, glv::GlvWithdrawal, market::revertible::Revertible,
-        withdrawal::WithdrawalParams, Glv, GlvDeposit, HasMarketMeta, Market, NonceBytes, Oracle,
-        Store, ValidateOracleTime,
+        common::action::{Action, ActionExt},
+        glv::{GlvShift, GlvWithdrawal},
+        market::revertible::Revertible,
+        withdrawal::WithdrawalParams,
+        Glv, GlvDeposit, HasMarketMeta, Market, NonceBytes, Oracle, Shift, Store,
+        ValidateOracleTime,
     },
     utils::internal::TransferUtils,
     CoreError, CoreResult, ModelError,
@@ -601,6 +606,7 @@ pub(crate) struct ExecuteGlvWithdrawalOperation<'a, 'info> {
     glv_token_program: AccountInfo<'info>,
     throw_on_execution_error: bool,
     store: AccountLoader<'info, Store>,
+    glv: &'a AccountLoader<'info, Glv>,
     glv_token_mint: &'a mut InterfaceAccount<'info, token_interface::Mint>,
     glv_token_account: AccountInfo<'info>,
     market: AccountLoader<'info, Market>,
@@ -730,9 +736,6 @@ impl<'a, 'info> ExecuteGlvWithdrawalOperation<'a, 'info> {
 
             // Transfer market tokens from the GLV vault to the withdrawal vault before the commitment.
             {
-                let signer = withdrawal.signer();
-                let seeds = signer.as_seeds();
-
                 transfer_checked(
                     CpiContext::new(
                         self.token_program.to_account_info(),
@@ -740,13 +743,14 @@ impl<'a, 'info> ExecuteGlvWithdrawalOperation<'a, 'info> {
                             from: self.market_token_glv_vault.to_account_info(),
                             mint: market_token_mint,
                             to: self.market_token_withdrawal_vault.to_account_info(),
-                            authority: self.glv_withdrawal.to_account_info(),
+                            authority: self.glv.to_account_info(),
                         },
                     )
-                    .with_signer(&[&seeds]),
+                    .with_signer(&[&self.glv.load()?.signer_seeds()]),
                     market_token_amount,
                     market_token_decimals,
-                )?;
+                )
+                .expect("failed to transfer market tokens");
             }
 
             executed.commit();
@@ -942,4 +946,206 @@ where
     .ok_or(error!(CoreError::FailedTOCalculateMarketTokenAmountToBurn))?;
 
     Ok(market_token_amount)
+}
+
+/// Operation for executing a GLV withdrawal.
+#[derive(TypedBuilder)]
+pub(crate) struct ExecuteGlvShiftOperation<'a, 'info> {
+    glv_shift: &'a AccountLoader<'info, GlvShift>,
+    token_program: AccountInfo<'info>,
+    throw_on_execution_error: bool,
+    store: &'a AccountLoader<'info, Store>,
+    glv: &'a AccountLoader<'info, Glv>,
+    from_market: &'a AccountLoader<'info, Market>,
+    from_market_token_mint: &'a mut Account<'info, Mint>,
+    from_market_token_account: AccountInfo<'info>,
+    from_market_token_withdrawal_vault: AccountInfo<'info>,
+    to_market: &'a AccountLoader<'info, Market>,
+    to_market_token_mint: &'a mut Account<'info, Mint>,
+    to_market_token_glv_vault: AccountInfo<'info>,
+    oracle: &'a Oracle,
+}
+
+impl<'a, 'info> ExecuteGlvShiftOperation<'a, 'info> {
+    /// Execute.
+    ///
+    /// # CHECK
+    ///
+    /// # Errors
+    ///
+    pub(crate) fn unchecked_execute(self) -> Result<bool> {
+        let throw_on_execution_error = self.throw_on_execution_error;
+        match self.validate_oracle() {
+            Ok(()) => {}
+            Err(CoreError::OracleTimestampsAreLargerThanRequired) if !throw_on_execution_error => {
+                msg!(
+                    "GLV Shift expired at {}",
+                    self.oracle_updated_before()
+                        .ok()
+                        .flatten()
+                        .expect("must have an expiration time"),
+                );
+            }
+            Err(err) => {
+                return Err(error!(err));
+            }
+        }
+        match self.perform_glv_shift() {
+            Ok(()) => Ok(true),
+            Err(err) if !throw_on_execution_error => {
+                msg!("Execute GLV shift error: {}", err);
+                Ok(false)
+            }
+            Err(err) => Err(err),
+        }
+    }
+
+    fn validate_oracle(&self) -> CoreResult<()> {
+        self.oracle.validate_time(self)
+    }
+
+    fn validate_markets_and_shift(&self) -> Result<()> {
+        require!(
+            self.from_market.key() != self.to_market.key(),
+            CoreError::Internal
+        );
+
+        let from_market = self.from_market.load()?;
+        let to_market = self.to_market.load()?;
+
+        from_market.validate(&self.store.key())?;
+        to_market.validate(&self.store.key())?;
+
+        from_market.validate_shiftable(&to_market)?;
+
+        let shift = self.glv_shift.load()?;
+        Borrow::<Shift>::borrow(&*shift)
+            .validate_for_execution(&self.to_market_token_mint.to_account_info(), &to_market)?;
+
+        Ok(())
+    }
+
+    #[inline(never)]
+    fn perform_glv_shift(self) -> Result<()> {
+        self.validate_markets_and_shift()?;
+
+        let from_market_token_mint = self.from_market_token_mint.to_account_info();
+        let from_market_token_decimals = self.from_market_token_mint.decimals;
+        let glv_shift = self.glv_shift.load()?;
+        let shift = Borrow::<Shift>::borrow(&*glv_shift);
+
+        let mut from_market = RevertibleLiquidityMarketOperation::new(
+            self.store,
+            self.oracle,
+            self.from_market,
+            self.from_market_token_mint,
+            self.token_program.clone(),
+            None,
+            &[],
+        )?;
+
+        let mut to_market = RevertibleLiquidityMarketOperation::new(
+            self.store,
+            self.oracle,
+            self.to_market,
+            self.to_market_token_mint,
+            self.token_program.clone(),
+            None,
+            &[],
+        )?;
+
+        let from_market = from_market.op()?;
+        let to_market = to_market.op()?;
+
+        let (from_market, to_market, received) = from_market.unchecked_shift(
+            to_market,
+            &shift.params,
+            &self.from_market_token_withdrawal_vault,
+            &self.to_market_token_glv_vault,
+        )?;
+
+        // Validate to market token balance.
+        {
+            let (_, market_pool_value, market_token_supply) = {
+                let mut prices = self.oracle.market_prices(to_market.market())?;
+                get_glv_value_for_market(self.oracle, &mut prices, to_market.market(), 0, true)?
+            };
+            let current_balance =
+                anchor_spl::token::accessor::amount(&self.to_market_token_glv_vault)?;
+            let new_balance = current_balance
+                .checked_add(received)
+                .ok_or(error!(CoreError::TokenAmountOverflow))?;
+            self.glv.load()?.validate_market_token_balance(
+                &to_market.market().market_meta().market_token_mint,
+                new_balance,
+                &market_pool_value,
+                &market_token_supply,
+            )?;
+        }
+
+        // Transfer market tokens from the GLV vault to the withdrawal vault before the commitment.
+        {
+            let signer = glv_shift.signer();
+            let seeds = signer.as_seeds();
+
+            transfer_checked(
+                CpiContext::new(
+                    self.token_program.to_account_info(),
+                    TransferChecked {
+                        from: self.from_market_token_account.to_account_info(),
+                        mint: from_market_token_mint,
+                        to: self.from_market_token_withdrawal_vault.to_account_info(),
+                        authority: self.glv_shift.to_account_info(),
+                    },
+                )
+                .with_signer(&[&seeds]),
+                shift.params.from_market_token_amount,
+                from_market_token_decimals,
+            )
+            .expect("failed to transfer from market tokens");
+        }
+
+        // Commit the changes.
+        from_market.commit();
+        to_market.commit();
+
+        Ok(())
+    }
+}
+
+impl<'a, 'info> ValidateOracleTime for ExecuteGlvShiftOperation<'a, 'info> {
+    fn oracle_updated_after(&self) -> CoreResult<Option<i64>> {
+        Ok(Some(
+            self.glv_shift
+                .load()
+                .map_err(|_| CoreError::LoadAccountError)?
+                .header()
+                .updated_at,
+        ))
+    }
+
+    fn oracle_updated_before(&self) -> CoreResult<Option<i64>> {
+        let ts = self
+            .store
+            .load()
+            .map_err(|_| CoreError::LoadAccountError)?
+            .request_expiration_at(
+                self.glv_shift
+                    .load()
+                    .map_err(|_| CoreError::LoadAccountError)?
+                    .header()
+                    .updated_at,
+            )?;
+        Ok(Some(ts))
+    }
+
+    fn oracle_updated_after_slot(&self) -> CoreResult<Option<u64>> {
+        Ok(Some(
+            self.glv_shift
+                .load()
+                .map_err(|_| CoreError::LoadAccountError)?
+                .header()
+                .updated_at_slot,
+        ))
+    }
 }

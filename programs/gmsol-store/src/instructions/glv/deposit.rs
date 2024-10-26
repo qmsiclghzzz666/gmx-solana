@@ -690,7 +690,7 @@ pub(crate) fn unchecked_execute_glv_deposit<'info>(
             &accounts.store.key(),
             accounts.token_program.key,
             remaining_accounts,
-            &*glv_deposit,
+            Some(&*glv_deposit),
             &token_map,
         )?
     };

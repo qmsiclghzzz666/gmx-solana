@@ -64,11 +64,17 @@ pub struct TokensCollector {
 
 impl TokensCollector {
     /// Create a new [`TokensCollactor`].
-    pub fn new(action: &impl HasSwapParams, extra_capacity: usize) -> Self {
-        let swap = action.swap();
-        let mut tokens = Vec::with_capacity(swap.num_tokens() + extra_capacity);
-        // The tokens in the swap params must be sorted.
-        tokens.extend_from_slice(swap.tokens());
+    pub fn new(action: Option<&impl HasSwapParams>, extra_capacity: usize) -> Self {
+        let mut tokens;
+        match action {
+            Some(action) => {
+                let swap = action.swap();
+                tokens = Vec::with_capacity(swap.num_tokens() + extra_capacity);
+                // The tokens in the swap params must be sorted.
+                tokens.extend_from_slice(swap.tokens());
+            }
+            None => tokens = Vec::with_capacity(extra_capacity),
+        }
 
         Self { tokens }
     }

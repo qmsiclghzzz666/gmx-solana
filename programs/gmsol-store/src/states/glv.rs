@@ -304,7 +304,7 @@ impl Glv {
     }
 
     /// Create a new [`GlvTokensCollector`].
-    pub fn tokens_collector(&self, action: &impl HasSwapParams) -> TokensCollector {
+    pub fn tokens_collector(&self, action: Option<&impl HasSwapParams>) -> TokensCollector {
         TokensCollector::new(action, self.num_markets())
     }
 
@@ -315,7 +315,7 @@ impl Glv {
         store: &Pubkey,
         token_program_id: &Pubkey,
         remaining_accounts: &'info [AccountInfo<'info>],
-        action: &impl HasSwapParams,
+        action: Option<&impl HasSwapParams>,
         token_map: &impl TokenMapAccess,
     ) -> Result<SplitAccountsForGlv<'info>> {
         let len = self.num_markets();
@@ -779,6 +779,10 @@ impl GlvShift {
     /// Get token infos.
     pub fn tokens(&self) -> &shift::TokenAccounts {
         self.shift.tokens()
+    }
+
+    pub(crate) fn header_mut(&mut self) -> &mut ActionHeader {
+        &mut self.shift.header
     }
 }
 

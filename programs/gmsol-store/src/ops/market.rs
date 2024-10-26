@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, TokenAccount};
-use gmsol_model::{LiquidityMarketMutExt, PositionImpactMarketMutExt};
+use gmsol_model::{Bank, LiquidityMarketMutExt, PositionImpactMarketMutExt};
 use typed_builder::TypedBuilder;
 
 use crate::{
@@ -17,7 +17,7 @@ use crate::{
             HasMarketMeta,
         },
         withdrawal::WithdrawalParams,
-        Market, Oracle, Store,
+        Market, Oracle, ShiftParams, Store,
     },
     CoreError, ModelError,
 };
@@ -366,6 +366,91 @@ impl<'a, 'info, T> Execute<'a, 'info, T> {
         params.validate_output_amounts(final_long_amount, final_short_amount)?;
 
         Ok(self.with_output((final_long_amount, final_short_amount)))
+    }
+
+    fn take_output<U>(self, new_output: U) -> (Execute<'a, 'info, U>, T) {
+        let Self {
+            output,
+            oracle,
+            swap,
+            market,
+            swap_markets,
+        } = self;
+
+        (
+            Execute {
+                output: new_output,
+                oracle,
+                swap,
+                market,
+                swap_markets,
+            },
+            output,
+        )
+    }
+
+    /// Shift market tokens.
+    /// # CHECK
+    ///
+    /// # Errors
+    ///
+    pub(crate) fn unchecked_shift(
+        self,
+        mut to_market: Self,
+        params: &ShiftParams,
+        from_market_token_vault: &'a AccountInfo<'info>,
+        to_market_token_account: &'a AccountInfo<'info>,
+    ) -> Result<(Self, Self, u64)> {
+        let meta = self.market().market_meta();
+        let (long_token, short_token) = (meta.long_token_mint, meta.short_token_mint);
+
+        // Perform the shift-withdrawal.
+        let (mut from_market, (long_amount, short_amount)) = {
+            let (op, output) = self.take_output(());
+            let mut withdrawal_params = WithdrawalParams::default();
+            withdrawal_params.market_token_amount = params.from_market_token_amount;
+            op.unchekced_withdraw(
+                from_market_token_vault,
+                &withdrawal_params,
+                (long_token, short_token),
+            )?
+            .take_output(output)
+        };
+
+        // Transfer tokens from the `from_market` to `to_market`.
+        // The vaults are assumed to be shared.
+        {
+            from_market
+                .market_mut()
+                .record_transferred_out_by_token(&long_token, &long_amount)
+                .map_err(ModelError::from)?;
+            to_market
+                .market_mut()
+                .record_transferred_in_by_token(&long_token, &long_amount)
+                .map_err(ModelError::from)?;
+
+            from_market
+                .market_mut()
+                .record_transferred_out_by_token(&short_token, &short_amount)
+                .map_err(ModelError::from)?;
+            to_market
+                .market_mut()
+                .record_transferred_in_by_token(&short_token, &short_amount)
+                .map_err(ModelError::from)?;
+        }
+
+        // Perform the shift-deposit.
+        let (to_market, received) = {
+            let (op, output) = to_market.take_output(());
+            let mut deposit_params = DepositParams::default();
+            deposit_params.initial_long_token_amount = long_amount;
+            deposit_params.initial_short_token_amount = short_amount;
+            deposit_params.min_market_token_amount = params.min_to_market_token_amount;
+            op.unchecked_deposit(to_market_token_account, &deposit_params, (None, None))?
+                .take_output(output)
+        };
+
+        Ok((from_market, to_market, received))
     }
 }
 

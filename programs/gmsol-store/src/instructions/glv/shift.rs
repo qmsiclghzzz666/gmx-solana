@@ -6,11 +6,17 @@ use anchor_spl::{
 use gmsol_utils::InitSpace;
 
 use crate::{
-    ops::shift::{CreateShiftOperation, CreateShiftParams},
+    constants,
+    ops::{
+        execution_fee::PayExecutionFeeOperation,
+        glv::ExecuteGlvShiftOperation,
+        shift::{CreateShiftOperation, CreateShiftParams},
+    },
+    ordered_tokens,
     states::{
         common::action::{self, Action, ActionExt},
         glv::GlvShift,
-        Glv, Market, NonceBytes, RoleKey, Seed, Store,
+        Glv, Market, NonceBytes, Oracle, PriceProvider, RoleKey, Seed, Store, TokenMapHeader,
     },
     utils::internal,
     CoreError,
@@ -318,5 +324,187 @@ impl<'info> internal::Authentication<'info> for CloseGlvShift<'info> {
 
     fn store(&self) -> &AccountLoader<'info, Store> {
         &self.store
+    }
+}
+
+/// The accounts definition for [`execute_glv_shift`] instruction.
+///
+/// Remaining accounts expected by this instruction:
+///
+///   - 0..M. `[]` M feed accounts, where M represents the total number of unique tokens
+///     of markets.
+#[derive(Accounts)]
+pub struct ExecuteGlvShift<'info> {
+    /// Authority.
+    pub authority: Signer<'info>,
+    /// Store.
+    #[account(has_one = token_map)]
+    pub store: AccountLoader<'info, Store>,
+    /// Token Map.
+    #[account(has_one = store)]
+    pub token_map: AccountLoader<'info, TokenMapHeader>,
+    /// Price Provider.
+    pub price_provider: Interface<'info, PriceProvider>,
+    /// Oracle buffer to use.
+    #[account(has_one = store)]
+    pub oracle: Box<Account<'info, Oracle>>,
+    /// GLV account.
+    #[account(
+        has_one = store,
+        constraint = glv.load()?.contains(&from_market_token.key()) @ CoreError::InvalidArgument,
+        constraint = glv.load()?.contains(&to_market_token.key()) @ CoreError::InvalidArgument,
+    )]
+    pub glv: AccountLoader<'info, Glv>,
+    /// From Market.
+    #[account(
+        mut,
+        has_one = store,
+        constraint = from_market.load()?.meta().market_token_mint == from_market_token.key() @ CoreError::MarketTokenMintMismatched,
+    )]
+    pub from_market: AccountLoader<'info, Market>,
+    /// To Market.
+    #[account(
+        mut,
+        has_one = store,
+        constraint = to_market.load()?.meta().market_token_mint == to_market_token.key() @ CoreError::MarketTokenMintMismatched,
+    )]
+    pub to_market: AccountLoader<'info, Market>,
+    /// The GLV shift to close.
+    #[account(
+        mut,
+        constraint = glv_shift.load()?.header().owner == glv.key() @ CoreError::OwnerMismatched,
+        constraint = glv_shift.load()?.header().store == store.key() @ CoreError::StoreMismatched,
+        constraint = glv_shift.load()?.tokens().from_market_token_account() == from_market_token_escrow.key() @ CoreError::MarketTokenAccountMismatched,
+        seeds = [GlvShift::SEED, store.key().as_ref(), glv.key().as_ref(), &glv_shift.load()?.header().nonce],
+        bump = glv_shift.load()?.header().bump,
+    )]
+    pub glv_shift: AccountLoader<'info, GlvShift>,
+    /// From Market token.
+    #[account(
+        constraint = glv_shift.load()?.tokens().from_market_token() == from_market_token.key() @ CoreError::MarketTokenMintMismatched
+    )]
+    pub from_market_token: Box<Account<'info, Mint>>,
+    /// To Market token.
+    #[account(
+        constraint = glv_shift.load()?.tokens().to_market_token() == to_market_token.key() @ CoreError::MarketTokenMintMismatched
+    )]
+    pub to_market_token: Box<Account<'info, Mint>>,
+    /// The escrow account for from market tokens.
+    #[account(
+        mut,
+        associated_token::mint = from_market_token,
+        associated_token::authority = glv_shift,
+    )]
+    pub from_market_token_escrow: Box<Account<'info, TokenAccount>>,
+    /// The escrow account for to market tokens.
+    #[account(
+        mut,
+        associated_token::mint = to_market_token,
+        associated_token::authority = glv,
+    )]
+    pub to_market_token_glv_vault: Box<Account<'info, TokenAccount>>,
+    /// From market token vault.
+    #[account(
+        mut,
+        token::mint = from_market_token,
+        seeds = [
+            constants::MARKET_VAULT_SEED,
+            store.key().as_ref(),
+            from_market_token_vault.mint.as_ref(),
+            &[],
+        ],
+        bump,
+    )]
+    pub from_market_token_vault: Box<Account<'info, TokenAccount>>,
+    /// The token program.
+    pub token_program: Program<'info, Token>,
+}
+
+/// Execute GLV shift.
+///
+/// # CHECK
+/// - Only ORDER_KEEPER is allowed to execute shift.
+pub fn unchecked_execute_glv_shift<'info>(
+    ctx: Context<'_, '_, 'info, 'info, ExecuteGlvShift<'info>>,
+    execution_lamports: u64,
+    throw_on_execution_error: bool,
+) -> Result<()> {
+    let accounts = ctx.accounts;
+    let remaining_accounts = ctx.remaining_accounts;
+
+    let executed = accounts.perform_execution(remaining_accounts, throw_on_execution_error)?;
+
+    if executed {
+        accounts.glv_shift.load_mut()?.header_mut().completed()?;
+    } else {
+        accounts.glv_shift.load_mut()?.header_mut().cancelled()?;
+    }
+
+    // It must be placed at the end to be executed correctly.
+    accounts.pay_execution_fee(execution_lamports)?;
+
+    Ok(())
+}
+
+impl<'info> internal::Authentication<'info> for ExecuteGlvShift<'info> {
+    fn authority(&self) -> &Signer<'info> {
+        &self.authority
+    }
+
+    fn store(&self) -> &AccountLoader<'info, Store> {
+        &self.store
+    }
+}
+
+impl<'info> ExecuteGlvShift<'info> {
+    #[inline(never)]
+    fn pay_execution_fee(&self, execution_fee: u64) -> Result<()> {
+        let execution_lamports = self.glv_shift.load()?.execution_lamports(execution_fee);
+        PayExecutionFeeOperation::builder()
+            .payer(self.glv_shift.to_account_info())
+            .receiver(self.authority.to_account_info())
+            .execution_lamports(execution_lamports)
+            .build()
+            .execute()?;
+        Ok(())
+    }
+
+    #[inline(never)]
+    fn ordered_tokens(&self) -> Result<Vec<Pubkey>> {
+        let from = *self.from_market.load()?.meta();
+        let to = *self.to_market.load()?.meta();
+
+        Ok(ordered_tokens(&from, &to).into_iter().collect())
+    }
+
+    fn perform_execution(
+        &mut self,
+        remaining_accounts: &'info [AccountInfo<'info>],
+        throw_on_execution_error: bool,
+    ) -> Result<bool> {
+        let tokens = self.ordered_tokens()?;
+
+        let builder = ExecuteGlvShiftOperation::builder()
+            .glv_shift(&self.glv_shift)
+            .token_program(self.token_program.to_account_info())
+            .throw_on_execution_error(throw_on_execution_error)
+            .store(&self.store)
+            .glv(&self.glv)
+            .from_market(&self.from_market)
+            .from_market_token_mint(&mut self.from_market_token)
+            .from_market_token_account(self.from_market_token_escrow.to_account_info())
+            .from_market_token_withdrawal_vault(self.from_market_token_vault.to_account_info())
+            .to_market(&self.to_market)
+            .to_market_token_mint(&mut self.to_market_token)
+            .to_market_token_glv_vault(self.to_market_token_glv_vault.to_account_info());
+
+        self.oracle.with_prices(
+            &self.store,
+            &self.price_provider,
+            &self.token_map,
+            &tokens,
+            remaining_accounts,
+            |oracle, _remaining_accounts| builder.oracle(oracle).build().unchecked_execute(),
+        )
     }
 }

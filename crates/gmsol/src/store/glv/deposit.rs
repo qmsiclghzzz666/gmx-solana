@@ -534,7 +534,7 @@ impl ExecuteGlvDepositHint {
         index_tokens: impl IntoIterator<Item = Pubkey>,
     ) -> crate::Result<Self> {
         let glv_market_tokens = glv.market_tokens().collect();
-        let mut collector = glv.tokens_collector(glv_deposit);
+        let mut collector = glv.tokens_collector(Some(glv_deposit));
         for token in index_tokens {
             collector.insert_token(&token);
         }

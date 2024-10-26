@@ -460,7 +460,7 @@ impl<'info> CloseGlvWithdrawal<'info> {
 
 /// The accounts definition for `execute_glv_withdrawal` instruction.
 ///
-/// Remaining accounts expected by thi instruction:
+/// Remaining accounts expected by this instruction:
 ///
 ///   - 0..N. `[]` N market accounts, where N represents the total number of markets managed
 ///     by the given GLV.
@@ -633,7 +633,7 @@ pub(crate) fn unchecked_execute_glv_withdrawal<'info>(
             &accounts.store.key(),
             accounts.token_program.key,
             remaining_accounts,
-            &*glv_withdrawal,
+            Some(&*glv_withdrawal),
             &token_map,
         )?
     };
@@ -698,6 +698,7 @@ impl<'info> ExecuteGlvWithdrawal<'info> {
             .glv_token_program(self.glv_token_program.to_account_info())
             .throw_on_execution_error(throw_on_execution_error)
             .store(self.store.clone())
+            .glv(&self.glv)
             .glv_token_mint(&mut self.glv_token)
             .glv_token_account(self.glv_token_escrow.to_account_info())
             .market(self.market.clone())

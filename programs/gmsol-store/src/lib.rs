@@ -1451,6 +1451,16 @@ pub mod gmsol_store {
     ) -> Result<()> {
         CloseGlvShift::close(&ctx, &reason)
     }
+
+    /// Execute GLV shift.
+    #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
+    pub fn execute_glv_shift<'info>(
+        ctx: Context<'_, '_, 'info, 'info, ExecuteGlvShift<'info>>,
+        execution_lamports: u64,
+        throw_on_execution_error: bool,
+    ) -> Result<()> {
+        instructions::unchecked_execute_glv_shift(ctx, execution_lamports, throw_on_execution_error)
+    }
 }
 
 /// Result type with [`CoreError`] as error type.
