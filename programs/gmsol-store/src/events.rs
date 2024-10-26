@@ -61,7 +61,7 @@ pub struct OrderCreatedEvent {
 /// Deposit removed event.
 #[event]
 #[cfg_attr(feature = "debug", derive(Debug))]
-#[derive(Clone)]
+#[derive(Clone, InitSpace)]
 pub struct RemoveDepositEvent {
     /// Action id.
     pub id: u64,
@@ -80,6 +80,7 @@ pub struct RemoveDepositEvent {
     /// Final state.
     pub state: ActionState,
     /// Reason.
+    #[max_len(32)]
     pub reason: String,
 }
 

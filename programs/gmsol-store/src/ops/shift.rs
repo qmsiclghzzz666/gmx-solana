@@ -1,11 +1,14 @@
+use std::{borrow::BorrowMut, cell::RefMut};
+
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, TokenAccount};
 use gmsol_model::Bank;
+use gmsol_utils::InitSpace;
 use typed_builder::TypedBuilder;
 
 use crate::{
     states::{
-        common::action::{Action, ActionExt},
+        common::action::{Action, ActionExt, ActionParams},
         deposit::DepositParams,
         market::revertible::Revertible,
         withdrawal::WithdrawalParams,
@@ -27,12 +30,21 @@ pub struct CreateShiftParams {
     pub min_to_market_token_amount: u64,
 }
 
+impl ActionParams for CreateShiftParams {
+    fn execution_lamports(&self) -> u64 {
+        self.execution_lamports
+    }
+}
+
 /// Operation for creating a shift.
 #[derive(TypedBuilder)]
-pub struct CreateShiftOperation<'a, 'info> {
+pub struct CreateShiftOperation<'a, 'info, T>
+where
+    T: anchor_lang::ZeroCopy + anchor_lang::Owner,
+{
     store: &'a AccountLoader<'info, Store>,
     owner: AccountInfo<'info>,
-    shift: &'a AccountLoader<'info, Shift>,
+    shift: &'a AccountLoader<'info, T>,
     from_market: &'a AccountLoader<'info, Market>,
     from_market_token_account: &'a Account<'info, TokenAccount>,
     to_market: &'a AccountLoader<'info, Market>,
@@ -42,14 +54,18 @@ pub struct CreateShiftOperation<'a, 'info> {
     params: &'a CreateShiftParams,
 }
 
-impl<'a, 'info> CreateShiftOperation<'a, 'info> {
+impl<'a, 'info, T> CreateShiftOperation<'a, 'info, T>
+where
+    T: anchor_lang::ZeroCopy + anchor_lang::Owner + Action + InitSpace,
+    T: BorrowMut<Shift>,
+{
     pub(crate) fn execute(self) -> Result<()> {
         self.validate_markets()?;
         self.validate_params()?;
 
         let id = self.from_market.load_mut()?.indexer_mut().next_shift_id()?;
 
-        let mut shift = self.shift.load_init()?;
+        let mut shift = RefMut::map(self.shift.load_init()?, |shift| shift.borrow_mut());
 
         // Initialize the header.
         shift.header.init(

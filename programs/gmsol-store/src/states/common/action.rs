@@ -2,7 +2,9 @@ use anchor_lang::{prelude::*, ZeroCopy};
 use gmsol_utils::InitSpace;
 
 use crate::{
+    constants,
     states::{NonceBytes, Seed},
+    utils::internal::Authenticate,
     CoreError,
 };
 
@@ -20,6 +22,7 @@ use crate::{
     strum::Display,
     AnchorSerialize,
     AnchorDeserialize,
+    InitSpace,
 )]
 #[strum(serialize_all = "snake_case")]
 #[num_enum(error_type(name = CoreError, constructor = CoreError::unknown_action_state))]
@@ -280,3 +283,157 @@ pub trait ActionExt: Action {
 }
 
 impl<T: Action> ActionExt for T {}
+
+/// Action Parameters.
+pub trait ActionParams {
+    /// Get max allowed execution fee in lamports.
+    fn execution_lamports(&self) -> u64;
+}
+
+/// Action Event.
+pub trait ActionEvent: InitSpace + anchor_lang::Event {
+    /// Emit this event through CPI. This is a manual implementation of `emit_cpi!`.
+    fn emit_cpi(&self, event_authority: AccountInfo, event_authority_bump: u8) -> Result<()> {
+        use anchor_lang::solana_program::instruction::Instruction;
+
+        let disc = anchor_lang::event::EVENT_IX_TAG_LE;
+        let mut ix_data = Vec::with_capacity(16 + Self::INIT_SPACE);
+        ix_data.extend_from_slice(&disc);
+        ix_data.extend_from_slice(&Self::DISCRIMINATOR);
+        self.serialize(&mut ix_data)?;
+        let ix = Instruction {
+            program_id: crate::ID,
+            accounts: vec![AccountMeta::new_readonly(*event_authority.key, true)],
+            data: ix_data,
+        };
+        anchor_lang::solana_program::program::invoke_signed(
+            &ix,
+            &[event_authority],
+            &[&[constants::EVENT_AUTHORITY_SEED, &[event_authority_bump]]],
+        )?;
+        Ok(())
+    }
+}
+
+/// Closable Action.
+pub trait Closable {
+    /// Closed Event.
+    type ClosedEvent: ActionEvent;
+
+    /// To closed event.
+    fn to_closed_event(&self, address: &Pubkey, reason: &str) -> Result<Self::ClosedEvent>;
+}
+
+/// Create Action.
+pub(crate) trait Create<'info, A>: Sized + anchor_lang::Bumps {
+    /// Create Params.
+    type CreateParams: ActionParams;
+
+    /// Get the action account.
+    fn action(&self) -> AccountInfo<'info>;
+
+    /// Get the payer account.
+    fn payer(&self) -> AccountInfo<'info>;
+
+    /// Get the system program account.
+    fn system_program(&self) -> AccountInfo<'info>;
+
+    /// The implementation of the creation.
+    fn create_impl(
+        &mut self,
+        params: &Self::CreateParams,
+        nonce: &NonceBytes,
+        bumps: &Self::Bumps,
+        remaining_accounts: &'info [AccountInfo<'info>],
+    ) -> Result<()>;
+
+    /// Create Action.
+    fn create(
+        ctx: &mut Context<'_, '_, 'info, 'info, Self>,
+        nonce: &NonceBytes,
+        params: &Self::CreateParams,
+    ) -> Result<()> {
+        let accounts = &mut ctx.accounts;
+        accounts.transfer_execution_lamports(params)?;
+        accounts.create_impl(params, nonce, &ctx.bumps, ctx.remaining_accounts)?;
+        Ok(())
+    }
+
+    /// Transfer execution lamports.
+    fn transfer_execution_lamports(&self, params: &Self::CreateParams) -> Result<()> {
+        use crate::ops::execution_fee::TransferExecutionFeeOperation;
+
+        TransferExecutionFeeOperation::builder()
+            .payment(self.action())
+            .payer(self.payer())
+            .execution_lamports(params.execution_lamports())
+            .system_program(self.system_program())
+            .build()
+            .execute()
+    }
+}
+
+type ShouldContinueWhenATAsAreMissing = bool;
+type Success = bool;
+
+/// Close Action.
+pub(crate) trait Close<'info, A>: Authenticate<'info>
+where
+    A: Action + ZeroCopy + Owner + Closable,
+{
+    /// Expected role.
+    fn expected_role(&self) -> &str;
+
+    /// Fund receiver.
+    fn fund_receiver(&self) -> AccountInfo<'info>;
+
+    /// Transfer funds to ATAs.
+    fn transfer_to_atas(&self, init_if_needed: bool) -> Result<Success>;
+
+    /// Get event authority.
+    fn event_authority(&self) -> (AccountInfo<'info>, u8);
+
+    /// Close Action.
+    fn close(ctx: &Context<'_, '_, '_, 'info, Self>, reason: &str) -> Result<()> {
+        let accounts = &ctx.accounts;
+        let should_continue_when_atas_are_missing = accounts.preprocess()?;
+        if accounts.transfer_to_atas(should_continue_when_atas_are_missing)? {
+            {
+                let action_address = accounts.action().key();
+                let action = accounts.action().load()?;
+                let event = action.to_closed_event(&action_address, reason)?;
+                let (event_authority, event_authority_bump) = accounts.event_authority();
+                event.emit_cpi(event_authority, event_authority_bump)?;
+            }
+            accounts.close_action_account()?;
+        } else {
+            msg!("Some ATAs are not initilaized, skip the close");
+        }
+        Ok(())
+    }
+
+    /// Action.
+    fn action(&self) -> &AccountLoader<'info, A>;
+
+    /// Preprocess.
+    fn preprocess(&self) -> Result<ShouldContinueWhenATAsAreMissing> {
+        if *self.authority().key == self.action().load()?.header().owner {
+            Ok(true)
+        } else {
+            self.only_role(self.expected_role())?;
+            {
+                let action = self.action().load()?;
+                if action.header().action_state()?.is_completed_or_cancelled() {
+                    Ok(false)
+                } else {
+                    err!(CoreError::PermissionDenied)
+                }
+            }
+        }
+    }
+
+    /// Close the action account.
+    fn close_action_account(&self) -> Result<()> {
+        self.action().close(self.fund_receiver())
+    }
+}

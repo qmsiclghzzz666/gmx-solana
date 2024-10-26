@@ -1,4 +1,7 @@
-use std::collections::BTreeSet;
+use std::{
+    borrow::{Borrow, BorrowMut},
+    collections::BTreeSet,
+};
 
 use anchor_lang::prelude::*;
 
@@ -15,7 +18,7 @@ use super::{
         token::{TokenAndAccount, TokensCollector},
     },
     deposit::DepositParams,
-    Seed, TokenMapAccess,
+    Seed, Shift, TokenMapAccess,
 };
 
 const MAX_ALLOWED_NUMBER_OF_MARKETS: usize = 128;
@@ -131,7 +134,7 @@ impl Glv {
         Pubkey::find_program_address(&[Self::SEED, glv_token.as_ref()], program_id)
     }
 
-    pub(crate) fn _signer_seeds(&self) -> [&[u8]; 3] {
+    pub(crate) fn signer_seeds(&self) -> [&[u8]; 3] {
         [Self::SEED, self.glv_token().as_ref(), &self.bump_bytes]
     }
 
@@ -715,4 +718,46 @@ pub struct GlvWithdrawalParams {
     /// The minimum acceptable amount of final short tokens to receive.
     pub min_final_short_token_amount: u64,
     reserved: [u8; 64],
+}
+
+/// Glv Shift.
+#[cfg_attr(feature = "debug", derive(Debug))]
+#[account(zero_copy)]
+pub struct GlvShift {
+    pub(crate) shift: Shift,
+}
+
+impl Action for GlvShift {
+    const MIN_EXECUTION_LAMPORTS: u64 = 200_000;
+
+    fn header(&self) -> &ActionHeader {
+        &self.shift.header
+    }
+}
+
+impl Seed for GlvShift {
+    const SEED: &'static [u8] = b"glv_shift";
+}
+
+impl gmsol_utils::InitSpace for GlvShift {
+    const INIT_SPACE: usize = core::mem::size_of::<Self>();
+}
+
+impl GlvShift {
+    /// Get the GLV address.
+    pub fn glv(&self) -> &Pubkey {
+        &self.shift.header.owner
+    }
+}
+
+impl Borrow<Shift> for GlvShift {
+    fn borrow(&self) -> &Shift {
+        &self.shift
+    }
+}
+
+impl BorrowMut<Shift> for GlvShift {
+    fn borrow_mut(&mut self) -> &mut Shift {
+        &mut self.shift
+    }
 }
