@@ -25,10 +25,7 @@ use crate::{
     },
     utils::{
         internal::{self, Authentication},
-        token::{
-            is_associated_token_account, is_associated_token_account_with_program_id,
-            must_be_uninitialized, validate_token_account,
-        },
+        token::is_associated_token_account,
     },
     CoreError,
 };
@@ -701,18 +698,6 @@ pub struct CloseOrder<'info> {
     pub long_token: Option<Box<Account<'info, Mint>>>,
     /// Short token.
     pub short_token: Option<Box<Account<'info, Mint>>>,
-    /// GT mint.
-    #[account(
-        mut,
-        mint::authority = store,
-        seeds = [
-            constants::GT_MINT_SEED,
-            store.key().as_ref(),
-        ],
-        bump,
-        owner = gt_token_program.key(),
-    )]
-    pub gt_mint: InterfaceAccount<'info, token_interface::Mint>,
     /// The escrow account for initial collateral tokens.
     #[account(
         mut,
@@ -769,20 +754,6 @@ pub struct CloseOrder<'info> {
         constraint = is_associated_token_account(short_token_ata.key, owner.key, &short_token.as_ref().map(|a| a.key()).expect("must provide")) @ CoreError::NotAnATA,
     )]
     pub short_token_ata: Option<UncheckedAccount<'info>>,
-    /// The ATA for GT.
-    /// CHECK: should be checked during the execution.
-    #[account(
-        mut,
-        constraint = is_associated_token_account_with_program_id(gt_ata.key, owner.key, &gt_mint.key(), &gt_token_program.key()) @ CoreError::NotAnATA,
-    )]
-    pub gt_ata: UncheckedAccount<'info>,
-    /// The ATA for GT.
-    /// CHECK: should be checked during the execution.
-    #[account(
-        mut,
-        constraint = is_associated_token_account_with_program_id(gt_ata_for_referrer.key, &referrer_user.as_ref().expect("must provided").load()?.owner, &gt_mint.key(), &gt_token_program.key()) @ CoreError::NotAnATA,
-    )]
-    pub gt_ata_for_referrer: Option<UncheckedAccount<'info>>,
     /// The system program.
     pub system_program: Program<'info, System>,
     /// The token program.
@@ -809,8 +780,8 @@ pub(crate) fn close_order(ctx: Context<CloseOrder>, reason: &str) -> Result<()> 
 
     let should_continue_when_atas_are_missing = accounts.preprocess()?;
     let transfer_success = accounts.transfer_to_atas(should_continue_when_atas_are_missing)?;
-    let mint_success = accounts.mint_gt_reward(should_continue_when_atas_are_missing)?;
-    if transfer_success && mint_success {
+    let process_success = accounts.process_gt_reward()?;
+    if transfer_success && process_success {
         {
             let order_address = accounts.order.key();
             let order = accounts.order.load()?;
@@ -926,82 +897,25 @@ impl<'info> CloseOrder<'info> {
         Ok(true)
     }
 
-    fn mint_gt_reward(&self, init_if_needed: bool) -> Result<Success> {
-        use anchor_spl::{
-            associated_token::{create, Create},
-            token::accessor::amount as access_amount,
-            token_2022::{mint_to, MintTo},
-        };
-
+    fn process_gt_reward(&self) -> Result<Success> {
         let amount = self.order.load()?.gt_reward;
         if amount != 0 {
+            // Update user's rank.
             {
-                let ata = &self.gt_ata;
-                let mint = &self.gt_mint;
-
-                if must_be_uninitialized(ata) {
-                    if !init_if_needed {
-                        return Ok(false);
-                    }
-                    create(CpiContext::new(
-                        self.associated_token_program.to_account_info(),
-                        Create {
-                            payer: self.executor.to_account_info(),
-                            associated_token: ata.to_account_info(),
-                            authority: self.owner.to_account_info(),
-                            mint: mint.to_account_info(),
-                            system_program: self.system_program.to_account_info(),
-                            token_program: self.gt_token_program.to_account_info(),
-                        },
-                    ))?;
-                }
-
-                // Skip the minting if the token account is not valid.
-                if validate_token_account(ata, self.gt_token_program.key).is_err() {
-                    msg!("[GT] minting has been cancelled because the ATA is not valid.");
-                    return Ok(true);
-                }
-
-                let ctx = CpiContext::new(
-                    self.gt_token_program.to_account_info(),
-                    MintTo {
-                        mint: mint.to_account_info(),
-                        to: ata.to_account_info(),
-                        authority: self.store.to_account_info(),
-                    },
-                );
-                mint_to(
-                    ctx.with_signer(&[&self.store.load()?.signer_seeds()]),
-                    amount,
-                )?;
-
-                msg!("[GT] minted {} units of GT", amount);
-
-                // Update the rank of the user.
-                {
-                    let total_amount = access_amount(ata)?;
-                    msg!("[GT] updating rank with total amount: {}", total_amount);
-                    self.user
-                        .load_mut()?
-                        .gt
-                        .update_rank(&*self.store.load()?, total_amount);
-                }
-
-                // Make sure the mint can only be done once.
-                self.order.load_mut()?.gt_reward = 0;
+                let mut user = self.user.load_mut()?;
+                msg!("[GT] updating rank with total amount: {}", user.gt.amount());
+                user.gt.update_rank(&*self.store.load()?);
             }
+
             self.mint_gt_reward_for_referrer(amount)?;
+
+            self.order.load_mut()?.gt_reward = 0;
         }
 
         Ok(true)
     }
 
     fn mint_gt_reward_for_referrer(&self, amount: u64) -> Result<()> {
-        use anchor_spl::{
-            token::accessor::amount as access_amount,
-            token_2022::{mint_to, MintTo},
-        };
-
         // Mint referral reward for the referrer.
         let Some(referrer) = self.user.load()?.referral().referrer().copied() else {
             return Ok(());
@@ -1011,6 +925,7 @@ impl<'info> CloseOrder<'info> {
             .referrer_user
             .as_ref()
             .ok_or(error!(CoreError::InvalidArgument))?;
+
         require_eq!(
             referrer_user.load()?.owner,
             referrer,
@@ -1022,6 +937,7 @@ impl<'info> CloseOrder<'info> {
             .load()?
             .gt()
             .referral_reward_factor(referrer_user.load()?.gt.rank())?;
+
         let reward: u64 =
             apply_factor::<_, { constants::MARKET_DECIMALS }>(&(amount as u128), &factor)
                 .ok_or(error!(CoreError::InvalidGTConfig))?
@@ -1029,60 +945,17 @@ impl<'info> CloseOrder<'info> {
                 .map_err(|_| error!(CoreError::TokenAmountOverflow))?;
 
         if reward != 0 {
-            let ata = self
-                .gt_ata_for_referrer
-                .as_ref()
-                .ok_or(error!(CoreError::TokenAccountNotProvided))?;
-            let mint = &self.gt_mint;
+            let mut store = self.store.load_mut()?;
+            let mut referrer_user = referrer_user.load_mut()?;
 
-            if must_be_uninitialized(ata) {
-                msg!("[GT] referrer reward has been cancelled because the ATA is not found.");
-                return Ok(());
-            }
-
-            // Skip the minting if the token account is not valid.
-            if validate_token_account(ata, self.gt_token_program.key).is_err() {
-                msg!("[GT] referrer reward has been cancelled because the ATA is not valid.");
-                return Ok(());
-            }
-
-            {
-                let mut store = self.store.load_mut()?;
-                let mut referrer_user = referrer_user.load_mut()?;
-
-                store.gt_mut().record_minted(reward)?;
-                referrer_user.gt.minted = referrer_user
-                    .gt
-                    .minted
-                    .checked_add(reward)
-                    .ok_or(error!(CoreError::TokenAmountOverflow))?;
-                referrer_user.gt.last_minted_at = store.gt().last_minted_at;
-            }
-
-            let ctx = CpiContext::new(
-                self.gt_token_program.to_account_info(),
-                MintTo {
-                    mint: mint.to_account_info(),
-                    to: ata.to_account_info(),
-                    authority: self.store.to_account_info(),
-                },
-            );
-            mint_to(
-                ctx.with_signer(&[&self.store.load()?.signer_seeds()]),
-                reward,
-            )?;
-
+            store.gt_mut().mint_to(&mut referrer_user, reward)?;
             msg!("[GT] minted {} units of GT to the referrer", reward);
 
-            // Update the rank of the referrer.
-            {
-                let total_amount = access_amount(ata)?;
-                msg!("[GT] updating rank with total amount: {}", total_amount);
-                referrer_user
-                    .load_mut()?
-                    .gt
-                    .update_rank(&*self.store.load()?, total_amount);
-            }
+            msg!(
+                "[GT] updating rank with total amount: {}",
+                referrer_user.gt.amount()
+            );
+            referrer_user.gt.update_rank(&store);
         }
 
         Ok(())

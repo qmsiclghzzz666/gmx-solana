@@ -534,11 +534,13 @@ impl Order {
         // Ignore the overflowed value.
         let next_traded_value = user.gt.traded_value().saturating_add(size_in_value);
         let minted_value = user.gt.minted_value();
+
         require_gte!(
             next_traded_value,
             minted_value,
             CoreError::InvalidUserAccount
         );
+
         let value_to_mint_for = next_traded_value.saturating_sub(minted_value);
 
         // Apply minting cost discount for referred user.
@@ -553,20 +555,14 @@ impl Order {
             .gt_mut()
             .get_mint_amount(value_to_mint_for, discount)?;
 
-        let next_minted = user
-            .gt
-            .minted
-            .checked_add(minted)
-            .ok_or(error!(CoreError::TokenAmountOverflow))?;
         let next_minted_value = minted_value
             .checked_add(delta_minted_value)
             .ok_or(error!(CoreError::ValueOverflow))?;
 
-        store.gt_mut().record_minted(minted)?;
+        store.gt_mut().mint_to(user, minted)?;
+        msg!("[GT] minted {} units of GT", minted);
 
         self.gt_reward = minted;
-        user.gt.minted = next_minted;
-        user.gt.last_minted_at = store.gt().last_minted_at;
         user.gt.traded_value = next_traded_value;
         user.gt.minted_value = next_minted_value;
 

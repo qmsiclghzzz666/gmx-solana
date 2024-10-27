@@ -255,8 +255,11 @@ impl Seed for ReferralCode {
 pub struct GTState {
     rank: u8,
     padding_0: [u8; 15],
-    pub(crate) minted: u64,
     pub(crate) last_minted_at: i64,
+    pub(crate) total_minted: u64,
+    pub(crate) amount: u64,
+    pub(crate) es_amount: u64,
+    pub(crate) es_factor: u128,
     pub(crate) traded_value: u128,
     pub(crate) minted_value: u128,
     reserved: [u8; 64],
@@ -278,9 +281,14 @@ impl GTState {
         self.rank
     }
 
-    pub(crate) fn update_rank(&mut self, store: &Store, gt_amount: u64) {
+    /// Get GT balance.
+    pub fn amount(&self) -> u64 {
+        self.amount
+    }
+
+    pub(crate) fn update_rank(&mut self, store: &Store) {
         debug_assert!(store.gt().ranks().len() < u8::MAX as usize);
-        let rank = match store.gt().ranks().binary_search(&gt_amount) {
+        let rank = match store.gt().ranks().binary_search(&self.amount) {
             Ok(rank) => rank + 1,
             Err(rank) => rank,
         };

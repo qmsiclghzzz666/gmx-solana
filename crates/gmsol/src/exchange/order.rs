@@ -10,9 +10,7 @@ use anchor_client::{
         signer::Signer,
     },
 };
-use anchor_spl::associated_token::{
-    get_associated_token_address, get_associated_token_address_with_program_id,
-};
+use anchor_spl::associated_token::get_associated_token_address;
 use gmsol_store::{
     accounts, instruction,
     ops::order::CreateOrderParams,
@@ -341,12 +339,6 @@ where
                 None
             };
         let position = self.position().await?;
-        let gt_mint = self.client.find_gt_mint_address(&self.store);
-        let gt_ata = get_associated_token_address_with_program_id(
-            payer,
-            &gt_mint,
-            &anchor_spl::token_2022::ID,
-        );
         let user = self.client.find_user_address(&self.store, payer);
 
         let kind = self.params.kind;
@@ -472,19 +464,6 @@ where
                         associated_token_program: anchor_spl::associated_token::ID,
                     })
                     .args(instruction::PrepareAssociatedTokenAccount {});
-                let gt_ata = self
-                    .client
-                    .store_rpc()
-                    .accounts(accounts::PrepareAssociatedTokenAccount {
-                        payer: *payer,
-                        owner: *payer,
-                        mint: gt_mint,
-                        account: gt_ata,
-                        system_program: system_program::ID,
-                        token_program: anchor_spl::token_2022::ID,
-                        associated_token_program: anchor_spl::associated_token::ID,
-                    })
-                    .args(instruction::PrepareAssociatedTokenAccount {});
                 let prepare_position = self
                     .client
                     .store_rpc()
@@ -501,7 +480,6 @@ where
                 escrow
                     .merge(long_token_ata)
                     .merge(short_token_ata)
-                    .merge(gt_ata)
                     .merge(prepare_position)
             }
             .args(instruction::PrepareIncreaseOrderEscrow { nonce }),
@@ -579,24 +557,10 @@ where
                         associated_token_program: anchor_spl::associated_token::ID,
                     })
                     .args(instruction::PrepareAssociatedTokenAccount {});
-                let gt_ata = self
-                    .client
-                    .store_rpc()
-                    .accounts(accounts::PrepareAssociatedTokenAccount {
-                        payer: *payer,
-                        owner: *payer,
-                        mint: gt_mint,
-                        account: gt_ata,
-                        system_program: system_program::ID,
-                        token_program: anchor_spl::token_2022::ID,
-                        associated_token_program: anchor_spl::associated_token::ID,
-                    })
-                    .args(instruction::PrepareAssociatedTokenAccount {});
                 escrow
                     .merge(long_token_ata)
                     .merge(short_token_ata)
                     .merge(final_output_token_ata)
-                    .merge(gt_ata)
             }
             _ => {
                 return Err(crate::Error::invalid_argument("unsupported order kind"));
@@ -1292,22 +1256,9 @@ where
         let hint = self.prepare_hint().await?;
         let payer = self.client.payer();
         let owner = hint.owner;
-        let gt_mint = self.client.find_gt_mint_address(&hint.store);
-        let gt_ata = get_associated_token_address_with_program_id(
-            &owner,
-            &gt_mint,
-            &anchor_spl::token_2022::ID,
-        );
         let referrer_user = hint
             .referrer
             .map(|owner| self.client.find_user_address(&hint.store, &owner));
-        let gt_ata_for_referrer = hint.referrer.map(|owner| {
-            get_associated_token_address_with_program_id(
-                &owner,
-                &gt_mint,
-                &anchor_spl::token_2022::ID,
-            )
-        });
         Ok(self
             .client
             .store_rpc()
@@ -1328,7 +1279,6 @@ where
                         .map(|(_, account)| account),
                     long_token: hint.long_token_and_account.map(|(token, _)| token),
                     short_token: hint.short_token_and_account.map(|(token, _)| token),
-                    gt_mint,
                     final_output_token: hint.final_output_token_and_account.map(|(token, _)| token),
                     final_output_token_escrow: hint
                         .final_output_token_and_account
@@ -1351,8 +1301,6 @@ where
                         .short_token_and_account
                         .as_ref()
                         .map(|(token, _)| get_associated_token_address(&owner, token)),
-                    gt_ata,
-                    gt_ata_for_referrer,
                     associated_token_program: anchor_spl::associated_token::ID,
                     token_program: anchor_spl::token::ID,
                     gt_token_program: anchor_spl::token_2022::ID,

@@ -30,7 +30,7 @@ use gmsol::{
     exchange::ExchangeOps,
     pyth::{pull_oracle::ExecuteWithPythPrices, Hermes, PythPullOracle},
     store::{
-        glv::GlvOps, gt::GTOps, market::MarketOps, oracle::OracleOps, roles::RolesOps,
+        glv::GlvOps, gt::GtOps, market::MarketOps, oracle::OracleOps, roles::RolesOps,
         store_ops::StoreOps, token_config::TokenConfigOps,
     },
     types::{FactorKey, MarketConfigKey, PriceProviderKind, RoleKey, TokenConfigBuilder},
@@ -77,8 +77,6 @@ pub struct Deployment {
     pub oracle: Pubkey,
     /// GLV mint.
     pub glv_token: Pubkey,
-    /// GT mint.
-    pub gt: Pubkey,
     /// Tokens.
     tokens: HashMap<String, Token>,
     /// Synthetic tokens.
@@ -100,7 +98,6 @@ impl fmt::Debug for Deployment {
             .field("token_map", &self.token_map.pubkey())
             .field("oracle", &self.oracle)
             .field("glv", &self.glv_token)
-            .field("gt", &self.gt)
             .field("tokens", &self.tokens)
             .field("synthetic_tokens", &self.synthetic_tokens)
             .finish_non_exhaustive()
@@ -166,7 +163,6 @@ impl Deployment {
             oracle_index,
             oracle,
             glv_token: Default::default(),
-            gt: Default::default(),
             tokens: Default::default(),
             synthetic_tokens: Default::default(),
             market_tokens: Default::default(),
@@ -655,13 +651,11 @@ impl Deployment {
 
         // Init common ALT.
         let event_authority = self.client.store_event_authority();
-        let gt_mint = self.client.find_gt_mint_address(&self.store);
         let mut addresses = vec![
             self.store,
             self.token_map(),
             self.oracle,
             event_authority,
-            gt_mint,
             anchor_spl::token::ID,
             anchor_spl::token_2022::ID,
             anchor_spl::associated_token::ID,
@@ -736,8 +730,6 @@ impl Deployment {
     async fn initialize_gt(&mut self, decimals: u8) -> eyre::Result<()> {
         let client = self.user_client(Self::DEFAULT_KEEPER)?;
         let store = &self.store;
-        let gt = client.find_gt_mint_address(store);
-        self.gt = gt;
 
         let mut tx = client.transaction();
 
@@ -786,7 +778,7 @@ impl Deployment {
         )?;
 
         tx.send_all()
-            .instrument(tracing::info_span!("initalize GT", gt=%gt))
+            .instrument(tracing::info_span!("initalize GT"))
             .await
             .inspect(|signatures| {
                 tracing::info!("initialized GT with txns: {signatures:#?}");

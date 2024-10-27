@@ -8,7 +8,7 @@ use anchor_client::{
 use gmsol_store::{accounts, instruction};
 
 /// GT Operations.
-pub trait GTOps<C> {
+pub trait GtOps<C> {
     /// Initialize GT Mint.
     fn initialize_gt(
         &self,
@@ -31,7 +31,7 @@ pub trait GTOps<C> {
     fn gt_set_referral_reward_factors(&self, store: &Pubkey, factors: Vec<u128>) -> RpcBuilder<C>;
 }
 
-impl<C: Deref<Target = impl Signer> + Clone> GTOps<C> for crate::Client<C> {
+impl<C: Deref<Target = impl Signer> + Clone> GtOps<C> for crate::Client<C> {
     fn initialize_gt(
         &self,
         store: &Pubkey,
@@ -42,12 +42,10 @@ impl<C: Deref<Target = impl Signer> + Clone> GTOps<C> for crate::Client<C> {
         ranks: Vec<u64>,
     ) -> RpcBuilder<C> {
         self.store_rpc()
-            .accounts(accounts::InitializeGT {
+            .accounts(accounts::InitializeGt {
                 authority: self.payer(),
                 store: *store,
-                gt_mint: self.find_gt_mint_address(store),
                 system_program: system_program::ID,
-                token_program: anchor_spl::token_2022::ID,
             })
             .args(instruction::InitializeGt {
                 decimals,

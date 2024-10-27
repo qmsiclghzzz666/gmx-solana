@@ -8,6 +8,7 @@ use crate::{constants, states::feature::display_feature, CoreError, CoreResult};
 
 use super::{
     feature::{ActionDisabledFlag, DisabledFeatures, DomainDisabledFlag},
+    user::UserHeader,
     Amount, Factor, InitSpace, RoleStore,
 };
 
@@ -492,30 +493,39 @@ const MAX_RANK: usize = 15;
 #[account(zero_copy)]
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub struct GTState {
-    minted: u64,
+    decimals: u8,
+    padding: [u8; 15],
     pub(crate) last_minted_at: i64,
+    total_minted: u64,
     grow_step_amount: u64,
     grow_steps: u64,
+    supply: u64,
+    es_supply: u64,
+    es_factor: u128,
     minting_cost_grow_factor: u128,
     minting_cost: u128,
     max_rank: u64,
     ranks: [u64; MAX_RANK],
     order_fee_discount_factors: [u128; MAX_RANK + 1],
     referral_reward_factors: [u128; MAX_RANK + 1],
-    reserve: [u8; 256],
+    reserved_1: [u8; 256],
 }
 
 impl GTState {
     pub(crate) fn init(
         &mut self,
+        decimals: u8,
         initial_minting_cost: u128,
         grow_factor: u128,
         grow_step: u64,
         ranks: &[u64],
     ) -> Result<()> {
-        require_eq!(self.minted, 0, CoreError::GTStateHasBeenInitialized);
         require_eq!(self.last_minted_at, 0, CoreError::GTStateHasBeenInitialized);
+        require_eq!(self.total_minted, 0, CoreError::GTStateHasBeenInitialized);
         require_eq!(self.grow_steps, 0, CoreError::GTStateHasBeenInitialized);
+        require_eq!(self.supply, 0, CoreError::GTStateHasBeenInitialized);
+        require_eq!(self.es_supply, 0, CoreError::GTStateHasBeenInitialized);
+        require_eq!(self.es_factor, 0, CoreError::GTStateHasBeenInitialized);
 
         require!(grow_step != 0, CoreError::InvalidGTConfig);
 
@@ -536,6 +546,7 @@ impl GTState {
 
         let clock = Clock::get()?;
 
+        self.decimals = decimals;
         self.last_minted_at = clock.unix_timestamp;
         self.grow_step_amount = grow_step;
         self.minting_cost_grow_factor = grow_factor;
@@ -613,22 +624,64 @@ impl GTState {
     }
 
     #[inline(never)]
-    pub(crate) fn record_minted(&mut self, amount: u64) -> Result<()> {
+    pub(crate) fn mint_to(&mut self, user: &mut UserHeader, amount: u64) -> Result<()> {
         if amount != 0 {
             let clock = Clock::get()?;
-            let next_minted = self
-                .minted
+
+            // Calculate global GT state updates.
+            let next_gt_total_minted = self
+                .total_minted
                 .checked_add(amount)
                 .ok_or(error!(CoreError::TokenAmountOverflow))?;
-            let next_minting_cost = self.next_minting_cost(next_minted)?;
+            let next_minting_cost = self.next_minting_cost(next_gt_total_minted)?;
 
-            // The following steps should be infallible.
+            // Calculate user GT state updates.
+            let next_user_total_minted = user
+                .gt
+                .total_minted
+                .checked_add(amount)
+                .ok_or(error!(CoreError::TokenAmountOverflow))?;
+            let next_amount = user
+                .gt
+                .amount
+                .checked_add(amount)
+                .ok_or(error!(CoreError::TokenAmountOverflow))?;
+            let next_supply = self
+                .supply
+                .checked_add(amount)
+                .ok_or(error!(CoreError::TokenAmountOverflow))?;
+
+            /* The following steps should be infallible. */
+
             if let Some((new_steps, new_minting_cost)) = next_minting_cost {
                 self.minting_cost = new_minting_cost;
                 self.grow_steps = new_steps;
             }
-            self.minted = next_minted;
+            self.total_minted = next_gt_total_minted;
             self.last_minted_at = clock.unix_timestamp;
+
+            user.gt.total_minted = next_user_total_minted;
+            user.gt.amount = next_amount;
+            user.gt.last_minted_at = self.last_minted_at;
+            self.supply = next_supply;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn _burn_from(&mut self, user: &mut UserHeader, amount: u64) -> Result<()> {
+        if amount != 0 {
+            require_gte!(user.gt.amount, amount, CoreError::NotEnoughTokenAmount);
+            let next_amount = user
+                .gt
+                .amount
+                .checked_sub(amount)
+                .ok_or(error!(CoreError::Internal))?;
+            let next_supply = self
+                .supply
+                .checked_sub(amount)
+                .ok_or(error!(CoreError::Internal))?;
+            user.gt.amount = next_amount;
+            self.supply = next_supply;
         }
         Ok(())
     }

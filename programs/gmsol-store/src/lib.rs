@@ -1299,7 +1299,7 @@ pub mod gmsol_store {
     /// Initialize GT Mint.
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn initialize_gt(
-        ctx: Context<InitializeGT>,
+        ctx: Context<InitializeGt>,
         decimals: u8,
         initial_minting_cost: u128,
         grow_factor: u128,
