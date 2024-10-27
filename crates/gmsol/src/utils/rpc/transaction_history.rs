@@ -10,7 +10,7 @@ use anchor_client::{
 };
 use async_stream::{stream, try_stream};
 use futures_util::Stream;
-use solana_transaction_status::{UiInstruction, UiTransactionEncoding};
+use solana_transaction_status::{UiInstruction, UiLoadedAddresses, UiTransactionEncoding};
 
 use crate::utils::WithSlot;
 
@@ -103,6 +103,7 @@ pub fn extract_cpi_events(
         for await res in stream {
             match res {
                 Ok(ctx) => {
+                    tracing::debug!(signature=%ctx.value(), "fetching transaction");
                     let tx = client
                         .borrow()
                         .get_transaction_with_config(
@@ -118,19 +119,25 @@ pub fn extract_cpi_events(
                     let Some(decoded) = tx.transaction.transaction.decode() else {
                         continue;
                     };
+                    let Some(meta) = tx.transaction.meta else {
+                        continue;
+                    };
                     let accounts = decoded.message.static_account_keys();
+                    let loaded_addresses = Option::from(meta.loaded_addresses).map(|mut loaded: UiLoadedAddresses| {
+                        loaded.writable.append(&mut loaded.readonly);
+                        loaded.writable
+                    }).unwrap_or_default();
                     let Some(event_authority_idx) = accounts
                         .iter()
+                        .map(|pk| pk.to_string())
+                        .chain(loaded_addresses)
                         .enumerate()
-                        .find_map(|(idx, pk)| (*pk == event_authority).then_some(idx))
+                        .find_map(|(idx, pk)| (pk == event_authority.to_string()).then_some(idx))
                     else {
                         continue;
                     };
                     let event_authority_idx = event_authority_idx as u8;
-                    let Some(ixs) = tx
-                        .transaction
-                        .meta
-                        .and_then(|meta| Option::<Vec<_>>::from(meta.inner_instructions))
+                    let Some(ixs) = Option::<Vec<_>>::from(meta.inner_instructions)
                     else {
                         yield Err(crate::Error::invalid_argument("invalid encoding"));
                         continue;
