@@ -725,20 +725,26 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
                     .transpose();
                 async move { signature }
             });
-        let events =
-            extract_cpi_events(signatures, query, &program_id, &event_authority, commitment)
-                .try_filter_map(|event| {
-                    let decoded = event
-                        .map(|event| {
-                            event
-                                .decode::<StoreCPIEvent>()
-                                .collect::<crate::Result<Vec<_>>>()
-                        })
-                        .transpose()
-                        .inspect_err(|err| tracing::error!(%err, "decode error"))
-                        .ok();
-                    async move { Ok(decoded) }
-                });
+        let events = extract_cpi_events(
+            signatures,
+            query,
+            &program_id,
+            &event_authority,
+            commitment,
+            Some(0),
+        )
+        .try_filter_map(|event| {
+            let decoded = event
+                .map(|event| {
+                    event
+                        .decode::<StoreCPIEvent>()
+                        .collect::<crate::Result<Vec<_>>>()
+                })
+                .transpose()
+                .inspect_err(|err| tracing::error!(%err, "decode error"))
+                .ok();
+            async move { Ok(decoded) }
+        });
         Ok(events)
     }
 
@@ -777,6 +783,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
             &self.store_program_id(),
             &self.store_event_authority(),
             commitment,
+            Some(0),
         )
         .and_then(|encoded| {
             let decoded = encoded

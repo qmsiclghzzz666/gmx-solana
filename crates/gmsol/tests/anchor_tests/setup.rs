@@ -742,8 +742,8 @@ impl Deployment {
             101 * MARKET_USD_UNIT / 100,
             10 * gt_unit,
             vec![
+                10 * gt_unit,
                 30 * gt_unit,
-                100 * gt_unit,
                 300 * gt_unit,
                 1_000 * gt_unit,
                 3_000 * gt_unit,

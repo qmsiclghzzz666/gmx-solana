@@ -95,6 +95,7 @@ pub fn extract_cpi_events(
     program_id: &Pubkey,
     event_authority: &Pubkey,
     commitment: CommitmentConfig,
+    max_supported_transaction_version: Option<u8>,
 ) -> impl Stream<Item = crate::Result<WithSlot<EncodedCPIEvents>>> {
     let program_id = *program_id;
     let event_authority = *event_authority;
@@ -109,7 +110,7 @@ pub fn extract_cpi_events(
                             RpcTransactionConfig {
                                 encoding: Some(UiTransactionEncoding::Base58),
                                 commitment: Some(commitment),
-                                ..Default::default()
+                                max_supported_transaction_version,
                             },
                         )
                         .await
