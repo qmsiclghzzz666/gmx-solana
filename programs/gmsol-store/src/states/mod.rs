@@ -40,6 +40,9 @@ pub mod user;
 /// GLV.
 pub mod glv;
 
+/// GT model.
+pub mod gt;
+
 pub use deposit::Deposit;
 pub use glv::{Glv, GlvDeposit};
 pub use market::{

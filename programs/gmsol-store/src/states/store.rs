@@ -8,7 +8,7 @@ use crate::{constants, states::feature::display_feature, CoreError, CoreResult};
 
 use super::{
     feature::{ActionDisabledFlag, DisabledFeatures, DomainDisabledFlag},
-    user::UserHeader,
+    gt::GtState,
     Amount, Factor, InitSpace, RoleStore,
 };
 
@@ -39,7 +39,7 @@ pub struct Store {
     /// Addresses.
     pub(crate) address: Addresses,
     /// GT State.
-    gt: GTState,
+    gt: GtState,
     reserve: [u8; 1024],
 }
 
@@ -255,12 +255,12 @@ impl Store {
     }
 
     /// Get GT State.
-    pub fn gt(&self) -> &GTState {
+    pub fn gt(&self) -> &GtState {
         &self.gt
     }
 
     /// Get GT State mutably.
-    pub(crate) fn gt_mut(&mut self) -> &mut GTState {
+    pub(crate) fn gt_mut(&mut self) -> &mut GtState {
         &mut self.gt
     }
 
@@ -485,254 +485,6 @@ impl Addresses {
         match key {
             AddressKey::Holding => &mut self.holding,
         }
-    }
-}
-
-const MAX_RANK: usize = 15;
-
-#[account(zero_copy)]
-#[cfg_attr(feature = "debug", derive(Debug))]
-pub struct GTState {
-    decimals: u8,
-    padding: [u8; 15],
-    pub(crate) last_minted_at: i64,
-    total_minted: u64,
-    grow_step_amount: u64,
-    grow_steps: u64,
-    supply: u64,
-    es_supply: u64,
-    es_factor: u128,
-    minting_cost_grow_factor: u128,
-    minting_cost: u128,
-    max_rank: u64,
-    ranks: [u64; MAX_RANK],
-    order_fee_discount_factors: [u128; MAX_RANK + 1],
-    referral_reward_factors: [u128; MAX_RANK + 1],
-    reserved_1: [u8; 256],
-}
-
-impl GTState {
-    pub(crate) fn init(
-        &mut self,
-        decimals: u8,
-        initial_minting_cost: u128,
-        grow_factor: u128,
-        grow_step: u64,
-        ranks: &[u64],
-    ) -> Result<()> {
-        require_eq!(self.last_minted_at, 0, CoreError::GTStateHasBeenInitialized);
-        require_eq!(self.total_minted, 0, CoreError::GTStateHasBeenInitialized);
-        require_eq!(self.grow_steps, 0, CoreError::GTStateHasBeenInitialized);
-        require_eq!(self.supply, 0, CoreError::GTStateHasBeenInitialized);
-        require_eq!(self.es_supply, 0, CoreError::GTStateHasBeenInitialized);
-        require_eq!(self.es_factor, 0, CoreError::GTStateHasBeenInitialized);
-
-        require!(grow_step != 0, CoreError::InvalidGTConfig);
-
-        let max_rank = ranks.len().min(MAX_RANK);
-        let ranks = &ranks[0..max_rank];
-
-        // Ranks must be storted.
-        require!(
-            ranks.windows(2).all(|ab| {
-                if let [a, b] = &ab {
-                    a < b
-                } else {
-                    false
-                }
-            }),
-            CoreError::InvalidGTConfig
-        );
-
-        let clock = Clock::get()?;
-
-        self.decimals = decimals;
-        self.last_minted_at = clock.unix_timestamp;
-        self.grow_step_amount = grow_step;
-        self.minting_cost_grow_factor = grow_factor;
-        self.minting_cost = initial_minting_cost;
-
-        let target = &mut self.ranks[0..max_rank];
-        target.copy_from_slice(ranks);
-        self.max_rank = max_rank as u64;
-
-        Ok(())
-    }
-
-    pub(crate) fn set_order_fee_discount_factors(&mut self, factors: &[u128]) -> Result<()> {
-        require_eq!(
-            factors.len(),
-            (self.max_rank + 1) as usize,
-            CoreError::InvalidArgument
-        );
-
-        require!(
-            factors
-                .iter()
-                .all(|factor| *factor <= constants::MARKET_USD_UNIT),
-            CoreError::InvalidArgument
-        );
-
-        let target = &mut self.order_fee_discount_factors[0..factors.len()];
-        target.copy_from_slice(factors);
-
-        Ok(())
-    }
-
-    pub(crate) fn set_referral_reward_factors(&mut self, factors: &[u128]) -> Result<()> {
-        require_eq!(
-            factors.len(),
-            (self.max_rank + 1) as usize,
-            CoreError::InvalidArgument
-        );
-
-        let target = &mut self.referral_reward_factors[0..factors.len()];
-        target.copy_from_slice(factors);
-
-        Ok(())
-    }
-
-    pub(crate) fn order_fee_discount_factor(&self, rank: u8) -> Result<u128> {
-        require_gte!(self.max_rank, rank as u64, CoreError::InvalidArgument);
-        Ok(self.order_fee_discount_factors[rank as usize])
-    }
-
-    pub(crate) fn referral_reward_factor(&self, rank: u8) -> Result<u128> {
-        require_gte!(self.max_rank, rank as u64, CoreError::InvalidArgument);
-        Ok(self.referral_reward_factors[rank as usize])
-    }
-
-    fn next_minting_cost(&self, next_minted: u64) -> Result<Option<(u64, u128)>> {
-        use gmsol_model::utils::apply_factor;
-
-        require!(self.grow_step_amount != 0, CoreError::InvalidGTConfig);
-        let new_steps = next_minted / self.grow_step_amount;
-
-        if new_steps != self.grow_steps {
-            let mut minting_cost = self.minting_cost;
-            for _ in self.grow_steps..new_steps {
-                minting_cost = apply_factor::<_, { constants::MARKET_DECIMALS }>(
-                    &minting_cost,
-                    &self.minting_cost_grow_factor,
-                )
-                .ok_or(error!(CoreError::Internal))?;
-            }
-            Ok(Some((new_steps, minting_cost)))
-        } else {
-            Ok(None)
-        }
-    }
-
-    #[inline(never)]
-    pub(crate) fn mint_to(&mut self, user: &mut UserHeader, amount: u64) -> Result<()> {
-        if amount != 0 {
-            let clock = Clock::get()?;
-
-            // Calculate global GT state updates.
-            let next_gt_total_minted = self
-                .total_minted
-                .checked_add(amount)
-                .ok_or(error!(CoreError::TokenAmountOverflow))?;
-            let next_minting_cost = self.next_minting_cost(next_gt_total_minted)?;
-
-            // Calculate user GT state updates.
-            let next_user_total_minted = user
-                .gt
-                .total_minted
-                .checked_add(amount)
-                .ok_or(error!(CoreError::TokenAmountOverflow))?;
-            let next_amount = user
-                .gt
-                .amount
-                .checked_add(amount)
-                .ok_or(error!(CoreError::TokenAmountOverflow))?;
-            let next_supply = self
-                .supply
-                .checked_add(amount)
-                .ok_or(error!(CoreError::TokenAmountOverflow))?;
-
-            /* The following steps should be infallible. */
-
-            if let Some((new_steps, new_minting_cost)) = next_minting_cost {
-                self.minting_cost = new_minting_cost;
-                self.grow_steps = new_steps;
-            }
-            self.total_minted = next_gt_total_minted;
-            self.last_minted_at = clock.unix_timestamp;
-
-            user.gt.total_minted = next_user_total_minted;
-            user.gt.amount = next_amount;
-            user.gt.last_minted_at = self.last_minted_at;
-            self.supply = next_supply;
-        }
-        Ok(())
-    }
-
-    pub(crate) fn _burn_from(&mut self, user: &mut UserHeader, amount: u64) -> Result<()> {
-        if amount != 0 {
-            require_gte!(user.gt.amount, amount, CoreError::NotEnoughTokenAmount);
-            let next_amount = user
-                .gt
-                .amount
-                .checked_sub(amount)
-                .ok_or(error!(CoreError::Internal))?;
-            let next_supply = self
-                .supply
-                .checked_sub(amount)
-                .ok_or(error!(CoreError::Internal))?;
-            user.gt.amount = next_amount;
-            self.supply = next_supply;
-        }
-        Ok(())
-    }
-
-    #[inline(never)]
-    pub(crate) fn get_mint_amount(
-        &self,
-        size_in_value: u128,
-        discount: u128,
-    ) -> Result<(u64, u128)> {
-        use gmsol_model::utils::apply_factor;
-
-        // Calculate the minting cost to apply.
-        let minting_cost = if discount == 0 {
-            self.minting_cost
-        } else {
-            require_gt!(
-                constants::MARKET_USD_UNIT,
-                discount,
-                CoreError::InvalidGTDiscount
-            );
-            let discounted_factor = constants::MARKET_USD_UNIT - discount;
-
-            apply_factor::<_, { constants::MARKET_DECIMALS }>(
-                &self.minting_cost,
-                &discounted_factor,
-            )
-            .ok_or(error!(CoreError::InvalidGTDiscount))?
-        };
-
-        require!(minting_cost != 0, CoreError::InvalidGTConfig);
-
-        let remainder = size_in_value % minting_cost;
-        let minted = (size_in_value / minting_cost)
-            .try_into()
-            .map_err(|_| error!(CoreError::TokenAmountOverflow))?;
-
-        let minted_value = size_in_value - remainder;
-
-        msg!(
-            "[GT] will mint {} units of GT with a minting cost of {} per unit GT (in terms of trade volume), discount = {}",
-            minted,
-            minting_cost,
-            discount,
-        );
-
-        Ok((minted, minted_value))
-    }
-
-    pub(crate) fn ranks(&self) -> &[u64] {
-        &self.ranks[0..(self.max_rank as usize)]
     }
 }
 

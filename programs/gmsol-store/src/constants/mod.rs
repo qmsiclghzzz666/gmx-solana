@@ -58,3 +58,6 @@ pub const DEFAULT_ORACLE_MAX_TIMESTAMP_RANGE: Amount = 300;
 
 /// Default oracle ref price deviation.
 pub const DEFAULT_ORACLE_REF_PRICE_DEVIATION: Factor = 1_000_000_000_000_000;
+
+/// Default GT vault time window size.
+pub const DEFAULT_GT_VAULT_TIME_WINDOW: u32 = 24 * 60 * 60;
