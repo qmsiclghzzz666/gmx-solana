@@ -24,9 +24,11 @@ pub struct GtState {
     /* Configs */
     minting_cost_grow_factor: u128,
     minting_cost: u128,
+    gt_reserve_factor: u128,
     es_receiver_factor: u128,
     es_time_window: u32,
-    padding_1: [u8; 12],
+    es_vesting_divisor: u16,
+    padding_1: [u8; 10],
     max_rank: u64,
     ranks: [u64; MAX_RANK],
     order_fee_discount_factors: [u128; MAX_RANK + 1],
@@ -79,7 +81,9 @@ impl GtState {
         target.copy_from_slice(ranks);
         self.max_rank = max_rank as u64;
 
+        self.gt_reserve_factor = constants::DEFAULT_GT_RESERVE_FACTOR;
         self.es_time_window = constants::DEFAULT_GT_VAULT_TIME_WINDOW;
+        self.es_vesting_divisor = constants::DEFAULT_ES_GT_VESTING_DIVISOR;
 
         Ok(())
     }
@@ -190,16 +194,24 @@ impl GtState {
         let amount = apply_factor::<_, { constants::MARKET_DECIMALS }>(&gt_amount, &diff_factor)
             .ok_or(error!(CoreError::ValueOverflow))?;
 
+        let amount: u64 = amount.try_into()?;
+
         let next_es_amount = user
             .gt
             .es_amount
-            .checked_add(amount.try_into()?)
+            .checked_add(amount)
+            .ok_or(error!(CoreError::TokenAmountOverflow))?;
+
+        let next_es_supply = self
+            .es_supply
+            .checked_add(amount)
             .ok_or(error!(CoreError::TokenAmountOverflow))?;
 
         /* The following steps should be infallible. */
 
         user.gt.es_amount = next_es_amount;
         user.gt.es_factor = current_factor;
+        self.es_supply = next_es_supply;
 
         Ok(())
     }
@@ -251,6 +263,29 @@ impl GtState {
         Ok(())
     }
 
+    fn validate_gt_reserve(
+        &self,
+        user: &UserHeader,
+        next_gt_amount: Option<u64>,
+        next_vesting_es_amount: Option<u64>,
+    ) -> Result<()> {
+        use gmsol_model::utils::apply_factor;
+
+        let gt_amount = u128::from(next_gt_amount.unwrap_or(user.gt.amount));
+        let vesting_es_amount =
+            u128::from(next_vesting_es_amount.unwrap_or(user.gt.vesting_es_amount));
+
+        let reserve_gt_amount = apply_factor::<_, { constants::MARKET_DECIMALS }>(
+            &vesting_es_amount,
+            &self.gt_reserve_factor,
+        )
+        .ok_or(error!(CoreError::ValueOverflow))?;
+
+        require_gte!(gt_amount, reserve_gt_amount, CoreError::InvalidArgument);
+
+        Ok(())
+    }
+
     /// Burn GT from the given `user`.
     ///
     /// # CHECK
@@ -266,6 +301,9 @@ impl GtState {
                 .amount
                 .checked_sub(amount)
                 .ok_or(error!(CoreError::Internal))?;
+
+            self.validate_gt_reserve(user, Some(next_amount), None)?;
+
             let next_supply = self
                 .supply
                 .checked_sub(amount)
@@ -395,9 +433,16 @@ impl GtState {
             .checked_sub(amount_for_vault)
             .ok_or(error!(CoreError::Internal))?;
 
+        let amount_for_vault: u64 = amount_for_vault.try_into()?;
+
         let next_es_vault = self
             .es_vault
-            .checked_add(amount_for_vault.try_into()?)
+            .checked_add(amount_for_vault)
+            .ok_or(error!(CoreError::TokenAmountOverflow))?;
+
+        let next_es_supply = self
+            .es_supply
+            .checked_add(amount_for_vault)
             .ok_or(error!(CoreError::TokenAmountOverflow))?;
 
         debug_assert_ne!(self.supply, 0);
@@ -413,6 +458,99 @@ impl GtState {
 
         self.es_vault = next_es_vault;
         self.es_factor = next_es_factor;
+        self.es_supply = next_es_supply;
+        Ok(())
+    }
+
+    /// Request for a vesting.
+    ///
+    /// # CHECK
+    /// - `user` and `vesting` must be owned by this store.
+    /// - `vesting` must belong to the `user`.
+    ///
+    /// # Errors
+    /// - The `user` must have enough amount of esGT.
+    ///
+    /// # Notes
+    /// - This is not an atomic operation.
+    pub(crate) fn unchecked_request_vesting(
+        &mut self,
+        user: &mut UserHeader,
+        vesting: &mut GtVesting,
+        amount: u64,
+    ) -> Result<()> {
+        require_gte!(user.gt.es_amount, amount, CoreError::NotEnoughTokenAmount);
+
+        self.unchecked_update_vesting(user, vesting)?;
+
+        let next_es_amount = user
+            .gt
+            .es_amount
+            .checked_sub(amount)
+            .ok_or(error!(CoreError::NotEnoughTokenAmount))?;
+        let next_vesting_es_amount = user
+            .gt
+            .vesting_es_amount
+            .checked_add(amount)
+            .ok_or(error!(CoreError::TokenAmountOverflow))?;
+
+        self.validate_gt_reserve(user, None, Some(next_vesting_es_amount))?;
+
+        vesting.add(amount, self.es_vesting_divisor)?;
+
+        user.gt.es_amount = next_es_amount;
+        user.gt.vesting_es_amount = next_vesting_es_amount;
+
+        Ok(())
+    }
+
+    /// Update vesting state.
+    ///
+    /// # CHECK
+    /// - `user` and `vesting` must be owned by this store.
+    /// - `vesting` msut belong to the `user`.
+    ///
+    /// # Errors
+    ///
+    pub(crate) fn unchecked_update_vesting(
+        &mut self,
+        user: &mut UserHeader,
+        vesting: &mut GtVesting,
+    ) -> Result<()> {
+        self.unchecked_sync_es_factor(user)?;
+
+        let amount = vesting.advance()?;
+
+        if amount == 0 {
+            return Ok(());
+        }
+
+        let next_vesting_es_amount = user
+            .gt
+            .vesting_es_amount
+            .checked_sub(amount)
+            .ok_or(error!(CoreError::TokenAmountOverflow))?;
+        let next_es_supply = self
+            .es_supply
+            .checked_sub(amount)
+            .ok_or(error!(CoreError::NotEnoughTokenAmount))?;
+
+        // The process of esGT -> GT does not affect the mint cost and the total minted.
+        let next_amount = user
+            .gt
+            .amount
+            .checked_add(amount)
+            .ok_or(error!(CoreError::TokenAmountOverflow))?;
+        let next_supply = self
+            .supply
+            .checked_add(amount)
+            .ok_or(error!(CoreError::TokenAmountOverflow))?;
+
+        user.gt.vesting_es_amount = next_vesting_es_amount;
+        user.gt.amount = next_amount;
+        self.es_supply = next_es_supply;
+        self.supply = next_supply;
+
         Ok(())
     }
 }
@@ -474,13 +612,14 @@ impl GtExchangeVault {
         self.get_flag(GtExchangeVaultFlag::Comfirmed)
     }
 
-    pub(crate) fn init(&mut self, store: &Pubkey, time_window: u32) -> Result<()> {
+    pub(crate) fn init(&mut self, bump: u8, store: &Pubkey, time_window: u32) -> Result<()> {
         require!(!self.is_initialized(), CoreError::PreconditionsAreNotMet);
 
         require!(time_window != 0, CoreError::InvalidArgument);
 
         let clock = Clock::get()?;
 
+        self.bump = bump;
         self.ts = clock.unix_timestamp;
         self.store = *store;
         self.set_flag(GtExchangeVaultFlag::Intiailized, true);
@@ -599,9 +738,16 @@ impl GtExchange {
         self.get_flag(GtExchangeFlag::Intiailized)
     }
 
-    pub(crate) fn init(&mut self, owner: &Pubkey, store: &Pubkey, vault: &Pubkey) -> Result<()> {
-        require!(self.is_initialized(), CoreError::PreconditionsAreNotMet);
+    pub(crate) fn init(
+        &mut self,
+        bump: u8,
+        owner: &Pubkey,
+        store: &Pubkey,
+        vault: &Pubkey,
+    ) -> Result<()> {
+        require!(!self.is_initialized(), CoreError::PreconditionsAreNotMet);
 
+        self.bump = bump;
         self.owner = *owner;
         self.store = *store;
         self.vault = *vault;
@@ -622,4 +768,163 @@ impl GtExchange {
 fn get_time_window_index(ts: i64, time_window: i64) -> i64 {
     debug_assert!(time_window > 0);
     ts / time_window
+}
+
+type GtVestingFlagsMap = bitmaps::Bitmap<MAX_FLAGS>;
+type GtVestingFlagsValue = u8;
+
+/// GT Vesting Vault Flags.
+#[repr(u8)]
+#[non_exhaustive]
+#[derive(num_enum::IntoPrimitive, num_enum::TryFromPrimitive)]
+pub enum GtVestingFlag {
+    /// Initialized.
+    Intiailized,
+    // CHECK: should have no more than `MAX_FLAGS` of flags.
+}
+
+const VESTING_LEN: usize = 512;
+
+/// GT Vesting.
+#[account(zero_copy)]
+#[cfg_attr(feature = "debug", derive(Debug))]
+pub struct GtVesting {
+    bump: u8,
+    flags: GtVestingFlagsValue,
+    head: u16,
+    time_window: u32,
+    time_window_index: i64,
+    owner: Pubkey,
+    store: Pubkey,
+    vesting: [u64; VESTING_LEN],
+}
+
+impl GtVesting {
+    fn get_flag(&self, kind: GtVestingFlag) -> bool {
+        let index = u8::from(kind);
+        let map = GtVestingFlagsMap::from_value(self.flags);
+        map.get(usize::from(index))
+    }
+
+    fn set_flag(&mut self, kind: GtVestingFlag, value: bool) -> bool {
+        let index = u8::from(kind);
+        let mut map = GtVestingFlagsMap::from_value(self.flags);
+        map.set(usize::from(index), value)
+    }
+
+    /// Get whether the vault is initialized.
+    pub fn is_initialized(&self) -> bool {
+        self.get_flag(GtVestingFlag::Intiailized)
+    }
+
+    pub(crate) fn init(
+        &mut self,
+        bump: u8,
+        owner: &Pubkey,
+        store: &Pubkey,
+        time_window: u32,
+    ) -> Result<()> {
+        require!(!self.is_initialized(), CoreError::PreconditionsAreNotMet);
+
+        let clock = Clock::get()?;
+        self.time_window_index = get_time_window_index(clock.unix_timestamp, time_window.into());
+
+        self.bump = bump;
+        self.owner = *owner;
+        self.store = *store;
+        self.time_window = time_window;
+
+        Ok(())
+    }
+
+    fn current_time_window_index(&self) -> Result<i64> {
+        let clock = Clock::get()?;
+        let current = get_time_window_index(clock.unix_timestamp, self.time_window.into());
+
+        Ok(current)
+    }
+
+    fn validate_time_window(&self) -> Result<()> {
+        require_eq!(
+            self.current_time_window_index()?,
+            self.time_window_index,
+            CoreError::PreconditionsAreNotMet
+        );
+        Ok(())
+    }
+
+    /// Add amount to the vesting.
+    ///
+    /// # Notes
+    /// - This is not an atomic operation.
+    fn add(&mut self, amount: u64, divisor: u16) -> Result<()> {
+        require!(self.is_initialized(), CoreError::PreconditionsAreNotMet);
+
+        // Time window must be up-to-date.
+        self.validate_time_window()?;
+
+        require!(divisor != 0, CoreError::InvalidArgument);
+        require_gte!(VESTING_LEN, divisor as usize, CoreError::InvalidArgument);
+
+        let d = u64::from(divisor);
+        let quotient = amount.div_euclid(d);
+        let remainder = amount.rem_euclid(d);
+
+        for offset in 0..(divisor) {
+            let delta = if offset == 0 {
+                quotient + remainder
+            } else {
+                quotient
+            };
+            // Since head + offset + 1 <= 2 * VESTING_LEN < u16::MAX, this will never overflow.
+            let idx = usize::from(self.head + offset) % VESTING_LEN;
+            self.vesting[idx] = self.vesting[idx]
+                .checked_add(delta)
+                .ok_or(error!(CoreError::TokenAmountOverflow))?;
+        }
+
+        Ok(())
+    }
+
+    fn pop_head(&mut self) -> u64 {
+        let amount = &mut self.vesting[usize::from(self.head)];
+
+        if *amount == 0 {
+            return 0;
+        }
+
+        // Since head + 1 <= VESTING_LEN + 1 < u16::MAX, this will never overflow.
+        let next_head = (self.head + 1) % (VESTING_LEN as u16);
+
+        let current = *amount;
+        self.head = next_head;
+        *amount = 0;
+
+        current
+    }
+
+    fn advance(&mut self) -> Result<u64> {
+        let current = self.current_time_window_index()?;
+
+        require_gte!(
+            current,
+            self.time_window_index,
+            CoreError::PreconditionsAreNotMet
+        );
+
+        let mut amount = 0u64;
+
+        for _ in self.time_window_index..current {
+            let pop = self.pop_head();
+            if pop != 0 {
+                amount = amount
+                    .checked_add(pop)
+                    .ok_or(error!(CoreError::TokenAmountOverflow))?;
+            }
+        }
+
+        self.time_window_index = current;
+
+        Ok(amount)
+    }
 }

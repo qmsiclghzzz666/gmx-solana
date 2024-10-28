@@ -21,7 +21,7 @@ pub struct UserHeader {
     /// Referral.
     pub(crate) referral: Referral,
     /// GT State.
-    pub(crate) gt: GTState,
+    pub(crate) gt: GtState,
     reserved: [u8; 128],
 }
 
@@ -252,20 +252,21 @@ impl Seed for ReferralCode {
 /// GT State.
 #[zero_copy]
 #[cfg_attr(feature = "debug", derive(Debug))]
-pub struct GTState {
+pub struct GtState {
     rank: u8,
-    padding_0: [u8; 15],
+    padding_0: [u8; 7],
     pub(crate) last_minted_at: i64,
     pub(crate) total_minted: u64,
     pub(crate) amount: u64,
     pub(crate) es_amount: u64,
+    pub(crate) vesting_es_amount: u64,
     pub(crate) es_factor: u128,
     pub(crate) traded_value: u128,
     pub(crate) minted_value: u128,
     reserved: [u8; 64],
 }
 
-impl GTState {
+impl GtState {
     /// Get traded value.
     pub fn traded_value(&self) -> u128 {
         self.traded_value
