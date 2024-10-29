@@ -1319,7 +1319,7 @@ pub mod gmsol_store {
     /// Set order fee discount factors.
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn gt_set_order_fee_discount_factors(
-        ctx: Context<ConfigurateGT>,
+        ctx: Context<ConfigurateGt>,
         factors: Vec<u128>,
     ) -> Result<()> {
         instructions::unchecked_gt_set_order_fee_discount_factors(ctx, &factors)
@@ -1328,7 +1328,7 @@ pub mod gmsol_store {
     /// Set referral reward factors.
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn gt_set_referral_reward_factors(
-        ctx: Context<ConfigurateGT>,
+        ctx: Context<ConfigurateGt>,
         factors: Vec<u128>,
     ) -> Result<()> {
         instructions::unchecked_gt_set_referral_reward_factors(ctx, &factors)
