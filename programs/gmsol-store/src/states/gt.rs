@@ -465,7 +465,7 @@ impl GtState {
     /// Request for a vesting.
     ///
     /// # CHECK
-    /// - `user` and `vesting` must be owned by this store.
+    /// - `user` and `vesting` must be initialized and owned by this store.
     /// - `vesting` must belong to the `user`.
     ///
     /// # Errors
@@ -507,7 +507,7 @@ impl GtState {
     /// Update vesting state.
     ///
     /// # CHECK
-    /// - `user` and `vesting` must be owned by this store.
+    /// - `user` and `vesting` must be initialized and owned by this store.
     /// - `vesting` msut belong to the `user`.
     ///
     /// # Errors
@@ -550,6 +550,45 @@ impl GtState {
         user.gt.amount = next_amount;
         self.es_supply = next_es_supply;
         self.supply = next_supply;
+
+        Ok(())
+    }
+
+    /// Directly distribute esGT from the esGT vault to the given user as vesting.
+    ///
+    /// # CHECK
+    /// - The `user` and `vesting` must be initialized and owned by this store.
+    /// - The owner of the `vesting` must have been authorized to be distributed.
+    ///
+    /// # Errors
+    /// - The esGT vault must have enough amount of esGT.
+    ///
+    /// # Notes
+    /// - This is not an atomic operation.
+    pub(crate) fn unchecked_distribute_es_vault(
+        &mut self,
+        user: &mut UserHeader,
+        vesting: &mut GtVesting,
+        amount: u64,
+    ) -> Result<()> {
+        require_gte!(self.es_vault, amount, CoreError::NotEnoughTokenAmount);
+
+        self.unchecked_update_vesting(user, vesting)?;
+
+        let next_es_vault = self
+            .es_vault
+            .checked_sub(amount)
+            .ok_or(error!(CoreError::NotEnoughTokenAmount))?;
+        let next_vesting_es_amount = user
+            .gt
+            .vesting_es_amount
+            .checked_add(amount)
+            .ok_or(error!(CoreError::TokenAmountOverflow))?;
+
+        vesting.add(amount, self.es_vesting_divisor)?;
+
+        self.es_vault = next_es_vault;
+        user.gt.vesting_es_amount = next_vesting_es_amount;
 
         Ok(())
     }
