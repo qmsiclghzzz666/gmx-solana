@@ -1326,12 +1326,73 @@ pub mod gmsol_store {
     }
 
     /// Set referral reward factors.
-    #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
+    #[access_control(internal::Authenticate::only_gt_controller(&ctx))]
     pub fn gt_set_referral_reward_factors(
         ctx: Context<ConfigurateGt>,
         factors: Vec<u128>,
     ) -> Result<()> {
         instructions::unchecked_gt_set_referral_reward_factors(ctx, &factors)
+    }
+
+    /// Set esGT receiver factor.
+    #[access_control(internal::Authenticate::only_gt_controller(&ctx))]
+    pub fn gt_set_es_receiver_factor(ctx: Context<ConfigurateGt>, factor: u128) -> Result<()> {
+        instructions::unchecked_gt_set_es_receiver_factor(ctx, factor)
+    }
+
+    /// Set GT exchange time window (in seconds).
+    #[access_control(internal::Authenticate::only_gt_controller(&ctx))]
+    pub fn gt_set_exchange_time_window(ctx: Context<ConfigurateGt>, window: u32) -> Result<()> {
+        instructions::unchecked_gt_set_exchange_time_window(ctx, window)
+    }
+
+    /// Set GT esGT vault receiver.
+    #[access_control(internal::Authenticate::only_gt_controller(&ctx))]
+    pub fn gt_set_receiver(ctx: Context<ConfigurateGt>, receiver: Pubkey) -> Result<()> {
+        instructions::unchecked_gt_set_receiver(ctx, &receiver)
+    }
+
+    /// Initialize GT Exchange Vault.
+    #[access_control(internal::Authenticate::only_gt_controller(&ctx))]
+    pub fn initialize_gt_exchange_vault(
+        ctx: Context<InitializeGtExchangeVault>,
+        time_window_index: i64,
+    ) -> Result<()> {
+        instructions::unchecked_initialize_gt_exchange_vault(ctx, time_window_index)
+    }
+
+    /// Confirm GT exchange vault.
+    #[access_control(internal::Authenticate::only_gt_controller(&ctx))]
+    pub fn confirm_gt_exchange_vault(ctx: Context<ConfirmGtExchangeVault>) -> Result<()> {
+        instructions::unchecked_confirm_gt_exchange_vault(ctx)
+    }
+
+    /// Request a GT exchange.
+    pub fn request_gt_exchange(ctx: Context<RequestGtExchange>, amount: u64) -> Result<()> {
+        instructions::request_gt_exchange(ctx, amount)
+    }
+
+    /// Request GT vesting.
+    pub fn request_gt_vesting(ctx: Context<RequestGtVesting>, amount: u64) -> Result<()> {
+        instructions::request_gt_vesting(ctx, amount)
+    }
+
+    /// Update GT vesting.
+    pub fn update_gt_vesting(ctx: Context<UpdateGtVesting>) -> Result<()> {
+        instructions::update_gt_vesting(ctx)
+    }
+
+    /// Close GT vesting account.
+    pub fn close_gt_vesting(ctx: Context<CloseGtVesting>) -> Result<()> {
+        instructions::close_gt_vesting(ctx)
+    }
+
+    /// Claim esGT vault by vesting.
+    pub fn claim_es_gt_vault_by_vesting(
+        ctx: Context<ClaimEsGtVaultByVesting>,
+        amount: u64,
+    ) -> Result<()> {
+        instructions::claim_es_gt_vault_by_vesting(ctx, amount)
     }
 
     /// Prepare User Account.
@@ -1360,7 +1421,7 @@ pub mod gmsol_store {
     // GLV instructions.
     /// Initialize GLV.
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
-    pub fn initalize_glv<'info>(
+    pub fn initialize_glv<'info>(
         ctx: Context<'_, '_, 'info, 'info, InitializeGlv<'info>>,
         index: u8,
         length: u16,

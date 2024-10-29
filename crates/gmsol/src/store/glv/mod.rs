@@ -88,7 +88,7 @@ impl<C: Deref<Target = impl Signer> + Clone> GlvOps<C> for crate::Client<C> {
                 market_token_program: market_token_program_id,
                 associated_token_program: anchor_spl::associated_token::ID,
             })
-            .args(instruction::InitalizeGlv {
+            .args(instruction::InitializeGlv {
                 index,
                 length: length
                     .try_into()

@@ -36,6 +36,9 @@ impl RoleKey {
 
     /// FEATURE KEEPER.
     pub const FEATURE_KEEPER: &'static str = "FEATURE_KEEPER";
+
+    /// GT Controller.
+    pub const GT_CONTROLLER: &'static str = "GT_CONTROLLER";
 }
 
 impl Borrow<str> for RoleKey {

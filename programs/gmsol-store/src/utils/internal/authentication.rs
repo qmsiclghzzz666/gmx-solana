@@ -58,6 +58,11 @@ pub(crate) trait Authenticate<'info>: Authentication<'info> + Bumps + Sized {
     fn only_order_keeper(ctx: &Context<Self>) -> Result<()> {
         Self::only(ctx, RoleKey::ORDER_KEEPER)
     }
+
+    /// Check that the `authority` has the [`GT_CONTROLLER`](`RoleKey::GT_CONTROLLER`) role.
+    fn only_gt_controller(ctx: &Context<Self>) -> Result<()> {
+        Self::only(ctx, RoleKey::GT_CONTROLLER)
+    }
 }
 
 impl<'info, T> Authenticate<'info> for T where T: Authentication<'info> + Bumps + Sized {}

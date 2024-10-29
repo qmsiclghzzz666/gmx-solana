@@ -24,15 +24,16 @@ pub struct GtState {
     /* Configs */
     minting_cost_grow_factor: u128,
     minting_cost: u128,
-    gt_reserve_factor: u128,
+    reserve_factor: u128,
     es_receiver_factor: u128,
-    es_time_window: u32,
+    exchange_time_window: u32,
     es_vesting_divisor: u16,
     padding_1: [u8; 10],
     max_rank: u64,
     ranks: [u64; MAX_RANK],
     order_fee_discount_factors: [u128; MAX_RANK + 1],
     referral_reward_factors: [u128; MAX_RANK + 1],
+    receiver: Pubkey,
     reserved_1: [u8; 256],
 }
 
@@ -81,8 +82,8 @@ impl GtState {
         target.copy_from_slice(ranks);
         self.max_rank = max_rank as u64;
 
-        self.gt_reserve_factor = constants::DEFAULT_GT_RESERVE_FACTOR;
-        self.es_time_window = constants::DEFAULT_GT_VAULT_TIME_WINDOW;
+        self.reserve_factor = constants::DEFAULT_GT_RESERVE_FACTOR;
+        self.exchange_time_window = constants::DEFAULT_GT_VAULT_TIME_WINDOW;
         self.es_vesting_divisor = constants::DEFAULT_ES_GT_VESTING_DIVISOR;
 
         Ok(())
@@ -143,6 +144,16 @@ impl GtState {
 
     pub(crate) fn es_receiver_factor(&self) -> u128 {
         self.es_receiver_factor
+    }
+
+    pub(crate) fn exchange_time_window(&self) -> u32 {
+        self.exchange_time_window
+    }
+
+    pub(crate) fn set_exchange_time_window(&mut self, window: u32) -> Result<()> {
+        require_neq!(window, 0, CoreError::InvalidArgument);
+        self.exchange_time_window = window;
+        Ok(())
     }
 
     fn next_minting_cost(&self, next_minted: u64) -> Result<Option<(u64, u128)>> {
@@ -277,7 +288,7 @@ impl GtState {
 
         let reserve_gt_amount = apply_factor::<_, { constants::MARKET_DECIMALS }>(
             &vesting_es_amount,
-            &self.gt_reserve_factor,
+            &self.reserve_factor,
         )
         .ok_or(error!(CoreError::ValueOverflow))?;
 
@@ -371,12 +382,15 @@ impl GtState {
     /// Request an exchange.
     ///
     /// # CHECK
-    /// - `user`, vault` and `exchange` must owned by this store.
+    /// - `user`, `vault` and `exchange` must owned by this store.
     ///
     /// # Errors
     /// - `user`, `vault` and `exchange` must have been initialized.
     /// - `vault` must be depositable.
     /// - `user` must have enough amount of GT.
+    ///
+    /// # Notes
+    /// - This is not an atomic operation.
     pub(crate) fn unchecked_request_exchange(
         &mut self,
         user: &mut UserHeader,
@@ -554,6 +568,29 @@ impl GtState {
         Ok(())
     }
 
+    /// Get esGT vault receiver.
+    pub fn receiver(&self) -> Option<Pubkey> {
+        if self.receiver == Pubkey::default() {
+            None
+        } else {
+            Some(self.receiver)
+        }
+    }
+
+    pub(crate) fn validate_receiver(&self, address: &Pubkey) -> Result<()> {
+        let receiver = self
+            .receiver()
+            .ok_or(error!(CoreError::PreconditionsAreNotMet))?;
+        require_eq!(receiver, *address, CoreError::PermissionDenied);
+        Ok(())
+    }
+
+    pub(crate) fn set_receiver(&mut self, receiver: &Pubkey) -> Result<()> {
+        require_neq!(*receiver, Pubkey::default(), CoreError::InvalidArgument);
+        self.receiver = *receiver;
+        Ok(())
+    }
+
     /// Directly distribute esGT from the esGT vault to the given user as vesting.
     ///
     /// # CHECK
@@ -571,6 +608,7 @@ impl GtState {
         vesting: &mut GtVesting,
         amount: u64,
     ) -> Result<()> {
+        require_neq!(amount, 0, CoreError::InvalidArgument);
         require_gte!(self.es_vault, amount, CoreError::NotEnoughTokenAmount);
 
         self.unchecked_update_vesting(user, vesting)?;
@@ -613,13 +651,13 @@ pub enum GtExchangeVaultFlag {
 #[account(zero_copy)]
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub struct GtExchangeVault {
-    bump: u8,
+    pub(crate) bump: u8,
     flags: GtExchangeVaultFlagsValue,
     padding: [u8; 6],
     ts: i64,
     time_window: i64,
     amount: u64,
-    store: Pubkey,
+    pub(crate) store: Pubkey,
     reserved: [u8; 64],
 }
 
@@ -791,6 +829,8 @@ impl GtExchange {
         self.store = *store;
         self.vault = *vault;
 
+        self.set_flag(GtExchangeFlag::Intiailized, true);
+
         Ok(())
     }
 
@@ -802,9 +842,26 @@ impl GtExchange {
             .ok_or(error!(CoreError::TokenAmountOverflow))?;
         Ok(())
     }
+
+    pub(crate) fn owner(&self) -> &Pubkey {
+        &self.owner
+    }
+
+    pub(crate) fn store(&self) -> &Pubkey {
+        &self.store
+    }
 }
 
-fn get_time_window_index(ts: i64, time_window: i64) -> i64 {
+impl gmsol_utils::InitSpace for GtExchange {
+    const INIT_SPACE: usize = std::mem::size_of::<Self>();
+}
+
+impl Seed for GtExchange {
+    const SEED: &'static [u8] = b"gt_exchange";
+}
+
+/// Get time window index.
+pub fn get_time_window_index(ts: i64, time_window: i64) -> i64 {
     debug_assert!(time_window > 0);
     ts / time_window
 }
@@ -828,13 +885,13 @@ const VESTING_LEN: usize = 512;
 #[account(zero_copy)]
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub struct GtVesting {
-    bump: u8,
+    pub(crate) bump: u8,
     flags: GtVestingFlagsValue,
     head: u16,
     time_window: u32,
     time_window_index: i64,
-    owner: Pubkey,
-    store: Pubkey,
+    pub(crate) owner: Pubkey,
+    pub(crate) store: Pubkey,
     vesting: [u64; VESTING_LEN],
 }
 
@@ -872,6 +929,8 @@ impl GtVesting {
         self.owner = *owner;
         self.store = *store;
         self.time_window = time_window;
+
+        self.set_flag(GtVestingFlag::Intiailized, true);
 
         Ok(())
     }
@@ -966,4 +1025,27 @@ impl GtVesting {
 
         Ok(amount)
     }
+
+    /// Get the owner.
+    pub fn owner(&self) -> &Pubkey {
+        &self.owner
+    }
+
+    /// Get the store.
+    pub fn store(&self) -> &Pubkey {
+        &self.store
+    }
+
+    /// Return whether the vesting is empty.
+    pub fn is_empty(&self) -> bool {
+        self.vesting[usize::from(self.head)] == 0
+    }
+}
+
+impl gmsol_utils::InitSpace for GtVesting {
+    const INIT_SPACE: usize = std::mem::size_of::<Self>();
+}
+
+impl Seed for GtVesting {
+    const SEED: &'static [u8] = b"gt_vesting";
 }
