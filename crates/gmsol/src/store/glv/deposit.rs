@@ -24,7 +24,7 @@ use gmsol_store::{
 use crate::{
     exchange::generate_nonce,
     store::{token::TokenAccountOps, utils::FeedsParser},
-    utils::{ComputeBudget, RpcBuilder, ZeroCopy},
+    utils::{fix_optional_account_metas, ComputeBudget, RpcBuilder, ZeroCopy},
 };
 
 use super::{split_to_accounts, GlvOps};
@@ -290,28 +290,32 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateGlvDepositBuilder<'a, C> 
         let create = self
             .client
             .store_rpc()
-            .accounts(accounts::CreateGlvDeposit {
-                owner,
-                store: self.store,
-                market,
-                glv,
-                glv_deposit,
-                glv_token: self.glv_token,
-                market_token: self.market_token,
-                initial_long_token,
-                initial_short_token,
-                market_token_source,
-                initial_long_token_source,
-                initial_short_token_source,
-                glv_token_escrow,
-                market_token_escrow,
-                initial_long_token_escrow,
-                initial_short_token_escrow,
-                system_program: system_program::ID,
-                token_program: token_program_id,
-                glv_token_program: glv_token_program_id,
-                associated_token_program: anchor_spl::associated_token::ID,
-            })
+            .accounts(fix_optional_account_metas(
+                accounts::CreateGlvDeposit {
+                    owner,
+                    store: self.store,
+                    market,
+                    glv,
+                    glv_deposit,
+                    glv_token: self.glv_token,
+                    market_token: self.market_token,
+                    initial_long_token,
+                    initial_short_token,
+                    market_token_source,
+                    initial_long_token_source,
+                    initial_short_token_source,
+                    glv_token_escrow,
+                    market_token_escrow,
+                    initial_long_token_escrow,
+                    initial_short_token_escrow,
+                    system_program: system_program::ID,
+                    token_program: token_program_id,
+                    glv_token_program: glv_token_program_id,
+                    associated_token_program: anchor_spl::associated_token::ID,
+                },
+                &crate::program_ids::DEFAULT_GMSOL_STORE_ID,
+                &self.client.store_program_id(),
+            ))
             .args(instruction::CreateGlvDeposit {
                 nonce,
                 params: CreateGlvDepositParams {

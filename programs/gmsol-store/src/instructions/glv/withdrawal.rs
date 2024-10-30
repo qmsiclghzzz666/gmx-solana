@@ -156,7 +156,7 @@ impl<'info> CreateGlvWithdrawal<'info> {
         require!(amount != 0, CoreError::EmptyGlvWithdrawal);
 
         let source = &self.glv_token_source;
-        let target = &self.glv_token_escrow;
+        let target = &mut self.glv_token_escrow;
         let mint = &self.glv_token;
 
         transfer_checked(
@@ -172,6 +172,8 @@ impl<'info> CreateGlvWithdrawal<'info> {
             amount,
             mint.decimals,
         )?;
+
+        target.reload()?;
 
         Ok(())
     }

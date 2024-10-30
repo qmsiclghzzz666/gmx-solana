@@ -2,6 +2,7 @@ use anchor_client::solana_sdk::pubkey::Pubkey;
 use gmsol_store::{
     events::TradeEventData,
     states::{
+        glv::GlvWithdrawal,
         gt::{GtExchange, GtExchangeVault, GtVesting},
         position::PositionKind,
         user::{ReferralCode, ReferralCodeBytes, UserHeader},
@@ -215,6 +216,19 @@ pub fn find_glv_deposit_pda(
 ) -> (Pubkey, u8) {
     Pubkey::find_program_address(
         &[GlvDeposit::SEED, store.as_ref(), owner.as_ref(), nonce],
+        store_program_id,
+    )
+}
+
+/// Find the PDA for a GLV withdrawal account.
+pub fn find_glv_withdrawal_pda(
+    store: &Pubkey,
+    owner: &Pubkey,
+    nonce: &NonceBytes,
+    store_program_id: &Pubkey,
+) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[GlvWithdrawal::SEED, store.as_ref(), owner.as_ref(), nonce],
         store_program_id,
     )
 }

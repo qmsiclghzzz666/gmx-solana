@@ -336,6 +336,16 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         crate::pda::find_glv_deposit_pda(store, owner, nonce, &self.store_program_id()).0
     }
 
+    /// Find GLV withdrawal address.
+    pub fn find_glv_withdrawal_address(
+        &self,
+        store: &Pubkey,
+        owner: &Pubkey,
+        nonce: &NonceBytes,
+    ) -> Pubkey {
+        crate::pda::find_glv_withdrawal_pda(store, owner, nonce, &self.store_program_id()).0
+    }
+
     /// Find GT exchange vault address.
     pub fn find_gt_exchange_vault_address(&self, store: &Pubkey, time_window_index: i64) -> Pubkey {
         crate::pda::find_gt_exchange_vault_pda(store, time_window_index, &self.store_program_id()).0

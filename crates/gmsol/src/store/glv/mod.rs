@@ -10,10 +10,14 @@ use gmsol_store::{accounts, instruction, states::Market};
 use crate::utils::RpcBuilder;
 
 mod deposit;
+mod withdrawal;
 
-pub use self::deposit::{
-    CloseGlvDepositBuilder, CloseGlvDepositHint, CreateGlvDepositBuilder, CreateGlvDepositHint,
-    ExecuteGlvDepositBuilder, ExecuteGlvDepositHint,
+pub use self::{
+    deposit::{
+        CloseGlvDepositBuilder, CloseGlvDepositHint, CreateGlvDepositBuilder, CreateGlvDepositHint,
+        ExecuteGlvDepositBuilder, ExecuteGlvDepositHint,
+    },
+    withdrawal::{CreateGlvWithdrawalBuilder, CreateGlvWithdrawalHint},
 };
 
 /// Glv Operations.
@@ -54,6 +58,14 @@ pub trait GlvOps<C> {
         glv_deposit: &Pubkey,
         cancel_on_execution_error: bool,
     ) -> ExecuteGlvDepositBuilder<C>;
+
+    fn create_glv_withdrawal(
+        &self,
+        store: &Pubkey,
+        glv_token: &Pubkey,
+        market_token: &Pubkey,
+        amount: u64,
+    ) -> CreateGlvWithdrawalBuilder<C>;
 }
 
 impl<C: Deref<Target = impl Signer> + Clone> GlvOps<C> for crate::Client<C> {
@@ -140,6 +152,16 @@ impl<C: Deref<Target = impl Signer> + Clone> GlvOps<C> for crate::Client<C> {
         cancel_on_execution_error: bool,
     ) -> ExecuteGlvDepositBuilder<C> {
         ExecuteGlvDepositBuilder::new(self, *oracle, *glv_deposit, cancel_on_execution_error)
+    }
+
+    fn create_glv_withdrawal(
+        &self,
+        store: &Pubkey,
+        glv_token: &Pubkey,
+        market_token: &Pubkey,
+        amount: u64,
+    ) -> CreateGlvWithdrawalBuilder<C> {
+        CreateGlvWithdrawalBuilder::new(self, *store, *glv_token, *market_token, amount)
     }
 }
 
