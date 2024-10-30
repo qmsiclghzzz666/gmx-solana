@@ -900,13 +900,6 @@ impl<'info> CloseOrder<'info> {
     fn process_gt_reward(&self) -> Result<Success> {
         let amount = self.order.load()?.gt_reward;
         if amount != 0 {
-            // Update user's rank.
-            {
-                let mut user = self.user.load_mut()?;
-                msg!("[GT] updating rank with total amount: {}", user.gt.amount());
-                user.gt.update_rank(&*self.store.load()?);
-            }
-
             self.mint_gt_reward_for_referrer(amount)?;
 
             self.order.load_mut()?.gt_reward = 0;
@@ -955,7 +948,6 @@ impl<'info> CloseOrder<'info> {
                 "[GT] updating rank with total amount: {}",
                 referrer_user.gt.amount()
             );
-            referrer_user.gt.update_rank(&store);
         }
 
         Ok(())

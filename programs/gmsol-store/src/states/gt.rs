@@ -266,6 +266,21 @@ impl GtState {
         Ok(())
     }
 
+    /// CHECK: the user must be owned by this store.
+    fn unchecked_update_rank(&self, user: &mut UserHeader) {
+        debug_assert!(self.ranks().len() < u8::MAX as usize);
+        let rank = match self.ranks().binary_search(&user.gt.amount) {
+            Ok(rank) => rank + 1,
+            Err(rank) => rank,
+        };
+
+        let rank = rank as u8;
+        if user.gt.rank != rank {
+            user.gt.rank = rank;
+            msg!("[GT] user rank updated, new rank = {}", rank);
+        }
+    }
+
     #[inline(never)]
     pub(crate) fn mint_to(&mut self, user: &mut UserHeader, amount: u64) -> Result<()> {
         if amount != 0 {
@@ -309,6 +324,8 @@ impl GtState {
             user.gt.amount = next_amount;
             user.gt.last_minted_at = self.last_minted_at;
             self.supply = next_supply;
+
+            self.unchecked_update_rank(user);
         }
         Ok(())
     }
@@ -365,6 +382,8 @@ impl GtState {
 
             user.gt.amount = next_amount;
             self.supply = next_supply;
+
+            self.unchecked_update_rank(user);
         }
         Ok(())
     }
@@ -607,6 +626,8 @@ impl GtState {
         user.gt.amount = next_amount;
         self.es_supply = next_es_supply;
         self.supply = next_supply;
+
+        self.unchecked_update_rank(user);
 
         Ok(())
     }

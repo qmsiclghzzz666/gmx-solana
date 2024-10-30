@@ -39,7 +39,12 @@ enum Command {
     /// Initialize GT exchange vault.
     InitializeExchangeVault,
     /// Confirm the given GT exchange vault.
-    ConfirmExchangeVault { address: Pubkey },
+    ConfirmExchangeVault {
+        address: Pubkey,
+        /// Whether to skip the initialization of current exchange vault.
+        #[arg(long)]
+        skip_init_current: bool,
+    },
     /// Set GT exchange time window.
     SetExchangeTimeWindow { seconds: NonZeroU32 },
     /// Set esGT vault receiver.
@@ -142,6 +147,7 @@ impl Args {
                     let gt = user.gt().amount();
                     let es_gt = user.gt().es_amount();
                     let vesting_es_gt = user.gt().vesting_es_amount();
+                    let rank = user.gt().rank();
 
                     let factor = store_account.gt().es_factor();
                     let user_factor = user.gt().es_factor();
@@ -176,6 +182,7 @@ impl Args {
                         "Vesting esGT: {}",
                         unsigned_amount_to_decimal(vesting_es_gt, decimals).normalize()
                     );
+                    println!("User Rank: {rank}");
                 }
             }
             Command::InitializeExchangeVault => {
@@ -188,8 +195,24 @@ impl Args {
                 })
                 .await?;
             }
-            Command::ConfirmExchangeVault { address } => {
-                let rpc = client.confirm_gt_exchange_vault(store, address);
+            Command::ConfirmExchangeVault {
+                address,
+                skip_init_current,
+            } => {
+                let time_window = client.store(store).await?.gt().exchange_time_window();
+
+                let init = (!*skip_init_current)
+                    .then(|| {
+                        client.initialize_gt_exchange_vault_with_time_window(store, time_window)
+                    })
+                    .transpose()?;
+
+                let mut rpc = client.confirm_gt_exchange_vault(store, address);
+
+                if let Some(init) = init {
+                    rpc = rpc.merge(init);
+                }
+
                 send_or_serialize_rpc(rpc, serialize_only, skip_preflight, |signature| {
                     println!("{signature}");
                     Ok(())

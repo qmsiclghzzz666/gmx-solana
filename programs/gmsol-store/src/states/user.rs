@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 use crate::CoreError;
 
-use super::{Seed, Store};
+use super::Seed;
 
 /// Header of `User` Account.
 #[account(zero_copy)]
@@ -258,7 +258,7 @@ impl Seed for ReferralCode {
 #[zero_copy]
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub struct GtState {
-    rank: u8,
+    pub(crate) rank: u8,
     padding_0: [u8; 7],
     pub(crate) last_minted_at: i64,
     pub(crate) total_minted: u64,
@@ -305,15 +305,5 @@ impl GtState {
     /// Get current vaule of es factor of this user.
     pub fn es_factor(&self) -> u128 {
         self.es_factor
-    }
-
-    pub(crate) fn update_rank(&mut self, store: &Store) {
-        debug_assert!(store.gt().ranks().len() < u8::MAX as usize);
-        let rank = match store.gt().ranks().binary_search(&self.amount) {
-            Ok(rank) => rank + 1,
-            Err(rank) => rank,
-        };
-        self.rank = rank as u8;
-        msg!("[GT] new rank = {}", rank);
     }
 }
