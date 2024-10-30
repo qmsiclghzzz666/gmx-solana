@@ -4,6 +4,9 @@ use crate::{constants, CoreError};
 
 use super::{user::UserHeader, Seed};
 
+#[cfg(feature = "utils")]
+use std::num::NonZeroU64;
+
 const MAX_RANK: usize = 15;
 const MAX_FLAGS: usize = 8;
 
@@ -146,8 +149,39 @@ impl GtState {
         self.es_receiver_factor
     }
 
-    pub(crate) fn exchange_time_window(&self) -> u32 {
+    /// Get time window for GT exchange.
+    pub fn exchange_time_window(&self) -> u32 {
         self.exchange_time_window
+    }
+
+    /// Get GT decimals.
+    pub fn decimals(&self) -> u8 {
+        self.decimals
+    }
+
+    /// Get total minted.
+    pub fn total_minted(&self) -> u64 {
+        self.total_minted
+    }
+
+    /// Get GT supply.
+    pub fn supply(&self) -> u64 {
+        self.supply
+    }
+
+    /// Get esGT supply.
+    pub fn es_supply(&self) -> u64 {
+        self.es_supply
+    }
+
+    /// Get es vesting disivor.
+    pub fn es_vesting_divisor(&self) -> u16 {
+        self.es_vesting_divisor
+    }
+
+    /// Get esGT vault.
+    pub fn es_vault(&self) -> u64 {
+        self.es_vault
     }
 
     pub(crate) fn set_exchange_time_window(&mut self, window: u32) -> Result<()> {
@@ -487,6 +521,7 @@ impl GtState {
     ///
     /// # Notes
     /// - This is not an atomic operation.
+    #[inline(never)]
     pub(crate) fn unchecked_request_vesting(
         &mut self,
         user: &mut UserHeader,
@@ -496,6 +531,8 @@ impl GtState {
         require_gte!(user.gt.es_amount, amount, CoreError::NotEnoughTokenAmount);
 
         self.unchecked_update_vesting(user, vesting)?;
+
+        msg!("Vesting state updated");
 
         let next_es_amount = user
             .gt
@@ -510,7 +547,7 @@ impl GtState {
 
         self.validate_gt_reserve(user, None, Some(next_vesting_es_amount))?;
 
-        vesting.add(amount, self.es_vesting_divisor)?;
+        vesting.add(amount)?;
 
         user.gt.es_amount = next_es_amount;
         user.gt.vesting_es_amount = next_vesting_es_amount;
@@ -526,6 +563,7 @@ impl GtState {
     ///
     /// # Errors
     ///
+    #[inline(never)]
     pub(crate) fn unchecked_update_vesting(
         &mut self,
         user: &mut UserHeader,
@@ -623,7 +661,7 @@ impl GtState {
             .checked_add(amount)
             .ok_or(error!(CoreError::TokenAmountOverflow))?;
 
-        vesting.add(amount, self.es_vesting_divisor)?;
+        vesting.add(amount)?;
 
         self.es_vault = next_es_vault;
         user.gt.vesting_es_amount = next_vesting_es_amount;
@@ -671,7 +709,9 @@ impl GtExchangeVault {
     fn set_flag(&mut self, kind: GtExchangeVaultFlag, value: bool) -> bool {
         let index = u8::from(kind);
         let mut map = GtExchangeVaultFlagsMap::from_value(self.flags);
-        map.set(usize::from(index), value)
+        let previous = map.set(usize::from(index), value);
+        self.flags = map.into_value();
+        previous
     }
 
     /// Get amount.
@@ -791,10 +831,20 @@ pub struct GtExchange {
     flags: GtExchangeFlagsValue,
     padding: [u8; 6],
     amount: u64,
-    owner: Pubkey,
-    store: Pubkey,
+    /// Owner address.
+    pub owner: Pubkey,
+    /// Store address.
+    pub store: Pubkey,
     vault: Pubkey,
     reserved: [u8; 64],
+}
+
+impl Default for GtExchange {
+    fn default() -> Self {
+        use bytemuck::Zeroable;
+
+        Self::zeroed()
+    }
 }
 
 impl GtExchange {
@@ -807,7 +857,9 @@ impl GtExchange {
     fn set_flag(&mut self, kind: GtExchangeFlag, value: bool) -> bool {
         let index = u8::from(kind);
         let mut map = GtExchangeFlagsMap::from_value(self.flags);
-        map.set(usize::from(index), value)
+        let previous = map.set(usize::from(index), value);
+        self.flags = map.into_value();
+        previous
     }
 
     /// Get whether the vault is initialized.
@@ -850,6 +902,16 @@ impl GtExchange {
     pub(crate) fn store(&self) -> &Pubkey {
         &self.store
     }
+
+    /// Get vault.
+    pub fn vault(&self) -> &Pubkey {
+        &self.vault
+    }
+
+    /// Get amount.
+    pub fn amount(&self) -> u64 {
+        self.amount
+    }
 }
 
 impl gmsol_utils::InitSpace for GtExchange {
@@ -888,7 +950,10 @@ pub struct GtVesting {
     pub(crate) bump: u8,
     flags: GtVestingFlagsValue,
     head: u16,
+    divisor: u16,
+    padding_0: [u8; 2],
     time_window: u32,
+    padding_1: [u8; 4],
     time_window_index: i64,
     pub(crate) owner: Pubkey,
     pub(crate) store: Pubkey,
@@ -905,7 +970,9 @@ impl GtVesting {
     fn set_flag(&mut self, kind: GtVestingFlag, value: bool) -> bool {
         let index = u8::from(kind);
         let mut map = GtVestingFlagsMap::from_value(self.flags);
-        map.set(usize::from(index), value)
+        let previous = map.set(usize::from(index), value);
+        self.flags = map.into_value();
+        previous
     }
 
     /// Get whether the vault is initialized.
@@ -918,9 +985,13 @@ impl GtVesting {
         bump: u8,
         owner: &Pubkey,
         store: &Pubkey,
+        divisor: u16,
         time_window: u32,
     ) -> Result<()> {
         require!(!self.is_initialized(), CoreError::PreconditionsAreNotMet);
+
+        require_neq!(divisor, 0, CoreError::InvalidArgument);
+        require_gte!(VESTING_LEN, divisor as usize, CoreError::InvalidArgument);
 
         let clock = Clock::get()?;
         self.time_window_index = get_time_window_index(clock.unix_timestamp, time_window.into());
@@ -928,6 +999,7 @@ impl GtVesting {
         self.bump = bump;
         self.owner = *owner;
         self.store = *store;
+        self.divisor = divisor;
         self.time_window = time_window;
 
         self.set_flag(GtVestingFlag::Intiailized, true);
@@ -955,35 +1027,51 @@ impl GtVesting {
     ///
     /// # Notes
     /// - This is not an atomic operation.
-    fn add(&mut self, amount: u64, divisor: u16) -> Result<()> {
+    #[inline(never)]
+    fn add(&mut self, amount: u64) -> Result<()> {
         require!(self.is_initialized(), CoreError::PreconditionsAreNotMet);
 
         // Time window must be up-to-date.
         self.validate_time_window()?;
 
-        require!(divisor != 0, CoreError::InvalidArgument);
-        require_gte!(VESTING_LEN, divisor as usize, CoreError::InvalidArgument);
-
-        let d = u64::from(divisor);
+        let d = u64::from(self.divisor);
         let quotient = amount.div_euclid(d);
         let remainder = amount.rem_euclid(d);
 
-        for offset in 0..(divisor) {
-            let delta = if offset == 0 {
+        let mut delta;
+        for offset in 0..(self.divisor) {
+            delta = if offset == 0 {
                 quotient + remainder
             } else {
                 quotient
             };
             // Since head + offset + 1 <= 2 * VESTING_LEN < u16::MAX, this will never overflow.
-            let idx = usize::from(self.head + offset) % VESTING_LEN;
-            self.vesting[idx] = self.vesting[idx]
-                .checked_add(delta)
-                .ok_or(error!(CoreError::TokenAmountOverflow))?;
+            self.add_at_offset(offset, &delta)?;
         }
 
         Ok(())
     }
 
+    fn offset_to_idx(&self, offset: u16) -> usize {
+        (self.head as usize + offset as usize) % VESTING_LEN
+    }
+
+    #[inline(never)]
+    fn add_at_offset(&mut self, offset: u16, delta: &u64) -> Result<()> {
+        let idx = self.offset_to_idx(offset);
+        self.vesting[idx] = self.vesting[idx]
+            .checked_add(*delta)
+            .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
+        Ok(())
+    }
+
+    #[allow(dead_code)]
+    fn get_at_offset(&self, offset: u16) -> u64 {
+        let idx = self.offset_to_idx(offset);
+        self.vesting[idx]
+    }
+
+    #[inline(never)]
     fn pop_head(&mut self) -> u64 {
         let amount = &mut self.vesting[usize::from(self.head)];
 
@@ -1001,6 +1089,8 @@ impl GtVesting {
         current
     }
 
+    /// Advance the vesting progress and return the vestable amount.
+    #[inline(never)]
     fn advance(&mut self) -> Result<u64> {
         let current = self.current_time_window_index()?;
 
@@ -1017,7 +1107,7 @@ impl GtVesting {
             if pop != 0 {
                 amount = amount
                     .checked_add(pop)
-                    .ok_or(error!(CoreError::TokenAmountOverflow))?;
+                    .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
             }
         }
 
@@ -1040,6 +1130,26 @@ impl GtVesting {
     pub fn is_empty(&self) -> bool {
         self.vesting[usize::from(self.head)] == 0
     }
+
+    /// Get vesting.
+    #[cfg(feature = "utils")]
+    pub fn vesting(&self) -> impl Iterator<Item = NonZeroU64> + '_ {
+        GtVestingIter {
+            vesting: self,
+            offset: 0,
+        }
+    }
+
+    /// Get vestable.
+    #[cfg(feature = "utils")]
+    pub fn claimable(&self, current: i64) -> u64 {
+        let current = get_time_window_index(current, self.time_window as i64);
+        (self.time_window_index..current)
+            .enumerate()
+            .map(|(offset, _)| self.get_at_offset(offset as u16))
+            .take_while(|amount| *amount != 0)
+            .sum()
+    }
 }
 
 impl gmsol_utils::InitSpace for GtVesting {
@@ -1048,4 +1158,25 @@ impl gmsol_utils::InitSpace for GtVesting {
 
 impl Seed for GtVesting {
     const SEED: &'static [u8] = b"gt_vesting";
+}
+
+#[cfg(feature = "utils")]
+struct GtVestingIter<'a> {
+    vesting: &'a GtVesting,
+    offset: u16,
+}
+
+#[cfg(feature = "utils")]
+impl<'a> Iterator for GtVestingIter<'a> {
+    type Item = NonZeroU64;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let value = self.vesting.get_at_offset(self.offset);
+        if value == 0 {
+            None
+        } else {
+            self.offset += 1;
+            NonZeroU64::new(value)
+        }
+    }
 }

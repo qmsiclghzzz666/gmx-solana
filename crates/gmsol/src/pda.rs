@@ -2,6 +2,7 @@ use anchor_client::solana_sdk::pubkey::Pubkey;
 use gmsol_store::{
     events::TradeEventData,
     states::{
+        gt::{GtExchange, GtExchangeVault, GtVesting},
         position::PositionKind,
         user::{ReferralCode, ReferralCodeBytes, UserHeader},
         Deposit, GlvDeposit, NonceBytes, Oracle, Order, Position, Seed, Shift, Store, Withdrawal,
@@ -214,6 +215,46 @@ pub fn find_glv_deposit_pda(
 ) -> (Pubkey, u8) {
     Pubkey::find_program_address(
         &[GlvDeposit::SEED, store.as_ref(), owner.as_ref(), nonce],
+        store_program_id,
+    )
+}
+
+/// Find the PDA for GT exchange vault account.
+pub fn find_gt_exchange_vault_pda(
+    store: &Pubkey,
+    time_window_index: i64,
+    store_program_id: &Pubkey,
+) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[
+            GtExchangeVault::SEED,
+            store.as_ref(),
+            &time_window_index.to_be_bytes(),
+        ],
+        store_program_id,
+    )
+}
+
+/// Find the PDA for GT exchange account.
+pub fn find_gt_exchange_pda(
+    vault: &Pubkey,
+    owner: &Pubkey,
+    store_program_id: &Pubkey,
+) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[GtExchange::SEED, vault.as_ref(), owner.as_ref()],
+        store_program_id,
+    )
+}
+
+/// Find the PDA for GT vesting account.
+pub fn find_gt_vesting_pda(
+    store: &Pubkey,
+    owner: &Pubkey,
+    store_program_id: &Pubkey,
+) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[GtVesting::SEED, store.as_ref(), owner.as_ref()],
         store_program_id,
     )
 }

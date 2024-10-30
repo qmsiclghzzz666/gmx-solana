@@ -1357,8 +1357,9 @@ pub mod gmsol_store {
     pub fn initialize_gt_exchange_vault(
         ctx: Context<InitializeGtExchangeVault>,
         time_window_index: i64,
+        time_window: u32,
     ) -> Result<()> {
-        instructions::unchecked_initialize_gt_exchange_vault(ctx, time_window_index)
+        instructions::unchecked_initialize_gt_exchange_vault(ctx, time_window_index, time_window)
     }
 
     /// Confirm GT exchange vault.

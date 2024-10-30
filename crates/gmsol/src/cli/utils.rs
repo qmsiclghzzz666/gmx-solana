@@ -6,7 +6,7 @@ use anchor_client::{
     RequestBuilder,
 };
 use eyre::ContextCompat;
-use gmsol::utils::TransactionBuilder;
+use gmsol::utils::{RpcBuilder, TransactionBuilder};
 use prettytable::format::{FormatBuilder, TableFormat};
 
 #[derive(clap::Args, Clone)]
@@ -91,6 +91,36 @@ where
         }
     } else {
         let signature = req.send().await?;
+        (callback)(signature)?;
+    }
+    Ok(())
+}
+
+pub(crate) async fn send_or_serialize_rpc<C, S>(
+    req: RpcBuilder<'_, C>,
+    serialize_only: bool,
+    skip_preflight: bool,
+    callback: impl FnOnce(Signature) -> gmsol::Result<()>,
+) -> gmsol::Result<()>
+where
+    C: Clone + Deref<Target = S>,
+    S: Signer,
+{
+    if serialize_only {
+        for (idx, ix) in req.instructions().into_iter().enumerate() {
+            println!("ix[{idx}]: {}", gmsol::utils::serialize_instruction(&ix)?);
+        }
+    } else {
+        let signature = req
+            .send_with_options(
+                false,
+                None,
+                RpcSendTransactionConfig {
+                    skip_preflight,
+                    ..Default::default()
+                },
+            )
+            .await?;
         (callback)(signature)?;
     }
     Ok(())

@@ -175,14 +175,16 @@ pub struct InitializeGtExchangeVault<'info> {
 pub(crate) fn unchecked_initialize_gt_exchange_vault(
     ctx: Context<InitializeGtExchangeVault>,
     time_window_index: i64,
+    time_window: u32,
 ) -> Result<()> {
     let store = ctx.accounts.store.load()?;
-    let mut vault = ctx.accounts.vault.load_init()?;
-    vault.init(
-        ctx.bumps.vault,
-        &ctx.accounts.store.key(),
+    require_eq!(
         store.gt().exchange_time_window(),
-    )?;
+        time_window,
+        CoreError::InvalidArgument
+    );
+    let mut vault = ctx.accounts.vault.load_init()?;
+    vault.init(ctx.bumps.vault, &ctx.accounts.store.key(), time_window)?;
     require_eq!(
         vault.time_window_index(),
         time_window_index,
@@ -220,7 +222,7 @@ pub struct RequestGtExchange<'info> {
     pub user: AccountLoader<'info, UserHeader>,
     #[account(
         mut,
-        constraint = vault.load()?.is_initialized() @ CoreError::InvalidUserAccount,
+        constraint = vault.load()?.is_initialized() @ CoreError::InvalidArgument,
         has_one = store,
         seeds = [GtExchangeVault::SEED, store.key().as_ref(), &vault.load()?.time_window_index().to_be_bytes()],
         bump = vault.load()?.bump,
@@ -366,6 +368,8 @@ pub(crate) fn request_gt_vesting(ctx: Context<RequestGtVesting>, amount: u64) ->
     let accounts = ctx.accounts;
     accounts.validate_and_init_vesting_if_needed(ctx.bumps.vesting)?;
 
+    msg!("Vesting account is initialized");
+
     if amount != 0 {
         let mut store = accounts.store.load_mut()?;
         let mut user = accounts.user.load_mut()?;
@@ -381,8 +385,20 @@ impl<'info> RequestGtVesting<'info> {
     fn validate_and_init_vesting_if_needed(&mut self, bump: u8) -> Result<()> {
         match self.vesting.load_init() {
             Ok(mut exchange) => {
-                let time_window = self.store.load()?.gt().exchange_time_window();
-                exchange.init(bump, &self.owner.key(), &self.store.key(), time_window)?;
+                let (divisor, time_window) = {
+                    let store = self.store.load()?;
+                    (
+                        store.gt().es_vesting_divisor(),
+                        store.gt().exchange_time_window(),
+                    )
+                };
+                exchange.init(
+                    bump,
+                    &self.owner.key(),
+                    &self.store.key(),
+                    divisor,
+                    time_window,
+                )?;
                 drop(exchange);
                 self.vesting.exit(&crate::ID)?;
             }

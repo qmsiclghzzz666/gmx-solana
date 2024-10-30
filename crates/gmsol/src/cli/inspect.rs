@@ -8,11 +8,12 @@ use eyre::OptionExt;
 use futures_util::{pin_mut, StreamExt};
 use gmsol::{
     pyth::Hermes,
+    store::gt::current_time_window_index,
     types::{
         self,
         common::action::Action,
         feature::{display_feature, ActionDisabledFlag, DomainDisabledFlag},
-        user::{ReferralCode, UserHeader},
+        user::ReferralCode,
         TokenMapAccess,
     },
     utils::{signed_value_to_decimal, unsigned_value_to_decimal, ZeroCopy},
@@ -213,6 +214,8 @@ enum Command {
         #[arg(long, short, group = "select-glv")]
         token: Option<Pubkey>,
     },
+    /// GT exchange vault.
+    GtExchangeVault { address: Option<Pubkey> },
 }
 
 #[derive(clap::ValueEnum, Clone, Default)]
@@ -266,11 +269,7 @@ impl InspectArgs {
                     let owner = owner.unwrap_or_else(|| client.payer());
                     client.find_user_address(store, &owner)
                 });
-                let user = client
-                    .account::<ZeroCopy<UserHeader>>(&address)
-                    .await?
-                    .ok_or(gmsol::Error::NotFound)?
-                    .0;
+                let user = client.user(&address).await?;
                 println!("{user:#?}");
             }
             Command::ReferralCode { address, code } => {
@@ -942,7 +941,6 @@ impl InspectArgs {
                 let data = GMSOLCPIEvent::decode(decoder)?;
                 println!("{data:#?}");
             }
-
             Command::Glv {
                 address,
                 index,
@@ -967,6 +965,22 @@ impl InspectArgs {
                     .ok_or(gmsol::Error::NotFound)?
                     .0;
                 println!("{glv:#?}");
+            }
+            Command::GtExchangeVault { address } => {
+                let address = match address {
+                    Some(address) => *address,
+                    None => {
+                        let time_window = client.store(store).await?.gt().exchange_time_window();
+                        let time_window_index = current_time_window_index(time_window)?;
+                        client.find_gt_exchange_vault_address(store, time_window_index)
+                    }
+                };
+                let vault = client
+                    .account::<ZeroCopy<types::gt::GtExchangeVault>>(&address)
+                    .await?
+                    .ok_or(gmsol::Error::NotFound)?
+                    .0;
+                println!("{vault:?}");
             }
         }
         Ok(())

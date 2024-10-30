@@ -336,6 +336,21 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         crate::pda::find_glv_deposit_pda(store, owner, nonce, &self.store_program_id()).0
     }
 
+    /// Find GT exchange vault address.
+    pub fn find_gt_exchange_vault_address(&self, store: &Pubkey, time_window_index: i64) -> Pubkey {
+        crate::pda::find_gt_exchange_vault_pda(store, time_window_index, &self.store_program_id()).0
+    }
+
+    /// Find GT exchange address.
+    pub fn find_gt_exchange_address(&self, vault: &Pubkey, owner: &Pubkey) -> Pubkey {
+        crate::pda::find_gt_exchange_pda(vault, owner, &self.store_program_id()).0
+    }
+
+    /// Find GT vesting address.
+    pub fn find_gt_vesting_address(&self, store: &Pubkey, owner: &Pubkey) -> Pubkey {
+        crate::pda::find_gt_vesting_pda(store, owner, &self.store_program_id()).0
+    }
+
     /// Get slot.
     pub async fn get_slot(&self, commitment: Option<CommitmentConfig>) -> crate::Result<u64> {
         let slot = self
@@ -424,6 +439,15 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
     pub async fn store(&self, address: &Pubkey) -> crate::Result<types::Store> {
         Ok(self
             .account::<ZeroCopy<types::Store>>(address)
+            .await?
+            .ok_or(crate::Error::NotFound)?
+            .0)
+    }
+
+    /// Fetch user account with its address.
+    pub async fn user(&self, address: &Pubkey) -> crate::Result<types::user::UserHeader> {
+        Ok(self
+            .account::<ZeroCopy<types::user::UserHeader>>(address)
             .await?
             .ok_or(crate::Error::NotFound)?
             .0)
@@ -954,6 +978,28 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
     /// Shutdown the client gracefully.
     pub async fn shutdown(&self) -> crate::Result<()> {
         self.pub_sub().await?.shutdown().await
+    }
+
+    /// Get GT exchanges.
+    pub async fn gt_exchanges(
+        &self,
+        store: &Pubkey,
+        owner: &Pubkey,
+    ) -> crate::Result<BTreeMap<Pubkey, types::gt::GtExchange>> {
+        use types::gt::GtExchange;
+
+        let store_filter = StoreFilter::new(store, bytemuck::offset_of!(GtExchange, store));
+        let owner_filter = RpcFilterType::Memcmp(Memcmp::new_base58_encoded(
+            8 + bytemuck::offset_of!(GtExchange, owner),
+            owner.as_ref(),
+        ));
+        let exchanges = self
+            .store_accounts::<ZeroCopy<GtExchange>>(Some(store_filter), Some(owner_filter))
+            .await?;
+        Ok(exchanges
+            .into_iter()
+            .map(|(address, exchange)| (address, exchange.0))
+            .collect())
     }
 }
 

@@ -19,6 +19,7 @@ mod bug_fix;
 mod controller;
 mod exchange;
 mod feature_keeper;
+mod gt;
 mod inspect;
 mod market_keeper;
 mod order_keeper;
@@ -57,8 +58,11 @@ struct Cli {
     exchange_program: Option<Pubkey>,
     /// Print the Based64 encoded serialized instructions,
     /// instead of sending the transaction.
-    #[arg(long)]
+    #[arg(long, group = "tx-opts")]
     serialize_only: bool,
+    /// Whether to skip preflight.
+    #[arg(long, group = "ts-opts")]
+    skip_preflight: bool,
     /// Use this address as payer.
     ///
     /// Only available in `serialize-only` mode.
@@ -86,6 +90,8 @@ enum Command {
     Order(order_keeper::KeeperArgs),
     /// Commands for MARKET_KEEPER.
     Market(market_keeper::Args),
+    /// Commands for GT.
+    Gt(gt::Args),
     /// Commands for CONTROLLER.
     Controller(controller::ControllerArgs),
     /// Commands for FEATURE_KEEPER.
@@ -179,6 +185,10 @@ impl Cli {
             }
             Command::Order(args) => args.run(&client, &store, self.serialize_only).await?,
             Command::Market(args) => args.run(&client, &store, self.serialize_only).await?,
+            Command::Gt(args) => {
+                args.run(&client, &store, self.serialize_only, self.skip_preflight)
+                    .await?
+            }
             Command::Controller(args) => args.run(&client, &store, self.serialize_only).await?,
             Command::Feature(args) => args.run(&client, &store, self.serialize_only).await?,
             Command::BugFix(args) => args.run(&client, &store, self.serialize_only).await?,

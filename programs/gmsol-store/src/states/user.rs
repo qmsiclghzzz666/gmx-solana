@@ -106,6 +106,11 @@ impl UserHeader {
         self.referral.code = Pubkey::default();
         Ok(())
     }
+
+    /// Get GT state.
+    pub fn gt(&self) -> &GtState {
+        &self.gt
+    }
 }
 
 impl Seed for UserHeader {
@@ -285,6 +290,16 @@ impl GtState {
     /// Get GT balance.
     pub fn amount(&self) -> u64 {
         self.amount
+    }
+
+    /// Get esGT balance.
+    pub fn es_amount(&self) -> u64 {
+        self.es_amount
+    }
+
+    /// Get vesting esGT amount.
+    pub fn vesting_es_amount(&self) -> u64 {
+        self.vesting_es_amount
     }
 
     pub(crate) fn update_rank(&mut self, store: &Store) {

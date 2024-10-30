@@ -50,7 +50,6 @@ const ENV_ANCHOR_PROVIDER: &str = "ANCHOR_PROVIDER_URL";
 const ENV_ANCHOR_WALLET: &str = "ANCHOR_WALLET";
 const ENV_GMSOL_RANDOM_STORE: &str = "GMSOL_RANDOM_STORE";
 const ENV_GMSOL_RNG: &str = "GMSOL_RNG";
-const ENV_GMSOL_KEEPER: &str = "GMSOL_KEEPER";
 const ENV_GMSOL_REFUND_WAIT: &str = "GMSOL_REFUND_WAIT";
 const ENV_GMSOL_CLAIM_FEES_WAIT: &str = "GMSOL_CLAIM_FEES_WAIT";
 
@@ -109,7 +108,7 @@ impl Deployment {
     pub const DEFAULT_USER: &'static str = "user_0";
 
     /// Default keeper.
-    pub const DEFAULT_KEEPER: &'static str = "keeper_0";
+    pub const DEFAULT_KEEPER: &'static str = "keeper";
 
     /// Market selector for liquidation test.
     pub const SELECT_LIQUIDATION_MARKET: [&'static str; 3] = ["fBTC", "USDG", "fBTC"];
@@ -311,20 +310,8 @@ impl Deployment {
     }
 
     fn add_users(&mut self) -> eyre::Result<()> {
-        self.users.add_user(Self::DEFAULT_USER, &mut self.rng);
-
-        match std::env::var(ENV_GMSOL_KEEPER) {
-            Ok(path) => {
-                let path = shellexpand::full(&path)?;
-                let keypair = Keypair::read_from_file(&*path)
-                    .map_err(|err| eyre::Error::msg(err.to_string()))?;
-                self.users
-                    .add_user_with_keypair(Self::DEFAULT_KEEPER, keypair);
-            }
-            Err(_) => {
-                self.users.add_user(Self::DEFAULT_KEEPER, &mut self.rng);
-            }
-        }
+        self.users.add_user(Self::DEFAULT_USER, &mut self.rng)?;
+        self.users.add_user(Self::DEFAULT_KEEPER, &mut self.rng)?;
 
         Ok(())
     }
@@ -483,13 +470,15 @@ impl Deployment {
                     RoleKey::CONTROLLER,
                     RoleKey::MARKET_KEEPER,
                     RoleKey::ORDER_KEEPER,
+                    RoleKey::GT_CONTROLLER,
                 ]
                 .iter()
                 .map(|role| client.enable_role(store, role)),
                 false,
             )?
             .push(client.grant_role(store, &keeper, RoleKey::MARKET_KEEPER))?
-            .push(client.grant_role(store, &keeper, RoleKey::ORDER_KEEPER))?;
+            .push(client.grant_role(store, &keeper, RoleKey::ORDER_KEEPER))?
+            .push(client.grant_role(store, &keeper, RoleKey::GT_CONTROLLER))?;
 
         _ = builder
             .send_all()
@@ -1189,12 +1178,23 @@ impl Users {
         }
     }
 
-    fn add_user<R>(&mut self, name: &str, rng: &mut R) -> bool
+    fn add_user<R>(&mut self, name: &str, rng: &mut R) -> eyre::Result<bool>
     where
         R: CryptoRng + RngCore,
     {
-        let keypair = Keypair::generate(rng);
-        self.add_user_with_keypair(name, keypair)
+        let env = format!("GMSOL_{}", name.to_uppercase());
+        match std::env::var(env) {
+            Ok(path) => {
+                let path = shellexpand::full(&path)?;
+                let keypair = Keypair::read_from_file(&*path)
+                    .map_err(|err| eyre::Error::msg(err.to_string()))?;
+                Ok(self.add_user_with_keypair(name, keypair))
+            }
+            Err(_) => {
+                let keypair = Keypair::generate(rng);
+                Ok(self.add_user_with_keypair(name, keypair))
+            }
+        }
     }
 
     fn add_user_with_keypair(&mut self, name: &str, keypair: Keypair) -> bool {
