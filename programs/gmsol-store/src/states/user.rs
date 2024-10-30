@@ -302,6 +302,11 @@ impl GtState {
         self.vesting_es_amount
     }
 
+    /// Get current vaule of es factor of this user.
+    pub fn es_factor(&self) -> u128 {
+        self.es_factor
+    }
+
     pub(crate) fn update_rank(&mut self, store: &Store) {
         debug_assert!(store.gt().ranks().len() < u8::MAX as usize);
         let rank = match store.gt().ranks().binary_search(&self.amount) {

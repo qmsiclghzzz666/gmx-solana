@@ -1373,6 +1373,11 @@ pub mod gmsol_store {
         instructions::request_gt_exchange(ctx, amount)
     }
 
+    /// Claim esGT.
+    pub fn claim_es_gt(ctx: Context<ClaimEsGt>) -> Result<()> {
+        instructions::claim_es_gt(ctx)
+    }
+
     /// Request GT vesting.
     pub fn request_gt_vesting(ctx: Context<RequestGtVesting>, amount: u64) -> Result<()> {
         instructions::request_gt_vesting(ctx, amount)

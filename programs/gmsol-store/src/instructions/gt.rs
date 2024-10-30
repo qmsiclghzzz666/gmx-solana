@@ -336,6 +336,31 @@ impl<'info> internal::Authentication<'info> for ConfirmGtExchangeVault<'info> {
     }
 }
 
+/// The accounts definition for [`claim_es_gt`].
+#[derive(Accounts)]
+pub struct ClaimEsGt<'info> {
+    pub(crate) owner: Signer<'info>,
+    #[account(mut)]
+    pub(crate) store: AccountLoader<'info, Store>,
+    /// User Account.
+    #[account(
+        mut,
+        constraint = user.load()?.is_initialized() @ CoreError::InvalidUserAccount,
+        has_one = owner,
+        has_one = store,
+        seeds = [UserHeader::SEED, store.key().as_ref(), owner.key().as_ref()],
+        bump = user.load()?.bump,
+    )]
+    pub user: AccountLoader<'info, UserHeader>,
+}
+
+pub(crate) fn claim_es_gt(ctx: Context<ClaimEsGt>) -> Result<()> {
+    let accounts = ctx.accounts;
+    let mut store = accounts.store.load_mut()?;
+    let mut user = accounts.user.load_mut()?;
+    store.gt_mut().unchecked_sync_es_factor(&mut user)
+}
+
 /// The accounts definition for [`request_gt_vesting`].
 #[derive(Accounts)]
 pub struct RequestGtVesting<'info> {

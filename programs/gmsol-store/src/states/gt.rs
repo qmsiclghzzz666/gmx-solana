@@ -184,6 +184,11 @@ impl GtState {
         self.es_vault
     }
 
+    /// Get current vaule of es factor.
+    pub fn es_factor(&self) -> u128 {
+        self.es_factor
+    }
+
     pub(crate) fn set_exchange_time_window(&mut self, window: u32) -> Result<()> {
         require_neq!(window, 0, CoreError::InvalidArgument);
         self.exchange_time_window = window;

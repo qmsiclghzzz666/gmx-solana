@@ -27,8 +27,14 @@ enum Command {
     Status,
     /// Balance.
     Balance {
-        #[arg(long)]
+        #[arg(long, group = "balance-input")]
         owner: Option<Pubkey>,
+        /// Claim pending esGT.
+        #[arg(long, group = "balance-input", requires = "confirm")]
+        claim: bool,
+        /// Confirm the operation.
+        #[arg(long)]
+        confirm: bool,
     },
     /// Initialize GT exchange vault.
     InitializeExchangeVault,
@@ -112,26 +118,65 @@ impl Args {
                     unsigned_amount_to_decimal(gt.es_vault(), decimals).normalize()
                 );
             }
-            Command::Balance { owner } => {
-                let decimals = client.store(store).await?.gt().decimals();
-                let owner = owner.unwrap_or(client.payer());
-                let user = client.find_user_address(store, &owner);
-                let user = client.user(&user).await?;
-                let gt = user.gt().amount();
-                let es_gt = user.gt().es_amount();
-                let vesting_es_gt = user.gt().vesting_es_amount();
-                println!(
-                    "GT: {}",
-                    unsigned_amount_to_decimal(gt, decimals).normalize()
-                );
-                println!(
-                    "esGT: {}",
-                    unsigned_amount_to_decimal(es_gt, decimals).normalize()
-                );
-                println!(
-                    "vesting esGT: {}",
-                    unsigned_amount_to_decimal(vesting_es_gt, decimals).normalize()
-                );
+            Command::Balance {
+                owner,
+                claim,
+                confirm: _,
+            } => {
+                use gmsol_model::utils::apply_factor;
+
+                if *claim {
+                    let rpc = client.claim_es_gt(store);
+                    send_or_serialize_rpc(rpc, serialize_only, skip_preflight, |signature| {
+                        println!("{signature}");
+                        Ok(())
+                    })
+                    .await?;
+                } else {
+                    let owner = owner.unwrap_or(client.payer());
+                    let user = client.find_user_address(store, &owner);
+                    let user = client.user(&user).await?;
+                    let store_account = client.store(store).await?;
+                    let decimals = store_account.gt().decimals();
+
+                    let gt = user.gt().amount();
+                    let es_gt = user.gt().es_amount();
+                    let vesting_es_gt = user.gt().vesting_es_amount();
+
+                    let factor = store_account.gt().es_factor();
+                    let user_factor = user.gt().es_factor();
+                    let diff_factor = factor.saturating_sub(user_factor);
+
+                    let pending_es_gt: u64 =
+                        apply_factor::<_, { gmsol::constants::MARKET_DECIMALS }>(
+                            &(gt as u128),
+                            &diff_factor,
+                        )
+                        .ok_or_else(|| {
+                            gmsol::Error::unknown("calculating pending esGT amount overflow")
+                        })?
+                        .try_into()
+                        .map_err(|_| {
+                            gmsol::Error::unknown("failed to converting the result into amount")
+                        })?;
+
+                    println!(
+                        "GT: {}",
+                        unsigned_amount_to_decimal(gt, decimals).normalize()
+                    );
+                    println!(
+                        "esGT: {}",
+                        unsigned_amount_to_decimal(es_gt, decimals).normalize()
+                    );
+                    println!(
+                        "Pending esGT: {}",
+                        unsigned_amount_to_decimal(pending_es_gt, decimals).normalize()
+                    );
+                    println!(
+                        "Vesting esGT: {}",
+                        unsigned_amount_to_decimal(vesting_es_gt, decimals).normalize()
+                    );
+                }
             }
             Command::InitializeExchangeVault => {
                 let time_window = client.store(store).await?.gt().exchange_time_window();
