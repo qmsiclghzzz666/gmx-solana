@@ -10,12 +10,17 @@ use gmsol_store::{accounts, instruction, states::Market};
 use crate::utils::RpcBuilder;
 
 mod deposit;
+mod shift;
 mod withdrawal;
 
 pub use self::{
     deposit::{
         CloseGlvDepositBuilder, CloseGlvDepositHint, CreateGlvDepositBuilder, CreateGlvDepositHint,
         ExecuteGlvDepositBuilder, ExecuteGlvDepositHint,
+    },
+    shift::{
+        CloseGlvShiftBuilder, CloseGlvShiftHint, CreateGlvShiftBuilder, ExecuteGlvShiftBuilder,
+        ExecuteGlvShiftHint,
     },
     withdrawal::{
         CloseGlvWithdrawalBuilder, CloseGlvWithdrawalHint, CreateGlvWithdrawalBuilder,
@@ -80,6 +85,24 @@ pub trait GlvOps<C> {
         glv_withdrawal: &Pubkey,
         cancel_on_execution_error: bool,
     ) -> ExecuteGlvWithdrawalBuilder<C>;
+
+    fn create_glv_shift(
+        &self,
+        store: &Pubkey,
+        glv_token: &Pubkey,
+        from_market_token: &Pubkey,
+        to_market_token: &Pubkey,
+        amount: u64,
+    ) -> CreateGlvShiftBuilder<C>;
+
+    fn close_glv_shift(&self, glv_shift: &Pubkey) -> CloseGlvShiftBuilder<C>;
+
+    fn execute_glv_shift(
+        &self,
+        oracle: &Pubkey,
+        glv_shift: &Pubkey,
+        cancel_on_execution_error: bool,
+    ) -> ExecuteGlvShiftBuilder<C>;
 }
 
 impl<C: Deref<Target = impl Signer> + Clone> GlvOps<C> for crate::Client<C> {
@@ -189,6 +212,39 @@ impl<C: Deref<Target = impl Signer> + Clone> GlvOps<C> for crate::Client<C> {
         cancel_on_execution_error: bool,
     ) -> ExecuteGlvWithdrawalBuilder<C> {
         ExecuteGlvWithdrawalBuilder::new(self, *oracle, *glv_withdrawal, cancel_on_execution_error)
+    }
+
+    fn create_glv_shift(
+        &self,
+        store: &Pubkey,
+        glv_token: &Pubkey,
+        from_market_token: &Pubkey,
+        to_market_token: &Pubkey,
+        amount: u64,
+    ) -> CreateGlvShiftBuilder<C> {
+        CreateGlvShiftBuilder::new(
+            self,
+            store,
+            glv_token,
+            from_market_token,
+            to_market_token,
+            amount,
+        )
+    }
+
+    fn close_glv_shift(&self, glv_shift: &Pubkey) -> CloseGlvShiftBuilder<C> {
+        CloseGlvShiftBuilder::new(self, glv_shift)
+    }
+
+    fn execute_glv_shift(
+        &self,
+        oracle: &Pubkey,
+        glv_shift: &Pubkey,
+        cancel_on_execution_error: bool,
+    ) -> ExecuteGlvShiftBuilder<C> {
+        let mut builder = ExecuteGlvShiftBuilder::new(self, oracle, glv_shift);
+        builder.cancel_on_execution_error(cancel_on_execution_error);
+        builder
     }
 }
 

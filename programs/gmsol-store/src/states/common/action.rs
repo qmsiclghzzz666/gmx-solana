@@ -392,11 +392,16 @@ pub(crate) trait Close<'info, A>: Authenticate<'info>
 where
     A: Action + ZeroCopy + Owner + Closable,
 {
-    /// Expected role.
-    fn expected_role(&self) -> &str;
+    /// Expected keeper role.
+    fn expected_keeper_role(&self) -> &str;
 
     /// Fund receiver.
     fn fund_receiver(&self) -> AccountInfo<'info>;
+
+    /// Whether to skip the completion check when the authority is keeper.
+    fn skip_completion_check_for_keeper(&self) -> bool {
+        false
+    }
 
     /// Transfer funds to ATAs.
     fn transfer_to_atas(&self, init_if_needed: bool) -> Result<TransferSuccess>;
@@ -431,10 +436,12 @@ where
         if *self.authority().key == self.action().load()?.header().owner {
             Ok(true)
         } else {
-            self.only_role(self.expected_role())?;
+            self.only_role(self.expected_keeper_role())?;
             {
                 let action = self.action().load()?;
-                if action.header().action_state()?.is_completed_or_cancelled() {
+                if self.skip_completion_check_for_keeper()
+                    || action.header().action_state()?.is_completed_or_cancelled()
+                {
                     Ok(false)
                 } else {
                     err!(CoreError::PermissionDenied)

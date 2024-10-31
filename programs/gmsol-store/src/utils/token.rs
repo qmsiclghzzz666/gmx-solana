@@ -104,6 +104,8 @@ pub struct TransferAllFromEscrowToATA<'a, 'info> {
     skip_owner_check: bool,
     #[builder(default)]
     keep_escrow: bool,
+    #[builder(default, setter(strip_option))]
+    fund_receiver: Option<AccountInfo<'info>>,
 }
 
 impl<'a, 'info> TransferAllFromEscrowToATA<'a, 'info> {
@@ -127,6 +129,7 @@ impl<'a, 'info> TransferAllFromEscrowToATA<'a, 'info> {
             init_if_needed,
             skip_owner_check,
             keep_escrow,
+            fund_receiver,
         } = self;
 
         let amount = anchor_spl::token::accessor::amount(&escrow)?;
@@ -174,12 +177,13 @@ impl<'a, 'info> TransferAllFromEscrowToATA<'a, 'info> {
             )?;
         }
         if !keep_escrow {
+            let fund_receiver = fund_receiver.unwrap_or_else(|| owner.clone());
             close_account(
                 CpiContext::new(
                     token_program,
                     CloseAccount {
                         account: escrow.to_account_info(),
-                        destination: owner.clone(),
+                        destination: fund_receiver,
                         authority: escrow_authority,
                     },
                 )

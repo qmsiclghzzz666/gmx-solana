@@ -27,12 +27,12 @@ use crate::{
 #[instruction(nonce: [u8; 32])]
 pub struct CreateGlvShift<'info> {
     /// Authority.
+    #[account(mut)]
     pub authority: Signer<'info>,
     /// Store.
     pub store: AccountLoader<'info, Store>,
     /// GLV.
     #[account(
-        mut,
         has_one = store,
         constraint = glv.load()?.contains(&from_market_token.key()) @ CoreError::InvalidArgument,
         constraint = glv.load()?.contains(&to_market_token.key()) @ CoreError::InvalidArgument,
@@ -55,7 +55,7 @@ pub struct CreateGlvShift<'info> {
     /// GLV shift.
     #[account(
         init,
-        payer = glv,
+        payer = authority,
         space = 8 + GlvShift::INIT_SPACE,
         seeds = [GlvShift::SEED, store.key().as_ref(), glv.key().as_ref(), &nonce],
         bump,
@@ -103,7 +103,7 @@ impl<'info> CreateGlvShift<'info> {
         require!(amount != 0, CoreError::EmptyShift);
 
         let source = &self.from_market_token_vault;
-        let target = &self.from_market_token_escrow;
+        let target = &mut self.from_market_token_escrow;
         let mint = &self.from_market_token;
 
         let glv = self.glv.load()?;
@@ -123,6 +123,8 @@ impl<'info> CreateGlvShift<'info> {
             mint.decimals,
         )?;
 
+        target.reload()?;
+
         Ok(())
     }
 }
@@ -135,7 +137,7 @@ impl<'info> action::Create<'info, GlvShift> for CreateGlvShift<'info> {
     }
 
     fn payer(&self) -> AccountInfo<'info> {
-        self.glv.to_account_info()
+        self.authority.to_account_info()
     }
 
     fn payer_seeds(&self) -> Result<Option<Vec<Vec<u8>>>> {
@@ -167,6 +169,13 @@ impl<'info> action::Create<'info, GlvShift> for CreateGlvShift<'info> {
             .params(params)
             .build()
             .execute()?;
+
+        // Set the funder of the GLV shift.
+        {
+            self.glv_shift.exit(&crate::ID)?;
+            self.glv_shift.load_mut()?.funder = self.authority.key();
+        }
+
         Ok(())
     }
 }
@@ -188,6 +197,10 @@ pub struct CloseGlvShift<'info> {
     /// Authority.
     #[account(mut)]
     pub authority: Signer<'info>,
+    /// Funder of the GLV shift.
+    /// CHECK: only used to receive funds.
+    #[account(mut)]
+    pub funder: UncheckedAccount<'info>,
     /// The store.
     pub store: AccountLoader<'info, Store>,
     /// GLV.
@@ -200,6 +213,7 @@ pub struct CloseGlvShift<'info> {
     /// The GLV shift to close.
     #[account(
         mut,
+        has_one = funder,
         constraint = glv_shift.load()?.header().owner == glv.key() @ CoreError::OwnerMismatched,
         constraint = glv_shift.load()?.header().store == store.key() @ CoreError::StoreMismatched,
         constraint = glv_shift.load()?.tokens().from_market_token_account() == from_market_token_escrow.key() @ CoreError::MarketTokenAccountMismatched,
@@ -255,12 +269,16 @@ pub struct CloseGlvShift<'info> {
 }
 
 impl<'info> action::Close<'info, GlvShift> for CloseGlvShift<'info> {
-    fn expected_role(&self) -> &str {
+    fn expected_keeper_role(&self) -> &str {
         RoleKey::ORDER_KEEPER
     }
 
     fn fund_receiver(&self) -> AccountInfo<'info> {
-        self.glv.to_account_info()
+        self.funder.to_account_info()
+    }
+
+    fn skip_completion_check_for_keeper(&self) -> bool {
+        true
     }
 
     fn transfer_to_atas(&self, init_if_needed: bool) -> Result<action::TransferSuccess> {
@@ -275,6 +293,7 @@ impl<'info> action::Close<'info, GlvShift> for CloseGlvShift<'info> {
             .associated_token_program(self.associated_token_program.to_account_info())
             .payer(self.authority.to_account_info())
             .owner(self.glv.to_account_info())
+            .fund_receiver(self.funder.to_account_info())
             .escrow_authority(self.glv_shift.to_account_info())
             .seeds(&seeds)
             .init_if_needed(init_if_needed);
@@ -381,11 +400,13 @@ pub struct ExecuteGlvShift<'info> {
     pub glv_shift: AccountLoader<'info, GlvShift>,
     /// From Market token.
     #[account(
+        mut,
         constraint = glv_shift.load()?.tokens().from_market_token() == from_market_token.key() @ CoreError::MarketTokenMintMismatched
     )]
     pub from_market_token: Box<Account<'info, Mint>>,
     /// To Market token.
     #[account(
+        mut,
         constraint = glv_shift.load()?.tokens().to_market_token() == to_market_token.key() @ CoreError::MarketTokenMintMismatched
     )]
     pub to_market_token: Box<Account<'info, Mint>>,

@@ -113,6 +113,7 @@ pub(crate) fn unchecked_initialize_glv<'info>(
         &short_token,
         &expected_market_tokens,
     )?;
+
     Ok(())
 }
 

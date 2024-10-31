@@ -791,7 +791,7 @@ impl Deployment {
     }
 
     async fn fund_users(&self) -> eyre::Result<()> {
-        const LAMPORTS: u64 = 1_000_000_000;
+        const LAMPORTS: u64 = 2_000_000_000;
 
         let client = self.client.data_store().solana_rpc();
         let payer = self.client.payer();
