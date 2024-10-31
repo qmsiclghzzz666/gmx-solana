@@ -11,7 +11,11 @@ use gmsol_store::{
     states::{common::action::Action, glv::GlvWithdrawal, HasMarketMeta, NonceBytes},
 };
 
-use crate::{exchange::generate_nonce, store::token::TokenAccountOps, utils::RpcBuilder};
+use crate::{
+    exchange::generate_nonce,
+    store::token::TokenAccountOps,
+    utils::{RpcBuilder, ZeroCopy},
+};
 
 /// Create GLV withdrawal builder.
 pub struct CreateGlvWithdrawalBuilder<'a, C> {
@@ -277,5 +281,149 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateGlvWithdrawalBuilder<'a, 
             );
 
         Ok((prepare.merge(create), glv_withdrawal))
+    }
+}
+
+/// Close GLV withdrawal builder.
+pub struct CloseGlvWithdrawalBuilder<'a, C> {
+    client: &'a crate::Client<C>,
+    glv_withdrawal: Pubkey,
+    reason: String,
+    hint: Option<CloseGlvWithdrawalHint>,
+}
+
+/// Hint for [`CloseGlvDepositBuilder`].
+#[derive(Clone)]
+pub struct CloseGlvWithdrawalHint {
+    store: Pubkey,
+    owner: Pubkey,
+    glv_token: Pubkey,
+    market_token: Pubkey,
+    final_long_token: Pubkey,
+    final_short_token: Pubkey,
+    market_token_escrow: Pubkey,
+    final_long_token_escrow: Pubkey,
+    final_short_token_escrow: Pubkey,
+    glv_token_escrow: Pubkey,
+}
+
+impl CloseGlvWithdrawalHint {
+    /// Create from the GLV withdrawal.
+    pub fn new(glv_withdrawal: &GlvWithdrawal) -> Self {
+        Self {
+            store: *glv_withdrawal.header().store(),
+            owner: *glv_withdrawal.header().owner(),
+            glv_token: glv_withdrawal.tokens().glv_token(),
+            market_token: glv_withdrawal.tokens().market_token(),
+            final_long_token: glv_withdrawal.tokens().final_long_token(),
+            final_short_token: glv_withdrawal.tokens().final_short_token(),
+            market_token_escrow: glv_withdrawal.tokens().market_token_account(),
+            final_long_token_escrow: glv_withdrawal.tokens().final_long_token_account(),
+            final_short_token_escrow: glv_withdrawal.tokens().final_short_token_account(),
+            glv_token_escrow: glv_withdrawal.tokens().glv_token_account(),
+        }
+    }
+}
+
+impl<'a, C: Deref<Target = impl Signer> + Clone> CloseGlvWithdrawalBuilder<'a, C> {
+    pub(super) fn new(client: &'a crate::Client<C>, glv_withdrawal: Pubkey) -> Self {
+        Self {
+            client,
+            glv_withdrawal,
+            reason: "cancelled".to_string(),
+            hint: None,
+        }
+    }
+
+    /// Set hint.
+    pub fn hint(&mut self, hint: CloseGlvWithdrawalHint) -> &mut Self {
+        self.hint = Some(hint);
+        self
+    }
+
+    /// Set reason.
+    pub fn reason(&mut self, reason: impl ToString) -> &mut Self {
+        self.reason = reason.to_string();
+        self
+    }
+
+    async fn prepare_hint(&mut self) -> crate::Result<CloseGlvWithdrawalHint> {
+        match &self.hint {
+            Some(hint) => Ok(hint.clone()),
+            None => {
+                let glv_deposit = self
+                    .client
+                    .account::<ZeroCopy<GlvWithdrawal>>(&self.glv_withdrawal)
+                    .await?
+                    .ok_or(crate::Error::NotFound)?
+                    .0;
+                let hint = CloseGlvWithdrawalHint::new(&glv_deposit);
+                self.hint = Some(hint.clone());
+                Ok(hint)
+            }
+        }
+    }
+
+    /// Build.
+    pub async fn build(&mut self) -> crate::Result<RpcBuilder<'a, C>> {
+        let hint = self.prepare_hint().await?;
+
+        let token_program_id = anchor_spl::token::ID;
+        let glv_token_program_id = anchor_spl::token_2022::ID;
+
+        let payer = self.client.payer();
+
+        let market_token_ata = get_associated_token_address_with_program_id(
+            &hint.owner,
+            &hint.market_token,
+            &token_program_id,
+        );
+        let glv_token_ata = get_associated_token_address_with_program_id(
+            &hint.owner,
+            &hint.glv_token,
+            &glv_token_program_id,
+        );
+        let final_long_token_ata = get_associated_token_address_with_program_id(
+            &hint.owner,
+            &hint.final_long_token,
+            &token_program_id,
+        );
+        let final_short_token_ata = get_associated_token_address_with_program_id(
+            &hint.owner,
+            &hint.final_short_token,
+            &token_program_id,
+        );
+
+        let rpc = self
+            .client
+            .store_rpc()
+            .accounts(accounts::CloseGlvWithdrawal {
+                executor: payer,
+                store: hint.store,
+                owner: hint.owner,
+                glv_withdrawal: self.glv_withdrawal,
+                market_token: hint.market_token,
+                final_long_token: hint.final_long_token,
+                final_short_token: hint.final_short_token,
+                glv_token: hint.glv_token,
+                market_token_escrow: hint.market_token_escrow,
+                final_long_token_escrow: hint.final_long_token_escrow,
+                final_short_token_escrow: hint.final_short_token_escrow,
+                market_token_ata,
+                final_long_token_ata,
+                final_short_token_ata,
+                glv_token_escrow: hint.glv_token_escrow,
+                glv_token_ata,
+                system_program: system_program::ID,
+                token_program: token_program_id,
+                glv_token_program: glv_token_program_id,
+                associated_token_program: anchor_spl::associated_token::ID,
+                event_authority: self.client.store_event_authority(),
+                program: self.client.store_program_id(),
+            })
+            .args(instruction::CloseGlvWithdrawal {
+                reason: self.reason.clone(),
+            });
+        Ok(rpc)
     }
 }

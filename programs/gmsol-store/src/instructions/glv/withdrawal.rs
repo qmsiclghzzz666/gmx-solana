@@ -198,8 +198,8 @@ pub struct CloseGlvWithdrawal<'info> {
         constraint = glv_withdrawal.load()?.header.store == store.key() @ CoreError::StoreMismatched,
         constraint = glv_withdrawal.load()?.tokens.market_token_account() == market_token_escrow.key() @ CoreError::MarketTokenAccountMismatched,
         constraint = glv_withdrawal.load()?.tokens.glv_token_account() == glv_token_escrow.key() @ CoreError::MarketTokenAccountMismatched,
-        constraint = glv_withdrawal.load()?.tokens.final_long_token.account() == final_long_token_escrow.as_ref().map(|a| a.key()) @ CoreError::TokenAccountMismatched,
-        constraint = glv_withdrawal.load()?.tokens.final_short_token.account() == final_short_token_escrow.as_ref().map(|a| a.key()) @ CoreError::TokenAccountMismatched,
+        constraint = glv_withdrawal.load()?.tokens.final_long_token_account() == final_long_token_escrow.key() @ CoreError::TokenAccountMismatched,
+        constraint = glv_withdrawal.load()?.tokens.final_short_token_account() == final_short_token_escrow.key() @ CoreError::TokenAccountMismatched,
         seeds = [GlvWithdrawal::SEED, store.key().as_ref(), owner.key().as_ref(), &glv_withdrawal.load()?.header.nonce],
         bump = glv_withdrawal.load()?.header.bump,
     )]
@@ -211,14 +211,14 @@ pub struct CloseGlvWithdrawal<'info> {
     pub market_token: Box<Account<'info, Mint>>,
     /// Final long token.
     #[account(
-        constraint = glv_withdrawal.load()?.tokens.final_long_token.token().map(|token| final_long_token.key() == token).unwrap_or(true) @ CoreError::TokenMintMismatched
+        constraint = glv_withdrawal.load()?.tokens.final_long_token() == final_long_token.key() @ CoreError::TokenMintMismatched
     )]
-    pub final_long_token: Option<Box<Account<'info, Mint>>>,
+    pub final_long_token: Box<Account<'info, Mint>>,
     /// Final short token.
     #[account(
-        constraint = glv_withdrawal.load()?.tokens.final_short_token.token().map(|token| final_short_token.key() == token).unwrap_or(true) @ CoreError::TokenMintMismatched
+        constraint = glv_withdrawal.load()?.tokens.final_short_token() == final_short_token.key() @ CoreError::TokenMintMismatched
     )]
-    pub final_short_token: Option<Box<Account<'info, Mint>>>,
+    pub final_short_token: Box<Account<'info, Mint>>,
     /// GLV token.
     #[account(
         constraint = glv_withdrawal.load()?.tokens.glv_token() == glv_token.key() @ CoreError::TokenMintMismatched
@@ -237,14 +237,14 @@ pub struct CloseGlvWithdrawal<'info> {
         associated_token::mint = final_long_token,
         associated_token::authority = glv_withdrawal,
     )]
-    pub final_long_token_escrow: Option<Box<Account<'info, TokenAccount>>>,
+    pub final_long_token_escrow: Box<Account<'info, TokenAccount>>,
     /// The escrow account for receiving final short token for deposit.
     #[account(
         mut,
         associated_token::mint = final_short_token,
         associated_token::authority = glv_withdrawal,
     )]
-    pub final_short_token_escrow: Option<Box<Account<'info, TokenAccount>>>,
+    pub final_short_token_escrow: Box<Account<'info, TokenAccount>>,
     /// The ATA for market token of owner.
     /// CHECK: should be checked during the execution.
     #[account(
@@ -256,16 +256,16 @@ pub struct CloseGlvWithdrawal<'info> {
     /// CHECK: should be checked during the execution
     #[account(
         mut,
-        constraint = is_associated_token_account(final_long_token_ata.key, owner.key, &final_long_token.as_ref().expect("must provided").key()) @ CoreError::NotAnATA,
+        constraint = is_associated_token_account(final_long_token_ata.key, owner.key, &final_long_token.as_ref().key()) @ CoreError::NotAnATA,
     )]
-    pub final_long_token_ata: Option<UncheckedAccount<'info>>,
+    pub final_long_token_ata: UncheckedAccount<'info>,
     /// The ATA for final short token of owner.
     /// CHECK: should be checked during the execution
     #[account(
         mut,
-        constraint = is_associated_token_account(final_short_token_ata.key, owner.key, &final_short_token.as_ref().expect("must provided").key()) @ CoreError::NotAnATA,
+        constraint = is_associated_token_account(final_short_token_ata.key, owner.key, &final_short_token.as_ref().key()) @ CoreError::NotAnATA,
     )]
-    pub final_short_token_ata: Option<UncheckedAccount<'info>>,
+    pub final_short_token_ata: UncheckedAccount<'info>,
     /// The escrow account for GLV tokens.
     #[account(
         mut,
@@ -401,25 +401,19 @@ impl<'info> CloseGlvWithdrawal<'info> {
 
         // Prevent closing the same token accounts.
         let (final_long_token_escrow, final_short_token_escrow) =
-            if self.final_long_token_escrow.as_ref().map(|a| a.key())
-                == self.final_short_token_escrow.as_ref().map(|a| a.key())
-            {
-                (self.final_long_token_escrow.as_ref(), None)
+            if self.final_long_token_escrow.key() == self.final_short_token_escrow.key() {
+                (Some(&self.final_long_token_escrow), None)
             } else {
                 (
-                    self.final_long_token_escrow.as_ref(),
-                    self.final_short_token_escrow.as_ref(),
+                    Some(&self.final_long_token_escrow),
+                    Some(&self.final_short_token_escrow),
                 )
             };
 
         // Transfer final long tokens.
         if let Some(escrow) = final_long_token_escrow.as_ref() {
-            let Some(ata) = self.final_long_token_ata.as_ref() else {
-                return err!(CoreError::TokenAccountNotProvided);
-            };
-            let Some(mint) = self.final_long_token.as_ref() else {
-                return err!(CoreError::MintAccountNotProvided);
-            };
+            let ata = &self.final_long_token_ata;
+            let mint = &self.final_long_token;
             if !builder
                 .clone()
                 .token_program(self.token_program.to_account_info())
@@ -436,12 +430,8 @@ impl<'info> CloseGlvWithdrawal<'info> {
 
         // Transfer final short tokens.
         if let Some(escrow) = final_short_token_escrow.as_ref() {
-            let Some(ata) = self.final_short_token_ata.as_ref() else {
-                return err!(CoreError::TokenAccountNotProvided);
-            };
-            let Some(mint) = self.final_short_token.as_ref() else {
-                return err!(CoreError::MintAccountNotProvided);
-            };
+            let ata = &self.final_long_token_ata;
+            let mint = &self.final_short_token;
             if !builder
                 .clone()
                 .token_program(self.token_program.to_account_info())

@@ -205,13 +205,21 @@ async fn glv_withdrawal() -> eyre::Result<()> {
 
     let glv_amount = 500 * 1_000_000_000;
 
-    // Create GLV withdrawal.
+    // Create and cancel a GLV withdrawal.
     let (rpc, withdrawal) = user
         .create_glv_withdrawal(store, glv_token, market_token, glv_amount)
         .build_with_address()
         .await?;
     let signature = rpc.send_without_preflight().await?;
     tracing::info!(%signature, %withdrawal, "created a glv withdrawal");
+
+    let signature = user
+        .close_glv_withdrawal(&withdrawal)
+        .build()
+        .await?
+        .send_without_preflight()
+        .await?;
+    tracing::info!(%signature, %withdrawal, "cancelled the glv withdrawal");
 
     Ok(())
 }

@@ -622,6 +622,13 @@ pub struct GlvWithdrawal {
     reserve: [u8; 128],
 }
 
+impl GlvWithdrawal {
+    /// Get tokens.
+    pub fn tokens(&self) -> &GlvWithdrawalTokenAccounts {
+        &self.tokens
+    }
+}
+
 impl Action for GlvWithdrawal {
     const MIN_EXECUTION_LAMPORTS: u64 = 200_000;
 
@@ -763,7 +770,7 @@ impl Closable for GlvShift {
 }
 
 impl Seed for GlvShift {
-    const SEED: &'static [u8] = b"glv_shift";
+    const SEED: &'static [u8] = Shift::SEED;
 }
 
 impl gmsol_utils::InitSpace for GlvShift {

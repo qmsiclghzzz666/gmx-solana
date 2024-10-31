@@ -17,7 +17,10 @@ pub use self::{
         CloseGlvDepositBuilder, CloseGlvDepositHint, CreateGlvDepositBuilder, CreateGlvDepositHint,
         ExecuteGlvDepositBuilder, ExecuteGlvDepositHint,
     },
-    withdrawal::{CreateGlvWithdrawalBuilder, CreateGlvWithdrawalHint},
+    withdrawal::{
+        CloseGlvWithdrawalBuilder, CloseGlvWithdrawalHint, CreateGlvWithdrawalBuilder,
+        CreateGlvWithdrawalHint,
+    },
 };
 
 /// Glv Operations.
@@ -66,6 +69,9 @@ pub trait GlvOps<C> {
         market_token: &Pubkey,
         amount: u64,
     ) -> CreateGlvWithdrawalBuilder<C>;
+
+    /// Close a GLV withdrawal.
+    fn close_glv_withdrawal(&self, glv_withdrawal: &Pubkey) -> CloseGlvWithdrawalBuilder<C>;
 }
 
 impl<C: Deref<Target = impl Signer> + Clone> GlvOps<C> for crate::Client<C> {
@@ -162,6 +168,10 @@ impl<C: Deref<Target = impl Signer> + Clone> GlvOps<C> for crate::Client<C> {
         amount: u64,
     ) -> CreateGlvWithdrawalBuilder<C> {
         CreateGlvWithdrawalBuilder::new(self, *store, *glv_token, *market_token, amount)
+    }
+
+    fn close_glv_withdrawal(&self, glv_withdrawal: &Pubkey) -> CloseGlvWithdrawalBuilder<C> {
+        CloseGlvWithdrawalBuilder::new(self, *glv_withdrawal)
     }
 }
 

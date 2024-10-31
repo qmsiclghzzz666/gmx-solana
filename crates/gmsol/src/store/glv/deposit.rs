@@ -462,30 +462,34 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CloseGlvDepositBuilder<'a, C> {
         let rpc = self
             .client
             .store_rpc()
-            .accounts(accounts::CloseGlvDeposit {
-                executor: payer,
-                store: hint.store,
-                owner: hint.owner,
-                market_token: hint.market_token,
-                initial_long_token: hint.initial_long_token,
-                initial_short_token: hint.initial_short_token,
-                glv_token: hint.glv_token,
-                glv_deposit: self.glv_deposit,
-                market_token_escrow: hint.market_token_escrow,
-                initial_long_token_escrow: hint.initial_long_token_escrow,
-                initial_short_token_escrow: hint.initial_short_token_escrow,
-                glv_token_escrow: hint.glv_token_escrow,
-                market_token_ata,
-                initial_long_token_ata,
-                initial_short_token_ata,
-                glv_token_ata,
-                system_program: system_program::ID,
-                token_program: token_program_id,
-                glv_token_program: glv_token_program_id,
-                associated_token_program: anchor_spl::associated_token::ID,
-                event_authority: self.client.store_event_authority(),
-                program: self.client.store_program_id(),
-            })
+            .accounts(fix_optional_account_metas(
+                accounts::CloseGlvDeposit {
+                    executor: payer,
+                    store: hint.store,
+                    owner: hint.owner,
+                    market_token: hint.market_token,
+                    initial_long_token: hint.initial_long_token,
+                    initial_short_token: hint.initial_short_token,
+                    glv_token: hint.glv_token,
+                    glv_deposit: self.glv_deposit,
+                    market_token_escrow: hint.market_token_escrow,
+                    initial_long_token_escrow: hint.initial_long_token_escrow,
+                    initial_short_token_escrow: hint.initial_short_token_escrow,
+                    glv_token_escrow: hint.glv_token_escrow,
+                    market_token_ata,
+                    initial_long_token_ata,
+                    initial_short_token_ata,
+                    glv_token_ata,
+                    system_program: system_program::ID,
+                    token_program: token_program_id,
+                    glv_token_program: glv_token_program_id,
+                    associated_token_program: anchor_spl::associated_token::ID,
+                    event_authority: self.client.store_event_authority(),
+                    program: self.client.store_program_id(),
+                },
+                &crate::program_ids::DEFAULT_GMSOL_STORE_ID,
+                &self.client.store_program_id(),
+            ))
             .args(instruction::CloseGlvDeposit {
                 reason: self.reason.clone(),
             });
