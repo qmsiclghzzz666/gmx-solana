@@ -430,7 +430,7 @@ impl<'info> CloseGlvWithdrawal<'info> {
 
         // Transfer final short tokens.
         if let Some(escrow) = final_short_token_escrow.as_ref() {
-            let ata = &self.final_long_token_ata;
+            let ata = &self.final_short_token_ata;
             let mint = &self.final_short_token;
             if !builder
                 .clone()

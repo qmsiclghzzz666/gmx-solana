@@ -1,21 +1,32 @@
-use std::ops::Deref;
+use std::{
+    collections::{BTreeSet, HashMap},
+    ops::Deref,
+};
 
 use anchor_client::{
-    anchor_lang::{prelude::AccountMeta, system_program},
-    solana_sdk::{pubkey::Pubkey, signer::Signer},
+    anchor_lang::{prelude::AccountMeta, system_program, Id},
+    solana_sdk::{address_lookup_table::AddressLookupTableAccount, pubkey::Pubkey, signer::Signer},
 };
 use anchor_spl::associated_token::get_associated_token_address_with_program_id;
 use gmsol_store::{
     accounts, instruction,
     ops::glv::CreateGlvWithdrawalParams,
-    states::{common::action::Action, glv::GlvWithdrawal, HasMarketMeta, NonceBytes},
+    states::{
+        common::{action::Action, swap::SwapParams, TokensWithFeed},
+        glv::GlvWithdrawal,
+        Glv, HasMarketMeta, NonceBytes, Pyth, TokenMapAccess,
+    },
 };
 
 use crate::{
     exchange::generate_nonce,
-    store::token::TokenAccountOps,
-    utils::{RpcBuilder, ZeroCopy},
+    store::{token::TokenAccountOps, utils::FeedsParser},
+    utils::{ComputeBudget, RpcBuilder, ZeroCopy},
 };
+
+use super::{split_to_accounts, GlvOps};
+
+pub const EXECUTE_GLV_WITHDRAWAL_COMPUTE_BUDGET: u32 = 400_000;
 
 /// Create GLV withdrawal builder.
 pub struct CreateGlvWithdrawalBuilder<'a, C> {
@@ -425,5 +436,314 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CloseGlvWithdrawalBuilder<'a, C
                 reason: self.reason.clone(),
             });
         Ok(rpc)
+    }
+}
+
+/// Execute GLV withdrawal builder.
+pub struct ExecuteGlvWithdrawalBuilder<'a, C> {
+    client: &'a crate::Client<C>,
+    oracle: Pubkey,
+    price_provider: Pubkey,
+    glv_withdrawal: Pubkey,
+    execution_lamports: u64,
+    cancel_on_execution_error: bool,
+    hint: Option<ExecuteGlvWithdrawalHint>,
+    token_map: Option<Pubkey>,
+    feeds_parser: FeedsParser,
+    close: bool,
+    alts: HashMap<Pubkey, Vec<Pubkey>>,
+}
+
+/// Hint for [`ExecuteGlvWithdrawalBuilder`].
+#[derive(Clone)]
+pub struct ExecuteGlvWithdrawalHint {
+    close: CloseGlvWithdrawalHint,
+    token_map: Pubkey,
+    glv_market_tokens: BTreeSet<Pubkey>,
+    swap: SwapParams,
+    feeds: TokensWithFeed,
+}
+
+impl Deref for ExecuteGlvWithdrawalHint {
+    type Target = CloseGlvWithdrawalHint;
+
+    fn deref(&self) -> &Self::Target {
+        &self.close
+    }
+}
+
+impl ExecuteGlvWithdrawalHint {
+    /// Create a new hint.
+    pub fn new(
+        glv: &Glv,
+        glv_withdrawal: &GlvWithdrawal,
+        token_map_address: &Pubkey,
+        token_map: &impl TokenMapAccess,
+        index_tokens: impl IntoIterator<Item = Pubkey>,
+    ) -> crate::Result<Self> {
+        let glv_market_tokens = glv.market_tokens().collect();
+        let mut collector = glv.tokens_collector(Some(glv_withdrawal));
+        for token in index_tokens {
+            collector.insert_token(&token);
+        }
+        let close = CloseGlvWithdrawalHint::new(glv_withdrawal);
+        Ok(Self {
+            close,
+            token_map: *token_map_address,
+            glv_market_tokens,
+            swap: *glv_withdrawal.swap(),
+            feeds: collector.to_feeds(token_map)?,
+        })
+    }
+}
+
+impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteGlvWithdrawalBuilder<'a, C> {
+    pub(super) fn new(
+        client: &'a crate::Client<C>,
+        oracle: Pubkey,
+        glv_withdrawal: Pubkey,
+        cancel_on_execution_error: bool,
+    ) -> Self {
+        Self {
+            client,
+            oracle,
+            price_provider: Pyth::id(),
+            glv_withdrawal,
+            execution_lamports: 0,
+            cancel_on_execution_error,
+            hint: None,
+            token_map: None,
+            feeds_parser: Default::default(),
+            close: true,
+            alts: Default::default(),
+        }
+    }
+
+    /// Set execution fee.
+    pub fn execution_fee(&mut self, lamports: u64) -> &mut Self {
+        self.execution_lamports = lamports;
+        self
+    }
+
+    /// Set hint.
+    pub fn hint(&mut self, hint: ExecuteGlvWithdrawalHint) -> &mut Self {
+        self.hint = Some(hint);
+        self
+    }
+
+    /// Set token map address.
+    pub fn token_map(&mut self, address: &Pubkey) -> &mut Self {
+        self.token_map = Some(*address);
+        self
+    }
+
+    /// Set whether to close the GLV deposit after execution.
+    pub fn close(&mut self, close: bool) -> &mut Self {
+        self.close = close;
+        self
+    }
+
+    /// Parse feeds with the given price udpates map.
+    #[cfg(feature = "pyth-pull-oracle")]
+    pub fn parse_with_pyth_price_updates(
+        &mut self,
+        price_updates: crate::pyth::pull_oracle::Prices,
+    ) -> &mut Self {
+        self.feeds_parser.with_pyth_price_updates(price_updates);
+        self
+    }
+
+    /// Insert an Address Lookup Table.
+    pub fn add_alt(&mut self, account: AddressLookupTableAccount) -> &mut Self {
+        self.alts.insert(account.key, account.addresses);
+        self
+    }
+
+    async fn prepare_hint(&mut self) -> crate::Result<ExecuteGlvWithdrawalHint> {
+        match &self.hint {
+            Some(hint) => Ok(hint.clone()),
+            None => {
+                let glv_deposit = self
+                    .client
+                    .account::<ZeroCopy<GlvWithdrawal>>(&self.glv_withdrawal)
+                    .await?
+                    .ok_or(crate::Error::NotFound)?
+                    .0;
+
+                let glv_address = self
+                    .client
+                    .find_glv_address(&glv_deposit.tokens().glv_token());
+                let glv = self
+                    .client
+                    .account::<ZeroCopy<Glv>>(&glv_address)
+                    .await?
+                    .ok_or(crate::Error::NotFound)?
+                    .0;
+
+                let mut index_tokens = Vec::with_capacity(glv.num_markets());
+                for token in glv.market_tokens() {
+                    let market = self.client.find_market_address(glv.store(), &token);
+                    let market = self.client.market(&market).await?;
+                    index_tokens.push(market.meta().index_token_mint);
+                }
+
+                let store = glv_deposit.header().store();
+                let token_map_address = self
+                    .client
+                    .authorized_token_map_address(store)
+                    .await?
+                    .ok_or(crate::Error::NotFound)?;
+                let token_map = self.client.token_map(&token_map_address).await?;
+                let hint = ExecuteGlvWithdrawalHint::new(
+                    &glv,
+                    &glv_deposit,
+                    &token_map_address,
+                    &token_map,
+                    index_tokens,
+                )?;
+                self.hint = Some(hint.clone());
+                Ok(hint)
+            }
+        }
+    }
+
+    /// Build.
+    pub async fn build(&mut self) -> crate::Result<RpcBuilder<'a, C>> {
+        let hint = self.prepare_hint().await?;
+
+        let token_program_id = anchor_spl::token::ID;
+        let glv_token_program_id = anchor_spl::token_2022::ID;
+
+        let authority = self.client.payer();
+        let glv = self.client.find_glv_address(&hint.glv_token);
+        let market = self
+            .client
+            .find_market_address(&hint.close.store, &hint.market_token);
+
+        let feeds = self
+            .feeds_parser
+            .parse(&hint.feeds)
+            .collect::<Result<Vec<_>, _>>()?;
+        let markets = hint
+            .swap
+            .unique_market_tokens_excluding_current(&hint.market_token)
+            .map(|mint| AccountMeta {
+                pubkey: self.client.find_market_address(&hint.store, mint),
+                is_signer: false,
+                is_writable: true,
+            });
+
+        let glv_accounts = split_to_accounts(
+            hint.glv_market_tokens.iter().copied(),
+            &glv,
+            &hint.store,
+            &self.client.store_program_id(),
+            &token_program_id,
+        )
+        .0;
+
+        let final_long_token_vault = self
+            .client
+            .find_market_vault_address(&hint.store, &hint.final_long_token);
+        let final_short_token_vault = self
+            .client
+            .find_market_vault_address(&hint.store, &hint.final_short_token);
+
+        let market_token_vault = get_associated_token_address_with_program_id(
+            &glv,
+            &hint.market_token,
+            &token_program_id,
+        );
+
+        let market_token_withdrawal_vault = self
+            .client
+            .find_market_vault_address(&hint.store, &hint.market_token);
+
+        let execute = self
+            .client
+            .store_rpc()
+            .accounts(accounts::ExecuteGlvWithdrawal {
+                authority,
+                store: hint.store,
+                token_map: hint.token_map,
+                price_provider: self.price_provider,
+                oracle: self.oracle,
+                glv,
+                market,
+                glv_withdrawal: self.glv_withdrawal,
+                glv_token: hint.glv_token,
+                market_token: hint.market_token,
+                final_long_token: hint.final_long_token,
+                final_short_token: hint.final_short_token,
+                glv_token_escrow: hint.glv_token_escrow,
+                market_token_escrow: hint.market_token_escrow,
+                final_long_token_escrow: hint.final_long_token_escrow,
+                final_short_token_escrow: hint.final_short_token_escrow,
+                market_token_withdrawal_vault,
+                final_long_token_vault,
+                final_short_token_vault,
+                market_token_vault,
+                token_program: token_program_id,
+                glv_token_program: glv_token_program_id,
+                system_program: system_program::ID,
+            })
+            .args(instruction::ExecuteGlvWithdrawal {
+                execution_lamports: self.execution_lamports,
+                throw_on_execution_error: !self.cancel_on_execution_error,
+            })
+            .accounts(glv_accounts)
+            .accounts(feeds.into_iter().chain(markets).collect::<Vec<_>>())
+            .compute_budget(
+                ComputeBudget::default().with_limit(EXECUTE_GLV_WITHDRAWAL_COMPUTE_BUDGET),
+            )
+            .lookup_tables(self.alts.clone());
+
+        if self.close {
+            let close = self
+                .client
+                .close_glv_withdrawal(&self.glv_withdrawal)
+                .reason("executed")
+                .hint(hint.close)
+                .build()
+                .await?;
+            Ok(execute.merge(close))
+        } else {
+            Ok(execute)
+        }
+    }
+}
+
+#[cfg(feature = "pyth-pull-oracle")]
+mod pyth {
+    use crate::pyth::{
+        pull_oracle::{ExecuteWithPythPrices, Prices},
+        PythPullOracleContext,
+    };
+
+    use super::*;
+
+    impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteWithPythPrices<'a, C>
+        for ExecuteGlvWithdrawalBuilder<'a, C>
+    {
+        fn set_execution_fee(&mut self, lamports: u64) {
+            self.execution_fee(lamports);
+        }
+
+        async fn context(&mut self) -> crate::Result<PythPullOracleContext> {
+            let hint = self.prepare_hint().await?;
+            let ctx = PythPullOracleContext::try_from_feeds(&hint.feeds)?;
+            Ok(ctx)
+        }
+
+        async fn build_rpc_with_price_updates(
+            &mut self,
+            price_updates: Prices,
+        ) -> crate::Result<Vec<crate::utils::RpcBuilder<'a, C, ()>>> {
+            let rpc = self
+                .parse_with_pyth_price_updates(price_updates)
+                .build()
+                .await?;
+            Ok(vec![rpc])
+        }
     }
 }

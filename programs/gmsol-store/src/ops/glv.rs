@@ -11,7 +11,7 @@ use typed_builder::TypedBuilder;
 use crate::{
     constants,
     states::{
-        common::action::{Action, ActionExt},
+        common::action::{Action, ActionExt, ActionSigner},
         glv::{GlvShift, GlvWithdrawal},
         market::revertible::Revertible,
         withdrawal::WithdrawalParams,
@@ -669,6 +669,8 @@ impl<'a, 'info> ExecuteGlvWithdrawalOperation<'a, 'info> {
 
         self.validate_market()?;
 
+        let withdrawal_signer = self.glv_withdrawal.load()?.signer();
+
         let (glv_token_amount, amounts) = {
             let withdrawal = self.glv_withdrawal.load()?;
             let glv_token_amount = withdrawal.params.glv_token_amount;
@@ -761,7 +763,7 @@ impl<'a, 'info> ExecuteGlvWithdrawalOperation<'a, 'info> {
         // Invertible operations after the commitment.
         {
             // Burn GLV tokens.
-            self.burn_glv_tokens(glv_token_amount);
+            self.burn_glv_tokens(&withdrawal_signer, glv_token_amount);
         }
 
         Ok(amounts)
@@ -771,15 +773,20 @@ impl<'a, 'info> ExecuteGlvWithdrawalOperation<'a, 'info> {
     ///
     /// # Panic
     /// This is an invertbile operation that will panic on error.
-    fn burn_glv_tokens(&self, glv_token_amount: u64) {
+    fn burn_glv_tokens(&self, signer: &ActionSigner, glv_token_amount: u64) {
+        use anchor_spl::token_interface::{burn, Burn};
+
         if glv_token_amount != 0 {
-            TransferUtils::new(
-                self.glv_token_program.clone(),
-                &self.store,
-                self.glv_token_mint.to_account_info(),
-            )
-            .burn_from(&self.glv_token_account, glv_token_amount)
-            .expect("failed to burn GLV tokens");
+            let ctx = CpiContext::new(
+                self.glv_token_program.to_account_info(),
+                Burn {
+                    mint: self.glv_token_mint.to_account_info(),
+                    from: self.glv_token_account.clone(),
+                    authority: self.glv_withdrawal.to_account_info(),
+                },
+            );
+            burn(ctx.with_signer(&[&signer.as_seeds()]), glv_token_amount)
+                .expect("failed to burn GLV tokens");
         }
     }
 }

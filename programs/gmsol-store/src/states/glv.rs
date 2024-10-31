@@ -627,6 +627,11 @@ impl GlvWithdrawal {
     pub fn tokens(&self) -> &GlvWithdrawalTokenAccounts {
         &self.tokens
     }
+
+    /// Get swap params.
+    pub fn swap(&self) -> &SwapParams {
+        &self.swap
+    }
 }
 
 impl Action for GlvWithdrawal {

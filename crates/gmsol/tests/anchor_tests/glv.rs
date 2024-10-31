@@ -221,5 +221,26 @@ async fn glv_withdrawal() -> eyre::Result<()> {
         .await?;
     tracing::info!(%signature, %withdrawal, "cancelled the glv withdrawal");
 
+    // Create and execute a GLV withdrawal.
+    let (rpc, withdrawal) = user
+        .create_glv_withdrawal(store, glv_token, market_token, glv_amount)
+        .build_with_address()
+        .await?;
+    let signature = rpc.send_without_preflight().await?;
+    tracing::info!(%signature, %withdrawal, "created a glv withdrawal again");
+
+    let mut execute = keeper.execute_glv_withdrawal(oracle, &withdrawal, false);
+    deployment
+        .execute_with_pyth(
+            execute
+                .add_alt(deployment.common_alt().clone())
+                .add_alt(deployment.market_alt().clone()),
+            None,
+            false,
+            true,
+        )
+        .instrument(tracing::info_span!("executing glv withdrawal", glv_withdrawal=%withdrawal))
+        .await?;
+
     Ok(())
 }
