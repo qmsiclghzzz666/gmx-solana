@@ -112,13 +112,6 @@ async fn glv_deposit() -> eyre::Result<()> {
         .instrument(tracing::info_span!("executing glv deposit", glv_deposit=%deposit))
         .await?;
 
-    // Update max value.
-    let signature = keeper
-        .update_glv_market_config(store, glv_token, market_token, None, Some(1))
-        .send_without_preflight()
-        .await?;
-    tracing::info!(%signature, %market_token, "updated market config in the GLV");
-
     // Deposit again.
     let (rpc, deposit) = user
         .create_glv_deposit(store, glv_token, market_token)
@@ -127,6 +120,13 @@ async fn glv_deposit() -> eyre::Result<()> {
         .await?;
     let signature = rpc.send_without_preflight().await?;
     tracing::info!(%signature, %deposit, "created a glv deposit");
+
+    // Update max value.
+    let signature = keeper
+        .update_glv_market_config(store, glv_token, market_token, None, Some(1))
+        .send_without_preflight()
+        .await?;
+    tracing::info!(%signature, %market_token, "updated market config in the GLV");
 
     let mut execute = keeper.execute_glv_deposit(oracle, &deposit, false);
     let err = deployment
