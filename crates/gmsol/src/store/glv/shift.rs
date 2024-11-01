@@ -18,7 +18,7 @@ use gmsol_store::{
 
 use crate::{
     exchange::generate_nonce,
-    store::{token::TokenAccountOps, utils::FeedsParser},
+    store::utils::FeedsParser,
     utils::{RpcBuilder, ZeroCopy},
 };
 
@@ -101,19 +101,6 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateGlvShiftBuilder<'a, C> {
         let from_market_token_vault = get_associated_token_address(&glv, &self.from_market_token);
         let to_market_token_vault = get_associated_token_address(&glv, &self.to_market_token);
 
-        let prepare = self
-            .client
-            .prepare_associated_token_account(
-                &self.from_market_token,
-                &token_program_id,
-                Some(&glv_shift),
-            )
-            .merge(self.client.prepare_associated_token_account(
-                &self.to_market_token,
-                &token_program_id,
-                Some(&glv_shift),
-            ));
-
         let rpc = self
             .client
             .store_rpc()
@@ -137,7 +124,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateGlvShiftBuilder<'a, C> {
                 params: self.get_create_shift_params(),
             });
 
-        Ok((prepare.merge(rpc), glv_shift))
+        Ok((rpc, glv_shift))
     }
 }
 
