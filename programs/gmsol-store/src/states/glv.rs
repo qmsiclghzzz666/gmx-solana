@@ -6,7 +6,7 @@ use std::{
 use anchor_lang::prelude::*;
 
 use crate::{
-    events::RemoveShiftEvent,
+    events::{RemoveGlvDepositEvent, RemoveGlvWithdrawalEvent, RemoveShiftEvent},
     states::{Deposit, Market},
     utils::token::validate_associated_token_account,
     CoreError,
@@ -439,6 +439,23 @@ impl Action for GlvDeposit {
     }
 }
 
+impl Closable for GlvDeposit {
+    type ClosedEvent = RemoveGlvDepositEvent;
+
+    fn to_closed_event(&self, address: &Pubkey, reason: &str) -> Result<Self::ClosedEvent> {
+        RemoveGlvDepositEvent::new(
+            self.header.id(),
+            *self.header.store(),
+            *address,
+            self.tokens().market_token(),
+            self.tokens().glv_token(),
+            *self.header.owner(),
+            self.header.action_state()?,
+            reason,
+        )
+    }
+}
+
 impl Seed for GlvDeposit {
     const SEED: &'static [u8] = b"glv_deposit";
 }
@@ -639,6 +656,23 @@ impl Action for GlvWithdrawal {
 
     fn header(&self) -> &ActionHeader {
         &self.header
+    }
+}
+
+impl Closable for GlvWithdrawal {
+    type ClosedEvent = RemoveGlvWithdrawalEvent;
+
+    fn to_closed_event(&self, address: &Pubkey, reason: &str) -> Result<Self::ClosedEvent> {
+        RemoveGlvWithdrawalEvent::new(
+            self.header.id,
+            self.header.store,
+            *address,
+            self.tokens.market_token(),
+            self.tokens.glv_token(),
+            self.header.owner,
+            self.header.action_state()?,
+            reason,
+        )
     }
 }
 

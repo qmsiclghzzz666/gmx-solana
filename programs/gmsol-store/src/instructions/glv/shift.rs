@@ -14,7 +14,7 @@ use crate::{
     },
     ordered_tokens,
     states::{
-        common::action::{self, Action, ActionExt},
+        common::action::{Action, ActionExt},
         glv::GlvShift,
         Glv, Market, NonceBytes, Oracle, PriceProvider, RoleKey, Seed, Store, TokenMapHeader,
     },
@@ -88,7 +88,7 @@ pub struct CreateGlvShift<'info> {
     pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
-impl<'info> action::Create<'info, GlvShift> for CreateGlvShift<'info> {
+impl<'info> internal::Create<'info, GlvShift> for CreateGlvShift<'info> {
     type CreateParams = CreateShiftParams;
 
     fn action(&self) -> AccountInfo<'info> {
@@ -196,7 +196,7 @@ pub struct CloseGlvShift<'info> {
     pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
-impl<'info> action::Close<'info, GlvShift> for CloseGlvShift<'info> {
+impl<'info> internal::Close<'info, GlvShift> for CloseGlvShift<'info> {
     fn expected_keeper_role(&self) -> &str {
         RoleKey::ORDER_KEEPER
     }
@@ -209,7 +209,7 @@ impl<'info> action::Close<'info, GlvShift> for CloseGlvShift<'info> {
         true
     }
 
-    fn transfer_to_atas(&self, _init_if_needed: bool) -> Result<action::TransferSuccess> {
+    fn transfer_to_atas(&self, _init_if_needed: bool) -> Result<internal::TransferSuccess> {
         Ok(true)
     }
 

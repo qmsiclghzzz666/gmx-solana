@@ -11,7 +11,7 @@ use typed_builder::TypedBuilder;
 use crate::{
     constants,
     states::{
-        common::action::{Action, ActionExt, ActionSigner},
+        common::action::{Action, ActionExt, ActionParams, ActionSigner},
         glv::{GlvShift, GlvWithdrawal},
         market::revertible::Revertible,
         withdrawal::WithdrawalParams,
@@ -43,6 +43,12 @@ pub struct CreateGlvDepositParams {
     pub min_market_token_amount: u64,
     /// Minimum acceptable amount of glv tokens to receive.
     pub min_glv_token_amount: u64,
+}
+
+impl ActionParams for CreateGlvDepositParams {
+    fn execution_lamports(&self) -> u64 {
+        self.execution_lamports
+    }
 }
 
 /// Operation for creating GLV deposit.
@@ -513,6 +519,12 @@ pub struct CreateGlvWithdrawalParams {
     pub min_final_long_token_amount: u64,
     /// Minimum acceptable final short token to receive.
     pub min_final_short_token_amount: u64,
+}
+
+impl ActionParams for CreateGlvWithdrawalParams {
+    fn execution_lamports(&self) -> u64 {
+        self.execution_lamports
+    }
 }
 
 /// Operation for creating GLV withdrawal.

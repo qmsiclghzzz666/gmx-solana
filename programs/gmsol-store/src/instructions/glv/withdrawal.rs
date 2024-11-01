@@ -9,9 +9,8 @@ use gmsol_utils::InitSpace;
 
 use crate::{
     constants,
-    events::RemoveGlvWithdrawalEvent,
     ops::{
-        execution_fee::{PayExecutionFeeOperation, TransferExecutionFeeOperation},
+        execution_fee::PayExecutionFeeOperation,
         glv::{
             CreateGlvWithdrawalOperation, CreateGlvWithdrawalParams, ExecuteGlvWithdrawalOperation,
         },
@@ -24,7 +23,7 @@ use crate::{
         TokenMapLoader,
     },
     utils::{
-        internal::{self, Authentication},
+        internal,
         token::{is_associated_token_account, is_associated_token_account_with_program_id},
     },
     CoreError,
@@ -112,43 +111,49 @@ pub struct CreateGlvWithdrawal<'info> {
     pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
-pub(crate) fn create_glv_withdrawal<'info>(
-    ctx: Context<'_, '_, 'info, 'info, CreateGlvWithdrawal<'info>>,
-    nonce: &NonceBytes,
-    params: &CreateGlvWithdrawalParams,
-) -> Result<()> {
-    let accounts = ctx.accounts;
-    accounts.transfer_execution_lamports(params)?;
-    accounts.transfer_glv_tokens(params)?;
-    CreateGlvWithdrawalOperation::builder()
-        .glv_withdrawal(accounts.glv_withdrawal.clone())
-        .market(accounts.market.clone())
-        .store(accounts.store.clone())
-        .owner(&accounts.owner)
-        .nonce(nonce)
-        .bump(ctx.bumps.glv_withdrawal)
-        .final_long_token(&accounts.final_long_token_escrow)
-        .final_short_token(&accounts.final_short_token_escrow)
-        .market_token(&accounts.market_token_escrow)
-        .glv_token(&accounts.glv_token_escrow)
-        .params(params)
-        .swap_paths(ctx.remaining_accounts)
-        .build()
-        .unchecked_execute()?;
-    Ok(())
+impl<'info> internal::Create<'info, GlvWithdrawal> for CreateGlvWithdrawal<'info> {
+    type CreateParams = CreateGlvWithdrawalParams;
+
+    fn action(&self) -> AccountInfo<'info> {
+        self.glv_withdrawal.to_account_info()
+    }
+
+    fn payer(&self) -> AccountInfo<'info> {
+        self.owner.to_account_info()
+    }
+
+    fn system_program(&self) -> AccountInfo<'info> {
+        self.system_program.to_account_info()
+    }
+
+    fn create_impl(
+        &mut self,
+        params: &Self::CreateParams,
+        nonce: &NonceBytes,
+        bumps: &Self::Bumps,
+        remaining_accounts: &'info [AccountInfo<'info>],
+    ) -> Result<()> {
+        self.transfer_glv_tokens(params)?;
+        CreateGlvWithdrawalOperation::builder()
+            .glv_withdrawal(self.glv_withdrawal.clone())
+            .market(self.market.clone())
+            .store(self.store.clone())
+            .owner(&self.owner)
+            .nonce(nonce)
+            .bump(bumps.glv_withdrawal)
+            .final_long_token(&self.final_long_token_escrow)
+            .final_short_token(&self.final_short_token_escrow)
+            .market_token(&self.market_token_escrow)
+            .glv_token(&self.glv_token_escrow)
+            .params(params)
+            .swap_paths(remaining_accounts)
+            .build()
+            .unchecked_execute()?;
+        Ok(())
+    }
 }
 
 impl<'info> CreateGlvWithdrawal<'info> {
-    fn transfer_execution_lamports(&self, params: &CreateGlvWithdrawalParams) -> Result<()> {
-        TransferExecutionFeeOperation::builder()
-            .payment(self.glv_withdrawal.to_account_info())
-            .payer(self.owner.to_account_info())
-            .execution_lamports(params.execution_lamports)
-            .system_program(self.system_program.to_account_info())
-            .build()
-            .execute()
-    }
-
     fn transfer_glv_tokens(&mut self, params: &CreateGlvWithdrawalParams) -> Result<()> {
         use anchor_spl::token_interface::{transfer_checked, TransferChecked};
 
@@ -291,71 +296,16 @@ pub struct CloseGlvWithdrawal<'info> {
     pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
-pub(crate) fn close_glv_withdrawal(ctx: Context<CloseGlvWithdrawal>, reason: &str) -> Result<()> {
-    let accounts = &ctx.accounts;
-    let should_continue_when_atas_are_missing = accounts.preprocess()?;
-    if accounts.transfer_to_atas(should_continue_when_atas_are_missing)? {
-        {
-            let glv_withdrawal_address = accounts.glv_withdrawal.key();
-            let glv_withdrawal = accounts.glv_withdrawal.load()?;
-            emit_cpi!(RemoveGlvWithdrawalEvent::new(
-                glv_withdrawal.header.id,
-                glv_withdrawal.header.store,
-                glv_withdrawal_address,
-                glv_withdrawal.tokens.market_token(),
-                glv_withdrawal.tokens.glv_token(),
-                glv_withdrawal.header.owner,
-                glv_withdrawal.header.action_state()?,
-                reason,
-            )?);
-        }
-        accounts.close()?;
-    } else {
-        msg!("Some ATAs are not initilaized, skip the close");
-    }
-    Ok(())
-}
-
-impl<'info> internal::Authentication<'info> for CloseGlvWithdrawal<'info> {
-    fn authority(&self) -> &Signer<'info> {
-        &self.executor
+impl<'info> internal::Close<'info, GlvWithdrawal> for CloseGlvWithdrawal<'info> {
+    fn expected_keeper_role(&self) -> &str {
+        RoleKey::ORDER_KEEPER
     }
 
-    fn store(&self) -> &AccountLoader<'info, Store> {
-        &self.store
-    }
-}
-
-type ShouldContinueWhenATAsAreMissing = bool;
-type Success = bool;
-
-impl<'info> CloseGlvWithdrawal<'info> {
-    fn preprocess(&self) -> Result<ShouldContinueWhenATAsAreMissing> {
-        if self.executor.key == self.owner.key {
-            Ok(true)
-        } else {
-            self.only_role(RoleKey::ORDER_KEEPER)?;
-            {
-                let glv_withdrawal = self.glv_withdrawal.load()?;
-                if glv_withdrawal
-                    .header
-                    .action_state()?
-                    .is_completed_or_cancelled()
-                {
-                    Ok(false)
-                } else {
-                    err!(CoreError::PermissionDenied)
-                }
-            }
-        }
+    fn fund_receiver(&self) -> AccountInfo<'info> {
+        self.owner.to_account_info()
     }
 
-    fn close(&self) -> Result<()> {
-        self.glv_withdrawal.close(self.owner.to_account_info())?;
-        Ok(())
-    }
-
-    fn transfer_to_atas(&self, init_if_needed: bool) -> Result<Success> {
+    fn transfer_to_atas(&self, init_if_needed: bool) -> Result<internal::TransferSuccess> {
         use crate::utils::token::TransferAllFromEscrowToATA;
 
         // Prepare signer seeds.
@@ -447,6 +397,27 @@ impl<'info> CloseGlvWithdrawal<'info> {
         }
 
         Ok(true)
+    }
+
+    fn event_authority(&self, bumps: &Self::Bumps) -> (AccountInfo<'info>, u8) {
+        (
+            self.event_authority.to_account_info(),
+            bumps.event_authority,
+        )
+    }
+
+    fn action(&self) -> &AccountLoader<'info, GlvWithdrawal> {
+        &self.glv_withdrawal
+    }
+}
+
+impl<'info> internal::Authentication<'info> for CloseGlvWithdrawal<'info> {
+    fn authority(&self) -> &Signer<'info> {
+        &self.executor
+    }
+
+    fn store(&self) -> &AccountLoader<'info, Store> {
+        &self.store
     }
 }
 

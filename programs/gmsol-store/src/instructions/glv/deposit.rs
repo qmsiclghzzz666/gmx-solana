@@ -9,9 +9,8 @@ use gmsol_utils::InitSpace;
 
 use crate::{
     constants,
-    events::RemoveGlvDepositEvent,
     ops::{
-        execution_fee::{PayExecutionFeeOperation, TransferExecutionFeeOperation},
+        execution_fee::PayExecutionFeeOperation,
         glv::{CreateGlvDepositOperation, CreateGlvDepositParams, ExecuteGlvDepositOperation},
         market::{MarketTransferInOperation, MarketTransferOutOperation},
     },
@@ -22,7 +21,7 @@ use crate::{
         TokenMapHeader, TokenMapLoader,
     },
     utils::{
-        internal::{self, Authentication},
+        internal,
         token::{is_associated_token_account, is_associated_token_account_with_program_id},
     },
     CoreError,
@@ -116,43 +115,49 @@ pub struct CreateGlvDeposit<'info> {
     pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
-pub(crate) fn create_glv_deposit<'info>(
-    ctx: Context<'_, '_, 'info, 'info, CreateGlvDeposit<'info>>,
-    nonce: &NonceBytes,
-    params: &CreateGlvDepositParams,
-) -> Result<()> {
-    let accounts = ctx.accounts;
-    accounts.transfer_execution_lamports(params)?;
-    accounts.transfer_tokens(params)?;
-    CreateGlvDepositOperation::builder()
-        .glv_deposit(accounts.glv_deposit.clone())
-        .market(accounts.market.clone())
-        .store(accounts.store.clone())
-        .owner(accounts.owner.to_account_info())
-        .nonce(nonce)
-        .bump(ctx.bumps.glv_deposit)
-        .initial_long_token(accounts.initial_long_token_escrow.as_deref())
-        .initial_short_token(accounts.initial_short_token_escrow.as_deref())
-        .market_token(&accounts.market_token_escrow)
-        .glv_token(&accounts.glv_token_escrow)
-        .params(params)
-        .swap_paths(ctx.remaining_accounts)
-        .build()
-        .unchecked_execute()?;
-    Ok(())
+impl<'info> internal::Create<'info, GlvDeposit> for CreateGlvDeposit<'info> {
+    type CreateParams = CreateGlvDepositParams;
+
+    fn action(&self) -> AccountInfo<'info> {
+        self.glv_deposit.to_account_info()
+    }
+
+    fn payer(&self) -> AccountInfo<'info> {
+        self.owner.to_account_info()
+    }
+
+    fn system_program(&self) -> AccountInfo<'info> {
+        self.system_program.to_account_info()
+    }
+
+    fn create_impl(
+        &mut self,
+        params: &Self::CreateParams,
+        nonce: &NonceBytes,
+        bumps: &Self::Bumps,
+        remaining_accounts: &'info [AccountInfo<'info>],
+    ) -> Result<()> {
+        self.transfer_tokens(params)?;
+        CreateGlvDepositOperation::builder()
+            .glv_deposit(self.glv_deposit.clone())
+            .market(self.market.clone())
+            .store(self.store.clone())
+            .owner(self.owner.to_account_info())
+            .nonce(nonce)
+            .bump(bumps.glv_deposit)
+            .initial_long_token(self.initial_long_token_escrow.as_deref())
+            .initial_short_token(self.initial_short_token_escrow.as_deref())
+            .market_token(&self.market_token_escrow)
+            .glv_token(&self.glv_token_escrow)
+            .params(params)
+            .swap_paths(remaining_accounts)
+            .build()
+            .unchecked_execute()?;
+        Ok(())
+    }
 }
 
 impl<'info> CreateGlvDeposit<'info> {
-    fn transfer_execution_lamports(&self, params: &CreateGlvDepositParams) -> Result<()> {
-        TransferExecutionFeeOperation::builder()
-            .payment(self.glv_deposit.to_account_info())
-            .payer(self.owner.to_account_info())
-            .execution_lamports(params.execution_lamports)
-            .system_program(self.system_program.to_account_info())
-            .build()
-            .execute()
-    }
-
     fn transfer_tokens(&mut self, params: &CreateGlvDepositParams) -> Result<()> {
         use anchor_spl::token::{transfer_checked, TransferChecked};
 
@@ -357,66 +362,16 @@ pub struct CloseGlvDeposit<'info> {
     pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
-pub(crate) fn close_glv_deposit(ctx: Context<CloseGlvDeposit>, reason: &str) -> Result<()> {
-    let accounts = &ctx.accounts;
-    let should_continue_when_atas_are_missing = accounts.preprocess()?;
-    if accounts.transfer_to_atas(should_continue_when_atas_are_missing)? {
-        {
-            let glv_deposit_address = accounts.glv_deposit.key();
-            let glv_deposit = accounts.glv_deposit.load()?;
-            emit_cpi!(RemoveGlvDepositEvent::new(
-                glv_deposit.header.id,
-                glv_deposit.header.store,
-                glv_deposit_address,
-                glv_deposit.tokens.market_token(),
-                glv_deposit.tokens.glv_token(),
-                glv_deposit.header.owner,
-                glv_deposit.header.action_state()?,
-                reason,
-            )?);
-        }
-        accounts.close()?;
-    } else {
-        msg!("Some ATAs are not initilaized, skip the close");
-    }
-    Ok(())
-}
-
-impl<'info> internal::Authentication<'info> for CloseGlvDeposit<'info> {
-    fn authority(&self) -> &Signer<'info> {
-        &self.executor
+impl<'info> internal::Close<'info, GlvDeposit> for CloseGlvDeposit<'info> {
+    fn expected_keeper_role(&self) -> &str {
+        RoleKey::ORDER_KEEPER
     }
 
-    fn store(&self) -> &AccountLoader<'info, Store> {
-        &self.store
-    }
-}
-
-type ShouldContinueWhenATAsAreMissing = bool;
-type Success = bool;
-
-impl<'info> CloseGlvDeposit<'info> {
-    fn preprocess(&self) -> Result<ShouldContinueWhenATAsAreMissing> {
-        if self.executor.key == self.owner.key {
-            Ok(true)
-        } else {
-            self.only_role(RoleKey::ORDER_KEEPER)?;
-            {
-                let glv_deposit = self.glv_deposit.load()?;
-                if glv_deposit
-                    .header
-                    .action_state()?
-                    .is_completed_or_cancelled()
-                {
-                    Ok(false)
-                } else {
-                    err!(CoreError::PermissionDenied)
-                }
-            }
-        }
+    fn fund_receiver(&self) -> AccountInfo<'info> {
+        self.owner.to_account_info()
     }
 
-    fn transfer_to_atas(&self, init_if_needed: bool) -> Result<Success> {
+    fn transfer_to_atas(&self, init_if_needed: bool) -> Result<internal::TransferSuccess> {
         use crate::utils::token::TransferAllFromEscrowToATA;
 
         // Prepare signer seeds.
@@ -520,9 +475,25 @@ impl<'info> CloseGlvDeposit<'info> {
         Ok(true)
     }
 
-    fn close(&self) -> Result<()> {
-        self.glv_deposit.close(self.owner.to_account_info())?;
-        Ok(())
+    fn event_authority(&self, bumps: &Self::Bumps) -> (AccountInfo<'info>, u8) {
+        (
+            self.event_authority.to_account_info(),
+            bumps.event_authority,
+        )
+    }
+
+    fn action(&self) -> &AccountLoader<'info, GlvDeposit> {
+        &self.glv_deposit
+    }
+}
+
+impl<'info> internal::Authentication<'info> for CloseGlvDeposit<'info> {
+    fn authority(&self) -> &Signer<'info> {
+        &self.executor
+    }
+
+    fn store(&self) -> &AccountLoader<'info, Store> {
+        &self.store
     }
 }
 

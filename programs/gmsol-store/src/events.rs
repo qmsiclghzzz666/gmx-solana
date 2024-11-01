@@ -274,7 +274,7 @@ impl ActionEvent for RemoveShiftEvent {}
 /// GLV Deposit removed event.
 #[event]
 #[cfg_attr(feature = "debug", derive(Debug))]
-#[derive(Clone)]
+#[derive(Clone, InitSpace)]
 pub struct RemoveGlvDepositEvent {
     /// Action id.
     pub id: u64,
@@ -295,6 +295,7 @@ pub struct RemoveGlvDepositEvent {
     /// Final state.
     pub state: ActionState,
     /// Reason.
+    #[max_len(32)]
     pub reason: String,
 }
 
@@ -325,10 +326,16 @@ impl RemoveGlvDepositEvent {
     }
 }
 
+impl InitSpace for RemoveGlvDepositEvent {
+    const INIT_SPACE: usize = <Self as Space>::INIT_SPACE;
+}
+
+impl ActionEvent for RemoveGlvDepositEvent {}
+
 /// GLV Withdrawal removed event.
 #[event]
 #[cfg_attr(feature = "debug", derive(Debug))]
-#[derive(Clone)]
+#[derive(Clone, InitSpace)]
 pub struct RemoveGlvWithdrawalEvent {
     /// Action id.
     pub id: u64,
@@ -349,6 +356,7 @@ pub struct RemoveGlvWithdrawalEvent {
     /// Final state.
     pub state: ActionState,
     /// Reason.
+    #[max_len(32)]
     pub reason: String,
 }
 
@@ -378,6 +386,12 @@ impl RemoveGlvWithdrawalEvent {
         })
     }
 }
+
+impl InitSpace for RemoveGlvWithdrawalEvent {
+    const INIT_SPACE: usize = <Self as Space>::INIT_SPACE;
+}
+
+impl ActionEvent for RemoveGlvWithdrawalEvent {}
 
 /// Trade event.
 #[cfg_attr(feature = "debug", derive(Debug))]

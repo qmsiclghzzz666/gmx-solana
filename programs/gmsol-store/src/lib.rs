@@ -124,7 +124,6 @@ use self::{
         withdrawal::CreateWithdrawalParams,
     },
     states::{
-        common::action::{Close, Create},
         market::{config::EntryArgs, status::MarketStatus, MarketMeta},
         order::UpdateOrderParams,
         token_config::TokenConfigBuilder,
@@ -1452,16 +1451,19 @@ pub mod gmsol_store {
 
     /// Create GLV deposit.
     pub fn create_glv_deposit<'info>(
-        ctx: Context<'_, '_, 'info, 'info, CreateGlvDeposit<'info>>,
+        mut ctx: Context<'_, '_, 'info, 'info, CreateGlvDeposit<'info>>,
         nonce: [u8; 32],
         params: CreateGlvDepositParams,
     ) -> Result<()> {
-        instructions::create_glv_deposit(ctx, &nonce, &params)
+        internal::Create::create(&mut ctx, &nonce, &params)
     }
 
     /// Close GLV deposit.
-    pub fn close_glv_deposit(ctx: Context<CloseGlvDeposit>, reason: String) -> Result<()> {
-        instructions::close_glv_deposit(ctx, &reason)
+    pub fn close_glv_deposit<'info>(
+        ctx: Context<'_, '_, 'info, 'info, CloseGlvDeposit<'info>>,
+        reason: String,
+    ) -> Result<()> {
+        internal::Close::close(&ctx, &reason)
     }
 
     #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
@@ -1479,16 +1481,19 @@ pub mod gmsol_store {
 
     /// Create GLV withdrawal.
     pub fn create_glv_withdrawal<'info>(
-        ctx: Context<'_, '_, 'info, 'info, CreateGlvWithdrawal<'info>>,
+        mut ctx: Context<'_, '_, 'info, 'info, CreateGlvWithdrawal<'info>>,
         nonce: [u8; 32],
         params: CreateGlvWithdrawalParams,
     ) -> Result<()> {
-        instructions::create_glv_withdrawal(ctx, &nonce, &params)
+        internal::Create::create(&mut ctx, &nonce, &params)
     }
 
     /// Close GLV withdrawal.
-    pub fn close_glv_withdrawal(ctx: Context<CloseGlvWithdrawal>, reason: String) -> Result<()> {
-        instructions::close_glv_withdrawal(ctx, &reason)
+    pub fn close_glv_withdrawal<'info>(
+        ctx: Context<'_, '_, 'info, 'info, CloseGlvWithdrawal<'info>>,
+        reason: String,
+    ) -> Result<()> {
+        internal::Close::close(&ctx, &reason)
     }
 
     /// Execute GLV withdrawal.
@@ -1512,7 +1517,7 @@ pub mod gmsol_store {
         nonce: [u8; 32],
         params: CreateShiftParams,
     ) -> Result<()> {
-        CreateGlvShift::create(&mut ctx, &nonce, &params)
+        internal::Create::create(&mut ctx, &nonce, &params)
     }
 
     /// Close a GLV shift.
@@ -1521,7 +1526,7 @@ pub mod gmsol_store {
         ctx: Context<'_, '_, 'info, 'info, CloseGlvShift<'info>>,
         reason: String,
     ) -> Result<()> {
-        CloseGlvShift::close(&ctx, &reason)
+        internal::Close::close(&ctx, &reason)
     }
 
     /// Execute GLV shift.
