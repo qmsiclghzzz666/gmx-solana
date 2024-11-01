@@ -4,8 +4,10 @@ use typed_builder::TypedBuilder;
 
 use crate::{
     states::{
-        common::action::Action, market::revertible::Revertible, withdrawal::Withdrawal, Market,
-        NonceBytes, Oracle, Store, ValidateOracleTime,
+        common::action::{Action, ActionParams},
+        market::revertible::Revertible,
+        withdrawal::Withdrawal,
+        Market, NonceBytes, Oracle, Store, ValidateOracleTime,
     },
     CoreError, CoreResult,
 };
@@ -16,7 +18,7 @@ use super::market::RevertibleLiquidityMarketOperation;
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct CreateWithdrawalParams {
     /// Execution fee in lamports.
-    pub execution_fee: u64,
+    pub execution_lamports: u64,
     /// The length of the swap path for long token.
     pub long_token_swap_path_length: u8,
     /// The length of the swap path for short token.
@@ -27,6 +29,12 @@ pub struct CreateWithdrawalParams {
     pub min_long_token_amount: u64,
     /// The minimum acceptable final short token amount to receive.
     pub min_short_token_amount: u64,
+}
+
+impl ActionParams for CreateWithdrawalParams {
+    fn execution_lamports(&self) -> u64 {
+        self.execution_lamports
+    }
 }
 
 /// Operation for creating a withdrawal.
@@ -77,7 +85,7 @@ impl<'a, 'info> CreateWithdrawalOperation<'a, 'info> {
             owner.key(),
             *nonce,
             bump,
-            params.execution_fee,
+            params.execution_lamports,
         )?;
 
         // Initialize tokens.
@@ -116,14 +124,14 @@ impl<'a, 'info> CreateWithdrawalOperation<'a, 'info> {
         );
 
         require_gte!(
-            params.execution_fee,
+            params.execution_lamports,
             Withdrawal::MIN_EXECUTION_LAMPORTS,
             CoreError::NotEnoughExecutionFee
         );
 
         require_gte!(
             self.withdrawal.get_lamports(),
-            params.execution_fee,
+            params.execution_lamports,
             CoreError::NotEnoughExecutionFee
         );
 

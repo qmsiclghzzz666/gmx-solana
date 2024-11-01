@@ -6,69 +6,11 @@ use anchor_spl::{
 use gmsol_utils::InitSpace;
 
 use crate::{
-    events::RemoveShiftEvent,
-    ops::{
-        execution_fee::TransferExecutionFeeOperation,
-        shift::{CreateShiftOperation, CreateShiftParams},
-    },
+    ops::shift::{CreateShiftOperation, CreateShiftParams},
     states::{common::action::ActionExt, Market, NonceBytes, RoleKey, Seed, Shift, Store},
-    utils::{
-        internal::{self, Authentication},
-        token::is_associated_token_account,
-    },
+    utils::{internal, token::is_associated_token_account},
     CoreError,
 };
-
-/// The accounts definitions for the `prepare_shift_escorw` instruction.
-#[derive(Accounts)]
-#[instruction(nonce: [u8; 32])]
-pub struct PrepareShiftEscorw<'info> {
-    /// The owner of the shift.
-    #[account(mut)]
-    pub owner: Signer<'info>,
-    /// Store.
-    pub store: AccountLoader<'info, Store>,
-    /// The shift account owning these escrow accoutns.
-    /// CHECK: The shift account don't have to be initialized.
-    #[account(
-        seeds = [Shift::SEED, store.key().as_ref(), owner.key().as_ref(), &nonce],
-        bump,
-    )]
-    pub shift: UncheckedAccount<'info>,
-    /// From market token.
-    pub from_market_token: Box<Account<'info, Mint>>,
-    /// To Market token.
-    pub to_market_token: Box<Account<'info, Mint>>,
-    /// The escrow account for from market tokens.
-    #[account(
-        init_if_needed,
-        payer = owner,
-        associated_token::mint = from_market_token,
-        associated_token::authority = shift,
-    )]
-    pub from_market_token_escrow: Box<Account<'info, TokenAccount>>,
-    /// The escrow account for to market tokens.
-    #[account(
-        init_if_needed,
-        payer = owner,
-        associated_token::mint = to_market_token,
-        associated_token::authority = shift,
-    )]
-    pub to_market_token_escrow: Box<Account<'info, TokenAccount>>,
-    /// The system program.
-    pub system_program: Program<'info, System>,
-    /// The token program.
-    pub token_program: Program<'info, Token>,
-    /// The associated token program.
-    pub associated_token_program: Program<'info, AssociatedToken>,
-}
-
-pub(crate) fn prepare_shift_escrow(
-    _ctx: Context<PrepareShiftEscorw>,
-    _nonce: NonceBytes,
-) -> Result<()> {
-    Ok(())
-}
 
 /// The accounts definition for the `create_shift` instruction.
 #[derive(Accounts)]
@@ -137,41 +79,47 @@ pub struct CreateShift<'info> {
     pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
-pub(crate) fn create_shift(
-    ctx: Context<CreateShift>,
-    nonce: &NonceBytes,
-    params: &CreateShiftParams,
-) -> Result<()> {
-    let accounts = ctx.accounts;
-    accounts.transfer_execution_fee(params)?;
-    accounts.transfer_tokens(params)?;
-    CreateShiftOperation::builder()
-        .store(&accounts.store)
-        .owner(accounts.owner.to_account_info())
-        .shift(&accounts.shift)
-        .from_market(&accounts.from_market)
-        .from_market_token_account(&accounts.from_market_token_escrow)
-        .to_market(&accounts.to_market)
-        .to_market_token_account(&accounts.to_market_token_escrow)
-        .nonce(nonce)
-        .bump(ctx.bumps.shift)
-        .params(params)
-        .build()
-        .execute()?;
-    Ok(())
+impl<'info> internal::Create<'info, Shift> for CreateShift<'info> {
+    type CreateParams = CreateShiftParams;
+
+    fn action(&self) -> AccountInfo<'info> {
+        self.shift.to_account_info()
+    }
+
+    fn payer(&self) -> AccountInfo<'info> {
+        self.owner.to_account_info()
+    }
+
+    fn system_program(&self) -> AccountInfo<'info> {
+        self.system_program.to_account_info()
+    }
+
+    fn create_impl(
+        &mut self,
+        params: &Self::CreateParams,
+        nonce: &NonceBytes,
+        bumps: &Self::Bumps,
+        _remaining_accounts: &'info [AccountInfo<'info>],
+    ) -> Result<()> {
+        self.transfer_tokens(params)?;
+        CreateShiftOperation::builder()
+            .store(&self.store)
+            .owner(self.owner.to_account_info())
+            .shift(&self.shift)
+            .from_market(&self.from_market)
+            .from_market_token_account(&self.from_market_token_escrow)
+            .to_market(&self.to_market)
+            .to_market_token_account(&self.to_market_token_escrow)
+            .nonce(nonce)
+            .bump(bumps.shift)
+            .params(params)
+            .build()
+            .execute()?;
+        Ok(())
+    }
 }
 
 impl<'info> CreateShift<'info> {
-    fn transfer_execution_fee(&self, params: &CreateShiftParams) -> Result<()> {
-        TransferExecutionFeeOperation::builder()
-            .payment(self.shift.to_account_info())
-            .payer(self.owner.to_account_info())
-            .execution_lamports(params.execution_lamports)
-            .system_program(self.system_program.to_account_info())
-            .build()
-            .execute()
-    }
-
     fn transfer_tokens(&mut self, params: &CreateShiftParams) -> Result<()> {
         let amount = params.from_market_token_amount;
         let source = &self.from_market_token_source;
@@ -260,30 +208,6 @@ pub struct CloseShift<'info> {
     pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
-pub(crate) fn close_shift(ctx: Context<CloseShift>, reason: &str) -> Result<()> {
-    let accounts = &ctx.accounts;
-    let should_continue_when_atas_are_missing = accounts.preprocess()?;
-    if accounts.transfer_to_atas(should_continue_when_atas_are_missing)? {
-        {
-            let shift_address = accounts.shift.key();
-            let shift = accounts.shift.load()?;
-            emit_cpi!(RemoveShiftEvent::new(
-                shift.header.id,
-                shift.header.store,
-                shift_address,
-                shift.tokens().from_market_token(),
-                shift.header.owner,
-                shift.header.action_state()?,
-                reason,
-            )?)
-        }
-        accounts.close()?;
-    } else {
-        msg!("Some ATAs are not initilaized, skip the close");
-    }
-    Ok(())
-}
-
 impl<'info> internal::Authentication<'info> for CloseShift<'info> {
     fn authority(&self) -> &Signer<'info> {
         &self.executor
@@ -294,27 +218,16 @@ impl<'info> internal::Authentication<'info> for CloseShift<'info> {
     }
 }
 
-type ShouldContinueWhenATAsAreMissing = bool;
-type Success = bool;
-
-impl<'info> CloseShift<'info> {
-    fn preprocess(&self) -> Result<ShouldContinueWhenATAsAreMissing> {
-        if self.executor.key == self.owner.key {
-            Ok(true)
-        } else {
-            self.only_role(RoleKey::ORDER_KEEPER)?;
-            {
-                let shift = self.shift.load()?;
-                if shift.header.action_state()?.is_completed_or_cancelled() {
-                    Ok(false)
-                } else {
-                    err!(CoreError::PermissionDenied)
-                }
-            }
-        }
+impl<'info> internal::Close<'info, Shift> for CloseShift<'info> {
+    fn expected_keeper_role(&self) -> &str {
+        RoleKey::ORDER_KEEPER
     }
 
-    fn transfer_to_atas(&self, init_if_needed: bool) -> Result<Success> {
+    fn fund_receiver(&self) -> AccountInfo<'info> {
+        self.owner.to_account_info()
+    }
+
+    fn transfer_to_atas(&self, init_if_needed: bool) -> Result<internal::TransferSuccess> {
         use crate::utils::token::TransferAllFromEscrowToATA;
 
         let signer = self.shift.load()?.signer();
@@ -359,8 +272,14 @@ impl<'info> CloseShift<'info> {
         Ok(true)
     }
 
-    fn close(&self) -> Result<()> {
-        self.shift.close(self.owner.to_account_info())?;
-        Ok(())
+    fn event_authority(&self, bumps: &Self::Bumps) -> (AccountInfo<'info>, u8) {
+        (
+            self.event_authority.to_account_info(),
+            bumps.event_authority,
+        )
+    }
+
+    fn action(&self) -> &AccountLoader<'info, Shift> {
+        &self.shift
     }
 }

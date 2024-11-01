@@ -1,10 +1,10 @@
 use anchor_lang::prelude::*;
 
-use crate::CoreError;
+use crate::{events::RemoveWithdrawalEvent, CoreError};
 
 use super::{
     common::{
-        action::{Action, ActionHeader},
+        action::{Action, ActionHeader, Closable},
         swap::SwapParams,
         token::TokenAndAccount,
     },
@@ -53,6 +53,22 @@ impl Action for Withdrawal {
 
     fn header(&self) -> &ActionHeader {
         &self.header
+    }
+}
+
+impl Closable for Withdrawal {
+    type ClosedEvent = RemoveWithdrawalEvent;
+
+    fn to_closed_event(&self, address: &Pubkey, reason: &str) -> Result<Self::ClosedEvent> {
+        RemoveWithdrawalEvent::new(
+            self.header.id,
+            self.header.store,
+            *address,
+            self.tokens.market_token(),
+            self.header.owner,
+            self.header.action_state()?,
+            reason,
+        )
     }
 }
 

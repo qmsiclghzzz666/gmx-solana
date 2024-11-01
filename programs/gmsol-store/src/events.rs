@@ -110,6 +110,12 @@ impl RemoveDepositEvent {
     }
 }
 
+impl InitSpace for RemoveDepositEvent {
+    const INIT_SPACE: usize = <Self as Space>::INIT_SPACE;
+}
+
+impl ActionEvent for RemoveDepositEvent {}
+
 /// Order removed event.
 #[event]
 #[cfg_attr(feature = "debug", derive(Debug))]
@@ -167,7 +173,7 @@ impl RemoveOrderEvent {
 /// Withdrawal removed event.
 #[event]
 #[cfg_attr(feature = "debug", derive(Debug))]
-#[derive(Clone)]
+#[derive(Clone, InitSpace)]
 pub struct RemoveWithdrawalEvent {
     /// Action id.
     pub id: u64,
@@ -186,8 +192,15 @@ pub struct RemoveWithdrawalEvent {
     /// Final state.
     pub state: ActionState,
     /// Reason.
+    #[max_len(32)]
     pub reason: String,
 }
+
+impl InitSpace for RemoveWithdrawalEvent {
+    const INIT_SPACE: usize = <Self as Space>::INIT_SPACE;
+}
+
+impl ActionEvent for RemoveWithdrawalEvent {}
 
 impl RemoveWithdrawalEvent {
     pub(crate) fn new(

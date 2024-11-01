@@ -1075,23 +1075,19 @@ pub mod gmsol_store {
     }
 
     // Exchange.
-    pub fn prepare_deposit_escrow(
-        ctx: Context<PrepareDepositEscrow>,
-        nonce: [u8; 32],
-    ) -> Result<()> {
-        instructions::prepare_deposit_escrow(ctx, nonce)
-    }
-
     pub fn create_deposit<'info>(
-        ctx: Context<'_, '_, 'info, 'info, CreateDeposit<'info>>,
+        mut ctx: Context<'_, '_, 'info, 'info, CreateDeposit<'info>>,
         nonce: [u8; 32],
         params: CreateDepositParams,
     ) -> Result<()> {
-        instructions::create_deposit(ctx, nonce, &params)
+        internal::Create::create(&mut ctx, &nonce, &params)
     }
 
-    pub fn close_deposit(ctx: Context<CloseDeposit>, reason: String) -> Result<()> {
-        instructions::close_deposit(ctx, &reason)
+    pub fn close_deposit<'info>(
+        ctx: Context<'_, '_, 'info, 'info, CloseDeposit<'info>>,
+        reason: String,
+    ) -> Result<()> {
+        internal::Close::close(&ctx, &reason)
     }
 
     #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
@@ -1103,23 +1099,19 @@ pub mod gmsol_store {
         instructions::unchecked_execute_deposit(ctx, execution_fee, throw_on_execution_error)
     }
 
-    pub fn prepare_withdrawal_escrow(
-        ctx: Context<PrepareWithdrawalEscrow>,
-        nonce: [u8; 32],
-    ) -> Result<()> {
-        instructions::prepare_withdrawal_escrow(ctx, nonce)
-    }
-
     pub fn create_withdrawal<'info>(
-        ctx: Context<'_, '_, 'info, 'info, CreateWithdrawal<'info>>,
+        mut ctx: Context<'_, '_, 'info, 'info, CreateWithdrawal<'info>>,
         nonce: [u8; 32],
         params: CreateWithdrawalParams,
     ) -> Result<()> {
-        instructions::create_withdrawal(ctx, nonce, &params)
+        internal::Create::create(&mut ctx, &nonce, &params)
     }
 
-    pub fn close_withdrawal(ctx: Context<CloseWithdrawal>, reason: String) -> Result<()> {
-        instructions::close_withdrawal(ctx, &reason)
+    pub fn close_withdrawal<'info>(
+        ctx: Context<'_, '_, 'info, 'info, CloseWithdrawal<'info>>,
+        reason: String,
+    ) -> Result<()> {
+        internal::Close::close(&ctx, &reason)
     }
 
     #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
@@ -1269,16 +1261,12 @@ pub mod gmsol_store {
         )
     }
 
-    pub fn prepare_shift_escrow(ctx: Context<PrepareShiftEscorw>, nonce: [u8; 32]) -> Result<()> {
-        instructions::prepare_shift_escrow(ctx, nonce)
-    }
-
     pub fn create_shift<'info>(
-        ctx: Context<'_, '_, 'info, 'info, CreateShift<'info>>,
+        mut ctx: Context<'_, '_, 'info, 'info, CreateShift<'info>>,
         nonce: [u8; 32],
         params: CreateShiftParams,
     ) -> Result<()> {
-        instructions::create_shift(ctx, &nonce, &params)
+        internal::Create::create(&mut ctx, &nonce, &params)
     }
 
     /// Execute Shift.
@@ -1291,8 +1279,11 @@ pub mod gmsol_store {
         instructions::unchecked_execute_shift(ctx, execution_lamports, throw_on_execution_error)
     }
 
-    pub fn close_shift(ctx: Context<CloseShift>, reason: String) -> Result<()> {
-        instructions::close_shift(ctx, &reason)
+    pub fn close_shift<'info>(
+        ctx: Context<'_, '_, 'info, 'info, CloseShift<'info>>,
+        reason: String,
+    ) -> Result<()> {
+        internal::Close::close(&ctx, &reason)
     }
 
     /// Initialize GT Mint.

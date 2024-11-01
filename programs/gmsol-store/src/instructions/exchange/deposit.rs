@@ -6,79 +6,11 @@ use anchor_spl::{
 use gmsol_utils::InitSpace;
 
 use crate::{
-    events::RemoveDepositEvent,
-    ops::{
-        deposit::{CreateDepositOperation, CreateDepositParams},
-        execution_fee::TransferExecutionFeeOperation,
-    },
+    ops::deposit::{CreateDepositOperation, CreateDepositParams},
     states::{common::action::ActionExt, Deposit, Market, NonceBytes, RoleKey, Seed, Store},
-    utils::{
-        internal::{self, Authentication},
-        token::is_associated_token_account,
-    },
+    utils::{internal, token::is_associated_token_account},
     CoreError,
 };
-
-/// The accounts definition for the `prepare_deposit_escrow` instruction.
-#[derive(Accounts)]
-#[instruction(nonce: [u8; 32])]
-pub struct PrepareDepositEscrow<'info> {
-    /// The owner of the deposit.
-    #[account(mut)]
-    pub owner: Signer<'info>,
-    /// Store.
-    pub store: AccountLoader<'info, Store>,
-    /// The deposit owning these escrow accounts.
-    /// CHECK: The deposit don't have to be initialized.
-    #[account(
-        seeds = [Deposit::SEED, store.key().as_ref(), owner.key().as_ref(), &nonce],
-        bump,
-    )]
-    pub deposit: UncheckedAccount<'info>,
-    /// Market token.
-    pub market_token: Box<Account<'info, Mint>>,
-    /// Initial long token.
-    pub initial_long_token: Option<Box<Account<'info, Mint>>>,
-    /// initial short token.
-    pub initial_short_token: Option<Box<Account<'info, Mint>>>,
-    /// The escrow account for receving market tokens.
-    #[account(
-        init_if_needed,
-        payer = owner,
-        associated_token::mint = market_token,
-        associated_token::authority = deposit,
-    )]
-    pub market_token_escrow: Box<Account<'info, TokenAccount>>,
-    /// The escrow account for receiving initial long token for deposit.
-    #[account(
-        init_if_needed,
-        payer = owner,
-        associated_token::mint = initial_long_token,
-        associated_token::authority = deposit,
-    )]
-    pub initial_long_token_escrow: Option<Box<Account<'info, TokenAccount>>>,
-    /// The escrow account for receiving initial short token for deposit.
-    #[account(
-        init_if_needed,
-        payer = owner,
-        associated_token::mint = initial_short_token,
-        associated_token::authority = deposit,
-    )]
-    pub initial_short_token_escrow: Option<Box<Account<'info, TokenAccount>>>,
-    /// The system program.
-    pub system_program: Program<'info, System>,
-    /// The token program.
-    pub token_program: Program<'info, Token>,
-    /// The associated token program.
-    pub associated_token_program: Program<'info, AssociatedToken>,
-}
-
-pub(crate) fn prepare_deposit_escrow(
-    _ctx: Context<PrepareDepositEscrow>,
-    _nonce: NonceBytes,
-) -> Result<()> {
-    Ok(())
-}
 
 /// The accounts definition for the `create_deposit` instruction.
 #[derive(Accounts)]
@@ -151,29 +83,45 @@ pub struct CreateDeposit<'info> {
     pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
-pub(crate) fn create_deposit<'info>(
-    ctx: Context<'_, '_, 'info, 'info, CreateDeposit<'info>>,
-    nonce: NonceBytes,
-    params: &CreateDepositParams,
-) -> Result<()> {
-    let accounts = ctx.accounts;
-    accounts.transfer_execution_fee(params)?;
-    accounts.transfer_tokens(params)?;
-    CreateDepositOperation::builder()
-        .deposit(accounts.deposit.clone())
-        .market(accounts.market.clone())
-        .store(accounts.store.clone())
-        .owner(&accounts.owner)
-        .nonce(&nonce)
-        .bump(ctx.bumps.deposit)
-        .initial_long_token(accounts.initial_long_token_escrow.as_deref())
-        .initial_short_token(accounts.initial_short_token_escrow.as_deref())
-        .market_token(&accounts.market_token_escrow)
-        .params(params)
-        .swap_paths(ctx.remaining_accounts)
-        .build()
-        .execute()?;
-    Ok(())
+impl<'info> internal::Create<'info, Deposit> for CreateDeposit<'info> {
+    type CreateParams = CreateDepositParams;
+
+    fn action(&self) -> AccountInfo<'info> {
+        self.deposit.to_account_info()
+    }
+
+    fn payer(&self) -> AccountInfo<'info> {
+        self.owner.to_account_info()
+    }
+
+    fn system_program(&self) -> AccountInfo<'info> {
+        self.system_program.to_account_info()
+    }
+
+    fn create_impl(
+        &mut self,
+        params: &Self::CreateParams,
+        nonce: &NonceBytes,
+        bumps: &Self::Bumps,
+        remaining_accounts: &'info [AccountInfo<'info>],
+    ) -> Result<()> {
+        self.transfer_tokens(params)?;
+        CreateDepositOperation::builder()
+            .deposit(self.deposit.clone())
+            .market(self.market.clone())
+            .store(self.store.clone())
+            .owner(&self.owner)
+            .nonce(nonce)
+            .bump(bumps.deposit)
+            .initial_long_token(self.initial_long_token_escrow.as_deref())
+            .initial_short_token(self.initial_short_token_escrow.as_deref())
+            .market_token(&self.market_token_escrow)
+            .params(params)
+            .swap_paths(remaining_accounts)
+            .build()
+            .execute()?;
+        Ok(())
+    }
 }
 
 impl<'info> CreateDeposit<'info> {
@@ -242,16 +190,6 @@ impl<'info> CreateDeposit<'info> {
             escrow.reload()?;
         }
         Ok(())
-    }
-
-    fn transfer_execution_fee(&self, params: &CreateDepositParams) -> Result<()> {
-        TransferExecutionFeeOperation::builder()
-            .payment(self.deposit.to_account_info())
-            .payer(self.owner.to_account_info())
-            .execution_lamports(params.execution_fee)
-            .system_program(self.system_program.to_account_info())
-            .build()
-            .execute()
     }
 }
 
@@ -344,30 +282,6 @@ pub struct CloseDeposit<'info> {
     pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
-pub(crate) fn close_deposit(ctx: Context<CloseDeposit>, reason: &str) -> Result<()> {
-    let accounts = &ctx.accounts;
-    let should_continue_when_atas_are_missing = accounts.preprocess()?;
-    if accounts.transfer_to_atas(should_continue_when_atas_are_missing)? {
-        {
-            let deposit_address = accounts.deposit.key();
-            let deposit = accounts.deposit.load()?;
-            emit_cpi!(RemoveDepositEvent::new(
-                deposit.header.id,
-                deposit.header.store,
-                deposit_address,
-                deposit.tokens.market_token(),
-                deposit.header.owner,
-                deposit.header.action_state()?,
-                reason,
-            )?);
-        }
-        accounts.close()?;
-    } else {
-        msg!("Some ATAs are not initilaized, skip the close");
-    }
-    Ok(())
-}
-
 impl<'info> internal::Authentication<'info> for CloseDeposit<'info> {
     fn authority(&self) -> &Signer<'info> {
         &self.executor
@@ -378,27 +292,16 @@ impl<'info> internal::Authentication<'info> for CloseDeposit<'info> {
     }
 }
 
-type ShouldContinueWhenATAsAreMissing = bool;
-type Success = bool;
-
-impl<'info> CloseDeposit<'info> {
-    fn preprocess(&self) -> Result<ShouldContinueWhenATAsAreMissing> {
-        if self.executor.key == self.owner.key {
-            Ok(true)
-        } else {
-            self.only_role(RoleKey::ORDER_KEEPER)?;
-            {
-                let deposit = self.deposit.load()?;
-                if deposit.header.action_state()?.is_completed_or_cancelled() {
-                    Ok(false)
-                } else {
-                    err!(CoreError::PermissionDenied)
-                }
-            }
-        }
+impl<'info> internal::Close<'info, Deposit> for CloseDeposit<'info> {
+    fn expected_keeper_role(&self) -> &str {
+        RoleKey::ORDER_KEEPER
     }
 
-    fn transfer_to_atas(&self, init_if_needed: bool) -> Result<Success> {
+    fn fund_receiver(&self) -> AccountInfo<'info> {
+        self.owner.to_account_info()
+    }
+
+    fn transfer_to_atas(&self, init_if_needed: bool) -> Result<internal::TransferSuccess> {
         use crate::utils::token::TransferAllFromEscrowToATA;
 
         // Prepare signer seeds.
@@ -486,8 +389,14 @@ impl<'info> CloseDeposit<'info> {
         Ok(true)
     }
 
-    fn close(&self) -> Result<()> {
-        self.deposit.close(self.owner.to_account_info())?;
-        Ok(())
+    fn event_authority(&self, bumps: &Self::Bumps) -> (AccountInfo<'info>, u8) {
+        (
+            self.event_authority.to_account_info(),
+            bumps.event_authority,
+        )
+    }
+
+    fn action(&self) -> &AccountLoader<'info, Deposit> {
+        &self.deposit
     }
 }

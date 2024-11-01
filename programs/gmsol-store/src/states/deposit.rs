@@ -1,11 +1,11 @@
 use anchor_lang::prelude::*;
 use gmsol_utils::InitSpace;
 
-use crate::{states::MarketConfigKey, CoreError};
+use crate::{events::RemoveDepositEvent, states::MarketConfigKey, CoreError};
 
 use super::{
     common::{
-        action::{Action, ActionHeader},
+        action::{Action, ActionHeader, Closable},
         swap::SwapParams,
         token::TokenAndAccount,
     },
@@ -35,6 +35,22 @@ pub fn find_first_deposit_owner_pda(store_program_id: &Pubkey) -> (Pubkey, u8) {
 
 impl InitSpace for Deposit {
     const INIT_SPACE: usize = core::mem::size_of::<Self>();
+}
+
+impl Closable for Deposit {
+    type ClosedEvent = RemoveDepositEvent;
+
+    fn to_closed_event(&self, address: &Pubkey, reason: &str) -> Result<Self::ClosedEvent> {
+        RemoveDepositEvent::new(
+            self.header.id,
+            self.header.store,
+            *address,
+            self.tokens.market_token(),
+            self.header.owner,
+            self.header.action_state()?,
+            reason,
+        )
+    }
 }
 
 impl Deposit {

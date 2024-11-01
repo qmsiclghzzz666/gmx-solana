@@ -101,6 +101,8 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateShiftBuilder<'a, C> {
 
     /// Build a [`RpcBuilder`] to create shift account and return the address of the shift account to create.
     pub fn build_with_address(&self) -> crate::Result<(RpcBuilder<'a, C>, Pubkey)> {
+        let token_program_id = anchor_spl::token::ID;
+
         let owner = self.client.payer();
         let nonce = self.nonce.unwrap_or_else(generate_nonce);
         let shift = self.client.find_shift_address(&self.store, &owner, &nonce);
@@ -119,24 +121,20 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateShiftBuilder<'a, C> {
 
         let prepare_escrow = self
             .client
-            .store_rpc()
-            .accounts(accounts::PrepareShiftEscorw {
-                owner,
-                store: self.store,
-                shift,
-                from_market_token: self.from_market_token,
-                to_market_token: self.to_market_token,
-                from_market_token_escrow,
-                to_market_token_escrow,
-                system_program: system_program::ID,
-                token_program: anchor_spl::token::ID,
-                associated_token_program: anchor_spl::associated_token::ID,
-            })
-            .args(instruction::PrepareShiftEscrow { nonce });
+            .prepare_associated_token_account(
+                &self.from_market_token,
+                &token_program_id,
+                Some(&shift),
+            )
+            .merge(self.client.prepare_associated_token_account(
+                &self.to_market_token,
+                &token_program_id,
+                Some(&shift),
+            ));
 
         let prepare_ata = self.client.prepare_associated_token_account(
             &self.to_market_token,
-            &anchor_spl::token::ID,
+            &token_program_id,
             None,
         );
 
@@ -156,7 +154,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateShiftBuilder<'a, C> {
                 from_market_token_source: self.get_from_market_token_source(),
                 to_market_token_ata,
                 system_program: system_program::ID,
-                token_program: anchor_spl::token::ID,
+                token_program: token_program_id,
                 associated_token_program: anchor_spl::associated_token::ID,
             })
             .args(instruction::CreateShift {

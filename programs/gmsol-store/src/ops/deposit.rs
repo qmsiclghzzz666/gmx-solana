@@ -5,7 +5,7 @@ use typed_builder::TypedBuilder;
 use crate::{
     ops::market::RevertibleLiquidityMarketOperation,
     states::{
-        common::action::{Action, ActionExt},
+        common::action::{Action, ActionExt, ActionParams},
         market::revertible::Revertible,
         Deposit, Market, NonceBytes, Oracle, Store, ValidateOracleTime,
     },
@@ -16,7 +16,7 @@ use crate::{
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct CreateDepositParams {
     /// Execution fee in lamports
-    pub execution_fee: u64,
+    pub execution_lamports: u64,
     /// The length of the swap path for long token.
     pub long_token_swap_length: u8,
     /// The length of the swap path for short token.
@@ -27,6 +27,12 @@ pub struct CreateDepositParams {
     pub initial_short_token_amount: u64,
     /// The minimum acceptable amount of market tokens to receive.
     pub min_market_token_amount: u64,
+}
+
+impl ActionParams for CreateDepositParams {
+    fn execution_lamports(&self) -> u64 {
+        self.execution_lamports
+    }
 }
 
 /// Operation for creating a deposit.
@@ -78,7 +84,7 @@ impl<'a, 'info> CreateDepositOperation<'a, 'info> {
             owner.key(),
             *nonce,
             bump,
-            params.execution_fee,
+            params.execution_lamports,
         )?;
 
         let (long_token, short_token) = {
@@ -163,7 +169,7 @@ impl<'a, 'info> CreateDepositOperation<'a, 'info> {
             require_gte!(amount, total_amount, CoreError::NotEnoughTokenAmount);
         }
 
-        ActionExt::validate_balance(&self.deposit, self.params.execution_fee)?;
+        ActionExt::validate_balance(&self.deposit, self.params.execution_lamports)?;
 
         Ok(())
     }

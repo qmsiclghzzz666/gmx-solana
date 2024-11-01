@@ -16,7 +16,10 @@ use gmsol_store::{
 
 use crate::{
     exchange::ExchangeOps,
-    store::utils::{read_market, FeedsParser},
+    store::{
+        token::TokenAccountOps,
+        utils::{read_market, FeedsParser},
+    },
     utils::{ComputeBudget, RpcBuilder},
 };
 
@@ -180,6 +183,7 @@ where
 
     /// Build a [`RpcBuilder`] and return deposit address.
     pub async fn build_with_address(&self) -> crate::Result<(RpcBuilder<'a, C>, Pubkey)> {
+        let token_program_id = anchor_spl::token::ID;
         let Self {
             client,
             store,
@@ -197,12 +201,15 @@ where
         let payer = client.payer();
         let deposit = client.find_deposit_address(store, &payer, &nonce);
         let market = client.find_market_address(store, market_token);
+
         let (long_token, short_token) = self.get_or_fetch_initial_tokens(&market).await?;
+
         let initial_long_token_account =
             self.get_or_find_associated_initial_long_token_account(long_token.as_ref());
         let initial_short_token_account =
             self.get_or_find_associated_initial_short_token_account(short_token.as_ref());
         let market_token_ata = get_associated_token_address(&payer, market_token);
+
         let market_token_escrow = get_associated_token_address(&deposit, market_token);
         let initial_long_token_escrow = long_token
             .as_ref()
@@ -210,27 +217,21 @@ where
         let initial_short_token_escrow = short_token
             .as_ref()
             .map(|mint| get_associated_token_address(&deposit, mint));
-        let prepare = client
-            .store_rpc()
-            .accounts(crate::utils::fix_optional_account_metas(
-                accounts::PrepareDepositEscrow {
-                    owner: payer,
-                    store: *store,
-                    deposit,
-                    market_token: *market_token,
-                    initial_long_token: long_token,
-                    initial_short_token: short_token,
-                    market_token_escrow,
-                    initial_long_token_escrow,
-                    initial_short_token_escrow,
-                    system_program: system_program::ID,
-                    token_program: anchor_spl::token::ID,
-                    associated_token_program: anchor_spl::associated_token::ID,
-                },
-                &gmsol_store::id(),
-                &client.store_program_id(),
-            ))
-            .args(instruction::PrepareDepositEscrow { nonce });
+
+        let mut prepare = client.prepare_associated_token_account(
+            market_token,
+            &token_program_id,
+            Some(&deposit),
+        );
+
+        for token in long_token.iter().chain(short_token.iter()) {
+            prepare = prepare.merge(client.prepare_associated_token_account(
+                token,
+                &token_program_id,
+                Some(&deposit),
+            ));
+        }
+
         let create = client
             .store_rpc()
             .accounts(crate::utils::fix_optional_account_metas(
@@ -249,7 +250,7 @@ where
                     initial_long_token_source: initial_long_token_account,
                     initial_short_token_source: initial_short_token_account,
                     system_program: system_program::ID,
-                    token_program: anchor_spl::token::ID,
+                    token_program: token_program_id,
                     associated_token_program: anchor_spl::associated_token::ID,
                 },
                 &gmsol_store::id(),
@@ -258,7 +259,7 @@ where
             .args(instruction::CreateDeposit {
                 nonce,
                 params: CreateDepositParams {
-                    execution_fee: *execution_fee,
+                    execution_lamports: *execution_fee,
                     long_token_swap_length: long_token_swap_path
                         .len()
                         .try_into()

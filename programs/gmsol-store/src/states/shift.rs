@@ -1,10 +1,10 @@
 use anchor_lang::prelude::*;
 
-use crate::{states::Deposit, CoreError};
+use crate::{events::RemoveShiftEvent, states::Deposit, CoreError};
 
 use super::{
     common::{
-        action::{Action, ActionHeader},
+        action::{Action, ActionHeader, Closable},
         token::TokenAndAccount,
     },
     Market, Seed,
@@ -31,6 +31,22 @@ impl Action for Shift {
 
     fn header(&self) -> &ActionHeader {
         &self.header
+    }
+}
+
+impl Closable for Shift {
+    type ClosedEvent = RemoveShiftEvent;
+
+    fn to_closed_event(&self, address: &Pubkey, reason: &str) -> Result<Self::ClosedEvent> {
+        RemoveShiftEvent::new(
+            self.header.id,
+            self.header.store,
+            *address,
+            self.tokens().from_market_token(),
+            self.header.owner,
+            self.header.action_state()?,
+            reason,
+        )
     }
 }
 

@@ -16,7 +16,10 @@ use gmsol_store::{
 };
 
 use crate::{
-    store::utils::{read_market, FeedsParser},
+    store::{
+        token::TokenAccountOps,
+        utils::{read_market, FeedsParser},
+    },
     utils::{ComputeBudget, RpcBuilder, ZeroCopy},
 };
 
@@ -169,6 +172,8 @@ where
 
     /// Create the [`RpcBuilder`] and return withdrawal address.
     pub async fn build_with_address(&self) -> crate::Result<(RpcBuilder<'a, C>, Pubkey)> {
+        let token_program_id = anchor_spl::token::ID;
+
         let owner = self.client.payer();
         let nonce = self.nonce.unwrap_or_else(generate_nonce);
         let withdrawal = self
@@ -185,22 +190,17 @@ where
         let final_short_token_ata = get_associated_token_address(&owner, &short_token);
         let prepare_escrows = self
             .client
-            .store_rpc()
-            .accounts(accounts::PrepareWithdrawalEscrow {
-                owner,
-                store: self.store,
-                withdrawal,
-                market_token: self.market_token,
-                final_long_token: long_token,
-                final_short_token: short_token,
-                market_token_escrow,
-                final_long_token_escrow,
-                final_short_token_escrow,
-                system_program: system_program::ID,
-                token_program: anchor_spl::token::ID,
-                associated_token_program: anchor_spl::associated_token::ID,
-            })
-            .args(instruction::PrepareWithdrawalEscrow { nonce });
+            .prepare_associated_token_account(&long_token, &token_program_id, Some(&withdrawal))
+            .merge(self.client.prepare_associated_token_account(
+                &short_token,
+                &token_program_id,
+                Some(&withdrawal),
+            ))
+            .merge(self.client.prepare_associated_token_account(
+                &self.market_token,
+                &token_program_id,
+                Some(&withdrawal),
+            ));
         let prepare_final_long_token_ata = self
             .client
             .store_rpc()
@@ -252,7 +252,7 @@ where
                 nonce,
                 params: CreateWithdrawalParams {
                     market_token_amount: self.amount,
-                    execution_fee: self.execution_fee,
+                    execution_lamports: self.execution_fee,
                     min_long_token_amount: self.min_long_token_amount,
                     min_short_token_amount: self.min_short_token_amount,
                     long_token_swap_path_length: self
