@@ -858,7 +858,8 @@ pub enum GtExchangeFlag {
 #[account(zero_copy)]
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub struct GtExchange {
-    bump: u8,
+    /// Bump.
+    pub bump: u8,
     flags: GtExchangeFlagsValue,
     padding: [u8; 6],
     amount: u64,
@@ -866,7 +867,8 @@ pub struct GtExchange {
     pub owner: Pubkey,
     /// Store address.
     pub store: Pubkey,
-    vault: Pubkey,
+    /// Vault address.
+    pub vault: Pubkey,
     reserved: [u8; 64],
 }
 
@@ -926,7 +928,8 @@ impl GtExchange {
         Ok(())
     }
 
-    pub(crate) fn owner(&self) -> &Pubkey {
+    /// Get the owner address.
+    pub fn owner(&self) -> &Pubkey {
         &self.owner
     }
 

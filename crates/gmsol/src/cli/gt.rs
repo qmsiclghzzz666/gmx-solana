@@ -60,6 +60,13 @@ enum Command {
             requires = "confirm"
         )]
         request: Option<String>,
+        #[arg(
+            long,
+            value_name = "ADDRESS",
+            group = "exchange-input",
+            requires = "confirm"
+        )]
+        close: Option<Pubkey>,
         #[arg(long, group = "exchange-input")]
         owner: Option<Pubkey>,
         /// Confirm the operation.
@@ -245,20 +252,17 @@ impl Args {
             }
             Command::Exchange {
                 request: amount,
+                close,
                 owner,
-                confirm,
+                confirm: _,
                 prepare_vault,
             } => {
                 let store_account = client.store(store).await?;
                 let time_window = store_account.gt().exchange_time_window();
                 let decimals = store_account.gt().decimals();
 
-                match amount {
-                    Some(amount) => {
-                        if !*confirm {
-                            tracing::error!("must provide `--confirm` to confirm this operation");
-                            return Err(gmsol::Error::invalid_argument("not confirmed"));
-                        }
+                match (amount, close) {
+                    (Some(amount), None) => {
                         let amount = parse_amount(amount, decimals)?;
                         let request = client.request_gt_exchange_with_time_window(
                             store,
@@ -278,7 +282,17 @@ impl Args {
                         })
                         .await?;
                     }
-                    None => {
+                    (None, Some(exchange)) => {
+                        let rpc = client
+                            .close_gt_exchange(store, exchange, None, None)
+                            .await?;
+                        send_or_serialize_rpc(rpc, serialize_only, skip_preflight, |signature| {
+                            println!("{signature}");
+                            Ok(())
+                        })
+                        .await?;
+                    }
+                    (None, None) => {
                         let owner = owner.unwrap_or(client.payer());
                         let exchanges = client.gt_exchanges(store, &owner).await?;
 
@@ -293,6 +307,9 @@ impl Args {
                         }
 
                         println!("{table}");
+                    }
+                    _ => {
+                        unreachable!()
                     }
                 }
             }

@@ -1,11 +1,14 @@
-use std::ops::Deref;
+use std::{future::Future, ops::Deref};
 
 use crate::utils::RpcBuilder;
 use anchor_client::{
     anchor_lang::system_program,
     solana_sdk::{pubkey::Pubkey, signer::Signer},
 };
-use gmsol_store::{accounts, instruction, states::gt::get_time_window_index};
+use gmsol_store::{
+    accounts, instruction,
+    states::gt::{get_time_window_index, GtExchange},
+};
 
 /// GT Operations.
 pub trait GtOps<C> {
@@ -84,6 +87,15 @@ pub trait GtOps<C> {
             amount,
         ))
     }
+
+    /// Close a confirmed GT exchange.
+    fn close_gt_exchange(
+        &self,
+        store: &Pubkey,
+        exchange: &Pubkey,
+        hint_owner: Option<&Pubkey>,
+        hint_vault: Option<&Pubkey>,
+    ) -> impl Future<Output = crate::Result<RpcBuilder<C>>>;
 
     /// Request GT vesting.
     fn request_gt_vesting(&self, store: &Pubkey, amount: u64) -> RpcBuilder<C>;
@@ -221,6 +233,36 @@ impl<C: Deref<Target = impl Signer> + Clone> GtOps<C> for crate::Client<C> {
                 system_program: system_program::ID,
             })
             .args(instruction::RequestGtExchange { amount })
+    }
+
+    async fn close_gt_exchange(
+        &self,
+        store: &Pubkey,
+        exchange: &Pubkey,
+        hint_owner: Option<&Pubkey>,
+        hint_vault: Option<&Pubkey>,
+    ) -> crate::Result<RpcBuilder<C>> {
+        let (owner, vault) = match (hint_owner, hint_vault) {
+            (Some(owner), Some(vault)) => (*owner, *vault),
+            _ => {
+                let exchange = self
+                    .account::<GtExchange>(exchange)
+                    .await?
+                    .ok_or(crate::Error::NotFound)?;
+                (*exchange.owner(), *exchange.vault())
+            }
+        };
+
+        Ok(self
+            .store_rpc()
+            .accounts(accounts::CloseGtExchange {
+                authority: self.payer(),
+                store: *store,
+                owner,
+                vault,
+                exchange: *exchange,
+            })
+            .args(instruction::CloseGtExchange {}))
     }
 
     fn request_gt_vesting(&self, store: &Pubkey, amount: u64) -> RpcBuilder<C> {

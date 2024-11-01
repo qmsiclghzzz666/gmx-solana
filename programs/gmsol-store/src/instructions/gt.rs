@@ -356,6 +356,60 @@ impl<'info> internal::Authentication<'info> for ConfirmGtExchangeVault<'info> {
     }
 }
 
+/// The accounts definition for [`close_gt_exchange`] instruction.
+#[derive(Accounts)]
+pub struct CloseGtExchange<'info> {
+    authority: Signer<'info>,
+    store: AccountLoader<'info, Store>,
+    /// CHECK: only used to receive the funds.
+    #[account(mut)]
+    owner: UncheckedAccount<'info>,
+    #[account(
+        mut,
+        constraint = vault.load()?.is_initialized() @ CoreError::InvalidArgument,
+        constraint = vault.load()?.is_confirmed() @ CoreError::PreconditionsAreNotMet,
+        has_one = store,
+        seeds = [GtExchangeVault::SEED, store.key().as_ref(), &vault.load()?.time_window_index().to_be_bytes()],
+        bump = vault.load()?.bump,
+    )]
+    vault: AccountLoader<'info, GtExchangeVault>,
+    #[account(
+        mut,
+        close = owner,
+        constraint = exchange.load()?.is_initialized() @ CoreError::InvalidArgument,
+        has_one = store,
+        has_one = owner,
+        has_one = vault,
+        seeds = [GtExchange::SEED, vault.key().as_ref(), owner.key().as_ref()],
+        bump = exchange.load()?.bump,
+    )]
+    exchange: AccountLoader<'info, GtExchange>,
+}
+
+/// CHECK: only GT_CONTROLLER is allowed to use this instruction.
+pub(crate) fn unchecked_close_gt_exchange(ctx: Context<CloseGtExchange>) -> Result<()> {
+    let vault = ctx.accounts.vault.load()?;
+    let exchange = ctx.accounts.exchange.load()?;
+    msg!(
+        "[GT] Closing confirmed exchange: vault_index = {}, vault = {}, owner = {}, amount = {}",
+        vault.time_window_index(),
+        exchange.vault(),
+        exchange.owner(),
+        exchange.amount()
+    );
+    Ok(())
+}
+
+impl<'info> internal::Authentication<'info> for CloseGtExchange<'info> {
+    fn authority(&self) -> &Signer<'info> {
+        &self.authority
+    }
+
+    fn store(&self) -> &AccountLoader<'info, Store> {
+        &self.store
+    }
+}
+
 /// The accounts definition for [`claim_es_gt`].
 #[derive(Accounts)]
 pub struct ClaimEsGt<'info> {

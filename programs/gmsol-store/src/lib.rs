@@ -1372,6 +1372,12 @@ pub mod gmsol_store {
         instructions::request_gt_exchange(ctx, amount)
     }
 
+    /// Close a confirmed GT exchange.
+    #[access_control(internal::Authenticate::only_gt_controller(&ctx))]
+    pub fn close_gt_exchange(ctx: Context<CloseGtExchange>) -> Result<()> {
+        instructions::unchecked_close_gt_exchange(ctx)
+    }
+
     /// Claim esGT.
     pub fn claim_es_gt(ctx: Context<ClaimEsGt>) -> Result<()> {
         instructions::claim_es_gt(ctx)
