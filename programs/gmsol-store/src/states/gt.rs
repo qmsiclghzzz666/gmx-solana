@@ -208,7 +208,7 @@ impl GtState {
                     &minting_cost,
                     &self.minting_cost_grow_factor,
                 )
-                .ok_or(error!(CoreError::Internal))?;
+                .ok_or_else(|| error!(CoreError::Internal))?;
             }
             Ok(Some((new_steps, minting_cost)))
         } else {
@@ -239,10 +239,10 @@ impl GtState {
 
         let diff_factor = current_factor
             .checked_sub(user_factor)
-            .ok_or(error!(CoreError::ValueOverflow))?;
+            .ok_or_else(|| error!(CoreError::ValueOverflow))?;
 
         let amount = apply_factor::<_, { constants::MARKET_DECIMALS }>(&gt_amount, &diff_factor)
-            .ok_or(error!(CoreError::ValueOverflow))?;
+            .ok_or_else(|| error!(CoreError::ValueOverflow))?;
 
         let amount: u64 = amount.try_into()?;
 
@@ -250,12 +250,12 @@ impl GtState {
             .gt
             .es_amount
             .checked_add(amount)
-            .ok_or(error!(CoreError::TokenAmountOverflow))?;
+            .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
 
         let next_es_supply = self
             .es_supply
             .checked_add(amount)
-            .ok_or(error!(CoreError::TokenAmountOverflow))?;
+            .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
 
         /* The following steps should be infallible. */
 
@@ -290,7 +290,7 @@ impl GtState {
             let next_gt_total_minted = self
                 .total_minted
                 .checked_add(amount)
-                .ok_or(error!(CoreError::TokenAmountOverflow))?;
+                .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
             let next_minting_cost = self.next_minting_cost(next_gt_total_minted)?;
 
             // Calculate user GT state updates.
@@ -298,16 +298,16 @@ impl GtState {
                 .gt
                 .total_minted
                 .checked_add(amount)
-                .ok_or(error!(CoreError::TokenAmountOverflow))?;
+                .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
             let next_amount = user
                 .gt
                 .amount
                 .checked_add(amount)
-                .ok_or(error!(CoreError::TokenAmountOverflow))?;
+                .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
             let next_supply = self
                 .supply
                 .checked_add(amount)
-                .ok_or(error!(CoreError::TokenAmountOverflow))?;
+                .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
 
             self.unchecked_sync_es_factor(user)?;
 
@@ -346,7 +346,7 @@ impl GtState {
             &vesting_es_amount,
             &self.reserve_factor,
         )
-        .ok_or(error!(CoreError::ValueOverflow))?;
+        .ok_or_else(|| error!(CoreError::ValueOverflow))?;
 
         require_gte!(gt_amount, reserve_gt_amount, CoreError::InvalidArgument);
 
@@ -367,14 +367,14 @@ impl GtState {
                 .gt
                 .amount
                 .checked_sub(amount)
-                .ok_or(error!(CoreError::Internal))?;
+                .ok_or_else(|| error!(CoreError::Internal))?;
 
             self.validate_gt_reserve(user, Some(next_amount), None)?;
 
             let next_supply = self
                 .supply
                 .checked_sub(amount)
-                .ok_or(error!(CoreError::Internal))?;
+                .ok_or_else(|| error!(CoreError::Internal))?;
 
             self.unchecked_sync_es_factor(user)?;
 
@@ -411,7 +411,7 @@ impl GtState {
                 &self.minting_cost,
                 &discounted_factor,
             )
-            .ok_or(error!(CoreError::InvalidGTDiscount))?
+            .ok_or_else(|| error!(CoreError::InvalidGTDiscount))?
         };
 
         require!(minting_cost != 0, CoreError::InvalidGTConfig);
@@ -499,34 +499,34 @@ impl GtState {
         let mut amount = u128::from(amount);
         let amount_for_vault =
             apply_factor::<_, { constants::MARKET_DECIMALS }>(&amount, &self.es_receiver_factor())
-                .ok_or(error!(CoreError::ValueOverflow))?;
+                .ok_or_else(|| error!(CoreError::ValueOverflow))?;
         require_gte!(amount, amount_for_vault, CoreError::Internal);
         amount = amount
             .checked_sub(amount_for_vault)
-            .ok_or(error!(CoreError::Internal))?;
+            .ok_or_else(|| error!(CoreError::Internal))?;
 
         let amount_for_vault: u64 = amount_for_vault.try_into()?;
 
         let next_es_vault = self
             .es_vault
             .checked_add(amount_for_vault)
-            .ok_or(error!(CoreError::TokenAmountOverflow))?;
+            .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
 
         let next_es_supply = self
             .es_supply
             .checked_add(amount_for_vault)
-            .ok_or(error!(CoreError::TokenAmountOverflow))?;
+            .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
 
         debug_assert_ne!(self.supply, 0);
         let supply = u128::from(self.supply);
 
         let delta = div_to_factor::<_, { constants::MARKET_DECIMALS }>(&amount, &supply, false)
-            .ok_or(error!(CoreError::ValueOverflow))?;
+            .ok_or_else(|| error!(CoreError::ValueOverflow))?;
 
         let next_es_factor = self
             .es_factor
             .checked_add(delta)
-            .ok_or(error!(CoreError::ValueOverflow))?;
+            .ok_or_else(|| error!(CoreError::ValueOverflow))?;
 
         self.es_vault = next_es_vault;
         self.es_factor = next_es_factor;
@@ -562,12 +562,12 @@ impl GtState {
             .gt
             .es_amount
             .checked_sub(amount)
-            .ok_or(error!(CoreError::NotEnoughTokenAmount))?;
+            .ok_or_else(|| error!(CoreError::NotEnoughTokenAmount))?;
         let next_vesting_es_amount = user
             .gt
             .vesting_es_amount
             .checked_add(amount)
-            .ok_or(error!(CoreError::TokenAmountOverflow))?;
+            .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
 
         self.validate_gt_reserve(user, None, Some(next_vesting_es_amount))?;
 
@@ -605,22 +605,22 @@ impl GtState {
             .gt
             .vesting_es_amount
             .checked_sub(amount)
-            .ok_or(error!(CoreError::TokenAmountOverflow))?;
+            .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
         let next_es_supply = self
             .es_supply
             .checked_sub(amount)
-            .ok_or(error!(CoreError::NotEnoughTokenAmount))?;
+            .ok_or_else(|| error!(CoreError::NotEnoughTokenAmount))?;
 
         // The process of esGT -> GT does not affect the mint cost and the total minted.
         let next_amount = user
             .gt
             .amount
             .checked_add(amount)
-            .ok_or(error!(CoreError::TokenAmountOverflow))?;
+            .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
         let next_supply = self
             .supply
             .checked_add(amount)
-            .ok_or(error!(CoreError::TokenAmountOverflow))?;
+            .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
 
         user.gt.vesting_es_amount = next_vesting_es_amount;
         user.gt.amount = next_amount;
@@ -644,7 +644,7 @@ impl GtState {
     pub(crate) fn validate_receiver(&self, address: &Pubkey) -> Result<()> {
         let receiver = self
             .receiver()
-            .ok_or(error!(CoreError::PreconditionsAreNotMet))?;
+            .ok_or_else(|| error!(CoreError::PreconditionsAreNotMet))?;
         require_eq!(receiver, *address, CoreError::PermissionDenied);
         Ok(())
     }
@@ -680,12 +680,12 @@ impl GtState {
         let next_es_vault = self
             .es_vault
             .checked_sub(amount)
-            .ok_or(error!(CoreError::NotEnoughTokenAmount))?;
+            .ok_or_else(|| error!(CoreError::NotEnoughTokenAmount))?;
         let next_vesting_es_amount = user
             .gt
             .vesting_es_amount
             .checked_add(amount)
-            .ok_or(error!(CoreError::TokenAmountOverflow))?;
+            .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
 
         vesting.add(amount)?;
 
@@ -828,7 +828,7 @@ impl GtExchangeVault {
         self.amount = self
             .amount
             .checked_add(amount)
-            .ok_or(error!(CoreError::TokenAmountOverflow))?;
+            .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
         Ok(())
     }
 }
@@ -924,7 +924,7 @@ impl GtExchange {
         self.amount = self
             .amount
             .checked_add(amount)
-            .ok_or(error!(CoreError::TokenAmountOverflow))?;
+            .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
         Ok(())
     }
 

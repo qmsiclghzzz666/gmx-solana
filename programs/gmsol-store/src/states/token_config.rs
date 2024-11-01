@@ -91,7 +91,10 @@ impl TokenConfig {
     /// Get the corresponding price feed config.
     pub fn get_feed_config(&self, kind: &PriceProviderKind) -> Result<&FeedConfig> {
         let index = *kind as usize;
-        let config = self.feeds.get(index).ok_or(error!(CoreError::NotFound))?;
+        let config = self
+            .feeds
+            .get(index)
+            .ok_or_else(|| error!(CoreError::NotFound))?;
         if config.feed == Pubkey::default() {
             err!(CoreError::NotFound)
         } else {
@@ -109,7 +112,7 @@ impl TokenConfig {
         let config = self
             .feeds
             .get_mut(index)
-            .ok_or(CoreError::InvalidProviderKindIndex)?;
+            .ok_or_else(|| error!(CoreError::InvalidProviderKindIndex))?;
         *config = new_config;
         Ok(())
     }
@@ -318,7 +321,10 @@ impl TokenConfigBuilder {
     /// Return error when the feed was not set before.
     pub fn update_price_feed(mut self, kind: &PriceProviderKind, new_feed: Pubkey) -> Result<Self> {
         let index = *kind as usize;
-        let feed = self.feeds.get_mut(index).ok_or(CoreError::NotFound)?;
+        let feed = self
+            .feeds
+            .get_mut(index)
+            .ok_or_else(|| error!(CoreError::NotFound))?;
         *feed = new_feed;
         Ok(self)
     }
@@ -389,7 +395,7 @@ impl TokenMapHeader {
             .tokens
             .len()
             .checked_add(1)
-            .ok_or(error!(CoreError::ExceedMaxLengthLimit))?
+            .ok_or_else(|| error!(CoreError::ExceedMaxLengthLimit))?
             .try_into()
             .map_err(|_| error!(CoreError::InvalidArgument))?;
         Ok(Self::space(num_configs))
@@ -553,7 +559,7 @@ impl<'a> TokenMapMutAccess for TokenMapMut<'a> {
                 .header
                 .tokens
                 .get(token)
-                .ok_or(error!(CoreError::NotFound))?
+                .ok_or_else(|| error!(CoreError::NotFound))?
         };
         let Some(dst) = crate::utils::dynamic_access::get_mut::<TokenConfig>(
             &mut self.configs,

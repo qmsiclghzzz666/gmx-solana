@@ -84,7 +84,7 @@ pub(crate) fn get_pnl_token(
 ) -> Result<Pubkey> {
     let is_long = position
         .as_ref()
-        .ok_or(error!(CoreError::PositionIsRequired))?
+        .ok_or_else(|| error!(CoreError::PositionIsRequired))?
         .load()?
         .try_is_long()?;
     if is_long {
@@ -98,7 +98,7 @@ pub(crate) fn check_delegation(account: &TokenAccount, target: Pubkey) -> Result
     let is_matched = account
         .delegate
         .map(|delegate| delegate == target)
-        .ok_or(error!(CoreError::NoDelegatedAuthorityIsSet))?;
+        .ok_or_else(|| error!(CoreError::NoDelegatedAuthorityIsSet))?;
     Ok(is_matched)
 }
 
@@ -359,7 +359,7 @@ pub(crate) fn unchecked_execute_order<'info>(
         let event_loader = accounts.event.clone();
         let event = event_loader
             .as_ref()
-            .ok_or(error!(CoreError::PositionIsRequired))?
+            .ok_or_else(|| error!(CoreError::PositionIsRequired))?
             .load()?;
         let event = TradeEvent::from(&*event);
         event.emit(&accounts.event_authority, ctx.bumps.event_authority)?;
@@ -398,7 +398,7 @@ impl<'info> ExecuteOrder<'info> {
             let vault = self
                 .initial_collateral_token_vault
                 .as_ref()
-                .ok_or(error!(CoreError::TokenAccountNotProvided))?;
+                .ok_or_else(|| error!(CoreError::TokenAccountNotProvided))?;
             let amount = self.order.load()?.params.initial_collateral_delta_amount;
             MarketTransferInOperation::builder()
                 .store(&self.store)
@@ -427,11 +427,11 @@ impl<'info> ExecuteOrder<'info> {
             let vault = self
                 .initial_collateral_token_vault
                 .as_ref()
-                .ok_or(error!(CoreError::TokenAccountNotProvided))?;
+                .ok_or_else(|| error!(CoreError::TokenAccountNotProvided))?;
             let token = self
                 .initial_collateral_token
                 .as_ref()
-                .ok_or(error!(CoreError::TokenMintNotProvided))?;
+                .ok_or_else(|| error!(CoreError::TokenMintNotProvided))?;
             let amount = self.order.load()?.params.initial_collateral_delta_amount;
             MarketTransferOutOperation::builder()
                 .store(&self.store)

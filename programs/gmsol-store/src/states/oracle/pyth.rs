@@ -83,10 +83,10 @@ pub fn pyth_price_with_confidence_to_price(
         .map_err(|_| error!(CoreError::InvalidPriceFeedPrice))?;
     let min_price = mid_price
         .checked_sub(confidence)
-        .ok_or(error!(CoreError::InvalidPriceFeedPrice))?;
+        .ok_or_else(|| error!(CoreError::InvalidPriceFeedPrice))?;
     let max_price = mid_price
         .checked_add(confidence)
-        .ok_or(CoreError::InvalidPriceFeedPrice)?;
+        .ok_or_else(|| error!(CoreError::InvalidPriceFeedPrice))?;
     Ok(Price {
         min: pyth_price_value_to_decimal(min_price, exponent, token_config)?,
         max: pyth_price_value_to_decimal(max_price, exponent, token_config)?,
@@ -109,10 +109,10 @@ pub fn pyth_price_value_to_decimal(
     } else {
         let factor = 10u64
             .checked_pow(exponent as u32)
-            .ok_or(CoreError::InvalidPriceFeedPrice)?;
+            .ok_or_else(|| error!(CoreError::InvalidPriceFeedPrice))?;
         value = value
             .checked_mul(factor)
-            .ok_or(CoreError::InvalidPriceFeedPrice)?;
+            .ok_or_else(|| error!(CoreError::InvalidPriceFeedPrice))?;
         0
     };
     let price = Decimal::try_from_price(

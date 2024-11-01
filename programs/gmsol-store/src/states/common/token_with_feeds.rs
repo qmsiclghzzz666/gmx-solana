@@ -88,7 +88,9 @@ pub fn token_records<A: TokenMapAccess>(
     tokens
         .iter()
         .map(|token| {
-            let config = token_map.get(token).ok_or(error!(CoreError::NotFound))?;
+            let config = token_map
+                .get(token)
+                .ok_or_else(|| error!(CoreError::NotFound))?;
             TokenRecord::from_config(*token, config)
         })
         .collect::<Result<Vec<_>>>()

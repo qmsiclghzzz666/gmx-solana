@@ -205,7 +205,7 @@ impl<'a, 'info> CreateGlvDepositOperation<'a, 'info> {
             let total_amount = params
                 .initial_long_token_amount
                 .checked_add(params.initial_short_token_amount)
-                .ok_or(error!(CoreError::TokenAmountExceedsLimit))?;
+                .ok_or_else(|| error!(CoreError::TokenAmountExceedsLimit))?;
             require_gte!(amount, total_amount, CoreError::NotEnoughTokenAmount);
         }
 
@@ -340,7 +340,7 @@ impl<'a, 'info> ExecuteGlvDepositOperation<'a, 'info> {
 
                 market_token_amount = market_token_amount
                     .checked_add(executed.output)
-                    .ok_or(error!(CoreError::TokenAmountOverflow))?;
+                    .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
 
                 op = executed.with_output(());
             }
@@ -374,7 +374,7 @@ impl<'a, 'info> ExecuteGlvDepositOperation<'a, 'info> {
                         anchor_spl::token::accessor::amount(&self.market_token_vault)?;
                     let new_balance = current_balance
                         .checked_add(market_token_amount)
-                        .ok_or(error!(CoreError::TokenAmountOverflow))?;
+                        .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
                     self.glv.load()?.validate_market_token_balance(
                         &op.market().market_meta().market_token_mint,
                         new_balance,
@@ -396,7 +396,7 @@ impl<'a, 'info> ExecuteGlvDepositOperation<'a, 'info> {
                     u128::from(glv_supply),
                     constants::MARKET_USD_TO_AMOUNT_DIVISOR,
                 )
-                .ok_or(error!(CoreError::FailedToCalculateGlvAmountToMint))?;
+                .ok_or_else(|| error!(CoreError::FailedToCalculateGlvAmountToMint))?;
                 u64::try_from(glv_amount).map_err(|_| error!(CoreError::TokenAmountOverflow))?
             };
 
@@ -732,7 +732,7 @@ impl<'a, 'info> ExecuteGlvWithdrawalOperation<'a, 'info> {
                     &glv_value,
                     &(u128::from(glv_supply)),
                 )
-                .ok_or(error!(CoreError::FailedToCalculateGlvValueForMarket))?;
+                .ok_or_else(|| error!(CoreError::FailedToCalculateGlvValueForMarket))?;
 
                 msg!(
                     "[GLV] Calculating GM amount with glv_supply={}, glv_value={}, market_token_value={}",
@@ -921,7 +921,7 @@ fn unchecked_get_glv_value<'info>(
 
         value = value
             .checked_add(value_for_market)
-            .ok_or(error!(CoreError::ValueOverflow))?;
+            .ok_or_else(|| error!(CoreError::ValueOverflow))?;
     }
 
     Ok(value)
@@ -958,7 +958,7 @@ where
     }
 
     let glv_value = utils::market_token_amount_to_usd(&balance, &value, &supply)
-        .ok_or(error!(CoreError::FailedToCalculateGlvValueForMarket))?;
+        .ok_or_else(|| error!(CoreError::FailedToCalculateGlvValueForMarket))?;
 
     Ok((glv_value, value, supply))
 }
@@ -989,7 +989,7 @@ where
         supply,
         constants::MARKET_USD_TO_AMOUNT_DIVISOR,
     )
-    .ok_or(error!(CoreError::FailedTOCalculateMarketTokenAmountToBurn))?;
+    .ok_or_else(|| error!(CoreError::FailedTOCalculateMarketTokenAmountToBurn))?;
 
     Ok(market_token_amount)
 }
@@ -1130,7 +1130,7 @@ impl<'a, 'info> ExecuteGlvShiftOperation<'a, 'info> {
                 anchor_spl::token::accessor::amount(&self.to_market_token_glv_vault)?;
             let new_balance = current_balance
                 .checked_add(received)
-                .ok_or(error!(CoreError::TokenAmountOverflow))?;
+                .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
             self.glv.load()?.validate_market_token_balance(
                 &to_market.market().market_meta().market_token_mint,
                 new_balance,

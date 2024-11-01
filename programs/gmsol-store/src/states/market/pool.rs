@@ -42,7 +42,7 @@ impl Pool {
         self.long_token_amount = self
             .long_token_amount
             .checked_add(self.short_token_amount)
-            .ok_or(error!(CoreError::TokenAmountOverflow))?;
+            .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
         Ok(())
     }
 }

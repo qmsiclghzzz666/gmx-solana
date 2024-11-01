@@ -87,7 +87,7 @@ impl GlvMarketConfig {
                 market_pool_value,
                 market_token_supply,
             )
-            .ok_or(error!(CoreError::FailedToCalculateGlvValueForMarket))?;
+            .ok_or_else(|| error!(CoreError::FailedToCalculateGlvValueForMarket))?;
             require_gte!(
                 self.max_value,
                 value,
@@ -293,7 +293,7 @@ impl Glv {
         let config = self
             .markets
             .get_mut(market_token)
-            .ok_or(error!(CoreError::NotFound))?;
+            .ok_or_else(|| error!(CoreError::NotFound))?;
         if let Some(amount) = max_amount {
             config.max_amount = amount;
         }
@@ -402,7 +402,7 @@ impl Glv {
         let config = self
             .markets
             .get(market_token)
-            .ok_or(error!(CoreError::NotFound))?;
+            .ok_or_else(|| error!(CoreError::NotFound))?;
         config.validate_market_token_balance(new_balance, market_pool_value, market_token_supply)
     }
 }

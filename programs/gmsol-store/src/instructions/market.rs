@@ -127,21 +127,21 @@ pub(crate) fn unchecked_initialize_market(
         require!(
             token_map
                 .get(&index_token_mint)
-                .ok_or(error!(CoreError::NotFound))?
+                .ok_or_else(|| error!(CoreError::NotFound))?
                 .is_enabled(),
             CoreError::InvalidArgument
         );
         require!(
             token_map
                 .get(&ctx.accounts.long_token_mint.key())
-                .ok_or(error!(CoreError::NotFound))?
+                .ok_or_else(|| error!(CoreError::NotFound))?
                 .is_enabled(),
             CoreError::InvalidArgument
         );
         require!(
             token_map
                 .get(&ctx.accounts.short_token_mint.key())
-                .ok_or(error!(CoreError::NotFound))?
+                .ok_or_else(|| error!(CoreError::NotFound))?
                 .is_enabled(),
             CoreError::InvalidArgument
         );

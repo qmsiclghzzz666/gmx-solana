@@ -279,14 +279,14 @@ impl Market {
                 .other
                 .long_token_balance
                 .checked_add(amount)
-                .ok_or(error!(CoreError::TokenAmountOverflow))?;
+                .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
         } else {
             self.state.other.short_token_balance = self
                 .state
                 .other
                 .short_token_balance
                 .checked_add(amount)
-                .ok_or(error!(CoreError::TokenAmountOverflow))?;
+                .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
         }
         msg!(
             "[Balance updated] {}: {},{}",
@@ -313,14 +313,14 @@ impl Market {
                 .other
                 .long_token_balance
                 .checked_sub(amount)
-                .ok_or(error!(CoreError::TokenAmountOverflow))?;
+                .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
         } else {
             self.state.other.short_token_balance = self
                 .state
                 .other
                 .short_token_balance
                 .checked_sub(amount)
-                .ok_or(error!(CoreError::TokenAmountOverflow))?;
+                .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
         }
         msg!(
             "[Balance updated] {}: {},{}",
@@ -513,7 +513,7 @@ impl OtherState {
         let next_id = self
             .trade_count
             .checked_add(1)
-            .ok_or(error!(CoreError::TokenAmountOverflow))?;
+            .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
         self.trade_count = next_id;
         Ok(next_id)
     }
@@ -723,7 +723,7 @@ impl Indexer {
         let next_id = self
             .deposit_count
             .checked_add(1)
-            .ok_or(error!(CoreError::TokenAmountOverflow))?;
+            .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
         self.deposit_count = next_id;
         Ok(next_id)
     }
@@ -733,7 +733,7 @@ impl Indexer {
         let next_id = self
             .withdrawal_count
             .checked_add(1)
-            .ok_or(error!(CoreError::TokenAmountOverflow))?;
+            .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
         self.withdrawal_count = next_id;
         Ok(next_id)
     }
@@ -743,7 +743,7 @@ impl Indexer {
         let next_id = self
             .order_count
             .checked_add(1)
-            .ok_or(error!(CoreError::TokenAmountOverflow))?;
+            .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
         self.order_count = next_id;
         Ok(next_id)
     }
@@ -753,7 +753,7 @@ impl Indexer {
         let next_id = self
             .shift_count
             .checked_add(1)
-            .ok_or(error!(CoreError::TokenAmountOverflow))?;
+            .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
         self.shift_count = next_id;
         Ok(next_id)
     }
@@ -763,7 +763,7 @@ impl Indexer {
         let next_id = self
             .glv_deposit_count
             .checked_add(1)
-            .ok_or(error!(CoreError::TokenAmountOverflow))?;
+            .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
         self.glv_deposit_count = next_id;
         Ok(next_id)
     }
@@ -773,7 +773,7 @@ impl Indexer {
         let next_id = self
             .glv_withdrawal_count
             .checked_add(1)
-            .ok_or(error!(CoreError::TokenAmountOverflow))?;
+            .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
         self.glv_withdrawal_count = next_id;
         Ok(next_id)
     }

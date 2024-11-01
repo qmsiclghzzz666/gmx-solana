@@ -165,7 +165,7 @@ impl<'a, 'info> CreateDepositOperation<'a, 'info> {
             let total_amount = params
                 .initial_long_token_amount
                 .checked_add(params.initial_short_token_amount)
-                .ok_or(error!(CoreError::TokenAmountExceedsLimit))?;
+                .ok_or_else(|| error!(CoreError::TokenAmountExceedsLimit))?;
             require_gte!(amount, total_amount, CoreError::NotEnoughTokenAmount);
         }
 

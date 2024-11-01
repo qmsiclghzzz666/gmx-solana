@@ -208,7 +208,8 @@ impl Store {
 
     /// Get claimable time window size.
     pub fn claimable_time_window(&self) -> Result<NonZeroU64> {
-        NonZeroU64::new(self.amount.claimable_time_window).ok_or(error!(CoreError::InvalidArgument))
+        NonZeroU64::new(self.amount.claimable_time_window)
+            .ok_or_else(|| error!(CoreError::InvalidArgument))
     }
 
     /// Get claimable time window index for the given timestamp.

@@ -179,14 +179,14 @@ impl TransferOut {
         self.long_token
             .checked_add(self.long_token_for_claimable_account_of_user)
             .and_then(|a| a.checked_add(self.long_token_for_claimable_account_of_holding))
-            .ok_or(error!(CoreError::TokenAmountOverflow))
+            .ok_or_else(|| error!(CoreError::TokenAmountOverflow))
     }
 
     pub(crate) fn total_short_token_amount(&self) -> Result<u64> {
         self.short_token
             .checked_add(self.short_token_for_claimable_account_of_user)
             .and_then(|a| a.checked_add(self.short_token_for_claimable_account_of_holding))
-            .ok_or(error!(CoreError::TokenAmountOverflow))
+            .ok_or_else(|| error!(CoreError::TokenAmountOverflow))
     }
 
     pub(crate) fn transfer_out(&mut self, is_secondary: bool, amount: u64) -> Result<()> {
@@ -197,12 +197,12 @@ impl TransferOut {
             self.secondary_output_token = self
                 .secondary_output_token
                 .checked_add(amount)
-                .ok_or(error!(CoreError::TokenAmountOverflow))?;
+                .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
         } else {
             self.final_output_token = self
                 .final_output_token
                 .checked_add(amount)
-                .ok_or(error!(CoreError::TokenAmountOverflow))?;
+                .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
         }
         Ok(())
     }
@@ -284,12 +284,12 @@ impl TransferOut {
                     self.long_token = self
                         .long_token
                         .checked_add(amount)
-                        .ok_or(error!(CoreError::TokenAmountOverflow))?;
+                        .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
                 } else {
                     self.short_token = self
                         .short_token
                         .checked_add(amount)
-                        .ok_or(error!(CoreError::TokenAmountOverflow))?;
+                        .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
                 }
             }
             CollateralReceiver::ClaimableForHolding => {
@@ -297,12 +297,12 @@ impl TransferOut {
                     self.long_token_for_claimable_account_of_holding = self
                         .long_token_for_claimable_account_of_holding
                         .checked_add(amount)
-                        .ok_or(error!(CoreError::TokenAmountOverflow))?;
+                        .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
                 } else {
                     self.short_token_for_claimable_account_of_holding = self
                         .short_token_for_claimable_account_of_holding
                         .checked_add(amount)
-                        .ok_or(error!(CoreError::TokenAmountOverflow))?;
+                        .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
                 }
             }
             CollateralReceiver::ClaimableForUser => {
@@ -310,12 +310,12 @@ impl TransferOut {
                     self.long_token_for_claimable_account_of_user = self
                         .long_token_for_claimable_account_of_user
                         .checked_add(amount)
-                        .ok_or(error!(CoreError::TokenAmountOverflow))?;
+                        .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
                 } else {
                     self.short_token_for_claimable_account_of_user = self
                         .short_token_for_claimable_account_of_user
                         .checked_add(amount)
-                        .ok_or(error!(CoreError::TokenAmountOverflow))?;
+                        .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
                 }
             }
         }
@@ -487,7 +487,7 @@ impl Order {
             let price = oracle
                 .primary
                 .get(output_token)
-                .ok_or(error!(CoreError::MissingOraclePrice))?
+                .ok_or_else(|| error!(CoreError::MissingOraclePrice))?
                 .min
                 .to_unit_price();
             let output_value = u128::from(output_amount).saturating_mul(price);
@@ -497,7 +497,7 @@ impl Order {
             let price = oracle
                 .primary
                 .get(secondary_output_token)
-                .ok_or(error!(CoreError::MissingOraclePrice))?
+                .ok_or_else(|| error!(CoreError::MissingOraclePrice))?
                 .min
                 .to_unit_price();
             let output_value = u128::from(secondary_output_amount).saturating_mul(price);
@@ -516,7 +516,7 @@ impl Order {
         } else {
             self.tokens.short_token.token()
         }
-        .ok_or(error!(CoreError::MissingPoolTokens))
+        .ok_or_else(|| error!(CoreError::MissingPoolTokens))
     }
 
     /// Get order params.
@@ -574,7 +574,7 @@ impl Order {
 
         let next_minted_value = minted_value
             .checked_add(delta_minted_value)
-            .ok_or(error!(CoreError::ValueOverflow))?;
+            .ok_or_else(|| error!(CoreError::ValueOverflow))?;
 
         store.gt_mut().mint_to(user, minted)?;
         msg!("[GT] minted {} units of GT", minted);

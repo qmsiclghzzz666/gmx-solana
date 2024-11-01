@@ -21,7 +21,7 @@ pub trait ValidateMarketBalances:
         if self.is_pure() {
             let total = long_excluding_amount
                 .checked_add(short_excluding_amount)
-                .ok_or(error!(CoreError::TokenAmountOverflow))?;
+                .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
             (long_excluding_amount, short_excluding_amount) = (total / 2, total / 2);
         }
         let meta = self.market_meta();
@@ -62,11 +62,11 @@ pub trait ValidateMarketBalances:
             if is_long {
                 long_excluding_amount = long_excluding_amount
                     .checked_add(amount)
-                    .ok_or(error!(CoreError::TokenAmountOverflow))?;
+                    .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
             } else {
                 short_excluding_amount = short_excluding_amount
                     .checked_add(amount)
-                    .ok_or(error!(CoreError::TokenAmountOverflow))?;
+                    .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
             }
         }
         self.validate_market_balances(long_excluding_amount, short_excluding_amount)
@@ -148,7 +148,7 @@ impl Adl for Market {
             .state
             .clocks
             .get_mut(kind)
-            .ok_or(error!(CoreError::NotFound))?;
+            .ok_or_else(|| error!(CoreError::NotFound))?;
         *clock = Clock::get()?.unix_timestamp;
         Ok(())
     }

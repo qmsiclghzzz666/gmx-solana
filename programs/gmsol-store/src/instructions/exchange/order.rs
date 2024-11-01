@@ -345,11 +345,11 @@ impl<'info> internal::Create<'info, Order> for CreateOrder<'info> {
                 let swap_in = self
                     .initial_collateral_token_escrow
                     .as_ref()
-                    .ok_or(error!(CoreError::TokenAccountNotProvided))?;
+                    .ok_or_else(|| error!(CoreError::TokenAccountNotProvided))?;
                 let swap_out = self
                     .final_output_token_escrow
                     .as_ref()
-                    .ok_or(error!(CoreError::TokenAccountNotProvided))?;
+                    .ok_or_else(|| error!(CoreError::TokenAccountNotProvided))?;
                 ops.swap()
                     .swap_in_token(swap_in.as_ref())
                     .swap_out_token(swap_out.as_ref())
@@ -360,20 +360,20 @@ impl<'info> internal::Create<'info, Order> for CreateOrder<'info> {
                 let initial_collateral = self
                     .initial_collateral_token_escrow
                     .as_ref()
-                    .ok_or(error!(CoreError::TokenAccountNotProvided))?;
+                    .ok_or_else(|| error!(CoreError::TokenAccountNotProvided))?;
                 let long_token = self
                     .long_token_escrow
                     .as_ref()
-                    .ok_or(error!(CoreError::TokenAccountNotProvided))?;
+                    .ok_or_else(|| error!(CoreError::TokenAccountNotProvided))?;
                 let short_token = self
                     .short_token_escrow
                     .as_ref()
-                    .ok_or(error!(CoreError::TokenAccountNotProvided))?;
+                    .ok_or_else(|| error!(CoreError::TokenAccountNotProvided))?;
                 ops.increase()
                     .position(
                         self.position
                             .as_ref()
-                            .ok_or(error!(CoreError::PositionIsRequired))?,
+                            .ok_or_else(|| error!(CoreError::PositionIsRequired))?,
                     )
                     .initial_collateral_token(initial_collateral.as_ref())
                     .long_token(long_token.as_ref())
@@ -385,20 +385,20 @@ impl<'info> internal::Create<'info, Order> for CreateOrder<'info> {
                 let final_output = self
                     .final_output_token_escrow
                     .as_ref()
-                    .ok_or(error!(CoreError::TokenAccountNotProvided))?;
+                    .ok_or_else(|| error!(CoreError::TokenAccountNotProvided))?;
                 let long_token = self
                     .long_token_escrow
                     .as_ref()
-                    .ok_or(error!(CoreError::TokenAccountNotProvided))?;
+                    .ok_or_else(|| error!(CoreError::TokenAccountNotProvided))?;
                 let short_token = self
                     .short_token_escrow
                     .as_ref()
-                    .ok_or(error!(CoreError::TokenAccountNotProvided))?;
+                    .ok_or_else(|| error!(CoreError::TokenAccountNotProvided))?;
                 ops.decrease()
                     .position(
                         self.position
                             .as_ref()
-                            .ok_or(error!(CoreError::PositionIsRequired))?,
+                            .ok_or_else(|| error!(CoreError::PositionIsRequired))?,
                     )
                     .final_output_token(final_output.as_ref())
                     .long_token(long_token.as_ref())
@@ -431,15 +431,15 @@ impl<'info> CreateOrder<'info> {
             let token = self
                 .initial_collateral_token
                 .as_ref()
-                .ok_or(error!(CoreError::MissingInitialCollateralToken))?;
+                .ok_or_else(|| error!(CoreError::MissingInitialCollateralToken))?;
             let from = self
                 .initial_collateral_token_source
                 .as_ref()
-                .ok_or(error!(CoreError::TokenAccountNotProvided))?;
+                .ok_or_else(|| error!(CoreError::TokenAccountNotProvided))?;
             let to = self
                 .initial_collateral_token_escrow
                 .as_mut()
-                .ok_or(error!(CoreError::TokenAccountNotProvided))?;
+                .ok_or_else(|| error!(CoreError::TokenAccountNotProvided))?;
 
             transfer_checked(
                 CpiContext::new(
@@ -673,8 +673,8 @@ impl<'info> CloseOrder<'info> {
                 if !seen.insert(escrow.key()) {
                     continue;
                 }
-                let ata = ata.ok_or(error!(CoreError::TokenAccountNotProvided))?;
-                let token = token.ok_or(error!(CoreError::TokenMintNotProvided))?;
+                let ata = ata.ok_or_else(|| error!(CoreError::TokenAccountNotProvided))?;
+                let token = token.ok_or_else(|| error!(CoreError::TokenMintNotProvided))?;
 
                 if !builder
                     .clone()
@@ -713,7 +713,7 @@ impl<'info> CloseOrder<'info> {
         let referrer_user = self
             .referrer_user
             .as_ref()
-            .ok_or(error!(CoreError::InvalidArgument))?;
+            .ok_or_else(|| error!(CoreError::InvalidArgument))?;
 
         require_eq!(
             referrer_user.load()?.owner,
@@ -729,7 +729,7 @@ impl<'info> CloseOrder<'info> {
 
         let reward: u64 =
             apply_factor::<_, { constants::MARKET_DECIMALS }>(&(amount as u128), &factor)
-                .ok_or(error!(CoreError::InvalidGTConfig))?
+                .ok_or_else(|| error!(CoreError::InvalidGTConfig))?
                 .try_into()
                 .map_err(|_| error!(CoreError::TokenAmountOverflow))?;
 

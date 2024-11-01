@@ -193,7 +193,7 @@ impl<'info> ExecuteDeposit<'info> {
             let vault = self
                 .initial_long_token_vault
                 .as_ref()
-                .ok_or(error!(CoreError::TokenAccountNotProvided))?;
+                .ok_or_else(|| error!(CoreError::TokenAccountNotProvided))?;
             builder
                 .clone()
                 .market(&market)
@@ -214,7 +214,7 @@ impl<'info> ExecuteDeposit<'info> {
             let vault = self
                 .initial_short_token_vault
                 .as_ref()
-                .ok_or(error!(CoreError::TokenAccountNotProvided))?;
+                .ok_or_else(|| error!(CoreError::TokenAccountNotProvided))?;
             builder
                 .clone()
                 .market(&market)
@@ -246,11 +246,11 @@ impl<'info> ExecuteDeposit<'info> {
             let vault = self
                 .initial_long_token_vault
                 .as_ref()
-                .ok_or(error!(CoreError::TokenAccountNotProvided))?;
+                .ok_or_else(|| error!(CoreError::TokenAccountNotProvided))?;
             let token = self
                 .initial_long_token
                 .as_ref()
-                .ok_or(error!(CoreError::TokenMintNotProvided))?;
+                .ok_or_else(|| error!(CoreError::TokenMintNotProvided))?;
             builder
                 .clone()
                 .market(&market)
@@ -273,11 +273,11 @@ impl<'info> ExecuteDeposit<'info> {
             let vault = self
                 .initial_short_token_vault
                 .as_ref()
-                .ok_or(error!(CoreError::TokenAccountNotProvided))?;
+                .ok_or_else(|| error!(CoreError::TokenAccountNotProvided))?;
             let token = self
                 .initial_short_token
                 .as_ref()
-                .ok_or(error!(CoreError::TokenMintNotProvided))?;
+                .ok_or_else(|| error!(CoreError::TokenMintNotProvided))?;
             builder
                 .market(&market)
                 .to(escrow.to_account_info())

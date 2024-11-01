@@ -38,11 +38,11 @@ impl PriceValidator {
         let timestamp_adjustment = token_config.timestamp_adjustment(provider)?.into();
         let ts = oracle_ts
             .checked_sub_unsigned(timestamp_adjustment)
-            .ok_or(CoreError::TokenAmountOverflow)?;
+            .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
 
         let expiration_ts = ts
             .checked_add_unsigned(self.max_age)
-            .ok_or(CoreError::TokenAmountOverflow)?;
+            .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
         if expiration_ts < self.clock.unix_timestamp {
             return err!(CoreError::MaxPriceAgeExceeded);
         }
@@ -73,7 +73,7 @@ impl PriceValidator {
         let range: u64 = self
             .max_oracle_ts
             .checked_sub(self.min_oracle_ts)
-            .ok_or(error!(CoreError::TokenAmountOverflow))?
+            .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?
             .try_into()
             .map_err(|_| error!(CoreError::InvalidOracleTimestampsRange))?;
         require_gte!(

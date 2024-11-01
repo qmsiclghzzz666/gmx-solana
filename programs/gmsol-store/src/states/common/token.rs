@@ -104,7 +104,7 @@ impl TokensCollector {
             .map(|token| {
                 let config = token_map
                     .get(token)
-                    .ok_or(error!(CoreError::UnknownOrDisabledToken))?;
+                    .ok_or_else(|| error!(CoreError::UnknownOrDisabledToken))?;
                 TokenRecord::from_config(*token, config)
             })
             .collect::<Result<Vec<_>>>()?;

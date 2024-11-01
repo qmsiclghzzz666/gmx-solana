@@ -36,7 +36,9 @@ pub(crate) fn unchecked_turn_into_pure_pool(
 ) -> Result<()> {
     let mut market = ctx.accounts.market.load_mut()?;
     let mint = market.meta.market_token_mint;
-    let pool = market.pool_mut(kind).ok_or(error!(CoreError::NotFound))?;
+    let pool = market
+        .pool_mut(kind)
+        .ok_or_else(|| error!(CoreError::NotFound))?;
     require!(!pool.is_pure(), CoreError::PreconditionsAreNotMet);
     msg!("{}: turning pool `{}` to pure", mint, kind);
     pool.set_is_pure(true);
@@ -54,7 +56,9 @@ pub(crate) fn unchecked_turn_into_impure_pool(
 ) -> Result<()> {
     let mut market = ctx.accounts.market.load_mut()?;
     let mint = market.meta.market_token_mint;
-    let pool = market.pool_mut(kind).ok_or(error!(CoreError::NotFound))?;
+    let pool = market
+        .pool_mut(kind)
+        .ok_or_else(|| error!(CoreError::NotFound))?;
     require!(pool.is_pure(), CoreError::PreconditionsAreNotMet);
     msg!("{}: turning pool `{}` to impure", mint, kind);
     pool.set_is_pure(false);

@@ -771,14 +771,14 @@ impl<'info> ExecuteGlvDeposit<'info> {
                 continue;
             }
 
-            let escrow = escrow.ok_or(error!(CoreError::TokenAccountNotProvided))?;
+            let escrow = escrow.ok_or_else(|| error!(CoreError::TokenAccountNotProvided))?;
             let market = self
                 .glv_deposit
                 .load()?
                 .swap
                 .find_and_unpack_first_market(store, is_primary, remaining_accounts)?
                 .unwrap_or(self.market.clone());
-            let vault = vault.ok_or(error!(CoreError::TokenAccountNotProvided))?;
+            let vault = vault.ok_or_else(|| error!(CoreError::TokenAccountNotProvided))?;
             builder
                 .clone()
                 .market(&market)
@@ -837,8 +837,8 @@ impl<'info> ExecuteGlvDeposit<'info> {
                 .swap
                 .find_and_unpack_first_market(store, is_primary, remaining_accounts)?
                 .unwrap_or(self.market.clone());
-            let token = token.ok_or(error!(CoreError::TokenMintNotProvided))?;
-            let vault = vault.ok_or(error!(CoreError::TokenAccountNotProvided))?;
+            let token = token.ok_or_else(|| error!(CoreError::TokenMintNotProvided))?;
+            let vault = vault.ok_or_else(|| error!(CoreError::TokenAccountNotProvided))?;
             builder
                 .clone()
                 .market(&market)

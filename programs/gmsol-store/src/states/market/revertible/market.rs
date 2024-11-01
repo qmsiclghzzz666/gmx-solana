@@ -124,12 +124,12 @@ impl<'a> RevertibleMarket<'a> {
             other.long_token_balance = other
                 .long_token_balance
                 .checked_add(amount)
-                .ok_or(error!(CoreError::TokenAmountOverflow))?;
+                .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
         } else {
             other.short_token_balance = other
                 .short_token_balance
                 .checked_add(amount)
-                .ok_or(error!(CoreError::TokenAmountOverflow))?;
+                .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
         }
 
         msg!(
@@ -159,12 +159,12 @@ impl<'a> RevertibleMarket<'a> {
             other.long_token_balance = other
                 .long_token_balance
                 .checked_sub(amount)
-                .ok_or(error!(CoreError::TokenAmountOverflow))?;
+                .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
         } else {
             other.short_token_balance = other
                 .short_token_balance
                 .checked_sub(amount)
-                .ok_or(error!(CoreError::TokenAmountOverflow))?;
+                .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
         }
 
         msg!(
@@ -187,7 +187,7 @@ impl<'a> RevertibleMarket<'a> {
             .other
             .trade_count
             .checked_add(1)
-            .ok_or(error!(CoreError::TokenAmountOverflow))?;
+            .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
         self.other_mut().trade_count = next_trade_id;
         Ok(next_trade_id)
     }

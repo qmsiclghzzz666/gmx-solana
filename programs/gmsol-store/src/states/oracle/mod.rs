@@ -81,7 +81,7 @@ impl Oracle {
         // [token_config, feed; tokens.len()] [..remaining]
         for (idx, token) in tokens.iter().enumerate() {
             let feed = &remaining_accounts[idx];
-            let token_config = map.get(token).ok_or(CoreError::NotFound)?;
+            let token_config = map.get(token).ok_or_else(|| error!(CoreError::NotFound))?;
             require!(token_config.is_enabled(), CoreError::TokenConfigDisabled);
             require_eq!(token_config.expected_provider()?, *program.kind());
             let (oracle_slot, oracle_ts, price, kind) = match &program {
@@ -196,7 +196,7 @@ impl Oracle {
         let price = self
             .primary
             .get(token)
-            .ok_or(error!(CoreError::MissingOraclePrice))?;
+            .ok_or_else(|| error!(CoreError::MissingOraclePrice))?;
         Ok(gmsol_model::price::Price {
             min: price.min.to_unit_price(),
             max: price.max.to_unit_price(),
