@@ -345,7 +345,7 @@ impl Market {
             .ok_or(gmsol_model::Error::MissingPoolKind(kind))
     }
 
-    pub(crate) fn pool_mut(&mut self, kind: PoolKind) -> Option<&mut Pool> {
+    pub(crate) fn _pool_mut(&mut self, kind: PoolKind) -> Option<&mut Pool> {
         self.state.pools.get_mut(kind)
     }
 

@@ -133,7 +133,6 @@ use self::{
 };
 use anchor_lang::prelude::*;
 use gmsol_model::price::Prices;
-use gmsol_utils::price::Price;
 
 #[cfg_attr(test, macro_use)]
 extern crate static_assertions;
@@ -1041,37 +1040,11 @@ pub mod gmsol_store {
     }
 
     #[access_control(internal::Authenticate::only_controller(&ctx))]
-    pub fn set_price(ctx: Context<SetPrice>, token: Pubkey, price: Price) -> Result<()> {
-        instructions::set_price(ctx, token, price)
-    }
-
-    #[access_control(internal::Authenticate::only_controller(&ctx))]
     pub fn set_prices_from_price_feed<'info>(
         ctx: Context<'_, '_, 'info, 'info, SetPricesFromPriceFeed<'info>>,
         tokens: Vec<Pubkey>,
     ) -> Result<()> {
         instructions::set_prices_from_price_feed(ctx, tokens)
-    }
-
-    // Position.
-    #[cfg(not(feature = "no-bug-fix"))]
-    #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
-    pub fn turn_into_pure_pool(ctx: Context<TurnPureFlag>, kind: u8) -> Result<()> {
-        instructions::unchecked_turn_into_pure_pool(
-            ctx,
-            kind.try_into()
-                .map_err(|_| error!(CoreError::InvalidArgument))?,
-        )
-    }
-
-    #[cfg(not(feature = "no-bug-fix"))]
-    #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
-    pub fn turn_into_impure_pool(ctx: Context<TurnPureFlag>, kind: u8) -> Result<()> {
-        instructions::unchecked_turn_into_impure_pool(
-            ctx,
-            kind.try_into()
-                .map_err(|_| error!(CoreError::InvalidArgument))?,
-        )
     }
 
     // Exchange.

@@ -2,7 +2,6 @@
 pub mod price_feeds;
 
 use anchor_lang::prelude::*;
-use gmsol_utils::price::Price;
 
 use crate::{
     states::{Oracle, Store},
@@ -106,11 +105,4 @@ impl<'info> internal::Authentication<'info> for SetPrice<'info> {
     fn store(&self) -> &AccountLoader<'info, Store> {
         &self.store
     }
-}
-
-/// Set the price of a token in the given oracle.
-/// # Error
-/// Returns error if the price of the given token already been set.
-pub(crate) fn set_price(ctx: Context<SetPrice>, token: Pubkey, price: Price) -> Result<()> {
-    ctx.accounts.oracle.primary.set(&token, price)
 }

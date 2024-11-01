@@ -15,7 +15,6 @@ use tracing::level_filters::LevelFilter;
 use tracing_subscriber::EnvFilter;
 
 mod admin;
-mod bug_fix;
 mod controller;
 mod exchange;
 mod feature_keeper;
@@ -96,8 +95,6 @@ enum Command {
     Controller(controller::ControllerArgs),
     /// Commands for FEATURE_KEEPER.
     Feature(feature_keeper::Args),
-    /// Bug fix commands.
-    BugFix(bug_fix::Args),
 }
 
 #[tokio::main]
@@ -191,7 +188,6 @@ impl Cli {
             }
             Command::Controller(args) => args.run(&client, &store, self.serialize_only).await?,
             Command::Feature(args) => args.run(&client, &store, self.serialize_only).await?,
-            Command::BugFix(args) => args.run(&client, &store, self.serialize_only).await?,
         }
         client.shutdown().await?;
         Ok(())

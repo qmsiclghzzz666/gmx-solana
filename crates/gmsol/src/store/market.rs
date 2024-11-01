@@ -4,7 +4,7 @@ use anchor_client::{
     anchor_lang::system_program,
     solana_sdk::{pubkey::Pubkey, signer::Signer},
 };
-use gmsol_model::{price::Prices, PnlFactorKind, PoolKind};
+use gmsol_model::{price::Prices, PnlFactorKind};
 use gmsol_store::{
     accounts, instruction,
     states::{market::config::EntryArgs, Factor, MarketConfigKey},
@@ -160,22 +160,6 @@ pub trait MarketOps<C> {
         store: &Pubkey,
         market_token: &Pubkey,
         buffer: &Pubkey,
-    ) -> RpcBuilder<C>;
-
-    /// Turn an impure pool into a pure pool.
-    fn turn_into_pure_pool(
-        &self,
-        store: &Pubkey,
-        market_token: &Pubkey,
-        kind: PoolKind,
-    ) -> RpcBuilder<C>;
-
-    /// Turn an pure pool into a impure pool.
-    fn turn_into_impure_pool(
-        &self,
-        store: &Pubkey,
-        market_token: &Pubkey,
-        kind: PoolKind,
     ) -> RpcBuilder<C>;
 }
 
@@ -350,36 +334,6 @@ where
                 store: *store,
                 market: self.find_market_address(store, market_token),
                 buffer: *buffer,
-            })
-    }
-
-    fn turn_into_pure_pool(
-        &self,
-        store: &Pubkey,
-        market_token: &Pubkey,
-        kind: PoolKind,
-    ) -> RpcBuilder<C> {
-        self.store_rpc()
-            .args(instruction::TurnIntoPurePool { kind: kind.into() })
-            .accounts(accounts::TurnPureFlag {
-                authority: self.payer(),
-                store: *store,
-                market: self.find_market_address(store, market_token),
-            })
-    }
-
-    fn turn_into_impure_pool(
-        &self,
-        store: &Pubkey,
-        market_token: &Pubkey,
-        kind: PoolKind,
-    ) -> RpcBuilder<C> {
-        self.store_rpc()
-            .args(instruction::TurnIntoImpurePool { kind: kind.into() })
-            .accounts(accounts::TurnPureFlag {
-                authority: self.payer(),
-                store: *store,
-                market: self.find_market_address(store, market_token),
             })
     }
 }

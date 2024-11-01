@@ -37,7 +37,7 @@ impl Pool {
 
     /// Merge pool amount if it is pure.
     /// Will return error if the pool is not pure.
-    pub(crate) fn merge_if_pure(&mut self) -> Result<()> {
+    pub(crate) fn _merge_if_pure(&mut self) -> Result<()> {
         require!(self.is_pure(), CoreError::InvalidArgument);
         self.long_token_amount = self
             .long_token_amount
