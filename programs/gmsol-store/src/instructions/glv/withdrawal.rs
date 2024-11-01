@@ -305,7 +305,7 @@ impl<'info> internal::Close<'info, GlvWithdrawal> for CloseGlvWithdrawal<'info> 
         self.owner.to_account_info()
     }
 
-    fn transfer_to_atas(&self, init_if_needed: bool) -> Result<internal::TransferSuccess> {
+    fn process(&self, init_if_needed: bool) -> Result<internal::Success> {
         use crate::utils::token::TransferAllFromEscrowToATA;
 
         // Prepare signer seeds.

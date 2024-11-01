@@ -227,7 +227,7 @@ impl<'info> internal::Close<'info, Shift> for CloseShift<'info> {
         self.owner.to_account_info()
     }
 
-    fn transfer_to_atas(&self, init_if_needed: bool) -> Result<internal::TransferSuccess> {
+    fn process(&self, init_if_needed: bool) -> Result<internal::Success> {
         use crate::utils::token::TransferAllFromEscrowToATA;
 
         let signer = self.shift.load()?.signer();

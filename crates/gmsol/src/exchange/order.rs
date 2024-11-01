@@ -24,7 +24,10 @@ use gmsol_store::{
 };
 
 use crate::{
-    store::utils::{read_market, read_store, FeedsParser},
+    store::{
+        token::TokenAccountOps,
+        utils::{read_market, read_store, FeedsParser},
+    },
     utils::{ComputeBudget, RpcBuilder, TokenAccountParams, TransactionBuilder, ZeroCopy},
 };
 
@@ -304,6 +307,8 @@ where
     pub async fn build_with_addresses(
         &mut self,
     ) -> crate::Result<(RpcBuilder<'a, C>, Pubkey, Option<Pubkey>)> {
+        let token_program_id = anchor_spl::token::ID;
+
         let nonce = self.nonce.unwrap_or_else(generate_nonce);
         let payer = &self.client.payer();
         let order = self.client.find_order_address(&self.store, payer, &nonce);
@@ -343,7 +348,7 @@ where
 
         let kind = self.params.kind;
         let params = CreateOrderParams {
-            execution_fee: self.execution_fee,
+            execution_lamports: self.execution_fee,
             swap_path_length: self
                 .swap_path
                 .len()
@@ -364,106 +369,63 @@ where
                 let swap_in_token = initial_collateral_token.ok_or(
                     crate::Error::invalid_argument("swap in token is not provided"),
                 )?;
-                let swap_in_token_escrow = initial_collateral_token_escrow.ok_or(
-                    crate::Error::invalid_argument("swap in token escrow is not provided"),
-                )?;
-                let (swap_out_token_escrow, swap_out_token_ata) = final_output_token_accounts
-                    .ok_or(crate::Error::invalid_argument(
-                        "swap out token accounts are not provided",
-                    ))?;
                 let escrow = self
                     .client
-                    .store_rpc()
-                    .accounts(accounts::PrepareSwapOrderEscrow {
-                        owner: *payer,
-                        store: self.store,
-                        order,
-                        swap_in_token,
-                        swap_out_token: final_output_token,
-                        swap_in_token_escrow,
-                        swap_out_token_escrow,
-                        system_program: system_program::ID,
-                        token_program: anchor_spl::token::ID,
-                        associated_token_program: anchor_spl::associated_token::ID,
-                    })
-                    .args(instruction::PrepareSwapOrderEscrow { nonce });
-                let ata = self
-                    .client
-                    .store_rpc()
-                    .accounts(accounts::PrepareAssociatedTokenAccount {
-                        payer: *payer,
-                        owner: *payer,
-                        mint: final_output_token,
-                        account: swap_out_token_ata,
-                        system_program: system_program::ID,
-                        token_program: anchor_spl::token::ID,
-                        associated_token_program: anchor_spl::associated_token::ID,
-                    })
-                    .args(instruction::PrepareAssociatedTokenAccount {});
+                    .prepare_associated_token_account(
+                        &swap_in_token,
+                        &token_program_id,
+                        Some(&order),
+                    )
+                    .merge(self.client.prepare_associated_token_account(
+                        &final_output_token,
+                        &token_program_id,
+                        Some(&order),
+                    ));
+                let ata = self.client.prepare_associated_token_account(
+                    &final_output_token,
+                    &token_program_id,
+                    None,
+                );
                 escrow.merge(ata)
             }
             OrderKind::MarketIncrease | OrderKind::LimitIncrease => {
                 let initial_collateral_token = initial_collateral_token.ok_or(
                     crate::Error::invalid_argument("initial collateral token is not provided"),
                 )?;
-                let initial_collateral_token_escrow =
-                    initial_collateral_token_escrow.ok_or(crate::Error::invalid_argument(
-                        "initial collateral token escrow is not provided",
-                    ))?;
                 let long_token = long_token
                     .ok_or(crate::Error::invalid_argument("long token is not provided"))?;
                 let short_token = short_token.ok_or(crate::Error::invalid_argument(
                     "short token is not provided",
                 ))?;
-                let (long_token_escrow, long_token_ata) = long_token_accounts.ok_or(
-                    crate::Error::invalid_argument("long token accounts are not provided"),
-                )?;
-                let (short_token_escrow, short_token_ata) = short_token_accounts.ok_or(
-                    crate::Error::invalid_argument("short token accounts are not provided"),
-                )?;
-                let escrow =
-                    self.client
-                        .store_rpc()
-                        .accounts(accounts::PrepareIncreaseOrderEscrow {
-                            owner: *payer,
-                            store: self.store,
-                            order,
-                            initial_collateral_token,
-                            long_token,
-                            short_token,
-                            initial_collateral_token_escrow,
-                            long_token_escrow,
-                            short_token_escrow,
-                            system_program: system_program::ID,
-                            token_program: anchor_spl::token::ID,
-                            associated_token_program: anchor_spl::associated_token::ID,
-                        });
-                let long_token_ata = self
+
+                let escrow = self
                     .client
-                    .store_rpc()
-                    .accounts(accounts::PrepareAssociatedTokenAccount {
-                        payer: *payer,
-                        owner: *payer,
-                        mint: long_token,
-                        account: long_token_ata,
-                        system_program: system_program::ID,
-                        token_program: anchor_spl::token::ID,
-                        associated_token_program: anchor_spl::associated_token::ID,
-                    })
-                    .args(instruction::PrepareAssociatedTokenAccount {});
-                let short_token_ata = self
-                    .client
-                    .store_rpc()
-                    .accounts(accounts::PrepareAssociatedTokenAccount {
-                        payer: *payer,
-                        owner: *payer,
-                        mint: short_token,
-                        account: short_token_ata,
-                        system_program: system_program::ID,
-                        token_program: anchor_spl::token::ID,
-                        associated_token_program: anchor_spl::associated_token::ID,
-                    })
-                    .args(instruction::PrepareAssociatedTokenAccount {});
+                    .prepare_associated_token_account(
+                        &initial_collateral_token,
+                        &token_program_id,
+                        Some(&order),
+                    )
+                    .merge(self.client.prepare_associated_token_account(
+                        &long_token,
+                        &token_program_id,
+                        Some(&order),
+                    ))
+                    .merge(self.client.prepare_associated_token_account(
+                        &short_token,
+                        &token_program_id,
+                        Some(&order),
+                    ));
+                let long_token_ata = self.client.prepare_associated_token_account(
+                    &long_token,
+                    &token_program_id,
+                    None,
+                );
+                let short_token_ata = self.client.prepare_associated_token_account(
+                    &short_token,
+                    &token_program_id,
+                    None,
+                );
+
                 let prepare_position = self
                     .client
                     .store_rpc()
@@ -477,86 +439,53 @@ where
                     .args(instruction::PreparePosition {
                         params: params.clone(),
                     });
+
                 escrow
                     .merge(long_token_ata)
                     .merge(short_token_ata)
                     .merge(prepare_position)
             }
-            .args(instruction::PrepareIncreaseOrderEscrow { nonce }),
             OrderKind::MarketDecrease | OrderKind::LimitDecrease | OrderKind::StopLossDecrease => {
                 let long_token = long_token
                     .ok_or(crate::Error::invalid_argument("long token is not provided"))?;
                 let short_token = short_token.ok_or(crate::Error::invalid_argument(
                     "short token is not provided",
                 ))?;
-                let (long_token_escrow, long_token_ata) = long_token_accounts.ok_or(
-                    crate::Error::invalid_argument("long token accounts are not provided"),
-                )?;
-                let (short_token_escrow, short_token_ata) = short_token_accounts.ok_or(
-                    crate::Error::invalid_argument("short token accounts are not provided"),
-                )?;
-                let (final_output_token_escrow, final_output_token_ata) =
-                    final_output_token_accounts.ok_or(crate::Error::invalid_argument(
-                        "final_output_token accounts are not provided",
-                    ))?;
+
                 let escrow = self
                     .client
-                    .store_rpc()
-                    .accounts(accounts::PrepareDecreaseOrderEscrow {
-                        payer: *payer,
-                        owner: *payer,
-                        store: self.store,
-                        order,
-                        final_output_token,
-                        long_token,
-                        short_token,
-                        final_output_token_escrow,
-                        long_token_escrow,
-                        short_token_escrow,
-                        system_program: system_program::ID,
-                        token_program: anchor_spl::token::ID,
-                        associated_token_program: anchor_spl::associated_token::ID,
-                    })
-                    .args(instruction::PrepareDecreaseOrderEscrow { nonce });
-                let long_token_ata = self
-                    .client
-                    .store_rpc()
-                    .accounts(accounts::PrepareAssociatedTokenAccount {
-                        payer: *payer,
-                        owner: *payer,
-                        mint: long_token,
-                        account: long_token_ata,
-                        system_program: system_program::ID,
-                        token_program: anchor_spl::token::ID,
-                        associated_token_program: anchor_spl::associated_token::ID,
-                    })
-                    .args(instruction::PrepareAssociatedTokenAccount {});
-                let short_token_ata = self
-                    .client
-                    .store_rpc()
-                    .accounts(accounts::PrepareAssociatedTokenAccount {
-                        payer: *payer,
-                        owner: *payer,
-                        mint: short_token,
-                        account: short_token_ata,
-                        system_program: system_program::ID,
-                        token_program: anchor_spl::token::ID,
-                        associated_token_program: anchor_spl::associated_token::ID,
-                    })
-                    .args(instruction::PrepareAssociatedTokenAccount {});
-                let final_output_token_ata = self
-                    .client
-                    .store_rpc()
-                    .accounts(accounts::PrepareAssociatedTokenAccount {
-                        payer: *payer,
-                        owner: *payer,
-                        mint: final_output_token,
-                        account: final_output_token_ata,
-                        system_program: system_program::ID,
-                        token_program: anchor_spl::token::ID,
-                        associated_token_program: anchor_spl::associated_token::ID,
-                    })
-                    .args(instruction::PrepareAssociatedTokenAccount {});
+                    .prepare_associated_token_account(
+                        &final_output_token,
+                        &token_program_id,
+                        Some(&order),
+                    )
+                    .merge(self.client.prepare_associated_token_account(
+                        &long_token,
+                        &token_program_id,
+                        Some(&order),
+                    ))
+                    .merge(self.client.prepare_associated_token_account(
+                        &short_token,
+                        &token_program_id,
+                        Some(&order),
+                    ));
+
+                let long_token_ata = self.client.prepare_associated_token_account(
+                    &long_token,
+                    &token_program_id,
+                    None,
+                );
+                let short_token_ata = self.client.prepare_associated_token_account(
+                    &short_token,
+                    &token_program_id,
+                    None,
+                );
+                let final_output_token_ata = self.client.prepare_associated_token_account(
+                    &final_output_token,
+                    &token_program_id,
+                    None,
+                );
+
                 escrow
                     .merge(long_token_ata)
                     .merge(short_token_ata)

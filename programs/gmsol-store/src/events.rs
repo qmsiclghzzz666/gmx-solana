@@ -119,7 +119,7 @@ impl ActionEvent for RemoveDepositEvent {}
 /// Order removed event.
 #[event]
 #[cfg_attr(feature = "debug", derive(Debug))]
-#[derive(Clone)]
+#[derive(Clone, InitSpace)]
 pub struct RemoveOrderEvent {
     /// Action id.
     pub id: u64,
@@ -140,6 +140,7 @@ pub struct RemoveOrderEvent {
     /// Final state.
     pub state: ActionState,
     /// Reason.
+    #[max_len(32)]
     pub reason: String,
 }
 
@@ -169,6 +170,12 @@ impl RemoveOrderEvent {
         })
     }
 }
+
+impl InitSpace for RemoveOrderEvent {
+    const INIT_SPACE: usize = <Self as Space>::INIT_SPACE;
+}
+
+impl ActionEvent for RemoveOrderEvent {}
 
 /// Withdrawal removed event.
 #[event]

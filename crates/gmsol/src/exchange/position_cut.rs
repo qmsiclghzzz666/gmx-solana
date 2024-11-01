@@ -16,7 +16,7 @@ use gmsol_store::{
 
 use crate::{
     exchange::generate_nonce,
-    store::utils::FeedsParser,
+    store::{token::TokenAccountOps, utils::FeedsParser},
     utils::{ComputeBudget, TransactionBuilder, ZeroCopy},
 };
 
@@ -229,6 +229,8 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> PositionCutBuilder<'a, C> {
 
     /// Build [`TransactionBuilder`] for position cut.
     pub async fn build(&mut self) -> crate::Result<TransactionBuilder<'a, C>> {
+        let token_program_id = anchor_spl::token::ID;
+
         let payer = self.client.payer();
         let nonce = self.nonce.unwrap_or_else(generate_nonce);
         let hint = self.prepare_hint().await?;
@@ -275,23 +277,21 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> PositionCutBuilder<'a, C> {
 
         let prepare = self
             .client
-            .store_rpc()
-            .accounts(accounts::PrepareDecreaseOrderEscrow {
-                payer,
-                owner,
-                store,
-                order,
-                final_output_token: hint.collateral_token,
-                long_token: long_token_mint,
-                short_token: short_token_mint,
-                final_output_token_escrow: output_token_escrow,
-                long_token_escrow,
-                short_token_escrow,
-                system_program: system_program::ID,
-                token_program: anchor_spl::token::ID,
-                associated_token_program: anchor_spl::associated_token::ID,
-            })
-            .args(instruction::PrepareDecreaseOrderEscrow { nonce });
+            .prepare_associated_token_account(
+                &hint.collateral_token,
+                &token_program_id,
+                Some(&order),
+            )
+            .merge(self.client.prepare_associated_token_account(
+                &long_token_mint,
+                &token_program_id,
+                Some(&order),
+            ))
+            .merge(self.client.prepare_associated_token_account(
+                &short_token_mint,
+                &token_program_id,
+                Some(&order),
+            ));
         let prepare_event_buffer = self
             .client
             .store_rpc()

@@ -9,7 +9,7 @@ use typed_builder::TypedBuilder;
 use crate::{
     events::TradeEventData,
     states::{
-        common::action::{Action, ActionExt},
+        common::action::{Action, ActionExt, ActionParams},
         market::{
             revertible::{
                 market::RevertibleMarket,
@@ -36,7 +36,7 @@ pub struct CreateOrderParams {
     /// Order Kind.
     pub kind: OrderKind,
     /// Execution fee in lamports.
-    pub execution_fee: u64,
+    pub execution_lamports: u64,
     /// The length of the swap path.
     pub swap_path_length: u8,
     /// Initial collateral / swap in token amount.
@@ -53,6 +53,12 @@ pub struct CreateOrderParams {
     pub trigger_price: Option<u128>,
     /// Acceptable price.
     pub acceptable_price: Option<u128>,
+}
+
+impl ActionParams for CreateOrderParams {
+    fn execution_lamports(&self) -> u64 {
+        self.execution_lamports
+    }
 }
 
 impl CreateOrderParams {
@@ -122,7 +128,7 @@ impl<'a, 'info> CreateOrderOperation<'a, 'info> {
 
     fn validate(&self) -> Result<()> {
         self.market.load()?.validate(&self.store.key())?;
-        ActionExt::validate_balance(&self.order, self.params.execution_fee)?;
+        ActionExt::validate_balance(&self.order, self.params.execution_lamports)?;
         Ok(())
     }
 
@@ -153,7 +159,7 @@ impl<'a, 'info> CreateOrderOperation<'a, 'info> {
                 self.owner.key(),
                 *self.nonce,
                 self.bump,
-                self.params.execution_fee,
+                self.params.execution_lamports,
             )?;
 
             *market_token = self.market.load()?.meta().market_token_mint;
@@ -1549,7 +1555,7 @@ impl<'a, 'info> PositionCutOp<'a, 'info> {
             .execute()?;
         let params = CreateOrderParams {
             kind: self.kind.to_order_kind(),
-            execution_fee: Order::MIN_EXECUTION_LAMPORTS,
+            execution_lamports: Order::MIN_EXECUTION_LAMPORTS,
             swap_path_length: 0,
             initial_collateral_delta_amount: 0,
             size_delta_value: self.kind.size_delta_usd(size_in_usd),

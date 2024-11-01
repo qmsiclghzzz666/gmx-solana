@@ -11,7 +11,6 @@ use gmsol_utils::InitSpace;
 
 use crate::{
     constants,
-    events::RemoveOrderEvent,
     ops::{
         execution_fee::TransferExecutionFeeOperation,
         order::{CreateOrderOperation, CreateOrderParams},
@@ -23,196 +22,9 @@ use crate::{
         user::UserHeader,
         Market, NonceBytes, Position, RoleKey, Seed, Store, UpdateOrderParams,
     },
-    utils::{
-        internal::{self, Authentication},
-        token::is_associated_token_account,
-    },
+    utils::{internal, token::is_associated_token_account},
     CoreError,
 };
-
-/// The accounts definitions for the `prepare_swap_order_escrow` instruction.
-#[derive(Accounts)]
-#[instruction(nonce: [u8; 32])]
-pub struct PrepareSwapOrderEscrow<'info> {
-    /// The owner of the order.
-    #[account(mut)]
-    pub owner: Signer<'info>,
-    /// Store.
-    pub store: AccountLoader<'info, Store>,
-    /// The order owning these escrow accounts.
-    /// CHECK: The order account don't have to be initialized.
-    #[account(
-        seeds = [Order::SEED, store.key().as_ref(), owner.key().as_ref(), &nonce],
-        bump,
-    )]
-    pub order: UncheckedAccount<'info>,
-    /// Swap in token (will be stored as initial collateral token in order account).
-    pub swap_in_token: Box<Account<'info, Mint>>,
-    /// Swap out token (will be stored as collateral/output token in order account).
-    pub swap_out_token: Box<Account<'info, Mint>>,
-    /// The escrow account for receving the swap in tokens from the owner.
-    /// It will be stored as initial collateral token account in order account.
-    #[account(
-        init_if_needed,
-        payer = owner,
-        associated_token::mint = swap_in_token,
-        associated_token::authority = order,
-    )]
-    pub swap_in_token_escrow: Box<Account<'info, TokenAccount>>,
-    /// The escrow account for receving the swap out tokens after the swap.
-    /// It will be stored as final output token account in order account.
-    #[account(
-        init_if_needed,
-        payer = owner,
-        associated_token::mint = swap_out_token,
-        associated_token::authority = order,
-    )]
-    pub swap_out_token_escrow: Box<Account<'info, TokenAccount>>,
-    /// The system program.
-    pub system_program: Program<'info, System>,
-    /// The token program.
-    pub token_program: Program<'info, Token>,
-    /// The associated token program.
-    pub associated_token_program: Program<'info, AssociatedToken>,
-}
-
-pub(crate) fn prepare_swap_order_escrow(
-    _ctx: Context<PrepareSwapOrderEscrow>,
-    _nonce: NonceBytes,
-) -> Result<()> {
-    Ok(())
-}
-
-/// The accounts definitions for the `prepare_increase_order_escrow` instruction.
-#[derive(Accounts)]
-#[instruction(nonce: [u8; 32])]
-pub struct PrepareIncreaseOrderEscrow<'info> {
-    /// The owner of the order.
-    #[account(mut)]
-    pub owner: Signer<'info>,
-    /// Store.
-    pub store: AccountLoader<'info, Store>,
-    /// The order owning these escrow accounts.
-    /// CHECK: The order account don't have to be initialized.
-    #[account(
-        seeds = [Order::SEED, store.key().as_ref(), owner.key().as_ref(), &nonce],
-        bump,
-    )]
-    pub order: UncheckedAccount<'info>,
-    /// Initial collateral token (will be stored as initial collateral token in order account).
-    pub initial_collateral_token: Box<Account<'info, Mint>>,
-    /// Long token of the market.
-    pub long_token: Box<Account<'info, Mint>>,
-    /// Short token of the market.
-    pub short_token: Box<Account<'info, Mint>>,
-    /// The escrow account for receving the initial collateral tokens from the owner.
-    /// It will be stored as initial collateral token account in order account.
-    #[account(
-        init_if_needed,
-        payer = owner,
-        associated_token::mint = initial_collateral_token,
-        associated_token::authority = order,
-    )]
-    pub initial_collateral_token_escrow: Box<Account<'info, TokenAccount>>,
-    /// The escrow account for receving the funding rebate in long tokens after increasing position.
-    /// It will be stored as long token account.
-    #[account(
-        init_if_needed,
-        payer = owner,
-        associated_token::mint = long_token,
-        associated_token::authority = order,
-    )]
-    pub long_token_escrow: Box<Account<'info, TokenAccount>>,
-    /// The escrow account for receving the funding rebate in short tokens after increasing position.
-    /// It will be stored as short token account.
-    #[account(
-        init_if_needed,
-        payer = owner,
-        associated_token::mint = short_token,
-        associated_token::authority = order,
-    )]
-    pub short_token_escrow: Box<Account<'info, TokenAccount>>,
-    /// The system program.
-    pub system_program: Program<'info, System>,
-    /// The token program.
-    pub token_program: Program<'info, Token>,
-    /// The associated token program.
-    pub associated_token_program: Program<'info, AssociatedToken>,
-}
-
-pub(crate) fn prepare_increase_order_escrow(
-    _ctx: Context<PrepareIncreaseOrderEscrow>,
-    _nonce: NonceBytes,
-) -> Result<()> {
-    Ok(())
-}
-
-/// The accounts definitions for the `prepare_decrease_order_escrow` instruction.
-#[derive(Accounts)]
-#[instruction(nonce: [u8; 32])]
-pub struct PrepareDecreaseOrderEscrow<'info> {
-    /// The payer of this instruction.
-    #[account(mut)]
-    pub payer: Signer<'info>,
-    /// The owner of the order.
-    /// CHECK: only used as an identifier.
-    pub owner: UncheckedAccount<'info>,
-    /// Store.
-    pub store: AccountLoader<'info, Store>,
-    /// The order owning these escrow accounts.
-    /// CHECK: The order account don't have to be initialized.
-    #[account(
-        seeds = [Order::SEED, store.key().as_ref(), owner.key().as_ref(), &nonce],
-        bump,
-    )]
-    pub order: UncheckedAccount<'info>,
-    /// Final output token (will be stored as final output token in order account).
-    pub final_output_token: Box<Account<'info, Mint>>,
-    /// Long token of the market.
-    pub long_token: Box<Account<'info, Mint>>,
-    /// Short token of the market.
-    pub short_token: Box<Account<'info, Mint>>,
-    /// The escrow account for receving final output tokens after decreasing position.
-    /// It will be stored as final output token account in order account.
-    #[account(
-        init_if_needed,
-        payer = payer,
-        associated_token::mint = final_output_token,
-        associated_token::authority = order,
-    )]
-    pub final_output_token_escrow: Box<Account<'info, TokenAccount>>,
-    /// The escrow account for receving the funding rebate in long tokens or pnl tokens after decreasing position.
-    /// It will be stored as long token account.
-    #[account(
-        init_if_needed,
-        payer = payer,
-        associated_token::mint = long_token,
-        associated_token::authority = order,
-    )]
-    pub long_token_escrow: Box<Account<'info, TokenAccount>>,
-    /// The escrow account for receving the funding rebate in short tokens or pnl tokens after decreasing position.
-    /// It will be stored as short token account.
-    #[account(
-        init_if_needed,
-        payer = payer,
-        associated_token::mint = short_token,
-        associated_token::authority = order,
-    )]
-    pub short_token_escrow: Box<Account<'info, TokenAccount>>,
-    /// The system program.
-    pub system_program: Program<'info, System>,
-    /// The token program.
-    pub token_program: Program<'info, Token>,
-    /// The associated token program.
-    pub associated_token_program: Program<'info, AssociatedToken>,
-}
-
-pub(crate) fn prepare_decrease_order_escrow(
-    _ctx: Context<PrepareDecreaseOrderEscrow>,
-    _nonce: NonceBytes,
-) -> Result<()> {
-    Ok(())
-}
 
 /// Prepare position.
 #[derive(Accounts)]
@@ -268,7 +80,7 @@ pub(crate) fn prepare_position(
 }
 
 fn validate_and_initialize_position_if_needed<'info>(
-    position: &AccountLoader<'info, Position>,
+    position_loader: &AccountLoader<'info, Position>,
     bump: u8,
     kind: PositionKind,
     owner: &AccountInfo<'info>,
@@ -280,7 +92,7 @@ fn validate_and_initialize_position_if_needed<'info>(
     let mut should_transfer_in = false;
 
     let owner_key = owner.key;
-    match position.load_init() {
+    match position_loader.load_init() {
         Ok(mut position) => {
             position.try_init(
                 kind,
@@ -291,6 +103,8 @@ fn validate_and_initialize_position_if_needed<'info>(
                 collateral_token,
             )?;
             should_transfer_in = true;
+            drop(position);
+            position_loader.exit(&crate::ID)?;
         }
         Err(Error::AnchorError(err)) => {
             if err.error_code_number != ErrorCode::AccountDiscriminatorAlreadySet as u32 {
@@ -301,9 +115,8 @@ fn validate_and_initialize_position_if_needed<'info>(
             return Err(err);
         }
     }
-    position.exit(&crate::ID)?;
     validate_position(
-        &*position.load()?,
+        &*position_loader.load()?,
         bump,
         kind,
         owner_key,
@@ -314,7 +127,7 @@ fn validate_and_initialize_position_if_needed<'info>(
 
     if should_transfer_in {
         TransferExecutionFeeOperation::builder()
-            .payment(position.to_account_info())
+            .payment(position_loader.to_account_info())
             .payer(owner.clone())
             .execution_lamports(Order::position_cut_rent()?)
             .system_program(system_program)
@@ -484,121 +297,124 @@ pub struct CreateOrder<'info> {
     pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
-#[inline(never)]
-pub(crate) fn create_order<'info>(
-    ctx: Context<'_, '_, 'info, 'info, CreateOrder<'info>>,
-    nonce: &NonceBytes,
-    params: &CreateOrderParams,
-) -> Result<()> {
-    let accounts = ctx.accounts;
+impl<'info> internal::Create<'info, Order> for CreateOrder<'info> {
+    type CreateParams = CreateOrderParams;
 
-    accounts
-        .store
-        .load()?
-        .validate_feature_enabled(params.kind.try_into()?, ActionDisabledFlag::CreateOrder)?;
-
-    accounts.transfer_execution_fee(params)?;
-    accounts.transfer_tokens(params)?;
-
-    let ops = CreateOrderOperation::builder()
-        .order(accounts.order.clone())
-        .market(accounts.market.clone())
-        .store(accounts.store.clone())
-        .owner(accounts.owner.to_account_info())
-        .nonce(nonce)
-        .bump(ctx.bumps.order)
-        .params(params)
-        .swap_path(ctx.remaining_accounts)
-        .build();
-
-    let kind = params.kind;
-    match kind {
-        OrderKind::MarketSwap | OrderKind::LimitSwap => {
-            let swap_in = accounts
-                .initial_collateral_token_escrow
-                .as_ref()
-                .ok_or(error!(CoreError::TokenAccountNotProvided))?;
-            let swap_out = accounts
-                .final_output_token_escrow
-                .as_ref()
-                .ok_or(error!(CoreError::TokenAccountNotProvided))?;
-            ops.swap()
-                .swap_in_token(swap_in.as_ref())
-                .swap_out_token(swap_out.as_ref())
-                .build()
-                .execute()?;
-        }
-        OrderKind::MarketIncrease | OrderKind::LimitIncrease => {
-            let initial_collateral = accounts
-                .initial_collateral_token_escrow
-                .as_ref()
-                .ok_or(error!(CoreError::TokenAccountNotProvided))?;
-            let long_token = accounts
-                .long_token_escrow
-                .as_ref()
-                .ok_or(error!(CoreError::TokenAccountNotProvided))?;
-            let short_token = accounts
-                .short_token_escrow
-                .as_ref()
-                .ok_or(error!(CoreError::TokenAccountNotProvided))?;
-            ops.increase()
-                .position(
-                    accounts
-                        .position
-                        .as_ref()
-                        .ok_or(error!(CoreError::PositionIsRequired))?,
-                )
-                .initial_collateral_token(initial_collateral.as_ref())
-                .long_token(long_token.as_ref())
-                .short_token(short_token.as_ref())
-                .build()
-                .execute()?;
-        }
-        OrderKind::MarketDecrease | OrderKind::LimitDecrease | OrderKind::StopLossDecrease => {
-            let final_output = accounts
-                .final_output_token_escrow
-                .as_ref()
-                .ok_or(error!(CoreError::TokenAccountNotProvided))?;
-            let long_token = accounts
-                .long_token_escrow
-                .as_ref()
-                .ok_or(error!(CoreError::TokenAccountNotProvided))?;
-            let short_token = accounts
-                .short_token_escrow
-                .as_ref()
-                .ok_or(error!(CoreError::TokenAccountNotProvided))?;
-            ops.decrease()
-                .position(
-                    accounts
-                        .position
-                        .as_ref()
-                        .ok_or(error!(CoreError::PositionIsRequired))?,
-                )
-                .final_output_token(final_output.as_ref())
-                .long_token(long_token.as_ref())
-                .short_token(short_token.as_ref())
-                .build()
-                .execute()?;
-        }
-        _ => {
-            return err!(CoreError::OrderKindNotAllowed);
-        }
+    fn action(&self) -> AccountInfo<'info> {
+        self.order.to_account_info()
     }
 
-    Ok(())
+    fn payer(&self) -> AccountInfo<'info> {
+        self.owner.to_account_info()
+    }
+
+    fn system_program(&self) -> AccountInfo<'info> {
+        self.system_program.to_account_info()
+    }
+
+    fn validate(&self, params: &Self::CreateParams) -> Result<()> {
+        self.store
+            .load()?
+            .validate_feature_enabled(params.kind.try_into()?, ActionDisabledFlag::CreateOrder)?;
+        Ok(())
+    }
+
+    fn create_impl(
+        &mut self,
+        params: &Self::CreateParams,
+        nonce: &NonceBytes,
+        bumps: &Self::Bumps,
+        remaining_accounts: &'info [AccountInfo<'info>],
+    ) -> Result<()> {
+        self.transfer_tokens(params)?;
+
+        let ops = CreateOrderOperation::builder()
+            .order(self.order.clone())
+            .market(self.market.clone())
+            .store(self.store.clone())
+            .owner(self.owner.to_account_info())
+            .nonce(nonce)
+            .bump(bumps.order)
+            .params(params)
+            .swap_path(remaining_accounts)
+            .build();
+
+        let kind = params.kind;
+        match kind {
+            OrderKind::MarketSwap | OrderKind::LimitSwap => {
+                let swap_in = self
+                    .initial_collateral_token_escrow
+                    .as_ref()
+                    .ok_or(error!(CoreError::TokenAccountNotProvided))?;
+                let swap_out = self
+                    .final_output_token_escrow
+                    .as_ref()
+                    .ok_or(error!(CoreError::TokenAccountNotProvided))?;
+                ops.swap()
+                    .swap_in_token(swap_in.as_ref())
+                    .swap_out_token(swap_out.as_ref())
+                    .build()
+                    .execute()?;
+            }
+            OrderKind::MarketIncrease | OrderKind::LimitIncrease => {
+                let initial_collateral = self
+                    .initial_collateral_token_escrow
+                    .as_ref()
+                    .ok_or(error!(CoreError::TokenAccountNotProvided))?;
+                let long_token = self
+                    .long_token_escrow
+                    .as_ref()
+                    .ok_or(error!(CoreError::TokenAccountNotProvided))?;
+                let short_token = self
+                    .short_token_escrow
+                    .as_ref()
+                    .ok_or(error!(CoreError::TokenAccountNotProvided))?;
+                ops.increase()
+                    .position(
+                        self.position
+                            .as_ref()
+                            .ok_or(error!(CoreError::PositionIsRequired))?,
+                    )
+                    .initial_collateral_token(initial_collateral.as_ref())
+                    .long_token(long_token.as_ref())
+                    .short_token(short_token.as_ref())
+                    .build()
+                    .execute()?;
+            }
+            OrderKind::MarketDecrease | OrderKind::LimitDecrease | OrderKind::StopLossDecrease => {
+                let final_output = self
+                    .final_output_token_escrow
+                    .as_ref()
+                    .ok_or(error!(CoreError::TokenAccountNotProvided))?;
+                let long_token = self
+                    .long_token_escrow
+                    .as_ref()
+                    .ok_or(error!(CoreError::TokenAccountNotProvided))?;
+                let short_token = self
+                    .short_token_escrow
+                    .as_ref()
+                    .ok_or(error!(CoreError::TokenAccountNotProvided))?;
+                ops.decrease()
+                    .position(
+                        self.position
+                            .as_ref()
+                            .ok_or(error!(CoreError::PositionIsRequired))?,
+                    )
+                    .final_output_token(final_output.as_ref())
+                    .long_token(long_token.as_ref())
+                    .short_token(short_token.as_ref())
+                    .build()
+                    .execute()?;
+            }
+            _ => {
+                return err!(CoreError::OrderKindNotAllowed);
+            }
+        }
+        Ok(())
+    }
 }
 
 impl<'info> CreateOrder<'info> {
-    fn transfer_execution_fee(&self, params: &CreateOrderParams) -> Result<()> {
-        TransferExecutionFeeOperation::builder()
-            .payment(self.order.to_account_info())
-            .payer(self.owner.to_account_info())
-            .execution_lamports(params.execution_fee)
-            .system_program(self.system_program.to_account_info())
-            .build()
-            .execute()
-    }
-
     fn transfer_tokens(&mut self, params: &CreateOrderParams) -> Result<()> {
         let kind = params.kind;
         if !matches!(
@@ -764,45 +580,6 @@ pub struct CloseOrder<'info> {
     pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
-pub(crate) fn close_order(ctx: Context<CloseOrder>, reason: &str) -> Result<()> {
-    let accounts = &ctx.accounts;
-
-    // Validate feature enabled.
-    {
-        let order = accounts.order.load()?;
-        if order.header.action_state()?.is_pending() {
-            accounts.store.load()?.validate_feature_enabled(
-                order.params().kind()?.try_into()?,
-                ActionDisabledFlag::CancelOrder,
-            )?;
-        }
-    }
-
-    let should_continue_when_atas_are_missing = accounts.preprocess()?;
-    let transfer_success = accounts.transfer_to_atas(should_continue_when_atas_are_missing)?;
-    let process_success = accounts.process_gt_reward()?;
-    if transfer_success && process_success {
-        {
-            let order_address = accounts.order.key();
-            let order = accounts.order.load()?;
-            emit_cpi!(RemoveOrderEvent::new(
-                order.header.id,
-                order.header.store,
-                order_address,
-                order.params.kind()?,
-                order.market_token,
-                order.header.owner,
-                order.header.action_state()?,
-                reason
-            )?);
-        }
-        accounts.close()?;
-    } else {
-        msg!("Some ATAs are not initialized, skip the close");
-    }
-    Ok(())
-}
-
 impl<'info> internal::Authentication<'info> for CloseOrder<'info> {
     fn authority(&self) -> &Signer<'info> {
         &self.executor
@@ -813,27 +590,46 @@ impl<'info> internal::Authentication<'info> for CloseOrder<'info> {
     }
 }
 
-type ShouldContinueWhenATAsAreMissing = bool;
-type Success = bool;
-
-impl<'info> CloseOrder<'info> {
-    fn preprocess(&self) -> Result<ShouldContinueWhenATAsAreMissing> {
-        if self.executor.key == self.owner.key {
-            Ok(true)
-        } else {
-            self.only_role(RoleKey::ORDER_KEEPER)?;
-            {
-                let order = self.order.load()?;
-                if order.header.action_state()?.is_completed_or_cancelled() {
-                    Ok(false)
-                } else {
-                    err!(CoreError::PermissionDenied)
-                }
-            }
-        }
+impl<'info> internal::Close<'info, Order> for CloseOrder<'info> {
+    fn expected_keeper_role(&self) -> &str {
+        RoleKey::ORDER_KEEPER
     }
 
-    fn transfer_to_atas(&self, init_if_needed: bool) -> Result<Success> {
+    fn fund_receiver(&self) -> AccountInfo<'info> {
+        self.owner.to_account_info()
+    }
+
+    fn validate(&self) -> Result<()> {
+        let order = self.order.load()?;
+        if order.header.action_state()?.is_pending() {
+            self.store.load()?.validate_feature_enabled(
+                order.params().kind()?.try_into()?,
+                ActionDisabledFlag::CancelOrder,
+            )?;
+        }
+        Ok(())
+    }
+
+    fn process(&self, init_if_needed: bool) -> Result<internal::Success> {
+        let transfer_success = self.transfer_to_atas(init_if_needed)?;
+        let process_success = self.process_gt_reward()?;
+        Ok(transfer_success && process_success)
+    }
+
+    fn event_authority(&self, bumps: &Self::Bumps) -> (AccountInfo<'info>, u8) {
+        (
+            self.event_authority.to_account_info(),
+            bumps.event_authority,
+        )
+    }
+
+    fn action(&self) -> &AccountLoader<'info, Order> {
+        &self.order
+    }
+}
+
+impl<'info> CloseOrder<'info> {
+    fn transfer_to_atas(&self, init_if_needed: bool) -> Result<internal::Success> {
         use crate::utils::token::TransferAllFromEscrowToATA;
 
         let signer = self.order.load()?.signer();
@@ -897,7 +693,7 @@ impl<'info> CloseOrder<'info> {
         Ok(true)
     }
 
-    fn process_gt_reward(&self) -> Result<Success> {
+    fn process_gt_reward(&self) -> Result<internal::Success> {
         let amount = self.order.load()?.gt_reward;
         if amount != 0 {
             self.mint_gt_reward_for_referrer(amount)?;
@@ -950,11 +746,6 @@ impl<'info> CloseOrder<'info> {
             );
         }
 
-        Ok(())
-    }
-
-    fn close(&self) -> Result<()> {
-        self.order.close(self.owner.to_account_info())?;
         Ok(())
     }
 }

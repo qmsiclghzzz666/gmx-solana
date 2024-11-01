@@ -29,6 +29,11 @@ pub(crate) trait Create<'info, A>: Sized + anchor_lang::Bumps {
     /// Get the system program account.
     fn system_program(&self) -> AccountInfo<'info>;
 
+    /// Validate.
+    fn validate(&self, _params: &Self::CreateParams) -> Result<()> {
+        Ok(())
+    }
+
     /// The implementation of the creation.
     fn create_impl(
         &mut self,
@@ -45,6 +50,7 @@ pub(crate) trait Create<'info, A>: Sized + anchor_lang::Bumps {
         params: &Self::CreateParams,
     ) -> Result<()> {
         let accounts = &mut ctx.accounts;
+        accounts.validate(params)?;
         accounts.transfer_execution_lamports(params)?;
         accounts.create_impl(params, nonce, &ctx.bumps, ctx.remaining_accounts)?;
         Ok(())
@@ -71,7 +77,7 @@ pub(crate) trait Create<'info, A>: Sized + anchor_lang::Bumps {
 }
 
 type ShouldContinueWhenATAsAreMissing = bool;
-pub(crate) type TransferSuccess = bool;
+pub(crate) type Success = bool;
 
 /// Close Action.
 pub(crate) trait Close<'info, A>: Authenticate<'info>
@@ -84,22 +90,28 @@ where
     /// Fund receiver.
     fn fund_receiver(&self) -> AccountInfo<'info>;
 
+    /// Get event authority.
+    fn event_authority(&self, bumps: &Self::Bumps) -> (AccountInfo<'info>, u8);
+
     /// Whether to skip the completion check when the authority is keeper.
     fn skip_completion_check_for_keeper(&self) -> bool {
         false
     }
 
-    /// Transfer funds to ATAs.
-    fn transfer_to_atas(&self, init_if_needed: bool) -> Result<TransferSuccess>;
+    /// Validate.
+    fn validate(&self) -> Result<()> {
+        Ok(())
+    }
 
-    /// Get event authority.
-    fn event_authority(&self, bumps: &Self::Bumps) -> (AccountInfo<'info>, u8);
+    /// Process before the close.
+    fn process(&self, init_if_needed: bool) -> Result<Success>;
 
     /// Close Action.
     fn close(ctx: &Context<'_, '_, '_, 'info, Self>, reason: &str) -> Result<()> {
         let accounts = &ctx.accounts;
+        accounts.validate()?;
         let should_continue_when_atas_are_missing = accounts.preprocess()?;
-        if accounts.transfer_to_atas(should_continue_when_atas_are_missing)? {
+        if accounts.process(should_continue_when_atas_are_missing)? {
             {
                 let action_address = accounts.action().key();
                 let action = accounts.action().load()?;

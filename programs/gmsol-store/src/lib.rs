@@ -1123,27 +1123,6 @@ pub mod gmsol_store {
         instructions::unchecked_execute_withdrawal(ctx, execution_fee, throw_on_execution_error)
     }
 
-    pub fn prepare_swap_order_escrow(
-        ctx: Context<PrepareSwapOrderEscrow>,
-        nonce: [u8; 32],
-    ) -> Result<()> {
-        instructions::prepare_swap_order_escrow(ctx, nonce)
-    }
-
-    pub fn prepare_increase_order_escrow(
-        ctx: Context<PrepareIncreaseOrderEscrow>,
-        nonce: [u8; 32],
-    ) -> Result<()> {
-        instructions::prepare_increase_order_escrow(ctx, nonce)
-    }
-
-    pub fn prepare_decrease_order_escrow(
-        ctx: Context<PrepareDecreaseOrderEscrow>,
-        nonce: [u8; 32],
-    ) -> Result<()> {
-        instructions::prepare_decrease_order_escrow(ctx, nonce)
-    }
-
     pub fn prepare_position(
         ctx: Context<PreparePosition>,
         params: CreateOrderParams,
@@ -1152,15 +1131,18 @@ pub mod gmsol_store {
     }
 
     pub fn create_order<'info>(
-        ctx: Context<'_, '_, 'info, 'info, CreateOrder<'info>>,
+        mut ctx: Context<'_, '_, 'info, 'info, CreateOrder<'info>>,
         nonce: [u8; 32],
         params: CreateOrderParams,
     ) -> Result<()> {
-        instructions::create_order(ctx, &nonce, &params)
+        internal::Create::create(&mut ctx, &nonce, &params)
     }
 
-    pub fn close_order(ctx: Context<CloseOrder>, reason: String) -> Result<()> {
-        instructions::close_order(ctx, &reason)
+    pub fn close_order<'info>(
+        ctx: Context<'_, '_, 'info, 'info, CloseOrder<'info>>,
+        reason: String,
+    ) -> Result<()> {
+        internal::Close::close(&ctx, &reason)
     }
 
     pub fn prepare_trade_event_buffer(

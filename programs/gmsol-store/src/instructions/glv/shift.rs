@@ -209,7 +209,7 @@ impl<'info> internal::Close<'info, GlvShift> for CloseGlvShift<'info> {
         true
     }
 
-    fn transfer_to_atas(&self, _init_if_needed: bool) -> Result<internal::TransferSuccess> {
+    fn process(&self, _init_if_needed: bool) -> Result<internal::Success> {
         Ok(true)
     }
 

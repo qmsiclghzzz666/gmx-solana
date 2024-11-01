@@ -3,7 +3,7 @@ mod authentication;
 mod transfer;
 
 pub(crate) use self::{
-    action::{Close, Create, TransferSuccess},
+    action::{Close, Create, Success},
     authentication::{Authenticate, Authentication},
     transfer::TransferUtils,
 };
