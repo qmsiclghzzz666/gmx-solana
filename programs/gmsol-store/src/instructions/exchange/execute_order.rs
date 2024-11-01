@@ -5,14 +5,14 @@ use anchor_spl::token::{Mint, Token, TokenAccount};
 
 use crate::{
     constants,
-    events::{TradeEvent, TradeEventData},
+    events::{Trade, TradeData},
     ops::{
         execution_fee::PayExecutionFeeOperation,
         market::{MarketTransferInOperation, MarketTransferOutOperation},
         order::{ExecuteOrderOperation, ProcessTransferOutOperation, ShouldSendTradeEvent},
     },
     states::{
-        common::action::{ActionExt, ActionSigner},
+        common::action::{ActionEvent, ActionExt, ActionSigner},
         feature::ActionDisabledFlag,
         order::{Order, TransferOut},
         position::Position,
@@ -36,11 +36,11 @@ pub struct PrepareTradeEventBuffer<'info> {
     #[account(
         init_if_needed,
         payer = authority,
-        space = 8 + TradeEventData::INIT_SPACE,
-        seeds = [TradeEventData::SEED, store.key().as_ref(), authority.key().as_ref(), &[index]],
+        space = 8 + TradeData::INIT_SPACE,
+        seeds = [TradeData::SEED, store.key().as_ref(), authority.key().as_ref(), &[index]],
         bump,
     )]
-    pub event: AccountLoader<'info, TradeEventData>,
+    pub event: AccountLoader<'info, TradeData>,
     /// System Program.
     pub system_program: Program<'info, System>,
 }
@@ -178,7 +178,7 @@ pub struct ExecuteOrder<'info> {
     pub position: Option<AccountLoader<'info, Position>>,
     /// Trade event buffer.
     #[account(mut, has_one = store, has_one = authority)]
-    pub event: Option<AccountLoader<'info, TradeEventData>>,
+    pub event: Option<AccountLoader<'info, TradeData>>,
     /// Initial collateral token.
     pub initial_collateral_token: Option<Box<Account<'info, Mint>>>,
     /// Final output token.
@@ -361,8 +361,8 @@ pub(crate) fn unchecked_execute_order<'info>(
             .as_ref()
             .ok_or_else(|| error!(CoreError::PositionIsRequired))?
             .load()?;
-        let event = TradeEvent::from(&*event);
-        event.emit(&accounts.event_authority, ctx.bumps.event_authority)?;
+        let event = Trade::from(&*event);
+        event.emit_cpi(accounts.event_authority.clone(), ctx.bumps.event_authority)?;
     }
 
     // It must be placed at the end to be executed correctly.
@@ -621,7 +621,7 @@ pub struct ExecuteDecreaseOrder<'info> {
     pub position: AccountLoader<'info, Position>,
     /// Trade event buffer.
     #[account(mut, has_one = store, has_one = authority)]
-    pub event: AccountLoader<'info, TradeEventData>,
+    pub event: AccountLoader<'info, TradeData>,
     /// Final output token.
     pub final_output_token: Box<Account<'info, Mint>>,
     /// Long token.
@@ -764,8 +764,8 @@ pub(crate) fn unchecked_execute_decrease_order<'info>(
     if should_send_trade_event {
         let event_loader = accounts.event.clone();
         let event = event_loader.load()?;
-        let event = TradeEvent::from(&*event);
-        event.emit(&accounts.event_authority, ctx.bumps.event_authority)?;
+        let event = Trade::from(&*event);
+        event.emit_cpi(accounts.event_authority.clone(), ctx.bumps.event_authority)?;
     }
 
     // It must be placed at the end to be executed correctly.

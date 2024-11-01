@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use gmsol_utils::{to_seed, InitSpace};
 
 use crate::{
-    states::{DataStoreInitEvent, Store, TokenMapHeader},
+    states::{Store, TokenMapHeader},
     utils::internal,
     CoreError,
 };
@@ -43,10 +43,6 @@ pub(crate) fn initialize(
         &key,
         ctx.bumps.store,
     )?;
-    emit!(DataStoreInitEvent {
-        key,
-        address: ctx.accounts.store.key(),
-    });
     Ok(())
 }
 

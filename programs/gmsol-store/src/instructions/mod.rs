@@ -23,7 +23,7 @@
 //! [`Store`]: crate::states::Store
 
 /// Instructions for [`Store`](crate::states::Store) account.
-pub mod data_store;
+pub mod store;
 
 /// Instructions for config magament.
 pub mod config;
@@ -63,7 +63,6 @@ pub mod glv;
 pub mod bug_fix;
 
 pub use config::*;
-pub use data_store::*;
 pub use exchange::*;
 pub use feature::*;
 pub use glv::*;
@@ -71,6 +70,7 @@ pub use gt::*;
 pub use market::*;
 pub use oracle::*;
 pub use roles::*;
+pub use store::*;
 pub use token::*;
 pub use token_config::*;
 pub use user::*;

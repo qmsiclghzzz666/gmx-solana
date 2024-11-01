@@ -7,7 +7,7 @@ use gmsol_model::{
 use typed_builder::TypedBuilder;
 
 use crate::{
-    events::TradeEventData,
+    events::TradeData,
     states::{
         common::action::{Action, ActionExt, ActionParams},
         market::{
@@ -693,7 +693,7 @@ pub(crate) struct ExecuteOrderOperation<'a, 'info> {
     order: &'a AccountLoader<'info, Order>,
     owner: AccountInfo<'info>,
     position: Option<&'a AccountLoader<'info, Position>>,
-    event: Option<&'a AccountLoader<'info, TradeEventData>>,
+    event: Option<&'a AccountLoader<'info, TradeData>>,
     oracle: &'a Oracle,
     remaining_accounts: &'info [AccountInfo<'info>],
     throw_on_execution_error: bool,
@@ -1201,7 +1201,7 @@ fn execute_increase_position(
     position: &mut RevertiblePosition<'_>,
     swap_markets: &mut SwapMarkets<'_>,
     transfer_out: &mut TransferOut,
-    event: &mut TradeEventData,
+    event: &mut TradeData,
     order: &mut Order,
 ) -> Result<()> {
     let params = &order.params;
@@ -1271,7 +1271,7 @@ fn execute_decrease_position(
     position: &mut RevertiblePosition<'_>,
     swap_markets: &mut SwapMarkets<'_>,
     transfer_out: &mut TransferOut,
-    event: &mut TradeEventData,
+    event: &mut TradeData,
     order: &mut Order,
     is_insolvent_close_allowed: bool,
     secondary_order_type: Option<SecondaryOrderType>,
@@ -1471,7 +1471,7 @@ pub struct PositionCutOp<'a, 'info> {
     kind: PositionCutKind,
     executor: AccountInfo<'info>,
     position: &'a AccountLoader<'info, Position>,
-    event: &'a AccountLoader<'info, TradeEventData>,
+    event: &'a AccountLoader<'info, TradeData>,
     order: &'a AccountLoader<'info, Order>,
     market: &'a AccountLoader<'info, Market>,
     store: &'a AccountLoader<'info, Store>,

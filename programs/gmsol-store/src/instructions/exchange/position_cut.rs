@@ -9,14 +9,14 @@ use gmsol_utils::InitSpace;
 
 use crate::{
     check_delegation, constants,
-    events::{TradeEvent, TradeEventData},
+    events::{Trade, TradeData},
     get_pnl_token,
     ops::{
         execution_fee::PayExecutionFeeOperation,
         order::{PositionCutKind, PositionCutOp},
     },
     states::{
-        common::action::ActionExt,
+        common::action::{ActionEvent, ActionExt},
         feature::{ActionDisabledFlag, DomainDisabledFlag},
         order::Order,
         user::UserHeader,
@@ -88,7 +88,7 @@ pub struct PositionCut<'info> {
     pub position: AccountLoader<'info, Position>,
     /// Trade event buffer.
     #[account(mut, has_one = store, has_one = authority)]
-    pub event: AccountLoader<'info, TradeEventData>,
+    pub event: AccountLoader<'info, TradeData>,
     /// Long token.
     pub long_token: Box<Account<'info, Mint>>,
     /// Short token.
@@ -271,8 +271,8 @@ pub(crate) fn unchecked_process_position_cut<'info>(
     if should_send_trade_event {
         let event_loader = accounts.event.clone();
         let event = event_loader.load()?;
-        let event = TradeEvent::from(&*event);
-        event.emit(&accounts.event_authority, ctx.bumps.event_authority)?;
+        let event = Trade::from(&*event);
+        event.emit_cpi(accounts.event_authority.clone(), ctx.bumps.event_authority)?;
     }
 
     accounts.pay_execution_fee(execution_fee)?;

@@ -6,6 +6,7 @@ use anchor_spl::{
 use gmsol_utils::InitSpace;
 
 use crate::{
+    events::WithdrawalCreated,
     ops::withdrawal::{CreateWithdrawalOperation, CreateWithdrawalParams},
     states::{
         common::action::ActionExt, withdrawal::Withdrawal, Market, NonceBytes, RoleKey, Seed, Store,
@@ -13,67 +14,6 @@ use crate::{
     utils::{internal, token::is_associated_token_account},
     CoreError,
 };
-
-// /// The accounts definitions for the `prepare_withdrawal_escrow` instruction.
-// #[derive(Accounts)]
-// #[instruction(nonce: [u8; 32])]
-// pub struct PrepareWithdrawalEscrow<'info> {
-//     /// The owner of the withdrawal.
-//     #[account(mut)]
-//     pub owner: Signer<'info>,
-//     /// Store.
-//     pub store: AccountLoader<'info, Store>,
-//     /// The withdrawal owning these escrow accounts.
-//     /// CHECK: The withdrawal don't have to be initialized.
-//     #[account(
-//         seeds = [Withdrawal::SEED, store.key().as_ref(), owner.key().as_ref(), &nonce],
-//         bump,
-//     )]
-//     pub withdrawal: UncheckedAccount<'info>,
-//     /// Market token.
-//     pub market_token: Box<Account<'info, Mint>>,
-//     /// Final long token.
-//     pub final_long_token: Box<Account<'info, Mint>>,
-//     /// Final short token.
-//     pub final_short_token: Box<Account<'info, Mint>>,
-//     /// The escrow account for receving market tokens to burn.
-//     #[account(
-//         init_if_needed,
-//         payer = owner,
-//         associated_token::mint = market_token,
-//         associated_token::authority = withdrawal,
-//     )]
-//     pub market_token_escrow: Box<Account<'info, TokenAccount>>,
-//     /// The escrow account for receiving withdrawed final long token
-//     #[account(
-//         init_if_needed,
-//         payer = owner,
-//         associated_token::mint = final_long_token,
-//         associated_token::authority = withdrawal,
-//     )]
-//     pub final_long_token_escrow: Box<Account<'info, TokenAccount>>,
-//     /// The escrow account for receiving withdrawed final short token
-//     #[account(
-//         init_if_needed,
-//         payer = owner,
-//         associated_token::mint = final_short_token,
-//         associated_token::authority = withdrawal,
-//     )]
-//     pub final_short_token_escrow: Box<Account<'info, TokenAccount>>,
-//     /// The system program.
-//     pub system_program: Program<'info, System>,
-//     /// The token program.
-//     pub token_program: Program<'info, Token>,
-//     /// The associated token program.
-//     pub associated_token_program: Program<'info, AssociatedToken>,
-// }
-
-// pub(crate) fn prepare_withdrawal_escrow(
-//     _ctx: Context<PrepareWithdrawalEscrow>,
-//     _nonce: NonceBytes,
-// ) -> Result<()> {
-//     Ok(())
-// }
 
 /// The accounts definition for the `create_withdrawal` instruction.
 #[derive(Accounts)]
@@ -187,6 +127,10 @@ impl<'info> internal::Create<'info, Withdrawal> for CreateWithdrawal<'info> {
             .swap_paths(remaining_accounts)
             .build()
             .execute()?;
+        emit!(WithdrawalCreated::new(
+            self.store.key(),
+            self.withdrawal.key(),
+        )?);
         Ok(())
     }
 }

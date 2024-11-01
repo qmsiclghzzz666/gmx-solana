@@ -6,7 +6,7 @@ use std::{
 use anchor_lang::prelude::*;
 
 use crate::{
-    events::{RemoveGlvDepositEvent, RemoveGlvWithdrawalEvent, RemoveShiftEvent},
+    events::{GlvDepositRemoved, GlvWithdrawalRemoved, ShiftRemoved},
     states::{Deposit, Market},
     utils::token::validate_associated_token_account,
     CoreError,
@@ -440,10 +440,10 @@ impl Action for GlvDeposit {
 }
 
 impl Closable for GlvDeposit {
-    type ClosedEvent = RemoveGlvDepositEvent;
+    type ClosedEvent = GlvDepositRemoved;
 
     fn to_closed_event(&self, address: &Pubkey, reason: &str) -> Result<Self::ClosedEvent> {
-        RemoveGlvDepositEvent::new(
+        GlvDepositRemoved::new(
             self.header.id(),
             *self.header.store(),
             *address,
@@ -660,10 +660,10 @@ impl Action for GlvWithdrawal {
 }
 
 impl Closable for GlvWithdrawal {
-    type ClosedEvent = RemoveGlvWithdrawalEvent;
+    type ClosedEvent = GlvWithdrawalRemoved;
 
     fn to_closed_event(&self, address: &Pubkey, reason: &str) -> Result<Self::ClosedEvent> {
-        RemoveGlvWithdrawalEvent::new(
+        GlvWithdrawalRemoved::new(
             self.header.id,
             self.header.store,
             *address,
@@ -792,12 +792,12 @@ impl Action for GlvShift {
 }
 
 impl Closable for GlvShift {
-    type ClosedEvent = RemoveShiftEvent;
+    type ClosedEvent = ShiftRemoved;
 
     fn to_closed_event(&self, address: &Pubkey, reason: &str) -> Result<Self::ClosedEvent> {
         let header = self.header();
         let tokens = self.tokens();
-        RemoveShiftEvent::new(
+        ShiftRemoved::new(
             header.id,
             header.store,
             *address,

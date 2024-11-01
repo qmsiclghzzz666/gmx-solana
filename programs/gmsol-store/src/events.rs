@@ -14,7 +14,6 @@ use gmsol_model::{
 use gmsol_utils::InitSpace;
 
 use crate::{
-    constants,
     states::{
         common::action::{ActionEvent, ActionState},
         order::{OrderKind, TransferOut},
@@ -26,7 +25,7 @@ use crate::{
 
 #[event]
 #[cfg_attr(feature = "debug", derive(Debug))]
-pub struct DepositCreatedEvent {
+pub struct DepositCreated {
     /// Event time.
     pub ts: i64,
     /// Store account.
@@ -35,9 +34,19 @@ pub struct DepositCreatedEvent {
     pub deposit: Pubkey,
 }
 
+impl DepositCreated {
+    pub(crate) fn new(store: Pubkey, deposit: Pubkey) -> Result<Self> {
+        Ok(Self {
+            ts: Clock::get()?.unix_timestamp,
+            store,
+            deposit,
+        })
+    }
+}
+
 #[event]
 #[cfg_attr(feature = "debug", derive(Debug))]
-pub struct WithdrawalCreatedEvent {
+pub struct WithdrawalCreated {
     /// Event time.
     pub ts: i64,
     /// Store account.
@@ -46,9 +55,19 @@ pub struct WithdrawalCreatedEvent {
     pub withdrawal: Pubkey,
 }
 
+impl WithdrawalCreated {
+    pub(crate) fn new(store: Pubkey, withdrawal: Pubkey) -> Result<Self> {
+        Ok(Self {
+            ts: Clock::get()?.unix_timestamp,
+            store,
+            withdrawal,
+        })
+    }
+}
+
 #[event]
 #[cfg_attr(feature = "debug", derive(Debug))]
-pub struct OrderCreatedEvent {
+pub struct OrderCreated {
     /// Event time.
     pub ts: i64,
     /// Store account.
@@ -59,11 +78,22 @@ pub struct OrderCreatedEvent {
     pub position: Option<Pubkey>,
 }
 
+impl OrderCreated {
+    pub(crate) fn new(store: Pubkey, order: Pubkey, position: Option<Pubkey>) -> Result<Self> {
+        Ok(Self {
+            ts: Clock::get()?.unix_timestamp,
+            store,
+            order,
+            position,
+        })
+    }
+}
+
 /// Deposit removed event.
 #[event]
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[derive(Clone, InitSpace)]
-pub struct RemoveDepositEvent {
+pub struct DepositRemoved {
     /// Action id.
     pub id: u64,
     /// Timestamp.
@@ -85,7 +115,7 @@ pub struct RemoveDepositEvent {
     pub reason: String,
 }
 
-impl RemoveDepositEvent {
+impl DepositRemoved {
     pub(crate) fn new(
         id: u64,
         store: Pubkey,
@@ -110,17 +140,17 @@ impl RemoveDepositEvent {
     }
 }
 
-impl InitSpace for RemoveDepositEvent {
+impl InitSpace for DepositRemoved {
     const INIT_SPACE: usize = <Self as Space>::INIT_SPACE;
 }
 
-impl ActionEvent for RemoveDepositEvent {}
+impl ActionEvent for DepositRemoved {}
 
 /// Order removed event.
 #[event]
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[derive(Clone, InitSpace)]
-pub struct RemoveOrderEvent {
+pub struct OrderRemoved {
     /// Action id.
     pub id: u64,
     /// Timestamp.
@@ -144,7 +174,7 @@ pub struct RemoveOrderEvent {
     pub reason: String,
 }
 
-impl RemoveOrderEvent {
+impl OrderRemoved {
     pub(crate) fn new(
         id: u64,
         store: Pubkey,
@@ -171,17 +201,17 @@ impl RemoveOrderEvent {
     }
 }
 
-impl InitSpace for RemoveOrderEvent {
+impl InitSpace for OrderRemoved {
     const INIT_SPACE: usize = <Self as Space>::INIT_SPACE;
 }
 
-impl ActionEvent for RemoveOrderEvent {}
+impl ActionEvent for OrderRemoved {}
 
 /// Withdrawal removed event.
 #[event]
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[derive(Clone, InitSpace)]
-pub struct RemoveWithdrawalEvent {
+pub struct WithdrawalRemoved {
     /// Action id.
     pub id: u64,
     /// Timestamp.
@@ -203,13 +233,13 @@ pub struct RemoveWithdrawalEvent {
     pub reason: String,
 }
 
-impl InitSpace for RemoveWithdrawalEvent {
+impl InitSpace for WithdrawalRemoved {
     const INIT_SPACE: usize = <Self as Space>::INIT_SPACE;
 }
 
-impl ActionEvent for RemoveWithdrawalEvent {}
+impl ActionEvent for WithdrawalRemoved {}
 
-impl RemoveWithdrawalEvent {
+impl WithdrawalRemoved {
     pub(crate) fn new(
         id: u64,
         store: Pubkey,
@@ -238,7 +268,7 @@ impl RemoveWithdrawalEvent {
 #[event]
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[derive(Clone, InitSpace)]
-pub struct RemoveShiftEvent {
+pub struct ShiftRemoved {
     /// Action id.
     pub id: u64,
     /// Timestamp.
@@ -260,7 +290,7 @@ pub struct RemoveShiftEvent {
     pub reason: String,
 }
 
-impl RemoveShiftEvent {
+impl ShiftRemoved {
     pub(crate) fn new(
         id: u64,
         store: Pubkey,
@@ -285,17 +315,17 @@ impl RemoveShiftEvent {
     }
 }
 
-impl InitSpace for RemoveShiftEvent {
+impl InitSpace for ShiftRemoved {
     const INIT_SPACE: usize = <Self as Space>::INIT_SPACE;
 }
 
-impl ActionEvent for RemoveShiftEvent {}
+impl ActionEvent for ShiftRemoved {}
 
 /// GLV Deposit removed event.
 #[event]
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[derive(Clone, InitSpace)]
-pub struct RemoveGlvDepositEvent {
+pub struct GlvDepositRemoved {
     /// Action id.
     pub id: u64,
     /// Timestamp.
@@ -319,7 +349,7 @@ pub struct RemoveGlvDepositEvent {
     pub reason: String,
 }
 
-impl RemoveGlvDepositEvent {
+impl GlvDepositRemoved {
     pub(crate) fn new(
         id: u64,
         store: Pubkey,
@@ -346,17 +376,17 @@ impl RemoveGlvDepositEvent {
     }
 }
 
-impl InitSpace for RemoveGlvDepositEvent {
+impl InitSpace for GlvDepositRemoved {
     const INIT_SPACE: usize = <Self as Space>::INIT_SPACE;
 }
 
-impl ActionEvent for RemoveGlvDepositEvent {}
+impl ActionEvent for GlvDepositRemoved {}
 
 /// GLV Withdrawal removed event.
 #[event]
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[derive(Clone, InitSpace)]
-pub struct RemoveGlvWithdrawalEvent {
+pub struct GlvWithdrawalRemoved {
     /// Action id.
     pub id: u64,
     /// Timestamp.
@@ -380,7 +410,7 @@ pub struct RemoveGlvWithdrawalEvent {
     pub reason: String,
 }
 
-impl RemoveGlvWithdrawalEvent {
+impl GlvWithdrawalRemoved {
     pub(crate) fn new(
         id: u64,
         store: Pubkey,
@@ -407,25 +437,25 @@ impl RemoveGlvWithdrawalEvent {
     }
 }
 
-impl InitSpace for RemoveGlvWithdrawalEvent {
+impl InitSpace for GlvWithdrawalRemoved {
     const INIT_SPACE: usize = <Self as Space>::INIT_SPACE;
 }
 
-impl ActionEvent for RemoveGlvWithdrawalEvent {}
+impl ActionEvent for GlvWithdrawalRemoved {}
 
-/// Trade event.
+/// A trade.
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, BorshSerialize, BorshDeserialize)]
-pub struct TradeEvent<'a>(Cow<'a, TradeEventData>);
+pub struct Trade<'a>(Cow<'a, TradeData>);
 
-impl<'a> From<&'a TradeEventData> for TradeEvent<'a> {
-    fn from(value: &'a TradeEventData) -> Self {
+impl<'a> From<&'a TradeData> for Trade<'a> {
+    fn from(value: &'a TradeData) -> Self {
         Self(Cow::Borrowed(value))
     }
 }
 
-impl<'a> anchor_lang::Event for TradeEvent<'a> {
+impl<'a> anchor_lang::Event for Trade<'a> {
     fn data(&self) -> Vec<u8> {
         let mut data = Vec::with_capacity(256);
         data.extend_from_slice(&[189, 219, 127, 211, 78, 230, 97, 238]);
@@ -434,38 +464,18 @@ impl<'a> anchor_lang::Event for TradeEvent<'a> {
     }
 }
 
-impl<'a> anchor_lang::Discriminator for TradeEvent<'a> {
+impl<'a> anchor_lang::Discriminator for Trade<'a> {
     const DISCRIMINATOR: [u8; 8] = [189, 219, 127, 211, 78, 230, 97, 238];
 }
 
-impl<'a> TradeEvent<'a> {
-    /// Emit this event through CPI. This is a manual implementation of `emit_cpi!`.
-    pub(crate) fn emit(&self, event_authority: &AccountInfo, bump: u8) -> Result<()> {
-        use anchor_lang::{solana_program::instruction::Instruction, Discriminator};
-
-        let authority_info = event_authority.to_account_info();
-        let authority_bump = bump;
-        let disc = anchor_lang::event::EVENT_IX_TAG_LE;
-        let mut ix_data = Vec::with_capacity(16 + TradeEventData::INIT_SPACE);
-        ix_data.extend_from_slice(&disc);
-        ix_data.extend_from_slice(&Self::DISCRIMINATOR);
-        self.serialize(&mut ix_data)?;
-        let ix = Instruction {
-            program_id: crate::ID,
-            accounts: vec![AccountMeta::new_readonly(*authority_info.key, true)],
-            data: ix_data,
-        };
-        anchor_lang::solana_program::program::invoke_signed(
-            &ix,
-            &[authority_info],
-            &[&[constants::EVENT_AUTHORITY_SEED, &[authority_bump]]],
-        )?;
-        Ok(())
-    }
+impl<'a> InitSpace for Trade<'a> {
+    const INIT_SPACE: usize = TradeData::INIT_SPACE;
 }
 
+impl<'a> ActionEvent for Trade<'a> {}
+
 #[cfg(feature = "display")]
-impl<'a> std::fmt::Display for TradeEvent<'a> {
+impl<'a> std::fmt::Display for Trade<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("TradeEvent")
             .field("trade_id", &self.trade_id)
@@ -503,7 +513,7 @@ impl<'a> std::fmt::Display for TradeEvent<'a> {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[derive(BorshSerialize, BorshDeserialize)]
-pub struct TradeEventData {
+pub struct TradeData {
     /// Trade flag.
     flags: u8,
     padding_0: [u8; 7],
@@ -579,7 +589,7 @@ pub struct TradeEventData {
     pub output_amounts: TradeOutputAmounts,
 }
 
-impl TradeEventData {
+impl TradeData {
     /// Init space.
     pub const INIT_SPACE: usize = core::mem::size_of::<Self>();
 
@@ -697,7 +707,7 @@ enum TradeFlag {
     IsIncrease,
 }
 
-impl TradeEventData {
+impl TradeData {
     pub(crate) fn init(
         &mut self,
         is_increase: bool,
@@ -869,8 +879,8 @@ impl TradeEventData {
     }
 }
 
-impl<'a> Deref for TradeEvent<'a> {
-    type Target = TradeEventData;
+impl<'a> Deref for Trade<'a> {
+    type Target = TradeData;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -878,7 +888,7 @@ impl<'a> Deref for TradeEvent<'a> {
 }
 
 #[cfg(feature = "utils")]
-impl<'a> TradeEvent<'a> {
+impl<'a> Trade<'a> {
     /// Updated at.
     pub fn updated_at(&self) -> i64 {
         self.after.increased_at.max(self.after.decreased_at)

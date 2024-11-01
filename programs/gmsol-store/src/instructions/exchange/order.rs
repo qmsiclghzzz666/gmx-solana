@@ -11,6 +11,7 @@ use gmsol_utils::InitSpace;
 
 use crate::{
     constants,
+    events::OrderCreated,
     ops::{
         execution_fee::TransferExecutionFeeOperation,
         order::{CreateOrderOperation, CreateOrderParams},
@@ -410,6 +411,11 @@ impl<'info> internal::Create<'info, Order> for CreateOrder<'info> {
                 return err!(CoreError::OrderKindNotAllowed);
             }
         }
+        emit!(OrderCreated::new(
+            self.store.key(),
+            self.order.key(),
+            self.position.as_ref().map(|a| a.key()),
+        )?);
         Ok(())
     }
 }

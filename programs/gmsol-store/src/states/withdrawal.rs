@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{events::RemoveWithdrawalEvent, CoreError};
+use crate::{events::WithdrawalRemoved, CoreError};
 
 use super::{
     common::{
@@ -57,10 +57,10 @@ impl Action for Withdrawal {
 }
 
 impl Closable for Withdrawal {
-    type ClosedEvent = RemoveWithdrawalEvent;
+    type ClosedEvent = WithdrawalRemoved;
 
     fn to_closed_event(&self, address: &Pubkey, reason: &str) -> Result<Self::ClosedEvent> {
-        RemoveWithdrawalEvent::new(
+        WithdrawalRemoved::new(
             self.header.id,
             self.header.store,
             *address,

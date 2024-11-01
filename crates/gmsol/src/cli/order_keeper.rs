@@ -12,9 +12,7 @@ use gmsol::{
         pull_oracle::utils::extract_pyth_feed_ids, EncodingType, Hermes, PythPullOracle,
         PythPullOracleContext, PythPullOracleOps,
     },
-    types::{
-        Deposit, DepositCreatedEvent, Order, OrderCreatedEvent, Withdrawal, WithdrawalCreatedEvent,
-    },
+    types::{Deposit, DepositCreated, Order, OrderCreated, Withdrawal, WithdrawalCreated},
     utils::{ComputeBudget, RpcBuilder, ZeroCopy},
 };
 use gmsol_model::PositionState;
@@ -663,7 +661,7 @@ impl KeeperArgs {
         let deposit_program = client.anchor().program(client.store_program_id())?;
         let unsubscriber =
             deposit_program
-            .on::<DepositCreatedEvent>({
+            .on::<DepositCreated>({
                 let tx = tx.clone();
                 move |ctx, event| {
                 if event.store == store {
@@ -683,7 +681,7 @@ impl KeeperArgs {
         // Subscribe withdrawal creation event.
         let withdrawal_program = client.anchor().program(client.store_program_id())?;
         let unsubscriber = withdrawal_program
-            .on::<WithdrawalCreatedEvent>({
+            .on::<WithdrawalCreated>({
                 let tx = tx.clone();
                 move |ctx, event| {
                 if event.store == store {
@@ -703,7 +701,7 @@ impl KeeperArgs {
         // Subscribe order creation event.
         let order_program = client.anchor().program(client.store_program_id())?;
         let unsubscriber = order_program
-            .on::<OrderCreatedEvent>({
+            .on::<OrderCreated>({
                 let tx = tx.clone();
                 move |ctx, event| {
                 if event.store == store {

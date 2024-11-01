@@ -488,9 +488,3 @@ impl Addresses {
         }
     }
 }
-
-#[event]
-pub struct DataStoreInitEvent {
-    pub key: String,
-    pub address: Pubkey,
-}

@@ -6,6 +6,7 @@ use anchor_spl::{
 use gmsol_utils::InitSpace;
 
 use crate::{
+    events::DepositCreated,
     ops::deposit::{CreateDepositOperation, CreateDepositParams},
     states::{common::action::ActionExt, Deposit, Market, NonceBytes, RoleKey, Seed, Store},
     utils::{internal, token::is_associated_token_account},
@@ -120,6 +121,7 @@ impl<'info> internal::Create<'info, Deposit> for CreateDeposit<'info> {
             .swap_paths(remaining_accounts)
             .build()
             .execute()?;
+        emit!(DepositCreated::new(self.store.key(), self.deposit.key())?);
         Ok(())
     }
 }

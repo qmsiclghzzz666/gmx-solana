@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use gmsol_utils::InitSpace;
 
-use crate::{events::RemoveDepositEvent, states::MarketConfigKey, CoreError};
+use crate::{events::DepositRemoved, states::MarketConfigKey, CoreError};
 
 use super::{
     common::{
@@ -38,10 +38,10 @@ impl InitSpace for Deposit {
 }
 
 impl Closable for Deposit {
-    type ClosedEvent = RemoveDepositEvent;
+    type ClosedEvent = DepositRemoved;
 
     fn to_closed_event(&self, address: &Pubkey, reason: &str) -> Result<Self::ClosedEvent> {
-        RemoveDepositEvent::new(
+        DepositRemoved::new(
             self.header.id,
             self.header.store,
             *address,

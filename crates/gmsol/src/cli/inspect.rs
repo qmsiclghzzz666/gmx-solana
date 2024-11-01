@@ -921,8 +921,8 @@ impl InspectArgs {
                 let disc: &[u8; 8] = data[..8].try_into().unwrap();
                 let data = &data[8..];
                 match *disc {
-                    types::TradeEvent::DISCRIMINATOR => {
-                        let event = types::TradeEvent::try_from_slice(data)?;
+                    types::Trade::DISCRIMINATOR => {
+                        let event = types::Trade::try_from_slice(data)?;
                         output.print(&event, |event| Ok(format!("{event:#}")))?;
                     }
                     _ => return Err(gmsol::Error::invalid_argument("Unknown event type")),

@@ -1,6 +1,6 @@
 use anchor_client::solana_sdk::pubkey::Pubkey;
 use gmsol_store::{
-    events::TradeEventData,
+    events::TradeData,
     states::{
         glv::GlvWithdrawal,
         gt::{GtExchange, GtExchangeVault, GtVesting},
@@ -178,7 +178,7 @@ pub fn find_trade_event_buffer_pda(
 ) -> (Pubkey, u8) {
     Pubkey::find_program_address(
         &[
-            TradeEventData::SEED,
+            TradeData::SEED,
             store.as_ref(),
             authority.as_ref(),
             &[index],

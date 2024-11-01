@@ -1,7 +1,7 @@
 use crate::{impl_decode_for_cpi_event, impl_decode_for_zero_copy};
 
 use gmsol_store::{
-    events::{RemoveDepositEvent, RemoveOrderEvent, RemoveWithdrawalEvent, TradeEvent},
+    events::{DepositRemoved, OrderRemoved, Trade, WithdrawalRemoved},
     states::{Deposit, Market, Order, Position, Store, Withdrawal},
 };
 
@@ -13,10 +13,10 @@ impl_decode_for_zero_copy!(Market);
 impl_decode_for_zero_copy!(Deposit);
 impl_decode_for_zero_copy!(Withdrawal);
 impl_decode_for_zero_copy!(Order);
-impl_decode_for_cpi_event!(RemoveDepositEvent);
-impl_decode_for_cpi_event!(RemoveWithdrawalEvent);
-impl_decode_for_cpi_event!(RemoveOrderEvent);
-impl_decode_for_cpi_event!(TradeEvent<'static>);
+impl_decode_for_cpi_event!(DepositRemoved);
+impl_decode_for_cpi_event!(WithdrawalRemoved);
+impl_decode_for_cpi_event!(OrderRemoved);
+impl_decode_for_cpi_event!(Trade<'static>);
 
 untagged!(
     GMSOLAccountData,
@@ -36,9 +36,9 @@ type Account = crate::value::Account<GMSOLAccountData>;
 untagged!(
     GMSOLCPIEvent,
     [
-        RemoveDepositEvent,
-        RemoveOrderEvent,
-        RemoveWithdrawalEvent,
+        DepositRemoved,
+        OrderRemoved,
+        WithdrawalRemoved,
         // TradeEvent,
         UnknownOwnedData
     ]

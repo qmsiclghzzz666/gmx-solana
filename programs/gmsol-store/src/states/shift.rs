@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{events::RemoveShiftEvent, states::Deposit, CoreError};
+use crate::{events::ShiftRemoved, states::Deposit, CoreError};
 
 use super::{
     common::{
@@ -35,10 +35,10 @@ impl Action for Shift {
 }
 
 impl Closable for Shift {
-    type ClosedEvent = RemoveShiftEvent;
+    type ClosedEvent = ShiftRemoved;
 
     fn to_closed_event(&self, address: &Pubkey, reason: &str) -> Result<Self::ClosedEvent> {
-        RemoveShiftEvent::new(
+        ShiftRemoved::new(
             self.header.id,
             self.header.store,
             *address,

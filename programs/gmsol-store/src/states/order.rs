@@ -3,7 +3,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use gmsol_model::{action::decrease_position::DecreasePositionReport, price::Price};
 use gmsol_utils::InitSpace as _;
 
-use crate::{events::RemoveOrderEvent, states::FactorKey, CoreError};
+use crate::{events::OrderRemoved, states::FactorKey, CoreError};
 
 use super::{
     common::{
@@ -361,10 +361,10 @@ impl Action for Order {
 }
 
 impl Closable for Order {
-    type ClosedEvent = RemoveOrderEvent;
+    type ClosedEvent = OrderRemoved;
 
     fn to_closed_event(&self, address: &Pubkey, reason: &str) -> Result<Self::ClosedEvent> {
-        RemoveOrderEvent::new(
+        OrderRemoved::new(
             self.header.id,
             self.header.store,
             *address,

@@ -1,4 +1,7 @@
-/// Data Store.
+/// Common types.
+pub mod common;
+
+/// Store.
 pub mod store;
 
 /// Feature.
@@ -6,9 +9,6 @@ pub mod feature;
 
 /// Roles.
 pub mod roles;
-
-/// Common types.
-pub mod common;
 
 /// Token Config.
 pub mod token_config;
@@ -62,8 +62,6 @@ pub type Factor = u128;
 
 use gmsol_utils::InitSpace;
 
-use anchor_lang::prelude::{borsh, AnchorDeserialize, AnchorSerialize};
-
 /// Data type that has [`SEED`](Seed::SEED).
 pub trait Seed {
     /// Prefix seed for program derived addresses.
@@ -72,14 +70,3 @@ pub trait Seed {
 
 /// Nonce Bytes.
 pub type NonceBytes = [u8; 32];
-
-/// Action.
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq)]
-pub enum Action {
-    /// Initialize.
-    Init,
-    /// Change.
-    Change,
-    /// Remove.
-    Remove,
-}
