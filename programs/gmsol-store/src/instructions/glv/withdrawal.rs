@@ -695,7 +695,7 @@ impl<'info> ExecuteGlvWithdrawal<'info> {
             .glv_token_account(self.glv_token_escrow.to_account_info())
             .market(self.market.clone())
             .market_token_mint(&mut self.market_token)
-            .market_token_glv_vault(self.market_token_vault.to_account_info())
+            .market_token_glv_vault(&self.market_token_vault)
             .market_token_withdrawal_vault(self.market_token_withdrawal_vault.to_account_info())
             .markets(splitted.markets)
             .market_tokens(splitted.market_tokens)

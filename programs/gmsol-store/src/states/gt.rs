@@ -776,6 +776,11 @@ impl GtExchangeVault {
         get_time_window_index(self.ts, self.time_window)
     }
 
+    /// Get time window.
+    pub fn time_window(&self) -> i64 {
+        self.time_window
+    }
+
     fn validate_confirmable(&self) -> Result<()> {
         require!(self.is_initialized(), CoreError::PreconditionsAreNotMet);
         require!(!self.is_confirmed(), CoreError::PreconditionsAreNotMet);

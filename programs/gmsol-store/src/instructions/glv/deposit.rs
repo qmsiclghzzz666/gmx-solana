@@ -902,7 +902,7 @@ impl<'info> ExecuteGlvDeposit<'info> {
             .glv_token_mint(&mut self.glv_token)
             .glv_token_receiver(self.glv_token_escrow.to_account_info())
             .market(self.market.clone())
-            .market_token_source(self.market_token_escrow.to_account_info())
+            .market_token_source(&self.market_token_escrow)
             .market_token_mint(&mut self.market_token)
             .market_token_vault(self.market_token_vault.to_account_info())
             .markets(markets)

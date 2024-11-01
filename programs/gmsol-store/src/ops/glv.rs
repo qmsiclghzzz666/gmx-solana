@@ -222,7 +222,7 @@ pub(crate) struct ExecuteGlvDepositOperation<'a, 'info> {
     glv_token_receiver: AccountInfo<'info>,
     market: AccountLoader<'info, Market>,
     market_token_mint: &'a mut Account<'info, Mint>,
-    market_token_source: AccountInfo<'info>,
+    market_token_source: &'a Account<'info, TokenAccount>,
     market_token_vault: AccountInfo<'info>,
     markets: &'info [AccountInfo<'info>],
     market_tokens: &'info [AccountInfo<'info>],
@@ -277,18 +277,25 @@ impl<'a, 'info> ExecuteGlvDepositOperation<'a, 'info> {
         self.oracle.validate_time(self)
     }
 
-    fn validate_market_and_glv_deposit(&self) -> Result<()> {
+    fn validate_before_execution(&self) -> Result<()> {
         let market = self.market.load()?;
         market.validate(&self.store.key())?;
 
         let glv = self.glv.load()?;
+        let glv_deposit = self.glv_deposit.load()?;
 
-        self.glv_deposit.load()?.unchecked_validate_for_execution(
+        glv_deposit.unchecked_validate_for_execution(
             &self.market_token_mint.to_account_info(),
             &market,
             &self.glv_token_mint.to_account_info(),
             &glv,
         )?;
+
+        require_gte!(
+            self.market_token_source.amount,
+            glv_deposit.params.market_token_amount,
+            CoreError::NotEnoughTokenAmount,
+        );
 
         Ok(())
     }
@@ -297,7 +304,7 @@ impl<'a, 'info> ExecuteGlvDepositOperation<'a, 'info> {
     fn perform_glv_deposit(self) -> Result<()> {
         use gmsol_model::utils::usd_to_market_token_amount;
 
-        self.validate_market_and_glv_deposit()?;
+        self.validate_before_execution()?;
 
         let glv_token_amount = {
             let deposit = self.glv_deposit.load()?;
@@ -369,6 +376,13 @@ impl<'a, 'info> ExecuteGlvDepositOperation<'a, 'info> {
                         &market_token_supply,
                     )?;
                 }
+
+                msg!(
+                    "[GLV] Calculating GLV amount with glv_supply={}, glv_value={}, received_value={}",
+                    glv_supply,
+                    glv_value,
+                    received_value,
+                );
 
                 let glv_amount = usd_to_market_token_amount(
                     received_value,
@@ -611,7 +625,7 @@ pub(crate) struct ExecuteGlvWithdrawalOperation<'a, 'info> {
     glv_token_account: AccountInfo<'info>,
     market: AccountLoader<'info, Market>,
     market_token_mint: &'a mut Account<'info, Mint>,
-    market_token_glv_vault: AccountInfo<'info>,
+    market_token_glv_vault: &'a Account<'info, TokenAccount>,
     market_token_withdrawal_vault: AccountInfo<'info>,
     markets: &'info [AccountInfo<'info>],
     market_tokens: &'info [AccountInfo<'info>],
@@ -708,6 +722,13 @@ impl<'a, 'info> ExecuteGlvWithdrawalOperation<'a, 'info> {
                 )
                 .ok_or(error!(CoreError::FailedToCalculateGlvValueForMarket))?;
 
+                msg!(
+                    "[GLV] Calculating GM amount with glv_supply={}, glv_value={}, market_token_value={}",
+                    glv_supply,
+                    glv_value,
+                    market_token_value,
+                );
+
                 get_market_token_amount_for_glv_value(
                     self.oracle,
                     op.market(),
@@ -717,6 +738,12 @@ impl<'a, 'info> ExecuteGlvWithdrawalOperation<'a, 'info> {
                 .try_into()
                 .map_err(|_| error!(CoreError::TokenAmountOverflow))?
             };
+
+            require_gte!(
+                self.market_token_glv_vault.amount,
+                market_token_amount,
+                CoreError::NotEnoughTokenAmount,
+            );
 
             let executed = {
                 let mut params = WithdrawalParams::default();
@@ -965,7 +992,7 @@ pub(crate) struct ExecuteGlvShiftOperation<'a, 'info> {
     glv: &'a AccountLoader<'info, Glv>,
     from_market: &'a AccountLoader<'info, Market>,
     from_market_token_mint: &'a mut Account<'info, Mint>,
-    from_market_token_account: AccountInfo<'info>,
+    from_market_token_glv_vault: &'a Account<'info, TokenAccount>,
     from_market_token_withdrawal_vault: AccountInfo<'info>,
     to_market: &'a AccountLoader<'info, Market>,
     to_market_token_mint: &'a mut Account<'info, Mint>,
@@ -1011,7 +1038,7 @@ impl<'a, 'info> ExecuteGlvShiftOperation<'a, 'info> {
         self.oracle.validate_time(self)
     }
 
-    fn validate_markets_and_shift(&self) -> Result<()> {
+    fn validate_before_execution(&self) -> Result<()> {
         require!(
             self.from_market.key() != self.to_market.key(),
             CoreError::Internal
@@ -1029,12 +1056,22 @@ impl<'a, 'info> ExecuteGlvShiftOperation<'a, 'info> {
         Borrow::<Shift>::borrow(&*shift)
             .validate_for_execution(&self.to_market_token_mint.to_account_info(), &to_market)?;
 
+        // Validate the vault has enough from market tokens.
+        let amount = Borrow::<Shift>::borrow(&*shift)
+            .params
+            .from_market_token_amount;
+        require_gte!(
+            self.from_market_token_glv_vault.amount,
+            amount,
+            CoreError::NotEnoughTokenAmount
+        );
+
         Ok(())
     }
 
     #[inline(never)]
     fn perform_glv_shift(self) -> Result<()> {
-        self.validate_markets_and_shift()?;
+        self.validate_before_execution()?;
 
         let from_market_token_mint = self.from_market_token_mint.to_account_info();
         let from_market_token_decimals = self.from_market_token_mint.decimals;
@@ -1092,17 +1129,17 @@ impl<'a, 'info> ExecuteGlvShiftOperation<'a, 'info> {
 
         // Transfer market tokens from the GLV vault to the withdrawal vault before the commitment.
         {
-            let signer = glv_shift.signer();
-            let seeds = signer.as_seeds();
+            let glv = self.glv.load()?;
+            let seeds = glv.signer_seeds();
 
             transfer_checked(
                 CpiContext::new(
                     self.token_program.to_account_info(),
                     TransferChecked {
-                        from: self.from_market_token_account.to_account_info(),
+                        from: self.from_market_token_glv_vault.to_account_info(),
                         mint: from_market_token_mint,
                         to: self.from_market_token_withdrawal_vault.to_account_info(),
-                        authority: self.glv_shift.to_account_info(),
+                        authority: self.glv.to_account_info(),
                     },
                 )
                 .with_signer(&[&seeds]),

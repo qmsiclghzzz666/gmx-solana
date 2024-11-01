@@ -40,20 +40,20 @@ pub trait GtOps<C> {
     fn gt_set_es_receiver_factor(&self, store: &Pubkey, factor: u128) -> RpcBuilder<C>;
 
     /// Initialize GT exchange vault with the given time window index.
-    fn initialize_gt_exchange_vault_with_time_window_index(
+    fn prepare_gt_exchange_vault_with_time_window_index(
         &self,
         store: &Pubkey,
         time_window_index: i64,
         time_window: u32,
     ) -> RpcBuilder<C>;
 
-    /// Initialize GT exchange vault with the given time window.
-    fn initialize_gt_exchange_vault_with_time_window(
+    /// Prepare GT exchange vault with the given time window.
+    fn prepare_gt_exchange_vault_with_time_window(
         &self,
         store: &Pubkey,
         time_window: u32,
     ) -> crate::Result<RpcBuilder<C>> {
-        Ok(self.initialize_gt_exchange_vault_with_time_window_index(
+        Ok(self.prepare_gt_exchange_vault_with_time_window_index(
             store,
             current_time_window_index(time_window)?,
             time_window,
@@ -174,20 +174,20 @@ impl<C: Deref<Target = impl Signer> + Clone> GtOps<C> for crate::Client<C> {
             .args(instruction::GtSetEsReceiverFactor { factor })
     }
 
-    fn initialize_gt_exchange_vault_with_time_window_index(
+    fn prepare_gt_exchange_vault_with_time_window_index(
         &self,
         store: &Pubkey,
         time_window_index: i64,
         time_window: u32,
     ) -> RpcBuilder<C> {
         self.store_rpc()
-            .accounts(accounts::InitializeGtExchangeVault {
-                authority: self.payer(),
+            .accounts(accounts::PrepareGtExchangeVault {
+                payer: self.payer(),
                 store: *store,
                 vault: self.find_gt_exchange_vault_address(store, time_window_index),
                 system_program: system_program::ID,
             })
-            .args(instruction::InitializeGtExchangeVault {
+            .args(instruction::PrepareGtExchangeVault {
                 time_window_index,
                 time_window,
             })

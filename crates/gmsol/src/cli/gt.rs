@@ -36,8 +36,8 @@ enum Command {
         #[arg(long)]
         confirm: bool,
     },
-    /// Initialize GT exchange vault.
-    InitializeExchangeVault,
+    /// Prepare GT exchange vault.
+    PrepareExchangeVault,
     /// Confirm the given GT exchange vault.
     ConfirmExchangeVault {
         address: Pubkey,
@@ -65,6 +65,9 @@ enum Command {
         /// Confirm the operation.
         #[arg(long)]
         confirm: bool,
+        /// Whether to prepare the exchange vault before the request or not.
+        #[arg(long, requires = "request")]
+        prepare_vault: bool,
     },
     /// Vest esGT.
     Vest {
@@ -185,10 +188,9 @@ impl Args {
                     println!("User Rank: {rank}");
                 }
             }
-            Command::InitializeExchangeVault => {
+            Command::PrepareExchangeVault => {
                 let time_window = client.store(store).await?.gt().exchange_time_window();
-                let rpc =
-                    client.initialize_gt_exchange_vault_with_time_window(store, time_window)?;
+                let rpc = client.prepare_gt_exchange_vault_with_time_window(store, time_window)?;
                 send_or_serialize_rpc(rpc, serialize_only, skip_preflight, |signature| {
                     println!("{signature}");
                     Ok(())
@@ -202,9 +204,7 @@ impl Args {
                 let time_window = client.store(store).await?.gt().exchange_time_window();
 
                 let init = (!*skip_init_current)
-                    .then(|| {
-                        client.initialize_gt_exchange_vault_with_time_window(store, time_window)
-                    })
+                    .then(|| client.prepare_gt_exchange_vault_with_time_window(store, time_window))
                     .transpose()?;
 
                 let mut rpc = client.confirm_gt_exchange_vault(store, address);
@@ -247,6 +247,7 @@ impl Args {
                 request: amount,
                 owner,
                 confirm,
+                prepare_vault,
             } => {
                 let store_account = client.store(store).await?;
                 let time_window = store_account.gt().exchange_time_window();
@@ -259,11 +260,18 @@ impl Args {
                             return Err(gmsol::Error::invalid_argument("not confirmed"));
                         }
                         let amount = parse_amount(amount, decimals)?;
-                        let rpc = client.request_gt_exchange_with_time_window(
+                        let request = client.request_gt_exchange_with_time_window(
                             store,
                             time_window,
                             amount,
                         )?;
+                        let rpc = if *prepare_vault {
+                            let prepare = client
+                                .prepare_gt_exchange_vault_with_time_window(store, time_window)?;
+                            prepare.merge(request)
+                        } else {
+                            request
+                        };
                         send_or_serialize_rpc(rpc, serialize_only, skip_preflight, |signature| {
                             println!("{signature}");
                             Ok(())

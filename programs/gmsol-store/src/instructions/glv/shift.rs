@@ -70,63 +70,22 @@ pub struct CreateGlvShift<'info> {
     pub to_market_token: Box<Account<'info, Mint>>,
     /// Vault for from market tokens.
     #[account(
-        mut,
         associated_token::mint = from_market_token,
         associated_token::authority = glv,
     )]
     pub from_market_token_vault: Box<Account<'info, TokenAccount>>,
-    /// The escrow account for from market tokens.
-    #[account(
-        mut,
-        associated_token::mint = from_market_token,
-        associated_token::authority = glv_shift,
-    )]
-    pub from_market_token_escrow: Box<Account<'info, TokenAccount>>,
-    /// The escrow account for to market tokens.
+    /// Vault for to market tokens.
     #[account(
         associated_token::mint = to_market_token,
-        associated_token::authority = glv_shift,
+        associated_token::authority = glv,
     )]
-    pub to_market_token_escrow: Box<Account<'info, TokenAccount>>,
+    pub to_market_token_vault: Box<Account<'info, TokenAccount>>,
     /// The system program.
     pub system_program: Program<'info, System>,
     /// The token program.
     pub token_program: Program<'info, Token>,
     /// The associated token program.
     pub associated_token_program: Program<'info, AssociatedToken>,
-}
-
-impl<'info> CreateGlvShift<'info> {
-    fn transfer_from_market_tokens(&mut self, amount: u64) -> Result<()> {
-        use anchor_spl::token_interface::{transfer_checked, TransferChecked};
-
-        require!(amount != 0, CoreError::EmptyShift);
-
-        let source = &self.from_market_token_vault;
-        let target = &mut self.from_market_token_escrow;
-        let mint = &self.from_market_token;
-
-        let glv = self.glv.load()?;
-
-        transfer_checked(
-            CpiContext::new(
-                self.token_program.to_account_info(),
-                TransferChecked {
-                    from: source.to_account_info(),
-                    mint: mint.to_account_info(),
-                    to: target.to_account_info(),
-                    authority: self.glv.to_account_info(),
-                },
-            )
-            .with_signer(&[&glv.signer_seeds()]),
-            amount,
-            mint.decimals,
-        )?;
-
-        target.reload()?;
-
-        Ok(())
-    }
 }
 
 impl<'info> action::Create<'info, GlvShift> for CreateGlvShift<'info> {
@@ -155,15 +114,14 @@ impl<'info> action::Create<'info, GlvShift> for CreateGlvShift<'info> {
         bumps: &Self::Bumps,
         _remaining_accounts: &'info [AccountInfo<'info>],
     ) -> Result<()> {
-        self.transfer_from_market_tokens(params.from_market_token_amount)?;
         CreateShiftOperation::builder()
             .store(&self.store)
             .owner(self.glv.to_account_info())
             .shift(&self.glv_shift)
             .from_market(&self.from_market)
-            .from_market_token_account(&self.from_market_token_escrow)
+            .from_market_token_account(&self.from_market_token_vault)
             .to_market(&self.to_market)
-            .to_market_token_account(&self.to_market_token_escrow)
+            .to_market_token_account(&self.to_market_token_vault)
             .nonce(nonce)
             .bump(bumps.glv_shift)
             .params(params)
@@ -216,8 +174,6 @@ pub struct CloseGlvShift<'info> {
         has_one = funder,
         constraint = glv_shift.load()?.header().owner == glv.key() @ CoreError::OwnerMismatched,
         constraint = glv_shift.load()?.header().store == store.key() @ CoreError::StoreMismatched,
-        constraint = glv_shift.load()?.tokens().from_market_token_account() == from_market_token_escrow.key() @ CoreError::MarketTokenAccountMismatched,
-        constraint = glv_shift.load()?.tokens().to_market_token_account() == to_market_token_escrow.key() @ CoreError::MarketTokenAccountMismatched,
         seeds = [GlvShift::SEED, store.key().as_ref(), glv.key().as_ref(), &glv_shift.load()?.header().nonce],
         bump = glv_shift.load()?.header().bump,
     )]
@@ -232,34 +188,6 @@ pub struct CloseGlvShift<'info> {
         constraint = glv_shift.load()?.tokens().to_market_token() == to_market_token.key() @ CoreError::MarketTokenMintMismatched
     )]
     pub to_market_token: Box<Account<'info, Mint>>,
-    /// The escrow account for from market tokens.
-    #[account(
-        mut,
-        associated_token::mint = from_market_token,
-        associated_token::authority = glv_shift,
-    )]
-    pub from_market_token_escrow: Box<Account<'info, TokenAccount>>,
-    /// The escrow account for to market tokens.
-    #[account(
-        mut,
-        associated_token::mint = to_market_token,
-        associated_token::authority = glv_shift,
-    )]
-    pub to_market_token_escrow: Box<Account<'info, TokenAccount>>,
-    /// Vault for from market tokens.
-    #[account(
-        mut,
-        associated_token::mint = from_market_token,
-        associated_token::authority = glv,
-    )]
-    pub from_market_token_vault: Box<Account<'info, TokenAccount>>,
-    /// Vault for to market tokens.
-    #[account(
-        mut,
-        associated_token::mint = to_market_token,
-        associated_token::authority = glv,
-    )]
-    pub to_market_token_vault: Box<Account<'info, TokenAccount>>,
     /// The system program.
     pub system_program: Program<'info, System>,
     /// The token program.
@@ -281,49 +209,7 @@ impl<'info> action::Close<'info, GlvShift> for CloseGlvShift<'info> {
         true
     }
 
-    fn transfer_to_atas(&self, init_if_needed: bool) -> Result<action::TransferSuccess> {
-        use crate::utils::token::TransferAllFromEscrowToATA;
-
-        let signer = self.glv_shift.load()?.signer();
-        let seeds = signer.as_seeds();
-
-        let builder = TransferAllFromEscrowToATA::builder()
-            .system_program(self.system_program.to_account_info())
-            .token_program(self.token_program.to_account_info())
-            .associated_token_program(self.associated_token_program.to_account_info())
-            .payer(self.authority.to_account_info())
-            .owner(self.glv.to_account_info())
-            .fund_receiver(self.funder.to_account_info())
-            .escrow_authority(self.glv_shift.to_account_info())
-            .seeds(&seeds)
-            .init_if_needed(init_if_needed);
-
-        // Transfer from market tokens.
-        if !builder
-            .clone()
-            .mint(self.from_market_token.to_account_info())
-            .decimals(self.from_market_token.decimals)
-            .ata(self.from_market_token_vault.to_account_info())
-            .escrow(self.from_market_token_escrow.to_account_info())
-            .build()
-            .execute()?
-        {
-            return Ok(false);
-        }
-
-        // Transfer to market tokens.
-        if !builder
-            .clone()
-            .mint(self.to_market_token.to_account_info())
-            .decimals(self.to_market_token.decimals)
-            .ata(self.to_market_token_vault.to_account_info())
-            .escrow(self.to_market_token_escrow.to_account_info())
-            .build()
-            .execute()?
-        {
-            return Ok(false);
-        }
-
+    fn transfer_to_atas(&self, _init_if_needed: bool) -> Result<action::TransferSuccess> {
         Ok(true)
     }
 
@@ -393,7 +279,8 @@ pub struct ExecuteGlvShift<'info> {
         mut,
         constraint = glv_shift.load()?.header().owner == glv.key() @ CoreError::OwnerMismatched,
         constraint = glv_shift.load()?.header().store == store.key() @ CoreError::StoreMismatched,
-        constraint = glv_shift.load()?.tokens().from_market_token_account() == from_market_token_escrow.key() @ CoreError::MarketTokenAccountMismatched,
+        constraint = glv_shift.load()?.tokens().from_market_token_account() == from_market_token_glv_vault.key() @ CoreError::MarketTokenAccountMismatched,
+        constraint = glv_shift.load()?.tokens().to_market_token_account() == to_market_token_glv_vault.key() @ CoreError::MarketTokenAccountMismatched,
         seeds = [GlvShift::SEED, store.key().as_ref(), glv.key().as_ref(), &glv_shift.load()?.header().nonce],
         bump = glv_shift.load()?.header().bump,
     )]
@@ -414,9 +301,9 @@ pub struct ExecuteGlvShift<'info> {
     #[account(
         mut,
         associated_token::mint = from_market_token,
-        associated_token::authority = glv_shift,
+        associated_token::authority = glv,
     )]
-    pub from_market_token_escrow: Box<Account<'info, TokenAccount>>,
+    pub from_market_token_glv_vault: Box<Account<'info, TokenAccount>>,
     /// The escrow account for to market tokens.
     #[account(
         mut,
@@ -513,7 +400,7 @@ impl<'info> ExecuteGlvShift<'info> {
             .glv(&self.glv)
             .from_market(&self.from_market)
             .from_market_token_mint(&mut self.from_market_token)
-            .from_market_token_account(self.from_market_token_escrow.to_account_info())
+            .from_market_token_glv_vault(&self.from_market_token_glv_vault)
             .from_market_token_withdrawal_vault(self.from_market_token_vault.to_account_info())
             .to_market(&self.to_market)
             .to_market_token_mint(&mut self.to_market_token)

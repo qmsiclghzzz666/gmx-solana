@@ -1352,14 +1352,13 @@ pub mod gmsol_store {
         instructions::unchecked_gt_set_receiver(ctx, &receiver)
     }
 
-    /// Initialize GT Exchange Vault.
-    #[access_control(internal::Authenticate::only_gt_controller(&ctx))]
-    pub fn initialize_gt_exchange_vault(
-        ctx: Context<InitializeGtExchangeVault>,
+    /// Prepare GT Exchange Vault.
+    pub fn prepare_gt_exchange_vault(
+        ctx: Context<PrepareGtExchangeVault>,
         time_window_index: i64,
         time_window: u32,
     ) -> Result<()> {
-        instructions::unchecked_initialize_gt_exchange_vault(ctx, time_window_index, time_window)
+        instructions::prepare_gt_exchange_vault(ctx, time_window_index, time_window)
     }
 
     /// Confirm GT exchange vault.

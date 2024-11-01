@@ -156,14 +156,14 @@ pub(crate) fn unchecked_gt_set_receiver(
 /// The accounts definition for [`initialize_gt_exchange_vault`] instruction.
 #[derive(Accounts)]
 #[instruction(time_window_index: i64)]
-pub struct InitializeGtExchangeVault<'info> {
+pub struct PrepareGtExchangeVault<'info> {
     #[account(mut)]
-    authority: Signer<'info>,
+    payer: Signer<'info>,
     store: AccountLoader<'info, Store>,
     #[account(
-        init,
+        init_if_needed,
         space = 8 + GtExchangeVault::INIT_SPACE,
-        payer = authority,
+        payer = payer,
         seeds = [GtExchangeVault::SEED, store.key().as_ref(), &time_window_index.to_be_bytes()],
         bump,
     )]
@@ -171,9 +171,8 @@ pub struct InitializeGtExchangeVault<'info> {
     pub system_program: Program<'info, System>,
 }
 
-/// CHECK: only GT_CONTROLLER is authorized to use this instruction.
-pub(crate) fn unchecked_initialize_gt_exchange_vault(
-    ctx: Context<InitializeGtExchangeVault>,
+pub(crate) fn prepare_gt_exchange_vault(
+    ctx: Context<PrepareGtExchangeVault>,
     time_window_index: i64,
     time_window: u32,
 ) -> Result<()> {
@@ -183,24 +182,45 @@ pub(crate) fn unchecked_initialize_gt_exchange_vault(
         time_window,
         CoreError::InvalidArgument
     );
-    let mut vault = ctx.accounts.vault.load_init()?;
-    vault.init(ctx.bumps.vault, &ctx.accounts.store.key(), time_window)?;
-    require_eq!(
-        vault.time_window_index(),
-        time_window_index,
-        CoreError::InvalidArgument
-    );
+
+    match ctx.accounts.vault.load_init() {
+        Ok(mut vault) => {
+            vault.init(ctx.bumps.vault, &ctx.accounts.store.key(), time_window)?;
+            drop(vault);
+            ctx.accounts.vault.exit(&crate::ID)?;
+        }
+        Err(Error::AnchorError(err)) => {
+            if err.error_code_number != ErrorCode::AccountDiscriminatorAlreadySet as u32 {
+                return Err(Error::AnchorError(err));
+            }
+        }
+        Err(err) => {
+            return Err(err);
+        }
+    }
+
+    // Validate the vault.
+    {
+        let vault = ctx.accounts.vault.load()?;
+        require!(vault.is_initialized(), CoreError::PreconditionsAreNotMet);
+        require_eq!(
+            vault.store,
+            ctx.accounts.store.key(),
+            CoreError::StoreMismatched
+        );
+        require_eq!(
+            vault.time_window_index(),
+            time_window_index,
+            CoreError::InvalidArgument
+        );
+        require_eq!(
+            vault.time_window(),
+            time_window as i64,
+            CoreError::InvalidArgument
+        );
+    }
+
     Ok(())
-}
-
-impl<'info> internal::Authentication<'info> for InitializeGtExchangeVault<'info> {
-    fn authority(&self) -> &Signer<'info> {
-        &self.authority
-    }
-
-    fn store(&self) -> &AccountLoader<'info, Store> {
-        &self.store
-    }
 }
 
 /// The accounts definition for [`request_gt_exchange`] instruction.

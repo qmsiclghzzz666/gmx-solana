@@ -99,10 +99,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateGlvShiftBuilder<'a, C> {
             .find_market_address(&self.store, &self.to_market_token);
 
         let from_market_token_vault = get_associated_token_address(&glv, &self.from_market_token);
-        let from_market_token_escrow =
-            get_associated_token_address(&glv_shift, &self.from_market_token);
-        let to_market_token_escrow =
-            get_associated_token_address(&glv_shift, &self.to_market_token);
+        let to_market_token_vault = get_associated_token_address(&glv, &self.to_market_token);
 
         let prepare = self
             .client
@@ -129,8 +126,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateGlvShiftBuilder<'a, C> {
                 from_market_token: self.from_market_token,
                 to_market_token: self.to_market_token,
                 from_market_token_vault,
-                from_market_token_escrow,
-                to_market_token_escrow,
+                to_market_token_vault,
                 system_program: system_program::ID,
                 token_program: token_program_id,
                 associated_token_program: anchor_spl::associated_token::ID,
@@ -161,8 +157,6 @@ pub struct CloseGlvShiftHint {
     funder: Pubkey,
     from_market_token: Pubkey,
     to_market_token: Pubkey,
-    from_market_token_escrow: Pubkey,
-    to_market_token_escrow: Pubkey,
 }
 
 impl CloseGlvShiftHint {
@@ -174,19 +168,8 @@ impl CloseGlvShiftHint {
             owner: *glv_shift.header().owner(),
             funder: *glv_shift.funder(),
             from_market_token: tokens.from_market_token(),
-            from_market_token_escrow: tokens.from_market_token_account(),
             to_market_token: tokens.to_market_token(),
-            to_market_token_escrow: tokens.to_market_token_account(),
         })
-    }
-
-    #[allow(clippy::wrong_self_convention)]
-    fn from_market_token_ata(&self) -> Pubkey {
-        get_associated_token_address(&self.owner, &self.from_market_token)
-    }
-
-    fn to_market_token_ata(&self) -> Pubkey {
-        get_associated_token_address(&self.owner, &self.to_market_token)
     }
 }
 
@@ -246,10 +229,6 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CloseGlvShiftBuilder<'a, C> {
                 glv_shift: self.glv_shift,
                 from_market_token: hint.from_market_token,
                 to_market_token: hint.to_market_token,
-                from_market_token_escrow: hint.from_market_token_escrow,
-                to_market_token_escrow: hint.to_market_token_escrow,
-                from_market_token_vault: hint.from_market_token_ata(),
-                to_market_token_vault: hint.to_market_token_ata(),
                 system_program: system_program::ID,
                 token_program: anchor_spl::token::ID,
                 associated_token_program: anchor_spl::associated_token::ID,
@@ -287,8 +266,6 @@ pub struct ExecuteGlvShiftHint {
     funder: Pubkey,
     from_market_token: Pubkey,
     to_market_token: Pubkey,
-    from_market_token_escrow: Pubkey,
-    to_market_token_escrow: Pubkey,
     /// Feeds.
     pub feeds: TokensWithFeed,
 }
@@ -315,9 +292,7 @@ impl ExecuteGlvShiftHint {
             owner: *glv_shift.header().owner(),
             funder: *glv_shift.funder(),
             from_market_token: token_infos.from_market_token(),
-            from_market_token_escrow: token_infos.from_market_token_account(),
             to_market_token: token_infos.to_market_token(),
-            to_market_token_escrow: token_infos.to_market_token_account(),
             token_map: *store.token_map().ok_or(crate::Error::NotFound)?,
             feeds,
         })
@@ -433,6 +408,8 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteGlvShiftBuilder<'a, C> {
             .client
             .find_market_vault_address(&hint.store, &hint.from_market_token);
 
+        let from_market_token_glv_vault =
+            get_associated_token_address(&glv, &hint.from_market_token);
         let to_market_token_glv_vault = get_associated_token_address(&glv, &hint.to_market_token);
 
         let feeds = self
@@ -455,7 +432,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteGlvShiftBuilder<'a, C> {
                 glv_shift: self.shift,
                 from_market_token: hint.from_market_token,
                 to_market_token: hint.to_market_token,
-                from_market_token_escrow: hint.from_market_token_escrow,
+                from_market_token_glv_vault,
                 to_market_token_glv_vault,
                 from_market_token_vault,
                 token_program: anchor_spl::token::ID,
@@ -477,8 +454,6 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteGlvShiftBuilder<'a, C> {
                     funder: hint.funder,
                     from_market_token: hint.from_market_token,
                     to_market_token: hint.to_market_token,
-                    from_market_token_escrow: hint.from_market_token_escrow,
-                    to_market_token_escrow: hint.to_market_token_escrow,
                 })
                 .reason("executed")
                 .build()
