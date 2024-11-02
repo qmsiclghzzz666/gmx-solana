@@ -3,7 +3,7 @@ use std::ops::Deref;
 use anchor_lang::prelude::*;
 
 use crate::{
-    states::{Oracle, PriceProvider, PriceValidator, Store, TokenMapHeader, TokenMapLoader},
+    states::{Chainlink, Oracle, PriceValidator, Store, TokenMapHeader, TokenMapLoader},
     utils::internal,
 };
 
@@ -21,7 +21,7 @@ pub struct SetPricesFromPriceFeed<'info> {
     pub oracle: Account<'info, Oracle>,
     #[account(has_one = store)]
     pub token_map: AccountLoader<'info, TokenMapHeader>,
-    pub price_provider: Interface<'info, PriceProvider>,
+    pub chainlink_program: Option<Program<'info, Chainlink>>,
 }
 
 /// Set the oracle prices from price feeds.
@@ -33,10 +33,10 @@ pub(crate) fn set_prices_from_price_feed<'info>(
     let token_map = ctx.accounts.token_map.load_token_map()?;
     ctx.accounts.oracle.set_prices_from_remaining_accounts(
         validator,
-        &ctx.accounts.price_provider,
         &token_map,
         &tokens,
         ctx.remaining_accounts,
+        ctx.accounts.chainlink_program.as_ref(),
     )
 }
 

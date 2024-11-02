@@ -17,7 +17,7 @@ use crate::{
     states::{
         common::action::{ActionExt, ActionSigner},
         glv::SplitAccountsForGlv,
-        Glv, GlvDeposit, Market, NonceBytes, Oracle, PriceProvider, RoleKey, Seed, Store,
+        Chainlink, Glv, GlvDeposit, Market, NonceBytes, Oracle, RoleKey, Seed, Store,
         TokenMapHeader, TokenMapLoader,
     },
     utils::{
@@ -519,8 +519,6 @@ pub struct ExecuteGlvDeposit<'info> {
     /// Token Map.
     #[account(has_one = store)]
     pub token_map: AccountLoader<'info, TokenMapHeader>,
-    /// Price Provider.
-    pub price_provider: Interface<'info, PriceProvider>,
     /// Oracle buffer to use.
     #[account(has_one = store)]
     pub oracle: Box<Account<'info, Oracle>>,
@@ -634,6 +632,8 @@ pub struct ExecuteGlvDeposit<'info> {
     pub glv_token_program: Program<'info, Token2022>,
     /// The system program.
     pub system_program: Program<'info, System>,
+    /// Chainlink Program.
+    pub chainlink_program: Option<Program<'info, Chainlink>>,
 }
 
 /// CHECK: only ORDER_KEEPER is allowed to call this function.
@@ -882,10 +882,10 @@ impl<'info> ExecuteGlvDeposit<'info> {
 
         self.oracle.with_prices(
             &self.store,
-            &self.price_provider,
             &self.token_map,
             tokens,
             remaining_accounts,
+            self.chainlink_program.as_ref(),
             |oracle, remaining_accounts| {
                 builder
                     .oracle(oracle)

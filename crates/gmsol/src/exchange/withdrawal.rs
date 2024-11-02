@@ -20,7 +20,7 @@ use crate::{
         token::TokenAccountOps,
         utils::{read_market, FeedsParser},
     },
-    utils::{ComputeBudget, RpcBuilder, ZeroCopy},
+    utils::{fix_optional_account_metas, ComputeBudget, RpcBuilder, ZeroCopy},
 };
 
 use super::{generate_nonce, ExchangeOps};
@@ -395,7 +395,7 @@ where
                 final_long_token_ata,
                 final_short_token_ata,
                 associated_token_program: anchor_spl::associated_token::ID,
-                program: self.client.store_program_id(),
+                program: *self.client.store_program_id(),
             })
             .args(instruction::CloseWithdrawal {
                 reason: self.reason.clone(),
@@ -569,34 +569,38 @@ where
         let execute = self
             .client
             .store_rpc()
-            .accounts(accounts::ExecuteWithdrawal {
-                authority,
-                store: self.store,
-                price_provider: self.price_provider,
-                token_program: anchor_spl::token::ID,
-                system_program: system_program::ID,
-                oracle: self.oracle,
-                token_map: self.get_token_map().await?,
-                withdrawal: self.withdrawal,
-                market: self
-                    .client
-                    .find_market_address(&self.store, &hint.market_token),
-                final_long_token_vault: self
-                    .client
-                    .find_market_vault_address(&self.store, &hint.final_long_token),
-                final_short_token_vault: self
-                    .client
-                    .find_market_vault_address(&self.store, &hint.final_short_token),
-                market_token: hint.market_token,
-                final_long_token: hint.final_long_token,
-                final_short_token: hint.final_short_token,
-                market_token_escrow: hint.market_token_escrow,
-                final_long_token_escrow: hint.final_long_token_escrow,
-                final_short_token_escrow: hint.final_short_token_escrow,
-                market_token_vault: self
-                    .client
-                    .find_market_vault_address(&self.store, &hint.market_token),
-            })
+            .accounts(fix_optional_account_metas(
+                accounts::ExecuteWithdrawal {
+                    authority,
+                    store: self.store,
+                    token_program: anchor_spl::token::ID,
+                    system_program: system_program::ID,
+                    oracle: self.oracle,
+                    token_map: self.get_token_map().await?,
+                    withdrawal: self.withdrawal,
+                    market: self
+                        .client
+                        .find_market_address(&self.store, &hint.market_token),
+                    final_long_token_vault: self
+                        .client
+                        .find_market_vault_address(&self.store, &hint.final_long_token),
+                    final_short_token_vault: self
+                        .client
+                        .find_market_vault_address(&self.store, &hint.final_short_token),
+                    market_token: hint.market_token,
+                    final_long_token: hint.final_long_token,
+                    final_short_token: hint.final_short_token,
+                    market_token_escrow: hint.market_token_escrow,
+                    final_long_token_escrow: hint.final_long_token_escrow,
+                    final_short_token_escrow: hint.final_short_token_escrow,
+                    market_token_vault: self
+                        .client
+                        .find_market_vault_address(&self.store, &hint.market_token),
+                    chainlink_program: None,
+                },
+                &crate::program_ids::DEFAULT_GMSOL_STORE_ID,
+                self.client.store_program_id(),
+            ))
             .args(instruction::ExecuteWithdrawal {
                 execution_fee: self.execution_fee,
                 throw_on_execution_error: !self.cancel_on_execution_error,

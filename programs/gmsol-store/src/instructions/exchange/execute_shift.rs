@@ -8,7 +8,7 @@ use crate::{
     ops::{execution_fee::PayExecutionFeeOperation, shift::ExecuteShiftOperation},
     states::{
         common::action::{ActionExt, ActionSigner},
-        HasMarketMeta, Market, Oracle, PriceProvider, Shift, Store, TokenMapHeader,
+        Chainlink, HasMarketMeta, Market, Oracle, Shift, Store, TokenMapHeader,
     },
     utils::internal,
     CoreError,
@@ -25,8 +25,6 @@ pub struct ExecuteShift<'info> {
     /// Token map.
     #[account(has_one = store)]
     pub token_map: AccountLoader<'info, TokenMapHeader>,
-    /// Price Provider.
-    pub price_provider: Interface<'info, PriceProvider>,
     /// Oracle buffer to use.
     #[account(has_one = store)]
     pub oracle: Box<Account<'info, Oracle>>,
@@ -98,6 +96,8 @@ pub struct ExecuteShift<'info> {
     pub from_market_token_vault: Box<Account<'info, TokenAccount>>,
     /// The token program.
     pub token_program: Program<'info, Token>,
+    /// Chainlink Program.
+    pub chainlink_program: Option<Program<'info, Chainlink>>,
 }
 
 /// CHECK: only ORDER_KEEPER is allowed to execute shift.
@@ -208,10 +208,10 @@ impl<'info> ExecuteShift<'info> {
 
         let executed = self.oracle.with_prices(
             &self.store,
-            &self.price_provider,
             &self.token_map,
             &tokens,
             remaining_accounts,
+            self.chainlink_program.as_ref(),
             |oracle, _remaining_accounts| ops.oracle(oracle).build().execute(),
         )?;
 

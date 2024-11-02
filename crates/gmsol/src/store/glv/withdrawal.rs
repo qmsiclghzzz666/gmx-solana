@@ -4,7 +4,7 @@ use std::{
 };
 
 use anchor_client::{
-    anchor_lang::{prelude::AccountMeta, system_program, Id},
+    anchor_lang::{prelude::AccountMeta, system_program},
     solana_sdk::{address_lookup_table::AddressLookupTableAccount, pubkey::Pubkey, signer::Signer},
 };
 use anchor_spl::associated_token::get_associated_token_address_with_program_id;
@@ -14,14 +14,14 @@ use gmsol_store::{
     states::{
         common::{action::Action, swap::SwapParams, TokensWithFeed},
         glv::GlvWithdrawal,
-        Glv, HasMarketMeta, NonceBytes, Pyth, TokenMapAccess,
+        Glv, HasMarketMeta, NonceBytes, TokenMapAccess,
     },
 };
 
 use crate::{
     exchange::generate_nonce,
     store::{token::TokenAccountOps, utils::FeedsParser},
-    utils::{ComputeBudget, RpcBuilder, ZeroCopy},
+    utils::{fix_optional_account_metas, ComputeBudget, RpcBuilder, ZeroCopy},
 };
 
 use super::{split_to_accounts, GlvOps};
@@ -430,7 +430,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CloseGlvWithdrawalBuilder<'a, C
                 glv_token_program: glv_token_program_id,
                 associated_token_program: anchor_spl::associated_token::ID,
                 event_authority: self.client.store_event_authority(),
-                program: self.client.store_program_id(),
+                program: *self.client.store_program_id(),
             })
             .args(instruction::CloseGlvWithdrawal {
                 reason: self.reason.clone(),
@@ -443,7 +443,6 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CloseGlvWithdrawalBuilder<'a, C
 pub struct ExecuteGlvWithdrawalBuilder<'a, C> {
     client: &'a crate::Client<C>,
     oracle: Pubkey,
-    price_provider: Pubkey,
     glv_withdrawal: Pubkey,
     execution_lamports: u64,
     cancel_on_execution_error: bool,
@@ -507,7 +506,6 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteGlvWithdrawalBuilder<'a,
         Self {
             client,
             oracle,
-            price_provider: Pyth::id(),
             glv_withdrawal,
             execution_lamports: 0,
             cancel_on_execution_error,
@@ -637,7 +635,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteGlvWithdrawalBuilder<'a,
             hint.glv_market_tokens.iter().copied(),
             &glv,
             &hint.store,
-            &self.client.store_program_id(),
+            self.client.store_program_id(),
             &token_program_id,
         )
         .0;
@@ -662,31 +660,35 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteGlvWithdrawalBuilder<'a,
         let execute = self
             .client
             .store_rpc()
-            .accounts(accounts::ExecuteGlvWithdrawal {
-                authority,
-                store: hint.store,
-                token_map: hint.token_map,
-                price_provider: self.price_provider,
-                oracle: self.oracle,
-                glv,
-                market,
-                glv_withdrawal: self.glv_withdrawal,
-                glv_token: hint.glv_token,
-                market_token: hint.market_token,
-                final_long_token: hint.final_long_token,
-                final_short_token: hint.final_short_token,
-                glv_token_escrow: hint.glv_token_escrow,
-                market_token_escrow: hint.market_token_escrow,
-                final_long_token_escrow: hint.final_long_token_escrow,
-                final_short_token_escrow: hint.final_short_token_escrow,
-                market_token_withdrawal_vault,
-                final_long_token_vault,
-                final_short_token_vault,
-                market_token_vault,
-                token_program: token_program_id,
-                glv_token_program: glv_token_program_id,
-                system_program: system_program::ID,
-            })
+            .accounts(fix_optional_account_metas(
+                accounts::ExecuteGlvWithdrawal {
+                    authority,
+                    store: hint.store,
+                    token_map: hint.token_map,
+                    oracle: self.oracle,
+                    glv,
+                    market,
+                    glv_withdrawal: self.glv_withdrawal,
+                    glv_token: hint.glv_token,
+                    market_token: hint.market_token,
+                    final_long_token: hint.final_long_token,
+                    final_short_token: hint.final_short_token,
+                    glv_token_escrow: hint.glv_token_escrow,
+                    market_token_escrow: hint.market_token_escrow,
+                    final_long_token_escrow: hint.final_long_token_escrow,
+                    final_short_token_escrow: hint.final_short_token_escrow,
+                    market_token_withdrawal_vault,
+                    final_long_token_vault,
+                    final_short_token_vault,
+                    market_token_vault,
+                    token_program: token_program_id,
+                    glv_token_program: glv_token_program_id,
+                    system_program: system_program::ID,
+                    chainlink_program: None,
+                },
+                &crate::program_ids::DEFAULT_GMSOL_STORE_ID,
+                self.client.store_program_id(),
+            ))
             .args(instruction::ExecuteGlvWithdrawal {
                 execution_lamports: self.execution_lamports,
                 throw_on_execution_error: !self.cancel_on_execution_error,

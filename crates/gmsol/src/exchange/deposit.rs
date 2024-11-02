@@ -254,7 +254,7 @@ where
                     associated_token_program: anchor_spl::associated_token::ID,
                 },
                 &gmsol_store::id(),
-                &client.store_program_id(),
+                client.store_program_id(),
             ))
             .args(instruction::CreateDeposit {
                 nonce,
@@ -415,10 +415,10 @@ where
                     token_program: anchor_spl::token::ID,
                     system_program: system_program::ID,
                     event_authority: client.store_event_authority(),
-                    program: client.store_program_id(),
+                    program: *client.store_program_id(),
                 },
                 &gmsol_store::id(),
-                &client.store_program_id(),
+                client.store_program_id(),
             ))
             .args(instruction::CloseDeposit {
                 reason: self.reason.clone(),
@@ -603,7 +603,6 @@ where
                 accounts::ExecuteDeposit {
                     authority,
                     store: *store,
-                    price_provider: *price_provider,
                     oracle: *oracle,
                     token_map,
                     deposit: *deposit,
@@ -624,9 +623,10 @@ where
                     market_token_escrow: hint.market_token_escrow,
                     initial_long_token_escrow: hint.initial_long_token_escrow,
                     initial_short_token_escrow: hint.initial_short_token_escrow,
+                    chainlink_program: None,
                 },
                 &gmsol_store::ID,
-                &self.client.store_program_id(),
+                self.client.store_program_id(),
             ))
             .args(instruction::ExecuteDeposit {
                 execution_fee: *execution_fee,

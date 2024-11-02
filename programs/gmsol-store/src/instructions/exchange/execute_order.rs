@@ -17,7 +17,7 @@ use crate::{
         order::{Order, TransferOut},
         position::Position,
         user::UserHeader,
-        Market, Oracle, PriceProvider, Seed, Store, TokenMapHeader, TokenMapLoader,
+        Chainlink, Market, Oracle, Seed, Store, TokenMapHeader, TokenMapLoader,
     },
     utils::internal,
     CoreError,
@@ -126,8 +126,6 @@ pub struct ExecuteOrder<'info> {
     /// Token Map.
     #[account(has_one = store)]
     pub token_map: AccountLoader<'info, TokenMapHeader>,
-    /// Price Provider.
-    pub price_provider: Interface<'info, PriceProvider>,
     /// Oracle buffer to use.
     #[account(has_one = store)]
     pub oracle: Box<Account<'info, Oracle>>,
@@ -320,6 +318,8 @@ pub struct ExecuteOrder<'info> {
     pub token_program: Program<'info, Token>,
     /// The system program.
     pub system_program: Program<'info, System>,
+    /// Chainlink Program.
+    pub chainlink_program: Option<Program<'info, Chainlink>>,
 }
 
 pub(crate) fn unchecked_execute_order<'info>(
@@ -474,10 +474,10 @@ impl<'info> ExecuteOrder<'info> {
 
         self.oracle.with_prices(
             &self.store,
-            &self.price_provider,
             &self.token_map,
             &feeds.tokens,
             remaining_accounts,
+            self.chainlink_program.as_ref(),
             |oracle, remaining_accounts| {
                 ops.oracle(oracle)
                     .remaining_accounts(remaining_accounts)
@@ -570,8 +570,6 @@ pub struct ExecuteDecreaseOrder<'info> {
     /// Token Map.
     #[account(has_one = store)]
     pub token_map: AccountLoader<'info, TokenMapHeader>,
-    /// Price Provider.
-    pub price_provider: Interface<'info, PriceProvider>,
     /// Oracle buffer to use.
     #[account(has_one = store)]
     pub oracle: Box<Account<'info, Oracle>>,
@@ -740,6 +738,8 @@ pub struct ExecuteDecreaseOrder<'info> {
     pub token_program: Program<'info, Token>,
     /// The system program.
     pub system_program: Program<'info, System>,
+    /// Chainlink Program.
+    pub chainlink_program: Option<Program<'info, Chainlink>>,
 }
 
 pub(crate) fn unchecked_execute_decrease_order<'info>(
@@ -811,10 +811,10 @@ impl<'info> ExecuteDecreaseOrder<'info> {
 
         self.oracle.with_prices(
             &self.store,
-            &self.price_provider,
             &self.token_map,
             &feeds.tokens,
             remaining_accounts,
+            self.chainlink_program.as_ref(),
             #[inline(never)]
             |oracle, remaining_accounts| {
                 ops.oracle(oracle)

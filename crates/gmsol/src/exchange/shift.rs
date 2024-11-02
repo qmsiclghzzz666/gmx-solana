@@ -1,7 +1,7 @@
 use std::ops::Deref;
 
 use anchor_client::{
-    anchor_lang::{system_program, Id},
+    anchor_lang::system_program,
     solana_sdk::{pubkey::Pubkey, signer::Signer},
 };
 use anchor_spl::associated_token::get_associated_token_address;
@@ -11,14 +11,14 @@ use gmsol_store::{
     ops::shift::CreateShiftParams,
     states::{
         common::{action::Action, TokensWithFeed},
-        HasMarketMeta, NonceBytes, Pyth, Shift, Store, TokenMapAccess,
+        HasMarketMeta, NonceBytes, Shift, Store, TokenMapAccess,
     },
 };
 
 use crate::{
     exchange::generate_nonce,
     store::{token::TokenAccountOps, utils::FeedsParser},
-    utils::{RpcBuilder, ZeroCopy},
+    utils::{fix_optional_account_metas, RpcBuilder, ZeroCopy},
 };
 
 use super::ExchangeOps;
@@ -272,7 +272,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CloseShiftBuilder<'a, C> {
                 token_program: anchor_spl::token::ID,
                 associated_token_program: anchor_spl::associated_token::ID,
                 event_authority: self.client.store_event_authority(),
-                program: self.client.store_program_id(),
+                program: *self.client.store_program_id(),
             })
             .args(instruction::CloseShift {
                 reason: self.reason.clone(),
@@ -288,7 +288,6 @@ pub struct ExecuteShiftBuilder<'a, C> {
     shift: Pubkey,
     execution_fee: u64,
     cancel_on_execution_error: bool,
-    price_provider: Pubkey,
     oracle: Pubkey,
     hint: Option<ExecuteShiftHint>,
     close: bool,
@@ -347,7 +346,6 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteShiftBuilder<'a, C> {
             hint: None,
             execution_fee: 0,
             cancel_on_execution_error: true,
-            price_provider: Pyth::id(),
             oracle: *oracle,
             close: true,
             feeds_parser: Default::default(),
@@ -442,22 +440,26 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteShiftBuilder<'a, C> {
         let mut rpc = self
             .client
             .store_rpc()
-            .accounts(accounts::ExecuteShift {
-                authority,
-                store: hint.store,
-                token_map: hint.token_map,
-                price_provider: self.price_provider,
-                oracle: self.oracle,
-                from_market,
-                to_market,
-                shift: self.shift,
-                from_market_token: hint.from_market_token,
-                to_market_token: hint.to_market_token,
-                from_market_token_escrow: hint.from_market_token_escrow,
-                to_market_token_escrow: hint.to_market_token_escrow,
-                from_market_token_vault,
-                token_program: anchor_spl::token::ID,
-            })
+            .accounts(fix_optional_account_metas(
+                accounts::ExecuteShift {
+                    authority,
+                    store: hint.store,
+                    token_map: hint.token_map,
+                    oracle: self.oracle,
+                    from_market,
+                    to_market,
+                    shift: self.shift,
+                    from_market_token: hint.from_market_token,
+                    to_market_token: hint.to_market_token,
+                    from_market_token_escrow: hint.from_market_token_escrow,
+                    to_market_token_escrow: hint.to_market_token_escrow,
+                    from_market_token_vault,
+                    token_program: anchor_spl::token::ID,
+                    chainlink_program: None,
+                },
+                &crate::program_ids::DEFAULT_GMSOL_STORE_ID,
+                self.client.store_program_id(),
+            ))
             .args(instruction::ExecuteShift {
                 execution_lamports: self.execution_fee,
                 throw_on_execution_error: !self.cancel_on_execution_error,

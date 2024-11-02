@@ -10,7 +10,7 @@ use crate::{
     },
     states::{
         common::action::{ActionExt, ActionSigner},
-        Deposit, Market, Oracle, PriceProvider, Seed, Store, TokenMapHeader, TokenMapLoader,
+        Chainlink, Deposit, Market, Oracle, Seed, Store, TokenMapHeader, TokenMapLoader,
     },
     utils::internal,
     CoreError,
@@ -27,8 +27,6 @@ pub struct ExecuteDeposit<'info> {
     /// Token Map.
     #[account(has_one = store)]
     pub token_map: AccountLoader<'info, TokenMapHeader>,
-    /// Price Provider.
-    pub price_provider: Interface<'info, PriceProvider>,
     /// Oracle buffer to use.
     #[account(has_one = store)]
     pub oracle: Box<Account<'info, Oracle>>,
@@ -113,6 +111,8 @@ pub struct ExecuteDeposit<'info> {
     pub token_program: Program<'info, Token>,
     /// The system program.
     pub system_program: Program<'info, System>,
+    /// Chainlink Program.
+    pub chainlink_program: Option<Program<'info, Chainlink>>,
 }
 
 /// CHECK: only ORDER_KEEPER can invoke this instruction.
@@ -315,10 +315,10 @@ impl<'info> ExecuteDeposit<'info> {
 
         let executed = self.oracle.with_prices(
             &self.store,
-            &self.price_provider,
             &self.token_map,
             &feeds.tokens,
             remaining_accounts,
+            self.chainlink_program.as_ref(),
             |oracle, remaining_accounts| {
                 ops.oracle(oracle)
                     .remaining_accounts(remaining_accounts)

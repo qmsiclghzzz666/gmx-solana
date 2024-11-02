@@ -4,7 +4,7 @@ use std::{
 };
 
 use anchor_client::{
-    anchor_lang::{prelude::AccountMeta, system_program, Id},
+    anchor_lang::{prelude::AccountMeta, system_program},
     solana_sdk::{address_lookup_table::AddressLookupTableAccount, pubkey::Pubkey, signer::Signer},
 };
 use anchor_spl::associated_token::get_associated_token_address_with_program_id;
@@ -17,7 +17,7 @@ use gmsol_store::{
             swap::{HasSwapParams, SwapParams},
             TokensWithFeed,
         },
-        Glv, GlvDeposit, HasMarketMeta, NonceBytes, Pyth, TokenMapAccess,
+        Glv, GlvDeposit, HasMarketMeta, NonceBytes, TokenMapAccess,
     },
 };
 
@@ -314,7 +314,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateGlvDepositBuilder<'a, C> 
                     associated_token_program: anchor_spl::associated_token::ID,
                 },
                 &crate::program_ids::DEFAULT_GMSOL_STORE_ID,
-                &self.client.store_program_id(),
+                self.client.store_program_id(),
             ))
             .args(instruction::CreateGlvDeposit {
                 nonce,
@@ -485,10 +485,10 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CloseGlvDepositBuilder<'a, C> {
                     glv_token_program: glv_token_program_id,
                     associated_token_program: anchor_spl::associated_token::ID,
                     event_authority: self.client.store_event_authority(),
-                    program: self.client.store_program_id(),
+                    program: *self.client.store_program_id(),
                 },
                 &crate::program_ids::DEFAULT_GMSOL_STORE_ID,
-                &self.client.store_program_id(),
+                self.client.store_program_id(),
             ))
             .args(instruction::CloseGlvDeposit {
                 reason: self.reason.clone(),
@@ -502,7 +502,6 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CloseGlvDepositBuilder<'a, C> {
 pub struct ExecuteGlvDepositBuilder<'a, C> {
     client: &'a crate::Client<C>,
     oracle: Pubkey,
-    price_provider: Pubkey,
     glv_deposit: Pubkey,
     execution_lamports: u64,
     cancel_on_execution_error: bool,
@@ -575,7 +574,6 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteGlvDepositBuilder<'a, C>
         Self {
             client,
             oracle,
-            price_provider: Pyth::id(),
             glv_deposit,
             execution_lamports: 0,
             cancel_on_execution_error,
@@ -719,7 +717,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteGlvDepositBuilder<'a, C>
             hint.glv_market_tokens,
             &glv,
             &hint.store,
-            &self.client.store_program_id(),
+            self.client.store_program_id(),
             &token_program_id,
         )
         .0;
@@ -732,7 +730,6 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteGlvDepositBuilder<'a, C>
                     authority,
                     store: hint.store,
                     token_map: hint.token_map,
-                    price_provider: self.price_provider,
                     oracle: self.oracle,
                     glv,
                     market,
@@ -751,9 +748,10 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteGlvDepositBuilder<'a, C>
                     token_program: token_program_id,
                     glv_token_program: glv_token_program_id,
                     system_program: system_program::ID,
+                    chainlink_program: None,
                 },
                 &crate::program_ids::DEFAULT_GMSOL_STORE_ID,
-                &self.client.store_program_id(),
+                self.client.store_program_id(),
             ))
             .args(instruction::ExecuteGlvDeposit {
                 execution_lamports: self.execution_lamports,

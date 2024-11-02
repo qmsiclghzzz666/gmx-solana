@@ -121,7 +121,7 @@ impl<C: Deref<Target = impl Signer> + Clone> GlvOps<C> for crate::Client<C> {
             market_tokens,
             &glv,
             store,
-            &self.store_program_id(),
+            self.store_program_id(),
             &market_token_program_id,
         );
 

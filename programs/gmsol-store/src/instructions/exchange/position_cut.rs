@@ -20,7 +20,7 @@ use crate::{
         feature::{ActionDisabledFlag, DomainDisabledFlag},
         order::Order,
         user::UserHeader,
-        Market, NonceBytes, Oracle, Position, PriceProvider, Seed, Store, TokenMapHeader,
+        Chainlink, Market, NonceBytes, Oracle, Position, Seed, Store, TokenMapHeader,
     },
     utils::internal,
     validated_recent_timestamp, CoreError,
@@ -54,8 +54,6 @@ pub struct PositionCut<'info> {
     /// Token map.
     #[account(has_one = store)]
     pub token_map: AccountLoader<'info, TokenMapHeader>,
-    /// Price Provider.
-    pub price_provider: Interface<'info, PriceProvider>,
     /// Buffer for oracle prices.
     #[account(mut, has_one = store)]
     pub oracle: Box<Account<'info, Oracle>>,
@@ -187,6 +185,8 @@ pub struct PositionCut<'info> {
     pub token_program: Program<'info, Token>,
     /// The associated token program.
     pub associated_token_program: Program<'info, AssociatedToken>,
+    /// Chainlink Program.
+    pub chainlink_program: Option<Program<'info, Chainlink>>,
 }
 
 /// CHECK: only ORDER_KEEPER is allowed to use this instrcution.
@@ -261,10 +261,10 @@ pub(crate) fn unchecked_process_position_cut<'info>(
 
     let should_send_trade_event = accounts.oracle.with_prices(
         &accounts.store,
-        &accounts.price_provider,
         &accounts.token_map,
         &tokens,
         remaining_accounts,
+        accounts.chainlink_program.as_ref(),
         |oracle, _remaining_accounts| ops.oracle(oracle).build().execute(),
     )?;
 

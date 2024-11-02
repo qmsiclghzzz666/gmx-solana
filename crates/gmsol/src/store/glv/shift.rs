@@ -1,7 +1,7 @@
 use std::{collections::HashMap, ops::Deref};
 
 use anchor_client::{
-    anchor_lang::{system_program, Id},
+    anchor_lang::system_program,
     solana_sdk::{address_lookup_table::AddressLookupTableAccount, pubkey::Pubkey, signer::Signer},
 };
 use anchor_spl::associated_token::get_associated_token_address;
@@ -12,14 +12,14 @@ use gmsol_store::{
     states::{
         common::{action::Action, TokensWithFeed},
         glv::GlvShift,
-        HasMarketMeta, NonceBytes, Pyth, Shift, Store, TokenMapAccess,
+        HasMarketMeta, NonceBytes, Shift, Store, TokenMapAccess,
     },
 };
 
 use crate::{
     exchange::generate_nonce,
     store::utils::FeedsParser,
-    utils::{RpcBuilder, ZeroCopy},
+    utils::{fix_optional_account_metas, RpcBuilder, ZeroCopy},
 };
 
 #[cfg(feature = "pyth-pull-oracle")]
@@ -220,7 +220,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CloseGlvShiftBuilder<'a, C> {
                 token_program: anchor_spl::token::ID,
                 associated_token_program: anchor_spl::associated_token::ID,
                 event_authority: self.client.store_event_authority(),
-                program: self.client.store_program_id(),
+                program: *self.client.store_program_id(),
             })
             .args(instruction::CloseGlvShift {
                 reason: self.reason.clone(),
@@ -236,7 +236,6 @@ pub struct ExecuteGlvShiftBuilder<'a, C> {
     shift: Pubkey,
     execution_fee: u64,
     cancel_on_execution_error: bool,
-    price_provider: Pubkey,
     oracle: Pubkey,
     hint: Option<ExecuteGlvShiftHint>,
     close: bool,
@@ -294,7 +293,6 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteGlvShiftBuilder<'a, C> {
             hint: None,
             execution_fee: 0,
             cancel_on_execution_error: true,
-            price_provider: Pyth::id(),
             oracle: *oracle,
             close: true,
             feeds_parser: Default::default(),
@@ -407,23 +405,27 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteGlvShiftBuilder<'a, C> {
         let mut rpc = self
             .client
             .store_rpc()
-            .accounts(accounts::ExecuteGlvShift {
-                authority,
-                store: hint.store,
-                token_map: hint.token_map,
-                price_provider: self.price_provider,
-                oracle: self.oracle,
-                glv,
-                from_market,
-                to_market,
-                glv_shift: self.shift,
-                from_market_token: hint.from_market_token,
-                to_market_token: hint.to_market_token,
-                from_market_token_glv_vault,
-                to_market_token_glv_vault,
-                from_market_token_vault,
-                token_program: anchor_spl::token::ID,
-            })
+            .accounts(fix_optional_account_metas(
+                accounts::ExecuteGlvShift {
+                    authority,
+                    store: hint.store,
+                    token_map: hint.token_map,
+                    oracle: self.oracle,
+                    glv,
+                    from_market,
+                    to_market,
+                    glv_shift: self.shift,
+                    from_market_token: hint.from_market_token,
+                    to_market_token: hint.to_market_token,
+                    from_market_token_glv_vault,
+                    to_market_token_glv_vault,
+                    from_market_token_vault,
+                    token_program: anchor_spl::token::ID,
+                    chainlink_program: None,
+                },
+                &crate::program_ids::DEFAULT_GMSOL_STORE_ID,
+                self.client.store_program_id(),
+            ))
             .args(instruction::ExecuteGlvShift {
                 execution_lamports: self.execution_fee,
                 throw_on_execution_error: !self.cancel_on_execution_error,

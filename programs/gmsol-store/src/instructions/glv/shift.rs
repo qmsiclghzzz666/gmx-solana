@@ -16,7 +16,7 @@ use crate::{
     states::{
         common::action::{Action, ActionExt},
         glv::GlvShift,
-        Glv, Market, NonceBytes, Oracle, PriceProvider, RoleKey, Seed, Store, TokenMapHeader,
+        Chainlink, Glv, Market, NonceBytes, Oracle, RoleKey, Seed, Store, TokenMapHeader,
     },
     utils::internal,
     CoreError,
@@ -248,8 +248,6 @@ pub struct ExecuteGlvShift<'info> {
     /// Token Map.
     #[account(has_one = store)]
     pub token_map: AccountLoader<'info, TokenMapHeader>,
-    /// Price Provider.
-    pub price_provider: Interface<'info, PriceProvider>,
     /// Oracle buffer to use.
     #[account(has_one = store)]
     pub oracle: Box<Account<'info, Oracle>>,
@@ -326,6 +324,8 @@ pub struct ExecuteGlvShift<'info> {
     pub from_market_token_vault: Box<Account<'info, TokenAccount>>,
     /// The token program.
     pub token_program: Program<'info, Token>,
+    /// Chainlink Program.
+    pub chainlink_program: Option<Program<'info, Chainlink>>,
 }
 
 /// Execute GLV shift.
@@ -408,10 +408,10 @@ impl<'info> ExecuteGlvShift<'info> {
 
         self.oracle.with_prices(
             &self.store,
-            &self.price_provider,
             &self.token_map,
             &tokens,
             remaining_accounts,
+            self.chainlink_program.as_ref(),
             |oracle, _remaining_accounts| builder.oracle(oracle).build().unchecked_execute(),
         )
     }

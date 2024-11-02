@@ -677,7 +677,7 @@ impl InspectArgs {
                 println!("Event Authority: {}", client.store_event_authority());
             }
             Command::Oracle { oracle } => {
-                let address = oracle.address(Some(store), &client.store_program_id())?;
+                let address = oracle.address(Some(store), client.store_program_id())?;
                 println!("{address}");
                 println!(
                     "{:#?}",
@@ -937,7 +937,7 @@ impl InspectArgs {
                     Program::Store => client.store_program_id(),
                 };
 
-                let decoder = OwnedDataDecoder::new(&program_id, &data);
+                let decoder = OwnedDataDecoder::new(program_id, &data);
                 let data = GMSOLCPIEvent::decode(decoder)?;
                 println!("{data:#?}");
             }

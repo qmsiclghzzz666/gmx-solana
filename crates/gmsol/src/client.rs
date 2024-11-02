@@ -98,7 +98,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
             self.cluster().clone(),
             payer,
             ClientOptions {
-                data_store_program_id: Some(self.store_program_id()),
+                data_store_program_id: Some(*self.store_program_id()),
                 commitment: self.commitment(),
                 subscription: self.subscription_config.clone(),
             },
@@ -110,7 +110,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         Ok(Self {
             cfg: self.cfg.clone(),
             anchor: self.anchor.clone(),
-            data_store: self.program(self.store_program_id()),
+            data_store: self.program(*self.store_program_id()),
             pub_sub: OnceCell::default(),
             subscription_config: self.subscription_config.clone(),
         })
@@ -154,17 +154,17 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
 
     /// Create a new `DataStore` Program.
     pub fn new_data_store(&self) -> crate::Result<Program<C>> {
-        Ok(self.program(self.store_program_id()))
+        Ok(self.program(*self.store_program_id()))
     }
 
     /// Get the program id of `Store` program.
-    pub fn store_program_id(&self) -> Pubkey {
-        *self.data_store().id()
+    pub fn store_program_id(&self) -> &Pubkey {
+        self.data_store().id()
     }
 
     /// Create a rpc builder for `Store` Program.
     pub fn store_rpc(&self) -> RpcBuilder<'_, C> {
-        RpcBuilder::new(self.store_program_id(), &self.cfg)
+        RpcBuilder::new(*self.store_program_id(), &self.cfg)
     }
 
     /// Create a transaction builder with the given options.
@@ -187,22 +187,22 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
 
     /// Find PDA for [`Store`](gmsol_store::states::Store) account.
     pub fn find_store_address(&self, key: &str) -> Pubkey {
-        crate::pda::find_store_address(key, &self.store_program_id()).0
+        crate::pda::find_store_address(key, self.store_program_id()).0
     }
 
     /// Get the event authority address for the `Store` program.
     pub fn store_event_authority(&self) -> Pubkey {
-        crate::pda::find_event_authority_address(&self.store_program_id()).0
+        crate::pda::find_event_authority_address(self.store_program_id()).0
     }
 
     /// Find PDA for [`Oracle`](gmsol_store::states::Oracle) account.
     pub fn find_oracle_address(&self, store: &Pubkey, index: u8) -> Pubkey {
-        crate::pda::find_oracle_address(store, index, &self.store_program_id()).0
+        crate::pda::find_oracle_address(store, index, self.store_program_id()).0
     }
 
     /// Find PDA for market vault account.
     pub fn find_market_vault_address(&self, store: &Pubkey, token: &Pubkey) -> Pubkey {
-        crate::pda::find_market_vault_address(store, token, &self.store_program_id()).0
+        crate::pda::find_market_vault_address(store, token, self.store_program_id()).0
     }
 
     /// Find PDA for market token mint account.
@@ -218,14 +218,14 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
             index_token,
             long_token,
             short_token,
-            &self.store_program_id(),
+            self.store_program_id(),
         )
         .0
     }
 
     /// Find PDA for market account.
     pub fn find_market_address(&self, store: &Pubkey, token: &Pubkey) -> Pubkey {
-        types::Market::find_market_address(store, token, &self.store_program_id()).0
+        types::Market::find_market_address(store, token, self.store_program_id()).0
     }
 
     /// Find PDA for deposit account.
@@ -235,7 +235,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         user: &Pubkey,
         nonce: &NonceBytes,
     ) -> Pubkey {
-        crate::pda::find_deposit_address(store, user, nonce, &self.store_program_id()).0
+        crate::pda::find_deposit_address(store, user, nonce, self.store_program_id()).0
     }
 
     /// Find DPA for withdrawal account.
@@ -245,17 +245,17 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         user: &Pubkey,
         nonce: &NonceBytes,
     ) -> Pubkey {
-        crate::pda::find_withdrawal_address(store, user, nonce, &self.store_program_id()).0
+        crate::pda::find_withdrawal_address(store, user, nonce, self.store_program_id()).0
     }
 
     /// Find PDA for order.
     pub fn find_order_address(&self, store: &Pubkey, user: &Pubkey, nonce: &NonceBytes) -> Pubkey {
-        crate::pda::find_order_address(store, user, nonce, &self.store_program_id()).0
+        crate::pda::find_order_address(store, user, nonce, self.store_program_id()).0
     }
 
     /// Find PDA for shift.
     pub fn find_shift_address(&self, store: &Pubkey, owner: &Pubkey, nonce: &NonceBytes) -> Pubkey {
-        crate::pda::find_shift_address(store, owner, nonce, &self.store_program_id()).0
+        crate::pda::find_shift_address(store, owner, nonce, self.store_program_id()).0
     }
 
     /// Find PDA for position.
@@ -273,7 +273,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
             market_token,
             collateral_token,
             kind,
-            &self.store_program_id(),
+            self.store_program_id(),
         )?
         .0)
     }
@@ -286,14 +286,8 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         user: &Pubkey,
         time_key: &[u8],
     ) -> Pubkey {
-        crate::pda::find_claimable_account_pda(
-            store,
-            mint,
-            user,
-            time_key,
-            &self.store_program_id(),
-        )
-        .0
+        crate::pda::find_claimable_account_pda(store, mint, user, time_key, self.store_program_id())
+            .0
     }
 
     /// Find trade event buffer address.
@@ -303,27 +297,27 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         authority: &Pubkey,
         index: u8,
     ) -> Pubkey {
-        crate::pda::find_trade_event_buffer_pda(store, authority, index, &self.store_program_id()).0
+        crate::pda::find_trade_event_buffer_pda(store, authority, index, self.store_program_id()).0
     }
 
     /// Find User account address.
     pub fn find_user_address(&self, store: &Pubkey, owner: &Pubkey) -> Pubkey {
-        crate::pda::find_user_pda(store, owner, &self.store_program_id()).0
+        crate::pda::find_user_pda(store, owner, self.store_program_id()).0
     }
 
     /// Find referral code address.
     pub fn find_referral_code_address(&self, store: &Pubkey, code: ReferralCodeBytes) -> Pubkey {
-        crate::pda::find_referral_code_pda(store, code, &self.store_program_id()).0
+        crate::pda::find_referral_code_pda(store, code, self.store_program_id()).0
     }
 
     /// Find GLV token address.
     pub fn find_glv_token_address(&self, store: &Pubkey, index: u8) -> Pubkey {
-        types::Glv::find_glv_token_pda(store, index, &self.store_program_id()).0
+        types::Glv::find_glv_token_pda(store, index, self.store_program_id()).0
     }
 
     /// Find GLV address.
     pub fn find_glv_address(&self, glv_token: &Pubkey) -> Pubkey {
-        types::Glv::find_glv_pda(glv_token, &self.store_program_id()).0
+        types::Glv::find_glv_pda(glv_token, self.store_program_id()).0
     }
 
     /// Find GLV deposit address.
@@ -333,7 +327,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         owner: &Pubkey,
         nonce: &NonceBytes,
     ) -> Pubkey {
-        crate::pda::find_glv_deposit_pda(store, owner, nonce, &self.store_program_id()).0
+        crate::pda::find_glv_deposit_pda(store, owner, nonce, self.store_program_id()).0
     }
 
     /// Find GLV withdrawal address.
@@ -343,22 +337,22 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         owner: &Pubkey,
         nonce: &NonceBytes,
     ) -> Pubkey {
-        crate::pda::find_glv_withdrawal_pda(store, owner, nonce, &self.store_program_id()).0
+        crate::pda::find_glv_withdrawal_pda(store, owner, nonce, self.store_program_id()).0
     }
 
     /// Find GT exchange vault address.
     pub fn find_gt_exchange_vault_address(&self, store: &Pubkey, time_window_index: i64) -> Pubkey {
-        crate::pda::find_gt_exchange_vault_pda(store, time_window_index, &self.store_program_id()).0
+        crate::pda::find_gt_exchange_vault_pda(store, time_window_index, self.store_program_id()).0
     }
 
     /// Find GT exchange address.
     pub fn find_gt_exchange_address(&self, vault: &Pubkey, owner: &Pubkey) -> Pubkey {
-        crate::pda::find_gt_exchange_pda(vault, owner, &self.store_program_id()).0
+        crate::pda::find_gt_exchange_pda(vault, owner, self.store_program_id()).0
     }
 
     /// Find GT vesting address.
     pub fn find_gt_vesting_address(&self, store: &Pubkey, owner: &Pubkey) -> Pubkey {
-        crate::pda::find_gt_vesting_pda(store, owner, &self.store_program_id()).0
+        crate::pda::find_gt_vesting_pda(store, owner, self.store_program_id()).0
     }
 
     /// Get slot.
@@ -762,7 +756,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         let events = extract_cpi_events(
             signatures,
             query,
-            &program_id,
+            program_id,
             &event_authority,
             commitment,
             Some(0),
@@ -814,7 +808,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         let events = extract_cpi_events(
             signatures,
             client,
-            &self.store_program_id(),
+            self.store_program_id(),
             &self.store_event_authority(),
             commitment,
             Some(0),

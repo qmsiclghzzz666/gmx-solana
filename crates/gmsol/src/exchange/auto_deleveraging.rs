@@ -6,7 +6,10 @@ use anchor_client::{
 };
 use gmsol_store::states::{common::TokensWithFeed, Market, Pyth};
 
-use crate::{store::utils::FeedsParser, utils::RpcBuilder};
+use crate::{
+    store::utils::FeedsParser,
+    utils::{fix_optional_account_metas, RpcBuilder},
+};
 
 /// The compute budget for `auto_deleverage`.
 pub const ADL_COMPUTE_BUDGET: u32 = 800_000;
@@ -85,16 +88,20 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> UpdateAdlBuilder<'a, C> {
         let rpc = self
             .client
             .store_rpc()
-            .accounts(gmsol_store::accounts::UpdateAdlState {
-                authority: self.client.payer(),
-                store: self.store,
-                token_map: hint.token_map,
-                oracle: self.oracle,
-                market: self
-                    .client
-                    .find_market_address(&self.store, &self.market_token),
-                price_provider: self.price_provider,
-            })
+            .accounts(fix_optional_account_metas(
+                gmsol_store::accounts::UpdateAdlState {
+                    authority: self.client.payer(),
+                    store: self.store,
+                    token_map: hint.token_map,
+                    oracle: self.oracle,
+                    market: self
+                        .client
+                        .find_market_address(&self.store, &self.market_token),
+                    chainlink_program: None,
+                },
+                &crate::program_ids::DEFAULT_GMSOL_STORE_ID,
+                self.client.store_program_id(),
+            ))
             .args(gmsol_store::instruction::UpdateAdlState {
                 is_long: self.is_long,
             })

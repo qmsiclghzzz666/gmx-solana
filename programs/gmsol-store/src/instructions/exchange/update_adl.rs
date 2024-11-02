@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    states::{market::utils::Adl, Market, Oracle, PriceProvider, Store, TokenMapHeader},
+    states::{market::utils::Adl, Chainlink, Market, Oracle, Store, TokenMapHeader},
     utils::internal,
 };
 
@@ -18,14 +18,14 @@ pub struct UpdateAdlState<'info> {
     /// Token map.
     #[account(has_one = store)]
     pub token_map: AccountLoader<'info, TokenMapHeader>,
-    /// Price Provider.
-    pub price_provider: Interface<'info, PriceProvider>,
     /// The oracle buffer to use.
     #[account(has_one = store)]
     pub oracle: Account<'info, Oracle>,
     /// The market to update the ADL state.
     #[account(mut, has_one = store)]
     pub market: AccountLoader<'info, Market>,
+    /// Chainlink Program.
+    pub chainlink_program: Option<Program<'info, Chainlink>>,
 }
 
 /// CHECK: only ORDER_KEEPER is authorized to perform this action.
@@ -42,10 +42,10 @@ pub(crate) fn unchecked_update_adl_state<'info>(
 
     ctx.accounts.oracle.with_prices(
         &ctx.accounts.store,
-        &ctx.accounts.price_provider,
         &ctx.accounts.token_map,
         &tokens,
         ctx.remaining_accounts,
+        ctx.accounts.chainlink_program.as_ref(),
         |oracle, _remaining_accounts| market.update_adl_state(oracle, is_long),
     )?;
 

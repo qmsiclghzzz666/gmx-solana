@@ -250,7 +250,7 @@ impl KeeperArgs {
                     store,
                     &self
                         .oracle
-                        .address(Some(store), &client.store_program_id())?,
+                        .address(Some(store), client.store_program_id())?,
                     deposit,
                     true,
                 );
@@ -298,7 +298,7 @@ impl KeeperArgs {
                     store,
                     &self
                         .oracle
-                        .address(Some(store), &client.store_program_id())?,
+                        .address(Some(store), client.store_program_id())?,
                     withdrawal,
                     true,
                 );
@@ -358,7 +358,7 @@ impl KeeperArgs {
                     store,
                     &self
                         .oracle
-                        .address(Some(store), &client.store_program_id())?,
+                        .address(Some(store), client.store_program_id())?,
                     order,
                     true,
                 )?;
@@ -429,7 +429,7 @@ impl KeeperArgs {
                 let mut builder = client.liquidate(
                     &self
                         .oracle
-                        .address(Some(store), &client.store_program_id())?,
+                        .address(Some(store), client.store_program_id())?,
                     position,
                 )?;
                 let execution_fee = self
@@ -511,7 +511,7 @@ impl KeeperArgs {
                 let mut builder = client.auto_deleverage(
                     &self
                         .oracle
-                        .address(Some(store), &client.store_program_id())?,
+                        .address(Some(store), client.store_program_id())?,
                     position,
                     size,
                 )?;
@@ -583,7 +583,7 @@ impl KeeperArgs {
                     store,
                     &self
                         .oracle
-                        .address(Some(store), &client.store_program_id())?,
+                        .address(Some(store), client.store_program_id())?,
                     market_token,
                     side.is_long(),
                 )?;
@@ -658,7 +658,7 @@ impl KeeperArgs {
 
         let after = Duration::from_secs(wait);
         // Subscribe deposit creation event.
-        let deposit_program = client.anchor().program(client.store_program_id())?;
+        let deposit_program = client.anchor().program(*client.store_program_id())?;
         let unsubscriber =
             deposit_program
             .on::<DepositCreated>({
@@ -679,7 +679,7 @@ impl KeeperArgs {
         tracing::info!("deposit creation subscribed");
 
         // Subscribe withdrawal creation event.
-        let withdrawal_program = client.anchor().program(client.store_program_id())?;
+        let withdrawal_program = client.anchor().program(*client.store_program_id())?;
         let unsubscriber = withdrawal_program
             .on::<WithdrawalCreated>({
                 let tx = tx.clone();
@@ -699,7 +699,7 @@ impl KeeperArgs {
         tracing::info!("withdrawal creation subscribed");
 
         // Subscribe order creation event.
-        let order_program = client.anchor().program(client.store_program_id())?;
+        let order_program = client.anchor().program(*client.store_program_id())?;
         let unsubscriber = order_program
             .on::<OrderCreated>({
                 let tx = tx.clone();

@@ -17,7 +17,7 @@ use gmsol_store::{
 use crate::{
     exchange::generate_nonce,
     store::{token::TokenAccountOps, utils::FeedsParser},
-    utils::{ComputeBudget, TransactionBuilder, ZeroCopy},
+    utils::{fix_optional_account_metas, ComputeBudget, TransactionBuilder, ZeroCopy},
 };
 
 use super::{
@@ -94,7 +94,7 @@ impl PositionCutHint {
             market,
             meta,
             user.as_ref(),
-            &client.store_program_id(),
+            client.store_program_id(),
         )
     }
 
@@ -307,33 +307,37 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> PositionCutBuilder<'a, C> {
         let mut exec_builder = self
             .client
             .store_rpc()
-            .accounts(accounts::PositionCut {
-                authority: payer,
-                owner,
-                user: hint.user,
-                store,
-                token_map: hint.token_map,
-                price_provider: self.price_provider,
-                oracle: self.oracle,
-                market: hint.market,
-                order,
-                position: self.position,
-                event,
-                long_token: long_token_mint,
-                short_token: short_token_mint,
-                long_token_escrow,
-                short_token_escrow,
-                long_token_vault,
-                short_token_vault,
-                claimable_long_token_account_for_user,
-                claimable_short_token_account_for_user,
-                claimable_pnl_token_account_for_holding,
-                system_program: system_program::ID,
-                token_program: anchor_spl::token::ID,
-                associated_token_program: anchor_spl::associated_token::ID,
-                event_authority: self.client.store_event_authority(),
-                program: self.client.store_program_id(),
-            })
+            .accounts(fix_optional_account_metas(
+                accounts::PositionCut {
+                    authority: payer,
+                    owner,
+                    user: hint.user,
+                    store,
+                    token_map: hint.token_map,
+                    oracle: self.oracle,
+                    market: hint.market,
+                    order,
+                    position: self.position,
+                    event,
+                    long_token: long_token_mint,
+                    short_token: short_token_mint,
+                    long_token_escrow,
+                    short_token_escrow,
+                    long_token_vault,
+                    short_token_vault,
+                    claimable_long_token_account_for_user,
+                    claimable_short_token_account_for_user,
+                    claimable_pnl_token_account_for_holding,
+                    system_program: system_program::ID,
+                    token_program: anchor_spl::token::ID,
+                    associated_token_program: anchor_spl::associated_token::ID,
+                    event_authority: self.client.store_event_authority(),
+                    program: *self.client.store_program_id(),
+                    chainlink_program: None,
+                },
+                &crate::program_ids::DEFAULT_GMSOL_STORE_ID,
+                self.client.store_program_id(),
+            ))
             .accounts(feeds)
             .compute_budget(ComputeBudget::default().with_limit(POSITION_CUT_COMPUTE_BUDGET))
             .lookup_tables(self.alts.clone());

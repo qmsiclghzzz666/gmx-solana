@@ -1601,6 +1601,9 @@ pub enum CoreError {
     /// Invalid Provider Kind Index.
     #[msg("invalid provider kind index")]
     InvalidProviderKindIndex,
+    /// Chainlink Program is required.
+    #[msg("chainlink program is required")]
+    ChainlinkProgramIsRequired,
     /// Not enough token feeds.
     #[msg("not enough token feeds")]
     NotEnoughTokenFeeds,

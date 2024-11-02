@@ -16,13 +16,13 @@ impl Chainlink {
     /// Check and get latest chainlink price from data feed.
     pub(crate) fn check_and_get_chainlink_price<'info>(
         clock: &Clock,
-        chainlink_program: &AccountInfo<'info>,
+        chainlink_program: &impl ToAccountInfo<'info>,
         token_config: &TokenConfig,
         feed: &AccountInfo<'info>,
     ) -> Result<(u64, i64, Price)> {
+        let chainlink_program = chainlink_program.to_account_info();
         let round = chainlink_solana::latest_round_data(chainlink_program.clone(), feed.clone())?;
-        let decimals =
-            chainlink_solana::decimals(chainlink_program.to_account_info(), feed.clone())?;
+        let decimals = chainlink_solana::decimals(chainlink_program, feed.clone())?;
         Self::check_and_get_price_from_round(clock, &round, decimals, token_config)
     }
 

@@ -28,7 +28,10 @@ use crate::{
         token::TokenAccountOps,
         utils::{read_market, read_store, FeedsParser},
     },
-    utils::{ComputeBudget, RpcBuilder, TokenAccountParams, TransactionBuilder, ZeroCopy},
+    utils::{
+        fix_optional_account_metas, ComputeBudget, RpcBuilder, TokenAccountParams,
+        TransactionBuilder, ZeroCopy,
+    },
 };
 
 use super::{generate_nonce, ExchangeOps};
@@ -536,7 +539,7 @@ where
                     associated_token_program: anchor_spl::associated_token::ID,
                 },
                 &gmsol_store::id(),
-                &self.client.store_program_id(),
+                self.client.store_program_id(),
             ))
             .args(instruction::CreateOrder { nonce, params })
             .accounts(
@@ -731,7 +734,7 @@ where
         let referrer = user.and_then(|user| user.referral().referrer().copied());
         self.hint = Some(ExecuteOrderHint {
             kind,
-            store_program_id: self.client.store_program_id(),
+            store_program_id: *self.client.store_program_id(),
             store: *store,
             market_token,
             position: params.position().copied(),
@@ -870,67 +873,77 @@ where
 
                 self.client
                     .store_rpc()
-                    .accounts(accounts::ExecuteDecreaseOrder {
-                        authority,
-                        owner: hint.owner,
-                        user: hint.user,
-                        store: self.store,
-                        oracle: self.oracle,
-                        token_map,
-                        market: self
-                            .client
-                            .find_market_address(&self.store, &hint.market_token),
-                        order: self.order,
-                        position: hint
-                            .position
-                            .ok_or(crate::Error::invalid_argument("missing position"))?,
-                        event,
-                        final_output_token_vault: hint
-                            .final_output_token_and_account
-                            .as_ref()
-                            .map(|(token, _)| {
-                                self.client.find_market_vault_address(&self.store, token)
-                            })
-                            .ok_or(crate::Error::invalid_argument("missing final output token"))?,
-                        long_token_vault: hint
-                            .long_token_vault(&self.store)
-                            .ok_or(crate::Error::invalid_argument("missing long token"))?,
-                        short_token_vault: hint
-                            .short_token_vault(&self.store)
-                            .ok_or(crate::Error::invalid_argument("missing short token"))?,
-                        claimable_long_token_account_for_user,
-                        claimable_short_token_account_for_user,
-                        claimable_pnl_token_account_for_holding,
-                        event_authority: self.client.store_event_authority(),
-                        token_program: anchor_spl::token::ID,
-                        price_provider: self.price_provider,
-                        system_program: system_program::ID,
-                        long_token: hint
-                            .long_token_and_account
-                            .map(|(token, _)| token)
-                            .ok_or(crate::Error::invalid_argument("missing long token"))?,
-                        short_token: hint
-                            .short_token_and_account
-                            .map(|(token, _)| token)
-                            .ok_or(crate::Error::invalid_argument("missing short token"))?,
-                        final_output_token: hint
-                            .final_output_token_and_account
-                            .map(|(token, _)| token)
-                            .ok_or(crate::Error::invalid_argument("missing final output token"))?,
-                        final_output_token_escrow: hint
-                            .final_output_token_and_account
-                            .map(|(_, account)| account)
-                            .ok_or(crate::Error::invalid_argument("missing final output token"))?,
-                        long_token_escrow: hint
-                            .long_token_and_account
-                            .map(|(_, account)| account)
-                            .ok_or(crate::Error::invalid_argument("missing long token"))?,
-                        short_token_escrow: hint
-                            .short_token_and_account
-                            .map(|(_, account)| account)
-                            .ok_or(crate::Error::invalid_argument("missing short token"))?,
-                        program: self.client.store_program_id(),
-                    })
+                    .accounts(fix_optional_account_metas(
+                        accounts::ExecuteDecreaseOrder {
+                            authority,
+                            owner: hint.owner,
+                            user: hint.user,
+                            store: self.store,
+                            oracle: self.oracle,
+                            token_map,
+                            market: self
+                                .client
+                                .find_market_address(&self.store, &hint.market_token),
+                            order: self.order,
+                            position: hint
+                                .position
+                                .ok_or(crate::Error::invalid_argument("missing position"))?,
+                            event,
+                            final_output_token_vault: hint
+                                .final_output_token_and_account
+                                .as_ref()
+                                .map(|(token, _)| {
+                                    self.client.find_market_vault_address(&self.store, token)
+                                })
+                                .ok_or(crate::Error::invalid_argument(
+                                    "missing final output token",
+                                ))?,
+                            long_token_vault: hint
+                                .long_token_vault(&self.store)
+                                .ok_or(crate::Error::invalid_argument("missing long token"))?,
+                            short_token_vault: hint
+                                .short_token_vault(&self.store)
+                                .ok_or(crate::Error::invalid_argument("missing short token"))?,
+                            claimable_long_token_account_for_user,
+                            claimable_short_token_account_for_user,
+                            claimable_pnl_token_account_for_holding,
+                            event_authority: self.client.store_event_authority(),
+                            token_program: anchor_spl::token::ID,
+                            system_program: system_program::ID,
+                            long_token: hint
+                                .long_token_and_account
+                                .map(|(token, _)| token)
+                                .ok_or(crate::Error::invalid_argument("missing long token"))?,
+                            short_token: hint
+                                .short_token_and_account
+                                .map(|(token, _)| token)
+                                .ok_or(crate::Error::invalid_argument("missing short token"))?,
+                            final_output_token: hint
+                                .final_output_token_and_account
+                                .map(|(token, _)| token)
+                                .ok_or(crate::Error::invalid_argument(
+                                    "missing final output token",
+                                ))?,
+                            final_output_token_escrow: hint
+                                .final_output_token_and_account
+                                .map(|(_, account)| account)
+                                .ok_or(crate::Error::invalid_argument(
+                                    "missing final output token",
+                                ))?,
+                            long_token_escrow: hint
+                                .long_token_and_account
+                                .map(|(_, account)| account)
+                                .ok_or(crate::Error::invalid_argument("missing long token"))?,
+                            short_token_escrow: hint
+                                .short_token_and_account
+                                .map(|(_, account)| account)
+                                .ok_or(crate::Error::invalid_argument("missing short token"))?,
+                            program: *self.client.store_program_id(),
+                            chainlink_program: None,
+                        },
+                        &crate::program_ids::DEFAULT_GMSOL_STORE_ID,
+                        self.client.store_program_id(),
+                    ))
                     .args(instruction::ExecuteDecreaseOrder {
                         recent_timestamp: self.recent_timestamp,
                         execution_fee: self.execution_fee,
@@ -964,7 +977,6 @@ where
                         claimable_pnl_token_account_for_holding: None,
                         event_authority: self.client.store_event_authority(),
                         token_program: anchor_spl::token::ID,
-                        price_provider: self.price_provider,
                         system_program: system_program::ID,
                         initial_collateral_token: hint
                             .initial_collateral_token_and_account
@@ -989,10 +1001,11 @@ where
                         short_token_escrow: hint
                             .short_token_and_account
                             .map(|(_, account)| account),
-                        program: self.client.store_program_id(),
+                        program: *self.client.store_program_id(),
+                        chainlink_program: None,
                     },
-                    &gmsol_store::id(),
-                    &self.client.store_program_id(),
+                    &crate::program_ids::DEFAULT_GMSOL_STORE_ID,
+                    self.client.store_program_id(),
                 ))
                 .args(instruction::ExecuteOrder {
                     recent_timestamp: self.recent_timestamp,
@@ -1173,7 +1186,7 @@ where
                     .find_user_address(order.0.header().store(), order.0.header().owner());
                 let user = self.client.account(&user).await?;
                 let hint =
-                    CloseOrderHint::new(&order.0, user.as_ref(), &self.client.store_program_id())?;
+                    CloseOrderHint::new(&order.0, user.as_ref(), self.client.store_program_id())?;
                 self.hint = Some(hint);
                 Ok(hint)
             }
@@ -1234,10 +1247,10 @@ where
                     token_program: anchor_spl::token::ID,
                     gt_token_program: anchor_spl::token_2022::ID,
                     system_program: system_program::ID,
-                    program: self.client.store_program_id(),
+                    program: *self.client.store_program_id(),
                 },
                 &gmsol_store::ID,
-                &self.client.store_program_id(),
+                self.client.store_program_id(),
             ))
             .args(instruction::CloseOrder {
                 reason: self.reason.clone(),

@@ -22,7 +22,7 @@ use crate::{
 use anchor_lang::{prelude::*, Ids};
 use num_enum::TryFromPrimitive;
 
-use super::{HasMarketMeta, Store, TokenMapHeader, TokenMapRef};
+use super::{HasMarketMeta, Store, TokenConfig, TokenMapHeader, TokenMapRef};
 
 pub use self::{
     chainlink::Chainlink,
@@ -62,10 +62,10 @@ impl Oracle {
     pub(crate) fn set_prices_from_remaining_accounts<'info>(
         &mut self,
         mut validator: PriceValidator,
-        provider: &Interface<'info, PriceProvider>,
         map: &TokenMapRef,
         tokens: &[Pubkey],
         remaining_accounts: &'info [AccountInfo<'info>],
+        chainlink: Option<&Program<'info, Chainlink>>,
     ) -> Result<()> {
         require!(self.primary.is_empty(), CoreError::PricesAreAlreadySet);
         require!(
@@ -76,49 +76,29 @@ impl Oracle {
             tokens.len() <= remaining_accounts.len(),
             ErrorCode::AccountNotEnoughKeys
         );
-        let program = PriceProviderProgram::from_interface(provider);
         // Assume the remaining accounts are arranged in the following way:
         // [token_config, feed; tokens.len()] [..remaining]
         for (idx, token) in tokens.iter().enumerate() {
             let feed = &remaining_accounts[idx];
             let token_config = map.get(token).ok_or_else(|| error!(CoreError::NotFound))?;
+
             require!(token_config.is_enabled(), CoreError::TokenConfigDisabled);
-            require_eq!(token_config.expected_provider()?, *program.kind());
-            let (oracle_slot, oracle_ts, price, kind) = match &program {
-                PriceProviderProgram::Chainlink(program, kind) => {
-                    require_eq!(
-                        token_config.get_feed(kind)?,
-                        feed.key(),
-                        CoreError::InvalidPriceFeedAccount
-                    );
-                    let (oracle_slot, oracle_ts, price) = Chainlink::check_and_get_chainlink_price(
-                        validator.clock(),
-                        program,
-                        token_config,
-                        feed,
-                    )?;
-                    (oracle_slot, oracle_ts, price, kind)
-                }
-                PriceProviderProgram::Pyth(_program, kind) => {
-                    let feed_id = token_config.get_feed(kind)?;
-                    let (oracle_slot, oracle_ts, price) =
-                        Pyth::check_and_get_price(validator.clock(), token_config, feed, &feed_id)?;
-                    (oracle_slot, oracle_ts, price, kind)
-                }
-                PriceProviderProgram::PythLegacy(_program, kind) => {
-                    require_eq!(
-                        token_config.get_feed(kind)?,
-                        feed.key(),
-                        CoreError::InvalidPriceFeedAccount
-                    );
-                    // We don't have to check the `feed_id` because the `feed` account is set by the token config keeper.
-                    let (oracle_slot, oracle_ts, price) =
-                        PythLegacy::check_and_get_price(validator.clock(), token_config, feed)?;
-                    (oracle_slot, oracle_ts, price, kind)
-                }
-            };
-            validator.validate_one(token_config, kind, oracle_ts, oracle_slot, &price)?;
-            self.primary.set(token, price)?;
+
+            let oracle_price = OraclePrice::parse_from_feed_account(
+                validator.clock(),
+                token_config,
+                chainlink,
+                feed,
+            )?;
+
+            validator.validate_one(
+                token_config,
+                &oracle_price.provider,
+                oracle_price.oracle_ts,
+                oracle_price.oracle_slot,
+                &oracle_price.price,
+            )?;
+            self.primary.set(token, oracle_price.price)?;
         }
         self.update_oracle_ts_and_slot(validator)?;
         Ok(())
@@ -145,10 +125,10 @@ impl Oracle {
     pub(crate) fn with_prices<'info, T>(
         &mut self,
         store: &AccountLoader<'info, Store>,
-        provider: &Interface<'info, PriceProvider>,
         token_map: &AccountLoader<'info, TokenMapHeader>,
         tokens: &[Pubkey],
         remaining_accounts: &'info [AccountInfo<'info>],
+        chainlink: Option<&Program<'info, Chainlink>>,
         f: impl FnOnce(&mut Self, &'info [AccountInfo<'info>]) -> Result<T>,
     ) -> Result<T> {
         let validator = PriceValidator::try_from(store.load()?.deref())?;
@@ -161,7 +141,7 @@ impl Oracle {
         let remaining_accounts = &remaining_accounts[tokens.len()..];
         let res = {
             let token_map = token_map.load_token_map()?;
-            self.set_prices_from_remaining_accounts(validator, provider, &token_map, tokens, feeds)
+            self.set_prices_from_remaining_accounts(validator, &token_map, tokens, feeds, chainlink)
         };
         match res {
             Ok(()) => {
@@ -256,8 +236,8 @@ pub enum PriceProviderKind {
     PythLegacy = 2,
 }
 
-#[cfg(feature = "utils")]
 impl PriceProviderKind {
+    #[cfg(feature = "utils")]
     /// Get correspoding program address.
     pub fn program(&self) -> Pubkey {
         match self {
@@ -266,35 +246,79 @@ impl PriceProviderKind {
             Self::PythLegacy => PythLegacy::id(),
         }
     }
-}
 
-/// Supported Price Provider Programs.
-/// The [`PriceProviderKind`] field is used as index
-/// to query the correspoding feed from the token config.
-enum PriceProviderProgram<'info> {
-    Chainlink(AccountInfo<'info>, PriceProviderKind),
-    Pyth(AccountInfo<'info>, PriceProviderKind),
-    PythLegacy(AccountInfo<'info>, PriceProviderKind),
-}
-
-impl<'info> PriceProviderProgram<'info> {
-    fn kind(&self) -> &PriceProviderKind {
-        match self {
-            Self::Chainlink(_, kind) | Self::Pyth(_, kind) | Self::PythLegacy(_, kind) => kind,
+    /// Create from program id.
+    pub fn from_program_id(program_id: &Pubkey) -> Option<Self> {
+        if *program_id == Chainlink::id() {
+            Some(Self::Chainlink)
+        } else if *program_id == Pyth::id() {
+            Some(Self::Pyth)
+        } else if *program_id == PythLegacy::id() {
+            Some(Self::PythLegacy)
+        } else {
+            None
         }
     }
 }
 
-impl<'info> PriceProviderProgram<'info> {
-    fn from_interface(interface: &Interface<'info, PriceProvider>) -> Self {
-        if *interface.key == Chainlink::id() {
-            Self::Chainlink(interface.to_account_info(), PriceProviderKind::Chainlink)
-        } else if *interface.key == Pyth::id() {
-            Self::Pyth(interface.to_account_info(), PriceProviderKind::Pyth)
-        } else if *interface.key == PythLegacy::id() {
-            Self::PythLegacy(interface.to_account_info(), PriceProviderKind::PythLegacy)
-        } else {
-            unreachable!();
-        }
+struct OraclePrice {
+    provider: PriceProviderKind,
+    oracle_slot: u64,
+    oracle_ts: i64,
+    price: gmsol_utils::Price,
+}
+
+impl OraclePrice {
+    fn parse_from_feed_account<'info>(
+        clock: &Clock,
+        token_config: &TokenConfig,
+        chainlink: Option<&Program<'info, Chainlink>>,
+        account: &'info AccountInfo<'info>,
+    ) -> Result<Self> {
+        let provider = match PriceProviderKind::from_program_id(account.owner) {
+            Some(provider) => provider,
+            None if *account.owner == crate::ID => {
+                todo!("feed account created by this program")
+            }
+            None => return Err(error!(CoreError::InvalidPriceFeedAccount)),
+        };
+
+        require_eq!(token_config.expected_provider()?, provider);
+
+        let feed_id = token_config.get_feed(&provider)?;
+
+        let (oracle_slot, oracle_ts, price) = match provider {
+            PriceProviderKind::Chainlink => {
+                require_eq!(feed_id, account.key(), CoreError::InvalidPriceFeedAccount);
+                let program =
+                    chainlink.ok_or_else(|| error!(CoreError::ChainlinkProgramIsRequired))?;
+                let (oracle_slot, oracle_ts, price) = Chainlink::check_and_get_chainlink_price(
+                    clock,
+                    program,
+                    token_config,
+                    account,
+                )?;
+                (oracle_slot, oracle_ts, price)
+            }
+            PriceProviderKind::Pyth => {
+                let (oracle_slot, oracle_ts, price) =
+                    Pyth::check_and_get_price(clock, token_config, account, &feed_id)?;
+                (oracle_slot, oracle_ts, price)
+            }
+            PriceProviderKind::PythLegacy => {
+                require_eq!(feed_id, account.key(), CoreError::InvalidPriceFeedAccount);
+                // We don't have to check the `feed_id` because the `feed` account is set by the token config keeper.
+                let (oracle_slot, oracle_ts, price) =
+                    PythLegacy::check_and_get_price(clock, token_config, account)?;
+                (oracle_slot, oracle_ts, price)
+            }
+        };
+
+        Ok(Self {
+            provider,
+            oracle_slot,
+            oracle_ts,
+            price,
+        })
     }
 }

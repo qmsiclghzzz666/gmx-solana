@@ -13,7 +13,7 @@ pub fn to_seed(key: &str) -> [u8; 32] {
     hash(key.as_bytes()).to_bytes()
 }
 
-pub use self::init_space::InitSpace;
+pub use self::{init_space::InitSpace, price::Price};
 pub use paste;
 pub use static_assertions;
 
