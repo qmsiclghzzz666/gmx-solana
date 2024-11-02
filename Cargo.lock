@@ -1578,13 +1578,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "dual-vec-map"
-version = "0.2.0"
-dependencies = [
- "thiserror",
-]
-
-[[package]]
 name = "dyn-clone"
 version = "1.0.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2051,7 +2044,6 @@ dependencies = [
  "bytes",
  "chainlink_solana",
  "clap 4.5.20",
- "dual-vec-map",
  "gmsol-model",
  "gmsol-utils",
  "indexmap 2.6.0",

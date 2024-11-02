@@ -72,9 +72,6 @@ time = "0.3.36"
 [workspace.dependencies.gmsol-model]
 path = "crates/gmsol-model"
 
-[workspace.dependencies.dual-vec-map]
-path = "crates/dual-vec-map"
-
 [workspace.dependencies.gmsol-utils]
 path = "crates/gmsol-utils"
 
