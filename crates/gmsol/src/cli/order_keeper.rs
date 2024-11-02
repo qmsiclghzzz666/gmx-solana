@@ -260,9 +260,7 @@ impl KeeperArgs {
                         builder.build().await?,
                     )
                     .await?;
-                builder
-                    .execution_fee(execution_fee)
-                    .price_provider(self.provider.program());
+                builder.execution_fee(execution_fee);
                 if self.use_pyth_pull_oracle() {
                     let hint = builder.prepare_hint().await?;
                     let feed_ids = extract_pyth_feed_ids(&hint.feeds)?;
@@ -308,9 +306,7 @@ impl KeeperArgs {
                         builder.build().await?,
                     )
                     .await?;
-                builder
-                    .execution_fee(execution_fee)
-                    .price_provider(self.provider.program());
+                builder.execution_fee(execution_fee);
                 if self.use_pyth_pull_oracle() {
                     let hint = builder.prepare_hint().await?;
                     let mut ctx = PythPullOracleContext::try_from_feeds(&hint.feeds)?;
@@ -376,9 +372,7 @@ impl KeeperArgs {
                             .right_future()
                     })
                     .await?;
-                builder
-                    .execution_fee(execution_fee)
-                    .price_provider(self.provider.program());
+                builder.execution_fee(execution_fee);
                 if self.use_pyth_pull_oracle() {
                     let hint = builder.prepare_hint().await?;
                     let mut ctx = PythPullOracleContext::try_from_feeds(&hint.feeds)?;
@@ -446,9 +440,7 @@ impl KeeperArgs {
                             .right_future()
                     })
                     .await?;
-                builder
-                    .execution_fee(execution_fee)
-                    .price_provider(&self.provider.program());
+                builder.execution_fee(execution_fee);
                 if self.use_pyth_pull_oracle() {
                     let hint = builder.prepare_hint().await?;
                     let mut ctx = PythPullOracleContext::try_from_feeds(hint.feeds())?;
@@ -529,9 +521,7 @@ impl KeeperArgs {
                             .right_future()
                     })
                     .await?;
-                builder
-                    .execution_fee(execution_fee)
-                    .price_provider(&self.provider.program());
+                builder.execution_fee(execution_fee);
                 if self.use_pyth_pull_oracle() {
                     let hint = builder.prepare_hint().await?;
                     let mut ctx = PythPullOracleContext::try_from_feeds(hint.feeds())?;
@@ -587,7 +577,6 @@ impl KeeperArgs {
                     market_token,
                     side.is_long(),
                 )?;
-                builder.price_provider(&self.provider.program());
 
                 if self.use_pyth_pull_oracle() {
                     let hint = builder.prepare_hint().await?;

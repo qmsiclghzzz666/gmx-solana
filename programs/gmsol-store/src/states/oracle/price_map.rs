@@ -35,6 +35,24 @@ impl SmallPrices {
             decimal_multiplier: self.decimal_multipler,
         }
     }
+
+    pub(crate) fn from_price(price: &gmsol_utils::Price) -> Result<Self> {
+        // Validate price data.
+        require_eq!(
+            price.min.decimal_multiplier,
+            price.max.decimal_multiplier,
+            CoreError::InvalidArgument
+        );
+        require_neq!(price.min.value, 0, CoreError::InvalidArgument);
+        require_gt!(price.max.value, price.min.value, CoreError::InvalidArgument);
+
+        Ok(SmallPrices {
+            decimal_multipler: price.min.decimal_multiplier,
+            padding_0: [0; 3],
+            min: price.min.value,
+            max: price.max.value,
+        })
+    }
 }
 
 const MAX_TOKENS: usize = 512;
@@ -46,20 +64,7 @@ impl PriceMap {
     pub const MAX_TOKENS: usize = MAX_TOKENS;
 
     pub(super) fn set(&mut self, token: &Pubkey, price: gmsol_utils::Price) -> Result<()> {
-        require_eq!(
-            price.min.decimal_multiplier,
-            price.max.decimal_multiplier,
-            CoreError::InvalidArgument
-        );
-        self.insert(
-            token,
-            SmallPrices {
-                decimal_multipler: price.min.decimal_multiplier,
-                padding_0: [0; 3],
-                min: price.min.value,
-                max: price.max.value,
-            },
-        );
+        self.insert(token, SmallPrices::from_price(&price)?);
         Ok(())
     }
 }

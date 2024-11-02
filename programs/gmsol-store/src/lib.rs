@@ -1042,6 +1042,19 @@ pub mod gmsol_store {
         instructions::set_prices_from_price_feed(ctx, tokens)
     }
 
+    /// Initialize a custom price feed account.
+    #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
+    pub fn initialize_price_feed(
+        ctx: Context<InitializePriceFeed>,
+        provider: u8,
+        token: Pubkey,
+        feed_id: Pubkey,
+    ) -> Result<()> {
+        let provider = PriceProviderKind::try_from(provider)
+            .map_err(|_| error!(CoreError::InvalidProviderKindIndex))?;
+        instructions::unchecked_initialize_price_feed(ctx, provider, &token, &feed_id)
+    }
+
     // Exchange.
     pub fn create_deposit<'info>(
         mut ctx: Context<'_, '_, 'info, 'info, CreateDeposit<'info>>,
@@ -1599,6 +1612,9 @@ pub enum CoreError {
     /// Chainlink Program is required.
     #[msg("chainlink program is required")]
     ChainlinkProgramIsRequired,
+    /// Not supported price provider for custom price feed.
+    #[msg("this price provider is not supported to be used with custom price feed")]
+    NotSupportedCustomPriceProvider,
     /// Not enough token feeds.
     #[msg("not enough token feeds")]
     NotEnoughTokenFeeds,

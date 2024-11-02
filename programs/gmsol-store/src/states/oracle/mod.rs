@@ -1,6 +1,9 @@
 /// Price Map.
 pub mod price_map;
 
+/// Custom Price Feed.
+mod feed;
+
 /// Chainlink.
 pub mod chainlink;
 
@@ -20,13 +23,14 @@ use crate::{
     CoreError, CoreResult,
 };
 use anchor_lang::{prelude::*, Ids};
-use num_enum::TryFromPrimitive;
+use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 use self::price_map::PriceMap;
 use super::{HasMarketMeta, Store, TokenConfig, TokenMapHeader, TokenMapRef};
 
 pub use self::{
     chainlink::Chainlink,
+    feed::PriceFeed,
     pyth::{Pyth, PythLegacy, PYTH_LEGACY_ID},
     time::{ValidateOracleTime, ValidateOracleTimeExt},
     validator::PriceValidator,
@@ -276,7 +280,16 @@ impl Ids for PriceProvider {
 /// Supported Price Provider Kind.
 #[repr(u8)]
 #[derive(
-    Clone, Copy, Default, TryFromPrimitive, PartialEq, Eq, Hash, strum::EnumString, strum::Display,
+    Clone,
+    Copy,
+    Default,
+    TryFromPrimitive,
+    IntoPrimitive,
+    PartialEq,
+    Eq,
+    Hash,
+    strum::EnumString,
+    strum::Display,
 )]
 #[strum(serialize_all = "snake_case")]
 #[cfg_attr(feature = "enum-iter", derive(strum::EnumIter))]
@@ -294,19 +307,11 @@ pub enum PriceProviderKind {
     Chainlink = 1,
     /// Legacy Pyth Push Oracle.
     PythLegacy = 2,
+    /// Chainlink Data Streams.
+    ChainlinkDataStreams = 3,
 }
 
 impl PriceProviderKind {
-    #[cfg(feature = "utils")]
-    /// Get correspoding program address.
-    pub fn program(&self) -> Pubkey {
-        match self {
-            Self::Pyth => Pyth::id(),
-            Self::Chainlink => Chainlink::id(),
-            Self::PythLegacy => PythLegacy::id(),
-        }
-    }
-
     /// Create from program id.
     pub fn from_program_id(program_id: &Pubkey) -> Option<Self> {
         if *program_id == Chainlink::id() {
@@ -371,6 +376,9 @@ impl OraclePrice {
                 let (oracle_slot, oracle_ts, price) =
                     PythLegacy::check_and_get_price(clock, token_config, account)?;
                 (oracle_slot, oracle_ts, price)
+            }
+            PriceProviderKind::ChainlinkDataStreams => {
+                todo!()
             }
         };
 
