@@ -127,8 +127,8 @@ pub struct ExecuteOrder<'info> {
     #[account(has_one = store)]
     pub token_map: AccountLoader<'info, TokenMapHeader>,
     /// Oracle buffer to use.
-    #[account(has_one = store)]
-    pub oracle: Box<Account<'info, Oracle>>,
+    #[account(mut, has_one = store)]
+    pub oracle: AccountLoader<'info, Oracle>,
     /// Market.
     #[account(mut, has_one = store)]
     pub market: AccountLoader<'info, Market>,
@@ -472,7 +472,7 @@ impl<'info> ExecuteOrder<'info> {
             .executor(self.authority.to_account_info())
             .system_program(self.system_program.to_account_info());
 
-        self.oracle.with_prices(
+        self.oracle.load_mut()?.with_prices(
             &self.store,
             &self.token_map,
             &feeds.tokens,
@@ -571,8 +571,8 @@ pub struct ExecuteDecreaseOrder<'info> {
     #[account(has_one = store)]
     pub token_map: AccountLoader<'info, TokenMapHeader>,
     /// Oracle buffer to use.
-    #[account(has_one = store)]
-    pub oracle: Box<Account<'info, Oracle>>,
+    #[account(mut, has_one = store)]
+    pub oracle: AccountLoader<'info, Oracle>,
     /// Market.
     #[account(mut, has_one = store)]
     pub market: AccountLoader<'info, Market>,
@@ -809,7 +809,7 @@ impl<'info> ExecuteDecreaseOrder<'info> {
             .executor(self.authority.to_account_info())
             .system_program(self.system_program.to_account_info());
 
-        self.oracle.with_prices(
+        self.oracle.load_mut()?.with_prices(
             &self.store,
             &self.token_map,
             &feeds.tokens,

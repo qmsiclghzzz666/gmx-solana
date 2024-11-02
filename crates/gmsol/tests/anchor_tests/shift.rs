@@ -13,7 +13,7 @@ async fn shift() -> eyre::Result<()> {
     let keeper = deployment.user_client(Deployment::DEFAULT_KEEPER)?;
     let client = deployment.user_client(Deployment::DEFAULT_USER)?;
     let store = &deployment.store;
-    let oracle = &deployment.oracle;
+    let oracle = &deployment.oracle();
 
     let long_token_amount = 1_000_008;
     let short_token_amount = 6_000_000_000_007;

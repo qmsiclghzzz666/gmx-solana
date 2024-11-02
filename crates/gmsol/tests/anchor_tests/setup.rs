@@ -70,10 +70,8 @@ pub struct Deployment {
     pub store: Pubkey,
     /// Token Map.
     token_map: Keypair,
-    /// Oracle index.
-    pub oracle_index: u8,
     /// Oracle.
-    pub oracle: Pubkey,
+    oracle: Keypair,
     /// GLV mint.
     pub glv_token: Pubkey,
     /// Tokens.
@@ -138,8 +136,7 @@ impl Deployment {
     async fn connect() -> eyre::Result<Self> {
         let mut rng = Self::get_rng()?;
         let (client, store_key, store) = Self::get_client_and_store().await?;
-        let oracle_index = 255;
-        let oracle = client.find_oracle_address(&store, oracle_index);
+        let oracle = Keypair::generate(&mut rng);
         let token_map = Keypair::generate(&mut rng);
 
         let (rpc, common_alt) = client.create_alt().await?;
@@ -159,7 +156,6 @@ impl Deployment {
             store_key,
             store,
             token_map,
-            oracle_index,
             oracle,
             glv_token: Default::default(),
             tokens: Default::default(),
@@ -546,7 +542,7 @@ impl Deployment {
                     .collect::<eyre::Result<Vec<_>>>()?,
                 false,
             )?
-            .push(client.initialize_oracle(store, self.oracle_index).0)?;
+            .push(client.initialize_oracle(store, &self.oracle).await?.0)?;
 
         _ = builder
             .send_all()
@@ -558,6 +554,7 @@ impl Deployment {
                 tracing::error!(%err, "failed to initialize token map, successful txns: {signatures:#?}");
             });
 
+        tracing::info!(oracle=%self.oracle(), "initialized oracle");
         Ok(())
     }
 
@@ -643,7 +640,7 @@ impl Deployment {
         let mut addresses = vec![
             self.store,
             self.token_map(),
-            self.oracle,
+            self.oracle(),
             event_authority,
             anchor_spl::token::ID,
             anchor_spl::token_2022::ID,
@@ -1119,7 +1116,7 @@ impl Deployment {
             )
             .await?;
         tracing::info!(%deposit, %signature, "created a deposit");
-        let mut builder = keeper.execute_deposit(&self.store, &self.oracle, &deposit, false);
+        let mut builder = keeper.execute_deposit(&self.store, &self.oracle(), &deposit, false);
         self.execute_with_pyth(&mut builder, None, skip_preflight, true)
             .await?;
         Ok(market_token)
@@ -1135,6 +1132,10 @@ impl Deployment {
 
     pub(crate) async fn wait_until_claim_fees_enabled(&self) {
         tokio::time::sleep_until(self.claim_fees_enabled_at.into()).await
+    }
+
+    pub(crate) fn oracle(&self) -> Pubkey {
+        self.oracle.pubkey()
     }
 }
 

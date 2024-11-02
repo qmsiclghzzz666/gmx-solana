@@ -16,7 +16,7 @@ async fn balanced_market_order() -> eyre::Result<()> {
     let keeper = deployment.user_client(Deployment::DEFAULT_KEEPER)?;
     let client = deployment.user_client(Deployment::DEFAULT_USER)?;
     let store = &deployment.store;
-    let oracle = &deployment.oracle;
+    let oracle = &deployment.oracle();
     let usdg = deployment.token("USDG").expect("must exist");
 
     let long_token_amount = 1_000_005;
@@ -215,7 +215,7 @@ async fn single_token_market_order() -> eyre::Result<()> {
     let keeper = deployment.user_client(Deployment::DEFAULT_KEEPER)?;
     let client = deployment.user_client(Deployment::DEFAULT_USER)?;
     let store = &deployment.store;
-    let oracle = &deployment.oracle;
+    let oracle = &deployment.oracle();
     let usdg = deployment.token("USDG").expect("must exist");
 
     let long_token_amount = 1_000_005;
@@ -423,7 +423,7 @@ async fn liquidation() -> eyre::Result<()> {
         .await?;
 
     let store = &deployment.store;
-    let oracle = &deployment.oracle;
+    let oracle = &deployment.oracle();
 
     {
         let client = deployment.locked_user_client().await?;

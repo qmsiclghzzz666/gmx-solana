@@ -249,8 +249,8 @@ pub struct ExecuteGlvShift<'info> {
     #[account(has_one = store)]
     pub token_map: AccountLoader<'info, TokenMapHeader>,
     /// Oracle buffer to use.
-    #[account(has_one = store)]
-    pub oracle: Box<Account<'info, Oracle>>,
+    #[account(mut, has_one = store)]
+    pub oracle: AccountLoader<'info, Oracle>,
     /// GLV account.
     #[account(
         has_one = store,
@@ -406,7 +406,7 @@ impl<'info> ExecuteGlvShift<'info> {
             .to_market_token_mint(&mut self.to_market_token)
             .to_market_token_glv_vault(self.to_market_token_glv_vault.to_account_info());
 
-        self.oracle.with_prices(
+        self.oracle.load_mut()?.with_prices(
             &self.store,
             &self.token_map,
             &tokens,

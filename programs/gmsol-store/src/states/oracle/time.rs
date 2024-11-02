@@ -44,7 +44,7 @@ pub trait ValidateOracleTimeExt: ValidateOracleTime {
 
     /// Validate min oracle updated slot.
     fn validate_min_oracle_slot(&self, oracle: &Oracle) -> CoreResult<()> {
-        let Some(min_slot) = oracle.min_oracle_slot else {
+        let Some(min_slot) = oracle.min_oracle_slot() else {
             return Err(CoreError::OracleNotUpdated);
         };
         let Some(after) = self.oracle_updated_after_slot()? else {

@@ -1019,19 +1019,14 @@ pub mod gmsol_store {
     /// # Accounts
     /// *[See the documentation for the accounts.](InitializeOracle).*
     ///
-    /// # Arguments
-    /// - `index`: The oracle index to use.
-    ///
     /// # Errors
-    /// - The [`authority`](InitializeOracle::authority) must be a signer and a MARKET_KEEPER of the store.
     /// - The [`store`](InitializeOracle::store) must be an initialized [`Store`](states::Store)
     /// account owned by the store program. And it must be the owner of the token map.
     /// - The [`oralce`](InitializeOracle::oracle) account must be uninitialized and its address must be the PDA
     /// derived from the oracle account seed [`SEED`](states::Oracle::SEED), the `store` address and
     /// the `index`.
-    #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
-    pub fn initialize_oracle(ctx: Context<InitializeOracle>, index: u8) -> Result<()> {
-        instructions::unchecked_initialize_oracle(ctx, index)
+    pub fn initialize_oracle(ctx: Context<InitializeOracle>) -> Result<()> {
+        instructions::unchecked_initialize_oracle(ctx)
     }
 
     #[access_control(internal::Authenticate::only_controller(&ctx))]

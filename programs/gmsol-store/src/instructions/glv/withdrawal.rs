@@ -444,8 +444,8 @@ pub struct ExecuteGlvWithdrawal<'info> {
     #[account(has_one = store)]
     pub token_map: AccountLoader<'info, TokenMapHeader>,
     /// Oracle buffer to use.
-    #[account(has_one = store)]
-    pub oracle: Box<Account<'info, Oracle>>,
+    #[account(mut, has_one = store)]
+    pub oracle: AccountLoader<'info, Oracle>,
     /// GLV account.
     #[account(
         has_one = store,
@@ -672,7 +672,7 @@ impl<'info> ExecuteGlvWithdrawal<'info> {
             .market_tokens(splitted.market_tokens)
             .market_token_vaults(splitted.market_token_vaults);
 
-        self.oracle.with_prices(
+        self.oracle.load_mut()?.with_prices(
             &self.store,
             &self.token_map,
             &splitted.tokens,

@@ -19,8 +19,8 @@ pub struct UpdateAdlState<'info> {
     #[account(has_one = store)]
     pub token_map: AccountLoader<'info, TokenMapHeader>,
     /// The oracle buffer to use.
-    #[account(has_one = store)]
-    pub oracle: Account<'info, Oracle>,
+    #[account(mut, has_one = store)]
+    pub oracle: AccountLoader<'info, Oracle>,
     /// The market to update the ADL state.
     #[account(mut, has_one = store)]
     pub market: AccountLoader<'info, Market>,
@@ -40,7 +40,7 @@ pub(crate) fn unchecked_update_adl_state<'info>(
         .into_iter()
         .collect::<Vec<_>>();
 
-    ctx.accounts.oracle.with_prices(
+    ctx.accounts.oracle.load_mut()?.with_prices(
         &ctx.accounts.store,
         &ctx.accounts.token_map,
         &tokens,

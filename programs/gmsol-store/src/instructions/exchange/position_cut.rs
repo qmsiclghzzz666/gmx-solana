@@ -56,7 +56,7 @@ pub struct PositionCut<'info> {
     pub token_map: AccountLoader<'info, TokenMapHeader>,
     /// Buffer for oracle prices.
     #[account(mut, has_one = store)]
-    pub oracle: Box<Account<'info, Oracle>>,
+    pub oracle: AccountLoader<'info, Oracle>,
     /// Market.
     #[account(mut, has_one = store)]
     pub market: AccountLoader<'info, Market>,
@@ -259,7 +259,7 @@ pub(crate) fn unchecked_process_position_cut<'info>(
         .executor(accounts.authority.to_account_info())
         .refund(refund);
 
-    let should_send_trade_event = accounts.oracle.with_prices(
+    let should_send_trade_event = accounts.oracle.load_mut()?.with_prices(
         &accounts.store,
         &accounts.token_map,
         &tokens,

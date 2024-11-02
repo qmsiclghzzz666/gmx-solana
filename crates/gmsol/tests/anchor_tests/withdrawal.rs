@@ -18,7 +18,7 @@ async fn single_token_pool_withdarwal() -> eyre::Result<()> {
 
         let keeper = deployment.user_client(Deployment::DEFAULT_KEEPER)?;
         let store = &deployment.store;
-        let oracle = &deployment.oracle;
+        let oracle = &deployment.oracle();
         let market_token = deployment
             .market_token("SOL", "WSOL", "WSOL")
             .expect("must exist");
@@ -77,7 +77,7 @@ async fn balanced_pool_withdrawal() -> eyre::Result<()> {
     let keeper = deployment.user_client(Deployment::DEFAULT_KEEPER)?;
     let client = deployment.user_client(Deployment::DEFAULT_USER)?;
     let store = &deployment.store;
-    let oracle = &deployment.oracle;
+    let oracle = &deployment.oracle();
     let for_swap = deployment
         .market_token("fBTC", "fBTC", "USDG")
         .expect("must exist");

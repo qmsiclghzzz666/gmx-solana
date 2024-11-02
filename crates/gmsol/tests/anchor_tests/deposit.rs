@@ -19,7 +19,7 @@ async fn single_token_pool_deposit() -> eyre::Result<()> {
 
         let keeper = deployment.user_client(Deployment::DEFAULT_KEEPER)?;
         let store = &deployment.store;
-        let oracle = &deployment.oracle;
+        let oracle = &deployment.oracle();
         let market_token = deployment.market_token("SOL", "WSOL", "WSOL").unwrap();
         let wsol = deployment.token("WSOL").expect("must exist");
 
@@ -108,7 +108,7 @@ async fn balanced_pool_deposit() -> eyre::Result<()> {
     let keeper = deployment.user_client(Deployment::DEFAULT_KEEPER)?;
     let client = deployment.user_client(Deployment::DEFAULT_USER)?;
     let store = &deployment.store;
-    let oracle = &deployment.oracle;
+    let oracle = &deployment.oracle();
     let for_swap = deployment
         .market_token("fBTC", "fBTC", "USDG")
         .expect("must exist");
@@ -216,7 +216,7 @@ async fn first_deposit() -> eyre::Result<()> {
     let keeper = deployment.user_client(Deployment::DEFAULT_KEEPER)?;
 
     let store = &deployment.store;
-    let oracle = &deployment.oracle;
+    let oracle = &deployment.oracle();
     let [index_token, long_token, short_token] = Deployment::SELECT_FIRST_DEPOSIT_MARKET;
     let market_token = deployment
         .market_token(index_token, long_token, short_token)

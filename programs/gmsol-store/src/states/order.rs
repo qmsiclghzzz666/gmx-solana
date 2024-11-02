@@ -484,22 +484,12 @@ impl Order {
     ) -> Result<()> {
         let mut total = 0u128;
         {
-            let price = oracle
-                .primary
-                .get(output_token)
-                .ok_or_else(|| error!(CoreError::MissingOraclePrice))?
-                .min
-                .to_unit_price();
+            let price = oracle.get_primary_price(output_token)?.min;
             let output_value = u128::from(output_amount).saturating_mul(price);
             total = total.saturating_add(output_value);
         }
         {
-            let price = oracle
-                .primary
-                .get(secondary_output_token)
-                .ok_or_else(|| error!(CoreError::MissingOraclePrice))?
-                .min
-                .to_unit_price();
+            let price = oracle.get_primary_price(secondary_output_token)?.min;
             let output_value = u128::from(secondary_output_amount).saturating_mul(price);
             total = total.saturating_add(output_value);
         }

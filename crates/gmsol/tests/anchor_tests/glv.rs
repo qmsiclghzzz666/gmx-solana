@@ -40,7 +40,7 @@ async fn glv_deposit() -> eyre::Result<()> {
     let keeper = deployment.user_client(Deployment::DEFAULT_KEEPER)?;
 
     let store = &deployment.store;
-    let oracle = &deployment.oracle;
+    let oracle = &deployment.oracle();
     let glv_token = &deployment.glv_token;
     let market_token = deployment.market_token("SOL", "fBTC", "USDG").unwrap();
     let market_token_2 = deployment.market_token("fBTC", "fBTC", "USDG").unwrap();
@@ -167,7 +167,7 @@ async fn glv_withdrawal() -> eyre::Result<()> {
     let keeper = deployment.user_client(Deployment::DEFAULT_KEEPER)?;
 
     let store = &deployment.store;
-    let oracle = &deployment.oracle;
+    let oracle = &deployment.oracle();
     let glv_token = &deployment.glv_token;
     let market_token = deployment.market_token("SOL", "fBTC", "USDG").unwrap();
 
@@ -256,7 +256,7 @@ async fn glv_shift() -> eyre::Result<()> {
     let keeper = deployment.user_client(Deployment::DEFAULT_KEEPER)?;
 
     let store = &deployment.store;
-    let oracle = &deployment.oracle;
+    let oracle = &deployment.oracle();
     let glv_token = &deployment.glv_token;
     let market_token = deployment.market_token("fBTC", "fBTC", "USDG").unwrap();
     let to_market_token = deployment.market_token("SOL", "fBTC", "USDG").unwrap();

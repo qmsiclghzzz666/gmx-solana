@@ -160,6 +160,15 @@ macro_rules! fixed_map {
                         (&entry.key, &entry.value)
                     })
                 }
+
+                /// Clear.
+                pub fn clear(&mut self) {
+                    let len = self.len();
+                    for i in 0..len {
+                        self.data[i] = [<$map Entry>]::default();
+                    }
+                    self.count = 0;
+                }
             }
         }
     };

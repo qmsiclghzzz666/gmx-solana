@@ -1,58 +1,65 @@
 use anchor_lang::prelude::*;
-use dual_vec_map::DualVecMap;
-use gmsol_utils::price::Price;
+use gmsol_utils::price::Decimal;
 
-use crate::CoreError;
+use crate::{utils::pubkey::to_bytes, CoreError};
 
-/// Maximum number of tokens for a single `Price Map` to store.
-const MAX_TOKENS: usize = 32;
-
-/// Price Map.
-#[derive(Debug, AnchorSerialize, AnchorDeserialize, Clone, InitSpace, Default)]
-pub struct PriceMap {
-    #[max_len(MAX_TOKENS)]
-    prices: Vec<Price>,
-    #[max_len(MAX_TOKENS)]
-    tokens: Vec<Pubkey>,
+/// Zero-copy price structure for storing min max prices.
+#[zero_copy]
+#[cfg_attr(feature = "debug", derive(Debug))]
+pub struct SmallPrices {
+    decimal_multipler: u8,
+    padding_0: [u8; 3],
+    min: u32,
+    max: u32,
 }
 
+impl Default for SmallPrices {
+    fn default() -> Self {
+        bytemuck::Zeroable::zeroed()
+    }
+}
+
+impl SmallPrices {
+    /// Get min price.
+    pub fn min(&self) -> Decimal {
+        Decimal {
+            value: self.min,
+            decimal_multiplier: self.decimal_multipler,
+        }
+    }
+
+    /// Get max price.
+    pub fn max(&self) -> Decimal {
+        Decimal {
+            value: self.max,
+            decimal_multiplier: self.decimal_multipler,
+        }
+    }
+}
+
+const MAX_TOKENS: usize = 512;
+
+gmsol_utils::fixed_map!(PriceMap, Pubkey, to_bytes, SmallPrices, MAX_TOKENS, 0);
+
 impl PriceMap {
-    /// Maximum number of tokens for a single `Price Map` to store.
+    /// Max tokens.
     pub const MAX_TOKENS: usize = MAX_TOKENS;
 
-    fn as_map(&self) -> DualVecMap<&Vec<Pubkey>, &Vec<Price>> {
-        // CHECK: All the insert operations is done by `FlatMap`.
-        DualVecMap::from_sorted_stores_unchecked(&self.tokens, &self.prices)
-    }
-
-    fn as_map_mut(&mut self) -> DualVecMap<&mut Vec<Pubkey>, &mut Vec<Price>> {
-        // CHECK: All the insert operations is done by `FlatMap`.
-        DualVecMap::from_sorted_stores_unchecked(&mut self.tokens, &mut self.prices)
-    }
-
-    /// Get price of the given token key.
-    pub fn get(&self, token: &Pubkey) -> Option<Price> {
-        self.as_map().get(token).copied()
-    }
-
-    /// Set the price of the given token.
-    /// # Error
-    /// Return error if it already set.
-    pub(crate) fn set(&mut self, token: &Pubkey, price: Price) -> Result<()> {
-        self.as_map_mut()
-            .try_insert(*token, price)
-            .map_err(|_| CoreError::PriceIsAlreadySet)?;
+    pub(super) fn set(&mut self, token: &Pubkey, price: gmsol_utils::Price) -> Result<()> {
+        require_eq!(
+            price.min.decimal_multiplier,
+            price.max.decimal_multiplier,
+            CoreError::InvalidArgument
+        );
+        self.insert(
+            token,
+            SmallPrices {
+                decimal_multipler: price.min.decimal_multiplier,
+                padding_0: [0; 3],
+                min: price.min.value,
+                max: price.max.value,
+            },
+        );
         Ok(())
-    }
-
-    /// Clear all prices.
-    pub(crate) fn clear(&mut self) {
-        self.tokens.clear();
-        self.prices.clear();
-    }
-
-    /// Is empty.
-    pub fn is_empty(&self) -> bool {
-        self.tokens.is_empty()
     }
 }

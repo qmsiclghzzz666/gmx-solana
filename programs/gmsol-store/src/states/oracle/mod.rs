@@ -22,40 +22,74 @@ use crate::{
 use anchor_lang::{prelude::*, Ids};
 use num_enum::TryFromPrimitive;
 
+use self::price_map::PriceMap;
 use super::{HasMarketMeta, Store, TokenConfig, TokenMapHeader, TokenMapRef};
 
 pub use self::{
     chainlink::Chainlink,
-    price_map::PriceMap,
     pyth::{Pyth, PythLegacy, PYTH_LEGACY_ID},
     time::{ValidateOracleTime, ValidateOracleTimeExt},
     validator::PriceValidator,
 };
 
+const MAX_FLAGS: usize = 8;
+
+#[repr(u8)]
+#[non_exhaustive]
+#[derive(num_enum::IntoPrimitive, num_enum::TryFromPrimitive)]
+enum OracleFlag {
+    /// Cleared.
+    Cleared,
+    // CHECK: should have no more than `MAX_FLAGS` of flags.
+}
+
+type OracleFlagsMap = bitmaps::Bitmap<MAX_FLAGS>;
+type OracleFlagsValue = u8;
+
 /// Oracle Account.
-#[account]
-#[derive(InitSpace, Default)]
+#[account(zero_copy)]
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub struct Oracle {
-    pub bump: u8,
     pub store: Pubkey,
-    pub index: u8,
-    pub primary: PriceMap,
-    pub min_oracle_ts: i64,
-    pub max_oracle_ts: i64,
-    pub min_oracle_slot: Option<u64>,
+    min_oracle_ts: i64,
+    max_oracle_ts: i64,
+    min_oracle_slot: u64,
+    primary: PriceMap,
+    flags: OracleFlagsValue,
+    padding_0: [u8; 3],
+}
+
+impl gmsol_utils::InitSpace for Oracle {
+    const INIT_SPACE: usize = std::mem::size_of::<Self>();
 }
 
 impl Oracle {
     /// The seed for the oracle account's address.
     pub const SEED: &'static [u8] = b"oracle";
 
+    fn get_flag(&self, kind: OracleFlag) -> bool {
+        let index = u8::from(kind);
+        let map = OracleFlagsMap::from_value(self.flags);
+        map.get(usize::from(index))
+    }
+
+    fn set_flag(&mut self, kind: OracleFlag, value: bool) -> bool {
+        let index = u8::from(kind);
+        let mut map = OracleFlagsMap::from_value(self.flags);
+        let previous = map.set(usize::from(index), value);
+        self.flags = map.into_value();
+        previous
+    }
+
     /// Initialize the [`Oracle`].
-    pub(crate) fn init(&mut self, bump: u8, store: Pubkey, index: u8) {
+    pub(crate) fn init(&mut self, store: Pubkey) {
         self.clear_all_prices();
-        self.bump = bump;
         self.store = store;
-        self.index = index;
+    }
+
+    /// Return whether the oracle is cleared.
+    pub fn is_cleared(&self) -> bool {
+        self.get_flag(OracleFlag::Cleared)
     }
 
     /// Set prices from remaining accounts.
@@ -67,6 +101,7 @@ impl Oracle {
         remaining_accounts: &'info [AccountInfo<'info>],
         chainlink: Option<&Program<'info, Chainlink>>,
     ) -> Result<()> {
+        require!(self.is_cleared(), CoreError::PricesAreAlreadySet);
         require!(self.primary.is_empty(), CoreError::PricesAreAlreadySet);
         require!(
             tokens.len() <= PriceMap::MAX_TOKENS,
@@ -104,12 +139,36 @@ impl Oracle {
         Ok(())
     }
 
+    /// Get min oracle slot.
+    pub fn min_oracle_slot(&self) -> Option<u64> {
+        if self.is_cleared() {
+            None
+        } else {
+            Some(self.min_oracle_slot)
+        }
+    }
+
+    /// Get min oracle ts.
+    pub fn min_oracle_ts(&self) -> i64 {
+        self.min_oracle_ts
+    }
+
+    /// Get max oracle ts.
+    pub fn max_oracle_ts(&self) -> i64 {
+        self.max_oracle_ts
+    }
+
     fn update_oracle_ts_and_slot(&mut self, mut validator: PriceValidator) -> Result<()> {
-        validator.merge_range(self.min_oracle_slot, self.min_oracle_ts, self.max_oracle_ts);
+        validator.merge_range(
+            self.min_oracle_slot(),
+            self.min_oracle_ts,
+            self.max_oracle_ts,
+        );
         if let Some((min_slot, min_ts, max_ts)) = validator.finish()? {
-            self.min_oracle_slot = Some(min_slot);
+            self.min_oracle_slot = min_slot;
             self.min_oracle_ts = min_ts;
             self.max_oracle_ts = max_ts;
+            self.set_flag(OracleFlag::Cleared, false);
         }
         Ok(())
     }
@@ -119,7 +178,8 @@ impl Oracle {
         self.primary.clear();
         self.min_oracle_ts = i64::MAX;
         self.max_oracle_ts = i64::MIN;
-        self.min_oracle_slot = None;
+        self.min_oracle_slot = u64::MAX;
+        self.set_flag(OracleFlag::Cleared, true);
     }
 
     pub(crate) fn with_prices<'info, T>(
@@ -178,8 +238,8 @@ impl Oracle {
             .get(token)
             .ok_or_else(|| error!(CoreError::MissingOraclePrice))?;
         Ok(gmsol_model::price::Price {
-            min: price.min.to_unit_price(),
-            max: price.max.to_unit_price(),
+            min: price.min().to_unit_price(),
+            max: price.max().to_unit_price(),
         })
     }
 

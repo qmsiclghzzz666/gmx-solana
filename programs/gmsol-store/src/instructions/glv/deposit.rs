@@ -520,8 +520,8 @@ pub struct ExecuteGlvDeposit<'info> {
     #[account(has_one = store)]
     pub token_map: AccountLoader<'info, TokenMapHeader>,
     /// Oracle buffer to use.
-    #[account(has_one = store)]
-    pub oracle: Box<Account<'info, Oracle>>,
+    #[account(mut, has_one = store)]
+    pub oracle: AccountLoader<'info, Oracle>,
     /// GLV account.
     #[account(
         has_one = store,
@@ -880,7 +880,7 @@ impl<'info> ExecuteGlvDeposit<'info> {
             .market_tokens(market_tokens)
             .market_token_vaults(market_token_vaults);
 
-        self.oracle.with_prices(
+        self.oracle.load_mut()?.with_prices(
             &self.store,
             &self.token_map,
             tokens,

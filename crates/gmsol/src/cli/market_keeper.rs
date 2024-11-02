@@ -38,7 +38,7 @@ pub(super) struct Args {
 #[derive(clap::Subcommand)]
 enum Command {
     /// Create an `Oracle` account.
-    CreateOracle { index: u8 },
+    CreateOracle {},
     /// Create a `TokenMap` account.
     CreateTokenMap,
     /// Create a `MarketConfigBuffer` account.
@@ -104,7 +104,7 @@ enum Command {
         #[arg(long)]
         set_token_map: bool,
         #[arg(long)]
-        init_oracle: Option<u8>,
+        init_oracle: bool,
         #[arg(long)]
         max_transaction_size: Option<usize>,
     },
@@ -276,8 +276,9 @@ impl Args {
         serialize_only: bool,
     ) -> gmsol::Result<()> {
         match &self.command {
-            Command::CreateOracle { index } => {
-                let (request, oracle) = client.initialize_oracle(store, *index);
+            Command::CreateOracle {} => {
+                let oracle_keypair = Keypair::new();
+                let (request, oracle) = client.initialize_oracle(store, &oracle_keypair).await?;
                 crate::utils::send_or_serialize(
                     request.into_anchor_request_without_compute_budget(),
                     serialize_only,
@@ -346,6 +347,8 @@ impl Args {
                         .await?
                         .ok_or(gmsol::Error::NotFound)?,
                 };
+
+                let init_oracle = (*init_oracle).then(Keypair::new);
                 insert_token_configs(
                     client,
                     store,
@@ -353,7 +356,7 @@ impl Args {
                     serialize_only,
                     *skip_preflight,
                     *set_token_map,
-                    *init_oracle,
+                    init_oracle,
                     *max_transaction_size,
                     &configs,
                 )
@@ -756,7 +759,7 @@ async fn insert_token_configs(
     serialize_only: bool,
     skip_preflight: bool,
     set_token_map: bool,
-    init_oracle: Option<u8>,
+    init_oracle: Option<Keypair>,
     max_transaction_size: Option<usize>,
     configs: &IndexMap<String, TokenConfig>,
 ) -> gmsol::Result<()> {
@@ -770,9 +773,9 @@ async fn insert_token_configs(
         builder.try_push(client.set_token_map(store, token_map))?;
     }
 
-    if let Some(index) = init_oracle {
-        let (rpc, oracle) = client.initialize_oracle(store, index);
-        tracing::info!(%index, %oracle, "insert oracle initialization instruction");
+    if let Some(oracle) = init_oracle.as_ref() {
+        let (rpc, oracle) = client.initialize_oracle(store, oracle).await?;
+        tracing::info!(%oracle, "insert oracle initialization instruction");
         builder.try_push(rpc)?;
     }
 

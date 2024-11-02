@@ -122,14 +122,14 @@ impl Adl for Market {
         if !self.is_adl_enabled(is_long) {
             return Err(CoreError::AdlNotEnabled);
         }
-        if oracle.max_oracle_ts < self.latest_adl_time(is_long)? {
+        if oracle.max_oracle_ts() < self.latest_adl_time(is_long)? {
             return Err(CoreError::OracleTimestampsAreSmallerThanRequired);
         }
         Ok(())
     }
 
     fn update_adl_state(&mut self, oracle: &Oracle, is_long: bool) -> Result<()> {
-        if oracle.max_oracle_ts < self.latest_adl_time(is_long)? {
+        if oracle.max_oracle_ts() < self.latest_adl_time(is_long)? {
             return err!(CoreError::OracleTimestampsAreSmallerThanRequired);
         }
         require!(self.is_enabled(), CoreError::DisabledMarket);

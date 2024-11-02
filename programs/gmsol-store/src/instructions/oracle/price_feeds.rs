@@ -15,10 +15,8 @@ pub struct SetPricesFromPriceFeed<'info> {
     #[account(
         mut,
         has_one = store,
-        seeds = [Oracle::SEED, store.key().as_ref(), &[oracle.index]],
-        bump = oracle.bump,
     )]
-    pub oracle: Account<'info, Oracle>,
+    pub oracle: AccountLoader<'info, Oracle>,
     #[account(has_one = store)]
     pub token_map: AccountLoader<'info, TokenMapHeader>,
     pub chainlink_program: Option<Program<'info, Chainlink>>,
@@ -31,13 +29,16 @@ pub(crate) fn set_prices_from_price_feed<'info>(
 ) -> Result<()> {
     let validator = PriceValidator::try_from(ctx.accounts.store.load()?.deref())?;
     let token_map = ctx.accounts.token_map.load_token_map()?;
-    ctx.accounts.oracle.set_prices_from_remaining_accounts(
-        validator,
-        &token_map,
-        &tokens,
-        ctx.remaining_accounts,
-        ctx.accounts.chainlink_program.as_ref(),
-    )
+    ctx.accounts
+        .oracle
+        .load_mut()?
+        .set_prices_from_remaining_accounts(
+            validator,
+            &token_map,
+            &tokens,
+            ctx.remaining_accounts,
+            ctx.accounts.chainlink_program.as_ref(),
+        )
 }
 
 impl<'info> internal::Authentication<'info> for SetPricesFromPriceFeed<'info> {

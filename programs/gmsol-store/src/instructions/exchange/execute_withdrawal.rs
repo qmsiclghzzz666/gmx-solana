@@ -28,8 +28,8 @@ pub struct ExecuteWithdrawal<'info> {
     #[account(has_one = store)]
     pub token_map: AccountLoader<'info, TokenMapHeader>,
     /// Oracle buffer to use.
-    #[account(has_one = store)]
-    pub oracle: Box<Account<'info, Oracle>>,
+    #[account(mut, has_one = store)]
+    pub oracle: AccountLoader<'info, Oracle>,
     /// Market.
     #[account(mut, has_one = store)]
     pub market: AccountLoader<'info, Market>,
@@ -192,7 +192,7 @@ impl<'info> ExecuteWithdrawal<'info> {
             .token_program(self.token_program.to_account_info())
             .throw_on_execution_error(throw_on_execution_error);
 
-        let executed = self.oracle.with_prices(
+        let executed = self.oracle.load_mut()?.with_prices(
             &self.store,
             &self.token_map,
             &feeds.tokens,
