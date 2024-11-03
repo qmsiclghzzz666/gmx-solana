@@ -22,6 +22,7 @@ bytes = "1.6.0"
 chainlink_solana = "1.0.0"
 clap = "4.5.0"
 either = "1.13.0"
+ethabi = { version = "18", default-features = false }
 event-listener = "5.3.1"
 eventsource-stream = "0.2.3"
 eyre = "0.6.12"
@@ -84,8 +85,14 @@ path = "programs/gmsol-treasury"
 [workspace.dependencies.gmsol-timelock]
 path = "programs/gmsol-timelock"
 
+[workspace.dependencies.mock-chainlink-verifier]
+path = "programs/mock-chainlink-verifier"
+
 [workspace.dependencies.gmsol-decode]
 path = "crates/gmsol-decode"
+
+[workspace.dependencies.chainlink-datastreams]
+path = "crates/chainlink-datastreams"
 
 # FIXME: use the crates.io version when it can compile with `anchor v0.30`.
 # See https://github.com/pyth-network/pyth-crosschain/issues/1522 for more information.

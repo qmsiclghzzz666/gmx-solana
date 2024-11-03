@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+
 use gmsol_utils::price::{Decimal, Price};
 
 use crate::{states::TokenConfig, CoreError};
@@ -40,7 +41,7 @@ impl Chainlink {
         let timestamp = *timestamp as i64;
         let current = clock.unix_timestamp;
         if current > timestamp && current - timestamp > token_config.heartbeat_duration().into() {
-            return Err(CoreError::PriceFeedNotUpdated.into());
+            return err!(CoreError::PriceFeedNotUpdated);
         }
         let price = Decimal::try_from_price(
             *answer as u128,
@@ -48,7 +49,7 @@ impl Chainlink {
             token_config.token_decimals(),
             token_config.precision(),
         )
-        .map_err(|_| CoreError::InvalidPriceFeedPrice)?;
+        .map_err(|_| error!(CoreError::InvalidPriceFeedPrice))?;
         Ok((
             round.slot,
             timestamp,

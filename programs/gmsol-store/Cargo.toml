@@ -49,3 +49,5 @@ indexmap = { workspace = true }
 bytes = { workspace = true, optional = true }
 typed-builder = { workspace = true }
 bs58 = { workspace = true, optional = true }
+
+chainlink-datastreams = { workspace = true }

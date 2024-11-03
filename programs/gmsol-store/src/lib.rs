@@ -1660,6 +1660,9 @@ pub enum CoreError {
     /// Token config is diabled.
     #[msg("token config is disabled")]
     TokenConfigDisabled,
+    /// Invalid Price Report.
+    #[msg("invalid price report")]
+    InvalidPriceReport,
     /* Errors for Deposit */
     /// Empty Deposit.
     #[msg("empty deposit")]

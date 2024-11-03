@@ -53,6 +53,14 @@ impl SmallPrices {
             max: price.max.value,
         })
     }
+
+    /// Convert to [`Price`](gmsol_utils::Price).
+    pub fn to_price(&self) -> gmsol_utils::Price {
+        gmsol_utils::Price {
+            min: self.min(),
+            max: self.max(),
+        }
+    }
 }
 
 const MAX_TOKENS: usize = 512;

@@ -1,0 +1,14 @@
+[package]
+name = "chainlink-datastreams"
+version.workspace = true
+edition.workspace = true
+
+[features]
+no-mock = []
+
+[dependencies]
+ruint = { workspace = true, default-features = false }
+ethabi = { workspace = true, default-features = false }
+hex = { workspace = true }
+mock-chainlink-verifier = { workspace = true, features = ["cpi"] }
+anchor-lang = { workspace = true }

@@ -30,7 +30,7 @@ use super::{HasMarketMeta, Store, TokenConfig, TokenMapHeader, TokenMapRef};
 
 pub use self::{
     chainlink::Chainlink,
-    feed::PriceFeed,
+    feed::{PriceFeed, PriceFeedPrice},
     pyth::{Pyth, PythLegacy, PYTH_LEGACY_ID},
     time::{ValidateOracleTime, ValidateOracleTimeExt},
     validator::PriceValidator,
@@ -340,10 +340,17 @@ impl OraclePrice {
         chainlink: Option<&Program<'info, Chainlink>>,
         account: &'info AccountInfo<'info>,
     ) -> Result<Self> {
-        let provider = match PriceProviderKind::from_program_id(account.owner) {
-            Some(provider) => provider,
+        let (provider, parsed) = match PriceProviderKind::from_program_id(account.owner) {
+            Some(provider) => (provider, None),
             None if *account.owner == crate::ID => {
-                todo!("feed account created by this program")
+                let loader = AccountLoader::<'info, PriceFeed>::try_from(account)?;
+                let feed = loader.load()?;
+                let kind = feed.provider()?;
+                let price = feed.check_and_get_price(clock, token_config)?;
+                (
+                    kind,
+                    Some((feed.last_published_at_slot(), feed.ts(), price)),
+                )
             }
             None => return Err(error!(CoreError::InvalidPriceFeedAccount)),
         };
@@ -378,7 +385,7 @@ impl OraclePrice {
                 (oracle_slot, oracle_ts, price)
             }
             PriceProviderKind::ChainlinkDataStreams => {
-                todo!()
+                parsed.ok_or_else(|| error!(CoreError::Internal))?
             }
         };
 

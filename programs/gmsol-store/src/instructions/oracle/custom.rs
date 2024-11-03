@@ -1,8 +1,9 @@
 use anchor_lang::prelude::*;
+use chainlink_datastreams::interface::ChainlinkDataStreamsInterface;
 use gmsol_utils::InitSpace;
 
 use crate::{
-    states::{PriceFeed, PriceProviderKind, Seed, Store},
+    states::{PriceFeed, PriceFeedPrice, PriceProviderKind, Seed, Store},
     utils::internal,
     CoreError,
 };
@@ -61,13 +62,68 @@ impl<'info> internal::Authentication<'info> for InitializePriceFeed<'info> {
     }
 }
 
-/// The accounts definition for [`update_price_feed`] instruction.
+/// The accounts definition for [`update_price_feed_for_chainlink`] instruction.
 #[derive(Accounts)]
-pub struct UpdatePriceFeed<'info> {
+pub struct UpdatePriceFeedForChainlink<'info> {
     /// Authority.
     pub authority: Signer<'info>,
     /// Store.
     pub store: AccountLoader<'info, Store>,
-    #[account(has_one = store)]
+    /// Verifier Account.
+    /// CHECK: checked by CPI.
+    pub verifier_account: UncheckedAccount<'info>,
+    /// Price Feed Account.
+    #[account(mut, has_one = store)]
     pub price_feed: AccountLoader<'info, PriceFeed>,
+    /// Chainlink Data Streams Program.
+    pub chainlink: Interface<'info, ChainlinkDataStreamsInterface>,
+}
+
+/// CHECK: only MARKET_KEEPER can update custom price feed.
+pub fn unchecked_update_price_feed_for_chainlink(
+    ctx: Context<UpdatePriceFeedForChainlink>,
+    signed_report: Vec<u8>,
+) -> Result<()> {
+    let accounts = ctx.accounts;
+
+    let (ts, price) = accounts.decode_and_validate_report(&signed_report)?;
+
+    accounts.verify_report(signed_report)?;
+
+    accounts.price_feed.load_mut()?.update(ts, &price)?;
+
+    Ok(())
+}
+
+impl<'info> UpdatePriceFeedForChainlink<'info> {
+    fn decode_and_validate_report(&self, signed_report: &[u8]) -> Result<(i64, PriceFeedPrice)> {
+        use chainlink_datastreams::report::decode;
+
+        let report = decode(signed_report).map_err(|_| error!(CoreError::InvalidPriceReport))?;
+
+        require_eq!(
+            Pubkey::new_from_array(report.feed_id),
+            self.price_feed.load()?.feed_id,
+            CoreError::InvalidPriceReport
+        );
+
+        Ok((
+            i64::from(report.valid_from_timestamp),
+            PriceFeedPrice::from_chainlink_report(&report)?,
+        ))
+    }
+
+    fn verify_report(&self, signed_report: Vec<u8>) -> Result<()> {
+        use chainlink_datastreams::interface::{verify, VerifyContext};
+
+        let ctx = CpiContext::new(
+            self.chainlink.to_account_info(),
+            VerifyContext {
+                verifier_account: self.verifier_account.to_account_info(),
+            },
+        );
+
+        verify(ctx, signed_report)?;
+        Ok(())
+    }
 }
