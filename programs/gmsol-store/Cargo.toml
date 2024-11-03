@@ -22,6 +22,7 @@ devnet = []
 serde = ["dep:serde", "serde_with"]
 enum-iter = []
 no-bug-fix = []
+no-mock = ["chainlink-datastreams/no-mock"]
 
 [dependencies]
 bytemuck = { workspace = true }
