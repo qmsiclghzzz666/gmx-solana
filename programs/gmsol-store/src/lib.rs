@@ -1043,7 +1043,7 @@ pub mod gmsol_store {
     }
 
     /// Initialize a custom price feed account.
-    #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
+    #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
     pub fn initialize_price_feed(
         ctx: Context<InitializePriceFeed>,
         provider: u8,
@@ -1053,6 +1053,15 @@ pub mod gmsol_store {
         let provider = PriceProviderKind::try_from(provider)
             .map_err(|_| error!(CoreError::InvalidProviderKindIndex))?;
         instructions::unchecked_initialize_price_feed(ctx, provider, &token, &feed_id)
+    }
+
+    /// Update a custom price feed account.
+    #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
+    pub fn update_price_feed_with_chainlink(
+        ctx: Context<UpdatePriceFeedWithChainlink>,
+        signed_report: Vec<u8>,
+    ) -> Result<()> {
+        instructions::unchecked_update_price_feed_with_chainlink(ctx, signed_report)
     }
 
     // Exchange.
@@ -1645,6 +1654,9 @@ pub enum CoreError {
     /// Invalid Price feed price.
     #[msg("invalid price feed price")]
     InvalidPriceFeedPrice,
+    /// Price Overflow.
+    #[msg("price overflow")]
+    PriceOverflow,
     /// Invalid price feed account.
     #[msg("invalid price feed account")]
     InvalidPriceFeedAccount,

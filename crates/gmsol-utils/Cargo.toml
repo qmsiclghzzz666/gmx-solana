@@ -12,3 +12,4 @@ thiserror = { workspace = true }
 paste = { workspace = true }
 bytemuck = { workspace = true }
 static_assertions = { workspace = true }
+ruint = { workspace = true, default-features = false }

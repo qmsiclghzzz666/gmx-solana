@@ -346,11 +346,7 @@ impl OraclePrice {
                 let loader = AccountLoader::<'info, PriceFeed>::try_from(account)?;
                 let feed = loader.load()?;
                 let kind = feed.provider()?;
-                let price = feed.check_and_get_price(clock, token_config)?;
-                (
-                    kind,
-                    Some((feed.last_published_at_slot(), feed.ts(), price)),
-                )
+                (kind, Some(feed.check_and_get_price(clock, token_config)?))
             }
             None => return Err(error!(CoreError::InvalidPriceFeedAccount)),
         };

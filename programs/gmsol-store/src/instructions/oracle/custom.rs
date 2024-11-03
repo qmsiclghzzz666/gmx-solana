@@ -30,7 +30,7 @@ pub struct InitializePriceFeed<'info> {
     pub system_program: Program<'info, System>,
 }
 
-/// CHECK: only MARKET_KEEPER is allowed to initialize price feed.
+/// CHECK: only ORDER_KEEPER is allowed to initialize price feed.
 pub(crate) fn unchecked_initialize_price_feed(
     ctx: Context<InitializePriceFeed>,
     provider: PriceProviderKind,
@@ -46,6 +46,7 @@ pub(crate) fn unchecked_initialize_price_feed(
         ctx.bumps.price_feed,
         provider,
         &ctx.accounts.store.key(),
+        &ctx.accounts.authority.key(),
         token,
         feed_id,
     )?;
@@ -62,9 +63,9 @@ impl<'info> internal::Authentication<'info> for InitializePriceFeed<'info> {
     }
 }
 
-/// The accounts definition for [`update_price_feed_for_chainlink`] instruction.
+/// The accounts definition for [`update_price_feed_with_chainlink`] instruction.
 #[derive(Accounts)]
-pub struct UpdatePriceFeedForChainlink<'info> {
+pub struct UpdatePriceFeedWithChainlink<'info> {
     /// Authority.
     pub authority: Signer<'info>,
     /// Store.
@@ -73,30 +74,46 @@ pub struct UpdatePriceFeedForChainlink<'info> {
     /// CHECK: checked by CPI.
     pub verifier_account: UncheckedAccount<'info>,
     /// Price Feed Account.
-    #[account(mut, has_one = store)]
+    #[account(mut, has_one = store, has_one = authority)]
     pub price_feed: AccountLoader<'info, PriceFeed>,
     /// Chainlink Data Streams Program.
     pub chainlink: Interface<'info, ChainlinkDataStreamsInterface>,
 }
 
-/// CHECK: only MARKET_KEEPER can update custom price feed.
-pub fn unchecked_update_price_feed_for_chainlink(
-    ctx: Context<UpdatePriceFeedForChainlink>,
+/// CHECK: only ORDER_KEEPER can update custom price feed.
+pub(crate) fn unchecked_update_price_feed_with_chainlink(
+    ctx: Context<UpdatePriceFeedWithChainlink>,
     signed_report: Vec<u8>,
 ) -> Result<()> {
     let accounts = ctx.accounts;
 
-    let (ts, price) = accounts.decode_and_validate_report(&signed_report)?;
+    require_eq!(
+        accounts.price_feed.load()?.provider()?,
+        PriceProviderKind::ChainlinkDataStreams,
+        CoreError::InvalidArgument
+    );
+
+    let price = accounts.decode_and_validate_report(&signed_report)?;
 
     accounts.verify_report(signed_report)?;
 
-    accounts.price_feed.load_mut()?.update(ts, &price)?;
+    accounts.price_feed.load_mut()?.update(&price)?;
 
     Ok(())
 }
 
-impl<'info> UpdatePriceFeedForChainlink<'info> {
-    fn decode_and_validate_report(&self, signed_report: &[u8]) -> Result<(i64, PriceFeedPrice)> {
+impl<'info> internal::Authentication<'info> for UpdatePriceFeedWithChainlink<'info> {
+    fn authority(&self) -> &Signer<'info> {
+        &self.authority
+    }
+
+    fn store(&self) -> &AccountLoader<'info, Store> {
+        &self.store
+    }
+}
+
+impl<'info> UpdatePriceFeedWithChainlink<'info> {
+    fn decode_and_validate_report(&self, signed_report: &[u8]) -> Result<PriceFeedPrice> {
         use chainlink_datastreams::report::decode;
 
         let report = decode(signed_report).map_err(|_| error!(CoreError::InvalidPriceReport))?;
@@ -107,10 +124,7 @@ impl<'info> UpdatePriceFeedForChainlink<'info> {
             CoreError::InvalidPriceReport
         );
 
-        Ok((
-            i64::from(report.valid_from_timestamp),
-            PriceFeedPrice::from_chainlink_report(&report)?,
-        ))
+        PriceFeedPrice::from_chainlink_report(&report)
     }
 
     fn verify_report(&self, signed_report: Vec<u8>) -> Result<()> {

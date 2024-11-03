@@ -16,12 +16,11 @@ pub struct PriceFeed {
     pub(crate) provider: u8,
     padding_0: [u8; 14],
     pub(crate) store: Pubkey,
+    pub(crate) authority: Pubkey,
     pub(crate) token: Pubkey,
     pub(crate) feed_id: Pubkey,
-    ts: i64,
     last_published_at_slot: u64,
     last_published_at: i64,
-    padding_1: [u8; 8],
     price: PriceFeedPrice,
     reserved: [u8; 256],
 }
@@ -40,18 +39,20 @@ impl PriceFeed {
         bump: u8,
         provider: PriceProviderKind,
         store: &Pubkey,
+        authority: &Pubkey,
         token: &Pubkey,
         feed_id: &Pubkey,
     ) -> Result<()> {
         self.bump = bump;
         self.provider = provider.into();
         self.store = *store;
+        self.authority = *authority;
         self.token = *token;
         self.feed_id = *feed_id;
         Ok(())
     }
 
-    pub(crate) fn update(&mut self, ts: i64, price: &PriceFeedPrice) -> Result<()> {
+    pub(crate) fn update(&mut self, price: &PriceFeedPrice) -> Result<()> {
         let clock = Clock::get()?;
         let slot = clock.slot;
         let current_ts = clock.unix_timestamp;
@@ -67,15 +68,14 @@ impl PriceFeed {
             self.last_published_at,
             CoreError::PreconditionsAreNotMet
         );
-        require_gte!(ts, self.ts, CoreError::InvalidArgument);
 
-        self.ts = ts;
-        self.last_published_at_slot = slot;
-        self.last_published_at = current_ts;
-
+        require_gte!(price.ts, self.price.ts, CoreError::InvalidArgument);
         require_gte!(price.max_price, price.min_price, CoreError::InvalidArgument);
         require_gte!(price.max_price, price.price, CoreError::InvalidArgument);
         require_gte!(price.price, price.min_price, CoreError::InvalidArgument);
+
+        self.last_published_at_slot = slot;
+        self.last_published_at = current_ts;
         self.price = *price;
 
         Ok(())
@@ -92,11 +92,6 @@ impl PriceFeed {
         &self.price
     }
 
-    /// Get ts.
-    pub fn ts(&self) -> i64 {
-        self.ts
-    }
-
     /// Get published slot.
     pub fn last_published_at_slot(&self) -> u64 {
         self.last_published_at_slot
@@ -106,19 +101,22 @@ impl PriceFeed {
         &self,
         clock: &Clock,
         token_config: &TokenConfig,
-    ) -> Result<gmsol_utils::Price> {
+    ) -> Result<(u64, i64, gmsol_utils::Price)> {
         let provider = self.provider()?;
         require_eq!(token_config.expected_provider()?, provider);
         let feed_id = token_config.get_feed(&provider)?;
 
         require_eq!(self.feed_id, feed_id, CoreError::InvalidPriceFeedAccount);
 
+        let timestamp = self.price.ts;
         let current = clock.unix_timestamp;
-        if current > self.ts && current - self.ts > token_config.heartbeat_duration().into() {
+        if current > timestamp && current - timestamp > token_config.heartbeat_duration().into() {
             return Err(CoreError::PriceFeedNotUpdated.into());
         }
 
-        self.try_to_price(token_config)
+        let price = self.try_to_price(token_config)?;
+
+        Ok((self.last_published_at_slot(), timestamp, price))
     }
 
     fn try_to_price(&self, token_config: &TokenConfig) -> Result<gmsol_utils::Price> {
@@ -129,7 +127,7 @@ impl PriceFeed {
 
         let min = Decimal::try_from_price(
             self.price.min_price,
-            PriceFeedPrice::DECIMALS,
+            self.price.decimals,
             token_decimals,
             precision,
         )
@@ -137,7 +135,7 @@ impl PriceFeed {
 
         let max = Decimal::try_from_price(
             self.price.max_price,
-            PriceFeedPrice::DECIMALS,
+            self.price.decimals,
             token_decimals,
             precision,
         )
@@ -151,14 +149,19 @@ impl PriceFeed {
 #[zero_copy]
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub struct PriceFeedPrice {
+    decimals: u8,
+    padding: [u8; 7],
+    ts: i64,
     price: u128,
     min_price: u128,
     max_price: u128,
 }
 
 impl PriceFeedPrice {
-    /// Decimals.
-    pub const DECIMALS: u8 = 18;
+    /// Get ts.
+    pub fn ts(&self) -> i64 {
+        self.ts
+    }
 
     /// Get min price.
     pub fn min_price(&self) -> &u128 {
@@ -178,6 +181,31 @@ impl PriceFeedPrice {
     pub(crate) fn from_chainlink_report(
         report: &chainlink_datastreams::report::Report,
     ) -> Result<Self> {
-        todo!()
+        use chainlink_datastreams::report::Report;
+        use gmsol_utils::price::{find_divisor_decimals, TEN, U192};
+
+        let max_price = Report::max_price();
+
+        require!(max_price >= report.price, CoreError::InvalidPriceReport);
+        require!(max_price >= report.bid, CoreError::InvalidPriceReport);
+        require!(max_price >= report.ask, CoreError::InvalidPriceReport);
+
+        require!(report.ask >= report.price, CoreError::InvalidPriceReport);
+        require!(report.price >= report.bid, CoreError::InvalidPriceReport);
+
+        let divisor_decimals = find_divisor_decimals(&report.ask);
+
+        require_gte!(Report::DECIMALS, divisor_decimals, CoreError::PriceOverflow);
+
+        let divisor = TEN.pow(U192::from(divisor_decimals));
+
+        Ok(Self {
+            decimals: Report::DECIMALS - divisor_decimals,
+            padding: [0; 7],
+            ts: i64::from(report.observations_timestamp),
+            price: (report.price / divisor).try_into().unwrap(),
+            min_price: (report.bid / divisor).try_into().unwrap(),
+            max_price: (report.ask / divisor).try_into().unwrap(),
+        })
     }
 }

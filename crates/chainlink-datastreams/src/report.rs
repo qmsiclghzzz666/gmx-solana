@@ -1,10 +1,6 @@
-use std::{fmt, sync::OnceLock};
+use std::fmt;
 
-use ethabi::{ethereum_types::U256, ParamType, Token};
-use ruint::aliases::U192;
-
-static SCHEMA_1: OnceLock<Vec<ParamType>> = OnceLock::<Vec<ParamType>>::new();
-static SCHEMA_REPORT_V3: OnceLock<Vec<ParamType>> = OnceLock::<Vec<ParamType>>::new();
+use ruint::aliases::{U192, U256};
 
 /// Report.
 pub struct Report {
@@ -26,6 +22,16 @@ pub struct Report {
     pub ask: U192,
 }
 
+impl Report {
+    /// Decimals.
+    pub const DECIMALS: u8 = 18;
+
+    /// Get max possible price.
+    pub fn max_price() -> U192 {
+        (U192::MAX >> 1) - U192::from(1)
+    }
+}
+
 impl fmt::Debug for Report {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Report")
@@ -42,73 +48,90 @@ impl fmt::Debug for Report {
     }
 }
 
+/// Decode Report Error.
+#[derive(Debug, thiserror::Error)]
+pub enum DecodeError {
+    /// Invalid data.
+    #[error("invalid data")]
+    InvalidData,
+    /// Unsupported Version.
+    #[error("unsupported version: {0}")]
+    UnsupportedVersion(u16),
+}
+
 /// Decode Report.
-pub fn decode(data: &[u8]) -> ethabi::Result<Report> {
-    let schema_1 = SCHEMA_1.get_or_init(|| {
-        vec![
-            ParamType::FixedArray(Box::new(ParamType::FixedBytes(32)), 3),
-            ParamType::Bytes,
-        ]
-    });
+pub fn decode(mut data: &[u8]) -> Result<Report, DecodeError> {
+    let mut offset = 0;
 
-    let schema_report_v3 = SCHEMA_REPORT_V3.get_or_init(|| {
-        vec![
-            ParamType::FixedBytes(32),
-            ParamType::Uint(32),
-            ParamType::Uint(32),
-            ParamType::Uint(192),
-            ParamType::Uint(192),
-            ParamType::Uint(32),
-            ParamType::Int(192),
-            ParamType::Int(192),
-            ParamType::Int(192),
-        ]
-    });
+    if data.len() < 3 * 32 {
+        return Err(DecodeError::InvalidData);
+    }
+    offset += 3 * 32;
 
-    let [_, Token::Bytes(data)]: [Token; 2] = ethabi::decode(schema_1, data)?
-        .try_into()
-        .map_err(|_| ethabi::Error::InvalidData)?
-    else {
-        return Err(ethabi::Error::InvalidData);
-    };
+    // Decode body.
+    let dynamic_offset = as_usize(&peek_32_bytes(data, offset)?)?;
+    let len = as_usize(&peek_32_bytes(data, dynamic_offset)?)?;
+    data = &data[dynamic_offset + 32..(dynamic_offset + 32 + len)];
+    offset = 0;
 
+    // Peek version.
+    if data.len() < 2 {
+        return Err(DecodeError::InvalidData);
+    }
     let version = ((data[0] as u16) << 8) | (data[1] as u16);
-
     if version != 3 {
-        return Err(ethabi::Error::InvalidData);
+        return Err(DecodeError::UnsupportedVersion(version));
     }
 
-    let [
-        Token::FixedBytes(feed_id),
-        Token::Uint(valid_from_timestamp),
-        Token::Uint(observations_timestamp),
-        Token::Uint(native_fee),
-        Token::Uint(link_fee),
-        Token::Uint(expires_at),
-        Token::Int(price),
-        Token::Int(bid),
-        Token::Int(ask),
-    ]: [Token; 9] =
-        ethabi::decode_whole(schema_report_v3, &data)?
-            .try_into()
-            .map_err(|_| ethabi::Error::InvalidData)?
-    else {
-        return Err(ethabi::Error::InvalidData);
-    };
+    // Decode `feed_id`.
+    let feed_id = peek_32_bytes(data, offset)?;
+    offset += 32;
+
+    // Decode `valid_from_timestamp`.
+    let valid_from_timestamp = as_u256(&peek_32_bytes(data, offset)?);
+    offset += 32;
+
+    // Decode `observations_timestamp`.
+    let observations_timestamp = as_u256(&peek_32_bytes(data, offset)?);
+    offset += 32;
+
+    // Decode `native_fee`.
+    let native_fee = as_u256(&peek_32_bytes(data, offset)?);
+    offset += 32;
+
+    // Decode `link_fee`.
+    let link_fee = as_u256(&peek_32_bytes(data, offset)?);
+    offset += 32;
+
+    // Decode `expires_at`.
+    let expires_at = as_u256(&peek_32_bytes(data, offset)?);
+    offset += 32;
+
+    // Decode `price`.
+    let price = as_u256(&peek_32_bytes(data, offset)?);
+    offset += 32;
+
+    // Decode `price`.
+    let bid = as_u256(&peek_32_bytes(data, offset)?);
+    offset += 32;
+
+    // Decode `price`.
+    let ask = as_u256(&peek_32_bytes(data, offset)?);
+    // offset += 32;
 
     Ok(Report {
-        feed_id: feed_id.try_into().map_err(|_| ethabi::Error::InvalidData)?,
+        feed_id,
         valid_from_timestamp: valid_from_timestamp
             .try_into()
-            .map_err(|_| ethabi::Error::InvalidData)?,
+            .map_err(|_| DecodeError::InvalidData)?,
         observations_timestamp: observations_timestamp
             .try_into()
-            .map_err(|_| ethabi::Error::InvalidData)?,
+            .map_err(|_| DecodeError::InvalidData)?,
         native_fee: u256_to_u192(native_fee),
         link_fee: u256_to_u192(link_fee),
         expires_at: expires_at
             .try_into()
-            .map_err(|_| ethabi::Error::InvalidData)?,
+            .map_err(|_| DecodeError::InvalidData)?,
         price: u256_to_u192(price),
         bid: u256_to_u192(bid),
         ask: u256_to_u192(ask),
@@ -116,8 +139,41 @@ pub fn decode(data: &[u8]) -> ethabi::Result<Report> {
 }
 
 fn u256_to_u192(num: U256) -> U192 {
-    let inner = num.0;
+    let inner = num.as_limbs();
     U192::from_limbs([inner[0], inner[1], inner[2]])
+}
+
+type Word = [u8; 32];
+
+fn peek(data: &[u8], offset: usize, len: usize) -> Result<&[u8], DecodeError> {
+    if offset + len > data.len() {
+        Err(DecodeError::InvalidData)
+    } else {
+        Ok(&data[offset..(offset + len)])
+    }
+}
+
+fn peek_32_bytes(data: &[u8], offset: usize) -> Result<Word, DecodeError> {
+    peek(data, offset, 32).map(|x| {
+        let mut out: Word = [0u8; 32];
+        out.copy_from_slice(&x[0..32]);
+        out
+    })
+}
+
+fn as_usize(slice: &Word) -> Result<usize, DecodeError> {
+    if !slice[..28].iter().all(|x| *x == 0) {
+        return Err(DecodeError::InvalidData);
+    }
+    let result = ((slice[28] as usize) << 24)
+        + ((slice[29] as usize) << 16)
+        + ((slice[30] as usize) << 8)
+        + (slice[31] as usize);
+    Ok(result)
+}
+
+fn as_u256(slice: &Word) -> U256 {
+    U256::from_be_bytes(*slice)
 }
 
 #[cfg(test)]
@@ -154,7 +210,7 @@ mod tests {
         )
         .unwrap();
         let report = decode(&data).unwrap();
-        println!("{}", u128::try_from(report.ask).unwrap());
-        println!("{}", i64::from(report.valid_from_timestamp));
+        assert!(report.ask == U192::from(1445876300000000000u64));
+        assert_eq!(report.valid_from_timestamp, 1730606208);
     }
 }
