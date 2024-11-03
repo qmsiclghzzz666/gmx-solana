@@ -210,7 +210,10 @@ mod tests {
         )
         .unwrap();
         let report = decode(&data).unwrap();
+        assert!(report.price == U192::from(1445538218802086900u64));
+        assert!(report.bid == U192::from(1445336809268003700u64));
         assert!(report.ask == U192::from(1445876300000000000u64));
         assert_eq!(report.valid_from_timestamp, 1730606208);
+        assert_eq!(report.observations_timestamp, 1730606208);
     }
 }
