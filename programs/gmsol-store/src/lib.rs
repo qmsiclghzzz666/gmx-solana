@@ -8,6 +8,8 @@
 //! #### Instructions for Store Accounts
 //! - [`initialize`](gmsol_store::initialize): Create a new [`Store`](states::Store) account.
 //! - [`transfer_store_authority`]: Transfer the authority of the given store to a new authority.
+//! - [`set_receiver`]: Set the claimable fee receiver address.
+//! - [`set_token_map`]: Set the token map account to use.
 //!
 //! ## Role-based Permission Management
 //!
@@ -143,7 +145,9 @@ pub mod gmsol_store {
 
     use super::*;
 
-    // Data Store.
+    // ===========================================
+    //                 Data Store
+    // ===========================================
     /// Create a new [`Store`](states::Store) account.
     ///
     /// # Accounts
@@ -159,8 +163,9 @@ pub mod gmsol_store {
     /// authority address.
     ///
     /// # Errors
+    /// - Only empty `key` is allowed unless `multi-store` feature is enabled.
     /// - The [`payer`](Initialize::payer) must a signer.
-    /// - The [`store`](Initialize::store) must not be initialized.
+    /// - The [`store`](Initialize::store) must haven't been initialized.
     /// - The address of the [`store`](Initialize::store) must be the PDA
     ///   derived from the store account seed [`SEED`](states::Store::SEED)
     ///   and the SHA-256 encoded `key` parameter.
@@ -182,9 +187,9 @@ pub mod gmsol_store {
     ///
     /// # Errors
     /// - The [`authority`](TransferStoreAuthority::authority) must be a signer
-    /// and be the `ADMIN` of the store.
+    ///   and be the `ADMIN` of the store.
     /// - The [`store`](TransferStoreAuthority::store) must have been initialized
-    /// and owned by the store program.
+    ///   and owned by the store program.
     #[access_control(internal::Authenticate::only_admin(&ctx))]
     pub fn transfer_store_authority(
         ctx: Context<TransferStoreAuthority>,
@@ -194,20 +199,39 @@ pub mod gmsol_store {
     }
 
     /// Set the receiver address.
+    ///
+    /// # Accounts
+    /// *[See the documentation for the accounts.](SetReceiver).*
+    ///
+    /// # Errors
+    /// - The [`authority`](SetReceiver::authority) must be a signer and the current
+    ///   receiver of the given store.
+    /// - The [`store`](SetReceiver::store) must be initialized.
+    /// - The new [`receiver`](SetReceiver::receiver) cannot be the same as the current
+    ///   one.
     pub fn set_receiver(ctx: Context<SetReceiver>) -> Result<()> {
         instructions::set_receiver(ctx)
     }
 
+    /// Set the token map address.
+    ///
+    /// # Accounts
+    /// *[See the documentation for the accounts.](SetTokenMap).*
+    ///
+    /// # Errors
+    /// - The [`authority`](SetTokenMap::authority) must be a signer and a MARKET_KEEPER
+    ///   of the store.
+    /// - The [`store`](SetTokenMap::store) must be initialized.
+    /// - The [`token_map`](SetTokenMap::token_map) must be initialized and owned by the
+    ///   given store.
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn set_token_map(ctx: Context<SetTokenMap>) -> Result<()> {
         instructions::unchecked_set_token_map(ctx)
     }
 
-    pub fn get_token_map(ctx: Context<ReadStore>) -> Result<Option<Pubkey>> {
-        instructions::get_token_map(ctx)
-    }
-
-    // Roles.
+    // ===========================================
+    //      Role-based Permission Management
+    // ===========================================
     /// Check that the signer is the admin of the given store, throw error if
     /// the check fails.
     ///
