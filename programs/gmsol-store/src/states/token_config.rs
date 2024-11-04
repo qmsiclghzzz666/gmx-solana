@@ -189,6 +189,11 @@ impl TokenConfig {
             self.set_flag(Flag::Initialized, true);
         } else {
             require!(self.flag(Flag::Initialized), CoreError::InvalidArgument);
+            require_eq!(
+                self.token_decimals,
+                token_decimals,
+                CoreError::TokenDecimalsChanged
+            );
         }
         let TokenConfigBuilder {
             heartbeat_duration,

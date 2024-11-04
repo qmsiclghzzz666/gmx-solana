@@ -38,8 +38,6 @@ pub(crate) fn initialize_token_map(ctx: Context<InitializeTokenMap>) -> Result<(
 }
 
 /// The accounts definition for [`push_to_token_map`](crate::gmsol_store::push_to_token_map).
-///
-/// [*See also the documentation for the instruction.*](crate::gmsol_store::push_to_token_map)
 #[derive(Accounts)]
 pub struct PushToTokenMap<'info> {
     /// The authority of the instruction.
@@ -284,9 +282,11 @@ impl<'info> internal::Authentication<'info> for SetFeedConfig<'info> {
     }
 }
 
+/// The accounts definition of the instructions to read token map.
 #[derive(Accounts)]
 pub struct ReadTokenMap<'info> {
-    token_map: AccountLoader<'info, TokenMapHeader>,
+    /// Token map.
+    pub token_map: AccountLoader<'info, TokenMapHeader>,
 }
 
 /// Check if the config of the given token is enabled.

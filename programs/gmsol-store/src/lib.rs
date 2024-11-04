@@ -44,12 +44,11 @@
 //! #### Instructions for Feature Management
 //! - [`toggle_feature`](toggle_feature): Enable or diable the given feature.
 //!
-//! ## Oracle Price Management
+//! ## Token and Oracle Management
 //!
-//! #### Instructions for [`TokenConfig`](states::TokenConfig) and token maps.
+//! #### Instructions for managing [`TokenConfig`](states::TokenConfig) and token maps.
 //! - [`initialize_token_map`](gmsol_store::initialize_token_map): Initialize a new token map account.
 //!   This is a permissionless instruction.
-//! - [`set_token_map`]: Set the token map address used in the given store.
 //! - [`push_to_token_map`]: Push a new token config for an existing token to the given token map.
 //! - [`push_to_token_map_synthetic`]: Push a new token config for a "synthetic"
 //!   token to the given token map.
@@ -503,7 +502,9 @@ pub mod gmsol_store {
         instructions::unchecked_toggle_feature(ctx, domain, action, enable)
     }
 
-    // Token Config.
+    // ===========================================
+    //           Token Config Management
+    // ===========================================
     /// Initialize a new token map account with its store set to [`store`](InitializeTokenMap::store).
     ///
     /// Anyone can initialize a token map account without any permissions, but after initialization, only
@@ -515,7 +516,7 @@ pub mod gmsol_store {
     /// # Errors
     /// - The [`payer`](InitializeTokenMap::payer) must be a signer.
     /// - The [`store`](InitializeTokenMap::store) must be an initialized [`Store`](states::Store)
-    /// account owned by the store program.
+    ///   account owned by the store program.
     /// - The [`token_map`](InitializeTokenMap::token_map) must be a uninitialized account.
     pub fn initialize_token_map(ctx: Context<InitializeTokenMap>) -> Result<()> {
         instructions::initialize_token_map(ctx)
@@ -534,17 +535,17 @@ pub mod gmsol_store {
     /// - `builder`: Builder for the token config.
     /// - `enable`: Whether the token config should be enabled/disabled after the push.
     /// - `new`: Enforce insert if new = true, and an error will be returned if the config
-    /// for the given token already exists.
+    ///   for the given token already exists.
     ///
     /// # Errors
     /// - The [`authority`](PushToTokenMap::authority) must be a signer and a MARKET_KEEPER
-    /// of the given store.
+    ///   in the given store.
     /// - The [`store`](PushToTokenMap::store) must be an initialized [`Store`](states::Store)
-    /// account owned by the store program. And it must be the owner of the token map.
+    ///   account owned by the store program. And it must be the owner of the token map.
     /// - The [`token_map`](PushToTokenMap::token_map) must be an initialized token map account
-    /// owned by the store program.
+    ///   owned by the store program.
     /// - The [`token`](PushToTokenMap::token) must be an initialized token mint account owned
-    /// by the SPL token program.
+    ///   by the SPL token program.
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn push_to_token_map(
         ctx: Context<PushToTokenMap>,
@@ -575,11 +576,12 @@ pub mod gmsol_store {
     ///
     /// # Errors
     /// - The [`authority`](PushToTokenMapSynthetic::authority) must be a signer and a MARKET_KEEPER
-    /// of the given store.
+    ///   in the given store.
     /// - The [`store`](PushToTokenMapSynthetic::store) must be an initialized [`Store`](states::Store)
-    /// account owned by the store program. And it must be the owner of the token map.
+    ///   account owned by the store program. And it must be the owner of the token map.
     /// - The [`token_map`](PushToTokenMapSynthetic::token_map) must be an initialized token map account
-    /// owned by the store program.
+    ///   owned by the store program.
+    /// - If this is an update, then the `token_decimals` must be the same as before.
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn push_to_token_map_synthetic(
         ctx: Context<PushToTokenMapSynthetic>,
@@ -601,48 +603,6 @@ pub mod gmsol_store {
         )
     }
 
-    pub fn is_token_config_enabled(ctx: Context<ReadTokenMap>, token: Pubkey) -> Result<bool> {
-        instructions::is_token_config_enabled(ctx, &token)
-    }
-
-    pub fn token_expected_provider(ctx: Context<ReadTokenMap>, token: Pubkey) -> Result<u8> {
-        instructions::token_expected_provider(ctx, &token).map(|kind| kind as u8)
-    }
-
-    pub fn token_feed(ctx: Context<ReadTokenMap>, token: Pubkey, provider: u8) -> Result<Pubkey> {
-        instructions::token_feed(
-            ctx,
-            &token,
-            &PriceProviderKind::try_from(provider)
-                .map_err(|_| CoreError::InvalidProviderKindIndex)?,
-        )
-    }
-
-    pub fn token_timestamp_adjustment(
-        ctx: Context<ReadTokenMap>,
-        token: Pubkey,
-        provider: u8,
-    ) -> Result<u32> {
-        instructions::token_timestamp_adjustment(
-            ctx,
-            &token,
-            &PriceProviderKind::try_from(provider)
-                .map_err(|_| CoreError::InvalidProviderKindIndex)?,
-        )
-    }
-
-    pub fn token_name(ctx: Context<ReadTokenMap>, token: Pubkey) -> Result<String> {
-        instructions::token_name(ctx, &token)
-    }
-
-    pub fn token_decimals(ctx: Context<ReadTokenMap>, token: Pubkey) -> Result<u8> {
-        instructions::token_decimals(ctx, &token)
-    }
-
-    pub fn token_precision(ctx: Context<ReadTokenMap>, token: Pubkey) -> Result<u8> {
-        instructions::token_precision(ctx, &token)
-    }
-
     /// Enable of disable the config for the given token.
     ///
     /// # Accounts
@@ -654,11 +614,11 @@ pub mod gmsol_store {
     ///
     /// # Errors
     /// - The [`authority`](ToggleTokenConfig::authority) must be a signer
-    /// and a MARKET_KEEPER of the give store.
+    ///   and a MARKET_KEEPER in the give store.
     /// - The [`store`](ToggleTokenConfig::store) must be an initialized [`Store`](states::Store)
-    /// account owned by the store program. And it must be the owner of the token map.
+    ///   account owned by the store program. And it must be the owner of the token map.
     /// - The [`token_map`](ToggleTokenConfig::token_map) must be an initialized token map account
-    /// owned by the store program.
+    ///   owned by the store program.
     /// - The given `token` must exist in the token map.
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn toggle_token_config(
@@ -681,11 +641,11 @@ pub mod gmsol_store {
     ///
     /// # Errors
     /// - The [`authority`](SetExpectedProvider::authority) must be a signer
-    /// and a MARKET_KEEPER of the give store.
+    ///   and a MARKET_KEEPER in the give store.
     /// - The [`store`](SetExpectedProvider::store) must be an initialized [`Store`](states::Store)
-    /// account owned by the store program. And it must be the owner of the token map.
+    ///   account owned by the store program. And it must be the owner of the token map.
     /// - The [`token_map`](SetExpectedProvider::token_map) must be an initialized token map account
-    /// owned by the store program.
+    ///   owned by the store program.
     /// - The given `token` must exist in the token map.
     /// - The index of the provider must be valid.
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
@@ -715,11 +675,11 @@ pub mod gmsol_store {
     ///
     /// # Errors
     /// - The [`authority`](SetFeedConfig::authority) must be a signer
-    /// and a MARKET_KEEPER of the give store.
+    ///   and a MARKET_KEEPER in the give store.
     /// - The [`store`](SetFeedConfig::store) must be an initialized [`Store`](states::Store)
-    /// account owned by the store program. And it must be the owner of the token map.
+    ///   account owned by the store program. And it must be the owner of the token map.
     /// - The [`token_map`](SetFeedConfig::token_map) must be an initialized token map account
-    /// owned by the store program.
+    ///   owned by the store program.
     /// - The given `token` must exist in the token map.
     /// - The index of the provider must be valid.
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
@@ -738,6 +698,129 @@ pub mod gmsol_store {
             feed,
             timestamp_adjustment,
         )
+    }
+
+    /// Return whether the token config is enabled.
+    ///
+    /// # Accounts
+    /// [*See the documentation for the accounts*](ReadTokenMap).
+    ///
+    /// # Arguments.
+    /// - `token`: The address of the token to query for.
+    ///
+    /// # Errors
+    /// - The [`token_map`](ReadTokenMap::token_map) must be initialized.
+    /// - The `token` must be in the map.
+    pub fn is_token_config_enabled(ctx: Context<ReadTokenMap>, token: Pubkey) -> Result<bool> {
+        instructions::is_token_config_enabled(ctx, &token)
+    }
+
+    /// Get the expected provider of the given token.
+    ///
+    /// # Accounts
+    /// [*See the documentation for the accounts*](ReadTokenMap).
+    ///
+    /// # Arguments.
+    /// - `token`: The address of the token to query for.
+    ///
+    /// # Errors
+    /// - The [`token_map`](ReadTokenMap::token_map) must be initialized.
+    /// - The `token` must be in the map.
+    pub fn token_expected_provider(ctx: Context<ReadTokenMap>, token: Pubkey) -> Result<u8> {
+        instructions::token_expected_provider(ctx, &token).map(|kind| kind as u8)
+    }
+
+    /// Get the configured feed of the given token for the provider.
+    ///
+    /// # Accounts
+    /// [*See the documentation for the accounts*](ReadTokenMap).
+    ///
+    /// # Arguments.
+    /// - `token`: The address of the token to query for.
+    /// - `provider`: The index of provider to query for.
+    ///
+    /// # Errors
+    /// - The [`token_map`](ReadTokenMap::token_map) must be initialized.
+    /// - The `token` must be in the map.
+    /// - The `provider` index must be valid. See [`PriceProviderKind`] for more details.
+    pub fn token_feed(ctx: Context<ReadTokenMap>, token: Pubkey, provider: u8) -> Result<Pubkey> {
+        instructions::token_feed(
+            ctx,
+            &token,
+            &PriceProviderKind::try_from(provider)
+                .map_err(|_| CoreError::InvalidProviderKindIndex)?,
+        )
+    }
+
+    /// Get the configured timestamp adjustment of the given token for the provider.
+    ///
+    /// # Accounts
+    /// [*See the documentation for the accounts*](ReadTokenMap).
+    ///
+    /// # Arguments.
+    /// - `token`: The address of the token to query for.
+    /// - `provider`: The index of provider to query for.
+    ///
+    /// # Errors
+    /// - The [`token_map`](ReadTokenMap::token_map) must be initialized.
+    /// - The `token` must be in the map.
+    /// - The `provider` index must be valid. See [`PriceProviderKind`] for more details.
+    pub fn token_timestamp_adjustment(
+        ctx: Context<ReadTokenMap>,
+        token: Pubkey,
+        provider: u8,
+    ) -> Result<u32> {
+        instructions::token_timestamp_adjustment(
+            ctx,
+            &token,
+            &PriceProviderKind::try_from(provider)
+                .map_err(|_| CoreError::InvalidProviderKindIndex)?,
+        )
+    }
+
+    /// Get the name of the token.
+    ///
+    /// # Accounts
+    /// [*See the documentation for the accounts*](ReadTokenMap).
+    ///
+    /// # Arguments.
+    /// - `token`: The address of the token to query for.
+    ///
+    /// # Errors
+    /// - The [`token_map`](ReadTokenMap::token_map) must be initialized.
+    /// - The `token` must be in the map.
+    pub fn token_name(ctx: Context<ReadTokenMap>, token: Pubkey) -> Result<String> {
+        instructions::token_name(ctx, &token)
+    }
+
+    /// Get the decimals of the token.
+    ///
+    /// # Accounts
+    /// [*See the documentation for the accounts*](ReadTokenMap).
+    ///
+    /// # Arguments.
+    /// - `token`: The address of the token to query for.
+    ///
+    /// # Errors
+    /// - The [`token_map`](ReadTokenMap::token_map) must be initialized.
+    /// - The `token` must be in the map.
+    pub fn token_decimals(ctx: Context<ReadTokenMap>, token: Pubkey) -> Result<u8> {
+        instructions::token_decimals(ctx, &token)
+    }
+
+    /// Get the price precision of the token.
+    ///
+    /// # Accounts
+    /// [*See the documentation for the accounts*](ReadTokenMap).
+    ///
+    /// # Arguments.
+    /// - `token`: The address of the token to query for.
+    ///
+    /// # Errors
+    /// - The [`token_map`](ReadTokenMap::token_map) must be initialized.
+    /// - The `token` must be in the map.
+    pub fn token_precision(ctx: Context<ReadTokenMap>, token: Pubkey) -> Result<u8> {
+        instructions::token_precision(ctx, &token)
     }
 
     // Market.
@@ -1615,6 +1698,9 @@ pub type CoreResult<T> = std::result::Result<T, CoreError>;
 
 #[error_code]
 pub enum CoreError {
+    // ===========================================
+    //                Common Errors
+    // ===========================================
     /// Non-defualt store is not allowed.
     #[msg("non-default store is not allowed")]
     NonDefaultStore,
@@ -1720,11 +1806,15 @@ pub enum CoreError {
     /// Insufficient output amounts.
     #[msg("insufficient output amounts")]
     InsufficientOutputAmount,
-    /* Errors for Store */
+    // ===========================================
+    //                 Store Errors
+    // ===========================================
     /// Invalid Store Config Key.
     #[msg("invalid store config key")]
     InvalidStoreConfigKey,
-    /* Errors for Oracle */
+    // ===========================================
+    //                Oracle Errors
+    // ===========================================
     /// Invalid Provider Kind Index.
     #[msg("invalid provider kind index")]
     InvalidProviderKindIndex,
@@ -1788,7 +1878,9 @@ pub enum CoreError {
     /// Market not opened.
     #[msg("market is not open")]
     MarketNotOpen,
-    /* Errors for Deposit */
+    // ===========================================
+    //                Deposit Errors
+    // ===========================================
     /// Empty Deposit.
     #[msg("empty deposit")]
     EmptyDeposit,
@@ -1801,11 +1893,15 @@ pub enum CoreError {
     /// Not enough GLV token amount for the first deposit.
     #[msg("not enough GLV token amount for the first deposit")]
     NotEnoughGlvTokenAmountForFirstDeposit,
-    /* Errors for Withdrawal */
+    // ===========================================
+    //               Withdrawal Errors
+    // ===========================================
     /// Empty Withdrawal.
     #[msg("emtpy withdrawal")]
     EmptyWithdrawal,
-    /* Errors for Orders */
+    // ===========================================
+    //                 Order Errors
+    // ===========================================
     /// Empty Order.
     #[msg("emtpy order")]
     EmptyOrder,
@@ -1882,14 +1978,18 @@ pub enum CoreError {
     /// but the token amounts are not merged togather.
     #[msg("same output tokens not merged")]
     SameOutputTokensNotMerged,
-    /* Errors for Shift */
+    // ===========================================
+    //                 Shift Errors
+    // ===========================================
     /// Empty Shift.
     #[msg("emtpy shift")]
     EmptyShift,
     /// Invalid Shift Markets
     #[msg("invalid shift markets")]
     InvalidShiftMarkets,
-    /* Errors for GT and User accounts */
+    // ===========================================
+    //        GT and User Accounts Errors
+    // ===========================================
     /// GT State has been initialized.
     #[msg("GT State has been initialized")]
     GTStateHasBeenInitialized,
@@ -1902,7 +2002,9 @@ pub enum CoreError {
     /// User account has been initialized.
     #[msg("user account has been initialized")]
     UserAccountHasBeenInitialized,
-    /* Errors for referral */
+    // ===========================================
+    //               Referral Errors
+    // ===========================================
     /// Referral Code has been set.
     #[msg("referral code has been set")]
     ReferralCodeHasBeenSet,
@@ -1921,7 +2023,9 @@ pub enum CoreError {
     /// Mutual-referral is not allowed.
     #[msg("mutual-referral is not allowed")]
     MutualReferral,
-    /* Errors for market */
+    // ===========================================
+    //                Market Errors
+    // ===========================================
     /// Invalid market config key.
     #[msg("invalid market config key")]
     InvalidMarketConfigKey,
@@ -1931,7 +2035,9 @@ pub enum CoreError {
     /// Disabled market.
     #[msg("disabled market")]
     DisabledMarket,
-    /* Errors for GLV */
+    // ===========================================
+    //                  GLV Errors
+    // ===========================================
     /// Failed to calculate GLV value for market.
     #[msg("failed to calculate GLV value for this market")]
     FailedToCalculateGlvValueForMarket,
@@ -1949,6 +2055,12 @@ pub enum CoreError {
     /// Empty GLV withdrawal.
     #[msg("Empty GLV withdrawal")]
     EmptyGlvWithdrawal,
+    // ===========================================
+    //                Other Errors
+    // ===========================================
+    /// The decimals of token is immutable.
+    #[msg("The decimals of token is immutable")]
+    TokenDecimalsChanged,
 }
 
 impl CoreError {
