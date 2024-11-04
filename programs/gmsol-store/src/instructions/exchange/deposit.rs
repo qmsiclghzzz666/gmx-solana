@@ -14,6 +14,13 @@ use crate::{
 };
 
 /// The accounts definition for the `create_deposit` instruction.
+///
+/// Remaining accounts expected by this instruction:
+///
+///   - 0..M. `[]` M market accounts, where M represents the length
+///     of the swap path for initial long token.
+///   - M..M+N. `[]` N market accounts, where N represents the length
+///     of the swap path for initial short token.
 #[derive(Accounts)]
 #[instruction(nonce: [u8; 32])]
 pub struct CreateDeposit<'info> {
@@ -70,8 +77,8 @@ pub struct CreateDeposit<'info> {
         associated_token::authority = owner,
     )]
     pub market_token_ata: Box<Account<'info, TokenAccount>>,
-    #[account(mut, token::mint = initial_long_token)]
     /// The source initial long token account.
+    #[account(mut, token::mint = initial_long_token)]
     pub initial_long_token_source: Option<Box<Account<'info, TokenAccount>>>,
     /// The source initial short token account.
     #[account(mut, token::mint = initial_short_token)]

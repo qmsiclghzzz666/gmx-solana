@@ -16,7 +16,14 @@ use crate::{
     CoreError,
 };
 
-/// The accounts definition for `execute_deposit` instruction.
+/// The accounts definition for [`execute_deposit`](crate::gmsol_store::execute_deposit) instruction.
+///
+/// Remaining accounts expected by this instruction:
+///
+///   - 0..M. `[]` M feed accounts, where M represents the total number of tokens in the
+///     swap params.
+///   - M..M+N. `[writable]` N market accounts, where N represents the total number of unique
+///     markets excluding the current market in the swap params.
 #[derive(Accounts)]
 pub struct ExecuteDeposit<'info> {
     /// Authority.

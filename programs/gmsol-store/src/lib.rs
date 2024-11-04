@@ -99,6 +99,14 @@
 //! - [`use_claimable_account`]: Prepare a claimable account to receive tokens during the order execution.
 //! - [`close_empty_claimable_account`]: Close a empty claimble account.
 //! - [`prepare_associated_token_account`]: Prepare an ATA.
+//!
+//! ## Exchange
+//! The instructions for providing functionalities as an exchange are as follows:
+//!
+//! #### Instructions for [`Deposit`](states::Deposit).
+//! - [`create_deposit`]: Create a deposit by the owner.
+//! - [`execute_deposit`](gmsol_store::execute_deposit): Execute a deposit by keepers.
+//! - [`close_deposit`]: Close a deposit, either by the owner or by keepers.
 
 /// Instructions.
 pub mod instructions;
@@ -1312,7 +1320,7 @@ pub mod gmsol_store {
     /// Prepare an associated token account.
     ///
     /// # Accounts
-    /// *[See the documentation for the accounts.](PrepareAssociatedTokenAccount).*
+    /// *[See the documentation for the accounts.](PrepareAssociatedTokenAccount)*
     ///
     /// # Errors
     /// - The [`payer`](PrepareAssociatedTokenAccount::payer) must be a signer.
@@ -1330,6 +1338,29 @@ pub mod gmsol_store {
     //                  Depsoit
     // ===========================================
 
+    /// Create a deposit by the owner.
+    ///
+    /// # Accounts
+    /// *[See the documentation for the accounts.](CreateDeposit)*
+    ///
+    /// # Arguments
+    /// - `nonce`: Nonce bytes used to derive the address for the deposit.
+    /// - `params`: Deposit Parameters.
+    ///
+    /// # Errors
+    /// - The [`owner`](CreateDeposit::owner) must be a signer and have enough balance for
+    ///   depositing the execution fee.
+    /// - The [`store`](CreateDeposit::store) must be initialized.
+    /// - The [`market`](CreateDeposit::market) must be initialized and owned by the store.
+    /// - The `market` must be enabled.
+    /// - The [`deposit`](CreateDeposit::deposit) must be uninitialized and a PDA derived
+    ///   from the `nonce` and other expected seeds.
+    /// - The [`market_token`](CreateDeposit::market_token) must be the market token of the
+    ///   given `market`.
+    /// - The required escrow accounts must have been initialized and owned by the `deposit`.
+    /// - The source accounts must correspond to the initial tokens and have enough balance.
+    /// - The remaining accounts must be enabled market accounts, and they must define valid
+    ///   swap paths.
     pub fn create_deposit<'info>(
         mut ctx: Context<'_, '_, 'info, 'info, CreateDeposit<'info>>,
         nonce: [u8; 32],
@@ -1338,6 +1369,25 @@ pub mod gmsol_store {
         internal::Create::create(&mut ctx, &nonce, &params)
     }
 
+    /// Close a deposit, either by the owner or by keepers.
+    ///
+    /// # Accounts
+    /// *[See the documentation for the accounts.](CloseDeposit)*
+    ///
+    /// # Arguments
+    /// - `reason`: The reason for the close.
+    ///
+    /// # Errors
+    /// - The [`executor`](CloseDeposit::executor) must be a signer and either the owner
+    ///   of the `deposit` or a ORDER_KEEPER in the store.
+    /// - The [`store`](CloseDeposit::store) must be initialized.
+    /// - The [`owner`](CloseDeposit::owner) must be the owner of the `deposit`.
+    /// - The tokens must be the those record in the `deposit`.
+    /// - The [`deposit`](CloseDeposit::deposit) must be initialized and owned by the store
+    ///   and the owner.
+    /// - The escrow accounts must be owned and record in the `deposit`.
+    /// - The addresses of the ATAs must be valid.
+    /// - The `deposit` must be cancelled or completed if the `executor` is not the owner.
     pub fn close_deposit<'info>(
         ctx: Context<'_, '_, 'info, 'info, CloseDeposit<'info>>,
         reason: String,
@@ -1345,6 +1395,34 @@ pub mod gmsol_store {
         internal::Close::close(&ctx, &reason)
     }
 
+    /// Execute a deposit by keepers.
+    ///
+    /// # Accounts
+    /// *[See the documentation for the accounts.](ExecuteDeposit)*
+    ///
+    /// # Arguments
+    /// - `execution_fee`: The execution fee claimed for use by the `authority`.
+    /// - `throw_on_execution_error`: Whether to throw error on the execution error.
+    ///
+    /// # Errors
+    /// - The [`authority`](ExecuteDeposit::authority) must be a signer and be a ORDER_KEEPER
+    ///   in the store.
+    /// - The [`store`](ExecuteDeposit::store) must be initialized.
+    /// - The [`token_map`](ExecuteDeposit::token_map) must be initialized and authorized by
+    ///   the store.
+    /// - The [`oracle`](ExecuteDeposit::oracle) must be initialized, cleared and owned by the
+    ///   store.
+    /// - The [`market`](ExecuteDeposit::market) must be initialized, enabled and owned by the
+    ///   store. It must be the one record in the `deposit`.
+    /// - The [`deposit`](ExecuteDeposit::deposit) must be initialized and owned by the store.
+    /// - The tokens must be those record in the `deposit`.
+    /// - The escrow accounts must be owned and record in the `deposit`.
+    /// - The vaults must be valid market vaults and correspond to the initial tokens.
+    /// - The remaining feed accounts must be valid and match the swap params.
+    /// - The remaining market accounts must be enabled and owned by the store. They must also
+    ///   match the swap params.
+    /// - The oracle prices must be complete and valid.
+    /// - Return an error if the execution fail and `throw_on_execution_error` is `true`.
     #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
     pub fn execute_deposit<'info>(
         ctx: Context<'_, '_, 'info, 'info, ExecuteDeposit<'info>>,
