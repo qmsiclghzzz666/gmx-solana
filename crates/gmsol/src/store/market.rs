@@ -16,15 +16,6 @@ use crate::utils::RpcBuilder;
 pub trait VaultOps<C> {
     /// Initialize a market vault for the given token.
     fn initialize_market_vault(&self, store: &Pubkey, token: &Pubkey) -> (RpcBuilder<C>, Pubkey);
-
-    /// Transfer tokens out from the given market vault.
-    fn market_vault_transfer_out(
-        &self,
-        store: &Pubkey,
-        token: &Pubkey,
-        to: &Pubkey,
-        amount: u64,
-    ) -> RpcBuilder<C>;
 }
 
 impl<C, S> VaultOps<C> for crate::Client<C>
@@ -45,29 +36,8 @@ where
                 system_program: system_program::ID,
                 token_program: anchor_spl::token::ID,
             })
-            .args(instruction::InitializeMarketVault {
-                market_token_mint: None,
-            });
+            .args(instruction::InitializeMarketVault {});
         (builder, vault)
-    }
-
-    fn market_vault_transfer_out(
-        &self,
-        store: &Pubkey,
-        token: &Pubkey,
-        to: &Pubkey,
-        amount: u64,
-    ) -> RpcBuilder<C> {
-        let authority = self.payer();
-        self.store_rpc()
-            .accounts(accounts::MarketVaultTransferOut {
-                authority,
-                store: *store,
-                market_vault: self.find_market_vault_address(store, token),
-                to: *to,
-                token_program: anchor_spl::token::ID,
-            })
-            .args(instruction::MarketVaultTransferOut { amount })
     }
 }
 

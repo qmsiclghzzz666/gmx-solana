@@ -26,7 +26,7 @@ use crate::{
     constants,
     states::{
         market::config::{EntryArgs, MarketConfigBuffer},
-        Market, MarketMeta, Seed, Store, TokenMapAccess, TokenMapHeader, TokenMapLoader,
+        Market, Seed, Store, TokenMapAccess, TokenMapHeader, TokenMapLoader,
     },
     utils::internal,
     CoreError,
@@ -61,7 +61,9 @@ pub struct InitializeMarket<'info> {
         bump,
     )]
     pub market_token_mint: Account<'info, Mint>,
+    /// Long token.
     pub long_token_mint: Account<'info, Mint>,
+    /// Short token.
     pub short_token_mint: Account<'info, Mint>,
     /// The market account.
     #[account(
@@ -79,7 +81,7 @@ pub struct InitializeMarket<'info> {
     /// The token map account.
     #[account(has_one = store)]
     pub token_map: AccountLoader<'info, TokenMapHeader>,
-    /// Long token vault must be exist.
+    /// Long token vault must exist.
     #[account(
         token::mint = long_token_mint,
         // We use the store as the authority of the token account.
@@ -93,7 +95,7 @@ pub struct InitializeMarket<'info> {
         bump,
     )]
     pub long_token_vault: Account<'info, TokenAccount>,
-    /// Short token vault must be exist.
+    /// Short token vault must exist.
     #[account(
         token::mint = short_token_mint,
         // We use the store as the authority of the token account.
@@ -170,33 +172,30 @@ impl<'info> internal::Authentication<'info> for InitializeMarket<'info> {
     }
 }
 
-/// The accounts definition for [`remove_market`](crate::gmsol_store::remove_market).
+/// The accounts definition for [`toggle_market`](crate::gmsol_store::toggle_market).
 ///
-/// *[See also the documentation for the instruction.](crate::gmsol_store::remove_market)*
+/// *[See also the documentation for the instruction.](crate::gmsol_store::toggle_market)*
 #[derive(Accounts)]
-pub struct RemoveMarket<'info> {
-    #[account(mut)]
-    authority: Signer<'info>,
-    store: AccountLoader<'info, Store>,
-    #[account(
-        mut,
-        has_one = store,
-        seeds = [Market::SEED, store.key().as_ref(), market.load()?.meta().market_token_mint.as_ref()],
-        bump = market.load()?.bump,
-        close = authority,
-    )]
-    market: AccountLoader<'info, Market>,
+pub struct ToggleMarket<'info> {
+    /// The caller.
+    pub authority: Signer<'info>,
+    /// Store.
+    pub store: AccountLoader<'info, Store>,
+    /// Market.
+    #[account(mut, has_one = store)]
+    pub market: AccountLoader<'info, Market>,
 }
 
-/// Remove market.
+/// Toggle Market.
 ///
 /// ## CHECK
-/// - Only MARKET_KEEPER can remove market.
-pub(crate) fn unchecked_remove_market(_ctx: Context<RemoveMarket>) -> Result<()> {
+/// - Only MARKET_KEEPER can toggle market.
+pub(crate) fn unchecked_toggle_market(ctx: Context<ToggleMarket>, enable: bool) -> Result<()> {
+    ctx.accounts.market.load_mut()?.set_enabled(enable);
     Ok(())
 }
 
-impl<'info> internal::Authentication<'info> for RemoveMarket<'info> {
+impl<'info> internal::Authentication<'info> for ToggleMarket<'info> {
     fn authority(&self) -> &Signer<'info> {
         &self.authority
     }
@@ -206,34 +205,22 @@ impl<'info> internal::Authentication<'info> for RemoveMarket<'info> {
     }
 }
 
-/// The accounts definition for [`get_validated_market_meta`](crate::gmsol_store::get_validated_market_meta).
-///
-/// *[See also the documentation for the instruction.](crate::gmsol_store::get_validated_market_meta)*
-#[derive(Accounts)]
-pub struct GetValidatedMarketMeta<'info> {
-    pub(crate) store: AccountLoader<'info, Store>,
-    #[account(has_one = store)]
-    pub(crate) market: AccountLoader<'info, Market>,
-}
-
-/// Get the meta of the market after validation.
-pub(crate) fn get_validated_market_meta(
-    ctx: Context<GetValidatedMarketMeta>,
-) -> Result<MarketMeta> {
-    let market = ctx.accounts.market.load()?;
-    market.validate(&ctx.accounts.store.key())?;
-    Ok(*market.meta())
-}
-
+/// The accounts definition for [`market_transfer_in`](crate::gmsol_store::market_transfer_in).
 #[derive(Accounts)]
 pub struct MarketTransferIn<'info> {
+    /// Authority.
     pub authority: Signer<'info>,
+    /// Store.
     pub store: AccountLoader<'info, Store>,
+    /// The authority of the source account.
     pub from_authority: Signer<'info>,
+    /// Market.
     #[account(mut, has_one = store)]
     pub market: AccountLoader<'info, Market>,
+    /// The source account.
     #[account(mut, token::mint = vault.mint, constraint = from.key() != vault.key())]
     pub from: Account<'info, TokenAccount>,
+    /// The market vault.
     #[account(
         mut,
         token::authority = store,
@@ -246,6 +233,7 @@ pub struct MarketTransferIn<'info> {
         bump,
     )]
     pub vault: Account<'info, TokenAccount>,
+    /// Token Program.
     pub token_program: Program<'info, Token>,
 }
 
@@ -259,10 +247,15 @@ pub(crate) fn unchecked_market_transfer_in(
 ) -> Result<()> {
     use anchor_spl::token;
 
-    ctx.accounts
-        .market
-        .load()?
-        .validate(&ctx.accounts.store.key())?;
+    {
+        let is_collateral_token = ctx
+            .accounts
+            .market
+            .load()?
+            .validated_meta(&ctx.accounts.store.key())?
+            .is_collateral_token(&ctx.accounts.from.mint);
+        require!(is_collateral_token, CoreError::InvalidArgument);
+    }
 
     if amount != 0 {
         token::transfer(
@@ -296,21 +289,105 @@ impl<'info> internal::Authentication<'info> for MarketTransferIn<'info> {
     }
 }
 
+/// The accounts definition for [`update_market_config`](crate::gmsol_store::update_market_config).
+///
+/// *[See also the documentation for the instruction.](crate::gmsol_store::update_market_config)*
+#[derive(Accounts)]
+pub struct UpdateMarketConfig<'info> {
+    /// The caller.
+    pub authority: Signer<'info>,
+    /// Store.
+    pub store: AccountLoader<'info, Store>,
+    /// Market.
+    #[account(mut, has_one = store)]
+    pub market: AccountLoader<'info, Market>,
+}
+
+/// Update market config by key.
+///
+/// ## CHECK
+/// - Only MARKET_KEEPER can udpate the config of market.
+pub(crate) fn unchecked_update_market_config(
+    ctx: Context<UpdateMarketConfig>,
+    key: &str,
+    value: Factor,
+) -> Result<()> {
+    *ctx.accounts.market.load_mut()?.get_config_mut(key)? = value;
+    msg!(
+        "{}: set {} = {}",
+        ctx.accounts.market.load()?.meta.market_token_mint,
+        key,
+        value
+    );
+    Ok(())
+}
+
+impl<'info> internal::Authentication<'info> for UpdateMarketConfig<'info> {
+    fn authority(&self) -> &Signer<'info> {
+        &self.authority
+    }
+
+    fn store(&self) -> &AccountLoader<'info, Store> {
+        &self.store
+    }
+}
+
+/// The accounts definition for [`update_market_config_with_buffer`](crate::gmsol_store::update_market_config_with_buffer).
+///
+/// *[See also the documentation for the instruction.](crate::gmsol_store::update_market_config_with_buffer)*
+#[derive(Accounts)]
+pub struct UpdateMarketConfigWithBuffer<'info> {
+    /// The caller.
+    pub authority: Signer<'info>,
+    /// Store.
+    pub store: AccountLoader<'info, Store>,
+    /// Market.
+    #[account(mut, has_one = store)]
+    pub market: AccountLoader<'info, Market>,
+    /// The buffer to use.
+    #[account(mut, has_one = store, has_one = authority @ CoreError::PermissionDenied)]
+    pub buffer: Account<'info, MarketConfigBuffer>,
+}
+
+/// Update market config with buffer.
+///
+/// ## CHECK
+/// - Only MARKET_KEEPER can udpate the config of market.
+pub(crate) fn unchecked_update_market_config_with_buffer(
+    ctx: Context<UpdateMarketConfigWithBuffer>,
+) -> Result<()> {
+    let buffer = &ctx.accounts.buffer;
+    require_gt!(
+        buffer.expiry,
+        Clock::get()?.unix_timestamp,
+        CoreError::InvalidArgument
+    );
+    ctx.accounts
+        .market
+        .load_mut()?
+        .update_config_with_buffer(buffer)?;
+    msg!(
+        "{} updated with buffer {}",
+        ctx.accounts.market.load()?.description()?,
+        buffer.key()
+    );
+    Ok(())
+}
+
+impl<'info> internal::Authentication<'info> for UpdateMarketConfigWithBuffer<'info> {
+    fn authority(&self) -> &Signer<'info> {
+        &self.authority
+    }
+
+    fn store(&self) -> &AccountLoader<'info, Store> {
+        &self.store
+    }
+}
+
 /// The accounts definition for read-only instructions for market.
 #[derive(Accounts)]
 pub struct ReadMarket<'info> {
     market: AccountLoader<'info, Market>,
-}
-
-/// Get market config by key.
-pub(crate) fn get_market_config(ctx: Context<ReadMarket>, key: &str) -> Result<Factor> {
-    ctx.accounts.market.load()?.get_config(key).copied()
-}
-
-/// Get the meta of the market.
-pub(crate) fn get_market_meta(ctx: Context<ReadMarket>) -> Result<MarketMeta> {
-    let market = ctx.accounts.market.load()?;
-    Ok(*market.meta())
 }
 
 /// Get market status.
@@ -351,105 +428,21 @@ pub(crate) fn get_market_token_price(
     Ok(price)
 }
 
-/// The accounts definition for [`update_market_config`](crate::gmsol_store::update_market_config).
-///
-/// *[See also the documentation for the instruction.](crate::gmsol_store::update_market_config)*
-#[derive(Accounts)]
-pub struct UpdateMarketConfig<'info> {
-    authority: Signer<'info>,
-    store: AccountLoader<'info, Store>,
-    #[account(mut, has_one = store)]
-    market: AccountLoader<'info, Market>,
-}
-
-/// Update market config by key.
-///
-/// ## CHECK
-/// - Only MARKET_KEEPER can udpate the config of market.
-pub(crate) fn unchecked_update_market_config(
-    ctx: Context<UpdateMarketConfig>,
-    key: &str,
-    value: Factor,
-) -> Result<()> {
-    *ctx.accounts.market.load_mut()?.get_config_mut(key)? = value;
-    msg!(
-        "{}: set {} = {}",
-        ctx.accounts.market.load()?.meta.market_token_mint,
-        key,
-        value
-    );
-    Ok(())
-}
-
-impl<'info> internal::Authentication<'info> for UpdateMarketConfig<'info> {
-    fn authority(&self) -> &Signer<'info> {
-        &self.authority
-    }
-
-    fn store(&self) -> &AccountLoader<'info, Store> {
-        &self.store
-    }
-}
-
-/// The accounts definition for [`update_market_config_with_buffer`](crate::gmsol_store::update_market_config_with_buffer).
-///
-/// *[See also the documentation for the instruction.](crate::gmsol_store::update_market_config_with_buffer)*
-#[derive(Accounts)]
-pub struct UpdateMarketConfigWithBuffer<'info> {
-    authority: Signer<'info>,
-    store: AccountLoader<'info, Store>,
-    #[account(mut, has_one = store)]
-    market: AccountLoader<'info, Market>,
-    #[account(mut, has_one = store, has_one = authority @ CoreError::PermissionDenied)]
-    buffer: Account<'info, MarketConfigBuffer>,
-}
-
-/// Update market config with buffer.
-///
-/// ## CHECK
-/// - Only MARKET_KEEPER can udpate the config of market.
-pub(crate) fn unchecked_update_market_config_with_buffer(
-    ctx: Context<UpdateMarketConfigWithBuffer>,
-) -> Result<()> {
-    let buffer = &ctx.accounts.buffer;
-    require_gt!(
-        buffer.expiry,
-        Clock::get()?.unix_timestamp,
-        CoreError::InvalidArgument
-    );
-    ctx.accounts
-        .market
-        .load_mut()?
-        .update_config_with_buffer(buffer)?;
-    msg!(
-        "{} updated with buffer {}",
-        ctx.accounts.market.load()?.description()?,
-        buffer.key()
-    );
-    Ok(())
-}
-
-impl<'info> internal::Authentication<'info> for UpdateMarketConfigWithBuffer<'info> {
-    fn authority(&self) -> &Signer<'info> {
-        &self.authority
-    }
-
-    fn store(&self) -> &AccountLoader<'info, Store> {
-        &self.store
-    }
-}
-
 /// The accounts definition for [`initialize_market_config_buffer`](crate::gmsol_store::initialize_market_config_buffer).
 ///
 /// *[See also the documentation for the instruction.](crate::gmsol_store::initialize_market_config_buffer)*
 #[derive(Accounts)]
 pub struct InitializeMarketConfigBuffer<'info> {
+    /// The caller.
     #[account(mut)]
-    authority: Signer<'info>,
-    store: AccountLoader<'info, Store>,
+    pub authority: Signer<'info>,
+    /// Store.
+    pub store: AccountLoader<'info, Store>,
+    /// Buffer account to create.
     #[account(init, payer = authority, space = 8 + MarketConfigBuffer::init_space(0))]
-    buffer: Account<'info, MarketConfigBuffer>,
-    system_program: Program<'info, System>,
+    pub buffer: Account<'info, MarketConfigBuffer>,
+    /// System Program.
+    pub system_program: Program<'info, System>,
 }
 
 /// Initialize a market config buffer account.
@@ -536,45 +529,18 @@ pub(crate) fn push_to_market_config_buffer(
     Ok(())
 }
 
-/// The accounts definition for [`toggle_market`](crate::gmsol_store::toggle_market).
-///
-/// *[See also the documentation for the instruction.](crate::gmsol_store::toggle_market)*
-#[derive(Accounts)]
-pub struct ToggleMarket<'info> {
-    authority: Signer<'info>,
-    store: AccountLoader<'info, Store>,
-    #[account(mut, has_one = store)]
-    market: AccountLoader<'info, Market>,
-}
-
-/// Toggle Market.
-///
-/// ## CHECK
-/// - Only MARKET_KEEPER can toggle market.
-pub(crate) fn unchecked_toggle_market(ctx: Context<ToggleMarket>, enable: bool) -> Result<()> {
-    ctx.accounts.market.load_mut()?.set_enabled(enable);
-    Ok(())
-}
-
-impl<'info> internal::Authentication<'info> for ToggleMarket<'info> {
-    fn authority(&self) -> &Signer<'info> {
-        &self.authority
-    }
-
-    fn store(&self) -> &AccountLoader<'info, Store> {
-        &self.store
-    }
-}
-
 /// The accounts definition for [`toggle_gt_minting`](crate::gmsol_store::toggle_gt_minting).
 ///
 /// *[See also the documentation for the instruction.](crate::gmsol_store::toggle_gt_minting)*
 #[derive(Accounts)]
 pub struct ToggleGTMinting<'info> {
-    authority: Signer<'info>,
-    store: AccountLoader<'info, Store>,
+    /// The caller.
+    pub authority: Signer<'info>,
+    /// Store.
+    pub store: AccountLoader<'info, Store>,
+    /// Market.
     #[account(mut, has_one = store)]
-    market: AccountLoader<'info, Market>,
+    pub market: AccountLoader<'info, Market>,
 }
 
 /// Toggle GT Minting.

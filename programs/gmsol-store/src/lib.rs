@@ -77,17 +77,14 @@
 //!
 //! #### Instructions for [`Market`](states::Market) management
 //! - [`initialize_market`]: Initialize a [`Market`](states::Market) account.
-//! - [`remove_market`]: Close the given [`Market`](states::Market) account.
 //! - [`toggle_market`]: Enable or diable the given market.
 //! - [`market_transfer_in`]: Transfer tokens into the market and record in its balance.
 //! - [`update_market_config`]: Update an item in the market config.
 //! - [`update_market_config_with_buffer`]: Update the market config with the given
 //!   [`MarketConfigBuffer`](states::market::config::MarketConfigBuffer) account.
-//! - [`get_validated_market_meta`](gmsol_store::get_validated_market_meta): Validate the market and
-//!   return its [meta](states::MarketMeta).
-//! - [`get_market_config`](gmsol_store::get_market_config): Read an item from the market config by the key.
-//! - [`get_market_meta`](gmsol_store::get_market_meta): Get the [meta](states::MarketMeta) of the market
-//!   without validation.
+//! - [`get_market_status`]: Calculate the market status with the given prices.
+//! - [`get_market_token_price`]: Calculate the market token price the given prices.
+//! - [`toggle_gt_minting`]: Enable or diable GT minting for the given market.
 //!
 //! #### Instructions for [`MarketConfigBuffer`](states::market::config::MarketConfigBuffer) accounts
 //! - [`initialize_market_config_buffer`](gmsol_store::initialize_market_config_buffer): Initialize a market config buffer account.
@@ -97,15 +94,11 @@
 //! - [`push_to_market_config_buffer`](gmsol_store::push_to_market_config_buffer): Push config items to the given market config
 //!   buffer account.
 //!
-//! #### Instructions for market tokens
-//! - [`mint_market_token_to`]: Mint the given amount of market tokens to the destination
-//!   account.
-//! - [`burn_market_token_from`]: Burn the given amount of market tokens from the given account.
-//!
-//! #### Instructions for market vaults
+//! #### Instructions for token accounts
 //! - [`initialize_market_vault`]: Initialize the market vault for the given token.
-//! - [`market_vault_transfer_out`]: Transfer the given amount of tokens out to the destination
-//!   account.
+//! - [`use_claimable_account`]: Prepare a claimable account to receive tokens during the order execution.
+//! - [`close_empty_claimable_account`]: Close a empty claimble account.
+//! - [`prepare_associated_token_account`]: Prepare an ATA.
 
 /// Instructions.
 pub mod instructions;
@@ -135,7 +128,7 @@ use self::{
         withdrawal::CreateWithdrawalParams,
     },
     states::{
-        market::{config::EntryArgs, status::MarketStatus, MarketMeta},
+        market::{config::EntryArgs, status::MarketStatus},
         order::UpdateOrderParams,
         token_config::TokenConfigBuilder,
         FactorKey, PriceProviderKind,
@@ -970,7 +963,20 @@ pub mod gmsol_store {
     /// - `enable`: Whether to enable the market after initialization.
     ///
     /// # Errors
-    /// - *TODO*
+    /// - The [`authority`](InitializeMarket::authority) must be a signer and be a MARKET_KEEPER
+    ///   in the store.
+    /// - The [`store`](InitializeMarket::store) must be initialized.
+    /// - The [`market_token_mint`](InitializeMarket::market_token_mint) must be uninitialized
+    ///   and a PDA derived from the expected seeds.
+    /// - The [`long_token_mint`](InitializeMarket::long_token_mint) and
+    ///   [`short_token_mint`](InitializeMarket::short_token_mint) must be valid Mint accounts.
+    /// - The [`market`](InitializeMarket::market) must be uninitialized and a PDA derived from
+    ///   the expected seeds.
+    /// - The [`token_map`](InitializeMarket::token_map) must be initialized, owned and authorized
+    ///   by the `store`.
+    /// - The [`long_token_vault`](InitializeMarket::long_token_vault) and
+    ///   the [`short_token_vault`](InitializeMarket::short_token_vault) must be initialized
+    ///   and valid market vault accounts of the store for long token and short token correspondingly.
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn initialize_market(
         ctx: Context<InitializeMarket>,
@@ -981,27 +987,22 @@ pub mod gmsol_store {
         instructions::unchecked_initialize_market(ctx, index_token_mint, &name, enable)
     }
 
-    /// Close a [`Market`](states::Market) account.
+    /// Enable or diable the given market.
     ///
     /// # Accounts
-    /// [*See the documentation for the accounts.*](RemoveMarket)
+    /// [*See the documentation for the accounts.*](ToggleMarket)
+    ///
+    /// # Arguments
+    /// - `enable`: Whether to enable or disable the market.
     ///
     /// # Errors
-    /// - *TODO*
+    /// - The [`authority`](ToggleMarket::authority) must be a signer and be a MARKET_KEEPER
+    ///   in the store.
+    /// - The [`store`](ToggleMarket::store) must be initialized.
+    /// - The [`market`](ToggleMarket::market) must be initialized and owned by the store.
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
-    pub fn remove_market(ctx: Context<RemoveMarket>) -> Result<()> {
-        instructions::unchecked_remove_market(ctx)
-    }
-
-    /// Validate the market and returns its [meta](states::MarketMeta).
-    ///
-    /// # Accounts
-    /// [*See the documentation for the accounts.*](GetValidatedMarketMeta)
-    ///
-    /// # Errors
-    /// - *TODO*
-    pub fn get_validated_market_meta(ctx: Context<GetValidatedMarketMeta>) -> Result<MarketMeta> {
-        instructions::get_validated_market_meta(ctx)
+    pub fn toggle_market(ctx: Context<ToggleMarket>, enable: bool) -> Result<()> {
+        instructions::unchecked_toggle_market(ctx, enable)
     }
 
     /// Transfer tokens into the market and record in its balance.
@@ -1013,73 +1014,21 @@ pub mod gmsol_store {
     /// - `amount`: The amount to transfer in.
     ///
     /// # Errors
-    /// - *TODO*
+    /// - The [`authority`](MarketTransferIn::authority) must be a signer and be a MARKET_KEEPER
+    ///   in the store.
+    /// - The [`store`](MarketTransferIn::store) must be initialized.
+    /// - The [`from_authority`](MarketTransferIn::from_authority) must be a signer and the authority
+    ///   of the `from` token account.
+    /// - The [`market`](MarketTransferIn::market) account must be initialized and owned by the store.
+    /// - The [`from`](MarketTransferIn::from) account must be a initialized token account and cannot
+    ///   be the same as the `vault`.
+    /// - The [`vault`](MarketTransferIn::vault) account must be a initialized valid market vault account
+    ///   of the store.
+    /// - The `market` must be enabled and the transfer in token must be one of the collateral tokens.
+    /// - The `from` account must have enough amount of tokens.
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn market_transfer_in(ctx: Context<MarketTransferIn>, amount: u64) -> Result<()> {
         instructions::unchecked_market_transfer_in(ctx, amount)
-    }
-
-    /// Get the [meta](states::MarketMeta) of the market without validation.
-    ///
-    /// # Errors
-    /// [*See the documentation for the accounts.*](ReadMarket)
-    ///
-    pub fn get_market_meta(ctx: Context<ReadMarket>) -> Result<MarketMeta> {
-        instructions::get_market_meta(ctx)
-    }
-
-    /// Read an item from the market config by the key.
-    ///
-    /// # Accounts
-    /// [*See the documentation for the accounts.*](ReadMarket)
-    ///
-    /// # Arguments
-    /// - `key`: The key of the config item.
-    pub fn get_market_config(ctx: Context<ReadMarket>, key: String) -> Result<u128> {
-        instructions::get_market_config(ctx, &key)
-    }
-
-    /// Read current market status.
-    ///
-    /// # Accounts
-    /// [*See the documentation for the accounts.*](ReadMarket)
-    ///
-    /// # Arguments
-    /// - `prices`: The unit prices of tokens.
-    /// - `maximize_pnl`: Whether to maximize the PnL.
-    /// - `maximize_pool_value`: Whether to maximize the pool value.
-    pub fn get_market_status(
-        ctx: Context<ReadMarket>,
-        prices: Prices<u128>,
-        maximize_pnl: bool,
-        maximize_pool_value: bool,
-    ) -> Result<MarketStatus> {
-        instructions::get_market_status(ctx, &prices, maximize_pnl, maximize_pool_value)
-    }
-
-    /// Get current market token price.
-    ///
-    /// # Accounts
-    /// [*See the documentation for the accounts.*](ReadMarket)
-    ///
-    /// # Arguments
-    /// - `prices`: The unit prices of tokens.
-    /// - `maximize_pnl`: Whether to maximize the PnL.
-    /// - `maximize_pool_value`: Whether to maximize the pool value.
-    pub fn get_market_token_price(
-        ctx: Context<ReadMarketWithToken>,
-        prices: Prices<u128>,
-        pnl_factor: String,
-        maximize: bool,
-    ) -> Result<u128> {
-        instructions::get_market_token_price(
-            ctx,
-            &prices,
-            pnl_factor
-                .parse()
-                .map_err(|_| error!(CoreError::InvalidArgument))?,
-            maximize,
-        )
     }
 
     /// Update an item in the market config.
@@ -1092,7 +1041,11 @@ pub mod gmsol_store {
     /// - `value`: The value to update the config item to.
     ///
     /// # Errors
-    /// - *TODO*
+    /// - The [`authority`](UpdateMarketConfig::authority) must be a signer and be a MARKET_KEEPER
+    ///   in the store.
+    /// - The [`store`](UpdateMarketConfig::store) must be initialized.
+    /// - The [`market`](UpdateMarketConfig::market) must be initialized and owned by the store.
+    /// - The `key` must be defined in [`MarketConfigKey`](states::market::config::MarketConfigKey).
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn update_market_config(
         ctx: Context<UpdateMarketConfig>,
@@ -1109,12 +1062,70 @@ pub mod gmsol_store {
     /// [*See the documentation for the accounts.*](UpdateMarketConfigWithBuffer)
     ///
     /// # Errors
-    /// - *TODO*
+    /// - The [`authority`](UpdateMarketConfigWithBuffer::authority) must be a signer and be a MARKET_KEEPER
+    ///   in the store.
+    /// - The [`store`](UpdateMarketConfigWithBuffer::store) must be initialized.
+    /// - The [`market`](UpdateMarketConfigWithBuffer::market) must be initialized and owned by the store.
+    /// - The [`buffer`](UpdateMarketConfigWithBuffer::buffer) must be initialized and owned by the store
+    ///   and the authority.
+    /// - The `buffer` must not have been expired.
+    /// - The keys in the `buffer` must be defined in [`MarketConfigKey`](states::market::config::MarketConfigKey).
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn update_market_config_with_buffer(
         ctx: Context<UpdateMarketConfigWithBuffer>,
     ) -> Result<()> {
         instructions::unchecked_update_market_config_with_buffer(ctx)
+    }
+
+    /// Read current market status.
+    ///
+    /// # Accounts
+    /// [*See the documentation for the accounts.*](ReadMarket)
+    ///
+    /// # Arguments
+    /// - `prices`: The unit prices of tokens.
+    /// - `maximize_pnl`: Whether to maximize the PnL.
+    /// - `maximize_pool_value`: Whether to maximize the pool value.
+    ///
+    /// # Errors
+    /// - The [`market`](ReadMarket::market) must be initialized.
+    /// - Other calculation errors.
+    pub fn get_market_status(
+        ctx: Context<ReadMarket>,
+        prices: Prices<u128>,
+        maximize_pnl: bool,
+        maximize_pool_value: bool,
+    ) -> Result<MarketStatus> {
+        instructions::get_market_status(ctx, &prices, maximize_pnl, maximize_pool_value)
+    }
+
+    /// Get current market token price.
+    ///
+    /// # Accounts
+    /// [*See the documentation for the accounts.*](ReadMarketWithToken)
+    ///
+    /// # Arguments
+    /// - `prices`: The unit prices of tokens.
+    /// - `maximize_pnl`: Whether to maximize the PnL.
+    /// - `maximize_pool_value`: Whether to maximize the pool value.
+    ///
+    /// # Errors
+    /// - The [`market`](ReadMarketWithToken::market) must be initialized.
+    /// - Other calculation errors.
+    pub fn get_market_token_price(
+        ctx: Context<ReadMarketWithToken>,
+        prices: Prices<u128>,
+        pnl_factor: String,
+        maximize: bool,
+    ) -> Result<u128> {
+        instructions::get_market_token_price(
+            ctx,
+            &prices,
+            pnl_factor
+                .parse()
+                .map_err(|_| error!(CoreError::InvalidArgument))?,
+            maximize,
+        )
     }
 
     /// Initialize a market config buffer account.
@@ -1126,7 +1137,9 @@ pub mod gmsol_store {
     /// - `expire_after_secs`: The expiration time of the buffer in seconds.
     ///
     /// # Errors
-    /// - *TODO*
+    /// - The [`authority`](InitializeMarketConfigBuffer::authority) must be a signer.
+    /// - The [`store`](InitializeMarketConfigBuffer::store) must be initialized.
+    /// - The [`buffer`](InitializeMarketConfigBuffer::buffer) must be uninitialized.
     pub fn initialize_market_config_buffer(
         ctx: Context<InitializeMarketConfigBuffer>,
         expire_after_secs: u32,
@@ -1144,7 +1157,9 @@ pub mod gmsol_store {
     /// - `new_authority`: The new authority.
     ///
     /// # Errors
-    /// - *TODO*
+    /// - The [`authority`](SetMarketConfigBufferAuthority::authority) must be a signer
+    ///   and the owner of the `buffer`.
+    /// - The [`buffer`](SetMarketConfigBufferAuthority::buffer) must be initialized.
     pub fn set_market_config_buffer_authority(
         ctx: Context<SetMarketConfigBufferAuthority>,
         new_authority: Pubkey,
@@ -1158,7 +1173,9 @@ pub mod gmsol_store {
     /// [*See the documentation for the accounts.*](CloseMarketConfigBuffer)
     ///
     /// # Errors
-    /// - *TODO*
+    /// - The [`authority`](CloseMarketConfigBuffer::authority) must be a signer
+    ///   and the owner of the `buffer`.
+    /// - The [`buffer`](CloseMarketConfigBuffer::buffer) must be initialized.
     pub fn close_market_config_buffer(ctx: Context<CloseMarketConfigBuffer>) -> Result<()> {
         instructions::close_market_config_buffer(ctx)
     }
@@ -1172,27 +1189,14 @@ pub mod gmsol_store {
     /// - `new_configs`: The list of new config items.
     ///
     /// # Errors
-    /// - *TODO*
+    /// - The [`authority`](PushToMarketConfigBuffer::authority) must be a signer
+    ///   and the owner of the `buffer`.
+    /// - The [`buffer`](PushToMarketConfigBuffer::buffer) must be initialized.
     pub fn push_to_market_config_buffer(
         ctx: Context<PushToMarketConfigBuffer>,
         new_configs: Vec<EntryArgs>,
     ) -> Result<()> {
         instructions::push_to_market_config_buffer(ctx, new_configs)
-    }
-
-    /// Enable or diable the given market.
-    ///
-    /// # Accounts
-    /// [*See the documentation for the accounts.*](ToggleMarket)
-    ///
-    /// # Arguments
-    /// - `enable`: Whether to enable or disable the market.
-    ///
-    /// # Errors
-    /// - *TODO*
-    #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
-    pub fn toggle_market(ctx: Context<ToggleMarket>, enable: bool) -> Result<()> {
-        instructions::unchecked_toggle_market(ctx, enable)
     }
 
     /// Enable or diable GT minting for the given market.
@@ -1204,7 +1208,10 @@ pub mod gmsol_store {
     /// - `enable`: Whether to enable or disable GT minting for the given market.
     ///
     /// # Errors
-    /// - *TODO*
+    /// - The [`authority`](ToggleGTMinting::authority) must be a signer and be a MARKET_KEEPER
+    ///   in the store.
+    /// - The [`store`](ToggleGTMinting::store) must be initialized.
+    /// - The [`market`](ToggleGTMinting::market) must be initialized and owned by the store.
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn toggle_gt_minting(ctx: Context<ToggleGTMinting>, enable: bool) -> Result<()> {
         instructions::unchecked_toggle_gt_minting(ctx, enable)
@@ -1221,11 +1228,11 @@ pub mod gmsol_store {
     ///
     /// # Errors
     /// - The [`authority`](ClaimFeesFromMarket) must be a signer and be the receiver
-    /// in the given store.
+    ///   in the given store.
     /// - The [`store`](ClaimFeesFromMarket) must be an initialized [`Store`](crate::states::Store)
-    /// account owned by this store program.
+    ///   account owned by this store program.
     /// - The [`market`](ClaimFeesFromMarket) must be an initialized [`Market`](crate::states::Market)
-    /// account owned by this store program, whose the store must be the given one.
+    ///   account owned by this store program, whose the store must be the given one.
     /// - The `token` must be one of the collateral token.
     /// - Token accounts must be matched.
     /// - The market balance validation must pass after the claim.
@@ -1234,72 +1241,41 @@ pub mod gmsol_store {
         Ok(claimed)
     }
 
-    /// Mint the given amount of market tokens to the destination account.
-    ///
-    /// # Accounts
-    /// [*See the documentation for the accounts.*](MintMarketTokenTo)
-    ///
-    /// # Arguments
-    /// - `amount`: The amount to mint.
-    ///
-    /// # Errors
-    /// - *TODO*
-    #[access_control(internal::Authenticate::only_controller(&ctx))]
-    pub fn mint_market_token_to(ctx: Context<MintMarketTokenTo>, amount: u64) -> Result<()> {
-        instructions::unchecked_mint_market_token_to(ctx, amount)
-    }
-
-    /// Burn the given amount of market tokens from the given account.
-    ///
-    /// # Accounts
-    /// [*See the documentation for the accounts.*](BurnMarketTokenFrom)
-    ///
-    /// # Arguments
-    /// - `amount`: The amount to burn.
-    ///
-    /// # Errors
-    /// - *TODO*
-    #[access_control(internal::Authenticate::only_controller(&ctx))]
-    pub fn burn_market_token_from(ctx: Context<BurnMarketTokenFrom>, amount: u64) -> Result<()> {
-        instructions::unchecked_burn_market_token_from(ctx, amount)
-    }
-
     /// Initialize the market vault for the given token.
     ///
     /// # Accounts
     /// [*See the documentation for the accounts.*](InitializeMarketVault)
     ///
-    /// # Arguments
-    /// - `market_token_mint`: (*deprecated*) The market that owns this vault.
-    ///
     /// # Errors
-    /// - *TODO*
+    /// - The [`authority`](InitializeMarketVault::authority) must be a signer and be a MARKET_KEEPER
+    ///   in the store.
+    /// - The [`store`](InitializeMarketVault::store) must be initialized.
+    /// - The [`vault`](InitializeMarketVault::vault) must be uninitialized and a PDA derived
+    ///   from the expected seeds.
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
-    pub fn initialize_market_vault(
-        ctx: Context<InitializeMarketVault>,
-        market_token_mint: Option<Pubkey>,
-    ) -> Result<()> {
-        instructions::unchecked_initialize_market_vault(ctx, market_token_mint)
+    pub fn initialize_market_vault(ctx: Context<InitializeMarketVault>) -> Result<()> {
+        instructions::unchecked_initialize_market_vault(ctx)
     }
 
-    /// Transfer the given amount of tokens out to the destination account.
+    /// Prepare a claimable account to receive tokens during the order execution.
+    ///
+    /// This instruction can also be used to unlock the fund for the owner to claim.
     ///
     /// # Accounts
-    /// [*See the documentation for the accounts.*](MarketVaultTransferOut)
+    /// [*See the documentation for the accounts.*](UseClaimableAccount)
     ///
     /// # Arguments
-    /// - `amount`: The amount to transfer.
+    /// - `timestamp`: The timestamp of the claimable account created with.
+    /// - `amount`: The amount to approve for delegation.
     ///
     /// # Errors
-    /// - *TODO*
-    #[access_control(internal::Authenticate::only_controller(&ctx))]
-    pub fn market_vault_transfer_out(
-        ctx: Context<MarketVaultTransferOut>,
-        amount: u64,
-    ) -> Result<()> {
-        instructions::unchecked_market_vault_transfer_out(ctx, amount)
-    }
-
+    /// - The [`authority`](UseClaimableAccount::authority) must be a signer and be a ORDER_KEEPER
+    ///   in the store.
+    /// - The [`store`](UseClaimableAccount::store) must be initialized.
+    /// - The [`account`](UseClaimableAccount::account) must be a PDA derived from
+    ///   the claimable time key and other expected seeds.
+    /// - The [`account`](UseClaimableAccount::account) must be owned by the store if it has
+    ///   been initialized.
     #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
     pub fn use_claimable_account(
         ctx: Context<UseClaimableAccount>,
@@ -1309,6 +1285,22 @@ pub mod gmsol_store {
         instructions::unchecked_use_claimable_account(ctx, timestamp, amount)
     }
 
+    /// Close empty claiamble account.
+    ///
+    /// # Accounts
+    /// [*See the documentation for the accounts.*](CloseEmptyClaimableAccount)
+    ///
+    /// # Arguments
+    /// - `timestamp`: The timestamp of the claimable account created with.
+    ///
+    /// # Errors
+    /// - The [`authority`](CloseEmptyClaimableAccount::authority) must be a signer and be a ORDER_KEEPER
+    ///   in the store.
+    /// - The [`store`](CloseEmptyClaimableAccount::store) must be initialized.
+    /// - The [`account`](UseClaimableAccount::account) must be a PDA derived from
+    ///   the claimable time key and other expected seeds.
+    /// - The [`account`](UseClaimableAccount::account) must be initialzied and owned by the store.
+    /// - The balance of the [`account`](UseClaimableAccount::account) must be zero.
     #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
     pub fn close_empty_claimable_account(
         ctx: Context<CloseEmptyClaimableAccount>,
@@ -1334,7 +1326,10 @@ pub mod gmsol_store {
         instructions::prepare_associated_token_account(ctx)
     }
 
-    // Exchange.
+    // ===========================================
+    //                  Depsoit
+    // ===========================================
+
     pub fn create_deposit<'info>(
         mut ctx: Context<'_, '_, 'info, 'info, CreateDeposit<'info>>,
         nonce: [u8; 32],
@@ -1358,6 +1353,10 @@ pub mod gmsol_store {
     ) -> Result<()> {
         instructions::unchecked_execute_deposit(ctx, execution_fee, throw_on_execution_error)
     }
+
+    // ===========================================
+    //                 Withdrawal
+    // ===========================================
 
     pub fn create_withdrawal<'info>(
         mut ctx: Context<'_, '_, 'info, 'info, CreateWithdrawal<'info>>,
@@ -1383,6 +1382,9 @@ pub mod gmsol_store {
         instructions::unchecked_execute_withdrawal(ctx, execution_fee, throw_on_execution_error)
     }
 
+    // ===========================================
+    //             Order and Position
+    // ===========================================
     pub fn prepare_position(
         ctx: Context<PreparePosition>,
         params: CreateOrderParams,
@@ -1503,6 +1505,10 @@ pub mod gmsol_store {
         )
     }
 
+    // ===========================================
+    //                  Shift
+    // ===========================================
+
     pub fn create_shift<'info>(
         mut ctx: Context<'_, '_, 'info, 'info, CreateShift<'info>>,
         nonce: [u8; 32],
@@ -1527,6 +1533,10 @@ pub mod gmsol_store {
     ) -> Result<()> {
         internal::Close::close(&ctx, &reason)
     }
+
+    // ===========================================
+    //                The GT Model
+    // ===========================================
 
     /// Initialize GT Mint.
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
@@ -1638,6 +1648,10 @@ pub mod gmsol_store {
         instructions::claim_es_gt_vault_by_vesting(ctx, amount)
     }
 
+    // ===========================================
+    //              User & Referral
+    // ===========================================
+
     /// Prepare User Account.
     pub fn prepare_user(ctx: Context<PrepareUser>) -> Result<()> {
         instructions::prepare_user(ctx)
@@ -1661,7 +1675,10 @@ pub mod gmsol_store {
         instructions::transfer_referral_code(ctx)
     }
 
-    // GLV instructions.
+    // ===========================================
+    //                GLV Operations
+    // ===========================================
+
     /// Initialize GLV.
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn initialize_glv<'info>(
