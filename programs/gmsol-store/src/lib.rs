@@ -5,7 +5,7 @@
 //! A [`Store`](states::Store) Account serves as both an authority and a global configuration
 //! storage.
 //!
-//! ### Instructions for Store Accounts
+//! #### Instructions for Store Accounts
 //! - [`initialize`](gmsol_store::initialize): Create a new [`Store`](states::Store) account.
 //! - [`transfer_store_authority`]: Transfer the authority of the given store to a new authority.
 //!
@@ -18,7 +18,7 @@
 //! - Custom Roles: The custom role table and member table are stored in the `role` field of the
 //!   [`Store`](states::Store) account as a [`RoleStore`](states::RoleStore) structure.
 //!
-//! ### Instructions for Permission Management
+//! #### Instructions for Permission Management
 //! - [`enable_role`]: Insert or enable a role for the given store.
 //! - [`disable_role`]: Disable an existing role for the given store.
 //! - [`grant_role`]: Grant a role to the given user in the given store.
@@ -34,7 +34,7 @@
 //!
 //! ## Oracle Price Management
 //!
-//! ### Instructions for [`TokenConfig`](states::TokenConfig) and token maps.
+//! #### Instructions for [`TokenConfig`](states::TokenConfig) and token maps.
 //! - [`initialize_token_map`](gmsol_store::initialize_token_map): Initialize a new token map account.
 //!   This is a permissionless instruction.
 //! - [`set_token_map`]: Set the token map address used in the given store.
@@ -53,7 +53,7 @@
 //! - [`token_decimals`](gmsol_store::token_decimals): Get the token decimals of the given token.
 //! - [`token_precision`](gmsol_store::token_precision): Get the price precision of the given token.
 //!
-//! ### Instructions for [`Oracle`](states::Oracle) accounts
+//! #### Instructions for [`Oracle`](states::Oracle) accounts
 //! - [`initialize_oracle`]: Initialize a new [`Oracle`](states::Oracle) account.
 //! - [`clear_all_prices`](gmsol_store::clear_all_prices): Clear the prices of the given oracle account.
 //! - [`set_prices_from_price_feed`](gmsol_store::set_prices_from_price_feed): Validate and set prices parsed from the
@@ -62,7 +62,7 @@
 //! ## Market Management
 //! The instructions related to market management are as follows:
 //!
-//! ### Instructions for [`Market`](states::Market) management
+//! #### Instructions for [`Market`](states::Market) management
 //! - [`initialize_market`]: Initialize a [`Market`](states::Market) account.
 //! - [`remove_market`]: Close the given [`Market`](states::Market) account.
 //! - [`toggle_market`]: Enable or diable the given market.
@@ -76,7 +76,7 @@
 //! - [`get_market_meta`](gmsol_store::get_market_meta): Get the [meta](states::MarketMeta) of the market
 //!   without validation.
 //!
-//! ### Instructions for [`MarketConfigBuffer`](states::market::config::MarketConfigBuffer) accounts
+//! #### Instructions for [`MarketConfigBuffer`](states::market::config::MarketConfigBuffer) accounts
 //! - [`initialize_market_config_buffer`](gmsol_store::initialize_market_config_buffer): Initialize a market config buffer account.
 //! - [`set_market_config_buffer_authority`](gmsol_store::set_market_config_buffer_authority): Replace the authority of the market
 //!   config buffer account with the new one.
@@ -84,12 +84,12 @@
 //! - [`push_to_market_config_buffer`](gmsol_store::push_to_market_config_buffer): Push config items to the given market config
 //!   buffer account.
 //!
-//! ### Instructions for market tokens
+//! #### Instructions for market tokens
 //! - [`mint_market_token_to`]: Mint the given amount of market tokens to the destination
 //!   account.
 //! - [`burn_market_token_from`]: Burn the given amount of market tokens from the given account.
 //!
-//! ### Instructions for market vaults
+//! #### Instructions for market vaults
 //! - [`initialize_market_vault`]: Initialize the market vault for the given token.
 //! - [`market_vault_transfer_out`]: Transfer the given amount of tokens out to the destination
 //!   account.
@@ -1507,6 +1507,9 @@ pub type CoreResult<T> = std::result::Result<T, CoreError>;
 
 #[error_code]
 pub enum CoreError {
+    /// Non-defualt store is not allowed.
+    #[msg("non-default store is not allowed")]
+    NonDefaultStore,
     /// Internal error.
     #[msg("internal error")]
     Internal,

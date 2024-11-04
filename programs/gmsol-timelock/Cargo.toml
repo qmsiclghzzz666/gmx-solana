@@ -15,6 +15,7 @@ no-idl = []
 no-log-ix-name = []
 idl-build = ["anchor-lang/idl-build", "gmsol-store/idl-build"]
 debug = ["gmsol-store/debug"]
+multi-store = ["gmsol-store/multi-store"]
 
 [dependencies]
 anchor-lang = { workspace = true }

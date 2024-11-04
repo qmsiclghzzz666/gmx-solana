@@ -8,8 +8,6 @@ use crate::{
 };
 
 /// The accounts definition for [`initialize`](crate::gmsol_store::initialize).
-///
-/// *[See also the documentation for the instruction.](crate::gmsol_store::initialize)*
 #[derive(Accounts)]
 #[instruction(key: String)]
 pub struct Initialize<'info> {
@@ -37,6 +35,8 @@ pub(crate) fn initialize(
     key: String,
     authority: Option<Pubkey>,
 ) -> Result<()> {
+    ctx.accounts.validate_key(&key)?;
+
     let mut store = ctx.accounts.store.load_init()?;
     store.init(
         authority.unwrap_or(ctx.accounts.payer.key()),
@@ -44,6 +44,16 @@ pub(crate) fn initialize(
         ctx.bumps.store,
     )?;
     Ok(())
+}
+
+impl<'info> Initialize<'info> {
+    fn validate_key(&self, key: &str) -> Result<()> {
+        #[cfg(not(feature = "multi-store"))]
+        require!(key.is_empty(), CoreError::NonDefaultStore);
+
+        msg!("initializing a new store with key = {}", key);
+        Ok(())
+    }
 }
 
 /// The accounts definition for
