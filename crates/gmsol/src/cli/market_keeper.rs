@@ -224,10 +224,6 @@ struct Feeds {
     /// Pyth feed id.
     #[arg(long)]
     pyth_feed_id: Option<String>,
-    /// Pyth feed account (Legacy)
-    #[arg(long)]
-    #[serde_as(as = "Option<serde_with::DisplayFromStr>")]
-    pyth_feed_legacy: Option<Pubkey>,
     /// Chainlink feed.
     #[arg(long)]
     #[serde_as(as = "Option<serde_with::DisplayFromStr>")]
@@ -379,11 +375,6 @@ impl Args {
                 if let Some(feed_id) = feeds.pyth_feed_id()? {
                     builder = builder
                         .update_price_feed(&PriceProviderKind::Pyth, feed_id)
-                        .map_err(anchor_client::ClientError::from)?;
-                }
-                if let Some(feed) = feeds.pyth_feed_legacy {
-                    builder = builder
-                        .update_price_feed(&PriceProviderKind::PythLegacy, feed)
                         .map_err(anchor_client::ClientError::from)?;
                 }
                 if let Some(feed) = feeds.chainlink_feed {
@@ -742,10 +733,6 @@ impl<'a> TryFrom<&'a TokenConfig> for TokenConfigBuilder {
         }
         if let Some(chainlink_feed) = config.feeds.chainlink_feed {
             builder = builder.update_price_feed(&PriceProviderKind::Chainlink, chainlink_feed)?;
-        }
-        if let Some(pyth_legacy_feed) = config.feeds.pyth_feed_legacy {
-            builder =
-                builder.update_price_feed(&PriceProviderKind::PythLegacy, pyth_legacy_feed)?;
         }
         Ok(builder)
     }

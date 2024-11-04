@@ -22,7 +22,7 @@ use crate::{
     states::{TokenMapAccess, TokenMapLoader},
     CoreError, CoreResult,
 };
-use anchor_lang::{prelude::*, Ids};
+use anchor_lang::prelude::*;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 use self::price_map::PriceMap;
@@ -31,7 +31,7 @@ use super::{HasMarketMeta, Store, TokenConfig, TokenMapHeader, TokenMapRef};
 pub use self::{
     chainlink::Chainlink,
     feed::{PriceFeed, PriceFeedPrice},
-    pyth::{Pyth, PythLegacy, PYTH_LEGACY_ID},
+    pyth::Pyth,
     time::{ValidateOracleTime, ValidateOracleTimeExt},
     validator::PriceValidator,
 };
@@ -262,21 +262,6 @@ impl Oracle {
     }
 }
 
-/// Price Provider.
-pub struct PriceProvider;
-
-pub(crate) static PRICE_PROVIDER_IDS: [Pubkey; 3] = [
-    pyth_solana_receiver_sdk::ID,
-    chainlink_solana::ID,
-    PYTH_LEGACY_ID,
-];
-
-impl Ids for PriceProvider {
-    fn ids() -> &'static [Pubkey] {
-        &PRICE_PROVIDER_IDS
-    }
-}
-
 /// Supported Price Provider Kind.
 #[repr(u8)]
 #[derive(
@@ -300,15 +285,13 @@ impl Ids for PriceProvider {
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[non_exhaustive]
 pub enum PriceProviderKind {
-    /// Pyth Oracle V2.
-    #[default]
-    Pyth = 0,
-    /// Chainlink Data Feed.
-    Chainlink = 1,
-    /// Legacy Pyth Push Oracle.
-    PythLegacy = 2,
     /// Chainlink Data Streams.
-    ChainlinkDataStreams = 3,
+    #[default]
+    ChainlinkDataStreams = 0,
+    /// Pyth Oracle V2.
+    Pyth = 1,
+    /// Chainlink Data Feed.
+    Chainlink = 2,
 }
 
 impl PriceProviderKind {
@@ -318,8 +301,6 @@ impl PriceProviderKind {
             Some(Self::Chainlink)
         } else if *program_id == Pyth::id() {
             Some(Self::Pyth)
-        } else if *program_id == PythLegacy::id() {
-            Some(Self::PythLegacy)
         } else {
             None
         }
@@ -371,13 +352,6 @@ impl OraclePrice {
             PriceProviderKind::Pyth => {
                 let (oracle_slot, oracle_ts, price) =
                     Pyth::check_and_get_price(clock, token_config, account, &feed_id)?;
-                (oracle_slot, oracle_ts, price)
-            }
-            PriceProviderKind::PythLegacy => {
-                require_eq!(feed_id, account.key(), CoreError::InvalidPriceFeedAccount);
-                // We don't have to check the `feed_id` because the `feed` account is set by the token config keeper.
-                let (oracle_slot, oracle_ts, price) =
-                    PythLegacy::check_and_get_price(clock, token_config, account)?;
                 (oracle_slot, oracle_ts, price)
             }
             PriceProviderKind::ChainlinkDataStreams => {

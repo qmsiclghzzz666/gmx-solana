@@ -42,7 +42,6 @@ cli = [
     "decode",
 ]
 clap = ["dep:clap", "gmsol-store/clap"]
-devnet = ["gmsol-store/devnet"]
 chainlink-pull-oracle = [
     "reqwest",
     "url",
@@ -66,7 +65,6 @@ discover = ["tower/discover", "tokio/time", "pin-project-lite"]
 decode = ["gmsol-decode"]
 
 anchor-test = [
-    "devnet",
     "chainlink-pull-oracle",
     "pyth-pull-oracle",
     "tracing-subscriber",

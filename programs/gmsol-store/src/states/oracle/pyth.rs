@@ -40,37 +40,6 @@ impl Pyth {
     }
 }
 
-/// The legacy Pyth program.
-pub struct PythLegacy;
-
-impl PythLegacy {
-    pub(super) fn check_and_get_price<'info>(
-        clock: &Clock,
-        token_config: &TokenConfig,
-        feed: &'info AccountInfo<'info>,
-    ) -> Result<(u64, i64, Price)> {
-        use pyth_sdk_solana::state::SolanaPriceAccount;
-        let feed = SolanaPriceAccount::account_info_to_feed(feed).map_err(|err| {
-            msg!("Pyth Error: {}", err);
-            CoreError::Internal
-        })?;
-
-        let Some(price) = feed.get_price_no_older_than(
-            clock.unix_timestamp,
-            token_config.heartbeat_duration().into(),
-        ) else {
-            return err!(CoreError::PriceFeedNotUpdated);
-        };
-
-        let parsed_price =
-            pyth_price_with_confidence_to_price(price.price, price.conf, price.expo, token_config)?;
-
-        // Pyth legacy price feed does not provide `posted_slot`,
-        // so we use current slot to ignore the slot check.
-        Ok((clock.slot, price.publish_time, parsed_price))
-    }
-}
-
 /// Convert pyth price value with confidence to [`Price`].
 pub fn pyth_price_with_confidence_to_price(
     price: i64,
@@ -123,23 +92,4 @@ pub fn pyth_price_value_to_decimal(
     )
     .map_err(|_| CoreError::InvalidPriceFeedPrice)?;
     Ok(price)
-}
-
-/// The address of legacy Pyth program.
-#[cfg(not(feature = "devnet"))]
-pub const PYTH_LEGACY_ID: Pubkey = Pubkey::new_from_array([
-    220, 229, 235, 225, 228, 156, 59, 159, 17, 76, 181, 84, 76, 80, 169, 158, 192, 214, 146, 214,
-    63, 86, 121, 90, 224, 41, 172, 131, 217, 234, 139, 226,
-]);
-
-#[cfg(feature = "devnet")]
-pub const PYTH_LEGACY_ID: Pubkey = Pubkey::new_from_array([
-    10, 26, 152, 51, 163, 118, 85, 43, 86, 183, 202, 13, 237, 25, 41, 23, 0, 87, 232, 39, 160, 198,
-    39, 244, 182, 71, 185, 238, 144, 153, 175, 180,
-]);
-
-impl Id for PythLegacy {
-    fn id() -> Pubkey {
-        PYTH_LEGACY_ID
-    }
 }
