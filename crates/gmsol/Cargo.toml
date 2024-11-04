@@ -43,7 +43,14 @@ cli = [
 ]
 clap = ["dep:clap", "gmsol-store/clap"]
 devnet = ["gmsol-store/devnet"]
-chainlink-pull-oracle = ["reqwest", "url", "sha2", "hmac", "reqwest-websocket"]
+chainlink-pull-oracle = [
+    "reqwest",
+    "url",
+    "sha2",
+    "hmac",
+    "reqwest-websocket",
+    "chainlink-datastreams",
+]
 pyth-pull-oracle = [
     "reqwest/stream",
     "url",
@@ -135,6 +142,7 @@ reqwest-websocket = { workspace = true, optional = true }
 # Chainlink.
 sha2 = { workspace = true, optional = true }
 hmac = { workspace = true, optional = true }
+chainlink-datastreams = { workspace = true, optional = true }
 
 # Dependencies for pyth support
 url = { workspace = true, optional = true }
@@ -155,3 +163,4 @@ event-listener = { workspace = true }
 spl-token = { workspace = true }
 spl-associated-token-account = { workspace = true }
 shellexpand = { workspace = true }
+mock-chainlink-verifier = { workspace = true }

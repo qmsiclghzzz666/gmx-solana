@@ -1676,6 +1676,9 @@ pub enum CoreError {
     /// Invalid Price Report.
     #[msg("invalid price report")]
     InvalidPriceReport,
+    /// Market not opened.
+    #[msg("market is not open")]
+    MarketNotOpen,
     /* Errors for Deposit */
     /// Empty Deposit.
     #[msg("empty deposit")]

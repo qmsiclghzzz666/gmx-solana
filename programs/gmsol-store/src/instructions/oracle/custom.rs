@@ -10,7 +10,7 @@ use crate::{
 
 /// The accounts definition for [`initialize_price_feed`] instruction.
 #[derive(Accounts)]
-#[instruction(index: u8, provider: u8, token: Pubkey, feed_id: Pubkey)]
+#[instruction(index: u8, provider: u8, token: Pubkey)]
 pub struct InitializePriceFeed<'info> {
     /// Authority.
     #[account(mut)]

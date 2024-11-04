@@ -216,6 +216,8 @@ enum Command {
     },
     /// GT exchange vault.
     GtExchangeVault { address: Option<Pubkey> },
+    /// Price Feed.
+    PriceFeed { address: Pubkey },
 }
 
 #[derive(clap::ValueEnum, Clone, Default)]
@@ -981,6 +983,14 @@ impl InspectArgs {
                     .ok_or(gmsol::Error::NotFound)?
                     .0;
                 println!("{vault:?}");
+            }
+            Command::PriceFeed { address } => {
+                let feed = client
+                    .account::<ZeroCopy<types::PriceFeed>>(address)
+                    .await?
+                    .ok_or(gmsol::Error::NotFound)?
+                    .0;
+                println!("{feed:#?}");
             }
         }
         Ok(())

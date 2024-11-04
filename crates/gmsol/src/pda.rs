@@ -6,7 +6,8 @@ use gmsol_store::{
         gt::{GtExchange, GtExchangeVault, GtVesting},
         position::PositionKind,
         user::{ReferralCode, ReferralCodeBytes, UserHeader},
-        Deposit, GlvDeposit, NonceBytes, Oracle, Order, Position, Seed, Shift, Store, Withdrawal,
+        Deposit, GlvDeposit, NonceBytes, Oracle, Order, Position, PriceFeed, PriceProviderKind,
+        Seed, Shift, Store, Withdrawal,
     },
 };
 use gmsol_utils::to_seed;
@@ -269,6 +270,28 @@ pub fn find_gt_vesting_pda(
 ) -> (Pubkey, u8) {
     Pubkey::find_program_address(
         &[GtVesting::SEED, store.as_ref(), owner.as_ref()],
+        store_program_id,
+    )
+}
+
+/// Fint the PDA for custom price feed account.
+pub fn find_price_feed_pda(
+    store: &Pubkey,
+    authority: &Pubkey,
+    index: u8,
+    provider: PriceProviderKind,
+    token: &Pubkey,
+    store_program_id: &Pubkey,
+) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[
+            PriceFeed::SEED,
+            store.as_ref(),
+            authority.as_ref(),
+            &[index],
+            &[u8::from(provider)],
+            token.as_ref(),
+        ],
         store_program_id,
     )
 }

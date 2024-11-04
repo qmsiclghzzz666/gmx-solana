@@ -1,5 +1,6 @@
 use std::{fmt, ops::Deref, sync::Arc};
 
+use chainlink_datastreams::report::{decode, Report};
 use futures_util::{Stream, StreamExt, TryStreamExt};
 use reqwest::{IntoUrl, Url};
 use reqwest_websocket::{Message, RequestBuilderExt};
@@ -333,6 +334,25 @@ pub struct ReportData {
     pub observations_timestamp: i64,
     /// Valid From Timestamp (in secs).
     pub valid_from_timestamp: i64,
+}
+
+impl ReportData {
+    /// Decode the report.
+    pub fn decode(&self) -> crate::Result<Report> {
+        let report = self.report_bytes()?;
+        let report = decode(&report).map_err(crate::Error::invalid_argument)?;
+        Ok(report)
+    }
+
+    /// Decode report to bytes.
+    pub fn report_bytes(&self) -> crate::Result<Vec<u8>> {
+        hex::decode(
+            self.full_report
+                .strip_prefix("0x")
+                .unwrap_or(&self.full_report),
+        )
+        .map_err(crate::Error::invalid_argument)
+    }
 }
 
 #[cfg(test)]

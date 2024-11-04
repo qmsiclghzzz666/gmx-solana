@@ -13,6 +13,7 @@ use anchor_client::{
 use gmsol_model::{price::Prices, PnlFactorKind};
 use gmsol_store::states::{
     market::status::MarketStatus, position::PositionKind, user::ReferralCodeBytes, NonceBytes,
+    PriceProviderKind,
 };
 use solana_account_decoder::UiAccountEncoding;
 use tokio::sync::OnceCell;
@@ -353,6 +354,26 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
     /// Find GT vesting address.
     pub fn find_gt_vesting_address(&self, store: &Pubkey, owner: &Pubkey) -> Pubkey {
         crate::pda::find_gt_vesting_pda(store, owner, self.store_program_id()).0
+    }
+
+    /// Find Custom Price Feed address.
+    pub fn find_price_feed_address(
+        &self,
+        store: &Pubkey,
+        authority: &Pubkey,
+        index: u8,
+        provider: PriceProviderKind,
+        token: &Pubkey,
+    ) -> Pubkey {
+        crate::pda::find_price_feed_pda(
+            store,
+            authority,
+            index,
+            provider,
+            token,
+            self.store_program_id(),
+        )
+        .0
     }
 
     /// Get slot.

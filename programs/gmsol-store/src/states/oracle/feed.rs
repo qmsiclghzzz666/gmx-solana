@@ -8,6 +8,8 @@ use crate::{
 
 use super::PriceProviderKind;
 
+const MAX_FLAGS: usize = 8;
+
 /// Custom Price Feed.
 #[account(zero_copy)]
 #[cfg_attr(feature = "debug", derive(Debug))]
@@ -110,6 +112,7 @@ impl PriceFeed {
         let feed_id = token_config.get_feed(&provider)?;
 
         require_eq!(self.feed_id, feed_id, CoreError::InvalidPriceFeedAccount);
+        require!(self.price.is_market_open(), CoreError::MarketNotOpen);
 
         let timestamp = self.price.ts;
         let current = clock.unix_timestamp;
@@ -148,12 +151,26 @@ impl PriceFeed {
     }
 }
 
+type PriceFlagsMap = bitmaps::Bitmap<MAX_FLAGS>;
+type PriceFlagsValue = u8;
+
+/// Price Feed Flags.
+#[repr(u8)]
+#[non_exhaustive]
+#[derive(num_enum::IntoPrimitive, num_enum::TryFromPrimitive)]
+pub enum PriceFlag {
+    /// Is Market Opened.
+    Open,
+    // CHECK: should have no more than `MAX_FLAGS` of flags.
+}
+
 /// Price structure for Price Feed.
 #[zero_copy]
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub struct PriceFeedPrice {
     decimals: u8,
-    padding: [u8; 7],
+    flags: PriceFlagsValue,
+    padding: [u8; 6],
     ts: i64,
     price: u128,
     min_price: u128,
@@ -181,6 +198,25 @@ impl PriceFeedPrice {
         &self.price
     }
 
+    fn get_flag(&self, kind: PriceFlag) -> bool {
+        let index = u8::from(kind);
+        let map = PriceFlagsMap::from_value(self.flags);
+        map.get(usize::from(index))
+    }
+
+    fn set_flag(&mut self, kind: PriceFlag, value: bool) -> bool {
+        let index = u8::from(kind);
+        let mut map = PriceFlagsMap::from_value(self.flags);
+        let previous = map.set(usize::from(index), value);
+        self.flags = map.into_value();
+        previous
+    }
+
+    /// Is market open.
+    pub fn is_market_open(&self) -> bool {
+        self.get_flag(PriceFlag::Open)
+    }
+
     pub(crate) fn from_chainlink_report(
         report: &chainlink_datastreams::report::Report,
     ) -> Result<Self> {
@@ -202,13 +238,18 @@ impl PriceFeedPrice {
 
         let divisor = TEN.pow(U192::from(divisor_decimals));
 
-        Ok(Self {
+        let mut price = Self {
             decimals: Report::DECIMALS - divisor_decimals,
-            padding: [0; 7],
+            flags: PriceFlagsMap::new().into_value(),
+            padding: [0; 6],
             ts: i64::from(report.observations_timestamp),
             price: (report.price / divisor).try_into().unwrap(),
             min_price: (report.bid / divisor).try_into().unwrap(),
             max_price: (report.ask / divisor).try_into().unwrap(),
-        })
+        };
+
+        price.set_flag(PriceFlag::Open, true);
+
+        Ok(price)
     }
 }

@@ -10,6 +10,7 @@ use std::{
 };
 
 use anchor_client::{
+    anchor_lang::system_program,
     solana_client::rpc_config::RpcSendTransactionConfig,
     solana_sdk::{
         address_lookup_table::AddressLookupTableAccount,
@@ -83,6 +84,10 @@ pub struct Deployment {
     common_alt: AddressLookupTableAccount,
     market_alt: AddressLookupTableAccount,
     claim_fees_enabled_at: Instant,
+    /// Chainlink Verifier.
+    pub chainlink_verifier: Pubkey,
+    /// Chainlink verifirer Program.
+    pub chainlink_verifier_program: Pubkey,
 }
 
 impl fmt::Debug for Deployment {
@@ -170,6 +175,8 @@ impl Deployment {
                 addresses: vec![],
             },
             claim_fees_enabled_at: Instant::now(),
+            chainlink_verifier: Default::default(),
+            chainlink_verifier_program: Default::default(),
         })
     }
 
@@ -185,6 +192,11 @@ impl Deployment {
 
     async fn setup(&mut self) -> eyre::Result<()> {
         tracing::info!("[Setting up everything...]");
+
+        if let Err(err) = self.initialize_mock().await {
+            tracing::warn!(%err, "failed to initialize chainlink mock, maybe it has been initialized");
+        }
+
         self.add_users()?;
 
         let _guard = self.use_accounts().await?;
@@ -302,6 +314,32 @@ impl Deployment {
             )
             .try_init()
             .map_err(eyre::Error::msg)?;
+        Ok(())
+    }
+
+    async fn initialize_mock(&mut self) -> eyre::Result<()> {
+        use mock_chainlink_verifier::{accounts, instruction, DEFAULT_VERIFIER_ACCOUNT_SEEDS, ID};
+
+        let chainlink_verifier =
+            Pubkey::find_program_address(&[DEFAULT_VERIFIER_ACCOUNT_SEEDS], &ID).0;
+        self.chainlink_verifier = chainlink_verifier;
+        self.chainlink_verifier_program = ID;
+
+        let signature = self
+            .client
+            .store_rpc()
+            .program(ID)
+            .accounts(accounts::Initialize {
+                payer: self.client.payer(),
+                verifier_account: chainlink_verifier,
+                system_program: system_program::ID,
+            })
+            .args(instruction::Initialize {})
+            .send()
+            .await?;
+
+        tracing::info!(%signature, "initialized chainlink mock");
+
         Ok(())
     }
 

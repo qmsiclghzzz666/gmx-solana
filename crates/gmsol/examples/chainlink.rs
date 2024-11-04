@@ -35,7 +35,10 @@ async fn main() -> eyre::Result<()> {
         .await?;
 
     for (idx, report) in reports.iter().enumerate() {
-        println!("[{idx}] {report:?}");
+        tracing::info!("[{idx}] {report:?}");
+        if let Ok(report) = report.decode() {
+            println!("[{idx}] {report:#?}");
+        }
     }
 
     // Subscribe to reports.
@@ -45,8 +48,8 @@ async fn main() -> eyre::Result<()> {
 
     futures_util::pin_mut!(stream);
 
-    while let Some(msg) = stream.try_next().await? {
-        println!("{msg:?}");
+    while let Some(report) = stream.try_next().await? {
+        tracing::info!("{report:?}");
     }
     Ok(())
 }
