@@ -28,6 +28,9 @@ impl RoleKey {
     /// Controller.
     pub const CONTROLLER: &'static str = "CONTROLLER";
 
+    /// Oracle Controller.
+    pub const ORACLE_CONTROLLER: &'static str = "ORACLE_CONTROLLER";
+
     /// GT Controller.
     pub const GT_CONTROLLER: &'static str = "GT_CONTROLLER";
 

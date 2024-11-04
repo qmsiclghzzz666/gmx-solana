@@ -27,7 +27,7 @@ pub struct InitializeOracle<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub(crate) fn unchecked_initialize_oracle(ctx: Context<InitializeOracle>) -> Result<()> {
+pub(crate) fn initialize_oracle(ctx: Context<InitializeOracle>) -> Result<()> {
     ctx.accounts
         .oracle
         .load_init()?
@@ -35,10 +35,14 @@ pub(crate) fn unchecked_initialize_oracle(ctx: Context<InitializeOracle>) -> Res
     Ok(())
 }
 
+/// The accounts definition for [`clear_all_prices`](crate::gmsol_store::clear_all_prices).
 #[derive(Accounts)]
 pub struct ClearAllPrices<'info> {
+    /// The caller.
     pub authority: Signer<'info>,
+    /// Store.
     pub store: AccountLoader<'info, Store>,
+    /// Oracle.
     #[account(
         mut,
         has_one = store,
@@ -47,7 +51,8 @@ pub struct ClearAllPrices<'info> {
 }
 
 /// Clear all prices of the given oracle account.
-pub(crate) fn clear_all_prices(ctx: Context<ClearAllPrices>) -> Result<()> {
+/// CHECK: only ORACLE_CONTROLLER is allowed to invoke.
+pub(crate) fn unchecked_clear_all_prices(ctx: Context<ClearAllPrices>) -> Result<()> {
     ctx.accounts.oracle.load_mut()?.clear_all_prices();
     Ok(())
 }
@@ -62,18 +67,28 @@ impl<'info> internal::Authentication<'info> for ClearAllPrices<'info> {
     }
 }
 
+/// The accounts definition for [`set_prices_from_price_feed`](crate::gmsol_store::set_prices_from_price_feed).
+///
+/// Remaining accounts expected by this instruction:
+///
+///   - 0..N. `[]` N feed accounts, where N represents the total number of tokens.
 #[derive(Accounts)]
 pub struct SetPricesFromPriceFeed<'info> {
+    /// The caller.
     pub authority: Signer<'info>,
+    /// Store.
     #[account(has_one = token_map)]
     pub store: AccountLoader<'info, Store>,
+    /// Oracle.
     #[account(
         mut,
         has_one = store,
     )]
     pub oracle: AccountLoader<'info, Oracle>,
+    /// Token map.
     #[account(has_one = store)]
     pub token_map: AccountLoader<'info, TokenMapHeader>,
+    /// Chainlink Program.
     pub chainlink_program: Option<Program<'info, Chainlink>>,
 }
 

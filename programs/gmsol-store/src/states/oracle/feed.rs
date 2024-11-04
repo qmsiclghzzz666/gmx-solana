@@ -63,7 +63,7 @@ impl PriceFeed {
         let current_ts = clock.unix_timestamp;
 
         // Validate time.
-        require_gt!(
+        require_gte!(
             slot,
             self.last_published_at_slot,
             CoreError::PreconditionsAreNotMet

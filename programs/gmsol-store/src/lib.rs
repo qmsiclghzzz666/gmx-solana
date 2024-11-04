@@ -44,7 +44,7 @@
 //! #### Instructions for Feature Management
 //! - [`toggle_feature`](toggle_feature): Enable or diable the given feature.
 //!
-//! ## Token and Oracle Management
+//! ## Token Config and Oracle Management
 //!
 //! #### Instructions for managing [`TokenConfig`](states::TokenConfig) and token maps.
 //! - [`initialize_token_map`](gmsol_store::initialize_token_map): Initialize a new token map account.
@@ -69,6 +69,8 @@
 //! - [`clear_all_prices`](gmsol_store::clear_all_prices): Clear the prices of the given oracle account.
 //! - [`set_prices_from_price_feed`](gmsol_store::set_prices_from_price_feed): Validate and set prices parsed from the
 //!   provided price feed accounts.
+//! - [`initialize_price_feed`](initialize_price_feed): Initialize a custom price feed.
+//! - [`update_price_feed_with_chainlink`]: Update a custom Chainlink price feed with Chainlink Data Streams report.
 //!
 //! ## Market Management
 //! The instructions related to market management are as follows:
@@ -157,6 +159,7 @@ pub mod gmsol_store {
     // ===========================================
     //                 Data Store
     // ===========================================
+
     /// Create a new [`Store`](states::Store) account.
     ///
     /// # Accounts
@@ -241,6 +244,7 @@ pub mod gmsol_store {
     // ===========================================
     //      Role-based Permission Management
     // ===========================================
+
     /// Check that the signer is the admin of the given store, throw error if
     /// the check fails.
     ///
@@ -389,6 +393,7 @@ pub mod gmsol_store {
     // ===========================================
     //              Config Management
     // ===========================================
+
     /// Insert an amount to the global config.
     ///
     /// # Accounts
@@ -471,6 +476,7 @@ pub mod gmsol_store {
     // ===========================================
     //             Feature Management
     // ===========================================
+
     /// Enable or diable the given feature.
     ///
     /// # Accounts
@@ -505,6 +511,7 @@ pub mod gmsol_store {
     // ===========================================
     //           Token Config Management
     // ===========================================
+
     /// Initialize a new token map account with its store set to [`store`](InitializeTokenMap::store).
     ///
     /// Anyone can initialize a token map account without any permissions, but after initialization, only
@@ -572,7 +579,7 @@ pub mod gmsol_store {
     /// - `builder`: Builder for the token config.
     /// - `enable`: Whether the token config should be enabled/disabled after the push.
     /// - `new`: Enforce insert if new = true, and an error will be returned if the config
-    /// for the given token already exists.
+    ///   for the given token already exists.
     ///
     /// # Errors
     /// - The [`authority`](PushToTokenMapSynthetic::authority) must be a signer and a MARKET_KEEPER
@@ -823,7 +830,132 @@ pub mod gmsol_store {
         instructions::token_precision(ctx, &token)
     }
 
-    // Market.
+    // ===========================================
+    //              Oracle Management
+    // ===========================================
+
+    /// Initailize a new oracle account for the given store with the given index.
+    ///
+    /// # Accounts
+    /// *[See the documentation for the accounts.](InitializeOracle)*
+    ///
+    /// # Errors
+    /// - The [`store`](InitializeOracle::store) must be an initialized [`Store`](states::Store)
+    ///   account owned by the store program. And it must be the owner of the token map.
+    /// - The [`oralce`](InitializeOracle::oracle) account must be uninitialized.
+    pub fn initialize_oracle(ctx: Context<InitializeOracle>) -> Result<()> {
+        instructions::initialize_oracle(ctx)
+    }
+
+    /// Clear the given oracle.
+    ///
+    /// # Accounts
+    /// *[See the documentation for the accounts.](ClearAllPrices)*
+    ///
+    /// # Errors
+    /// - The [`authority`](ClearAllPrices::authority) must be a signer and be a ORACLE_CONTROLLER in
+    ///   the given store.
+    /// - The [`store`](ClearAllPrices::store) must be initialized.
+    /// - The [`oracle`](ClearAllPrices::oracle) must be initialized and owned by the store.
+    #[access_control(internal::Authenticate::only_oracle_controller(&ctx))]
+    pub fn clear_all_prices(ctx: Context<ClearAllPrices>) -> Result<()> {
+        instructions::unchecked_clear_all_prices(ctx)
+    }
+
+    /// Set prices from the provided price feeds.
+    ///
+    /// # Accounts
+    /// *[See the documentation for the accounts.](SetPricesFromPriceFeed)*
+    ///
+    /// # Arguments
+    /// - `tokens`: The list of tokens to set prices for.
+    ///
+    /// # Errors
+    /// - The [`authority`](SetPricesFromPriceFeed::authority) must be a signer and be a ORACLE_CONTROLLER in
+    ///   the given store.
+    /// - The [`store`](SetPricesFromPriceFeed::store) must be initialized.
+    /// - The [`oracle`](SetPricesFromPriceFeed::oracle) must be initialized and owned by the store.
+    /// - The [`token_map`](SetPricesFromPriceFeed::token_map) must be initialized and owned and
+    ///   authorized by the store.
+    /// - Cannot provide more than [`MAX_TOKENS`](crate::states::oracle::price_map::PriceMap::MAX_TOKENS) tokens.
+    /// - The provided `tokens` must be configured and enabled in the given token map.
+    /// - The provided feed accounts must be valid and correspond to the provided `tokens`.
+    #[access_control(internal::Authenticate::only_oracle_controller(&ctx))]
+    pub fn set_prices_from_price_feed<'info>(
+        ctx: Context<'_, '_, 'info, 'info, SetPricesFromPriceFeed<'info>>,
+        tokens: Vec<Pubkey>,
+    ) -> Result<()> {
+        instructions::set_prices_from_price_feed(ctx, tokens)
+    }
+
+    /// Initialize a custom price feed account.
+    ///
+    /// # Accounts
+    /// *[See the documentation for the accounts.](InitializePriceFeed)*
+    ///
+    /// # Arguments
+    /// - `index`: The custom index of the oracle.
+    /// - `provider`: The index of the provider to use.
+    /// - `token`: The token of the feed.
+    /// - `feed_id`: The feed id for the token.
+    ///
+    /// # Errors
+    /// - The [`authority`](InitializePriceFeed::authority) must be a signer and be a ORDER_KEEPER
+    ///   in the store.
+    /// - The [`store`](InitializePriceFeed::store) must be initialized.
+    /// - The [`price_feed`](InitializePriceFeed::price_feed) must be uninitialized and a PDA
+    ///   derived from the expected seeds.
+    /// - The index of the `provider` must be defined in [`PriceProviderKind`].
+    /// - The `provider` must be supported to use a custom price feed.
+    #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
+    pub fn initialize_price_feed(
+        ctx: Context<InitializePriceFeed>,
+        index: u8,
+        provider: u8,
+        token: Pubkey,
+        feed_id: Pubkey,
+    ) -> Result<()> {
+        let provider = PriceProviderKind::try_from(provider)
+            .map_err(|_| error!(CoreError::InvalidProviderKindIndex))?;
+        instructions::unchecked_initialize_price_feed(ctx, index, provider, &token, &feed_id)
+    }
+
+    /// Update a custom price feed account with Chainlink report.
+    ///
+    /// # Accounts
+    /// *[See the documentation for the accounts.](UpdatePriceFeedWithChainlink)*
+    ///
+    /// # Arguments
+    /// - `signed_report`: A signed price report from Chainlink Data Streams.
+    ///
+    /// # Errors
+    /// - The [`authority`](UpdatePriceFeedWithChainlink::authority) must be a signer and be a ORDER_KEEPER
+    ///   in the store.
+    /// - The [`store`](UpdatePriceFeedWithChainlink::store) must be initialized.
+    /// - The [`verifier_account`](UpdatePriceFeedWithChainlink::verifier_account) must be valid.
+    /// - The [`price_feed`] must be initialized and owned by the `store` and the `authority`.
+    /// - The [`chainlink`](UpdatePriceFeedWithChainlink::chainlink) program must be trusted.
+    /// - The configured provider of the `price_feed` must be
+    ///   [`ChainlinkDataStreams`](PriceProviderKind::ChainlinkDataStreams).
+    /// - The `signed_report` must be decodable and the data is valid for creating
+    ///   [`PriceFeedPrice`](states::oracle::PriceFeedPrice).
+    /// - The `signed_report` must be verifiable by the Chainlink Verifier Program.
+    /// - The current slot and timestamp must be greater than or equal to those in the `feed`.
+    /// - The timestamp of the price data must be greater than or equal to the one in the `feed`.
+    /// - The price data must be valid. See the `update` method of [`PriceFeed`](states::oracle::PriceFeed)
+    ///   for more details.
+    #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
+    pub fn update_price_feed_with_chainlink(
+        ctx: Context<UpdatePriceFeedWithChainlink>,
+        signed_report: Vec<u8>,
+    ) -> Result<()> {
+        instructions::unchecked_update_price_feed_with_chainlink(ctx, signed_report)
+    }
+
+    // ===========================================
+    //              Market Management
+    // ===========================================
+
     /// Initialize a [`Market`](states::Market) account.
     ///
     /// # Accounts
@@ -1200,58 +1332,6 @@ pub mod gmsol_store {
         ctx: Context<PrepareAssociatedTokenAccount>,
     ) -> Result<()> {
         instructions::prepare_associated_token_account(ctx)
-    }
-
-    // Oracle.
-    /// Initailize a new oracle account for the given store with the given index.
-    ///
-    /// # Accounts
-    /// *[See the documentation for the accounts.](InitializeOracle).*
-    ///
-    /// # Errors
-    /// - The [`store`](InitializeOracle::store) must be an initialized [`Store`](states::Store)
-    /// account owned by the store program. And it must be the owner of the token map.
-    /// - The [`oralce`](InitializeOracle::oracle) account must be uninitialized and its address must be the PDA
-    /// derived from the oracle account seed [`SEED`](states::Oracle::SEED), the `store` address and
-    /// the `index`.
-    pub fn initialize_oracle(ctx: Context<InitializeOracle>) -> Result<()> {
-        instructions::unchecked_initialize_oracle(ctx)
-    }
-
-    #[access_control(internal::Authenticate::only_controller(&ctx))]
-    pub fn clear_all_prices(ctx: Context<ClearAllPrices>) -> Result<()> {
-        instructions::clear_all_prices(ctx)
-    }
-
-    #[access_control(internal::Authenticate::only_controller(&ctx))]
-    pub fn set_prices_from_price_feed<'info>(
-        ctx: Context<'_, '_, 'info, 'info, SetPricesFromPriceFeed<'info>>,
-        tokens: Vec<Pubkey>,
-    ) -> Result<()> {
-        instructions::set_prices_from_price_feed(ctx, tokens)
-    }
-
-    /// Initialize a custom price feed account.
-    #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
-    pub fn initialize_price_feed(
-        ctx: Context<InitializePriceFeed>,
-        index: u8,
-        provider: u8,
-        token: Pubkey,
-        feed_id: Pubkey,
-    ) -> Result<()> {
-        let provider = PriceProviderKind::try_from(provider)
-            .map_err(|_| error!(CoreError::InvalidProviderKindIndex))?;
-        instructions::unchecked_initialize_price_feed(ctx, index, provider, &token, &feed_id)
-    }
-
-    /// Update a custom price feed account.
-    #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
-    pub fn update_price_feed_with_chainlink(
-        ctx: Context<UpdatePriceFeedWithChainlink>,
-        signed_report: Vec<u8>,
-    ) -> Result<()> {
-        instructions::unchecked_update_price_feed_with_chainlink(ctx, signed_report)
     }
 
     // Exchange.

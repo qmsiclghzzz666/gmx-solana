@@ -49,6 +49,11 @@ pub(crate) trait Authenticate<'info>: Authentication<'info> + Bumps + Sized {
         Self::only(ctx, RoleKey::CONTROLLER)
     }
 
+    /// Check that the `authority` has the [`ORACLE_CONTROLLER`](`RoleKey::ORACLE_CONTROLLER`) role.
+    fn only_oracle_controller(ctx: &Context<Self>) -> Result<()> {
+        Self::only(ctx, RoleKey::GT_CONTROLLER)
+    }
+
     /// Check that the `authority` has the [`GT_CONTROLLER`](`RoleKey::GT_CONTROLLER`) role.
     fn only_gt_controller(ctx: &Context<Self>) -> Result<()> {
         Self::only(ctx, RoleKey::GT_CONTROLLER)
