@@ -303,7 +303,7 @@ impl Glv {
         Ok(())
     }
 
-    /// Create a new [`GlvTokensCollector`].
+    /// Create a new [`TokensCollector`].
     pub fn tokens_collector(&self, action: Option<&impl HasSwapParams>) -> TokensCollector {
         TokensCollector::new(action, self.num_markets())
     }

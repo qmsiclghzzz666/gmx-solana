@@ -63,7 +63,7 @@ pub struct TokensCollector {
 }
 
 impl TokensCollector {
-    /// Create a new [`TokensCollactor`].
+    /// Create a new [`TokensCollector`].
     pub fn new(action: Option<&impl HasSwapParams>, extra_capacity: usize) -> Self {
         let mut tokens;
         match action {

@@ -22,7 +22,7 @@ use crate::{
     CoreError,
 };
 
-/// The accounts definition for [`create_glv_shift`] instruction.
+/// The accounts definition for [`create_glv_shift`](crate::create_glv_shift) instruction.
 #[derive(Accounts)]
 #[instruction(nonce: [u8; 32])]
 pub struct CreateGlvShift<'info> {
@@ -148,7 +148,7 @@ impl<'info> internal::Authentication<'info> for CreateGlvShift<'info> {
     }
 }
 
-/// The accounts definition for [`close_glv_shift`] instruction.
+/// The accounts definition for [`close_glv_shift`](crate::close_glv_shift) instruction.
 #[event_cpi]
 #[derive(Accounts)]
 pub struct CloseGlvShift<'info> {
@@ -232,7 +232,7 @@ impl<'info> internal::Authentication<'info> for CloseGlvShift<'info> {
     }
 }
 
-/// The accounts definition for [`execute_glv_shift`] instruction.
+/// The accounts definition for [`execute_glv_shift`](crate::execute_glv_shift) instruction.
 ///
 /// Remaining accounts expected by this instruction:
 ///

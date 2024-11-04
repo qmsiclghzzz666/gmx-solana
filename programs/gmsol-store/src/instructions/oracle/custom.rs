@@ -8,7 +8,7 @@ use crate::{
     CoreError,
 };
 
-/// The accounts definition for [`initialize_price_feed`] instruction.
+/// The accounts definition for [`initialize_price_feed`](crate::initialize_price_feed) instruction.
 #[derive(Accounts)]
 #[instruction(index: u8, provider: u8, token: Pubkey)]
 pub struct InitializePriceFeed<'info> {
@@ -72,7 +72,7 @@ impl<'info> internal::Authentication<'info> for InitializePriceFeed<'info> {
     }
 }
 
-/// The accounts definition for [`update_price_feed_with_chainlink`] instruction.
+/// The accounts definition for [`update_price_feed_with_chainlink`](crate::update_price_feed_with_chainlink) instruction.
 #[derive(Accounts)]
 pub struct UpdatePriceFeedWithChainlink<'info> {
     /// Authority.

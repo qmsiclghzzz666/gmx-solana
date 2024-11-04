@@ -14,7 +14,7 @@ use crate::{
     CoreError,
 };
 
-/// The accounts definitions for [`initialize_glv`] instruction.
+/// The accounts definitions for [`initialize_glv`](crate::initialize_glv) instruction.
 ///
 /// Remaining accounts expected by this instruction:
 ///
@@ -181,7 +181,7 @@ impl<'info> InitializeGlv<'info> {
     }
 }
 
-/// The accounts definition for [`update_glv_market_config`] instruction.
+/// The accounts definition for [`update_glv_market_config`](crate::update_glv_market_config) instruction.
 #[derive(Accounts)]
 pub struct UpdateGlvMarketConfig<'info> {
     /// Authority.

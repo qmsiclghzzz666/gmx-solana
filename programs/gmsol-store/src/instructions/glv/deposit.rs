@@ -27,7 +27,7 @@ use crate::{
     CoreError,
 };
 
-/// The accounts definition for [`create_glv_deposit`] instruction.
+/// The accounts definition for [`create_glv_deposit`](crate::create_glv_deposit) instruction.
 #[derive(Accounts)]
 #[instruction(nonce: [u8; 32])]
 pub struct CreateGlvDeposit<'info> {

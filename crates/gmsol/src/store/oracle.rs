@@ -14,7 +14,7 @@ use crate::utils::RpcBuilder;
 
 /// Oracle management for GMSOL.
 pub trait OracleOps<C> {
-    /// Initialize [`Oracle`](gmsol_store::states::Oracle) account.
+    /// Initialize [`Oracle`] account.
     fn initialize_oracle<'a>(
         &'a self,
         store: &Pubkey,

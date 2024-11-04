@@ -153,7 +153,7 @@ pub(crate) fn unchecked_gt_set_receiver(
         .set_receiver(receiver)
 }
 
-/// The accounts definition for [`initialize_gt_exchange_vault`] instruction.
+/// The accounts definition for [`prepare_gt_exchange_vault`](crate::gmsol_store::prepare_gt_exchange_vault) instruction.
 #[derive(Accounts)]
 #[instruction(time_window_index: i64)]
 pub struct PrepareGtExchangeVault<'info> {
@@ -223,7 +223,7 @@ pub(crate) fn prepare_gt_exchange_vault(
     Ok(())
 }
 
-/// The accounts definition for [`request_gt_exchange`] instruction.
+/// The accounts definition for [`request_gt_exchange`](crate::gmsol_store::request_gt_exchange) instruction.
 #[derive(Accounts)]
 pub struct RequestGtExchange<'info> {
     #[account(mut)]
@@ -316,7 +316,7 @@ impl<'info> RequestGtExchange<'info> {
     }
 }
 
-/// The accounts definition for [`confirm_gt_exchange_vault`] instruction.
+/// The accounts definition for [`confirm_gt_exchange_vault`](crate::confirm_gt_exchange_vault) instruction.
 #[derive(Accounts)]
 pub struct ConfirmGtExchangeVault<'info> {
     /// Authority.
@@ -356,7 +356,7 @@ impl<'info> internal::Authentication<'info> for ConfirmGtExchangeVault<'info> {
     }
 }
 
-/// The accounts definition for [`close_gt_exchange`] instruction.
+/// The accounts definition for [`close_gt_exchange`](crate::close_gt_exchange) instruction.
 #[derive(Accounts)]
 pub struct CloseGtExchange<'info> {
     authority: Signer<'info>,
@@ -410,7 +410,7 @@ impl<'info> internal::Authentication<'info> for CloseGtExchange<'info> {
     }
 }
 
-/// The accounts definition for [`claim_es_gt`].
+/// The accounts definition for [`claim_es_gt`](crate::gmsol_store::claim_es_gt).
 #[derive(Accounts)]
 pub struct ClaimEsGt<'info> {
     pub(crate) owner: Signer<'info>,
@@ -435,7 +435,7 @@ pub(crate) fn claim_es_gt(ctx: Context<ClaimEsGt>) -> Result<()> {
     store.gt_mut().unchecked_sync_es_factor(&mut user)
 }
 
-/// The accounts definition for [`request_gt_vesting`].
+/// The accounts definition for [`request_gt_vesting`](crate::gmsol_store::request_gt_vesting).
 #[derive(Accounts)]
 pub struct RequestGtVesting<'info> {
     #[account(mut)]
@@ -528,7 +528,7 @@ impl<'info> RequestGtVesting<'info> {
     }
 }
 
-/// The accounts definition for [`update_gt_vesting`].
+/// The accounts definition for [`update_gt_vesting`](crate::gmsol_store::update_gt_vesting).
 #[derive(Accounts)]
 pub struct UpdateGtVesting<'info> {
     pub(crate) owner: Signer<'info>,
@@ -567,7 +567,7 @@ pub(crate) fn update_gt_vesting(ctx: Context<UpdateGtVesting>) -> Result<()> {
     Ok(())
 }
 
-/// The accounts definition for [`close_gt_vesting`].
+/// The accounts definition for [`close_gt_vesting`](crate::gmsol_store::close_gt_vesting).
 #[derive(Accounts)]
 pub struct CloseGtVesting<'info> {
     pub(crate) owner: Signer<'info>,
@@ -608,7 +608,7 @@ pub(crate) fn close_gt_vesting(ctx: Context<CloseGtVesting>) -> Result<()> {
     Ok(())
 }
 
-/// The accounts definition for [`claim_es_gt_vault_by_vesting`].
+/// The accounts definition for [`claim_es_gt_vault_by_vesting`](crate::gmsol_store::claim_es_gt_vault_by_vesting).
 #[derive(Accounts)]
 pub struct ClaimEsGtVaultByVesting<'info> {
     /// The owner.

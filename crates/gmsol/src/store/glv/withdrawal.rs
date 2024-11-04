@@ -303,7 +303,7 @@ pub struct CloseGlvWithdrawalBuilder<'a, C> {
     hint: Option<CloseGlvWithdrawalHint>,
 }
 
-/// Hint for [`CloseGlvDepositBuilder`].
+/// Hint for [`CloseGlvWithdrawalBuilder`].
 #[derive(Clone)]
 pub struct CloseGlvWithdrawalHint {
     store: Pubkey,

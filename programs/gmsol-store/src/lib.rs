@@ -56,7 +56,6 @@
 //! ### Instructions for [`Oracle`](states::Oracle) accounts
 //! - [`initialize_oracle`]: Initialize a new [`Oracle`](states::Oracle) account.
 //! - [`clear_all_prices`](gmsol_store::clear_all_prices): Clear the prices of the given oracle account.
-//! - [`set_price`](gmsol_store::set_price): Set a price for the given token in the given oracle account.
 //! - [`set_prices_from_price_feed`](gmsol_store::set_prices_from_price_feed): Validate and set prices parsed from the
 //!   provided price feed accounts.
 //!
@@ -68,17 +67,16 @@
 //! - [`remove_market`]: Close the given [`Market`](states::Market) account.
 //! - [`toggle_market`]: Enable or diable the given market.
 //! - [`market_transfer_in`]: Transfer tokens into the market and record in its balance.
-//! - [`market_transfer_out`]: Transfer tokens out from the market and record in its balance.
 //! - [`update_market_config`]: Update an item in the market config.
 //! - [`update_market_config_with_buffer`]: Update the market config with the given
-//!   [`MarketConfigBuffer`](states::MarketConfigBuffer) account.
+//!   [`MarketConfigBuffer`](states::market::config::MarketConfigBuffer) account.
 //! - [`get_validated_market_meta`](gmsol_store::get_validated_market_meta): Validate the market and
 //!   return its [meta](states::MarketMeta).
 //! - [`get_market_config`](gmsol_store::get_market_config): Read an item from the market config by the key.
 //! - [`get_market_meta`](gmsol_store::get_market_meta): Get the [meta](states::MarketMeta) of the market
 //!   without validation.
 //!
-//! ### Instructions for [`MarketConfigBuffer`](states::MarketConfigBuffer) accounts
+//! ### Instructions for [`MarketConfigBuffer`](states::market::config::MarketConfigBuffer) accounts
 //! - [`initialize_market_config_buffer`](gmsol_store::initialize_market_config_buffer): Initialize a market config buffer account.
 //! - [`set_market_config_buffer_authority`](gmsol_store::set_market_config_buffer_authority): Replace the authority of the market
 //!   config buffer account with the new one.
@@ -782,7 +780,7 @@ pub mod gmsol_store {
     }
 
     /// Update the market config with the given
-    /// [`MarketConfigBuffer`](states::MarketConfigBuffer) account.
+    /// [`MarketConfigBuffer`](crate::states::market::config::MarketConfigBuffer) account.
     ///
     /// # Accounts
     /// [*See the documentation for the accounts.*](UpdateMarketConfigWithBuffer)

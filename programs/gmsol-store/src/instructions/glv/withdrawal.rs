@@ -29,7 +29,7 @@ use crate::{
     CoreError,
 };
 
-/// The accounts defintion for [`create_glv_withdrawal`] instruction.
+/// The accounts defintion for [`create_glv_withdrawal`](crate::create_glv_withdrawal) instruction.
 #[derive(Accounts)]
 #[instruction(nonce: [u8; 32])]
 pub struct CreateGlvWithdrawal<'info> {
