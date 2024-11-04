@@ -65,7 +65,7 @@ where
                 key: key.to_string(),
                 amount: *amount,
             })
-            .accounts(accounts::InsertAmount {
+            .accounts(accounts::InsertConfig {
                 authority,
                 store: *store,
             })
@@ -78,7 +78,7 @@ where
                 key: key.to_string(),
                 factor: *factor,
             })
-            .accounts(accounts::InsertFactor {
+            .accounts(accounts::InsertConfig {
                 authority,
                 store: *store,
             })
@@ -91,7 +91,7 @@ where
                 key: key.to_string(),
                 address: *address,
             })
-            .accounts(accounts::InsertAddress {
+            .accounts(accounts::InsertConfig {
                 authority,
                 store: *store,
             })

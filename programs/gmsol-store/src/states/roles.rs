@@ -25,20 +25,23 @@ pub struct RoleKey {
 }
 
 impl RoleKey {
-    /// CONTROLLER.
+    /// Controller.
     pub const CONTROLLER: &'static str = "CONTROLLER";
-
-    /// MARKET KEEPER.
-    pub const MARKET_KEEPER: &'static str = "MARKET_KEEPER";
-
-    /// ORDER KEEPER.
-    pub const ORDER_KEEPER: &'static str = "ORDER_KEEPER";
-
-    /// FEATURE KEEPER.
-    pub const FEATURE_KEEPER: &'static str = "FEATURE_KEEPER";
 
     /// GT Controller.
     pub const GT_CONTROLLER: &'static str = "GT_CONTROLLER";
+
+    /// Market Keeper.
+    pub const MARKET_KEEPER: &'static str = "MARKET_KEEPER";
+
+    /// Order Keeper.
+    pub const ORDER_KEEPER: &'static str = "ORDER_KEEPER";
+
+    /// Feature Keeper.
+    pub const FEATURE_KEEPER: &'static str = "FEATURE_KEEPER";
+
+    /// Config Keeper.
+    pub const CONFIG_KEEPER: &'static str = "CONFIG_KEEPER";
 }
 
 impl Borrow<str> for RoleKey {

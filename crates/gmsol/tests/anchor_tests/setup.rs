@@ -502,9 +502,11 @@ impl Deployment {
             .push_many(
                 [
                     RoleKey::CONTROLLER,
+                    RoleKey::GT_CONTROLLER,
                     RoleKey::MARKET_KEEPER,
                     RoleKey::ORDER_KEEPER,
-                    RoleKey::GT_CONTROLLER,
+                    RoleKey::FEATURE_KEEPER,
+                    RoleKey::CONFIG_KEEPER,
                 ]
                 .iter()
                 .map(|role| client.enable_role(store, role)),
@@ -512,6 +514,8 @@ impl Deployment {
             )?
             .push(client.grant_role(store, &keeper, RoleKey::MARKET_KEEPER))?
             .push(client.grant_role(store, &keeper, RoleKey::ORDER_KEEPER))?
+            .push(client.grant_role(store, &keeper, RoleKey::FEATURE_KEEPER))?
+            .push(client.grant_role(store, &keeper, RoleKey::CONFIG_KEEPER))?
             .push(client.grant_role(store, &keeper, RoleKey::GT_CONTROLLER))?;
 
         _ = builder

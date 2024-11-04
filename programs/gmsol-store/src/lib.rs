@@ -1,6 +1,6 @@
 //! # The GMSOL Store Program
 //!
-//! ## Store Account
+//! ## Store
 //!
 //! A [`Store`](states::Store) Account serves as both an authority and a global configuration
 //! storage.
@@ -21,10 +21,6 @@
 //!   [`Store`](states::Store) account as a [`RoleStore`](states::RoleStore) structure.
 //!
 //! #### Instructions for Permission Management
-//! - [`enable_role`]: Insert or enable a role for the given store.
-//! - [`disable_role`]: Disable an existing role for the given store.
-//! - [`grant_role`]: Grant a role to the given user in the given store.
-//! - [`revoke_role`]: Revoke a role from the given user in the given store.
 //! - [`check_admin`](gmsol_store::check_admin): Check that the signer is the admin of the given store,
 //!   throw error if the check fails.
 //! - [`check_role`](gmsol_store::check_role): Check that the signer has the given role in the given store,
@@ -33,6 +29,20 @@
 //!   or not.
 //! - [`has_role`](gmsol_store::has_role): Return whether the given address has the given role in the given store,
 //!   or not.
+//! - [`enable_role`]: Insert or enable a role for the given store.
+//! - [`disable_role`]: Disable an existing role for the given store.
+//! - [`grant_role`]: Grant a role to the given user in the given store.
+//! - [`revoke_role`]: Revoke a role from the given user in the given store.
+//!
+//! #### Instructions for Config Management
+//! - [`insert_amount`](insert_amount): Insert an amount to the global config.
+//! - [`insert_factor`](insert_factor): Insert a factor to the global config.
+//! - [`insert_address`](insert_address): Insert an address to the global config.
+//! - [`insert_gt_minting_cost_referred_discount`](insert_gt_minting_cost_referred_discount):
+//!   Insert GT miniting cost referred discount factor to the global config.
+//!
+//! #### Instructions for Feature Management
+//! - [`toggle_feature`](toggle_feature): Enable or diable the given feature.
 //!
 //! ## Oracle Price Management
 //!
@@ -220,7 +230,7 @@ pub mod gmsol_store {
     ///
     /// # Errors
     /// - The [`authority`](SetTokenMap::authority) must be a signer and a MARKET_KEEPER
-    ///   of the store.
+    ///   in the store.
     /// - The [`store`](SetTokenMap::store) must be initialized.
     /// - The [`token_map`](SetTokenMap::token_map) must be initialized and owned by the
     ///   given store.
@@ -240,9 +250,9 @@ pub mod gmsol_store {
     ///
     /// # Errors
     /// - The [`authority`](CheckRole::authority) must be a signer and be
-    /// the `ADMIN` of the store.
+    ///   the `ADMIN` of the store.
     /// - The [`store`](CheckRole::store) must have been initialized
-    /// and owned by the store program.
+    ///   and owned by the store program.
     pub fn check_admin(ctx: Context<CheckRole>) -> Result<bool> {
         instructions::check_admin(ctx)
     }
@@ -258,9 +268,9 @@ pub mod gmsol_store {
     ///
     /// # Errors
     /// - The [`authority`](CheckRole::authority) must be a signer and
-    /// must be a member with the `role` role in the store.
+    ///   must be a member with the `role` role in the store.
     /// - The [`store`](CheckRole::store) must have been initialized
-    /// and owned by the store program.
+    ///   and owned by the store program.
     /// - The `role` must exist and be enabled in the store.
     pub fn check_role(ctx: Context<CheckRole>, role: String) -> Result<bool> {
         instructions::check_role(ctx, role)
@@ -276,7 +286,7 @@ pub mod gmsol_store {
     ///
     /// # Errors
     /// - The [`store`](HasRole::store) must have been initialized
-    /// and owned by the store program.
+    ///   and owned by the store program.
     pub fn has_admin(ctx: Context<HasRole>, authority: Pubkey) -> Result<bool> {
         instructions::has_admin(ctx, authority)
     }
@@ -292,7 +302,7 @@ pub mod gmsol_store {
     ///
     /// # Errors
     /// - The [`store`](HasRole::store) must have been initialized
-    /// and owned by the store program.
+    ///   and owned by the store program.
     /// - The `role` must exist and be enabled in the store.
     pub fn has_role(ctx: Context<HasRole>, authority: Pubkey, role: String) -> Result<bool> {
         instructions::has_role(ctx, authority, role)
@@ -377,33 +387,107 @@ pub mod gmsol_store {
         instructions::unchecked_revoke_role(ctx, user, role)
     }
 
-    // Config.
-    #[access_control(internal::Authenticate::only_controller(&ctx))]
-    pub fn insert_amount(ctx: Context<InsertAmount>, key: String, amount: u64) -> Result<()> {
-        instructions::insert_amount(ctx, &key, amount)
+    // ===========================================
+    //              Config Management
+    // ===========================================
+    /// Insert an amount to the global config.
+    ///
+    /// # Accounts
+    /// *[See the documentation for the accounts.](InsertConfig).*
+    ///
+    /// # Arguments
+    /// - `key`: The key of the config.
+    /// - `amount`: The value of the config.
+    ///
+    /// # Errors
+    /// - The [`authority`](InsertConfig::authority) must be a signer and be a
+    ///   CONFIG_KEEPER in the store.
+    /// - The `key` must be defined in [`AmountKey`](crate::states::AmountKey).
+    #[access_control(internal::Authenticate::only_config_keeper(&ctx))]
+    pub fn insert_amount(ctx: Context<InsertConfig>, key: String, amount: u64) -> Result<()> {
+        instructions::unchecked_insert_amount(ctx, &key, amount)
     }
 
-    #[access_control(internal::Authenticate::only_controller(&ctx))]
-    pub fn insert_factor(ctx: Context<InsertFactor>, key: String, factor: u128) -> Result<()> {
-        instructions::insert_factor(ctx, &key, factor)
+    /// Insert a factor to the global config.
+    ///
+    /// # Accounts
+    /// *[See the documentation for the accounts.](InsertConfig).*
+    ///
+    /// # Arguments
+    /// - `key`: The key of the config.
+    /// - `factor`: The value of the config.
+    ///
+    /// # Errors
+    /// - The [`authority`](InsertConfig::authority) must be a signer and be a
+    ///   CONFIG_KEEPER in the store.
+    /// - The `key` must be defined in [`FactorKey`](crate::states::FactorKey).
+    #[access_control(internal::Authenticate::only_config_keeper(&ctx))]
+    pub fn insert_factor(ctx: Context<InsertConfig>, key: String, factor: u128) -> Result<()> {
+        instructions::unchecked_insert_factor(ctx, &key, factor)
     }
 
-    #[access_control(internal::Authenticate::only_controller(&ctx))]
-    pub fn insert_address(ctx: Context<InsertAddress>, key: String, address: Pubkey) -> Result<()> {
-        instructions::insert_address(ctx, &key, address)
+    /// Insert an address to the global config.
+    ///
+    /// # Accounts
+    /// *[See the documentation for the accounts.](InsertConfig).*
+    ///
+    /// # Arguments
+    /// - `key`: The key of the config.
+    /// - `address`: The value of the config.
+    ///
+    /// # Errors
+    /// - The [`authority`](InsertConfig::authority) must be a signer and be a
+    ///   CONFIG_KEEPER in the store.
+    /// - The `key` must be defined in [`AddressKey`](crate::states::AddressKey).
+    #[access_control(internal::Authenticate::only_config_keeper(&ctx))]
+    pub fn insert_address(ctx: Context<InsertConfig>, key: String, address: Pubkey) -> Result<()> {
+        instructions::unchecked_insert_address(ctx, &key, address)
     }
 
+    /// Insert GT minting cost referred discount factor to the global config.
+    ///
+    /// # Accounts
+    /// *[See the documentation for the accounts.](InsertConfig).*
+    ///
+    /// # Arguments
+    /// - `factor`: The value of GT minting cost referred discount factor.
+    ///
+    /// # Errors
+    /// - The [`authority`](InsertConfig::authority) must be a signer and be a
+    ///   MARKET_KEEPER in the store.
+    ///
+    /// # Notes
+    /// - Although the [`insert_factor`] instruction overrides the functionality of
+    ///   this instruction, the permission required for this instruction is different
+    ///   from the one for [`insert_factor`].
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn insert_gt_minting_cost_referred_discount(
-        ctx: Context<InsertFactor>,
+        ctx: Context<InsertConfig>,
         factor: u128,
     ) -> Result<()> {
         let key = FactorKey::GtMintingCostReferredDiscount;
-        instructions::insert_factor(ctx, &key.to_string(), factor)
+        instructions::unchecked_insert_factor(ctx, &key.to_string(), factor)
     }
 
+    // ===========================================
+    //             Feature Management
+    // ===========================================
     /// Enable or diable the given feature.
-    #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
+    ///
+    /// # Accounts
+    /// *[See the documentation for the accounts.](ToggleFeature).*
+    ///
+    /// # Arguments
+    /// - `domain`: Domain part of the feature.
+    /// - `action`: Action part of the feature.
+    /// - `enable`: Whether to enable of disable.
+    ///
+    /// # Errors
+    /// - The [`authority`](ToggleFeature::authority) must be signer and be a
+    ///   FEATURE_KEEPER in the store.
+    /// - The `domain` must be defined in [`DomainDisabledFlag`](crate::states::feature::DomainDisabledFlag).
+    /// - The `action` must be defined in [`ActionDisabledFlag`](crate::states::feature::ActionDiabledFlag).
+    #[access_control(internal::Authenticate::only_feature_keeper(&ctx))]
     pub fn toggle_feature(
         ctx: Context<ToggleFeature>,
         domain: String,

@@ -8,7 +8,7 @@ use crate::{
     utils::internal,
 };
 
-/// The accounts definitions for [`toggle_feature`](crate::gmsol_store::toggle_feature).
+/// The accounts definition for [`toggle_feature`](crate::gmsol_store::toggle_feature).
 #[derive(Accounts)]
 pub struct ToggleFeature<'info> {
     /// Authority.

@@ -49,6 +49,11 @@ pub(crate) trait Authenticate<'info>: Authentication<'info> + Bumps + Sized {
         Self::only(ctx, RoleKey::CONTROLLER)
     }
 
+    /// Check that the `authority` has the [`GT_CONTROLLER`](`RoleKey::GT_CONTROLLER`) role.
+    fn only_gt_controller(ctx: &Context<Self>) -> Result<()> {
+        Self::only(ctx, RoleKey::GT_CONTROLLER)
+    }
+
     /// Check that the `authority` has the [`MARKET_KEEPER`](`RoleKey::MARKET_KEEPER`) role.
     fn only_market_keeper(ctx: &Context<Self>) -> Result<()> {
         Self::only(ctx, RoleKey::MARKET_KEEPER)
@@ -59,9 +64,14 @@ pub(crate) trait Authenticate<'info>: Authentication<'info> + Bumps + Sized {
         Self::only(ctx, RoleKey::ORDER_KEEPER)
     }
 
-    /// Check that the `authority` has the [`GT_CONTROLLER`](`RoleKey::GT_CONTROLLER`) role.
-    fn only_gt_controller(ctx: &Context<Self>) -> Result<()> {
-        Self::only(ctx, RoleKey::GT_CONTROLLER)
+    /// Check that the `authority` has the [`FEATURE_KEEPER`](`RoleKey::FEATURE_KEEPER`) role.
+    fn only_feature_keeper(ctx: &Context<Self>) -> Result<()> {
+        Self::only(ctx, RoleKey::FEATURE_KEEPER)
+    }
+
+    /// Check that the `authority` has the [`CONFIG_KEEPER`](`RoleKey::CONFIG_KEEPER`) role.
+    fn only_config_keeper(ctx: &Context<Self>) -> Result<()> {
+        Self::only(ctx, RoleKey::CONFIG_KEEPER)
     }
 }
 

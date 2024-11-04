@@ -67,7 +67,7 @@ where
     }
 
     fn insert_factor(&self, store: &Pubkey, key: FactorKey, factor: Factor) -> RpcBuilder<C> {
-        let rpc = self.store_rpc().accounts(accounts::InsertFactor {
+        let rpc = self.store_rpc().accounts(accounts::InsertConfig {
             authority: self.payer(),
             store: *store,
         });
