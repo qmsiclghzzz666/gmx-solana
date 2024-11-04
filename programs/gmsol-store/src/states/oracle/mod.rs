@@ -186,6 +186,7 @@ impl Oracle {
         self.set_flag(OracleFlag::Cleared, true);
     }
 
+    #[inline(never)]
     pub(crate) fn with_prices<'info, T>(
         &mut self,
         store: &AccountLoader<'info, Store>,

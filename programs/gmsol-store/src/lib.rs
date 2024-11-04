@@ -123,7 +123,7 @@
 //! - [`prepare_trade_event_buffer`](gmsol_store::prepare_trade_event_buffer): Prepare trade event buffer.
 //! - [`create_order`]: Create an order by the owner.
 //! - [`update_order`](gmsol_store::update_order): Update an order by the owner.
-//! - [`execute_order`](gmsol_store::execute_order()): Execute an order by keepers.
+//! - [`execute_increase_or_swap_order`](gmsol_store::execute_increase_or_swap_order()): Execute an order by keepers.
 //! - [`execute_decrease_order`]: Execute a decrease order by keepers.
 //! - [`close_order`]: Close an order, either by the owner or by keepers.
 //! - [`liquidate`]: Perform a liquidation by keepers.
@@ -1574,15 +1574,15 @@ pub mod gmsol_store {
         instructions::update_order(ctx, &params)
     }
 
-    /// Execute an order by keepers.
+    /// Execute an increase/swap order by keepers.
     #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
-    pub fn execute_order<'info>(
-        ctx: Context<'_, '_, 'info, 'info, ExecuteOrder<'info>>,
+    pub fn execute_increase_or_swap_order<'info>(
+        ctx: Context<'_, '_, 'info, 'info, ExecuteIncreaseOrSwapOrder<'info>>,
         recent_timestamp: i64,
         execution_fee: u64,
         throw_on_execution_error: bool,
     ) -> Result<()> {
-        instructions::unchecked_execute_order(
+        instructions::unchecked_execute_increase_or_swap_order(
             ctx,
             recent_timestamp,
             execution_fee,

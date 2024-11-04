@@ -954,7 +954,7 @@ where
                 .client
                 .store_rpc()
                 .accounts(crate::utils::fix_optional_account_metas(
-                    accounts::ExecuteOrder {
+                    accounts::ExecuteIncreaseOrSwapOrder {
                         authority,
                         owner: hint.owner,
                         user: hint.user,
@@ -972,9 +972,6 @@ where
                         ),
                         long_token_vault: hint.long_token_vault(&self.store),
                         short_token_vault: hint.short_token_vault(&self.store),
-                        claimable_long_token_account_for_user: None,
-                        claimable_short_token_account_for_user: None,
-                        claimable_pnl_token_account_for_holding: None,
                         event_authority: self.client.store_event_authority(),
                         token_program: anchor_spl::token::ID,
                         system_program: system_program::ID,
@@ -1007,7 +1004,7 @@ where
                     &crate::program_ids::DEFAULT_GMSOL_STORE_ID,
                     self.client.store_program_id(),
                 ))
-                .args(instruction::ExecuteOrder {
+                .args(instruction::ExecuteIncreaseOrSwapOrder {
                     recent_timestamp: self.recent_timestamp,
                     execution_fee: self.execution_fee,
                     throw_on_execution_error: !self.cancel_on_execution_error,

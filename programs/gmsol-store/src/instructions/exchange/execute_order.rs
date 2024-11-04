@@ -113,7 +113,7 @@ pub(crate) fn validated_recent_timestamp(config: &Store, timestamp: i64) -> Resu
     }
 }
 
-/// The accounts definition for `execute_order` instruction.
+/// The accounts definition for `execute_increase_or_swap_order` instruction.
 ///
 /// Remaining accounts expected by this instruction:
 ///   - 0..M. `[]` M feed accounts, where M represents the total number of tokens in the
@@ -123,7 +123,7 @@ pub(crate) fn validated_recent_timestamp(config: &Store, timestamp: i64) -> Resu
 #[event_cpi]
 #[derive(Accounts)]
 #[instruction(recent_timestamp: i64)]
-pub struct ExecuteOrder<'info> {
+pub struct ExecuteIncreaseOrSwapOrder<'info> {
     /// Authority.
     pub authority: Signer<'info>,
     /// Store.
@@ -157,7 +157,7 @@ pub struct ExecuteOrder<'info> {
         mut,
         constraint = order.load()?.header.store == store.key() @ CoreError::StoreMismatched,
         constraint = order.load()?.header.market == market.key() @ CoreError::MarketMismatched,
-        constraint = order.load()?.header.owner== owner.key() @ CoreError::OwnerMismatched,
+        constraint = order.load()?.header.owner == owner.key() @ CoreError::OwnerMismatched,
         constraint = order.load()?.params.position().copied() == position.as_ref().map(|p| p.key()) @ CoreError::PositionMismatched,
         constraint = order.load()?.tokens.initial_collateral.account() == initial_collateral_token_escrow.as_ref().map(|a| a.key()) @ CoreError::TokenAccountMismatched,
         constraint = order.load()?.tokens.final_output_token.account() == final_output_token_escrow.as_ref().map(|a| a.key()) @ CoreError::TokenAccountMismatched,
@@ -275,51 +275,6 @@ pub struct ExecuteOrder<'info> {
         bump,
     )]
     pub short_token_vault: Option<Box<Account<'info, TokenAccount>>>,
-    #[account(
-        mut,
-        token::mint = market.load()?.meta().long_token_mint,
-        token::authority = store,
-        constraint = check_delegation(claimable_long_token_account_for_user, order.load()?.header.owner)?,
-        seeds = [
-            constants::CLAIMABLE_ACCOUNT_SEED,
-            store.key().as_ref(),
-            market.load()?.meta().long_token_mint.as_ref(),
-            order.load()?.header.owner.as_ref(),
-            &store.load()?.claimable_time_key(validated_recent_timestamp(store.load()?.deref(), recent_timestamp)?)?,
-        ],
-        bump,
-    )]
-    pub claimable_long_token_account_for_user: Option<Box<Account<'info, TokenAccount>>>,
-    #[account(
-        mut,
-        token::mint = market.load()?.meta().short_token_mint,
-        token::authority = store,
-        constraint = check_delegation(claimable_short_token_account_for_user, order.load()?.header.owner)?,
-        seeds = [
-            constants::CLAIMABLE_ACCOUNT_SEED,
-            store.key().as_ref(),
-            market.load()?.meta().short_token_mint.as_ref(),
-            order.load()?.header.owner.as_ref(),
-            &store.load()?.claimable_time_key(validated_recent_timestamp(store.load()?.deref(), recent_timestamp)?)?,
-        ],
-        bump,
-    )]
-    pub claimable_short_token_account_for_user: Option<Box<Account<'info, TokenAccount>>>,
-    #[account(
-        mut,
-        token::mint = get_pnl_token(&position, market.load()?.deref())?,
-        token::authority = store,
-        constraint = check_delegation(claimable_pnl_token_account_for_holding, store.load()?.address.holding)?,
-        seeds = [
-            constants::CLAIMABLE_ACCOUNT_SEED,
-            store.key().as_ref(),
-            get_pnl_token(&position, market.load()?.deref())?.as_ref(),
-            store.load()?.address.holding.as_ref(),
-            &store.load()?.claimable_time_key(validated_recent_timestamp(store.load()?.deref(), recent_timestamp)?)?,
-        ],
-        bump,
-    )]
-    pub claimable_pnl_token_account_for_holding: Option<Box<Account<'info, TokenAccount>>>,
     /// The token program.
     pub token_program: Program<'info, Token>,
     /// The system program.
@@ -328,22 +283,28 @@ pub struct ExecuteOrder<'info> {
     pub chainlink_program: Option<Program<'info, Chainlink>>,
 }
 
-pub(crate) fn unchecked_execute_order<'info>(
-    mut ctx: Context<'_, '_, 'info, 'info, ExecuteOrder<'info>>,
+#[inline(never)]
+pub(crate) fn unchecked_execute_increase_or_swap_order<'info>(
+    mut ctx: Context<'_, '_, 'info, 'info, ExecuteIncreaseOrSwapOrder<'info>>,
     _recent_timestamp: i64,
     execution_fee: u64,
     throw_on_execution_error: bool,
 ) -> Result<()> {
     let accounts = &mut ctx.accounts;
 
+    let kind = accounts.order.load()?.params().kind()?;
+
+    // Validate the order kind.
+    require!(
+        kind.is_increase_position() || kind.is_swap(),
+        CoreError::InvalidArgument
+    );
+
     // Validate feature enabled.
-    {
-        let order = accounts.order.load()?;
-        accounts.store.load()?.validate_feature_enabled(
-            order.params().kind()?.try_into()?,
-            ActionDisabledFlag::ExecuteOrder,
-        )?;
-    }
+    accounts
+        .store
+        .load()?
+        .validate_feature_enabled(kind.try_into()?, ActionDisabledFlag::ExecuteOrder)?;
 
     let remaining_accounts = ctx.remaining_accounts;
     let signer = accounts.order.load()?.signer();
@@ -377,7 +338,7 @@ pub(crate) fn unchecked_execute_order<'info>(
     Ok(())
 }
 
-impl<'info> internal::Authentication<'info> for ExecuteOrder<'info> {
+impl<'info> internal::Authentication<'info> for ExecuteIncreaseOrSwapOrder<'info> {
     fn authority(&self) -> &Signer<'info> {
         &self.authority
     }
@@ -387,7 +348,8 @@ impl<'info> internal::Authentication<'info> for ExecuteOrder<'info> {
     }
 }
 
-impl<'info> ExecuteOrder<'info> {
+impl<'info> ExecuteIncreaseOrSwapOrder<'info> {
+    #[inline(never)]
     fn transfer_tokens_in(
         &self,
         signer: &ActionSigner,
@@ -421,6 +383,7 @@ impl<'info> ExecuteOrder<'info> {
         Ok(())
     }
 
+    #[inline(never)]
     fn transfer_tokens_out(&self, remaining_accounts: &'info [AccountInfo<'info>]) -> Result<()> {
         if let Some(escrow) = self.initial_collateral_token_escrow.as_ref() {
             let store = &self.store.key();
@@ -529,21 +492,9 @@ impl<'info> ExecuteOrder<'info> {
                     .map(|a| a.to_account_info()),
             )
             .short_token_vault(self.short_token_vault.as_deref())
-            .claimable_long_token_account_for_user(
-                self.claimable_long_token_account_for_user
-                    .as_ref()
-                    .map(|a| a.to_account_info()),
-            )
-            .claimable_short_token_account_for_user(
-                self.claimable_short_token_account_for_user
-                    .as_ref()
-                    .map(|a| a.to_account_info()),
-            )
-            .claimable_pnl_token_account_for_holding(
-                self.claimable_pnl_token_account_for_holding
-                    .as_ref()
-                    .map(|a| a.to_account_info()),
-            )
+            .claimable_long_token_account_for_user(None)
+            .claimable_short_token_account_for_user(None)
+            .claimable_pnl_token_account_for_holding(None)
             .transfer_out(transfer_out)
             .build()
             .execute()?;
@@ -762,6 +713,17 @@ pub(crate) fn unchecked_execute_decrease_order<'info>(
 ) -> Result<()> {
     let accounts = &mut ctx.accounts;
     let remaining_accounts = ctx.remaining_accounts;
+
+    let kind = accounts.order.load()?.params().kind()?;
+
+    // Validate the order kind.
+    require!(kind.is_decrease_position(), CoreError::InvalidArgument);
+
+    // Validate feature enabled.
+    accounts
+        .store
+        .load()?
+        .validate_feature_enabled(kind.try_into()?, ActionDisabledFlag::ExecuteOrder)?;
 
     let (transfer_out, should_send_trade_event) =
         accounts.perform_execution(remaining_accounts, throw_on_execution_error)?;

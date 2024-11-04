@@ -711,6 +711,7 @@ enum SecondaryOrderType {
 }
 
 impl<'a, 'info> ExecuteOrderOperation<'a, 'info> {
+    #[inline(never)]
     pub(crate) fn execute(self) -> Result<(Box<TransferOut>, ShouldSendTradeEvent)> {
         let mut should_close_position = false;
 
