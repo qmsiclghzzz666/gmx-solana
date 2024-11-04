@@ -17,9 +17,6 @@ pub mod store;
 /// Actions for `Exchange` program.`
 pub mod exchange;
 
-/// Pyth integration.
-pub mod pyth;
-
 /// Address Lookup Table operations.
 pub mod alt;
 
@@ -36,6 +33,12 @@ pub mod program_ids;
 pub mod constants {
     pub use gmsol_store::constants::*;
 }
+
+/// Chainlink intergartion.
+pub mod chainlink;
+
+/// Pyth integration.
+pub mod pyth;
 
 /// Test Utils.
 #[cfg(test)]

@@ -79,6 +79,9 @@ pub enum Error {
     /// Signer Error.
     #[error("signer: {0}")]
     SignerError(#[from] solana_sdk::signer::SignerError),
+    /// Transport Error.
+    #[error("transport: {0}")]
+    Transport(String),
 }
 
 impl Error {
@@ -87,9 +90,14 @@ impl Error {
         Self::Unknown(msg.to_string())
     }
 
-    /// Create "invalid argument" error.
+    /// Create an "invalid argument" error.
     pub fn invalid_argument(msg: impl ToString) -> Self {
         Self::InvalidArgument(msg.to_string())
+    }
+
+    /// Create a transport error.
+    pub fn transport(msg: impl ToString) -> Self {
+        Self::Transport(msg.to_string())
     }
 
     /// Anchor Error Code.

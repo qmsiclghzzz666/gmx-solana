@@ -20,8 +20,13 @@ required-features = ["discover", "cli"]
 name = "trade_event"
 required-features = ["decode"]
 
+[[example]]
+name = "chainlink"
+required-features = ["chainlink-pull-oracle", "cli"]
+
 [features]
 cli = [
+    "chainlink-pull-oracle",
     "pyth-pull-oracle",
     "tokio/full",
     "clap",
@@ -38,6 +43,7 @@ cli = [
 ]
 clap = ["dep:clap", "gmsol-store/clap"]
 devnet = ["gmsol-store/devnet"]
+chainlink-pull-oracle = ["reqwest", "url", "sha2", "hmac", "reqwest-websocket"]
 pyth-pull-oracle = [
     "reqwest/stream",
     "url",
@@ -54,6 +60,7 @@ decode = ["gmsol-decode"]
 
 anchor-test = [
     "devnet",
+    "chainlink-pull-oracle",
     "pyth-pull-oracle",
     "tracing-subscriber",
     "shellexpand",
@@ -122,9 +129,14 @@ serde_with = { workspace = true, optional = true, features = ["indexmap_2"] }
 humantime = { workspace = true, optional = true }
 num-format = { workspace = true, optional = true }
 prettytable = { workspace = true, optional = true }
+reqwest = { workspace = true, optional = true, features = ["json"] }
+reqwest-websocket = { workspace = true, optional = true }
+
+# Chainlink.
+sha2 = { workspace = true, optional = true }
+hmac = { workspace = true, optional = true }
 
 # Dependencies for pyth support
-reqwest = { workspace = true, optional = true, features = ["json"] }
 url = { workspace = true, optional = true }
 eventsource-stream = { workspace = true, optional = true }
 pythnet-sdk = { workspace = true, optional = true }
