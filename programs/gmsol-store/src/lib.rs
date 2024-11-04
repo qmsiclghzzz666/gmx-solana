@@ -1046,13 +1046,14 @@ pub mod gmsol_store {
     #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
     pub fn initialize_price_feed(
         ctx: Context<InitializePriceFeed>,
+        index: u8,
         provider: u8,
         token: Pubkey,
         feed_id: Pubkey,
     ) -> Result<()> {
         let provider = PriceProviderKind::try_from(provider)
             .map_err(|_| error!(CoreError::InvalidProviderKindIndex))?;
-        instructions::unchecked_initialize_price_feed(ctx, provider, &token, &feed_id)
+        instructions::unchecked_initialize_price_feed(ctx, index, provider, &token, &feed_id)
     }
 
     /// Update a custom price feed account.

@@ -10,7 +10,7 @@ use crate::{
 
 /// The accounts definition for [`initialize_price_feed`] instruction.
 #[derive(Accounts)]
-#[instruction(provider: u8, token: Pubkey, feed_id: Pubkey)]
+#[instruction(index: u8, provider: u8, token: Pubkey, feed_id: Pubkey)]
 pub struct InitializePriceFeed<'info> {
     /// Authority.
     #[account(mut)]
@@ -22,7 +22,14 @@ pub struct InitializePriceFeed<'info> {
         init,
         payer = authority,
         space = 8 + PriceFeed::INIT_SPACE,
-        seeds = [PriceFeed::SEED, store.key().as_ref(), &[provider], token.as_ref(), feed_id.as_ref()],
+        seeds = [
+            PriceFeed::SEED,
+            store.key().as_ref(),
+            authority.key().as_ref(),
+            &[index],
+            &[provider],
+            token.as_ref(),
+        ],
         bump,
     )]
     pub price_feed: AccountLoader<'info, PriceFeed>,
@@ -33,6 +40,7 @@ pub struct InitializePriceFeed<'info> {
 /// CHECK: only ORDER_KEEPER is allowed to initialize price feed.
 pub(crate) fn unchecked_initialize_price_feed(
     ctx: Context<InitializePriceFeed>,
+    index: u8,
     provider: PriceProviderKind,
     token: &Pubkey,
     feed_id: &Pubkey,
@@ -44,6 +52,7 @@ pub(crate) fn unchecked_initialize_price_feed(
     let mut feed = ctx.accounts.price_feed.load_init()?;
     feed.init(
         ctx.bumps.price_feed,
+        index,
         provider,
         &ctx.accounts.store.key(),
         &ctx.accounts.authority.key(),

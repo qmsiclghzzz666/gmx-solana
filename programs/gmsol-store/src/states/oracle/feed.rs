@@ -13,8 +13,9 @@ use super::PriceProviderKind;
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub struct PriceFeed {
     pub(crate) bump: u8,
+    pub(crate) index: u8,
     pub(crate) provider: u8,
-    padding_0: [u8; 14],
+    padding_0: [u8; 13],
     pub(crate) store: Pubkey,
     pub(crate) authority: Pubkey,
     pub(crate) token: Pubkey,
@@ -37,6 +38,7 @@ impl PriceFeed {
     pub(crate) fn init(
         &mut self,
         bump: u8,
+        index: u8,
         provider: PriceProviderKind,
         store: &Pubkey,
         authority: &Pubkey,
@@ -44,6 +46,7 @@ impl PriceFeed {
         feed_id: &Pubkey,
     ) -> Result<()> {
         self.bump = bump;
+        self.index = index;
         self.provider = provider.into();
         self.store = *store;
         self.authority = *authority;
