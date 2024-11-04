@@ -17,6 +17,13 @@ use crate::{
 };
 
 /// The accounts deifinition for the `execute_withdrawal` instruction.
+///
+/// Remaining accounts expected by this instruction:
+///
+///   - 0..M. `[]` M feed accounts, where M represents the total number of tokens in the
+///     swap params.
+///   - M..M+N. `[writable]` N market accounts, where N represents the total number of unique
+///     markets excluding the current market in the swap params.
 #[derive(Accounts)]
 pub struct ExecuteWithdrawal<'info> {
     /// Authority.

@@ -27,6 +27,11 @@ use crate::{
 };
 
 /// The accounts definitions for the `liquidate` and `auto_deleverage` instructions.
+///
+/// Remaining accounts expected by this instruction:
+///
+///   - 0..N. `[]` N feed accounts, where N represents the total number of unique tokens
+///     in the market.
 #[event_cpi]
 #[derive(Accounts)]
 #[instruction(nonce: [u8; 32], recent_timestamp: i64)]

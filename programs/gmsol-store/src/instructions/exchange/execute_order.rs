@@ -114,6 +114,12 @@ pub(crate) fn validated_recent_timestamp(config: &Store, timestamp: i64) -> Resu
 }
 
 /// The accounts definition for `execute_order` instruction.
+///
+/// Remaining accounts expected by this instruction:
+///   - 0..M. `[]` M feed accounts, where M represents the total number of tokens in the
+///     swap params.
+///   - M..M+N. `[writable]` N market accounts, where N represents the total number of unique
+///     markets excluding the current market in the swap params.
 #[event_cpi]
 #[derive(Accounts)]
 #[instruction(recent_timestamp: i64)]
@@ -558,6 +564,12 @@ impl<'info> ExecuteOrder<'info> {
 }
 
 /// The accounts definition for `execute_decrease_order` instruction.
+///
+/// Remaining accounts expected by this instruction:
+///   - 0..M. `[]` M feed accounts, where M represents the total number of tokens in the
+///     swap params.
+///   - M..M+N. `[writable]` N market accounts, where N represents the total number of unique
+///     markets excluding the current market in the swap params.
 #[event_cpi]
 #[derive(Accounts)]
 #[instruction(recent_timestamp: i64)]

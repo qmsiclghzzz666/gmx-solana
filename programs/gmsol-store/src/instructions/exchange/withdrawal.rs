@@ -16,6 +16,13 @@ use crate::{
 };
 
 /// The accounts definition for the `create_withdrawal` instruction.
+///
+/// Remaining accounts expected by this instruction:
+///
+///   - 0..M. `[]` M market accounts, where M represents the length
+///     of the swap path for final long token.
+///   - M..M+N. `[]` N market accounts, where N represents the length
+///     of the swap path for final short token.
 #[derive(Accounts)]
 #[instruction(nonce: [u8; 32])]
 pub struct CreateWithdrawal<'info> {

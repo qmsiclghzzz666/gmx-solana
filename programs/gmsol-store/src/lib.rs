@@ -1463,6 +1463,7 @@ pub mod gmsol_store {
     // ===========================================
     //             Order and Position
     // ===========================================
+
     pub fn prepare_position(
         ctx: Context<PreparePosition>,
         params: CreateOrderParams,

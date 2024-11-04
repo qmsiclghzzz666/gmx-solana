@@ -165,6 +165,11 @@ fn validate_position(
 }
 
 /// The accounts definitions for `create_order` instruction.
+///
+/// Remaining accounts expected by this instruction:
+///
+///   - 0..M. `[]` M market accounts, where M represents the length of the
+///     swap path for initial collateral token or final output token.
 #[derive(Accounts)]
 #[instruction(nonce: [u8; 32], params: CreateOrderParams)]
 pub struct CreateOrder<'info> {

@@ -15,6 +15,11 @@ use crate::{
 };
 
 /// The accounts definition for the `execute_shift` instruction.
+///
+/// Remaining accounts expected by this instruction:
+///
+///   - 0..N. `[]` N feed accounts, where N represents the total number of unique tokens
+///     in the markets.
 #[derive(Accounts)]
 pub struct ExecuteShift<'info> {
     /// Authority.

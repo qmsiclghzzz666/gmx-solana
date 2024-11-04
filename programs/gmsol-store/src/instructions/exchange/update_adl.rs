@@ -8,6 +8,11 @@ use crate::{
 /// The accounts definition for [`update_adl_state`](crate::gmsol_store::update_adl_state).
 ///
 /// *[See also the documentation for the instruction.](crate::gmsol_store::update_adl_state)*
+///
+/// Remaining accounts expected by this instruction:
+///
+///   - 0..N. `[]` N feed accounts, where N represents the total number of unique tokens
+///     in the market.
 #[derive(Accounts)]
 pub struct UpdateAdlState<'info> {
     /// The address authorized to execute this instruction.
