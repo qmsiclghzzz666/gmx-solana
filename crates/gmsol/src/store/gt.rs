@@ -313,13 +313,13 @@ impl<C: Deref<Target = impl Signer> + Clone> GtOps<C> for crate::Client<C> {
         let vesting = self.find_gt_vesting_address(store, &owner);
         let rpc = self
             .store_rpc()
-            .accounts(accounts::ClaimEsGtVaultByVesting {
+            .accounts(accounts::ClaimEsGtVaultViaVesting {
                 owner,
                 store: *store,
                 user,
                 vesting,
             })
-            .args(instruction::ClaimEsGtVaultByVesting { amount });
+            .args(instruction::ClaimEsGtVaultViaVesting { amount });
         prepare.merge(rpc)
     }
 }

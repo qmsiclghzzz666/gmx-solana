@@ -387,7 +387,8 @@ impl<'info> internal::Authentication<'info> for UpdateMarketConfigWithBuffer<'in
 /// The accounts definition for read-only instructions for market.
 #[derive(Accounts)]
 pub struct ReadMarket<'info> {
-    market: AccountLoader<'info, Market>,
+    /// Market.
+    pub market: AccountLoader<'info, Market>,
 }
 
 /// Get market status.
@@ -406,11 +407,13 @@ pub(crate) fn get_market_status(
 /// The accounts definition for read-only instructions for market.
 #[derive(Accounts)]
 pub struct ReadMarketWithToken<'info> {
+    /// Market.
     #[account(
         constraint = market.load()?.meta.market_token_mint == market_token.key() @ CoreError::InvalidArgument,
     )]
-    market: AccountLoader<'info, Market>,
-    market_token: Account<'info, Mint>,
+    pub market: AccountLoader<'info, Market>,
+    /// Market token.
+    pub market_token: Account<'info, Mint>,
 }
 
 /// Get market token price.
@@ -464,10 +467,12 @@ pub(crate) fn initialize_market_config_buffer(
 /// *[See also the documentation for the instruction.](crate::gmsol_store::set_market_config_buffer_authority)*
 #[derive(Accounts)]
 pub struct SetMarketConfigBufferAuthority<'info> {
+    /// The authority.
     #[account(mut)]
-    authority: Signer<'info>,
+    pub authority: Signer<'info>,
+    /// Buffer.
     #[account(mut, has_one = authority @ CoreError::PermissionDenied)]
-    buffer: Account<'info, MarketConfigBuffer>,
+    pub buffer: Account<'info, MarketConfigBuffer>,
 }
 
 /// Set the authority of the buffer account.
@@ -484,13 +489,16 @@ pub(crate) fn set_market_config_buffer_authority(
 /// *[See also the documentation for the instruction.](crate::gmsol_store::close_market_config_buffer)*
 #[derive(Accounts)]
 pub struct CloseMarketConfigBuffer<'info> {
+    /// The authority.
     #[account(mut)]
-    authority: Signer<'info>,
+    pub authority: Signer<'info>,
+    /// Buffer.
     #[account(mut, close = receiver, has_one = authority @ CoreError::PermissionDenied)]
-    buffer: Account<'info, MarketConfigBuffer>,
+    pub buffer: Account<'info, MarketConfigBuffer>,
+    /// Receiver.
     /// CHECK: Only used to receive funds after closing the buffer account.
     #[account(mut)]
-    receiver: UncheckedAccount<'info>,
+    pub receiver: UncheckedAccount<'info>,
 }
 
 /// Close the buffer account.
@@ -504,8 +512,10 @@ pub(crate) fn close_market_config_buffer(_ctx: Context<CloseMarketConfigBuffer>)
 #[derive(Accounts)]
 #[instruction(new_configs: Vec<(String, Factor)>)]
 pub struct PushToMarketConfigBuffer<'info> {
+    /// Authority.
     #[account(mut)]
-    authority: Signer<'info>,
+    pub authority: Signer<'info>,
+    /// Buffer.
     #[account(
         mut,
         has_one = authority @ CoreError::PermissionDenied,
@@ -513,7 +523,7 @@ pub struct PushToMarketConfigBuffer<'info> {
         realloc::payer = authority,
         realloc::zero = false,
     )]
-    buffer: Account<'info, MarketConfigBuffer>,
+    pub buffer: Account<'info, MarketConfigBuffer>,
     system_program: Program<'info, System>,
 }
 

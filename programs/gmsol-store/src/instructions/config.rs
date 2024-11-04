@@ -8,10 +8,10 @@ use crate::{states::Store, utils::internal};
 pub struct InsertConfig<'info> {
     /// Caller.
     #[account(mut)]
-    authority: Signer<'info>,
+    pub authority: Signer<'info>,
     /// Store.
     #[account(mut)]
-    store: AccountLoader<'info, Store>,
+    pub store: AccountLoader<'info, Store>,
 }
 
 impl<'info> internal::Authentication<'info> for InsertConfig<'info> {

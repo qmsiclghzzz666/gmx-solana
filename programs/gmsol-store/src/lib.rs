@@ -8,7 +8,7 @@
 //! #### Instructions for Store Accounts
 //! - [`initialize`](gmsol_store::initialize): Create a new [`Store`](states::Store) account.
 //! - [`transfer_store_authority`]: Transfer the authority of the given store to a new authority.
-//! - [`set_receiver`]: Set the claimable fee receiver address.
+//! - [`set_receiver`](gmsol_store::set_receiver): Set the claimable fee receiver address.
 //! - [`set_token_map`]: Set the token map account to use.
 //!
 //! ## Role-based Permission Management
@@ -35,14 +35,14 @@
 //! - [`revoke_role`]: Revoke a role from the given user in the given store.
 //!
 //! #### Instructions for Config Management
-//! - [`insert_amount`](insert_amount): Insert an amount to the global config.
-//! - [`insert_factor`](insert_factor): Insert a factor to the global config.
-//! - [`insert_address`](insert_address): Insert an address to the global config.
-//! - [`insert_gt_minting_cost_referred_discount`](insert_gt_minting_cost_referred_discount):
+//! - [`insert_amount`]: Insert an amount to the global config.
+//! - [`insert_factor`]: Insert a factor to the global config.
+//! - [`insert_address`]: Insert an address to the global config.
+//! - [`insert_gt_minting_cost_referred_discount`]:
 //!   Insert GT miniting cost referred discount factor to the global config.
 //!
 //! #### Instructions for Feature Management
-//! - [`toggle_feature`](toggle_feature): Enable or diable the given feature.
+//! - [`toggle_feature`]: Enable or diable the given feature.
 //!
 //! ## Token Config and Oracle Management
 //!
@@ -65,11 +65,11 @@
 //! - [`token_precision`](gmsol_store::token_precision): Get the price precision of the given token.
 //!
 //! #### Instructions for [`Oracle`](states::Oracle) accounts
-//! - [`initialize_oracle`]: Initialize a new [`Oracle`](states::Oracle) account.
-//! - [`clear_all_prices`](gmsol_store::clear_all_prices): Clear the prices of the given oracle account.
+//! - [`initialize_oracle`](gmsol_store::initialize_oracle): Initialize a new [`Oracle`](states::Oracle) account.
+//! - [`clear_all_prices`]: Clear the prices of the given oracle account.
 //! - [`set_prices_from_price_feed`](gmsol_store::set_prices_from_price_feed): Validate and set prices parsed from the
 //!   provided price feed accounts.
-//! - [`initialize_price_feed`](initialize_price_feed): Initialize a custom price feed.
+//! - [`initialize_price_feed`]: Initialize a custom price feed.
 //! - [`update_price_feed_with_chainlink`]: Update a custom Chainlink price feed with Chainlink Data Streams report.
 //!
 //! ## Market Management
@@ -82,8 +82,8 @@
 //! - [`update_market_config`]: Update an item in the market config.
 //! - [`update_market_config_with_buffer`]: Update the market config with the given
 //!   [`MarketConfigBuffer`](states::market::config::MarketConfigBuffer) account.
-//! - [`get_market_status`]: Calculate the market status with the given prices.
-//! - [`get_market_token_price`]: Calculate the market token price the given prices.
+//! - [`get_market_status`](gmsol_store::get_market_status): Calculate the market status with the given prices.
+//! - [`get_market_token_price`](gmsol_store::get_market_token_price): Calculate the market token price the given prices.
 //! - [`toggle_gt_minting`]: Enable or diable GT minting for the given market.
 //!
 //! #### Instructions for [`MarketConfigBuffer`](states::market::config::MarketConfigBuffer) accounts
@@ -98,15 +98,84 @@
 //! - [`initialize_market_vault`]: Initialize the market vault for the given token.
 //! - [`use_claimable_account`]: Prepare a claimable account to receive tokens during the order execution.
 //! - [`close_empty_claimable_account`]: Close a empty claimble account.
-//! - [`prepare_associated_token_account`]: Prepare an ATA.
+//! - [`prepare_associated_token_account`](gmsol_store::prepare_associated_token_account): Prepare an ATA.
 //!
 //! ## Exchange
 //! The instructions for providing functionalities as an exchange are as follows:
 //!
-//! #### Instructions for [`Deposit`](states::Deposit).
+//! #### Instructions for [`Deposit`](states::Deposit)
 //! - [`create_deposit`]: Create a deposit by the owner.
-//! - [`execute_deposit`](gmsol_store::execute_deposit): Execute a deposit by keepers.
+//! - [`execute_deposit`](gmsol_store::execute_deposit()): Execute a deposit by keepers.
 //! - [`close_deposit`]: Close a deposit, either by the owner or by keepers.
+//!
+//! #### Instructions for [`Withdrawal`](states::Withdrawal)
+//! - [`create_withdrawal`]: Create a withdrawal by the owner.
+//! - [`execute_withdrawal`](gmsol_store::execute_withdrawal()): Execute a withdrawal by keepers.
+//! - [`close_withdrawal`]: Close a withdrawal, either by the owner or by keepers.
+//!
+//! #### Instructions for [`Shift`](states::Shift)
+//! - [`create_shift`]: Create a shift by the owner.
+//! - [`execute_shift`](gmsol_store::execute_shift()): Execute a shift by keepers.
+//! - [`close_shift`]: Close a shift, either by the owner or by keepers.
+//!
+//! #### Instructions for [`Order`](states::Order) and [`Position`](states::Position)
+//! - [`prepare_position`](gmsol_store::prepare_position): Prepare the position account for orders.
+//! - [`prepare_trade_event_buffer`](gmsol_store::prepare_trade_event_buffer): Prepare trade event buffer.
+//! - [`create_order`]: Create an order by the owner.
+//! - [`update_order`](gmsol_store::update_order): Update an order by the owner.
+//! - [`execute_order`](gmsol_store::execute_order()): Execute an order by keepers.
+//! - [`execute_decrease_order`]: Execute a decrease order by keepers.
+//! - [`close_order`]: Close an order, either by the owner or by keepers.
+//! - [`liquidate`]: Perform a liquidation by keepers.
+//! - [`auto_deleverage`]: Perform an ADL by keepers.
+//! - [`update_adl_state`]: Update the ADL state of the market.
+//!
+//! ## GLV Model
+//! The instructions for providing functionalities for GLV are as follows:
+//!
+//! #### Instructions for [`Glv`](states::Glv).
+//! - [`initialize_glv`]: Initialize a GLV.
+//! - [`update_glv_market_config`]: Update GLV market config.
+//!
+//! #### Instructions for [`GlvDeposit`](states::GlvDeposit)
+//! - [`create_glv_deposit`]: Create a GLV deposit by the owner.
+//! - [`execute_glv_deposit`]: Execute a GLV deposit by keepers.
+//! - [`close_glv_deposit`]: Close a GLV deposit, either by the owner or by keepers.
+//!
+//! #### Instructions for [`GlvWithdrawal`](states::glv::GlvWithdrawal)
+//! - [`create_glv_withdrawal`]: Create a GLV withdrawal by the owner.
+//! - [`execute_glv_withdrawal`]: Execute a GLV withdrawal by keepers.
+//! - [`close_glv_withdrawal`]: Close a GLV withdrawal, either by the owner or by keepers.
+//!
+//! #### Instructions for [`GlvShift`](states::glv::GlvShift)
+//! - [`create_glv_shift`]: Create a GLV shift by keepers.
+//! - [`execute_glv_shift`]: Execute a GLV shift by keepers.
+//! - [`close_glv_shift`]: Close a shift by keepers.
+//!
+//! ## User and Referral
+//! The instructions for user accounts and referrals are as follows:
+//! - [`prepare_user`](gmsol_store::prepare_user): Prepare a user account.
+//! - [`initialize_referral_code`](gmsol_store::initialize_referral_code): Initialize and set a referral code.
+//! - [`set_referrer`](gmsol_store::set_referrer): Set the referrer.
+//! - [`transfer_referral_code`](gmsol_store::transfer_referral_code): Transfer the referral code to others.
+//!
+//! ## GT Model
+//! The instructions for GT Model are as follows:
+//! - [`initialize_gt`]: Initialize the GT state.
+//! - [`gt_set_order_fee_discount_factors`]: Set order fee discount factors.
+//! - [`gt_set_referral_reward_factors`]: Set referral reward factors.
+//! - [`gt_set_es_receiver_factor`]: Set esGT receiver factor.
+//! - [`gt_set_exchange_time_window`]: Set GT exchange time window.
+//! - [`gt_set_receiver`]: Set esGT vault receiver.
+//! - [`prepare_gt_exchange_vault`](gmsol_store::prepare_gt_exchange_vault): Prepare current GT exchange vault.
+//! - [`confirm_gt_exchange_vault`]: Confirm GT exchange vault.
+//! - [`request_gt_exchange`](gmsol_store::request_gt_exchange): Request a GT exchange.
+//! - [`close_gt_exchange`]: Close a confirmed GT exchange.
+//! - [`claim_es_gt`](gmsol_store::claim_es_gt): Claim esGT.
+//! - [`request_gt_vesting`](gmsol_store::request_gt_vesting): Request GT vesting.
+//! - [`update_gt_vesting`](gmsol_store::update_gt_vesting): Update GT vesting state.
+//! - [`close_gt_vesting`](gmsol_store::close_gt_vesting): Close an empty GT vesting.
+//! - [`claim_es_gt_vault_via_vesting`](gmsol_store::claim_es_gt_vault_via_vesting): Claim esGT vault via vesting.
 
 /// Instructions.
 pub mod instructions;
@@ -492,7 +561,7 @@ pub mod gmsol_store {
     /// - The [`authority`](ToggleFeature::authority) must be signer and be a
     ///   FEATURE_KEEPER in the store.
     /// - The `domain` must be defined in [`DomainDisabledFlag`](crate::states::feature::DomainDisabledFlag).
-    /// - The `action` must be defined in [`ActionDisabledFlag`](crate::states::feature::ActionDiabledFlag).
+    /// - The `action` must be defined in [`ActionDisabledFlag`](crate::states::feature::ActionDisabledFlag).
     #[access_control(internal::Authenticate::only_feature_keeper(&ctx))]
     pub fn toggle_feature(
         ctx: Context<ToggleFeature>,
@@ -934,7 +1003,7 @@ pub mod gmsol_store {
     ///   in the store.
     /// - The [`store`](UpdatePriceFeedWithChainlink::store) must be initialized.
     /// - The [`verifier_account`](UpdatePriceFeedWithChainlink::verifier_account) must be valid.
-    /// - The [`price_feed`] must be initialized and owned by the `store` and the `authority`.
+    /// - The [`price_feed`](UpdatePriceFeedWithChainlink::price_feed) must be initialized and owned by the `store` and the `authority`.
     /// - The [`chainlink`](UpdatePriceFeedWithChainlink::chainlink) program must be trusted.
     /// - The configured provider of the `price_feed` must be
     ///   [`ChainlinkDataStreams`](PriceProviderKind::ChainlinkDataStreams).
@@ -1436,6 +1505,7 @@ pub mod gmsol_store {
     //                 Withdrawal
     // ===========================================
 
+    /// Create a withdrawal by the owner.
     pub fn create_withdrawal<'info>(
         mut ctx: Context<'_, '_, 'info, 'info, CreateWithdrawal<'info>>,
         nonce: [u8; 32],
@@ -1444,6 +1514,7 @@ pub mod gmsol_store {
         internal::Create::create(&mut ctx, &nonce, &params)
     }
 
+    /// Close a withdrawal, either by the owner or by keepers.
     pub fn close_withdrawal<'info>(
         ctx: Context<'_, '_, 'info, 'info, CloseWithdrawal<'info>>,
         reason: String,
@@ -1451,6 +1522,7 @@ pub mod gmsol_store {
         internal::Close::close(&ctx, &reason)
     }
 
+    /// Execute a withdrawal by keepers.
     #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
     pub fn execute_withdrawal<'info>(
         ctx: Context<'_, '_, 'info, 'info, ExecuteWithdrawal<'info>>,
@@ -1464,6 +1536,7 @@ pub mod gmsol_store {
     //             Order and Position
     // ===========================================
 
+    /// Prepare the position account for orders.
     pub fn prepare_position(
         ctx: Context<PreparePosition>,
         params: CreateOrderParams,
@@ -1471,6 +1544,7 @@ pub mod gmsol_store {
         instructions::prepare_position(ctx, &params)
     }
 
+    /// Create an order by the owner.
     pub fn create_order<'info>(
         mut ctx: Context<'_, '_, 'info, 'info, CreateOrder<'info>>,
         nonce: [u8; 32],
@@ -1479,6 +1553,7 @@ pub mod gmsol_store {
         internal::Create::create(&mut ctx, &nonce, &params)
     }
 
+    /// Close an order, either by the owner or by keepers.
     pub fn close_order<'info>(
         ctx: Context<'_, '_, 'info, 'info, CloseOrder<'info>>,
         reason: String,
@@ -1486,6 +1561,7 @@ pub mod gmsol_store {
         internal::Close::close(&ctx, &reason)
     }
 
+    /// Prepare trade event buffer.
     pub fn prepare_trade_event_buffer(
         ctx: Context<PrepareTradeEventBuffer>,
         index: u8,
@@ -1493,10 +1569,12 @@ pub mod gmsol_store {
         instructions::prepare_trade_event_buffer(ctx, index)
     }
 
+    /// Update an order by the owner.
     pub fn update_order(ctx: Context<UpdateOrder>, params: UpdateOrderParams) -> Result<()> {
         instructions::update_order(ctx, &params)
     }
 
+    /// Execute an order by keepers.
     #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
     pub fn execute_order<'info>(
         ctx: Context<'_, '_, 'info, 'info, ExecuteOrder<'info>>,
@@ -1512,6 +1590,7 @@ pub mod gmsol_store {
         )
     }
 
+    /// Execute a decrease order by keepers.
     #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
     pub fn execute_decrease_order<'info>(
         ctx: Context<'_, '_, 'info, 'info, ExecuteDecreaseOrder<'info>>,
@@ -1527,6 +1606,7 @@ pub mod gmsol_store {
         )
     }
 
+    /// Perform a liquidation by keepers.
     #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
     pub fn liquidate<'info>(
         ctx: Context<'_, '_, 'info, 'info, PositionCut<'info>>,
@@ -1567,6 +1647,7 @@ pub mod gmsol_store {
         instructions::unchecked_update_adl_state(ctx, is_long)
     }
 
+    /// Perform an ADL by keepers.
     #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
     pub fn auto_deleverage<'info>(
         ctx: Context<'_, '_, 'info, 'info, PositionCut<'info>>,
@@ -1588,6 +1669,7 @@ pub mod gmsol_store {
     //                  Shift
     // ===========================================
 
+    /// Create a shift by the owner.
     pub fn create_shift<'info>(
         mut ctx: Context<'_, '_, 'info, 'info, CreateShift<'info>>,
         nonce: [u8; 32],
@@ -1596,7 +1678,7 @@ pub mod gmsol_store {
         internal::Create::create(&mut ctx, &nonce, &params)
     }
 
-    /// Execute Shift.
+    /// Execute a shift by keepers.
     #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
     pub fn execute_shift<'info>(
         ctx: Context<'_, '_, 'info, 'info, ExecuteShift<'info>>,
@@ -1606,6 +1688,7 @@ pub mod gmsol_store {
         instructions::unchecked_execute_shift(ctx, execution_lamports, throw_on_execution_error)
     }
 
+    /// Close a shift, either by the owner or by keepers.
     pub fn close_shift<'info>(
         ctx: Context<'_, '_, 'info, 'info, CloseShift<'info>>,
         reason: String,
@@ -1667,7 +1750,7 @@ pub mod gmsol_store {
         instructions::unchecked_gt_set_exchange_time_window(ctx, window)
     }
 
-    /// Set GT esGT vault receiver.
+    /// Set esGT vault receiver.
     #[access_control(internal::Authenticate::only_gt_controller(&ctx))]
     pub fn gt_set_receiver(ctx: Context<ConfigurateGt>, receiver: Pubkey) -> Result<()> {
         instructions::unchecked_gt_set_receiver(ctx, &receiver)
@@ -1719,12 +1802,12 @@ pub mod gmsol_store {
         instructions::close_gt_vesting(ctx)
     }
 
-    /// Claim esGT vault by vesting.
-    pub fn claim_es_gt_vault_by_vesting(
-        ctx: Context<ClaimEsGtVaultByVesting>,
+    /// Claim esGT vault via vesting.
+    pub fn claim_es_gt_vault_via_vesting(
+        ctx: Context<ClaimEsGtVaultViaVesting>,
         amount: u64,
     ) -> Result<()> {
-        instructions::claim_es_gt_vault_by_vesting(ctx, amount)
+        instructions::claim_es_gt_vault_via_vesting(ctx, amount)
     }
 
     // ===========================================

@@ -608,9 +608,9 @@ pub(crate) fn close_gt_vesting(ctx: Context<CloseGtVesting>) -> Result<()> {
     Ok(())
 }
 
-/// The accounts definition for [`claim_es_gt_vault_by_vesting`](crate::gmsol_store::claim_es_gt_vault_by_vesting).
+/// The accounts definition for [`claim_es_gt_vault_by_vesting`](crate::gmsol_store::claim_es_gt_vault_via_vesting).
 #[derive(Accounts)]
-pub struct ClaimEsGtVaultByVesting<'info> {
+pub struct ClaimEsGtVaultViaVesting<'info> {
     /// The owner.
     pub(crate) owner: Signer<'info>,
     #[account(mut)]
@@ -637,8 +637,8 @@ pub struct ClaimEsGtVaultByVesting<'info> {
     pub vesting: AccountLoader<'info, GtVesting>,
 }
 
-pub(crate) fn claim_es_gt_vault_by_vesting(
-    ctx: Context<ClaimEsGtVaultByVesting>,
+pub(crate) fn claim_es_gt_vault_via_vesting(
+    ctx: Context<ClaimEsGtVaultViaVesting>,
     amount: u64,
 ) -> Result<()> {
     let accounts = ctx.accounts;
