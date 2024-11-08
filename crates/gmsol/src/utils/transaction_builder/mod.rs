@@ -194,8 +194,8 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> TransactionBuilder<'a, C> {
         send_all_txs(&self.client, txs, config).await
     }
 
-    /// Estimated execution fee.
-    pub async fn estimated_execution_fee(
+    /// Estimate execution fee.
+    pub async fn estimate_execution_fee(
         &self,
         compute_unit_price_micro_lamports: Option<u64>,
     ) -> crate::Result<u64> {

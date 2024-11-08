@@ -30,6 +30,9 @@ pub mod fixed;
 /// Utils for token calculation.
 pub mod token;
 
+/// Utils for action builders.
+pub mod builder;
+
 pub use self::{
     fixed::{
         signed_amount_to_decimal, signed_fixed_to_decimal, signed_value_to_decimal,

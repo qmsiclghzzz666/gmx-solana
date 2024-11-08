@@ -366,7 +366,7 @@ impl KeeperArgs {
                             .build()
                             .and_then(|builder| async move {
                                 builder
-                                    .estimated_execution_fee(Some(self.compute_unit_price))
+                                    .estimate_execution_fee(Some(self.compute_unit_price))
                                     .await
                             })
                             .right_future()
@@ -434,7 +434,7 @@ impl KeeperArgs {
                             .build()
                             .and_then(|builder| async move {
                                 builder
-                                    .estimated_execution_fee(Some(self.compute_unit_price))
+                                    .estimate_execution_fee(Some(self.compute_unit_price))
                                     .await
                             })
                             .right_future()
@@ -515,7 +515,7 @@ impl KeeperArgs {
                             .build()
                             .and_then(|builder| async move {
                                 builder
-                                    .estimated_execution_fee(Some(self.compute_unit_price))
+                                    .estimate_execution_fee(Some(self.compute_unit_price))
                                     .await
                             })
                             .right_future()

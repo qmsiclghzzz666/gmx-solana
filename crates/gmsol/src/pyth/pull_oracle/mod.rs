@@ -54,11 +54,11 @@ where
     ) -> crate::Result<u64> {
         let mut execution_fee = self
             .post
-            .estimated_execution_fee(compute_unit_price_micro_lamports)
+            .estimate_execution_fee(compute_unit_price_micro_lamports)
             .await?;
         execution_fee = execution_fee.saturating_add(
             self.close
-                .estimated_execution_fee(compute_unit_price_micro_lamports)
+                .estimate_execution_fee(compute_unit_price_micro_lamports)
                 .await?,
         );
         Ok(execution_fee)
