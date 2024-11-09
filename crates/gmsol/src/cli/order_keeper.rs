@@ -13,7 +13,10 @@ use gmsol::{
         PythPullOracleContext, PythPullOracleOps,
     },
     types::{Deposit, DepositCreated, Order, OrderCreated, Withdrawal, WithdrawalCreated},
-    utils::{ComputeBudget, RpcBuilder, ZeroCopy},
+    utils::{
+        builder::{MakeTransactionBuilder, SetExecutionFee},
+        ComputeBudget, RpcBuilder, ZeroCopy,
+    },
 };
 use gmsol_model::PositionState;
 use gmsol_store::states::PriceProviderKind;
@@ -254,13 +257,8 @@ impl KeeperArgs {
                     deposit,
                     true,
                 );
-                let execution_fee = self
-                    .get_or_estimate_execution_fee(
-                        &client.data_store().solana_rpc(),
-                        builder.build().await?,
-                    )
-                    .await?;
-                builder.execution_fee(execution_fee);
+                let execution_fee = builder.build().await?.estimate_execution_fee(None).await?;
+                builder.set_execution_fee(execution_fee);
                 if self.use_pyth_pull_oracle() {
                     let hint = builder.prepare_hint().await?;
                     let feed_ids = extract_pyth_feed_ids(&hint.feeds)?;
@@ -282,13 +280,18 @@ impl KeeperArgs {
                         )
                         .await?;
                 } else {
-                    let mut rpc = builder.build().await?;
-                    if let Some(budget) = self.get_compute_budget() {
-                        rpc = rpc.compute_budget(budget)
-                    }
-                    let signature = rpc.into_anchor_request().send().await?;
-                    tracing::info!(%deposit, "executed deposit at tx {signature}");
-                    println!("{signature}");
+                    let builder = builder.build().await?;
+                    let compute_unit_price_micro_lamports =
+                        self.get_compute_budget().map(|budget| budget.price());
+                    let signatures = builder
+                        .send_all_with_opts(
+                            compute_unit_price_micro_lamports,
+                            Default::default(),
+                            false,
+                        )
+                        .await?;
+                    tracing::info!(%deposit, "executed deposit at tx {signatures:#?}");
+                    println!("{signatures:#?}");
                 }
             }
             Command::ExecuteWithdrawal { withdrawal } => {

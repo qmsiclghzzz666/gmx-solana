@@ -210,7 +210,7 @@ impl Client {
     }
 
     /// Get latest report of the given hex-encoded feed ID.
-    pub async fn latest_report(&self, feed_id: &str) -> crate::Result<RawReport<ReportData>> {
+    pub async fn latest_report(&self, feed_id: &str) -> crate::Result<ApiReport> {
         let report = self
             .get(Path::ReportsLatest, &[("feedID", feed_id)], true)?
             .send()
@@ -225,7 +225,7 @@ impl Client {
         &self,
         feed_ids: impl IntoIterator<Item = &str>,
         ts: time::OffsetDateTime,
-    ) -> crate::Result<RawReports> {
+    ) -> crate::Result<ApiReports> {
         let feed_ids = feed_ids.into_iter().collect::<Vec<_>>().join(",");
         let timestamp = ts.unix_timestamp();
         let reports = self
@@ -245,7 +245,7 @@ impl Client {
     pub async fn subscribe(
         &self,
         feed_ids: impl IntoIterator<Item = &str>,
-    ) -> crate::Result<impl Stream<Item = crate::Result<RawReport<ReportData>>>> {
+    ) -> crate::Result<impl Stream<Item = crate::Result<ApiReport>>> {
         let feed_ids = feed_ids.into_iter().collect::<Vec<_>>().join(",");
         let ws = self
             .get_inner(Path::Websocket, &[("feedIDs", feed_ids)], true, true)?
@@ -295,12 +295,19 @@ pub struct Feed {
 
 /// Raw Report.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RawReport<T> {
-    report: T,
+pub struct ApiReport {
+    report: ApiReportData,
 }
 
-impl<T> Deref for RawReport<T> {
-    type Target = T;
+impl ApiReport {
+    /// Into report data.
+    pub fn into_data(self) -> ApiReportData {
+        self.report
+    }
+}
+
+impl Deref for ApiReport {
+    type Target = ApiReportData;
 
     fn deref(&self) -> &Self::Target {
         &self.report
@@ -309,12 +316,19 @@ impl<T> Deref for RawReport<T> {
 
 /// A bulk of reports.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RawReports {
-    reports: Vec<ReportData>,
+pub struct ApiReports {
+    reports: Vec<ApiReportData>,
 }
 
-impl Deref for RawReports {
-    type Target = Vec<ReportData>;
+impl ApiReports {
+    /// Into reports.
+    pub fn into_reports(self) -> Vec<ApiReportData> {
+        self.reports
+    }
+}
+
+impl Deref for ApiReports {
+    type Target = Vec<ApiReportData>;
 
     fn deref(&self) -> &Self::Target {
         &self.reports
@@ -324,7 +338,7 @@ impl Deref for RawReports {
 /// Raw Report Data.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ReportData {
+pub struct ApiReportData {
     /// Feed ID.
     #[serde(rename = "feedID")]
     pub feed_id: String,
@@ -336,7 +350,7 @@ pub struct ReportData {
     pub valid_from_timestamp: i64,
 }
 
-impl ReportData {
+impl ApiReportData {
     /// Decode the report.
     pub fn decode(&self) -> crate::Result<Report> {
         let report = self.report_bytes()?;
@@ -352,6 +366,17 @@ impl ReportData {
                 .unwrap_or(&self.full_report),
         )
         .map_err(crate::Error::invalid_argument)
+    }
+
+    /// Feed ID.
+    pub fn decode_feed_id(&self) -> crate::Result<[u8; 32]> {
+        let mut data = [0; 32];
+        hex::decode_to_slice(
+            self.feed_id.strip_prefix("0x").unwrap_or(&self.feed_id),
+            &mut data,
+        )
+        .map_err(crate::Error::unknown)?;
+        Ok(data)
     }
 }
 

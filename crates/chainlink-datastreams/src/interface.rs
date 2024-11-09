@@ -1,6 +1,9 @@
 use anchor_lang::{prelude::Pubkey, Ids};
 
-pub use mock_chainlink_verifier::cpi::{accounts::VerifyContext, verify, verify_bulk};
+pub use mock_chainlink_verifier::{
+    cpi::{accounts::VerifyContext, verify, verify_bulk},
+    DEFAULT_VERIFIER_ACCOUNT_SEEDS as VERIFIER_ACCOUNT_SEEDS,
+};
 
 /// Chainlink DataStreams Interface.
 #[derive(Clone, Copy)]

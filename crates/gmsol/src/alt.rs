@@ -10,7 +10,9 @@ use anchor_client::{
     },
 };
 
-use crate::utils::{rpc::accounts::get_account_with_context, RpcBuilder, WithSlot};
+use crate::utils::{
+    rpc::accounts::get_account_with_context, RpcBuilder, TransactionBuilder, WithSlot,
+};
 
 /// Address Lookup Table operations.
 pub trait AddressLookupTableOps<C> {
@@ -37,9 +39,13 @@ pub trait AddressLookupTableOps<C> {
     /// Create a [`RpcBuilder`] to create address lookup table.
     fn create_alt(&self) -> impl Future<Output = crate::Result<(RpcBuilder<C>, Pubkey)>>;
 
-    /// Create a [`RpcBuilder`] to extend the given address lookup table with new addresses.
-    fn extend_alt(&self, alt: &Pubkey, new_addresses: Vec<Pubkey>) -> RpcBuilder<C>;
-
+    /// Create a [`TransactionBuilder`] to extend the given address lookup table with new addresses.
+    fn extend_alt(
+        &self,
+        alt: &Pubkey,
+        new_addresses: Vec<Pubkey>,
+        chunk_size: Option<usize>,
+    ) -> crate::Result<TransactionBuilder<C>>;
     /// Create a [`RpcBuilder`] to deactivate the given address lookup table
     fn deactivate_alt(&self, alt: &Pubkey) -> RpcBuilder<C>;
 
@@ -85,17 +91,30 @@ impl<C: Deref<Target = impl Signer> + Clone> AddressLookupTableOps<C> for crate:
         Ok((rpc, address))
     }
 
-    fn extend_alt(&self, alt: &Pubkey, new_addresses: Vec<Pubkey>) -> RpcBuilder<C> {
+    fn extend_alt(
+        &self,
+        alt: &Pubkey,
+        new_addresses: Vec<Pubkey>,
+        chunk_size: Option<usize>,
+    ) -> crate::Result<TransactionBuilder<C>> {
+        let mut tx = self.transaction();
         let payer = self.payer();
-        let ix = address_lookup_table::instruction::extend_lookup_table(
-            *alt,
-            payer,
-            Some(payer),
-            new_addresses,
-        );
-        self.store_rpc()
-            .program(address_lookup_table::program::ID)
-            .pre_instruction(ix)
+
+        let chunk_size = chunk_size.unwrap_or(10);
+        for new_addresses in new_addresses.chunks(chunk_size) {
+            let ix = address_lookup_table::instruction::extend_lookup_table(
+                *alt,
+                payer,
+                Some(payer),
+                new_addresses.to_owned(),
+            );
+            let rpc = self
+                .store_rpc()
+                .program(address_lookup_table::program::ID)
+                .pre_instruction(ix);
+            tx.try_push(rpc)?;
+        }
+        Ok(tx)
     }
 
     fn deactivate_alt(&self, alt: &Pubkey) -> RpcBuilder<C> {

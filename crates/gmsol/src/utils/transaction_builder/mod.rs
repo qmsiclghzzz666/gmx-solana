@@ -34,7 +34,11 @@ pub struct TransactionBuilder<'a, C> {
     builders: Vec<RpcBuilder<'a, C>>,
     force_one_transaction: bool,
     max_packet_size: Option<usize>,
+    max_instructions_for_one_tx: usize,
 }
+
+const TRANSACTION_SIZE_LIMIT: usize = PACKET_DATA_SIZE;
+const MAX_INSTRUCTIONS_FOR_ONE_TX: usize = 14;
 
 impl<'a, C> TransactionBuilder<'a, C> {
     /// Create a new [`TransactionBuilder`].
@@ -53,15 +57,26 @@ impl<'a, C> TransactionBuilder<'a, C> {
             builders: Default::default(),
             force_one_transaction,
             max_packet_size,
+            max_instructions_for_one_tx: MAX_INSTRUCTIONS_FOR_ONE_TX,
         }
     }
 
     /// Get packet size.
     pub fn packet_size(&self) -> usize {
         match self.max_packet_size {
-            Some(size) => size.min(PACKET_DATA_SIZE),
-            None => PACKET_DATA_SIZE,
+            Some(size) => size.min(TRANSACTION_SIZE_LIMIT),
+            None => TRANSACTION_SIZE_LIMIT,
         }
+    }
+
+    /// Get the client.
+    pub fn client(&self) -> &RpcClient {
+        &self.client
+    }
+
+    /// Is emtpy.
+    pub fn is_emtpy(&self) -> bool {
+        self.builders.is_empty()
     }
 }
 
@@ -110,7 +125,9 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> TransactionBuilder<'a, C> {
                 Some(&lookup_table),
                 lookup_table_addresses.len(),
             );
-            if size_after_merge <= packet_size {
+            if size_after_merge <= packet_size
+                && ixs_after_merge.len() <= self.max_instructions_for_one_tx
+            {
                 tracing::debug!(size_after_merge, "adding to the last tx");
                 last.try_merge(&mut rpc).map_err(|err| (rpc, err))?;
             } else {

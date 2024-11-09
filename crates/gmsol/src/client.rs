@@ -727,6 +727,14 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
             .0)
     }
 
+    /// Fetch [`PriceFeed`](types::PriceFeed) account with its address.
+    pub async fn price_feed(&self, address: &Pubkey) -> crate::Result<Option<types::PriceFeed>> {
+        Ok(self
+            .account::<ZeroCopy<types::PriceFeed>>(address)
+            .await?
+            .map(|a| a.0))
+    }
+
     /// Get the [`PubsubClient`].
     pub async fn pub_sub(&self) -> crate::Result<&PubsubClient> {
         let client = self

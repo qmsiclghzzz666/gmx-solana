@@ -12,7 +12,7 @@ use anchor_client::{
 };
 use gmsol_store::states::{common::TokensWithFeed, Market, PriceProviderKind, Store};
 
-use crate::pyth::find_pyth_feed_account;
+use crate::{pyth::find_pyth_feed_account, utils::builder::FeedAddressMap};
 
 type Parser = Box<dyn Fn(Pubkey) -> crate::Result<AccountMeta>>;
 
@@ -58,6 +58,31 @@ impl FeedsParser {
             });
         };
         (parser)(*feed)
+    }
+
+    /// Insert a pull oracle feed parser.
+    pub fn insert_pull_oracle_feed_parser(
+        &mut self,
+        provider: PriceProviderKind,
+        map: FeedAddressMap,
+    ) -> &mut Self {
+        self.parsers.insert(
+            provider,
+            Box::new(move |feed_id| {
+                let price_update = map.get(&feed_id).ok_or_else(|| {
+                    crate::Error::invalid_argument(format!(
+                        "feed account for {feed_id} not provided"
+                    ))
+                })?;
+
+                Ok(AccountMeta {
+                    pubkey: *price_update,
+                    is_signer: false,
+                    is_writable: false,
+                })
+            }),
+        );
+        self
     }
 }
 

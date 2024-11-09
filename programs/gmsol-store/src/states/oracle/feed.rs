@@ -102,6 +102,11 @@ impl PriceFeed {
         self.last_published_at_slot
     }
 
+    /// Get feed id.
+    pub fn feed_id(&self) -> &Pubkey {
+        &self.feed_id
+    }
+
     pub(crate) fn check_and_get_price(
         &self,
         clock: &Clock,

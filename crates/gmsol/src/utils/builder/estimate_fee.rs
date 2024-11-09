@@ -4,12 +4,22 @@ use anchor_client::solana_sdk::signer::Signer;
 
 use crate::utils::TransactionBuilder;
 
-use super::Builder;
+use super::MakeTransactionBuilder;
 
 /// Estimate Execution Fee.
 pub struct EstimateFee<T> {
     builder: T,
     compute_unit_price_micro_lamports: Option<u64>,
+}
+
+impl<T> EstimateFee<T> {
+    /// Estiamte fee before building the transaction.
+    pub fn new(builder: T, compute_unit_price_micro_lamports: Option<u64>) -> Self {
+        Self {
+            builder,
+            compute_unit_price_micro_lamports,
+        }
+    }
 }
 
 /// Set Execution Fee.
@@ -20,13 +30,13 @@ pub trait SetExecutionFee {
     }
 
     /// Set execution fee.
-    fn set_execution_fee(&mut self, lamports: u64);
+    fn set_execution_fee(&mut self, lamports: u64) -> &mut Self;
 }
 
-impl<'a, C: Deref<Target = impl Signer> + Clone, T> Builder<'a, C> for EstimateFee<T>
+impl<'a, C: Deref<Target = impl Signer> + Clone, T> MakeTransactionBuilder<'a, C> for EstimateFee<T>
 where
     T: SetExecutionFee,
-    T: Builder<'a, C>,
+    T: MakeTransactionBuilder<'a, C>,
 {
     async fn build(&mut self) -> crate::Result<TransactionBuilder<'a, C>> {
         let mut tx = self.builder.build().await?;

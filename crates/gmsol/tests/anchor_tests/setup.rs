@@ -26,6 +26,7 @@ use event_listener::Event;
 use eyre::{eyre, OptionExt};
 use gmsol::{
     alt::AddressLookupTableOps,
+    chainlink::pull_oracle::ChainlinkPullOracle,
     client::SystemProgramOps,
     constants::MARKET_USD_UNIT,
     exchange::ExchangeOps,
@@ -38,7 +39,6 @@ use gmsol::{
     utils::{shared_signer, SignerRef, TransactionBuilder},
     Client, ClientOptions,
 };
-use pyth_sdk::Identifier;
 use rand::{rngs::StdRng, CryptoRng, RngCore, SeedableRng};
 use tokio::{
     sync::{Mutex, OnceCell, OwnedMutexGuard},
@@ -84,10 +84,10 @@ pub struct Deployment {
     common_alt: AddressLookupTableAccount,
     market_alt: AddressLookupTableAccount,
     claim_fees_enabled_at: Instant,
-    /// Chainlink Verifier.
-    pub chainlink_verifier: Pubkey,
     /// Chainlink verifirer Program.
     pub chainlink_verifier_program: Pubkey,
+    /// Chainlink Feed Index.
+    pub chainlink_feed_index: u8,
 }
 
 impl fmt::Debug for Deployment {
@@ -138,6 +138,18 @@ impl Deployment {
         0xc9, 0x4a,
     ];
 
+    const ETH_CHAINLINK_FEED_ID: [u8; 32] = [
+        0x00, 0x03, 0x59, 0x84, 0x3a, 0x54, 0x3e, 0xe2, 0xfe, 0x41, 0x4d, 0xc1, 0x4c, 0x7e, 0x79,
+        0x20, 0xef, 0x10, 0xf4, 0x37, 0x29, 0x90, 0xb7, 0x9d, 0x63, 0x61, 0xcd, 0xc0, 0xdd, 0x1b,
+        0xa7, 0x82,
+    ];
+
+    const USDT_CHAINLINK_FEED_ID: [u8; 32] = [
+        0x00, 0x03, 0x28, 0x74, 0x07, 0x72, 0x16, 0x15, 0x59, 0x26, 0xe2, 0x6c, 0x15, 0x9c, 0x1c,
+        0x20, 0xa5, 0x72, 0x92, 0x13, 0x71, 0xd9, 0xde, 0x60, 0x5f, 0xe9, 0x63, 0x3e, 0x48, 0xd1,
+        0x36, 0xf9,
+    ];
+
     async fn connect() -> eyre::Result<Self> {
         let mut rng = Self::get_rng()?;
         let (client, store_key, store) = Self::get_client_and_store().await?;
@@ -175,8 +187,8 @@ impl Deployment {
                 addresses: vec![],
             },
             claim_fees_enabled_at: Instant::now(),
-            chainlink_verifier: Default::default(),
             chainlink_verifier_program: Default::default(),
+            chainlink_feed_index: 42,
         })
     }
 
@@ -205,16 +217,36 @@ impl Deployment {
             (
                 "fBTC",
                 TokenConfig {
+                    provider: PriceProviderKind::Pyth,
                     decimals: 6,
-                    pyth_feed_id: Identifier::new(Self::BTC_PYTH_FEED_ID),
+                    feed_id: Pubkey::new_from_array(Self::BTC_PYTH_FEED_ID),
                     precision: 3,
                 },
             ),
             (
                 "USDG",
                 TokenConfig {
+                    provider: PriceProviderKind::Pyth,
                     decimals: 8,
-                    pyth_feed_id: Identifier::new(Self::USDC_PYTH_FEED_ID),
+                    feed_id: Pubkey::new_from_array(Self::USDC_PYTH_FEED_ID),
+                    precision: 6,
+                },
+            ),
+            (
+                "fETH",
+                TokenConfig {
+                    provider: PriceProviderKind::ChainlinkDataStreams,
+                    decimals: 6,
+                    feed_id: Pubkey::new_from_array(Self::ETH_CHAINLINK_FEED_ID),
+                    precision: 4,
+                },
+            ),
+            (
+                "USDH",
+                TokenConfig {
+                    provider: PriceProviderKind::ChainlinkDataStreams,
+                    decimals: 6,
+                    feed_id: Pubkey::new_from_array(Self::USDT_CHAINLINK_FEED_ID),
                     precision: 6,
                 },
             ),
@@ -224,8 +256,9 @@ impl Deployment {
             "SOL",
             Pubkey::default(),
             TokenConfig {
+                provider: PriceProviderKind::Pyth,
                 decimals: 9,
-                pyth_feed_id: Identifier::new(Self::SOL_PYTH_FEED_ID),
+                feed_id: Pubkey::new_from_array(Self::SOL_PYTH_FEED_ID),
                 precision: 4,
             },
         )]);
@@ -245,6 +278,7 @@ impl Deployment {
             Self::SELECT_ADL_MARKET,
             // For first deposit test only
             Self::SELECT_FIRST_DEPOSIT_MARKET,
+            ["fETH", "fETH", "USDH"],
         ])
         .await?;
         self.initialize_glv("fBTC", "USDG").await?;
@@ -322,7 +356,6 @@ impl Deployment {
 
         let chainlink_verifier =
             Pubkey::find_program_address(&[DEFAULT_VERIFIER_ACCOUNT_SEEDS], &ID).0;
-        self.chainlink_verifier = chainlink_verifier;
         self.chainlink_verifier_program = ID;
 
         let signature = self
@@ -371,8 +404,9 @@ impl Deployment {
             entry.insert(Token {
                 address: native_mint::ID,
                 config: TokenConfig {
+                    provider: PriceProviderKind::Pyth,
                     decimals: native_mint::DECIMALS,
-                    pyth_feed_id: Identifier::new(Self::SOL_PYTH_FEED_ID),
+                    feed_id: Pubkey::new_from_array(Self::SOL_PYTH_FEED_ID),
                     precision: 4,
                 },
             });
@@ -475,7 +509,17 @@ impl Deployment {
             }
         }
 
-        match builder.send_all().await {
+        match builder
+            .send_all_with_opts(
+                None,
+                RpcSendTransactionConfig {
+                    skip_preflight: true,
+                    ..Default::default()
+                },
+                false,
+            )
+            .await
+        {
             Ok(signatures) => {
                 tracing::info!("created token accounts with {signatures:#?}");
             }
@@ -531,13 +575,14 @@ impl Deployment {
         Ok(())
     }
 
-    async fn initialize_token_map(&self) -> eyre::Result<()> {
+    async fn initialize_token_map(&mut self) -> eyre::Result<()> {
         let client = self.user_client(Self::DEFAULT_KEEPER)?;
         let store = &self.store;
 
         let mut builder = client.transaction();
 
         let (rpc, address) = client.initialize_token_map(store, &self.token_map);
+
         builder
             .push(rpc)?
             .push(client.set_token_map(store, &address))?
@@ -552,11 +597,8 @@ impl Deployment {
                     )
                     .map(|(name, token, synthetic)| {
                         let config = TokenConfigBuilder::default()
-                            .update_price_feed(
-                                &PriceProviderKind::Pyth,
-                                Pubkey::new_from_array(token.config.pyth_feed_id.to_bytes()),
-                            )?
-                            .with_expected_provider(PriceProviderKind::Pyth)
+                            .update_price_feed(&token.config.provider, token.config.feed_id)?
+                            .with_expected_provider(token.config.provider)
                             .with_precision(token.config.precision);
                         if synthetic {
                             Ok(client.insert_synthetic_token_config(
@@ -698,13 +740,14 @@ impl Deployment {
             );
         }
 
-        let signature = self
+        let signatures = self
             .client
-            .extend_alt(&self.common_alt.key, addresses.clone())
-            .send_without_preflight()
-            .await?;
+            .extend_alt(&self.common_alt.key, addresses.clone(), None)?
+            .send_all()
+            .await
+            .map_err(|(_, err)| err)?;
 
-        tracing::info!(len=%addresses.len(), %signature, "common ALT extended");
+        tracing::info!(len=%addresses.len(), ?signatures, "common ALT extended");
         self.common_alt.addresses = addresses;
 
         // Init market ALT.
@@ -719,13 +762,14 @@ impl Deployment {
             );
         }
 
-        let signature = self
+        let signatures = self
             .client
-            .extend_alt(&self.market_alt.key, addresses.clone())
-            .send_without_preflight()
-            .await?;
+            .extend_alt(&self.market_alt.key, addresses.clone(), None)?
+            .send_all()
+            .await
+            .map_err(|(_, err)| err)?;
 
-        tracing::info!(len=%addresses.len(), %signature, "market ALT extended");
+        tracing::info!(len=%addresses.len(), ?signatures, "market ALT extended");
         self.market_alt.addresses = addresses;
 
         Ok(())
@@ -1179,6 +1223,37 @@ impl Deployment {
     pub(crate) fn oracle(&self) -> Pubkey {
         self.oracle.pubkey()
     }
+
+    pub(crate) async fn chainlink_pull_oracle<'a>(
+        &self,
+        chainlink: &'a gmsol::chainlink::Client,
+        gmsol: &'a gmsol::Client<SignerRef>,
+    ) -> eyre::Result<ChainlinkPullOracle<'a, SignerRef>> {
+        let mut oracle = ChainlinkPullOracle::new(
+            chainlink,
+            gmsol,
+            &self.chainlink_verifier_program,
+            &self.store,
+            self.chainlink_feed_index,
+        );
+
+        let feed_ids = self
+            .tokens
+            .iter()
+            .chain(self.synthetic_tokens.iter())
+            .filter(|(_name, token)| {
+                matches!(
+                    token.config.provider,
+                    PriceProviderKind::ChainlinkDataStreams
+                )
+            })
+            .map(|(_name, token)| (token.address, token.config.feed_id.to_bytes()))
+            .collect();
+
+        oracle.prepare_feeds(feed_ids).await?;
+
+        Ok(oracle)
+    }
 }
 
 /// Users.
@@ -1357,8 +1432,9 @@ pub(crate) struct Token {
 
 #[derive(Debug)]
 pub(crate) struct TokenConfig {
+    pub(crate) provider: PriceProviderKind,
     pub(crate) decimals: u8,
-    pub(crate) pyth_feed_id: Identifier,
+    pub(crate) feed_id: Pubkey,
     pub(crate) precision: u8,
 }
 

@@ -35,7 +35,6 @@ pub trait OracleOps<C> {
     fn update_price_feed_with_chainlink(
         &self,
         store: &Pubkey,
-        verifier_account: &Pubkey,
         price_feed: &Pubkey,
         chainlink: &Pubkey,
         signed_report: Vec<u8>,
@@ -116,17 +115,21 @@ where
     fn update_price_feed_with_chainlink(
         &self,
         store: &Pubkey,
-        verifier_account: &Pubkey,
         price_feed: &Pubkey,
         chainlink: &Pubkey,
         signed_report: Vec<u8>,
     ) -> RpcBuilder<C> {
         let authority = self.payer();
+        let verifier_account = Pubkey::find_program_address(
+            &[chainlink_datastreams::interface::VERIFIER_ACCOUNT_SEEDS],
+            chainlink,
+        )
+        .0;
         self.store_rpc()
             .accounts(accounts::UpdatePriceFeedWithChainlink {
                 authority,
                 store: *store,
-                verifier_account: *verifier_account,
+                verifier_account,
                 price_feed: *price_feed,
                 chainlink: *chainlink,
             })

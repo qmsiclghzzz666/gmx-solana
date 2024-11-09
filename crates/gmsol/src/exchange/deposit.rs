@@ -10,7 +10,7 @@ use gmsol_store::{
     ops::deposit::CreateDepositParams,
     states::{
         common::{action::Action, swap::SwapParams, TokensWithFeed},
-        Deposit, NonceBytes, Pyth, TokenMapAccess,
+        Deposit, NonceBytes, PriceProviderKind, Pyth, TokenMapAccess,
     },
 };
 
@@ -20,7 +20,13 @@ use crate::{
         token::TokenAccountOps,
         utils::{read_market, FeedsParser},
     },
-    utils::{ComputeBudget, RpcBuilder},
+    utils::{
+        builder::{
+            FeedAddressMap, FeedIds, MakeTransactionBuilder, PullOraclePriceConsumer,
+            SetExecutionFee,
+        },
+        ComputeBudget, RpcBuilder, TransactionBuilder,
+    },
 };
 
 use super::generate_nonce;
@@ -73,17 +79,15 @@ where
         }
     }
 
-    /// Set min market token to mint.
-    pub fn min_market_token(&mut self, amount: u64) -> &mut Self {
-        self.min_market_token = amount;
+    /// Set execution fee. Defaults to min execution fee.
+    pub fn execution_fee(&mut self, fee: u64) -> &mut Self {
+        self.execution_fee = fee;
         self
     }
 
-    /// Set exectuion fee allowed to use.
-    ///
-    /// Defaults to min execution fee.
-    pub fn execution_fee(&mut self, fee: u64) -> &mut Self {
-        self.execution_fee = fee;
+    /// Set min market token to mint.
+    pub fn min_market_token(&mut self, amount: u64) -> &mut Self {
+        self.min_market_token = amount;
         self
     }
 
@@ -500,12 +504,6 @@ where
         }
     }
 
-    /// Set execution fee.
-    pub fn execution_fee(&mut self, fee: u64) -> &mut Self {
-        self.execution_fee = fee;
-        self
-    }
-
     /// Set whether to close the deposit after execution.
     pub fn close(&mut self, close: bool) -> &mut Self {
         self.close = close;
@@ -566,9 +564,44 @@ where
         self.token_map = Some(address);
         self
     }
+}
 
-    /// Build [`RpcBuilder`] for executing the deposit.
-    pub async fn build(&mut self) -> crate::Result<RpcBuilder<'a, C>> {
+#[cfg(feature = "pyth-pull-oracle")]
+mod pyth {
+    use crate::pyth::{pull_oracle::ExecuteWithPythPrices, PythPullOracleContext};
+
+    use super::*;
+
+    impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteWithPythPrices<'a, C>
+        for ExecuteDepositBuilder<'a, C>
+    {
+        fn set_execution_fee(&mut self, lamports: u64) {
+            SetExecutionFee::set_execution_fee(self, lamports);
+        }
+
+        async fn context(&mut self) -> crate::Result<PythPullOracleContext> {
+            let hint = self.prepare_hint().await?;
+            let ctx = PythPullOracleContext::try_from_feeds(&hint.feeds)?;
+            Ok(ctx)
+        }
+
+        async fn build_rpc_with_price_updates(
+            &mut self,
+            price_updates: Prices,
+        ) -> crate::Result<Vec<crate::utils::RpcBuilder<'a, C, ()>>> {
+            let txs = self
+                .parse_with_pyth_price_updates(price_updates)
+                .build()
+                .await?;
+            Ok(txs.into_builders())
+        }
+    }
+}
+
+impl<'a, C: Deref<Target = impl Signer> + Clone> MakeTransactionBuilder<'a, C>
+    for ExecuteDepositBuilder<'a, C>
+{
+    async fn build(&mut self) -> crate::Result<TransactionBuilder<'a, C>> {
         let token_map = self.get_token_map().await?;
         let hint = self.prepare_hint().await?;
         let Self {
@@ -635,7 +668,7 @@ where
             .accounts(feeds.into_iter().chain(markets).collect::<Vec<_>>())
             .compute_budget(ComputeBudget::default().with_limit(EXECUTE_DEPOSIT_COMPUTE_BUDGET));
 
-        if self.close {
+        let rpc = if self.close {
             let close = self
                 .client
                 .close_deposit(store, deposit)
@@ -651,41 +684,41 @@ where
                 .reason("executed")
                 .build()
                 .await?;
-            Ok(execute.merge(close))
+            execute.merge(close)
         } else {
-            Ok(execute)
-        }
+            execute
+        };
+
+        let mut tx = self.client.transaction();
+
+        tx.try_push(rpc)?;
+
+        Ok(tx)
     }
 }
 
-#[cfg(feature = "pyth-pull-oracle")]
-mod pyth {
-    use crate::pyth::{pull_oracle::ExecuteWithPythPrices, PythPullOracleContext};
+impl<'a, C: Deref<Target = impl Signer> + Clone> PullOraclePriceConsumer
+    for ExecuteDepositBuilder<'a, C>
+{
+    async fn feed_ids(&mut self) -> crate::Result<FeedIds> {
+        let hint = self.prepare_hint().await?;
+        Ok(hint.feeds)
+    }
 
-    use super::*;
+    fn process_feeds(
+        &mut self,
+        provider: PriceProviderKind,
+        map: FeedAddressMap,
+    ) -> crate::Result<()> {
+        self.feeds_parser
+            .insert_pull_oracle_feed_parser(provider, map);
+        Ok(())
+    }
+}
 
-    impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteWithPythPrices<'a, C>
-        for ExecuteDepositBuilder<'a, C>
-    {
-        fn set_execution_fee(&mut self, lamports: u64) {
-            self.execution_fee(lamports);
-        }
-
-        async fn context(&mut self) -> crate::Result<PythPullOracleContext> {
-            let hint = self.prepare_hint().await?;
-            let ctx = PythPullOracleContext::try_from_feeds(&hint.feeds)?;
-            Ok(ctx)
-        }
-
-        async fn build_rpc_with_price_updates(
-            &mut self,
-            price_updates: Prices,
-        ) -> crate::Result<Vec<crate::utils::RpcBuilder<'a, C, ()>>> {
-            let rpc = self
-                .parse_with_pyth_price_updates(price_updates)
-                .build()
-                .await?;
-            Ok(vec![rpc])
-        }
+impl<'a, C> SetExecutionFee for ExecuteDepositBuilder<'a, C> {
+    fn set_execution_fee(&mut self, lamports: u64) -> &mut Self {
+        self.execution_fee = lamports;
+        self
     }
 }

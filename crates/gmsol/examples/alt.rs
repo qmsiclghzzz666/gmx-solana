@@ -31,11 +31,12 @@ async fn main() -> eyre::Result<()> {
     tracing::info!(%alt, %signature, "ALT created");
 
     let random_address = Keypair::new();
-    let signature = client
-        .extend_alt(&alt, vec![random_address.pubkey()])
-        .send()
-        .await?;
-    tracing::info!(%alt, %signature, "ALT extended, new address={}", random_address.pubkey());
+    let signatures = client
+        .extend_alt(&alt, vec![random_address.pubkey()], None)?
+        .send_all()
+        .await
+        .map_err(|(_, err)| err)?;
+    tracing::info!(%alt, ?signatures, "ALT extended, new address={}", random_address.pubkey());
 
     let account = client.alt(&alt).await?;
     tracing::info!(%alt, "ALT fetched {account:?}");

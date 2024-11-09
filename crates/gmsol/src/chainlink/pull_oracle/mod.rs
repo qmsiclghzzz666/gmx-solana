@@ -1,7 +1,11 @@
 /// Client.
 pub mod client;
 
-pub use client::{Client, Credential};
+/// Pull Oracle.
+pub mod pull_oracle_impl;
+
+pub use client::{ApiReport, Client, Credential};
+pub use pull_oracle_impl::ChainlinkPullOracle;
 
 pub type FeedId = [u8; 32];
 

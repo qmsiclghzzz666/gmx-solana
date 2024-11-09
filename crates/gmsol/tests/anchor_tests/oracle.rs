@@ -1,7 +1,11 @@
+use std::time::Duration;
+
 use gmsol::{
     chainlink::{self, pull_oracle::parse_feed_id},
+    exchange::ExchangeOps,
     store::oracle::OracleOps,
     types::PriceProviderKind,
+    utils::builder::{EstimateFee, MakeTransactionBuilder, WithPullOracle},
 };
 
 use anchor_client::solana_sdk::pubkey::Pubkey;
@@ -15,9 +19,13 @@ async fn update_chainlink_price_feed() -> eyre::Result<()> {
     let span = tracing::info_span!("update_chainlink_price_feed");
     let _enter = span.enter();
 
+    let Ok(chainlink) = chainlink::Client::from_testnet_defaults() else {
+        tracing::warn!("the envs for Chainlink Data Streams are not set");
+        return Ok(());
+    };
+
     let index = 255;
     let store = &deployment.store;
-    let verifier_account = &deployment.chainlink_verifier;
     let chainlink_verifier_program = &deployment.chainlink_verifier_program;
     let keeper = deployment.user_client(Deployment::DEFAULT_KEEPER)?;
 
@@ -37,14 +45,11 @@ async fn update_chainlink_price_feed() -> eyre::Result<()> {
     let signature = rpc.send_without_preflight().await?;
     tracing::info!(%signature, %feed, "created a chainlink feed for USDG");
 
-    let chainlink = chainlink::Client::from_testnet_defaults()?;
-
     let report = chainlink.latest_report(feed_id_hex).await?;
 
     let signature = keeper
         .update_price_feed_with_chainlink(
             store,
-            verifier_account,
             &feed,
             chainlink_verifier_program,
             report.report_bytes()?,
@@ -54,5 +59,59 @@ async fn update_chainlink_price_feed() -> eyre::Result<()> {
 
     tracing::info!(%signature, %feed, "updated price feed with chainlink report");
 
+    Ok(())
+}
+
+#[tokio::test]
+async fn use_chainlink_data_streams() -> eyre::Result<()> {
+    let deployment = current_deployment().await?;
+    let _guard = deployment.use_accounts().await?;
+    let span = tracing::info_span!("use_chainlink_data_streams");
+    let _enter = span.enter();
+
+    let Ok(chainlink) = chainlink::Client::from_testnet_defaults() else {
+        tracing::warn!("the envs for Chainlink Data Streams are not set");
+        return Ok(());
+    };
+
+    let client = deployment.user_client(Deployment::DEFAULT_USER)?;
+    let keeper = deployment.user_client(Deployment::DEFAULT_KEEPER)?;
+
+    let chainlink = deployment
+        .chainlink_pull_oracle(&chainlink, &keeper)
+        .await?;
+
+    let store = &deployment.store;
+    let oracle = &deployment.oracle();
+    let market_token = deployment.market_token("fETH", "fETH", "USDH").unwrap();
+
+    let amount = 1_000_000;
+    deployment
+        .mint_or_transfer_to_user("fETH", Deployment::DEFAULT_USER, amount)
+        .await?;
+
+    let (rpc, deposit) = client
+        .create_deposit(store, market_token)
+        .long_token(amount, None, None)
+        .build_with_address()
+        .await?;
+    let signature = rpc.send_without_preflight().await?;
+    tracing::info!(%deposit, %signature, "created a deposit");
+
+    let execute = keeper.execute_deposit(store, oracle, &deposit, false);
+    tokio::time::sleep(Duration::from_secs(2)).await;
+    let execute = WithPullOracle::new(&chainlink, execute).await?;
+    let mut execute = EstimateFee::new(execute, None);
+
+    let txs = execute.build().await?;
+
+    match txs.send_all().await {
+        Ok(signatures) => {
+            tracing::info!("execute deposit successfully, txs={signatures:#?}");
+        }
+        Err((signatures, err)) => {
+            tracing::error!(%err, "failed to execute deposit, successful txs={signatures:#?}");
+        }
+    }
     Ok(())
 }
