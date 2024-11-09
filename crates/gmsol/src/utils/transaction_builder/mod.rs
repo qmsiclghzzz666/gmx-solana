@@ -206,6 +206,19 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> TransactionBuilder<'a, C> {
             .try_fold(0, |acc, fee| futures_util::future::ready(Ok(acc + fee)))
             .await
     }
+
+    /// Insert all the instructions of `other` into `self`.
+    ///
+    /// If `new_transaction` is `true`, then a new transaction will be created before pushing.
+    pub fn append(&mut self, other: Self, new_transaction: bool) -> crate::Result<()> {
+        let builders = other.into_builders();
+
+        for (idx, rpc) in builders.into_iter().enumerate() {
+            self.try_push_with_opts(rpc, new_transaction && idx == 0)?;
+        }
+
+        Ok(())
+    }
 }
 
 impl<'a, C> IntoIterator for TransactionBuilder<'a, C> {
