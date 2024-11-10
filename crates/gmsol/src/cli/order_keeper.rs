@@ -22,10 +22,7 @@ use gmsol_model::PositionState;
 use gmsol_store::states::PriceProviderKind;
 use tokio::{sync::mpsc::UnboundedSender, time::Instant};
 
-use crate::{
-    utils::{Oracle, Side},
-    GMSOLClient,
-};
+use crate::{utils::Side, GMSOLClient};
 
 #[derive(clap::Args, Clone)]
 pub(super) struct KeeperArgs {
@@ -36,8 +33,8 @@ pub(super) struct KeeperArgs {
     #[arg(long, short = 'p', default_value_t = 50_000)]
     compute_unit_price: u64,
     /// The oracle to use.
-    #[command(flatten)]
-    oracle: Oracle,
+    #[arg(long, env)]
+    oracle: Pubkey,
     /// Set the execution fee to the given instead of estimating one.
     #[arg(long)]
     execution_fee: Option<u64>,
@@ -249,14 +246,7 @@ impl KeeperArgs {
                 }
             }
             Command::ExecuteDeposit { deposit } => {
-                let mut builder = client.execute_deposit(
-                    store,
-                    &self
-                        .oracle
-                        .address(Some(store), client.store_program_id())?,
-                    deposit,
-                    true,
-                );
+                let mut builder = client.execute_deposit(store, &self.oracle, deposit, true);
                 let execution_fee = builder.build().await?.estimate_execution_fee(None).await?;
                 builder.set_execution_fee(execution_fee);
                 if self.use_pyth_pull_oracle() {
@@ -295,14 +285,7 @@ impl KeeperArgs {
                 }
             }
             Command::ExecuteWithdrawal { withdrawal } => {
-                let mut builder = client.execute_withdrawal(
-                    store,
-                    &self
-                        .oracle
-                        .address(Some(store), client.store_program_id())?,
-                    withdrawal,
-                    true,
-                );
+                let mut builder = client.execute_withdrawal(store, &self.oracle, withdrawal, true);
                 let execution_fee = self
                     .get_or_estimate_execution_fee(
                         &client.data_store().solana_rpc(),
@@ -353,14 +336,7 @@ impl KeeperArgs {
                 }
             }
             Command::ExecuteOrder { order } => {
-                let mut builder = client.execute_order(
-                    store,
-                    &self
-                        .oracle
-                        .address(Some(store), client.store_program_id())?,
-                    order,
-                    true,
-                )?;
+                let mut builder = client.execute_order(store, &self.oracle, order, true)?;
                 let execution_fee = self
                     .execution_fee
                     .map(|fee| futures_util::future::ready(Ok(fee)).left_future())
@@ -423,12 +399,7 @@ impl KeeperArgs {
                 }
             }
             Command::Liquidate { position } => {
-                let mut builder = client.liquidate(
-                    &self
-                        .oracle
-                        .address(Some(store), client.store_program_id())?,
-                    position,
-                )?;
+                let mut builder = client.liquidate(&self.oracle, position)?;
                 let execution_fee = self
                     .execution_fee
                     .map(|fee| futures_util::future::ready(Ok(fee)).left_future())
@@ -503,13 +474,7 @@ impl KeeperArgs {
                         *position.state.size_in_usd()
                     }
                 };
-                let mut builder = client.auto_deleverage(
-                    &self
-                        .oracle
-                        .address(Some(store), client.store_program_id())?,
-                    position,
-                    size,
-                )?;
+                let mut builder = client.auto_deleverage(&self.oracle, position, size)?;
                 let execution_fee = self
                     .execution_fee
                     .map(|fee| futures_util::future::ready(Ok(fee)).left_future())
@@ -572,14 +537,8 @@ impl KeeperArgs {
                 }
             }
             Command::UpdateAdl { market_token, side } => {
-                let mut builder = client.update_adl(
-                    store,
-                    &self
-                        .oracle
-                        .address(Some(store), client.store_program_id())?,
-                    market_token,
-                    side.is_long(),
-                )?;
+                let mut builder =
+                    client.update_adl(store, &self.oracle, market_token, side.is_long())?;
 
                 if self.use_pyth_pull_oracle() {
                     let hint = builder.prepare_hint().await?;

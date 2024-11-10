@@ -34,7 +34,7 @@ use strum::IntoEnumIterator;
 
 use crate::{
     ser::{self, SerializeMarket},
-    utils::{table_format, Oracle, Output},
+    utils::{table_format, Output},
     GMSOLClient,
 };
 
@@ -141,8 +141,8 @@ enum Command {
     Withdrawal { address: Pubkey },
     /// `Oracle` account.
     Oracle {
-        #[command(flatten)]
-        oracle: Oracle,
+        #[arg(long, env)]
+        oracle: Pubkey,
     },
     /// `Order` account.
     Order {
@@ -679,12 +679,10 @@ impl InspectArgs {
                 println!("Event Authority: {}", client.store_event_authority());
             }
             Command::Oracle { oracle } => {
-                let address = oracle.address(Some(store), client.store_program_id())?;
-                println!("{address}");
                 println!(
                     "{:#?}",
                     client
-                        .account::<states::Oracle>(&address)
+                        .account::<states::Oracle>(oracle)
                         .await?
                         .ok_or(gmsol::Error::NotFound)
                 );

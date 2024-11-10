@@ -2,39 +2,11 @@ use std::ops::Deref;
 
 use anchor_client::{
     solana_client::rpc_config::RpcSendTransactionConfig,
-    solana_sdk::{pubkey::Pubkey, signature::Signature, signer::Signer},
+    solana_sdk::{signature::Signature, signer::Signer},
     RequestBuilder,
 };
-use eyre::ContextCompat;
 use gmsol::utils::{RpcBuilder, TransactionBuilder};
 use prettytable::format::{FormatBuilder, TableFormat};
-
-#[derive(clap::Args, Clone)]
-#[group(required = false, multiple = false, id = "oracle_address")]
-pub(crate) struct Oracle {
-    #[arg(long, env)]
-    oracle: Option<Pubkey>,
-    #[arg(long, default_value_t = 0)]
-    oracle_index: u8,
-}
-
-impl Oracle {
-    pub(crate) fn address(
-        &self,
-        store: Option<&Pubkey>,
-        store_program_id: &Pubkey,
-    ) -> gmsol::Result<Pubkey> {
-        match self.oracle {
-            Some(address) => Ok(address),
-            None => Ok(gmsol::pda::find_oracle_address(
-                store.wrap_err("`store` not provided")?,
-                self.oracle_index,
-                store_program_id,
-            )
-            .0),
-        }
-    }
-}
 
 #[derive(clap::ValueEnum, Clone, Copy, Default)]
 #[clap(rename_all = "kebab-case")]

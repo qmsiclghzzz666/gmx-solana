@@ -6,8 +6,8 @@ use gmsol_store::{
         gt::{GtExchange, GtExchangeVault, GtVesting},
         position::PositionKind,
         user::{ReferralCode, ReferralCodeBytes, UserHeader},
-        Deposit, GlvDeposit, NonceBytes, Oracle, Order, Position, PriceFeed, PriceProviderKind,
-        Seed, Shift, Store, Withdrawal,
+        Deposit, GlvDeposit, NonceBytes, Order, Position, PriceFeed, PriceProviderKind, Seed,
+        Shift, Store, Withdrawal,
     },
 };
 use gmsol_utils::to_seed;
@@ -27,11 +27,6 @@ pub fn find_event_authority_address(program_id: &Pubkey) -> (Pubkey, u8) {
 /// Find PDA for [`Store`] account.
 pub fn find_store_address(key: &str, store_program_id: &Pubkey) -> (Pubkey, u8) {
     Pubkey::find_program_address(&[Store::SEED, &to_seed(key)], store_program_id)
-}
-
-/// Find PDA for [`Oracle`] account.
-pub fn find_oracle_address(store: &Pubkey, index: u8, store_program_id: &Pubkey) -> (Pubkey, u8) {
-    Pubkey::find_program_address(&[Oracle::SEED, store.as_ref(), &[index]], store_program_id)
 }
 
 /// Find PDA for the market vault.

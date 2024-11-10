@@ -196,11 +196,6 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         crate::pda::find_event_authority_address(self.store_program_id()).0
     }
 
-    /// Find PDA for [`Oracle`](gmsol_store::states::Oracle) account.
-    pub fn find_oracle_address(&self, store: &Pubkey, index: u8) -> Pubkey {
-        crate::pda::find_oracle_address(store, index, self.store_program_id()).0
-    }
-
     /// Find PDA for market vault account.
     pub fn find_market_vault_address(&self, store: &Pubkey, token: &Pubkey) -> Pubkey {
         crate::pda::find_market_vault_address(store, token, self.store_program_id()).0
