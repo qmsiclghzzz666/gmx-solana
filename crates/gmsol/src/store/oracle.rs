@@ -32,6 +32,7 @@ pub trait OracleOps<C> {
     ) -> (RpcBuilder<C>, Pubkey);
 
     /// Update price feed with chainlink.
+    #[cfg(feature = "chainlink-datastreams")]
     fn update_price_feed_with_chainlink(
         &self,
         store: &Pubkey,
@@ -112,6 +113,7 @@ where
         (rpc, price_feed)
     }
 
+    #[cfg(feature = "chainlink-datastreams")]
     fn update_price_feed_with_chainlink(
         &self,
         store: &Pubkey,
