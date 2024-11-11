@@ -11,7 +11,7 @@ use crate::{
     CoreError,
 };
 
-/// The accounts defintions for the `initialize_gt` instruction.
+/// The accounts defintions for the [`initialize_gt`](crate::gmsol_store::initialize_gt) instruction.
 #[derive(Accounts)]
 pub struct InitializeGt<'info> {
     /// Authority
@@ -413,9 +413,9 @@ impl<'info> internal::Authentication<'info> for CloseGtExchange<'info> {
 /// The accounts definition for [`claim_es_gt`](crate::gmsol_store::claim_es_gt).
 #[derive(Accounts)]
 pub struct ClaimEsGt<'info> {
-    pub(crate) owner: Signer<'info>,
+    pub owner: Signer<'info>,
     #[account(mut)]
-    pub(crate) store: AccountLoader<'info, Store>,
+    pub store: AccountLoader<'info, Store>,
     /// User Account.
     #[account(
         mut,
@@ -439,9 +439,9 @@ pub(crate) fn claim_es_gt(ctx: Context<ClaimEsGt>) -> Result<()> {
 #[derive(Accounts)]
 pub struct RequestGtVesting<'info> {
     #[account(mut)]
-    owner: Signer<'info>,
+    pub owner: Signer<'info>,
     #[account(mut)]
-    store: AccountLoader<'info, Store>,
+    pub store: AccountLoader<'info, Store>,
     /// User Account.
     #[account(
         mut,
@@ -459,7 +459,7 @@ pub struct RequestGtVesting<'info> {
         seeds = [GtVesting::SEED, store.key().as_ref(), owner.key().as_ref()],
         bump,
     )]
-    vesting: AccountLoader<'info, GtVesting>,
+    pub vesting: AccountLoader<'info, GtVesting>,
     pub system_program: Program<'info, System>,
 }
 

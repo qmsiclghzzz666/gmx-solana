@@ -14,7 +14,7 @@ use crate::{
     CoreError,
 };
 
-/// The accounts definition for the `execute_shift` instruction.
+/// The accounts definition for the [`execute_shift`](crate::gmsol_store::execute_shift) instruction.
 ///
 /// Remaining accounts expected by this instruction:
 ///

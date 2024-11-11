@@ -12,7 +12,7 @@ use crate::{
     CoreError,
 };
 
-/// The accounts definition for the `create_shift` instruction.
+/// The accounts definition for the [`create_shift`](crate::gmsol_store::create_shift) instruction.
 #[derive(Accounts)]
 #[instruction(nonce: [u8; 32])]
 pub struct CreateShift<'info> {
@@ -145,7 +145,7 @@ impl<'info> CreateShift<'info> {
     }
 }
 
-/// The accounts definition for the `close_shift` instruction.
+/// The accounts definition for the [`close_shift`](crate::gmsol_store::close_shift) instruction.
 #[event_cpi]
 #[derive(Accounts)]
 pub struct CloseShift<'info> {

@@ -15,7 +15,8 @@ use crate::{
     CoreError,
 };
 
-/// The accounts definition for the `create_withdrawal` instruction.
+/// The accounts definition for the [`create_withdrawal`](crate::gmsol_store::create_withdrawal)
+/// instruction.
 ///
 /// Remaining accounts expected by this instruction:
 ///
@@ -168,7 +169,8 @@ impl<'info> CreateWithdrawal<'info> {
     }
 }
 
-/// The accounts definition for the `close_withdrawal` instruction.
+/// The accounts definition for the [`close_withdrawal`](crate::gmsol_store::close_withdrawal)
+/// instruction.
 #[event_cpi]
 #[derive(Accounts)]
 pub struct CloseWithdrawal<'info> {

@@ -13,7 +13,8 @@ use crate::{
     CoreError,
 };
 
-/// The accounts definition for the `create_deposit` instruction.
+/// The accounts definition for the [`create_deposit`](crate::gmsol_store::create_deposit)
+/// instruction.
 ///
 /// Remaining accounts expected by this instruction:
 ///
@@ -202,7 +203,8 @@ impl<'info> CreateDeposit<'info> {
     }
 }
 
-/// The accounts definition for `close_deposit` instruction.
+/// The accounts definition for [`close_deposit`](crate::gmsol_store::close_deposit)
+/// instruction.
 #[event_cpi]
 #[derive(Accounts)]
 pub struct CloseDeposit<'info> {

@@ -23,7 +23,7 @@ use crate::{
     CoreError,
 };
 
-/// Prepare Trade Event Buffer.
+/// The accounts definition for [`prepare_trade_event_buffer`](crate::gmsol_store::prepare_trade_event_buffer).
 #[derive(Accounts)]
 #[instruction(index: u8)]
 pub struct PrepareTradeEventBuffer<'info> {
@@ -113,7 +113,7 @@ pub(crate) fn validated_recent_timestamp(config: &Store, timestamp: i64) -> Resu
     }
 }
 
-/// The accounts definition for `execute_increase_or_swap_order` instruction.
+/// The accounts definition for [`execute_increase_or_swap_order`](crate::gmsol_store::execute_increase_or_swap_order) instruction.
 ///
 /// Remaining accounts expected by this instruction:
 ///   - 0..M. `[]` M feed accounts, where M represents the total number of tokens in the
@@ -514,7 +514,8 @@ impl<'info> ExecuteIncreaseOrSwapOrder<'info> {
     }
 }
 
-/// The accounts definition for `execute_decrease_order` instruction.
+/// The accounts definition for [`execute_decrease_order`](crate::gmsol_store::execute_decrease_order)
+/// instruction.
 ///
 /// Remaining accounts expected by this instruction:
 ///   - 0..M. `[]` M feed accounts, where M represents the total number of tokens in the
