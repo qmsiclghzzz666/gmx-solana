@@ -2594,6 +2594,22 @@ pub mod gmsol_store {
     // ===========================================
 
     /// Initialize GLV.
+    ///
+    /// # Accounts
+    /// *[See the documentation for the accounts.](InitializeGlv)*
+    ///
+    /// # Arguments
+    /// - `index`: The index of the GLV.
+    /// - `length`: The number of markets in the GLV.
+    ///
+    /// # Errors
+    /// - The [`authority`](InitializeGlv::authority) must be a signer and a
+    ///   MARKET_KEEPER in the store.
+    /// - The [`store`](InitializeGlv::store) must be initialized.
+    /// - The [`glv_token`](InitializeGlv::glv_token) must be uninitialized and its address must be PDA derived from the [`GLV_TOKEN_SEED`](crate::states::Glv::GLV_TOKEN_SEED), [`store`] and `index`.
+    /// - The [`glv`](InitializeGlv::glv) must be uninitialized and its address must be PDA derived from the [`GLV_SEED`](crate::states::Glv::SEED) and [`glv_token`].
+    /// - The requirements for the remaining accounts can be found in the documentation of [`InitializeGlv`].
+    /// - The `length` must be greater than 0 and less than or equal to [`Glv::MAX_ALLOWED_NUMBER_OF_MARKETS`](crate::states::Glv::MAX_ALLOWED_NUMBER_OF_MARKETS).
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn initialize_glv<'info>(
         ctx: Context<'_, '_, 'info, 'info, InitializeGlv<'info>>,
@@ -2603,7 +2619,22 @@ pub mod gmsol_store {
         instructions::unchecked_initialize_glv(ctx, index, length as usize)
     }
 
-    /// GLV update market config.
+    /// Update a market config of a GLV.
+    ///
+    /// # Accounts
+    /// *[See the documentation for the accounts.](UpdateGlvMarketConfig)*
+    ///
+    /// # Arguments
+    /// - `max_amount`: The maximum amount of the market token to be stored in the GLV.
+    /// - `max_value`: The maximum value of the market token to be stored in the GLV.
+    ///
+    /// # Errors
+    /// - The [`authority`](UpdateGlvMarketConfig::authority) must be a signer and a
+    ///   MARKET_KEEPER in the store.
+    /// - The [`store`](UpdateGlvMarketConfig::store) must be initialized.
+    /// - The [`glv`](UpdateGlvMarketConfig::glv) must be validly initialized and owned by the
+    ///   `store` and the market token must be in the GLV.
+    /// - The `max_amount` and `max_value` must be provided at least one.
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn update_glv_market_config(
         ctx: Context<UpdateGlvMarketConfig>,
@@ -2614,6 +2645,30 @@ pub mod gmsol_store {
     }
 
     /// Create GLV deposit.
+    ///
+    /// # Accounts
+    /// *[See the documentation for the accounts.](CreateGlvDeposit)*
+    ///
+    /// # Arguments
+    /// - `nonce`: The nonce for the GLV deposit.
+    /// - `params`: The parameters for the GLV deposit.
+    ///
+    /// # Errors
+    /// - The [`owner`](CreateGlvDeposit::owner) must be a signer.
+    /// - The [`store`](CreateGlvDeposit::store) must be initialized.
+    /// - The [`market`](CreateGlvDeposit::market) must be validly initialized and owned by the
+    ///   `store`. It must be one of the markets in the [`glv`](CreateGlvDeposit::glv).
+    /// - The [`glv`](CreateGlvDeposit::glv) must be validly initialized and owned by the
+    ///   `store`.
+    /// - The [`glv_deposit`](CreateGlvDeposit::glv_deposit) must be uninitialized. Its address must be PDA derived from the [`GLV_DEPOSIT_SEED`](crate::states::GlvDeposit::SEED), [`store`], [`owner`] and `nonce`.
+    /// - The [`glv_token`](CreateGlvDeposit::glv_token) must be validly initialized and be the GLV token of the [`glv`](CreateGlvDeposit::glv).
+    /// - The [`market_token`](CreateGlvDeposit::market_token) must be validly initialized and be the market token of the [`market`](CreateGlvDeposit::market).
+    /// - The [`initial_long_token`](CreateGlvDeposit::initial_long_token) must be provided if the initial long token amount is not zero.
+    /// - The [`initial_short_token`](CreateGlvDeposit::initial_short_token) must be provided if the initial short token amount is not zero.
+    /// - The corresponding source token accounts must be provided if the initial token amount is not zero.
+    /// - The [`glv_token_escrow`](CreateGlvDeposit::glv_token_escrow) must be provided and owned by the [`glv_deposit`].
+    /// - The other corresponding escrow token accounts must be provided if the initial token amount is not zero, have enough balance and owned by the [`glv_deposit`].
+    /// - The token programs must be matching with the token accounts.
     pub fn create_glv_deposit<'info>(
         mut ctx: Context<'_, '_, 'info, 'info, CreateGlvDeposit<'info>>,
         nonce: [u8; 32],

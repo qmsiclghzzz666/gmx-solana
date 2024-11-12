@@ -250,7 +250,7 @@ impl<'info> CreateGlvDeposit<'info> {
     }
 }
 
-/// The accounts definition for `close_glv_deposit` instruction.
+/// The accounts definition for [`close_glv_deposit`](crate::gmsol_store::close_glv_deposit) instruction.
 #[event_cpi]
 #[derive(Accounts)]
 pub struct CloseGlvDeposit<'info> {
