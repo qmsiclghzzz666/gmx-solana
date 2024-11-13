@@ -236,21 +236,17 @@ pub mod gmsol_store {
     /// *[See the documentation for the accounts.](Initialize).*
     ///
     /// # Arguments
-    /// - `key`: The name of the store, also used as seed to derive
-    /// the address of the store account. The length of the `key`
-    /// cannot exceed [`MAX_LEN`](states::Store::MAX_LEN).
-    /// - `authority`: The authority (admin) address that will be set
-    /// after the Store is created. If not provided,
-    /// [`payer`](Initialize::payer) will be used as the default
-    /// authority address.
+    /// - `key`: The name of the store, used as a seed to derive the store account's address.
+    ///   The length must not exceed [`MAX_LEN`](states::Store::MAX_LEN).
+    /// - `authority`: The authority (admin) address to set for the new Store. If not provided,
+    ///   the [`payer`](Initialize::payer) will be used as the authority.
     ///
     /// # Errors
-    /// - Only empty `key` is allowed unless `multi-store` feature is enabled.
-    /// - The [`payer`](Initialize::payer) must a signer.
-    /// - The [`store`](Initialize::store) must haven't been initialized.
-    /// - The address of the [`store`](Initialize::store) must be the PDA
-    ///   derived from the store account seed [`SEED`](states::Store::SEED)
-    ///   and the SHA-256 encoded `key` parameter.
+    /// - The `key` must be empty unless the `multi-store` feature is enabled
+    /// - The [`payer`](Initialize::payer) must be a signer
+    /// - The [`store`](Initialize::store) must not be initialized
+    /// - The [`store`](Initialize::store) address must match the PDA derived from
+    ///   [`SEED`](states::Store::SEED) and the SHA-256 hash of `key`
     pub fn initialize(
         ctx: Context<Initialize>,
         key: String,
@@ -259,19 +255,20 @@ pub mod gmsol_store {
         instructions::initialize(ctx, key, authority)
     }
 
-    /// Transfer the authority of the given store to a new authority.
+    /// Transfer the authority (admin) of the given store to a new address.
     ///
     /// # Accounts
     /// *[See the documentation for the accounts.](TransferStoreAuthority).*
     ///
     /// # Arguments
-    /// - `new_authority`: The new authority to be set for the store account.
+    /// - `new_authority`: The new authority address that will become the admin of the store.
     ///
     /// # Errors
-    /// - The [`authority`](TransferStoreAuthority::authority) must be a signer
-    ///   and be the `ADMIN` of the store.
-    /// - The [`store`](TransferStoreAuthority::store) must have been initialized
-    ///   and owned by the store program.
+    /// - The [`authority`](TransferStoreAuthority::authority) must be a signer and the current
+    ///   admin of the store.
+    /// - The [`store`](TransferStoreAuthority::store) must be an initialized store account
+    ///   owned by the store program.
+    /// - The `new_authority` cannot be the same as the current authority.
     #[access_control(internal::Authenticate::only_admin(&ctx))]
     pub fn transfer_store_authority(
         ctx: Context<TransferStoreAuthority>,
@@ -280,32 +277,38 @@ pub mod gmsol_store {
         instructions::unchecked_transfer_store_authority(ctx, new_authority)
     }
 
-    /// Set the receiver address.
+    /// Set the receiver address for claiming fees.
     ///
     /// # Accounts
     /// *[See the documentation for the accounts.](SetReceiver).*
     ///
     /// # Errors
-    /// - The [`authority`](SetReceiver::authority) must be a signer and the current
-    ///   receiver of the given store.
-    /// - The [`store`](SetReceiver::store) must be initialized.
-    /// - The new [`receiver`](SetReceiver::receiver) cannot be the same as the current
-    ///   one.
+    /// - The [`authority`](SetReceiver::authority) must be a signer and the current admin
+    ///   of the given store.
+    /// - The [`store`](SetReceiver::store) must be an initialized store account owned by
+    ///   the store program.
+    /// - The new [`receiver`](SetReceiver::receiver) account provided cannot be the same as
+    ///   the current receiver.
     pub fn set_receiver(ctx: Context<SetReceiver>) -> Result<()> {
         instructions::set_receiver(ctx)
     }
 
-    /// Set the token map address.
+    /// Set the token map address for the store.
+    ///
+    /// This instruction allows a MARKET_KEEPER to update which token map account the store uses.
+    /// The token map account contains token configurations and price feed configurations.
     ///
     /// # Accounts
     /// *[See the documentation for the accounts.](SetTokenMap).*
     ///
     /// # Errors
-    /// - The [`authority`](SetTokenMap::authority) must be a signer and a MARKET_KEEPER
-    ///   in the store.
-    /// - The [`store`](SetTokenMap::store) must be initialized.
-    /// - The [`token_map`](SetTokenMap::token_map) must be initialized and owned by the
-    ///   given store.
+    /// - The [`authority`](SetTokenMap::authority) must be a signer and have the MARKET_KEEPER
+    ///   role in the store.
+    /// - The [`store`](SetTokenMap::store) must be an initialized store account owned by the
+    ///   store program.
+    /// - The [`token_map`](SetTokenMap::token_map) must be an initialized token map account
+    ///   and owned by the given store.
+    /// - The new token map address cannot be the same as the current one.
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn set_token_map(ctx: Context<SetTokenMap>) -> Result<()> {
         instructions::unchecked_set_token_map(ctx)
@@ -315,93 +318,117 @@ pub mod gmsol_store {
     //      Role-based Permission Management
     // ===========================================
 
-    /// Check that the signer is the admin of the given store, throw error if
-    /// the check fails.
+    /// Return whether the signer is the admin of the given store.
+    ///
+    /// This instruction verifies if the signer has administrator privileges for the given store
+    /// and returns a boolean result.
     ///
     /// # Accounts
     /// *[See the documentation for the accounts.](CheckRole).*
     ///
+    /// # Returns
+    /// Returns `true` if the signer is the admin, `false` otherwise.
+    ///
     /// # Errors
-    /// - The [`authority`](CheckRole::authority) must be a signer and be
-    ///   the `ADMIN` of the store.
-    /// - The [`store`](CheckRole::store) must have been initialized
-    ///   and owned by the store program.
+    /// - The [`authority`](CheckRole::authority) must be a signer.
+    /// - The [`store`](CheckRole::store) must be an initialized store account owned by
+    ///   the store program.
     pub fn check_admin(ctx: Context<CheckRole>) -> Result<bool> {
         instructions::check_admin(ctx)
     }
 
-    /// Check that the signer has the given role in the given store, throw
-    /// error if the check fails.
+    /// Check that the authority has the given role in the given store.
+    ///
+    /// This instruction verifies if the authority has the specified role in the given store
+    /// and returns a boolean result.
     ///
     /// # Accounts
     /// *[See the documentation for the accounts.](CheckRole).*
     ///
     /// # Arguments
-    /// - `role`: The name of the role to be checked.
+    /// - `role`: The name of the role to check for the authority.
+    ///
+    /// # Returns
+    /// Returns `true` if the authority has the role, `false` otherwise.
     ///
     /// # Errors
-    /// - The [`authority`](CheckRole::authority) must be a signer and
-    ///   must be a member with the `role` role in the store.
-    /// - The [`store`](CheckRole::store) must have been initialized
-    ///   and owned by the store program.
-    /// - The `role` must exist and be enabled in the store.
+    /// - The [`authority`](CheckRole::authority) must be a signer.
+    /// - The [`store`](CheckRole::store) must be an initialized store account owned by
+    ///   the store program.
+    /// - The `role` must exist and be enabled in the store's role configuration.
     pub fn check_role(ctx: Context<CheckRole>, role: String) -> Result<bool> {
         instructions::check_role(ctx, role)
     }
 
-    /// Return whether the given address is the admin of the given store, or not.
+    /// Return whether the given address is the administrator of the given store.
+    ///
+    /// This instruction checks if the provided address has administrator privileges for the given store
+    /// and returns a boolean result.
     ///
     /// # Accounts
     /// *[See the documentation for the accounts.](HasRole).*
     ///
     /// # Arguments
-    /// - `authority`: The address to check for admin privileges.
+    /// - `authority`: The address to check for administrator privileges.
+    ///
+    /// # Returns
+    /// Returns `true` if the address is the administrator, `false` otherwise.
     ///
     /// # Errors
-    /// - The [`store`](HasRole::store) must have been initialized
-    ///   and owned by the store program.
+    /// - The [`store`](HasRole::store) must be an initialized store account owned by
+    ///   the store program.
     pub fn has_admin(ctx: Context<HasRole>, authority: Pubkey) -> Result<bool> {
         instructions::has_admin(ctx, authority)
     }
 
-    /// Return whether the given address has the given role in the given store, or not.
+    /// Return whether the given address has the given role in the given store.
+    ///
+    /// This instruction checks if the provided address has the specified role in the given store
+    /// and returns a boolean result.
     ///
     /// # Accounts
     /// *[See the documentation for the accounts.](HasRole).*
     ///
     /// # Arguments
-    /// - `authority`: The address to check for the role.
-    /// - `role`: The role to be checked.
+    /// - `authority`: The address to check for role membership.
+    /// - `role`: The name of the role to check for the authority.
+    ///
+    /// # Returns
+    /// Returns `true` if the address has the specified role, `false` otherwise.
     ///
     /// # Errors
-    /// - The [`store`](HasRole::store) must have been initialized
-    ///   and owned by the store program.
-    /// - The `role` must exist and be enabled in the store.
+    /// - The [`store`](HasRole::store) must be an initialized store account owned by
+    ///   the store program.
+    /// - The `role` must exist and be enabled in the store's role configuration.
     pub fn has_role(ctx: Context<HasRole>, authority: Pubkey, role: String) -> Result<bool> {
         instructions::has_role(ctx, authority, role)
     }
 
     /// Insert or enable a role for the given store.
     ///
+    /// This instruction adds a new role or enables an existing disabled role in the store's role configuration.
+    /// If the role already exists and is enabled, this instruction has no effect.
+    ///
     /// # Accounts
     /// *[See the documentation for the accounts.](EnableRole).*
     ///
     /// # Arguments
     /// - `role`: The name of the role to be added/enabled. The length cannot exceed
-    /// [`MAX_ROLE_NAME_LEN`](states::roles::MAX_ROLE_NAME_LEN).
+    ///   [`MAX_ROLE_NAME_LEN`](states::roles::MAX_ROLE_NAME_LEN).
     ///
     /// # Errors
-    /// - The [`authority`](EnableRole::authority) must be a signer and be
-    /// the `ADMIN` of the store.
-    /// - The [`store`](EnableRole::store) must have been initialized
-    /// and owned by the store program.
+    /// - The [`authority`](EnableRole::authority) must be a signer and be the `ADMIN` of the store.
+    /// - The [`store`](EnableRole::store) must be an initialized store account owned by the store program.
+    /// - The `role` name length must not exceed [`MAX_ROLE_NAME_LEN`](states::roles::MAX_ROLE_NAME_LEN).
     #[access_control(internal::Authenticate::only_admin(&ctx))]
     pub fn enable_role(ctx: Context<EnableRole>, role: String) -> Result<()> {
         instructions::unchecked_enable_role(ctx, role)
     }
 
     /// Disable an existing role for the given store.
-    /// It has no effect if this role does not exist in the store.
+    ///
+    /// This instruction disables an existing role in the store's role configuration.
+    /// If the role does not exist in the store, this instruction has no effect.
     ///
     /// # Accounts
     /// *[See the documentation for the accounts.](DisableRole).*
@@ -410,10 +437,8 @@ pub mod gmsol_store {
     /// - `role`: The name of the role to be disabled.
     ///
     /// # Errors
-    /// - The [`authority`](DisableRole::authority) must be a signer and be
-    /// the `ADMIN` of the store.
-    /// - The [`store`](DisableRole::store) must have been initialized
-    /// and owned by the store program.
+    /// - The [`authority`](DisableRole::authority) must be a signer and be the `ADMIN` of the store.
+    /// - The [`store`](DisableRole::store) must be an initialized store account owned by the store program.
     #[access_control(internal::Authenticate::only_admin(&ctx))]
     pub fn disable_role(ctx: Context<DisableRole>, role: String) -> Result<()> {
         instructions::unchecked_disable_role(ctx, role)
@@ -421,19 +446,20 @@ pub mod gmsol_store {
 
     /// Grant a role to the given user in the given store.
     ///
+    /// This instruction grants a role to a user in the store's role configuration. If the user already
+    /// has the role, this instruction has no effect.
+    ///
     /// # Accounts
     /// *[See the documentation for the accounts.](GrantRole).*
     ///
     /// # Arguments
-    /// - `user`: The user to whom the role is to be granted.
-    /// - `role`: The role to be granted to the user.
+    /// - `user`: The address of the user to whom the role should be granted.
+    /// - `role`: The name of the role to be granted. Must be an enabled role in the store.
     ///
     /// # Errors
-    /// - The [`authority`](GrantRole::authority) must be a signer and
-    /// be the `ADMIN` of the store.
-    /// - The [`store`](GrantRole::store) must have been initialized
-    /// and owned by the store program.
-    /// - The `role` must exist and be enabled in the store.
+    /// - The [`authority`](GrantRole::authority) must be a signer and be the `ADMIN` of the store.
+    /// - The [`store`](GrantRole::store) must be an initialized store account owned by the store program.
+    /// - The `role` must exist and be enabled in the store's role configuration.
     #[access_control(internal::Authenticate::only_admin(&ctx))]
     pub fn grant_role(ctx: Context<GrantRole>, user: Pubkey, role: String) -> Result<()> {
         instructions::unchecked_grant_role(ctx, user, role)
@@ -441,20 +467,21 @@ pub mod gmsol_store {
 
     /// Revoke a role from the given user in the given store.
     ///
+    /// This instruction revokes a role from a user in the store's role configuration. If the user does
+    /// not have the role, this instruction has no effect.
+    ///
     /// # Accounts
     /// *[See the documentation for the accounts.](RevokeRole).*
     ///
     /// # Arguments
-    /// - `user`: The user to whom the role is to be revoked.
-    /// - `role`: The role to be revoked from the user.
+    /// - `user`: The address of the user from whom the role should be revoked.
+    /// - `role`: The name of the role to be revoked. Must be an enabled role in the store.
     ///
     /// # Errors
-    /// - The [`authority`](RevokeRole::authority) must be a signer and be
-    /// the `ADMIN` of the store.
-    /// - The [`store`](RevokeRole::store) must have been initialized
-    /// and owned by the store program.
-    /// - The `user` must exist in the member table.
-    /// - The `role` must exist and be enabled in the store.
+    /// - The [`authority`](RevokeRole::authority) must be a signer and be the `ADMIN` of the store.
+    /// - The [`store`](RevokeRole::store) must be an initialized store account owned by the store program.
+    /// - The `role` must exist and be enabled in the store's role configuration.
+    /// - The `user` must exist in the store's member table.
     #[access_control(internal::Authenticate::only_admin(&ctx))]
     pub fn revoke_role(ctx: Context<RevokeRole>, user: Pubkey, role: String) -> Result<()> {
         instructions::unchecked_revoke_role(ctx, user, role)
@@ -464,55 +491,69 @@ pub mod gmsol_store {
     //              Config Management
     // ===========================================
 
-    /// Insert an amount to the global config.
+    /// Insert an amount value into the store's global configuration.
+    ///
+    /// This instruction allows a CONFIG_KEEPER to set or update an amount value in the store's
+    /// configuration. The key must be one of the predefined amount keys.
     ///
     /// # Accounts
     /// *[See the documentation for the accounts.](InsertConfig).*
     ///
     /// # Arguments
-    /// - `key`: The key of the config.
-    /// - `amount`: The value of the config.
+    /// - `key`: The configuration key to update. Must be a valid amount key defined in
+    ///   [`AmountKey`](crate::states::AmountKey).
+    /// - `amount`: The amount value to store for this configuration key.
     ///
     /// # Errors
-    /// - The [`authority`](InsertConfig::authority) must be a signer and be a
-    ///   CONFIG_KEEPER in the store.
-    /// - The `key` must be defined in [`AmountKey`](crate::states::AmountKey).
+    /// - The [`authority`](InsertConfig::authority) must be a signer and have the CONFIG_KEEPER role
+    ///   in the store.
+    /// - The provided `key` must be defined in [`AmountKey`](crate::states::AmountKey).
+    /// - The store must be initialized and owned by this program.
     #[access_control(internal::Authenticate::only_config_keeper(&ctx))]
     pub fn insert_amount(ctx: Context<InsertConfig>, key: String, amount: u64) -> Result<()> {
         instructions::unchecked_insert_amount(ctx, &key, amount)
     }
 
-    /// Insert a factor to the global config.
+    /// Insert a factor value into the store's global configuration.
+    /// This instruction allows a CONFIG_KEEPER to set or update a factor value in the store's
+    /// configuration. The key must be one of the predefined factor keys.
     ///
     /// # Accounts
     /// *[See the documentation for the accounts.](InsertConfig).*
     ///
     /// # Arguments
-    /// - `key`: The key of the config.
-    /// - `factor`: The value of the config.
+    /// - `key`: The configuration key to update. Must be a valid factor key defined in
+    ///   [`FactorKey`](crate::states::FactorKey).
+    /// - `factor`: The factor value to store for this configuration key.
     ///
     /// # Errors
-    /// - The [`authority`](InsertConfig::authority) must be a signer and be a
-    ///   CONFIG_KEEPER in the store.
-    /// - The `key` must be defined in [`FactorKey`](crate::states::FactorKey).
+    /// - The [`authority`](InsertConfig::authority) must be a signer and have the CONFIG_KEEPER role
+    ///   in the store.
+    /// - The provided `key` must be defined in [`FactorKey`](crate::states::FactorKey).
+    /// - The store must be initialized and owned by this program.
     #[access_control(internal::Authenticate::only_config_keeper(&ctx))]
     pub fn insert_factor(ctx: Context<InsertConfig>, key: String, factor: u128) -> Result<()> {
         instructions::unchecked_insert_factor(ctx, &key, factor)
     }
 
-    /// Insert an address to the global config.
+    /// Insert an address value into the store's global configuration.
+    ///
+    /// This instruction allows a CONFIG_KEEPER to set or update an address value in the store's
+    /// configuration. The key must be one of the predefined address keys.
     ///
     /// # Accounts
     /// *[See the documentation for the accounts.](InsertConfig).*
     ///
     /// # Arguments
-    /// - `key`: The key of the config.
-    /// - `address`: The value of the config.
+    /// - `key`: The configuration key to update. Must be a valid address key defined in
+    ///   [`AddressKey`](crate::states::AddressKey).
+    /// - `address`: The address value to store for this configuration key.
     ///
     /// # Errors
-    /// - The [`authority`](InsertConfig::authority) must be a signer and be a
-    ///   CONFIG_KEEPER in the store.
-    /// - The `key` must be defined in [`AddressKey`](crate::states::AddressKey).
+    /// - The [`authority`](InsertConfig::authority) must be a signer and have the CONFIG_KEEPER role
+    ///   in the store.
+    /// - The provided `key` must be defined in [`AddressKey`](crate::states::AddressKey).
+    /// - The store must be initialized and owned by this program.
     #[access_control(internal::Authenticate::only_config_keeper(&ctx))]
     pub fn insert_address(ctx: Context<InsertConfig>, key: String, address: Pubkey) -> Result<()> {
         instructions::unchecked_insert_address(ctx, &key, address)
@@ -520,20 +561,25 @@ pub mod gmsol_store {
 
     /// Insert GT minting cost referred discount factor to the global config.
     ///
+    /// This instruction allows a MARKET_KEEPER to set or update the GT minting cost referred
+    /// discount factor in the store's configuration. This factor determines the discount
+    /// applied to GT minting costs for referred users.
+    ///
     /// # Accounts
     /// *[See the documentation for the accounts.](InsertConfig).*
     ///
     /// # Arguments
-    /// - `factor`: The value of GT minting cost referred discount factor.
+    /// - `factor`: The discount factor value to set.
     ///
     /// # Errors
-    /// - The [`authority`](InsertConfig::authority) must be a signer and be a
-    ///   MARKET_KEEPER in the store.
+    /// - The [`authority`](InsertConfig::authority) must be a signer and have the
+    ///   MARKET_KEEPER role in the store.
+    /// - The store must be initialized and owned by this program.
     ///
     /// # Notes
-    /// - Although the [`insert_factor`] instruction overrides the functionality of
-    ///   this instruction, the permission required for this instruction is different
-    ///   from the one for [`insert_factor`].
+    /// - While [`insert_factor`] can also modify this value, it requires CONFIG_KEEPER
+    ///   permissions instead of MARKET_KEEPER permissions required by this instruction.
+    /// - The factor is stored under the [`FactorKey::GtMintingCostReferredDiscount`] key.
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn insert_gt_minting_cost_referred_discount(
         ctx: Context<InsertConfig>,
@@ -547,21 +593,27 @@ pub mod gmsol_store {
     //             Feature Management
     // ===========================================
 
-    /// Enable or diable the given feature.
+    /// Enable or disable a feature in the store.
+    ///
+    /// This instruction allows a FEATURE_KEEPER to toggle specific features on or off by providing
+    /// a domain and action combination. Features are used to control which functionality is available
+    /// in the store.
     ///
     /// # Accounts
     /// *[See the documentation for the accounts.](ToggleFeature).*
     ///
     /// # Arguments
-    /// - `domain`: Domain part of the feature.
-    /// - `action`: Action part of the feature.
-    /// - `enable`: Whether to enable of disable.
+    /// - `domain`: The domain part of the feature flag, must be a valid domain defined in
+    ///   [`DomainDisabledFlag`](crate::states::feature::DomainDisabledFlag).
+    /// - `action`: The action part of the feature flag, must be a valid action defined in
+    ///   [`ActionDisabledFlag`](crate::states::feature::ActionDisabledFlag).
+    /// - `enable`: If true, enables the feature. If false, disables it.
     ///
     /// # Errors
-    /// - The [`authority`](ToggleFeature::authority) must be signer and be a
-    ///   FEATURE_KEEPER in the store.
-    /// - The `domain` must be defined in [`DomainDisabledFlag`](crate::states::feature::DomainDisabledFlag).
-    /// - The `action` must be defined in [`ActionDisabledFlag`](crate::states::feature::ActionDisabledFlag).
+    /// - The [`authority`](ToggleFeature::authority) must be a signer and have the
+    ///   FEATURE_KEEPER role in the store.
+    /// - The `domain` must be a valid domain defined in [`DomainDisabledFlag`](crate::states::feature::DomainDisabledFlag).
+    /// - The `action` must be a valid action defined in [`ActionDisabledFlag`](crate::states::feature::ActionDisabledFlag).
     #[access_control(internal::Authenticate::only_feature_keeper(&ctx))]
     pub fn toggle_feature(
         ctx: Context<ToggleFeature>,
@@ -588,41 +640,39 @@ pub mod gmsol_store {
     /// addresses authorized by the store can modify this token map.
     ///
     /// # Accounts
-    /// [*See the documentation for the accounts*](InitializeTokenMap).
+    /// *[See the documentation for the accounts.](InitializeTokenMap)*
     ///
     /// # Errors
     /// - The [`payer`](InitializeTokenMap::payer) must be a signer.
     /// - The [`store`](InitializeTokenMap::store) must be an initialized [`Store`](states::Store)
     ///   account owned by the store program.
-    /// - The [`token_map`](InitializeTokenMap::token_map) must be a uninitialized account.
+    /// - The [`token_map`](InitializeTokenMap::token_map) must be an uninitialized account.
     pub fn initialize_token_map(ctx: Context<InitializeTokenMap>) -> Result<()> {
         instructions::initialize_token_map(ctx)
     }
 
     /// Push a new token config to the given token map.
     ///
-    /// This instruction is used to add or update the token config for an existing token,
-    /// where its `token_decimals` will naturally be set to the decimals of this token.
+    /// This instruction is used to add or update the token config for an existing token.
+    /// The token's decimals will be automatically set based on the token mint account.
     ///
     /// # Accounts
     /// [*See the documentation for the accounts*](PushToTokenMap).
     ///
     /// # Arguments
-    /// - `name`: The name of token.
-    /// - `builder`: Builder for the token config.
-    /// - `enable`: Whether the token config should be enabled/disabled after the push.
-    /// - `new`: Enforce insert if new = true, and an error will be returned if the config
-    ///   for the given token already exists.
+    /// - `name`: The token identifier (e.g. "WSOL", "WBTC")
+    /// - `builder`: Configuration builder containing token parameters
+    /// - `enable`: If true, enables this token config after pushing. If false, disables it.
+    /// - `new`: If true, requires this to be a new token config. An error will be returned if
+    ///   a config already exists for this token. If false, allows updating existing configs.
     ///
     /// # Errors
-    /// - The [`authority`](PushToTokenMap::authority) must be a signer and a MARKET_KEEPER
-    ///   in the given store.
-    /// - The [`store`](PushToTokenMap::store) must be an initialized [`Store`](states::Store)
-    ///   account owned by the store program. And it must be the owner of the token map.
-    /// - The [`token_map`](PushToTokenMap::token_map) must be an initialized token map account
-    ///   owned by the store program.
-    /// - The [`token`](PushToTokenMap::token) must be an initialized token mint account owned
-    ///   by the SPL token program.
+    /// - The [`authority`](PushToTokenMap::authority) must be a signer with the MARKET_KEEPER role
+    /// - The [`store`](PushToTokenMap::store) must be an initialized [`Store`](states::Store).
+    ///   account owned by the store program and must own the token map.
+    /// - The [`token_map`](PushToTokenMap::token_map) must be initialized and owned by the program
+    /// - The [`token`](PushToTokenMap::token) must be a valid SPL token mint account.
+    /// - If `new` is true, the token must not already have a config in the map.
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn push_to_token_map(
         ctx: Context<PushToTokenMap>,
@@ -636,29 +686,29 @@ pub mod gmsol_store {
 
     /// Push a new synthetic token config to the given token map.
     ///
-    /// This instruction can set or update the token config for a non-existent token.
-    /// Its token decimals are determined by the corresponding argument.
+    /// This instruction allows adding or updating token configurations for synthetic tokens that don't have
+    /// an actual SPL token mint account. Unlike regular tokens where decimals are read from the mint,
+    /// synthetic tokens specify their decimals directly through the `token_decimals` parameter.
     ///
     /// # Accounts
     /// [*See the documentation for the accounts*](PushToTokenMapSynthetic).
     ///
     /// # Arguments
-    /// - `name`: The name of synthetic token.
-    /// - `token`: The address of the synthetic token.
-    /// - `token_decimals`: The token decimals to use for the synthetic token.
-    /// - `builder`: Builder for the token config.
-    /// - `enable`: Whether the token config should be enabled/disabled after the push.
-    /// - `new`: Enforce insert if new = true, and an error will be returned if the config
-    ///   for the given token already exists.
+    /// - `name`: The identifier for the synthetic token (e.g. "BTC-PERP")
+    /// - `token`: The public key to use as the synthetic token's address
+    /// - `token_decimals`: Number of decimals for the synthetic token's amounts
+    /// - `builder`: Configuration builder containing token parameters
+    /// - `enable`: If true, enables this token config after pushing. If false, disables it.
+    /// - `new`: If true, requires this to be a new token config. An error will be returned if
+    ///   a config already exists for this token. If false, allows updating existing configs.
     ///
     /// # Errors
-    /// - The [`authority`](PushToTokenMapSynthetic::authority) must be a signer and a MARKET_KEEPER
-    ///   in the given store.
+    /// - The [`authority`](PushToTokenMapSynthetic::authority) must be a signer with the MARKET_KEEPER role.
     /// - The [`store`](PushToTokenMapSynthetic::store) must be an initialized [`Store`](states::Store)
-    ///   account owned by the store program. And it must be the owner of the token map.
-    /// - The [`token_map`](PushToTokenMapSynthetic::token_map) must be an initialized token map account
-    ///   owned by the store program.
-    /// - If this is an update, then the `token_decimals` must be the same as before.
+    ///   account owned by the store program and must own the token map.
+    /// - The [`token_map`](PushToTokenMapSynthetic::token_map) must be initialized and owned by the program.
+    /// - If updating an existing config, the `token_decimals` must match the original value.
+    /// - If `new` is true, the token must not already have a config in the map.
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn push_to_token_map_synthetic(
         ctx: Context<PushToTokenMapSynthetic>,
@@ -680,20 +730,20 @@ pub mod gmsol_store {
         )
     }
 
-    /// Enable of disable the config for the given token.
+    /// Enable or disable the config for the given token.
     ///
     /// # Accounts
     /// [*See the documentation for the accounts*](ToggleTokenConfig).
     ///
     /// # Arguments
     /// - `token`: The token whose config will be updated.
-    /// - `enable`: Enable or diable the config.
+    /// - `enable`: Enable or disable the config.
     ///
     /// # Errors
     /// - The [`authority`](ToggleTokenConfig::authority) must be a signer
-    ///   and a MARKET_KEEPER in the give store.
+    ///   and a MARKET_KEEPER in the given store.
     /// - The [`store`](ToggleTokenConfig::store) must be an initialized [`Store`](states::Store)
-    ///   account owned by the store program. And it must be the owner of the token map.
+    ///   account owned by the store program and must be the owner of the token map.
     /// - The [`token_map`](ToggleTokenConfig::token_map) must be an initialized token map account
     ///   owned by the store program.
     /// - The given `token` must exist in the token map.
@@ -714,17 +764,17 @@ pub mod gmsol_store {
     /// # Arguments
     /// - `token`: The token whose config will be updated.
     /// - `provider`: The provider index to be set as the expected provider
-    /// for the token. See also [`PriceProviderKind`].
+    ///   for the token. Must be a valid [`PriceProviderKind`] value.
     ///
     /// # Errors
     /// - The [`authority`](SetExpectedProvider::authority) must be a signer
-    ///   and a MARKET_KEEPER in the give store.
+    ///   and have the MARKET_KEEPER role in the given store.
     /// - The [`store`](SetExpectedProvider::store) must be an initialized [`Store`](states::Store)
-    ///   account owned by the store program. And it must be the owner of the token map.
+    ///   account owned by the store program and must be the owner of the token map.
     /// - The [`token_map`](SetExpectedProvider::token_map) must be an initialized token map account
     ///   owned by the store program.
     /// - The given `token` must exist in the token map.
-    /// - The index of the provider must be valid.
+    /// - The `provider` index must correspond to a valid [`PriceProviderKind`].
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn set_expected_provider(
         ctx: Context<SetExpectedProvider>,
@@ -747,18 +797,19 @@ pub mod gmsol_store {
     /// # Arguments
     /// - `token`: The token whose config will be updated.
     /// - `provider`: The index of the provider whose feed config will be updated.
+    ///   Must be a valid [`PriceProviderKind`] value.
     /// - `feed`: The new feed address.
-    /// - `timestamp_adjustment`: The new timestamp adjustment seconds.
+    /// - `timestamp_adjustment`: The new timestamp adjustment in seconds.
     ///
     /// # Errors
     /// - The [`authority`](SetFeedConfig::authority) must be a signer
-    ///   and a MARKET_KEEPER in the give store.
+    ///   and a MARKET_KEEPER in the given store.
     /// - The [`store`](SetFeedConfig::store) must be an initialized [`Store`](states::Store)
-    ///   account owned by the store program. And it must be the owner of the token map.
+    ///   account owned by the store program and must be the owner of the token map.
     /// - The [`token_map`](SetFeedConfig::token_map) must be an initialized token map account
     ///   owned by the store program.
     /// - The given `token` must exist in the token map.
-    /// - The index of the provider must be valid.
+    /// - The `provider` index must correspond to a valid [`PriceProviderKind`].
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn set_feed_config(
         ctx: Context<SetFeedConfig>,
@@ -782,12 +833,16 @@ pub mod gmsol_store {
     /// # Accounts
     /// [*See the documentation for the accounts*](ReadTokenMap).
     ///
-    /// # Arguments.
+    /// # Arguments
     /// - `token`: The address of the token to query for.
     ///
     /// # Errors
-    /// - The [`token_map`](ReadTokenMap::token_map) must be initialized.
-    /// - The `token` must be in the map.
+    /// - The [`token_map`](ReadTokenMap::token_map) must be an initialized token map account
+    ///   owned by the store program.
+    /// - The given `token` must exist in the token map.
+    ///
+    /// # Returns
+    /// Returns `true` if the token config is enabled, `false` otherwise.
     pub fn is_token_config_enabled(ctx: Context<ReadTokenMap>, token: Pubkey) -> Result<bool> {
         instructions::is_token_config_enabled(ctx, &token)
     }
@@ -797,12 +852,16 @@ pub mod gmsol_store {
     /// # Accounts
     /// [*See the documentation for the accounts*](ReadTokenMap).
     ///
-    /// # Arguments.
+    /// # Arguments
     /// - `token`: The address of the token to query for.
     ///
     /// # Errors
-    /// - The [`token_map`](ReadTokenMap::token_map) must be initialized.
-    /// - The `token` must be in the map.
+    /// - The [`token_map`](ReadTokenMap::token_map) must be an initialized token map account
+    ///   owned by the store program.
+    /// - The given `token` must exist in the token map.
+    ///
+    /// # Returns
+    /// Returns the expected provider kind as a u8 index. See [`PriceProviderKind`] for valid indices.
     pub fn token_expected_provider(ctx: Context<ReadTokenMap>, token: Pubkey) -> Result<u8> {
         instructions::token_expected_provider(ctx, &token).map(|kind| kind as u8)
     }
@@ -812,14 +871,20 @@ pub mod gmsol_store {
     /// # Accounts
     /// [*See the documentation for the accounts*](ReadTokenMap).
     ///
-    /// # Arguments.
+    /// # Arguments
     /// - `token`: The address of the token to query for.
-    /// - `provider`: The index of provider to query for.
+    /// - `provider`: The index of provider to query for. Must be a valid index defined in
+    ///   [`PriceProviderKind`].
     ///
     /// # Errors
-    /// - The [`token_map`](ReadTokenMap::token_map) must be initialized.
-    /// - The `token` must be in the map.
-    /// - The `provider` index must be valid. See [`PriceProviderKind`] for more details.
+    /// - The [`token_map`](ReadTokenMap::token_map) must be an initialized token map account
+    ///   owned by the store program.
+    /// - The given `token` must exist in the token map.
+    /// - The `provider` must be a valid index defined in [`PriceProviderKind`], otherwise
+    ///   returns [`CoreError::InvalidProviderKindIndex`].
+    ///
+    /// # Returns
+    /// Returns the configured feed address for the given token and provider.
     pub fn token_feed(ctx: Context<ReadTokenMap>, token: Pubkey, provider: u8) -> Result<Pubkey> {
         instructions::token_feed(
             ctx,
@@ -834,14 +899,20 @@ pub mod gmsol_store {
     /// # Accounts
     /// [*See the documentation for the accounts*](ReadTokenMap).
     ///
-    /// # Arguments.
+    /// # Arguments
     /// - `token`: The address of the token to query for.
-    /// - `provider`: The index of provider to query for.
+    /// - `provider`: The index of provider to query for. Must be a valid index defined in
+    ///   [`PriceProviderKind`].
     ///
     /// # Errors
-    /// - The [`token_map`](ReadTokenMap::token_map) must be initialized.
-    /// - The `token` must be in the map.
-    /// - The `provider` index must be valid. See [`PriceProviderKind`] for more details.
+    /// - The [`token_map`](ReadTokenMap::token_map) must be an initialized token map account
+    ///   owned by the store program.
+    /// - The given `token` must exist in the token map.
+    /// - The `provider` must be a valid index defined in [`PriceProviderKind`], otherwise
+    ///   returns [`CoreError::InvalidProviderKindIndex`].
+    ///
+    /// # Returns
+    /// Returns the configured timestamp adjustment for the given token and provider.
     pub fn token_timestamp_adjustment(
         ctx: Context<ReadTokenMap>,
         token: Pubkey,
@@ -860,12 +931,16 @@ pub mod gmsol_store {
     /// # Accounts
     /// [*See the documentation for the accounts*](ReadTokenMap).
     ///
-    /// # Arguments.
+    /// # Arguments
     /// - `token`: The address of the token to query for.
     ///
     /// # Errors
-    /// - The [`token_map`](ReadTokenMap::token_map) must be initialized.
-    /// - The `token` must be in the map.
+    /// - The [`token_map`](ReadTokenMap::token_map) must be an initialized token map account
+    ///   owned by the store program.
+    /// - The given `token` must exist in the token map.
+    ///
+    /// # Returns
+    /// Returns the configured name string for the given token.
     pub fn token_name(ctx: Context<ReadTokenMap>, token: Pubkey) -> Result<String> {
         instructions::token_name(ctx, &token)
     }
@@ -875,12 +950,16 @@ pub mod gmsol_store {
     /// # Accounts
     /// [*See the documentation for the accounts*](ReadTokenMap).
     ///
-    /// # Arguments.
+    /// # Arguments
     /// - `token`: The address of the token to query for.
     ///
     /// # Errors
-    /// - The [`token_map`](ReadTokenMap::token_map) must be initialized.
-    /// - The `token` must be in the map.
+    /// - The [`token_map`](ReadTokenMap::token_map) must be an initialized token map account
+    ///   owned by the store program.
+    /// - The given `token` must exist in the token map.
+    ///
+    /// # Returns
+    /// Returns the configured number of decimals for the given token.
     pub fn token_decimals(ctx: Context<ReadTokenMap>, token: Pubkey) -> Result<u8> {
         instructions::token_decimals(ctx, &token)
     }
@@ -890,12 +969,16 @@ pub mod gmsol_store {
     /// # Accounts
     /// [*See the documentation for the accounts*](ReadTokenMap).
     ///
-    /// # Arguments.
+    /// # Arguments
     /// - `token`: The address of the token to query for.
     ///
     /// # Errors
-    /// - The [`token_map`](ReadTokenMap::token_map) must be initialized.
-    /// - The `token` must be in the map.
+    /// - The [`token_map`](ReadTokenMap::token_map) must be an initialized token map account
+    ///   owned by the store program.
+    /// - The given `token` must exist in the token map.
+    ///
+    /// # Returns
+    /// Returns the configured price precision for the given token.
     pub fn token_precision(ctx: Context<ReadTokenMap>, token: Pubkey) -> Result<u8> {
         instructions::token_precision(ctx, &token)
     }
@@ -904,29 +987,37 @@ pub mod gmsol_store {
     //              Oracle Management
     // ===========================================
 
-    /// Initailize a new oracle account for the given store with the given index.
+    /// Initialize a new oracle account for the given store.
+    ///
+    /// This instruction creates a new oracle account that will be owned by the store. The oracle
+    /// account is used to store price data for tokens configured in the store's token map.
     ///
     /// # Accounts
     /// *[See the documentation for the accounts.](InitializeOracle)*
     ///
     /// # Errors
     /// - The [`store`](InitializeOracle::store) must be an initialized [`Store`](states::Store)
-    ///   account owned by the store program. And it must be the owner of the token map.
-    /// - The [`oralce`](InitializeOracle::oracle) account must be uninitialized.
+    ///   account owned by the store program and must be the owner of the token map.
+    /// - The [`oracle`](InitializeOracle::oracle) account must be uninitialized.
     pub fn initialize_oracle(ctx: Context<InitializeOracle>) -> Result<()> {
         instructions::initialize_oracle(ctx)
     }
 
-    /// Clear the given oracle.
+    /// Clear all prices from the given oracle.
+    ///
+    /// This instruction removes all stored price data from the oracle account. This can be useful
+    /// when needing to reset price data or when decommissioning an oracle.
     ///
     /// # Accounts
     /// *[See the documentation for the accounts.](ClearAllPrices)*
     ///
     /// # Errors
-    /// - The [`authority`](ClearAllPrices::authority) must be a signer and be a ORACLE_CONTROLLER in
+    /// - The [`authority`](ClearAllPrices::authority) must be a signer and have the ORACLE_CONTROLLER
+    ///   role in the given store.
+    /// - The [`store`](ClearAllPrices::store) must be an initialized store account owned by the
+    ///   store program.
+    /// - The [`oracle`](ClearAllPrices::oracle) must be an initialized oracle account owned by
     ///   the given store.
-    /// - The [`store`](ClearAllPrices::store) must be initialized.
-    /// - The [`oracle`](ClearAllPrices::oracle) must be initialized and owned by the store.
     #[access_control(internal::Authenticate::only_oracle_controller(&ctx))]
     pub fn clear_all_prices(ctx: Context<ClearAllPrices>) -> Result<()> {
         instructions::unchecked_clear_all_prices(ctx)
@@ -934,22 +1025,29 @@ pub mod gmsol_store {
 
     /// Set prices from the provided price feeds.
     ///
+    /// This instruction updates token prices in the oracle account using data from configured price feeds.
+    /// For each token provided, it reads the current price from the corresponding price feed account and
+    /// stores it in the oracle.
+    ///
     /// # Accounts
     /// *[See the documentation for the accounts.](SetPricesFromPriceFeed)*
     ///
     /// # Arguments
-    /// - `tokens`: The list of tokens to set prices for.
+    /// - `tokens`: The list of token mint addresses to update prices for. Each token must be configured
+    ///   in the token map with a valid price feed.
     ///
     /// # Errors
-    /// - The [`authority`](SetPricesFromPriceFeed::authority) must be a signer and be a ORACLE_CONTROLLER in
-    ///   the given store.
-    /// - The [`store`](SetPricesFromPriceFeed::store) must be initialized.
-    /// - The [`oracle`](SetPricesFromPriceFeed::oracle) must be initialized and owned by the store.
-    /// - The [`token_map`](SetPricesFromPriceFeed::token_map) must be initialized and owned and
-    ///   authorized by the store.
-    /// - Cannot provide more than [`MAX_TOKENS`](crate::states::oracle::price_map::PriceMap::MAX_TOKENS) tokens.
-    /// - The provided `tokens` must be configured and enabled in the given token map.
-    /// - The provided feed accounts must be valid and correspond to the provided `tokens`.
+    /// - The [`authority`](SetPricesFromPriceFeed::authority) must be a signer and have the
+    ///   ORACLE_CONTROLLER role in the given store.
+    /// - The [`store`](SetPricesFromPriceFeed::store) must be an initialized store account owned by
+    ///   the store program.
+    /// - The [`oracle`](SetPricesFromPriceFeed::oracle) must be an initialized oracle account owned
+    ///   by the given store.
+    /// - The [`token_map`](SetPricesFromPriceFeed::token_map) must be an initialized token map account
+    ///   that is owned and authorized by the store.
+    /// - The number of tokens provided cannot exceed [`MAX_TOKENS`](crate::states::oracle::price_map::PriceMap::MAX_TOKENS).
+    /// - Each token in `tokens` must be configured and enabled in the token map.
+    /// - For each token, there must be a valid corresponding price feed account included in the remaining accounts.
     #[access_control(internal::Authenticate::only_oracle_controller(&ctx))]
     pub fn set_prices_from_price_feed<'info>(
         ctx: Context<'_, '_, 'info, 'info, SetPricesFromPriceFeed<'info>>,
@@ -960,23 +1058,28 @@ pub mod gmsol_store {
 
     /// Initialize a custom price feed account.
     ///
+    /// Creates a new price feed account that can be used to provide custom price data for a token.
+    /// The price feed is owned by the store and can only be updated by ORDER_KEEPERs.
+    ///
     /// # Accounts
     /// *[See the documentation for the accounts.](InitializePriceFeed)*
     ///
     /// # Arguments
-    /// - `index`: The custom index of the oracle.
-    /// - `provider`: The index of the provider to use.
-    /// - `token`: The token of the feed.
-    /// - `feed_id`: The feed id for the token.
+    /// - `index`: The oracle index this price feed will be associated with.
+    /// - `provider`: The price provider kind index that will be used for this feed. Must be a valid
+    ///   index from [`PriceProviderKind`] that supports custom price feeds.
+    /// - `token`: The mint address of the token this price feed will provide prices for.
+    /// - `feed_id`: The unique identifier for this price feed, used to derive its PDA address.
     ///
     /// # Errors
-    /// - The [`authority`](InitializePriceFeed::authority) must be a signer and be a ORDER_KEEPER
-    ///   in the store.
-    /// - The [`store`](InitializePriceFeed::store) must be initialized.
-    /// - The [`price_feed`](InitializePriceFeed::price_feed) must be uninitialized and a PDA
-    ///   derived from the expected seeds.
-    /// - The index of the `provider` must be defined in [`PriceProviderKind`].
-    /// - The `provider` must be supported to use a custom price feed.
+    /// - The [`authority`](InitializePriceFeed::authority) must be a signer and have the ORDER_KEEPER
+    ///   role in the store.
+    /// - The [`store`](InitializePriceFeed::store) must be an initialized store account owned by
+    ///   the store program.
+    /// - The [`price_feed`](InitializePriceFeed::price_feed) must be uninitialized and its address
+    ///   must match the PDA derived from the store, index, and feed_id.
+    /// - The `provider` index must correspond to a valid [`PriceProviderKind`] that supports
+    ///   custom price feeds.
     #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
     pub fn initialize_price_feed(
         ctx: Context<InitializePriceFeed>,
@@ -992,28 +1095,36 @@ pub mod gmsol_store {
 
     /// Update a custom price feed account with Chainlink report.
     ///
+    /// Updates the price data in a custom price feed account using a signed price report from
+    /// Chainlink Data Streams. The price feed must be configured to use the Chainlink Data Streams
+    /// provider. The Chainlink program must be explicitly trusted by the store.
+    ///
     /// # Accounts
     /// *[See the documentation for the accounts.](UpdatePriceFeedWithChainlink)*
     ///
     /// # Arguments
-    /// - `signed_report`: A signed price report from Chainlink Data Streams.
+    /// - `signed_report`: A signed price report from Chainlink Data Streams containing the latest
+    ///   price data.
     ///
     /// # Errors
-    /// - The [`authority`](UpdatePriceFeedWithChainlink::authority) must be a signer and be a ORDER_KEEPER
-    ///   in the store.
-    /// - The [`store`](UpdatePriceFeedWithChainlink::store) must be initialized.
-    /// - The [`verifier_account`](UpdatePriceFeedWithChainlink::verifier_account) must be valid.
-    /// - The [`price_feed`](UpdatePriceFeedWithChainlink::price_feed) must be initialized and owned by the `store` and the `authority`.
-    /// - The [`chainlink`](UpdatePriceFeedWithChainlink::chainlink) program must be trusted.
-    /// - The configured provider of the `price_feed` must be
-    ///   [`ChainlinkDataStreams`](PriceProviderKind::ChainlinkDataStreams).
-    /// - The `signed_report` must be decodable and the data is valid for creating
-    ///   [`PriceFeedPrice`](states::oracle::PriceFeedPrice).
-    /// - The `signed_report` must be verifiable by the Chainlink Verifier Program.
-    /// - The current slot and timestamp must be greater than or equal to those in the `feed`.
-    /// - The timestamp of the price data must be greater than or equal to the one in the `feed`.
-    /// - The price data must be valid. See the `update` method of [`PriceFeed`](states::oracle::PriceFeed)
-    ///   for more details.
+    /// - The [`authority`](UpdatePriceFeedWithChainlink::authority) must be a signer and have the
+    ///   ORDER_KEEPER role in the store.
+    /// - The [`store`](UpdatePriceFeedWithChainlink::store) must be an initialized store account
+    /// - The [`verifier_account`](UpdatePriceFeedWithChainlink::verifier_account) must be a valid
+    ///   Chainlink verifier account.
+    /// - The [`price_feed`](UpdatePriceFeedWithChainlink::price_feed) must be initialized, owned by
+    ///   the store, and authorized for the authority.
+    /// - The [`chainlink`](UpdatePriceFeedWithChainlink::chainlink) program ID must be trusted in the
+    ///   definition of the [`ChainlinkDataStreamsInterface`](chainlink-datastreams::ChainlinkDataStreamsInterface).
+    /// - The price feed must be configured to use [`ChainlinkDataStreams`](PriceProviderKind::ChainlinkDataStreams)
+    ///   as its provider.
+    /// - The `signed_report` must be:
+    ///   - Decodable as a valid Chainlink price report
+    ///   - Verifiable by the Chainlink Verifier Program
+    ///   - Contain valid data for creating a [`PriceFeedPrice`](states::oracle::PriceFeedPrice)
+    /// - The current slot and timestamp must be >= the feed's last update.
+    /// - The price data timestamp must be >= the feed's last price timestamp
+    /// - The price data must meet all validity requirements (see the `update` method of [`PriceFeed`](states::oracle::PriceFeed)).
     #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
     pub fn update_price_feed_with_chainlink(
         ctx: Context<UpdatePriceFeedWithChainlink>,
@@ -1032,28 +1143,23 @@ pub mod gmsol_store {
     /// [*See the documentation for the accounts.*](InitializeMarket)
     ///
     /// # Arguments
-    /// - `market_token_mint`: The address of the corresponding market token.
-    /// - `index_token_mint`: The address of the index token.
-    /// - `long_token_mint`: The address of the long token.
-    /// - `short_token_mint`: The address of the short token.
+    /// - `index_token_mint`: The address of the index token that this market tracks.
     /// - `name`: The name of the market.
     /// - `enable`: Whether to enable the market after initialization.
     ///
     /// # Errors
-    /// - The [`authority`](InitializeMarket::authority) must be a signer and be a MARKET_KEEPER
+    /// - The [`authority`](InitializeMarket::authority) must be a signer and have the MARKET_KEEPER role
     ///   in the store.
     /// - The [`store`](InitializeMarket::store) must be initialized.
     /// - The [`market_token_mint`](InitializeMarket::market_token_mint) must be uninitialized
     ///   and a PDA derived from the expected seeds.
-    /// - The [`long_token_mint`](InitializeMarket::long_token_mint) and
-    ///   [`short_token_mint`](InitializeMarket::short_token_mint) must be valid Mint accounts.
     /// - The [`market`](InitializeMarket::market) must be uninitialized and a PDA derived from
     ///   the expected seeds.
-    /// - The [`token_map`](InitializeMarket::token_map) must be initialized, owned and authorized
-    ///   by the `store`.
+    /// - The [`token_map`](InitializeMarket::token_map) must be initialized and owned by the store.
     /// - The [`long_token_vault`](InitializeMarket::long_token_vault) and
-    ///   the [`short_token_vault`](InitializeMarket::short_token_vault) must be initialized
-    ///   and valid market vault accounts of the store for long token and short token correspondingly.
+    ///   [`short_token_vault`](InitializeMarket::short_token_vault) must be initialized
+    ///   and valid market vault accounts of the store for their respective tokens.
+    /// - The long and short token mints must be valid Mint accounts.
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn initialize_market(
         ctx: Context<InitializeMarket>,
@@ -1064,19 +1170,24 @@ pub mod gmsol_store {
         instructions::unchecked_initialize_market(ctx, index_token_mint, &name, enable)
     }
 
-    /// Enable or diable the given market.
+    /// Enable or disable the given market.
+    ///
+    /// This instruction allows a MARKET_KEEPER to toggle whether a market is enabled or disabled.
+    /// When disabled, no new positions can be opened in the market, but existing positions can
+    /// still be closed.
     ///
     /// # Accounts
     /// [*See the documentation for the accounts.*](ToggleMarket)
     ///
     /// # Arguments
-    /// - `enable`: Whether to enable or disable the market.
+    /// - `enable`: Whether to enable (`true`) or disable (`false`) the market.
     ///
     /// # Errors
-    /// - The [`authority`](ToggleMarket::authority) must be a signer and be a MARKET_KEEPER
-    ///   in the store.
-    /// - The [`store`](ToggleMarket::store) must be initialized.
+    /// - The [`authority`](ToggleMarket::authority) must be a signer and have the MARKET_KEEPER
+    ///   role in the store.
+    /// - The [`store`](ToggleMarket::store) must be initialized and owned by this program.
     /// - The [`market`](ToggleMarket::market) must be initialized and owned by the store.
+    /// - The market's status must not already be in the requested state.
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn toggle_market(ctx: Context<ToggleMarket>, enable: bool) -> Result<()> {
         instructions::unchecked_toggle_market(ctx, enable)
@@ -1084,25 +1195,29 @@ pub mod gmsol_store {
 
     /// Transfer tokens into the market and record the amounts in its balance.
     ///
+    /// This instruction allows a MARKET_KEEPER to transfer tokens from a source account into one of
+    /// the market's vault accounts, updating the market's internal balance tracking.
+    ///
     /// # Accounts
     /// [*See the documentation for the accounts.*](MarketTransferIn)
     ///
     /// # Arguments
-    /// - `amount`: The amount to transfer in.
+    /// - `amount`: The amount of tokens to transfer into the market vault.
     ///
     /// # Errors
-    /// - The [`authority`](MarketTransferIn::authority) must be a signer and be a MARKET_KEEPER
-    ///   in the store.
-    /// - The [`store`](MarketTransferIn::store) must be initialized.
-    /// - The [`from_authority`](MarketTransferIn::from_authority) must be a signer and the authority
-    ///   of the `from` token account.
-    /// - The [`market`](MarketTransferIn::market) account must be initialized and owned by the store.
-    /// - The [`from`](MarketTransferIn::from) account must be a initialized token account and cannot
-    ///   be the same as the `vault`.
-    /// - The [`vault`](MarketTransferIn::vault) account must be a initialized valid market vault account
-    ///   of the store.
-    /// - The `market` must be enabled and the transfer in token must be one of the collateral tokens.
-    /// - The `from` account must have enough amount of tokens.
+    /// - The [`authority`](MarketTransferIn::authority) must be a signer and have the MARKET_KEEPER
+    ///   role in the store.
+    /// - The [`store`](MarketTransferIn::store) must be an initialized store account owned by this program.
+    /// - The [`from_authority`](MarketTransferIn::from_authority) must be a signer and own the source
+    ///   token account.
+    /// - The [`market`](MarketTransferIn::market) must be an initialized market account owned by the store.
+    /// - The [`from`](MarketTransferIn::from) must be an initialized token account and cannot be the
+    ///   same as the destination vault.
+    /// - The [`vault`](MarketTransferIn::vault) must be an initialized and valid market vault token
+    ///   account owned by the store.
+    /// - The market must be enabled and the token being transferred must be one of the market's
+    ///   configured collateral tokens.
+    /// - The source token account must have sufficient balance for the transfer amount.
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn market_transfer_in(ctx: Context<MarketTransferIn>, amount: u64) -> Result<()> {
         instructions::unchecked_market_transfer_in(ctx, amount)
@@ -1110,19 +1225,23 @@ pub mod gmsol_store {
 
     /// Update an item in the market config.
     ///
+    /// This instruction allows a MARKET_KEEPER to update a single configuration value in the market's
+    /// configuration. The key must be one of the predefined market config keys.
+    ///
     /// # Accounts
     /// [*See the documentation for the accounts.*](UpdateMarketConfig)
     ///
     /// # Arguments
-    /// - `key`: The key of the config item.
-    /// - `value`: The value to update the config item to.
+    /// - `key`: The configuration key to update. Must be a valid key defined in
+    ///   [`MarketConfigKey`](states::market::config::MarketConfigKey).
+    /// - `value`: The new value to set for this configuration key.
     ///
     /// # Errors
-    /// - The [`authority`](UpdateMarketConfig::authority) must be a signer and be a MARKET_KEEPER
-    ///   in the store.
-    /// - The [`store`](UpdateMarketConfig::store) must be initialized.
-    /// - The [`market`](UpdateMarketConfig::market) must be initialized and owned by the store.
-    /// - The `key` must be defined in [`MarketConfigKey`](states::market::config::MarketConfigKey).
+    /// - The [`authority`](UpdateMarketConfig::authority) must be a signer and have the MARKET_KEEPER
+    ///   role in the store.
+    /// - The [`store`](UpdateMarketConfig::store) must be an initialized store account owned by this program.
+    /// - The [`market`](UpdateMarketConfig::market) must be an initialized market account owned by the store.
+    /// - The provided `key` must be defined in [`MarketConfigKey`](states::market::config::MarketConfigKey).
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn update_market_config(
         ctx: Context<UpdateMarketConfig>,
@@ -1132,21 +1251,29 @@ pub mod gmsol_store {
         instructions::unchecked_update_market_config(ctx, &key, value)
     }
 
-    /// Update the market config with the given
+    /// Update the market configuration using a pre-populated
     /// [`MarketConfigBuffer`](crate::states::market::config::MarketConfigBuffer) account.
+    ///
+    /// This instruction allows a MARKET_KEEPER to update multiple market configuration values at once
+    /// by applying the changes stored in a buffer account. The buffer must contain valid configuration
+    /// keys and values.
     ///
     /// # Accounts
     /// [*See the documentation for the accounts.*](UpdateMarketConfigWithBuffer)
     ///
     /// # Errors
-    /// - The [`authority`](UpdateMarketConfigWithBuffer::authority) must be a signer and be a MARKET_KEEPER
-    ///   in the store.
-    /// - The [`store`](UpdateMarketConfigWithBuffer::store) must be initialized.
-    /// - The [`market`](UpdateMarketConfigWithBuffer::market) must be initialized and owned by the store.
-    /// - The [`buffer`](UpdateMarketConfigWithBuffer::buffer) must be initialized and owned by the store
-    ///   and the authority.
-    /// - The `buffer` must not have been expired.
-    /// - The keys in the `buffer` must be defined in [`MarketConfigKey`](states::market::config::MarketConfigKey).
+    /// - The [`authority`](UpdateMarketConfigWithBuffer::authority) must be a signer and have the
+    ///   MARKET_KEEPER role in the store.
+    /// - The [`store`](UpdateMarketConfigWithBuffer::store) must be an initialized store account
+    ///   owned by this program.
+    /// - The [`market`](UpdateMarketConfigWithBuffer::market) must be an initialized market account
+    ///   owned by the store.
+    /// - The [`buffer`](UpdateMarketConfigWithBuffer::buffer) must be:
+    ///   - An initialized market config buffer account
+    ///   - Owned by both the store and the authority
+    ///   - Not expired
+    /// - All configuration keys in the buffer must be valid keys defined in
+    ///   [`MarketConfigKey`](states::market::config::MarketConfigKey).
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn update_market_config_with_buffer(
         ctx: Context<UpdateMarketConfigWithBuffer>,
@@ -1154,19 +1281,28 @@ pub mod gmsol_store {
         instructions::unchecked_update_market_config_with_buffer(ctx)
     }
 
-    /// Read current market status.
+    /// Read the current market status.
+    ///
+    /// This instruction calculates and returns the current status of a market, including metrics like
+    /// pool value, PnL, and other key indicators. The calculation can be configured to maximize or
+    /// minimize certain values based on the provided flags.
     ///
     /// # Accounts
     /// [*See the documentation for the accounts.*](ReadMarket)
     ///
     /// # Arguments
-    /// - `prices`: The unit prices of tokens.
-    /// - `maximize_pnl`: Whether to maximize the PnL.
-    /// - `maximize_pool_value`: Whether to maximize the pool value.
+    /// - `prices`: The current unit prices of tokens in the market, used for calculations.
+    /// - `maximize_pnl`: If true, uses the maximum possible PnL values in calculations.
+    ///   If false, uses minimum PnL values.
+    /// - `maximize_pool_value`: If true, uses the maximum possible pool value in calculations.
+    ///   If false, uses minimum pool value.
     ///
     /// # Errors
-    /// - The [`market`](ReadMarket::market) must be initialized.
-    /// - Other calculation errors.
+    /// - The [`market`](ReadMarket::market) account must be properly initialized.
+    /// - The market must have valid token configurations.
+    /// - The provided prices must match the market's token configurations.
+    /// - Numerical overflow/underflow during calculations.
+    /// - Invalid pool value or PnL calculations.
     pub fn get_market_status(
         ctx: Context<ReadMarket>,
         prices: Prices<u128>,
@@ -1176,19 +1312,29 @@ pub mod gmsol_store {
         instructions::get_market_status(ctx, &prices, maximize_pnl, maximize_pool_value)
     }
 
-    /// Get current market token price.
+    /// Get the current market token price based on the provided token prices and PnL factor.
+    ///
+    /// This instruction calculates and returns the current price of the market token, taking into
+    /// account the provided token prices and PnL factor. The calculation can be configured to
+    /// maximize certain values based on the provided flag.
     ///
     /// # Accounts
     /// [*See the documentation for the accounts.*](ReadMarketWithToken)
     ///
     /// # Arguments
-    /// - `prices`: The unit prices of tokens.
-    /// - `maximize_pnl`: Whether to maximize the PnL.
-    /// - `maximize_pool_value`: Whether to maximize the pool value.
+    /// - `prices`: The current unit prices of tokens in the market, used for calculations.
+    /// - `pnl_factor`: The PnL factor key to use for price calculations, must be a valid
+    ///   [`FactorKey`](states::FactorKey).
+    /// - `maximize`: If true, uses the maximum possible values in calculations.
+    ///   If false, uses minimum values.
     ///
     /// # Errors
-    /// - The [`market`](ReadMarketWithToken::market) must be initialized.
-    /// - Other calculation errors.
+    /// - The [`market`](ReadMarketWithToken::market) must be an initialized market account.
+    /// - The market must have valid token configurations.
+    /// - The provided prices must match the market's token configurations.
+    /// - The `pnl_factor` must be a valid factor key.
+    /// - Numerical overflow/underflow during calculations.
+    /// - Invalid price calculations.
     pub fn get_market_token_price(
         ctx: Context<ReadMarketWithToken>,
         prices: Prices<u128>,
@@ -1207,16 +1353,25 @@ pub mod gmsol_store {
 
     /// Initialize a market config buffer account.
     ///
+    /// This instruction creates a new market config buffer account that can be used to stage market
+    /// configuration changes before applying them. The buffer has an expiration time after which
+    /// it cannot be used.
+    ///
     /// # Accounts
     /// [*See the documentation for the accounts.*](InitializeMarketConfigBuffer)
     ///
     /// # Arguments
-    /// - `expire_after_secs`: The expiration time of the buffer in seconds.
+    /// - `expire_after_secs`: The number of seconds after which this buffer account will expire.
+    ///   Once expired, the buffer can no longer be used and must be closed.
     ///
     /// # Errors
-    /// - The [`authority`](InitializeMarketConfigBuffer::authority) must be a signer.
-    /// - The [`store`](InitializeMarketConfigBuffer::store) must be initialized.
-    /// - The [`buffer`](InitializeMarketConfigBuffer::buffer) must be uninitialized.
+    /// - The [`authority`](InitializeMarketConfigBuffer::authority) must be a signer and will be
+    ///   set as the owner of the buffer account.
+    /// - The [`store`](InitializeMarketConfigBuffer::store) must be an initialized store account
+    ///   owned by the program.
+    /// - The [`buffer`](InitializeMarketConfigBuffer::buffer) must be an uninitialized account
+    ///   that will store the market configuration data.
+    /// - The expiration time must be greater than zero.
     pub fn initialize_market_config_buffer(
         ctx: Context<InitializeMarketConfigBuffer>,
         expire_after_secs: u32,
@@ -1224,19 +1379,24 @@ pub mod gmsol_store {
         instructions::initialize_market_config_buffer(ctx, expire_after_secs)
     }
 
-    /// Replace the authority of the market config buffer account
-    /// with the new one.
+    /// Transfer ownership of a market config buffer account to a new authority.
+    ///
+    /// This instruction allows the current authority to transfer ownership of the buffer
+    /// account to a new authority. After the transfer, only the new authority will be able
+    /// to modify or close the buffer.
     ///
     /// # Accounts
     /// [*See the documentation for the accounts.*](SetMarketConfigBufferAuthority)
     ///
     /// # Arguments
-    /// - `new_authority`: The new authority.
+    /// - `new_authority`: The public key of the new authority that will own the buffer account.
     ///
     /// # Errors
     /// - The [`authority`](SetMarketConfigBufferAuthority::authority) must be a signer
-    ///   and the owner of the `buffer`.
-    /// - The [`buffer`](SetMarketConfigBufferAuthority::buffer) must be initialized.
+    ///   and the current owner of the `buffer` account.
+    /// - The [`buffer`](SetMarketConfigBufferAuthority::buffer) must be an initialized
+    ///   market config buffer account.
+    /// - The `new_authority` cannot be the same as the current authority.
     pub fn set_market_config_buffer_authority(
         ctx: Context<SetMarketConfigBufferAuthority>,
         new_authority: Pubkey,
@@ -1244,31 +1404,43 @@ pub mod gmsol_store {
         instructions::set_market_config_buffer_authority(ctx, new_authority)
     }
 
-    /// Close the given market config buffer account.
+    /// Close the given market config buffer account and reclaim its rent.
+    ///
+    /// This instruction allows the authority to close their market config buffer account
+    /// and reclaim the rent.
     ///
     /// # Accounts
     /// [*See the documentation for the accounts.*](CloseMarketConfigBuffer)
     ///
     /// # Errors
     /// - The [`authority`](CloseMarketConfigBuffer::authority) must be a signer
-    ///   and the owner of the `buffer`.
-    /// - The [`buffer`](CloseMarketConfigBuffer::buffer) must be initialized.
+    ///   and the owner of the `buffer` account.
+    /// - The [`buffer`](CloseMarketConfigBuffer::buffer) must be an initialized
+    ///   market config buffer account.
     pub fn close_market_config_buffer(ctx: Context<CloseMarketConfigBuffer>) -> Result<()> {
         instructions::close_market_config_buffer(ctx)
     }
 
     /// Push config items to the given market config buffer account.
     ///
+    /// This instruction allows the authority to add new configuration items to their market
+    /// config buffer account. The buffer will be reallocated to accommodate the new items,
+    /// with the authority paying for any additional rent.
+    ///
     /// # Accounts
     /// [*See the documentation for the accounts.*](PushToMarketConfigBuffer)
     ///
     /// # Arguments
-    /// - `new_configs`: The list of new config items.
+    /// - `new_configs`: The list of new config items to append to the buffer. Each item
+    ///   consists of a string key and a factor value.
     ///
     /// # Errors
     /// - The [`authority`](PushToMarketConfigBuffer::authority) must be a signer
-    ///   and the owner of the `buffer`.
-    /// - The [`buffer`](PushToMarketConfigBuffer::buffer) must be initialized.
+    ///   and the owner of the `buffer` account.
+    /// - The [`buffer`](PushToMarketConfigBuffer::buffer) must be an initialized
+    ///   market config buffer account.
+    /// - The buffer must not have expired.
+    /// - The authority must have enough SOL to pay for any additional rent needed.
     pub fn push_to_market_config_buffer(
         ctx: Context<PushToMarketConfigBuffer>,
         new_configs: Vec<EntryArgs>,
@@ -1276,19 +1448,24 @@ pub mod gmsol_store {
         instructions::push_to_market_config_buffer(ctx, new_configs)
     }
 
-    /// Enable or diable GT minting for the given market.
+    /// Enable or disable GT minting for the given market.
+    ///
+    /// This instruction allows a market keeper to control whether GT (governance token)
+    /// minting is enabled for a specific market. When disabled, users cannot mint new GT
+    /// tokens through this market.
     ///
     /// # Accounts
     /// [*See the documentation for the accounts.*](ToggleGTMinting)
     ///
     /// # Arguments
-    /// - `enable`: Whether to enable or disable GT minting for the given market.
+    /// - `enable`: Whether to enable (`true`) or disable (`false`) GT minting for the given market.
     ///
     /// # Errors
     /// - The [`authority`](ToggleGTMinting::authority) must be a signer and be a MARKET_KEEPER
     ///   in the store.
-    /// - The [`store`](ToggleGTMinting::store) must be initialized.
-    /// - The [`market`](ToggleGTMinting::market) must be initialized and owned by the store.
+    /// - The [`store`](ToggleGTMinting::store) must be an initialized store account.
+    /// - The [`market`](ToggleGTMinting::market) must be an initialized market account and owned
+    ///   by the store.
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn toggle_gt_minting(ctx: Context<ToggleGTMinting>, enable: bool) -> Result<()> {
         instructions::unchecked_toggle_gt_minting(ctx, enable)
@@ -1297,62 +1474,70 @@ pub mod gmsol_store {
     /// Claim fees from the given market. The claimed amount remains in the market balance,
     /// and requires a subsequent transfer.
     ///
+    /// This instruction allows the fee receiver to claim accumulated fees from a market.
+    /// The claimed amount is not immediately transferred - it remains in the market's balance
+    /// and must be transferred in a separate instruction.
+    ///
     /// # Accounts
     /// [*See the documentation for the accounts.*](ClaimFeesFromMarket)
     ///
     /// # Return
-    /// - Returns the claimed amount.
+    /// - Returns the claimed amount in base units of the token.
     ///
     /// # Errors
-    /// - The [`authority`](ClaimFeesFromMarket) must be a signer and be the receiver
-    ///   in the given store.
-    /// - The [`store`](ClaimFeesFromMarket) must be an initialized [`Store`](crate::states::Store)
-    ///   account owned by this store program.
-    /// - The [`market`](ClaimFeesFromMarket) must be an initialized [`Market`](crate::states::Market)
-    ///   account owned by this store program, whose the store must be the given one.
-    /// - The `token` must be one of the collateral token.
-    /// - Token accounts must be matched.
-    /// - The market balance validation must pass after the claim.
+    /// - The [`authority`](ClaimFeesFromMarket::authority) must be a signer and be the designated
+    ///   fee receiver in the given store.
+    /// - The [`store`](ClaimFeesFromMarket::store) must be an initialized [`Store`](crate::states::Store)
+    ///   account owned by this program.
+    /// - The [`market`](ClaimFeesFromMarket::market) must be an initialized [`Market`](crate::states::Market)
+    ///   account owned by this program and associated with the given store.
+    /// - The token being claimed must be one of the market's configured collateral tokens.
+    /// - All provided token accounts must match their expected addresses.
+    /// - The market must maintain valid balance requirements after the claim.
     pub fn claim_fees_from_market(ctx: Context<ClaimFeesFromMarket>) -> Result<u64> {
         let claimed = instructions::claim_fees_from_market(ctx)?;
         Ok(claimed)
     }
 
-    /// Initialize the market vault for the given token.
+    /// Initialize a new market vault for a specific token.
+    ///
+    /// This instruction creates a new vault account that will be used to store tokens for a market.
+    /// The vault is a PDA (Program Derived Address) account that can only be controlled by this program.
     ///
     /// # Accounts
     /// [*See the documentation for the accounts.*](InitializeMarketVault)
     ///
     /// # Errors
-    /// - The [`authority`](InitializeMarketVault::authority) must be a signer and be a MARKET_KEEPER
-    ///   in the store.
-    /// - The [`store`](InitializeMarketVault::store) must be initialized.
-    /// - The [`vault`](InitializeMarketVault::vault) must be uninitialized and a PDA derived
-    ///   from the expected seeds.
+    /// - The [`authority`](InitializeMarketVault::authority) must be a signer and have MARKET_KEEPER
+    ///   permissions in the store.
+    /// - The [`store`](InitializeMarketVault::store) must be an initialized store account.
+    /// - The [`vault`](InitializeMarketVault::vault) must be an uninitialized account and its address
+    ///   must match the PDA derived from the expected seeds (store, market, token).
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn initialize_market_vault(ctx: Context<InitializeMarketVault>) -> Result<()> {
         instructions::unchecked_initialize_market_vault(ctx)
     }
 
-    /// Prepare a claimable account to receive tokens during the order execution.
+    /// Prepare a claimable account to receive tokens during order execution.
     ///
-    /// This instruction can also be used to unlock the fund for the owner to claim.
+    /// This instruction serves two purposes:
+    /// 1. For uninitialized accounts: Creates and prepares the account to receive tokens
+    /// 2. For initialized accounts: Unlocks the funds for the owner to claim
     ///
     /// # Accounts
     /// [*See the documentation for the accounts.*](UseClaimableAccount)
     ///
     /// # Arguments
-    /// - `timestamp`: The timestamp of the claimable account created with.
-    /// - `amount`: The amount to approve for delegation.
+    /// - `timestamp`: The timestamp when the claimable account was created
+    /// - `amount`: The token amount to approve for delegation
     ///
     /// # Errors
-    /// - The [`authority`](UseClaimableAccount::authority) must be a signer and be a ORDER_KEEPER
-    ///   in the store.
-    /// - The [`store`](UseClaimableAccount::store) must be initialized.
+    /// - The [`authority`](UseClaimableAccount::authority) must be a signer and have ORDER_KEEPER
+    ///   permissions in the store
+    /// - The [`store`](UseClaimableAccount::store) must be an initialized store account
     /// - The [`account`](UseClaimableAccount::account) must be a PDA derived from
-    ///   the claimable time key and other expected seeds.
-    /// - The [`account`](UseClaimableAccount::account) must be owned by the store if it has
-    ///   been initialized.
+    ///   the claimable timestamp and other expected seeds
+    /// - If initialized, the [`account`](UseClaimableAccount::account) must be owned by the store
     #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
     pub fn use_claimable_account(
         ctx: Context<UseClaimableAccount>,
@@ -1362,22 +1547,22 @@ pub mod gmsol_store {
         instructions::unchecked_use_claimable_account(ctx, timestamp, amount)
     }
 
-    /// Close empty claiamble account.
+    /// Close an empty claimable account.
     ///
     /// # Accounts
     /// [*See the documentation for the accounts.*](CloseEmptyClaimableAccount)
     ///
     /// # Arguments
-    /// - `timestamp`: The timestamp of the claimable account created with.
+    /// - `timestamp`: The timestamp when the claimable account was created.
     ///
     /// # Errors
-    /// - The [`authority`](CloseEmptyClaimableAccount::authority) must be a signer and be a ORDER_KEEPER
-    ///   in the store.
+    /// - The [`authority`](CloseEmptyClaimableAccount::authority) must be a signer and have ORDER_KEEPER
+    ///   permissions in the store.
     /// - The [`store`](CloseEmptyClaimableAccount::store) must be initialized.
-    /// - The [`account`](UseClaimableAccount::account) must be a PDA derived from
-    ///   the claimable time key and other expected seeds.
-    /// - The [`account`](UseClaimableAccount::account) must be initialzied and owned by the store.
-    /// - The balance of the [`account`](UseClaimableAccount::account) must be zero.
+    /// - The [`account`](CloseEmptyClaimableAccount::account) must be a PDA derived from
+    ///   the claimable timestamp and other expected seeds.
+    /// - The [`account`](CloseEmptyClaimableAccount::account) must be initialized and owned by the store.
+    /// - The balance of the [`account`](CloseEmptyClaimableAccount::account) must be zero.
     #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
     pub fn close_empty_claimable_account(
         ctx: Context<CloseEmptyClaimableAccount>,
@@ -1392,11 +1577,12 @@ pub mod gmsol_store {
     /// *[See the documentation for the accounts.](PrepareAssociatedTokenAccount)*
     ///
     /// # Errors
-    /// - The [`payer`](PrepareAssociatedTokenAccount::payer) must be a signer.
-    /// - The [`mint`](PrepareAssociatedTokenAccount::mint) must be a
-    /// [`Mint`](anchor_spl::token::Mint) account.
-    /// - The [`account`] must be an associated token account with mint = `mint`
-    /// and owner = `owner`. It can be uninitialized.
+    /// - The [`payer`](PrepareAssociatedTokenAccount::payer) must be a signer
+    /// - The [`mint`](PrepareAssociatedTokenAccount::mint) must be a [`Mint`](anchor_spl::token::Mint) account
+    /// - The [`account`](PrepareAssociatedTokenAccount::account) must be an associated token account with:
+    ///   - mint = [`mint`](PrepareAssociatedTokenAccount::mint)
+    ///   - owner = [`owner`](PrepareAssociatedTokenAccount::owner)
+    ///   - It can be uninitialized
     pub fn prepare_associated_token_account(
         ctx: Context<PrepareAssociatedTokenAccount>,
     ) -> Result<()> {
@@ -1413,23 +1599,23 @@ pub mod gmsol_store {
     /// *[See the documentation for the accounts.](CreateDeposit)*
     ///
     /// # Arguments
-    /// - `nonce`: Nonce bytes used to derive the address for the deposit.
-    /// - `params`: Deposit Parameters.
+    /// - `nonce`: Nonce bytes used to derive the deposit account address.
+    /// - `params`: Parameters specifying the deposit details.
     ///
     /// # Errors
-    /// - The [`owner`](CreateDeposit::owner) must be a signer and have enough balance for
-    ///   depositing the execution fee.
-    /// - The [`store`](CreateDeposit::store) must be initialized.
-    /// - The [`market`](CreateDeposit::market) must be initialized and owned by the store.
-    /// - The `market` must be enabled.
-    /// - The [`deposit`](CreateDeposit::deposit) must be uninitialized and a PDA derived
-    ///   from the `nonce` and other expected seeds.
-    /// - The [`market_token`](CreateDeposit::market_token) must be the market token of the
-    ///   given `market`.
-    /// - The required escrow accounts must have been initialized and owned by the `deposit`.
-    /// - The source accounts must correspond to the initial tokens and have enough balance.
-    /// - The remaining accounts must be enabled market accounts, and they must define valid
-    ///   swap paths.
+    /// This instruction will fail if:
+    /// - The [`owner`](CreateDeposit::owner) is not a signer or has insufficient balance
+    ///   for the execution fee
+    /// - The [`store`](CreateDeposit::store) is not properly initialized
+    /// - The [`market`](CreateDeposit::market) is not initialized, not owned by the store,
+    ///   or is disabled
+    /// - The [`deposit`](CreateDeposit::deposit) account is already initialized or is not
+    ///   a valid PDA derived from the provided nonce
+    /// - The [`market_token`](CreateDeposit::market_token) does not match the market's
+    ///   configured token
+    /// - Any required escrow account is not properly initialized or owned by the deposit
+    /// - Any source account has insufficient balance or does not match the initial tokens
+    /// - The remaining accounts do not form valid swap paths or reference disabled markets
     pub fn create_deposit<'info>(
         mut ctx: Context<'_, '_, 'info, 'info, CreateDeposit<'info>>,
         nonce: [u8; 32],
@@ -1444,19 +1630,20 @@ pub mod gmsol_store {
     /// *[See the documentation for the accounts.](CloseDeposit)*
     ///
     /// # Arguments
-    /// - `reason`: The reason for the close.
+    /// - `reason`: The reason for closing the deposit.
     ///
     /// # Errors
-    /// - The [`executor`](CloseDeposit::executor) must be a signer and either the owner
-    ///   of the `deposit` or a ORDER_KEEPER in the store.
-    /// - The [`store`](CloseDeposit::store) must be initialized.
-    /// - The [`owner`](CloseDeposit::owner) must be the owner of the `deposit`.
-    /// - The tokens must be the those recorded in the `deposit`.
-    /// - The [`deposit`](CloseDeposit::deposit) must be initialized and owned by the store
-    ///   and the owner.
-    /// - The escrow accounts must be owned and recorded in the `deposit`.
-    /// - The addresses of the ATAs must be valid.
-    /// - The `deposit` must be cancelled or completed if the `executor` is not the owner.
+    /// This instruction will fail if:
+    /// - The [`executor`](CloseDeposit::executor) is not a signer or is neither the deposit
+    ///   owner nor an ORDER_KEEPER in the store
+    /// - The [`store`](CloseDeposit::store) is not properly initialized
+    /// - The [`owner`](CloseDeposit::owner) does not match the deposit's owner
+    /// - The provided token accounts do not match those recorded in the deposit
+    /// - The [`deposit`](CloseDeposit::deposit) is not initialized, not owned by the store,
+    ///   or not owned by the specified owner
+    /// - Any escrow account is not properly owned or does not match the deposit records
+    /// - Any associated token account address is invalid
+    /// - The deposit is not in a cancelled or completed state when closed by a non-owner
     pub fn close_deposit<'info>(
         ctx: Context<'_, '_, 'info, 'info, CloseDeposit<'info>>,
         reason: String,
@@ -1470,29 +1657,31 @@ pub mod gmsol_store {
     /// *[See the documentation for the accounts.](ExecuteDeposit)*
     ///
     /// # Arguments
-    /// - `execution_fee`: The execution fee claimed for use by the `authority`.
-    /// - `throw_on_execution_error`: Whether to throw error on the execution error.
+    /// - `execution_fee`: The execution fee to be paid to the keeper for executing the deposit
+    /// - `throw_on_execution_error`: If true, throws an error if execution fails. If false,
+    ///   allows execution to continue even if there are errors.
     ///
     /// # Errors
-    /// - The [`authority`](ExecuteDeposit::authority) must be a signer and be a ORDER_KEEPER
-    ///   in the store.
-    /// - The [`store`](ExecuteDeposit::store) must be initialized.
-    /// - The [`token_map`](ExecuteDeposit::token_map) must be initialized and authorized by
-    ///   the store.
-    /// - The [`oracle`](ExecuteDeposit::oracle) must be initialized, cleared and owned by the
-    ///   store.
-    /// - The [`market`](ExecuteDeposit::market) must be initialized, enabled and owned by the
-    ///   store. It must be the one recorded in the `deposit`.
-    /// - The [`deposit`](ExecuteDeposit::deposit) must be initialized and owned by the store.
-    ///   It must be in the pending state.
-    /// - The tokens must be those recorded in the `deposit`.
-    /// - The escrow accounts must be owned and recorded in the `deposit`.
-    /// - The vaults must be valid market vaults and correspond to the initial tokens.
-    /// - The remaining feed accounts must be valid and match the swap params.
-    /// - The remaining market accounts must be enabled and owned by the store. They must also
-    ///   match the swap params.
-    /// - The oracle prices provided by the feed accounts must be complete and valid.
-    /// - Return an error if the execution fail and `throw_on_execution_error` is `true`.
+    /// This instruction will fail if:
+    /// - The [`authority`](ExecuteDeposit::authority) is not a signer or is not an ORDER_KEEPER
+    ///   in the store
+    /// - The [`store`](ExecuteDeposit::store) is not properly initialized
+    /// - The [`token_map`](ExecuteDeposit::token_map) is not initialized or not authorized by
+    ///   the store
+    /// - The [`oracle`](ExecuteDeposit::oracle) is not initialized, cleared and owned by the
+    ///   store
+    /// - The [`market`](ExecuteDeposit::market) is not initialized, is disabled, not owned by
+    ///   the store, or does not match the market recorded in the deposit
+    /// - The [`deposit`](ExecuteDeposit::deposit) is not initialized, not owned by the store,
+    ///   or not in the pending state
+    /// - Any token accounts do not match those recorded in the deposit
+    /// - Any escrow accounts are not properly owned or not recorded in the deposit
+    /// - Any vault accounts are not valid market vaults or do not correspond to the initial tokens
+    /// - Any feed accounts in the remaining accounts are invalid or do not match the swap parameters
+    /// - Any market accounts in the remaining accounts are disabled, not owned by the store,
+    ///   or do not match the swap parameters
+    /// - Any oracle prices from the feed accounts are incomplete or invalid
+    /// - The execution fails and `throw_on_execution_error` is set to `true`
     #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
     pub fn execute_deposit<'info>(
         ctx: Context<'_, '_, 'info, 'info, ExecuteDeposit<'info>>,
@@ -1513,22 +1702,23 @@ pub mod gmsol_store {
     ///
     /// # Arguments
     /// - `nonce`: Nonce bytes used to derive the address for the withdrawal.
-    /// - `params`: Withdrawal Parameters.
+    /// - `params`: Withdrawal Parameters containing the withdrawal configuration.
     ///
     /// # Errors
-    /// - The [`owner`](CreateWithdrawal::owner) must be a signer and have enough balance for
-    ///   withdrawing the tokens.
-    /// - The [`store`](CreateWithdrawal::store) must be initialized.
-    /// - The [`market`](CreateWithdrawal::market) must be initialized and owned by the store.
-    /// - The `market` must be enabled.
-    /// - The [`withdrawal`](CreateWithdrawal::withdrawal) must be uninitialized and a PDA derived
-    ///   from the `nonce` and other expected seeds.
-    /// - The [`market_token`](CreateWithdrawal::market_token) must be the market token of the
-    ///   given `market`.
-    /// - The required escrow accounts must have been initialized and owned by the `withdrawal`.
-    /// - The source market token account must have enough balance.
-    /// - The remaining accounts must be enabled market accounts, and they must define valid
-    ///   swap paths.
+    /// This instruction will fail if:
+    /// - The [`owner`](CreateWithdrawal::owner) is not a signer or has insufficient balance
+    ///   for the withdrawal
+    /// - The [`store`](CreateWithdrawal::store) is not properly initialized
+    /// - The [`market`](CreateWithdrawal::market) is not initialized, is disabled, or not owned
+    ///   by the store
+    /// - The [`withdrawal`](CreateWithdrawal::withdrawal) is already initialized or is not a valid
+    ///   PDA derived from the provided `nonce` and expected seeds
+    /// - The [`market_token`](CreateWithdrawal::market_token) does not match the market token
+    ///   of the specified market
+    /// - Any required escrow accounts are not properly initialized or not owned by the withdrawal
+    /// - The source market token account has insufficient balance
+    /// - Any market accounts in the remaining accounts are disabled, not owned by the store,
+    ///   or do not form valid swap paths
     pub fn create_withdrawal<'info>(
         mut ctx: Context<'_, '_, 'info, 'info, CreateWithdrawal<'info>>,
         nonce: [u8; 32],
@@ -1543,19 +1733,20 @@ pub mod gmsol_store {
     /// *[See the documentation for the accounts.](CloseWithdrawal)*
     ///
     /// # Arguments
-    /// - `reason`: The reason for the close.
+    /// - `reason`: The reason for closing the withdrawal.
     ///
     /// # Errors
-    /// - The [`executor`](CloseWithdrawal::executor) must be a signer and either the owner
-    ///   of the `withdrawal` or a ORDER_KEEPER in the store.
-    /// - The [`store`](CloseWithdrawal::store) must be initialized.
-    /// - The [`owner`](CloseWithdrawal::owner) must be the owner of the `withdrawal`.
-    /// - The tokens must be the those recorded in the `withdrawal`.
-    /// - The [`withdrawal`](CloseWithdrawal::withdrawal) must be initialized and owned by the store
-    ///   and the owner.
-    /// - The escrow accounts must be owned and recorded in the `withdrawal`.
-    /// - The addresses of the ATAs must be valid.
-    /// - The `withdrawal` must be cancelled or completed if the `executor` is not the owner.
+    /// This instruction will fail if:
+    /// - The [`executor`](CloseWithdrawal::executor) is not a signer or is neither the withdrawal
+    ///   owner nor an ORDER_KEEPER in the store
+    /// - The [`store`](CloseWithdrawal::store) is not properly initialized
+    /// - The [`owner`](CloseWithdrawal::owner) does not match the withdrawal owner
+    /// - The token accounts do not match those recorded in the withdrawal
+    /// - The [`withdrawal`](CloseWithdrawal::withdrawal) is not initialized, not owned by the store,
+    ///   or not owned by the specified owner
+    /// - Any required escrow accounts are not properly initialized or not owned by the withdrawal
+    /// - Any associated token accounts have invalid addresses
+    /// - The withdrawal is not in a cancelled or completed state when the executor is not the owner
     pub fn close_withdrawal<'info>(
         ctx: Context<'_, '_, 'info, 'info, CloseWithdrawal<'info>>,
         reason: String,
@@ -1569,29 +1760,31 @@ pub mod gmsol_store {
     /// *[See the documentation for the accounts.](ExecuteWithdrawal)*
     ///
     /// # Arguments
-    /// - `execution_fee`: The execution fee claimed for use by the `authority`.
-    /// - `throw_on_execution_error`: Whether to throw error on the execution error.
+    /// - `execution_fee`: The execution fee to be paid to the keeper for executing the withdrawal
+    /// - `throw_on_execution_error`: If true, throws an error if execution fails. If false, marks
+    ///   the withdrawal as failed but does not throw.
     ///
     /// # Errors
-    /// - The [`authority`](ExecuteWithdrawal::authority) must be a signer and be a ORDER_KEEPER
-    ///   in the store.
-    /// - The [`store`](ExecuteWithdrawal::store) must be initialized.
-    /// - The [`token_map`](ExecuteWithdrawal::token_map) must be initialized and authorized by
-    ///   the store.
-    /// - The [`oracle`](ExecuteWithdrawal::oracle) must be initialized, cleared and owned by the
-    ///   store.
-    /// - The [`market`](ExecuteWithdrawal::market) must be initialized, enabled and owned by the
-    ///   store. It must be the one recorded in the `withdrawal`.
-    /// - The [`withdrawal`](ExecuteWithdrawal::withdrawal) must be initialized and owned by the store.
-    ///   It must be in the pending state.
-    /// - The tokens must be those recorded in the `withdrawal`.
-    /// - The escrow accounts must be owned and recorded in the `withdrawal`.
-    /// - The vaults must be valid market vaults and correspond to the initial tokens.
-    /// - The remaining feed accounts must be valid and match the swap params.
-    /// - The remaining market accounts must be enabled and owned by the store. They must also
-    ///   match the swap params.
-    /// - The oracle prices provided by the feed accounts must be complete and valid.
-    /// - Return an error if the execution fail and `throw_on_execution_error` is `true`.
+    /// This instruction will fail if:
+    /// - The [`authority`](ExecuteWithdrawal::authority) is not a signer or is not an ORDER_KEEPER
+    ///   in the store
+    /// - The [`store`](ExecuteWithdrawal::store) is not properly initialized
+    /// - The [`token_map`](ExecuteWithdrawal::token_map) is not initialized or not authorized by
+    ///   the store
+    /// - The [`oracle`](ExecuteWithdrawal::oracle) is not initialized, cleared and owned by the
+    ///   store
+    /// - The [`market`](ExecuteWithdrawal::market) is not initialized, is disabled, not owned by
+    ///   the store, or does not match the market recorded in the withdrawal
+    /// - The [`withdrawal`](ExecuteWithdrawal::withdrawal) is not initialized, not owned by the
+    ///   store, or not in the pending state
+    /// - Any token accounts do not match those recorded in the withdrawal
+    /// - Any escrow accounts are not properly initialized or not owned by the withdrawal
+    /// - Any vault accounts are not valid market vaults or do not correspond to the initial tokens
+    /// - Any feed accounts in the remaining accounts are invalid or do not match the swap parameters
+    /// - Any market accounts in the remaining accounts are disabled, not owned by the store, or do
+    ///   not match the swap parameters
+    /// - Any oracle prices from the feed accounts are incomplete or invalid
+    /// - The execution fails and `throw_on_execution_error` is set to true
     #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
     pub fn execute_withdrawal<'info>(
         ctx: Context<'_, '_, 'info, 'info, ExecuteWithdrawal<'info>>,
@@ -1611,15 +1804,17 @@ pub mod gmsol_store {
     /// *[See the documentation for the accounts.](PreparePosition)*
     ///
     /// # Arguments
-    /// - `params`: Order Parameters.
+    /// - `params`: Order Parameters specifying the market and position details.
     ///
     /// # Errors
-    /// - The [`owner`](PreparePosition::owner) must be a signer.
-    /// - The [`store`](PreparePosition::store) must be initialized.
-    /// - The [`market`](PreparePosition::market) must be initialized and owned by the store.
-    /// - The `market` must be enabled.
-    /// - The [`position`](PreparePosition::position) must be a PDA derived from the owner
-    ///   and other expected seeds. It must be either uninitialized or validly initialized.
+    /// This instruction will fail if:
+    /// - The [`owner`](PreparePosition::owner) is not a signer
+    /// - The [`store`](PreparePosition::store) is not properly initialized
+    /// - The [`market`](PreparePosition::market) is not initialized, is disabled, or not owned by
+    ///   the store
+    /// - The [`position`](PreparePosition::position) address is not a valid PDA derived from the
+    ///   owner and expected seeds
+    /// - The position account is neither uninitialized nor validly initialized for the owner
     pub fn prepare_position(
         ctx: Context<PreparePosition>,
         params: CreateOrderParams,
@@ -1634,53 +1829,44 @@ pub mod gmsol_store {
     ///
     /// # Arguments
     /// - `nonce`: Nonce bytes used to derive the address for the order.
-    /// - `params`: Order Parameters.
+    /// - `params`: Order Parameters specifying the market, order kind, and other details.
     ///
     /// # Errors
-    /// - The [`owner`](CreateOrder::owner) must be a signer.
-    /// - The [`store`](CreateOrder::store) must be initialized.
-    /// - The [`market`](CreateOrder::market) must be initialized and owned by the store.
-    /// - The `market` must be enabled.
-    /// - The [`user`](CreateOrder::user) must be initialized and correspond to the `owner`.
-    ///   The address of the `user` must be a PDA derived from the owner and other expected seeds.
-    /// - The [`order`](CreateOrder::order) must be uninitialized and a PDA derived from the
-    ///   owner, the `nonce` and other expected seeds.
-    /// - The [`position`](CreateOrder::position) must be present if the order kind is increase
-    ///   or decrease, and it must be validly initialized and owned by the `owner` and the `store`.
-    ///   It must be the corresponding position of the `order`.
-    /// - The [`initial_collateral_token`](CreateOrder::initial_collateral_token) must be present
-    ///   if the order kind is increase or swap, and it must be a valid token if present.
-    /// - The [`final_output_token`](CreateOrder::final_output_token) must be a valid token.
-    /// - The [`long_token`](CreateOrder::long_token) must be present if the order kind is increase
-    ///   or decrease, and it must be the long token of the market if present.
-    /// - The [`short_token`](CreateOrder::short_token) must be present if the order kind is increase
-    ///   or decrease, and it must be the short token of the market if present.
-    /// - The [`initial_collateral_token_escrow`](CreateOrder::initial_collateral_token_escrow)
-    ///   must be present if the order kind is increase or swap, and it must be a valid escrow
-    ///   account for the `initial_collateral_token` and owned by the `order` if present.
-    /// - The [`final_output_token_escrow`](CreateOrder::final_output_token_escrow) must be
-    ///   present if the order kind is decrease or swap, and it must be a valid escrow account
-    ///   for the `final_output_token` and owned by the `order` if present.
-    /// - The [`long_token_escrow`](CreateOrder::long_token_escrow) must be present if the order
-    ///   kind is increase or decrease, and it must be a valid escrow account for the `long_token`
-    ///   and owned by the `order` if present.
-    /// - The [`short_token_escrow`](CreateOrder::short_token_escrow) must be present if the
-    ///   order kind is increase or decrease, and it must be a valid escrow account for the
-    ///   `short_token` and owned by the `order` if present.
-    /// - The [`initial_collateral_token_source`](CreateOrder::initial_collateral_token_source)
-    ///   must be present if the order kind is increase or swap, and it must be a valid source
-    ///   account for the `initial_collateral_token` whose authority is the `order`.
-    /// - The [`final_output_token_ata`](CreateOrder::final_output_token_ata) must be present if
-    ///   the order kind is decrease or swap, and it must be a valid ATA for the `final_output_token`
-    ///   whose authority is the `owner` if present.
-    /// - The [`long_token_ata`](CreateOrder::long_token_ata) must be present if the order kind
-    ///   is increase or decrease, and it must be a valid ATA for the `long_token` whose authority
-    ///   is the `owner` if present.
-    /// - The [`short_token_ata`](CreateOrder::short_token_ata) must be present if the order kind
-    ///   is increase or decrease, and it must be a valid ATA for the `short_token` whose authority
-    ///   is the `owner` if present.
-    /// - The feature must be enabled for creating the given kind of orders.
-    /// - The remaining accounts must be valid and match the swap params.
+    /// This instruction will fail if:
+    /// - The [`owner`](CreateOrder::owner) is not a signer
+    /// - The [`store`](CreateOrder::store) is not properly initialized
+    /// - The [`market`](CreateOrder::market) is not initialized, is disabled, or not owned by
+    ///   the store
+    /// - The [`user`](CreateOrder::user) is not initialized or does not correspond to the owner.
+    ///   The address must be a valid PDA derived from the owner and expected seeds.
+    /// - The [`order`](CreateOrder::order) is not uninitialized or the address is not a valid
+    ///   PDA derived from the owner, nonce and expected seeds
+    /// - For increase/decrease orders:
+    ///   - The [`position`](CreateOrder::position) is missing, not validly initialized, or not
+    ///     owned by both the owner and store
+    ///   - The [`long_token`](CreateOrder::long_token) or [`short_token`](CreateOrder::short_token)
+    ///     are missing or do not match the market tokens
+    ///   - The [`long_token_escrow`](CreateOrder::long_token_escrow) or
+    ///     [`short_token_escrow`](CreateOrder::short_token_escrow) are missing or not valid
+    ///     escrow accounts owned by the order
+    ///   - The [`long_token_ata`](CreateOrder::long_token_ata) or
+    ///     [`short_token_ata`](CreateOrder::short_token_ata) are missing or not valid ATAs
+    ///     owned by the owner
+    /// - For increase/swap orders:
+    ///   - The [`initial_collateral_token`](CreateOrder::initial_collateral_token) is missing
+    ///     or invalid
+    ///   - The [`initial_collateral_token_escrow`](CreateOrder::initial_collateral_token_escrow)
+    ///     is missing or not a valid escrow account owned by the order
+    ///   - The [`initial_collateral_token_source`](CreateOrder::initial_collateral_token_source)
+    ///     is missing or not a valid source account with order authority
+    /// - For decrease/swap orders:
+    ///   - The [`final_output_token`](CreateOrder::final_output_token) is invalid
+    ///   - The [`final_output_token_escrow`](CreateOrder::final_output_token_escrow) is missing
+    ///     or not a valid escrow account owned by the order
+    ///   - The [`final_output_token_ata`](CreateOrder::final_output_token_ata) is missing or
+    ///     not a valid ATA owned by the owner
+    /// - The feature for creating this kind of order is not enabled
+    /// - The remaining accounts do not match the swap parameters
     pub fn create_order<'info>(
         mut ctx: Context<'_, '_, 'info, 'info, CreateOrder<'info>>,
         nonce: [u8; 32],
@@ -1725,13 +1911,17 @@ pub mod gmsol_store {
     /// *[See the documentation for the accounts.](PrepareTradeEventBuffer)*
     ///
     /// # Arguments
-    /// - `index`: The index of the trade event buffer.
+    /// - `index`: The index of the trade event buffer to prepare. Must be between 0 and 255.
     ///
     /// # Errors
-    /// - The [`authority`](PrepareTradeEventBuffer::authority) must be a signer.
-    /// - The [`store`](PrepareTradeEventBuffer::store) must be initialized.
-    /// - The [`event`](PrepareTradeEventBuffer::event) must be either uninitialized or
-    ///   initialized with the `authority` as the `authority` and the `store` as the `store`.
+    /// - The [`authority`](PrepareTradeEventBuffer::authority) must be a signer and have
+    ///   permission to prepare trade event buffers.
+    /// - The [`store`](PrepareTradeEventBuffer::store) must be initialized and active.
+    /// - The [`event`](PrepareTradeEventBuffer::event) must be either:
+    ///   - Uninitialized, or
+    ///   - Already initialized with the `authority` as the authority and the `store` as
+    ///     the store
+    /// - The `index` must not already be in use by another trade event buffer.
     // FIXME: There is a false positive lint for the doc link of `event`.
     #[allow(rustdoc::broken_intra_doc_links)]
     pub fn prepare_trade_event_buffer(
@@ -1747,15 +1937,18 @@ pub mod gmsol_store {
     /// *[See the documentation for the accounts.](UpdateOrder)*
     ///
     /// # Arguments
-    /// - `params`: Update Order Parameters.
+    /// - `params`: Update Order Parameters. Contains the updated order details like size, price, etc.
     ///
     /// # Errors
-    /// - The [`owner`](UpdateOrder::owner) must be a signer.
-    /// - The [`store`](UpdateOrder::store) must be initialized.
-    /// - The [`market`](UpdateOrder::market) must be initialized and owned by the store.
-    /// - The [`order`](UpdateOrder::order) must be initialized and owned by the store and the
-    ///   `owner`, and the `market` must be the market of the `order`.
-    /// - The feature must be enabled for updating the given kind of `order`.
+    /// - The [`owner`](UpdateOrder::owner) must be a signer and the original creator of the order.
+    /// - The [`store`](UpdateOrder::store) must be initialized and active.
+    /// - The [`market`](UpdateOrder::market) must be initialized, enabled and owned by the store.
+    /// - The [`order`](UpdateOrder::order) must be:
+    ///   - Initialized and owned by both the store and the `owner`
+    ///   - Associated with the provided `market`
+    ///   - In a pending/active state that allows updates
+    /// - The feature must be enabled in the store for updating the given kind of `order`.
+    /// - The updated parameters must be valid for the order type and market configuration.
     pub fn update_order(ctx: Context<UpdateOrder>, params: UpdateOrderParams) -> Result<()> {
         instructions::update_order(ctx, &params)
     }
@@ -1766,70 +1959,40 @@ pub mod gmsol_store {
     /// *[See the documentation for the accounts.](ExecuteIncreaseOrSwapOrder)*
     ///
     /// # Arguments
-    /// - `recent_timestamp`: A recent timestamp.
-    /// - `execution_fee`: The execution fee claimed for use by the `authority`.
-    /// - `throw_on_execution_error`: Whether to throw error on the execution error.
+    /// - `recent_timestamp`: A recent timestamp used for deriving the claimable accounts.
+    /// - `execution_fee`: The execution fee to be paid to the keeper for processing the order.
+    /// - `throw_on_execution_error`: If true, throws an error if order execution fails. If false,
+    ///   silently cancels the order on execution failure.
     ///
     /// # Errors
-    /// - The [`authority`](ExecuteIncreaseOrSwapOrder::authority) must be a signer and a
-    /// ORDER_KEEPER in the store.
-    /// - The [`store`](ExecuteIncreaseOrSwapOrder::store) must be initialized.
-    /// - The [`token_map`](ExecuteIncreaseOrSwapOrder::token_map) must be initialized and
-    ///   authorized by the store.
-    /// - The [`oracle`](ExecuteIncreaseOrSwapOrder::oracle) must be initialized, cleared and
-    ///   owned by the store.
-    /// - The [`market`](ExecuteIncreaseOrSwapOrder::market) must be initialized, enabled and
-    ///   owned by the store.
-    /// - The [`owner`](ExecuteIncreaseOrSwapOrder::owner) must be the owner of the `order`.
-    /// - The [`user`](ExecuteIncreaseOrSwapOrder::user) must be initialized and correspond to
+    /// - The [`authority`](ExecuteIncreaseOrSwapOrder::authority) must be a signer with ORDER_KEEPER
+    ///   permissions in the store.
+    /// - The [`store`](ExecuteIncreaseOrSwapOrder::store) must be initialized and active.
+    /// - The [`token_map`](ExecuteIncreaseOrSwapOrder::token_map) must be initialized and authorized
+    ///   by the store.
+    /// - The [`oracle`](ExecuteIncreaseOrSwapOrder::oracle) must be initialized, cleared and owned
+    ///   by the store.
+    /// - The [`market`](ExecuteIncreaseOrSwapOrder::market) must be initialized, enabled and owned
+    ///   by the store.
+    /// - The [`owner`](ExecuteIncreaseOrSwapOrder::owner) must be the original creator of the order.
+    /// - The [`user`](ExecuteIncreaseOrSwapOrder::user) must be initialized and associated with
     ///   the `owner`.
-    /// - The [`order`](ExecuteIncreaseOrSwapOrder::order) must be initialized and owned by
-    ///   the store and the `owner`. Its `market` must be the given `market`, and it must be in
-    ///   the pending state.
-    /// - The [`position`](ExecuteIncreaseOrSwapOrder::position) must be present if the order
-    ///   kind is increase, and it must be validly initialized and owned by the `owner` and the
-    ///   `store`. It must be the corresponding position of the `order`.
-    /// - The [`event`](ExecuteIncreaseOrSwapOrder::event) must be present if the order kind is
-    ///   increase, and it must be a valid trade event buffer and owned by the `store` and the
-    ///   `authority`.
-    /// - The [`initial_collateral_token`](ExecuteIncreaseOrSwapOrder::initial_collateral_token)
-    ///   must be present if the order kind is increase or swap, and it must be a valid token if
-    ///   present.
-    /// - The [`final_output_token`](ExecuteIncreaseOrSwapOrder::final_output_token) must be a
-    ///   valid token.
-    /// - The [`long_token`](ExecuteIncreaseOrSwapOrder::long_token) must be present if the
-    ///   order kind is increase, and it must be the long token of the `market` if present.
-    /// - The [`short_token`](ExecuteIncreaseOrSwapOrder::short_token) must be present if the
-    ///   order kind is increase, and it must be the short token of the `market` if present.
-    /// - The [`initial_collateral_token_escrow`](ExecuteIncreaseOrSwapOrder::initial_collateral_token_escrow)
-    ///   must be present if the order kind is increase or swap, and it must be a valid escrow
-    ///   account for the `initial_collateral_token` and owned by the `order` if present.
-    /// - The [`final_output_token_escrow`](ExecuteIncreaseOrSwapOrder::final_output_token_escrow)
-    ///   must be present if the order kind is swap, and it must be a valid escrow
-    ///   account for the `final_output_token` and owned by the `order` if present.
-    /// - The [`long_token_escrow`](ExecuteIncreaseOrSwapOrder::long_token_escrow) must be present
-    ///   if the order kind is increase, and it must be a valid escrow account for the `long_token`
-    ///   and owned by the `order` if present.
-    /// - The [`short_token_escrow`](ExecuteIncreaseOrSwapOrder::short_token_escrow) must be
-    ///   present if the order kind is increase, and it must be a valid escrow account for the
-    ///   `short_token` and owned by the `order` if present.
-    /// - The [`initial_collateral_token_vault`](ExecuteIncreaseOrSwapOrder::initial_collateral_token_vault)
-    ///   must be present if the order kind is increase or swap, and it must be a valid vault
-    ///   account for the `initial_collateral_token` and owned by the `store` if present.
-    /// - The [`final_output_token_vault`](ExecuteIncreaseOrSwapOrder::final_output_token_vault)
-    ///   must be present if the order kind is swap, and it must be a valid vault account for the
-    ///   `final_output_token` and owned by the `store` if present.
-    /// - The [`long_token_vault`](ExecuteIncreaseOrSwapOrder::long_token_vault) must be present
-    ///   if the order kind is increase, and it must be a valid vault account for the `long_token`
-    ///   and owned by the `store` if present.
-    /// - The [`short_token_vault`](ExecuteIncreaseOrSwapOrder::short_token_vault) must be present
-    ///   if the order kind is increase, and it must be a valid vault account for the `short_token`
-    ///   and owned by the `store` if present.
-    /// - The remaining feed accounts must be valid and match the swap params.
-    /// - The remaining market accounts must be valid and match the swap params.
-    /// - The feature must be enabled for executing the given kind of `order`.
-    /// - The oracle prices provided by the feed accounts must be complete and valid.
-    /// - Return an error if the execution fail and `throw_on_execution_error` is `true`.
+    /// - The [`order`](ExecuteIncreaseOrSwapOrder::order) must be:
+    ///   - Initialized and owned by both the store and owner
+    ///   - Associated with the provided market
+    ///   - In a pending state
+    /// - For increase orders:
+    ///   - The [`position`](ExecuteIncreaseOrSwapOrder::position) must exist and be validly owned
+    ///   - The [`event`](ExecuteIncreaseOrSwapOrder::event) must be a valid trade event buffer
+    ///   - The [`long_token`](ExecuteIncreaseOrSwapOrder::long_token) and [`short_token`](ExecuteIncreaseOrSwapOrder::short_token)
+    ///     must match the market tokens
+    ///   - The corresponding token escrow and vault accounts must be valid
+    /// - For swap orders:
+    ///   - The initial and final token accounts must be valid
+    ///   - The corresponding escrow and vault accounts must be valid
+    /// - All feed accounts must provide valid and complete oracle prices
+    /// - The feature for executing this order type must be enabled in the store
+    /// - If `throw_on_execution_error` is true, any execution failure will throw an error
     // FIXME: There is a false positive lint for the doc link of `event`.
     #[allow(rustdoc::broken_intra_doc_links)]
     #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
@@ -1853,51 +2016,36 @@ pub mod gmsol_store {
     /// *[See the documentation for the accounts.](ExecuteDecreaseOrder)*
     ///
     /// # Arguments
-    /// - `recent_timestamp`: A recent timestamp.
-    /// - `execution_fee`: The execution fee claimed for use by the `authority`.
-    /// - `throw_on_execution_error`: Whether to throw error on the execution error.
+    /// - `recent_timestamp`: A recent timestamp that must be within the valid time window.
+    /// - `execution_fee`: The execution fee to be paid to the keeper for processing the order.
+    /// - `throw_on_execution_error`: If true, throws an error if order execution fails. If false,
+    ///   silently cancels the order on execution failure.
     ///
     /// # Errors
-    /// - The [`authority`](ExecuteDecreaseOrder::authority) must be a signer and a
-    ///   ORDER_KEEPER in the store.
-    /// - The [`store`](ExecuteDecreaseOrder::store) must be initialized.
-    /// - The [`token_map`](ExecuteDecreaseOrder::token_map) must be initialized and
-    ///   authorized by the store.
-    /// - The [`oracle`](ExecuteDecreaseOrder::oracle) must be initialized, cleared and
-    ///   owned by the store.
-    /// - The [`market`](ExecuteDecreaseOrder::market) must be initialized, enabled and
-    ///   owned by the store.
-    /// - The [`owner`](ExecuteDecreaseOrder::owner) must be the owner of the `order`.
-    /// - The [`user`](ExecuteDecreaseOrder::user) must be initialized and correspond to the `owner`.
-    /// - The [`order`](ExecuteDecreaseOrder::order) must be initialized and owned by the store and the
-    ///   `owner`. Its `market` must be the given `market`, and it must be in the pending state.
-    /// - The [`position`](ExecuteDecreaseOrder::position) must be validly initialized and owned by
-    ///   the `owner` and the `store`. It must be the corresponding position of the `order`.
-    /// - The [`event`](ExecuteDecreaseOrder::event) must be a valid trade
-    ///   event buffer and owned by the `store` and the `authority`.
-    /// - The tokens must be those recorded in the `order`.
-    /// - The escrow accounts must be owned and recorded in the `order`.
-    /// - The [`final_output_token_vault`](ExecuteDecreaseOrder::final_output_token_vault) must be
-    ///   a valid vault account for the `final_output_token` and owned by the `store`.
-    /// - The [`long_token_vault`](ExecuteDecreaseOrder::long_token_vault) must be a valid vault
-    ///   account for the `long_token` and owned by the `store`.
-    /// - The [`short_token_vault`](ExecuteDecreaseOrder::short_token_vault) must be a valid vault
-    ///   account for the `short_token` and owned by the `store`.
-    /// - The [`claimable_long_token_account_for_user`](ExecuteDecreaseOrder::claimable_long_token_account_for_user)
-    ///   must be a valid claimable account of `long_token` owned by the `store` and delegated to
+    /// - The [`authority`](ExecuteDecreaseOrder::authority) must be a signer with ORDER_KEEPER
+    ///   permissions in the store.
+    /// - The [`store`](ExecuteDecreaseOrder::store) must be initialized and active.
+    /// - The [`token_map`](ExecuteDecreaseOrder::token_map) must be initialized and authorized
+    ///   by the store.
+    /// - The [`oracle`](ExecuteDecreaseOrder::oracle) must be initialized, cleared and owned
+    ///   by the store.
+    /// - The [`market`](ExecuteDecreaseOrder::market) must be initialized, enabled and owned
+    ///   by the store.
+    /// - The [`owner`](ExecuteDecreaseOrder::owner) must be the original creator of the order.
+    /// - The [`user`](ExecuteDecreaseOrder::user) must be initialized and associated with
     ///   the `owner`.
-    /// - The [`claimable_short_token_account_for_user`](ExecuteDecreaseOrder::claimable_short_token_account_for_user)
-    ///   must be a valid claimable account of `short_token` owned by the `store` and delegated to
-    ///   the `owner`.
-    /// - The [`claimable_pnl_token_account_for_holding`](ExecuteDecreaseOrder::claimable_pnl_token_account_for_holding)
-    ///   must be a valid claimable account of the pnl token owned by the `store` and delegated to
-    ///   the `holding` address.
-    /// - The remaining feed accounts must be valid and match the swap params.
-    /// - The remaining market accounts must be valid and match the swap params.
-    /// - The feature must be enabled for executing the given kind of `order`.
-    /// - The oracle prices provided by the feed accounts must be complete and valid.
-    /// - The `recent_timestamp` must be within the recent time window.
-    /// - Return an error if the execution fail and `throw_on_execution_error` is `true`.
+    /// - The [`order`](ExecuteDecreaseOrder::order) must be:
+    ///   - Initialized and owned by both the store and owner
+    ///   - Associated with the provided market
+    ///   - In a pending state
+    /// - The [`position`](ExecuteDecreaseOrder::position) must exist and be validly owned
+    /// - The [`event`](ExecuteDecreaseOrder::event) must be a valid trade event buffer
+    /// - The tokens must match those specified in the order
+    /// - All token escrow and vault accounts must be valid and properly owned
+    /// - All claimable token accounts must be valid and properly delegated
+    /// - All feed accounts must provide valid and complete oracle prices
+    /// - The feature for executing decrease orders must be enabled in the store
+    /// - If `throw_on_execution_error` is true, any execution failure will throw an error
     // FIXME: There is a false positive lint for the doc link of `event`.
     #[allow(rustdoc::broken_intra_doc_links)]
     #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
@@ -1917,54 +2065,52 @@ pub mod gmsol_store {
 
     /// Perform a liquidation by keepers.
     ///
+    /// This instruction allows keepers to liquidate positions that have fallen below the required maintenance margin.
+    /// When executed, it will close the position and distribute funds according to the liquidation rules.
+    ///
     /// # Accounts
     /// *[See the documentation for the accounts.](PositionCut)*
     ///
     /// # Arguments
-    /// - `nonce`: The nonce to derive the `order` address.
-    /// - `recent_timestamp`: A recent timestamp.
-    /// - `execution_fee`: The execution fee claimed for use by the `authority`.
+    /// - `nonce`: The nonce used to derive the `order` PDA address
+    /// - `recent_timestamp`: A recent timestamp that must be within the valid time window
+    /// - `execution_fee`: The execution fee to be paid to the keeper for processing the liquidation
     ///
     /// # Errors
-    /// - The [`authority`](PositionCut::authority) must be a signer and a
-    /// ORDER_KEEPER in the store.
-    /// - The [`owner`](PositionCut::owner) must be the owner of the position.
-    /// - The [`user`](PositionCut::user) must be initialized and correspond to the `owner`.
-    /// - The [`store`](PositionCut::store) must be initialized.
-    /// - The [`token_map`](PositionCut::token_map) must be initialized and authorized by the store.
-    /// - The [`oracle`](PositionCut::oracle) must be initialized, cleared and owned by the store.
-    /// - The [`market`](PositionCut::market) must be initialized, enabled and owned by the store.
-    ///   It must be the market of the `position`.
-    /// - The [`order`](PositionCut::order) must be uninitialized and its address must be the PDA
-    ///   derived from the `store`, `owner` and `nonce`.
-    /// - The [`position`](PositionCut::position) must be validly initialized and owned by the `owner`
-    ///   and the `store`. It must be liquidatable.
-    /// - The [`event`](PositionCut::event) must be a valid trade event buffer and owned by the
-    ///   `store` and the `authority`.
-    /// - The [`long_token`](PositionCut::long_token) and [`short_token`](PositionCut::short_token)
-    ///   must be the long and short token of the `market`.
-    /// - The [`long_token_escrow`](PositionCut::long_token_escrow) and
-    ///   [`short_token_escrow`](PositionCut::short_token_escrow) must be valid escrow accounts for
-    ///   the [`long_token`](PositionCut::long_token) and [`short_token`](PositionCut::short_token)
-    ///   respectively and owned by the `order` if present.
-    /// - Return an error if the execution fail and `throw_on_execution_error` is `true`.
-    /// - The [`long_token_vault`](PositionCut::long_token_vault) and
-    ///   [`short_token_vault`](PositionCut::short_token_vault) must be valid vault accounts for
-    ///   the `long_token` and `short_token` respectively and owned by the `store`.
-    /// - The [`claimable_long_token_account_for_user`](PositionCut::claimable_long_token_account_for_user)
-    ///   must be a valid claimable account of `long_token` owned by the `store` and delegated to
-    ///   the `owner`.
-    /// - The [`claimable_short_token_account_for_user`](PositionCut::claimable_short_token_account_for_user)
-    ///   must be a valid claimable account of `short_token` owned by the `store` and delegated to
-    ///   the `owner`.
-    /// - The [`claimable_pnl_token_account_for_holding`](PositionCut::claimable_pnl_token_account_for_holding)
-    ///   must be a valid claimable account of the pnl token owned by the `store` and delegated to
-    ///   the `holding` address.
-    /// - The remaining feed accounts must be valid. They must be provided in the same order as
-    ///   the unique sorted list of tokens in the `market`.
-    /// - The liquidation feature must be enabled.
-    /// - The oracle prices provided by the feed accounts must be complete and valid.
-    /// - Return an error if the execution fail.
+    /// - The [`authority`](PositionCut::authority) must be a signer with ORDER_KEEPER permissions in the store
+    /// - The [`owner`](PositionCut::owner) must be the owner of the position being liquidated
+    /// - The [`user`](PositionCut::user) must be an initialized user account associated with the `owner`
+    /// - The [`store`](PositionCut::store) must be initialized and active
+    /// - The [`token_map`](PositionCut::token_map) must be initialized and authorized by the store
+    /// - The [`oracle`](PositionCut::oracle) must be initialized, cleared and owned by the store
+    /// - The [`market`](PositionCut::market) must be:
+    ///   - Initialized and enabled
+    ///   - Owned by the store
+    ///   - The market associated with the position being liquidated
+    /// - The [`order`](PositionCut::order) must be:
+    ///   - Uninitialized
+    ///   - Have an address matching the PDA derived from the store, owner and provided nonce
+    /// - The [`position`](PositionCut::position) must be:
+    ///   - Validly initialized
+    ///   - Owned by both the owner and store
+    ///   - In a liquidatable state (below maintenance margin)
+    /// - The [`event`](PositionCut::event) must be a valid trade event buffer owned by both the store and authority
+    /// - The [`long_token`](PositionCut::long_token) and [`short_token`](PositionCut::short_token) must match the market's configured tokens
+    /// - Token escrow accounts must be:
+    ///   - Valid for their respective tokens
+    ///   - Owned by the order if present
+    /// - Token vault accounts must be:
+    ///   - Valid for their respective tokens  
+    ///   - Owned by the store
+    /// - Claimable token accounts must be:
+    ///   - Valid for their respective tokens
+    ///   - Owned by the store
+    ///   - Properly delegated to their respective owners
+    /// - Price feed accounts must be:
+    ///   - Valid and complete
+    ///   - Provided in order matching the market's sorted token list
+    /// - The liquidation feature must be enabled in the store
+    /// - All oracle prices must be valid and complete
     // FIXME: There is a false positive lint for the doc link of `event`.
     #[allow(rustdoc::broken_intra_doc_links)]
     #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
@@ -1983,21 +2129,26 @@ pub mod gmsol_store {
         )
     }
 
-    /// Update the ADL state for the market.
+    /// Update the ADL (Auto-Deleveraging) state for the market.
     ///
-    /// # Accounts.
-    /// *[See the documentation for the accounts.](UpdateAdlState).*
+    /// This instruction updates the ADL state for either the long or short side of a market. The ADL
+    /// state determines whether positions on that side are eligible for auto-deleveraging based on
+    /// current market conditions.
+    ///
+    /// # Accounts
+    /// *[See the documentation for the accounts.](UpdateAdlState)*
     ///
     /// # Arguments
-    /// - `is_long`: The market side to update for.
+    /// - `is_long`: Whether to update the ADL state for the long (`true`) or short (`false`) side
+    ///   of the market.
     ///
     /// # Errors
-    /// - The [`authority`](UpdateAdlState::authority) must be a signer and a
-    /// CONTROLLER of the store.
+    /// - The [`authority`](UpdateAdlState::authority) must be a signer and have the ORDER_KEEPER
+    ///   role in the store.
     /// - The [`store`](UpdateAdlState::store) must be an initialized [`Store`](states::Store)
-    /// account owned by the store program.
+    ///   account owned by the store program.
     /// - The [`oracle`](UpdateAdlState::oracle) must be an initialized [`Oracle`](states::Oracle)
-    /// account owned by the store program, and it must be owned by the store.
+    ///   account that is owned by the store.
     /// - The [`market`](UpdateAdlState::market) must be enabled and owned by the store.
     #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
     pub fn update_adl_state<'info>(
@@ -2007,58 +2158,53 @@ pub mod gmsol_store {
         instructions::unchecked_update_adl_state(ctx, is_long)
     }
 
-    /// Perform an ADL by keepers.
+    /// Perform an ADL (Auto-Deleveraging) by keepers.
+    ///
+    /// This instruction allows keepers to execute auto-deleveraging on positions that meet the ADL criteria.
+    /// ADL helps maintain market stability by reducing highly leveraged positions when the market's
+    /// overall risk metrics exceed safe thresholds.
     ///
     /// # Accounts
     /// *[See the documentation for the accounts.](PositionCut)*
     ///
     /// # Arguments
-    /// - `nonce`: The nonce to derive the `order` address.
-    /// - `recent_timestamp`: A recent timestamp.
-    /// - `execution_fee`: The execution fee claimed for use by the `authority`.
+    /// - `nonce`: The nonce used to derive the `order` PDA address.
+    /// - `recent_timestamp`: A recent blockchain timestamp for validation.
+    /// - `execution_fee`: Fee paid to the keeper for executing the ADL.
     ///
     /// # Errors
-    /// - The [`authority`](PositionCut::authority) must be a signer and a
-    /// ORDER_KEEPER in the store.
-    /// - The [`owner`](PositionCut::owner) must be the owner of the position.
-    /// - The [`user`](PositionCut::user) must be initialized and correspond to the `owner`.
+    /// - The [`authority`](PositionCut::authority) must be a signer with ORDER_KEEPER role.
+    /// - The [`owner`](PositionCut::owner) must be the position owner.
+    /// - The [`user`](PositionCut::user) must be initialized and linked to the `owner`.
     /// - The [`store`](PositionCut::store) must be initialized.
     /// - The [`token_map`](PositionCut::token_map) must be initialized and authorized by the store.
-    /// - The [`oracle`](PositionCut::oracle) must be initialized, cleared and owned by the store.
-    /// - The [`market`](PositionCut::market) must be initialized, enabled and owned by the store.
-    ///   It must be the market of the `position`.
-    /// - The [`order`](PositionCut::order) must be uninitialized and its address must be the PDA
-    ///   derived from the `store`, `owner` and `nonce`.
-    /// - The [`position`](PositionCut::position) must be validly initialized and owned by the `owner`
-    ///   and the `store`. It must be auto deleveragable.
-    /// - The [`event`](PositionCut::event) must be a valid trade event buffer and owned by the
-    ///   `store` and the `authority`.
+    /// - The [`oracle`](PositionCut::oracle) must be initialized, cleared and store-owned.
+    /// - The [`market`](PositionCut::market) must be initialized, enabled, store-owned and match
+    ///   the position's market.
+    /// - The [`order`](PositionCut::order) must be uninitialized with address matching PDA from
+    ///   store, owner and nonce.
+    /// - The [`position`](PositionCut::position) must be initialized, owned by owner/store and
+    ///   eligible for ADL.
+    /// - The [`event`](PositionCut::event) must be a valid trade event buffer owned by store/authority.
     /// - The [`long_token`](PositionCut::long_token) and [`short_token`](PositionCut::short_token)
-    ///   must be the long and short token of the `market`.
+    ///   must match the market's tokens.
     /// - The [`long_token_escrow`](PositionCut::long_token_escrow) and
-    ///   [`short_token_escrow`](PositionCut::short_token_escrow) must be valid escrow accounts for
-    ///   the [`long_token`](PositionCut::long_token) and [`short_token`](PositionCut::short_token)
-    ///   respectively and owned by the `order` if present.
-    /// - Return an error if the execution fail and `throw_on_execution_error` is `true`.
+    ///   [`short_token_escrow`](PositionCut::short_token_escrow) must be valid order-owned escrow
+    ///   accounts for their respective tokens.
     /// - The [`long_token_vault`](PositionCut::long_token_vault) and
-    ///   [`short_token_vault`](PositionCut::short_token_vault) must be valid vault accounts for
-    ///   the `long_token` and `short_token` respectively and owned by the `store`.
+    ///   [`short_token_vault`](PositionCut::short_token_vault) must be valid store-owned vault
+    ///   accounts for their tokens.
     /// - The [`claimable_long_token_account_for_user`](PositionCut::claimable_long_token_account_for_user)
-    ///   must be a valid claimable account of `long_token` owned by the `store` and delegated to
-    ///   the `owner`.
+    ///   must be a store-owned, owner-delegated claimable account for long token.
     /// - The [`claimable_short_token_account_for_user`](PositionCut::claimable_short_token_account_for_user)
-    ///   must be a valid claimable account of `short_token` owned by the `store` and delegated to
-    ///   the `owner`.
+    ///   must be a store-owned, owner-delegated claimable account for short token.
     /// - The [`claimable_pnl_token_account_for_holding`](PositionCut::claimable_pnl_token_account_for_holding)
-    ///   must be a valid claimable account of the pnl token owned by the `store` and delegated to
-    ///   the `holding` address.
-    /// - The remaining feed accounts must be valid. They must be provided in the same order as
-    ///   the unique sorted list of tokens in the `market`.
-    /// - The auto deleverage feature must be enabled.
-    /// - The oracle prices provided by the feed accounts must be complete and valid.
-    /// - The market must be in the ADL state, and the pnl factor should not exceed the minimum
-    ///   pnl factor after the ADL.
-    /// - Return an error if the execution fail.
+    ///   must be a store-owned, holding-delegated claimable account for PnL token.
+    /// - Price feed accounts must be valid and provided in market's sorted token order.
+    /// - ADL feature must be enabled in store settings.
+    /// - Oracle prices must be valid and complete.
+    /// - Market must be in ADL state with PnL factor exceeding minimum threshold.
+    /// - Execution must complete successfully.
     // FIXME: There is a false positive lint for the doc link of `event`.
     #[allow(rustdoc::broken_intra_doc_links)]
     #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
@@ -2088,29 +2234,22 @@ pub mod gmsol_store {
     /// *[See the documentation for the accounts.](CreateShift)*
     ///
     /// # Arguments
-    /// - `nonce`: The nonce to derive the `shift` address.
-    /// - `params`: The parameters for the shift.
+    /// - `nonce`: The nonce used to derive the shift's PDA address.
+    /// - `params`: The parameters for creating the shift.
     ///
     /// # Errors
     /// - The [`owner`](CreateShift::owner) must be a signer.
     /// - The [`store`](CreateShift::store) must be initialized.
-    /// - The [`from_market`](CreateShift::from_market) must be initialized, enabled and owned by the store.
-    /// - The [`to_market`](CreateShift::to_market) must be initialized, enabled and owned by the store.
-    /// - The [`from_market`](CreateShift::from_market) must be shiftable to the [`to_market`](CreateShift::to_market).
+    /// - The [`from_market`](CreateShift::from_market) must be initialized, enabled and store-owned.
+    /// - The [`to_market`](CreateShift::to_market) must be initialized, enabled and store-owned.
+    /// - The [`from_market`](CreateShift::from_market) must be configured as shiftable to the [`to_market`](CreateShift::to_market).
     /// - The [`shift`](CreateShift::shift) must be uninitialized.
-    /// - The [`from_market_token`](CreateShift::from_market_token) and
-    ///   [`to_market_token`](CreateShift::to_market_token) must be the market token of
-    ///   the [`from_market`](CreateShift::from_market) and [`to_market`](CreateShift::to_market)
-    ///   respectively.
-    /// - The [`from_market_token_escrow`](CreateShift::from_market_token_escrow) and
-    ///   [`to_market_token_escrow`](CreateShift::to_market_token_escrow) must be valid escrow accounts
-    ///   for the [`from_market_token`](CreateShift::from_market_token) and
-    ///   [`to_market_token`](CreateShift::to_market_token) respectively and owned by the `shift`.
-    /// - The [`from_market_token_source`](CreateShift::from_market_token_source) must be the
-    ///   source token account for the [`from_market_token`](CreateShift::from_market_token). The
-    ///   `owner` must be the authority of the [`from_market_token_source`](CreateShift::from_market_token_source).
-    /// - The [`to_market_token_ata`](CreateShift::to_market_token_ata) must be a valid ATA for
-    ///   the [`to_market_token`](CreateShift::to_market_token) and owned by the `owner`.
+    /// - The [`from_market_token`](CreateShift::from_market_token) must be the market token of the [`from_market`](CreateShift::from_market).
+    /// - The [`to_market_token`](CreateShift::to_market_token) must be the market token of the [`to_market`](CreateShift::to_market).
+    /// - The [`from_market_token_escrow`](CreateShift::from_market_token_escrow) must be a valid shift-owned escrow account for the [`from_market_token`](CreateShift::from_market_token).
+    /// - The [`to_market_token_escrow`](CreateShift::to_market_token_escrow) must be a valid shift-owned escrow account for the [`to_market_token`](CreateShift::to_market_token).
+    /// - The [`from_market_token_source`](CreateShift::from_market_token_source) must be a token account for [`from_market_token`](CreateShift::from_market_token) with `owner` as authority.
+    /// - The [`to_market_token_ata`](CreateShift::to_market_token_ata) must be a valid associated token account for [`to_market_token`](CreateShift::to_market_token) owned by `owner`.
     pub fn create_shift<'info>(
         mut ctx: Context<'_, '_, 'info, 'info, CreateShift<'info>>,
         nonce: [u8; 32],
@@ -2125,34 +2264,26 @@ pub mod gmsol_store {
     /// *[See the documentation for the accounts.](ExecuteShift)*
     ///
     /// # Arguments
-    /// - `execution_lamports`: The execution fee claimed for use by the `authority`.
+    /// - `execution_lamports`: The execution fee in lamports claimed by the keeper.
     /// - `throw_on_execution_error`: Whether to throw an error if the execution fails.
     ///
     /// # Errors
-    /// - The [`authority`](ExecuteShift::authority) must be a signer and a
-    /// ORDER_KEEPER in the store.
+    /// - The [`authority`](ExecuteShift::authority) must be a signer and have ORDER_KEEPER role in the store.
     /// - The [`store`](ExecuteShift::store) must be initialized.
     /// - The [`token_map`](ExecuteShift::token_map) must be initialized and authorized by the store.
-    /// - The [`oracle`](ExecuteShift::oracle) must be initialized, cleared and owned by the store.
-    /// - The [`from_market`](ExecuteShift::from_market) must be initialized, enabled and owned by the store.
-    /// - The [`to_market`](ExecuteShift::to_market) must be initialized, enabled and owned by the store.
-    /// - The [`from_market`](ExecuteShift::from_market) must be shiftable to the [`to_market`](ExecuteShift::to_market).
-    /// - The [`shift`](ExecuteShift::shift) must be initialized and owned by the `store`.
-    /// - The [`from_market_token`](ExecuteShift::from_market_token) and
-    ///   [`to_market_token`](ExecuteShift::to_market_token) must be the market token of
-    ///   the [`from_market`](ExecuteShift::from_market) and [`to_market`](ExecuteShift::to_market)
-    ///   respectively.
-    /// - The [`from_market_token_escrow`](ExecuteShift::from_market_token_escrow) and
-    ///   [`to_market_token_escrow`](ExecuteShift::to_market_token_escrow) must be valid escrow accounts
-    ///   for the [`from_market_token`](ExecuteShift::from_market_token) and
-    ///   [`to_market_token`](ExecuteShift::to_market_token) respectively and owned by the `shift`.
-    /// - The [`from_market_token_vault`](ExecuteShift::from_market_token_vault) must be the
-    ///   token vault for the [`from_market_token`](ExecuteShift::from_market_token) and owned by
-    ///   the `store`.
-    /// - The remaining feed accounts must be valid. They must be provided in the same order as
-    ///   the unique sorted list of tokens in the `from_market`.
-    /// - The oracle prices provided by the feed accounts must be complete and valid.
-    /// - Return an error if the execution fail and `throw_on_execution_error` is `true`.
+    /// - The [`oracle`](ExecuteShift::oracle) must be initialized, cleared and store-owned.
+    /// - The [`from_market`](ExecuteShift::from_market) must be initialized, enabled and store-owned.
+    /// - The [`to_market`](ExecuteShift::to_market) must be initialized, enabled and store-owned.
+    /// - The [`from_market`](ExecuteShift::from_market) must be configured as shiftable to the [`to_market`](ExecuteShift::to_market).
+    /// - The [`shift`](ExecuteShift::shift) must be initialized and store-owned.
+    /// - The [`from_market_token`](ExecuteShift::from_market_token) must be the market token of the [`from_market`](ExecuteShift::from_market).
+    /// - The [`to_market_token`](ExecuteShift::to_market_token) must be the market token of the [`to_market`](ExecuteShift::to_market).
+    /// - The [`from_market_token_escrow`](ExecuteShift::from_market_token_escrow) must be a valid shift-owned escrow account for the [`from_market_token`](ExecuteShift::from_market_token).
+    /// - The [`to_market_token_escrow`](ExecuteShift::to_market_token_escrow) must be a valid shift-owned escrow account for the [`to_market_token`](ExecuteShift::to_market_token).
+    /// - The [`from_market_token_vault`](ExecuteShift::from_market_token_vault) must be the token vault for the [`from_market_token`](ExecuteShift::from_market_token) and store-owned.
+    /// - The feed accounts must be valid and provided in the same order as the unique sorted list of tokens in the `from_market`.
+    /// - The oracle prices from the feed accounts must be complete and valid.
+    /// - If `throw_on_execution_error` is `true`, returns an error if execution fails.
     #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
     pub fn execute_shift<'info>(
         ctx: Context<'_, '_, 'info, 'info, ExecuteShift<'info>>,
@@ -2174,21 +2305,12 @@ pub mod gmsol_store {
     /// - The [`executor`](CloseShift::executor) must be a signer.
     /// - The [`store`](CloseShift::store) must be initialized.
     /// - The [`owner`](CloseShift::owner) must be the owner of the shift.
-    /// - The [`shift`](CloseShift::shift) must be initialized, owned by the `store` and the
-    ///   `owner`.
-    /// - The [`from_market_token`](CloseShift::from_market_token) and
-    ///   [`to_market_token`](CloseShift::to_market_token) must be valid and recorded in the
-    ///   [`shift`](CloseShift::shift).
-    /// - The [`from_market_token_escrow`](CloseShift::from_market_token_escrow) and
-    ///   [`to_market_token_escrow`](CloseShift::to_market_token_escrow) must be valid escrow accounts
-    ///   for the [`from_market_token`](CloseShift::from_market_token) and
-    ///   [`to_market_token`](CloseShift::to_market_token) respectively and owned by the `shift` and
-    ///   recorded in the [`shift`](CloseShift::shift).
-    /// - The [`from_market_token_ata`](CloseShift::from_market_token_ata) must be a valid ATA for
-    ///   the [`from_market_token`](CloseShift::from_market_token) and owned by the `owner`.
-    /// - The [`to_market_token_ata`](CloseShift::to_market_token_ata) must be a valid ATA for
-    ///   the [`to_market_token`](CloseShift::to_market_token) and owned by the `owner`.
-    /// - The `shift` must be cancelled or completed if the `executor` is not the owner.
+    /// - The [`shift`](CloseShift::shift) must be initialized and owned by both the `store` and `owner`.
+    /// - The [`from_market_token`](CloseShift::from_market_token) and [`to_market_token`](CloseShift::to_market_token) must be valid and match those recorded in the [`shift`](CloseShift::shift).
+    /// - The [`from_market_token_escrow`](CloseShift::from_market_token_escrow) and [`to_market_token_escrow`](CloseShift::to_market_token_escrow) must be valid escrow accounts owned by the `shift` and match those recorded in the [`shift`](CloseShift::shift).
+    /// - The [`from_market_token_ata`](CloseShift::from_market_token_ata) must be a valid associated token account for [`from_market_token`](CloseShift::from_market_token) owned by `owner`.
+    /// - The [`to_market_token_ata`](CloseShift::to_market_token_ata) must be a valid associated token account for [`to_market_token`](CloseShift::to_market_token) owned by `owner`.
+    /// - If the `executor` is not the `owner`, the `shift` must be in either cancelled or completed state.
     pub fn close_shift<'info>(
         ctx: Context<'_, '_, 'info, 'info, CloseShift<'info>>,
         reason: String,
@@ -2206,18 +2328,17 @@ pub mod gmsol_store {
     /// *[See the documentation for the accounts.](InitializeGt)*
     ///
     /// # Arguments
-    /// - `decimals`: The decimals of the GT.
-    /// - `initial_minting_cost`: The initial minting cost of the GT.
-    /// - `grow_factor`: The grow factor of the GT.
-    /// - `grow_step`: The grow step of the GT.
-    /// - `ranks`: The boundaries of the user ranks.
+    /// - `decimals`: The number of decimal places for the GT token.
+    /// - `initial_minting_cost`: The base cost to mint the GT token.
+    /// - `grow_factor`: The multiplier that increases minting cost for each step.
+    /// - `grow_step`: The minted amount between each cost increase.
+    /// - `ranks`: Array of GT token thresholds that define user rank boundaries.
     ///
     /// # Errors
-    /// - The [`authority`](InitializeGt::authority) must be a signer and a
-    ///   MARKET_KEEPER in the store.
-    /// - The [`store`](InitializeGt::store) must be initialized.
-    /// - The GT state must be uninitialized.
-    /// - The arguments must be valid. See the `init` method of [`GtState`] for more details.
+    /// - The [`authority`](InitializeGt::authority) must be a signer and have MARKET_KEEPER permissions in the store
+    /// - The [`store`](InitializeGt::store) must be properly initialized
+    /// - The GT state account must not already be initialized
+    /// - The arguments must be valid. See `init` method of [`GtState`](states::gt::GtState) for detailed validation logic.
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn initialize_gt(
         ctx: Context<InitializeGt>,
@@ -2243,15 +2364,15 @@ pub mod gmsol_store {
     /// *[See the documentation for the accounts.](ConfigurateGt)*
     ///
     /// # Arguments
-    /// - `factors`: The discount factors for each rank.
+    /// - `factors`: The order fee discount factors for each rank.
     ///
     /// # Errors
     /// - The [`authority`](ConfigurateGt::authority) must be a signer and a
     ///   MARKET_KEEPER in the store.
     /// - The [`store`](ConfigurateGt::store) must be initialized.
     /// - The GT state must be initialized.
-    /// - The `factors` must be valid. See the `set_order_fee_discount_factors` method of
-    ///   [`GtState`] for more details.
+    /// - The number of `factors` must match the number of ranks defined in GT state.
+    /// - Each factor must be less than or equal to [`MARKET_USD_UNIT`](crate::constants::MARKET_USD_UNIT).
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn gt_set_order_fee_discount_factors(
         ctx: Context<ConfigurateGt>,
@@ -2273,8 +2394,8 @@ pub mod gmsol_store {
     ///   GT_CONTROLLER in the store.
     /// - The [`store`](ConfigurateGt::store) must be initialized.
     /// - The GT state must be initialized.
-    /// - The `factors` must be valid. See the `set_referral_reward_factors` method of
-    ///   [`GtState`] for more details.
+    /// - The number of `factors` must match the number of ranks defined in GT state.
+    /// - Each factor must be less than or equal to [`MARKET_USD_UNIT`](crate::constants::MARKET_USD_UNIT).
     #[access_control(internal::Authenticate::only_gt_controller(&ctx))]
     pub fn gt_set_referral_reward_factors(
         ctx: Context<ConfigurateGt>,
@@ -2289,14 +2410,14 @@ pub mod gmsol_store {
     /// *[See the documentation for the accounts.](ConfigurateGt)*
     ///
     /// # Arguments
-    /// - `factor`: The esGT receiver factor.
+    /// - `factor`: The factor determining what ratio of esGT rewards are minted to the receiver.
     ///
     /// # Errors
     /// - The [`authority`](ConfigurateGt::authority) must be a signer and a
     ///   GT_CONTROLLER in the store.
     /// - The [`store`](ConfigurateGt::store) must be initialized.
     /// - The GT state must be initialized.
-    /// - The `factor` must be less than or equal to the [`MARKET_USD_UNIT`](crate::constants::MARKET_USD_UNIT).
+    /// - The `factor` must be less than or equal to [`MARKET_USD_UNIT`](crate::constants::MARKET_USD_UNIT).
     #[access_control(internal::Authenticate::only_gt_controller(&ctx))]
     pub fn gt_set_es_receiver_factor(ctx: Context<ConfigurateGt>, factor: u128) -> Result<()> {
         instructions::unchecked_gt_set_es_receiver_factor(ctx, factor)
@@ -2308,14 +2429,14 @@ pub mod gmsol_store {
     /// *[See the documentation for the accounts.](ConfigurateGt)*
     ///
     /// # Arguments
-    /// - `window`: The time window for GT exchange.
+    /// - `window`: The time window in seconds for one GT exchange period.
     ///
     /// # Errors
-    /// - The [`authority`](ConfigurateGt::authority) must be a signer and a
-    ///   GT_CONTROLLER in the store.
-    /// - The [`store`](ConfigurateGt::store) must be initialized.
-    /// - The GT state must be initialized.
-    /// - The `window` must be greater than 0.
+    /// - The [`authority`](ConfigurateGt::authority) must be a signer and have
+    ///   GT_CONTROLLER privileges in the store.
+    /// - The [`store`](ConfigurateGt::store) must be properly initialized.
+    /// - The GT state must be properly initialized.
+    /// - The `window` must be greater than 0 seconds to ensure a valid exchange period.
     #[access_control(internal::Authenticate::only_gt_controller(&ctx))]
     pub fn gt_set_exchange_time_window(ctx: Context<ConfigurateGt>, window: u32) -> Result<()> {
         instructions::unchecked_gt_set_exchange_time_window(ctx, window)
@@ -2327,13 +2448,14 @@ pub mod gmsol_store {
     /// *[See the documentation for the accounts.](ConfigurateGt)*
     ///
     /// # Arguments
-    /// - `receiver`: The receiver of the esGT vault.
+    /// - `receiver`: The public key of the account that can claim esGT rewards from the esGT vault.
     ///
     /// # Errors
-    /// - The [`authority`](ConfigurateGt::authority) must be a signer and a
-    ///   GT_CONTROLLER in the store.
-    /// - The [`store`](ConfigurateGt::store) must be initialized.
-    /// - The GT state must be initialized.
+    /// - The [`authority`](ConfigurateGt::authority) must be a signer and have
+    ///   GT_CONTROLLER privileges in the store.
+    /// - The [`store`](ConfigurateGt::store) must be properly initialized.
+    /// - The GT state must be properly initialized.
+    /// - The `receiver` must be a valid account that can receive esGT tokens.
     #[access_control(internal::Authenticate::only_gt_controller(&ctx))]
     pub fn gt_set_receiver(ctx: Context<ConfigurateGt>, receiver: Pubkey) -> Result<()> {
         instructions::unchecked_gt_set_receiver(ctx, &receiver)
@@ -2346,17 +2468,18 @@ pub mod gmsol_store {
     ///
     /// # Arguments
     /// - `time_window_index`: The index of the current time window.
-    /// - `time_window`: The current GT exchange time window.
+    /// - `time_window`: The current GT exchange time window in seconds.
     ///
     /// # Errors
     /// - The [`payer`](PrepareGtExchangeVault::payer) must be a signer.
-    /// - The [`store`](PrepareGtExchangeVault::store) must be initialized.
-    /// - The GT state must be initialized.
-    /// - The [`vault`](PrepareGtExchangeVault::vault) must be either uninitialized or
-    ///   validly initialized and owned by the `store`. Its `time_window_index` and `time_window`
-    ///   must match the `time_window_index` and `time_window` respectively if it is initialized.
-    /// - The `time_window_index` must be current time window index.
-    /// - The `time_window` must be the current GT exchange time window.
+    /// - The [`store`](PrepareGtExchangeVault::store) must be properly initialized.
+    /// - The GT state must be properly initialized.
+    /// - The [`vault`](PrepareGtExchangeVault::vault) must be either:
+    ///   - Uninitialized, or
+    ///   - Properly initialized, owned by the `store`, and have matching `time_window_index`
+    ///     and `time_window` values
+    /// - The provided `time_window_index` must match the current time window index
+    /// - The provided `time_window` must match the current GT exchange time window
     pub fn prepare_gt_exchange_vault(
         ctx: Context<PrepareGtExchangeVault>,
         time_window_index: i64,
@@ -2371,13 +2494,13 @@ pub mod gmsol_store {
     /// *[See the documentation for the accounts.](ConfirmGtExchangeVault)*
     ///
     /// # Errors
-    /// - The [`authority`](ConfirmGtExchangeVault::authority) must be a signer and a
-    ///   GT_CONTROLLER in the store.
-    /// - The [`store`](ConfirmGtExchangeVault::store) must be initialized.
-    /// - The GT state must be initialized.
+    /// - The [`authority`](ConfirmGtExchangeVault::authority) must be a signer and have
+    ///   GT_CONTROLLER privileges in the store.
+    /// - The [`store`](ConfirmGtExchangeVault::store) must be properly initialized.
+    /// - The GT state must be properly initialized.
     /// - The [`vault`](ConfirmGtExchangeVault::vault) must be validly initialized and owned by
     ///   the `store`.
-    /// - The `vault` must be confirmable now.
+    /// - The `vault` must be in a confirmable state (deposit window has passed but not yet confirmed).
     #[access_control(internal::Authenticate::only_gt_controller(&ctx))]
     pub fn confirm_gt_exchange_vault(ctx: Context<ConfirmGtExchangeVault>) -> Result<()> {
         instructions::unchecked_confirm_gt_exchange_vault(ctx)
@@ -2389,19 +2512,20 @@ pub mod gmsol_store {
     /// *[See the documentation for the accounts.](RequestGtExchange)*
     ///
     /// # Arguments
-    /// - `amount`: The amount of GT to exchange.
+    /// - `amount`: The amount of GT to exchange for rewards.
     ///
     /// # Errors
     /// - The [`owner`](RequestGtExchange::owner) must be a signer.
-    /// - The [`store`](RequestGtExchange::store) must be initialized. Its GT state must be initialized.
-    /// - The [`user`](RequestGtExchange::user) must be validly initialized and corresponding to
-    ///   the `owner`.
-    /// - The [`vault`](RequestGtExchange::vault) must be validly initialized and owned by the
-    ///   `store`. It must be depositable now.
-    /// - The [`exchange`](RequestGtExchange::exchange) must be either uninitialized or validly
-    ///   initialized and owned by the `owner` and `vault`.
-    /// - The `amount` must be greater than 0 and not exceed the not reserved balance of the `owner`
-    ///   in the [`user`](RequestGtExchange::user).
+    /// - The [`store`](RequestGtExchange::store) must be properly initialized with an initialized GT state.
+    /// - The [`user`](RequestGtExchange::user) must be properly initialized and owned by the `owner`.
+    /// - The [`vault`](RequestGtExchange::vault) must be properly initialized, owned by the `store`,
+    ///   and currently accepting deposits.
+    /// - The [`exchange`](RequestGtExchange::exchange) must be either:
+    ///   - Uninitialized, or
+    ///   - Properly initialized and owned by both the `owner` and `vault`
+    /// - The `amount` must be:
+    ///   - Greater than 0
+    ///   - Not exceed the owner's available (non-reserved) GT balance in their user account
     pub fn request_gt_exchange(ctx: Context<RequestGtExchange>, amount: u64) -> Result<()> {
         instructions::request_gt_exchange(ctx, amount)
     }
@@ -2412,13 +2536,13 @@ pub mod gmsol_store {
     /// *[See the documentation for the accounts.](CloseGtExchange)*
     ///
     /// # Errors
-    /// - The [`authority`](CloseGtExchange::authority) must be a signer and a
-    ///   GT_CONTROLLER in the store.
-    /// - The [`store`](CloseGtExchange::store) must be initialized. Its GT state must be initialized.
-    /// - The [`vault`](CloseGtExchange::vault) must be validly initialized and owned by the `store`.
-    ///   It must be confirmed.
-    /// - The [`exchange`](CloseGtExchange::exchange) must be validly initialized and owned by the
-    ///   `owner` and `vault`.
+    /// - The [`authority`](CloseGtExchange::authority) must be a signer and have
+    ///   the GT_CONTROLLER role in the store.
+    /// - The [`store`](CloseGtExchange::store) must be properly initialized with an initialized GT state.
+    /// - The [`vault`](CloseGtExchange::vault) must be properly initialized, owned by the `store`,
+    ///   and in a confirmed state.
+    /// - The [`exchange`](CloseGtExchange::exchange) must be properly initialized and owned by both
+    ///   the `owner` and `vault`.
     #[access_control(internal::Authenticate::only_gt_controller(&ctx))]
     pub fn close_gt_exchange(ctx: Context<CloseGtExchange>) -> Result<()> {
         instructions::unchecked_close_gt_exchange(ctx)
@@ -2431,8 +2555,9 @@ pub mod gmsol_store {
     ///
     /// # Errors
     /// - The [`owner`](ClaimEsGt::owner) must be a signer.
-    /// - The [`store`](ClaimEsGt::store) must be initialized. Its GT state must be initialized.
-    /// - The [`user`](ClaimEsGt::user) must be validly initialized and corresponding to the `owner`.
+    /// - The [`store`](ClaimEsGt::store) must be properly initialized with an initialized GT state.
+    /// - The [`user`](ClaimEsGt::user) must be properly initialized and owned by the `owner`.
+    /// - The `user` must have pending esGT to claim.
     pub fn claim_es_gt(ctx: Context<ClaimEsGt>) -> Result<()> {
         instructions::claim_es_gt(ctx)
     }
@@ -2443,18 +2568,18 @@ pub mod gmsol_store {
     /// *[See the documentation for the accounts.](RequestGtVesting)*
     ///
     /// # Arguments
-    /// - `amount`: The amount of GT to vest.
+    /// - `amount`: The amount of esGT to vest into GT.
     ///
     /// # Errors
     /// - The [`owner`](RequestGtVesting::owner) must be a signer.
-    /// - The [`store`](RequestGtVesting::store) must be initialized. Its GT state must be initialized.
-    /// - The [`user`](RequestGtVesting::user) must be validly initialized and corresponding to the
-    ///   `owner`.
-    /// - The [`vesting`](RequestGtVesting::vesting) must be either uninitialized or validly
-    ///   initialized and owned by the `owner` and `store`.
-    /// - The `amount` must not exceed the balance of esGT of the `owner` in the [`user`](RequestGtVesting::user).
-    /// - The balance of GT of the `owner` in the [`user`](RequestGtVesting::user) must be enoughly
-    ///   reserved for the new total vesting esGT amount, i.e., `reserve factor * total vesting esGT <= GT`.
+    /// - The [`store`](RequestGtVesting::store) must be properly initialized with an initialized GT state.
+    /// - The [`user`](RequestGtVesting::user) must be properly initialized and owned by the `owner`.
+    /// - The [`vesting`](RequestGtVesting::vesting) must be either:
+    ///   - Uninitialized, or
+    ///   - Properly initialized and owned by both the `owner` and `store`
+    /// - The `amount` must not exceed the owner's esGT balance in their user account.
+    /// - The owner must have sufficient GT reserved in their user account to cover the total vesting amount
+    ///   after this request is processed (i.e., `reserve_factor * total_vesting_esgt <= gt_balance`).
     pub fn request_gt_vesting(ctx: Context<RequestGtVesting>, amount: u64) -> Result<()> {
         instructions::request_gt_vesting(ctx, amount)
     }
@@ -2466,11 +2591,10 @@ pub mod gmsol_store {
     ///
     /// # Errors
     /// - The [`owner`](UpdateGtVesting::owner) must be a signer.
-    /// - The [`store`](UpdateGtVesting::store) must be initialized. Its GT state must be initialized.
-    /// - The [`user`](UpdateGtVesting::user) must be validly initialized and corresponding to the
-    ///   `owner`.
-    /// - The [`vesting`](UpdateGtVesting::vesting) must be validly initialized and owned by the
-    ///   `owner` and `store`.
+    /// - The [`store`](UpdateGtVesting::store) must be properly initialized with an initialized GT state.
+    /// - The [`user`](UpdateGtVesting::user) must be properly initialized and owned by the `owner`.
+    /// - The [`vesting`](UpdateGtVesting::vesting) must be properly initialized and owned by both
+    ///   the `owner` and `store`.
     pub fn update_gt_vesting(ctx: Context<UpdateGtVesting>) -> Result<()> {
         instructions::update_gt_vesting(ctx)
     }
@@ -2482,31 +2606,29 @@ pub mod gmsol_store {
     ///
     /// # Errors
     /// - The [`owner`](CloseGtVesting::owner) must be a signer.
-    /// - The [`store`](CloseGtVesting::store) must be initialized. Its GT state must be initialized.
-    /// - The [`user`](CloseGtVesting::user) must be validly initialized and corresponding to the
-    ///   `owner`.
-    /// - The [`vesting`](CloseGtVesting::vesting) must be validly initialized and owned by the
-    ///   `owner` and `store`. It must be empty.
+    /// - The [`store`](CloseGtVesting::store) must be properly initialized with an initialized GT state.
+    /// - The [`user`](CloseGtVesting::user) must be properly initialized and owned by the `owner`.
+    /// - The [`vesting`](CloseGtVesting::vesting) must be properly initialized and owned by both
+    ///   the `owner` and `store`. The vesting account must have no remaining unvested esGT.
     pub fn close_gt_vesting(ctx: Context<CloseGtVesting>) -> Result<()> {
         instructions::close_gt_vesting(ctx)
     }
 
-    /// Claim esGT vault via vesting.
+    /// Claim esGT from a vault through a vesting account.
     ///
     /// # Accounts
     /// *[See the documentation for the accounts.](ClaimEsGtVaultViaVesting)*
     ///
     /// # Arguments
-    /// - `amount`: The amount of esGT to claim.
+    /// - `amount`: The amount of esGT to claim from the vault.
     ///
     /// # Errors
-    /// - The [`owner`](ClaimEsGtVaultViaVesting::owner) must be a signer and the receiver of the esGT vault.
-    /// - The [`store`](ClaimEsGtVaultViaVesting::store) must be initialized. Its GT state must be initialized.
-    /// - The [`user`](ClaimEsGtVaultViaVesting::user) must be validly initialized and corresponding to the
-    ///   `owner`.
-    /// - The [`vesting`](ClaimEsGtVaultViaVesting::vesting) must be validly initialized and owned by the
-    ///   `owner` and `store`.
-    /// - The `amount` must not exceed the balance of esGT in the vault.
+    /// - The [`owner`](ClaimEsGtVaultViaVesting::owner) must be a signer and the designated recipient of the esGT vault.
+    /// - The [`store`](ClaimEsGtVaultViaVesting::store) must be properly initialized with an initialized GT state.
+    /// - The [`user`](ClaimEsGtVaultViaVesting::user) must be properly initialized and owned by the `owner`.
+    /// - The [`vesting`](ClaimEsGtVaultViaVesting::vesting) must be properly initialized and owned by both
+    ///   the `owner` and `store`.
+    /// - The requested `amount` must not exceed the available esGT balance in the vault.
     pub fn claim_es_gt_vault_via_vesting(
         ctx: Context<ClaimEsGtVaultViaVesting>,
         amount: u64,
@@ -2518,16 +2640,17 @@ pub mod gmsol_store {
     //              User & Referral
     // ===========================================
 
-    /// Prepare User Account.
+    /// Initialize or validate a User Account.
     ///
     /// # Accounts
     /// *[See the documentation for the accounts.](PrepareUser)*
     ///
     /// # Errors
     /// - The [`owner`](PrepareUser::owner) must be a signer.
-    /// - The [`store`](PrepareUser::store) must be initialized.
-    /// - The [`user`](PrepareUser::user) must be either uninitialized or validly initialized and
-    ///   owned by the `store`.
+    /// - The [`store`](PrepareUser::store) must be properly initialized.
+    /// - The [`user`](PrepareUser::user) must be either:
+    ///   - Uninitialized (for new account creation)
+    ///   - Or validly initialized and owned by the `store`
     pub fn prepare_user(ctx: Context<PrepareUser>) -> Result<()> {
         instructions::prepare_user(ctx)
     }
@@ -2538,15 +2661,17 @@ pub mod gmsol_store {
     /// *[See the documentation for the accounts.](InitializeReferralCode)*
     ///
     /// # Arguments
-    /// - `code`: The referral code.
+    /// - `code`: The referral code to initialize and associate with the user.
     ///
     /// # Errors
     /// - The [`owner`](InitializeReferralCode::owner) must be a signer.
-    /// - The [`store`](InitializeReferralCode::store) must be initialized.
-    /// - The [`referral_code`](InitializeReferralCode::referral_code) must be uninitialized.
-    /// - The [`user`](InitializeReferralCode::user) must be validly initialized and corresponding to the
-    ///   `owner`. It must not have a referral code.
-    /// - The `code` must not be already used.
+    /// - The [`store`](InitializeReferralCode::store) must be properly initialized.
+    /// - The [`referral_code`](InitializeReferralCode::referral_code) account must be uninitialized.
+    /// - The [`user`](InitializeReferralCode::user) account must be:
+    ///   - Properly initialized
+    ///   - Owned by the `owner`
+    ///   - Not already have an associated referral code
+    /// - The provided `code` must not already be in use by another user.
     pub fn initialize_referral_code(
         ctx: Context<InitializeReferralCode>,
         code: [u8; 8],
@@ -2564,13 +2689,20 @@ pub mod gmsol_store {
     ///
     /// # Errors
     /// - The [`owner`](SetReferrer::owner) must be a signer.
-    /// - The [`store`](SetReferrer::store) must be initialized.
-    /// - The [`user`](SetReferrer::user) must be validly initialized and corresponding to the
-    ///   `owner`.
-    /// - The [`referral_code`](SetReferrer::referral_code) must be validly initialized and owned by
-    ///   the `store` and the `referrer_code` must be the referral code owned by the referrer.
-    /// - The [`referrer_user`](SetReferrer::referrer_user) must be validly initialized. It must not be the same as the `user`.
-    /// - The `owner` must have a referral code and it must not be the referrer of the `referrer`.
+    /// - The [`store`](SetReferrer::store) must be properly initialized.
+    /// - The [`user`](SetReferrer::user) must be:
+    ///   - Properly initialized
+    ///   - Owned by the `owner`
+    ///   - Must not already have a referrer set
+    /// - The [`referral_code`](SetReferrer::referral_code) must be:
+    ///   - Properly initialized
+    ///   - Owned by the `store`
+    ///   - Match the provided `code`
+    ///   - Be owned by the `referrer_user`
+    /// - The [`referrer_user`](SetReferrer::referrer_user) must be:
+    ///   - Properly initialized
+    ///   - Different from the `user`
+    ///   - Not have the `user` as their referrer (no circular references)
     pub fn set_referrer(ctx: Context<SetReferrer>, code: [u8; 8]) -> Result<()> {
         instructions::set_referrer(ctx, code)
     }
@@ -2582,12 +2714,18 @@ pub mod gmsol_store {
     ///
     /// # Errors
     /// - The [`owner`](TransferReferralCode::owner) must be a signer.
-    /// - The [`store`](TransferReferralCode::store) must be initialized.
-    /// - The [`user`](TransferReferralCode::user) must be validly initialized and corresponding to the
-    ///   `owner`. It must not be the same as the [`receiver_user`](TransferReferralCode::receiver_user).
-    /// - The [`referral_code`](TransferReferralCode::referral_code) must be validly initialized and owned by
-    ///   the `store` and the `code` must be the referral code owned by the `owner`.
-    /// - The [`receiver_user`](TransferReferralCode::receiver_user) must be validly initialized and not have a referral code.
+    /// - The [`store`](TransferReferralCode::store) must be properly initialized.
+    /// - The [`user`](TransferReferralCode::user) account must be:
+    ///   - Properly initialized
+    ///   - Owned by the `owner`
+    ///   - Different from the [`receiver_user`](TransferReferralCode::receiver_user)
+    /// - The [`referral_code`](TransferReferralCode::referral_code) account must be:
+    ///   - Properly initialized
+    ///   - Owned by the `store`
+    ///   - Owned by the `user`
+    /// - The [`receiver_user`](TransferReferralCode::receiver_user) account must be:
+    ///   - Properly initialized
+    ///   - Not have an associated referral code
     pub fn transfer_referral_code(ctx: Context<TransferReferralCode>) -> Result<()> {
         instructions::transfer_referral_code(ctx)
     }
@@ -2602,17 +2740,24 @@ pub mod gmsol_store {
     /// *[See the documentation for the accounts.](InitializeGlv)*
     ///
     /// # Arguments
-    /// - `index`: The index of the GLV.
-    /// - `length`: The number of markets in the GLV.
+    /// - `index`: The index of the GLV. Used to derive the GLV token address.
+    /// - `length`: The number of markets to include in the GLV.
     ///
     /// # Errors
-    /// - The [`authority`](InitializeGlv::authority) must be a signer and a
-    ///   MARKET_KEEPER in the store.
-    /// - The [`store`](InitializeGlv::store) must be initialized.
-    /// - The [`glv_token`](InitializeGlv::glv_token) must be uninitialized and its address must be PDA derived from the [`GLV_TOKEN_SEED`](crate::states::Glv::GLV_TOKEN_SEED), [`store`] and `index`.
-    /// - The [`glv`](InitializeGlv::glv) must be uninitialized and its address must be PDA derived from the [`GLV_SEED`](crate::states::Glv::SEED) and [`glv_token`].
-    /// - The requirements for the remaining accounts can be found in the documentation of [`InitializeGlv`].
-    /// - The `length` must be greater than 0 and less than or equal to [`Glv::MAX_ALLOWED_NUMBER_OF_MARKETS`](crate::states::Glv::MAX_ALLOWED_NUMBER_OF_MARKETS).
+    /// - The [`authority`](InitializeGlv::authority) must be a signer and have
+    ///   MARKET_KEEPER role in the store
+    /// - The [`store`](InitializeGlv::store) must be properly initialized
+    /// - The [`glv_token`](InitializeGlv::glv_token) must be:
+    ///   - Uninitialized
+    ///   - Address must be PDA derived from [`GLV_TOKEN_SEED`](crate::states::Glv::GLV_TOKEN_SEED),
+    ///     [`store`] and `index`
+    /// - The [`glv`](InitializeGlv::glv) must be:
+    ///   - Uninitialized  
+    ///   - Address must be PDA derived from the SEED of [`Glv`](states::Glv) and [`glv_token`](InitializeGlv::glv_token)
+    /// - The remaining required accounts are documented in [`InitializeGlv`]
+    /// - The `length` must be:
+    ///   - Greater than 0
+    ///   - Less than or equal to [`Glv::MAX_ALLOWED_NUMBER_OF_MARKETS`](crate::states::Glv::MAX_ALLOWED_NUMBER_OF_MARKETS)
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn initialize_glv<'info>(
         ctx: Context<'_, '_, 'info, 'info, InitializeGlv<'info>>,
@@ -2628,16 +2773,19 @@ pub mod gmsol_store {
     /// *[See the documentation for the accounts.](UpdateGlvMarketConfig)*
     ///
     /// # Arguments
-    /// - `max_amount`: The maximum amount of the market token to be stored in the GLV.
-    /// - `max_value`: The maximum value of the market token to be stored in the GLV.
+    /// - `max_amount`: The maximum amount of the market token that can be stored in the GLV.
+    /// - `max_value`: The maximum value of the market token that can be stored in the GLV.
     ///
     /// # Errors
-    /// - The [`authority`](UpdateGlvMarketConfig::authority) must be a signer and a
-    ///   MARKET_KEEPER in the store.
-    /// - The [`store`](UpdateGlvMarketConfig::store) must be initialized.
-    /// - The [`glv`](UpdateGlvMarketConfig::glv) must be validly initialized and owned by the
-    ///   `store` and the market token must be in the GLV.
-    /// - The `max_amount` and `max_value` must be provided at least one.
+    /// - The [`authority`](UpdateGlvMarketConfig::authority) must be:
+    ///   - A signer
+    ///   - Have MARKET_KEEPER role in the store
+    /// - The [`store`](UpdateGlvMarketConfig::store) must be properly initialized
+    /// - The [`glv`](UpdateGlvMarketConfig::glv) must be:
+    ///   - Properly initialized
+    ///   - Owned by the `store`
+    ///   - Have the market token in its list of markets
+    /// - At least one of `max_amount` or `max_value` must be provided
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn update_glv_market_config(
         ctx: Context<UpdateGlvMarketConfig>,
@@ -2653,25 +2801,42 @@ pub mod gmsol_store {
     /// *[See the documentation for the accounts.](CreateGlvDeposit)*
     ///
     /// # Arguments
-    /// - `nonce`: The nonce for the GLV deposit.
-    /// - `params`: The parameters for the GLV deposit.
+    /// - `nonce`: A 32-byte unique identifier for the GLV deposit.
+    /// - `params`: The parameters for creating the GLV deposit, including initial token amounts and configuration.
     ///
     /// # Errors
-    /// - The [`owner`](CreateGlvDeposit::owner) must be a signer.
-    /// - The [`store`](CreateGlvDeposit::store) must be initialized.
-    /// - The [`market`](CreateGlvDeposit::market) must be validly initialized and owned by the
-    ///   `store`. It must be one of the markets in the [`glv`](CreateGlvDeposit::glv).
-    /// - The [`glv`](CreateGlvDeposit::glv) must be validly initialized and owned by the
-    ///   `store`.
-    /// - The [`glv_deposit`](CreateGlvDeposit::glv_deposit) must be uninitialized. Its address must be PDA derived from the [`GLV_DEPOSIT_SEED`](crate::states::GlvDeposit::SEED), [`store`], [`owner`] and `nonce`.
-    /// - The [`glv_token`](CreateGlvDeposit::glv_token) must be validly initialized and be the GLV token of the [`glv`](CreateGlvDeposit::glv).
-    /// - The [`market_token`](CreateGlvDeposit::market_token) must be validly initialized and be the market token of the [`market`](CreateGlvDeposit::market).
-    /// - The [`initial_long_token`](CreateGlvDeposit::initial_long_token) must be provided if the initial long token amount is not zero.
-    /// - The [`initial_short_token`](CreateGlvDeposit::initial_short_token) must be provided if the initial short token amount is not zero.
-    /// - The corresponding source token accounts must be provided if the initial token amount is not zero.
-    /// - The [`glv_token_escrow`](CreateGlvDeposit::glv_token_escrow) must be provided and owned by the [`glv_deposit`].
-    /// - The other corresponding escrow token accounts must be provided if the initial token amount is not zero, have enough balance and owned by the [`glv_deposit`].
-    /// - The token programs must be matching with the token accounts.
+    /// - The [`owner`](CreateGlvDeposit::owner) must be a signer
+    /// - The [`store`](CreateGlvDeposit::store) must be properly initialized
+    /// - The [`market`](CreateGlvDeposit::market) must be:
+    ///   - Properly initialized
+    ///   - Owned by the `store`
+    ///   - Listed as a valid market in the [`glv`](CreateGlvDeposit::glv)
+    /// - The [`glv`](CreateGlvDeposit::glv) must be:
+    ///   - Properly initialized
+    ///   - Owned by the `store`
+    /// - The [`glv_deposit`](CreateGlvDeposit::glv_deposit) must be:
+    ///   - Uninitialized
+    ///   - Address must be PDA derived from the SEED of [`GlvDeposit`](states::GlvDeposit),
+    ///     [`store`](CreateGlvDeposit::store), [`owner`](CreateGlvDeposit::owner) and `nonce`
+    /// - The [`glv_token`](CreateGlvDeposit::glv_token) must be:
+    ///   - Properly initialized
+    ///   - Associated with the provided [`glv`](CreateGlvDeposit::glv)
+    /// - The [`market_token`](CreateGlvDeposit::market_token) must be:
+    ///   - Properly initialized
+    ///   - Associated with the provided [`market`](CreateGlvDeposit::market)
+    /// - Token account requirements:
+    ///   - [`initial_long_token`](CreateGlvDeposit::initial_long_token) must be provided if initial long amount > 0
+    ///   - [`initial_short_token`](CreateGlvDeposit::initial_short_token) must be provided if initial short amount > 0
+    ///   - Source token accounts must be provided for any non-zero initial token amounts
+    /// - Escrow account requirements:
+    ///   - [`glv_token_escrow`](CreateGlvDeposit::glv_token_escrow) must be:
+    ///     - Provided
+    ///     - Owned by the [`glv_deposit`](CreateGlvDeposit::glv_deposit)
+    ///   - Other escrow accounts must be:
+    ///     - Provided for any non-zero initial token amounts
+    ///     - Have sufficient balance
+    ///     - Owned by the [`glv_deposit`](CreateGlvDeposit::glv_deposit)
+    /// - All token programs must match their corresponding token accounts
     pub fn create_glv_deposit<'info>(
         mut ctx: Context<'_, '_, 'info, 'info, CreateGlvDeposit<'info>>,
         nonce: [u8; 32],
@@ -2690,17 +2855,25 @@ pub mod gmsol_store {
     ///
     /// # Errors
     /// - The [`executor`](CloseGlvDeposit::executor) must be a signer, and must be
-    ///   either the owner of the GLV deposit or a `ORDER_KEEPER` in the store.
-    /// - The [`store`](CloseGlvDeposit::store) must be initialized.
-    /// - The [`owner`](CloseGlvDeposit::owner) must be the owner of the GLV deposit.
-    /// - The [`glv_deposit`](CloseGlvDeposit::glv_deposit) must be validly initialized and owned by the `owner` and `store`.
-    /// - The tokens must be valid and recorded in the [`glv_deposit`].
-    /// - The [`initial_long_token`](CloseGlvDeposit::initial_long_token) must be provided if the initial long token amount is not zero.
-    /// - The [`initial_short_token`](CloseGlvDeposit::initial_short_token) must be provided if the initial short token amount is not zero.
-    /// - The escrow accounts must be corresponding to the tokens, owned by the [`glv_deposit`] and recorded in it.
-    /// - The ATA accounts must be corresponding to the tokens and owned by the `owner`.
-    /// - The `glv_deposit` must be cancelled or executed if the `executor` is not the `owner`.
-    /// -The token programs must be matching with the token accounts.
+    ///   either the owner of the GLV deposit or a `ORDER_KEEPER` in the store
+    /// - The [`store`](CloseGlvDeposit::store) must be properly initialized
+    /// - The [`owner`](CloseGlvDeposit::owner) must be the owner of the GLV deposit
+    /// - The [`glv_deposit`](CloseGlvDeposit::glv_deposit) must be:
+    ///   - Properly initialized
+    ///   - Owned by the `owner` and `store`
+    ///   - In cancelled or executed state if the `executor` is not the `owner`
+    /// - Token account requirements:
+    ///   - All tokens must be valid and recorded in the [`glv_deposit`](CloseGlvDeposit::glv_deposit)
+    ///   - [`initial_long_token`](CloseGlvDeposit::initial_long_token) must be provided if initial long amount > 0
+    ///   - [`initial_short_token`](CloseGlvDeposit::initial_short_token) must be provided if initial short amount > 0
+    /// - Escrow account requirements:
+    ///   - Must correspond to their respective tokens
+    ///   - Must be owned by the [`glv_deposit`](CloseGlvDeposit::glv_deposit)
+    ///   - Must be recorded in the [`glv_deposit`](CloseGlvDeposit::glv_deposit)
+    /// - Associated Token Account requirements:
+    ///   - Must correspond to their respective tokens
+    ///   - Must be owned by the `owner`
+    /// - All token programs must match their corresponding token accounts
     pub fn close_glv_deposit<'info>(
         ctx: Context<'_, '_, 'info, 'info, CloseGlvDeposit<'info>>,
         reason: String,
@@ -2714,27 +2887,51 @@ pub mod gmsol_store {
     /// *[See the documentation for the accounts.](ExecuteGlvDeposit)*
     ///
     /// # Arguments
-    /// - `execution_lamports`: The execution fee claimed to be used by the keeper.
+    /// - `execution_lamports`: The execution fee in lamports to be claimed by the keeper.
     /// - `throw_on_execution_error`: Whether to throw an error if the execution fails.
     ///
     /// # Errors
-    /// - The [`authority`](ExecuteGlvDeposit::authority) must be a signer and a `ORDER_KEEPER` in the store.
-    /// - The [`store`](ExecuteGlvDeposit::store) must be initialized.
-    /// - The [`token_map`](ExecuteGlvDeposit::token_map) must be initialized and authorized by the [`store`](ExecuteGlvDeposit::store).
-    /// - The [`oracle`](ExecuteGlvDeposit::oracle) must be cleared and owned by the store.
-    /// - The [`glv`](ExecuteGlvDeposit::glv) must be validly initialized and owned by the `store`. It must be the expected GLV of the [`glv_deposit`](ExecuteGlvDeposit::glv_deposit).
-    /// - The [`market`](ExecuteGlvDeposit::market) must be validly initialized and owned by the `store`. It must be the expected market of the [`glv_deposit`](ExecuteGlvDeposit::glv_deposit).
-    /// - The [`glv_deposit`](ExecuteGlvDeposit::glv_deposit) must be validly initialized and owned by the `store`. It must be in the pending state.
-    /// - The tokens must be valid and recorded in the [`glv_deposit`].
-    /// - The [`glv_token`](ExecuteGlvDeposit::glv_token) must be the GLV token of the [`glv`](ExecuteGlvDeposit::glv).
-    /// - The [`market_token`](ExecuteGlvDeposit::market_token) must be the market token of the [`market`](ExecuteGlvDeposit::market).
-    /// - The escrow accounts must be corresponding to the tokens, owned by the `glv_deposit` and recorded in it.
-    /// - The [`initial_long_token_vault`](ExecuteGlvDeposit::initial_long_token_vault) must be the market vault for the initial long token owned by the `store`.
-    /// - The [`initial_short_token_vault`](ExecuteGlvDeposit::initial_short_token_vault) must be the market vault for the initial short token owned by the `store`.
-    /// - The [`market_token_vault`](ExecuteGlvDeposit::market_token_vault) must be the market token vault for `market_token` in the GLV, which is owned by the `glv`.
-    /// - The token programs must be matching with the token accounts.
-    /// - The remaining accounts must be valid. See the documentation of [`ExecuteGlvDeposit`] for more details.
-    /// - Return an error if the execution fails and `throw_on_execution_error` is `true`.
+    /// - The [`authority`](ExecuteGlvDeposit::authority) must be a signer and have `ORDER_KEEPER` role in the store
+    /// - The [`store`](ExecuteGlvDeposit::store) must be properly initialized
+    /// - The [`token_map`](ExecuteGlvDeposit::token_map) must be:
+    ///   - Properly initialized
+    ///   - Authorized by the store
+    /// - The [`oracle`](ExecuteGlvDeposit::oracle) must be:
+    ///   - Cleared
+    ///   - Owned by the store
+    /// - The [`glv`](ExecuteGlvDeposit::glv) must be:
+    ///   - Properly initialized
+    ///   - Owned by the store
+    ///   - Match the expected GLV of the deposit
+    /// - The [`market`](ExecuteGlvDeposit::market) must be:
+    ///   - Properly initialized
+    ///   - Owned by the store
+    ///   - Match the expected market of the deposit
+    /// - The [`glv_deposit`](ExecuteGlvDeposit::glv_deposit) must be:
+    ///   - Properly initialized
+    ///   - Owned by the store
+    ///   - In pending state
+    /// - Token requirements:
+    ///   - All tokens must be valid and recorded in the [`glv_deposit`](ExecuteGlvDeposit::glv_deposit)
+    ///   - [`glv_token`](ExecuteGlvDeposit::glv_token) must be the GLV token of the [`glv`](ExecuteGlvDeposit::glv)
+    ///   - [`market_token`](ExecuteGlvDeposit::market_token) must be the market token of the [`market`](ExecuteGlvDeposit::market)
+    /// - Vault requirements:
+    ///   - [`initial_long_token_vault`](ExecuteGlvDeposit::initial_long_token_vault) must be:
+    ///     - The market vault for the initial long token
+    ///     - Owned by the store
+    ///   - [`initial_short_token_vault`](ExecuteGlvDeposit::initial_short_token_vault) must be:
+    ///     - The market vault for the initial short token
+    ///     - Owned by the store
+    ///   - [`market_token_vault`](ExecuteGlvDeposit::market_token_vault) must be:
+    ///     - The market token vault in the GLV
+    ///     - Owned by the GLV
+    /// - Escrow requirements:
+    ///   - Must correspond to their respective tokens
+    ///   - Must be owned by the GLV deposit
+    ///   - Must be recorded in the GLV deposit
+    /// - All token programs must match their corresponding token accounts
+    /// - All remaining accounts must be valid per [`ExecuteGlvDeposit`] documentation
+    /// - Returns error if execution fails and `throw_on_execution_error` is `true`
     #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
     pub fn execute_glv_deposit<'info>(
         ctx: Context<'_, '_, 'info, 'info, ExecuteGlvDeposit<'info>>,
@@ -2758,18 +2955,43 @@ pub mod gmsol_store {
     /// - `params`: The parameters for the GLV withdrawal.
     ///
     /// # Errors
-    /// - The [`owner`](CreateGlvWithdrawal::owner) must be a signer.
-    /// - The [`store`](CreateGlvWithdrawal::store) must be initialized.
-    /// - The [`market`](CreateGlvWithdrawal::market) must be enabled and owned by the `store`.
-    ///   It must be one of the markets in the [`glv`](CreateGlvWithdrawal::glv).
-    /// - The [`glv`](CreateGlvWithdrawal::glv) must be validly initialized and owned by the `store`.
-    /// - The [`glv_withdrawal`](CreateGlvWithdrawal::glv_withdrawal) must be uninitialized. Its address must be PDA derived from the [`GLV_WITHDRAWAL_SEED`](crate::states::GlvWithdrawal::SEED), [`store`], [`owner`] and `nonce`.
-    /// - The [`glv_token`](CreateGlvWithdrawal::glv_token) must be validly initialized and be the GLV token of the [`glv`](CreateGlvWithdrawal::glv).
-    /// - The [`market_token`](CreateGlvWithdrawal::market_token) must be validly initialized and be the market token of the [`market`](CreateGlvWithdrawal::market).
-    /// - The other tokens must be initialized.
-    /// - The [`glv_token_source`](CreateGlvWithdrawal::glv_token_source) must be initialized `glv_token` account, with enough balance and with `owner` as its authority.
-    /// - The escrow accounts must be corresponding to the tokens, owned by the [`glv_withdrawal`].
-    /// - The token programs must be matching with the tokens and token accounts.
+    /// - The [`owner`](CreateGlvWithdrawal::owner) must be:
+    ///   - A signer
+    /// - The [`store`](CreateGlvWithdrawal::store) must be:
+    ///   - Properly initialized
+    /// - The [`market`](CreateGlvWithdrawal::market) must be:
+    ///   - Properly initialized
+    ///   - Enabled
+    ///   - Owned by the store
+    ///   - One of the markets in the GLV
+    /// - The [`glv`](CreateGlvWithdrawal::glv) must be:
+    ///   - Properly initialized
+    ///   - Owned by the store
+    /// - The [`glv_withdrawal`](CreateGlvWithdrawal::glv_withdrawal) must be:
+    ///   - Uninitialized
+    ///   - A PDA derived from:
+    ///     - the SEED of [`GlvWithdrawal`](states::GlvWithdrawal)
+    ///     - [`store`](CreateGlvWithdrawal::store)
+    ///     - [`owner`](CreateGlvWithdrawal::owner)
+    ///     - `nonce`
+    /// - Token requirements:
+    ///   - [`glv_token`](CreateGlvWithdrawal::glv_token) must be:
+    ///     - Properly initialized
+    ///     - The GLV token of the [`glv`](CreateGlvWithdrawal::glv)
+    ///   - [`market_token`](CreateGlvWithdrawal::market_token) must be:
+    ///     - Properly initialized  
+    ///     - The market token of the [`market`](CreateGlvWithdrawal::market)
+    ///   - All other tokens must be properly initialized
+    /// - Source requirements:
+    ///   - [`glv_token_source`](CreateGlvWithdrawal::glv_token_source) must be:
+    ///     - Properly initialized
+    ///     - A GLV token account
+    ///     - Have sufficient balance
+    ///     - Have the `owner` as its authority
+    /// - Escrow requirements:
+    ///   - Must correspond to their respective tokens
+    ///   - Must be owned by the [`glv_withdrawal`](CreateGlvWithdrawal::glv_withdrawal)
+    /// - All token programs must match their corresponding token accounts
     pub fn create_glv_withdrawal<'info>(
         mut ctx: Context<'_, '_, 'info, 'info, CreateGlvWithdrawal<'info>>,
         nonce: [u8; 32],
@@ -2787,16 +3009,32 @@ pub mod gmsol_store {
     /// - `reason`: The reason for closing the GLV withdrawal.
     ///
     /// # Errors
-    /// - The [`executor`](CloseGlvWithdrawal::executor) must be a signer, and must be
-    ///   either the owner of the GLV withdrawal or a `ORDER_KEEPER` in the store.
-    /// - The [`store`](CloseGlvWithdrawal::store) must be initialized.
-    /// - The [`owner`](CloseGlvWithdrawal::owner) must be the owner of the GLV withdrawal.
-    /// - The [`glv_withdrawal`](CloseGlvWithdrawal::glv_withdrawal) must be validly initialized and owned by the `owner` and `store`.
-    /// - The tokens must be valid and recorded in the [`glv_withdrawal`].
-    /// - The escrow accounts must be corresponding to the tokens, owned by the [`glv_withdrawal`] and recorded in it.
-    /// - The ATA accounts must be corresponding to the tokens and owned by the `owner`.
-    /// - The token programs must be matching with the tokens and token accounts.
-    /// - The `glv_withdrawal` must be cancelled or executed if the `executor` is not the `owner`.
+    /// - The [`executor`](CloseGlvWithdrawal::executor) must be:
+    ///   - A signer
+    ///   - Either:
+    ///     - The owner of the GLV withdrawal
+    ///     - A `ORDER_KEEPER` in the store
+    /// - The [`store`](CloseGlvWithdrawal::store) must be:
+    ///   - Properly initialized
+    /// - The [`owner`](CloseGlvWithdrawal::owner) must be:
+    ///   - The owner of the GLV withdrawal
+    /// - The [`glv_withdrawal`](CloseGlvWithdrawal::glv_withdrawal) must be:
+    ///   - Properly initialized
+    ///   - Owned by the `owner`
+    ///   - Owned by the `store`
+    /// - Token requirements:
+    ///   - All tokens must be valid and recorded in the [`glv_withdrawal`](CloseGlvWithdrawal::glv_withdrawal)
+    /// - Escrow requirements:
+    ///   - Must correspond to their respective tokens
+    ///   - Must be owned by the [`glv_withdrawal`](CloseGlvWithdrawal::glv_withdrawal)
+    ///   - Must be recorded in the [`glv_withdrawal`](CloseGlvWithdrawal::glv_withdrawal)
+    /// - ATA requirements:
+    ///   - Must correspond to their respective tokens
+    ///   - Must be owned by the `owner`
+    /// - All token programs must match their corresponding token accounts
+    /// - State requirements:
+    ///   - If the `executor` is not the `owner`, the `glv_withdrawal` must be:
+    ///     - Either cancelled or executed
     pub fn close_glv_withdrawal<'info>(
         ctx: Context<'_, '_, 'info, 'info, CloseGlvWithdrawal<'info>>,
         reason: String,
@@ -2810,28 +3048,48 @@ pub mod gmsol_store {
     /// *[See the documentation for the accounts.](ExecuteGlvWithdrawal)*
     ///
     /// # Arguments
-    /// - `execution_lamports`: The execution fee claimed to be used by the keeper.
-    /// - `throw_on_execution_error`: Whether to throw an error if the execution fails.
+    /// - `execution_lamports`: The amount of lamports to be paid as execution fee to the keeper.
+    /// - `throw_on_execution_error`: If true, throws an error when execution fails. If false, returns success even if execution fails.
     ///
     /// # Errors
-    /// - The [`authority`](ExecuteGlvWithdrawal::authority) must be a signer and a `ORDER_KEEPER` in the store.
-    /// - The [`store`](ExecuteGlvWithdrawal::store) must be initialized.
-    /// - The [`token_map`](ExecuteGlvWithdrawal::token_map) must be initialized and authorized by the [`store`](ExecuteGlvWithdrawal::store).
-    /// - The [`oracle`](ExecuteGlvWithdrawal::oracle) must be cleared and owned by the store.
-    /// - The [`glv`](ExecuteGlvWithdrawal::glv) must be validly initialized and owned by the `store`. It must be the expected GLV of the [`glv_withdrawal`](ExecuteGlvWithdrawal::glv_withdrawal).
-    /// - The [`market`](ExecuteGlvWithdrawal::market) must be validly initialized and owned by the `store`. It must be the expected market of the [`glv_withdrawal`](ExecuteGlvWithdrawal::glv_withdrawal).
-    /// - The [`glv_withdrawal`](ExecuteGlvWithdrawal::glv_withdrawal) must be validly initialized and owned by the `store`. It must be in the pending state.
-    /// - The tokens must be valid and recorded in the [`glv_withdrawal`].
-    /// - The [`glv_token`](ExecuteGlvWithdrawal::glv_token) must be the GLV token of the [`glv`](ExecuteGlvWithdrawal::glv).
-    /// - The [`market_token`](ExecuteGlvWithdrawal::market_token) must be the market token of the [`market`](ExecuteGlvWithdrawal::market).
-    /// - The escrow accounts must be corresponding to the tokens, owned by the [`glv_withdrawal`] and recorded in it.
-    /// - The [`market_token_withdrawal_vault`](ExecuteGlvWithdrawal::market_token_withdrawal_vault) must be the market vault for `market_token` owned by the `store`.
-    /// - The [`final_long_token_vault`](ExecuteGlvWithdrawal::final_long_token_vault) must be the market vault for the final long token owned by the `store`.
-    /// - The [`final_short_token_vault`](ExecuteGlvWithdrawal::final_short_token_vault) must be the market vault for the final short token owned by the `store`.
-    /// - The [`market_token_vault`](ExecuteGlvWithdrawal::market_token_vault) must be the market token vault for `market_token` in the GLV, which is owned by the `glv`.
-    /// - The token programs must be matching with the tokens and token accounts.
-    /// - The remaining accounts must be valid. See the documentation of [`ExecuteGlvWithdrawal`] for more details.
-    /// - Return an error if the execution fails and `throw_on_execution_error` is `true`.
+    /// - The [`authority`](ExecuteGlvWithdrawal::authority) must be:
+    ///   - A signer
+    ///   - A `ORDER_KEEPER` in the store
+    /// - The [`store`](ExecuteGlvWithdrawal::store) must be:
+    ///   - Properly initialized
+    /// - The [`token_map`](ExecuteGlvWithdrawal::token_map) must be:
+    ///   - Properly initialized
+    ///   - Authorized by the store
+    /// - The [`oracle`](ExecuteGlvWithdrawal::oracle) must be:
+    ///   - Cleared
+    ///   - Owned by the store
+    /// - The [`glv`](ExecuteGlvWithdrawal::glv) must be:
+    ///   - Properly initialized
+    ///   - Owned by the store
+    ///   - The expected GLV of the withdrawal
+    /// - The [`market`](ExecuteGlvWithdrawal::market) must be:
+    ///   - Properly initialized
+    ///   - Owned by the store
+    ///   - The expected market of the withdrawal
+    /// - The [`glv_withdrawal`](ExecuteGlvWithdrawal::glv_withdrawal) must be:
+    ///   - Properly initialized
+    ///   - Owned by the store
+    ///   - In pending state
+    /// - Token requirements:
+    ///   - All tokens must be valid and recorded in the withdrawal
+    ///   - [`glv_token`](ExecuteGlvWithdrawal::glv_token) must be the GLV token of the GLV
+    ///   - [`market_token`](ExecuteGlvWithdrawal::market_token) must be the market token of the market
+    /// - Vault requirements:
+    ///   - Escrow accounts must correspond to their tokens
+    ///   - Escrow accounts must be owned by the withdrawal
+    ///   - Escrow accounts must be recorded in the withdrawal
+    ///   - [`market_token_withdrawal_vault`](ExecuteGlvWithdrawal::market_token_withdrawal_vault) must be the market vault for market token, owned by store
+    ///   - [`final_long_token_vault`](ExecuteGlvWithdrawal::final_long_token_vault) must be the market vault for final long token, owned by store
+    ///   - [`final_short_token_vault`](ExecuteGlvWithdrawal::final_short_token_vault) must be the market vault for final short token, owned by store
+    ///   - [`market_token_vault`](ExecuteGlvWithdrawal::market_token_vault) must be the GLV's market token vault, owned by GLV
+    /// - All token programs must match their corresponding token accounts
+    /// - All remaining accounts must be valid per [`ExecuteGlvWithdrawal`] documentation
+    /// - If `throw_on_execution_error` is true, execution failures will throw an error
     #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
     pub fn execute_glv_withdrawal<'info>(
         ctx: Context<'_, '_, 'info, 'info, ExecuteGlvWithdrawal<'info>>,
@@ -2854,19 +3112,42 @@ pub mod gmsol_store {
     /// - `nonce`: The nonce for the GLV shift.
     /// - `params`: The parameters for the GLV shift.
     ///
-    /// # Errors
-    /// - The [`authority`](CreateGlvShift::authority) must be a signer and a `ORDER_KEEPER` in the store.
-    /// - The [`store`](CreateGlvShift::store) must be initialized.
-    /// - The [`glv`](CreateGlvShift::glv) must be validly initialized and owned by the `store`.
-    /// - The [`from_market`](CreateGlvShift::from_market) must be enabled and owned by the `store`. It must be one of the markets in the [`glv`](CreateGlvShift::glv).
-    /// - The [`to_market`](CreateGlvShift::to_market) must be enabled and owned by the `store`. It must be one of the markets in the [`glv`](CreateGlvShift::glv).
-    ///   It must not be the same as [`from_market`](CreateGlvShift::from_market).
-    /// - The [`glv_shift`](CreateGlvShift::glv_shift) must be uninitialized.
-    ///   Its address must be PDA derived from the [`GLV_SHIFT_SEED`](crate::states::GlvShift::SEED), [`store`], [`glv`], and `nonce`.
-    /// - The [`from_market_token`](CreateGlvShift::from_market_token) must be validly initialized and be the market token of the [`from_market`](CreateGlvShift::from_market).
-    /// - The [`to_market_token`](CreateGlvShift::to_market_token) must be validly initialized and be the market token of the [`to_market`](CreateGlvShift::to_market).
-    /// - The [`from_market_token_vault`](CreateGlvShift::from_market_token_vault) must be the market token vault for `from_market_token` in the GLV, which is owned by the `glv`.
-    /// - The [`to_market_token_vault`](CreateGlvShift::to_market_token_vault) must be the market token vault for `to_market_token` in the GLV, which is owned by the `glv`.
+    /// # Requirements
+    /// - The [`authority`](CreateGlvShift::authority) must be:
+    ///   - A signer
+    ///   - A `ORDER_KEEPER` in the store
+    /// - The [`store`](CreateGlvShift::store) must be:
+    ///   - Properly initialized
+    /// - The [`glv`](CreateGlvShift::glv) must be:
+    ///   - Properly initialized
+    ///   - Owned by the store
+    /// - Market requirements:
+    ///   - [`from_market`](CreateGlvShift::from_market) must be:
+    ///     - Enabled
+    ///     - Owned by the store
+    ///     - One of the markets in the GLV
+    ///   - [`to_market`](CreateGlvShift::to_market) must be:
+    ///     - Enabled
+    ///     - Owned by the store
+    ///     - One of the markets in the GLV
+    ///     - Different from `from_market`
+    /// - The [`glv_shift`](CreateGlvShift::glv_shift) must be:
+    ///   - Uninitialized
+    ///   - PDA derived from the SEED of [`GlvShift`](states::GlvShift), `store`, `glv`, and `nonce`
+    /// - Token requirements:
+    ///   - [`from_market_token`](CreateGlvShift::from_market_token) must be:
+    ///     - Properly initialized
+    ///     - The market token of `from_market`
+    ///   - [`to_market_token`](CreateGlvShift::to_market_token) must be:
+    ///     - Properly initialized
+    ///     - The market token of `to_market`
+    /// - Vault requirements:
+    ///   - [`from_market_token_vault`](CreateGlvShift::from_market_token_vault) must be:
+    ///     - The market token vault for `from_market_token` in the GLV
+    ///     - Owned by the GLV
+    ///   - [`to_market_token_vault`](CreateGlvShift::to_market_token_vault) must be:
+    ///     - The market token vault for `to_market_token` in the GLV
+    ///     - Owned by the GLV
     #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
     pub fn create_glv_shift<'info>(
         mut ctx: Context<'_, '_, 'info, 'info, CreateGlvShift<'info>>,
@@ -2884,15 +3165,26 @@ pub mod gmsol_store {
     /// # Arguments
     /// - `reason`: The reason for closing the GLV shift.
     ///
-    /// # Errors
-    /// - The [`authority`](CloseGlvShift::authority) must be a signer and a `ORDER_KEEPER` in the store.
-    /// - The [`funder`](CloseGlvShift::funder) must be the funder of the GLV shift.
-    /// - The [`store`](CloseGlvShift::store) must be initialized.
-    /// - The [`glv`](CloseGlvShift::glv) must be validly initialized and owned by the `store`.
-    ///   It must be the expected GLV of the [`glv_shift`](CloseGlvShift::glv_shift).
-    /// - The [`glv_shift`](CloseGlvShift::glv_shift) must be validly initialized and owned by the `store`.
-    /// - The [`from_market_token`](CloseGlvShift::from_market_token) must be recorded in the [`glv_shift`](CloseGlvShift::glv_shift).
-    /// - The [`to_market_token`](CloseGlvShift::to_market_token) must be recorded in the [`glv_shift`](CloseGlvShift::glv_shift).
+    /// # Requirements
+    /// - The [`authority`](CloseGlvShift::authority) must be:
+    ///   - A signer
+    ///   - A `ORDER_KEEPER` in the store
+    /// - The [`funder`](CloseGlvShift::funder) must be:
+    ///   - The funder of the GLV shift
+    /// - The [`store`](CloseGlvShift::store) must be:
+    ///   - Properly initialized
+    /// - The [`glv`](CloseGlvShift::glv) must be:
+    ///   - Properly initialized
+    ///   - Owned by the store
+    ///   - The expected GLV of the GLV shift
+    /// - The [`glv_shift`](CloseGlvShift::glv_shift) must be:
+    ///   - Properly initialized
+    ///   - Owned by the store
+    /// - Token requirements:
+    ///   - [`from_market_token`](CloseGlvShift::from_market_token) must be:
+    ///     - Recorded in the GLV shift
+    ///   - [`to_market_token`](CloseGlvShift::to_market_token) must be:
+    ///     - Recorded in the GLV shift
     #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
     pub fn close_glv_shift<'info>(
         ctx: Context<'_, '_, 'info, 'info, CloseGlvShift<'info>>,
@@ -2907,27 +3199,55 @@ pub mod gmsol_store {
     /// *[See the documentation for the accounts.](ExecuteGlvShift)*
     ///
     /// # Arguments
-    /// - `execution_lamports`: The execution fee claimed to be used by the keeper.
-    /// - `throw_on_execution_error`: Whether to throw an error if the execution fails.
+    /// - `execution_lamports`: The execution fee claimed by the keeper.
+    /// - `throw_on_execution_error`: Whether to throw an error if execution fails.
     ///
-    /// # Errors
-    /// - The [`authority`](ExecuteGlvShift::authority) must be a signer and a `ORDER_KEEPER` in the store.
-    /// - The [`store`](ExecuteGlvShift::store) must be initialized.
-    /// - The [`token_map`](ExecuteGlvShift::token_map) must be initialized and authorized by the [`store`](ExecuteGlvShift::store).
-    /// - The [`oracle`](ExecuteGlvShift::oracle) must be cleared and owned by the store.
-    /// - The [`glv`](ExecuteGlvShift::glv) must be validly initialized and owned by the `store`.
-    ///   It must be the expected GLV of the [`glv_shift`](ExecuteGlvShift::glv_shift).
-    /// - The [`from_market`](ExecuteGlvShift::from_market) must be enabled and owned by the `store`. It must be one of the markets in the [`glv`](ExecuteGlvShift::glv).
-    /// - The [`to_market`](ExecuteGlvShift::to_market) must be enabled and owned by the `store`. It must be one of the markets in the [`glv`](ExecuteGlvShift::glv).
-    /// - The [`glv_shift`](ExecuteGlvShift::glv_shift) must be validly initialized and owned by the `store`.
-    /// - The [`from_market_token`](ExecuteGlvShift::from_market_token) must be the market token of [`from_market`](ExecuteGlvShift::from_market) and recorded in the [`glv_shift`](ExecuteGlvShift::glv_shift).
-    /// - The [`to_market_token`](ExecuteGlvShift::to_market_token) must be the market token of [`to_market`](ExecuteGlvShift::to_market) and recorded in the [`glv_shift`](ExecuteGlvShift::glv_shift).
-    /// - The [`from_market_token_glv_vault`](ExecuteGlvShift::from_market_token_glv_vault) must be the escrow account for `from_market_token` in the GLV, which is owned by the `glv`.
-    /// - The [`to_market_token_glv_vault`](ExecuteGlvShift::to_market_token_glv_vault) must be the escrow account for `to_market_token` in the GLV, which is owned by the `glv`.
-    /// - The [`from_market_token_vault`](ExecuteGlvShift::from_market_token_vault) must be the market vault for `from_market_token` owned by the `store`.
-    /// - The token programs must be matching with the tokens and token accounts.
-    /// - The remaining accounts must be valid. See the documentation of [`ExecuteGlvShift`] for more details.
-    /// - Return an error if the execution fails and `throw_on_execution_error` is `true`.
+    /// # Requirements
+    /// - The [`authority`](ExecuteGlvShift::authority) must be:
+    ///   - A signer
+    ///   - A `ORDER_KEEPER` in the store
+    /// - The [`store`](ExecuteGlvShift::store) must be:
+    ///   - Properly initialized
+    /// - The [`token_map`](ExecuteGlvShift::token_map) must be:
+    ///   - Properly initialized
+    ///   - Authorized by the store
+    /// - The [`oracle`](ExecuteGlvShift::oracle) must be:
+    ///   - Cleared
+    ///   - Owned by the store
+    /// - The [`glv`](ExecuteGlvShift::glv) must be:
+    ///   - Properly initialized
+    ///   - Owned by the store
+    ///   - The expected GLV of the GLV shift
+    /// - The [`from_market`](ExecuteGlvShift::from_market) must be:
+    ///   - Enabled
+    ///   - Owned by the store
+    ///   - One of the markets in the GLV
+    /// - The [`to_market`](ExecuteGlvShift::to_market) must be:
+    ///   - Enabled
+    ///   - Owned by the store
+    ///   - One of the markets in the GLV
+    /// - The [`glv_shift`](ExecuteGlvShift::glv_shift) must be:
+    ///   - Properly initialized
+    ///   - Owned by the store
+    /// - Token requirements:
+    ///   - [`from_market_token`](ExecuteGlvShift::from_market_token) must be:
+    ///     - The market token of `from_market`
+    ///     - Recorded in the GLV shift
+    ///   - [`to_market_token`](ExecuteGlvShift::to_market_token) must be:
+    ///     - The market token of `to_market`
+    ///     - Recorded in the GLV shift
+    ///   - [`from_market_token_glv_vault`](ExecuteGlvShift::from_market_token_glv_vault) must be:
+    ///     - The escrow account for `from_market_token` in the GLV
+    ///     - Owned by the GLV
+    ///   - [`to_market_token_glv_vault`](ExecuteGlvShift::to_market_token_glv_vault) must be:
+    ///     - The escrow account for `to_market_token` in the GLV
+    ///     - Owned by the GLV
+    ///   - [`from_market_token_vault`](ExecuteGlvShift::from_market_token_vault) must be:
+    ///     - The market vault for `from_market_token`
+    ///     - Owned by the store
+    ///   - Token programs must match the tokens and token accounts
+    /// - The remaining accounts must be valid (see [`ExecuteGlvShift`] docs)
+    /// - Returns error if execution fails and `throw_on_execution_error` is `true`
     #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
     pub fn execute_glv_shift<'info>(
         ctx: Context<'_, '_, 'info, 'info, ExecuteGlvShift<'info>>,

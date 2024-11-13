@@ -583,11 +583,11 @@ impl<'info> internal::Authentication<'info> for ToggleGTMinting<'info> {
 /// *[See also the documentation for the instruction.](crate::gmsol_store::claim_fees_from_market)*
 #[derive(Accounts)]
 pub struct ClaimFeesFromMarket<'info> {
-    authority: Signer<'info>,
-    store: AccountLoader<'info, Store>,
+    pub authority: Signer<'info>,
+    pub store: AccountLoader<'info, Store>,
     #[account(mut, has_one = store)]
-    market: AccountLoader<'info, Market>,
-    token_mint: InterfaceAccount<'info, anchor_spl::token_interface::Mint>,
+    pub market: AccountLoader<'info, Market>,
+    pub token_mint: InterfaceAccount<'info, anchor_spl::token_interface::Mint>,
     #[account(
         mut,
         token::mint = token_mint,
@@ -601,16 +601,16 @@ pub struct ClaimFeesFromMarket<'info> {
         ],
         bump,
     )]
-    vault: InterfaceAccount<'info, anchor_spl::token_interface::TokenAccount>,
+    pub vault: InterfaceAccount<'info, anchor_spl::token_interface::TokenAccount>,
     #[account(
         mut,
         associated_token::authority = authority,
         associated_token::mint = token_mint,
         associated_token::token_program = token_program,
     )]
-    target: InterfaceAccount<'info, anchor_spl::token_interface::TokenAccount>,
-    token_program: Interface<'info, anchor_spl::token_interface::TokenInterface>,
-    associated_token_program: Program<'info, AssociatedToken>,
+    pub target: InterfaceAccount<'info, anchor_spl::token_interface::TokenAccount>,
+    pub token_program: Interface<'info, anchor_spl::token_interface::TokenInterface>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
 /// Claim fees from the market.

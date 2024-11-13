@@ -119,8 +119,8 @@ pub(crate) fn initialize_referral_code(
 #[derive(Accounts)]
 #[instruction(code: [u8; 8])]
 pub struct SetReferrer<'info> {
-    owner: Signer<'info>,
-    store: AccountLoader<'info, Store>,
+    pub owner: Signer<'info>,
+    pub store: AccountLoader<'info, Store>,
     /// User Account.
     #[account(
         mut,
@@ -169,8 +169,8 @@ pub(crate) fn set_referrer(ctx: Context<SetReferrer>, _code: ReferralCodeBytes) 
 /// The accounts definitions for `transfer_referral_code` instruction.
 #[derive(Accounts)]
 pub struct TransferReferralCode<'info> {
-    owner: Signer<'info>,
-    store: AccountLoader<'info, Store>,
+    pub owner: Signer<'info>,
+    pub store: AccountLoader<'info, Store>,
     /// User Account.
     #[account(
         mut,
