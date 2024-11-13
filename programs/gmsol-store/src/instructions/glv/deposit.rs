@@ -497,7 +497,7 @@ impl<'info> internal::Authentication<'info> for CloseGlvDeposit<'info> {
     }
 }
 
-/// The accounts definition for `execute_glv_deposit` instruction.
+/// The accounts definition for [`execute_glv_deposit`](crate::gmsol_store::execute_glv_deposit) instruction.
 ///
 /// Remaining accounts expected by this instruction:
 ///
