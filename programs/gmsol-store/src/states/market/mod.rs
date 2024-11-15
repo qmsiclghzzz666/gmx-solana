@@ -1,3 +1,30 @@
+//! ## Market
+//! A [`Market`](crate::states::Market) in GMX-Solana is defined by three tokens:
+//!
+//! - **Index Token**: The underlying asset that serves as the trading instrument. The price movements
+//!   of this token determine the profit or loss of positions. It does not need to be a real token.
+//! - **Long Token**: The token used to:
+//!   - Collateralize long and short positions
+//!   - Pay profits to long position holders
+//! - **Short Token**: The token used to:
+//!   - Collateralize long and short positions
+//!   - Pay profits to short position holders
+//!
+//! Long token and short token can be the same token, in which case the market
+//! is called a *single-token market*.
+//!
+//! Liquidity Providers (LPs) can provide liquidity to the market by depositing pool tokens (long token
+//! and short token) in exchange for market tokens. These market tokens represent the LP's proportional
+//! share of the market's liquidity pool. The deposited tokens are held in shared token accounts called
+//! *Market Vaults*, with deposited amounts for this market tracked in the market state. LPs can later
+//! redeem their market tokens back for the underlying collateral tokens through withdrawal instructions.
+//!
+//! Traders can open long or short positions using either token as collateral. When opening a position,
+//! the trader deposits collateral tokens and specifies the desired leverage. The position's profit or
+//! loss is determined by price movements of the index token. The loss is incurred in the collateral
+//! token used to open the position while the profit is realized in the long token and short token
+//! respectively.
+
 use std::{collections::BTreeSet, str::FromStr};
 
 use anchor_lang::{prelude::*, Bump};
@@ -19,7 +46,7 @@ use self::{
     pool::{Pool, Pools},
 };
 
-pub(crate) use model::AsLiquidityMarket;
+pub use model::AsLiquidityMarket;
 
 /// Market Utils.
 pub mod utils;
