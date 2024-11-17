@@ -1922,7 +1922,7 @@ pub mod gmsol_store {
     /// - The [`user`](CloseOrder::user) must be initialized and correspond to the `owner`.
     /// - The [`referrer_user`](CloseOrder::referrer_user) must be present if the `owner` has a
     ///   referrer, and it must be initialized and correspond to the referrer of the `owner`.
-    /// - The [`order`](CloseOrder::order) must be initialized and owned by the store and the
+    /// - The [`order`](CloseOrder::order) must be initialized and owned by the `store` and the
     ///   `owner`.
     /// - The tokens must be those recorded in the `order`.
     /// - The escrow accounts must be owned and recorded in the `order`.
@@ -2055,36 +2055,40 @@ pub mod gmsol_store {
     /// *[See the documentation for the accounts.](ExecuteDecreaseOrder)*
     ///
     /// # Arguments
-    /// - `recent_timestamp`: A recent timestamp that must be within the valid time window.
-    /// - `execution_fee`: The execution fee to be paid to the keeper for processing the order.
+    /// - `recent_timestamp`: A timestamp that must be within a recent time window.
+    /// - `execution_fee`: The execution fee claimed to be used by the keeper.
     /// - `throw_on_execution_error`: If true, throws an error if order execution fails. If false,
     ///   silently cancels the order on execution failure.
     ///
     /// # Errors
-    /// - The [`authority`](ExecuteDecreaseOrder::authority) must be a signer with ORDER_KEEPER
-    ///   permissions in the store.
-    /// - The [`store`](ExecuteDecreaseOrder::store) must be initialized and active.
+    /// - The [`authority`](ExecuteDecreaseOrder::authority) must be a signer with the ORDER_KEEPER
+    ///   role in the `store`.
+    /// - The [`store`](ExecuteDecreaseOrder::store) must be initialized.
     /// - The [`token_map`](ExecuteDecreaseOrder::token_map) must be initialized and authorized
-    ///   by the store.
+    ///   by the `store`.
     /// - The [`oracle`](ExecuteDecreaseOrder::oracle) must be initialized, cleared and owned
-    ///   by the store.
+    ///   by the `store`.
     /// - The [`market`](ExecuteDecreaseOrder::market) must be initialized, enabled and owned
-    ///   by the store.
-    /// - The [`owner`](ExecuteDecreaseOrder::owner) must be the original creator of the order.
+    ///   by the `store`.
+    /// - The [`owner`](ExecuteDecreaseOrder::owner) must be the owner of the `order`.
     /// - The [`user`](ExecuteDecreaseOrder::user) must be initialized and associated with
     ///   the `owner`.
     /// - The [`order`](ExecuteDecreaseOrder::order) must be:
-    ///   - Initialized and owned by both the store and owner
-    ///   - Associated with the provided market
-    ///   - In a pending state
+    ///   - Initialized and owned by both the `store` and `owner`
+    ///   - Associated with the provided `market`
+    ///   - In the pending state
     /// - The [`position`](ExecuteDecreaseOrder::position) must exist and be validly owned
+    ///   by the `owner` and `store`. It must match the `order`.
     /// - The [`event`](ExecuteDecreaseOrder::event) must be a valid trade event buffer
-    /// - The tokens must match those specified in the order
-    /// - All token escrow and vault accounts must be valid and properly owned
-    /// - All claimable token accounts must be valid and properly delegated
-    /// - All feed accounts must provide valid and complete oracle prices
-    /// - The feature for executing decrease orders must be enabled in the store
-    /// - If `throw_on_execution_error` is true, any execution failure will throw an error
+    ///   owned by both the `store` and `authority`.
+    /// - The tokens must match those recorded in the `order`.
+    /// - All escrow accounts must be valid, recorded in the `order` and owned by the `order`.
+    /// - All vault accounts must be valid market vault accounts and owned by the `store`.
+    /// - All claimable token accounts must be valid and properly delegated to their owners.
+    /// - The remaining accounts must be valid. See the documentation for the accounts for more
+    ///   details.
+    /// - The feature for executing decrease orders must be enabled in the `store`.
+    /// - If `throw_on_execution_error` is true, any execution failure will throw an error.
     // FIXME: There is a false positive lint for the doc link of `event`.
     #[allow(rustdoc::broken_intra_doc_links)]
     #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
@@ -2104,52 +2108,55 @@ pub mod gmsol_store {
 
     /// Perform a liquidation by keepers.
     ///
-    /// This instruction allows keepers to liquidate positions that have fallen below the required maintenance margin.
-    /// When executed, it will close the position and distribute funds according to the liquidation rules.
-    ///
     /// # Accounts
     /// *[See the documentation for the accounts.](PositionCut)*
     ///
     /// # Arguments
-    /// - `nonce`: The nonce used to derive the `order` PDA address
-    /// - `recent_timestamp`: A recent timestamp that must be within the valid time window
-    /// - `execution_fee`: The execution fee to be paid to the keeper for processing the liquidation
+    /// - `nonce`: The nonce used to derive the `order` PDA address.
+    /// - `recent_timestamp`: A recent timestamp that must be within the valid time window.
+    /// - `execution_fee`: The execution fee claimed to be used by the keeper.
     ///
     /// # Errors
-    /// - The [`authority`](PositionCut::authority) must be a signer with ORDER_KEEPER permissions in the store
-    /// - The [`owner`](PositionCut::owner) must be the owner of the position being liquidated
-    /// - The [`user`](PositionCut::user) must be an initialized user account associated with the `owner`
-    /// - The [`store`](PositionCut::store) must be initialized and active
-    /// - The [`token_map`](PositionCut::token_map) must be initialized and authorized by the store
-    /// - The [`oracle`](PositionCut::oracle) must be initialized, cleared and owned by the store
+    /// - The [`authority`](PositionCut::authority) must be a signer with the ORDER_KEEPER
+    ///   role in the `store`.
+    /// - The [`owner`](PositionCut::owner) must be the owner of the position being liquidated.
+    /// - The [`user`](PositionCut::user) must be an initialized user account corresponding to the
+    ///   `owner`.
+    /// - The [`store`](PositionCut::store) must be initialized.
+    /// - The [`token_map`](PositionCut::token_map) must be initialized and authorized by the
+    ///   `store`.
+    /// - The [`oracle`](PositionCut::oracle) must be initialized, cleared and owned by the `store`.
     /// - The [`market`](PositionCut::market) must be:
     ///   - Initialized and enabled
-    ///   - Owned by the store
-    ///   - The market associated with the position being liquidated
+    ///   - Owned by the `store`
+    ///   - Associated with the position being liquidated
     /// - The [`order`](PositionCut::order) must be:
     ///   - Uninitialized
-    ///   - Have an address matching the PDA derived from the store, owner and provided nonce
+    ///   - Have an address matching the PDA derived from the `store`, `owner`, provided
+    ///     `nonce` and other expected seeds
     /// - The [`position`](PositionCut::position) must be:
     ///   - Validly initialized
-    ///   - Owned by both the owner and store
-    ///   - In a liquidatable state (below maintenance margin)
-    /// - The [`event`](PositionCut::event) must be a valid trade event buffer owned by both the store and authority
-    /// - The [`long_token`](PositionCut::long_token) and [`short_token`](PositionCut::short_token) must match the market's configured tokens
+    ///   - Owned by both the `owner` and `store`
+    ///   - In a liquidatable state
+    /// - The [`event`](PositionCut::event) must be a valid trade event buffer owned by both the
+    ///   `store` and `authority`.
+    /// - The [`long_token`](PositionCut::long_token) and [`short_token`](PositionCut::short_token)
+    ///   must match those defined in the `market`.
     /// - Token escrow accounts must be:
     ///   - Valid for their respective tokens
-    ///   - Owned by the order if present
-    /// - Token vault accounts must be:
-    ///   - Valid for their respective tokens  
-    ///   - Owned by the store
+    ///   - Owned by the `order`
+    /// - Market vault accounts must be:
+    ///   - Valid market vault accounts for their respective tokens
+    ///   - Owned by the `store`
     /// - Claimable token accounts must be:
     ///   - Valid for their respective tokens
-    ///   - Owned by the store
-    ///   - Properly delegated to their respective owners
+    ///   - Owned by the `store`
+    ///   - Properly delegated to their owners
     /// - Price feed accounts must be:
     ///   - Valid and complete
     ///   - Provided in order matching the market's sorted token list
-    /// - The liquidation feature must be enabled in the store
-    /// - All oracle prices must be valid and complete
+    /// - The liquidation feature must be enabled in the `store`.
+    /// - Oracle prices must be valid and complete.
     // FIXME: There is a false positive lint for the doc link of `event`.
     #[allow(rustdoc::broken_intra_doc_links)]
     #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
@@ -2170,10 +2177,6 @@ pub mod gmsol_store {
 
     /// Update the ADL (Auto-Deleveraging) state for the market.
     ///
-    /// This instruction updates the ADL state for either the long or short side of a market. The ADL
-    /// state determines whether positions on that side are eligible for auto-deleveraging based on
-    /// current market conditions.
-    ///
     /// # Accounts
     /// *[See the documentation for the accounts.](UpdateAdlState)*
     ///
@@ -2189,6 +2192,7 @@ pub mod gmsol_store {
     /// - The [`oracle`](UpdateAdlState::oracle) must be an initialized [`Oracle`](states::Oracle)
     ///   account that is owned by the store.
     /// - The [`market`](UpdateAdlState::market) must be enabled and owned by the store.
+    /// - Price feed accounts must be valid and provided in the market's sorted token list order.
     #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
     pub fn update_adl_state<'info>(
         ctx: Context<'_, '_, 'info, 'info, UpdateAdlState<'info>>,
@@ -2199,50 +2203,46 @@ pub mod gmsol_store {
 
     /// Perform an ADL (Auto-Deleveraging) by keepers.
     ///
-    /// This instruction allows keepers to execute auto-deleveraging on positions that meet the ADL criteria.
-    /// ADL helps maintain market stability by reducing highly leveraged positions when the market's
-    /// overall risk metrics exceed safe thresholds.
-    ///
     /// # Accounts
     /// *[See the documentation for the accounts.](PositionCut)*
     ///
     /// # Arguments
     /// - `nonce`: The nonce used to derive the `order` PDA address.
     /// - `recent_timestamp`: A recent blockchain timestamp for validation.
-    /// - `execution_fee`: Fee paid to the keeper for executing the ADL.
+    /// - `execution_fee`: The execution fee claimed to be used by the keeper.
     ///
     /// # Errors
-    /// - The [`authority`](PositionCut::authority) must be a signer with ORDER_KEEPER role.
+    /// - The [`authority`](PositionCut::authority) must be a signer with the ORDER_KEEPER role.
     /// - The [`owner`](PositionCut::owner) must be the position owner.
-    /// - The [`user`](PositionCut::user) must be initialized and linked to the `owner`.
+    /// - The [`user`](PositionCut::user) must be initialized and corresponding to the `owner`.
     /// - The [`store`](PositionCut::store) must be initialized.
     /// - The [`token_map`](PositionCut::token_map) must be initialized and authorized by the store.
     /// - The [`oracle`](PositionCut::oracle) must be initialized, cleared and store-owned.
     /// - The [`market`](PositionCut::market) must be initialized, enabled, store-owned and match
-    ///   the position's market.
+    ///   the position's market. The market must be in ADL state.
     /// - The [`order`](PositionCut::order) must be uninitialized with address matching PDA from
-    ///   store, owner and nonce.
-    /// - The [`position`](PositionCut::position) must be initialized, owned by owner/store and
-    ///   eligible for ADL.
-    /// - The [`event`](PositionCut::event) must be a valid trade event buffer owned by store/authority.
+    ///   the `store`, `owner`, `nonce` and other expected seeds.
+    /// - The [`position`](PositionCut::position) must be initialized, owned by the `owner` and
+    ///   `store` and eligible for ADL.
+    /// - The [`event`](PositionCut::event) must be a valid trade event buffer owned by the `store`
+    ///   and `authority`.
     /// - The [`long_token`](PositionCut::long_token) and [`short_token`](PositionCut::short_token)
-    ///   must match the market's tokens.
+    ///   must match those defined in the `market`.
     /// - The [`long_token_escrow`](PositionCut::long_token_escrow) and
     ///   [`short_token_escrow`](PositionCut::short_token_escrow) must be valid order-owned escrow
     ///   accounts for their respective tokens.
     /// - The [`long_token_vault`](PositionCut::long_token_vault) and
-    ///   [`short_token_vault`](PositionCut::short_token_vault) must be valid store-owned vault
-    ///   accounts for their tokens.
+    ///   [`short_token_vault`](PositionCut::short_token_vault) must be valid store-owned market
+    ///   vault accounts for their tokens.
     /// - The [`claimable_long_token_account_for_user`](PositionCut::claimable_long_token_account_for_user)
     ///   must be a store-owned, owner-delegated claimable account for long token.
     /// - The [`claimable_short_token_account_for_user`](PositionCut::claimable_short_token_account_for_user)
     ///   must be a store-owned, owner-delegated claimable account for short token.
     /// - The [`claimable_pnl_token_account_for_holding`](PositionCut::claimable_pnl_token_account_for_holding)
     ///   must be a store-owned, holding-delegated claimable account for PnL token.
-    /// - Price feed accounts must be valid and provided in market's sorted token order.
-    /// - ADL feature must be enabled in store settings.
+    /// - Price feed accounts must be valid and provided in the market's sorted token list order.
+    /// - The ADL feature must be enabled in the `store`.
     /// - Oracle prices must be valid and complete.
-    /// - Market must be in ADL state with PnL factor exceeding minimum threshold.
     /// - Execution must complete successfully.
     // FIXME: There is a false positive lint for the doc link of `event`.
     #[allow(rustdoc::broken_intra_doc_links)]
@@ -2808,7 +2808,7 @@ pub mod gmsol_store {
     //                GLV Operations
     // ===========================================
 
-    /// Initialize GLV.
+    /// Initialize a GLV token and the corresponding GLV account.
     ///
     /// # Accounts
     /// *[See the documentation for the accounts.](InitializeGlv)*
@@ -2827,7 +2827,8 @@ pub mod gmsol_store {
     ///     [`store`] and `index`
     /// - The [`glv`](InitializeGlv::glv) must be:
     ///   - Uninitialized  
-    ///   - Address must be PDA derived from the SEED of [`Glv`](states::Glv) and [`glv_token`](InitializeGlv::glv_token)
+    ///   - Address must be PDA derived from the SEED of [`Glv`](states::Glv) and the address of the
+    ///     [`glv_token`](InitializeGlv::glv_token)
     /// - The remaining required accounts are documented in [`InitializeGlv`]
     /// - The `length` must be:
     ///   - Greater than 0
@@ -2841,7 +2842,7 @@ pub mod gmsol_store {
         instructions::unchecked_initialize_glv(ctx, index, length as usize)
     }
 
-    /// Update a market config of a GLV.
+    /// Update the config of a market in the given GLV.
     ///
     /// # Accounts
     /// *[See the documentation for the accounts.](UpdateGlvMarketConfig)*
@@ -2853,12 +2854,15 @@ pub mod gmsol_store {
     /// # Errors
     /// - The [`authority`](UpdateGlvMarketConfig::authority) must be:
     ///   - A signer
-    ///   - Have MARKET_KEEPER role in the store
-    /// - The [`store`](UpdateGlvMarketConfig::store) must be properly initialized
+    ///   - Have MARKET_KEEPER role in the `store`
+    /// - The [`store`](UpdateGlvMarketConfig::store) must be properly initialized.
     /// - The [`glv`](UpdateGlvMarketConfig::glv) must be:
     ///   - Properly initialized
     ///   - Owned by the `store`
-    ///   - Have the market token in its list of markets
+    ///   - Have the market token in its list of market tokens
+    /// - The [`market_token`](UpdateGlvMarketConfig::market_token) must be:
+    ///   - Properly initialized
+    ///   - Owned by the `store`
     /// - At least one of `max_amount` or `max_value` must be provided
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn update_glv_market_config(
@@ -2875,16 +2879,16 @@ pub mod gmsol_store {
     /// *[See the documentation for the accounts.](CreateGlvDeposit)*
     ///
     /// # Arguments
-    /// - `nonce`: A 32-byte unique identifier for the GLV deposit.
-    /// - `params`: The parameters for creating the GLV deposit, including initial token amounts and configuration.
+    /// - `nonce`: A 32-byte used to derive the address of the GLV deposit.
+    /// - `params`: The parameters for creating the GLV deposit.
     ///
     /// # Errors
-    /// - The [`owner`](CreateGlvDeposit::owner) must be a signer
-    /// - The [`store`](CreateGlvDeposit::store) must be properly initialized
+    /// - The [`owner`](CreateGlvDeposit::owner) must be a signer.
+    /// - The [`store`](CreateGlvDeposit::store) must be properly initialized.
     /// - The [`market`](CreateGlvDeposit::market) must be:
     ///   - Properly initialized
     ///   - Owned by the `store`
-    ///   - Listed as a valid market in the [`glv`](CreateGlvDeposit::glv)
+    ///   - Listed in the [`glv`](CreateGlvDeposit::glv)
     /// - The [`glv`](CreateGlvDeposit::glv) must be:
     ///   - Properly initialized
     ///   - Owned by the `store`
@@ -2894,22 +2898,23 @@ pub mod gmsol_store {
     ///     [`store`](CreateGlvDeposit::store), [`owner`](CreateGlvDeposit::owner) and `nonce`
     /// - The [`glv_token`](CreateGlvDeposit::glv_token) must be:
     ///   - Properly initialized
-    ///   - Associated with the provided [`glv`](CreateGlvDeposit::glv)
+    ///   - Correspond to the provided [`glv`](CreateGlvDeposit::glv)
     /// - The [`market_token`](CreateGlvDeposit::market_token) must be:
     ///   - Properly initialized
-    ///   - Associated with the provided [`market`](CreateGlvDeposit::market)
-    /// - Token account requirements:
+    ///   - Correspond to the provided [`market`](CreateGlvDeposit::market)
+    /// - Token mint account requirements:
     ///   - [`initial_long_token`](CreateGlvDeposit::initial_long_token) must be provided if initial long amount > 0
     ///   - [`initial_short_token`](CreateGlvDeposit::initial_short_token) must be provided if initial short amount > 0
-    ///   - Source token accounts must be provided for any non-zero initial token amounts
     /// - Escrow account requirements:
     ///   - [`glv_token_escrow`](CreateGlvDeposit::glv_token_escrow) must be:
-    ///     - Provided
     ///     - Owned by the [`glv_deposit`](CreateGlvDeposit::glv_deposit)
     ///   - Other escrow accounts must be:
     ///     - Provided for any non-zero initial token amounts
-    ///     - Have sufficient balance
     ///     - Owned by the [`glv_deposit`](CreateGlvDeposit::glv_deposit)
+    /// - Source token account requirements:
+    ///   - Must be provided for any non-zero initial token amounts
+    ///   - Must have sufficient balance
+    ///   - Must have the `owner` as its authority
     /// - All token programs must match their corresponding token accounts
     pub fn create_glv_deposit<'info>(
         mut ctx: Context<'_, '_, 'info, 'info, CreateGlvDeposit<'info>>,
@@ -2936,7 +2941,7 @@ pub mod gmsol_store {
     ///   - Properly initialized
     ///   - Owned by the `owner` and `store`
     ///   - In cancelled or executed state if the `executor` is not the `owner`
-    /// - Token account requirements:
+    /// - Token mint account requirements:
     ///   - All tokens must be valid and recorded in the [`glv_deposit`](CloseGlvDeposit::glv_deposit)
     ///   - [`initial_long_token`](CloseGlvDeposit::initial_long_token) must be provided if initial long amount > 0
     ///   - [`initial_short_token`](CloseGlvDeposit::initial_short_token) must be provided if initial short amount > 0
@@ -2944,9 +2949,7 @@ pub mod gmsol_store {
     ///   - Must correspond to their respective tokens
     ///   - Must be owned by the [`glv_deposit`](CloseGlvDeposit::glv_deposit)
     ///   - Must be recorded in the [`glv_deposit`](CloseGlvDeposit::glv_deposit)
-    /// - Associated Token Account requirements:
-    ///   - Must correspond to their respective tokens
-    ///   - Must be owned by the `owner`
+    /// - The addresses of the ATAs must be valid associated token addresses derived from the respective tokens and `owner`
     /// - All token programs must match their corresponding token accounts
     pub fn close_glv_deposit<'info>(
         ctx: Context<'_, '_, 'info, 'info, CloseGlvDeposit<'info>>,
@@ -2961,29 +2964,30 @@ pub mod gmsol_store {
     /// *[See the documentation for the accounts.](ExecuteGlvDeposit)*
     ///
     /// # Arguments
-    /// - `execution_lamports`: The execution fee in lamports to be claimed by the keeper.
+    /// - `execution_lamports`: The execution fee claimed to be used by the keeper.
     /// - `throw_on_execution_error`: Whether to throw an error if the execution fails.
     ///
     /// # Errors
-    /// - The [`authority`](ExecuteGlvDeposit::authority) must be a signer and have `ORDER_KEEPER` role in the store
+    /// - The [`authority`](ExecuteGlvDeposit::authority) must be a signer and have `ORDER_KEEPER` role in the `store`
     /// - The [`store`](ExecuteGlvDeposit::store) must be properly initialized
     /// - The [`token_map`](ExecuteGlvDeposit::token_map) must be:
     ///   - Properly initialized
-    ///   - Authorized by the store
+    ///   - Authorized by the `store`
     /// - The [`oracle`](ExecuteGlvDeposit::oracle) must be:
     ///   - Cleared
-    ///   - Owned by the store
+    ///   - Owned by the `store`
     /// - The [`glv`](ExecuteGlvDeposit::glv) must be:
     ///   - Properly initialized
-    ///   - Owned by the store
+    ///   - Owned by the `store`
     ///   - Match the expected GLV of the deposit
     /// - The [`market`](ExecuteGlvDeposit::market) must be:
     ///   - Properly initialized
-    ///   - Owned by the store
+    ///   - Owned by the `store`
     ///   - Match the expected market of the deposit
+    ///   - Must be enabled and listed in the [`glv`](ExecuteGlvDeposit::glv)
     /// - The [`glv_deposit`](ExecuteGlvDeposit::glv_deposit) must be:
     ///   - Properly initialized
-    ///   - Owned by the store
+    ///   - Owned by the `store`
     ///   - In pending state
     /// - Token requirements:
     ///   - All tokens must be valid and recorded in the [`glv_deposit`](ExecuteGlvDeposit::glv_deposit)
@@ -2992,17 +2996,17 @@ pub mod gmsol_store {
     /// - Vault requirements:
     ///   - [`initial_long_token_vault`](ExecuteGlvDeposit::initial_long_token_vault) must be:
     ///     - The market vault for the initial long token
-    ///     - Owned by the store
+    ///     - Owned by the `store`
     ///   - [`initial_short_token_vault`](ExecuteGlvDeposit::initial_short_token_vault) must be:
     ///     - The market vault for the initial short token
-    ///     - Owned by the store
+    ///     - Owned by the `store`
     ///   - [`market_token_vault`](ExecuteGlvDeposit::market_token_vault) must be:
-    ///     - The market token vault in the GLV
-    ///     - Owned by the GLV
+    ///     - The market token vault in the [`glv`](ExecuteGlvDeposit::glv)
+    ///     - Owned by the [`glv`](ExecuteGlvDeposit::glv)
     /// - Escrow requirements:
     ///   - Must correspond to their respective tokens
-    ///   - Must be owned by the GLV deposit
-    ///   - Must be recorded in the GLV deposit
+    ///   - Must be owned by the [`glv_deposit`](ExecuteGlvDeposit::glv_deposit)
+    ///   - Must be recorded in the [`glv_deposit`](ExecuteGlvDeposit::glv_deposit)
     /// - All token programs must match their corresponding token accounts
     /// - All remaining accounts must be valid per [`ExecuteGlvDeposit`] documentation
     /// - Returns error if execution fails and `throw_on_execution_error` is `true`
@@ -3025,22 +3029,20 @@ pub mod gmsol_store {
     /// *[See the documentation for the accounts.](CreateGlvWithdrawal)*
     ///
     /// # Arguments
-    /// - `nonce`: The nonce for the GLV withdrawal.
-    /// - `params`: The parameters for the GLV withdrawal.
+    /// - `nonce`: A 32-byte used to derive the address of the GLV withdrawal.
+    /// - `params`: The parameters for creating the GLV withdrawal.
     ///
     /// # Errors
-    /// - The [`owner`](CreateGlvWithdrawal::owner) must be:
-    ///   - A signer
-    /// - The [`store`](CreateGlvWithdrawal::store) must be:
-    ///   - Properly initialized
+    /// - The [`owner`](CreateGlvWithdrawal::owner) must be a signer.
+    /// - The [`store`](CreateGlvWithdrawal::store) must be properly initialized.
     /// - The [`market`](CreateGlvWithdrawal::market) must be:
     ///   - Properly initialized
     ///   - Enabled
-    ///   - Owned by the store
-    ///   - One of the markets in the GLV
+    ///   - Owned by the `store`
+    ///   - One of the markets in the [`glv`](CreateGlvWithdrawal::glv)
     /// - The [`glv`](CreateGlvWithdrawal::glv) must be:
     ///   - Properly initialized
-    ///   - Owned by the store
+    ///   - Owned by the `store`
     /// - The [`glv_withdrawal`](CreateGlvWithdrawal::glv_withdrawal) must be:
     ///   - Uninitialized
     ///   - A PDA derived from:
@@ -3053,7 +3055,7 @@ pub mod gmsol_store {
     ///     - Properly initialized
     ///     - The GLV token of the [`glv`](CreateGlvWithdrawal::glv)
     ///   - [`market_token`](CreateGlvWithdrawal::market_token) must be:
-    ///     - Properly initialized  
+    ///     - Properly initialized
     ///     - The market token of the [`market`](CreateGlvWithdrawal::market)
     ///   - All other tokens must be properly initialized
     /// - Source requirements:
@@ -3086,12 +3088,10 @@ pub mod gmsol_store {
     /// - The [`executor`](CloseGlvWithdrawal::executor) must be:
     ///   - A signer
     ///   - Either:
-    ///     - The owner of the GLV withdrawal
-    ///     - A `ORDER_KEEPER` in the store
-    /// - The [`store`](CloseGlvWithdrawal::store) must be:
-    ///   - Properly initialized
-    /// - The [`owner`](CloseGlvWithdrawal::owner) must be:
-    ///   - The owner of the GLV withdrawal
+    ///     - The owner of the [`glv_withdrawal`](CloseGlvWithdrawal::glv_withdrawal)
+    ///     - A `ORDER_KEEPER` in the `store`
+    /// - The [`store`](CloseGlvWithdrawal::store) must be properly initialized
+    /// - The [`owner`](CloseGlvWithdrawal::owner) must be the owner of the [`glv_withdrawal`](CloseGlvWithdrawal::glv_withdrawal)
     /// - The [`glv_withdrawal`](CloseGlvWithdrawal::glv_withdrawal) must be:
     ///   - Properly initialized
     ///   - Owned by the `owner`
@@ -3102,13 +3102,9 @@ pub mod gmsol_store {
     ///   - Must correspond to their respective tokens
     ///   - Must be owned by the [`glv_withdrawal`](CloseGlvWithdrawal::glv_withdrawal)
     ///   - Must be recorded in the [`glv_withdrawal`](CloseGlvWithdrawal::glv_withdrawal)
-    /// - ATA requirements:
-    ///   - Must correspond to their respective tokens
-    ///   - Must be owned by the `owner`
+    /// - The addresses of the ATAs must be valid associated token addresses derived from the respective tokens and `owner`
     /// - All token programs must match their corresponding token accounts
-    /// - State requirements:
-    ///   - If the `executor` is not the `owner`, the `glv_withdrawal` must be:
-    ///     - Either cancelled or executed
+    /// - If the `executor` is not the `owner`, the [`glv_withdrawal`](CloseGlvWithdrawal::glv_withdrawal) must be either cancelled or executed.
     pub fn close_glv_withdrawal<'info>(
         ctx: Context<'_, '_, 'info, 'info, CloseGlvWithdrawal<'info>>,
         reason: String,
@@ -3122,48 +3118,49 @@ pub mod gmsol_store {
     /// *[See the documentation for the accounts.](ExecuteGlvWithdrawal)*
     ///
     /// # Arguments
-    /// - `execution_lamports`: The amount of lamports to be paid as execution fee to the keeper.
-    /// - `throw_on_execution_error`: If true, throws an error when execution fails. If false, returns success even if execution fails.
+    /// - `execution_lamports`: The execution fee claimed to be used by the keeper.
+    /// - `throw_on_execution_error`: Whether to throw an error if the execution fails.
     ///
     /// # Errors
     /// - The [`authority`](ExecuteGlvWithdrawal::authority) must be:
     ///   - A signer
-    ///   - A `ORDER_KEEPER` in the store
-    /// - The [`store`](ExecuteGlvWithdrawal::store) must be:
-    ///   - Properly initialized
+    ///   - A `ORDER_KEEPER` in the `store`
+    /// - The [`store`](ExecuteGlvWithdrawal::store) must be properly initialized
     /// - The [`token_map`](ExecuteGlvWithdrawal::token_map) must be:
     ///   - Properly initialized
-    ///   - Authorized by the store
+    ///   - Authorized by the `store`
     /// - The [`oracle`](ExecuteGlvWithdrawal::oracle) must be:
     ///   - Cleared
-    ///   - Owned by the store
+    ///   - Owned by the `store`
     /// - The [`glv`](ExecuteGlvWithdrawal::glv) must be:
     ///   - Properly initialized
-    ///   - Owned by the store
+    ///   - Owned by the `store`
     ///   - The expected GLV of the withdrawal
     /// - The [`market`](ExecuteGlvWithdrawal::market) must be:
     ///   - Properly initialized
-    ///   - Owned by the store
+    ///   - Owned by the `store`
     ///   - The expected market of the withdrawal
+    ///   - Must be enabled and listed in the [`glv`](ExecuteGlvWithdrawal::glv)
     /// - The [`glv_withdrawal`](ExecuteGlvWithdrawal::glv_withdrawal) must be:
     ///   - Properly initialized
-    ///   - Owned by the store
+    ///   - Owned by the `store`
     ///   - In pending state
     /// - Token requirements:
     ///   - All tokens must be valid and recorded in the withdrawal
     ///   - [`glv_token`](ExecuteGlvWithdrawal::glv_token) must be the GLV token of the GLV
     ///   - [`market_token`](ExecuteGlvWithdrawal::market_token) must be the market token of the market
-    /// - Vault requirements:
+    /// - Escrow requirements:
     ///   - Escrow accounts must correspond to their tokens
-    ///   - Escrow accounts must be owned by the withdrawal
-    ///   - Escrow accounts must be recorded in the withdrawal
-    ///   - [`market_token_withdrawal_vault`](ExecuteGlvWithdrawal::market_token_withdrawal_vault) must be the market vault for market token, owned by store
-    ///   - [`final_long_token_vault`](ExecuteGlvWithdrawal::final_long_token_vault) must be the market vault for final long token, owned by store
-    ///   - [`final_short_token_vault`](ExecuteGlvWithdrawal::final_short_token_vault) must be the market vault for final short token, owned by store
-    ///   - [`market_token_vault`](ExecuteGlvWithdrawal::market_token_vault) must be the GLV's market token vault, owned by GLV
+    ///   - Escrow accounts must be owned by the [`glv_withdrawal`](ExecuteGlvWithdrawal::glv_withdrawal)
+    ///   - Escrow accounts must be recorded in the [`glv_withdrawal`](ExecuteGlvWithdrawal::glv_withdrawal)
+    /// - Vault requirements:
+    ///   - [`market_token_withdrawal_vault`](ExecuteGlvWithdrawal::market_token_withdrawal_vault) must be the market vault for market token, owned by the `store`
+    ///   - [`final_long_token_vault`](ExecuteGlvWithdrawal::final_long_token_vault) must be the market vault for final long token, owned by the `store`
+    ///   - [`final_short_token_vault`](ExecuteGlvWithdrawal::final_short_token_vault) must be the market vault for final short token, owned by the `store`
+    ///   - [`market_token_vault`](ExecuteGlvWithdrawal::market_token_vault) must be the GLV's market token vault, owned by the [`glv`](ExecuteGlvWithdrawal::glv)
     /// - All token programs must match their corresponding token accounts
     /// - All remaining accounts must be valid per [`ExecuteGlvWithdrawal`] documentation
-    /// - If `throw_on_execution_error` is true, execution failures will throw an error
+    /// - Returns error if execution fails and `throw_on_execution_error` is `true`
     #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
     pub fn execute_glv_withdrawal<'info>(
         ctx: Context<'_, '_, 'info, 'info, ExecuteGlvWithdrawal<'info>>,
@@ -3183,27 +3180,26 @@ pub mod gmsol_store {
     /// *[See the documentation for the accounts.](CreateGlvShift)*
     ///
     /// # Arguments
-    /// - `nonce`: The nonce for the GLV shift.
-    /// - `params`: The parameters for the GLV shift.
+    /// - `nonce`: A 32-byte used to derive the address of the GLV shift.
+    /// - `params`: The parameters for creating the GLV shift.
     ///
-    /// # Requirements
+    /// # Errors
     /// - The [`authority`](CreateGlvShift::authority) must be:
     ///   - A signer
-    ///   - A `ORDER_KEEPER` in the store
-    /// - The [`store`](CreateGlvShift::store) must be:
-    ///   - Properly initialized
+    ///   - A `ORDER_KEEPER` in the `store`
+    /// - The [`store`](CreateGlvShift::store) must be properly initialized
     /// - The [`glv`](CreateGlvShift::glv) must be:
     ///   - Properly initialized
-    ///   - Owned by the store
+    ///   - Owned by the `store`
     /// - Market requirements:
     ///   - [`from_market`](CreateGlvShift::from_market) must be:
     ///     - Enabled
-    ///     - Owned by the store
-    ///     - One of the markets in the GLV
+    ///     - Owned by the `store`
+    ///     - One of the markets in the [`glv`](CreateGlvShift::glv)
     ///   - [`to_market`](CreateGlvShift::to_market) must be:
     ///     - Enabled
-    ///     - Owned by the store
-    ///     - One of the markets in the GLV
+    ///     - Owned by the `store`
+    ///     - One of the markets in the [`glv`](CreateGlvShift::glv)
     ///     - Different from `from_market`
     /// - The [`glv_shift`](CreateGlvShift::glv_shift) must be:
     ///   - Uninitialized
@@ -3217,11 +3213,11 @@ pub mod gmsol_store {
     ///     - The market token of `to_market`
     /// - Vault requirements:
     ///   - [`from_market_token_vault`](CreateGlvShift::from_market_token_vault) must be:
-    ///     - The market token vault for `from_market_token` in the GLV
-    ///     - Owned by the GLV
+    ///     - The market token vault for `from_market_token` in the [`glv`](CreateGlvShift::glv)
+    ///     - Owned by the [`glv`](CreateGlvShift::glv)
     ///   - [`to_market_token_vault`](CreateGlvShift::to_market_token_vault) must be:
-    ///     - The market token vault for `to_market_token` in the GLV
-    ///     - Owned by the GLV
+    ///     - The market token vault for `to_market_token` in the [`glv`](CreateGlvShift::glv)
+    ///     - Owned by the [`glv`](CreateGlvShift::glv)
     #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
     pub fn create_glv_shift<'info>(
         mut ctx: Context<'_, '_, 'info, 'info, CreateGlvShift<'info>>,
@@ -3239,21 +3235,19 @@ pub mod gmsol_store {
     /// # Arguments
     /// - `reason`: The reason for closing the GLV shift.
     ///
-    /// # Requirements
+    /// # Errors
     /// - The [`authority`](CloseGlvShift::authority) must be:
     ///   - A signer
-    ///   - A `ORDER_KEEPER` in the store
-    /// - The [`funder`](CloseGlvShift::funder) must be:
-    ///   - The funder of the GLV shift
-    /// - The [`store`](CloseGlvShift::store) must be:
-    ///   - Properly initialized
+    ///   - A `ORDER_KEEPER` in the `store`
+    /// - The [`funder`](CloseGlvShift::funder) must be the funder of the [`glv`](CloseGlvShift::glv).
+    /// - The [`store`](CloseGlvShift::store) must be properly initialized.
     /// - The [`glv`](CloseGlvShift::glv) must be:
     ///   - Properly initialized
-    ///   - Owned by the store
+    ///   - Owned by the `store`
     ///   - The expected GLV of the GLV shift
     /// - The [`glv_shift`](CloseGlvShift::glv_shift) must be:
     ///   - Properly initialized
-    ///   - Owned by the store
+    ///   - Owned by the `store`
     /// - Token requirements:
     ///   - [`from_market_token`](CloseGlvShift::from_market_token) must be:
     ///     - Recorded in the GLV shift
@@ -3273,36 +3267,35 @@ pub mod gmsol_store {
     /// *[See the documentation for the accounts.](ExecuteGlvShift)*
     ///
     /// # Arguments
-    /// - `execution_lamports`: The execution fee claimed by the keeper.
+    /// - `execution_lamports`: The execution fee claimed to be used by the keeper.
     /// - `throw_on_execution_error`: Whether to throw an error if execution fails.
     ///
-    /// # Requirements
+    /// # Errors
     /// - The [`authority`](ExecuteGlvShift::authority) must be:
     ///   - A signer
-    ///   - A `ORDER_KEEPER` in the store
-    /// - The [`store`](ExecuteGlvShift::store) must be:
-    ///   - Properly initialized
+    ///   - A `ORDER_KEEPER` in the `store`
+    /// - The [`store`](ExecuteGlvShift::store) must be properly initialized
     /// - The [`token_map`](ExecuteGlvShift::token_map) must be:
     ///   - Properly initialized
-    ///   - Authorized by the store
+    ///   - Authorized by the `store`
     /// - The [`oracle`](ExecuteGlvShift::oracle) must be:
     ///   - Cleared
-    ///   - Owned by the store
+    ///   - Owned by the `store`
     /// - The [`glv`](ExecuteGlvShift::glv) must be:
     ///   - Properly initialized
-    ///   - Owned by the store
+    ///   - Owned by the `store`
     ///   - The expected GLV of the GLV shift
     /// - The [`from_market`](ExecuteGlvShift::from_market) must be:
     ///   - Enabled
-    ///   - Owned by the store
-    ///   - One of the markets in the GLV
+    ///   - Owned by the `store`
+    ///   - One of the markets in the [`glv`](ExecuteGlvShift::glv)
     /// - The [`to_market`](ExecuteGlvShift::to_market) must be:
     ///   - Enabled
-    ///   - Owned by the store
-    ///   - One of the markets in the GLV
+    ///   - Owned by the `store`
+    ///   - One of the markets in the [`glv`](ExecuteGlvShift::glv)
     /// - The [`glv_shift`](ExecuteGlvShift::glv_shift) must be:
     ///   - Properly initialized
-    ///   - Owned by the store
+    ///   - Owned by the `store`
     /// - Token requirements:
     ///   - [`from_market_token`](ExecuteGlvShift::from_market_token) must be:
     ///     - The market token of `from_market`
@@ -3310,16 +3303,17 @@ pub mod gmsol_store {
     ///   - [`to_market_token`](ExecuteGlvShift::to_market_token) must be:
     ///     - The market token of `to_market`
     ///     - Recorded in the GLV shift
+    /// - Vault requirements:
     ///   - [`from_market_token_glv_vault`](ExecuteGlvShift::from_market_token_glv_vault) must be:
     ///     - The escrow account for `from_market_token` in the GLV
-    ///     - Owned by the GLV
+    ///     - Owned by the [`glv`](ExecuteGlvShift::glv)
     ///   - [`to_market_token_glv_vault`](ExecuteGlvShift::to_market_token_glv_vault) must be:
     ///     - The escrow account for `to_market_token` in the GLV
-    ///     - Owned by the GLV
+    ///     - Owned by the [`glv`](ExecuteGlvShift::glv)
     ///   - [`from_market_token_vault`](ExecuteGlvShift::from_market_token_vault) must be:
     ///     - The market vault for `from_market_token`
-    ///     - Owned by the store
-    ///   - Token programs must match the tokens and token accounts
+    ///     - Owned by the `store`
+    /// - Token programs must match the tokens and token accounts
     /// - The remaining accounts must be valid (see [`ExecuteGlvShift`] docs)
     /// - Returns error if execution fails and `throw_on_execution_error` is `true`
     #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
