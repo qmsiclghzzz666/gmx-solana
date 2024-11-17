@@ -27,7 +27,8 @@ use crate::{
     CoreError,
 };
 
-/// Prepare position.
+/// The accounts definition for the [`prepare_position`](crate::gmsol_store::prepare_position)
+/// instruction.
 #[derive(Accounts)]
 #[instruction(params: CreateOrderParams)]
 pub struct PreparePosition<'info> {
@@ -164,7 +165,7 @@ fn validate_position(
     Ok(())
 }
 
-/// The accounts definitions for `create_order` instruction.
+/// The accounts definitions for [`create_order`](crate::gmsol_store::create_order) instruction.
 ///
 /// Remaining accounts expected by this instruction:
 ///
@@ -472,7 +473,7 @@ impl<'info> CreateOrder<'info> {
     }
 }
 
-/// The accounts definition for the `close_order instruction.
+/// The accounts definition for the [`close_order`](crate::gmsol_store::close_order) instruction.
 #[event_cpi]
 #[derive(Accounts)]
 pub struct CloseOrder<'info> {

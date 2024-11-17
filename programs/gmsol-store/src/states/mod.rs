@@ -13,7 +13,7 @@ pub mod roles;
 /// Token Config.
 pub mod token_config;
 
-/// Market.
+/// This module defines the [`Market`] struct and its associated state.
 pub mod market;
 
 /// Oracle.
@@ -40,11 +40,11 @@ pub mod user;
 /// GLV.
 pub mod glv;
 
-/// GT model.
+/// GT.
 pub mod gt;
 
 pub use deposit::Deposit;
-pub use glv::{Glv, GlvDeposit};
+pub use glv::{Glv, GlvDeposit, GlvShift, GlvWithdrawal};
 pub use market::{
     config::MarketConfigKey, pool::Pool, HasMarketMeta, Market, MarketMeta, OtherState,
 };
@@ -55,6 +55,7 @@ pub use roles::*;
 pub use shift::*;
 pub use store::*;
 pub use token_config::*;
+pub use user::UserHeader;
 pub use withdrawal::Withdrawal;
 
 pub type Amount = u64;

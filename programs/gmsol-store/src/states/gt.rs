@@ -1,3 +1,45 @@
+//! # GT
+//!
+//! GT is designed to boost trading activity on GMX-Solana by offering a unique incentive mechanism
+//! that provides traders with additional rewards to maximize rebates and minimize trading costs. GT
+//! is a highly customizable token obtainable through trading on GMX-Solana. The initial mint cost
+//! of GT is $0.05, equivalent to a trading volume of $100 with a 5 bps fee. As the total supply
+//! grows, GT's mint cost will increase exponentially. Each cycle, set at 100,000 GT, raises the
+//! mint cost by 1%.
+//!
+//! #### Treasury and Buyback
+//!
+//! GT is non-transferable, and its sale can only occur through the daily Treasury buyback. 60% of
+//! the fees will go to the Treasury. Each day, the Treasury will allocate USDC for buybacks based
+//! on the min {deposited GT * mint cost, 2% of the Treasury, 60% of the Treasury's daily revenue}.
+//! The actual buyback price will be determined by dividing the total allocated USDC by the total
+//! amount of GT deposited by users. After the buyback is complete, users can claim the
+//! corresponding USDC.
+//!
+//! #### esGT
+//!
+//! To encourage long-term holding of GT, esGT (also known as "staking rewards") has been
+//! introduced. Each day, the amount of GT sold in the market generates an equivalent amount of esGT
+//! on a 1:1 basis. Of this, 60% is distributed proportionally to users based on their GT holdings.
+//!
+//! #### Vesting
+//!
+//! Users can convert their esGT to GT through a vesting process. To initiate vesting, an amount of
+//! GT equal to 5 times the esGT being vested must be locked. This locked GT cannot be sold during
+//! the vesting period. esGT will be linearly converted to GT over a one-year period, with the
+//! corresponding locked GT gradually unlocking as well. The converted GT retains the same
+//! properties as GT minted from trading.
+//!
+//! #### VIP Levels (User Ranks)
+//!
+//! VIP levels are assigned based on users' GT holdings. The more GT a user holds, the higher their
+//! VIP level, which grants greater trading fee discounts.
+//!
+//! #### Referral Program
+//!
+//! The referral program rewards referrers based on their VIP level and offers referees a 10%
+//! trading fee discount.
+
 use anchor_lang::prelude::*;
 
 use crate::{constants, CoreError};

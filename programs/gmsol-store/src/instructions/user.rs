@@ -8,7 +8,7 @@ use crate::{
     CoreError,
 };
 
-/// The accounts definitions for `prepare_user` instruction.
+/// The accounts definitions for [`prepare_user`](crate::gmsol_store::prepare_user) instruction.
 #[derive(Accounts)]
 pub struct PrepareUser<'info> {
     /// Owner.
@@ -57,7 +57,8 @@ pub(crate) fn prepare_user(ctx: Context<PrepareUser>) -> Result<()> {
     Ok(())
 }
 
-/// The accounts definition for `initialize_referral_code` instruction.
+/// The accounts definition for [`initialize_referral_code`](crate::gmsol_store::initialize_referral_code)
+/// instruction.
 #[derive(Accounts)]
 #[instruction(code: [u8; 8])]
 pub struct InitializeReferralCode<'info> {
@@ -113,12 +114,13 @@ pub(crate) fn initialize_referral_code(
     Ok(())
 }
 
-/// The accounts definitions for `set_referrer` instruction.
+/// The accounts definitions for [`set_referrer`](crate::gmsol_store::set_referrer)
+/// instruction.
 #[derive(Accounts)]
 #[instruction(code: [u8; 8])]
 pub struct SetReferrer<'info> {
-    owner: Signer<'info>,
-    store: AccountLoader<'info, Store>,
+    pub owner: Signer<'info>,
+    pub store: AccountLoader<'info, Store>,
     /// User Account.
     #[account(
         mut,
@@ -167,8 +169,8 @@ pub(crate) fn set_referrer(ctx: Context<SetReferrer>, _code: ReferralCodeBytes) 
 /// The accounts definitions for `transfer_referral_code` instruction.
 #[derive(Accounts)]
 pub struct TransferReferralCode<'info> {
-    owner: Signer<'info>,
-    store: AccountLoader<'info, Store>,
+    pub owner: Signer<'info>,
+    pub store: AccountLoader<'info, Store>,
     /// User Account.
     #[account(
         mut,

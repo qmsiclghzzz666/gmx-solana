@@ -16,7 +16,8 @@ use crate::{
     CoreError,
 };
 
-/// The accounts deifinition for the `execute_withdrawal` instruction.
+/// The accounts deifinition for the [`execute_withdrawal`](crate::gmsol_store::execute_withdrawal)
+/// instruction.
 ///
 /// Remaining accounts expected by this instruction:
 ///

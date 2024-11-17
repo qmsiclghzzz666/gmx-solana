@@ -184,7 +184,7 @@ impl<'info> CreateGlvWithdrawal<'info> {
     }
 }
 
-/// The accounts defintion for `close_glv_withdrawal` instruction.
+/// The accounts defintion for [`close_glv_withdrawal`](crate::gmsol_store::close_glv_withdrawal) instruction.
 #[event_cpi]
 #[derive(Accounts)]
 pub struct CloseGlvWithdrawal<'info> {
@@ -421,7 +421,7 @@ impl<'info> internal::Authentication<'info> for CloseGlvWithdrawal<'info> {
     }
 }
 
-/// The accounts definition for `execute_glv_withdrawal` instruction.
+/// The accounts definition for [`execute_glv_withdrawal`](crate::gmsol_store::execute_glv_withdrawal) instruction.
 ///
 /// Remaining accounts expected by this instruction:
 ///

@@ -26,7 +26,8 @@ use crate::{
     validated_recent_timestamp, CoreError,
 };
 
-/// The accounts definitions for the `liquidate` and `auto_deleverage` instructions.
+/// The accounts definitions for the [`liquidate`](crate::gmsol_store::liquidate) and
+/// [`auto_deleverage`](crate::gmsol_store::auto_deleverage) instructions.
 ///
 /// Remaining accounts expected by this instruction:
 ///

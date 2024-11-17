@@ -11,7 +11,7 @@ use crate::{
     CoreError,
 };
 
-/// The accounts defintions for the `initialize_gt` instruction.
+/// The accounts defintions for the [`initialize_gt`](crate::gmsol_store::initialize_gt) instruction.
 #[derive(Accounts)]
 pub struct InitializeGt<'info> {
     /// Authority
@@ -158,8 +158,8 @@ pub(crate) fn unchecked_gt_set_receiver(
 #[instruction(time_window_index: i64)]
 pub struct PrepareGtExchangeVault<'info> {
     #[account(mut)]
-    payer: Signer<'info>,
-    store: AccountLoader<'info, Store>,
+    pub payer: Signer<'info>,
+    pub store: AccountLoader<'info, Store>,
     #[account(
         init_if_needed,
         space = 8 + GtExchangeVault::INIT_SPACE,
@@ -167,7 +167,7 @@ pub struct PrepareGtExchangeVault<'info> {
         seeds = [GtExchangeVault::SEED, store.key().as_ref(), &time_window_index.to_be_bytes()],
         bump,
     )]
-    vault: AccountLoader<'info, GtExchangeVault>,
+    pub vault: AccountLoader<'info, GtExchangeVault>,
     pub system_program: Program<'info, System>,
 }
 
@@ -227,9 +227,9 @@ pub(crate) fn prepare_gt_exchange_vault(
 #[derive(Accounts)]
 pub struct RequestGtExchange<'info> {
     #[account(mut)]
-    owner: Signer<'info>,
+    pub owner: Signer<'info>,
     #[account(mut)]
-    store: AccountLoader<'info, Store>,
+    pub store: AccountLoader<'info, Store>,
     /// User Account.
     #[account(
         mut,
@@ -247,7 +247,7 @@ pub struct RequestGtExchange<'info> {
         seeds = [GtExchangeVault::SEED, store.key().as_ref(), &vault.load()?.time_window_index().to_be_bytes()],
         bump = vault.load()?.bump,
     )]
-    vault: AccountLoader<'info, GtExchangeVault>,
+    pub vault: AccountLoader<'info, GtExchangeVault>,
     #[account(
         init_if_needed,
         payer = owner,
@@ -255,7 +255,7 @@ pub struct RequestGtExchange<'info> {
         seeds = [GtExchange::SEED, vault.key().as_ref(), owner.key().as_ref()],
         bump,
     )]
-    exchange: AccountLoader<'info, GtExchange>,
+    pub exchange: AccountLoader<'info, GtExchange>,
     pub system_program: Program<'info, System>,
 }
 
@@ -331,7 +331,7 @@ pub struct ConfirmGtExchangeVault<'info> {
         seeds = [GtExchangeVault::SEED, store.key().as_ref(), &vault.load()?.time_window_index().to_be_bytes()],
         bump = vault.load()?.bump,
     )]
-    vault: AccountLoader<'info, GtExchangeVault>,
+    pub vault: AccountLoader<'info, GtExchangeVault>,
 }
 
 /// CHECK: only GT_CONTROLLER is authorized to use this instruction.
@@ -359,11 +359,11 @@ impl<'info> internal::Authentication<'info> for ConfirmGtExchangeVault<'info> {
 /// The accounts definition for [`close_gt_exchange`](crate::close_gt_exchange) instruction.
 #[derive(Accounts)]
 pub struct CloseGtExchange<'info> {
-    authority: Signer<'info>,
-    store: AccountLoader<'info, Store>,
+    pub authority: Signer<'info>,
+    pub store: AccountLoader<'info, Store>,
     /// CHECK: only used to receive the funds.
     #[account(mut)]
-    owner: UncheckedAccount<'info>,
+    pub owner: UncheckedAccount<'info>,
     #[account(
         mut,
         constraint = vault.load()?.is_initialized() @ CoreError::InvalidArgument,
@@ -372,7 +372,7 @@ pub struct CloseGtExchange<'info> {
         seeds = [GtExchangeVault::SEED, store.key().as_ref(), &vault.load()?.time_window_index().to_be_bytes()],
         bump = vault.load()?.bump,
     )]
-    vault: AccountLoader<'info, GtExchangeVault>,
+    pub vault: AccountLoader<'info, GtExchangeVault>,
     #[account(
         mut,
         close = owner,
@@ -383,7 +383,7 @@ pub struct CloseGtExchange<'info> {
         seeds = [GtExchange::SEED, vault.key().as_ref(), owner.key().as_ref()],
         bump = exchange.load()?.bump,
     )]
-    exchange: AccountLoader<'info, GtExchange>,
+    pub exchange: AccountLoader<'info, GtExchange>,
 }
 
 /// CHECK: only GT_CONTROLLER is allowed to use this instruction.
@@ -413,9 +413,9 @@ impl<'info> internal::Authentication<'info> for CloseGtExchange<'info> {
 /// The accounts definition for [`claim_es_gt`](crate::gmsol_store::claim_es_gt).
 #[derive(Accounts)]
 pub struct ClaimEsGt<'info> {
-    pub(crate) owner: Signer<'info>,
+    pub owner: Signer<'info>,
     #[account(mut)]
-    pub(crate) store: AccountLoader<'info, Store>,
+    pub store: AccountLoader<'info, Store>,
     /// User Account.
     #[account(
         mut,
@@ -439,9 +439,9 @@ pub(crate) fn claim_es_gt(ctx: Context<ClaimEsGt>) -> Result<()> {
 #[derive(Accounts)]
 pub struct RequestGtVesting<'info> {
     #[account(mut)]
-    owner: Signer<'info>,
+    pub owner: Signer<'info>,
     #[account(mut)]
-    store: AccountLoader<'info, Store>,
+    pub store: AccountLoader<'info, Store>,
     /// User Account.
     #[account(
         mut,
@@ -459,7 +459,7 @@ pub struct RequestGtVesting<'info> {
         seeds = [GtVesting::SEED, store.key().as_ref(), owner.key().as_ref()],
         bump,
     )]
-    vesting: AccountLoader<'info, GtVesting>,
+    pub vesting: AccountLoader<'info, GtVesting>,
     pub system_program: Program<'info, System>,
 }
 
@@ -531,9 +531,9 @@ impl<'info> RequestGtVesting<'info> {
 /// The accounts definition for [`update_gt_vesting`](crate::gmsol_store::update_gt_vesting).
 #[derive(Accounts)]
 pub struct UpdateGtVesting<'info> {
-    pub(crate) owner: Signer<'info>,
+    pub owner: Signer<'info>,
     #[account(mut)]
-    pub(crate) store: AccountLoader<'info, Store>,
+    pub store: AccountLoader<'info, Store>,
     /// User Account.
     #[account(
         mut,
@@ -570,8 +570,8 @@ pub(crate) fn update_gt_vesting(ctx: Context<UpdateGtVesting>) -> Result<()> {
 /// The accounts definition for [`close_gt_vesting`](crate::gmsol_store::close_gt_vesting).
 #[derive(Accounts)]
 pub struct CloseGtVesting<'info> {
-    pub(crate) owner: Signer<'info>,
-    pub(crate) store: AccountLoader<'info, Store>,
+    pub owner: Signer<'info>,
+    pub store: AccountLoader<'info, Store>,
     /// User Account.
     #[account(
         constraint = user.load()?.is_initialized() @ CoreError::InvalidUserAccount,
@@ -590,7 +590,7 @@ pub struct CloseGtVesting<'info> {
         seeds = [GtVesting::SEED, store.key().as_ref(), owner.key().as_ref()],
         bump = vesting.load()?.bump,
     )]
-    vesting: AccountLoader<'info, GtVesting>,
+    pub vesting: AccountLoader<'info, GtVesting>,
     pub system_program: Program<'info, System>,
 }
 
@@ -612,9 +612,9 @@ pub(crate) fn close_gt_vesting(ctx: Context<CloseGtVesting>) -> Result<()> {
 #[derive(Accounts)]
 pub struct ClaimEsGtVaultViaVesting<'info> {
     /// The owner.
-    pub(crate) owner: Signer<'info>,
+    pub owner: Signer<'info>,
     #[account(mut)]
-    pub(crate) store: AccountLoader<'info, Store>,
+    pub store: AccountLoader<'info, Store>,
     /// User account.
     #[account(
         mut,
