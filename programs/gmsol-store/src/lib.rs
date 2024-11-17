@@ -2403,15 +2403,15 @@ pub mod gmsol_store {
     ///
     /// # Arguments
     /// - `decimals`: The number of decimal places for the GT token.
-    /// - `initial_minting_cost`: The base cost to mint the GT token.
+    /// - `initial_minting_cost`: The initial cost for minting GT.
     /// - `grow_factor`: The multiplier that increases minting cost for each step.
-    /// - `grow_step`: The minted amount between each cost increase.
+    /// - `grow_step`: The step size (in GT amount) for minting cost increase.
     /// - `ranks`: Array of GT token thresholds that define user rank boundaries.
     ///
     /// # Errors
-    /// - The [`authority`](InitializeGt::authority) must be a signer and have MARKET_KEEPER permissions in the store
-    /// - The [`store`](InitializeGt::store) must be properly initialized
-    /// - The GT state account must not already be initialized
+    /// - The [`authority`](InitializeGt::authority) must be a signer and have the MARKET_KEEPER role in the `store`.
+    /// - The [`store`](InitializeGt::store) must be properly initialized.
+    /// - The GT state must not already be initialized.
     /// - The arguments must be valid. See `init` method of [`GtState`](states::gt::GtState) for detailed validation logic.
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn initialize_gt(
@@ -2438,15 +2438,14 @@ pub mod gmsol_store {
     /// *[See the documentation for the accounts.](ConfigurateGt)*
     ///
     /// # Arguments
-    /// - `factors`: The order fee discount factors for each rank.
+    /// - `factors`: The order fee discount factors for each user rank.
     ///
     /// # Errors
-    /// - The [`authority`](ConfigurateGt::authority) must be a signer and a
-    ///   MARKET_KEEPER in the store.
+    /// - The [`authority`](ConfigurateGt::authority) must be a signer and have the MARKET_KEEPER role in the `store`.
     /// - The [`store`](ConfigurateGt::store) must be initialized.
-    /// - The GT state must be initialized.
+    /// - The GT state of the `store` must be initialized.
     /// - The number of `factors` must match the number of ranks defined in GT state.
-    /// - Each factor must be less than or equal to [`MARKET_USD_UNIT`](crate::constants::MARKET_USD_UNIT).
+    /// - Each factor must be less than or equal to [`MARKET_USD_UNIT`](crate::constants::MARKET_USD_UNIT)(i.e., 100%).
     #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
     pub fn gt_set_order_fee_discount_factors(
         ctx: Context<ConfigurateGt>,
@@ -2461,15 +2460,15 @@ pub mod gmsol_store {
     /// *[See the documentation for the accounts.](ConfigurateGt)*
     ///
     /// # Arguments
-    /// - `factors`: The referral reward factors for each rank.
+    /// - `factors`: The referral reward factors for each user rank.
     ///
     /// # Errors
     /// - The [`authority`](ConfigurateGt::authority) must be a signer and a
     ///   GT_CONTROLLER in the store.
     /// - The [`store`](ConfigurateGt::store) must be initialized.
-    /// - The GT state must be initialized.
+    /// - The GT state of the `store` must be initialized.
     /// - The number of `factors` must match the number of ranks defined in GT state.
-    /// - Each factor must be less than or equal to [`MARKET_USD_UNIT`](crate::constants::MARKET_USD_UNIT).
+    /// - Each factor must be less than or equal to [`MARKET_USD_UNIT`](crate::constants::MARKET_USD_UNIT)(i.e., 100%).
     #[access_control(internal::Authenticate::only_gt_controller(&ctx))]
     pub fn gt_set_referral_reward_factors(
         ctx: Context<ConfigurateGt>,
@@ -2484,14 +2483,13 @@ pub mod gmsol_store {
     /// *[See the documentation for the accounts.](ConfigurateGt)*
     ///
     /// # Arguments
-    /// - `factor`: The factor determining what ratio of esGT rewards are minted to the receiver.
+    /// - `factor`: The factor determining what ratio of esGT rewards are minted to the esGT vault receiver.
     ///
     /// # Errors
-    /// - The [`authority`](ConfigurateGt::authority) must be a signer and a
-    ///   GT_CONTROLLER in the store.
+    /// - The [`authority`](ConfigurateGt::authority) must be a signer and have the GT_CONTROLLER role in the `store`.
     /// - The [`store`](ConfigurateGt::store) must be initialized.
-    /// - The GT state must be initialized.
-    /// - The `factor` must be less than or equal to [`MARKET_USD_UNIT`](crate::constants::MARKET_USD_UNIT).
+    /// - The GT state of the `store` must be initialized.
+    /// - The `factor` must be less than or equal to [`MARKET_USD_UNIT`](crate::constants::MARKET_USD_UNIT)(i.e., 100%).
     #[access_control(internal::Authenticate::only_gt_controller(&ctx))]
     pub fn gt_set_es_receiver_factor(ctx: Context<ConfigurateGt>, factor: u128) -> Result<()> {
         instructions::unchecked_gt_set_es_receiver_factor(ctx, factor)
@@ -2506,10 +2504,9 @@ pub mod gmsol_store {
     /// - `window`: The time window in seconds for one GT exchange period.
     ///
     /// # Errors
-    /// - The [`authority`](ConfigurateGt::authority) must be a signer and have
-    ///   GT_CONTROLLER privileges in the store.
+    /// - The [`authority`](ConfigurateGt::authority) must be a signer and have the GT_CONTROLLER role in the `store`.
     /// - The [`store`](ConfigurateGt::store) must be properly initialized.
-    /// - The GT state must be properly initialized.
+    /// - The GT state of the `store` must be initialized.
     /// - The `window` must be greater than 0 seconds to ensure a valid exchange period.
     #[access_control(internal::Authenticate::only_gt_controller(&ctx))]
     pub fn gt_set_exchange_time_window(ctx: Context<ConfigurateGt>, window: u32) -> Result<()> {
@@ -2525,17 +2522,15 @@ pub mod gmsol_store {
     /// - `receiver`: The public key of the account that can claim esGT rewards from the esGT vault.
     ///
     /// # Errors
-    /// - The [`authority`](ConfigurateGt::authority) must be a signer and have
-    ///   GT_CONTROLLER privileges in the store.
+    /// - The [`authority`](ConfigurateGt::authority) must be a signer and have the GT_CONTROLLER role in the `store`.
     /// - The [`store`](ConfigurateGt::store) must be properly initialized.
-    /// - The GT state must be properly initialized.
-    /// - The `receiver` must be a valid account that can receive esGT tokens.
+    /// - The GT state of the `store` must be initialized.
     #[access_control(internal::Authenticate::only_gt_controller(&ctx))]
     pub fn gt_set_receiver(ctx: Context<ConfigurateGt>, receiver: Pubkey) -> Result<()> {
         instructions::unchecked_gt_set_receiver(ctx, &receiver)
     }
 
-    /// Prepare GT Exchange Vault.
+    /// Prepare a GT exchange vault.
     ///
     /// # Accounts
     /// *[See the documentation for the accounts.](PrepareGtExchangeVault)*
@@ -2547,13 +2542,13 @@ pub mod gmsol_store {
     /// # Errors
     /// - The [`payer`](PrepareGtExchangeVault::payer) must be a signer.
     /// - The [`store`](PrepareGtExchangeVault::store) must be properly initialized.
-    /// - The GT state must be properly initialized.
+    /// - The GT state of the `store` must be initialized.
     /// - The [`vault`](PrepareGtExchangeVault::vault) must be either:
     ///   - Uninitialized, or
     ///   - Properly initialized, owned by the `store`, and have matching `time_window_index`
     ///     and `time_window` values
-    /// - The provided `time_window_index` must match the current time window index
-    /// - The provided `time_window` must match the current GT exchange time window
+    /// - The provided `time_window_index` must match the current time window index.
+    /// - The provided `time_window` must match the current GT exchange time window.
     pub fn prepare_gt_exchange_vault(
         ctx: Context<PrepareGtExchangeVault>,
         time_window_index: i64,
@@ -2568,10 +2563,9 @@ pub mod gmsol_store {
     /// *[See the documentation for the accounts.](ConfirmGtExchangeVault)*
     ///
     /// # Errors
-    /// - The [`authority`](ConfirmGtExchangeVault::authority) must be a signer and have
-    ///   GT_CONTROLLER privileges in the store.
+    /// - The [`authority`](ConfirmGtExchangeVault::authority) must be a signer and have the GT_CONTROLLER role in the `store`.
     /// - The [`store`](ConfirmGtExchangeVault::store) must be properly initialized.
-    /// - The GT state must be properly initialized.
+    /// - The GT state of the `store` must be initialized.
     /// - The [`vault`](ConfirmGtExchangeVault::vault) must be validly initialized and owned by
     ///   the `store`.
     /// - The `vault` must be in a confirmable state (deposit window has passed but not yet confirmed).
@@ -2591,15 +2585,15 @@ pub mod gmsol_store {
     /// # Errors
     /// - The [`owner`](RequestGtExchange::owner) must be a signer.
     /// - The [`store`](RequestGtExchange::store) must be properly initialized with an initialized GT state.
-    /// - The [`user`](RequestGtExchange::user) must be properly initialized and owned by the `owner`.
+    /// - The [`user`](RequestGtExchange::user) must be properly initialized and correspond to the `owner`.
     /// - The [`vault`](RequestGtExchange::vault) must be properly initialized, owned by the `store`,
-    ///   and currently accepting deposits.
+    ///   and currently accepting deposits (not yet confirmed).
     /// - The [`exchange`](RequestGtExchange::exchange) must be either:
     ///   - Uninitialized, or
     ///   - Properly initialized and owned by both the `owner` and `vault`
     /// - The `amount` must be:
     ///   - Greater than 0
-    ///   - Not exceed the owner's available (non-reserved) GT balance in their user account
+    ///   - Not exceed the owner's available (excluding reserved) GT balance in their user account
     pub fn request_gt_exchange(ctx: Context<RequestGtExchange>, amount: u64) -> Result<()> {
         instructions::request_gt_exchange(ctx, amount)
     }
@@ -2610,11 +2604,10 @@ pub mod gmsol_store {
     /// *[See the documentation for the accounts.](CloseGtExchange)*
     ///
     /// # Errors
-    /// - The [`authority`](CloseGtExchange::authority) must be a signer and have
-    ///   the GT_CONTROLLER role in the store.
+    /// - The [`authority`](CloseGtExchange::authority) must be a signer and have the GT_CONTROLLER role in the `store`.
     /// - The [`store`](CloseGtExchange::store) must be properly initialized with an initialized GT state.
     /// - The [`vault`](CloseGtExchange::vault) must be properly initialized, owned by the `store`,
-    ///   and in a confirmed state.
+    ///   and confirmed.
     /// - The [`exchange`](CloseGtExchange::exchange) must be properly initialized and owned by both
     ///   the `owner` and `vault`.
     #[access_control(internal::Authenticate::only_gt_controller(&ctx))]
@@ -2630,8 +2623,7 @@ pub mod gmsol_store {
     /// # Errors
     /// - The [`owner`](ClaimEsGt::owner) must be a signer.
     /// - The [`store`](ClaimEsGt::store) must be properly initialized with an initialized GT state.
-    /// - The [`user`](ClaimEsGt::user) must be properly initialized and owned by the `owner`.
-    /// - The `user` must have pending esGT to claim.
+    /// - The [`user`](ClaimEsGt::user) must be properly initialized and correspond to the `owner`.
     pub fn claim_es_gt(ctx: Context<ClaimEsGt>) -> Result<()> {
         instructions::claim_es_gt(ctx)
     }
@@ -2647,7 +2639,7 @@ pub mod gmsol_store {
     /// # Errors
     /// - The [`owner`](RequestGtVesting::owner) must be a signer.
     /// - The [`store`](RequestGtVesting::store) must be properly initialized with an initialized GT state.
-    /// - The [`user`](RequestGtVesting::user) must be properly initialized and owned by the `owner`.
+    /// - The [`user`](RequestGtVesting::user) must be properly initialized and correspond to the `owner`.
     /// - The [`vesting`](RequestGtVesting::vesting) must be either:
     ///   - Uninitialized, or
     ///   - Properly initialized and owned by both the `owner` and `store`
@@ -2666,7 +2658,7 @@ pub mod gmsol_store {
     /// # Errors
     /// - The [`owner`](UpdateGtVesting::owner) must be a signer.
     /// - The [`store`](UpdateGtVesting::store) must be properly initialized with an initialized GT state.
-    /// - The [`user`](UpdateGtVesting::user) must be properly initialized and owned by the `owner`.
+    /// - The [`user`](UpdateGtVesting::user) must be properly initialized and correspond to the `owner`.
     /// - The [`vesting`](UpdateGtVesting::vesting) must be properly initialized and owned by both
     ///   the `owner` and `store`.
     pub fn update_gt_vesting(ctx: Context<UpdateGtVesting>) -> Result<()> {
@@ -2681,14 +2673,14 @@ pub mod gmsol_store {
     /// # Errors
     /// - The [`owner`](CloseGtVesting::owner) must be a signer.
     /// - The [`store`](CloseGtVesting::store) must be properly initialized with an initialized GT state.
-    /// - The [`user`](CloseGtVesting::user) must be properly initialized and owned by the `owner`.
+    /// - The [`user`](CloseGtVesting::user) must be properly initialized and correspond to the `owner`.
     /// - The [`vesting`](CloseGtVesting::vesting) must be properly initialized and owned by both
     ///   the `owner` and `store`. The vesting account must have no remaining unvested esGT.
     pub fn close_gt_vesting(ctx: Context<CloseGtVesting>) -> Result<()> {
         instructions::close_gt_vesting(ctx)
     }
 
-    /// Claim esGT from a vault through a vesting account.
+    /// Claim esGT from the esGT vault by increasing the vesting amount of the receiver.
     ///
     /// # Accounts
     /// *[See the documentation for the accounts.](ClaimEsGtVaultViaVesting)*
@@ -2697,12 +2689,15 @@ pub mod gmsol_store {
     /// - `amount`: The amount of esGT to claim from the vault.
     ///
     /// # Errors
-    /// - The [`owner`](ClaimEsGtVaultViaVesting::owner) must be a signer and the designated recipient of the esGT vault.
+    /// - The [`owner`](ClaimEsGtVaultViaVesting::owner) must be a signer and the esGT vault receiver (see [`gt_set_receiver`](gt_set_receiver)).
     /// - The [`store`](ClaimEsGtVaultViaVesting::store) must be properly initialized with an initialized GT state.
-    /// - The [`user`](ClaimEsGtVaultViaVesting::user) must be properly initialized and owned by the `owner`.
+    /// - The [`user`](ClaimEsGtVaultViaVesting::user) must be properly initialized and correspond to the `owner`.
     /// - The [`vesting`](ClaimEsGtVaultViaVesting::vesting) must be properly initialized and owned by both
     ///   the `owner` and `store`.
     /// - The requested `amount` must not exceed the available esGT balance in the vault.
+    ///
+    /// # Notes
+    /// - This instruction allows the receiver to claim esGT even if the receiver does not have enough GT reserved.
     pub fn claim_es_gt_vault_via_vesting(
         ctx: Context<ClaimEsGtVaultViaVesting>,
         amount: u64,
@@ -2724,7 +2719,7 @@ pub mod gmsol_store {
     /// - The [`store`](PrepareUser::store) must be properly initialized.
     /// - The [`user`](PrepareUser::user) must be either:
     ///   - Uninitialized (for new account creation)
-    ///   - Or validly initialized and owned by the `store`
+    ///   - Or validly initialized and correspond to the `owner`
     pub fn prepare_user(ctx: Context<PrepareUser>) -> Result<()> {
         instructions::prepare_user(ctx)
     }
@@ -2743,7 +2738,7 @@ pub mod gmsol_store {
     /// - The [`referral_code`](InitializeReferralCode::referral_code) account must be uninitialized.
     /// - The [`user`](InitializeReferralCode::user) account must be:
     ///   - Properly initialized
-    ///   - Owned by the `owner`
+    ///   - Correspond to the `owner`
     ///   - Not already have an associated referral code
     /// - The provided `code` must not already be in use by another user.
     pub fn initialize_referral_code(
@@ -2766,13 +2761,13 @@ pub mod gmsol_store {
     /// - The [`store`](SetReferrer::store) must be properly initialized.
     /// - The [`user`](SetReferrer::user) must be:
     ///   - Properly initialized
-    ///   - Owned by the `owner`
+    ///   - Correspond to the `owner`
     ///   - Must not already have a referrer set
     /// - The [`referral_code`](SetReferrer::referral_code) must be:
     ///   - Properly initialized
     ///   - Owned by the `store`
     ///   - Match the provided `code`
-    ///   - Be owned by the `referrer_user`
+    ///   - Correspond to the `referrer_user`
     /// - The [`referrer_user`](SetReferrer::referrer_user) must be:
     ///   - Properly initialized
     ///   - Different from the `user`
@@ -2791,12 +2786,12 @@ pub mod gmsol_store {
     /// - The [`store`](TransferReferralCode::store) must be properly initialized.
     /// - The [`user`](TransferReferralCode::user) account must be:
     ///   - Properly initialized
-    ///   - Owned by the `owner`
+    ///   - Correspond to the `owner`
     ///   - Different from the [`receiver_user`](TransferReferralCode::receiver_user)
     /// - The [`referral_code`](TransferReferralCode::referral_code) account must be:
     ///   - Properly initialized
     ///   - Owned by the `store`
-    ///   - Owned by the `user`
+    ///   - Correspond to the `owner`
     /// - The [`receiver_user`](TransferReferralCode::receiver_user) account must be:
     ///   - Properly initialized
     ///   - Not have an associated referral code
