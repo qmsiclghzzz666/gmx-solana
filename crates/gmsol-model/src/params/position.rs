@@ -22,8 +22,8 @@ impl<T> PositionParams<T> {
         max_position_impact_factor_for_liquidations: T,
     ) -> Self {
         Self {
-            min_collateral_value,
             min_position_size_usd,
+            min_collateral_value,
             min_collateral_factor,
             max_positive_position_impact_factor,
             max_negative_position_impact_factor,
