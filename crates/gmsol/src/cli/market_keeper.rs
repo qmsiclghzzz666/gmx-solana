@@ -215,6 +215,12 @@ enum Command {
         #[arg(long, short)]
         amount: u64,
     },
+    /// Toggle GT minting.
+    ToggleGtMinting {
+        market_token: Pubkey,
+        #[command(flatten)]
+        toggle: Toggle,
+    },
 }
 
 #[serde_with::serde_as]
@@ -672,6 +678,30 @@ impl Args {
                     serialize_only,
                     |signature| {
                         tracing::info!("funded at tx {signature}");
+                        Ok(())
+                    },
+                )
+                .await?;
+            }
+            Command::ToggleGtMinting {
+                market_token,
+                toggle,
+            } => {
+                crate::utils::send_or_serialize(
+                    client
+                        .toggle_gt_minting(store, market_token, toggle.is_enable())
+                        .into_anchor_request_without_compute_budget(),
+                    serialize_only,
+                    |signature| {
+                        tracing::info!(
+                            %market_token,
+                            "GT minting set to be {} at tx {signature}",
+                            if toggle.is_enable() {
+                                "enabled"
+                            } else {
+                                "disabled"
+                            }
+                        );
                         Ok(())
                     },
                 )
