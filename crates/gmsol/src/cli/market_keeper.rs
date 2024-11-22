@@ -8,8 +8,10 @@ use std::{
 use anchor_client::solana_sdk::{pubkey::Pubkey, signature::Keypair, signer::Signer};
 use anchor_spl::associated_token::get_associated_token_address;
 use gmsol::{
+    constants,
     exchange::ExchangeOps,
     store::{
+        gt::GtOps,
         market::{MarketOps, VaultOps},
         oracle::OracleOps,
         store_ops::StoreOps,
@@ -221,6 +223,20 @@ enum Command {
         #[command(flatten)]
         toggle: Toggle,
     },
+    /// Initialize GT.
+    InitGt {
+        #[arg(long, short, default_value_t = 7)]
+        decimals: u8,
+        #[arg(long, short = 'c', default_value_t = 100 * constants::MARKET_USD_UNIT / 10u128.pow(7))]
+        initial_minting_cost: u128,
+        #[arg(long, default_value_t = 101 * constants::MARKET_USD_UNIT / 100)]
+        grow_factor: u128,
+        #[arg(long, default_value_t = 10 * 10u64.pow(7))]
+        grow_step: u64,
+        ranks: Vec<u64>,
+    },
+    /// Set order fee discount factors.
+    SetOrderFeeDiscountFactors { factors: Vec<u128> },
 }
 
 #[serde_with::serde_as]
@@ -687,11 +703,10 @@ impl Args {
                 market_token,
                 toggle,
             } => {
-                crate::utils::send_or_serialize(
-                    client
-                        .toggle_gt_minting(store, market_token, toggle.is_enable())
-                        .into_anchor_request_without_compute_budget(),
+                crate::utils::send_or_serialize_rpc(
+                    client.toggle_gt_minting(store, market_token, toggle.is_enable()),
                     serialize_only,
+                    false,
                     |signature| {
                         tracing::info!(
                             %market_token,
@@ -706,6 +721,51 @@ impl Args {
                     },
                 )
                 .await?;
+            }
+            Command::InitGt {
+                decimals,
+                initial_minting_cost,
+                grow_factor,
+                grow_step,
+                ranks,
+            } => {
+                if ranks.is_empty() {
+                    return Err(gmsol::Error::invalid_argument("ranks must be provided"));
+                }
+                let mut ranks = ranks.clone();
+                ranks.sort_unstable();
+                crate::utils::send_or_serialize_rpc(
+                    client.initialize_gt(
+                        store,
+                        *decimals,
+                        *initial_minting_cost,
+                        *grow_factor,
+                        *grow_step,
+                        ranks.clone(),
+                    ),
+                    serialize_only,
+                    false,
+                    |signature| {
+                        tracing::info!("initialized GT at tx {signature}");
+                        Ok(())
+                    },
+                )
+                .await?;
+            }
+            Command::SetOrderFeeDiscountFactors { factors } => {
+                if factors.is_empty() {
+                    return Err(gmsol::Error::invalid_argument("factors must be provided"));
+                }
+                crate::utils::send_or_serialize_rpc(
+                    client.gt_set_order_fee_discount_factors(store, factors.clone()),
+                    serialize_only,
+                    false,
+                    |signature| {
+                        tracing::info!("set order fee discount factors at tx {signature}");
+                        Ok(())
+                    },
+                )
+                .await?
             }
         }
         Ok(())
