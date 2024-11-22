@@ -22,6 +22,7 @@ mod gt;
 mod inspect;
 mod market_keeper;
 mod order_keeper;
+mod other;
 mod ser;
 mod treasury;
 mod utils;
@@ -95,6 +96,8 @@ enum Command {
     Controller(controller::ControllerArgs),
     /// Commands for FEATURE_KEEPER.
     Feature(feature_keeper::Args),
+    /// Commands for other.
+    Other(other::Args),
 }
 
 #[tokio::main]
@@ -188,6 +191,7 @@ impl Cli {
             }
             Command::Controller(args) => args.run(&client, &store, self.serialize_only).await?,
             Command::Feature(args) => args.run(&client, &store, self.serialize_only).await?,
+            Command::Other(args) => args.run(&client, &store, self.serialize_only).await?,
         }
         client.shutdown().await?;
         Ok(())

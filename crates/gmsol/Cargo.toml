@@ -40,6 +40,7 @@ cli = [
     "num-format",
     "prettytable",
     "decode",
+    "mock",
 ]
 clap = ["dep:clap", "gmsol-store/clap"]
 chainlink-pull-oracle = [
@@ -70,6 +71,8 @@ anchor-test = [
     "tracing-subscriber",
     "shellexpand",
 ]
+
+mock = ["mock-chainlink-verifier"]
 
 [dependencies]
 gmsol-utils = { workspace = true }
@@ -141,6 +144,9 @@ reqwest-websocket = { workspace = true, optional = true }
 sha2 = { workspace = true, optional = true }
 hmac = { workspace = true, optional = true }
 chainlink-datastreams = { workspace = true, optional = true }
+
+# Mock
+mock-chainlink-verifier = { workspace = true, optional = true }
 
 # Dependencies for pyth support
 url = { workspace = true, optional = true }

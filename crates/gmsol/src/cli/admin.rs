@@ -203,9 +203,19 @@ impl InitializeRoles {
         }
 
         builder
-            .try_push(client.enable_role(&store, RoleKey::CONTROLLER))?
-            .try_push(client.enable_role(&store, RoleKey::MARKET_KEEPER))?
-            .try_push(client.enable_role(&store, RoleKey::ORDER_KEEPER))?
+            .push_many(
+                [
+                    RoleKey::CONTROLLER,
+                    RoleKey::GT_CONTROLLER,
+                    RoleKey::MARKET_KEEPER,
+                    RoleKey::ORDER_KEEPER,
+                    RoleKey::FEATURE_KEEPER,
+                    RoleKey::CONFIG_KEEPER,
+                ]
+                .iter()
+                .map(|role| client.enable_role(&store, role)),
+                false,
+            )?
             .try_push(client.grant_role(&store, &self.market_keeper, RoleKey::MARKET_KEEPER))?;
 
         for keeper in self.unique_order_keepers() {

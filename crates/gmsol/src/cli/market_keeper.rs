@@ -764,6 +764,7 @@ async fn insert_token_configs(
         let (rpc, oracle) = client.initialize_oracle(store, oracle).await?;
         tracing::info!(%oracle, "insert oracle initialization instruction");
         builder.try_push(rpc)?;
+        println!("{oracle}");
     }
 
     for (name, config) in configs {
@@ -797,7 +798,7 @@ async fn insert_token_configs(
         serialize_only,
         skip_preflight,
         |signatures, error| {
-            println!("{signatures:#?}");
+            tracing::info!("{signatures:#?}");
             match error {
                 None => Ok(()),
                 Some(err) => Err(err),
