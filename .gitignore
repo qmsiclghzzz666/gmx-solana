@@ -11,3 +11,4 @@ test-ledger
 .vscode
 docker-target
 .helix
+/idl-out
