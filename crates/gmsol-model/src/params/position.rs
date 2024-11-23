@@ -1,7 +1,7 @@
 use typed_builder::TypedBuilder;
 
 /// Basic Position Parameters.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, TypedBuilder)]
 pub struct PositionParams<T> {
     min_position_size_usd: T,
     min_collateral_value: T,
