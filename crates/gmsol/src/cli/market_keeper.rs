@@ -5,7 +5,11 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anchor_client::solana_sdk::{pubkey::Pubkey, signature::Keypair, signer::Signer};
+use anchor_client::solana_sdk::{
+    pubkey::Pubkey,
+    signature::Keypair,
+    signer::{EncodableKey, Signer},
+};
 use anchor_spl::associated_token::get_associated_token_address;
 use gmsol::{
     constants,
@@ -25,6 +29,7 @@ use gmsol_store::states::{
     DEFAULT_PRECISION,
 };
 use indexmap::IndexMap;
+use rand::{rngs::StdRng, SeedableRng};
 use serde::de::DeserializeOwned;
 
 use crate::{ser::MarketConfigMap, GMSOLClient};
@@ -105,8 +110,6 @@ enum Command {
         skip_preflight: bool,
         #[arg(long)]
         set_token_map: bool,
-        #[arg(long)]
-        init_oracle: bool,
         #[arg(long)]
         max_transaction_size: Option<usize>,
     },
@@ -237,6 +240,12 @@ enum Command {
     },
     /// Set order fee discount factors.
     SetOrderFeeDiscountFactors { factors: Vec<u128> },
+    /// Initialize Oracle.
+    InitOracle {
+        wallet: Option<PathBuf>,
+        #[arg(long, short)]
+        seed: Option<u64>,
+    },
 }
 
 #[serde_with::serde_as]
@@ -345,7 +354,6 @@ impl Args {
                 token_map,
                 skip_preflight,
                 set_token_map,
-                init_oracle,
                 max_transaction_size,
             } => {
                 let configs: IndexMap<String, TokenConfig> = toml_from_file(path)?;
@@ -366,7 +374,6 @@ impl Args {
                         .ok_or(gmsol::Error::NotFound)?,
                 };
 
-                let init_oracle = (*init_oracle).then(Keypair::new);
                 insert_token_configs(
                     client,
                     store,
@@ -374,7 +381,6 @@ impl Args {
                     serialize_only,
                     *skip_preflight,
                     *set_token_map,
-                    init_oracle,
                     *max_transaction_size,
                     &configs,
                 )
@@ -767,6 +773,28 @@ impl Args {
                 )
                 .await?
             }
+            Command::InitOracle { wallet, seed } => {
+                let oracle = match wallet {
+                    Some(path) => {
+                        Keypair::read_from_file(path).map_err(gmsol::Error::invalid_argument)?
+                    }
+                    None => {
+                        let mut rng = if let Some(seed) = seed {
+                            StdRng::seed_from_u64(*seed)
+                        } else {
+                            StdRng::from_entropy()
+                        };
+                        Keypair::generate(&mut rng)
+                    }
+                };
+                let (rpc, oracle) = client.initialize_oracle(store, &oracle).await?;
+                crate::utils::send_or_serialize_rpc(rpc, serialize_only, false, |signature| {
+                    tracing::info!("initialized an oracle buffer account at tx {signature}");
+                    println!("{oracle}");
+                    Ok(())
+                })
+                .await?
+            }
         }
         Ok(())
     }
@@ -836,7 +864,6 @@ async fn insert_token_configs(
     serialize_only: bool,
     skip_preflight: bool,
     set_token_map: bool,
-    init_oracle: Option<Keypair>,
     max_transaction_size: Option<usize>,
     configs: &IndexMap<String, TokenConfig>,
 ) -> gmsol::Result<()> {
@@ -848,13 +875,6 @@ async fn insert_token_configs(
 
     if set_token_map {
         builder.try_push(client.set_token_map(store, token_map))?;
-    }
-
-    if let Some(oracle) = init_oracle.as_ref() {
-        let (rpc, oracle) = client.initialize_oracle(store, oracle).await?;
-        tracing::info!(%oracle, "insert oracle initialization instruction");
-        builder.try_push(rpc)?;
-        println!("{oracle}");
     }
 
     for (name, config) in configs {
