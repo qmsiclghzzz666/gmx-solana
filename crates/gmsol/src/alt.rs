@@ -9,6 +9,7 @@ use anchor_client::{
         signer::Signer,
     },
 };
+use solana_account_decoder::UiAccountEncoding;
 
 use crate::utils::{
     rpc::accounts::get_account_with_context, RpcBuilder, TransactionBuilder, WithSlot,
@@ -30,7 +31,13 @@ pub trait AddressLookupTableOps<C> {
     ) -> impl Future<Output = crate::Result<Option<AddressLookupTableAccount>>> {
         async {
             Ok(self
-                .alt_with_config(address, RpcAccountInfoConfig::default())
+                .alt_with_config(
+                    address,
+                    RpcAccountInfoConfig {
+                        encoding: Some(UiAccountEncoding::Base64),
+                        ..Default::default()
+                    },
+                )
                 .await?
                 .into_value())
         }
