@@ -15,6 +15,7 @@ use tracing::level_filters::LevelFilter;
 use tracing_subscriber::EnvFilter;
 
 mod admin;
+mod alt;
 mod controller;
 mod exchange;
 mod feature_keeper;
@@ -96,6 +97,8 @@ enum Command {
     Controller(controller::ControllerArgs),
     /// Commands for FEATURE_KEEPER.
     Feature(feature_keeper::Args),
+    /// Commands for ALT.
+    Alt(alt::Args),
     /// Commands for other.
     Other(other::Args),
 }
@@ -191,6 +194,7 @@ impl Cli {
             }
             Command::Controller(args) => args.run(&client, &store, self.serialize_only).await?,
             Command::Feature(args) => args.run(&client, &store, self.serialize_only).await?,
+            Command::Alt(args) => args.run(&client, &store, self.serialize_only).await?,
             Command::Other(args) => args.run(&client, &store, self.serialize_only).await?,
         }
         client.shutdown().await?;
