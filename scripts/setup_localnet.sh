@@ -89,6 +89,11 @@ cargo gmsol -ul -w $GMSOL_KEEPER market update-configs $GMSOL_MARKET_CONFIGS
 cargo gmsol -ul -w $GMSOL_KEEPER market toggle-gt-minting 6bVH9Hu8TT9pjknUKcoJTiQadjzWYa1Zvvb2V3UhrRvU --enable
 cargo gmsol -ul -w $GMSOL_KEEPER market toggle-gt-minting 9ryWpDKcgTr44jSWpu3eGBx64Vw3BAmJAgs7TGUmTLRn --enable
 
+export COMMON_ALT=$(cargo gmsol -ul alt extend --init common $ORACLE)
+export MARKET_ALT=$(cargo gmsol -ul alt extend --init market)
+
 echo "STORE: $STORE"
 echo "ORACLE: $ORACLE"
 echo "USDG: $USDG"
+echo "COMMON_ALT: $COMMON_ALT"
+echo "MARKET_ALT: $MARKET_ALT"
