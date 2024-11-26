@@ -17,7 +17,7 @@ pub const TREASURY_SEED: &[u8] = b"treasury";
 pub const CONFIG_SEED: &[u8] = b"config";
 
 /// `post_price_update` compute budget.
-pub const POST_PRICE_UPDATE_COMPUTE_BUDGET: u32 = 40_000;
+pub const POST_PRICE_UPDATE_COMPUTE_BUDGET: u32 = 80_000;
 
 /// `reclaim_rent` compute budget.
 pub const RECLAIM_RENT_COMPUTE_BUDGET: u32 = 4_000;
