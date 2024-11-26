@@ -39,6 +39,7 @@ const VAA_SPLIT_INDEX: usize = 755;
 /// With Pyth Prices.
 pub struct WithPythPrices<'a, C> {
     post: TransactionBuilder<'a, C>,
+    consume: TransactionBuilder<'a, C>,
     close: TransactionBuilder<'a, C>,
 }
 
@@ -56,6 +57,11 @@ where
             .post
             .estimate_execution_fee(compute_unit_price_micro_lamports)
             .await?;
+        execution_fee = execution_fee.saturating_add(
+            self.consume
+                .estimate_execution_fee(compute_unit_price_micro_lamports)
+                .await?,
+        );
         execution_fee = execution_fee.saturating_add(
             self.close
                 .estimate_execution_fee(compute_unit_price_micro_lamports)
@@ -90,6 +96,29 @@ where
                 signatures
             }
         };
+
+        if error.is_none() {
+            let mut consume_signatures = match self
+                .consume
+                .send_all_with_opts(
+                    compute_unit_price_micro_lamports,
+                    RpcSendTransactionConfig {
+                        skip_preflight,
+                        ..Default::default()
+                    },
+                    false,
+                )
+                .await
+            {
+                Ok(signatures) => signatures,
+                Err((signatures, err)) => {
+                    error = Some(err);
+                    signatures
+                }
+            };
+
+            signatures.append(&mut consume_signatures);
+        }
 
         let mut close_signatures = match self
             .close
@@ -216,6 +245,7 @@ pub trait PythPullOracleOps<C> {
             let pyth = self.pyth();
             let mut prices = HashMap::with_capacity(ctx.feeds.len());
             let mut post = TransactionBuilder::new(pyth.solana_rpc());
+            let mut consume_txns = TransactionBuilder::new(pyth.solana_rpc());
             let mut close = TransactionBuilder::new(pyth.solana_rpc());
 
             let datas = updates
@@ -288,8 +318,12 @@ pub trait PythPullOracleOps<C> {
             }
 
             let consume = (consume)(prices).await?;
-            post.push_many(consume, true)?;
-            Ok(WithPythPrices { post, close })
+            consume_txns.push_many(consume, false)?;
+            Ok(WithPythPrices {
+                post,
+                consume: consume_txns,
+                close,
+            })
         }
     }
 
