@@ -9,6 +9,8 @@ mod withdrawal;
 
 mod order;
 
+mod swap;
+
 mod user;
 
 mod shift;

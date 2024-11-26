@@ -19,7 +19,7 @@ use crate::{
             },
             utils::{Adl, ValidateMarketBalances},
         },
-        order::{CollateralReceiver, Order, OrderKind, OrderParams, TokenAccounts, TransferOut},
+        order::{Order, OrderKind, OrderParams, TokenAccounts, TransferOut},
         position::PositionKind,
         user::UserHeader,
         HasMarketMeta, Market, NonceBytes, Oracle, Position, Store, ValidateOracleTime,
@@ -1197,12 +1197,7 @@ fn execute_swap(
         }
         return Err(err);
     }
-    let is_long = market.market_meta().to_token_side(&swap_out_token)?;
-    transfer_out.transfer_out_collateral(
-        is_long,
-        CollateralReceiver::Collateral,
-        swap_out_amount,
-    )?;
+    transfer_out.transfer_out(false, swap_out_amount)?;
     Ok(())
 }
 

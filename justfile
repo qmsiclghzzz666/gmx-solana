@@ -28,8 +28,8 @@ lint:
 test:
   cargo test --features {{FEATURES}}
 
-test-programs:
-  anchor test
+test-programs *ARGS:
+  anchor test {{ARGS}}
 
 build-idls:
   mkdir -p {{IDL_OUT_DIR}}
