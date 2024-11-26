@@ -61,9 +61,9 @@ impl ComputeBudget {
     fn budget_price(&self, compute_unit_price_micro_lamports: Option<u64>) -> u64 {
         let mut price = compute_unit_price_micro_lamports.unwrap_or(self.price_micro_lamports);
         if let Some(min_price) = self.min_priority_lamports.and_then(|min_lamports| {
-            (self.limit_units as u64)
+            (min_lamports)
                 .checked_mul(Self::MICRO_LAMPORTS)?
-                .checked_div(min_lamports)
+                .checked_div(self.limit_units as u64)
         }) {
             price = price.max(min_price)
         }

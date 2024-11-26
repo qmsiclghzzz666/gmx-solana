@@ -43,7 +43,7 @@ else
 fi
 
 export KEEPER_ADDRESS=$(solana-keygen pubkey $GMSOL_KEEPER)
-solana -ul airdrop 100 $KEEPER_ADDRESS
+solana -ul airdrop 10000 $KEEPER_ADDRESS
 solana -ul airdrop 1 11111111111111111111111111111112
 solana -ul airdrop 1 11111111111111111111111111111113
 
