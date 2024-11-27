@@ -41,8 +41,31 @@ where
         // `price_impact_value` is comparable in magnitude to `size_delta_usd` and is capped,
         // overflow is unlikely in the `mul_div` part.
         //
+        // In practice, since:
+        //
+        // size_in_usd * abs(price_impact_value) / size_delta_usd
+        //     <= size_in_usd * (max_position_impact_factor * size_delta_usd / UNIT) / size_delta_usd
+        //     == size_in_usd * max_position_impact_factor / UNIT
+        //
+        // To ensure that no overflow occurs, we need:
+        //
+        // Unsigned::MAX * max_position_impact_factor / UNIT <= Signed::MAX
+        //
+        // Which simplifies to:
+        //
+        // max_position_impact_factor <= (Signed::MAX / Unsigned::MAX) * UNIT
+        //
+        // In other words, as long as `max_position_impact_factor` doesn't exceed 50%.
+        //
         // Otherwise, if we use the order `size_in_usd.mul_div(adjusted_price_impact_value, size_in_tokens) / size_in_usd`,
-        // the `mul_div` operation is likely to overflow.
+        // the `mul_div` operation is likely to overflow. For example (Unsigend = u128, Signed = i128, DECIMALS = 20):
+        //
+        // Assume that `size_in_usd = 6250 * 10^20` ($6250) and `size_in_tokens = 67774` (0.067774 BTC, decimals = 6). When the user
+        // close it with `size_delta_usd = 6250 * 10^20` causing a `price_impact_value = 3.90625 * 10^20` (the "factor" is only
+        // 0.0625%), an overflow will occur in the `mul_div` step:
+        //
+        // size_in_usd * price_impact_value / size_in_tokens >= 3.60 * 10^39 > i128::MAX
+        //
         let adjustment = size_in_usd
             .checked_mul_div_with_signed_numerator(&adjusted_price_impact_value, size_delta_usd)
             .ok_or(crate::Error::Computation(
