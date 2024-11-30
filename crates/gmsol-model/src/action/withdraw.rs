@@ -182,7 +182,7 @@ impl<const DECIMALS: u8, M: LiquidityMarketMut<DECIMALS>> Withdrawal<M, DECIMALS
             pool.long_usd_value(self.params.long_token_price().pick_price(true))?;
         let short_token_value =
             pool.short_usd_value(self.params.short_token_price().pick_price(true))?;
-        let total_pool_value =
+        let total_pool_token_value =
             long_token_value
                 .checked_add(&short_token_value)
                 .ok_or(crate::Error::Computation(
@@ -199,11 +199,11 @@ impl<const DECIMALS: u8, M: LiquidityMarketMut<DECIMALS>> Withdrawal<M, DECIMALS
         debug_assert!(!self.params.long_token_price().has_zero());
         debug_assert!(!self.params.short_token_price().has_zero());
         let long_token_amount = market_token_value
-            .checked_mul_div(&long_token_value, &total_pool_value)
+            .checked_mul_div(&long_token_value, &total_pool_token_value)
             .ok_or(crate::Error::Computation("long token amount"))?
             / self.params.long_token_price().pick_price(true).clone();
         let short_token_amount = market_token_value
-            .checked_mul_div(&short_token_value, &total_pool_value)
+            .checked_mul_div(&short_token_value, &total_pool_token_value)
             .ok_or(crate::Error::Computation("short token amount"))?
             / self.params.short_token_price().pick_price(true).clone();
         Ok((long_token_amount, short_token_amount))
