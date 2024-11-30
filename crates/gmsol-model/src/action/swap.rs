@@ -235,6 +235,13 @@ impl<const DECIMALS: u8, M: SwapMarketMut<DECIMALS>> Swap<M, DECIMALS> {
             token_in_amount = amount_after_fees.checked_sub(&price_impact_amount).ok_or(
                 crate::Error::Computation("swap: not enough fund to pay price impact"),
             )?;
+
+            if token_in_amount.is_zero() {
+                return Err(crate::Error::Computation(
+                    "swap: not enough fund to pay price impact",
+                ));
+            }
+
             token_out_amount = token_in_amount
                 .checked_mul_div(
                     token_in_price.pick_price(false),
