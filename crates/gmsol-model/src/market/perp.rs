@@ -328,6 +328,9 @@ pub trait PerpMarketExt<const DECIMALS: u8>: PerpMarket<DECIMALS> {
             } else {
                 params.max_negative_position_impact_factor()
             };
+            // Although `size_delta_usd` is still used here to calculate the max impact even in the case of liquidation,
+            // partial liquidation is not allowed. Therefore, `size_delta_usd == size_in_usd` always holds,
+            // ensuring consistency with the Solidity version.
             let min_impact = utils::apply_factor(&size_delta_usd.unsigned_abs(), max_impact_factor)
                 .ok_or(crate::Error::Computation(
                     "calculating max negative position impact based on max factor",
