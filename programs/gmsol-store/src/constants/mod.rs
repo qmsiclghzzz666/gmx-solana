@@ -66,4 +66,4 @@ pub const DEFAULT_GT_VAULT_TIME_WINDOW: u32 = 24 * 60 * 60;
 pub const DEFAULT_GT_RESERVE_FACTOR: u128 = 5 * MARKET_USD_UNIT;
 
 /// Default esGT vesting divisor.
-pub const DEFAULT_ES_GT_VESTING_DIVISOR: u16 = 365;
+pub const DEFAULT_ES_GT_VESTING_DIVISOR: u16 = 365 * 2;

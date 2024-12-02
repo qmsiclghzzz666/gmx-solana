@@ -1030,7 +1030,7 @@ pub enum GtVestingFlag {
     // CHECK: should have no more than `MAX_FLAGS` of flags.
 }
 
-const VESTING_LEN: usize = 512;
+const VESTING_LEN: usize = 1024;
 
 /// GT Vesting.
 #[account(zero_copy)]

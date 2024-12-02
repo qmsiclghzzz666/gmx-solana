@@ -1,4 +1,7 @@
-use gmsol::{store::user::UserOps, types::user::ReferralCode};
+use gmsol::{
+    store::{gt::GtOps, user::UserOps},
+    types::user::ReferralCode,
+};
 use gmsol_store::CoreError;
 
 use crate::anchor_tests::setup::{current_deployment, Deployment};
@@ -76,6 +79,27 @@ async fn referral() -> eyre::Result<()> {
         err.anchor_error_code(),
         Some(CoreError::MutualReferral.into())
     );
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn vesting() -> eyre::Result<()> {
+    let deployment = current_deployment().await?;
+    let _guard = deployment.use_accounts().await?;
+    let span = tracing::info_span!("vesting");
+    let _enter = span.enter();
+
+    let client = deployment.user_client(Deployment::DEFAULT_USER)?;
+    let store = &deployment.store;
+
+    let signature = client.prepare_user(store)?.send_without_preflight().await?;
+    tracing::info!(%signature, "prepared user account");
+
+    client
+        .request_gt_vesting(store, 0)
+        .send_without_preflight()
+        .await?;
 
     Ok(())
 }
