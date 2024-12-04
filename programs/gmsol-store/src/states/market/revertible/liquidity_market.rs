@@ -58,6 +58,10 @@ impl<'a, 'info> RevertibleLiquidityMarket<'a, 'info> {
             self.market_token.to_account_info(),
         )
     }
+
+    pub(crate) fn base_mut(&mut self) -> &mut RevertibleMarket<'a> {
+        &mut self.base
+    }
 }
 
 impl<'a, 'info> Key for RevertibleLiquidityMarket<'a, 'info> {

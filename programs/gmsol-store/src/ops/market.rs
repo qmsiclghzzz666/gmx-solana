@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, TokenAccount};
-use gmsol_model::{Bank, LiquidityMarketMutExt, PositionImpactMarketMutExt};
+use gmsol_model::{Bank, LiquidityMarketMutExt, PerpMarketMutExt, PositionImpactMarketMutExt};
 use typed_builder::TypedBuilder;
 
 use crate::{
@@ -237,6 +237,30 @@ impl<'a, 'info, T> Execute<'a, 'info, T> {
             msg!("[Deposit] pre-execute: {:?}", report);
         }
 
+        let prices = self.oracle.market_prices(&self.market)?;
+
+        // Update borrowing states.
+        {
+            let borrowing = self
+                .market
+                .base_mut()
+                .update_borrowing(&prices)
+                .and_then(|a| a.execute())
+                .map_err(ModelError::from)?;
+            msg!("[Deposit] pre-execute: {:?}", borrowing);
+        }
+
+        // Update funding states.
+        {
+            let funding = self
+                .market
+                .base_mut()
+                .update_funding(&prices)
+                .and_then(|a| a.execute())
+                .map_err(ModelError::from)?;
+            msg!("[Deposit] pre-execute: {:?}", funding);
+        }
+
         // Swap tokens into the target market.
         let (long_token_amount, short_token_amount) = {
             let meta = self.market.market_meta();
@@ -271,7 +295,6 @@ impl<'a, 'info, T> Execute<'a, 'info, T> {
 
         // Perform the deposit.
         let minted = {
-            let prices = self.oracle.market_prices(&self.market)?;
             let report = self
                 .market
                 .deposit(long_token_amount.into(), short_token_amount.into(), prices)
@@ -318,9 +341,32 @@ impl<'a, 'info, T> Execute<'a, 'info, T> {
             msg!("[Withdrawal] pre-execute: {:?}", report);
         }
 
+        let prices = self.oracle.market_prices(&self.market)?;
+
+        // Update borrowing states.
+        {
+            let borrowing = self
+                .market
+                .base_mut()
+                .update_borrowing(&prices)
+                .and_then(|a| a.execute())
+                .map_err(ModelError::from)?;
+            msg!("[Withdrawal] pre-execute: {:?}", borrowing);
+        }
+
+        // Update funding states.
+        {
+            let funding = self
+                .market
+                .base_mut()
+                .update_funding(&prices)
+                .and_then(|a| a.execute())
+                .map_err(ModelError::from)?;
+            msg!("[Withdrawal] pre-execute: {:?}", funding);
+        }
+
         // Perform the withdrawal.
         let (long_amount, short_amount) = {
-            let prices = self.oracle.market_prices(&self.market)?;
             let report = self
                 .market
                 .withdraw(params.market_token_amount.into(), prices)
