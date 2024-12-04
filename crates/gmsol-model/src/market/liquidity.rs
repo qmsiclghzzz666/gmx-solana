@@ -1,4 +1,4 @@
-use num_traits::{CheckedAdd, CheckedSub, Signed, Zero};
+use num_traits::{CheckedAdd, CheckedMul, CheckedSub, Signed, Zero};
 
 use crate::{
     action::{deposit::Deposit, withdraw::Withdrawal},
@@ -130,16 +130,21 @@ pub trait LiquidityMarketExt<const DECIMALS: u8>: LiquidityMarket<DECIMALS> {
             .checked_sub(&net_pnl)
             .ok_or(crate::Error::Computation("deducting net pnl"))?;
 
-        // Deduct impact pool amount.
-        let impact_pool_amount = {
+        // Deduct impact pool value.
+        let impact_pool_value = {
             let duration = self.passed_in_seconds_for_position_impact_distribution()?;
-            self.pending_position_impact_pool_distribution_amount(duration)?
-                .1
+            let amount = self
+                .pending_position_impact_pool_distribution_amount(duration)?
+                .1;
+            let price = prices.index_token_price.pick_price(!maximize);
+            amount
+                .checked_mul(price)
+                .ok_or(crate::Error::Computation("calculating impact pool value"))?
         }
         .to_signed()?;
 
         pool_value = pool_value
-            .checked_sub(&impact_pool_amount)
+            .checked_sub(&impact_pool_value)
             .ok_or(crate::Error::Computation("deducting impact pool value"))?;
 
         Ok(pool_value)
