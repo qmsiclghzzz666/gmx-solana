@@ -648,6 +648,19 @@ pub mod gmsol_store {
     ///   FEATURE_KEEPER role in the store.
     /// - The `domain` must be a valid domain defined in [`DomainDisabledFlag`](crate::states::feature::DomainDisabledFlag).
     /// - The `action` must be a valid action defined in [`ActionDisabledFlag`](crate::states::feature::ActionDisabledFlag).
+    ///
+    /// # Warnings
+    /// Although we currently do not provide a feature to disable swaps (only a feature to disable swap orders),
+    /// if we were to introduce such a feature, we must be aware that the following operations could still potentially
+    /// result in swaps:
+    /// - (GLV) Deposits
+    /// - (GLV) Withdrawals
+    /// - Swap Orders
+    /// - Increase Orders
+    /// - Decrease Orders
+    ///
+    /// Therefore, to ensure that this feature effectively prevents swaps from occurring, we need to add
+    /// validation of the swap parameters before executing all of these actions to ensure that swaps do not happen.
     #[access_control(internal::Authenticate::only_feature_keeper(&ctx))]
     pub fn toggle_feature(
         ctx: Context<ToggleFeature>,
