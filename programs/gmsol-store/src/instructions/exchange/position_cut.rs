@@ -33,6 +33,34 @@ use crate::{
 ///
 ///   - 0..N. `[]` N feed accounts, where N represents the total number of unique tokens
 ///     in the market.
+///
+/// # Warnings
+/// Because token accounts can be frozen by token's
+/// [freeze authority](https://explorer.solana.com/address/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/metadata)
+/// (although extremely unlikely), keepers may need to be aware of the following two issues when using the
+/// "position cut" instructions:
+///
+/// ## Escrow Accounts Are Frozen
+///
+/// If escrow accounts are frozen, the "position cut" instruction will fail to execute due to a transfer failure.
+///
+/// However, token accounts cannot be frozen before they are initialized. To avoid this issue, the keeper only needs
+/// to ensure that the escrow accounts creation instruction and the "position cut" instruction are within the same
+/// transaction.
+///
+/// ## Claimable Accounts Are Frozen
+///
+/// If the funding fee of a position is paid with secondary output tokens (pnl tokens), it may generate claimable
+/// funds belonging to the holding address. Alternatively, if a negative position's price impact is too high,
+/// it may generate a `price_impact_diff` that results in claimable funds transferred to the owner.
+/// If claimable funds are generated and the corresponding claimable accounts are frozen at
+/// this time, the "position cut" instruction may also fail to execute due to transfer failure.
+///
+/// Since claimable accounts may be created before executing the "position cut" instruction, in such cases, the keeper
+/// needs to wait until new claimable accounts can be created (when the recent time window changes, causing the address
+/// to change) before re-executing the "position cut" instruction.
+///
+/// In the future, we may avoid directly using token accounts to receive these claimable funds to prevent this issue.
 #[event_cpi]
 #[derive(Accounts)]
 #[instruction(nonce: [u8; 32], recent_timestamp: i64)]
