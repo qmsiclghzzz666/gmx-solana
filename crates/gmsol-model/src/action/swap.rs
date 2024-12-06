@@ -101,6 +101,8 @@ impl<const DECIMALS: u8, M: SwapMarketMut<DECIMALS>> Swap<M, DECIMALS> {
         } = self.reassign_values()?;
 
         // Calculate price impact.
+        //
+        // Note that the virtual inventory feature is not currently supported.
         let price_impact = self
             .market
             .liquidity_pool()?
