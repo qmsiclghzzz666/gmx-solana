@@ -16,6 +16,11 @@ pub trait FixedPointOps<const DECIMALS: u8>: MulDiv + Num {
 impl<const DECIMALS: u8> FixedPointOps<DECIMALS> for u64 {
     const UNIT: Self = 10u64.pow(DECIMALS as u32);
 
+    /// Fixed point power.
+    ///
+    /// # Notes
+    /// The code that calculates exponents behaves inconsistently depending on whether the exponent is a whole unit or not.
+    /// Therefore, to avoid issues, we should use only unit exponents until we implement better algorithms.
     #[allow(clippy::arithmetic_side_effects)]
     fn checked_pow_fixed(&self, exponent: &Self) -> Option<Self> {
         use rust_decimal::{Decimal, MathematicalOps};
@@ -48,6 +53,11 @@ impl<const DECIMALS: u8> FixedPointOps<DECIMALS> for u64 {
 impl<const DECIMALS: u8> FixedPointOps<DECIMALS> for u128 {
     const UNIT: Self = 10u128.pow(DECIMALS as u32);
 
+    /// Fixed point power.
+    ///
+    /// # Notes
+    /// The code that calculates exponents behaves inconsistently depending on whether the exponent is a whole unit or not.
+    /// Therefore, to avoid issues, we should use only unit exponents until we implement better algorithms.
     #[allow(clippy::arithmetic_side_effects)]
     fn checked_pow_fixed(&self, exponent: &Self) -> Option<Self> {
         use std::cmp::Ordering;
