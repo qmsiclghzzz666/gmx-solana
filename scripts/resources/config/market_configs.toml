@@ -1,4 +1,4 @@
-[6bVH9Hu8TT9pjknUKcoJTiQadjzWYa1Zvvb2V3UhrRvU]
+[B4qyuQJdUPqQeKVN6D6T96rNiDCmgXgvBqqKSCfMMuF3]
 swap_impact_exponent = "100_000_000_000_000_000_000"
 swap_impact_positive_factor = "0"
 swap_impact_negative_factor = "0"
@@ -61,7 +61,7 @@ max_pool_value_for_deposit_for_short_token = "75_000_000_000_000_000_000_000_000
 max_open_interest_for_long = "45_000_000_000_000_000_000_000_000"
 max_open_interest_for_short = "45_000_000_000_000_000_000_000_000"
 
-[9ryWpDKcgTr44jSWpu3eGBx64Vw3BAmJAgs7TGUmTLRn]
+[ACycDYCpDWxZWLuig6oGSVXmAm8czZ4en4Nk5cug9q1V]
 swap_impact_exponent = "200_000_000_000_000_000_000"
 swap_impact_positive_factor = "175_000_000_000"
 swap_impact_negative_factor = "350_000_000_000"
