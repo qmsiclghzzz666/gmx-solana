@@ -400,7 +400,7 @@ pub struct LiquidationFeeParams<T> {
 impl<T> LiquidationFeeParams<T> {
     pub(crate) fn fee<const DECIMALS: u8>(
         &self,
-        size_in_usd: &T,
+        size_delta_usd: &T,
         collateral_token_price: &Price<T>,
     ) -> crate::Result<LiquidationFees<T>>
     where
@@ -410,7 +410,7 @@ impl<T> LiquidationFeeParams<T> {
             return Ok(Default::default());
         }
 
-        let fee_value = utils::apply_factor(size_in_usd, &self.factor).ok_or(
+        let fee_value = utils::apply_factor(size_delta_usd, &self.factor).ok_or(
             crate::Error::Computation("liquidation fee: calculating fee value"),
         )?;
         let fee_amount = fee_value

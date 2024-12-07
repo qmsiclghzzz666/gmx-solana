@@ -681,9 +681,11 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
 
         let liquidation_fees = is_liquidation
             .then(|| {
+                // Although `size_delta_usd` is used here to calculate liquidation fee, partial liquidation is not allowed.
+                // Therefore, `size_delta_usd == size_in_usd` always holds, ensuring consistency with the Solidity version.
                 self.market()
                     .liquidation_fee_params()?
-                    .fee(self.size_in_usd(), collateral_token_price)
+                    .fee(size_delta_usd, collateral_token_price)
             })
             .transpose()?;
 

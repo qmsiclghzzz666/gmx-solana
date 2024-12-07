@@ -47,7 +47,7 @@ pub const DEFAULT_ORDER_FEE_FACTOR_FOR_POSITIVE_IMPACT: Factor = 50_000_000_000_
 pub const DEFAULT_ORDER_FEE_FACTOR_FOR_NEGATIVE_IMPACT: Factor = 70_000_000_000_000_000;
 
 /// Default liquidation fee factor.
-pub const DEFAULT_LIQUIDATION_FEE_FACTOR: Factor = 0;
+pub const DEFAULT_LIQUIDATION_FEE_FACTOR: Factor = 20 * super::MARKET_USD_UNIT / 10_000;
 
 /// Default position impact distribute factor.
 pub const DEFAULT_POSITION_IMPACT_DISTRIBUTE_FACTOR: Factor = 230_000_000_000_000_000;

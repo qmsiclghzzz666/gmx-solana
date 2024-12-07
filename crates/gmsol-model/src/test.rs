@@ -336,7 +336,7 @@ impl Default for TestMarketConfig<u64, 9> {
             min_collateral_factor_for_oi: 5 * 10u64.pow(6) / 83_000_000,
             ignore_open_interest_for_usage_factor: false,
             liquidation_fee_params: LiquidationFeeParams::builder()
-                .factor(500_000)
+                .factor(2_000_000)
                 .receiver_factor(370_000_000)
                 .build(),
         }
@@ -419,7 +419,7 @@ impl Default for TestMarketConfig<u128, 20> {
             min_collateral_factor_for_oi: 5 * 10u128.pow(17) / 83_000_000,
             ignore_open_interest_for_usage_factor: false,
             liquidation_fee_params: LiquidationFeeParams::builder()
-                .factor(50_000_000_000_000_000)
+                .factor(200_000_000_000_000_000)
                 .receiver_factor(37_000_000_000_000_000_000)
                 .build(),
         }
