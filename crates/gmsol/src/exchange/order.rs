@@ -1202,9 +1202,12 @@ where
                 let user = self
                     .client
                     .find_user_address(order.0.header().store(), order.0.header().owner());
-                let user = self.client.account(&user).await?;
-                let hint =
-                    CloseOrderHint::new(&order.0, user.as_ref(), self.client.store_program_id())?;
+                let user = self.client.account::<ZeroCopy<_>>(&user).await?;
+                let hint = CloseOrderHint::new(
+                    &order.0,
+                    user.as_ref().map(|user| &user.0),
+                    self.client.store_program_id(),
+                )?;
                 self.hint = Some(hint);
                 Ok(hint)
             }
