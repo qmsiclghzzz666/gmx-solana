@@ -171,6 +171,8 @@ struct InitializeRoles {
     #[arg(long)]
     init_store: bool,
     #[arg(long)]
+    gt_controller: Pubkey,
+    #[arg(long)]
     market_keeper: Pubkey,
     #[arg(long)]
     order_keeper: Vec<Pubkey>,
@@ -215,7 +217,8 @@ impl InitializeRoles {
                 .map(|role| client.enable_role(&store, role)),
                 false,
             )?
-            .try_push(client.grant_role(&store, &self.market_keeper, RoleKey::MARKET_KEEPER))?;
+            .try_push(client.grant_role(&store, &self.market_keeper, RoleKey::MARKET_KEEPER))?
+            .try_push(client.grant_role(&store, &self.market_keeper, RoleKey::GT_CONTROLLER))?;
 
         for keeper in self.unique_order_keepers() {
             builder.try_push(client.grant_role(&store, keeper, RoleKey::ORDER_KEEPER))?;

@@ -21,7 +21,10 @@ use gmsol::{
         store_ops::StoreOps,
         token_config::TokenConfigOps,
     },
-    types::market::config::{MarketConfigBuffer, MarketConfigFlag},
+    types::{
+        market::config::{MarketConfigBuffer, MarketConfigFlag},
+        FactorKey,
+    },
     utils::TransactionBuilder,
 };
 use gmsol_store::states::{
@@ -251,6 +254,10 @@ enum Command {
     },
     /// Set order fee discount factors.
     SetOrderFeeDiscountFactors { factors: Vec<u128> },
+    /// Set referral reward factors.
+    SetReferralRewardFactors { factors: Vec<u128> },
+    /// Set referred discount.
+    SetReferredDiscountFactor { factor: u128 },
     /// Initialize Oracle.
     InitOracle {
         wallet: Option<PathBuf>,
@@ -797,6 +804,37 @@ impl Args {
                     false,
                     |signature| {
                         tracing::info!("set order fee discount factors at tx {signature}");
+                        Ok(())
+                    },
+                )
+                .await?
+            }
+            Command::SetReferralRewardFactors { factors } => {
+                if factors.is_empty() {
+                    return Err(gmsol::Error::invalid_argument("factors must be provided"));
+                }
+                crate::utils::send_or_serialize_rpc(
+                    client.gt_set_referral_reward_factors(store, factors.clone()),
+                    serialize_only,
+                    false,
+                    |signature| {
+                        tracing::info!("set referral reward factors at tx {signature}");
+                        Ok(())
+                    },
+                )
+                .await?
+            }
+            Command::SetReferredDiscountFactor { factor } => {
+                crate::utils::send_or_serialize_rpc(
+                    client.insert_factor(
+                        store,
+                        FactorKey::OrderFeeDiscountForReferredUser,
+                        *factor,
+                    ),
+                    serialize_only,
+                    false,
+                    |signature| {
+                        tracing::info!("set referred discount factor at tx {signature}");
                         Ok(())
                     },
                 )

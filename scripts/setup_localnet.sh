@@ -55,30 +55,50 @@ spl-token -ul mint $USDG 1000
 cargo gmsol -ul other init-mock-chainlink-verifier
 
 export STORE=$(cargo gmsol -ul admin create-store)
-cargo gmsol -ul admin init-roles --market-keeper $KEEPER_ADDRESS --order-keeper $KEEPER_ADDRESS
+cargo gmsol -ul admin init-roles \
+    --gt-controller $KEEPER_ADDRESS \
+    --market-keeper $KEEPER_ADDRESS \
+    --order-keeper $KEEPER_ADDRESS
 
 cargo gmsol -ul -w $GMSOL_KEEPER market init-gt \
-    3000000000 \
-    10000000000 \
-    30000000000 \
-    100000000000 \
-    300000000000 \
-    1000000000000 \
-    3000000000000 \
-    10000000000000 \
-    30000000000000
+    -c 100000000000 \
+    --grow-factor 102100000000000000000 \
+    --grow-step 2100000000000 \
+    6000000000 \
+    20000000000 \
+    60000000000 \
+    200000000000 \
+    600000000000 \
+    2000000000000 \
+    6000000000000 \
+    20000000000000 \
+    60000000000000
 
 cargo gmsol -ul -w $GMSOL_KEEPER market set-order-fee-discount-factors \
     0 \
+    2000000000000000000 \
+    3000000000000000000 \
     4000000000000000000 \
+    5000000000000000000 \
     6000000000000000000 \
+    7000000000000000000 \
     8000000000000000000 \
-    10000000000000000000 \
-    12000000000000000000 \
-    14000000000000000000 \
-    16000000000000000000 \
-    18000000000000000000 \
-    20000000000000000000
+    9000000000000000000 \
+    10000000000000000000
+
+cargo gmsol -ul -w $GMSOL_KEEPER market set-referral-reward-factors \
+    0 \
+    2000000000000000000 \
+    3000000000000000000 \
+    4000000000000000000 \
+    5000000000000000000 \
+    6000000000000000000 \
+    7000000000000000000 \
+    8000000000000000000 \
+    9000000000000000000 \
+    10000000000000000000
+
+cargo gmsol -ul -w $GMSOL_KEEPER market set-referred-discount-factor 10000000000000000000
 
 export TOKEN_MAP=$(cargo gmsol -ul market create-token-map)
 export ORACLE=$(cargo gmsol -ul market init-oracle --seed $GMSOL_ORACLE_SEED)
