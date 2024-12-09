@@ -52,6 +52,9 @@ check-verifiable:
   fi
 
 build-verifiable:
+  anchor build -v -- --features no-mock
+
+build-verifiable-with-mock:
   anchor build -v
 
 check-geyser:
