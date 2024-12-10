@@ -2016,6 +2016,7 @@ dependencies = [
  "sha2 0.10.8",
  "shellexpand",
  "solana-account-decoder",
+ "solana-remote-wallet",
  "solana-transaction-status",
  "spl-associated-token-account 3.0.4",
  "spl-governance",
@@ -2280,6 +2281,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 dependencies = [
  "serde",
+]
+
+[[package]]
+name = "hidapi"
+version = "2.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9e58251020fe88fe0dae5ebcc1be92b4995214af84725b375d08354d0311c23c"
+dependencies = [
+ "cc",
+ "cfg-if",
+ "libc",
+ "pkg-config",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]
@@ -5131,6 +5145,7 @@ checksum = "c191019f4d4f84281a6d0dd9a43181146b33019627fc394e42e08ade8976b431"
 dependencies = [
  "console",
  "dialoguer",
+ "hidapi",
  "log",
  "num-derive 0.4.2",
  "num-traits",

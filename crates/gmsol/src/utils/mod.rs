@@ -47,7 +47,7 @@ pub use self::{
             extract_cpi_events, fetch_transaction_history_with_config, EncodedCPIEvents,
         },
     },
-    signer::{shared_signer, SignerRef},
+    signer::{local_signer, shared_signer, LocalSignerRef, SignerRef},
     token::price_to_min_output_amount,
     transaction_builder::{
         compute_budget::ComputeBudget, rpc_builder::RpcBuilder, transaction_size::transaction_size,

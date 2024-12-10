@@ -42,6 +42,7 @@ cli = [
     "decode",
     "mock",
 ]
+remote-wallet = ["solana-remote-wallet"]
 clap = ["dep:clap", "gmsol-store/clap"]
 chainlink-pull-oracle = [
     "reqwest",
@@ -139,6 +140,7 @@ num-format = { workspace = true, optional = true }
 prettytable = { workspace = true, optional = true }
 reqwest = { workspace = true, optional = true, features = ["json"] }
 reqwest-websocket = { workspace = true, optional = true }
+solana-remote-wallet = { workspace = true, optional = true }
 
 # Chainlink.
 sha2 = { workspace = true, optional = true }

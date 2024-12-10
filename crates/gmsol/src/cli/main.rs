@@ -10,7 +10,7 @@ use anchor_client::{
 };
 use clap::Parser;
 use eyre::eyre;
-use gmsol::{store::utils::read_store, utils::SignerRef};
+use gmsol::{store::utils::read_store, utils::LocalSignerRef};
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::EnvFilter;
 
@@ -117,21 +117,21 @@ async fn main() -> eyre::Result<()> {
     Ok(())
 }
 
-type GMSOLClient = gmsol::Client<SignerRef>;
+type GMSOLClient = gmsol::Client<LocalSignerRef>;
 
 impl Cli {
-    fn wallet(&self) -> eyre::Result<SignerRef> {
+    fn wallet(&self) -> eyre::Result<LocalSignerRef> {
         if let Some(payer) = self.payer {
             if self.serialize_only {
                 let payer = NullSigner::new(&payer);
-                Ok(gmsol::utils::shared_signer(payer))
+                Ok(gmsol::utils::local_signer(payer))
             } else {
                 eyre::bail!("Setting payer is only allowed in `serialize-only` mode");
             }
         } else {
             let payer = read_keypair_file(&*shellexpand::full(&self.wallet)?)
                 .map_err(|err| eyre!("Failed to read keypair: {err}"))?;
-            Ok(gmsol::utils::shared_signer(payer))
+            Ok(gmsol::utils::local_signer(payer))
         }
     }
 
