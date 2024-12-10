@@ -41,8 +41,10 @@ cli = [
     "prettytable",
     "decode",
     "mock",
+    "url",
+    "solana-remote-wallet",
 ]
-remote-wallet = ["solana-remote-wallet"]
+
 clap = ["dep:clap", "gmsol-store/clap"]
 chainlink-pull-oracle = [
     "reqwest",
@@ -141,6 +143,7 @@ prettytable = { workspace = true, optional = true }
 reqwest = { workspace = true, optional = true, features = ["json"] }
 reqwest-websocket = { workspace = true, optional = true }
 solana-remote-wallet = { workspace = true, optional = true }
+url = { workspace = true, optional = true }
 
 # Chainlink.
 sha2 = { workspace = true, optional = true }
@@ -151,7 +154,6 @@ chainlink-datastreams = { workspace = true, optional = true }
 mock-chainlink-verifier = { workspace = true, optional = true }
 
 # Dependencies for pyth support
-url = { workspace = true, optional = true }
 eventsource-stream = { workspace = true, optional = true }
 pythnet-sdk = { workspace = true, optional = true }
 pyth-solana-receiver-sdk = { workspace = true, optional = true }

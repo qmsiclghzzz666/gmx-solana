@@ -12,6 +12,8 @@ pub(super) struct Args {
 enum Command {
     /// Initialize the mock chainlink verifier.
     InitMockChainlinkVerifier,
+    /// Hex to base58
+    HexToBase58 { hex: String },
 }
 
 impl Args {
@@ -21,7 +23,7 @@ impl Args {
         store: &Pubkey,
         serialize_only: bool,
     ) -> gmsol::Result<()> {
-        match self.command {
+        match &self.command {
             Command::InitMockChainlinkVerifier => {
                 use mock_chainlink_verifier::{
                     accounts, instruction, DEFAULT_ACCESS_CONTROLLER_ACCOUNT_SEEDS,
@@ -50,6 +52,12 @@ impl Args {
                     Ok(())
                 })
                 .await
+            }
+            Command::HexToBase58 { hex } => {
+                let data = hex::decode(hex).map_err(gmsol::Error::invalid_argument)?;
+                let data = bs58::encode(&data).into_string();
+                println!("{data}");
+                Ok(())
             }
         }
     }

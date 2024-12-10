@@ -1,16 +1,16 @@
+use std::rc::Rc;
+
 use admin::AdminArgs;
 use anchor_client::{
     solana_sdk::{
-        commitment_config::CommitmentConfig,
-        pubkey::Pubkey,
-        signature::{read_keypair_file, NullSigner},
-        signer::Signer,
+        commitment_config::CommitmentConfig, pubkey::Pubkey, signature::NullSigner, signer::Signer,
     },
     Cluster,
 };
 use clap::Parser;
 use eyre::eyre;
 use gmsol::{store::utils::read_store, utils::LocalSignerRef};
+use solana_remote_wallet::remote_wallet::RemoteWalletManager;
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::EnvFilter;
 
@@ -120,7 +120,10 @@ async fn main() -> eyre::Result<()> {
 type GMSOLClient = gmsol::Client<LocalSignerRef>;
 
 impl Cli {
-    fn wallet(&self) -> eyre::Result<LocalSignerRef> {
+    fn wallet(
+        &self,
+        wallet_manager: &mut Option<Rc<RemoteWalletManager>>,
+    ) -> eyre::Result<LocalSignerRef> {
         if let Some(payer) = self.payer {
             if self.serialize_only {
                 let payer = NullSigner::new(&payer);
@@ -129,9 +132,7 @@ impl Cli {
                 eyre::bail!("Setting payer is only allowed in `serialize-only` mode");
             }
         } else {
-            let payer = read_keypair_file(&*shellexpand::full(&self.wallet)?)
-                .map_err(|err| eyre!("Failed to read keypair: {err}"))?;
-            Ok(gmsol::utils::local_signer(payer))
+            utils::signer_from_source(&self.wallet, false, "keypair", wallet_manager)
         }
     }
 
@@ -158,10 +159,13 @@ impl Cli {
             .build()
     }
 
-    fn gmsol_client(&self) -> eyre::Result<GMSOLClient> {
+    fn gmsol_client(
+        &self,
+        wallet_manager: &mut Option<Rc<RemoteWalletManager>>,
+    ) -> eyre::Result<GMSOLClient> {
         let cluster = self.cluster()?;
         tracing::debug!("using cluster: {cluster}");
-        let wallet = self.wallet()?;
+        let wallet = self.wallet(wallet_manager)?;
         let payer = wallet.pubkey();
         tracing::debug!("using wallet: {}", payer);
         let commitment = self.commitment;
@@ -171,7 +175,8 @@ impl Cli {
     }
 
     async fn run(&self) -> eyre::Result<()> {
-        let client = self.gmsol_client()?;
+        let mut wallet_manager = None;
+        let client = self.gmsol_client(&mut wallet_manager)?;
         let (store, store_key) = self.store(&client).await?;
         match &self.command {
             Command::Whoami => {
