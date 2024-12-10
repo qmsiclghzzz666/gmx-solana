@@ -3,6 +3,7 @@ use num_traits::{CheckedAdd, CheckedDiv, CheckedMul, CheckedSub, Signed, Zero};
 use crate::{
     action::{deposit::Deposit, withdraw::Withdrawal},
     fixed::FixedPointOps,
+    market::utils::MarketUtils,
     num::{Unsigned, UnsignedAbs},
     price::Prices,
     BorrowingFeeMarket, PnlFactorKind, PositionImpactMarket,
@@ -82,14 +83,13 @@ pub trait LiquidityMarketExt<const DECIMALS: u8>: LiquidityMarket<DECIMALS> {
         pnl_factor: PnlFactorKind,
         maximize: bool,
     ) -> crate::Result<Self::Signed> {
-        let mut pool_value = {
-            let long_value = self.pool_value_without_pnl_for_one_side(prices, true, maximize)?;
-            let short_value = self.pool_value_without_pnl_for_one_side(prices, false, maximize)?;
-            long_value
-                .checked_add(&short_value)
-                .ok_or(crate::Error::Overflow)?
-                .to_signed()?
-        };
+        let long_value = self.pool_value_without_pnl_for_one_side(prices, true, maximize)?;
+        let short_value = self.pool_value_without_pnl_for_one_side(prices, false, maximize)?;
+
+        let mut pool_value = long_value
+            .checked_add(&short_value)
+            .ok_or(crate::Error::Overflow)?
+            .to_signed()?;
 
         // Add total pending borrowing fees.
         let total_borrowing_fees = {
@@ -117,11 +117,11 @@ pub trait LiquidityMarketExt<const DECIMALS: u8>: LiquidityMarket<DECIMALS> {
         // Deduct net pnl.
         let long_pnl = {
             let pnl = self.pnl(&prices.index_token_price, true, !maximize)?;
-            self.cap_pnl(prices, true, &pnl, pnl_factor, true)?
+            self.cap_pnl(true, &pnl, &long_value, pnl_factor)?
         };
         let short_pnl = {
             let pnl = self.pnl(&prices.index_token_price, false, !maximize)?;
-            self.cap_pnl(prices, false, &pnl, pnl_factor, true)?
+            self.cap_pnl(false, &pnl, &short_value, pnl_factor)?
         };
         let net_pnl = long_pnl
             .checked_add(&short_pnl)

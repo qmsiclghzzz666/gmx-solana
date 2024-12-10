@@ -11,8 +11,8 @@ use crate::{
     },
     fixed::FixedPointOps,
     market::{
-        BaseMarketExt, BorrowingFeeMarket, BorrowingFeeMarketExt, PerpMarket, PerpMarketExt,
-        PositionImpactMarket,
+        utils::MarketUtils, BaseMarketExt, BorrowingFeeMarket, BorrowingFeeMarketExt, PerpMarket,
+        PerpMarketExt, PositionImpactMarket,
     },
     num::{MulDiv, Num, Unsigned, UnsignedAbs},
     params::fee::{FundingFees, PositionFees},
@@ -370,15 +370,17 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
         let uncapped_total_pnl = total_pnl.clone();
 
         if total_pnl.is_positive() {
+            let pool_value =
+                self.market()
+                    .pool_value_without_pnl_for_one_side(prices, self.is_long(), false)?;
             let pool_pnl = self
                 .market()
                 .pnl(&prices.index_token_price, self.is_long(), true)?;
             let capped_pool_pnl = self.market().cap_pnl(
-                prices,
                 self.is_long(),
                 &pool_pnl,
+                &pool_value,
                 PnlFactorKind::MaxForTrader,
-                false,
             )?;
 
             // Note: If the PnL is capped at zero, it can still pass this test.

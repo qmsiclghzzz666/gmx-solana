@@ -1,6 +1,8 @@
-use crate::{utils, BalanceExt};
+use num_traits::Signed;
 
-use super::{BaseMarket, BaseMarketExt};
+use crate::{num::Unsigned, utils, BalanceExt};
+
+use super::{BaseMarket, BaseMarketExt, PnlFactorKind};
 
 /// Utils for market.
 pub(crate) trait MarketUtils<const DECIMALS: u8>: BaseMarket<DECIMALS> {
@@ -34,6 +36,29 @@ pub(crate) trait MarketUtils<const DECIMALS: u8>: BaseMarket<DECIMALS> {
             Ok(reserve_usage_factor)
         } else {
             Ok(open_interest_usage_factor)
+        }
+    }
+
+    /// Cap pnl with the given pool value and the max pnl factor.
+    fn cap_pnl(
+        &self,
+        is_long: bool,
+        pnl: &Self::Signed,
+        pool_value: &Self::Num,
+        kind: PnlFactorKind,
+    ) -> crate::Result<Self::Signed> {
+        if pnl.is_positive() {
+            let max_pnl_factor = self.pnl_factor_config(kind, is_long)?;
+            let max_pnl = crate::utils::apply_factor(pool_value, &max_pnl_factor)
+                .ok_or(crate::Error::Computation("calculating max pnl"))?
+                .to_signed()?;
+            if *pnl > max_pnl {
+                Ok(max_pnl)
+            } else {
+                Ok(pnl.clone())
+            }
+        } else {
+            Ok(pnl.clone())
         }
     }
 }

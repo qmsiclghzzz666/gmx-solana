@@ -216,31 +216,6 @@ pub trait BaseMarketExt<const DECIMALS: u8>: BaseMarket<DECIMALS> {
         }
     }
 
-    /// Cap pnl with max pnl factor.
-    fn cap_pnl(
-        &self,
-        prices: &Prices<Self::Num>,
-        is_long: bool,
-        pnl: &Self::Signed,
-        kind: PnlFactorKind,
-        maximize: bool,
-    ) -> crate::Result<Self::Signed> {
-        if pnl.is_positive() {
-            let max_pnl_factor = self.pnl_factor_config(kind, is_long)?;
-            let pool_value = self.pool_value_without_pnl_for_one_side(prices, is_long, maximize)?;
-            let max_pnl = crate::utils::apply_factor(&pool_value, &max_pnl_factor)
-                .ok_or(crate::Error::Computation("calculating max pnl"))?
-                .to_signed()?;
-            if *pnl > max_pnl {
-                Ok(max_pnl)
-            } else {
-                Ok(pnl.clone())
-            }
-        } else {
-            Ok(pnl.clone())
-        }
-    }
-
     /// Get pnl factor.
     fn pnl_factor(
         &self,
