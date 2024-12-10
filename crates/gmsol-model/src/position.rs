@@ -513,7 +513,7 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
         match check_collateral(
             size_in_usd,
             params.min_collateral_factor(),
-            should_validate_min_collateral_usd.then(|| params.min_collateral_factor()),
+            should_validate_min_collateral_usd.then(|| params.min_collateral_value()),
             false,
             &remaining_collateral_value,
         )? {
