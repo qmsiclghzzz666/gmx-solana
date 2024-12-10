@@ -53,6 +53,7 @@ chainlink-pull-oracle = [
     "hmac",
     "reqwest-websocket",
     "chainlink-datastreams",
+    "async-tungstenite",
 ]
 pyth-pull-oracle = [
     "reqwest/stream",
@@ -142,6 +143,10 @@ num-format = { workspace = true, optional = true }
 prettytable = { workspace = true, optional = true }
 reqwest = { workspace = true, optional = true, features = ["json"] }
 reqwest-websocket = { workspace = true, optional = true }
+# Manually enable the `futures-03-sink` feature to prevent compile errors.
+async-tungstenite = { workspace = true, optional = true, features = [
+    "futures-03-sink",
+] }
 solana-remote-wallet = { workspace = true, optional = true }
 url = { workspace = true, optional = true }
 
