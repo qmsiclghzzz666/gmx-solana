@@ -133,19 +133,45 @@ pub(crate) fn unchecked_initialize_market(
                 .is_enabled(),
             CoreError::InvalidArgument
         );
+
+        let long_token = &ctx.accounts.long_token_mint;
+        let long_token_config = token_map
+            .get(&long_token.key())
+            .ok_or_else(|| error!(CoreError::NotFound))?;
         require!(
-            token_map
-                .get(&ctx.accounts.long_token_mint.key())
-                .ok_or_else(|| error!(CoreError::NotFound))?
-                .is_enabled(),
-            CoreError::InvalidArgument
+            long_token_config.is_enabled(),
+            CoreError::TokenConfigDisabled
         );
         require!(
-            token_map
-                .get(&ctx.accounts.short_token_mint.key())
-                .ok_or_else(|| error!(CoreError::NotFound))?
-                .is_enabled(),
+            long_token_config.is_valid_pool_token_config(),
             CoreError::InvalidArgument
+        );
+        // This is a redundant check to prevent the decimals in the token config from
+        // being inconsistent with the actual values.
+        require_eq!(
+            long_token_config.token_decimals(),
+            long_token.decimals,
+            CoreError::TokenDecimalsMismatched
+        );
+
+        let short_token = &ctx.accounts.short_token_mint;
+        let short_token_config = token_map
+            .get(&short_token.key())
+            .ok_or_else(|| error!(CoreError::NotFound))?;
+        require!(
+            short_token_config.is_enabled(),
+            CoreError::TokenConfigDisabled
+        );
+        require!(
+            short_token_config.is_valid_pool_token_config(),
+            CoreError::InvalidArgument
+        );
+        // This is a redundant check to prevent the decimals in the token config from
+        // being inconsistent with the actual values.
+        require_eq!(
+            short_token_config.token_decimals(),
+            short_token.decimals,
+            CoreError::TokenDecimalsMismatched
         );
     }
     let market = &ctx.accounts.market;

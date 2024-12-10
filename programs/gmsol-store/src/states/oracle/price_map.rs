@@ -8,7 +8,8 @@ use crate::{utils::pubkey::to_bytes, CoreError};
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub struct SmallPrices {
     decimal_multipler: u8,
-    padding_0: [u8; 3],
+    flags: u8,
+    padding_0: [u8; 2],
     min: u32,
     max: u32,
 }
@@ -20,6 +21,8 @@ impl Default for SmallPrices {
 }
 
 impl SmallPrices {
+    const SYNTHETIC_FLAGS: u8 = u8::MAX;
+
     /// Get min price.
     pub fn min(&self) -> Decimal {
         Decimal {
@@ -36,7 +39,7 @@ impl SmallPrices {
         }
     }
 
-    pub(crate) fn from_price(price: &gmsol_utils::Price) -> Result<Self> {
+    pub(crate) fn from_price(price: &gmsol_utils::Price, is_synthetic: bool) -> Result<Self> {
         // Validate price data.
         require_eq!(
             price.min.decimal_multiplier,
@@ -46,20 +49,32 @@ impl SmallPrices {
         require_neq!(price.min.value, 0, CoreError::InvalidArgument);
         require_gt!(price.max.value, price.min.value, CoreError::InvalidArgument);
 
+        let flags = if is_synthetic {
+            Self::SYNTHETIC_FLAGS
+        } else {
+            0
+        };
+
         Ok(SmallPrices {
             decimal_multipler: price.min.decimal_multiplier,
-            padding_0: [0; 3],
+            flags,
+            padding_0: [0; 2],
             min: price.min.value,
             max: price.max.value,
         })
     }
 
+    /// Returns whether the token is synthetic.
+    pub fn is_synthetic(&self) -> bool {
+        self.flags == Self::SYNTHETIC_FLAGS
+    }
+
     /// Convert to [`Price`](gmsol_utils::Price).
-    pub fn to_price(&self) -> gmsol_utils::Price {
-        gmsol_utils::Price {
+    pub fn to_price(&self) -> Result<gmsol_utils::Price> {
+        Ok(gmsol_utils::Price {
             min: self.min(),
             max: self.max(),
-        }
+        })
     }
 }
 
@@ -71,8 +86,13 @@ impl PriceMap {
     /// Max tokens.
     pub const MAX_TOKENS: usize = MAX_TOKENS;
 
-    pub(super) fn set(&mut self, token: &Pubkey, price: gmsol_utils::Price) -> Result<()> {
-        self.insert(token, SmallPrices::from_price(&price)?);
+    pub(super) fn set(
+        &mut self,
+        token: &Pubkey,
+        price: gmsol_utils::Price,
+        is_synthetic: bool,
+    ) -> Result<()> {
+        self.insert(token, SmallPrices::from_price(&price, is_synthetic)?);
         Ok(())
     }
 }

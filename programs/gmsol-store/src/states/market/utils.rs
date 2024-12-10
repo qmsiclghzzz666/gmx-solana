@@ -13,6 +13,16 @@ pub trait ValidateMarketBalances:
     + HasMarketMeta
 {
     /// Validate market balance for the given token.
+    ///
+    /// # Notes
+    /// Unlike the Solidity version, this function does not actually verify
+    /// the token balance but only checks the balance recorded in the market state.
+    /// This is because we use a shared vaults design, making it unlikely to sum all
+    /// markets in a single instruction and then verify the vault's balance.
+    ///
+    /// The reason we adopt a shared vaults design is to avoid performing a large number
+    /// of CPIs when executing swaps along the swap path, which could easily lead to heap
+    /// memory overflows if we used Solana's default heap allocator.
     fn validate_market_balance_for_the_given_token(
         &self,
         token: &Pubkey,

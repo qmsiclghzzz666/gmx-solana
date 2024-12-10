@@ -138,7 +138,8 @@ impl Oracle {
                 oracle_price.oracle_slot,
                 &oracle_price.price,
             )?;
-            self.primary.set(token, oracle_price.price)?;
+            self.primary
+                .set(token, oracle_price.price, token_config.is_synthetic())?;
         }
         self.update_oracle_ts_and_slot(validator)?;
         Ok(())
@@ -238,11 +239,28 @@ impl Oracle {
     pub(crate) fn get_primary_price(
         &self,
         token: &Pubkey,
+        allow_synthetic: bool,
     ) -> Result<gmsol_model::price::Price<u128>> {
         let price = self
             .primary
             .get(token)
             .ok_or_else(|| error!(CoreError::MissingOraclePrice))?;
+
+        // The `is_synthetic` flag needs to be checked because, for pool tokens,
+        // we do not want their token decimals to be manually set (only synthetic
+        // tokens are allowed to have their decimals manually configured).
+        // This helps prevent the possibility of unit price using incorrect token
+        // decimals assumptions.
+        //
+        // Note: the SPL token mint cannot be closed, and the SPL token 2022 token mint
+        // also cannot be closed when there is a supply. Therefore, there is generally
+        // no need to worry about the decimals of non-synthetic tokens being changed.
+        if !allow_synthetic {
+            require!(
+                !price.is_synthetic(),
+                CoreError::SyntheticTokenPriceIsNotAllowed
+            );
+        }
         Ok(gmsol_model::price::Price {
             min: price.min().to_unit_price(),
             max: price.max().to_unit_price(),
@@ -256,9 +274,9 @@ impl Oracle {
     ) -> Result<gmsol_model::price::Prices<u128>> {
         let meta = market.market_meta();
         let prices = gmsol_model::price::Prices {
-            index_token_price: self.get_primary_price(&meta.index_token_mint)?,
-            long_token_price: self.get_primary_price(&meta.long_token_mint)?,
-            short_token_price: self.get_primary_price(&meta.short_token_mint)?,
+            index_token_price: self.get_primary_price(&meta.index_token_mint, true)?,
+            long_token_price: self.get_primary_price(&meta.long_token_mint, false)?,
+            short_token_price: self.get_primary_price(&meta.short_token_mint, false)?,
         };
         Ok(prices)
     }

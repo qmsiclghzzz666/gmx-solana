@@ -159,6 +159,11 @@ impl TokenConfig {
         self.flag(Flag::Synthetic)
     }
 
+    /// Returns whether the config is a valid pool token config.
+    pub fn is_valid_pool_token_config(&self) -> bool {
+        !self.is_synthetic()
+    }
+
     /// Set flag
     pub fn set_flag(&mut self, flag: Flag, value: bool) {
         let mut bitmap = TokenFlags::from_value(self.flags);

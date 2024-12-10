@@ -947,7 +947,7 @@ where
     {
         let index_token_mint = market.market_meta().index_token_mint;
         prices.index_token_price = oracle
-            .get_primary_price(&index_token_mint)
+            .get_primary_price(&index_token_mint, true)
             .expect("must exist");
     }
 

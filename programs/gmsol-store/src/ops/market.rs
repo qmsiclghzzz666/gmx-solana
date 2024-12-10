@@ -236,6 +236,12 @@ impl<'a, 'info, T> Execute<'a, 'info, T> {
                 .map_err(ModelError::from)?
                 .execute()
                 .map_err(ModelError::from)?;
+            // Unlike the Solidity version, this log will still be output
+            // even when there is no position impact amount to distribute.
+            //
+            // However, in the future, we will decide whether to emit
+            // an event based on whether the `distribution_amount` is zero,
+            // which is consistent with the Solidity version.
             msg!("[Deposit] pre-execute: {:?}", report);
         }
 
@@ -340,6 +346,12 @@ impl<'a, 'info, T> Execute<'a, 'info, T> {
                 .map_err(ModelError::from)?
                 .execute()
                 .map_err(ModelError::from)?;
+            // Unlike the Solidity version, this log will still be output
+            // even when there is no position impact amount to distribute.
+            //
+            // However, in the future, we will decide whether to emit
+            // an event based on whether the `distribution_amount` is zero,
+            // which is consistent with the Solidity version.
             msg!("[Withdrawal] pre-execute: {:?}", report);
         }
 

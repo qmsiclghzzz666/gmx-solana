@@ -3426,6 +3426,9 @@ pub enum CoreError {
     /// Token mint is not provided.
     #[msg("required token mint is not provided")]
     TokenMintNotProvided,
+    /// Token decimals mismatched.
+    #[msg("token decimals mismatched")]
+    TokenDecimalsMismatched,
     /// Market account is not provided.
     #[msg("market account is not provided")]
     MarketAccountIsNotProvided,
@@ -3549,6 +3552,9 @@ pub enum CoreError {
     /// Token config is diabled.
     #[msg("token config is disabled")]
     TokenConfigDisabled,
+    /// Synthetic token price is not allowed.
+    #[msg("synthetic token price is not allowed")]
+    SyntheticTokenPriceIsNotAllowed,
     /// Invalid Price Report.
     #[msg("invalid price report")]
     InvalidPriceReport,

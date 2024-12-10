@@ -861,6 +861,12 @@ impl<'a, 'info> ExecuteOrderOperation<'a, 'info> {
                 .map_err(ModelError::from)?
                 .execute()
                 .map_err(ModelError::from)?;
+            // Unlike the Solidity version, this log will still be output
+            // even when there is no position impact amount to distribute.
+            //
+            // However, in the future, we will decide whether to emit
+            // an event based on whether the `distribution_amount` is zero,
+            // which is consistent with the Solidity version.
             msg!("[Order] pre-execute: {:?}", report);
         }
 
