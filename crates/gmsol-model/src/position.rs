@@ -297,15 +297,15 @@ pub trait PositionExt<const DECIMALS: u8>: Position<DECIMALS> {
             true,
             &remaining_collateral_value,
         )? {
-            CheckCollateralResult::Sufficient | CheckCollateralResult::Zero => Ok(
-                WillCollateralBeSufficient::Sufficient(remaining_collateral_value),
-            ),
+            CheckCollateralResult::Sufficient => Ok(WillCollateralBeSufficient::Sufficient(
+                remaining_collateral_value,
+            )),
             CheckCollateralResult::Negative | CheckCollateralResult::MinCollateralForLeverage => {
                 Ok(WillCollateralBeSufficient::Insufficient(
                     remaining_collateral_value,
                 ))
             }
-            CheckCollateralResult::MinCollateral => unreachable!(),
+            CheckCollateralResult::MinCollateral | CheckCollateralResult::Zero => unreachable!(),
         }
     }
 
