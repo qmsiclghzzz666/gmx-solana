@@ -58,7 +58,7 @@ where
         // In other words, as long as `max_position_impact_factor` doesn't exceed 50%.
         //
         // Otherwise, if we use the order `size_in_usd.mul_div(adjusted_price_impact_value, size_in_tokens) / size_in_usd`,
-        // the `mul_div` operation is likely to overflow. For example (Unsigend = u128, Signed = i128, DECIMALS = 20):
+        // the `mul_div` operation is likely to overflow. For example (Unsigned = u128, Signed = i128, DECIMALS = 20):
         //
         // Assume that `size_in_usd = 6250 * 10^20` ($6250) and `size_in_tokens = 67774` (0.067774 BTC, decimals = 6). When the user
         // close it with `size_delta_usd = 6250 * 10^20` causing a `price_impact_value = 3.90625 * 10^20` (the "factor" is only

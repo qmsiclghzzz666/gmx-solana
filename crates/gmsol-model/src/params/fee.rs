@@ -260,7 +260,7 @@ impl<T> BorrowingFeeKinkModelParams<T> {
                     above_optimal_usage_borrowing_factor
                         .checked_sub(base_borrowing_factor)
                         .ok_or(crate::Error::Computation(
-                            "borrowing fee kink model: calculating addtional factor",
+                            "borrowing fee kink model: calculating additional factor",
                         ))?
                 } else {
                     T::zero()
@@ -577,7 +577,7 @@ impl<T> FundingFees<T> {
         &self.claimable_long_token_amount
     }
 
-    /// Get claimble short token funding fee amount.
+    /// Get claimable short token funding fee amount.
     pub fn claimable_short_token_amount(&self) -> &T {
         &self.claimable_short_token_amount
     }

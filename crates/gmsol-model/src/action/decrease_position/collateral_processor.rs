@@ -370,7 +370,7 @@ where
                 .unsigned_abs()
                 .checked_div(self.state.pnl_token_price().pick_price(true))
                 .ok_or(crate::Error::Computation(
-                    "pnl: calculating dedcution amount for pool",
+                    "pnl: calculating deduction amount for pool",
                 ))?;
 
             let is_pnl_token_long = self.state.is_pnl_token_long;

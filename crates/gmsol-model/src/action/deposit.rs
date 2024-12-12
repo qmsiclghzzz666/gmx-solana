@@ -49,18 +49,18 @@ impl<T> DepositParams<T> {
         &self.prices.short_token_price
     }
 
-    fn reassign_values(&self, is_long_token: bool) -> ReassignedVaules<T>
+    fn reassign_values(&self, is_long_token: bool) -> ReassignedValues<T>
     where
         T: Clone,
     {
         if is_long_token {
-            ReassignedVaules {
+            ReassignedValues {
                 amount: self.long_token_amount.clone(),
                 price: self.long_token_price(),
                 opposite_price: self.short_token_price(),
             }
         } else {
-            ReassignedVaules {
+            ReassignedValues {
                 amount: self.short_token_amount.clone(),
                 price: self.short_token_price(),
                 opposite_price: self.long_token_price(),
@@ -205,7 +205,7 @@ impl<const DECIMALS: u8, M: LiquidityMarketMut<DECIMALS>> Deposit<M, DECIMALS> {
             return Err(crate::Error::InvalidPoolValue("deposit"));
         }
 
-        let ReassignedVaules {
+        let ReassignedValues {
             mut amount,
             price,
             opposite_price,
@@ -373,7 +373,7 @@ where
     }
 }
 
-struct ReassignedVaules<'a, T> {
+struct ReassignedValues<'a, T> {
     amount: T,
     price: &'a Price<T>,
     opposite_price: &'a Price<T>,

@@ -65,7 +65,7 @@ impl Decimal {
             decimal_multiplier <= Self::MAX_DECIMAL_MULTIPLIER,
             "must not exceed `MAX_DECIMAL_MULTIPLIER`"
         );
-        // CHECK: 2 * MAX_DECIMALS + MAX_DECIMAL_MULTIPLER <= u8::MAX
+        // CHECK: 2 * MAX_DECIMALS + MAX_DECIMAL_MULTIPLIER <= u8::MAX
         let multiplier = (token_decimals << 1) + decimal_multiplier;
         let value = if Self::MAX_DECIMALS >= multiplier {
             let mut exp = Self::MAX_DECIMALS - multiplier;
@@ -139,7 +139,7 @@ mod tests {
 
     #[test]
     fn test_price_1() {
-        // The price of ETH is 5,000 with 18 decimals and the decimal multipler is set to 8 (so that we have decimals of precision 4).
+        // The price of ETH is 5,000 with 18 decimals and the decimal multiplier is set to 8 (so that we have decimals of precision 4).
         let price = Decimal::try_from_price(5_000_000_000_000_000_000_000, 18, 8, 4).unwrap();
         assert_eq!(price.to_unit_price(), 5_000_000_000_000_000);
         assert_eq!(price.decimal_multiplier, 8);
@@ -147,7 +147,7 @@ mod tests {
 
     #[test]
     fn test_price_2() {
-        // The price of BTC is 60,000 with 8 decimals and the decimal multipler is set to 10 (so that we have decimals of precision 2).
+        // The price of BTC is 60,000 with 8 decimals and the decimal multiplier is set to 10 (so that we have decimals of precision 2).
         let price = Decimal::try_from_price(6_000_000_000_000, 8, 8, 2).unwrap();
         assert_eq!(price.to_unit_price(), 60_000_000_000_000_000);
         assert_eq!(price.decimal_multiplier, 10);
@@ -155,7 +155,7 @@ mod tests {
 
     #[test]
     fn test_price_3() {
-        // The price of USDC is 1 with 6 decimals and the decimal multipler is set to 8 (so that we have decimals of precision 6).
+        // The price of USDC is 1 with 6 decimals and the decimal multiplier is set to 8 (so that we have decimals of precision 6).
         let price = Decimal::try_from_price(1_000_000, 6, 6, 6).unwrap();
         assert_eq!(price.to_unit_price(), 100_000_000_000_000);
         assert_eq!(price.decimal_multiplier, 8);
@@ -163,7 +163,7 @@ mod tests {
 
     #[test]
     fn test_price_4() {
-        // The price of DG is 0.00000001 with 18 decimals and the decimal multipler is set to 1 (so that we have decimals of precision 11).
+        // The price of DG is 0.00000001 with 18 decimals and the decimal multiplier is set to 1 (so that we have decimals of precision 11).
         let price = Decimal::try_from_price(10_000_000_000, 18, 8, 11).unwrap();
         assert_eq!(price.to_unit_price(), 10_000);
         assert_eq!(price.decimal_multiplier, 1);
