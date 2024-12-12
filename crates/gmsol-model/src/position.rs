@@ -235,11 +235,11 @@ impl<'a, const DECIMALS: u8, P: PositionMut<DECIMALS>> PositionMut<DECIMALS> for
 
 /// Extension trait for [`PositionState`].
 pub trait PositionStateExt<const DECIMALS: u8>: PositionState<DECIMALS> {
-    /// Return whether the position is considered to be empty.
+    /// Return whether the position is considered to be empty **during the decrease position action**.
     fn is_empty(&self) -> bool {
         self.size_in_usd().is_zero()
-            || self.size_in_tokens().is_zero()
-            || self.collateral_amount().is_zero()
+            && self.size_in_tokens().is_zero()
+            && self.collateral_amount().is_zero()
     }
 }
 
