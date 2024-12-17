@@ -1113,16 +1113,18 @@ impl<'a, 'info> ExecuteOrderOperation<'a, 'info> {
         let params = &order.params;
         let kind = params.kind()?;
 
-        // NOTE: we currently allow the delta size for decrease position order to be empty.
-        if kind.is_increase_position() {
-            require!(params.size_delta_value != 0, CoreError::InvalidArgument);
-        }
-
-        if kind.is_swap() {
+        if kind.is_increase_position() || kind.is_decrease_position() {
+            require!(
+                params.size_delta_value != 0 || params.initial_collateral_delta_amount != 0,
+                CoreError::EmptyOrder
+            );
+        } else if kind.is_swap() {
             require!(
                 params.initial_collateral_delta_amount != 0,
-                CoreError::InvalidArgument
+                CoreError::EmptyOrder
             );
+        } else {
+            unreachable!()
         }
         Ok(())
     }
