@@ -321,21 +321,21 @@ pub struct DepositIntoTreasury<'info> {
     #[account(
         mut,
         associated_token::authority = config,
-        associated_token::mint =  token,
+        associated_token::mint = token,
     )]
     pub receiver_vault: InterfaceAccount<'info, TokenAccount>,
     /// Treasury vault.
     #[account(
         mut,
         associated_token::authority = treasury_config,
-        associated_token::mint =  token,
+        associated_token::mint = token,
     )]
     pub treasury_vault: InterfaceAccount<'info, TokenAccount>,
     /// GT bank vault.
     #[account(
         mut,
         associated_token::authority = gt_bank,
-        associated_token::mint =  token,
+        associated_token::mint = token,
     )]
     pub gt_bank_vault: InterfaceAccount<'info, TokenAccount>,
     /// Store program.

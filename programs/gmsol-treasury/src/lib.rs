@@ -8,13 +8,14 @@ pub mod instructions;
 pub mod roles;
 
 use anchor_lang::prelude::*;
-use gmsol_store::utils::CpiAuthenticate;
+use gmsol_store::{states::NonceBytes, utils::CpiAuthenticate};
 use instructions::*;
 
 declare_id!("GTtRSYha5h8S26kPFHgYKUf8enEgabkTFwW7UToXAHoY");
 
 #[program]
 pub mod gmsol_treasury {
+
     use super::*;
 
     /// Initialize a treasury [`Config`](crate::states::Config) account.
@@ -141,5 +142,23 @@ pub mod gmsol_treasury {
         ctx: Context<'_, '_, 'info, 'info, CompleteGtExchange<'info>>,
     ) -> Result<()> {
         instructions::complete_gt_exchange(ctx)
+    }
+
+    /// Create a swap.
+    #[access_control(CpiAuthenticate::only(&ctx, roles::TREASURY_KEEPER))]
+    pub fn create_swap<'info>(
+        ctx: Context<'_, '_, 'info, 'info, CreateSwap<'info>>,
+        nonce: NonceBytes,
+        swap_path_length: u8,
+        swap_in_amount: u64,
+        min_swap_out_amount: Option<u64>,
+    ) -> Result<()> {
+        instructions::unchecked_create_swap(
+            ctx,
+            nonce,
+            swap_path_length,
+            swap_in_amount,
+            min_swap_out_amount,
+        )
     }
 }

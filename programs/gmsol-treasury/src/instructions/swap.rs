@@ -1,0 +1,175 @@
+use anchor_lang::prelude::*;
+use anchor_spl::{
+    associated_token::AssociatedToken,
+    token::{Mint, Token, TokenAccount},
+};
+use gmsol_store::{
+    cpi::{accounts::CreateOrder, create_order},
+    ops::order::CreateOrderParams,
+    program::GmsolStore,
+    states::{common::action::Action, order::OrderKind, NonceBytes, Order},
+    utils::{CpiAuthentication, WithStore},
+    CoreError,
+};
+
+use crate::states::{Config, TreasuryConfig};
+
+/// The accounts definition for [`create_swap`](crate::gmsol_treasury::create_swap).
+#[derive(Accounts)]
+pub struct CreateSwap<'info> {
+    /// Authority.
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    /// Store.
+    /// CHECK: check by CPI.
+    pub store: UncheckedAccount<'info>,
+    /// Config.
+    #[account(
+        mut,
+        has_one = store,
+        // Only allow using the authorized treasury config.
+        constraint = config.load()?.treasury_config() == Some(&treasury_config.key()) @ CoreError::InvalidArgument,
+    )]
+    pub config: AccountLoader<'info, Config>,
+    /// Treasury Config.
+    #[account(
+        has_one = config,
+        constraint = !treasury_config.load()?.is_deposit_allowed(&swap_in_token.key()).unwrap_or(false) @ CoreError::InvalidArgument,
+        constraint = treasury_config.load()?.is_deposit_allowed(&swap_out_token.key())? @ CoreError::InvalidArgument,
+    )]
+    pub treasury_config: AccountLoader<'info, TreasuryConfig>,
+    /// Swap in token.
+    pub swap_in_token: Account<'info, Mint>,
+    /// Swap out token.
+    #[account(constraint = swap_in_token.key() != swap_out_token.key() @ CoreError::InvalidArgument)]
+    pub swap_out_token: Account<'info, Mint>,
+    /// Swap in token receiver vault.
+    #[account(
+        mut,
+        associated_token::authority = config,
+        associated_token::mint = swap_in_token,
+    )]
+    pub swap_in_token_receiver_vault: Account<'info, TokenAccount>,
+    /// Swap out token receiver vault.
+    #[account(
+        mut,
+        associated_token::authority = config,
+        associated_token::mint = swap_out_token,
+    )]
+    pub swap_out_token_receiver_vault: Account<'info, TokenAccount>,
+    /// Market.
+    /// CHECK: check by CPI.
+    #[account(mut)]
+    pub market: UncheckedAccount<'info>,
+    /// The user account for `config`.
+    /// CHECK: check by CPI.
+    #[account(mut)]
+    pub user: UncheckedAccount<'info>,
+    /// The escrow account for swap in token.
+    /// CHECK: check by CPI.
+    #[account(mut)]
+    pub swap_in_token_escrow: UncheckedAccount<'info>,
+    /// The escrow account for swap out token.
+    /// CHECK: check by CPI.
+    #[account(mut)]
+    pub swap_out_token_escrow: UncheckedAccount<'info>,
+    /// The order account.
+    #[account(mut)]
+    pub order: UncheckedAccount<'info>,
+    /// Store program.
+    pub store_program: Program<'info, GmsolStore>,
+    /// The token program.
+    pub token_program: Program<'info, Token>,
+    /// Associated token program.
+    pub associated_token_program: Program<'info, AssociatedToken>,
+    /// The system program.
+    pub system_program: Program<'info, System>,
+}
+
+/// Create a swap with the store program.
+/// # CHECK
+/// Only [`TREASURY_KEEPER`](crate::roles::TREASURY_KEEPER) is allowed to use.
+pub(crate) fn unchecked_create_swap<'info>(
+    ctx: Context<'_, '_, 'info, 'info, CreateSwap<'info>>,
+    nonce: NonceBytes,
+    swap_path_length: u8,
+    swap_in_amount: u64,
+    min_swap_out_amount: Option<u64>,
+) -> Result<()> {
+    let signer = ctx.accounts.config.load()?.signer();
+    let cpi_ctx = ctx.accounts.create_order_ctx();
+    let params = CreateOrderParams {
+        kind: OrderKind::MarketSwap,
+        decrease_position_swap_type: None,
+        execution_lamports: Order::MIN_EXECUTION_LAMPORTS,
+        swap_path_length,
+        initial_collateral_delta_amount: swap_in_amount,
+        size_delta_value: 0,
+        is_long: true,
+        is_collateral_long: true,
+        min_output: min_swap_out_amount.map(u128::from),
+        trigger_price: None,
+        acceptable_price: None,
+    };
+    create_order(
+        cpi_ctx
+            .with_signer(&[&signer.as_seeds()])
+            .with_remaining_accounts(ctx.remaining_accounts.to_vec()),
+        nonce,
+        params,
+    )?;
+    Ok(())
+}
+
+impl<'info> WithStore<'info> for CreateSwap<'info> {
+    fn store_program(&self) -> AccountInfo<'info> {
+        self.store_program.to_account_info()
+    }
+
+    fn store(&self) -> AccountInfo<'info> {
+        self.store.to_account_info()
+    }
+}
+
+impl<'info> CpiAuthentication<'info> for CreateSwap<'info> {
+    fn authority(&self) -> AccountInfo<'info> {
+        self.authority.to_account_info()
+    }
+
+    fn on_error(&self) -> Result<()> {
+        err!(CoreError::PermissionDenied)
+    }
+}
+
+impl<'info> CreateSwap<'info> {
+    fn create_order_ctx(&self) -> CpiContext<'_, '_, '_, 'info, CreateOrder<'info>> {
+        CpiContext::new(
+            self.store_program.to_account_info(),
+            CreateOrder {
+                owner: self.config.to_account_info(),
+                store: self.store.to_account_info(),
+                market: self.market.to_account_info(),
+                user: self.user.to_account_info(),
+                order: self.order.to_account_info(),
+                position: None,
+                initial_collateral_token: Some(self.swap_in_token.to_account_info()),
+                final_output_token: self.swap_out_token.to_account_info(),
+                long_token: None,
+                short_token: None,
+                initial_collateral_token_escrow: Some(self.swap_in_token_escrow.to_account_info()),
+                final_output_token_escrow: Some(self.swap_out_token_escrow.to_account_info()),
+                long_token_escrow: None,
+                short_token_escrow: None,
+                initial_collateral_token_source: Some(
+                    self.swap_in_token_receiver_vault.to_account_info(),
+                ),
+                final_output_token_ata: Some(self.swap_out_token_receiver_vault.to_account_info()),
+                long_token_ata: None,
+                short_token_ata: None,
+                system_program: self.system_program.to_account_info(),
+                token_program: self.token_program.to_account_info(),
+                associated_token_program: self.associated_token_program.to_account_info(),
+            },
+        )
+    }
+}
