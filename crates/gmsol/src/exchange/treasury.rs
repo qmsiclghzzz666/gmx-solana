@@ -75,7 +75,6 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> ClaimFeesBuilder<'a, C> {
                 vault,
                 target,
                 token_program,
-                associated_token_program: anchor_spl::associated_token::ID,
             })
             .args(instruction::ClaimFeesFromMarket {});
 

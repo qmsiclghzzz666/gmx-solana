@@ -12,10 +12,7 @@ use crate::{
 };
 
 use anchor_lang::prelude::*;
-use anchor_spl::{
-    associated_token::AssociatedToken,
-    token::{Mint, Token, TokenAccount},
-};
+use anchor_spl::token::{Mint, Token, TokenAccount};
 use gmsol_model::{
     num::Unsigned, price::Prices, BalanceExt, BaseMarketMut, LiquidityMarketExt, PnlFactorKind,
     PoolExt,
@@ -653,13 +650,10 @@ pub struct ClaimFeesFromMarket<'info> {
     pub vault: InterfaceAccount<'info, anchor_spl::token_interface::TokenAccount>,
     #[account(
         mut,
-        associated_token::authority = authority,
-        associated_token::mint = token_mint,
-        associated_token::token_program = token_program,
+        token::mint = token_mint,
     )]
     pub target: InterfaceAccount<'info, anchor_spl::token_interface::TokenAccount>,
     pub token_program: Interface<'info, anchor_spl::token_interface::TokenInterface>,
-    pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
 /// Claim fees from the market.

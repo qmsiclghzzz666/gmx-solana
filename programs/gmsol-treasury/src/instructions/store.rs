@@ -165,7 +165,6 @@ impl<'info> ClaimFees<'info> {
                 vault: self.vault.to_account_info(),
                 target: self.receiver_vault.to_account_info(),
                 token_program: self.token_program.to_account_info(),
-                associated_token_program: self.associated_token_program.to_account_info(),
             },
         )
     }
