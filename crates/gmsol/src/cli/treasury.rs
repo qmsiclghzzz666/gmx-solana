@@ -4,6 +4,7 @@ use gmsol::{
     treasury::TreasuryOps,
     utils::builder::{MakeTransactionBuilder, WithPullOracle},
 };
+use gmsol_model::{BalanceExt, BaseMarket};
 use gmsol_treasury::states::treasury::TokenFlag;
 
 use crate::{utils::Side, GMSOLClient};
@@ -47,6 +48,10 @@ enum Command {
         market_token: Pubkey,
         #[arg(long)]
         side: Side,
+        #[arg(long)]
+        deposit: bool,
+        #[arg(long)]
+        token_program_id: Option<Pubkey>,
     },
     /// Deposit into treasury vault.
     DepositToTreasury {
@@ -114,14 +119,41 @@ impl Args {
             Command::SetEsgtReceiver { esgt_receiver } => {
                 client.set_esgt_receiver(store, esgt_receiver)
             }
-            Command::ClaimFees { market_token, side } => {
+            Command::ClaimFees {
+                market_token,
+                side,
+                deposit,
+                token_program_id,
+            } => {
                 let market = client.find_market_address(store, market_token);
-                let token_mint = client
-                    .market(&market)
-                    .await?
-                    .meta()
-                    .pnl_token(side.is_long());
-                client.claim_fees_to_receiver_vault(store, market_token, &token_mint)
+                let market = client.market(&market).await?;
+                let amount = market.claimable_fee_pool()?.amount(side.is_long())?;
+                if amount == 0 {
+                    return Err(gmsol::Error::invalid_argument(
+                        "no claimable fees for this side",
+                    ));
+                }
+                let token_mint = market.meta().pnl_token(side.is_long());
+                let claim = client.claim_fees_to_receiver_vault(store, market_token, &token_mint);
+
+                if *deposit {
+                    let store_account = client.store(store).await?;
+                    let time_window = store_account.gt().exchange_time_window();
+                    let (deposit, gt_exchange_vault) = client
+                        .deposit_into_treasury_valut(
+                            store,
+                            None,
+                            &token_mint,
+                            token_program_id.as_ref(),
+                            time_window,
+                        )
+                        .await?
+                        .swap_output(());
+                    println!("{gt_exchange_vault}");
+                    claim.merge(deposit)
+                } else {
+                    claim
+                }
             }
             Command::DepositToTreasury {
                 token_mint,
