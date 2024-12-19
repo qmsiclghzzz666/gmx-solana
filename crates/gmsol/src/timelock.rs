@@ -23,7 +23,7 @@ pub trait TimelockOps<C> {
     /// Increase timelock delay.
     fn increase_timelock_delay(&self, store: &Pubkey, delta: u32) -> RpcBuilder<C>;
 
-    /// Initialize [`Executor`](crate::types::timelock::Executor) account.
+    /// Initialize [`Executor`] account.
     fn initialize_executor(
         &self,
         store: &Pubkey,
