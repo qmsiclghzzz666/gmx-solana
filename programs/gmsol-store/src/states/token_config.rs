@@ -447,20 +447,6 @@ pub struct TokenMapRef<'a> {
     configs: Ref<'a, [u8]>,
 }
 
-impl<'a, 'info> TryFrom<Ref<'a, &'info mut [u8]>> for TokenMapRef<'a> {
-    type Error = anchor_lang::prelude::Error;
-
-    fn try_from(data: Ref<'a, &'info mut [u8]>) -> std::result::Result<Self, Self::Error> {
-        let (_disc, data) = Ref::map_split(data, |d| d.split_at(8));
-        let (header, configs) = Ref::map_split(data, |d| d.split_at(size_of::<TokenMapHeader>()));
-
-        Ok(TokenMapRef {
-            header: Ref::map(header, bytemuck::from_bytes),
-            configs,
-        })
-    }
-}
-
 /// Mutable Reference to Token Map.
 pub struct TokenMapMut<'a> {
     header: RefMut<'a, TokenMapHeader>,
@@ -480,7 +466,14 @@ impl<'info> TokenMapLoader<'info> for AccountLoader<'info, TokenMapHeader> {
         // Check the account.
         self.load()?;
 
-        self.as_ref().try_borrow_data()?.try_into()
+        let data = self.as_ref().try_borrow_data()?;
+        let (_disc, data) = Ref::map_split(data, |d| d.split_at(8));
+        let (header, configs) = Ref::map_split(data, |d| d.split_at(size_of::<TokenMapHeader>()));
+
+        Ok(TokenMapRef {
+            header: Ref::map(header, bytemuck::from_bytes),
+            configs,
+        })
     }
 
     fn load_token_map_mut(&self) -> Result<TokenMapMut> {
@@ -491,6 +484,7 @@ impl<'info> TokenMapLoader<'info> for AccountLoader<'info, TokenMapHeader> {
         let (_disc, data) = RefMut::map_split(data, |d| d.split_at_mut(8));
         let (header, configs) =
             RefMut::map_split(data, |d| d.split_at_mut(size_of::<TokenMapHeader>()));
+
         Ok(TokenMapMut {
             header: RefMut::map(header, bytemuck::from_bytes_mut),
             configs,
