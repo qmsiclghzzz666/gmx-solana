@@ -7,7 +7,10 @@ use gmsol::{
 use gmsol_model::{BalanceExt, BaseMarket};
 use gmsol_treasury::states::treasury::TokenFlag;
 
-use crate::{utils::Side, GMSOLClient, TimelockCtx};
+use crate::{
+    utils::{SelectGtExchangeVault, Side},
+    GMSOLClient, TimelockCtx,
+};
 
 #[derive(clap::Args)]
 pub(super) struct Args {
@@ -61,14 +64,16 @@ enum Command {
     },
     /// Confirm GT buyback.
     ConfirmGtBuyback {
-        gt_exchange_vault: Pubkey,
+        #[clap(flatten)]
+        gt_exchange_vault: SelectGtExchangeVault,
         #[arg(long)]
         oracle: Pubkey,
     },
     /// Sync GT bank.
     SyncGtBank {
-        gt_exchange_vault: Pubkey,
         token_mint: Pubkey,
+        #[clap(flatten)]
+        gt_exchange_vault: SelectGtExchangeVault,
         #[arg(long)]
         token_program_id: Option<Pubkey>,
     },
@@ -179,7 +184,8 @@ impl Args {
                 gt_exchange_vault,
                 oracle,
             } => {
-                let builder = client.confirm_gt_buyback(store, gt_exchange_vault, oracle);
+                let gt_exchange_vault = gt_exchange_vault.get(store, client).await?;
+                let builder = client.confirm_gt_buyback(store, &gt_exchange_vault, oracle);
                 // TODO: add support for chainlink.
                 let pyth = PythPullOracleWithHermes::from_parts(
                     client,
@@ -211,11 +217,12 @@ impl Args {
                 token_mint,
                 token_program_id,
             } => {
+                let gt_exchange_vault = gt_exchange_vault.get(store, client).await?;
                 client
                     .sync_gt_bank(
                         store,
                         None,
-                        gt_exchange_vault,
+                        &gt_exchange_vault,
                         token_mint,
                         token_program_id.as_ref(),
                     )

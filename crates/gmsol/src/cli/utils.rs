@@ -281,6 +281,48 @@ pub fn signer_from_source(
     }
 }
 
+#[derive(clap::Args, Clone)]
+pub(crate) struct SelectGtExchangeVaultByDate {
+    #[arg(long, short)]
+    date: Option<humantime::Timestamp>,
+}
+
+impl SelectGtExchangeVaultByDate {
+    pub(crate) async fn get(&self, store: &Pubkey, client: &GMSOLClient) -> gmsol::Result<Pubkey> {
+        use std::time::SystemTime;
+
+        let time_window = client.store(store).await?.gt().exchange_time_window();
+        let date = self
+            .date
+            .as_ref()
+            .cloned()
+            .unwrap_or_else(|| humantime::Timestamp::from(SystemTime::now()));
+        let ts = date
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .map_err(gmsol::Error::unknown)?
+            .as_secs();
+        let index = ts / time_window as u64;
+        Ok(client.find_gt_exchange_vault_address(store, index as i64))
+    }
+}
+
+#[derive(clap::Args, Clone)]
+pub(crate) struct SelectGtExchangeVault {
+    gt_exchange_vault: Option<Pubkey>,
+    #[clap(flatten)]
+    date: SelectGtExchangeVaultByDate,
+}
+
+impl SelectGtExchangeVault {
+    pub(crate) async fn get(&self, store: &Pubkey, client: &GMSOLClient) -> gmsol::Result<Pubkey> {
+        if let Some(address) = self.gt_exchange_vault {
+            Ok(address)
+        } else {
+            self.date.get(store, client).await
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

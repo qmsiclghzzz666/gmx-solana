@@ -35,7 +35,7 @@ use strum::IntoEnumIterator;
 
 use crate::{
     ser::{self, SerializeMarket},
-    utils::{table_format, Output},
+    utils::{table_format, Output, SelectGtExchangeVaultByDate},
     GMSOLClient,
 };
 
@@ -221,10 +221,11 @@ enum Command {
     PriceFeed { address: Pubkey },
     /// GT Bank.
     GtBank {
-        #[arg(group = "select-gt-bank")]
         address: Option<Pubkey>,
-        #[arg(long, group = "select-gt-bank")]
-        gt_exchange_vault: Option<Pubkey>,
+        #[arg(long, value_name = "GT_EXCHANGE_VAULT")]
+        vault: Option<Pubkey>,
+        #[clap(flatten)]
+        date: SelectGtExchangeVaultByDate,
         #[arg(long)]
         debug: bool,
     },
@@ -1004,12 +1005,17 @@ impl InspectArgs {
             }
             Command::GtBank {
                 address,
+                vault,
+                date,
                 debug,
-                gt_exchange_vault,
             } => {
                 let address = if let Some(address) = address {
                     *address
-                } else if let Some(gt_exchange_vault) = gt_exchange_vault {
+                } else {
+                    let vault = match vault {
+                        Some(vault) => *vault,
+                        None => date.get(store, client).await?,
+                    };
                     let config = client.find_config_address(store);
                     let config = client
                         .account::<ZeroCopy<types::treasury::Config>>(&config)
@@ -1019,9 +1025,7 @@ impl InspectArgs {
                     let treasury_config = config.treasury_config().ok_or_else(|| {
                         gmsol::Error::invalid_argument("treasury config is not set")
                     })?;
-                    client.find_gt_bank_address(treasury_config, gt_exchange_vault)
-                } else {
-                    return Err(gmsol::Error::invalid_argument("missing gt bank selector"));
+                    client.find_gt_bank_address(treasury_config, &vault)
                 };
 
                 let bank = client
