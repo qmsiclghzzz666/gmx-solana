@@ -9,7 +9,11 @@ use gmsol_store::{
 
 use crate::{roles, states::Executor};
 
-const NOT_BYPASSABLE_ROLES: [&str; 2] = [roles::TIMELOCKED_ADMIN, roles::TIMELOCK_ADMIN];
+const NOT_BYPASSABLE_ROLES: [&str; 3] = [
+    roles::TIMELOCKED_ADMIN,
+    roles::TIMELOCK_ADMIN,
+    roles::TIMELOCK_KEEPER,
+];
 
 /// The accounts definition for [`revoke_role`](crate::gmsol_timelock::revoke_role).
 #[derive(Accounts)]
