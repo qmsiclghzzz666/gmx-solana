@@ -106,6 +106,20 @@ impl<'info> CpiAuthentication<'info> for CreateInstructionBuffer<'info> {
     }
 }
 
+fn validate_timelocked_role<'info>(
+    ctx: &Context<impl CpiAuthenticate<'info>>,
+    role: &str,
+) -> Result<()> {
+    let timelocked_role = [roles::TIMELOCKED, role].concat();
+    CpiAuthenticate::only(ctx, &timelocked_role)?;
+    msg!(
+        "[Timelock] approving `{}` instruction by a `{}`",
+        role,
+        timelocked_role
+    );
+    Ok(())
+}
+
 /// The accounts definition for [`approve_instruction`](crate::gmsol_timelock::approve_instruction).
 #[derive(Accounts)]
 #[instruction(role: String)]
@@ -136,13 +150,7 @@ pub struct ApproveInstruction<'info> {
 
 /// Approve instruction.
 pub(crate) fn approve_instruction(ctx: Context<ApproveInstruction>, role: &str) -> Result<()> {
-    let timelocked_role = [roles::TIMELOCKED, role].concat();
-    CpiAuthenticate::only(&ctx, &timelocked_role)?;
-    msg!(
-        "[Timelock] approving a `{}` instruction by a `{}`",
-        role,
-        timelocked_role
-    );
+    validate_timelocked_role(&ctx, role)?;
     ctx.accounts.instruction.load_mut()?.approve()
 }
 
@@ -157,6 +165,73 @@ impl<'info> WithStore<'info> for ApproveInstruction<'info> {
 }
 
 impl<'info> CpiAuthentication<'info> for ApproveInstruction<'info> {
+    fn authority(&self) -> AccountInfo<'info> {
+        self.authority.to_account_info()
+    }
+
+    fn on_error(&self) -> Result<()> {
+        err!(CoreError::PermissionDenied)
+    }
+}
+
+/// The accounts definition for [`approve_instructions`](crate::gmsol_timelock::approve_instructions).
+#[derive(Accounts)]
+#[instruction(role: String)]
+pub struct ApproveInstructions<'info> {
+    /// Authority.
+    pub authority: Signer<'info>,
+    /// Store.
+    /// CHECK: check by CPI.
+    pub store: UncheckedAccount<'info>,
+    /// Executor.
+    #[account(
+        has_one = store,
+        constraint = executor.load()?.role_name()? == role.as_str() @ CoreError::InvalidArgument,
+        seeds = [
+            Executor::SEED,
+            store.key.as_ref(),
+            &fixed_str_to_bytes::<MAX_ROLE_NAME_LEN>(&role)?,
+        ],
+        bump = executor.load()?.bump,
+    )]
+    pub executor: AccountLoader<'info, Executor>,
+    /// Store program.
+    pub store_program: Program<'info, GmsolStore>,
+}
+
+/// Approve instructions.
+pub(crate) fn approve_instructions<'info>(
+    ctx: Context<'_, '_, 'info, 'info, ApproveInstructions<'info>>,
+    role: &str,
+) -> Result<()> {
+    validate_timelocked_role(&ctx, role)?;
+
+    let executor = ctx.accounts.executor.key();
+    for account in ctx.remaining_accounts {
+        require!(account.is_writable, ErrorCode::AccountNotMutable);
+        let loader = AccountLoader::<InstructionHeader>::try_from(account)?;
+        require_eq!(
+            *loader.load()?.executor(),
+            executor,
+            CoreError::InvalidArgument
+        );
+        loader.load_mut()?.approve()?;
+    }
+
+    Ok(())
+}
+
+impl<'info> WithStore<'info> for ApproveInstructions<'info> {
+    fn store_program(&self) -> AccountInfo<'info> {
+        self.store_program.to_account_info()
+    }
+
+    fn store(&self) -> AccountInfo<'info> {
+        self.store.to_account_info()
+    }
+}
+
+impl<'info> CpiAuthentication<'info> for ApproveInstructions<'info> {
     fn authority(&self) -> AccountInfo<'info> {
         self.authority.to_account_info()
     }
@@ -202,6 +277,63 @@ impl<'info> WithStore<'info> for CancelInstruction<'info> {
 }
 
 impl<'info> CpiAuthentication<'info> for CancelInstruction<'info> {
+    fn authority(&self) -> AccountInfo<'info> {
+        self.authority.to_account_info()
+    }
+
+    fn on_error(&self) -> Result<()> {
+        err!(CoreError::PermissionDenied)
+    }
+}
+
+/// The accounts definition for [`cancel_instructions`](crate::gmsol_timelock::cancel_instructions).
+#[derive(Accounts)]
+pub struct CancelInstructions<'info> {
+    /// Authority.
+    pub authority: Signer<'info>,
+    /// Store.
+    /// CHECK: check by CPI.
+    pub store: UncheckedAccount<'info>,
+    /// Executor.
+    #[account(has_one = store)]
+    pub executor: AccountLoader<'info, Executor>,
+    /// Store program.
+    pub store_program: Program<'info, GmsolStore>,
+}
+
+/// Cancel instructions.
+/// # CHECK
+/// Only [`TIMELOCK_ADMIN`](crate::roles::TIMELOCK_ADMIN) can use.
+pub(crate) fn unchecked_cancel_instructions<'info>(
+    ctx: Context<'_, '_, 'info, 'info, CancelInstructions<'info>>,
+) -> Result<()> {
+    let executor = ctx.accounts.executor.key();
+
+    for account in ctx.remaining_accounts {
+        require!(account.is_writable, ErrorCode::AccountNotMutable);
+        let loader = AccountLoader::<InstructionHeader>::try_from(account)?;
+        require_eq!(
+            *loader.load()?.executor(),
+            executor,
+            CoreError::InvalidArgument
+        );
+        loader.close(ctx.accounts.authority.to_account_info())?;
+    }
+
+    Ok(())
+}
+
+impl<'info> WithStore<'info> for CancelInstructions<'info> {
+    fn store_program(&self) -> AccountInfo<'info> {
+        self.store_program.to_account_info()
+    }
+
+    fn store(&self) -> AccountInfo<'info> {
+        self.store.to_account_info()
+    }
+}
+
+impl<'info> CpiAuthentication<'info> for CancelInstructions<'info> {
     fn authority(&self) -> AccountInfo<'info> {
         self.authority.to_account_info()
     }

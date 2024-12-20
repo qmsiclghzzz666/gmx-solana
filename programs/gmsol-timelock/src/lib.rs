@@ -58,10 +58,26 @@ pub mod gmsol_timelock {
         instructions::approve_instruction(ctx, &role)
     }
 
+    /// Approve multiple instructions.
+    pub fn approve_instructions<'info>(
+        ctx: Context<'_, '_, 'info, 'info, ApproveInstructions<'info>>,
+        role: String,
+    ) -> Result<()> {
+        instructions::approve_instructions(ctx, &role)
+    }
+
     /// Cancel instruction.
     #[access_control(CpiAuthenticate::only(&ctx, roles::TIMELOCK_ADMIN))]
     pub fn cancel_instruction(ctx: Context<CancelInstruction>) -> Result<()> {
         instructions::unchecked_cancel_instruction(ctx)
+    }
+
+    /// Cancel multiple instructions.
+    #[access_control(CpiAuthenticate::only(&ctx, roles::TIMELOCK_ADMIN))]
+    pub fn cancel_instructions<'info>(
+        ctx: Context<'_, '_, 'info, 'info, CancelInstructions<'info>>,
+    ) -> Result<()> {
+        instructions::unchecked_cancel_instructions(ctx)
     }
 
     /// Execute instruction.
