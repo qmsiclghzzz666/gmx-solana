@@ -12,7 +12,7 @@ pub mod instructions;
 use gmsol_store::utils::CpiAuthenticate;
 use instructions::*;
 
-declare_id!("timedreYasWZUyAgofdmjFVJwk3LKZZq6QJtgpc1aqv");
+declare_id!("timeAUGcp4UHrmnW5W6mhJDA7mjpFsVrEePTKd1Ed7P");
 
 #[program]
 pub mod gmsol_timelock {
