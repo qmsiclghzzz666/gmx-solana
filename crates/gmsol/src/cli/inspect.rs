@@ -230,7 +230,7 @@ enum Command {
         debug: bool,
     },
     /// Timelocked instruction.
-    TimelockedIx { address: Pubkey },
+    TldIx { address: Pubkey },
 }
 
 #[derive(clap::ValueEnum, Clone, Default)]
@@ -1044,7 +1044,7 @@ impl InspectArgs {
                     }
                 }
             }
-            Command::TimelockedIx { address } => {
+            Command::TldIx { address } => {
                 let buffer = client
                     .instruction_buffer(address)
                     .await?
