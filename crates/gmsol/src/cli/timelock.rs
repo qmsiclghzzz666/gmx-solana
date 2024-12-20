@@ -24,18 +24,18 @@ enum Command {
     InitExecutor { role: String },
     /// Approve a timelocked instruction.
     Approve {
-        buffer: Pubkey,
+        buffers: Vec<Pubkey>,
         #[arg(long)]
         role: Option<String>,
     },
     /// Cancel a timelocked instruction.
     Cancel {
-        buffer: Pubkey,
+        buffers: Vec<Pubkey>,
         #[arg(long)]
         executor: Option<Pubkey>,
     },
     /// Execute a timelocked instruction.
-    Execute { buffer: Pubkey },
+    Execute { buffers: Vec<Pubkey> },
     /// Revoke role.
     RevokeRole {
         /// User.
@@ -81,24 +81,49 @@ impl Args {
                 println!("{executor}");
                 rpc
             }
-            Command::Approve { buffer, role } => {
+            Command::Approve { buffers, role } => {
                 client
-                    .approve_timelocked_instruction(
+                    .approve_timelocked_instructions(
                         store,
-                        buffer,
+                        buffers.iter().copied(),
                         role.as_ref().map(|s| s.as_str()),
                     )
                     .await?
             }
-            Command::Cancel { buffer, executor } => {
+            Command::Cancel { buffers, executor } => {
                 client
-                    .cancel_timelocked_instruction(store, buffer, executor.as_ref())
+                    .cancel_timelocked_instructions(
+                        store,
+                        buffers.iter().copied(),
+                        executor.as_ref(),
+                    )
                     .await?
             }
-            Command::Execute { buffer } => {
-                client
-                    .execute_timelocked_instruction(store, buffer, None)
-                    .await?
+            Command::Execute { buffers } => {
+                let mut txns = client.transaction();
+                for buffer in buffers {
+                    let rpc = client
+                        .execute_timelocked_instruction(store, buffer, None)
+                        .await?;
+                    txns.push(rpc)?;
+                }
+                return crate::utils::send_or_serialize_transactions(
+                    txns,
+                    serialize_only,
+                    skip_preflight,
+                    |signatures, error| {
+                        match error {
+                            Some(err) => {
+                                tracing::error!(%err, "successful txns: {signatures:#?}");
+                            }
+                            None => {
+                                tracing::info!("successful txns: {signatures:#?}");
+                            }
+                        }
+                        Ok(())
+                    },
+                )
+                .await;
             }
             Command::RevokeRole { authority, role } => {
                 client.timelock_bypassed_revoke_role(store, role, authority)

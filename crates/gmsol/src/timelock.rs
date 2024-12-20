@@ -47,11 +47,27 @@ pub trait TimelockOps<C> {
         role_hint: Option<&str>,
     ) -> impl Future<Output = crate::Result<RpcBuilder<C>>>;
 
+    /// Approve timelocked instruction.
+    fn approve_timelocked_instructions(
+        &self,
+        store: &Pubkey,
+        buffers: impl IntoIterator<Item = Pubkey>,
+        role_hint: Option<&str>,
+    ) -> impl Future<Output = crate::Result<RpcBuilder<C>>>;
+
     /// Cancel timelocked instruction.
     fn cancel_timelocked_instruction(
         &self,
         store: &Pubkey,
         buffer: &Pubkey,
+        executor_hint: Option<&Pubkey>,
+    ) -> impl Future<Output = crate::Result<RpcBuilder<C>>>;
+
+    /// Cancel timelocked instruction.
+    fn cancel_timelocked_instructions(
+        &self,
+        store: &Pubkey,
+        buffers: impl IntoIterator<Item = Pubkey>,
         executor_hint: Option<&Pubkey>,
     ) -> impl Future<Output = crate::Result<RpcBuilder<C>>>;
 
@@ -218,6 +234,54 @@ impl<C: Deref<Target = impl Signer> + Clone> TimelockOps<C> for crate::Client<C>
             }))
     }
 
+    async fn approve_timelocked_instructions(
+        &self,
+        store: &Pubkey,
+        buffers: impl IntoIterator<Item = Pubkey>,
+        role_hint: Option<&str>,
+    ) -> crate::Result<RpcBuilder<C>> {
+        let mut buffers = buffers.into_iter().peekable();
+        let buffer = buffers
+            .peek()
+            .ok_or_else(|| crate::Error::invalid_argument("no instructions to appove"))?;
+        let role = match role_hint {
+            Some(role) => role.to_string(),
+            None => {
+                let instruction_header = self
+                    .account::<ZeroCopy<InstructionHeader>>(buffer)
+                    .await?
+                    .ok_or(crate::Error::NotFound)?
+                    .0;
+                let executor = instruction_header.executor();
+                let executor = self
+                    .account::<ZeroCopy<Executor>>(executor)
+                    .await?
+                    .ok_or(crate::Error::NotFound)?
+                    .0;
+                executor.role_name()?.to_string()
+            }
+        };
+        let executor = self.find_executor_address(store, &role)?;
+        Ok(self
+            .timelock_rpc()
+            .args(instruction::ApproveInstructions { role })
+            .accounts(accounts::ApproveInstructions {
+                authority: self.payer(),
+                store: *store,
+                executor,
+                store_program: *self.store_program_id(),
+            })
+            .accounts(
+                buffers
+                    .map(|pubkey| AccountMeta {
+                        pubkey,
+                        is_signer: false,
+                        is_writable: true,
+                    })
+                    .collect::<Vec<_>>(),
+            ))
+    }
+
     async fn cancel_timelocked_instruction(
         &self,
         store: &Pubkey,
@@ -245,6 +309,47 @@ impl<C: Deref<Target = impl Signer> + Clone> TimelockOps<C> for crate::Client<C>
                 instruction: *buffer,
                 store_program: *self.store_program_id(),
             }))
+    }
+
+    async fn cancel_timelocked_instructions(
+        &self,
+        store: &Pubkey,
+        buffers: impl IntoIterator<Item = Pubkey>,
+        executor_hint: Option<&Pubkey>,
+    ) -> crate::Result<RpcBuilder<C>> {
+        let mut buffers = buffers.into_iter().peekable();
+        let buffer = buffers
+            .peek()
+            .ok_or_else(|| crate::Error::invalid_argument("no instructions to appove"))?;
+        let executor = match executor_hint {
+            Some(address) => *address,
+            None => {
+                let instruction_header = self
+                    .account::<ZeroCopy<InstructionHeader>>(buffer)
+                    .await?
+                    .ok_or(crate::Error::NotFound)?
+                    .0;
+                *instruction_header.executor()
+            }
+        };
+        Ok(self
+            .timelock_rpc()
+            .args(instruction::CancelInstructions {})
+            .accounts(accounts::CancelInstructions {
+                authority: self.payer(),
+                store: *store,
+                executor,
+                store_program: *self.store_program_id(),
+            })
+            .accounts(
+                buffers
+                    .map(|pubkey| AccountMeta {
+                        pubkey,
+                        is_signer: false,
+                        is_writable: true,
+                    })
+                    .collect::<Vec<_>>(),
+            ))
     }
 
     async fn execute_timelocked_instruction(
