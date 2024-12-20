@@ -94,7 +94,11 @@ where
     S: Signer,
 {
     if serialize_only {
-        for (idx, ix) in req.instructions().into_iter().enumerate() {
+        for (idx, ix) in req
+            .instructions_with_options(true, None)
+            .into_iter()
+            .enumerate()
+        {
             println!("ix[{idx}]: {}", gmsol::utils::serialize_instruction(&ix)?);
         }
     } else if let Some((role, client)) = timelock {
