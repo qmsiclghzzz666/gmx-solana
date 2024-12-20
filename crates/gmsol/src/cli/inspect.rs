@@ -230,7 +230,7 @@ enum Command {
         debug: bool,
     },
     /// Timelocked instruction.
-    TldIx { address: Pubkey },
+    Tld { addresses: Vec<Pubkey> },
 }
 
 #[derive(clap::ValueEnum, Clone, Default)]
@@ -1044,11 +1044,9 @@ impl InspectArgs {
                     }
                 }
             }
-            Command::TldIx { address } => {
-                let buffer = client
-                    .instruction_buffer(address)
-                    .await?
-                    .ok_or(gmsol::Error::NotFound)?;
+            Command::Tld { addresses } => {
+                use anchor_client::solana_sdk::message::Message;
+
                 let config = client.find_timelock_config_address(store);
                 let delay = client
                     .account::<ZeroCopy<types::timelock::TimelockConfig>>(&config)
@@ -1057,22 +1055,41 @@ impl InspectArgs {
                     .0
                     .delay();
                 let delay = time::Duration::seconds(delay as i64);
-                let status = match buffer.header().approved_at() {
-                    Some(approved_at) => {
-                        let approved_at = time::OffsetDateTime::from_unix_timestamp(approved_at)
-                            .map_err(gmsol::Error::unknown)?;
-                        let executable_at = approved_at.saturating_add(delay);
-                        let now = time::OffsetDateTime::now_utc();
-                        let delta = executable_at - now;
-                        if delta.is_positive() {
-                            format!("executable in {delta}")
-                        } else {
-                            "executable".to_string()
+
+                let mut instructions = Vec::with_capacity(addresses.len());
+
+                for (idx, address) in addresses.iter().enumerate() {
+                    let buffer = client
+                        .instruction_buffer(address)
+                        .await?
+                        .ok_or(gmsol::Error::NotFound)?;
+
+                    let status = match buffer.header().approved_at() {
+                        Some(approved_at) => {
+                            let approved_at =
+                                time::OffsetDateTime::from_unix_timestamp(approved_at)
+                                    .map_err(gmsol::Error::unknown)?;
+                            let executable_at = approved_at.saturating_add(delay);
+                            let now = time::OffsetDateTime::now_utc();
+                            let delta = executable_at - now;
+                            if delta.is_positive() {
+                                format!("executable in {delta}")
+                            } else {
+                                "executable".to_string()
+                            }
                         }
-                    }
-                    None => "is not approved".to_string(),
-                };
-                println!("Status: {status}");
+                        None => "is not approved".to_string(),
+                    };
+                    tracing::info!("[{idx}] {address}: {status}");
+
+                    instructions.push(buffer.to_instruction());
+                }
+
+                let message = Message::new(&instructions, Some(&client.payer()));
+                println!(
+                    "{}",
+                    crate::utils::to_inspector_url(&message, client.cluster())
+                );
             }
         }
         Ok(())

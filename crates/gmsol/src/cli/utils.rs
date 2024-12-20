@@ -3,11 +3,12 @@ use std::{collections::HashMap, fs, ops::Deref, path::PathBuf, rc::Rc};
 use anchor_client::{
     solana_client::rpc_config::RpcSendTransactionConfig,
     solana_sdk::{
+        message::Message,
         pubkey::Pubkey,
         signature::{Keypair, Signature},
         signer::Signer,
     },
-    RequestBuilder,
+    Cluster, RequestBuilder,
 };
 use eyre::OptionExt;
 use gmsol::{
@@ -321,6 +322,20 @@ impl SelectGtExchangeVault {
             self.date.get(store, client).await
         }
     }
+}
+
+pub(crate) fn to_inspector_url(message: &Message, cluster: &Cluster) -> String {
+    use base64::{prelude::BASE64_STANDARD, Engine};
+    use url::form_urlencoded;
+
+    let message = BASE64_STANDARD.encode(message.serialize());
+
+    let encoded = form_urlencoded::Serializer::new(String::new())
+        .append_pair("message", &message)
+        .append_pair("cluster", &cluster.to_string())
+        .finish();
+
+    format!("https://explorer.solana.com/tx/inspector?{encoded}")
 }
 
 #[cfg(test)]
