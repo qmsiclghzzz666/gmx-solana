@@ -275,6 +275,12 @@ impl RoleStore {
         require!(bitmap.get(index), CoreError::PreconditionsAreNotMet);
         bitmap.set(index, false);
         *value = bitmap.into_value();
+
+        // Remove the membership if the authority no longer has a role.
+        if bitmap.is_empty() {
+            self.members.remove(authority);
+        }
+
         Ok(())
     }
 
@@ -336,15 +342,11 @@ mod tests {
             Ok(false)
         );
 
+        // This is the last role of the `authority`.
+        // So the membership will be removed after revoking the role.
         store.revoke(&authority, RoleKey::MARKET_KEEPER).unwrap();
-        assert_eq!(
-            store.has_role(&authority, RoleKey::MARKET_KEEPER),
-            Ok(false)
-        );
-        assert_eq!(
-            store.has_role(&authority, RoleKey::GT_CONTROLLER),
-            Ok(false)
-        );
+        assert!(store.has_role(&authority, RoleKey::MARKET_KEEPER).is_err());
+        assert!(store.has_role(&authority, RoleKey::GT_CONTROLLER).is_err());
 
         store.disable_role(RoleKey::MARKET_KEEPER).unwrap();
         assert!(store.grant(&authority, RoleKey::MARKET_KEEPER).is_err());
