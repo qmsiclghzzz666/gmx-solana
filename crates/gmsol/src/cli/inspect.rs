@@ -16,7 +16,7 @@ use gmsol::{
         user::ReferralCode,
         TokenMapAccess,
     },
-    utils::{signed_value_to_decimal, unsigned_value_to_decimal, ZeroCopy},
+    utils::{unsigned_amount_to_decimal, unsigned_value_to_decimal, ZeroCopy},
 };
 use gmsol_model::{
     price::{Price, Prices},
@@ -30,7 +30,6 @@ use indexmap::IndexMap;
 use num_format::{Locale, ToFormattedString};
 use prettytable::{row, Table};
 use pyth_sdk::Identifier;
-use rust_decimal_macros::dec;
 use strum::IntoEnumIterator;
 
 use crate::{
@@ -533,6 +532,7 @@ impl InspectArgs {
                         output.print(&serialized, format_market)?;
                     }
                 } else {
+                    let token_map = client.authorized_token_map(store).await?;
                     let markets = client
                         .markets(store)
                         .await?
@@ -589,17 +589,45 @@ impl InspectArgs {
                             let name = &market.name;
                             let token = market.meta.market_token;
                             let enabled = market.enabled;
-                            let funding_per_hour =
-                                signed_value_to_decimal(market.state.funding_factor_per_second)
-                                    * dec!(3600)
-                                    * dec!(100);
+                            let mut claimable_fees = ("-".to_string(), "-".to_string());
+                            if let Some(pool) = market.pools.0.get(&PoolKind::ClaimableFee) {
+                                let (long, short) = (pool.long_amount()?, pool.short_amount()?);
+                                if market.is_pure {
+                                    let decimals = token_map
+                                        .get(&market.meta.long_token)
+                                        .expect("must exist")
+                                        .token_decimals();
+                                    claimable_fees.0 =
+                                        unsigned_amount_to_decimal((long + short) as u64, decimals)
+                                            .normalize()
+                                            .to_string();
+                                } else {
+                                    let decimals = token_map
+                                        .get(&market.meta.long_token)
+                                        .expect("must exist")
+                                        .token_decimals();
+                                    claimable_fees.0 =
+                                        unsigned_amount_to_decimal(long as u64, decimals)
+                                            .normalize()
+                                            .to_string();
+                                    let decimals = token_map
+                                        .get(&market.meta.short_token)
+                                        .expect("must exist")
+                                        .token_decimals();
+                                    claimable_fees.1 =
+                                        unsigned_amount_to_decimal(short as u64, decimals)
+                                            .normalize()
+                                            .to_string();
+                                }
+                            }
                             table.add_row(row![
                                 name,
                                 token,
                                 enabled,
                                 oi_long,
                                 oi_short,
-                                funding_per_hour.normalize(),
+                                claimable_fees.0,
+                                claimable_fees.1
                             ]);
                         }
 
@@ -609,7 +637,8 @@ impl InspectArgs {
                             "Enabled",
                             "OI Long ($)",
                             "OI Short ($)",
-                            "Funding Rate (% / hour)",
+                            "Claimable fees (long)",
+                            "Claimable fees (short)",
                         ]);
                         table.set_format(table_format());
                         Ok(table.to_string())
