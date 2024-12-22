@@ -6,7 +6,7 @@ edition.workspace = true
 [features]
 default = []
 tracing = ["dep:tracing"]
-gmsol = ["gmsol-store/debug"]
+gmsol = ["gmsol-store/debug", "gmsol-store/display"]
 
 [dependencies]
 tracing = { workspace = true, optional = true }
