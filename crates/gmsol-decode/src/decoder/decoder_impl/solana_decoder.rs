@@ -194,6 +194,7 @@ impl<'a> Decoder for TransactionDecoder<'a> {
 }
 
 /// CPI Event filter.
+#[derive(Debug, Clone, Default)]
 pub struct CPIEventFilter {
     /// A mapping from event authority to its program id.
     map: HashMap<Pubkey, Pubkey>,
