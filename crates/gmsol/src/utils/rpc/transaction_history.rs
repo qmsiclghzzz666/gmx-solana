@@ -118,7 +118,7 @@ pub fn extract_cpi_events(
                         )
                         .await
                         .map_err(ClientError::from)?;
-                    let mut decoder = TransactionDecoder::new(signature, &tx);
+                    let mut decoder = TransactionDecoder::new(tx.slot, signature, &tx.transaction);
                     match decoder
                         .add_cpi_event_authority_and_program_id(event_authority, program_id)
                         .and_then(|decoder| decoder.extract_cpi_events())

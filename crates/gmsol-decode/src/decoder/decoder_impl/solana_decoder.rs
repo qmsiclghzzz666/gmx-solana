@@ -3,25 +3,28 @@ use std::collections::{HashMap, HashSet};
 use anchor_lang::prelude::event::EVENT_IX_TAG_LE;
 use solana_sdk::{pubkey::Pubkey, signature::Signature};
 use solana_transaction_status::{
-    EncodedConfirmedTransactionWithStatusMeta, UiInstruction, UiLoadedAddresses,
+    EncodedTransactionWithStatusMeta, UiInstruction, UiLoadedAddresses,
 };
 
 use crate::{Decode, DecodeError, Decoder, Visitor};
 
 /// Transaction Decoder.
 pub struct TransactionDecoder<'a> {
+    slot: u64,
     signature: Signature,
-    transaction: &'a EncodedConfirmedTransactionWithStatusMeta,
+    transaction: &'a EncodedTransactionWithStatusMeta,
     cpi_event_filter: CPIEventFilter,
 }
 
 impl<'a> TransactionDecoder<'a> {
     /// Create a new transaction decoder.
     pub fn new(
+        slot: u64,
         signature: Signature,
-        transaction: &'a EncodedConfirmedTransactionWithStatusMeta,
+        transaction: &'a EncodedTransactionWithStatusMeta,
     ) -> Self {
         Self {
+            slot,
             signature,
             transaction,
             cpi_event_filter: CPIEventFilter {
@@ -55,19 +58,24 @@ impl<'a> TransactionDecoder<'a> {
         self.signature
     }
 
+    /// Get slot.
+    pub fn slot(&self) -> u64 {
+        self.slot
+    }
+
     /// Get transaction.
-    pub fn transaction(&self) -> &EncodedConfirmedTransactionWithStatusMeta {
+    pub fn transaction(&self) -> &EncodedTransactionWithStatusMeta {
         self.transaction
     }
 
     /// Extract CPI events.
     pub fn extract_cpi_events(&self) -> Result<CPIEvents, DecodeError> {
         let tx = self.transaction;
-        let slot_index = (tx.slot, None);
-        let Some(decoded) = tx.transaction.transaction.decode() else {
+        let slot_index = (self.slot, None);
+        let Some(decoded) = tx.transaction.decode() else {
             return Err(DecodeError::custom("failed to decode transaction"));
         };
-        let Some(meta) = &tx.transaction.meta else {
+        let Some(meta) = &tx.meta else {
             return Err(DecodeError::custom("missing meta"));
         };
         let accounts = decoded.message.static_account_keys();
