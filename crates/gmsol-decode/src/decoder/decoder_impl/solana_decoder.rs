@@ -223,6 +223,16 @@ impl CPIEventFilter {
         }
         Ok(self)
     }
+
+    /// Get event authorities.
+    pub fn event_authorities(&self) -> impl Iterator<Item = &Pubkey> {
+        self.map.keys()
+    }
+
+    /// Get programs.
+    pub fn programs(&self) -> impl Iterator<Item = &Pubkey> {
+        self.map.values()
+    }
 }
 
 /// CPI Event decoder.
