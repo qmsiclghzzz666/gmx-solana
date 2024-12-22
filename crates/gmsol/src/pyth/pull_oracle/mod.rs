@@ -216,7 +216,7 @@ pub trait PythPullOracleOps<C> {
     /// Create transactions to post price updates and consume the prices.
     fn with_pyth_prices<'a, S, It, Fut>(
         &'a self,
-        ctx: &'a mut PythPullOracleContext,
+        ctx: &'a PythPullOracleContext,
         update: &'a PriceUpdate,
         consume: impl FnOnce(Prices) -> Fut,
     ) -> impl Future<Output = crate::Result<WithPythPrices<'a, C>>>
@@ -232,7 +232,7 @@ pub trait PythPullOracleOps<C> {
     /// Create transactions to post price updates and consume the prices.
     fn with_pyth_price_updates<'a, S, It, Fut>(
         &'a self,
-        ctx: &'a mut PythPullOracleContext,
+        ctx: &'a PythPullOracleContext,
         updates: impl IntoIterator<Item = &'a BinaryPriceUpdate>,
         consume: impl FnOnce(Prices) -> Fut,
     ) -> impl Future<Output = crate::Result<WithPythPrices<'a, C>>>
@@ -360,11 +360,11 @@ pub trait PythPullOracleOps<C> {
         async move {
             let mut execution_fee_estiamted = !execute.should_estiamte_execution_fee();
             let updates = updates.into_iter().collect::<Vec<_>>();
-            let mut ctx = execute.context().await?;
+            let ctx = execute.context().await?;
             let mut with_prices;
             loop {
                 with_prices = self
-                    .with_pyth_price_updates(&mut ctx, updates.clone(), |prices| async {
+                    .with_pyth_price_updates(&ctx, updates.clone(), |prices| async {
                         let rpcs = execute.build_rpc_with_price_updates(prices).await?;
                         Ok(rpcs)
                     })

@@ -6,6 +6,7 @@ use anchor_client::{
 };
 use futures_util::{FutureExt, TryFutureExt};
 use gmsol::{
+    alt::AddressLookupTableOps,
     client::StoreFilter,
     exchange::ExchangeOps,
     pyth::{
@@ -34,16 +35,19 @@ pub(super) struct KeeperArgs {
     compute_unit_price: u64,
     /// The oracle to use.
     #[arg(long, env)]
-    oracle: Pubkey,
+    oracle: Option<Pubkey>,
     /// Set the execution fee to the given instead of estimating one.
     #[arg(long)]
     execution_fee: Option<u64>,
     /// Set the price provider to use.
     #[arg(long, default_value = "pyth")]
     provider: PriceProviderKind,
-    /// Whether to use pull oracle when available.
+    /// Whether to use push oracle when available.
     #[arg(long)]
-    pull_oracle: bool,
+    push_oracle: bool,
+    /// ALTs.
+    #[arg(long, short = 'a')]
+    alts: Vec<Pubkey>,
     #[command(subcommand)]
     command: Command,
 }
@@ -132,7 +136,13 @@ impl KeeperArgs {
     }
 
     fn use_pyth_pull_oracle(&self) -> bool {
-        self.pull_oracle && matches!(self.provider, PriceProviderKind::Pyth)
+        !self.push_oracle && matches!(self.provider, PriceProviderKind::Pyth)
+    }
+
+    fn oracle(&self) -> gmsol::Result<&Pubkey> {
+        self.oracle
+            .as_ref()
+            .ok_or_else(|| gmsol::Error::invalid_argument("oracle is not provided"))
     }
 
     pub(super) async fn run(
@@ -163,7 +173,7 @@ impl KeeperArgs {
                         let actions = client
                             .store_accounts::<ZeroCopy<Deposit>>(
                                 filter_store
-                                    .then(|| StoreFilter::new(store, 8).ignore_disc_offset(true)),
+                                    .then(|| StoreFilter::new(store, 8).ignore_disc_offset(false)),
                                 None,
                             )
                             .await?;
@@ -189,7 +199,7 @@ impl KeeperArgs {
                         let actions = client
                             .store_accounts::<ZeroCopy<Withdrawal>>(
                                 filter_store
-                                    .then(|| StoreFilter::new(store, 8).ignore_disc_offset(true)),
+                                    .then(|| StoreFilter::new(store, 8).ignore_disc_offset(false)),
                                 None,
                             )
                             .await?;
@@ -221,7 +231,7 @@ impl KeeperArgs {
                         let actions = client
                             .store_accounts::<ZeroCopy<Order>>(
                                 filter_store
-                                    .then(|| StoreFilter::new(store, 9).ignore_disc_offset(true)),
+                                    .then(|| StoreFilter::new(store, 8).ignore_disc_offset(false)),
                                 None,
                             )
                             .await?;
@@ -246,7 +256,7 @@ impl KeeperArgs {
                 }
             }
             Command::ExecuteDeposit { deposit } => {
-                let mut builder = client.execute_deposit(store, &self.oracle, deposit, true);
+                let mut builder = client.execute_deposit(store, self.oracle()?, deposit, true);
                 let execution_fee = builder.build().await?.estimate_execution_fee(None).await?;
                 builder.set_execution_fee(execution_fee);
                 if self.use_pyth_pull_oracle() {
@@ -285,7 +295,8 @@ impl KeeperArgs {
                 }
             }
             Command::ExecuteWithdrawal { withdrawal } => {
-                let mut builder = client.execute_withdrawal(store, &self.oracle, withdrawal, true);
+                let mut builder =
+                    client.execute_withdrawal(store, self.oracle()?, withdrawal, true);
                 let execution_fee = self
                     .get_or_estimate_execution_fee(
                         &client.store_program().solana_rpc(),
@@ -295,7 +306,7 @@ impl KeeperArgs {
                 builder.execution_fee(execution_fee);
                 if self.use_pyth_pull_oracle() {
                     let hint = builder.prepare_hint().await?;
-                    let mut ctx = PythPullOracleContext::try_from_feeds(&hint.feeds)?;
+                    let ctx = PythPullOracleContext::try_from_feeds(&hint.feeds)?;
                     let feed_ids = ctx.feed_ids();
                     if feed_ids.is_empty() {
                         tracing::error!(%withdrawal, "empty feed ids");
@@ -306,7 +317,7 @@ impl KeeperArgs {
                         .latest_price_updates(feed_ids, Some(EncodingType::Base64))
                         .await?;
                     let with_prices = oracle
-                        .with_pyth_prices(&mut ctx, &update, |prices| async {
+                        .with_pyth_prices(&ctx, &update, |prices| async {
                             let rpc = builder
                                 .parse_with_pyth_price_updates(prices)
                                 .build()
@@ -336,7 +347,7 @@ impl KeeperArgs {
                 }
             }
             Command::ExecuteOrder { order } => {
-                let mut builder = client.execute_order(store, &self.oracle, order, true)?;
+                let mut builder = client.execute_order(store, self.oracle()?, order, true)?;
                 let execution_fee = self
                     .execution_fee
                     .map(|fee| futures_util::future::ready(Ok(fee)).left_future())
@@ -354,7 +365,7 @@ impl KeeperArgs {
                 builder.execution_fee(execution_fee);
                 if self.use_pyth_pull_oracle() {
                     let hint = builder.prepare_hint().await?;
-                    let mut ctx = PythPullOracleContext::try_from_feeds(&hint.feeds)?;
+                    let ctx = PythPullOracleContext::try_from_feeds(&hint.feeds)?;
                     let feed_ids = ctx.feed_ids();
                     if feed_ids.is_empty() {
                         tracing::error!(%order, "empty feed ids");
@@ -365,7 +376,7 @@ impl KeeperArgs {
                         .latest_price_updates(feed_ids, Some(EncodingType::Base64))
                         .await?;
                     let with_prices = oracle
-                        .with_pyth_prices(&mut ctx, &update, |prices| async {
+                        .with_pyth_prices(&ctx, &update, |prices| async {
                             let builder = builder
                                 .parse_with_pyth_price_updates(prices)
                                 .build()
@@ -399,7 +410,11 @@ impl KeeperArgs {
                 }
             }
             Command::Liquidate { position } => {
-                let mut builder = client.liquidate(&self.oracle, position)?;
+                let mut builder = client.liquidate(self.oracle()?, position)?;
+                for alt in &self.alts {
+                    let alt = client.alt(alt).await?.ok_or(gmsol::Error::NotFound)?;
+                    builder.add_alt(alt);
+                }
                 let execution_fee = self
                     .execution_fee
                     .map(|fee| futures_util::future::ready(Ok(fee)).left_future())
@@ -417,7 +432,7 @@ impl KeeperArgs {
                 builder.execution_fee(execution_fee);
                 if self.use_pyth_pull_oracle() {
                     let hint = builder.prepare_hint().await?;
-                    let mut ctx = PythPullOracleContext::try_from_feeds(hint.feeds())?;
+                    let ctx = PythPullOracleContext::try_from_feeds(hint.feeds())?;
                     let feed_ids = ctx.feed_ids();
                     if feed_ids.is_empty() {
                         tracing::error!(%position, "empty feed ids");
@@ -428,7 +443,7 @@ impl KeeperArgs {
                         .latest_price_updates(feed_ids, Some(EncodingType::Base64))
                         .await?;
                     let with_prices = oracle
-                        .with_pyth_prices(&mut ctx, &update, |prices| async {
+                        .with_pyth_prices(&ctx, &update, |prices| async {
                             let builder = builder
                                 .parse_with_pyth_price_updates(prices)
                                 .build()
@@ -474,7 +489,7 @@ impl KeeperArgs {
                         *position.state.size_in_usd()
                     }
                 };
-                let mut builder = client.auto_deleverage(&self.oracle, position, size)?;
+                let mut builder = client.auto_deleverage(self.oracle()?, position, size)?;
                 let execution_fee = self
                     .execution_fee
                     .map(|fee| futures_util::future::ready(Ok(fee)).left_future())
@@ -492,7 +507,7 @@ impl KeeperArgs {
                 builder.execution_fee(execution_fee);
                 if self.use_pyth_pull_oracle() {
                     let hint = builder.prepare_hint().await?;
-                    let mut ctx = PythPullOracleContext::try_from_feeds(hint.feeds())?;
+                    let ctx = PythPullOracleContext::try_from_feeds(hint.feeds())?;
                     let feed_ids = ctx.feed_ids();
                     if feed_ids.is_empty() {
                         tracing::error!(%position, "empty feed ids");
@@ -503,7 +518,7 @@ impl KeeperArgs {
                         .latest_price_updates(feed_ids, Some(EncodingType::Base64))
                         .await?;
                     let with_prices = oracle
-                        .with_pyth_prices(&mut ctx, &update, |prices| async {
+                        .with_pyth_prices(&ctx, &update, |prices| async {
                             let builder = builder
                                 .parse_with_pyth_price_updates(prices)
                                 .build()
@@ -538,11 +553,11 @@ impl KeeperArgs {
             }
             Command::UpdateAdl { market_token, side } => {
                 let mut builder =
-                    client.update_adl(store, &self.oracle, market_token, side.is_long())?;
+                    client.update_adl(store, self.oracle()?, market_token, side.is_long())?;
 
                 if self.use_pyth_pull_oracle() {
                     let hint = builder.prepare_hint().await?;
-                    let mut ctx = PythPullOracleContext::try_from_feeds(hint.feeds())?;
+                    let ctx = PythPullOracleContext::try_from_feeds(hint.feeds())?;
                     let feed_ids = ctx.feed_ids();
                     if feed_ids.is_empty() {
                         tracing::error!(%market_token, "empty feed ids");
@@ -553,7 +568,7 @@ impl KeeperArgs {
                         .latest_price_updates(feed_ids, Some(EncodingType::Base64))
                         .await?;
                     let with_prices = oracle
-                        .with_pyth_prices(&mut ctx, &update, |prices| async {
+                        .with_pyth_prices(&ctx, &update, |prices| async {
                             let builder = builder
                                 .parse_with_pyth_price_updates(prices)
                                 .build()
