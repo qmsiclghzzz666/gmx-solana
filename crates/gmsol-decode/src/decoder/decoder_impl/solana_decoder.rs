@@ -55,6 +55,12 @@ impl<'a> TransactionDecoder<'a> {
         Ok(self)
     }
 
+    /// Set CPI events filter.
+    pub fn set_cpi_event_filter(&mut self, filter: CPIEventFilter) -> &mut Self {
+        self.cpi_event_filter = filter;
+        self
+    }
+
     /// Get signature.
     pub fn signature(&self) -> Signature {
         self.signature
