@@ -21,7 +21,7 @@ idl-build = [
     "gmsol-utils/idl-build",
 ]
 debug = []
-display = []
+display = ["utils"]
 utils = ["bytes", "bs58"]
 serde = ["dep:serde", "serde_with"]
 enum-iter = []
