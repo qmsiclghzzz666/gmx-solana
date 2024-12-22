@@ -8,6 +8,8 @@ use solana_transaction_status::{
 
 use crate::{Decode, DecodeError, Decoder, Visitor};
 
+pub use solana_transaction_status;
+
 /// Transaction Decoder.
 pub struct TransactionDecoder<'a> {
     slot: u64,
