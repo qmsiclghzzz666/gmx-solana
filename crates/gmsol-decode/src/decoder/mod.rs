@@ -6,6 +6,11 @@ pub mod account_access;
 /// CPI Event Access.
 pub mod cpi_event_access;
 
+/// Decoder implementations.
+pub mod decoder_impl;
+
+pub use decoder_impl::*;
+
 /// Decoder for received program data.
 pub trait Decoder {
     /// Hint that the visitor is expecting an `AccountInfo`.

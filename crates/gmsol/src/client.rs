@@ -847,6 +847,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         >,
     > {
         use futures_util::TryStreamExt;
+        use gmsol_decode::Decode;
 
         use crate::{
             store::events::StoreCPIEvent,
@@ -884,7 +885,9 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
             let decoded = event
                 .map(|event| {
                     event
-                        .decode::<StoreCPIEvent>()
+                        .events
+                        .iter()
+                        .map(|event| StoreCPIEvent::decode(event).map_err(crate::Error::from))
                         .collect::<crate::Result<Vec<_>>>()
                 })
                 .transpose()
@@ -907,6 +910,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         >,
     > {
         use futures_util::TryStreamExt;
+        use gmsol_decode::Decode;
 
         use crate::{
             store::events::StoreCPIEvent,
@@ -936,7 +940,9 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
             let decoded = encoded
                 .map(|event| {
                     event
-                        .decode::<StoreCPIEvent>()
+                        .events
+                        .iter()
+                        .map(|event| StoreCPIEvent::decode(event).map_err(crate::Error::from))
                         .collect::<crate::Result<Vec<_>>>()
                 })
                 .transpose();

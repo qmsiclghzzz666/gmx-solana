@@ -10,7 +10,8 @@ use anchor_client::{
 };
 use async_stream::{stream, try_stream};
 use futures_util::Stream;
-use solana_transaction_status::{UiInstruction, UiLoadedAddresses, UiTransactionEncoding};
+use gmsol_decode::decoder::{CPIEvents, TransactionDecoder};
+use solana_transaction_status::UiTransactionEncoding;
 
 use crate::utils::WithSlot;
 
@@ -96,72 +97,38 @@ pub fn extract_cpi_events(
     event_authority: &Pubkey,
     commitment: CommitmentConfig,
     max_supported_transaction_version: Option<u8>,
-) -> impl Stream<Item = crate::Result<WithSlot<EncodedCPIEvents>>> {
+) -> impl Stream<Item = crate::Result<WithSlot<CPIEvents>>> {
     let program_id = *program_id;
     let event_authority = *event_authority;
     stream! {
         for await res in stream {
             match res {
                 Ok(ctx) => {
-                    tracing::debug!(signature=%ctx.value(), "fetching transaction");
+                    let signature = *ctx.value();
+                    tracing::debug!(%signature, "fetching transaction");
                     let tx = client
                         .borrow()
                         .get_transaction_with_config(
-                            ctx.value(),
+                            &signature,
                             RpcTransactionConfig {
-                                encoding: Some(UiTransactionEncoding::Base58),
+                                encoding: Some(UiTransactionEncoding::Base64),
                                 commitment: Some(commitment),
                                 max_supported_transaction_version,
                             },
                         )
                         .await
                         .map_err(ClientError::from)?;
-                    let Some(decoded) = tx.transaction.transaction.decode() else {
-                        continue;
-                    };
-                    let Some(meta) = tx.transaction.meta else {
-                        continue;
-                    };
-                    let accounts = decoded.message.static_account_keys();
-                    let loaded_addresses = Option::from(meta.loaded_addresses).map(|mut loaded: UiLoadedAddresses| {
-                        loaded.writable.append(&mut loaded.readonly);
-                        loaded.writable
-                    }).unwrap_or_default();
-                    let Some(event_authority_idx) = accounts
-                        .iter()
-                        .map(|pk| pk.to_string())
-                        .chain(loaded_addresses)
-                        .enumerate()
-                        .find_map(|(idx, pk)| (pk == event_authority.to_string()).then_some(idx))
-                    else {
-                        continue;
-                    };
-                    let event_authority_idx = event_authority_idx as u8;
-                    let Some(ixs) = Option::<Vec<_>>::from(meta.inner_instructions)
-                    else {
-                        yield Err(crate::Error::invalid_argument("invalid encoding"));
-                        continue;
-                    };
-                    let events = ixs
-                        .into_iter()
-                        .flat_map(|ixs| ixs.instructions)
-                        .filter_map(move |ix| match ix {
-                            UiInstruction::Compiled(ix) => {
-                                (
-                                    ix.accounts == [event_authority_idx]
-                                    && accounts.get(ix.program_id_index as usize) == Some(&program_id)
-                                ).then_some(ix.data)
-                            }
-                            UiInstruction::Parsed(_) => None,
-                        })
-                        .map(|data| bs58::decode(data).into_vec().map_err(crate::Error::unknown))
-                        .collect::<crate::Result<Vec<_>>>()?;
-                    if !events.is_empty() {
-                        yield Ok(ctx.map(|signature| EncodedCPIEvents {
-                            program_id,
-                            signature,
-                            events,
-                        }));
+                    let mut decoder = TransactionDecoder::new(signature, &tx);
+                    match decoder
+                        .add_cpi_event_authority_and_program_id(event_authority, program_id)
+                        .and_then(|decoder| decoder.extract_cpi_events())
+                    {
+                        Ok(events) => {
+                            yield Ok(ctx.map(|_| events));
+                        },
+                        Err(err) => {
+                            yield Err(err.into());
+                        }
                     }
                 },
                 Err(err) => {
