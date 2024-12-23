@@ -25,11 +25,16 @@ impl Pyth {
     ) -> Result<(u64, i64, Price)> {
         let feed = Account::<PriceUpdateV2>::try_from(feed)?;
         let feed_id = feed_id.to_bytes();
-        let price = feed.get_price_no_older_than(
-            clock,
-            token_config.heartbeat_duration().into(),
-            &feed_id,
-        )?;
+        let price = feed
+            .get_price_no_older_than(clock, token_config.heartbeat_duration().into(), &feed_id)
+            .inspect_err(|_err| {
+                let price_ts = feed.price_message.publish_time;
+                msg!(
+                    "[Pyth] get price error, clock={} price_ts={}",
+                    clock.unix_timestamp,
+                    price_ts,
+                );
+            })?;
         let parsed_price = pyth_price_with_confidence_to_price(
             price.price,
             price.conf,
