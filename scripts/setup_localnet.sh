@@ -42,6 +42,13 @@ else
     echo "LOCALNET_USDG_KEYPAIR is set to: $LOCALNET_USDG_KEYPAIR"
 fi
 
+if [ -z "${LOCALNET_BTC_KEYPAIR}" ]; then
+    echo "Error: LOCALNET_BTC_KEYPAIR is not set" >&2
+    exit 1
+else
+    echo "LOCALNET_BTC_KEYPAIR is set to: $LOCALNET_BTC_KEYPAIR"
+fi
+
 if [ -z "${GMSOL_TIME_WINDOW}" ]; then
     echo "Error: GMSOL_TIME_WINDOW is not set" >&2
     exit 1
@@ -57,7 +64,12 @@ solana -ul airdrop 1 11111111111111111111111111111113
 export USDG=$(solana-keygen pubkey $LOCALNET_USDG_KEYPAIR)
 spl-token -ul create-token $LOCALNET_USDG_KEYPAIR --decimals 6
 spl-token -ul create-account $USDG
-spl-token -ul mint $USDG 1000
+spl-token -ul mint $USDG 1000000000000
+
+export BTC=$(solana-keygen pubkey $LOCALNET_BTC_KEYPAIR)
+spl-token -ul create-token $LOCALNET_BTC_KEYPAIR --decimals 8
+spl-token -ul create-account $BTC
+spl-token -ul mint $BTC 1000000000
 
 cargo gmsol -ul other init-mock-chainlink-verifier
 
@@ -148,6 +160,7 @@ cargo gmsol -ul -w $GMSOL_KEEPER market update-configs $GMSOL_MARKET_CONFIGS
 
 cargo gmsol -ul -w $GMSOL_KEEPER market toggle-gt-minting B4qyuQJdUPqQeKVN6D6T96rNiDCmgXgvBqqKSCfMMuF3 --enable
 cargo gmsol -ul -w $GMSOL_KEEPER market toggle-gt-minting ACycDYCpDWxZWLuig6oGSVXmAm8czZ4en4Nk5cug9q1V --enable
+cargo gmsol -ul -w $GMSOL_KEEPER market toggle-gt-minting Feuv6GdnXPec1ELiXDYLH3XJkmDX9BgvrYVK68oGb6MC --enable
 
 export COMMON_ALT=$(cargo gmsol -ul alt extend --init common $ORACLE)
 export MARKET_ALT=$(cargo gmsol -ul alt extend --init market)
@@ -158,5 +171,6 @@ echo "CONFIG: $CONFIG"
 echo "TREASURY: $TREASURY"
 echo "ORACLE: $ORACLE"
 echo "USDG: $USDG"
+echo "BTC: $BTC"
 echo "COMMON_ALT: $COMMON_ALT"
 echo "MARKET_ALT: $MARKET_ALT"

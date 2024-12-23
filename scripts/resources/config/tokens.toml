@@ -31,3 +31,14 @@ heartbeat_duration = 120
 
 [USDG.feeds]
 pyth_feed_id = "0xeaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a"
+
+[BTC]
+address = "btcx3SkD6MNhkuKmgi3nayRbc9SQXomeuHMCxJJFaew"
+enable = true
+update = false
+expected_provider = "pyth"
+precision = 2
+heartbeat_duration = 120
+
+[BTC.feeds]
+pyth_feed_id = "0xe62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43"
