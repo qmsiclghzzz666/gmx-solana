@@ -371,7 +371,7 @@ impl KeeperArgs {
                                 },
                             )
                             .await?;
-                        tracing::info!(%order, "positoin does not exist, the order is cancelled");
+                        tracing::info!(%order, "position does not exist, the order is cancelled");
                         println!("{signature}");
                         return Ok(());
                     }
