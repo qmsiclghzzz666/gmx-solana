@@ -3,17 +3,17 @@ use std::borrow::Borrow;
 use anchor_client::{
     solana_client::{
         nonblocking::rpc_client::RpcClient, rpc_client::GetConfirmedSignaturesForAddress2Config,
-        rpc_config::RpcTransactionConfig,
     },
     solana_sdk::{commitment_config::CommitmentConfig, pubkey::Pubkey, signature::Signature},
     ClientError,
 };
-use async_stream::{stream, try_stream};
+use async_stream::try_stream;
 use futures_util::Stream;
-use gmsol_decode::decoder::{CPIEvents, TransactionDecoder};
-use solana_transaction_status::UiTransactionEncoding;
 
 use crate::utils::WithSlot;
+
+#[cfg(feature = "decode")]
+use gmsol_decode::decoder::{CPIEvents, TransactionDecoder};
 
 /// Fetch transaction history for an address.
 pub async fn fetch_transaction_history_with_config(
@@ -55,41 +55,8 @@ pub async fn fetch_transaction_history_with_config(
     Ok(stream)
 }
 
-/// Encoded CPI Events.
-#[derive(Debug, Clone)]
-pub struct EncodedCPIEvents {
-    program_id: Pubkey,
-    signature: Signature,
-    events: Vec<Vec<u8>>,
-}
-
-impl EncodedCPIEvents {
-    /// Get the program id.
-    pub fn program_id(&self) -> &Pubkey {
-        &self.program_id
-    }
-
-    /// Get the transaction signature.
-    pub fn signature(&self) -> &Signature {
-        &self.signature
-    }
-
-    /// Get events.
-    pub fn events(&self) -> &[Vec<u8>] {
-        &self.events
-    }
-
-    #[cfg(feature = "decode")]
-    pub fn decode<T: crate::decode::Decode>(&self) -> impl Iterator<Item = crate::Result<T>> + '_ {
-        use crate::decode::value::OwnedDataDecoder;
-        self.events.iter().map(|data| {
-            let decoder = OwnedDataDecoder::new(&self.program_id, data);
-            Ok(T::decode(decoder)?)
-        })
-    }
-}
-
 /// Extract encoded CPI events from transaction history.
+#[cfg(feature = "decode")]
 pub fn extract_cpi_events(
     stream: impl Stream<Item = crate::Result<WithSlot<Signature>>>,
     client: impl Borrow<RpcClient>,
@@ -98,9 +65,12 @@ pub fn extract_cpi_events(
     commitment: CommitmentConfig,
     max_supported_transaction_version: Option<u8>,
 ) -> impl Stream<Item = crate::Result<WithSlot<CPIEvents>>> {
+    use anchor_client::solana_client::rpc_config::RpcTransactionConfig;
+    use solana_transaction_status::UiTransactionEncoding;
+
     let program_id = *program_id;
     let event_authority = *event_authority;
-    stream! {
+    async_stream::stream! {
         for await res in stream {
             match res {
                 Ok(ctx) => {

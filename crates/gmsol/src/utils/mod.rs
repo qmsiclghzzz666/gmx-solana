@@ -43,9 +43,7 @@ pub use self::{
         accounts::{account_with_context, accounts_lazy_with_context, ProgramAccountsConfig},
         context::{WithContext, WithSlot},
         pubsub::{PubsubClient, SubscriptionConfig},
-        transaction_history::{
-            extract_cpi_events, fetch_transaction_history_with_config, EncodedCPIEvents,
-        },
+        transaction_history::fetch_transaction_history_with_config,
     },
     signer::{local_signer, shared_signer, LocalSignerRef, SignerRef},
     token::price_to_min_output_amount,
@@ -58,6 +56,9 @@ pub use self::{
         zero_copy::{try_deserailize_zero_copy_account, ZeroCopy},
     },
 };
+
+#[cfg(feature = "decode")]
+pub use rpc::transaction_history::extract_cpi_events;
 
 /// View the return data by simulating the transaction.
 pub async fn view<T: BorshDeserialize>(

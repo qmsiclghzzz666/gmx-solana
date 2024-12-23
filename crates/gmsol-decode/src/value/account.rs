@@ -2,10 +2,7 @@ use std::marker::PhantomData;
 
 use solana_sdk::pubkey::Pubkey;
 
-use crate::{
-    decoder::account_access::AccountAccessDecoder, AccountAccess, Decode, DecodeError, Decoder,
-    Visitor,
-};
+use crate::{decoder::AccountAccessDecoder, AccountAccess, Decode, DecodeError, Decoder, Visitor};
 
 use super::OwnedData;
 
