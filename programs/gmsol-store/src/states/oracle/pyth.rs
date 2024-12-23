@@ -26,14 +26,16 @@ impl Pyth {
     ) -> Result<(u64, i64, Price)> {
         let feed = Account::<PriceUpdateV2>::try_from(feed)?;
         let feed_id = feed_id.to_bytes();
+        let max_age = token_config.heartbeat_duration().into();
         let price = feed
-            .get_price_no_older_than(clock, token_config.heartbeat_duration().into(), &feed_id)
+            .get_price_no_older_than(clock, max_age, &feed_id)
             .map_err(|err| {
                 let price_ts = feed.price_message.publish_time;
                 msg!(
-                    "[Pyth] get price error, clock={} price_ts={}",
+                    "[Pyth] get price error, clock={} price_ts={} max_age={}",
                     clock.unix_timestamp,
                     price_ts,
+                    max_age,
                 );
                 err
             })?;
