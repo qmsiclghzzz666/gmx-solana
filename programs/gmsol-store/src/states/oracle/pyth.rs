@@ -17,6 +17,7 @@ impl Pyth {
     /// Push Oracle ID.
     pub const PUSH_ORACLE_ID: Pubkey = pyth_solana_receiver_sdk::PYTH_PUSH_ORACLE_ID;
 
+    #[allow(clippy::manual_inspect)]
     pub(super) fn check_and_get_price<'info>(
         clock: &Clock,
         token_config: &TokenConfig,
@@ -27,13 +28,14 @@ impl Pyth {
         let feed_id = feed_id.to_bytes();
         let price = feed
             .get_price_no_older_than(clock, token_config.heartbeat_duration().into(), &feed_id)
-            .inspect_err(|_err| {
+            .map_err(|err| {
                 let price_ts = feed.price_message.publish_time;
                 msg!(
                     "[Pyth] get price error, clock={} price_ts={}",
                     clock.unix_timestamp,
                     price_ts,
                 );
+                err
             })?;
         let parsed_price = pyth_price_with_confidence_to_price(
             price.price,
