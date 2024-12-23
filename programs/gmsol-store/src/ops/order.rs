@@ -379,9 +379,13 @@ impl<'a, 'info> CreateDecreaseOrderOperation<'a, 'info> {
             self.common.params.kind.is_decrease_position(),
             CoreError::Internal
         );
+
+        // Note: Empty market decrease order is allowed so that the user
+        // can claim funding rebates without modifying the position.
         require!(
             self.common.params.size_delta_value != 0
-                || self.common.params.initial_collateral_delta_amount != 0,
+                || self.common.params.initial_collateral_delta_amount != 0
+                || self.common.params.kind.is_market_decrease(),
             CoreError::EmptyOrder
         );
 
@@ -1114,8 +1118,12 @@ impl<'a, 'info> ExecuteOrderOperation<'a, 'info> {
         let kind = params.kind()?;
 
         if kind.is_increase_position() || kind.is_decrease_position() {
+            // Note: Empty market decrease order is allowed so that the user
+            // can claim funding rebates without modifying the position.
             require!(
-                params.size_delta_value != 0 || params.initial_collateral_delta_amount != 0,
+                params.size_delta_value != 0
+                    || params.initial_collateral_delta_amount != 0
+                    || kind.is_market_decrease(),
                 CoreError::EmptyOrder
             );
         } else if kind.is_swap() {

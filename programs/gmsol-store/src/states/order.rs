@@ -107,6 +107,11 @@ impl OrderKind {
                 | Self::StopLossDecrease
         )
     }
+
+    /// Is market decrease.
+    pub fn is_market_decrease(&self) -> bool {
+        matches!(self, Self::MarketDecrease)
+    }
 }
 
 /// Transfer Out.
