@@ -154,6 +154,7 @@
 //! - [`execute_increase_or_swap_order`](gmsol_store::execute_increase_or_swap_order()): Execute an order by keepers.
 //! - [`execute_decrease_order`]: Execute a decrease order by keepers.
 //! - [`close_order`]: Close an order, either by the owner or by keepers.
+//! - [`cancel_order_if_no_position`]: Cancel an order if the position does not exist.
 //! - [`liquidate`]: Perform a liquidation by keepers.
 //! - [`auto_deleverage`]: Perform an ADL by keepers.
 //! - [`update_adl_state`]: Update the ADL state of the market.
@@ -1977,6 +1978,24 @@ pub mod gmsol_store {
         reason: String,
     ) -> Result<()> {
         internal::Close::close(&ctx, &reason)
+    }
+
+    /// Cancel order if the corresponding position does not exist.
+    ///
+    /// # Accounts
+    /// *[See the documentation for the accounts.](CancelOrderIfNoPosition)*
+    ///
+    /// # Errors
+    /// - The [`authority`](CancelOrderIfNoPosition::authority) must be a signed ORDER_KEEPER
+    ///   in the store.
+    /// - The [`store`](CancelOrderIfNoPosition::authority) must be initialized.
+    /// - The [`order`](CancelOrderIfNoPosition::order) must be initialized and owned by the
+    ///   `store`. It must be in the pending state.
+    /// - The [`position`](CancelOrderIfNoPosition::position) must be recorded in the order.
+    ///   It must be owned by the system program (i.e., considered to be missing).
+    #[access_control(internal::Authenticate::only_order_keeper(&ctx))]
+    pub fn cancel_order_if_no_position(ctx: Context<CancelOrderIfNoPosition>) -> Result<()> {
+        instructions::unchecked_cancel_order_if_no_position(ctx)
     }
 
     /// Prepare a trade event buffer.

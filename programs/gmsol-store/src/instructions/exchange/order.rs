@@ -805,3 +805,42 @@ pub(crate) fn update_order(ctx: Context<UpdateOrder>, params: &UpdateOrderParams
     ctx.accounts.order.load_mut()?.update(id, params)?;
     Ok(())
 }
+
+/// The accounts definition for the [`cancel_order_if_no_position`](crate::gmsol_store::cancel_order_if_no_position)
+/// instruction.
+#[derive(Accounts)]
+pub struct CancelOrderIfNoPosition<'info> {
+    /// Authority.
+    pub authority: Signer<'info>,
+    /// Store.
+    pub store: AccountLoader<'info, Store>,
+    /// Order to check.
+    #[account(
+        mut,
+        constraint = order.load()?.header.store == store.key() @ CoreError::StoreMismatched,
+        constraint = order.load()?.params.position().copied() == Some(position.key()) @ CoreError::PositionMismatched,
+    )]
+    pub order: AccountLoader<'info, Order>,
+    /// Validate that the position does not exist (or is owned by the system program).
+    pub position: SystemAccount<'info>,
+}
+
+/// Cancel order if the position does not exist (or is owned by the system program).
+/// # CHECK
+/// Only [`ORDER_KEEPER`](crate::states::roles::RoleKey::ORDER_KEEPER) can use.
+pub(crate) fn unchecked_cancel_order_if_no_position(
+    ctx: Context<CancelOrderIfNoPosition>,
+) -> Result<()> {
+    // Order must be in the pending state which is checked before the transition.
+    ctx.accounts.order.load_mut()?.header.cancelled()
+}
+
+impl<'info> internal::Authentication<'info> for CancelOrderIfNoPosition<'info> {
+    fn authority(&self) -> &Signer<'info> {
+        &self.authority
+    }
+
+    fn store(&self) -> &AccountLoader<'info, Store> {
+        &self.store
+    }
+}

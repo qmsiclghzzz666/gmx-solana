@@ -27,6 +27,7 @@ use anchor_client::{
 };
 use auto_deleveraging::UpdateAdlBuilder;
 use gmsol_store::{
+    accounts, instruction,
     ops::order::PositionCutKind,
     states::{
         feature::{ActionDisabledFlag, DomainDisabledFlag},
@@ -154,6 +155,14 @@ pub trait ExchangeOps<C> {
 
     /// Close an order.
     fn close_order(&self, order: &Pubkey) -> crate::Result<CloseOrderBuilder<C>>;
+
+    /// Cancel order if the position does not exist.
+    fn cancel_order_if_no_position(
+        &self,
+        store: &Pubkey,
+        order: &Pubkey,
+        position_hint: Option<&Pubkey>,
+    ) -> impl Future<Output = crate::Result<RpcBuilder<C>>>;
 
     /// Liquidate a position.
     fn liquidate(&self, oracle: &Pubkey, position: &Pubkey)
@@ -579,6 +588,36 @@ where
 
     fn close_order(&self, order: &Pubkey) -> crate::Result<CloseOrderBuilder<C>> {
         Ok(CloseOrderBuilder::new(self, order))
+    }
+
+    async fn cancel_order_if_no_position(
+        &self,
+        store: &Pubkey,
+        order: &Pubkey,
+        position_hint: Option<&Pubkey>,
+    ) -> crate::Result<RpcBuilder<C>> {
+        let position = match position_hint {
+            Some(position) => *position,
+            None => {
+                let order = self.order(order).await?;
+
+                let position = order.params().position().ok_or_else(|| {
+                    crate::Error::invalid_argument("this order does not have position")
+                })?;
+
+                *position
+            }
+        };
+
+        Ok(self
+            .store_rpc()
+            .args(instruction::CancelOrderIfNoPosition {})
+            .accounts(accounts::CancelOrderIfNoPosition {
+                authority: self.payer(),
+                store: *store,
+                order: *order,
+                position,
+            }))
     }
 
     fn liquidate(

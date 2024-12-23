@@ -1,7 +1,7 @@
 use std::{ops::Deref, time::Duration};
 
 use anchor_client::{
-    solana_client::nonblocking::rpc_client::RpcClient,
+    solana_client::{nonblocking::rpc_client::RpcClient, rpc_config::RpcSendTransactionConfig},
     solana_sdk::{pubkey::Pubkey, signer::Signer},
 };
 use futures_util::{FutureExt, TryFutureExt};
@@ -347,6 +347,29 @@ impl KeeperArgs {
                 }
             }
             Command::ExecuteOrder { order } => {
+                let order_account = client.order(order).await?;
+                if let Some(position) = order_account.params().position() {
+                    if let Err(gmsol::Error::NotFound) = client.position(position).await {
+                        let cancel = client
+                            .cancel_order_if_no_position(store, order, Some(position))
+                            .await?;
+                        let close = client.close_order(order)?.build().await?;
+                        let signature = cancel
+                            .merge(close)
+                            .send_with_options(
+                                false,
+                                Some(self.compute_unit_price),
+                                RpcSendTransactionConfig {
+                                    skip_preflight: true,
+                                    ..Default::default()
+                                },
+                            )
+                            .await?;
+                        tracing::info!(%order, "positoin does not exist, the order is cancelled");
+                        println!("{signature}");
+                        return Ok(());
+                    }
+                }
                 let mut builder = client.execute_order(store, self.oracle()?, order, true)?;
                 let execution_fee = self
                     .execution_fee
