@@ -93,6 +93,12 @@ enum Command {
         #[arg(long)]
         ignore_store: bool,
     },
+    /// Cancel order if no position.
+    CancelOrderIfNoPosition {
+        order: Pubkey,
+        #[arg(long)]
+        keep: bool,
+    },
 }
 
 #[derive(Debug, clap::ValueEnum, Clone, Copy)]
@@ -622,6 +628,28 @@ impl KeeperArgs {
                         .await?;
                     tracing::info!(%market_token, ?side, "updated ADL state with txs: {signatures:#?}");
                 }
+            }
+            Command::CancelOrderIfNoPosition { order, keep } => {
+                let cancel = client
+                    .cancel_order_if_no_position(store, order, None)
+                    .await?;
+                let rpc = if *keep {
+                    cancel
+                } else {
+                    let close = client.close_order(order)?.build().await?;
+                    cancel.merge(close)
+                };
+                let signature = rpc
+                    .send_with_options(
+                        false,
+                        Some(self.compute_unit_price),
+                        RpcSendTransactionConfig {
+                            skip_preflight: false,
+                            ..Default::default()
+                        },
+                    )
+                    .await?;
+                tracing::info!(%order, "cancelled order at {signature}");
             }
         }
         Ok(())
