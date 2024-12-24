@@ -16,7 +16,14 @@ use gmsol_store::{
 };
 use gmsol_utils::InitSpace;
 
-use crate::states::{config::Config, treasury::TreasuryConfig, GtBank};
+use crate::{
+    constants,
+    states::{
+        config::{Config, ReceiverSigner},
+        treasury::TreasuryConfig,
+        GtBank,
+    },
+};
 
 /// The accounts definition for [`initialize_treasury`](crate::gmsol_treasury::initialize_treasury).
 #[derive(Accounts)]
@@ -291,6 +298,12 @@ pub struct DepositIntoTreasury<'info> {
         constraint = treasury_config.load()?.is_deposit_allowed(&token.key())? @ CoreError::InvalidArgument,
     )]
     pub treasury_config: AccountLoader<'info, TreasuryConfig>,
+    /// Receiver.
+    #[account(
+        seeds = [constants::RECEIVER_SEED, config.key().as_ref()],
+        bump,
+    )]
+    pub receiver: SystemAccount<'info>,
     /// GT exchange vault.
     #[account(
         has_one = store,
@@ -320,7 +333,7 @@ pub struct DepositIntoTreasury<'info> {
     /// Receiver vault.
     #[account(
         mut,
-        associated_token::authority = config,
+        associated_token::authority = receiver,
         associated_token::mint = token,
     )]
     pub receiver_vault: InterfaceAccount<'info, TokenAccount>,
@@ -353,7 +366,7 @@ pub(crate) fn unchecked_deposit_into_treasury(ctx: Context<DepositIntoTreasury>)
     use gmsol_model::utils::apply_factor;
     use gmsol_store::constants::{MARKET_DECIMALS, MARKET_USD_UNIT};
 
-    let signer = ctx.accounts.config.load()?.signer();
+    let signer = ReceiverSigner::new(ctx.accounts.config.key(), ctx.bumps.receiver);
     let decimals = ctx.accounts.token.decimals;
 
     let (gt_amount, treasury_amount): (u64, u64) = {
@@ -426,7 +439,7 @@ impl<'info> DepositIntoTreasury<'info> {
                 from: self.receiver_vault.to_account_info(),
                 mint: self.token.to_account_info(),
                 to: self.treasury_vault.to_account_info(),
-                authority: self.config.to_account_info(),
+                authority: self.receiver.to_account_info(),
             },
         )
     }
@@ -440,7 +453,7 @@ impl<'info> DepositIntoTreasury<'info> {
                 from: self.receiver_vault.to_account_info(),
                 mint: self.token.to_account_info(),
                 to: self.gt_bank_vault.to_account_info(),
-                authority: self.config.to_account_info(),
+                authority: self.receiver.to_account_info(),
             },
         )
     }

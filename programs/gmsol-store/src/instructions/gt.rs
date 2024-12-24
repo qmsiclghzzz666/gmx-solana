@@ -129,7 +129,7 @@ pub(crate) fn unchecked_gt_set_es_receiver_factor(
         .store
         .load_mut()?
         .gt_mut()
-        .set_es_recevier_factor(factor)
+        .set_es_receiver_factor(factor)
 }
 
 /// CHECK: only GT_CONTROLLER is authorized to use this instruction.

@@ -79,7 +79,9 @@ export STORE=$(cargo gmsol -ul admin create-store)
 
 export CONFIG=$(cargo gmsol -ul treasury init-config)
 
-cargo gmsol -ul admin transfer-receiver $CONFIG --confirm
+export RECEIVER=$(cargo gmsol -ul treasury receiver)
+
+cargo gmsol -ul admin transfer-receiver $RECEIVER --confirm
 
 export ADMIN_EXECUTOR=$(cargo gmsol -ul timelock init-executor ADMIN)
 
@@ -168,6 +170,7 @@ export MARKET_ALT=$(cargo gmsol -ul alt extend --init market)
 echo "STORE: $STORE"
 echo "ADMIN_EXECUTOR: $ADMIN_EXECUTOR"
 echo "CONFIG: $CONFIG"
+echo "RECEIVER: $RECEIVER"
 echo "TREASURY: $TREASURY"
 echo "ORACLE: $ORACLE"
 echo "USDG: $USDG"

@@ -218,6 +218,8 @@ enum Command {
     GtExchangeVault { address: Option<Pubkey> },
     /// Price Feed.
     PriceFeed { address: Pubkey },
+    /// Treasury.
+    Treasury,
     /// GT Bank.
     GtBank {
         address: Option<Pubkey>,
@@ -1031,6 +1033,21 @@ impl InspectArgs {
                     .ok_or(gmsol::Error::NotFound)?
                     .0;
                 println!("{feed:#?}");
+            }
+            Command::Treasury => {
+                let config = client.find_config_address(store);
+                println!("Global Config: {config}");
+                let receiver = client.find_treasury_receiver_address(&config);
+                println!("Receiver: {receiver}");
+                let config = client
+                    .account::<ZeroCopy<types::treasury::Config>>(&config)
+                    .await?
+                    .ok_or(gmsol::Error::NotFound)?
+                    .0;
+                match config.treasury_config() {
+                    Some(treasury_config) => println!("Treasury Config: {treasury_config}"),
+                    None => println!("Treasury Config is not set"),
+                }
             }
             Command::GtBank {
                 address,

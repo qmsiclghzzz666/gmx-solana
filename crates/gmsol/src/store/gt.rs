@@ -39,7 +39,7 @@ pub trait GtOps<C> {
     /// Configurate the receiver of esGT vault.
     fn gt_set_es_receiver(&self, store: &Pubkey, receiver: &Pubkey) -> RpcBuilder<C>;
 
-    /// Configurate the recevier factor of esGT.
+    /// Configurate the receiver factor of esGT.
     fn gt_set_es_receiver_factor(&self, store: &Pubkey, factor: u128) -> RpcBuilder<C>;
 
     /// Initialize GT exchange vault with the given time window index.

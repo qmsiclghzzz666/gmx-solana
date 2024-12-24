@@ -13,7 +13,10 @@ use gmsol_store::{
     CoreError,
 };
 
-use crate::states::Config;
+use crate::{
+    constants,
+    states::{config::ReceiverSigner, Config},
+};
 
 /// The accounts definition for [`transfer_receiver`](crate::gmsol_treasury::transfer_receiver).
 #[derive(Accounts)]
@@ -28,9 +31,15 @@ pub struct TransferReceiver<'info> {
     /// Config.
     #[account(has_one = store)]
     pub config: AccountLoader<'info, Config>,
+    /// Receiver.
+    #[account(
+        seeds = [constants::RECEIVER_SEED, config.key().as_ref()],
+        bump,
+    )]
+    pub receiver: SystemAccount<'info>,
     /// The new receiver.
     /// CHECK: only used as an identifier.
-    pub receiver: UncheckedAccount<'info>,
+    pub new_receiver: UncheckedAccount<'info>,
     /// Store program.
     pub store_program: Program<'info, GmsolStore>,
     /// The system program.
@@ -41,7 +50,7 @@ pub struct TransferReceiver<'info> {
 /// # CHECK
 /// Only [`TREASURY_OWNER`](crate::roles::TREASURY_OWNER) can use.
 pub(crate) fn unchecked_transfer_receiver(ctx: Context<TransferReceiver>) -> Result<()> {
-    let signer = ctx.accounts.config.load()?.signer();
+    let signer = ReceiverSigner::new(ctx.accounts.config.key(), ctx.bumps.receiver);
     let cpi_ctx = ctx.accounts.set_receiver_ctx();
     set_receiver(cpi_ctx.with_signer(&[&signer.as_seeds()]))?;
     Ok(())
@@ -72,9 +81,9 @@ impl<'info> TransferReceiver<'info> {
         CpiContext::new(
             self.store_program.to_account_info(),
             SetReceiver {
-                authority: self.config.to_account_info(),
+                authority: self.receiver.to_account_info(),
                 store: self.store.to_account_info(),
-                receiver: self.receiver.to_account_info(),
+                receiver: self.new_receiver.to_account_info(),
             },
         )
     }
@@ -92,6 +101,12 @@ pub struct ClaimFees<'info> {
     /// Config to initialize with.
     #[account(has_one = store)]
     pub config: AccountLoader<'info, Config>,
+    /// Receiver.
+    #[account(
+        seeds = [constants::RECEIVER_SEED, config.key().as_ref()],
+        bump,
+    )]
+    pub receiver: SystemAccount<'info>,
     /// Market to claim fees from.
     /// CHECK: check by CPI.
     #[account(mut)]
@@ -106,7 +121,7 @@ pub struct ClaimFees<'info> {
     #[account(
         init_if_needed,
         payer = authority,
-        associated_token::authority = config,
+        associated_token::authority = receiver,
         associated_token::mint = token,
     )]
     pub receiver_vault: InterfaceAccount<'info, TokenAccount>,
@@ -124,7 +139,7 @@ pub struct ClaimFees<'info> {
 /// # CHECK
 /// Only [`TREASURY_KEEPER`](crate::roles::TREASURY_KEEPER) can use.
 pub(crate) fn unchecked_claim_fees(ctx: Context<ClaimFees>) -> Result<()> {
-    let signer = ctx.accounts.config.load()?.signer();
+    let signer = ReceiverSigner::new(ctx.accounts.config.key(), ctx.bumps.receiver);
     let cpi_ctx = ctx.accounts.claim_fees_from_market_ctx();
     let amount = claim_fees_from_market(cpi_ctx.with_signer(&[&signer.as_seeds()]))?;
     msg!("[Treasury] claimed {} tokens from the market", amount.get());
@@ -158,7 +173,7 @@ impl<'info> ClaimFees<'info> {
         CpiContext::new(
             self.store_program.to_account_info(),
             ClaimFeesFromMarket {
-                authority: self.config.to_account_info(),
+                authority: self.receiver.to_account_info(),
                 store: self.store.to_account_info(),
                 market: self.market.to_account_info(),
                 token_mint: self.token.to_account_info(),

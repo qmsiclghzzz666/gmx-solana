@@ -2,6 +2,8 @@ use anchor_lang::prelude::*;
 use gmsol_store::{states::Seed, CoreError};
 use gmsol_utils::InitSpace;
 
+use crate::constants;
+
 /// Global Config account.
 #[account(zero_copy)]
 #[cfg_attr(feature = "debug", derive(Debug))]
@@ -86,5 +88,30 @@ impl ConfigSigner {
     /// As signer seeds.
     pub fn as_seeds(&self) -> [&[u8]; 3] {
         [Config::SEED, self.store.as_ref(), &self.bump_bytes]
+    }
+}
+
+/// Receiver Signer.
+pub struct ReceiverSigner {
+    config: Pubkey,
+    bump_bytes: [u8; 1],
+}
+
+impl ReceiverSigner {
+    /// Create from config address and bump.
+    pub fn new(config: Pubkey, bump: u8) -> Self {
+        Self {
+            config,
+            bump_bytes: [bump],
+        }
+    }
+
+    /// As signer seeds.
+    pub fn as_seeds(&self) -> [&[u8]; 3] {
+        [
+            constants::RECEIVER_SEED,
+            self.config.as_ref(),
+            &self.bump_bytes,
+        ]
     }
 }

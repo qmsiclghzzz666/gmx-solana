@@ -170,10 +170,4 @@ pub mod gmsol_treasury {
     pub fn cancel_swap(ctx: Context<CancelSwap>) -> Result<()> {
         instructions::unchecked_cancel_swap(ctx)
     }
-
-    /// Claim swapped tokens.
-    #[access_control(CpiAuthenticate::only(&ctx, roles::TREASURY_KEEPER))]
-    pub fn claim_swapped_tokens(ctx: Context<ClaimSwappedTokens>) -> Result<()> {
-        instructions::unchecked_claim_swapped_tokens(ctx)
-    }
 }

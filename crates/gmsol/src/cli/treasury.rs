@@ -65,8 +65,6 @@ enum Command {
         token_mint: Pubkey,
         #[arg(long)]
         token_program_id: Option<Pubkey>,
-        #[arg(long)]
-        no_claim_swap_vault: bool,
     },
     /// Confirm GT buyback.
     ConfirmGtBuyback {
@@ -104,6 +102,8 @@ enum Command {
     },
     /// Cancel Swap.
     CancelSwap { order: Pubkey },
+    /// Get Receiver Address.
+    Receiver,
 }
 
 impl Args {
@@ -196,7 +196,6 @@ impl Args {
             Command::DepositToTreasury {
                 token_mint,
                 token_program_id,
-                no_claim_swap_vault,
             } => {
                 let store_account = client.store(store).await?;
                 let time_window = store_account.gt().exchange_time_window();
@@ -213,16 +212,7 @@ impl Args {
                     .swap_output(());
                 println!("{gt_exchange_vault}");
 
-                if !*no_claim_swap_vault {
-                    let claim = client.claim_treasury_swapped_tokens(
-                        store,
-                        token_mint,
-                        token_program_id.as_ref(),
-                    );
-                    claim.merge(rpc)
-                } else {
-                    rpc
-                }
+                rpc
             }
             Command::ConfirmGtBuyback {
                 gt_exchange_vault,
@@ -282,10 +272,11 @@ impl Args {
                 fund,
             } => {
                 let config = client.find_config_address(store);
+                let receiver = client.find_treasury_receiver_address(&config);
                 let amount = match amount {
                     Some(amount) => *amount,
                     None => {
-                        let vault = get_associated_token_address(&config, swap_in);
+                        let vault = get_associated_token_address(&receiver, swap_in);
                         let account =
                             client
                                 .account::<TokenAccount>(&vault)
@@ -315,7 +306,7 @@ impl Args {
                     .swap_output(());
                 println!("{order}");
                 if let Some(lamports) = fund {
-                    let swap_owner = client.find_treasury_swap_owner_address(&config);
+                    let swap_owner = client.find_treasury_receiver_address(&config);
                     let fund = client.transfer(&swap_owner, *lamports)?;
                     fund.merge(rpc)
                 } else {
@@ -324,6 +315,12 @@ impl Args {
             }
             Command::CancelSwap { order } => {
                 client.cancel_treasury_swap(store, order, None).await?
+            }
+            Command::Receiver => {
+                let config = client.find_config_address(store);
+                let receiver = client.find_treasury_receiver_address(&config);
+                println!("{receiver}");
+                return Ok(());
             }
         };
         crate::utils::send_or_serialize_rpc(

@@ -191,7 +191,7 @@ impl GtState {
         Ok(self.referral_reward_factors[rank as usize])
     }
 
-    pub(crate) fn set_es_recevier_factor(&mut self, factor: u128) -> Result<()> {
+    pub(crate) fn set_es_receiver_factor(&mut self, factor: u128) -> Result<()> {
         require_gte!(
             constants::MARKET_USD_UNIT,
             factor,

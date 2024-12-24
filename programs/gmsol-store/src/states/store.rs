@@ -252,7 +252,7 @@ impl Store {
         Ok(())
     }
 
-    /// Get the recevier address.
+    /// Get the receiver address.
     pub fn receiver(&self) -> Pubkey {
         self.treasury.receiver
     }

@@ -13,7 +13,7 @@ use gmsol_store::{
 };
 use gmsol_timelock::states::{Executor, TimelockConfig};
 use gmsol_treasury::{
-    constants::SWAP_ORDER_OWNER_SEED,
+    constants::RECEIVER_SEED,
     states::{Config, GtBank, TreasuryConfig},
 };
 use gmsol_utils::to_seed;
@@ -330,12 +330,9 @@ pub fn find_gt_bank_pda(
     )
 }
 
-/// Find treasury swap owner PDA.
-pub fn find_treasury_swap_owner_pda(config: &Pubkey, treasury_program_id: &Pubkey) -> (Pubkey, u8) {
-    Pubkey::find_program_address(
-        &[SWAP_ORDER_OWNER_SEED, config.as_ref()],
-        treasury_program_id,
-    )
+/// Find treasury receiver PDA.
+pub fn find_treasury_receiver_pda(config: &Pubkey, treasury_program_id: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(&[RECEIVER_SEED, config.as_ref()], treasury_program_id)
 }
 
 /// Find timelock config PDA.
