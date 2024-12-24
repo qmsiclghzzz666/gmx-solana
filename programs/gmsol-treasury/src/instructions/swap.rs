@@ -360,7 +360,7 @@ impl<'info> CancelSwap<'info> {
                 executor: self.owner.to_account_info(),
                 store: self.store.to_account_info(),
                 owner: self.owner.to_account_info(),
-                rent_receiver: self.config.to_account_info(),
+                rent_receiver: self.owner.to_account_info(),
                 user: self.user.to_account_info(),
                 referrer_user: None,
                 order: self.order.to_account_info(),
