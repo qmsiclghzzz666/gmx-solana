@@ -6,7 +6,9 @@ use anchor_client::{
     solana_sdk::{pubkey::Pubkey, signer::Signer},
 };
 use anchor_spl::associated_token::get_associated_token_address_with_program_id;
-use gmsol_store::states::{common::TokensWithFeed, gt::GtExchange, Chainlink, PriceProviderKind};
+use gmsol_store::states::{
+    common::TokensWithFeed, gt::GtExchange, Chainlink, NonceBytes, PriceProviderKind,
+};
 use gmsol_treasury::{
     accounts, instruction,
     states::{treasury::TokenFlag, Config, TreasuryConfig},
@@ -14,6 +16,7 @@ use gmsol_treasury::{
 use solana_account_decoder::UiAccountEncoding;
 
 use crate::{
+    exchange::generate_nonce,
     store::{gt::GtOps, token::TokenAccountOps, utils::FeedsParser},
     utils::{
         builder::{
@@ -139,6 +142,46 @@ pub trait TreasuryOps<C> {
         tokens_hint: Option<Vec<(Pubkey, Pubkey)>>,
         gt_exchange_vault_hint: Option<&Pubkey>,
     ) -> impl Future<Output = crate::Result<RpcBuilder<C>>>;
+
+    /// Create a swap.
+    fn create_treasury_swap(
+        &self,
+        store: &Pubkey,
+        market_token: &Pubkey,
+        swap_in_token: &Pubkey,
+        swap_out_token: &Pubkey,
+        swap_in_token_amount: u64,
+        options: CreateTreasurySwapOptions,
+    ) -> impl Future<Output = crate::Result<RpcBuilder<C, Pubkey>>>;
+
+    /// Cancel a swap.
+    fn cancel_treasury_swap(
+        &self,
+        store: &Pubkey,
+        order: &Pubkey,
+        hint: Option<(&Pubkey, &Pubkey)>,
+    ) -> impl Future<Output = crate::Result<RpcBuilder<C>>>;
+
+    /// Claim swapped tokens.
+    fn claim_treasury_swapped_tokens(
+        &self,
+        store: &Pubkey,
+        token: &Pubkey,
+        token_program_id: Option<&Pubkey>,
+    ) -> RpcBuilder<C>;
+}
+
+/// Create Treasury Swap Options.
+#[derive(Debug, Clone, Default)]
+pub struct CreateTreasurySwapOptions {
+    /// Nonce.
+    pub nonce: Option<NonceBytes>,
+    /// The market tokens of the swap path.
+    pub swap_path: Vec<Pubkey>,
+    /// Min swap out amount.
+    pub min_swap_out_amount: Option<u64>,
+    /// Hint for the treasury config address.
+    pub treasury_config_hint: Option<Pubkey>,
 }
 
 impl<S, C> TreasuryOps<C> for crate::Client<C>
@@ -626,6 +669,210 @@ where
                     .chain(atas)
                     .collect::<Vec<_>>(),
             ))
+    }
+
+    async fn create_treasury_swap(
+        &self,
+        store: &Pubkey,
+        market_token: &Pubkey,
+        swap_in_token: &Pubkey,
+        swap_out_token: &Pubkey,
+        swap_in_token_amount: u64,
+        options: CreateTreasurySwapOptions,
+    ) -> crate::Result<RpcBuilder<C, Pubkey>> {
+        let nonce = options.nonce.unwrap_or_else(generate_nonce);
+        let swap_path = options
+            .swap_path
+            .iter()
+            .chain(Some(market_token))
+            .map(|token| {
+                let pubkey = self.find_market_address(store, token);
+                AccountMeta {
+                    pubkey,
+                    is_signer: false,
+                    is_writable: false,
+                }
+            })
+            .collect::<Vec<_>>();
+        let (config, treasury_config) =
+            find_config_addresses(self, store, options.treasury_config_hint.as_ref()).await?;
+
+        let owner = self.find_treasury_swap_owner_address(&config);
+
+        // Currently only SPL-Token is supported.
+        let token_program_id = anchor_spl::token::ID;
+
+        let swap_in_token_receiver_vault =
+            get_associated_token_address_with_program_id(&config, swap_in_token, &token_program_id);
+        let swap_out_token_ata =
+            get_associated_token_address_with_program_id(&owner, swap_out_token, &token_program_id);
+
+        let market = self.find_market_address(store, market_token);
+
+        let user = self.find_user_address(store, &owner);
+
+        let order = self.find_order_address(store, &owner, &nonce);
+
+        let swap_in_token_escrow =
+            get_associated_token_address_with_program_id(&order, swap_in_token, &token_program_id);
+        let swap_out_token_escrow =
+            get_associated_token_address_with_program_id(&order, swap_out_token, &token_program_id);
+
+        let prepare_swap_in_escrow =
+            self.prepare_associated_token_account(swap_in_token, &token_program_id, Some(&order));
+        let prepare_swap_out_escrow =
+            self.prepare_associated_token_account(swap_out_token, &token_program_id, Some(&order));
+        let prepare_ata =
+            self.prepare_associated_token_account(swap_out_token, &token_program_id, Some(&owner));
+
+        let create = self
+            .treasury_rpc()
+            .args(instruction::CreateSwap {
+                nonce,
+                swap_path_length: swap_path
+                    .len()
+                    .try_into()
+                    .map_err(|_| crate::Error::invalid_argument("swap path is too long"))?,
+                swap_in_amount: swap_in_token_amount,
+                min_swap_out_amount: options.min_swap_out_amount,
+            })
+            .accounts(accounts::CreateSwap {
+                authority: self.payer(),
+                store: *store,
+                config,
+                treasury_config,
+                swap_in_token: *swap_in_token,
+                swap_out_token: *swap_out_token,
+                swap_in_token_receiver_vault,
+                swap_out_token_ata,
+                market,
+                owner,
+                user,
+                swap_in_token_escrow,
+                swap_out_token_escrow,
+                order,
+                store_program: *self.store_program_id(),
+                token_program: token_program_id,
+                associated_token_program: anchor_spl::associated_token::ID,
+                system_program: system_program::ID,
+            })
+            .accounts(swap_path);
+
+        Ok(prepare_ata
+            .merge(prepare_swap_in_escrow)
+            .merge(prepare_swap_out_escrow)
+            .merge(create)
+            .with_output(order))
+    }
+
+    async fn cancel_treasury_swap(
+        &self,
+        store: &Pubkey,
+        order: &Pubkey,
+        hint: Option<(&Pubkey, &Pubkey)>,
+    ) -> crate::Result<RpcBuilder<C>> {
+        let config = self.find_config_address(store);
+        let owner = self.find_treasury_swap_owner_address(&config);
+        let user = self.find_user_address(store, &config);
+
+        let (swap_in_token, swap_out_token) = match hint {
+            Some((swap_in_token, swap_out_token)) => (*swap_in_token, *swap_out_token),
+            None => {
+                let order = self.order(order).await?;
+                let swap_in_token =
+                    order.tokens().initial_collateral().token().ok_or_else(|| {
+                        crate::Error::invalid_argument("invalid swap order: missing swap in token")
+                    })?;
+
+                let swap_out_token =
+                    order.tokens().final_output_token().token().ok_or_else(|| {
+                        crate::Error::invalid_argument("invalid swap order: missing swap out token")
+                    })?;
+                (swap_in_token, swap_out_token)
+            }
+        };
+
+        // Currently only SPL-Token is supported.
+        let token_program_id = anchor_spl::token::ID;
+
+        let swap_in_token_receiver_vault = get_associated_token_address_with_program_id(
+            &config,
+            &swap_in_token,
+            &token_program_id,
+        );
+        let swap_out_token_ata = get_associated_token_address_with_program_id(
+            &owner,
+            &swap_out_token,
+            &token_program_id,
+        );
+        let swap_in_token_escrow =
+            get_associated_token_address_with_program_id(order, &swap_in_token, &token_program_id);
+        let swap_out_token_escrow =
+            get_associated_token_address_with_program_id(order, &swap_out_token, &token_program_id);
+
+        let swap_in_token_vault = self.find_market_vault_address(store, &swap_in_token);
+        let swap_out_token_vault = self.find_market_vault_address(store, &swap_out_token);
+
+        let prepare =
+            self.prepare_associated_token_account(&swap_out_token, &token_program_id, Some(&owner));
+
+        let cancel = self
+            .treasury_rpc()
+            .args(instruction::CancelSwap {})
+            .accounts(accounts::CancelSwap {
+                authority: self.payer(),
+                store: *store,
+                config,
+                owner,
+                user,
+                swap_in_token,
+                swap_out_token,
+                swap_in_token_receiver_vault,
+                swap_out_token_ata,
+                swap_in_token_escrow,
+                swap_out_token_escrow,
+                order: *order,
+                swap_in_token_vault,
+                swap_out_token_vault,
+                event_authority: self.store_event_authority(),
+                store_program: *self.store_program_id(),
+                token_program: token_program_id,
+                associated_token_program: anchor_spl::associated_token::ID,
+                system_program: system_program::ID,
+            });
+
+        Ok(prepare.merge(cancel))
+    }
+
+    fn claim_treasury_swapped_tokens(
+        &self,
+        store: &Pubkey,
+        token: &Pubkey,
+        token_program_id: Option<&Pubkey>,
+    ) -> RpcBuilder<C> {
+        let config = self.find_config_address(store);
+        let owner = self.find_treasury_swap_owner_address(&config);
+        let token_program_id = token_program_id.unwrap_or(&anchor_spl::token::ID);
+        let swap_vault =
+            get_associated_token_address_with_program_id(&owner, token, token_program_id);
+        let receiver_vault =
+            get_associated_token_address_with_program_id(&config, token, token_program_id);
+        let prepare = self.prepare_associated_token_account(token, token_program_id, Some(&config));
+        let claim = self
+            .treasury_rpc()
+            .args(instruction::ClaimSwappedTokens {})
+            .accounts(accounts::ClaimSwappedTokens {
+                authority: self.payer(),
+                store: *store,
+                config,
+                owner,
+                token: *token,
+                swap_vault,
+                receiver_vault,
+                store_program: *self.store_program_id(),
+                token_program: *token_program_id,
+            });
+        prepare.merge(claim)
     }
 }
 

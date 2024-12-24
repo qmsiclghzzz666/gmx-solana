@@ -12,7 +12,10 @@ use gmsol_store::{
     utils::fixed_str::fixed_str_to_bytes,
 };
 use gmsol_timelock::states::{Executor, TimelockConfig};
-use gmsol_treasury::states::{Config, GtBank, TreasuryConfig};
+use gmsol_treasury::{
+    constants::SWAP_ORDER_OWNER_SEED,
+    states::{Config, GtBank, TreasuryConfig},
+};
 use gmsol_utils::to_seed;
 
 use crate::utils::EVENT_AUTHORITY_SEED;
@@ -323,6 +326,14 @@ pub fn find_gt_bank_pda(
             treasury_config.as_ref(),
             gt_exchange_vault.as_ref(),
         ],
+        treasury_program_id,
+    )
+}
+
+/// Find treasury swap owner PDA.
+pub fn find_treasury_swap_owner_pda(config: &Pubkey, treasury_program_id: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[SWAP_ORDER_OWNER_SEED, config.as_ref()],
         treasury_program_id,
     )
 }

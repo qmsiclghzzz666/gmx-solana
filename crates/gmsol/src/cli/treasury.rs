@@ -1,7 +1,9 @@
 use anchor_client::solana_sdk::pubkey::Pubkey;
+use anchor_spl::{associated_token::get_associated_token_address, token_interface::TokenAccount};
 use gmsol::{
+    client::SystemProgramOps,
     pyth::{pull_oracle::PythPullOracleWithHermes, PythPullOracle},
-    treasury::TreasuryOps,
+    treasury::{CreateTreasurySwapOptions, TreasuryOps},
     utils::builder::{MakeTransactionBuilder, WithPullOracle},
 };
 use gmsol_model::{BalanceExt, BaseMarket};
@@ -61,6 +63,8 @@ enum Command {
         token_mint: Pubkey,
         #[arg(long)]
         token_program_id: Option<Pubkey>,
+        #[arg(long)]
+        no_claim_swap_vault: bool,
     },
     /// Confirm GT buyback.
     ConfirmGtBuyback {
@@ -77,6 +81,27 @@ enum Command {
         #[arg(long)]
         token_program_id: Option<Pubkey>,
     },
+    /// Create Swap.
+    CreateSwap {
+        market_token: Pubkey,
+        #[arg(long, short = 'i')]
+        swap_in: Pubkey,
+        #[arg(long, short = 'o')]
+        swap_out: Pubkey,
+        /// Swap in amount.
+        #[arg(long, short)]
+        amount: Option<u64>,
+        #[arg(long)]
+        min_output_amount: Option<u64>,
+        /// Extra swap paths.
+        #[arg(long, short = 's', action = clap::ArgAction::Append)]
+        extra_swap_path: Vec<Pubkey>,
+        /// Fund the swap owner.
+        #[arg(long, value_name = "LAMPORTS")]
+        fund: Option<u64>,
+    },
+    /// Cancel Swap.
+    CancelSwap { order: Pubkey },
 }
 
 impl Args {
@@ -164,9 +189,11 @@ impl Args {
             Command::DepositToTreasury {
                 token_mint,
                 token_program_id,
+                no_claim_swap_vault,
             } => {
                 let store_account = client.store(store).await?;
                 let time_window = store_account.gt().exchange_time_window();
+
                 let (rpc, gt_exchange_vault) = client
                     .deposit_into_treasury_valut(
                         store,
@@ -178,7 +205,17 @@ impl Args {
                     .await?
                     .swap_output(());
                 println!("{gt_exchange_vault}");
-                rpc
+
+                if !*no_claim_swap_vault {
+                    let claim = client.claim_treasury_swapped_tokens(
+                        store,
+                        token_mint,
+                        token_program_id.as_ref(),
+                    );
+                    claim.merge(rpc)
+                } else {
+                    rpc
+                }
             }
             Command::ConfirmGtBuyback {
                 gt_exchange_vault,
@@ -227,6 +264,59 @@ impl Args {
                         token_program_id.as_ref(),
                     )
                     .await?
+            }
+            Command::CreateSwap {
+                market_token,
+                swap_in,
+                swap_out,
+                amount,
+                min_output_amount,
+                extra_swap_path,
+                fund,
+            } => {
+                let config = client.find_config_address(store);
+                let amount = match amount {
+                    Some(amount) => *amount,
+                    None => {
+                        let vault = get_associated_token_address(&config, swap_in);
+                        let account =
+                            client
+                                .account::<TokenAccount>(&vault)
+                                .await?
+                                .ok_or_else(|| {
+                                    gmsol::Error::invalid_argument(
+                                        "vault account is not initialized",
+                                    )
+                                })?;
+                        account.amount
+                    }
+                };
+                let (rpc, order) = client
+                    .create_treasury_swap(
+                        store,
+                        market_token,
+                        swap_in,
+                        swap_out,
+                        amount,
+                        CreateTreasurySwapOptions {
+                            swap_path: extra_swap_path.clone(),
+                            min_swap_out_amount: *min_output_amount,
+                            ..Default::default()
+                        },
+                    )
+                    .await?
+                    .swap_output(());
+                println!("{order}");
+                if let Some(lamports) = fund {
+                    let swap_owner = client.find_treasury_swap_owner_address(&config);
+                    let fund = client.transfer(&swap_owner, *lamports)?;
+                    fund.merge(rpc)
+                } else {
+                    rpc
+                }
+            }
+            Command::CancelSwap { order } => {
+                client.cancel_treasury_swap(store, order, None).await?
             }
         };
         crate::utils::send_or_serialize_rpc(

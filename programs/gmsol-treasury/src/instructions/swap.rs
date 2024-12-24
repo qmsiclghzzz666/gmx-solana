@@ -1,12 +1,13 @@
 use anchor_lang::prelude::*;
 use anchor_spl::{
     associated_token::AssociatedToken,
-    token::{Mint, Token, TokenAccount},
+    token::{approve, Approve, Mint, Token, TokenAccount},
+    token_interface,
 };
 use gmsol_store::{
     cpi::{
-        accounts::{CloseOrder, CreateOrder},
-        close_order, create_order,
+        accounts::{CloseOrder, CreateOrder, PrepareUser},
+        close_order, create_order, prepare_user,
     },
     ops::order::CreateOrderParams,
     program::GmsolStore,
@@ -15,7 +16,25 @@ use gmsol_store::{
     CoreError,
 };
 
-use crate::states::{Config, TreasuryConfig};
+use crate::{
+    constants,
+    states::{Config, TreasuryConfig},
+};
+
+struct SwapOwnerSigner {
+    config: Pubkey,
+    bump_bytes: [u8; 1],
+}
+
+impl SwapOwnerSigner {
+    fn as_seeds(&self) -> [&[u8]; 3] {
+        [
+            constants::SWAP_ORDER_OWNER_SEED,
+            self.config.as_ref(),
+            &self.bump_bytes,
+        ]
+    }
+}
 
 /// The accounts definition for [`create_swap`](crate::gmsol_treasury::create_swap).
 #[derive(Accounts)]
@@ -28,7 +47,6 @@ pub struct CreateSwap<'info> {
     pub store: UncheckedAccount<'info>,
     /// Config.
     #[account(
-        mut,
         has_one = store,
         // Only allow using the authorized treasury config.
         constraint = config.load()?.treasury_config() == Some(&treasury_config.key()) @ CoreError::InvalidArgument,
@@ -56,15 +74,22 @@ pub struct CreateSwap<'info> {
     /// Swap out token receiver vault.
     #[account(
         mut,
-        associated_token::authority = config,
+        associated_token::authority = owner,
         associated_token::mint = swap_out_token,
     )]
-    pub swap_out_token_receiver_vault: Account<'info, TokenAccount>,
+    pub swap_out_token_ata: Account<'info, TokenAccount>,
     /// Market.
     /// CHECK: check by CPI.
     #[account(mut)]
     pub market: UncheckedAccount<'info>,
-    /// The user account for `config`.
+    /// Swap order owner.
+    #[account(
+        mut,
+        seeds = [constants::SWAP_ORDER_OWNER_SEED, config.key().as_ref()],
+        bump,
+    )]
+    pub owner: SystemAccount<'info>,
+    /// The user account for `owner`.
     /// CHECK: check by CPI.
     #[account(mut)]
     pub user: UncheckedAccount<'info>,
@@ -100,7 +125,18 @@ pub(crate) fn unchecked_create_swap<'info>(
     swap_in_amount: u64,
     min_swap_out_amount: Option<u64>,
 ) -> Result<()> {
-    let signer = ctx.accounts.config.load()?.signer();
+    ctx.accounts.approve(swap_in_amount)?;
+
+    let signer = SwapOwnerSigner {
+        config: ctx.accounts.config.key(),
+        bump_bytes: [ctx.bumps.owner],
+    };
+
+    // Prepare user.
+    let cpi_ctx = ctx.accounts.prepare_user_ctx();
+    prepare_user(cpi_ctx.with_signer(&[&signer.as_seeds()]))?;
+
+    // Create order.
     let cpi_ctx = ctx.accounts.create_order_ctx();
     let params = CreateOrderParams {
         kind: OrderKind::MarketSwap,
@@ -146,11 +182,41 @@ impl<'info> CpiAuthentication<'info> for CreateSwap<'info> {
 }
 
 impl<'info> CreateSwap<'info> {
+    fn approve(&self, amount: u64) -> Result<()> {
+        require_gt!(amount, 0, CoreError::InvalidArgument);
+
+        let signer = self.config.load()?.signer();
+        let ctx = CpiContext::new(
+            self.token_program.to_account_info(),
+            Approve {
+                to: self.swap_in_token_receiver_vault.to_account_info(),
+                delegate: self.owner.to_account_info(),
+                authority: self.config.to_account_info(),
+            },
+        );
+
+        approve(ctx.with_signer(&[&signer.as_seeds()]), amount)?;
+
+        Ok(())
+    }
+
+    fn prepare_user_ctx(&self) -> CpiContext<'_, '_, '_, 'info, PrepareUser<'info>> {
+        CpiContext::new(
+            self.store_program.to_account_info(),
+            PrepareUser {
+                owner: self.owner.to_account_info(),
+                store: self.store.to_account_info(),
+                user: self.user.to_account_info(),
+                system_program: self.system_program.to_account_info(),
+            },
+        )
+    }
+
     fn create_order_ctx(&self) -> CpiContext<'_, '_, '_, 'info, CreateOrder<'info>> {
         CpiContext::new(
             self.store_program.to_account_info(),
             CreateOrder {
-                owner: self.config.to_account_info(),
+                owner: self.owner.to_account_info(),
                 store: self.store.to_account_info(),
                 market: self.market.to_account_info(),
                 user: self.user.to_account_info(),
@@ -167,7 +233,7 @@ impl<'info> CreateSwap<'info> {
                 initial_collateral_token_source: Some(
                     self.swap_in_token_receiver_vault.to_account_info(),
                 ),
-                final_output_token_ata: Some(self.swap_out_token_receiver_vault.to_account_info()),
+                final_output_token_ata: Some(self.swap_out_token_ata.to_account_info()),
                 long_token_ata: None,
                 short_token_ata: None,
                 system_program: self.system_program.to_account_info(),
@@ -188,11 +254,17 @@ pub struct CancelSwap<'info> {
     /// CHECK: check by CPI.
     pub store: UncheckedAccount<'info>,
     #[account(
-        mut,
         has_one = store,
     )]
     pub config: AccountLoader<'info, Config>,
-    /// The user account for `config`.
+    /// Swap order owner.
+    #[account(
+        mut,
+        seeds = [constants::SWAP_ORDER_OWNER_SEED, config.key().as_ref()],
+        bump,
+    )]
+    pub owner: SystemAccount<'info>,
+    /// The user account for `owner`.
     /// CHECK: check by CPI.
     #[account(mut)]
     pub user: UncheckedAccount<'info>,
@@ -209,7 +281,7 @@ pub struct CancelSwap<'info> {
     /// Swap out token receiver vault.
     /// CHECK: check by CPI.
     #[account(mut)]
-    pub swap_out_token_receiver_vault: UncheckedAccount<'info>,
+    pub swap_out_token_ata: UncheckedAccount<'info>,
     /// The escrow account for swap in token.
     /// CHECK: check by CPI.
     #[account(mut)]
@@ -247,7 +319,10 @@ pub struct CancelSwap<'info> {
 /// # CHECK
 /// Only [`TREASURY_KEEPER`](crate::roles::TREASURY_KEEPER) is allowed to use.
 pub(crate) fn unchecked_cancel_swap(ctx: Context<CancelSwap>) -> Result<()> {
-    let signer = ctx.accounts.config.load()?.signer();
+    let signer = SwapOwnerSigner {
+        config: ctx.accounts.config.key(),
+        bump_bytes: [ctx.bumps.owner],
+    };
     let cpi_ctx = ctx.accounts.close_order_ctx();
     close_order(
         cpi_ctx.with_signer(&[&signer.as_seeds()]),
@@ -281,9 +356,9 @@ impl<'info> CancelSwap<'info> {
         CpiContext::new(
             self.store_program.to_account_info(),
             CloseOrder {
-                executor: self.config.to_account_info(),
+                executor: self.owner.to_account_info(),
                 store: self.store.to_account_info(),
-                owner: self.config.to_account_info(),
+                owner: self.owner.to_account_info(),
                 rent_receiver: self.config.to_account_info(),
                 user: self.user.to_account_info(),
                 referrer_user: None,
@@ -299,7 +374,7 @@ impl<'info> CancelSwap<'info> {
                 initial_collateral_token_ata: Some(
                     self.swap_in_token_receiver_vault.to_account_info(),
                 ),
-                final_output_token_ata: Some(self.swap_out_token_receiver_vault.to_account_info()),
+                final_output_token_ata: Some(self.swap_out_token_ata.to_account_info()),
                 long_token_ata: None,
                 short_token_ata: None,
                 system_program: self.system_program.to_account_info(),
@@ -310,4 +385,96 @@ impl<'info> CancelSwap<'info> {
             },
         )
     }
+}
+
+/// The accounts definition for [`claim_swapped_tokens`](crate::gmsol_treasury::claim_swapped_tokens).
+#[derive(Accounts)]
+pub struct ClaimSwappedTokens<'info> {
+    /// Authority.
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    /// Store.
+    /// CHECK: check by CPI.
+    pub store: UncheckedAccount<'info>,
+    #[account(
+        has_one = store,
+    )]
+    pub config: AccountLoader<'info, Config>,
+    /// Swap order owner.
+    #[account(
+        seeds = [constants::SWAP_ORDER_OWNER_SEED, config.key().as_ref()],
+        bump,
+    )]
+    pub owner: SystemAccount<'info>,
+    /// Token.
+    pub token: InterfaceAccount<'info, token_interface::Mint>,
+    /// Swap out token receiver vault.
+    #[account(
+        mut,
+        associated_token::authority = owner,
+        associated_token::mint = token,
+    )]
+    pub swap_vault: InterfaceAccount<'info, token_interface::TokenAccount>,
+    /// Swap in token receiver vault.
+    #[account(
+        mut,
+        associated_token::authority = config,
+        associated_token::mint = token,
+    )]
+    pub receiver_vault: InterfaceAccount<'info, token_interface::TokenAccount>,
+    /// Store program.
+    pub store_program: Program<'info, GmsolStore>,
+    /// The token program.
+    pub token_program: Interface<'info, token_interface::TokenInterface>,
+}
+
+impl<'info> WithStore<'info> for ClaimSwappedTokens<'info> {
+    fn store_program(&self) -> AccountInfo<'info> {
+        self.store_program.to_account_info()
+    }
+
+    fn store(&self) -> AccountInfo<'info> {
+        self.store.to_account_info()
+    }
+}
+
+impl<'info> CpiAuthentication<'info> for ClaimSwappedTokens<'info> {
+    fn authority(&self) -> AccountInfo<'info> {
+        self.authority.to_account_info()
+    }
+
+    fn on_error(&self) -> Result<()> {
+        err!(CoreError::PermissionDenied)
+    }
+}
+
+/// Claim swapped tokens.
+/// # CHECK
+/// Only [`TREASURY_KEEPER`](crate::roles::TREASURY_KEEPER) can use.
+pub(crate) fn unchecked_claim_swapped_tokens(ctx: Context<ClaimSwappedTokens>) -> Result<()> {
+    let amount = ctx.accounts.swap_vault.amount;
+
+    if amount == 0 {
+        msg!("[Treasury] empty swap vault");
+        return Ok(());
+    }
+
+    let decimals = ctx.accounts.token.decimals;
+
+    let signer = SwapOwnerSigner {
+        config: ctx.accounts.config.key(),
+        bump_bytes: [ctx.bumps.owner],
+    };
+
+    let ctx = CpiContext::new(
+        ctx.accounts.token_program.to_account_info(),
+        token_interface::TransferChecked {
+            from: ctx.accounts.swap_vault.to_account_info(),
+            mint: ctx.accounts.token.to_account_info(),
+            to: ctx.accounts.receiver_vault.to_account_info(),
+            authority: ctx.accounts.owner.to_account_info(),
+        },
+    );
+    token_interface::transfer_checked(ctx.with_signer(&[&signer.as_seeds()]), amount, decimals)?;
+    Ok(())
 }

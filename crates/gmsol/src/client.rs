@@ -448,6 +448,11 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         .0
     }
 
+    /// Find treasury swap owner address.
+    pub fn find_treasury_swap_owner_address(&self, config: &Pubkey) -> Pubkey {
+        crate::pda::find_treasury_swap_owner_pda(config, self.treasury_program_id()).0
+    }
+
     /// Find timelock config address.
     pub fn find_timelock_config_address(&self, store: &Pubkey) -> Pubkey {
         crate::pda::find_timelock_config_pda(store, self.timelock_program_id()).0

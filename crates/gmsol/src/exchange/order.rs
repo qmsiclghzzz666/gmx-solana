@@ -99,8 +99,9 @@ pub struct CreateOrderBuilder<'a, C> {
     short_token_account: Option<Pubkey>,
 }
 
+/// Create Order Hint.
 #[derive(Clone, Copy)]
-struct CreateOrderHint {
+pub struct CreateOrderHint {
     long_token: Pubkey,
     short_token: Pubkey,
 }
