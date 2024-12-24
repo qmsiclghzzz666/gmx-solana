@@ -32,6 +32,8 @@ enum Command {
     SetGtFactor { factor: u128 },
     /// Insert token to the treasury.
     InsertToken { token: Pubkey },
+    /// Remove token from the treasury.
+    RemoveToken { token: Pubkey },
     /// Toggle token flag.
     ToggleTokenFlag {
         token: Pubkey,
@@ -128,6 +130,11 @@ impl Args {
             Command::SetGtFactor { factor } => client.set_gt_factor(store, *factor)?,
             Command::InsertToken { token } => {
                 client.insert_token_to_treasury(store, None, token).await?
+            }
+            Command::RemoveToken { token } => {
+                client
+                    .remove_token_from_treasury(store, None, token)
+                    .await?
             }
             Command::ToggleTokenFlag {
                 token,

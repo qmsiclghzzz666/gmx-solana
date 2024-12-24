@@ -87,6 +87,18 @@ impl GtBank {
         &self.gt_exchange_vault
     }
 
+    /// Get the number of tokens.
+    pub fn num_tokens(&self) -> usize {
+        self.balances.len()
+    }
+
+    /// Get all tokens.
+    pub fn tokens(&self) -> impl Iterator<Item = Pubkey> + '_ {
+        self.balances
+            .entries()
+            .map(|(key, _)| Pubkey::new_from_array(*key))
+    }
+
     pub(crate) fn record_transferred_in(&mut self, token: &Pubkey, amount: u64) -> Result<()> {
         let balance = self.get_balance_or_insert(token)?;
         let next_balance = balance

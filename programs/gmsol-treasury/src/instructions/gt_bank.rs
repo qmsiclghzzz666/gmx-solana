@@ -256,7 +256,7 @@ impl<'info> SyncGtBank<'info> {
 /// Remaining accounts expected by this instruction:
 ///
 ///   - 0..N. `[]` N token mint accounts, where N represents the total number of tokens defined
-///     in the treasury config.
+///     in the GT bank.
 ///   - N..2N. `[mutable]` N GT bank vault accounts.
 ///   - 2N..3N. `[mutable]` N token accounts to receive the funds, owned by the `owner`.
 #[derive(Accounts)]
@@ -326,7 +326,8 @@ impl<'info> CompleteGtExchange<'info> {
             return Ok(());
         }
 
-        let len = self.treasury_config.load()?.num_tokens();
+        let len = self.gt_bank.load()?.num_tokens();
+        let gt_bank_tokens = self.gt_bank.load()?.tokens().collect::<Vec<_>>();
         let total_len = len.checked_mul(3).expect("must not overflow");
         require_gte!(remaining_accounts.len(), total_len);
         let tokens = &remaining_accounts[0..len];
@@ -338,16 +339,13 @@ impl<'info> CompleteGtExchange<'info> {
             let gt_bank_address = self.gt_bank.key();
             let owner_address = self.owner.key();
 
-            let treasury_config = self.treasury_config.load()?;
             let gt_bank_signer = self.gt_bank.load()?.signer();
             let total_gt_amount = self.gt_bank.load()?.remaining_confirmed_gt_amount();
 
             require_gte!(total_gt_amount, gt_amount, CoreError::Internal);
 
-            for (idx, token) in treasury_config.tokens().enumerate() {
-                let Some(balance) = self.gt_bank.load()?.get_balance(&token) else {
-                    continue;
-                };
+            for (idx, token) in gt_bank_tokens.iter().enumerate() {
+                let balance = self.gt_bank.load()?.get_balance(token).expect("must exist");
                 if balance == 0 {
                     continue;
                 }
@@ -356,7 +354,7 @@ impl<'info> CompleteGtExchange<'info> {
                     .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
 
                 let mint = &tokens[idx];
-                require_eq!(*mint.key, token, CoreError::InvalidArgument);
+                require_eq!(*mint.key, *token, CoreError::InvalidArgument);
                 let token_program = if mint.owner == self.token_program.key {
                     self.token_program.to_account_info()
                 } else if mint.owner == self.token_2022_program.key {
@@ -369,7 +367,7 @@ impl<'info> CompleteGtExchange<'info> {
                 validate_associated_token_account(
                     vault,
                     &gt_bank_address,
-                    &token,
+                    token,
                     &token_program.key(),
                 )?;
 
@@ -400,7 +398,7 @@ impl<'info> CompleteGtExchange<'info> {
 
                 self.gt_bank
                     .load_mut()?
-                    .record_transferred_out(&token, amount)?;
+                    .record_transferred_out(token, amount)?;
             }
 
             self.gt_bank.load_mut()?.record_claimed(gt_amount)?;

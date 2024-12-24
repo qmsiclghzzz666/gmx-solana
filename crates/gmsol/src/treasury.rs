@@ -11,7 +11,7 @@ use gmsol_store::states::{
 };
 use gmsol_treasury::{
     accounts, instruction,
-    states::{treasury::TokenFlag, Config, TreasuryConfig},
+    states::{treasury::TokenFlag, Config, GtBank, TreasuryConfig},
 };
 use solana_account_decoder::UiAccountEncoding;
 
@@ -592,13 +592,13 @@ where
         let tokens = match tokens_hint {
             Some(tokens) => tokens,
             None => {
-                let treasury_config = self
-                    .account::<ZeroCopy<TreasuryConfig>>(&treasury_config)
+                let gt_bank = self
+                    .account::<ZeroCopy<GtBank>>(&gt_bank)
                     .await?
                     .ok_or_else(|| crate::Error::invalid_argument("treasury config not exist"))?
                     .0;
 
-                let tokens = treasury_config.tokens().collect::<Vec<_>>();
+                let tokens = gt_bank.tokens().collect::<Vec<_>>();
                 self.treasury_program()
                     .solana_rpc()
                     .get_multiple_accounts_with_config(

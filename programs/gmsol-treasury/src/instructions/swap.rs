@@ -252,6 +252,7 @@ pub struct CancelSwap<'info> {
     pub authority: Signer<'info>,
     /// Store.
     /// CHECK: check by CPI.
+    #[account(mut)]
     pub store: UncheckedAccount<'info>,
     #[account(
         has_one = store,
