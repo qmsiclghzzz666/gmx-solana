@@ -671,8 +671,11 @@ pub(crate) fn claim_fees_from_market(ctx: Context<ClaimFeesFromMarket>) -> Resul
         let token = ctx.accounts.token_mint.key();
         let mut market = RevertibleMarket::try_from(&ctx.accounts.market)?;
         let is_long_token = market.market_meta().to_token_side(&token)?;
+        let the_opposite_side = !is_long_token;
         let is_pure = market.market_meta().is_pure();
         let pool = market.claimable_fee_pool_mut().map_err(ModelError::from)?;
+
+        let mut deltas = (0, 0);
 
         // Saturating claim all fees from the pool.
         let mut amount: u64 = pool
@@ -682,28 +685,33 @@ pub(crate) fn claim_fees_from_market(ctx: Context<ClaimFeesFromMarket>) -> Resul
             .try_into()
             .expect("must success");
 
-        let delta = (u128::from(amount))
+        deltas.0 = (u128::from(amount))
             .to_opposite_signed()
-            .map_err(ModelError::from)?;
-        pool.apply_delta_amount(is_long_token, &delta)
             .map_err(ModelError::from)?;
 
         if is_pure {
-            let the_opposite_side = !is_long_token;
             let the_opposite_side_amount: u64 = pool
                 .amount(the_opposite_side)
                 .map_err(ModelError::from)?
                 .min(u128::from(u64::MAX))
                 .try_into()
                 .expect("must success");
-            let delta = (u128::from(the_opposite_side_amount))
+            deltas.1 = (u128::from(the_opposite_side_amount))
                 .to_opposite_signed()
-                .map_err(ModelError::from)?;
-            pool.apply_delta_amount(the_opposite_side, &delta)
                 .map_err(ModelError::from)?;
             amount = amount
                 .checked_add(the_opposite_side_amount)
                 .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
+        }
+
+        if deltas.0 != 0 {
+            pool.apply_delta_amount(is_long_token, &deltas.0)
+                .map_err(ModelError::from)?;
+        }
+
+        if deltas.1 != 0 {
+            pool.apply_delta_amount(the_opposite_side, &deltas.1)
+                .map_err(ModelError::from)?;
         }
 
         market
