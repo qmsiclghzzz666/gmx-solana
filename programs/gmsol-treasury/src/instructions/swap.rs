@@ -4,7 +4,10 @@ use anchor_spl::{
     token::{Mint, Token, TokenAccount},
 };
 use gmsol_store::{
-    cpi::{accounts::CreateOrder, create_order},
+    cpi::{
+        accounts::{CloseOrder, CreateOrder},
+        close_order, create_order,
+    },
     ops::order::CreateOrderParams,
     program::GmsolStore,
     states::{common::action::Action, order::OrderKind, NonceBytes, Order},
@@ -74,6 +77,7 @@ pub struct CreateSwap<'info> {
     #[account(mut)]
     pub swap_out_token_escrow: UncheckedAccount<'info>,
     /// The order account.
+    /// CHECK: check by CPI.
     #[account(mut)]
     pub order: UncheckedAccount<'info>,
     /// Store program.
@@ -169,6 +173,140 @@ impl<'info> CreateSwap<'info> {
                 system_program: self.system_program.to_account_info(),
                 token_program: self.token_program.to_account_info(),
                 associated_token_program: self.associated_token_program.to_account_info(),
+            },
+        )
+    }
+}
+
+/// The accounts definition for [`cancel_swap`](crate::gmsol_treasury::cancel_swap).
+#[derive(Accounts)]
+pub struct CancelSwap<'info> {
+    /// Authority.
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    /// Store.
+    /// CHECK: check by CPI.
+    pub store: UncheckedAccount<'info>,
+    #[account(
+        mut,
+        has_one = store,
+    )]
+    pub config: AccountLoader<'info, Config>,
+    /// The user account for `config`.
+    /// CHECK: check by CPI.
+    #[account(mut)]
+    pub user: UncheckedAccount<'info>,
+    /// Swap in token.
+    /// CHECK: check by CPI.
+    pub swap_in_token: UncheckedAccount<'info>,
+    /// Swap out token.
+    /// CHECK: check by CPI.
+    pub swap_out_token: UncheckedAccount<'info>,
+    /// Swap in token receiver vault.
+    /// CHECK: check by CPI.
+    #[account(mut)]
+    pub swap_in_token_receiver_vault: UncheckedAccount<'info>,
+    /// Swap out token receiver vault.
+    /// CHECK: check by CPI.
+    #[account(mut)]
+    pub swap_out_token_receiver_vault: UncheckedAccount<'info>,
+    /// The escrow account for swap in token.
+    /// CHECK: check by CPI.
+    #[account(mut)]
+    pub swap_in_token_escrow: UncheckedAccount<'info>,
+    /// The escrow account for swap out token.
+    /// CHECK: check by CPI.
+    #[account(mut)]
+    pub swap_out_token_escrow: UncheckedAccount<'info>,
+    /// The order account.
+    /// CHECK: check by CPI.
+    #[account(mut)]
+    pub order: UncheckedAccount<'info>,
+    /// The vault for swap in token.
+    /// CHECK: check by CPI.
+    #[account(mut)]
+    pub swap_in_token_vault: UncheckedAccount<'info>,
+    /// The vault for swap out token.
+    /// CHECK: check by CPI.
+    #[account(mut)]
+    pub swap_out_token_vault: UncheckedAccount<'info>,
+    /// Event authority.
+    /// CHECK: check by CPI.
+    pub event_authority: UncheckedAccount<'info>,
+    /// Store program.
+    pub store_program: Program<'info, GmsolStore>,
+    /// The token program.
+    pub token_program: Program<'info, Token>,
+    /// Associated token program.
+    pub associated_token_program: Program<'info, AssociatedToken>,
+    /// The system program.
+    pub system_program: Program<'info, System>,
+}
+
+/// Cancel a swap with the store program.
+/// # CHECK
+/// Only [`TREASURY_KEEPER`](crate::roles::TREASURY_KEEPER) is allowed to use.
+pub(crate) fn unchecked_cancel_swap(ctx: Context<CancelSwap>) -> Result<()> {
+    let signer = ctx.accounts.config.load()?.signer();
+    let cpi_ctx = ctx.accounts.close_order_ctx();
+    close_order(
+        cpi_ctx.with_signer(&[&signer.as_seeds()]),
+        "cancel".to_string(),
+    )?;
+    Ok(())
+}
+
+impl<'info> WithStore<'info> for CancelSwap<'info> {
+    fn store_program(&self) -> AccountInfo<'info> {
+        self.store_program.to_account_info()
+    }
+
+    fn store(&self) -> AccountInfo<'info> {
+        self.store.to_account_info()
+    }
+}
+
+impl<'info> CpiAuthentication<'info> for CancelSwap<'info> {
+    fn authority(&self) -> AccountInfo<'info> {
+        self.authority.to_account_info()
+    }
+
+    fn on_error(&self) -> Result<()> {
+        err!(CoreError::PermissionDenied)
+    }
+}
+
+impl<'info> CancelSwap<'info> {
+    fn close_order_ctx(&self) -> CpiContext<'_, '_, '_, 'info, CloseOrder<'info>> {
+        CpiContext::new(
+            self.store_program.to_account_info(),
+            CloseOrder {
+                executor: self.config.to_account_info(),
+                store: self.store.to_account_info(),
+                owner: self.config.to_account_info(),
+                rent_receiver: self.config.to_account_info(),
+                user: self.user.to_account_info(),
+                referrer_user: None,
+                order: self.order.to_account_info(),
+                initial_collateral_token: Some(self.swap_in_token.to_account_info()),
+                final_output_token: Some(self.swap_out_token.to_account_info()),
+                long_token: None,
+                short_token: None,
+                initial_collateral_token_escrow: Some(self.swap_in_token_escrow.to_account_info()),
+                final_output_token_escrow: Some(self.swap_out_token_escrow.to_account_info()),
+                long_token_escrow: None,
+                short_token_escrow: None,
+                initial_collateral_token_ata: Some(
+                    self.swap_in_token_receiver_vault.to_account_info(),
+                ),
+                final_output_token_ata: Some(self.swap_out_token_receiver_vault.to_account_info()),
+                long_token_ata: None,
+                short_token_ata: None,
+                system_program: self.system_program.to_account_info(),
+                token_program: self.token_program.to_account_info(),
+                associated_token_program: self.associated_token_program.to_account_info(),
+                event_authority: self.event_authority.to_account_info(),
+                program: self.store_program.to_account_info(),
             },
         )
     }

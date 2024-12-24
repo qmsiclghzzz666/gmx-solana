@@ -8,7 +8,7 @@ pub mod instructions;
 pub mod roles;
 
 use anchor_lang::prelude::*;
-use gmsol_store::{states::NonceBytes, utils::CpiAuthenticate};
+use gmsol_store::utils::CpiAuthenticate;
 use instructions::*;
 
 declare_id!("GTtRSYha5h8S26kPFHgYKUf8enEgabkTFwW7UToXAHoY");
@@ -148,7 +148,7 @@ pub mod gmsol_treasury {
     #[access_control(CpiAuthenticate::only(&ctx, roles::TREASURY_KEEPER))]
     pub fn create_swap<'info>(
         ctx: Context<'_, '_, 'info, 'info, CreateSwap<'info>>,
-        nonce: NonceBytes,
+        nonce: [u8; 32],
         swap_path_length: u8,
         swap_in_amount: u64,
         min_swap_out_amount: Option<u64>,
@@ -160,5 +160,11 @@ pub mod gmsol_treasury {
             swap_in_amount,
             min_swap_out_amount,
         )
+    }
+
+    /// Cancel a swap.
+    #[access_control(CpiAuthenticate::only(&ctx, roles::TREASURY_KEEPER))]
+    pub fn cancel_swap(ctx: Context<CancelSwap>) -> Result<()> {
+        instructions::unchecked_cancel_swap(ctx)
     }
 }
