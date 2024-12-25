@@ -377,6 +377,10 @@ impl KeeperArgs {
                     }
                 }
                 let mut builder = client.execute_order(store, self.oracle()?, order, true)?;
+                for alt in &self.alts {
+                    let alt = client.alt(alt).await?.ok_or(gmsol::Error::NotFound)?;
+                    builder.add_alt(alt);
+                }
                 let execution_fee = self
                     .execution_fee
                     .map(|fee| futures_util::future::ready(Ok(fee)).left_future())
@@ -519,6 +523,10 @@ impl KeeperArgs {
                     }
                 };
                 let mut builder = client.auto_deleverage(self.oracle()?, position, size)?;
+                for alt in &self.alts {
+                    let alt = client.alt(alt).await?.ok_or(gmsol::Error::NotFound)?;
+                    builder.add_alt(alt);
+                }
                 let execution_fee = self
                     .execution_fee
                     .map(|fee| futures_util::future::ready(Ok(fee)).left_future())
