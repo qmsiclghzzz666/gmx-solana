@@ -230,10 +230,6 @@ struct InitializeRoles {
     #[arg(long)]
     timelock_admin: Pubkey,
     #[arg(long)]
-    timelock_keeper: Pubkey,
-    #[arg(long)]
-    tld_admin: Pubkey,
-    #[arg(long)]
     market_keeper: Pubkey,
     #[arg(long)]
     order_keeper: Vec<Pubkey>,
@@ -317,12 +313,12 @@ impl InitializeRoles {
             ))?
             .try_push(client.grant_role(
                 &store,
-                &self.timelock_keeper,
+                &self.timelock_admin,
                 timelock_roles::TIMELOCK_KEEPER,
             ))?
             .try_push(client.grant_role(
                 &store,
-                &self.tld_admin,
+                &self.timelock_admin,
                 timelock_roles::TIMELOCKED_ADMIN,
             ))?;
 

@@ -83,7 +83,8 @@ export RECEIVER=$(cargo gmsol -ul treasury receiver)
 
 cargo gmsol -ul admin transfer-receiver $RECEIVER --confirm
 
-export ADMIN_EXECUTOR=$(cargo gmsol -ul timelock init-executor ADMIN)
+cargo gmsol -ul timelock init-executor ADMIN
+export ADMIN_EXECUTOR_WALLET=$(cargo gmsol -ul timelock executor-wallet ADMIN)
 
 cargo gmsol -ul admin init-roles \
     --market-keeper $KEEPER_ADDRESS \
@@ -92,8 +93,6 @@ cargo gmsol -ul admin init-roles \
     --treasury-withdrawer $KEEPER_ADDRESS \
     --treasury-keeper $KEEPER_ADDRESS \
     --timelock-admin $ADDRESS \
-    --timelock-keeper $KEEPER_ADDRESS \
-    --tld-admin $ADDRESS \
     --allow-multiple-transactions
 
 cargo gmsol -ul timelock init-config --initial-delay 300
@@ -168,7 +167,7 @@ export COMMON_ALT=$(cargo gmsol -ul alt extend --init common $ORACLE)
 export MARKET_ALT=$(cargo gmsol -ul alt extend --init market)
 
 echo "STORE: $STORE"
-echo "ADMIN_EXECUTOR: $ADMIN_EXECUTOR"
+echo "ADMIN_EXECUTOR_WALLET: $ADMIN_EXECUTOR_WALLET"
 echo "CONFIG: $CONFIG"
 echo "RECEIVER: $RECEIVER"
 echo "TREASURY: $TREASURY"

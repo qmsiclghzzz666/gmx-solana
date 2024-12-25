@@ -15,6 +15,9 @@ pub struct Executor {
 }
 
 impl Executor {
+    /// Wallet Seed.
+    pub const WALLET_SEED: &'static [u8] = b"wallet";
+
     /// Get role name.
     pub fn role_name(&self) -> Result<&str> {
         bytes_to_fixed_str(&self.role_name)
@@ -27,14 +30,6 @@ impl Executor {
         self.role_name = role_name;
         Ok(())
     }
-
-    pub(crate) fn signer(&self) -> ExecutorSigner {
-        ExecutorSigner {
-            store: self.store,
-            role_name: self.role_name,
-            bump_bytes: [self.bump],
-        }
-    }
 }
 
 impl Seed for Executor {
@@ -45,19 +40,24 @@ impl gmsol_utils::InitSpace for Executor {
     const INIT_SPACE: usize = std::mem::size_of::<Self>();
 }
 
-/// Executor Signer.
-pub struct ExecutorSigner {
-    store: Pubkey,
-    role_name: [u8; MAX_ROLE_NAME_LEN],
+/// Executor Wallet Signer.
+pub struct ExecutorWalletSigner {
+    executor: Pubkey,
     bump_bytes: [u8; 1],
 }
 
-impl ExecutorSigner {
-    pub(crate) fn as_seeds(&self) -> [&[u8]; 4] {
+impl ExecutorWalletSigner {
+    pub(crate) fn new(executor: Pubkey, bump: u8) -> Self {
+        Self {
+            executor,
+            bump_bytes: [bump],
+        }
+    }
+
+    pub(crate) fn as_seeds(&self) -> [&[u8]; 3] {
         [
-            Executor::SEED,
-            self.store.as_ref(),
-            self.role_name.as_ref(),
+            Executor::WALLET_SEED,
+            self.executor.as_ref(),
             &self.bump_bytes,
         ]
     }

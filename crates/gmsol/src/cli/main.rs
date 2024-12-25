@@ -154,16 +154,19 @@ impl Cli {
                     )
                     .0
                 };
+                let timelock_program_id = &gmsol_timelock::ID;
                 let executor = gmsol::pda::find_executor_pda(
                     &store,
                     role,
                     self.timelock_program
                         .as_ref()
-                        .unwrap_or(&gmsol_timelock::ID),
+                        .unwrap_or(timelock_program_id),
                 )?
                 .0;
+                let executor_wallet =
+                    gmsol::pda::find_executor_wallet_pda(&executor, timelock_program_id).0;
 
-                let payer = NullSigner::new(&executor);
+                let payer = NullSigner::new(&executor_wallet);
 
                 Ok((gmsol::utils::local_signer(payer), Some(wallet)))
             } else {

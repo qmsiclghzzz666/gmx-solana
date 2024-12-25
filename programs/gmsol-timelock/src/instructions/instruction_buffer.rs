@@ -9,7 +9,8 @@ use gmsol_store::{
 use crate::{
     roles,
     states::{
-        config::TimelockConfig, Executor, InstructionAccess, InstructionHeader, InstructionLoader,
+        config::TimelockConfig, Executor, ExecutorWalletSigner, InstructionAccess,
+        InstructionHeader, InstructionLoader,
     },
 };
 
@@ -357,6 +358,13 @@ pub struct ExecuteInstruction<'info> {
     /// Executor.
     #[account(has_one = store)]
     pub executor: AccountLoader<'info, Executor>,
+    /// Executor Wallet.
+    #[account(
+        mut,
+        seeds = [Executor::WALLET_SEED, executor.key().as_ref()],
+        bump,
+    )]
+    pub wallet: SystemAccount<'info>,
     /// Instruction to execute.
     #[account(mut, has_one = executor, close = authority)]
     pub instruction: AccountLoader<'info, InstructionHeader>,
@@ -378,7 +386,7 @@ pub(crate) fn unchecked_execute_instruction(ctx: Context<ExecuteInstruction>) ->
         CoreError::PreconditionsAreNotMet
     );
 
-    let signer = ctx.accounts.executor.load()?.signer();
+    let signer = ExecutorWalletSigner::new(ctx.accounts.executor.key(), ctx.bumps.wallet);
 
     invoke_signed(
         &instruction.to_instruction(),

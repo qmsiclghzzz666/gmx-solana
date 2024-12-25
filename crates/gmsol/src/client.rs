@@ -463,6 +463,11 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         Ok(crate::pda::find_executor_pda(store, role, self.timelock_program_id())?.0)
     }
 
+    /// Find the wallet address of the given executor.
+    pub fn find_executor_wallet_address(&self, executor: &Pubkey) -> Pubkey {
+        crate::pda::find_executor_wallet_pda(executor, self.timelock_program_id()).0
+    }
+
     /// Get slot.
     pub async fn get_slot(&self, commitment: Option<CommitmentConfig>) -> crate::Result<u64> {
         let slot = self

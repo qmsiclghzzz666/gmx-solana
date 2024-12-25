@@ -1,7 +1,7 @@
 use crate::GMSOLClient;
 use anchor_client::solana_sdk::pubkey::Pubkey;
 use gmsol::{timelock::TimelockOps, utils::ZeroCopy};
-use gmsol_timelock::states::Executor;
+use gmsol_timelock::states::{Executor, TimelockConfig};
 
 #[derive(clap::Args)]
 pub(super) struct Args {
@@ -11,8 +11,12 @@ pub(super) struct Args {
 
 #[derive(clap::Subcommand)]
 enum Command {
+    /// Get current config.
+    Config,
     /// Get executor.
     Executor { role: String },
+    /// Get executor wallet.
+    ExecutorWallet { role: String },
     /// Initialize timelock config.
     InitConfig {
         #[arg(long, default_value_t = 86400)]
@@ -54,18 +58,34 @@ impl Args {
         skip_preflight: bool,
     ) -> gmsol::Result<()> {
         let req = match &self.command {
-            Command::Executor { role } => {
-                let executor = client.find_executor_address(store, role)?;
-                let account = client
-                    .account::<ZeroCopy<Executor>>(&executor)
-                    .await?
-                    .ok_or(gmsol::Error::NotFound)?;
-                if account.0.role_name()? != role {
-                    return Err(gmsol::Error::invalid_argument(format!(
-                        "invalid executor account found: {executor}"
-                    )));
+            Command::Config => {
+                let config_address = client.find_timelock_config_address(store);
+                let config = client
+                    .account::<ZeroCopy<TimelockConfig>>(&config_address)
+                    .await?;
+                match config {
+                    Some(config) => {
+                        let config = config.0;
+                        println!("Address: {config_address}");
+                        println!("Delay: {}", config.delay());
+                    }
+                    None => {
+                        println!("Not initialized");
+                    }
                 }
-                println!("{executor}");
+                return Ok(());
+            }
+            Command::Executor { role } => {
+                let executor = get_and_validate_executor_address(client, store, role).await?;
+                let wallet = client.find_executor_wallet_address(&executor);
+                println!("Executor: {executor}");
+                println!("Wallet: {wallet}");
+                return Ok(());
+            }
+            Command::ExecutorWallet { role } => {
+                let executor = get_and_validate_executor_address(client, store, role).await?;
+                let wallet = client.find_executor_wallet_address(&executor);
+                println!("{wallet}");
                 return Ok(());
             }
             Command::InitConfig { initial_delay } => {
@@ -141,5 +161,24 @@ impl Args {
             },
         )
         .await
+    }
+}
+
+async fn get_and_validate_executor_address(
+    client: &GMSOLClient,
+    store: &Pubkey,
+    role: &str,
+) -> gmsol::Result<Pubkey> {
+    let executor = client.find_executor_address(store, role)?;
+    let account = client
+        .account::<ZeroCopy<Executor>>(&executor)
+        .await?
+        .ok_or(gmsol::Error::NotFound)?;
+    if account.0.role_name()? == role {
+        Ok(executor)
+    } else {
+        Err(gmsol::Error::invalid_argument(format!(
+            "invalid executor account found: {executor}"
+        )))
     }
 }

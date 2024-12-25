@@ -355,3 +355,11 @@ pub fn find_executor_pda(
         timelock_program_id,
     ))
 }
+
+/// Find executor wallet PDA.
+pub fn find_executor_wallet_pda(executor: &Pubkey, timelock_program_id: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[Executor::WALLET_SEED, executor.as_ref()],
+        timelock_program_id,
+    )
+}

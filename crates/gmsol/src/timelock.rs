@@ -373,9 +373,11 @@ impl<C: Deref<Target = impl Signer> + Clone> TimelockOps<C> for crate::Client<C>
             }
         };
 
+        let wallet = self.find_executor_wallet_address(&executor);
+
         accounts
             .iter_mut()
-            .filter(|a| a.pubkey == executor)
+            .filter(|a| a.pubkey == wallet)
             .for_each(|a| a.is_signer = false);
 
         Ok(self
@@ -386,6 +388,7 @@ impl<C: Deref<Target = impl Signer> + Clone> TimelockOps<C> for crate::Client<C>
                 store: *store,
                 timelock_config: self.find_timelock_config_address(store),
                 executor,
+                wallet,
                 instruction: *buffer,
                 store_program: *self.store_program_id(),
             })
@@ -401,6 +404,7 @@ impl<C: Deref<Target = impl Signer> + Clone> TimelockOps<C> for crate::Client<C>
         let executor = self
             .find_executor_address(store, roles::ADMIN)
             .expect("must success");
+        let wallet = self.find_executor_wallet_address(&executor);
         self.timelock_rpc()
             .args(instruction::RevokeRole {
                 role: role.to_string(),
@@ -409,6 +413,7 @@ impl<C: Deref<Target = impl Signer> + Clone> TimelockOps<C> for crate::Client<C>
                 authority: self.payer(),
                 store: *store,
                 executor,
+                wallet,
                 user: *address,
                 store_program: *self.store_program_id(),
             })

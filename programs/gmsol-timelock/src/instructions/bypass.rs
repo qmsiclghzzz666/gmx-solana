@@ -7,7 +7,10 @@ use gmsol_store::{
     CoreError,
 };
 
-use crate::{roles, states::Executor};
+use crate::{
+    roles,
+    states::{Executor, ExecutorWalletSigner},
+};
 
 const NOT_BYPASSABLE_ROLES: [&str; 3] = [
     roles::TIMELOCKED_ADMIN,
@@ -36,6 +39,13 @@ pub struct RevokeRole<'info> {
         bump = executor.load()?.bump,
     )]
     pub executor: AccountLoader<'info, Executor>,
+    /// Executor Wallet.
+    #[account(
+        mut,
+        seeds = [Executor::WALLET_SEED, executor.key().as_ref()],
+        bump,
+    )]
+    pub wallet: SystemAccount<'info>,
     /// User.
     /// CHECK: only its address is used.
     pub user: UncheckedAccount<'info>,
@@ -51,7 +61,7 @@ pub(crate) fn unchecked_revoke_role(ctx: Context<RevokeRole>, role: String) -> R
         !NOT_BYPASSABLE_ROLES.contains(&role.as_str()),
         CoreError::InvalidArgument
     );
-    let signer = ctx.accounts.executor.load()?.signer();
+    let signer = ExecutorWalletSigner::new(ctx.accounts.executor.key(), ctx.bumps.wallet);
     let cpi_ctx = ctx.accounts.revoke_role_ctx();
     revoke_role(
         cpi_ctx.with_signer(&[&signer.as_seeds()]),
