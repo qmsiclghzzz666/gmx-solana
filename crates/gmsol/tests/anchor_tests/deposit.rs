@@ -223,8 +223,8 @@ async fn first_deposit() -> eyre::Result<()> {
         .market_token(index_token, long_token, short_token)
         .expect("must exist");
 
-    let amount = 1_000_013;
-    let min_amount = 1_000_000;
+    let amount = 1_000_000_013;
+    let min_amount = 1u64;
 
     deployment
         .mint_or_transfer_to_user(long_token, Deployment::DEFAULT_USER, amount)
@@ -238,7 +238,7 @@ async fn first_deposit() -> eyre::Result<()> {
             store,
             market_token,
             MarketConfigKey::MinTokensForFirstDeposit,
-            &min_amount,
+            &(min_amount.into()),
         )?
         .send_without_preflight()
         .await?;
@@ -267,6 +267,7 @@ async fn first_deposit() -> eyre::Result<()> {
     let (rpc, deposit) = keeper
         .create_first_deposit(store, market_token)
         .long_token(amount, None, None)
+        .min_market_token(min_amount)
         .build_with_address()
         .await?;
     let signature = rpc.send_without_preflight().await?;
