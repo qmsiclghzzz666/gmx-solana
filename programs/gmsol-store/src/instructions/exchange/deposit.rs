@@ -13,6 +13,8 @@ use crate::{
     CoreError,
 };
 
+use self::internal::Authentication;
+
 /// The accounts definition for the [`create_deposit`](crate::gmsol_store::create_deposit)
 /// instruction.
 ///
@@ -110,6 +112,19 @@ impl<'info> internal::Create<'info, Deposit> for CreateDeposit<'info> {
         self.system_program.to_account_info()
     }
 
+    fn validate(&self, _params: &Self::CreateParams) -> Result<()> {
+        // Currently, only the market keeper is allowed to create deposits
+        // for the first deposit owner. In all other cases, the payer and
+        // the owner must still be the same, although this may not be
+        // strictly necessary.
+        if *self.owner.key == Deposit::first_deposit_owner() {
+            self.only_role(RoleKey::MARKET_KEEPER)?;
+        } else {
+            require_eq!(self.owner.key, self.payer.key)
+        }
+        Ok(())
+    }
+
     fn create_impl(
         &mut self,
         params: &Self::CreateParams,
@@ -203,6 +218,16 @@ impl<'info> CreateDeposit<'info> {
             escrow.reload()?;
         }
         Ok(())
+    }
+}
+
+impl<'info> Authentication<'info> for CreateDeposit<'info> {
+    fn authority(&self) -> &Signer<'info> {
+        &self.payer
+    }
+
+    fn store(&self) -> &AccountLoader<'info, Store> {
+        &self.store
     }
 }
 

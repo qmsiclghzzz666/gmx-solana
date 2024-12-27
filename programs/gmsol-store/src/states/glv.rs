@@ -533,7 +533,7 @@ impl GlvDeposit {
     }
 
     #[inline]
-    fn first_deposit_owner() -> Pubkey {
+    pub(crate) fn first_deposit_owner() -> Pubkey {
         Deposit::first_deposit_owner()
     }
 
