@@ -47,6 +47,7 @@ pub struct CreateGlvDepositBuilder<'a, C> {
     min_market_token_amount: u64,
     min_glv_token_amount: u64,
     max_execution_lamports: u64,
+    owner: Option<Pubkey>,
     nonce: Option<NonceBytes>,
     market_token_source: Option<Pubkey>,
     initial_long_token_source: Option<Pubkey>,
@@ -94,6 +95,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateGlvDepositBuilder<'a, C> 
             min_market_token_amount: 0,
             min_glv_token_amount: 0,
             max_execution_lamports: GlvDeposit::MIN_EXECUTION_LAMPORTS,
+            owner: None,
             nonce: None,
             market_token_source: None,
             initial_long_token_source: None,
@@ -157,6 +159,13 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateGlvDepositBuilder<'a, C> 
         self
     }
 
+    /// Set Owner.
+    /// Defaults to the payer.
+    pub fn owner(&mut self, owner: Option<Pubkey>) -> &mut Self {
+        self.owner = owner;
+        self
+    }
+
     /// Set hint.
     pub fn hint(&mut self, hint: CreateGlvDepositHint) -> &mut Self {
         self.hint = Some(hint);
@@ -186,7 +195,8 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateGlvDepositBuilder<'a, C> 
         let hint = self.prepare_hint().await?;
 
         let nonce = self.nonce.unwrap_or_else(generate_nonce);
-        let owner = self.client.payer();
+        let payer = self.client.payer();
+        let owner = self.owner.unwrap_or(payer);
         let glv_deposit = self
             .client
             .find_glv_deposit_address(&self.store, &owner, &nonce);
@@ -219,7 +229,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateGlvDepositBuilder<'a, C> 
         let mut prepare = self.client.prepare_associated_token_account(
             &self.glv_token,
             &glv_token_program_id,
-            None,
+            Some(&owner),
         );
 
         // Prepare the escrow account for GLV tokens.
@@ -292,6 +302,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateGlvDepositBuilder<'a, C> 
             .store_rpc()
             .accounts(fix_optional_account_metas(
                 accounts::CreateGlvDeposit {
+                    payer,
                     owner,
                     store: self.store,
                     market,

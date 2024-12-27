@@ -25,9 +25,12 @@ use crate::{
 #[derive(Accounts)]
 #[instruction(nonce: [u8; 32])]
 pub struct CreateDeposit<'info> {
-    /// The owner.
+    /// The payer.
     #[account(mut)]
-    pub owner: Signer<'info>,
+    pub payer: Signer<'info>,
+    /// The owner.
+    /// CHECK: only the address is used.
+    pub owner: UncheckedAccount<'info>,
     /// Store.
     pub store: AccountLoader<'info, Store>,
     /// Market.
@@ -37,7 +40,7 @@ pub struct CreateDeposit<'info> {
     #[account(
         init,
         space = 8 + Deposit::INIT_SPACE,
-        payer = owner,
+        payer = payer,
         seeds = [Deposit::SEED, store.key().as_ref(), owner.key().as_ref(), &nonce],
         bump,
     )]
@@ -73,7 +76,7 @@ pub struct CreateDeposit<'info> {
     /// The ATA of the owner for receving market tokens.
     #[account(
         init_if_needed,
-        payer = owner,
+        payer = payer,
         associated_token::mint = market_token,
         associated_token::authority = owner,
     )]
@@ -100,7 +103,7 @@ impl<'info> internal::Create<'info, Deposit> for CreateDeposit<'info> {
     }
 
     fn payer(&self) -> AccountInfo<'info> {
-        self.owner.to_account_info()
+        self.payer.to_account_info()
     }
 
     fn system_program(&self) -> AccountInfo<'info> {
@@ -156,7 +159,7 @@ impl<'info> CreateDeposit<'info> {
                         from: source.to_account_info(),
                         mint: mint.to_account_info(),
                         to: target.to_account_info(),
-                        authority: self.owner.to_account_info(),
+                        authority: self.payer.to_account_info(),
                     },
                 ),
                 amount,

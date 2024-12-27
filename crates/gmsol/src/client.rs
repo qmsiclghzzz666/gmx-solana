@@ -12,8 +12,8 @@ use anchor_client::{
 
 use gmsol_model::{price::Prices, PnlFactorKind};
 use gmsol_store::states::{
-    market::status::MarketStatus, position::PositionKind, user::ReferralCodeBytes, NonceBytes,
-    PriceProviderKind,
+    deposit::find_first_deposit_owner_pda, market::status::MarketStatus, position::PositionKind,
+    user::ReferralCodeBytes, NonceBytes, PriceProviderKind,
 };
 use gmsol_timelock::states::utils::InstructionBuffer;
 use solana_account_decoder::UiAccountEncoding;
@@ -285,6 +285,11 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         nonce: &NonceBytes,
     ) -> Pubkey {
         crate::pda::find_deposit_address(store, user, nonce, self.store_program_id()).0
+    }
+
+    /// Find first deposit owner address.
+    pub fn find_first_deposit_owner_address(&self) -> Pubkey {
+        find_first_deposit_owner_pda(self.store_program_id()).0
     }
 
     /// Find DPA for withdrawal account.

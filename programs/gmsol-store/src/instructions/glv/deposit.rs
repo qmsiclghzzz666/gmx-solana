@@ -31,9 +31,12 @@ use crate::{
 #[derive(Accounts)]
 #[instruction(nonce: [u8; 32])]
 pub struct CreateGlvDeposit<'info> {
-    /// Owner.
+    /// Payer.
     #[account(mut)]
-    pub owner: Signer<'info>,
+    pub payer: Signer<'info>,
+    /// Owner.
+    /// CHECK: only the address is used.
+    pub owner: UncheckedAccount<'info>,
     /// Store.
     pub store: AccountLoader<'info, Store>,
     /// Market.
@@ -53,7 +56,7 @@ pub struct CreateGlvDeposit<'info> {
     /// GLV deposit.
     #[account(
         init,
-        payer = owner,
+        payer = payer,
         space = 8 + GlvDeposit::INIT_SPACE,
         seeds = [GlvDeposit::SEED, store.key().as_ref(), owner.key().as_ref(), &nonce],
         bump,
@@ -123,7 +126,7 @@ impl<'info> internal::Create<'info, GlvDeposit> for CreateGlvDeposit<'info> {
     }
 
     fn payer(&self) -> AccountInfo<'info> {
-        self.owner.to_account_info()
+        self.payer.to_account_info()
     }
 
     fn system_program(&self) -> AccountInfo<'info> {
@@ -179,7 +182,7 @@ impl<'info> CreateGlvDeposit<'info> {
                         from: source.to_account_info(),
                         mint: mint.to_account_info(),
                         to: target.to_account_info(),
-                        authority: self.owner.to_account_info(),
+                        authority: self.payer.to_account_info(),
                     },
                 ),
                 amount,
@@ -205,7 +208,7 @@ impl<'info> CreateGlvDeposit<'info> {
                         from: source.to_account_info(),
                         mint: mint.to_account_info(),
                         to: target.to_account_info(),
-                        authority: self.owner.to_account_info(),
+                        authority: self.payer.to_account_info(),
                     },
                 ),
                 amount,
@@ -227,7 +230,7 @@ impl<'info> CreateGlvDeposit<'info> {
                         from: source.to_account_info(),
                         mint: mint.to_account_info(),
                         to: target.to_account_info(),
-                        authority: self.owner.to_account_info(),
+                        authority: self.payer.to_account_info(),
                     },
                 ),
                 amount,

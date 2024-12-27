@@ -679,3 +679,16 @@ pub(crate) fn generate_nonce() -> NonceBytes {
         .try_into()
         .unwrap()
 }
+
+impl<C: Deref<Target = impl Signer> + Clone> crate::Client<C> {
+    /// Create first deposit.
+    pub fn create_first_deposit(
+        &self,
+        store: &Pubkey,
+        market_token: &Pubkey,
+    ) -> CreateDepositBuilder<C> {
+        let mut builder = self.create_deposit(store, market_token);
+        builder.owner(Some(self.find_first_deposit_owner_address()));
+        builder
+    }
+}

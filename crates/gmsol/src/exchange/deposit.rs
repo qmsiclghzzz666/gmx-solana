@@ -52,33 +52,11 @@ pub struct CreateDepositBuilder<'a, C> {
     initial_long_token_amount: u64,
     initial_short_token_amount: u64,
     min_market_token: u64,
+    owner: Option<Pubkey>,
     nonce: Option<NonceBytes>,
 }
 
-impl<'a, C, S> CreateDepositBuilder<'a, C>
-where
-    C: Deref<Target = S> + Clone,
-    S: Signer,
-{
-    pub(super) fn new(client: &'a crate::Client<C>, store: Pubkey, market_token: Pubkey) -> Self {
-        Self {
-            client,
-            store,
-            nonce: None,
-            market_token,
-            execution_fee: Deposit::MIN_EXECUTION_LAMPORTS,
-            long_token_swap_path: vec![],
-            short_token_swap_path: vec![],
-            initial_long_token: None,
-            initial_short_token: None,
-            initial_long_token_account: None,
-            initial_short_token_account: None,
-            initial_long_token_amount: 0,
-            initial_short_token_amount: 0,
-            min_market_token: 0,
-        }
-    }
-
+impl<'a, C> CreateDepositBuilder<'a, C> {
     /// Set execution fee. Defaults to min execution fee.
     pub fn execution_fee(&mut self, fee: u64) -> &mut Self {
         self.execution_fee = fee;
@@ -103,6 +81,43 @@ where
         self
     }
 
+    /// Set Owner.
+    /// Defaults to the payer.
+    pub fn owner(&mut self, owner: Option<Pubkey>) -> &mut Self {
+        self.owner = owner;
+        self
+    }
+}
+
+impl<'a, C, S> CreateDepositBuilder<'a, C>
+where
+    C: Deref<Target = S> + Clone,
+    S: Signer,
+{
+    pub(super) fn new(client: &'a crate::Client<C>, store: Pubkey, market_token: Pubkey) -> Self {
+        Self {
+            client,
+            store,
+            market_token,
+            execution_fee: Deposit::MIN_EXECUTION_LAMPORTS,
+            long_token_swap_path: vec![],
+            short_token_swap_path: vec![],
+            initial_long_token: None,
+            initial_short_token: None,
+            initial_long_token_account: None,
+            initial_short_token_account: None,
+            initial_long_token_amount: 0,
+            initial_short_token_amount: 0,
+            min_market_token: 0,
+            owner: None,
+            nonce: None,
+        }
+    }
+
+    fn get_owner(&self) -> Pubkey {
+        self.owner.unwrap_or(self.client.payer())
+    }
+
     fn get_or_find_associated_initial_long_token_account(
         &self,
         token: Option<&Pubkey>,
@@ -110,7 +125,7 @@ where
         let token = token?;
         match self.initial_long_token_account {
             Some(account) => Some(account),
-            None => Some(get_associated_token_address(&self.client.payer(), token)),
+            None => Some(get_associated_token_address(&self.get_owner(), token)),
         }
     }
 
@@ -121,7 +136,7 @@ where
         let token = token?;
         match self.initial_short_token_account {
             Some(account) => Some(account),
-            None => Some(get_associated_token_address(&self.client.payer(), token)),
+            None => Some(get_associated_token_address(&self.get_owner(), token)),
         }
     }
 
@@ -203,7 +218,8 @@ where
         } = self;
         let nonce = nonce.unwrap_or_else(generate_nonce);
         let payer = client.payer();
-        let deposit = client.find_deposit_address(store, &payer, &nonce);
+        let owner = self.get_owner();
+        let deposit = client.find_deposit_address(store, &owner, &nonce);
         let market = client.find_market_address(store, market_token);
 
         let (long_token, short_token) = self.get_or_fetch_initial_tokens(&market).await?;
@@ -212,7 +228,7 @@ where
             self.get_or_find_associated_initial_long_token_account(long_token.as_ref());
         let initial_short_token_account =
             self.get_or_find_associated_initial_short_token_account(short_token.as_ref());
-        let market_token_ata = get_associated_token_address(&payer, market_token);
+        let market_token_ata = get_associated_token_address(&owner, market_token);
 
         let market_token_escrow = get_associated_token_address(&deposit, market_token);
         let initial_long_token_escrow = long_token
@@ -240,7 +256,8 @@ where
             .store_rpc()
             .accounts(crate::utils::fix_optional_account_metas(
                 accounts::CreateDeposit {
-                    owner: payer,
+                    payer,
+                    owner,
                     store: *store,
                     market,
                     deposit,

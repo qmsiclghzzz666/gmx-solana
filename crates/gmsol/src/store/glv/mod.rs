@@ -283,3 +283,17 @@ fn split_to_accounts(
 
     (accounts, length)
 }
+
+impl<C: Deref<Target = impl Signer> + Clone> crate::Client<C> {
+    /// Create first GLV deposit.
+    pub fn create_first_glv_deposit(
+        &self,
+        store: &Pubkey,
+        glv_token: &Pubkey,
+        market_token: &Pubkey,
+    ) -> CreateGlvDepositBuilder<C> {
+        let mut builder = self.create_glv_deposit(store, glv_token, market_token);
+        builder.owner(Some(self.find_first_deposit_owner_address()));
+        builder
+    }
+}
