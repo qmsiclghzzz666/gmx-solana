@@ -125,7 +125,7 @@ where
         let token = token?;
         match self.initial_long_token_account {
             Some(account) => Some(account),
-            None => Some(get_associated_token_address(&self.get_owner(), token)),
+            None => Some(get_associated_token_address(&self.client.payer(), token)),
         }
     }
 
@@ -136,7 +136,7 @@ where
         let token = token?;
         match self.initial_short_token_account {
             Some(account) => Some(account),
-            None => Some(get_associated_token_address(&self.get_owner(), token)),
+            None => Some(get_associated_token_address(&self.client.payer(), token)),
         }
     }
 

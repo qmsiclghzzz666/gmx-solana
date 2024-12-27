@@ -200,7 +200,7 @@ impl<'info> CreateDeposit<'info> {
                         from: source.to_account_info(),
                         mint: mint.to_account_info(),
                         to: target.to_account_info(),
-                        authority: self.owner.to_account_info(),
+                        authority: self.payer.to_account_info(),
                     },
                 ),
                 amount,

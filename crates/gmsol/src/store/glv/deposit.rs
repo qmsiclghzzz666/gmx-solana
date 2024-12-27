@@ -249,7 +249,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateGlvDepositBuilder<'a, C> 
         if self.market_token_amount != 0 {
             market_token_source = Some(self.market_token_source.unwrap_or_else(|| {
                 get_associated_token_address_with_program_id(
-                    &owner,
+                    &payer,
                     &self.market_token,
                     &token_program_id,
                 )
@@ -260,7 +260,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateGlvDepositBuilder<'a, C> 
             let token = self.initial_long_token.unwrap_or(hint.long_token_mint);
             initial_long_token = Some(token);
             initial_long_token_source = Some(self.initial_long_token_source.unwrap_or_else(|| {
-                get_associated_token_address_with_program_id(&owner, &token, &token_program_id)
+                get_associated_token_address_with_program_id(&payer, &token, &token_program_id)
             }));
             initial_long_token_escrow = Some(get_associated_token_address_with_program_id(
                 &glv_deposit,
@@ -281,7 +281,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateGlvDepositBuilder<'a, C> 
             initial_short_token = Some(token);
             initial_short_token_source =
                 Some(self.initial_short_token_source.unwrap_or_else(|| {
-                    get_associated_token_address_with_program_id(&owner, &token, &token_program_id)
+                    get_associated_token_address_with_program_id(&payer, &token, &token_program_id)
                 }));
             initial_short_token_escrow = Some(get_associated_token_address_with_program_id(
                 &glv_deposit,

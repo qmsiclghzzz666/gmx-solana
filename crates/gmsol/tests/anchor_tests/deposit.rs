@@ -1,5 +1,6 @@
 use gmsol::{exchange::ExchangeOps, store::market::MarketOps, types::MarketConfigKey};
 use gmsol_store::CoreError;
+use tracing::Instrument;
 
 use crate::anchor_tests::setup::{self, Deployment};
 
@@ -223,10 +224,13 @@ async fn first_deposit() -> eyre::Result<()> {
         .expect("must exist");
 
     let amount = 1_000_013;
-    let min_amount = 1;
+    let min_amount = 1_000_000;
 
     deployment
         .mint_or_transfer_to_user(long_token, Deployment::DEFAULT_USER, amount)
+        .await?;
+    deployment
+        .mint_or_transfer_to_user(long_token, Deployment::DEFAULT_KEEPER, amount)
         .await?;
 
     let signature = keeper
@@ -258,6 +262,20 @@ async fn first_deposit() -> eyre::Result<()> {
         err.anchor_error_code(),
         Some(CoreError::InvalidOwnerForFirstDeposit.into())
     );
+
+    // Only MARKET_KEEPER is allowed to create first deposit.
+    let (rpc, deposit) = keeper
+        .create_first_deposit(store, market_token)
+        .long_token(amount, None, None)
+        .build_with_address()
+        .await?;
+    let signature = rpc.send_without_preflight().await?;
+    tracing::info!(%signature, %deposit, "created first deposit by market keeper");
+    let mut builder = keeper.execute_deposit(store, oracle, &deposit, false);
+    deployment
+        .execute_with_pyth(&mut builder, None, false, false)
+        .instrument(tracing::info_span!("execut first deposit", first_deposit=%deposit))
+        .await?;
 
     Ok(())
 }
