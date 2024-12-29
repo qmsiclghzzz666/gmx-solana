@@ -38,6 +38,9 @@ pub trait TreasuryOps<C> {
     /// Set GT factor.
     fn set_gt_factor(&self, store: &Pubkey, factor: u128) -> crate::Result<RpcBuilder<C>>;
 
+    /// Set buyback factor.
+    fn set_buyback_factor(&self, store: &Pubkey, factor: u128) -> crate::Result<RpcBuilder<C>>;
+
     /// Initialize [`TreasuryConfig`](crate::types::treasury::TreasuryConfig).
     fn initialize_treasury(&self, store: &Pubkey, index: u8) -> RpcBuilder<C, Pubkey>;
 
@@ -214,7 +217,25 @@ where
         Ok(self
             .treasury_rpc()
             .args(instruction::SetGtFactor { factor })
-            .accounts(accounts::SetGtFactor {
+            .accounts(accounts::UpdateConfig {
+                authority: self.payer(),
+                store: *store,
+                config,
+                store_program: *self.store_program_id(),
+            }))
+    }
+
+    fn set_buyback_factor(&self, store: &Pubkey, factor: u128) -> crate::Result<RpcBuilder<C>> {
+        if factor > crate::constants::MARKET_USD_UNIT {
+            return Err(crate::Error::invalid_argument(
+                "cannot use a factor greater than 1",
+            ));
+        }
+        let config = self.find_config_address(store);
+        Ok(self
+            .treasury_rpc()
+            .args(instruction::SetBuybackFactor { factor })
+            .accounts(accounts::UpdateConfig {
                 authority: self.payer(),
                 store: *store,
                 config,

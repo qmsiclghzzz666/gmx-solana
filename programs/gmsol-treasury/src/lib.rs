@@ -34,8 +34,14 @@ pub mod gmsol_treasury {
 
     /// Set GT factor.
     #[access_control(CpiAuthenticate::only(&ctx, roles::TREASURY_ADMIN))]
-    pub fn set_gt_factor(ctx: Context<SetGtFactor>, factor: u128) -> Result<()> {
+    pub fn set_gt_factor(ctx: Context<UpdateConfig>, factor: u128) -> Result<()> {
         instructions::unchecked_set_gt_factor(ctx, factor)
+    }
+
+    /// Set buyback factor.
+    #[access_control(CpiAuthenticate::only(&ctx, roles::TREASURY_ADMIN))]
+    pub fn set_buyback_factor(ctx: Context<UpdateConfig>, factor: u128) -> Result<()> {
+        instructions::unchecked_set_buyback_factor(ctx, factor)
     }
 
     /// Initialize a [`TreasuryConfig`](crate::states::TreasuryConfig) account.

@@ -9,11 +9,14 @@ use crate::constants;
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub struct Config {
     pub(crate) bump: u8,
-    padding: [u8; 15],
+    padding_0: [u8; 15],
     pub(crate) store: Pubkey,
     treasury_config: Pubkey,
     gt_factor: u128,
-    reserved: [u8; 256],
+    buyback_factor: u128,
+    padding_1: [u8; 48],
+    padding_2: [u8; 64],
+    reserved: [u8; 128],
 }
 
 impl Seed for Config {
@@ -66,6 +69,27 @@ impl Config {
         );
         require_neq!(self.gt_factor, factor, CoreError::PreconditionsAreNotMet);
         std::mem::swap(&mut self.gt_factor, &mut factor);
+        Ok(factor)
+    }
+
+    /// Get buyback factor.
+    pub fn buyback_factor(&self) -> u128 {
+        self.buyback_factor
+    }
+
+    /// Set buyback factor.
+    pub(crate) fn set_buyback_factor(&mut self, mut factor: u128) -> Result<u128> {
+        require_gte!(
+            gmsol_store::constants::MARKET_USD_UNIT,
+            factor,
+            CoreError::InvalidArgument
+        );
+        require_neq!(
+            self.buyback_factor,
+            factor,
+            CoreError::PreconditionsAreNotMet
+        );
+        std::mem::swap(&mut self.buyback_factor, &mut factor);
         Ok(factor)
     }
 

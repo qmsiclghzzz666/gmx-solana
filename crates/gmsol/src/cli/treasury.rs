@@ -30,6 +30,8 @@ enum Command {
     SetTreasury { treasury_config: Pubkey },
     /// Set GT factor.
     SetGtFactor { factor: u128 },
+    /// Set Buyback factor.
+    SetBuybackFactor { factor: u128 },
     /// Insert token to the treasury.
     InsertToken { token: Pubkey },
     /// Remove token from the treasury.
@@ -126,6 +128,7 @@ impl Args {
             }
             Command::SetTreasury { treasury_config } => client.set_treasury(store, treasury_config),
             Command::SetGtFactor { factor } => client.set_gt_factor(store, *factor)?,
+            Command::SetBuybackFactor { factor } => client.set_buyback_factor(store, *factor)?,
             Command::InsertToken { token } => {
                 client.insert_token_to_treasury(store, None, token).await?
             }

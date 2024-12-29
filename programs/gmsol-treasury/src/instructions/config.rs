@@ -93,9 +93,9 @@ impl<'info> CpiAuthentication<'info> for SetTreasury<'info> {
     }
 }
 
-/// The accounts definition for [`set_gt_factor`](crate::gmsol_treasury::set_gt_factor).
+/// The accounts definition for updating [`Config`].
 #[derive(Accounts)]
-pub struct SetGtFactor<'info> {
+pub struct UpdateConfig<'info> {
     /// Authority.
     pub authority: Signer<'info>,
     /// Store.
@@ -108,20 +108,7 @@ pub struct SetGtFactor<'info> {
     pub store_program: Program<'info, GmsolStore>,
 }
 
-/// Set config's gt factor.
-/// # CHECK
-/// Only [`TREASURY_ADMIN`](crate::roles::TREASURY_ADMIN) can use.
-pub(crate) fn unchecked_set_gt_factor(ctx: Context<SetGtFactor>, factor: u128) -> Result<()> {
-    let previous = ctx.accounts.config.load_mut()?.set_gt_factor(factor)?;
-    msg!(
-        "[Treasury] the GT factor has been updated from {} to {}",
-        previous,
-        factor
-    );
-    Ok(())
-}
-
-impl<'info> WithStore<'info> for SetGtFactor<'info> {
+impl<'info> WithStore<'info> for UpdateConfig<'info> {
     fn store_program(&self) -> AccountInfo<'info> {
         self.store_program.to_account_info()
     }
@@ -131,7 +118,7 @@ impl<'info> WithStore<'info> for SetGtFactor<'info> {
     }
 }
 
-impl<'info> CpiAuthentication<'info> for SetGtFactor<'info> {
+impl<'info> CpiAuthentication<'info> for UpdateConfig<'info> {
     fn authority(&self) -> AccountInfo<'info> {
         self.authority.to_account_info()
     }
@@ -139,4 +126,30 @@ impl<'info> CpiAuthentication<'info> for SetGtFactor<'info> {
     fn on_error(&self) -> Result<()> {
         err!(gmsol_store::CoreError::PermissionDenied)
     }
+}
+
+/// Set config's gt factor.
+/// # CHECK
+/// Only [`TREASURY_ADMIN`](crate::roles::TREASURY_ADMIN) can use.
+pub(crate) fn unchecked_set_gt_factor(ctx: Context<UpdateConfig>, factor: u128) -> Result<()> {
+    let previous = ctx.accounts.config.load_mut()?.set_gt_factor(factor)?;
+    msg!(
+        "[Treasury] the GT factor has been updated from {} to {}",
+        previous,
+        factor
+    );
+    Ok(())
+}
+
+/// Set config's buyback factor.
+/// # CHECK
+/// Only [`TREASURY_ADMIN`](crate::roles::TREASURY_ADMIN) can use.
+pub(crate) fn unchecked_set_buyback_factor(ctx: Context<UpdateConfig>, factor: u128) -> Result<()> {
+    let previous = ctx.accounts.config.load_mut()?.set_buyback_factor(factor)?;
+    msg!(
+        "[Treasury] the buyback factor has been updated from {} to {}",
+        previous,
+        factor
+    );
+    Ok(())
 }
