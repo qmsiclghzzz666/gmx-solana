@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use anchor_lang::prelude::*;
 use anchor_spl::{
     associated_token::AssociatedToken,
@@ -11,7 +13,7 @@ use gmsol_store::{
     },
     program::GmsolStore,
     states::{gt::GtExchangeVault, Chainlink, Oracle, Seed, Store},
-    utils::{CpiAuthentication, WithStore},
+    utils::{token::is_associated_token_account_with_program_id, CpiAuthentication, WithStore},
     CoreError,
 };
 use gmsol_utils::InitSpace;
@@ -551,8 +553,11 @@ impl<'info> WithdrawFromTreasury<'info> {
 ///
 /// Remaining accounts expected by this instruction:
 ///
-///   - 0..N. `[]` N feed accounts, where N represents the total number of tokens defined in
-///     the GT bank.
+///   - 0..N. `[]` N feed accounts sorted by token addresses, where N represents the total number of tokens defined in
+///     the GT bank or the treasury config.
+///   - N..(N+M). `[]` M token mint accounts, where M represents the total number of tokens defined in
+///     the treasury config.
+///   - (N+M)..(N+2M). `[]` M treasury vault accounts.
 #[derive(Accounts)]
 pub struct ConfirmGtBuyback<'info> {
     /// Authority.
@@ -607,8 +612,7 @@ pub struct ConfirmGtBuyback<'info> {
 pub(crate) fn unchecked_confirm_gt_buyback<'info>(
     ctx: Context<'_, '_, 'info, 'info, ConfirmGtBuyback<'info>>,
 ) -> Result<()> {
-    let remaining_accounts = ctx.remaining_accounts.to_vec();
-    ctx.accounts.execute(remaining_accounts)
+    ctx.accounts.execute(ctx.remaining_accounts)
 }
 
 impl<'info> WithStore<'info> for ConfirmGtBuyback<'info> {
@@ -632,7 +636,57 @@ impl<'info> CpiAuthentication<'info> for ConfirmGtBuyback<'info> {
 }
 
 impl<'info> ConfirmGtBuyback<'info> {
-    fn execute(&mut self, remaining_accounts: Vec<AccountInfo<'info>>) -> Result<()> {
+    fn validate_and_split_remaining_accounts(
+        &self,
+        remaining_accounts: &'info [AccountInfo<'info>],
+        num_tokens: usize,
+    ) -> Result<(&'info [AccountInfo<'info>], &'info [AccountInfo<'info>])> {
+        let num_treasury_tokens = self.treasury_config.load()?.num_tokens();
+        let treasury_tokens_end = num_tokens
+            .checked_add(num_treasury_tokens)
+            .ok_or_else(|| error!(CoreError::Internal))?;
+        let end = treasury_tokens_end
+            .checked_add(num_treasury_tokens)
+            .ok_or_else(|| error!(CoreError::Internal))?;
+        require_gte!(
+            remaining_accounts.len(),
+            end,
+            ErrorCode::AccountNotEnoughKeys
+        );
+
+        let feeds = &remaining_accounts[0..num_tokens];
+        let mints = &remaining_accounts[num_tokens..treasury_tokens_end];
+        let vaults = &remaining_accounts[treasury_tokens_end..end];
+
+        let treasury_config_key = self.treasury_config.key();
+        for (idx, token) in self.treasury_config.load()?.tokens().enumerate() {
+            let mint = &mints[idx];
+            require_eq!(mint.key(), token, CoreError::TokenMintMismatched);
+            let vault = &vaults[idx];
+            require_eq!(mint.owner, vault.owner, CoreError::InvalidArgument);
+
+            let token_program_id = mint.owner;
+
+            let mint = InterfaceAccount::<Mint>::try_from(mint)?;
+            let vault = InterfaceAccount::<TokenAccount>::try_from(vault)?;
+
+            require_eq!(vault.mint, mint.key(), CoreError::TokenMintMismatched);
+            require_eq!(vault.owner, treasury_config_key, CoreError::InvalidArgument);
+            require!(
+                is_associated_token_account_with_program_id(
+                    &vault.key(),
+                    &treasury_config_key,
+                    &token,
+                    token_program_id
+                ),
+                CoreError::InvalidArgument
+            );
+        }
+
+        Ok((feeds, vaults))
+    }
+
+    fn execute(&mut self, remaining_accounts: &'info [AccountInfo<'info>]) -> Result<()> {
         let signer = self.config.load()?.signer();
 
         // Confirm GT exchange vault first to make sure all preconditions are satified.
@@ -641,17 +695,25 @@ impl<'info> ConfirmGtBuyback<'info> {
         confirm_gt_exchange_vault(ctx.with_signer(&[&signer.as_seeds()]))?;
         self.gt_bank.load_mut()?.unchecked_confirm(total_gt_amount);
 
-        let tokens = self.gt_bank.load()?.tokens().collect();
+        let tokens = self
+            .gt_bank
+            .load()?
+            .tokens()
+            .chain(self.treasury_config.load()?.tokens())
+            .collect::<BTreeSet<_>>();
+
+        let (feeds, vaults) =
+            self.validate_and_split_remaining_accounts(remaining_accounts, tokens.len())?;
 
         // Set prices.
         let ctx = self.set_prices_from_price_feed_ctx();
         set_prices_from_price_feed(
             ctx.with_signer(&[&signer.as_seeds()])
-                .with_remaining_accounts(remaining_accounts),
-            tokens,
+                .with_remaining_accounts(feeds.to_vec()),
+            tokens.iter().copied().collect(),
         )?;
 
-        self.update_balances()?;
+        self.update_balances(vaults)?;
 
         // Clear prices.
         let ctx = self.clear_all_prices_ctx();
@@ -699,12 +761,47 @@ impl<'info> ConfirmGtBuyback<'info> {
         )
     }
 
+    fn get_max_buyback_value(&self, vaults: &[AccountInfo<'info>]) -> Result<u128> {
+        use anchor_spl::token::accessor;
+        use gmsol_model::utils::apply_factor;
+
+        let oracle = self.oracle.load()?;
+        let gt_bank_value = self.gt_bank.load()?.total_value(&oracle)?;
+
+        let mut treasury_value = 0u128;
+        for vault in vaults {
+            let token = accessor::mint(vault)?;
+            let amount = accessor::amount(vault)?;
+            let price = oracle.get_primary_price(&token, false)?.min;
+            let value = u128::from(amount)
+                .checked_mul(price)
+                .ok_or_else(|| error!(CoreError::ValueOverflow))?;
+            if value != 0 {
+                treasury_value = treasury_value
+                    .checked_add(value)
+                    .ok_or_else(|| error!(CoreError::ValueOverflow))?;
+            }
+        }
+
+        let total_vaule = treasury_value
+            .checked_add(gt_bank_value)
+            .ok_or_else(|| error!(CoreError::ValueOverflow))?;
+        let buyback_factor = self.config.load()?.buyback_factor();
+        let max_buyback_value = apply_factor::<_, { gmsol_store::constants::MARKET_DECIMALS }>(
+            &total_vaule,
+            &buyback_factor,
+        )
+        .ok_or_else(|| error!(CoreError::ValueOverflow))?;
+
+        Ok(gt_bank_value.min(max_buyback_value))
+    }
+
     /// Reserve the final GT bank balances eligible for buyback.
     /// # Note
     /// We do not actually execute token transfers; instead, we only update
     /// the token balances recorded in the GT bank. This is because tokens exceeding
     /// the recorded amount can be transferred to the treasury bank at any time.
-    fn update_balances(&self) -> Result<()> {
+    fn update_balances(&self, vaults: &[AccountInfo<'info>]) -> Result<()> {
         let buyback_amount = self.gt_exchange_vault.load()?.amount();
 
         if buyback_amount == 0 {
@@ -712,10 +809,7 @@ impl<'info> ConfirmGtBuyback<'info> {
             return Ok(());
         }
 
-        let max_buyback_value = {
-            let oracle = self.oracle.load()?;
-            self.gt_bank.load()?.total_value(&oracle)?
-        };
+        let max_buyback_value = self.get_max_buyback_value(vaults)?;
 
         let buyback_amount = u128::from(self.gt_exchange_vault.load()?.amount());
 

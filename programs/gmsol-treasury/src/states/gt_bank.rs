@@ -104,16 +104,23 @@ impl GtBank {
     pub fn to_feeds(
         &self,
         map: &impl gmsol_store::states::TokenMapAccess,
+        treasury_config: &super::TreasuryConfig,
     ) -> Result<gmsol_store::states::common::TokensWithFeed> {
+        use std::collections::BTreeSet;
+
         use gmsol_store::states::common::{TokenRecord, TokensWithFeed};
 
-        let records = self
+        let tokens = self
             .tokens()
+            .chain(treasury_config.tokens())
+            .collect::<BTreeSet<_>>();
+        let records = tokens
+            .iter()
             .map(|token| {
                 let config = map
-                    .get(&token)
+                    .get(token)
                     .ok_or_else(|| error!(CoreError::UnknownOrDisabledToken))?;
-                TokenRecord::from_config(token, config)
+                TokenRecord::from_config(*token, config)
             })
             .collect::<Result<Vec<_>>>()?;
 

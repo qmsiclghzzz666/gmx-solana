@@ -149,6 +149,8 @@ cargo gmsol -ul -w $GMSOL_KEEPER market set-referred-discount-factor 10000000000
 
 cargo gmsol -ul -w $GMSOL_KEEPER treasury set-gt-factor 60000000000000000000
 
+cargo gmsol -ul -w $GMSOL_KEEPER treasury set-buyback-factor 2000000000000000000
+
 cargo gmsol -ul admin grant-role $KEEPER_ADDRESS GT_CONTROLLER
 cargo gmsol -ul -w $GMSOL_KEEPER gt set-exchange-time-window $GMSOL_TIME_WINDOW
 cargo gmsol -ul admin revoke-role $KEEPER_ADDRESS GT_CONTROLLER

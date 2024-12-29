@@ -11,7 +11,7 @@ use gmsol_store::states::{
 };
 use gmsol_treasury::{
     accounts, instruction,
-    states::{treasury::TokenFlag, Config, GtBank},
+    states::{treasury::TokenFlag, Config, GtBank, TreasuryConfig},
 };
 use solana_account_decoder::UiAccountEncoding;
 
@@ -41,7 +41,7 @@ pub trait TreasuryOps<C> {
     /// Set buyback factor.
     fn set_buyback_factor(&self, store: &Pubkey, factor: u128) -> crate::Result<RpcBuilder<C>>;
 
-    /// Initialize [`TreasuryConfig`](crate::types::treasury::TreasuryConfig).
+    /// Initialize [`TreasuryConfig`].
     fn initialize_treasury(&self, store: &Pubkey, index: u8) -> RpcBuilder<C, Pubkey>;
 
     /// Insert token to treasury.
@@ -904,6 +904,7 @@ pub struct ConfirmGtBuybackHint {
     config: Pubkey,
     treasury_config: Pubkey,
     token_map: Pubkey,
+    treasury_tokens: Vec<Pubkey>,
     feeds: TokensWithFeed,
 }
 
@@ -947,11 +948,18 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> ConfirmGtBuybackBuilder<'a, C> 
                     .await?
                     .ok_or(crate::Error::NotFound)?
                     .0;
+                let treasury_config = self
+                    .client
+                    .account::<ZeroCopy<TreasuryConfig>>(&treasury_config_address)
+                    .await?
+                    .ok_or(crate::Error::NotFound)?
+                    .0;
                 let hint = ConfirmGtBuybackHint {
                     config,
                     treasury_config: treasury_config_address,
                     token_map: map_address,
-                    feeds: gt_bank.to_feeds(&map)?,
+                    treasury_tokens: treasury_config.tokens().collect(),
+                    feeds: gt_bank.to_feeds(&map, &treasury_config)?,
                 };
                 self.hint = Some(hint.clone());
                 Ok(hint)
@@ -976,10 +984,29 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> MakeTransactionBuilder<'a, C>
             None
         };
 
+        let token_program_id = anchor_spl::token::ID;
+
         let feeds = self
             .feeds_parser
             .parse(&hint.feeds)
             .collect::<Result<Vec<_>, _>>()?;
+        let tokens = hint.treasury_tokens.iter().map(|pubkey| AccountMeta {
+            pubkey: *pubkey,
+            is_signer: false,
+            is_writable: false,
+        });
+        let vaults = hint.treasury_tokens.iter().map(|token| {
+            let pubkey = get_associated_token_address_with_program_id(
+                &hint.treasury_config,
+                token,
+                &token_program_id,
+            );
+            AccountMeta {
+                pubkey,
+                is_signer: false,
+                is_writable: false,
+            }
+        });
 
         let rpc = self
             .client
@@ -1001,7 +1028,8 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> MakeTransactionBuilder<'a, C>
                 &gmsol_treasury::ID,
                 self.client.treasury_program_id(),
             ))
-            .accounts(feeds);
+            .accounts(feeds)
+            .accounts(tokens.chain(vaults).collect::<Vec<_>>());
 
         let mut tx = self.client.transaction();
         tx.try_push(rpc)?;
