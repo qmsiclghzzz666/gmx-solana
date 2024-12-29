@@ -552,7 +552,7 @@ impl<'info> WithdrawFromTreasury<'info> {
 /// Remaining accounts expected by this instruction:
 ///
 ///   - 0..N. `[]` N feed accounts, where N represents the total number of tokens defined in
-///     the treasury config.
+///     the GT bank.
 #[derive(Accounts)]
 pub struct ConfirmGtBuyback<'info> {
     /// Authority.
@@ -641,7 +641,7 @@ impl<'info> ConfirmGtBuyback<'info> {
         confirm_gt_exchange_vault(ctx.with_signer(&[&signer.as_seeds()]))?;
         self.gt_bank.load_mut()?.unchecked_confirm(total_gt_amount);
 
-        let tokens = self.treasury_config.load()?.tokens().collect();
+        let tokens = self.gt_bank.load()?.tokens().collect();
 
         // Set prices.
         let ctx = self.set_prices_from_price_feed_ctx();

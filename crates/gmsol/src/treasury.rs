@@ -11,7 +11,7 @@ use gmsol_store::states::{
 };
 use gmsol_treasury::{
     accounts, instruction,
-    states::{treasury::TokenFlag, Config, GtBank, TreasuryConfig},
+    states::{treasury::TokenFlag, Config, GtBank},
 };
 use solana_account_decoder::UiAccountEncoding;
 
@@ -38,7 +38,7 @@ pub trait TreasuryOps<C> {
     /// Set GT factor.
     fn set_gt_factor(&self, store: &Pubkey, factor: u128) -> crate::Result<RpcBuilder<C>>;
 
-    /// Initialize [`TreasuryConfig`].
+    /// Initialize [`TreasuryConfig`](crate::types::treasury::TreasuryConfig).
     fn initialize_treasury(&self, store: &Pubkey, index: u8) -> RpcBuilder<C, Pubkey>;
 
     /// Insert token to treasury.
@@ -926,15 +926,18 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> ConfirmGtBuybackBuilder<'a, C> 
             None => {
                 let (config, treasury_config_address) =
                     find_config_addresses(self.client, &self.store, None).await?;
+                let gt_bank = self
+                    .client
+                    .find_gt_bank_address(&treasury_config_address, &self.gt_exchange_vault);
                 let map_address = self
                     .client
                     .authorized_token_map_address(&self.store)
                     .await?
                     .ok_or_else(|| crate::Error::invalid_argument("token map is not set"))?;
                 let map = self.client.token_map(&map_address).await?;
-                let treasury_config = self
+                let gt_bank = self
                     .client
-                    .account::<ZeroCopy<TreasuryConfig>>(&treasury_config_address)
+                    .account::<ZeroCopy<GtBank>>(&gt_bank)
                     .await?
                     .ok_or(crate::Error::NotFound)?
                     .0;
@@ -942,7 +945,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> ConfirmGtBuybackBuilder<'a, C> 
                     config,
                     treasury_config: treasury_config_address,
                     token_map: map_address,
-                    feeds: treasury_config.to_feeds(&map)?,
+                    feeds: gt_bank.to_feeds(&map)?,
                 };
                 self.hint = Some(hint.clone());
                 Ok(hint)

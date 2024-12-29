@@ -99,6 +99,27 @@ impl GtBank {
             .map(|(key, _)| Pubkey::new_from_array(*key))
     }
 
+    /// Create tokens with feed.
+    #[cfg(feature = "utils")]
+    pub fn to_feeds(
+        &self,
+        map: &impl gmsol_store::states::TokenMapAccess,
+    ) -> Result<gmsol_store::states::common::TokensWithFeed> {
+        use gmsol_store::states::common::{TokenRecord, TokensWithFeed};
+
+        let records = self
+            .tokens()
+            .map(|token| {
+                let config = map
+                    .get(&token)
+                    .ok_or_else(|| error!(CoreError::UnknownOrDisabledToken))?;
+                TokenRecord::from_config(token, config)
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        TokensWithFeed::try_from_records(records)
+    }
+
     pub(crate) fn record_transferred_in(&mut self, token: &Pubkey, amount: u64) -> Result<()> {
         let balance = self.get_balance_or_insert(token)?;
         let next_balance = balance
