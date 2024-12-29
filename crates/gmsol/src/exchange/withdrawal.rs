@@ -23,7 +23,7 @@ use crate::{
     utils::{fix_optional_account_metas, ComputeBudget, RpcBuilder, ZeroCopy},
 };
 
-use super::{generate_nonce, ExchangeOps};
+use super::{generate_nonce, get_ata_or_owner, ExchangeOps};
 
 #[cfg(feature = "pyth-pull-oracle")]
 use crate::pyth::pull_oracle::Prices;
@@ -49,6 +49,7 @@ pub struct CreateWithdrawalBuilder<'a, C> {
     long_token_swap_path: Vec<Pubkey>,
     short_token_swap_path: Vec<Pubkey>,
     token_map: Option<Pubkey>,
+    should_unwrap_native_token: bool,
 }
 
 impl<'a, C, S> CreateWithdrawalBuilder<'a, C>
@@ -79,6 +80,7 @@ where
             long_token_swap_path: vec![],
             short_token_swap_path: vec![],
             token_map: None,
+            should_unwrap_native_token: true,
         }
     }
 
@@ -139,6 +141,13 @@ where
     /// Set short swap path.
     pub fn short_token_swap_path(&mut self, market_tokens: Vec<Pubkey>) -> &mut Self {
         self.short_token_swap_path = market_tokens;
+        self
+    }
+
+    /// Set whether to unwrap native token.
+    /// Defaults to should unwrap.
+    pub fn should_unwrap_native_token(&mut self, should_unwrap: bool) -> &mut Self {
+        self.should_unwrap_native_token = should_unwrap;
         self
     }
 
@@ -245,8 +254,6 @@ where
                 final_long_token_escrow,
                 final_short_token_escrow,
                 market_token_source: self.get_or_find_associated_market_token_account(),
-                final_long_token_ata,
-                final_short_token_ata,
             })
             .args(instruction::CreateWithdrawal {
                 nonce,
@@ -265,6 +272,7 @@ where
                         .len()
                         .try_into()
                         .map_err(|_| crate::Error::NumberOutOfRange)?,
+                    should_unwrap_native_token: self.should_unwrap_native_token,
                 },
             })
             .accounts(
@@ -307,6 +315,7 @@ pub struct CloseWithdrawalHint {
     market_token_account: Pubkey,
     final_long_token_account: Pubkey,
     final_short_token_account: Pubkey,
+    should_unwrap_native_token: bool,
 }
 
 impl<'a> From<&'a Withdrawal> for CloseWithdrawalHint {
@@ -320,6 +329,7 @@ impl<'a> From<&'a Withdrawal> for CloseWithdrawalHint {
             market_token_account: tokens.market_token_account(),
             final_long_token_account: tokens.final_long_token_account(),
             final_short_token_account: tokens.final_short_token_account(),
+            should_unwrap_native_token: withdrawal.header().should_unwrap_native_token(),
         }
     }
 }
@@ -370,10 +380,16 @@ where
         let payer = self.client.payer();
         let hint = self.get_or_fetch_withdrawal_hint().await?;
         let market_token_ata = get_associated_token_address(&hint.owner, &hint.market_token);
-        let final_long_token_ata =
-            get_associated_token_address(&hint.owner, &hint.final_long_token);
-        let final_short_token_ata =
-            get_associated_token_address(&hint.owner, &hint.final_short_token);
+        let final_long_token_ata = get_ata_or_owner(
+            &hint.owner,
+            &hint.final_long_token,
+            hint.should_unwrap_native_token,
+        );
+        let final_short_token_ata = get_ata_or_owner(
+            &hint.owner,
+            &hint.final_short_token,
+            hint.should_unwrap_native_token,
+        );
         Ok(self
             .client
             .store_rpc()
@@ -431,6 +447,7 @@ pub struct ExecuteWithdrawalHint {
     /// Feeds.
     pub feeds: TokensWithFeed,
     swap: SwapParams,
+    should_unwrap_native_token: bool,
 }
 
 impl ExecuteWithdrawalHint {
@@ -448,6 +465,7 @@ impl ExecuteWithdrawalHint {
             final_short_token: tokens.final_short_token(),
             feeds: swap.to_feeds(map)?,
             swap: *swap,
+            should_unwrap_native_token: withdrawal.header().should_unwrap_native_token(),
         })
     }
 }
@@ -624,6 +642,7 @@ where
                     market_token_account: hint.market_token_escrow,
                     final_long_token_account: hint.final_long_token_escrow,
                     final_short_token_account: hint.final_short_token_escrow,
+                    should_unwrap_native_token: hint.should_unwrap_native_token,
                 })
                 .reason("executed")
                 .build()

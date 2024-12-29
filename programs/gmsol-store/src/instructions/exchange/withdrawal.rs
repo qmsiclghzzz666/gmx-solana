@@ -9,9 +9,14 @@ use crate::{
     events::WithdrawalCreated,
     ops::withdrawal::{CreateWithdrawalOperation, CreateWithdrawalParams},
     states::{
-        common::action::ActionExt, withdrawal::Withdrawal, Market, NonceBytes, RoleKey, Seed, Store,
+        common::action::{Action, ActionExt},
+        withdrawal::Withdrawal,
+        Market, NonceBytes, RoleKey, Seed, Store,
     },
-    utils::{internal, token::is_associated_token_account},
+    utils::{
+        internal,
+        token::{is_associated_token_account, is_associated_token_account_or_owner},
+    },
     CoreError,
 };
 
@@ -78,18 +83,6 @@ pub struct CreateWithdrawal<'info> {
         token::mint = market_token,
     )]
     pub market_token_source: Box<Account<'info, TokenAccount>>,
-    /// The ATA for receiving the final long tokens.
-    #[account(
-        associated_token::mint = final_long_token,
-        associated_token::authority = owner,
-    )]
-    pub final_long_token_ata: Box<Account<'info, TokenAccount>>,
-    /// The ATA for receiving the final short tokens.
-    #[account(
-        associated_token::mint = final_short_token,
-        associated_token::authority = owner,
-    )]
-    pub final_short_token_ata: Box<Account<'info, TokenAccount>>,
     /// The system program.
     pub system_program: Program<'info, System>,
     /// The token program.
@@ -237,14 +230,14 @@ pub struct CloseWithdrawal<'info> {
     /// CHECK: should be checked during the execution
     #[account(
         mut,
-        constraint = is_associated_token_account(final_long_token_ata.key, owner.key, &final_long_token.key()) @ CoreError::NotAnATA,
+        constraint = is_associated_token_account_or_owner(final_long_token_ata.key, owner.key, &final_long_token.key()) @ CoreError::NotAnATA,
     )]
     pub final_long_token_ata: UncheckedAccount<'info>,
     /// The ATA for final short token of owner.
     /// CHECK: should be checked during the execution
     #[account(
         mut,
-        constraint = is_associated_token_account(final_short_token_ata.key, owner.key, &final_short_token.key()) @ CoreError::NotAnATA,
+        constraint = is_associated_token_account_or_owner(final_short_token_ata.key, owner.key, &final_short_token.key()) @ CoreError::NotAnATA,
     )]
     pub final_short_token_ata: UncheckedAccount<'info>,
     /// The system program.
@@ -285,6 +278,7 @@ impl<'info> internal::Close<'info, Withdrawal> for CloseWithdrawal<'info> {
         let seeds = signer.as_seeds();
 
         let builder = TransferAllFromEscrowToATA::builder()
+            .action(self.withdrawal.to_account_info())
             .system_program(self.system_program.to_account_info())
             .token_program(self.token_program.to_account_info())
             .associated_token_program(self.associated_token_program.to_account_info())
@@ -293,7 +287,13 @@ impl<'info> internal::Close<'info, Withdrawal> for CloseWithdrawal<'info> {
             .escrow_authority(self.withdrawal.to_account_info())
             .seeds(&seeds)
             .init_if_needed(init_if_needed)
-            .rent_receiver(self.rent_receiver());
+            .rent_receiver(self.rent_receiver())
+            .should_unwrap_native(
+                self.withdrawal
+                    .load()?
+                    .header()
+                    .should_unwrap_native_token(),
+            );
 
         // Transfer market tokens.
         if !builder
@@ -303,7 +303,7 @@ impl<'info> internal::Close<'info, Withdrawal> for CloseWithdrawal<'info> {
             .ata(self.market_token_ata.to_account_info())
             .escrow(self.market_token_escrow.to_account_info())
             .build()
-            .execute()?
+            .unchecked_execute()?
         {
             return Ok(false);
         }
@@ -316,7 +316,7 @@ impl<'info> internal::Close<'info, Withdrawal> for CloseWithdrawal<'info> {
             .ata(self.final_long_token_ata.to_account_info())
             .escrow(self.final_long_token_escrow.to_account_info())
             .build()
-            .execute()?
+            .unchecked_execute()?
         {
             return Ok(false);
         }
@@ -330,7 +330,7 @@ impl<'info> internal::Close<'info, Withdrawal> for CloseWithdrawal<'info> {
                 .ata(self.final_short_token_ata.to_account_info())
                 .escrow(self.final_short_token_escrow.to_account_info())
                 .build()
-                .execute()?
+                .unchecked_execute()?
             {
                 return Ok(false);
             }

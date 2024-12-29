@@ -8,8 +8,14 @@ use gmsol_utils::InitSpace;
 use crate::{
     events::DepositCreated,
     ops::deposit::{CreateDepositOperation, CreateDepositParams},
-    states::{common::action::ActionExt, Deposit, Market, NonceBytes, RoleKey, Seed, Store},
-    utils::{internal, token::is_associated_token_account},
+    states::{
+        common::action::{Action, ActionExt},
+        Deposit, Market, NonceBytes, RoleKey, Seed, Store,
+    },
+    utils::{
+        internal,
+        token::{is_associated_token_account, is_associated_token_account_or_owner},
+    },
     CoreError,
 };
 
@@ -305,14 +311,14 @@ pub struct CloseDeposit<'info> {
     /// CHECK: should be checked during the execution
     #[account(
         mut,
-        constraint = is_associated_token_account(initial_long_token_ata.key, owner.key, &initial_long_token.as_ref().expect("must provided").key()) @ CoreError::NotAnATA,
+        constraint = is_associated_token_account_or_owner(initial_long_token_ata.key, owner.key, &initial_long_token.as_ref().expect("must provided").key()) @ CoreError::NotAnATA,
     )]
     pub initial_long_token_ata: Option<UncheckedAccount<'info>>,
     /// The ATA for initial short token of owner.
     /// CHECK: should be checked during the execution
     #[account(
         mut,
-        constraint = is_associated_token_account(initial_short_token_ata.key, owner.key, &initial_short_token.as_ref().expect("must provided").key()) @ CoreError::NotAnATA,
+        constraint = is_associated_token_account_or_owner(initial_short_token_ata.key, owner.key, &initial_short_token.as_ref().expect("must provided").key()) @ CoreError::NotAnATA,
     )]
     pub initial_short_token_ata: Option<UncheckedAccount<'info>>,
     /// The system program.
@@ -354,6 +360,7 @@ impl<'info> internal::Close<'info, Deposit> for CloseDeposit<'info> {
         let seeds = signer.as_seeds();
 
         let builder = TransferAllFromEscrowToATA::builder()
+            .action(self.deposit.to_account_info())
             .system_program(self.system_program.to_account_info())
             .token_program(self.token_program.to_account_info())
             .associated_token_program(self.associated_token_program.to_account_info())
@@ -362,7 +369,8 @@ impl<'info> internal::Close<'info, Deposit> for CloseDeposit<'info> {
             .escrow_authority(self.deposit.to_account_info())
             .seeds(&seeds)
             .init_if_needed(init_if_needed)
-            .rent_receiver(self.rent_receiver());
+            .rent_receiver(self.rent_receiver())
+            .should_unwrap_native(self.deposit.load()?.header().should_unwrap_native_token());
 
         // Transfer market tokens.
         if !builder
@@ -372,7 +380,7 @@ impl<'info> internal::Close<'info, Deposit> for CloseDeposit<'info> {
             .ata(self.market_token_ata.to_account_info())
             .escrow(self.market_token_escrow.to_account_info())
             .build()
-            .execute()?
+            .unchecked_execute()?
         {
             return Ok(false);
         }
@@ -405,7 +413,7 @@ impl<'info> internal::Close<'info, Deposit> for CloseDeposit<'info> {
                 .ata(ata.to_account_info())
                 .escrow(escrow.to_account_info())
                 .build()
-                .execute()?
+                .unchecked_execute()?
             {
                 return Ok(false);
             }
@@ -426,7 +434,7 @@ impl<'info> internal::Close<'info, Deposit> for CloseDeposit<'info> {
                 .ata(ata.to_account_info())
                 .escrow(escrow.to_account_info())
                 .build()
-                .execute()?
+                .unchecked_execute()?
             {
                 return Ok(false);
             }

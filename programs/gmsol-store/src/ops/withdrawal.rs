@@ -29,6 +29,8 @@ pub struct CreateWithdrawalParams {
     pub min_long_token_amount: u64,
     /// The minimum acceptable final short token amount to receive.
     pub min_short_token_amount: u64,
+    /// Whether to unwrap native token when sending funds back.
+    pub should_unwrap_native_token: bool,
 }
 
 impl ActionParams for CreateWithdrawalParams {
@@ -86,6 +88,7 @@ impl<'a, 'info> CreateWithdrawalOperation<'a, 'info> {
             *nonce,
             bump,
             params.execution_lamports,
+            params.should_unwrap_native_token,
         )?;
 
         // Initialize tokens.

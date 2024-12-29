@@ -27,6 +27,8 @@ pub struct CreateDepositParams {
     pub initial_short_token_amount: u64,
     /// The minimum acceptable amount of market tokens to receive.
     pub min_market_token_amount: u64,
+    /// Whether to unwrap native token when sending funds back.
+    pub should_unwrap_native_token: bool,
 }
 
 impl ActionParams for CreateDepositParams {
@@ -85,6 +87,7 @@ impl<'a, 'info> CreateDepositOperation<'a, 'info> {
             *nonce,
             bump,
             params.execution_lamports,
+            params.should_unwrap_native_token,
         )?;
 
         let (long_token, short_token) = {

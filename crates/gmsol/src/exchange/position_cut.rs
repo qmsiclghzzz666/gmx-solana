@@ -384,6 +384,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> PositionCutBuilder<'a, C> {
                     user: hint.user,
                     referrer: hint.referrer,
                     rent_receiver: if is_full_close { owner } else { payer },
+                    should_unwrap_native_token: true,
                 })
                 .reason("position cut")
                 .build()

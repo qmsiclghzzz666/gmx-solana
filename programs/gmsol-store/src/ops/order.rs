@@ -58,6 +58,8 @@ pub struct CreateOrderParams {
     pub trigger_price: Option<u128>,
     /// Acceptable price.
     pub acceptable_price: Option<u128>,
+    /// Whether to unwrap native token when sending funds back.
+    pub should_unwrap_native_token: bool,
 }
 
 impl ActionParams for CreateOrderParams {
@@ -173,6 +175,7 @@ impl<'a, 'info> CreateOrderOperation<'a, 'info> {
                 *self.nonce,
                 self.bump,
                 self.params.execution_lamports,
+                self.params.should_unwrap_native_token,
             )?;
 
             if let Some(creator) = self.creator.as_ref() {
@@ -1599,6 +1602,7 @@ pub struct PositionCutOperation<'a, 'info> {
     token_program: AccountInfo<'info>,
     system_program: AccountInfo<'info>,
     refund: u64,
+    should_unwrap_native_token: bool,
 }
 
 /// Position Cut Kind.
@@ -1683,6 +1687,7 @@ impl<'a, 'info> PositionCutOperation<'a, 'info> {
             min_output: None,
             trigger_price: None,
             acceptable_price: None,
+            should_unwrap_native_token: self.should_unwrap_native_token,
         };
         let output_token_account = if is_collateral_long {
             self.long_token_account

@@ -7,7 +7,19 @@ use anchor_spl::{
 };
 use typed_builder::TypedBuilder;
 
-/// Check if the given address is an ATA address.
+use crate::CoreError;
+
+/// Check if the given `pubkey` is an ATA address or
+/// the `owner` itself.
+pub fn is_associated_token_account_or_owner(
+    pubkey: &Pubkey,
+    owner: &Pubkey,
+    mint: &Pubkey,
+) -> bool {
+    is_associated_token_account(pubkey, owner, mint) || pubkey == owner
+}
+
+/// Check if the given `pubkey` is an ATA address.
 pub fn is_associated_token_account(pubkey: &Pubkey, owner: &Pubkey, mint: &Pubkey) -> bool {
     let expected = get_associated_token_address(owner, mint);
     expected == *pubkey
@@ -88,6 +100,7 @@ pub fn validate_associated_token_account<'info>(
 
 #[derive(TypedBuilder)]
 pub struct TransferAllFromEscrowToATA<'a, 'info> {
+    action: AccountInfo<'info>,
     system_program: AccountInfo<'info>,
     token_program: AccountInfo<'info>,
     associated_token_program: AccountInfo<'info>,
@@ -105,6 +118,7 @@ pub struct TransferAllFromEscrowToATA<'a, 'info> {
     #[builder(default)]
     keep_escrow: bool,
     rent_receiver: AccountInfo<'info>,
+    should_unwrap_native: bool,
 }
 
 impl<'a, 'info> TransferAllFromEscrowToATA<'a, 'info> {
@@ -112,7 +126,14 @@ impl<'a, 'info> TransferAllFromEscrowToATA<'a, 'info> {
     /// the transfer is complete if `keep_escrow` is `false`, which is the default.
     ///
     /// Return `false` if the transfer is required but the ATA is not initilaized.
-    pub(crate) fn execute(self) -> Result<bool> {
+    ///
+    /// # CHECK
+    /// - The `action` account must be owned by the store program and mutable.
+    pub(crate) fn unchecked_execute(self) -> Result<bool> {
+        if self.unwrap_native_if_needed()? {
+            return Ok(true);
+        }
+
         let Self {
             system_program,
             token_program,
@@ -129,9 +150,11 @@ impl<'a, 'info> TransferAllFromEscrowToATA<'a, 'info> {
             skip_owner_check,
             keep_escrow,
             rent_receiver,
+            ..
         } = self;
 
         let amount = anchor_spl::token::accessor::amount(&escrow)?;
+
         if amount != 0 {
             if must_be_uninitialized(&ata) {
                 if !init_if_needed {
@@ -175,6 +198,7 @@ impl<'a, 'info> TransferAllFromEscrowToATA<'a, 'info> {
                 decimals,
             )?;
         }
+
         if !keep_escrow {
             close_account(
                 CpiContext::new(
@@ -189,5 +213,70 @@ impl<'a, 'info> TransferAllFromEscrowToATA<'a, 'info> {
             )?;
         }
         Ok(true)
+    }
+
+    /// Unwrap native if needed.
+    /// Returns `true` if unwrapped.
+    fn unwrap_native_if_needed(&self) -> Result<bool> {
+        let Self {
+            action,
+            token_program,
+            owner,
+            ata,
+            escrow,
+            escrow_authority,
+            seeds,
+            keep_escrow,
+            rent_receiver,
+            should_unwrap_native,
+            mint,
+            ..
+        } = self;
+
+        let is_native_token = *mint.key == anchor_spl::token::spl_token::native_mint::ID;
+
+        let amount = anchor_spl::token::accessor::amount(escrow)?;
+
+        // Unwrap native.
+        if is_native_token && *should_unwrap_native && amount != 0 {
+            // The escrow will be closed after unwrap.
+            require!(!keep_escrow, CoreError::InvalidArgument);
+
+            require_eq!(ata.key, owner.key, CoreError::InvalidArgument);
+            require_eq!(
+                anchor_spl::token::accessor::mint(escrow)?,
+                anchor_spl::token::spl_token::native_mint::ID
+            );
+
+            let balance = escrow.lamports();
+            let rent = balance
+                .checked_sub(amount)
+                .ok_or_else(|| error!(CoreError::Internal))?;
+
+            // We use the `action` account as an intermediary to distribute funds.
+            close_account(
+                CpiContext::new(
+                    token_program.clone(),
+                    CloseAccount {
+                        account: escrow.to_account_info(),
+                        destination: action.clone(),
+                        authority: escrow_authority.clone(),
+                    },
+                )
+                .with_signer(&[seeds]),
+            )?;
+
+            // Refund rent to the `rent_receiver`.
+            action.sub_lamports(rent)?;
+            rent_receiver.add_lamports(rent)?;
+
+            // Refund amount to the `owner`.
+            action.sub_lamports(amount)?;
+            owner.add_lamports(amount)?;
+
+            Ok(true)
+        } else {
+            Ok(false)
+        }
     }
 }

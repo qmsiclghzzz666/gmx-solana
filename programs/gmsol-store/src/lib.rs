@@ -1922,9 +1922,6 @@ pub mod gmsol_store {
     ///   - The [`long_token_escrow`](CreateOrder::long_token_escrow) or
     ///     [`short_token_escrow`](CreateOrder::short_token_escrow) are missing, not valid
     ///     escrow accounts for `long_token` or `short_token` respectively, or not owned by the `order`.
-    ///   - The [`long_token_ata`](CreateOrder::long_token_ata) or
-    ///     [`short_token_ata`](CreateOrder::short_token_ata) are missing, or not valid ATAs
-    ///     owned by the `owner`.
     /// - For increase/swap orders:
     ///   - The [`initial_collateral_token`](CreateOrder::initial_collateral_token) is missing
     ///     or invalid.
@@ -1937,8 +1934,6 @@ pub mod gmsol_store {
     ///   - The [`final_output_token`](CreateOrder::final_output_token) is invalid.
     ///   - The [`final_output_token_escrow`](CreateOrder::final_output_token_escrow) is missing,
     ///     not a valid escrow account for `final_output_token`, or not owned by the `order`.
-    ///   - The [`final_output_token_ata`](CreateOrder::final_output_token_ata) is missing or
-    ///     not a valid ATA owned by the `owner`.
     /// - The feature for creating this kind of order is not enabled.
     /// - The remaining market accounts do not match the swap parameters, not all enabled or owned
     ///   by the `store`.
@@ -2234,6 +2229,7 @@ pub mod gmsol_store {
             recent_timestamp,
             PositionCutKind::Liquidate,
             execution_fee,
+            true,
         )
     }
 
@@ -2322,6 +2318,7 @@ pub mod gmsol_store {
             recent_timestamp,
             PositionCutKind::AutoDeleverage(size_delta_in_usd),
             execution_fee,
+            true,
         )
     }
 

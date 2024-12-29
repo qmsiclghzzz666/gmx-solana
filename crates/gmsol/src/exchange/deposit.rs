@@ -29,7 +29,7 @@ use crate::{
     },
 };
 
-use super::generate_nonce;
+use super::{generate_nonce, get_ata_or_owner};
 
 #[cfg(feature = "pyth-pull-oracle")]
 use crate::pyth::pull_oracle::Prices;
@@ -54,6 +54,7 @@ pub struct CreateDepositBuilder<'a, C> {
     min_market_token: u64,
     owner: Option<Pubkey>,
     nonce: Option<NonceBytes>,
+    should_unwrap_native_token: bool,
 }
 
 impl<'a, C> CreateDepositBuilder<'a, C> {
@@ -87,6 +88,13 @@ impl<'a, C> CreateDepositBuilder<'a, C> {
         self.owner = owner;
         self
     }
+
+    /// Set whether to unwrap native token.
+    /// Defaults to should unwrap.
+    pub fn should_unwrap_native_token(&mut self, should_unwrap: bool) -> &mut Self {
+        self.should_unwrap_native_token = should_unwrap;
+        self
+    }
 }
 
 impl<'a, C, S> CreateDepositBuilder<'a, C>
@@ -111,6 +119,7 @@ where
             min_market_token: 0,
             owner: None,
             nonce: None,
+            should_unwrap_native_token: true,
         }
     }
 
@@ -214,6 +223,7 @@ where
             initial_long_token_amount,
             initial_short_token_amount,
             min_market_token,
+            should_unwrap_native_token,
             ..
         } = self;
         let nonce = nonce.unwrap_or_else(generate_nonce);
@@ -292,6 +302,7 @@ where
                     initial_long_token_amount: *initial_long_token_amount,
                     initial_short_token_amount: *initial_short_token_amount,
                     min_market_token_amount: *min_market_token,
+                    should_unwrap_native_token: *should_unwrap_native_token,
                 },
             })
             .accounts(
@@ -336,6 +347,7 @@ pub struct CloseDepositHint {
     initial_short_token: Option<Pubkey>,
     initial_long_token_account: Option<Pubkey>,
     initial_short_token_account: Option<Pubkey>,
+    should_unwrap_native_token: bool,
 }
 
 impl<'a> CloseDepositHint {
@@ -349,6 +361,7 @@ impl<'a> CloseDepositHint {
             initial_short_token: deposit.tokens().initial_short_token.token(),
             initial_long_token_account: deposit.tokens().initial_long_token.account(),
             initial_short_token_account: deposit.tokens().initial_short_token.account(),
+            should_unwrap_native_token: deposit.header().should_unwrap_native_token(),
         }
     }
 }
@@ -407,14 +420,15 @@ where
         } = self;
         let owner = hint.owner;
         let market_token_ata = get_associated_token_address(&owner, &hint.market_token);
+        let should_unwrap_native_token = hint.should_unwrap_native_token;
         let initial_long_token_ata = hint
             .initial_long_token
             .as_ref()
-            .map(|mint| get_associated_token_address(&owner, mint));
+            .map(|mint| get_ata_or_owner(&owner, mint, should_unwrap_native_token));
         let initial_short_token_ata = hint
             .initial_short_token
             .as_ref()
-            .map(|mint| get_associated_token_address(&owner, mint));
+            .map(|mint| get_ata_or_owner(&owner, mint, should_unwrap_native_token));
         Ok(client
             .store_rpc()
             .accounts(crate::utils::fix_optional_account_metas(
@@ -474,6 +488,7 @@ pub struct ExecuteDepositHint {
     initial_short_token_escrow: Option<Pubkey>,
     initial_long_token: Option<Pubkey>,
     initial_short_token: Option<Pubkey>,
+    should_unwrap_native_token: bool,
 }
 
 impl ExecuteDepositHint {
@@ -489,6 +504,7 @@ impl ExecuteDepositHint {
             initial_short_token: deposit.tokens().initial_short_token.token(),
             initial_long_token_escrow: deposit.tokens().initial_long_token.account(),
             initial_short_token_escrow: deposit.tokens().initial_short_token.account(),
+            should_unwrap_native_token: deposit.header().should_unwrap_native_token(),
         })
     }
 }
@@ -687,6 +703,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> MakeTransactionBuilder<'a, C>
                     initial_short_token: hint.initial_short_token,
                     initial_long_token_account: hint.initial_long_token_escrow,
                     initial_short_token_account: hint.initial_short_token_escrow,
+                    should_unwrap_native_token: hint.should_unwrap_native_token,
                 })
                 .reason("executed")
                 .build()

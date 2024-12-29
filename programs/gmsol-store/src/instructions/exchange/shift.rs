@@ -7,7 +7,10 @@ use gmsol_utils::InitSpace;
 
 use crate::{
     ops::shift::{CreateShiftOperation, CreateShiftParams},
-    states::{common::action::ActionExt, Market, NonceBytes, RoleKey, Seed, Shift, Store},
+    states::{
+        common::action::{Action, ActionExt},
+        Market, NonceBytes, RoleKey, Seed, Shift, Store,
+    },
     utils::{internal, token::is_associated_token_account},
     CoreError,
 };
@@ -240,6 +243,7 @@ impl<'info> internal::Close<'info, Shift> for CloseShift<'info> {
         let seeds = signer.as_seeds();
 
         let builder = TransferAllFromEscrowToATA::builder()
+            .action(self.shift.to_account_info())
             .system_program(self.system_program.to_account_info())
             .token_program(self.token_program.to_account_info())
             .associated_token_program(self.associated_token_program.to_account_info())
@@ -248,7 +252,8 @@ impl<'info> internal::Close<'info, Shift> for CloseShift<'info> {
             .escrow_authority(self.shift.to_account_info())
             .seeds(&seeds)
             .init_if_needed(init_if_needed)
-            .rent_receiver(self.rent_receiver());
+            .rent_receiver(self.rent_receiver())
+            .should_unwrap_native(self.shift.load()?.header().should_unwrap_native_token());
 
         // Transfer from market tokens.
         if !builder
@@ -258,7 +263,7 @@ impl<'info> internal::Close<'info, Shift> for CloseShift<'info> {
             .ata(self.from_market_token_ata.to_account_info())
             .escrow(self.from_market_token_escrow.to_account_info())
             .build()
-            .execute()?
+            .unchecked_execute()?
         {
             return Ok(false);
         }
@@ -271,7 +276,7 @@ impl<'info> internal::Close<'info, Shift> for CloseShift<'info> {
             .ata(self.to_market_token_ata.to_account_info())
             .escrow(self.to_market_token_escrow.to_account_info())
             .build()
-            .execute()?
+            .unchecked_execute()?
         {
             return Ok(false);
         }

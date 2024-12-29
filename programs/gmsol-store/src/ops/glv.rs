@@ -43,6 +43,8 @@ pub struct CreateGlvDepositParams {
     pub min_market_token_amount: u64,
     /// Minimum acceptable amount of glv tokens to receive.
     pub min_glv_token_amount: u64,
+    /// Whether to unwrap native token when sending funds back.
+    pub should_unwrap_native_token: bool,
 }
 
 impl ActionParams for CreateGlvDepositParams {
@@ -112,6 +114,7 @@ impl<'a, 'info> CreateGlvDepositOperation<'a, 'info> {
             *self.nonce,
             self.bump,
             self.params.execution_lamports,
+            self.params.should_unwrap_native_token,
         )?;
 
         // Init tokens and token accounts.
@@ -522,6 +525,8 @@ pub struct CreateGlvWithdrawalParams {
     pub min_final_long_token_amount: u64,
     /// Minimum acceptable final short token to receive.
     pub min_final_short_token_amount: u64,
+    /// Whether to unwrap native token when sending funds back.
+    pub should_unwrap_native_token: bool,
 }
 
 impl ActionParams for CreateGlvWithdrawalParams {
@@ -576,6 +581,7 @@ impl<'a, 'info> CreateGlvWithdrawalOperation<'a, 'info> {
             *self.nonce,
             self.bump,
             self.params.execution_lamports,
+            self.params.should_unwrap_native_token,
         )?;
 
         // Init tokens and token accounts.

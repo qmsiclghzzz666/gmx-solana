@@ -19,7 +19,7 @@ use gmsol_store::{
 };
 
 use crate::{
-    exchange::generate_nonce,
+    exchange::{generate_nonce, get_ata_or_owner_with_program_id},
     store::{token::TokenAccountOps, utils::FeedsParser},
     utils::{fix_optional_account_metas, ComputeBudget, RpcBuilder, ZeroCopy},
 };
@@ -45,6 +45,7 @@ pub struct CreateGlvWithdrawalBuilder<'a, C> {
     nonce: Option<NonceBytes>,
     glv_token_source: Option<Pubkey>,
     hint: Option<CreateGlvWithdrawalHint>,
+    should_unwrap_native_token: bool,
 }
 
 /// Hint for [`CreateGlvWithdrawalBuilder`]
@@ -89,6 +90,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateGlvWithdrawalBuilder<'a, 
             nonce: None,
             glv_token_source: None,
             hint: None,
+            should_unwrap_native_token: true,
         }
     }
 
@@ -129,6 +131,13 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateGlvWithdrawalBuilder<'a, 
     /// Set hint.
     pub fn hint(&mut self, hint: CreateGlvWithdrawalHint) -> &mut Self {
         self.hint = Some(hint);
+        self
+    }
+
+    /// Set whether to unwrap native token.
+    /// Defaults to should unwrap.
+    pub fn should_unwrap_native_token(&mut self, should_unwrap: bool) -> &mut Self {
+        self.should_unwrap_native_token = should_unwrap;
         self
     }
 
@@ -277,6 +286,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateGlvWithdrawalBuilder<'a, 
                     glv_token_amount: self.glv_token_amount,
                     min_final_long_token_amount: self.min_final_long_token_amount,
                     min_final_short_token_amount: self.min_final_short_token_amount,
+                    should_unwrap_native_token: self.should_unwrap_native_token,
                 },
             })
             .accounts(
@@ -316,6 +326,7 @@ pub struct CloseGlvWithdrawalHint {
     final_long_token_escrow: Pubkey,
     final_short_token_escrow: Pubkey,
     glv_token_escrow: Pubkey,
+    should_unwrap_native_token: bool,
 }
 
 impl CloseGlvWithdrawalHint {
@@ -332,6 +343,7 @@ impl CloseGlvWithdrawalHint {
             final_long_token_escrow: glv_withdrawal.tokens().final_long_token_account(),
             final_short_token_escrow: glv_withdrawal.tokens().final_short_token_account(),
             glv_token_escrow: glv_withdrawal.tokens().glv_token_account(),
+            should_unwrap_native_token: glv_withdrawal.header().should_unwrap_native_token(),
         }
     }
 }
@@ -394,14 +406,16 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CloseGlvWithdrawalBuilder<'a, C
             &hint.glv_token,
             &glv_token_program_id,
         );
-        let final_long_token_ata = get_associated_token_address_with_program_id(
+        let final_long_token_ata = get_ata_or_owner_with_program_id(
             &hint.owner,
             &hint.final_long_token,
+            hint.should_unwrap_native_token,
             &token_program_id,
         );
-        let final_short_token_ata = get_associated_token_address_with_program_id(
+        let final_short_token_ata = get_ata_or_owner_with_program_id(
             &hint.owner,
             &hint.final_short_token,
+            hint.should_unwrap_native_token,
             &token_program_id,
         );
 

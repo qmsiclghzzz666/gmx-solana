@@ -22,7 +22,7 @@ use gmsol_store::{
 };
 
 use crate::{
-    exchange::generate_nonce,
+    exchange::{generate_nonce, get_ata_or_owner_with_program_id},
     store::{token::TokenAccountOps, utils::FeedsParser},
     utils::{fix_optional_account_metas, ComputeBudget, RpcBuilder, ZeroCopy},
 };
@@ -53,6 +53,7 @@ pub struct CreateGlvDepositBuilder<'a, C> {
     initial_long_token_source: Option<Pubkey>,
     initial_short_token_source: Option<Pubkey>,
     hint: Option<CreateGlvDepositHint>,
+    should_unwrap_native_token: bool,
 }
 
 /// Hint for [`CreateGlvDepositBuilder`].
@@ -101,6 +102,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateGlvDepositBuilder<'a, C> 
             initial_long_token_source: None,
             initial_short_token_source: None,
             hint: None,
+            should_unwrap_native_token: true,
         }
     }
 
@@ -156,6 +158,13 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateGlvDepositBuilder<'a, C> 
         self.initial_short_token = token.cloned();
         self.initial_short_token_amount = amount;
         self.initial_short_token_source = token_account.copied();
+        self
+    }
+
+    /// Set whether to unwrap native token.
+    /// Defaults to should unwrap.
+    pub fn should_unwrap_native_token(&mut self, should_unwrap: bool) -> &mut Self {
+        self.should_unwrap_native_token = should_unwrap;
         self
     }
 
@@ -346,6 +355,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CreateGlvDepositBuilder<'a, C> 
                     market_token_amount: self.market_token_amount,
                     min_market_token_amount: self.min_market_token_amount,
                     min_glv_token_amount: self.min_glv_token_amount,
+                    should_unwrap_native_token: self.should_unwrap_native_token,
                 },
             })
             .accounts(
@@ -385,6 +395,7 @@ pub struct CloseGlvDepositHint {
     initial_long_token_escrow: Option<Pubkey>,
     initial_short_token_escrow: Option<Pubkey>,
     glv_token_escrow: Pubkey,
+    should_unwrap_native_token: bool,
 }
 
 impl CloseGlvDepositHint {
@@ -401,6 +412,7 @@ impl CloseGlvDepositHint {
             initial_long_token_escrow: glv_deposit.tokens().initial_long_token.account(),
             initial_short_token_escrow: glv_deposit.tokens().initial_short_token.account(),
             glv_token_escrow: glv_deposit.tokens().glv_token_account(),
+            should_unwrap_native_token: glv_deposit.header().should_unwrap_native_token(),
         }
     }
 }
@@ -464,10 +476,20 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CloseGlvDepositBuilder<'a, C> {
             &glv_token_program_id,
         );
         let initial_long_token_ata = hint.initial_long_token.as_ref().map(|token| {
-            get_associated_token_address_with_program_id(&hint.owner, token, &token_program_id)
+            get_ata_or_owner_with_program_id(
+                &hint.owner,
+                token,
+                hint.should_unwrap_native_token,
+                &token_program_id,
+            )
         });
         let initial_short_token_ata = hint.initial_short_token.as_ref().map(|token| {
-            get_associated_token_address_with_program_id(&hint.owner, token, &token_program_id)
+            get_ata_or_owner_with_program_id(
+                &hint.owner,
+                token,
+                hint.should_unwrap_native_token,
+                &token_program_id,
+            )
         });
 
         let rpc = self
@@ -540,6 +562,7 @@ pub struct ExecuteGlvDepositHint {
     glv_token_escrow: Pubkey,
     swap: SwapParams,
     feeds: TokensWithFeed,
+    should_unwrap_native_token: bool,
 }
 
 impl ExecuteGlvDepositHint {
@@ -571,6 +594,7 @@ impl ExecuteGlvDepositHint {
             glv_token_escrow: glv_deposit.tokens().glv_token_account(),
             swap: *glv_deposit.swap(),
             feeds: collector.to_feeds(token_map)?,
+            should_unwrap_native_token: glv_deposit.header().should_unwrap_native_token(),
         })
     }
 }
@@ -789,6 +813,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteGlvDepositBuilder<'a, C>
                     initial_long_token_escrow: hint.initial_long_token_escrow,
                     initial_short_token_escrow: hint.initial_short_token_escrow,
                     glv_token_escrow: hint.glv_token_escrow,
+                    should_unwrap_native_token: hint.should_unwrap_native_token,
                 })
                 .build()
                 .await?;

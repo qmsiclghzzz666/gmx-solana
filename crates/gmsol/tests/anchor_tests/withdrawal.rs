@@ -3,7 +3,7 @@ use gmsol::exchange::ExchangeOps;
 use crate::anchor_tests::setup::{current_deployment, Deployment};
 
 #[tokio::test]
-async fn single_token_pool_withdarwal() -> eyre::Result<()> {
+async fn single_token_pool_withdrawal() -> eyre::Result<()> {
     let deployment = current_deployment().await?;
     let _guard = deployment.use_accounts().await?;
     let span = tracing::info_span!("single_token_pool_withdrawal");

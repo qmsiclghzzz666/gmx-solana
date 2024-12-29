@@ -17,14 +17,17 @@ use crate::{
         market::MarketTransferOutOperation,
     },
     states::{
-        common::action::ActionExt,
+        common::action::{Action, ActionExt},
         glv::{GlvWithdrawal, SplitAccountsForGlv},
         Chainlink, Glv, Market, NonceBytes, Oracle, RoleKey, Seed, Store, TokenMapHeader,
         TokenMapLoader,
     },
     utils::{
         internal,
-        token::{is_associated_token_account, is_associated_token_account_with_program_id},
+        token::{
+            is_associated_token_account, is_associated_token_account_or_owner,
+            is_associated_token_account_with_program_id,
+        },
     },
     CoreError,
 };
@@ -263,14 +266,14 @@ pub struct CloseGlvWithdrawal<'info> {
     /// CHECK: should be checked during the execution
     #[account(
         mut,
-        constraint = is_associated_token_account(final_long_token_ata.key, owner.key, &final_long_token.as_ref().key()) @ CoreError::NotAnATA,
+        constraint = is_associated_token_account_or_owner(final_long_token_ata.key, owner.key, &final_long_token.as_ref().key()) @ CoreError::NotAnATA,
     )]
     pub final_long_token_ata: UncheckedAccount<'info>,
     /// The ATA for final short token of owner.
     /// CHECK: should be checked during the execution
     #[account(
         mut,
-        constraint = is_associated_token_account(final_short_token_ata.key, owner.key, &final_short_token.as_ref().key()) @ CoreError::NotAnATA,
+        constraint = is_associated_token_account_or_owner(final_short_token_ata.key, owner.key, &final_short_token.as_ref().key()) @ CoreError::NotAnATA,
     )]
     pub final_short_token_ata: UncheckedAccount<'info>,
     /// The escrow account for GLV tokens.
@@ -319,6 +322,7 @@ impl<'info> internal::Close<'info, GlvWithdrawal> for CloseGlvWithdrawal<'info> 
         let seeds = signer.as_seeds();
 
         let builder = TransferAllFromEscrowToATA::builder()
+            .action(self.glv_withdrawal.to_account_info())
             .system_program(self.system_program.to_account_info())
             .associated_token_program(self.associated_token_program.to_account_info())
             .payer(self.executor.to_account_info())
@@ -326,7 +330,13 @@ impl<'info> internal::Close<'info, GlvWithdrawal> for CloseGlvWithdrawal<'info> 
             .escrow_authority(self.glv_withdrawal.to_account_info())
             .seeds(&seeds)
             .init_if_needed(init_if_needed)
-            .rent_receiver(self.rent_receiver());
+            .rent_receiver(self.rent_receiver())
+            .should_unwrap_native(
+                self.glv_withdrawal
+                    .load()?
+                    .header()
+                    .should_unwrap_native_token(),
+            );
 
         // Transfer market tokens.
         if !builder
@@ -337,7 +347,7 @@ impl<'info> internal::Close<'info, GlvWithdrawal> for CloseGlvWithdrawal<'info> 
             .ata(self.market_token_ata.to_account_info())
             .escrow(self.market_token_escrow.to_account_info())
             .build()
-            .execute()?
+            .unchecked_execute()?
         {
             return Ok(false);
         }
@@ -351,7 +361,7 @@ impl<'info> internal::Close<'info, GlvWithdrawal> for CloseGlvWithdrawal<'info> 
             .ata(self.glv_token_ata.to_account_info())
             .escrow(self.glv_token_escrow.to_account_info())
             .build()
-            .execute()?
+            .unchecked_execute()?
         {
             return Ok(false);
         }
@@ -379,7 +389,7 @@ impl<'info> internal::Close<'info, GlvWithdrawal> for CloseGlvWithdrawal<'info> 
                 .ata(ata.to_account_info())
                 .escrow(escrow.to_account_info())
                 .build()
-                .execute()?
+                .unchecked_execute()?
             {
                 return Ok(false);
             }
@@ -397,7 +407,7 @@ impl<'info> internal::Close<'info, GlvWithdrawal> for CloseGlvWithdrawal<'info> 
                 .ata(ata.to_account_info())
                 .escrow(escrow.to_account_info())
                 .build()
-                .execute()?
+                .unchecked_execute()?
             {
                 return Ok(false);
             }

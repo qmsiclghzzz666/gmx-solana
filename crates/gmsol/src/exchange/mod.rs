@@ -671,15 +671,6 @@ where
     }
 }
 
-pub(crate) fn generate_nonce() -> NonceBytes {
-    rand::thread_rng()
-        .sample_iter(Standard)
-        .take(32)
-        .collect::<Vec<u8>>()
-        .try_into()
-        .unwrap()
-}
-
 impl<C: Deref<Target = impl Signer> + Clone> crate::Client<C> {
     /// Create first deposit.
     pub fn create_first_deposit(
@@ -690,5 +681,45 @@ impl<C: Deref<Target = impl Signer> + Clone> crate::Client<C> {
         let mut builder = self.create_deposit(store, market_token);
         builder.owner(Some(self.find_first_deposit_owner_address()));
         builder
+    }
+}
+
+pub(crate) fn generate_nonce() -> NonceBytes {
+    rand::thread_rng()
+        .sample_iter(Standard)
+        .take(32)
+        .collect::<Vec<u8>>()
+        .try_into()
+        .unwrap()
+}
+
+pub(crate) fn get_ata_or_owner(
+    owner: &Pubkey,
+    mint: &Pubkey,
+    should_unwrap_native_token: bool,
+) -> Pubkey {
+    get_ata_or_owner_with_program_id(
+        owner,
+        mint,
+        should_unwrap_native_token,
+        &anchor_spl::token::ID,
+    )
+}
+
+pub(crate) fn get_ata_or_owner_with_program_id(
+    owner: &Pubkey,
+    mint: &Pubkey,
+    should_unwrap_native_token: bool,
+    token_program_id: &Pubkey,
+) -> Pubkey {
+    use anchor_spl::{
+        associated_token::get_associated_token_address_with_program_id,
+        token::spl_token::native_mint,
+    };
+
+    if should_unwrap_native_token && *mint == native_mint::ID {
+        *owner
+    } else {
+        get_associated_token_address_with_program_id(owner, mint, token_program_id)
     }
 }

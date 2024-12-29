@@ -129,6 +129,7 @@ pub(crate) fn unchecked_create_swap<'info>(
         min_output: min_swap_out_amount.map(u128::from),
         trigger_price: None,
         acceptable_price: None,
+        should_unwrap_native_token: false,
     };
     create_order(
         cpi_ctx
@@ -194,9 +195,6 @@ impl<'info> CreateSwap<'info> {
                 initial_collateral_token_source: Some(
                     self.swap_in_token_receiver_vault.to_account_info(),
                 ),
-                final_output_token_ata: Some(self.swap_out_token_receiver_vault.to_account_info()),
-                long_token_ata: None,
-                short_token_ata: None,
                 system_program: self.system_program.to_account_info(),
                 token_program: self.token_program.to_account_info(),
                 associated_token_program: self.associated_token_program.to_account_info(),

@@ -35,7 +35,7 @@ use crate::{
     },
 };
 
-use super::{generate_nonce, ExchangeOps};
+use super::{generate_nonce, get_ata_or_owner, ExchangeOps};
 
 #[cfg(feature = "pyth-pull-oracle")]
 use crate::pyth::pull_oracle::{ExecuteWithPythPrices, Prices, PythPullOracleContext};
@@ -97,6 +97,7 @@ pub struct CreateOrderBuilder<'a, C> {
     final_token: Option<Pubkey>,
     long_token_account: Option<Pubkey>,
     short_token_account: Option<Pubkey>,
+    should_unwrap_native_token: bool,
 }
 
 /// Create Order Hint.
@@ -132,6 +133,7 @@ where
             final_token: Default::default(),
             long_token_account: None,
             short_token_account: None,
+            should_unwrap_native_token: true,
         }
     }
 
@@ -207,6 +209,13 @@ where
     /// Set acceptable price.
     pub fn acceptable_price(&mut self, unit_price: u128) -> &mut Self {
         self.params.acceptable_price = Some(unit_price);
+        self
+    }
+
+    /// Set whether to unwrap native token.
+    /// Defaults to should unwrap.
+    pub fn should_unwrap_native_token(&mut self, should_unwrap: bool) -> &mut Self {
+        self.should_unwrap_native_token = should_unwrap;
         self
     }
 
@@ -380,6 +389,7 @@ where
             min_output: Some(self.params.min_output_amount),
             trigger_price: self.params.trigger_price,
             acceptable_price: self.params.acceptable_price,
+            should_unwrap_native_token: self.should_unwrap_native_token,
         };
 
         let prepare = match kind {
@@ -546,9 +556,6 @@ where
                     long_token_escrow: long_token_accounts.map(|(escrow, _)| escrow),
                     short_token_escrow: short_token_accounts.map(|(escrow, _)| escrow),
                     initial_collateral_token_source: initial_collateral_token_account,
-                    final_output_token_ata: final_output_token_accounts.map(|(_, ata)| ata),
-                    long_token_ata: long_token_accounts.map(|(_, ata)| ata),
-                    short_token_ata: short_token_accounts.map(|(_, ata)| ata),
                     system_program: system_program::ID,
                     token_program: anchor_spl::token::ID,
                     associated_token_program: anchor_spl::associated_token::ID,
@@ -612,6 +619,7 @@ pub struct ExecuteOrderHint {
     /// Feeds.
     pub feeds: TokensWithFeed,
     swap: SwapParams,
+    should_unwrap_native_token: bool,
 }
 
 impl ExecuteOrderHint {
@@ -772,6 +780,7 @@ where
             final_output_token_and_account: tokens.final_output_token().token_and_account(),
             long_token_and_account: tokens.long_token().token_and_account(),
             short_token_and_account: tokens.short_token().token_and_account(),
+            should_unwrap_native_token: order.header().should_unwrap_native_token(),
         });
         Ok(self)
     }
@@ -1065,6 +1074,7 @@ where
                     user: hint.user,
                     referrer: hint.referrer,
                     rent_receiver: hint.rent_receiver,
+                    should_unwrap_native_token: hint.should_unwrap_native_token,
                 })
                 .build()
                 .await?;
@@ -1125,6 +1135,7 @@ pub struct CloseOrderHint {
     pub(super) user: Pubkey,
     pub(super) referrer: Option<Pubkey>,
     pub(super) rent_receiver: Pubkey,
+    pub(super) should_unwrap_native_token: bool,
 }
 
 impl CloseOrderHint {
@@ -1150,6 +1161,7 @@ impl CloseOrderHint {
             long_token_and_account: tokens.long_token().token_and_account(),
             short_token_and_account: tokens.short_token().token_and_account(),
             rent_receiver,
+            should_unwrap_native_token: order.header().should_unwrap_native_token(),
         })
     }
 }
@@ -1253,19 +1265,20 @@ where
                     initial_collateral_token_ata: hint
                         .initial_collateral_token_and_account
                         .as_ref()
-                        .map(|(token, _)| get_associated_token_address(&owner, token)),
-                    final_output_token_ata: hint
-                        .final_output_token_and_account
-                        .as_ref()
-                        .map(|(token, _)| get_associated_token_address(&owner, token)),
-                    long_token_ata: hint
-                        .long_token_and_account
-                        .as_ref()
-                        .map(|(token, _)| get_associated_token_address(&owner, token)),
-                    short_token_ata: hint
-                        .short_token_and_account
-                        .as_ref()
-                        .map(|(token, _)| get_associated_token_address(&owner, token)),
+                        .map(|(token, _)| {
+                            get_ata_or_owner(&owner, token, hint.should_unwrap_native_token)
+                        }),
+                    final_output_token_ata: hint.final_output_token_and_account.as_ref().map(
+                        |(token, _)| {
+                            get_ata_or_owner(&owner, token, hint.should_unwrap_native_token)
+                        },
+                    ),
+                    long_token_ata: hint.long_token_and_account.as_ref().map(|(token, _)| {
+                        get_ata_or_owner(&owner, token, hint.should_unwrap_native_token)
+                    }),
+                    short_token_ata: hint.short_token_and_account.as_ref().map(|(token, _)| {
+                        get_ata_or_owner(&owner, token, hint.should_unwrap_native_token)
+                    }),
                     associated_token_program: anchor_spl::associated_token::ID,
                     token_program: anchor_spl::token::ID,
                     system_program: system_program::ID,

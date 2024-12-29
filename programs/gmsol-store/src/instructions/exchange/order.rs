@@ -17,13 +17,14 @@ use crate::{
     },
     order::internal::Close,
     states::{
+        common::action::Action,
         feature::ActionDisabledFlag,
         order::{Order, OrderKind},
         position::PositionKind,
         user::UserHeader,
         Market, NonceBytes, Position, RoleKey, Seed, Store, UpdateOrderParams,
     },
-    utils::{internal, token::is_associated_token_account},
+    utils::{internal, token::is_associated_token_account_or_owner},
     CoreError,
 };
 
@@ -275,27 +276,6 @@ pub struct CreateOrder<'info> {
         token::mint = initial_collateral_token,
     )]
     pub initial_collateral_token_source: Option<Box<Account<'info, TokenAccount>>>,
-    /// The ATA for receiving the final output tokens.
-    /// Only required by decrease and swap orders.
-    #[account(
-        associated_token::mint = final_output_token,
-        associated_token::authority = owner
-    )]
-    pub final_output_token_ata: Option<Box<Account<'info, TokenAccount>>>,
-    /// The ATA for receiving the long tokens.
-    /// Only required by increase and decrease orders.
-    #[account(
-        associated_token::mint = long_token,
-        associated_token::authority = owner
-    )]
-    pub long_token_ata: Option<Box<Account<'info, TokenAccount>>>,
-    /// The ATA for receiving the long tokens.
-    /// Only required by increase and decrease orders.
-    #[account(
-        associated_token::mint = short_token,
-        associated_token::authority = owner
-    )]
-    pub short_token_ata: Option<Box<Account<'info, TokenAccount>>>,
     /// The system program.
     pub system_program: Program<'info, System>,
     /// The token program.
@@ -563,28 +543,28 @@ pub struct CloseOrder<'info> {
     /// CHECK: should be checked during the execution.
     #[account(
         mut,
-        constraint = is_associated_token_account(initial_collateral_token_ata.key, owner.key, &initial_collateral_token.as_ref().map(|a| a.key()).expect("must provide")) @ CoreError::NotAnATA,
+        constraint = is_associated_token_account_or_owner(initial_collateral_token_ata.key, owner.key, &initial_collateral_token.as_ref().map(|a| a.key()).expect("must provide")) @ CoreError::NotAnATA,
     )]
     pub initial_collateral_token_ata: Option<UncheckedAccount<'info>>,
     /// The ATA for final output token of owner.
     /// CHECK: should be checked during the execution.
     #[account(
         mut,
-        constraint = is_associated_token_account(final_output_token_ata.key, owner.key, &final_output_token.as_ref().map(|a| a.key()).expect("must provide")) @ CoreError::NotAnATA,
+        constraint = is_associated_token_account_or_owner(final_output_token_ata.key, owner.key, &final_output_token.as_ref().map(|a| a.key()).expect("must provide")) @ CoreError::NotAnATA,
     )]
     pub final_output_token_ata: Option<UncheckedAccount<'info>>,
     /// The ATA for long token of owner.
     /// CHECK: should be checked during the execution.
     #[account(
         mut,
-        constraint = is_associated_token_account(long_token_ata.key, owner.key, &long_token.as_ref().map(|a| a.key()).expect("must provide")) @ CoreError::NotAnATA,
+        constraint = is_associated_token_account_or_owner(long_token_ata.key, owner.key, &long_token.as_ref().map(|a| a.key()).expect("must provide")) @ CoreError::NotAnATA,
     )]
     pub long_token_ata: Option<UncheckedAccount<'info>>,
     /// The ATA for initial collateral token of owner.
     /// CHECK: should be checked during the execution.
     #[account(
         mut,
-        constraint = is_associated_token_account(short_token_ata.key, owner.key, &short_token.as_ref().map(|a| a.key()).expect("must provide")) @ CoreError::NotAnATA,
+        constraint = is_associated_token_account_or_owner(short_token_ata.key, owner.key, &short_token.as_ref().map(|a| a.key()).expect("must provide")) @ CoreError::NotAnATA,
     )]
     pub short_token_ata: Option<UncheckedAccount<'info>>,
     /// The system program.
@@ -653,6 +633,7 @@ impl<'info> CloseOrder<'info> {
         let mut seen = HashSet::<_>::default();
 
         let builder = TransferAllFromEscrowToATA::builder()
+            .action(self.order.to_account_info())
             .system_program(self.system_program.to_account_info())
             .token_program(self.token_program.to_account_info())
             .associated_token_program(self.associated_token_program.to_account_info())
@@ -661,7 +642,8 @@ impl<'info> CloseOrder<'info> {
             .escrow_authority(self.order.to_account_info())
             .seeds(&seeds)
             .rent_receiver(self.rent_receiver())
-            .init_if_needed(init_if_needed);
+            .init_if_needed(init_if_needed)
+            .should_unwrap_native(self.order.load()?.header().should_unwrap_native_token());
 
         for (escrow, ata, token) in [
             (
@@ -699,7 +681,7 @@ impl<'info> CloseOrder<'info> {
                     .ata(ata.to_account_info())
                     .escrow(escrow.to_account_info())
                     .build()
-                    .execute()?
+                    .unchecked_execute()?
                 {
                     return Ok(false);
                 }

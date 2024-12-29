@@ -7,6 +7,8 @@ use crate::{
     CoreError,
 };
 
+const MAX_FLAGS: usize = 8;
+
 /// Action State.
 #[non_exhaustive]
 #[repr(u8)]
@@ -89,13 +91,26 @@ pub struct ActionHeader {
     action_state: u8,
     /// The bump seed.
     pub(crate) bump: u8,
-    padding_0: [u8; 6],
+    flags: ActionFlagContainer,
+    padding_0: [u8; 5],
     /// Creator.
     pub(crate) creator: Pubkey,
     /// Rent receiver.
     rent_receiver: Pubkey,
     reserved: [u8; 256],
 }
+
+/// Action Flags.
+#[repr(u8)]
+#[non_exhaustive]
+#[derive(num_enum::IntoPrimitive, num_enum::TryFromPrimitive)]
+pub enum ActionFlag {
+    /// Should unwrap native token.
+    ShouldUnwrapNativeToken,
+    // CHECK: should have no more than `MAX_FLAGS` of flags.
+}
+
+gmsol_utils::flags!(ActionFlag, MAX_FLAGS, u8);
 
 impl ActionHeader {
     /// Get action state.
@@ -181,6 +196,7 @@ impl ActionHeader {
     }
 
     #[inline(never)]
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn init(
         &mut self,
         id: u64,
@@ -190,6 +206,7 @@ impl ActionHeader {
         nonce: [u8; 32],
         bump: u8,
         execution_lamports: u64,
+        should_unwrap_native_token: bool,
     ) -> Result<()> {
         let clock = Clock::get()?;
         self.id = id;
@@ -205,6 +222,8 @@ impl ActionHeader {
         self.creator = owner;
         // The rent receiver defaults to the `owner`.
         self.rent_receiver = owner;
+
+        self.set_should_unwrap_native_token(should_unwrap_native_token);
 
         Ok(())
     }
@@ -228,6 +247,19 @@ impl ActionHeader {
         self.updated_at_slot = clock.slot;
 
         Ok(())
+    }
+
+    /// Returns whether the native token should be unwrapped.
+    pub fn should_unwrap_native_token(&self) -> bool {
+        self.flags.get_flag(ActionFlag::ShouldUnwrapNativeToken)
+    }
+
+    /// Set whether the native token should be unwrapped.
+    ///
+    /// Returns the previous vaule.
+    fn set_should_unwrap_native_token(&mut self, should_unwrap: bool) -> bool {
+        self.flags
+            .set_flag(ActionFlag::ShouldUnwrapNativeToken, should_unwrap)
     }
 }
 

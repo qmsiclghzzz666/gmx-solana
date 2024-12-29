@@ -230,6 +230,7 @@ pub(crate) fn unchecked_process_position_cut<'info>(
     _recent_timestamp: i64,
     kind: PositionCutKind,
     execution_fee: u64,
+    should_unwrap_native_token: bool,
 ) -> Result<()> {
     let accounts = &mut ctx.accounts;
 
@@ -292,7 +293,8 @@ pub(crate) fn unchecked_process_position_cut<'info>(
         .system_program(accounts.system_program.to_account_info())
         // CHECK: the address of `order` has been checked to be derived from this account's address.
         .executor(accounts.authority.to_account_info())
-        .refund(refund);
+        .refund(refund)
+        .should_unwrap_native_token(should_unwrap_native_token);
 
     let should_send_trade_event = accounts.oracle.load_mut()?.with_prices(
         &accounts.store,
