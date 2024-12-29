@@ -196,18 +196,11 @@
 //! - [`initialize_gt`]: Initialize the GT state.
 //! - [`gt_set_order_fee_discount_factors`]: Set order fee discount factors.
 //! - [`gt_set_referral_reward_factors`]: Set referral reward factors.
-//! - [`gt_set_es_receiver_factor`]: Set esGT receiver factor.
 //! - [`gt_set_exchange_time_window`]: Set GT exchange time window.
-//! - [`gt_set_receiver`]: Set esGT vault receiver.
 //! - [`prepare_gt_exchange_vault`](gmsol_store::prepare_gt_exchange_vault): Prepare current GT exchange vault.
 //! - [`confirm_gt_exchange_vault`]: Confirm GT exchange vault.
 //! - [`request_gt_exchange`](gmsol_store::request_gt_exchange): Request a GT exchange.
 //! - [`close_gt_exchange`]: Close a confirmed GT exchange.
-//! - [`claim_es_gt`](gmsol_store::claim_es_gt): Claim esGT.
-//! - [`request_gt_vesting`](gmsol_store::request_gt_vesting): Request GT vesting.
-//! - [`update_gt_vesting`](gmsol_store::update_gt_vesting): Update GT vesting state.
-//! - [`close_gt_vesting`](gmsol_store::close_gt_vesting): Close an empty GT vesting.
-//! - [`claim_es_gt_vault_via_vesting`](gmsol_store::claim_es_gt_vault_via_vesting): Claim esGT vault via vesting.
 
 /// Instructions.
 pub mod instructions;
@@ -2537,24 +2530,6 @@ pub mod gmsol_store {
         instructions::unchecked_gt_set_referral_reward_factors(ctx, &factors)
     }
 
-    /// Set esGT receiver factor.
-    ///
-    /// # Accounts
-    /// *[See the documentation for the accounts.](ConfigurateGt)*
-    ///
-    /// # Arguments
-    /// - `factor`: The factor determining what ratio of esGT rewards are minted to the esGT vault receiver.
-    ///
-    /// # Errors
-    /// - The [`authority`](ConfigurateGt::authority) must be a signer and have the GT_CONTROLLER role in the `store`.
-    /// - The [`store`](ConfigurateGt::store) must be initialized.
-    /// - The GT state of the `store` must be initialized.
-    /// - The `factor` must be less than or equal to [`MARKET_USD_UNIT`](crate::constants::MARKET_USD_UNIT)(i.e., 100%).
-    #[access_control(internal::Authenticate::only_gt_controller(&ctx))]
-    pub fn gt_set_es_receiver_factor(ctx: Context<ConfigurateGt>, factor: u128) -> Result<()> {
-        instructions::unchecked_gt_set_es_receiver_factor(ctx, factor)
-    }
-
     /// Set GT exchange time window (in seconds).
     ///
     /// # Accounts
@@ -2571,23 +2546,6 @@ pub mod gmsol_store {
     #[access_control(internal::Authenticate::only_gt_controller(&ctx))]
     pub fn gt_set_exchange_time_window(ctx: Context<ConfigurateGt>, window: u32) -> Result<()> {
         instructions::unchecked_gt_set_exchange_time_window(ctx, window)
-    }
-
-    /// Set esGT vault receiver.
-    ///
-    /// # Accounts
-    /// *[See the documentation for the accounts.](ConfigurateGt)*
-    ///
-    /// # Arguments
-    /// - `receiver`: The public key of the account that can claim esGT rewards from the esGT vault.
-    ///
-    /// # Errors
-    /// - The [`authority`](ConfigurateGt::authority) must be a signer and have the GT_CONTROLLER role in the `store`.
-    /// - The [`store`](ConfigurateGt::store) must be properly initialized.
-    /// - The GT state of the `store` must be initialized.
-    #[access_control(internal::Authenticate::only_gt_controller(&ctx))]
-    pub fn gt_set_receiver(ctx: Context<ConfigurateGt>, receiver: Pubkey) -> Result<()> {
-        instructions::unchecked_gt_set_receiver(ctx, &receiver)
     }
 
     /// Prepare a GT exchange vault.
@@ -2673,96 +2631,6 @@ pub mod gmsol_store {
     #[access_control(internal::Authenticate::only_gt_controller(&ctx))]
     pub fn close_gt_exchange(ctx: Context<CloseGtExchange>) -> Result<()> {
         instructions::unchecked_close_gt_exchange(ctx)
-    }
-
-    /// Claim pending esGT of the owner.
-    ///
-    /// # Accounts
-    /// *[See the documentation for the accounts.](ClaimEsGt)*
-    ///
-    /// # Errors
-    /// - The [`owner`](ClaimEsGt::owner) must be a signer.
-    /// - The [`store`](ClaimEsGt::store) must be properly initialized with an initialized GT state.
-    /// - The [`user`](ClaimEsGt::user) must be properly initialized and correspond to the `owner`.
-    pub fn claim_es_gt(ctx: Context<ClaimEsGt>) -> Result<()> {
-        instructions::claim_es_gt(ctx)
-    }
-
-    /// Request GT vesting.
-    ///
-    /// # Accounts
-    /// *[See the documentation for the accounts.](RequestGtVesting)*
-    ///
-    /// # Arguments
-    /// - `amount`: The amount of esGT to vest into GT.
-    ///
-    /// # Errors
-    /// - The [`owner`](RequestGtVesting::owner) must be a signer.
-    /// - The [`store`](RequestGtVesting::store) must be properly initialized with an initialized GT state.
-    /// - The [`user`](RequestGtVesting::user) must be properly initialized and correspond to the `owner`.
-    /// - The [`vesting`](RequestGtVesting::vesting) must be either:
-    ///   - Uninitialized, or
-    ///   - Properly initialized and owned by both the `owner` and `store`
-    /// - The `amount` must not exceed the owner's esGT balance in their user account.
-    /// - The owner must have sufficient GT reserved in their user account to cover the total vesting amount
-    ///   after this request is processed (i.e., `reserve_factor * total_vesting_esgt <= gt_balance`).
-    pub fn request_gt_vesting(ctx: Context<RequestGtVesting>, amount: u64) -> Result<()> {
-        instructions::request_gt_vesting(ctx, amount)
-    }
-
-    /// Update GT vesting state for the owner. This can be used to claim the vested GT.
-    ///
-    /// # Accounts
-    /// *[See the documentation for the accounts.](UpdateGtVesting)*
-    ///
-    /// # Errors
-    /// - The [`owner`](UpdateGtVesting::owner) must be a signer.
-    /// - The [`store`](UpdateGtVesting::store) must be properly initialized with an initialized GT state.
-    /// - The [`user`](UpdateGtVesting::user) must be properly initialized and correspond to the `owner`.
-    /// - The [`vesting`](UpdateGtVesting::vesting) must be properly initialized and owned by both
-    ///   the `owner` and `store`.
-    pub fn update_gt_vesting(ctx: Context<UpdateGtVesting>) -> Result<()> {
-        instructions::update_gt_vesting(ctx)
-    }
-
-    /// Close GT vesting account.
-    ///
-    /// # Accounts
-    /// *[See the documentation for the accounts.](CloseGtVesting)*
-    ///
-    /// # Errors
-    /// - The [`owner`](CloseGtVesting::owner) must be a signer.
-    /// - The [`store`](CloseGtVesting::store) must be properly initialized with an initialized GT state.
-    /// - The [`user`](CloseGtVesting::user) must be properly initialized and correspond to the `owner`.
-    /// - The [`vesting`](CloseGtVesting::vesting) must be properly initialized and owned by both
-    ///   the `owner` and `store`. The vesting account must have no remaining unvested esGT.
-    pub fn close_gt_vesting(ctx: Context<CloseGtVesting>) -> Result<()> {
-        instructions::close_gt_vesting(ctx)
-    }
-
-    /// Claim esGT from the esGT vault by increasing the vesting amount of the receiver.
-    ///
-    /// # Accounts
-    /// *[See the documentation for the accounts.](ClaimEsGtVaultViaVesting)*
-    ///
-    /// # Arguments
-    /// - `amount`: The amount of esGT to claim from the vault.
-    ///
-    /// # Errors
-    /// - The [`owner`](ClaimEsGtVaultViaVesting::owner) must be a signer and the esGT vault receiver (see [`gt_set_receiver`](gt_set_receiver)).
-    /// - The [`store`](ClaimEsGtVaultViaVesting::store) must be properly initialized with an initialized GT state.
-    /// - The [`user`](ClaimEsGtVaultViaVesting::user) must be properly initialized and correspond to the `owner`.
-    /// - The [`vesting`](ClaimEsGtVaultViaVesting::vesting) must be properly initialized and owned by both
-    ///   the `owner` and `store`.
-    /// - The requested `amount` must not exceed the available esGT balance in the vault.
-    ///
-    /// # Notes
-    /// - This instruction allows the receiver to claim esGT even if the receiver does not have enough GT reserved.
-    pub fn claim_es_gt_vault_via_vesting(
-        ctx: Context<ClaimEsGtVaultViaVesting>,
-        amount: u64,
-    ) -> Result<()> {
-        instructions::claim_es_gt_vault_via_vesting(ctx, amount)
     }
 
     // ===========================================

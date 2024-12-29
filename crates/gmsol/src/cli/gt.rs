@@ -5,12 +5,7 @@ use crate::{
     GMSOLClient, TimelockCtx,
 };
 use anchor_client::solana_sdk::pubkey::Pubkey;
-use gmsol::{
-    store::gt::GtOps,
-    treasury::TreasuryOps,
-    types::gt::GtVesting,
-    utils::{unsigned_amount_to_decimal, ZeroCopy},
-};
+use gmsol::{store::gt::GtOps, treasury::TreasuryOps, utils::unsigned_amount_to_decimal};
 use prettytable::{row, Table};
 use rust_decimal::Decimal;
 
@@ -30,9 +25,6 @@ enum Command {
     Balance {
         #[arg(long, group = "balance-input")]
         owner: Option<Pubkey>,
-        /// Claim pending esGT.
-        #[arg(long, group = "balance-input", requires = "confirm")]
-        claim: bool,
         /// Confirm the operation.
         #[arg(long)]
         confirm: bool,
@@ -48,10 +40,6 @@ enum Command {
     },
     /// Set GT exchange time window.
     SetExchangeTimeWindow { seconds: NonZeroU32 },
-    /// Set esGT vault receiver.
-    SetReceiver { address: Pubkey },
-    /// Set esGT receiver factor.
-    SetReceiverFactor { factor: u128 },
     /// Get or request GT exchange.
     Exchange {
         #[arg(
@@ -76,30 +64,6 @@ enum Command {
         /// Whether to prepare the exchange vault before the request or not.
         #[arg(long, requires = "request")]
         prepare_vault: bool,
-    },
-    /// Vest esGT.
-    Vest {
-        #[arg(
-            long,
-            value_name = "AMOUNT",
-            group = "vest-input",
-            requires = "confirm"
-        )]
-        request: Option<String>,
-        #[arg(long, group = "vest-input", requires = "confirm")]
-        claim: bool,
-        #[arg(
-            long,
-            value_name = "AMOUNT",
-            group = "vest-input",
-            requires = "confirm"
-        )]
-        from_vault: Option<String>,
-        #[arg(long, group = "vest-input")]
-        owner: Option<Pubkey>,
-        /// Confirm the operation.
-        #[arg(long)]
-        confirm: bool,
     },
 }
 
@@ -127,82 +91,25 @@ impl Args {
                     unsigned_amount_to_decimal(gt.supply(), decimals).normalize()
                 );
                 println!(
-                    "esGT Supply: {}",
-                    unsigned_amount_to_decimal(gt.es_supply(), decimals).normalize()
-                );
-                println!(
-                    "esGT Receiver Vault: {}",
-                    unsigned_amount_to_decimal(gt.es_vault(), decimals).normalize()
+                    "GT Vault: {}",
+                    unsigned_amount_to_decimal(gt.gt_vault(), decimals).normalize()
                 );
             }
-            Command::Balance {
-                owner,
-                claim,
-                confirm: _,
-            } => {
-                use gmsol_model::utils::apply_factor;
+            Command::Balance { owner, confirm: _ } => {
+                let owner = owner.unwrap_or(client.payer());
+                let user = client.find_user_address(store, &owner);
+                let user = client.user(&user).await?;
+                let store_account = client.store(store).await?;
+                let decimals = store_account.gt().decimals();
 
-                if *claim {
-                    let rpc = client.claim_es_gt(store);
-                    send_or_serialize_rpc(
-                        store,
-                        rpc,
-                        timelock,
-                        serialize_only,
-                        skip_preflight,
-                        |signature| {
-                            println!("{signature}");
-                            Ok(())
-                        },
-                    )
-                    .await?;
-                } else {
-                    let owner = owner.unwrap_or(client.payer());
-                    let user = client.find_user_address(store, &owner);
-                    let user = client.user(&user).await?;
-                    let store_account = client.store(store).await?;
-                    let decimals = store_account.gt().decimals();
+                let gt = user.gt().amount();
+                let rank = user.gt().rank();
 
-                    let gt = user.gt().amount();
-                    let es_gt = user.gt().es_amount();
-                    let vesting_es_gt = user.gt().vesting_es_amount();
-                    let rank = user.gt().rank();
-
-                    let factor = store_account.gt().es_factor();
-                    let user_factor = user.gt().es_factor();
-                    let diff_factor = factor.saturating_sub(user_factor);
-
-                    let pending_es_gt: u64 =
-                        apply_factor::<_, { gmsol::constants::MARKET_DECIMALS }>(
-                            &(gt as u128),
-                            &diff_factor,
-                        )
-                        .ok_or_else(|| {
-                            gmsol::Error::unknown("calculating pending esGT amount overflow")
-                        })?
-                        .try_into()
-                        .map_err(|_| {
-                            gmsol::Error::unknown("failed to converting the result into amount")
-                        })?;
-
-                    println!(
-                        "GT: {}",
-                        unsigned_amount_to_decimal(gt, decimals).normalize()
-                    );
-                    println!(
-                        "esGT: {}",
-                        unsigned_amount_to_decimal(es_gt, decimals).normalize()
-                    );
-                    println!(
-                        "Pending esGT: {}",
-                        unsigned_amount_to_decimal(pending_es_gt, decimals).normalize()
-                    );
-                    println!(
-                        "Vesting esGT: {}",
-                        unsigned_amount_to_decimal(vesting_es_gt, decimals).normalize()
-                    );
-                    println!("User Rank: {rank}");
-                }
+                println!(
+                    "GT: {}",
+                    unsigned_amount_to_decimal(gt, decimals).normalize()
+                );
+                println!("User Rank: {rank}");
             }
             Command::PrepareExchangeVault => {
                 let time_window = client.store(store).await?.gt().exchange_time_window();
@@ -254,36 +161,6 @@ impl Args {
             }
             Command::SetExchangeTimeWindow { seconds } => {
                 let rpc = client.gt_set_exchange_time_window(store, seconds.get());
-                send_or_serialize_rpc(
-                    store,
-                    rpc,
-                    timelock,
-                    serialize_only,
-                    skip_preflight,
-                    |signature| {
-                        println!("{signature}");
-                        Ok(())
-                    },
-                )
-                .await?;
-            }
-            Command::SetReceiver { address } => {
-                let rpc = client.gt_set_es_receiver(store, address);
-                send_or_serialize_rpc(
-                    store,
-                    rpc,
-                    timelock,
-                    serialize_only,
-                    skip_preflight,
-                    |signature| {
-                        println!("{signature}");
-                        Ok(())
-                    },
-                )
-                .await?;
-            }
-            Command::SetReceiverFactor { factor } => {
-                let rpc = client.gt_set_es_receiver_factor(store, *factor);
                 send_or_serialize_rpc(
                     store,
                     rpc,
@@ -375,84 +252,6 @@ impl Args {
                     }
                 }
             }
-            Command::Vest {
-                request,
-                claim,
-                from_vault,
-                owner,
-                confirm: _,
-            } => {
-                let store_account = client.store(store).await?;
-                let decimals = store_account.gt().decimals();
-
-                if *claim {
-                    let rpc = client.update_gt_vesting(store);
-                    send_or_serialize_rpc(
-                        store,
-                        rpc,
-                        timelock,
-                        serialize_only,
-                        skip_preflight,
-                        |signature| {
-                            println!("{signature}");
-                            Ok(())
-                        },
-                    )
-                    .await?;
-                } else if let Some(amount) = from_vault {
-                    let amount = parse_amount(amount, decimals)?;
-                    let rpc = client.claim_es_vesting_from_vault(store, amount);
-                    send_or_serialize_rpc(
-                        store,
-                        rpc,
-                        timelock,
-                        serialize_only,
-                        skip_preflight,
-                        |signature| {
-                            println!("{signature}");
-                            Ok(())
-                        },
-                    )
-                    .await?;
-                } else if let Some(amount) = request {
-                    let amount = parse_amount(amount, decimals)?;
-                    let rpc = client.request_gt_vesting(store, amount);
-                    send_or_serialize_rpc(
-                        store,
-                        rpc,
-                        timelock,
-                        serialize_only,
-                        skip_preflight,
-                        |signature| {
-                            println!("{signature}");
-                            Ok(())
-                        },
-                    )
-                    .await?;
-                } else {
-                    let owner = owner.unwrap_or(client.payer());
-                    let vesting = client.find_gt_vesting_address(store, &owner);
-                    let vesting = client
-                        .account::<ZeroCopy<GtVesting>>(&vesting)
-                        .await?
-                        .ok_or(gmsol::Error::NotFound)?
-                        .0;
-                    if self.debug {
-                        println!("{vesting:?}");
-                    } else {
-                        let total_vesting: u64 = vesting.vesting().map(|amount| amount.get()).sum();
-                        let claimable = vesting.claimable(current_ts()?);
-                        println!(
-                            "Total Vesting: {}",
-                            unsigned_amount_to_decimal(total_vesting, decimals).normalize()
-                        );
-                        println!(
-                            "Claimable: {}",
-                            unsigned_amount_to_decimal(claimable, decimals).normalize()
-                        )
-                    }
-                }
-            }
         }
         Ok(())
     }
@@ -466,13 +265,4 @@ fn parse_amount(amount: &str, decimals: u8) -> gmsol::Result<u64> {
         .try_into()
         .map_err(gmsol::Error::invalid_argument)?;
     Ok(amount)
-}
-
-fn current_ts() -> gmsol::Result<i64> {
-    use std::time::SystemTime;
-
-    let now = SystemTime::now()
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .map_err(gmsol::Error::unknown)?;
-    Ok(now.as_secs() as i64)
 }

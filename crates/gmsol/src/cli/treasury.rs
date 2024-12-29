@@ -48,8 +48,6 @@ enum Command {
     },
     /// Set referral reward factors.
     SetReferralReward { factors: Vec<u128> },
-    /// Set esGT receiver.
-    SetEsgtReceiver { esgt_receiver: Pubkey },
     /// Claim fees.
     ClaimFees {
         market_token: Pubkey,
@@ -153,9 +151,6 @@ impl Args {
                     return Err(gmsol::Error::invalid_argument("factors must be provided"));
                 }
                 client.set_referral_reward(store, factors.clone())
-            }
-            Command::SetEsgtReceiver { esgt_receiver } => {
-                client.set_esgt_receiver(store, esgt_receiver)
             }
             Command::ClaimFees {
                 market_token,

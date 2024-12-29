@@ -36,12 +36,6 @@ pub trait GtOps<C> {
     /// Configurate the time window size for GT exchange.
     fn gt_set_exchange_time_window(&self, store: &Pubkey, window: u32) -> RpcBuilder<C>;
 
-    /// Configurate the receiver of esGT vault.
-    fn gt_set_es_receiver(&self, store: &Pubkey, receiver: &Pubkey) -> RpcBuilder<C>;
-
-    /// Configurate the receiver factor of esGT.
-    fn gt_set_es_receiver_factor(&self, store: &Pubkey, factor: u128) -> RpcBuilder<C>;
-
     /// Initialize GT exchange vault with the given time window index.
     fn prepare_gt_exchange_vault_with_time_window_index(
         &self,
@@ -96,18 +90,6 @@ pub trait GtOps<C> {
         hint_owner: Option<&Pubkey>,
         hint_vault: Option<&Pubkey>,
     ) -> impl Future<Output = crate::Result<RpcBuilder<C>>>;
-
-    /// Request GT vesting.
-    fn request_gt_vesting(&self, store: &Pubkey, amount: u64) -> RpcBuilder<C>;
-
-    /// Update vesting.
-    fn update_gt_vesting(&self, store: &Pubkey) -> RpcBuilder<C>;
-
-    /// Claim esGT.
-    fn claim_es_gt(&self, store: &Pubkey) -> RpcBuilder<C>;
-
-    /// Claim esGT vesting from vault.
-    fn claim_es_vesting_from_vault(&self, store: &Pubkey, amount: u64) -> RpcBuilder<C>;
 }
 
 impl<C: Deref<Target = impl Signer> + Clone> GtOps<C> for crate::Client<C> {
@@ -164,26 +146,6 @@ impl<C: Deref<Target = impl Signer> + Clone> GtOps<C> for crate::Client<C> {
                 store: *store,
             })
             .args(instruction::GtSetExchangeTimeWindow { window })
-    }
-
-    fn gt_set_es_receiver(&self, store: &Pubkey, receiver: &Pubkey) -> RpcBuilder<C> {
-        self.store_rpc()
-            .accounts(accounts::ConfigurateGt {
-                authority: self.payer(),
-                store: *store,
-            })
-            .args(instruction::GtSetReceiver {
-                receiver: *receiver,
-            })
-    }
-
-    fn gt_set_es_receiver_factor(&self, store: &Pubkey, factor: u128) -> RpcBuilder<C> {
-        self.store_rpc()
-            .accounts(accounts::ConfigurateGt {
-                authority: self.payer(),
-                store: *store,
-            })
-            .args(instruction::GtSetEsReceiverFactor { factor })
     }
 
     fn prepare_gt_exchange_vault_with_time_window_index(
@@ -266,64 +228,6 @@ impl<C: Deref<Target = impl Signer> + Clone> GtOps<C> for crate::Client<C> {
                 exchange: *exchange,
             })
             .args(instruction::CloseGtExchange {}))
-    }
-
-    fn request_gt_vesting(&self, store: &Pubkey, amount: u64) -> RpcBuilder<C> {
-        let owner = self.payer();
-        let user = self.find_user_address(store, &owner);
-        let vesting = self.find_gt_vesting_address(store, &owner);
-        self.store_rpc()
-            .accounts(accounts::RequestGtVesting {
-                owner,
-                store: *store,
-                user,
-                vesting,
-                system_program: system_program::ID,
-            })
-            .args(instruction::RequestGtVesting { amount })
-    }
-
-    fn update_gt_vesting(&self, store: &Pubkey) -> RpcBuilder<C> {
-        let owner = self.payer();
-        let user = self.find_user_address(store, &owner);
-        let vesting = self.find_gt_vesting_address(store, &owner);
-        self.store_rpc()
-            .accounts(accounts::UpdateGtVesting {
-                owner,
-                store: *store,
-                user,
-                vesting,
-            })
-            .args(instruction::UpdateGtVesting {})
-    }
-
-    fn claim_es_gt(&self, store: &Pubkey) -> RpcBuilder<C> {
-        let owner = self.payer();
-        let user = self.find_user_address(store, &owner);
-        self.store_rpc()
-            .accounts(accounts::ClaimEsGt {
-                owner,
-                store: *store,
-                user,
-            })
-            .args(instruction::ClaimEsGt {})
-    }
-
-    fn claim_es_vesting_from_vault(&self, store: &Pubkey, amount: u64) -> RpcBuilder<C> {
-        let prepare = self.request_gt_vesting(store, 0);
-        let owner = self.payer();
-        let user = self.find_user_address(store, &owner);
-        let vesting = self.find_gt_vesting_address(store, &owner);
-        let rpc = self
-            .store_rpc()
-            .accounts(accounts::ClaimEsGtVaultViaVesting {
-                owner,
-                store: *store,
-                user,
-                vesting,
-            })
-            .args(instruction::ClaimEsGtVaultViaVesting { amount });
-        prepare.merge(rpc)
     }
 }
 

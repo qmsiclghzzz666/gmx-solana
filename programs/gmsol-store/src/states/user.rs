@@ -250,9 +250,7 @@ pub struct GtState {
     pub(crate) last_minted_at: i64,
     pub(crate) total_minted: u64,
     pub(crate) amount: u64,
-    pub(crate) es_amount: u64,
-    pub(crate) vesting_es_amount: u64,
-    pub(crate) es_factor: u128,
+    padding_1: [u8; 32],
     pub(crate) paid_fee_value: u128,
     pub(crate) minted_fee_value: u128,
     reserved: [u8; 64],
@@ -277,20 +275,5 @@ impl GtState {
     /// Get GT balance.
     pub fn amount(&self) -> u64 {
         self.amount
-    }
-
-    /// Get esGT balance.
-    pub fn es_amount(&self) -> u64 {
-        self.es_amount
-    }
-
-    /// Get vesting esGT amount.
-    pub fn vesting_es_amount(&self) -> u64 {
-        self.vesting_es_amount
-    }
-
-    /// Get current vaule of es factor of this user.
-    pub fn es_factor(&self) -> u128 {
-        self.es_factor
     }
 }

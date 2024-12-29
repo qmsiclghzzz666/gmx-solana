@@ -3,7 +3,7 @@ use gmsol_store::{
     events::TradeData,
     states::{
         glv::GlvWithdrawal,
-        gt::{GtExchange, GtExchangeVault, GtVesting},
+        gt::{GtExchange, GtExchangeVault},
         position::PositionKind,
         user::{ReferralCode, ReferralCodeBytes, UserHeader},
         Deposit, GlvDeposit, NonceBytes, Order, Position, PriceFeed, PriceProviderKind, Seed,
@@ -259,18 +259,6 @@ pub fn find_gt_exchange_pda(
 ) -> (Pubkey, u8) {
     Pubkey::find_program_address(
         &[GtExchange::SEED, vault.as_ref(), owner.as_ref()],
-        store_program_id,
-    )
-}
-
-/// Find the PDA for GT vesting account.
-pub fn find_gt_vesting_pda(
-    store: &Pubkey,
-    owner: &Pubkey,
-    store_program_id: &Pubkey,
-) -> (Pubkey, u8) {
-    Pubkey::find_program_address(
-        &[GtVesting::SEED, store.as_ref(), owner.as_ref()],
         store_program_id,
     )
 }
