@@ -147,7 +147,7 @@ cargo gmsol -ul -w $GMSOL_KEEPER treasury set-referral-reward \
 
 cargo gmsol -ul -w $GMSOL_KEEPER market set-referred-discount-factor 10000000000000000000
 
-cargo gmsol -ul -w $GMSOL_KEEPER treasury set-gt-factor 60000000000000000000
+cargo gmsol -ul -w $GMSOL_KEEPER treasury set-gt-factor 51428600000000000000
 
 cargo gmsol -ul -w $GMSOL_KEEPER treasury set-buyback-factor 2000000000000000000
 
