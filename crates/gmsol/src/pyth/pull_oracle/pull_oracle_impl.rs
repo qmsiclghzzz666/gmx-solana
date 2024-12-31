@@ -15,8 +15,8 @@ use crate::{
 };
 
 use super::{
-    hermes::PriceUpdate, utils, PythPullOracle, PythPullOracleOps, PythReceiverOps, WormholeOps,
-    VAA_SPLIT_INDEX,
+    hermes::BinaryPriceUpdate, utils, PythPullOracle, PythPullOracleOps, PythReceiverOps,
+    WormholeOps, VAA_SPLIT_INDEX,
 };
 
 /// Pyth Pull Oracle.
@@ -28,8 +28,17 @@ pub struct PythPullOracleWithHermes<'a, C> {
 
 /// Price updates.
 pub struct PriceUpdates {
-    num_feeds: usize,
-    updates: Vec<PriceUpdate>,
+    num_feeds: Option<usize>,
+    updates: Vec<BinaryPriceUpdate>,
+}
+
+impl From<Vec<BinaryPriceUpdate>> for PriceUpdates {
+    fn from(value: Vec<BinaryPriceUpdate>) -> Self {
+        Self {
+            num_feeds: None,
+            updates: value,
+        }
+    }
 }
 
 impl<'a, C> PythPullOracleWithHermes<'a, C> {
@@ -77,8 +86,8 @@ impl<'a, C> PullOracle for PythPullOracleWithHermes<'a, C> {
             }
         }
         Ok(PriceUpdates {
-            num_feeds: feed_ids.len(),
-            updates: vec![update],
+            num_feeds: Some(feed_ids.len()),
+            updates: vec![update.binary],
         })
     }
 }
@@ -111,13 +120,12 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> PullOracleOps<'a, C>
 
         let PriceUpdates { updates, num_feeds } = price_updates;
 
-        let mut prices = HashMap::with_capacity(*num_feeds);
+        let mut prices = HashMap::with_capacity(num_feeds.unwrap_or(0));
 
         let mut ixns = PriceUpdateInstructions::new(self.gmsol);
 
         let datas = updates
             .iter()
-            .map(|update| update.binary())
             .flat_map(
                 |update| match utils::parse_accumulator_update_datas(update) {
                     Ok(datas) => Either::Left(datas.into_iter().map(Ok)),
