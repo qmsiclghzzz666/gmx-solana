@@ -83,7 +83,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> ChainlinkPullOracle<'a, C> {
         }
 
         if !txs.is_emtpy() {
-            match txs.send_all().await {
+            match txs.send_all(false).await {
                 Ok(signatures) => {
                     tracing::info!("initialized feeds with txs: {signatures:#?}");
                 }

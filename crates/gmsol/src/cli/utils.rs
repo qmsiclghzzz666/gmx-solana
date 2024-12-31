@@ -116,17 +116,7 @@ where
             println!("ix[{idx}]: {buffer}");
         }
 
-        match txn
-            .send_all_with_opts(
-                None,
-                RpcSendTransactionConfig {
-                    skip_preflight,
-                    ..Default::default()
-                },
-                false,
-            )
-            .await
-        {
+        match txn.send_all(skip_preflight).await {
             Ok(signatures) => {
                 tracing::info!("{signatures:#?}");
             }
@@ -174,17 +164,7 @@ where
             println!();
         }
     } else {
-        match builder
-            .send_all_with_opts(
-                None,
-                RpcSendTransactionConfig {
-                    skip_preflight,
-                    ..Default::default()
-                },
-                false,
-            )
-            .await
-        {
+        match builder.send_all(skip_preflight).await {
             Ok(signatures) => (callback)(signatures, None)?,
             Err((signatures, error)) => (callback)(signatures, Some(error))?,
         }

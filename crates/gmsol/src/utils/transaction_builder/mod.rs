@@ -7,12 +7,12 @@ use anchor_client::{
         rpc_request::RpcError,
     },
     solana_sdk::{
-        commitment_config::CommitmentConfig, packet::PACKET_DATA_SIZE, signature::Signature,
-        signer::Signer, transaction::VersionedTransaction,
+        commitment_config::CommitmentConfig, message::VersionedMessage, packet::PACKET_DATA_SIZE,
+        signature::Signature, signer::Signer, transaction::VersionedTransaction,
     },
     ClientError,
 };
-use futures_util::{stream::FuturesOrdered, TryStreamExt};
+use futures_util::TryStreamExt;
 use tokio::time::sleep;
 
 use super::RpcBuilder;
@@ -27,6 +27,19 @@ pub mod rpc_builder;
 
 /// Transaction size.
 pub mod transaction_size;
+
+/// Send Transaction Options.
+#[derive(Debug, Clone, Default)]
+pub struct SendTransactionOptions {
+    /// Whether to send without compute budget.
+    pub without_compute_budget: bool,
+    /// Compute unit price.
+    pub compute_unit_price_micro_lamports: Option<u64>,
+    /// Whether to update recent block hash before send.
+    pub update_recent_block_hash_before_send: bool,
+    /// RPC config.
+    pub config: RpcSendTransactionConfig,
+}
 
 /// Build transactions from [`RpcBuilder`].
 pub struct TransactionBuilder<'a, C> {
@@ -176,39 +189,63 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> TransactionBuilder<'a, C> {
     }
 
     /// Send all in order and returns the signatures of the success transactions.
-    pub async fn send_all(self) -> Result<Vec<Signature>, (Vec<Signature>, crate::Error)> {
-        self.send_all_with_opts(None, RpcSendTransactionConfig::default(), false)
-            .await
+    pub async fn send_all(
+        self,
+        skip_preflight: bool,
+    ) -> Result<Vec<Signature>, (Vec<Signature>, crate::Error)> {
+        self.send_all_with_opts(SendTransactionOptions {
+            config: RpcSendTransactionConfig {
+                skip_preflight,
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+        .await
     }
 
     /// Send all in order with the given options and returns the signatures of the success transactions.
     pub async fn send_all_with_opts(
         self,
-        compute_unit_price_micro_lamports: Option<u64>,
-        mut config: RpcSendTransactionConfig,
-        without_compute_budget: bool,
+        opts: SendTransactionOptions,
     ) -> Result<Vec<Signature>, (Vec<Signature>, crate::Error)> {
+        let SendTransactionOptions {
+            without_compute_budget,
+            compute_unit_price_micro_lamports,
+            update_recent_block_hash_before_send,
+            mut config,
+        } = opts;
         config.preflight_commitment = config
             .preflight_commitment
             .or(Some(self.client.commitment().commitment));
-        let txs = FuturesOrdered::from_iter(self.builders.into_iter().enumerate().map(
-            |(idx, builder)| async move {
+        let latest_hash = self
+            .client
+            .get_latest_blockhash()
+            .await
+            .map_err(|err| (vec![], anchor_client::ClientError::from(err).into()))?;
+        let txs = self
+            .builders
+            .into_iter()
+            .enumerate()
+            .map(|(idx, builder)| {
                 tracing::debug!(
                     size = builder.transaction_size(true),
                     "signing transaction {idx}"
                 );
-                builder
-                    .signed_transaction_with_options(
-                        without_compute_budget,
-                        compute_unit_price_micro_lamports,
-                    )
-                    .await
-            },
-        ))
-        .try_collect::<Vec<_>>()
+                builder.signed_transaction_with_blockhash_and_options(
+                    latest_hash,
+                    without_compute_budget,
+                    compute_unit_price_micro_lamports,
+                )
+            })
+            .collect::<crate::Result<Vec<_>>>()
+            .map_err(|err| (vec![], err))?;
+        send_all_txs(
+            &self.client,
+            txs,
+            config,
+            update_recent_block_hash_before_send,
+        )
         .await
-        .map_err(|err| (vec![], err))?;
-        send_all_txs(&self.client, txs, config).await
     }
 
     /// Estimate execution fee.
@@ -258,12 +295,27 @@ async fn send_all_txs(
     client: &RpcClient,
     txs: impl IntoIterator<Item = VersionedTransaction>,
     config: RpcSendTransactionConfig,
+    update_recent_block_hash_before_send: bool,
 ) -> Result<Vec<Signature>, (Vec<Signature>, crate::Error)> {
     let txs = txs.into_iter();
     let (min, max) = txs.size_hint();
     let mut signatures = Vec::with_capacity(max.unwrap_or(min));
     let mut error = None;
-    for (idx, tx) in txs.into_iter().enumerate() {
+    for (idx, mut tx) in txs.into_iter().enumerate() {
+        if update_recent_block_hash_before_send {
+            match client.get_latest_blockhash().await {
+                Ok(latest_blockhash) => match &mut tx.message {
+                    VersionedMessage::Legacy(message) => {
+                        message.recent_blockhash = latest_blockhash
+                    }
+                    VersionedMessage::V0(message) => message.recent_blockhash = latest_blockhash,
+                },
+                Err(err) => {
+                    error = Some(ClientError::from(err).into());
+                    break;
+                }
+            }
+        }
         tracing::debug!("sending transaction {idx}");
         match client
             .send_and_confirm_transaction_with_config(&tx, config)

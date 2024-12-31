@@ -28,7 +28,10 @@ use hermes::BinaryPriceUpdate;
 use pyth_sdk::Identifier;
 use pythnet_sdk::wire::v1::AccumulatorUpdateData;
 
-use crate::utils::{transaction_builder::rpc_builder::Program, RpcBuilder, TransactionBuilder};
+use crate::utils::{
+    transaction_builder::{rpc_builder::Program, SendTransactionOptions},
+    RpcBuilder, TransactionBuilder,
+};
 
 use self::wormhole::WORMHOLE_PROGRAM_ID;
 
@@ -84,14 +87,15 @@ where
 
         let mut signatures = match self
             .post
-            .send_all_with_opts(
+            .send_all_with_opts(SendTransactionOptions {
+                without_compute_budget: false,
                 compute_unit_price_micro_lamports,
-                RpcSendTransactionConfig {
+                update_recent_block_hash_before_send: false,
+                config: RpcSendTransactionConfig {
                     skip_preflight,
                     ..Default::default()
                 },
-                false,
-            )
+            })
             .await
         {
             Ok(signatures) => signatures,
@@ -104,14 +108,15 @@ where
         if error.is_none() {
             let mut consume_signatures = match self
                 .consume
-                .send_all_with_opts(
+                .send_all_with_opts(SendTransactionOptions {
+                    without_compute_budget: false,
                     compute_unit_price_micro_lamports,
-                    RpcSendTransactionConfig {
+                    update_recent_block_hash_before_send: false,
+                    config: RpcSendTransactionConfig {
                         skip_preflight,
                         ..Default::default()
                     },
-                    false,
-                )
+                })
                 .await
             {
                 Ok(signatures) => signatures,
@@ -126,14 +131,15 @@ where
 
         let mut close_signatures = match self
             .close
-            .send_all_with_opts(
+            .send_all_with_opts(SendTransactionOptions {
+                without_compute_budget: false,
                 compute_unit_price_micro_lamports,
-                RpcSendTransactionConfig {
+                update_recent_block_hash_before_send: false,
+                config: RpcSendTransactionConfig {
                     skip_preflight,
                     ..Default::default()
                 },
-                false,
-            )
+            })
             .await
         {
             Ok(signatures) => signatures,

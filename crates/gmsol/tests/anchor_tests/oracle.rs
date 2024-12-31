@@ -107,7 +107,7 @@ async fn use_chainlink_data_streams() -> eyre::Result<()> {
 
     let txs = execute.build().await?;
 
-    match txs.send_all().await {
+    match txs.send_all(false).await {
         Ok(signatures) => {
             tracing::info!("execute deposit successfully, txs={signatures:#?}");
         }

@@ -15,7 +15,7 @@ use gmsol::{
     types::{Deposit, DepositCreated, Order, OrderCreated, Withdrawal, WithdrawalCreated},
     utils::{
         builder::{MakeTransactionBuilder, SetExecutionFee},
-        ComputeBudget, ZeroCopy,
+        ComputeBudget, SendTransactionOptions, ZeroCopy,
     },
 };
 use gmsol_model::PositionState;
@@ -269,11 +269,10 @@ impl KeeperArgs {
                     let compute_unit_price_micro_lamports =
                         self.get_compute_budget().map(|budget| budget.price());
                     let signatures = builder
-                        .send_all_with_opts(
+                        .send_all_with_opts(SendTransactionOptions {
                             compute_unit_price_micro_lamports,
-                            Default::default(),
-                            false,
-                        )
+                            ..Default::default()
+                        })
                         .await?;
                     tracing::info!(%deposit, "executed deposit at tx {signatures:#?}");
                     println!("{signatures:#?}");
@@ -334,11 +333,10 @@ impl KeeperArgs {
                     let compute_unit_price_micro_lamports =
                         self.get_compute_budget().map(|budget| budget.price());
                     let signatures = builder
-                        .send_all_with_opts(
+                        .send_all_with_opts(SendTransactionOptions {
                             compute_unit_price_micro_lamports,
-                            Default::default(),
-                            false,
-                        )
+                            ..Default::default()
+                        })
                         .await?;
                     tracing::info!(%withdrawal, %execution_fee, "executed withdrawal with txs: {signatures:#?}");
                 }
@@ -424,11 +422,10 @@ impl KeeperArgs {
                     let compute_unit_price_micro_lamports =
                         self.get_compute_budget().map(|budget| budget.price());
                     let signatures = builder
-                        .send_all_with_opts(
+                        .send_all_with_opts(SendTransactionOptions {
                             compute_unit_price_micro_lamports,
-                            Default::default(),
-                            false,
-                        )
+                            ..Default::default()
+                        })
                         .await?;
                     tracing::info!(%order, %execution_fee, "executed order with txs: {signatures:#?}");
                 }
@@ -491,11 +488,10 @@ impl KeeperArgs {
                     let compute_unit_price_micro_lamports =
                         self.get_compute_budget().map(|budget| budget.price());
                     let signatures = builder
-                        .send_all_with_opts(
+                        .send_all_with_opts(SendTransactionOptions {
                             compute_unit_price_micro_lamports,
-                            Default::default(),
-                            false,
-                        )
+                            ..Default::default()
+                        })
                         .await?;
                     tracing::info!(%position, %execution_fee, "liquidated position with txs: {signatures:#?}");
                 }
@@ -570,11 +566,10 @@ impl KeeperArgs {
                     let compute_unit_price_micro_lamports =
                         self.get_compute_budget().map(|budget| budget.price());
                     let signatures = builder
-                        .send_all_with_opts(
+                        .send_all_with_opts(SendTransactionOptions {
                             compute_unit_price_micro_lamports,
-                            Default::default(),
-                            false,
-                        )
+                            ..Default::default()
+                        })
                         .await?;
                     tracing::info!(%position, %execution_fee, "auto-deleveraged position with txs: {signatures:#?}");
                 }

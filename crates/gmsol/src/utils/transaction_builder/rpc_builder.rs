@@ -444,7 +444,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone, T> RpcBuilder<'a, C, T> {
         )
     }
 
-    fn signed_transaction_with_blockhash_and_options(
+    pub(super) fn signed_transaction_with_blockhash_and_options(
         &self,
         latest_hash: Hash,
         without_compute_budget: bool,

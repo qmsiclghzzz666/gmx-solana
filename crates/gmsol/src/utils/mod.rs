@@ -49,7 +49,7 @@ pub use self::{
     token::price_to_min_output_amount,
     transaction_builder::{
         compute_budget::ComputeBudget, rpc_builder::RpcBuilder, transaction_size::transaction_size,
-        TransactionBuilder,
+        SendTransactionOptions, TransactionBuilder,
     },
     workarounds::{
         optional::fix_optional_account_metas,

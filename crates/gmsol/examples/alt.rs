@@ -33,7 +33,7 @@ async fn main() -> eyre::Result<()> {
     let random_address = Keypair::new();
     let signatures = client
         .extend_alt(&alt, vec![random_address.pubkey()], None)?
-        .send_all()
+        .send_all(false)
         .await
         .map_err(|(_, err)| err)?;
     tracing::info!(%alt, ?signatures, "ALT extended, new address={}", random_address.pubkey());

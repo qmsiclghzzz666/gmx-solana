@@ -36,7 +36,7 @@ use gmsol::{
         store_ops::StoreOps, token_config::TokenConfigOps,
     },
     types::{FactorKey, MarketConfigKey, PriceProviderKind, RoleKey, TokenConfigBuilder},
-    utils::{shared_signer, SignerRef, TransactionBuilder},
+    utils::{shared_signer, SendTransactionOptions, SignerRef, TransactionBuilder},
     Client, ClientOptions,
 };
 use rand::{rngs::StdRng, CryptoRng, RngCore, SeedableRng};
@@ -486,7 +486,7 @@ impl Deployment {
             builder.try_push(rpc).map_err(|(_, err)| err)?;
         }
 
-        match builder.send_all().await {
+        match builder.send_all(false).await {
             Ok(signatures) => {
                 tracing::info!("created tokens with {signatures:#?}");
             }
@@ -535,14 +535,13 @@ impl Deployment {
         }
 
         match builder
-            .send_all_with_opts(
-                None,
-                RpcSendTransactionConfig {
+            .send_all_with_opts(SendTransactionOptions {
+                config: RpcSendTransactionConfig {
                     skip_preflight: true,
                     ..Default::default()
                 },
-                false,
-            )
+                ..Default::default()
+            })
             .await
         {
             Ok(signatures) => {
@@ -587,7 +586,7 @@ impl Deployment {
             .push(client.grant_role(store, &keeper, RoleKey::GT_CONTROLLER))?;
 
         _ = builder
-            .send_all()
+            .send_all(false)
             .await.
             inspect(|signatures| {
                 tracing::info!("initialized store with txns: {signatures:#?}");
@@ -653,7 +652,7 @@ impl Deployment {
             .push(client.initialize_oracle(store, &self.oracle, None).await?.0)?;
 
         _ = builder
-            .send_all()
+            .send_all(false)
             .await.
             inspect(|signatures| {
                 tracing::info!("initialized token map with txns: {signatures:#?}");
@@ -728,7 +727,7 @@ impl Deployment {
             builder.push(rpc)?;
         }
         _ = builder
-            .send_all()
+            .send_all(false)
             .await
             .inspect(|signatures| {
                 tracing::info!("created markets with txns: {signatures:#?}");
@@ -767,7 +766,7 @@ impl Deployment {
         let signatures = self
             .client
             .extend_alt(&self.common_alt.key, addresses.clone(), None)?
-            .send_all()
+            .send_all(false)
             .await
             .map_err(|(_, err)| err)?;
 
@@ -789,7 +788,7 @@ impl Deployment {
         let signatures = self
             .client
             .extend_alt(&self.market_alt.key, addresses.clone(), None)?
-            .send_all()
+            .send_all(false)
             .await
             .map_err(|(_, err)| err)?;
 
@@ -873,7 +872,7 @@ impl Deployment {
             ),
         )?;
 
-        tx.send_all()
+        tx.send_all(false)
             .instrument(tracing::info_span!("initalize GT"))
             .await
             .inspect(|signatures| {
@@ -919,7 +918,7 @@ impl Deployment {
             false,
         )?;
 
-        match builder.send_all().await {
+        match builder.send_all(false).await {
             Ok(signatures) => {
                 tracing::info!("funded users with {signatures:#?}");
             }
@@ -958,7 +957,7 @@ impl Deployment {
                 .map_err(|(_, err)| err)?;
         }
 
-        match builder.send_all().await {
+        match builder.send_all(false).await {
             Ok(signatures) => {
                 tracing::info!("closed native token accounts with {signatures:#?}");
             }
@@ -989,7 +988,7 @@ impl Deployment {
                 .map_err(|(_, err)| err)?;
         }
 
-        match builder.send_all().await {
+        match builder.send_all(false).await {
             Ok(signatures) => {
                 tracing::info!("refunded the payer with {signatures:#?}");
             }
