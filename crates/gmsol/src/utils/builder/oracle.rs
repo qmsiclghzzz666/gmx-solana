@@ -2,6 +2,7 @@ use std::{future::Future, ops::Deref};
 
 use anchor_client::solana_sdk::{pubkey::Pubkey, signer::Signer};
 use gmsol_store::states::{common::TokensWithFeed, PriceProviderKind};
+use time::OffsetDateTime;
 
 use crate::utils::{RpcBuilder, TransactionBuilder};
 
@@ -31,12 +32,16 @@ impl<O: PullOracle, T> WithPullOracle<O, T> {
     }
 
     /// Fetch the required price updates and use them to construct transactions.
-    pub async fn new(pull_oracle: O, mut builder: T) -> crate::Result<Self>
+    pub async fn new(
+        pull_oracle: O,
+        mut builder: T,
+        after: Option<OffsetDateTime>,
+    ) -> crate::Result<Self>
     where
         T: PullOraclePriceConsumer,
     {
         let feed_ids = builder.feed_ids().await?;
-        let price_updates = pull_oracle.fetch_price_updates(&feed_ids).await?;
+        let price_updates = pull_oracle.fetch_price_updates(&feed_ids, after).await?;
 
         Ok(Self::with_price_updates(
             pull_oracle,
@@ -97,6 +102,7 @@ pub trait PullOracle {
     fn fetch_price_updates(
         &self,
         feed_ids: &FeedIds,
+        after: Option<OffsetDateTime>,
     ) -> impl Future<Output = crate::Result<Self::PriceUpdates>>;
 }
 

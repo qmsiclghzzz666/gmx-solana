@@ -11,7 +11,7 @@ use gmsol_store::{
     states::{
         common::{action::Action, swap::SwapParams, TokensWithFeed},
         withdrawal::Withdrawal,
-        NonceBytes, Pyth, TokenMapAccess,
+        NonceBytes, PriceProviderKind, Pyth, TokenMapAccess,
     },
 };
 
@@ -20,7 +20,13 @@ use crate::{
         token::TokenAccountOps,
         utils::{read_market, FeedsParser},
     },
-    utils::{fix_optional_account_metas, ComputeBudget, RpcBuilder, ZeroCopy},
+    utils::{
+        builder::{
+            FeedAddressMap, FeedIds, MakeTransactionBuilder, PullOraclePriceConsumer,
+            SetExecutionFee,
+        },
+        fix_optional_account_metas, ComputeBudget, RpcBuilder, TransactionBuilder, ZeroCopy,
+    },
 };
 
 use super::{generate_nonce, get_ata_or_owner, ExchangeOps};
@@ -497,12 +503,6 @@ where
         }
     }
 
-    /// Set execution fee.
-    pub fn execution_fee(&mut self, fee: u64) -> &mut Self {
-        self.execution_fee = fee;
-        self
-    }
-
     /// Set price provider to the given.
     pub fn price_provider(&mut self, program: Pubkey) -> &mut Self {
         self.price_provider = program;
@@ -567,9 +567,44 @@ where
         self.token_map = Some(address);
         self
     }
+}
 
-    /// Build [`RpcBuilder`] for `execute_withdrawal` instruction.
-    pub async fn build(&mut self) -> crate::Result<RpcBuilder<'a, C>> {
+#[cfg(feature = "pyth-pull-oracle")]
+mod pyth {
+    use crate::pyth::{pull_oracle::ExecuteWithPythPrices, PythPullOracleContext};
+
+    use super::*;
+
+    impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteWithPythPrices<'a, C>
+        for ExecuteWithdrawalBuilder<'a, C>
+    {
+        fn set_execution_fee(&mut self, lamports: u64) {
+            SetExecutionFee::set_execution_fee(self, lamports);
+        }
+
+        async fn context(&mut self) -> crate::Result<PythPullOracleContext> {
+            let hint = self.prepare_hint().await?;
+            let ctx = PythPullOracleContext::try_from_feeds(&hint.feeds)?;
+            Ok(ctx)
+        }
+
+        async fn build_rpc_with_price_updates(
+            &mut self,
+            price_updates: Prices,
+        ) -> crate::Result<Vec<crate::utils::RpcBuilder<'a, C, ()>>> {
+            let txns = self
+                .parse_with_pyth_price_updates(price_updates)
+                .build()
+                .await?;
+            Ok(txns.into_builders())
+        }
+    }
+}
+
+impl<'a, C: Deref<Target = impl Signer> + Clone> MakeTransactionBuilder<'a, C>
+    for ExecuteWithdrawalBuilder<'a, C>
+{
+    async fn build(&mut self) -> crate::Result<TransactionBuilder<'a, C>> {
         let authority = self.client.payer();
         let hint = self.prepare_hint().await?;
         let feeds = self
@@ -630,7 +665,7 @@ where
                     .collect::<Vec<_>>(),
             )
             .compute_budget(ComputeBudget::default().with_limit(EXECUTE_WITHDRAWAL_COMPUTE_BUDGET));
-        if self.close {
+        let rpc = if self.close {
             let close = self
                 .client
                 .close_withdrawal(&self.store, &self.withdrawal)
@@ -647,41 +682,41 @@ where
                 .reason("executed")
                 .build()
                 .await?;
-            Ok(execute.merge(close))
+            execute.merge(close)
         } else {
-            Ok(execute)
-        }
+            execute
+        };
+
+        let mut tx = self.client.transaction();
+
+        tx.try_push(rpc)?;
+
+        Ok(tx)
     }
 }
 
-#[cfg(feature = "pyth-pull-oracle")]
-mod pyth {
-    use crate::pyth::{pull_oracle::ExecuteWithPythPrices, PythPullOracleContext};
+impl<'a, C: Deref<Target = impl Signer> + Clone> PullOraclePriceConsumer
+    for ExecuteWithdrawalBuilder<'a, C>
+{
+    async fn feed_ids(&mut self) -> crate::Result<FeedIds> {
+        let hint = self.prepare_hint().await?;
+        Ok(hint.feeds)
+    }
 
-    use super::*;
+    fn process_feeds(
+        &mut self,
+        provider: PriceProviderKind,
+        map: FeedAddressMap,
+    ) -> crate::Result<()> {
+        self.feeds_parser
+            .insert_pull_oracle_feed_parser(provider, map);
+        Ok(())
+    }
+}
 
-    impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteWithPythPrices<'a, C>
-        for ExecuteWithdrawalBuilder<'a, C>
-    {
-        fn set_execution_fee(&mut self, lamports: u64) {
-            self.execution_fee(lamports);
-        }
-
-        async fn context(&mut self) -> crate::Result<PythPullOracleContext> {
-            let hint = self.prepare_hint().await?;
-            let ctx = PythPullOracleContext::try_from_feeds(&hint.feeds)?;
-            Ok(ctx)
-        }
-
-        async fn build_rpc_with_price_updates(
-            &mut self,
-            price_updates: Prices,
-        ) -> crate::Result<Vec<crate::utils::RpcBuilder<'a, C, ()>>> {
-            let rpc = self
-                .parse_with_pyth_price_updates(price_updates)
-                .build()
-                .await?;
-            Ok(vec![rpc])
-        }
+impl<'a, C> SetExecutionFee for ExecuteWithdrawalBuilder<'a, C> {
+    fn set_execution_fee(&mut self, lamports: u64) -> &mut Self {
+        self.execution_fee = lamports;
+        self
     }
 }

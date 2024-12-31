@@ -1,8 +1,7 @@
-use std::{ops::Deref, time::Duration};
+use std::time::Duration;
 
 use anchor_client::{
-    solana_client::{nonblocking::rpc_client::RpcClient, rpc_config::RpcSendTransactionConfig},
-    solana_sdk::{pubkey::Pubkey, signer::Signer},
+    solana_client::rpc_config::RpcSendTransactionConfig, solana_sdk::pubkey::Pubkey,
 };
 use futures_util::{FutureExt, TryFutureExt};
 use gmsol::{
@@ -16,7 +15,7 @@ use gmsol::{
     types::{Deposit, DepositCreated, Order, OrderCreated, Withdrawal, WithdrawalCreated},
     utils::{
         builder::{MakeTransactionBuilder, SetExecutionFee},
-        ComputeBudget, RpcBuilder, ZeroCopy,
+        ComputeBudget, ZeroCopy,
     },
 };
 use gmsol_model::PositionState;
@@ -119,26 +118,6 @@ impl KeeperArgs {
                 .with_limit(units)
                 .with_price(self.compute_unit_price),
         )
-    }
-
-    async fn get_or_estimate_execution_fee<S, C>(
-        &self,
-        client: &RpcClient,
-        mut rpc: RpcBuilder<'_, C>,
-    ) -> gmsol::Result<u64>
-    where
-        C: Deref<Target = S> + Clone,
-        S: Signer,
-    {
-        if let Some(fee) = self.execution_fee {
-            return Ok(fee);
-        }
-        if let Some(budget) = self.get_compute_budget() {
-            rpc = rpc.compute_budget(budget);
-        } else {
-            rpc.compute_budget_mut().set_price(self.compute_unit_price);
-        }
-        rpc.estimate_execution_fee(client, None).await
     }
 
     fn use_pyth_pull_oracle(&self) -> bool {
@@ -304,12 +283,20 @@ impl KeeperArgs {
                 let mut builder =
                     client.execute_withdrawal(store, self.oracle()?, withdrawal, true);
                 let execution_fee = self
-                    .get_or_estimate_execution_fee(
-                        &client.store_program().solana_rpc(),
-                        builder.build().await?,
-                    )
+                    .execution_fee
+                    .map(|fee| futures_util::future::ready(Ok(fee)).left_future())
+                    .unwrap_or_else(|| {
+                        builder
+                            .build()
+                            .and_then(|builder| async move {
+                                builder
+                                    .estimate_execution_fee(Some(self.compute_unit_price))
+                                    .await
+                            })
+                            .right_future()
+                    })
                     .await?;
-                builder.execution_fee(execution_fee);
+                builder.set_execution_fee(execution_fee);
                 if self.use_pyth_pull_oracle() {
                     let hint = builder.prepare_hint().await?;
                     let ctx = PythPullOracleContext::try_from_feeds(&hint.feeds)?;
@@ -324,11 +311,11 @@ impl KeeperArgs {
                         .await?;
                     let with_prices = oracle
                         .with_pyth_prices(&ctx, &update, |prices| async {
-                            let rpc = builder
+                            let txns = builder
                                 .parse_with_pyth_price_updates(prices)
                                 .build()
                                 .await?;
-                            Ok(Some(rpc))
+                            Ok(txns)
                         })
                         .await?;
                     match with_prices
@@ -343,13 +330,17 @@ impl KeeperArgs {
                         }
                     }
                 } else {
-                    let mut rpc = builder.build().await?;
-                    if let Some(budget) = self.get_compute_budget() {
-                        rpc = rpc.compute_budget(budget)
-                    }
-                    let signature = rpc.into_anchor_request().send().await?;
-                    tracing::info!(%withdrawal, "executed withdrawal at tx {signature}");
-                    println!("{signature}");
+                    let builder = builder.build().await?;
+                    let compute_unit_price_micro_lamports =
+                        self.get_compute_budget().map(|budget| budget.price());
+                    let signatures = builder
+                        .send_all_with_opts(
+                            compute_unit_price_micro_lamports,
+                            Default::default(),
+                            false,
+                        )
+                        .await?;
+                    tracing::info!(%withdrawal, %execution_fee, "executed withdrawal with txs: {signatures:#?}");
                 }
             }
             Command::ExecuteOrder { order } => {
@@ -395,7 +386,7 @@ impl KeeperArgs {
                             .right_future()
                     })
                     .await?;
-                builder.execution_fee(execution_fee);
+                builder.set_execution_fee(execution_fee);
                 if self.use_pyth_pull_oracle() {
                     let hint = builder.prepare_hint().await?;
                     let ctx = PythPullOracleContext::try_from_feeds(&hint.feeds)?;

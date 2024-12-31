@@ -2,7 +2,7 @@ use anchor_client::solana_sdk::pubkey::Pubkey;
 use anchor_spl::{associated_token::get_associated_token_address, token_interface::TokenAccount};
 use gmsol::{
     client::SystemProgramOps,
-    pyth::{pull_oracle::PythPullOracleWithHermes, PythPullOracle},
+    pyth::{pull_oracle::PythPullOracleWithHermes, Hermes, PythPullOracle},
     treasury::{CreateTreasurySwapOptions, TreasuryOps},
     utils::builder::{MakeTransactionBuilder, WithPullOracle},
 };
@@ -218,13 +218,14 @@ impl Args {
             } => {
                 let gt_exchange_vault = gt_exchange_vault.get(store, client).await?;
                 let builder = client.confirm_gt_buyback(store, &gt_exchange_vault, oracle);
+                let hermes = Hermes::default();
+                let oracle = PythPullOracle::try_new(client)?;
                 // TODO: add support for chainlink.
-                let pyth = PythPullOracleWithHermes::from_parts(
-                    client,
-                    Default::default(),
-                    PythPullOracle::try_new(client)?,
-                );
-                let txns = WithPullOracle::new(&pyth, builder).await?.build().await?;
+                let pyth = PythPullOracleWithHermes::from_parts(client, &hermes, &oracle);
+                let txns = WithPullOracle::new(&pyth, builder, None)
+                    .await?
+                    .build()
+                    .await?;
 
                 return crate::utils::send_or_serialize_transactions(
                     txns,

@@ -20,7 +20,7 @@ use gmsol_store::{
         order::{Order, OrderKind},
         position::PositionKind,
         user::UserHeader,
-        Market, MarketMeta, NonceBytes, Pyth, Store, TokenMapAccess,
+        Market, MarketMeta, NonceBytes, PriceProviderKind, Pyth, Store, TokenMapAccess,
     },
 };
 
@@ -30,6 +30,10 @@ use crate::{
         utils::{read_market, read_store, FeedsParser},
     },
     utils::{
+        builder::{
+            FeedAddressMap, FeedIds, MakeTransactionBuilder, PullOraclePriceConsumer,
+            SetExecutionFee,
+        },
         fix_optional_account_metas, ComputeBudget, RpcBuilder, TokenAccountParams,
         TransactionBuilder, ZeroCopy,
     },
@@ -709,12 +713,6 @@ where
         })
     }
 
-    /// Set execution fee.
-    pub fn execution_fee(&mut self, fee: u64) -> &mut Self {
-        self.execution_fee = fee;
-        self
-    }
-
     /// Set price provider to the given.
     pub fn price_provider(&mut self, program: Pubkey) -> &mut Self {
         self.price_provider = program;
@@ -864,9 +862,12 @@ where
         self.token_map = Some(address);
         self
     }
+}
 
-    /// Build [`TransactionBuilder`] for `execute_order` instructions.
-    pub async fn build(&mut self) -> crate::Result<TransactionBuilder<'a, C>> {
+impl<'a, C: Deref<Target = impl Signer> + Clone> MakeTransactionBuilder<'a, C>
+    for ExecuteOrderBuilder<'a, C>
+{
+    async fn build(&mut self) -> crate::Result<TransactionBuilder<'a, C>> {
         let hint = self.prepare_hint().await?;
         let [claimable_long_token_account_for_user, claimable_short_token_account_for_user, claimable_pnl_token_account_for_holding] =
             self.claimable_accounts().await?;
@@ -1112,6 +1113,32 @@ where
             .try_push(execute_order)?
             .try_push(post_builder)?;
         Ok(transaction_builder)
+    }
+}
+
+impl<'a, C: Deref<Target = impl Signer> + Clone> PullOraclePriceConsumer
+    for ExecuteOrderBuilder<'a, C>
+{
+    async fn feed_ids(&mut self) -> crate::Result<FeedIds> {
+        let hint = self.prepare_hint().await?;
+        Ok(hint.feeds)
+    }
+
+    fn process_feeds(
+        &mut self,
+        provider: PriceProviderKind,
+        map: FeedAddressMap,
+    ) -> crate::Result<()> {
+        self.feeds_parser
+            .insert_pull_oracle_feed_parser(provider, map);
+        Ok(())
+    }
+}
+
+impl<'a, C> SetExecutionFee for ExecuteOrderBuilder<'a, C> {
+    fn set_execution_fee(&mut self, lamports: u64) -> &mut Self {
+        self.execution_fee = lamports;
+        self
     }
 }
 
@@ -1436,7 +1463,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteWithPythPrices<'a, C>
     for ExecuteOrderBuilder<'a, C>
 {
     fn set_execution_fee(&mut self, lamports: u64) {
-        self.execution_fee(lamports);
+        SetExecutionFee::set_execution_fee(self, lamports);
     }
 
     async fn context(&mut self) -> crate::Result<PythPullOracleContext> {

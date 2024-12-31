@@ -7,6 +7,7 @@ use anchor_client::solana_sdk::{pubkey::Pubkey, signature::Keypair, signer::Sign
 use either::Either;
 use gmsol_store::states::PriceProviderKind;
 use pythnet_sdk::wire::v1::AccumulatorUpdateData;
+use time::OffsetDateTime;
 
 use crate::{
     pyth::{EncodingType, Hermes},
@@ -21,8 +22,8 @@ use super::{
 /// Pyth Pull Oracle.
 pub struct PythPullOracleWithHermes<'a, C> {
     gmsol: &'a crate::Client<C>,
-    hermes: Hermes,
-    oracle: PythPullOracle<C>,
+    hermes: &'a Hermes,
+    oracle: &'a PythPullOracle<C>,
 }
 
 /// Price updates.
@@ -35,8 +36,8 @@ impl<'a, C> PythPullOracleWithHermes<'a, C> {
     /// Create from parts.
     pub fn from_parts(
         gmsol: &'a crate::Client<C>,
-        hermes: Hermes,
-        oracle: PythPullOracle<C>,
+        hermes: &'a Hermes,
+        oracle: &'a PythPullOracle<C>,
     ) -> Self {
         Self {
             gmsol,
@@ -46,19 +47,35 @@ impl<'a, C> PythPullOracleWithHermes<'a, C> {
     }
 }
 
-impl<'r, 'a, C> PullOracle for &'r PythPullOracleWithHermes<'a, C> {
+impl<'a, C> PullOracle for PythPullOracleWithHermes<'a, C> {
     type PriceUpdates = PriceUpdates;
 
     fn provider_kind(&self) -> PriceProviderKind {
         PriceProviderKind::Pyth
     }
 
-    async fn fetch_price_updates(&self, feed_ids: &FeedIds) -> crate::Result<Self::PriceUpdates> {
+    async fn fetch_price_updates(
+        &self,
+        feed_ids: &FeedIds,
+        after: Option<OffsetDateTime>,
+    ) -> crate::Result<Self::PriceUpdates> {
         let feed_ids = utils::extract_pyth_feed_ids(feed_ids)?;
         let update = self
             .hermes
             .latest_price_updates(&feed_ids, Some(EncodingType::Base64))
             .await?;
+        if let Some(after) = after {
+            let min_ts = update
+                .min_timestamp()
+                .ok_or_else(|| crate::Error::invalid_argument("empty price updates"))?;
+            let min_ts = OffsetDateTime::from_unix_timestamp(min_ts)
+                .map_err(crate::Error::invalid_argument)?;
+            if min_ts < after {
+                return Err(crate::Error::invalid_argument(format!(
+                    "price updates are too old, min_ts={min_ts}, required={after}"
+                )));
+            }
+        }
         Ok(PriceUpdates {
             num_feeds: feed_ids.len(),
             updates: vec![update],
@@ -66,10 +83,24 @@ impl<'r, 'a, C> PullOracle for &'r PythPullOracleWithHermes<'a, C> {
     }
 }
 
-impl<'r, 'a, C: Deref<Target = impl Signer> + Clone> PullOracleOps<'a, C>
-    for &'r PythPullOracleWithHermes<'a, C>
-where
-    'r: 'a,
+impl<'r, 'a, C> PullOracle for &'r PythPullOracleWithHermes<'a, C> {
+    type PriceUpdates = PriceUpdates;
+
+    fn provider_kind(&self) -> PriceProviderKind {
+        (*self).provider_kind()
+    }
+
+    async fn fetch_price_updates(
+        &self,
+        feed_ids: &FeedIds,
+        after: Option<OffsetDateTime>,
+    ) -> crate::Result<Self::PriceUpdates> {
+        (*self).fetch_price_updates(feed_ids, after).await
+    }
+}
+
+impl<'a, C: Deref<Target = impl Signer> + Clone> PullOracleOps<'a, C>
+    for PythPullOracleWithHermes<'a, C>
 {
     async fn fetch_price_update_instructions(
         &self,
@@ -167,5 +198,18 @@ where
         }
 
         Ok((ixns, prices))
+    }
+}
+
+impl<'r, 'a, C: Deref<Target = impl Signer> + Clone> PullOracleOps<'a, C>
+    for &'r PythPullOracleWithHermes<'a, C>
+where
+    'r: 'a,
+{
+    async fn fetch_price_update_instructions(
+        &self,
+        price_updates: &Self::PriceUpdates,
+    ) -> crate::Result<(PriceUpdateInstructions<'a, C>, FeedAddressMap)> {
+        (*self).fetch_price_update_instructions(price_updates).await
     }
 }

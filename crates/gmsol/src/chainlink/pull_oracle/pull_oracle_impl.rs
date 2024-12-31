@@ -2,6 +2,7 @@ use std::{collections::HashMap, ops::Deref};
 
 use anchor_client::solana_sdk::{pubkey::Pubkey, signer::Signer};
 use gmsol_store::states::PriceProviderKind;
+use time::OffsetDateTime;
 
 use crate::{
     store::{oracle::OracleOps, utils::Feeds},
@@ -103,7 +104,11 @@ impl<'r, 'a, C> PullOracle for &'r ChainlinkPullOracle<'a, C> {
         PriceProviderKind::ChainlinkDataStreams
     }
 
-    async fn fetch_price_updates(&self, feed_ids: &FeedIds) -> crate::Result<Self::PriceUpdates> {
+    async fn fetch_price_updates(
+        &self,
+        feed_ids: &FeedIds,
+        after: Option<OffsetDateTime>,
+    ) -> crate::Result<Self::PriceUpdates> {
         let feed_ids = Feeds::new(feed_ids)
             .filter_map(|res| {
                 res.map(|(provider, feed)| {
@@ -118,13 +123,28 @@ impl<'r, 'a, C> PullOracle for &'r ChainlinkPullOracle<'a, C> {
             .iter()
             .map(|feed_id| self.chainlink.latest_report(feed_id));
         let price_updates = futures_util::future::try_join_all(tasks).await?;
-        price_updates
+
+        let updates = price_updates
             .into_iter()
             .map(|report| {
                 let feed_id = report.decode_feed_id()?;
+                let ts = report.observations_timestamp;
+
+                if let Some(after) = after {
+                    let ts = OffsetDateTime::from_unix_timestamp(ts)
+                        .map_err(crate::Error::invalid_argument)?;
+                    if after > ts {
+                        return Err(crate::Error::invalid_argument(format!(
+                            "price updates are too old, ts={ts}, required={after}"
+                        )));
+                    }
+                }
+
                 Ok((feed_id, report.into_data()))
             })
-            .collect()
+            .collect::<crate::Result<HashMap<_, _>>>()?;
+
+        Ok(updates)
     }
 }
 
