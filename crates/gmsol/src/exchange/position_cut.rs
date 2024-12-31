@@ -9,15 +9,21 @@ use gmsol_store::{
     accounts, instruction,
     ops::order::PositionCutKind,
     states::{
-        common::TokensWithFeed, user::UserHeader, MarketMeta, NonceBytes, Position, Pyth, Store,
-        TokenMap,
+        common::TokensWithFeed, user::UserHeader, MarketMeta, NonceBytes, Position,
+        PriceProviderKind, Pyth, Store, TokenMap,
     },
 };
 
 use crate::{
     exchange::generate_nonce,
     store::{token::TokenAccountOps, utils::FeedsParser},
-    utils::{fix_optional_account_metas, ComputeBudget, TransactionBuilder, ZeroCopy},
+    utils::{
+        builder::{
+            FeedAddressMap, FeedIds, MakeTransactionBuilder, PullOraclePriceConsumer,
+            SetExecutionFee,
+        },
+        fix_optional_account_metas, ComputeBudget, TransactionBuilder, ZeroCopy,
+    },
 };
 
 use super::{
@@ -210,12 +216,6 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> PositionCutBuilder<'a, C> {
         self
     }
 
-    /// Set execution fee.
-    pub fn execution_fee(&mut self, lamports: u64) -> &mut Self {
-        self.execution_fee = lamports;
-        self
-    }
-
     /// Insert an Address Lookup Table.
     pub fn add_alt(&mut self, account: AddressLookupTableAccount) -> &mut Self {
         self.alts.insert(account.key, account.addresses);
@@ -228,9 +228,38 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> PositionCutBuilder<'a, C> {
         self.feeds_parser.with_pyth_price_updates(price_updates);
         self
     }
+}
 
-    /// Build [`TransactionBuilder`] for position cut.
-    pub async fn build(&mut self) -> crate::Result<TransactionBuilder<'a, C>> {
+#[cfg(feature = "pyth-pull-oracle")]
+impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteWithPythPrices<'a, C>
+    for PositionCutBuilder<'a, C>
+{
+    fn set_execution_fee(&mut self, lamports: u64) {
+        SetExecutionFee::set_execution_fee(self, lamports);
+    }
+
+    async fn context(&mut self) -> crate::Result<PythPullOracleContext> {
+        let hint = self.prepare_hint().await?;
+        let ctx = PythPullOracleContext::try_from_feeds(hint.feeds())?;
+        Ok(ctx)
+    }
+
+    async fn build_rpc_with_price_updates(
+        &mut self,
+        price_updates: Prices,
+    ) -> crate::Result<Vec<crate::utils::RpcBuilder<'a, C, ()>>> {
+        let tx = self
+            .parse_with_pyth_price_updates(price_updates)
+            .build()
+            .await?;
+        Ok(tx.into_builders())
+    }
+}
+
+impl<'a, C: Deref<Target = impl Signer> + Clone> MakeTransactionBuilder<'a, C>
+    for PositionCutBuilder<'a, C>
+{
+    async fn build(&mut self) -> crate::Result<TransactionBuilder<'a, C>> {
         let token_program_id = anchor_spl::token::ID;
 
         let payer = self.client.payer();
@@ -421,28 +450,28 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> PositionCutBuilder<'a, C> {
     }
 }
 
-#[cfg(feature = "pyth-pull-oracle")]
-impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteWithPythPrices<'a, C>
+impl<'a, C: Deref<Target = impl Signer> + Clone> PullOraclePriceConsumer
     for PositionCutBuilder<'a, C>
 {
-    fn set_execution_fee(&mut self, lamports: u64) {
-        self.execution_fee(lamports);
-    }
-
-    async fn context(&mut self) -> crate::Result<PythPullOracleContext> {
+    async fn feed_ids(&mut self) -> crate::Result<FeedIds> {
         let hint = self.prepare_hint().await?;
-        let ctx = PythPullOracleContext::try_from_feeds(hint.feeds())?;
-        Ok(ctx)
+        Ok(hint.tokens_with_feed)
     }
 
-    async fn build_rpc_with_price_updates(
+    fn process_feeds(
         &mut self,
-        price_updates: Prices,
-    ) -> crate::Result<Vec<crate::utils::RpcBuilder<'a, C, ()>>> {
-        let tx = self
-            .parse_with_pyth_price_updates(price_updates)
-            .build()
-            .await?;
-        Ok(tx.into_builders())
+        provider: PriceProviderKind,
+        map: FeedAddressMap,
+    ) -> crate::Result<()> {
+        self.feeds_parser
+            .insert_pull_oracle_feed_parser(provider, map);
+        Ok(())
+    }
+}
+
+impl<'a, C> SetExecutionFee for PositionCutBuilder<'a, C> {
+    fn set_execution_fee(&mut self, lamports: u64) -> &mut Self {
+        self.execution_fee = lamports;
+        self
     }
 }
