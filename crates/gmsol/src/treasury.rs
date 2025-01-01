@@ -113,6 +113,7 @@ pub trait TreasuryOps<C> {
         store: &Pubkey,
         market_token: &Pubkey,
         token_mint: &Pubkey,
+        min_amount: u64,
     ) -> RpcBuilder<C>;
 
     /// Prepare GT bank.
@@ -471,6 +472,7 @@ where
         store: &Pubkey,
         market_token: &Pubkey,
         token_mint: &Pubkey,
+        min_amount: u64,
     ) -> RpcBuilder<C> {
         let config = self.find_config_address(store);
         let token_program_id = anchor_spl::token::ID;
@@ -478,7 +480,7 @@ where
         let receiver_vault =
             get_associated_token_address_with_program_id(&receiver, token_mint, &token_program_id);
         self.treasury_rpc()
-            .args(instruction::ClaimFees {})
+            .args(instruction::ClaimFees { min_amount })
             .accounts(accounts::ClaimFees {
                 authority: self.payer(),
                 store: *store,

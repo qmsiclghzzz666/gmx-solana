@@ -138,10 +138,13 @@ pub struct ClaimFees<'info> {
 /// Claim fees from a market.
 /// # CHECK
 /// Only [`TREASURY_KEEPER`](crate::roles::TREASURY_KEEPER) can use.
-pub(crate) fn unchecked_claim_fees(ctx: Context<ClaimFees>) -> Result<()> {
+pub(crate) fn unchecked_claim_fees(ctx: Context<ClaimFees>, min_amount: u64) -> Result<()> {
     let signer = ReceiverSigner::new(ctx.accounts.config.key(), ctx.bumps.receiver);
     let cpi_ctx = ctx.accounts.claim_fees_from_market_ctx();
     let amount = claim_fees_from_market(cpi_ctx.with_signer(&[&signer.as_seeds()]))?;
+
+    require_gte!(amount.get(), min_amount, CoreError::NotEnoughTokenAmount);
+
     msg!("[Treasury] claimed {} tokens from the market", amount.get());
     Ok(())
 }

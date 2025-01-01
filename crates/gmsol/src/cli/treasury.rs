@@ -59,6 +59,8 @@ enum Command {
         deposit: bool,
         #[arg(long)]
         token_program_id: Option<Pubkey>,
+        #[arg(long, short, default_value_t = 1)]
+        min_amount: u64,
     },
     /// Deposit into treasury vault.
     DepositToTreasury {
@@ -160,6 +162,7 @@ impl Args {
                 side,
                 deposit,
                 token_program_id,
+                min_amount,
             } => {
                 let market = client.find_market_address(store, market_token);
                 let market = client.market(&market).await?;
@@ -170,7 +173,12 @@ impl Args {
                     ));
                 }
                 let token_mint = market.meta().pnl_token(side.is_long());
-                let claim = client.claim_fees_to_receiver_vault(store, market_token, &token_mint);
+                let claim = client.claim_fees_to_receiver_vault(
+                    store,
+                    market_token,
+                    &token_mint,
+                    *min_amount,
+                );
 
                 if *deposit {
                     let store_account = client.store(store).await?;

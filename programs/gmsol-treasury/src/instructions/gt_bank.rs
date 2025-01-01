@@ -149,7 +149,11 @@ pub struct SyncGtBank<'info> {
     /// Treasury Config.
     #[account(
         has_one = config,
-        constraint = treasury_config.load()?.is_deposit_allowed(&token.key())? @ CoreError::InvalidArgument,
+        // As long as the treasury allows withdrawals of the given token,
+        // deposits from GT Bank remain permitted. Disabling deposits for
+        // that token won't affect GT Bank deposits already made, which
+        // in turn helps the treasury recover those funds.
+        constraint = treasury_config.load()?.is_withdrawal_allowed(&token.key())? @ CoreError::InvalidArgument,
     )]
     pub treasury_config: AccountLoader<'info, TreasuryConfig>,
     /// GT bank.
@@ -193,26 +197,25 @@ pub(crate) fn unchecked_sync_gt_bank(ctx: Context<SyncGtBank>) -> Result<()> {
         let recorded_balance = gt_bank.get_balance(&token).unwrap_or(0);
         let balance = ctx.accounts.gt_bank_vault.amount;
 
-        require_gte!(balance, recorded_balance, CoreError::NotEnoughTokenAmount);
-
         balance
             .checked_sub(recorded_balance)
             .ok_or_else(|| error!(CoreError::NotEnoughTokenAmount))?
     };
 
-    if delta != 0 {
-        let cpi_ctx = ctx.accounts.transfer_checked_ctx();
-        let signer = ctx.accounts.gt_bank.load()?.signer();
-        transfer_checked(
-            cpi_ctx.with_signer(&[&signer.as_seeds()]),
-            delta,
-            ctx.accounts.token.decimals,
-        )?;
-        msg!(
-            "[Treasury] Synced GT Bank balance, deposit exceeding {} tokens into treasury",
-            delta
-        );
-    }
+    // Check if the balance is already in sync.
+    require_neq!(delta, 0, CoreError::PreconditionsAreNotMet);
+
+    let cpi_ctx = ctx.accounts.transfer_checked_ctx();
+    let signer = ctx.accounts.gt_bank.load()?.signer();
+    transfer_checked(
+        cpi_ctx.with_signer(&[&signer.as_seeds()]),
+        delta,
+        ctx.accounts.token.decimals,
+    )?;
+    msg!(
+        "[Treasury] Synced GT Bank balance, deposit exceeding {} tokens into treasury",
+        delta
+    );
 
     Ok(())
 }
