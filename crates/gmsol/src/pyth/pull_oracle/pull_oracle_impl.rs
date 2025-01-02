@@ -11,7 +11,7 @@ use time::OffsetDateTime;
 
 use crate::{
     pyth::{EncodingType, Hermes},
-    utils::builder::{FeedAddressMap, FeedIds, PriceUpdateInstructions, PullOracle, PullOracleOps},
+    utils::builder::{FeedAddressMap, FeedIds, PriceUpdateInstructions, PullOracle, PostPullOraclePrices},
 };
 
 use super::{
@@ -108,7 +108,7 @@ impl<'r, 'a, C> PullOracle for &'r PythPullOracleWithHermes<'a, C> {
     }
 }
 
-impl<'a, C: Deref<Target = impl Signer> + Clone> PullOracleOps<'a, C>
+impl<'a, C: Deref<Target = impl Signer> + Clone> PostPullOraclePrices<'a, C>
     for PythPullOracleWithHermes<'a, C>
 {
     async fn fetch_price_update_instructions(
@@ -209,7 +209,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> PullOracleOps<'a, C>
     }
 }
 
-impl<'r, 'a, C: Deref<Target = impl Signer> + Clone> PullOracleOps<'a, C>
+impl<'r, 'a, C: Deref<Target = impl Signer> + Clone> PostPullOraclePrices<'a, C>
     for &'r PythPullOracleWithHermes<'a, C>
 where
     'r: 'a,

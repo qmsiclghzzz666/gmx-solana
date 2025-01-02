@@ -6,7 +6,9 @@ use time::OffsetDateTime;
 
 use crate::{
     store::{oracle::OracleOps, utils::Feeds},
-    utils::builder::{FeedAddressMap, FeedIds, PriceUpdateInstructions, PullOracle, PullOracleOps},
+    utils::builder::{
+        FeedAddressMap, FeedIds, PostPullOraclePrices, PriceUpdateInstructions, PullOracle,
+    },
 };
 
 use super::{client::ApiReportData, Client, FeedId};
@@ -167,7 +169,7 @@ impl<'r, 'a, C> PullOracle for &'r ChainlinkPullOracle<'a, C> {
     }
 }
 
-impl<'r, 'a, C: Deref<Target = impl Signer> + Clone> PullOracleOps<'a, C>
+impl<'r, 'a, C: Deref<Target = impl Signer> + Clone> PostPullOraclePrices<'a, C>
     for &'r ChainlinkPullOracle<'a, C>
 {
     async fn fetch_price_update_instructions(

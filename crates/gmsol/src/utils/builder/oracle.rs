@@ -54,7 +54,7 @@ impl<O: PullOracle, T> WithPullOracle<O, T> {
 impl<'a, C: Deref<Target = impl Signer> + Clone, O, T> MakeTransactionBuilder<'a, C>
     for WithPullOracle<O, T>
 where
-    O: PullOracleOps<'a, C>,
+    O: PostPullOraclePrices<'a, C>,
     T: PullOraclePriceConsumer + MakeTransactionBuilder<'a, C>,
 {
     async fn build(&mut self) -> crate::Result<TransactionBuilder<'a, C>> {
@@ -140,10 +140,17 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> PriceUpdateInstructions<'a, C> 
         self.close.try_push(instruction)?;
         Ok(())
     }
+
+    /// Merge.
+    pub fn merge(&mut self, other: Self) -> crate::Result<()> {
+        self.post.append(other.post, false)?;
+        self.close.append(other.close, false)?;
+        Ok(())
+    }
 }
 
-/// Pull Oracle Operations.
-pub trait PullOracleOps<'a, C>: PullOracle {
+/// Post pull oracle price updates.
+pub trait PostPullOraclePrices<'a, C>: PullOracle {
     /// Fetch instructions to post the price updates.
     fn fetch_price_update_instructions(
         &self,
