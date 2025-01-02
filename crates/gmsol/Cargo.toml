@@ -78,6 +78,8 @@ anchor-test = [
 
 mock = ["mock-chainlink-verifier"]
 
+devnet = []
+
 [dependencies]
 gmsol-utils = { workspace = true }
 gmsol-store = { workspace = true, features = [
@@ -131,6 +133,7 @@ rust-embed = { workspace = true, optional = true }
 poem = { workspace = true, optional = true }
 indexmap = { workspace = true, features = ["serde"] }
 time = { workspace = true }
+solana-sdk = { workspace = true }
 solana-account-decoder = { workspace = true }
 solana-transaction-status = { workspace = true }
 serde = { workspace = true, features = ["derive"] }

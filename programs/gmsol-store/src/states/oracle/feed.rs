@@ -213,29 +213,35 @@ impl PriceFeedPrice {
         use chainlink_datastreams::report::Report;
         use gmsol_utils::price::{find_divisor_decimals, TEN, U192};
 
-        let max_price = Report::max_price();
+        let price = report
+            .non_negative_price()
+            .ok_or_else(|| error!(CoreError::NegativePriceIsNotSupported))?;
+        let bid = report
+            .non_negative_bid()
+            .ok_or_else(|| error!(CoreError::NegativePriceIsNotSupported))?;
+        let ask = report
+            .non_negative_ask()
+            .ok_or_else(|| error!(CoreError::NegativePriceIsNotSupported))?;
 
-        require!(max_price >= report.price, CoreError::InvalidPriceReport);
-        require!(max_price >= report.bid, CoreError::InvalidPriceReport);
-        require!(max_price >= report.ask, CoreError::InvalidPriceReport);
+        require!(ask >= price, CoreError::InvalidPriceReport);
+        require!(price >= bid, CoreError::InvalidPriceReport);
 
-        require!(report.ask >= report.price, CoreError::InvalidPriceReport);
-        require!(report.price >= report.bid, CoreError::InvalidPriceReport);
-
-        let divisor_decimals = find_divisor_decimals(&report.ask);
+        let divisor_decimals = find_divisor_decimals(&ask);
 
         require_gte!(Report::DECIMALS, divisor_decimals, CoreError::PriceOverflow);
 
         let divisor = TEN.pow(U192::from(divisor_decimals));
+
+        debug_assert!(!divisor.is_zero());
 
         let mut price = Self {
             decimals: Report::DECIMALS - divisor_decimals,
             flags: Default::default(),
             padding: [0; 6],
             ts: i64::from(report.observations_timestamp),
-            price: (report.price / divisor).try_into().unwrap(),
-            min_price: (report.bid / divisor).try_into().unwrap(),
-            max_price: (report.ask / divisor).try_into().unwrap(),
+            price: (price / divisor).try_into().unwrap(),
+            min_price: (bid / divisor).try_into().unwrap(),
+            max_price: (ask / divisor).try_into().unwrap(),
         };
 
         price.flags.set_flag(PriceFlag::Open, true);

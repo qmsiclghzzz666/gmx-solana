@@ -1,11 +1,21 @@
 use std::fmt;
 
-use ruint::aliases::{U192, U256};
+use num_bigint::{BigInt, BigUint};
+use ruint::aliases::U192;
+
+use data_streams_report::{
+    feed_id::ID,
+    report::{base::ReportError, v3::ReportDataV3},
+};
+
+type Sign = bool;
+
+type Signed = (Sign, U192);
 
 /// Report.
 pub struct Report {
     /// The stream ID the report has data for.
-    pub feed_id: [u8; 32],
+    pub feed_id: ID,
     /// Earliest timestamp for which price is applicable.
     pub valid_from_timestamp: u32,
     /// Latest timestamp for which price is applicable.
@@ -13,22 +23,33 @@ pub struct Report {
     native_fee: U192,
     link_fee: U192,
     expires_at: u32,
-    // FIXME: the following types should be I192.
     /// DON consensus median price (8 or 18 decimals).
-    pub price: U192,
+    price: Signed,
     /// Simulated price impact of a buy order up to the X% depth of liquidity utilisation (8 or 18 decimals).
-    pub bid: U192,
+    bid: Signed,
     /// Simulated price impact of a sell order up to the X% depth of liquidity utilisation (8 or 18 decimals).
-    pub ask: U192,
+    ask: Signed,
 }
 
 impl Report {
     /// Decimals.
     pub const DECIMALS: u8 = 18;
 
-    /// Get max possible price.
-    pub fn max_price() -> U192 {
-        (U192::MAX >> 1) - U192::from(1)
+    const WORD_SIZE: usize = 32;
+
+    /// Get non-negative price.
+    pub fn non_negative_price(&self) -> Option<U192> {
+        non_negative(self.price)
+    }
+
+    /// Get non-negative bid.
+    pub fn non_negative_bid(&self) -> Option<U192> {
+        non_negative(self.bid)
+    }
+
+    /// Get non-negative ask.
+    pub fn non_negative_ask(&self) -> Option<U192> {
+        non_negative(self.ask)
     }
 }
 
@@ -41,9 +62,9 @@ impl fmt::Debug for Report {
             .field("native_fee", self.native_fee.as_limbs())
             .field("link_fee", self.link_fee.as_limbs())
             .field("expires_at", &self.expires_at)
-            .field("price", self.price.as_limbs())
-            .field("bid", self.bid.as_limbs())
-            .field("ask", self.ask.as_limbs())
+            .field("price", self.price.1.as_limbs())
+            .field("bid", self.bid.1.as_limbs())
+            .field("ask", self.ask.1.as_limbs())
             .finish()
     }
 }
@@ -57,135 +78,122 @@ pub enum DecodeError {
     /// Unsupported Version.
     #[error("unsupported version: {0}")]
     UnsupportedVersion(u16),
+    /// Overflow.
+    #[error("num overflow")]
+    NumOverflow,
+    /// Negative value.
+    #[error("negative value")]
+    NegativeValue,
     /// Snap Error.
     #[error(transparent)]
     Snap(#[from] snap::Error),
+    /// Report.
+    #[error(transparent)]
+    Report(#[from] data_streams_report::report::base::ReportError),
 }
 
-/// Decode compressed report.
-pub fn decode_compressed_report(compressed: &[u8]) -> Result<Report, DecodeError> {
+/// Decode compressed full report.
+pub fn decode_compressed_full_report(compressed: &[u8]) -> Result<Report, DecodeError> {
     use crate::utils::Compressor;
 
     let data = Compressor::decompress(compressed)?;
 
-    decode(&data)
+    let (_, blob) = decode_full_report(&data)?;
+    decode(blob)
 }
 
 /// Decode Report.
-pub fn decode(mut data: &[u8]) -> Result<Report, DecodeError> {
-    let mut offset = 0;
-
-    if data.len() < 3 * 32 {
-        return Err(DecodeError::InvalidData);
-    }
-    offset += 3 * 32;
-
-    // Decode body.
-    let dynamic_offset = as_usize(&peek_32_bytes(data, offset)?)?;
-    let len = as_usize(&peek_32_bytes(data, dynamic_offset)?)?;
-    data = &data[dynamic_offset + 32..(dynamic_offset + 32 + len)];
-    offset = 0;
-
-    // Peek version.
-    if data.len() < 2 {
-        return Err(DecodeError::InvalidData);
-    }
-    let version = ((data[0] as u16) << 8) | (data[1] as u16);
-    if version != 3 {
-        return Err(DecodeError::UnsupportedVersion(version));
-    }
-
-    // Decode `feed_id`.
-    let feed_id = peek_32_bytes(data, offset)?;
-    offset += 32;
-
-    // Decode `valid_from_timestamp`.
-    let valid_from_timestamp = as_u256(&peek_32_bytes(data, offset)?);
-    offset += 32;
-
-    // Decode `observations_timestamp`.
-    let observations_timestamp = as_u256(&peek_32_bytes(data, offset)?);
-    offset += 32;
-
-    // Decode `native_fee`.
-    let native_fee = as_u256(&peek_32_bytes(data, offset)?);
-    offset += 32;
-
-    // Decode `link_fee`.
-    let link_fee = as_u256(&peek_32_bytes(data, offset)?);
-    offset += 32;
-
-    // Decode `expires_at`.
-    let expires_at = as_u256(&peek_32_bytes(data, offset)?);
-    offset += 32;
-
-    // Decode `price`.
-    let price = as_u256(&peek_32_bytes(data, offset)?);
-    offset += 32;
-
-    // Decode `price`.
-    let bid = as_u256(&peek_32_bytes(data, offset)?);
-    offset += 32;
-
-    // Decode `price`.
-    let ask = as_u256(&peek_32_bytes(data, offset)?);
-    // offset += 32;
+pub fn decode(data: &[u8]) -> Result<Report, DecodeError> {
+    let report = ReportDataV3::decode(data)?;
 
     Ok(Report {
-        feed_id,
-        valid_from_timestamp: valid_from_timestamp
-            .try_into()
-            .map_err(|_| DecodeError::InvalidData)?,
-        observations_timestamp: observations_timestamp
-            .try_into()
-            .map_err(|_| DecodeError::InvalidData)?,
-        native_fee: u256_to_u192(native_fee),
-        link_fee: u256_to_u192(link_fee),
-        expires_at: expires_at
-            .try_into()
-            .map_err(|_| DecodeError::InvalidData)?,
-        price: u256_to_u192(price),
-        bid: u256_to_u192(bid),
-        ask: u256_to_u192(ask),
+        feed_id: report.feed_id,
+        valid_from_timestamp: report.valid_from_timestamp,
+        observations_timestamp: report.observations_timestamp,
+        native_fee: bigint_to_u192(report.native_fee)?,
+        link_fee: bigint_to_u192(report.link_fee)?,
+        expires_at: report.expires_at,
+        price: bigint_to_signed(report.benchmark_price)?,
+        bid: bigint_to_signed(report.bid)?,
+        ask: bigint_to_signed(report.ask)?,
     })
 }
 
-fn u256_to_u192(num: U256) -> U192 {
-    let inner = num.as_limbs();
-    U192::from_limbs([inner[0], inner[1], inner[2]])
+fn bigint_to_u192(num: BigInt) -> Result<U192, DecodeError> {
+    let Some(num) = num.to_biguint() else {
+        return Err(DecodeError::NegativeValue);
+    };
+    biguint_to_u192(num)
 }
 
-type Word = [u8; 32];
-
-fn peek(data: &[u8], offset: usize, len: usize) -> Result<&[u8], DecodeError> {
-    if offset + len > data.len() {
-        Err(DecodeError::InvalidData)
-    } else {
-        Ok(&data[offset..(offset + len)])
-    }
-}
-
-fn peek_32_bytes(data: &[u8], offset: usize) -> Result<Word, DecodeError> {
-    peek(data, offset, 32).map(|x| {
-        let mut out: Word = [0u8; 32];
-        out.copy_from_slice(&x[0..32]);
-        out
-    })
-}
-
-fn as_usize(slice: &Word) -> Result<usize, DecodeError> {
-    if !slice[..28].iter().all(|x| *x == 0) {
+fn biguint_to_u192(num: BigUint) -> Result<U192, DecodeError> {
+    let mut iter = num.iter_u64_digits();
+    if iter.len() > 3 {
         return Err(DecodeError::InvalidData);
     }
-    let result = ((slice[28] as usize) << 24)
-        + ((slice[29] as usize) << 16)
-        + ((slice[30] as usize) << 8)
-        + (slice[31] as usize);
-    Ok(result)
+
+    let ans = U192::from_limbs([
+        iter.next().unwrap_or_default(),
+        iter.next().unwrap_or_default(),
+        iter.next().unwrap_or_default(),
+    ]);
+    Ok(ans)
 }
 
-fn as_u256(slice: &Word) -> U256 {
-    U256::from_be_bytes(*slice)
+fn bigint_to_signed(num: BigInt) -> Result<Signed, DecodeError> {
+    let (sign, num) = num.into_parts();
+    let sign = !matches!(sign, num_bigint::Sign::Minus);
+    Ok((sign, biguint_to_u192(num)?))
+}
+
+fn non_negative(num: Signed) -> Option<U192> {
+    match num.0 {
+        true => Some(num.1),
+        false => None,
+    }
+}
+
+/// Decode full report.
+pub fn decode_full_report(payload: &[u8]) -> Result<([[u8; 32]; 3], &[u8]), ReportError> {
+    if payload.len() < 128 {
+        return Err(ReportError::DataTooShort("Payload is too short"));
+    }
+
+    // Decode the first three bytes32 elements
+    let mut report_context: [[u8; 32]; 3] = Default::default();
+    for idx in 0..3 {
+        let context = payload[idx * Report::WORD_SIZE..(idx + 1) * Report::WORD_SIZE]
+            .try_into()
+            .map_err(|_| ReportError::ParseError("report_context"))?;
+        report_context[idx] = context;
+    }
+
+    // Decode the offset for the bytes reportBlob data
+    let offset = usize::from_be_bytes(
+        payload[96..128][24..Report::WORD_SIZE] // Offset value is stored as Little Endian
+            .try_into()
+            .map_err(|_| ReportError::ParseError("offset as usize"))?,
+    );
+
+    if offset < 128 || offset >= payload.len() {
+        return Err(ReportError::InvalidLength("offset"));
+    }
+
+    // Decode the length of the bytes reportBlob data
+    let length = usize::from_be_bytes(
+        payload[offset..offset + 32][24..Report::WORD_SIZE] // Length value is stored as Little Endian
+            .try_into()
+            .map_err(|_| ReportError::ParseError("length as usize"))?,
+    );
+
+    if offset + Report::WORD_SIZE + length > payload.len() {
+        return Err(ReportError::InvalidLength("bytes data"));
+    }
+
+    // Decode the remainder of the payload (actual bytes reportBlob data)
+    let report_blob = &payload[offset + Report::WORD_SIZE..offset + Report::WORD_SIZE + length];
+
+    Ok((report_context, report_blob))
 }
 
 #[cfg(test)]
@@ -221,10 +229,12 @@ mod tests {
         3ed29f3fd7de70dc2b08e010ab93448e7dd423047e0f224d7145e0489faa9f23",
         )
         .unwrap();
-        let report = decode(&data).unwrap();
-        assert!(report.price == U192::from(1445538218802086900u64));
-        assert!(report.bid == U192::from(1445336809268003700u64));
-        assert!(report.ask == U192::from(1445876300000000000u64));
+        let (_, data) = decode_full_report(&data).unwrap();
+        let report = decode(data).unwrap();
+        println!("{report:?}");
+        assert!(report.price == (true, U192::from(1445538218802086900u64)));
+        assert!(report.bid == (true, U192::from(1445336809268003700u64)));
+        assert!(report.ask == (true, U192::from(1445876300000000000u64)));
         assert_eq!(report.valid_from_timestamp, 1730606208);
         assert_eq!(report.observations_timestamp, 1730606208);
     }

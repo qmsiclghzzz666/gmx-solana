@@ -13,3 +13,5 @@ mock-chainlink-verifier = { workspace = true, features = ["cpi"] }
 anchor-lang = { workspace = true }
 thiserror = { workspace = true }
 snap = { workspace = true }
+data-streams-report = { workspace = true }
+num-bigint = { workspace = true }

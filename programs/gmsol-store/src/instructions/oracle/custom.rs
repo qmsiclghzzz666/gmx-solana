@@ -109,7 +109,6 @@ pub(crate) fn unchecked_update_price_feed_with_chainlink(
     );
 
     let price = accounts.decode_and_validate_report(&compressed_report)?;
-
     accounts.verify_report(compressed_report)?;
 
     accounts.price_feed.load_mut()?.update(&price)?;
@@ -128,16 +127,16 @@ impl<'info> internal::Authentication<'info> for UpdatePriceFeedWithChainlink<'in
 }
 
 impl<'info> UpdatePriceFeedWithChainlink<'info> {
-    fn decode_and_validate_report(&self, compressed_report: &[u8]) -> Result<PriceFeedPrice> {
-        use chainlink_datastreams::report::decode_compressed_report;
+    fn decode_and_validate_report(&self, compressed_full_report: &[u8]) -> Result<PriceFeedPrice> {
+        use chainlink_datastreams::report::decode_compressed_full_report;
 
-        let report = decode_compressed_report(compressed_report).map_err(|err| {
+        let report = decode_compressed_full_report(compressed_full_report).map_err(|err| {
             msg!("[Decode Error] {}", err);
             error!(CoreError::InvalidPriceReport)
         })?;
 
         require_eq!(
-            Pubkey::new_from_array(report.feed_id),
+            Pubkey::new_from_array(report.feed_id.0),
             self.price_feed.load()?.feed_id,
             CoreError::InvalidPriceReport
         );
@@ -162,6 +161,7 @@ impl<'info> UpdatePriceFeedWithChainlink<'info> {
             ctx.with_signer(&[&self.store.load()?.signer_seeds()]),
             signed_report,
         )?;
+
         Ok(())
     }
 }

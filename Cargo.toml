@@ -31,6 +31,7 @@ heck = "0.5.0"
 hex = "0.4.3"
 hmac = "0.12.1"
 indexmap = "2.6.0"
+num-bigint = "0.4.6"
 num-traits = "0.2.18"
 num_enum = "0.7.3"
 paste = "1.0.15"
@@ -99,6 +100,9 @@ path = "crates/gmsol-decode"
 
 [workspace.dependencies.chainlink-datastreams]
 path = "crates/chainlink-datastreams"
+
+[workspace.dependencies.data-streams-report]
+git = "https://github.com/smartcontractkit/data-streams-sdk.git"
 
 [profile.release]
 overflow-checks = true

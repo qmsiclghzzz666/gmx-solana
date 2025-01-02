@@ -1060,8 +1060,10 @@ name = "chainlink-datastreams"
 version = "0.2.0"
 dependencies = [
  "anchor-lang",
+ "data-streams-report",
  "hex",
  "mock-chainlink-verifier",
+ "num-bigint 0.4.6",
  "ruint",
  "snap",
  "thiserror",
@@ -1446,6 +1448,19 @@ name = "data-encoding"
 version = "2.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e8566979429cf69b49a5c740c60791108e86440e8be149bbea4fe54d2c32d6e2"
+
+[[package]]
+name = "data-streams-report"
+version = "0.0.1"
+source = "git+https://github.com/smartcontractkit/data-streams-sdk.git#3a3a24b765721c3a8a0023196221639c1e4d690d"
+dependencies = [
+ "hex",
+ "num-bigint 0.4.6",
+ "serde",
+ "serde_json",
+ "snap",
+ "thiserror",
+]
 
 [[package]]
 name = "der"
@@ -2021,6 +2036,7 @@ dependencies = [
  "shellexpand",
  "solana-account-decoder",
  "solana-remote-wallet",
+ "solana-sdk",
  "solana-transaction-status",
  "spl-associated-token-account 3.0.4",
  "spl-governance",
@@ -3040,6 +3056,8 @@ name = "mock-chainlink-verifier"
 version = "0.2.0"
 dependencies = [
  "anchor-lang",
+ "data-streams-report",
+ "snap",
 ]
 
 [[package]]

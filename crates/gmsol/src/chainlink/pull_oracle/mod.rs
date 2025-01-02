@@ -4,6 +4,8 @@ pub mod client;
 /// Pull Oracle.
 pub mod pull_oracle_impl;
 
+mod access_controller_address;
+
 pub use client::{ApiReport, Client, Credential};
 pub use pull_oracle_impl::ChainlinkPullOracle;
 

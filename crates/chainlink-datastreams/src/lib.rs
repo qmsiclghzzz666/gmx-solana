@@ -13,3 +13,5 @@ pub mod utils;
 /// Mock Program.
 #[cfg(not(feature = "no-mock"))]
 pub mod mock;
+
+pub use data_streams_report;

@@ -57,7 +57,7 @@ address = "HJR45sRiFdGncL69HVzRK4HLS2SXcVW3KeTPkp2aFmWC"
 
 # Chainlink Access Controller Account
 [[test.validator.clone]]
-address = "DZGvxqHkELxY6HH5y5De5AUCzRn4BiwYVGK3d6ZdoysG"
+address = "2k3DsgwBoqrnvXKVvd7jX7aptNxdcRBdcd5HkYsGgbrb"
 
 # # Chainlink Data Streams Config Account for ETH.
 # [[test.validator.clone]]

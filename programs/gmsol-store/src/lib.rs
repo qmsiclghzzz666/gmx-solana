@@ -3409,6 +3409,9 @@ pub enum CoreError {
     /// Max price age exceeded.
     #[msg("max price age exceeded")]
     MaxPriceAgeExceeded,
+    /// Negative price.
+    #[msg("negative price is not supported")]
+    NegativePriceIsNotSupported,
     /// Invalid Oracle slot.
     #[msg("invalid oracle slot")]
     InvalidOracleSlot,

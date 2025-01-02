@@ -4,6 +4,7 @@ declare_id!("4nMxSRfeW7W2zFbN8FJ4YDvuTzEzCo1e6GzJxJLnDUoZ");
 
 #[program]
 pub mod mock_chainlink_verifier {
+
     use super::*;
 
     pub fn initialize(ctx: Context<Initialize>, user: Pubkey) -> Result<()> {
@@ -13,12 +14,16 @@ pub mod mock_chainlink_verifier {
         Ok(())
     }
 
-    pub fn verify(_ctx: Context<VerifyContext>, _signed_report: Vec<u8>) -> Result<()> {
-        Ok(())
-    }
+    pub fn verify(_ctx: Context<VerifyContext>, compressed_report: Vec<u8>) -> Result<Vec<u8>> {
+        use data_streams_report::report::decode_full_report;
+        use snap::raw::Decoder;
 
-    pub fn verify_bulk(_ctx: Context<VerifyContext>, _signed_reports: Vec<Vec<u8>>) -> Result<()> {
-        Ok(())
+        let mut decoder = Decoder::new();
+        let full_report = decoder
+            .decompress_vec(&compressed_report)
+            .expect("invalid compression");
+        let (_, report) = decode_full_report(&full_report).expect("invalid full report");
+        Ok(report)
     }
 }
 

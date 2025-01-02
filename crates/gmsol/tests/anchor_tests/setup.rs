@@ -1252,13 +1252,13 @@ impl Deployment {
         chainlink: &'a gmsol::chainlink::Client,
         gmsol: &'a gmsol::Client<SignerRef>,
     ) -> eyre::Result<ChainlinkPullOracle<'a, SignerRef>> {
-        let mut oracle = ChainlinkPullOracle::new(
+        let mut oracle = ChainlinkPullOracle::with_program_id_and_access_controller(
             chainlink,
             gmsol,
-            &self.chainlink_verifier_program,
-            &self.chainlink_access_controller,
             &self.store,
             self.chainlink_feed_index,
+            &self.chainlink_verifier_program,
+            &self.chainlink_access_controller,
         );
 
         let feed_ids = self

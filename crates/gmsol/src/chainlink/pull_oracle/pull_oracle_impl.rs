@@ -23,14 +23,33 @@ pub struct ChainlinkPullOracle<'a, C> {
 }
 
 impl<'a, C> ChainlinkPullOracle<'a, C> {
-    /// Create a new [`ChainlinkPullOracle`].
+    /// Create a new [`ChainlinkPullOracle`] with default program ID and access controller address.
     pub fn new(
         chainlink: &'a Client,
         gmsol: &'a crate::Client<C>,
-        chainlink_program: &Pubkey,
-        access_controller: &Pubkey,
         store: &Pubkey,
         feed_index: u8,
+    ) -> Self {
+        use chainlink_datastreams::verifier;
+
+        Self::with_program_id_and_access_controller(
+            chainlink,
+            gmsol,
+            store,
+            feed_index,
+            &verifier::ID,
+            &super::access_controller_address::ID,
+        )
+    }
+
+    /// Create a new [`ChainlinkPullOracle`] with the given program ID and access controller address.
+    pub fn with_program_id_and_access_controller(
+        chainlink: &'a Client,
+        gmsol: &'a crate::Client<C>,
+        store: &Pubkey,
+        feed_index: u8,
+        chainlink_program: &Pubkey,
+        access_controller: &Pubkey,
     ) -> Self {
         Self {
             chainlink,
