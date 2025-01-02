@@ -11,7 +11,9 @@ use time::OffsetDateTime;
 
 use crate::{
     pyth::{EncodingType, Hermes},
-    utils::builder::{FeedAddressMap, FeedIds, PriceUpdateInstructions, PullOracle, PostPullOraclePrices},
+    utils::builder::{
+        FeedAddressMap, FeedIds, PostPullOraclePrices, PriceUpdateInstructions, PullOracle,
+    },
 };
 
 use super::{
@@ -59,10 +61,6 @@ impl<'a, C> PythPullOracleWithHermes<'a, C> {
 impl<'a, C> PullOracle for PythPullOracleWithHermes<'a, C> {
     type PriceUpdates = PriceUpdates;
 
-    fn provider_kind(&self) -> PriceProviderKind {
-        PriceProviderKind::Pyth
-    }
-
     async fn fetch_price_updates(
         &self,
         feed_ids: &FeedIds,
@@ -95,10 +93,6 @@ impl<'a, C> PullOracle for PythPullOracleWithHermes<'a, C> {
 impl<'r, 'a, C> PullOracle for &'r PythPullOracleWithHermes<'a, C> {
     type PriceUpdates = PriceUpdates;
 
-    fn provider_kind(&self) -> PriceProviderKind {
-        (*self).provider_kind()
-    }
-
     async fn fetch_price_updates(
         &self,
         feed_ids: &FeedIds,
@@ -114,7 +108,10 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> PostPullOraclePrices<'a, C>
     async fn fetch_price_update_instructions(
         &self,
         price_updates: &Self::PriceUpdates,
-    ) -> crate::Result<(PriceUpdateInstructions<'a, C>, FeedAddressMap)> {
+    ) -> crate::Result<(
+        PriceUpdateInstructions<'a, C>,
+        HashMap<PriceProviderKind, FeedAddressMap>,
+    )> {
         let wormhole = self.oracle.wormhole();
         let pyth = self.oracle.pyth();
 
@@ -205,7 +202,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> PostPullOraclePrices<'a, C>
             ixns.try_push_close(pyth.reclaim_rent(&price_update))?;
         }
 
-        Ok((ixns, prices))
+        Ok((ixns, HashMap::from([(PriceProviderKind::Pyth, prices)])))
     }
 }
 
@@ -217,7 +214,10 @@ where
     async fn fetch_price_update_instructions(
         &self,
         price_updates: &Self::PriceUpdates,
-    ) -> crate::Result<(PriceUpdateInstructions<'a, C>, FeedAddressMap)> {
+    ) -> crate::Result<(
+        PriceUpdateInstructions<'a, C>,
+        HashMap<PriceProviderKind, FeedAddressMap>,
+    )> {
         (*self).fetch_price_update_instructions(price_updates).await
     }
 }

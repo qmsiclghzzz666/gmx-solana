@@ -121,10 +121,6 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> ChainlinkPullOracle<'a, C> {
 impl<'r, 'a, C> PullOracle for &'r ChainlinkPullOracle<'a, C> {
     type PriceUpdates = HashMap<FeedId, ApiReportData>;
 
-    fn provider_kind(&self) -> PriceProviderKind {
-        PriceProviderKind::ChainlinkDataStreams
-    }
-
     async fn fetch_price_updates(
         &self,
         feed_ids: &FeedIds,
@@ -175,7 +171,10 @@ impl<'r, 'a, C: Deref<Target = impl Signer> + Clone> PostPullOraclePrices<'a, C>
     async fn fetch_price_update_instructions(
         &self,
         price_updates: &Self::PriceUpdates,
-    ) -> crate::Result<(PriceUpdateInstructions<'a, C>, FeedAddressMap)> {
+    ) -> crate::Result<(
+        PriceUpdateInstructions<'a, C>,
+        HashMap<PriceProviderKind, FeedAddressMap>,
+    )> {
         let mut txs = PriceUpdateInstructions::new(self.gmsol);
         let mut map = HashMap::with_capacity(price_updates.len());
 
@@ -198,6 +197,9 @@ impl<'r, 'a, C: Deref<Target = impl Signer> + Clone> PostPullOraclePrices<'a, C>
             map.insert(feed_id, *feed);
         }
 
-        Ok((txs, map))
+        Ok((
+            txs,
+            HashMap::from([(PriceProviderKind::ChainlinkDataStreams, map)]),
+        ))
     }
 }

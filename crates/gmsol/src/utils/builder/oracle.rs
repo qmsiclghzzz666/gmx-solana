@@ -1,4 +1,4 @@
-use std::{future::Future, ops::Deref};
+use std::{collections::HashMap, future::Future, ops::Deref};
 
 use anchor_client::solana_sdk::{pubkey::Pubkey, signer::Signer};
 use gmsol_store::states::{common::TokensWithFeed, PriceProviderKind};
@@ -63,8 +63,9 @@ where
             .fetch_price_update_instructions(&self.price_updates)
             .await?;
 
-        self.builder
-            .process_feeds(self.pull_oracle.provider_kind(), map)?;
+        for (kind, map) in map {
+            self.builder.process_feeds(kind, map)?;
+        }
 
         let consume = self.builder.build().await?;
 
@@ -94,9 +95,6 @@ pub type FeedIds = TokensWithFeed;
 pub trait PullOracle {
     /// Price Updates.
     type PriceUpdates;
-
-    /// Get price provider kind.
-    fn provider_kind(&self) -> PriceProviderKind;
 
     /// Fetch Price Update.
     fn fetch_price_updates(
@@ -155,7 +153,12 @@ pub trait PostPullOraclePrices<'a, C>: PullOracle {
     fn fetch_price_update_instructions(
         &self,
         price_updates: &Self::PriceUpdates,
-    ) -> impl Future<Output = crate::Result<(PriceUpdateInstructions<'a, C>, FeedAddressMap)>>;
+    ) -> impl Future<
+        Output = crate::Result<(
+            PriceUpdateInstructions<'a, C>,
+            HashMap<PriceProviderKind, FeedAddressMap>,
+        )>,
+    >;
 }
 
 /// Pull Oracle Price Consumer.
