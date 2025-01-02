@@ -36,7 +36,9 @@ use crate::utils::{
 use self::wormhole::WORMHOLE_PROGRAM_ID;
 
 pub use self::{
-    pull_oracle_impl::PythPullOracleWithHermes, receiver::PythReceiverOps, wormhole::WormholeOps,
+    pull_oracle_impl::{PriceUpdates, PythPullOracleWithHermes},
+    receiver::PythReceiverOps,
+    wormhole::WormholeOps,
 };
 
 use self::hermes::PriceUpdate;
