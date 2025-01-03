@@ -44,7 +44,7 @@ impl Path {
 }
 
 /// Credential.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct Credential {
     user_id: String,
     secret: String,
