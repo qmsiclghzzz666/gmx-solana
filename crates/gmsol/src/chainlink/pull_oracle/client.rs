@@ -44,6 +44,7 @@ impl Path {
 }
 
 /// Credential.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Credential {
     user_id: String,
     secret: String,
@@ -151,22 +152,26 @@ impl Client {
         })
     }
 
+    /// Create a new mainnet [`Client`] with the given credential.
+    pub fn with_credential(credential: Credential) -> Self {
+        Self::try_new(DEFAULT_STREAMS_BASE, DEFAULT_WS_STREAMS_BASE, credential).unwrap()
+    }
+
+    /// Create a new testnet [`Client`] with the given credential.
+    pub fn with_testnet_credential(credential: Credential) -> Self {
+        Self::try_new(TESTNET_STREAMS_BASE, TESTNET_STREAMS_BASE, credential).unwrap()
+    }
+
     /// Create a new [`Client`] with default base url and default ENVs.
     pub fn from_defaults() -> crate::Result<Self> {
-        Self::try_new(
-            DEFAULT_STREAMS_BASE,
-            DEFAULT_WS_STREAMS_BASE,
-            Credential::from_default_envs()?,
-        )
+        Ok(Self::with_credential(Credential::from_default_envs()?))
     }
 
     /// Create a new [`Client`] with testnest base url and default ENVs.
     pub fn from_testnet_defaults() -> crate::Result<Self> {
-        Self::try_new(
-            TESTNET_STREAMS_BASE,
-            TESTNET_WS_STREAMS_BASE,
+        Ok(Self::with_testnet_credential(
             Credential::from_default_envs()?,
-        )
+        ))
     }
 
     fn get_inner<T>(
