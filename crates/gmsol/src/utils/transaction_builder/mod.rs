@@ -37,6 +37,8 @@ pub struct SendTransactionOptions {
     pub compute_unit_price_micro_lamports: Option<u64>,
     /// Whether to update recent block hash before send.
     pub update_recent_block_hash_before_send: bool,
+    /// Whether to continue on error.
+    pub continue_on_error: bool,
     /// RPC config.
     pub config: RpcSendTransactionConfig,
 }
@@ -212,6 +214,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> TransactionBuilder<'a, C> {
             without_compute_budget,
             compute_unit_price_micro_lamports,
             update_recent_block_hash_before_send,
+            continue_on_error,
             mut config,
         } = opts;
         config.preflight_commitment = config
@@ -244,6 +247,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> TransactionBuilder<'a, C> {
             txs,
             config,
             update_recent_block_hash_before_send,
+            continue_on_error,
         )
         .await
     }
@@ -296,6 +300,7 @@ async fn send_all_txs(
     txs: impl IntoIterator<Item = VersionedTransaction>,
     config: RpcSendTransactionConfig,
     update_recent_block_hash_before_send: bool,
+    continue_on_error: bool,
 ) -> Result<Vec<Signature>, (Vec<Signature>, crate::Error)> {
     let txs = txs.into_iter();
     let (min, max) = txs.size_hint();
@@ -325,8 +330,11 @@ async fn send_all_txs(
                 signatures.push(signature);
             }
             Err(err) => {
+                tracing::error!(%err, "transaction failed");
                 error = Some(ClientError::from(err).into());
-                break;
+                if !continue_on_error {
+                    break;
+                }
             }
         }
     }
