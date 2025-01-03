@@ -10,7 +10,7 @@ use super::TransactionBuilder;
 
 pub use estimate_fee::{EstimateFee, SetExecutionFee};
 pub use oracle::{
-    FeedAddressMap, FeedIds, PriceUpdateInstructions, PullOracle, PostPullOraclePrices,
+    FeedAddressMap, FeedIds, PostPullOraclePrices, PriceUpdateInstructions, PullOracle,
     PullOraclePriceConsumer, WithPullOracle,
 };
 

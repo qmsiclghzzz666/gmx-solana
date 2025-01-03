@@ -13,10 +13,8 @@ use crate::{
 
 use super::{client::ApiReportData, Client, FeedId};
 
-/// Chainlink Pull Oracle.
-pub struct ChainlinkPullOracle<'a, C> {
-    chainlink: &'a Client,
-    gmsol: &'a crate::Client<C>,
+/// Chainlink Pull Oracle Factory.
+pub struct ChainlinkPullOracleFactory {
     chainlink_program: Pubkey,
     access_controller: Pubkey,
     store: Pubkey,
@@ -24,19 +22,12 @@ pub struct ChainlinkPullOracle<'a, C> {
     feeds: FeedAddressMap,
 }
 
-impl<'a, C> ChainlinkPullOracle<'a, C> {
-    /// Create a new [`ChainlinkPullOracle`] with default program ID and access controller address.
-    pub fn new(
-        chainlink: &'a Client,
-        gmsol: &'a crate::Client<C>,
-        store: &Pubkey,
-        feed_index: u8,
-    ) -> Self {
+impl ChainlinkPullOracleFactory {
+    /// Create a new [`ChainlinkPullOracleFactory`] with default program ID and access controller address.
+    pub fn new(store: &Pubkey, feed_index: u8) -> Self {
         use chainlink_datastreams::verifier;
 
         Self::with_program_id_and_access_controller(
-            chainlink,
-            gmsol,
             store,
             feed_index,
             &verifier::ID,
@@ -44,18 +35,14 @@ impl<'a, C> ChainlinkPullOracle<'a, C> {
         )
     }
 
-    /// Create a new [`ChainlinkPullOracle`] with the given program ID and access controller address.
+    /// Create a new [`ChainlinkPullOracleFactory`] with the given program ID and access controller address.
     pub fn with_program_id_and_access_controller(
-        chainlink: &'a Client,
-        gmsol: &'a crate::Client<C>,
         store: &Pubkey,
         feed_index: u8,
         chainlink_program: &Pubkey,
         access_controller: &Pubkey,
     ) -> Self {
         Self {
-            chainlink,
-            gmsol,
             chainlink_program: *chainlink_program,
             access_controller: *access_controller,
             store: *store,
@@ -63,16 +50,18 @@ impl<'a, C> ChainlinkPullOracle<'a, C> {
             feeds: Default::default(),
         }
     }
-}
 
-impl<'a, C: Deref<Target = impl Signer> + Clone> ChainlinkPullOracle<'a, C> {
     /// Prepare feed accounts for the given tokens and feed_ids.
-    pub async fn prepare_feeds(&mut self, feed_ids: HashMap<Pubkey, FeedId>) -> crate::Result<()> {
+    pub async fn prepare_feeds<C: Deref<Target = impl Signer> + Clone>(
+        &mut self,
+        gmsol: &crate::Client<C>,
+        feed_ids: HashMap<Pubkey, FeedId>,
+    ) -> crate::Result<()> {
         let provider = PriceProviderKind::ChainlinkDataStreams;
-        let mut txs = self.gmsol.transaction();
-        let authority = self.gmsol.payer();
+        let mut txs = gmsol.transaction();
+        let authority = gmsol.payer();
         for (token, feed_id) in feed_ids {
-            let address = self.gmsol.find_price_feed_address(
+            let address = gmsol.find_price_feed_address(
                 &self.store,
                 &authority,
                 self.feed_index,
@@ -80,7 +69,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> ChainlinkPullOracle<'a, C> {
                 &token,
             );
             let feed_id = Pubkey::new_from_array(feed_id);
-            match self.gmsol.price_feed(&address).await? {
+            match gmsol.price_feed(&address).await? {
                 Some(feed) => {
                     if *feed.feed_id() != feed_id {
                         return Err(crate::Error::invalid_argument("feed_id mismatched"));
@@ -88,7 +77,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> ChainlinkPullOracle<'a, C> {
                 }
                 None => {
                     txs.push(
-                        self.gmsol
+                        gmsol
                             .initailize_price_feed(
                                 &self.store,
                                 self.feed_index,
@@ -115,6 +104,37 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> ChainlinkPullOracle<'a, C> {
         }
 
         Ok(())
+    }
+
+    /// Create [`ChainlinkPullOracle`].
+    pub fn make_oracle<'a, C>(
+        &'a self,
+        chainlink: &'a Client,
+        gmsol: &'a crate::Client<C>,
+    ) -> ChainlinkPullOracle<'a, C> {
+        ChainlinkPullOracle::new(chainlink, gmsol, self)
+    }
+}
+
+/// Chainlink Pull Oracle.
+pub struct ChainlinkPullOracle<'a, C> {
+    chainlink: &'a Client,
+    gmsol: &'a crate::Client<C>,
+    ctx: &'a ChainlinkPullOracleFactory,
+}
+
+impl<'a, C> ChainlinkPullOracle<'a, C> {
+    /// Create a new [`ChainlinkPullOracle`] with default program ID and access controller address.
+    pub fn new(
+        chainlink: &'a Client,
+        gmsol: &'a crate::Client<C>,
+        ctx: &'a ChainlinkPullOracleFactory,
+    ) -> Self {
+        Self {
+            chainlink,
+            gmsol,
+            ctx,
+        }
     }
 }
 
@@ -181,16 +201,16 @@ impl<'r, 'a, C: Deref<Target = impl Signer> + Clone> PostPullOraclePrices<'a, C>
         for (feed_id, update) in price_updates {
             let feed_id = Pubkey::new_from_array(*feed_id);
             tracing::info!("adding ix to post price update for {feed_id}");
-            let feed = self.feeds.get(&feed_id).ok_or_else(|| {
+            let feed = self.ctx.feeds.get(&feed_id).ok_or_else(|| {
                 crate::Error::invalid_argument(format!(
                     "feed account for the given `feed_id` is not provided, feed_id = {feed_id}"
                 ))
             })?;
             let rpc = self.gmsol.update_price_feed_with_chainlink(
-                &self.store,
+                &self.ctx.store,
                 feed,
-                &self.chainlink_program,
-                &self.access_controller,
+                &self.ctx.chainlink_program,
+                &self.ctx.access_controller,
                 &update.report_bytes()?,
             )?;
             txs.try_push_post(rpc)?;
