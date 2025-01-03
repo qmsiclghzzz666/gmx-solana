@@ -15,6 +15,8 @@ use anchor_client::{
 use futures_util::TryStreamExt;
 use tokio::time::sleep;
 
+use crate::utils::instruction::to_inspector_url;
+
 use super::RpcBuilder;
 
 use self::transaction_size::transaction_size;
@@ -330,7 +332,9 @@ async fn send_all_txs(
                 signatures.push(signature);
             }
             Err(err) => {
-                tracing::error!(%err, "transaction failed");
+                let cluster = client.url().parse().ok();
+                let inspector_url = to_inspector_url(&tx.message, cluster.as_ref());
+                tracing::error!(%err, "transaction failed: {inspector_url}");
                 error = Some(ClientError::from(err).into());
                 if !continue_on_error {
                     break;

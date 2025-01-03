@@ -53,7 +53,6 @@ pub enum Error {
     #[error(transparent)]
     Reqwest(#[from] reqwest::Error),
     /// Parse url error.
-    #[cfg(feature = "url")]
     #[error("parse url: {0}")]
     ParseUrl(#[from] url::ParseError),
     /// SSE error.

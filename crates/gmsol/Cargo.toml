@@ -41,14 +41,12 @@ cli = [
     "prettytable",
     "decode",
     "mock",
-    "url",
     "solana-remote-wallet",
 ]
 
 clap = ["dep:clap", "gmsol-store/clap"]
 chainlink-pull-oracle = [
     "reqwest",
-    "url",
     "sha2",
     "hmac",
     "reqwest-websocket",
@@ -57,7 +55,6 @@ chainlink-pull-oracle = [
 ]
 pyth-pull-oracle = [
     "reqwest/stream",
-    "url",
     "eventsource-stream",
     "pythnet-sdk",
     "pyth-solana-receiver-sdk",
@@ -142,6 +139,7 @@ tokio-stream = { workspace = true, features = ["sync", "time"] }
 bs58 = { workspace = true }
 async-stream = { workspace = true }
 either = { workspace = true }
+url = { workspace = true }
 
 # Dependencies for cli
 clap = { workspace = true, optional = true, features = ["derive", "env"] }
@@ -161,7 +159,6 @@ async-tungstenite = { workspace = true, optional = true, features = [
     "futures-03-sink",
 ] }
 solana-remote-wallet = { workspace = true, optional = true }
-url = { workspace = true, optional = true }
 
 # Chainlink.
 sha2 = { workspace = true, optional = true }

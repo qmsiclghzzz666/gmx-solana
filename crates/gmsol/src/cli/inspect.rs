@@ -1091,7 +1091,7 @@ impl InspectArgs {
                 }
             }
             Command::Tld { addresses } => {
-                use anchor_client::solana_sdk::message::Message;
+                use anchor_client::solana_sdk::message::{Message, VersionedMessage};
 
                 let config = client.find_timelock_config_address(store);
                 let delay = client
@@ -1134,7 +1134,10 @@ impl InspectArgs {
                 let message = Message::new(&instructions, Some(&client.payer()));
                 println!(
                     "{}",
-                    crate::utils::to_inspector_url(&message, client.cluster())
+                    gmsol::utils::instruction::to_inspector_url(
+                        &VersionedMessage::Legacy(message),
+                        Some(client.cluster())
+                    )
                 );
             }
         }
