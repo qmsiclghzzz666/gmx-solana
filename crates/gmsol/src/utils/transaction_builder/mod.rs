@@ -334,7 +334,7 @@ async fn send_all_txs(
                 });
                 let inspector_url = to_inspector_url(&tx.message, cluster.as_ref());
                 let hash = tx.message.recent_blockhash();
-                tracing::error!(%err, %hash, "transaction failed: {inspector_url}");
+                tracing::error!(%err, %hash, ?config, "transaction failed: {inspector_url}");
                 error = Some(ClientError::from(err).into());
                 if !continue_on_error {
                     break;
