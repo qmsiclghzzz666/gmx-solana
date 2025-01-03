@@ -10,7 +10,7 @@ use anchor_client::{
         commitment_config::CommitmentConfig, message::VersionedMessage, packet::PACKET_DATA_SIZE,
         signature::Signature, signer::Signer, transaction::VersionedTransaction,
     },
-    ClientError,
+    ClientError, Cluster,
 };
 use futures_util::TryStreamExt;
 use tokio::time::sleep;
@@ -332,7 +332,9 @@ async fn send_all_txs(
                 signatures.push(signature);
             }
             Err(err) => {
-                let cluster = client.url().parse().ok();
+                let cluster = client.url().parse().ok().and_then(|cluster| {
+                    (!matches!(cluster, Cluster::Custom(_, _))).then_some(cluster)
+                });
                 let inspector_url = to_inspector_url(&tx.message, cluster.as_ref());
                 tracing::error!(%err, "transaction failed: {inspector_url}");
                 error = Some(ClientError::from(err).into());
