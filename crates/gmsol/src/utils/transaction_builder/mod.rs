@@ -7,8 +7,8 @@ use anchor_client::{
         rpc_request::RpcError,
     },
     solana_sdk::{
-        commitment_config::CommitmentConfig, message::VersionedMessage, packet::PACKET_DATA_SIZE,
-        signature::Signature, signer::Signer, transaction::VersionedTransaction,
+        commitment_config::CommitmentConfig, packet::PACKET_DATA_SIZE, signature::Signature,
+        signer::Signer, transaction::VersionedTransaction,
     },
     ClientError, Cluster,
 };
@@ -311,12 +311,9 @@ async fn send_all_txs(
     for (idx, mut tx) in txs.into_iter().enumerate() {
         if update_recent_block_hash_before_send {
             match client.get_latest_blockhash().await {
-                Ok(latest_blockhash) => match &mut tx.message {
-                    VersionedMessage::Legacy(message) => {
-                        message.recent_blockhash = latest_blockhash
-                    }
-                    VersionedMessage::V0(message) => message.recent_blockhash = latest_blockhash,
-                },
+                Ok(latest_blockhash) => {
+                    tx.message.set_recent_blockhash(latest_blockhash);
+                }
                 Err(err) => {
                     error = Some(ClientError::from(err).into());
                     break;
@@ -336,7 +333,8 @@ async fn send_all_txs(
                     (!matches!(cluster, Cluster::Custom(_, _))).then_some(cluster)
                 });
                 let inspector_url = to_inspector_url(&tx.message, cluster.as_ref());
-                tracing::error!(%err, "transaction failed: {inspector_url}");
+                let hash = tx.message.recent_blockhash();
+                tracing::error!(%err, %hash, "transaction failed: {inspector_url}");
                 error = Some(ClientError::from(err).into());
                 if !continue_on_error {
                     break;
