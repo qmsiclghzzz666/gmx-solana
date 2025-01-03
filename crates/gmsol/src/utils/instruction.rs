@@ -17,7 +17,7 @@ pub fn to_inspector_url(message: &VersionedMessage, cluster: Option<&Cluster>) -
 
     let message = BASE64_STANDARD.encode(message.serialize());
 
-    let cluster = cluster.cloned().unwrap_or_default();
+    let cluster = cluster.cloned().unwrap_or(Cluster::Mainnet);
     let encoded = form_urlencoded::Serializer::new(String::new())
         .append_pair("message", &message)
         .append_pair("cluster", &cluster.to_string())
