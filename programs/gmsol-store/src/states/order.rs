@@ -118,7 +118,7 @@ impl OrderKind {
 #[zero_copy]
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(BorshSerialize, BorshDeserialize, Default)]
+#[derive(BorshSerialize, BorshDeserialize, Default, InitSpace)]
 pub struct TransferOut {
     /// Executed.
     executed: u8,

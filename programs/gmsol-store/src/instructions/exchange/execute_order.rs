@@ -2,7 +2,6 @@ use std::ops::Deref;
 
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token, TokenAccount};
-use gmsol_utils::InitSpace;
 
 use crate::{
     constants,
@@ -40,7 +39,8 @@ pub struct PrepareTradeEventBuffer<'info> {
     #[account(
         init_if_needed,
         payer = authority,
-        space = 8 + TradeData::INIT_SPACE,
+        // The "zero-copy" init space of `TradeData` is used here.
+        space = 8 + <TradeData as gmsol_utils::InitSpace>::INIT_SPACE,
         seeds = [TradeData::SEED, store.key().as_ref(), authority.key().as_ref(), &[index]],
         bump,
     )]

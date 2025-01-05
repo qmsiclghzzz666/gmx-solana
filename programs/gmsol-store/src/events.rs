@@ -448,6 +448,11 @@ impl ActionEvent for GlvWithdrawalRemoved {}
 #[derive(Clone, BorshSerialize, BorshDeserialize)]
 pub struct Trade<'a>(Cow<'a, TradeData>);
 
+/// Only used to generate the discriminator for [`Trade`].
+/// Please refer to [`TradeData`] for the actual structure definition.
+#[event]
+struct TradeEvent;
+
 impl<'a> From<&'a TradeData> for Trade<'a> {
     fn from(value: &'a TradeData) -> Self {
         Self(Cow::Borrowed(value))
@@ -456,19 +461,23 @@ impl<'a> From<&'a TradeData> for Trade<'a> {
 
 impl<'a> anchor_lang::Event for Trade<'a> {
     fn data(&self) -> Vec<u8> {
+        use anchor_lang::Discriminator;
+
         let mut data = Vec::with_capacity(256);
-        data.extend_from_slice(&[189, 219, 127, 211, 78, 230, 97, 238]);
+        data.extend_from_slice(&TradeEvent::DISCRIMINATOR);
+        // Borsh serialization is used here to align with other events.
         self.serialize(&mut data).unwrap();
         data
     }
 }
 
 impl<'a> anchor_lang::Discriminator for Trade<'a> {
-    const DISCRIMINATOR: [u8; 8] = [189, 219, 127, 211, 78, 230, 97, 238];
+    const DISCRIMINATOR: [u8; 8] = TradeEvent::DISCRIMINATOR;
 }
 
 impl<'a> InitSpace for Trade<'a> {
-    const INIT_SPACE: usize = TradeData::INIT_SPACE;
+    // The borsh init space of `TradeData` is used here.
+    const INIT_SPACE: usize = <TradeData as anchor_lang::Space>::INIT_SPACE;
 }
 
 impl<'a> ActionEvent for Trade<'a> {}
@@ -526,7 +535,7 @@ gmsol_utils::flags!(TradeFlag, 8, u8);
 #[account(zero_copy)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "debug", derive(Debug))]
-#[derive(BorshSerialize, BorshDeserialize)]
+#[derive(BorshSerialize, BorshDeserialize, InitSpace)]
 pub struct TradeData {
     /// Trade flag.
     // FIXME: Use the type alias `TradeFlag` instead of the concrete type.
@@ -617,7 +626,7 @@ impl Seed for TradeData {
 #[zero_copy]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "debug", derive(Debug))]
-#[derive(BorshSerialize, BorshDeserialize)]
+#[derive(BorshSerialize, BorshDeserialize, InitSpace)]
 pub struct TradePrice {
     /// Min price.
     pub min: u128,
@@ -629,7 +638,7 @@ pub struct TradePrice {
 #[zero_copy]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "debug", derive(Debug))]
-#[derive(BorshSerialize, BorshDeserialize)]
+#[derive(BorshSerialize, BorshDeserialize, InitSpace)]
 pub struct TradePrices {
     /// Index token price.
     pub index: TradePrice,
@@ -654,7 +663,7 @@ impl TradePrices {
 #[zero_copy]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "debug", derive(Debug))]
-#[derive(BorshSerialize, BorshDeserialize)]
+#[derive(BorshSerialize, BorshDeserialize, InitSpace)]
 pub struct TradePnL {
     /// Final PnL value.
     pub pnl: i128,
@@ -666,7 +675,7 @@ pub struct TradePnL {
 #[zero_copy]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "debug", derive(Debug))]
-#[derive(BorshSerialize, BorshDeserialize)]
+#[derive(BorshSerialize, BorshDeserialize, InitSpace)]
 pub struct TradeFees {
     /// Order fee for receiver amount.
     pub order_fee_for_receiver_amount: u128,
@@ -711,7 +720,7 @@ impl TradeFees {
 #[zero_copy]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "debug", derive(Debug))]
-#[derive(BorshSerialize, BorshDeserialize, Default)]
+#[derive(BorshSerialize, BorshDeserialize, Default, InitSpace)]
 pub struct TradeOutputAmounts {
     /// Output amount.
     pub output_amount: u128,

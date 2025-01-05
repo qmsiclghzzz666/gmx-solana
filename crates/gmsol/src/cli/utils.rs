@@ -53,11 +53,19 @@ impl Output {
     }
 }
 
-pub(crate) fn generate_discriminator(name: &str) -> [u8; 8] {
+pub(crate) fn generate_discriminator(
+    name: &str,
+    namespace: Option<&str>,
+    force_snake_case: bool,
+) -> [u8; 8] {
     use anchor_syn::codegen::program::common::{sighash, SIGHASH_GLOBAL_NAMESPACE};
     use heck::AsSnakeCase;
 
-    sighash(SIGHASH_GLOBAL_NAMESPACE, &AsSnakeCase(name).to_string())
+    let snake_case = AsSnakeCase(name).to_string();
+    sighash(
+        namespace.unwrap_or(SIGHASH_GLOBAL_NAMESPACE),
+        if force_snake_case { &snake_case } else { name },
+    )
 }
 
 pub(crate) async fn send_or_serialize<C, S>(

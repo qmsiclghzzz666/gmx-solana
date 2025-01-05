@@ -186,7 +186,13 @@ enum Command {
     /// Get the event authority address.
     EventAuthority,
     /// Generate Anchor Discriminator with the given name.
-    Discriminator { name: String },
+    Discriminator {
+        name: String,
+        #[arg(long)]
+        namespace: Option<String>,
+        #[arg(long)]
+        raw: bool,
+    },
     /// Event.
     CpiEvent {
         data: String,
@@ -277,8 +283,15 @@ impl MarketPrices {
 impl InspectArgs {
     pub(super) async fn run(&self, client: &GMSOLClient, store: &Pubkey) -> gmsol::Result<()> {
         match &self.command {
-            Command::Discriminator { name } => {
-                println!("{:?}", crate::utils::generate_discriminator(name));
+            Command::Discriminator {
+                name,
+                namespace,
+                raw,
+            } => {
+                println!(
+                    "{:?}",
+                    crate::utils::generate_discriminator(name, namespace.as_deref(), !*raw)
+                );
             }
             Command::User { address, owner } => {
                 let address = address.unwrap_or_else(|| {

@@ -135,7 +135,7 @@ impl AsRef<Position> for Position {
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[account(zero_copy)]
-#[derive(BorshDeserialize, BorshSerialize)]
+#[derive(BorshDeserialize, BorshSerialize, InitSpace)]
 pub struct PositionState {
     /// Trade id.
     pub trade_id: u64,
