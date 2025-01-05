@@ -946,6 +946,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
             commitment,
             Some(0),
         )
+        .try_filter(|events| std::future::ready(!events.value().events.is_empty()))
         .and_then(|encoded| {
             let decoded = encoded
                 .map(|event| {
