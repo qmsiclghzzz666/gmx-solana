@@ -296,6 +296,11 @@ impl SerializeFeedConfig {
                 feed_id: hex::encode(config.feed()),
                 timestamp_adjustment: config.timestamp_adjustment(),
             },
+            PriceProviderKind::ChainlinkDataStreams => Self {
+                feed_id_encoding: Encoding::Hex,
+                feed_id: hex::encode(config.feed()),
+                timestamp_adjustment: config.timestamp_adjustment(),
+            },
             _ => config.into(),
         }
     }

@@ -277,6 +277,9 @@ struct Feeds {
     #[arg(long)]
     #[serde_as(as = "Option<serde_with::DisplayFromStr>")]
     chainlink_feed: Option<Pubkey>,
+    /// Chainlink Data Streams feed id.
+    #[arg(long)]
+    chainlink_data_streams_feed_id: Option<String>,
 }
 
 impl Feeds {
@@ -287,6 +290,17 @@ impl Feeds {
         let feed_id = pyth_feed_id.strip_prefix("0x").unwrap_or(pyth_feed_id);
         let feed_id = pyth_sdk::Identifier::from_hex(feed_id).map_err(gmsol::Error::unknown)?;
         let feed_id_as_key = Pubkey::new_from_array(feed_id.to_bytes());
+        Ok(Some(feed_id_as_key))
+    }
+
+    fn chainlink_data_streams_feed_id(&self) -> gmsol::Result<Option<Pubkey>> {
+        use gmsol::chainlink::pull_oracle::parse_feed_id;
+
+        let Some(feed_id) = self.chainlink_data_streams_feed_id.as_ref() else {
+            return Ok(None);
+        };
+        let feed_id = parse_feed_id(feed_id)?;
+        let feed_id_as_key = Pubkey::new_from_array(feed_id);
         Ok(Some(feed_id_as_key))
     }
 }
@@ -448,6 +462,11 @@ impl Args {
                 if let Some(feed) = feeds.chainlink_feed {
                     builder = builder
                         .update_price_feed(&PriceProviderKind::Chainlink, feed)
+                        .map_err(anchor_client::ClientError::from)?;
+                }
+                if let Some(feed_id) = feeds.chainlink_data_streams_feed_id()? {
+                    builder = builder
+                        .update_price_feed(&PriceProviderKind::ChainlinkDataStreams, feed_id)
                         .map_err(anchor_client::ClientError::from)?;
                 }
                 let token_map = self.token_map(client, store).await?;
@@ -930,6 +949,10 @@ impl<'a> TryFrom<&'a TokenConfig> for TokenConfigBuilder {
         }
         if let Some(chainlink_feed) = config.feeds.chainlink_feed {
             builder = builder.update_price_feed(&PriceProviderKind::Chainlink, chainlink_feed)?;
+        }
+        if let Some(feed_id) = config.feeds.chainlink_data_streams_feed_id()? {
+            builder =
+                builder.update_price_feed(&PriceProviderKind::ChainlinkDataStreams, feed_id)?;
         }
         Ok(builder)
     }
