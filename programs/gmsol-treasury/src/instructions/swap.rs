@@ -213,6 +213,10 @@ pub struct CancelSwap<'info> {
     /// CHECK: check by CPI.
     #[account(mut)]
     pub store: UncheckedAccount<'info>,
+    /// Store Wallet.
+    /// CHECK: check by CPI.
+    #[account(mut)]
+    pub store_wallet: UncheckedAccount<'info>,
     #[account(
         has_one = store,
     )]
@@ -315,6 +319,7 @@ impl<'info> CancelSwap<'info> {
             CloseOrder {
                 executor: self.receiver.to_account_info(),
                 store: self.store.to_account_info(),
+                store_wallet: self.store_wallet.to_account_info(),
                 owner: self.receiver.to_account_info(),
                 rent_receiver: self.receiver.to_account_info(),
                 user: self.user.to_account_info(),

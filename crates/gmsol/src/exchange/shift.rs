@@ -260,6 +260,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CloseShiftBuilder<'a, C> {
             .accounts(accounts::CloseShift {
                 executor,
                 store: hint.store,
+                store_wallet: self.client.find_store_wallet_address(&hint.store),
                 owner: hint.owner,
                 shift: self.shift,
                 from_market_token: hint.from_market_token,

@@ -1268,6 +1268,7 @@ where
             .accounts(crate::utils::fix_optional_account_metas(
                 accounts::CloseOrder {
                     store: hint.store,
+                    store_wallet: self.client.find_store_wallet_address(&hint.store),
                     event_authority: self.client.store_event_authority(),
                     order: self.order,
                     executor: payer,

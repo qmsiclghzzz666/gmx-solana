@@ -16,7 +16,8 @@ use crate::{
     states::{
         common::action::{Action, ActionExt},
         glv::GlvShift,
-        Chainlink, Glv, Market, NonceBytes, Oracle, RoleKey, Seed, Store, TokenMapHeader,
+        Chainlink, Glv, Market, NonceBytes, Oracle, RoleKey, Seed, Store, StoreWalletSigner,
+        TokenMapHeader,
     },
     utils::internal,
     CoreError,
@@ -164,6 +165,9 @@ pub struct CloseGlvShift<'info> {
     pub funder: UncheckedAccount<'info>,
     /// The store.
     pub store: AccountLoader<'info, Store>,
+    /// The store wallet.
+    #[account(mut, seeds = [Store::WALLET_SEED, store.key().as_ref()], bump)]
+    pub store_wallet: SystemAccount<'info>,
     /// GLV.
     #[account(
         has_one = store,
@@ -217,7 +221,15 @@ impl<'info> internal::Close<'info, GlvShift> for CloseGlvShift<'info> {
         true
     }
 
-    fn process(&self, _init_if_needed: bool) -> Result<internal::Success> {
+    fn store_wallet_bump(&self, bumps: &Self::Bumps) -> u8 {
+        bumps.store_wallet
+    }
+
+    fn process(
+        &self,
+        _init_if_needed: bool,
+        _store_wallet_signer: &StoreWalletSigner,
+    ) -> Result<internal::Success> {
         Ok(true)
     }
 

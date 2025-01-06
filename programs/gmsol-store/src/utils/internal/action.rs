@@ -3,7 +3,7 @@ use anchor_lang::{prelude::*, ZeroCopy};
 use crate::{
     states::{
         common::action::{Action, ActionEvent, ActionParams, Closable},
-        NonceBytes,
+        NonceBytes, StoreWalletSigner,
     },
     CoreError,
 };
@@ -93,6 +93,9 @@ where
     /// Get event authority.
     fn event_authority(&self, bumps: &Self::Bumps) -> (AccountInfo<'info>, u8);
 
+    /// Get store wallet bump.
+    fn store_wallet_bump(&self, bumps: &Self::Bumps) -> u8;
+
     /// Whether to skip the completion check when the authority is keeper.
     fn skip_completion_check_for_keeper(&self) -> bool {
         false
@@ -104,14 +107,23 @@ where
     }
 
     /// Process before the close.
-    fn process(&self, init_if_needed: bool) -> Result<Success>;
+    fn process(
+        &self,
+        init_if_needed: bool,
+        store_wallet_signer: &StoreWalletSigner,
+    ) -> Result<Success>;
 
     /// Close Action.
     fn close(ctx: &Context<'_, '_, '_, 'info, Self>, reason: &str) -> Result<()> {
         let accounts = &ctx.accounts;
         accounts.validate()?;
         let should_continue_when_atas_are_missing = accounts.preprocess()?;
-        if accounts.process(should_continue_when_atas_are_missing)? {
+
+        let store_wallet_signer = StoreWalletSigner::new(
+            accounts.store().key(),
+            accounts.store_wallet_bump(&ctx.bumps),
+        );
+        if accounts.process(should_continue_when_atas_are_missing, &store_wallet_signer)? {
             {
                 let action_address = accounts.action().key();
                 let action = accounts.action().load()?;

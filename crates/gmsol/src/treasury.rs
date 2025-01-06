@@ -842,6 +842,7 @@ where
             .accounts(accounts::CancelSwap {
                 authority: self.payer(),
                 store: *store,
+                store_wallet: self.find_store_wallet_address(store),
                 config,
                 receiver,
                 user,

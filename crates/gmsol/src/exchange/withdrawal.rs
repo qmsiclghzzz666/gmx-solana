@@ -401,6 +401,7 @@ where
             .store_rpc()
             .accounts(accounts::CloseWithdrawal {
                 store: self.store,
+                store_wallet: self.client.find_store_wallet_address(&self.store),
                 withdrawal: self.withdrawal,
                 market_token: hint.market_token,
                 token_program: anchor_spl::token::ID,

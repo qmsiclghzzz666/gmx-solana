@@ -435,6 +435,7 @@ where
                 accounts::CloseDeposit {
                     executor,
                     store: *store,
+                    store_wallet: client.find_store_wallet_address(store),
                     owner,
                     market_token: hint.market_token,
                     initial_long_token: hint.initial_long_token,

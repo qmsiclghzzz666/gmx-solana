@@ -76,6 +76,9 @@ impl Store {
     /// Maximum length of key.
     pub const MAX_LEN: usize = MAX_LEN;
 
+    /// Wallet Seed.
+    pub const WALLET_SEED: &'static [u8] = b"store_wallet";
+
     /// Init.
     /// # Warning
     /// The `roles` is assumed to be initialized with `is_admin == false`.
@@ -336,6 +339,25 @@ impl Store {
         } else {
             Ok(discount_factor_for_rank)
         }
+    }
+}
+
+/// Store Wallet Signer.
+pub(crate) struct StoreWalletSigner {
+    store: Pubkey,
+    bump_seed: [u8; 1],
+}
+
+impl StoreWalletSigner {
+    pub(crate) fn new(store: Pubkey, bump: u8) -> Self {
+        Self {
+            store,
+            bump_seed: [bump],
+        }
+    }
+
+    pub(crate) fn signer_seeds(&self) -> [&[u8]; 3] {
+        [Store::WALLET_SEED, self.store.as_ref(), &self.bump_seed]
     }
 }
 

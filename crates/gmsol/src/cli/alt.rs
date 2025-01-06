@@ -102,6 +102,7 @@ impl Args {
 async fn common_addresses(client: &GMSOLClient, store: &Pubkey) -> gmsol::Result<Vec<Pubkey>> {
     let mut addresses = vec![
         *store,
+        client.find_store_wallet_address(store),
         client.store_event_authority(),
         anchor_spl::token::ID,
         anchor_spl::token_2022::ID,

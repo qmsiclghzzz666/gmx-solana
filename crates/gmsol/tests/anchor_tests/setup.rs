@@ -746,6 +746,7 @@ impl Deployment {
         let event_authority = self.client.store_event_authority();
         let mut addresses = vec![
             self.store,
+            self.client.find_store_wallet_address(&self.store),
             self.token_map(),
             self.oracle(),
             event_authority,

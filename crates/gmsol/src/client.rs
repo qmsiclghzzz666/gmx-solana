@@ -244,6 +244,11 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         crate::pda::find_store_address(key, self.store_program_id()).0
     }
 
+    /// Find PDA for store wallet account.
+    pub fn find_store_wallet_address(&self, store: &Pubkey) -> Pubkey {
+        crate::pda::find_store_wallet_pda(store, self.store_program_id()).0
+    }
+
     /// Get the event authority address for the `Store` program.
     pub fn store_event_authority(&self) -> Pubkey {
         crate::pda::find_event_authority_address(self.store_program_id()).0

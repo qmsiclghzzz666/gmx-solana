@@ -7,7 +7,7 @@ use anchor_spl::{
 };
 use typed_builder::TypedBuilder;
 
-use crate::CoreError;
+use crate::{states::StoreWalletSigner, CoreError};
 
 /// Check if the given `pubkey` is an ATA address or
 /// the `owner` itself.
@@ -100,7 +100,9 @@ pub fn validate_associated_token_account<'info>(
 
 #[derive(TypedBuilder)]
 pub struct TransferAllFromEscrowToATA<'a, 'info> {
-    action: AccountInfo<'info>,
+    /// Store wallet account, must be mutable.
+    store_wallet: AccountInfo<'info>,
+    store_wallet_signer: &'a StoreWalletSigner,
     system_program: AccountInfo<'info>,
     token_program: AccountInfo<'info>,
     associated_token_program: AccountInfo<'info>,
@@ -111,7 +113,7 @@ pub struct TransferAllFromEscrowToATA<'a, 'info> {
     ata: AccountInfo<'info>,
     escrow: AccountInfo<'info>,
     escrow_authority: AccountInfo<'info>,
-    seeds: &'a [&'a [u8]],
+    escrow_authority_seeds: &'a [&'a [u8]],
     init_if_needed: bool,
     #[builder(default)]
     skip_owner_check: bool,
@@ -145,7 +147,7 @@ impl<'a, 'info> TransferAllFromEscrowToATA<'a, 'info> {
             ata,
             escrow,
             escrow_authority,
-            seeds,
+            escrow_authority_seeds,
             init_if_needed,
             skip_owner_check,
             keep_escrow,
@@ -193,7 +195,7 @@ impl<'a, 'info> TransferAllFromEscrowToATA<'a, 'info> {
                         authority: escrow_authority.clone(),
                     },
                 )
-                .with_signer(&[seeds]),
+                .with_signer(&[escrow_authority_seeds]),
                 amount,
                 decimals,
             )?;
@@ -209,7 +211,7 @@ impl<'a, 'info> TransferAllFromEscrowToATA<'a, 'info> {
                         authority: escrow_authority,
                     },
                 )
-                .with_signer(&[seeds]),
+                .with_signer(&[escrow_authority_seeds]),
             )?;
         }
         Ok(true)
@@ -218,18 +220,22 @@ impl<'a, 'info> TransferAllFromEscrowToATA<'a, 'info> {
     /// Unwrap native if needed.
     /// Returns `true` if unwrapped.
     fn unwrap_native_if_needed(&self) -> Result<bool> {
+        use anchor_lang::system_program;
+
         let Self {
-            action,
+            store_wallet,
+            store_wallet_signer,
             token_program,
             owner,
             ata,
             escrow,
             escrow_authority,
-            seeds,
+            escrow_authority_seeds,
             keep_escrow,
             rent_receiver,
             should_unwrap_native,
             mint,
+            system_program,
             ..
         } = self;
 
@@ -253,26 +259,61 @@ impl<'a, 'info> TransferAllFromEscrowToATA<'a, 'info> {
                 .checked_sub(amount)
                 .ok_or_else(|| error!(CoreError::Internal))?;
 
-            // We use the `action` account as an intermediary to distribute funds.
+            // We use the `store_wallet` account as an intermediary to distribute funds.
             close_account(
                 CpiContext::new(
                     token_program.clone(),
                     CloseAccount {
                         account: escrow.to_account_info(),
-                        destination: action.clone(),
+                        destination: store_wallet.clone(),
                         authority: escrow_authority.clone(),
                     },
                 )
-                .with_signer(&[seeds]),
+                .with_signer(&[escrow_authority_seeds]),
             )?;
 
-            // Refund rent to the `rent_receiver`.
-            action.sub_lamports(rent)?;
-            rent_receiver.add_lamports(rent)?;
+            let store_wallet_seeds = store_wallet_signer.signer_seeds();
 
-            // Refund amount to the `owner`.
-            action.sub_lamports(amount)?;
-            owner.add_lamports(amount)?;
+            if rent_receiver.key == owner.key {
+                // Refund `balance` to the `owner`.
+                system_program::transfer(
+                    CpiContext::new(
+                        system_program.clone(),
+                        system_program::Transfer {
+                            from: store_wallet.clone(),
+                            to: owner.clone(),
+                        },
+                    )
+                    .with_signer(&[&store_wallet_seeds]),
+                    balance,
+                )?;
+            } else {
+                // Refund `rent` to the `rent_receiver`.
+                system_program::transfer(
+                    CpiContext::new(
+                        system_program.clone(),
+                        system_program::Transfer {
+                            from: store_wallet.clone(),
+                            to: rent_receiver.clone(),
+                        },
+                    )
+                    .with_signer(&[&store_wallet_seeds]),
+                    rent,
+                )?;
+
+                // Refund `amount` to the `owner`.
+                system_program::transfer(
+                    CpiContext::new(
+                        system_program.clone(),
+                        system_program::Transfer {
+                            from: store_wallet.clone(),
+                            to: owner.clone(),
+                        },
+                    )
+                    .with_signer(&[&store_wallet_seeds]),
+                    amount,
+                )?;
+            }
 
             Ok(true)
         } else {

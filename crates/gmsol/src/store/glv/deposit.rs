@@ -499,6 +499,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CloseGlvDepositBuilder<'a, C> {
                 accounts::CloseGlvDeposit {
                     executor: payer,
                     store: hint.store,
+                    store_wallet: self.client.find_store_wallet_address(&hint.store),
                     owner: hint.owner,
                     market_token: hint.market_token,
                     initial_long_token: hint.initial_long_token,

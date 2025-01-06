@@ -22,7 +22,7 @@ use crate::{
         order::{Order, OrderKind},
         position::PositionKind,
         user::UserHeader,
-        Market, NonceBytes, Position, RoleKey, Seed, Store, UpdateOrderParams,
+        Market, NonceBytes, Position, RoleKey, Seed, Store, StoreWalletSigner, UpdateOrderParams,
     },
     utils::{internal, token::is_associated_token_account_or_owner},
     CoreError,
@@ -462,6 +462,9 @@ pub struct CloseOrder<'info> {
     /// The store.
     #[account(mut)]
     pub store: AccountLoader<'info, Store>,
+    /// The store wallet.
+    #[account(mut, seeds = [Store::WALLET_SEED, store.key().as_ref()], bump)]
+    pub store_wallet: SystemAccount<'info>,
     /// The owner of the order.
     /// CHECK: only used to validate and receive fund.
     #[account(mut)]
@@ -605,8 +608,16 @@ impl<'info> internal::Close<'info, Order> for CloseOrder<'info> {
         Ok(())
     }
 
-    fn process(&self, init_if_needed: bool) -> Result<internal::Success> {
-        let transfer_success = self.transfer_to_atas(init_if_needed)?;
+    fn store_wallet_bump(&self, bumps: &Self::Bumps) -> u8 {
+        bumps.store_wallet
+    }
+
+    fn process(
+        &self,
+        init_if_needed: bool,
+        store_wallet_signer: &StoreWalletSigner,
+    ) -> Result<internal::Success> {
+        let transfer_success = self.transfer_to_atas(init_if_needed, store_wallet_signer)?;
         let process_success = self.process_gt_reward()?;
         Ok(transfer_success && process_success)
     }
@@ -624,7 +635,11 @@ impl<'info> internal::Close<'info, Order> for CloseOrder<'info> {
 }
 
 impl<'info> CloseOrder<'info> {
-    fn transfer_to_atas(&self, init_if_needed: bool) -> Result<internal::Success> {
+    fn transfer_to_atas(
+        &self,
+        init_if_needed: bool,
+        store_wallet_signer: &StoreWalletSigner,
+    ) -> Result<internal::Success> {
         use crate::utils::token::TransferAllFromEscrowToATA;
 
         let signer = self.order.load()?.signer();
@@ -633,14 +648,15 @@ impl<'info> CloseOrder<'info> {
         let mut seen = HashSet::<_>::default();
 
         let builder = TransferAllFromEscrowToATA::builder()
-            .action(self.order.to_account_info())
+            .store_wallet(self.store_wallet.to_account_info())
+            .store_wallet_signer(store_wallet_signer)
             .system_program(self.system_program.to_account_info())
             .token_program(self.token_program.to_account_info())
             .associated_token_program(self.associated_token_program.to_account_info())
             .payer(self.executor.to_account_info())
             .owner(self.owner.to_account_info())
             .escrow_authority(self.order.to_account_info())
-            .seeds(&seeds)
+            .escrow_authority_seeds(&seeds)
             .rent_receiver(self.rent_receiver())
             .init_if_needed(init_if_needed)
             .should_unwrap_native(self.order.load()?.header().should_unwrap_native_token());

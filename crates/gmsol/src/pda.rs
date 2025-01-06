@@ -35,6 +35,11 @@ pub fn find_store_address(key: &str, store_program_id: &Pubkey) -> (Pubkey, u8) 
     Pubkey::find_program_address(&[Store::SEED, &to_seed(key)], store_program_id)
 }
 
+/// Find PDA for store wallet account.
+pub fn find_store_wallet_pda(store: &Pubkey, store_program_id: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(&[Store::WALLET_SEED, store.as_ref()], store_program_id)
+}
+
 /// Find PDA for the market vault.
 pub fn find_market_vault_address(
     store: &Pubkey,

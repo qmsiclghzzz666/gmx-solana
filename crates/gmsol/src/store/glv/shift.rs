@@ -212,6 +212,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CloseGlvShiftBuilder<'a, C> {
                 authority,
                 funder: hint.funder,
                 store: hint.store,
+                store_wallet: self.client.find_store_wallet_address(&hint.store),
                 glv: hint.owner,
                 glv_shift: self.glv_shift,
                 from_market_token: hint.from_market_token,

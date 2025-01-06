@@ -9,7 +9,7 @@ use crate::{
     ops::shift::{CreateShiftOperation, CreateShiftParams},
     states::{
         common::action::{Action, ActionExt},
-        Market, NonceBytes, RoleKey, Seed, Shift, Store,
+        Market, NonceBytes, RoleKey, Seed, Shift, Store, StoreWalletSigner,
     },
     utils::{internal, token::is_associated_token_account},
     CoreError,
@@ -156,6 +156,9 @@ pub struct CloseShift<'info> {
     pub executor: Signer<'info>,
     /// The store.
     pub store: AccountLoader<'info, Store>,
+    /// The store wallet.
+    #[account(mut, seeds = [Store::WALLET_SEED, store.key().as_ref()], bump)]
+    pub store_wallet: SystemAccount<'info>,
     /// The owenr of the shift.
     /// CHECK: only use to validate and receive fund.
     #[account(mut)]
@@ -236,21 +239,30 @@ impl<'info> internal::Close<'info, Shift> for CloseShift<'info> {
         self.owner.to_account_info()
     }
 
-    fn process(&self, init_if_needed: bool) -> Result<internal::Success> {
+    fn store_wallet_bump(&self, bumps: &Self::Bumps) -> u8 {
+        bumps.store_wallet
+    }
+
+    fn process(
+        &self,
+        init_if_needed: bool,
+        store_wallet_signer: &StoreWalletSigner,
+    ) -> Result<internal::Success> {
         use crate::utils::token::TransferAllFromEscrowToATA;
 
         let signer = self.shift.load()?.signer();
         let seeds = signer.as_seeds();
 
         let builder = TransferAllFromEscrowToATA::builder()
-            .action(self.shift.to_account_info())
+            .store_wallet(self.store_wallet.to_account_info())
+            .store_wallet_signer(store_wallet_signer)
             .system_program(self.system_program.to_account_info())
             .token_program(self.token_program.to_account_info())
             .associated_token_program(self.associated_token_program.to_account_info())
             .payer(self.executor.to_account_info())
             .owner(self.owner.to_account_info())
             .escrow_authority(self.shift.to_account_info())
-            .seeds(&seeds)
+            .escrow_authority_seeds(&seeds)
             .init_if_needed(init_if_needed)
             .rent_receiver(self.rent_receiver())
             .should_unwrap_native(self.shift.load()?.header().should_unwrap_native_token());

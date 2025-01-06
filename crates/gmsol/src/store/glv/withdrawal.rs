@@ -425,6 +425,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> CloseGlvWithdrawalBuilder<'a, C
             .accounts(accounts::CloseGlvWithdrawal {
                 executor: payer,
                 store: hint.store,
+                store_wallet: self.client.find_store_wallet_address(&hint.store),
                 owner: hint.owner,
                 glv_withdrawal: self.glv_withdrawal,
                 market_token: hint.market_token,
