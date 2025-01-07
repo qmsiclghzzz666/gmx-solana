@@ -1025,6 +1025,7 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> MakeTransactionBuilder<'a, C>
                     gt_bank,
                     token_map: hint.token_map,
                     oracle: self.oracle,
+                    event_authority: self.client.store_event_authority(),
                     store_program: *self.client.store_program_id(),
                     chainlink_program,
                 },

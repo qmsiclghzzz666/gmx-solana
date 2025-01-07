@@ -175,6 +175,8 @@ impl<C: Deref<Target = impl Signer> + Clone> GtOps<C> for crate::Client<C> {
                 authority: self.payer(),
                 store: *store,
                 vault: *vault,
+                event_authority: self.store_event_authority(),
+                program: *self.store_program_id(),
             })
             .args(instruction::ConfirmGtExchangeVault {})
     }
@@ -195,6 +197,8 @@ impl<C: Deref<Target = impl Signer> + Clone> GtOps<C> for crate::Client<C> {
                 vault,
                 exchange: self.find_gt_exchange_address(&vault, &owner),
                 system_program: system_program::ID,
+                event_authority: self.store_event_authority(),
+                program: *self.store_program_id(),
             })
             .args(instruction::RequestGtExchange { amount })
     }

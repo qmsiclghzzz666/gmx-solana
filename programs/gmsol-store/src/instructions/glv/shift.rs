@@ -14,7 +14,7 @@ use crate::{
     },
     ordered_tokens,
     states::{
-        common::action::{Action, ActionExt},
+        common::action::{Action, ActionExt, EventEmitter},
         glv::GlvShift,
         Chainlink, Glv, Market, NonceBytes, Oracle, RoleKey, Seed, Store, StoreWalletSigner,
         TokenMapHeader,
@@ -229,6 +229,7 @@ impl<'info> internal::Close<'info, GlvShift> for CloseGlvShift<'info> {
         &self,
         _init_if_needed: bool,
         _store_wallet_signer: &StoreWalletSigner,
+        _event_emitter: &EventEmitter<'_, 'info>,
     ) -> Result<internal::Success> {
         Ok(true)
     }

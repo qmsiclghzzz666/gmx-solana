@@ -1,7 +1,7 @@
 use crate::{
     decode::untagged,
     types::{
-        self, DepositExecuted, DepositRemoved, GlvDepositRemoved, GlvWithdrawalRemoved,
+        self, DepositExecuted, DepositRemoved, GlvDepositRemoved, GlvWithdrawalRemoved, GtUpdated,
         MarketStateUpdated, OrderRemoved, PositionDecreased, PositionIncreased, ShiftRemoved,
         SwapExecuted, WithdrawalExecuted, WithdrawalRemoved,
     },
@@ -24,6 +24,7 @@ untagged!(
         OrderRemoved,
         TradeEvent,
         MarketStateUpdated,
-        SwapExecuted
+        SwapExecuted,
+        GtUpdated
     ]
 );

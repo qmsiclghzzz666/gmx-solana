@@ -2,7 +2,9 @@ use anchor_lang::prelude::*;
 use gmsol_utils::InitSpace;
 
 use crate::{
+    events::GtUpdated,
     states::{
+        common::action::EventEmitter,
         gt::{GtExchange, GtExchangeVault},
         user::UserHeader,
         Seed, Store,
@@ -204,6 +206,7 @@ pub(crate) fn prepare_gt_exchange_vault(
 }
 
 /// The accounts definition for [`request_gt_exchange`](crate::gmsol_store::request_gt_exchange) instruction.
+#[event_cpi]
 #[derive(Accounts)]
 pub struct RequestGtExchange<'info> {
     #[account(mut)]
@@ -256,6 +259,9 @@ pub(crate) fn request_gt_exchange(ctx: Context<RequestGtExchange>, amount: u64) 
         .gt_mut()
         .unchecked_request_exchange(&mut user, &mut vault, &mut exchange, amount)?;
 
+    let event_emitter = EventEmitter::new(&accounts.event_authority, ctx.bumps.event_authority);
+    event_emitter.emit_cpi(&GtUpdated::burned(user.owner, amount, store.gt()))?;
+
     Ok(())
 }
 
@@ -300,6 +306,7 @@ impl<'info> RequestGtExchange<'info> {
 }
 
 /// The accounts definition for [`confirm_gt_exchange_vault`](crate::confirm_gt_exchange_vault) instruction.
+#[event_cpi]
 #[derive(Accounts)]
 pub struct ConfirmGtExchangeVault<'info> {
     /// Authority.
@@ -329,6 +336,14 @@ pub(crate) fn unchecked_confirm_gt_exchange_vault(
     store
         .gt_mut()
         .unchecked_confirm_exchange_vault(&mut vault)?;
+
+    let event_emitter = EventEmitter::new(&ctx.accounts.event_authority, ctx.bumps.event_authority);
+    // Since no GT is minted, the rewarded amount is zero.
+    event_emitter.emit_cpi(&GtUpdated::rewarded(
+        ctx.accounts.authority.key(),
+        0,
+        store.gt(),
+    ))?;
     Ok(())
 }
 

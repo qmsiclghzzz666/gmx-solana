@@ -6,11 +6,14 @@ use gmsol_model::{
 };
 use gmsol_utils::InitSpace as _;
 
-use crate::{events::OrderRemoved, CoreError};
+use crate::{
+    events::{GtUpdated, OrderRemoved},
+    CoreError,
+};
 
 use super::{
     common::{
-        action::{Action, ActionHeader, ActionSigner, Closable},
+        action::{Action, ActionHeader, ActionSigner, Closable, EventEmitter},
         swap::SwapParams,
         token::TokenAndAccount,
     },
@@ -545,6 +548,7 @@ impl Order {
         store: &mut Store,
         user: &mut UserHeader,
         paid_fee_value: u128,
+        event_emitter: &EventEmitter,
     ) -> Result<()> {
         if paid_fee_value == 0 {
             msg!("[GT] GT is not minted unless an order fee is paid");
@@ -563,18 +567,25 @@ impl Order {
 
         let value_to_mint_for = next_paid_fee_value.saturating_sub(minted_fee_value);
 
-        let (minted, delta_minted_value) = store.gt_mut().get_mint_amount(value_to_mint_for, 0)?;
+        let (minted, delta_minted_value, minting_cost) =
+            store.gt_mut().get_mint_amount(value_to_mint_for, 0)?;
 
         let next_minted_value = minted_fee_value
             .checked_add(delta_minted_value)
             .ok_or_else(|| error!(CoreError::ValueOverflow))?;
 
         store.gt_mut().mint_to(user, minted)?;
-        msg!("[GT] minted {} units of GT", minted);
 
         self.gt_reward = minted;
         user.gt.paid_fee_value = next_paid_fee_value;
         user.gt.minted_fee_value = next_minted_value;
+
+        event_emitter.emit_cpi(&GtUpdated::minted(
+            user.owner,
+            minting_cost,
+            minted,
+            store.gt(),
+        ))?;
 
         Ok(())
     }

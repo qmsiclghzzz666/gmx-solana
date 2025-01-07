@@ -15,7 +15,7 @@ use crate::{
         market::{MarketTransferInOperation, MarketTransferOutOperation},
     },
     states::{
-        common::action::{Action, ActionExt, ActionSigner},
+        common::action::{Action, ActionExt, ActionSigner, EventEmitter},
         glv::SplitAccountsForGlv,
         Chainlink, Glv, GlvDeposit, Market, NonceBytes, Oracle, RoleKey, Seed, Store,
         StoreWalletSigner, TokenMapHeader, TokenMapLoader,
@@ -419,6 +419,7 @@ impl<'info> internal::Close<'info, GlvDeposit> for CloseGlvDeposit<'info> {
         &self,
         init_if_needed: bool,
         store_wallet_signer: &StoreWalletSigner,
+        _event_emitter: &EventEmitter<'_, 'info>,
     ) -> Result<internal::Success> {
         use crate::utils::token::TransferAllFromEscrowToATA;
 

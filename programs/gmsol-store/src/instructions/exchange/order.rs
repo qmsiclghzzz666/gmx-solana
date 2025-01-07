@@ -10,14 +10,14 @@ use gmsol_utils::InitSpace;
 
 use crate::{
     constants,
-    events::OrderCreated,
+    events::{GtUpdated, OrderCreated},
     ops::{
         execution_fee::TransferExecutionFeeOperation,
         order::{CreateOrderOperation, CreateOrderParams},
     },
     order::internal::Close,
     states::{
-        common::action::Action,
+        common::action::{Action, EventEmitter},
         feature::ActionDisabledFlag,
         order::{Order, OrderKind},
         position::PositionKind,
@@ -616,9 +616,10 @@ impl<'info> internal::Close<'info, Order> for CloseOrder<'info> {
         &self,
         init_if_needed: bool,
         store_wallet_signer: &StoreWalletSigner,
+        event_emitter: &EventEmitter<'_, 'info>,
     ) -> Result<internal::Success> {
         let transfer_success = self.transfer_to_atas(init_if_needed, store_wallet_signer)?;
-        let process_success = self.process_gt_reward()?;
+        let process_success = self.process_gt_reward(event_emitter)?;
         Ok(transfer_success && process_success)
     }
 
@@ -707,10 +708,13 @@ impl<'info> CloseOrder<'info> {
         Ok(true)
     }
 
-    fn process_gt_reward(&self) -> Result<internal::Success> {
+    fn process_gt_reward(
+        &self,
+        event_emitter: &EventEmitter<'_, 'info>,
+    ) -> Result<internal::Success> {
         let amount = self.order.load()?.gt_reward;
         if amount != 0 {
-            self.mint_gt_reward_for_referrer(amount)?;
+            self.mint_gt_reward_for_referrer(amount, event_emitter)?;
 
             self.order.load_mut()?.gt_reward = 0;
         }
@@ -718,7 +722,11 @@ impl<'info> CloseOrder<'info> {
         Ok(true)
     }
 
-    fn mint_gt_reward_for_referrer(&self, amount: u64) -> Result<()> {
+    fn mint_gt_reward_for_referrer(
+        &self,
+        amount: u64,
+        event_emitter: &EventEmitter<'_, 'info>,
+    ) -> Result<()> {
         // Mint referral reward for the referrer.
         let Some(referrer) = self.user.load()?.referral().referrer().copied() else {
             return Ok(());
@@ -752,12 +760,12 @@ impl<'info> CloseOrder<'info> {
             let mut referrer_user = referrer_user.load_mut()?;
 
             store.gt_mut().mint_to(&mut referrer_user, reward)?;
-            msg!("[GT] minted {} units of GT to the referrer", reward);
 
-            msg!(
-                "[GT] updating rank with total amount: {}",
-                referrer_user.gt.amount()
-            );
+            event_emitter.emit_cpi(&GtUpdated::rewarded(
+                referrer_user.owner,
+                amount,
+                store.gt(),
+            ))?;
         }
 
         Ok(())

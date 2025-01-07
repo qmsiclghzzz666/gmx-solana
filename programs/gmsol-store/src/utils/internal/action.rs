@@ -2,7 +2,7 @@ use anchor_lang::{prelude::*, ZeroCopy};
 
 use crate::{
     states::{
-        common::action::{Action, ActionEvent, ActionParams, Closable},
+        common::action::{Action, ActionParams, Closable, EventEmitter},
         NonceBytes, StoreWalletSigner,
     },
     CoreError,
@@ -111,6 +111,7 @@ where
         &self,
         init_if_needed: bool,
         store_wallet_signer: &StoreWalletSigner,
+        event_emitter: &EventEmitter<'_, 'info>,
     ) -> Result<Success>;
 
     /// Close Action.
@@ -123,13 +124,20 @@ where
             accounts.store().key(),
             accounts.store_wallet_bump(&ctx.bumps),
         );
-        if accounts.process(should_continue_when_atas_are_missing, &store_wallet_signer)? {
+
+        let (authority, bump) = accounts.event_authority(&ctx.bumps);
+        let event_emitter = EventEmitter::new(&authority, bump);
+
+        if accounts.process(
+            should_continue_when_atas_are_missing,
+            &store_wallet_signer,
+            &event_emitter,
+        )? {
             {
                 let action_address = accounts.action().key();
                 let action = accounts.action().load()?;
                 let event = action.to_closed_event(&action_address, reason)?;
-                let (event_authority, event_authority_bump) = accounts.event_authority(&ctx.bumps);
-                event.emit_cpi(event_authority, event_authority_bump)?;
+                event_emitter.emit_cpi(&event)?;
             }
             accounts.close_action_account()?;
         } else {

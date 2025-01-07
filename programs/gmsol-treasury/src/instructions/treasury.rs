@@ -600,6 +600,9 @@ pub struct ConfirmGtBuyback<'info> {
     /// CHECK: the permissions should be checked by the CPI.
     #[account(mut)]
     pub oracle: AccountLoader<'info, Oracle>,
+    /// Event authority.
+    /// CHECK: check by CPI.
+    pub event_authority: UncheckedAccount<'info>,
     /// Store program.
     pub store_program: Program<'info, GmsolStore>,
     /// Chainlink program.
@@ -757,6 +760,8 @@ impl<'info> ConfirmGtBuyback<'info> {
                 authority: self.config.to_account_info(),
                 store: self.store.to_account_info(),
                 vault: self.gt_exchange_vault.to_account_info(),
+                event_authority: self.event_authority.to_account_info(),
+                program: self.store_program.to_account_info(),
             },
         )
     }

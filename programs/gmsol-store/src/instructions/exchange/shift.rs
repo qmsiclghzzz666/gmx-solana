@@ -8,7 +8,7 @@ use gmsol_utils::InitSpace;
 use crate::{
     ops::shift::{CreateShiftOperation, CreateShiftParams},
     states::{
-        common::action::{Action, ActionExt},
+        common::action::{Action, ActionExt, EventEmitter},
         Market, NonceBytes, RoleKey, Seed, Shift, Store, StoreWalletSigner,
     },
     utils::{internal, token::is_associated_token_account},
@@ -247,6 +247,7 @@ impl<'info> internal::Close<'info, Shift> for CloseShift<'info> {
         &self,
         init_if_needed: bool,
         store_wallet_signer: &StoreWalletSigner,
+        _event_emitter: &EventEmitter<'_, 'info>,
     ) -> Result<internal::Success> {
         use crate::utils::token::TransferAllFromEscrowToATA;
 

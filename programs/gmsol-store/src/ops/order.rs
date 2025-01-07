@@ -1013,6 +1013,7 @@ impl<'a, 'info> ExecuteOrderOperation<'a, 'info> {
                         &mut *self.store.load_mut()?,
                         &mut *self.user.load_mut()?,
                         paid_fee_value,
+                        position.event_emitter(),
                     )?;
                 } else {
                     msg!("[GT] GT minting is disabled for this market");

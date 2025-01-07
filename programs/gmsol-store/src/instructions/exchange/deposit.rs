@@ -9,7 +9,7 @@ use crate::{
     events::DepositCreated,
     ops::deposit::{CreateDepositOperation, CreateDepositParams},
     states::{
-        common::action::{Action, ActionExt},
+        common::action::{Action, ActionExt, EventEmitter},
         Deposit, Market, NonceBytes, RoleKey, Seed, Store, StoreWalletSigner,
     },
     utils::{
@@ -363,6 +363,7 @@ impl<'info> internal::Close<'info, Deposit> for CloseDeposit<'info> {
         &self,
         init_if_needed: bool,
         store_wallet_signer: &StoreWalletSigner,
+        _event_emitter: &EventEmitter<'_, 'info>,
     ) -> Result<internal::Success> {
         use crate::utils::token::TransferAllFromEscrowToATA;
 

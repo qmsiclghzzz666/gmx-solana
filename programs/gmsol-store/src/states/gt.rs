@@ -186,6 +186,11 @@ impl GtState {
         self.total_minted
     }
 
+    /// Get grow steps.
+    pub fn grow_steps(&self) -> u64 {
+        self.grow_steps
+    }
+
     /// Get GT supply.
     pub fn supply(&self) -> u64 {
         self.supply
@@ -321,7 +326,7 @@ impl GtState {
         &self,
         size_in_value: u128,
         discount: u128,
-    ) -> Result<(u64, u128)> {
+    ) -> Result<(u64, u128, u128)> {
         use gmsol_model::utils::apply_factor;
 
         // Calculate the minting cost to apply.
@@ -351,14 +356,7 @@ impl GtState {
 
         let minted_value = size_in_value - remainder;
 
-        msg!(
-            "[GT] will mint {} units of GT with a minting cost of {} per unit GT (in terms of paid order fee), discount = {}",
-            minted,
-            minting_cost,
-            discount,
-        );
-
-        Ok((minted, minted_value))
+        Ok((minted, minted_value, minting_cost))
     }
 
     pub(crate) fn ranks(&self) -> &[u64] {
