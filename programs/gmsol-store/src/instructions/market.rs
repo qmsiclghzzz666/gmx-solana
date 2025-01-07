@@ -14,8 +14,8 @@ use crate::{
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token, TokenAccount};
 use gmsol_model::{
-    num::Unsigned, price::Prices, BalanceExt, BaseMarketMut, LiquidityMarketExt, PnlFactorKind,
-    PoolExt,
+    num::Unsigned, price::Prices, BalanceExt, Bank, BaseMarketMut, LiquidityMarketExt,
+    PnlFactorKind, PoolExt,
 };
 use gmsol_utils::InitSpace;
 
@@ -293,10 +293,11 @@ pub(crate) fn unchecked_market_transfer_in(
             amount,
         )?;
         let token = &ctx.accounts.vault.mint;
-        ctx.accounts
-            .market
-            .load_mut()?
-            .record_transferred_in_by_token(token, amount)?;
+        let mut market = RevertibleMarket::try_from(&ctx.accounts.market)?;
+        market
+            .record_transferred_in_by_token(token, &amount)
+            .map_err(ModelError::from)?;
+        market.commit();
     }
 
     Ok(())

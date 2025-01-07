@@ -13,7 +13,7 @@ use crate::{
             revertible::{
                 liquidity_market::RevertibleLiquidityMarket,
                 swap_market::{SwapDirection, SwapMarkets},
-                Revertible,
+                Revertible, RevertibleMarket,
             },
             utils::ValidateMarketBalances,
             HasMarketMeta,
@@ -58,9 +58,11 @@ impl<'a, 'info> MarketTransferInOperation<'a, 'info> {
                 amount,
             )?;
             let token = &self.vault.mint;
-            self.market
-                .load_mut()?
-                .record_transferred_in_by_token(token, amount)?;
+            let mut market = RevertibleMarket::try_from(self.market)?;
+            market
+                .record_transferred_in_by_token(token, &amount)
+                .map_err(ModelError::from)?;
+            market.commit();
         }
 
         Ok(())
@@ -103,9 +105,11 @@ impl<'a, 'info> MarketTransferOutOperation<'a, 'info> {
             )
             .transfer_out(self.vault.to_account_info(), self.to, amount, decimals)?;
             let token = &self.token_mint.key();
-            self.market
-                .load_mut()?
-                .record_transferred_out_by_token(token, amount)?;
+            let mut market = RevertibleMarket::try_from(self.market)?;
+            market
+                .record_transferred_out_by_token(token, &amount)
+                .map_err(ModelError::from)?;
+            market.commit();
         }
 
         Ok(())

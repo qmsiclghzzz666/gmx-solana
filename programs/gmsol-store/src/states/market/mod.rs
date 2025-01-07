@@ -197,28 +197,6 @@ impl Market {
         ))
     }
 
-    /// Record transferred in by the given token.
-    pub fn record_transferred_in_by_token(&mut self, token: &Pubkey, amount: u64) -> Result<()> {
-        if self.meta.long_token_mint == *token {
-            self.record_transferred_in(true, amount)
-        } else if self.meta.short_token_mint == *token {
-            self.record_transferred_in(false, amount)
-        } else {
-            Err(error!(CoreError::InvalidCollateralToken))
-        }
-    }
-
-    /// Record transferred out by the given token.
-    pub fn record_transferred_out_by_token(&mut self, token: &Pubkey, amount: u64) -> Result<()> {
-        if self.meta.long_token_mint == *token {
-            self.record_transferred_out(true, amount)
-        } else if self.meta.short_token_mint == *token {
-            self.record_transferred_out(false, amount)
-        } else {
-            Err(error!(CoreError::InvalidCollateralToken))
-        }
-    }
-
     /// Get flag.
     pub fn flag(&self, flag: MarketFlag) -> bool {
         self.flags.get_flag(flag)
@@ -278,74 +256,6 @@ impl Market {
     /// Return the previous value.
     pub fn set_is_gt_minting_enbaled(&mut self, enabled: bool) -> bool {
         self.set_flag(MarketFlag::GTEnabled, enabled)
-    }
-
-    /// Record transferred in.
-    fn record_transferred_in(&mut self, is_long_token: bool, amount: u64) -> Result<()> {
-        msg!(
-            "[Balance updating] {}: {},{}(+{},{})",
-            self.meta.market_token_mint,
-            self.state.other.long_token_balance,
-            self.state.other.short_token_balance,
-            amount,
-            is_long_token
-        );
-        if self.is_pure() || is_long_token {
-            self.state.other.long_token_balance = self
-                .state
-                .other
-                .long_token_balance
-                .checked_add(amount)
-                .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
-        } else {
-            self.state.other.short_token_balance = self
-                .state
-                .other
-                .short_token_balance
-                .checked_add(amount)
-                .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
-        }
-        msg!(
-            "[Balance updated] {}: {},{}",
-            self.meta.market_token_mint,
-            self.state.other.long_token_balance,
-            self.state.other.short_token_balance
-        );
-        Ok(())
-    }
-
-    /// Record transferred out.
-    fn record_transferred_out(&mut self, is_long_token: bool, amount: u64) -> Result<()> {
-        msg!(
-            "[Balance updating] {}: {},{}(-{},{})",
-            self.meta.market_token_mint,
-            self.state.other.long_token_balance,
-            self.state.other.short_token_balance,
-            amount,
-            is_long_token
-        );
-        if self.is_pure() || is_long_token {
-            self.state.other.long_token_balance = self
-                .state
-                .other
-                .long_token_balance
-                .checked_sub(amount)
-                .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
-        } else {
-            self.state.other.short_token_balance = self
-                .state
-                .other
-                .short_token_balance
-                .checked_sub(amount)
-                .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
-        }
-        msg!(
-            "[Balance updated] {}: {},{}",
-            self.meta.market_token_mint,
-            self.state.other.long_token_balance,
-            self.state.other.short_token_balance
-        );
-        Ok(())
     }
 
     /// Get pool of the given kind.
