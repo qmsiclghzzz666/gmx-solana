@@ -956,6 +956,14 @@ where
 
 /// Insolvent Close Step.
 #[derive(Debug, Clone, Copy)]
+#[cfg_attr(
+    feature = "anchor-lang",
+    derive(
+        anchor_lang::AnchorDeserialize,
+        anchor_lang::AnchorSerialize,
+        anchor_lang::InitSpace
+    )
+)]
 #[non_exhaustive]
 pub enum InsolventCloseStep {
     /// PnL.

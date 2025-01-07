@@ -2,9 +2,18 @@ use num_traits::{CheckedAdd, Zero};
 
 /// Claimable collateral amounts.
 #[derive(Debug, Clone, Copy)]
+#[cfg_attr(
+    feature = "anchor-lang",
+    derive(anchor_lang::AnchorDeserialize, anchor_lang::AnchorSerialize)
+)]
 pub struct ClaimableCollateral<T> {
     output_token_amount: T,
     secondary_output_token_amount: T,
+}
+
+#[cfg(feature = "gmsol-utils")]
+impl<T: gmsol_utils::InitSpace> gmsol_utils::InitSpace for ClaimableCollateral<T> {
+    const INIT_SPACE: usize = 2 * T::INIT_SPACE;
 }
 
 impl<T> ClaimableCollateral<T> {

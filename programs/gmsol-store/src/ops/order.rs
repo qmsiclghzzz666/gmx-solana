@@ -10,7 +10,7 @@ use gmsol_model::{
 use typed_builder::TypedBuilder;
 
 use crate::{
-    events::{MarketStateUpdated, PositionIncreased, TradeData},
+    events::{MarketStateUpdated, PositionDecreased, PositionIncreased, TradeData},
     states::{
         common::action::{Action, ActionExt, ActionParams, EventEmitter},
         market::{
@@ -1461,7 +1461,6 @@ fn execute_decrease_position(
             );
         }
 
-        msg!("[Position] decreased: {:?}", report);
         event.update_with_decrease_report(&report, &prices)?;
         report
     };
@@ -1576,10 +1575,14 @@ fn execute_decrease_position(
         .market()
         .validate_market_balances(long_transfer_out, short_transfer_out)?;
 
-    Ok((
-        should_remove_position,
-        *report.fees().paid_order_fee_value(),
-    ))
+    let paid_order_fee_value = *report.fees().paid_order_fee_value();
+
+    msg!("[Position] decreased");
+    position
+        .event_emitter()
+        .emit_cpi(&PositionDecreased::from(report))?;
+
+    Ok((should_remove_position, paid_order_fee_value))
 }
 
 /// Position Cut Operation.

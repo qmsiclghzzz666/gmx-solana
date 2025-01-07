@@ -1,5 +1,7 @@
 use std::fmt;
 
+use anchor_lang::Space;
+
 use crate::{num::Unsigned, params::fee::PositionFees, position::InsolventCloseStep};
 
 use super::{ClaimableCollateral, DecreasePositionParams, ProcessCollateralResult};
@@ -10,29 +12,52 @@ use super::{ClaimableCollateral, DecreasePositionParams, ProcessCollateralResult
     `claimable_funding_amounts`, `claimable_collateral_for_holding` and `claimable_collateral_for_user`
     must be used
 "]
-pub struct DecreasePositionReport<T: Unsigned> {
-    price_impact_value: T::Signed,
-    price_impact_diff: T,
-    execution_price: T,
-    size_delta_in_tokens: T,
-    withdrawable_collateral_amount: T,
-    initial_size_delta_usd: T,
-    size_delta_usd: T,
-    fees: PositionFees<T>,
-    pnl: Pnl<T::Signed>,
+#[derive(Clone)]
+#[cfg_attr(
+    feature = "anchor-lang",
+    derive(anchor_lang::AnchorDeserialize, anchor_lang::AnchorSerialize)
+)]
+pub struct DecreasePositionReport<Unsigned, Signed> {
+    price_impact_value: Signed,
+    price_impact_diff: Unsigned,
+    execution_price: Unsigned,
+    size_delta_in_tokens: Unsigned,
+    withdrawable_collateral_amount: Unsigned,
+    initial_size_delta_usd: Unsigned,
+    size_delta_usd: Unsigned,
+    fees: PositionFees<Unsigned>,
+    pnl: Pnl<Signed>,
     insolvent_close_step: Option<InsolventCloseStep>,
     // Output
     should_remove: bool,
     is_output_token_long: bool,
     is_secondary_output_token_long: bool,
-    output_amounts: OutputAmounts<T>,
-    claimable_funding_long_token_amount: T,
-    claimable_funding_short_token_amount: T,
-    for_holding: ClaimableCollateral<T>,
-    for_user: ClaimableCollateral<T>,
+    output_amounts: OutputAmounts<Unsigned>,
+    claimable_funding_long_token_amount: Unsigned,
+    claimable_funding_short_token_amount: Unsigned,
+    for_holding: ClaimableCollateral<Unsigned>,
+    for_user: ClaimableCollateral<Unsigned>,
 }
 
-impl<T: Unsigned + fmt::Debug> fmt::Debug for DecreasePositionReport<T>
+#[cfg(feature = "gmsol-utils")]
+impl<Unsigned, Signed> gmsol_utils::InitSpace for DecreasePositionReport<Unsigned, Signed>
+where
+    Unsigned: gmsol_utils::InitSpace,
+    Signed: gmsol_utils::InitSpace,
+{
+    const INIT_SPACE: usize = Signed::INIT_SPACE
+        + 6 * Unsigned::INIT_SPACE
+        + PositionFees::<Unsigned>::INIT_SPACE
+        + Pnl::<Signed>::INIT_SPACE
+        + 1
+        + InsolventCloseStep::INIT_SPACE
+        + 3 * bool::INIT_SPACE
+        + OutputAmounts::<Unsigned>::INIT_SPACE
+        + 2 * Unsigned::INIT_SPACE
+        + 2 * ClaimableCollateral::<Unsigned>::INIT_SPACE;
+}
+
+impl<T: Unsigned + fmt::Debug> fmt::Debug for DecreasePositionReport<T, T::Signed>
 where
     T::Signed: fmt::Debug,
 {
@@ -72,7 +97,7 @@ where
     }
 }
 
-impl<T: Unsigned + Clone> DecreasePositionReport<T> {
+impl<T: Unsigned + Clone> DecreasePositionReport<T, T::Signed> {
     pub(super) fn new(
         params: &DecreasePositionParams<T>,
         execution: ProcessCollateralResult<T>,
@@ -243,6 +268,11 @@ pub struct Pnl<T> {
     uncapped_pnl: T,
 }
 
+#[cfg(feature = "gmsol-utils")]
+impl<T: gmsol_utils::InitSpace> gmsol_utils::InitSpace for Pnl<T> {
+    const INIT_SPACE: usize = 2 * T::INIT_SPACE;
+}
+
 impl<T> Pnl<T> {
     /// Create a new [`Pnl`].
     pub fn new(pnl: T, uncapped_pnl: T) -> Self {
@@ -270,6 +300,11 @@ impl<T> Pnl<T> {
 pub struct OutputAmounts<T> {
     pub(super) output_amount: T,
     pub(super) secondary_output_amount: T,
+}
+
+#[cfg(feature = "gmsol-utils")]
+impl<T: gmsol_utils::InitSpace> gmsol_utils::InitSpace for OutputAmounts<T> {
+    const INIT_SPACE: usize = 2 * T::INIT_SPACE;
 }
 
 impl<T> OutputAmounts<T> {

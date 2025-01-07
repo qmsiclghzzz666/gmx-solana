@@ -502,7 +502,7 @@ where
     #[allow(clippy::type_complexity)]
     fn swap_collateral_token_to_pnl_token(
         market: &mut P::Market,
-        report: &mut DecreasePositionReport<P::Num>,
+        report: &mut DecreasePositionReport<P::Num, P::Signed>,
         prices: &Prices<P::Num>,
         swap: DecreasePositionSwapType,
     ) -> crate::Result<Option<crate::Result<SwapReport<P::Num, <P::Num as Unsigned>::Signed>>>>
@@ -546,7 +546,7 @@ impl<const DECIMALS: u8, P: PositionMut<DECIMALS>> MarketAction for DecreasePosi
 where
     P::Market: PerpMarketMut<DECIMALS, Num = P::Num, Signed = P::Signed>,
 {
-    type Report = Box<DecreasePositionReport<P::Num>>;
+    type Report = Box<DecreasePositionReport<P::Num, P::Signed>>;
 
     fn execute(mut self) -> crate::Result<Self::Report> {
         debug_assert!(

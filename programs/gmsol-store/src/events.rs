@@ -71,93 +71,6 @@ impl From<DepositReport<u128, i128>> for DepositExecuted {
     }
 }
 
-/// Withdrawal created event.
-#[event]
-#[cfg_attr(feature = "debug", derive(Debug))]
-pub struct WithdrawalCreated {
-    /// Event time.
-    pub ts: i64,
-    /// Store account.
-    pub store: Pubkey,
-    /// Withdrawal account.
-    pub withdrawal: Pubkey,
-}
-
-impl WithdrawalCreated {
-    pub(crate) fn new(store: Pubkey, withdrawal: Pubkey) -> Result<Self> {
-        Ok(Self {
-            ts: Clock::get()?.unix_timestamp,
-            store,
-            withdrawal,
-        })
-    }
-}
-
-/// Withdrawal executed Event.
-#[event]
-#[cfg_attr(feature = "debug", derive(Debug))]
-pub struct WithdrawalExecuted {
-    /// Report.
-    pub report: WithdrawReport<u128>,
-}
-
-impl gmsol_utils::InitSpace for WithdrawalExecuted {
-    const INIT_SPACE: usize = WithdrawReport::<u128>::INIT_SPACE;
-}
-
-impl ActionEvent for WithdrawalExecuted {}
-
-impl From<WithdrawReport<u128>> for WithdrawalExecuted {
-    fn from(report: WithdrawReport<u128>) -> Self {
-        Self { report }
-    }
-}
-
-/// Order created event.
-#[event]
-#[cfg_attr(feature = "debug", derive(Debug))]
-pub struct OrderCreated {
-    /// Event time.
-    pub ts: i64,
-    /// Store account.
-    pub store: Pubkey,
-    /// Order account.
-    pub order: Pubkey,
-    /// Position account.
-    pub position: Option<Pubkey>,
-}
-
-impl OrderCreated {
-    pub(crate) fn new(store: Pubkey, order: Pubkey, position: Option<Pubkey>) -> Result<Self> {
-        Ok(Self {
-            ts: Clock::get()?.unix_timestamp,
-            store,
-            order,
-            position,
-        })
-    }
-}
-
-/// Position increased event.
-#[event]
-#[cfg_attr(feature = "debug", derive(Debug))]
-pub struct PositionIncreased {
-    /// Report.
-    pub report: IncreasePositionReport<u128, i128>,
-}
-
-impl gmsol_utils::InitSpace for PositionIncreased {
-    const INIT_SPACE: usize = IncreasePositionReport::<u128, i128>::INIT_SPACE;
-}
-
-impl ActionEvent for PositionIncreased {}
-
-impl From<IncreasePositionReport<u128, i128>> for PositionIncreased {
-    fn from(report: IncreasePositionReport<u128, i128>) -> Self {
-        Self { report }
-    }
-}
-
 /// Deposit removed event.
 #[event]
 #[cfg_attr(feature = "debug", derive(Debug))]
@@ -214,6 +127,170 @@ impl InitSpace for DepositRemoved {
 }
 
 impl ActionEvent for DepositRemoved {}
+
+/// Withdrawal created event.
+#[event]
+#[cfg_attr(feature = "debug", derive(Debug))]
+pub struct WithdrawalCreated {
+    /// Event time.
+    pub ts: i64,
+    /// Store account.
+    pub store: Pubkey,
+    /// Withdrawal account.
+    pub withdrawal: Pubkey,
+}
+
+impl WithdrawalCreated {
+    pub(crate) fn new(store: Pubkey, withdrawal: Pubkey) -> Result<Self> {
+        Ok(Self {
+            ts: Clock::get()?.unix_timestamp,
+            store,
+            withdrawal,
+        })
+    }
+}
+
+/// Withdrawal executed Event.
+#[event]
+#[cfg_attr(feature = "debug", derive(Debug))]
+pub struct WithdrawalExecuted {
+    /// Report.
+    pub report: WithdrawReport<u128>,
+}
+
+impl gmsol_utils::InitSpace for WithdrawalExecuted {
+    const INIT_SPACE: usize = WithdrawReport::<u128>::INIT_SPACE;
+}
+
+impl ActionEvent for WithdrawalExecuted {}
+
+impl From<WithdrawReport<u128>> for WithdrawalExecuted {
+    fn from(report: WithdrawReport<u128>) -> Self {
+        Self { report }
+    }
+}
+
+/// Withdrawal removed event.
+#[event]
+#[cfg_attr(feature = "debug", derive(Debug))]
+#[derive(Clone, InitSpace)]
+pub struct WithdrawalRemoved {
+    /// Action id.
+    pub id: u64,
+    /// Timestamp.
+    pub ts: i64,
+    /// Slot.
+    pub slot: u64,
+    /// Store.
+    pub store: Pubkey,
+    /// Withdrawal.
+    pub withdrawal: Pubkey,
+    /// Market token.
+    pub market_token: Pubkey,
+    /// Owner.
+    pub owner: Pubkey,
+    /// Final state.
+    pub state: ActionState,
+    /// Reason.
+    #[max_len(32)]
+    pub reason: String,
+}
+
+impl InitSpace for WithdrawalRemoved {
+    const INIT_SPACE: usize = <Self as Space>::INIT_SPACE;
+}
+
+impl ActionEvent for WithdrawalRemoved {}
+
+impl WithdrawalRemoved {
+    pub(crate) fn new(
+        id: u64,
+        store: Pubkey,
+        withdrawal: Pubkey,
+        market_token: Pubkey,
+        owner: Pubkey,
+        state: ActionState,
+        reason: impl ToString,
+    ) -> Result<Self> {
+        let clock = Clock::get()?;
+        Ok(Self {
+            id,
+            ts: clock.unix_timestamp,
+            slot: clock.slot,
+            store,
+            withdrawal,
+            market_token,
+            owner,
+            state,
+            reason: reason.to_string(),
+        })
+    }
+}
+
+/// Order created event.
+#[event]
+#[cfg_attr(feature = "debug", derive(Debug))]
+pub struct OrderCreated {
+    /// Event time.
+    pub ts: i64,
+    /// Store account.
+    pub store: Pubkey,
+    /// Order account.
+    pub order: Pubkey,
+    /// Position account.
+    pub position: Option<Pubkey>,
+}
+
+impl OrderCreated {
+    pub(crate) fn new(store: Pubkey, order: Pubkey, position: Option<Pubkey>) -> Result<Self> {
+        Ok(Self {
+            ts: Clock::get()?.unix_timestamp,
+            store,
+            order,
+            position,
+        })
+    }
+}
+
+/// Position increased event.
+#[event]
+#[cfg_attr(feature = "debug", derive(Debug))]
+pub struct PositionIncreased {
+    /// Report.
+    pub report: IncreasePositionReport<u128, i128>,
+}
+
+impl gmsol_utils::InitSpace for PositionIncreased {
+    const INIT_SPACE: usize = IncreasePositionReport::<u128, i128>::INIT_SPACE;
+}
+
+impl ActionEvent for PositionIncreased {}
+
+impl From<IncreasePositionReport<u128, i128>> for PositionIncreased {
+    fn from(report: IncreasePositionReport<u128, i128>) -> Self {
+        Self { report }
+    }
+}
+
+/// Position decrease event.
+#[event]
+#[cfg_attr(feature = "debug", derive(Debug))]
+pub struct PositionDecreased {
+    /// Report.
+    pub report: Box<DecreasePositionReport<u128, i128>>,
+}
+
+impl gmsol_utils::InitSpace for PositionDecreased {
+    const INIT_SPACE: usize = DecreasePositionReport::<u128, i128>::INIT_SPACE;
+}
+
+impl ActionEvent for PositionDecreased {}
+
+impl From<Box<DecreasePositionReport<u128, i128>>> for PositionDecreased {
+    fn from(report: Box<DecreasePositionReport<u128, i128>>) -> Self {
+        Self { report }
+    }
+}
 
 /// Order removed event.
 #[event]
@@ -275,63 +352,6 @@ impl InitSpace for OrderRemoved {
 }
 
 impl ActionEvent for OrderRemoved {}
-
-/// Withdrawal removed event.
-#[event]
-#[cfg_attr(feature = "debug", derive(Debug))]
-#[derive(Clone, InitSpace)]
-pub struct WithdrawalRemoved {
-    /// Action id.
-    pub id: u64,
-    /// Timestamp.
-    pub ts: i64,
-    /// Slot.
-    pub slot: u64,
-    /// Store.
-    pub store: Pubkey,
-    /// Withdrawal.
-    pub withdrawal: Pubkey,
-    /// Market token.
-    pub market_token: Pubkey,
-    /// Owner.
-    pub owner: Pubkey,
-    /// Final state.
-    pub state: ActionState,
-    /// Reason.
-    #[max_len(32)]
-    pub reason: String,
-}
-
-impl InitSpace for WithdrawalRemoved {
-    const INIT_SPACE: usize = <Self as Space>::INIT_SPACE;
-}
-
-impl ActionEvent for WithdrawalRemoved {}
-
-impl WithdrawalRemoved {
-    pub(crate) fn new(
-        id: u64,
-        store: Pubkey,
-        withdrawal: Pubkey,
-        market_token: Pubkey,
-        owner: Pubkey,
-        state: ActionState,
-        reason: impl ToString,
-    ) -> Result<Self> {
-        let clock = Clock::get()?;
-        Ok(Self {
-            id,
-            ts: clock.unix_timestamp,
-            slot: clock.slot,
-            store,
-            withdrawal,
-            market_token,
-            owner,
-            state,
-            reason: reason.to_string(),
-        })
-    }
-}
 
 /// Shift removed event.
 #[event]
@@ -953,7 +973,7 @@ impl TradeData {
     /// Update with decrease report.
     pub(crate) fn update_with_decrease_report(
         &mut self,
-        report: &DecreasePositionReport<u128>,
+        report: &DecreasePositionReport<u128, i128>,
         prices: &Prices<u128>,
     ) -> Result<()> {
         self.prices.set_with_prices(prices);

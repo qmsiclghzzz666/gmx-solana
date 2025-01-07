@@ -239,7 +239,7 @@ impl TransferOut {
 
     pub(crate) fn process_claimable_collateral_for_decrease(
         &mut self,
-        report: &DecreasePositionReport<u128>,
+        report: &DecreasePositionReport<u128, i128>,
     ) -> Result<()> {
         let for_holding = report.claimable_collateral_for_holding();
         require!(
