@@ -60,10 +60,19 @@ impl<M: PerpMarketMut<DECIMALS>, const DECIMALS: u8> MarketAction
 
 /// Update Borrowing Report.
 #[derive(Debug)]
+#[cfg_attr(
+    feature = "anchor-lang",
+    derive(anchor_lang::AnchorDeserialize, anchor_lang::AnchorSerialize)
+)]
 pub struct UpdateBorrowingReport<T> {
     duration_in_seconds: u64,
     next_cumulative_borrowing_factor_for_long: T,
     next_cumulative_borrowing_factor_for_short: T,
+}
+
+#[cfg(feature = "gmsol-utils")]
+impl<T: gmsol_utils::InitSpace> gmsol_utils::InitSpace for UpdateBorrowingReport<T> {
+    const INIT_SPACE: usize = u64::INIT_SPACE + 2 * T::INIT_SPACE;
 }
 
 impl<T> UpdateBorrowingReport<T> {

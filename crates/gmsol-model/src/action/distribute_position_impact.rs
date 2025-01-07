@@ -17,10 +17,19 @@ pub struct DistributePositionImpact<M: BaseMarket<DECIMALS>, const DECIMALS: u8>
 
 /// Distribute Position Impact Report.
 #[derive(Debug)]
+#[cfg_attr(
+    feature = "anchor-lang",
+    derive(anchor_lang::AnchorDeserialize, anchor_lang::AnchorSerialize)
+)]
 pub struct DistributePositionImpactReport<T> {
     duration_in_seconds: u64,
     distribution_amount: T,
     next_position_impact_pool_amount: T,
+}
+
+#[cfg(feature = "gmsol-utils")]
+impl<T: gmsol_utils::InitSpace> gmsol_utils::InitSpace for DistributePositionImpactReport<T> {
+    const INIT_SPACE: usize = u64::INIT_SPACE + 2 * T::INIT_SPACE;
 }
 
 impl<T> DistributePositionImpactReport<T> {

@@ -10,9 +10,9 @@ use gmsol_model::{
 use typed_builder::TypedBuilder;
 
 use crate::{
-    events::TradeData,
+    events::{MarketStateUpdated, TradeData},
     states::{
-        common::action::{Action, ActionExt, ActionParams},
+        common::action::{Action, ActionExt, ActionParams, EventEmitter},
         market::{
             revertible::{
                 market::RevertibleMarket,
@@ -743,6 +743,8 @@ pub(crate) struct ExecuteOrderOperation<'a, 'info> {
     throw_on_execution_error: bool,
     #[builder(default)]
     refund: u64,
+    #[builder(setter(into))]
+    event_emitter: EventEmitter<'a, 'info>,
 }
 
 pub(crate) type RemovePosition = bool;
@@ -861,38 +863,39 @@ impl<'a, 'info> ExecuteOrderOperation<'a, 'info> {
             SwapMarkets::new(&self.store.key(), &loaders, Some(&current_market_token))?;
         let mut transfer_out = Box::default();
 
-        // Distribute position impact.
+        msg!("[Order]");
         {
-            let report = market
+            // Distribute position impact.
+            let distribute_position_impact = market
                 .distribute_position_impact()
                 .map_err(ModelError::from)?
                 .execute()
                 .map_err(ModelError::from)?;
-            // Unlike the Solidity version, this log will still be output
-            // even when there is no position impact amount to distribute.
-            //
-            // However, in the future, we will decide whether to emit
-            // an event based on whether the `distribution_amount` is zero,
-            // which is consistent with the Solidity version.
-            msg!("[Order] pre-execute: {:?}", report);
-        }
 
-        // Update borrowing states.
-        {
+            if *distribute_position_impact.distribution_amount() != 0 {
+                msg!("[Pre-execute] position impact distributed");
+            }
+
+            // Update borrowing state.
             let borrowing = market
                 .update_borrowing(&prices)
                 .and_then(|a| a.execute())
                 .map_err(ModelError::from)?;
-            msg!("[Order] pre-execute: {:?}", borrowing);
-        }
+            msg!("[Pre-execute] borrowing state updated");
 
-        // Update funding states.
-        {
+            // Update funding state.
             let funding = market
                 .update_funding(&prices)
                 .and_then(|a| a.execute())
                 .map_err(ModelError::from)?;
-            msg!("[Order] pre-execute: {:?}", funding);
+            msg!("[Pre-execute] funding state updated");
+
+            self.event_emitter
+                .emit_cpi(&MarketStateUpdated::from_reports(
+                    distribute_position_impact,
+                    borrowing,
+                    funding,
+                ))?;
         }
 
         let kind = self.order.load()?.params.kind()?;
@@ -1603,6 +1606,8 @@ pub struct PositionCutOperation<'a, 'info> {
     system_program: AccountInfo<'info>,
     refund: u64,
     should_unwrap_native_token: bool,
+    #[builder(setter(into))]
+    event_emitter: EventEmitter<'a, 'info>,
 }
 
 /// Position Cut Kind.
@@ -1732,6 +1737,7 @@ impl<'a, 'info> PositionCutOperation<'a, 'info> {
             .throw_on_execution_error(true)
             .refund(self.refund)
             .executor(self.executor.clone())
+            .event_emitter(self.event_emitter)
             .build()
             .execute()
     }

@@ -31,7 +31,7 @@ impl<M: PerpMarketMut<DECIMALS>, const DECIMALS: u8> UpdateFundingState<M, DECIM
     fn next_funding_amount_per_size(
         &self,
         duration_in_seconds: u64,
-    ) -> crate::Result<UpdateFundingReport<M::Num>> {
+    ) -> crate::Result<UpdateFundingReport<M::Num, <M::Num as Unsigned>::Signed>> {
         use crate::utils;
         use num_traits::{CheckedMul, FromPrimitive};
 
@@ -109,7 +109,7 @@ impl<M: PerpMarketMut<DECIMALS>, const DECIMALS: u8> UpdateFundingState<M, DECIM
 
     fn set_deltas(
         &self,
-        report: &mut UpdateFundingReport<M::Num>,
+        report: &mut UpdateFundingReport<M::Num, <M::Num as Unsigned>::Signed>,
         longs_pay_shorts: bool,
         for_long_collateral: &M::Num,
         for_short_collateral: &M::Num,
@@ -296,7 +296,7 @@ impl<M: PerpMarketMut<DECIMALS>, const DECIMALS: u8> UpdateFundingState<M, DECIM
 impl<M: PerpMarketMut<DECIMALS>, const DECIMALS: u8> MarketAction
     for UpdateFundingState<M, DECIMALS>
 {
-    type Report = UpdateFundingReport<M::Num>;
+    type Report = UpdateFundingReport<M::Num, <M::Num as Unsigned>::Signed>;
 
     fn execute(mut self) -> crate::Result<Self::Report> {
         const MATRIX: [(bool, bool); 4] =
@@ -328,11 +328,25 @@ impl<M: PerpMarketMut<DECIMALS>, const DECIMALS: u8> MarketAction
 
 /// Update Funding Report.
 #[derive(Debug)]
-pub struct UpdateFundingReport<T: Unsigned> {
+#[cfg_attr(
+    feature = "anchor-lang",
+    derive(anchor_lang::AnchorDeserialize, anchor_lang::AnchorSerialize)
+)]
+pub struct UpdateFundingReport<Unsigned, Signed> {
     duration_in_seconds: u64,
-    next_funding_factor_per_second: T::Signed,
-    delta_funding_amount_per_size: [T; 4],
-    delta_claimable_funding_amount_per_size: [T; 4],
+    next_funding_factor_per_second: Signed,
+    delta_funding_amount_per_size: [Unsigned; 4],
+    delta_claimable_funding_amount_per_size: [Unsigned; 4],
+}
+
+#[cfg(feature = "gmsol-utils")]
+impl<Unsigned, Signed> gmsol_utils::InitSpace for UpdateFundingReport<Unsigned, Signed>
+where
+    Unsigned: gmsol_utils::InitSpace,
+    Signed: gmsol_utils::InitSpace,
+{
+    const INIT_SPACE: usize =
+        u64::INIT_SPACE + Signed::INIT_SPACE + 4 * Unsigned::INIT_SPACE + 4 * Unsigned::INIT_SPACE;
 }
 
 #[inline]
@@ -345,7 +359,7 @@ fn flags_to_index(is_long: bool, is_long_collateral: bool) -> usize {
     }
 }
 
-impl<T: Unsigned> UpdateFundingReport<T> {
+impl<T: Unsigned> UpdateFundingReport<T, T::Signed> {
     /// Create a new empty report.
     pub fn empty(duration_in_seconds: u64) -> Self {
         Self {

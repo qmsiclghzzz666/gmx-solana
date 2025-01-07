@@ -294,7 +294,8 @@ pub(crate) fn unchecked_process_position_cut<'info>(
         // CHECK: the address of `order` has been checked to be derived from this account's address.
         .executor(accounts.authority.to_account_info())
         .refund(refund)
-        .should_unwrap_native_token(should_unwrap_native_token);
+        .should_unwrap_native_token(should_unwrap_native_token)
+        .event_emitter((&accounts.event_authority, ctx.bumps.event_authority));
 
     let should_send_trade_event = accounts.oracle.load_mut()?.with_prices(
         &accounts.store,

@@ -1,12 +1,13 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, TokenAccount};
 use gmsol_model::{
-    Bank, LiquidityMarketMutExt, MarketAction, PerpMarketMutExt, PositionImpactMarketMutExt,
+    price::Prices, Bank, LiquidityMarketMutExt, MarketAction, PerpMarketMutExt,
+    PositionImpactMarketMutExt,
 };
 use typed_builder::TypedBuilder;
 
 use crate::{
-    events::DepositExecuted,
+    events::{DepositExecuted, MarketStateUpdated, WithdrawalExecuted},
     states::{
         common::{action::EventEmitter, swap::SwapParams},
         deposit::DepositParams,
@@ -226,6 +227,46 @@ impl<'a, 'info, T> Execute<'a, 'info, T> {
         &self.swap_markets
     }
 
+    fn pre_execute(&mut self, prices: &Prices<u128>) -> Result<()> {
+        // Distribute position impact.
+        let distribute_position_impact = self
+            .market
+            .distribute_position_impact()
+            .map_err(ModelError::from)?
+            .execute()
+            .map_err(ModelError::from)?;
+
+        if *distribute_position_impact.distribution_amount() != 0 {
+            msg!("[Pre-execute] position impact distributed");
+        }
+
+        // Update borrowing state.
+        let borrowing = self
+            .market
+            .base_mut()
+            .update_borrowing(prices)
+            .and_then(|a| a.execute())
+            .map_err(ModelError::from)?;
+        msg!("[Pre-execute] borrowing state updated");
+
+        // Update funding state.
+        let funding = self
+            .market
+            .base_mut()
+            .update_funding(prices)
+            .and_then(|a| a.execute())
+            .map_err(ModelError::from)?;
+        msg!("[Pre-execute] funding state updated");
+
+        self.event_emitter
+            .emit_cpi(&MarketStateUpdated::from_reports(
+                distribute_position_impact,
+                borrowing,
+                funding,
+            ))?;
+        Ok(())
+    }
+
     /// Swap and deposit into the current market.
     ///
     /// # CHECK
@@ -240,46 +281,10 @@ impl<'a, 'info, T> Execute<'a, 'info, T> {
     ) -> Result<Execute<'a, 'info, u64>> {
         self.market = self.market.enable_mint(market_token_receiver);
 
-        // Distribute position impact.
-        {
-            let report = self
-                .market
-                .distribute_position_impact()
-                .map_err(ModelError::from)?
-                .execute()
-                .map_err(ModelError::from)?;
-            // Unlike the Solidity version, this log will still be output
-            // even when there is no position impact amount to distribute.
-            //
-            // However, in the future, we will decide whether to emit
-            // an event based on whether the `distribution_amount` is zero,
-            // which is consistent with the Solidity version.
-            msg!("[Deposit] pre-execute: {:?}", report);
-        }
-
         let prices = self.oracle.market_prices(&self.market)?;
 
-        // Update borrowing states.
-        {
-            let borrowing = self
-                .market
-                .base_mut()
-                .update_borrowing(&prices)
-                .and_then(|a| a.execute())
-                .map_err(ModelError::from)?;
-            msg!("[Deposit] pre-execute: {:?}", borrowing);
-        }
-
-        // Update funding states.
-        {
-            let funding = self
-                .market
-                .base_mut()
-                .update_funding(&prices)
-                .and_then(|a| a.execute())
-                .map_err(ModelError::from)?;
-            msg!("[Deposit] pre-execute: {:?}", funding);
-        }
+        msg!("[Deposit]");
+        self.pre_execute(&prices)?;
 
         // Swap tokens into the target market.
         let (long_token_amount, short_token_amount) = {
@@ -352,46 +357,10 @@ impl<'a, 'info, T> Execute<'a, 'info, T> {
     ) -> Result<Execute<'a, 'info, (u64, u64)>> {
         self.market = self.market.enable_burn(market_token_vault);
 
-        // Distribute position impact.
-        {
-            let report = self
-                .market
-                .distribute_position_impact()
-                .map_err(ModelError::from)?
-                .execute()
-                .map_err(ModelError::from)?;
-            // Unlike the Solidity version, this log will still be output
-            // even when there is no position impact amount to distribute.
-            //
-            // However, in the future, we will decide whether to emit
-            // an event based on whether the `distribution_amount` is zero,
-            // which is consistent with the Solidity version.
-            msg!("[Withdrawal] pre-execute: {:?}", report);
-        }
-
         let prices = self.oracle.market_prices(&self.market)?;
 
-        // Update borrowing states.
-        {
-            let borrowing = self
-                .market
-                .base_mut()
-                .update_borrowing(&prices)
-                .and_then(|a| a.execute())
-                .map_err(ModelError::from)?;
-            msg!("[Withdrawal] pre-execute: {:?}", borrowing);
-        }
-
-        // Update funding states.
-        {
-            let funding = self
-                .market
-                .base_mut()
-                .update_funding(&prices)
-                .and_then(|a| a.execute())
-                .map_err(ModelError::from)?;
-            msg!("[Withdrawal] pre-execute: {:?}", funding);
-        }
+        msg!("[Withdrawal]");
+        self.pre_execute(&prices)?;
 
         // Perform the withdrawal.
         let (long_amount, short_amount) = {
@@ -411,7 +380,11 @@ impl<'a, 'info, T> Execute<'a, 'info, T> {
             // Validate current market.
             self.market
                 .validate_market_balances(long_amount, short_amount)?;
-            msg!("[Withdrawal] executed: {:?}", report);
+
+            msg!("[Withdrawal] executed");
+            self.event_emitter
+                .emit_cpi(&WithdrawalExecuted::from(report))?;
+
             (long_amount, short_amount)
         };
 

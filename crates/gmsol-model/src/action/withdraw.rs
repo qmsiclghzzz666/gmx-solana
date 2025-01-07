@@ -18,9 +18,18 @@ pub struct Withdrawal<M: BaseMarket<DECIMALS>, const DECIMALS: u8> {
 
 /// Withdraw params.
 #[derive(Debug, Clone, Copy)]
+#[cfg_attr(
+    feature = "anchor-lang",
+    derive(anchor_lang::AnchorDeserialize, anchor_lang::AnchorSerialize)
+)]
 pub struct WithdrawParams<T> {
     market_token_amount: T,
     prices: Prices<T>,
+}
+
+#[cfg(feature = "gmsol-utils")]
+impl<T: gmsol_utils::InitSpace> gmsol_utils::InitSpace for WithdrawParams<T> {
+    const INIT_SPACE: usize = T::INIT_SPACE + Prices::<T>::INIT_SPACE;
 }
 
 impl<T> WithdrawParams<T> {
@@ -43,12 +52,22 @@ impl<T> WithdrawParams<T> {
 /// Report of the execution of withdrawal.
 #[must_use = "`long_token_output` and `short_token_output` must be used"]
 #[derive(Debug, Clone, Copy)]
+#[cfg_attr(
+    feature = "anchor-lang",
+    derive(anchor_lang::AnchorDeserialize, anchor_lang::AnchorSerialize)
+)]
 pub struct WithdrawReport<T> {
     params: WithdrawParams<T>,
     long_token_fees: Fees<T>,
     short_token_fees: Fees<T>,
     long_token_output: T,
     short_token_output: T,
+}
+
+#[cfg(feature = "gmsol-utils")]
+impl<T: gmsol_utils::InitSpace> gmsol_utils::InitSpace for WithdrawReport<T> {
+    const INIT_SPACE: usize =
+        WithdrawParams::<T>::INIT_SPACE + 2 * Fees::<T>::INIT_SPACE + 2 * T::INIT_SPACE;
 }
 
 impl<T> WithdrawReport<T> {

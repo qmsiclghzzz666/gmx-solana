@@ -6,7 +6,9 @@ use bytemuck::Zeroable;
 use gmsol_model::{
     action::{
         decrease_position::DecreasePositionReport, deposit::DepositReport,
-        increase_position::IncreasePositionReport,
+        distribute_position_impact::DistributePositionImpactReport,
+        increase_position::IncreasePositionReport, update_borrowing_state::UpdateBorrowingReport,
+        update_funding_state::UpdateFundingReport, withdraw::WithdrawReport,
     },
     params::fee::PositionFees,
     price::Prices,
@@ -45,7 +47,7 @@ impl DepositCreated {
     }
 }
 
-/// Deposit Executed Event.
+/// Deposit executed Event.
 #[event]
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub struct DepositExecuted {
@@ -65,6 +67,7 @@ impl From<DepositReport<u128, i128>> for DepositExecuted {
     }
 }
 
+/// Withdrawal created event.
 #[event]
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub struct WithdrawalCreated {
@@ -86,6 +89,27 @@ impl WithdrawalCreated {
     }
 }
 
+/// Withdrawal executed Event.
+#[event]
+#[cfg_attr(feature = "debug", derive(Debug))]
+pub struct WithdrawalExecuted {
+    /// Report.
+    pub report: WithdrawReport<u128>,
+}
+
+impl gmsol_utils::InitSpace for WithdrawalExecuted {
+    const INIT_SPACE: usize = WithdrawReport::<u128>::INIT_SPACE;
+}
+
+impl ActionEvent for WithdrawalExecuted {}
+
+impl From<WithdrawReport<u128>> for WithdrawalExecuted {
+    fn from(report: WithdrawReport<u128>) -> Self {
+        Self { report }
+    }
+}
+
+/// Order created event.
 #[event]
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub struct OrderCreated {
@@ -1021,5 +1045,40 @@ impl<'a> Trade<'a> {
             .unwrap();
         position.state = self.after;
         position
+    }
+}
+
+/// Market state updated event.
+#[event]
+#[cfg_attr(feature = "debug", derive(Debug))]
+pub struct MarketStateUpdated {
+    /// Position impact distribution report.
+    pub position_impact_distribution: DistributePositionImpactReport<u128>,
+    /// Update borrowing state report.
+    pub update_borrowing_state: UpdateBorrowingReport<u128>,
+    /// Update funding state report.
+    pub update_funding_state: UpdateFundingReport<u128, i128>,
+}
+
+impl gmsol_utils::InitSpace for MarketStateUpdated {
+    const INIT_SPACE: usize = DistributePositionImpactReport::<u128>::INIT_SPACE
+        + UpdateBorrowingReport::<u128>::INIT_SPACE
+        + UpdateFundingReport::<u128, i128>::INIT_SPACE;
+}
+
+impl ActionEvent for MarketStateUpdated {}
+
+impl MarketStateUpdated {
+    /// Create from reports.
+    pub fn from_reports(
+        position_impact_distribution: DistributePositionImpactReport<u128>,
+        update_borrowing_state: UpdateBorrowingReport<u128>,
+        update_funding_state: UpdateFundingReport<u128, i128>,
+    ) -> Self {
+        Self {
+            position_impact_distribution,
+            update_borrowing_state,
+            update_funding_state,
+        }
     }
 }
