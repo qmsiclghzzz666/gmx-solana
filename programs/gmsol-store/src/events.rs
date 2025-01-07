@@ -5,7 +5,8 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use bytemuck::Zeroable;
 use gmsol_model::{
     action::{
-        decrease_position::DecreasePositionReport, increase_position::IncreasePositionReport,
+        decrease_position::DecreasePositionReport, deposit::DepositReport,
+        increase_position::IncreasePositionReport,
     },
     params::fee::PositionFees,
     price::Prices,
@@ -22,6 +23,7 @@ use crate::{
     CoreError,
 };
 
+/// Deposit Created Event.
 #[event]
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub struct DepositCreated {
@@ -40,6 +42,26 @@ impl DepositCreated {
             store,
             deposit,
         })
+    }
+}
+
+/// Deposit Executed Event.
+#[event]
+#[cfg_attr(feature = "debug", derive(Debug))]
+pub struct DepositExecuted {
+    /// Report.
+    pub report: DepositReport<u128, i128>,
+}
+
+impl gmsol_utils::InitSpace for DepositExecuted {
+    const INIT_SPACE: usize = DepositReport::<u128, i128>::INIT_SPACE;
+}
+
+impl ActionEvent for DepositExecuted {}
+
+impl From<DepositReport<u128, i128>> for DepositExecuted {
+    fn from(report: DepositReport<u128, i128>) -> Self {
+        Self { report }
     }
 }
 

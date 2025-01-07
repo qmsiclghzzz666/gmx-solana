@@ -10,6 +10,10 @@ impl InitSpace for u8 {
     const INIT_SPACE: usize = 1;
 }
 
+impl InitSpace for u64 {
+    const INIT_SPACE: usize = 8;
+}
+
 impl InitSpace for i64 {
     const INIT_SPACE: usize = 8;
 }
@@ -18,8 +22,8 @@ impl InitSpace for u128 {
     const INIT_SPACE: usize = 16;
 }
 
-impl InitSpace for u64 {
-    const INIT_SPACE: usize = 8;
+impl InitSpace for i128 {
+    const INIT_SPACE: usize = 16;
 }
 
 impl InitSpace for Pubkey {

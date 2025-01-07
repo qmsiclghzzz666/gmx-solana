@@ -258,6 +258,7 @@ impl<'info> internal::Authentication<'info> for CloseGlvShift<'info> {
 ///
 ///   - 0..M. `[]` M feed accounts, where M represents the total number of unique tokens
 ///     of markets.
+#[event_cpi]
 #[derive(Accounts)]
 pub struct ExecuteGlvShift<'info> {
     /// Authority.
@@ -360,7 +361,11 @@ pub fn unchecked_execute_glv_shift<'info>(
     let accounts = ctx.accounts;
     let remaining_accounts = ctx.remaining_accounts;
 
-    let executed = accounts.perform_execution(remaining_accounts, throw_on_execution_error)?;
+    let executed = accounts.perform_execution(
+        remaining_accounts,
+        throw_on_execution_error,
+        ctx.bumps.event_authority,
+    )?;
 
     if executed {
         accounts.glv_shift.load_mut()?.header_mut().completed()?;
@@ -409,6 +414,7 @@ impl<'info> ExecuteGlvShift<'info> {
         &mut self,
         remaining_accounts: &'info [AccountInfo<'info>],
         throw_on_execution_error: bool,
+        event_authority_bump: u8,
     ) -> Result<bool> {
         let tokens = self.ordered_tokens()?;
 
@@ -424,7 +430,8 @@ impl<'info> ExecuteGlvShift<'info> {
             .from_market_token_withdrawal_vault(self.from_market_token_vault.to_account_info())
             .to_market(&self.to_market)
             .to_market_token_mint(&mut self.to_market_token)
-            .to_market_token_glv_vault(self.to_market_token_glv_vault.to_account_info());
+            .to_market_token_glv_vault(self.to_market_token_glv_vault.to_account_info())
+            .event_emitter((&self.event_authority, event_authority_bump));
 
         self.oracle.load_mut()?.with_prices(
             &self.store,

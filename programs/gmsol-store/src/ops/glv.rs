@@ -11,7 +11,7 @@ use typed_builder::TypedBuilder;
 use crate::{
     constants,
     states::{
-        common::action::{Action, ActionExt, ActionParams, ActionSigner},
+        common::action::{Action, ActionExt, ActionParams, ActionSigner, EventEmitter},
         glv::{GlvShift, GlvWithdrawal},
         market::revertible::Revertible,
         withdrawal::WithdrawalParams,
@@ -238,6 +238,8 @@ pub(crate) struct ExecuteGlvDepositOperation<'a, 'info> {
     market_token_vaults: &'info [AccountInfo<'info>],
     oracle: &'a Oracle,
     remaining_accounts: &'info [AccountInfo<'info>],
+    #[builder(setter(into))]
+    event_emitter: EventEmitter<'a, 'info>,
 }
 
 impl<'a, 'info> ExecuteGlvDepositOperation<'a, 'info> {
@@ -328,6 +330,7 @@ impl<'a, 'info> ExecuteGlvDepositOperation<'a, 'info> {
                 self.token_program.clone(),
                 Some(&deposit.swap),
                 self.remaining_accounts,
+                self.event_emitter,
             )?;
 
             let mut op = market.op()?;
@@ -653,6 +656,8 @@ pub(crate) struct ExecuteGlvWithdrawalOperation<'a, 'info> {
     market_token_vaults: &'info [AccountInfo<'info>],
     oracle: &'a Oracle,
     remaining_accounts: &'info [AccountInfo<'info>],
+    #[builder(setter(into))]
+    event_emitter: EventEmitter<'a, 'info>,
 }
 
 impl<'a, 'info> ExecuteGlvWithdrawalOperation<'a, 'info> {
@@ -721,6 +726,7 @@ impl<'a, 'info> ExecuteGlvWithdrawalOperation<'a, 'info> {
                 self.token_program.clone(),
                 Some(&withdrawal.swap),
                 self.remaining_accounts,
+                self.event_emitter,
             )?;
 
             let op = market.op()?;
@@ -1028,6 +1034,8 @@ pub(crate) struct ExecuteGlvShiftOperation<'a, 'info> {
     to_market_token_mint: &'a mut Account<'info, Mint>,
     to_market_token_glv_vault: AccountInfo<'info>,
     oracle: &'a Oracle,
+    #[builder(setter(into))]
+    event_emitter: EventEmitter<'a, 'info>,
 }
 
 impl<'a, 'info> ExecuteGlvShiftOperation<'a, 'info> {
@@ -1117,6 +1125,7 @@ impl<'a, 'info> ExecuteGlvShiftOperation<'a, 'info> {
             self.token_program.clone(),
             None,
             &[],
+            self.event_emitter,
         )?;
 
         let mut to_market = RevertibleLiquidityMarketOperation::new(
@@ -1127,6 +1136,7 @@ impl<'a, 'info> ExecuteGlvShiftOperation<'a, 'info> {
             self.token_program.clone(),
             None,
             &[],
+            self.event_emitter,
         )?;
 
         let from_market = from_market.op()?;

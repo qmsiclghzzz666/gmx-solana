@@ -651,6 +651,8 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> MakeTransactionBuilder<'a, C>
                         .client
                         .find_market_vault_address(&self.store, &hint.market_token),
                     chainlink_program: None,
+                    event_authority: self.client.store_event_authority(),
+                    program: *self.client.store_program_id(),
                 },
                 &crate::program_ids::DEFAULT_GMSOL_STORE_ID,
                 self.client.store_program_id(),

@@ -462,6 +462,7 @@ impl<'info> internal::Authentication<'info> for CloseGlvWithdrawal<'info> {
 ///     swap params.
 ///   - 3N+M..3N+M+L. `[writable]` L market accounts, where L represents the total number of unique
 ///     markets excluding the current market in the swap params.
+#[event_cpi]
 #[derive(Accounts)]
 pub struct ExecuteGlvWithdrawal<'info> {
     /// Authority.
@@ -630,7 +631,11 @@ pub(crate) fn unchecked_execute_glv_withdrawal<'info>(
         )?
     };
 
-    let executed = accounts.perform_execution(&splitted, throw_on_execution_error)?;
+    let executed = accounts.perform_execution(
+        &splitted,
+        throw_on_execution_error,
+        ctx.bumps.event_authority,
+    )?;
 
     match executed {
         Some((final_long_token_amount, final_short_token_amount)) => {
@@ -683,6 +688,7 @@ impl<'info> ExecuteGlvWithdrawal<'info> {
         &mut self,
         splitted: &SplitAccountsForGlv<'info>,
         throw_on_execution_error: bool,
+        event_authority_bump: u8,
     ) -> Result<Option<(u64, u64)>> {
         let builder = ExecuteGlvWithdrawalOperation::builder()
             .glv_withdrawal(self.glv_withdrawal.clone())
@@ -699,7 +705,8 @@ impl<'info> ExecuteGlvWithdrawal<'info> {
             .market_token_withdrawal_vault(self.market_token_withdrawal_vault.to_account_info())
             .markets(splitted.markets)
             .market_tokens(splitted.market_tokens)
-            .market_token_vaults(splitted.market_token_vaults);
+            .market_token_vaults(splitted.market_token_vaults)
+            .event_emitter((&self.event_authority, event_authority_bump));
 
         self.oracle.load_mut()?.with_prices(
             &self.store,

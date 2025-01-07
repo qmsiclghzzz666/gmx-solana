@@ -423,6 +423,8 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteGlvShiftBuilder<'a, C> {
                     from_market_token_vault,
                     token_program: anchor_spl::token::ID,
                     chainlink_program: None,
+                    event_authority: self.client.store_event_authority(),
+                    program: *self.client.store_program_id(),
                 },
                 &crate::program_ids::DEFAULT_GMSOL_STORE_ID,
                 self.client.store_program_id(),

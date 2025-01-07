@@ -2077,6 +2077,7 @@ dependencies = [
  "anchor-lang",
  "borsh 0.10.4",
  "gmsol-model",
+ "gmsol-utils",
  "num-traits",
  "num_enum 0.7.3",
  "ruint",

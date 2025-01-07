@@ -14,6 +14,11 @@ pub struct Price<T> {
     pub max: T,
 }
 
+#[cfg(feature = "gmsol-utils")]
+impl<T: gmsol_utils::InitSpace> gmsol_utils::InitSpace for Price<T> {
+    const INIT_SPACE: usize = 2 * T::INIT_SPACE;
+}
+
 impl<T: Clone> Price<T> {
     /// Set prices for test.
     #[cfg(test)]
@@ -98,6 +103,11 @@ pub struct Prices<T> {
     pub long_token_price: Price<T>,
     /// Short token price.
     pub short_token_price: Price<T>,
+}
+
+#[cfg(feature = "gmsol-utils")]
+impl<T: gmsol_utils::InitSpace> gmsol_utils::InitSpace for Prices<T> {
+    const INIT_SPACE: usize = 3 * Price::<T>::INIT_SPACE;
 }
 
 impl<T> Prices<T> {

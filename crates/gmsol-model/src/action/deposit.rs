@@ -5,7 +5,7 @@ use crate::{
         BaseMarket, BaseMarketExt, BaseMarketMutExt, LiquidityMarketExt, LiquidityMarketMut,
         SwapMarketMutExt,
     },
-    num::{MulDiv, UnsignedAbs},
+    num::{MulDiv, Unsigned, UnsignedAbs},
     params::Fees,
     price::{Price, Prices},
     utils, BalanceExt, PnlFactorKind, PoolExt,
@@ -22,10 +22,19 @@ pub struct Deposit<M: BaseMarket<DECIMALS>, const DECIMALS: u8> {
 
 /// Deposit params.
 #[derive(Debug, Clone, Copy)]
+#[cfg_attr(
+    feature = "anchor-lang",
+    derive(anchor_lang::AnchorDeserialize, anchor_lang::AnchorSerialize)
+)]
 pub struct DepositParams<T> {
     long_token_amount: T,
     short_token_amount: T,
     prices: Prices<T>,
+}
+
+#[cfg(feature = "gmsol-utils")]
+impl<T: gmsol_utils::InitSpace> gmsol_utils::InitSpace for DepositParams<T> {
+    const INIT_SPACE: usize = 2 * T::INIT_SPACE + Prices::<T>::INIT_SPACE;
 }
 
 impl<T> DepositParams<T> {
@@ -71,19 +80,32 @@ impl<T> DepositParams<T> {
 
 /// Report of the execution of deposit.
 #[derive(Debug, Clone, Copy)]
-pub struct DepositReport<T>
-where
-    T: MulDiv,
-{
-    params: DepositParams<T>,
-    minted: T,
-    price_impact: T::Signed,
-    fees: [Fees<T>; 2],
+#[cfg_attr(
+    feature = "anchor-lang",
+    derive(anchor_lang::AnchorDeserialize, anchor_lang::AnchorSerialize)
+)]
+pub struct DepositReport<Unsigned, Signed> {
+    params: DepositParams<Unsigned>,
+    minted: Unsigned,
+    price_impact: Signed,
+    fees: [Fees<Unsigned>; 2],
 }
 
-impl<T> DepositReport<T>
+#[cfg(feature = "gmsol-utils")]
+impl<Unsigned, Signed> gmsol_utils::InitSpace for DepositReport<Unsigned, Signed>
 where
-    T: MulDiv,
+    Unsigned: gmsol_utils::InitSpace,
+    Signed: gmsol_utils::InitSpace,
+{
+    const INIT_SPACE: usize = DepositParams::<Unsigned>::INIT_SPACE
+        + Unsigned::INIT_SPACE
+        + Signed::INIT_SPACE
+        + 2 * Fees::<Unsigned>::INIT_SPACE;
+}
+
+impl<T> DepositReport<T, T::Signed>
+where
+    T: Unsigned,
 {
     fn new(
         params: DepositParams<T>,
@@ -296,7 +318,7 @@ impl<const DECIMALS: u8, M> MarketAction for Deposit<M, DECIMALS>
 where
     M: LiquidityMarketMut<DECIMALS>,
 {
-    type Report = DepositReport<M::Num>;
+    type Report = DepositReport<M::Num, <M::Num as Unsigned>::Signed>;
 
     fn execute(mut self) -> crate::Result<Self::Report> {
         debug_assert!(

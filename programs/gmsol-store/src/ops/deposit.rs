@@ -5,7 +5,7 @@ use typed_builder::TypedBuilder;
 use crate::{
     ops::market::RevertibleLiquidityMarketOperation,
     states::{
-        common::action::{Action, ActionExt, ActionParams},
+        common::action::{Action, ActionExt, ActionParams, EventEmitter},
         market::revertible::Revertible,
         Deposit, Market, NonceBytes, Oracle, Store, ValidateOracleTime,
     },
@@ -190,6 +190,8 @@ pub(crate) struct ExecuteDepositOperation<'a, 'info> {
     remaining_accounts: &'info [AccountInfo<'info>],
     throw_on_execution_error: bool,
     token_program: AccountInfo<'info>,
+    #[builder(setter(into))]
+    event_emitter: EventEmitter<'a, 'info>,
 }
 
 impl<'a, 'info> ExecuteDepositOperation<'a, 'info> {
@@ -249,6 +251,7 @@ impl<'a, 'info> ExecuteDepositOperation<'a, 'info> {
                 self.token_program.clone(),
                 Some(deposit.swap()),
                 self.remaining_accounts,
+                self.event_emitter,
             )?
             .op()?
             .unchecked_deposit(

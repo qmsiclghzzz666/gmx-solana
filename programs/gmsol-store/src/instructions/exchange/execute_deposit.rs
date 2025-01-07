@@ -24,6 +24,7 @@ use crate::{
 ///     swap params.
 ///   - M..M+N. `[writable]` N market accounts, where N represents the total number of unique
 ///     markets excluding the current market in the swap params.
+#[event_cpi]
 #[derive(Accounts)]
 pub struct ExecuteDeposit<'info> {
     /// Authority.
@@ -136,7 +137,11 @@ pub(crate) fn unchecked_execute_deposit<'info>(
 
     accounts.transfer_tokens_in(&signer, remaining_accounts)?;
 
-    let executed = accounts.perform_execution(remaining_accounts, throw_on_execution_error)?;
+    let executed = accounts.perform_execution(
+        remaining_accounts,
+        throw_on_execution_error,
+        ctx.bumps.event_authority,
+    )?;
 
     if executed {
         accounts.deposit.load_mut()?.header.completed()?;
@@ -304,6 +309,7 @@ impl<'info> ExecuteDeposit<'info> {
         &mut self,
         remaining_accounts: &'info [AccountInfo<'info>],
         throw_on_execution_error: bool,
+        event_authority_bump: u8,
     ) -> Result<bool> {
         // FIXME: We only need the tokens here, the feeds are not necessary.
         let feeds = self
@@ -318,7 +324,8 @@ impl<'info> ExecuteDeposit<'info> {
             .market_token_mint(&mut self.market_token)
             .market_token_receiver(self.market_token_escrow.to_account_info())
             .token_program(self.token_program.to_account_info())
-            .throw_on_execution_error(throw_on_execution_error);
+            .throw_on_execution_error(throw_on_execution_error)
+            .event_emitter((&self.event_authority, event_authority_bump));
 
         let executed = self.oracle.load_mut()?.with_prices(
             &self.store,

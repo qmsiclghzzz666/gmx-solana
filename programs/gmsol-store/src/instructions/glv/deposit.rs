@@ -566,6 +566,7 @@ impl<'info> internal::Authentication<'info> for CloseGlvDeposit<'info> {
 ///     swap params.
 ///   - 3N+M..3N+M+L. `[writable]` L market accounts, where L represents the total number of unique
 ///     markets excluding the current market in the swap params.
+#[event_cpi]
 #[derive(Accounts)]
 pub struct ExecuteGlvDeposit<'info> {
     /// Authority.
@@ -733,6 +734,7 @@ pub(crate) fn unchecked_execute_glv_deposit<'info>(
         &tokens,
         remaining_accounts,
         throw_on_execution_error,
+        ctx.bumps.event_authority,
     )?;
 
     if executed {
@@ -919,6 +921,7 @@ impl<'info> ExecuteGlvDeposit<'info> {
         tokens: &[Pubkey],
         remaining_accounts: &'info [AccountInfo<'info>],
         throw_on_execution_error: bool,
+        event_authority_bump: u8,
     ) -> Result<bool> {
         let builder = ExecuteGlvDepositOperation::builder()
             .glv_deposit(self.glv_deposit.clone())
@@ -935,7 +938,8 @@ impl<'info> ExecuteGlvDeposit<'info> {
             .market_token_vault(self.market_token_vault.to_account_info())
             .markets(markets)
             .market_tokens(market_tokens)
-            .market_token_vaults(market_token_vaults);
+            .market_token_vaults(market_token_vaults)
+            .event_emitter((&self.event_authority, event_authority_bump));
 
         self.oracle.load_mut()?.with_prices(
             &self.store,

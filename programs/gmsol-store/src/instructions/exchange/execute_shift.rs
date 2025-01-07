@@ -20,6 +20,7 @@ use crate::{
 ///
 ///   - 0..N. `[]` N feed accounts, where N represents the total number of unique tokens
 ///     in the markets.
+#[event_cpi]
 #[derive(Accounts)]
 pub struct ExecuteShift<'info> {
     /// Authority.
@@ -117,7 +118,11 @@ pub fn unchecked_execute_shift<'info>(
 
     accounts.transfer_from_market_tokens_in(&signer)?;
 
-    let executed = accounts.perform_execution(remaining_accounts, throw_on_execution_error)?;
+    let executed = accounts.perform_execution(
+        remaining_accounts,
+        throw_on_execution_error,
+        ctx.bumps.event_authority,
+    )?;
 
     if executed {
         accounts.shift.load_mut()?.header.completed()?;
@@ -196,6 +201,7 @@ impl<'info> ExecuteShift<'info> {
         &mut self,
         remaining_accounts: &'info [AccountInfo<'info>],
         throw_on_execution_error: bool,
+        event_authority_bump: u8,
     ) -> Result<bool> {
         let tokens = self.ordered_tokens()?;
 
@@ -209,7 +215,8 @@ impl<'info> ExecuteShift<'info> {
             .from_market_token_vault(self.from_market_token_vault.to_account_info())
             .to_market_token_account(self.to_market_token_escrow.to_account_info())
             .throw_on_execution_error(throw_on_execution_error)
-            .token_program(self.token_program.to_account_info());
+            .token_program(self.token_program.to_account_info())
+            .event_emitter((&self.event_authority, event_authority_bump));
 
         let executed = self.oracle.load_mut()?.with_prices(
             &self.store,

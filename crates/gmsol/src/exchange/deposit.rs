@@ -681,6 +681,8 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> MakeTransactionBuilder<'a, C>
                     initial_long_token_escrow: hint.initial_long_token_escrow,
                     initial_short_token_escrow: hint.initial_short_token_escrow,
                     chainlink_program: None,
+                    event_authority: client.store_event_authority(),
+                    program: *client.store_program_id(),
                 },
                 &gmsol_store::ID,
                 self.client.store_program_id(),

@@ -6,8 +6,9 @@ use gmsol_model::{
 use typed_builder::TypedBuilder;
 
 use crate::{
+    events::DepositExecuted,
     states::{
-        common::swap::SwapParams,
+        common::{action::EventEmitter, swap::SwapParams},
         deposit::DepositParams,
         market::{
             revertible::{
@@ -125,6 +126,7 @@ pub struct RevertibleLiquidityMarketOperation<'a, 'info> {
     token_program: AccountInfo<'info>,
     swap: Option<&'a SwapParams>,
     swap_markets: Vec<AccountLoader<'info, Market>>,
+    event_emitter: EventEmitter<'a, 'info>,
 }
 
 impl<'a, 'info> RevertibleLiquidityMarketOperation<'a, 'info> {
@@ -136,6 +138,7 @@ impl<'a, 'info> RevertibleLiquidityMarketOperation<'a, 'info> {
         token_program: AccountInfo<'info>,
         swap: Option<&'a SwapParams>,
         remaining_accounts: &'info [AccountInfo<'info>],
+        event_emitter: EventEmitter<'a, 'info>,
     ) -> Result<Self> {
         let swap_markets = swap
             .map(|swap| swap.unpack_markets_for_swap(&market_token_mint.key(), remaining_accounts))
@@ -150,6 +153,7 @@ impl<'a, 'info> RevertibleLiquidityMarketOperation<'a, 'info> {
             token_program,
             swap,
             swap_markets,
+            event_emitter,
         })
     }
 }
@@ -174,6 +178,7 @@ impl<'a, 'info> RevertibleLiquidityMarketOperation<'a, 'info> {
             swap: self.swap,
             market,
             swap_markets,
+            event_emitter: self.event_emitter,
         })
     }
 }
@@ -185,6 +190,7 @@ pub(crate) struct Execute<'a, 'info, T = ()> {
     swap: Option<&'a SwapParams>,
     market: RevertibleLiquidityMarket<'a, 'info>,
     swap_markets: SwapMarkets<'a>,
+    event_emitter: EventEmitter<'a, 'info>,
 }
 
 impl<'a, 'info, T> Execute<'a, 'info, T> {
@@ -194,6 +200,7 @@ impl<'a, 'info, T> Execute<'a, 'info, T> {
             swap,
             market,
             swap_markets,
+            event_emitter: event_authority,
             ..
         } = self;
 
@@ -203,6 +210,7 @@ impl<'a, 'info, T> Execute<'a, 'info, T> {
             swap,
             market,
             swap_markets,
+            event_emitter: event_authority,
         }
     }
 
@@ -320,7 +328,9 @@ impl<'a, 'info, T> Execute<'a, 'info, T> {
 
             params.validate_market_token_amount(minted)?;
 
-            msg!("[Deposit] executed: {:?}", report);
+            msg!("[Deposit] executed");
+            self.event_emitter
+                .emit_cpi(&DepositExecuted::from(report))?;
 
             minted
         };
@@ -439,6 +449,7 @@ impl<'a, 'info, T> Execute<'a, 'info, T> {
             swap,
             market,
             swap_markets,
+            event_emitter: event_authority,
         } = self;
 
         (
@@ -448,6 +459,7 @@ impl<'a, 'info, T> Execute<'a, 'info, T> {
                 swap,
                 market,
                 swap_markets,
+                event_emitter: event_authority,
             },
             output,
         )

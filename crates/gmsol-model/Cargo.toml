@@ -6,7 +6,7 @@ edition.workspace = true
 [features]
 test = []
 u128 = ["ruint"]
-solana = ["anchor-lang", "borsh"]
+solana = ["anchor-lang", "borsh", "gmsol-utils"]
 strum = ["dep:strum"]
 serde = ["dep:serde"]
 
@@ -23,6 +23,8 @@ typed-builder = { workspace = true }
 strum = { workspace = true, optional = true }
 serde = { workspace = true, optional = true, features = ["derive"] }
 borsh = { workspace = true, optional = true }
+
+gmsol-utils = { workspace = true, optional = true }
 
 [dev-dependencies]
 gmsol-model = { path = ".", features = ["test", "u128"] }

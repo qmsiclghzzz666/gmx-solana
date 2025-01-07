@@ -4,7 +4,7 @@ use typed_builder::TypedBuilder;
 
 use crate::{
     states::{
-        common::action::{Action, ActionParams},
+        common::action::{Action, ActionParams, EventEmitter},
         market::revertible::Revertible,
         withdrawal::Withdrawal,
         Market, NonceBytes, Oracle, Store, ValidateOracleTime,
@@ -154,6 +154,8 @@ pub(crate) struct ExecuteWithdrawalOperation<'a, 'info> {
     remaining_accounts: &'info [AccountInfo<'info>],
     throw_on_execution_error: bool,
     token_program: AccountInfo<'info>,
+    #[builder(setter(into))]
+    event_emitter: EventEmitter<'a, 'info>,
 }
 
 impl<'a, 'info> ExecuteWithdrawalOperation<'a, 'info> {
@@ -203,6 +205,7 @@ impl<'a, 'info> ExecuteWithdrawalOperation<'a, 'info> {
             self.token_program,
             Some(&withdrawal.swap),
             self.remaining_accounts,
+            self.event_emitter,
         )?;
 
         let executed = market.op()?.unchecked_withdraw(

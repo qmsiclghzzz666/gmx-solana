@@ -7,7 +7,7 @@ use typed_builder::TypedBuilder;
 
 use crate::{
     states::{
-        common::action::{Action, ActionExt, ActionParams},
+        common::action::{Action, ActionExt, ActionParams, EventEmitter},
         market::revertible::Revertible,
         Market, NonceBytes, Oracle, Shift, Store, ValidateOracleTime,
     },
@@ -156,6 +156,8 @@ pub struct ExecuteShiftOperation<'a, 'info> {
     to_market_token_account: AccountInfo<'info>,
     throw_on_execution_error: bool,
     token_program: AccountInfo<'info>,
+    #[builder(setter(into))]
+    event_emitter: EventEmitter<'a, 'info>,
 }
 
 impl<'a, 'info> ExecuteShiftOperation<'a, 'info> {
@@ -227,6 +229,7 @@ impl<'a, 'info> ExecuteShiftOperation<'a, 'info> {
             self.token_program.clone(),
             None,
             &[],
+            self.event_emitter,
         )?;
 
         let mut to_market = RevertibleLiquidityMarketOperation::new(
@@ -237,6 +240,7 @@ impl<'a, 'info> ExecuteShiftOperation<'a, 'info> {
             self.token_program,
             None,
             &[],
+            self.event_emitter,
         )?;
 
         let from_market = from_market.op()?;

@@ -446,6 +446,11 @@ pub struct Fees<T> {
     fee_amount_for_pool: T,
 }
 
+#[cfg(feature = "gmsol-utils")]
+impl<T: gmsol_utils::InitSpace> gmsol_utils::InitSpace for Fees<T> {
+    const INIT_SPACE: usize = 2 * T::INIT_SPACE;
+}
+
 impl<T: Zero> Default for Fees<T> {
     fn default() -> Self {
         Self {

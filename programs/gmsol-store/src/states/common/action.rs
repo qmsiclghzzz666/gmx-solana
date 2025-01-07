@@ -354,6 +354,36 @@ pub trait ActionParams {
     fn execution_lamports(&self) -> u64;
 }
 
+/// Event Emitter.
+#[derive(Clone, Copy)]
+pub struct EventEmitter<'a, 'info> {
+    event_authority: &'a AccountInfo<'info>,
+    bump: u8,
+}
+
+impl<'a, 'info> EventEmitter<'a, 'info> {
+    /// Create an event emitter from event authority and bump.
+    pub fn new(event_authority: &'a AccountInfo<'info>, bump: u8) -> Self {
+        Self {
+            event_authority,
+            bump,
+        }
+    }
+}
+
+impl<'a, 'info> From<(&'a AccountInfo<'info>, u8)> for EventEmitter<'a, 'info> {
+    fn from((event_authority, bump): (&'a AccountInfo<'info>, u8)) -> Self {
+        Self::new(event_authority, bump)
+    }
+}
+
+impl<'a, 'info> EventEmitter<'a, 'info> {
+    /// Emit event through CPI.
+    pub fn emit_cpi(&self, event: &impl ActionEvent) -> Result<()> {
+        event.emit_cpi(self.event_authority.clone(), self.bump)
+    }
+}
+
 /// Action Event.
 pub trait ActionEvent: InitSpace + anchor_lang::Event {
     /// Emit this event through CPI. This is a manual implementation of `emit_cpi!`.

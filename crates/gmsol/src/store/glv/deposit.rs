@@ -785,6 +785,8 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> ExecuteGlvDepositBuilder<'a, C>
                     glv_token_program: glv_token_program_id,
                     system_program: system_program::ID,
                     chainlink_program: None,
+                    event_authority: self.client.store_event_authority(),
+                    program: *self.client.store_program_id(),
                 },
                 &crate::program_ids::DEFAULT_GMSOL_STORE_ID,
                 self.client.store_program_id(),
