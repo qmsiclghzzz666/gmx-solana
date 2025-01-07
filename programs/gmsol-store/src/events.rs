@@ -5,10 +5,14 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use bytemuck::Zeroable;
 use gmsol_model::{
     action::{
-        decrease_position::DecreasePositionReport, deposit::DepositReport,
+        decrease_position::{DecreasePositionReport, DecreasePositionSwapType},
+        deposit::DepositReport,
         distribute_position_impact::DistributePositionImpactReport,
-        increase_position::IncreasePositionReport, update_borrowing_state::UpdateBorrowingReport,
-        update_funding_state::UpdateFundingReport, withdraw::WithdrawReport,
+        increase_position::IncreasePositionReport,
+        swap::SwapReport,
+        update_borrowing_state::UpdateBorrowingReport,
+        update_funding_state::UpdateFundingReport,
+        withdraw::WithdrawReport,
     },
     params::fee::PositionFees,
     price::Prices,
@@ -1079,6 +1083,40 @@ impl MarketStateUpdated {
             position_impact_distribution,
             update_borrowing_state,
             update_funding_state,
+        }
+    }
+}
+
+/// Swap executed Event.
+#[event]
+#[cfg_attr(feature = "debug", derive(Debug))]
+pub struct SwapExecuted {
+    /// Market token.
+    pub market_token: Pubkey,
+    /// Report.
+    pub report: SwapReport<u128, i128>,
+    /// Type.
+    pub ty: Option<DecreasePositionSwapType>,
+}
+
+impl gmsol_utils::InitSpace for SwapExecuted {
+    const INIT_SPACE: usize =
+        SwapReport::<u128, i128>::INIT_SPACE + 1 + DecreasePositionSwapType::INIT_SPACE;
+}
+
+impl ActionEvent for SwapExecuted {}
+
+impl SwapExecuted {
+    /// Create.
+    pub fn new(
+        market_token: Pubkey,
+        report: SwapReport<u128, i128>,
+        ty: Option<DecreasePositionSwapType>,
+    ) -> Self {
+        Self {
+            market_token,
+            report,
+            ty,
         }
     }
 }

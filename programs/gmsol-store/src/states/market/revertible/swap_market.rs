@@ -4,9 +4,11 @@ use indexmap::{map::Entry, IndexMap};
 
 use crate::{
     constants,
+    events::SwapExecuted,
     states::{
-        common::swap::SwapParams, market::utils::ValidateMarketBalances, HasMarketMeta, Market,
-        Oracle,
+        common::{action::EventEmitter, swap::SwapParams},
+        market::utils::ValidateMarketBalances,
+        HasMarketMeta, Market, Oracle,
     },
     CoreError, ModelError,
 };
@@ -14,14 +16,18 @@ use crate::{
 use super::{market::RevertibleMarket, Revertible};
 
 /// A map of markets used for swaps where the key is the market token mint address.
-pub struct SwapMarkets<'a>(IndexMap<Pubkey, RevertibleMarket<'a>>);
+pub struct SwapMarkets<'a, 'info> {
+    markets: IndexMap<Pubkey, RevertibleMarket<'a>>,
+    event_emitter: EventEmitter<'a, 'info>,
+}
 
-impl<'a> SwapMarkets<'a> {
+impl<'a, 'info> SwapMarkets<'a, 'info> {
     /// Create a new [`SwapMarkets`] from loders.
-    pub fn new<'info>(
+    pub fn new(
         store: &Pubkey,
         loaders: &'a [AccountLoader<'info, Market>],
         current_market_token: Option<&Pubkey>,
+        event_emitter: EventEmitter<'a, 'info>,
     ) -> Result<Self> {
         let mut map = IndexMap::with_capacity(loaders.len());
         for loader in loaders {
@@ -39,17 +45,20 @@ impl<'a> SwapMarkets<'a> {
                 }
             }
         }
-        Ok(Self(map))
+        Ok(Self {
+            markets: map,
+            event_emitter,
+        })
     }
 
     /// Get market mutably.
     pub fn get_mut(&mut self, token: &Pubkey) -> Option<&mut RevertibleMarket<'a>> {
-        self.0.get_mut(token)
+        self.markets.get_mut(token)
     }
 
     /// Get market.
     pub fn get(&self, token: &Pubkey) -> Option<&RevertibleMarket<'a>> {
-        self.0.get(token)
+        self.markets.get(token)
     }
 
     /// Revertible Swap.
@@ -190,7 +199,7 @@ impl<'a> SwapMarkets<'a> {
         }
         let last_idx = path.len().saturating_sub(1);
         for (idx, market_token) in path.iter().enumerate() {
-            let market = self.get_mut(market_token).ok_or_else(|| {
+            let market = self.markets.get_mut(market_token).ok_or_else(|| {
                 msg!("Swap Error: missing market account for {}", market_token);
                 error!(CoreError::MarketAccountIsNotProvided)
             })?;
@@ -206,7 +215,6 @@ impl<'a> SwapMarkets<'a> {
                 .map_err(ModelError::from)?
                 .execute()
                 .map_err(ModelError::from)?;
-            msg!("[Swap] swap along the path: {:?}", report);
             *token_in = *market.market_meta().opposite_token(token_in)?;
             *token_in_amount = (*report.token_out_amount())
                 .try_into()
@@ -218,7 +226,10 @@ impl<'a> SwapMarkets<'a> {
                     .map_err(ModelError::from)?;
                 market.validate_market_balances(0, 0)?;
             }
+            self.event_emitter
+                .emit_cpi(&SwapExecuted::new(*market_token, report, None))?;
         }
+        msg!("[Swap] swapped along the path");
         Ok(())
     }
 
@@ -274,7 +285,12 @@ impl<'a> SwapMarkets<'a> {
 
             if *first_market_token == current {
                 // The validation of current market is delayed.
-                direction.swap_with_current(oracle, &mut token_in, &mut token_in_amount)?;
+                direction.swap_with_current(
+                    oracle,
+                    &mut token_in,
+                    &mut token_in_amount,
+                    &self.event_emitter,
+                )?;
                 path = &path[1..];
                 if let Some(first_market_token_to_swap_at) = path.first() {
                     debug_assert!(*first_market_token_to_swap_at != current);
@@ -325,7 +341,12 @@ impl<'a> SwapMarkets<'a> {
                             .map_err(ModelError::from)?;
                     }
                     // The validation of current market is delayed.
-                    direction.swap_with_current(oracle, &mut token_in, &mut token_in_amount)?;
+                    direction.swap_with_current(
+                        oracle,
+                        &mut token_in,
+                        &mut token_in_amount,
+                        &self.event_emitter,
+                    )?;
                 }
 
                 if let SwapDirection::Into(into_market) = direction {
@@ -348,12 +369,12 @@ impl<'a> SwapMarkets<'a> {
     }
 }
 
-impl<'a> Revertible for SwapMarkets<'a> {
+impl<'a, 'info> Revertible for SwapMarkets<'a, 'info> {
     /// Commit the swap.
     /// ## Panic
     /// Panic if one of the commitments panics.
     fn commit(self) {
-        for market in self.0.into_values() {
+        for market in self.markets.into_values() {
             market.commit();
         }
     }
@@ -394,12 +415,14 @@ where
 impl<'a, M> SwapDirection<'a, M>
 where
     M: HasMarketMeta + gmsol_model::SwapMarketMut<{ constants::MARKET_DECIMALS }, Num = u128>,
+    M: Key,
 {
     fn swap_with_current(
         &mut self,
         oracle: &Oracle,
         token_in: &mut Pubkey,
         token_in_amount: &mut u64,
+        event_emitter: &EventEmitter,
     ) -> Result<()> {
         let current = match self {
             Self::From(m) | Self::Into(m) => m,
@@ -411,11 +434,12 @@ where
             .map_err(ModelError::from)?
             .execute()
             .map_err(ModelError::from)?;
-        msg!("[Swap] in current market: {:?}", report);
         *token_in_amount = (*report.token_out_amount())
             .try_into()
             .map_err(|_| error!(CoreError::TokenAmountOverflow))?;
         *token_in = *current.market_meta().opposite_token(token_in)?;
+        msg!("[Swap] swapped in current market");
+        event_emitter.emit_cpi(&SwapExecuted::new(self.current(), report, None))?;
         Ok(())
     }
 }

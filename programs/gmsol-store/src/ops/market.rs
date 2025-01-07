@@ -172,6 +172,7 @@ impl<'a, 'info> RevertibleLiquidityMarketOperation<'a, 'info> {
             &self.store.key(),
             &self.swap_markets,
             Some(&current_market_token),
+            self.event_emitter,
         )?;
         Ok(Execute {
             output: (),
@@ -190,7 +191,7 @@ pub(crate) struct Execute<'a, 'info, T = ()> {
     oracle: &'a Oracle,
     swap: Option<&'a SwapParams>,
     market: RevertibleLiquidityMarket<'a, 'info>,
-    swap_markets: SwapMarkets<'a>,
+    swap_markets: SwapMarkets<'a, 'info>,
     event_emitter: EventEmitter<'a, 'info>,
 }
 
@@ -223,7 +224,7 @@ impl<'a, 'info, T> Execute<'a, 'info, T> {
         &mut self.market
     }
 
-    pub(crate) fn swap_markets(&self) -> &SwapMarkets {
+    pub(crate) fn swap_markets(&self) -> &SwapMarkets<'_, 'info> {
         &self.swap_markets
     }
 
@@ -283,7 +284,6 @@ impl<'a, 'info, T> Execute<'a, 'info, T> {
 
         let prices = self.oracle.market_prices(&self.market)?;
 
-        msg!("[Deposit]");
         self.pre_execute(&prices)?;
 
         // Swap tokens into the target market.
@@ -359,7 +359,6 @@ impl<'a, 'info, T> Execute<'a, 'info, T> {
 
         let prices = self.oracle.market_prices(&self.market)?;
 
-        msg!("[Withdrawal]");
         self.pre_execute(&prices)?;
 
         // Perform the withdrawal.

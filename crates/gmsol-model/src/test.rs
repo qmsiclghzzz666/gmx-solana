@@ -955,7 +955,7 @@ where
     fn on_swapped(
         &mut self,
         ty: DecreasePositionSwapType,
-        report: &crate::action::swap::SwapReport<Self::Num>,
+        report: &crate::action::swap::SwapReport<Self::Num, <Self::Num as Unsigned>::Signed>,
     ) -> crate::Result<()> {
         println!("swapped: ty={ty}, report={report:?}");
         Ok(())

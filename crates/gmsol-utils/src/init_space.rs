@@ -6,6 +6,10 @@ pub trait InitSpace {
     const INIT_SPACE: usize;
 }
 
+impl InitSpace for bool {
+    const INIT_SPACE: usize = 1;
+}
+
 impl InitSpace for u8 {
     const INIT_SPACE: usize = 1;
 }

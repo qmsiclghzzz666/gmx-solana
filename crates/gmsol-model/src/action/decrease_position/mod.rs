@@ -58,7 +58,11 @@ pub struct DecreasePosition<P: Position<DECIMALS>, const DECIMALS: u8> {
 #[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
 #[cfg_attr(
     feature = "anchor-lang",
-    derive(anchor_lang::AnchorSerialize, anchor_lang::AnchorDeserialize)
+    derive(
+        anchor_lang::AnchorSerialize,
+        anchor_lang::AnchorDeserialize,
+        anchor_lang::InitSpace
+    )
 )]
 #[repr(u8)]
 #[non_exhaustive]
@@ -495,12 +499,14 @@ where
     }
 
     /// Swap the secondary output tokens to output tokens if needed.
+    #[allow(clippy::type_complexity)]
     fn swap_collateral_token_to_pnl_token(
         market: &mut P::Market,
         report: &mut DecreasePositionReport<P::Num>,
         prices: &Prices<P::Num>,
         swap: DecreasePositionSwapType,
-    ) -> crate::Result<Option<crate::Result<SwapReport<P::Num>>>> {
+    ) -> crate::Result<Option<crate::Result<SwapReport<P::Num, <P::Num as Unsigned>::Signed>>>>
+    {
         let is_token_in_long = report.is_output_token_long();
         let is_secondary_output_token_long = report.is_secondary_output_token_long();
         let (output_amount, secondary_output_amount) = report.output_amounts_mut();

@@ -107,7 +107,7 @@ pub trait PositionMut<const DECIMALS: u8>: Position<DECIMALS> + PositionStateMut
     fn on_swapped(
         &mut self,
         ty: DecreasePositionSwapType,
-        report: &SwapReport<Self::Num>,
+        report: &SwapReport<Self::Num, <Self::Num as Unsigned>::Signed>,
     ) -> crate::Result<()>;
 
     /// Handle swap error.
@@ -219,7 +219,7 @@ impl<'a, const DECIMALS: u8, P: PositionMut<DECIMALS>> PositionMut<DECIMALS> for
     fn on_swapped(
         &mut self,
         ty: DecreasePositionSwapType,
-        report: &SwapReport<Self::Num>,
+        report: &SwapReport<Self::Num, <Self::Num as Unsigned>::Signed>,
     ) -> crate::Result<()> {
         (**self).on_swapped(ty, report)
     }

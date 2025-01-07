@@ -90,7 +90,13 @@ impl<const DECIMALS: u8, M: SwapMarketMut<DECIMALS>> Swap<M, DECIMALS> {
             .ok_or(crate::Error::Computation("apply fees"))
     }
 
-    fn try_execute(&self) -> crate::Result<(Cache<'_, M, DECIMALS>, SwapResult<M::Num>)> {
+    #[allow(clippy::type_complexity)]
+    fn try_execute(
+        &self,
+    ) -> crate::Result<(
+        Cache<'_, M, DECIMALS>,
+        SwapResult<M::Num, <M::Num as Unsigned>::Signed>,
+    )> {
         let ReassignedValues {
             long_token_delta_value,
             short_token_delta_value,
@@ -269,7 +275,7 @@ impl<const DECIMALS: u8, M> MarketAction for Swap<M, DECIMALS>
 where
     M: SwapMarketMut<DECIMALS>,
 {
-    type Report = SwapReport<M::Num>;
+    type Report = SwapReport<M::Num, <M::Num as Unsigned>::Signed>;
 
     /// Execute the swap.
     /// # Notes
@@ -308,10 +314,19 @@ where
 
 /// Swap params.
 #[derive(Debug, Clone, Copy)]
+#[cfg_attr(
+    feature = "anchor-lang",
+    derive(anchor_lang::AnchorDeserialize, anchor_lang::AnchorSerialize)
+)]
 pub struct SwapParams<T> {
     is_token_in_long: bool,
     token_in_amount: T,
     prices: Prices<T>,
+}
+
+#[cfg(feature = "gmsol-utils")]
+impl<T: gmsol_utils::InitSpace> gmsol_utils::InitSpace for SwapParams<T> {
+    const INIT_SPACE: usize = bool::INIT_SPACE + T::INIT_SPACE + Prices::<T>::INIT_SPACE;
 }
 
 impl<T> SwapParams<T> {
@@ -337,21 +352,52 @@ impl<T> SwapParams<T> {
 }
 
 #[derive(Debug, Clone, Copy)]
-struct SwapResult<T: Unsigned> {
-    token_in_fees: Fees<T>,
-    token_out_amount: T,
-    price_impact_value: T::Signed,
-    price_impact_amount: T,
+#[cfg_attr(
+    feature = "anchor-lang",
+    derive(anchor_lang::AnchorDeserialize, anchor_lang::AnchorSerialize)
+)]
+struct SwapResult<Unsigned, Signed> {
+    token_in_fees: Fees<Unsigned>,
+    token_out_amount: Unsigned,
+    price_impact_value: Signed,
+    price_impact_amount: Unsigned,
+}
+
+#[cfg(feature = "gmsol-utils")]
+impl<Unsigned, Signed> gmsol_utils::InitSpace for SwapResult<Unsigned, Signed>
+where
+    Unsigned: gmsol_utils::InitSpace,
+    Signed: gmsol_utils::InitSpace,
+{
+    const INIT_SPACE: usize = Fees::<Unsigned>::INIT_SPACE
+        + Unsigned::INIT_SPACE
+        + Signed::INIT_SPACE
+        + Unsigned::INIT_SPACE;
 }
 
 /// Report of the execution of swap.
 #[must_use = "`token_out_amount` must be used"]
-pub struct SwapReport<T: Unsigned> {
-    params: SwapParams<T>,
-    result: SwapResult<T>,
+#[cfg_attr(
+    feature = "anchor-lang",
+    derive(anchor_lang::AnchorDeserialize, anchor_lang::AnchorSerialize)
+)]
+#[derive(Clone)]
+pub struct SwapReport<Unsigned, Signed> {
+    params: SwapParams<Unsigned>,
+    result: SwapResult<Unsigned, Signed>,
 }
 
-impl<T> fmt::Debug for SwapReport<T>
+#[cfg(feature = "gmsol-utils")]
+impl<Unsigned, Signed> gmsol_utils::InitSpace for SwapReport<Unsigned, Signed>
+where
+    Unsigned: gmsol_utils::InitSpace,
+    Signed: gmsol_utils::InitSpace,
+{
+    const INIT_SPACE: usize =
+        SwapParams::<Unsigned>::INIT_SPACE + SwapResult::<Unsigned, Signed>::INIT_SPACE;
+}
+
+impl<T> fmt::Debug for SwapReport<T, T::Signed>
 where
     T: Unsigned,
     T: fmt::Debug,
@@ -365,7 +411,7 @@ where
     }
 }
 
-impl<T: Unsigned> SwapReport<T> {
+impl<T: Unsigned> SwapReport<T, T::Signed> {
     /// Get swap params.
     pub fn params(&self) -> &SwapParams<T> {
         &self.params

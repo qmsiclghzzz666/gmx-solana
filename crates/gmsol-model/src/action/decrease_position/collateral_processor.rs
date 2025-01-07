@@ -599,7 +599,9 @@ where
     pub(super) fn swap_profit_to_collateral_tokens(
         &mut self,
         swap: DecreasePositionSwapType,
-        handle_swap_result: impl FnOnce(crate::Result<SwapReport<M::Num>>) -> crate::Result<()>,
+        handle_swap_result: impl FnOnce(
+            crate::Result<SwapReport<M::Num, <M::Num as Unsigned>::Signed>>,
+        ) -> crate::Result<()>,
     ) -> crate::Result<&mut Self> {
         use crate::market::SwapMarketMutExt;
 

@@ -859,11 +859,14 @@ impl<'a, 'info> ExecuteOrderOperation<'a, 'info> {
             .load()?
             .swap
             .unpack_markets_for_swap(&current_market_token, self.remaining_accounts)?;
-        let mut swap_markets =
-            SwapMarkets::new(&self.store.key(), &loaders, Some(&current_market_token))?;
+        let mut swap_markets = SwapMarkets::new(
+            &self.store.key(),
+            &loaders,
+            Some(&current_market_token),
+            self.event_emitter,
+        )?;
         let mut transfer_out = Box::default();
 
-        msg!("[Order]");
         {
             // Distribute position impact.
             let distribute_position_impact = market
@@ -943,7 +946,8 @@ impl<'a, 'info> ExecuteOrderOperation<'a, 'info> {
                     )?;
                     should_send_trade_event = true;
                 }
-                let mut position = RevertiblePosition::new(market, position_loader)?;
+                let mut position =
+                    RevertiblePosition::new(market, position_loader, self.event_emitter)?;
 
                 position.on_validate().map_err(ModelError::from)?;
 
@@ -1246,7 +1250,7 @@ fn execute_swap(
     should_throw_error: &mut bool,
     oracle: &Oracle,
     market: &mut RevertibleMarket<'_>,
-    swap_markets: &mut SwapMarkets<'_>,
+    swap_markets: &mut SwapMarkets<'_, '_>,
     transfer_out: &mut TransferOut,
     order: &mut Order,
 ) -> Result<()> {
@@ -1288,8 +1292,8 @@ fn execute_swap(
 fn execute_increase_position(
     oracle: &Oracle,
     prices: Prices<u128>,
-    position: &mut RevertiblePosition<'_>,
-    swap_markets: &mut SwapMarkets<'_>,
+    position: &mut RevertiblePosition<'_, '_>,
+    swap_markets: &mut SwapMarkets<'_, '_>,
     transfer_out: &mut TransferOut,
     event: &mut TradeData,
     order: &mut Order,
@@ -1364,8 +1368,8 @@ fn execute_increase_position(
 fn execute_decrease_position(
     oracle: &Oracle,
     prices: Prices<u128>,
-    position: &mut RevertiblePosition<'_>,
-    swap_markets: &mut SwapMarkets<'_>,
+    position: &mut RevertiblePosition<'_, '_>,
+    swap_markets: &mut SwapMarkets<'_, '_>,
     transfer_out: &mut TransferOut,
     event: &mut TradeData,
     order: &mut Order,

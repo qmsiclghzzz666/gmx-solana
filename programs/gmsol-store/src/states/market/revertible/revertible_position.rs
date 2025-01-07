@@ -1,30 +1,32 @@
 use std::cell::RefMut;
 
 use anchor_lang::prelude::*;
-use gmsol_model::action::decrease_position::DecreasePositionSwapType;
+use gmsol_model::{action::decrease_position::DecreasePositionSwapType, num::Unsigned};
 
 use crate::{
     constants,
-    events::TradeData,
-    states::{position::PositionState, HasMarketMeta, Position},
+    events::{SwapExecuted, TradeData},
+    states::{common::action::EventEmitter, position::PositionState, HasMarketMeta, Position},
     CoreError,
 };
 
 use super::{market::RevertibleMarket, Revertible};
 
 /// Revertible Position.
-pub struct RevertiblePosition<'a> {
+pub struct RevertiblePosition<'a, 'info> {
     market: RevertibleMarket<'a>,
     storage: RefMut<'a, Position>,
     state: PositionState,
     is_collateral_token_long: bool,
     is_long: bool,
+    event_emitter: EventEmitter<'a, 'info>,
 }
 
-impl<'a> RevertiblePosition<'a> {
-    pub(crate) fn new<'info>(
+impl<'a, 'info> RevertiblePosition<'a, 'info> {
+    pub(crate) fn new(
         market: RevertibleMarket<'a>,
         loader: &'a AccountLoader<'info, Position>,
+        event_emitter: EventEmitter<'a, 'info>,
     ) -> Result<Self> {
         let storage = loader.load_mut()?;
         let meta = market.market_meta();
@@ -44,6 +46,7 @@ impl<'a> RevertiblePosition<'a> {
             state: storage.state,
             market,
             storage,
+            event_emitter,
         })
     }
 
@@ -56,14 +59,16 @@ impl<'a> RevertiblePosition<'a> {
     }
 }
 
-impl<'a> Revertible for RevertiblePosition<'a> {
+impl<'a, 'info> Revertible for RevertiblePosition<'a, 'info> {
     fn commit(mut self) {
         self.market.commit();
         self.storage.state = self.state;
     }
 }
 
-impl<'a> gmsol_model::PositionState<{ constants::MARKET_DECIMALS }> for RevertiblePosition<'a> {
+impl<'a, 'info> gmsol_model::PositionState<{ constants::MARKET_DECIMALS }>
+    for RevertiblePosition<'a, 'info>
+{
     type Num = u128;
 
     type Signed = i128;
@@ -94,7 +99,9 @@ impl<'a> gmsol_model::PositionState<{ constants::MARKET_DECIMALS }> for Revertib
     }
 }
 
-impl<'a> gmsol_model::Position<{ constants::MARKET_DECIMALS }> for RevertiblePosition<'a> {
+impl<'a, 'info> gmsol_model::Position<{ constants::MARKET_DECIMALS }>
+    for RevertiblePosition<'a, 'info>
+{
     type Market = RevertibleMarket<'a>;
 
     fn market(&self) -> &Self::Market {
@@ -118,7 +125,9 @@ impl<'a> gmsol_model::Position<{ constants::MARKET_DECIMALS }> for RevertiblePos
     }
 }
 
-impl<'a> gmsol_model::PositionMut<{ constants::MARKET_DECIMALS }> for RevertiblePosition<'a> {
+impl<'a, 'info> gmsol_model::PositionMut<{ constants::MARKET_DECIMALS }>
+    for RevertiblePosition<'a, 'info>
+{
     fn market_mut(&mut self) -> &mut Self::Market {
         &mut self.market
     }
@@ -142,13 +151,12 @@ impl<'a> gmsol_model::PositionMut<{ constants::MARKET_DECIMALS }> for Revertible
     fn on_swapped(
         &mut self,
         ty: DecreasePositionSwapType,
-        report: &gmsol_model::action::swap::SwapReport<Self::Num>,
+        report: &gmsol_model::action::swap::SwapReport<Self::Num, <Self::Num as Unsigned>::Signed>,
     ) -> gmsol_model::Result<()> {
-        msg!(
-            "[Decrease Position Swap] swapped: ty={}, report={:?}",
-            ty,
-            report
-        );
+        msg!("[Decrease Position Swap] swapped");
+        let market_token = self.market.market_meta().market_token_mint;
+        self.event_emitter
+            .emit_cpi(&SwapExecuted::new(market_token, report.clone(), Some(ty)))?;
         Ok(())
     }
 
@@ -162,7 +170,9 @@ impl<'a> gmsol_model::PositionMut<{ constants::MARKET_DECIMALS }> for Revertible
     }
 }
 
-impl<'a> gmsol_model::PositionStateMut<{ constants::MARKET_DECIMALS }> for RevertiblePosition<'a> {
+impl<'a, 'info> gmsol_model::PositionStateMut<{ constants::MARKET_DECIMALS }>
+    for RevertiblePosition<'a, 'info>
+{
     fn collateral_amount_mut(&mut self) -> &mut Self::Num {
         self.state.collateral_amount_mut()
     }
