@@ -21,11 +21,20 @@ pub struct IncreasePosition<P: Position<DECIMALS>, const DECIMALS: u8> {
 
 /// Increase Position Params.
 #[derive(Debug, Clone, Copy)]
+#[cfg_attr(
+    feature = "anchor-lang",
+    derive(anchor_lang::AnchorDeserialize, anchor_lang::AnchorSerialize)
+)]
 pub struct IncreasePositionParams<T> {
     collateral_increment_amount: T,
     size_delta_usd: T,
     acceptable_price: Option<T>,
     prices: Prices<T>,
+}
+
+#[cfg(feature = "gmsol-utils")]
+impl<T: gmsol_utils::InitSpace> gmsol_utils::InitSpace for IncreasePositionParams<T> {
+    const INIT_SPACE: usize = 2 * T::INIT_SPACE + 1 + T::INIT_SPACE + Prices::<T>::INIT_SPACE;
 }
 
 impl<T> IncreasePositionParams<T> {
@@ -52,17 +61,34 @@ impl<T> IncreasePositionParams<T> {
 
 /// Report of the execution of position increasing.
 #[must_use = "`claimable_funding_amounts` must be used"]
-pub struct IncreasePositionReport<T: Unsigned> {
-    params: IncreasePositionParams<T>,
-    execution: ExecutionParams<T>,
-    collateral_delta_amount: T::Signed,
-    fees: PositionFees<T>,
+#[cfg_attr(
+    feature = "anchor-lang",
+    derive(anchor_lang::AnchorDeserialize, anchor_lang::AnchorSerialize)
+)]
+pub struct IncreasePositionReport<Unsigned, Signed> {
+    params: IncreasePositionParams<Unsigned>,
+    execution: ExecutionParams<Unsigned, Signed>,
+    collateral_delta_amount: Signed,
+    fees: PositionFees<Unsigned>,
     /// Output amounts that must be processed.
-    claimable_funding_long_token_amount: T,
-    claimable_funding_short_token_amount: T,
+    claimable_funding_long_token_amount: Unsigned,
+    claimable_funding_short_token_amount: Unsigned,
 }
 
-impl<T: Unsigned + fmt::Debug> fmt::Debug for IncreasePositionReport<T>
+#[cfg(feature = "gmsol-utils")]
+impl<Unsigned, Signed> gmsol_utils::InitSpace for IncreasePositionReport<Unsigned, Signed>
+where
+    Unsigned: gmsol_utils::InitSpace,
+    Signed: gmsol_utils::InitSpace,
+{
+    const INIT_SPACE: usize = IncreasePositionParams::<Unsigned>::INIT_SPACE
+        + ExecutionParams::<Unsigned, Signed>::INIT_SPACE
+        + Signed::INIT_SPACE
+        + PositionFees::<Unsigned>::INIT_SPACE
+        + 2 * Unsigned::INIT_SPACE;
+}
+
+impl<T: Unsigned + fmt::Debug> fmt::Debug for IncreasePositionReport<T, T::Signed>
 where
     T::Signed: fmt::Debug,
 {
@@ -84,10 +110,10 @@ where
     }
 }
 
-impl<T: Unsigned + Clone> IncreasePositionReport<T> {
+impl<T: Unsigned + Clone> IncreasePositionReport<T, T::Signed> {
     fn new(
         params: IncreasePositionParams<T>,
-        execution: ExecutionParams<T>,
+        execution: ExecutionParams<T, T::Signed>,
         collateral_delta_amount: T::Signed,
         fees: PositionFees<T>,
     ) -> Self {
@@ -120,7 +146,7 @@ impl<T: Unsigned + Clone> IncreasePositionReport<T> {
     }
 
     /// Get execution params.
-    pub fn execution(&self) -> &ExecutionParams<T> {
+    pub fn execution(&self) -> &ExecutionParams<T, T::Signed> {
         &self.execution
     }
 
@@ -137,14 +163,27 @@ impl<T: Unsigned + Clone> IncreasePositionReport<T> {
 
 /// Execution Params for increasing position.
 #[derive(Debug, Clone, Copy)]
-pub struct ExecutionParams<T: Unsigned> {
-    price_impact_value: T::Signed,
-    price_impact_amount: T::Signed,
-    size_delta_in_tokens: T,
-    execution_price: T,
+#[cfg_attr(
+    feature = "anchor-lang",
+    derive(anchor_lang::AnchorDeserialize, anchor_lang::AnchorSerialize)
+)]
+pub struct ExecutionParams<Unsigned, Signed> {
+    price_impact_value: Signed,
+    price_impact_amount: Signed,
+    size_delta_in_tokens: Unsigned,
+    execution_price: Unsigned,
 }
 
-impl<T: Unsigned> ExecutionParams<T> {
+#[cfg(feature = "gmsol-utils")]
+impl<Unsigned, Signed> gmsol_utils::InitSpace for ExecutionParams<Unsigned, Signed>
+where
+    Unsigned: gmsol_utils::InitSpace,
+    Signed: gmsol_utils::InitSpace,
+{
+    const INIT_SPACE: usize = 2 * Signed::INIT_SPACE + 2 * Unsigned::INIT_SPACE;
+}
+
+impl<T: Unsigned> ExecutionParams<T, T::Signed> {
     /// Get price impact value.
     pub fn price_impact_value(&self) -> &T::Signed {
         &self.price_impact_value
@@ -218,7 +257,9 @@ where
         Ok(())
     }
 
-    fn get_execution_params(&self) -> crate::Result<ExecutionParams<P::Num>> {
+    fn get_execution_params(
+        &self,
+    ) -> crate::Result<ExecutionParams<P::Num, <P::Num as Unsigned>::Signed>> {
         let index_token_price = &self.params.prices.index_token_price;
         if self.params.size_delta_usd.is_zero() {
             return Ok(ExecutionParams {
@@ -394,7 +435,7 @@ impl<const DECIMALS: u8, P: PositionMut<DECIMALS>> MarketAction for IncreasePosi
 where
     P::Market: PerpMarketMut<DECIMALS, Num = P::Num, Signed = P::Signed>,
 {
-    type Report = IncreasePositionReport<P::Num>;
+    type Report = IncreasePositionReport<P::Num, P::Signed>;
 
     fn execute(mut self) -> crate::Result<Self::Report> {
         self.initialize_position_if_empty()?;

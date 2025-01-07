@@ -333,9 +333,9 @@ impl<'a, 'info, T> Execute<'a, 'info, T> {
 
             params.validate_market_token_amount(minted)?;
 
-            msg!("[Deposit] executed");
             self.event_emitter
                 .emit_cpi(&DepositExecuted::from(report))?;
+            msg!("[Deposit] executed");
 
             minted
         };
@@ -380,9 +380,9 @@ impl<'a, 'info, T> Execute<'a, 'info, T> {
             self.market
                 .validate_market_balances(long_amount, short_amount)?;
 
-            msg!("[Withdrawal] executed");
             self.event_emitter
                 .emit_cpi(&WithdrawalExecuted::from(report))?;
+            msg!("[Withdrawal] executed");
 
             (long_amount, short_amount)
         };

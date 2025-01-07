@@ -10,7 +10,7 @@ use gmsol_model::{
 use typed_builder::TypedBuilder;
 
 use crate::{
-    events::{MarketStateUpdated, TradeData},
+    events::{MarketStateUpdated, PositionIncreased, TradeData},
     states::{
         common::action::{Action, ActionExt, ActionParams, EventEmitter},
         market::{
@@ -1338,14 +1338,17 @@ fn execute_increase_position(
             )
             .and_then(|a| a.execute())
             .map_err(ModelError::from)?;
-        msg!("[Position] increased: {:?}", report);
-        let (long_amount, short_amount) = report.claimable_funding_amounts();
+
+        let (&long_amount, &short_amount) = report.claimable_funding_amounts();
+        let paid_order_fee_value = *report.fees().paid_order_fee_value();
         event.update_with_increase_report(&report)?;
-        (
-            *long_amount,
-            *short_amount,
-            *report.fees().paid_order_fee_value(),
-        )
+
+        position
+            .event_emitter()
+            .emit_cpi(&PositionIncreased::from(report))?;
+        msg!("[Position] increased");
+
+        (long_amount, short_amount, paid_order_fee_value)
     };
 
     // Process output amount.

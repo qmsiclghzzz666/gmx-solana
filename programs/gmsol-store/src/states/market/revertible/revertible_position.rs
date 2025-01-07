@@ -57,6 +57,10 @@ impl<'a, 'info> RevertiblePosition<'a, 'info> {
     pub(crate) fn write_to_event(&self, event: &mut TradeData) -> Result<()> {
         event.update_with_state(&self.state)
     }
+
+    pub(crate) fn event_emitter(&self) -> &EventEmitter<'_, 'info> {
+        &self.event_emitter
+    }
 }
 
 impl<'a, 'info> Revertible for RevertiblePosition<'a, 'info> {

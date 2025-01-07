@@ -3,8 +3,8 @@ use crate::{impl_decode_for_cpi_event, impl_decode_for_zero_copy};
 use gmsol_store::{
     events::{
         DepositExecuted, DepositRemoved, GlvDepositRemoved, GlvWithdrawalRemoved,
-        MarketStateUpdated, OrderRemoved, ShiftRemoved, SwapExecuted, Trade as TradeEvent,
-        WithdrawalExecuted, WithdrawalRemoved,
+        MarketStateUpdated, OrderRemoved, PositionIncreased, ShiftRemoved, SwapExecuted,
+        Trade as TradeEvent, WithdrawalExecuted, WithdrawalRemoved,
     },
     states::{Deposit, Market, Order, Position, Store, Withdrawal},
 };
@@ -25,6 +25,7 @@ impl_decode_for_cpi_event!(WithdrawalExecuted);
 impl_decode_for_cpi_event!(ShiftRemoved);
 impl_decode_for_cpi_event!(GlvDepositRemoved);
 impl_decode_for_cpi_event!(GlvWithdrawalRemoved);
+impl_decode_for_cpi_event!(PositionIncreased);
 impl_decode_for_cpi_event!(OrderRemoved);
 impl_decode_for_cpi_event!(TradeEvent<'static>);
 impl_decode_for_cpi_event!(MarketStateUpdated);
@@ -57,6 +58,7 @@ untagged!(
         ShiftRemoved,
         GlvDepositRemoved,
         GlvWithdrawalRemoved,
+        PositionIncreased,
         OrderRemoved,
         Trade,
         MarketStateUpdated,

@@ -492,6 +492,11 @@ pub struct OrderFees<T> {
     fee_value: T,
 }
 
+#[cfg(feature = "gmsol-utils")]
+impl<T: gmsol_utils::InitSpace> gmsol_utils::InitSpace for OrderFees<T> {
+    const INIT_SPACE: usize = Fees::<T>::INIT_SPACE + T::INIT_SPACE;
+}
+
 impl<T> OrderFees<T> {
     /// Get fee amounts.
     pub fn fee_amounts(&self) -> &Fees<T> {
@@ -523,6 +528,11 @@ impl<T: Zero> Default for OrderFees<T> {
 pub struct BorrowingFees<T> {
     fee_amount: T,
     fee_amount_for_receiver: T,
+}
+
+#[cfg(feature = "gmsol-utils")]
+impl<T: gmsol_utils::InitSpace> gmsol_utils::InitSpace for BorrowingFees<T> {
+    const INIT_SPACE: usize = 2 * T::INIT_SPACE;
 }
 
 impl<T> BorrowingFees<T> {
@@ -571,6 +581,11 @@ pub struct FundingFees<T> {
     claimable_short_token_amount: T,
 }
 
+#[cfg(feature = "gmsol-utils")]
+impl<T: gmsol_utils::InitSpace> gmsol_utils::InitSpace for FundingFees<T> {
+    const INIT_SPACE: usize = 3 * T::INIT_SPACE;
+}
+
 impl<T> FundingFees<T> {
     /// Get funding fee amount.
     pub fn amount(&self) -> &T {
@@ -609,6 +624,11 @@ pub struct LiquidationFees<T> {
     fee_value: T,
     fee_amount: T,
     fee_amount_for_receiver: T,
+}
+
+#[cfg(feature = "gmsol-utils")]
+impl<T: gmsol_utils::InitSpace> gmsol_utils::InitSpace for LiquidationFees<T> {
+    const INIT_SPACE: usize = 3 * T::INIT_SPACE;
 }
 
 impl<T: Zero> Default for LiquidationFees<T> {
@@ -663,6 +683,16 @@ pub struct PositionFees<T> {
     borrowing: BorrowingFees<T>,
     funding: FundingFees<T>,
     liquidation: Option<LiquidationFees<T>>,
+}
+
+#[cfg(feature = "gmsol-utils")]
+impl<T: gmsol_utils::InitSpace> gmsol_utils::InitSpace for PositionFees<T> {
+    const INIT_SPACE: usize = T::INIT_SPACE
+        + OrderFees::<T>::INIT_SPACE
+        + BorrowingFees::<T>::INIT_SPACE
+        + FundingFees::<T>::INIT_SPACE
+        + 1
+        + LiquidationFees::<T>::INIT_SPACE;
 }
 
 impl<T> PositionFees<T> {

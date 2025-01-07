@@ -138,6 +138,26 @@ impl OrderCreated {
     }
 }
 
+/// Position increased event.
+#[event]
+#[cfg_attr(feature = "debug", derive(Debug))]
+pub struct PositionIncreased {
+    /// Report.
+    pub report: IncreasePositionReport<u128, i128>,
+}
+
+impl gmsol_utils::InitSpace for PositionIncreased {
+    const INIT_SPACE: usize = IncreasePositionReport::<u128, i128>::INIT_SPACE;
+}
+
+impl ActionEvent for PositionIncreased {}
+
+impl From<IncreasePositionReport<u128, i128>> for PositionIncreased {
+    fn from(report: IncreasePositionReport<u128, i128>) -> Self {
+        Self { report }
+    }
+}
+
 /// Deposit removed event.
 #[event]
 #[cfg_attr(feature = "debug", derive(Debug))]
@@ -921,7 +941,7 @@ impl TradeData {
     #[inline(never)]
     pub(crate) fn update_with_increase_report(
         &mut self,
-        report: &IncreasePositionReport<u128>,
+        report: &IncreasePositionReport<u128, i128>,
     ) -> Result<()> {
         self.prices.set_with_prices(report.params().prices());
         self.execution_price = *report.execution().execution_price();
