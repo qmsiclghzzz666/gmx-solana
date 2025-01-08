@@ -10,7 +10,7 @@ use gmsol_model::{
 use typed_builder::TypedBuilder;
 
 use crate::{
-    events::{EventEmitter, MarketStateUpdated, PositionDecreased, PositionIncreased, TradeData},
+    events::{EventEmitter, MarketFeesUpdated, PositionDecreased, PositionIncreased, TradeData},
     states::{
         common::action::{Action, ActionExt, ActionParams},
         market::{
@@ -894,7 +894,7 @@ impl<'a, 'info> ExecuteOrderOperation<'a, 'info> {
             msg!("[Pre-execute] funding state updated");
 
             self.event_emitter
-                .emit_cpi(&MarketStateUpdated::from_reports(
+                .emit_cpi(&MarketFeesUpdated::from_reports(
                     distribute_position_impact,
                     borrowing,
                     funding,

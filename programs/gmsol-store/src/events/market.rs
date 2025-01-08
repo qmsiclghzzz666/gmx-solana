@@ -8,10 +8,10 @@ use gmsol_model::action::{
 
 use super::Event;
 
-/// Market state updated event.
+/// Market fees updated event.
 #[event]
 #[cfg_attr(feature = "debug", derive(Debug))]
-pub struct MarketStateUpdated {
+pub struct MarketFeesUpdated {
     /// Position impact distribution report.
     pub position_impact_distribution: DistributePositionImpactReport<u128>,
     /// Update borrowing state report.
@@ -20,15 +20,15 @@ pub struct MarketStateUpdated {
     pub update_funding_state: UpdateFundingReport<u128, i128>,
 }
 
-impl gmsol_utils::InitSpace for MarketStateUpdated {
+impl gmsol_utils::InitSpace for MarketFeesUpdated {
     const INIT_SPACE: usize = DistributePositionImpactReport::<u128>::INIT_SPACE
         + UpdateBorrowingReport::<u128>::INIT_SPACE
         + UpdateFundingReport::<u128, i128>::INIT_SPACE;
 }
 
-impl Event for MarketStateUpdated {}
+impl Event for MarketFeesUpdated {}
 
-impl MarketStateUpdated {
+impl MarketFeesUpdated {
     /// Create from reports.
     pub fn from_reports(
         position_impact_distribution: DistributePositionImpactReport<u128>,
