@@ -3,6 +3,7 @@ use anchor_spl::token::{Mint, Token, TokenAccount};
 
 use crate::{
     constants,
+    events::EventEmitter,
     ops::{
         deposit::ExecuteDepositOperation,
         execution_fee::PayExecutionFeeOperation,
@@ -135,19 +136,19 @@ pub(crate) fn unchecked_execute_deposit<'info>(
 
     let signer = accounts.deposit.load()?.signer();
 
-    accounts.transfer_tokens_in(&signer, remaining_accounts)?;
+    let event_authority = accounts.event_authority.clone();
+    let event_emitter = EventEmitter::new(&event_authority, ctx.bumps.event_authority);
 
-    let executed = accounts.perform_execution(
-        remaining_accounts,
-        throw_on_execution_error,
-        ctx.bumps.event_authority,
-    )?;
+    accounts.transfer_tokens_in(&signer, remaining_accounts, &event_emitter)?;
+
+    let executed =
+        accounts.perform_execution(remaining_accounts, throw_on_execution_error, &event_emitter)?;
 
     if executed {
         accounts.deposit.load_mut()?.header.completed()?;
     } else {
         accounts.deposit.load_mut()?.header.cancelled()?;
-        accounts.transfer_tokens_out(remaining_accounts)?;
+        accounts.transfer_tokens_out(remaining_accounts, &event_emitter)?;
     }
 
     // It must be placed at the end to be executed correctly.
@@ -184,6 +185,7 @@ impl<'info> ExecuteDeposit<'info> {
         &self,
         signer: &ActionSigner,
         remaining_accounts: &'info [AccountInfo<'info>],
+        event_emitter: &EventEmitter<'_, 'info>,
     ) -> Result<()> {
         let seeds = signer.as_seeds();
 
@@ -191,7 +193,8 @@ impl<'info> ExecuteDeposit<'info> {
             .store(&self.store)
             .from_authority(self.deposit.to_account_info())
             .token_program(self.token_program.to_account_info())
-            .signer_seeds(&seeds);
+            .signer_seeds(&seeds)
+            .event_emitter(*event_emitter);
 
         let store = &self.store.key();
 
@@ -241,10 +244,15 @@ impl<'info> ExecuteDeposit<'info> {
     }
 
     #[inline(never)]
-    fn transfer_tokens_out(&self, remaining_accounts: &'info [AccountInfo<'info>]) -> Result<()> {
+    fn transfer_tokens_out(
+        &self,
+        remaining_accounts: &'info [AccountInfo<'info>],
+        event_emitter: &EventEmitter<'_, 'info>,
+    ) -> Result<()> {
         let builder = MarketTransferOutOperation::builder()
             .store(&self.store)
-            .token_program(self.token_program.to_account_info());
+            .token_program(self.token_program.to_account_info())
+            .event_emitter(*event_emitter);
 
         let store = &self.store.key();
 
@@ -309,7 +317,7 @@ impl<'info> ExecuteDeposit<'info> {
         &mut self,
         remaining_accounts: &'info [AccountInfo<'info>],
         throw_on_execution_error: bool,
-        event_authority_bump: u8,
+        event_emitter: &EventEmitter<'_, 'info>,
     ) -> Result<bool> {
         // FIXME: We only need the tokens here, the feeds are not necessary.
         let feeds = self
@@ -325,7 +333,7 @@ impl<'info> ExecuteDeposit<'info> {
             .market_token_receiver(self.market_token_escrow.to_account_info())
             .token_program(self.token_program.to_account_info())
             .throw_on_execution_error(throw_on_execution_error)
-            .event_emitter((&self.event_authority, event_authority_bump));
+            .event_emitter(*event_emitter);
 
         let executed = self.oracle.load_mut()?.with_prices(
             &self.store,

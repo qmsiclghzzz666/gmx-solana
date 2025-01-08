@@ -2,9 +2,12 @@ use anchor_lang::prelude::*;
 use gmsol_model::PoolKind;
 use strum::IntoEnumIterator;
 
-use crate::states::{
-    market::{Clocks, Pool, State},
-    OtherState, PoolStorage,
+use crate::{
+    events::{EventEmitter, MarketStateUpdatedRef},
+    states::{
+        market::{Clocks, Pool, State},
+        OtherState, PoolStorage,
+    },
 };
 
 #[account(zero_copy)]
@@ -64,30 +67,60 @@ impl RevertibleBuffer {
         self.rev = self.rev.checked_add(1).expect("rev overflow");
     }
 
-    pub(super) fn commit_to_storage(&mut self, storage: &mut State) {
-        let state = &mut self.state;
+    pub(super) fn commit_to_storage(
+        &mut self,
+        storage: &mut State,
+        market_token: &Pubkey,
+        event_emitter: &EventEmitter,
+    ) {
+        let state = &self.state;
         let rev = self.rev;
+
+        let mut updated_pool_kinds = Vec::new();
 
         // Commit pools.
         for kind in PoolKind::iter() {
-            let Some(pool) = state.pools.get_mut(kind) else {
+            let Some(pool) = state.pools.get(kind) else {
                 continue;
             };
             if pool.is_dirty(rev) {
                 let target = storage.pools.get_mut(kind).expect("must exist");
                 *target = *pool;
+                updated_pool_kinds.push(kind);
             }
         }
 
         // Commit clocks.
-        if state.clocks.is_dirty(rev) {
+        let is_clocks_dirty = state.clocks.is_dirty(rev);
+        if is_clocks_dirty {
             storage.clocks = state.clocks;
         }
 
         // Commit other state.
-        if state.other.is_dirty(rev) {
+        let is_other_dirty = state.other.is_dirty(rev);
+        if is_other_dirty {
             storage.other = state.other;
         }
+
+        let updated_pools = updated_pool_kinds
+            .iter()
+            .map(|kind| state.pools.get(*kind).expect("must exist").pool())
+            .collect();
+
+        let event = MarketStateUpdatedRef::new(
+            *market_token,
+            updated_pool_kinds,
+            updated_pools,
+            is_clocks_dirty.then_some(&state.clocks),
+            is_other_dirty.then_some(&state.other),
+        );
+
+        event_emitter
+            .emit_cpi_with_space(&event, event.space())
+            .map_err(|err| {
+                msg!("{}", err);
+            })
+            .expect("emit event error");
     }
 }
 

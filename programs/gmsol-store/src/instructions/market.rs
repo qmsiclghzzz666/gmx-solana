@@ -1,4 +1,5 @@
 use crate::{
+    events::EventEmitter,
     ops::market::MarketTransferOutOperation,
     states::{
         market::{
@@ -229,6 +230,7 @@ impl<'info> internal::Authentication<'info> for ToggleMarket<'info> {
 }
 
 /// The accounts definition for [`market_transfer_in`](crate::gmsol_store::market_transfer_in).
+#[event_cpi]
 #[derive(Accounts)]
 pub struct MarketTransferIn<'info> {
     /// Authority.
@@ -292,8 +294,10 @@ pub(crate) fn unchecked_market_transfer_in(
             ),
             amount,
         )?;
+        let event_emitter =
+            EventEmitter::new(&ctx.accounts.event_authority, ctx.bumps.event_authority);
         let token = &ctx.accounts.vault.mint;
-        let mut market = RevertibleMarket::try_from(&ctx.accounts.market)?;
+        let mut market = RevertibleMarket::new(&ctx.accounts.market, event_emitter)?;
         market
             .record_transferred_in_by_token(token, &amount)
             .map_err(ModelError::from)?;
@@ -628,6 +632,7 @@ impl<'info> internal::Authentication<'info> for ToggleGTMinting<'info> {
 /// The accounts definition for [`claim_fees_from_market`](crate::gmsol_store::claim_fees_from_market).
 ///
 /// *[See also the documentation for the instruction.](crate::gmsol_store::claim_fees_from_market)*
+#[event_cpi]
 #[derive(Accounts)]
 pub struct ClaimFeesFromMarket<'info> {
     pub authority: Signer<'info>,
@@ -668,9 +673,12 @@ pub(crate) fn claim_fees_from_market(ctx: Context<ClaimFeesFromMarket>) -> Resul
         .load()?
         .validate_claim_fees_address(ctx.accounts.authority.key)?;
 
+    let event_emitter = EventEmitter::new(&ctx.accounts.event_authority, ctx.bumps.event_authority);
+
     let amount = {
         let token = ctx.accounts.token_mint.key();
-        let mut market = RevertibleMarket::try_from(&ctx.accounts.market)?;
+
+        let mut market = RevertibleMarket::new(&ctx.accounts.market, event_emitter)?;
         let is_long_token = market.market_meta().to_token_side(&token)?;
         let the_opposite_side = !is_long_token;
         let is_pure = market.market_meta().is_pure();
@@ -734,6 +742,7 @@ pub(crate) fn claim_fees_from_market(ctx: Context<ClaimFeesFromMarket>) -> Resul
         .token_mint(token.to_account_info())
         .vault(ctx.accounts.vault.to_account_info())
         .token_program(ctx.accounts.token_program.to_account_info())
+        .event_emitter(event_emitter)
         .build()
         .execute()?;
 

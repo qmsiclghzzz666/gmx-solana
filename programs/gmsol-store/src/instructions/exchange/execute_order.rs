@@ -313,20 +313,20 @@ pub(crate) fn unchecked_execute_increase_or_swap_order<'info>(
     let remaining_accounts = ctx.remaining_accounts;
     let signer = accounts.order.load()?.signer();
 
-    accounts.transfer_tokens_in(&signer, remaining_accounts)?;
-
     let event_authority = accounts.event_authority.clone();
     let event_emitter = EventEmitter::new(&event_authority, ctx.bumps.event_authority);
+
+    accounts.transfer_tokens_in(&signer, remaining_accounts, &event_emitter)?;
 
     let (is_position_removed, transfer_out, should_send_trade_event) =
         accounts.perform_execution(remaining_accounts, throw_on_execution_error, &event_emitter)?;
 
     if transfer_out.executed() {
         accounts.order.load_mut()?.header.completed()?;
-        accounts.process_transfer_out(remaining_accounts, &transfer_out)?;
+        accounts.process_transfer_out(remaining_accounts, &transfer_out, &event_emitter)?;
     } else {
         accounts.order.load_mut()?.header.cancelled()?;
-        accounts.transfer_tokens_out(remaining_accounts)?;
+        accounts.transfer_tokens_out(remaining_accounts, &event_emitter)?;
     }
 
     if should_send_trade_event {
@@ -365,6 +365,7 @@ impl<'info> ExecuteIncreaseOrSwapOrder<'info> {
         &self,
         signer: &ActionSigner,
         remaining_accounts: &'info [AccountInfo<'info>],
+        event_emitter: &EventEmitter<'_, 'info>,
     ) -> Result<()> {
         if let Some(escrow) = self.initial_collateral_token_escrow.as_ref() {
             let store = &self.store.key();
@@ -388,6 +389,7 @@ impl<'info> ExecuteIncreaseOrSwapOrder<'info> {
                 .from(escrow.to_account_info())
                 .vault(vault)
                 .amount(amount)
+                .event_emitter(*event_emitter)
                 .build()
                 .execute()?;
         }
@@ -395,7 +397,11 @@ impl<'info> ExecuteIncreaseOrSwapOrder<'info> {
     }
 
     #[inline(never)]
-    fn transfer_tokens_out(&self, remaining_accounts: &'info [AccountInfo<'info>]) -> Result<()> {
+    fn transfer_tokens_out(
+        &self,
+        remaining_accounts: &'info [AccountInfo<'info>],
+        event_emitter: &EventEmitter<'_, 'info>,
+    ) -> Result<()> {
         if let Some(escrow) = self.initial_collateral_token_escrow.as_ref() {
             let store = &self.store.key();
             let market = self
@@ -422,6 +428,7 @@ impl<'info> ExecuteIncreaseOrSwapOrder<'info> {
                 .amount(amount)
                 .decimals(token.decimals)
                 .token_mint(token.to_account_info())
+                .event_emitter(*event_emitter)
                 .build()
                 .execute()?;
         }
@@ -473,6 +480,7 @@ impl<'info> ExecuteIncreaseOrSwapOrder<'info> {
         &self,
         remaining_accounts: &'info [AccountInfo<'info>],
         transfer_out: &TransferOut,
+        event_emitter: &EventEmitter<'_, 'info>,
     ) -> Result<()> {
         let is_pnl_token_long_token = self.order.load()?.params.side()?.is_long();
         let final_output_market = self
@@ -508,6 +516,7 @@ impl<'info> ExecuteIncreaseOrSwapOrder<'info> {
             .claimable_short_token_account_for_user(None)
             .claimable_pnl_token_account_for_holding(None)
             .transfer_out(transfer_out)
+            .event_emitter(*event_emitter)
             .build()
             .execute()?;
         Ok(())
@@ -745,7 +754,7 @@ pub(crate) fn unchecked_execute_decrease_order<'info>(
 
     if transfer_out.executed() {
         accounts.order.load_mut()?.header.completed()?;
-        accounts.process_transfer_out(remaining_accounts, &transfer_out)?;
+        accounts.process_transfer_out(remaining_accounts, &transfer_out, &event_emitter)?;
     } else {
         accounts.order.load_mut()?.header.cancelled()?;
     }
@@ -824,6 +833,7 @@ impl<'info> ExecuteDecreaseOrder<'info> {
         &self,
         remaining_accounts: &'info [AccountInfo<'info>],
         transfer_out: &TransferOut,
+        event_emitter: &EventEmitter<'_, 'info>,
     ) -> Result<()> {
         let is_pnl_token_long_token = self.order.load()?.params.side()?.is_long();
         let final_output_market = self
@@ -859,6 +869,7 @@ impl<'info> ExecuteDecreaseOrder<'info> {
                     .to_account_info(),
             ))
             .transfer_out(transfer_out)
+            .event_emitter(*event_emitter)
             .build()
             .execute()?;
         Ok(())

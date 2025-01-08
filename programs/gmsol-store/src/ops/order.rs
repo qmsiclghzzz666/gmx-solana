@@ -435,6 +435,8 @@ pub(crate) struct ProcessTransferOutOperation<'a, 'info> {
     pub(crate) claimable_short_token_account_for_user: Option<AccountInfo<'info>>,
     pub(crate) claimable_pnl_token_account_for_holding: Option<AccountInfo<'info>>,
     transfer_out: &'a TransferOut,
+    #[builder(setter(into))]
+    event_emitter: EventEmitter<'a, 'info>,
 }
 
 impl<'a, 'info> ProcessTransferOutOperation<'a, 'info> {
@@ -462,6 +464,7 @@ impl<'a, 'info> ProcessTransferOutOperation<'a, 'info> {
                 .decimals(token.decimals)
                 .token_mint(token.to_account_info())
                 .token_program(self.token_program.clone())
+                .event_emitter(self.event_emitter)
                 .build()
                 .execute()?;
         }
@@ -493,6 +496,7 @@ impl<'a, 'info> ProcessTransferOutOperation<'a, 'info> {
                 .decimals(token.decimals)
                 .token_mint(token.to_account_info())
                 .to(account.clone())
+                .event_emitter(self.event_emitter)
                 .build()
                 .execute()?;
         }
@@ -508,6 +512,7 @@ impl<'a, 'info> ProcessTransferOutOperation<'a, 'info> {
                 .decimals(token.decimals)
                 .token_mint(token.to_account_info())
                 .to(account.clone())
+                .event_emitter(self.event_emitter)
                 .build()
                 .execute()?;
         }
@@ -523,6 +528,7 @@ impl<'a, 'info> ProcessTransferOutOperation<'a, 'info> {
                 .decimals(token.decimals)
                 .token_mint(token.to_account_info())
                 .to(account.clone())
+                .event_emitter(self.event_emitter)
                 .build()
                 .execute()?;
         }
@@ -538,6 +544,7 @@ impl<'a, 'info> ProcessTransferOutOperation<'a, 'info> {
                 .decimals(token.decimals)
                 .token_mint(token.to_account_info())
                 .to(account.clone())
+                .event_emitter(self.event_emitter)
                 .build()
                 .execute()?;
         }
@@ -553,6 +560,7 @@ impl<'a, 'info> ProcessTransferOutOperation<'a, 'info> {
                 .decimals(token.decimals)
                 .token_mint(token.to_account_info())
                 .to(account.clone())
+                .event_emitter(self.event_emitter)
                 .build()
                 .execute()?;
         }
@@ -568,6 +576,7 @@ impl<'a, 'info> ProcessTransferOutOperation<'a, 'info> {
                 .decimals(token.decimals)
                 .token_mint(token.to_account_info())
                 .to(account.clone())
+                .event_emitter(self.event_emitter)
                 .build()
                 .execute()?;
         }
@@ -851,7 +860,7 @@ impl<'a, 'info> ExecuteOrderOperation<'a, 'info> {
 
         // Prepare execution context.
         let gt_minting_enabled = self.market.load()?.is_gt_minting_enabled();
-        let mut market = RevertibleMarket::try_from(self.market)?
+        let mut market = RevertibleMarket::new(self.market, self.event_emitter)?
             .with_order_fee_discount_factor(order_fee_discount_factor);
         let current_market_token = market.market_meta().market_token_mint;
         let loaders = self
@@ -946,8 +955,7 @@ impl<'a, 'info> ExecuteOrderOperation<'a, 'info> {
                     )?;
                     should_send_trade_event = true;
                 }
-                let mut position =
-                    RevertiblePosition::new(market, position_loader, self.event_emitter)?;
+                let mut position = RevertiblePosition::new(market, position_loader)?;
 
                 position.on_validate().map_err(ModelError::from)?;
 
@@ -1250,7 +1258,7 @@ impl<'a, 'info> ValidateOracleTime for ExecuteOrderOperation<'a, 'info> {
 fn execute_swap(
     should_throw_error: &mut bool,
     oracle: &Oracle,
-    market: &mut RevertibleMarket<'_>,
+    market: &mut RevertibleMarket<'_, '_>,
     swap_markets: &mut SwapMarkets<'_, '_>,
     transfer_out: &mut TransferOut,
     order: &mut Order,
@@ -1798,6 +1806,7 @@ impl<'a, 'info> PositionCutOperation<'a, 'info> {
                 self.claimable_pnl_token_account_for_holding.clone(),
             ))
             .transfer_out(transfer_out)
+            .event_emitter(self.event_emitter)
             .build()
             .execute()?;
         Ok(())

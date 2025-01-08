@@ -545,6 +545,8 @@ where
                 vault,
                 from: *source_account,
                 token_program: anchor_spl::token::ID,
+                event_authority: self.store_event_authority(),
+                program: *self.store_program_id(),
             }))
     }
 

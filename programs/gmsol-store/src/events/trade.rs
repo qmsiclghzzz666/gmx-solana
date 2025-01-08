@@ -160,7 +160,8 @@ impl std::fmt::Display for TradeEvent {
     }
 }
 
-/// This is a cheaper variant of [`TradeEvent`], sharing the same format.
+/// This is a cheaper variant of [`TradeEvent`], sharing the same format
+/// for serialization.
 #[derive(Clone, BorshSerialize)]
 pub(crate) struct TradeEventRef<'a>(&'a TradeData);
 

@@ -125,6 +125,9 @@ pub struct ClaimFees<'info> {
         associated_token::mint = token,
     )]
     pub receiver_vault: InterfaceAccount<'info, TokenAccount>,
+    /// Event authority.
+    /// CHECK: check by CPI.
+    pub event_authority: UncheckedAccount<'info>,
     /// Store program.
     pub store_program: Program<'info, GmsolStore>,
     /// The token program.
@@ -183,6 +186,8 @@ impl<'info> ClaimFees<'info> {
                 vault: self.vault.to_account_info(),
                 target: self.receiver_vault.to_account_info(),
                 token_program: self.token_program.to_account_info(),
+                event_authority: self.event_authority.to_account_info(),
+                program: self.store_program.to_account_info(),
             },
         )
     }

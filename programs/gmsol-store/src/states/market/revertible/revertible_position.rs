@@ -14,19 +14,17 @@ use super::{market::RevertibleMarket, Revertible};
 
 /// Revertible Position.
 pub struct RevertiblePosition<'a, 'info> {
-    market: RevertibleMarket<'a>,
+    market: RevertibleMarket<'a, 'info>,
     storage: RefMut<'a, Position>,
     state: PositionState,
     is_collateral_token_long: bool,
     is_long: bool,
-    event_emitter: EventEmitter<'a, 'info>,
 }
 
 impl<'a, 'info> RevertiblePosition<'a, 'info> {
     pub(crate) fn new(
-        market: RevertibleMarket<'a>,
+        market: RevertibleMarket<'a, 'info>,
         loader: &'a AccountLoader<'info, Position>,
-        event_emitter: EventEmitter<'a, 'info>,
     ) -> Result<Self> {
         let storage = loader.load_mut()?;
         let meta = market.market_meta();
@@ -46,7 +44,6 @@ impl<'a, 'info> RevertiblePosition<'a, 'info> {
             state: storage.state,
             market,
             storage,
-            event_emitter,
         })
     }
 
@@ -58,8 +55,8 @@ impl<'a, 'info> RevertiblePosition<'a, 'info> {
         event.update_with_state(&self.state)
     }
 
-    pub(crate) fn event_emitter(&self) -> &EventEmitter<'_, 'info> {
-        &self.event_emitter
+    pub(crate) fn event_emitter(&self) -> &EventEmitter<'a, 'info> {
+        self.market.event_emitter()
     }
 }
 
@@ -106,7 +103,7 @@ impl<'a, 'info> gmsol_model::PositionState<{ constants::MARKET_DECIMALS }>
 impl<'a, 'info> gmsol_model::Position<{ constants::MARKET_DECIMALS }>
     for RevertiblePosition<'a, 'info>
 {
-    type Market = RevertibleMarket<'a>;
+    type Market = RevertibleMarket<'a, 'info>;
 
     fn market(&self) -> &Self::Market {
         &self.market
@@ -159,8 +156,11 @@ impl<'a, 'info> gmsol_model::PositionMut<{ constants::MARKET_DECIMALS }>
     ) -> gmsol_model::Result<()> {
         msg!("[Decrease Position Swap] swapped");
         let market_token = self.market.market_meta().market_token_mint;
-        self.event_emitter
-            .emit_cpi(&SwapExecuted::new(market_token, report.clone(), Some(ty)))?;
+        self.event_emitter().emit_cpi(&SwapExecuted::new(
+            market_token,
+            report.clone(),
+            Some(ty),
+        ))?;
         Ok(())
     }
 

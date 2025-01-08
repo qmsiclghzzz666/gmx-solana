@@ -490,6 +490,7 @@ where
                 token: *token_mint,
                 vault: self.find_market_vault_address(store, token_mint),
                 receiver_vault,
+                event_authority: self.store_event_authority(),
                 store_program: *self.store_program_id(),
                 token_program: token_program_id,
                 associated_token_program: anchor_spl::associated_token::ID,

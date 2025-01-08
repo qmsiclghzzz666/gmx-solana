@@ -37,6 +37,8 @@ pub(crate) struct MarketTransferInOperation<'a, 'info> {
     amount: u64,
     token_program: AccountInfo<'info>,
     signer_seeds: &'a [&'a [u8]],
+    #[builder(setter(into))]
+    event_emitter: EventEmitter<'a, 'info>,
 }
 
 impl<'a, 'info> MarketTransferInOperation<'a, 'info> {
@@ -60,7 +62,7 @@ impl<'a, 'info> MarketTransferInOperation<'a, 'info> {
                 amount,
             )?;
             let token = &self.vault.mint;
-            let mut market = RevertibleMarket::try_from(self.market)?;
+            let mut market = RevertibleMarket::new(self.market, self.event_emitter)?;
             market
                 .record_transferred_in_by_token(token, &amount)
                 .map_err(ModelError::from)?;
@@ -82,6 +84,8 @@ pub(crate) struct MarketTransferOutOperation<'a, 'info> {
     token_mint: AccountInfo<'info>,
     vault: AccountInfo<'info>,
     token_program: AccountInfo<'info>,
+    #[builder(setter(into))]
+    event_emitter: EventEmitter<'a, 'info>,
 }
 
 impl<'a, 'info> MarketTransferOutOperation<'a, 'info> {
@@ -107,7 +111,7 @@ impl<'a, 'info> MarketTransferOutOperation<'a, 'info> {
             )
             .transfer_out(self.vault.to_account_info(), self.to, amount, decimals)?;
             let token = &self.token_mint.key();
-            let mut market = RevertibleMarket::try_from(self.market)?;
+            let mut market = RevertibleMarket::new(self.market, self.event_emitter)?;
             market
                 .record_transferred_out_by_token(token, &amount)
                 .map_err(ModelError::from)?;
@@ -163,7 +167,7 @@ impl<'a, 'info> RevertibleLiquidityMarketOperation<'a, 'info> {
     pub(crate) fn op<'ctx>(&'ctx mut self) -> Result<Execute<'ctx, 'info>> {
         let current_market_token = self.market_token_mint.key();
         let market = RevertibleLiquidityMarket::from_revertible_market(
-            self.market.try_into()?,
+            RevertibleMarket::new(self.market, self.event_emitter)?,
             self.market_token_mint,
             &self.token_program,
             self.store,

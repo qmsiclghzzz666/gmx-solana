@@ -633,11 +633,11 @@ pub(crate) fn unchecked_execute_glv_withdrawal<'info>(
         )?
     };
 
-    let executed = accounts.perform_execution(
-        &splitted,
-        throw_on_execution_error,
-        ctx.bumps.event_authority,
-    )?;
+    let event_authority = accounts.event_authority.clone();
+    let event_emitter = EventEmitter::new(&event_authority, ctx.bumps.event_authority);
+
+    let executed =
+        accounts.perform_execution(&splitted, throw_on_execution_error, &event_emitter)?;
 
     match executed {
         Some((final_long_token_amount, final_short_token_amount)) => {
@@ -646,6 +646,7 @@ pub(crate) fn unchecked_execute_glv_withdrawal<'info>(
                 splitted.remaining_accounts,
                 final_long_token_amount,
                 final_short_token_amount,
+                &event_emitter,
             )?;
         }
         None => {
@@ -690,7 +691,7 @@ impl<'info> ExecuteGlvWithdrawal<'info> {
         &mut self,
         splitted: &SplitAccountsForGlv<'info>,
         throw_on_execution_error: bool,
-        event_authority_bump: u8,
+        event_emitter: &EventEmitter<'_, 'info>,
     ) -> Result<Option<(u64, u64)>> {
         let builder = ExecuteGlvWithdrawalOperation::builder()
             .glv_withdrawal(self.glv_withdrawal.clone())
@@ -708,7 +709,7 @@ impl<'info> ExecuteGlvWithdrawal<'info> {
             .markets(splitted.markets)
             .market_tokens(splitted.market_tokens)
             .market_token_vaults(splitted.market_token_vaults)
-            .event_emitter((&self.event_authority, event_authority_bump));
+            .event_emitter(*event_emitter);
 
         self.oracle.load_mut()?.with_prices(
             &self.store,
@@ -731,10 +732,12 @@ impl<'info> ExecuteGlvWithdrawal<'info> {
         remaining_accounts: &'info [AccountInfo<'info>],
         final_long_token_amount: u64,
         final_short_token_amount: u64,
+        event_emitter: &EventEmitter<'_, 'info>,
     ) -> Result<()> {
         let builder = MarketTransferOutOperation::builder()
             .store(&self.store)
-            .token_program(self.token_program.to_account_info());
+            .token_program(self.token_program.to_account_info())
+            .event_emitter(*event_emitter);
         let store = &self.store.key();
 
         if final_long_token_amount != 0 {

@@ -16,7 +16,7 @@ use super::{market::RevertibleMarket, Revertible};
 
 /// A map of markets used for swaps where the key is the market token mint address.
 pub struct SwapMarkets<'a, 'info> {
-    markets: IndexMap<Pubkey, RevertibleMarket<'a>>,
+    markets: IndexMap<Pubkey, RevertibleMarket<'a, 'info>>,
     event_emitter: EventEmitter<'a, 'info>,
 }
 
@@ -39,7 +39,7 @@ impl<'a, 'info> SwapMarkets<'a, 'info> {
                 Entry::Occupied(_) => return err!(CoreError::InvalidSwapPath),
                 Entry::Vacant(e) => {
                     loader.load()?.validate(store)?;
-                    let market = loader.try_into()?;
+                    let market = RevertibleMarket::new(loader, event_emitter)?;
                     e.insert(market);
                 }
             }
@@ -51,12 +51,12 @@ impl<'a, 'info> SwapMarkets<'a, 'info> {
     }
 
     /// Get market mutably.
-    pub fn get_mut(&mut self, token: &Pubkey) -> Option<&mut RevertibleMarket<'a>> {
+    pub fn get_mut(&mut self, token: &Pubkey) -> Option<&mut RevertibleMarket<'a, 'info>> {
         self.markets.get_mut(token)
     }
 
     /// Get market.
-    pub fn get(&self, token: &Pubkey) -> Option<&RevertibleMarket<'a>> {
+    pub fn get(&self, token: &Pubkey) -> Option<&RevertibleMarket<'a, 'info>> {
         self.markets.get(token)
     }
 
@@ -225,7 +225,8 @@ impl<'a, 'info> SwapMarkets<'a, 'info> {
                     .map_err(ModelError::from)?;
                 market.validate_market_balances(0, 0)?;
             }
-            self.event_emitter
+            market
+                .event_emitter()
                 .emit_cpi(&SwapExecuted::new(*market_token, report, None))?;
         }
         msg!("[Swap] swapped along the path");

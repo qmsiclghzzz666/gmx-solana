@@ -75,6 +75,8 @@ impl<'a, C: Deref<Target = impl Signer> + Clone> ClaimFeesBuilder<'a, C> {
                 vault,
                 target,
                 token_program,
+                event_authority: self.client.store_event_authority(),
+                program: *self.client.store_program_id(),
             })
             .args(instruction::ClaimFeesFromMarket {});
 

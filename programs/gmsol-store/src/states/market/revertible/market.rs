@@ -11,7 +11,8 @@ use gmsol_model::{
 };
 
 use crate::{
-    constants,
+    constants, debug_msg,
+    events::EventEmitter,
     states::{
         market::{
             clock::{AsClock, AsClockMut},
@@ -25,44 +26,45 @@ use crate::{
 use super::Revertible;
 
 /// Revertible Market.
-pub struct RevertibleMarket<'a> {
+pub struct RevertibleMarket<'a, 'info> {
     pub(super) market: RefMut<'a, Market>,
     order_fee_discount_factor: u128,
+    event_emitter: EventEmitter<'a, 'info>,
 }
 
-impl<'a, 'info> TryFrom<&'a AccountLoader<'info, Market>> for RevertibleMarket<'a> {
-    type Error = Error;
-
-    fn try_from(value: &'a AccountLoader<'info, Market>) -> std::result::Result<Self, Self::Error> {
-        Self::new(value)
-    }
-}
-
-impl<'a> Key for RevertibleMarket<'a> {
+impl<'a, 'info> Key for RevertibleMarket<'a, 'info> {
     fn key(&self) -> Pubkey {
         self.market.meta.market_token_mint
     }
 }
 
-impl<'a> AsRef<Market> for RevertibleMarket<'a> {
+impl<'a, 'info> AsRef<Market> for RevertibleMarket<'a, 'info> {
     fn as_ref(&self) -> &Market {
         &self.market
     }
 }
 
-impl<'a> RevertibleMarket<'a> {
-    fn new<'info>(market: &'a AccountLoader<'info, Market>) -> Result<Self> {
+impl<'a, 'info> RevertibleMarket<'a, 'info> {
+    pub(crate) fn new(
+        market: &'a AccountLoader<'info, Market>,
+        event_emitter: EventEmitter<'a, 'info>,
+    ) -> Result<Self> {
         let mut market = market.load_mut()?;
         market.buffer.start_revertible_operation();
         Ok(Self {
             market,
             order_fee_discount_factor: 0,
+            event_emitter,
         })
     }
 
     pub(crate) fn with_order_fee_discount_factor(mut self, discount: u128) -> Self {
         self.order_fee_discount_factor = discount;
         self
+    }
+
+    pub(crate) fn event_emitter(&self) -> &EventEmitter<'a, 'info> {
+        &self.event_emitter
     }
 
     fn pool(&self, kind: PoolKind) -> gmsol_model::Result<&Pool> {
@@ -110,11 +112,12 @@ impl<'a> RevertibleMarket<'a> {
 
     /// Record transferred in.
     fn record_transferred_in(&mut self, is_long_token: bool, amount: u64) -> Result<()> {
+        #[cfg(feature = "debug-msg")]
         let mint = self.market.meta.market_token_mint;
         let is_pure = self.market.is_pure();
         let other = self.other_mut();
 
-        msg!(
+        debug_msg!(
             "[Balance updating] {}: {},{}(+{},{is_long_token})",
             mint,
             other.long_token_balance,
@@ -134,7 +137,7 @@ impl<'a> RevertibleMarket<'a> {
                 .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
         }
 
-        msg!(
+        debug_msg!(
             "[Balance updated (to be committed)] {}: {},{}",
             mint,
             other.long_token_balance,
@@ -145,11 +148,12 @@ impl<'a> RevertibleMarket<'a> {
 
     /// Record transferred out.
     fn record_transferred_out(&mut self, is_long_token: bool, amount: u64) -> Result<()> {
+        #[cfg(feature = "debug-msg")]
         let mint = self.market.meta.market_token_mint;
         let is_pure = self.market.is_pure();
         let other = self.other_mut();
 
-        msg!(
+        debug_msg!(
             "[Balance updating] {}: {},{}(-{},{is_long_token})",
             mint,
             other.long_token_balance,
@@ -169,7 +173,7 @@ impl<'a> RevertibleMarket<'a> {
                 .ok_or_else(|| error!(CoreError::TokenAmountOverflow))?;
         }
 
-        msg!(
+        debug_msg!(
             "[Balance updated (to be committed)] {}: {},{}",
             mint,
             other.long_token_balance,
@@ -195,7 +199,7 @@ impl<'a> RevertibleMarket<'a> {
     }
 }
 
-impl<'a> Revertible for RevertibleMarket<'a> {
+impl<'a, 'info> Revertible for RevertibleMarket<'a, 'info> {
     fn commit(mut self) {
         let Market {
             meta,
@@ -203,8 +207,8 @@ impl<'a> Revertible for RevertibleMarket<'a> {
             buffer,
             ..
         } = &mut *self.market;
-        buffer.commit_to_storage(state);
-        msg!(
+        buffer.commit_to_storage(state, &meta.market_token_mint, &self.event_emitter);
+        debug_msg!(
             "[Balance committed] {}: {},{}",
             meta.market_token_mint,
             state.other.long_token_balance,
@@ -213,7 +217,7 @@ impl<'a> Revertible for RevertibleMarket<'a> {
     }
 }
 
-impl<'a> HasMarketMeta for RevertibleMarket<'a> {
+impl<'a, 'info> HasMarketMeta for RevertibleMarket<'a, 'info> {
     fn is_pure(&self) -> bool {
         self.market.is_pure()
     }
@@ -222,7 +226,7 @@ impl<'a> HasMarketMeta for RevertibleMarket<'a> {
     }
 }
 
-impl<'a> gmsol_model::Bank<Pubkey> for RevertibleMarket<'a> {
+impl<'a, 'info> gmsol_model::Bank<Pubkey> for RevertibleMarket<'a, 'info> {
     type Num = u64;
 
     fn record_transferred_in_by_token<Q: ?Sized + Borrow<Pubkey>>(
@@ -251,7 +255,9 @@ impl<'a> gmsol_model::Bank<Pubkey> for RevertibleMarket<'a> {
     }
 }
 
-impl<'a> gmsol_model::BaseMarket<{ constants::MARKET_DECIMALS }> for RevertibleMarket<'a> {
+impl<'a, 'info> gmsol_model::BaseMarket<{ constants::MARKET_DECIMALS }>
+    for RevertibleMarket<'a, 'info>
+{
     type Num = u128;
 
     type Signed = i128;
@@ -327,7 +333,9 @@ impl<'a> gmsol_model::BaseMarket<{ constants::MARKET_DECIMALS }> for RevertibleM
     }
 }
 
-impl<'a> gmsol_model::BaseMarketMut<{ constants::MARKET_DECIMALS }> for RevertibleMarket<'a> {
+impl<'a, 'info> gmsol_model::BaseMarketMut<{ constants::MARKET_DECIMALS }>
+    for RevertibleMarket<'a, 'info>
+{
     fn liquidity_pool_mut(&mut self) -> gmsol_model::Result<&mut Self::Pool> {
         self.pool_mut(PoolKind::Primary)
     }
@@ -337,7 +345,9 @@ impl<'a> gmsol_model::BaseMarketMut<{ constants::MARKET_DECIMALS }> for Revertib
     }
 }
 
-impl<'a> gmsol_model::SwapMarket<{ constants::MARKET_DECIMALS }> for RevertibleMarket<'a> {
+impl<'a, 'info> gmsol_model::SwapMarket<{ constants::MARKET_DECIMALS }>
+    for RevertibleMarket<'a, 'info>
+{
     fn swap_impact_params(&self) -> gmsol_model::Result<PriceImpactParams<Factor>> {
         self.market.swap_impact_params()
     }
@@ -347,14 +357,16 @@ impl<'a> gmsol_model::SwapMarket<{ constants::MARKET_DECIMALS }> for RevertibleM
     }
 }
 
-impl<'a> gmsol_model::SwapMarketMut<{ constants::MARKET_DECIMALS }> for RevertibleMarket<'a> {
+impl<'a, 'info> gmsol_model::SwapMarketMut<{ constants::MARKET_DECIMALS }>
+    for RevertibleMarket<'a, 'info>
+{
     fn swap_impact_pool_mut(&mut self) -> gmsol_model::Result<&mut Self::Pool> {
         self.pool_mut(PoolKind::SwapImpact)
     }
 }
 
-impl<'a> gmsol_model::PositionImpactMarket<{ constants::MARKET_DECIMALS }>
-    for RevertibleMarket<'a>
+impl<'a, 'info> gmsol_model::PositionImpactMarket<{ constants::MARKET_DECIMALS }>
+    for RevertibleMarket<'a, 'info>
 {
     fn position_impact_pool(&self) -> gmsol_model::Result<&Self::Pool> {
         self.pool(PoolKind::PositionImpact)
@@ -375,8 +387,8 @@ impl<'a> gmsol_model::PositionImpactMarket<{ constants::MARKET_DECIMALS }>
     }
 }
 
-impl<'a> gmsol_model::PositionImpactMarketMut<{ constants::MARKET_DECIMALS }>
-    for RevertibleMarket<'a>
+impl<'a, 'info> gmsol_model::PositionImpactMarketMut<{ constants::MARKET_DECIMALS }>
+    for RevertibleMarket<'a, 'info>
 {
     fn position_impact_pool_mut(&mut self) -> gmsol_model::Result<&mut Self::Pool> {
         self.pool_mut(PoolKind::PositionImpact)
@@ -389,7 +401,9 @@ impl<'a> gmsol_model::PositionImpactMarketMut<{ constants::MARKET_DECIMALS }>
     }
 }
 
-impl<'a> gmsol_model::BorrowingFeeMarket<{ constants::MARKET_DECIMALS }> for RevertibleMarket<'a> {
+impl<'a, 'info> gmsol_model::BorrowingFeeMarket<{ constants::MARKET_DECIMALS }>
+    for RevertibleMarket<'a, 'info>
+{
     fn borrowing_factor_pool(&self) -> gmsol_model::Result<&Self::Pool> {
         self.pool(PoolKind::BorrowingFactor)
     }
@@ -413,7 +427,9 @@ impl<'a> gmsol_model::BorrowingFeeMarket<{ constants::MARKET_DECIMALS }> for Rev
     }
 }
 
-impl<'a> gmsol_model::PerpMarket<{ constants::MARKET_DECIMALS }> for RevertibleMarket<'a> {
+impl<'a, 'info> gmsol_model::PerpMarket<{ constants::MARKET_DECIMALS }>
+    for RevertibleMarket<'a, 'info>
+{
     fn funding_factor_per_second(&self) -> &Self::Signed {
         &self.other().funding_factor_per_second
     }
@@ -469,7 +485,9 @@ impl<'a> gmsol_model::PerpMarket<{ constants::MARKET_DECIMALS }> for RevertibleM
     }
 }
 
-impl<'a> gmsol_model::PerpMarketMut<{ constants::MARKET_DECIMALS }> for RevertibleMarket<'a> {
+impl<'a, 'info> gmsol_model::PerpMarketMut<{ constants::MARKET_DECIMALS }>
+    for RevertibleMarket<'a, 'info>
+{
     fn just_passed_in_seconds_for_borrowing(&mut self) -> gmsol_model::Result<u64> {
         AsClockMut::from(&mut self.clocks_mut().borrowing).just_passed_in_seconds()
     }

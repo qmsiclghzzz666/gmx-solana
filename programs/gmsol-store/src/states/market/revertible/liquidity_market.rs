@@ -12,7 +12,7 @@ use super::{market::RevertibleMarket, Revertible};
 
 /// Convert a [`RevertibleMarket`] to a [`LiquidityMarketMut`](gmsol_model::LiquidityMarketMut).
 pub struct RevertibleLiquidityMarket<'a, 'info> {
-    base: RevertibleMarket<'a>,
+    base: RevertibleMarket<'a, 'info>,
     token_program: &'a AccountInfo<'info>,
     store: &'a AccountLoader<'info, Store>,
     market_token: &'a Account<'info, Mint>,
@@ -24,7 +24,7 @@ pub struct RevertibleLiquidityMarket<'a, 'info> {
 
 impl<'a, 'info> RevertibleLiquidityMarket<'a, 'info> {
     pub(crate) fn from_revertible_market(
-        market: RevertibleMarket<'a>,
+        market: RevertibleMarket<'a, 'info>,
         market_token: &'a Account<'info, Mint>,
         token_program: &'a AccountInfo<'info>,
         store: &'a AccountLoader<'info, Store>,
@@ -59,7 +59,7 @@ impl<'a, 'info> RevertibleLiquidityMarket<'a, 'info> {
         )
     }
 
-    pub(crate) fn base_mut(&mut self) -> &mut RevertibleMarket<'a> {
+    pub(crate) fn base_mut(&mut self) -> &mut RevertibleMarket<'a, 'info> {
         &mut self.base
     }
 }
@@ -95,7 +95,7 @@ impl<'a, 'info> Revertible for RevertibleLiquidityMarket<'a, 'info> {
 }
 
 impl<'a, 'info> gmsol_model::Bank<Pubkey> for RevertibleLiquidityMarket<'a, 'info> {
-    type Num = <RevertibleMarket<'a> as gmsol_model::Bank<Pubkey>>::Num;
+    type Num = <RevertibleMarket<'a, 'info> as gmsol_model::Bank<Pubkey>>::Num;
 
     fn record_transferred_in_by_token<Q: std::borrow::Borrow<Pubkey> + ?Sized>(
         &mut self,
@@ -124,14 +124,17 @@ impl<'a, 'info> gmsol_model::Bank<Pubkey> for RevertibleLiquidityMarket<'a, 'inf
 impl<'a, 'info> gmsol_model::BaseMarket<{ constants::MARKET_DECIMALS }>
     for RevertibleLiquidityMarket<'a, 'info>
 {
-    type Num =
-        <RevertibleMarket<'a> as gmsol_model::BaseMarket<{ constants::MARKET_DECIMALS }>>::Num;
+    type Num = <RevertibleMarket<'a, 'info> as gmsol_model::BaseMarket<
+        { constants::MARKET_DECIMALS },
+    >>::Num;
 
-    type Signed =
-        <RevertibleMarket<'a> as gmsol_model::BaseMarket<{ constants::MARKET_DECIMALS }>>::Signed;
+    type Signed = <RevertibleMarket<'a, 'info> as gmsol_model::BaseMarket<
+        { constants::MARKET_DECIMALS },
+    >>::Signed;
 
-    type Pool =
-        <RevertibleMarket<'a> as gmsol_model::BaseMarket<{ constants::MARKET_DECIMALS }>>::Pool;
+    type Pool = <RevertibleMarket<'a, 'info> as gmsol_model::BaseMarket<
+        { constants::MARKET_DECIMALS },
+    >>::Pool;
 
     fn liquidity_pool(&self) -> gmsol_model::Result<&Self::Pool> {
         self.base.liquidity_pool()

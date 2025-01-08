@@ -426,6 +426,7 @@ gmsol_utils::flags!(MarketFlag, MAX_FLAGS, u8);
 /// Market State.
 #[zero_copy]
 #[cfg_attr(feature = "debug", derive(Debug))]
+#[derive(BorshSerialize, BorshDeserialize, InitSpace)]
 pub struct OtherState {
     padding: [u8; 16],
     rev: u64,
@@ -560,6 +561,7 @@ impl HasMarketMeta for MarketMeta {
 /// Market clocks.
 #[zero_copy]
 #[cfg_attr(feature = "debug", derive(Debug))]
+#[derive(BorshSerialize, BorshDeserialize, InitSpace)]
 pub struct Clocks {
     padding: [u8; 8],
     rev: u64,

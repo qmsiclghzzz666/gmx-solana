@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use borsh::{BorshDeserialize, BorshSerialize};
 use gmsol_model::PoolKind;
 
 /// A pool storage for market.
@@ -32,6 +33,7 @@ impl PoolStorage {
 #[zero_copy]
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(BorshSerialize, BorshDeserialize, InitSpace)]
 pub struct Pool {
     /// Whether the pool only contains one kind of token,
     /// i.e. a pure pool.
