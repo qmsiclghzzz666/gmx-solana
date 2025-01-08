@@ -7,6 +7,7 @@ use gmsol_utils::InitSpace;
 
 use crate::{
     constants,
+    events::EventEmitter,
     ops::{
         execution_fee::PayExecutionFeeOperation,
         glv::ExecuteGlvShiftOperation,
@@ -14,7 +15,7 @@ use crate::{
     },
     ordered_tokens,
     states::{
-        common::action::{Action, ActionExt, EventEmitter},
+        common::action::{Action, ActionExt},
         glv::GlvShift,
         Chainlink, Glv, Market, NonceBytes, Oracle, RoleKey, Seed, Store, StoreWalletSigner,
         TokenMapHeader,

@@ -6,8 +6,9 @@ use gmsol_utils::InitSpace;
 use typed_builder::TypedBuilder;
 
 use crate::{
+    events::EventEmitter,
     states::{
-        common::action::{Action, ActionExt, ActionParams, EventEmitter},
+        common::action::{Action, ActionExt, ActionParams},
         market::revertible::Revertible,
         Market, NonceBytes, Oracle, Shift, Store, ValidateOracleTime,
     },

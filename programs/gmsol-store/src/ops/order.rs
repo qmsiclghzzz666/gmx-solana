@@ -10,9 +10,9 @@ use gmsol_model::{
 use typed_builder::TypedBuilder;
 
 use crate::{
-    events::{MarketStateUpdated, PositionDecreased, PositionIncreased, TradeData},
+    events::{EventEmitter, MarketStateUpdated, PositionDecreased, PositionIncreased, TradeData},
     states::{
-        common::action::{Action, ActionExt, ActionParams, EventEmitter},
+        common::action::{Action, ActionExt, ActionParams},
         market::{
             revertible::{
                 market::RevertibleMarket,

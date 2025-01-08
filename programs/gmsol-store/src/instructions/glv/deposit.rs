@@ -9,13 +9,14 @@ use gmsol_utils::InitSpace;
 
 use crate::{
     constants,
+    events::EventEmitter,
     ops::{
         execution_fee::PayExecutionFeeOperation,
         glv::{CreateGlvDepositOperation, CreateGlvDepositParams, ExecuteGlvDepositOperation},
         market::{MarketTransferInOperation, MarketTransferOutOperation},
     },
     states::{
-        common::action::{Action, ActionExt, ActionSigner, EventEmitter},
+        common::action::{Action, ActionExt, ActionSigner},
         glv::SplitAccountsForGlv,
         Chainlink, Glv, GlvDeposit, Market, NonceBytes, Oracle, RoleKey, Seed, Store,
         StoreWalletSigner, TokenMapHeader, TokenMapLoader,

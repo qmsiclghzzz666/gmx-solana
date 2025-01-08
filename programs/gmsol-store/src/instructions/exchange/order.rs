@@ -10,14 +10,14 @@ use gmsol_utils::InitSpace;
 
 use crate::{
     constants,
-    events::{GtUpdated, OrderCreated},
+    events::{EventEmitter, GtUpdated, OrderCreated},
     ops::{
         execution_fee::TransferExecutionFeeOperation,
         order::{CreateOrderOperation, CreateOrderParams},
     },
     order::internal::Close,
     states::{
-        common::action::{Action, EventEmitter},
+        common::action::Action,
         feature::ActionDisabledFlag,
         order::{Order, OrderKind},
         position::PositionKind,

@@ -7,9 +7,9 @@ use gmsol_model::{
 use typed_builder::TypedBuilder;
 
 use crate::{
-    events::{DepositExecuted, MarketStateUpdated, WithdrawalExecuted},
+    events::{DepositExecuted, EventEmitter, MarketStateUpdated, WithdrawalExecuted},
     states::{
-        common::{action::EventEmitter, swap::SwapParams},
+        common::swap::SwapParams,
         deposit::DepositParams,
         market::{
             revertible::{

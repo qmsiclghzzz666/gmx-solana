@@ -6,10 +6,10 @@ use anchor_spl::{
 use gmsol_utils::InitSpace;
 
 use crate::{
-    events::DepositCreated,
+    events::{DepositCreated, EventEmitter},
     ops::deposit::{CreateDepositOperation, CreateDepositParams},
     states::{
-        common::action::{Action, ActionExt, EventEmitter},
+        common::action::{Action, ActionExt},
         Deposit, Market, NonceBytes, RoleKey, Seed, Store, StoreWalletSigner,
     },
     utils::{

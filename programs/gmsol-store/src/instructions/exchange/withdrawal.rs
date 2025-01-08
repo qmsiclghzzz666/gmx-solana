@@ -6,10 +6,10 @@ use anchor_spl::{
 use gmsol_utils::InitSpace;
 
 use crate::{
-    events::WithdrawalCreated,
+    events::{EventEmitter, WithdrawalCreated},
     ops::withdrawal::{CreateWithdrawalOperation, CreateWithdrawalParams},
     states::{
-        common::action::{Action, ActionExt, EventEmitter},
+        common::action::{Action, ActionExt},
         withdrawal::Withdrawal,
         Market, NonceBytes, RoleKey, Seed, Store, StoreWalletSigner,
     },

@@ -2,9 +2,8 @@ use anchor_lang::prelude::*;
 use gmsol_utils::InitSpace;
 
 use crate::{
-    events::GtUpdated,
+    events::{EventEmitter, GtUpdated},
     states::{
-        common::action::EventEmitter,
         gt::{GtExchange, GtExchangeVault},
         user::UserHeader,
         Seed, Store,

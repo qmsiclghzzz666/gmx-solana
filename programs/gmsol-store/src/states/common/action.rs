@@ -2,7 +2,7 @@ use anchor_lang::{prelude::*, ZeroCopy};
 use gmsol_utils::InitSpace;
 
 use crate::{
-    constants,
+    events::Event,
     states::{NonceBytes, Seed},
     CoreError,
 };
@@ -354,81 +354,10 @@ pub trait ActionParams {
     fn execution_lamports(&self) -> u64;
 }
 
-/// Event Emitter.
-#[derive(Clone, Copy)]
-pub struct EventEmitter<'a, 'info> {
-    event_authority: &'a AccountInfo<'info>,
-    bump: u8,
-}
-
-impl<'a, 'info> EventEmitter<'a, 'info> {
-    /// Create an event emitter from event authority and bump.
-    pub fn new(event_authority: &'a AccountInfo<'info>, bump: u8) -> Self {
-        Self {
-            event_authority,
-            bump,
-        }
-    }
-}
-
-impl<'a, 'info> From<(&'a AccountInfo<'info>, u8)> for EventEmitter<'a, 'info> {
-    fn from((event_authority, bump): (&'a AccountInfo<'info>, u8)) -> Self {
-        Self::new(event_authority, bump)
-    }
-}
-
-impl<'a, 'info> EventEmitter<'a, 'info> {
-    /// Emit event through CPI with the given space.
-    pub fn emit_cpi_with_space<E>(&self, event: &E, space: usize) -> Result<()>
-    where
-        E: ActionEvent,
-    {
-        event.emit_cpi_with_space(self.event_authority.clone(), self.bump, space)
-    }
-
-    /// Emit event through CPI.
-    pub fn emit_cpi<E>(&self, event: &E) -> Result<()>
-    where
-        E: InitSpace + ActionEvent,
-    {
-        self.emit_cpi_with_space(event, E::INIT_SPACE)
-    }
-}
-
-/// Action Event.
-pub trait ActionEvent: borsh::BorshSerialize + anchor_lang::Discriminator {
-    /// Emit this event through CPI. This is a manual implementation of `emit_cpi!`.
-    fn emit_cpi_with_space(
-        &self,
-        event_authority: AccountInfo,
-        event_authority_bump: u8,
-        space: usize,
-    ) -> Result<()> {
-        use anchor_lang::solana_program::instruction::Instruction;
-
-        let disc = anchor_lang::event::EVENT_IX_TAG_LE;
-        let mut ix_data = Vec::with_capacity(16 + space);
-        ix_data.extend_from_slice(&disc);
-        ix_data.extend_from_slice(&Self::DISCRIMINATOR);
-        self.serialize(&mut ix_data)?;
-        let ix = Instruction {
-            program_id: crate::ID,
-            accounts: vec![AccountMeta::new_readonly(*event_authority.key, true)],
-            data: ix_data,
-        };
-        anchor_lang::solana_program::program::invoke_signed(
-            &ix,
-            &[event_authority],
-            &[&[constants::EVENT_AUTHORITY_SEED, &[event_authority_bump]]],
-        )?;
-        Ok(())
-    }
-}
-
 /// Closable Action.
 pub trait Closable {
     /// Closed Event.
-    type ClosedEvent: ActionEvent + InitSpace;
+    type ClosedEvent: Event + InitSpace;
 
     /// To closed event.
     fn to_closed_event(&self, address: &Pubkey, reason: &str) -> Result<Self::ClosedEvent>;

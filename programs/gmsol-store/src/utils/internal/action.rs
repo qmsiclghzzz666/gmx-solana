@@ -1,8 +1,9 @@
 use anchor_lang::{prelude::*, ZeroCopy};
 
 use crate::{
+    events::EventEmitter,
     states::{
-        common::action::{Action, ActionParams, Closable, EventEmitter},
+        common::action::{Action, ActionParams, Closable},
         NonceBytes, StoreWalletSigner,
     },
     CoreError,

@@ -5,8 +5,8 @@ use gmsol_model::{action::decrease_position::DecreasePositionSwapType, num::Unsi
 
 use crate::{
     constants,
-    events::{SwapExecuted, TradeData},
-    states::{common::action::EventEmitter, position::PositionState, HasMarketMeta, Position},
+    events::{EventEmitter, SwapExecuted, TradeData},
+    states::{position::PositionState, HasMarketMeta, Position},
     CoreError,
 };
 

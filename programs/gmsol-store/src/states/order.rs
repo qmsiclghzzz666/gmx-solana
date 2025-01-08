@@ -7,13 +7,13 @@ use gmsol_model::{
 use gmsol_utils::InitSpace as _;
 
 use crate::{
-    events::{GtUpdated, OrderRemoved},
+    events::{EventEmitter, GtUpdated, OrderRemoved},
     CoreError,
 };
 
 use super::{
     common::{
-        action::{Action, ActionHeader, ActionSigner, Closable, EventEmitter},
+        action::{Action, ActionHeader, ActionSigner, Closable},
         swap::SwapParams,
         token::TokenAndAccount,
     },

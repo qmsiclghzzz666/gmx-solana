@@ -5,7 +5,7 @@ use anchor_spl::token::{Mint, Token, TokenAccount};
 
 use crate::{
     constants,
-    events::{TradeData, TradeEventRef},
+    events::{EventEmitter, TradeData, TradeEventRef},
     ops::{
         execution_fee::PayExecutionFeeOperation,
         market::{MarketTransferInOperation, MarketTransferOutOperation},
@@ -15,7 +15,7 @@ use crate::{
         },
     },
     states::{
-        common::action::{ActionExt, ActionSigner, EventEmitter},
+        common::action::{ActionExt, ActionSigner},
         feature::ActionDisabledFlag,
         order::{Order, TransferOut},
         position::Position,

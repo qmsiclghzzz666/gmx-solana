@@ -6,9 +6,10 @@ use anchor_spl::{
 use gmsol_utils::InitSpace;
 
 use crate::{
+    events::EventEmitter,
     ops::shift::{CreateShiftOperation, CreateShiftParams},
     states::{
-        common::action::{Action, ActionExt, EventEmitter},
+        common::action::{Action, ActionExt},
         Market, NonceBytes, RoleKey, Seed, Shift, Store, StoreWalletSigner,
     },
     utils::{internal, token::is_associated_token_account},

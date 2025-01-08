@@ -4,11 +4,10 @@ use indexmap::{map::Entry, IndexMap};
 
 use crate::{
     constants,
-    events::SwapExecuted,
+    events::{EventEmitter, SwapExecuted},
     states::{
-        common::{action::EventEmitter, swap::SwapParams},
-        market::utils::ValidateMarketBalances,
-        HasMarketMeta, Market, Oracle,
+        common::swap::SwapParams, market::utils::ValidateMarketBalances, HasMarketMeta, Market,
+        Oracle,
     },
     CoreError, ModelError,
 };
@@ -23,7 +22,7 @@ pub struct SwapMarkets<'a, 'info> {
 
 impl<'a, 'info> SwapMarkets<'a, 'info> {
     /// Create a new [`SwapMarkets`] from loders.
-    pub fn new(
+    pub(crate) fn new(
         store: &Pubkey,
         loaders: &'a [AccountLoader<'info, Market>],
         current_market_token: Option<&Pubkey>,

@@ -3,9 +3,10 @@ use anchor_spl::token::{Mint, TokenAccount};
 use typed_builder::TypedBuilder;
 
 use crate::{
+    events::EventEmitter,
     ops::market::RevertibleLiquidityMarketOperation,
     states::{
-        common::action::{Action, ActionExt, ActionParams, EventEmitter},
+        common::action::{Action, ActionExt, ActionParams},
         market::revertible::Revertible,
         Deposit, Market, NonceBytes, Oracle, Store, ValidateOracleTime,
     },

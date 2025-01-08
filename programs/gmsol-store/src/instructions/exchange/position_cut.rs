@@ -9,14 +9,14 @@ use gmsol_utils::InitSpace;
 
 use crate::{
     check_delegation, constants,
-    events::{TradeData, TradeEventRef},
+    events::{EventEmitter, TradeData, TradeEventRef},
     get_pnl_token,
     ops::{
         execution_fee::PayExecutionFeeOperation,
         order::{PositionCutKind, PositionCutOperation},
     },
     states::{
-        common::action::{ActionExt, EventEmitter},
+        common::action::ActionExt,
         feature::{ActionDisabledFlag, DomainDisabledFlag},
         order::Order,
         user::UserHeader,

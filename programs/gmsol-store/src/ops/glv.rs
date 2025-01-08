@@ -10,8 +10,9 @@ use typed_builder::TypedBuilder;
 
 use crate::{
     constants,
+    events::EventEmitter,
     states::{
-        common::action::{Action, ActionExt, ActionParams, ActionSigner, EventEmitter},
+        common::action::{Action, ActionExt, ActionParams, ActionSigner},
         glv::{GlvShift, GlvWithdrawal},
         market::revertible::Revertible,
         withdrawal::WithdrawalParams,
