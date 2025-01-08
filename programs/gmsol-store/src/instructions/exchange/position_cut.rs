@@ -9,14 +9,14 @@ use gmsol_utils::InitSpace;
 
 use crate::{
     check_delegation, constants,
-    events::{Trade, TradeData},
+    events::{TradeData, TradeEventRef},
     get_pnl_token,
     ops::{
         execution_fee::PayExecutionFeeOperation,
         order::{PositionCutKind, PositionCutOperation},
     },
     states::{
-        common::action::{ActionEvent, ActionExt},
+        common::action::{ActionExt, EventEmitter},
         feature::{ActionDisabledFlag, DomainDisabledFlag},
         order::Order,
         user::UserHeader,
@@ -257,6 +257,8 @@ pub(crate) fn unchecked_process_position_cut<'info>(
 
     let refund = Order::position_cut_rent()?;
 
+    let event_emitter = EventEmitter::new(&accounts.event_authority, ctx.bumps.event_authority);
+
     let ops = PositionCutOperation::builder()
         .kind(kind)
         .position(&accounts.position)
@@ -295,7 +297,7 @@ pub(crate) fn unchecked_process_position_cut<'info>(
         .executor(accounts.authority.to_account_info())
         .refund(refund)
         .should_unwrap_native_token(should_unwrap_native_token)
-        .event_emitter((&accounts.event_authority, ctx.bumps.event_authority));
+        .event_emitter(event_emitter);
 
     let should_send_trade_event = accounts.oracle.load_mut()?.with_prices(
         &accounts.store,
@@ -309,8 +311,8 @@ pub(crate) fn unchecked_process_position_cut<'info>(
     if should_send_trade_event {
         let event_loader = accounts.event.clone();
         let event = event_loader.load()?;
-        let event = Trade::from(&*event);
-        event.emit_cpi(accounts.event_authority.clone(), ctx.bumps.event_authority)?;
+        let event = TradeEventRef::from(&*event);
+        event_emitter.emit_cpi(&event)?;
     }
 
     accounts.pay_execution_fee(execution_fee)?;

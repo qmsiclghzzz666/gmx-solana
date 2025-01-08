@@ -973,7 +973,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         &self,
         address: &Pubkey,
         commitment: Option<CommitmentConfig>,
-    ) -> crate::Result<Option<crate::types::Trade>> {
+    ) -> crate::Result<Option<crate::types::TradeEvent>> {
         let slot = self.get_slot(None).await?;
         self.complete_order_with_config(
             address,
@@ -1016,7 +1016,7 @@ impl<C: Clone + Deref<Target = impl Signer>> Client<C> {
         mut slot: u64,
         polling: std::time::Duration,
         commitment: Option<CommitmentConfig>,
-    ) -> crate::Result<Option<crate::types::Trade>> {
+    ) -> crate::Result<Option<crate::types::TradeEvent>> {
         use crate::store::events::StoreCPIEvent;
         use futures_util::{StreamExt, TryStreamExt};
         use solana_account_decoder::UiAccountEncoding;

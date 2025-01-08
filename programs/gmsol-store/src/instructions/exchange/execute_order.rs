@@ -5,7 +5,7 @@ use anchor_spl::token::{Mint, Token, TokenAccount};
 
 use crate::{
     constants,
-    events::{Trade, TradeData},
+    events::{TradeData, TradeEventRef},
     ops::{
         execution_fee::PayExecutionFeeOperation,
         market::{MarketTransferInOperation, MarketTransferOutOperation},
@@ -15,7 +15,7 @@ use crate::{
         },
     },
     states::{
-        common::action::{ActionEvent, ActionExt, ActionSigner},
+        common::action::{ActionExt, ActionSigner, EventEmitter},
         feature::ActionDisabledFlag,
         order::{Order, TransferOut},
         position::Position,
@@ -315,11 +315,11 @@ pub(crate) fn unchecked_execute_increase_or_swap_order<'info>(
 
     accounts.transfer_tokens_in(&signer, remaining_accounts)?;
 
-    let (is_position_removed, transfer_out, should_send_trade_event) = accounts.perform_execution(
-        remaining_accounts,
-        throw_on_execution_error,
-        ctx.bumps.event_authority,
-    )?;
+    let event_authority = accounts.event_authority.clone();
+    let event_emitter = EventEmitter::new(&event_authority, ctx.bumps.event_authority);
+
+    let (is_position_removed, transfer_out, should_send_trade_event) =
+        accounts.perform_execution(remaining_accounts, throw_on_execution_error, &event_emitter)?;
 
     if transfer_out.executed() {
         accounts.order.load_mut()?.header.completed()?;
@@ -335,8 +335,8 @@ pub(crate) fn unchecked_execute_increase_or_swap_order<'info>(
             .as_ref()
             .ok_or_else(|| error!(CoreError::PositionIsRequired))?
             .load()?;
-        let event = Trade::from(&*event);
-        event.emit_cpi(accounts.event_authority.clone(), ctx.bumps.event_authority)?;
+        let event = TradeEventRef::from(&*event);
+        event_emitter.emit_cpi(&event)?;
     }
 
     if is_position_removed {
@@ -433,7 +433,7 @@ impl<'info> ExecuteIncreaseOrSwapOrder<'info> {
         &mut self,
         remaining_accounts: &'info [AccountInfo<'info>],
         throw_on_execution_error: bool,
-        event_authority_bump: u8,
+        event_emitter: &EventEmitter<'_, 'info>,
     ) -> Result<(RemovePosition, Box<TransferOut>, ShouldSendTradeEvent)> {
         // FIXME: We only need the tokens here, the feeds are not necessary.
         let feeds = self
@@ -451,7 +451,7 @@ impl<'info> ExecuteIncreaseOrSwapOrder<'info> {
             .event(self.event.as_ref())
             .throw_on_execution_error(throw_on_execution_error)
             .executor(self.authority.to_account_info())
-            .event_emitter((&self.event_authority, event_authority_bump));
+            .event_emitter(*event_emitter);
 
         self.oracle.load_mut()?.with_prices(
             &self.store,
@@ -738,11 +738,10 @@ pub(crate) fn unchecked_execute_decrease_order<'info>(
         .load()?
         .validate_feature_enabled(kind.try_into()?, ActionDisabledFlag::ExecuteOrder)?;
 
-    let (is_position_removed, transfer_out, should_send_trade_event) = accounts.perform_execution(
-        remaining_accounts,
-        throw_on_execution_error,
-        ctx.bumps.event_authority,
-    )?;
+    let event_authority = accounts.event_authority.clone();
+    let event_emitter = EventEmitter::new(&event_authority, ctx.bumps.event_authority);
+    let (is_position_removed, transfer_out, should_send_trade_event) =
+        accounts.perform_execution(remaining_accounts, throw_on_execution_error, &event_emitter)?;
 
     if transfer_out.executed() {
         accounts.order.load_mut()?.header.completed()?;
@@ -754,8 +753,8 @@ pub(crate) fn unchecked_execute_decrease_order<'info>(
     if should_send_trade_event {
         let event_loader = accounts.event.clone();
         let event = event_loader.load()?;
-        let event = Trade::from(&*event);
-        event.emit_cpi(accounts.event_authority.clone(), ctx.bumps.event_authority)?;
+        let event = TradeEventRef::from(&*event);
+        event_emitter.emit_cpi(&event)?;
     }
 
     if is_position_removed {
@@ -784,7 +783,7 @@ impl<'info> ExecuteDecreaseOrder<'info> {
         &mut self,
         remaining_accounts: &'info [AccountInfo<'info>],
         throw_on_execution_error: bool,
-        event_authority_bump: u8,
+        event_emitter: &EventEmitter<'_, 'info>,
     ) -> Result<(RemovePosition, Box<TransferOut>, ShouldSendTradeEvent)> {
         // FIXME: We only need the tokens here, the feeds are not necessary.
         let feeds = self
@@ -802,7 +801,7 @@ impl<'info> ExecuteDecreaseOrder<'info> {
             .event(Some(&self.event))
             .throw_on_execution_error(throw_on_execution_error)
             .executor(self.authority.to_account_info())
-            .event_emitter((&self.event_authority, event_authority_bump));
+            .event_emitter(*event_emitter);
 
         self.oracle.load_mut()?.with_prices(
             &self.store,

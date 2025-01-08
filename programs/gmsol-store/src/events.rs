@@ -1,4 +1,4 @@
-use std::{borrow::Cow, ops::Deref};
+use std::ops::Deref;
 
 use anchor_lang::prelude::*;
 use borsh::{BorshDeserialize, BorshSerialize};
@@ -533,48 +533,115 @@ impl InitSpace for GlvWithdrawalRemoved {
 
 impl ActionEvent for GlvWithdrawalRemoved {}
 
-/// A trade.
+/// Trade event.
+#[event]
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Clone, BorshSerialize, BorshDeserialize)]
-pub struct Trade<'a>(Cow<'a, TradeData>);
+pub struct TradeEvent(TradeData);
 
-/// Only used to generate the discriminator for [`Trade`].
-/// Please refer to [`TradeData`] for the actual structure definition.
-#[event]
-struct TradeEvent;
+impl Deref for TradeEvent {
+    type Target = TradeData;
 
-impl<'a> From<&'a TradeData> for Trade<'a> {
-    fn from(value: &'a TradeData) -> Self {
-        Self(Cow::Borrowed(value))
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 
-impl<'a> anchor_lang::Event for Trade<'a> {
-    fn data(&self) -> Vec<u8> {
-        use anchor_lang::Discriminator;
+#[cfg(feature = "utils")]
+impl TradeEvent {
+    /// Updated at.
+    pub fn updated_at(&self) -> i64 {
+        self.after.increased_at.max(self.after.decreased_at)
+    }
 
-        let mut data = Vec::with_capacity(256);
-        data.extend_from_slice(&TradeEvent::DISCRIMINATOR);
-        // Borsh serialization is used here to align with other events.
-        self.serialize(&mut data).unwrap();
-        data
+    /// Delta size in usd.
+    pub fn delta_size_in_usd(&self) -> u128 {
+        self.after.size_in_usd.abs_diff(self.before.size_in_usd)
+    }
+
+    /// Delta size in tokens.
+    pub fn delta_size_in_tokens(&self) -> u128 {
+        self.after
+            .size_in_tokens
+            .abs_diff(self.before.size_in_tokens)
+    }
+
+    /// Delta collateral amount.
+    pub fn delta_collateral_amount(&self) -> u128 {
+        self.after
+            .collateral_amount
+            .abs_diff(self.before.collateral_amount)
+    }
+
+    /// Delta borrowing factor.
+    pub fn delta_borrowing_factor(&self) -> u128 {
+        self.after
+            .borrowing_factor
+            .abs_diff(self.before.borrowing_factor)
+    }
+
+    /// Delta funding fee amount per size.
+    pub fn delta_funding_fee_amount_per_size(&self) -> u128 {
+        self.after
+            .funding_fee_amount_per_size
+            .abs_diff(self.before.funding_fee_amount_per_size)
+    }
+
+    /// Funding fee amount.
+    pub fn funding_fee(&self) -> u128 {
+        self.delta_funding_fee_amount_per_size()
+            .saturating_mul(self.before.size_in_usd)
+    }
+
+    /// Delta claimable amount per size.
+    pub fn delta_claimable_funding_amount_per_size(&self, is_long_token: bool) -> u128 {
+        if is_long_token {
+            self.after
+                .long_token_claimable_funding_amount_per_size
+                .abs_diff(self.before.long_token_claimable_funding_amount_per_size)
+        } else {
+            self.after
+                .short_token_claimable_funding_amount_per_size
+                .abs_diff(self.before.short_token_claimable_funding_amount_per_size)
+        }
+    }
+
+    /// Create position from this event.
+    pub fn to_position(&self, meta: &impl crate::states::HasMarketMeta) -> Position {
+        use crate::states::position::PositionKind;
+
+        let mut position = Position::default();
+
+        let kind = if self.is_long() {
+            PositionKind::Long
+        } else {
+            PositionKind::Short
+        };
+
+        let collateral_token = if self.is_collateral_long() {
+            meta.market_meta().long_token_mint
+        } else {
+            meta.market_meta().short_token_mint
+        };
+
+        // FIXME: should we provide a correct bump here?
+        position
+            .try_init(
+                kind,
+                0,
+                self.store,
+                &self.user,
+                &self.market_token,
+                &collateral_token,
+            )
+            .unwrap();
+        position.state = self.after;
+        position
     }
 }
-
-impl<'a> anchor_lang::Discriminator for Trade<'a> {
-    const DISCRIMINATOR: [u8; 8] = TradeEvent::DISCRIMINATOR;
-}
-
-impl<'a> InitSpace for Trade<'a> {
-    // The borsh init space of `TradeData` is used here.
-    const INIT_SPACE: usize = <TradeData as anchor_lang::Space>::INIT_SPACE;
-}
-
-impl<'a> ActionEvent for Trade<'a> {}
 
 #[cfg(feature = "display")]
-impl<'a> std::fmt::Display for Trade<'a> {
+impl std::fmt::Display for TradeEvent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("TradeEvent")
             .field("trade_id", &self.trade_id)
@@ -606,6 +673,27 @@ impl<'a> std::fmt::Display for Trade<'a> {
             .finish_non_exhaustive()
     }
 }
+
+/// This is a cheaper variant of [`TradeEvent`], sharing the same format.
+#[derive(Clone, BorshSerialize)]
+pub(crate) struct TradeEventRef<'a>(&'a TradeData);
+
+impl<'a> From<&'a TradeData> for TradeEventRef<'a> {
+    fn from(value: &'a TradeData) -> Self {
+        Self(value)
+    }
+}
+
+impl<'a> anchor_lang::Discriminator for TradeEventRef<'a> {
+    const DISCRIMINATOR: [u8; 8] = TradeEvent::DISCRIMINATOR;
+}
+
+impl<'a> InitSpace for TradeEventRef<'a> {
+    // The borsh init space of `TradeData` is used here.
+    const INIT_SPACE: usize = <TradeData as anchor_lang::Space>::INIT_SPACE;
+}
+
+impl<'a> ActionEvent for TradeEventRef<'a> {}
 
 #[allow(clippy::enum_variant_names)]
 #[derive(num_enum::IntoPrimitive)]
@@ -988,108 +1076,6 @@ impl TradeData {
         self.output_amounts.secondary_output_amount =
             *report.output_amounts().secondary_output_amount();
         Ok(())
-    }
-}
-
-impl<'a> Deref for Trade<'a> {
-    type Target = TradeData;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-#[cfg(feature = "utils")]
-impl<'a> Trade<'a> {
-    /// Updated at.
-    pub fn updated_at(&self) -> i64 {
-        self.after.increased_at.max(self.after.decreased_at)
-    }
-
-    /// Delta size in usd.
-    pub fn delta_size_in_usd(&self) -> u128 {
-        self.after.size_in_usd.abs_diff(self.before.size_in_usd)
-    }
-
-    /// Delta size in tokens.
-    pub fn delta_size_in_tokens(&self) -> u128 {
-        self.after
-            .size_in_tokens
-            .abs_diff(self.before.size_in_tokens)
-    }
-
-    /// Delta collateral amount.
-    pub fn delta_collateral_amount(&self) -> u128 {
-        self.after
-            .collateral_amount
-            .abs_diff(self.before.collateral_amount)
-    }
-
-    /// Delta borrowing factor.
-    pub fn delta_borrowing_factor(&self) -> u128 {
-        self.after
-            .borrowing_factor
-            .abs_diff(self.before.borrowing_factor)
-    }
-
-    /// Delta funding fee amount per size.
-    pub fn delta_funding_fee_amount_per_size(&self) -> u128 {
-        self.after
-            .funding_fee_amount_per_size
-            .abs_diff(self.before.funding_fee_amount_per_size)
-    }
-
-    /// Funding fee amount.
-    pub fn funding_fee(&self) -> u128 {
-        self.delta_funding_fee_amount_per_size()
-            .saturating_mul(self.before.size_in_usd)
-    }
-
-    /// Delta claimable amount per size.
-    pub fn delta_claimable_funding_amount_per_size(&self, is_long_token: bool) -> u128 {
-        if is_long_token {
-            self.after
-                .long_token_claimable_funding_amount_per_size
-                .abs_diff(self.before.long_token_claimable_funding_amount_per_size)
-        } else {
-            self.after
-                .short_token_claimable_funding_amount_per_size
-                .abs_diff(self.before.short_token_claimable_funding_amount_per_size)
-        }
-    }
-
-    #[cfg(feature = "utils")]
-    /// Create position from this event.
-    pub fn to_position(&self, meta: &impl crate::states::HasMarketMeta) -> Position {
-        use crate::states::position::PositionKind;
-
-        let mut position = Position::default();
-
-        let kind = if self.is_long() {
-            PositionKind::Long
-        } else {
-            PositionKind::Short
-        };
-
-        let collateral_token = if self.is_collateral_long() {
-            meta.market_meta().long_token_mint
-        } else {
-            meta.market_meta().short_token_mint
-        };
-
-        // FIXME: should we provide a correct bump here?
-        position
-            .try_init(
-                kind,
-                0,
-                self.store,
-                &self.user,
-                &self.market_token,
-                &collateral_token,
-            )
-            .unwrap();
-        position.state = self.after;
-        position
     }
 }
 

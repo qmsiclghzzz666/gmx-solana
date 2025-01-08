@@ -378,20 +378,36 @@ impl<'a, 'info> From<(&'a AccountInfo<'info>, u8)> for EventEmitter<'a, 'info> {
 }
 
 impl<'a, 'info> EventEmitter<'a, 'info> {
+    /// Emit event through CPI with the given space.
+    pub fn emit_cpi_with_space<E>(&self, event: &E, space: usize) -> Result<()>
+    where
+        E: ActionEvent,
+    {
+        event.emit_cpi_with_space(self.event_authority.clone(), self.bump, space)
+    }
+
     /// Emit event through CPI.
-    pub fn emit_cpi(&self, event: &impl ActionEvent) -> Result<()> {
-        event.emit_cpi(self.event_authority.clone(), self.bump)
+    pub fn emit_cpi<E>(&self, event: &E) -> Result<()>
+    where
+        E: InitSpace + ActionEvent,
+    {
+        self.emit_cpi_with_space(event, E::INIT_SPACE)
     }
 }
 
 /// Action Event.
-pub trait ActionEvent: InitSpace + anchor_lang::Event {
+pub trait ActionEvent: borsh::BorshSerialize + anchor_lang::Discriminator {
     /// Emit this event through CPI. This is a manual implementation of `emit_cpi!`.
-    fn emit_cpi(&self, event_authority: AccountInfo, event_authority_bump: u8) -> Result<()> {
+    fn emit_cpi_with_space(
+        &self,
+        event_authority: AccountInfo,
+        event_authority_bump: u8,
+        space: usize,
+    ) -> Result<()> {
         use anchor_lang::solana_program::instruction::Instruction;
 
         let disc = anchor_lang::event::EVENT_IX_TAG_LE;
-        let mut ix_data = Vec::with_capacity(16 + Self::INIT_SPACE);
+        let mut ix_data = Vec::with_capacity(16 + space);
         ix_data.extend_from_slice(&disc);
         ix_data.extend_from_slice(&Self::DISCRIMINATOR);
         self.serialize(&mut ix_data)?;
@@ -412,7 +428,7 @@ pub trait ActionEvent: InitSpace + anchor_lang::Event {
 /// Closable Action.
 pub trait Closable {
     /// Closed Event.
-    type ClosedEvent: ActionEvent;
+    type ClosedEvent: ActionEvent + InitSpace;
 
     /// To closed event.
     fn to_closed_event(&self, address: &Pubkey, reason: &str) -> Result<Self::ClosedEvent>;

@@ -1,13 +1,11 @@
 use crate::{
     decode::untagged,
     types::{
-        self, DepositExecuted, DepositRemoved, GlvDepositRemoved, GlvWithdrawalRemoved, GtUpdated,
+        DepositExecuted, DepositRemoved, GlvDepositRemoved, GlvWithdrawalRemoved, GtUpdated,
         MarketStateUpdated, OrderRemoved, PositionDecreased, PositionIncreased, ShiftRemoved,
-        SwapExecuted, WithdrawalExecuted, WithdrawalRemoved,
+        SwapExecuted, TradeEvent, WithdrawalExecuted, WithdrawalRemoved,
     },
 };
-
-type TradeEvent = types::Trade<'static>;
 
 untagged!(
     StoreCPIEvent,
