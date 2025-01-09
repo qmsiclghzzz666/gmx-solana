@@ -4,6 +4,7 @@ use anchor_client::{
     anchor_lang::{prelude::AccountMeta, system_program},
     solana_sdk::{instruction::Instruction, pubkey::Pubkey, signer::Signer},
 };
+use gmsol_store::states::{PriceProviderKind, RoleKey};
 use gmsol_timelock::{
     accounts, instruction, roles,
     states::{Executor, InstructionAccess, InstructionHeader},
@@ -85,6 +86,15 @@ pub trait TimelockOps<C> {
         store: &Pubkey,
         role: &str,
         address: &Pubkey,
+    ) -> RpcBuilder<C>;
+
+    /// Timelock-bypassed set expected price provider.
+    fn timelock_bypassed_set_epxected_price_provider(
+        &self,
+        store: &Pubkey,
+        token_map: &Pubkey,
+        token: &Pubkey,
+        new_expected_price_provider: PriceProviderKind,
     ) -> RpcBuilder<C>;
 }
 
@@ -416,6 +426,33 @@ impl<C: Deref<Target = impl Signer> + Clone> TimelockOps<C> for crate::Client<C>
                 wallet,
                 user: *address,
                 store_program: *self.store_program_id(),
+            })
+    }
+
+    fn timelock_bypassed_set_epxected_price_provider(
+        &self,
+        store: &Pubkey,
+        token_map: &Pubkey,
+        token: &Pubkey,
+        new_expected_price_provider: PriceProviderKind,
+    ) -> RpcBuilder<C> {
+        let executor = self
+            .find_executor_address(store, RoleKey::MARKET_KEEPER)
+            .expect("must success");
+        let wallet = self.find_executor_wallet_address(&executor);
+        self.timelock_rpc()
+            .args(instruction::SetExpectedPriceProvider {
+                new_expected_price_provider: new_expected_price_provider.into(),
+            })
+            .accounts(accounts::SetExpectedPriceProvider {
+                authority: self.payer(),
+                store: *store,
+                executor,
+                wallet,
+                token_map: *token_map,
+                token: *token,
+                store_program: *self.store_program_id(),
+                system_program: system_program::ID,
             })
     }
 }

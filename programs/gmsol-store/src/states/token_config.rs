@@ -207,7 +207,9 @@ impl TokenConfig {
         self.precision = precision;
         self.feeds = feeds
             .into_iter()
-            .map(FeedConfig::new)
+            .map(|(feed, timestamp_adjustment)| {
+                FeedConfig::new(feed).with_timestamp_adjustment(timestamp_adjustment)
+            })
             .collect::<Vec<_>>()
             .try_into()
             .map_err(|_| error!(CoreError::InvalidArgument))?;
@@ -305,7 +307,7 @@ impl FeedConfig {
 pub struct TokenConfigBuilder {
     heartbeat_duration: u32,
     precision: u8,
-    feeds: Vec<Pubkey>,
+    feeds: Vec<(Pubkey, u32)>,
     expected_provider: Option<u8>,
 }
 
@@ -314,8 +316,23 @@ impl Default for TokenConfigBuilder {
         Self {
             heartbeat_duration: DEFAULT_HEARTBEAT_DURATION,
             precision: DEFAULT_PRECISION,
-            feeds: vec![Pubkey::default(); MAX_FEEDS],
+            feeds: vec![(Pubkey::default(), DEFAULT_TIMESTAMP_ADJUSTMENT); MAX_FEEDS],
             expected_provider: None,
+        }
+    }
+}
+
+impl<'a> From<&'a TokenConfig> for TokenConfigBuilder {
+    fn from(config: &'a TokenConfig) -> Self {
+        Self {
+            heartbeat_duration: config.heartbeat_duration(),
+            precision: config.precision(),
+            feeds: config
+                .feeds
+                .iter()
+                .map(|config| (config.feed, config.timestamp_adjustment))
+                .collect(),
+            expected_provider: Some(config.expected_provider),
         }
     }
 }
@@ -323,13 +340,21 @@ impl Default for TokenConfigBuilder {
 impl TokenConfigBuilder {
     /// Update the feed address for the given price provider.
     /// Return error when the feed was not set before.
-    pub fn update_price_feed(mut self, kind: &PriceProviderKind, new_feed: Pubkey) -> Result<Self> {
+    pub fn update_price_feed(
+        mut self,
+        kind: &PriceProviderKind,
+        new_feed: Pubkey,
+        new_timestamp_adjustment: Option<u32>,
+    ) -> Result<Self> {
         let index = *kind as usize;
-        let feed = self
+        let (feed, timestamp_adjustment) = self
             .feeds
             .get_mut(index)
             .ok_or_else(|| error!(CoreError::NotFound))?;
         *feed = new_feed;
+        if let Some(new_timestamp_adjustment) = new_timestamp_adjustment {
+            *timestamp_adjustment = new_timestamp_adjustment;
+        }
         Ok(self)
     }
 

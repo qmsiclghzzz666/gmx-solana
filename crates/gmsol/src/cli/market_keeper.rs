@@ -23,7 +23,7 @@ use gmsol::{
     },
     types::{
         market::config::{MarketConfigBuffer, MarketConfigFlag},
-        FactorKey,
+        FactorKey, DEFAULT_TIMESTAMP_ADJUSTMENT,
     },
     utils::TransactionBuilder,
 };
@@ -273,13 +273,27 @@ struct Feeds {
     /// Pyth feed id.
     #[arg(long)]
     pyth_feed_id: Option<String>,
+    /// Pyth feed timestamp adjustment.
+    #[arg(long, default_value_t = DEFAULT_TIMESTAMP_ADJUSTMENT)]
+    #[serde(default = "default_timestamp_adjustment")]
+    pyth_feed_timestamp_adjustment: u32,
     /// Chainlink feed.
     #[arg(long)]
     #[serde_as(as = "Option<serde_with::DisplayFromStr>")]
     chainlink_feed: Option<Pubkey>,
+    #[arg(long, default_value_t = DEFAULT_TIMESTAMP_ADJUSTMENT)]
+    #[serde(default = "default_timestamp_adjustment")]
+    chainlink_feed_timestamp_adjustment: u32,
     /// Chainlink Data Streams feed id.
     #[arg(long)]
     chainlink_data_streams_feed_id: Option<String>,
+    #[arg(long, default_value_t = DEFAULT_TIMESTAMP_ADJUSTMENT)]
+    #[serde(default = "default_timestamp_adjustment")]
+    chainlink_data_streams_feed_timestamp_adjustment: u32,
+}
+
+fn default_timestamp_adjustment() -> u32 {
+    DEFAULT_TIMESTAMP_ADJUSTMENT
 }
 
 impl Feeds {
@@ -456,17 +470,29 @@ impl Args {
                     .with_expected_provider(*expected_provider);
                 if let Some(feed_id) = feeds.pyth_feed_id()? {
                     builder = builder
-                        .update_price_feed(&PriceProviderKind::Pyth, feed_id)
+                        .update_price_feed(
+                            &PriceProviderKind::Pyth,
+                            feed_id,
+                            Some(feeds.pyth_feed_timestamp_adjustment),
+                        )
                         .map_err(anchor_client::ClientError::from)?;
                 }
                 if let Some(feed) = feeds.chainlink_feed {
                     builder = builder
-                        .update_price_feed(&PriceProviderKind::Chainlink, feed)
+                        .update_price_feed(
+                            &PriceProviderKind::Chainlink,
+                            feed,
+                            Some(feeds.chainlink_feed_timestamp_adjustment),
+                        )
                         .map_err(anchor_client::ClientError::from)?;
                 }
                 if let Some(feed_id) = feeds.chainlink_data_streams_feed_id()? {
                     builder = builder
-                        .update_price_feed(&PriceProviderKind::ChainlinkDataStreams, feed_id)
+                        .update_price_feed(
+                            &PriceProviderKind::ChainlinkDataStreams,
+                            feed_id,
+                            Some(feeds.chainlink_data_streams_feed_timestamp_adjustment),
+                        )
                         .map_err(anchor_client::ClientError::from)?;
                 }
                 let token_map = self.token_map(client, store).await?;
@@ -945,14 +971,29 @@ impl<'a> TryFrom<&'a TokenConfig> for TokenConfigBuilder {
             .with_heartbeat_duration(config.heartbeat_duration)
             .with_precision(config.precision);
         if let Some(pyth_feed_id) = config.feeds.pyth_feed_id()? {
-            builder = builder.update_price_feed(&PriceProviderKind::Pyth, pyth_feed_id)?;
+            builder = builder.update_price_feed(
+                &PriceProviderKind::Pyth,
+                pyth_feed_id,
+                Some(config.feeds.pyth_feed_timestamp_adjustment),
+            )?;
         }
         if let Some(chainlink_feed) = config.feeds.chainlink_feed {
-            builder = builder.update_price_feed(&PriceProviderKind::Chainlink, chainlink_feed)?;
+            builder = builder.update_price_feed(
+                &PriceProviderKind::Chainlink,
+                chainlink_feed,
+                Some(config.feeds.chainlink_feed_timestamp_adjustment),
+            )?;
         }
         if let Some(feed_id) = config.feeds.chainlink_data_streams_feed_id()? {
-            builder =
-                builder.update_price_feed(&PriceProviderKind::ChainlinkDataStreams, feed_id)?;
+            builder = builder.update_price_feed(
+                &PriceProviderKind::ChainlinkDataStreams,
+                feed_id,
+                Some(
+                    config
+                        .feeds
+                        .chainlink_data_streams_feed_timestamp_adjustment,
+                ),
+            )?;
         }
         Ok(builder)
     }

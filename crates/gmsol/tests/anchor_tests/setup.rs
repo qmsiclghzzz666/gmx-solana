@@ -620,7 +620,7 @@ impl Deployment {
                     )
                     .map(|(name, token, synthetic)| {
                         let config = TokenConfigBuilder::default()
-                            .update_price_feed(&token.config.provider, token.config.feed_id)?
+                            .update_price_feed(&token.config.provider, token.config.feed_id, None)?
                             .with_expected_provider(token.config.provider)
                             .with_precision(token.config.precision);
                         if synthetic {

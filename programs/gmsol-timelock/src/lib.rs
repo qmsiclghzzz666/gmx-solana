@@ -9,13 +9,14 @@ pub mod roles;
 /// Instructions;
 pub mod instructions;
 
-use gmsol_store::utils::CpiAuthenticate;
+use gmsol_store::{utils::CpiAuthenticate, CoreError};
 use instructions::*;
 
 declare_id!("timeAUGcp4UHrmnW5W6mhJDA7mjpFsVrEePTKd1Ed7P");
 
 #[program]
 pub mod gmsol_timelock {
+
     use super::*;
 
     /// Initialize timelock config.
@@ -90,5 +91,19 @@ pub mod gmsol_timelock {
     #[access_control(CpiAuthenticate::only(&ctx, roles::TIMELOCKED_ADMIN))]
     pub fn revoke_role(ctx: Context<RevokeRole>, role: String) -> Result<()> {
         instructions::unchecked_revoke_role(ctx, role)
+    }
+
+    /// Set expected price provider.
+    #[access_control(CpiAuthenticate::only(&ctx, roles::TIMELOCKED_ADMIN))]
+    pub fn set_expected_price_provider(
+        ctx: Context<SetExpectedPriceProvider>,
+        new_expected_price_provider: u8,
+    ) -> Result<()> {
+        instructions::unchecked_set_expected_price_provider(
+            ctx,
+            new_expected_price_provider
+                .try_into()
+                .map_err(|_| error!(CoreError::InvalidProviderKindIndex))?,
+        )
     }
 }

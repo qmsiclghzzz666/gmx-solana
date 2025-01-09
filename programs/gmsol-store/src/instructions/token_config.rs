@@ -217,12 +217,19 @@ pub(crate) fn unchecked_set_expected_provider(
     token: Pubkey,
     provider: PriceProviderKind,
 ) -> Result<()> {
-    ctx.accounts
-        .token_map
-        .load_token_map_mut()?
+    let mut token_map = ctx.accounts.token_map.load_token_map_mut()?;
+
+    let config = token_map
         .get_mut(&token)
-        .ok_or_else(|| error!(CoreError::NotFound))?
-        .set_expected_provider(provider);
+        .ok_or_else(|| error!(CoreError::NotFound))?;
+
+    require_neq!(
+        config.expected_provider()?,
+        provider,
+        CoreError::PreconditionsAreNotMet
+    );
+
+    config.set_expected_provider(provider);
     Ok(())
 }
 

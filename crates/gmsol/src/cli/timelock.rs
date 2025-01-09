@@ -1,6 +1,6 @@
 use crate::GMSOLClient;
 use anchor_client::solana_sdk::pubkey::Pubkey;
-use gmsol::{timelock::TimelockOps, utils::ZeroCopy};
+use gmsol::{timelock::TimelockOps, types::PriceProviderKind, utils::ZeroCopy};
 use gmsol_timelock::states::{Executor, TimelockConfig};
 
 #[derive(clap::Args)]
@@ -46,6 +46,16 @@ enum Command {
         authority: Pubkey,
         /// Role.
         role: String,
+    },
+    /// Set expected price provider.
+    SetExpectedPriceProvider {
+        /// Token.
+        token: Pubkey,
+        /// New Price Provider.
+        provider: PriceProviderKind,
+        /// Token map.
+        #[arg(long)]
+        token_map: Option<Pubkey>,
     },
 }
 
@@ -147,6 +157,22 @@ impl Args {
             }
             Command::RevokeRole { authority, role } => {
                 client.timelock_bypassed_revoke_role(store, role, authority)
+            }
+            Command::SetExpectedPriceProvider {
+                token,
+                provider,
+                token_map,
+            } => {
+                let token_map = match *token_map {
+                    Some(token_map) => token_map,
+                    None => client
+                        .authorized_token_map_address(store)
+                        .await?
+                        .ok_or(gmsol::Error::NotFound)?,
+                };
+                client.timelock_bypassed_set_epxected_price_provider(
+                    store, &token_map, token, *provider,
+                )
             }
         };
         crate::utils::send_or_serialize_rpc(

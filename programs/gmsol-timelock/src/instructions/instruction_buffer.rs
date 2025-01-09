@@ -111,7 +111,7 @@ fn validate_timelocked_role<'info>(
     ctx: &Context<impl CpiAuthenticate<'info>>,
     role: &str,
 ) -> Result<()> {
-    let timelocked_role = [roles::TIMELOCKED, role].concat();
+    let timelocked_role = roles::timelocked_role(role);
     CpiAuthenticate::only(ctx, &timelocked_role)?;
     msg!(
         "[Timelock] approving `{}` instruction by a `{}`",
