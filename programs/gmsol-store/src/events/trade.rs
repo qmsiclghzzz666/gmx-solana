@@ -21,6 +21,7 @@ use super::Event;
 
 /// Trade event.
 #[event]
+#[derive(Clone)]
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TradeEvent(TradeData);
