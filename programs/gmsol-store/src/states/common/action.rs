@@ -89,8 +89,6 @@ pub struct ActionHeader {
     pub(crate) market: Pubkey,
     /// Owner.
     pub(crate) owner: Pubkey,
-    /// The output funds receiver.
-    pub(crate) receiver: Pubkey,
     /// Nonce bytes.
     pub(crate) nonce: [u8; 32],
     /// Max execution lamports.
@@ -109,7 +107,11 @@ pub struct ActionHeader {
     pub(crate) creator: Pubkey,
     /// Rent receiver.
     rent_receiver: Pubkey,
-    reserved: [u8; 256],
+    /// The output funds receiver.
+    pub(crate) receiver: Pubkey,
+    padding_1: [u8; 32],
+    padding_2: [u8; 64],
+    reserved: [u8; 128],
 }
 
 /// Action Flags.
