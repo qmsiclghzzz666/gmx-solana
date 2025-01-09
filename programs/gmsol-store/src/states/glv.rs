@@ -24,6 +24,8 @@ use super::{
 };
 
 const MAX_ALLOWED_NUMBER_OF_MARKETS: usize = 128;
+/// Max number of flags.
+pub const MAX_FLAGS: usize = 8;
 
 /// Glv.
 #[account(zero_copy)]
@@ -46,12 +48,28 @@ pub struct Glv {
     markets: GlvMarkets,
 }
 
+/// GLV Market Config Flag.
+#[derive(
+    num_enum::IntoPrimitive, Clone, Copy, strum::EnumString, strum::Display, PartialEq, Eq,
+)]
+#[strum(serialize_all = "snake_case")]
+#[cfg_attr(feature = "enum-iter", derive(strum::EnumIter))]
+#[repr(u8)]
+pub enum GlvMarketFlag {
+    /// Is deposit allowed.
+    IsDepositAllowed,
+    // CHECK: cannot have more than `MAX_FLAGS` flags.
+}
+
+gmsol_utils::flags!(GlvMarketFlag, MAX_FLAGS, u8);
+
 /// Market Config for GLV.
 #[zero_copy]
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub struct GlvMarketConfig {
     max_amount: u64,
-    padding: [u8; 8],
+    flags: GlvMarketFlagContainer,
+    padding: [u8; 7],
     max_value: u128,
 }
 
@@ -101,6 +119,17 @@ impl GlvMarketConfig {
         }
 
         Ok(())
+    }
+
+    pub(crate) fn toggle_flag(&mut self, flag: GlvMarketFlag, enable: bool) -> Result<bool> {
+        let current = self.flags.get_flag(flag);
+        require_neq!(current, enable, CoreError::PreconditionsAreNotMet);
+        Ok(self.flags.set_flag(flag, enable))
+    }
+
+    /// Get flag.
+    pub fn get_flag(&self, flag: GlvMarketFlag) -> bool {
+        self.flags.get_flag(flag)
     }
 }
 
@@ -290,6 +319,11 @@ impl Glv {
         self.markets.get(market_token).is_some()
     }
 
+    /// Get [`GlvMarketConfig`] for the given market.
+    pub fn market_config(&self, market_token: &Pubkey) -> Option<&GlvMarketConfig> {
+        self.markets.get(market_token)
+    }
+
     pub(crate) fn update_market_config(
         &mut self,
         market_token: &Pubkey,
@@ -307,6 +341,18 @@ impl Glv {
             config.max_value = value;
         }
         Ok(())
+    }
+
+    pub(crate) fn toggle_market_config_flag(
+        &mut self,
+        market_token: &Pubkey,
+        flag: GlvMarketFlag,
+        enable: bool,
+    ) -> Result<bool> {
+        self.markets
+            .get_mut(market_token)
+            .ok_or_else(|| error!(CoreError::NotFound))?
+            .toggle_flag(flag, enable)
     }
 
     /// Create a new [`TokensCollector`].

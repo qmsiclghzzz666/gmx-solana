@@ -2796,6 +2796,37 @@ pub mod gmsol_store {
         instructions::unchecked_update_glv_market_config(ctx, max_amount, max_value)
     }
 
+    /// Toggle the given flag of a market in the given GLV.
+    ///
+    /// # Accounts
+    /// *[See the documentation for the accounts.](UpdateGlvMarketConfig)*
+    ///
+    /// # Arguments
+    /// - `flag`: The flag to toggle.
+    /// - `enable`: The value to toggle to.
+    ///
+    /// # Errors
+    /// - The [`authority`](UpdateGlvMarketConfig::authority) must be:
+    ///   - A signer
+    ///   - Have MARKET_KEEPER role in the `store`
+    /// - The [`store`](UpdateGlvMarketConfig::store) must be properly initialized.
+    /// - The [`glv`](UpdateGlvMarketConfig::glv) must be:
+    ///   - Properly initialized
+    ///   - Owned by the `store`
+    ///   - Have the market token in its list of market tokens
+    /// - The [`market_token`](UpdateGlvMarketConfig::market_token) must be:
+    ///   - Properly initialized
+    ///   - Owned by the `store`
+    /// - `flag` must be defined in [`GlvMarketFlag`](crate::states::glv::GlvMarketFlag).
+    #[access_control(internal::Authenticate::only_market_keeper(&ctx))]
+    pub fn toggle_glv_market_flag(
+        ctx: Context<UpdateGlvMarketConfig>,
+        flag: String,
+        enable: bool,
+    ) -> Result<()> {
+        instructions::unchecked_toggle_glv_market_flag(ctx, &flag, enable)
+    }
+
     /// Create GLV deposit.
     ///
     /// # Accounts
@@ -3634,6 +3665,9 @@ pub enum CoreError {
     /// Negative Market Pool Value.
     #[msg("GLV: negative market pool value")]
     GlvNegativeMarketPoolValue,
+    /// Deposit is not allowed with the given market.
+    #[msg("GLV: deposit is not allowed with the given market")]
+    GlvDepositIsNotAllowed,
     // ===========================================
     //                Other Errors
     // ===========================================

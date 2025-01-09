@@ -201,11 +201,21 @@ pub struct UpdateGlvMarketConfig<'info> {
     pub market_token: Box<Account<'info, anchor_spl::token::Mint>>,
 }
 
+impl<'info> internal::Authentication<'info> for UpdateGlvMarketConfig<'info> {
+    fn authority(&self) -> &Signer<'info> {
+        &self.authority
+    }
+
+    fn store(&self) -> &AccountLoader<'info, Store> {
+        &self.store
+    }
+}
+
 /// Update the config for the given market.
 ///
 /// # CHECK
 /// - Only MARKET_KEEPER is allowed to call this function.
-pub fn unchecked_update_glv_market_config(
+pub(crate) fn unchecked_update_glv_market_config(
     ctx: Context<UpdateGlvMarketConfig>,
     max_amount: Option<u64>,
     max_value: Option<u128>,
@@ -219,12 +229,26 @@ pub fn unchecked_update_glv_market_config(
     Ok(())
 }
 
-impl<'info> internal::Authentication<'info> for UpdateGlvMarketConfig<'info> {
-    fn authority(&self) -> &Signer<'info> {
-        &self.authority
-    }
-
-    fn store(&self) -> &AccountLoader<'info, Store> {
-        &self.store
-    }
+/// Toggle flag of the given market.
+///
+/// # CHECK
+/// - Only MARKET_KEEPER is allowed to call this function.
+pub(crate) fn unchecked_toggle_glv_market_flag(
+    ctx: Context<UpdateGlvMarketConfig>,
+    flag: &str,
+    enable: bool,
+) -> Result<()> {
+    let flag = flag
+        .parse()
+        .map_err(|_| error!(CoreError::InvalidArgument))?;
+    let mut glv = ctx.accounts.glv.load_mut()?;
+    let market_token = ctx.accounts.market_token.key();
+    let previous = glv.toggle_market_config_flag(&market_token, flag, enable)?;
+    msg!(
+        "[GLV] toggled market flag {}: {} -> {}",
+        flag,
+        previous,
+        enable
+    );
+    Ok(())
 }

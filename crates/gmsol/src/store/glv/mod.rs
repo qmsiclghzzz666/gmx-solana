@@ -5,7 +5,10 @@ use anchor_client::{
     solana_sdk::{instruction::AccountMeta, pubkey::Pubkey, signer::Signer},
 };
 use anchor_spl::associated_token::get_associated_token_address_with_program_id;
-use gmsol_store::{accounts, instruction, states::Market};
+use gmsol_store::{
+    accounts, instruction,
+    states::{glv::GlvMarketFlag, Market},
+};
 
 use crate::utils::RpcBuilder;
 
@@ -42,10 +45,20 @@ pub trait GlvOps<C> {
     fn update_glv_market_config(
         &self,
         store: &Pubkey,
-        glv: &Pubkey,
+        glv_token: &Pubkey,
         market_token: &Pubkey,
         max_amount: Option<u64>,
         max_value: Option<u128>,
+    ) -> RpcBuilder<C>;
+
+    /// GLV toggle market flag.
+    fn toggle_glv_market_flag(
+        &self,
+        store: &Pubkey,
+        glv_token: &Pubkey,
+        market_token: &Pubkey,
+        flag: GlvMarketFlag,
+        enable: bool,
     ) -> RpcBuilder<C>;
 
     /// Create a GLV deposit.
@@ -166,6 +179,28 @@ impl<C: Deref<Target = impl Signer> + Clone> GlvOps<C> for crate::Client<C> {
             .args(instruction::UpdateGlvMarketConfig {
                 max_amount,
                 max_value,
+            })
+    }
+
+    fn toggle_glv_market_flag(
+        &self,
+        store: &Pubkey,
+        glv_token: &Pubkey,
+        market_token: &Pubkey,
+        flag: GlvMarketFlag,
+        enable: bool,
+    ) -> RpcBuilder<C> {
+        let glv = self.find_glv_address(glv_token);
+        self.store_rpc()
+            .accounts(accounts::UpdateGlvMarketConfig {
+                authority: self.payer(),
+                store: *store,
+                glv,
+                market_token: *market_token,
+            })
+            .args(instruction::ToggleGlvMarketFlag {
+                flag: flag.to_string(),
+                enable,
             })
     }
 

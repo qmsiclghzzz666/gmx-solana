@@ -17,7 +17,7 @@ use crate::{
     },
     states::{
         common::action::{Action, ActionExt, ActionSigner},
-        glv::SplitAccountsForGlv,
+        glv::{GlvMarketFlag, SplitAccountsForGlv},
         Chainlink, Glv, GlvDeposit, Market, NonceBytes, Oracle, RoleKey, Seed, Store,
         StoreWalletSigner, TokenMapHeader, TokenMapLoader,
     },
@@ -138,6 +138,14 @@ impl<'info> internal::Create<'info, GlvDeposit> for CreateGlvDeposit<'info> {
     }
 
     fn validate(&self, _params: &Self::CreateParams) -> Result<()> {
+        let market_token = self.market_token.key();
+        let is_deposit_allowed = self
+            .glv
+            .load()?
+            .market_config(&market_token)
+            .ok_or_else(|| error!(CoreError::Internal))?
+            .get_flag(GlvMarketFlag::IsDepositAllowed);
+        require!(is_deposit_allowed, CoreError::GlvDepositIsNotAllowed);
         Ok(())
     }
 
